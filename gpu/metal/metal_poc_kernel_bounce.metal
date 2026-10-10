@@ -215,13 +215,14 @@ inline bool traceBounce(thread const KernelRes& R, thread PathState& P) {
     scatteredInMedium = false;
     passedThroughMediumSphere = false;
     if (!traverseBoundedMedia(R, P, B)) return false;
+    if (scatteredInMedium) fromMediumScatter = false;   // a bounded medium samples the image sky itself
     if (passedThroughMediumSphere) mediumSkippedDist += length(rayOrigin - mediumOriginBefore);
     else if (scatteredInMedium) mediumSkippedDist = 0.0;
 
     if (!scatterInGlobalMedium(R, P, B)) return false;
 
     if (scatteredInMedium) mediumSkippedDist = 0.0;  // global-fog scatter: new segment
-    if (scatteredInMedium) { CENSUS_PUSH(100u); fromMediumScatter = true; }
+    if (scatteredInMedium) { CENSUS_PUSH(100u); }
     if (!scatteredInMedium && !passedThroughMediumSphere) {
         if (result.type == intersection_type::none) {
             CENSUS_PUSH(255u);

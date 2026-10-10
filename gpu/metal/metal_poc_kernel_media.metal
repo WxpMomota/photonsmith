@@ -64,24 +64,26 @@ inline bool traverseBoundedMedia(thread const KernelRes& R, thread PathState& P,
     if (lastBounce && result.type == intersection_type::bounding_box &&
         ((result.geometry_id == 0u && sphereMaterials[result.primitive_id].materialType >= METAL_MAT_MEDIUM_HOMOGENEOUS && sphereMaterials[result.primitive_id].materialType <= METAL_MAT_MEDIUM_RGB_GRID) ||
          (result.geometry_id == 2u && cylinderMaterials[result.primitive_id].materialType == METAL_MAT_MEDIUM_HOMOGENEOUS))) return false;
+    const MediumEnvRefs medEnv{envMarginalCDF, envConditionalCDF, uniforms.envMapWidth, uniforms.envMapHeight,
+                               pbrtEnvMarginalCDF, pbrtEnvConditionalCDF, uniforms.pbrtEnvMapWidth, uniforms.pbrtEnvMapHeight, earthTexture, pbrtEnvTexture};
     if (result.type == intersection_type::bounding_box && result.geometry_id == 0u) {
         uint mediumPrimId = result.primitive_id;
         TriangleMaterial mediumMat = sphereMaterials[mediumPrimId];
         if (mediumMat.materialType == METAL_MAT_MEDIUM_HOMOGENEOUS) {
             shadeHomogeneousMediumSphere(mediumMat, mediumPrimId, result.distance,
-                spheres, shutterT, lights, pointLights, directionalLights, uniforms, pbrtAreaLightTexture, textureSampler,
+                spheres, shutterT, lights, pointLights, directionalLights, uniforms, medEnv, pbrtAreaLightTexture, textureSampler,
                 isect, accelStructure, functionTable, shadowSpherePayload,
                 rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState,
                 scatteredInMedium, passedThroughMediumSphere);
         } else if (mediumMat.materialType == METAL_MAT_MEDIUM_HETEROGENEOUS) {
             shadeCloudMediumSphere(mediumMat, mediumPrimId, result.distance, spheres, shutterT,
-                cloudMediums, lights, pointLights, directionalLights, uniforms, pbrtAreaLightTexture, textureSampler,
+                cloudMediums, lights, pointLights, directionalLights, uniforms, medEnv, pbrtAreaLightTexture, textureSampler,
                 isect, accelStructure, functionTable, shadowSpherePayload,
                 rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState,
                 scatteredInMedium, passedThroughMediumSphere, envLightSampled);
         } else if (mediumMat.materialType == METAL_MAT_MEDIUM_RGB_GRID) {
             shadeRgbGridMediumSphere(mediumMat, mediumPrimId, result.distance, spheres, shutterT,
-                rgbGridMediums, rgbGridData, lights, pointLights, directionalLights, uniforms, pbrtAreaLightTexture, textureSampler,
+                rgbGridMediums, rgbGridData, lights, pointLights, directionalLights, uniforms, medEnv, pbrtAreaLightTexture, textureSampler,
                 isect, accelStructure, functionTable, shadowSpherePayload,
                 rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState,
                 scatteredInMedium, passedThroughMediumSphere);
@@ -90,7 +92,7 @@ inline bool traverseBoundedMedia(thread const KernelRes& R, thread PathState& P,
                cylinderMaterials[result.primitive_id].materialType == METAL_MAT_MEDIUM_HOMOGENEOUS) {
         // A tube bounding a homogeneous medium (Shape "cylinder" + MediumInterface).
         shadeHomogeneousMediumCylinder(cylinderMaterials[result.primitive_id], cylinders[result.primitive_id],
-            lights, pointLights, directionalLights, uniforms, pbrtAreaLightTexture, textureSampler,
+            lights, pointLights, directionalLights, uniforms, medEnv, pbrtAreaLightTexture, textureSampler,
             isect, accelStructure, functionTable, shadowSpherePayload,
             rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState,
             scatteredInMedium, passedThroughMediumSphere);
@@ -166,6 +168,7 @@ inline bool scatterInGlobalMedium(thread const KernelRes& R, thread PathState& P
         if (t < surfaceDist) {
             if (lastBounce) return false;   // emission-only step: no scattering, the path ends
             scatteredInMedium = true;
+            fromMediumScatter = true;   // the camera fog and glass interiors do no image-sky light sampling: the continuation ray's escape takes the whole sky
             float3 scatterPoint = rayOrigin + rayDir * t;
 
             // NEE from the scatter point - same sampleAreaLight()/

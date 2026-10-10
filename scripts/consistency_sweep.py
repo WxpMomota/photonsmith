@@ -89,6 +89,7 @@ MATERIALS = {
     # participating media: a sphere of "interface" material holding the medium (sigma is per unit length, so it scales with 1/scale)
     "fog": lambda sc: 'Material "interface"\n  MediumInterface "m" ""',
     "cloud": lambda sc: 'Material "interface"\n  MediumInterface "puffcloud" ""',
+    "rgbgrid": lambda sc: 'Material "interface"\n  MediumInterface "grid" ""',
 }
 
 # materials whose light paths go through a specular chain a point light cannot reach (a point light cannot be hit by a random walk through glass, so the caustic a sphere
@@ -111,6 +112,13 @@ def medium_prelude(sc):
         c = sc.p(0, 0, 0) if sc.fill else sc.p(0.5, 1.0, 0)
         return ('AttributeBegin\n  Translate %s\n  Scale %g %g %g\n  Translate -0.5 -0.5 -0.5\n  MakeNamedMedium "puffcloud" "string type" [ "cloud" ] "rgb sigma_a" [ 0 0 0 ] "rgb sigma_s" [ %g %g %g ] '
                 '"float g" [ 0.3 ] "float density" [ 1 ] "float wispiness" [ 1 ] "float frequency" [ 4 ]\nAttributeEnd') % (sc.f(c), 2.4 * s_, 2.4 * s_, 2.4 * s_, 0.5 / s_, 0.5 / s_, 0.5 / s_)
+    if sc.material == "rgbgrid":
+        # a 2x2x2 grid of different scattering and absorption per voxel and colour, its box bigger than the interface sphere (the sphere clips it)
+        c = sc.p(0, 0, 0) if sc.fill else sc.p(0.5, 1.0, 0)
+        ss = [0.2, 0.35, 0.5, 0.6, 0.3, 0.1, 0.4, 0.4, 0.4, 0.1, 0.5, 0.9, 0.7, 0.2, 0.3, 0.3, 0.6, 0.2, 0.5, 0.5, 0.1, 0.2, 0.8, 0.4]
+        sa = [0.0, 0.05, 0.1, 0.02, 0.0, 0.0, 0.05, 0.05, 0.05, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1, 0.1, 0.0, 0.0, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0]
+        return ('AttributeBegin\n  Translate %s\n  Scale %g %g %g\n  Translate -0.5 -0.5 -0.5\n  MakeNamedMedium "grid" "string type" [ "rgbgrid" ] "integer nx" [ 2 ] "integer ny" [ 2 ] "integer nz" [ 2 ] '
+                '"float g" [ 0.3 ] "rgb sigma_a" [ %s ] "rgb sigma_s" [ %s ]\nAttributeEnd') % (sc.f(c), 2.4 * s_, 2.4 * s_, 2.4 * s_, " ".join("%g" % (v / s_) for v in sa), " ".join("%g" % (v / s_) for v in ss))
     return ""
 
 

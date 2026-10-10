@@ -76,7 +76,7 @@ struct PathState {
     float mediumSkippedDist = 0.0;
     bool pathTouchedHair = false;
     bool envLightSampled = false;   // a cloud scatter already sampled the constant environment light for the current ray (see shadeEscapedRay)
-    bool fromMediumScatter = false;   // the current ray started at a medium scatter, which does no image-sky light sampling: its escape takes the whole sky, not an MIS share (see shadeEscapedRay)
+    bool fromMediumScatter = false;   // the current ray started at a camera-fog or glass-interior scatter, which does no image-sky light sampling: its escape takes the whole sky, not an MIS share (see shadeEscapedRay)
     bool inGlass = false;
     float3 glassSigmaT3 = float3(0.0);
     float glassG = 0.0;
