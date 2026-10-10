@@ -237,11 +237,11 @@ def write_png(path, w, h, pixel):
 class Sweep:
     def __init__(self, exe, backends, workdir, verbose):
         self.exe, self.backends, self.dir, self.verbose = exe, backends, workdir, verbose
-        self.white = os.path.join(workdir, "white.png")
+        self.white = os.path.join(workdir, "white.png").replace("\\", "/")   # forward slashes: a backslash inside a pbrt string is an escape
         write_png(self.white, 64, 32, lambda x, y: (255, 255, 255))
-        self.gradient = os.path.join(workdir, "gradient.png")   # brighter to one side: a picture sky that is not the same in every direction
+        self.gradient = os.path.join(workdir, "gradient.png").replace("\\", "/")   # brighter to one side: a picture sky that is not the same in every direction
         write_png(self.gradient, 64, 64, lambda x, y: (30 + 3 * x, 40 + 2 * x + y, 255 - 3 * x))
-        self.grey = os.path.join(workdir, "grey.png")   # a uniform image for the texture pair, written with a linear encoding
+        self.grey = os.path.join(workdir, "grey.png").replace("\\", "/")   # a uniform image for the texture pair, written with a linear encoding
         write_png(self.grey, 8, 8, lambda x, y: (153, 102, 77))
         self.n = 0
         self.cache = {}
