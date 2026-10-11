@@ -14,6 +14,7 @@
 #include <QVector>
 
 #include "camera_math.h"
+#include "object_drag_math.h"
 #include "realtime_preview_session.h"
 
 class OrbitPreviewLabel;
@@ -88,6 +89,7 @@ private:
 	QTimer *m_hoverTimer = nullptr;
 	bool m_dragging = false;
 	camera_math::Vec3 m_pending;   // how far the current drag has moved the object so far (added to m_selected when the mouse is released)
+	object_drag::DragSession m_drag;   // the floor/vertical mode switches of the current drag
 };
 
 #endif  // LIVE_OBJECT_EDITOR_H

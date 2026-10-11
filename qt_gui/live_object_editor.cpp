@@ -125,6 +125,7 @@ void LiveObjectEditor::onPressed(double s, double t) {
 	m_label->clearHover();
 	m_label->setObjectGrabbed(true);
 	m_pending = camera_math::Vec3{0.0, 0.0, 0.0};
+	m_drag.reset();
 	showSelectionBox();
 	setHint(tr("Selected: %1. Drag to move it (Shift: up and down); W A S D and Up/Down move it too.").arg(pick.label));
 }
@@ -134,9 +135,9 @@ void LiveObjectEditor::onDragged(double s, double t, bool vertical) {
 	const double *b = m_selected.cameraBasis;
 	const camera_math::CameraBasis basis{{b[0], b[1], b[2]}, {b[3], b[4], b[5]}, {b[6], b[7], b[8]}, {b[9], b[10], b[11]}};
 	const camera_math::Vec3 grab{m_selected.hit[0], m_selected.hit[1], m_selected.hit[2]};
-	camera_math::Vec3 delta;
+	camera_math::Vec3 delta = m_pending;
 	// One drag never throws the object further than a few scene sizes (a ray that grazes the floor meets it very far away).
-	if (!object_drag::dragDelta(basis, grab, s, t, vertical, m_sceneSize > 0.0 ? 3.0 * m_sceneSize : 0.0, delta)) return;
+	if (!m_drag.update(basis, grab, s, t, vertical, m_sceneSize > 0.0 ? 3.0 * m_sceneSize : 0.0, delta)) return;
 	m_session->setObjectOffset(m_selected.object, m_selected.offset[0] + delta.x, m_selected.offset[1] + delta.y, m_selected.offset[2] + delta.z);
 	m_pending = delta;
 	showSelectionBox();
