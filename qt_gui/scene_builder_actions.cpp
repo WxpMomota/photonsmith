@@ -50,7 +50,7 @@ private:
 std::vector<SceneBuilderWidget::Command> SceneBuilderWidget::buildCommands() {
 	std::vector<Command> out;
 	const auto add = [&out](const QString &kind, const QString &name, std::function<void()> run) { out.push_back({QStringLiteral("%1: %2").arg(kind, name), std::move(run)}); };
-	const QString kAdd = tr("Add"), kEdit = tr("Edit"), kArrange = tr("Arrange"), kView = tr("View"), kRender = tr("Render");
+	const QString kAdd = tr("Add"), kLighting = tr("Lighting"), kEdit = tr("Edit"), kArrange = tr("Arrange"), kView = tr("View"), kRender = tr("Render");
 
 	for (scene_doc::ShapeKind k : scene_doc::allShapeKinds()) add(kAdd, shapeLabel(k), [this, k]() { addObject(k); });
 	for (scene_doc::VolumeKind k : {scene_doc::VolumeKind::Fog, scene_doc::VolumeKind::Smoke, scene_doc::VolumeKind::Cloud}) add(kAdd, volumeLabel(k), [this, k]() { addVolume(k); });
@@ -60,6 +60,8 @@ std::vector<SceneBuilderWidget::Command> SceneBuilderWidget::buildCommands() {
 	for (scene_doc::BlockyKind k : scene_doc::allBlockyKinds()) add(kAdd, blockyLabel(k), [this, k]() { addBlocky(k); });
 	add(kAdd, tr("Model library..."), [this]() { showModelLibrary(); });
 	add(kAdd, tr("Object from a photo..."), [this]() { addObjectFromPhoto(); });
+
+	for (scene_doc::lighting::Preset p : scene_doc::lighting::allPresets()) add(kLighting, lightingLabel(p), [this, p]() { applyLightingPreset(p); });
 
 	add(kEdit, tr("Duplicate"), [this]() { duplicateSelected(); });
 	add(kEdit, tr("Array..."), [this]() { showArrayDialog(); });

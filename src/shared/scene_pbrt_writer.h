@@ -244,9 +244,13 @@ inline std::string toPbrt(const Document& d) {
 				   << " ] \"rgb L\" [ " << detail::rgb(col) << " ]\n";
 				break;
 			case LightKind::Infinite:
-				if (!l.imageFile.empty())
+				if (!l.imageFile.empty()) {
+					const bool spun = l.skySpin != 0.0 && !l.physicalSky;   // (the generated sky is tied to its sun: it is not turned)
+					if (spun) os << "AttributeBegin\n  Rotate " << detail::num(l.skySpin) << " 0 1 0\n  ";
 					os << "LightSource \"infinite\" \"string filename\" [ " << detail::quoted(detail::pbrtPath(l.imageFile)) << " ] \"float scale\" [ "
 					   << detail::num(l.intensity) << " ]\n";
+					if (spun) os << "AttributeEnd\n";
+				}
 				else
 					os << "LightSource \"infinite\" \"rgb L\" [ " << detail::rgb(col) << " ]\n";
 				break;

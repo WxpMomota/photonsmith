@@ -749,8 +749,11 @@ void SceneBuilderWidget::inspectLight(QFormLayout *f, int i) {
 			hint->setWordWrap(true);
 			f->addRow(hint);
 		} else {
-			addFile(f, tr("Sky image"), [lt]() { return lt() ? &lt()->imageFile : nullptr; }, tr("Images (*.exr *.hdr *.png *.jpg *.jpeg)"));
-			auto *hint = new QLabel(tr("Leave the image empty for a plain colour sky. An image is an equirectangular (lat-long) panorama."));
+			addFile(f, tr("Sky image"), [lt]() { return lt() ? &lt()->imageFile : nullptr; }, tr("Images (*.exr *.hdr *.png *.jpg *.jpeg)"), false,
+			        [](const QString &) {});   // (a choice shows the rotation row)
+			if (!l.imageFile.empty()) addNum(f, tr("Rotate sky"), [lt]() { return lt() ? &lt()->skySpin : nullptr; }, -360, 360, 5, 0, QString::fromUtf8(" \xC2\xB0"));
+			auto *hint = new QLabel(tr("Leave the image empty for a plain colour sky. An image is an equirectangular (lat-long) panorama; Rotate sky turns it about the vertical axis "
+			                           "(counter-clockwise seen from above), to put the bright part of the picture where you want the light to come from."));
 			hint->setWordWrap(true);
 			f->addRow(hint);
 		}

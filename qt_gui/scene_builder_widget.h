@@ -64,6 +64,8 @@ public:
 	bool saveFile(const QString &path);
 	void selectObject(int index);
 	void selectLight(int index);   // (the self-test picks the sky)
+	void setSkyImageForTest(int light, const QString &path);   // a light's sky picture chosen as the Browse button would leave it, and the properties rebuilt
+	QString pbrtTextForTest() const { return QString::fromStdString(scene_doc::toPbrt(m_doc)); }
 	// Several items at once (scene_builder_multi.cpp): Ctrl- or Shift-click and a box in the views, Ctrl/Shift-click in the list, and groups. Everything acts on all of them.
 	void pickObjects(const std::vector<int> &objects, const std::vector<int> &lights = {});   // replaces the selection; the first one given is the main one
 	scene_doc::ItemSet pickedItems() const;   // the main item and the others picked along with it (never the camera)
@@ -155,6 +157,7 @@ public:
 	void addParts(std::vector<scene_doc::Object> parts, const QString &groupName = QString());
 	void addVolume(scene_doc::VolumeKind kind);   // fog, smoke or a cloud
 	void addLight(scene_doc::LightKind kind);
+	void applyLightingPreset(scene_doc::lighting::Preset preset);   // the lights become a ready-made lighting (one undo step)
 	void addObjectFromPhoto();  // scene_builder_photo.cpp: needs the optional photo helper
 	void showModelLibrary();    // scene_builder_models.cpp: the dialog behind Add > Model library...
 	// Adds one library model (the stem of models/<stem>.obj) at a handy size, standing on the floor under the drop point, as one undo step. False when it is not found.

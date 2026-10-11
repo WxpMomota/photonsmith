@@ -151,6 +151,7 @@ struct Light {
 	double coneDelta = 5.0;            // Spot, degrees of soft edge
 	std::string imageFile;             // Infinite: an equirectangular image (empty: a constant colour)
 	bool physicalSky = false;          // Infinite: imageFile is the generated sky of `sky` (scene_sky.h)
+	double skySpin = 0.0;              // Infinite with an image: degrees the picture is turned about the vertical axis (counter-clockwise seen from above)
 	SkyParams sky;
 	bool hidden = false;               // as Object::hidden
 	bool locked = false;               // as Object::locked

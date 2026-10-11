@@ -20,6 +20,8 @@
 
 #include <QApplication>
 #include <QCheckBox>
+#include <QDir>
+#include <QFile>
 #include <QDialog>
 #include <QLineEdit>
 #include <QKeyEvent>
@@ -409,6 +411,46 @@ void MainWindow::selfTestShapes(SceneBuilderWidget *sb, const std::function<void
 			}
 		}
 		while (sb->document().lights.size() > lightsBefore && sb->undo()) {}   // back to the starter's lights
+		sb->selectObject(1);
+	}
+	// Ready-made lighting (scene_lighting.h): the Lighting actions (found by the search box) replace the lights with a rig; one undo brings the old lights back. An image sky has
+	// a Rotate sky row that turns the picture (it is written as a Rotate before the light).
+	{
+		const size_t lightsBefore = sb->document().lights.size();
+		check(sb->runActionForTest("lighting studio") && sb->document().lights.size() == 4 && sb->document().lights[0].name == "Key light",
+		      "the Studio lighting replaces the lights with a key, a fill, a rim and a backdrop");
+		check(sb->selectionForTest().index == 0, "and picks the first of them");
+		check(sb->undo() && sb->document().lights.size() == lightsBefore, "one undo brings the old lights back");
+		check(sb->runActionForTest("lighting overcast") && sb->document().lights.size() == 1 && sb->document().lights[0].kind == scene_doc::LightKind::Infinite &&
+		          !sb->document().lights[0].physicalSky,
+		      "the Overcast lighting is a plain sky");
+		sb->undo();
+		check(sb->runActionForTest("lighting sunny") && sb->document().lights[0].physicalSky && sb->document().lights.size() == 2 &&
+		          QFileInfo::exists(QString::fromStdString(sb->document().lights[0].imageFile)),
+		      "the Sunny lighting is Sun & sky: the sky picture is made and the Sun light follows it");
+		check(sb->undo() && sb->document().lights.size() == lightsBefore && sb->document().lights[0].sky.sunElevation == scene_doc::SkyParams().sunElevation, "one undo brings the starter lights back, Sun included");
+		// the sky picture of the starter scene's own image: any picture file will do for the row
+		const QString picture = QDir::temp().filePath("rt_lighting_selftest.hdr");
+		{
+			QFile f(picture);
+			if (f.open(QIODevice::WriteOnly)) f.write(QByteArray("#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 1 +X 2\n") + QByteArray(8, 0x40));
+		}
+		sb->selectLight(0);
+		sb->setSkyImageForTest(0, picture);
+		QApplication::processEvents();
+		QDoubleSpinBox *spin = nullptr;
+		for (QDoubleSpinBox *s : sb->findChildren<QDoubleSpinBox *>())
+			if (s->minimum() == -360.0 && s->maximum() == 360.0) spin = s;
+		check(spin != nullptr, "an image sky has a Rotate sky row");
+		if (spin) {
+			spin->setValue(90.0);
+			QApplication::processEvents();
+			check(sb->document().lights[0].skySpin == 90.0 && sb->pbrtTextForTest().contains("Rotate 90 0 1 0"), "turning it is kept in the document and written as a rotation");
+			check(sb->undo() && sb->document().lights[0].skySpin == 0.0, "one undo turns it back");
+		}
+		while (sb->document().lights[0].skySpin != 0.0 && sb->undo()) {}
+		sb->undo();   // (the picture)
+		QFile::remove(picture);
 		sb->selectObject(1);
 	}
 	// The Preset list in a material's properties: choosing "Gold" in the real combo box makes the selected object a gold conductor, as one undo step.

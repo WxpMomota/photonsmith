@@ -158,6 +158,29 @@ inline QString lightLabel(LightKind k) {
 	}
 	return QString();
 }
+// The lighting setups (scene_lighting.h), named and described in the user's language.
+inline QString lightingLabel(scene_doc::lighting::Preset p) {
+	switch (p) {
+		case scene_doc::lighting::Preset::Studio: return QObject::tr("Studio (three lights)");
+		case scene_doc::lighting::Preset::Overcast: return QObject::tr("Overcast day");
+		case scene_doc::lighting::Preset::Sunny: return QObject::tr("Sunny day");
+		case scene_doc::lighting::Preset::GoldenHour: return QObject::tr("Golden hour");
+		case scene_doc::lighting::Preset::Moonlit: return QObject::tr("Moonlit night");
+		case scene_doc::lighting::Preset::LightBox: return QObject::tr("Light box");
+	}
+	return QString();
+}
+inline QString lightingNote(scene_doc::lighting::Preset p) {
+	switch (p) {
+		case scene_doc::lighting::Preset::Studio: return QObject::tr("A key light from the camera's left, a softer fill from its right and a rim light from behind, on a dark backdrop.");
+		case scene_doc::lighting::Preset::Overcast: return QObject::tr("Even, soft light from a grey-white sky with no sun and no hard shadows.");
+		case scene_doc::lighting::Preset::Sunny: return QObject::tr("A clear sky with the sun high behind the camera's right shoulder.");
+		case scene_doc::lighting::Preset::GoldenHour: return QObject::tr("A clear sky with the sun low and to the side, long shadows and warm light.");
+		case scene_doc::lighting::Preset::Moonlit: return QObject::tr("A dark blue sky and a dim cool moon from above and behind.");
+		case scene_doc::lighting::Preset::LightBox: return QObject::tr("A bright white surround with a little light from above, as for a product shot.");
+	}
+	return QString();
+}
 // "Sphere", then "Sphere 2", "Sphere 3", ...: the first of those not already in `taken`.
 inline QString uniqueName(const QString &base, const QStringList &taken) {
 	QString name = base;

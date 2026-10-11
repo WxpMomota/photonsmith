@@ -219,6 +219,13 @@ void SceneBuilderWidget::buildUi() {
 	addMenu->addSection(tr("Lights"));
 	for (LightKind k : {LightKind::Point, LightKind::Spot, LightKind::Distant, LightKind::Infinite})
 		addMenu->addAction(lightLabel(k), this, [this, k]() { addLight(k); });
+	// Ready-made lighting (scene_lighting.h): replaces the lights with a rig round what the camera looks at.
+	addMenu->addSection(tr("Lighting (replaces the lights)"));
+	for (scene_doc::lighting::Preset p : scene_doc::lighting::allPresets()) {
+		QAction *a = addMenu->addAction(lightingLabel(p), this, [this, p]() { applyLightingPreset(p); });
+		a->setStatusTip(lightingNote(p));
+		a->setToolTip(lightingNote(p));
+	}
 	addB->setMenu(addMenu);
 	m_duplicateButton = new QPushButton(tr("Duplicate"), left);
 	m_duplicateButton->setToolTip(tr("Make a copy of the selected item beside it (%1)").arg(QKeySequence(Qt::CTRL | Qt::Key_D).toString(QKeySequence::NativeText)));
@@ -664,6 +671,15 @@ void SceneBuilderWidget::selectObject(int index) {
 	setSelection({SelKind::Object, index});
 }
 
+void SceneBuilderWidget::setSkyImageForTest(int light, const QString &path) {
+	if (light < 0 || light >= static_cast<int>(m_doc.lights.size())) return;
+	edit(QString(), [&]() {
+		m_doc.lights[static_cast<std::size_t>(light)].physicalSky = false;   // (a picture of its own, not the generated sky)
+		m_doc.lights[static_cast<std::size_t>(light)].imageFile = path.toStdString();
+	});
+	rebuildInspector();
+}
+
 void SceneBuilderWidget::selectLight(int index) {
 	setSelection({SelKind::Light, index});
 }
@@ -740,6 +756,17 @@ void SceneBuilderWidget::addVolume(scene_doc::VolumeKind kind) {
 	});
 	rebuildList();
 	setSelection(m_sel);
+}
+
+// The lights become one of the ready-made lightings, placed round what the camera looks at (an object that gives off light stays). One undo step brings the old lights back.
+void SceneBuilderWidget::applyLightingPreset(scene_doc::lighting::Preset preset) {
+	edit(QString(), [&]() {
+		scene_doc::lighting::apply(m_doc, preset);
+		m_sel = {SelKind::Light, 0};
+	});
+	rebuildList();
+	setSelection(m_sel);
+	emit statusMessage(tr("Lighting: %1. %2").arg(lightingLabel(preset), lightingNote(preset)));
 }
 
 void SceneBuilderWidget::addLight(LightKind kind) {

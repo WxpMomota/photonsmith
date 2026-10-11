@@ -134,7 +134,7 @@ Delete or Backspace removes what is picked (from the list or a view; in a text b
 
 ## Search for an action
 
-**F3** (or **Ctrl+K**, Command+K on a Mac, where F3 belongs to the system; also **Arrange > Search actions...**) opens a box where you type what you want to do and run it without finding its button: "wire", "drop", "add fog", "top view", "lock". Every word you type has to be somewhere in the action's name, in any order; names that start with your first word come first. Up and Down move the highlight, Enter (or a double-click) runs it, Escape closes. It lists about ninety actions, each named with its kind: **Add** (every shape, volume, light, prop and blocky object, the model library and a photo), **Edit** (duplicate, array, delete, select all, group, ungroup, undo, redo), **Arrange** (rename, drop to floor, frame selected, hide, show, lock, unlock), **View** (frame all, the six standard views, wireframe, orthographic, through camera, camera from view, snap to objects) and **Render** (the turntable and flythrough videos). The matching is `src/shared/action_search.h`.
+**F3** (or **Ctrl+K**, Command+K on a Mac, where F3 belongs to the system; also **Arrange > Search actions...**) opens a box where you type what you want to do and run it without finding its button: "wire", "drop", "add fog", "top view", "lock". Every word you type has to be somewhere in the action's name, in any order; names that start with your first word come first. Up and Down move the highlight, Enter (or a double-click) runs it, Escape closes. It lists about a hundred actions, each named with its kind: **Lighting** (the six ready-made lightings below), **Add** (every shape, volume, light, prop and blocky object, the model library and a photo), **Edit** (duplicate, array, delete, select all, group, ungroup, undo, redo), **Arrange** (rename, drop to floor, frame selected, hide, show, lock, unlock), **View** (frame all, the six standard views, wireframe, orthographic, through camera, camera from view, snap to objects) and **Render** (the turntable and flythrough videos). The matching is `src/shared/action_search.h`.
 
 ## The 3D view: standard views, orthographic, wireframe
 
@@ -268,6 +268,21 @@ A **Picture** (matte and glossy paint) replaces the colour with an image on any 
 
 A scene with no light renders black; the tab says so under the properties.
 
+**Lighting setups.** The **Add** menu ends with a **Lighting (replaces the lights)** list (and the search box has them as "Lighting: ..."): one click replaces the scene's lights with a ready-made lighting placed round what the camera looks at, at the camera's distance, so it suits a scene of any size and from any side; one undo brings the old lights back. Objects that give off light stay.
+
+| Setup | What it makes |
+|---|---|
+| Studio (three lights) | a warm key spotlight from the camera's left (irradiance 2.2 at the subject), a cooler fill from the right (0.7), a rim light from behind (1.4) and a very dim sky as a dark backdrop |
+| Overcast day | a grey-white sky of brightness 0.8 and no sun: soft, even light, no hard shadows |
+| Sunny day | Sun & sky, the sun at 55 degrees above the horizon behind the camera's right shoulder |
+| Golden hour | Sun & sky, the sun 8 degrees above the horizon, low and from the side |
+| Moonlit night | a very dim dark-blue sky and a cool Moon (distant light) from above and behind |
+| Light box | a bright white surround (brightness 1) and a soft light from above, as for a product shot |
+
+The numbers are in the same units as the starter scene (a sun gives an irradiance of 3, a spotlight of strength I lights a surface d away with I / d squared, a sky of brightness L lights a level surface with pi times L), so a lighting looks right for any camera distance. They are a starting point: pick any light afterwards and change it. The code is `src/shared/scene_lighting.h`.
+
+**Rotate sky.** A sky light with an image of its own (not Sun & sky) has a **Rotate sky** row: the picture is turned about the vertical axis, counter-clockwise seen from above, so the bright part of an HDRI can be put where you want the light to come from. It is written as a `Rotate` before the light in the `.pbrt` file (the renderers apply a light's transform to it), and an unturned sky leaves the file as it was. The generated Sun & sky is tied to its sun and is not turned: change the sun's direction instead.
+
 ## Rendering
 
 **Preview** renders a small picture (*Draft* 480 pixels wide and 16 samples per pixel, *Good* 720 and 64, *Best* 960 and 256) and shows it as large as its pane allows with the same renderer the Render tab uses, on the scene saved to a temporary file. Tick **Use the GPU** to use OptiX (Windows) or Metal (macOS); it needs a supported card and is much faster for large pictures. The button reads *Cancel* while a render runs.
@@ -323,6 +338,8 @@ The scene model (`scene_model.h`), the JSON (`scene_json.h`), the checks (`scene
 The saved camera views (`scene_camera_views.h`) and the maths of looking through the camera (`orbitLookingFrom`, `pictureFrame`, `fovForFrame` in `scene_view_math.h`: the view's eye lands on the camera's, and the camera's top edge on the frame's) have unit tests, and the self-test looks through the camera, sets the camera from the view, and saves, uses, updates, renames and deletes a view.
 
 The selection operations (`scene_selection.h`: move, copy, delete, group, copy a look) have unit tests in `tests/unit/scene_selection_tests.cpp`, and the self-test picks by list, Ctrl-click and box, drags two objects with real mouse events, copies, groups, deletes and undoes each.
+
+The lighting setups (`scene_lighting.h`) have unit tests: each is a valid lighting, the studio rig aims at what the camera looks at at the camera's distance with the stated irradiance and puts the key on the camera's left whichever way it looks, the sky setups put the sun on the right side of the camera, and two CPU renders check them: an overcast sky lights a level plate with exactly albedo times the sky's brightness, and an image sky bright towards +X lights the right side of a ball and, turned half way round, the left (`tests/unit/scene_lighting_tests.cpp`). The self-test runs the Lighting actions from the search box, undoes them, and turns an image sky with the real Rotate sky row.
 
 What a change means for the rendered viewport (a moved eye is a camera change, a new size or field of view a restart, which edits change the picture) is `src/shared/scene_viewport.h`, and `translationOnly` (which change is only a move, and each object's offset), with unit tests in `tests/unit/scene_viewport_tests.cpp`; on a machine with the GPU renderer the self-test switches the viewport on, checks it produces a refining, lit picture of the right shape with the red box in it, recolours the box and waits for the picture to follow, drags it along X and checks the picture follows without the copy being written again, orbits, and switches it off.
 
