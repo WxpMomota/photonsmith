@@ -287,5 +287,17 @@ Run: `python scripts\consistency_sweep.py --exe <full path to>\ray_tracer.exe --
 
 One pair is borderline on the wavefront backend and only there: `camera`, "spherical camera, scene mirrored" (4.7% over 8 seeds against a 5% tolerance, 8% on seed 3). The picture is the same: with the lamp removed plain and mirrored agree to 4 digits on CPU, recursive and wavefront, so what differs is only the few pixels that show the 318-radiance lamp directly, which the wavefront sampler places differently. Not treated as a bug; if it flickers, give that pair a lamp-free scene.
 
-Not done: the CPU-versus-OptiX baselines for the subsurface scenes (B16, layered-materials, the SSS dragons) were not re-measured; the unit tests that compare them are in the list of things to look at if one fails. Metal's own `--wavefront` equivalent does not exist.
+That pair ("spherical camera, scene mirrored") was borderline on the wavefront backend only; the Mac session made it lamp-free (the few pixels that show the 318-radiance lamp directly were all that differed) and it now agrees to four digits on CPU, recursive and wavefront.
+
+Subsurface baselines, measured 2026-10-11 (EXR means, 160 x 160, 128 samples, depth 8, seed 3; `rec` is the recursive and `wf` the wavefront OptiX backend):
+
+| scene | CPU | rec | wf | rec / CPU | wf / CPU |
+|---|---|---|---|---|---|
+| subsurface-ball | 0.1339 | 0.1341 | 0.1337 | 1.002 | 0.999 |
+| subsurface-slab (B13) | 0.1141 | 0.1137 | 0.1130 | 0.997 | 0.991 |
+| layered-materials | 0.1649 | 0.1650 | 0.1633 | 1.001 | 0.990 |
+| cornell-wax-slab | 0.1628 | 0.1627 | 0.1602 | 0.999 | 0.984 |
+| sssdragon/dragon_10 | 0.0554 | 0.0553 | 0.0553 | 0.998 | 0.999 |
+
+All within 1.6% of the CPU, so the old "about 25% brighter" note is only the CPU's and Metal's own move for a ball filling the frame, not a gap to expect on OptiX: the unit suite's CPU-versus-OptiX subsurface comparisons pass with the standard tolerances (the B13 exception stays retired). `scripts/run_optix_sweeps.ps1` now runs the sweep on both OptiX backends in one command. Metal's own `--wavefront` equivalent does not exist.
 
