@@ -950,6 +950,58 @@ inline bool flattenCurveShape(const pbrt_scene::Scene &scene, FlatScene &out, co
 	return false;   // not handled here: fall through to the generic 'not supported' warning
 }
 
+// A disk, cylinder, cone or paraboloid inside an ObjectBegin/ObjectEnd definition: the definition has no list for these (an instance group holds triangles and
+// spheres), so the shape becomes triangles in the group, in object space like the group's other geometry. Only a plain surface: an emissive shape or one bounding a
+// medium needs more than triangles and stays unsupported. False when `shape` is not one of the four, or its own list exists (a top-level shape: the backend draws it).
+inline bool flattenQuadricAsTriangles(const pbrt_scene::ShapeDecl &shape, const flatten_detail::ShapeWork &w) {
+	if (!w.triangles || shape.areaLightIndex >= 0 || shape.insideMedium >= 0) return false;
+	const pbrt_scene::Matrix4 &xform = w.xform;
+	if (shape.type == "disk" && !w.disks) {
+		Disk d;
+		d.height = shape.params.getFloat("height", 0.0);
+		d.radius = shape.params.getFloat("radius", 1.0);
+		d.innerRadius = shape.params.getFloat("innerradius", 0.0);
+		d.phiMaxDeg = shape.params.getFloat("phimax", 360.0);
+		fromMatrix4(xform, d.xform);
+		d.material = shape.materialIndex;
+		quadric_tessellate::tessellateDisk(d, *w.triangles);
+		return true;
+	}
+	if (shape.type == "cylinder" && !w.cylinders) {
+		Cylinder c;
+		c.radius = shape.params.getFloat("radius", 1.0);
+		c.zMin = shape.params.getFloat("zmin", -1.0);
+		c.zMax = shape.params.getFloat("zmax", 1.0);
+		c.phiMaxDeg = shape.params.getFloat("phimax", 360.0);
+		fromMatrix4(xform, c.xform);
+		c.material = shape.materialIndex;
+		quadric_tessellate::tessellateCylinder(c, *w.triangles);
+		return true;
+	}
+	if (shape.type == "cone" && !w.cones) {
+		Cone cn;
+		cn.radius = shape.params.getFloat("radius", 1.0);
+		cn.height = shape.params.getFloat("height", 1.0);
+		cn.phiMaxDeg = shape.params.getFloat("phimax", 360.0);
+		fromMatrix4(xform, cn.xform);
+		cn.material = shape.materialIndex;
+		quadric_tessellate::tessellateCone(cn, *w.triangles);
+		return true;
+	}
+	if (shape.type == "paraboloid" && !w.paraboloids) {
+		Paraboloid pb;
+		pb.radius = shape.params.getFloat("radius", 1.0);
+		pb.zMin = shape.params.getFloat("zmin", 0.0);
+		pb.zMax = shape.params.getFloat("zmax", 1.0);
+		pb.phiMaxDeg = shape.params.getFloat("phimax", 360.0);
+		fromMatrix4(xform, pb.xform);
+		pb.material = shape.materialIndex;
+		quadric_tessellate::tessellateParaboloid(pb, *w.triangles);
+		return true;
+	}
+	return false;
+}
+
 // Every Shape (and object instance) -> triangles, spheres, patches, curves, groups and instances.
 inline void flattenShapes(const pbrt_scene::Scene &scene, FlatScene &out, const MeshResolver &meshes) {
 	const auto warn = [&out](const std::string &msg) {
@@ -1083,6 +1135,8 @@ inline void flattenShapes(const pbrt_scene::Scene &scene, FlatScene &out, const 
 		if (shape.type == "sphere") {
 			if (flattenSphereShape(scene, out, meshes, w)) continue;
 		}
+
+		if (flattenQuadricAsTriangles(shape, w)) continue;   // inside an object definition
 
 		if (shape.type == "disk" && w.disks) {
 			if (flattenDiskShape(scene, out, meshes, w)) continue;
