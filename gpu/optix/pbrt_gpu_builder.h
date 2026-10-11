@@ -1271,6 +1271,12 @@ inline void addInstances(BuildCtx &c) {
 	auto &out = c.out;
 	auto &stats = c.stats;
 	const auto &materialIndex = c.materialIndex;
+	// A shape's material slot: its Medium material when it has a MediumInterface (the top-level sphere loop's rule: an opaque surface keeps its surface instead), else
+	// its surface material. Without this an instanced fog ball dropped its medium and rendered as nothing at all (consistency sweep `shapeform`, "ball written as instance, fog").
+	const auto slotOf = [&c, &scene, &materialIndex](const pbrt_flatten::Sphere &s) {
+		const bool hasMedium = s.medium >= 0 && static_cast<std::size_t>(s.medium) < scene.media.size() && !c.isOpaque(s.material);
+		return hasMedium ? c.mediumMaterialIndexFn(s.medium, s.material) : materialIndex(s.material, s.areaLight);
+	};
 	// ---- instanced geometry ----------------------------------------------
 	// Object space, kept apart from the world-space list above. Emissive
 	// shapes are not here: flatten() already baked those per placement into
@@ -1380,7 +1386,7 @@ inline void addInstances(BuildCtx &c) {
 			// emitGeometry lambda already handles this case correctly.
 			sd.center1 = f3(s.center1);
 			sd.radius = static_cast<float>(s.radius);
-			sd.materialIdx = materialIndex(s.material, s.areaLight);
+			sd.materialIdx = slotOf(s);
 			out.instanceSpheres.push_back(sd);
 		}
 		gpuGroup.sphereCount =
@@ -1832,4 +1838,4 @@ inline BuildStats build(const pbrt_flatten::FlatScene &scene, SceneData &out) {
 	return c.stats;
 }
 
-} // namespace pbrt_gpu
+} // namespace pbrt_gpu

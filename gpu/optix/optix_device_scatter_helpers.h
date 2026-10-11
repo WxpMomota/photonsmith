@@ -64,6 +64,19 @@ __device__ __forceinline__ void shade_normalized_fresnel(
 		}
 	}
 
+	// Point, spot and distant lights (delta lights: no MIS, the BSDF cannot find them). Without this a subsurface exit point, which is shaded here, was lit by area lights
+	// and the sky only, so a scene lit by a point light read 12% dark against the same scene lit by a small emissive sphere.
+	for (unsigned int pi = 0; pi < params.numPunctualLights; ++pi) {
+		float3 wi_p, Li_p; float t_max_p;
+		if (!eval_punctual_light(params.punctualLights[pi], hit_point, wi_p, Li_p, t_max_p)) continue;
+		const float cos_p = dot(wi_p, normal);
+		if (cos_p <= 0.0f) continue;
+		if (trace_shadow_ray_stochastic(hit_point, wi_p, t_max_p, seed, nee_shadow_rgb)) {
+			const float brdf_val_p = (1.0f - FrDielectric(cos_p, nf_eta)) / (nf_c * 3.14159265358979323846f);
+			emission = emission + brdf_val_p * Li_p * cos_p * (camera_medium_shadow_trans(t_max_p) * nee_shadow_rgb);
+		}
+	}
+
 	{
 		const float3& skyColor = params.camera.backgroundColor;
 		if (skyColor.x > 0.0f || skyColor.y > 0.0f || skyColor.z > 0.0f) {

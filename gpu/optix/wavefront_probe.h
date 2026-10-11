@@ -275,6 +275,8 @@ __device__ __forceinline__ float wf_gpu_bssrdf_sample_sr(const GpuBssrdfTable& t
 // same documented simplification as optix_probe_hit.h's own comment.
 // ---------------------------------------------------------------------------
 
+// normal is the shape's OUTWARD normal, not the one facing the probe ray: a probe that finds the far side of a closed shape hits it from inside, and the exit BSDF
+// (NormalizedFresnel, in its normal's hemisphere) would send the light into the object (optix_probe_hit.h has the same rule; pbrt's SubsurfaceInteraction carries the shape's normal).
 struct WfProbePayload {
 	bool   found;
 	float3 position;
@@ -340,12 +342,10 @@ extern "C" __global__ void __closesthit__wf_probe_sphere() {
 	} else if (instBase >= 0) {
 		outward_normal = normalize(optixTransformNormalFromObjectToWorldSpace(outward_normal));
 	}
-	const bool front_face = dot(ray_dir, outward_normal) < 0.0f;
-	const float3 normal = front_face ? outward_normal : -outward_normal;
 
 	payload->found       = true;
 	payload->position    = hit_point;
-	payload->normal      = normal;
+	payload->normal      = outward_normal;
 	payload->materialIdx = sphere.materialIdx;
 }
 
@@ -360,12 +360,10 @@ extern "C" __global__ void __closesthit__wf_probe_quad() {
 	const float  t        = optixGetRayTmax();
 	const float3 hit_point = ray_orig + t * ray_dir;
 
-	const bool front_face = dot(ray_dir, quad.normal) < 0.0f;
-	const float3 normal = front_face ? quad.normal : -quad.normal;
 
 	payload->found       = true;
 	payload->position    = hit_point;
-	payload->normal      = normal;
+	payload->normal      = quad.normal;
 	payload->materialIdx = quad.materialIdx;
 }
 
@@ -388,12 +386,10 @@ extern "C" __global__ void __closesthit__wf_probe_bilinear_patch() {
 	const float3 dpdu = pu1 - pu0;
 	const float3 dpdv = lerp(patch.p01, patch.p11, u) - lerp(patch.p00, patch.p10, u);
 	const float3 geom_normal = normalize(cross(dpdu, dpdv));
-	const bool front_face = dot(ray_dir, geom_normal) < 0.0f;
-	const float3 normal = front_face ? geom_normal : -geom_normal;
 
 	payload->found       = true;
 	payload->position    = hit_point;
-	payload->normal      = normal;
+	payload->normal      = geom_normal;
 	payload->materialIdx = patch.materialIdx;
 }
 
@@ -412,12 +408,10 @@ extern "C" __global__ void __closesthit__wf_probe_triangle() {
 	float3 geom_normal = normalize(cross(tri.p1 - tri.p0, tri.p2 - tri.p0));
 	if (instBase >= 0)
 		geom_normal = normalize(optixTransformNormalFromObjectToWorldSpace(geom_normal));
-	const bool front_face = dot(ray_dir, geom_normal) < 0.0f;
-	const float3 normal = front_face ? geom_normal : -geom_normal;
 
 	payload->found       = true;
 	payload->position    = hit_point;
-	payload->normal      = normal;
+	payload->normal      = geom_normal;
 	payload->materialIdx = tri.materialIdx;
 }
 
@@ -439,12 +433,10 @@ extern "C" __global__ void __closesthit__wf_probe_disk() {
 
 	const float3 obj_normal = make_float3(0.0f, 0.0f, 1.0f);
 	float3 outward_normal = normalize(wf_dc_apply_normal_from_w2o(disk.w2o, obj_normal));
-	const bool front_face = dot(ray_dir, outward_normal) < 0.0f;
-	const float3 normal = front_face ? outward_normal : -outward_normal;
 
 	payload->found       = true;
 	payload->position    = hit_point;
-	payload->normal      = normal;
+	payload->normal      = outward_normal;
 	payload->materialIdx = disk.materialIdx;
 }
 
@@ -465,12 +457,10 @@ extern "C" __global__ void __closesthit__wf_probe_cylinder() {
 		? make_float3(obj_hit.x / obj_hit_len, obj_hit.y / obj_hit_len, 0.0f)
 		: make_float3(1.0f, 0.0f, 0.0f);
 	float3 outward_normal = normalize(wf_dc_apply_normal_from_w2o(cyl.w2o, obj_normal));
-	const bool front_face = dot(ray_dir, outward_normal) < 0.0f;
-	const float3 normal = front_face ? outward_normal : -outward_normal;
 
 	payload->found       = true;
 	payload->position    = hit_point;
-	payload->normal      = normal;
+	payload->normal      = outward_normal;
 	payload->materialIdx = cyl.materialIdx;
 }
 

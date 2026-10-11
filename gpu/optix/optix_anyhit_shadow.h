@@ -12,8 +12,12 @@
 // untouched ("hasn't been ported to this shadow-ray path yet"), so a cloud or
 // nebula cast no shadow on anything behind it (E4/E5: recursive 20-28% brighter
 // than wavefront in the blocks behind the medium).
+//
+// clipNear/clipFar: the part of the shadow ray that is inside the medium's INTERFACE SHAPE (the sphere or box the scene gave it). A pbrt medium fills that shape, not its own
+// grid box, which can stick out of it: tracking through the whole box dimmed a light that reaches the shape's surface from outside the shape, so a floor under a cloud or
+// grid whose box is bigger than its sphere read 6% dark against the CPU (consistency sweep, `backends` pair for `rgbgrid`).
 __device__ __forceinline__ void shadow_ratio_track_heterogeneous(
-	const MaterialData& mat, ShadowRayState* st
+	const MaterialData& mat, ShadowRayState* st, float clipNear, float clipFar
 ) {
 	const float3 ray_orig = optixGetWorldRayOrigin();
 	const float3 unit_dir = normalize(optixGetWorldRayDirection());
@@ -31,6 +35,9 @@ __device__ __forceinline__ void shadow_ratio_track_heterogeneous(
 		float segMin, segMax, sigma_maj;
 		if (maj_it.next(segMin, segMax, sigma_maj) && sigma_maj > 0.0f) {
 			if (segMin < 0.0f) segMin = 0.0f;
+			segMin = fmaxf(segMin, clipNear);
+			segMax = fminf(segMax, clipFar);
+			if (segMin >= segMax) return;
 			float t = segMin;
 			for (int i = 0; i < 128 && st->transmittance > 0.0f; ++i) {
 				float dt = -logf(fmaxf(1e-8f, 1.0f - random_float(st->seed))) / sigma_maj;
@@ -100,6 +107,9 @@ __device__ __forceinline__ void shadow_ratio_track_heterogeneous(
 	}
 	if (!has_seg || sigma_maj <= 0.0f) return;
 	if (segMin < 0.0f) segMin = 0.0f;
+	segMin = fmaxf(segMin, clipNear);
+	segMax = fminf(segMax, clipFar);
+	if (segMin >= segMax) return;
 	float tt = segMin;
 	const int voxelCount = nx * ny * nz;
 	if (isRgb) {
@@ -139,6 +149,35 @@ __device__ __forceinline__ void shadow_ratio_track_heterogeneous(
 			st->transmittance *= fmaxf(0.0f, 1.0f - (d * sigma_scale) / sigma_maj);
 		}
 	}
+}
+
+// Where the shadow ray enters and leaves a Medium sphere or box (t measured along the ray, entry clamped to 0). The sphere's centre and radius (and a box's corners) are in
+// the shape's OWN space, which for an instanced shape is not the world's: the ray is brought into it first (the same t, as the transform is linear). Reading them against the
+// world ray, as this did, put an instanced fog ball's chord in the wrong place, so a shadow through it was too short or too long (a ball written as an ObjectInstance read
+// 5.8% dark against the same ball written plainly, consistency sweep `shapeform`).
+__device__ __forceinline__ void shadow_medium_sphere_chord(const SphereData& sphere, int instBase, float& t_near, float& t_far) {
+	float3 o = optixGetWorldRayOrigin(), d = optixGetWorldRayDirection();
+	if (instBase >= 0) {
+		o = optixTransformPointFromWorldToObjectSpace(o);
+		d = optixTransformVectorFromWorldToObjectSpace(d);
+	}
+	if (sphere.shapeKind == GpuMediumShapeKind::Box) {
+		float bn, bf;
+		box_slab_intersect(o, d, sphere.boxMin, sphere.boxMax, bn, bf);
+		t_near = fmaxf(0.0f, bn);
+		t_far = bf;
+		return;
+	}
+	// Object-space centre and radius from the intersection program's attributes (time-interpolated for a moving sphere): see __closesthit__sphere.
+	const float3 c = make_float3(__int_as_float(optixGetAttribute_0()), __int_as_float(optixGetAttribute_1()), __int_as_float(optixGetAttribute_2()));
+	const float r = __int_as_float(optixGetAttribute_3());
+	const float3 oc = o - c;
+	const float a = dot(d, d);
+	const float half_b = dot(oc, d);
+	const float disc = fmaxf(0.0f, half_b * half_b - a * (dot(oc, oc) - r * r));
+	const float sq = sqrtf(disc);
+	t_near = fmaxf(0.0f, (-half_b - sq) / a);
+	t_far = (-half_b + sq) / a;
 }
 
 extern "C" __global__ void __anyhit__shadow_sphere() {
@@ -190,33 +229,8 @@ extern "C" __global__ void __anyhit__shadow_sphere() {
 	// surface with a material it is opaque to NEE shadow rays (VolPathIntegrator::SampleLd), so it falls through to
 	// the occluder case below. Light reaches the fog inside only along specular chains, as in pbrt.
 	if (mat.type == MaterialType::Medium) {
-		const float3 ray_orig = optixGetWorldRayOrigin();
-		const float3 ray_dir = optixGetWorldRayDirection();  // unit length by construction (trace_shadow_ray's own callers)
-		const bool is_box = (sphere.shapeKind == GpuMediumShapeKind::Box);
 		float t_near, t_far;
-		if (is_box) {
-			float bn, bf;
-			box_slab_intersect(ray_orig, ray_dir, sphere.boxMin, sphere.boxMax, bn, bf);
-			t_near = fmaxf(0.0f, bn);
-			t_far = bf;
-		} else {
-			// Object-space center/radius via the intersection program's own
-			// reported attributes (time-interpolated for a moving sphere) -
-			// see __closesthit__sphere's identical read just above, in this
-			// same translation unit's own optix_intersection_sphere.h.
-			const float3 sphere_center = make_float3(
-				__int_as_float(optixGetAttribute_0()),
-				__int_as_float(optixGetAttribute_1()),
-				__int_as_float(optixGetAttribute_2()));
-			const float sphere_radius = __int_as_float(optixGetAttribute_3());
-			const float3 oc = ray_orig - sphere_center;
-			const float half_b = dot(oc, ray_dir);
-			const float c = dot(oc, oc) - sphere_radius * sphere_radius;
-			const float disc = fmaxf(0.0f, half_b * half_b - c);
-			const float sq = sqrtf(disc);
-			t_near = fmaxf(0.0f, -half_b - sq);
-			t_far = -half_b + sq;
-		}
+		shadow_medium_sphere_chord(sphere, instBase, t_near, t_far);
 		const float sigma_t = mat.sigma_t;
 		// NOT optixGetRayTmax(): inside an any-hit program that is the CANDIDATE
 		// hit's own t (OptiX shrinks tmax to it while the program runs), not the
@@ -266,7 +280,11 @@ extern "C" __global__ void __anyhit__shadow_sphere() {
 		mat.type == MaterialType::RgbGridMedium ||
 		mat.type == MaterialType::GridMedium) {
 		ShadowRayState* st = shadow_state_from_payload();
-		shadow_ratio_track_heterogeneous(mat, st);
+		// The interface shape's chord along the shadow ray (the same one the homogeneous branch above uses): a plain sphere through the intersection program's attributes,
+		// a box by its slabs. A ClippedSphere packs no attributes (see optix_intersection_sphere.h), so it is not clipped here.
+		float clipNear = 0.0f, clipFar = 1e30f;
+		if (sphere.shapeKind != GpuMediumShapeKind::ClippedSphere) shadow_medium_sphere_chord(sphere, instBase, clipNear, clipFar);
+		shadow_ratio_track_heterogeneous(mat, st, clipNear, clipFar);
 		if (st->transmittance <= 0.0f || (st->rgb.x <= 0.0f && st->rgb.y <= 0.0f && st->rgb.z <= 0.0f)) {
 			st->occluded = 1;  // fully attenuated - treat as occluded
 			optixTerminateRay();
@@ -276,8 +294,10 @@ extern "C" __global__ void __anyhit__shadow_sphere() {
 		return;
 	}
 
-	// Transmissive materials let light through -- ignore them in shadow rays.
-	if (mat.type == MaterialType::Interface) {
+	// Transmissive materials let light through -- ignore them in shadow rays. A Subsurface sphere is one of them, like a Subsurface mesh (the triangle any-hit
+	// below) and CPU's `class subsurface::is_shadow_transmissive()`: its entry interface is a dielectric, which this project's NEE shadow rays see through. Without it a
+	// subsurface ball cast a shadow here and none on the CPU: a lit floor read 7% dark on OptiX in the consistency sweep (`backends`, `lightform` pairs).
+	if (mat.type == MaterialType::Interface || mat.type == MaterialType::Subsurface) {
 		optixIgnoreIntersection();  // continue traversal (not an occluder)
 		return;
 	}

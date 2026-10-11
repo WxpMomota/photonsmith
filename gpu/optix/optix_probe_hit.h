@@ -26,7 +26,9 @@
 // RAY_TYPE_PROBE's own comment for why they don't share one convention):
 //   p0        : material index (int, bit-reinterpreted; -1 = no hit / miss)
 //   p1,p2,p3  : world-space hit position (float bits)
-//   p4,p5,p6  : world-space front-face-corrected shading normal (float bits)
+//   p4,p5,p6  : world-space shading normal (float bits), the shape's OWN outward normal and NOT turned to face the probe ray: a probe that finds the far side of a closed
+//               shape hits it from inside, and the exit BSDF (bssrdf_probe_walk() -> shade code) works in the hemisphere of the normal it is given, so a normal turned
+//               to face the ray sent the exit light into the object (subsurface read 14-16% dark against the CPU; pbrt's SubsurfaceInteraction carries the shape's normal)
 
 extern "C" __global__ void __closesthit__probe_sphere() {
 	const unsigned int primIdx = optixGetPrimitiveIndex();
@@ -92,8 +94,7 @@ extern "C" __global__ void __closesthit__probe_sphere() {
 	} else if (instBase >= 0) {
 		outward_normal = normalize(optixTransformNormalFromObjectToWorldSpace(obj_normal));
 	}
-	const bool front_face = dot(ray_dir, outward_normal) < 0.0f;
-	const float3 normal = front_face ? outward_normal : -outward_normal;
+	const float3 normal = outward_normal;   // the shape's own outward normal (see the payload comment above)
 
 	optixSetPayload_0((unsigned int)sphere.materialIdx);
 	optixSetPayload_1(__float_as_uint(hit_point.x));
@@ -119,8 +120,7 @@ extern "C" __global__ void __closesthit__probe_quad() {
 	const float3 ray_dir = optixGetWorldRayDirection();
 	const float3 hit_point = ray_orig + t * ray_dir;
 
-	const bool front_face = dot(ray_dir, normal_raw) < 0.0f;
-	const float3 normal = front_face ? normal_raw : -normal_raw;
+	const float3 normal = normal_raw;   // the shape's own normal, not turned to face the probe ray
 
 	optixSetPayload_0((unsigned int)quad.materialIdx);
 	optixSetPayload_1(__float_as_uint(hit_point.x));
@@ -148,8 +148,7 @@ extern "C" __global__ void __closesthit__probe_bilinear_patch() {
 	const float3 dpdu = pu1 - pu0;
 	const float3 dpdv = lerp(patch.p01, patch.p11, u) - lerp(patch.p00, patch.p10, u);
 	const float3 geom_normal = normalize(cross(dpdu, dpdv));
-	const bool front_face = dot(ray_dir, geom_normal) < 0.0f;
-	const float3 normal = front_face ? geom_normal : -geom_normal;
+	const float3 normal = geom_normal;   // the shape's own normal, not turned to face the probe ray
 
 	optixSetPayload_0((unsigned int)patch.materialIdx);
 	optixSetPayload_1(__float_as_uint(hit_point.x));
@@ -171,8 +170,7 @@ extern "C" __global__ void __closesthit__probe_disk() {
 
 	const float3 obj_normal = make_float3(0.0f, 0.0f, 1.0f);
 	float3 outward_normal = normalize(dc_apply_normal_from_w2o(disk.w2o, obj_normal));
-	const bool front_face = dot(ray_dir, outward_normal) < 0.0f;
-	const float3 normal = front_face ? outward_normal : -outward_normal;
+	const float3 normal = outward_normal;
 
 	optixSetPayload_0((unsigned int)disk.materialIdx);
 	optixSetPayload_1(__float_as_uint(hit_point.x));
@@ -198,8 +196,7 @@ extern "C" __global__ void __closesthit__probe_cylinder() {
 		? make_float3(obj_hit.x / obj_hit_len, obj_hit.y / obj_hit_len, 0.0f)
 		: make_float3(1.0f, 0.0f, 0.0f);
 	float3 outward_normal = normalize(dc_apply_normal_from_w2o(cyl.w2o, obj_normal));
-	const bool front_face = dot(ray_dir, outward_normal) < 0.0f;
-	const float3 normal = front_face ? outward_normal : -outward_normal;
+	const float3 normal = outward_normal;
 
 	optixSetPayload_0((unsigned int)cyl.materialIdx);
 	optixSetPayload_1(__float_as_uint(hit_point.x));
@@ -233,8 +230,7 @@ extern "C" __global__ void __closesthit__probe_triangle() {
 	}
 	if (instBase >= 0) shading_normal = normalize(optixTransformNormalFromObjectToWorldSpace(shading_normal));
 
-	const bool front_face = dot(ray_dir, shading_normal) < 0.0f;
-	const float3 normal = front_face ? shading_normal : -shading_normal;
+	const float3 normal = shading_normal;   // the shape's own normal, not turned to face the probe ray
 
 	optixSetPayload_0((unsigned int)tri.materialIdx);
 	optixSetPayload_1(__float_as_uint(hit_point.x));

@@ -69,7 +69,9 @@ extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 	// on the sphere's near side and the ray never reaches it - a hit here is a DIFFERENT emitter, or the light's own
 	// far side, in the way. It used to be ignored, so an emissive sphere hanging in front of a lamp cast no shadow
 	// (a dim emissive ball under a quad lamp over a floor: 117% of the CPU on both GPU backends).
-	if (mat.type == MaterialType::Interface) {
+	// Subsurface too: its entry interface is a dielectric, which this project's NEE shadow rays see through (CPU `subsurface::is_shadow_transmissive()`, and the triangle
+	// any-hit below). Without it a subsurface ball cast a shadow here and none on the CPU: a lit floor read 6% dark (consistency sweep, `backends` and `lightform` pairs).
+	if (mat.type == MaterialType::Interface || mat.type == MaterialType::Subsurface) {
 		optixIgnoreIntersection();
 		return;
 	}
@@ -91,7 +93,7 @@ extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 		const bool is_box = (sph.shapeKind == GpuMediumShapeKind::Box);
 		const float3 sphere_center = wf_read_hit_sphere_center();
 		float t_near, t_far;
-		wf_medium_sphere_near_far(ray_orig, unit_dir, sph, sphere_center, is_box, t_near, t_far);
+		wf_medium_sphere_near_far(ray_orig, unit_dir, sph, sphere_center, is_box, wf_instance_base(), t_near, t_far);
 		const float sigma_t = mat.sigma_t;
 		const float segFar = fminf(t_far, sp->tMax);
 		const float segLen = fmaxf(0.0f, segFar - fmaxf(0.0f, t_near));
@@ -112,6 +114,15 @@ extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 		if (sp->transmittance <= 0.0f) { optixTerminateRay(); return; }
 		optixIgnoreIntersection();
 		return;
+	}
+	// The part of the shadow ray inside the medium's INTERFACE SHAPE (a pbrt medium fills it, not its grid box, which can stick out of it): the heterogeneous media below
+	// track only through that chord, like optix_anyhit_shadow.h's shadow_ratio_track_heterogeneous(). A ClippedSphere is not clipped (no attributes to read).
+	float clipNear = 0.0f, clipFar = 1e30f;
+	if (mat.type == MaterialType::CloudMedium || mat.type == MaterialType::RgbGridMedium || mat.type == MaterialType::GridMedium) {
+		if (sph.shapeKind != GpuMediumShapeKind::ClippedSphere) {
+			wf_medium_sphere_near_far(ray_orig, normalize(ray_dir), sph, wf_read_hit_sphere_center(), sph.shapeKind == GpuMediumShapeKind::Box, wf_instance_base(), clipNear, clipFar);
+			clipNear = fmaxf(0.0f, clipNear);
+		}
 	}
 	if (mat.type == MaterialType::CloudMedium) {
 		const int cloudIdx = (int)mat.cloud_medium_extra.cloudMediumIdx;
@@ -138,6 +149,8 @@ extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 		float segMin, segMax, sigma_maj;
 		if (maj_it.next(segMin, segMax, sigma_maj) && sigma_maj > 0.0f) {
 			if (segMin < 0.0f) segMin = 0.0f;
+			segMin = fmaxf(segMin, clipNear);   // (a segment left empty by the clip ends the loop below at once)
+			segMax = fminf(segMax, clipFar);
 			float t = segMin;
 			// Cap matches wavefront_kernels_materials.cu's primary-path
 			// CloudMedium branch.
@@ -238,6 +251,8 @@ extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 
 		if (has_seg && sigma_maj > 0.0f) {
 			if (segMin < 0.0f) segMin = 0.0f;
+			segMin = fmaxf(segMin, clipNear);   // (a segment left empty by the clip ends the loops below at once)
+			segMax = fminf(segMax, clipFar);
 			float tt = segMin;
 			const int voxelCount = nx * ny * nz;
 			if (isRgb) {
@@ -308,7 +323,7 @@ extern "C" __global__ void __anyhit__wf_shadow_quad() {
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
 
-	if (mat.type == MaterialType::Interface) {
+	if (mat.type == MaterialType::Interface || mat.type == MaterialType::Subsurface) {  // Subsurface: transmissive to NEE shadow rays, like the CPU
 		optixIgnoreIntersection();
 		return;
 	}
@@ -327,7 +342,7 @@ extern "C" __global__ void __anyhit__wf_shadow_bilinear_patch() {
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
 
-	if (mat.type == MaterialType::Interface) {
+	if (mat.type == MaterialType::Interface || mat.type == MaterialType::Subsurface) {  // Subsurface: transmissive to NEE shadow rays, like the CPU
 		optixIgnoreIntersection();
 		return;
 	}
@@ -371,7 +386,7 @@ extern "C" __global__ void __anyhit__wf_shadow_triangle() {
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
 
-	if (mat.type == MaterialType::Interface) {
+	if (mat.type == MaterialType::Interface || mat.type == MaterialType::Subsurface) {  // Subsurface: transmissive to NEE shadow rays, like the CPU
 		optixIgnoreIntersection();
 		return;
 	}
@@ -396,7 +411,7 @@ extern "C" __global__ void __anyhit__wf_shadow_disk() {
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
 
-	if (mat.type == MaterialType::Interface) {
+	if (mat.type == MaterialType::Interface || mat.type == MaterialType::Subsurface) {  // Subsurface: transmissive to NEE shadow rays, like the CPU
 		optixIgnoreIntersection();
 		return;
 	}
@@ -417,7 +432,7 @@ extern "C" __global__ void __anyhit__wf_shadow_cylinder() {
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
 
-	if (mat.type == MaterialType::Interface) {
+	if (mat.type == MaterialType::Interface || mat.type == MaterialType::Subsurface) {  // Subsurface: transmissive to NEE shadow rays, like the CPU
 		optixIgnoreIntersection();
 		return;
 	}

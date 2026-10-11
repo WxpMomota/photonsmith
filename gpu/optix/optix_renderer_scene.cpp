@@ -600,8 +600,9 @@ bool OptiXRenderer::buildCustomAabbs(const SceneInputs &in, SceneBuildState &st)
 	// Build acceleration structure for custom primitives
 	// We'll use AABB (axis-aligned bounding box) custom primitives
 
+	// A scene made only of object instances has nothing at the top level: its geometry is in the instance definitions.
 	if (spheres.empty() && quads.empty() && bilinearPatches.empty() && triangles.empty() &&
-		disks.empty() && cylinders.empty()) {
+		disks.empty() && cylinders.empty() && instancePlacements_.empty()) {
 		std::cerr << "[OptiX] Error: Scene contains no geometry" << std::endl;
 		return false;
 	}

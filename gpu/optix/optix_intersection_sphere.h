@@ -334,6 +334,33 @@ extern "C" __global__ void __intersection__sphere() {
 // Sphere Closest Hit Program
 //==============================================================================
 
+// Where the world ray (unit_dir) enters and leaves a Medium or DielectricMedium sphere or box, entry clamped to 0. center, radius and the box's corners are in the
+// shape's OWN space, which for an instanced shape is not the world's, so the ray is brought into it first; t is the same in both spaces because the transform is linear.
+// (A ray used as-is placed an instanced fog ball's chord in the wrong place, and the ball rendered black: consistency sweep `shapeform`.) Not instanced: the world ray as it was.
+__device__ __forceinline__ void interface_shape_chord(
+	const SphereData& sphere, bool is_box, int instBase, float3 ray_orig, float3 unit_dir, float3 center, float radius, float& t_near, float& t_far
+) {
+	float3 o = ray_orig, d = unit_dir;
+	if (instBase >= 0) {
+		o = optixTransformPointFromWorldToObjectSpace(ray_orig);
+		d = optixTransformVectorFromWorldToObjectSpace(unit_dir);
+	}
+	if (is_box) {
+		float bn, bf;
+		box_slab_intersect(o, d, sphere.boxMin, sphere.boxMax, bn, bf);
+		t_near = fmaxf(0.0f, bn);
+		t_far  = bf;
+		return;
+	}
+	const float3 oc = o - center;
+	const float a = dot(d, d);
+	const float half_b = dot(oc, d);
+	const float disc = fmaxf(0.0f, half_b * half_b - a * (dot(oc, oc) - radius * radius));
+	const float sq = sqrtf(disc);
+	t_near = fmaxf(0.0f, (-half_b - sq) / a);
+	t_far  = (-half_b + sq) / a;
+}
+
 extern "C" __global__ void __closesthit__sphere() {
 	// Get primitive index
 	const unsigned int primIdx = optixGetPrimitiveIndex();
@@ -594,32 +621,10 @@ extern "C" __global__ void __closesthit__sphere() {
 			// before the exit, scatter via the HG phase function, else pass
 			// straight through and continue from the exit point.
 			//
-			// This and the DielectricMedium branch below are the two places
-			// still mixing the WORLD ray with the now-object-space centre.
-			// That is sound rather than sloppy: the only spheres whose two
-			// spaces differ are instanced ones, and instanced spheres reach
-			// here only from a .pbrt file, whose material set (see
-			// pbrt_gpu_builder.h's makeMaterial) has no Medium or
-			// DielectricMedium in it at all. Built-in scenes 12/13, which do
-			// use them, have no instancing - so the combination is
-			// unreachable, and leaving these on world space keeps their
-			// verified output bit-for-bit unchanged.
+			// The chord is taken in the sphere's own space (interface_shape_chord), so an instanced fog ball works.
 			float3 unit_dir = normalize(ray_dir);
 			float t_near, t_far;
-			if (is_box) {
-				float bn, bf;
-				box_slab_intersect(ray_orig, unit_dir, sphere.boxMin, sphere.boxMax, bn, bf);
-				t_near = fmaxf(0.0f, bn);
-				t_far  = bf;
-			} else {
-				float3 oc2 = ray_orig - sphere_center;
-				float half_b2 = dot(oc2, unit_dir);
-				float c2 = dot(oc2, oc2) - sphere_radius * sphere_radius;
-				float disc2 = fmaxf(0.0f, half_b2 * half_b2 - c2);
-				float sq2 = sqrtf(disc2);
-				t_near = fmaxf(0.0f, -half_b2 - sq2);
-				t_far  = -half_b2 + sq2;
-			}
+			interface_shape_chord(sphere, is_box, instBase, ray_orig, unit_dir, sphere_center, sphere_radius, t_near, t_far);
 			float dist_inside = fmaxf(0.0f, t_far - t_near);
 
 			float sigma_t = mat.ior;
@@ -1027,20 +1032,7 @@ extern "C" __global__ void __closesthit__sphere() {
 			} else {
 				float3 unit_dir = normalize(ray_dir);
 				float t_near, t_far;
-				if (is_box) {
-					float bn, bf;
-					box_slab_intersect(ray_orig, unit_dir, sphere.boxMin, sphere.boxMax, bn, bf);
-					t_near = fmaxf(0.0f, bn);
-					t_far  = bf;
-				} else {
-					float3 oc2 = ray_orig - sphere_center;
-					float half_b2 = dot(oc2, unit_dir);
-					float c2 = dot(oc2, oc2) - sphere_radius * sphere_radius;
-					float disc2 = fmaxf(0.0f, half_b2 * half_b2 - c2);
-					float sq2 = sqrtf(disc2);
-					t_near = fmaxf(0.0f, -half_b2 - sq2);
-					t_far  = -half_b2 + sq2;
-				}
+				interface_shape_chord(sphere, is_box, instBase, ray_orig, unit_dir, sphere_center, sphere_radius, t_near, t_far);
 				float dist_inside = fmaxf(0.0f, t_far - t_near);
 
 				float sigma_t = mat.eta_c.x;

@@ -76,20 +76,27 @@ __device__ __forceinline__ float3 wf_box_face_normal(const float3& p, const floa
 // the sphere reports only the far root as "the" hit).
 __device__ __forceinline__ void wf_medium_sphere_near_far(
 		const float3& ray_orig, const float3& unit_dir, const SphereData& sph,
-		const float3& sphere_center, bool is_box, float& t_near, float& t_far) {
+		const float3& sphere_center, bool is_box, int instBase, float& t_near, float& t_far) {
+	// centre, radius and box corners are in the shape's own space, which for an instanced shape is not the world's: bring the ray into it (the same t, the transform is linear).
+	float3 o = ray_orig, d = unit_dir;
+	if (instBase >= 0) {
+		o = optixTransformPointFromWorldToObjectSpace(ray_orig);
+		d = optixTransformVectorFromWorldToObjectSpace(unit_dir);
+	}
 	if (is_box) {
 		float bn, bf;
-		wf_box_slab_intersect(ray_orig, unit_dir, sph.boxMin, sph.boxMax, bn, bf);
+		wf_box_slab_intersect(o, d, sph.boxMin, sph.boxMax, bn, bf);
 		t_near = fmaxf(0.0f, bn);
 		t_far  = bf;
 	} else {
-		float3 oc2 = ray_orig - sphere_center;
-		float half_b2 = dot(oc2, unit_dir);
+		float3 oc2 = o - sphere_center;
+		float a2 = dot(d, d);
+		float half_b2 = dot(oc2, d);
 		float c2 = dot(oc2, oc2) - sph.radius * sph.radius;
-		float disc2 = fmaxf(0.0f, half_b2 * half_b2 - c2);
+		float disc2 = fmaxf(0.0f, half_b2 * half_b2 - a2 * c2);
 		float sq2 = sqrtf(disc2);
-		t_near = fmaxf(0.0f, -half_b2 - sq2);
-		t_far  = -half_b2 + sq2;
+		t_near = fmaxf(0.0f, (-half_b2 - sq2) / a2);
+		t_far  = (-half_b2 + sq2) / a2;
 	}
 }
 
@@ -472,7 +479,7 @@ extern "C" __global__ void __closesthit__wf_sphere() {
 		// against, not the raw start-of-shutter struct value. See
 		// wf_medium_sphere_near_far's own comment for why both roots need
 		// recomputing rather than trusting optixGetRayTmax() alone.
-		wf_medium_sphere_near_far(ray_orig, unit_dir, sph, sphere_center, is_box, t_near, t_far);
+		wf_medium_sphere_near_far(ray_orig, unit_dir, sph, sphere_center, is_box, wf_instance_base(), t_near, t_far);
 		payload->t          = t_near;
 		payload->hitPoint   = ray_orig + t_near * unit_dir;
 		payload->mediumTFar = t_far;
