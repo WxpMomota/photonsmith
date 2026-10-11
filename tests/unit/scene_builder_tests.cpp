@@ -1071,3 +1071,459 @@ TEST(SceneArrayDocumentTest, WritesADemoSceneWhenAsked) {
 	d.camera.position = {4.0, 7.0, 14.0}; d.camera.target = {0.0, 0.5, -2.0};
 	std::ofstream(out, std::ios::binary) << toPbrt(d);
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Volumes: fog, smoke and clouds (Volume in scene_model.h)
+// ---------------------------------------------------------------------------------------------------------------------------------
+using scene_doc::VolumeKind;
+using scene_doc::makeVolume;
+
+namespace {
+
+// A camera looking down -Z at a unit-radius volume at the origin through a very narrow window, under a uniform white sky of radiance 1.
+Document volumeThroughASky(const Object& volume, double fov = 1.0) {
+	Document d;
+	d.camera.position = {0, 0, 10};
+	d.camera.target = {0, 0, 0};
+	d.camera.fov = fov;
+	d.objects.push_back(volume);
+	Light sky;
+	sky.kind = LightKind::Infinite;
+	sky.color = {1, 1, 1};
+	sky.intensity = 1.0;
+	d.lights.push_back(sky);
+	return d;
+}
+
+}  // namespace
+
+TEST(SceneVolumeTest, AVolumeRoundTripsAndASceneWithoutOneWritesNothingNew) {
+	Document d = makeStarterScene();
+	EXPECT_EQ(toJson(d).find("volume"), std::string::npos) << "a scene with no volumes writes exactly what it always did";
+	Object cloud = makeVolume(VolumeKind::Cloud, "Puff");
+	cloud.volume.wispiness = 0.7;
+	cloud.volume.frequency = 5.5;
+	cloud.volume.anisotropy = -0.25;
+	cloud.volume.color = {0.9, 0.95, 1.0};
+	d.objects.push_back(cloud);
+	d.objects.push_back(makeVolume(VolumeKind::Smoke, "Smoke"));
+	Document back;
+	std::string error;
+	ASSERT_TRUE(fromJson(toJson(d), back, error)) << error;
+	EXPECT_EQ(toJson(back), toJson(d));
+	ASSERT_EQ(back.objects.size(), d.objects.size());
+	EXPECT_EQ(back.objects[back.objects.size() - 2].volume.kind, VolumeKind::Cloud);
+	EXPECT_DOUBLE_EQ(back.objects[back.objects.size() - 2].volume.frequency, 5.5);
+	EXPECT_DOUBLE_EQ(back.objects.back().volume.density, 1.6);
+	EXPECT_EQ(back.objects.front().volume.kind, VolumeKind::None);
+}
+
+TEST(SceneVolumeTest, FogSmokeAndCloudAreWrittenAsMediaTheRendererLoads) {
+	Document d = makeStarterScene();
+	d.objects.push_back(makeVolume(VolumeKind::Fog, "Mist"));
+	d.objects.push_back(makeVolume(VolumeKind::Smoke, "Smoke"));
+	d.objects.push_back(makeVolume(VolumeKind::Cloud, "Puff"));
+	Object tube = makeVolume(VolumeKind::Fog, "Fog column");
+	tube.shape = ShapeKind::Cylinder;
+	tube.radius = 0.8;
+	tube.height = 3.0;
+	d.objects.push_back(tube);
+	ASSERT_FALSE(hasErrors(validate(d))) << validate(d).front().message;
+	const std::string text = toPbrt(d);
+	EXPECT_NE(text.find("MakeNamedMedium \"volume-1\" \"string type\" [ \"homogeneous\" ]"), std::string::npos);
+	EXPECT_NE(text.find("MakeNamedMedium \"volume-3\" \"string type\" [ \"cloud\" ]"), std::string::npos);
+	EXPECT_NE(text.find("MediumInterface \"volume-2\" \"\""), std::string::npos);
+	EXPECT_NE(text.find("Material \"interface\""), std::string::npos);
+	// sigma_s = density * colour and sigma_a = density * (1 - colour): the smoke (density 1.6, colour 0.30 0.30 0.32) absorbs 70% of what it takes from the light.
+	EXPECT_NE(text.find("\"rgb sigma_a\" [ 1.12 1.12 1.088 ]"), std::string::npos) << text;
+	EXPECT_NE(text.find("\"rgb sigma_s\" [ 0.48 0.48 0.512 ]"), std::string::npos);
+	const pbrt_load::LoadResult r = loadText(text, "volumes");
+	ASSERT_TRUE(r.ok) << r.error;
+	// It survives the round trip through the file too.
+	Document back;
+	std::string error;
+	ASSERT_TRUE(fromPbrt(text, back, error)) << error;
+	EXPECT_EQ(toJson(back), toJson(d));
+}
+
+TEST(SceneVolumeTest, AVolumeThatTheRendererCannotFillIsAnErrorAndItsLightIsIgnored) {
+	Document d = makeStarterScene();
+	Object box = makeVolume(VolumeKind::Fog, "Box of fog");
+	box.shape = ShapeKind::Box;
+	d.objects.push_back(box);
+	auto problems = validate(d);
+	ASSERT_TRUE(hasErrors(problems));
+	EXPECT_NE(problems.back().message.find("sphere"), std::string::npos);
+	d.objects.back() = makeVolume(VolumeKind::Cloud, "Cloud tube");
+	d.objects.back().shape = ShapeKind::Cylinder;
+	EXPECT_TRUE(hasErrors(validate(d))) << "a cloud only fills a sphere";
+	d.objects.back() = makeVolume(VolumeKind::Fog, "Fog");
+	d.objects.back().volume.density = 0.0;
+	EXPECT_TRUE(hasErrors(validate(d)));
+	d.objects.back() = makeVolume(VolumeKind::Fog, "Fog");
+	d.objects.back().volume.color = {1.5, 1.0, 1.0};
+	EXPECT_TRUE(hasErrors(validate(d)));
+	d.objects.back() = makeVolume(VolumeKind::Fog, "Fog");
+	d.objects.back().volume.anisotropy = 1.0;
+	EXPECT_TRUE(hasErrors(validate(d)));
+	d.objects.back() = makeVolume(VolumeKind::Fog, "Fog");
+	d.objects.back().emissive = true;   // not an error, a note; and it is no light
+	problems = validate(d);
+	EXPECT_FALSE(hasErrors(problems));
+	Document dark;
+	dark.objects.push_back(d.objects.back());
+	bool noLight = false;
+	for (const Problem& p : validate(dark)) noLight = noLight || p.message.find("no light") != std::string::npos;
+	EXPECT_TRUE(noLight) << "an emissive volume does not count as a light";
+}
+
+// A pure absorber (scattering colour 0) of density s and radius 1 seen through a window so narrow that every ray crosses it near the middle, chord 2: it passes exp(-2 s) of the
+// sky's radiance 1.
+TEST(SceneVolumeRenderTest, AnAbsorbingVolumeTransmitsTheBeerLambertFraction) {
+	const std::string launcher = findLauncher();
+	if (launcher.empty()) GTEST_SKIP() << "ray_tracer.exe was not found next to the tests";
+	for (double density : {0.5, 1.0}) {
+		Object v = makeVolume(VolumeKind::Smoke, "Absorber");
+		v.position = {0, 0, 0};
+		v.radius = 1.0;
+		v.volume.density = density;
+		v.volume.color = {0, 0, 0};
+		v.volume.anisotropy = 0.0;
+		const Document d = volumeThroughASky(v);
+		ASSERT_FALSE(hasErrors(validate(d)));
+		std::vector<float> rgb;
+		int w = 0, h = 0;
+		ASSERT_TRUE(renderWithLauncher(launcher, toPbrt(d), "absorber", 24, 192, 6, rgb, w, h));
+		const double want = std::exp(-2.0 * density);
+		for (int c = 0; c < 3; ++c) EXPECT_NEAR(channelMean(rgb, c), want, 0.05 * want) << "density " << density << " channel " << c;
+	}
+}
+
+// A volume that only scatters (white) inside a uniform sky of radiance 1 cannot change the picture: every ray leaves with radiance 1 however often it scatters (a furnace). It
+// checks the whole scattering path, for the fog and for the cloud (whose density varies, so it is sampled by delta tracking).
+TEST(SceneVolumeRenderTest, AWhiteVolumeInAUniformSkyIsInvisible) {
+	const std::string launcher = findLauncher();
+	if (launcher.empty()) GTEST_SKIP() << "ray_tracer.exe was not found next to the tests";
+	for (VolumeKind kind : {VolumeKind::Fog, VolumeKind::Cloud}) {
+		Object v = makeVolume(kind, "White");
+		v.position = {0, 0, 0};
+		v.radius = 1.0;
+		v.volume.density = kind == VolumeKind::Cloud ? 8.0 : 2.0;
+		v.volume.color = {1, 1, 1};
+		const Document d = volumeThroughASky(v, 14.0);   // the whole sphere in view this time
+		ASSERT_FALSE(hasErrors(validate(d)));
+		std::vector<float> rgb;
+		int w = 0, h = 0;
+		ASSERT_TRUE(renderWithLauncher(launcher, toPbrt(d), "furnace_volume", 32, 128, 100, rgb, w, h));
+		for (int c = 0; c < 3; ++c) EXPECT_NEAR(channelMean(rgb, c), 1.0, 0.03) << toString(kind) << " channel " << c;
+	}
+}
+
+// RT_VOLUMES_PBRT=<file> writes a scene with one of each volume, to look at the starting values.
+TEST(SceneVolumeTest, WritesADemoSceneWhenAsked) {
+	const char* out = std::getenv("RT_VOLUMES_PBRT");
+	if (!out) GTEST_SKIP() << "set RT_VOLUMES_PBRT=<file> to write the demo scene";
+	Document d = makeStarterScene();
+	d.objects.resize(1);   // keep the floor
+	d.objects[0].size = {30.0, 1.0, 30.0};
+	d.objects.push_back(makeAreaLightPanel("Ceiling light"));
+	d.objects.back().position = {0, 9.0, 0};
+	d.objects.back().size = {4, 1, 4};
+	Object fog = makeVolume(VolumeKind::Fog, "Fog");
+	fog.position = {-4.5, 2.0, 0};
+	Object smoke = makeVolume(VolumeKind::Smoke, "Smoke");
+	smoke.position = {0, 1.4, 0};
+	Object cloud = makeVolume(VolumeKind::Cloud, "Cloud");
+	cloud.position = {5.0, 3.0, 0};
+	d.objects.push_back(fog);
+	d.objects.push_back(smoke);
+	d.objects.push_back(cloud);
+	Object ball = makeObject(ShapeKind::Sphere, "Marker");
+	ball.radius = 0.4;
+	ball.position = {-4.5, 0.4, 0};
+	ball.material.color = {0.8, 0.2, 0.1};
+	d.objects.push_back(ball);
+	ball.position = {0, 0.4, 0};
+	d.objects.push_back(ball);
+	ball.position = {5.0, 0.4, 0};
+	d.objects.push_back(ball);
+	d.camera.position = {0.0, 4.5, 15.0};
+	d.camera.target = {0.0, 2.0, 0.0};
+	d.camera.fov = 45;
+	d.render = {640, 360, 128, 12};
+	std::ofstream(out, std::ios::binary) << toPbrt(d);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// A medium fills the shape it is attached to, not the box its density is declared in (src/shared/medium_clip.h)
+// ---------------------------------------------------------------------------------------------------------------------------------
+#include "../../src/shared/medium_clip.h"
+
+TEST(MediumSphereClipTest, ShortensASegmentToTheChordInsideTheSphere) {
+	MediumSphereClip clip;
+	clip.set(0, 0, 0, 1.0);
+	double t0 = 0.0, t1 = 100.0;
+	ASSERT_TRUE(clip.apply(0, 0, -5, 0, 0, 1, t0, t1));   // straight through the middle: from z = -1 to 1
+	EXPECT_NEAR(t0, 4.0, 1e-12);
+	EXPECT_NEAR(t1, 6.0, 1e-12);
+	t0 = 5.0;   // a segment that starts inside the sphere keeps its start
+	t1 = 100.0;
+	ASSERT_TRUE(clip.apply(0, 0, -5, 0, 0, 1, t0, t1));
+	EXPECT_NEAR(t0, 5.0, 1e-12);
+	EXPECT_NEAR(t1, 6.0, 1e-12);
+	t0 = 0.0;   // one that ends before the sphere, or misses it, leaves nothing
+	t1 = 3.0;
+	EXPECT_FALSE(clip.apply(0, 0, -5, 0, 0, 1, t0, t1));
+	t0 = 0.0;
+	t1 = 100.0;
+	EXPECT_FALSE(clip.apply(1.5, 0, -5, 0, 0, 1, t0, t1));
+	t0 = 0.0;
+	t1 = 100.0;
+	ASSERT_TRUE(clip.apply(0.6, 0, -5, 0, 0, 1, t0, t1));   // off to one side: a chord of 2 * sqrt(1 - 0.36)
+	EXPECT_NEAR(t1 - t0, 2.0 * std::sqrt(1.0 - 0.36), 1e-12);
+	MediumSphereClip none;
+	t0 = 1.0;
+	t1 = 2.0;
+	EXPECT_TRUE(none.apply(0, 0, 0, 1, 0, 0, t0, t1));   // no sphere: left alone
+	EXPECT_EQ(t0, 1.0);
+	EXPECT_EQ(t1, 2.0);
+}
+
+// A medium whose density grid is declared in a box eight units across, on an interface sphere of radius 1, must look like the same scattering fog filling just the sphere.
+// (Before the clip the CPU filled the whole box.)
+TEST(SceneVolumeRenderTest, AGridMediumInABoxBiggerThanItsSphereIsCutRoundBySphere) {
+	const std::string launcher = findLauncher();
+	if (launcher.empty()) GTEST_SKIP() << "ray_tracer.exe was not found next to the tests";
+	const std::string head =
+	    "LookAt 0 0 10  0 0 0  0 1 0\nCamera \"perspective\" \"float fov\" [ 14 ]\nFilm \"rgb\" \"integer xresolution\" [ 32 ] \"integer yresolution\" [ 32 ]\n"
+	    "Sampler \"halton\" \"integer pixelsamples\" [ 64 ]\nIntegrator \"volpath\" \"integer maxdepth\" [ 40 ]\nWorldBegin\n"
+	    "LightSource \"infinite\" \"rgb L\" [ 0.2 0.3 0.5 ]\nLightSource \"distant\" \"point3 from\" [ 1 2 3 ] \"point3 to\" [ 0 0 0 ] \"rgb L\" [ 3 3 3 ]\n";
+	const std::string sphere = "Material \"interface\"\nMediumInterface \"m\" \"\"\nShape \"sphere\" \"float radius\" [ 1 ]\n";
+	const std::string fog = "MakeNamedMedium \"m\" \"string type\" [ \"homogeneous\" ] \"rgb sigma_a\" [ 0 0 0 ] \"rgb sigma_s\" [ 0.8 0.8 0.8 ] \"float g\" [ 0 ]\n";
+	const std::string grid =
+	    "AttributeBegin\n  Translate -4 -4 -4\n  Scale 8 8 8\n  MakeNamedMedium \"m\" \"string type\" [ \"uniformgrid\" ] \"integer nx\" [ 1 ] \"integer ny\" [ 1 ] \"integer nz\" [ 1 ] "
+	    "\"float density\" [ 1 ] \"rgb sigma_s\" [ 0.8 0.8 0.8 ] \"float g\" [ 0 ]\nAttributeEnd\n";
+	std::vector<float> a, b;
+	int w = 0, h = 0;
+	ASSERT_TRUE(renderWithLauncher(launcher, head + fog + sphere, "fog_sphere", 32, 64, 40, a, w, h));
+	ASSERT_TRUE(renderWithLauncher(launcher, head + grid + sphere, "grid_sphere", 32, 64, 40, b, w, h));
+	for (int c = 0; c < 3; ++c) EXPECT_NEAR(channelMean(b, c), channelMean(a, c), 0.04 * channelMean(a, c)) << "channel " << c;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// More materials: subsurface, marble and noise patterns, bump and normal maps
+// ---------------------------------------------------------------------------------------------------------------------------------
+using scene_doc::BumpKind;
+using scene_doc::Pattern;
+
+TEST(SceneMaterialsMoreTest, TheNewFieldsRoundTripAndASceneWithoutThemWritesNothingNew) {
+	Document plain = makeStarterScene();
+	const std::string text = toJson(plain);
+	for (const char* key : {"pattern", "scatterDistance", "bumpFile", "bumpKind"}) EXPECT_EQ(text.find(key), std::string::npos) << key;
+	Document d = plain;
+	Object skin = makeObject(ShapeKind::Sphere, "Skin ball");
+	scene_doc::applyMaterialPreset(skin.material, "skin");
+	skin.material.scatterDistance = {0.2, 0.1, 0.05};
+	d.objects.push_back(skin);
+	Object stone = makeObject(ShapeKind::Box, "Stone");
+	stone.material.pattern = Pattern::Marble;
+	stone.material.patternScale = 7.5;
+	stone.material.patternVariation = 0.45;
+	stone.material.bumpFile = "C:\\maps\\bumps.png";
+	stone.material.bumpKind = BumpKind::Normal;
+	stone.material.bumpStrength = 0.2;
+	d.objects.push_back(stone);
+	Object cloudy = makeObject(ShapeKind::Quad, "Cloudy");
+	cloudy.material.kind = MaterialKind::CoatedDiffuse;
+	cloudy.material.pattern = Pattern::Noise;
+	d.objects.push_back(cloudy);
+	Document back;
+	std::string error;
+	ASSERT_TRUE(fromJson(toJson(d), back, error)) << error;
+	EXPECT_EQ(toJson(back), toJson(d));
+	const scene_doc::Material& m = back.objects[back.objects.size() - 2].material;
+	EXPECT_EQ(m.pattern, Pattern::Marble);
+	EXPECT_DOUBLE_EQ(m.patternScale, 7.5);
+	EXPECT_EQ(m.bumpKind, BumpKind::Normal);
+	EXPECT_EQ(m.bumpFile, "C:\\maps\\bumps.png");
+	EXPECT_EQ(back.objects[back.objects.size() - 3].material.kind, MaterialKind::Subsurface);
+	EXPECT_DOUBLE_EQ(back.objects[back.objects.size() - 3].material.scatterDistance.r, 0.2);
+}
+
+TEST(SceneMaterialsMoreTest, SubsurfacePatternsAndBumpMapsAreWrittenAsPbrtTheRendererLoads) {
+	Document d = makeStarterScene();
+	Object skin = makeObject(ShapeKind::Sphere, "Skin");
+	scene_doc::applyMaterialPreset(skin.material, "skin");
+	d.objects.push_back(skin);
+	Object marble = makeObject(ShapeKind::Box, "Marble");
+	marble.material.pattern = Pattern::Marble;
+	marble.material.patternScale = 6.0;
+	d.objects.push_back(marble);
+	Object noise = makeObject(ShapeKind::Quad, "Noise");
+	noise.material.kind = MaterialKind::CoatedDiffuse;
+	noise.material.pattern = Pattern::Noise;
+	d.objects.push_back(noise);
+	// Two picture files that exist, so the loader has them.
+	const std::string heights = std::filesystem::absolute("scene_builder_heights.bmp").string(), normals = std::filesystem::absolute("scene_builder_normals.bmp").string();
+	{
+		std::ofstream a(heights, std::ios::binary), b(normals, std::ios::binary);
+		a << bmpFile(2, 2, std::vector<unsigned char>(12, 100));
+		b << bmpFile(2, 2, std::vector<unsigned char>(12, 128));
+	}
+	Object bumpy = makeObject(ShapeKind::Quad, "Bumpy");
+	bumpy.material.bumpFile = heights;
+	bumpy.material.bumpStrength = 0.07;
+	d.objects.push_back(bumpy);
+	Object tilted = makeObject(ShapeKind::Box, "Tilted");
+	tilted.material.kind = MaterialKind::Conductor;
+	tilted.material.bumpFile = normals;
+	tilted.material.bumpKind = BumpKind::Normal;
+	d.objects.push_back(tilted);
+	ASSERT_FALSE(hasErrors(validate(d)));
+	const std::string text = toPbrt(d);
+	EXPECT_NE(text.find("Material \"subsurface\" \"rgb reflectance\" [ 0.8 0.58 0.48 ] \"rgb mfp\" [ 0.14 0.055 0.036 ] \"float eta\" [ 1.4 ] \"float roughness\" [ 0.35 ]"), std::string::npos) << text;
+	EXPECT_NE(text.find("\"spectrum\" \"marble\" \"float scale\" [ 6 ]"), std::string::npos);
+	EXPECT_NE(text.find("\"spectrum\" \"fbm\""), std::string::npos);
+	EXPECT_NE(text.find("\"float\" \"imagemap\""), std::string::npos);
+	EXPECT_NE(text.find("\"float\" \"scale\" \"texture tex\""), std::string::npos);
+	EXPECT_NE(text.find("\"float scale\" [ 0.07 ]"), std::string::npos);
+	EXPECT_NE(text.find("\"texture displacement\""), std::string::npos);
+	const pbrt_load::LoadResult r = loadText(text, "materials_more");
+	EXPECT_TRUE(r.ok) << r.error;
+	std::remove(heights.c_str());
+	std::remove(normals.c_str());
+	Document back;
+	std::string error;
+	ASSERT_TRUE(fromPbrt(text, back, error)) << error;
+	EXPECT_EQ(toJson(back), toJson(d));
+}
+
+TEST(SceneMaterialsMoreTest, ProblemsWithTheNewMaterialFieldsAreReported) {
+	Document d = makeStarterScene();
+	Object o = makeObject(ShapeKind::Sphere, "Ball");
+	o.material.kind = MaterialKind::Subsurface;
+	o.material.scatterDistance = {0.1, 0.0, 0.1};
+	d.objects.push_back(o);
+	EXPECT_TRUE(hasErrors(validate(d))) << "a distance of zero in a colour";
+	d.objects.back().material.scatterDistance = {0.1, 0.1, 0.1};
+	EXPECT_FALSE(hasErrors(validate(d)));
+	d.objects.back().material = scene_doc::Material{};
+	d.objects.back().material.pattern = Pattern::Marble;
+	d.objects.back().material.patternScale = 0.0;
+	EXPECT_TRUE(hasErrors(validate(d)));
+	d.objects.back().material.patternScale = 4.0;
+	d.objects.back().material.imageFile = "relative.png";
+	bool replaced = false;
+	for (const Problem& p : validate(d)) replaced = replaced || p.message.find("replaces the marble") != std::string::npos;
+	EXPECT_TRUE(replaced) << "a picture replaces the pattern";
+	d.objects.back().material.imageFile.clear();
+	d.objects.back().material.bumpFile = "bumps.png";
+	bool gpu = false;
+	for (const Problem& p : validate(d)) gpu = gpu || p.message.find("GPU renderers apply a bump") != std::string::npos;
+	EXPECT_TRUE(gpu) << "a bump map on a sphere shows on the CPU only";
+	d.objects.back().shape = ShapeKind::Box;
+	gpu = false;
+	for (const Problem& p : validate(d)) gpu = gpu || p.message.find("GPU renderers apply a bump") != std::string::npos;
+	EXPECT_FALSE(gpu) << "a box is made of triangles: the GPU applies it";
+	d.objects.back().material.kind = MaterialKind::Dielectric;
+	bool onlyFor = false;
+	for (const Problem& p : validate(d)) onlyFor = onlyFor || p.message.find("only applies to matte, glossy paint and metal") != std::string::npos;
+	EXPECT_TRUE(onlyFor);
+}
+
+TEST(SceneMaterialsMoreTest, ApplyingAPresetKeepsTheBumpSlot) {
+	scene_doc::Material m;
+	m.bumpFile = "bumps.png";
+	m.bumpKind = BumpKind::Normal;
+	m.bumpStrength = 0.3;
+	m.pattern = Pattern::Marble;
+	ASSERT_TRUE(scene_doc::applyMaterialPreset(m, "gold"));
+	EXPECT_EQ(m.kind, MaterialKind::Conductor);
+	EXPECT_EQ(m.bumpFile, "bumps.png");
+	EXPECT_EQ(m.bumpKind, BumpKind::Normal);
+	EXPECT_DOUBLE_EQ(m.bumpStrength, 0.3);
+	EXPECT_EQ(m.pattern, Pattern::None) << "the colour is the preset's";
+}
+
+// A diffuse plate of albedo 1 lit from straight above by a distant light of irradiance pi reads 1. A normal map whose every texel tilts the normal by 30 degrees leaves the light
+// 30 degrees off the shading normal, so the plate reads cos(30 deg): the writer's texture binding really reaches the renderer's normal mapping.
+TEST(SceneMaterialsMoreTest, ANormalMapTiltsTheShadingByTheAngleItEncodes) {
+	const std::string launcher = findLauncher();
+	if (launcher.empty()) GTEST_SKIP() << "ray_tracer.exe was not found next to the tests";
+	// A tangent-space normal (sin30, 0, cos30) as RGB: ((x+1)/2, (y+1)/2, (z+1)/2) * 255 = (191, 128, 238).
+	const std::string normals = std::filesystem::absolute("scene_builder_tilt_normals.bmp").string();
+	{
+		std::ofstream out(normals, std::ios::binary);
+		std::vector<unsigned char> px;
+		for (int i = 0; i < 4; ++i) { px.push_back(191); px.push_back(128); px.push_back(238); }
+		out << bmpFile(2, 2, px);
+	}
+	const auto plate = [&](bool tilted) {
+		Document d;
+		d.camera.position = {0, 10, 0.001};
+		d.camera.target = {0, 0, 0};
+		d.camera.fov = 4;
+		Object quad = makeObject(ShapeKind::Quad, "Plate");
+		quad.position = {0, 0, 0};
+		quad.size = {20, 1, 20};
+		quad.material.color = {1, 1, 1};
+		if (tilted) {
+			quad.material.bumpFile = normals;
+			quad.material.bumpKind = BumpKind::Normal;
+		}
+		d.objects.push_back(quad);
+		Light sun;
+		sun.kind = LightKind::Distant;
+		sun.position = {0, 10, 0};
+		sun.target = {0, 0, 0};
+		sun.color = {1, 1, 1};
+		sun.intensity = 3.14159265;
+		d.lights.push_back(sun);
+		return d;
+	};
+	std::vector<float> flat, tilt;
+	int w = 0, h = 0;
+	const bool ok = renderWithLauncher(launcher, toPbrt(plate(false)), "plate_flat", 24, 64, 1, flat, w, h) && renderWithLauncher(launcher, toPbrt(plate(true)), "plate_tilt", 24, 64, 1, tilt, w, h);
+	std::remove(normals.c_str());
+	ASSERT_TRUE(ok);
+	const double base = channelMean(flat, 1);
+	EXPECT_NEAR(base, 1.0, 0.03) << "the flat white plate under irradiance pi";
+	EXPECT_NEAR(channelMean(tilt, 1) / base, std::cos(30.0 * 3.14159265358979 / 180.0), 0.04);
+}
+
+// RT_PRESET_SCENES_DIR=<folder> writes one scene per material preset (a sphere in a small studio), which scripts/make_material_thumbnails.py renders into the pictures the
+// Scene Builder's preset list shows.
+TEST(SceneMaterialsMoreTest, WritesOneSceneForEveryPresetWhenAsked) {
+	const char* dir = std::getenv("RT_PRESET_SCENES_DIR");
+	if (!dir) GTEST_SKIP() << "set RT_PRESET_SCENES_DIR=<folder> to write the preset scenes";
+	for (const scene_doc::MaterialPreset& preset : scene_doc::materialPresets()) {
+		Document d;
+		d.camera.position = {0, 0.55, 4.6};
+		d.camera.target = {0, 0.0, 0};
+		d.camera.fov = 28;
+		d.render = {64, 64, 96, 12};
+		Object ball = makeObject(ShapeKind::Sphere, preset.id);
+		ball.position = {0, 0, 0};
+		ball.radius = 1.0;
+		scene_doc::applyMaterialPreset(ball.material, preset.id);
+		d.objects.push_back(ball);
+		Object floorObj = makeObject(ShapeKind::Quad, "Floor");
+		floorObj.position = {0, -1.0, 0};
+		floorObj.size = {30, 1, 30};
+		floorObj.material.color = {0.55, 0.55, 0.55};
+		d.objects.push_back(floorObj);
+		Light sky;
+		sky.kind = LightKind::Infinite;
+		sky.color = {0.62, 0.72, 0.95};
+		sky.intensity = 0.7;
+		d.lights.push_back(sky);
+		Light sun;
+		sun.kind = LightKind::Distant;
+		sun.position = {3, 5, 4};
+		sun.target = {0, 0, 0};
+		sun.color = {1.0, 0.96, 0.9};
+		sun.intensity = 3.0;
+		d.lights.push_back(sun);
+		std::ofstream(std::string(dir) + "/" + preset.id + ".pbrt", std::ios::binary) << toPbrt(d);
+	}
+}

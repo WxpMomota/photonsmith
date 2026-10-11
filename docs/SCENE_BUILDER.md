@@ -139,6 +139,20 @@ The copies are ordinary objects with their own numbered names: move, recolour or
 
 A scatter is not an instance: each copy is a separate object in the saved file (a few hundred bytes of text), which is why the limit exists.
 
+## Volumes: fog, smoke and clouds
+
+**Add > Volumes** puts in a sphere of participating medium: **Fog**, **Smoke** or a **Cloud**. It is not a surface: light passes into it and is scattered or absorbed on the way, so it shows as a soft glow, a dark haze or a lumpy white puff. In the layout and 3D views it is drawn see-through (white-ish for fog, grey for smoke, pale for a cloud) so what is behind it shows.
+
+| Type | What it is | Settings |
+|---|---|---|
+| Fog | an even haze in a sphere (or a cylinder: pick the shape) | **Density** (how quickly light is scattered or absorbed per unit of distance: 0.3 is a light mist in a sphere a few units across, 2 is thick), **Colour** (the fraction scattered, per colour: white only scatters, so it glows; a tint tints what it scatters), **Forward scattering** (0 scatters evenly, above 0 towards where the light was going) |
+| Smoke | the same, starting dark | the same, starting at a dark grey colour, which absorbs most of what it takes from the light |
+| Cloud | a lumpy cloud inside a sphere | **Density** (6 is a solid white puff, 1 a thin haze), **Forward scattering**, **Wispiness** (how torn its edges are), **Detail** (lumps across); a cloud only scatters and has no colour |
+
+A volume has no material, picture or light of its own, and **Gives off light** does not apply to it. It is saved as pbrt `MakeNamedMedium` with a `MediumInterface` on a sphere (or cylinder, for fog and smoke), so it renders the same on the CPU, both OptiX backends and the Mac. The medium fills the sphere, not a box: a cloud's density is declared in a cube round the sphere and cut by it. Rotating a cloud turns its lumps; a sphere of fog looks the same turned.
+
+Things to know: a volume shows only where light reaches it, so a scene lit by a small lamp makes fog glow near it; a bigger sphere with the same density is thicker (light crosses more of it); and a scene with many dense volumes takes longer to render and shows more noise at low sample counts.
+
 ## Props
 
 The **Props** section of the Add menu puts a few ordinary objects in at once: a **table** (top and four legs), a **chair**, a **tree** (trunk and two cones), a **snowman**, a stone **column** and a **street lamp** (its bulb is an emitting sphere). They stand on the floor with the middle of their footprint where the new item would drop, as one undo step, and are all picked and made a group (the prop's name, "Table"), so they move, copy and delete as one thing; click a part's row in the list to edit it alone, or Ungroup. A second copy of a prop is named apart ("Table top 2", group "Table 2").
@@ -177,13 +191,20 @@ The sun follows these settings only when they change; a Sun light you move by ha
 
 | In the tab | What it is | Settings |
 |---|---|---|
-| Matte (diffuse) | pbrt `diffuse`; optional checker pattern of two colours (every shape but a box; on a disk it makes rings), or a picture | colour or **Picture**; checker colour B and how many checks across |
+| Matte (diffuse) | pbrt `diffuse`; a plain colour, a **Pattern** (checker of two colours, marble or noise), or a picture | colour or **Picture**; checker colour B and how many checks across; marble's veins and wander |
 | Metal | pbrt `conductor` | colour, roughness (0 is a mirror) |
 | Glass | pbrt `dielectric` | index of refraction (1.5 for glass, 1.33 for water), roughness |
-| Glossy paint (coated) | pbrt `coateddiffuse`: a diffuse colour (or a picture) under a clear coat | paint colour or **Picture**, coat index of refraction, coat roughness |
+| Glossy paint (coated) | pbrt `coateddiffuse`: a diffuse colour (or a picture, or a marble or noise pattern) under a clear coat | paint colour or **Picture** or **Pattern**, coat index of refraction, coat roughness |
 | Translucent | pbrt `diffusetransmission`: paper, leaves, lampshades | what it reflects, what it lets through |
+| Subsurface | pbrt `subsurface`: light goes in, scatters about and comes out elsewhere: skin, wax, milk, marble, jade | colour, how far each colour **travels under the surface** (red, green, blue), index of refraction, surface roughness |
 
-**Preset.** The first row of a material's properties is a **Preset** list of ready-made materials: matte (chalk, black rubber, terracotta, concrete), plastic (red, blue, white ceramic, car paint), metal (gold, copper, silver, aluminium, chrome, brushed steel), glass (clear, frosted, water, diamond) and translucent (wax, leaf, paper). Choosing one sets the material's type, colour, roughness and index of refraction in one step (and clears a picture or checker); nothing about the preset is remembered afterwards, so the values can be tuned further. One undo step reverts it. The metal colours are the real reflectance of each metal, the glass indices the real ones. The table is `src/shared/scene_materials.h`.
+**Subsurface.** The colour is what a thick piece of it looks like; the three distances are how far light of each colour wanders before it scatters, in the scene's units (a tenth to a half of the object's size looks translucent; far more looks like fog in glass). A colour that travels further glows further from where the light went in: skin's red does, which is what makes it look like skin. It costs more to render than the other materials and is noisier at low sample counts. The renderer inverts the colour into scattering coefficients (pbrt's `reflectance` and `mfp`), the same on the CPU and both OptiX backends.
+
+**Pattern.** Matte and glossy paint can show **Marble** (pale stone with veins: **Veins** is how many, **Wander** how much they meander) or **Noise** (soft grey clouds) instead of a colour. These are the renderer's own marble and fbm textures, which bring their own colours, so there is no colour to pick. A picture or the checker replaces a pattern.
+
+**Bump or normal map.** Matte, glossy paint and metal have a **Bump or normal map** row: a **height map** (grayscale; light is high, so the surface is shaded as if it had that relief; **Bump height** is how tall) or a **normal map** (an RGB picture of the surface's normals, as game assets have). It changes the shading, not the shape: the silhouette stays smooth. On the CPU it works on every shape; the GPU renderers apply it to shapes made of triangles only (a box, quad, mesh or the ready-made shapes), so on a sphere, disk, cylinder or cone it shows in the CPU preview but not on a GPU render, and the properties say so. Choosing a ready-made material keeps the bump picture.
+
+**Preset.** The first row of a material's properties is a **Preset** list of ready-made materials: matte (chalk, black rubber, terracotta, concrete), plastic (red, blue, white ceramic, car paint), metal (gold, copper, silver, aluminium, chrome, brushed steel), glass (clear, frosted, water, diamond), translucent (wax, leaf, paper) and subsurface (skin, milk, marble stone, jade, candle wax). Each entry in the list shows a small picture of a sphere made of it (rendered by `scripts/make_material_thumbnails.py` from the same document code, and built into the program). Choosing one sets the material's type, colour, roughness and index of refraction in one step (and clears a picture or checker); nothing about the preset is remembered afterwards, so the values can be tuned further. One undo step reverts it. The metal colours are the real reflectance of each metal, the glass indices the real ones. The table is `src/shared/scene_materials.h`.
 
 A **Picture** (matte and glossy paint) replaces the colour with an image on any shape; **Clear** goes back to a colour. On a quad it also gives the quad the picture's shape and the picture stands upright when the quad is rotated 90 degrees about X (a wall). On a mesh the mesh's own texture coordinates decide where it goes. See [PHOTO_TO_SCENE.md](PHOTO_TO_SCENE.md).
 
@@ -239,7 +260,7 @@ The scene's **name** is the field at the top right of the tab (it is also the *T
 ## What it does not do (yet)
 
 * Groups are for editing here: the saved `.pbrt` has no groups, so Live Preview's *Move objects* still moves the members one at a time. Scaling several things is uniform (the same in every direction): stretching a set along one axis would shear the turned objects in it.
-* Bump or normal maps, hair, subsurface, participating media, the principled material and instanced copies: use a hand-written pbrt file for those ([PBRT_SUPPORT.md](PBRT_SUPPORT.md) lists what the renderer accepts).
+* Hair, the principled material, mixed materials and instanced copies; a box-shaped volume (the renderer's media fill a sphere, or a cylinder for fog) and a medium around the camera: use a hand-written pbrt file for those ([PBRT_SUPPORT.md](PBRT_SUPPORT.md) lists what the renderer accepts).
 * A mesh (`.ply` or `.obj`) is shown in the layout view only as a small marker at its position, because the view does not read the file; its scale and rotation apply when it renders.
 * No animation of objects. The camera can fly along a path through saved views (*Camera views*, *Flythrough...*) or orbit (*Turntable...*), but nothing else moves between frames.
 * The 3D view shows shapes, not materials or lighting, and a mesh as its bounding box and a sample of its points. Use it with the flat views, or type exact numbers in the properties.

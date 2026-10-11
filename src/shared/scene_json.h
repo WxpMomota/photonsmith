@@ -355,7 +355,19 @@ inline std::string toJson(const Document& d) {
 		m.set("checkerCount", Json::number(o.material.checkerCount)).set("roughness", Json::number(o.material.roughness));
 		m.set("ior", Json::number(o.material.ior)).set("transmittance", detail::toJson(o.material.transmittance));
 		m.set("imageFile", Json::string(o.material.imageFile));
+		// The newer material fields are written only when they are in use, so a scene that does not use them writes exactly what it always did.
+		if (o.material.pattern != Pattern::None)
+			m.set("pattern", Json::string(toString(o.material.pattern))).set("patternScale", Json::number(o.material.patternScale)).set("patternVariation", Json::number(o.material.patternVariation));
+		if (o.material.kind == MaterialKind::Subsurface) m.set("scatterDistance", detail::toJson(o.material.scatterDistance));
+		if (!o.material.bumpFile.empty())
+			m.set("bumpFile", Json::string(o.material.bumpFile)).set("bumpKind", Json::string(toString(o.material.bumpKind))).set("bumpStrength", Json::number(o.material.bumpStrength));
 		j.set("material", std::move(m));
+		if (o.volume.kind != VolumeKind::None) {   // (only when it is one, so every scene without volumes writes exactly what it always did)
+			Json v = Json::object();
+			v.set("kind", Json::string(toString(o.volume.kind))).set("density", Json::number(o.volume.density)).set("color", detail::toJson(o.volume.color));
+			v.set("anisotropy", Json::number(o.volume.anisotropy)).set("wispiness", Json::number(o.volume.wispiness)).set("frequency", Json::number(o.volume.frequency));
+			j.set("volume", std::move(v));
+		}
 		j.set("emissive", Json::boolean(o.emissive)).set("emission", detail::toJson(o.emission));
 		j.set("emissionStrength", Json::number(o.emissionStrength)).set("twoSided", Json::boolean(o.twoSided));
 		if (!o.group.empty()) j.set("group", Json::string(o.group));
@@ -433,6 +445,20 @@ inline bool fromJson(const std::string& text, Document& out, std::string& err) {
 					     detail::readRgb(*m, "color2", o.material.color2) && detail::readNum(*m, "checkerCount", o.material.checkerCount) &&
 					     detail::readNum(*m, "roughness", o.material.roughness) && detail::readNum(*m, "ior", o.material.ior) &&
 					     detail::readRgb(*m, "transmittance", o.material.transmittance) && detail::readStr(*m, "imageFile", o.material.imageFile);
+					std::string pattern = toString(o.material.pattern), bumpKind = toString(o.material.bumpKind);
+					ok = ok && detail::readStr(*m, "pattern", pattern) && patternFromString(pattern, o.material.pattern) && detail::readNum(*m, "patternScale", o.material.patternScale) &&
+					     detail::readNum(*m, "patternVariation", o.material.patternVariation) && detail::readRgb(*m, "scatterDistance", o.material.scatterDistance) &&
+					     detail::readStr(*m, "bumpFile", o.material.bumpFile) && detail::readStr(*m, "bumpKind", bumpKind) && bumpKindFromString(bumpKind, o.material.bumpKind) &&
+					     detail::readNum(*m, "bumpStrength", o.material.bumpStrength);
+				}
+			}
+			if (const Json* vol = j.find("volume")) {
+				if (vol->type != Json::Type::Obj) ok = false;
+				else {
+					std::string kind = toString(o.volume.kind);
+					ok = ok && detail::readStr(*vol, "kind", kind) && volumeKindFromString(kind, o.volume.kind) && detail::readNum(*vol, "density", o.volume.density) &&
+					     detail::readRgb(*vol, "color", o.volume.color) && detail::readNum(*vol, "anisotropy", o.volume.anisotropy) &&
+					     detail::readNum(*vol, "wispiness", o.volume.wispiness) && detail::readNum(*vol, "frequency", o.volume.frequency);
 				}
 			}
 			if (!ok) break;

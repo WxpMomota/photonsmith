@@ -7,6 +7,33 @@
         <file alias="assets/downloadable_assets.txt">downloadable_assets.txt</file>
         <file alias="assets/scene_packs.txt">scene_packs.txt</file>
         <file>icons/render.svg</file>
+        <!-- A picture of a sphere made of each ready-made material, for the Scene Builder's Preset list (scripts/make_material_thumbnails.py). -->
+        <file>material_thumbs/aluminium.png</file>
+        <file>material_thumbs/blue-plastic.png</file>
+        <file>material_thumbs/brushed-steel.png</file>
+        <file>material_thumbs/candle-wax.png</file>
+        <file>material_thumbs/car-paint.png</file>
+        <file>material_thumbs/ceramic.png</file>
+        <file>material_thumbs/chalk.png</file>
+        <file>material_thumbs/chrome.png</file>
+        <file>material_thumbs/clay.png</file>
+        <file>material_thumbs/concrete.png</file>
+        <file>material_thumbs/copper.png</file>
+        <file>material_thumbs/diamond.png</file>
+        <file>material_thumbs/frosted-glass.png</file>
+        <file>material_thumbs/glass.png</file>
+        <file>material_thumbs/gold.png</file>
+        <file>material_thumbs/jade.png</file>
+        <file>material_thumbs/leaf.png</file>
+        <file>material_thumbs/marble-stone.png</file>
+        <file>material_thumbs/milk.png</file>
+        <file>material_thumbs/paper.png</file>
+        <file>material_thumbs/red-plastic.png</file>
+        <file>material_thumbs/rubber.png</file>
+        <file>material_thumbs/silver.png</file>
+        <file>material_thumbs/skin.png</file>
+        <file>material_thumbs/water.png</file>
+        <file>material_thumbs/wax.png</file>
         <file>icons/stop.svg</file>
         <file>icons/pause.svg</file>
         <file>icons/skip_next.svg</file>

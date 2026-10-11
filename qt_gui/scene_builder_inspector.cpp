@@ -10,6 +10,7 @@
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QIcon>
 #include <QImage>
 #include <QDir>
 #include <QAbstractSpinBox>
@@ -319,8 +320,10 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 	// A ready-made material (gold, frosted glass, red plastic...) sets the type and its values in one go; they can be tuned afterwards.
 	auto *preset = new QComboBox;
 	preset->addItem(tr("Choose a ready-made material..."), QString());
+	preset->setIconSize(QSize(36, 36));   // each preset shows a small picture of a sphere made of it (qt_gui/material_thumbs, made by scripts/make_material_thumbnails.py)
 	for (const scene_doc::MaterialPreset &p : scene_doc::materialPresets())
-		preset->addItem(QStringLiteral("%1: %2").arg(presetGroupLabel(p.group), presetLabel(p.name)), QString::fromLatin1(p.id));
+		preset->addItem(QIcon(QStringLiteral(":/material_thumbs/%1.png").arg(QString::fromLatin1(p.id))), QStringLiteral("%1: %2").arg(presetGroupLabel(p.group), presetLabel(p.name)),
+		                QString::fromLatin1(p.id));
 	connect(preset, QOverload<int>::of(&QComboBox::activated), this, [this, i, preset](int idx) {
 		const QString id = preset->itemData(idx).toString();
 		if (m_loading || id.isEmpty() || i >= static_cast<int>(m_doc.objects.size())) return;
@@ -329,7 +332,7 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 	});
 	f->addRow(tr("Preset"), preset);
 	auto *kind = new QComboBox;
-	for (MaterialKind k : {MaterialKind::Diffuse, MaterialKind::Conductor, MaterialKind::Dielectric, MaterialKind::CoatedDiffuse, MaterialKind::DiffuseTransmission})
+	for (MaterialKind k : {MaterialKind::Diffuse, MaterialKind::Conductor, MaterialKind::Dielectric, MaterialKind::CoatedDiffuse, MaterialKind::DiffuseTransmission, MaterialKind::Subsurface})
 		kind->addItem(materialLabel(k), static_cast<int>(k));
 	kind->setCurrentIndex(kind->findData(static_cast<int>(m_doc.objects[i].material.kind)));
 	connect(kind, QOverload<int>::of(&QComboBox::activated), this, [this, i, kind](int idx) {
@@ -340,6 +343,7 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 			// Starting values that look right for the new kind.
 			if (m.kind == MaterialKind::Conductor && m.roughness == 0.0) m.roughness = 0.1;
 			if (m.kind == MaterialKind::CoatedDiffuse && m.roughness == 0.0) m.roughness = 0.05;
+			if (m.kind == MaterialKind::Subsurface && m.ior == 1.5) m.ior = 1.4;   // (skin, milk and wax are nearer water's 1.33 than glass's 1.5)
 		});
 		QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
 	});
@@ -357,18 +361,66 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 			        if (o.shape == ShapeKind::Quad && px.isValid() && px.width() > 0) o.size.z = o.size.x * px.height() / px.width();
 		        });
 	};
+	// What the surface's colour is, when it is not a picture: a plain colour, a checker (matte only), or the renderer's marble or noise (their own colours).
+	// Returns true when the colour is a plain one (or a checker's first colour), so the caller shows the colour row.
+	const auto addPattern = [&](bool checkerToo) {
+		auto *pattern = new QComboBox;
+		pattern->addItem(tr("Plain colour"), 0);
+		if (checkerToo) pattern->addItem(tr("Checker"), 1);
+		pattern->addItem(tr("Marble"), 2);
+		pattern->addItem(tr("Noise (soft clouds)"), 3);
+		const int current = (checkerToo && m.checker) ? 1 : m.pattern == scene_doc::Pattern::Marble ? 2 : m.pattern == scene_doc::Pattern::Noise ? 3 : 0;
+		pattern->setCurrentIndex(pattern->findData(current));
+		connect(pattern, QOverload<int>::of(&QComboBox::activated), this, [this, i, pattern](int idx) {
+			if (m_loading || i >= static_cast<int>(m_doc.objects.size())) return;
+			const int what = pattern->itemData(idx).toInt();
+			edit(QString(), [&]() {
+				scene_doc::Material &mm = m_doc.objects[i].material;
+				mm.checker = what == 1;
+				mm.pattern = what == 2 ? scene_doc::Pattern::Marble : what == 3 ? scene_doc::Pattern::Noise : scene_doc::Pattern::None;
+			});
+			QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
+		});
+		f->addRow(tr("Pattern"), pattern);
+	};
+	// A picture that bumps the surface (a grayscale height map) or tilts its normals (an RGB normal map), for matte, glossy paint and metal.
+	const auto addBump = [&]() {
+		addFile(f, tr("Bump or normal map"), [mat]() { return mat() ? &mat()->bumpFile : nullptr; }, tr("Images (*.png *.jpg *.jpeg *.bmp *.tga *.exr *.hdr)"), true);
+		if (m.bumpFile.empty()) return;
+		auto *bumpKind = new QComboBox;
+		bumpKind->addItem(tr("Height map (grayscale: light is high)"), static_cast<int>(scene_doc::BumpKind::Height));
+		bumpKind->addItem(tr("Normal map (colour)"), static_cast<int>(scene_doc::BumpKind::Normal));
+		bumpKind->setCurrentIndex(bumpKind->findData(static_cast<int>(m.bumpKind)));
+		connect(bumpKind, QOverload<int>::of(&QComboBox::activated), this, [this, i, bumpKind](int idx) {
+			if (m_loading || i >= static_cast<int>(m_doc.objects.size())) return;
+			edit(QString(), [&]() { m_doc.objects[i].material.bumpKind = static_cast<scene_doc::BumpKind>(bumpKind->itemData(idx).toInt()); });
+			QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
+		});
+		f->addRow(tr("Picture is a"), bumpKind);
+		if (m.bumpKind == scene_doc::BumpKind::Height)
+			addNum(f, tr("Bump height"), [mat]() { return mat() ? &mat()->bumpStrength : nullptr; }, 0, 100, 0.01, 3);
+	};
+	bool bumpable = false;
 	switch (m.kind) {
 		case MaterialKind::Diffuse:
+			bumpable = true;
 			addPicture();
 			if (!m.imageFile.empty()) break;  // the picture is the colour
+			addPattern(true);
+			if (m.pattern == scene_doc::Pattern::Marble) {
+				addNum(f, tr("Veins"), [mat]() { return mat() ? &mat()->patternScale : nullptr; }, 0.1, 100, 0.5, 1);
+				addNum(f, tr("Wander"), [mat]() { return mat() ? &mat()->patternVariation : nullptr; }, 0, 5, 0.1, 2);
+				break;
+			}
+			if (m.pattern == scene_doc::Pattern::Noise) break;
 			addColor(f, m.checker ? tr("Colour A") : tr("Colour"), [mat]() { return mat() ? &mat()->color : nullptr; });
-			addBool(f, tr("Checker pattern"), [mat]() { return mat() ? &mat()->checker : nullptr; }, true);
 			if (m.checker) {
 				addColor(f, tr("Colour B"), [mat]() { return mat() ? &mat()->color2 : nullptr; });
 				addNum(f, tr("Checks across"), [mat]() { return mat() ? &mat()->checkerCount : nullptr; }, 1, 1000, 1, 0);
 			}
 			break;
 		case MaterialKind::Conductor:
+			bumpable = true;
 			addColor(f, tr("Colour"), [mat]() { return mat() ? &mat()->color : nullptr; });
 			addNum(f, tr("Roughness"), [mat]() { return mat() ? &mat()->roughness : nullptr; }, 0, 1, 0.02, 2);
 			break;
@@ -377,8 +429,17 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 			addNum(f, tr("Roughness"), [mat]() { return mat() ? &mat()->roughness : nullptr; }, 0, 1, 0.02, 2);
 			break;
 		case MaterialKind::CoatedDiffuse:
+			bumpable = true;
 			addPicture();
-			if (m.imageFile.empty()) addColor(f, tr("Paint colour"), [mat]() { return mat() ? &mat()->color : nullptr; });
+			if (m.imageFile.empty()) {
+				addPattern(false);
+				if (m.pattern == scene_doc::Pattern::Marble) {
+					addNum(f, tr("Veins"), [mat]() { return mat() ? &mat()->patternScale : nullptr; }, 0.1, 100, 0.5, 1);
+					addNum(f, tr("Wander"), [mat]() { return mat() ? &mat()->patternVariation : nullptr; }, 0, 5, 0.1, 2);
+				} else if (m.pattern == scene_doc::Pattern::None) {
+					addColor(f, tr("Paint colour"), [mat]() { return mat() ? &mat()->color : nullptr; });
+				}
+			}
 			addNum(f, tr("Coat index of refraction"), [mat]() { return mat() ? &mat()->ior : nullptr; }, 1.0, 3.0, 0.05, 2);
 			addNum(f, tr("Coat roughness"), [mat]() { return mat() ? &mat()->roughness : nullptr; }, 0, 1, 0.02, 2);
 			break;
@@ -386,10 +447,82 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 			addColor(f, tr("Reflects"), [mat]() { return mat() ? &mat()->color : nullptr; });
 			addColor(f, tr("Lets through"), [mat]() { return mat() ? &mat()->transmittance : nullptr; });
 			break;
+		case MaterialKind::Subsurface: {
+			addColor(f, tr("Colour"), [mat]() { return mat() ? &mat()->color : nullptr; });
+			addNum(f, tr("Travels under the surface: red"), [mat]() { return mat() ? &mat()->scatterDistance.r : nullptr; }, 0.001, 1000, 0.01, 3);
+			addNum(f, tr("Travels under the surface: green"), [mat]() { return mat() ? &mat()->scatterDistance.g : nullptr; }, 0.001, 1000, 0.01, 3);
+			addNum(f, tr("Travels under the surface: blue"), [mat]() { return mat() ? &mat()->scatterDistance.b : nullptr; }, 0.001, 1000, 0.01, 3);
+			addNum(f, tr("Index of refraction"), [mat]() { return mat() ? &mat()->ior : nullptr; }, 1.0, 3.0, 0.05, 2);
+			addNum(f, tr("Surface roughness"), [mat]() { return mat() ? &mat()->roughness : nullptr; }, 0, 1, 0.02, 2);
+			auto *hint = new QLabel(tr("Light goes into the surface, wanders about and comes out somewhere else, which softens the shading the way skin, wax, milk and marble are soft. The "
+			                           "distances are how far each colour travels before it scatters, in the scene's units: a tenth to a half of the object's size looks translucent, "
+			                           "much more looks like fog inside glass. A colour that travels further glows further from where the light went in (skin's red does)."));
+			hint->setWordWrap(true);
+			f->addRow(hint);
+			break;
+		}
 	}
+	if (bumpable) addBump();
+}
+
+// Fog, smoke or a cloud (scene_model.h Volume): where it is and how big, and what its medium does to light. No surface material and no light.
+void SceneBuilderWidget::inspectVolume(QFormLayout *f, int i) {
+	auto obj = [this, i]() -> Object * { return i < static_cast<int>(m_doc.objects.size()) ? &m_doc.objects[i] : nullptr; };
+	using scene_doc::VolumeKind;
+	addHeading(f, tr("Volume"));
+	addText(f, tr("Name"), [obj]() { return obj() ? &obj()->name : nullptr; });
+	auto *kind = new QComboBox;
+	for (VolumeKind k : {VolumeKind::Fog, VolumeKind::Smoke, VolumeKind::Cloud}) kind->addItem(volumeLabel(k), static_cast<int>(k));
+	kind->setCurrentIndex(kind->findData(static_cast<int>(m_doc.objects[i].volume.kind)));
+	connect(kind, QOverload<int>::of(&QComboBox::activated), this, [this, i, kind](int idx) {
+		if (m_loading || i >= static_cast<int>(m_doc.objects.size())) return;
+		edit(QString(), [&]() {
+			Object &o = m_doc.objects[i];
+			o.volume = scene_doc::makeVolume(static_cast<VolumeKind>(kind->itemData(idx).toInt()), o.name).volume;   // the new type's own starting values
+			if (o.volume.kind == VolumeKind::Cloud) o.shape = ShapeKind::Sphere;   // a cloud only fills a sphere
+		});
+		rebuildList();
+		QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
+	});
+	f->addRow(tr("Type"), kind);
+	const Object &o = m_doc.objects[i];
+	if (o.volume.kind != VolumeKind::Cloud) {   // fog and smoke can also fill a cylinder
+		auto *shape = new QComboBox;
+		shape->addItem(shapeLabel(ShapeKind::Sphere), static_cast<int>(ShapeKind::Sphere));
+		shape->addItem(shapeLabel(ShapeKind::Cylinder), static_cast<int>(ShapeKind::Cylinder));
+		shape->setCurrentIndex(shape->findData(static_cast<int>(o.shape)));
+		connect(shape, QOverload<int>::of(&QComboBox::activated), this, [this, i, shape](int idx) {
+			if (m_loading || i >= static_cast<int>(m_doc.objects.size())) return;
+			edit(QString(), [&]() { m_doc.objects[i].shape = static_cast<ShapeKind>(shape->itemData(idx).toInt()); });
+			QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
+		});
+		f->addRow(tr("Shape"), shape);
+	}
+	addVec3(f, tr("Position"), [obj]() { return obj() ? &obj()->position : nullptr; }, 0.25);
+	addVec3(f, tr("Rotation (degrees)"), [obj]() { return obj() ? &obj()->rotation : nullptr; }, 5.0);
+	addNum(f, tr("Radius"), [obj]() { return obj() ? &obj()->radius : nullptr; }, 0.001, 10000, 0.1);
+	if (o.shape == ShapeKind::Cylinder) addNum(f, tr("Height"), [obj]() { return obj() ? &obj()->height : nullptr; }, 0.001, 10000, 0.1);
+	addNum(f, tr("Density"), [obj]() { return obj() ? &obj()->volume.density : nullptr; }, 0.001, 10000, 0.1, 3);
+	if (o.volume.kind != VolumeKind::Cloud) addColor(f, tr("Colour"), [obj]() { return obj() ? &obj()->volume.color : nullptr; });
+	addNum(f, tr("Forward scattering"), [obj]() { return obj() ? &obj()->volume.anisotropy : nullptr; }, -0.95, 0.95, 0.05, 2);
+	if (o.volume.kind == VolumeKind::Cloud) {
+		addNum(f, tr("Wispiness"), [obj]() { return obj() ? &obj()->volume.wispiness : nullptr; }, 0, 2, 0.1, 2);
+		addNum(f, tr("Detail (lumps across)"), [obj]() { return obj() ? &obj()->volume.frequency : nullptr; }, 0.5, 30, 0.5, 1);
+	}
+	auto *hint = new QLabel(o.volume.kind == VolumeKind::Cloud
+	                            ? tr("A cloud scatters light and never absorbs it. Density is how thick it is: about 6 is a solid white cloud, 1 is a thin haze. Forward scattering above 0 "
+	                                 "gives the bright silver edge against the sun.")
+	                            : tr("Density is how quickly the light is scattered or absorbed per unit of distance: 0.3 is a light mist in a sphere a few units across, 2 is thick. "
+	                                 "The colour is what is scattered: white fog only scatters, so it glows; a dark colour absorbs the rest and looks like smoke."));
+	hint->setWordWrap(true);
+	f->addRow(hint);
 }
 
 void SceneBuilderWidget::inspectObject(QFormLayout *f, int i) {
+	if (m_doc.objects[i].volume.kind != scene_doc::VolumeKind::None) {
+		inspectVolume(f, i);
+		return;
+	}
 	auto obj = [this, i]() -> Object * { return i < static_cast<int>(m_doc.objects.size()) ? &m_doc.objects[i] : nullptr; };
 	addHeading(f, tr("Object"));
 	addText(f, tr("Name"), [obj]() { return obj() ? &obj()->name : nullptr; });

@@ -259,8 +259,9 @@ std::uint64_t Scene3DView::geometrySignature() const {
 		mix(h, o.shape);
 		mix(h, o.position); mix(h, o.rotation); mix(h, o.size);
 		mix(h, o.radius); mix(h, o.radius2); mix(h, o.height); mix(h, o.steps); mix(h, o.meshScale);
-		mix(h, o.material.kind); mix(h, o.material.color);
+		mix(h, o.material.kind); mix(h, o.material.color); mix(h, o.material.pattern);
 		mix(h, o.emissive);
+		mix(h, o.volume.kind); mix(h, o.volume.color);
 		mix(h, o.meshFile.data(), o.meshFile.size());
 	}
 	return h;
@@ -280,6 +281,8 @@ std::vector<Scene3DView::Face> &Scene3DView::faces() const {
 		else if (o.material.kind == MaterialKind::Conductor) base = base.lighter(115);
 		if (o.emissive) base = QColor(255, 220, 120);
 		if (o.material.kind == MaterialKind::Dielectric) base.setAlpha(150);
+		if (o.material.pattern != scene_doc::Pattern::None && o.material.imageFile.empty() && !o.material.checker) base = patternDrawColor(o.material.pattern);
+		if (o.volume.kind != scene_doc::VolumeKind::None) base = volumeDrawColor(o.volume);
 
 		auto addFace = [&](std::vector<Float3> local) {
 			Face f;

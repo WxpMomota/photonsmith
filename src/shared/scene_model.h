@@ -28,7 +28,17 @@ struct Rgb {
 	double r = 0.8, g = 0.8, b = 0.8;
 };
 
-enum class MaterialKind { Diffuse, Conductor, Dielectric, CoatedDiffuse, DiffuseTransmission };
+// Subsurface: light enters, scatters about inside and leaves somewhere else (skin, wax, milk, marble, jade). `color` is the surface's overall colour (pbrt's reflectance: what
+// a thick slab of it reflects) and `scatterDistance` how far light travels inside before it scatters, per colour channel in scene units: longer for a colour means that colour
+// glows further from where it entered (skin's red does). The same size object wants a different distance: about a tenth to a half of the object's size looks translucent.
+enum class MaterialKind { Diffuse, Conductor, Dielectric, CoatedDiffuse, DiffuseTransmission, Subsurface };
+
+// A procedural pattern for the colour of a Diffuse or CoatedDiffuse surface (with no picture and no checker): the renderer's own marble (pale stone with veins) and fbm noise
+// (soft grey clouds); both give their own colours.
+enum class Pattern { None, Marble, Noise };
+
+// What a bump slot's picture is: a grayscale height map (light is high; the surface is shaded as if it had that relief), or a tangent-space normal map (RGB: the shading normal).
+enum class BumpKind { Height, Normal };
 
 struct Material {
 	MaterialKind kind = MaterialKind::Diffuse;
@@ -40,6 +50,28 @@ struct Material {
 	double ior = 1.5;                  // Dielectric and CoatedDiffuse
 	Rgb transmittance{0.5, 0.5, 0.5};  // DiffuseTransmission (its reflectance is `color`)
 	std::string imageFile;             // Diffuse / CoatedDiffuse: a picture used as the surface colour (replaces `color` and the checker)
+	Pattern pattern = Pattern::None;   // Diffuse / CoatedDiffuse: marble or noise instead of `color` (not with a picture or a checker)
+	double patternScale = 4.0;         // Marble: how many veins (the renderer's marble "scale")
+	double patternVariation = 0.3;     // Marble: how much the veins wander
+	Rgb scatterDistance{0.10, 0.07, 0.05};   // Subsurface: mean free path per channel, in scene units
+	std::string bumpFile;              // Diffuse / CoatedDiffuse / Conductor: a picture that bumps the shading (empty: none)
+	BumpKind bumpKind = BumpKind::Height;
+	double bumpStrength = 0.05;        // Height map: how tall the relief is (the picture's 0..1 times this, in scene units)
+};
+
+// A volume is an object that is not a surface but a region of participating medium: fog, smoke or a cloud, inside a sphere (or, for fog and smoke, a cylinder). A surface's material,
+// picture and light do not apply to it; the renderer's media do (pbrt `MakeNamedMedium` with a `MediumInterface` on the shape). The strength of the medium is `density`, how much
+// of the light passing through one unit of it is scattered or absorbed; `color` is the fraction of that which is scattered, per colour channel, so white fog only scatters, a grey
+// smoke also absorbs (and looks dark), and a coloured one tints what it scatters.
+enum class VolumeKind { None, Fog, Smoke, Cloud };
+
+struct Volume {
+	VolumeKind kind = VolumeKind::None;
+	double density = 0.4;              // extinction per unit length (a cloud: the strength of its own lumpy density, which is 0 to 1 inside it)
+	Rgb color{1.0, 1.0, 1.0};          // Fog, Smoke: scattering albedo per channel: 1 scatters everything, 0 absorbs everything (a Cloud only scatters, and has no tint)
+	double anisotropy = 0.0;           // the phase function's g: 0 scatters evenly, towards 1 forwards (-1: backwards)
+	double wispiness = 1.0;            // Cloud: how torn and feathery its edges are, 0 to 2
+	double frequency = 4.0;            // Cloud: how many lumps across (higher is finer detail)
 };
 
 enum class ShapeKind { Sphere, Box, Quad, Disk, Cylinder, Cone, Mesh, Pyramid, Wedge, Stairs, Torus, Capsule, Dome, Tube };
@@ -70,6 +102,7 @@ struct Object {
 	double meshScale = 1.0;            // Mesh
 	std::string meshFile;              // Mesh: a .ply file
 	Material material;
+	Volume volume;                     // kind != None: this object is fog, smoke or a cloud (a Sphere, or a Cylinder for fog and smoke) and has no surface material or light
 	bool emissive = false;             // an area light
 	Rgb emission{1.0, 1.0, 1.0};
 	double emissionStrength = 10.0;    // radiance = emission * strength
@@ -166,12 +199,46 @@ inline const char* toString(MaterialKind k) {
 		case MaterialKind::Dielectric: return "dielectric";
 		case MaterialKind::CoatedDiffuse: return "coateddiffuse";
 		case MaterialKind::DiffuseTransmission: return "diffusetransmission";
+		case MaterialKind::Subsurface: return "subsurface";
 	}
 	return "diffuse";
 }
+inline const char* toString(Pattern p) {
+	switch (p) {
+		case Pattern::None: return "none";
+		case Pattern::Marble: return "marble";
+		case Pattern::Noise: return "noise";
+	}
+	return "none";
+}
+inline bool patternFromString(const std::string& s, Pattern& out) {
+	for (Pattern p : {Pattern::None, Pattern::Marble, Pattern::Noise})
+		if (s == toString(p)) { out = p; return true; }
+	return false;
+}
+inline const char* toString(BumpKind k) { return k == BumpKind::Normal ? "normal" : "height"; }
+inline bool bumpKindFromString(const std::string& s, BumpKind& out) {
+	if (s == "height") { out = BumpKind::Height; return true; }
+	if (s == "normal") { out = BumpKind::Normal; return true; }
+	return false;
+}
 inline bool materialKindFromString(const std::string& s, MaterialKind& out) {
 	for (MaterialKind k : {MaterialKind::Diffuse, MaterialKind::Conductor, MaterialKind::Dielectric, MaterialKind::CoatedDiffuse,
-	                       MaterialKind::DiffuseTransmission})
+	                       MaterialKind::DiffuseTransmission, MaterialKind::Subsurface})
+		if (s == toString(k)) { out = k; return true; }
+	return false;
+}
+inline const char* toString(VolumeKind k) {
+	switch (k) {
+		case VolumeKind::None: return "none";
+		case VolumeKind::Fog: return "fog";
+		case VolumeKind::Smoke: return "smoke";
+		case VolumeKind::Cloud: return "cloud";
+	}
+	return "none";
+}
+inline bool volumeKindFromString(const std::string& s, VolumeKind& out) {
+	for (VolumeKind k : {VolumeKind::None, VolumeKind::Fog, VolumeKind::Smoke, VolumeKind::Cloud})
 		if (s == toString(k)) { out = k; return true; }
 	return false;
 }

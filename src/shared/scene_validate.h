@@ -59,7 +59,7 @@ inline std::vector<Problem> validate(const Document& d) {
 	bool anyLight = !d.lights.empty();
 	for (const Object& o : d.objects) {
 		const std::string who = "'" + o.name + "': ";
-		if (o.emissive) anyLight = true;
+		if (o.emissive && o.volume.kind == VolumeKind::None) anyLight = true;
 		switch (o.shape) {
 			case ShapeKind::Sphere: if (!(o.radius > 0.0)) err(who + "the radius must be above zero."); break;
 			case ShapeKind::Disk: if (!(o.radius > 0.0)) err(who + "the radius must be above zero."); break;
@@ -95,6 +95,19 @@ inline std::vector<Problem> validate(const Document& d) {
 				if (!(o.meshScale > 0.0)) err(who + "the mesh scale must be above zero.");
 				break;
 		}
+		if (o.volume.kind != VolumeKind::None) {   // fog, smoke or a cloud: a medium has no surface material, picture or light
+			const Volume& v = o.volume;
+			if (o.shape != ShapeKind::Sphere && !(o.shape == ShapeKind::Cylinder && v.kind != VolumeKind::Cloud))
+				err(who + "a volume can only be a sphere (or a cylinder, for fog and smoke): the renderer's media fill nothing else.");
+			if (!(v.density > 0.0)) err(who + "the density must be above zero.");
+			if (!(v.color.r >= 0.0 && v.color.g >= 0.0 && v.color.b >= 0.0 && v.color.r <= 1.0 && v.color.g <= 1.0 && v.color.b <= 1.0))
+				err(who + "the scattering colour must be between 0 and 1 in every channel (1 scatters all the light, 0 absorbs all of it).");
+			if (!(v.anisotropy > -1.0 && v.anisotropy < 1.0)) err(who + "the anisotropy must be between -1 and 1 (not including them).");
+			if (v.kind == VolumeKind::Cloud && !(v.wispiness >= 0.0 && v.wispiness <= 2.0)) err(who + "a cloud's wispiness must be between 0 and 2.");
+			if (v.kind == VolumeKind::Cloud && !(v.frequency > 0.0)) err(who + "a cloud's detail (frequency) must be above zero.");
+			if (o.emissive) warn(who + "a volume does not give off light, so \"Gives off light\" is ignored for it.");
+			continue;
+		}
 		if (o.emissive && o.emissionStrength <= 0.0) warn(who + "it is an area light with no strength, so it gives no light.");
 		if (!o.material.imageFile.empty()) {
 			if (o.material.kind != MaterialKind::Diffuse && o.material.kind != MaterialKind::CoatedDiffuse)
@@ -105,13 +118,35 @@ inline std::vector<Problem> validate(const Document& d) {
 		}
 		if (o.shape == ShapeKind::Mesh && detail::absoluteFileMissing(o.meshFile))
 			warn(who + "the mesh file was not found (" + o.meshFile + "). Choose it again.");
+		if (o.material.pattern != Pattern::None) {
+			if (o.material.kind != MaterialKind::Diffuse && o.material.kind != MaterialKind::CoatedDiffuse) warn(who + "the marble and noise patterns only apply to diffuse and glossy paint materials.");
+			else if (!o.material.imageFile.empty()) warn(who + "the picture replaces the " + toString(o.material.pattern) + " pattern.");
+			else if (o.material.checker) warn(who + "the checker pattern replaces the " + toString(o.material.pattern) + " pattern.");
+			if (o.material.pattern == Pattern::Marble && (!(o.material.patternScale > 0.0) || !(o.material.patternVariation >= 0.0)))
+				err(who + "the marble's scale must be above zero and its variation not negative.");
+		}
+		if (o.material.kind == MaterialKind::Subsurface) {
+			const Rgb& d = o.material.scatterDistance;
+			if (!(d.r > 0.0 && d.g > 0.0 && d.b > 0.0)) err(who + "the distance light travels under the surface must be above zero in every colour.");
+		}
+		if (!o.material.bumpFile.empty()) {
+			const MaterialKind k = o.material.kind;
+			if (k != MaterialKind::Diffuse && k != MaterialKind::CoatedDiffuse && k != MaterialKind::Conductor)
+				warn(who + "a bump or normal map only applies to matte, glossy paint and metal materials.");
+			else if (o.shape == ShapeKind::Sphere || o.shape == ShapeKind::Disk || o.shape == ShapeKind::Cylinder || o.shape == ShapeKind::Cone)
+				warn(who + "the GPU renderers apply a bump or normal map to shapes made of triangles only (a box, quad, mesh or the ready-made shapes); on a " + toString(o.shape) +
+				     " it shows in the CPU preview but not on the GPU.");
+			if (o.material.bumpKind == BumpKind::Height && !(o.material.bumpStrength >= 0.0)) err(who + "the bump height cannot be negative.");
+			if (detail::absoluteFileMissing(o.material.bumpFile))
+				warn(who + "the bump picture file was not found (" + o.material.bumpFile + "), so it will render without it. Choose it again.");
+		}
 		if (o.material.checker && o.material.kind != MaterialKind::Diffuse) warn(who + "the checker pattern only applies to diffuse materials.");
 		if (o.material.checker && o.shape == ShapeKind::Box) warn(who + "the checker pattern is not applied to boxes.");
-		if ((o.material.kind == MaterialKind::Dielectric || o.material.kind == MaterialKind::CoatedDiffuse) && !(o.material.ior >= 1.0 && o.material.ior <= 3.0))
+		if ((o.material.kind == MaterialKind::Dielectric || o.material.kind == MaterialKind::CoatedDiffuse || o.material.kind == MaterialKind::Subsurface) && !(o.material.ior >= 1.0 && o.material.ior <= 3.0))
 			warn(who + "an index of refraction outside 1 to 3 is unusual.");
 		if (o.material.roughness < 0.0 || o.material.roughness > 1.0) err(who + "the roughness must be between 0 and 1.");
 		if (o.material.kind == MaterialKind::Diffuse || o.material.kind == MaterialKind::Conductor || o.material.kind == MaterialKind::CoatedDiffuse ||
-		    o.material.kind == MaterialKind::DiffuseTransmission) {
+		    o.material.kind == MaterialKind::DiffuseTransmission || o.material.kind == MaterialKind::Subsurface) {
 			auto bad = [](const Rgb& c) { return c.r < 0 || c.g < 0 || c.b < 0 || c.r > 1 || c.g > 1 || c.b > 1; };
 			if (bad(o.material.color)) warn(who + "a reflectance colour outside 0 to 1 gives more light out than in.");
 		}

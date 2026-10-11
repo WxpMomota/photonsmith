@@ -15,7 +15,7 @@ namespace scene_doc {
 struct MaterialPreset {
 	const char* id;     // stable, never shown; the name below is what a user sees (translated by the GUI)
 	const char* name;
-	const char* group;  // "Matte", "Plastic", "Metal", "Glass", "Translucent"
+	const char* group;  // "Matte", "Plastic", "Metal", "Glass", "Translucent", "Subsurface"
 	Material material;
 };
 
@@ -27,6 +27,16 @@ inline Material make(MaterialKind kind, Rgb color, double roughness = 0.0, doubl
 	m.roughness = roughness;
 	m.ior = ior;
 	m.transmittance = transmittance;
+	return m;
+}
+// A subsurface material: `color` is the overall colour, `distance` how far each colour travels under the surface (scene units: tuned for an object about two units across).
+inline Material subsurface(Rgb color, Rgb distance, double ior, double roughness) {
+	Material m;
+	m.kind = MaterialKind::Subsurface;
+	m.color = color;
+	m.scatterDistance = distance;
+	m.ior = ior;
+	m.roughness = roughness;
 	return m;
 }
 }  // namespace presets_detail
@@ -55,6 +65,12 @@ inline const std::vector<MaterialPreset>& materialPresets() {
 		{"wax", "Wax", "Translucent", make(MaterialKind::DiffuseTransmission, {0.70, 0.62, 0.40}, 0.0, 1.5, {0.40, 0.34, 0.16})},
 		{"leaf", "Leaf", "Translucent", make(MaterialKind::DiffuseTransmission, {0.10, 0.38, 0.07}, 0.0, 1.5, {0.12, 0.34, 0.05})},
 		{"paper", "Paper", "Translucent", make(MaterialKind::DiffuseTransmission, {0.78, 0.78, 0.74}, 0.0, 1.5, {0.45, 0.45, 0.42})},
+		// Light goes into these and comes out elsewhere, softening the shading (the red of skin travels furthest).
+		{"skin", "Skin", "Subsurface", subsurface({0.80, 0.58, 0.48}, {0.140, 0.055, 0.036}, 1.4, 0.35)},
+		{"milk", "Milk", "Subsurface", subsurface({0.92, 0.90, 0.82}, {0.105, 0.085, 0.060}, 1.33, 0.15)},
+		{"marble-stone", "Marble stone", "Subsurface", subsurface({0.88, 0.86, 0.82}, {0.060, 0.050, 0.040}, 1.5, 0.05)},
+		{"jade", "Jade", "Subsurface", subsurface({0.30, 0.62, 0.42}, {0.090, 0.036, 0.066}, 1.6, 0.10)},
+		{"candle-wax", "Candle wax", "Subsurface", subsurface({0.90, 0.78, 0.52}, {0.105, 0.066, 0.036}, 1.45, 0.20)},
 	};
 	return all;
 }
@@ -70,9 +86,16 @@ inline const MaterialPreset* findMaterialPreset(const std::string& id) {
 inline bool applyMaterialPreset(Material& m, const std::string& id) {
 	const MaterialPreset* p = findMaterialPreset(id);
 	if (!p) return false;
+	const std::string bumpFile = m.bumpFile;   // (a bump slot is the surface's relief, not its colour: it stays)
+	const BumpKind bumpKind = m.bumpKind;
+	const double bumpStrength = m.bumpStrength;
 	m = p->material;
+	m.bumpFile = bumpFile;
+	m.bumpKind = bumpKind;
+	m.bumpStrength = bumpStrength;
 	m.imageFile.clear();
 	m.checker = false;
+	m.pattern = Pattern::None;
 	return true;
 }
 

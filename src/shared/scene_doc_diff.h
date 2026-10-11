@@ -24,8 +24,12 @@ inline Fields fieldsOf(const Object& o) {
 	        {"radius2", v(o.radius2)}, {"height", v(o.height)}, {"size", v(o.size)}, {"steps", std::to_string(o.steps)}, {"meshScale", v(o.meshScale)},
 	        {"meshFile", o.meshFile}, {"material", toString(o.material.kind)}, {"color", v(o.material.color)}, {"checker", o.material.checker ? "1" : "0"},
 	        {"color2", v(o.material.color2)}, {"checkerCount", v(o.material.checkerCount)}, {"roughness", v(o.material.roughness)}, {"ior", v(o.material.ior)},
-	        {"transmittance", v(o.material.transmittance)}, {"picture", o.material.imageFile}, {"emissive", o.emissive ? "1" : "0"}, {"emission", v(o.emission)},
-	        {"strength", v(o.emissionStrength)}, {"twoSided", o.twoSided ? "1" : "0"}, {"group", o.group}};
+	        {"transmittance", v(o.material.transmittance)}, {"picture", o.material.imageFile}, {"pattern", toString(o.material.pattern)},
+	        {"patternScale", v(o.material.patternScale)}, {"patternVariation", v(o.material.patternVariation)}, {"scatterDistance", v(o.material.scatterDistance)},
+	        {"bump", o.material.bumpFile}, {"bumpKind", toString(o.material.bumpKind)}, {"bumpStrength", v(o.material.bumpStrength)}, {"emissive", o.emissive ? "1" : "0"}, {"emission", v(o.emission)},
+	        {"strength", v(o.emissionStrength)}, {"twoSided", o.twoSided ? "1" : "0"}, {"group", o.group},
+	        {"volume", toString(o.volume.kind)}, {"density", v(o.volume.density)}, {"scatterColor", v(o.volume.color)}, {"anisotropy", v(o.volume.anisotropy)},
+	        {"wispiness", v(o.volume.wispiness)}, {"frequency", v(o.volume.frequency)}};
 }
 inline Fields fieldsOf(const Light& l) {
 	return {{"name", l.name}, {"kind", toString(l.kind)}, {"position", v(l.position)}, {"target", v(l.target)}, {"color", v(l.color)},

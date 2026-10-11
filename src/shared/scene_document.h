@@ -61,6 +61,35 @@ inline Object makeObject(ShapeKind shape, const std::string& name) {
 	return o;
 }
 
+// Fog, smoke or a cloud: a sphere of participating medium standing on the floor, with starting values that look like what it is named after. (The strengths are per unit length,
+// so a bigger one wants a smaller density to stay as see-through.)
+inline Object makeVolume(VolumeKind kind, const std::string& name) {
+	Object o = makeObject(ShapeKind::Sphere, name);
+	o.volume.kind = kind;
+	switch (kind) {
+		case VolumeKind::Fog:
+			o.radius = 2.0;
+			o.position = {0, 2.0, 0};
+			o.volume.density = 0.35;
+			break;
+		case VolumeKind::Smoke:
+			o.radius = 1.4;
+			o.position = {0, 1.4, 0};
+			o.volume.density = 1.6;
+			o.volume.color = {0.30, 0.30, 0.32};
+			o.volume.anisotropy = 0.3;
+			break;
+		case VolumeKind::Cloud:
+			o.radius = 3.0;
+			o.position = {0, 4.0, 0};
+			o.volume.density = 6.0;
+			o.volume.anisotropy = 0.3;
+			break;
+		case VolumeKind::None: break;
+	}
+	return o;
+}
+
 // A light panel: a quad that faces down, to hang above a scene.
 inline Object makeAreaLightPanel(const std::string& name) {
 	Object o = makeObject(ShapeKind::Quad, name);

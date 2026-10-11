@@ -76,6 +76,9 @@ Utility scripts for building, packaging, and testing the ray tracer.
 - **`run_optix_sweeps.ps1`** - Builds the renderer and runs that sweep on both OptiX backends (recursive, then wavefront with
   `RAY_TRACER_WAVEFRONT=1`), ending with one PASS/FAIL line each (exit code 0: nothing off). `-NoBuild`, `-Only sky,shapeform`,
   `-Backend Wavefront`, `-Detail`. About ten minutes a backend; run it after a change that can alter a picture, since the Mac cannot run OptiX.
+- **`make_material_thumbnails.py`** - Renders `qt_gui/material_thumbs/<preset>.png`, the pictures of the Scene Builder's material presets (a sphere in a small
+  studio, CPU, from scenes the unit tests write with the Scene Builder's own document code). Run it after adding or changing a preset, then add the new
+  file to `qt_gui/resources.qrc` (it prints the lines).
 - **`run_tests_parallel.ps1`** - Shards `ray_tracer_tests.exe` across multiple
   parallel processes (`GTEST_TOTAL_SHARDS`), with per-shard scratch
   directories to avoid output-file collisions

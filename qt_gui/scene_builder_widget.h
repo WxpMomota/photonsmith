@@ -126,6 +126,7 @@ public:
 	void setGizmoToolForTest(int tool) { m_view3d->setGizmoMode(static_cast<Scene3DView::GizmoMode>(tool)); }   // 0 Move, 1 Rotate, 2 Scale
 	bool dragScale3dForTest(int index, int axis, double ratio);
 	BuilderSelection selectionForTest() const { return m_sel; }
+	void setMaterialForTest(int index, const scene_doc::Material &m);   // an object's material set as the user would leave it, and the properties rebuilt
 	bool dragViewMarker3dForTest(int viewIndex, int which, const QPointF &deltaPx, Qt::KeyboardModifiers mods = Qt::NoModifier);   // a saved view's marker in the 3D view
 	void orbit3dForTest(double yawDeg, double pitchDeg);
 	void frame3dForTest() { m_view3d->frameAll(); }
@@ -142,6 +143,7 @@ public:
 	void showArrayDialog();                                    // the Array... button: a grid, ring or scatter of copies of the selected object
 	// The objects go in together at the drop point, named apart from what is there, as a group of that name (two or more) and all picked.
 	void addParts(std::vector<scene_doc::Object> parts, const QString &groupName = QString());
+	void addVolume(scene_doc::VolumeKind kind);   // fog, smoke or a cloud
 	void addLight(scene_doc::LightKind kind);
 	void addObjectFromPhoto();  // scene_builder_photo.cpp: needs the optional photo helper
 	void showModelLibrary();    // scene_builder_models.cpp: the dialog behind Add > Model library...
@@ -283,6 +285,7 @@ private:
 	void addFile(QFormLayout *f, const QString &label, const std::function<std::string *()> &ref, const QString &filter, bool clearable = false,
 	             const std::function<void(const QString &)> &alsoApply = nullptr);
 	void inspectCamera(QFormLayout *f);
+	void inspectVolume(QFormLayout *f, int i);
 	void inspectObject(QFormLayout *f, int i);
 	void inspectLight(QFormLayout *f, int i);
 	void inspectMaterial(QFormLayout *f, int i);

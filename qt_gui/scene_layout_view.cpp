@@ -341,8 +341,10 @@ void SceneLayoutView::paintEvent(QPaintEvent *) {
 		const QList<QPointF> poly = silhouette(o);
 		QColor fill = toQColor(o.material.color);
 		if (o.material.kind == MaterialKind::Dielectric) fill = QColor(150, 200, 240);
+		if (o.material.pattern != scene_doc::Pattern::None && o.material.imageFile.empty() && !o.material.checker) fill = patternDrawColor(o.material.pattern);
 		if (o.emissive) fill = QColor(255, 214, 110);
 		fill.setAlpha(o.shape == ShapeKind::Quad && o.size.x * o.size.z > 30 ? 60 : 140);
+		if (o.volume.kind != scene_doc::VolumeKind::None) fill = volumeDrawColor(o.volume);
 		const bool selected = isPicked({BuilderSelection::Kind::Object, i});
 		p.setBrush(fill);
 		p.setPen(QPen(selected ? accent : text, selected ? 2.5 : 1.0));

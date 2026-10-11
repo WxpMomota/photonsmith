@@ -24,17 +24,20 @@ namespace scene_doc {
 
 namespace detail {
 
-// `textureName`, when not empty, is a Texture already declared: it replaces the flat reflectance of a diffuse or coated material.
-inline void writeMaterial(std::ostringstream& os, const Material& m, const std::string& ind, const std::string& textureName = std::string()) {
+// `textureName`, when not empty, is a Texture already declared: it replaces the flat reflectance of a diffuse or coated material. `displacement`, when not empty, is a Texture
+// already declared that bumps (a height map) or perturbs the normal (a normal map) of a diffuse, coated or conductor surface.
+inline void writeMaterial(std::ostringstream& os, const Material& m, const std::string& ind, const std::string& textureName = std::string(),
+                          const std::string& displacement = std::string()) {
 	const auto reflectance = [&]() {
 		return textureName.empty() ? "\"rgb reflectance\" [ " + rgb(m.color) + " ]" : "\"texture reflectance\" \"" + textureName + "\"";
 	};
+	const std::string bump = displacement.empty() ? std::string() : " \"texture displacement\" \"" + displacement + "\"";
 	switch (m.kind) {
 		case MaterialKind::Diffuse:
-			os << ind << "Material \"diffuse\" " << reflectance() << "\n";
+			os << ind << "Material \"diffuse\" " << reflectance() << bump << "\n";
 			break;
 		case MaterialKind::Conductor:
-			os << ind << "Material \"conductor\" \"rgb reflectance\" [ " << rgb(m.color) << " ] \"float roughness\" [ " << num(m.roughness) << " ]\n";
+			os << ind << "Material \"conductor\" \"rgb reflectance\" [ " << rgb(m.color) << " ] \"float roughness\" [ " << num(m.roughness) << " ]" << bump << "\n";
 			break;
 		case MaterialKind::Dielectric:
 			os << ind << "Material \"dielectric\" \"float eta\" [ " << num(m.ior) << " ]";
@@ -43,7 +46,13 @@ inline void writeMaterial(std::ostringstream& os, const Material& m, const std::
 			break;
 		case MaterialKind::CoatedDiffuse:
 			os << ind << "Material \"coateddiffuse\" " << reflectance() << " \"float eta\" [ " << num(m.ior) << " ] \"float roughness\" [ "
-			   << num(m.roughness) << " ]\n";
+			   << num(m.roughness) << " ]" << bump << "\n";
+			break;
+		case MaterialKind::Subsurface:
+			// pbrt's subsurface from a colour and a mean free path: the renderer inverts the colour into scattering coefficients (the same on every backend).
+			os << ind << "Material \"subsurface\" \"rgb reflectance\" [ " << rgb(m.color) << " ] \"rgb mfp\" [ " << rgb(m.scatterDistance) << " ] \"float eta\" [ " << num(m.ior) << " ]";
+			if (m.roughness > 0.0) os << " \"float roughness\" [ " << num(m.roughness) << " ]";
+			os << "\n";
 			break;
 		case MaterialKind::DiffuseTransmission:
 			os << ind << "Material \"diffusetransmission\" \"rgb reflectance\" [ " << rgb(m.color) << " ] \"rgb transmittance\" [ " << rgb(m.transmittance)
@@ -146,6 +155,35 @@ inline void writeShape(std::ostringstream& os, const Object& o, const std::strin
 	}
 }
 
+// A volume object (Volume in scene_model.h): its medium, named volume-N, and the shape carrying it. The shape has pbrt's "interface" material (a surface with no BSDF that
+// light passes straight through) and a MediumInterface naming the medium inside and none outside, which is how the renderer's media are given a boundary. The medium's extinction
+// is `density` split by the albedo: sigma_s = density * color and sigma_a = density * (1 - color), per channel.
+inline void writeVolume(std::ostringstream& os, const Object& o, int n, const std::string& ind) {
+	const Volume& v = o.volume;
+	const std::string name = "volume-" + std::to_string(n);
+	// A cloud only scatters, the same in every colour: the CPU's cloud medium has no absorption or tint (cloud_medium_hittable.h), so the Scene Builder does not offer them.
+	const bool cloud = v.kind == VolumeKind::Cloud;
+	const Rgb absorbed = cloud ? Rgb{0, 0, 0} : Rgb{v.density * (1.0 - v.color.r), v.density * (1.0 - v.color.g), v.density * (1.0 - v.color.b)};
+	const Rgb scattered = cloud ? Rgb{v.density, v.density, v.density} : Rgb{v.density * v.color.r, v.density * v.color.g, v.density * v.color.b};
+	if (v.kind == VolumeKind::Cloud) {
+		// The cloud's lumpy density fills the unit cube of its medium space, so the medium is declared with the cube scaled and moved to just hold the sphere (the sphere then
+		// cuts it round): from -r to r about the object's centre.
+		const double r = o.radius;
+		os << ind << "AttributeBegin\n"
+		   << ind << "  Translate " << num(-r) << " " << num(-r) << " " << num(-r) << "\n"
+		   << ind << "  Scale " << num(2 * r) << " " << num(2 * r) << " " << num(2 * r) << "\n"
+		   << ind << "  MakeNamedMedium \"" << name << "\" \"string type\" [ \"cloud\" ] \"rgb sigma_a\" [ " << rgb(absorbed) << " ] \"rgb sigma_s\" [ " << rgb(scattered)
+		   << " ] \"float g\" [ " << num(v.anisotropy) << " ] \"float density\" [ 1 ] \"float wispiness\" [ " << num(v.wispiness) << " ] \"float frequency\" [ "
+		   << num(v.frequency) << " ]\n"
+		   << ind << "AttributeEnd\n";
+	} else {
+		os << ind << "MakeNamedMedium \"" << name << "\" \"string type\" [ \"homogeneous\" ] \"rgb sigma_a\" [ " << rgb(absorbed) << " ] \"rgb sigma_s\" [ " << rgb(scattered)
+		   << " ] \"float g\" [ " << num(v.anisotropy) << " ]\n";
+	}
+	os << ind << "Material \"interface\"\n" << ind << "MediumInterface \"" << name << "\" \"\"\n";
+	writeShape(os, o, ind);
+}
+
 }  // namespace detail
 
 // The triangle mesh of one of the generated shapes (isGeneratedShape), in the object's own space; the GUI's previews draw it too.
@@ -216,20 +254,49 @@ inline std::string toPbrt(const Document& d) {
 	}
 	if (!d.lights.empty()) os << "\n";
 
-	int textureIndex = 0;
+	int textureIndex = 0, mediumIndex = 0;
 	for (const Object& o : d.objects) {
 		os << "# " << detail::commentText(o.name) << "\n";
+		if (o.volume.kind != VolumeKind::None) {   // fog, smoke or a cloud: a medium, with no material or light of its own
+			os << "AttributeBegin\n";
+			os << "  Translate " << detail::vec(o.position) << "\n";
+			if (o.rotation.z != 0.0) os << "  Rotate " << detail::num(o.rotation.z) << " 0 0 1\n";
+			if (o.rotation.y != 0.0) os << "  Rotate " << detail::num(o.rotation.y) << " 0 1 0\n";
+			if (o.rotation.x != 0.0) os << "  Rotate " << detail::num(o.rotation.x) << " 1 0 0\n";
+			detail::writeVolume(os, o, ++mediumIndex, "  ");
+			os << "AttributeEnd\n\n";
+			continue;
+		}
 		std::string textureName;
 		const bool pictured = !o.material.imageFile.empty() && (o.material.kind == MaterialKind::Diffuse || o.material.kind == MaterialKind::CoatedDiffuse);
 		if (pictured) {
 			textureName = "picture-" + std::to_string(++textureIndex);
 			os << "Texture \"" << textureName << "\" \"spectrum\" \"imagemap\" \"string filename\" [ " << detail::quoted(detail::pbrtPath(o.material.imageFile))
 			   << " ]\n";
+		} else if (o.material.pattern != Pattern::None && !o.material.checker && (o.material.kind == MaterialKind::Diffuse || o.material.kind == MaterialKind::CoatedDiffuse)) {
+			textureName = "pattern-" + std::to_string(++textureIndex);
+			if (o.material.pattern == Pattern::Marble)
+				os << "Texture \"" << textureName << "\" \"spectrum\" \"marble\" \"float scale\" [ " << detail::num(o.material.patternScale) << " ] \"float variation\" [ "
+				   << detail::num(o.material.patternVariation) << " ]\n";
+			else
+				os << "Texture \"" << textureName << "\" \"spectrum\" \"fbm\"\n";
 		} else if (o.material.checker && o.material.kind == MaterialKind::Diffuse && o.shape != ShapeKind::Box) {
 			textureName = "checks-" + std::to_string(++textureIndex);
 			os << "Texture \"" << textureName << "\" \"spectrum\" \"checkerboard\" \"float uscale\" [ " << detail::num(o.material.checkerCount)
 			   << " ] \"float vscale\" [ " << detail::num(o.material.checkerCount) << " ] \"rgb tex1\" [ " << detail::rgb(o.material.color)
 			   << " ] \"rgb tex2\" [ " << detail::rgb(o.material.color2) << " ]\n";
+		}
+		// A bump slot: a height map is a float image scaled to its height; a normal map is the colour image itself (the renderer reads either as the material's displacement).
+		std::string displacement;
+		const bool canBump = o.material.kind == MaterialKind::Diffuse || o.material.kind == MaterialKind::CoatedDiffuse || o.material.kind == MaterialKind::Conductor;
+		if (canBump && !o.material.bumpFile.empty()) {
+			displacement = "bump-" + std::to_string(++textureIndex);
+			if (o.material.bumpKind == BumpKind::Height) {
+				os << "Texture \"" << displacement << "-image\" \"float\" \"imagemap\" \"string filename\" [ " << detail::quoted(detail::pbrtPath(o.material.bumpFile)) << " ]\n";
+				os << "Texture \"" << displacement << "\" \"float\" \"scale\" \"texture tex\" [ \"" << displacement << "-image\" ] \"float scale\" [ " << detail::num(o.material.bumpStrength) << " ]\n";
+			} else {
+				os << "Texture \"" << displacement << "\" \"spectrum\" \"imagemap\" \"string filename\" [ " << detail::quoted(detail::pbrtPath(o.material.bumpFile)) << " ]\n";
+			}
 		}
 		os << "AttributeBegin\n";
 		const std::string ind = "  ";
@@ -237,7 +304,7 @@ inline std::string toPbrt(const Document& d) {
 		if (o.rotation.z != 0.0) os << ind << "Rotate " << detail::num(o.rotation.z) << " 0 0 1\n";
 		if (o.rotation.y != 0.0) os << ind << "Rotate " << detail::num(o.rotation.y) << " 0 1 0\n";
 		if (o.rotation.x != 0.0) os << ind << "Rotate " << detail::num(o.rotation.x) << " 1 0 0\n";
-		detail::writeMaterial(os, o.material, ind, textureName);
+		detail::writeMaterial(os, o.material, ind, textureName, displacement);
 		if (o.emissive) {
 			os << ind << "AreaLightSource \"diffuse\" \"rgb L\" [ " << detail::rgb(detail::scaled(o.emission, o.emissionStrength)) << " ]";
 			if (o.twoSided) os << " \"bool twosided\" true";

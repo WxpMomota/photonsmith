@@ -291,6 +291,24 @@ void MainWindow::selfTestShapes(SceneBuilderWidget *sb, const std::function<void
 		for (size_t n = 0; n < added; ++n) sb->redo();
 		for (size_t n = 0; n < added; ++n) sb->undo();
 	}
+	// Volumes: fog, smoke and a cloud each add as one object that is a medium (not a surface), validate, draw in both views and undo.
+	{
+		const size_t before = sb->document().objects.size();
+		for (scene_doc::VolumeKind k : {scene_doc::VolumeKind::Fog, scene_doc::VolumeKind::Smoke, scene_doc::VolumeKind::Cloud}) sb->addVolume(k);
+		const auto &objs = sb->document().objects;
+		check(objs.size() == before + 3 && objs[before].volume.kind == scene_doc::VolumeKind::Fog && objs[before + 2].volume.kind == scene_doc::VolumeKind::Cloud, "Add > Volumes adds fog, smoke and a cloud");
+		check(sb->problemsText().isEmpty(), "the volumes give no problems or notes");
+		std::set<std::string> names;
+		for (const scene_doc::Object &o : objs) names.insert(o.name);
+		check(names.size() == objs.size() && objs[before].name == "Fog" && objs[before + 1].name == "Smoke", "named for what they are, and apart");
+		sb->show3dView(true);
+		sb->frame3dForTest();
+		check(sb->cameraPathPixelsForTest(false) >= 0, "the 3D view draws them (see-through)");
+		sb->show3dView(false);
+		bool undone = true;
+		for (int n = 0; n < 3; ++n) undone = sb->undo() && undone;
+		check(undone && sb->document().objects.size() == before, "each is one undo step");
+	}
 	// The model library: a bundled model is added at about 1.6 units across, standing on the floor under the drop point, as one undo step; an unknown one adds nothing.
 	{
 		const size_t before = sb->document().objects.size();
@@ -415,7 +433,65 @@ void MainWindow::selfTestShapes(SceneBuilderWidget *sb, const std::function<void
 			check(sb->undo() && sb->document().objects[1].material.kind == kindBefore, "one undo takes the preset back");
 			sb->redo();
 			sb->undo();
+			QApplication::processEvents();
+			// (undo rebuilt the properties, so the list is looked up again.)
+			presets = nullptr;
+			for (QComboBox *c : sb->findChildren<QComboBox *>())
+				if (c->findData(QStringLiteral("gold")) >= 0) presets = c;
+			check(presets != nullptr, "the Preset list is there again after the undo");
+			if (!presets) return;
+			// Every preset shows a picture of itself, and the subsurface ones are there: choosing Skin makes a subsurface material.
+			bool allPictured = true;
+			for (int row = 1; row < presets->count(); ++row) allPictured = allPictured && !presets->itemIcon(row).isNull();
+			check(allPictured, "every preset in the list has a picture of a sphere made of it");
+			const int skinIndex = presets->findData(QStringLiteral("skin"));
+			check(skinIndex >= 0, "the Preset list has Skin");
+			if (skinIndex >= 0) {
+				presets->setCurrentIndex(skinIndex);
+				emit presets->activated(skinIndex);
+				QApplication::processEvents();
+				const scene_doc::Material &skin = sb->document().objects[1].material;
+				check(skin.kind == scene_doc::MaterialKind::Subsurface && skin.scatterDistance.r > skin.scatterDistance.b, "choosing Skin makes a subsurface material (red travels furthest)");
+				check(sb->problemsText().isEmpty(), "and it gives no problems or notes");
+				check(sb->undo() && sb->document().objects[1].material.kind == kindBefore, "one undo");
+			}
 		}
+	}
+	// A marble pattern and a bump map in the properties: the Pattern list offers Marble, and with a picture in the bump slot the kind of picture can be changed.
+	{
+		scene_doc::Material m;
+		m.pattern = scene_doc::Pattern::Marble;
+		m.bumpFile = "bumps.png";
+		sb->selectObject(1);
+		sb->setMaterialForTest(1, m);
+		QApplication::processEvents();
+		QComboBox *pattern = nullptr, *bumpKind = nullptr;
+		for (QComboBox *c : sb->findChildren<QComboBox *>()) {
+			if (c->count() >= 3 && c->count() <= 4 && c->findData(2) >= 0 && c->currentData().toInt() == 2) pattern = c;   // Plain colour / (Checker) / Marble / Noise, on Marble
+			if (c->count() == 2 && c->findData(static_cast<int>(scene_doc::BumpKind::Normal)) >= 0 && c->currentData().toInt() == static_cast<int>(scene_doc::BumpKind::Height)) bumpKind = c;
+		}
+		check(pattern != nullptr, "a marble material shows Marble in its Pattern list");
+		check(bumpKind != nullptr, "and a bump picture shows what kind of picture it is");
+		if (bumpKind) {
+			const int normalRow = bumpKind->findData(static_cast<int>(scene_doc::BumpKind::Normal));
+			bumpKind->setCurrentIndex(normalRow);
+			emit bumpKind->activated(normalRow);
+			QApplication::processEvents();
+			check(sb->document().objects[1].material.bumpKind == scene_doc::BumpKind::Normal, "changing it to a normal map is saved");
+		}
+		pattern = nullptr;   // (the change rebuilt the properties: look the list up again)
+		for (QComboBox *c : sb->findChildren<QComboBox *>())
+			if (c->count() >= 3 && c->count() <= 4 && c->findData(2) >= 0 && c->currentData().toInt() == 2) pattern = c;
+		if (pattern) {
+			const int plainRow = pattern->findData(0);
+			pattern->setCurrentIndex(plainRow);
+			emit pattern->activated(plainRow);
+			QApplication::processEvents();
+			check(sb->document().objects[1].material.pattern == scene_doc::Pattern::None, "choosing Plain colour drops the marble");
+		}
+		sb->undo();
+		sb->undo();
+		sb->undo();
 	}
 }
 

@@ -132,6 +132,23 @@ inline QString blockyLabel(scene_doc::BlockyKind k) {
 	}
 	return QString();
 }
+inline QString volumeLabel(scene_doc::VolumeKind k) {
+	switch (k) {
+		case scene_doc::VolumeKind::Fog: return QObject::tr("Fog");
+		case scene_doc::VolumeKind::Smoke: return QObject::tr("Smoke");
+		case scene_doc::VolumeKind::Cloud: return QObject::tr("Cloud");
+		case scene_doc::VolumeKind::None: break;
+	}
+	return QString();
+}
+// How a volume is drawn in the views: a see-through blob of what it looks like (white mist, grey smoke, a pale cloud), so what is behind it still shows.
+inline QColor volumeDrawColor(const scene_doc::Volume &v) {
+	QColor c = v.kind == scene_doc::VolumeKind::Cloud ? QColor(246, 249, 255) : toQColor(v.color).lighter(v.kind == scene_doc::VolumeKind::Smoke ? 100 : 110);
+	c.setAlpha(v.kind == scene_doc::VolumeKind::Smoke ? 115 : 80);
+	return c;
+}
+// The colour a marble or noise pattern is drawn in, in the views (they only show a flat colour per object): the renderer's marble is pale stone, its noise soft grey.
+inline QColor patternDrawColor(scene_doc::Pattern p) { return p == scene_doc::Pattern::Marble ? QColor(222, 222, 230) : QColor(160, 160, 168); }
 inline QString lightLabel(LightKind k) {
 	switch (k) {
 		case LightKind::Point: return QObject::tr("Point light");
@@ -160,8 +177,10 @@ inline QString presetGroupLabel(const char *group) { return QCoreApplication::tr
 	QT_TRANSLATE_NOOP("MaterialPreset", "Chrome"); QT_TRANSLATE_NOOP("MaterialPreset", "Brushed steel"); QT_TRANSLATE_NOOP("MaterialPreset", "Clear glass");
 	QT_TRANSLATE_NOOP("MaterialPreset", "Frosted glass"); QT_TRANSLATE_NOOP("MaterialPreset", "Water"); QT_TRANSLATE_NOOP("MaterialPreset", "Diamond");
 	QT_TRANSLATE_NOOP("MaterialPreset", "Wax"); QT_TRANSLATE_NOOP("MaterialPreset", "Leaf"); QT_TRANSLATE_NOOP("MaterialPreset", "Paper");
+	QT_TRANSLATE_NOOP("MaterialPreset", "Skin"); QT_TRANSLATE_NOOP("MaterialPreset", "Milk"); QT_TRANSLATE_NOOP("MaterialPreset", "Marble stone");
+	QT_TRANSLATE_NOOP("MaterialPreset", "Jade"); QT_TRANSLATE_NOOP("MaterialPreset", "Candle wax");
 	QT_TRANSLATE_NOOP("MaterialPresetGroup", "Matte"); QT_TRANSLATE_NOOP("MaterialPresetGroup", "Plastic"); QT_TRANSLATE_NOOP("MaterialPresetGroup", "Metal");
-	QT_TRANSLATE_NOOP("MaterialPresetGroup", "Glass"); QT_TRANSLATE_NOOP("MaterialPresetGroup", "Translucent");
+	QT_TRANSLATE_NOOP("MaterialPresetGroup", "Glass"); QT_TRANSLATE_NOOP("MaterialPresetGroup", "Translucent"); QT_TRANSLATE_NOOP("MaterialPresetGroup", "Subsurface");
 }
 
 inline QString materialLabel(MaterialKind k) {
@@ -171,6 +190,7 @@ inline QString materialLabel(MaterialKind k) {
 		case MaterialKind::Dielectric: return QObject::tr("Glass");
 		case MaterialKind::CoatedDiffuse: return QObject::tr("Glossy paint (coated)");
 		case MaterialKind::DiffuseTransmission: return QObject::tr("Translucent (paper, leaves)");
+		case MaterialKind::Subsurface: return QObject::tr("Subsurface (skin, wax, milk)");
 	}
 	return QString();
 }

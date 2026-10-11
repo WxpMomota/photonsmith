@@ -194,6 +194,10 @@ void SceneBuilderWidget::buildUi() {
 	QMenu *blockMenus[3] = {addMenu->addMenu(tr("Blocks")), addMenu->addMenu(tr("Creatures")), addMenu->addMenu(tr("Things"))};
 	for (scene_doc::BlockyKind k : scene_doc::allBlockyKinds())
 		blockMenus[static_cast<int>(scene_doc::blockyGroup(k))]->addAction(blockyLabel(k), this, [this, k]() { addBlocky(k); });
+	// Volumes (scene_model.h Volume): a sphere of fog, smoke or cloud, which the renderer's participating media fill.
+	addMenu->addSection(tr("Volumes (fog, smoke, cloud)"));
+	for (scene_doc::VolumeKind k : {scene_doc::VolumeKind::Fog, scene_doc::VolumeKind::Smoke, scene_doc::VolumeKind::Cloud})
+		addMenu->addAction(volumeLabel(k), this, [this, k]() { addVolume(k); });
 	addMenu->addSection(tr("More"));
 	addMenu->addAction(tr("Model library..."), this, [this]() { showModelLibrary(); });
 	addMenu->addAction(tr("Object from a photo..."), this, [this]() { addObjectFromPhoto(); });
@@ -528,7 +532,10 @@ void SceneBuilderWidget::refreshListLabels() {
 		const int i = it->data(Qt::UserRole + 1).toInt();
 		if (kind == SelKind::Object && i < static_cast<int>(m_doc.objects.size())) {
 			const Object &o = m_doc.objects[i];
-			it->setText(QString("%1  -  %2%3").arg(QString::fromStdString(o.name), shapeLabel(o.shape).section(' ', 0, 0), o.emissive ? tr(", light") : QString()));
+			if (o.volume.kind != scene_doc::VolumeKind::None)
+				it->setText(QString("%1  -  %2").arg(QString::fromStdString(o.name), volumeLabel(o.volume.kind)));
+			else
+				it->setText(QString("%1  -  %2%3").arg(QString::fromStdString(o.name), shapeLabel(o.shape).section(' ', 0, 0), o.emissive ? tr(", light") : QString()));
 		} else if (kind == SelKind::Light && i < static_cast<int>(m_doc.lights.size())) {
 			const Light &l = m_doc.lights[i];
 			const QString type = lightLabel(l.kind).section(" (", 0, 0);
@@ -673,6 +680,22 @@ void SceneBuilderWidget::addObject(ShapeKind shape) {
 		o.position.x = c.x;
 		o.position.z = c.z;
 		if (c.y != 0.0) o.position.y = c.y;
+		m_doc.objects.push_back(o);
+		m_sel = {SelKind::Object, static_cast<int>(m_doc.objects.size()) - 1};
+	});
+	rebuildList();
+	setSelection(m_sel);
+}
+
+// Fog, smoke or a cloud, dropped on the floor at the middle of the view.
+void SceneBuilderWidget::addVolume(scene_doc::VolumeKind kind) {
+	edit(QString(), [&]() {
+		QStringList names;
+		for (const Object &existing : m_doc.objects) names << QString::fromStdString(existing.name);
+		Object o = scene_doc::makeVolume(kind, uniqueName(volumeLabel(kind), names).toStdString());
+		const Float3 c = dropPoint();
+		o.position.x = c.x;
+		o.position.z = c.z;
 		m_doc.objects.push_back(o);
 		m_sel = {SelKind::Object, static_cast<int>(m_doc.objects.size()) - 1};
 	});
