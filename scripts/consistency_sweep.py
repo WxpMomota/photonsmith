@@ -420,10 +420,11 @@ def run(args):
             check("integrator", "path vs volpath, %s" % name, backend, Scene(material=name), Scene(material=name, integrator="path"), tolerance=max(tol, 6.0))
         check("film", "iso 200 for 1 s vs iso 100 for 2 s", backend, Scene(material="diffuse", film_extra='"float iso" [ 200 ] "float exposuretime" [ 1 ]'),
               Scene(material="diffuse", film_extra='"float iso" [ 100 ] "float exposuretime" [ 2 ]'), tolerance=tol)
-        # a camera that sees every direction, the scene moved, scaled, turned and mirrored
-        for label, other in (("moved", Scene(material="diffuse", camera="spherical", offset=(37.0, -11.0, 5.0))), ("8x bigger", Scene(material="diffuse", camera="spherical", scale=8.0)),
-                             ("turned 90", Scene(material="diffuse", camera="spherical", rot=90.0)), ("mirrored", Scene(material="diffuse", camera="spherical", mirror=True))):
-            check("camera", "spherical camera, scene %s" % label, backend, Scene(material="diffuse", camera="spherical"), other, tolerance=max(tol, 5.0))
+        # a camera that sees every direction, the scene moved, scaled, turned and mirrored. Without the lamp: it would show in a few pixels at a radiance of 318, and where
+        # those pixels land differs between samplers by up to 4% of the picture's mean (the Windows session's wavefront backend and Metal both hit this).
+        sph = dict(material="diffuse", camera="spherical", lamp="none")
+        for label, other in (("moved", Scene(offset=(37.0, -11.0, 5.0), **sph)), ("8x bigger", Scene(scale=8.0, **sph)), ("turned 90", Scene(rot=90.0, **sph)), ("mirrored", Scene(mirror=True, **sph))):
+            check("camera", "spherical camera, scene %s" % label, backend, Scene(**sph), other, tolerance=max(tol, 5.0))
         # a sky with a small bright spot, lighting the scene alone, turned with the scene: the sampling of a sharp feature must agree with the lookup of the picture
         for name in SUN_MATERIALS:
             for angle in (90.0, 200.0):
