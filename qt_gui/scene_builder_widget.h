@@ -23,6 +23,7 @@
 #include "../src/shared/scene_blocks.h"
 #include "../src/shared/scene_selection.h"
 #include "../src/shared/scene_camera_views.h"
+#include "../src/shared/scene_viewport.h"
 
 class QButtonGroup;
 class QCheckBox;
@@ -34,7 +35,9 @@ class QLabel;
 class QSlider;
 class QListWidget;
 class QProcess;
+class QImage;
 class QListWidgetItem;
+class RealtimePreviewSession;
 class QMenu;
 class QPushButton;
 class QScrollArea;
@@ -168,6 +171,15 @@ public:
 	void frameSelected();
 	void renameSelected();
 	void renameItem(const BuilderSelection &s, const QString &wanted);
+	// The rendered viewport (scene_builder_rendered.cpp): the 3D view shows a progressive path-traced picture of the scene, kept up to date as you edit. Needs the Live Preview
+	// renderer; the main window stops a running Live Preview when this starts, and calls stopRenderedViewport() when Live Preview starts (one renderer at a time).
+	static bool renderedViewportAvailable();
+	void setRenderedViewport(bool on);
+	bool renderedViewport() const { return m_viewportOn; }
+	void stopRenderedViewport();
+	int renderedFramesForTest() const { return m_viewportFrames; }
+	int renderedSamplesForTest() const { return m_viewportSamples; }
+	QImage renderedImageForTest() const { return m_viewportImage; }
 	// "Search actions" (F3, Ctrl+K): type what to do and run it (scene_builder_actions.cpp; the matching is src/shared/action_search.h).
 	void showActionSearch();
 	QStringList actionNamesForTest();
@@ -211,6 +223,7 @@ public:
 	void setSceneName(const QString &name);
 
 signals:
+	void renderedViewportStarting();   // the main window stops a running Live Preview: only one renderer can have the GPU
 	void statusMessage(const QString &text);
 	// A copy of the scene was saved into the scene-list folder ("Add to scene list"); the main window lists it without a restart.
 	void sceneListed(const QString &path);
@@ -220,6 +233,7 @@ signals:
 protected:
 	void resizeEvent(QResizeEvent *e) override;
 	void showEvent(QShowEvent *e) override;
+	void hideEvent(QHideEvent *e) override;
 	bool eventFilter(QObject *watched, QEvent *event) override;
 
 private slots:
@@ -313,11 +327,31 @@ private:
 	bool isLockedItem(const BuilderSelection &s) const;
 	QMenu *createArrangeMenu(QWidget *parent);
 	void createArrangeShortcuts();
+	void syncRenderedViewport();
+	void startViewportSession(const scene_viewport::Pose &pose);
+	void pauseViewportIfHidden(bool hidden);
+	scene_viewport::Pose viewportPose() const;
+	QString livePreviewCopyPath(QString *error);       // where the "(live preview)" copy of the scene goes
+	bool writeSceneCopy(const scene_doc::Document &doc, const QString &path);
 	void createActionSearchShortcuts();
 	struct Command { QString label; std::function<void()> run; };   // one thing the search box can do
 	std::vector<Command> buildCommands();
 	void addVisibilityRows(QFormLayout *f, const std::function<bool *()> &hidden, const std::function<bool *()> &locked);
 	void decorateListItem(QListWidgetItem *it, bool hidden, bool locked);
+	QPushButton *m_renderedButton = nullptr;  // Rendered: the 3D view shows a rendered picture of the scene
+	RealtimePreviewSession *m_viewportSession = nullptr;
+	QTimer *m_viewportTimer = nullptr;
+	bool m_viewportOn = false;
+	bool m_viewportRunning = false;           // the renderer has been started on the scene as it is (or was, until an edit)
+	bool m_viewportPending = false;           // the scene changed: restart once the edits have paused
+	bool m_viewportDocChanged = false;        // documentChanged() ran since the signature was last worked out
+	QElapsedTimer m_viewportEditClock;
+	std::string m_viewportSignature;
+	scene_viewport::Pose m_viewportSent;
+	QString m_viewportSceneId;
+	int m_viewportFrames = 0;
+	int m_viewportSamples = 0;
+	QImage m_viewportImage;
 	QPushButton *m_wireButton = nullptr;      // the 3D view's Wireframe and Orthographic switches
 	QPushButton *m_orthoButton = nullptr;
 	QPushButton *m_arrangeButton = nullptr;   // the Arrange menu: rename, drop to floor, frame, hide, lock

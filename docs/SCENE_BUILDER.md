@@ -146,6 +146,15 @@ Beside the Move, Rotate and Scale tools the 3D view has three more controls:
 
 The **numpad** does these when the 3D view has the focus (click in it): **1** Front, **3** Right, **7** Top, and with **Ctrl** the opposite side (Back, Left, Bottom); **5** switches between perspective and orthographic; **0** looks through the scene's camera; **2, 4, 6, 8** turn the view by 15 degrees; **+** and **-** zoom; **.** frames what is picked. (A keyboard without a numpad has the View menu and the buttons.)
 
+## The rendered viewport
+
+The **Rendered** switch (next to Orthographic and Wireframe, shown when the program has the GPU renderer that Live Preview uses) turns the 3D view into a picture of the scene as it will look: a progressive path-traced render, drawn behind the usual names, lights, camera and tool, so orbiting, picking and moving work as they always did with the real picture under them. The corner says how many samples it has ("Rendered, 40 samples"); it starts grainy and refines while you look, and the denoiser cleans it up where it is available.
+
+* **It follows you.** Orbiting, panning and zooming pass the new eye to the renderer without starting over. An edit (a move, a colour, a light, adding or deleting something) restarts the render once you have paused for about a third of a second, so a drag costs one restart at its end; the old picture stays until the new one has samples. Things that do not change the picture (a rename, hiding or locking, the saved camera views, the render settings) do not restart it (`scene_viewport.h` decides this by comparing the scene text without those).
+* **What it shows.** The 3D view's own camera and field of view, at most 800 pixels wide and drawn scaled up (the same shape as the view). Depth of field is drawn only when you look through the scene's camera (the 0 key), since that is the picture a render makes. With Wireframe on the edges are drawn over the picture.
+* **It shares the GPU.** It uses the "(live preview)" copy that Preview live writes, and only one of the two can have the renderer at a time: starting the Rendered viewport stops a running Live Preview, and starting Live Preview switches the viewport off. It rests while another tab is showing. The viewport is perspective only, so switching it on turns Orthographic off.
+* **What it is not.** It is a quick look, at most 8 bounces and one sample at a time, not a final render; use Render for that. On a Mac it uses Metal, which has not been tried from the Windows side.
+
 ## Arranging: hide, lock, drop to floor, frame, rename
 
 The **Arrange** button under the list (and a right-click on an item in the list) has the tidying tools; each is one undo step and works on everything picked.
@@ -300,7 +309,7 @@ The scene's **name** is the field at the top right of the tab (it is also the *T
 * Hair, the principled material, mixed materials and instanced copies; a box-shaped volume (the renderer's media fill a sphere, or a cylinder for fog) and a medium around the camera: use a hand-written pbrt file for those ([PBRT_SUPPORT.md](PBRT_SUPPORT.md) lists what the renderer accepts).
 * A mesh (`.ply` or `.obj`) is shown in the layout view only as a small marker at its position, because the view does not read the file; its scale and rotation apply when it renders.
 * No animation of objects. The camera can fly along a path through saved views (*Camera views*, *Flythrough...*) or orbit (*Turntable...*), but nothing else moves between frames.
-* The 3D view shows shapes, not materials or lighting, and a mesh as its bounding box and a sample of its points. Use it with the flat views, or type exact numbers in the properties.
+* The 3D view shows shapes, not materials or lighting (switch on **Rendered** for those), and a mesh as its bounding box and a sample of its points. Use it with the flat views, or type exact numbers in the properties.
 
 ## How it is checked
 
@@ -314,5 +323,7 @@ The scene model (`scene_model.h`), the JSON (`scene_json.h`), the checks (`scene
 The saved camera views (`scene_camera_views.h`) and the maths of looking through the camera (`orbitLookingFrom`, `pictureFrame`, `fovForFrame` in `scene_view_math.h`: the view's eye lands on the camera's, and the camera's top edge on the frame's) have unit tests, and the self-test looks through the camera, sets the camera from the view, and saves, uses, updates, renames and deletes a view.
 
 The selection operations (`scene_selection.h`: move, copy, delete, group, copy a look) have unit tests in `tests/unit/scene_selection_tests.cpp`, and the self-test picks by list, Ctrl-click and box, drags two objects with real mouse events, copies, groups, deletes and undoes each.
+
+What a change means for the rendered viewport (a moved eye is a camera change, a new size or field of view a restart, which edits change the picture) is `src/shared/scene_viewport.h`, with unit tests in `tests/unit/scene_viewport_tests.cpp`; on a machine with the GPU renderer the self-test switches the viewport on, checks it produces a refining, lit picture of the right shape with the red box in it, recolours the box and waits for the picture to follow, orbits, and switches it off.
 
 The tab itself has a headless self-test (`RT_GUI_SELFTEST=builder`, see `qt_gui/mainwindow_selftest.cpp`): an edit, a real mouse drag in the layout view, undo and redo, a save and re-open, and a preview render. On a machine with a GPU (`scripts/gui_selftest.py --live-preview`) it also renders a preview through *Use the GPU* (Metal on a Mac) and checks it is lit and about as bright as the CPU one, and checks that *Add to scene list* from inside a `.app` writes to the per-user folder. It also checks that the scene is in the list at once under its persistent id, that the `ray_tracer` the GUI starts renders it by that id, and that the Settings tab's picker shows it selected.

@@ -998,7 +998,7 @@
     </message>
     <message>
         <location filename="../mainwindow_actions.cpp" line="88"/>
-        <location filename="../mainwindow_tabs_render.cpp" line="347"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="351"/>
         <source>Open Output &amp;Folder</source>
         <translation>Abrir &amp;carpeta de salida</translation>
     </message>
@@ -1009,7 +1009,7 @@
     </message>
     <message>
         <location filename="../mainwindow_actions.cpp" line="98"/>
-        <location filename="../mainwindow_tabs_render.cpp" line="359"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="363"/>
         <source>Open in Default &amp;Viewer</source>
         <translation>Abrir en el &amp;visor predeterminado</translation>
     </message>
@@ -3617,7 +3617,7 @@ Eliminador de ruido SVGF: un filtro de reducción de ruido alternativo y experim
         <translation>Aclara una escena oscura para que no salga casi negra: el brillo medio de los píxeles iluminados se eleva hacia un gris medio, hasta 64x, siguiendo la imagen con suavidad. Nunca oscurece nada: una escena con exposición normal o brillante se ve exactamente igual que con esto desactivado. Además multiplica el valor de Exposición de arriba, que sigue sirviendo como corrección manual.</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="93"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="94"/>
         <location filename="../mainwindow_tabs_render_live.cpp" line="760"/>
         <source>AI denoise</source>
         <translation>Eliminar ruido con IA</translation>
@@ -4500,37 +4500,37 @@ Desactivado por defecto (aleatorio genuino en cada renderizado).</translation>
     </message>
     <message>
         <location filename="../mainwindow_live_preview.cpp" line="142"/>
-        <location filename="../mainwindow_tabs_render.cpp" line="129"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="133"/>
         <source>Saved, but the scene list could not list it until the program is restarted.</source>
         <translation>Guardado, pero la lista de escenas no podrá mostrarlo hasta que se reinicie el programa.</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="133"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="137"/>
         <source>Added to the scene list as %1 (Settings tab).</source>
         <translation>Añadida a la lista de escenas como %1 (pestaña Configuración).</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="135"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="139"/>
         <source>Scene Builder</source>
         <translation>Constructor de escenas</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="141"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="145"/>
         <source>The preview copy could not be opened in Live Preview.</source>
         <translation>No se pudo abrir la copia de vista previa en la Vista previa en vivo.</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="350"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="354"/>
         <source>Show the folder containing the active tab&apos;s render in Explorer</source>
         <translation>Muestra en el Explorador la carpeta que contiene el renderizado de la pestaña activa</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="362"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="366"/>
         <source>Open the active tab&apos;s render in the system viewer</source>
         <translation>Abre el renderizado de la pestaña activa en el visor del sistema</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="388"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="392"/>
         <source>Preview</source>
         <translation>Vista previa</translation>
     </message>
@@ -4559,45 +4559,45 @@ Arrastra para orbitar, usa la rueda o +/- para zoom, WASD para moverte, Arriba/A
         <translation>Vista previa interactiva por GPU - arrastra para orbitar, usa la rueda o +/- para zoom, WASD para moverte, Arriba/Abajo para volar, Izquierda/Derecha para orbitar</translation>
     </message>
     <message>
-        <location filename="../mainwindow_live_preview.cpp" line="191"/>
+        <location filename="../mainwindow_live_preview.cpp" line="192"/>
         <source>Select a scene first</source>
         <translation>Selecciona primero una escena</translation>
     </message>
     <message>
         <location filename="../mainwindow_denoiser.cpp" line="38"/>
-        <location filename="../mainwindow_live_preview.cpp" line="269"/>
+        <location filename="../mainwindow_live_preview.cpp" line="270"/>
         <location filename="../mainwindow_photo_install.cpp" line="72"/>
         <source>Starting...</source>
         <translation>Iniciando...</translation>
     </message>
     <message>
-        <location filename="../mainwindow_live_preview.cpp" line="285"/>
+        <location filename="../mainwindow_live_preview.cpp" line="286"/>
         <source>Stopped</source>
         <translation>Detenido</translation>
     </message>
     <message>
-        <location filename="../mainwindow_live_preview.cpp" line="312"/>
+        <location filename="../mainwindow_live_preview.cpp" line="313"/>
         <source>Live (denoised, not accumulating)</source>
         <translation>En vivo (con ruido eliminado, sin acumular)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_live_preview.cpp" line="314"/>
+        <location filename="../mainwindow_live_preview.cpp" line="315"/>
         <source>%1 samples</source>
         <translation>%1 muestras</translation>
     </message>
     <message>
-        <location filename="../mainwindow_live_preview.cpp" line="339"/>
+        <location filename="../mainwindow_live_preview.cpp" line="340"/>
         <source>[Live Preview] ERROR: %1</source>
         <translation>[Vista previa en vivo] ERROR: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="431"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="435"/>
         <source>&lt;b&gt;Why it looks this way&lt;/b&gt;&lt;br&gt;%1</source>
         <translation>&lt;b&gt;Por qué se ve así&lt;/b&gt;&lt;br&gt;%1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="557"/>
-        <location filename="../mainwindow_tabs_render.cpp" line="570"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="561"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="574"/>
         <location filename="../mainwindow_tabs_settings_groups.cpp" line="278"/>
         <location filename="../mainwindow_thumbnails.cpp" line="126"/>
         <location filename="../mainwindow_thumbnails.cpp" line="165"/>
@@ -4605,12 +4605,12 @@ Arrastra para orbitar, usa la rueda o +/- para zoom, WASD para moverte, Arriba/A
         <translation>Pausar</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="570"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="574"/>
         <source>Play</source>
         <translation>Reproducir</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="580"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="584"/>
         <source>Video playback error (%1): %2</source>
         <translation>Error de reproducción de video (%1): %2</translation>
     </message>
@@ -6557,32 +6557,42 @@ Salida:
         <translation>Inferior</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="545"/>
+        <location filename="../scene_3d_view.cpp" line="547"/>
         <source>Orthographic</source>
         <translation>Ortogonal</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="564"/>
+        <location filename="../scene_3d_view.cpp" line="548"/>
+        <source>Rendered, %1 samples</source>
+        <translation>Renderizado, %1 muestras</translation>
+    </message>
+    <message>
+        <location filename="../scene_3d_view.cpp" line="548"/>
+        <source>Rendering...</source>
+        <translation>Renderizando...</translation>
+    </message>
+    <message>
+        <location filename="../scene_3d_view.cpp" line="567"/>
         <source>the floor</source>
         <translation>el suelo</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="577"/>
+        <location filename="../scene_3d_view.cpp" line="580"/>
         <source>Snapped to %1</source>
         <translation>Ajustado a %1</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="595"/>
+        <location filename="../scene_3d_view.cpp" line="598"/>
         <source>Flythrough preview, %1% (%2 x %3). Orbit, pan or zoom to leave.</source>
         <translation>Vista previa del recorrido, %1% (%2 x %3). Orbita, desplaza o haz zoom para salir.</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="596"/>
+        <location filename="../scene_3d_view.cpp" line="599"/>
         <source>Through the camera (%1 x %2). Orbit, pan or zoom to leave.</source>
         <translation>A través de la cámara (%1 x %2). Orbita, desplaza o haz zoom para salir.</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="803"/>
+        <location filename="../scene_3d_view.cpp" line="806"/>
         <source>Camera</source>
         <translation>Cámara</translation>
     </message>
@@ -7092,7 +7102,7 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="667"/>
-        <location filename="../scene_builder_widget.cpp" line="700"/>
+        <location filename="../scene_builder_widget.cpp" line="707"/>
         <source>Meshes (*.ply *.obj)</source>
         <translation>Mallas (*.ply *.obj)</translation>
     </message>
@@ -7241,122 +7251,122 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation>Brillo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="126"/>
+        <location filename="../scene_builder_widget.cpp" line="132"/>
         <source>New</source>
         <translation>Nueva</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="126"/>
+        <location filename="../scene_builder_widget.cpp" line="132"/>
         <source>Start again from the example scene</source>
         <translation>Empezar de nuevo desde la escena de ejemplo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="127"/>
+        <location filename="../scene_builder_widget.cpp" line="133"/>
         <source>Open...</source>
         <translation>Abrir...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="127"/>
+        <location filename="../scene_builder_widget.cpp" line="133"/>
         <source>Open a .pbrt file saved by the Scene Builder</source>
         <translation>Abrir un archivo .pbrt guardado por el Constructor de escenas</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="128"/>
+        <location filename="../scene_builder_widget.cpp" line="134"/>
         <source>Save</source>
         <translation>Guardar</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="128"/>
+        <location filename="../scene_builder_widget.cpp" line="134"/>
         <source>Save the scene as a .pbrt file</source>
         <translation>Guardar la escena como archivo .pbrt</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="129"/>
+        <location filename="../scene_builder_widget.cpp" line="135"/>
         <source>Save As...</source>
         <translation>Guardar como...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="129"/>
+        <location filename="../scene_builder_widget.cpp" line="135"/>
         <source>Save the scene under a new name</source>
         <translation>Guardar la escena con un nombre nuevo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="130"/>
+        <location filename="../scene_builder_widget.cpp" line="136"/>
         <source>Add to scene list</source>
         <translation>Añadir a la lista de escenas</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="131"/>
+        <location filename="../scene_builder_widget.cpp" line="137"/>
         <source>Preview live</source>
         <translation>Vista previa en vivo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="131"/>
+        <location filename="../scene_builder_widget.cpp" line="137"/>
         <source>Open this scene in Live Preview: walk around it and move things. It is saved as a separate &quot;(live preview)&quot; scene in the scene list; your scene and its own listing are not changed.</source>
         <translation>Abre esta escena en la Vista previa en vivo: recórrela y mueve cosas. Se guarda como una escena aparte «(vista previa en vivo)» en la lista de escenas; tu escena y su propia entrada no cambian.</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="70"/>
-        <location filename="../scene_builder_widget.cpp" line="134"/>
+        <location filename="../scene_builder_widget.cpp" line="140"/>
         <source>Undo</source>
         <translation>Deshacer</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="71"/>
-        <location filename="../scene_builder_widget.cpp" line="135"/>
+        <location filename="../scene_builder_widget.cpp" line="141"/>
         <source>Redo</source>
         <translation>Rehacer</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="140"/>
+        <location filename="../scene_builder_widget.cpp" line="146"/>
         <source>Scene name</source>
         <translation>Nombre de la escena</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="141"/>
+        <location filename="../scene_builder_widget.cpp" line="147"/>
         <source>The name of this scene, shown in the scene list</source>
         <translation>El nombre de esta escena, que se muestra en la lista de escenas</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="161"/>
+        <location filename="../scene_builder_widget.cpp" line="167"/>
         <source>Name:</source>
         <translation>Nombre:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="198"/>
+        <location filename="../scene_builder_widget.cpp" line="204"/>
         <source>Volumes (fog, smoke, cloud)</source>
         <translation>Volúmenes (niebla, humo, nube)</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
-        <location filename="../scene_builder_widget.cpp" line="222"/>
+        <location filename="../scene_builder_widget.cpp" line="228"/>
         <source>Arrange</source>
         <translation>Organizar</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="223"/>
+        <location filename="../scene_builder_widget.cpp" line="229"/>
         <source>Rename, put on the floor, frame, hide and lock what is picked (also on a right-click in the list)</source>
         <translation>Cambiar nombre, poner en el suelo, encuadrar, ocultar y bloquear lo seleccionado (también con clic derecho en la lista)</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="96"/>
-        <location filename="../scene_builder_widget.cpp" line="309"/>
+        <location filename="../scene_builder_widget.cpp" line="315"/>
         <source>Turntable...</source>
         <translation>Plato giratorio...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="311"/>
+        <location filename="../scene_builder_widget.cpp" line="317"/>
         <source>Make a video of the scene from a camera that goes once round it</source>
         <translation>Crea un vídeo de la escena desde una cámara que da una vuelta completa alrededor de ella</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="97"/>
-        <location filename="../scene_builder_widget.cpp" line="312"/>
+        <location filename="../scene_builder_widget.cpp" line="318"/>
         <source>Flythrough...</source>
         <translation>Recorrido...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="314"/>
+        <location filename="../scene_builder_widget.cpp" line="320"/>
         <source>Make a video of the scene from a camera that flies through your saved camera views (needs two or more)</source>
         <translation>Crea un vídeo de la escena desde una cámara que vuela por tus vistas de cámara guardadas (hacen falta dos o más)</translation>
     </message>
@@ -7398,7 +7408,7 @@ Procedencia: %3</translation>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
         <location filename="../scene_builder_models.cpp" line="118"/>
-        <location filename="../scene_builder_widget.cpp" line="184"/>
+        <location filename="../scene_builder_widget.cpp" line="190"/>
         <source>Add</source>
         <translation>Añadir</translation>
     </message>
@@ -7413,81 +7423,81 @@ Procedencia: %3</translation>
         <translation>No se pudo leer ese modelo.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="187"/>
+        <location filename="../scene_builder_widget.cpp" line="193"/>
         <source>Objects</source>
         <translation>Objetos</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="190"/>
+        <location filename="../scene_builder_widget.cpp" line="196"/>
         <source>Props (several objects at once)</source>
         <translation>Accesorios (varios objetos a la vez)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="193"/>
+        <location filename="../scene_builder_widget.cpp" line="199"/>
         <source>Blocky (several objects at once)</source>
         <translation>Estilo bloques (varios objetos a la vez)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="194"/>
+        <location filename="../scene_builder_widget.cpp" line="200"/>
         <source>Blocks</source>
         <translation>Bloques</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="194"/>
+        <location filename="../scene_builder_widget.cpp" line="200"/>
         <source>Creatures</source>
         <translation>Criaturas</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="194"/>
+        <location filename="../scene_builder_widget.cpp" line="200"/>
         <source>Things</source>
         <translation>Cosas</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="201"/>
+        <location filename="../scene_builder_widget.cpp" line="207"/>
         <source>More</source>
         <translation>Más</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="61"/>
-        <location filename="../scene_builder_widget.cpp" line="202"/>
+        <location filename="../scene_builder_widget.cpp" line="208"/>
         <source>Model library...</source>
         <translation>Biblioteca de modelos...</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="62"/>
-        <location filename="../scene_builder_widget.cpp" line="203"/>
+        <location filename="../scene_builder_widget.cpp" line="209"/>
         <source>Object from a photo...</source>
         <translation>Objeto a partir de una foto...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="204"/>
+        <location filename="../scene_builder_widget.cpp" line="210"/>
         <source>Light panel (emitting quad)</source>
         <translation>Panel de luz (cuadrilátero emisor)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="213"/>
+        <location filename="../scene_builder_widget.cpp" line="219"/>
         <source>Lights</source>
         <translation>Luces</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="64"/>
-        <location filename="../scene_builder_widget.cpp" line="217"/>
+        <location filename="../scene_builder_widget.cpp" line="223"/>
         <source>Duplicate</source>
         <translation>Duplicar</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="218"/>
+        <location filename="../scene_builder_widget.cpp" line="224"/>
         <source>Make a copy of the selected item beside it (%1)</source>
         <translation>Hace una copia del elemento seleccionado a su lado (%1)</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="65"/>
-        <location filename="../scene_builder_widget.cpp" line="219"/>
+        <location filename="../scene_builder_widget.cpp" line="225"/>
         <source>Array...</source>
         <translation>Matriz...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="220"/>
+        <location filename="../scene_builder_widget.cpp" line="226"/>
         <source>Make many copies of the selected object: a grid, a ring round a point, or a random scatter</source>
         <translation>Hace muchas copias del objeto seleccionado: una cuadrícula, un anillo alrededor de un punto o una dispersión al azar</translation>
     </message>
@@ -7651,7 +7661,7 @@ Procedencia: %3</translation>
     <message>
         <location filename="../scene_builder_actions.cpp" line="66"/>
         <location filename="../scene_builder_camera_views.cpp" line="332"/>
-        <location filename="../scene_builder_widget.cpp" line="221"/>
+        <location filename="../scene_builder_widget.cpp" line="227"/>
         <source>Delete</source>
         <translation>Eliminar</translation>
     </message>
@@ -7789,12 +7799,22 @@ Procedencia: %3</translation>
         <translation>Escalar (R): arrastra un cuadrado para estirar el objeto a lo largo de ese eje</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="109"/>
+        <location filename="../scene_builder_views.cpp" line="91"/>
+        <source>Rendered</source>
+        <translation>Renderizado</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_views.cpp" line="95"/>
+        <source>Show a rendered picture of the scene in the 3D view, refining as you look at it and kept up to date as you edit (needs the GPU renderer of Live Preview; it is paused while this tab is not showing, and stops when Live Preview starts)</source>
+        <translation>Muestra en la vista 3D una imagen renderizada de la escena, que se va refinando mientras la miras y se mantiene al día según editas (necesita el renderizador de GPU de la vista previa en vivo; se pausa mientras esta pestaña no se ve y se detiene cuando empieza la vista previa en vivo)</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_views.cpp" line="116"/>
         <source>Focus distance %1.</source>
         <translation>Distancia de enfoque %1.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="109"/>
+        <location filename="../scene_builder_views.cpp" line="116"/>
         <source>Focus distance %1. It only shows with depth of field: set an aperture.</source>
         <translation>Distancia de enfoque %1. Solo se nota con profundidad de campo: ajusta una apertura.</translation>
     </message>
@@ -7850,24 +7870,24 @@ Procedencia: %3</translation>
         <translation>Inferior</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="515"/>
-        <location filename="../mainwindow_selftest_modes.cpp" line="563"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="516"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="564"/>
         <location filename="../scene_builder_actions.cpp" line="85"/>
         <location filename="../scene_builder_views.cpp" line="85"/>
-        <location filename="../scene_builder_views.cpp" line="112"/>
+        <location filename="../scene_builder_views.cpp" line="119"/>
         <source>Top</source>
         <translation>Superior</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="517"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="518"/>
         <location filename="../scene_builder_actions.cpp" line="83"/>
         <location filename="../scene_builder_views.cpp" line="83"/>
-        <location filename="../scene_builder_views.cpp" line="112"/>
+        <location filename="../scene_builder_views.cpp" line="119"/>
         <source>Front</source>
         <translation>Frontal</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="519"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="520"/>
         <location filename="../scene_builder_actions.cpp" line="84"/>
         <location filename="../scene_builder_views.cpp" line="84"/>
         <source>Left</source>
@@ -7878,22 +7898,22 @@ Procedencia: %3</translation>
         <translation type="obsolete">Niebla</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="112"/>
+        <location filename="../scene_builder_views.cpp" line="119"/>
         <source>Side</source>
         <translation>Lateral</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="129"/>
+        <location filename="../scene_builder_views.cpp" line="136"/>
         <source>3D</source>
         <translation>3D</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="132"/>
+        <location filename="../scene_builder_views.cpp" line="139"/>
         <source>Look at the scene from any side, and move things in 3D</source>
         <translation>Mira la escena desde cualquier lado y mueve las cosas en 3D</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="162"/>
+        <location filename="../scene_builder_views.cpp" line="169"/>
         <source>Zoom both views to what is picked (F)</source>
         <translation>Acercar ambas vistas a lo seleccionado (F)</translation>
     </message>
@@ -7904,71 +7924,71 @@ Procedencia: %3</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_builder3d.cpp" line="503"/>
-        <location filename="../scene_builder_views.cpp" line="143"/>
+        <location filename="../scene_builder_views.cpp" line="150"/>
         <source>Snap to grid</source>
         <translation>Ajustar a la cuadrícula</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="145"/>
+        <location filename="../scene_builder_views.cpp" line="152"/>
         <source>Dragging moves things in steps of 0.25. Hold %1 to drag freely.</source>
         <translation>Al arrastrar, las cosas se mueven en pasos de 0,25. Mantén pulsada %1 para arrastrar libremente.</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="94"/>
-        <location filename="../scene_builder_views.cpp" line="150"/>
+        <location filename="../scene_builder_views.cpp" line="157"/>
         <source>Snap to objects</source>
         <translation>Ajustar a objetos</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="152"/>
+        <location filename="../scene_builder_views.cpp" line="159"/>
         <source>While dragging, line the object up with the edges and middles of the others, and rest it on top of them or the floor (orange lines show what it snapped to). Hold %1 to drag freely.</source>
         <translation>Al arrastrar, alinea el objeto con los bordes y el centro de los demás, y lo apoya encima de ellos o en el suelo (las líneas naranjas muestran a qué se ajustó). Mantén %1 para arrastrar libremente.</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="82"/>
-        <location filename="../scene_builder_views.cpp" line="154"/>
+        <location filename="../scene_builder_views.cpp" line="161"/>
         <source>Frame all</source>
         <translation>Encuadrar todo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="297"/>
+        <location filename="../scene_builder_widget.cpp" line="303"/>
         <source>Draft</source>
         <translation>Borrador</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="298"/>
+        <location filename="../scene_builder_widget.cpp" line="304"/>
         <source>Good</source>
         <translation>Buena</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="299"/>
+        <location filename="../scene_builder_widget.cpp" line="305"/>
         <source>Best</source>
         <translation>Óptima</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="302"/>
+        <location filename="../scene_builder_widget.cpp" line="308"/>
         <source>Use the GPU</source>
         <translation>Usar la GPU</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="303"/>
+        <location filename="../scene_builder_widget.cpp" line="309"/>
         <source>Render on the graphics card (NVIDIA OptiX on Windows, Metal on a Mac). Much faster for large pictures; needs a supported GPU.</source>
         <translation>Renderizar en la tarjeta gráfica (NVIDIA OptiX en Windows, Metal en Mac). Mucho más rápido para imágenes grandes; requiere una GPU compatible.</translation>
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="164"/>
         <location filename="../scene_builder_turntable.cpp" line="244"/>
-        <location filename="../scene_builder_widget.cpp" line="304"/>
+        <location filename="../scene_builder_widget.cpp" line="310"/>
         <source>Preview</source>
         <translation>Vista previa</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="306"/>
+        <location filename="../scene_builder_widget.cpp" line="312"/>
         <source>Render picture...</source>
         <translation>Renderizar imagen...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="308"/>
+        <location filename="../scene_builder_widget.cpp" line="314"/>
         <source>Render at the image size and sample count set under Camera, and save the picture as a PNG</source>
         <translation>Renderizar con el tamaño de imagen y el número de muestras fijados en Cámara, y guardar la imagen como PNG</translation>
     </message>
@@ -8055,7 +8075,7 @@ Procedencia: %3</translation>
     </message>
     <message>
         <location filename="../scene_builder_turntable.cpp" line="94"/>
-        <location filename="../scene_builder_widget.cpp" line="316"/>
+        <location filename="../scene_builder_widget.cpp" line="322"/>
         <source>Quality:</source>
         <translation>Calidad:</translation>
     </message>
@@ -8185,7 +8205,7 @@ Procedencia: %3</translation>
         <translation type="vanished">El plato giratorio falló.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="333"/>
+        <location filename="../scene_builder_widget.cpp" line="339"/>
         <source>Press Preview to see the scene.</source>
         <translation>Pulsa Vista previa para ver la escena.</translation>
     </message>
@@ -8217,14 +8237,14 @@ Procedencia: %3</translation>
     </message>
     <message>
         <location filename="../scene_builder_files.cpp" line="157"/>
-        <location filename="../scene_builder_files.cpp" line="270"/>
+        <location filename="../scene_builder_files.cpp" line="278"/>
         <source>Cannot open the scene</source>
         <translation>No se puede abrir la escena</translation>
     </message>
     <message>
         <location filename="../scene_builder_files.cpp" line="165"/>
         <location filename="../scene_builder_files.cpp" line="175"/>
-        <location filename="../scene_builder_files.cpp" line="301"/>
+        <location filename="../scene_builder_files.cpp" line="309"/>
         <source>Cannot save</source>
         <translation>No se puede guardar</translation>
     </message>
@@ -8232,8 +8252,9 @@ Procedencia: %3</translation>
         <location filename="../scene_builder_files.cpp" line="165"/>
         <location filename="../scene_builder_files.cpp" line="175"/>
         <location filename="../scene_builder_files.cpp" line="222"/>
-        <location filename="../scene_builder_files.cpp" line="248"/>
+        <location filename="../scene_builder_files.cpp" line="256"/>
         <location filename="../scene_builder_render.cpp" line="85"/>
+        <location filename="../scene_builder_rendered.cpp" line="170"/>
         <location filename="../scene_builder_turntable.cpp" line="183"/>
         <source>Could not write %1.</source>
         <translation>No se pudo escribir %1.</translation>
@@ -8255,37 +8276,37 @@ Procedencia: %3</translation>
         <translation>No hay una carpeta de escenas donde escribir la copia de vista previa.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="259"/>
+        <location filename="../scene_builder_files.cpp" line="267"/>
         <source>Cannot preview</source>
         <translation>No se puede previsualizar</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="281"/>
+        <location filename="../scene_builder_files.cpp" line="289"/>
         <source>No scenes folder</source>
         <translation>No hay carpeta de escenas</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="288"/>
+        <location filename="../scene_builder_files.cpp" line="296"/>
         <source>Add to the scene list</source>
         <translation>Añadir a la lista de escenas</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="289"/>
+        <location filename="../scene_builder_files.cpp" line="297"/>
         <source>This scene is already in the list as &quot;%1&quot;.</source>
         <translation>Esta escena ya está en la lista como «%1».</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="290"/>
+        <location filename="../scene_builder_files.cpp" line="298"/>
         <source>Add as a new scene</source>
         <translation>Añadir como escena nueva</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="291"/>
+        <location filename="../scene_builder_files.cpp" line="299"/>
         <source>Update the existing one</source>
         <translation>Actualizar la existente</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="306"/>
+        <location filename="../scene_builder_files.cpp" line="314"/>
         <source>Saved a copy as %1.
 
 It is in the scene list now (Settings tab, My Scenes).</source>
@@ -8294,12 +8315,12 @@ It is in the scene list now (Settings tab, My Scenes).</source>
 Ya está en la lista de escenas (pestaña Configuración, Mis escenas).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="826"/>
+        <location filename="../scene_builder_widget.cpp" line="833"/>
         <source>(%1)%2  |  %3 objects, %4 lights</source>
         <translation>(%1)%2  |  %3 objetos, %4 luces</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="700"/>
+        <location filename="../scene_builder_widget.cpp" line="707"/>
         <source>Choose a mesh</source>
         <translation>Elegir una malla</translation>
     </message>
@@ -8309,57 +8330,57 @@ Ya está en la lista de escenas (pestaña Configuración, Mis escenas).</transla
         <translation>No se encontró la carpeta de escenas (pbrt_scenes) junto al programa. Usa Guardar como para dejar el archivo donde quieras, y define la variable de entorno RAY_TRACER_PBRT_DIR con esa carpeta para que el programa la incluya en la lista.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="130"/>
+        <location filename="../scene_builder_widget.cpp" line="136"/>
         <source>Save the scene into the scenes folder so it shows up in the Settings tab</source>
         <translation>Guardar la escena en la carpeta de escenas para que aparezca en la pestaña Configuración</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="134"/>
+        <location filename="../scene_builder_widget.cpp" line="140"/>
         <source>Undo the last change (%1)</source>
         <translation>Deshacer el último cambio (%1)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="135"/>
+        <location filename="../scene_builder_widget.cpp" line="141"/>
         <source>Redo (%1)</source>
         <translation>Rehacer (%1)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="301"/>
+        <location filename="../scene_builder_widget.cpp" line="307"/>
         <source>Draft: 480 pixels wide, 16 samples. Good: 720 wide, 64 samples. Best: 960 wide, 256 samples.</source>
         <translation>Borrador: 480 píxeles de ancho, 16 muestras. Buena: 720 de ancho, 64 muestras. Óptima: 960 de ancho, 256 muestras.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="305"/>
+        <location filename="../scene_builder_files.cpp" line="313"/>
         <source>Added to the scene list</source>
         <translation>Añadida a la lista de escenas</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="527"/>
+        <location filename="../scene_builder_widget.cpp" line="534"/>
         <source>Camera and image</source>
         <translation>Cámara e imagen</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="568"/>
+        <location filename="../scene_builder_widget.cpp" line="575"/>
         <source>, light</source>
         <translation>, luz</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="820"/>
+        <location filename="../scene_builder_widget.cpp" line="827"/>
         <source>not saved yet</source>
         <translation>sin guardar todavía</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="854"/>
+        <location filename="../scene_builder_widget.cpp" line="861"/>
         <source>No problems found.</source>
         <translation>No se encontraron problemas.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="860"/>
+        <location filename="../scene_builder_widget.cpp" line="867"/>
         <source>Fix this:</source>
         <translation>Corrige esto:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="860"/>
+        <location filename="../scene_builder_widget.cpp" line="867"/>
         <source>Note:</source>
         <translation>Nota:</translation>
     </message>
@@ -8532,14 +8553,14 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <translation>No se pudo guardar en %1.</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="461"/>
-        <location filename="../scene_builder_widget.cpp" line="552"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="462"/>
+        <location filename="../scene_builder_widget.cpp" line="559"/>
         <source>, locked</source>
         <translation>, bloqueado</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="475"/>
-        <location filename="../scene_builder_widget.cpp" line="551"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="476"/>
+        <location filename="../scene_builder_widget.cpp" line="558"/>
         <source>, hidden</source>
         <translation>, oculto</translation>
     </message>
@@ -8643,7 +8664,7 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
     <message>
         <location filename="../scene_builder_actions.cpp" line="75"/>
         <location filename="../scene_builder_arrange.cpp" line="148"/>
-        <location filename="../scene_builder_views.cpp" line="160"/>
+        <location filename="../scene_builder_views.cpp" line="167"/>
         <source>Frame selected</source>
         <translation>Encuadrar selección</translation>
     </message>
@@ -8686,6 +8707,16 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <location filename="../scene_builder_actions.cpp" line="129"/>
         <source>Type what you want to do: wireframe, drop, add fog, top view...</source>
         <translation>Escribe lo que quieres hacer: estructura alámbrica, soltar, añadir niebla, vista superior...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_rendered.cpp" line="58"/>
+        <source>The rendered viewport needs the Live Preview renderer, which was not found.</source>
+        <translation>La vista renderizada necesita el renderizador de la vista previa en vivo, que no se encontró.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_rendered.cpp" line="179"/>
+        <source>The scene list could not list the preview copy.</source>
+        <translation>La lista de escenas no pudo incluir la copia de la vista previa.</translation>
     </message>
 </context>
 <context>

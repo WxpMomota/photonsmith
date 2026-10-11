@@ -88,12 +88,19 @@ void SceneBuilderWidget::createViews(QWidget *layoutBox, QVBoxLayout *layoutLayo
 		viewMenu->addAction(tr(s.name) + QLatin1Char('\t') + QString::fromLatin1(s.key), this, [this, sv]() { m_view3d->setStandardView(sv); });
 	}
 	viewButton->setMenu(viewMenu);
-	for (QPushButton *b : {m_wireButton, m_orthoButton, viewButton}) {
+	m_renderedButton = new QPushButton(tr("Rendered"), m_gizmoBar);
+	m_renderedButton->setCheckable(true);
+	m_renderedButton->setAutoDefault(false);
+	m_renderedButton->setVisible(SceneBuilderWidget::renderedViewportAvailable());
+	m_renderedButton->setToolTip(tr("Show a rendered picture of the scene in the 3D view, refining as you look at it and kept up to date as you edit (needs the GPU renderer of Live Preview; "
+	                                "it is paused while this tab is not showing, and stops when Live Preview starts)"));
+	for (QPushButton *b : {m_wireButton, m_orthoButton, m_renderedButton, viewButton}) {
 		scene_builder_ui::compactStyle(b);
 		gizmoLayout->addWidget(b);
 	}
 	connect(m_wireButton, &QPushButton::toggled, this, [this](bool on) { m_view3d->setWireframe(on); });
 	connect(m_orthoButton, &QPushButton::toggled, this, [this](bool on) { m_view3d->setOrthographic(on); });
+	connect(m_renderedButton, &QPushButton::toggled, this, [this](bool on) { setRenderedViewport(on); });
 	connect(m_view3d, &Scene3DView::displayModeChanged, this, [this]() {   // (the numpad 5 key changes it from the keyboard)
 		QSignalBlocker blockW(m_wireButton), blockO(m_orthoButton);
 		m_wireButton->setChecked(m_view3d->wireframe());

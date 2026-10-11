@@ -77,8 +77,14 @@ SceneBuilderWidget::SceneBuilderWidget(QWidget *parent) : QWidget(parent) {
 	if (!(m_autosaveEnabled && loadAutosave())) newScene();
 }
 
+void SceneBuilderWidget::hideEvent(QHideEvent *e) {
+	QWidget::hideEvent(e);
+	pauseViewportIfHidden(true);   // (the rendered viewport rests while another tab is showing)
+}
+
 void SceneBuilderWidget::showEvent(QShowEvent *e) {
 	QWidget::showEvent(e);
+	pauseViewportIfHidden(false);
 	// The panel can be dragged as narrow as the three buttons above the list allow, whatever the language and theme padding: that width comes from
 	// their (now styled) size hints, not from a fixed number.
 	if (!m_leftPanel) return;
@@ -512,6 +518,7 @@ void SceneBuilderWidget::documentChanged() {
 	updateViews();
 	scheduleAutosave();
 	if (m_sel.kind == SelKind::Camera && !m_loading) refreshInspectorValues();   // (the camera's lens rows are worked out from one another)
+	m_viewportDocChanged = true;   // (the rendered viewport works out whether the picture changed at its next tick)
 }
 
 // ---- list, selection ------------------------------------------------------------------------------------------------------------

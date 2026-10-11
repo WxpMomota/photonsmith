@@ -231,9 +231,9 @@ void SceneBuilderWidget::setLivePreviewAvailable(bool available) {
 	if (m_liveButton) m_liveButton->setVisible(available);
 }
 
-QString SceneBuilderWidget::writeLivePreviewCopy(QString *error) {
+// Where the "(live preview)" copy of the scene goes: the scenes folder, named for the scene. "Preview live" and the rendered viewport share it.
+QString SceneBuilderWidget::livePreviewCopyPath(QString *error) {
 	const QString folder = sceneListFolder();
-	flushEditLog();
 	if (folder.isEmpty()) {
 		if (error) *error = tr("There is no scenes folder to write the preview copy to.");
 		return QString();
@@ -241,7 +241,15 @@ QString SceneBuilderWidget::writeLivePreviewCopy(QString *error) {
 	QString name = QString::fromStdString(m_doc.title).trimmed().toLower().replace(QRegularExpression("[^a-z0-9]+"), "-");
 	name.remove(QRegularExpression("^-+|-+$"));
 	if (name.isEmpty()) name = "my-scene";
-	const QString path = folder + "/" + name + "-live-preview.pbrt";
+	return folder + "/" + name + "-live-preview.pbrt";
+}
+
+bool SceneBuilderWidget::writeSceneCopy(const Document &doc, const QString &path) { return writeSceneText(doc, path); }
+
+QString SceneBuilderWidget::writeLivePreviewCopy(QString *error) {
+	flushEditLog();
+	const QString path = livePreviewCopyPath(error);
+	if (path.isEmpty()) return QString();
 	Document copy = m_doc;
 	copy.title += " (live preview)";
 	if (!writeSceneText(copy, path)) {

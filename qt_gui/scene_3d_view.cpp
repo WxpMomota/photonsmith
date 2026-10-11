@@ -527,9 +527,11 @@ void Scene3DView::paintEvent(QPaintEvent *) {
 	p.fillRect(rect(), palette().color(QPalette::Base));
 	Ctx c{&p, view(), palette().color(QPalette::Text), palette().color(QPalette::Highlight), font(), font()};
 	c.small.setPointSizeF(std::max(7.0, font().pointSizeF() - 1.5));
-	drawGrid(c);
+	const bool picture = m_renderedMode && !m_rendered.isNull();
+	if (picture) p.drawImage(rect(), m_rendered);   // the rendered viewport: the real picture, under everything drawn below
+	else drawGrid(c);
 	if (!m_doc) return;
-	drawFaces(c);
+	if (!picture || m_wireframe) drawFaces(c);
 	drawNames(c);
 	drawLights(c);
 	if (!m_throughCamera) {   // the eye is the camera
@@ -539,10 +541,11 @@ void Scene3DView::paintEvent(QPaintEvent *) {
 	drawTool(c);
 	drawSnapGuides(c);
 	if (m_throughCamera) drawCameraFrame(p);
-	else if (m_cam.ortho || !m_viewName.isEmpty()) {   // which standard view this is, and that it is orthographic
+	else if (m_cam.ortho || !m_viewName.isEmpty() || m_renderedMode) {   // which standard view this is, that it is orthographic, and how the rendering is getting on
 		QStringList parts;
 		if (!m_viewName.isEmpty()) parts << m_viewName;
 		if (m_cam.ortho) parts << tr("Orthographic");
+		if (m_renderedMode) parts << (!m_renderedNote.isEmpty() ? m_renderedNote : picture ? tr("Rendered, %1 samples").arg(m_renderedSamples) : tr("Rendering..."));
 		p.setFont(c.small);
 		p.setPen(c.text);
 		p.drawText(QPointF(10, 18), parts.join(QStringLiteral(", ")));

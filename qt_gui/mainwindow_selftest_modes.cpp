@@ -12,6 +12,7 @@
 
 #include <QApplication>
 #include <QElapsedTimer>
+#include <QThread>
 #include <QAbstractSpinBox>
 #include <QLineEdit>
 #include <QPushButton>
@@ -647,6 +648,78 @@ static void selfTestCameraLens(SceneBuilderWidget *sb, const std::function<void(
 	sb->selectObject(1);
 }
 
+// The rendered viewport (scene_builder_rendered.cpp): the 3D view shows a real progressive render of the scene (the Live Preview GPU renderer), refining, kept up to date as the
+// scene is edited, and following the camera. Needs the GPU renderer; skipped (and said so) where it is not there. Leaves the scene as it found it.
+static void selfTestRenderedViewport(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check, const std::function<void(const QString &)> &log) {
+	if (!SceneBuilderWidget::renderedViewportAvailable()) {
+		log("skipped: the rendered viewport needs the Live Preview renderer, which is not available here");
+		return;
+	}
+	const auto wait = [](int ms, const std::function<bool()> &done) {
+		QElapsedTimer t;
+		t.start();
+		while (t.elapsed() < ms && !done()) {
+			QApplication::processEvents(QEventLoop::AllEvents, 20);
+			QThread::msleep(10);
+		}
+		return done();
+	};
+	// How many pixels are clearly red (the red box) in a picture.
+	const auto redPixels = [](const QImage &img) {
+		int n = 0;
+		for (int y = 0; y < img.height(); ++y)
+			for (int x = 0; x < img.width(); ++x) {
+				const QColor c = img.pixelColor(x, y);
+				if (c.red() > c.green() + 60 && c.red() > c.blue() + 60) ++n;
+			}
+		return n;
+	};
+	sb->show3dView(true);
+	sb->frame3dForTest();
+	sb->orbit3dForTest(25.0, 30.0);
+	sb->setRenderedViewport(true);
+	check(sb->renderedViewport() && sb->view3dForTest()->renderedMode(), "the Rendered switch turns the viewport on");
+	const bool frames = wait(90000, [&]() { return sb->renderedSamplesForTest() >= 6; });
+	check(frames, QString("it produces frames and refines them (%1 frames, %2 samples)").arg(sb->renderedFramesForTest()).arg(sb->renderedSamplesForTest()));
+	if (!frames) {
+		sb->setRenderedViewport(false);
+		return;
+	}
+	const QImage first = sb->renderedImageForTest();
+	const double viewAspect = double(sb->view3dForTest()->width()) / sb->view3dForTest()->height(), pictureAspect = first.isNull() ? 0.0 : double(first.width()) / first.height();
+	check(!first.isNull() && std::abs(viewAspect - pictureAspect) < 0.01 * viewAspect && first.width() <= 800,
+	      QString("the picture has the view's shape, at a size the renderer can refine quickly (%1 x %2 for a %3 x %4 view)").arg(first.width()).arg(first.height()).arg(sb->view3dForTest()->width()).arg(sb->view3dForTest()->height()));
+	QColor lo = QColor(255, 255, 255), hi = QColor(0, 0, 0);
+	double mean = 0;
+	for (int y = 0; y < first.height(); y += 4)
+		for (int x = 0; x < first.width(); x += 4) {
+			const int l = qGray(first.pixel(x, y));
+			mean += l;
+			lo = QColor(std::min(lo.red(), l), 0, 0);
+			hi = QColor(std::max(hi.red(), l), 0, 0);
+		}
+	mean /= (first.height() / 4.0) * (first.width() / 4.0);
+	check(mean > 20.0 && hi.red() - lo.red() > 60, QString("and it is a picture of the lit scene (mean grey %1, from %2 to %3)").arg(mean, 0, 'f', 1).arg(lo.red()).arg(hi.red()));
+	const int redBefore = redPixels(first);
+	check(redBefore > 40, QString("the red box is in it (%1 red pixels)").arg(redBefore));
+	// Edit and see: the box turns green; the picture follows once the edit has paused.
+	scene_doc::Material green = sb->document().objects[3].material;
+	green.color = {0.1, 0.8, 0.15};
+	sb->setMaterialForTest(3, green);
+	const bool changed = wait(60000, [&]() { return redPixels(sb->renderedImageForTest()) < redBefore / 3; });
+	check(changed, QString("recolouring the red box changes the picture within a few seconds (red pixels %1 -> %2)").arg(redBefore).arg(redPixels(sb->renderedImageForTest())));
+	// The camera: turning the view keeps it rendering (the picture follows without a restart).
+	const int framesBefore = sb->renderedFramesForTest();
+	sb->orbit3dForTest(70.0, 25.0);
+	const bool moved = wait(30000, [&]() { return sb->renderedFramesForTest() > framesBefore + 3; });
+	check(moved, "orbiting the view keeps the picture coming");
+	sb->undo();
+	sb->setRenderedViewport(false);
+	check(!sb->renderedViewport() && !sb->view3dForTest()->renderedMode(), "the Rendered switch turns it off again (the 3D view draws its faces)");
+	sb->show3dView(false);
+	sb->selectObject(1);
+}
+
 // Snap to objects (scene_snap.h): dragging the red box of the starter scene to near the gold ball's middle lands exactly on it when snapping to objects is on, and on the
 // 0.25 grid when it is off. Leaves the document as it found it.
 static void selfTestSnap(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
@@ -774,6 +847,7 @@ void MainWindow::runBuilderSelfTest(const std::function<void(const QString &)> &
 	selfTestViewModes(sb, check);
 	selfTestActionSearch(sb, check);
 	selfTestCameraLens(sb, check);
+	selfTestRenderedViewport(sb, check, log);
 	sb->selectObject(1);
 	check(sb->problemsText().isEmpty(), "the scene has no problems or notes");
 	const QString pbrt = outPrefix + "_builder.pbrt";

@@ -180,6 +180,7 @@ void MainWindow::stopLivePreviewIfNavigatedAway() {
 
 void MainWindow::startLivePreview() {
 	if (!m_livePreviewSession || m_livePreviewRunning) return;
+	if (m_sceneBuilder) m_sceneBuilder->stopRenderedViewport();   // (the Scene Builder's rendered viewport has the GPU's scene: only one renderer at a time)
 
 	const QString sceneId = m_sceneCombo->currentData().toString();
 	if (sceneId.isEmpty()) {

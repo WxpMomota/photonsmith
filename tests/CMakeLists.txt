@@ -62,6 +62,7 @@ add_executable(unit_tests
     unit/action_search_tests.cpp
     unit/scene_arrange_tests.cpp
     unit/scene_camera_lens_tests.cpp
+    unit/scene_viewport_tests.cpp
     unit/scene_camera_views_tests.cpp
     unit/camera_keyframes_tests.cpp
     unit/gpu_scene_textures_tests.cpp

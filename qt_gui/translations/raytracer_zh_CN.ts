@@ -997,7 +997,7 @@
     </message>
     <message>
         <location filename="../mainwindow_actions.cpp" line="88"/>
-        <location filename="../mainwindow_tabs_render.cpp" line="347"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="351"/>
         <source>Open Output &amp;Folder</source>
         <translation>打开输出文件夹(&amp;F)</translation>
     </message>
@@ -1008,7 +1008,7 @@
     </message>
     <message>
         <location filename="../mainwindow_actions.cpp" line="98"/>
-        <location filename="../mainwindow_tabs_render.cpp" line="359"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="363"/>
         <source>Open in Default &amp;Viewer</source>
         <translation>用默认查看器打开(&amp;V)</translation>
     </message>
@@ -3586,7 +3586,7 @@ SVGF Denoiser: an alternative, experimental noise-reduction filter. Instead of b
         <translation>提亮较暗的场景，避免画面几乎全黑：把被照亮像素的平均亮度向中灰提升，最多 64 倍，并平滑地跟随画面变化。它绝不会让任何东西变暗，曝光正常或较亮的场景与关闭时完全一样。它会与上方的曝光值相乘，曝光值仍可作为手动修正。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="93"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="94"/>
         <location filename="../mainwindow_tabs_render_live.cpp" line="760"/>
         <source>AI denoise</source>
         <translation>AI 降噪</translation>
@@ -4460,37 +4460,37 @@ Off by default (genuinely random every render).</source>
     </message>
     <message>
         <location filename="../mainwindow_live_preview.cpp" line="142"/>
-        <location filename="../mainwindow_tabs_render.cpp" line="129"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="133"/>
         <source>Saved, but the scene list could not list it until the program is restarted.</source>
         <translation>已保存，但在重启程序之前场景列表无法列出它。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="133"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="137"/>
         <source>Added to the scene list as %1 (Settings tab).</source>
         <translation>已作为 %1 添加到场景列表（“设置”标签页）。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="135"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="139"/>
         <source>Scene Builder</source>
         <translation>场景构建器</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="141"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="145"/>
         <source>The preview copy could not be opened in Live Preview.</source>
         <translation>无法在实时预览中打开预览副本。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="350"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="354"/>
         <source>Show the folder containing the active tab&apos;s render in Explorer</source>
         <translation>在资源管理器中显示当前标签页渲染结果所在的文件夹</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="362"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="366"/>
         <source>Open the active tab&apos;s render in the system viewer</source>
         <translation>使用系统查看器打开当前标签页的渲染结果</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="388"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="392"/>
         <source>Preview</source>
         <translation>预览</translation>
     </message>
@@ -4519,45 +4519,45 @@ Drag to orbit, scroll or +/- to zoom, WASD to move, Up/Down to fly</source>
         <translation>交互式 GPU 预览——拖动以环绕，滚轮或 +/- 缩放，WASD 移动，上/下飞行，左/右环绕</translation>
     </message>
     <message>
-        <location filename="../mainwindow_live_preview.cpp" line="191"/>
+        <location filename="../mainwindow_live_preview.cpp" line="192"/>
         <source>Select a scene first</source>
         <translation>请先选择一个场景</translation>
     </message>
     <message>
         <location filename="../mainwindow_denoiser.cpp" line="38"/>
-        <location filename="../mainwindow_live_preview.cpp" line="269"/>
+        <location filename="../mainwindow_live_preview.cpp" line="270"/>
         <location filename="../mainwindow_photo_install.cpp" line="72"/>
         <source>Starting...</source>
         <translation>正在启动…</translation>
     </message>
     <message>
-        <location filename="../mainwindow_live_preview.cpp" line="285"/>
+        <location filename="../mainwindow_live_preview.cpp" line="286"/>
         <source>Stopped</source>
         <translation>已停止</translation>
     </message>
     <message>
-        <location filename="../mainwindow_live_preview.cpp" line="312"/>
+        <location filename="../mainwindow_live_preview.cpp" line="313"/>
         <source>Live (denoised, not accumulating)</source>
         <translation>实时（已降噪，不进行累积）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_live_preview.cpp" line="314"/>
+        <location filename="../mainwindow_live_preview.cpp" line="315"/>
         <source>%1 samples</source>
         <translation>%1 个样本</translation>
     </message>
     <message>
-        <location filename="../mainwindow_live_preview.cpp" line="339"/>
+        <location filename="../mainwindow_live_preview.cpp" line="340"/>
         <source>[Live Preview] ERROR: %1</source>
         <translation>[实时预览] 错误：%1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="431"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="435"/>
         <source>&lt;b&gt;Why it looks this way&lt;/b&gt;&lt;br&gt;%1</source>
         <translation>&lt;b&gt;为什么看起来是这样&lt;/b&gt;&lt;br&gt;%1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="557"/>
-        <location filename="../mainwindow_tabs_render.cpp" line="570"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="561"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="574"/>
         <location filename="../mainwindow_tabs_settings_groups.cpp" line="278"/>
         <location filename="../mainwindow_thumbnails.cpp" line="126"/>
         <location filename="../mainwindow_thumbnails.cpp" line="165"/>
@@ -4565,12 +4565,12 @@ Drag to orbit, scroll or +/- to zoom, WASD to move, Up/Down to fly</source>
         <translation>暂停</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="570"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="574"/>
         <source>Play</source>
         <translation>播放</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="580"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="584"/>
         <source>Video playback error (%1): %2</source>
         <translation>视频播放错误 (%1):%2</translation>
     </message>
@@ -6512,32 +6512,42 @@ Output:
         <translation>底</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="545"/>
+        <location filename="../scene_3d_view.cpp" line="547"/>
         <source>Orthographic</source>
         <translation>正交</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="564"/>
+        <location filename="../scene_3d_view.cpp" line="548"/>
+        <source>Rendered, %1 samples</source>
+        <translation>渲染，%1 个采样</translation>
+    </message>
+    <message>
+        <location filename="../scene_3d_view.cpp" line="548"/>
+        <source>Rendering...</source>
+        <translation>正在渲染...</translation>
+    </message>
+    <message>
+        <location filename="../scene_3d_view.cpp" line="567"/>
         <source>the floor</source>
         <translation>地面</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="577"/>
+        <location filename="../scene_3d_view.cpp" line="580"/>
         <source>Snapped to %1</source>
         <translation>已吸附到 %1</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="595"/>
+        <location filename="../scene_3d_view.cpp" line="598"/>
         <source>Flythrough preview, %1% (%2 x %3). Orbit, pan or zoom to leave.</source>
         <translation>飞行预览，%1%（%2 x %3）。环绕、平移或缩放即可退出。</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="596"/>
+        <location filename="../scene_3d_view.cpp" line="599"/>
         <source>Through the camera (%1 x %2). Orbit, pan or zoom to leave.</source>
         <translation>透过相机观看（%1 x %2）。环绕、平移或缩放即可退出。</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="803"/>
+        <location filename="../scene_3d_view.cpp" line="806"/>
         <source>Camera</source>
         <translation>相机</translation>
     </message>
@@ -7047,7 +7057,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="667"/>
-        <location filename="../scene_builder_widget.cpp" line="700"/>
+        <location filename="../scene_builder_widget.cpp" line="707"/>
         <source>Meshes (*.ply *.obj)</source>
         <translation>网格 (*.ply *.obj)</translation>
     </message>
@@ -7196,122 +7206,122 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>亮度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="126"/>
+        <location filename="../scene_builder_widget.cpp" line="132"/>
         <source>New</source>
         <translation>新建</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="126"/>
+        <location filename="../scene_builder_widget.cpp" line="132"/>
         <source>Start again from the example scene</source>
         <translation>从示例场景重新开始</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="127"/>
+        <location filename="../scene_builder_widget.cpp" line="133"/>
         <source>Open...</source>
         <translation>打开...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="127"/>
+        <location filename="../scene_builder_widget.cpp" line="133"/>
         <source>Open a .pbrt file saved by the Scene Builder</source>
         <translation>打开由场景构建器保存的 .pbrt 文件</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="128"/>
+        <location filename="../scene_builder_widget.cpp" line="134"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="128"/>
+        <location filename="../scene_builder_widget.cpp" line="134"/>
         <source>Save the scene as a .pbrt file</source>
         <translation>将场景保存为 .pbrt 文件</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="129"/>
+        <location filename="../scene_builder_widget.cpp" line="135"/>
         <source>Save As...</source>
         <translation>另存为...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="129"/>
+        <location filename="../scene_builder_widget.cpp" line="135"/>
         <source>Save the scene under a new name</source>
         <translation>以新名称保存场景</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="130"/>
+        <location filename="../scene_builder_widget.cpp" line="136"/>
         <source>Add to scene list</source>
         <translation>添加到场景列表</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="131"/>
+        <location filename="../scene_builder_widget.cpp" line="137"/>
         <source>Preview live</source>
         <translation>实时预览</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="131"/>
+        <location filename="../scene_builder_widget.cpp" line="137"/>
         <source>Open this scene in Live Preview: walk around it and move things. It is saved as a separate &quot;(live preview)&quot; scene in the scene list; your scene and its own listing are not changed.</source>
         <translation>在实时预览中打开此场景：可以在其中走动并移动物体。它会作为一个单独的“（实时预览）”场景保存到场景列表中；你的场景及其自己的条目不会改变。</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="70"/>
-        <location filename="../scene_builder_widget.cpp" line="134"/>
+        <location filename="../scene_builder_widget.cpp" line="140"/>
         <source>Undo</source>
         <translation>撤销</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="71"/>
-        <location filename="../scene_builder_widget.cpp" line="135"/>
+        <location filename="../scene_builder_widget.cpp" line="141"/>
         <source>Redo</source>
         <translation>重做</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="140"/>
+        <location filename="../scene_builder_widget.cpp" line="146"/>
         <source>Scene name</source>
         <translation>场景名称</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="141"/>
+        <location filename="../scene_builder_widget.cpp" line="147"/>
         <source>The name of this scene, shown in the scene list</source>
         <translation>此场景的名称，显示在场景列表中</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="161"/>
+        <location filename="../scene_builder_widget.cpp" line="167"/>
         <source>Name:</source>
         <translation>名称：</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="198"/>
+        <location filename="../scene_builder_widget.cpp" line="204"/>
         <source>Volumes (fog, smoke, cloud)</source>
         <translation>体积（雾、烟、云）</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
-        <location filename="../scene_builder_widget.cpp" line="222"/>
+        <location filename="../scene_builder_widget.cpp" line="228"/>
         <source>Arrange</source>
         <translation>整理</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="223"/>
+        <location filename="../scene_builder_widget.cpp" line="229"/>
         <source>Rename, put on the floor, frame, hide and lock what is picked (also on a right-click in the list)</source>
         <translation>对所选项重命名、放到地面、取景、隐藏和锁定（在列表中右键点击也可使用）</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="96"/>
-        <location filename="../scene_builder_widget.cpp" line="309"/>
+        <location filename="../scene_builder_widget.cpp" line="315"/>
         <source>Turntable...</source>
         <translation>转台视频...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="311"/>
+        <location filename="../scene_builder_widget.cpp" line="317"/>
         <source>Make a video of the scene from a camera that goes once round it</source>
         <translation>制作一段视频：相机围绕场景转一整圈</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="97"/>
-        <location filename="../scene_builder_widget.cpp" line="312"/>
+        <location filename="../scene_builder_widget.cpp" line="318"/>
         <source>Flythrough...</source>
         <translation>飞行视频...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="314"/>
+        <location filename="../scene_builder_widget.cpp" line="320"/>
         <source>Make a video of the scene from a camera that flies through your saved camera views (needs two or more)</source>
         <translation>制作一段视频：相机依次飞过你保存的相机视图（需要两个或更多）</translation>
     </message>
@@ -7353,7 +7363,7 @@ From: %3</source>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
         <location filename="../scene_builder_models.cpp" line="118"/>
-        <location filename="../scene_builder_widget.cpp" line="184"/>
+        <location filename="../scene_builder_widget.cpp" line="190"/>
         <source>Add</source>
         <translation>添加</translation>
     </message>
@@ -7368,81 +7378,81 @@ From: %3</source>
         <translation>无法读取该模型。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="187"/>
+        <location filename="../scene_builder_widget.cpp" line="193"/>
         <source>Objects</source>
         <translation>物体</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="190"/>
+        <location filename="../scene_builder_widget.cpp" line="196"/>
         <source>Props (several objects at once)</source>
         <translation>道具（一次添加多个物体）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="193"/>
+        <location filename="../scene_builder_widget.cpp" line="199"/>
         <source>Blocky (several objects at once)</source>
         <translation>方块风格（一次添加多个对象）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="194"/>
+        <location filename="../scene_builder_widget.cpp" line="200"/>
         <source>Blocks</source>
         <translation>方块</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="194"/>
+        <location filename="../scene_builder_widget.cpp" line="200"/>
         <source>Creatures</source>
         <translation>生物</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="194"/>
+        <location filename="../scene_builder_widget.cpp" line="200"/>
         <source>Things</source>
         <translation>物品</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="201"/>
+        <location filename="../scene_builder_widget.cpp" line="207"/>
         <source>More</source>
         <translation>更多</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="61"/>
-        <location filename="../scene_builder_widget.cpp" line="202"/>
+        <location filename="../scene_builder_widget.cpp" line="208"/>
         <source>Model library...</source>
         <translation>模型库...</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="62"/>
-        <location filename="../scene_builder_widget.cpp" line="203"/>
+        <location filename="../scene_builder_widget.cpp" line="209"/>
         <source>Object from a photo...</source>
         <translation>由照片生成物体...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="204"/>
+        <location filename="../scene_builder_widget.cpp" line="210"/>
         <source>Light panel (emitting quad)</source>
         <translation>灯板（发光四边形）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="213"/>
+        <location filename="../scene_builder_widget.cpp" line="219"/>
         <source>Lights</source>
         <translation>光源</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="64"/>
-        <location filename="../scene_builder_widget.cpp" line="217"/>
+        <location filename="../scene_builder_widget.cpp" line="223"/>
         <source>Duplicate</source>
         <translation>复制</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="218"/>
+        <location filename="../scene_builder_widget.cpp" line="224"/>
         <source>Make a copy of the selected item beside it (%1)</source>
         <translation>在所选项旁边制作一个副本（%1）</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="65"/>
-        <location filename="../scene_builder_widget.cpp" line="219"/>
+        <location filename="../scene_builder_widget.cpp" line="225"/>
         <source>Array...</source>
         <translation>阵列...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="220"/>
+        <location filename="../scene_builder_widget.cpp" line="226"/>
         <source>Make many copies of the selected object: a grid, a ring round a point, or a random scatter</source>
         <translation>为所选对象制作许多副本：网格、绕一点的环形，或随机散布</translation>
     </message>
@@ -7606,7 +7616,7 @@ From: %3</source>
     <message>
         <location filename="../scene_builder_actions.cpp" line="66"/>
         <location filename="../scene_builder_camera_views.cpp" line="332"/>
-        <location filename="../scene_builder_widget.cpp" line="221"/>
+        <location filename="../scene_builder_widget.cpp" line="227"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
@@ -7744,12 +7754,22 @@ From: %3</source>
         <translation>缩放 (R)：拖动方块沿该轴拉伸物体</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="109"/>
+        <location filename="../scene_builder_views.cpp" line="91"/>
+        <source>Rendered</source>
+        <translation>渲染视图</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_views.cpp" line="95"/>
+        <source>Show a rendered picture of the scene in the 3D view, refining as you look at it and kept up to date as you edit (needs the GPU renderer of Live Preview; it is paused while this tab is not showing, and stops when Live Preview starts)</source>
+        <translation>在 3D 视图中显示场景的渲染图像，边看边逐步细化，并随编辑实时更新（需要实时预览的 GPU 渲染器；此标签页不显示时暂停，开始实时预览时停止）</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_views.cpp" line="116"/>
         <source>Focus distance %1.</source>
         <translation>对焦距离 %1。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="109"/>
+        <location filename="../scene_builder_views.cpp" line="116"/>
         <source>Focus distance %1. It only shows with depth of field: set an aperture.</source>
         <translation>对焦距离 %1。只有启用景深时才看得出来：请设置光圈。</translation>
     </message>
@@ -7805,24 +7825,24 @@ From: %3</source>
         <translation>底</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="515"/>
-        <location filename="../mainwindow_selftest_modes.cpp" line="563"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="516"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="564"/>
         <location filename="../scene_builder_actions.cpp" line="85"/>
         <location filename="../scene_builder_views.cpp" line="85"/>
-        <location filename="../scene_builder_views.cpp" line="112"/>
+        <location filename="../scene_builder_views.cpp" line="119"/>
         <source>Top</source>
         <translation>顶视</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="517"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="518"/>
         <location filename="../scene_builder_actions.cpp" line="83"/>
         <location filename="../scene_builder_views.cpp" line="83"/>
-        <location filename="../scene_builder_views.cpp" line="112"/>
+        <location filename="../scene_builder_views.cpp" line="119"/>
         <source>Front</source>
         <translation>前视</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="519"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="520"/>
         <location filename="../scene_builder_actions.cpp" line="84"/>
         <location filename="../scene_builder_views.cpp" line="84"/>
         <source>Left</source>
@@ -7833,22 +7853,22 @@ From: %3</source>
         <translation type="obsolete">雾</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="112"/>
+        <location filename="../scene_builder_views.cpp" line="119"/>
         <source>Side</source>
         <translation>侧视</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="129"/>
+        <location filename="../scene_builder_views.cpp" line="136"/>
         <source>3D</source>
         <translation>3D</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="132"/>
+        <location filename="../scene_builder_views.cpp" line="139"/>
         <source>Look at the scene from any side, and move things in 3D</source>
         <translation>从任意角度查看场景，并在 3D 中移动物体</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="162"/>
+        <location filename="../scene_builder_views.cpp" line="169"/>
         <source>Zoom both views to what is picked (F)</source>
         <translation>将两个视图缩放到所选项（F）</translation>
     </message>
@@ -7859,71 +7879,71 @@ From: %3</source>
     </message>
     <message>
         <location filename="../mainwindow_selftest_builder3d.cpp" line="503"/>
-        <location filename="../scene_builder_views.cpp" line="143"/>
+        <location filename="../scene_builder_views.cpp" line="150"/>
         <source>Snap to grid</source>
         <translation>吸附到网格</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="145"/>
+        <location filename="../scene_builder_views.cpp" line="152"/>
         <source>Dragging moves things in steps of 0.25. Hold %1 to drag freely.</source>
         <translation>拖动时以 0.25 为步长移动。按住 %1 可自由拖动。</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="94"/>
-        <location filename="../scene_builder_views.cpp" line="150"/>
+        <location filename="../scene_builder_views.cpp" line="157"/>
         <source>Snap to objects</source>
         <translation>吸附到对象</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="152"/>
+        <location filename="../scene_builder_views.cpp" line="159"/>
         <source>While dragging, line the object up with the edges and middles of the others, and rest it on top of them or the floor (orange lines show what it snapped to). Hold %1 to drag freely.</source>
         <translation>拖动时让对象与其他对象的边缘和中心对齐，并放在它们上面或地面上（橙色线条表示吸附到了哪里）。按住 %1 可自由拖动。</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="82"/>
-        <location filename="../scene_builder_views.cpp" line="154"/>
+        <location filename="../scene_builder_views.cpp" line="161"/>
         <source>Frame all</source>
         <translation>显示全部</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="297"/>
+        <location filename="../scene_builder_widget.cpp" line="303"/>
         <source>Draft</source>
         <translation>草稿</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="298"/>
+        <location filename="../scene_builder_widget.cpp" line="304"/>
         <source>Good</source>
         <translation>良好</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="299"/>
+        <location filename="../scene_builder_widget.cpp" line="305"/>
         <source>Best</source>
         <translation>最佳</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="302"/>
+        <location filename="../scene_builder_widget.cpp" line="308"/>
         <source>Use the GPU</source>
         <translation>使用 GPU</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="303"/>
+        <location filename="../scene_builder_widget.cpp" line="309"/>
         <source>Render on the graphics card (NVIDIA OptiX on Windows, Metal on a Mac). Much faster for large pictures; needs a supported GPU.</source>
         <translation>在显卡上渲染（Windows 上为 NVIDIA OptiX，Mac 上为 Metal）。大幅面图像快得多，需要受支持的 GPU。</translation>
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="164"/>
         <location filename="../scene_builder_turntable.cpp" line="244"/>
-        <location filename="../scene_builder_widget.cpp" line="304"/>
+        <location filename="../scene_builder_widget.cpp" line="310"/>
         <source>Preview</source>
         <translation>预览</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="306"/>
+        <location filename="../scene_builder_widget.cpp" line="312"/>
         <source>Render picture...</source>
         <translation>渲染图像...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="308"/>
+        <location filename="../scene_builder_widget.cpp" line="314"/>
         <source>Render at the image size and sample count set under Camera, and save the picture as a PNG</source>
         <translation>按“相机”中设置的图像尺寸和采样数渲染，并将图像保存为 PNG</translation>
     </message>
@@ -8010,7 +8030,7 @@ From: %3</source>
     </message>
     <message>
         <location filename="../scene_builder_turntable.cpp" line="94"/>
-        <location filename="../scene_builder_widget.cpp" line="316"/>
+        <location filename="../scene_builder_widget.cpp" line="322"/>
         <source>Quality:</source>
         <translation>质量：</translation>
     </message>
@@ -8140,7 +8160,7 @@ From: %3</source>
         <translation type="vanished">转台视频失败。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="333"/>
+        <location filename="../scene_builder_widget.cpp" line="339"/>
         <source>Press Preview to see the scene.</source>
         <translation>点击“预览”查看场景。</translation>
     </message>
@@ -8172,14 +8192,14 @@ From: %3</source>
     </message>
     <message>
         <location filename="../scene_builder_files.cpp" line="157"/>
-        <location filename="../scene_builder_files.cpp" line="270"/>
+        <location filename="../scene_builder_files.cpp" line="278"/>
         <source>Cannot open the scene</source>
         <translation>无法打开场景</translation>
     </message>
     <message>
         <location filename="../scene_builder_files.cpp" line="165"/>
         <location filename="../scene_builder_files.cpp" line="175"/>
-        <location filename="../scene_builder_files.cpp" line="301"/>
+        <location filename="../scene_builder_files.cpp" line="309"/>
         <source>Cannot save</source>
         <translation>无法保存</translation>
     </message>
@@ -8187,8 +8207,9 @@ From: %3</source>
         <location filename="../scene_builder_files.cpp" line="165"/>
         <location filename="../scene_builder_files.cpp" line="175"/>
         <location filename="../scene_builder_files.cpp" line="222"/>
-        <location filename="../scene_builder_files.cpp" line="248"/>
+        <location filename="../scene_builder_files.cpp" line="256"/>
         <location filename="../scene_builder_render.cpp" line="85"/>
+        <location filename="../scene_builder_rendered.cpp" line="170"/>
         <location filename="../scene_builder_turntable.cpp" line="183"/>
         <source>Could not write %1.</source>
         <translation>无法写入 %1。</translation>
@@ -8210,37 +8231,37 @@ From: %3</source>
         <translation>没有可写入预览副本的场景文件夹。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="259"/>
+        <location filename="../scene_builder_files.cpp" line="267"/>
         <source>Cannot preview</source>
         <translation>无法预览</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="281"/>
+        <location filename="../scene_builder_files.cpp" line="289"/>
         <source>No scenes folder</source>
         <translation>没有场景文件夹</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="288"/>
+        <location filename="../scene_builder_files.cpp" line="296"/>
         <source>Add to the scene list</source>
         <translation>添加到场景列表</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="289"/>
+        <location filename="../scene_builder_files.cpp" line="297"/>
         <source>This scene is already in the list as &quot;%1&quot;.</source>
         <translation>此场景已在列表中，名称为“%1”。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="290"/>
+        <location filename="../scene_builder_files.cpp" line="298"/>
         <source>Add as a new scene</source>
         <translation>添加为新场景</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="291"/>
+        <location filename="../scene_builder_files.cpp" line="299"/>
         <source>Update the existing one</source>
         <translation>更新现有场景</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="306"/>
+        <location filename="../scene_builder_files.cpp" line="314"/>
         <source>Saved a copy as %1.
 
 It is in the scene list now (Settings tab, My Scenes).</source>
@@ -8249,12 +8270,12 @@ It is in the scene list now (Settings tab, My Scenes).</source>
 它现在已在场景列表中（“设置”标签页，我的场景）。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="826"/>
+        <location filename="../scene_builder_widget.cpp" line="833"/>
         <source>(%1)%2  |  %3 objects, %4 lights</source>
         <translation>(%1)%2  |  %3 个物体，%4 个光源</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="700"/>
+        <location filename="../scene_builder_widget.cpp" line="707"/>
         <source>Choose a mesh</source>
         <translation>选择网格</translation>
     </message>
@@ -8264,57 +8285,57 @@ It is in the scene list now (Settings tab, My Scenes).</source>
         <translation>在程序旁边找不到场景文件夹 (pbrt_scenes)。可以用“另存为”把文件放到任意位置，并将环境变量 RAY_TRACER_PBRT_DIR 设为该文件夹，程序就会把它列出来。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="130"/>
+        <location filename="../scene_builder_widget.cpp" line="136"/>
         <source>Save the scene into the scenes folder so it shows up in the Settings tab</source>
         <translation>将场景保存到场景文件夹，使其出现在“设置”标签页中</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="134"/>
+        <location filename="../scene_builder_widget.cpp" line="140"/>
         <source>Undo the last change (%1)</source>
         <translation>撤销上一次更改 (%1)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="135"/>
+        <location filename="../scene_builder_widget.cpp" line="141"/>
         <source>Redo (%1)</source>
         <translation>重做 (%1)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="301"/>
+        <location filename="../scene_builder_widget.cpp" line="307"/>
         <source>Draft: 480 pixels wide, 16 samples. Good: 720 wide, 64 samples. Best: 960 wide, 256 samples.</source>
         <translation>草稿：宽 480 像素，16 个采样。良好：宽 720，64 个采样。最佳：宽 960，256 个采样。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="305"/>
+        <location filename="../scene_builder_files.cpp" line="313"/>
         <source>Added to the scene list</source>
         <translation>已添加到场景列表</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="527"/>
+        <location filename="../scene_builder_widget.cpp" line="534"/>
         <source>Camera and image</source>
         <translation>相机与画面</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="568"/>
+        <location filename="../scene_builder_widget.cpp" line="575"/>
         <source>, light</source>
         <translation>，光源</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="820"/>
+        <location filename="../scene_builder_widget.cpp" line="827"/>
         <source>not saved yet</source>
         <translation>尚未保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="854"/>
+        <location filename="../scene_builder_widget.cpp" line="861"/>
         <source>No problems found.</source>
         <translation>未发现问题。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="860"/>
+        <location filename="../scene_builder_widget.cpp" line="867"/>
         <source>Fix this:</source>
         <translation>请修复：</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="860"/>
+        <location filename="../scene_builder_widget.cpp" line="867"/>
         <source>Note:</source>
         <translation>注意：</translation>
     </message>
@@ -8487,14 +8508,14 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>无法保存到 %1。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="461"/>
-        <location filename="../scene_builder_widget.cpp" line="552"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="462"/>
+        <location filename="../scene_builder_widget.cpp" line="559"/>
         <source>, locked</source>
         <translation>，已锁定</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="475"/>
-        <location filename="../scene_builder_widget.cpp" line="551"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="476"/>
+        <location filename="../scene_builder_widget.cpp" line="558"/>
         <source>, hidden</source>
         <translation>，已隐藏</translation>
     </message>
@@ -8598,7 +8619,7 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
     <message>
         <location filename="../scene_builder_actions.cpp" line="75"/>
         <location filename="../scene_builder_arrange.cpp" line="148"/>
-        <location filename="../scene_builder_views.cpp" line="160"/>
+        <location filename="../scene_builder_views.cpp" line="167"/>
         <source>Frame selected</source>
         <translation>取景所选项</translation>
     </message>
@@ -8641,6 +8662,16 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <location filename="../scene_builder_actions.cpp" line="129"/>
         <source>Type what you want to do: wireframe, drop, add fog, top view...</source>
         <translation>输入你想做的事：线框、放到地面、添加雾、顶视图……</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_rendered.cpp" line="58"/>
+        <source>The rendered viewport needs the Live Preview renderer, which was not found.</source>
+        <translation>渲染视图需要实时预览的渲染器，但未找到。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_rendered.cpp" line="179"/>
+        <source>The scene list could not list the preview copy.</source>
+        <translation>场景列表无法列出预览副本。</translation>
     </message>
 </context>
 <context>

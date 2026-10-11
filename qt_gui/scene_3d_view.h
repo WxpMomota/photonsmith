@@ -14,6 +14,7 @@
 // arrive as a whole edited object.
 
 #include <QElapsedTimer>
+#include <QImage>
 #include <QPointF>
 #include <QWidget>
 
@@ -77,6 +78,14 @@ public:
 	void beginPickFocus();
 	bool pickingFocus() const { return m_pickFocus; }
 	bool surfaceAt(const QPointF &px, scene_doc::Float3 &where) const;   // the point of the nearest face under that pixel (else of the floor); false if neither
+	// Rendered mode (the Scene Builder's rendered viewport): a path-traced picture of the scene is drawn behind the usual names, lights, camera and tool, instead of the flat-shaded
+	// faces, so everything (orbiting, picking, moving) works as before with the real picture under it. The picture is rendered by the owner for exactly this view (same eye, target,
+	// field of view and shape), so what is drawn on top lines up. Until the first picture arrives the faces are drawn as usual. With Wireframe on, the edges are drawn over the picture.
+	void setRenderedMode(bool on) { m_renderedMode = on; if (!on) m_rendered = QImage(); update(); }
+	bool renderedMode() const { return m_renderedMode; }
+	void setRenderedImage(const QImage &image, int samples) { m_rendered = image; m_renderedSamples = samples; update(); }
+	void setRenderedNote(const QString &text) { m_renderedNote = text; update(); }   // what to say in the corner instead of the sample count (an error), or empty
+	bool hasRenderedImage() const { return !m_rendered.isNull(); }
 	void setGizmoMode(GizmoMode m);
 	GizmoMode gizmoMode() const { return m_gizmo; }
 	// Where a new object is dropped: the floor (y = 0) point under the middle of the view when that is near what the camera looks at, else the floor under
@@ -203,6 +212,10 @@ private:
 	double m_previewProgress = 0.0;
 	int m_activeView = -1;          // the saved view whose marker was pressed last: its target is drawn and can be dragged too
 	bool m_pickFocus = false;       // the next click picks the focus point
+	bool m_renderedMode = false;
+	QImage m_rendered;
+	int m_renderedSamples = 0;
+	QString m_renderedNote;
 	bool m_wireframe = false;
 	QString m_viewName;             // the standard view the camera is in, until it is turned by hand
 	bool numpadKey(QKeyEvent *e);   // a numpad view key; true if it was one

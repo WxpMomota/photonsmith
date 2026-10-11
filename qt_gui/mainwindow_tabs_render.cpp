@@ -122,6 +122,10 @@ void MainWindow::createSceneBuilderTab() {
 	m_sceneBuilder = new SceneBuilderWidget(this);
 	connect(m_sceneBuilder, &SceneBuilderWidget::statusMessage, this, [this](const QString &text) { statusBar()->showMessage(text, 5000); });
 	// "Add to scene list": list the saved file now (the registry grows while the program runs) and select it in the Settings tab.
+#ifdef RT_GUI_HAVE_LIVE_PREVIEW
+	// The rendered viewport and Live Preview cannot both have the GPU: starting the viewport stops a running Live Preview.
+	connect(m_sceneBuilder, &SceneBuilderWidget::renderedViewportStarting, this, [this]() { if (m_livePreviewRunning) stopLivePreview(); });
+#endif
 	connect(m_sceneBuilder, &SceneBuilderWidget::sceneListed, this, [this](const QString &path) {
 		SceneMetadataClient::refreshUserScenes();
 		const QString id = SceneMetadataClient::sceneIdForFile(path);
