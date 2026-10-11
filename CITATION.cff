@@ -1,12 +1,12 @@
 cff-version: 1.2.0
 message: "If you use this renderer in research or a publication, please cite it as below."
-title: "ray_tracer: a pbrt-v4-compatible path tracer for CPU, NVIDIA OptiX and Apple Metal"
+title: "Photonsmith: a pbrt-v4-compatible path tracer for CPU, NVIDIA OptiX and Apple Metal"
 type: software
 authors:
   - family-names: Wang
     given-names: Xinpei
-repository-code: "https://github.com/XinpeiWang/ray_tracer"
-url: "https://xinpeiwang.github.io/ray_tracer/"
+repository-code: "https://github.com/XinpeiWang/photonsmith"
+url: "https://xinpeiwang.github.io/photonsmith/"
 license: MIT
 keywords:
   - ray tracing
