@@ -705,6 +705,17 @@ TEST(FlattenTest, CurveWidthParamsAreReadWhenGiven) {
 	EXPECT_EQ(s.curves[0].curveType, "cylinder");
 }
 
+TEST(FlattenTest, CurveWidthFollowsTheTransformLikeTheControlPoints) {
+	// pbrt-v4 intersects a curve in object space: the width is an object-space length, so under Scale 8 the control points and the width both grow 8 times.
+	const FlatScene s = flattenSource(
+		"AttributeBegin\n  Scale 8 8 8\n  Shape \"curve\" \"float width0\" [ 0.2 ] \"float width1\" [ 0.05 ]\n"
+		"    \"point3 P\" [ 0 0 0  1 1 0  2 1 0  3 0 0 ]\nAttributeEnd\n");
+	ASSERT_EQ(s.curves.size(), 1u);
+	EXPECT_NEAR(s.curves[0].cp[9], 24.0, 1e-9);
+	EXPECT_NEAR(s.curves[0].width0, 1.6, 1e-9);
+	EXPECT_NEAR(s.curves[0].width1, 0.4, 1e-9);
+}
+
 TEST(FlattenTest, CurveWidthShorthandSetsBothEndpoints) {
 	const FlatScene s = flattenSource(
 		std::string("Shape \"curve\" \"float width\" [ 0.3 ]\n") +
