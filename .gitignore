@@ -491,3 +491,6 @@ measured_bxdf_pbrt_tests/
 
 # Scratch EXRs the Metal CPU/GPU parity ctest writes into the working directory.
 mcparity_*.exr
+
+# the Scene Builder's material preset pictures are Qt resources (qt_gui/resources.qrc lists them), so they are committed
+!qt_gui/material_thumbs/*.png
