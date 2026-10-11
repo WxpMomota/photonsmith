@@ -370,3 +370,78 @@ TEST(SceneViewMath, TheNudgeSteps) {
 	EXPECT_DOUBLE_EQ(nudgeStep(false, true), 0.05);
 	EXPECT_DOUBLE_EQ(nudgeStep(true, true), 1.0) << "Shift wins";
 }
+
+
+TEST(SceneViewOrthoTest, ThingsKeepTheirSizeWhateverTheirDistanceAndNothingIsBehindTheCamera) {
+	View v = makeView();
+	v.cam.ortho = true;
+	double ax, ay, bx, by, cx, cy;
+	const V3 near{0, 1, 3}, far{0, 1, -40};   // the same x, on the axis; one 5 units from the eye, one 48
+	ASSERT_TRUE(v.project(near + V3{1, 0, 0}, ax, ay));
+	ASSERT_TRUE(v.project(near, bx, by));
+	ASSERT_TRUE(v.project(far + V3{1, 0, 0}, cx, cy));
+	double dx, dy;
+	ASSERT_TRUE(v.project(far, dx, dy));
+	EXPECT_NEAR(ax - bx, cx - dx, 1e-9) << "a unit is as many pixels across near and far";
+	EXPECT_NEAR(v.unitsPerPixel(1.0), v.unitsPerPixel(500.0), 1e-12);
+	double sx, sy;
+	EXPECT_TRUE(v.project(v.cam.eye() - v.cam.forward() * 50.0, sx, sy)) << "a point behind the eye is still drawn: there is no camera position to be behind";
+}
+
+TEST(SceneViewOrthoTest, TheSizeAtTheTargetIsTheSameAsInThePerspectiveView) {
+	View p = makeView();
+	View o = makeView();
+	o.cam.ortho = true;
+	const V3 target = p.cam.target;
+	double px0, py0, px1, py1, ox0, oy0, ox1, oy1;
+	ASSERT_TRUE(p.project(target, px0, py0));
+	ASSERT_TRUE(p.project(target + p.cam.right() * 1.0, px1, py1));
+	ASSERT_TRUE(o.project(target, ox0, oy0));
+	ASSERT_TRUE(o.project(target + o.cam.right() * 1.0, ox1, oy1));
+	EXPECT_NEAR(px1 - px0, ox1 - ox0, 1e-9) << "so switching does not zoom";
+	EXPECT_NEAR(px0, ox0, 1e-9);
+}
+
+TEST(SceneViewOrthoTest, TheRayUnderAPixelAlwaysPassesThroughWhatProjectsThere) {
+	View v = makeView();
+	v.cam.ortho = true;
+	for (const V3 p : {V3{1, 2, 3}, V3{-4, 0.5, -9}, V3{0, 1, 0}, V3{6, 5, 20}}) {
+		double sx, sy;
+		ASSERT_TRUE(v.project(p, sx, sy));
+		const Ray r = v.ray(sx, sy);
+		expectNear(r.dir, v.cam.forward());
+		const V3 w = p - r.origin;   // the distance from p to the ray's line
+		const V3 off = w - r.dir * dot(w, r.dir);
+		EXPECT_NEAR(length(off), 0.0, 1e-9);
+		EXPECT_GT(dot(w, r.dir), 0.0) << "and the point is ahead of the ray's start";
+	}
+}
+
+TEST(SceneViewOrthoTest, DraggingOnTheFloorGivesTheSamePointAsProjectingIt) {
+	View v = makeView();
+	v.cam.ortho = true;
+	double sx, sy;
+	ASSERT_TRUE(v.project({2.5, 0, -1.5}, sx, sy));
+	V3 hit;
+	ASSERT_TRUE(rayPlane(v.ray(sx, sy), {0, 0, 0}, {0, 1, 0}, hit));
+	expectNear(hit, {2.5, 0, -1.5}, 1e-6);
+}
+
+TEST(SceneViewStandardTest, EachStandardViewLooksFromItsAxis) {
+	OrbitCamera c;
+	c.target = {0, 0, 0};
+	c.distance = 10;
+	const struct { StandardView v; V3 eye; } want[] = {{StandardView::Front, {0, 0, 10}}, {StandardView::Back, {0, 0, -10}}, {StandardView::Right, {10, 0, 0}},
+	                                                 {StandardView::Left, {-10, 0, 0}}};
+	for (const auto& w : want) {
+		standardViewAngles(w.v, c.yawDeg, c.pitchDeg);
+		expectNear(c.eye(), w.eye, 1e-9);
+	}
+	standardViewAngles(StandardView::Top, c.yawDeg, c.pitchDeg);
+	EXPECT_NEAR(c.eye().y, 10.0, 0.01);
+	EXPECT_NEAR(c.eye().x, 0.0, 1e-9);
+	EXPECT_LT(c.up().z, -0.99) << "from above, up the screen is away from you (-Z)";
+	EXPECT_NEAR(length(c.right()), 1.0, 1e-9) << "the axes still make sense straight down";
+	standardViewAngles(StandardView::Bottom, c.yawDeg, c.pitchDeg);
+	EXPECT_NEAR(c.eye().y, -10.0, 0.01);
+}

@@ -37,6 +37,7 @@ struct OrbitCamera {
 	double yawDeg = 30;
 	double pitchDeg = 25;   // kept inside +-89 so "up" is never parallel to the view direction
 	double fovDeg = 40;     // vertical
+	bool ortho = false;     // an orthographic view (no perspective: things do not shrink with distance, parallel lines stay parallel): the same size at the target as the perspective one
 
 	V3 eye() const {
 		const double y = yawDeg * kPi / 180.0, p = pitchDeg * kPi / 180.0;
@@ -60,6 +61,20 @@ struct OrbitCamera {
 		if (distance > 2000) distance = 2000;
 	}
 };
+
+// The six standard views of the 3D view (the numpad of a 3D program): the camera on one of the axes, looking at the target. Front looks from +Z (towards -Z, the way the starting
+// camera looks), Right from +X, Back from -Z, Left from -X, Top from above (+Y, with -Z up the screen) and Bottom from below.
+enum class StandardView { Front, Back, Right, Left, Top, Bottom };
+inline void standardViewAngles(StandardView v, double& yawDeg, double& pitchDeg) {
+	switch (v) {
+		case StandardView::Front: yawDeg = 0; pitchDeg = 0; break;
+		case StandardView::Back: yawDeg = 180; pitchDeg = 0; break;
+		case StandardView::Right: yawDeg = 90; pitchDeg = 0; break;
+		case StandardView::Left: yawDeg = -90; pitchDeg = 0; break;
+		case StandardView::Top: yawDeg = 0; pitchDeg = 89.9; break;       // (just short of straight down, so "up" is never parallel to the view direction)
+		case StandardView::Bottom: yawDeg = 0; pitchDeg = -89.9; break;
+	}
+}
 
 // The orbit that puts the eye at `eye` looking at `target` (the inverse of OrbitCamera::eye()): the same pose, so the 3D view can look through a scene camera. A
 // camera looking straight up or down gets the nearest pitch the orbit allows; an eye on its target keeps the shortest distance.
@@ -128,6 +143,8 @@ struct View {
 	double nearPlane = 0.05;
 
 	double focal() const { return (height / 2.0) / std::tan(cam.fovDeg * kPi / 360.0); }  // pixels
+	// Orthographic: pixels per world unit, the size a unit has at the target's distance in the perspective view of the same field of view.
+	double orthoScale() const { return (height / 2.0) / (cam.distance * std::tan(cam.fovDeg * kPi / 360.0)); }
 
 	// World -> camera space: x right, y up, z DEPTH (positive in front of the camera).
 	V3 toView(const V3& p) const {
@@ -136,26 +153,37 @@ struct View {
 	}
 	// Camera space -> pixels (y down). The point must be in front of the camera.
 	void toPixel(const V3& v, double& sx, double& sy) const {
+		if (cam.ortho) {
+			const double s = orthoScale();
+			sx = width / 2.0 + v.x * s;
+			sy = height / 2.0 - v.y * s;
+			return;
+		}
 		const double f = focal();
 		sx = width / 2.0 + v.x / v.z * f;
 		sy = height / 2.0 - v.y / v.z * f;
 	}
-	// False when the point is behind (or too near) the camera.
+	// False when the point is behind (or too near) the camera. (An orthographic view has no camera position to be behind: everything is in front of it.)
 	bool project(const V3& p, double& sx, double& sy, double* depth = nullptr) const {
 		const V3 v = toView(p);
-		if (v.z < nearPlane) return false;
+		if (!cam.ortho && v.z < nearPlane) return false;
 		toPixel(v, sx, sy);
 		if (depth) *depth = v.z;
 		return true;
 	}
 	// The ray from the eye through a pixel.
 	Ray ray(double sx, double sy) const {
+		if (cam.ortho) {   // parallel rays, one per pixel, starting well behind the eye so that things behind the eye's plane are met too
+			const double upp = 1.0 / orthoScale();
+			const V3 origin = cam.eye() + cam.right() * ((sx - width / 2.0) * upp) - cam.up() * ((sy - height / 2.0) * upp);
+			return {origin - cam.forward() * 1e4, cam.forward()};
+		}
 		const double f = focal();
 		const V3 d = cam.forward() + cam.right() * ((sx - width / 2.0) / f) - cam.up() * ((sy - height / 2.0) / f);
 		return {cam.eye(), normalize(d)};
 	}
 	// World units per pixel at a given depth.
-	double unitsPerPixel(double depth) const { return depth / focal(); }
+	double unitsPerPixel(double depth) const { return cam.ortho ? 1.0 / orthoScale() : depth / focal(); }
 };
 
 // Where a ray meets a plane (False when it is parallel to it or the hit is behind the ray's origin).

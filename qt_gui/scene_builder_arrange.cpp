@@ -141,6 +141,8 @@ void SceneBuilderWidget::renameItem(const BuilderSelection &s, const QString &wa
 QMenu *SceneBuilderWidget::createArrangeMenu(QWidget *parent) {
 	auto *menu = new QMenu(parent);
 	const auto key = [](const QKeySequence &k) { return QLatin1Char('\t') + k.toString(QKeySequence::NativeText); };
+	menu->addAction(tr("Search actions...") + key(QKeySequence(Qt::Key_F3)), this, [this]() { showActionSearch(); });
+	menu->addSeparator();
 	menu->addAction(tr("Rename...") + key(QKeySequence(Qt::Key_F2)), this, [this]() { renameSelected(); });
 	menu->addAction(tr("Drop to floor") + key(QKeySequence(Qt::Key_End)), this, [this]() { dropSelectedToFloor(); });
 	menu->addAction(tr("Frame selected") + key(QKeySequence(Qt::Key_F)), this, [this]() { frameSelected(); });

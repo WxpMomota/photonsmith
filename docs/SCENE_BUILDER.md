@@ -121,6 +121,20 @@ While several are picked the properties panel shows who they are and offers **Mo
 
 Delete or Backspace removes what is picked (from the list or a view; in a text box they edit the text). Ctrl+D (Command+D on a Mac) duplicates it, Ctrl+A picks everything, Ctrl+G groups and Ctrl+Shift+G ungroups. Undo and Redo use the platform's usual keys (Ctrl+Z / Ctrl+Y on Windows, Command+Z / Shift+Command+Z on a Mac); the buttons' tooltips show the ones for your keyboard. W, E and R pick the 3D view's Move, Rotate and Scale tools. H hides, Alt+H shows everything hidden, L locks, Alt+L unlocks everything, End drops to the floor, F frames what is picked and F2 renames (see *Arranging*).
 
+## Search for an action
+
+**F3** (or **Ctrl+K**, Command+K on a Mac, where F3 belongs to the system; also **Arrange > Search actions...**) opens a box where you type what you want to do and run it without finding its button: "wire", "drop", "add fog", "top view", "lock". Every word you type has to be somewhere in the action's name, in any order; names that start with your first word come first. Up and Down move the highlight, Enter (or a double-click) runs it, Escape closes. It lists about ninety actions, each named with its kind: **Add** (every shape, volume, light, prop and blocky object, the model library and a photo), **Edit** (duplicate, array, delete, select all, group, ungroup, undo, redo), **Arrange** (rename, drop to floor, frame selected, hide, show, lock, unlock), **View** (frame all, the six standard views, wireframe, orthographic, through camera, camera from view, snap to objects) and **Render** (the turntable and flythrough videos). The matching is `src/shared/action_search.h`.
+
+## The 3D view: standard views, orthographic, wireframe
+
+Beside the Move, Rotate and Scale tools the 3D view has three more controls:
+
+* **View** puts the camera on an axis, looking at the same target from the same distance: **Front** (from +Z, the way the starting camera looks), **Back**, **Right** (from +X), **Left**, **Top** (from above, with away from you up the screen) and **Bottom**. The name is drawn in the corner until you turn the view by hand.
+* **Orthographic** removes the perspective: things keep their size however far away they are and parallel lines stay parallel, which is what you want to line things up or measure by eye (a front view in perspective makes the far things small). It is the same size at the target, so switching does not zoom. Dragging and picking work the same way.
+* **Wireframe** draws only the edges of everything, so things show through each other and you can see what is inside or behind (a hidden-line view; there is no shading).
+
+The **numpad** does these when the 3D view has the focus (click in it): **1** Front, **3** Right, **7** Top, and with **Ctrl** the opposite side (Back, Left, Bottom); **5** switches between perspective and orthographic; **0** looks through the scene's camera; **2, 4, 6, 8** turn the view by 15 degrees; **+** and **-** zoom; **.** frames what is picked. (A keyboard without a numpad has the View menu and the buttons.)
+
 ## Arranging: hide, lock, drop to floor, frame, rename
 
 The **Arrange** button under the list (and a right-click on an item in the list) has the tidying tools; each is one undo step and works on everything picked.

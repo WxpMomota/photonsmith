@@ -281,6 +281,7 @@ void Scene3DView::mouseMoveEvent(QMouseEvent *e) {
 	if (m_mode == Mode::Orbit) {
 		leaveCameraView();
 		m_userView = true;
+		m_viewName.clear();
 		m_cam.orbit(-d.x() * 0.4, d.y() * 0.4);
 		m_last = px;
 		update();

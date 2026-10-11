@@ -133,6 +133,8 @@ public:
 	bool dragViewMarker3dForTest(int viewIndex, int which, const QPointF &deltaPx, Qt::KeyboardModifiers mods = Qt::NoModifier);   // a saved view's marker in the 3D view
 	void orbit3dForTest(double yawDeg, double pitchDeg);
 	void frame3dForTest() { m_view3d->frameAll(); }
+	Scene3DView *view3dForTest() { return m_view3d; }
+	int wireframeDifferenceForTest();   // how many pixels of the 3D view differ between solid and wireframe
 	scene_doc::Float3 dropPointForTest() const { return dropPoint(); }
 	bool meshReadyForTest(const QString &path) const;
 	bool gizmoButtonEnabled(int tool) const;   // 0 Move, 1 Rotate, 2 Scale
@@ -165,6 +167,10 @@ public:
 	void frameSelected();
 	void renameSelected();
 	void renameItem(const BuilderSelection &s, const QString &wanted);
+	// "Search actions" (F3, Ctrl+K): type what to do and run it (scene_builder_actions.cpp; the matching is src/shared/action_search.h).
+	void showActionSearch();
+	QStringList actionNamesForTest();
+	bool runActionForTest(const QString &words);   // runs the best match for the words, as if picked in the box
 	void deleteSelected();
 	bool undo();
 	bool redo();
@@ -301,8 +307,13 @@ private:
 	bool isLockedItem(const BuilderSelection &s) const;
 	QMenu *createArrangeMenu(QWidget *parent);
 	void createArrangeShortcuts();
+	void createActionSearchShortcuts();
+	struct Command { QString label; std::function<void()> run; };   // one thing the search box can do
+	std::vector<Command> buildCommands();
 	void addVisibilityRows(QFormLayout *f, const std::function<bool *()> &hidden, const std::function<bool *()> &locked);
 	void decorateListItem(QListWidgetItem *it, bool hidden, bool locked);
+	QPushButton *m_wireButton = nullptr;      // the 3D view's Wireframe and Orthographic switches
+	QPushButton *m_orthoButton = nullptr;
 	QPushButton *m_arrangeButton = nullptr;   // the Arrange menu: rename, drop to floor, frame, hide, lock
 	void inspectVolume(QFormLayout *f, int i);
 	void inspectObject(QFormLayout *f, int i);

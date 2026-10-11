@@ -34,7 +34,63 @@ scene_view::View Scene3DView::view() const {
 	v.cam = (m_throughCamera && m_doc) ? cameraPose() : m_cam;
 	v.width = std::max(1, width());
 	v.height = std::max(1, height());
+	if (v.cam.ortho) v.nearPlane = -1e9;   // (nothing is behind an orthographic view's eye: no near-plane clipping)
 	return v;
+}
+
+void Scene3DView::setOrthographic(bool on) {
+	if (on == m_cam.ortho && !m_throughCamera) return;
+	leaveCameraView();
+	m_cam.ortho = on;
+	m_userView = true;
+	update();
+	emit displayModeChanged();
+}
+
+void Scene3DView::setStandardView(scene_view::StandardView v) {
+	leaveCameraView();
+	scene_view::standardViewAngles(v, m_cam.yawDeg, m_cam.pitchDeg);
+	m_userView = true;
+	switch (v) {
+		case scene_view::StandardView::Front: m_viewName = tr("Front"); break;
+		case scene_view::StandardView::Back: m_viewName = tr("Back"); break;
+		case scene_view::StandardView::Right: m_viewName = tr("Right"); break;
+		case scene_view::StandardView::Left: m_viewName = tr("Left"); break;
+		case scene_view::StandardView::Top: m_viewName = tr("Top"); break;
+		case scene_view::StandardView::Bottom: m_viewName = tr("Bottom"); break;
+	}
+	update();
+}
+
+// The numpad, as in a 3D program: 1 Front, 3 Right, 7 Top (with Ctrl the opposite side), 5 perspective or orthographic, 0 through the camera, 2/4/6/8 turn by 15 degrees,
+// + and - zoom, and the dot frames what is picked.
+bool Scene3DView::numpadKey(QKeyEvent *e) {
+	if (!(e->modifiers() & Qt::KeypadModifier)) return false;
+	const bool opposite = e->modifiers() & Qt::ControlModifier;
+	switch (e->key()) {
+		case Qt::Key_1: setStandardView(opposite ? scene_view::StandardView::Back : scene_view::StandardView::Front); break;
+		case Qt::Key_3: setStandardView(opposite ? scene_view::StandardView::Left : scene_view::StandardView::Right); break;
+		case Qt::Key_7: setStandardView(opposite ? scene_view::StandardView::Bottom : scene_view::StandardView::Top); break;
+		case Qt::Key_5: setOrthographic(!m_cam.ortho); break;
+		case Qt::Key_0: emit cameraViewRequested(); break;
+		case Qt::Key_2: case Qt::Key_8: case Qt::Key_4: case Qt::Key_6:
+			leaveCameraView();
+			m_userView = true;
+			m_viewName.clear();
+			m_cam.orbit(e->key() == Qt::Key_4 ? -15.0 : e->key() == Qt::Key_6 ? 15.0 : 0.0, e->key() == Qt::Key_8 ? 15.0 : e->key() == Qt::Key_2 ? -15.0 : 0.0);
+			update();
+			break;
+		case Qt::Key_Plus: case Qt::Key_Minus:
+			leaveCameraView();
+			m_userView = true;
+			m_cam.dolly(e->key() == Qt::Key_Plus ? 0.8 : 1.25);
+			update();
+			break;
+		case Qt::Key_Period: case Qt::Key_Comma: emit frameSelectedRequested(); break;
+		default: return false;
+	}
+	e->accept();
+	return true;
 }
 
 scene_view::OrbitCamera Scene3DView::cameraPose() const {
@@ -116,6 +172,7 @@ void Scene3DView::setGizmoMode(GizmoMode m) {
 }
 
 void Scene3DView::keyPressEvent(QKeyEvent *e) {
+	if (numpadKey(e)) return;
 	GizmoMode wanted = m_gizmo;
 	const char *name = "";
 	switch (e->key()) {
@@ -439,6 +496,14 @@ void Scene3DView::paintEvent(QPaintEvent *) {
 	drawTool(c);
 	drawSnapGuides(c);
 	if (m_throughCamera) drawCameraFrame(p);
+	else if (m_cam.ortho || !m_viewName.isEmpty()) {   // which standard view this is, and that it is orthographic
+		QStringList parts;
+		if (!m_viewName.isEmpty()) parts << m_viewName;
+		if (m_cam.ortho) parts << tr("Orthographic");
+		p.setFont(c.small);
+		p.setPen(c.text);
+		p.drawText(QPointF(10, 18), parts.join(QStringLiteral(", ")));
+	}
 }
 
 double Scene3DView::snapTolerance(const Float3 &at) const {
@@ -537,6 +602,14 @@ void Scene3DView::drawFaces(Ctx &c) const {
 		col = QColor(std::min(255, int(col.red() * k)), std::min(255, int(col.green() * k)), std::min(255, int(col.blue() * k)), col.alpha());
 		QColor edge = col.darker(160);
 		edge.setAlpha(120);
+		if (m_wireframe) {   // only the edges, in the face's own colour (lightened enough to be seen), so everything shows through
+			QColor line = col.lighter(110);
+			line.setAlpha(230);
+			c.p->setBrush(Qt::NoBrush);
+			c.p->setPen(QPen(selected ? c.accent : line, selected ? 1.6 : 1.0));
+			c.p->drawPolygon(f.screen);
+			continue;
+		}
 		c.p->setBrush(col);
 		c.p->setPen(QPen(selected ? c.accent : edge, selected ? 1.6 : 0.8));
 		c.p->drawPolygon(f.screen);

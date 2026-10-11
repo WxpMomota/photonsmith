@@ -267,7 +267,8 @@ void SceneBuilderWidget::buildUi() {
 	addKey(QKeySequence(Qt::CTRL | Qt::Key_G), [this]() { groupSelected(); });
 	addKey(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G), [this]() { ungroupSelected(); });
 	addKey(QKeySequence(Qt::CTRL | Qt::Key_A), [this]() { selectAll(); });
-	createArrangeShortcuts();   // H hide, Alt+H show all, L lock, Alt+L unlock all, F2 rename, End drop to floor
+	createArrangeShortcuts();
+	createActionSearchShortcuts();   // H hide, Alt+H show all, L lock, Alt+L unlock all, F2 rename, End drop to floor
 	// Ctrl+D (Command+D on a Mac) duplicates from anywhere in the tab except a text box.
 	auto *duplicateKey = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_D), this);
 	duplicateKey->setContext(Qt::WidgetWithChildrenShortcut);

@@ -505,6 +505,72 @@ static void selfTestArrange(SceneBuilderWidget *sb, const std::function<void(boo
 	sb->selectObject(1);
 }
 
+// The 3D view's display modes (scene_view_math.h): standard views and the numpad, orthographic, wireframe. Leaves the view as it found it.
+static void selfTestViewModes(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
+	using scene_view::StandardView;
+	sb->show3dView(true);
+	sb->frame3dForTest();
+	Scene3DView *v = sb->view3dForTest();
+	v->setStandardView(StandardView::Top);
+	check(v->viewName() == SceneBuilderWidget::tr("Top") && v->currentPose().eye().y > v->currentPose().target.y + 1.0 && std::abs(v->currentPose().eye().x - v->currentPose().target.x) < 0.01, "View > Top looks straight down at the target");
+	sb->sendKeyForTest(true, Qt::Key_1, Qt::KeypadModifier);
+	check(v->viewName() == SceneBuilderWidget::tr("Front") && std::abs(v->currentPose().eye().y - v->currentPose().target.y) < 0.01 && v->currentPose().eye().z > v->currentPose().target.z, "numpad 1 is the front view");
+	sb->sendKeyForTest(true, Qt::Key_3, Qt::KeypadModifier | Qt::ControlModifier);
+	check(v->viewName() == SceneBuilderWidget::tr("Left") && v->currentPose().eye().x < v->currentPose().target.x, "Ctrl+numpad 3 is the left view");
+	sb->orbit3dForTest(40.0, 25.0);
+	check(v->viewName().isEmpty(), "turning the view by hand leaves the standard view");
+	check(!v->orthographic(), "the view starts in perspective");
+	sb->sendKeyForTest(true, Qt::Key_5, Qt::KeypadModifier);
+	check(v->orthographic(), "numpad 5 makes it orthographic");
+	// In orthographic a drag in the 3D view still moves things where the mouse goes.
+	check(sb->dragObject3dForTest(1, QPointF(60, 20)), "dragging an object in an orthographic view moves it");
+	check(sb->undo(), "undone");
+	check(sb->wireframeDifferenceForTest() > 200, "Wireframe changes the picture (only edges are drawn)");
+	sb->sendKeyForTest(true, Qt::Key_5, Qt::KeypadModifier);
+	check(!v->orthographic(), "numpad 5 again is perspective");
+	// RT_GUI_SELFTEST_VIEWS_PNG=<prefix> saves pictures of the modes: <prefix>_persp.png, <prefix>_ortho_front.png, <prefix>_wire_top.png.
+	const QString prefix = qEnvironmentVariable("RT_GUI_SELFTEST_VIEWS_PNG");
+	if (!prefix.isEmpty()) {
+		sb->orbit3dForTest(30.0, 25.0);
+		sb->show3dView(true);
+		QApplication::processEvents();
+		v->grab().save(prefix + "_persp.png");
+		v->setOrthographic(true);
+		v->setStandardView(StandardView::Front);
+		v->grab().save(prefix + "_ortho_front.png");
+		v->setWireframe(true);
+		v->setStandardView(StandardView::Top);
+		v->grab().save(prefix + "_wire_top.png");
+		v->setOrthographic(false);
+	}
+	v->setWireframe(false);
+	sb->show3dView(false);
+}
+
+// Search actions (F3, scene_builder_actions.cpp, action_search.h): the list has what can be done, and the best match for some words runs. Leaves the document as it found it.
+static void selfTestActionSearch(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
+	const QStringList names = sb->actionNamesForTest();
+	check(names.size() > 60 && names.contains(QStringLiteral("Add: Fog")) && names.contains(QStringLiteral("View: Wireframe")),
+	      QString("the action list has %1 actions, among them Add: Fog and View: Wireframe").arg(names.size()));
+	check(!sb->runActionForTest("zzzz nothing like this"), "words that fit nothing run nothing");
+	const size_t before = sb->document().objects.size();
+	check(sb->runActionForTest("add fog") && sb->document().objects.size() == before + 1 && sb->document().objects.back().volume.kind == scene_doc::VolumeKind::Fog, "\"add fog\" adds a fog volume");
+	check(sb->undo() && sb->document().objects.size() == before, "one undo");
+	sb->show3dView(true);
+	const bool wire = sb->view3dForTest()->wireframe();
+	check(sb->runActionForTest("wireframe") && sb->view3dForTest()->wireframe() != wire, "\"wireframe\" toggles the wireframe view");
+	check(sb->runActionForTest("view wireframe") && sb->view3dForTest()->wireframe() == wire, "and again");
+	check(sb->runActionForTest("top view") && sb->view3dForTest()->viewName() == SceneBuilderWidget::tr("Top"), "\"top view\" puts the 3D view on top (any word order)");
+	sb->orbit3dForTest(30.0, 25.0);
+	sb->selectObject(2);
+	const double y0 = sb->document().objects[2].position.y;
+	sb->sendKeyForTest(false, Qt::Key_PageUp);
+	check(sb->runActionForTest("drop floor") && std::abs(sb->document().objects[2].position.y - y0) < 1e-9, "\"drop floor\" puts the selected object on the floor");
+	check(sb->undo() && sb->undo(), "undone");
+	sb->show3dView(false);
+	sb->selectObject(1);
+}
+
 // Snap to objects (scene_snap.h): dragging the red box of the starter scene to near the gold ball's middle lands exactly on it when snapping to objects is on, and on the
 // 0.25 grid when it is off. Leaves the document as it found it.
 static void selfTestSnap(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
@@ -629,6 +695,8 @@ void MainWindow::runBuilderSelfTest(const std::function<void(const QString &)> &
 	selfTestMultiSelect(sb, check);
 	selfTestCameraViews(sb, check);
 	selfTestArrange(sb, check);
+	selfTestViewModes(sb, check);
+	selfTestActionSearch(sb, check);
 	sb->selectObject(1);
 	check(sb->problemsText().isEmpty(), "the scene has no problems or notes");
 	const QString pbrt = outPrefix + "_builder.pbrt";

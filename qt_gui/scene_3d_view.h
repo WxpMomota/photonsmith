@@ -63,6 +63,15 @@ public:
 	QPointF viewMarkerPoint(int viewIndex, int which) const;   // where a marker is drawn, in this widget's pixels (null if hidden or behind the camera), for tests
 	// Where the eye is and what it looks at now: the 3D view's own orbit, or the scene's camera while looking through it.
 	scene_view::OrbitCamera currentPose() const { return view().cam; }
+	// Display modes. Wireframe draws only the edges of every face (nothing hides anything), to see through and into things. Orthographic has no perspective: things keep their size
+	// with distance and parallel lines stay parallel (the same size at the target, so switching does not zoom). A standard view (Front, Back, Right, Left, Top, Bottom) puts the
+	// camera on that axis, looking at the same target from the same distance; orbiting leaves it. The numpad does these too (see keyPressEvent).
+	void setWireframe(bool on) { m_wireframe = on; update(); emit displayModeChanged(); }
+	bool wireframe() const { return m_wireframe; }
+	void setOrthographic(bool on);
+	bool orthographic() const { return m_cam.ortho; }
+	void setStandardView(scene_view::StandardView v);
+	QString viewName() const { return m_viewName; }   // "Front", "Top"...: empty once the view is turned by hand
 	void setGizmoMode(GizmoMode m);
 	GizmoMode gizmoMode() const { return m_gizmo; }
 	// Where a new object is dropped: the floor (y = 0) point under the middle of the view when that is near what the camera looks at, else the floor under
@@ -76,7 +85,7 @@ public:
 	QPointF ringPoint(int axis, double deg) const;
 	QPointF scaleHandlePoint(int axis, double fraction) const;
 	// For tests: set the camera's angles, and whether a mesh file's preview has been read yet.
-	void orbitForTest(double yawDeg, double pitchDeg) { leaveCameraView(); m_cam.yawDeg = yawDeg; m_cam.pitchDeg = pitchDeg; m_userView = true; update(); }
+	void orbitForTest(double yawDeg, double pitchDeg) { leaveCameraView(); m_cam.yawDeg = yawDeg; m_cam.pitchDeg = pitchDeg; m_userView = true; m_viewName.clear(); update(); }
 	bool meshPreviewReady(const std::string &path) const { return meshPreview(path) != nullptr; }
 
 	QSize sizeHint() const override { return QSize(520, 380); }
@@ -93,6 +102,8 @@ signals:
 	// A saved view's marker dragged (the owner takes the view's eye or target to `world`); dragBegan() came first, as for everything else that is dragged.
 	void viewMarkerDragged(int viewIndex, int which, const scene_doc::Float3 &world);
 	void frameSelectedRequested();   // the F key
+	void displayModeChanged();       // wireframe or orthographic changed (the numpad 5 key changes the latter)
+	void cameraViewRequested();      // the numpad 0 key: look through the scene's camera
 	void cameraViewLeft();   // the user orbited, panned or zoomed away from looking through the camera
 	// An arrow key, Page Up or Page Down: move the picked items by this much (scene units): the arrows along the horizontal world axes nearest the screen's right and away,
 	// Page Up and Page Down up and down.
@@ -185,6 +196,9 @@ private:
 	scene_doc::Camera m_previewCamera;
 	double m_previewProgress = 0.0;
 	int m_activeView = -1;          // the saved view whose marker was pressed last: its target is drawn and can be dragged too
+	bool m_wireframe = false;
+	QString m_viewName;             // the standard view the camera is in, until it is turned by hand
+	bool numpadKey(QKeyEvent *e);   // a numpad view key; true if it was one
 	bool m_showPath = true;         // draw the flythrough's camera path (setShowCameraPath)
 	bool m_throughCamera = false;   // the view is the scene's camera (m_cam is kept for when it is switched off)
 

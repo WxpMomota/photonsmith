@@ -17,6 +17,7 @@
 #include <QListWidget>
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QMenu>
 #include <QPushButton>
 #include <QShortcut>
 #include <QStackedWidget>
@@ -64,8 +65,43 @@ void SceneBuilderWidget::createViews(QWidget *layoutBox, QVBoxLayout *layoutLayo
 	connect(m_view3d, &Scene3DView::gizmoModeChanged, this, [gizmoGroup](int mode) {
 		if (auto *b = gizmoGroup->button(mode)) b->setChecked(true);  // the W / E / R keys
 	});
+	// How the 3D view draws and looks: Wireframe and Orthographic are switches; View picks one of the six standard views (the numpad does these too: 1, 3, 7, with Ctrl the
+	// opposite, 5 for orthographic, 0 through the camera).
+	m_wireButton = new QPushButton(tr("Wireframe"), m_gizmoBar);
+	m_wireButton->setCheckable(true);
+	m_wireButton->setAutoDefault(false);
+	m_wireButton->setToolTip(tr("Draw only the edges of everything, so things show through each other"));
+	m_orthoButton = new QPushButton(tr("Orthographic"), m_gizmoBar);
+	m_orthoButton->setCheckable(true);
+	m_orthoButton->setAutoDefault(false);
+	m_orthoButton->setToolTip(tr("No perspective: things keep their size with distance and parallel lines stay parallel (numpad 5)"));
+	auto *viewButton = new QPushButton(tr("View"), m_gizmoBar);
+	viewButton->setAutoDefault(false);
+	viewButton->setToolTip(tr("Look from the front, back, left, right, top or bottom (numpad 1, 3 and 7; with Ctrl the opposite side)"));
+	auto *viewMenu = new QMenu(viewButton);
+	const struct { const char *name; scene_view::StandardView view; const char *key; } standard[] = {
+		{QT_TR_NOOP("Front"), scene_view::StandardView::Front, "Num 1"}, {QT_TR_NOOP("Back"), scene_view::StandardView::Back, "Ctrl+Num 1"},
+		{QT_TR_NOOP("Right"), scene_view::StandardView::Right, "Num 3"}, {QT_TR_NOOP("Left"), scene_view::StandardView::Left, "Ctrl+Num 3"},
+		{QT_TR_NOOP("Top"), scene_view::StandardView::Top, "Num 7"}, {QT_TR_NOOP("Bottom"), scene_view::StandardView::Bottom, "Ctrl+Num 7"}};
+	for (const auto &s : standard) {
+		const scene_view::StandardView sv = s.view;
+		viewMenu->addAction(tr(s.name) + QLatin1Char('\t') + QString::fromLatin1(s.key), this, [this, sv]() { m_view3d->setStandardView(sv); });
+	}
+	viewButton->setMenu(viewMenu);
+	for (QPushButton *b : {m_wireButton, m_orthoButton, viewButton}) {
+		scene_builder_ui::compactStyle(b);
+		gizmoLayout->addWidget(b);
+	}
+	connect(m_wireButton, &QPushButton::toggled, this, [this](bool on) { m_view3d->setWireframe(on); });
+	connect(m_orthoButton, &QPushButton::toggled, this, [this](bool on) { m_view3d->setOrthographic(on); });
+	connect(m_view3d, &Scene3DView::displayModeChanged, this, [this]() {   // (the numpad 5 key changes it from the keyboard)
+		QSignalBlocker blockW(m_wireButton), blockO(m_orthoButton);
+		m_wireButton->setChecked(m_view3d->wireframe());
+		m_orthoButton->setChecked(m_view3d->orthographic());
+	});
 	m_gizmoBar->setVisible(false);
 	createCameraBar(layoutBox);
+	connect(m_view3d, &Scene3DView::cameraViewRequested, this, [this]() { if (m_throughButton) m_throughButton->setChecked(true); });   // numpad 0
 
 	const std::pair<QString, SceneLayoutView::Plane> planes[] = {{tr("Top"), SceneLayoutView::Plane::Top}, {tr("Front"), SceneLayoutView::Plane::Front}, {tr("Side"), SceneLayoutView::Plane::Side}};
 	for (const auto &pl : planes) {
@@ -473,6 +509,20 @@ void SceneBuilderWidget::clickItemForTest(const BuilderSelection &s, Qt::Keyboar
 	const QPointF at = m_view->itemScreenPos(s);
 	sendMouse(m_view, QEvent::MouseButtonPress, at, Qt::LeftButton, Qt::LeftButton, mods);
 	sendMouse(m_view, QEvent::MouseButtonRelease, at, Qt::LeftButton, Qt::NoButton, mods);
+}
+
+int SceneBuilderWidget::wireframeDifferenceForTest() {
+	const bool was = m_view3d->wireframe();
+	m_view3d->setWireframe(false);
+	const QImage solid = m_view3d->grab().toImage();
+	m_view3d->setWireframe(true);
+	const QImage wire = m_view3d->grab().toImage();
+	m_view3d->setWireframe(was);
+	int n = 0;
+	for (int y = 0; y < solid.height() && y < wire.height(); ++y)
+		for (int x = 0; x < solid.width() && x < wire.width(); ++x)
+			if (solid.pixel(x, y) != wire.pixel(x, y)) ++n;
+	return n;
 }
 
 QString SceneBuilderWidget::listTextForTest(int row) const { return m_list->item(row) ? m_list->item(row)->text() : QString(); }
