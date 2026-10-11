@@ -579,12 +579,14 @@ Mat4<T> make_look_at(T ex, T ey, T ez,
 		forward.z*right.x - forward.x*right.z,
 		forward.x*right.y - forward.y*right.x
 	};
-	// Camera space: +X = right, +Y = up, +Z = forward
-	// Column-major: columns are the axes of camera space in world space + translation
+	// Camera space: +X = right, +Y = up, +Z = forward. camera_to_world has these axes as its COLUMNS (the image of the camera's x axis is `right`, and so
+	// on), so the rows below read right.x, newup.x, forward.x. It used to be written with the axes as rows, which is the inverse rotation: right for a camera
+	// looking along an axis, a view tilted sideways turned the other way (the error grows with the distance to the look-at point). Found by
+	// scripts/consistency_sweep.py: an orthographic camera 50 units away saw only sky on the CPU.
 	return Mat4<T>::from_rows(
-		right.x,   right.y,   right.z,   ex,
-		newup.x,   newup.y,   newup.z,   ey,
-		forward.x, forward.y, forward.z, ez,
+		right.x,   newup.x,   forward.x, ex,
+		right.y,   newup.y,   forward.y, ey,
+		right.z,   newup.z,   forward.z, ez,
 		T(0),      T(0),      T(0),      T(1)
 	);
 }
