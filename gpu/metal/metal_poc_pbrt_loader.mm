@@ -352,6 +352,33 @@ void MetalPocApp::loadPbrtAreaLights(const pbrt_flatten::FlatScene& scene, const
     }
 }
 
+// Alpha cutout masks (a pbrt Shape's "alpha" / "texture alpha"): each distinct file is decoded once (gpu_scene_textures::decodeAlphaMask, the decode OptiX and the CPU
+// use) into the shared float buffer, one float per texel. pbrtAlphaMasks: filename -> {offset, width, height}; width 0 = unusable. Used for the scene's own triangles and
+// for the triangles of an instanced group.
+void MetalPocApp::applyPbrtAlphaMask(TriangleMaterial& mat, const pbrt_flatten::Material& m) {
+    if (m.alphaTextureFilename.empty() || mat.lightId >= 0) return;
+    auto it = pbrtAlphaMasks.find(m.alphaTextureFilename);
+    if (it == pbrtAlphaMasks.end()) {
+        std::array<int, 3> entry{0, 0, 0};
+        const gpu_scene_textures::DecodedImage mask = gpu_scene_textures::decodeAlphaMask(m.alphaTextureFilename);
+        if (mask.found && mask.width > 0 && mask.height > 0) {
+            entry = {(int)rgbGridData.size(), mask.width, mask.height};
+            const size_t texels = (size_t)mask.width * mask.height;
+            rgbGridData.reserve(rgbGridData.size() + texels);
+            for (size_t k = 0; k < texels; ++k) rgbGridData.push_back(mask.pixels[k * 3] / 255.0f);   // the mask is replicated in R, G, B
+        } else {
+            fprintf(stderr, "loadPbrtScene: alpha mask '%s' could not be read; ignoring it\n", m.alphaTextureFilename.c_str());
+        }
+        it = pbrtAlphaMasks.emplace(m.alphaTextureFilename, entry).first;
+    }
+    if (it->second[1] > 0) {
+        mat.alphaOffset = it->second[0];
+        mat.alphaWidth = it->second[1];
+        mat.alphaHeight = it->second[2];
+        havePbrtTriangleAnyHit = true;
+    }
+}
+
 // Every triangle loadPbrtAreaLights() didn't already consume as a
 // light's own quad - ordinary geometry, or an unhandled (non-quad)
 // light's own triangles (emissive via `unhandledLightEmission`, not
@@ -405,32 +432,8 @@ void MetalPocApp::loadPbrtRemainingTriangles(const pbrt_flatten::FlatScene& scen
             mat.bumpIsNormalMap = it->second[3];
         }
     };
-    // Alpha cutout masks (a pbrt Shape's "alpha" / "texture alpha"): each distinct file is decoded once (gpu_scene_textures::decodeAlphaMask, the
-    // decode OptiX and the CPU use) into the shared float buffer, one float per texel. filename -> {offset, width, height}; width 0 = unusable.
-    std::map<std::string, std::array<int, 3>> alphaMasks;
-    auto applyAlphaMask = [&](TriangleMaterial& mat, const pbrt_flatten::Material& m) {
-        if (m.alphaTextureFilename.empty() || mat.lightId >= 0) return;
-        auto it = alphaMasks.find(m.alphaTextureFilename);
-        if (it == alphaMasks.end()) {
-            std::array<int, 3> entry{0, 0, 0};
-            const gpu_scene_textures::DecodedImage mask = gpu_scene_textures::decodeAlphaMask(m.alphaTextureFilename);
-            if (mask.found && mask.width > 0 && mask.height > 0) {
-                entry = {(int)rgbGridData.size(), mask.width, mask.height};
-                const size_t texels = (size_t)mask.width * mask.height;
-                rgbGridData.reserve(rgbGridData.size() + texels);
-                for (size_t k = 0; k < texels; ++k) rgbGridData.push_back(mask.pixels[k * 3] / 255.0f);   // the mask is replicated in R, G, B
-            } else {
-                fprintf(stderr, "loadPbrtScene: alpha mask '%s' could not be read; ignoring it\n", m.alphaTextureFilename.c_str());
-            }
-            it = alphaMasks.emplace(m.alphaTextureFilename, entry).first;
-        }
-        if (it->second[1] > 0) {
-            mat.alphaOffset = it->second[0];
-            mat.alphaWidth = it->second[1];
-            mat.alphaHeight = it->second[2];
-            havePbrtTriangleAnyHit = true;
-        }
-    };
+    pbrtAlphaMasks.clear();   // applyPbrtAlphaMask() decodes each mask file once; the instanced groups (loadPbrtObjectInstances, later) reuse the table
+    auto applyAlphaMask = [&](TriangleMaterial& mat, const pbrt_flatten::Material& m) { applyPbrtAlphaMask(mat, m); };
     for (int i = 0; i < (int)scene.triangles.size(); ++i) {
         if (triangleHandled[i]) continue;
         const pbrt_flatten::Triangle& t = scene.triangles[i];
@@ -1076,7 +1079,10 @@ void MetalPocApp::loadPbrtObjectInstances(const pbrt_flatten::FlatScene& scene, 
                     // Same default UVs as loadPbrtRemainingTriangles() (J1, section 172).
                     uvs.push_back(PackedFloat2{0, 0}); uvs.push_back(PackedFloat2{1, 0}); uvs.push_back(PackedFloat2{0, 1});
                 }
-                materials.push_back(materialFor(tri.material));
+                TriangleMaterial groupMat = materialFor(tri.material);
+                if (groupMat.materialType == METAL_MAT_SUBSURFACE) havePbrtTriangleAnyHit = true;
+                if (tri.material >= 0 && tri.material < (int)scene.materials.size()) applyPbrtAlphaMask(groupMat, scene.materials[tri.material]);   // an alpha mask on an instanced mesh
+                materials.push_back(groupMat);
             }
         }
 
