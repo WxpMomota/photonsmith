@@ -140,4 +140,20 @@ inline std::vector<camera_keyframes::Key> flythroughCurve(const camera_keyframes
 	return out;
 }
 
+// Moves a saved view's eye (where the camera stands) or its target (what it looks at) to `where`, the way dragging its marker in the 3D view does: the lens, field of view and up
+// stay, and the focus distance follows (cameraLookingFrom). False for a bad index or a point that is not finite; the view is unchanged then.
+inline bool moveCameraViewEye(Document& d, int index, const Float3& where) {
+	if (index < 0 || index >= static_cast<int>(d.cameraViews.size()) || !std::isfinite(where.x) || !std::isfinite(where.y) || !std::isfinite(where.z)) return false;
+	Camera& c = d.cameraViews[static_cast<std::size_t>(index)].camera;
+	c = cameraLookingFrom(c, where, c.target);
+	return true;
+}
+
+inline bool moveCameraViewTarget(Document& d, int index, const Float3& where) {
+	if (index < 0 || index >= static_cast<int>(d.cameraViews.size()) || !std::isfinite(where.x) || !std::isfinite(where.y) || !std::isfinite(where.z)) return false;
+	Camera& c = d.cameraViews[static_cast<std::size_t>(index)].camera;
+	c = cameraLookingFrom(c, c.position, where);
+	return true;
+}
+
 }  // namespace scene_doc

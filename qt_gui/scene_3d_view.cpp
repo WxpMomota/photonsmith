@@ -185,6 +185,19 @@ QPointF Scene3DView::itemScreenPos(const BuilderSelection &s) const {
 	return QPointF(sx, sy);
 }
 
+const Float3 *Scene3DView::viewHandle(int viewIndex, int which) const {
+	if (!m_doc || viewIndex < 0 || viewIndex >= static_cast<int>(m_doc->cameraViews.size())) return nullptr;
+	const scene_doc::Camera &c = m_doc->cameraViews[static_cast<std::size_t>(viewIndex)].camera;
+	return which == 0 ? &c.position : &c.target;
+}
+
+QPointF Scene3DView::viewMarkerPoint(int viewIndex, int which) const {
+	const Float3 *p = pathShown() ? viewHandle(viewIndex, which) : nullptr;
+	double sx, sy;
+	if (!p || !view().project(toV3(*p), sx, sy)) return QPointF();
+	return QPointF(sx, sy);
+}
+
 double Scene3DView::gizmoLength(const scene_view::View &v, const V3 &at) const {
 	const double depth = std::max(v.nearPlane * 2, v.toView(at).z);
 	return 80.0 * v.unitsPerPixel(depth);  // about 80 pixels, whatever the zoom
@@ -578,12 +591,21 @@ void Scene3DView::drawFlythroughPath(Ctx &c) const {
 		const scene_doc::CameraView &v = m_doc->cameraViews[i];
 		const V3 pos = toV3(v.camera.position), tgt = toV3(v.camera.target);
 		const V3 look = tgt - pos;
-		if (scene_view::length(look) > 1e-6) c.line(pos, pos + scene_view::normalize(look) * std::min(0.8, scene_view::length(look)), QPen(color, 1.0, Qt::DotLine));
-		QPointF px;
+		const bool active = static_cast<int>(i) == m_activeView;
+		// The view pressed last shows all of where it looks, with a ring at the target to drag; the others just a short tick.
+		if (scene_view::length(look) > 1e-6) c.line(pos, active ? tgt : pos + scene_view::normalize(look) * std::min(0.8, scene_view::length(look)), QPen(color, 1.0, Qt::DotLine));
+		QPointF px, tx;
+		if (active && c.pixel(tgt, tx)) {
+			c.p->setPen(QPen(color, 2.0));
+			c.p->setBrush(Qt::NoBrush);
+			c.p->drawEllipse(tx, 6.0, 6.0);
+			c.p->drawLine(tx - QPointF(9, 0), tx + QPointF(9, 0));
+			c.p->drawLine(tx - QPointF(0, 9), tx + QPointF(0, 9));
+		}
 		if (!c.pixel(pos, px)) continue;
-		c.p->setPen(QPen(color.darker(140), 1.5));
+		c.p->setPen(QPen(active ? c.accent : color.darker(140), active ? 2.5 : 1.5));
 		c.p->setBrush(i == 0 ? color : color.lighter(170));   // the first view, where the flythrough starts, is filled
-		c.p->drawEllipse(px, 5.0, 5.0);
+		c.p->drawEllipse(px, active ? 6.5 : 5.0, active ? 6.5 : 5.0);
 		c.p->setPen(c.text);
 		c.p->drawText(px + QPointF(8, -6), QString::fromStdString(v.name));
 	}

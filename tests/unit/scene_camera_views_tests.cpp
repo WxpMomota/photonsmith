@@ -1,6 +1,8 @@
 // scene_camera_views_tests.cpp - src/shared/scene_camera_views.h: saved cameras of the Scene Builder (name, apply, update, rename, remove) and their JSON.
 #include <gtest/gtest.h>
 
+#include <cmath>
+#include <limits>
 #include <string>
 
 #include "../../src/shared/scene_camera_views.h"
@@ -221,4 +223,46 @@ TEST(SceneCameraViews, TheCurveStartsAndEndsOnTheViewsAndPassesThroughTheMiddleO
 	EXPECT_NEAR(curve[10].pos[1], 3.0, 1e-9);
 	// A step count of zero or less still gives a curve (one step a stretch).
 	EXPECT_EQ(flythroughCurve(flythroughPath(d), 0).size(), 3u);
+}
+
+TEST(SceneCameraViews, MovingAViewsEyeOrTargetKeepsItsLensAndFollowsTheFocus) {
+	Document d;
+	Camera c = cameraAt(0, 1, 8);
+	c.target = {0, 1, 0};
+	c.fov = 35;
+	c.lensRadius = 0;
+	saveCameraView(d, "Front", c);
+	saveCameraView(d, "Side", cameraAt(8, 1, 0));
+	ASSERT_TRUE(moveCameraViewEye(d, 0, {0, 1, 4}));
+	const Camera& moved = d.cameraViews[0].camera;
+	EXPECT_DOUBLE_EQ(moved.position.z, 4.0);
+	EXPECT_DOUBLE_EQ(moved.target.z, 0.0);
+	EXPECT_DOUBLE_EQ(moved.fov, 35.0);
+	EXPECT_NEAR(moved.focusDistance, 4.0, 1e-9) << "with no depth of field the focus follows what is looked at";
+	ASSERT_TRUE(moveCameraViewTarget(d, 0, {3, 1, 0}));
+	EXPECT_DOUBLE_EQ(d.cameraViews[0].camera.target.x, 3.0);
+	EXPECT_DOUBLE_EQ(d.cameraViews[0].camera.position.z, 4.0);
+	EXPECT_NEAR(d.cameraViews[0].camera.focusDistance, 5.0, 1e-9);
+	EXPECT_DOUBLE_EQ(d.cameraViews[1].camera.position.x, 8.0) << "the other views are untouched";
+}
+
+TEST(SceneCameraViews, ALensWithDepthOfFieldKeepsItsFocusWhenAMarkerMoves) {
+	Document d;
+	Camera c = cameraAt(0, 1, 8);
+	c.lensRadius = 0.2;
+	c.focusDistance = 6.5;
+	saveCameraView(d, "Close", c);
+	ASSERT_TRUE(moveCameraViewEye(d, 0, {1, 2, 3}));
+	EXPECT_DOUBLE_EQ(d.cameraViews[0].camera.focusDistance, 6.5);
+}
+
+TEST(SceneCameraViews, MovingAMarkerRefusesABadIndexOrAPointThatIsNotFinite) {
+	Document d;
+	saveCameraView(d, "A", cameraAt(1, 1, 1));
+	const Document before = d;
+	EXPECT_FALSE(moveCameraViewEye(d, 1, {0, 0, 0}));
+	EXPECT_FALSE(moveCameraViewEye(d, -1, {0, 0, 0}));
+	EXPECT_FALSE(moveCameraViewTarget(d, 0, {std::nan(""), 0, 0}));
+	EXPECT_FALSE(moveCameraViewEye(d, 0, {0, std::numeric_limits<double>::infinity(), 0}));
+	EXPECT_EQ(toJson(d), toJson(before));
 }

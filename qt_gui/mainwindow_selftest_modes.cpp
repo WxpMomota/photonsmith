@@ -369,6 +369,25 @@ static void selfTestCameraViews(SceneBuilderWidget *sb, const std::function<void
 	sb->frame3dForTest();   // the whole scene in view, so the curve between the camera and the view saved at the orbit's eye is on screen
 	const int shown = sb->cameraPathPixelsForTest(true), hidden = sb->cameraPathPixelsForTest(false);
 	check(shown > hidden + 30, "with two saved views the 3D view draws the flythrough path, and the Camera path switch hides it (orange pixels " + QString::number(shown) + " against " + QString::number(hidden) + ")");
+	// Dragging the path's markers edits the saved view: its eye on the floor plane (snapped to the grid), up and down with Shift, its target once the view is the active one.
+	{
+		const size_t second = sb->document().cameraViews.size() - 1;
+		const scene_doc::Camera before = sb->document().cameraViews[second].camera;
+		const BuilderSelection selected = sb->selectionForTest();
+		check(sb->dragViewMarker3dForTest(static_cast<int>(second), 0, QPointF(45, 12)), "dragging a saved view's marker moves the view");
+		const scene_doc::Camera after = sb->document().cameraViews[second].camera;
+		check(after.position.y == before.position.y && (after.position.x != before.position.x || after.position.z != before.position.z), "along the floor plane (its height stays)");
+		check(std::fabs(after.position.x * 4 - std::round(after.position.x * 4)) < 1e-9 && std::fabs(after.position.z * 4 - std::round(after.position.z * 4)) < 1e-9, "on the 0.25 grid");
+		check(near3(after.target, before.target) && after.fov == before.fov, "what it looks at and its lens stay");
+		check(sb->selectionForTest() == selected, "and the selection did not change");
+		check(sb->undo() && near3(sb->document().cameraViews[second].camera.position, before.position), "one undo puts the view back");
+		check(sb->dragViewMarker3dForTest(static_cast<int>(second), 0, QPointF(0, -30), Qt::ShiftModifier) && sb->document().cameraViews[second].camera.position.y > before.position.y, "Shift lifts it");
+		check(sb->undo(), "undone");
+		check(sb->dragViewMarker3dForTest(static_cast<int>(second), 1, QPointF(-30, 10)), "after pressing a view, its target can be dragged too");
+		const scene_doc::Camera looked = sb->document().cameraViews[second].camera;
+		check(near3(looked.position, before.position) && !near3(looked.target, before.target), "the target moves and the eye stays");
+		check(sb->undo() && near3(sb->document().cameraViews[second].camera.target, before.target), "one undo");
+	}
 	sb->undo();
 	// RT_GUI_SELFTEST_CAMERA_PNG=<file> saves a picture of the tab looking through the camera, with the camera's properties (and its saved view) beside it.
 	const QString picture = qEnvironmentVariable("RT_GUI_SELFTEST_CAMERA_PNG");

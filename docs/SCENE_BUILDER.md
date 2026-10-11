@@ -72,6 +72,8 @@ The camera's properties also list the saved views, each with its name (edit it t
 
 With two or more saved views the 3D view also draws the **flythrough path**: the smooth orange curve the camera would follow through them, in the order they were saved, with a marker and the name at each view (the first one filled) and a short dotted line along where it looks. It is the same curve the Flythrough video uses, so what you see is what is rendered; edit a view (**Update**) and the curve follows. The **Camera path** switch next to the saved-views list hides it, and it is not drawn while you look through the camera.
 
+**Drag a marker** to move that saved view: its eye slides on the floor plane (in steps of 0.25; hold Shift to lift it, Ctrl to move it freely, Alt to ignore the grid). Pressing a marker also shows where that view looks, with a ring at its target that you can drag the same way. The lens, field of view and hold are kept, the focus distance follows what is looked at (unless the lens has depth of field), and one drag is one undo step; the selection does not change.
+
 ## Ready-made shapes
 
 Besides the sphere, box, quad, disk, cylinder, cone and mesh file, the Add menu has shapes with no pbrt primitive of their own. They are written into the scene as triangle meshes with smooth or sharp normals as fits the shape, so they render the same on the CPU, Metal and OptiX.

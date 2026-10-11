@@ -6389,22 +6389,22 @@ Output:
 <context>
     <name>Scene3DView</name>
     <message>
-        <location filename="../scene_3d_view.cpp" line="414"/>
+        <location filename="../scene_3d_view.cpp" line="427"/>
         <source>the floor</source>
         <translation>地面</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="427"/>
+        <location filename="../scene_3d_view.cpp" line="440"/>
         <source>Snapped to %1</source>
         <translation>已吸附到 %1</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="445"/>
+        <location filename="../scene_3d_view.cpp" line="458"/>
         <source>Through the camera (%1 x %2). Orbit, pan or zoom to leave.</source>
         <translation>透过相机观看（%1 x %2）。环绕、平移或缩放即可退出。</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="623"/>
+        <location filename="../scene_3d_view.cpp" line="645"/>
         <source>Camera</source>
         <translation>相机</translation>
     </message>
@@ -7132,9 +7132,13 @@ From: %3</source>
         <translation>相机路径</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="58"/>
         <source>With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view.</source>
-        <translation>保存了两个或更多视图时，绘制飞行视频穿过这些视图的路径（橙色曲线），并在每个视图处加一个标记。</translation>
+        <translation type="vanished">保存了两个或更多视图时，绘制飞行视频穿过这些视图的路径（橙色曲线），并在每个视图处加一个标记。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_views.cpp" line="58"/>
+        <source>With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view. Drag a marker to move that view (Shift: up and down); press one to see where it looks, and drag the ring at its target too.</source>
+        <translation>保存了两个或更多视图时，绘制飞行视频穿过这些视图的路径（橙色曲线），并在每个视图处加一个标记。拖动标记可移动该视图（Shift：上下移动）；按下标记可看到它朝向哪里，也可以拖动其目标处的圆环。</translation>
     </message>
     <message>
         <location filename="../scene_builder_camera_views.cpp" line="71"/>

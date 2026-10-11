@@ -55,7 +55,7 @@ void SceneBuilderWidget::createCameraBar(QWidget *layoutBox) {
 	flow->addWidget(m_viewCombo);
 	m_pathCheck = new QCheckBox(tr("Camera path"), m_cameraBar);
 	m_pathCheck->setChecked(true);
-	m_pathCheck->setToolTip(tr("With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view."));
+	m_pathCheck->setToolTip(tr("With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view. Drag a marker to move that view (Shift: up and down); press one to see where it looks, and drag the ring at its target too."));
 	flow->addWidget(m_pathCheck);
 	m_cameraBar->setVisible(false);   // shown with the 3D view; createViews() puts it in the column
 

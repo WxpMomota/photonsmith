@@ -6434,22 +6434,22 @@ Salida:
 <context>
     <name>Scene3DView</name>
     <message>
-        <location filename="../scene_3d_view.cpp" line="414"/>
+        <location filename="../scene_3d_view.cpp" line="427"/>
         <source>the floor</source>
         <translation>el suelo</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="427"/>
+        <location filename="../scene_3d_view.cpp" line="440"/>
         <source>Snapped to %1</source>
         <translation>Ajustado a %1</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="445"/>
+        <location filename="../scene_3d_view.cpp" line="458"/>
         <source>Through the camera (%1 x %2). Orbit, pan or zoom to leave.</source>
         <translation>A través de la cámara (%1 x %2). Orbita, desplaza o haz zoom para salir.</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="623"/>
+        <location filename="../scene_3d_view.cpp" line="645"/>
         <source>Camera</source>
         <translation>Cámara</translation>
     </message>
@@ -7177,9 +7177,13 @@ Procedencia: %3</translation>
         <translation>Trayectoria de cámara</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="58"/>
         <source>With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view.</source>
-        <translation>Con dos o más vistas guardadas, dibuja el trayecto que seguiría un recorrido por ellas (la curva naranja), con una marca en cada vista.</translation>
+        <translation type="vanished">Con dos o más vistas guardadas, dibuja el trayecto que seguiría un recorrido por ellas (la curva naranja), con una marca en cada vista.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_views.cpp" line="58"/>
+        <source>With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view. Drag a marker to move that view (Shift: up and down); press one to see where it looks, and drag the ring at its target too.</source>
+        <translation>Con dos o más vistas guardadas, dibuja el trayecto que seguiría un recorrido por ellas (la curva naranja), con una marca en cada vista. Arrastra una marca para mover esa vista (Mayús: arriba y abajo); pulsa una para ver hacia dónde mira y arrastra también el anillo de su objetivo.</translation>
     </message>
     <message>
         <location filename="../scene_builder_camera_views.cpp" line="71"/>

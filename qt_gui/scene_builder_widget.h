@@ -119,6 +119,8 @@ public:
 	bool dragPickedScale3dForTest(int axis, double ratio);
 	void setGizmoToolForTest(int tool) { m_view3d->setGizmoMode(static_cast<Scene3DView::GizmoMode>(tool)); }   // 0 Move, 1 Rotate, 2 Scale
 	bool dragScale3dForTest(int index, int axis, double ratio);
+	BuilderSelection selectionForTest() const { return m_sel; }
+	bool dragViewMarker3dForTest(int viewIndex, int which, const QPointF &deltaPx, Qt::KeyboardModifiers mods = Qt::NoModifier);   // a saved view's marker in the 3D view
 	void orbit3dForTest(double yawDeg, double pitchDeg);
 	void frame3dForTest() { m_view3d->frameAll(); }
 	scene_doc::Float3 dropPointForTest() const { return dropPoint(); }

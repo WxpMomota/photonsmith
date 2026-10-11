@@ -6383,22 +6383,22 @@ Output:
 <context>
     <name>Scene3DView</name>
     <message>
-        <location filename="../scene_3d_view.cpp" line="414"/>
+        <location filename="../scene_3d_view.cpp" line="427"/>
         <source>the floor</source>
         <translation>床</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="427"/>
+        <location filename="../scene_3d_view.cpp" line="440"/>
         <source>Snapped to %1</source>
         <translation>%1 に吸着</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="445"/>
+        <location filename="../scene_3d_view.cpp" line="458"/>
         <source>Through the camera (%1 x %2). Orbit, pan or zoom to leave.</source>
         <translation>カメラ越しの表示 (%1 x %2)。回り込み・画面移動・ズームで解除されます。</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="623"/>
+        <location filename="../scene_3d_view.cpp" line="645"/>
         <source>Camera</source>
         <translation>カメラ</translation>
     </message>
@@ -7126,9 +7126,13 @@ From: %3</source>
         <translation>カメラの軌跡</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="58"/>
         <source>With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view.</source>
-        <translation>保存したビューが 2 つ以上あるとき、フライスルーがそれらを通る経路 (オレンジ色の曲線) を、各ビューに目印を付けて表示します。</translation>
+        <translation type="vanished">保存したビューが 2 つ以上あるとき、フライスルーがそれらを通る経路 (オレンジ色の曲線) を、各ビューに目印を付けて表示します。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_views.cpp" line="58"/>
+        <source>With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view. Drag a marker to move that view (Shift: up and down); press one to see where it looks, and drag the ring at its target too.</source>
+        <translation>保存したビューが 2 つ以上あるとき、フライスルーがそれらを通る経路 (オレンジ色の曲線) を、各ビューに目印を付けて表示します。目印をドラッグするとそのビューが動きます (Shift: 上下)。目印を押すとそのビューの向きが表示され、ターゲットの輪もドラッグできます。</translation>
     </message>
     <message>
         <location filename="../scene_builder_camera_views.cpp" line="71"/>

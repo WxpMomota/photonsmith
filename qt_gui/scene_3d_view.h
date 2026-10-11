@@ -52,6 +52,10 @@ public:
 	// marker and the name at each view, and a short line along where it looks. On by default; not drawn while looking through the camera.
 	void setShowCameraPath(bool on) { m_showPath = on; update(); }
 	bool showCameraPath() const { return m_showPath; }
+	// A marker of that path can be dragged: the eye (which 0) of any saved view, and the target (which 1, a ring) of the one pressed last. It moves on the floor plane (Shift: up
+	// and down; Ctrl: freely), snapped to the 0.25 grid like an object; the owner changes the view (viewMarkerDragged).
+	int activeView() const { return m_activeView; }
+	QPointF viewMarkerPoint(int viewIndex, int which) const;   // where a marker is drawn, in this widget's pixels (null if hidden or behind the camera), for tests
 	// Where the eye is and what it looks at now: the 3D view's own orbit, or the scene's camera while looking through it.
 	scene_view::OrbitCamera currentPose() const { return view().cam; }
 	void setGizmoMode(GizmoMode m);
@@ -80,6 +84,8 @@ signals:
 	// A turn or a stretch: the object as it now is (the owner takes its rotation, radius, height, size and meshScale).
 	void objectEdited(const BuilderSelection &s, const scene_doc::Object &updated);
 	void gizmoModeChanged(int mode);
+	// A saved view's marker dragged (the owner takes the view's eye or target to `world`); dragBegan() came first, as for everything else that is dragged.
+	void viewMarkerDragged(int viewIndex, int which, const scene_doc::Float3 &world);
 	void cameraViewLeft();   // the user orbited, panned or zoomed away from looking through the camera
 	// An arrow key, Page Up or Page Down: move the picked items by this much (scene units): the arrows along the horizontal world axes nearest the screen's right and away,
 	// Page Up and Page Down up and down.
@@ -102,8 +108,8 @@ private:
 	struct Face;
 	struct Ctx;
 	struct Hit {
-		enum class Kind { None, Item, Axis, Ring, ScaleHandle, FreeHandle } kind = Kind::None;
-		BuilderSelection sel;
+		enum class Kind { None, Item, Axis, Ring, ScaleHandle, FreeHandle, ViewMarker } kind = Kind::None;
+		BuilderSelection sel;   // (a ViewMarker keeps the saved view's index in sel.index)
 		int which = 0;   // 0: the item's position, 1: its target
 		int axis = 0;    // for an arrow, ring or handle
 	};
@@ -116,6 +122,8 @@ private:
 	void projectFaces(const scene_view::View &v) const;
 	std::uint64_t geometrySignature() const;
 	const scene_doc::Float3 *handle(const BuilderSelection &s, int which) const;
+	const scene_doc::Float3 *viewHandle(int viewIndex, int which) const;   // a saved view's eye or target in the document, or null
+	bool pathShown() const { return m_showPath && m_doc && m_doc->cameraViews.size() >= 2; }
 	const scene_doc::Object *selectedObject() const;
 	GizmoMode effectiveGizmo() const;   // Rotate and Scale only apply to objects; for a light or the camera the Move tool shows
 	double gizmoLength(const scene_view::View &v, const scene_view::V3 &at) const;
@@ -158,6 +166,7 @@ private:
 	bool m_snap = true;
 	GizmoMode m_gizmo = GizmoMode::Move;
 	bool m_userView = false;   // the user has orbited, panned or zoomed, so a resize keeps the view instead of re-framing the scene
+	int m_activeView = -1;          // the saved view whose marker was pressed last: its target is drawn and can be dragged too
 	bool m_showPath = true;         // draw the flythrough's camera path (setShowCameraPath)
 	bool m_throughCamera = false;   // the view is the scene's camera (m_cam is kept for when it is switched off)
 

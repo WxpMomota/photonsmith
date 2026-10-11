@@ -6486,22 +6486,22 @@ Sortie :
 <context>
     <name>Scene3DView</name>
     <message>
-        <location filename="../scene_3d_view.cpp" line="414"/>
+        <location filename="../scene_3d_view.cpp" line="427"/>
         <source>the floor</source>
         <translation>le sol</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="427"/>
+        <location filename="../scene_3d_view.cpp" line="440"/>
         <source>Snapped to %1</source>
         <translation>Aimanté sur %1</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="445"/>
+        <location filename="../scene_3d_view.cpp" line="458"/>
         <source>Through the camera (%1 x %2). Orbit, pan or zoom to leave.</source>
         <translation>À travers la caméra (%1 x %2). Orbitez, déplacez ou zoomez pour quitter.</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="623"/>
+        <location filename="../scene_3d_view.cpp" line="645"/>
         <source>Camera</source>
         <translation>Caméra</translation>
     </message>
@@ -7229,9 +7229,13 @@ Origine : %3</translation>
         <translation>Trajet de la caméra</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="58"/>
         <source>With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view.</source>
-        <translation>Avec deux vues enregistrées ou plus, dessine le trajet qu'un survol suivrait à travers elles (la courbe orange), avec un repère à chaque vue.</translation>
+        <translation type="vanished">Avec deux vues enregistrées ou plus, dessine le trajet qu&apos;un survol suivrait à travers elles (la courbe orange), avec un repère à chaque vue.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_views.cpp" line="58"/>
+        <source>With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view. Drag a marker to move that view (Shift: up and down); press one to see where it looks, and drag the ring at its target too.</source>
+        <translation>Avec deux vues enregistrées ou plus, dessine le trajet qu'un survol suivrait à travers elles (la courbe orange), avec un repère à chaque vue. Faites glisser un repère pour déplacer cette vue (Maj : vers le haut et le bas) ; appuyez sur l'un d'eux pour voir où elle regarde, et faites aussi glisser l'anneau de sa cible.</translation>
     </message>
     <message>
         <location filename="../scene_builder_camera_views.cpp" line="71"/>

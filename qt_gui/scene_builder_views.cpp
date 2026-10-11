@@ -184,6 +184,13 @@ void SceneBuilderWidget::createViews(QWidget *layoutBox, QVBoxLayout *layoutLayo
 	connect(m_view3d, &Scene3DView::selectionRequested, this, onSelection("3D view"));
 	connect(m_view3d, &Scene3DView::dragBegan, this, onDragBegan);
 	connect(m_view3d, &Scene3DView::positionDragged, this, onDragged);
+	// A saved view's marker (the flythrough path): its eye or target moves, as one undo step per drag.
+	connect(m_view3d, &Scene3DView::viewMarkerDragged, this, [this](int index, int which, const Float3 &world) {
+		edit(QString("drag#%1").arg(m_editCounter), [&]() {
+			if (which == 0) scene_doc::moveCameraViewEye(m_doc, index, world);
+			else scene_doc::moveCameraViewTarget(m_doc, index, world);
+		});
+	});
 	// With several picked, a ring or handle turns or stretches them all, about their middle.
 	connect(m_view3d, &Scene3DView::groupTurned, this, [this](int axis, double degrees) { transformPicked(true, axis, degrees); });
 	connect(m_view3d, &Scene3DView::groupScaled, this, [this](double factor) { transformPicked(false, 0, factor); });
@@ -314,6 +321,26 @@ bool SceneBuilderWidget::dragObject3dForTest(int index, const QPointF &deltaPx, 
 	for (int step = 1; step <= 4; ++step) sendMouse(m_view3d, QEvent::MouseMove, start + deltaPx * (step / 4.0), Qt::NoButton, Qt::LeftButton, mods);
 	sendMouse(m_view3d, QEvent::MouseButtonRelease, start + deltaPx, Qt::LeftButton, Qt::NoButton, mods);
 	const Float3 after = m_doc.objects[index].position;
+	return before.x != after.x || before.y != after.y || before.z != after.z;
+}
+
+// A real drag of a saved view's marker (its eye, or with `which` 1 its target) by `deltaPx` in the 3D view. A target can only be pressed once its view is the active one, so
+// that is done first with a click on its eye. True if the view's point moved.
+bool SceneBuilderWidget::dragViewMarker3dForTest(int viewIndex, int which, const QPointF &deltaPx, Qt::KeyboardModifiers mods) {
+	if (viewIndex < 0 || viewIndex >= static_cast<int>(m_doc.cameraViews.size())) return false;
+	const auto pointOf = [&]() { const scene_doc::Camera &c = m_doc.cameraViews[static_cast<std::size_t>(viewIndex)].camera; return which == 0 ? c.position : c.target; };
+	if (which == 1) {
+		const QPointF eye = m_view3d->viewMarkerPoint(viewIndex, 0);
+		sendMouse(m_view3d, QEvent::MouseButtonPress, eye, Qt::LeftButton, Qt::LeftButton);
+		sendMouse(m_view3d, QEvent::MouseButtonRelease, eye, Qt::LeftButton, Qt::NoButton);
+	}
+	const Float3 before = pointOf();
+	const QPointF start = m_view3d->viewMarkerPoint(viewIndex, which);
+	if (start.isNull()) return false;
+	sendMouse(m_view3d, QEvent::MouseButtonPress, start, Qt::LeftButton, Qt::LeftButton, mods);
+	for (int step = 1; step <= 4; ++step) sendMouse(m_view3d, QEvent::MouseMove, start + deltaPx * (step / 4.0), Qt::NoButton, Qt::LeftButton, mods);
+	sendMouse(m_view3d, QEvent::MouseButtonRelease, start + deltaPx, Qt::LeftButton, Qt::NoButton, mods);
+	const Float3 after = pointOf();
 	return before.x != after.x || before.y != after.y || before.z != after.z;
 }
 

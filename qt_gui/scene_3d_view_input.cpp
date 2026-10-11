@@ -80,6 +80,22 @@ Scene3DView::Hit Scene3DView::hitTest(const QPointF &px) const {
 		if (l.kind != LightKind::Infinite && withinPx(l.position, 13)) { h.kind = Hit::Kind::Item; h.sel = {BuilderSelection::Kind::Light, i}; return h; }
 	}
 	if (withinPx(m_doc->camera.position, 15)) { h.kind = Hit::Kind::Item; h.sel = {BuilderSelection::Kind::Camera, 0}; return h; }
+	// The flythrough path's markers (scene_3d_view.cpp drawFlythroughPath): the target of the view pressed last, then the eyes, the last saved on top.
+	if (pathShown()) {
+		if (m_activeView >= 0 && m_activeView < static_cast<int>(m_doc->cameraViews.size()) && withinPx(m_doc->cameraViews[static_cast<std::size_t>(m_activeView)].camera.target, 10)) {
+			h.kind = Hit::Kind::ViewMarker;
+			h.sel.index = m_activeView;
+			h.which = 1;
+			return h;
+		}
+		for (int k = static_cast<int>(m_doc->cameraViews.size()) - 1; k >= 0; --k)
+			if (withinPx(m_doc->cameraViews[static_cast<std::size_t>(k)].camera.position, 9)) {
+				h.kind = Hit::Kind::ViewMarker;
+				h.sel.index = k;
+				h.which = 0;
+				return h;
+			}
+	}
 
 	// Objects: the nearest face under the pointer.
 	projectFaces(v);
@@ -106,6 +122,10 @@ void Scene3DView::mousePressEvent(QMouseEvent *e) {
 	}
 	if (e->button() != Qt::LeftButton) return;
 	const Hit h = hitTest(px);
+	if (h.kind != Hit::Kind::ViewMarker && m_activeView >= 0) {
+		m_activeView = -1;
+		update();
+	}
 	if (h.kind == Hit::Kind::None) {
 		// A click on nothing deselects; a drag on nothing orbits, or pans with Shift (for a trackpad, where a right-drag is awkward).
 		m_mode = (e->modifiers() & Qt::ShiftModifier) ? Mode::Pan : Mode::Orbit;
@@ -134,7 +154,11 @@ void Scene3DView::beginHit(const Hit &h, const QPointF &px, Qt::KeyboardModifier
 			emit selectionRequested(h.sel);
 		}
 	}
-	const Float3 *pos = handle(h.sel, h.which);
+	if (h.kind == Hit::Kind::ViewMarker) {
+		m_activeView = h.sel.index;   // (a view's marker is not an item: the selection stays as it was)
+		update();
+	}
+	const Float3 *pos = h.kind == Hit::Kind::ViewMarker ? viewHandle(h.sel.index, h.which) : handle(h.sel, h.which);
 	if (!pos) { m_mode = Mode::None; return; }
 	m_dragStart = toV3(*pos);
 	if (multi() && (h.kind == Hit::Kind::Ring || h.kind == Hit::Kind::ScaleHandle)) gizmoOrigin(m_dragStart);   // a turn or a stretch of several is about their middle
@@ -219,7 +243,8 @@ void Scene3DView::applyDrag(const QPointF &px, Qt::KeyboardModifiers mods) {
 		return;
 	}
 
-	const Float3 *current = handle(m_drag.sel, m_drag.which);
+	const bool marker = m_drag.kind == Hit::Kind::ViewMarker;
+	const Float3 *current = marker ? viewHandle(m_drag.sel.index, m_drag.which) : handle(m_drag.sel, m_drag.which);
 	if (!current) return;
 	Float3 w = *current;
 	if (m_mode == Mode::Ground) {
@@ -246,7 +271,8 @@ void Scene3DView::applyDrag(const QPointF &px, Qt::KeyboardModifiers mods) {
 	} else {
 		return;
 	}
-	emit positionDragged(m_drag.sel, m_drag.which, w);
+	if (marker) emit viewMarkerDragged(m_drag.sel.index, m_drag.which, w);
+	else emit positionDragged(m_drag.sel, m_drag.which, w);
 }
 
 void Scene3DView::mouseMoveEvent(QMouseEvent *e) {
