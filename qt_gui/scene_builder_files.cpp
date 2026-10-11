@@ -197,6 +197,25 @@ QString SceneBuilderWidget::skyImageFolder() {
 	return folder;
 }
 
+// The slide a new projector light starts with: a window of four panes (light on a dark ground), written once to <data>/slides/window.png. An empty string if it could not be written.
+QString SceneBuilderWidget::defaultSlidePicture() {
+	const QString scenes = QString::fromStdString(pbrt_asset_check::userSceneDir());
+	const QString folder = !scenes.isEmpty() ? QFileInfo(scenes).dir().filePath(QStringLiteral("slides"))
+	                                         : QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/user_assets/slides");
+	QDir().mkpath(folder);
+	const QString path = QDir(folder).filePath(QStringLiteral("window.png"));
+	if (QFileInfo(path).size() > 0) return path;
+	QImage img(256, 256, QImage::Format_RGB32);
+	img.fill(QColor(12, 12, 14));
+	QPainter p(&img);
+	p.setPen(Qt::NoPen);
+	p.setBrush(QColor(255, 246, 225));
+	for (int row = 0; row < 2; ++row)
+		for (int col = 0; col < 2; ++col) p.drawRect(34 + col * 94, 34 + row * 94, 84, 84);
+	p.end();
+	return img.save(path) ? path : QString();
+}
+
 QString SceneBuilderWidget::addToSceneList(QString *error, bool update) {
 	const QString folder = sceneListFolder();
 	flushEditLog();

@@ -185,6 +185,8 @@ private:
 	void drawMeshPoints(Ctx &c, int objectIndex) const;
 	void drawNames(Ctx &c) const;
 	void drawLights(Ctx &c) const;
+	void drawProjector(Ctx &c, const scene_doc::Light &l, bool selected) const;   // the frustum a projector light shines through
+	double slideAspect(const std::string &file) const;   // width / height of a slide picture (1 until it is found)
 	void drawCamera(Ctx &c) const;
 	void drawFlythroughPath(Ctx &c) const;
 	const scene_doc::Camera &lookCamera() const { return m_previewing ? m_previewCamera : m_doc->camera; }   // what the view looks through when it is the camera's
@@ -212,6 +214,7 @@ private:
 	double m_previewProgress = 0.0;
 	int m_activeView = -1;          // the saved view whose marker was pressed last: its target is drawn and can be dragged too
 	bool m_pickFocus = false;       // the next click picks the focus point
+	mutable std::map<std::string, double> m_slideAspects;
 	bool m_renderedMode = false;
 	QImage m_rendered;
 	int m_renderedSamples = 0;

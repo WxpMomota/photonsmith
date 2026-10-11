@@ -155,6 +155,7 @@ inline QString lightLabel(LightKind k) {
 		case LightKind::Spot: return QObject::tr("Spotlight");
 		case LightKind::Distant: return QObject::tr("Sun (distant light)");
 		case LightKind::Infinite: return QObject::tr("Sky (surrounds the scene)");
+		case LightKind::Projector: return QObject::tr("Projector (slide light)");
 	}
 	return QString();
 }

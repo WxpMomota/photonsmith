@@ -129,7 +129,7 @@ inline double boundingRadius(const Object& o) {
 	return std::fabs(r);
 }
 
-enum class LightKind { Point, Spot, Distant, Infinite };
+enum class LightKind { Point, Spot, Distant, Infinite, Projector };   // a Projector is a slide projector (pbrt's "projection" light): the picture in `imageFile` shines out through a frustum of `fov` degrees
 
 // The Sun & sky option of an Infinite light (scene_sky.h): when `physicalSky` is on, the light's picture is a generated clear sky for this sun, and the scene's
 // Sun (a Distant light) follows it. Angles in degrees; azimuth 0 is +X, 90 is -Z, 180 is -X, 270 is +Z.
@@ -151,6 +151,7 @@ struct Light {
 	double coneDelta = 5.0;            // Spot, degrees of soft edge
 	std::string imageFile;             // Infinite: an equirectangular image (empty: a constant colour)
 	bool physicalSky = false;          // Infinite: imageFile is the generated sky of `sky` (scene_sky.h)
+	double fov = 40.0;                 // Projector: the angle, in degrees, the slide spans along its shorter side
 	double skySpin = 0.0;              // Infinite with an image: degrees the picture is turned about the vertical axis (counter-clockwise seen from above)
 	SkyParams sky;
 	bool hidden = false;               // as Object::hidden
@@ -278,13 +279,17 @@ inline const char* toString(LightKind k) {
 		case LightKind::Spot: return "spot";
 		case LightKind::Distant: return "distant";
 		case LightKind::Infinite: return "infinite";
+		case LightKind::Projector: return "projector";
 	}
 	return "point";
 }
 inline bool lightKindFromString(const std::string& s, LightKind& out) {
-	for (LightKind k : {LightKind::Point, LightKind::Spot, LightKind::Distant, LightKind::Infinite})
+	for (LightKind k : {LightKind::Point, LightKind::Spot, LightKind::Distant, LightKind::Infinite, LightKind::Projector})
 		if (s == toString(k)) { out = k; return true; }
 	return false;
 }
+
+// Whether the light shines towards a point of its own (`target`): a spotlight, a projector, and a sun (which shines from `position` towards `target`).
+inline bool aimsAtTarget(const Light& l) { return l.kind == LightKind::Spot || l.kind == LightKind::Distant || l.kind == LightKind::Projector; }
 
 }  // namespace scene_doc

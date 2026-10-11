@@ -226,7 +226,7 @@ const Float3 *builderHandle(const Document *doc, const BuilderSelection &s, int 
 				const Light &l = doc->lights[s.index];
 				if (l.kind == LightKind::Infinite) return nullptr;
 				if (which == 0) return &l.position;
-				return (l.kind == LightKind::Spot || l.kind == LightKind::Distant) ? &l.target : nullptr;
+				return aimsAtTarget(l) ? &l.target : nullptr;
 			}
 		case BuilderSelection::Kind::None: break;
 	}
@@ -383,7 +383,7 @@ void SceneLayoutView::paintEvent(QPaintEvent *) {
 		if (l.kind == LightKind::Infinite || l.hidden) continue;
 		const bool selected = isPicked({BuilderSelection::Kind::Light, i});
 		const QPointF c = toScreen(l.position);
-		if (l.kind == LightKind::Spot || l.kind == LightKind::Distant) {
+		if (aimsAtTarget(l)) {
 			const QPointF t = toScreen(l.target);
 			p.setPen(QPen(selected ? accent : QColor(230, 180, 40), 1.2, Qt::DashLine));
 			p.drawLine(c, t);

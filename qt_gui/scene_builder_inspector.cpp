@@ -691,7 +691,7 @@ void SceneBuilderWidget::inspectLight(QFormLayout *f, int i) {
 	addText(f, tr("Name"), [lt]() { return lt() ? &lt()->name : nullptr; });
 	addVisibilityRows(f, [lt]() { return lt() ? &lt()->hidden : nullptr; }, [lt]() { return lt() ? &lt()->locked : nullptr; });
 	auto *kind = new QComboBox;
-	for (LightKind k : {LightKind::Point, LightKind::Spot, LightKind::Distant, LightKind::Infinite}) kind->addItem(lightLabel(k), static_cast<int>(k));
+	for (LightKind k : {LightKind::Point, LightKind::Spot, LightKind::Distant, LightKind::Infinite, LightKind::Projector}) kind->addItem(lightLabel(k), static_cast<int>(k));
 	kind->setCurrentIndex(kind->findData(static_cast<int>(m_doc.lights[i].kind)));
 	connect(kind, QOverload<int>::of(&QComboBox::activated), this, [this, i, kind](int idx) {
 		if (m_loading || i >= static_cast<int>(m_doc.lights.size())) return;
@@ -701,11 +701,21 @@ void SceneBuilderWidget::inspectLight(QFormLayout *f, int i) {
 	});
 	f->addRow(tr("Type"), kind);
 	const Light &l = m_doc.lights[i];
-	if (l.kind == LightKind::Point || l.kind == LightKind::Spot) addVec3(f, tr("Position"), [lt]() { return lt() ? &lt()->position : nullptr; }, 0.25);
+	if (l.kind == LightKind::Point || l.kind == LightKind::Spot || l.kind == LightKind::Projector) addVec3(f, tr("Position"), [lt]() { return lt() ? &lt()->position : nullptr; }, 0.25);
 	if (l.kind == LightKind::Spot) {
 		addVec3(f, tr("Aims at"), [lt]() { return lt() ? &lt()->target : nullptr; }, 0.25);
 		addNum(f, tr("Cone angle"), [lt]() { return lt() ? &lt()->coneAngle : nullptr; }, 1, 89, 1, 1, QString::fromUtf8(" \xC2\xB0"));
 		addNum(f, tr("Soft edge"), [lt]() { return lt() ? &lt()->coneDelta : nullptr; }, 0, 89, 1, 1, QString::fromUtf8(" \xC2\xB0"));
+	}
+	if (l.kind == LightKind::Projector) {
+		addVec3(f, tr("Aims at"), [lt]() { return lt() ? &lt()->target : nullptr; }, 0.25);
+		addNum(f, tr("Field of view"), [lt]() { return lt() ? &lt()->fov : nullptr; }, 1, 170, 1, 1, QString::fromUtf8(" \xC2\xB0"));
+		addFile(f, tr("Slide picture"), [lt]() { return lt() ? &lt()->imageFile : nullptr; }, tr("Images (*.png *.jpg *.jpeg *.bmp *.tga *.exr *.hdr)"));
+		auto *hint = new QLabel(tr("A slide projector: the picture shines out through a frustum, onto whatever it falls on, with the colours of the picture. The field of view is the angle across "
+		                           "the picture's shorter side. Strength is the brightness of the whitest part of the picture; a surface facing the projector from distance d is lit with "
+		                           "Strength / d squared. The top of the picture points up as far as the aim allows."));
+		hint->setWordWrap(true);
+		f->addRow(hint);
 	}
 	if (l.kind == LightKind::Distant) {
 		addVec3(f, tr("Shines from"), [lt]() { return lt() ? &lt()->position : nullptr; }, 0.25);
@@ -758,7 +768,8 @@ void SceneBuilderWidget::inspectLight(QFormLayout *f, int i) {
 			f->addRow(hint);
 		}
 	}
-	if (l.kind != LightKind::Infinite || (l.imageFile.empty() && !l.physicalSky)) addColor(f, tr("Colour"), [lt]() { return lt() ? &lt()->color : nullptr; });
-	addNum(f, l.kind == LightKind::Point || l.kind == LightKind::Spot ? tr("Strength") : tr("Brightness"), [lt]() { return lt() ? &lt()->intensity : nullptr; }, 0, 100000, 0.5, 2);
+	if (l.kind == LightKind::Projector) {}   // (the picture gives the colour)
+	else if (l.kind != LightKind::Infinite || (l.imageFile.empty() && !l.physicalSky)) addColor(f, tr("Colour"), [lt]() { return lt() ? &lt()->color : nullptr; });
+	addNum(f, l.kind == LightKind::Point || l.kind == LightKind::Spot || l.kind == LightKind::Projector ? tr("Strength") : tr("Brightness"), [lt]() { return lt() ? &lt()->intensity : nullptr; }, 0, 100000, 0.5, 2);
 }
 

@@ -156,9 +156,14 @@ inline std::vector<Problem> validate(const Document& d) {
 		const std::string who = "'" + l.name + "': ";
 		if (l.intensity < 0.0) err(who + "the light strength cannot be negative.");
 		if (l.kind == LightKind::Infinite && detail::absoluteFileMissing(l.imageFile)) warn(who + "the sky image was not found (" + l.imageFile + "). Choose it again.");
+		if (l.kind == LightKind::Projector) {
+			if (!(l.fov >= 1.0 && l.fov <= 170.0)) err(who + "the projector's field of view must be between 1 and 170 degrees.");
+			if (l.imageFile.empty()) warn(who + "the projector has no slide picture, so it shines a plain white beam. Choose a picture.");
+			else if (detail::absoluteFileMissing(l.imageFile)) warn(who + "the slide picture was not found (" + l.imageFile + "). Choose it again.");
+		}
 		if (l.kind == LightKind::Spot && !(l.coneAngle > 0.0 && l.coneAngle < 90.0)) err(who + "the spot cone angle must be between 0 and 90 degrees.");
 		if (l.kind == LightKind::Spot && (l.coneDelta < 0.0 || l.coneDelta > l.coneAngle)) err(who + "the spot soft edge must be between 0 and the cone angle.");
-		if ((l.kind == LightKind::Spot || l.kind == LightKind::Distant) && l.position.x == l.target.x && l.position.y == l.target.y && l.position.z == l.target.z)
+		if (aimsAtTarget(l) && l.position.x == l.target.x && l.position.y == l.target.y && l.position.z == l.target.z)
 			err(who + "the light is at the point it aims at.");
 	}
 	if (!anyLight) warn("The scene has no light, so the picture will be black. Add a light or make an object emissive.");

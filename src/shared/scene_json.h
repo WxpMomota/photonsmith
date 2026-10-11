@@ -389,6 +389,7 @@ inline std::string toJson(const Document& d) {
 			j.set("physicalSky", Json::boolean(true)).set("sunElevation", Json::number(l.sky.sunElevation)).set("sunAzimuth", Json::number(l.sky.sunAzimuth));
 			j.set("turbidity", Json::number(l.sky.turbidity)).set("groundAlbedo", Json::number(l.sky.groundAlbedo));
 		}
+		if (l.kind == LightKind::Projector) j.set("fov", Json::number(l.fov));   // (older files and other lights do not have it)
 		if (l.skySpin != 0.0) j.set("skySpin", Json::number(l.skySpin));
 		if (l.hidden) j.set("hidden", Json::boolean(true));
 		if (l.locked) j.set("locked", Json::boolean(true));
@@ -484,7 +485,7 @@ inline bool fromJson(const std::string& text, Document& out, std::string& err) {
 			     detail::readNum(j, "coneDelta", l.coneDelta) && detail::readStr(j, "imageFile", l.imageFile) && detail::readBool(j, "physicalSky", l.physicalSky) &&
 			     detail::readNum(j, "sunElevation", l.sky.sunElevation) && detail::readNum(j, "sunAzimuth", l.sky.sunAzimuth) &&
 			     detail::readNum(j, "turbidity", l.sky.turbidity) && detail::readNum(j, "groundAlbedo", l.sky.groundAlbedo) && detail::readBool(j, "hidden", l.hidden) &&
-			     detail::readBool(j, "locked", l.locked) && detail::readNum(j, "skySpin", l.skySpin);
+			     detail::readBool(j, "locked", l.locked) && detail::readNum(j, "skySpin", l.skySpin) && detail::readNum(j, "fov", l.fov);
 			if (!ok) break;
 			d.lights.push_back(l);
 		}

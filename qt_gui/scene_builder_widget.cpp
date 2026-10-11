@@ -217,7 +217,7 @@ void SceneBuilderWidget::buildUi() {
 		setSelection(m_sel);
 	});
 	addMenu->addSection(tr("Lights"));
-	for (LightKind k : {LightKind::Point, LightKind::Spot, LightKind::Distant, LightKind::Infinite})
+	for (LightKind k : {LightKind::Point, LightKind::Spot, LightKind::Distant, LightKind::Infinite, LightKind::Projector})
 		addMenu->addAction(lightLabel(k), this, [this, k]() { addLight(k); });
 	// Ready-made lighting (scene_lighting.h): replaces the lights with a rig round what the camera looks at.
 	addMenu->addSection(tr("Lighting (replaces the lights)"));
@@ -781,9 +781,17 @@ void SceneBuilderWidget::addLight(LightKind kind) {
 			case LightKind::Spot: l.position = {0.0, 5.0, 2.0}; l.target = {0.0, 0.0, 0.0}; l.intensity = 120.0; break;
 			case LightKind::Distant: l.position = {4.0, 6.0, 3.0}; l.target = {0.0, 0.0, 0.0}; l.color = {1.0, 0.95, 0.85}; l.intensity = 3.0; break;
 			case LightKind::Infinite: l.color = {0.55, 0.70, 1.0}; l.intensity = 0.5; break;
+			case LightKind::Projector:
+				l.position = {0.0, 4.0, 6.0};
+				l.target = {0.0, 1.0, 0.0};
+				l.intensity = 150.0;
+				l.fov = 40.0;
+				l.imageFile = defaultSlidePicture().toStdString();
+				break;
 		}
 		const Float3 c = dropPoint();
 		if (kind == LightKind::Point || kind == LightKind::Spot) { l.position.x = c.x; l.position.z = c.z; }
+		if (kind == LightKind::Projector) { l.position.x = c.x; l.position.z = c.z + 6.0; l.target.x = c.x; l.target.z = c.z; }   // (it stands back from the middle of the view, aimed at it)
 		m_doc.lights.push_back(l);
 		m_sel = {SelKind::Light, static_cast<int>(m_doc.lights.size()) - 1};
 	});

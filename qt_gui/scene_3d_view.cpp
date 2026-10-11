@@ -9,6 +9,7 @@
 #include <QKeyEvent>
 #include <QMetaObject>
 #include <QMouseEvent>
+#include <QImageReader>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPointer>
@@ -697,6 +698,39 @@ void Scene3DView::drawNames(Ctx &c) const {
 	}
 }
 
+double Scene3DView::slideAspect(const std::string &file) const {
+	const auto found = m_slideAspects.find(file);
+	if (found != m_slideAspects.end()) return found->second;
+	double aspect = 1.0;
+	if (!file.empty()) {
+		const QSize size = QImageReader(QString::fromStdString(file)).size();   // (only the header is read; an .exr or .hdr it cannot read is taken as square)
+		if (size.isValid() && size.height() > 0) aspect = static_cast<double>(size.width()) / size.height();
+	}
+	m_slideAspects[file] = aspect;
+	return aspect;
+}
+
+// A projector's frustum: four edges from the light to the rectangle the slide covers at the distance of its aim point, and the rectangle, with a short tick above its top edge.
+void Scene3DView::drawProjector(Ctx &c, const Light &l, bool selected) const {
+	const scene_doc::projector::Frame f = scene_doc::projector::frameOf(l);
+	const double dx = l.target.x - l.position.x, dy = l.target.y - l.position.y, dz = l.target.z - l.position.z;
+	const double dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+	if (dist < 1e-9) return;
+	double hw = 0, hh = 0;
+	scene_doc::projector::halfSize(l.fov, slideAspect(l.imageFile), dist, hw, hh);
+	const V3 centre{l.position.x + f.dir.x * dist, l.position.y + f.dir.y * dist, l.position.z + f.dir.z * dist};
+	const auto corner = [&](double sx, double sy) {
+		return V3{centre.x + f.right.x * hw * sx + f.up.x * hh * sy, centre.y + f.right.y * hw * sx + f.up.y * hh * sy, centre.z + f.right.z * hw * sx + f.up.z * hh * sy};
+	};
+	const V3 pts[4] = {corner(-1, 1), corner(1, 1), corner(1, -1), corner(-1, -1)};
+	const QPen pen(selected ? c.accent : QColor(230, 180, 40), 1.0, Qt::DotLine);
+	for (int i = 0; i < 4; ++i) {
+		c.line(toV3(l.position), pts[i], pen);
+		c.line(pts[i], pts[(i + 1) % 4], pen);
+	}
+	c.line(corner(0, 1), corner(0, 1.15), QPen(selected ? c.accent : QColor(230, 180, 40), 1.6));   // which way up the slide is
+}
+
 void Scene3DView::drawLights(Ctx &c) const {
 	for (int i = 0; i < static_cast<int>(m_doc->lights.size()); ++i) {
 		const Light &l = m_doc->lights[i];
@@ -704,7 +738,7 @@ void Scene3DView::drawLights(Ctx &c) const {
 		const bool selected = isPicked({BuilderSelection::Kind::Light, i});
 		QPointF at;
 		if (!c.pixel(toV3(l.position), at)) continue;
-		if (l.kind == LightKind::Spot || l.kind == LightKind::Distant) {
+		if (aimsAtTarget(l)) {
 			c.line(toV3(l.position), toV3(l.target), QPen(selected ? c.accent : QColor(230, 180, 40), 1.2, Qt::DashLine));
 			QPointF t;
 			if (c.pixel(toV3(l.target), t)) {
@@ -713,6 +747,7 @@ void Scene3DView::drawLights(Ctx &c) const {
 				c.p->drawLine(t - QPointF(4, -4), t + QPointF(4, -4));
 			}
 		}
+		if (l.kind == LightKind::Projector) drawProjector(c, l, selected);
 		c.p->setPen(QPen(selected ? c.accent : QColor(200, 150, 20), selected ? 2.5 : 1.5));
 		c.p->setBrush(toQColor(l.color).lighter(130));
 		c.p->drawEllipse(at, 6, 6);

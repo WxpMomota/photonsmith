@@ -135,7 +135,7 @@ inline void translateItems(Document& d, const ItemSet& s, const Float3& delta) {
 		l.position.x += delta.x;
 		l.position.y += delta.y;
 		l.position.z += delta.z;
-		if (l.kind == LightKind::Spot || l.kind == LightKind::Distant) {
+		if (aimsAtTarget(l)) {
 			l.target.x += delta.x;
 			l.target.y += delta.y;
 			l.target.z += delta.z;
@@ -191,7 +191,7 @@ inline void rotateItems(Document& d, const ItemSet& wanted, int axis, double deg
 	for (int i : s.lights) {
 		Light& l = d.lights[i];
 		l.position = selection_detail::turned(l.position, pivot, r);
-		if (l.kind == LightKind::Spot || l.kind == LightKind::Distant) l.target = selection_detail::turned(l.target, pivot, r);
+		if (aimsAtTarget(l)) l.target = selection_detail::turned(l.target, pivot, r);
 	}
 }
 
@@ -208,7 +208,7 @@ inline bool scaleItems(Document& d, const ItemSet& wanted, double factor, const 
 	for (int i : s.lights) {
 		Light& l = d.lights[i];
 		l.position = selection_detail::scaledAbout(l.position, pivot, factor);
-		if (l.kind == LightKind::Spot || l.kind == LightKind::Distant) l.target = selection_detail::scaledAbout(l.target, pivot, factor);
+		if (aimsAtTarget(l)) l.target = selection_detail::scaledAbout(l.target, pivot, factor);
 	}
 	return true;
 }
@@ -255,7 +255,7 @@ inline ItemSet duplicateItems(Document& d, const ItemSet& wanted) {
 		}
 		l.name = name;
 		l.position.x += dx;
-		if (l.kind == LightKind::Spot || l.kind == LightKind::Distant) l.target.x += dx;
+		if (aimsAtTarget(l)) l.target.x += dx;
 		d.lights.push_back(l);
 		added.lights.push_back(static_cast<int>(d.lights.size()) - 1);
 	}

@@ -245,6 +245,78 @@ void MainWindow::runBuilder3dSelfTest(const std::function<void(const QString &)>
 }
 
 // Part of the "builder" mode: every ready-made shape and prop can be added, leaves the scene without problems, and is one undo step each.
+// The light kinds the Scene Builder adds beyond the plain ones: a projector, the ready-made lightings and the turn of an image sky (called from selfTestShapes).
+void MainWindow::selfTestLights(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
+	// A projector light (a slide shining through a frustum): added from the search box with a slide of its own, its properties have the field of view and the slide, the 3D view draws
+	// its frustum, the file has a projection light, and one undo takes it away again.
+	{
+		const size_t lightsBefore = sb->document().lights.size();
+		check(sb->runActionForTest("add projector") && sb->document().lights.size() == lightsBefore + 1 && sb->document().lights.back().kind == scene_doc::LightKind::Projector,
+		      "Add > Projector (slide light) adds a projector");
+		const scene_doc::Light &slide = sb->document().lights.back();
+		check(!slide.imageFile.empty() && QFileInfo::exists(QString::fromStdString(slide.imageFile)), "with a slide picture of its own: " + QString::fromStdString(slide.imageFile));
+		check(sb->pbrtTextForTest().contains("LightSource \"projection\"") && !scene_doc::hasErrors(scene_doc::validate(sb->document())), "the file has a projection light and the scene is valid");
+		QApplication::processEvents();
+		QDoubleSpinBox *fov = nullptr;
+		for (QDoubleSpinBox *s : sb->findChildren<QDoubleSpinBox *>())
+			if (s->minimum() == 1.0 && s->maximum() == 170.0 && std::fabs(s->value() - slide.fov) < 1e-9) fov = s;
+		check(fov != nullptr, "its properties have a field of view");
+		if (fov) {
+			fov->setValue(55.0);
+			QApplication::processEvents();
+			check(sb->document().lights.back().fov == 55.0 && sb->pbrtTextForTest().contains("\"float fov\" [ 55 ]"), "changing it changes the projector and the file");
+		}
+		bool drawn = false;
+		for (QLabel *l : sb->findChildren<QLabel *>()) drawn = drawn || l->text().startsWith(QStringLiteral("A slide projector"));
+		check(drawn, "and explain what a projector is");
+		sb->show3dView(true);
+		check(!sb->view3dForTest()->grab().isNull(), "the 3D view draws it (the frustum) without trouble");
+		sb->show3dView(false);
+		while (sb->document().lights.size() > lightsBefore && sb->undo()) {}
+		check(sb->document().lights.size() == lightsBefore, "undo takes the projector away");
+	}
+	// Ready-made lighting (scene_lighting.h): the Lighting actions (found by the search box) replace the lights with a rig; one undo brings the old lights back. An image sky has
+	// a Rotate sky row that turns the picture (it is written as a Rotate before the light).
+	{
+		const size_t lightsBefore = sb->document().lights.size();
+		check(sb->runActionForTest("lighting studio") && sb->document().lights.size() == 4 && sb->document().lights[0].name == "Key light",
+		      "the Studio lighting replaces the lights with a key, a fill, a rim and a backdrop");
+		check(sb->selectionForTest().index == 0, "and picks the first of them");
+		check(sb->undo() && sb->document().lights.size() == lightsBefore, "one undo brings the old lights back");
+		check(sb->runActionForTest("lighting overcast") && sb->document().lights.size() == 1 && sb->document().lights[0].kind == scene_doc::LightKind::Infinite &&
+		          !sb->document().lights[0].physicalSky,
+		      "the Overcast lighting is a plain sky");
+		sb->undo();
+		check(sb->runActionForTest("lighting sunny") && sb->document().lights[0].physicalSky && sb->document().lights.size() == 2 &&
+		          QFileInfo::exists(QString::fromStdString(sb->document().lights[0].imageFile)),
+		      "the Sunny lighting is Sun & sky: the sky picture is made and the Sun light follows it");
+		check(sb->undo() && sb->document().lights.size() == lightsBefore && sb->document().lights[0].sky.sunElevation == scene_doc::SkyParams().sunElevation, "one undo brings the starter lights back, Sun included");
+		// the sky picture of the starter scene's own image: any picture file will do for the row
+		const QString picture = QDir::temp().filePath("rt_lighting_selftest.hdr");
+		{
+			QFile f(picture);
+			if (f.open(QIODevice::WriteOnly)) f.write(QByteArray("#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 1 +X 2\n") + QByteArray(8, 0x40));
+		}
+		sb->selectLight(0);
+		sb->setSkyImageForTest(0, picture);
+		QApplication::processEvents();
+		QDoubleSpinBox *spin = nullptr;
+		for (QDoubleSpinBox *s : sb->findChildren<QDoubleSpinBox *>())
+			if (s->minimum() == -360.0 && s->maximum() == 360.0) spin = s;
+		check(spin != nullptr, "an image sky has a Rotate sky row");
+		if (spin) {
+			spin->setValue(90.0);
+			QApplication::processEvents();
+			check(sb->document().lights[0].skySpin == 90.0 && sb->pbrtTextForTest().contains("Rotate 90 0 1 0"), "turning it is kept in the document and written as a rotation");
+			check(sb->undo() && sb->document().lights[0].skySpin == 0.0, "one undo turns it back");
+		}
+		while (sb->document().lights[0].skySpin != 0.0 && sb->undo()) {}
+		sb->undo();   // (the picture)
+		QFile::remove(picture);
+		sb->selectObject(1);
+	}
+}
+
 void MainWindow::selfTestShapes(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
 	// Every ready-made shape can be added (and drawn in the layout and 3D views), leaves the scene without problems, and is one undo step each.
 	{
@@ -413,46 +485,7 @@ void MainWindow::selfTestShapes(SceneBuilderWidget *sb, const std::function<void
 		while (sb->document().lights.size() > lightsBefore && sb->undo()) {}   // back to the starter's lights
 		sb->selectObject(1);
 	}
-	// Ready-made lighting (scene_lighting.h): the Lighting actions (found by the search box) replace the lights with a rig; one undo brings the old lights back. An image sky has
-	// a Rotate sky row that turns the picture (it is written as a Rotate before the light).
-	{
-		const size_t lightsBefore = sb->document().lights.size();
-		check(sb->runActionForTest("lighting studio") && sb->document().lights.size() == 4 && sb->document().lights[0].name == "Key light",
-		      "the Studio lighting replaces the lights with a key, a fill, a rim and a backdrop");
-		check(sb->selectionForTest().index == 0, "and picks the first of them");
-		check(sb->undo() && sb->document().lights.size() == lightsBefore, "one undo brings the old lights back");
-		check(sb->runActionForTest("lighting overcast") && sb->document().lights.size() == 1 && sb->document().lights[0].kind == scene_doc::LightKind::Infinite &&
-		          !sb->document().lights[0].physicalSky,
-		      "the Overcast lighting is a plain sky");
-		sb->undo();
-		check(sb->runActionForTest("lighting sunny") && sb->document().lights[0].physicalSky && sb->document().lights.size() == 2 &&
-		          QFileInfo::exists(QString::fromStdString(sb->document().lights[0].imageFile)),
-		      "the Sunny lighting is Sun & sky: the sky picture is made and the Sun light follows it");
-		check(sb->undo() && sb->document().lights.size() == lightsBefore && sb->document().lights[0].sky.sunElevation == scene_doc::SkyParams().sunElevation, "one undo brings the starter lights back, Sun included");
-		// the sky picture of the starter scene's own image: any picture file will do for the row
-		const QString picture = QDir::temp().filePath("rt_lighting_selftest.hdr");
-		{
-			QFile f(picture);
-			if (f.open(QIODevice::WriteOnly)) f.write(QByteArray("#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 1 +X 2\n") + QByteArray(8, 0x40));
-		}
-		sb->selectLight(0);
-		sb->setSkyImageForTest(0, picture);
-		QApplication::processEvents();
-		QDoubleSpinBox *spin = nullptr;
-		for (QDoubleSpinBox *s : sb->findChildren<QDoubleSpinBox *>())
-			if (s->minimum() == -360.0 && s->maximum() == 360.0) spin = s;
-		check(spin != nullptr, "an image sky has a Rotate sky row");
-		if (spin) {
-			spin->setValue(90.0);
-			QApplication::processEvents();
-			check(sb->document().lights[0].skySpin == 90.0 && sb->pbrtTextForTest().contains("Rotate 90 0 1 0"), "turning it is kept in the document and written as a rotation");
-			check(sb->undo() && sb->document().lights[0].skySpin == 0.0, "one undo turns it back");
-		}
-		while (sb->document().lights[0].skySpin != 0.0 && sb->undo()) {}
-		sb->undo();   // (the picture)
-		QFile::remove(picture);
-		sb->selectObject(1);
-	}
+	selfTestLights(sb, check);
 	// The Preset list in a material's properties: choosing "Gold" in the real combo box makes the selected object a gold conductor, as one undo step.
 	{
 		sb->selectObject(1);

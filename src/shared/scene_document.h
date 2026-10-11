@@ -32,6 +32,7 @@
 #include "scene_materials.h"
 #include "scene_sky.h"
 #include "scene_lighting.h"
+#include "scene_projector.h"
 #include "scene_pbrt_writer.h"
 #include "scene_validate.h"
 

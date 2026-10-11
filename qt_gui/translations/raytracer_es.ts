@@ -717,42 +717,42 @@
 <context>
     <name>LensPreset</name>
     <message>
-        <location filename="../scene_builder_common.h" line="201"/>
+        <location filename="../scene_builder_common.h" line="202"/>
         <source>14 mm ultra wide</source>
         <translation>14 mm ultra gran angular</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="201"/>
+        <location filename="../scene_builder_common.h" line="202"/>
         <source>24 mm wide</source>
         <translation>24 mm gran angular</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="201"/>
+        <location filename="../scene_builder_common.h" line="202"/>
         <source>35 mm street</source>
         <translation>35 mm calle</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="202"/>
+        <location filename="../scene_builder_common.h" line="203"/>
         <source>50 mm normal</source>
         <translation>50 mm normal</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="202"/>
+        <location filename="../scene_builder_common.h" line="203"/>
         <source>85 mm portrait</source>
         <translation>85 mm retrato</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="202"/>
+        <location filename="../scene_builder_common.h" line="203"/>
         <source>135 mm telephoto</source>
         <translation>135 mm teleobjetivo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="203"/>
+        <location filename="../scene_builder_common.h" line="204"/>
         <source>200 mm long telephoto</source>
         <translation>200 mm teleobjetivo largo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="203"/>
+        <location filename="../scene_builder_common.h" line="204"/>
         <source>400 mm super telephoto</source>
         <translation>400 mm supertelefoto</translation>
     </message>
@@ -5250,132 +5250,132 @@ Las escenas de las demás categorías no se tocan. Puedes recuperarlas desde %1.
 <context>
     <name>MaterialPreset</name>
     <message>
-        <location filename="../scene_builder_common.h" line="207"/>
+        <location filename="../scene_builder_common.h" line="208"/>
         <source>Chalk</source>
         <translation>Tiza</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="207"/>
+        <location filename="../scene_builder_common.h" line="208"/>
         <source>Black rubber</source>
         <translation>Caucho negro</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="207"/>
+        <location filename="../scene_builder_common.h" line="208"/>
         <source>Terracotta</source>
         <translation>Terracota</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="208"/>
+        <location filename="../scene_builder_common.h" line="209"/>
         <source>Concrete</source>
         <translation>Hormigón</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="208"/>
+        <location filename="../scene_builder_common.h" line="209"/>
         <source>Red plastic</source>
         <translation>Plástico rojo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="208"/>
+        <location filename="../scene_builder_common.h" line="209"/>
         <source>Blue plastic</source>
         <translation>Plástico azul</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="209"/>
+        <location filename="../scene_builder_common.h" line="210"/>
         <source>White ceramic</source>
         <translation>Cerámica blanca</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="209"/>
+        <location filename="../scene_builder_common.h" line="210"/>
         <source>Car paint</source>
         <translation>Pintura de coche</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="209"/>
+        <location filename="../scene_builder_common.h" line="210"/>
         <source>Gold</source>
         <translation>Oro</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="210"/>
+        <location filename="../scene_builder_common.h" line="211"/>
         <source>Copper</source>
         <translation>Cobre</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="210"/>
+        <location filename="../scene_builder_common.h" line="211"/>
         <source>Silver</source>
         <translation>Plata</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="210"/>
+        <location filename="../scene_builder_common.h" line="211"/>
         <source>Aluminium</source>
         <translation>Aluminio</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="211"/>
+        <location filename="../scene_builder_common.h" line="212"/>
         <source>Chrome</source>
         <translation>Cromo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="211"/>
+        <location filename="../scene_builder_common.h" line="212"/>
         <source>Brushed steel</source>
         <translation>Acero cepillado</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="211"/>
+        <location filename="../scene_builder_common.h" line="212"/>
         <source>Clear glass</source>
         <translation>Vidrio transparente</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="212"/>
+        <location filename="../scene_builder_common.h" line="213"/>
         <source>Frosted glass</source>
         <translation>Vidrio esmerilado</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="212"/>
+        <location filename="../scene_builder_common.h" line="213"/>
         <source>Water</source>
         <translation>Agua</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="212"/>
+        <location filename="../scene_builder_common.h" line="213"/>
         <source>Diamond</source>
         <translation>Diamante</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="213"/>
+        <location filename="../scene_builder_common.h" line="214"/>
         <source>Wax</source>
         <translation>Cera</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="213"/>
+        <location filename="../scene_builder_common.h" line="214"/>
         <source>Leaf</source>
         <translation>Hoja</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="213"/>
+        <location filename="../scene_builder_common.h" line="214"/>
         <source>Paper</source>
         <translation>Papel</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="214"/>
+        <location filename="../scene_builder_common.h" line="215"/>
         <source>Skin</source>
         <translation>Piel</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="214"/>
+        <location filename="../scene_builder_common.h" line="215"/>
         <source>Milk</source>
         <translation>Leche</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="214"/>
+        <location filename="../scene_builder_common.h" line="215"/>
         <source>Marble stone</source>
         <translation>Mármol (piedra)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="215"/>
+        <location filename="../scene_builder_common.h" line="216"/>
         <source>Jade</source>
         <translation>Jade</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="215"/>
+        <location filename="../scene_builder_common.h" line="216"/>
         <source>Candle wax</source>
         <translation>Cera de vela</translation>
     </message>
@@ -5383,32 +5383,32 @@ Las escenas de las demás categorías no se tocan. Puedes recuperarlas desde %1.
 <context>
     <name>MaterialPresetGroup</name>
     <message>
-        <location filename="../scene_builder_common.h" line="216"/>
+        <location filename="../scene_builder_common.h" line="217"/>
         <source>Matte</source>
         <translation>Mate</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="216"/>
+        <location filename="../scene_builder_common.h" line="217"/>
         <source>Plastic</source>
         <translation>Plástico</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="216"/>
+        <location filename="../scene_builder_common.h" line="217"/>
         <source>Metal</source>
         <translation>Metal</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="217"/>
+        <location filename="../scene_builder_common.h" line="218"/>
         <source>Glass</source>
         <translation>Vidrio</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="217"/>
+        <location filename="../scene_builder_common.h" line="218"/>
         <source>Translucent</source>
         <translation>Translúcido</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="217"/>
+        <location filename="../scene_builder_common.h" line="218"/>
         <source>Subsurface</source>
         <translation>Subsuperficie</translation>
     </message>
@@ -6320,92 +6320,97 @@ Las escenas de las demás categorías no se tocan. Puedes recuperarlas desde %1.
         <translation>Cielo (rodea la escena)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="164"/>
+        <location filename="../scene_builder_common.h" line="158"/>
+        <source>Projector (slide light)</source>
+        <translation>Proyector (luz de diapositiva)</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="165"/>
         <source>Studio (three lights)</source>
         <translation>Estudio (tres luces)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="165"/>
+        <location filename="../scene_builder_common.h" line="166"/>
         <source>Overcast day</source>
         <translation>Día nublado</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="166"/>
+        <location filename="../scene_builder_common.h" line="167"/>
         <source>Sunny day</source>
         <translation>Día soleado</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="167"/>
+        <location filename="../scene_builder_common.h" line="168"/>
         <source>Golden hour</source>
         <translation>Hora dorada</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="168"/>
+        <location filename="../scene_builder_common.h" line="169"/>
         <source>Moonlit night</source>
         <translation>Noche de luna</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="169"/>
+        <location filename="../scene_builder_common.h" line="170"/>
         <source>Light box</source>
         <translation>Caja de luz</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="175"/>
+        <location filename="../scene_builder_common.h" line="176"/>
         <source>A key light from the camera&apos;s left, a softer fill from its right and a rim light from behind, on a dark backdrop.</source>
         <translation>Una luz principal desde la izquierda de la cámara, un relleno más suave desde su derecha y una luz de contorno desde atrás, sobre un fondo oscuro.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="176"/>
+        <location filename="../scene_builder_common.h" line="177"/>
         <source>Even, soft light from a grey-white sky with no sun and no hard shadows.</source>
         <translation>Luz suave y uniforme de un cielo gris blanquecino, sin sol ni sombras duras.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="177"/>
+        <location filename="../scene_builder_common.h" line="178"/>
         <source>A clear sky with the sun high behind the camera&apos;s right shoulder.</source>
         <translation>Un cielo despejado con el sol alto, detrás del hombro derecho de la cámara.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="178"/>
+        <location filename="../scene_builder_common.h" line="179"/>
         <source>A clear sky with the sun low and to the side, long shadows and warm light.</source>
         <translation>Un cielo despejado con el sol bajo y a un lado: sombras largas y luz cálida.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="179"/>
+        <location filename="../scene_builder_common.h" line="180"/>
         <source>A dark blue sky and a dim cool moon from above and behind.</source>
         <translation>Un cielo azul oscuro y una luna tenue y fría desde arriba y atrás.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="180"/>
+        <location filename="../scene_builder_common.h" line="181"/>
         <source>A bright white surround with a little light from above, as for a product shot.</source>
         <translation>Un entorno blanco brillante con un poco de luz desde arriba, como en una foto de producto.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="222"/>
+        <location filename="../scene_builder_common.h" line="223"/>
         <source>Matte (diffuse)</source>
         <translation>Mate (difuso)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="223"/>
+        <location filename="../scene_builder_common.h" line="224"/>
         <source>Metal</source>
         <translation>Metal</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="224"/>
+        <location filename="../scene_builder_common.h" line="225"/>
         <source>Glass</source>
         <translation>Vidrio</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="225"/>
+        <location filename="../scene_builder_common.h" line="226"/>
         <source>Glossy paint (coated)</source>
         <translation>Pintura brillante (con capa)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="226"/>
+        <location filename="../scene_builder_common.h" line="227"/>
         <source>Translucent (paper, leaves)</source>
         <translation>Translúcido (papel, hojas)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="227"/>
+        <location filename="../scene_builder_common.h" line="228"/>
         <source>Subsurface (skin, wax, milk)</source>
         <translation>Subsuperficie (piel, cera, leche)</translation>
     </message>
@@ -6517,13 +6522,13 @@ Salida:
 <context>
     <name>RenderQueueModel</name>
     <message>
-        <location filename="../mainwindow_selftest_builder3d.cpp" line="744"/>
+        <location filename="../mainwindow_selftest_builder3d.cpp" line="772"/>
         <location filename="../render_queue_model.cpp" line="114"/>
         <source>Waiting</source>
         <translation>En espera</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_builder3d.cpp" line="762"/>
+        <location filename="../mainwindow_selftest_builder3d.cpp" line="790"/>
         <location filename="../render_queue_model.cpp" line="136"/>
         <source>%1 s</source>
         <translation>%1 s</translation>
@@ -6587,72 +6592,72 @@ Salida:
 <context>
     <name>Scene3DView</name>
     <message>
-        <location filename="../scene_3d_view.cpp" line="92"/>
+        <location filename="../scene_3d_view.cpp" line="93"/>
         <source>Front</source>
         <translation>Frontal</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="93"/>
+        <location filename="../scene_3d_view.cpp" line="94"/>
         <source>Back</source>
         <translation>Posterior</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="94"/>
+        <location filename="../scene_3d_view.cpp" line="95"/>
         <source>Right</source>
         <translation>Derecha</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="95"/>
+        <location filename="../scene_3d_view.cpp" line="96"/>
         <source>Left</source>
         <translation>Izquierda</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="96"/>
+        <location filename="../scene_3d_view.cpp" line="97"/>
         <source>Top</source>
         <translation>Superior</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="97"/>
+        <location filename="../scene_3d_view.cpp" line="98"/>
         <source>Bottom</source>
         <translation>Inferior</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="547"/>
+        <location filename="../scene_3d_view.cpp" line="548"/>
         <source>Orthographic</source>
         <translation>Ortogonal</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="548"/>
+        <location filename="../scene_3d_view.cpp" line="549"/>
         <source>Rendered, %1 samples</source>
         <translation>Renderizado, %1 muestras</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="548"/>
+        <location filename="../scene_3d_view.cpp" line="549"/>
         <source>Rendering...</source>
         <translation>Renderizando...</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="567"/>
+        <location filename="../scene_3d_view.cpp" line="568"/>
         <source>the floor</source>
         <translation>el suelo</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="580"/>
+        <location filename="../scene_3d_view.cpp" line="581"/>
         <source>Snapped to %1</source>
         <translation>Ajustado a %1</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="598"/>
+        <location filename="../scene_3d_view.cpp" line="599"/>
         <source>Flythrough preview, %1% (%2 x %3). Orbit, pan or zoom to leave.</source>
         <translation>Vista previa del recorrido, %1% (%2 x %3). Orbita, desplaza o haz zoom para salir.</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="599"/>
+        <location filename="../scene_3d_view.cpp" line="600"/>
         <source>Through the camera (%1 x %2). Orbit, pan or zoom to leave.</source>
         <translation>A través de la cámara (%1 x %2). Orbita, desplaza o haz zoom para salir.</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="806"/>
+        <location filename="../scene_3d_view.cpp" line="841"/>
         <source>Camera</source>
         <translation>Cámara</translation>
     </message>
@@ -6723,6 +6728,7 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="315"/>
+        <location filename="../scene_builder_inspector.cpp" line="712"/>
         <source>Field of view</source>
         <translation>Campo de visión</translation>
     </message>
@@ -6788,7 +6794,7 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="405"/>
-        <location filename="../scene_builder_inspector.cpp" line="742"/>
+        <location filename="../scene_builder_inspector.cpp" line="752"/>
         <source>Preset</source>
         <translation>Preajuste</translation>
     </message>
@@ -6802,6 +6808,7 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
     <message>
         <location filename="../scene_builder_inspector.cpp" line="427"/>
         <location filename="../scene_builder_inspector.cpp" line="460"/>
+        <location filename="../scene_builder_inspector.cpp" line="713"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.tga *.exr *.hdr)</source>
         <translation>Imágenes (*.png *.jpg *.jpeg *.bmp *.tga *.exr *.hdr)</translation>
     </message>
@@ -6815,7 +6822,7 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <location filename="../scene_builder_inspector.cpp" line="496"/>
         <location filename="../scene_builder_inspector.cpp" line="523"/>
         <location filename="../scene_builder_inspector.cpp" line="585"/>
-        <location filename="../scene_builder_inspector.cpp" line="761"/>
+        <location filename="../scene_builder_inspector.cpp" line="772"/>
         <source>Colour</source>
         <translation>Color</translation>
     </message>
@@ -7191,7 +7198,7 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="678"/>
-        <location filename="../scene_builder_inspector.cpp" line="762"/>
+        <location filename="../scene_builder_inspector.cpp" line="773"/>
         <source>Strength</source>
         <translation>Intensidad</translation>
     </message>
@@ -7207,6 +7214,7 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="706"/>
+        <location filename="../scene_builder_inspector.cpp" line="711"/>
         <source>Aims at</source>
         <translation>Apunta a</translation>
     </message>
@@ -7221,92 +7229,102 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation>Borde suave</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="711"/>
+        <location filename="../scene_builder_inspector.cpp" line="713"/>
+        <source>Slide picture</source>
+        <translation>Imagen de la diapositiva</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="714"/>
+        <source>A slide projector: the picture shines out through a frustum, onto whatever it falls on, with the colours of the picture. The field of view is the angle across the picture&apos;s shorter side. Strength is the brightness of the whitest part of the picture; a surface facing the projector from distance d is lit with Strength / d squared. The top of the picture points up as far as the aim allows.</source>
+        <translation>Un proyector de diapositivas: la imagen sale por un tronco de pirámide y cae sobre lo que encuentra, con los colores de la imagen. El campo de visión es el ángulo del lado más corto de la imagen. La intensidad es el brillo de la parte más blanca de la imagen; una superficie de cara al proyector a una distancia d recibe Intensidad / d al cuadrado. La parte superior de la imagen apunta hacia arriba en la medida en que lo permite la orientación.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="721"/>
         <source>Shines from</source>
         <translation>Brilla desde</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="712"/>
+        <location filename="../scene_builder_inspector.cpp" line="722"/>
         <source>Towards</source>
         <translation>Hacia</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="716"/>
+        <location filename="../scene_builder_inspector.cpp" line="726"/>
         <source>Sun &amp;&amp; sky (a clear sky for a time of day)</source>
         <translation>Sol y cielo (un cielo despejado según la hora del día)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="732"/>
+        <location filename="../scene_builder_inspector.cpp" line="742"/>
         <source>Time of day...</source>
         <translation>Hora del día...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="733"/>
+        <location filename="../scene_builder_inspector.cpp" line="743"/>
         <source>Sunrise</source>
         <translation>Amanecer</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="733"/>
+        <location filename="../scene_builder_inspector.cpp" line="743"/>
         <source>Morning</source>
         <translation>Mañana</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="733"/>
+        <location filename="../scene_builder_inspector.cpp" line="743"/>
         <source>Noon</source>
         <translation>Mediodía</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="734"/>
+        <location filename="../scene_builder_inspector.cpp" line="744"/>
         <source>Afternoon</source>
         <translation>Tarde</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="734"/>
+        <location filename="../scene_builder_inspector.cpp" line="744"/>
         <source>Sunset</source>
         <translation>Atardecer</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="743"/>
+        <location filename="../scene_builder_inspector.cpp" line="753"/>
         <source>Sun height</source>
         <translation>Altura del sol</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="744"/>
+        <location filename="../scene_builder_inspector.cpp" line="754"/>
         <source>Sun direction</source>
         <translation>Dirección del sol</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="745"/>
+        <location filename="../scene_builder_inspector.cpp" line="755"/>
         <source>Haze</source>
         <translation>Calima</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="746"/>
+        <location filename="../scene_builder_inspector.cpp" line="756"/>
         <source>Ground brightness</source>
         <translation>Brillo del suelo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="747"/>
+        <location filename="../scene_builder_inspector.cpp" line="757"/>
         <source>The sky picture and the Sun light are made from these settings; change the sun here rather than moving the Sun light. Direction 0 is towards +X, 90 away from the starting camera, 180 towards -X, 270 behind it. Brightness 1 is a daylight scene.</source>
         <translation>La imagen del cielo y la luz del Sol se generan con estos ajustes; cambia el sol aquí en lugar de mover la luz del Sol. La dirección 0 es hacia +X, 90 alejándose de la cámara inicial, 180 hacia -X y 270 detrás de ella. Un brillo de 1 es una escena de pleno día.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="752"/>
+        <location filename="../scene_builder_inspector.cpp" line="762"/>
         <source>Sky image</source>
         <translation>Imagen del cielo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="752"/>
+        <location filename="../scene_builder_inspector.cpp" line="762"/>
         <source>Images (*.exr *.hdr *.png *.jpg *.jpeg)</source>
         <translation>Imágenes (*.exr *.hdr *.png *.jpg *.jpeg)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="754"/>
+        <location filename="../scene_builder_inspector.cpp" line="764"/>
         <source>Rotate sky</source>
         <translation>Girar el cielo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="755"/>
+        <location filename="../scene_builder_inspector.cpp" line="765"/>
         <source>Leave the image empty for a plain colour sky. An image is an equirectangular (lat-long) panorama; Rotate sky turns it about the vertical axis (counter-clockwise seen from above), to put the bright part of the picture where you want the light to come from.</source>
         <translation>Deja la imagen vacía para un cielo de color liso. Una imagen es un panorama equirrectangular (lat-long); Girar el cielo lo gira sobre el eje vertical (en sentido antihorario visto desde arriba), para poner la parte brillante de la imagen por donde quieres que llegue la luz.</translation>
     </message>
@@ -7315,7 +7333,7 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation type="vanished">Deja la imagen vacía para un cielo de color liso. Una imagen es un panorama equirrectangular (latitud-longitud).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="762"/>
+        <location filename="../scene_builder_inspector.cpp" line="773"/>
         <source>Brightness</source>
         <translation>Brillo</translation>
     </message>
@@ -7992,7 +8010,7 @@ Procedencia: %3</translation>
         <translation>Mármol</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_builder3d.cpp" line="545"/>
+        <location filename="../mainwindow_selftest_builder3d.cpp" line="573"/>
         <location filename="../scene_builder_views.cpp" line="150"/>
         <source>Snap to grid</source>
         <translation>Ajustar a la cuadrícula</translation>
@@ -8306,22 +8324,22 @@ Procedencia: %3</translation>
     </message>
     <message>
         <location filename="../scene_builder_files.cpp" line="157"/>
-        <location filename="../scene_builder_files.cpp" line="278"/>
+        <location filename="../scene_builder_files.cpp" line="297"/>
         <source>Cannot open the scene</source>
         <translation>No se puede abrir la escena</translation>
     </message>
     <message>
         <location filename="../scene_builder_files.cpp" line="165"/>
         <location filename="../scene_builder_files.cpp" line="175"/>
-        <location filename="../scene_builder_files.cpp" line="309"/>
+        <location filename="../scene_builder_files.cpp" line="328"/>
         <source>Cannot save</source>
         <translation>No se puede guardar</translation>
     </message>
     <message>
         <location filename="../scene_builder_files.cpp" line="165"/>
         <location filename="../scene_builder_files.cpp" line="175"/>
-        <location filename="../scene_builder_files.cpp" line="222"/>
-        <location filename="../scene_builder_files.cpp" line="256"/>
+        <location filename="../scene_builder_files.cpp" line="241"/>
+        <location filename="../scene_builder_files.cpp" line="275"/>
         <location filename="../scene_builder_render.cpp" line="85"/>
         <location filename="../scene_builder_rendered.cpp" line="189"/>
         <location filename="../scene_builder_turntable.cpp" line="183"/>
@@ -8340,42 +8358,42 @@ Procedencia: %3</translation>
         <translation>Guardar la escena</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="238"/>
+        <location filename="../scene_builder_files.cpp" line="257"/>
         <source>There is no scenes folder to write the preview copy to.</source>
         <translation>No hay una carpeta de escenas donde escribir la copia de vista previa.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="267"/>
+        <location filename="../scene_builder_files.cpp" line="286"/>
         <source>Cannot preview</source>
         <translation>No se puede previsualizar</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="289"/>
+        <location filename="../scene_builder_files.cpp" line="308"/>
         <source>No scenes folder</source>
         <translation>No hay carpeta de escenas</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="296"/>
+        <location filename="../scene_builder_files.cpp" line="315"/>
         <source>Add to the scene list</source>
         <translation>Añadir a la lista de escenas</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="297"/>
+        <location filename="../scene_builder_files.cpp" line="316"/>
         <source>This scene is already in the list as &quot;%1&quot;.</source>
         <translation>Esta escena ya está en la lista como «%1».</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="298"/>
+        <location filename="../scene_builder_files.cpp" line="317"/>
         <source>Add as a new scene</source>
         <translation>Añadir como escena nueva</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="299"/>
+        <location filename="../scene_builder_files.cpp" line="318"/>
         <source>Update the existing one</source>
         <translation>Actualizar la existente</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="314"/>
+        <location filename="../scene_builder_files.cpp" line="333"/>
         <source>Saved a copy as %1.
 
 It is in the scene list now (Settings tab, My Scenes).</source>
@@ -8384,7 +8402,7 @@ It is in the scene list now (Settings tab, My Scenes).</source>
 Ya está en la lista de escenas (pestaña Configuración, Mis escenas).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="860"/>
+        <location filename="../scene_builder_widget.cpp" line="868"/>
         <source>(%1)%2  |  %3 objects, %4 lights</source>
         <translation>(%1)%2  |  %3 objetos, %4 luces</translation>
     </message>
@@ -8394,7 +8412,7 @@ Ya está en la lista de escenas (pestaña Configuración, Mis escenas).</transla
         <translation>Elegir una malla</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="205"/>
+        <location filename="../scene_builder_files.cpp" line="224"/>
         <source>The scenes folder (pbrt_scenes) was not found next to the program. Use Save As to put the file where you like, and set the environment variable RAY_TRACER_PBRT_DIR to that folder to have the program list it.</source>
         <translation>No se encontró la carpeta de escenas (pbrt_scenes) junto al programa. Usa Guardar como para dejar el archivo donde quieras, y define la variable de entorno RAY_TRACER_PBRT_DIR con esa carpeta para que el programa la incluya en la lista.</translation>
     </message>
@@ -8424,7 +8442,7 @@ Ya está en la lista de escenas (pestaña Configuración, Mis escenas).</transla
         <translation>Borrador: 480 píxeles de ancho, 16 muestras. Buena: 720 de ancho, 64 muestras. Óptima: 960 de ancho, 256 muestras.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="313"/>
+        <location filename="../scene_builder_files.cpp" line="332"/>
         <source>Added to the scene list</source>
         <translation>Añadida a la lista de escenas</translation>
     </message>
@@ -8444,22 +8462,22 @@ Ya está en la lista de escenas (pestaña Configuración, Mis escenas).</transla
         <translation>Iluminación: %1. %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="854"/>
+        <location filename="../scene_builder_widget.cpp" line="862"/>
         <source>not saved yet</source>
         <translation>sin guardar todavía</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="888"/>
+        <location filename="../scene_builder_widget.cpp" line="896"/>
         <source>No problems found.</source>
         <translation>No se encontraron problemas.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="894"/>
+        <location filename="../scene_builder_widget.cpp" line="902"/>
         <source>Fix this:</source>
         <translation>Corrige esto:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="894"/>
+        <location filename="../scene_builder_widget.cpp" line="902"/>
         <source>Note:</source>
         <translation>Nota:</translation>
     </message>
@@ -8935,47 +8953,47 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
 <context>
     <name>SensorPreset</name>
     <message>
-        <location filename="../scene_builder_common.h" line="197"/>
+        <location filename="../scene_builder_common.h" line="198"/>
         <source>Full frame (36 x 24 mm)</source>
         <translation>Full frame (36 x 24 mm)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="197"/>
+        <location filename="../scene_builder_common.h" line="198"/>
         <source>APS-C (23.5 x 15.6 mm)</source>
         <translation>APS-C (23,5 x 15,6 mm)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="197"/>
+        <location filename="../scene_builder_common.h" line="198"/>
         <source>APS-C Canon (22.3 x 14.9 mm)</source>
         <translation>APS-C Canon (22,3 x 14,9 mm)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="198"/>
+        <location filename="../scene_builder_common.h" line="199"/>
         <source>Micro Four Thirds (17.3 x 13 mm)</source>
         <translation>Micro cuatro tercios (17,3 x 13 mm)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="198"/>
+        <location filename="../scene_builder_common.h" line="199"/>
         <source>Super 35 film (24.9 x 18.7 mm)</source>
         <translation>Película Super 35 (24,9 x 18,7 mm)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="199"/>
+        <location filename="../scene_builder_common.h" line="200"/>
         <source>Medium format (43.8 x 32.9 mm)</source>
         <translation>Formato medio (43,8 x 32,9 mm)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="199"/>
+        <location filename="../scene_builder_common.h" line="200"/>
         <source>IMAX 70 mm film (70.4 x 52.6 mm)</source>
         <translation>Película IMAX 70 mm (70,4 x 52,6 mm)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="200"/>
+        <location filename="../scene_builder_common.h" line="201"/>
         <source>1 inch (13.2 x 8.8 mm)</source>
         <translation>1 pulgada (13,2 x 8,8 mm)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="200"/>
+        <location filename="../scene_builder_common.h" line="201"/>
         <source>Phone (7.6 x 5.7 mm)</source>
         <translation>Teléfono (7,6 x 5,7 mm)</translation>
     </message>

@@ -302,6 +302,7 @@ private:
 	// hand stays where it is until the sky is changed again.
 	std::string skySignature() const;
 	void syncSunAndSky();
+	static QString defaultSlidePicture();   // the picture a new projector light starts with (a window): made once, in <user assets>/slides
 	static QString skyImageFolder();   // where the generated sky pictures go: <user assets>/skies
 	void pushUndo();
 	bool restore(const std::string &json);   // false (and nothing changed) if the snapshot cannot be read

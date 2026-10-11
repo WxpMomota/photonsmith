@@ -54,7 +54,7 @@ std::vector<SceneBuilderWidget::Command> SceneBuilderWidget::buildCommands() {
 
 	for (scene_doc::ShapeKind k : scene_doc::allShapeKinds()) add(kAdd, shapeLabel(k), [this, k]() { addObject(k); });
 	for (scene_doc::VolumeKind k : {scene_doc::VolumeKind::Fog, scene_doc::VolumeKind::Smoke, scene_doc::VolumeKind::Cloud}) add(kAdd, volumeLabel(k), [this, k]() { addVolume(k); });
-	for (scene_doc::LightKind k : {scene_doc::LightKind::Point, scene_doc::LightKind::Spot, scene_doc::LightKind::Distant, scene_doc::LightKind::Infinite})
+	for (scene_doc::LightKind k : {scene_doc::LightKind::Point, scene_doc::LightKind::Spot, scene_doc::LightKind::Distant, scene_doc::LightKind::Infinite, scene_doc::LightKind::Projector})
 		add(kAdd, lightLabel(k), [this, k]() { addLight(k); });
 	for (scene_doc::PropKind k : scene_doc::allPropKinds()) add(kAdd, propLabel(k), [this, k]() { addProp(k); });
 	for (scene_doc::BlockyKind k : scene_doc::allBlockyKinds()) add(kAdd, blockyLabel(k), [this, k]() { addBlocky(k); });
