@@ -59,6 +59,7 @@ add_executable(unit_tests
     unit/scene_array_tests.cpp
     unit/scene_selection_tests.cpp
     unit/scene_snap_tests.cpp
+    unit/scene_arrange_tests.cpp
     unit/scene_camera_views_tests.cpp
     unit/camera_keyframes_tests.cpp
     unit/gpu_scene_textures_tests.cpp

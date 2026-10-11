@@ -108,6 +108,8 @@ struct Object {
 	double emissionStrength = 10.0;    // radiance = emission * strength
 	bool twoSided = false;             // emits from both sides
 	std::string group;                 // objects with the same non-empty group are picked, moved, copied and deleted together in the Scene Builder (scene_selection.h)
+	bool hidden = false;               // not drawn in the Scene Builder's views (it still renders): to see what is behind it while editing (scene_arrange.h)
+	bool locked = false;               // cannot be picked or moved by clicking and dragging in the views, so it is not moved by accident (it can still be picked in the list)
 };
 
 // The radius of a sphere around the object's position that holds all of it, whatever its rotation (a mesh, whose size the document does not know, counts as its
@@ -150,6 +152,8 @@ struct Light {
 	std::string imageFile;             // Infinite: an equirectangular image (empty: a constant colour)
 	bool physicalSky = false;          // Infinite: imageFile is the generated sky of `sky` (scene_sky.h)
 	SkyParams sky;
+	bool hidden = false;               // as Object::hidden
+	bool locked = false;               // as Object::locked
 };
 
 struct Camera {

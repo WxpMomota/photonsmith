@@ -115,11 +115,19 @@ void SceneBuilderWidget::createViews(QWidget *layoutBox, QVBoxLayout *layoutLayo
 		m_view->frameAll();
 		m_view3d->frameAll();
 	});
+	auto *frameSel = new QPushButton(tr("Frame selected"), layoutBox);
+	frameSel->setAutoDefault(false);
+	frameSel->setToolTip(tr("Zoom both views to what is picked (F)"));
+	connect(frameSel, &QPushButton::clicked, this, [this]() { frameSelected(); });
+	connect(m_view, &SceneLayoutView::frameSelectedRequested, this, [this]() { frameSelected(); });
+	connect(m_view3d, &Scene3DView::frameSelectedRequested, this, [this]() { frameSelected(); });
 	// One flow: Top / Front / Side / 3D, Snap to grid and Frame all share a line when the column is wide, and wrap when it is not.
 	scene_builder_ui::compactStyle(frame);
+	scene_builder_ui::compactStyle(frameSel);
 	planeRow->addWidget(snap);
 	planeRow->addWidget(m_snapObjectsCheck);
 	planeRow->addWidget(frame);
+	planeRow->addWidget(frameSel);
 	layoutLayout->addWidget(viewBar);
 	// The tools get a row of their own (only in 3D), so neither row is wider than the column.
 	gizmoLayout->addStretch(1);
@@ -145,6 +153,7 @@ void SceneBuilderWidget::createViews(QWidget *layoutBox, QVBoxLayout *layoutLayo
 		m_editCounter++;
 	};
 	const auto onDragged = [this](const BuilderSelection &s, int which, const Float3 &asked) {
+		if (isLockedItem(s)) return;   // a locked (or hidden) item is not moved by dragging in a view
 		const Float3 w = which == 0 ? snapDragTarget(s, asked) : asked;   // lined up with the objects around it, if that is on
 		// Dragging one of several picked items moves them all by the same amount.
 		const bool picked = which == 0 && !m_extra.empty() && (s == m_sel || std::find(m_extra.begin(), m_extra.end(), s) != m_extra.end());
@@ -153,7 +162,7 @@ void SceneBuilderWidget::createViews(QWidget *layoutBox, QVBoxLayout *layoutLayo
 			if (now) {
 				const Float3 delta{w.x - now->x, w.y - now->y, w.z - now->z};
 				if (delta.x == 0.0 && delta.y == 0.0 && delta.z == 0.0) return;
-				const scene_doc::ItemSet items = pickedItems();
+				const scene_doc::ItemSet items = unlockedPicked();
 				edit(QString("drag#%1").arg(m_editCounter), [&]() { scene_doc::translateItems(m_doc, items, delta); });
 				refreshInspectorValues();
 				return;
@@ -466,6 +475,7 @@ void SceneBuilderWidget::clickItemForTest(const BuilderSelection &s, Qt::Keyboar
 	sendMouse(m_view, QEvent::MouseButtonRelease, at, Qt::LeftButton, Qt::NoButton, mods);
 }
 
+QString SceneBuilderWidget::listTextForTest(int row) const { return m_list->item(row) ? m_list->item(row)->text() : QString(); }
 int SceneBuilderWidget::pickedRowsForTest() const { return static_cast<int>(m_list->selectedItems().size()); }
 
 void SceneBuilderWidget::boxSelectForTest(const QPointF &from, const QPointF &to) {

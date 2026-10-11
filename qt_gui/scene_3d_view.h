@@ -69,6 +69,7 @@ public:
 	// the point it looks at (a level camera would otherwise drop it near the horizon, far from anything visible).
 	scene_doc::Float3 centerInWorld() const;
 	void frameAll();
+	void frameBox(const scene_doc::Float3 &lo, const scene_doc::Float3 &hi);   // Frame selected: look at the middle of this box from far enough to hold it
 	QPointF itemScreenPos(const BuilderSelection &s) const;        // where an item is drawn, in this widget's pixels (null if behind the camera)
 	// Points on the selected object's tool, for tests: along a move arrow, on a rotate ring (angle from its reference direction), at a scale handle.
 	QPointF axisArrowPoint(int axis, double fraction) const;
@@ -91,6 +92,7 @@ signals:
 	void gizmoModeChanged(int mode);
 	// A saved view's marker dragged (the owner takes the view's eye or target to `world`); dragBegan() came first, as for everything else that is dragged.
 	void viewMarkerDragged(int viewIndex, int which, const scene_doc::Float3 &world);
+	void frameSelectedRequested();   // the F key
 	void cameraViewLeft();   // the user orbited, panned or zoomed away from looking through the camera
 	// An arrow key, Page Up or Page Down: move the picked items by this much (scene units): the arrows along the horizontal world axes nearest the screen's right and away,
 	// Page Up and Page Down up and down.
@@ -142,6 +144,13 @@ private:
 	void beginHit(const Hit &h, const QPointF &px, Qt::KeyboardModifiers mods);   // what a press on an item or a tool handle starts
 	bool isPicked(const BuilderSelection &s) const;   // the main item or one of the extra ones
 	bool multi() const { return !m_extra.empty(); }
+	// The main selected item is locked or hidden, so no tool is drawn for it and it is not picked or moved by dragging in this view.
+	bool selectionLocked() const {
+		if (!m_doc) return false;
+		if (m_sel.kind == BuilderSelection::Kind::Object) return m_sel.index >= 0 && m_sel.index < static_cast<int>(m_doc->objects.size()) && (m_doc->objects[m_sel.index].locked || m_doc->objects[m_sel.index].hidden);
+		if (m_sel.kind == BuilderSelection::Kind::Light) return m_sel.index >= 0 && m_sel.index < static_cast<int>(m_doc->lights.size()) && (m_doc->lights[m_sel.index].locked || m_doc->lights[m_sel.index].hidden);
+		return false;
+	}
 	bool gizmoOrigin(scene_view::V3 &out) const;   // where the tool is drawn: the item's place, or the middle of everything picked
 
 	// paintEvent's parts

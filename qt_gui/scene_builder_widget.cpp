@@ -219,15 +219,20 @@ void SceneBuilderWidget::buildUi() {
 	m_arrayButton = new QPushButton(tr("Array..."), left);
 	m_arrayButton->setToolTip(tr("Make many copies of the selected object: a grid, a ring round a point, or a random scatter"));
 	m_deleteButton = new QPushButton(tr("Delete"), left);
+	m_arrangeButton = new QPushButton(tr("Arrange"), left);
+	m_arrangeButton->setToolTip(tr("Rename, put on the floor, frame, hide and lock what is picked (also on a right-click in the list)"));
+	m_arrangeButton->setMenu(createArrangeMenu(m_arrangeButton));
 	m_duplicateButton->setAutoDefault(false);
 	m_arrayButton->setAutoDefault(false);
 	m_deleteButton->setAutoDefault(false);
-	for (QPushButton *b : {addB, m_duplicateButton, m_arrayButton, m_deleteButton}) scene_builder_ui::compactStyle(b);   // compact, so the list column can be narrow
+	m_arrangeButton->setAutoDefault(false);
+	for (QPushButton *b : {addB, m_duplicateButton, m_arrayButton, m_arrangeButton, m_deleteButton}) scene_builder_ui::compactStyle(b);   // compact, so the list column can be narrow
 	auto *listBar = new QWidget(left);   // wraps (Add / Duplicate / Delete on two lines) when the column is dragged narrow
 	auto *row = new FlowLayout(listBar, 0, 6, 6);
 	row->addWidget(addB);
 	row->addWidget(m_duplicateButton);
 	row->addWidget(m_arrayButton);
+	row->addWidget(m_arrangeButton);
 	row->addWidget(m_deleteButton);
 	leftLayout->addWidget(listBar);
 	m_list = new QListWidget(left);
@@ -238,6 +243,18 @@ void SceneBuilderWidget::buildUi() {
 	m_leftPanel = left;
 	m_addButton = addB;
 	connect(m_list, &QListWidget::itemSelectionChanged, this, [this]() { onListSelectionChanged(); });
+	// A right-click on the list opens the same tools as the Arrange button (picking the item under the mouse first, unless it is already picked); a double-click renames.
+	m_list->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(m_list, &QListWidget::customContextMenuRequested, this, [this](const QPoint &pos) {
+		if (QListWidgetItem *it = m_list->itemAt(pos); it && !it->isSelected()) {
+			m_list->clearSelection();
+			it->setSelected(true);
+		}
+		QMenu *menu = createArrangeMenu(m_list);
+		menu->setAttribute(Qt::WA_DeleteOnClose);
+		menu->popup(m_list->viewport()->mapToGlobal(pos));
+	});
+	connect(m_list, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem *) { renameSelected(); });
 	connect(m_deleteButton, &QPushButton::clicked, this, [this]() { deleteSelected(); });
 	connect(m_duplicateButton, &QPushButton::clicked, this, [this]() { duplicateSelected(); });
 	connect(m_arrayButton, &QPushButton::clicked, this, [this]() { showArrayDialog(); });
@@ -250,6 +267,7 @@ void SceneBuilderWidget::buildUi() {
 	addKey(QKeySequence(Qt::CTRL | Qt::Key_G), [this]() { groupSelected(); });
 	addKey(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_G), [this]() { ungroupSelected(); });
 	addKey(QKeySequence(Qt::CTRL | Qt::Key_A), [this]() { selectAll(); });
+	createArrangeShortcuts();   // H hide, Alt+H show all, L lock, Alt+L unlock all, F2 rename, End drop to floor
 	// Ctrl+D (Command+D on a Mac) duplicates from anywhere in the tab except a text box.
 	auto *duplicateKey = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_D), this);
 	duplicateKey->setContext(Qt::WidgetWithChildrenShortcut);
@@ -525,6 +543,16 @@ void SceneBuilderWidget::syncListSelection() {
 	}
 }
 
+// ", hidden" and ", locked" after the name, and a hidden item in the dimmed colour of a disabled one.
+void SceneBuilderWidget::decorateListItem(QListWidgetItem *it, bool hidden, bool locked) {
+	QString text = it->text();
+	if (hidden) text += tr(", hidden");
+	if (locked) text += tr(", locked");
+	it->setText(text);
+	if (hidden) it->setForeground(palette().color(QPalette::Disabled, QPalette::Text));
+	else it->setData(Qt::ForegroundRole, QVariant());
+}
+
 void SceneBuilderWidget::refreshListLabels() {
 	for (int r = 0; r < m_list->count(); ++r) {
 		QListWidgetItem *it = m_list->item(r);
@@ -536,11 +564,13 @@ void SceneBuilderWidget::refreshListLabels() {
 				it->setText(QString("%1  -  %2").arg(QString::fromStdString(o.name), volumeLabel(o.volume.kind)));
 			else
 				it->setText(QString("%1  -  %2%3").arg(QString::fromStdString(o.name), shapeLabel(o.shape).section(' ', 0, 0), o.emissive ? tr(", light") : QString()));
+			decorateListItem(it, o.hidden, o.locked);
 		} else if (kind == SelKind::Light && i < static_cast<int>(m_doc.lights.size())) {
 			const Light &l = m_doc.lights[i];
 			const QString type = lightLabel(l.kind).section(" (", 0, 0);
 			const QString name = QString::fromStdString(l.name);
 			it->setText(name.compare(type, Qt::CaseInsensitive) == 0 || name.startsWith(type.section(' ', 0, 0)) ? name : QString("%1  -  %2").arg(name, type));
+			decorateListItem(it, l.hidden, l.locked);
 		}
 	}
 }

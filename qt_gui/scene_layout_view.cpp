@@ -133,17 +133,30 @@ void SceneLayoutView::frameAll() {
 	add(m_doc->camera.position, 0.5);
 	add(m_doc->camera.target, 0.2);
 	for (const Object &o : m_doc->objects) {
+		if (o.hidden) continue;
 		// A big floor would make everything else tiny: frame a bounded part of it.
 		const double pad = std::min(o.shape == ShapeKind::Quad ? std::max(o.size.x, o.size.z) * 0.5 : std::max({o.radius, o.size.x, o.size.y, o.size.z}), 4.0);
 		add(o.position, pad);
 	}
 	for (const Light &l : m_doc->lights)
-		if (l.kind != LightKind::Infinite) add(l.position, 0.5);
+		if (l.kind != LightKind::Infinite && !l.hidden) add(l.position, 0.5);
 	if (u0 > u1) { u0 = -4; u1 = 4; v0 = -3; v1 = 3; }
 	m_cu = (u0 + u1) / 2.0;
 	m_cv = (v0 + v1) / 2.0;
 	const double sx = (width() - 40) / std::max(0.5, u1 - u0), sy = (height() - 40) / std::max(0.5, v1 - v0);
 	m_scale = std::clamp(std::min(sx, sy), 6.0, 200.0);
+	update();
+}
+
+// The view shows what is in [lo, hi] (Frame selected): centred on it, as large as fits (and no larger than a normal zoom).
+void SceneLayoutView::frameBox(const Float3 &lo, const Float3 &hi) {
+	m_userView = true;
+	const QPointF a = toUV(lo), c2 = toUV(hi);
+	const double u0 = std::min(a.x(), c2.x()), u1 = std::max(a.x(), c2.x()), v0 = std::min(a.y(), c2.y()), v1 = std::max(a.y(), c2.y());
+	m_cu = (u0 + u1) / 2.0;
+	m_cv = (v0 + v1) / 2.0;
+	const double sx = (width() - 80) / std::max(1.0, u1 - u0), sy = (height() - 80) / std::max(1.0, v1 - v0);
+	m_scale = std::clamp(std::min(sx, sy), 6.0, 120.0);
 	update();
 }
 
@@ -236,7 +249,7 @@ SceneLayoutView::Hit SceneLayoutView::hitTest(const QPointF &px) const {
 	auto withinPx = [&](const Float3 &p, double r) { return std::hypot(toScreen(p).x() - px.x(), toScreen(p).y() - px.y()) <= r; };
 
 	// The selected item's own handles first, so a target can be grabbed even when something is drawn over it.
-	for (int which = 1; which >= 0; --which) {
+	for (int which = 1; which >= 0 && !selectionLocked(); --which) {
 		if (const Float3 *p = handlePosition(m_sel, which)) {
 			if (withinPx(*p, 11)) { h.sel = m_sel; h.which = which; h.valid = true; return h; }
 		}
@@ -244,7 +257,7 @@ SceneLayoutView::Hit SceneLayoutView::hitTest(const QPointF &px) const {
 	// Lights and the camera next: they are small and would otherwise be hidden behind a floor.
 	for (int i = static_cast<int>(m_doc->lights.size()) - 1; i >= 0; --i) {
 		const Light &l = m_doc->lights[i];
-		if (l.kind == LightKind::Infinite) continue;
+		if (l.kind == LightKind::Infinite || l.hidden || l.locked) continue;
 		if (withinPx(l.position, 12)) { h.sel = {BuilderSelection::Kind::Light, i}; h.valid = true; return h; }
 	}
 	if (withinPx(m_doc->camera.position, 14)) { h.sel = {BuilderSelection::Kind::Camera, 0}; h.valid = true; return h; }
@@ -253,6 +266,7 @@ SceneLayoutView::Hit SceneLayoutView::hitTest(const QPointF &px) const {
 	// Objects: of everything under the pointer, the smallest outline (a ball on a floor picks the ball).
 	double best = 1e30;
 	for (int i = static_cast<int>(m_doc->objects.size()) - 1; i >= 0; --i) {
+		if (m_doc->objects[i].hidden || m_doc->objects[i].locked) continue;
 		const QList<QPointF> poly = silhouette(m_doc->objects[i]);
 		bool inside = false;
 		if (poly.size() >= 3) inside = QPolygonF(poly.toVector()).containsPoint(px, Qt::OddEvenFill);
@@ -338,6 +352,7 @@ void SceneLayoutView::paintEvent(QPaintEvent *) {
 	small.setPointSizeF(std::max(7.0, font().pointSizeF() - 1.5));
 	for (int i = 0; i < static_cast<int>(m_doc->objects.size()); ++i) {
 		const Object &o = m_doc->objects[i];
+		if (o.hidden) continue;
 		const QList<QPointF> poly = silhouette(o);
 		QColor fill = toQColor(o.material.color);
 		if (o.material.kind == MaterialKind::Dielectric) fill = QColor(150, 200, 240);
@@ -347,7 +362,7 @@ void SceneLayoutView::paintEvent(QPaintEvent *) {
 		if (o.volume.kind != scene_doc::VolumeKind::None) fill = volumeDrawColor(o.volume);
 		const bool selected = isPicked({BuilderSelection::Kind::Object, i});
 		p.setBrush(fill);
-		p.setPen(QPen(selected ? accent : text, selected ? 2.5 : 1.0));
+		p.setPen(QPen(selected ? accent : text, selected ? 2.5 : 1.0, o.locked ? Qt::DashLine : Qt::SolidLine));   // (a locked object has a dashed outline)
 		if (poly.size() >= 3) p.drawPolygon(QPolygonF(poly.toVector()));
 		else if (poly.size() == 2) { p.setPen(QPen(selected ? accent : fill.darker(), selected ? 4.0 : 3.0)); p.drawLine(poly[0], poly[1]); }
 		const QPointF c = toScreen(o.position);
@@ -365,7 +380,7 @@ void SceneLayoutView::paintEvent(QPaintEvent *) {
 	// Lights
 	for (int i = 0; i < static_cast<int>(m_doc->lights.size()); ++i) {
 		const Light &l = m_doc->lights[i];
-		if (l.kind == LightKind::Infinite) continue;
+		if (l.kind == LightKind::Infinite || l.hidden) continue;
 		const bool selected = isPicked({BuilderSelection::Kind::Light, i});
 		const QPointF c = toScreen(l.position);
 		if (l.kind == LightKind::Spot || l.kind == LightKind::Distant) {
@@ -532,9 +547,10 @@ void SceneLayoutView::mouseReleaseEvent(QMouseEvent *) {
 		QList<BuilderSelection> inside;
 		if (m_doc) {
 			for (int i = 0; i < static_cast<int>(m_doc->objects.size()); ++i)
-				if (box.contains(toScreen(m_doc->objects[i].position))) inside.append({BuilderSelection::Kind::Object, i});
+				if (!m_doc->objects[i].hidden && !m_doc->objects[i].locked && box.contains(toScreen(m_doc->objects[i].position))) inside.append({BuilderSelection::Kind::Object, i});
 			for (int i = 0; i < static_cast<int>(m_doc->lights.size()); ++i)
-				if (m_doc->lights[i].kind != LightKind::Infinite && box.contains(toScreen(m_doc->lights[i].position))) inside.append({BuilderSelection::Kind::Light, i});
+				if (m_doc->lights[i].kind != LightKind::Infinite && !m_doc->lights[i].hidden && !m_doc->lights[i].locked && box.contains(toScreen(m_doc->lights[i].position)))
+					inside.append({BuilderSelection::Kind::Light, i});
 		}
 		update();
 		emit boxSelected(inside, m_bandAdditive);
@@ -561,6 +577,7 @@ void SceneLayoutView::keyPressEvent(QKeyEvent *e) {
 		case Qt::Key_Down: up = -step; break;
 		case Qt::Key_PageUp: lift = step; break;
 		case Qt::Key_PageDown: lift = -step; break;
+		case Qt::Key_F: emit frameSelectedRequested(); e->accept(); return;   // Frame selected
 		default: QWidget::keyPressEvent(e); return;
 	}
 	Float3 d{};

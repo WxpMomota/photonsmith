@@ -83,6 +83,7 @@ Scene3DView::GizmoMode Scene3DView::effectiveGizmo() const { return (selectedObj
 
 bool Scene3DView::gizmoOrigin(V3 &out) const {
 	if (!m_doc) return false;
+	if (selectionLocked()) return false;   // a locked item has no tool: it is not moved by dragging in a view
 	if (!multi()) {
 		const Float3 *p = handle(m_sel, 0);
 		if (!p) return false;
@@ -121,6 +122,7 @@ void Scene3DView::keyPressEvent(QKeyEvent *e) {
 		case Qt::Key_W: wanted = GizmoMode::Move; name = "Move (W key)"; break;
 		case Qt::Key_E: wanted = GizmoMode::Rotate; name = "Rotate (E key)"; break;
 		case Qt::Key_R: wanted = GizmoMode::Scale; name = "Scale (R key)"; break;
+		case Qt::Key_F: emit frameSelectedRequested(); e->accept(); return;   // Frame selected
 		case Qt::Key_Right:
 		case Qt::Key_Left:
 		case Qt::Key_Up:
@@ -165,6 +167,7 @@ void Scene3DView::frameAll() {
 	};
 	add(m_doc->camera.position, 0.3);
 	for (const Object &o : m_doc->objects) {
+		if (o.hidden) continue;
 		double pad = o.shape == ShapeKind::Quad ? std::max(o.size.x, o.size.z) * 0.5 : std::max({o.radius, o.size.x, o.size.y, o.size.z, o.height});
 		if (o.shape == ShapeKind::Mesh)
 			if (const mesh_preview::MeshPreview *m = meshPreview(o.meshFile))
@@ -172,12 +175,23 @@ void Scene3DView::frameAll() {
 		add(o.position, std::min(pad, 4.0));  // a big floor would make everything else tiny: frame a bounded part of it
 	}
 	for (const Light &l : m_doc->lights)
-		if (l.kind != LightKind::Infinite) add(l.position, 0.3);
+		if (l.kind != LightKind::Infinite && !l.hidden) add(l.position, 0.3);
 	if (lo.x > hi.x) { lo = {-4, 0, -4}; hi = {4, 3, 4}; }
 	const V3 centre = (lo + hi) * 0.5;
 	const double radius = std::max(1.5, scene_view::length(hi - lo) * 0.5);
 	m_cam.target = centre;
 	m_cam.distance = radius / std::sin(m_cam.fovDeg * kPi / 360.0) * 0.55;
+	update();
+}
+
+// Frame selected: the view looks at the middle of the box and is far enough back to hold it (whatever the box's size, even a point), keeping its angle.
+void Scene3DView::frameBox(const Float3 &lo, const Float3 &hi) {
+	leaveCameraView();
+	m_userView = true;
+	const V3 a = toV3(lo), c = toV3(hi);
+	const double radius = std::max(0.75, scene_view::length(c - a) * 0.5);
+	m_cam.target = (a + c) * 0.5;
+	m_cam.distance = std::clamp(radius / std::sin(m_cam.fovDeg * kPi / 360.0) * 0.6, 0.5, 2000.0);
 	update();
 }
 
@@ -261,7 +275,7 @@ std::uint64_t Scene3DView::geometrySignature() const {
 		mix(h, o.radius); mix(h, o.radius2); mix(h, o.height); mix(h, o.steps); mix(h, o.meshScale);
 		mix(h, o.material.kind); mix(h, o.material.color); mix(h, o.material.pattern);
 		mix(h, o.emissive);
-		mix(h, o.volume.kind); mix(h, o.volume.color);
+		mix(h, o.volume.kind); mix(h, o.volume.color); mix(h, o.hidden);
 		mix(h, o.meshFile.data(), o.meshFile.size());
 	}
 	return h;
@@ -276,6 +290,7 @@ std::vector<Scene3DView::Face> &Scene3DView::faces() const {
 	if (!m_doc) return m_faces;
 	for (int i = 0; i < static_cast<int>(m_doc->objects.size()); ++i) {
 		const Object &o = m_doc->objects[i];
+		if (o.hidden) continue;
 		QColor base = toQColor(o.material.color);
 		if (o.material.kind == MaterialKind::Dielectric) base = QColor(150, 200, 240);
 		else if (o.material.kind == MaterialKind::Conductor) base = base.lighter(115);
@@ -549,6 +564,7 @@ void Scene3DView::drawMeshPoints(Ctx &c, int i) const {
 void Scene3DView::drawNames(Ctx &c) const {
 	for (int i = 0; i < static_cast<int>(m_doc->objects.size()); ++i) {
 		const Object &o = m_doc->objects[i];
+		if (o.hidden) continue;
 		QPointF at;
 		if (!c.pixel(toV3(o.position), at)) continue;
 		const bool selected = isPicked({BuilderSelection::Kind::Object, i});
@@ -565,7 +581,7 @@ void Scene3DView::drawNames(Ctx &c) const {
 void Scene3DView::drawLights(Ctx &c) const {
 	for (int i = 0; i < static_cast<int>(m_doc->lights.size()); ++i) {
 		const Light &l = m_doc->lights[i];
-		if (l.kind == LightKind::Infinite) continue;
+		if (l.kind == LightKind::Infinite || l.hidden) continue;
 		const bool selected = isPicked({BuilderSelection::Kind::Light, i});
 		QPointF at;
 		if (!c.pixel(toV3(l.position), at)) continue;

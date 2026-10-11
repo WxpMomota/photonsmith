@@ -371,6 +371,8 @@ inline std::string toJson(const Document& d) {
 		j.set("emissive", Json::boolean(o.emissive)).set("emission", detail::toJson(o.emission));
 		j.set("emissionStrength", Json::number(o.emissionStrength)).set("twoSided", Json::boolean(o.twoSided));
 		if (!o.group.empty()) j.set("group", Json::string(o.group));
+		if (o.hidden) j.set("hidden", Json::boolean(true));   // (only when set: a scene that hides and locks nothing writes what it always did)
+		if (o.locked) j.set("locked", Json::boolean(true));
 		objs.push(std::move(j));
 	}
 	root.set("objects", std::move(objs));
@@ -386,6 +388,8 @@ inline std::string toJson(const Document& d) {
 			j.set("physicalSky", Json::boolean(true)).set("sunElevation", Json::number(l.sky.sunElevation)).set("sunAzimuth", Json::number(l.sky.sunAzimuth));
 			j.set("turbidity", Json::number(l.sky.turbidity)).set("groundAlbedo", Json::number(l.sky.groundAlbedo));
 		}
+		if (l.hidden) j.set("hidden", Json::boolean(true));
+		if (l.locked) j.set("locked", Json::boolean(true));
 		lights.push(std::move(j));
 	}
 	root.set("lights", std::move(lights));
@@ -435,7 +439,8 @@ inline bool fromJson(const std::string& text, Document& out, std::string& err) {
 			     detail::readVec(j, "position", o.position) && detail::readVec(j, "rotation", o.rotation) && detail::readNum(j, "radius", o.radius) &&
 			     detail::readNum(j, "height", o.height) && detail::readVec(j, "size", o.size) && detail::readNum(j, "meshScale", o.meshScale) && detail::readNum(j, "radius2", o.radius2) && detail::readInt(j, "steps", o.steps) &&
 			     detail::readStr(j, "meshFile", o.meshFile) && detail::readBool(j, "emissive", o.emissive) && detail::readRgb(j, "emission", o.emission) &&
-			     detail::readNum(j, "emissionStrength", o.emissionStrength) && detail::readBool(j, "twoSided", o.twoSided) && detail::readStr(j, "group", o.group);
+			     detail::readNum(j, "emissionStrength", o.emissionStrength) && detail::readBool(j, "twoSided", o.twoSided) && detail::readStr(j, "group", o.group) &&
+			     detail::readBool(j, "hidden", o.hidden) && detail::readBool(j, "locked", o.locked);
 			if (const Json* m = j.find("material")) {
 				if (m->type != Json::Type::Obj) ok = false;
 				else {
@@ -476,7 +481,8 @@ inline bool fromJson(const std::string& text, Document& out, std::string& err) {
 			     detail::readNum(j, "intensity", l.intensity) && detail::readNum(j, "coneAngle", l.coneAngle) &&
 			     detail::readNum(j, "coneDelta", l.coneDelta) && detail::readStr(j, "imageFile", l.imageFile) && detail::readBool(j, "physicalSky", l.physicalSky) &&
 			     detail::readNum(j, "sunElevation", l.sky.sunElevation) && detail::readNum(j, "sunAzimuth", l.sky.sunAzimuth) &&
-			     detail::readNum(j, "turbidity", l.sky.turbidity) && detail::readNum(j, "groundAlbedo", l.sky.groundAlbedo);
+			     detail::readNum(j, "turbidity", l.sky.turbidity) && detail::readNum(j, "groundAlbedo", l.sky.groundAlbedo) && detail::readBool(j, "hidden", l.hidden) &&
+			     detail::readBool(j, "locked", l.locked);
 			if (!ok) break;
 			d.lights.push_back(l);
 		}

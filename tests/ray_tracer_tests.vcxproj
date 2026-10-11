@@ -207,6 +207,7 @@
     <ClCompile Include="unit\scene_array_tests.cpp" />
     <ClCompile Include="unit\scene_selection_tests.cpp" />
     <ClCompile Include="unit\scene_snap_tests.cpp" />
+    <ClCompile Include="unit\scene_arrange_tests.cpp" />
     <ClCompile Include="unit\scene_camera_views_tests.cpp" />
     <ClCompile Include="unit\camera_keyframes_tests.cpp" />
     <ClCompile Include="unit\model_library_tests.cpp" />

@@ -27,13 +27,13 @@ inline Fields fieldsOf(const Object& o) {
 	        {"transmittance", v(o.material.transmittance)}, {"picture", o.material.imageFile}, {"pattern", toString(o.material.pattern)},
 	        {"patternScale", v(o.material.patternScale)}, {"patternVariation", v(o.material.patternVariation)}, {"scatterDistance", v(o.material.scatterDistance)},
 	        {"bump", o.material.bumpFile}, {"bumpKind", toString(o.material.bumpKind)}, {"bumpStrength", v(o.material.bumpStrength)}, {"emissive", o.emissive ? "1" : "0"}, {"emission", v(o.emission)},
-	        {"strength", v(o.emissionStrength)}, {"twoSided", o.twoSided ? "1" : "0"}, {"group", o.group},
+	        {"strength", v(o.emissionStrength)}, {"twoSided", o.twoSided ? "1" : "0"}, {"group", o.group}, {"hidden", o.hidden ? "1" : "0"}, {"locked", o.locked ? "1" : "0"},
 	        {"volume", toString(o.volume.kind)}, {"density", v(o.volume.density)}, {"scatterColor", v(o.volume.color)}, {"anisotropy", v(o.volume.anisotropy)},
 	        {"wispiness", v(o.volume.wispiness)}, {"frequency", v(o.volume.frequency)}};
 }
 inline Fields fieldsOf(const Light& l) {
 	return {{"name", l.name}, {"kind", toString(l.kind)}, {"position", v(l.position)}, {"target", v(l.target)}, {"color", v(l.color)},
-	        {"intensity", v(l.intensity)}, {"coneAngle", v(l.coneAngle)}, {"coneDelta", v(l.coneDelta)}, {"image", l.imageFile}};
+	        {"intensity", v(l.intensity)}, {"coneAngle", v(l.coneAngle)}, {"coneDelta", v(l.coneDelta)}, {"image", l.imageFile}, {"hidden", l.hidden ? "1" : "0"}, {"locked", l.locked ? "1" : "0"}};
 }
 inline Fields fieldsOf(const Camera& c) {
 	return {{"position", v(c.position)}, {"target", v(c.target)}, {"up", v(c.up)}, {"fov", v(c.fov)}, {"lensRadius", v(c.lensRadius)}, {"focusDistance", v(c.focusDistance)}};

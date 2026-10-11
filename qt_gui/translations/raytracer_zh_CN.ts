@@ -6369,13 +6369,13 @@ Output:
 <context>
     <name>RenderQueueModel</name>
     <message>
-        <location filename="../mainwindow_selftest_builder3d.cpp" line="692"/>
+        <location filename="../mainwindow_selftest_builder3d.cpp" line="702"/>
         <location filename="../render_queue_model.cpp" line="114"/>
         <source>Waiting</source>
         <translation>等待中</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_builder3d.cpp" line="710"/>
+        <location filename="../mainwindow_selftest_builder3d.cpp" line="720"/>
         <location filename="../render_queue_model.cpp" line="136"/>
         <source>%1 s</source>
         <translation>%1 秒</translation>
@@ -6439,27 +6439,27 @@ Output:
 <context>
     <name>Scene3DView</name>
     <message>
-        <location filename="../scene_3d_view.cpp" line="441"/>
+        <location filename="../scene_3d_view.cpp" line="456"/>
         <source>the floor</source>
         <translation>地面</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="454"/>
+        <location filename="../scene_3d_view.cpp" line="469"/>
         <source>Snapped to %1</source>
         <translation>已吸附到 %1</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="472"/>
+        <location filename="../scene_3d_view.cpp" line="487"/>
         <source>Flythrough preview, %1% (%2 x %3). Orbit, pan or zoom to leave.</source>
         <translation>飞行预览，%1%（%2 x %3）。环绕、平移或缩放即可退出。</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="473"/>
+        <location filename="../scene_3d_view.cpp" line="488"/>
         <source>Through the camera (%1 x %2). Orbit, pan or zoom to leave.</source>
         <translation>透过相机观看（%1 x %2）。环绕、平移或缩放即可退出。</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="660"/>
+        <location filename="../scene_3d_view.cpp" line="676"/>
         <source>Camera</source>
         <translation>相机</translation>
     </message>
@@ -6517,9 +6517,9 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="291"/>
-        <location filename="../scene_builder_inspector.cpp" line="501"/>
-        <location filename="../scene_builder_inspector.cpp" line="539"/>
-        <location filename="../scene_builder_inspector.cpp" line="623"/>
+        <location filename="../scene_builder_inspector.cpp" line="508"/>
+        <location filename="../scene_builder_inspector.cpp" line="547"/>
+        <location filename="../scene_builder_inspector.cpp" line="632"/>
         <source>Position</source>
         <translation>位置</translation>
     </message>
@@ -6596,14 +6596,14 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="333"/>
-        <location filename="../scene_builder_inspector.cpp" line="661"/>
+        <location filename="../scene_builder_inspector.cpp" line="670"/>
         <source>Preset</source>
         <translation>预设</translation>
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="350"/>
-        <location filename="../scene_builder_inspector.cpp" line="487"/>
-        <location filename="../scene_builder_inspector.cpp" line="621"/>
+        <location filename="../scene_builder_inspector.cpp" line="494"/>
+        <location filename="../scene_builder_inspector.cpp" line="630"/>
         <source>Type</source>
         <translation>类型</translation>
     </message>
@@ -6622,8 +6622,8 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <location filename="../scene_builder_inspector.cpp" line="416"/>
         <location filename="../scene_builder_inspector.cpp" line="424"/>
         <location filename="../scene_builder_inspector.cpp" line="451"/>
-        <location filename="../scene_builder_inspector.cpp" line="506"/>
-        <location filename="../scene_builder_inspector.cpp" line="677"/>
+        <location filename="../scene_builder_inspector.cpp" line="513"/>
+        <location filename="../scene_builder_inspector.cpp" line="686"/>
         <source>Colour</source>
         <translation>颜色</translation>
     </message>
@@ -6679,14 +6679,14 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>透射</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="527"/>
+        <location filename="../scene_builder_inspector.cpp" line="534"/>
         <source>Object</source>
         <translation>物体</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="473"/>
-        <location filename="../scene_builder_inspector.cpp" line="528"/>
-        <location filename="../scene_builder_inspector.cpp" line="611"/>
+        <location filename="../scene_builder_inspector.cpp" line="479"/>
+        <location filename="../scene_builder_inspector.cpp" line="535"/>
+        <location filename="../scene_builder_inspector.cpp" line="619"/>
         <source>Name</source>
         <translation>名称</translation>
     </message>
@@ -6773,277 +6773,287 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>光线进入表面，在内部游走后从别处射出，从而使明暗变得柔和，就像皮肤、蜡、牛奶和大理石那样。距离是各颜色在散射前传播的长度，单位与场景一致：约为物体尺寸的十分之一到一半时看起来半透明，大得多则像玻璃里的雾。传播得更远的颜色会在离光线进入处更远的地方发亮（皮肤的红色就是这样）。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="472"/>
+        <location filename="../scene_builder_inspector.cpp" line="470"/>
+        <source>Hidden in the views</source>
+        <translation>在视图中隐藏</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="471"/>
+        <source>Locked</source>
+        <translation>已锁定</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="478"/>
         <source>Volume</source>
         <translation>体积</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="499"/>
-        <location filename="../scene_builder_inspector.cpp" line="538"/>
+        <location filename="../scene_builder_inspector.cpp" line="506"/>
+        <location filename="../scene_builder_inspector.cpp" line="546"/>
         <source>Shape</source>
         <translation>形状</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="502"/>
-        <location filename="../scene_builder_inspector.cpp" line="540"/>
+        <location filename="../scene_builder_inspector.cpp" line="509"/>
+        <location filename="../scene_builder_inspector.cpp" line="548"/>
         <source>Rotation (degrees)</source>
         <translation>旋转（度）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="503"/>
-        <location filename="../scene_builder_inspector.cpp" line="546"/>
-        <location filename="../scene_builder_inspector.cpp" line="550"/>
+        <location filename="../scene_builder_inspector.cpp" line="510"/>
         <location filename="../scene_builder_inspector.cpp" line="554"/>
-        <location filename="../scene_builder_inspector.cpp" line="557"/>
+        <location filename="../scene_builder_inspector.cpp" line="558"/>
+        <location filename="../scene_builder_inspector.cpp" line="562"/>
+        <location filename="../scene_builder_inspector.cpp" line="565"/>
         <source>Radius</source>
         <translation>半径</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="504"/>
-        <location filename="../scene_builder_inspector.cpp" line="551"/>
-        <location filename="../scene_builder_inspector.cpp" line="567"/>
-        <location filename="../scene_builder_inspector.cpp" line="572"/>
+        <location filename="../scene_builder_inspector.cpp" line="511"/>
+        <location filename="../scene_builder_inspector.cpp" line="559"/>
+        <location filename="../scene_builder_inspector.cpp" line="575"/>
+        <location filename="../scene_builder_inspector.cpp" line="580"/>
         <source>Height</source>
         <translation>高度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="505"/>
+        <location filename="../scene_builder_inspector.cpp" line="512"/>
         <source>Density</source>
         <translation>密度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="507"/>
+        <location filename="../scene_builder_inspector.cpp" line="514"/>
         <source>Forward scattering</source>
         <translation>前向散射</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="509"/>
+        <location filename="../scene_builder_inspector.cpp" line="516"/>
         <source>Wispiness</source>
         <translation>蓬松度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="510"/>
+        <location filename="../scene_builder_inspector.cpp" line="517"/>
         <source>Detail (lumps across)</source>
         <translation>细节（横向的团块数）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="513"/>
+        <location filename="../scene_builder_inspector.cpp" line="520"/>
         <source>A cloud scatters light and never absorbs it. Density is how thick it is: about 6 is a solid white cloud, 1 is a thin haze. Forward scattering above 0 gives the bright silver edge against the sun.</source>
         <translation>云只散射光，从不吸收光。密度表示它有多浓：约 6 是实心的白云，1 是薄薄的雾气。前向散射大于 0 时，朝向太阳的边缘会出现明亮的银边。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="515"/>
+        <location filename="../scene_builder_inspector.cpp" line="522"/>
         <source>Density is how quickly the light is scattered or absorbed per unit of distance: 0.3 is a light mist in a sphere a few units across, 2 is thick. The colour is what is scattered: white fog only scatters, so it glows; a dark colour absorbs the rest and looks like smoke.</source>
         <translation>密度表示光在每单位距离上被散射或吸收的快慢：在几个单位宽的球体中，0.3 是淡淡的薄雾，2 则很浓。颜色表示被散射的部分：白雾只散射，所以会发光；深色会吸收其余部分，看起来像烟。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="558"/>
+        <location filename="../scene_builder_inspector.cpp" line="566"/>
         <source>Height (with the rounded ends)</source>
         <translation>高度（含圆形两端）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="561"/>
+        <location filename="../scene_builder_inspector.cpp" line="569"/>
         <source>Ring radius</source>
         <translation>环半径</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="562"/>
+        <location filename="../scene_builder_inspector.cpp" line="570"/>
         <source>Tube radius</source>
         <translation>管半径</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="565"/>
+        <location filename="../scene_builder_inspector.cpp" line="573"/>
         <source>Outer radius</source>
         <translation>外半径</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="566"/>
+        <location filename="../scene_builder_inspector.cpp" line="574"/>
         <source>Hole radius</source>
         <translation>孔半径</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="570"/>
+        <location filename="../scene_builder_inspector.cpp" line="578"/>
         <source>Base width (X)</source>
         <translation>底面宽度 (X)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="571"/>
+        <location filename="../scene_builder_inspector.cpp" line="579"/>
         <source>Base depth (Z)</source>
         <translation>底面深度 (Z)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="575"/>
-        <location filename="../scene_builder_inspector.cpp" line="580"/>
+        <location filename="../scene_builder_inspector.cpp" line="583"/>
+        <location filename="../scene_builder_inspector.cpp" line="588"/>
         <source>Size</source>
         <translation>大小</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="576"/>
+        <location filename="../scene_builder_inspector.cpp" line="584"/>
         <source>Steps</source>
         <translation>台阶数</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="583"/>
+        <location filename="../scene_builder_inspector.cpp" line="591"/>
         <source>Width (X)</source>
         <translation>宽度 (X)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="584"/>
+        <location filename="../scene_builder_inspector.cpp" line="592"/>
         <source>Depth (Z)</source>
         <translation>深度 (Z)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="587"/>
+        <location filename="../scene_builder_inspector.cpp" line="595"/>
         <source>Mesh file</source>
         <translation>网格文件</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="587"/>
-        <location filename="../scene_builder_widget.cpp" line="668"/>
+        <location filename="../scene_builder_inspector.cpp" line="595"/>
+        <location filename="../scene_builder_widget.cpp" line="698"/>
         <source>Meshes (*.ply *.obj)</source>
         <translation>网格 (*.ply *.obj)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="588"/>
+        <location filename="../scene_builder_inspector.cpp" line="596"/>
         <location filename="../scene_builder_multi.cpp" line="317"/>
         <location filename="../scene_builder_views.cpp" line="52"/>
         <source>Scale</source>
         <translation>缩放</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="594"/>
-        <location filename="../scene_builder_inspector.cpp" line="610"/>
+        <location filename="../scene_builder_inspector.cpp" line="602"/>
+        <location filename="../scene_builder_inspector.cpp" line="618"/>
         <source>Light</source>
         <translation>光源</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="595"/>
+        <location filename="../scene_builder_inspector.cpp" line="603"/>
         <source>Gives off light</source>
         <translation>发光</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="597"/>
+        <location filename="../scene_builder_inspector.cpp" line="605"/>
         <source>Light colour</source>
         <translation>光源颜色</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="598"/>
-        <location filename="../scene_builder_inspector.cpp" line="678"/>
+        <location filename="../scene_builder_inspector.cpp" line="606"/>
+        <location filename="../scene_builder_inspector.cpp" line="687"/>
         <source>Strength</source>
         <translation>强度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="599"/>
+        <location filename="../scene_builder_inspector.cpp" line="607"/>
         <source>Both sides</source>
         <translation>双面</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="601"/>
+        <location filename="../scene_builder_inspector.cpp" line="609"/>
         <source>A quad or disk lights the side that faces up. Rotate it 180 degrees about X to make a ceiling light.</source>
         <translation>四边形或圆盘照亮朝上的那一面。绕 X 轴旋转 180 度即可做成顶灯。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="625"/>
+        <location filename="../scene_builder_inspector.cpp" line="634"/>
         <source>Aims at</source>
         <translation>对准</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="626"/>
+        <location filename="../scene_builder_inspector.cpp" line="635"/>
         <source>Cone angle</source>
         <translation>锥角</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="627"/>
+        <location filename="../scene_builder_inspector.cpp" line="636"/>
         <source>Soft edge</source>
         <translation>柔化边缘</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="630"/>
+        <location filename="../scene_builder_inspector.cpp" line="639"/>
         <source>Shines from</source>
         <translation>照射自</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="631"/>
+        <location filename="../scene_builder_inspector.cpp" line="640"/>
         <source>Towards</source>
         <translation>朝向</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="635"/>
+        <location filename="../scene_builder_inspector.cpp" line="644"/>
         <source>Sun &amp;&amp; sky (a clear sky for a time of day)</source>
         <translation>太阳与天空（随时间变化的晴朗天空）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="651"/>
+        <location filename="../scene_builder_inspector.cpp" line="660"/>
         <source>Time of day...</source>
         <translation>时间...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="652"/>
+        <location filename="../scene_builder_inspector.cpp" line="661"/>
         <source>Sunrise</source>
         <translation>日出</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="652"/>
+        <location filename="../scene_builder_inspector.cpp" line="661"/>
         <source>Morning</source>
         <translation>上午</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="652"/>
+        <location filename="../scene_builder_inspector.cpp" line="661"/>
         <source>Noon</source>
         <translation>正午</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="653"/>
+        <location filename="../scene_builder_inspector.cpp" line="662"/>
         <source>Afternoon</source>
         <translation>下午</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="653"/>
+        <location filename="../scene_builder_inspector.cpp" line="662"/>
         <source>Sunset</source>
         <translation>日落</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="662"/>
+        <location filename="../scene_builder_inspector.cpp" line="671"/>
         <source>Sun height</source>
         <translation>太阳高度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="663"/>
+        <location filename="../scene_builder_inspector.cpp" line="672"/>
         <source>Sun direction</source>
         <translation>太阳方向</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="664"/>
+        <location filename="../scene_builder_inspector.cpp" line="673"/>
         <source>Haze</source>
         <translation>雾霾</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="665"/>
+        <location filename="../scene_builder_inspector.cpp" line="674"/>
         <source>Ground brightness</source>
         <translation>地面亮度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="666"/>
+        <location filename="../scene_builder_inspector.cpp" line="675"/>
         <source>The sky picture and the Sun light are made from these settings; change the sun here rather than moving the Sun light. Direction 0 is towards +X, 90 away from the starting camera, 180 towards -X, 270 behind it. Brightness 1 is a daylight scene.</source>
         <translation>天空图像和太阳光由这些设置生成；请在这里调整太阳，而不是移动太阳光。方向 0 朝向 +X，90 远离初始相机，180 朝向 -X，270 在相机后方。亮度 1 为白天场景。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="671"/>
+        <location filename="../scene_builder_inspector.cpp" line="680"/>
         <source>Sky image</source>
         <translation>天空图像</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="671"/>
+        <location filename="../scene_builder_inspector.cpp" line="680"/>
         <source>Images (*.exr *.hdr *.png *.jpg *.jpeg)</source>
         <translation>图像 (*.exr *.hdr *.png *.jpg *.jpeg)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="672"/>
+        <location filename="../scene_builder_inspector.cpp" line="681"/>
         <source>Leave the image empty for a plain colour sky. An image is an equirectangular (lat-long) panorama.</source>
         <translation>图像留空则使用纯色天空。图像应为等距柱状（经纬度）全景图。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="678"/>
+        <location filename="../scene_builder_inspector.cpp" line="687"/>
         <source>Brightness</source>
         <translation>亮度</translation>
     </message>
@@ -7133,22 +7143,32 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>体积（雾、烟、云）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="290"/>
+        <location filename="../scene_builder_widget.cpp" line="222"/>
+        <source>Arrange</source>
+        <translation>整理</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="223"/>
+        <source>Rename, put on the floor, frame, hide and lock what is picked (also on a right-click in the list)</source>
+        <translation>对所选项重命名、放到地面、取景、隐藏和锁定（在列表中右键点击也可使用）</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="308"/>
         <source>Turntable...</source>
         <translation>转台视频...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="292"/>
+        <location filename="../scene_builder_widget.cpp" line="310"/>
         <source>Make a video of the scene from a camera that goes once round it</source>
         <translation>制作一段视频：相机围绕场景转一整圈</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="293"/>
+        <location filename="../scene_builder_widget.cpp" line="311"/>
         <source>Flythrough...</source>
         <translation>飞行视频...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="295"/>
+        <location filename="../scene_builder_widget.cpp" line="313"/>
         <source>Make a video of the scene from a camera that flies through your saved camera views (needs two or more)</source>
         <translation>制作一段视频：相机依次飞过你保存的相机视图（需要两个或更多）</translation>
     </message>
@@ -7591,12 +7611,17 @@ From: %3</source>
         <translation>从任意角度查看场景，并在 3D 中移动物体</translation>
     </message>
     <message>
+        <location filename="../scene_builder_views.cpp" line="120"/>
+        <source>Zoom both views to what is picked (F)</source>
+        <translation>将两个视图缩放到所选项（F）</translation>
+    </message>
+    <message>
         <location filename="../scene_builder_inspector.cpp" line="370"/>
         <source>Marble</source>
         <translation>大理石</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_builder3d.cpp" line="493"/>
+        <location filename="../mainwindow_selftest_builder3d.cpp" line="503"/>
         <location filename="../scene_builder_views.cpp" line="101"/>
         <source>Snap to grid</source>
         <translation>吸附到网格</translation>
@@ -7622,44 +7647,44 @@ From: %3</source>
         <translation>显示全部</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="278"/>
+        <location filename="../scene_builder_widget.cpp" line="296"/>
         <source>Draft</source>
         <translation>草稿</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="279"/>
+        <location filename="../scene_builder_widget.cpp" line="297"/>
         <source>Good</source>
         <translation>良好</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="280"/>
+        <location filename="../scene_builder_widget.cpp" line="298"/>
         <source>Best</source>
         <translation>最佳</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="283"/>
+        <location filename="../scene_builder_widget.cpp" line="301"/>
         <source>Use the GPU</source>
         <translation>使用 GPU</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="284"/>
+        <location filename="../scene_builder_widget.cpp" line="302"/>
         <source>Render on the graphics card (NVIDIA OptiX on Windows, Metal on a Mac). Much faster for large pictures; needs a supported GPU.</source>
         <translation>在显卡上渲染（Windows 上为 NVIDIA OptiX，Mac 上为 Metal）。大幅面图像快得多，需要受支持的 GPU。</translation>
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="164"/>
         <location filename="../scene_builder_turntable.cpp" line="244"/>
-        <location filename="../scene_builder_widget.cpp" line="285"/>
+        <location filename="../scene_builder_widget.cpp" line="303"/>
         <source>Preview</source>
         <translation>预览</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="287"/>
+        <location filename="../scene_builder_widget.cpp" line="305"/>
         <source>Render picture...</source>
         <translation>渲染图像...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="289"/>
+        <location filename="../scene_builder_widget.cpp" line="307"/>
         <source>Render at the image size and sample count set under Camera, and save the picture as a PNG</source>
         <translation>按“相机”中设置的图像尺寸和采样数渲染，并将图像保存为 PNG</translation>
     </message>
@@ -7746,7 +7771,7 @@ From: %3</source>
     </message>
     <message>
         <location filename="../scene_builder_turntable.cpp" line="94"/>
-        <location filename="../scene_builder_widget.cpp" line="297"/>
+        <location filename="../scene_builder_widget.cpp" line="315"/>
         <source>Quality:</source>
         <translation>质量：</translation>
     </message>
@@ -7876,7 +7901,7 @@ From: %3</source>
         <translation type="vanished">转台视频失败。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="314"/>
+        <location filename="../scene_builder_widget.cpp" line="332"/>
         <source>Press Preview to see the scene.</source>
         <translation>点击“预览”查看场景。</translation>
     </message>
@@ -7985,12 +8010,12 @@ It is in the scene list now (Settings tab, My Scenes).</source>
 它现在已在场景列表中（“设置”标签页，我的场景）。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="794"/>
+        <location filename="../scene_builder_widget.cpp" line="824"/>
         <source>(%1)%2  |  %3 objects, %4 lights</source>
         <translation>(%1)%2  |  %3 个物体，%4 个光源</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="668"/>
+        <location filename="../scene_builder_widget.cpp" line="698"/>
         <source>Choose a mesh</source>
         <translation>选择网格</translation>
     </message>
@@ -8015,7 +8040,7 @@ It is in the scene list now (Settings tab, My Scenes).</source>
         <translation>重做 (%1)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="282"/>
+        <location filename="../scene_builder_widget.cpp" line="300"/>
         <source>Draft: 480 pixels wide, 16 samples. Good: 720 wide, 64 samples. Best: 960 wide, 256 samples.</source>
         <translation>草稿：宽 480 像素，16 个采样。良好：宽 720，64 个采样。最佳：宽 960，256 个采样。</translation>
     </message>
@@ -8025,32 +8050,32 @@ It is in the scene list now (Settings tab, My Scenes).</source>
         <translation>已添加到场景列表</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="507"/>
+        <location filename="../scene_builder_widget.cpp" line="525"/>
         <source>Camera and image</source>
         <translation>相机与画面</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="538"/>
+        <location filename="../scene_builder_widget.cpp" line="566"/>
         <source>, light</source>
         <translation>，光源</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="788"/>
+        <location filename="../scene_builder_widget.cpp" line="818"/>
         <source>not saved yet</source>
         <translation>尚未保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="822"/>
+        <location filename="../scene_builder_widget.cpp" line="852"/>
         <source>No problems found.</source>
         <translation>未发现问题。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="828"/>
+        <location filename="../scene_builder_widget.cpp" line="858"/>
         <source>Fix this:</source>
         <translation>请修复：</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="828"/>
+        <location filename="../scene_builder_widget.cpp" line="858"/>
         <source>Note:</source>
         <translation>注意：</translation>
     </message>
@@ -8222,6 +8247,124 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <source>Could not save to %1.</source>
         <translation>无法保存到 %1。</translation>
     </message>
+    <message>
+        <location filename="../mainwindow_selftest_modes.cpp" line="461"/>
+        <location filename="../scene_builder_widget.cpp" line="550"/>
+        <source>, locked</source>
+        <translation>，已锁定</translation>
+    </message>
+    <message>
+        <location filename="../mainwindow_selftest_modes.cpp" line="475"/>
+        <location filename="../scene_builder_widget.cpp" line="549"/>
+        <source>, hidden</source>
+        <translation>，已隐藏</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="46"/>
+        <source>Hidden in the views (it still renders). Alt+H shows everything again.</source>
+        <translation>已在视图中隐藏（仍会被渲染）。按 Alt+H 可重新显示全部。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="46"/>
+        <source>Shown in the views again.</source>
+        <translation>已在视图中重新显示。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="57"/>
+        <source>Locked: it is not picked or moved by clicking and dragging in the views (it can still be picked in the list).</source>
+        <translation>已锁定：在视图中点击和拖动时不会选中或移动它（仍可在列表中选中）。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="57"/>
+        <source>Unlocked.</source>
+        <translation>已解锁。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="64"/>
+        <source>Nothing is hidden.</source>
+        <translation>没有隐藏的项目。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="65"/>
+        <source>Showed %1 hidden item(s) again.</source>
+        <translation>已重新显示 %1 个隐藏项。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="72"/>
+        <source>Nothing is locked.</source>
+        <translation>没有锁定的项目。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="73"/>
+        <source>Unlocked %1 item(s).</source>
+        <translation>已解锁 %1 个项目。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="84"/>
+        <source>Nothing to drop: it already stands on the floor, or its size is not known (a mesh file).</source>
+        <translation>无需放置：它已在地面上，或其大小未知（网格文件）。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="88"/>
+        <source>Put on the floor.</source>
+        <translation>已放到地面。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="104"/>
+        <source>Pick something to frame it.</source>
+        <translation>请先选择要取景的对象。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="119"/>
+        <source>Rename</source>
+        <translation>重命名</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="119"/>
+        <source>New name:</source>
+        <translation>新名称：</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="144"/>
+        <source>Rename...</source>
+        <translation>重命名...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="145"/>
+        <source>Drop to floor</source>
+        <translation>放到地面</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="146"/>
+        <location filename="../scene_builder_views.cpp" line="118"/>
+        <source>Frame selected</source>
+        <translation>取景所选项</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="148"/>
+        <source>Hide in the views</source>
+        <translation>在视图中隐藏</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="149"/>
+        <source>Show everything hidden</source>
+        <translation>显示所有隐藏项</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="150"/>
+        <source>Lock</source>
+        <translation>锁定</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="151"/>
+        <source>Unlock</source>
+        <translation>解锁</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_arrange.cpp" line="152"/>
+        <source>Unlock everything locked</source>
+        <translation>解锁所有已锁定项</translation>
+    </message>
 </context>
 <context>
     <name>SceneCategory</name>
@@ -8294,32 +8437,32 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
 <context>
     <name>SceneLayoutView</name>
     <message>
-        <location filename="../scene_layout_view.cpp" line="327"/>
+        <location filename="../scene_layout_view.cpp" line="341"/>
         <source>Top view: X to the right, Z towards you (down)</source>
         <translation>顶视图：X 向右，Z 朝向你（向下）</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="328"/>
+        <location filename="../scene_layout_view.cpp" line="342"/>
         <source>Front view: X to the right, Y up</source>
         <translation>前视图：X 向右，Y 向上</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="329"/>
+        <location filename="../scene_layout_view.cpp" line="343"/>
         <source>Side view: Z to the left, Y up</source>
         <translation>侧视图：Z 向左，Y 向上</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="332"/>
+        <location filename="../scene_layout_view.cpp" line="346"/>
         <source>Grid: 1 unit</source>
         <translation>网格：1 个单位</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="332"/>
+        <location filename="../scene_layout_view.cpp" line="346"/>
         <source>Grid: %1 units</source>
         <translation>网格：%1 个单位</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="422"/>
+        <location filename="../scene_layout_view.cpp" line="437"/>
         <source>Camera</source>
         <translation>相机</translation>
     </message>

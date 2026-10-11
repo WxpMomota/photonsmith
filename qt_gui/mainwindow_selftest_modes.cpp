@@ -451,6 +451,60 @@ static void selfTestCameraViews(SceneBuilderWidget *sb, const std::function<void
 	sb->show3dView(false);
 }
 
+// Arrange (scene_arrange.h, scene_builder_arrange.cpp): hide, lock, drop to the floor, frame and rename. Leaves the document as it found it.
+static void selfTestArrange(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
+	using Sel = BuilderSelection;
+	const auto pos = [sb](int i) { return sb->document().objects[static_cast<size_t>(i)].position; };
+	// Lock: the arrow keys leave a locked object alone, and a mouse press where it is picks what is behind it; Unlock gives it back.
+	sb->selectObject(3);
+	sb->lockSelected(true);
+	check(sb->document().objects[3].locked && sb->listTextForTest(3 + 1).contains(SceneBuilderWidget::tr(", locked")), "Lock marks the object in the document and in the list");
+	const double x0 = pos(3).x;
+	sb->sendKeyForTest(false, Qt::Key_Right);
+	check(pos(3).x == x0, "the arrow keys leave a locked object where it is");
+	sb->clickItemForTest(Sel{Sel::Kind::Object, 3});
+	check(!(sb->selectionForTest() == Sel{Sel::Kind::Object, 3}), "a click where a locked object is does not pick it (it picks what is behind it)");
+	sb->selectObject(3);
+	sb->lockSelected(false);
+	sb->sendKeyForTest(false, Qt::Key_Right);
+	check(pos(3).x > x0 && !sb->document().objects[3].locked, "Unlock gives the arrow keys back");
+	check(sb->undo() && sb->undo() && sb->undo(), "each is one undo step");
+	// Hide: not drawn or picked in the views, shown dimmed in the list, still in the scene; Show everything brings it back.
+	sb->selectObject(2);
+	sb->hideSelected(true);
+	check(sb->document().objects[2].hidden && sb->listTextForTest(2 + 1).contains(SceneBuilderWidget::tr(", hidden")), "Hide marks the object in the document and in the list");
+	sb->clickItemForTest(Sel{Sel::Kind::Object, 2});
+	check(!(sb->selectionForTest() == Sel{Sel::Kind::Object, 2}), "a hidden object is not picked by a click in a view");
+	check(scene_doc::toPbrt(sb->document()).find("Gold ball") != std::string::npos, "but it is still in the scene file, so it still renders");
+	sb->showAllHidden();
+	check(!sb->document().objects[2].hidden, "Show everything hidden brings it back");
+	check(sb->undo() && sb->undo(), "undone");
+	// Drop to floor: lift the gold ball, then put it back on the floor (its lowest point on y = 0).
+	sb->selectObject(2);
+	const double y0 = pos(2).y;
+	for (int n = 0; n < 8; ++n) sb->sendKeyForTest(false, Qt::Key_PageUp);
+	check(pos(2).y > y0 + 1.0, "lifted");
+	sb->dropSelectedToFloor();
+	check(std::abs(pos(2).y - y0) < 1e-9, "Drop to floor puts the ball back on the floor (its radius above y = 0)");
+	check(sb->undo() && sb->undo(), "undone");
+	// Frame selected: the 3D view looks at it from near.
+	sb->show3dView(true);
+	sb->frame3dForTest();
+	const scene_doc::Float3 eye0 = sb->viewEyeForTest();
+	sb->selectObject(2);
+	sb->frameSelected();
+	const scene_doc::Float3 eye1 = sb->viewEyeForTest();
+	check(std::abs(eye1.x - eye0.x) + std::abs(eye1.y - eye0.y) + std::abs(eye1.z - eye0.z) > 0.1, "Frame selected moves the 3D view in on what is picked");
+	sb->show3dView(false);
+	// Rename: a name already taken is made different.
+	sb->selectObject(2);
+	const std::string was = sb->document().objects[2].name;
+	sb->renameItem(Sel{Sel::Kind::Object, 2}, QString::fromStdString(sb->document().objects[1].name));
+	check(sb->document().objects[2].name != sb->document().objects[1].name && sb->document().objects[2].name.find(sb->document().objects[1].name) == 0, "Rename to a name that is taken gives it a number");
+	check(sb->undo() && sb->document().objects[2].name == was, "one undo");
+	sb->selectObject(1);
+}
+
 // Snap to objects (scene_snap.h): dragging the red box of the starter scene to near the gold ball's middle lands exactly on it when snapping to objects is on, and on the
 // 0.25 grid when it is off. Leaves the document as it found it.
 static void selfTestSnap(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
@@ -574,6 +628,7 @@ void MainWindow::runBuilderSelfTest(const std::function<void(const QString &)> &
 	selfTestArray(sb, check);
 	selfTestMultiSelect(sb, check);
 	selfTestCameraViews(sb, check);
+	selfTestArrange(sb, check);
 	sb->selectObject(1);
 	check(sb->problemsText().isEmpty(), "the scene has no problems or notes");
 	const QString pbrt = outPrefix + "_builder.pbrt";

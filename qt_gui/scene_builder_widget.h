@@ -34,6 +34,8 @@ class QLabel;
 class QSlider;
 class QListWidget;
 class QProcess;
+class QListWidgetItem;
+class QMenu;
 class QPushButton;
 class QScrollArea;
 class QStackedWidget;
@@ -104,6 +106,7 @@ public:
 	void releaseDragForTest(bool in3d);   // a real drag in the layout view of one picked object (moves them all)
 	void togglePickedForTest(const BuilderSelection &s) { togglePicked(s); }
 	void clickItemForTest(const BuilderSelection &s, Qt::KeyboardModifiers mods = Qt::NoModifier);   // a real click on an item in the layout view
+	QString listTextForTest(int row) const;
 	int pickedRowsForTest() const;   // how many rows of the list are highlighted
 	QPointF itemScreenPosForTest(const BuilderSelection &s) const;   // where the layout view draws an item
 	// A box dragged in the layout view with Ctrl held, from one pixel position to another (real mouse events); the layout view must be the one showing.
@@ -153,6 +156,15 @@ public:
 	bool importPhoto(const QString &photo, QString *error);
 	// See scene_builder_inspector.cpp: an upright copy of a picture whose EXIF tag asks for a rotation (the renderer ignores that tag).
 	static QString uprightPictureCopy(const QString &path, QSize *size);
+	// Arrange (scene_builder_arrange.cpp): hide and lock what is picked, put it on the floor, rename it, frame it.
+	void hideSelected(bool hide);
+	void lockSelected(bool lock);
+	void showAllHidden();
+	void unlockAllLocked();
+	void dropSelectedToFloor();
+	void frameSelected();
+	void renameSelected();
+	void renameItem(const BuilderSelection &s, const QString &wanted);
 	void deleteSelected();
 	bool undo();
 	bool redo();
@@ -285,6 +297,13 @@ private:
 	void addFile(QFormLayout *f, const QString &label, const std::function<std::string *()> &ref, const QString &filter, bool clearable = false,
 	             const std::function<void(const QString &)> &alsoApply = nullptr);
 	void inspectCamera(QFormLayout *f);
+	scene_doc::ItemSet unlockedPicked() const;   // the picked items a drag in a view may move (not the locked or hidden ones)
+	bool isLockedItem(const BuilderSelection &s) const;
+	QMenu *createArrangeMenu(QWidget *parent);
+	void createArrangeShortcuts();
+	void addVisibilityRows(QFormLayout *f, const std::function<bool *()> &hidden, const std::function<bool *()> &locked);
+	void decorateListItem(QListWidgetItem *it, bool hidden, bool locked);
+	QPushButton *m_arrangeButton = nullptr;   // the Arrange menu: rename, drop to floor, frame, hide, lock
 	void inspectVolume(QFormLayout *f, int i);
 	void inspectObject(QFormLayout *f, int i);
 	void inspectLight(QFormLayout *f, int i);

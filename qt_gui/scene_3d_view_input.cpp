@@ -73,11 +73,11 @@ Scene3DView::Hit Scene3DView::hitTest(const QPointF &px) const {
 		}
 	}
 	// The selected camera's or light's target.
-	if (handle(m_sel, 1) && withinPx(*handle(m_sel, 1), 11)) { h.kind = Hit::Kind::Item; h.sel = m_sel; h.which = 1; return h; }
+	if (!selectionLocked() && handle(m_sel, 1) && withinPx(*handle(m_sel, 1), 11)) { h.kind = Hit::Kind::Item; h.sel = m_sel; h.which = 1; return h; }
 	// Lights and the camera: small, so they come before the faces.
 	for (int i = static_cast<int>(m_doc->lights.size()) - 1; i >= 0; --i) {
 		const Light &l = m_doc->lights[i];
-		if (l.kind != LightKind::Infinite && withinPx(l.position, 13)) { h.kind = Hit::Kind::Item; h.sel = {BuilderSelection::Kind::Light, i}; return h; }
+		if (l.kind != LightKind::Infinite && !l.hidden && !l.locked && withinPx(l.position, 13)) { h.kind = Hit::Kind::Item; h.sel = {BuilderSelection::Kind::Light, i}; return h; }
 	}
 	if (withinPx(m_doc->camera.position, 15)) { h.kind = Hit::Kind::Item; h.sel = {BuilderSelection::Kind::Camera, 0}; return h; }
 	// The flythrough path's markers (scene_3d_view.cpp drawFlythroughPath): the target of the view pressed last, then the eyes, the last saved on top.
@@ -101,7 +101,7 @@ Scene3DView::Hit Scene3DView::hitTest(const QPointF &px) const {
 	projectFaces(v);
 	const Face *best = nullptr;
 	for (const Face &f : faces()) {
-		if (f.screen.size() < 3 || !f.screen.containsPoint(px, Qt::OddEvenFill)) continue;
+		if (f.screen.size() < 3 || !f.screen.containsPoint(px, Qt::OddEvenFill) || m_doc->objects[f.owner].locked) continue;
 		if (!best || f.depth < best->depth) best = &f;
 	}
 	if (best) { h.kind = Hit::Kind::Item; h.sel = {BuilderSelection::Kind::Object, best->owner}; }

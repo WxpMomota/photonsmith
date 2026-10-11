@@ -119,7 +119,19 @@ While several are picked the properties panel shows who they are and offers **Mo
 
 **Arrow keys** (when a view has the focus: click in it) nudge what is picked, or the selected camera (with its target, so it keeps looking the same way): a step of 0.25 (the grid), **Shift** a whole unit, **Ctrl** (Command on a Mac) a fine 0.05; **Page Up** and **Page Down** lift and lower it. In the top view Right and Left move along X and Up and Down move away from or towards you (Z); in the front and side views Up and Down are up and down, and in the side view Right is towards the left of the screen's Z axis; in **3D** the arrows follow the screen: Right moves along the horizontal world axis (X or Z) nearest the screen's right, Up along the other one, away from you, so from any side Up goes the way you are looking. A run of key presses (a key held down) is one undo step, and the keys do not snap to objects. The list keeps the arrow keys for moving between its rows.
 
-Delete or Backspace removes what is picked (from the list or a view; in a text box they edit the text). Ctrl+D (Command+D on a Mac) duplicates it, Ctrl+A picks everything, Ctrl+G groups and Ctrl+Shift+G ungroups. Undo and Redo use the platform's usual keys (Ctrl+Z / Ctrl+Y on Windows, Command+Z / Shift+Command+Z on a Mac); the buttons' tooltips show the ones for your keyboard. W, E and R pick the 3D view's Move, Rotate and Scale tools.
+Delete or Backspace removes what is picked (from the list or a view; in a text box they edit the text). Ctrl+D (Command+D on a Mac) duplicates it, Ctrl+A picks everything, Ctrl+G groups and Ctrl+Shift+G ungroups. Undo and Redo use the platform's usual keys (Ctrl+Z / Ctrl+Y on Windows, Command+Z / Shift+Command+Z on a Mac); the buttons' tooltips show the ones for your keyboard. W, E and R pick the 3D view's Move, Rotate and Scale tools. H hides, Alt+H shows everything hidden, L locks, Alt+L unlocks everything, End drops to the floor, F frames what is picked and F2 renames (see *Arranging*).
+
+## Arranging: hide, lock, drop to floor, frame, rename
+
+The **Arrange** button under the list (and a right-click on an item in the list) has the tidying tools; each is one undo step and works on everything picked.
+
+* **Hide in the views** (H) takes the picked items out of the layout and 3D views, so what is behind them can be seen and edited (lift the ceiling off a room). A hidden item is **still in the scene and still renders**: hiding is for the views only. It shows in the list dimmed with ", hidden", and **Show everything hidden** (Alt+H) brings them all back. The properties of an object or light have a **Hidden in the views** box too.
+* **Lock** (L) keeps the picked items from being picked or moved by clicking and dragging in the views, and the arrow keys and the rings and handles leave them alone (so a finished floor or backdrop is not dragged by accident). A click where a locked object is picks what is behind it; a locked item is drawn with a dashed outline in the layout view, and it can still be picked in the list and edited in the properties. **Unlock everything locked** is Alt+L; the properties have a **Locked** box.
+* **Drop to floor** (End) puts the picked items down on the floor: all of them together, by the gap under the lowest one, so a table and its legs, or a set picked together, keep their places relative to one another. A mesh file's size is not known to the scene, so a mesh does not count in finding the lowest point (it comes down with the rest).
+* **Frame selected** (F in a view, or the button beside Frame all) zooms both views to what is picked (the camera and its target, if that is selected); the 3D view keeps its angle.
+* **Rename...** (F2, or double-click an item in the list) asks for a new name; one that is already taken gets a number.
+
+Hidden and locked are saved in the builder's own copy of the scene (the `.pbrt` text, which the renderers read, does not have them).
 
 ## Copies: duplicate, array and scatter
 

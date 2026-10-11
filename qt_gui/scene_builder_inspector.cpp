@@ -465,12 +465,19 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 	if (bumpable) addBump();
 }
 
+// Hidden in the views / Locked, for an object or a light: they live in the builder's own copy of the document (scene_arrange.h) and never reach the .pbrt text.
+void SceneBuilderWidget::addVisibilityRows(QFormLayout *f, const std::function<bool *()> &hidden, const std::function<bool *()> &locked) {
+	addBool(f, tr("Hidden in the views"), hidden);
+	addBool(f, tr("Locked"), locked);
+}
+
 // Fog, smoke or a cloud (scene_model.h Volume): where it is and how big, and what its medium does to light. No surface material and no light.
 void SceneBuilderWidget::inspectVolume(QFormLayout *f, int i) {
 	auto obj = [this, i]() -> Object * { return i < static_cast<int>(m_doc.objects.size()) ? &m_doc.objects[i] : nullptr; };
 	using scene_doc::VolumeKind;
 	addHeading(f, tr("Volume"));
 	addText(f, tr("Name"), [obj]() { return obj() ? &obj()->name : nullptr; });
+	addVisibilityRows(f, [obj]() { return obj() ? &obj()->hidden : nullptr; }, [obj]() { return obj() ? &obj()->locked : nullptr; });
 	auto *kind = new QComboBox;
 	for (VolumeKind k : {VolumeKind::Fog, VolumeKind::Smoke, VolumeKind::Cloud}) kind->addItem(volumeLabel(k), static_cast<int>(k));
 	kind->setCurrentIndex(kind->findData(static_cast<int>(m_doc.objects[i].volume.kind)));
@@ -526,6 +533,7 @@ void SceneBuilderWidget::inspectObject(QFormLayout *f, int i) {
 	auto obj = [this, i]() -> Object * { return i < static_cast<int>(m_doc.objects.size()) ? &m_doc.objects[i] : nullptr; };
 	addHeading(f, tr("Object"));
 	addText(f, tr("Name"), [obj]() { return obj() ? &obj()->name : nullptr; });
+	addVisibilityRows(f, [obj]() { return obj() ? &obj()->hidden : nullptr; }, [obj]() { return obj() ? &obj()->locked : nullptr; });
 	auto *shape = new QComboBox;
 	for (ShapeKind k : scene_doc::allShapeKinds())
 		shape->addItem(shapeLabel(k), static_cast<int>(k));
@@ -609,6 +617,7 @@ void SceneBuilderWidget::inspectLight(QFormLayout *f, int i) {
 	auto lt = [this, i]() -> Light * { return i < static_cast<int>(m_doc.lights.size()) ? &m_doc.lights[i] : nullptr; };
 	addHeading(f, tr("Light"));
 	addText(f, tr("Name"), [lt]() { return lt() ? &lt()->name : nullptr; });
+	addVisibilityRows(f, [lt]() { return lt() ? &lt()->hidden : nullptr; }, [lt]() { return lt() ? &lt()->locked : nullptr; });
 	auto *kind = new QComboBox;
 	for (LightKind k : {LightKind::Point, LightKind::Spot, LightKind::Distant, LightKind::Infinite}) kind->addItem(lightLabel(k), static_cast<int>(k));
 	kind->setCurrentIndex(kind->findData(static_cast<int>(m_doc.lights[i].kind)));

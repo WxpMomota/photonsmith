@@ -152,7 +152,7 @@ void SceneBuilderWidget::moveSelectedBy(const Float3 &delta) {
 // One update of a ring or handle being dragged: the items go back to how they were when the drag began and are turned (or scaled) by the TOTAL so far, so the
 // result does not depend on how many mouse events it took and does not drift. The whole drag is one undo step (the edit key names the drag).
 void SceneBuilderWidget::transformPicked(bool turn, int axis, double amount) {
-	const ItemSet items = pickedItems();
+	const ItemSet items = unlockedPicked();   // (locked and hidden items are not turned or stretched by a ring in a view)
 	if (items.empty()) return;
 	if (m_groupBaseDrag != m_editCounter) {
 		m_groupBase = m_doc;
@@ -197,7 +197,7 @@ void SceneBuilderWidget::nudgeSelectedBy(const Float3 &delta) {
 		refreshInspectorValues();
 		return;
 	}
-	const ItemSet items = pickedItems();
+	const ItemSet items = unlockedPicked();   // (the arrow keys leave locked and hidden items where they are)
 	if (items.empty()) return;
 	edit(QStringLiteral("nudge"), [&]() { scene_doc::translateItems(m_doc, items, delta); });
 	refreshInspectorValues();

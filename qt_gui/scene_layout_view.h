@@ -42,6 +42,7 @@ public:
 	// The point in world space the view is centred on, for the plane's two axes (the third is 0): where a new object is dropped.
 	scene_doc::Float3 centerInWorld() const;
 	void frameAll();
+	void frameBox(const scene_doc::Float3 &lo, const scene_doc::Float3 &hi);   // Frame selected: the view shows this box (and stays there when the window is resized)
 	QPointF itemScreenPos(const BuilderSelection &s) const;  // where an item is drawn, in this widget's pixels
 
 	QSize sizeHint() const override { return QSize(520, 380); }
@@ -53,6 +54,7 @@ signals:
 	// A box dragged round items (Ctrl or Shift held on the background): every object and light whose centre is inside; `additive` adds to the picked items.
 	void boxSelected(const QList<BuilderSelection> &items, bool additive);
 	// An arrow key, Page Up or Page Down: move the picked items by this much (scene units; the view works out which way the arrow points in its plane).
+	void frameSelectedRequested();   // the F key
 	void nudged(const scene_doc::Float3 &delta);
 	// A drag moved something: `which` is 0 for the item's position, 1 for its target (camera, spot and distant lights). dragBegan is sent once at the
 	// start so the owner can take an undo snapshot.
@@ -82,6 +84,13 @@ private:
 	Hit hitTest(const QPointF &px) const;
 	const scene_doc::Float3 *handlePosition(const BuilderSelection &s, int which) const;
 	bool isPicked(const BuilderSelection &s) const;   // the main item or one of the extra ones
+	// The main selected item is locked or hidden, so its handles are not offered (it is not moved by dragging in a view).
+	bool selectionLocked() const {
+		if (!m_doc) return false;
+		if (m_sel.kind == BuilderSelection::Kind::Object) return m_sel.index >= 0 && m_sel.index < static_cast<int>(m_doc->objects.size()) && (m_doc->objects[m_sel.index].locked || m_doc->objects[m_sel.index].hidden);
+		if (m_sel.kind == BuilderSelection::Kind::Light) return m_sel.index >= 0 && m_sel.index < static_cast<int>(m_doc->lights.size()) && (m_doc->lights[m_sel.index].locked || m_doc->lights[m_sel.index].hidden);
+		return false;
+	}
 	void drawSnapGuides(QPainter &p) const;
 	std::vector<scene_doc::SnapGuide> m_guides;
 
