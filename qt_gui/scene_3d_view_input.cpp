@@ -116,6 +116,13 @@ void Scene3DView::mousePressEvent(QMouseEvent *e) {
 	setFocus();
 	const QPointF px = e->position();
 	m_last = px;
+	if (m_pickFocus && e->button() == Qt::LeftButton) {   // Pick focus takes the click: nothing is selected or dragged
+		m_pickFocus = false;
+		unsetCursor();
+		Float3 where;
+		if (surfaceAt(px, where)) emit focusPointPicked(where);
+		return;
+	}
 	if (e->button() == Qt::MiddleButton || e->button() == Qt::RightButton) {
 		m_mode = Mode::Pan;
 		return;

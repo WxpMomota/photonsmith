@@ -28,6 +28,7 @@
 
 #include "scene_json.h"
 #include "scene_model.h"
+#include "scene_camera_lens.h"
 #include "scene_materials.h"
 #include "scene_sky.h"
 #include "scene_pbrt_writer.h"

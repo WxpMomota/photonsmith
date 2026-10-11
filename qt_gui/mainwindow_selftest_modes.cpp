@@ -571,6 +571,82 @@ static void selfTestActionSearch(SceneBuilderWidget *sb, const std::function<voi
 	sb->selectObject(1);
 }
 
+// The camera lens rows (scene_camera_lens.h): focal length, lens presets, sensor, aperture and Pick focus. Leaves the document as it found it.
+static void selfTestCameraLens(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
+	using scene_doc::aspectOf;
+	const scene_doc::Camera camera0 = sb->document().camera;
+	sb->selectCameraForTest();
+	QApplication::processEvents();
+	const auto find = [sb](QDoubleSpinBox *&focal, QDoubleSpinBox *&aperture, QDoubleSpinBox *&fovBox, QComboBox *&lens, QComboBox *&sensor) {
+		for (QDoubleSpinBox *s : sb->findChildren<QDoubleSpinBox *>()) {
+			if (s->maximum() == 2000.0 && s->suffix().contains("mm")) focal = s;
+			if (s->maximum() == 64.0 && !s->specialValueText().isEmpty()) aperture = s;
+			if (s->maximum() == 170.0 && s->minimum() == 1.0) fovBox = s;
+		}
+		for (QComboBox *c : sb->findChildren<QComboBox *>()) {
+			if (c->count() == 9 && c->findData(24.0) >= 0 && c->itemData(0).toDouble() < 0) lens = c;   // Choose a lens... and 8 presets
+			if (c->count() == static_cast<int>(scene_doc::sensorPresets().size()) + 1 && c->findData(36.0) >= 0) sensor = c;
+		}
+	};
+	QDoubleSpinBox *focal = nullptr, *aperture = nullptr, *fovBox = nullptr;
+	QComboBox *lens = nullptr, *sensor = nullptr;
+	find(focal, aperture, fovBox, lens, sensor);
+	check(focal && aperture && fovBox && lens && sensor, "the camera properties have Focal length, Lens, Sensor and Aperture rows");
+	if (!(focal && aperture && fovBox && lens && sensor)) return;
+	const double aspect = aspectOf(sb->document().render), sensorW = sb->document().camera.sensorWidthMm;
+	check(std::abs(focal->value() - scene_doc::focalLengthMm(camera0.fov, aspect, sensorW)) < 0.06, QString("the focal length shown (%1 mm) is the one the field of view means").arg(focal->value()));
+	focal->setValue(85.0);
+	QApplication::processEvents();
+	check(std::abs(sb->document().camera.fov - scene_doc::fovFromFocalLength(85.0, aspect, sensorW)) < 1e-9, "typing a focal length of 85 mm sets the field of view");
+	check(std::abs(fovBox->value() - sb->document().camera.fov) < 0.06, "and the Field of view row follows");
+	const int wide = lens->findData(24.0);
+	lens->setCurrentIndex(wide);
+	emit lens->activated(wide);
+	QApplication::processEvents();
+	check(std::abs(sb->document().camera.fov - scene_doc::fovFromFocalLength(24.0, aspect, sensorW)) < 1e-9, "choosing the 24 mm lens does the same");
+	focal = aperture = fovBox = nullptr;
+	lens = sensor = nullptr;
+	find(focal, aperture, fovBox, lens, sensor);
+	const double fovBefore = sb->document().camera.fov;
+	const int aps = sensor->findData(23.5);
+	sensor->setCurrentIndex(aps);
+	emit sensor->activated(aps);
+	QApplication::processEvents();
+	check(sb->document().camera.sensorWidthMm == 23.5 && sb->document().camera.fov == fovBefore, "choosing a smaller sensor keeps the view and changes the focal length it means");
+	check(std::abs(focal->value() - scene_doc::focalLengthMm(fovBefore, aspect, 23.5)) < 0.06 && focal->value() < 24.0, "(24 mm of full frame is about 16 mm on APS-C)");
+	check(aperture->value() == 0.0, "no lens radius shows as a pinhole");
+	aperture->setValue(2.8);
+	QApplication::processEvents();
+	const double mm = scene_doc::focalLengthMm(sb->document().camera.fov, aspect, 23.5);
+	check(std::abs(sb->document().camera.lensRadius - scene_doc::lensRadiusFromFNumber(mm, 2.8)) < 1e-9 && sb->document().camera.lensRadius > 0.0, "an aperture of f/2.8 sets the lens radius");
+	// Pick focus: a click on the gold ball in the 3D view puts the near side of the ball in focus.
+	sb->show3dView(true);
+	sb->frame3dForTest();
+	if (const QString lensPng = qEnvironmentVariable("RT_GUI_SELFTEST_LENS_PNG"); !lensPng.isEmpty()) {   // a picture of the focus plane (the camera selected, with depth of field)
+		sb->view3dForTest()->setStandardView(scene_view::StandardView::Right);
+		QApplication::processEvents();
+		sb->view3dForTest()->grab().save(lensPng);
+		sb->orbit3dForTest(30.0, 25.0);
+	}
+	sb->lookThroughCamera(true);
+	QApplication::processEvents();
+	const scene_doc::Object &ball = sb->document().objects[2];
+	const double centreDistance = scene_doc::focusDistanceTo(sb->document().camera, ball.position);
+	check(sb->clickPickFocusForTest(2), "Pick focus takes the next click in the 3D view");
+	const double picked = sb->document().camera.focusDistance;
+	check(picked < centreDistance + 0.02 && picked > centreDistance - ball.radius - 0.15,
+	      QString("and puts the surface it hit in focus (%1; the middle of the ball is %2 away, its radius %3)").arg(picked, 0, 'f', 2).arg(centreDistance, 0, 'f', 2).arg(ball.radius, 0, 'f', 2));
+	sb->lookThroughCamera(false);
+	sb->show3dView(false);
+	const auto same = [&]() {
+		const scene_doc::Camera &c = sb->document().camera;
+		return c.fov == camera0.fov && c.lensRadius == camera0.lensRadius && c.focusDistance == camera0.focusDistance && c.sensorWidthMm == camera0.sensorWidthMm;
+	};
+	while (!same() && sb->undo()) {}
+	check(same(), "everything undoes back to the camera as it was");
+	sb->selectObject(1);
+}
+
 // Snap to objects (scene_snap.h): dragging the red box of the starter scene to near the gold ball's middle lands exactly on it when snapping to objects is on, and on the
 // 0.25 grid when it is off. Leaves the document as it found it.
 static void selfTestSnap(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
@@ -697,6 +773,7 @@ void MainWindow::runBuilderSelfTest(const std::function<void(const QString &)> &
 	selfTestArrange(sb, check);
 	selfTestViewModes(sb, check);
 	selfTestActionSearch(sb, check);
+	selfTestCameraLens(sb, check);
 	sb->selectObject(1);
 	check(sb->problemsText().isEmpty(), "the scene has no problems or notes");
 	const QString pbrt = outPrefix + "_builder.pbrt";

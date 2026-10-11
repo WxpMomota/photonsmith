@@ -168,6 +168,17 @@ inline QString uniqueName(const QString &base, const QStringList &taken) {
 // The names of the ready-made materials (src/shared/scene_materials.h), translated: the table there is Qt-free, so the strings are declared for translation
 // here and looked up by their English name.
 inline QString presetLabel(const char *name) { return QCoreApplication::translate("MaterialPreset", name); }
+inline QString sensorLabel(const char *name) { return QCoreApplication::translate("SensorPreset", name); }
+inline QString lensLabel(const char *name) { return QCoreApplication::translate("LensPreset", name); }
+[[maybe_unused]] inline void cameraPresetNamesForTranslation() {
+	QT_TRANSLATE_NOOP("SensorPreset", "Full frame (36 x 24 mm)"); QT_TRANSLATE_NOOP("SensorPreset", "APS-C (23.5 x 15.6 mm)"); QT_TRANSLATE_NOOP("SensorPreset", "APS-C Canon (22.3 x 14.9 mm)");
+	QT_TRANSLATE_NOOP("SensorPreset", "Micro Four Thirds (17.3 x 13 mm)"); QT_TRANSLATE_NOOP("SensorPreset", "Super 35 film (24.9 x 18.7 mm)");
+	QT_TRANSLATE_NOOP("SensorPreset", "Medium format (43.8 x 32.9 mm)"); QT_TRANSLATE_NOOP("SensorPreset", "IMAX 70 mm film (70.4 x 52.6 mm)");
+	QT_TRANSLATE_NOOP("SensorPreset", "1 inch (13.2 x 8.8 mm)"); QT_TRANSLATE_NOOP("SensorPreset", "Phone (7.6 x 5.7 mm)");
+	QT_TRANSLATE_NOOP("LensPreset", "14 mm ultra wide"); QT_TRANSLATE_NOOP("LensPreset", "24 mm wide"); QT_TRANSLATE_NOOP("LensPreset", "35 mm street");
+	QT_TRANSLATE_NOOP("LensPreset", "50 mm normal"); QT_TRANSLATE_NOOP("LensPreset", "85 mm portrait"); QT_TRANSLATE_NOOP("LensPreset", "135 mm telephoto");
+	QT_TRANSLATE_NOOP("LensPreset", "200 mm long telephoto"); QT_TRANSLATE_NOOP("LensPreset", "400 mm super telephoto");
+}
 inline QString presetGroupLabel(const char *group) { return QCoreApplication::translate("MaterialPresetGroup", group); }
 [[maybe_unused]] inline void presetNamesForTranslation() {
 	QT_TRANSLATE_NOOP("MaterialPreset", "Chalk"); QT_TRANSLATE_NOOP("MaterialPreset", "Black rubber"); QT_TRANSLATE_NOOP("MaterialPreset", "Terracotta");

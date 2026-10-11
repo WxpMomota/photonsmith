@@ -134,6 +134,7 @@ public:
 	void orbit3dForTest(double yawDeg, double pitchDeg);
 	void frame3dForTest() { m_view3d->frameAll(); }
 	Scene3DView *view3dForTest() { return m_view3d; }
+	bool clickPickFocusForTest(int objectIndex);   // Pick focus, then a click on that object in the 3D view; true if the focus distance changed
 	int wireframeDifferenceForTest();   // how many pixels of the 3D view differ between solid and wireframe
 	scene_doc::Float3 dropPointForTest() const { return dropPoint(); }
 	bool meshReadyForTest(const QString &path) const;
@@ -295,6 +296,11 @@ private:
 	void addNum(QFormLayout *f, const QString &label, const std::function<double *()> &ref, double lo, double hi, double step, int decimals = 3,
 	            const QString &suffix = QString());
 	void addInt(QFormLayout *f, const QString &label, const std::function<int *()> &ref, int lo, int hi);
+	// A number the document does not store but works out from what it does (a focal length from the field of view): `get` reads it, `set` makes the edit it means. `special`, if
+	// not empty, is shown for the lowest value (0).
+	void addDerivedNum(QFormLayout *f, const QString &label, const std::function<double()> &get, const std::function<void(double)> &set, double lo, double hi, double step, int decimals,
+	                   const QString &suffix = QString(), const QString &special = QString());
+	void beginPickFocus();   // the next click in the 3D view puts what is under it in focus
 	void addVec3(QFormLayout *f, const QString &label, const std::function<scene_doc::Float3 *()> &ref, double step);
 	void addColor(QFormLayout *f, const QString &label, const std::function<scene_doc::Rgb *()> &ref);
 	void addBool(QFormLayout *f, const QString &label, const std::function<bool *()> &ref, bool rebuildAfter = false);

@@ -57,6 +57,17 @@ While you drag an object (or several picked ones), **Snap to objects** (the chec
 * it takes over from the 0.25 grid on the axes where it snaps and leaves the grid alone where nothing is near; hold **Alt (Option on a Mac)** to drag freely without either;
 * several picked objects snap as one box (their members are never targets for each other). An object's box is the smallest box round it as it is turned (exact for a sphere, a box, a flat panel and the generated shapes; a mesh file's size is not known to the builder, so a mesh snaps only by its middle point). Lights, the camera and their targets, keys, the numbers in the properties and the arrows' keyboard moves are not snapped.
 
+## The camera as a photographer's lens
+
+Select the camera and its properties give the lens in a photographer's terms as well as in degrees and scene units. The scene file keeps the **field of view** and the **lens radius** (that is what the renderer reads, and what every older scene has); the other rows are worked out from them and edit them, so either way of saying it works and they follow one another.
+
+* **Focal length** (mm) is the lens the field of view means on the chosen **Sensor** (full frame, APS-C, Micro Four Thirds, Super 35 film, medium format, IMAX 70 mm film, 1 inch, a phone, or **Sensor width** typed in). The picture uses the whole width of the sensor and its height follows the picture's shape, so a 16:9 picture is shorter than a 3:2 one and the lens sees less up and down, as a real camera crops. 50 mm on full frame is about 40 degrees across, 24 mm about 74, 135 mm about 15. Typing a focal length sets the field of view; choosing a different sensor keeps the view and changes the focal length it means.
+* **Lens** picks one of eight usual focal lengths (14 mm ultra wide to 400 mm super telephoto) in one step.
+* **Aperture (f-number)** sets the **lens radius** for a scene where one unit is a metre: the radius is the focal length over twice the f-number (50 mm at f/1.8 is 0.014). "Pinhole" is a lens radius of 0 (everything sharp). A lens radius above 0 blurs what is not at the **Focus distance** (depth of field), more for a wider opening and a longer lens. If your scene is in other units, set the **Lens radius** directly.
+* **Pick focus in the 3D view** then a click on whatever should be sharp puts it in focus: the focus distance becomes how far that point is from the camera along the way the camera looks (the focal plane is flat, not a sphere round the camera). The click takes the view's nearest surface under it (or the floor); Escape cancels. With the camera selected and a lens radius above 0, the 3D view draws the **focal plane** as a green dashed rectangle with a cross in the middle: what is on it is sharp.
+
+The sensor width is kept in the builder's copy of the scene and with each saved view (the `.pbrt` has only the field of view and the lens), so a saved 24 mm view comes back as 24 mm.
+
 ## Camera views
 
 The scene has one camera (select **Camera and image** in the list to edit it), and the 3D view has a row of camera buttons under its tools:

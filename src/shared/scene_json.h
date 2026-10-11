@@ -307,13 +307,14 @@ inline Json cameraToJson(const Camera& c) {
 	Json cam = Json::object();
 	cam.set("position", toJson(c.position)).set("target", toJson(c.target)).set("up", toJson(c.up));
 	cam.set("fov", Json::number(c.fov)).set("lensRadius", Json::number(c.lensRadius)).set("focusDistance", Json::number(c.focusDistance));
+	if (c.sensorWidthMm != 36.0) cam.set("sensorWidthMm", Json::number(c.sensorWidthMm));   // (only when it is not the full-frame default: older scenes write what they always did)
 	return cam;
 }
 
 inline bool readCamera(const Json& cam, Camera& c) {
 	if (cam.type != Json::Type::Obj) return false;
 	return readVec(cam, "position", c.position) && readVec(cam, "target", c.target) && readVec(cam, "up", c.up) && readNum(cam, "fov", c.fov) &&
-	       readNum(cam, "lensRadius", c.lensRadius) && readNum(cam, "focusDistance", c.focusDistance);
+	       readNum(cam, "lensRadius", c.lensRadius) && readNum(cam, "focusDistance", c.focusDistance) && readNum(cam, "sensorWidthMm", c.sensorWidthMm);
 }
 
 }  // namespace detail

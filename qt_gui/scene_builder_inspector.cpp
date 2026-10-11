@@ -130,6 +130,28 @@ void SceneBuilderWidget::addNum(QFormLayout *f, const QString &label, const std:
 	f->addRow(label, box);
 }
 
+void SceneBuilderWidget::addDerivedNum(QFormLayout *f, const QString &label, const std::function<double()> &get, const std::function<void(double)> &set, double lo, double hi, double step,
+                                       int decimals, const QString &suffix, const QString &special) {
+	auto *box = new QDoubleSpinBox;
+	box->setRange(lo, hi);
+	box->setDecimals(decimals);
+	box->setSingleStep(step);
+	box->setKeyboardTracking(false);
+	if (!suffix.isEmpty()) box->setSuffix(suffix);
+	if (!special.isEmpty()) box->setSpecialValueText(special);
+	box->setValue(std::clamp(get(), lo, hi));
+	connect(box, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this, set](double x) {
+		if (m_loading) return;
+		set(x);
+		refreshInspectorValues();   // (the rows that were worked out from the same numbers follow)
+	});
+	m_refreshers.push_back([box, get, lo, hi]() {
+		QSignalBlocker b(box);
+		box->setValue(std::clamp(get(), lo, hi));
+	});
+	f->addRow(label, box);
+}
+
 void SceneBuilderWidget::addInt(QFormLayout *f, const QString &label, const std::function<int *()> &ref, int lo, int hi) {
 	auto *box = new QSpinBox;
 	box->setRange(lo, hi);
@@ -291,9 +313,59 @@ void SceneBuilderWidget::inspectCamera(QFormLayout *f) {
 	addVec3(f, tr("Position"), [this]() { return &m_doc.camera.position; }, 0.25);
 	addVec3(f, tr("Looks at"), [this]() { return &m_doc.camera.target; }, 0.25);
 	addNum(f, tr("Field of view"), [this]() { return &m_doc.camera.fov; }, 1, 170, 1, 1, QString::fromUtf8(" \xC2\xB0"));
+	// The lens as a photographer says it: a focal length on a sensor of a real size, and an f-number (scene_camera_lens.h). The document keeps the field of view and the lens radius
+	// (what the renderer reads); these rows are worked out from them and edit them.
+	addDerivedNum(f, tr("Focal length"), [this]() { return scene_doc::focalLengthMm(m_doc.camera.fov, scene_doc::aspectOf(m_doc.render), m_doc.camera.sensorWidthMm); },
+	              [this](double mm) { edit(QStringLiteral("camera:focal"), [&]() { m_doc.camera = scene_doc::withFocalLength(m_doc.camera, mm, m_doc.render); }); }, 1, 2000, 1, 1, tr(" mm"));
+	auto *lens = new QComboBox;
+	lens->addItem(tr("Choose a lens..."), -1.0);
+	for (const scene_doc::LensPreset &p : scene_doc::lensPresets()) lens->addItem(lensLabel(p.name), p.focalMm);
+	connect(lens, QOverload<int>::of(&QComboBox::activated), this, [this, lens](int idx) {
+		const double mm = lens->itemData(idx).toDouble();
+		if (m_loading || mm <= 0.0) return;
+		edit(QString(), [&]() { m_doc.camera = scene_doc::withFocalLength(m_doc.camera, mm, m_doc.render); });
+		lens->setCurrentIndex(0);
+		refreshInspectorValues();
+	});
+	f->addRow(tr("Lens"), lens);
+	auto *sensor = new QComboBox;
+	for (const scene_doc::SensorPreset &p : scene_doc::sensorPresets()) sensor->addItem(sensorLabel(p.name), p.widthMm);
+	sensor->addItem(tr("Other"), -1.0);
+	const auto syncSensor = [this, sensor]() {
+		QSignalBlocker b(sensor);
+		int row = sensor->count() - 1;   // "Other"
+		for (int i = 0; i + 1 < sensor->count(); ++i)
+			if (std::fabs(sensor->itemData(i).toDouble() - m_doc.camera.sensorWidthMm) < 0.05) row = i;
+		sensor->setCurrentIndex(row);
+	};
+	syncSensor();
+	m_refreshers.push_back(syncSensor);
+	connect(sensor, QOverload<int>::of(&QComboBox::activated), this, [this, sensor](int idx) {
+		const double w = sensor->itemData(idx).toDouble();
+		if (m_loading || w <= 0.0) return;   // ("Other" keeps what is there: type a width below)
+		edit(QString(), [&]() { m_doc.camera.sensorWidthMm = w; });   // (the field of view stays: what changes is the focal length it means)
+		refreshInspectorValues();
+	});
+	f->addRow(tr("Sensor"), sensor);
+	addNum(f, tr("Sensor width"), [this]() { return &m_doc.camera.sensorWidthMm; }, 1, 1000, 0.5, 1, tr(" mm"));
+	addDerivedNum(f, tr("Aperture (f-number)"), [this]() { return scene_doc::fNumberFromLensRadius(scene_doc::focalLengthMm(m_doc.camera.fov, scene_doc::aspectOf(m_doc.render), m_doc.camera.sensorWidthMm), m_doc.camera.lensRadius); },
+	              [this](double n) {
+		              edit(QStringLiteral("camera:aperture"), [&]() {
+			              const double mm = scene_doc::focalLengthMm(m_doc.camera.fov, scene_doc::aspectOf(m_doc.render), m_doc.camera.sensorWidthMm);
+			              m_doc.camera.lensRadius = scene_doc::lensRadiusFromFNumber(mm, n > 0.0 ? std::max(0.7, n) : 0.0);
+		              });
+	              },
+	              0, 64, 0.2, 1, QString(), tr("Pinhole (everything sharp)"));
 	addNum(f, tr("Lens radius"), [this]() { return &m_doc.camera.lensRadius; }, 0, 10, 0.01, 3);
 	addNum(f, tr("Focus distance"), [this]() { return &m_doc.camera.focusDistance; }, 0.01, 10000, 0.5, 2);
-	auto *hint = new QLabel(tr("A lens radius above 0 blurs what is not at the focus distance (depth of field)."));
+	auto *pick = new QPushButton(tr("Pick focus in the 3D view"));
+	pick->setAutoDefault(false);
+	pick->setToolTip(tr("Then click what should be sharp: the focus distance becomes how far that is from the camera along the way it looks"));
+	connect(pick, &QPushButton::clicked, this, [this]() { beginPickFocus(); });
+	f->addRow(pick);
+	auto *hint = new QLabel(tr("The focal length and the sensor tell the field of view the way a photographer's lens does (50 mm on a 36 mm sensor is about 40 degrees across), and "
+	                           "the picture's shape crops the sensor, as in a real camera. The aperture sets the lens radius for a scene where one unit is a metre (50 mm at f/1.8 "
+	                           "is 0.014): a lens radius above 0 blurs what is not at the focus distance (depth of field), the more the wider the opening and the longer the lens."));
 	hint->setWordWrap(true);
 	f->addRow(hint);
 	addHeading(f, tr("Picture"));

@@ -511,6 +511,7 @@ void SceneBuilderWidget::documentChanged() {
 	updateActions();
 	updateViews();
 	scheduleAutosave();
+	if (m_sel.kind == SelKind::Camera && !m_loading) refreshInspectorValues();   // (the camera's lens rows are worked out from one another)
 }
 
 // ---- list, selection ------------------------------------------------------------------------------------------------------------

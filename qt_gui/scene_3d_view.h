@@ -72,6 +72,11 @@ public:
 	bool orthographic() const { return m_cam.ortho; }
 	void setStandardView(scene_view::StandardView v);
 	QString viewName() const { return m_viewName; }   // "Front", "Top"...: empty once the view is turned by hand
+	// Pick focus: the next click puts what is under it in focus. The view takes the click (nothing is selected or dragged), the cursor is a cross, and the point the click found on a
+	// surface (or on the floor if it hit none) is reported with focusPointPicked(); Escape, or the first click that finds nothing at all, ends it.
+	void beginPickFocus();
+	bool pickingFocus() const { return m_pickFocus; }
+	bool surfaceAt(const QPointF &px, scene_doc::Float3 &where) const;   // the point of the nearest face under that pixel (else of the floor); false if neither
 	void setGizmoMode(GizmoMode m);
 	GizmoMode gizmoMode() const { return m_gizmo; }
 	// Where a new object is dropped: the floor (y = 0) point under the middle of the view when that is near what the camera looks at, else the floor under
@@ -101,6 +106,7 @@ signals:
 	void gizmoModeChanged(int mode);
 	// A saved view's marker dragged (the owner takes the view's eye or target to `world`); dragBegan() came first, as for everything else that is dragged.
 	void viewMarkerDragged(int viewIndex, int which, const scene_doc::Float3 &world);
+	void focusPointPicked(const scene_doc::Float3 &world);   // a click found this point (Pick focus)
 	void frameSelectedRequested();   // the F key
 	void displayModeChanged();       // wireframe or orthographic changed (the numpad 5 key changes the latter)
 	void cameraViewRequested();      // the numpad 0 key: look through the scene's camera
@@ -196,6 +202,7 @@ private:
 	scene_doc::Camera m_previewCamera;
 	double m_previewProgress = 0.0;
 	int m_activeView = -1;          // the saved view whose marker was pressed last: its target is drawn and can be dragged too
+	bool m_pickFocus = false;       // the next click picks the focus point
 	bool m_wireframe = false;
 	QString m_viewName;             // the standard view the camera is in, until it is turned by hand
 	bool numpadKey(QKeyEvent *e);   // a numpad view key; true if it was one

@@ -102,6 +102,12 @@ void SceneBuilderWidget::createViews(QWidget *layoutBox, QVBoxLayout *layoutLayo
 	m_gizmoBar->setVisible(false);
 	createCameraBar(layoutBox);
 	connect(m_view3d, &Scene3DView::cameraViewRequested, this, [this]() { if (m_throughButton) m_throughButton->setChecked(true); });   // numpad 0
+	connect(m_view3d, &Scene3DView::focusPointPicked, this, [this](const Float3 &where) {
+		const double d = scene_doc::focusDistanceTo(m_doc.camera, where);
+		edit(QString(), [&]() { m_doc.camera.focusDistance = d; });
+		refreshInspectorValues();
+		emit statusMessage(m_doc.camera.lensRadius > 0.0 ? tr("Focus distance %1.").arg(d, 0, 'f', 2) : tr("Focus distance %1. It only shows with depth of field: set an aperture.").arg(d, 0, 'f', 2));
+	});
 
 	const std::pair<QString, SceneLayoutView::Plane> planes[] = {{tr("Top"), SceneLayoutView::Plane::Top}, {tr("Front"), SceneLayoutView::Plane::Front}, {tr("Side"), SceneLayoutView::Plane::Side}};
 	for (const auto &pl : planes) {
@@ -509,6 +515,16 @@ void SceneBuilderWidget::clickItemForTest(const BuilderSelection &s, Qt::Keyboar
 	const QPointF at = m_view->itemScreenPos(s);
 	sendMouse(m_view, QEvent::MouseButtonPress, at, Qt::LeftButton, Qt::LeftButton, mods);
 	sendMouse(m_view, QEvent::MouseButtonRelease, at, Qt::LeftButton, Qt::NoButton, mods);
+}
+
+bool SceneBuilderWidget::clickPickFocusForTest(int objectIndex) {
+	if (objectIndex < 0 || objectIndex >= static_cast<int>(m_doc.objects.size())) return false;
+	const double before = m_doc.camera.focusDistance;
+	beginPickFocus();
+	const QPointF at = m_view3d->itemScreenPos({SelKind::Object, objectIndex});
+	sendMouse(m_view3d, QEvent::MouseButtonPress, at, Qt::LeftButton, Qt::LeftButton);
+	sendMouse(m_view3d, QEvent::MouseButtonRelease, at, Qt::LeftButton, Qt::NoButton);
+	return m_doc.camera.focusDistance != before && !m_view3d->pickingFocus();
 }
 
 int SceneBuilderWidget::wireframeDifferenceForTest() {

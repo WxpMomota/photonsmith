@@ -38,6 +38,43 @@ scene_view::View Scene3DView::view() const {
 	return v;
 }
 
+void Scene3DView::beginPickFocus() {
+	m_pickFocus = true;
+	setCursor(Qt::CrossCursor);
+	setFocus();
+}
+
+// The point under a pixel: the nearest face the ray meets (a face is a flat polygon; the ray is cut with its plane, and the pixel must be inside the polygon as drawn), else the
+// floor (y = 0) if the ray reaches it.
+bool Scene3DView::surfaceAt(const QPointF &px, Float3 &where) const {
+	if (!m_doc) return false;
+	const scene_view::View v = view();
+	const scene_view::Ray ray = v.ray(px.x(), px.y());
+	projectFaces(v);
+	double best = 1e300;
+	bool found = false;
+	for (const Face &f : faces()) {
+		if (f.screen.size() < 3 || f.world.size() < 3 || !f.screen.containsPoint(px, Qt::OddEvenFill)) continue;
+		const V3 n = scene_view::normalize(scene_view::cross(f.world[1] - f.world[0], f.world[2] - f.world[0]));
+		const double denom = scene_view::dot(ray.dir, n);
+		if (std::abs(denom) < 1e-9) continue;
+		const double t = scene_view::dot(f.world[0] - ray.origin, n) / denom;
+		if (t < 0 || t >= best) continue;
+		best = t;
+		found = true;
+	}
+	if (found) {
+		where = toFloat3(ray.origin + ray.dir * best);
+		return true;
+	}
+	V3 hit;
+	if (scene_view::rayPlane(ray, {0, 0, 0}, {0, 1, 0}, hit)) {
+		where = toFloat3(hit);
+		return true;
+	}
+	return false;
+}
+
 void Scene3DView::setOrthographic(bool on) {
 	if (on == m_cam.ortho && !m_throughCamera) return;
 	leaveCameraView();
@@ -172,6 +209,12 @@ void Scene3DView::setGizmoMode(GizmoMode m) {
 }
 
 void Scene3DView::keyPressEvent(QKeyEvent *e) {
+	if (m_pickFocus && e->key() == Qt::Key_Escape) {
+		m_pickFocus = false;
+		unsetCursor();
+		e->accept();
+		return;
+	}
 	if (numpadKey(e)) return;
 	GizmoMode wanted = m_gizmo;
 	const char *name = "";
@@ -737,6 +780,17 @@ void Scene3DView::drawCamera(Ctx &c) const {
 			c.line(corner[k], corner[(k + 1) % 4], pen);
 		}
 		c.line(pos, tgt, QPen(camColor, 1.0, Qt::DashLine));
+		// With depth of field the focal plane: a rectangle square to the view, as wide as the picture is there, with a cross in the middle (what is on it is sharp).
+		if (selected && m_doc->camera.lensRadius > 0.0) {
+			const double fd = std::max(0.01, m_doc->camera.focusDistance);
+			const double fh = fd * std::tan(m_doc->camera.fov * kPi / 360.0), fw = fh * aspect;
+			const V3 fc = pos + f * fd;
+			const V3 fcorner[4] = {fc - r * fw - u * fh, fc + r * fw - u * fh, fc + r * fw + u * fh, fc - r * fw + u * fh};
+			const QPen focusPen(QColor(90, 200, 120), 1.2, Qt::DashLine);
+			for (int k = 0; k < 4; ++k) c.line(fcorner[k], fcorner[(k + 1) % 4], focusPen);
+			c.line(fc - r * (fw * 0.08), fc + r * (fw * 0.08), QPen(QColor(90, 200, 120), 1.6));
+			c.line(fc - u * (fh * 0.08), fc + u * (fh * 0.08), QPen(QColor(90, 200, 120), 1.6));
+		}
 	}
 	QPointF at, t;
 	if (c.pixel(pos, at)) {

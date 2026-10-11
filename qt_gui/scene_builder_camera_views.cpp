@@ -207,6 +207,13 @@ Camera SceneBuilderWidget::cameraNow() const {
 	return scene_doc::cameraLookingFrom(m_doc.camera, toFloat3(pose.eye()), toFloat3(pose.target));
 }
 
+// Shows the 3D view and waits for a click in it: what is under the click is put in focus (Scene3DView::beginPickFocus).
+void SceneBuilderWidget::beginPickFocus() {
+	show3dView(true);
+	m_view3d->beginPickFocus();
+	emit statusMessage(tr("Click what should be in focus in the 3D view (Escape cancels)."));
+}
+
 void SceneBuilderWidget::cameraFromView() {
 	if (m_view3d->throughCamera() && !m_view3d->previewingFlythrough()) return;   // already the camera
 	const Camera camera = cameraNow();

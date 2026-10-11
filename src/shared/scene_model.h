@@ -163,6 +163,7 @@ struct Camera {
 	double fov = 40.0;                 // vertical field of view, degrees
 	double lensRadius = 0.0;           // 0 = a pinhole; > 0 blurs what is not at focusDistance
 	double focusDistance = 8.0;
+	double sensorWidthMm = 36.0;       // the film's width in millimetres, for talking about the lens as a focal length (scene_camera_lens.h); the renderer reads only `fov`
 };
 
 // A camera the user saved under a name, to come back to (scene_camera_views.h).
