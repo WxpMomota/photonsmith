@@ -1,5 +1,9 @@
 # Ray Tracer
 
+**An open-source, pbrt-v4-compatible path tracer for the CPU, NVIDIA OptiX (Windows) and Apple Metal (macOS), with a Qt GUI, a Scene Builder and a Live Preview you can drag objects around in.** It reads pbrt-v4 scene files, and its renders are checked against closed-form results, not only against each other.
+
+[**Download**](https://github.com/XinpeiWang/ray_tracer/releases) | [**Website and gallery**](https://xinpeiwang.github.io/ray_tracer/) | [**What is supported**](docs/BACKEND_SUPPORT.md) | [**How the renders are checked**](docs/CLOSED_FORMS_FOUND_THE_BUGS.md)
+
 A physically-based renderer with parallel **CPU**, **GPU (OptiX)** (Windows + NVIDIA) and **GPU (Metal)** (macOS) implementations, built up from the "Ray Tracing in One Weekend" book series into a much broader pbrt-v4-style feature set: 151 built-in scenes and 58 test scenes, a wide material library, multiple light types, real triangle-mesh/texture support, BVH acceleration, volumetrics, and an experimental SPPM (photon-mapping) integrator alongside standard path tracing.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
@@ -73,7 +77,7 @@ The portable version includes:
 
 See [INSTALL.md](INSTALL.md) for detailed usage instructions.
 
-**macOS:** a `RayTracerGUI.dmg` (Metal GPU rendering and Live Preview included; native on Apple silicon; `--arch universal` builds one dmg for Apple-silicon and Intel Macs) is built by `scripts/build_and_deploy_macos.sh` — see [BUILD.md](BUILD.md#macos-cpu-and-metal-gpu). It is not code-signed, so on first launch right-click the app → **Open**.
+**macOS:** download `RayTracerGUI.dmg` from the [Releases page](https://github.com/XinpeiWang/ray_tracer/releases) (Metal GPU rendering and Live Preview included; one dmg for Apple-silicon and Intel Macs; it is not notarized, so macOS asks you to confirm the first launch: see the notes on the release). To build it yourself: `scripts/build_and_deploy_macos.sh --arch universal`. — see [BUILD.md](BUILD.md#macos-cpu-and-metal-gpu). It is not code-signed, so on first launch right-click the app → **Open**.
 
 ## 🔨 Building from Source
 

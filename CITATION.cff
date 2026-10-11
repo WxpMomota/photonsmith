@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this renderer in research or a publication, please cite it as below."
+title: "ray_tracer: a pbrt-v4-compatible path tracer for CPU, NVIDIA OptiX and Apple Metal"
+type: software
+authors:
+  - family-names: Wang
+    given-names: Xinpei
+repository-code: "https://github.com/XinpeiWang/ray_tracer"
+url: "https://xinpeiwang.github.io/ray_tracer/"
+license: MIT
+keywords:
+  - ray tracing
+  - path tracing
+  - physically based rendering
+  - pbrt
+  - OptiX
+  - Metal
+  - computer graphics
+abstract: >-
+  A physically based renderer that reads pbrt-v4 scene files and renders them on the CPU, on NVIDIA GPUs through OptiX and on Apple GPUs through Metal,
+  with a Qt GUI, a Scene Builder and an interactive Live Preview. Its renders are checked against closed-form results and by rendering the same scene two ways.
