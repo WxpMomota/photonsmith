@@ -708,11 +708,33 @@ static void selfTestRenderedViewport(SceneBuilderWidget *sb, const std::function
 	sb->setMaterialForTest(3, green);
 	const bool changed = wait(60000, [&]() { return redPixels(sb->renderedImageForTest()) < redBefore / 3; });
 	check(changed, QString("recolouring the red box changes the picture within a few seconds (red pixels %1 -> %2)").arg(redBefore).arg(redPixels(sb->renderedImageForTest())));
+	// Dragging the (now green) box along X only moves it: the renderer is told its offset and redraws, without writing the copy and starting again.
+	const auto greenCentre = [](const QImage &img) {
+		double sx = 0;
+		int n = 0;
+		for (int y = 0; y < img.height(); ++y)
+			for (int x = 0; x < img.width(); ++x) {
+				const QColor c = img.pixelColor(x, y);
+				if (c.green() > c.red() + 50 && c.green() > c.blue() + 50) { sx += x; ++n; }
+			}
+		return n > 20 ? sx / n : -1.0;
+	};
+	if (changed) {
+		wait(30000, [&]() { return greenCentre(sb->renderedImageForTest()) >= 0.0; });
+		const double centreBefore = greenCentre(sb->renderedImageForTest());
+		const int restartsBefore = sb->renderedRestartsForTest();
+		sb->setGizmoToolForTest(0);
+		const bool dragged = sb->dragAxis3dForTest(3, 0, 130);
+		const bool followed = wait(60000, [&]() { return std::abs(greenCentre(sb->renderedImageForTest()) - centreBefore) > 5.0; });
+		check(dragged && followed, QString("dragging the box along X moves it in the picture (its centre %1 -> %2)").arg(centreBefore, 0, 'f', 1).arg(greenCentre(sb->renderedImageForTest()), 0, 'f', 1));
+		check(sb->renderedRestartsForTest() == restartsBefore, QString("and the renderer was told the move, not started again (%1 restarts during the drag)").arg(sb->renderedRestartsForTest() - restartsBefore));
+	}
 	// The camera: turning the view keeps it rendering (the picture follows without a restart).
 	const int framesBefore = sb->renderedFramesForTest();
 	sb->orbit3dForTest(70.0, 25.0);
 	const bool moved = wait(30000, [&]() { return sb->renderedFramesForTest() > framesBefore + 3; });
 	check(moved, "orbiting the view keeps the picture coming");
+	sb->undo();   // (the move, and then the recolour)
 	sb->undo();
 	sb->setRenderedViewport(false);
 	check(!sb->renderedViewport() && !sb->view3dForTest()->renderedMode(), "the Rendered switch turns it off again (the 3D view draws its faces)");

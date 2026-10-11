@@ -132,8 +132,12 @@ void SceneBuilderWidget::syncRenderedViewport() {
 		const std::string signature = scene_viewport::sceneSignature(m_doc);
 		if (signature != m_viewportSignature) {
 			m_viewportSignature = signature;
-			m_viewportPending = true;          // (the first time too)
-			m_viewportEditClock.restart();
+			if (!m_viewportPending && !moveViewportObjects()) {
+				m_viewportPending = true;          // (the first time too)
+				m_viewportEditClock.restart();
+			} else if (m_viewportPending) {
+				m_viewportEditClock.restart();
+			}
 		}
 	}
 	if (m_viewportPending && !m_viewportEditClock.hasExpired(kEditPauseMs) && m_viewportRunning) return;   // still being edited: the old picture stays until the pause
@@ -146,6 +150,21 @@ void SceneBuilderWidget::syncRenderedViewport() {
 		m_viewportSession->setCamera(pose.eye[0], pose.eye[1], pose.eye[2], pose.target[0], pose.target[1], pose.target[2]);
 		m_viewportSent = pose;
 	}
+}
+
+// A drag only moved objects: tell the renderer where each one is now, from where its copy has it, and it redraws at once without a restart. False when the change is more than that
+// (or the renderer has not drawn the copy yet, when it would not know the objects), and the copy is written again.
+bool SceneBuilderWidget::moveViewportObjects() {
+	if (!m_viewportRunning || m_viewportFrames <= m_viewportFramesAtStart || !RealtimePreviewSession::objectEditingAvailable()) return false;
+	const std::vector<std::array<double, 3>> offsets = scene_viewport::translationOnly(m_viewportBase, m_doc);
+	if (offsets.empty()) return false;
+	if (m_viewportOffsets.size() != offsets.size()) m_viewportOffsets.assign(offsets.size(), {0.0, 0.0, 0.0});
+	for (std::size_t i = 0; i < offsets.size(); ++i) {
+		if (offsets[i] == m_viewportOffsets[i]) continue;
+		m_viewportSession->setObjectOffset(static_cast<int>(i), offsets[i][0], offsets[i][1], offsets[i][2]);
+		m_viewportOffsets[i] = offsets[i];
+	}
+	return true;
 }
 
 // Writes the scene as the viewport sees it (the view's camera, the view's shape) over the "(live preview)" copy and starts the renderer on it.
@@ -187,6 +206,10 @@ void SceneBuilderWidget::startViewportSession(const scene_viewport::Pose &pose) 
 	                         /*spp*/ 1, std::min(m_doc.render.maxDepth, 8), /*fireflyClamp*/ 50.0, /*temporalUpscale*/ false, 1, /*nrc*/ false, /*neuralUpscale*/ false,
 	                         lens, lens ? m_doc.camera.lensRadius : 0.0, lens ? m_doc.camera.focusDistance : 0.0);
 	m_viewportSent = pose;
+	m_viewportBase = m_doc;
+	m_viewportOffsets.clear();
+	m_viewportFramesAtStart = m_viewportFrames;
+	++m_viewportRestarts;
 	m_viewportRunning = true;
 	m_viewportSceneId = id;
 }

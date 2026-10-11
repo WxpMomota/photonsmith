@@ -15,6 +15,7 @@
 #include <QWidget>
 
 #include <functional>
+#include <array>
 #include <vector>
 
 #include "../src/shared/scene_document.h"
@@ -178,6 +179,7 @@ public:
 	bool renderedViewport() const { return m_viewportOn; }
 	void stopRenderedViewport();
 	int renderedFramesForTest() const { return m_viewportFrames; }
+	int renderedRestartsForTest() const { return m_viewportRestarts; }   // how many times the renderer was started on a new copy of the scene
 	int renderedSamplesForTest() const { return m_viewportSamples; }
 	QImage renderedImageForTest() const { return m_viewportImage; }
 	// "Search actions" (F3, Ctrl+K): type what to do and run it (scene_builder_actions.cpp; the matching is src/shared/action_search.h).
@@ -328,6 +330,7 @@ private:
 	QMenu *createArrangeMenu(QWidget *parent);
 	void createArrangeShortcuts();
 	void syncRenderedViewport();
+	bool moveViewportObjects();
 	void startViewportSession(const scene_viewport::Pose &pose);
 	void pauseViewportIfHidden(bool hidden);
 	scene_viewport::Pose viewportPose() const;
@@ -348,6 +351,10 @@ private:
 	QElapsedTimer m_viewportEditClock;
 	std::string m_viewportSignature;
 	scene_viewport::Pose m_viewportSent;
+	scene_doc::Document m_viewportBase;                      // the document the renderer's copy was written from
+	std::vector<std::array<double, 3>> m_viewportOffsets;    // where the renderer has been told each object is, from the copy (empty: none)
+	int m_viewportRestarts = 0;
+	int m_viewportFramesAtStart = 0;                         // frames seen when the copy was last started: offsets are sent only once the renderer has drawn it
 	QString m_viewportSceneId;
 	int m_viewportFrames = 0;
 	int m_viewportSamples = 0;

@@ -98,3 +98,43 @@ TEST(SceneViewportTest, AnEditThatChangesThePictureChangesTheSignature) {
 	fewer.objects.pop_back();
 	EXPECT_NE(sceneSignature(fewer), sig);
 }
+
+TEST(SceneViewportTest, MovingObjectsGivesEachOneItsOffsetFromTheCopy) {
+	const Document base = makeStarterScene();
+	Document now = base;
+	now.objects[2].position.x += 0.5;
+	now.objects[2].position.z -= 0.25;
+	const auto offsets = translationOnly(base, now);
+	ASSERT_EQ(offsets.size(), base.objects.size());
+	EXPECT_NEAR(offsets[2][0], 0.5, 1e-12);
+	EXPECT_NEAR(offsets[2][1], 0.0, 1e-12);
+	EXPECT_NEAR(offsets[2][2], -0.25, 1e-12);
+	EXPECT_EQ(offsets[1], (std::array<double, 3>{0, 0, 0}));
+	const auto none = translationOnly(base, base);
+	ASSERT_EQ(none.size(), base.objects.size()) << "nothing moved is still a move of zero, not a restart";
+	for (const auto &o : none) EXPECT_EQ(o, (std::array<double, 3>{0, 0, 0}));
+}
+
+TEST(SceneViewportTest, AMoveWithAnotherChangeOrAnUntrustedObjectIsNotJustAMove) {
+	const Document base = makeStarterScene();
+	Document recoloured = base;
+	recoloured.objects[2].position.x += 1.0;
+	recoloured.objects[3].material.color = {0.1, 0.9, 0.2};
+	EXPECT_TRUE(translationOnly(base, recoloured).empty());
+	Document extra = base;
+	extra.objects.push_back(base.objects[1]);
+	EXPECT_TRUE(translationOnly(base, extra).empty()) << "a different number of objects changes the renderer's numbering";
+	Document turned = base;
+	turned.objects[2].rotation.y += 30.0;
+	EXPECT_TRUE(translationOnly(base, turned).empty());
+	Document fogged = base;
+	fogged.objects.push_back(scene_doc::makeVolume(scene_doc::VolumeKind::Fog, "Fog"));
+	Document fogMoved = fogged;
+	fogMoved.objects.back().position.x += 1.0;
+	EXPECT_TRUE(translationOnly(fogged, fogMoved).empty()) << "a volume restarts: its medium would stay where it was declared";
+	Document coned = base;
+	coned.objects[2].shape = scene_doc::ShapeKind::Cone;
+	Document conedMoved = coned;
+	conedMoved.objects[2].position.x += 1.0;
+	EXPECT_TRUE(translationOnly(coned, conedMoved).empty());
+}

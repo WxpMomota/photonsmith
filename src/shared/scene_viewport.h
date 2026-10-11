@@ -6,15 +6,18 @@
 // happen, and they cost very different amounts:
 //   * the view's eye or target moved (orbit, pan, zoom): tell the renderer the new camera; it keeps what it can of the picture (cheap);
 //   * the picture's size or field of view changed (the window was resized, a different lens): the renderer starts the picture again from the same scene (a restart);
-//   * the document changed so that the scene is different: write the copy again and start again (a restart, after the edits have paused).
+//   * the document changed so that the scene is different: write the copy again and start again (a restart, after the edits have paused);
+//   * the document changed only by moving objects (a drag): tell the renderer each object's offset from where the copy has it (translationOnly()); it keeps the copy and redraws.
 // An edit that does not change the scene (a saved view, hiding something in the views, a name, the picture size for rendering) must not restart anything: sceneSignature() is what
 // is compared to know.
 
 #include "scene_document.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <string>
+#include <vector>
 
 namespace scene_viewport {
 
@@ -64,6 +67,27 @@ inline std::string sceneSignature(const scene_doc::Document& d) {
 		start = end + 1;
 	}
 	return out;
+}
+
+// Whether `now` differs from `base` (the document the renderer's copy was written from) only in where objects are, and by how much: the offset of each object (absolute from where
+// `base` has it, so all zeros when nothing moved). The renderer numbers objects as the copy's AttributeBegin blocks in file order, which are the document's objects in order, so an
+// offset's index is the object's. Nothing is returned (an empty vector) when the change is more than a move, or for a scene where the numbering cannot be trusted or a move would not
+// carry everything along: a cone (the GPU does not draw it as one of the shapes it can move), a mesh (its file may not load, which leaves no object), and a volume (the medium of a cloud
+// stays where it was declared). Those restart instead.
+inline std::vector<std::array<double, 3>> translationOnly(const scene_doc::Document& base, const scene_doc::Document& now) {
+	if (base.objects.size() != now.objects.size() || base.objects.empty()) return {};
+	for (const scene_doc::Object& o : now.objects)
+		if (o.shape == scene_doc::ShapeKind::Cone || o.shape == scene_doc::ShapeKind::Mesh || o.volume.kind != scene_doc::VolumeKind::None) return {};
+	scene_doc::Document unmoved = now;
+	std::vector<std::array<double, 3>> offsets(now.objects.size());
+	for (std::size_t i = 0; i < now.objects.size(); ++i) {
+		const scene_doc::Float3& a = base.objects[i].position;
+		const scene_doc::Float3& b = now.objects[i].position;
+		offsets[i] = {b.x - a.x, b.y - a.y, b.z - a.z};
+		unmoved.objects[i].position = a;
+	}
+	if (sceneSignature(unmoved) != sceneSignature(base)) return {};
+	return offsets;
 }
 
 }  // namespace scene_viewport
