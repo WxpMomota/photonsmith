@@ -762,22 +762,22 @@
         <translation>オブジェクトをクリックしてドラッグします（Shift：上下）。その後は W A S D と上下キーでも動かせます。</translation>
     </message>
     <message>
-        <location filename="../live_object_editor.cpp" line="129"/>
+        <location filename="../live_object_editor.cpp" line="130"/>
         <source>Selected: %1. Drag to move it (Shift: up and down); W A S D and Up/Down move it too.</source>
         <translation>選択中：%1。ドラッグで移動（Shift：上下）。W A S D と上下キーでも動かせます。</translation>
     </message>
     <message>
-        <location filename="../live_object_editor.cpp" line="172"/>
+        <location filename="../live_object_editor.cpp" line="173"/>
         <source>Cannot save: there is no scenes folder to write to.</source>
         <translation>保存できません：書き込めるシーンフォルダがありません。</translation>
     </message>
     <message>
-        <location filename="../live_object_editor.cpp" line="184"/>
+        <location filename="../live_object_editor.cpp" line="185"/>
         <source>Not saved: %1.</source>
         <translation>保存されていません：%1。</translation>
     </message>
     <message>
-        <location filename="../live_object_editor.cpp" line="187"/>
+        <location filename="../live_object_editor.cpp" line="188"/>
         <source>Saved as %1 (%2). It is in the scene list under My Scenes.</source>
         <translation>%1 として保存しました（%2）。シーン一覧の「マイシーン」にあります。</translation>
     </message>
@@ -787,7 +787,7 @@
         <translation>そこには動かせるものがありません。ドラッグでカメラを周回します。</translation>
     </message>
     <message>
-        <location filename="../live_object_editor.cpp" line="164"/>
+        <location filename="../live_object_editor.cpp" line="165"/>
         <source>Every object is back where the scene file puts it.</source>
         <translation>すべてのオブジェクトをシーンファイルの位置に戻しました。</translation>
     </message>
@@ -6383,22 +6383,22 @@ Output:
 <context>
     <name>Scene3DView</name>
     <message>
-        <location filename="../scene_3d_view.cpp" line="410"/>
+        <location filename="../scene_3d_view.cpp" line="414"/>
         <source>the floor</source>
         <translation>床</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="423"/>
+        <location filename="../scene_3d_view.cpp" line="427"/>
         <source>Snapped to %1</source>
         <translation>%1 に吸着</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="441"/>
+        <location filename="../scene_3d_view.cpp" line="445"/>
         <source>Through the camera (%1 x %2). Orbit, pan or zoom to leave.</source>
         <translation>カメラ越しの表示 (%1 x %2)。回り込み・画面移動・ズームで解除されます。</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="593"/>
+        <location filename="../scene_3d_view.cpp" line="623"/>
         <source>Camera</source>
         <translation>カメラ</translation>
     </message>
@@ -7086,133 +7086,143 @@ From: %3</source>
         <translation>選択したオブジェクトのコピーをたくさん作ります。グリッド、点のまわりのリング、またはランダムな散布</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="36"/>
+        <location filename="../scene_builder_camera_views.cpp" line="40"/>
         <source>Through camera</source>
         <translation>カメラ越し</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="38"/>
+        <location filename="../scene_builder_camera_views.cpp" line="42"/>
         <source>Look at the scene from the camera, with the picture&apos;s frame drawn over it. Orbit, pan or zoom to leave.</source>
         <translation>シーンをカメラの位置から見ます。画像のフレームが重ねて表示されます。回り込み・画面移動・ズームで解除されます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="39"/>
+        <location filename="../scene_builder_camera_views.cpp" line="43"/>
         <source>Camera from view</source>
         <translation>ビューからカメラ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="40"/>
+        <location filename="../scene_builder_camera_views.cpp" line="44"/>
         <source>Put the scene&apos;s camera where the 3D view is now, looking the same way</source>
         <translation>シーンのカメラを、現在の 3D ビューの位置と向きに合わせます</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="42"/>
+        <location filename="../scene_builder_camera_views.cpp" line="46"/>
         <source>Saved camera views: pick one to put the camera there</source>
         <translation>保存したカメラビュー: 選ぶとカメラがその位置に移ります</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="44"/>
+        <location filename="../scene_builder_camera_views.cpp" line="48"/>
         <source>Save view...</source>
         <translation>ビューを保存...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="45"/>
+        <location filename="../scene_builder_camera_views.cpp" line="49"/>
         <source>Remember what you are looking at now (the 3D view, or the camera while looking through it) under a name</source>
         <translation>今見ているもの (3D ビュー、またはカメラ越しの表示ならカメラ) に名前を付けて記憶します</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="62"/>
+        <location filename="../scene_builder_camera_views.cpp" line="56"/>
+        <source>Camera path</source>
+        <translation>カメラの軌跡</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_views.cpp" line="58"/>
+        <source>With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view.</source>
+        <translation>保存したビューが 2 つ以上あるとき、フライスルーがそれらを通る経路 (オレンジ色の曲線) を、各ビューに目印を付けて表示します。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_views.cpp" line="71"/>
         <source>Save view</source>
         <translation>ビューを保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="62"/>
+        <location filename="../scene_builder_camera_views.cpp" line="71"/>
         <source>Name of the view:</source>
         <translation>ビューの名前:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="75"/>
+        <location filename="../scene_builder_camera_views.cpp" line="84"/>
         <source>No saved views</source>
         <translation>保存したビューはありません</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="75"/>
+        <location filename="../scene_builder_camera_views.cpp" line="84"/>
         <source>Saved views</source>
         <translation>保存したビュー</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="92"/>
+        <location filename="../scene_builder_camera_views.cpp" line="101"/>
         <source>The camera is where the view is.</source>
         <translation>カメラをビューの位置に合わせました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="100"/>
+        <location filename="../scene_builder_camera_views.cpp" line="109"/>
         <source>There are already %1 saved views: delete one first.</source>
         <translation>すでに %1 個のビューが保存されています。先に 1 つ削除してください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="104"/>
+        <location filename="../scene_builder_camera_views.cpp" line="113"/>
         <source>Saved the view &quot;%1&quot;.</source>
         <translation>ビュー「%1」を保存しました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="151"/>
+        <location filename="../scene_builder_camera_views.cpp" line="175"/>
         <source>&lt;b&gt;Saved views&lt;/b&gt;</source>
         <translation>&lt;b&gt;保存したビュー&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="155"/>
+        <location filename="../scene_builder_camera_views.cpp" line="179"/>
         <source>None yet. Save the camera as a view to come back to it: a front view, a close-up, a bird&apos;s-eye shot.</source>
         <translation>まだありません。カメラをビューとして保存すると、あとで戻れます (正面、クローズアップ、俯瞰など)。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="182"/>
+        <location filename="../scene_builder_camera_views.cpp" line="206"/>
         <source>How long a flythrough stays at this view before flying on (0: it does not stop)</source>
         <translation>フライスルーがこのビューにとどまってから先へ進むまでの時間 (0: 止まらない)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="183"/>
+        <location filename="../scene_builder_camera_views.cpp" line="207"/>
         <source>Hold:</source>
         <translation>停止:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="185"/>
+        <location filename="../scene_builder_camera_views.cpp" line="209"/>
         <source>Use</source>
         <translation>使う</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="185"/>
+        <location filename="../scene_builder_camera_views.cpp" line="209"/>
         <source>Put the camera at this view</source>
         <translation>カメラをこのビューの位置に移します</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="186"/>
+        <location filename="../scene_builder_camera_views.cpp" line="210"/>
         <source>Update</source>
         <translation>更新</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="186"/>
+        <location filename="../scene_builder_camera_views.cpp" line="210"/>
         <source>Save the camera as it is now over this view</source>
         <translation>現在のカメラでこのビューを上書き保存します</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="187"/>
+        <location filename="../scene_builder_camera_views.cpp" line="211"/>
         <location filename="../scene_builder_widget.cpp" line="217"/>
         <source>Delete</source>
         <translation>削除</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="187"/>
+        <location filename="../scene_builder_camera_views.cpp" line="211"/>
         <source>Remove this saved view</source>
         <translation>この保存ビューを削除します</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="191"/>
+        <location filename="../scene_builder_camera_views.cpp" line="215"/>
         <source>Save camera as a view</source>
         <translation>カメラをビューとして保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="192"/>
+        <location filename="../scene_builder_camera_views.cpp" line="216"/>
         <source>Remember the camera as it is now under a name (a saved view can be used from the 3D view&apos;s list too)</source>
         <translation>現在のカメラに名前を付けて記憶します (保存したビューは 3D ビューの一覧からも使えます)</translation>
     </message>
@@ -7410,7 +7420,7 @@ From: %3</source>
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="164"/>
-        <location filename="../scene_builder_turntable.cpp" line="255"/>
+        <location filename="../scene_builder_turntable.cpp" line="244"/>
         <location filename="../scene_builder_widget.cpp" line="281"/>
         <source>Preview</source>
         <translation>プレビュー</translation>
@@ -7426,23 +7436,23 @@ From: %3</source>
         <translation>カメラで設定した画像サイズとサンプル数でレンダリングし、PNG として保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="53"/>
-        <location filename="../scene_builder_turntable.cpp" line="144"/>
+        <location filename="../scene_builder_turntable.cpp" line="54"/>
+        <location filename="../scene_builder_turntable.cpp" line="145"/>
         <source>A flythrough needs two or more saved camera views.</source>
         <translation>フライスルーには、保存したカメラビューが 2 つ以上必要です。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="57"/>
+        <location filename="../scene_builder_turntable.cpp" line="58"/>
         <source>Turntable video</source>
         <translation>ターンテーブル動画</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="57"/>
+        <location filename="../scene_builder_turntable.cpp" line="58"/>
         <source>Flythrough video</source>
         <translation>フライスルー動画</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="59"/>
+        <location filename="../scene_builder_turntable.cpp" line="60"/>
         <source>Makes a video of the scene from a camera that goes once round the point the camera looks at, at the camera&apos;s own height and distance, starting where it is now. It renders every frame, so a long or large video takes a while; start with Draft.</source>
         <translation>カメラが注視している点のまわりを、カメラ自身の高さと距離のまま、現在の位置から 1 周する動画を作ります。すべてのフレームをレンダリングするので、長い動画や大きな動画は時間がかかります。まずは「ドラフト」から試してください。</translation>
     </message>
@@ -7451,144 +7461,144 @@ From: %3</source>
         <translation type="vanished">保存したカメラビューを保存した順にたどって飛ぶカメラから見たシーンの動画を作ります: %1。最初の画像が最初のビュー、最後の画像が最後のビューになります。レンズ (画角、被写界深度) は最初のビューのものです。すべてのフレームをレンダリングするので、長い動画や大きな動画は時間がかかります。まずは「ドラフト」から試してください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="64"/>
+        <location filename="../scene_builder_turntable.cpp" line="65"/>
         <source>Makes a video of the scene from a camera that flies through your saved camera views in the order they were saved: %1. The first picture is the first view and the last picture the last. Each view&apos;s field of view and lens go with it. It renders every frame, so a long or large video takes a while; start with Draft.</source>
         <translation>保存したカメラビューを保存した順にたどって飛ぶカメラから見たシーンの動画を作ります: %1。最初の画像が最初のビュー、最後の画像が最後のビューになります。各ビューの画角とレンズもそのビューと一緒に反映されます。すべてのフレームをレンダリングするので、長い動画や大きな動画は時間がかかります。まずは「ドラフト」から試してください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="179"/>
-        <location filename="../scene_builder_turntable.cpp" line="75"/>
+        <location filename="../scene_builder_camera_views.cpp" line="203"/>
+        <location filename="../scene_builder_turntable.cpp" line="76"/>
         <source> s</source>
         <translation> 秒</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="77"/>
+        <location filename="../scene_builder_turntable.cpp" line="78"/>
         <source>%1 frames per second</source>
         <translation>毎秒 %1 フレーム</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="80"/>
+        <location filename="../scene_builder_turntable.cpp" line="81"/>
         <source>Draft: 480 pixels wide, 16 samples</source>
         <translation>ドラフト: 幅 480 ピクセル、16 サンプル</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="81"/>
+        <location filename="../scene_builder_turntable.cpp" line="82"/>
         <source>Good: 720 pixels wide, 64 samples</source>
         <translation>標準: 幅 720 ピクセル、64 サンプル</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="82"/>
+        <location filename="../scene_builder_turntable.cpp" line="83"/>
         <source>Best: 960 pixels wide, 256 samples</source>
         <translation>最高: 幅 960 ピクセル、256 サンプル</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="83"/>
+        <location filename="../scene_builder_turntable.cpp" line="84"/>
         <source>The scene&apos;s own size and samples (%1 x %2, %3)</source>
         <translation>シーンのサイズとサンプル数 (%1 x %2、%3)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="87"/>
+        <location filename="../scene_builder_turntable.cpp" line="88"/>
         <source>Start and end gently</source>
         <translation>ゆっくり始めてゆっくり終える</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="89"/>
+        <location filename="../scene_builder_turntable.cpp" line="90"/>
         <source>Come back to the first view at the end</source>
         <translation>最後に最初のビューへ戻る</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="91"/>
+        <location filename="../scene_builder_turntable.cpp" line="92"/>
         <source>Length:</source>
         <translation>長さ:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="92"/>
+        <location filename="../scene_builder_turntable.cpp" line="93"/>
         <source>Speed:</source>
         <translation>速さ:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="93"/>
+        <location filename="../scene_builder_turntable.cpp" line="94"/>
         <location filename="../scene_builder_widget.cpp" line="293"/>
         <source>Quality:</source>
         <translation>品質:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="105"/>
+        <location filename="../scene_builder_turntable.cpp" line="106"/>
         <source>%1 frames.</source>
         <translation>%1 フレーム。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="107"/>
+        <location filename="../scene_builder_turntable.cpp" line="108"/>
         <source>The pauses (%1 s in all) are longer than this video can hold: they are shortened to leave a tenth of it for moving.</source>
         <translation>停止時間 (合計 %1 秒) がこの動画の長さに収まりません。移動のために 10 分の 1 を残すよう短縮されます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="108"/>
+        <location filename="../scene_builder_turntable.cpp" line="109"/>
         <source>The camera pauses for %1 s in all, so it moves for %2 s.</source>
         <translation>カメラは合計 %1 秒停止するため、移動する時間は %2 秒です。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="116"/>
+        <location filename="../scene_builder_turntable.cpp" line="117"/>
         <source>Choose where to save...</source>
         <translation>保存先を選ぶ...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="124"/>
+        <location filename="../scene_builder_turntable.cpp" line="125"/>
         <source>Save the turntable video</source>
         <translation>ターンテーブル動画を保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="124"/>
+        <location filename="../scene_builder_turntable.cpp" line="125"/>
         <source>MP4 videos (*.mp4)</source>
         <translation>MP4 動画 (*.mp4)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="124"/>
+        <location filename="../scene_builder_turntable.cpp" line="125"/>
         <source>Save the flythrough video</source>
         <translation>フライスルー動画を保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="131"/>
+        <location filename="../scene_builder_turntable.cpp" line="132"/>
         <source>The turntable failed</source>
         <translation>ターンテーブルに失敗しました</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="131"/>
+        <location filename="../scene_builder_turntable.cpp" line="132"/>
         <source>The flythrough failed</source>
         <translation>フライスルーに失敗しました</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="179"/>
+        <location filename="../scene_builder_turntable.cpp" line="168"/>
         <source>A video needs at least one frame.</source>
         <translation>動画には少なくとも 1 フレームが必要です。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="228"/>
+        <location filename="../scene_builder_turntable.cpp" line="217"/>
         <source>Video: frame %1 of %2...</source>
         <translation>動画: フレーム %1 / %2...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="229"/>
+        <location filename="../scene_builder_turntable.cpp" line="218"/>
         <source>Video: putting the video together...</source>
         <translation>動画: 動画を組み立てています...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="243"/>
+        <location filename="../scene_builder_turntable.cpp" line="232"/>
         <source>Video: starting (%1 frames, %2 x %3, %4 samples)...</source>
         <translation>動画: 開始 (%1 フレーム、%2 x %3、%4 サンプル)...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="269"/>
+        <location filename="../scene_builder_turntable.cpp" line="258"/>
         <source>Video done in %1 s. Saved %2.</source>
         <translation>動画が %1 秒で完成しました。%2 に保存しました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="274"/>
+        <location filename="../scene_builder_turntable.cpp" line="263"/>
         <source>The video was cancelled.</source>
         <translation>動画はキャンセルされました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="286"/>
+        <location filename="../scene_builder_turntable.cpp" line="275"/>
         <source>The video failed.</source>
         <translation>動画の作成に失敗しました。</translation>
     </message>
@@ -7613,7 +7623,7 @@ From: %3</source>
         <translation type="vanished">ターンテーブルが %1 秒で完了しました。%2 に保存しました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="271"/>
+        <location filename="../scene_builder_turntable.cpp" line="260"/>
         <source>The video was made but could not be saved to %1.</source>
         <translation>動画は作成されましたが、%1 に保存できませんでした。</translation>
     </message>
@@ -7622,12 +7632,12 @@ From: %3</source>
         <translation type="vanished">ターンテーブルはキャンセルされました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="282"/>
+        <location filename="../scene_builder_turntable.cpp" line="271"/>
         <source>The frames were rendered, but putting them together needs the free program ffmpeg, which was not found. Install it (ffmpeg.org) and try again.</source>
         <translation>フレームはレンダリングされましたが、動画にまとめるには無料のプログラム ffmpeg が必要で、見つかりませんでした。インストール (ffmpeg.org) してからもう一度お試しください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="283"/>
+        <location filename="../scene_builder_turntable.cpp" line="272"/>
         <source>The renderer did not produce a video (exit code %1).
 %2</source>
         <translation>レンダラーは動画を作成しませんでした (終了コード %1)。
@@ -7687,7 +7697,7 @@ From: %3</source>
         <location filename="../scene_builder_files.cpp" line="222"/>
         <location filename="../scene_builder_files.cpp" line="248"/>
         <location filename="../scene_builder_render.cpp" line="85"/>
-        <location filename="../scene_builder_turntable.cpp" line="194"/>
+        <location filename="../scene_builder_turntable.cpp" line="183"/>
         <source>Could not write %1.</source>
         <translation>%1 に書き込めませんでした。</translation>
     </message>
@@ -7833,19 +7843,19 @@ It is in the scene list now (Settings tab, My Scenes).</source>
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="111"/>
-        <location filename="../scene_builder_turntable.cpp" line="178"/>
+        <location filename="../scene_builder_turntable.cpp" line="167"/>
         <source>A render is already running.</source>
         <translation>すでにレンダリング中です。</translation>
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="113"/>
-        <location filename="../scene_builder_turntable.cpp" line="181"/>
+        <location filename="../scene_builder_turntable.cpp" line="170"/>
         <source>Fix the problems listed under the properties first.</source>
         <translation>先にプロパティに表示されている問題を修正してください。</translation>
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="114"/>
-        <location filename="../scene_builder_turntable.cpp" line="182"/>
+        <location filename="../scene_builder_turntable.cpp" line="171"/>
         <source>The renderer (%1) was not found next to the program.</source>
         <translation>プログラムと同じ場所にレンダラー (%1) が見つかりません。</translation>
     </message>
@@ -7917,7 +7927,7 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
     <message>
         <location filename="../scene_builder_photo.cpp" line="87"/>
         <location filename="../scene_builder_render.cpp" line="149"/>
-        <location filename="../scene_builder_turntable.cpp" line="238"/>
+        <location filename="../scene_builder_turntable.cpp" line="227"/>
         <source>Cancel</source>
         <translation>キャンセル</translation>
     </message>
@@ -7953,7 +7963,7 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="180"/>
-        <location filename="../scene_builder_turntable.cpp" line="281"/>
+        <location filename="../scene_builder_turntable.cpp" line="270"/>
         <source>The renderer stopped unexpectedly.</source>
         <translation>レンダラーが予期せず停止しました。</translation>
     </message>

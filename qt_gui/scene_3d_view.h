@@ -48,6 +48,10 @@ public:
 	// the frame is dimmed), and follows the camera while it is edited. Orbiting, panning, zooming or Frame all leaves it (cameraViewLeft()).
 	void setThroughCamera(bool on);
 	bool throughCamera() const { return m_throughCamera; }
+	// The flythrough's path: with two or more saved camera views, the curve the camera would follow through them (the renderer's own Catmull-Rom curve, camera_keyframes.h), a
+	// marker and the name at each view, and a short line along where it looks. On by default; not drawn while looking through the camera.
+	void setShowCameraPath(bool on) { m_showPath = on; update(); }
+	bool showCameraPath() const { return m_showPath; }
 	// Where the eye is and what it looks at now: the 3D view's own orbit, or the scene's camera while looking through it.
 	scene_view::OrbitCamera currentPose() const { return view().cam; }
 	void setGizmoMode(GizmoMode m);
@@ -134,6 +138,7 @@ private:
 	void drawNames(Ctx &c) const;
 	void drawLights(Ctx &c) const;
 	void drawCamera(Ctx &c) const;
+	void drawFlythroughPath(Ctx &c) const;
 	void drawTool(Ctx &c) const;
 	void drawCameraFrame(QPainter &p) const;
 	void drawSnapGuides(Ctx &c) const;
@@ -153,6 +158,7 @@ private:
 	bool m_snap = true;
 	GizmoMode m_gizmo = GizmoMode::Move;
 	bool m_userView = false;   // the user has orbited, panned or zoomed, so a resize keeps the view instead of re-framing the scene
+	bool m_showPath = true;         // draw the flythrough's camera path (setShowCameraPath)
 	bool m_throughCamera = false;   // the view is the scene's camera (m_cam is kept for when it is switched off)
 
 	Mode m_mode = Mode::None;

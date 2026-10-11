@@ -6,11 +6,13 @@
 // Every function changes the Document it is given and does nothing else (no selection, no undo): the GUI wraps one call in one undo step. std-only, like
 // scene_document.h.
 
+#include "camera_keyframes.h"
 #include "scene_document.h"
 
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <vector>
 
 namespace scene_doc {
 
@@ -103,6 +105,39 @@ inline Camera cameraLookingFrom(const Camera& base, const Float3& eye, const Flo
 		if (dist > 1e-6) c.focusDistance = dist;
 	}
 	return c;
+}
+
+// The flythrough's camera path: the saved views in the order they were saved (and the first again at the end, if asked), each with its own field of view, lens and hold. The
+// Scene Builder's flythrough video and its preview in the 3D view both come from here, so what is drawn is what is rendered. Empty with fewer than two views.
+inline camera_keyframes::Path flythroughPath(const Document& d, bool ease = true, bool returnToStart = false) {
+	camera_keyframes::Path path;
+	path.ease = ease;
+	if (d.cameraViews.size() < 2) return path;
+	for (const CameraView& v : d.cameraViews) {
+		camera_keyframes::Key k;
+		k.pos[0] = v.camera.position.x; k.pos[1] = v.camera.position.y; k.pos[2] = v.camera.position.z;
+		k.target[0] = v.camera.target.x; k.target[1] = v.camera.target.y; k.target[2] = v.camera.target.z;
+		k.fov = v.camera.fov;
+		k.lensRadius = v.camera.lensRadius;
+		k.focus = v.camera.focusDistance;
+		k.hold = v.hold;
+		path.keys.push_back(k);
+	}
+	if (returnToStart) path.keys.push_back(path.keys.front());
+	return path;
+}
+
+// Points along the curve the camera follows (position and target), `stepsPerStretch` between one key and the next, starting at the first key and ending exactly on the last. The
+// same Catmull-Rom curve the renderer uses, though not at its pace: this is the shape of the path, to draw. Empty with fewer than two keys.
+inline std::vector<camera_keyframes::Key> flythroughCurve(const camera_keyframes::Path& path, int stepsPerStretch = 16) {
+	std::vector<camera_keyframes::Key> out;
+	const std::size_t n = path.keys.size();
+	if (n < 2) return out;
+	const int steps = std::max(1, stepsPerStretch);
+	for (std::size_t seg = 0; seg + 1 < n; ++seg)
+		for (int s = 0; s < steps; ++s) out.push_back(camera_keyframes::splineAt(path.keys, seg, static_cast<double>(s) / steps));
+	out.push_back(path.keys.back());
+	return out;
 }
 
 }  // namespace scene_doc

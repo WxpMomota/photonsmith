@@ -3,6 +3,7 @@
 
 #include "scene_3d_view_internal.h"
 #include "app_log.h"
+#include "../src/shared/scene_camera_views.h"
 
 #include <QFileInfo>
 #include <QKeyEvent>
@@ -389,7 +390,10 @@ void Scene3DView::paintEvent(QPaintEvent *) {
 	drawFaces(c);
 	drawNames(c);
 	drawLights(c);
-	if (!m_throughCamera) drawCamera(c);   // the eye is the camera
+	if (!m_throughCamera) {   // the eye is the camera
+		drawFlythroughPath(c);
+		drawCamera(c);
+	}
 	drawTool(c);
 	drawSnapGuides(c);
 	if (m_throughCamera) drawCameraFrame(p);
@@ -558,6 +562,32 @@ void Scene3DView::drawLights(Ctx &c) const {
 		c.p->drawText(at + QPointF(10, -10), QString::fromStdString(l.name));
 		c.p->setFont(c.normal);
 	}
+}
+
+// The flythrough's camera path: the curve through the saved views, a marker and the name at each view, and a short line along where it looks
+void Scene3DView::drawFlythroughPath(Ctx &c) const {
+	if (!m_showPath || m_doc->cameraViews.size() < 2) return;
+	const QColor color(225, 130, 40);
+	const camera_keyframes::Path path = scene_doc::flythroughPath(*m_doc);
+	const std::vector<camera_keyframes::Key> curve = scene_doc::flythroughCurve(path);
+	const auto at = [](const camera_keyframes::Key &k) { return V3{k.pos[0], k.pos[1], k.pos[2]}; };
+	const QPen pen(color, 1.6);
+	for (std::size_t k = 0; k + 1 < curve.size(); ++k) c.line(at(curve[k]), at(curve[k + 1]), pen);
+	c.p->setFont(c.small);
+	for (std::size_t i = 0; i < m_doc->cameraViews.size(); ++i) {
+		const scene_doc::CameraView &v = m_doc->cameraViews[i];
+		const V3 pos = toV3(v.camera.position), tgt = toV3(v.camera.target);
+		const V3 look = tgt - pos;
+		if (scene_view::length(look) > 1e-6) c.line(pos, pos + scene_view::normalize(look) * std::min(0.8, scene_view::length(look)), QPen(color, 1.0, Qt::DotLine));
+		QPointF px;
+		if (!c.pixel(pos, px)) continue;
+		c.p->setPen(QPen(color.darker(140), 1.5));
+		c.p->setBrush(i == 0 ? color : color.lighter(170));   // the first view, where the flythrough starts, is filled
+		c.p->drawEllipse(px, 5.0, 5.0);
+		c.p->setPen(c.text);
+		c.p->drawText(px + QPointF(8, -6), QString::fromStdString(v.name));
+	}
+	c.p->setFont(c.normal);
 }
 
 // The camera: its position, what it looks at, and the frame it sees

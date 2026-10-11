@@ -178,3 +178,47 @@ TEST(SceneCameraViews, ChangingAHoldIsInTheLog) {
 	setCameraViewHold(b, 0, 2.0);
 	EXPECT_NE(describeChange(a, b).find("hold"), std::string::npos);
 }
+
+TEST(SceneCameraViews, TheFlythroughPathIsTheViewsInOrderWithTheirOwnLensAndHold) {
+	Document d;
+	Camera a = cameraAt(0, 1, 8);
+	a.fov = 40;
+	Camera b = cameraAt(6, 2, 3);
+	b.fov = 55;
+	saveCameraView(d, "A", a);
+	saveCameraView(d, "B", b);
+	setCameraViewHold(d, 1, 1.5);
+	const camera_keyframes::Path path = flythroughPath(d, false, false);
+	ASSERT_EQ(path.keys.size(), 2u);
+	EXPECT_FALSE(path.ease);
+	EXPECT_DOUBLE_EQ(path.keys[0].pos[2], 8.0);
+	EXPECT_DOUBLE_EQ(path.keys[1].pos[0], 6.0);
+	EXPECT_DOUBLE_EQ(path.keys[1].fov, 55.0);
+	EXPECT_DOUBLE_EQ(path.keys[1].hold, 1.5);
+	EXPECT_EQ(flythroughPath(d, true, true).keys.size(), 3u) << "returning to the start repeats the first view";
+	EXPECT_DOUBLE_EQ(flythroughPath(d, true, true).keys.back().pos[2], 8.0);
+}
+
+TEST(SceneCameraViews, FewerThanTwoViewsHaveNoFlythroughPathOrCurve) {
+	Document d;
+	EXPECT_TRUE(flythroughPath(d).keys.empty());
+	saveCameraView(d, "Only", cameraAt(1, 1, 1));
+	EXPECT_TRUE(flythroughPath(d).keys.empty());
+	EXPECT_TRUE(flythroughCurve(flythroughPath(d)).empty());
+}
+
+TEST(SceneCameraViews, TheCurveStartsAndEndsOnTheViewsAndPassesThroughTheMiddleOne) {
+	Document d;
+	saveCameraView(d, "A", cameraAt(0, 1, 8));
+	saveCameraView(d, "B", cameraAt(5, 3, 0));
+	saveCameraView(d, "C", cameraAt(0, 1, -8));
+	const std::vector<camera_keyframes::Key> curve = flythroughCurve(flythroughPath(d), 10);
+	ASSERT_EQ(curve.size(), 2u * 10u + 1u);
+	EXPECT_DOUBLE_EQ(curve.front().pos[2], 8.0);
+	EXPECT_DOUBLE_EQ(curve.back().pos[2], -8.0);
+	// The first sample of the second stretch is exactly the middle view: the curve goes through it, not past it.
+	EXPECT_NEAR(curve[10].pos[0], 5.0, 1e-9);
+	EXPECT_NEAR(curve[10].pos[1], 3.0, 1e-9);
+	// A step count of zero or less still gives a curve (one step a stretch).
+	EXPECT_EQ(flythroughCurve(flythroughPath(d), 0).size(), 3u);
+}

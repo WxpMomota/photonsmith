@@ -7,8 +7,10 @@
 #include "scene_3d_view.h"
 #include "scene_builder_common.h"
 
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
+#include <QImage>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QInputDialog>
@@ -18,6 +20,7 @@
 #include <QSignalBlocker>
 #include <QStackedWidget>
 #include <QTimer>
+#include <cmath>
 
 using namespace scene_builder_ui;
 
@@ -50,6 +53,10 @@ void SceneBuilderWidget::createCameraBar(QWidget *layoutBox) {
 		flow->addWidget(b);
 	}
 	flow->addWidget(m_viewCombo);
+	m_pathCheck = new QCheckBox(tr("Camera path"), m_cameraBar);
+	m_pathCheck->setChecked(true);
+	m_pathCheck->setToolTip(tr("With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view."));
+	flow->addWidget(m_pathCheck);
 	m_cameraBar->setVisible(false);   // shown with the 3D view; createViews() puts it in the column
 
 	connect(m_throughButton, &QPushButton::toggled, this, [this](bool on) { m_view3d->setThroughCamera(on); });
@@ -57,6 +64,7 @@ void SceneBuilderWidget::createCameraBar(QWidget *layoutBox) {
 		QSignalBlocker block(m_throughButton);
 		m_throughButton->setChecked(false);
 	});
+	connect(m_pathCheck, &QCheckBox::toggled, this, [this](bool on) { m_view3d->setShowCameraPath(on); });
 	connect(fromView, &QPushButton::clicked, this, [this]() { cameraFromView(); });
 	connect(saveView, &QPushButton::clicked, this, [this]() {
 		bool ok = false;
@@ -138,6 +146,21 @@ void SceneBuilderWidget::renameCameraView(int index, const QString &name) {
 	if (name.trimmed().isEmpty() || name.toStdString() == m_doc.cameraViews[static_cast<size_t>(index)].name) return;
 	edit(QString(), [&]() { scene_doc::renameCameraView(m_doc, index, name.toStdString()); });
 	if (m_sel.kind == SelKind::Camera) QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
+}
+
+int SceneBuilderWidget::cameraPathPixelsForTest(bool shown) {
+	const bool was = m_view3d->showCameraPath();
+	m_view3d->setShowCameraPath(shown);
+	const QImage img = m_view3d->grab().toImage();
+	if (shown && !qEnvironmentVariable("RT_GUI_SELFTEST_PATH_PNG").isEmpty()) img.save(qEnvironmentVariable("RT_GUI_SELFTEST_PATH_PNG"));
+	m_view3d->setShowCameraPath(was);
+	int n = 0;
+	for (int y = 0; y < img.height(); ++y)
+		for (int x = 0; x < img.width(); ++x) {
+			const QColor c = img.pixelColor(x, y);
+			if (c.red() - c.blue() > 70 && c.red() > c.green() && c.green() > c.blue()) ++n;   // orange, or a line of it blended into the background
+		}
+	return n;
 }
 
 int SceneBuilderWidget::viewComboCountForTest() const { return m_viewCombo ? m_viewCombo->count() : 0; }

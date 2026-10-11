@@ -70,6 +70,8 @@ The scene has one camera (select **Camera and image** in the list to edit it), a
 
 The camera's properties also list the saved views, each with its name (edit it to rename), a **Hold** time in seconds (how long a flythrough stays there; see *Rendering*) and **Use**, **Update** (save the camera as it is now over that view) and **Delete**, and a **Save camera as a view** button. A view is a whole camera (position, what it looks at, field of view, lens radius, focus distance); names are made unique ("Front", "Front 2"), there can be 100, and each of these is one undo step. Views are kept in the scene's JSON copy, so reopening the file brings them back; the `.pbrt` text has only the scene's one camera. Looking through the camera uses the world's up direction, so a camera with a tilted up vector shows level.
 
+With two or more saved views the 3D view also draws the **flythrough path**: the smooth orange curve the camera would follow through them, in the order they were saved, with a marker and the name at each view (the first one filled) and a short dotted line along where it looks. It is the same curve the Flythrough video uses, so what you see is what is rendered; edit a view (**Update**) and the curve follows. The **Camera path** switch next to the saved-views list hides it, and it is not drawn while you look through the camera.
+
 ## Ready-made shapes
 
 Besides the sphere, box, quad, disk, cylinder, cone and mesh file, the Add menu has shapes with no pbrt primitive of their own. They are written into the scene as triangle meshes with smooth or sharp normals as fits the shape, so they render the same on the CPU, Metal and OptiX.

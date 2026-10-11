@@ -7,6 +7,7 @@
 #include "app_log.h"
 #include "scene_builder_common.h"
 #include "../src/shared/camera_keyframes.h"
+#include "../src/shared/scene_camera_views.h"
 
 #include <QCheckBox>
 #include <QCoreApplication>
@@ -146,19 +147,7 @@ void SceneBuilderWidget::startFlythrough(int frames, int fps, int width, int sam
 		if (done) done(false, msg);
 		return;
 	}
-	camera_keyframes::Path path;
-	path.ease = ease;
-	for (const scene_doc::CameraView &v : m_doc.cameraViews) {
-		camera_keyframes::Key k;
-		k.pos[0] = v.camera.position.x; k.pos[1] = v.camera.position.y; k.pos[2] = v.camera.position.z;
-		k.target[0] = v.camera.target.x; k.target[1] = v.camera.target.y; k.target[2] = v.camera.target.z;
-		k.fov = v.camera.fov;                       // each view's own field of view and lens
-		k.lensRadius = v.camera.lensRadius;
-		k.focus = v.camera.focusDistance;
-		k.hold = v.hold;                            // how long the camera stays at this view
-		path.keys.push_back(k);
-	}
-	if (returnToStart) path.keys.push_back(path.keys.front());
+	const camera_keyframes::Path path = scene_doc::flythroughPath(m_doc, ease, returnToStart);
 	// The scene is written with the first view's camera (the rest of a frame's camera comes from the keyframes).
 	scene_doc::Document lens = m_doc;
 	lens.camera = m_doc.cameraViews.front().camera;

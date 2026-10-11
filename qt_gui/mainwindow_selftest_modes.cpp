@@ -362,6 +362,14 @@ static void selfTestCameraViews(SceneBuilderWidget *sb, const std::function<void
 	check(sb->document().cameraViews[views0].name == "Roof", "a view can be renamed");
 	sb->updateCameraViewFromNow(static_cast<int>(views0), true);
 	check(near3(sb->document().cameraViews[views0].camera.position, farEye), "Update saves the camera over it");
+	// The flythrough's path in the 3D view: drawn once there are two saved views (the orange curve), and the Camera path switch hides it.
+	sb->lookThroughCamera(false);
+	sb->orbit3dForTest(200.0, 35.0);
+	check(sb->saveCameraViewNamed("Second") >= 0 && sb->document().cameraViews.size() >= 2, "a second saved view, from somewhere else");
+	sb->frame3dForTest();   // the whole scene in view, so the curve between the camera and the view saved at the orbit's eye is on screen
+	const int shown = sb->cameraPathPixelsForTest(true), hidden = sb->cameraPathPixelsForTest(false);
+	check(shown > hidden + 30, "with two saved views the 3D view draws the flythrough path, and the Camera path switch hides it (orange pixels " + QString::number(shown) + " against " + QString::number(hidden) + ")");
+	sb->undo();
 	// RT_GUI_SELFTEST_CAMERA_PNG=<file> saves a picture of the tab looking through the camera, with the camera's properties (and its saved view) beside it.
 	const QString picture = qEnvironmentVariable("RT_GUI_SELFTEST_CAMERA_PNG");
 	if (!picture.isEmpty()) {

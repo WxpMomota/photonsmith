@@ -89,6 +89,8 @@ public:
 		const scene_view::V3 e = m_view3d->currentPose().eye();
 		return {e.x, e.y, e.z};
 	}
+	// How many pixels of the 3D view's picture are the flythrough path's orange, with the path drawn or not (the setting is put back).
+	int cameraPathPixelsForTest(bool shown);
 	int viewComboCountForTest() const;
 	bool dragPickedForTest(int index, const QPointF &deltaPx);
 	// A drag left unfinished (the mouse still down) in the 2D or the 3D view, and its release: for a picture of what a drag shows while it is going on.
@@ -118,6 +120,7 @@ public:
 	void setGizmoToolForTest(int tool) { m_view3d->setGizmoMode(static_cast<Scene3DView::GizmoMode>(tool)); }   // 0 Move, 1 Rotate, 2 Scale
 	bool dragScale3dForTest(int index, int axis, double ratio);
 	void orbit3dForTest(double yawDeg, double pitchDeg);
+	void frame3dForTest() { m_view3d->frameAll(); }
 	scene_doc::Float3 dropPointForTest() const { return dropPoint(); }
 	bool meshReadyForTest(const QString &path) const;
 	bool gizmoButtonEnabled(int tool) const;   // 0 Move, 1 Rotate, 2 Scale
@@ -311,6 +314,7 @@ private:
 	bool m_snapObjects = true;
 	QPointF m_holdEnd;   // where holdDragForTest() left the mouse
 	QCheckBox *m_snapObjectsCheck = nullptr;
+	QCheckBox *m_pathCheck = nullptr;        // Camera path: draw the flythrough's path in the 3D view
 	QWidget *m_cameraBar = nullptr;          // the 3D view's camera buttons: Through camera, Camera from view, the saved views
 	QPushButton *m_throughButton = nullptr;
 	QComboBox *m_viewCombo = nullptr;
