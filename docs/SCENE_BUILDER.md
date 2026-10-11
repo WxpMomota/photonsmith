@@ -241,7 +241,7 @@ The scene's **name** is the field at the top right of the tab (it is also the *T
 * Groups are for editing here: the saved `.pbrt` has no groups, so Live Preview's *Move objects* still moves the members one at a time. Scaling several things is uniform (the same in every direction): stretching a set along one axis would shear the turned objects in it.
 * Bump or normal maps, hair, subsurface, participating media, the principled material and instanced copies: use a hand-written pbrt file for those ([PBRT_SUPPORT.md](PBRT_SUPPORT.md) lists what the renderer accepts).
 * A mesh (`.ply` or `.obj`) is shown in the layout view only as a small marker at its position, because the view does not read the file; its scale and rotation apply when it renders.
-* No animation or camera paths.
+* No animation of objects. The camera can fly along a path through saved views (*Camera views*, *Flythrough...*) or orbit (*Turntable...*), but nothing else moves between frames.
 * The 3D view shows shapes, not materials or lighting, and a mesh as its bounding box and a sample of its points. Use it with the flat views, or type exact numbers in the properties.
 
 ## How it is checked
