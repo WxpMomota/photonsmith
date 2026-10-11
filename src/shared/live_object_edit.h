@@ -5,7 +5,8 @@
 //
 // An "object" here is what a person would call one thing in the scene: all the top-level `Shape`s of one AttributeBegin/End block (a box written as six quads is
 // one object), or a `Shape` outside any block on its own. Only shapes that became triangles, spheres, disks or cylinders count. (A shape turned into another kind,
-// an instance, or geometry the loader tessellates later is not an object: it cannot be picked or moved.)
+// or geometry the loader tessellates later, is not an object: it cannot be picked or moved.) An `ObjectInstance` is an object too, or part of the one of its block:
+// a placement of a tree is one thing you move, and moving it changes the instance's transform (the geometry is shared and stays where it is).
 
 #include <algorithm>
 #include <cmath>
@@ -63,6 +64,9 @@ inline void translateRange(pbrt_flatten::FlatScene& scene, const pbrt_flatten::S
 			scene.cylinders[i].xform[3 + 4 * a] += d[a];
 			scene.cylinders[i].xformEnd[3 + 4 * a] += d[a];
 		}
+	// An instance: the placement is object -> world, so a move in world space is a change of its translation column.
+	if (r.instance >= 0 && static_cast<std::size_t>(r.instance) < scene.instances.size())
+		for (int a = 0; a < 3; ++a) scene.instances[static_cast<std::size_t>(r.instance)].xform[3 + 4 * a] += d[a];
 }
 
 }  // namespace detail
@@ -142,16 +146,24 @@ inline double triangleDistance(const double p[3], const float* t) {
 
 }  // namespace detail
 
-// Indexes every object of the scene. An object with more than `maxTrianglesKept` triangles keeps only its box (a picked point is then matched to the box).
-inline PickIndex buildPickIndex(const pbrt_flatten::FlatScene& scene, const ObjectList& objects, std::size_t maxTrianglesKept = 200000) {
+// Indexes every object of the scene. An object with more than `maxTrianglesKept` triangles keeps only its box (a picked point is then matched to the box), and so
+// does every object after `totalTrianglesKept` triangles have been kept in all (600 placements of one tree must not each keep a copy of its triangles).
+inline PickIndex buildPickIndex(const pbrt_flatten::FlatScene& scene, const ObjectList& objects, std::size_t maxTrianglesKept = 200000, std::size_t totalTrianglesKept = 3000000) {
 	PickIndex index;
+	std::size_t keptInAll = 0;
 	for (std::size_t o = 0; o < objects.size(); ++o) {
 		PickShape s;
 		s.object = static_cast<int>(o);
 		s.label = objects[o].size() == 1 ? scene.shapeRanges[objects[o][0]].type : std::to_string(objects[o].size()) + " shapes";
 		std::size_t tris = 0;
-		for (std::size_t ri : objects[o]) tris += scene.shapeRanges[ri].triEnd - scene.shapeRanges[ri].triBegin;
-		const bool keep = tris <= maxTrianglesKept;
+		for (std::size_t ri : objects[o]) {
+			const pbrt_flatten::ShapeRange& r = scene.shapeRanges[ri];
+			tris += r.triEnd - r.triBegin;
+			if (r.instance >= 0 && static_cast<std::size_t>(r.instance) < scene.instances.size())
+				tris += scene.groups[static_cast<std::size_t>(scene.instances[static_cast<std::size_t>(r.instance)].group)].triangles.size();
+		}
+		const bool keep = tris <= maxTrianglesKept && keptInAll + tris <= totalTrianglesKept;
+		if (keep) keptInAll += tris;
 		bool first = true, boxOnly = false;
 		auto addTransformedBox = [&](const double* m, double rad, double z0, double z1) {
 			for (int corner = 0; corner < 8; ++corner) {
@@ -164,6 +176,43 @@ inline PickIndex buildPickIndex(const pbrt_flatten::FlatScene& scene, const Obje
 		};
 		for (std::size_t ri : objects[o]) {
 			const pbrt_flatten::ShapeRange& r = scene.shapeRanges[ri];
+			if (r.instance >= 0 && static_cast<std::size_t>(r.instance) < scene.instances.size()) {
+				// The group's geometry, placed: its triangles through the instance's transform, its spheres by centre and radius (a stretched sphere keeps only its box).
+				const pbrt_flatten::Instance& inst = scene.instances[static_cast<std::size_t>(r.instance)];
+				const pbrt_flatten::InstanceGroup& grp = scene.groups[static_cast<std::size_t>(inst.group)];
+				const double* m = inst.xform;
+				auto place = [&](const double* p, double* q) {
+					for (int a = 0; a < 3; ++a) q[a] = m[a * 4] * p[0] + m[a * 4 + 1] * p[1] + m[a * 4 + 2] * p[2] + m[a * 4 + 3];
+				};
+				for (const pbrt_flatten::Triangle& t : grp.triangles)
+					for (int v = 0; v < 3; ++v) {
+						double q[3];
+						place(&t.v[v * 3], q);
+						detail::grow(s, q, first);
+						first = false;
+						if (keep) for (int a = 0; a < 3; ++a) s.triangles.push_back(static_cast<float>(q[a]));
+					}
+				for (const pbrt_flatten::Sphere& sp : grp.spheres) {
+					double c[3];
+					place(sp.center, c);
+					double scaleSq[3];
+					for (int col = 0; col < 3; ++col) scaleSq[col] = m[col] * m[col] + m[4 + col] * m[4 + col] + m[8 + col] * m[8 + col];
+					const double rad = std::fabs(sp.radius) * std::sqrt(std::max({scaleSq[0], scaleSq[1], scaleSq[2]}));
+					for (int corner = 0; corner < 8; ++corner) {
+						const double p[3] = {c[0] + ((corner & 1) ? rad : -rad), c[1] + ((corner & 2) ? rad : -rad), c[2] + ((corner & 4) ? rad : -rad)};
+						detail::grow(s, p, first);
+						first = false;
+					}
+					const bool similarity = std::fabs(scaleSq[0] - scaleSq[1]) < 1e-6 * scaleSq[0] && std::fabs(scaleSq[0] - scaleSq[2]) < 1e-6 * scaleSq[0];
+					if (similarity) {
+						for (int a = 0; a < 3; ++a) s.spheres.push_back(static_cast<float>(c[a]));
+						s.spheres.push_back(static_cast<float>(rad));
+					} else {
+						boxOnly = true;
+					}
+				}
+				continue;
+			}
 			for (std::size_t i = r.triBegin; i < r.triEnd && i < scene.triangles.size(); ++i)
 				for (int v = 0; v < 3; ++v) {
 					const double p[3] = {scene.triangles[i].v[v * 3], scene.triangles[i].v[v * 3 + 1], scene.triangles[i].v[v * 3 + 2]};

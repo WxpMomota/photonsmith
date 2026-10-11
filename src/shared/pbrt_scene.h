@@ -371,6 +371,9 @@ struct InstanceDecl {
 	std::string name;
 	Matrix4 xform;      // the CTM where ObjectInstance appeared
 	int line = 0;       // so an instance of an undefined object can be located
+	int group = -1;     // the AttributeBegin/End block the ObjectInstance sat in (ShapeDecl::group), -1 outside any
+	int srcFile = 0;    // where the ObjectInstance directive is in the scene's text, as ShapeDecl::srcFile/srcBegin/srcEnd say for a Shape
+	std::size_t srcBegin = 0, srcEnd = 0;
 };
 
 struct Scene {
@@ -1106,6 +1109,10 @@ private:
 			inst.name = name;
 			inst.xform = gs_.ctm;
 			inst.line = line;
+			inst.group = gs_.group;
+			inst.srcFile = t_[pos_ - 1].file;
+			inst.srcEnd = t_[pos_ - 1].end;   // the instance's name (the last token it consumed)
+			inst.srcBegin = directiveBegin;
 			s_.instances.push_back(inst);
 			return true;
 		}

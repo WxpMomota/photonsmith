@@ -501,6 +501,8 @@ if(RT_BUILD_METAL)
     target_include_directories(metal_live_edit_check PRIVATE ${CMAKE_SOURCE_DIR})
     target_link_libraries(metal_live_edit_check PRIVATE metal_renderer cpu_renderer)
     add_test(NAME metal_live_edit COMMAND metal_live_edit_check)
+    # the same on a scene of ObjectInstance placements (F3, instanced spheres): an instance is picked, moved, saved and reset like a shape
+    add_test(NAME metal_live_edit_instances COMMAND metal_live_edit_check F3)
     set_tests_properties(metal_live_edit PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
         PASS_REGULAR_EXPRESSION "LIVE_EDIT_OK|SKIP: no usable Metal device")
 
