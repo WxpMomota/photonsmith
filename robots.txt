@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://xinpeiwang.github.io/ray_tracer/sitemap.xml
