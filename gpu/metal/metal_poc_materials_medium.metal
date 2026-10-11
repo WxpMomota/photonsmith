@@ -25,6 +25,58 @@
 // parameters (mutated here by reference) are all it needs to decide
 // what happens next.
 
+// What a scatter inside a medium needs to sample an image sky (the demo scene's picture or a pbrt image infinite light): the two importance-sampling tables and the
+// picture of each. Built once per ray by the kernel, passed down by reference.
+struct MediumEnvRefs {
+    device const float* envMarginalCDF;
+    device const float* envConditionalCDF;
+    uint envMapWidth, envMapHeight;
+    device const float* pbrtEnvMarginalCDF;
+    device const float* pbrtEnvConditionalCDF;
+    uint pbrtEnvMapWidth, pbrtEnvMapHeight;
+    texture2d<float, access::sample> earthTexture;
+    texture2d<float, access::sample> pbrtEnvTexture;
+};
+
+// One light sample from the image sky for a scatter at `p`, MIS-weighted against the phase function's own sample (what the continuation ray's escape is weighted
+// against in shadeEscapedRay): wi is the direction and `weighted` = Le * phase / pdf_env * weight, without the visibility, the transmittance, the throughput or the
+// albedo, which the caller applies. False when the scene has no image sky or the sample is unusable. Before this, a ray leaving a medium scatter took the whole sky
+// (fromMediumScatter) - right on average, much noisier under an HDR sky with a bright sun.
+inline bool sampleMediumEnvLight(constant Uniforms& uniforms, thread const MediumEnvRefs& e, sampler textureSampler, float3 p, float3 wo, float g,
+                                 thread uint& rngState, thread float3& wi, thread float3& weighted) {
+    float pdfEnv = 0.0;
+    float3 le = float3(0.0);
+    if (e.envMapWidth > 0u && uniforms.useEnvironmentMap != 0u) {
+        wi = sampleEnvironmentDirection(e.envMarginalCDF, e.envConditionalCDF, int(e.envMapWidth), int(e.envMapHeight), randFloat(rngState), randFloat(rngState), pdfEnv);
+        le = e.earthTexture.sample(textureSampler, envMapUV(wi)).rgb;
+    } else if (e.pbrtEnvMapWidth > 0u && uniforms.pbrtHasImageEnvLight != 0u) {
+        wi = pbrtEnvSampleDirection(uniforms, e.pbrtEnvMarginalCDF, e.pbrtEnvConditionalCDF, e.pbrtEnvMapWidth, e.pbrtEnvMapHeight, p, randFloat(rngState), randFloat(rngState), pdfEnv);
+        le = pbrtEnvLeAt(uniforms, e.pbrtEnvConditionalCDF, e.pbrtEnvTexture, textureSampler, p, wi);
+    } else {
+        return false;
+    }
+    if (!(pdfEnv > 1e-9)) return false;
+    const float phase = henyeyGreensteinPhase(dot(wo, wi), g);
+    weighted = le * phase / pdfEnv * ((pdfEnv * pdfEnv) / (pdfEnv * pdfEnv + phase * phase));
+    return true;
+}
+
+// sampleMediumEnvLight plus its shadow ray (attenuated by the medium spheres it crosses, as the lights' are): the unoccluded radiance estimate in `weighted`, zero when the
+// sample is blocked or there is no image sky, and the sampled direction in wi for a caller that must also ratio-track the rest of its own medium.
+inline float3 mediumEnvLightVisible(constant Uniforms& uniforms, thread const MediumEnvRefs& e, sampler textureSampler, float3 p, float3 wo, float g, thread uint& rngState,
+                                    intersector<instancing, triangle_data> isect, instance_acceleration_structure accelStructure,
+                                    intersection_function_table<instancing, triangle_data> functionTable, SpherePayload shadowSpherePayload, thread float3& wi) {
+    float3 weighted = float3(0.0);
+    if (!sampleMediumEnvLight(uniforms, e, textureSampler, p, wo, g, rngState, wi, weighted)) return float3(0.0);
+    ray shadowRay;
+    shadowRay.origin = p;
+    shadowRay.direction = wi;
+    shadowRay.min_distance = 0.001f;
+    shadowRay.max_distance = 1e5f;
+    intersection_result<instancing, triangle_data> shadowResult = traceShadowAnyP(isect, shadowRay, accelStructure, functionTable, shadowSpherePayload);
+    return shadowResult.type == intersection_type::none ? weighted : float3(0.0);
+}
+
 // The shortest stretch of a grid box that counts as a segment: a ray that leaves the box exactly on its face has a zero-length segment there, which must not be traced.
 constant float kGridBoxEdgeEps = 1e-4;
 
@@ -49,7 +101,7 @@ inline bool mediumSphereInterval(float3 center, float radius, float3 origin, flo
 // original inline kernel code) for the full algorithm.
 inline void shadeHomogeneousMediumSpan(
     TriangleMaterial mediumMat, float entryT, float exitT,
-    device const AreaLight* lights, device const PointLight* pointLights, device const DirectionalLight* directionalLights, constant Uniforms& uniforms,
+    device const AreaLight* lights, device const PointLight* pointLights, device const DirectionalLight* directionalLights, constant Uniforms& uniforms, thread const MediumEnvRefs& medEnv,
     texture2d<float, access::sample> pbrtAreaLightTexture, sampler textureSampler,
     intersector<instancing, triangle_data> isect,
     instance_acceleration_structure accelStructure,
@@ -110,6 +162,12 @@ inline void shadeHomogeneousMediumSpan(
                 traceShadowAnyP(isect, dlShadowRay, accelStructure, functionTable, shadowSpherePayload);
             if (dlShadowResult.type == intersection_type::none)
                 radiance += throughput * float3(mediumMat.color) * henyeyGreensteinPhase(dot(wo, dlWi), mediumMat.roughness) * float3(dl.emission);
+        }
+
+        // The image sky: one light sample, its shadow ray attenuated by the medium spheres it crosses like the lights' above.
+        {
+            float3 envWi;
+            radiance += throughput * float3(mediumMat.color) * mediumEnvLightVisible(uniforms, medEnv, textureSampler, scatterPoint, wo, mediumMat.roughness, rngState, isect, accelStructure, functionTable, shadowSpherePayload, envWi);
         }
 
         if (uniforms.lightCount > 0u) {
@@ -197,7 +255,7 @@ inline void shadeHomogeneousMediumSpan(
 inline void shadeHomogeneousMediumSphere(
     TriangleMaterial mediumMat, uint mediumPrimId, float entryDistance,
     device const SphereData* spheres, float shutterT,
-    device const AreaLight* lights, device const PointLight* pointLights, device const DirectionalLight* directionalLights, constant Uniforms& uniforms,
+    device const AreaLight* lights, device const PointLight* pointLights, device const DirectionalLight* directionalLights, constant Uniforms& uniforms, thread const MediumEnvRefs& medEnv,
     texture2d<float, access::sample> pbrtAreaLightTexture, sampler textureSampler,
     intersector<instancing, triangle_data> isect,
     instance_acceleration_structure accelStructure,
@@ -224,7 +282,7 @@ inline void shadeHomogeneousMediumSphere(
         exitT = entryDistance;
         entryT = 0.0;
     }
-    shadeHomogeneousMediumSpan(mediumMat, entryT, exitT, lights, pointLights, directionalLights, uniforms, pbrtAreaLightTexture, textureSampler,
+    shadeHomogeneousMediumSpan(mediumMat, entryT, exitT, lights, pointLights, directionalLights, uniforms, medEnv, pbrtAreaLightTexture, textureSampler,
         isect, accelStructure, functionTable, shadowSpherePayload,
         rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState,
         scatteredInMedium, passedThroughMediumSphere);
@@ -234,7 +292,7 @@ inline void shadeHomogeneousMediumSphere(
 // so a ray may enter or leave through an open end as well as the wall.
 inline void shadeHomogeneousMediumCylinder(
     TriangleMaterial mediumMat, CylinderData cyl,
-    device const AreaLight* lights, device const PointLight* pointLights, device const DirectionalLight* directionalLights, constant Uniforms& uniforms,
+    device const AreaLight* lights, device const PointLight* pointLights, device const DirectionalLight* directionalLights, constant Uniforms& uniforms, thread const MediumEnvRefs& medEnv,
     texture2d<float, access::sample> pbrtAreaLightTexture, sampler textureSampler,
     intersector<instancing, triangle_data> isect,
     instance_acceleration_structure accelStructure,
@@ -246,7 +304,7 @@ inline void shadeHomogeneousMediumCylinder(
     thread bool& scatteredInMedium, thread bool& passedThroughMediumSphere) {
     float s0 = 0.0, s1 = 0.0;
     if (!cylinderSolidInterval(rayOrigin, rayDir, cyl, s0, s1)) return;
-    shadeHomogeneousMediumSpan(mediumMat, max(s0, 0.0f), s1, lights, pointLights, directionalLights, uniforms, pbrtAreaLightTexture, textureSampler,
+    shadeHomogeneousMediumSpan(mediumMat, max(s0, 0.0f), s1, lights, pointLights, directionalLights, uniforms, medEnv, pbrtAreaLightTexture, textureSampler,
         isect, accelStructure, functionTable, shadowSpherePayload,
         rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState,
         scatteredInMedium, passedThroughMediumSphere);
@@ -277,6 +335,69 @@ inline float cloudShadowTransmittance(GpuCloudMedium cloud, float3 sphereCenter,
     return transmittance;
 }
 
+// The constant sky's light sample for a scatter inside a cloud: a phase-sampled direction (the continuation ray's own distribution, so its escape is not counted a second time:
+// see envLightSampled), its shadow ray, and the transmittance through the rest of the cloud. Returns the sky colour times that transmittance, zero when blocked. The long
+// comment is the history of how the transmittance came to be estimated this way.
+inline float3 cloudConstantSkyNee(GpuCloudMedium cloud, TriangleMaterial mediumMat, float3 sphereCenter, float sphereRadius, float3 mediumPoint, float3 wo, float sigmaMaj,
+                                  constant Uniforms& uniforms, intersector<instancing, triangle_data> isect, instance_acceleration_structure accelStructure,
+                                  intersection_function_table<instancing, triangle_data> functionTable, SpherePayload shadowSpherePayload, thread uint& rngState) {
+        float3 bgDir = sampleHenyeyGreenstein(wo, mediumMat.roughness, rngState);
+        // This NEE ray's own remaining self-
+        // attenuation through the REST of the cloud,
+        // approximated via the conservative MAJORANT
+        // sigma_t (sigmaMaj) over the analytic box-
+        // exit distance in this direction (the same
+        // ray/AABB slab test the delta-tracking loop
+        // above already uses) - a coarse stand-in for
+        // CPU's own real ratio-tracking transmittance
+        // estimate (src/shared/ratio_tracking.h),
+        // cheap (one more slab test, no extra rays)
+        // and enough to fix the massive over-
+        // brightening an earlier, fully-unattenuated
+        // version of this NEE ray produced (every
+        // scatter event along a path added a FULL,
+        // un-decayed background contribution
+        // regardless of how deep inside the cloud it
+        // was, summing to a blown-out white box -
+        // caught by comparing against `--cpu`, not
+        // assumed correct from the formula alone). Not
+        // a bias-free match to CPU's own continuous
+        // estimator - a real, documented scope cut.
+        float3 bgMo = worldToMediumPoint(cloud, mediumPoint);
+        float3 bgMd = float3(
+            cloud.worldToMediumMat[0]*bgDir.x + cloud.worldToMediumMat[1]*bgDir.y + cloud.worldToMediumMat[2]*bgDir.z,
+            cloud.worldToMediumMat[3]*bgDir.x + cloud.worldToMediumMat[4]*bgDir.y + cloud.worldToMediumMat[5]*bgDir.z,
+            cloud.worldToMediumMat[6]*bgDir.x + cloud.worldToMediumMat[7]*bgDir.y + cloud.worldToMediumMat[8]*bgDir.z);
+        float bgSegMin, bgSegMax;
+        bool bgHasSeg = cloudAabbSlabIntersect(cloud, bgMo, bgMd, bgSegMin, bgSegMax);
+        float bgS0 = 0.0, bgS1 = 0.0;
+        const bool bgInSphere = mediumSphereInterval(sphereCenter, sphereRadius, mediumPoint, bgDir, bgS0, bgS1);
+        float remainingDist = (bgHasSeg && bgSegMax > 0.0 && bgInSphere) ? min(bgSegMax, bgS1) : 0.0;
+        // Ratio tracking through the rest of the cloud (CPU's src/shared/ratio_tracking.h estimator): every majorant
+        // collision multiplies by the probability of a NULL collision, 1 - density. The old exp(-majorant * distance)
+        // treated the whole box as maximally dense, which for a cloud of any real optical depth (a pbrt scene's
+        // sigma_s 0.6 over a 160-unit box) made every environment-light NEE ray black.
+        float selfTransmittance = 1.0;
+        if (remainingDist > 0.0 && sigmaMaj > 0.0) {
+            float rt = max(max(bgSegMin, 0.0f), bgS0);
+            for (int riter = 0; riter < 256 && selfTransmittance > 1e-3; ++riter) {
+                rt += -log(max(1.0 - randFloat(rngState), 1e-8)) / sigmaMaj;
+                if (rt >= remainingDist) break;
+                float3 rp = bgMo + rt * bgMd;
+                selfTransmittance *= 1.0 - gpuCloudDensity(cloud, rp.x, rp.y, rp.z);
+            }
+        }
+
+        ray bgShadowRay;
+        bgShadowRay.origin = mediumPoint;
+        bgShadowRay.direction = bgDir;
+        bgShadowRay.min_distance = 0.001f;
+        bgShadowRay.max_distance = 1.0e6f;
+        intersection_result<instancing, triangle_data> bgShadowResult =
+            traceShadowAnyP(isect, bgShadowRay, accelStructure, functionTable, shadowSpherePayload);
+        return bgShadowResult.type == intersection_type::none ? float3(uniforms.pbrtEnvColor) * selfTransmittance : float3(0.0);
+}
+
 // materialType 29 (E2, section 178) - heterogeneous, procedural
 // Perlin-noise CloudMedium. See metal_poc_scenes_e.mm's own
 // buildCloudMediumScene() comment and this function's own inline
@@ -286,7 +407,7 @@ inline void shadeCloudMediumSphere(
     TriangleMaterial mediumMat, uint mediumPrimId, float entryDistance,
     device const SphereData* spheres, float shutterT,
     device const GpuCloudMedium* cloudMediums,
-    device const AreaLight* lights, device const PointLight* pointLights, device const DirectionalLight* directionalLights, constant Uniforms& uniforms,
+    device const AreaLight* lights, device const PointLight* pointLights, device const DirectionalLight* directionalLights, constant Uniforms& uniforms, thread const MediumEnvRefs& medEnv,
     texture2d<float, access::sample> pbrtAreaLightTexture, sampler textureSampler,
     intersector<instancing, triangle_data> isect,
     instance_acceleration_structure accelStructure,
@@ -512,64 +633,15 @@ inline void shadeCloudMediumSphere(
         // ever co-occurring for the same path is
         // negligible given how rare an unassisted escape
         // already is.
-        if (uniforms.pbrtHasConstantEnvLight != 0u) {
-            float3 bgDir = sampleHenyeyGreenstein(wo, mediumMat.roughness, rngState);
-            // This NEE ray's own remaining self-
-            // attenuation through the REST of the cloud,
-            // approximated via the conservative MAJORANT
-            // sigma_t (sigmaMaj) over the analytic box-
-            // exit distance in this direction (the same
-            // ray/AABB slab test the delta-tracking loop
-            // above already uses) - a coarse stand-in for
-            // CPU's own real ratio-tracking transmittance
-            // estimate (src/shared/ratio_tracking.h),
-            // cheap (one more slab test, no extra rays)
-            // and enough to fix the massive over-
-            // brightening an earlier, fully-unattenuated
-            // version of this NEE ray produced (every
-            // scatter event along a path added a FULL,
-            // un-decayed background contribution
-            // regardless of how deep inside the cloud it
-            // was, summing to a blown-out white box -
-            // caught by comparing against `--cpu`, not
-            // assumed correct from the formula alone). Not
-            // a bias-free match to CPU's own continuous
-            // estimator - a real, documented scope cut.
-            float3 bgMo = worldToMediumPoint(cloud, mediumPoint);
-            float3 bgMd = float3(
-                cloud.worldToMediumMat[0]*bgDir.x + cloud.worldToMediumMat[1]*bgDir.y + cloud.worldToMediumMat[2]*bgDir.z,
-                cloud.worldToMediumMat[3]*bgDir.x + cloud.worldToMediumMat[4]*bgDir.y + cloud.worldToMediumMat[5]*bgDir.z,
-                cloud.worldToMediumMat[6]*bgDir.x + cloud.worldToMediumMat[7]*bgDir.y + cloud.worldToMediumMat[8]*bgDir.z);
-            float bgSegMin, bgSegMax;
-            bool bgHasSeg = cloudAabbSlabIntersect(cloud, bgMo, bgMd, bgSegMin, bgSegMax);
-            float bgS0 = 0.0, bgS1 = 0.0;
-            const bool bgInSphere = mediumSphereInterval(sphereCenter, sphereRadius, mediumPoint, bgDir, bgS0, bgS1);
-            float remainingDist = (bgHasSeg && bgSegMax > 0.0 && bgInSphere) ? min(bgSegMax, bgS1) : 0.0;
-            // Ratio tracking through the rest of the cloud (CPU's src/shared/ratio_tracking.h estimator): every majorant
-            // collision multiplies by the probability of a NULL collision, 1 - density. The old exp(-majorant * distance)
-            // treated the whole box as maximally dense, which for a cloud of any real optical depth (a pbrt scene's
-            // sigma_s 0.6 over a 160-unit box) made every environment-light NEE ray black.
-            float selfTransmittance = 1.0;
-            if (remainingDist > 0.0 && sigmaMaj > 0.0) {
-                float rt = max(max(bgSegMin, 0.0f), bgS0);
-                for (int riter = 0; riter < 256 && selfTransmittance > 1e-3; ++riter) {
-                    rt += -log(max(1.0 - randFloat(rngState), 1e-8)) / sigmaMaj;
-                    if (rt >= remainingDist) break;
-                    float3 rp = bgMo + rt * bgMd;
-                    selfTransmittance *= 1.0 - gpuCloudDensity(cloud, rp.x, rp.y, rp.z);
-                }
-            }
+        if (uniforms.pbrtHasConstantEnvLight != 0u)
+            radiance += throughput * float3(mediumMat.color) * cloudConstantSkyNee(cloud, mediumMat, sphereCenter, sphereRadius, mediumPoint, wo, sigmaMaj, uniforms, isect, accelStructure, functionTable, shadowSpherePayload, rngState);
 
-            ray bgShadowRay;
-            bgShadowRay.origin = mediumPoint;
-            bgShadowRay.direction = bgDir;
-            bgShadowRay.min_distance = 0.001f;
-            bgShadowRay.max_distance = 1.0e6f;
-            intersection_result<instancing, triangle_data> bgShadowResult =
-                traceShadowAnyP(isect, bgShadowRay, accelStructure, functionTable, shadowSpherePayload);
-            if (bgShadowResult.type == intersection_type::none) {
-                radiance += throughput * float3(mediumMat.color) * float3(uniforms.pbrtEnvColor) * selfTransmittance;
-            }
+        // The image sky: one light sample, ratio-tracked through the rest of the cloud (the sphere clips it).
+        {
+            float3 envWi;
+            const float3 envL = mediumEnvLightVisible(uniforms, medEnv, textureSampler, mediumPoint, wo, mediumMat.roughness, rngState, isect, accelStructure, functionTable, shadowSpherePayload, envWi);
+            if (any(envL > 0.0f))
+                radiance += throughput * float3(mediumMat.color) * envL * cloudShadowTransmittance(cloud, sphereCenter, sphereRadius, mediumPoint, envWi, 1e5f, sigmaMaj, rngState);
         }
 
         // The environment light was just sampled directly (the NEE ray above, drawn from the same phase function as the
@@ -662,7 +734,7 @@ inline void shadeRgbGridMediumSphere(
     TriangleMaterial mediumMat, uint mediumPrimId, float entryDistance,
     device const SphereData* spheres, float shutterT,
     device const GpuRgbGridMedium* rgbGridMediums, device const float* rgbGridData,
-    device const AreaLight* lights, device const PointLight* pointLights, device const DirectionalLight* directionalLights, constant Uniforms& uniforms,
+    device const AreaLight* lights, device const PointLight* pointLights, device const DirectionalLight* directionalLights, constant Uniforms& uniforms, thread const MediumEnvRefs& medEnv,
     texture2d<float, access::sample> pbrtAreaLightTexture, sampler textureSampler,
     intersector<instancing, triangle_data> isect,
     instance_acceleration_structure accelStructure,
@@ -804,6 +876,14 @@ inline void shadeRgbGridMediumSphere(
                 const float3 tr = rgbGridShadowTransmittance(grid, rgbGridData, sphereCenter, sphereRadius, mediumPoint, dlWi, kDirectionalLightMaxDistance, rngState);
                 radiance += throughput * collideW * tr * dlPhase * float3(dl.emission);
             }
+        }
+
+        // The image sky: one light sample, ratio-tracked through the grid like the lights above.
+        {
+            float3 envWi;
+            const float3 envL = mediumEnvLightVisible(uniforms, medEnv, textureSampler, mediumPoint, wo, grid.phaseG, rngState, isect, accelStructure, functionTable, shadowSpherePayload, envWi);
+            if (any(envL > 0.0f))
+                radiance += throughput * collideW * rgbGridShadowTransmittance(grid, rgbGridData, sphereCenter, sphereRadius, mediumPoint, envWi, 1e5f, rngState) * envL;
         }
 
         float3 newDir = sampleHenyeyGreenstein(wo, grid.phaseG, rngState);
