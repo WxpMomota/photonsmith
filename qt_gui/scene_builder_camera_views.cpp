@@ -8,6 +8,7 @@
 #include "scene_builder_common.h"
 
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QInputDialog>
