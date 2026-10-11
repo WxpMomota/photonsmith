@@ -110,6 +110,50 @@ TEST(ObjectDragMathTest, NoVerticalPlaneFacesACameraLookingStraightDown) {
 	EXPECT_FALSE(dragDelta(cb, Vec3{0.0, 0.0, 0.0}, 0.5, 0.5, true, 0.0, delta));
 }
 
+TEST(ObjectDragMathTest, ShiftHalfWayThroughADragKeepsTheHorizontalMoveAndDoesNotJump) {
+	const CameraBasis cb = testCamera();
+	const Vec3 grab{2.0, 0.0, 0.0};
+	DragSession drag;
+	Vec3 total;
+	double s, t;
+	// 1. drag over the floor to (5, 0, 3)
+	screenOf(cb, Vec3{5.0, 0.0, 3.0}, s, t);
+	ASSERT_TRUE(drag.update(cb, grab, s, t, false, 0.0, total));
+	EXPECT_NEAR(total.x, 3.0, 1e-9);
+	EXPECT_NEAR(total.z, 3.0, 1e-9);
+	// 2. Shift goes down with the mouse where it is: nothing moves (no jump), and the horizontal move stays
+	ASSERT_TRUE(drag.update(cb, grab, s, t, true, 0.0, total));
+	EXPECT_NEAR(total.x, 3.0, 1e-9);
+	EXPECT_NEAR(total.y, 0.0, 1e-9);
+	EXPECT_NEAR(total.z, 3.0, 1e-9);
+	// 3. the mouse goes up the picture: the object goes up, still 3 and 3 across
+	double s2, t2;
+	screenOf(cb, Vec3{5.0, 1.5, 3.0}, s2, t2);
+	ASSERT_TRUE(drag.update(cb, grab, s2, t2, true, 0.0, total));
+	EXPECT_GT(total.y, 0.5);
+	EXPECT_NEAR(total.x, 3.0, 1e-9);
+	EXPECT_NEAR(total.z, 3.0, 1e-9);
+	// 4. Shift up again: back on the floor plane through the lifted point, the lift stays
+	const double lifted = total.y;
+	ASSERT_TRUE(drag.update(cb, grab, s2, t2, false, 0.0, total));
+	EXPECT_NEAR(total.y, lifted, 1e-9);
+	EXPECT_NEAR(total.x, 3.0, 1e-9);
+	EXPECT_NEAR(total.z, 3.0, 1e-9);
+}
+
+TEST(ObjectDragMathTest, ADragThatNeverSwitchesBehavesAsDragDelta) {
+	const CameraBasis cb = testCamera();
+	const Vec3 grab{2.0, 0.0, 0.0};
+	DragSession drag;
+	double s, t;
+	screenOf(cb, Vec3{5.0, 0.0, 3.0}, s, t);
+	Vec3 total, expected;
+	ASSERT_TRUE(drag.update(cb, grab, s, t, false, 0.0, total));
+	ASSERT_TRUE(dragDelta(cb, grab, s, t, false, 0.0, expected));
+	EXPECT_NEAR(total.x, expected.x, 1e-12);
+	EXPECT_NEAR(total.z, expected.z, 1e-12);
+}
+
 TEST(ObjectDragMathTest, KeysMoveAnObjectRelativeToTheView) {
 	const CameraBasis cb = testCamera();   // at (0, 5, 10) looking at the origin: forward is -z on the floor, right is +x
 	Vec3 delta;

@@ -38,7 +38,7 @@ These are in the **Render Options** tab, in the group for Live Preview.
 Under the picture there are three buttons. **Move objects** switches the mouse over to the objects in the scene; the other two work on what you have moved.
 
 * **Pick**: move the cursor over an object and a thin white box shows what a click would take. Click it and a yellow box marks it.
-* **Drag** to slide it across the floor. Hold **Shift** while dragging to lift or lower it.
+* **Drag** to slide it across the floor. Hold **Shift** while dragging to lift or lower it (press and release it as often as you like in one drag: the object keeps what it has moved).
 * **Keys**: with an object selected, W / S, A / D and Up / Down move it instead of the camera, in the directions the picture shows (forward is away from you, along the floor). You can orbit, zoom or fly with it selected: the yellow box follows.
 * **Click on empty space** to let go of the object. Dragging there orbits the camera as usual.
 * **Reset objects** puts everything back where the scene file has it.
