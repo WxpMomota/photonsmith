@@ -40,40 +40,10 @@ using FiberTangents = std::unordered_map<int, std::array<float, 3>>;
 
 namespace tessellate_detail {
 
-constexpr double kPi = 3.14159265358979323846;
+using pbrt_flatten::quadric_tessellate::kPi;
+using pbrt_flatten::quadric_tessellate::normalize3;
+using pbrt_flatten::quadric_tessellate::tessellateGrid;
 
-inline void tessellateGrid(std::vector<pbrt_flatten::Triangle>& out, int nu, int nv, int material, int areaLight,
-                    const std::function<void(double, double, double*, double*)>& eval) {
-    for (int j = 0; j < nv; ++j) {
-        for (int i = 0; i < nu; ++i) {
-            const double u0 = (double)i / nu, u1 = (double)(i + 1) / nu;
-            const double v0 = (double)j / nv, v1 = (double)(j + 1) / nv;
-            double p[4][3], n[4][3];
-            const double us[4] = {u0, u1, u0, u1}, vs[4] = {v0, v0, v1, v1};   // p00 p10 p01 p11
-            for (int k = 0; k < 4; ++k) eval(us[k], vs[k], p[k], n[k]);
-            const int tris[2][3] = {{0, 1, 3}, {0, 3, 2}};
-            for (const auto& t : tris) {
-                pbrt_flatten::Triangle tri;
-                for (int c = 0; c < 3; ++c) {
-                    for (int a = 0; a < 3; ++a) { tri.v[c * 3 + a] = p[t[c]][a]; tri.n[c * 3 + a] = n[t[c]][a]; }
-                    tri.uv[c * 2 + 0] = us[t[c]]; tri.uv[c * 2 + 1] = vs[t[c]];
-                }
-                tri.hasNormals = true;
-                tri.hasUVs = true;
-                tri.material = material;
-                tri.areaLight = areaLight;
-                out.push_back(tri);
-            }
-        }
-    }
-}
-
-inline void normalize3(double* v) {
-    const double l = std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-    if (l > 1e-300) { v[0] /= l; v[1] /= l; v[2] /= l; }
-}
-
-// Returns how many triangles were added (0 when the scene has none of these shapes).
 }  // namespace tessellate_detail
 
 // Rewrites the shapes `caps` names as triangles appended to scene.triangles (and removes them from the scene). Returns how many triangles were added (0 when the
@@ -107,39 +77,16 @@ inline size_t tessellateForBackend(pbrt_flatten::FlatScene& scene, const Tessell
         });
     }
 
-    // Cone (open, no base cap): object space z in [0,height], radius R*(1 - z/height).
+    // Cone (open, no base cap) and paraboloid: quadric_tessellate.h.
     for (const pbrt_flatten::Cone& c : scene.cones) {
         if (!caps.cones) break;
         if (isInterface(c.material)) continue;
-        pbrt_scene::Matrix4 xf;
-        for (int i = 0; i < 16; ++i) xf.m[i] = c.xform[i];
-        const double phiMax = c.phiMaxDeg * tessellate_detail::kPi / 180.0;
-        tessellate_detail::tessellateGrid(out, 48, 4, c.material, c.areaLight, [&](double u, double v, double* p, double* n) {
-            const double ph = u * phiMax, rad = c.radius * (1.0 - v);
-            const double po[3] = {rad * std::cos(ph), rad * std::sin(ph), v * c.height};
-            pbrt_flatten::flatten_detail::transformPoint(xf, po[0], po[1], po[2], p);
-            pbrt_flatten::flatten_detail::transformNormal(xf, c.height * std::cos(ph), c.height * std::sin(ph), c.radius, n);
-            tessellate_detail::normalize3(n);
-        });
+        pbrt_flatten::quadric_tessellate::tessellateCone(c, out);
     }
-
-    // Paraboloid: z in [zMin,zMax], radius R*sqrt(z/zMax); outward normal is the gradient of
-    // x^2 + y^2 - (R^2/zMax) z.
     for (const pbrt_flatten::Paraboloid& pa : scene.paraboloids) {
         if (!caps.paraboloids) break;
         if (isInterface(pa.material)) continue;
-        pbrt_scene::Matrix4 xf;
-        for (int i = 0; i < 16; ++i) xf.m[i] = pa.xform[i];
-        const double phiMax = pa.phiMaxDeg * tessellate_detail::kPi / 180.0;
-        tessellate_detail::tessellateGrid(out, 48, 24, pa.material, pa.areaLight, [&](double u, double v, double* p, double* n) {
-            const double ph = u * phiMax;
-            const double z = pa.zMin + v * (pa.zMax - pa.zMin);
-            const double rad = pa.radius * std::sqrt(std::max(z, 0.0) / pa.zMax);
-            const double x = rad * std::cos(ph), y = rad * std::sin(ph);
-            pbrt_flatten::flatten_detail::transformPoint(xf, x, y, z, p);
-            pbrt_flatten::flatten_detail::transformNormal(xf, 2.0 * x, 2.0 * y, -pa.radius * pa.radius / pa.zMax, n);
-            tessellate_detail::normalize3(n);
-        });
+        pbrt_flatten::quadric_tessellate::tessellateParaboloid(pa, out);
     }
 
     // Curve: every Bezier segment becomes a tapered 8-sided tube (the same dicing density OptiX

@@ -370,3 +370,42 @@ AttributeEnd
 		<< "an emitter-only definition should place no instanced geometry";
 }
 
+
+// ---------------------------------------------------------------------------
+// A disk, cylinder, cone or paraboloid in a definition
+// ---------------------------------------------------------------------------
+
+TEST(PbrtInstanceQuadricTest, QuadricsInADefinitionBecomeTheGroupsTriangles) {
+	// An instance group holds triangles and spheres; these four used to be skipped with a warning on every backend.
+	for (const char *shape : {"cylinder", "disk", "cone", "paraboloid"}) {
+		const FlatScene s = build(std::string("ObjectBegin \"o\"\n  Shape \"") + shape + "\" \"float radius\" [ 1 ]\nObjectEnd\n"
+								  "AttributeBegin\n  Translate 5 0 0\n  ObjectInstance \"o\"\nAttributeEnd\n");
+		EXPECT_FALSE(warned(s, "not supported")) << shape;
+		ASSERT_EQ(s.groups.size(), 1u) << shape;
+		EXPECT_GT(s.groups[0].triangles.size(), 50u) << shape;
+		EXPECT_TRUE(s.disks.empty() && s.cylinders.empty() && s.cones.empty() && s.paraboloids.empty()) << shape;
+	}
+}
+
+TEST(PbrtInstanceQuadricTest, ACylinderInADefinitionIsATubeOfItsRadiusAndHeight) {
+	const FlatScene s = build("ObjectBegin \"o\"\n  Shape \"cylinder\" \"float radius\" [ 2 ] \"float zmin\" [ 0 ] \"float zmax\" [ 3 ]\nObjectEnd\n"
+							  "AttributeBegin\n  ObjectInstance \"o\"\nAttributeEnd\n");
+	ASSERT_EQ(s.groups.size(), 1u);
+	double lo = 1e9, hi = -1e9, maxR = 0;
+	for (const Triangle &t : s.groups[0].triangles)
+		for (int c = 0; c < 3; ++c) {
+			lo = std::min(lo, t.v[c * 3 + 2]); hi = std::max(hi, t.v[c * 3 + 2]);
+			maxR = std::max(maxR, std::sqrt(t.v[c * 3] * t.v[c * 3] + t.v[c * 3 + 1] * t.v[c * 3 + 1]));
+		}
+	EXPECT_NEAR(lo, 0.0, 1e-12);
+	EXPECT_NEAR(hi, 3.0, 1e-12);
+	EXPECT_NEAR(maxR, 2.0, 1e-9);
+}
+
+TEST(PbrtInstanceQuadricTest, AnEmissiveQuadricInADefinitionIsStillBakedIntoTheScene) {
+	// An instanced emitter is placed in world space (it must be sampled as a light), as a disk: not turned into the group's triangles.
+	const FlatScene s = build("ObjectBegin \"o\"\n  AreaLightSource \"diffuse\" \"rgb L\" [ 1 1 1 ]\n  Shape \"disk\"\nObjectEnd\n"
+							  "AttributeBegin\n  ObjectInstance \"o\"\nAttributeEnd\n");
+	EXPECT_EQ(s.disks.size(), 1u);
+	for (const InstanceGroup &g : s.groups) EXPECT_TRUE(g.triangles.empty());
+}
