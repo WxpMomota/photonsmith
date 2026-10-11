@@ -81,6 +81,7 @@ public:
 	void updateCameraViewFromNow(int index, bool sceneCamera = false);
 	void deleteCameraView(int index);
 	void renameCameraView(int index, const QString &name);
+	void setCameraViewHold(int index, double seconds);   // how long a flythrough stays at the view (seconds)
 	void cameraFromView();                    // the scene's camera goes where the 3D view is
 	void lookThroughCamera(bool on);          // the 3D view looks through the scene's camera
 	bool lookingThroughCameraForTest() const { return m_view3d && m_view3d->throughCamera(); }

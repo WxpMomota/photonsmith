@@ -132,6 +132,7 @@ struct Camera {
 struct CameraView {
 	std::string name = "View";
 	Camera camera;
+	double hold = 0.0;   // seconds a flythrough stays at this view (a pause); 0: it flies on
 };
 
 struct RenderSettings {

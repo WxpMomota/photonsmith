@@ -306,3 +306,112 @@ TEST(CameraKeyframes, TheFileWrittenKeepsTheFieldOfViewAndLens) {
 	EXPECT_EQ(text.find("fov"), std::string::npos);
 	EXPECT_FALSE(parse(text).path.keys[0].hasLens());
 }
+
+// ---- holds ---------------------------------------------------------------------------------------------------------------------------
+
+namespace {
+
+// A (x 0), B (x 10), C (x 20): holds in seconds on each.
+Path heldPath(double a, double b, double c, bool ease) {
+	Path p = straight(ease);
+	p.keys[0].hold = a;
+	p.keys[1].hold = b;
+	p.keys[2].hold = c;
+	return p;
+}
+
+}  // namespace
+
+TEST(CameraKeyframes, AHoldIsWrittenAndReadBack) {
+	const ParseResult r = parse("key 0 1 8  0 1 0  hold 1.5\nkey 4 1 6  0 1 0  40  hold 2\nkey 0 1 4  0 1 0  35 0.2 3 hold 0\n");
+	ASSERT_TRUE(r.ok) << r.error;
+	EXPECT_DOUBLE_EQ(r.path.keys[0].hold, 1.5);
+	EXPECT_DOUBLE_EQ(r.path.keys[1].hold, 2.0);
+	EXPECT_DOUBLE_EQ(r.path.keys[1].fov, 40.0);
+	EXPECT_DOUBLE_EQ(r.path.keys[2].hold, 0.0);
+	EXPECT_TRUE(r.path.keys[2].hasLens());
+	const ParseResult again = parse(toText(r.path));
+	ASSERT_TRUE(again.ok) << again.error;
+	EXPECT_DOUBLE_EQ(again.path.keys[0].hold, 1.5);
+	EXPECT_DOUBLE_EQ(again.path.keys[1].hold, 2.0);
+	EXPECT_EQ(toText(r.path).find("hold 0"), std::string::npos) << "no hold, nothing written";
+	EXPECT_FALSE(parse("key 0 0 1 0 0 0 hold -1\nkey 1 0 1 0 0 0\n").ok);
+	EXPECT_FALSE(parse("key 0 0 1 0 0 0 hold\nkey 1 0 1 0 0 0\n").ok);
+	EXPECT_FALSE(parse("key 0 0 1 0 0 0 hold 1e9\nkey 1 0 1 0 0 0\n").ok);
+	EXPECT_FALSE(parse("key 0 0 1 0 0 0 hold abc\nkey 1 0 1 0 0 0\n").ok);
+	EXPECT_FALSE(parse("key 0 0 1 0 0 0 40 hold\n").ok);
+}
+
+TEST(CameraKeyframes, TheCameraStandsStillForTheHoldAndThenMoves) {
+	// 10 seconds: one second at A, then the moves share 9 seconds (to B and on to C, equal stretches), no holds elsewhere.
+	const Path p = heldPath(1.0, 0.0, 0.0, false);
+	EXPECT_DOUBLE_EQ(at(p, 0.0, 10.0).pos[0], 0.0);
+	EXPECT_DOUBLE_EQ(at(p, 0.05, 10.0).pos[0], 0.0) << "half a second in: still held";
+	EXPECT_DOUBLE_EQ(at(p, 0.1, 10.0).pos[0], 0.0) << "the hold ends at one second";
+	EXPECT_GT(at(p, 0.12, 10.0).pos[0], 0.0);
+	EXPECT_NEAR(at(p, 0.1 + 0.45, 10.0).pos[0], 10.0, 1e-9) << "half way through the 9 seconds of moving: the middle key";
+	EXPECT_NEAR(at(p, 1.0, 10.0).pos[0], 20.0, 1e-9);
+}
+
+TEST(CameraKeyframes, AHoldInTheMiddleAndAtTheEnd) {
+	const Path p = heldPath(0.0, 2.0, 1.0, false);   // 10 seconds: 2 at B, 1 at the end; 7 seconds of moving, 3.5 each way
+	EXPECT_NEAR(at(p, 3.5 / 10.0, 10.0).pos[0], 10.0, 1e-9) << "arrives at B after 3.5 seconds";
+	EXPECT_DOUBLE_EQ(at(p, 4.0 / 10.0, 10.0).pos[0], 10.0) << "held at B";
+	EXPECT_DOUBLE_EQ(at(p, 5.5 / 10.0, 10.0).pos[0], 10.0) << "still held until 5.5 seconds";
+	EXPECT_GT(at(p, 6.0 / 10.0, 10.0).pos[0], 10.0);
+	EXPECT_NEAR(at(p, 9.0 / 10.0, 10.0).pos[0], 20.0, 1e-9) << "at C from 9 seconds on";
+	EXPECT_DOUBLE_EQ(at(p, 9.6 / 10.0, 10.0).pos[0], 20.0) << "the pause at the end";
+	EXPECT_DOUBLE_EQ(at(p, 1.0, 10.0).pos[0], 20.0);
+}
+
+TEST(CameraKeyframes, WithoutADurationOrWithoutHoldsTheHoldsDoNotApply) {
+	const Path p = heldPath(2.0, 2.0, 2.0, true);
+	const Path plain = straight(true);
+	for (int i = 0; i <= 20; ++i) {
+		const double t = i / 20.0;
+		EXPECT_DOUBLE_EQ(at(p, t).pos[0], at(plain, t).pos[0]) << "holds are seconds: no length, no pause";
+		EXPECT_DOUBLE_EQ(at(heldPath(0, 0, 0, true), t, 10.0).pos[0], at(plain, t).pos[0]) << "no holds: as before";
+	}
+}
+
+TEST(CameraKeyframes, HoldsThatAreMostOfTheVideoAreShortenedToLeaveTimeToMove) {
+	const Path p = heldPath(8.0, 8.0, 8.0, false);   // 24 seconds of holds in a 10 second video: scaled to 9 seconds, 1 left to move
+	// Each hold is 3 seconds; the 1 second of moving is half to B, half to C: A held 0-3, move 3-3.5, B held 3.5-6.5, move 6.5-7, C held 7-10.
+	EXPECT_DOUBLE_EQ(at(p, 0.25, 10.0).pos[0], 0.0);
+	EXPECT_NEAR(at(p, 0.35, 10.0).pos[0], 10.0, 1e-9);
+	EXPECT_DOUBLE_EQ(at(p, 0.5, 10.0).pos[0], 10.0);
+	EXPECT_DOUBLE_EQ(at(p, 0.8, 10.0).pos[0], 20.0);
+}
+
+TEST(CameraKeyframes, EasingStopsSmoothlyAtEveryHoldNotJustTheEnds) {
+	// A, then B held for 2 seconds, then C: with ease each of the two moves starts and ends gently, so just after leaving the hold the camera has barely moved.
+	const Path eased = heldPath(0.0, 2.0, 0.0, true), steady = heldPath(0.0, 2.0, 0.0, false);
+	const double leaving = 6.0 / 10.0 + 0.01;   // a moment after the hold ends at 6 seconds (4 seconds of moving each way)
+	EXPECT_LT(at(eased, leaving, 10.0).pos[0] - 10.0, 0.2 * (at(steady, leaving, 10.0).pos[0] - 10.0));
+	const double arriving = 4.0 / 10.0 - 0.01;   // and just before it reaches B
+	EXPECT_LT(10.0 - at(eased, arriving, 10.0).pos[0], 0.2 * (10.0 - at(steady, arriving, 10.0).pos[0]));
+	EXPECT_NEAR(at(eased, 0.5, 10.0).pos[0], 10.0, 1e-9);
+	EXPECT_NEAR(at(eased, 1.0, 10.0).pos[0], 20.0, 1e-9);
+}
+
+TEST(CameraKeyframes, AKeyWithoutAHoldIsPassedThroughWithoutStoppingEvenWhenOthersHold) {
+	// A (hold 1), B, C, D (hold 1): B and C are not stops, so the run A..D is one smooth move (with ease, slow only at its ends).
+	Path p;
+	p.ease = true;
+	for (double x : {0.0, 10.0, 20.0, 30.0}) {
+		Key k;
+		k.pos[0] = x;
+		k.target[0] = x;
+		k.target[2] = 5;
+		p.keys.push_back(k);
+	}
+	p.keys[0].hold = 1.0;
+	p.keys[3].hold = 1.0;
+	double last = -1.0;
+	for (int i = 0; i <= 200; ++i) {
+		const double x = at(p, i / 200.0, 10.0).pos[0];
+		EXPECT_GE(x, last - 1e-9) << "never backwards";
+		last = x;
+	}
+	EXPECT_NEAR(at(p, 0.5, 10.0).pos[0], 15.0, 1e-9) << "the middle of the 8 seconds of moving is the middle of the run";
+}

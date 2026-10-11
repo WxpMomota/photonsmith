@@ -37,6 +37,7 @@ inline Fields fieldsOf(const Camera& c) {
 inline Fields fieldsOf(const CameraView& v) {
 	Fields f = fieldsOf(v.camera);
 	f.insert(f.begin(), {"name", v.name});
+	f.push_back({"hold", diff_detail::v(v.hold)});
 	return f;
 }
 inline Fields fieldsOf(const RenderSettings& r) {

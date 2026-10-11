@@ -570,6 +570,7 @@ void MainWindow::runBuilderSelfTest(const std::function<void(const QString &)> &
 					if (!turned || size <= 1000) { conclude(false); return; }
 					// A flythrough through two saved views (the camera, and the 3D view orbited round).
 					sb->saveCameraViewNamed("Start", true);
+					sb->setCameraViewHold(static_cast<int>(sb->document().cameraViews.size()) - 1, 0.2);   // a pause at the first view
 					sb->show3dView(true);
 					sb->orbit3dForTest(100.0, 20.0);
 					sb->saveCameraViewNamed("Side");

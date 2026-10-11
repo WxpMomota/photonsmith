@@ -8,11 +8,17 @@
 //     key  px py pz   tx ty tz         # a camera place: where it is, and what it looks at (two or more, in the order they are visited)
 //     key  px py pz   tx ty tz  fov    # ... and its vertical field of view in degrees
 //     key  px py pz   tx ty tz  fov lensRadius focusDistance    # ... and its lens: the radius of the aperture (0: sharp everywhere) and the distance in focus
+//     key  ...   hold 1.5              # at the end of any key line: the camera stays here for this many seconds (see below)
 //
 // The first frame is exactly the first key and the last frame exactly the last. In between the camera goes through every key on a smooth curve (a Catmull-Rom
 // spline through the places, and another through the targets), spending time on each stretch in proportion to how far it is (the distance the camera and its
 // target travel), so the speed is about the same all the way instead of racing through a short stretch and crawling through a long one. A key twice in a row is a
 // pause-free duplicate (the stretch between them has no length and takes no time).
+//
+// A hold is a pause: the camera stands still at that key for that many seconds, and the rest of the video's length is what it has to travel in (the same pace as before:
+// time on each stretch in proportion to its length). Holds are seconds of the finished video, so at() is given its length; with ease on, the camera eases to a stop at every
+// key that has a hold (and out of it again), as well as at the first and last, each run between two stops being one smooth move. If the holds add up to more than 90% of the
+// video they are shortened so that 10% is left for moving. A hold on the first key is a pause before the first move and on the last key a pause at the end.
 //
 // The field of view and the lens are on the same curve when EVERY key gives them (a view that does not is the scene's own, so a path where only some keys say is
 // not mixed: those values are then left to the scene, and at() reports them as not given: fov 0, lensRadius -1, focus 0).
@@ -35,6 +41,7 @@ struct Key {
 	double fov = 0;                 // vertical field of view in degrees; 0: not given
 	double lensRadius = -1;         // aperture radius; < 0: not given (0 is a real value: no depth of field)
 	double focus = 0;               // distance in focus; 0: not given
+	double hold = 0;                // seconds the camera stays here (a pause); 0: it does not stop
 	bool hasLens() const { return lensRadius >= 0 && focus > 0; }
 };
 
@@ -105,13 +112,26 @@ inline ParseResult parse(const std::string& text) {
 			r.path.ease = v == 1;
 		} else if (word == "key") {
 			Key k;
+			std::vector<std::string> tokens;
+			for (std::string t; words >> t;) tokens.push_back(t);
 			std::vector<double> v;
-			double x;
-			while (words >> x) {
-				if (!detail::finiteNumber(x)) return fail("'key' has a number that is not finite");
+			const auto number = [](const std::string& t, double& out) {
+				std::istringstream s(t);
+				s.imbue(std::locale::classic());
+				s >> out;
+				return !s.fail() && s.eof() && detail::finiteNumber(out);
+			};
+			if (tokens.size() >= 2 && tokens[tokens.size() - 2] == "hold") {
+				double h = 0;
+				if (!number(tokens.back(), h) || h < 0.0 || h > 3600.0) return fail("'hold' is a number of seconds, 0 to 3600");
+				k.hold = h;
+				tokens.resize(tokens.size() - 2);
+			}
+			for (const std::string& t : tokens) {
+				double x = 0;
+				if (!number(t, x)) return fail("'key' has something that is not a number: '" + t + "'");
 				v.push_back(x);
 			}
-			if (!words.eof()) return fail("'key' has something that is not a number");
 			if (v.size() != 6 && v.size() != 7 && v.size() != 9) return fail("'key' needs 6 numbers (px py pz tx ty tz), or 7 (and fov), or 9 (and fov lensRadius focusDistance)");
 			for (int i = 0; i < 3; ++i) {
 				k.pos[i] = v[i];
@@ -168,6 +188,7 @@ inline std::string toText(const Path& p) {
 		out << "key " << k.pos[0] << " " << k.pos[1] << " " << k.pos[2] << "  " << k.target[0] << " " << k.target[1] << " " << k.target[2];
 		if (k.fov > 0) out << "  " << k.fov;
 		if (k.fov > 0 && k.hasLens()) out << " " << k.lensRadius << " " << k.focus;
+		if (k.hold > 0) out << "  hold " << k.hold;
 		out << "\n";
 	}
 	return out.str();
@@ -176,30 +197,8 @@ inline std::string toText(const Path& p) {
 // How far along the path (0 first frame, 1 last) a frame is: frame 0 of `total` is the start and frame total-1 the end; one frame is the start.
 inline double progressOf(int frame, int total) { return total <= 1 ? 0.0 : std::min(1.0, std::max(0.0, static_cast<double>(frame) / static_cast<double>(total - 1))); }
 
-// The camera at progress t in [0, 1] (clamped). A path with fewer than two keys is its first key (or a camera at the origin looking down +Z if empty).
-inline Key at(const Path& path, double t) {
-	const std::vector<Key>& k = path.keys;
-	if (k.empty()) return Key{};
-	if (k.size() == 1) return k[0];
-	t = std::min(1.0, std::max(0.0, t));
-	if (path.ease) t = t * t * (3.0 - 2.0 * t);   // smoothstep: the ends stay where they are
-	const std::size_t segments = k.size() - 1;
-	std::vector<double> length(segments);
-	double total = 0.0;
-	for (std::size_t i = 0; i < segments; ++i) {
-		length[i] = detail::distance(k[i].pos, k[i + 1].pos) + detail::distance(k[i].target, k[i + 1].target);
-		total += length[i];
-	}
-	if (total <= 1e-12) return k.front();
-	// The segment this progress falls in, and how far into it.
-	double along = t * total;
-	std::size_t seg = 0;
-	while (seg + 1 < segments && along > length[seg]) {
-		along -= length[seg];
-		++seg;
-	}
-	// (A zero-length stretch is skipped: along <= 0 there leaves seg where the loop stopped, which has length unless it is the last one.)
-	const double u = length[seg] > 1e-12 ? std::min(1.0, std::max(0.0, along / length[seg])) : 1.0;
+// The camera on the curve through the keys: between key `seg` and the next, `u` (0..1) of the way.
+inline Key splineAt(const std::vector<Key>& k, std::size_t seg, double u) {
 	const Key& p1 = k[seg];
 	const Key& p2 = k[seg + 1];
 	const Key p0 = seg > 0 ? k[seg - 1] : detail::reflected(p1, p2);
@@ -219,6 +218,82 @@ inline Key at(const Path& path, double t) {
 		}
 	}
 	return out;
+}
+
+// The camera at progress t in [0, 1] (clamped) of a video `durationSeconds` long (only needed for holds: they are seconds; 0 or less ignores them). A path with fewer than two
+// keys is its first key (or a camera at the origin looking down +Z if empty).
+inline Key at(const Path& path, double t, double durationSeconds = 0.0) {
+	const std::vector<Key>& k = path.keys;
+	if (k.empty()) return Key{};
+	if (k.size() == 1) return k[0];
+	t = std::min(1.0, std::max(0.0, t));
+	const std::size_t n = k.size(), segments = n - 1;
+	std::vector<double> length(segments);
+	double total = 0.0;
+	for (std::size_t i = 0; i < segments; ++i) {
+		length[i] = detail::distance(k[i].pos, k[i + 1].pos) + detail::distance(k[i].target, k[i + 1].target);
+		total += length[i];
+	}
+	if (total <= 1e-12) return k.front();
+
+	// The timeline: a hold at each key (if it has one) and the move to the next, the moves sharing what is left of the video in proportion to their lengths. Without holds
+	// (or without a duration) the timeline is just the moves, one unit long.
+	std::vector<double> hold(n, 0.0);
+	double holds = 0.0;
+	if (durationSeconds > 0.0)
+		for (std::size_t i = 0; i < n; ++i) {
+			hold[i] = std::max(0.0, k[i].hold);
+			holds += hold[i];
+		}
+	double length1 = 1.0, now = t;   // the timeline's length, and where progress t is on it
+	if (holds > 0.0) {
+		const double scale = holds > 0.9 * durationSeconds ? 0.9 * durationSeconds / holds : 1.0;
+		for (double& h : hold) h *= scale;
+		holds *= scale;
+		length1 = durationSeconds;
+		now = t * durationSeconds;
+	}
+	const double moving = length1 - holds;
+	const auto isStop = [&](std::size_t i) { return i == 0 || i + 1 == n || hold[i] > 0.0; };
+
+	double cursor = 0.0, legStartTime = 0.0;
+	for (std::size_t i = 0; i < n; ++i) {
+		if (hold[i] > 0.0 && now <= cursor + hold[i]) {   // standing at key i
+			Key standing = k[i];
+			standing.hold = 0.0;
+			return standing;
+		}
+		cursor += hold[i];
+		if (isStop(i)) legStartTime = cursor;
+		if (i + 1 == n) break;
+		const double moveTime = moving * length[i] / total;
+		if (moveTime <= 0.0) continue;
+		if (now <= cursor + moveTime) {
+			// In the move from key i to the next: which run between two stops it is part of, and how far along that run.
+			std::size_t legFrom = i, legTo = i + 1;
+			while (legFrom > 0 && !isStop(legFrom)) --legFrom;
+			while (legTo + 1 < n && !isStop(legTo)) ++legTo;
+			double legLength = 0.0;
+			for (std::size_t s = legFrom; s < legTo; ++s) legLength += length[s];
+			const double legTime = moving * legLength / total;
+			double f = legTime > 0.0 ? std::min(1.0, std::max(0.0, (now - legStartTime) / legTime)) : 1.0;
+			if (path.ease) f = f * f * (3.0 - 2.0 * f);   // smoothstep: each stop stays where it is
+			double along = f * legLength;
+			std::size_t seg = legFrom;
+			while (seg + 1 < legTo && along > length[seg]) {
+				along -= length[seg];
+				++seg;
+			}
+			const double u = length[seg] > 1e-12 ? std::min(1.0, std::max(0.0, along / length[seg])) : 1.0;
+			Key out = splineAt(k, seg, u);
+			out.hold = 0.0;
+			return out;
+		}
+		cursor += moveTime;
+	}
+	Key last = k.back();   // the end of the timeline
+	last.hold = 0.0;
+	return last;
 }
 
 }  // namespace camera_keyframes

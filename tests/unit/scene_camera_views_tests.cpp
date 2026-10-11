@@ -130,3 +130,51 @@ TEST(SceneCameraViews, TheLogSaysWhenAViewIsAddedOrChanged) {
 	updateCameraView(c, 0, cameraAt(5, 1, 8));
 	EXPECT_NE(describeChange(b, c).find("Front"), std::string::npos);
 }
+
+TEST(SceneCameraViews, AViewCanHoldAFlythroughForSomeSeconds) {
+	Document d;
+	saveCameraView(d, "A", cameraAt(1, 1, 1));
+	saveCameraView(d, "B", cameraAt(2, 2, 2));
+	EXPECT_DOUBLE_EQ(d.cameraViews[0].hold, 0.0) << "no pause by default";
+	EXPECT_TRUE(setCameraViewHold(d, 1, 1.5));
+	EXPECT_DOUBLE_EQ(d.cameraViews[1].hold, 1.5);
+	EXPECT_FALSE(setCameraViewHold(d, 1, -1.0));
+	EXPECT_FALSE(setCameraViewHold(d, 1, 5000.0));
+	EXPECT_FALSE(setCameraViewHold(d, 1, std::nan("")));
+	EXPECT_FALSE(setCameraViewHold(d, 7, 1.0));
+	EXPECT_DOUBLE_EQ(d.cameraViews[1].hold, 1.5) << "refused values change nothing";
+	EXPECT_TRUE(updateCameraView(d, 1, cameraAt(9, 9, 9)));
+	EXPECT_DOUBLE_EQ(d.cameraViews[1].hold, 1.5) << "updating a view's camera keeps its pause";
+	EXPECT_TRUE(renameCameraView(d, 1, "Roof"));
+	EXPECT_DOUBLE_EQ(d.cameraViews[1].hold, 1.5);
+}
+
+TEST(SceneCameraViews, TheHoldSurvivesTheJsonCopyAndNoHoldWritesNothing) {
+	Document d;
+	saveCameraView(d, "A", cameraAt(1, 1, 1));
+	saveCameraView(d, "B", cameraAt(2, 2, 2));
+	setCameraViewHold(d, 0, 2.5);
+	Document back;
+	std::string error;
+	ASSERT_TRUE(fromJson(toJson(d), back, error)) << error;
+	EXPECT_DOUBLE_EQ(back.cameraViews[0].hold, 2.5);
+	EXPECT_DOUBLE_EQ(back.cameraViews[1].hold, 0.0);
+	EXPECT_EQ(toJson(back), toJson(d));
+	Document none;
+	saveCameraView(none, "A", cameraAt(1, 1, 1));
+	EXPECT_EQ(toJson(none).find("hold"), std::string::npos) << "older files and new ones without pauses agree";
+	// A nonsense hold in a file is a pause of none, not a failure to open the scene.
+	std::string text = toJson(d);
+	text.replace(text.find("\"hold\":2.5"), 10, "\"hold\":-4");
+	Document odd;
+	ASSERT_TRUE(fromJson(text, odd, error)) << error;
+	EXPECT_DOUBLE_EQ(odd.cameraViews[0].hold, 0.0);
+}
+
+TEST(SceneCameraViews, ChangingAHoldIsInTheLog) {
+	Document a;
+	saveCameraView(a, "Front", cameraAt(0, 1, 8));
+	Document b = a;
+	setCameraViewHold(b, 0, 2.0);
+	EXPECT_NE(describeChange(a, b).find("hold"), std::string::npos);
+}

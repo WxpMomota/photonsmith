@@ -71,6 +71,13 @@ inline bool updateCameraView(Document& d, int index, const Camera& camera) {
 	return true;
 }
 
+// How long a flythrough stays at the view, in seconds (0 to 3600; anything else is refused). False for a bad index.
+inline bool setCameraViewHold(Document& d, int index, double seconds) {
+	if (index < 0 || index >= static_cast<int>(d.cameraViews.size()) || !(seconds >= 0.0 && seconds <= 3600.0)) return false;
+	d.cameraViews[static_cast<std::size_t>(index)].hold = seconds;
+	return true;
+}
+
 inline bool removeCameraView(Document& d, int index) {
 	if (index < 0 || index >= static_cast<int>(d.cameraViews.size())) return false;
 	d.cameraViews.erase(d.cameraViews.begin() + index);

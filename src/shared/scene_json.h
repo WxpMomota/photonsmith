@@ -330,6 +330,7 @@ inline std::string toJson(const Document& d) {
 		for (const CameraView& v : d.cameraViews) {
 			Json j = detail::cameraToJson(v.camera);
 			j.set("name", Json::string(v.name));
+			if (v.hold > 0.0) j.set("hold", Json::number(v.hold));
 			views.push(std::move(j));
 		}
 		root.set("cameraViews", std::move(views));
@@ -399,7 +400,8 @@ inline bool fromJson(const std::string& text, Document& out, std::string& err) {
 		else for (const Json& j : views->a) {
 			CameraView v;
 			v.camera = d.camera;   // a field a view does not carry is the scene camera's
-			ok = ok && detail::readCamera(j, v.camera) && detail::readStr(j, "name", v.name);
+			ok = ok && detail::readCamera(j, v.camera) && detail::readStr(j, "name", v.name) && detail::readNum(j, "hold", v.hold);
+			if (!(v.hold >= 0.0 && v.hold <= 3600.0)) v.hold = 0.0;
 			if (!ok) break;
 			d.cameraViews.push_back(v);
 		}

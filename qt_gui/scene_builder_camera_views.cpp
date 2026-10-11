@@ -127,6 +127,11 @@ void SceneBuilderWidget::deleteCameraView(int index) {
 	if (m_sel.kind == SelKind::Camera) QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
 }
 
+void SceneBuilderWidget::setCameraViewHold(int index, double seconds) {
+	if (index < 0 || index >= static_cast<int>(m_doc.cameraViews.size()) || m_doc.cameraViews[static_cast<size_t>(index)].hold == seconds) return;
+	edit(QStringLiteral("viewhold:%1").arg(index), [&]() { scene_doc::setCameraViewHold(m_doc, index, seconds); });
+}
+
 void SceneBuilderWidget::renameCameraView(int index, const QString &name) {
 	if (index < 0 || index >= static_cast<int>(m_doc.cameraViews.size())) return;
 	if (name.trimmed().isEmpty() || name.toStdString() == m_doc.cameraViews[static_cast<size_t>(index)].name) return;
@@ -166,6 +171,17 @@ void SceneBuilderWidget::inspectCameraViews(QFormLayout *f) {
 			layout->addWidget(b);
 			connect(b, &QPushButton::clicked, this, action);
 		};
+		const double held = m_doc.cameraViews[static_cast<size_t>(i)].hold;
+		auto *hold = new QDoubleSpinBox;
+		hold->setRange(0.0, 600.0);
+		hold->setDecimals(1);
+		hold->setSingleStep(0.5);
+		hold->setSuffix(tr(" s"));
+		hold->setValue(held);
+		hold->setKeyboardTracking(false);
+		hold->setToolTip(tr("How long a flythrough stays at this view before flying on (0: it does not stop)"));
+		f->addRow(tr("Hold:"), hold);
+		connect(hold, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this, i](double seconds) { setCameraViewHold(i, seconds); });
 		add(tr("Use"), tr("Put the camera at this view"), [this, i]() { useCameraView(i); });
 		add(tr("Update"), tr("Save the camera as it is now over this view"), [this, i]() { updateCameraViewFromNow(i, true); });
 		add(tr("Delete"), tr("Remove this saved view"), [this, i]() { deleteCameraView(i); });

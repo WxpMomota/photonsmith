@@ -95,8 +95,20 @@ void SceneBuilderWidget::showVideoDialog(bool flythrough) {
 		form->addRow(ease);
 		form->addRow(loop);
 	}
+	summary->setWordWrap(true);
 	root->addWidget(summary);
-	const auto refresh = [=]() { summary->setText(tr("%1 frames.").arg(seconds->value() * fps->currentData().toInt())); };
+	double holds = 0.0;   // a flythrough's pauses, in seconds
+	if (flythrough)
+		for (const scene_doc::CameraView &v : m_doc.cameraViews) holds += v.hold;
+	const auto refresh = [=]() {
+		const int length = seconds->value();
+		QString text = tr("%1 frames.").arg(length * fps->currentData().toInt());
+		if (holds > 0.0) {
+			if (holds > 0.9 * length) text += " " + tr("The pauses (%1 s in all) are longer than this video can hold: they are shortened to leave a tenth of it for moving.").arg(holds, 0, 'g', 4);
+			else text += " " + tr("The camera pauses for %1 s in all, so it moves for %2 s.").arg(holds, 0, 'g', 4).arg(length - holds, 0, 'g', 4);
+		}
+		summary->setText(text);
+	};
 	connect(seconds, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, refresh);
 	connect(fps, QOverload<int>::of(&QComboBox::currentIndexChanged), &dialog, refresh);
 	refresh();
@@ -143,6 +155,7 @@ void SceneBuilderWidget::startFlythrough(int frames, int fps, int width, int sam
 		k.fov = v.camera.fov;                       // each view's own field of view and lens
 		k.lensRadius = v.camera.lensRadius;
 		k.focus = v.camera.focusDistance;
+		k.hold = v.hold;                            // how long the camera stays at this view
 		path.keys.push_back(k);
 	}
 	if (returnToStart) path.keys.push_back(path.keys.front());

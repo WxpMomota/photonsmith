@@ -6066,12 +6066,12 @@ Les scènes des autres catégories ne sont pas touchées. Vous pouvez les récup
     <message>
         <location filename="../scene_builder_common.h" line="80"/>
         <source>Wheel: zoom. Drag the background or right-drag: pan. %1- or Shift-click adds an item to what is picked or takes it out; %1- or Shift-drag the background picks what a box holds. The arrow keys nudge what is picked (Page Up and Page Down lift it; Shift: a whole unit, %1: a fine step).</source>
-        <translation>Molette : zoom. Faites glisser l'arrière-plan ou avec le clic droit : déplacer la vue. %1 ou Maj + clic ajoute un élément à la sélection ou le retire ; %1 ou Maj + glisser sur l'arrière-plan sélectionne ce que contient le cadre. Les flèches déplacent légèrement la sélection (Page précédente et Page suivante la montent et la descendent ; Maj : une unité entière, %1 : un pas fin).</translation>
+        <translation>Molette : zoom. Faites glisser l&apos;arrière-plan ou avec le clic droit : déplacer la vue. %1 ou Maj + clic ajoute un élément à la sélection ou le retire ; %1 ou Maj + glisser sur l&apos;arrière-plan sélectionne ce que contient le cadre. Les flèches déplacent légèrement la sélection (Page précédente et Page suivante la montent et la descendent ; Maj : une unité entière, %1 : un pas fin).</translation>
     </message>
     <message>
         <location filename="../scene_builder_common.h" line="83"/>
         <source>Drag the background: orbit (Shift-drag: pan). Right-drag also pans. Wheel: zoom. Pick Move, Rotate or Scale (W, E, R) and drag the arrows, rings or squares; drag an object to slide it on the floor, Shift-drag to lift it, and drag the white dot (or hold %1 while dragging) to move it in any direction. Shift- or %1-click (without dragging) adds an item to what is picked or takes it out. The arrow keys nudge what is picked (Page Up and Page Down lift it; Shift: a whole unit, %1: a fine step).</source>
-        <translation>Faites glisser l'arrière-plan : orbite (Maj + glisser : déplacer). Le clic droit déplace aussi la vue. Molette : zoom. Choisissez Déplacer, Pivoter ou Redimensionner (W, E, R) et faites glisser les flèches, les anneaux ou les carrés ; faites glisser un objet pour le faire glisser sur le sol, Maj + glisser pour le soulever, et faites glisser le point blanc (ou maintenez %1 en glissant) pour le déplacer dans n'importe quelle direction. Maj ou %1 + clic (sans glisser) ajoute un élément à la sélection ou le retire. Les flèches déplacent légèrement la sélection (Page précédente et Page suivante la montent et la descendent ; Maj : une unité entière, %1 : un pas fin).</translation>
+        <translation>Faites glisser l&apos;arrière-plan : orbite (Maj + glisser : déplacer). Le clic droit déplace aussi la vue. Molette : zoom. Choisissez Déplacer, Pivoter ou Redimensionner (W, E, R) et faites glisser les flèches, les anneaux ou les carrés ; faites glisser un objet pour le faire glisser sur le sol, Maj + glisser pour le soulever, et faites glisser le point blanc (ou maintenez %1 en glissant) pour le déplacer dans n&apos;importe quelle direction. Maj ou %1 + clic (sans glisser) ajoute un élément à la sélection ou le retire. Les flèches déplacent légèrement la sélection (Page précédente et Page suivante la montent et la descendent ; Maj : une unité entière, %1 : un pas fin).</translation>
     </message>
     <message>
         <location filename="../scene_builder_common.h" line="88"/>
@@ -7259,53 +7259,63 @@ Origine : %3</translation>
         <translation>Vue « %1 » enregistrée.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="146"/>
+        <location filename="../scene_builder_camera_views.cpp" line="151"/>
         <source>&lt;b&gt;Saved views&lt;/b&gt;</source>
         <translation>&lt;b&gt;Vues enregistrées&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="150"/>
+        <location filename="../scene_builder_camera_views.cpp" line="155"/>
         <source>None yet. Save the camera as a view to come back to it: a front view, a close-up, a bird&apos;s-eye shot.</source>
         <translation>Aucune pour l&apos;instant. Enregistrez la caméra comme vue pour y revenir : une vue de face, un gros plan, une vue plongeante.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="169"/>
+        <location filename="../scene_builder_camera_views.cpp" line="182"/>
+        <source>How long a flythrough stays at this view before flying on (0: it does not stop)</source>
+        <translation>Combien de temps un survol reste sur cette vue avant de repartir (0 : il ne s'arrête pas)</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_views.cpp" line="183"/>
+        <source>Hold:</source>
+        <translation>Pause :</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_views.cpp" line="185"/>
         <source>Use</source>
         <translation>Utiliser</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="169"/>
+        <location filename="../scene_builder_camera_views.cpp" line="185"/>
         <source>Put the camera at this view</source>
         <translation>Place la caméra sur cette vue</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="170"/>
+        <location filename="../scene_builder_camera_views.cpp" line="186"/>
         <source>Update</source>
         <translation>Mettre à jour</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="170"/>
+        <location filename="../scene_builder_camera_views.cpp" line="186"/>
         <source>Save the camera as it is now over this view</source>
         <translation>Enregistre la caméra telle qu&apos;elle est maintenant à la place de cette vue</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="171"/>
+        <location filename="../scene_builder_camera_views.cpp" line="187"/>
         <location filename="../scene_builder_widget.cpp" line="217"/>
         <source>Delete</source>
         <translation>Supprimer</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="171"/>
+        <location filename="../scene_builder_camera_views.cpp" line="187"/>
         <source>Remove this saved view</source>
         <translation>Supprime cette vue enregistrée</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="175"/>
+        <location filename="../scene_builder_camera_views.cpp" line="191"/>
         <source>Save camera as a view</source>
         <translation>Enregistrer la caméra comme vue</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="176"/>
+        <location filename="../scene_builder_camera_views.cpp" line="192"/>
         <source>Remember the camera as it is now under a name (a saved view can be used from the 3D view&apos;s list too)</source>
         <translation>Mémorise la caméra telle qu&apos;elle est maintenant sous un nom (une vue enregistrée peut aussi être utilisée depuis la liste de la vue 3D)</translation>
     </message>
@@ -7503,7 +7513,7 @@ Origine : %3</translation>
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="164"/>
-        <location filename="../scene_builder_turntable.cpp" line="242"/>
+        <location filename="../scene_builder_turntable.cpp" line="255"/>
         <location filename="../scene_builder_widget.cpp" line="281"/>
         <source>Preview</source>
         <translation>Aperçu</translation>
@@ -7520,7 +7530,7 @@ Origine : %3</translation>
     </message>
     <message>
         <location filename="../scene_builder_turntable.cpp" line="53"/>
-        <location filename="../scene_builder_turntable.cpp" line="132"/>
+        <location filename="../scene_builder_turntable.cpp" line="144"/>
         <source>A flythrough needs two or more saved camera views.</source>
         <translation>Un survol nécessite au moins deux vues de caméra enregistrées.</translation>
     </message>
@@ -7549,6 +7559,7 @@ Origine : %3</translation>
         <translation>Crée une vidéo de la scène depuis une caméra qui survole vos vues de caméra enregistrées dans l&apos;ordre où elles l&apos;ont été : %1. La première image est la première vue et la dernière image la dernière. Le champ de vision et l&apos;objectif de chaque vue l&apos;accompagnent. Toutes les images sont calculées, donc une vidéo longue ou grande prend du temps ; commencez par Brouillon.</translation>
     </message>
     <message>
+        <location filename="../scene_builder_camera_views.cpp" line="179"/>
         <location filename="../scene_builder_turntable.cpp" line="75"/>
         <source> s</source>
         <translation> s</translation>
@@ -7605,72 +7616,82 @@ Origine : %3</translation>
         <translation>Qualité :</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="99"/>
+        <location filename="../scene_builder_turntable.cpp" line="105"/>
         <source>%1 frames.</source>
         <translation>%1 images.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="104"/>
+        <location filename="../scene_builder_turntable.cpp" line="107"/>
+        <source>The pauses (%1 s in all) are longer than this video can hold: they are shortened to leave a tenth of it for moving.</source>
+        <translation>Les pauses (%1 s au total) sont plus longues que ce que cette vidéo peut contenir : elles sont raccourcies pour laisser un dixième au mouvement.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_turntable.cpp" line="108"/>
+        <source>The camera pauses for %1 s in all, so it moves for %2 s.</source>
+        <translation>La caméra fait des pauses pendant %1 s au total, elle se déplace donc pendant %2 s.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_turntable.cpp" line="116"/>
         <source>Choose where to save...</source>
         <translation>Choisir où enregistrer...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="112"/>
+        <location filename="../scene_builder_turntable.cpp" line="124"/>
         <source>Save the turntable video</source>
         <translation>Enregistrer la vidéo sur plateau tournant</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="112"/>
+        <location filename="../scene_builder_turntable.cpp" line="124"/>
         <source>MP4 videos (*.mp4)</source>
         <translation>Vidéos MP4 (*.mp4)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="112"/>
+        <location filename="../scene_builder_turntable.cpp" line="124"/>
         <source>Save the flythrough video</source>
         <translation>Enregistrer la vidéo de survol</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="119"/>
+        <location filename="../scene_builder_turntable.cpp" line="131"/>
         <source>The turntable failed</source>
         <translation>Le plateau tournant a échoué</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="119"/>
+        <location filename="../scene_builder_turntable.cpp" line="131"/>
         <source>The flythrough failed</source>
         <translation>Le survol a échoué</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="166"/>
+        <location filename="../scene_builder_turntable.cpp" line="179"/>
         <source>A video needs at least one frame.</source>
         <translation>Une vidéo a besoin d&apos;au moins une image.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="215"/>
+        <location filename="../scene_builder_turntable.cpp" line="228"/>
         <source>Video: frame %1 of %2...</source>
         <translation>Vidéo : image %1 sur %2...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="216"/>
+        <location filename="../scene_builder_turntable.cpp" line="229"/>
         <source>Video: putting the video together...</source>
         <translation>Vidéo : assemblage de la vidéo...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="230"/>
+        <location filename="../scene_builder_turntable.cpp" line="243"/>
         <source>Video: starting (%1 frames, %2 x %3, %4 samples)...</source>
         <translation>Vidéo : démarrage (%1 images, %2 x %3, %4 échantillons)...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="256"/>
+        <location filename="../scene_builder_turntable.cpp" line="269"/>
         <source>Video done in %1 s. Saved %2.</source>
         <translation>Vidéo terminée en %1 s. Enregistrée : %2.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="261"/>
+        <location filename="../scene_builder_turntable.cpp" line="274"/>
         <source>The video was cancelled.</source>
         <translation>La vidéo a été annulée.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="273"/>
+        <location filename="../scene_builder_turntable.cpp" line="286"/>
         <source>The video failed.</source>
         <translation>La vidéo a échoué.</translation>
     </message>
@@ -7695,7 +7716,7 @@ Origine : %3</translation>
         <translation type="vanished">Plateau tournant terminé en %1 s. Enregistré : %2.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="258"/>
+        <location filename="../scene_builder_turntable.cpp" line="271"/>
         <source>The video was made but could not be saved to %1.</source>
         <translation>La vidéo a été créée mais n&apos;a pas pu être enregistrée dans %1.</translation>
     </message>
@@ -7704,12 +7725,12 @@ Origine : %3</translation>
         <translation type="vanished">Le plateau tournant a été annulé.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="269"/>
+        <location filename="../scene_builder_turntable.cpp" line="282"/>
         <source>The frames were rendered, but putting them together needs the free program ffmpeg, which was not found. Install it (ffmpeg.org) and try again.</source>
         <translation>Les images ont été calculées, mais leur assemblage nécessite le programme gratuit ffmpeg, introuvable. Installez-le (ffmpeg.org) puis réessayez.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="270"/>
+        <location filename="../scene_builder_turntable.cpp" line="283"/>
         <source>The renderer did not produce a video (exit code %1).
 %2</source>
         <translation>Le moteur de rendu n&apos;a pas produit de vidéo (code de sortie %1).
@@ -7769,7 +7790,7 @@ Origine : %3</translation>
         <location filename="../scene_builder_files.cpp" line="222"/>
         <location filename="../scene_builder_files.cpp" line="248"/>
         <location filename="../scene_builder_render.cpp" line="85"/>
-        <location filename="../scene_builder_turntable.cpp" line="181"/>
+        <location filename="../scene_builder_turntable.cpp" line="194"/>
         <source>Could not write %1.</source>
         <translation>Impossible d&apos;écrire %1.</translation>
     </message>
@@ -7915,19 +7936,19 @@ Elle figure maintenant dans la liste des scènes (onglet Paramètres, Mes scène
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="111"/>
-        <location filename="../scene_builder_turntable.cpp" line="165"/>
+        <location filename="../scene_builder_turntable.cpp" line="178"/>
         <source>A render is already running.</source>
         <translation>Un rendu est déjà en cours.</translation>
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="113"/>
-        <location filename="../scene_builder_turntable.cpp" line="168"/>
+        <location filename="../scene_builder_turntable.cpp" line="181"/>
         <source>Fix the problems listed under the properties first.</source>
         <translation>Corrigez d&apos;abord les problèmes indiqués dans les propriétés.</translation>
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="114"/>
-        <location filename="../scene_builder_turntable.cpp" line="169"/>
+        <location filename="../scene_builder_turntable.cpp" line="182"/>
         <source>The renderer (%1) was not found next to the program.</source>
         <translation>Le moteur de rendu (%1) est introuvable à côté du programme.</translation>
     </message>
@@ -7999,7 +8020,7 @@ La forme est une estimation : l&apos;arrière est inventé et les détails fins 
     <message>
         <location filename="../scene_builder_photo.cpp" line="87"/>
         <location filename="../scene_builder_render.cpp" line="149"/>
-        <location filename="../scene_builder_turntable.cpp" line="225"/>
+        <location filename="../scene_builder_turntable.cpp" line="238"/>
         <source>Cancel</source>
         <translation>Annuler</translation>
     </message>
@@ -8035,7 +8056,7 @@ La forme est une estimation : l&apos;arrière est inventé et les détails fins 
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="180"/>
-        <location filename="../scene_builder_turntable.cpp" line="268"/>
+        <location filename="../scene_builder_turntable.cpp" line="281"/>
         <source>The renderer stopped unexpectedly.</source>
         <translation>Le moteur de rendu s&apos;est arrêté de façon inattendue.</translation>
     </message>
