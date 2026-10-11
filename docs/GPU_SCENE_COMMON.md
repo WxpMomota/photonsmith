@@ -285,5 +285,7 @@ Run: `python scripts\consistency_sweep.py --exe <full path to>\ray_tracer.exe --
 
 `make_look_at` (shared): the `camera` group passes on OptiX, so the orthographic/spherical/realistic cameras agree with the CPU.
 
+One pair is borderline on the wavefront backend and only there: `camera`, "spherical camera, scene mirrored" (4.7% over 8 seeds against a 5% tolerance, 8% on seed 3). The picture is the same: with the lamp removed plain and mirrored agree to 4 digits on CPU, recursive and wavefront, so what differs is only the few pixels that show the 318-radiance lamp directly, which the wavefront sampler places differently. Not treated as a bug; if it flickers, give that pair a lamp-free scene.
+
 Not done: the CPU-versus-OptiX baselines for the subsurface scenes (B16, layered-materials, the SSS dragons) were not re-measured; the unit tests that compare them are in the list of things to look at if one fails. Metal's own `--wavefront` equivalent does not exist.
 
