@@ -268,6 +268,29 @@ SceneLayoutView::Hit SceneLayoutView::hitTest(const QPointF &px) const {
 	return h;
 }
 
+// The lines a drag has snapped to: through the coordinate the dragged objects now share with another (across the whole view), and an outline round the object matched.
+void SceneLayoutView::drawSnapGuides(QPainter &p) const {
+	if (m_guides.empty() || !m_doc) return;
+	const QPen pen(QColor(255, 140, 0), 1.4, Qt::DashLine);
+	p.setBrush(Qt::NoBrush);
+	for (const scene_doc::SnapGuide &g : m_guides) {
+		p.setPen(pen);
+		if (g.object >= 0 && g.object < static_cast<int>(m_doc->objects.size())) {
+			const scene_doc::Aabb b = scene_doc::aabbOf(m_doc->objects[static_cast<std::size_t>(g.object)]);
+			p.drawRect(QRectF(toScreen(b.lo), toScreen(b.hi)).normalized().adjusted(-2, -2, 2, 2));
+		}
+		Float3 at{};
+		(g.axis == 0 ? at.x : g.axis == 1 ? at.y : at.z) = g.value;
+		Float3 next = at;
+		(g.axis == 0 ? next.x : g.axis == 1 ? next.y : next.z) += 1.0;
+		const QPointF s0 = toScreen(at), d = toScreen(next) - s0;
+		const double dl = std::hypot(d.x(), d.y());
+		if (dl < 1e-6) continue;   // this axis is not in the plane being looked at
+		const QPointF across(-d.y() / dl, d.x() / dl);
+		p.drawLine(s0 - across * 5000.0, s0 + across * 5000.0);
+	}
+}
+
 void SceneLayoutView::paintEvent(QPaintEvent *) {
 	QPainter p(this);
 	p.setRenderHint(QPainter::Antialiasing, true);
@@ -397,6 +420,8 @@ void SceneLayoutView::paintEvent(QPaintEvent *) {
 		p.setFont(font());
 	}
 
+	drawSnapGuides(p);
+
 	if (m_banding) {
 		QColor fill = accent;
 		fill.setAlpha(40);
@@ -489,6 +514,10 @@ void SceneLayoutView::mouseMoveEvent(QMouseEvent *e) {
 }
 
 void SceneLayoutView::mouseReleaseEvent(QMouseEvent *) {
+	if (!m_guides.empty()) {
+		m_guides.clear();
+		update();
+	}
 	if (m_maybeToggle) {
 		m_maybeToggle = false;
 		if (m_toggleCandidate.kind != BuilderSelection::Kind::None) emit selectionToggled(m_toggleCandidate);

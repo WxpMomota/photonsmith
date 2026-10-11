@@ -8,6 +8,7 @@
 #include "flow_layout.h"
 
 #include <QApplication>
+#include <QGuiApplication>
 #include <QAbstractButton>
 #include <QButtonGroup>
 #include <QCheckBox>
@@ -103,6 +104,10 @@ void SceneBuilderWidget::createViews(QWidget *layoutBox, QVBoxLayout *layoutLayo
 		m_view->setSnap(on);
 		m_view3d->setSnap(on);
 	});
+	m_snapObjectsCheck = new QCheckBox(tr("Snap to objects"), layoutBox);
+	m_snapObjectsCheck->setChecked(true);
+	m_snapObjectsCheck->setToolTip(tr("While dragging, line the object up with the edges and middles of the others, and rest it on top of them or the floor (orange lines show what it snapped to). Hold %1 to drag freely.").arg(altKeyName()));
+	connect(m_snapObjectsCheck, &QCheckBox::toggled, this, [this](bool on) { setSnapToObjects(on); });
 	auto *frame = new QPushButton(tr("Frame all"), layoutBox);
 	frame->setAutoDefault(false);
 	connect(frame, &QPushButton::clicked, this, [this]() {
@@ -112,6 +117,7 @@ void SceneBuilderWidget::createViews(QWidget *layoutBox, QVBoxLayout *layoutLayo
 	// One flow: Top / Front / Side / 3D, Snap to grid and Frame all share a line when the column is wide, and wrap when it is not.
 	scene_builder_ui::compactStyle(frame);
 	planeRow->addWidget(snap);
+	planeRow->addWidget(m_snapObjectsCheck);
 	planeRow->addWidget(frame);
 	layoutLayout->addWidget(viewBar);
 	// The tools get a row of their own (only in 3D), so neither row is wider than the column.
@@ -137,7 +143,8 @@ void SceneBuilderWidget::createViews(QWidget *layoutBox, QVBoxLayout *layoutLayo
 		m_lastEditKey.clear();
 		m_editCounter++;
 	};
-	const auto onDragged = [this](const BuilderSelection &s, int which, const Float3 &w) {
+	const auto onDragged = [this](const BuilderSelection &s, int which, const Float3 &asked) {
+		const Float3 w = which == 0 ? snapDragTarget(s, asked) : asked;   // lined up with the objects around it, if that is on
 		// Dragging one of several picked items moves them all by the same amount.
 		const bool picked = which == 0 && !m_extra.empty() && (s == m_sel || std::find(m_extra.begin(), m_extra.end(), s) != m_extra.end());
 		if (picked && (s.kind == SelKind::Object || s.kind == SelKind::Light)) {
@@ -205,6 +212,39 @@ void SceneBuilderWidget::createViews(QWidget *layoutBox, QVBoxLayout *layoutLayo
 			connect(delView, &QShortcut::activated, this, [this]() { deleteSelected(); });
 		}
 	}
+}
+
+void SceneBuilderWidget::setSnapToObjects(bool on) {
+	m_snapObjects = on;
+	if (m_snapObjectsCheck && m_snapObjectsCheck->isChecked() != on) m_snapObjectsCheck->setChecked(on);
+	if (!on) {
+		m_view->setSnapGuides({});
+		m_view3d->setSnapGuides({});
+	}
+}
+
+// Where a drag of the object `s` to `wanted` ends up: nudged so that, on the axes the drag changes, the dragged objects (all the picked ones, if it is one of several) line up
+// with or rest on the objects around them (scene_snap.h). What it snapped to is shown in both views until the mouse is released. Alt (Option) drags freely; lights, the
+// camera and targets are not snapped.
+Float3 SceneBuilderWidget::snapDragTarget(const BuilderSelection &s, const Float3 &wanted) {
+	std::vector<scene_doc::SnapGuide> none;
+	if (!m_snapObjects || s.kind != SelKind::Object || (QGuiApplication::keyboardModifiers() & Qt::AltModifier)) {
+		m_view->setSnapGuides(none);
+		m_view3d->setSnapGuides(none);
+		return wanted;
+	}
+	const Float3 *now = builderHandle(&m_doc, s, 0);
+	if (!now) return wanted;
+	const Float3 delta{wanted.x - now->x, wanted.y - now->y, wanted.z - now->z};
+	const bool active[3] = {std::abs(delta.x) > 1e-9, std::abs(delta.y) > 1e-9, std::abs(delta.z) > 1e-9};
+	if (!active[0] && !active[1] && !active[2]) return wanted;
+	std::vector<int> moving{s.index};
+	if (!m_extra.empty() && (s == m_sel || std::find(m_extra.begin(), m_extra.end(), s) != m_extra.end())) moving = pickedItems().objects;
+	const double tolerance = m_viewStack->currentWidget() == m_view3d ? m_view3d->snapTolerance(*now) : m_view->snapTolerance();
+	const scene_doc::SnapResult r = scene_doc::snapMove(m_doc, moving, delta, active, tolerance);
+	m_view->setSnapGuides(r.guides);
+	m_view3d->setSnapGuides(r.guides);
+	return Float3{now->x + r.delta.x, now->y + r.delta.y, now->z + r.delta.z};
 }
 
 // The views follow the document: both are redrawn, and the one on show tells where a new object goes.
@@ -362,6 +402,19 @@ void SceneBuilderWidget::orbit3dForTest(double yawDeg, double pitchDeg) { m_view
 
 // A real drag of object `index` in the layout view while others are picked: true if object `index` moved.
 bool SceneBuilderWidget::dragPickedForTest(int index, const QPointF &deltaPx) { return dragObjectForTest(index, deltaPx); }
+
+void SceneBuilderWidget::holdDragForTest(int index, const QPointF &deltaPx, bool in3d) {
+	QWidget *view = in3d ? static_cast<QWidget *>(m_view3d) : static_cast<QWidget *>(m_view);
+	const QPointF start = in3d ? m_view3d->itemScreenPos({SelKind::Object, index}) : m_view->itemScreenPos({SelKind::Object, index});
+	m_holdEnd = start + deltaPx;
+	sendMouse(view, QEvent::MouseButtonPress, start, Qt::LeftButton, Qt::LeftButton);
+	for (int step = 1; step <= 4; ++step) sendMouse(view, QEvent::MouseMove, start + deltaPx * (step / 4.0), Qt::NoButton, Qt::LeftButton);
+}
+
+void SceneBuilderWidget::releaseDragForTest(bool in3d) {
+	QWidget *view = in3d ? static_cast<QWidget *>(m_view3d) : static_cast<QWidget *>(m_view);
+	sendMouse(view, QEvent::MouseButtonRelease, m_holdEnd, Qt::LeftButton, Qt::NoButton);
+}
 
 QPointF SceneBuilderWidget::itemScreenPosForTest(const BuilderSelection &s) const { return m_view->itemScreenPos(s); }
 

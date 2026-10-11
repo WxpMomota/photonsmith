@@ -378,6 +378,50 @@ static void selfTestCameraViews(SceneBuilderWidget *sb, const std::function<void
 	sb->show3dView(false);
 }
 
+// Snap to objects (scene_snap.h): dragging the red box of the starter scene to near the gold ball's middle lands exactly on it when snapping to objects is on, and on the
+// 0.25 grid when it is off. Leaves the document as it found it.
+static void selfTestSnap(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
+	using Sel = BuilderSelection;
+	const auto pos = [sb](int i) { return sb->document().objects[static_cast<size_t>(i)].position; };
+	const double x0 = pos(3).x;
+	const QPointF a = sb->itemScreenPosForTest(Sel{Sel::Kind::Object, 3}), b = sb->itemScreenPosForTest(Sel{Sel::Kind::Object, 2});
+	const double pixelsPerUnit = (b.x() - a.x()) / (pos(2).x - pos(3).x);   // the top view's scale
+	const QPointF drag(1.3 * pixelsPerUnit, 0.0);                           // to about 0.1 from the gold ball's middle
+	sb->setSnapToObjects(false);
+	const bool movedOff = sb->dragObjectForTest(3, drag);
+	const double offX = pos(3).x;
+	check(movedOff && std::abs(offX - 1.5) < 1e-9, "with Snap to objects off a drag lands on the 0.25 grid (x " + QString::number(offX, 'f', 3) + ")");
+	check(sb->undo() && pos(3).x == x0, "undone");
+	sb->setSnapToObjects(true);
+	const bool movedOn = sb->dragObjectForTest(3, drag);
+	const double onX = pos(3).x;
+	// Lined up: one of the box's sides (it is turned, so its box is wider than it looks) or its middle is exactly on one of the gold ball's.
+	const scene_doc::Aabb moved = scene_doc::aabbOf(sb->document().objects[3]), gold = scene_doc::aabbOf(sb->document().objects[2]);
+	const double mine[3] = {moved.low(0), moved.centre(0), moved.high(0)}, theirs[3] = {gold.low(0), gold.centre(0), gold.high(0)};
+	bool lined = false;
+	for (int i = 0; i < 3; ++i)
+		for (int j = 0; j < 3; ++j) lined = lined || (std::abs(mine[i] - theirs[j]) < 1e-9 && (i == 1) == (j == 1));
+	check(movedOn && lined && std::abs(onX - 1.5) > 1e-6, "with it on the same drag lines up with the gold ball instead of the grid (x " + QString::number(onX, 'f', 3) + ")");
+	check(sb->undo() && pos(3).x == x0, "that is one undo step too");
+	// RT_GUI_SELFTEST_SNAP_PNG=<prefix> saves pictures of the tab in the middle of such a drag, in the top view and in 3D (<prefix>_top.png, <prefix>_3d.png).
+	const QString picture = qEnvironmentVariable("RT_GUI_SELFTEST_SNAP_PNG");
+	if (!picture.isEmpty()) {
+		sb->show3dView(false);
+		sb->holdDragForTest(3, drag, false);
+		QApplication::processEvents();
+		sb->grab().save(picture + "_top.png");
+		sb->releaseDragForTest(false);
+		sb->undo();
+		sb->show3dView(true);
+		sb->holdDragForTest(3, QPointF(60, 0), true);
+		QApplication::processEvents();
+		sb->grab().save(picture + "_3d.png");
+		sb->releaseDragForTest(true);
+		sb->undo();
+		sb->show3dView(false);
+	}
+}
+
 void MainWindow::runBuilderSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot, const QString &outPrefix) {
 	resize(qEnvironmentVariableIntValue("RT_GUI_SELFTEST_WIDTH") > 0 ? qEnvironmentVariableIntValue("RT_GUI_SELFTEST_WIDTH") : 1500, qEnvironmentVariableIntValue("RT_GUI_SELFTEST_HEIGHT") > 0 ? qEnvironmentVariableIntValue("RT_GUI_SELFTEST_HEIGHT") : 950);  // (..._WIDTH / ..._HEIGHT: a smaller window)
 	if (m_sceneBuilder) m_tabWidget->setCurrentWidget(m_sceneBuilder);  // by widget, so it works in every language
@@ -397,7 +441,9 @@ void MainWindow::runBuilderSelfTest(const std::function<void(const QString &)> &
 	check(sb->redo() && sb->document().lights.size() == 2, "redo brings it back");
 	// A real mouse drag in the layout view moves the object (snapped to the 0.25 grid) as one undo step.
 	const scene_doc::Float3 ball0 = sb->document().objects[1].position;
+	sb->setSnapToObjects(false);   // (this step is about the grid; snapping to objects has its own step below)
 	check(sb->dragObjectForTest(1, QPointF(80, -40)), "dragging the glass ball in the layout view moves it");
+	sb->setSnapToObjects(true);
 	const scene_doc::Float3 ball1 = sb->document().objects[1].position;
 	check(ball1.x > ball0.x + 0.3 && ball1.z < ball0.z - 0.1 && ball1.y == ball0.y, "it moved right and away from the camera, height unchanged");
 	check(std::fabs(ball1.x * 4 - std::round(ball1.x * 4)) < 1e-9, "the new position is on the grid");
@@ -424,6 +470,7 @@ void MainWindow::runBuilderSelfTest(const std::function<void(const QString &)> &
 	selfTestRenderQueue(check);
 	// The screenshots show the starter scene (the edits above are done), with the gold ball picked.
 	sb->newScene();
+	selfTestSnap(sb, check);
 	sb->selectObject(2);
 	QTimer::singleShot(600, this, [this, shot, log, sb, ok, outPrefix]() mutable {
 		shot("builder_edit");

@@ -47,6 +47,16 @@ drawn by their farthest point, so they no longer cover things standing in front 
 The 3D view draws flat-shaded shapes with the same size, position and rotation the renderer uses; it shows shape and placement, not materials or lighting (press
 **Preview** for that). A mesh is drawn at its real size: its bounding box (at the object's Scale) with a sample of its vertices, so you can see how big it is and which way it faces; a file that cannot be read, or one over 80 MB, shows a small marker instead.
 
+## Snap to objects
+
+While you drag an object (or several picked ones), **Snap to objects** (the check box beside *Snap to grid*, on by default) lines it up with the objects around it, like the smart guides of a drawing program:
+
+* its **low side, middle or high side** along an axis snaps to the same side or middle of a nearby object (flush edges, centred on each other), and its low side to the other object's high side and the other way round (**resting on top of it, or touching it side to side**); the floor (height 0) is a target for its lowest point;
+* only the axes the drag changes snap (dragging on the floor snaps in X and Z; lifting snaps in Y; an arrow snaps along its own axis), within about **8 pixels** of the view you are dragging in, so zooming in makes it finer; the nearest match wins, and a touch wins a tie;
+* **orange lines** (through the shared coordinate, in the flat views) and an **outline round the matched object** show what it snapped to, and 3D also says so in the corner; they go when you let go;
+* it takes over from the 0.25 grid on the axes where it snaps and leaves the grid alone where nothing is near; hold **Alt (Option on a Mac)** to drag freely without either;
+* several picked objects snap as one box (their members are never targets for each other). An object's box is the smallest box round it as it is turned (exact for a sphere, a box, a flat panel and the generated shapes; a mesh file's size is not known to the builder, so a mesh snaps only by its middle point). Lights, the camera and their targets, keys, the numbers in the properties and the arrows' keyboard moves are not snapped.
+
 ## Camera views
 
 The scene has one camera (select **Camera and image** in the list to edit it), and the 3D view has a row of camera buttons under its tools:

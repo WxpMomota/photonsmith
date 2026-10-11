@@ -374,7 +374,36 @@ void Scene3DView::paintEvent(QPaintEvent *) {
 	drawLights(c);
 	if (!m_throughCamera) drawCamera(c);   // the eye is the camera
 	drawTool(c);
+	drawSnapGuides(c);
 	if (m_throughCamera) drawCameraFrame(p);
+}
+
+double Scene3DView::snapTolerance(const Float3 &at) const {
+	const scene_view::View v = view();
+	return 8.0 * v.unitsPerPixel(std::max(v.nearPlane * 2, v.toView(toV3(at)).z));
+}
+
+// What a drag has snapped to: the box round each object matched (the floor has none) and a note saying which.
+void Scene3DView::drawSnapGuides(Ctx &c) const {
+	if (m_guides.empty() || !m_doc) return;
+	const QPen pen(QColor(255, 140, 0), 1.6, Qt::DashLine);
+	QStringList notes;
+	for (const scene_doc::SnapGuide &g : m_guides) {
+		if (g.object < 0 || g.object >= static_cast<int>(m_doc->objects.size())) {
+			notes << tr("the floor");
+			continue;
+		}
+		notes << QString::fromStdString(m_doc->objects[static_cast<std::size_t>(g.object)].name);
+		const scene_doc::Aabb b = scene_doc::aabbOf(m_doc->objects[static_cast<std::size_t>(g.object)]);
+		const V3 lo = toV3(b.lo), hi = toV3(b.hi);
+		const V3 corner[8] = {{lo.x, lo.y, lo.z}, {hi.x, lo.y, lo.z}, {hi.x, hi.y, lo.z}, {lo.x, hi.y, lo.z}, {lo.x, lo.y, hi.z}, {hi.x, lo.y, hi.z}, {hi.x, hi.y, hi.z}, {lo.x, hi.y, hi.z}};
+		const int edge[12][2] = {{0, 1}, {1, 2}, {2, 3}, {3, 0}, {4, 5}, {5, 6}, {6, 7}, {7, 4}, {0, 4}, {1, 5}, {2, 6}, {3, 7}};
+		for (const auto &e : edge) c.line(corner[e[0]], corner[e[1]], pen);
+	}
+	notes.removeDuplicates();
+	c.p->setPen(QColor(255, 140, 0));
+	c.p->setFont(c.normal);
+	c.p->drawText(QPointF(10, 18), tr("Snapped to %1").arg(notes.join(QStringLiteral(", "))));
 }
 
 // The picture's frame over the view: what is outside it is dimmed, so what is inside is what a render shows.

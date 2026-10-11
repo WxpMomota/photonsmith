@@ -277,6 +277,10 @@ void Scene3DView::mouseMoveEvent(QMouseEvent *e) {
 }
 
 void Scene3DView::mouseReleaseEvent(QMouseEvent *) {
+	if (!m_guides.empty()) {
+		m_guides.clear();
+		update();
+	}
 	if (m_mode == Mode::MaybeToggle) emit selectionToggled(m_pending.sel);
 	if (m_collapsePending) {
 		m_collapsePending = false;

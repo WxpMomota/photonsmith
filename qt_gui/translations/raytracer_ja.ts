@@ -6375,12 +6375,22 @@ Output:
 <context>
     <name>Scene3DView</name>
     <message>
-        <location filename="../scene_3d_view.cpp" line="395"/>
+        <location filename="../scene_3d_view.cpp" line="393"/>
+        <source>the floor</source>
+        <translation>床</translation>
+    </message>
+    <message>
+        <location filename="../scene_3d_view.cpp" line="406"/>
+        <source>Snapped to %1</source>
+        <translation>%1 に吸着</translation>
+    </message>
+    <message>
+        <location filename="../scene_3d_view.cpp" line="424"/>
         <source>Through the camera (%1 x %2). Orbit, pan or zoom to leave.</source>
         <translation>カメラ越しの表示 (%1 x %2)。回り込み・画面移動・ズームで解除されます。</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="547"/>
+        <location filename="../scene_3d_view.cpp" line="576"/>
         <source>Camera</source>
         <translation>カメラ</translation>
     </message>
@@ -6700,7 +6710,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     <message>
         <location filename="../scene_builder_inspector.cpp" line="455"/>
         <location filename="../scene_builder_multi.cpp" line="298"/>
-        <location filename="../scene_builder_views.cpp" line="50"/>
+        <location filename="../scene_builder_views.cpp" line="51"/>
         <source>Scale</source>
         <translation>スケール</translation>
     </message>
@@ -7240,7 +7250,7 @@ From: %3</source>
     </message>
     <message>
         <location filename="../scene_builder_multi.cpp" line="255"/>
-        <location filename="../scene_builder_views.cpp" line="48"/>
+        <location filename="../scene_builder_views.cpp" line="49"/>
         <source>Move</source>
         <translation>移動</translation>
     </message>
@@ -7285,63 +7295,73 @@ From: %3</source>
         <translation>ほかの選択中のオブジェクトにも、このオブジェクト (メイン: 最初に選んだもの) と同じ素材と光の設定を適用します</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="48"/>
+        <location filename="../scene_builder_views.cpp" line="49"/>
         <source>Move (W): drag an object, or an arrow to move along one axis</source>
         <translation>移動 (W): オブジェクトをドラッグするか、矢印をドラッグして 1 つの軸に沿って動かします</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="49"/>
+        <location filename="../scene_builder_views.cpp" line="50"/>
         <source>Rotate</source>
         <translation>回転</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="49"/>
+        <location filename="../scene_builder_views.cpp" line="50"/>
         <source>Rotate (E): drag a ring to turn the object about that axis</source>
         <translation>回転 (E): リングをドラッグすると、その軸まわりにオブジェクトを回転させます</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="50"/>
+        <location filename="../scene_builder_views.cpp" line="51"/>
         <source>Scale (R): drag a square handle to stretch the object along that axis</source>
         <translation>拡大縮小 (R): 四角形をドラッグすると、その軸に沿ってオブジェクトを伸縮します</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="68"/>
+        <location filename="../scene_builder_views.cpp" line="69"/>
         <source>Top</source>
         <translation>上</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="68"/>
+        <location filename="../scene_builder_views.cpp" line="69"/>
         <source>Front</source>
         <translation>前</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="68"/>
+        <location filename="../scene_builder_views.cpp" line="69"/>
         <source>Side</source>
         <translation>横</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="85"/>
+        <location filename="../scene_builder_views.cpp" line="86"/>
         <source>3D</source>
         <translation>3D</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="88"/>
+        <location filename="../scene_builder_views.cpp" line="89"/>
         <source>Look at the scene from any side, and move things in 3D</source>
         <translation>シーンを任意の方向から見て、3D で物を動かします</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_builder3d.cpp" line="427"/>
-        <location filename="../scene_builder_views.cpp" line="99"/>
+        <location filename="../scene_builder_views.cpp" line="100"/>
         <source>Snap to grid</source>
         <translation>グリッドにスナップ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="101"/>
+        <location filename="../scene_builder_views.cpp" line="102"/>
         <source>Dragging moves things in steps of 0.25. Hold %1 to drag freely.</source>
         <translation>ドラッグすると 0.25 刻みで動きます。%1 キーを押しながらドラッグすると自由に動かせます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="106"/>
+        <location filename="../scene_builder_views.cpp" line="107"/>
+        <source>Snap to objects</source>
+        <translation>オブジェクトに吸着</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_views.cpp" line="109"/>
+        <source>While dragging, line the object up with the edges and middles of the others, and rest it on top of them or the floor (orange lines show what it snapped to). Hold %1 to drag freely.</source>
+        <translation>ドラッグ中、ほかのオブジェクトの端や中心にそろえ、上や床に乗せます (オレンジの線が吸着先を示します)。%1 を押しながらドラッグすると自由に動かせます。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_views.cpp" line="111"/>
         <source>Frame all</source>
         <translation>すべてを表示</translation>
     </message>
@@ -8007,32 +8027,32 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
 <context>
     <name>SceneLayoutView</name>
     <message>
-        <location filename="../scene_layout_view.cpp" line="303"/>
+        <location filename="../scene_layout_view.cpp" line="326"/>
         <source>Top view: X to the right, Z towards you (down)</source>
         <translation>上面図: X は右、Z は手前 (下)</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="304"/>
+        <location filename="../scene_layout_view.cpp" line="327"/>
         <source>Front view: X to the right, Y up</source>
         <translation>正面図: X は右、Y は上</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="305"/>
+        <location filename="../scene_layout_view.cpp" line="328"/>
         <source>Side view: Z to the left, Y up</source>
         <translation>側面図: Z は左、Y は上</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="308"/>
+        <location filename="../scene_layout_view.cpp" line="331"/>
         <source>Grid: 1 unit</source>
         <translation>グリッド: 1 単位</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="308"/>
+        <location filename="../scene_layout_view.cpp" line="331"/>
         <source>Grid: %1 units</source>
         <translation>グリッド: %1 単位</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="396"/>
+        <location filename="../scene_layout_view.cpp" line="419"/>
         <source>Camera</source>
         <translation>カメラ</translation>
     </message>

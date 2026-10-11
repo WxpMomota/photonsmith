@@ -41,6 +41,9 @@ public:
 	// is drawn at the middle of them all and turns or scales them as one (groupTurned, groupScaled), about that point.
 	void setExtraSelection(const std::vector<BuilderSelection> &extra) { m_extra = extra; update(); }
 	void setSnap(bool on) { m_snap = on; }
+	// What a drag has just snapped to (scene_snap.h): an outline round each object matched and a note; gone when the mouse is released.
+	void setSnapGuides(const std::vector<scene_doc::SnapGuide> &guides) { m_guides = guides; update(); }
+	double snapTolerance(const scene_doc::Float3 &at) const;   // about 8 pixels at that point, in world units
 	// Looks through the scene's camera: the view takes the camera's place, direction and field of view, with the picture's frame drawn over it (everything outside
 	// the frame is dimmed), and follows the camera while it is edited. Orbiting, panning, zooming or Frame all leaves it (cameraViewLeft()).
 	void setThroughCamera(bool on);
@@ -130,6 +133,8 @@ private:
 	void drawCamera(Ctx &c) const;
 	void drawTool(Ctx &c) const;
 	void drawCameraFrame(QPainter &p) const;
+	void drawSnapGuides(Ctx &c) const;
+	std::vector<scene_doc::SnapGuide> m_guides;
 	scene_view::OrbitCamera cameraPose() const;   // the scene's camera as an orbit (with the field of view that makes the frame show what it sees)
 	void leaveCameraView();                        // out of looking through the camera, the view staying where it is
 

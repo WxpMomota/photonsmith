@@ -69,6 +69,9 @@ public:
 	void turnSelectedBy(int axis, double degrees);
 	void scaleSelectedBy(double factor);
 	void useLookOfMainObject();                // the other picked objects get the main one's material
+	// "Snap to objects" (scene_snap.h): while an object (or a picked set) is dragged, its edges and middle line up with the other objects', and it rests on them or the floor.
+	void setSnapToObjects(bool on);
+	bool snapToObjects() const { return m_snapObjects; }
 	// Saved camera views (scene_builder_camera_views.cpp). Each change is one undo step.
 	int saveCameraViewNamed(const QString &name, bool sceneCamera = false);   // the 3D view's place (or the camera, looking through it; or always the camera if `sceneCamera`); the new index, -1 if full
 	void useCameraView(int index);            // the scene's camera goes to the saved view
@@ -83,7 +86,10 @@ public:
 		return {e.x, e.y, e.z};
 	}
 	int viewComboCountForTest() const;
-	bool dragPickedForTest(int index, const QPointF &deltaPx);   // a real drag in the layout view of one picked object (moves them all)
+	bool dragPickedForTest(int index, const QPointF &deltaPx);
+	// A drag left unfinished (the mouse still down) in the 2D or the 3D view, and its release: for a picture of what a drag shows while it is going on.
+	void holdDragForTest(int index, const QPointF &deltaPx, bool in3d);
+	void releaseDragForTest(bool in3d);   // a real drag in the layout view of one picked object (moves them all)
 	void togglePickedForTest(const BuilderSelection &s) { togglePicked(s); }
 	void clickItemForTest(const BuilderSelection &s, Qt::KeyboardModifiers mods = Qt::NoModifier);   // a real click on an item in the layout view
 	int pickedRowsForTest() const;   // how many rows of the list are highlighted
@@ -212,6 +218,7 @@ private:
 	void togglePicked(const BuilderSelection &s);      // Ctrl- or Shift-click: add or remove (a group goes in or out whole)
 	void boxPicked(const QList<BuilderSelection> &items, bool additive);
 	void inspectMultiple(QFormLayout *f);
+	scene_doc::Float3 snapDragTarget(const BuilderSelection &s, const scene_doc::Float3 &wanted);   // where a drag of `s` to `wanted` ends up, with what it snapped to shown
 	void transformPicked(bool turn, int axis, double amount);   // a drag in the 3D view: the total turn or factor since it began
 	scene_doc::Document m_groupBase;                            // the document when the current group turn or stretch began
 	int m_groupBaseDrag = -1;                                   // m_editCounter of that drag
@@ -297,6 +304,9 @@ private:
 	QStackedWidget *m_viewStack = nullptr;  // m_view (Top / Front / Side) or m_view3d, one at a time
 	QLabel *m_viewHint = nullptr;
 	QWidget *m_gizmoBar = nullptr;           // the 3D view's Move / Rotate / Scale buttons
+	bool m_snapObjects = true;
+	QPointF m_holdEnd;   // where holdDragForTest() left the mouse
+	QCheckBox *m_snapObjectsCheck = nullptr;
 	QWidget *m_cameraBar = nullptr;          // the 3D view's camera buttons: Through camera, Camera from view, the saved views
 	QPushButton *m_throughButton = nullptr;
 	QComboBox *m_viewCombo = nullptr;

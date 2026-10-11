@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "../src/shared/scene_document.h"
+#include "../src/shared/scene_snap.h"
 
 // What is selected in the list and the layout view.
 struct BuilderSelection {
@@ -33,6 +34,9 @@ public:
 	void setSelection(const BuilderSelection &s) { m_sel = s; update(); }
 	// The other items picked along with the main one (Ctrl- or Shift-click, a box, a group): drawn like it, and dragged with it.
 	void setExtraSelection(const std::vector<BuilderSelection> &extra) { m_extra = extra; update(); }
+	// What a drag has just snapped to (scene_snap.h): drawn as lines through the shared coordinates and an outline round each object matched; gone when the mouse is released.
+	void setSnapGuides(const std::vector<scene_doc::SnapGuide> &guides) { m_guides = guides; update(); }
+	double snapTolerance() const { return 8.0 / m_scale; }   // about 8 pixels, in world units
 	void setPlane(Plane p);
 	void setSnap(bool on) { m_snap = on; }
 	// The point in world space the view is centred on, for the plane's two axes (the third is 0): where a new object is dropped.
@@ -75,6 +79,8 @@ private:
 	Hit hitTest(const QPointF &px) const;
 	const scene_doc::Float3 *handlePosition(const BuilderSelection &s, int which) const;
 	bool isPicked(const BuilderSelection &s) const;   // the main item or one of the extra ones
+	void drawSnapGuides(QPainter &p) const;
+	std::vector<scene_doc::SnapGuide> m_guides;
 
 	const scene_doc::Document *m_doc = nullptr;
 	BuilderSelection m_sel;

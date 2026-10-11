@@ -6478,12 +6478,22 @@ Sortie :
 <context>
     <name>Scene3DView</name>
     <message>
-        <location filename="../scene_3d_view.cpp" line="395"/>
+        <location filename="../scene_3d_view.cpp" line="393"/>
+        <source>the floor</source>
+        <translation>le sol</translation>
+    </message>
+    <message>
+        <location filename="../scene_3d_view.cpp" line="406"/>
+        <source>Snapped to %1</source>
+        <translation>Aimanté sur %1</translation>
+    </message>
+    <message>
+        <location filename="../scene_3d_view.cpp" line="424"/>
         <source>Through the camera (%1 x %2). Orbit, pan or zoom to leave.</source>
         <translation>À travers la caméra (%1 x %2). Orbitez, déplacez ou zoomez pour quitter.</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="547"/>
+        <location filename="../scene_3d_view.cpp" line="576"/>
         <source>Camera</source>
         <translation>Caméra</translation>
     </message>
@@ -6803,7 +6813,7 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
     <message>
         <location filename="../scene_builder_inspector.cpp" line="455"/>
         <location filename="../scene_builder_multi.cpp" line="298"/>
-        <location filename="../scene_builder_views.cpp" line="50"/>
+        <location filename="../scene_builder_views.cpp" line="51"/>
         <source>Scale</source>
         <translation>Échelle</translation>
     </message>
@@ -7343,7 +7353,7 @@ Origine : %3</translation>
     </message>
     <message>
         <location filename="../scene_builder_multi.cpp" line="255"/>
-        <location filename="../scene_builder_views.cpp" line="48"/>
+        <location filename="../scene_builder_views.cpp" line="49"/>
         <source>Move</source>
         <translation>Déplacer</translation>
     </message>
@@ -7388,63 +7398,73 @@ Origine : %3</translation>
         <translation>Donne aux autres objets sélectionnés le même matériau et les mêmes réglages de lumière que celui-ci (l&apos;objet principal : le premier sélectionné)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="48"/>
+        <location filename="../scene_builder_views.cpp" line="49"/>
         <source>Move (W): drag an object, or an arrow to move along one axis</source>
         <translation>Déplacer (W) : faites glisser un objet, ou une flèche pour déplacer le long d&apos;un axe</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="49"/>
+        <location filename="../scene_builder_views.cpp" line="50"/>
         <source>Rotate</source>
         <translation>Pivoter</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="49"/>
+        <location filename="../scene_builder_views.cpp" line="50"/>
         <source>Rotate (E): drag a ring to turn the object about that axis</source>
         <translation>Pivoter (E) : faites glisser un anneau pour faire tourner l&apos;objet autour de cet axe</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="50"/>
+        <location filename="../scene_builder_views.cpp" line="51"/>
         <source>Scale (R): drag a square handle to stretch the object along that axis</source>
         <translation>Redimensionner (R) : faites glisser un carré pour étirer l&apos;objet le long de cet axe</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="68"/>
+        <location filename="../scene_builder_views.cpp" line="69"/>
         <source>Top</source>
         <translation>Dessus</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="68"/>
+        <location filename="../scene_builder_views.cpp" line="69"/>
         <source>Front</source>
         <translation>Face</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="68"/>
+        <location filename="../scene_builder_views.cpp" line="69"/>
         <source>Side</source>
         <translation>Côté</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="85"/>
+        <location filename="../scene_builder_views.cpp" line="86"/>
         <source>3D</source>
         <translation>3D</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="88"/>
+        <location filename="../scene_builder_views.cpp" line="89"/>
         <source>Look at the scene from any side, and move things in 3D</source>
         <translation>Voir la scène sous n&apos;importe quel angle et déplacer les éléments en 3D</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_builder3d.cpp" line="427"/>
-        <location filename="../scene_builder_views.cpp" line="99"/>
+        <location filename="../scene_builder_views.cpp" line="100"/>
         <source>Snap to grid</source>
         <translation>Aligner sur la grille</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="101"/>
+        <location filename="../scene_builder_views.cpp" line="102"/>
         <source>Dragging moves things in steps of 0.25. Hold %1 to drag freely.</source>
         <translation>Le glissement déplace par pas de 0,25. Maintenez %1 pour glisser librement.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="106"/>
+        <location filename="../scene_builder_views.cpp" line="107"/>
+        <source>Snap to objects</source>
+        <translation>Aimanter aux objets</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_views.cpp" line="109"/>
+        <source>While dragging, line the object up with the edges and middles of the others, and rest it on top of them or the floor (orange lines show what it snapped to). Hold %1 to drag freely.</source>
+        <translation>Pendant le glissement, aligne l'objet sur les bords et le milieu des autres, et le pose sur eux ou sur le sol (les lignes orange montrent sur quoi il s'est aimanté). Maintenez %1 pour glisser librement.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_views.cpp" line="111"/>
         <source>Frame all</source>
         <translation>Tout cadrer</translation>
     </message>
@@ -7518,7 +7538,7 @@ Origine : %3</translation>
     <message>
         <location filename="../scene_builder_turntable.cpp" line="64"/>
         <source>Makes a video of the scene from a camera that flies through your saved camera views in the order they were saved: %1. The first picture is the first view and the last picture the last. Each view&apos;s field of view and lens go with it. It renders every frame, so a long or large video takes a while; start with Draft.</source>
-        <translation>Crée une vidéo de la scène depuis une caméra qui survole vos vues de caméra enregistrées dans l'ordre où elles l'ont été : %1. La première image est la première vue et la dernière image la dernière. Le champ de vision et l'objectif de chaque vue l'accompagnent. Toutes les images sont calculées, donc une vidéo longue ou grande prend du temps ; commencez par Brouillon.</translation>
+        <translation>Crée une vidéo de la scène depuis une caméra qui survole vos vues de caméra enregistrées dans l&apos;ordre où elles l&apos;ont été : %1. La première image est la première vue et la dernière image la dernière. Le champ de vision et l&apos;objectif de chaque vue l&apos;accompagnent. Toutes les images sont calculées, donc une vidéo longue ou grande prend du temps ; commencez par Brouillon.</translation>
     </message>
     <message>
         <location filename="../scene_builder_turntable.cpp" line="75"/>
@@ -8110,32 +8130,32 @@ La forme est une estimation : l&apos;arrière est inventé et les détails fins 
 <context>
     <name>SceneLayoutView</name>
     <message>
-        <location filename="../scene_layout_view.cpp" line="303"/>
+        <location filename="../scene_layout_view.cpp" line="326"/>
         <source>Top view: X to the right, Z towards you (down)</source>
         <translation>Vue de dessus : X vers la droite, Z vers vous (vers le bas)</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="304"/>
+        <location filename="../scene_layout_view.cpp" line="327"/>
         <source>Front view: X to the right, Y up</source>
         <translation>Vue de face : X vers la droite, Y vers le haut</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="305"/>
+        <location filename="../scene_layout_view.cpp" line="328"/>
         <source>Side view: Z to the left, Y up</source>
         <translation>Vue de côté : Z vers la gauche, Y vers le haut</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="308"/>
+        <location filename="../scene_layout_view.cpp" line="331"/>
         <source>Grid: 1 unit</source>
         <translation>Grille : 1 unité</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="308"/>
+        <location filename="../scene_layout_view.cpp" line="331"/>
         <source>Grid: %1 units</source>
         <translation>Grille : %1 unités</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="396"/>
+        <location filename="../scene_layout_view.cpp" line="419"/>
         <source>Camera</source>
         <translation>Caméra</translation>
     </message>
