@@ -598,6 +598,7 @@ inline Camera cameraFromWorldToCamera(const pbrt_scene::Matrix4 &w2c, double loo
 
 #include "pbrt_flatten_materials.h"
 #include "pbrt_flatten_scene_parts.h"
+#include "quadric_tessellate.h"   // disk/cylinder/cone/paraboloid as triangles: a shape inside an object definition, and gpu_tessellate.h
 #include "pbrt_flatten_shapes.h"
 
 namespace flatten_detail {

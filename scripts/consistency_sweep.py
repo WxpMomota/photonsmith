@@ -208,6 +208,9 @@ class Scene:
     def ball_text(self, material):
         p, f, s = self.p, self.f, self.scale
         at = p(0, 0, 0) if self.fill else p(0.5, 1.0, 0)
+        if self.shape != "sphere" and self.ball == "instance":   # the same, as an object instance
+            return 'ObjectBegin "ball"\n  %s\n  %s\nObjectEnd\nAttributeBegin\n  Translate %s\n  Rotate %g 0 1 0\n  Scale %g 1 1\n  Scale %g %g %g\n  ObjectInstance "ball"\nAttributeEnd' % (
+                material, self.SHAPES[self.shape], f(at), self.rot, -1.0 if self.mirror else 1.0, s, s, s)
         if self.shape != "sphere":   # another shape, turned and mirrored with the scene (its own axes go with it)
             return 'AttributeBegin\n  Translate %s\n  Rotate %g 0 1 0\n  Scale %g 1 1\n  Scale %g %g %g\n  %s\n  %s\nAttributeEnd' % (
                 f(at), self.rot, -1.0 if self.mirror else 1.0, s, s, s, material, self.SHAPES[self.shape])
@@ -391,6 +394,8 @@ def run(args):
                                  ("mirrored", Scene(material="diffuse", shape=shape, mirror=True)), ("turned 90", Scene(material="diffuse", shape=shape, rot=90.0)),
                                  ("turned 200", Scene(material="diffuse", shape=shape, rot=200.0))):
                 check("shapetransform", "%s %s" % (shape, label), backend, base, other, tolerance=max(tol, 5.0))
+            check("shapeform", "%s written as an object instance" % shape, backend, base, Scene(material="diffuse", shape=shape, ball="instance"), tolerance=max(tol, 5.0))
+            check("shapeform", "%s as an instance, turned 200" % shape, backend, base, Scene(material="diffuse", shape=shape, ball="instance", rot=200.0), tolerance=max(tol, 5.0))
         # cameras: a lens of almost no radius against a pinhole, a real lens (defocus keeps the energy), and a far perspective camera against an orthographic one
         for name in CAMERA_MATERIALS:
             check("camera", "pinhole vs tiny lens, %s" % name, backend, Scene(material=name), Scene(material=name, camera="tinylens"), tolerance=noise_tol(name))
