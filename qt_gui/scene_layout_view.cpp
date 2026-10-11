@@ -3,6 +3,7 @@
 
 #include "scene_builder_common.h"
 
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QWheelEvent>
@@ -544,6 +545,30 @@ void SceneLayoutView::mouseReleaseEvent(QMouseEvent *) {
 	m_panning = false;
 	m_dragging = false;
 	m_drag = Hit{};
+}
+
+// The arrow keys nudge what is picked in the direction they point on the screen (Up is away from you in the top view, up in the front and side views), Page Up and Page
+// Down lift and lower it; the step is 0.25, a whole unit with Shift, 0.05 with Ctrl.
+void SceneLayoutView::keyPressEvent(QKeyEvent *e) {
+	const double step = scene_view::nudgeStep(e->modifiers() & Qt::ShiftModifier, e->modifiers() & Qt::ControlModifier);
+	double right = 0.0, up = 0.0, lift = 0.0;
+	switch (e->key()) {
+		case Qt::Key_Right: right = step; break;
+		case Qt::Key_Left: right = -step; break;
+		case Qt::Key_Up: up = step; break;
+		case Qt::Key_Down: up = -step; break;
+		case Qt::Key_PageUp: lift = step; break;
+		case Qt::Key_PageDown: lift = -step; break;
+		default: QWidget::keyPressEvent(e); return;
+	}
+	Float3 d{};
+	switch (m_plane) {
+		case Plane::Top: d = {right, lift, -up}; break;        // X to the right, Z towards you (down the screen)
+		case Plane::Front: d = {right, up + lift, 0.0}; break;  // X to the right, Y up
+		case Plane::Side: d = {0.0, up + lift, -right}; break;  // Z to the left, Y up
+	}
+	emit nudged(d);
+	e->accept();
 }
 
 void SceneLayoutView::wheelEvent(QWheelEvent *e) {

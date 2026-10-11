@@ -184,6 +184,25 @@ void SceneBuilderWidget::scaleSelectedBy(double factor) {
 	refreshInspectorValues();
 }
 
+// An arrow key: the picked items move; the camera, if it is what is selected, moves with its target (a plain shift of the camera, which keeps looking the same way). Presses
+// that follow one another (a key held down) are one undo step.
+void SceneBuilderWidget::nudgeSelectedBy(const Float3 &delta) {
+	if (delta.x == 0.0 && delta.y == 0.0 && delta.z == 0.0) return;
+	if (m_sel.kind == SelKind::Camera) {
+		edit(QStringLiteral("nudge"), [&]() {
+			scene_doc::Camera &c = m_doc.camera;
+			c.position = {c.position.x + delta.x, c.position.y + delta.y, c.position.z + delta.z};
+			c.target = {c.target.x + delta.x, c.target.y + delta.y, c.target.z + delta.z};
+		});
+		refreshInspectorValues();
+		return;
+	}
+	const ItemSet items = pickedItems();
+	if (items.empty()) return;
+	edit(QStringLiteral("nudge"), [&]() { scene_doc::translateItems(m_doc, items, delta); });
+	refreshInspectorValues();
+}
+
 void SceneBuilderWidget::useLookOfMainObject() {
 	if (m_sel.kind != SelKind::Object) return;
 	const ItemSet items = pickedItems();

@@ -111,6 +111,8 @@ While several are picked the properties panel shows who they are and offers **Mo
 
 ## Keyboard
 
+**Arrow keys** (when a view has the focus: click in it) nudge what is picked, or the selected camera (with its target, so it keeps looking the same way): a step of 0.25 (the grid), **Shift** a whole unit, **Ctrl** (Command on a Mac) a fine 0.05; **Page Up** and **Page Down** lift and lower it. In the top view Right and Left move along X and Up and Down move away from or towards you (Z); in the front and side views Up and Down are up and down, and in the side view Right is towards the left of the screen's Z axis; in **3D** the arrows follow the screen: Right moves along the horizontal world axis (X or Z) nearest the screen's right, Up along the other one, away from you, so from any side Up goes the way you are looking. A run of key presses (a key held down) is one undo step, and the keys do not snap to objects. The list keeps the arrow keys for moving between its rows.
+
 Delete or Backspace removes what is picked (from the list or a view; in a text box they edit the text). Ctrl+D (Command+D on a Mac) duplicates it, Ctrl+A picks everything, Ctrl+G groups and Ctrl+Shift+G ungroups. Undo and Redo use the platform's usual keys (Ctrl+Z / Ctrl+Y on Windows, Command+Z / Shift+Command+Z on a Mac); the buttons' tooltips show the ones for your keyboard. W, E and R pick the 3D view's Move, Rotate and Scale tools.
 
 ## Copies: duplicate, array and scatter

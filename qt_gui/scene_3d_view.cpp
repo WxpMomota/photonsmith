@@ -109,6 +109,23 @@ void Scene3DView::keyPressEvent(QKeyEvent *e) {
 		case Qt::Key_W: wanted = GizmoMode::Move; name = "Move (W key)"; break;
 		case Qt::Key_E: wanted = GizmoMode::Rotate; name = "Rotate (E key)"; break;
 		case Qt::Key_R: wanted = GizmoMode::Scale; name = "Scale (R key)"; break;
+		case Qt::Key_Right:
+		case Qt::Key_Left:
+		case Qt::Key_Up:
+		case Qt::Key_Down:
+		case Qt::Key_PageUp:
+		case Qt::Key_PageDown: {
+			const double step = scene_view::nudgeStep(e->modifiers() & Qt::ShiftModifier, e->modifiers() & Qt::ControlModifier);
+			const scene_view::NudgeAxes axes = scene_view::nudgeAxes(view().cam);
+			const double sign = (e->key() == Qt::Key_Right || e->key() == Qt::Key_Up || e->key() == Qt::Key_PageUp) ? 1.0 : -1.0;
+			scene_view::V3 d{};
+			if (e->key() == Qt::Key_Right || e->key() == Qt::Key_Left) d = axes.right * (sign * step);
+			else if (e->key() == Qt::Key_Up || e->key() == Qt::Key_Down) d = axes.away * (sign * step);
+			else d = scene_view::V3{0.0, sign * step, 0.0};
+			emit nudged(Float3{d.x, d.y, d.z});
+			e->accept();
+			return;
+		}
 		default: QWidget::keyPressEvent(e); return;
 	}
 	if (wanted != m_gizmo) AppLog::info(QStringLiteral("builder"), QStringLiteral("3D view: tool %1").arg(QString::fromLatin1(name)));

@@ -15,6 +15,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
+#include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QShortcut>
@@ -173,6 +174,8 @@ void SceneBuilderWidget::createViews(QWidget *layoutBox, QVBoxLayout *layoutLayo
 		refreshInspectorValues();
 	};
 	connect(m_view, &SceneLayoutView::selectionRequested, this, onSelection("layout view"));
+	connect(m_view, &SceneLayoutView::nudged, this, [this](const Float3 &delta) { nudgeSelectedBy(delta); });
+	connect(m_view3d, &Scene3DView::nudged, this, [this](const Float3 &delta) { nudgeSelectedBy(delta); });
 	connect(m_view, &SceneLayoutView::selectionToggled, this, [this](const BuilderSelection &s) { togglePicked(s); });
 	connect(m_view, &SceneLayoutView::boxSelected, this, [this](const QList<BuilderSelection> &items, bool additive) { boxPicked(items, additive); });
 	connect(m_view3d, &Scene3DView::selectionToggled, this, [this](const BuilderSelection &s) { togglePicked(s); });
@@ -414,6 +417,12 @@ void SceneBuilderWidget::holdDragForTest(int index, const QPointF &deltaPx, bool
 void SceneBuilderWidget::releaseDragForTest(bool in3d) {
 	QWidget *view = in3d ? static_cast<QWidget *>(m_view3d) : static_cast<QWidget *>(m_view);
 	sendMouse(view, QEvent::MouseButtonRelease, m_holdEnd, Qt::LeftButton, Qt::NoButton);
+}
+
+void SceneBuilderWidget::sendKeyForTest(bool in3d, int key, Qt::KeyboardModifiers mods) {
+	QWidget *view = in3d ? static_cast<QWidget *>(m_view3d) : static_cast<QWidget *>(m_view);
+	QKeyEvent press(QEvent::KeyPress, key, mods);
+	QApplication::sendEvent(view, &press);
 }
 
 QPointF SceneBuilderWidget::itemScreenPosForTest(const BuilderSelection &s) const { return m_view->itemScreenPos(s); }

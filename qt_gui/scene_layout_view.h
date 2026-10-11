@@ -52,6 +52,8 @@ signals:
 	void selectionToggled(const BuilderSelection &s);
 	// A box dragged round items (Ctrl or Shift held on the background): every object and light whose centre is inside; `additive` adds to the picked items.
 	void boxSelected(const QList<BuilderSelection> &items, bool additive);
+	// An arrow key, Page Up or Page Down: move the picked items by this much (scene units; the view works out which way the arrow points in its plane).
+	void nudged(const scene_doc::Float3 &delta);
 	// A drag moved something: `which` is 0 for the item's position, 1 for its target (camera, spot and distant lights). dragBegan is sent once at the
 	// start so the owner can take an undo snapshot.
 	void dragBegan();
@@ -64,6 +66,7 @@ protected:
 	void mouseMoveEvent(QMouseEvent *e) override;
 	void mouseReleaseEvent(QMouseEvent *e) override;
 	void wheelEvent(QWheelEvent *e) override;
+	void keyPressEvent(QKeyEvent *e) override;
 
 private:
 	struct Hit {

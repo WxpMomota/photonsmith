@@ -324,3 +324,49 @@ TEST(SceneViewMath, TheViewFovShowsExactlyWhatTheCameraSeesInsideTheFrame) {
 	EXPECT_NEAR(fovForFrame(40.0, 600.0, 600.0), 40.0, 1e-9) << "a frame as tall as the view needs no change";
 	EXPECT_DOUBLE_EQ(fovForFrame(40.0, 600.0, 0.0), 40.0) << "no frame: unchanged";
 }
+
+// ---- the arrow keys ----------------------------------------------------------------------------------------------------------------------
+
+TEST(SceneViewMath, TheArrowKeysUseTheHorizontalAxesNearestTheScreen) {
+	OrbitCamera c;
+	c.pitchDeg = 25;
+	struct Case { double yaw; V3 right, away; };
+	// Looking from +Z (yaw 0): right is +X and away is -Z; each quarter turn round the scene turns them.
+	const Case cases[] = {{0, {1, 0, 0}, {0, 0, -1}}, {90, {0, 0, -1}, {-1, 0, 0}}, {180, {-1, 0, 0}, {0, 0, 1}}, {270, {0, 0, 1}, {1, 0, 0}}, {-90, {0, 0, 1}, {1, 0, 0}}};
+	for (const Case& k : cases) {
+		c.yawDeg = k.yaw;
+		const NudgeAxes a = nudgeAxes(c);
+		expectNear(a.right, k.right);
+		expectNear(a.away, k.away);
+	}
+	// In between, the nearest axis: 30 degrees round is still mostly +X / -Z, 60 degrees mostly -Z / -X.
+	c.yawDeg = 30;
+	expectNear(nudgeAxes(c).right, {1, 0, 0});
+	expectNear(nudgeAxes(c).away, {0, 0, -1});
+	c.yawDeg = 60;
+	expectNear(nudgeAxes(c).right, {0, 0, -1});
+	expectNear(nudgeAxes(c).away, {-1, 0, 0});
+}
+
+TEST(SceneViewMath, TheTwoArrowAxesAreAlwaysDifferentAndLookTheSameWayFromHighAbove) {
+	for (double pitch : {-60.0, 0.0, 45.0, 85.0, 89.0}) {
+		for (double yaw = -180.0; yaw <= 180.0; yaw += 7.5) {
+			OrbitCamera c;
+			c.pitchDeg = pitch;
+			c.yawDeg = yaw;
+			const NudgeAxes a = nudgeAxes(c);
+			EXPECT_NEAR(length(a.right), 1.0, 1e-12);
+			EXPECT_NEAR(length(a.away), 1.0, 1e-12);
+			EXPECT_NEAR(dot(a.right, a.away), 0.0, 1e-12) << "yaw " << yaw << " pitch " << pitch << ": two different horizontal axes";
+			EXPECT_NEAR(a.right.y, 0.0, 1e-12);
+			EXPECT_GT(dot(a.right, c.right()), 0.0) << "right points to the screen's right side";
+		}
+	}
+}
+
+TEST(SceneViewMath, TheNudgeSteps) {
+	EXPECT_DOUBLE_EQ(nudgeStep(false, false), 0.25);
+	EXPECT_DOUBLE_EQ(nudgeStep(true, false), 1.0);
+	EXPECT_DOUBLE_EQ(nudgeStep(false, true), 0.05);
+	EXPECT_DOUBLE_EQ(nudgeStep(true, true), 1.0) << "Shift wins";
+}

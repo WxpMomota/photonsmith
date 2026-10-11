@@ -77,6 +77,9 @@ signals:
 	void objectEdited(const BuilderSelection &s, const scene_doc::Object &updated);
 	void gizmoModeChanged(int mode);
 	void cameraViewLeft();   // the user orbited, panned or zoomed away from looking through the camera
+	// An arrow key, Page Up or Page Down: move the picked items by this much (scene units): the arrows along the horizontal world axes nearest the screen's right and away,
+	// Page Up and Page Down up and down.
+	void nudged(const scene_doc::Float3 &delta);
 	// With several items picked, a Rotate ring or Scale handle dragged: the TOTAL turn (degrees, about world axis 0 X, 1 Y, 2 Z) or factor since the press, which the
 	// owner applies to the items as they were then (about the middle of them, scene_selection.h centroidOf()).
 	void groupTurned(int axis, double degrees);

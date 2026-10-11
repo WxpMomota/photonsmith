@@ -5959,14 +5959,22 @@ The scenes in the other categories are not touched. You can get them back from %
         <translation>Command</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="80"/>
         <source>Wheel: zoom. Drag the background or right-drag: pan. %1- or Shift-click adds an item to what is picked or takes it out; %1- or Shift-drag the background picks what a box holds.</source>
-        <translation>滚轮：缩放。拖动背景或右键拖动：平移。按住 %1 或 Shift 单击可把项目加入选择或从选择中去除；按住 %1 或 Shift 拖动背景，可选中方框内的所有项目。</translation>
+        <translation type="vanished">滚轮：缩放。拖动背景或右键拖动：平移。按住 %1 或 Shift 单击可把项目加入选择或从选择中去除；按住 %1 或 Shift 拖动背景，可选中方框内的所有项目。</translation>
+    </message>
+    <message>
+        <source>Drag the background: orbit (Shift-drag: pan). Right-drag also pans. Wheel: zoom. Pick Move, Rotate or Scale (W, E, R) and drag the arrows, rings or squares; drag an object to slide it on the floor, Shift-drag to lift it, and drag the white dot (or hold %1 while dragging) to move it in any direction. Shift- or %1-click (without dragging) adds an item to what is picked or takes it out.</source>
+        <translation type="vanished">拖动背景：环绕查看（Shift+拖动：平移）。右键拖动也可平移。滚轮：缩放。选择移动、旋转或缩放（W、E、R），再拖动箭头、圆环或方块；拖动对象可使其在地面上滑动，Shift+拖动可将其抬起，拖动白点（或拖动时按住 %1）可向任意方向移动。按住 Shift 或 %1 单击（不拖动）可把项目加入选择或从选择中去除。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="80"/>
+        <source>Wheel: zoom. Drag the background or right-drag: pan. %1- or Shift-click adds an item to what is picked or takes it out; %1- or Shift-drag the background picks what a box holds. The arrow keys nudge what is picked (Page Up and Page Down lift it; Shift: a whole unit, %1: a fine step).</source>
+        <translation>滚轮：缩放。拖动背景或右键拖动：平移。按住 %1 或 Shift 单击可把项目加入选择或从选择中去除；按住 %1 或 Shift 拖动背景，可选中方框内的所有项目。方向键可微调所选项目的位置（Page Up 和 Page Down 升降；Shift：整整一个单位，%1：精细的一小步）。</translation>
     </message>
     <message>
         <location filename="../scene_builder_common.h" line="83"/>
-        <source>Drag the background: orbit (Shift-drag: pan). Right-drag also pans. Wheel: zoom. Pick Move, Rotate or Scale (W, E, R) and drag the arrows, rings or squares; drag an object to slide it on the floor, Shift-drag to lift it, and drag the white dot (or hold %1 while dragging) to move it in any direction. Shift- or %1-click (without dragging) adds an item to what is picked or takes it out.</source>
-        <translation>拖动背景：环绕查看（Shift+拖动：平移）。右键拖动也可平移。滚轮：缩放。选择移动、旋转或缩放（W、E、R），再拖动箭头、圆环或方块；拖动对象可使其在地面上滑动，Shift+拖动可将其抬起，拖动白点（或拖动时按住 %1）可向任意方向移动。按住 Shift 或 %1 单击（不拖动）可把项目加入选择或从选择中去除。</translation>
+        <source>Drag the background: orbit (Shift-drag: pan). Right-drag also pans. Wheel: zoom. Pick Move, Rotate or Scale (W, E, R) and drag the arrows, rings or squares; drag an object to slide it on the floor, Shift-drag to lift it, and drag the white dot (or hold %1 while dragging) to move it in any direction. Shift- or %1-click (without dragging) adds an item to what is picked or takes it out. The arrow keys nudge what is picked (Page Up and Page Down lift it; Shift: a whole unit, %1: a fine step).</source>
+        <translation>拖动背景：环绕查看（Shift+拖动：平移）。右键拖动也可平移。滚轮：缩放。选择移动、旋转或缩放（W、E、R），再拖动箭头、圆环或方块；拖动对象可使其在地面上滑动，Shift+拖动可将其抬起，拖动白点（或拖动时按住 %1）可向任意方向移动。按住 Shift 或 %1 单击（不拖动）可把项目加入选择或从选择中去除。方向键可微调所选项目的位置（Page Up 和 Page Down 升降；Shift：整整一个单位，%1：精细的一小步）。</translation>
     </message>
     <message>
         <location filename="../scene_builder_common.h" line="88"/>
@@ -6381,22 +6389,22 @@ Output:
 <context>
     <name>Scene3DView</name>
     <message>
-        <location filename="../scene_3d_view.cpp" line="393"/>
+        <location filename="../scene_3d_view.cpp" line="410"/>
         <source>the floor</source>
         <translation>地面</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="406"/>
+        <location filename="../scene_3d_view.cpp" line="423"/>
         <source>Snapped to %1</source>
         <translation>已吸附到 %1</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="424"/>
+        <location filename="../scene_3d_view.cpp" line="441"/>
         <source>Through the camera (%1 x %2). Orbit, pan or zoom to leave.</source>
         <translation>透过相机观看（%1 x %2）。环绕、平移或缩放即可退出。</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="576"/>
+        <location filename="../scene_3d_view.cpp" line="593"/>
         <source>Camera</source>
         <translation>相机</translation>
     </message>
@@ -6715,8 +6723,8 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="455"/>
-        <location filename="../scene_builder_multi.cpp" line="298"/>
-        <location filename="../scene_builder_views.cpp" line="51"/>
+        <location filename="../scene_builder_multi.cpp" line="317"/>
+        <location filename="../scene_builder_views.cpp" line="52"/>
         <source>Scale</source>
         <translation>缩放</translation>
     </message>
@@ -7215,159 +7223,159 @@ From: %3</source>
         <translation>缩放系数须在 0.01 到 100 之间。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="197"/>
+        <location filename="../scene_builder_multi.cpp" line="216"/>
         <source>&lt;b&gt;%1 items picked&lt;/b&gt;</source>
         <translation>&lt;b&gt;已选中 %1 个项目&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="203"/>
+        <location filename="../scene_builder_multi.cpp" line="222"/>
         <source>, and %1 more</source>
         <translation>，以及另外 %1 个</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="207"/>
+        <location filename="../scene_builder_multi.cpp" line="226"/>
         <source>Drag any of them to move them all. Delete and Duplicate act on all of them.</source>
         <translation>拖动其中任何一个即可一起移动。删除和复制会作用于所有选中项。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="220"/>
+        <location filename="../scene_builder_multi.cpp" line="239"/>
         <source>Group:</source>
         <translation>组：</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="224"/>
+        <location filename="../scene_builder_multi.cpp" line="243"/>
         <source>Group</source>
         <translation>编组</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="225"/>
+        <location filename="../scene_builder_multi.cpp" line="244"/>
         <source>Make the picked objects one group: clicking one in a view picks them all (%1)</source>
         <translation>把选中的对象编为一组：在视图中单击其中一个就会选中全部（%1）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="227"/>
+        <location filename="../scene_builder_multi.cpp" line="246"/>
         <source>Ungroup</source>
         <translation>取消编组</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="228"/>
+        <location filename="../scene_builder_multi.cpp" line="247"/>
         <source>Dissolve the group (%1)</source>
         <translation>解散该组（%1）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="255"/>
-        <location filename="../scene_builder_views.cpp" line="49"/>
+        <location filename="../scene_builder_multi.cpp" line="274"/>
+        <location filename="../scene_builder_views.cpp" line="50"/>
         <source>Move</source>
         <translation>移动</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="258"/>
+        <location filename="../scene_builder_multi.cpp" line="277"/>
         <source>Move all by:</source>
         <translation>整体移动：</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="280"/>
+        <location filename="../scene_builder_multi.cpp" line="299"/>
         <source>Turn all by:</source>
         <translation>整体旋转：</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="281"/>
+        <location filename="../scene_builder_multi.cpp" line="300"/>
         <source>Turn</source>
         <translation>旋转</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="282"/>
+        <location filename="../scene_builder_multi.cpp" line="301"/>
         <source>Turn them as one about the middle of them, about the world&apos;s X, then Y, then Z axis</source>
         <translation>以它们的中心为轴，依次绕世界的 X、Y、Z 轴整体旋转</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="297"/>
+        <location filename="../scene_builder_multi.cpp" line="316"/>
         <source>Scale all to:</source>
         <translation>整体缩放到：</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="299"/>
+        <location filename="../scene_builder_multi.cpp" line="318"/>
         <source>Make them all bigger or smaller, about the middle of them (200 % is twice the size, 50 % half)</source>
         <translation>以它们的中心为基准整体放大或缩小（200 % 为两倍大小，50 % 为一半）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="309"/>
+        <location filename="../scene_builder_multi.cpp" line="328"/>
         <source>Use %1&apos;s look for all</source>
         <translation>将 %1 的外观用于全部</translation>
     </message>
     <message>
-        <location filename="../scene_builder_multi.cpp" line="310"/>
+        <location filename="../scene_builder_multi.cpp" line="329"/>
         <source>Give the other picked objects the same material and light settings as this one (the main one: the first you picked)</source>
         <translation>让其他选中的对象使用与此对象相同的材质和发光设置（主对象：你最先选中的那个）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="49"/>
+        <location filename="../scene_builder_views.cpp" line="50"/>
         <source>Move (W): drag an object, or an arrow to move along one axis</source>
         <translation>移动 (W)：拖动物体，或拖动箭头沿一个轴移动</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="50"/>
+        <location filename="../scene_builder_views.cpp" line="51"/>
         <source>Rotate</source>
         <translation>旋转</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="50"/>
+        <location filename="../scene_builder_views.cpp" line="51"/>
         <source>Rotate (E): drag a ring to turn the object about that axis</source>
         <translation>旋转 (E)：拖动圆环使物体绕该轴旋转</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="51"/>
+        <location filename="../scene_builder_views.cpp" line="52"/>
         <source>Scale (R): drag a square handle to stretch the object along that axis</source>
         <translation>缩放 (R)：拖动方块沿该轴拉伸物体</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="69"/>
+        <location filename="../scene_builder_views.cpp" line="70"/>
         <source>Top</source>
         <translation>顶视</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="69"/>
+        <location filename="../scene_builder_views.cpp" line="70"/>
         <source>Front</source>
         <translation>前视</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="69"/>
+        <location filename="../scene_builder_views.cpp" line="70"/>
         <source>Side</source>
         <translation>侧视</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="86"/>
+        <location filename="../scene_builder_views.cpp" line="87"/>
         <source>3D</source>
         <translation>3D</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="89"/>
+        <location filename="../scene_builder_views.cpp" line="90"/>
         <source>Look at the scene from any side, and move things in 3D</source>
         <translation>从任意角度查看场景，并在 3D 中移动物体</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_builder3d.cpp" line="427"/>
-        <location filename="../scene_builder_views.cpp" line="100"/>
+        <location filename="../scene_builder_views.cpp" line="101"/>
         <source>Snap to grid</source>
         <translation>吸附到网格</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="102"/>
+        <location filename="../scene_builder_views.cpp" line="103"/>
         <source>Dragging moves things in steps of 0.25. Hold %1 to drag freely.</source>
         <translation>拖动时以 0.25 为步长移动。按住 %1 可自由拖动。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="107"/>
+        <location filename="../scene_builder_views.cpp" line="108"/>
         <source>Snap to objects</source>
         <translation>吸附到对象</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="109"/>
+        <location filename="../scene_builder_views.cpp" line="110"/>
         <source>While dragging, line the object up with the edges and middles of the others, and rest it on top of them or the floor (orange lines show what it snapped to). Hold %1 to drag freely.</source>
         <translation>拖动时让对象与其他对象的边缘和中心对齐，并放在它们上面或地面上（橙色线条表示吸附到了哪里）。按住 %1 可自由拖动。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_views.cpp" line="111"/>
+        <location filename="../scene_builder_views.cpp" line="112"/>
         <source>Frame all</source>
         <translation>显示全部</translation>
     </message>
@@ -8033,32 +8041,32 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
 <context>
     <name>SceneLayoutView</name>
     <message>
-        <location filename="../scene_layout_view.cpp" line="326"/>
+        <location filename="../scene_layout_view.cpp" line="327"/>
         <source>Top view: X to the right, Z towards you (down)</source>
         <translation>顶视图：X 向右，Z 朝向你（向下）</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="327"/>
+        <location filename="../scene_layout_view.cpp" line="328"/>
         <source>Front view: X to the right, Y up</source>
         <translation>前视图：X 向右，Y 向上</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="328"/>
+        <location filename="../scene_layout_view.cpp" line="329"/>
         <source>Side view: Z to the left, Y up</source>
         <translation>侧视图：Z 向左，Y 向上</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="331"/>
+        <location filename="../scene_layout_view.cpp" line="332"/>
         <source>Grid: 1 unit</source>
         <translation>网格：1 个单位</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="331"/>
+        <location filename="../scene_layout_view.cpp" line="332"/>
         <source>Grid: %1 units</source>
         <translation>网格：%1 个单位</translation>
     </message>
     <message>
-        <location filename="../scene_layout_view.cpp" line="419"/>
+        <location filename="../scene_layout_view.cpp" line="420"/>
         <source>Camera</source>
         <translation>相机</translation>
     </message>

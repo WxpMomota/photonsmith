@@ -422,6 +422,54 @@ static void selfTestSnap(SceneBuilderWidget *sb, const std::function<void(bool, 
 	}
 }
 
+// The arrow keys (Page Up and Down lift): they nudge what is picked by 0.25, a whole unit with Shift, 0.05 with Ctrl, in the direction they point in the view; a run of
+// presses is one undo step. Leaves the document as it found it.
+static void selfTestNudge(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
+	using Sel = BuilderSelection;
+	const auto pos = [sb](int i) { return sb->document().objects[static_cast<size_t>(i)].position; };
+	const auto same = [](double a, double b) { return std::abs(a - b) < 1e-9; };
+	sb->show3dView(false);
+	sb->selectObject(3);
+	const scene_doc::Float3 p0 = pos(3);
+	sb->setSnapToObjects(false);
+	sb->sendKeyForTest(false, Qt::Key_Right);
+	check(same(pos(3).x, p0.x + 0.25) && same(pos(3).z, p0.z), "Right in the top view moves the object 0.25 to the right");
+	sb->sendKeyForTest(false, Qt::Key_Up);
+	check(same(pos(3).z, p0.z - 0.25), "Up moves it away from you (towards -Z)");
+	sb->sendKeyForTest(false, Qt::Key_Down, Qt::ShiftModifier);
+	check(same(pos(3).z, p0.z + 0.75), "Shift+Down moves it a whole unit towards you");
+	sb->sendKeyForTest(false, Qt::Key_Left, Qt::ControlModifier);
+	check(same(pos(3).x, p0.x + 0.2), "Ctrl+Left moves it a fine 0.05");
+	sb->sendKeyForTest(false, Qt::Key_PageUp);
+	check(same(pos(3).y, p0.y + 0.25), "Page Up lifts it");
+	check(sb->undo() && same(pos(3).x, p0.x) && same(pos(3).y, p0.y) && same(pos(3).z, p0.z), "a run of presses is one undo step");
+	// Several picked move together; the camera moves with its target.
+	sb->pickObjects({2, 3});
+	const scene_doc::Float3 gold0 = pos(2);
+	sb->sendKeyForTest(false, Qt::Key_Right);
+	check(same(pos(2).x, gold0.x + 0.25) && same(pos(3).x, p0.x + 0.25), "with several picked, all of them move");
+	check(sb->undo() && same(pos(2).x, gold0.x), "undone");
+	sb->selectCameraForTest();
+	const scene_doc::Camera cam0 = sb->document().camera;
+	sb->sendKeyForTest(false, Qt::Key_Right);
+	check(same(sb->document().camera.position.x, cam0.position.x + 0.25) && same(sb->document().camera.target.x, cam0.target.x + 0.25), "the selected camera moves with what it looks at");
+	check(sb->undo() && same(sb->document().camera.position.x, cam0.position.x), "undone");
+	// In 3D the arrows follow the screen: from +X looking back (yaw 90) Right is -Z and Up is -X.
+	sb->selectObject(3);
+	sb->show3dView(true);
+	sb->orbit3dForTest(90.0, 20.0);
+	sb->sendKeyForTest(true, Qt::Key_Right);
+	check(same(pos(3).z, p0.z - 0.25) && same(pos(3).x, p0.x), "in 3D, seen from +X, Right moves it along -Z");
+	sb->sendKeyForTest(true, Qt::Key_Up);
+	check(same(pos(3).x, p0.x - 0.25), "and Up moves it away from you along -X");
+	sb->sendKeyForTest(true, Qt::Key_PageDown);
+	check(same(pos(3).y, p0.y - 0.25), "Page Down lowers it");
+	check(sb->undo() && same(pos(3).x, p0.x) && same(pos(3).y, p0.y) && same(pos(3).z, p0.z), "that is one undo step too");
+	sb->setSnapToObjects(true);
+	sb->orbit3dForTest(30.0, 25.0);
+	sb->show3dView(false);
+}
+
 void MainWindow::runBuilderSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot, const QString &outPrefix) {
 	resize(qEnvironmentVariableIntValue("RT_GUI_SELFTEST_WIDTH") > 0 ? qEnvironmentVariableIntValue("RT_GUI_SELFTEST_WIDTH") : 1500, qEnvironmentVariableIntValue("RT_GUI_SELFTEST_HEIGHT") > 0 ? qEnvironmentVariableIntValue("RT_GUI_SELFTEST_HEIGHT") : 950);  // (..._WIDTH / ..._HEIGHT: a smaller window)
 	if (m_sceneBuilder) m_tabWidget->setCurrentWidget(m_sceneBuilder);  // by widget, so it works in every language
@@ -471,6 +519,7 @@ void MainWindow::runBuilderSelfTest(const std::function<void(const QString &)> &
 	// The screenshots show the starter scene (the edits above are done), with the gold ball picked.
 	sb->newScene();
 	selfTestSnap(sb, check);
+	selfTestNudge(sb, check);
 	sb->selectObject(2);
 	QTimer::singleShot(600, this, [this, shot, log, sb, ok, outPrefix]() mutable {
 		shot("builder_edit");

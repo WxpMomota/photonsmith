@@ -98,6 +98,29 @@ inline double fovForFrame(double cameraFovDeg, double height, double frameHeight
 	return 2.0 * std::atan(t) * 180.0 / kPi;
 }
 
+// What the arrow keys move things by in the Scene Builder's views: a grid step (the same 0.25 as dragging snaps to), a whole unit with Shift, a fine 0.05 with Ctrl (Command
+// on a Mac).
+constexpr double kNudgeStep = 0.25, kNudgeCoarse = 1.0, kNudgeFine = 0.05;
+inline double nudgeStep(bool coarse, bool fine) { return coarse ? kNudgeCoarse : fine ? kNudgeFine : kNudgeStep; }
+
+// The two horizontal world axes the arrow keys use in a 3D view seen from `cam`: `right` is the +-X or +-Z axis nearest the screen's right, and `away` the other one, pointing
+// the way the camera looks (so Up moves things away from you). Both are unit vectors. A camera looking straight down still has a yaw, so there is always an answer.
+struct NudgeAxes {
+	V3 right, away;
+};
+inline NudgeAxes nudgeAxes(const OrbitCamera& cam) {
+	const V3 r = cam.right(), f = cam.forward();
+	NudgeAxes a;
+	if (std::fabs(r.x) >= std::fabs(r.z)) {
+		a.right = {r.x >= 0 ? 1.0 : -1.0, 0, 0};
+		a.away = {0, 0, f.z >= 0 ? 1.0 : -1.0};
+	} else {
+		a.right = {0, 0, r.z >= 0 ? 1.0 : -1.0};
+		a.away = {f.x >= 0 ? 1.0 : -1.0, 0, 0};
+	}
+	return a;
+}
+
 // A camera seen through a width x height widget.
 struct View {
 	OrbitCamera cam;

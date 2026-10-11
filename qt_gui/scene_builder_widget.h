@@ -64,6 +64,9 @@ public:
 	void groupSelected();                      // the picked objects become one group (Ctrl+G); needs two or more
 	void ungroupSelected();                    // dissolves the groups of the picked objects (Ctrl+Shift+G)
 	void moveSelectedBy(const scene_doc::Float3 &delta);   // the picked items, together, one undo step
+	// The arrow keys in a view: the picked items (or the camera, with its target) move by `delta`; a run of key presses is one undo step.
+	void nudgeSelectedBy(const scene_doc::Float3 &delta);
+	void sendKeyForTest(bool in3d, int key, Qt::KeyboardModifiers mods = Qt::NoModifier);   // a real key press in the 2D or the 3D view
 	// Turn or scale the picked items as one about the middle of them (scene_selection.h). One undo step each; while a ring or handle is dragged (transformPicked) the
 	// whole drag is one step and every update is worked out from the items as they were when the drag began.
 	void turnSelectedBy(int axis, double degrees);
