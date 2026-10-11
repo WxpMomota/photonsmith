@@ -84,6 +84,7 @@ MATERIALS = {
     "coateddiffuse": 'Material "coateddiffuse" "rgb reflectance" [ 0.5 0.3 0.2 ] "float roughness" [ 0.1 ]',
     "coatedconductor": 'Material "coatedconductor" "rgb reflectance" [ 0.9 0.7 0.5 ] "float interface.roughness" [ 0.05 ] "float conductor.roughness" [ 0.1 ]',
     "conductor_cu": 'Material "conductor" "spectrum eta" "metal-Cu-eta" "spectrum k" "metal-Cu-k" "float roughness" [ 0.05 ]',
+    "measured": 'Material "measured" "string filename" [ "%s" ]' % os.path.join(REPO, "pbrt_scenes", "synthetic-gold.bsdf").replace("\\", "/"),
     "diffusetransmission": 'Material "diffusetransmission" "rgb reflectance" [ 0.5 0.4 0.3 ] "rgb transmittance" [ 0.3 0.3 0.3 ]',
     # the mean free path is a length: scaling the scene scales it too (or the ball is a different ball)
     "subsurface": lambda sc: 'Material "subsurface" "rgb mfp" [ %g %g %g ] "rgb reflectance" [ 0.8 0.8 0.8 ] "float eta" [ 1.33 ] "float roughness" [ 0 ]' % ((0.4 * sc.scale,) * 3),
@@ -102,6 +103,7 @@ LIGHT_MATERIALS = {"diffuse", "conductor", "coateddiffuse", "diffusetransmission
 BACKEND_TOLERANCE = {}   # a material whose two backends are known to differ by more than the default 6%, with the reason
 SHAPE_LIST = ("cylinder", "disk", "cone", "paraboloid", "cube")
 CAMERA_MATERIALS = ("diffuse", "coateddiffuse", "dielectric")
+SUN_MATERIALS = ("diffuse", "conductor", "coateddiffuse")
 NOISY = {"dielectric", "thindielectric"}   # fireflies: a pair needs a looser tolerance
 
 
@@ -157,6 +159,8 @@ class Scene:
     def lamp_text(self):
         s, p, f = self.scale, self.p, self.f
         lamp_at, power = p(-1.2, 3.0, 1.0), 40.0
+        if self.lamp == "none":   # lit by the sky alone
+            return ""
         if self.lamp == "area":
             return 'AttributeBegin\n  Translate %s\n  AreaLightSource "diffuse" "rgb L" [ %s ]\n  Shape "sphere" "float radius" [ %g ]\nAttributeEnd' % (f(lamp_at), f((power / (3.14159265 * 0.04),) * 3), 0.2 * s)
         if self.lamp == "texarea":   # the same sphere light, its emission scaled by a white picture
@@ -197,6 +201,9 @@ class Scene:
         return 'AttributeBegin\n  Material "diffuse" "rgb reflectance" [ 0.7 0.7 0.7 ]\n  %s\nAttributeEnd' % (shape % " ".join(f(v) for v in q))
 
     SHAPES = {
+        # a bundle of strands, a thin tube each: for the hair material
+        "hair": "\n  ".join('Shape "curve" "point3 P" [ %g %g %g  %g %g %g  %g %g %g  %g %g %g ] "float width" [ 0.06 ]' % (
+            0.0, -0.8, 0.0,  0.5 * math.cos(a), -0.2, 0.5 * math.sin(a),  0.7 * math.cos(a), 0.3, 0.7 * math.sin(a),  0.3 * math.cos(a), 0.9, 0.3 * math.sin(a)) for a in [i * math.pi / 4 for i in range(8)]),
         "cylinder": 'Shape "cylinder" "float radius" [ 0.6 ] "float zmin" [ -0.6 ] "float zmax" [ 0.6 ]',
         "disk": 'Shape "disk" "float radius" [ 1 ]',
         "cone": 'Shape "cone" "float radius" [ 0.8 ] "float height" [ 1.2 ]',
@@ -234,6 +241,8 @@ class Scene:
             camera_line = 'Camera "perspective" "float fov" [ %g ] "float lensradius" [ %g ] "float focaldistance" [ %g ]' % (fov, 1e-4 * self.scale, dist)
         elif self.camera == "lens":   # defocus moves energy around, not out of the picture
             camera_line = 'Camera "perspective" "float fov" [ %g ] "float lensradius" [ %g ] "float focaldistance" [ %g ]' % (fov, 0.15 * self.scale, dist)
+        elif self.camera == "spherical":   # sees every direction from the eye
+            camera_line = 'Camera "spherical"'
         elif self.camera in ("far", "ortho"):   # 200 times as far away, looking at the same place: parallel rays, a window 4 across each way at the look point
             k = 200.0 * self.scale / dist
             eye = tuple(l + (e - l) * k for e, l in zip(eye, look))
@@ -282,6 +291,8 @@ class Sweep:
         write_png(self.gradient, 64, 64, lambda x, y: (30 + 3 * x, 40 + 2 * x + y, 255 - 3 * x))
         self.flat_normal = os.path.join(workdir, "flat_normal.png").replace("\\", "/")   # a normal map that points straight out everywhere
         write_png(self.flat_normal, 8, 8, lambda x, y: (128, 128, 255))
+        self.sun = os.path.join(workdir, "sun.png").replace("\\", "/")   # a dark sky with one small bright spot (an 8-bit stand-in for the sun): a sharp feature for the sky sampling
+        write_png(self.sun, 64, 64, lambda x, y: (255, 255, 230) if (x - 20) ** 2 + (y - 18) ** 2 < 5 else (20, 25, 40))
         self.grey = os.path.join(workdir, "grey.png").replace("\\", "/")   # a uniform image for the texture pair, written with a linear encoding
         write_png(self.grey, 8, 8, lambda x, y: (153, 102, 77))
         self.n = 0
@@ -409,6 +420,30 @@ def run(args):
             check("integrator", "path vs volpath, %s" % name, backend, Scene(material=name), Scene(material=name, integrator="path"), tolerance=max(tol, 6.0))
         check("film", "iso 200 for 1 s vs iso 100 for 2 s", backend, Scene(material="diffuse", film_extra='"float iso" [ 200 ] "float exposuretime" [ 1 ]'),
               Scene(material="diffuse", film_extra='"float iso" [ 100 ] "float exposuretime" [ 2 ]'), tolerance=tol)
+        # a camera that sees every direction, the scene moved, scaled, turned and mirrored
+        for label, other in (("moved", Scene(material="diffuse", camera="spherical", offset=(37.0, -11.0, 5.0))), ("8x bigger", Scene(material="diffuse", camera="spherical", scale=8.0)),
+                             ("turned 90", Scene(material="diffuse", camera="spherical", rot=90.0)), ("mirrored", Scene(material="diffuse", camera="spherical", mirror=True))):
+            check("camera", "spherical camera, scene %s" % label, backend, Scene(material="diffuse", camera="spherical"), other, tolerance=max(tol, 5.0))
+        # a sky with a small bright spot, lighting the scene alone, turned with the scene: the sampling of a sharp feature must agree with the lookup of the picture
+        for name in SUN_MATERIALS:
+            for angle in (90.0, 200.0):
+                check("sun", "sun sky and scene turned %g deg, %s" % (angle, name), backend, Scene(material=name, sky="picture", sky_png=sw.sun, lamp="none", spp=128),
+                      Scene(material=name, sky="picture", sky_png=sw.sun, lamp="none", rot=angle, spp=128), tolerance=max(noise_tol(name), 8.0))
+        # a mix of two named materials: mixing a material with itself, or at amount 0 or 1, is one of them
+        named = ('MakeNamedMaterial "ma" "string type" [ "diffuse" ] "rgb reflectance" [ 0.6 0.4 0.3 ]\n'
+                 'MakeNamedMaterial "mb" "string type" [ "conductor" ] "rgb reflectance" [ 0.9 0.6 0.4 ] "float roughness" [ 0.1 ]')
+        plain_a, plain_b = 'NamedMaterial "ma"', 'NamedMaterial "mb"'
+        for label, mix, plain in (("a with itself", 'Material "mix" "string materials" [ "ma" "ma" ] "float amount" [ 0.4 ]', plain_a),
+                                  ("amount 0 is the first", 'Material "mix" "string materials" [ "ma" "mb" ] "float amount" [ 0 ]', plain_a),
+                                  ("amount 1 is the second", 'Material "mix" "string materials" [ "ma" "mb" ] "float amount" [ 1 ]', plain_b)):
+            check("mix", "mix, %s" % label, backend, Scene(material_text=plain, prelude=named), Scene(material_text=mix, prelude=named), tolerance=max(tol, 5.0))
+        # hair on curves: the same scene moved, scaled and turned, and under the two forms of sky
+        hair = 'Material "hair" "rgb sigma_a" [ 0.3 0.5 0.9 ]'
+        hbase = Scene(material_text=hair, shape="hair", spp=512)
+        for label, other in (("moved", Scene(material_text=hair, shape="hair", spp=512, offset=(37.0, -11.0, 5.0))), ("8x bigger", Scene(material_text=hair, shape="hair", spp=512, scale=8.0)),
+                             ("turned 90", Scene(material_text=hair, shape="hair", spp=512, rot=90.0))):
+            check("hair", "hair curves %s" % label, backend, hbase, other, tolerance=10.0)   # the tube's eight facets do not turn exactly with the scene
+        check("hair", "hair curves, constant vs picture sky", backend, Scene(material_text=hair, shape="hair", spp=512, fill=True, size=32), Scene(material_text=hair, shape="hair", spp=512, fill=True, size=32, sky="picture", sky_png=sw.white), tolerance=6.0)
         # more light kinds against a point light
         check("lights", "white-picture area light vs plain, diffuse", backend, Scene(material="diffuse"), Scene(material="diffuse", lamp="texarea", lamp_png=sw.white), tolerance=max(tol, 6.0))
         for lamp in ("gonio", "projection"):

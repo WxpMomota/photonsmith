@@ -879,6 +879,16 @@ inline bool flattenCurveShape(const pbrt_scene::Scene &scene, FlatScene &out, co
 	const double width = shape.params.getFloat("width", 1.0);
 	c.width0 = shape.params.getFloat("width0", width);
 	c.width1 = shape.params.getFloat("width1", width);
+	// pbrt-v4 intersects a curve in object space, so its width is an object-space length: it grows and shrinks with the transform like the control points do. They are
+	// baked to world space above; the width has to follow (by the transform's mean linear scale: exact for a uniform one). Found by scripts/consistency_sweep.py: a
+	// bundle of hair strands under Scale 8 had strands 8 times too thin.
+	const double objWidth0 = c.width0, objWidth1 = c.width1;
+	{
+		const double *m = xform.m;
+		const double det = m[0] * (m[5] * m[10] - m[6] * m[9]) - m[1] * (m[4] * m[10] - m[6] * m[8]) + m[2] * (m[4] * m[9] - m[5] * m[8]);
+		const double k = std::cbrt(std::fabs(det));
+		if (k > 1e-12) { c.width0 *= k; c.width1 *= k; }
+	}
 	c.curveType = shape.params.getString("type", "flat");
 	if (c.curveType != "flat" && c.curveType != "cylinder" && c.curveType != "ribbon") {
 		warn("a curve has unknown \"type\" '" + c.curveType +
@@ -937,8 +947,8 @@ inline bool flattenCurveShape(const pbrt_scene::Scene &scene, FlatScene &out, co
 		AnimatedCurve ac;
 		ac.cp = objCp;
 		ac.nSegments = nSegments;
-		ac.width0 = c.width0;
-		ac.width1 = c.width1;
+		ac.width0 = objWidth0;   // object space: the animated curve applies its own transforms
+		ac.width1 = objWidth1;
 		ac.curveType = c.curveType;
 		ac.material = c.material;
 		fromMatrix4(xform, ac.xform);
