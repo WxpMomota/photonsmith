@@ -48,6 +48,11 @@ public:
 	// the frame is dimmed), and follows the camera while it is edited. Orbiting, panning, zooming or Frame all leaves it (cameraViewLeft()).
 	void setThroughCamera(bool on);
 	bool throughCamera() const { return m_throughCamera; }
+	// The flythrough scrub: looks through `camera` (a point along the saved views' path, `progress` 0..1 of the way) instead of the scene's camera, with the picture's frame over it
+	// like Through camera. Ended by setThroughCamera(), or by orbiting, panning or zooming (cameraViewLeft(), as for Through camera). It changes nothing in the document.
+	void setFlythroughPreview(const scene_doc::Camera &camera, double progress);
+	bool previewingFlythrough() const { return m_previewing; }
+	const scene_doc::Camera &previewCamera() const { return m_previewCamera; }
 	// The flythrough's path: with two or more saved camera views, the curve the camera would follow through them (the renderer's own Catmull-Rom curve, camera_keyframes.h), a
 	// marker and the name at each view, and a short line along where it looks. On by default; not drawn while looking through the camera.
 	void setShowCameraPath(bool on) { m_showPath = on; update(); }
@@ -147,6 +152,7 @@ private:
 	void drawLights(Ctx &c) const;
 	void drawCamera(Ctx &c) const;
 	void drawFlythroughPath(Ctx &c) const;
+	const scene_doc::Camera &lookCamera() const { return m_previewing ? m_previewCamera : m_doc->camera; }   // what the view looks through when it is the camera's
 	void drawTool(Ctx &c) const;
 	void drawCameraFrame(QPainter &p) const;
 	void drawSnapGuides(Ctx &c) const;
@@ -166,6 +172,9 @@ private:
 	bool m_snap = true;
 	GizmoMode m_gizmo = GizmoMode::Move;
 	bool m_userView = false;   // the user has orbited, panned or zoomed, so a resize keeps the view instead of re-framing the scene
+	bool m_previewing = false;      // the view is a point on the flythrough (setFlythroughPreview), not the scene's camera
+	scene_doc::Camera m_previewCamera;
+	double m_previewProgress = 0.0;
 	int m_activeView = -1;          // the saved view whose marker was pressed last: its target is drawn and can be dragged too
 	bool m_showPath = true;         // draw the flythrough's camera path (setShowCameraPath)
 	bool m_throughCamera = false;   // the view is the scene's camera (m_cam is kept for when it is switched off)

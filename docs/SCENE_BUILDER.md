@@ -74,6 +74,8 @@ With two or more saved views the 3D view also draws the **flythrough path**: the
 
 **Drag a marker** to move that saved view: its eye slides on the floor plane (in steps of 0.25; hold Shift to lift it, Ctrl to move it freely, Alt to ignore the grid). Pressing a marker also shows where that view looks, with a ring at its target that you can drag the same way. The lens, field of view and hold are kept, the focus distance follows what is looked at (unless the lens has depth of field), and one drag is one undo step; the selection does not change.
 
+The **Flythrough** slider beside it scrubs the 3D view along that path: at the left end it looks from the first saved view, at the right end from the last, and in between from where the flythrough video's camera would be (the same pace, easing and pauses, with the pauses measured against a nominal 10-second video), with each view's own field of view and lens, and the picture's frame drawn over it. Nothing in the scene changes; orbit, pan or zoom to leave (the slider goes back to the start). While it is on, **Camera from view** and **Save view** take the point you are looking from, so a view can be saved from anywhere on the path. It needs two or more saved views.
+
 ## Ready-made shapes
 
 Besides the sphere, box, quad, disk, cylinder, cone and mesh file, the Add menu has shapes with no pbrt primitive of their own. They are written into the scene as triangle meshes with smooth or sharp normals as fits the shape, so they render the same on the CPU, Metal and OptiX.

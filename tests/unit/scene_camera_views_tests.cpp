@@ -266,3 +266,50 @@ TEST(SceneCameraViews, MovingAMarkerRefusesABadIndexOrAPointThatIsNotFinite) {
 	EXPECT_FALSE(moveCameraViewEye(d, 0, {0, std::numeric_limits<double>::infinity(), 0}));
 	EXPECT_EQ(toJson(d), toJson(before));
 }
+
+TEST(SceneCameraViews, TheScrubbedCameraStartsAtTheFirstViewEndsAtTheLastAndTakesEachViewsLens) {
+	Document d;
+	Camera a = cameraAt(0, 1, 8);
+	a.fov = 30;
+	a.lensRadius = 0.1;
+	a.focusDistance = 8;
+	Camera b = cameraAt(8, 1, 0);
+	b.fov = 60;
+	b.lensRadius = 0.3;
+	b.focusDistance = 4;
+	saveCameraView(d, "A", a);
+	saveCameraView(d, "B", b);
+	d.camera.up = {0, 1, 0};
+	const Camera first = cameraAtFlythrough(d, 0.0), last = cameraAtFlythrough(d, 1.0), mid = cameraAtFlythrough(d, 0.5);
+	EXPECT_DOUBLE_EQ(first.position.z, 8.0);
+	EXPECT_DOUBLE_EQ(first.fov, 30.0);
+	EXPECT_DOUBLE_EQ(last.position.x, 8.0);
+	EXPECT_DOUBLE_EQ(last.fov, 60.0);
+	EXPECT_DOUBLE_EQ(last.lensRadius, 0.3);
+	EXPECT_DOUBLE_EQ(last.focusDistance, 4.0);
+	EXPECT_GT(mid.fov, 30.0);
+	EXPECT_LT(mid.fov, 60.0);
+	EXPECT_GT(mid.position.x, 0.0);
+	EXPECT_LT(mid.position.x, 8.0);
+	EXPECT_EQ(mid.up.y, 1.0) << "the rest of the scene camera is kept";
+}
+
+TEST(SceneCameraViews, WithoutTwoViewsTheScrubbedCameraIsTheSceneCamera) {
+	Document d;
+	d.camera = cameraAt(3, 3, 3);
+	EXPECT_DOUBLE_EQ(cameraAtFlythrough(d, 0.7).position.x, 3.0);
+	saveCameraView(d, "Only", cameraAt(9, 9, 9));
+	EXPECT_DOUBLE_EQ(cameraAtFlythrough(d, 0.7).position.x, 3.0);
+}
+
+TEST(SceneCameraViews, AHoldStandsStillWhileTheSliderMoves) {
+	Document d;
+	saveCameraView(d, "A", cameraAt(0, 1, 8));
+	saveCameraView(d, "B", cameraAt(8, 1, 0));
+	saveCameraView(d, "C", cameraAt(8, 1, -8));
+	setCameraViewHold(d, 1, 4.0);   // 4 of the nominal 10 seconds at B
+	const Camera before = cameraAtFlythrough(d, 0.45), after = cameraAtFlythrough(d, 0.55);
+	EXPECT_NEAR(before.position.x, after.position.x, 1e-6);
+	EXPECT_NEAR(before.position.z, after.position.z, 1e-6);
+	EXPECT_DOUBLE_EQ(before.position.x, 8.0);
+}

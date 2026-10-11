@@ -38,15 +38,25 @@ scene_view::View Scene3DView::view() const {
 }
 
 scene_view::OrbitCamera Scene3DView::cameraPose() const {
-	const scene_doc::Camera &c = m_doc->camera;
+	const scene_doc::Camera &c = lookCamera();
 	const double aspect = m_doc->render.height > 0 ? double(m_doc->render.width) / m_doc->render.height : 1.0;
 	const scene_view::FrameRect frame = scene_view::pictureFrame(std::max(1, width()), std::max(1, height()), aspect);
 	return scene_view::orbitLookingFrom(toV3(c.position), toV3(c.target), scene_view::fovForFrame(c.fov, std::max(1, height()), frame.h));
 }
 
 void Scene3DView::setThroughCamera(bool on) {
-	if (on == m_throughCamera) return;
+	if (on == m_throughCamera && !m_previewing) return;
+	m_previewing = false;   // (looking through the scene's camera, or out of it: either way the scrub is over)
 	m_throughCamera = on && m_doc;
+	update();
+}
+
+void Scene3DView::setFlythroughPreview(const scene_doc::Camera &camera, double progress) {
+	if (!m_doc) return;
+	m_previewCamera = camera;
+	m_previewProgress = progress;
+	m_previewing = true;
+	m_throughCamera = true;
 	update();
 }
 
@@ -56,6 +66,7 @@ void Scene3DView::leaveCameraView() {
 	m_cam = cameraPose();
 	m_cam.fovDeg = scene_view::OrbitCamera{}.fovDeg;
 	m_throughCamera = false;
+	m_previewing = false;
 	m_userView = true;
 	emit cameraViewLeft();
 	update();
@@ -455,7 +466,8 @@ void Scene3DView::drawCameraFrame(QPainter &p) const {
 	p.setPen(QPen(palette().color(QPalette::Highlight), 1.5));
 	p.drawRect(QRectF(f.x, f.y, f.w, f.h));
 	p.setPen(palette().color(QPalette::Text));
-	p.drawText(QPointF(f.x + 8, f.y + 18), tr("Through the camera (%1 x %2). Orbit, pan or zoom to leave.").arg(m_doc->render.width).arg(m_doc->render.height));
+	p.drawText(QPointF(f.x + 8, f.y + 18), m_previewing ? tr("Flythrough preview, %1% (%2 x %3). Orbit, pan or zoom to leave.").arg(qRound(m_previewProgress * 100.0)).arg(m_doc->render.width).arg(m_doc->render.height)
+	                                                     : tr("Through the camera (%1 x %2). Orbit, pan or zoom to leave.").arg(m_doc->render.width).arg(m_doc->render.height));
 }
 
 // Floor grid and the world axes

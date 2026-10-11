@@ -15,6 +15,7 @@
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
+#include <QSlider>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSignalBlocker>
@@ -57,12 +58,24 @@ void SceneBuilderWidget::createCameraBar(QWidget *layoutBox) {
 	m_pathCheck->setChecked(true);
 	m_pathCheck->setToolTip(tr("With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view. Drag a marker to move that view (Shift: up and down); press one to see where it looks, and drag the ring at its target too."));
 	flow->addWidget(m_pathCheck);
+	auto *scrubLabel = new QLabel(tr("Flythrough:"), m_cameraBar);
+	m_scrubSlider = new QSlider(Qt::Horizontal, m_cameraBar);
+	m_scrubSlider->setRange(0, 1000);
+	m_scrubSlider->setMinimumWidth(140);
+	m_scrubSlider->setEnabled(false);
+	m_scrubSlider->setToolTip(tr("Slide along the path through the saved views to see what the camera sees on the way, at the pace of a flythrough video (pauses included). Needs two or more saved views. Orbit, pan or zoom to leave."));
+	scrubLabel->setBuddy(m_scrubSlider);
+	flow->addWidget(scrubLabel);
+	flow->addWidget(m_scrubSlider);
 	m_cameraBar->setVisible(false);   // shown with the 3D view; createViews() puts it in the column
 
 	connect(m_throughButton, &QPushButton::toggled, this, [this](bool on) { m_view3d->setThroughCamera(on); });
+	connect(m_scrubSlider, &QSlider::valueChanged, this, [this](int value) { scrubFlythrough(value / 1000.0); });
 	connect(m_view3d, &Scene3DView::cameraViewLeft, this, [this]() {
 		QSignalBlocker block(m_throughButton);
 		m_throughButton->setChecked(false);
+		QSignalBlocker blockScrub(m_scrubSlider);
+		m_scrubSlider->setValue(0);   // (leaving the preview, by orbiting or by any other way, puts the slider back at the start)
 	});
 	connect(m_pathCheck, &QCheckBox::toggled, this, [this](bool on) { m_view3d->setShowCameraPath(on); });
 	connect(fromView, &QPushButton::clicked, this, [this]() { cameraFromView(); });
@@ -77,6 +90,37 @@ void SceneBuilderWidget::createCameraBar(QWidget *layoutBox) {
 	refreshViewCombo();
 }
 
+// The 3D view looks from `progress` (0..1) of the way along the flythrough. It is not the scene's camera, so Through camera is not lit.
+void SceneBuilderWidget::scrubFlythrough(double progress) {
+	if (m_doc.cameraViews.size() < 2) return;
+	if (m_viewStack->currentWidget() != m_view3d) return;
+	m_view3d->setFlythroughPreview(scene_doc::cameraAtFlythrough(m_doc, progress), progress);
+	if (m_throughButton) {
+		QSignalBlocker block(m_throughButton);
+		m_throughButton->setChecked(false);
+	}
+}
+
+void SceneBuilderWidget::refreshScrub() {
+	if (!m_scrubSlider) return;
+	const bool enough = m_doc.cameraViews.size() >= 2;
+	m_scrubSlider->setEnabled(enough);
+	if (!enough) {
+		if (m_view3d->previewingFlythrough()) m_view3d->setThroughCamera(false);
+		QSignalBlocker block(m_scrubSlider);
+		m_scrubSlider->setValue(0);
+	} else if (m_view3d->previewingFlythrough()) {
+		scrubFlythrough(m_scrubSlider->value() / 1000.0);   // a view was edited: the picture follows
+	}
+}
+
+bool SceneBuilderWidget::scrubForTest(double progress) {
+	if (!m_scrubSlider || !m_scrubSlider->isEnabled()) return false;
+	m_scrubSlider->setValue(qRound(progress * 1000.0));
+	if (progress == 0.0) scrubFlythrough(0.0);   // (the slider starts at 0, so no change was signalled)
+	return m_view3d->previewingFlythrough();
+}
+
 void SceneBuilderWidget::refreshViewCombo() {
 	if (!m_viewCombo) return;
 	QSignalBlocker block(m_viewCombo);
@@ -84,17 +128,19 @@ void SceneBuilderWidget::refreshViewCombo() {
 	m_viewCombo->addItem(m_doc.cameraViews.empty() ? tr("No saved views") : tr("Saved views"));
 	for (const scene_doc::CameraView &v : m_doc.cameraViews) m_viewCombo->addItem(QString::fromStdString(v.name));
 	m_viewCombo->setCurrentIndex(0);
+	refreshScrub();
 }
 
 // What the user is looking at as a camera: the scene's camera while looking through it, else the 3D view's place and direction with the scene camera's lens.
 Camera SceneBuilderWidget::cameraNow() const {
+	if (m_view3d->previewingFlythrough()) return m_view3d->previewCamera();   // the point on the flythrough being looked from
 	if (m_view3d->throughCamera()) return m_doc.camera;
 	const scene_view::OrbitCamera pose = m_view3d->currentPose();
 	return scene_doc::cameraLookingFrom(m_doc.camera, toFloat3(pose.eye()), toFloat3(pose.target));
 }
 
 void SceneBuilderWidget::cameraFromView() {
-	if (m_view3d->throughCamera()) return;   // already the camera
+	if (m_view3d->throughCamera() && !m_view3d->previewingFlythrough()) return;   // already the camera
 	const Camera camera = cameraNow();
 	edit(QString(), [&]() { m_doc.camera = camera; });
 	refreshInspectorValues();

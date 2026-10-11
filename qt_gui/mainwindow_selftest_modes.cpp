@@ -388,6 +388,24 @@ static void selfTestCameraViews(SceneBuilderWidget *sb, const std::function<void
 		check(near3(looked.position, before.position) && !near3(looked.target, before.target), "the target moves and the eye stays");
 		check(sb->undo() && near3(sb->document().cameraViews[second].camera.target, before.target), "one undo");
 	}
+	// The Flythrough slider: the 3D view looks from a point along the path, the first view at 0 and the last at 1, and orbiting leaves it.
+	{
+		const auto &views = sb->document().cameraViews;
+		const scene_doc::Camera camera0 = sb->document().camera;
+		check(sb->scrubForTest(0.0) && sb->lookingThroughCameraForTest() && near3(sb->viewEyeForTest(), views.front().camera.position), "the Flythrough slider at the start looks from the first saved view");
+		check(sb->scrubForTest(1.0) && near3(sb->viewEyeForTest(), views.back().camera.position), "and at the end from the last");
+		check(sb->scrubForTest(0.5), "somewhere in the middle");
+		const scene_doc::Float3 mid = sb->viewEyeForTest();
+		check(!near3(mid, views.front().camera.position) && !near3(mid, views.back().camera.position), "it is on the way, neither at the first view nor at the last");
+		check(near3(sb->document().camera.position, camera0.position) && near3(sb->document().camera.target, camera0.target), "and the scene's own camera is not touched");
+		sb->orbit3dForTest(120.0, 10.0);
+		check(!sb->lookingThroughCameraForTest(), "orbiting the view leaves the preview");
+		check(sb->scrubForTest(0.25) && sb->lookingThroughCameraForTest(), "and the slider starts it again");
+		sb->cameraFromView();
+		check(!near3(sb->document().camera.position, camera0.position), "Camera from view takes the point being looked from");
+		check(sb->undo() && near3(sb->document().camera.position, camera0.position), "one undo");
+		sb->orbit3dForTest(40.0, 30.0);
+	}
 	sb->undo();
 	// RT_GUI_SELFTEST_CAMERA_PNG=<file> saves a picture of the tab looking through the camera, with the camera's properties (and its saved view) beside it.
 	const QString picture = qEnvironmentVariable("RT_GUI_SELFTEST_CAMERA_PNG");

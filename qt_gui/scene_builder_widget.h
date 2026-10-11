@@ -31,6 +31,7 @@ class QLineEdit;
 class QComboBox;
 class QFormLayout;
 class QLabel;
+class QSlider;
 class QListWidget;
 class QProcess;
 class QPushButton;
@@ -91,6 +92,7 @@ public:
 	}
 	// How many pixels of the 3D view's picture are the flythrough path's orange, with the path drawn or not (the setting is put back).
 	int cameraPathPixelsForTest(bool shown);
+	bool scrubForTest(double progress);   // moves the Flythrough slider; true if the 3D view is now looking from there
 	int viewComboCountForTest() const;
 	bool dragPickedForTest(int index, const QPointF &deltaPx);
 	// A drag left unfinished (the mouse still down) in the 2D or the 3D view, and its release: for a picture of what a drag shows while it is going on.
@@ -237,6 +239,8 @@ private:
 	                      const std::function<void(bool, const QString &)> &done);
 	void createCameraBar(QWidget *layoutBox);
 	void refreshViewCombo();
+	void refreshScrub();                      // the scrub slider follows the saved views: off with fewer than two, and the picture they show is kept current
+	void scrubFlythrough(double progress);    // the 3D view looks from that point on the flythrough
 	scene_doc::Camera cameraNow() const;
 	void logSelection(const BuilderSelection &s, const char *where);   // what the user picked, and where (the list, the layout view, the 3D view)
 	void documentChanged();
@@ -316,6 +320,7 @@ private:
 	bool m_snapObjects = true;
 	QPointF m_holdEnd;   // where holdDragForTest() left the mouse
 	QCheckBox *m_snapObjectsCheck = nullptr;
+	QSlider *m_scrubSlider = nullptr;        // Flythrough: scrubs the 3D view along the saved views' path (0..1000)
 	QCheckBox *m_pathCheck = nullptr;        // Camera path: draw the flythrough's path in the 3D view
 	QWidget *m_cameraBar = nullptr;          // the 3D view's camera buttons: Through camera, Camera from view, the saved views
 	QPushButton *m_throughButton = nullptr;

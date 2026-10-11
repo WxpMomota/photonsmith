@@ -156,4 +156,19 @@ inline bool moveCameraViewTarget(Document& d, int index, const Float3& where) {
 	return true;
 }
 
+// The camera `progress` (0 first view, 1 last) of the way through the flythrough, for the Scene Builder's scrub slider: the renderer's own camera_keyframes::at() (so the pace, the
+// easing and the pauses are the video's), with the scene camera's other settings (up) and each view's field of view and lens interpolated. Pauses are seconds of the finished video,
+// so they are measured against `nominalSeconds`. The scene's camera if there are fewer than two views.
+inline Camera cameraAtFlythrough(const Document& d, double progress, bool ease = true, double nominalSeconds = 10.0) {
+	if (d.cameraViews.size() < 2) return d.camera;
+	const camera_keyframes::Key k = camera_keyframes::at(flythroughPath(d, ease), progress, nominalSeconds);
+	Camera c = cameraLookingFrom(d.camera, Float3{k.pos[0], k.pos[1], k.pos[2]}, Float3{k.target[0], k.target[1], k.target[2]});
+	if (k.fov > 0) c.fov = k.fov;
+	if (k.hasLens()) {
+		c.lensRadius = k.lensRadius;
+		c.focusDistance = k.focus;
+	}
+	return c;
+}
+
 }  // namespace scene_doc

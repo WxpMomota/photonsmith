@@ -6389,22 +6389,27 @@ Output:
 <context>
     <name>Scene3DView</name>
     <message>
-        <location filename="../scene_3d_view.cpp" line="427"/>
+        <location filename="../scene_3d_view.cpp" line="438"/>
         <source>the floor</source>
         <translation>地面</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="440"/>
+        <location filename="../scene_3d_view.cpp" line="451"/>
         <source>Snapped to %1</source>
         <translation>已吸附到 %1</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="458"/>
+        <location filename="../scene_3d_view.cpp" line="469"/>
+        <source>Flythrough preview, %1% (%2 x %3). Orbit, pan or zoom to leave.</source>
+        <translation>飞行预览，%1%（%2 x %3）。环绕、平移或缩放即可退出。</translation>
+    </message>
+    <message>
+        <location filename="../scene_3d_view.cpp" line="470"/>
         <source>Through the camera (%1 x %2). Orbit, pan or zoom to leave.</source>
         <translation>透过相机观看（%1 x %2）。环绕、平移或缩放即可退出。</translation>
     </message>
     <message>
-        <location filename="../scene_3d_view.cpp" line="645"/>
+        <location filename="../scene_3d_view.cpp" line="657"/>
         <source>Camera</source>
         <translation>相机</translation>
     </message>
@@ -7092,42 +7097,42 @@ From: %3</source>
         <translation>为所选对象制作许多副本：网格、绕一点的环形，或随机散布</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="40"/>
+        <location filename="../scene_builder_camera_views.cpp" line="41"/>
         <source>Through camera</source>
         <translation>透过相机</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="42"/>
+        <location filename="../scene_builder_camera_views.cpp" line="43"/>
         <source>Look at the scene from the camera, with the picture&apos;s frame drawn over it. Orbit, pan or zoom to leave.</source>
         <translation>从相机的位置观看场景，并在上面绘制图像的取景框。环绕、平移或缩放即可退出。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="43"/>
+        <location filename="../scene_builder_camera_views.cpp" line="44"/>
         <source>Camera from view</source>
         <translation>按视图设置相机</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="44"/>
+        <location filename="../scene_builder_camera_views.cpp" line="45"/>
         <source>Put the scene&apos;s camera where the 3D view is now, looking the same way</source>
         <translation>把场景相机放到 3D 视图当前的位置，并朝向相同方向</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="46"/>
+        <location filename="../scene_builder_camera_views.cpp" line="47"/>
         <source>Saved camera views: pick one to put the camera there</source>
         <translation>已保存的相机视图：选择一个即可把相机放到那里</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="48"/>
+        <location filename="../scene_builder_camera_views.cpp" line="49"/>
         <source>Save view...</source>
         <translation>保存视图...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="49"/>
+        <location filename="../scene_builder_camera_views.cpp" line="50"/>
         <source>Remember what you are looking at now (the 3D view, or the camera while looking through it) under a name</source>
         <translation>把你现在看到的内容（3D 视图，或透过相机观看时的相机）按名称记住</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="56"/>
+        <location filename="../scene_builder_camera_views.cpp" line="57"/>
         <source>Camera path</source>
         <translation>相机路径</translation>
     </message>
@@ -7136,103 +7141,113 @@ From: %3</source>
         <translation type="vanished">保存了两个或更多视图时，绘制飞行视频穿过这些视图的路径（橙色曲线），并在每个视图处加一个标记。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="58"/>
+        <location filename="../scene_builder_camera_views.cpp" line="59"/>
         <source>With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view. Drag a marker to move that view (Shift: up and down); press one to see where it looks, and drag the ring at its target too.</source>
         <translation>保存了两个或更多视图时，绘制飞行视频穿过这些视图的路径（橙色曲线），并在每个视图处加一个标记。拖动标记可移动该视图（Shift：上下移动）；按下标记可看到它朝向哪里，也可以拖动其目标处的圆环。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="71"/>
+        <location filename="../scene_builder_camera_views.cpp" line="61"/>
+        <source>Flythrough:</source>
+        <translation>飞行：</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_views.cpp" line="66"/>
+        <source>Slide along the path through the saved views to see what the camera sees on the way, at the pace of a flythrough video (pauses included). Needs two or more saved views. Orbit, pan or zoom to leave.</source>
+        <translation>沿着穿过已保存视图的路径滑动，可按飞行视频的节奏（包括停留）查看相机沿途所见。需要两个或更多已保存的视图。环绕、平移或缩放即可退出。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_views.cpp" line="84"/>
         <source>Save view</source>
         <translation>保存视图</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="71"/>
+        <location filename="../scene_builder_camera_views.cpp" line="84"/>
         <source>Name of the view:</source>
         <translation>视图名称：</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="84"/>
+        <location filename="../scene_builder_camera_views.cpp" line="128"/>
         <source>No saved views</source>
         <translation>没有已保存的视图</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="84"/>
+        <location filename="../scene_builder_camera_views.cpp" line="128"/>
         <source>Saved views</source>
         <translation>已保存的视图</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="101"/>
+        <location filename="../scene_builder_camera_views.cpp" line="147"/>
         <source>The camera is where the view is.</source>
         <translation>相机已放到视图所在的位置。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="109"/>
+        <location filename="../scene_builder_camera_views.cpp" line="155"/>
         <source>There are already %1 saved views: delete one first.</source>
         <translation>已经有 %1 个已保存的视图：请先删除一个。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="113"/>
+        <location filename="../scene_builder_camera_views.cpp" line="159"/>
         <source>Saved the view &quot;%1&quot;.</source>
         <translation>已保存视图“%1”。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="175"/>
+        <location filename="../scene_builder_camera_views.cpp" line="221"/>
         <source>&lt;b&gt;Saved views&lt;/b&gt;</source>
         <translation>&lt;b&gt;已保存的视图&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="179"/>
+        <location filename="../scene_builder_camera_views.cpp" line="225"/>
         <source>None yet. Save the camera as a view to come back to it: a front view, a close-up, a bird&apos;s-eye shot.</source>
         <translation>还没有。把相机保存为视图，之后可随时回到那里：正面图、特写、俯拍等。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="206"/>
+        <location filename="../scene_builder_camera_views.cpp" line="252"/>
         <source>How long a flythrough stays at this view before flying on (0: it does not stop)</source>
         <translation>飞行视频在此视图停留多久再继续飞行（0：不停留）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="207"/>
+        <location filename="../scene_builder_camera_views.cpp" line="253"/>
         <source>Hold:</source>
         <translation>停留：</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="209"/>
+        <location filename="../scene_builder_camera_views.cpp" line="255"/>
         <source>Use</source>
         <translation>使用</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="209"/>
+        <location filename="../scene_builder_camera_views.cpp" line="255"/>
         <source>Put the camera at this view</source>
         <translation>把相机放到此视图</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="210"/>
+        <location filename="../scene_builder_camera_views.cpp" line="256"/>
         <source>Update</source>
         <translation>更新</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="210"/>
+        <location filename="../scene_builder_camera_views.cpp" line="256"/>
         <source>Save the camera as it is now over this view</source>
         <translation>用相机当前的状态覆盖此视图</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="211"/>
+        <location filename="../scene_builder_camera_views.cpp" line="257"/>
         <location filename="../scene_builder_widget.cpp" line="217"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="211"/>
+        <location filename="../scene_builder_camera_views.cpp" line="257"/>
         <source>Remove this saved view</source>
         <translation>删除此已保存的视图</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="215"/>
+        <location filename="../scene_builder_camera_views.cpp" line="261"/>
         <source>Save camera as a view</source>
         <translation>将相机保存为视图</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="216"/>
+        <location filename="../scene_builder_camera_views.cpp" line="262"/>
         <source>Remember the camera as it is now under a name (a saved view can be used from the 3D view&apos;s list too)</source>
         <translation>把相机当前的状态按名称记住（已保存的视图也可从 3D 视图的列表中使用）</translation>
     </message>
@@ -7476,7 +7491,7 @@ From: %3</source>
         <translation>制作一段视频：相机按保存的先后顺序依次飞过你保存的相机视图：%1。第一张画面就是第一个视图，最后一张画面就是最后一个视图。每个视图自己的视野和镜头也会随之变化。每一帧都要渲染，所以较长或较大的视频需要一些时间；建议先用“草稿”。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="203"/>
+        <location filename="../scene_builder_camera_views.cpp" line="249"/>
         <location filename="../scene_builder_turntable.cpp" line="76"/>
         <source> s</source>
         <translation> 秒</translation>
