@@ -3574,7 +3574,7 @@ Eliminador de ruido SVGF: un filtro de reducción de ruido alternativo y experim
         <translation>Aclara una escena oscura para que no salga casi negra: el brillo medio de los píxeles iluminados se eleva hacia un gris medio, hasta 64x, siguiendo la imagen con suavidad. Nunca oscurece nada: una escena con exposición normal o brillante se ve exactamente igual que con esto desactivado. Además multiplica el valor de Exposición de arriba, que sigue sirviendo como corrección manual.</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="92"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="93"/>
         <location filename="../mainwindow_tabs_render_live.cpp" line="760"/>
         <source>AI denoise</source>
         <translation>Eliminar ruido con IA</translation>
@@ -7142,42 +7142,42 @@ Procedencia: %3</translation>
         <translation>Hace muchas copias del objeto seleccionado: una cuadrícula, un anillo alrededor de un punto o una dispersión al azar</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="41"/>
+        <location filename="../scene_builder_camera_views.cpp" line="42"/>
         <source>Through camera</source>
         <translation>A través de la cámara</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="43"/>
+        <location filename="../scene_builder_camera_views.cpp" line="44"/>
         <source>Look at the scene from the camera, with the picture&apos;s frame drawn over it. Orbit, pan or zoom to leave.</source>
         <translation>Mira la escena desde la cámara, con el encuadre de la imagen dibujado encima. Orbita, desplaza o haz zoom para salir.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="44"/>
+        <location filename="../scene_builder_camera_views.cpp" line="45"/>
         <source>Camera from view</source>
         <translation>Cámara desde la vista</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="45"/>
+        <location filename="../scene_builder_camera_views.cpp" line="46"/>
         <source>Put the scene&apos;s camera where the 3D view is now, looking the same way</source>
         <translation>Coloca la cámara de la escena donde está ahora la vista 3D, mirando en la misma dirección</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="47"/>
+        <location filename="../scene_builder_camera_views.cpp" line="48"/>
         <source>Saved camera views: pick one to put the camera there</source>
         <translation>Vistas de cámara guardadas: elige una para colocar la cámara ahí</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="49"/>
+        <location filename="../scene_builder_camera_views.cpp" line="50"/>
         <source>Save view...</source>
         <translation>Guardar vista...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="50"/>
+        <location filename="../scene_builder_camera_views.cpp" line="51"/>
         <source>Remember what you are looking at now (the 3D view, or the camera while looking through it) under a name</source>
         <translation>Recuerda lo que estás viendo ahora (la vista 3D, o la cámara si miras a través de ella) con un nombre</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="57"/>
+        <location filename="../scene_builder_camera_views.cpp" line="58"/>
         <source>Camera path</source>
         <translation>Trayectoria de cámara</translation>
     </message>
@@ -7186,113 +7186,129 @@ Procedencia: %3</translation>
         <translation type="vanished">Con dos o más vistas guardadas, dibuja el trayecto que seguiría un recorrido por ellas (la curva naranja), con una marca en cada vista.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="59"/>
+        <location filename="../scene_builder_camera_views.cpp" line="60"/>
         <source>With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view. Drag a marker to move that view (Shift: up and down); press one to see where it looks, and drag the ring at its target too.</source>
         <translation>Con dos o más vistas guardadas, dibuja el trayecto que seguiría un recorrido por ellas (la curva naranja), con una marca en cada vista. Arrastra una marca para mover esa vista (Mayús: arriba y abajo); pulsa una para ver hacia dónde mira y arrastra también el anillo de su objetivo.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="61"/>
+        <location filename="../scene_builder_camera_views.cpp" line="62"/>
         <source>Flythrough:</source>
         <translation>Recorrido:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="66"/>
+        <location filename="../scene_builder_camera_views.cpp" line="67"/>
         <source>Slide along the path through the saved views to see what the camera sees on the way, at the pace of a flythrough video (pauses included). Needs two or more saved views. Orbit, pan or zoom to leave.</source>
         <translation>Desliza por el trayecto entre las vistas guardadas para ver lo que ve la cámara por el camino, al ritmo de un vídeo de recorrido (con sus pausas). Necesita dos o más vistas guardadas. Orbita, desplaza o haz zoom para salir.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="84"/>
+        <location filename="../scene_builder_camera_views.cpp" line="69"/>
+        <location filename="../scene_builder_camera_views.cpp" line="150"/>
+        <source>Play</source>
+        <translation>Reproducir</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_views.cpp" line="73"/>
+        <source>Play the flythrough in the 3D view, at the pace of the video (10 seconds for the whole path). Click again to pause; moving the slider also stops it.</source>
+        <translation>Reproduce el recorrido en la vista 3D, al ritmo del vídeo (10 segundos para todo el trayecto). Vuelve a pulsar para pausar; mover el control deslizante también lo detiene.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_views.cpp" line="108"/>
         <source>Save view</source>
         <translation>Guardar vista</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="84"/>
+        <location filename="../scene_builder_camera_views.cpp" line="108"/>
         <source>Name of the view:</source>
         <translation>Nombre de la vista:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="128"/>
+        <location filename="../scene_builder_camera_views.cpp" line="140"/>
+        <source>Pause</source>
+        <translation>Pausa</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_views.cpp" line="196"/>
         <source>No saved views</source>
         <translation>Sin vistas guardadas</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="128"/>
+        <location filename="../scene_builder_camera_views.cpp" line="196"/>
         <source>Saved views</source>
         <translation>Vistas guardadas</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="147"/>
+        <location filename="../scene_builder_camera_views.cpp" line="215"/>
         <source>The camera is where the view is.</source>
         <translation>La cámara está donde está la vista.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="155"/>
+        <location filename="../scene_builder_camera_views.cpp" line="223"/>
         <source>There are already %1 saved views: delete one first.</source>
         <translation>Ya hay %1 vistas guardadas: elimina una primero.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="159"/>
+        <location filename="../scene_builder_camera_views.cpp" line="227"/>
         <source>Saved the view &quot;%1&quot;.</source>
         <translation>Vista &quot;%1&quot; guardada.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="221"/>
+        <location filename="../scene_builder_camera_views.cpp" line="289"/>
         <source>&lt;b&gt;Saved views&lt;/b&gt;</source>
         <translation>&lt;b&gt;Vistas guardadas&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="225"/>
+        <location filename="../scene_builder_camera_views.cpp" line="293"/>
         <source>None yet. Save the camera as a view to come back to it: a front view, a close-up, a bird&apos;s-eye shot.</source>
         <translation>Ninguna todavía. Guarda la cámara como vista para volver a ella: una vista frontal, un primer plano, una toma cenital.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="252"/>
+        <location filename="../scene_builder_camera_views.cpp" line="320"/>
         <source>How long a flythrough stays at this view before flying on (0: it does not stop)</source>
         <translation>Cuánto se queda quieto un recorrido en esta vista antes de seguir (0: no se detiene)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="253"/>
+        <location filename="../scene_builder_camera_views.cpp" line="321"/>
         <source>Hold:</source>
         <translation>Pausa:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="255"/>
+        <location filename="../scene_builder_camera_views.cpp" line="323"/>
         <source>Use</source>
         <translation>Usar</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="255"/>
+        <location filename="../scene_builder_camera_views.cpp" line="323"/>
         <source>Put the camera at this view</source>
         <translation>Coloca la cámara en esta vista</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="256"/>
+        <location filename="../scene_builder_camera_views.cpp" line="324"/>
         <source>Update</source>
         <translation>Actualizar</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="256"/>
+        <location filename="../scene_builder_camera_views.cpp" line="324"/>
         <source>Save the camera as it is now over this view</source>
         <translation>Guarda la cámara tal como está ahora sobre esta vista</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="257"/>
+        <location filename="../scene_builder_camera_views.cpp" line="325"/>
         <location filename="../scene_builder_widget.cpp" line="217"/>
         <source>Delete</source>
         <translation>Eliminar</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="257"/>
+        <location filename="../scene_builder_camera_views.cpp" line="325"/>
         <source>Remove this saved view</source>
         <translation>Elimina esta vista guardada</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="261"/>
+        <location filename="../scene_builder_camera_views.cpp" line="329"/>
         <source>Save camera as a view</source>
         <translation>Guardar la cámara como vista</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="262"/>
+        <location filename="../scene_builder_camera_views.cpp" line="330"/>
         <source>Remember the camera as it is now under a name (a saved view can be used from the 3D view&apos;s list too)</source>
         <translation>Recuerda la cámara tal como está ahora con un nombre (una vista guardada también se puede usar desde la lista de la vista 3D)</translation>
     </message>
@@ -7536,7 +7552,7 @@ Procedencia: %3</translation>
         <translation>Crea un vídeo de la escena desde una cámara que vuela por tus vistas de cámara guardadas en el orden en que se guardaron: %1. La primera imagen es la primera vista y la última imagen la última. El campo de visión y el objetivo de cada vista van con ella. Renderiza todos los fotogramas, así que un vídeo largo o grande tarda un rato; empieza con Borrador.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="249"/>
+        <location filename="../scene_builder_camera_views.cpp" line="317"/>
         <location filename="../scene_builder_turntable.cpp" line="76"/>
         <source> s</source>
         <translation> s</translation>

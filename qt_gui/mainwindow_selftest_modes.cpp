@@ -11,6 +11,7 @@
 #include "../src/shared/pbrt_asset_check.h"
 
 #include <QApplication>
+#include <QElapsedTimer>
 #include <QAbstractSpinBox>
 #include <QLineEdit>
 #include <QPushButton>
@@ -401,6 +402,33 @@ static void selfTestCameraViews(SceneBuilderWidget *sb, const std::function<void
 		sb->orbit3dForTest(120.0, 10.0);
 		check(!sb->lookingThroughCameraForTest(), "orbiting the view leaves the preview");
 		check(sb->scrubForTest(0.25) && sb->lookingThroughCameraForTest(), "and the slider starts it again");
+		// Play: the preview runs by itself (10 s for the whole path), pauses, stops at the last view, and starts over from there.
+		check(sb->scrubForTest(0.0), "back at the start");
+		sb->playForTest(true);
+		check(sb->playingForTest(), "Play starts the preview running");
+		{   // the timer itself: about half a second of real time is about 5% of the 10 s path
+			QElapsedTimer wait;
+			wait.start();
+			while (wait.elapsed() < 500) QApplication::processEvents();
+			const double ran = sb->playProgressForTest();
+			check(ran > 0.02 && ran < 0.15, QString("the timer moves it on in real time (%1 of the path in half a second)").arg(ran, 0, 'f', 3));
+			sb->playForTest(false);
+			check(sb->scrubForTest(0.0), "back at the start");
+			sb->playForTest(true);
+		}
+		sb->advancePlayForTest(5.0);
+		const scene_doc::Float3 half = sb->viewEyeForTest();
+		check(std::fabs(sb->playProgressForTest() - 0.5) < 1e-9 && !near3(half, views.front().camera.position) && !near3(half, views.back().camera.position), "5 s later it is half way along");
+		sb->playForTest(false);
+		check(!sb->playingForTest() && near3(sb->viewEyeForTest(), half), "Pause holds it where it is");
+		sb->playForTest(true);
+		sb->advancePlayForTest(6.0);
+		check(!sb->playingForTest() && std::fabs(sb->playProgressForTest() - 1.0) < 1e-9 && near3(sb->viewEyeForTest(), views.back().camera.position), "it stops at the last view");
+		sb->playForTest(true);
+		check(sb->playingForTest() && near3(sb->viewEyeForTest(), views.front().camera.position), "and Play again starts from the first");
+		sb->orbit3dForTest(120.0, 10.0);
+		check(!sb->playingForTest(), "orbiting the view stops it");
+		check(sb->scrubForTest(0.25), "the slider starts the preview again");
 		sb->cameraFromView();
 		check(!near3(sb->document().camera.position, camera0.position), "Camera from view takes the point being looked from");
 		check(sb->undo() && near3(sb->document().camera.position, camera0.position), "one undo");

@@ -21,6 +21,7 @@
 #include <QSignalBlocker>
 #include <QStackedWidget>
 #include <QTimer>
+#include <algorithm>
 #include <cmath>
 
 using namespace scene_builder_ui;
@@ -65,17 +66,40 @@ void SceneBuilderWidget::createCameraBar(QWidget *layoutBox) {
 	m_scrubSlider->setEnabled(false);
 	m_scrubSlider->setToolTip(tr("Slide along the path through the saved views to see what the camera sees on the way, at the pace of a flythrough video (pauses included). Needs two or more saved views. Orbit, pan or zoom to leave."));
 	scrubLabel->setBuddy(m_scrubSlider);
+	m_playButton = new QPushButton(tr("Play"), m_cameraBar);
+	m_playButton->setCheckable(true);
+	m_playButton->setAutoDefault(false);
+	m_playButton->setEnabled(false);
+	m_playButton->setToolTip(tr("Play the flythrough in the 3D view, at the pace of the video (10 seconds for the whole path). Click again to pause; moving the slider also stops it."));
+	compactStyle(m_playButton);
+	m_playTimer = new QTimer(this);
+	m_playTimer->setInterval(33);
 	flow->addWidget(scrubLabel);
 	flow->addWidget(m_scrubSlider);
+	flow->addWidget(m_playButton);
 	m_cameraBar->setVisible(false);   // shown with the 3D view; createViews() puts it in the column
 
 	connect(m_throughButton, &QPushButton::toggled, this, [this](bool on) { m_view3d->setThroughCamera(on); });
-	connect(m_scrubSlider, &QSlider::valueChanged, this, [this](int value) { scrubFlythrough(value / 1000.0); });
+	connect(m_scrubSlider, &QSlider::valueChanged, this, [this](int value) {   // (only the user moves it: the playing preview sets it with the signal blocked)
+		stopPlay();
+		m_playProgress = value / 1000.0;
+		scrubFlythrough(m_playProgress);
+	});
+	connect(m_playButton, &QPushButton::clicked, this, [this](bool on) { if (on) startPlay(); else stopPlay(); });
+	connect(m_playTimer, &QTimer::timeout, this, [this]() {
+		if (m_viewStack->currentWidget() != m_view3d || !m_view3d->previewingFlythrough()) {   // the preview was left (or the view changed): nothing to play
+			stopPlay();
+			return;
+		}
+		advancePlay(m_playClock.restart() / 1000.0);
+	});
 	connect(m_view3d, &Scene3DView::cameraViewLeft, this, [this]() {
 		QSignalBlocker block(m_throughButton);
 		m_throughButton->setChecked(false);
+		stopPlay();
 		QSignalBlocker blockScrub(m_scrubSlider);
 		m_scrubSlider->setValue(0);   // (leaving the preview, by orbiting or by any other way, puts the slider back at the start)
+		m_playProgress = 0.0;
 	});
 	connect(m_pathCheck, &QCheckBox::toggled, this, [this](bool on) { m_view3d->setShowCameraPath(on); });
 	connect(fromView, &QPushButton::clicked, this, [this]() { cameraFromView(); });
@@ -101,23 +125,67 @@ void SceneBuilderWidget::scrubFlythrough(double progress) {
 	}
 }
 
+constexpr double kPlaySeconds = 10.0;   // the whole path takes this long to play (the nominal video length cameraAtFlythrough measures the pauses against)
+
+void SceneBuilderWidget::startPlay() {
+	if (m_doc.cameraViews.size() < 2 || m_viewStack->currentWidget() != m_view3d) {
+		stopPlay();
+		return;
+	}
+	if (!m_view3d->previewingFlythrough()) m_playProgress = 0.0;   // (a preview that was left starts again from the first view)
+	if (m_playProgress >= 1.0) m_playProgress = 0.0;
+	scrubFlythrough(m_playProgress);
+	QSignalBlocker block(m_playButton);
+	m_playButton->setChecked(true);
+	m_playButton->setText(tr("Pause"));
+	m_playClock.restart();
+	m_playTimer->start();
+}
+
+void SceneBuilderWidget::stopPlay() {
+	if (!m_playTimer) return;
+	m_playTimer->stop();
+	QSignalBlocker block(m_playButton);
+	m_playButton->setChecked(false);
+	m_playButton->setText(tr("Play"));
+}
+
+void SceneBuilderWidget::advancePlay(double seconds) {
+	if (m_doc.cameraViews.size() < 2) {
+		stopPlay();
+		return;
+	}
+	m_playProgress = std::min(1.0, m_playProgress + std::max(0.0, seconds) / kPlaySeconds);
+	{
+		QSignalBlocker block(m_scrubSlider);
+		m_scrubSlider->setValue(qRound(m_playProgress * 1000.0));
+	}
+	scrubFlythrough(m_playProgress);
+	if (m_playProgress >= 1.0) stopPlay();   // at the last view; Play again starts over
+}
+
 void SceneBuilderWidget::refreshScrub() {
 	if (!m_scrubSlider) return;
 	const bool enough = m_doc.cameraViews.size() >= 2;
 	m_scrubSlider->setEnabled(enough);
+	m_playButton->setEnabled(enough);
 	if (!enough) {
+		stopPlay();
 		if (m_view3d->previewingFlythrough()) m_view3d->setThroughCamera(false);
 		QSignalBlocker block(m_scrubSlider);
 		m_scrubSlider->setValue(0);
 	} else if (m_view3d->previewingFlythrough()) {
-		scrubFlythrough(m_scrubSlider->value() / 1000.0);   // a view was edited: the picture follows
+		scrubFlythrough(m_playProgress);   // a view was edited: the picture follows
 	}
 }
+
+bool SceneBuilderWidget::playingForTest() const { return m_playTimer && m_playTimer->isActive(); }
 
 bool SceneBuilderWidget::scrubForTest(double progress) {
 	if (!m_scrubSlider || !m_scrubSlider->isEnabled()) return false;
 	m_scrubSlider->setValue(qRound(progress * 1000.0));
-	if (progress == 0.0) scrubFlythrough(0.0);   // (the slider starts at 0, so no change was signalled)
+	if (progress == 0.0) scrubFlythrough(0.0);
+	m_playProgress = progress;   // (the slider starts at 0, so no change was signalled)
 	return m_view3d->previewingFlythrough();
 }
 

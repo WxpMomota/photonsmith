@@ -3537,7 +3537,7 @@ SVGFデノイザー: もう一つの、実験的なノイズ低減フィルタ�
         <translation>暗いシーンがほぼ真っ黒にならないよう明るくします。明るいピクセルの平均輝度を中間グレーに向けて最大64倍まで引き上げ、画像に滑らかに追従します。何かを暗くすることはなく、通常の露出のシーンや明るいシーンは、オフのときとまったく同じに見えます。上の露出の値にさらに掛け合わされるため、露出は手動の補正として引き続き使えます。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="92"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="93"/>
         <location filename="../mainwindow_tabs_render_live.cpp" line="760"/>
         <source>AI denoise</source>
         <translation>AIノイズ除去</translation>
@@ -7091,42 +7091,42 @@ From: %3</source>
         <translation>選択したオブジェクトのコピーをたくさん作ります。グリッド、点のまわりのリング、またはランダムな散布</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="41"/>
+        <location filename="../scene_builder_camera_views.cpp" line="42"/>
         <source>Through camera</source>
         <translation>カメラ越し</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="43"/>
+        <location filename="../scene_builder_camera_views.cpp" line="44"/>
         <source>Look at the scene from the camera, with the picture&apos;s frame drawn over it. Orbit, pan or zoom to leave.</source>
         <translation>シーンをカメラの位置から見ます。画像のフレームが重ねて表示されます。回り込み・画面移動・ズームで解除されます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="44"/>
+        <location filename="../scene_builder_camera_views.cpp" line="45"/>
         <source>Camera from view</source>
         <translation>ビューからカメラ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="45"/>
+        <location filename="../scene_builder_camera_views.cpp" line="46"/>
         <source>Put the scene&apos;s camera where the 3D view is now, looking the same way</source>
         <translation>シーンのカメラを、現在の 3D ビューの位置と向きに合わせます</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="47"/>
+        <location filename="../scene_builder_camera_views.cpp" line="48"/>
         <source>Saved camera views: pick one to put the camera there</source>
         <translation>保存したカメラビュー: 選ぶとカメラがその位置に移ります</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="49"/>
+        <location filename="../scene_builder_camera_views.cpp" line="50"/>
         <source>Save view...</source>
         <translation>ビューを保存...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="50"/>
+        <location filename="../scene_builder_camera_views.cpp" line="51"/>
         <source>Remember what you are looking at now (the 3D view, or the camera while looking through it) under a name</source>
         <translation>今見ているもの (3D ビュー、またはカメラ越しの表示ならカメラ) に名前を付けて記憶します</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="57"/>
+        <location filename="../scene_builder_camera_views.cpp" line="58"/>
         <source>Camera path</source>
         <translation>カメラの軌跡</translation>
     </message>
@@ -7135,113 +7135,129 @@ From: %3</source>
         <translation type="vanished">保存したビューが 2 つ以上あるとき、フライスルーがそれらを通る経路 (オレンジ色の曲線) を、各ビューに目印を付けて表示します。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="59"/>
+        <location filename="../scene_builder_camera_views.cpp" line="60"/>
         <source>With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view. Drag a marker to move that view (Shift: up and down); press one to see where it looks, and drag the ring at its target too.</source>
         <translation>保存したビューが 2 つ以上あるとき、フライスルーがそれらを通る経路 (オレンジ色の曲線) を、各ビューに目印を付けて表示します。目印をドラッグするとそのビューが動きます (Shift: 上下)。目印を押すとそのビューの向きが表示され、ターゲットの輪もドラッグできます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="61"/>
+        <location filename="../scene_builder_camera_views.cpp" line="62"/>
         <source>Flythrough:</source>
         <translation>フライスルー:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="66"/>
+        <location filename="../scene_builder_camera_views.cpp" line="67"/>
         <source>Slide along the path through the saved views to see what the camera sees on the way, at the pace of a flythrough video (pauses included). Needs two or more saved views. Orbit, pan or zoom to leave.</source>
         <translation>保存したビューを通る経路に沿ってスライドすると、フライスルー動画と同じペース (停止時間を含む) で、途中でカメラに見える映像を確認できます。保存したビューが 2 つ以上必要です。オービット、パン、ズームで終了します。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="84"/>
+        <location filename="../scene_builder_camera_views.cpp" line="69"/>
+        <location filename="../scene_builder_camera_views.cpp" line="150"/>
+        <source>Play</source>
+        <translation>再生</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_views.cpp" line="73"/>
+        <source>Play the flythrough in the 3D view, at the pace of the video (10 seconds for the whole path). Click again to pause; moving the slider also stops it.</source>
+        <translation>3D ビューでフライスルーを動画と同じペース (経路全体で 10 秒) で再生します。もう一度クリックすると一時停止し、スライダーを動かしても止まります。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_views.cpp" line="108"/>
         <source>Save view</source>
         <translation>ビューを保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="84"/>
+        <location filename="../scene_builder_camera_views.cpp" line="108"/>
         <source>Name of the view:</source>
         <translation>ビューの名前:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="128"/>
+        <location filename="../scene_builder_camera_views.cpp" line="140"/>
+        <source>Pause</source>
+        <translation>一時停止</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_views.cpp" line="196"/>
         <source>No saved views</source>
         <translation>保存したビューはありません</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="128"/>
+        <location filename="../scene_builder_camera_views.cpp" line="196"/>
         <source>Saved views</source>
         <translation>保存したビュー</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="147"/>
+        <location filename="../scene_builder_camera_views.cpp" line="215"/>
         <source>The camera is where the view is.</source>
         <translation>カメラをビューの位置に合わせました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="155"/>
+        <location filename="../scene_builder_camera_views.cpp" line="223"/>
         <source>There are already %1 saved views: delete one first.</source>
         <translation>すでに %1 個のビューが保存されています。先に 1 つ削除してください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="159"/>
+        <location filename="../scene_builder_camera_views.cpp" line="227"/>
         <source>Saved the view &quot;%1&quot;.</source>
         <translation>ビュー「%1」を保存しました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="221"/>
+        <location filename="../scene_builder_camera_views.cpp" line="289"/>
         <source>&lt;b&gt;Saved views&lt;/b&gt;</source>
         <translation>&lt;b&gt;保存したビュー&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="225"/>
+        <location filename="../scene_builder_camera_views.cpp" line="293"/>
         <source>None yet. Save the camera as a view to come back to it: a front view, a close-up, a bird&apos;s-eye shot.</source>
         <translation>まだありません。カメラをビューとして保存すると、あとで戻れます (正面、クローズアップ、俯瞰など)。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="252"/>
+        <location filename="../scene_builder_camera_views.cpp" line="320"/>
         <source>How long a flythrough stays at this view before flying on (0: it does not stop)</source>
         <translation>フライスルーがこのビューにとどまってから先へ進むまでの時間 (0: 止まらない)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="253"/>
+        <location filename="../scene_builder_camera_views.cpp" line="321"/>
         <source>Hold:</source>
         <translation>停止:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="255"/>
+        <location filename="../scene_builder_camera_views.cpp" line="323"/>
         <source>Use</source>
         <translation>使う</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="255"/>
+        <location filename="../scene_builder_camera_views.cpp" line="323"/>
         <source>Put the camera at this view</source>
         <translation>カメラをこのビューの位置に移します</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="256"/>
+        <location filename="../scene_builder_camera_views.cpp" line="324"/>
         <source>Update</source>
         <translation>更新</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="256"/>
+        <location filename="../scene_builder_camera_views.cpp" line="324"/>
         <source>Save the camera as it is now over this view</source>
         <translation>現在のカメラでこのビューを上書き保存します</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="257"/>
+        <location filename="../scene_builder_camera_views.cpp" line="325"/>
         <location filename="../scene_builder_widget.cpp" line="217"/>
         <source>Delete</source>
         <translation>削除</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="257"/>
+        <location filename="../scene_builder_camera_views.cpp" line="325"/>
         <source>Remove this saved view</source>
         <translation>この保存ビューを削除します</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="261"/>
+        <location filename="../scene_builder_camera_views.cpp" line="329"/>
         <source>Save camera as a view</source>
         <translation>カメラをビューとして保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="262"/>
+        <location filename="../scene_builder_camera_views.cpp" line="330"/>
         <source>Remember the camera as it is now under a name (a saved view can be used from the 3D view&apos;s list too)</source>
         <translation>現在のカメラに名前を付けて記憶します (保存したビューは 3D ビューの一覧からも使えます)</translation>
     </message>
@@ -7485,7 +7501,7 @@ From: %3</source>
         <translation>保存したカメラビューを保存した順にたどって飛ぶカメラから見たシーンの動画を作ります: %1。最初の画像が最初のビュー、最後の画像が最後のビューになります。各ビューの画角とレンズもそのビューと一緒に反映されます。すべてのフレームをレンダリングするので、長い動画や大きな動画は時間がかかります。まずは「ドラフト」から試してください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="249"/>
+        <location filename="../scene_builder_camera_views.cpp" line="317"/>
         <location filename="../scene_builder_turntable.cpp" line="76"/>
         <source> s</source>
         <translation> 秒</translation>

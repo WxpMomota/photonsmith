@@ -92,6 +92,10 @@ public:
 	}
 	// How many pixels of the 3D view's picture are the flythrough path's orange, with the path drawn or not (the setting is put back).
 	int cameraPathPixelsForTest(bool shown);
+	bool playingForTest() const;
+	void playForTest(bool on) { if (on) startPlay(); else stopPlay(); }
+	void advancePlayForTest(double seconds) { advancePlay(seconds); }   // what the timer does, with a made-up time step
+	double playProgressForTest() const { return m_playProgress; }
 	bool scrubForTest(double progress);   // moves the Flythrough slider; true if the 3D view is now looking from there
 	int viewComboCountForTest() const;
 	bool dragPickedForTest(int index, const QPointF &deltaPx);
@@ -240,7 +244,10 @@ private:
 	void createCameraBar(QWidget *layoutBox);
 	void refreshViewCombo();
 	void refreshScrub();                      // the scrub slider follows the saved views: off with fewer than two, and the picture they show is kept current
-	void scrubFlythrough(double progress);    // the 3D view looks from that point on the flythrough
+	void scrubFlythrough(double progress);
+	void startPlay();                         // the Flythrough preview plays from where the slider is (from the start if it is at the end)
+	void stopPlay();
+	void advancePlay(double seconds);         // the playing preview moves on by that much video time; stops at the end    // the 3D view looks from that point on the flythrough
 	scene_doc::Camera cameraNow() const;
 	void logSelection(const BuilderSelection &s, const char *where);   // what the user picked, and where (the list, the layout view, the 3D view)
 	void documentChanged();
@@ -320,6 +327,10 @@ private:
 	bool m_snapObjects = true;
 	QPointF m_holdEnd;   // where holdDragForTest() left the mouse
 	QCheckBox *m_snapObjectsCheck = nullptr;
+	QPushButton *m_playButton = nullptr;     // Play / Pause: the scrub slider runs by itself, at the video's pace
+	QTimer *m_playTimer = nullptr;
+	QElapsedTimer m_playClock;
+	double m_playProgress = 0.0;             // where the playing preview is, 0..1 (the slider is only 1000 steps)
 	QSlider *m_scrubSlider = nullptr;        // Flythrough: scrubs the 3D view along the saved views' path (0..1000)
 	QCheckBox *m_pathCheck = nullptr;        // Camera path: draw the flythrough's path in the 3D view
 	QWidget *m_cameraBar = nullptr;          // the 3D view's camera buttons: Through camera, Camera from view, the saved views
