@@ -27,6 +27,7 @@
 #include "hittable.h"
 #include "constant_medium.h"  // hg_phase_material
 #include "../shared/cloud_medium.h"
+#include "../shared/medium_clip.h"
 #include "../shared/ratio_tracking.h"  // RatioTrackingTrHeterogeneous
 
 class cloud_medium_hittable : public hittable {
@@ -41,6 +42,10 @@ class cloud_medium_hittable : public hittable {
         phase_mat = make_shared<hg_phase_material>(albedo, medium.phase_g,
             [this](const ray& r, double t_max) { return shadow_transmittance_impl(r, t_max); });
     }
+
+    // The sphere this medium's MediumInterface sits on, if it is a plain sphere (pbrt-v4: a medium fills its interface shape, not the box its density is declared in); the builder
+    // sets it, and every segment this medium walks is shortened to the chord inside it (medium_clip.h).
+    MediumSphereClip clip;
 
     bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
         // Work in world distance: a camera ray's direction is not unit length (it is pixel_sample - origin),
@@ -59,6 +64,7 @@ class cloud_medium_hittable : public hittable {
         if (sigma_maj <= 0.0) return false;
         if (tMin < t_lo) tMin = t_lo;
         if (tMin >= tMax) return false;
+        if (!clip.apply(ray_o[0], ray_o[1], ray_o[2], ray_d[0], ray_d[1], ray_d[2], tMin, tMax)) return false;
 
         double t = tMin;
         while (true) {
@@ -122,6 +128,7 @@ class cloud_medium_hittable : public hittable {
         if (sigma_maj <= 0.0) return color(1, 1, 1);
         if (tMin < 0) tMin = 0;
         if (tMin >= tMax) return color(1, 1, 1);
+        if (!clip.apply(ray_o[0], ray_o[1], ray_o[2], ray_d[0], ray_d[1], ray_d[2], tMin, tMax)) return color(1, 1, 1);
 
         // Safety cap, same spirit as shadow_ray.h's kMaxTransmissiveSkips -
         // bounds worst-case cost for a pathologically dense/thick medium

@@ -38,6 +38,7 @@
 #include <utility>  // std::move
 
 #include "hittable.h"
+#include "../shared/medium_clip.h"
 #include "constant_medium.h"  // hg_phase_material
 #include "../shared/sampled_grid.h"
 
@@ -66,6 +67,10 @@ class grid_medium_hittable : public hittable {
         for (int i = 0; i < 3; ++i) translate_[i] = world_to_medium_translate[i];
     }
 
+    // The sphere this medium's MediumInterface sits on, if it is a plain sphere (pbrt-v4: a medium fills its interface shape, not the box its density is declared in); the builder
+    // sets it, and every segment this medium walks is shortened to the chord inside it (medium_clip.h).
+    MediumSphereClip clip;
+
     bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
         // Work in world distance: a camera ray's direction is not unit length (it is pixel_sample - origin),
         // and sigma is per world unit, so sampling along the raw parameter made the medium |d| times too thin for
@@ -82,6 +87,7 @@ class grid_medium_hittable : public hittable {
         if (!grid.intersect_ray(mray, t_hi, tMin, tMax)) return false;
         if (tMin < t_lo) tMin = t_lo;
         if (tMin >= tMax) return false;
+        if (!clip.apply(ur.origin().x(), ur.origin().y(), ur.origin().z(), ur.direction().x(), ur.direction().y(), ur.direction().z(), tMin, tMax)) return false;
 
         bool got_hit = false;
         march_segments(mray, tMin, tMax, [&](double tt, double seg_sigma_maj) {
@@ -182,6 +188,7 @@ class grid_medium_hittable : public hittable {
         if (!grid.intersect_ray(mray, t_max_w, tMin, tMax)) return color(1, 1, 1);
         if (tMin < 0) tMin = 0;
         if (tMin >= tMax) return color(1, 1, 1);
+        if (!clip.apply(ur.origin().x(), ur.origin().y(), ur.origin().z(), ur.direction().x(), ur.direction().y(), ur.direction().z(), tMin, tMax)) return color(1, 1, 1);
 
         double Tr = 1.0;
         constexpr int kMaxNullCollisions = 100000;

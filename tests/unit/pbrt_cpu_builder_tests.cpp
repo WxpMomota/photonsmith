@@ -926,21 +926,21 @@ TEST(PbrtCpuBuildTest, UniformGridMediumThicknessDoesNotDependOnRayDirectionLeng
 		"\"float density\" [ 1 1 1 1 1 1 1 1 ] "
 		"\"rgb sigma_a\" [ 0 0 0 ] \"rgb sigma_s\" [ 0.7 0.7 0.7 ]\n"
 		"AttributeBegin\n"
-		"  Translate 1000 1000 1000\n"
+		"  Translate 0.5 0.5 0.5\n"
 		"  Material \"interface\"\n"
 		"  MediumInterface \"g\" \"\"\n"
-		"  Shape \"sphere\" \"float radius\" [ 0.01 ]\n"
+		"  Shape \"sphere\" \"float radius\" [ 1 ]\n"
 		"AttributeEnd\n");
 	const auto scatterFraction = [&](double dirLength) {
 		int scattered = 0;
 		constexpr int kRays = 4000;
 		for (int i = 0; i < kRays; ++i) {
 			hit_record rec;
-			const ray r(point3(0.5, 0.5, -5), vec3(0, 0, dirLength));
-			if (b.world->hit(r, interval(0.001, infinity), rec)) {
+			const ray r(point3(0.5, 0.5, 0.1), vec3(0, 0, dirLength));   // inside the sphere, so its own surface is not met; the ray ends where the cube does (and starts at 0: a minimum in ray-parameter units would skip |d| times as much)
+			if (b.world->hit(r, interval(0.0, 0.9 / dirLength), rec)) {
 				++scattered;
-				EXPECT_GT(rec.t * dirLength, 5.0) << "rec.t is in ray-parameter units, so the hit is past the origin";
-				EXPECT_LT(rec.t * dirLength, 6.0) << "and inside the unit cube, whatever the direction's length";
+				EXPECT_GT(rec.t * dirLength, 0.0) << "rec.t is in ray-parameter units, so the hit is past the origin";
+				EXPECT_LT(rec.t * dirLength, 0.9) << "and inside the unit cube, whatever the direction's length";
 			}
 		}
 		return static_cast<double>(scattered) / kRays;

@@ -30,6 +30,7 @@
 //==============================================================================================
 
 #include "hittable.h"
+#include "../shared/medium_clip.h"
 #include "constant_medium.h"  // hg_phase_material
 #include "../shared/rgb_grid_medium.h"
 
@@ -67,6 +68,10 @@ class rgb_grid_medium_hittable : public hittable, public event_medium {
     //         for the homogeneous media: only its emission survives),
     //   null: the running weight takes (majorant - sigma_t_c) / (majorant - mean(sigma_t)), at most 3 for any channel.
     // A grey grid reduces to ordinary delta tracking with albedo sigma_s / sigma_t.
+    // The sphere this medium's MediumInterface sits on, if it is a plain sphere (pbrt-v4: a medium fills its interface shape, not the box its density is declared in); the builder
+    // sets it, and every segment this medium walks is shortened to the chord inside it (medium_clip.h).
+    MediumSphereClip clip;
+
     bool chord(const ray& r, double& t0, double& t1) const override {
         const double len = r.direction().length();
         if (!(len > 0.0)) return false;
@@ -78,6 +83,7 @@ class rgb_grid_medium_hittable : public hittable, public event_medium {
         if (!grid.intersect_ray(mray, infinity, tMin, tMax)) return false;
         if (tMin < 0) tMin = 0;
         if (tMin >= tMax) return false;
+        if (!clip.apply(ur.origin().x(), ur.origin().y(), ur.origin().z(), ur.direction().x(), ur.direction().y(), ur.direction().z(), tMin, tMax)) return false;
         t0 = tMin / len;
         t1 = tMax / len;
         return true;
@@ -98,6 +104,7 @@ class rgb_grid_medium_hittable : public hittable, public event_medium {
         if (!grid.intersect_ray(mray, t_hi, tMin, tMax)) return false;
         if (tMin < 0) tMin = 0;
         if (tMin >= tMax) return false;
+        if (!clip.apply(ur.origin().x(), ur.origin().y(), ur.origin().z(), ur.direction().x(), ur.direction().y(), ur.direction().z(), tMin, tMax)) return false;
         entry_t = tMin / len;
 
         double w[3] = { 1.0, 1.0, 1.0 };
@@ -148,6 +155,7 @@ class rgb_grid_medium_hittable : public hittable, public event_medium {
         if (!grid.intersect_ray(mray, t_hi, tMin, tMax)) return false;
         if (tMin < t_lo) tMin = t_lo;
         if (tMin >= tMax) return false;
+        if (!clip.apply(ur.origin().x(), ur.origin().y(), ur.origin().z(), ur.direction().x(), ur.direction().y(), ur.direction().z(), tMin, tMax)) return false;
 
         bool got_hit = false;
         march_segments(mray, tMin, tMax, [&](double tt, double seg_sigma_maj) {
@@ -295,6 +303,7 @@ class rgb_grid_medium_hittable : public hittable, public event_medium {
         if (!grid.intersect_ray(mray, t_max_w, tMin, tMax)) return color(1, 1, 1);
         if (tMin < 0) tMin = 0;
         if (tMin >= tMax) return color(1, 1, 1);
+        if (!clip.apply(ur.origin().x(), ur.origin().y(), ur.origin().z(), ur.direction().x(), ur.direction().y(), ur.direction().z(), tMin, tMax)) return color(1, 1, 1);
 
         double Tr[3] = { 1.0, 1.0, 1.0 };
         // Safety cap, same spirit as shadow_ray.h's kMaxTransmissiveSkips.

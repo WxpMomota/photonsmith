@@ -238,7 +238,9 @@ private:
 
 	// MediumInterface "insideMedium" - layers a participating medium inside a shape already added to `world`, or adds a world-space medium hittable
 	// (see the comments in the body for which kinds wrap the shape and which do not).
-	void addMediumIfPresent(hittable_list &world, const std::shared_ptr<hittable> &shape, int mediumIndex) {
+	// `clip`, when given, is the plain sphere the MediumInterface is on: cloud, rgbgrid and uniformgrid media then fill that sphere rather than the whole box their density is
+	// declared in (pbrt-v4: a medium fills its interface shape; medium_clip.h). Any other shape passes none and keeps the box.
+	void addMediumIfPresent(hittable_list &world, const std::shared_ptr<hittable> &shape, int mediumIndex, const MediumSphereClip *clip = nullptr) {
 		if (mediumIndex < 0 || static_cast<std::size_t>(mediumIndex) >= scene.media.size()) return;
 		const pbrt_flatten::Medium &md = scene.media[static_cast<std::size_t>(mediumIndex)];
 		out.hasShapeMedia = true;
@@ -265,7 +267,9 @@ private:
 				md.density, md.wispiness, md.frequency);
 			const point3 world_min(md.worldMin[0], md.worldMin[1], md.worldMin[2]);
 			const point3 world_max(md.worldMax[0], md.worldMax[1], md.worldMax[2]);
-			world.add(std::make_shared<cloud_medium_hittable>(cloud, color(1,1,1), world_min, world_max));
+			auto cloudMedium = std::make_shared<cloud_medium_hittable>(cloud, color(1,1,1), world_min, world_max);
+			if (clip) cloudMedium->clip = *clip;
+			world.add(cloudMedium);
 			return;
 		}
 		if (md.type == "rgbgrid") {
@@ -285,6 +289,7 @@ private:
 			const point3 world_max(md.worldMax[0], md.worldMax[1], md.worldMax[2]);
 			auto gridMedium = std::make_shared<rgb_grid_medium_hittable>(
 				grid, md.g, world_min, world_max, md.toMediumMat, md.toMediumTranslate);
+			if (clip) gridMedium->clip = *clip;
 			world.add(gridMedium);
 			// camera::ray_color() samples a grid itself, per channel (rgb_grid_medium_hittable::sample_event); every other integrator
 			// keeps the max-channel delta tracking of hit().
@@ -311,8 +316,10 @@ private:
 				/*sa=*/0.0, luminanceOf(md.sigma_s), md.g);
 			const point3 world_min(md.worldMin[0], md.worldMin[1], md.worldMin[2]);
 			const point3 world_max(md.worldMax[0], md.worldMax[1], md.worldMax[2]);
-			world.add(std::make_shared<grid_medium_hittable>(
-				std::move(grid), color(1,1,1), md.g, world_min, world_max, md.toMediumMat, md.toMediumTranslate));
+			auto densityGrid = std::make_shared<grid_medium_hittable>(
+				std::move(grid), color(1,1,1), md.g, world_min, world_max, md.toMediumMat, md.toMediumTranslate);
+			if (clip) densityGrid->clip = *clip;
+			world.add(densityGrid);
 			return;
 		}
 		if (md.type == "nanovdb") {
@@ -501,7 +508,11 @@ private:
 			// CPU-only limitation anymore. flatten() already warned; here we
 			// just honor it by not wrapping this specific hittable in
 			// constant_medium.
-			if (!s.cpuMediumUnsupported) addMediumIfPresent(world, sp, s.medium);
+			if (!s.cpuMediumUnsupported) {
+				MediumSphereClip sphereClip;
+				if (!s.clipped) sphereClip.set(s.center[0], s.center[1], s.center[2], s.radius);   // (a moving sphere's start is as good as any: a medium on one is rare)
+				addMediumIfPresent(world, sp, s.medium, sphereClip.on ? &sphereClip : nullptr);
+			}
 		}
 		out.sphereCount += sphs.size();
 	}
