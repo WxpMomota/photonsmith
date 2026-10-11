@@ -368,6 +368,7 @@ def run(args):
             "constant": 'Texture "t" "spectrum" "constant" "rgb value" [ 0.6 0.4 0.3 ]',
             "image": 'Texture "t" "spectrum" "imagemap" "string filename" [ "%s" ] "string encoding" [ "linear" ]' % sw.grey,
             "checkerboard": 'Texture "t" "spectrum" "checkerboard" "rgb tex1" [ 0.6 0.4 0.3 ] "rgb tex2" [ 0.6 0.4 0.3 ] "float uscale" [ 6 ] "float vscale" [ 6 ]',
+            "scaled": 'Texture "t" "spectrum" "scale" "rgb tex" [ 0.3 0.2 0.15 ] "float scale" [ 2 ]',
             "mix": 'Texture "t" "spectrum" "mix" "rgb tex1" [ 0.6 0.4 0.3 ] "rgb tex2" [ 0.6 0.4 0.3 ] "float amount" [ 0.3 ]',
         }
         for tname, decl in textures.items():

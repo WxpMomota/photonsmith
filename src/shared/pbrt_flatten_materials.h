@@ -16,6 +16,26 @@ inline void bakeConstantTextureParams(const pbrt_scene::Scene &scene, FlatScene 
 	for (pbrt_scene::Param &p : md.params.items) {
 		if (p.type != "texture" || p.strings.empty()) continue;
 		const pbrt_scene::TextureDecl *constTex = findTexture(scene, p.strings[0]);
+		// A "scale" texture of a plain colour (written out, or a constant texture) by a plain number is a flat colour too: tex * scale. One that wraps an image or
+		// another procedural texture is resolved by the code that knows that texture.
+		if (constTex && constTex->cls == "scale") {
+			const pbrt_scene::Param *inner = constTex->params.find("tex");
+			const pbrt_scene::Param *factor = constTex->params.find("scale");
+			const pbrt_scene::Param *value = inner;
+			if (inner && inner->type == "texture" && !inner->strings.empty()) {
+				const pbrt_scene::TextureDecl *c = findTexture(scene, inner->strings[0]);
+				value = (c && c->cls == "constant") ? c->params.find("value") : nullptr;
+			}
+			const bool plainValue = value && value->type != "texture" && (value->numbers.size() == 1 || value->numbers.size() >= 3);
+			const bool plainFactor = !factor || (factor->type != "texture" && !factor->numbers.empty());
+			if (plainValue && plainFactor) {
+				const double k = factor ? factor->numbers[0] : 1.0;
+				const bool one = value->numbers.size() == 1;
+				p.type = "rgb";
+				p.numbers = {k * value->numbers[0], k * value->numbers[one ? 0 : 1], k * value->numbers[one ? 0 : 2]};
+				continue;
+			}
+		}
 		if (!constTex || constTex->cls != "constant") continue;
 		const pbrt_scene::Param *valueP = constTex->params.find("value");
 		if (!valueP) continue;
