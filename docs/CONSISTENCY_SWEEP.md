@@ -18,10 +18,13 @@ The scene is a floor, a ball of the material under test and a lamp, in a sky. Ea
 | `lightform` | a point light against a small emissive sphere of the same intensity | the two light kinds disagreeing about power |
 | `skyrotate` | a picture sky that is brighter on one side, with the whole scene and the sky turned 90 and 200 degrees | a sky orientation that the lookup and the light sampling disagree on |
 | `shapeform` | the ball written as a radius 2 sphere under `Scale 0.5`, under an arbitrary `Rotate`, with every sphere parameter spelled out, and as an `ObjectInstance`; the floor with the other diagonal, as a bilinear patch with four indices, and as one without indices | a shape or transform path that draws something else for the same geometry |
-| `lights` | a spot light with a hard wide cone against a point light; a distant light against a point light 1000 units away | the light kinds disagreeing about power or direction |
+| `lights` | a spot light with a hard wide cone, a goniometric light and a projection light (both with no picture), against a point light; a distant light against a point light 1000 units away; an area light with a white picture against the plain one | the light kinds disagreeing about power or direction |
 | `texture` | a diffuse reflectance as an inline colour, a constant texture, an image (`encoding "linear"`), a checkerboard of two equal colours, a mix of two equal colours; roughness and coated reflectance as textures | a texture path that reads a different value than the plain one |
 | `skyscale` | a constant sky at 0.4 against a white picture at `scale 0.4` | the `scale` of a picture sky |
 | `backends` | the same scene on the CPU and on the GPU, under a constant and a picture sky (only when both are asked for) | anything the two renderers disagree about; glass uses 512 samples, a caustic from a small lamp can move a 64-sample mean by 9% |
+| `shapetransform` | a cylinder, disk, cone, paraboloid and cube, each moved, 8 times bigger, mirrored and turned 90 and 200 degrees (the shape's own axes go with the scene) | a shape path that handles a transform wrongly (tessellation, orientation) |
+| `camera` | a lens of almost no radius against a pinhole; a real lens (defocus moves energy, not out of the picture); a far perspective camera against an orthographic one | a camera model's ray origin, direction or window |
+| `sampler`, `integrator`, `film` | the six other samplers against halton, `path` against `volpath`, `iso 200` for 1 s against `iso 100` for 2 s | a sampler or integrator that is biased, an exposure that is not applied |
 | `size` | the same scene at two picture sizes | a pixel-size dependency |
 | `spp` | 16 against 128 samples a pixel | bias that grows or shrinks with the sample count |
 
@@ -36,6 +39,8 @@ The glass materials (`dielectric`, `thindielectric`, `roughdielectric`) skip `li
 * **A `bilinearmesh` with `integer indices`** (four of them, one patch) was read in the order the points were listed, giving a twisted patch on every backend (13% darker floor). The indices pick the corners now; more than four mean several patches, which the loader still does not build.
 * **An image texture with `encoding "linear"` (or `gamma`, or `invert`) was decoded as sRGB on Metal** (12% darker than the CPU); the Metal loader now redoes the curve.
 * **A `mix` texture of plain colours drew as the default grey on Metal**: the flattener leaves the blend as the flat colour for a backend with no mix texture.
+* **`make_look_at` returned the inverse rotation** (`src/shared/cameras.h`): the camera-to-world matrix had its axes as rows instead of columns, so a camera whose view is not along an axis was turned the wrong way sideways or in pitch, and the error grows with the distance to the look-at point. It only showed in the CPU's and OptiX's orthographic, spherical and realistic cameras (the perspective camera has its own set-up, Metal its own): an orthographic camera 50 units away saw only sky. `ortho-camera-scene.pbrt` (a camera at (0, 10, 20) looking at (0, 1, 0)) and `realistic-camera-scene.pbrt` render differently on the CPU now, correctly.
+* Three of the first failures here were mistakes of the test, worth keeping as a warning: pbrt-v4's goniometric and projection lights have no `from` (they sit where the transform puts them), a projection light's strength is its `scale` (there is no `I`), and an area light with a `filename` takes its colour from the picture times `scale` (a given `L` is dropped). The loader does all three right; and a glass ball needs 512 samples for the backends to agree (see the `backends` group).
 * Earlier by hand, the same method: subsurface exit normal, sphere-clipped media, distant lights in media.
 
 ## In ctest

@@ -83,6 +83,7 @@ MATERIALS = {
     "thindielectric": 'Material "thindielectric" "float eta" [ 1.5 ]',
     "coateddiffuse": 'Material "coateddiffuse" "rgb reflectance" [ 0.5 0.3 0.2 ] "float roughness" [ 0.1 ]',
     "coatedconductor": 'Material "coatedconductor" "rgb reflectance" [ 0.9 0.7 0.5 ] "float interface.roughness" [ 0.05 ] "float conductor.roughness" [ 0.1 ]',
+    "conductor_cu": 'Material "conductor" "spectrum eta" "metal-Cu-eta" "spectrum k" "metal-Cu-k" "float roughness" [ 0.05 ]',
     "diffusetransmission": 'Material "diffusetransmission" "rgb reflectance" [ 0.5 0.4 0.3 ] "rgb transmittance" [ 0.3 0.3 0.3 ]',
     # the mean free path is a length: scaling the scene scales it too (or the ball is a different ball)
     "subsurface": lambda sc: 'Material "subsurface" "rgb mfp" [ %g %g %g ] "rgb reflectance" [ 0.8 0.8 0.8 ] "float eta" [ 1.33 ] "float roughness" [ 0 ]' % ((0.4 * sc.scale,) * 3),
@@ -99,6 +100,8 @@ ROTATE_MATERIALS = {"diffuse", "conductor", "coateddiffuse", "dielectric", "subs
 SHAPE_MATERIALS = {"diffuse", "conductor", "coateddiffuse", "dielectric", "fog"}
 LIGHT_MATERIALS = {"diffuse", "conductor", "coateddiffuse", "diffusetransmission", "subsurface"}
 BACKEND_TOLERANCE = {}   # a material whose two backends are known to differ by more than the default 6%, with the reason
+SHAPE_LIST = ("cylinder", "disk", "cone", "paraboloid", "cube")
+CAMERA_MATERIALS = ("diffuse", "coateddiffuse", "dielectric")
 NOISY = {"dielectric", "thindielectric"}   # fireflies: a pair needs a looser tolerance
 
 
@@ -126,7 +129,7 @@ class Scene:
     """A scene description with the knobs the sweep turns: offset, scale, mirror, turn about the vertical axis, sky form, lamp form, ball form, floor form, size, samples."""
 
     def __init__(self, material="diffuse", sky="constant", lamp="area", offset=(0, 0, 0), scale=1.0, mirror=False, rot=0.0, size=48, spp=64, fill=False, depth=8, sky_png=None,
-                 sky_scale=1.0, ball="sphere", floor="tri", material_text=None, prelude=""):
+                 sky_scale=1.0, ball="sphere", floor="tri", material_text=None, prelude="", camera="perspective", shape="sphere", lamp_png=None, sampler="halton", integrator="volpath", film_extra=""):
         self.__dict__.update(locals())
         del self.__dict__["self"]
 
@@ -156,10 +159,17 @@ class Scene:
         lamp_at, power = p(-1.2, 3.0, 1.0), 40.0
         if self.lamp == "area":
             return 'AttributeBegin\n  Translate %s\n  AreaLightSource "diffuse" "rgb L" [ %s ]\n  Shape "sphere" "float radius" [ %g ]\nAttributeEnd' % (f(lamp_at), f((power / (3.14159265 * 0.04),) * 3), 0.2 * s)
+        if self.lamp == "texarea":   # the same sphere light, its emission scaled by a white picture
+            return 'AttributeBegin\n  Translate %s\n  AreaLightSource "diffuse" "string filename" [ "%s" ] "float scale" [ %g ]\n  Shape "sphere" "float radius" [ %g ]\nAttributeEnd' % (f(lamp_at), self.lamp_png, power / (3.14159265 * 0.04), 0.2 * s)
         if self.lamp == "point":
             return 'LightSource "point" "point3 from" [ %s ] "rgb I" [ %s ]' % (f(lamp_at), f((power * s * s,) * 3))
         if self.lamp == "spot":   # a cone wide enough to hold the whole scene, with a hard edge: lights what the point light does
             return 'LightSource "spot" "point3 from" [ %s ] "point3 to" [ %s ] "float coneangle" [ 89 ] "float conedeltaangle" [ 0 ] "rgb I" [ %s ]' % (f(lamp_at), f(p(-1.2, 0.0, 1.0)), f((power * s * s,) * 3))
+        # pbrt-v4's goniometric and projection lights have no "from": they sit where the current transform puts them (a projection light shines along +z)
+        if self.lamp == "gonio":   # a goniometric light with no picture is a point light
+            return 'AttributeBegin\n  Translate %s\n  LightSource "goniometric" "rgb I" [ %s ]\nAttributeEnd' % (f(lamp_at), f((power * s * s,) * 3))
+        if self.lamp == "projection":   # a wide frustum with no picture, pointing down: a point light over the whole scene (the projection light's strength is its "scale")
+            return 'AttributeBegin\n  Translate %s\n  Rotate 90 1 0 0\n  LightSource "projection" "float fov" [ 170 ] "float scale" [ %g ]\nAttributeEnd' % (f(lamp_at), power * s * s)
         # a distant light of irradiance E, and the same light as a point light 1000 units away along its direction (intensity E * d^2)
         d = (-0.3, 0.85, 0.25)
         n = math.sqrt(sum(c * c for c in d))
@@ -186,9 +196,21 @@ class Scene:
             shape = 'Shape "bilinearmesh" "point3 P" [ %s ]'
         return 'AttributeBegin\n  Material "diffuse" "rgb reflectance" [ 0.7 0.7 0.7 ]\n  %s\nAttributeEnd' % (shape % " ".join(f(v) for v in q))
 
+    SHAPES = {
+        "cylinder": 'Shape "cylinder" "float radius" [ 0.6 ] "float zmin" [ -0.6 ] "float zmax" [ 0.6 ]',
+        "disk": 'Shape "disk" "float radius" [ 1 ]',
+        "cone": 'Shape "cone" "float radius" [ 0.8 ] "float height" [ 1.2 ]',
+        "paraboloid": 'Shape "paraboloid" "float radius" [ 0.8 ] "float zmax" [ 1.0 ]',
+        "cube": 'Shape "trianglemesh" "integer indices" [ 0 2 1 0 3 2  4 5 6 4 6 7  0 1 5 0 5 4  2 3 7 2 7 6  0 4 7 0 7 3  1 2 6 1 6 5 ] '
+                '"point3 P" [ -0.7 -0.7 -0.7  0.7 -0.7 -0.7  0.7 0.7 -0.7  -0.7 0.7 -0.7  -0.7 -0.7 0.7  0.7 -0.7 0.7  0.7 0.7 0.7  -0.7 0.7 0.7 ]',
+    }
+
     def ball_text(self, material):
         p, f, s = self.p, self.f, self.scale
         at = p(0, 0, 0) if self.fill else p(0.5, 1.0, 0)
+        if self.shape != "sphere":   # another shape, turned and mirrored with the scene (its own axes go with it)
+            return 'AttributeBegin\n  Translate %s\n  Rotate %g 0 1 0\n  Scale %g 1 1\n  Scale %g %g %g\n  %s\n  %s\nAttributeEnd' % (
+                f(at), self.rot, -1.0 if self.mirror else 1.0, s, s, s, material, self.SHAPES[self.shape])
         if self.ball == "scaled":      # the same ball as a radius 2 sphere shrunk by the transform
             return 'AttributeBegin\n  Translate %s\n  Scale 0.5 0.5 0.5\n  %s\n  Shape "sphere" "float radius" [ %g ]\nAttributeEnd' % (f(at), material, 2.0 * s)
         if self.ball == "rotated":     # a sphere does not care how it is turned
@@ -203,11 +225,25 @@ class Scene:
         p, f = self.p, self.f
         eye, look = (p(0, 0, 5) if self.fill else p(0.5, 1.5, 6.0)), (p(0, 0, 0) if self.fill else p(0.2, 0.6, 0))
         fov = 10 if self.fill else 38
+        camera_line = 'Camera "perspective" "float fov" [ %g ]' % fov
+        dist = math.sqrt(sum((a - b) ** 2 for a, b in zip(eye, look)))
+        if self.camera == "tinylens":
+            camera_line = 'Camera "perspective" "float fov" [ %g ] "float lensradius" [ %g ] "float focaldistance" [ %g ]' % (fov, 1e-4 * self.scale, dist)
+        elif self.camera == "lens":   # defocus moves energy around, not out of the picture
+            camera_line = 'Camera "perspective" "float fov" [ %g ] "float lensradius" [ %g ] "float focaldistance" [ %g ]' % (fov, 0.15 * self.scale, dist)
+        elif self.camera in ("far", "ortho"):   # 200 times as far away, looking at the same place: parallel rays, a window 4 across each way at the look point
+            k = 200.0 * self.scale / dist
+            eye = tuple(l + (e - l) * k for e, l in zip(eye, look))
+            half = 4.0 * self.scale
+            if self.camera == "far":
+                camera_line = 'Camera "perspective" "float fov" [ %g ]' % (2 * math.degrees(math.atan(half / (200.0 * self.scale))))
+            else:
+                camera_line = 'Camera "orthographic" "float screenwindow" [ %g %g %g %g ]' % (-half, half, -half, half)
         up = self.p(0, 1, 0)
         up = tuple(a - b for a, b in zip(up, self.p(0, 0, 0)))   # the turned, scaled up vector's direction
-        out = ["LookAt %s  %s  %s" % (f(eye), f(look), f(tuple(c / self.scale for c in up))), 'Camera "perspective" "float fov" [ %g ]' % fov,
-               'Film "rgb" "integer xresolution" [ %d ] "integer yresolution" [ %d ]' % (self.size, self.size),
-               'Sampler "halton" "integer pixelsamples" [ %d ]' % self.spp, 'Integrator "volpath" "integer maxdepth" [ %d ]' % self.depth, "WorldBegin"]
+        out = ["LookAt %s  %s  %s" % (f(eye), f(look), f(tuple(c / self.scale for c in up))), camera_line,
+               'Film "rgb" "integer xresolution" [ %d ] "integer yresolution" [ %d ] %s' % (self.size, self.size, self.film_extra),
+               'Sampler "%s" "integer pixelsamples" [ %d ]' % (self.sampler, self.spp), 'Integrator "%s" "integer maxdepth" [ %d ]' % (self.integrator, self.depth), "WorldBegin"]
         out.append(self.sky_text())
         if not self.fill:
             out.append(self.floor_text())
@@ -241,6 +277,8 @@ class Sweep:
         write_png(self.white, 64, 32, lambda x, y: (255, 255, 255))
         self.gradient = os.path.join(workdir, "gradient.png").replace("\\", "/")   # brighter to one side: a picture sky that is not the same in every direction
         write_png(self.gradient, 64, 64, lambda x, y: (30 + 3 * x, 40 + 2 * x + y, 255 - 3 * x))
+        self.flat_normal = os.path.join(workdir, "flat_normal.png").replace("\\", "/")   # a normal map that points straight out everywhere
+        write_png(self.flat_normal, 8, 8, lambda x, y: (128, 128, 255))
         self.grey = os.path.join(workdir, "grey.png").replace("\\", "/")   # a uniform image for the texture pair, written with a linear encoding
         write_png(self.grey, 8, 8, lambda x, y: (153, 102, 77))
         self.n = 0
@@ -338,9 +376,38 @@ def run(args):
               Scene(material_text='Material "coateddiffuse" "rgb reflectance" [ 0.5 0.3 0.2 ] "texture roughness" [ "r" ]', prelude=roughness_tex), tolerance=tol)
         check("texture", "coateddiffuse reflectance as a texture", backend, Scene(material="coateddiffuse"),
               Scene(material_text='Material "coateddiffuse" "texture reflectance" [ "t" ] "float roughness" [ 0.1 ]', prelude='Texture "t" "spectrum" "constant" "rgb value" [ 0.5 0.3 0.2 ]'), tolerance=tol)
+        # bump and normal maps that change nothing: a constant displacement, and a flat normal map
+        check("texture", "constant displacement texture changes nothing", backend, Scene(material_text=diffuse_inline),
+              Scene(material_text='Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "texture displacement" [ "d" ]', prelude='Texture "d" "float" "constant" "float value" [ 0.3 ]'), tolerance=tol)
+        check("texture", "flat normal map changes nothing", backend, Scene(material_text=diffuse_inline),
+              Scene(material_text='Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "string normalmap" [ "%s" ]' % sw.flat_normal), tolerance=tol)
         # the sky's scale: a constant sky at 0.4 against a white picture at scale 0.4
         check("skyscale", "constant sky at 0.4 vs white picture at scale 0.4", backend, Scene(material="diffuse", sky="constant", sky_scale=0.4, fill=True),
               Scene(material="diffuse", sky="picture", sky_png=sw.white, sky_scale=0.4, fill=True), tolerance=tol)
+        # shapes other than the sphere, each moved, scaled, mirrored and turned
+        for shape in SHAPE_LIST:
+            base = Scene(material="diffuse", shape=shape)
+            for label, other in (("moved", Scene(material="diffuse", shape=shape, offset=(37.0, -11.0, 5.0))), ("8x bigger", Scene(material="diffuse", shape=shape, scale=8.0)),
+                                 ("mirrored", Scene(material="diffuse", shape=shape, mirror=True)), ("turned 90", Scene(material="diffuse", shape=shape, rot=90.0)),
+                                 ("turned 200", Scene(material="diffuse", shape=shape, rot=200.0))):
+                check("shapetransform", "%s %s" % (shape, label), backend, base, other, tolerance=max(tol, 5.0))
+        # cameras: a lens of almost no radius against a pinhole, a real lens (defocus keeps the energy), and a far perspective camera against an orthographic one
+        for name in CAMERA_MATERIALS:
+            check("camera", "pinhole vs tiny lens, %s" % name, backend, Scene(material=name), Scene(material=name, camera="tinylens"), tolerance=noise_tol(name))
+            check("camera", "pinhole vs lens radius 0.15, %s" % name, backend, Scene(material=name), Scene(material=name, camera="lens"), tolerance=max(noise_tol(name), 6.0))
+            check("camera", "far perspective vs orthographic, %s" % name, backend, Scene(material=name, camera="far"), Scene(material=name, camera="ortho"), tolerance=max(noise_tol(name), 6.0))
+        # the sampler, the integrator and the film's exposure: the same picture however it is asked for
+        for name in ("diffuse", "coateddiffuse", "conductor"):
+            for sampler in ("independent", "sobol", "zsobol", "pmj02bn", "stratified", "paddedsobol"):
+                check("sampler", "%s sampler vs halton, %s" % (sampler, name), backend, Scene(material=name), Scene(material=name, sampler=sampler), tolerance=max(tol, 6.0))
+            check("integrator", "path vs volpath, %s" % name, backend, Scene(material=name), Scene(material=name, integrator="path"), tolerance=max(tol, 6.0))
+        check("film", "iso 200 for 1 s vs iso 100 for 2 s", backend, Scene(material="diffuse", film_extra='"float iso" [ 200 ] "float exposuretime" [ 1 ]'),
+              Scene(material="diffuse", film_extra='"float iso" [ 100 ] "float exposuretime" [ 2 ]'), tolerance=tol)
+        # more light kinds against a point light
+        check("lights", "white-picture area light vs plain, diffuse", backend, Scene(material="diffuse"), Scene(material="diffuse", lamp="texarea", lamp_png=sw.white), tolerance=max(tol, 6.0))
+        for lamp in ("gonio", "projection"):
+            check("lights", "%s vs point, diffuse" % lamp, backend, Scene(material="diffuse", lamp="point"), Scene(material="diffuse", lamp=lamp), tolerance=max(tol, 6.0))
+
     # backends: the same scene on the CPU and on the GPU (only when both are asked for)
     if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only):
         print("[cpu vs gpu]")

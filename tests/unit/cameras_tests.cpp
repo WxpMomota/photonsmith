@@ -446,6 +446,30 @@ TEST(Cameras, LookAtForwardIsZ) {
 	EXPECT_NEAR(d.z, 1.f, 1e-5f);
 }
 
+TEST(Cameras, LookAtForwardPointsAtTheTargetWhenTilted) {
+	// A view that is not along an axis: the camera's +Z must map to the direction of the target, +X to the right of it and +Y to its up (the matrix used to be the
+	// inverse rotation, which agrees only for views along an axis).
+	auto m = make_look_at<double>(10.0, 30.0, 200.0,  0.2, 0.6, 0.0,  0.0, 1.0, 0.0);
+	const double dx = 0.2 - 10.0, dy = 0.6 - 30.0, dz = 0.0 - 200.0;
+	const double len = std::sqrt(dx*dx + dy*dy + dz*dz);
+	auto f = m.transform_vec(0.0, 0.0, 1.0);
+	EXPECT_NEAR(f.x, dx / len, 1e-9);
+	EXPECT_NEAR(f.y, dy / len, 1e-9);
+	EXPECT_NEAR(f.z, dz / len, 1e-9);
+	auto r = m.transform_vec(1.0, 0.0, 0.0);
+	auto u = m.transform_vec(0.0, 1.0, 0.0);
+	EXPECT_NEAR(r.x * f.x + r.y * f.y + r.z * f.z, 0.0, 1e-9);   // an orthonormal frame
+	EXPECT_NEAR(u.x * f.x + u.y * f.y + u.z * f.z, 0.0, 1e-9);
+	EXPECT_NEAR(r.x * u.x + r.y * u.y + r.z * u.z, 0.0, 1e-9);
+	EXPECT_GT(u.y, 0.0);   // up stays up
+	// the ray through the middle of an orthographic picture really starts at the eye and goes to the target
+	OrthographicCamera<double> cam(-4, 4, -4, 4, 32, 32, m);
+	CameraSample<double> s{16.0, 16.0, 0.5, 0.5};
+	auto ray = cam.generate_ray(s);
+	EXPECT_NEAR(ray.origin.x, 10.0, 1e-9);
+	EXPECT_NEAR(ray.direction.x, dx / len, 1e-9);
+}
+
 TEST(Cameras, LookAtOriginTranslated) {
 	// Camera at (1,2,3)
 	auto m = make_look_at<float>(1.f,2.f,3.f,  1.f,2.f,4.f,  0.f,1.f,0.f);
