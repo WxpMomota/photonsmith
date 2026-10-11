@@ -5,16 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Photonsmith: a pbrt-v4-compatible path tracer for CPU, NVIDIA OptiX and Apple Metal</title>
 <meta name="description" content="Open-source physically based path tracer that reads pbrt-v4 scenes and renders on the CPU, NVIDIA OptiX and Apple Metal, with a Qt GUI, a Scene Builder and a Live Preview. Its renders are checked against closed-form results.">
-<link rel="canonical" href="https://xinpeiwang.github.io/ray_tracer/">
+<link rel="canonical" href="https://xinpeiwang.github.io/photonsmith/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Photonsmith: a pbrt-v4-compatible path tracer for CPU, OptiX and Metal">
 <meta property="og:description" content="Open-source path tracer with CPU, NVIDIA OptiX and Apple Metal backends, a Scene Builder and a Live Preview. Tested against closed-form results.">
-<meta property="og:url" content="https://xinpeiwang.github.io/ray_tracer/">
-<meta property="og:image" content="https://xinpeiwang.github.io/ray_tracer/assets/social-preview.jpg">
+<meta property="og:url" content="https://xinpeiwang.github.io/photonsmith/">
+<meta property="og:image" content="https://xinpeiwang.github.io/photonsmith/assets/social-preview.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="assets/A1-cornell-box.jpg">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Photonsmith","alternateName":"ray_tracer","description":"A pbrt-v4-compatible path tracer for the CPU, NVIDIA OptiX and Apple Metal, with a Qt GUI, a Scene Builder and a Live Preview.","codeRepository":"https://github.com/XinpeiWang/ray_tracer","programmingLanguage":"C++","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Xinpei Wang"},"url":"https://xinpeiwang.github.io/ray_tracer/"}
+{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Photonsmith","alternateName":"ray_tracer","description":"A pbrt-v4-compatible path tracer for the CPU, NVIDIA OptiX and Apple Metal, with a Qt GUI, a Scene Builder and a Live Preview.","codeRepository":"https://github.com/XinpeiWang/photonsmith","programmingLanguage":"C++","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Xinpei Wang"},"url":"https://xinpeiwang.github.io/photonsmith/"}
 </script>
 <style>
 :root{--bg:#fff;--fg:#1d2430;--muted:#5a6676;--card:#f4f6f9;--accent:#2c5fd6;--line:#e1e6ee}
@@ -48,16 +48,16 @@ footer{margin:64px 0 40px;color:var(--muted);font-size:.9rem;border-top:1px soli
 <h1>Photonsmith</h1>
 <p class="lead">An open-source, pbrt-v4-compatible <b>path tracer</b> for the <b>CPU</b>, <b>NVIDIA OptiX</b> (Windows) and <b>Apple Metal</b> (macOS), with a Qt GUI, a Scene Builder and a Live Preview you can drag objects around in. Its renders are checked against closed-form results, not only against each other.</p>
 <div class="buttons">
-<a class="btn primary" href="https://github.com/XinpeiWang/ray_tracer/releases">Download</a>
-<a class="btn" href="https://github.com/XinpeiWang/ray_tracer">Source on GitHub</a>
-<a class="btn" href="https://github.com/XinpeiWang/ray_tracer/blob/main/docs/BACKEND_SUPPORT.md">What is supported</a>
+<a class="btn primary" href="https://github.com/XinpeiWang/photonsmith/releases">Download</a>
+<a class="btn" href="https://github.com/XinpeiWang/photonsmith">Source on GitHub</a>
+<a class="btn" href="https://github.com/XinpeiWang/photonsmith/blob/main/docs/BACKEND_SUPPORT.md">What is supported</a>
 </div>
 <img class="hero" src="assets/hero.jpg" alt="A Cornell box with a glass sphere, the Stanford bunny in bronze, and glass spheres containing coloured fog, all rendered by this project" width="1440" height="480">
 </header>
 
 <h2>What it is</h2>
 <ul class="points">
-<li><b>Reads pbrt-v4 scene files.</b> Materials (diffuse, conductor, dielectric, coated, subsurface, hair, measured, mix and more), lights (area, point, spot, distant, goniometric, projection, image-based), media (homogeneous, cloud, grid, NanoVDB), cameras (pinhole, thin lens, orthographic, spherical, realistic) and instancing. <a href="https://github.com/XinpeiWang/ray_tracer/blob/main/docs/PBRT_SUPPORT.md">Directive by directive support table</a>.</li>
+<li><b>Reads pbrt-v4 scene files.</b> Materials (diffuse, conductor, dielectric, coated, subsurface, hair, measured, mix and more), lights (area, point, spot, distant, goniometric, projection, image-based), media (homogeneous, cloud, grid, NanoVDB), cameras (pinhole, thin lens, orthographic, spherical, realistic) and instancing. <a href="https://github.com/XinpeiWang/photonsmith/blob/main/docs/PBRT_SUPPORT.md">Directive by directive support table</a>.</li>
 <li><b>Three renderers from one scene description.</b> A multi-threaded CPU renderer with no GPU needed, an OptiX renderer for NVIDIA GPUs, and a Metal renderer for Apple silicon and Intel Macs. Alternative integrators: bidirectional path tracing, Metropolis light transport and photon mapping (SPPM).</li>
 <li><b>A real GUI.</b> A Scene Builder (add shapes, props, lights and materials, drag them around, save a <code>.pbrt</code>), a Live Preview where you click an object in the picture and move it, and video from camera paths.</li>
 </ul>
@@ -86,21 +86,21 @@ footer{margin:64px 0 40px;color:var(--muted);font-size:.9rem;border-top:1px soli
 <p>A rendering bug is quiet: the picture still looks plausible while being 20% too dark. So the tests check absolute numbers, and the renderer is made to disagree with itself:</p>
 <ul class="points">
 <li><b>Closed forms.</b> A diffuse sphere under a white sky must read its albedo; a closed diffuse-transmission shell, Beer-Lambert absorbers and a point light over a plate have exact answers the renderers must hit.</li>
-<li><b>Consistency sweep.</b> The same scene written two ways (a constant sky against the same sky as a picture, the scene moved, scaled, mirrored, turned, a light written as a point or a sphere, a shape as a mesh or an instance, and so on) must give the same picture, for every material, on every backend. <a href="https://github.com/XinpeiWang/ray_tracer/blob/main/docs/CONSISTENCY_SWEEP.md">500+ pairs</a>; it found tilted cameras turned the wrong way, instanced shapes that vanished, and light that was missing under an image sky.</li>
-<li><b>Cross-checks and over 5,000 automated tests</b> across the CPU, OptiX and Metal renderers. <a href="https://github.com/XinpeiWang/ray_tracer/blob/main/docs/CLOSED_FORMS_FOUND_THE_BUGS.md">How closed forms found the bugs</a>.</li>
+<li><b>Consistency sweep.</b> The same scene written two ways (a constant sky against the same sky as a picture, the scene moved, scaled, mirrored, turned, a light written as a point or a sphere, a shape as a mesh or an instance, and so on) must give the same picture, for every material, on every backend. <a href="https://github.com/XinpeiWang/photonsmith/blob/main/docs/CONSISTENCY_SWEEP.md">500+ pairs</a>; it found tilted cameras turned the wrong way, instanced shapes that vanished, and light that was missing under an image sky.</li>
+<li><b>Cross-checks and over 5,000 automated tests</b> across the CPU, OptiX and Metal renderers. <a href="https://github.com/XinpeiWang/photonsmith/blob/main/docs/CLOSED_FORMS_FOUND_THE_BUGS.md">How closed forms found the bugs</a>.</li>
 </ul>
 
 <h2>Try it</h2>
-<p>Download the macOS app from the <a href="https://github.com/XinpeiWang/ray_tracer/releases">Releases page</a> (a Windows package is built with <code>scripts/package.ps1</code>), or build the CPU renderer yourself (plain CMake and a C++17 compiler, no CUDA, OptiX or Qt needed):</p>
-<pre>git clone --depth 1 https://github.com/XinpeiWang/ray_tracer
-cd ray_tracer
+<p>Download the macOS app from the <a href="https://github.com/XinpeiWang/photonsmith/releases">Releases page</a> (a Windows package is built with <code>scripts/package.ps1</code>), or build the CPU renderer yourself (plain CMake and a C++17 compiler, no CUDA, OptiX or Qt needed):</p>
+<pre>git clone --depth 1 https://github.com/XinpeiWang/photonsmith
+cd photonsmith
 cmake -S . -B build
 cmake --build build --config Release --target ray_tracer
 build/ray_tracer --cpu --output cornell.png 400 128 8 A1</pre>
-<p>That renders the Cornell box at 400 px with 128 samples per pixel. Full build and usage notes: <a href="https://github.com/XinpeiWang/ray_tracer/blob/main/BUILD.md">BUILD.md</a>.</p>
+<p>That renders the Cornell box at 400 px with 128 samples per pixel. Full build and usage notes: <a href="https://github.com/XinpeiWang/photonsmith/blob/main/BUILD.md">BUILD.md</a>.</p>
 
 <footer>
-<p>MIT licensed (code from other projects keeps its own licence: see the <a href="https://github.com/XinpeiWang/ray_tracer/blob/main/THIRD_PARTY_NOTICES.md">third-party notices</a>). Built from the "Ray Tracing in One Weekend" book series into a pbrt-v4-style renderer. By <a href="https://github.com/XinpeiWang">Xinpei Wang</a>. Keywords: ray tracing, path tracing, physically based rendering, pbrt-v4, OptiX, Metal, global illumination, BDPT, MLT, photon mapping, C++.</p>
+<p>MIT licensed (code from other projects keeps its own licence: see the <a href="https://github.com/XinpeiWang/photonsmith/blob/main/THIRD_PARTY_NOTICES.md">third-party notices</a>). Built from the "Ray Tracing in One Weekend" book series into a pbrt-v4-style renderer. By <a href="https://github.com/XinpeiWang">Xinpei Wang</a>. Keywords: ray tracing, path tracing, physically based rendering, pbrt-v4, OptiX, Metal, global illumination, BDPT, MLT, photon mapping, C++.</p>
 </footer>
 </div>
 </body>
