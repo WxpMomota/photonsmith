@@ -54,6 +54,36 @@ inline bool dragDelta(const CameraBasis &cb, const Vec3 &grab, double s1, double
 	return true;
 }
 
+// One drag from the first press to the release, which may change between the floor and the vertical mode (Shift) any number of times. Each switch keeps what has
+// been moved so far and starts the new mode from where the mouse is then, so the object does not jump: before this, Shift held half way through a drag threw
+// the horizontal part of the move away (the vertical plane gives no horizontal move at all).
+struct DragSession {
+	Vec3 base;          // the move so far, kept at the last switch of mode
+	Vec3 modeOffset;    // what the new mode's plane gives for the mouse at that switch, taken off so the object stays put
+	bool lastVertical = false;
+	bool started = false;
+
+	void reset() { base = Vec3{}; modeOffset = Vec3{}; lastVertical = false; started = false; }
+
+	// The total move of the object since the press, for the mouse now at (s1, t1). `grab` is where the mouse first met the object. False when the mouse has no
+	// position on the current mode's plane (the caller keeps the last move); `total` is left alone then.
+	bool update(const CameraBasis &cb, const Vec3 &grab, double s1, double t1, bool vertical, double maxLength, Vec3 &total) {
+		if (!started) {
+			started = true;
+			lastVertical = vertical;
+		} else if (vertical != lastVertical) {
+			base = total;   // the move so far, as the caller last saw it
+			Vec3 atSwitch;
+			modeOffset = dragDelta(cb, grab + base, s1, t1, vertical, 0.0, atSwitch) ? atSwitch : Vec3{};
+			lastVertical = vertical;
+		}
+		Vec3 delta;
+		if (!dragDelta(cb, grab + base, s1, t1, vertical, maxLength, delta)) return false;
+		total = base + (delta - modeOffset);
+		return true;
+	}
+};
+
 // The world-space move of a keypress for an object, in the camera's own terms (the same W/A/S/D and Up/Down as the camera's free fly): `forwardSteps` along the way
 // the camera looks (flattened onto the floor, so the object stays on it), `rightSteps` to the camera's right, `upSteps` straight up, each times `step`.
 // False when the camera looks straight down or up (no horizontal forward).

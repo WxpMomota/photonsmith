@@ -1908,6 +1908,24 @@ TEST(FlattenTest, BilinearmeshWithFourIndicesPicksItsCornersByThem) {
 	EXPECT_TRUE(t.bilinearPatches.empty());
 }
 
+TEST(FlattenMaterialTest, ScaleTextureOfAPlainColourIsAFlatColour) {
+	// tex * scale, written out or through a constant texture; one that wraps an image is left to the image code.
+	const FlatScene s = flattenSource(
+		"Texture \"t\" \"spectrum\" \"scale\" \"rgb tex\" [ 0.3 0.2 0.1 ] \"float scale\" [ 2 ]\n"
+		"Material \"diffuse\" \"texture reflectance\" [ \"t\" ]\n" + std::string(kQuadMesh));
+	ASSERT_EQ(s.materials.size(), 1u);
+	EXPECT_NEAR(s.materials[0].color[0], 0.6, 1e-12);
+	EXPECT_NEAR(s.materials[0].color[1], 0.4, 1e-12);
+	EXPECT_NEAR(s.materials[0].color[2], 0.2, 1e-12);
+	EXPECT_FALSE(warnedAbout(s, "not supported"));
+	const FlatScene u = flattenSource(
+		"Texture \"c\" \"spectrum\" \"constant\" \"rgb value\" [ 0.5 0.5 0.5 ]\n"
+		"Texture \"t\" \"spectrum\" \"scale\" \"texture tex\" [ \"c\" ] \"float scale\" [ 0.5 ]\n"
+		"Material \"diffuse\" \"texture reflectance\" [ \"t\" ]\n" + std::string(kQuadMesh));
+	ASSERT_EQ(u.materials.size(), 1u);
+	EXPECT_NEAR(u.materials[0].color[1], 0.25, 1e-12);
+}
+
 TEST(FlattenMaterialTest, MixTextureOfPlainColoursLeavesTheirBlendAsTheFlatColour) {
 	// A backend with no mix texture draws the flat colour: (1 - amount) * tex1 + amount * tex2.
 	const FlatScene s = flattenSource(

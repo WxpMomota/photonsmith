@@ -436,14 +436,18 @@ inline bool alphaPasses(float a, float3 o, float3 d) {
 [[intersection(triangle, triangle_data, instancing)]]
 bool triangleAnyHitFunction(
     float2 barycentric [[barycentric_coord]],
-    uint primitiveIndex [[primitive_id]],
+    uint groupPrimitiveIndex [[primitive_id]],
+    uint instanceIndex [[instance_id]],
     float3 origin [[origin]],
     float3 direction [[direction]],
     device const TriangleMaterial* triMaterials [[buffer(5)]],
     device const packed_float2* uvs [[buffer(6)]],
     device const float* alphaData [[buffer(7)]],
+    device const InstanceTransform* instanceTransforms [[buffer(8)]],
     ray_data SpherePayload& payload [[payload]])
 {
+    // The scene's own triangles are instance 0 (triBase 0); a pbrt ObjectInstance's group stores its triangles once, after them, at that instance's triBase.
+    const uint primitiveIndex = groupPrimitiveIndex + instanceTransforms[instanceIndex].triBase;
     const TriangleMaterial mat = triMaterials[primitiveIndex];
     if (payload.isShadowRay && mat.materialType == METAL_MAT_SUBSURFACE) return false;
     if (mat.alphaWidth <= 0) return true;

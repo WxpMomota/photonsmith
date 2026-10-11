@@ -424,6 +424,12 @@ bool MetalPocApp::buildInstancedMeshAS(GpuBuildState& s) {
         groupGeom.vertexStride = sizeof(PackedFloat3);
         groupGeom.triangleCount = g.triCount;
         groupGeom.opaque = YES;
+        // An alpha mask or a subsurface material among the scene's triangles: the group's triangles are tested by triangleAnyHitFunction too (function table slot 3),
+        // which finds their material at the instance's triBase + the group-local primitive id.
+        if (havePbrtTriangleAnyHit) {
+            groupGeom.opaque = NO;
+            groupGeom.intersectionFunctionTableOffset = 3;
+        }
         MTLPrimitiveAccelerationStructureDescriptor* groupDesc = [MTLPrimitiveAccelerationStructureDescriptor descriptor];
         groupDesc.geometryDescriptors = @[groupGeom];
         MTLAccelerationStructureSizes groupSizes = [device accelerationStructureSizesWithDescriptor:groupDesc];

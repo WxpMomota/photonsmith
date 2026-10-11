@@ -257,6 +257,7 @@ bool MetalPocApp::dsBuildPipeline(DispatchState& s) {
     [functionTable setBuffer:materialBuffer offset:0 atIndex:5];
     [functionTable setBuffer:uvBuffer offset:0 atIndex:6];
     [functionTable setBuffer:rgbGridDataBuffer offset:0 atIndex:7];
+    [functionTable setBuffer:instanceTransformBuffer offset:0 atIndex:8];   // an instanced group's triangles are found at the instance's triBase
     // sphereIntersectionFunction/diskIntersectionFunction/
     // cylinderIntersectionFunction each read their own geometry buffer
     // (metal_poc.metal buffer(0)/buffer(1)/buffer(2) respectively - a

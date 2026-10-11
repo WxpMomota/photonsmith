@@ -545,6 +545,8 @@ struct MetalPocApp {
     void loadPbrtRemainingTriangles(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
         const PbrtMaterialForFn& materialFor, const std::vector<bool>& triangleHandled,
         const std::unordered_map<int, std::pair<float3, bool>>& unhandledLightEmission);
+    void applyPbrtAlphaMask(TriangleMaterial& mat, const pbrt_flatten::Material& m);
+    std::map<std::string, std::array<int, 3>> pbrtAlphaMasks;   // alpha mask file -> {offset in rgbGridData, width, height}
     void loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, const std::vector<pbrt_flatten::Sphere>& sphereList, const PbrtToWorldFn& toWorld,
         const PbrtMaterialForFn& materialFor, float sceneScale);
     void loadPbrtDisks(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
