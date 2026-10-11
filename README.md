@@ -1,8 +1,10 @@
-# Ray Tracer
+# Photonsmith
+
+*(formerly `ray_tracer`: the repository was renamed; old links redirect. The programs keep their names: `ray_tracer`, `RayTracerGUI`.)*
 
 **An open-source, pbrt-v4-compatible path tracer for the CPU, NVIDIA OptiX (Windows) and Apple Metal (macOS), with a Qt GUI, a Scene Builder and a Live Preview you can drag objects around in.** It reads pbrt-v4 scene files, and its renders are checked against closed-form results, not only against each other.
 
-[**Download**](https://github.com/XinpeiWang/ray_tracer/releases) | [**Website and gallery**](https://xinpeiwang.github.io/ray_tracer/) | [**What is supported**](docs/BACKEND_SUPPORT.md) | [**How the renders are checked**](docs/CLOSED_FORMS_FOUND_THE_BUGS.md)
+[**Download**](https://github.com/XinpeiWang/photonsmith/releases) | [**Website and gallery**](https://xinpeiwang.github.io/photonsmith/) | [**What is supported**](docs/BACKEND_SUPPORT.md) | [**How the renders are checked**](docs/CLOSED_FORMS_FOUND_THE_BUGS.md)
 
 A physically-based renderer with parallel **CPU**, **GPU (OptiX)** (Windows + NVIDIA) and **GPU (Metal)** (macOS) implementations, built up from the "Ray Tracing in One Weekend" book series into a much broader pbrt-v4-style feature set: 151 built-in scenes and 58 test scenes, a wide material library, multiple light types, real triangle-mesh/texture support, BVH acceleration, volumetrics, and an experimental SPPM (photon-mapping) integrator alongside standard path tracing.
 
@@ -40,8 +42,8 @@ How this found more than a dozen bugs that a plain backend-versus-backend compar
 The CPU renderer is a complete renderer and builds with plain CMake and a C++17 compiler (on Windows, Visual Studio with the C++ workload). No CUDA, OptiX or Qt is needed:
 
 ```bash
-git clone --depth 1 https://github.com/XinpeiWang/ray_tracer
-cd ray_tracer
+git clone --depth 1 https://github.com/XinpeiWang/photonsmith
+cd photonsmith
 cmake -S . -B build
 cmake --build build --config Release --target ray_tracer
 # run from the repository root, so the scenes and textures are found:
@@ -77,11 +79,11 @@ The portable version includes:
 
 See [INSTALL.md](INSTALL.md) for detailed usage instructions.
 
-**macOS:** download `RayTracerGUI.dmg` from the [Releases page](https://github.com/XinpeiWang/ray_tracer/releases) (Metal GPU rendering and Live Preview included; one dmg for Apple-silicon and Intel Macs; it is not notarized, so macOS asks you to confirm the first launch: see the notes on the release). To build it yourself: `scripts/build_and_deploy_macos.sh --arch universal`. — see [BUILD.md](BUILD.md#macos-cpu-and-metal-gpu). It is not code-signed, so on first launch right-click the app → **Open**.
+**macOS:** download `RayTracerGUI.dmg` from the [Releases page](https://github.com/XinpeiWang/photonsmith/releases) (Metal GPU rendering and Live Preview included; one dmg for Apple-silicon and Intel Macs; it is not notarized, so macOS asks you to confirm the first launch: see the notes on the release). To build it yourself: `scripts/build_and_deploy_macos.sh --arch universal`. — see [BUILD.md](BUILD.md#macos-cpu-and-metal-gpu). It is not code-signed, so on first launch right-click the app → **Open**.
 
 ## 🔨 Building from Source
 
-**Cloning:** the full history is about 440 MB, because older commits contained generated GPU code and release archives that are no longer tracked. If you only want the code, take a shallow clone: `git clone --depth 1 https://github.com/XinpeiWang/ray_tracer` downloads about 52 MB (150 MB checked out). A few large mesh and texture assets are tracked with Git LFS; run `git lfs pull` if they show up as small pointer files.
+**Cloning:** the full history is about 440 MB, because older commits contained generated GPU code and release archives that are no longer tracked. If you only want the code, take a shallow clone: `git clone --depth 1 https://github.com/XinpeiWang/photonsmith` downloads about 52 MB (150 MB checked out). A few large mesh and texture assets are tracked with Git LFS; run `git lfs pull` if they show up as small pointer files.
 
 **Windows** (CPU, OptiX GPU and the Qt GUI), from a Visual Studio Developer PowerShell:
 ```powershell
@@ -293,7 +295,7 @@ It also contains code that comes from other projects, which keeps its own licenc
 
 **Xinpei Wang**
 - GitHub: [@XinpeiWang](https://github.com/XinpeiWang)
-- Project: [ray_tracer](https://github.com/XinpeiWang/ray_tracer)
+- Project: [photonsmith](https://github.com/XinpeiWang/photonsmith)
 
 ## 🌟 Acknowledgments
 
