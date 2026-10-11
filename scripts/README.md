@@ -71,6 +71,11 @@ Utility scripts for building, packaging, and testing the ray tracer.
   - Compares CPU vs GPU output
   - Pixel-by-pixel difference analysis
   - Usage: `python scripts/compare_images.py image1.ppm image2.ppm`
+- **`consistency_sweep.py`** - Renders hundreds of pairs of scenes that must look alike (moved, scaled, mirrored, turned; constant against
+  picture sky; CPU against GPU) and prints the pairs that do not. See `docs/CONSISTENCY_SWEEP.md`.
+- **`run_optix_sweeps.ps1`** - Builds the renderer and runs that sweep on both OptiX backends (recursive, then wavefront with
+  `RAY_TRACER_WAVEFRONT=1`), ending with one PASS/FAIL line each (exit code 0: nothing off). `-NoBuild`, `-Only sky,shapeform`,
+  `-Backend Wavefront`, `-Detail`. About ten minutes a backend; run it after a change that can alter a picture, since the Mac cannot run OptiX.
 - **`run_tests_parallel.ps1`** - Shards `ray_tracer_tests.exe` across multiple
   parallel processes (`GTEST_TOTAL_SHARDS`), with per-shard scratch
   directories to avoid output-file collisions

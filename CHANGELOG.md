@@ -111,6 +111,7 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 ### Testing and project
 
 * Over 5,000 automated tests, including closed-form scenes; the CPU integrator agreement tests also build as a GPU-free CMake target and run in GitHub CI, where they pass (as do the code-size, build-list, macOS and Windows GUI jobs).
+* `scriptsun_optix_sweeps.ps1` builds the renderer and runs the consistency sweep on both OptiX backends (recursive and wavefront) in one command, ending with a PASS or FAIL line each.
 * The slow test tier uses 8.5 GB instead of 23 GB; incremental builds and a fast test tier were added.
 * A `LICENSE` (MIT), [third-party notices](THIRD_PARTY_NOTICES.md), a README gallery, a CPU-only quick start, [CONTRIBUTING](CONTRIBUTING.md), issue and pull request templates, and a code of conduct.
 * A fresh clone is clean again (stale Git LFS rules removed).

@@ -49,6 +49,10 @@ The glass materials (`dielectric`, `thindielectric`, `roughdielectric`) skip `li
 * **OptiX, first run on Windows (both backends, 472 pairs, 0 off after the fixes):** subsurface 5-12% dark (the exit BSDF got the probe-facing normal, no punctual-light NEE at the exit, and the shadow any-hits treated the ball as an occluder); a grid or cloud under a sphere read 6% dark (shadow tracking through the grid box instead of the interface sphere's chord); an instanced sphere stopped a scene with "contains no geometry", an instanced fog ball was not built at all and its medium chord ignored the instance transform. The script needs an absolute `--exe` path, and `RAY_TRACER_WAVEFRONT=1` in the environment runs the wavefront backend as `--gpu`.
 * Earlier by hand, the same method: subsurface exit normal, sphere-clipped media, distant lights in media.
 
+## On Windows (OptiX)
+
+`scriptsun_optix_sweeps.ps1` builds the renderer and runs the sweep once for the recursive OptiX backend and once for the wavefront one (`RAY_TRACER_WAVEFRONT=1`), then prints one PASS or FAIL line each (about ten minutes a backend); the pairs that are off are printed above them. `-NoBuild` skips the build, `-Only sky,shapeform` runs just those groups, `-Backend Wavefront` just one backend, `-Detail` every pair. Exit code 0 means both found nothing off. Run it after a change under `gpu/optix/`, `src/shared/` or `src/TheRestOfYourLife/` that can change a picture: the Mac cannot run OptiX.
+
 ## In ctest
 
 `metal_poc_consistency` runs the Metal half (about a minute; tolerance 6%, the pictures are small). `python3 scripts/consistency_sweep.py` runs the CPU half and the CPU-against-GPU group as well (about 70 seconds in all).
