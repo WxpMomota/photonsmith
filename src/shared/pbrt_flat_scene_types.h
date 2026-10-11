@@ -373,7 +373,8 @@ struct Instance {
 
 // The primitives one top-level `Shape` of the scene file produced: index ranges [begin, end) into FlatScene::triangles / spheres / disks / cylinders. Written by
 // flattenShapes() in file order, so index i is the i-th Shape that made any of those four kinds; the Live Preview's object picking and moving use it. Shapes that were
-// turned into other kinds (curves, cones, patches, instances) have no range, and primitives the loader adds later (a tessellation) lie beyond every range.
+// turned into other kinds (curves, cones, patches) have no range, and primitives the loader adds later (a tessellation) lie beyond every range. An ObjectInstance has a range of
+// its own (`instance` below) after the Shapes'.
 struct ShapeRange {
 	std::string type;                  // the pbrt shape name: "sphere", "trianglemesh", "plymesh", ...
 	int material = -1;                 // index into FlatScene::materials of the first primitive it made
@@ -382,6 +383,9 @@ struct ShapeRange {
 	std::size_t srcBegin = 0, srcEnd = 0;
 	double ctm[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};   // ... and the transform in force at it (object -> world, row major)
 	std::size_t triBegin = 0, triEnd = 0, sphereBegin = 0, sphereEnd = 0, diskBegin = 0, diskEnd = 0, cylinderBegin = 0, cylinderEnd = 0;
+	// An ObjectInstance rather than a Shape: the index into FlatScene::instances (the primitive ranges above are then empty: its geometry is the group's, placed by the
+	// instance's transform). The entries come after every Shape's, in the order of the instances. -1 for a Shape.
+	int instance = -1;
 };
 
 struct FlatScene {

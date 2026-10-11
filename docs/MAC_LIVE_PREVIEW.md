@@ -48,7 +48,7 @@ everything back. Moves are for looking at a different arrangement: they are not 
   `metal_live_edit` (the saved scene has the object where the live picture has it), and by the GUI self-test, which saves, lists, opens the saved scene in Live Preview
   and checks the picture is the arrangement, not the original.
 * What an "object" is: the shapes of one `AttributeBegin`/`AttributeEnd` block of the pbrt file (a box written as six quads is one object), or a `Shape` outside any
-  block on its own. Only shapes that became triangles, spheres, disks or cylinders can be moved; instances, curves and the like cannot, and a click on one orbits.
+  block on its own, or one `ObjectInstance` placement (live_objects: `ShapeRange::instance`; the shared geometry stays, the placement's transform moves). Only shapes that became triangles, spheres, disks or cylinders can be moved; curves, cones and an instance of a definition with a light cannot, and a click on one orbits.
   A scene with everything in one block is one object.
 * How it works: the parser gives each `ShapeDecl` its block number (`group`), `flattenShapes()` records which primitives each shape made (`FlatScene::shapeRanges`),
   and `src/shared/live_object_edit.h` (standard library only, so OptiX can use it too) groups ranges into objects, translates an object and finds the object

@@ -1059,6 +1059,7 @@ inline void flattenShapes(const pbrt_scene::Scene &scene, FlatScene &out, const 
 		}
 	}
 
+	std::vector<const pbrt_scene::InstanceDecl *> placedDecls;   // out.instances[k]'s declaration: the ranges of the instances are made once the groups are filled
 	for (const pbrt_scene::InstanceDecl &inst : scene.instances) {
 		int group = -1;
 		// Last match wins, matching pbrt's own name-rebinding semantics and
@@ -1082,6 +1083,7 @@ inline void flattenShapes(const pbrt_scene::Scene &scene, FlatScene &out, const 
 		placed.group = group;
 		fromMatrix4(inst.xform, placed.xform);
 		out.instances.push_back(placed);
+		placedDecls.push_back(&inst);
 
 		// Emissive shapes in the definition, baked into world space for this
 		// placement so they can be sampled like any other light.
@@ -1183,6 +1185,27 @@ inline void flattenShapes(const pbrt_scene::Scene &scene, FlatScene &out, const 
 		warn("shape '" + shape.type + "' is not supported; skipped");
 	}
 	closeRange();
+
+	// The instances, as objects the Live Preview can pick and move: one range each, after every Shape's (so the Shapes keep their indices). Moving one changes the
+	// instance's transform. An instance whose definition holds an emitter is left out: the emitter is baked into the scene per placement and would stay behind.
+	for (std::size_t k = 0; k < out.instances.size() && k < placedDecls.size(); ++k) {
+		const pbrt_scene::InstanceDecl &decl = *placedDecls[k];
+		const std::size_t g = static_cast<std::size_t>(out.instances[k].group);
+		bool emits = false;
+		for (const pbrt_scene::ShapeDecl &shape : scene.objects[g].shapes) emits = emits || shape.areaLightIndex >= 0;
+		const InstanceGroup &grp = out.groups[g];
+		if (emits || (grp.triangles.empty() && grp.spheres.empty())) continue;
+		ShapeRange r;
+		r.type = "instance of " + scene.objects[g].name;
+		r.group = decl.group;
+		r.srcFile = decl.srcFile;
+		r.srcBegin = decl.srcBegin;
+		r.srcEnd = decl.srcEnd;
+		for (int c = 0; c < 16; ++c) r.ctm[c] = decl.xform.m[c];
+		r.instance = static_cast<int>(k);
+		r.material = !grp.triangles.empty() ? grp.triangles[0].material : grp.spheres[0].material;
+		out.shapeRanges.push_back(r);
+	}
 }
 
 // Camera-medium and area-light-power resolution: needs the shapes (areas) and media to be final.

@@ -128,3 +128,65 @@ TEST(LiveObjectEditTest, TheNestedBlockWinsOverItsParent) {
 	ASSERT_EQ(objects.size(), 2u) << "the outer block's two spheres (not adjacent in the file) are one object, the nested block's sphere another";
 	EXPECT_EQ(objects[0].size(), 2u);
 }
+
+// A sphere defined once and placed twice (at x = -5 and x = 5, the second twice as big), plus a quad on the floor.
+const char *kInstances =
+	"WorldBegin\n"
+	"ObjectBegin \"ball\"\n  Shape \"sphere\" \"float radius\" [ 1 ]\nObjectEnd\n"
+	"AttributeBegin\n  Translate -5 0 0\n  ObjectInstance \"ball\"\nAttributeEnd\n"
+	"AttributeBegin\n  Translate 5 0 0\n  Scale 2 2 2\n  ObjectInstance \"ball\"\nAttributeEnd\n"
+	"Shape \"trianglemesh\" \"integer indices\" [ 0 1 2  0 2 3 ] \"point3 P\" [ 0 3 0  2 3 0  2 5 0  0 5 0 ]\n";
+
+TEST(LiveObjectEditTest, AnObjectInstanceIsAnObjectOfItsOwn) {
+	const pbrt_flatten::FlatScene s = flattenText(kInstances);
+	const ObjectList objects = objectsOf(s);
+	ASSERT_EQ(objects.size(), 3u);   // the quad (a Shape, listed first), then the two placements
+	const PickIndex index = buildPickIndex(s, objects);
+	const double onFirst[3] = {-5, 0, 1}, onSecond[3] = {5, 0, 2}, onQuad[3] = {1, 4, 0};
+	const PickResult a = pick(index, onFirst, 0.01), b = pick(index, onSecond, 0.01), q = pick(index, onQuad, 0.01);
+	ASSERT_GE(a.object, 0);
+	ASSERT_GE(b.object, 0);
+	ASSERT_GE(q.object, 0);
+	EXPECT_NE(a.object, b.object);
+	EXPECT_NE(a.object, q.object);
+	EXPECT_NE(b.object, q.object);
+	// the second placement is twice as big: a point on its far side is on its surface, not the first's
+	const double farSide[3] = {5, 0, -2};
+	EXPECT_EQ(pick(index, farSide, 0.01).object, b.object);
+}
+
+TEST(LiveObjectEditTest, MovingAnInstanceChangesItsTransformAndNothingElse) {
+	pbrt_flatten::FlatScene s = flattenText(kInstances);
+	const ObjectList objects = objectsOf(s);
+	const PickIndex before = buildPickIndex(s, objects);
+	const double onSecond[3] = {5, 0, 2};
+	const int second = pick(before, onSecond, 0.01).object;
+	ASSERT_GE(second, 0);
+	const pbrt_flatten::FlatScene original = s;
+	const double d[3] = {3, 1, -2};
+	ASSERT_TRUE(translateObject(s, objects, static_cast<std::size_t>(second), d));
+	// the shared geometry is where it was, the other placement is where it was, the moved one's translation column moved by d
+	EXPECT_DOUBLE_EQ(s.groups[0].spheres[0].center[0], original.groups[0].spheres[0].center[0]);
+	int moved = 0;
+	for (std::size_t i = 0; i < s.instances.size(); ++i) {
+		const bool same = s.instances[i].xform[3] == original.instances[i].xform[3] && s.instances[i].xform[7] == original.instances[i].xform[7];
+		if (!same) {
+			++moved;
+			EXPECT_DOUBLE_EQ(s.instances[i].xform[3], original.instances[i].xform[3] + 3);
+			EXPECT_DOUBLE_EQ(s.instances[i].xform[7], original.instances[i].xform[7] + 1);
+			EXPECT_DOUBLE_EQ(s.instances[i].xform[11], original.instances[i].xform[11] - 2);
+		}
+	}
+	EXPECT_EQ(moved, 1);
+	// and it is picked at its new place
+	const PickIndex after = buildPickIndex(s, objects);
+	const double onNewSurface[3] = {8, 1, -4};   // the old centre (5, 0, 0) moved by d is (8, 1, -2); the surface 2 (the doubled radius) further down z
+	EXPECT_EQ(pick(after, onNewSurface, 0.01).object, second);
+}
+
+TEST(LiveObjectEditTest, AnInstanceWithAnEmitterInItsDefinitionIsNotAnObject) {
+	const pbrt_flatten::FlatScene s = flattenText(
+		"WorldBegin\nObjectBegin \"lamp\"\n  AreaLightSource \"diffuse\" \"rgb L\" [ 1 1 1 ]\n  Shape \"sphere\" \"float radius\" [ 1 ]\nObjectEnd\n"
+		"AttributeBegin\n  ObjectInstance \"lamp\"\nAttributeEnd\n");
+	for (const pbrt_flatten::ShapeRange& r : s.shapeRanges) EXPECT_LT(r.instance, 0);
+}

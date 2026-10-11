@@ -30,6 +30,7 @@ std::vector<double> allCoordinates(const pbrt_flatten::FlatScene& s) {
 	for (const auto& sp : s.spheres) { v.insert(v.end(), sp.center, sp.center + 3); v.push_back(sp.radius); }
 	for (const auto& d : s.disks) v.insert(v.end(), d.xform, d.xform + 16);
 	for (const auto& c : s.cylinders) v.insert(v.end(), c.xform, c.xform + 16);
+	for (const auto& i : s.instances) v.insert(v.end(), i.xform, i.xform + 16);
 	return v;
 }
 
@@ -205,4 +206,23 @@ TEST(PbrtArrangementTest, AnArrangementOfAPreviewLiveCopyIsNamedAfterTheScene) {
 	std::string err;
 	ASSERT_TRUE(scene_doc::fromPbrt(saved.text, reread, err)) << err;
 	EXPECT_EQ(reread.title, "Garden (arranged)");
+}
+
+TEST(PbrtArrangementTest, AnObjectInstanceMovesByItsTransform) {
+	// A placement of a shared object, in a block with a scale and rotation: the saved text must put it where moving the flattened instance by the same world offset does.
+	expectSavedMatchesTranslated(
+		"WorldBegin\n"
+		"ObjectBegin \"ball\"\n  Shape \"sphere\" \"float radius\" [ 1 ]\nObjectEnd\n"
+		"AttributeBegin\n  Translate 5 0 0\n  Scale 2 2 2\n  Rotate 30 0 1 0\n  ObjectInstance \"ball\"\nAttributeEnd\n"
+		"AttributeBegin\n  Translate -5 0 0\n  ObjectInstance \"ball\"\nAttributeEnd\n",
+		{{1.5, 0.25, -2.0}, {0.0, 0.0, 0.0}}, 1);
+}
+
+TEST(PbrtArrangementTest, AnInstanceAndAShapeOfOneBlockMoveTogether) {
+	expectSavedMatchesTranslated(
+		"WorldBegin\n"
+		"ObjectBegin \"ball\"\n  Shape \"sphere\" \"float radius\" [ 1 ]\nObjectEnd\n"
+		"AttributeBegin\n  Translate 0 1 0\n  Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 ] \"point3 P\" [ 0 0 0  1 0 0  0 1 0 ]\n"
+		"  Translate 4 0 0\n  ObjectInstance \"ball\"\nAttributeEnd\n",
+		{{2.0, 0.0, 1.0}}, 2);
 }
