@@ -4,7 +4,7 @@
 // `RT_SHOWCASE_OUT=<file> ray_tracer_tests --gtest_filter=SceneShowcaseTest.WriteTheFile` writes it again after a change. Qt-free and std-only.
 //
 // What is in it: a cyclorama (seamless studio backdrop) lit by the Studio three-light rig and a window-pattern projector; a rounded box of red car paint worn through to copper (a mixed
-// material); a candle-wax ball (subsurface scattering); a clear glass ball on a tile with a tiled picture (texture repeats); a gold ball.
+// material); a block of mossy stone (a ready-made mix); a candle-wax ball (subsurface scattering); a clear glass ball on a tile with a tiled picture (texture repeats); a gold ball.
 
 #include "scene_document.h"
 
@@ -63,6 +63,14 @@ inline Document makeShowcaseScene() {
 	applyMaterialPreset(gold.material, "gold");
 	d.objects.push_back(gold);
 
+	Object moss = makeObject(ShapeKind::RoundedBox, "Mossy block");   // a ready-made mix (the Mossy stone preset): stone with moss growing on it
+	moss.size = {0.9, 0.9, 0.9};
+	moss.radius = 0.2;
+	moss.position = {-3.4, 0.45, 2.7};
+	moss.rotation = {0.0, 35.0, 0.0};
+	applyMixPreset(moss.material, "mossy-stone");
+	d.objects.push_back(moss);
+
 	d.camera.position = {0.0, 2.5, 9.6};
 	d.camera.target = {0.0, 1.0, 0.0};
 	d.camera.fov = 38.0;
@@ -93,7 +101,7 @@ inline std::string showcaseFileText() {
 	const std::string tags =
 	    "# @rt-category Materials\n"
 	    "# @rt-description A small photo studio built in the Scene Builder: a cyclorama backdrop lit by a three-light studio rig and a window-pattern projector, a rounded box of red car\n"
-	    "# @rt-description paint worn through to copper (a mixed material), a candle-wax ball (subsurface scattering), a glass ball on a tiled picture and a gold ball. Open it in the Scene Builder to change anything.\n"
+	    "# @rt-description paint worn through to copper (a mixed material), a block of mossy stone (a ready-made mix), a candle-wax ball (subsurface scattering), a glass ball on a tiled picture and a gold ball. Open it in the Scene Builder to change anything.\n"
 	    "# @rt-performance Medium\n";
 	return text.substr(0, firstLine + 1) + tags + text.substr(firstLine + 1);
 }

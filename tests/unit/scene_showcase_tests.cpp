@@ -98,11 +98,13 @@ TEST(SceneShowcaseTest, ItIsAValidDocumentThatUsesWhatItSaysItUses) {
 	const Document d = makeShowcaseScene();
 	EXPECT_EQ(d.title, "Studio Showcase");
 	for (const Problem& p : validate(d)) ADD_FAILURE() << p.message;   // no errors and no notes
+	int mixes = 0;
 	bool cyclorama = false, rounded = false, mix = false, subsurface = false, glass = false, tiled = false, projector = false, studio = false;
 	for (const Object& o : d.objects) {
 		cyclorama = cyclorama || o.shape == ShapeKind::Cyclorama;
 		rounded = rounded || o.shape == ShapeKind::RoundedBox;
 		mix = mix || isMix(o.material);
+		mixes += isMix(o.material) ? 1 : 0;
 		subsurface = subsurface || o.material.kind == MaterialKind::Subsurface;
 		glass = glass || o.material.kind == MaterialKind::Dielectric;
 		tiled = tiled || (!o.material.imageFile.empty() && uvPlaced(o.material));
@@ -112,6 +114,7 @@ TEST(SceneShowcaseTest, ItIsAValidDocumentThatUsesWhatItSaysItUses) {
 		studio = studio || l.name == "Key light";
 	}
 	EXPECT_TRUE(cyclorama && rounded && mix && subsurface && glass && tiled && projector && studio);
+	EXPECT_EQ(mixes, 2) << "the worn paint box and the mossy block (a ready-made mix)";
 }
 
 TEST(SceneShowcaseTest, TheCommittedFileIsExactlyWhatTheCodeWritesAndItOpensInTheBuilder) {
