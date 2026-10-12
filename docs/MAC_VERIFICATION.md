@@ -31,3 +31,34 @@ New shared code the Mac side has not run: the Live Preview's keyboard step is 2%
 1. Rebuild, then from the app folder run `RT_GUI_SELFTEST=livepreview_keys RT_GUI_SELFTEST_SCENES=A1,L51,L52` (ids are per category and can differ, so use `scene_metadata_id_for_key` names to find them): each line should say one press moves 2.00% of the scene (11.1 for the Cornell box, 0.128 for `nanovdb-furnace`, 0.008 for `nanovdb-thin-slab`) and end with `0 of N scenes flagged`.
 2. By hand in Live Preview: press W / Up in a small scene (a Scene Builder room) and in the Cornell box; a press should move a sensible fraction of what you see, and zooming in with the wheel should stop just short of the pivot.
 3. `python scripts/stamp_scene_sizes.py --check` (needs a built `ray_tracer`; `--exe` for the Mac binary) should list nothing but the two scenes that cannot be measured.
+
+
+## Scene Builder features (Windows, 2026-10-11)
+
+Everything below was written and tested on Windows (CPU renders, OptiX, the headless GUI self-test); none of it has run on a Mac. Most of it is Qt and shared code that should behave the same, so the self-test is the quick pass; the by-hand items are the ones where Metal or macOS could differ. Tick what you ran and write what you saw under the item; "same as Windows" is a fine answer.
+
+Automated
+
+- [ ] Rebuild (`cmake --build build_macos`) and run `ctest` and the unit tests as before. New test files: `scene_viewport_tests.cpp`, `scene_lighting_tests.cpp` and `scene_projector_tests.cpp` (the last two include CPU renders through `ray_tracer`; they skip if the launcher is not next to the tests).
+- [ ] `RT_GUI_SELFTEST=builder` from the app folder (`scripts/gui_selftest.py ... --live-preview` runs it too). It should end `RESULT: OK`. On a machine with Live Preview it also switches the **Rendered** viewport on, recolours and drags an object and waits for the picture to follow (up to a few minutes on the first run; it says "skipped" if the Live Preview renderer is not there). If a step fails, paste its `FAIL:` line.
+
+By hand: the Rendered viewport (Metal)
+
+- [ ] Scene Builder tab, open the starter scene, press **Rendered** (next to Orthographic and Wireframe). The 3D view should fill with a grainy picture that refines (the corner says "Rendered, N samples"), with the names, lights and camera still drawn on top.
+- [ ] Orbit and zoom: the picture follows without starting over. Pick an object and drag it by its arrows: the picture follows, and the sample count restarts but the "Rendering..." state does not come back (a drag is sent as an offset, not a restart). If a drag makes the picture jump to a different scene state or goes black, that is the Metal side of `setObjectOffset`.
+- [ ] Change a colour or add a shape: the picture restarts after a short pause and shows it. Turn **Rendered** off: the 3D view draws faces again. Start Live Preview from the toolbar with Rendered on: the viewport should switch itself off.
+
+By hand: lighting, sky and projector
+
+- [ ] Add > **Lighting (replaces the lights)**: try each of the six on the starter scene with Rendered on. Studio should show three directions of light on a dark ground, Overcast soft shadows, Sunny and Golden hour a blue sky and a sun (golden hour low and warm), Moonlit a dark blue night, Light box a white surround. Undo (Ctrl/Cmd+Z) brings the old lights back each time.
+- [ ] Select the Sky light, tick off **Sun & sky**, choose an `.hdr` or `.exr` panorama, then change **Rotate sky** between 0 and 180: the bright part of the picture should move to the other side of the scene (check with Rendered on, and with a normal Render). Metal reads the `Rotate` before the `LightSource "infinite"` in the saved file; if the sky does not turn, say which renderer.
+- [ ] Add > **Projector (slide light)**: a window of four panes should be projected on the floor and the objects, upright and not mirrored (the panes' bright squares appear on the floor beyond the aim point). Change the **Field of view**, the **Slide picture** (try a picture with text on it, and an `.exr`) and aim it at a wall: the picture should read the right way round. In the 3D view the dotted frustum should end at the same rectangle the light lands on. If the slide is mirrored or upside down on Metal only, report which way.
+
+By hand: things the renderers draw (spot-check against a CPU render of the same scene)
+
+- [ ] Add > Volumes: fog, smoke and a cloud, each with a light shining through them (Rendered on, and Render). A cloud is a lumpy sphere, fog and smoke fill their shape; none should be a cube or a hard-edged black disc.
+- [ ] A **Subsurface** material (preset skin or candle wax) on a ball under a light: it should glow softly, not look like plain plastic or black. **Marble** and **Noise** patterns on a matte ball; a **bump** or **normal** picture on a box (Metal applies it to triangle shapes).
+- [ ] Camera: set the focal length to 200 mm and the f-number to 1.4, **Pick focus in the 3D view**, click a ball: the 3D view draws the focal plane, and a Render shows the depth of field with that ball sharp.
+- [ ] Preview live and Edit in Builder still round-trip a scene that now contains a projector or a Lighting setup.
+
+Report back by editing this section, or by sending the failing `FAIL:` lines.
