@@ -27,6 +27,7 @@ inline Fields fieldsOf(const Object& o) {
 	        {"transmittance", v(o.material.transmittance)}, {"picture", o.material.imageFile}, {"pattern", toString(o.material.pattern)},
 	        {"patternScale", v(o.material.patternScale)}, {"patternVariation", v(o.material.patternVariation)}, {"scatterDistance", v(o.material.scatterDistance)},
 	        {"bump", o.material.bumpFile}, {"bumpKind", toString(o.material.bumpKind)}, {"bumpStrength", v(o.material.bumpStrength)},
+	        {"uvScale", v(o.material.uvScaleU) + " " + v(o.material.uvScaleV)}, {"uvOffset", v(o.material.uvOffsetU) + " " + v(o.material.uvOffsetV)},
 	        {"mix", isMix(o.material) ? toString(o.material.mixWith[0].kind) : ""}, {"mixAmount", v(o.material.mixAmount)}, {"mixColor", isMix(o.material) ? v(o.material.mixWith[0].color) : ""}, {"emissive", o.emissive ? "1" : "0"}, {"emission", v(o.emission)},
 	        {"strength", v(o.emissionStrength)}, {"twoSided", o.twoSided ? "1" : "0"}, {"group", o.group}, {"hidden", o.hidden ? "1" : "0"}, {"locked", o.locked ? "1" : "0"},
 	        {"volume", toString(o.volume.kind)}, {"density", v(o.volume.density)}, {"scatterColor", v(o.volume.color)}, {"anisotropy", v(o.volume.anisotropy)},

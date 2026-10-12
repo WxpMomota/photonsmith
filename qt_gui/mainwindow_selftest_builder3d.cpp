@@ -290,6 +290,41 @@ void MainWindow::selfTestMixedMaterial(SceneBuilderWidget *sb, const std::functi
 	sb->selectObject(1);
 }
 
+// The placement of a texture (Material::uvScaleU...): a material with a texture (here a checker) has Texture repeats / shift rows; they change the document and the coordinates in the
+// file, and the rows are not there for a plain colour.
+void MainWindow::selfTestTexturePlacement(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
+	const size_t before = sb->document().objects.size();
+	check(sb->runActionForTest("add quad") && sb->document().objects.size() == before + 1, "a quad is added");
+	const int quad = static_cast<int>(sb->document().objects.size()) - 1;
+	const auto repeatBoxes = [sb]() {
+		int n = 0;
+		for (QDoubleSpinBox *s : sb->findChildren<QDoubleSpinBox *>())
+			if (s->minimum() == -1000.0 && s->maximum() == 1000.0) ++n;
+		return n;
+	};
+	sb->selectObject(quad);
+	QApplication::processEvents();
+	check(repeatBoxes() == 0, "a plain colour has no texture to place: no repeat and shift rows");
+	scene_doc::Material checker = sb->document().objects[quad].material;
+	checker.checker = true;
+	sb->setMaterialForTest(quad, checker);
+	QApplication::processEvents();
+	check(repeatBoxes() == 4, "a checker has four: repeats across and up, shift across and up");
+	QDoubleSpinBox *across = nullptr;
+	for (QDoubleSpinBox *s : sb->findChildren<QDoubleSpinBox *>())
+		if (s->minimum() == -1000.0 && s->maximum() == 1000.0 && s->singleStep() == 0.5 && !across) across = s;   // (the first is "repeats across")
+	check(across != nullptr, "the first is how often it repeats across");
+	if (across) {
+		across->setValue(3.0);
+		QApplication::processEvents();
+		check(sb->document().objects[quad].material.uvScaleU == 3.0 && sb->pbrtTextForTest().contains("\"point2 uv\" [ 0 0 3 0 3 1 0 1 ]"), "setting it to 3 repeats the checker three times across in the document and the file");
+		check(sb->undo() && sb->document().objects[quad].material.uvScaleU == 1.0, "one undo puts it back");
+	}
+	while (sb->document().objects.size() > before && sb->undo()) {}
+	check(sb->document().objects.size() == before, "undo takes the quad away");
+	sb->selectObject(1);
+}
+
 // The light kinds the Scene Builder adds beyond the plain ones: a projector, the ready-made lightings and the turn of an image sky (called from selfTestShapes).
 void MainWindow::selfTestLights(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
 	// A projector light (a slide shining through a frustum): added from the search box with a slide of its own, its properties have the field of view and the slide, the 3D view draws
@@ -532,6 +567,7 @@ void MainWindow::selfTestShapes(SceneBuilderWidget *sb, const std::function<void
 	}
 	selfTestLights(sb, check);
 	selfTestMixedMaterial(sb, check);
+	selfTestTexturePlacement(sb, check);
 	// The Preset list in a material's properties: choosing "Gold" in the real combo box makes the selected object a gold conductor, as one undo step.
 	{
 		sb->selectObject(1);

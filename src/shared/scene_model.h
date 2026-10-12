@@ -57,6 +57,12 @@ struct Material {
 	std::string bumpFile;              // Diffuse / CoatedDiffuse / Conductor: a picture that bumps the shading (empty: none)
 	BumpKind bumpKind = BumpKind::Height;
 	double bumpStrength = 0.05;        // Height map: how tall the relief is (the picture's 0..1 times this, in scene units)
+	// Where the surface's texture coordinates put a picture, a checker and a bump map: the texture is repeated `uvScale` times across (U) and up (V) the surface and moved by
+	// `uvOffset` of a repeat, so a picture of bricks can tile a wall and be shifted to start on a brick. (u, v) become ((u - offsetU) * scaleU, (v - offsetV) * scaleV); the texture's
+	// edges repeat. Only the shapes that write their own texture coordinates (a box, a quad, the ready-made shapes) take it; a sphere, disk, cylinder, cone or mesh file has the
+	// renderer's own.
+	double uvScaleU = 1.0, uvScaleV = 1.0;
+	double uvOffsetU = 0.0, uvOffsetV = 0.0;
 	// A mix (pbrt's "mix" material): when `mixWith` holds a material, the surface is this material at some points and that one at the others, `mixAmount` being the fraction of points
 	// that are the second (0 is all this one, 1 all the other), chosen afresh at each point of the surface so the two grade into one another. The second material is a plain one:
 	// its picture, pattern, checker and bump fields are not used, and it is not itself a mix. (A vector so that Material can hold a Material; it never has more than one.)
@@ -65,6 +71,10 @@ struct Material {
 };
 
 inline bool isMix(const Material& m) { return !m.mixWith.empty(); }
+
+// Whether the texture coordinates are placed in any way other than the plain ones, and whether the material has a texture (picture, checker or bump map) to place.
+inline bool uvPlaced(const Material& m) { return m.uvScaleU != 1.0 || m.uvScaleV != 1.0 || m.uvOffsetU != 0.0 || m.uvOffsetV != 0.0; }
+inline bool hasUvTexture(const Material& m) { return !m.imageFile.empty() || m.checker || !m.bumpFile.empty(); }
 
 // The colour a material looks like on average, for drawing it in the views: a mix is the blend of its two.
 inline Rgb displayColor(const Material& m) {
