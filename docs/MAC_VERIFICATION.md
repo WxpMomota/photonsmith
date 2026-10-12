@@ -82,3 +82,12 @@ By hand (Metal)
 - [x] **Normal map**: the tilt test (`cos 30`) passes on Metal. Subsurface skin and candle wax, marble and noise, and a bump picture by eye: not looked at.
 - [ ] Camera focus and depth of field in the 3D view: not run.
 - [ ] Preview live and Edit in Builder with a projector or Lighting setup: not run.
+
+## Mixed materials and texture repeats (Windows, 2026-10-11)
+
+Two more Scene Builder features that have only run on Windows: new test files `scene_mix_tests.cpp` and `scene_uv_tests.cpp` (each has a CPU render test; as before, run the same render tests with `--gpu` if you can).
+
+- [ ] `scene_mix_tests`: `AMixOfTwoMatteMaterialsReadsTheBlendOfTheirAlbedos` on Metal. A big plate with a mix of two matte albedos (0.8 and 0.2) under a uniform sky should read (1 - t) * 0.8 + t * 0.2 at t = 0, 0.25, 0.7 and 1, within about 6%. pbrt's `mix` material picks the material per hit point by hashing the point, so on Metal check that two different amounts really give different brightness, not an average of the two.
+- [ ] By eye: select an object, tick **Mix with a second material** at the bottom of its material properties (the second starts as a rough copper), set the amount to 0.5 and the first material to red matte: the ball should look like red paint worn through to metal, in a fine grain, in the 3D view's Rendered mode and in a normal Render, with CPU and Metal looking alike.
+- [ ] `scene_uv_tests`: `APictureRepeatsAndMovesAcrossAQuad` on Metal: a picture that is red on its left half and blue on its right, on a quad, with **Texture repeats across** 1, 2 and with **Texture shift across** 0.5: unrepeated one half is red and the other blue, repeated twice each half has one of each, shifted by half the halves swap.
+- [ ] By eye: a box with a picture and **Texture repeats across/up** 4: the picture tiles four times on each face; a negative number mirrors it. A sphere with a picture says in its properties that the repeats have no effect on it.
