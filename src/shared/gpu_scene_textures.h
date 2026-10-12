@@ -87,8 +87,8 @@ inline void applyImagemapEncoding(std::vector<float>& pixels, const std::string&
     std::string lower = filename;
     for (char& c : lower) c = (char)tolower((unsigned char)c);
     const bool floatPicture = lower.size() >= 4 && (lower.compare(lower.size() - 4, 4, ".exr") == 0 || lower.compare(lower.size() - 4, 4, ".hdr") == 0 || lower.compare(lower.size() - 4, 4, ".pic") == 0);
-    if (floatPicture) return;
-    const float exponent = (float)(gamma / 2.2);
+    // A float picture is linear already (no curve to redo), but "invert" still applies to it.
+    const float exponent = floatPicture ? 1.0f : (float)(gamma / 2.2);
     for (float& v : pixels) {
         if (exponent != 1.0f) v = powf(std::max(v, 0.0f), exponent);
         if (invert) v = std::max(0.0f, 1.0f - v);

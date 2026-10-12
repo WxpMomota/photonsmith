@@ -12,6 +12,22 @@
 
 GpuWarmup::GpuWarmup(QObject *parent) : QObject(parent) {}
 
+// Closing the window while a build runs: the niced child is stopped; the in-process thread cannot be stopped in the middle of Metal's compile, so it is let go (it frees itself when it
+// finishes, and the process ends it at exit) instead of making the window wait up to two minutes.
+GpuWarmup::~GpuWarmup() {
+	if (m_process) {
+		m_process->disconnect(this);
+		if (m_process->state() != QProcess::NotRunning) {
+			m_process->kill();
+			m_process->waitForFinished(500);
+		}
+	}
+	if (m_thread && m_thread->isRunning()) {
+		m_thread->disconnect(this);
+		m_thread->setParent(nullptr);
+	}
+}
+
 void GpuWarmup::start() {
 #ifdef Q_OS_MAC
 	if (m_pending > 0 || qEnvironmentVariableIsSet("RT_GUI_SELFTEST") || qEnvironmentVariableIsSet("RT_NO_GPU_WARMUP")) return;
@@ -20,6 +36,8 @@ void GpuWarmup::start() {
 	if (RealtimePreviewSession::isAvailable()) {
 		++m_pending;
 		m_thread = QThread::create([] { RealtimePreviewSession::warmUp(); });
+		m_thread->setParent(this);
+		connect(m_thread, &QThread::finished, m_thread, &QObject::deleteLater);
 		connect(m_thread, &QThread::finished, this, [this] { oneFinished(true); });
 		m_thread->start(QThread::LowPriority);
 	}

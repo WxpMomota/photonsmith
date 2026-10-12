@@ -68,18 +68,19 @@ constexpr double kChromaticFogSpread = 0.01;
 // are unchanged).
 
 // Metal draws a pbrt "uniformgrid" medium (one density per voxel, scaled by a single sigma_s) with the per-voxel RGB grid medium it already has for "rgbgrid": the density times
-// each channel of sigma_s per voxel, and no absorption (the CPU's uniformgrid is pure scattering: its sigma_a is forced to 0). Before this a uniformgrid inside an interface sphere
+// the LUMINANCE of sigma_s per voxel in all three channels (the CPU's uniformgrid is a grey medium: it takes the luminance of sigma_s, and its sigma_a is forced to 0). Before this a uniformgrid inside an interface sphere
 // drew as nothing at all on a Mac (found by the Scene Builder's volume test run against Metal). A grid with no usable density stays as it was (invisible, with the flattener's warning).
 static void uniformGridsAsRgbGrids(pbrt_flatten::FlatScene& scene) {
     for (pbrt_flatten::Medium& m : scene.media) {
         if (m.type != "uniformgrid") continue;
         const size_t voxels = (size_t)m.nx * m.ny * m.nz;
         if (voxels == 0 || m.gridDensity.size() != voxels) continue;
+        const double sigmaGrey = 0.2126 * m.sigma_s[0] + 0.7152 * m.sigma_s[1] + 0.0722 * m.sigma_s[2];   // src/TheRestOfYourLife/pbrt_cpu_stages.h luminanceOf()
         std::vector<double>* sigmaS[3] = {&m.sigma_s_r, &m.sigma_s_g, &m.sigma_s_b};
         std::vector<double>* sigmaA[3] = {&m.sigma_a_r, &m.sigma_a_g, &m.sigma_a_b};
         for (int c = 0; c < 3; ++c) {
             sigmaS[c]->resize(voxels);
-            for (size_t i = 0; i < voxels; ++i) (*sigmaS[c])[i] = m.gridDensity[i] * m.sigma_s[c];
+            for (size_t i = 0; i < voxels; ++i) (*sigmaS[c])[i] = m.gridDensity[i] * sigmaGrey;
             sigmaA[c]->assign(voxels, 0.0);
         }
         m.type = "rgbgrid";

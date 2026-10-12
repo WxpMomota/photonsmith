@@ -409,3 +409,20 @@ TEST(PbrtInstanceQuadricTest, AnEmissiveQuadricInADefinitionIsStillBakedIntoTheS
 	EXPECT_EQ(s.disks.size(), 1u);
 	for (const InstanceGroup &g : s.groups) EXPECT_TRUE(g.triangles.empty());
 }
+
+TEST(PbrtInstanceQuadricTest, ADegenerateParaboloidInADefinitionIsNotSupportedNotNaN) {
+	// zmax 0 would divide by zero: no triangles with non-finite corners, the generic warning instead.
+	const FlatScene s = build("ObjectBegin \"o\"\n  Shape \"paraboloid\" \"float radius\" [ 1 ] \"float zmax\" [ 0 ]\nObjectEnd\n"
+							  "AttributeBegin\n  ObjectInstance \"o\"\nAttributeEnd\n");
+	for (const InstanceGroup &g : s.groups)
+		for (const Triangle &t : g.triangles)
+			for (int i = 0; i < 9; ++i) EXPECT_TRUE(std::isfinite(t.v[i]));
+	EXPECT_TRUE(warned(s, "paraboloid"));
+}
+
+TEST(PbrtInstanceQuadricTest, AnInterfaceQuadricInADefinitionIsLeftOutLikeTheTopLevelOnes) {
+	const FlatScene s = build("ObjectBegin \"o\"\n  Material \"interface\"\n  Shape \"cylinder\" \"float radius\" [ 1 ]\nObjectEnd\n"
+							  "AttributeBegin\n  ObjectInstance \"o\"\nAttributeEnd\n");
+	for (const InstanceGroup &g : s.groups) EXPECT_TRUE(g.triangles.empty());
+	EXPECT_FALSE(warned(s, "not supported"));
+}
