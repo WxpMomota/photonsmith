@@ -83,9 +83,42 @@ TEST(SceneUvTest, AQuadsCoordinatesAreScaledAndShiftedAsStated) {
 	const std::vector<double> placed = uvOf(toPbrt(d));
 	ASSERT_EQ(placed.size(), 8u);
 	for (size_t i = 0; i < 8; i += 2) {
-		EXPECT_NEAR(placed[i], (plain[i] - 0.5) * 3.0, 1e-9);
-		EXPECT_NEAR(placed[i + 1], (plain[i + 1] - 0.25) * 2.0, 1e-9);
+		EXPECT_NEAR(placed[i], plain[i] * 3.0 - 0.5, 1e-9) << "scaled, then shifted by half a repeat";
+		EXPECT_NEAR(placed[i + 1], plain[i + 1] * 2.0 - 0.25, 1e-9);
 	}
+}
+
+TEST(SceneUvTest, TheShiftIsInRepeatsWhateverTheRepeatsAre) {
+	Document d;
+	d.objects.push_back(texturedObject(ShapeKind::Quad));
+	const std::vector<double> plain = uvOf(toPbrt(d));
+	for (double repeats : {1.0, 4.0, 10.0}) {
+		d.objects[0].material.uvScaleU = repeats;
+		d.objects[0].material.uvOffsetU = 0.25;
+		const std::vector<double> placed = uvOf(toPbrt(d));
+		for (size_t i = 0; i < 8; i += 2) EXPECT_NEAR(placed[i] - plain[i] * repeats, -0.25, 1e-9) << "a shift of 0.25 is a quarter of a picture with " << repeats << " repeats";
+	}
+}
+
+TEST(SceneUvTest, ZeroRepeatsOnlyMatterWhereThereIsATextureToPlace) {
+	Document d;
+	Object plain = makeObject(ShapeKind::Quad, "Plain");
+	plain.material.uvScaleU = 0.0;   // (a plain colour: the rows that would fix it are hidden, and nothing is placed)
+	d.objects.push_back(plain);
+	EXPECT_FALSE(hasErrors(validate(d)));
+	d.objects[0].material.checker = true;
+	EXPECT_TRUE(hasErrors(validate(d)));
+}
+
+TEST(SceneUvTest, AReadyMadeMaterialKeepsTheTextureCoordinatePlacementOfTheBumpPictureItKeeps) {
+	Material m;
+	m.bumpFile = "bump.png";
+	m.uvScaleU = 4.0;
+	m.uvOffsetV = 0.3;
+	ASSERT_TRUE(applyMaterialPreset(m, "gold"));
+	EXPECT_EQ(m.bumpFile, "bump.png");
+	EXPECT_EQ(m.uvScaleU, 4.0);
+	EXPECT_EQ(m.uvOffsetV, 0.3);
 }
 
 TEST(SceneUvTest, ABoxAndAReadyMadeShapeTakeItToo) {

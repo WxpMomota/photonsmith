@@ -406,7 +406,10 @@ void MainWindow::selfTestLights(SceneBuilderWidget *sb, const std::function<void
 		check(sb->runActionForTest("lighting sunny") && sb->document().lights[0].physicalSky && sb->document().lights.size() == 2 &&
 		          QFileInfo::exists(QString::fromStdString(sb->document().lights[0].imageFile)),
 		      "the Sunny lighting is Sun & sky: the sky picture is made and the Sun light follows it");
-		check(sb->undo() && sb->document().lights.size() == lightsBefore && sb->document().lights[0].sky.sunElevation == scene_doc::SkyParams().sunElevation, "one undo brings the starter lights back, Sun included");
+		check(sb->runActionForTest("lighting sunny") && sb->document().lights.size() == 2 && QFileInfo::exists(QString::fromStdString(sb->document().lights[0].imageFile)),
+		      "applying the Sunny lighting again (the same sky settings) still makes the sky picture and the Sun");
+		sb->undo();
+		check(sb->undo() && sb->document().lights.size() == lightsBefore && sb->document().lights[0].sky.sunElevation == scene_doc::SkyParams().sunElevation, "undo brings the starter lights back, Sun included");
 		// the sky picture of the starter scene's own image: any picture file will do for the row
 		const QString picture = QDir::temp().filePath("rt_lighting_selftest.hdr");
 		{

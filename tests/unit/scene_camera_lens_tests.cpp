@@ -2,9 +2,12 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <cstdio>
+#include <fstream>
 #include <set>
 #include <string>
 
+#include "../../src/shared/pbrt_load.h"
 #include "../../src/shared/scene_document.h"
 
 using namespace scene_doc;
@@ -123,4 +126,43 @@ TEST(SceneCameraLensTest, ANonsenseSensorWidthIsAnError) {
 	EXPECT_TRUE(hasErrors(validate(d)));
 	d.camera.sensorWidthMm = 36.0;
 	EXPECT_FALSE(hasErrors(validate(d)));
+}
+
+TEST(SceneCameraWriterTest, APortraitPictureGetsPbrtsShorterSideFieldOfViewAndTheLoaderGivesTheVerticalOneBack) {
+	using namespace scene_doc;
+	for (double vfov : {25.0, 40.0, 70.0}) {
+		Document d = makeStarterScene();
+		d.camera.fov = vfov;
+		d.render.width = 600;
+		d.render.height = 800;   // portrait: pbrt's fov is across the width
+		const std::string path = "scene_portrait_fov.pbrt";
+		{
+			std::ofstream out(path, std::ios::binary);
+			out << toPbrt(d);
+		}
+		const pbrt_load::LoadResult r = pbrt_load::loadFile(path);
+		std::remove(path.c_str());
+		ASSERT_TRUE(r.ok) << r.error;
+		EXPECT_NEAR(r.scene.camera.vfov, vfov, 1e-6) << "the vertical field of view the document has is the one the renderer frames";
+	}
+	Document land = makeStarterScene();
+	land.camera.fov = 40.0;
+	EXPECT_NE(toPbrt(land).find("\"float fov\" [ 40 ]"), std::string::npos) << "a landscape picture's is written as it is";
+}
+
+TEST(SceneCameraWriterTest, ASavedViewKeepsItsSensorWidthThroughTheJsonWhateverTheSceneCameraHas) {
+	using namespace scene_doc;
+	Document d = makeStarterScene();
+	d.camera.sensorWidthMm = 24.0;
+	CameraView v;
+	v.name = "Full frame view";
+	v.camera = d.camera;
+	v.camera.sensorWidthMm = 36.0;
+	d.cameraViews.push_back(v);
+	Document back;
+	std::string error;
+	ASSERT_TRUE(fromJson(toJson(d), back, error)) << error;
+	EXPECT_EQ(back.camera.sensorWidthMm, 24.0);
+	ASSERT_EQ(back.cameraViews.size(), 1u);
+	EXPECT_EQ(back.cameraViews[0].camera.sensorWidthMm, 36.0) << "a view saved at 36 mm is still 36 mm";
 }

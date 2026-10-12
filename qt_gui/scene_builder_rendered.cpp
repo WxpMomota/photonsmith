@@ -153,6 +153,7 @@ void SceneBuilderWidget::syncRenderedViewport() {
 	}
 	if (m_viewportPending && !m_viewportEditClock.hasExpired(kEditPauseMs) && m_viewportRunning) return;   // still being edited: the old picture stays until the pause
 	if (!m_viewportRunning || m_viewportPending || scene_viewport::classify(m_viewportSent, pose) == scene_viewport::Change::Restart) {
+		if (m_viewportFailed && !m_viewportRetryClock.hasExpired(2000)) return;   // (a start that failed is tried again in a couple of seconds, not every tick with a disk write each)
 		m_viewportPending = false;
 		startViewportSession(pose);
 		return;
@@ -182,6 +183,8 @@ bool SceneBuilderWidget::moveViewportObjects() {
 void SceneBuilderWidget::startViewportSession(const scene_viewport::Pose &pose) {
 	QString error;
 	const QString path = livePreviewCopyPath(&error);
+	m_viewportFailed = true;   // (until it has started)
+	m_viewportRetryClock.restart();
 	if (path.isEmpty()) {
 		m_view3d->setRenderedNote(error);
 		return;
@@ -216,7 +219,8 @@ void SceneBuilderWidget::startViewportSession(const scene_viewport::Pose &pose) 
 	m_viewportSession->start(id, pose.width, pose.height, pose.eye[0], pose.eye[1], pose.eye[2], pose.target[0], pose.target[1], pose.target[2],
 	                         /*denoise*/ false, 0.0, false, /*svgf*/ false, /*restirGi*/ true, /*restirDi*/ true, /*probeCache*/ false, /*pathGuiding*/ false,
 	                         /*spp*/ 1, std::min(m_doc.render.maxDepth, 8), /*fireflyClamp*/ 50.0, /*temporalUpscale*/ false, 1, /*nrc*/ false, /*neuralUpscale*/ false,
-	                         lens, pose.lensRadius, pose.focusDistance);
+	                         lens, 2.0 * pose.lensRadius, pose.focusDistance);   // (the renderer's aperture is the lens's diameter)
+	m_viewportFailed = false;
 	m_viewportSent = pose;
 	m_viewportBase = m_doc;
 	m_viewportBaseSignature = m_viewportSignature;   // (the signature of the document as it is now: syncRenderedViewport worked it out just before starting)

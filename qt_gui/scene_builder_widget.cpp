@@ -762,6 +762,7 @@ void SceneBuilderWidget::addVolume(scene_doc::VolumeKind kind) {
 void SceneBuilderWidget::applyLightingPreset(scene_doc::lighting::Preset preset) {
 	edit(QString(), [&]() {
 		scene_doc::lighting::apply(m_doc, preset);
+		syncSunAndSky();   // (a sky that is Sun & sky again with the same settings does not change the sky signature, which is what makes edit() make its picture and its Sun)
 		m_sel = {SelKind::Light, 0};
 	});
 	rebuildList();

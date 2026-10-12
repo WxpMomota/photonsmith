@@ -470,6 +470,9 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 			QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
 		});
 		f->addRow(tr("Picture is a"), bumpKind);
+		auto *kindNote = new QLabel(tr("The renderer tells the two apart by the picture itself: a grayscale picture is a height map and a colour one a normal map, whichever is chosen here."));
+		kindNote->setWordWrap(true);
+		f->addRow(kindNote);
 		if (m.bumpKind == scene_doc::BumpKind::Height)
 			addNum(f, tr("Bump height"), [mat]() { return mat() ? &mat()->bumpStrength : nullptr; }, 0, 100, 0.01, 3);
 	};
