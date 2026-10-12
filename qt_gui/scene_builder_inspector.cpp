@@ -535,6 +535,19 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 		}
 	}
 	if (bumpable) addBump();
+	// Where the texture sits: how often a picture, a checker or a bump map repeats across and up the surface, and how far it is shifted (scene_model.h Material::uvScaleU...).
+	if (scene_doc::hasUvTexture(m)) {
+		addNum(f, tr("Texture repeats across"), [mat]() { return mat() ? &mat()->uvScaleU : nullptr; }, -1000, 1000, 0.5, 2);
+		addNum(f, tr("Texture repeats up"), [mat]() { return mat() ? &mat()->uvScaleV : nullptr; }, -1000, 1000, 0.5, 2);
+		addNum(f, tr("Texture shift across"), [mat]() { return mat() ? &mat()->uvOffsetU : nullptr; }, -1000, 1000, 0.05, 3);
+		addNum(f, tr("Texture shift up"), [mat]() { return mat() ? &mat()->uvOffsetV : nullptr; }, -1000, 1000, 0.05, 3);
+		const ShapeKind shape = m_doc.objects[i].shape;
+		if (shape == ShapeKind::Sphere || shape == ShapeKind::Disk || shape == ShapeKind::Cylinder || shape == ShapeKind::Cone || shape == ShapeKind::Mesh) {
+			auto *note = new QLabel(tr("Repeats and shift apply to a box, a quad and the ready-made shapes; this shape keeps the renderer's own texture coordinates, so they have no effect here."));
+			note->setWordWrap(true);
+			f->addRow(note);
+		}
+	}
 	addMixRows(f, i);
 }
 

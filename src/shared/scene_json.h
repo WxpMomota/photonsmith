@@ -333,6 +333,8 @@ inline Json materialToJson(const Material& mat) {
 	if (mat.kind == MaterialKind::Subsurface) m.set("scatterDistance", toJson(mat.scatterDistance));
 	if (!mat.bumpFile.empty())
 		m.set("bumpFile", Json::string(mat.bumpFile)).set("bumpKind", Json::string(toString(mat.bumpKind))).set("bumpStrength", Json::number(mat.bumpStrength));
+	if (uvPlaced(mat))
+		m.set("uvScaleU", Json::number(mat.uvScaleU)).set("uvScaleV", Json::number(mat.uvScaleV)).set("uvOffsetU", Json::number(mat.uvOffsetU)).set("uvOffsetV", Json::number(mat.uvOffsetV));
 	if (!mat.mixWith.empty()) {
 		m.set("mixAmount", Json::number(mat.mixAmount));
 		m.set("mixWith", materialToJson(mat.mixWith[0]));
@@ -423,7 +425,8 @@ inline bool readMaterial(const Json& m, Material& mat, int depth = 0) {
 	std::string pattern = toString(mat.pattern), bumpKind = toString(mat.bumpKind);
 	ok = ok && readStr(m, "pattern", pattern) && patternFromString(pattern, mat.pattern) && readNum(m, "patternScale", mat.patternScale) &&
 	     readNum(m, "patternVariation", mat.patternVariation) && readRgb(m, "scatterDistance", mat.scatterDistance) && readStr(m, "bumpFile", mat.bumpFile) &&
-	     readStr(m, "bumpKind", bumpKind) && bumpKindFromString(bumpKind, mat.bumpKind) && readNum(m, "bumpStrength", mat.bumpStrength) && readNum(m, "mixAmount", mat.mixAmount);
+	     readStr(m, "bumpKind", bumpKind) && bumpKindFromString(bumpKind, mat.bumpKind) && readNum(m, "bumpStrength", mat.bumpStrength) && readNum(m, "mixAmount", mat.mixAmount) && readNum(m, "uvScaleU", mat.uvScaleU) &&
+	     readNum(m, "uvScaleV", mat.uvScaleV) && readNum(m, "uvOffsetU", mat.uvOffsetU) && readNum(m, "uvOffsetV", mat.uvOffsetV);
 	if (const Json* other = m.find("mixWith")) {
 		Material second;
 		if (depth > 0 || !readMaterial(*other, second, depth + 1)) return false;   // (a mix inside a mix is not something the Scene Builder makes)

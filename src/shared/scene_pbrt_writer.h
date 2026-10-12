@@ -73,8 +73,30 @@ inline void writeMaterial(std::ostringstream& os, const Material& m, const std::
 	os << ind << "Material \"mix\" \"string materials\" [ \"" << a << "\" \"" << b << "\" ] \"float amount\" [ " << num(std::clamp(m.mixAmount, 0.0, 1.0)) << " ]\n";
 }
 
+// How an object places its texture coordinates (Material::uvScaleU...): (u, v) -> ((u - offsetU) * scaleU, (v - offsetV) * scaleV), only for a material that has a texture to place.
+struct UvPlace {
+	double su = 1.0, sv = 1.0, ou = 0.0, ov = 0.0;
+	void apply(double& u, double& v) const {
+		u = (u - ou) * su;
+		v = (v - ov) * sv;
+	}
+};
+inline UvPlace uvPlaceOf(const Object& o) {
+	UvPlace p;
+	if (uvPlaced(o.material) && hasUvTexture(o.material)) p = {o.material.uvScaleU, o.material.uvScaleV, o.material.uvOffsetU, o.material.uvOffsetV};
+	return p;
+}
+// Writes the pairs of uv numbers `uv` (u, v, u, v...) placed by `place`.
+inline void writeUv(std::ostringstream& os, const double* uv, std::size_t count, const UvPlace& place) {
+	for (std::size_t i = 0; i + 1 < count; i += 2) {
+		double u = uv[i], v = uv[i + 1];
+		place.apply(u, v);
+		os << (i ? " " : "") << num(u) << " " << num(v);
+	}
+}
+
 // Box faces (outward winding), 4 vertices each with their own uv so a texture can be applied per face.
-inline void writeBox(std::ostringstream& os, const Float3& s, const std::string& ind) {
+inline void writeBox(std::ostringstream& os, const Float3& s, const std::string& ind, const UvPlace& place = UvPlace()) {
 	const double hx = s.x / 2, hy = s.y / 2, hz = s.z / 2;
 	struct Face { double v[4][3]; };
 	const Face faces[6] = {
@@ -89,8 +111,12 @@ inline void writeBox(std::ostringstream& os, const Float3& s, const std::string&
 	for (int f = 0; f < 6; ++f) os << " " << f * 4 << " " << f * 4 + 1 << " " << f * 4 + 2 << " " << f * 4 << " " << f * 4 + 2 << " " << f * 4 + 3;
 	os << " ]\n" << ind << "  \"point3 P\" [";
 	for (const Face& f : faces) for (const auto& v : f.v) os << " " << num(v[0]) << " " << num(v[1]) << " " << num(v[2]);
-	os << " ]\n" << ind << "  \"point2 uv\" [";
-	for (int f = 0; f < 6; ++f) os << " 0 0 1 0 1 1 0 1";
+	os << " ]\n" << ind << "  \"point2 uv\" [ ";
+	static const double kFaceUv[8] = {0, 0, 1, 0, 1, 1, 0, 1};
+	for (int f = 0; f < 6; ++f) {
+		if (f) os << " ";
+		writeUv(os, kFaceUv, 8, place);
+	}
 	os << " ]\n";
 }
 
@@ -108,7 +134,7 @@ inline ShapeMesh meshOfShape(const Object& o) {
 	return ShapeMesh();
 }
 
-inline void writeGenerated(std::ostringstream& os, const ShapeMesh& m, const std::string& ind) {
+inline void writeGenerated(std::ostringstream& os, const ShapeMesh& m, const std::string& ind, const UvPlace& place = UvPlace()) {
 	os << ind << "Shape \"trianglemesh\" \"integer indices\" [";
 	for (std::size_t i = 0; i < m.indices.size(); ++i) os << (i % 12 == 0 ? "\n" + ind + "    " : " ") << m.indices[i];
 	os << " ]\n" << ind << "  \"point3 P\" [";
@@ -116,7 +142,11 @@ inline void writeGenerated(std::ostringstream& os, const ShapeMesh& m, const std
 	os << " ]\n" << ind << "  \"normal N\" [";
 	for (std::size_t i = 0; i < m.N.size(); ++i) os << (i % 12 == 0 ? "\n" + ind + "    " : " ") << num(m.N[i]);
 	os << " ]\n" << ind << "  \"point2 uv\" [";
-	for (std::size_t i = 0; i < m.UV.size(); ++i) os << (i % 12 == 0 ? "\n" + ind + "    " : " ") << num(m.UV[i]);
+	for (std::size_t i = 0; i + 1 < m.UV.size(); i += 2) {
+		double u = m.UV[i], v = m.UV[i + 1];
+		place.apply(u, v);
+		os << (i % 12 == 0 ? "\n" + ind + "    " : " ") << num(u) << " " << num(v);
+	}
 	os << " ]\n";
 }
 
@@ -128,7 +158,7 @@ inline void writeShape(std::ostringstream& os, const Object& o, const std::strin
 			os << ind << "Shape \"sphere\" \"float radius\" [ " << num(o.radius) << " ]\n";
 			break;
 		case ShapeKind::Box:
-			writeBox(os, o.size, ind);
+			writeBox(os, o.size, ind, uvPlaceOf(o));
 			break;
 		case ShapeKind::Quad: {
 			const double hx = o.size.x / 2, hz = o.size.z / 2;
@@ -136,7 +166,10 @@ inline void writeShape(std::ostringstream& os, const Object& o, const std::strin
 			os << ind << "Shape \"trianglemesh\" \"integer indices\" [ 0 2 1 0 3 2 ]\n"
 			   << ind << "  \"point3 P\" [ " << num(-hx) << " 0 " << num(-hz) << "  " << num(hx) << " 0 " << num(-hz) << "  " << num(hx) << " 0 " << num(hz)
 			   << "  " << num(-hx) << " 0 " << num(hz) << " ]\n"
-			   << ind << "  \"point2 uv\" [ " << (pictured ? "0 1 1 1 1 0 0 0" : "0 0 1 0 1 1 0 1") << " ]\n";
+			   << ind << "  \"point2 uv\" [ ";
+			static const double kPicturedUv[8] = {0, 1, 1, 1, 1, 0, 0, 0}, kPlainUv[8] = {0, 0, 1, 0, 1, 1, 0, 1};
+			writeUv(os, pictured ? kPicturedUv : kPlainUv, 8, uvPlaceOf(o));
+			os << " ]\n";
 			break;
 		}
 		case ShapeKind::Disk:
@@ -158,7 +191,7 @@ inline void writeShape(std::ostringstream& os, const Object& o, const std::strin
 		case ShapeKind::Capsule:
 		case ShapeKind::Dome:
 		case ShapeKind::Tube:
-			writeGenerated(os, meshOfShape(o), ind);
+			writeGenerated(os, meshOfShape(o), ind, uvPlaceOf(o));
 			break;
 		case ShapeKind::Mesh:
 			os << ind << "Scale " << num(o.meshScale) << " " << num(o.meshScale) << " " << num(o.meshScale) << "\n"

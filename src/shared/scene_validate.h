@@ -126,6 +126,13 @@ inline std::vector<Problem> validate(const Document& d) {
 			if (o.material.pattern == Pattern::Marble && (!(o.material.patternScale > 0.0) || !(o.material.patternVariation >= 0.0)))
 				err(who + "the marble's scale must be above zero and its variation not negative.");
 		}
+		if (uvPlaced(o.material)) {
+			const Material& m = o.material;
+			if (!std::isfinite(m.uvScaleU + m.uvScaleV + m.uvOffsetU + m.uvOffsetV) || m.uvScaleU == 0.0 || m.uvScaleV == 0.0)
+				err(who + "the texture's repeats cannot be zero.");
+			else if (hasUvTexture(m) && (o.shape == ShapeKind::Sphere || o.shape == ShapeKind::Disk || o.shape == ShapeKind::Cylinder || o.shape == ShapeKind::Cone || o.shape == ShapeKind::Mesh))
+				warn(who + "the repeats and shift of a texture apply to a box, a quad and the ready-made shapes; a " + toString(o.shape) + " keeps the renderer's own texture coordinates.");
+		}
 		if (isMix(o.material)) {
 			if (o.material.mixWith.size() != 1) err(who + "a mixed material has exactly one second material.");
 			else {
