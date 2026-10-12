@@ -51,7 +51,8 @@ void MainWindow::startPhotoHelperInstall(bool confirm, const std::function<void(
 #else
 		const QString runner = tr("The script that will run (bash):");
 		const QString pytorchFrom = tr("PyTorch (from PyPI)");
-		const QString pythonNeeds = tr("It needs Python 3.10 to 3.12 (for example brew install python@3.12) and git (xcode-select --install)");
+		const QString pythonNeeds = tr("It needs Python 3.10 to 3.12 (for example brew install python@3.12) and git (xcode-select --install)")
+		                            + QLatin1Char('\n') + tr("If there is no suitable Python, a private copy of Python 3.12 (about 25 MB, from GitHub, checked against its published checksum) is downloaded into the same folder.");
 #endif
 		const QString question =
 		    tr("Install the photo helper?\n\nThis downloads about 5 GB and installs it for your user only, in %1:\n"
@@ -114,7 +115,8 @@ void MainWindow::startPhotoHelperInstall(bool confirm, const std::function<void(
 		m_photoInstaller = nullptr;
 		bar->setRange(0, 1);
 		bar->setValue(ok ? 1 : 0);
-		statusLabel->setText(ok ? tr("Installed. Running the diagnostics again to check it...") : tr("The installation did not finish: %1").arg(message));
+		statusLabel->setText(ok ? tr("Installed. Running the diagnostics again to check it...")
+		                        : tr("The installation did not finish: %1").arg(message) + QLatin1Char('\n') + tr("Everything the installer printed is in the box below and in the log file (Help > Show Log Folder):\n%1").arg(QDir::toNativeSeparators(AppLog::filePath())));
 		button->setText(tr("Close"));
 		button->setEnabled(true);
 		updateInstallPhotoButton();

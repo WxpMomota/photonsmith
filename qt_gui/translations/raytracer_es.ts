@@ -2004,6 +2004,18 @@ Download it now?</source>
         <translation>La instalación no terminó: %1</translation>
     </message>
     <message>
+        <location filename="../mainwindow_photo_install.cpp" line="117"/>
+        <source>If there is no suitable Python, a private copy of Python 3.12 (about 25 MB, from GitHub, checked against its published checksum) is downloaded into the same folder.</source>
+        <translation>Si no hay un Python adecuado, se descarga en la misma carpeta una copia privada de Python 3.12 (unos 25 MB, desde GitHub, comprobada con su suma de verificación publicada).</translation>
+    </message>
+    <message>
+        <location filename="../mainwindow_photo_install.cpp" line="117"/>
+        <source>Everything the installer printed is in the box below and in the log file (Help &gt; Show Log Folder):
+%1</source>
+        <translation>Todo lo que mostró el instalador está en el cuadro de abajo y en el archivo de registro (Ayuda &gt; Mostrar carpeta de registros):
+%1</translation>
+    </message>
+    <message>
         <location filename="../mainwindow_photo_install.cpp" line="118"/>
         <source>Close</source>
         <translation>Cerrar</translation>

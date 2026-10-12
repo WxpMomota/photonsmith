@@ -81,7 +81,7 @@ The same helper works on macOS; the installer is a bash script that ships inside
 bash "/Applications/RayTracerGUI.app/Contents/MacOS/scripts/setup_photo_to_mesh.sh"
 ```
 
-It needs **Python 3.10, 3.11 or 3.12** and **git**, which a Mac does not have by default: `brew install python.12`, or the installer from python.org, and `xcode-select --install` for git. The environment goes to `~/Library/Application Support/RayTracerPhoto` (set `RAY_TRACER_PHOTO3D_PYTHON` to its `venv/bin/python` if you keep it elsewhere).
+It needs **Python 3.10, 3.11 or 3.12** and **git**, which a Mac does not have by default. The Diagnostics tab's **Install Photo Helper** button (or the script) looks for a suitable Python on the usual paths, including Homebrew's and python.org's, which a program started from Finder does not have on its PATH; if there is none it downloads a private copy of Python 3.12 (about 25 MB, from the python-build-standalone releases on GitHub, checked against their published SHA-256) into the same folder, so nothing needs installing first except git (`xcode-select --install`). What it found or skipped is in the installer's window and in the log file. You can also bring your own: `brew install python@3.12`, or the installer from python.org. The environment goes to `~/Library/Application Support/RayTracerPhoto` (set `RAY_TRACER_PHOTO3D_PYTHON` to its `venv/bin/python` if you keep it elsewhere).
 
 - **Apple silicon** uses the Apple GPU through PyTorch's MPS backend; if MPS cannot run something the helper says so and finishes on the processor (several minutes). `PYTORCH_ENABLE_MPS_FALLBACK=1` is set for it.
 - **Intel Macs** get PyTorch 2.2.2, the last version built for them, and always run on the processor (several minutes per photo).
