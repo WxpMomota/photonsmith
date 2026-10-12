@@ -4,7 +4,17 @@ Release notes for the next tagged release, summarising the large correctness eff
 Before this, see `git log`. Each item has a commit with the measurements behind it, and
 [docs/PBRT_SUPPORT.md](docs/PBRT_SUPPORT.md) has the per-feature, per-backend detail.
 
-## Unreleased
+## 0.1.1 (2026-10-12)
+
+* **Metal**: texture repeats and shift, and pictures on disks and cylinders; a pbrt `uniformgrid` medium is drawn; the GPU renderer is built in the background so the first render no longer looks hung.
+* **Scene Builder**: the rendered viewport, orthographic and wireframe 3D view, camera focal length, sensor and f-number, ready-made lighting, projector light, mixed materials and ready-made mixes, texture repeats and shift, rounded box, cyclorama and terrain shapes, a model library, a roomier layout.
+* **CPU and OptiX**: texture repeats and shift (`imagemap` `uscale`/`vscale`/`udelta`/`vdelta`) on every shape.
+* **Fixes**: a data race in the subsurface table cache, uniformgrid colour, float invert, paraboloid NaN, scene files tagged with a built-in category rendering the wrong scene, and the Scene Builder findings of an internal review.
+* New scene: Studio Showcase. The CI now builds the launcher so the Scene Builder render tests run.
+
+The full list is below.
+
+## 0.1.0 and earlier
 
 ### New
 
