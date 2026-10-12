@@ -71,6 +71,15 @@ std::string roundNumbers(const std::string& text) {
 	return out;
 }
 
+// Where two texts first differ, with some text round it: the two whole scene files are far too long to read in a CI log.
+std::string firstDifference(const std::string& a, const std::string& b) {
+	size_t i = 0;
+	while (i < a.size() && i < b.size() && a[i] == b[i]) ++i;
+	if (i == a.size() && i == b.size()) return "none";
+	const size_t from = i > 100 ? i - 100 : 0;
+	return "at " + std::to_string(i) + " (of " + std::to_string(a.size()) + " and " + std::to_string(b.size()) + " characters)\n  file : " + a.substr(from, 200) + "\n  code : " + b.substr(from, 200);
+}
+
 }  // namespace
 
 // Not a check: writes the file after a change to the scene (RT_SHOWCASE_OUT=<path to pbrt_scenes/studio-showcase.pbrt>).
@@ -106,7 +115,8 @@ TEST(SceneShowcaseTest, TheCommittedFileIsExactlyWhatTheCodeWritesAndItOpensInTh
 	const std::string path = findShowcaseFile();
 	if (path.empty()) GTEST_SKIP() << "pbrt_scenes/studio-showcase.pbrt was not found from here";
 	const std::string text = readAll(path);
-	EXPECT_EQ(roundNumbers(text), roundNumbers(showcaseFileText())) << "the scene changed: write the file again with RT_SHOWCASE_OUT=" << path << " ray_tracer_tests --gtest_filter=SceneShowcaseTest.WriteTheFile";
+	const std::string fileRounded = roundNumbers(text), codeRounded = roundNumbers(showcaseFileText());
+	EXPECT_TRUE(fileRounded == codeRounded) << "the scene changed: write the file again with RT_SHOWCASE_OUT=" << path << " ray_tracer_tests --gtest_filter=SceneShowcaseTest.WriteTheFile\nfirst difference " << firstDifference(fileRounded, codeRounded);
 	Document back;
 	std::string error;
 	ASSERT_TRUE(fromPbrt(text, back, error)) << error;
