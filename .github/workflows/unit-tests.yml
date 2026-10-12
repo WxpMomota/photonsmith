@@ -226,6 +226,9 @@ jobs:
           # Every Metal ctest, not a named subset: the subset had fallen behind (the alpha cutout, cloud furnace, subsurface, NanoVDB, media lights, clipped medium,
           # subsurface sky, consistency sweep, GPU prepare and Live Preview object tests were all outside it, and an untracked picture one of them loads went unnoticed).
           # The first GPU test builds the shader pipelines (about 90 s per variant on a fast Mac; Metal caches them for the rest).
+          # Be clear about what this buys on a hosted runner: its virtual GPU has no hardware raytracing ("does not support hardware raytracing" in the log), so the GPU tests
+          # fail at the device check and the step reports them as a warning, as before. The host-only ones (the Live Preview object tests, the math tests) run for real, and a
+          # self-hosted Mac or a runner with a raytracing GPU runs all of it with no change here.
           ctest --output-on-failure --timeout 1200
           rc=$?
           set -e

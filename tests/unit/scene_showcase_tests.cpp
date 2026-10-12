@@ -7,6 +7,9 @@
 #include "../../src/shared/scene_document.h"
 #include "../../src/shared/scene_showcase.h"
 
+#include <cctype>
+#include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -34,6 +37,37 @@ std::string readAll(const std::string& path) {
 	std::string out;
 	for (char c : text)
 		if (c != '\r') out.push_back(c);   // (a checkout may have changed the line endings)
+	return out;
+}
+
+// The text with every decimal number rounded to 10 significant digits. The scene's positions come out of sin, cos and pow, which differ in the last one or two digits between the
+// C libraries of Windows and macOS (5.131678516375649 against 5.13167851637565), so an exact comparison of the committed file passed where it was written and failed on the macOS CI
+// runner. Ten digits are far beyond what a scene can show and far below that noise.
+std::string roundNumbers(const std::string& text) {
+	std::string out;
+	size_t i = 0;
+	while (i < text.size()) {
+		const char c = text[i];
+		const bool startsNumber = std::isdigit(static_cast<unsigned char>(c)) || (c == '-' && i + 1 < text.size() && std::isdigit(static_cast<unsigned char>(text[i + 1])));
+		const bool afterWord = i > 0 && (std::isalpha(static_cast<unsigned char>(text[i - 1])) || text[i - 1] == '_');   // "point2", "p0": part of a name, not a number
+		if (!startsNumber || afterWord) { out.push_back(c); ++i; continue; }
+		size_t j = i + 1;
+		bool decimal = false;
+		while (j < text.size() && (std::isdigit(static_cast<unsigned char>(text[j])) || text[j] == '.' || text[j] == 'e' || text[j] == 'E' ||
+		                           ((text[j] == '-' || text[j] == '+') && (text[j - 1] == 'e' || text[j - 1] == 'E')))) {
+			if (text[j] == '.' || text[j] == 'e' || text[j] == 'E') decimal = true;
+			++j;
+		}
+		const std::string token = text.substr(i, j - i);
+		if (decimal) {
+			char buf[64];
+			std::snprintf(buf, sizeof buf, "%.10g", std::strtod(token.c_str(), nullptr));
+			out += buf;
+		} else {
+			out += token;
+		}
+		i = j;
+	}
 	return out;
 }
 
@@ -72,7 +106,7 @@ TEST(SceneShowcaseTest, TheCommittedFileIsExactlyWhatTheCodeWritesAndItOpensInTh
 	const std::string path = findShowcaseFile();
 	if (path.empty()) GTEST_SKIP() << "pbrt_scenes/studio-showcase.pbrt was not found from here";
 	const std::string text = readAll(path);
-	EXPECT_EQ(text, showcaseFileText()) << "the scene changed: write the file again with RT_SHOWCASE_OUT=" << path << " ray_tracer_tests --gtest_filter=SceneShowcaseTest.WriteTheFile";
+	EXPECT_EQ(roundNumbers(text), roundNumbers(showcaseFileText())) << "the scene changed: write the file again with RT_SHOWCASE_OUT=" << path << " ray_tracer_tests --gtest_filter=SceneShowcaseTest.WriteTheFile";
 	Document back;
 	std::string error;
 	ASSERT_TRUE(fromPbrt(text, back, error)) << error;
