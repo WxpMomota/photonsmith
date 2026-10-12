@@ -2,7 +2,7 @@
 """Renders every shape-by-material scene the Scene Builder's tests write (SceneCombosTest) on the CPU and both OptiX backends and reports what fails to render or looks different.
 
     RT_COMBO_SCENES_DIR=<dir> ray_tracer_tests --gtest_filter=SceneCombosTest.*       # writes <shape>__<treatment>.pbrt (run from the repository root)
-    python scripts/combo_sweep.py --dir <dir> [--exe RayTracer_Package/ray_tracer.exe] [--only cone,mix] [--jobs 3]
+    python scripts/combo_sweep.py --dir <dir> [--exe RayTracer_Package/ray_tracer.exe] [--only cone,mix] [--jobs 3] [--skip-wavefront]   (--skip-wavefront on a Mac)
 
 For each scene it prints one line when a backend fails to render it (an OptiX trap, say) or when a GPU picture is further from the CPU's than the noise allows: the mean brightness
 more than 6% off, or the 99th percentile of the 4x4-block differences above 0.08 (0.15 for glass, subsurface, transmission and emitters, which are noisy at this sample count), or three or more blocks off by more than 0.1.
@@ -59,13 +59,14 @@ def run_scene(args, name):
     work = os.path.join(args.dir, "out")
     os.makedirs(work, exist_ok=True)
     results = {}
-    for tag, backend, wf in (("cpu", "cpu", False), ("gpu", "gpu", False), ("wf", "gpu", True)):
+    renders = (("cpu", "cpu", False), ("gpu", "gpu", False)) + (() if args.skip_wavefront else (("wf", "gpu", True),))
+    for tag, backend, wf in renders:
         img, err = render(args.exe, scene, os.path.join(work, name + "." + tag), backend, wf)
         results[tag] = (img, err)
     problems = []
     cpu = results["cpu"][0]
     failed = [t for t in results if results[t][0] is None]
-    if len(failed) == 3:
+    if len(failed) == len(renders):
         return name, ["BAD SCENE: no backend rendered it: " + results["cpu"][1]]
     for t in failed:
         problems.append("%s FAILED TO RENDER: %s" % (t, results[t][1]))
@@ -73,7 +74,7 @@ def run_scene(args, name):
         return name, problems
     noisy = any(k in name for k in NOISY)
     tol = 0.15 if noisy else 0.08
-    for t in ("gpu", "wf"):
+    for t in [r[0] for r in renders][1:]:
         img = results[t][0]
         if img is None:
             continue
@@ -95,6 +96,7 @@ def main():
     ap.add_argument("--exe", default=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "RayTracer_Package", "ray_tracer.exe"))
     ap.add_argument("--only", default="", help="comma separated words: only scenes whose name contains one of them")
     ap.add_argument("--jobs", type=int, default=3)
+    ap.add_argument("--skip-wavefront", action="store_true", help="render the CPU and the GPU only (on a Mac the GPU is Metal and there is no wavefront backend to compare)")
     ap.add_argument("--stats", action="store_true", help="print the numbers for every scene instead of only the ones over the limits")
     args = ap.parse_args()
     args.exe = os.path.abspath(args.exe)
