@@ -193,17 +193,19 @@ void SceneBuilderWidget::buildUi() {
 	addMenu->addSection(tr("Objects"));
 	for (ShapeKind k : scene_doc::allShapeKinds())
 		addMenu->addAction(shapeLabel(k), this, [this, k]() { addObject(k); });
-	addMenu->addSection(tr("Props (several objects at once)"));
-	for (scene_doc::PropKind k : scene_doc::allPropKinds()) addMenu->addAction(propLabel(k), this, [this, k]() { addProp(k); });
+	// (The sections after the shapes are submenus: a section's heading is not drawn in every theme, so a plain list of Table, Chair, Fog, Overcast day... under the shapes did not say what each group was
+	// or, for the lightings, that they replace the lights. Four groups of items made the menu two screens of columns.)
+	QMenu *propMenu = addMenu->addMenu(tr("Props (several objects at once)"));
+	for (scene_doc::PropKind k : scene_doc::allPropKinds()) propMenu->addAction(propLabel(k), this, [this, k]() { addProp(k); });
 	// Blocky objects (scene_blocks.h): coloured blocks, creatures and things, each a few dozen boxes added together, in three submenus.
 	addMenu->addSection(tr("Blocky (several objects at once)"));
 	QMenu *blockMenus[3] = {addMenu->addMenu(tr("Blocks")), addMenu->addMenu(tr("Creatures")), addMenu->addMenu(tr("Things"))};
 	for (scene_doc::BlockyKind k : scene_doc::allBlockyKinds())
 		blockMenus[static_cast<int>(scene_doc::blockyGroup(k))]->addAction(blockyLabel(k), this, [this, k]() { addBlocky(k); });
 	// Volumes (scene_model.h Volume): a sphere of fog, smoke or cloud, which the renderer's participating media fill.
-	addMenu->addSection(tr("Volumes (fog, smoke, cloud)"));
+	QMenu *volumeMenu = addMenu->addMenu(tr("Volumes (fog, smoke, cloud)"));
 	for (scene_doc::VolumeKind k : {scene_doc::VolumeKind::Fog, scene_doc::VolumeKind::Smoke, scene_doc::VolumeKind::Cloud})
-		addMenu->addAction(volumeLabel(k), this, [this, k]() { addVolume(k); });
+		volumeMenu->addAction(volumeLabel(k), this, [this, k]() { addVolume(k); });
 	addMenu->addSection(tr("More"));
 	addMenu->addAction(tr("Model library..."), this, [this]() { showModelLibrary(); });
 	addMenu->addAction(tr("Object from a photo..."), this, [this]() { addObjectFromPhoto(); });
@@ -216,13 +218,13 @@ void SceneBuilderWidget::buildUi() {
 		rebuildList();
 		setSelection(m_sel);
 	});
-	addMenu->addSection(tr("Lights"));
+	QMenu *lightMenu = addMenu->addMenu(tr("Lights"));
 	for (LightKind k : {LightKind::Point, LightKind::Spot, LightKind::Distant, LightKind::Infinite, LightKind::Projector})
-		addMenu->addAction(lightLabel(k), this, [this, k]() { addLight(k); });
+		lightMenu->addAction(lightLabel(k), this, [this, k]() { addLight(k); });
 	// Ready-made lighting (scene_lighting.h): replaces the lights with a rig round what the camera looks at.
-	addMenu->addSection(tr("Lighting (replaces the lights)"));
+	QMenu *lightingMenu = addMenu->addMenu(tr("Lighting (replaces the lights)"));
 	for (scene_doc::lighting::Preset p : scene_doc::lighting::allPresets()) {
-		QAction *a = addMenu->addAction(lightingLabel(p), this, [this, p]() { applyLightingPreset(p); });
+		QAction *a = lightingMenu->addAction(lightingLabel(p), this, [this, p]() { applyLightingPreset(p); });
 		a->setStatusTip(lightingNote(p));
 		a->setToolTip(lightingNote(p));
 	}
@@ -394,7 +396,7 @@ void SceneBuilderWidget::buildUi() {
 	split->setStretchFactor(0, 0);
 	split->setStretchFactor(1, 1);
 	split->setStretchFactor(2, 0);
-	split->setSizes({262, 560, 320});   // wide enough for Add / Duplicate / Delete on one line
+	split->setSizes({262, 560, 360});   // the left wide enough for Add / Duplicate / Delete on one line; the properties wide enough for a name, a picture path and a number box beside their labels
 	centreScroll->setMinimumWidth(340);   // wide enough for the Top / Front / Side / 3D row of buttons
 	m_mainSplit = split;
 	m_centreSplit = centre;
@@ -406,7 +408,7 @@ void SceneBuilderWidget::buildUi() {
 }
 
 void SceneBuilderWidget::resetPaneSizes() {
-	if (m_mainSplit) m_mainSplit->setSizes({230, 560, 320});
+	if (m_mainSplit) m_mainSplit->setSizes({230, 560, 360});
 	if (m_centreSplit) m_centreSplit->setSizes({820, 740});
 	window_geometry::saveSplitter(m_mainSplit, "builder/mainSplit");
 	window_geometry::saveSplitter(m_centreSplit, "builder/centreSplit");

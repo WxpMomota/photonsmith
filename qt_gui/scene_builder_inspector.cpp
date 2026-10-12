@@ -149,7 +149,12 @@ void SceneBuilderWidget::addDerivedNum(QFormLayout *f, const QString &label, con
 		QSignalBlocker b(box);
 		box->setValue(std::clamp(get(), lo, hi));
 	});
-	f->addRow(label, box);
+	if (special.isEmpty()) {
+		f->addRow(label, box);
+	} else {   // (a box with a word for its lowest value, "Pinhole (everything sharp)", wants the whole width of the page for it)
+		f->addRow(new QLabel(label));
+		f->addRow(box);
+	}
 }
 
 void SceneBuilderWidget::addInt(QFormLayout *f, const QString &label, const std::function<int *()> &ref, int lo, int hi) {
@@ -198,7 +203,8 @@ void SceneBuilderWidget::addVec3(QFormLayout *f, const QString &label, const std
 		});
 		h->addWidget(box, 1);
 	}
-	f->addRow(label, row);
+	f->addRow(new QLabel(label));   // (the label above and the three boxes across the page, always: beside a short label (in Japanese, "Position" is two characters) they were 45 pixels each and cut "-2.400" short)
+	f->addRow(row);
 }
 
 void SceneBuilderWidget::addColor(QFormLayout *f, const QString &label, const std::function<Rgb *()> &ref) {
@@ -227,14 +233,14 @@ void SceneBuilderWidget::addColor(QFormLayout *f, const QString &label, const st
 }
 
 void SceneBuilderWidget::addBool(QFormLayout *f, const QString &label, const std::function<bool *()> &ref, bool rebuildAfter) {
-	auto *c = new QCheckBox;
+	auto *c = new QCheckBox(label);   // (its own label, on a row of its own: a box beside a label column made that column as wide as "Hidden in the views" for every field of the page)
 	if (bool *v = ref()) c->setChecked(*v);
 	connect(c, &QCheckBox::toggled, this, [this, ref, rebuildAfter](bool on) {
 		if (m_loading) return;
 		edit(QString(), [&]() { if (bool *v = ref()) *v = on; });
 		if (rebuildAfter) QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
 	});
-	f->addRow(label, c);
+	f->addRow(c);
 }
 
 void SceneBuilderWidget::addText(QFormLayout *f, const QString &label, const std::function<std::string *()> &ref) {
@@ -245,7 +251,8 @@ void SceneBuilderWidget::addText(QFormLayout *f, const QString &label, const std
 		if (m_loading) return;
 		edit(key, [&]() { if (std::string *v = ref()) *v = t.toStdString(); });
 	});
-	f->addRow(label, e);
+	f->addRow(new QLabel(label));   // (the label above and the box across the page: beside the label column a name like "Worn paint box" had room for half of itself)
+	f->addRow(e);
 }
 
 // A phone photo is often stored sideways with an EXIF "rotate me" tag. The renderer ignores that tag, so the picture would show sideways (and a quad

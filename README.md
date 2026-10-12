@@ -59,7 +59,7 @@ The GUI has a **Scene Builder** tab: add spheres, boxes, quads, cylinders, cones
 
 The GUI keeps a log file of everything it does (every click and choice, the Scene Builder's edits, render commands and results, errors, and a note when the last run crashed): *Help > Show Log Folder*, and `docs/LOGGING.md` says what is in it. Send it with a bug report.
 
-![The Scene Builder tab](docs/gallery/scene-builder.jpg)
+![The Scene Builder tab with the Studio Showcase scene, drawn by the Rendered viewport](docs/gallery/scene-builder.jpg)
 
 ## 📦 Download & Use (No Build Required!)
 

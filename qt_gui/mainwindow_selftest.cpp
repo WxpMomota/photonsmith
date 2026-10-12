@@ -108,6 +108,7 @@ void MainWindow::runSelfTest(const QString &mode, const QString &outPrefix) {
 	if (mode == "builder3d") { runBuilder3dSelfTest(log, shot); return; }
 	if (mode == "denoiser") { runDenoiserSelfTest(log, shot); return; }
 	if (mode == "tour") { runTourSelfTest(log, shot); return; }
+	if (mode == "builderui") { runBuilderUiSelfTest(log, shot); return; }
 	if (mode == "queue") { runQueueSelfTest(log, shot); return; }
 	if (mode == "installphoto") { runInstallPhotoSelfTest(log, shot); return; }
 

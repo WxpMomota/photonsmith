@@ -19,6 +19,7 @@
 #include <QMouseEvent>
 #include <QMenu>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QShortcut>
 #include <QStackedWidget>
 #include <QVBoxLayout>
@@ -43,8 +44,7 @@ void SceneBuilderWidget::createViews(QWidget *layoutBox, QVBoxLayout *layoutLayo
 	m_viewHint = new QLabel(layoutBox);
 	m_viewHint->setText(viewHint2d());
 	m_gizmoBar = new QWidget(layoutBox);  // the Move / Rotate / Scale tools of the 3D view (W, E, R); shown with it
-	auto *gizmoLayout = new QHBoxLayout(m_gizmoBar);
-	gizmoLayout->setContentsMargins(0, 0, 0, 0);
+	auto *gizmoLayout = new FlowLayout(m_gizmoBar, 0, 6, 6);   // (a flow, not one row: Move, Rotate, Scale, Wireframe, Orthographic, Rendered and View are wider than a narrow column in some languages)
 	auto *gizmoGroup = new QButtonGroup(this);
 	m_gizmoGroup = gizmoGroup;
 	gizmoGroup->setExclusive(true);
@@ -179,7 +179,6 @@ void SceneBuilderWidget::createViews(QWidget *layoutBox, QVBoxLayout *layoutLayo
 	planeRow->addWidget(frameSel);
 	layoutLayout->addWidget(viewBar);
 	// The tools get a row of their own (only in 3D), so neither row is wider than the column.
-	gizmoLayout->addStretch(1);
 	layoutLayout->addWidget(m_gizmoBar);
 	layoutLayout->addWidget(m_cameraBar);
 	layoutLayout->addWidget(m_viewStack, 1);
@@ -560,3 +559,5 @@ void SceneBuilderWidget::boxSelectForTest(const QPointF &from, const QPointF &to
 bool SceneBuilderWidget::meshReadyForTest(const QString &path) const { return m_view3d->meshPreviewReady(path.toStdString()); }
 bool SceneBuilderWidget::gizmoButtonEnabled(int tool) const { return m_gizmoGroup && m_gizmoGroup->button(tool) && m_gizmoGroup->button(tool)->isEnabled(); }
 int SceneBuilderWidget::gizmoButtonChecked() const { return m_gizmoGroup ? m_gizmoGroup->checkedId() : -1; }
+
+QWidget *SceneBuilderWidget::inspectorContentForTest() const { return m_inspectorScroll ? m_inspectorScroll->widget() : nullptr; }

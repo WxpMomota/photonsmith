@@ -147,6 +147,7 @@ public:
 	bool gizmoButtonEnabled(int tool) const;   // 0 Move, 1 Rotate, 2 Scale
 	int gizmoButtonChecked() const;
 	void selectCameraForTest() { setSelection({SelKind::Camera, 0}); }
+	QWidget *inspectorContentForTest() const;   // the whole properties page (what the scroll area scrolls over), for taking its picture
 	void addObject(scene_doc::ShapeKind shape);
 	void addProp(scene_doc::PropKind kind);   // a few ordinary objects at once (a table, a tree...), one undo step
 	void addBlocky(scene_doc::BlockyKind kind);   // a block, creature or thing made of boxes (scene_blocks.h), one undo step

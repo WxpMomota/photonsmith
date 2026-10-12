@@ -2,7 +2,7 @@
 
 Build a scene from shapes, materials and lights, move things around, see a picture, and save it as an ordinary pbrt-v4 file. It is the **Scene Builder** tab of the Qt GUI (`RayTracerGUI`), and it needs no pbrt knowledge.
 
-![The Scene Builder tab: the scene list, a top view with the camera and its field of view, a preview render, and the properties of the selected gold ball](gallery/scene-builder.jpg)
+![The Scene Builder tab with the Studio Showcase scene: the scene list, the Rendered viewport showing the lit scene with the lights and camera over it, and the properties of the selected rounded box](gallery/scene-builder.jpg)
 
 ## A scene to look at first: Studio Showcase
 
@@ -282,7 +282,7 @@ A scene with no light renders black; the tab says so under the properties.
 
 **Projector.** Add > **Projector (slide light)** puts in a light with a **Slide picture** (a window of four panes to start with; choose any picture: `.png`, `.jpg`, `.bmp`, `.tga`, `.exr`, `.hdr`), a **Position**, an **Aims at** point, a **Field of view** and a **Strength**. It is pbrt's `projection` light: the picture is projected through a frustum with the angle of the field of view across the picture's shorter side, and lands on whatever is in the way with its own colours (a window pattern across a wall and floor, a spotlight with a shape). Strength is the brightness of the picture's whitest part, in the units of a point light: a surface facing the projector from distance d is lit with Strength / d squared. The slide lands the way it looks (its top upwards, not mirrored), and its top points up as far as the aim allows (aimed straight down, towards -Z). The 3D view draws the frustum with a tick above the picture's top edge; move the light and its aim point like a spotlight's. The picture is the light: bright parts shine, dark parts do not, so a high-contrast picture (white shapes on black) makes the clearest pattern. A projector without a picture shines a plain white beam, and the checks say so.
 
-**Lighting setups.** The **Add** menu ends with a **Lighting (replaces the lights)** list (and the search box has them as "Lighting: ..."): one click replaces the scene's lights with a ready-made lighting placed round what the camera looks at, at the camera's distance, so it suits a scene of any size and from any side; one undo brings the old lights back. Objects that give off light stay.
+**Lighting setups.** The **Add** menu has a **Lighting (replaces the lights)** submenu (as it has submenus for the props, volumes and lights; and the search box has them as "Lighting: ..."): one click replaces the scene's lights with a ready-made lighting placed round what the camera looks at, at the camera's distance, so it suits a scene of any size and from any side; one undo brings the old lights back. Objects that give off light stay.
 
 | Setup | What it makes |
 |---|---|

@@ -63,6 +63,7 @@ SOURCES += \
 	mainwindow_denoiser.cpp \
 	denoiser_installer.cpp \
 	mainwindow_selftest_builder3d.cpp \
+	mainwindow_selftest_builderui.cpp \
 	mainwindow_tabs_output.cpp \
 	mainwindow_style.cpp \
 	mainwindow_slots.cpp \
