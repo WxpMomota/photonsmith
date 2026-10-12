@@ -146,6 +146,7 @@ public:
 	bool meshReadyForTest(const QString &path) const;
 	bool gizmoButtonEnabled(int tool) const;   // 0 Move, 1 Rotate, 2 Scale
 	int gizmoButtonChecked() const;
+	QCheckBox *denoiseCheckForTest() const { return m_denoiseCheck; }
 	void selectCameraForTest() { setSelection({SelKind::Camera, 0}); }
 	QWidget *inspectorContentForTest() const;   // the whole properties page (what the scroll area scrolls over), for taking its picture
 	void addObject(scene_doc::ShapeKind shape);
@@ -233,6 +234,9 @@ signals:
 	void statusMessage(const QString &text);
 	// A copy of the scene was saved into the scene-list folder ("Add to scene list"); the main window lists it without a restart.
 	void sceneListed(const QString &path);
+	// The Denoise tick was ticked and the CPU denoiser (Intel Open Image Denoise) is not installed: the main window offers to download it (its own prompt, shared with the Render Options tab).
+	// `onDeclined` runs when it was declined, cancelled or failed (the tick goes off again); `onInstalled` when the library is there.
+	void denoiserInstallRequested(const std::function<void()> &onDeclined, const std::function<void()> &onInstalled);
 	// "Preview live": the scene was saved as a listing of its own (livePreviewCopy()) and should be opened in Live Preview; the main window does that.
 	void livePreviewRequested(const QString &path);
 
@@ -442,6 +446,8 @@ private:
 	QLabel *m_previewStatus = nullptr;
 	QComboBox *m_qualityCombo = nullptr;
 	QCheckBox *m_gpuCheck = nullptr;
+	void createDenoiseCheck(QWidget *parent);   // scene_builder_render.cpp: the Preview row's Denoise tick
+	QCheckBox *m_denoiseCheck = nullptr;     // Denoise: the Preview picture is cleaned by the AI denoiser (OIDN on the CPU, OptiX's own with the GPU on Windows)
 	QPushButton *m_previewButton = nullptr;
 	QPushButton *m_finalButton = nullptr;
 	QPushButton *m_turntableButton = nullptr;

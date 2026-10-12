@@ -9077,6 +9077,16 @@ La forme est une estimation : l&apos;arrière est inventé et les détails fins 
         <source>Ready-made mix</source>
         <translation>Mélange prêt à l'emploi</translation>
     </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="1"/>
+        <source>Denoise</source>
+        <translation>Débruiter</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="1"/>
+        <source>Clean the grain out of the Preview picture with an AI denoiser. A Draft picture has only 16 samples per pixel, so it is grainy without it. Uses Intel Open Image Denoise on the CPU (downloaded once, with your permission) and NVIDIA&apos;s denoiser with the GPU. The final picture (Render picture...) is not denoised.</source>
+        <translation>Nettoie le grain de l&apos;aperçu avec un débruiteur IA. Une image Brouillon n&apos;a que 16 échantillons par pixel : elle est granuleuse sans lui. Utilise Intel Open Image Denoise sur le CPU (téléchargé une fois, avec votre permission) et le débruiteur de NVIDIA avec le GPU. L&apos;image finale (Rendre l&apos;image...) n&apos;est pas débruitée.</translation>
+    </message>
 </context>
 <context>
     <name>SceneCategory</name>

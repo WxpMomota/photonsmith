@@ -299,7 +299,7 @@ The numbers are in the same units as the starter scene (a sun gives an irradianc
 
 ## Rendering
 
-**Preview** renders a small picture (*Draft* 480 pixels wide and 16 samples per pixel, *Good* 720 and 64, *Best* 960 and 256) and shows it as large as its pane allows with the same renderer the Render tab uses, on the scene saved to a temporary file. Tick **Use the GPU** to use OptiX (Windows) or Metal (macOS); it needs a supported card and is much faster for large pictures. The button reads *Cancel* while a render runs.
+**Preview** renders a small picture (*Draft* 480 pixels wide and 16 samples per pixel, *Good* 720 and 64, *Best* 960 and 256) and shows it as large as its pane allows with the same renderer the Render tab uses, on the scene saved to a temporary file. Tick **Use the GPU** to use OptiX (Windows) or Metal (macOS); it needs a supported card and is much faster for large pictures. The button reads *Cancel* while a render runs. The **Denoise** tick next to *Use the GPU* cleans the grain out of that picture with an AI denoiser (NVIDIA's with the GPU on Windows, Intel Open Image Denoise on the CPU or on a Mac, which is downloaded once with your permission, as in the Render Options tab). It is on by default when the library is already installed, remembered between sessions, and applies to **Preview** only: **Render picture...** saves what was rendered. Measured against a 1024-sample picture on the GPU, a 16-sample Draft is 2.4 to 6 times closer to it when denoised (the showcase 0.029 to 0.007, glass 0.019 to 0.003) with the mean brightness within 0.1%; a subsurface surface keeps a little speckle.
 
 **Render picture...** uses the width, height, samples and light bounces under *Camera and image*, and asks where to save the PNG.
 

@@ -685,6 +685,14 @@ static void selfTestRenderedViewport(SceneBuilderWidget *sb, const std::function
 		sb->setRenderedViewport(false);
 		return;
 	}
+	// The picture follows the view's shape. The pane may still be settling when the first frames arrive (the splitter and the rows round the view lay out a moment after the tab shows), in which case
+	// the viewport restarts at the new size: wait for that to finish before looking, rather than catching the one instant between the view changing and the picture following.
+	const auto shapeMatches = [&]() {
+		const QImage img = sb->renderedImageForTest();
+		const double v = double(sb->view3dForTest()->width()) / sb->view3dForTest()->height();
+		return !img.isNull() && std::abs(v - double(img.width()) / img.height()) < 0.01 * v && img.width() <= 800;
+	};
+	wait(15000, shapeMatches);
 	const QImage first = sb->renderedImageForTest();
 	const double viewAspect = double(sb->view3dForTest()->width()) / sb->view3dForTest()->height(), pictureAspect = first.isNull() ? 0.0 : double(first.width()) / first.height();
 	check(!first.isNull() && std::abs(viewAspect - pictureAspect) < 0.01 * viewAspect && first.width() <= 800,

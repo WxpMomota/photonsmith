@@ -9025,6 +9025,16 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <source>Ready-made mix</source>
         <translation>Mezcla prediseñada</translation>
     </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="1"/>
+        <source>Denoise</source>
+        <translation>Reducir ruido</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="1"/>
+        <source>Clean the grain out of the Preview picture with an AI denoiser. A Draft picture has only 16 samples per pixel, so it is grainy without it. Uses Intel Open Image Denoise on the CPU (downloaded once, with your permission) and NVIDIA&apos;s denoiser with the GPU. The final picture (Render picture...) is not denoised.</source>
+        <translation>Limpia el grano de la vista previa con un reductor de ruido con IA. Una imagen en Borrador tiene solo 16 muestras por píxel, así que sin él sale granulada. Usa Intel Open Image Denoise en la CPU (se descarga una vez, con tu permiso) y el reductor de ruido de NVIDIA con la GPU. La imagen final (Renderizar imagen...) no se limpia.</translation>
+    </message>
 </context>
 <context>
     <name>SceneCategory</name>

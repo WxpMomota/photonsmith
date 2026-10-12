@@ -1,5 +1,8 @@
 // scene_builder_render.cpp - the Scene Builder's preview and final renders: running the renderer on the scene file and showing what it made (see scene_builder_widget.h).
 #include "scene_builder_widget.h"
+#include "../src/shared/oidn_runtime.h"
+#include "settings_keys.h"
+#include "denoiser_installer.h"
 
 #include "scene_builder_common.h"
 #include "app_log.h"
@@ -16,6 +19,8 @@
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDir>
+#include <QSignalBlocker>
+#include <QSettings>
 #include <QAbstractSpinBox>
 #include <QDoubleSpinBox>
 #include <QFile>
@@ -69,6 +74,30 @@ void SceneBuilderWidget::setSceneName(const QString &text) {
 	if (name == m_doc.title) return;
 	edit(QStringLiteral("title"), [&]() { m_doc.title = name; });
 }
+void SceneBuilderWidget::createDenoiseCheck(QWidget *parent) {
+	// Denoise: on by default where it costs nothing to ask (the library is already there); ticking it without the library offers the download, and unticks again if declined.
+	m_denoiseCheck = new QCheckBox(tr("Denoise"), parent);
+	m_denoiseCheck->setToolTip(tr("Clean the grain out of the Preview picture with an AI denoiser. A Draft picture has only 16 samples per pixel, so it is grainy without it. Uses Intel Open Image Denoise "
+	                              "on the CPU (downloaded once, with your permission) and NVIDIA's denoiser with the GPU. The final picture (Render picture...) is not denoised."));
+	m_denoiseCheck->setChecked(QSettings(settings_keys::kOrg, settings_keys::kApp).value(settings_keys::kSceneBuilderDenoiseKey, oidn_runtime::available()).toBool());
+	connect(m_denoiseCheck, &QCheckBox::toggled, this, [this](bool on) {
+		QSettings(settings_keys::kOrg, settings_keys::kApp).setValue(settings_keys::kSceneBuilderDenoiseKey, on);
+#ifdef Q_OS_MACOS
+		const bool needsLibrary = true;   // (the Metal renderer's denoiser is OIDN too)
+#else
+		const bool needsLibrary = !m_gpuCheck->isChecked();   // (OptiX has its own)
+#endif
+		if (!on || !needsLibrary || oidn_runtime::available() || !denoiser_installer::isSupportedHere()) return;
+		emit denoiserInstallRequested(
+			[this]() {
+				const QSignalBlocker blocker(m_denoiseCheck);
+				m_denoiseCheck->setChecked(false);
+				QSettings(settings_keys::kOrg, settings_keys::kApp).setValue(settings_keys::kSceneBuilderDenoiseKey, false);
+			},
+			[]() { oidn_runtime::rescan(); });   // (this process looked for the library before it existed)
+	});
+}
+
 void SceneBuilderWidget::startPreview(const std::function<void(bool, const QString &)> &done) {
 	static const int widths[3] = {480, 720, 960};
 	static const int spps[3] = {16, 64, 256};
@@ -122,7 +151,9 @@ void SceneBuilderWidget::runRender(int width, int height, int samples, bool toFi
 	if (!writeSceneFile(scene, &writeError)) return fail(writeError);
 
 	QStringList args;
-	args << (m_gpuCheck->isChecked() ? "--gpu" : "--cpu") << "--output" << base + ".ppm" << "--height" << QString::number(height)
+	args << (m_gpuCheck->isChecked() ? "--gpu" : "--cpu");
+	if (!toFinalFile && m_denoiseCheck && m_denoiseCheck->isChecked()) args << "--denoise";   // (the Preview only: a final picture is what was rendered; with no denoiser the renderer says so and goes on without)
+	args << "--output" << base + ".ppm" << "--height" << QString::number(height)
 	     << QString::number(width) << QString::number(samples) << QString::number(m_doc.render.maxDepth) << scene;
 
 	m_pendingFinalPng = toFinalFile ? finalPng : QString();

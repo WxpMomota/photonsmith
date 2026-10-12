@@ -8980,6 +8980,16 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <source>Ready-made mix</source>
         <translation>现成的混合材质</translation>
     </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="1"/>
+        <source>Denoise</source>
+        <translation>降噪</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="1"/>
+        <source>Clean the grain out of the Preview picture with an AI denoiser. A Draft picture has only 16 samples per pixel, so it is grainy without it. Uses Intel Open Image Denoise on the CPU (downloaded once, with your permission) and NVIDIA&apos;s denoiser with the GPU. The final picture (Render picture...) is not denoised.</source>
+        <translation>用 AI 降噪器清除预览图的颗粒。草稿质量每像素只有 16 个采样，没有降噪会很粗糙。CPU 上使用 Intel Open Image Denoise（经你允许下载一次），GPU 上使用 NVIDIA 的降噪器。最终图片（渲染图片...）不会降噪。</translation>
+    </message>
 </context>
 <context>
     <name>SceneCategory</name>

@@ -124,6 +124,7 @@ void MainWindow::createSceneBuilderTab() {
 	// "Add to scene list": list the saved file now (the registry grows while the program runs) and select it in the Settings tab.
 #ifdef RT_GUI_HAVE_LIVE_PREVIEW
 	// The rendered viewport and Live Preview cannot both have the GPU: starting the viewport stops a running Live Preview.
+	connect(m_sceneBuilder, &SceneBuilderWidget::denoiserInstallRequested, this, [this](const std::function<void()> &onDeclined, const std::function<void()> &onInstalled) { offerDenoiserInstall(onDeclined, onInstalled); });
 	connect(m_sceneBuilder, &SceneBuilderWidget::renderedViewportStarting, this, [this]() { if (m_livePreviewRunning) stopLivePreview(); });
 #endif
 	connect(m_sceneBuilder, &SceneBuilderWidget::sceneListed, this, [this](const QString &path) {

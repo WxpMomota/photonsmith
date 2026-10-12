@@ -33,6 +33,7 @@
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QSignalBlocker>
 #include <QPixmap>
 #include <QProcess>
 #include <QRegularExpression>
@@ -316,6 +317,7 @@ void SceneBuilderWidget::buildUi() {
 	m_qualityCombo->setToolTip(tr("Draft: 480 pixels wide, 16 samples. Good: 720 wide, 64 samples. Best: 960 wide, 256 samples."));
 	m_gpuCheck = new QCheckBox(tr("Use the GPU"), previewBox);
 	m_gpuCheck->setToolTip(tr("Render on the graphics card (NVIDIA OptiX on Windows, Metal on a Mac). Much faster for large pictures; needs a supported GPU."));
+	createDenoiseCheck(previewBox);   // the Preview's Denoise tick (scene_builder_render.cpp)
 	m_previewButton = new QPushButton(tr("Preview"), previewBox);
 	m_previewButton->setAutoDefault(false);
 	m_finalButton = new QPushButton(tr("Render picture..."), previewBox);
@@ -331,6 +333,7 @@ void SceneBuilderWidget::buildUi() {
 	renderRow->addWidget(new QLabel(tr("Quality:"), renderBar));
 	renderRow->addWidget(m_qualityCombo);
 	renderRow->addWidget(m_gpuCheck);
+	renderRow->addWidget(m_denoiseCheck);
 	scene_builder_ui::compactStyle(m_previewButton);
 	scene_builder_ui::compactStyle(m_finalButton);
 	renderRow->addWidget(m_previewButton);

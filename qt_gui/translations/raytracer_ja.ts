@@ -8974,6 +8974,16 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <source>Ready-made mix</source>
         <translation>既成のミックス</translation>
     </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="1"/>
+        <source>Denoise</source>
+        <translation>ノイズ除去</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="1"/>
+        <source>Clean the grain out of the Preview picture with an AI denoiser. A Draft picture has only 16 samples per pixel, so it is grainy without it. Uses Intel Open Image Denoise on the CPU (downloaded once, with your permission) and NVIDIA&apos;s denoiser with the GPU. The final picture (Render picture...) is not denoised.</source>
+        <translation>AIノイズ除去でプレビューのざらつきを取り除きます。下書き画質は1ピクセル16サンプルしかないため、これがないとざらつきます。CPUではIntel Open Image Denoise（許可を得て一度だけダウンロード）、GPUではNVIDIAのノイズ除去を使います。最終画像（画像をレンダリング...）にはかけません。</translation>
+    </message>
 </context>
 <context>
     <name>SceneCategory</name>

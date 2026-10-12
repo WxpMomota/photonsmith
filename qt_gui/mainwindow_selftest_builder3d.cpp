@@ -11,6 +11,7 @@
 #include "crash_recovery.h"
 #include "render_queue_model.h"
 #include "denoiser_installer.h"
+#include "settings_keys.h"
 #include "../src/shared/oidn_runtime.h"
 #include "../src/shared/mesh_preview.h"
 #include <random>
@@ -23,6 +24,7 @@
 #include <QDir>
 #include <QFile>
 #include <QDialog>
+#include <QSettings>
 #include <QLineEdit>
 #include <QKeyEvent>
 #include <QListWidget>
@@ -304,6 +306,17 @@ void MainWindow::selfTestMixedMaterial(SceneBuilderWidget *sb, const std::functi
 		check(sb->undo() && !scene_doc::isMix(sb->document().objects[3].material), "one undo takes it away again");
 	}
 	sb->selectObject(1);
+}
+
+// The Preview's Denoise tick: there, a checkbox in the Preview row, on by default only when the library is already installed (ticking it without the library would ask to download it, which a
+// test must not do), saved as the setting, and read by the next Preview.
+void MainWindow::selfTestPreviewDenoise(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
+	QCheckBox *tick = sb->denoiseCheckForTest();
+	check(tick != nullptr && tick->text() == QStringLiteral("Denoise"), "the Preview row has a Denoise tick");
+	if (!tick) return;
+	check(tick->isChecked() == oidn_runtime::available() || QSettings(settings_keys::kOrg, settings_keys::kApp).contains(settings_keys::kSceneBuilderDenoiseKey),
+	      "it starts on exactly when the denoiser library is already there (or as the person left it)");
+	check(!tick->toolTip().isEmpty(), "and it says what it does");
 }
 
 // The placement of a texture (Material::uvScaleU...): a material with a texture (here a checker) has Texture repeats / shift rows; they change the document and the coordinates in the
@@ -622,6 +635,7 @@ void MainWindow::selfTestShapes(SceneBuilderWidget *sb, const std::function<void
 	}
 	selfTestLights(sb, check);
 	selfTestMixedMaterial(sb, check);
+	selfTestPreviewDenoise(sb, check);
 	selfTestTexturePlacement(sb, check);
 	selfTestMoreShapes(sb, check);
 	// The Preset list in a material's properties: choosing "Gold" in the real combo box makes the selected object a gold conductor, as one undo step.

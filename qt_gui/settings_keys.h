@@ -50,6 +50,7 @@ constexpr const char *kLivePreviewNeuralUpscaleEnabledKey = "livePreview/neuralU
 constexpr const char *kLivePreviewDofEnabledKey = "livePreview/dofEnabled";
 constexpr const char *kLivePreviewSmoothNoiseKey = "livePreview/smoothNoise";
 constexpr const char *kLivePreviewAiDenoiseKey = "livePreview/aiDenoise";
+constexpr const char *kSceneBuilderDenoiseKey = "sceneBuilder/denoisePreview";   // the Scene Builder Preview's Denoise tick
 constexpr const char *kLivePreviewAutoExposureKey = "livePreview/autoExposure";
 constexpr const char *kLivePreviewApertureKey = "livePreview/aperture";
 constexpr const char *kLivePreviewFocusDistanceKey = "livePreview/focusDistance";
