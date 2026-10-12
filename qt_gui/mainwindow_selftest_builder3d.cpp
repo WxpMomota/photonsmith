@@ -90,7 +90,12 @@ void MainWindow::runBuilder3dSelfTest(const std::function<void(const QString &)>
 			}
 		}
 		const scene_doc::Float3 ball0 = sb->document().objects[1].position;
+		// This step is about the grid: with Snap to objects on (the default), a drop that ends near another object's edge or middle lines up with that instead (it did on a Mac, where the
+		// 3D view has another size), which is right but not what is checked here.
+		const bool snapToObjects = sb->snapToObjects();
+		sb->setSnapToObjects(false);
 		check(sb->dragObject3dForTest(1, QPointF(70, -25)), "dragging the glass ball in the 3D view moves it");
+		sb->setSnapToObjects(snapToObjects);
 		const scene_doc::Float3 ball1 = sb->document().objects[1].position;
 		check(ball1.y == ball0.y, "it stayed at its height (a drag on the floor plane)");
 		check(std::fabs(ball1.x * 4 - std::round(ball1.x * 4)) < 1e-9 && std::fabs(ball1.z * 4 - std::round(ball1.z * 4)) < 1e-9, "its new position is on the grid");

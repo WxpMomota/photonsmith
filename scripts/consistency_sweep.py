@@ -316,6 +316,8 @@ class Sweep:
         write_png(self.height, 8, 8, height_pixel)
         self.height_tiled = os.path.join(workdir, "height_tiled.png").replace("\\", "/")
         write_png(self.height_tiled, 16, 16, lambda x, y: height_pixel(x % 8, y % 8))
+        self.tilted_normal = os.path.join(workdir, "tilted_normal.png").replace("\\", "/")   # a normal map that leans every normal to one side
+        write_png(self.tilted_normal, 4, 4, lambda x, y: (250, 128, 140))
         self.n = 0
         self.cache = {}
 
@@ -437,12 +439,15 @@ def run(args):
         # bump and normal maps that change nothing: a constant displacement, and a flat normal map
         check("texture", "constant displacement texture changes nothing", backend, Scene(material_text=diffuse_inline),
               Scene(material_text='Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "texture displacement" [ "d" ]', prelude='Texture "d" "float" "constant" "float value" [ 0.3 ]'), tolerance=tol)
+        # (pbrt's own "string normalmap" is not read by the loader, so a pair written with it compared a scene with itself; a normal map is a "texture displacement" bound to an RGB picture)
+        flat_normal_decl = 'Texture "nm" "float" "imagemap" "string filename" [ "%s" ] "string encoding" [ "linear" ]' % sw.flat_normal
+        normal_material = 'Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "texture displacement" [ "nm" ]'
         check("texture", "flat normal map changes nothing", backend, Scene(material_text=diffuse_inline),
-              Scene(material_text='Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "string normalmap" [ "%s" ]' % sw.flat_normal), tolerance=tol)
+              Scene(material_text=normal_material, prelude=flat_normal_decl), tolerance=tol)
         # a normal map on a shape the renderer draws as an analytic surface: a disk and a cylinder used to stop the whole OptiX render ("MaterialType 14 is not supported"), and a flat map changes nothing
         for shape in ("disk", "cylinder"):
             check("normalmap", "flat normal map changes nothing, %s" % shape, backend, Scene(material_text=diffuse_inline, shape=shape),
-                  Scene(material_text='Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "string normalmap" [ "%s" ]' % sw.flat_normal, shape=shape), tolerance=tol)
+                  Scene(material_text=normal_material, prelude=flat_normal_decl, shape=shape), tolerance=tol)
         # the sky's scale: a constant sky at 0.4 against a white picture at scale 0.4
         check("skyscale", "constant sky at 0.4 vs white picture at scale 0.4", backend, Scene(material="diffuse", sky="constant", sky_scale=0.4, fill=True),
               Scene(material="diffuse", sky="picture", sky_png=sw.white, sky_scale=0.4, fill=True), tolerance=tol)
@@ -516,6 +521,28 @@ def run(args):
                     print("  %-4s %-34s %s  %.4f vs %.4f  off by %.1f%%" % ("both", "cpu vs gpu, %s, %s" % (label, name), "ok   " if worst <= limit else "WRONG", ma[1], mb[1], worst))
                 if worst > limit:
                     failures.append(("backends", "both", "%s, %s" % (label, name)))
+    # a normal map and a height map on shapes the GPU draws as triangles (or, on a disk and a cylinder, as analytic surfaces with their own derivatives): the CPU's picture. A sphere has none
+    # on Metal (a map on a sphere is not drawn there), so it is not listed.
+    if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "maps" in only):
+        print("[cpu vs gpu, normal and height maps]")
+        tilted = ('Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "texture displacement" [ "nm" ]', 'Texture "nm" "float" "imagemap" "string filename" [ "%s" ] "string encoding" [ "linear" ]' % sw.tilted_normal)
+        height = ('Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "texture displacement" [ "b" ]',
+                  'Texture "h" "float" "imagemap" "string filename" [ "%s" ] "string wrap" [ "repeat" ] "string encoding" [ "linear" ]\nTexture "b" "float" "scale" "texture tex" [ "h" ] "float scale" [ 1.5 ]' % sw.height)
+        for shape in ("disk", "cylinder", "uvquad", "cone", "cube"):
+            for label, (mat, decl) in (("tilted normal map", tilted), ("height map", height)):
+                scene = Scene(material_text=mat, prelude=decl, shape=shape)
+                total += 1
+                try:
+                    ma, mb = sw.render("cpu", scene), sw.render("gpu", scene)
+                except RuntimeError as e:
+                    print("  both cpu vs gpu, %s, %s: FAILED TO RENDER: %s" % (label, shape, e))
+                    failures.append(("maps", "both", "%s, %s" % (label, shape)))
+                    continue
+                worst = max(abs(x - y) / max(abs(x), 1e-6) for x, y in zip(ma, mb)) * 100.0
+                if worst > 4.0 or args.verbose:
+                    print("  %-4s %-34s %s  %.4f vs %.4f  off by %.1f%%" % ("both", "cpu vs gpu, %s, %s" % (label, shape), "ok   " if worst <= 4.0 else "WRONG", ma[1], mb[1], worst))
+                if worst > 4.0:
+                    failures.append(("maps", "both", "%s, %s" % (label, shape)))
     print("\n%d pairs, %d off by more than %g%%" % (total, len(failures), tol))
     if not args.keep:
         shutil.rmtree(workdir, ignore_errors=True)
