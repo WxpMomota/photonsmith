@@ -31,14 +31,32 @@ struct TessellationCaps {
 	bool curves = false;
 	bool cones = false;
 	bool paraboloids = false;
-	static TessellationCaps all() { return {true, true, true, true}; }                  // Metal: only triangles and the three analytic shapes it has
-	static TessellationCaps conesAndParaboloids() { return {false, false, true, true}; }   // OptiX: its patches and curve dicing are native
+	// A disk or cylinder whose material draws a picture, a checker or a bump map through the surface's (u, v). Metal's analytic disk and cylinder carry no
+	// coordinates, so a picture on one would not be drawn at all (and its repeats and shift could not apply); as triangles they get pbrt's own (u, v).
+	bool texturedQuadrics = false;
+	static TessellationCaps all() { return {true, true, true, true, true}; }            // Metal: only triangles and the three analytic shapes it has
+	static TessellationCaps conesAndParaboloids() { return {false, false, true, true, false}; }   // OptiX: its patches and curve dicing are native
 };
 
 // Triangle index (in scene.triangles after the call) -> the fibre direction of the curve tube it came from, which a hair shader wants.
 using FiberTangents = std::unordered_map<int, std::array<float, 3>>;
 
 namespace tessellate_detail {
+
+// Does the material look something up through the surface's (u, v)? A reflectance picture, a checker or a bump / normal map.
+inline bool usesSurfaceCoordinates(const pbrt_flatten::FlatScene& scene, int material) {
+    if (material < 0 || material >= (int)scene.materials.size()) return false;
+    const pbrt_flatten::Material& m = scene.materials[material];
+    return !m.textureFilename.empty() || !m.displacementTextureFilename.empty() || m.hasCheckerReflectance;
+}
+
+// A disk or cylinder that Metal should draw as triangles: textured, not a light, not in a medium, not moving.
+template <class Quadric>
+inline bool tessellateAsTextured(const pbrt_flatten::FlatScene& scene, const Quadric& q) {
+    if (q.areaLight >= 0 || q.medium >= 0 || !usesSurfaceCoordinates(scene, q.material)) return false;
+    for (int i = 0; i < 16; ++i) if (q.xform[i] != q.xformEnd[i]) return false;
+    return true;
+}
 
 using pbrt_flatten::quadric_tessellate::kPi;
 using pbrt_flatten::quadric_tessellate::normalize3;
@@ -89,6 +107,20 @@ inline size_t tessellateForBackend(pbrt_flatten::FlatScene& scene, const Tessell
         pbrt_flatten::quadric_tessellate::tessellateParaboloid(pa, out);
     }
 
+    // A textured disk or cylinder (caps.texturedQuadrics): triangles with pbrt's (u, v), so the picture is drawn and its repeats and shift apply.
+    std::vector<pbrt_flatten::Disk> keptDisks;
+    std::vector<pbrt_flatten::Cylinder> keptCylinders;
+    if (caps.texturedQuadrics) {
+        for (const pbrt_flatten::Disk& d : scene.disks) {
+            if (isInterface(d.material) || !tessellate_detail::tessellateAsTextured(scene, d)) { keptDisks.push_back(d); continue; }
+            pbrt_flatten::quadric_tessellate::tessellateDisk(d, out);
+        }
+        for (const pbrt_flatten::Cylinder& cy : scene.cylinders) {
+            if (isInterface(cy.material) || !tessellate_detail::tessellateAsTextured(scene, cy)) { keptCylinders.push_back(cy); continue; }
+            pbrt_flatten::quadric_tessellate::tessellateCylinder(cy, out);
+        }
+    }
+
     // Curve: every Bezier segment becomes a tapered 8-sided tube (the same dicing density OptiX
     // uses); width interpolates across the WHOLE curve, as in pbrt-v4. Flat-shaded.
     for (const pbrt_flatten::Curve& cv : scene.curves) {
@@ -132,6 +164,7 @@ inline size_t tessellateForBackend(pbrt_flatten::FlatScene& scene, const Tessell
     if (caps.cones) scene.cones.clear();
     if (caps.paraboloids) scene.paraboloids.clear();
     if (caps.curves) scene.curves.clear();
+    if (caps.texturedQuadrics) { scene.disks = std::move(keptDisks); scene.cylinders = std::move(keptCylinders); }
     return out.size();
 }
 

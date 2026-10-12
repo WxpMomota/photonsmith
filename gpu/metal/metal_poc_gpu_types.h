@@ -480,6 +480,11 @@ struct TriangleMaterial {
     int32_t alphaOffset = 0;
     int32_t alphaWidth = 0;
     int32_t alphaHeight = 0;
+    // pbrt "imagemap" UV mapping (uscale/vscale/udelta/vdelta): the picture is looked up at (su*u + du, sv*v + dv), before it wraps.
+    // uvScale/uvDelta is for the reflectance picture (materialType 26/27/9); bumpUv* for the bump / normal-map picture (bumpWidth > 0).
+    // (1, 1, 0, 0) is the identity. The other image slots use the surface coordinates as they are.
+    float uvScaleU = 1.0f, uvScaleV = 1.0f, uvDeltaU = 0.0f, uvDeltaV = 0.0f;
+    float bumpUvScaleU = 1.0f, bumpUvScaleV = 1.0f, bumpUvDeltaU = 0.0f, bumpUvDeltaV = 0.0f;
 };
 
 // Mirrors metal_poc_types.metal's GpuCloudMedium byte-for-byte (E2,
