@@ -8918,6 +8918,11 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <source>The surface is the first material at some points and the second at others, chosen afresh at each point, so the two grade into one another: 0 is all the first, 1 all the second, 0.5 half each. Use it for worn paint over metal, rust, dirt, a glaze that has chipped. The second material is a plain one (no picture, pattern or bump); the first keeps all of its own.</source>
         <translation>表面在某些点上是第一种材质，在另一些点上是第二种，每个点重新选择，因此两者会自然过渡：0 为全部第一种，1 为全部第二种，0.5 各占一半。可用于金属上磨损的油漆、锈迹、污垢或剥落的釉面。第二种材质是简单材质（没有图片、图案或凹凸）；第一种保留它自己的全部功能。</translation>
     </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="40"/>
+        <source>About this</source>
+        <translation>说明</translation>
+    </message>
 </context>
 <context>
     <name>SceneCategory</name>

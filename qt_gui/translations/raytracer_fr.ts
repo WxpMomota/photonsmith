@@ -9015,6 +9015,11 @@ La forme est une estimation : l&apos;arrière est inventé et les détails fins 
         <source>The surface is the first material at some points and the second at others, chosen afresh at each point, so the two grade into one another: 0 is all the first, 1 all the second, 0.5 half each. Use it for worn paint over metal, rust, dirt, a glaze that has chipped. The second material is a plain one (no picture, pattern or bump); the first keeps all of its own.</source>
         <translation>La surface est le premier matériau en certains points et le second en d&apos;autres, choisi à nouveau en chaque point, de sorte que les deux se fondent l&apos;un dans l&apos;autre : 0 est tout le premier, 1 tout le second, 0,5 moitié-moitié. Utile pour de la peinture usée sur du métal, de la rouille, de la saleté ou une glaçure écaillée. Le second matériau est simple (sans image, motif ni relief) ; le premier garde tout ce qui lui est propre.</translation>
     </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="40"/>
+        <source>About this</source>
+        <translation>À propos</translation>
+    </message>
 </context>
 <context>
     <name>SceneCategory</name>

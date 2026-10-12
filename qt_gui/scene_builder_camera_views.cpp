@@ -59,7 +59,8 @@ void SceneBuilderWidget::createCameraBar(QWidget *layoutBox) {
 	m_pathCheck->setChecked(true);
 	m_pathCheck->setToolTip(tr("With two or more saved views, draw the path a flythrough would take through them (the orange curve), with a marker at each view. Drag a marker to move that view (Shift: up and down); press one to see where it looks, and drag the ring at its target too."));
 	flow->addWidget(m_pathCheck);
-	auto *scrubLabel = new QLabel(tr("Flythrough:"), m_cameraBar);
+	m_scrubLabel = new QLabel(tr("Flythrough:"), m_cameraBar);
+	auto *scrubLabel = m_scrubLabel;
 	m_scrubSlider = new QSlider(Qt::Horizontal, m_cameraBar);
 	m_scrubSlider->setRange(0, 1000);
 	m_scrubSlider->setMinimumWidth(140);
@@ -169,6 +170,8 @@ void SceneBuilderWidget::refreshScrub() {
 	const bool enough = m_doc.cameraViews.size() >= 2;
 	m_scrubSlider->setEnabled(enough);
 	m_playButton->setEnabled(enough);
+	// Without two saved views there is no path to draw or fly along: these four take a row of the bar and the 3D view's height for nothing, so they appear with the second view.
+	for (QWidget *w : {static_cast<QWidget *>(m_scrubLabel), static_cast<QWidget *>(m_scrubSlider), static_cast<QWidget *>(m_playButton), static_cast<QWidget *>(m_pathCheck)}) w->setVisible(enough);
 	if (!enough) {
 		stopPlay();
 		if (m_view3d->previewingFlythrough()) m_view3d->setThroughCamera(false);

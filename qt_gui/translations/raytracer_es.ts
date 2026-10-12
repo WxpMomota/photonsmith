@@ -8963,6 +8963,11 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <source>The surface is the first material at some points and the second at others, chosen afresh at each point, so the two grade into one another: 0 is all the first, 1 all the second, 0.5 half each. Use it for worn paint over metal, rust, dirt, a glaze that has chipped. The second material is a plain one (no picture, pattern or bump); the first keeps all of its own.</source>
         <translation>La superficie es el primer material en unos puntos y el segundo en otros, elegido de nuevo en cada punto, de modo que los dos se funden: 0 es todo el primero, 1 todo el segundo, 0,5 mitad y mitad. Sirve para pintura desgastada sobre metal, óxido, suciedad o un esmalte desconchado. El segundo material es uno sencillo (sin imagen, patrón ni relieve); el primero conserva todo lo suyo.</translation>
     </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="40"/>
+        <source>About this</source>
+        <translation>Acerca de esto</translation>
+    </message>
 </context>
 <context>
     <name>SceneCategory</name>

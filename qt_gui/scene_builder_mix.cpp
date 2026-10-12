@@ -100,9 +100,7 @@ void SceneBuilderWidget::addMixRows(QFormLayout *f, int i) {
 			addNum(f, named(tr("Surface roughness")), [second]() { return second() ? &second()->roughness : nullptr; }, 0, 1, 0.02, 2);
 			break;
 	}
-	auto *hint = new QLabel(tr("The surface is the first material at some points and the second at others, chosen afresh at each point, so the two grade into one another: "
+	addHint(f, tr("The surface is the first material at some points and the second at others, chosen afresh at each point, so the two grade into one another: "
 	                           "0 is all the first, 1 all the second, 0.5 half each. Use it for worn paint over metal, rust, dirt, a glaze that has chipped. The second material is "
 	                           "a plain one (no picture, pattern or bump); the first keeps all of its own."));
-	hint->setWordWrap(true);
-	f->addRow(hint);
 }

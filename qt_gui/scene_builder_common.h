@@ -3,7 +3,11 @@
 
 #include <QColor>
 #include <QCoreApplication>
+#include <QFormLayout>
 #include <QKeySequence>
+#include <QLabel>
+#include <QToolButton>
+#include <QVBoxLayout>
 #include <QObject>
 #include <QWidget>
 #include <QString>
@@ -20,7 +24,39 @@ namespace scene_builder_ui {
 
 // The toolbar buttons are plain and close together, so a row of them fits (and wraps) in a narrow window: less side padding than the application's own button style.
 // (The vertical padding is the common one, so the height is too: only the width is tighter.)
-inline void compactStyle(QWidget *button) { button->setStyleSheet(QStringLiteral("padding: 6px 12px;")); }
+inline void compactStyle(QWidget *button) { button->setStyleSheet(QStringLiteral("padding: 6px 8px;")); }
+
+// A long explanation under a group of properties (what the mix amount means, how the projector's strength falls off...) is folded to one "About this" line, so the properties page is
+// the rows a person edits and not three paragraphs they have read already. One click opens it, and the choice is kept for the pages built after it (every hint opens together).
+inline bool &hintsOpen() {
+	static bool open = false;
+	return open;
+}
+inline void addHint(QFormLayout *f, const QString &text) {
+	auto *host = new QWidget;
+	auto *column = new QVBoxLayout(host);
+	column->setContentsMargins(0, 0, 0, 0);
+	column->setSpacing(2);
+	auto *toggle = new QToolButton(host);
+	toggle->setAutoRaise(true);
+	toggle->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+	toggle->setCursor(Qt::PointingHandCursor);
+	auto *body = new QLabel(text, host);
+	body->setWordWrap(true);
+	const auto show = [toggle, body](bool open) {
+		toggle->setArrowType(open ? Qt::DownArrow : Qt::RightArrow);   // (Qt's own arrow: a triangle character is not in every font)
+		toggle->setText(QCoreApplication::translate("SceneBuilderWidget", "About this"));
+		body->setVisible(open);
+	};
+	show(hintsOpen());
+	QObject::connect(toggle, &QToolButton::clicked, host, [show]() {
+		hintsOpen() = !hintsOpen();
+		show(hintsOpen());
+	});
+	column->addWidget(toggle, 0, Qt::AlignLeft);
+	column->addWidget(body);
+	f->addRow(host);
+}
 
 using scene_doc::LightKind;
 using scene_doc::MaterialKind;

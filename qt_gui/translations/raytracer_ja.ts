@@ -8912,6 +8912,11 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <source>The surface is the first material at some points and the second at others, chosen afresh at each point, so the two grade into one another: 0 is all the first, 1 all the second, 0.5 half each. Use it for worn paint over metal, rust, dirt, a glaze that has chipped. The second material is a plain one (no picture, pattern or bump); the first keeps all of its own.</source>
         <translation>表面は、点ごとに最初のマテリアルか 2 つ目のマテリアルのどちらかになり、その選択は点ごとにやり直されるので、2 つが混ざり合って見えます。0 は最初のみ、1 は 2 つ目のみ、0.5 は半々です。金属の上のはげた塗装、錆、汚れ、欠けた釉薬などに使えます。2 つ目は単純なマテリアル (画像・パターン・バンプなし) で、最初のマテリアルはそのまま全機能を保ちます。</translation>
     </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="40"/>
+        <source>About this</source>
+        <translation>これについて</translation>
+    </message>
 </context>
 <context>
     <name>SceneCategory</name>

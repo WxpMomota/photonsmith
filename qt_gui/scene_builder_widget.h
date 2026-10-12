@@ -421,6 +421,7 @@ private:
 	QTimer *m_playTimer = nullptr;
 	QElapsedTimer m_playClock;
 	double m_playProgress = 0.0;             // where the playing preview is, 0..1 (the slider is only 1000 steps)
+	QLabel *m_scrubLabel = nullptr;          // the "Flythrough:" label beside it (hidden with it)
 	QSlider *m_scrubSlider = nullptr;        // Flythrough: scrubs the 3D view along the saved views' path (0..1000)
 	QCheckBox *m_pathCheck = nullptr;        // Camera path: draw the flythrough's path in the 3D view
 	QWidget *m_cameraBar = nullptr;          // the 3D view's camera buttons: Through camera, Camera from view, the saved views

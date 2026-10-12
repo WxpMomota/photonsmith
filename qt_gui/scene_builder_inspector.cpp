@@ -370,11 +370,9 @@ void SceneBuilderWidget::inspectCamera(QFormLayout *f) {
 	pick->setToolTip(tr("Then click what should be sharp: the focus distance becomes how far that is from the camera along the way it looks"));
 	connect(pick, &QPushButton::clicked, this, [this]() { beginPickFocus(); });
 	f->addRow(pick);
-	auto *hint = new QLabel(tr("The focal length and the sensor tell the field of view the way a photographer's lens does (50 mm on a 36 mm sensor is about 40 degrees across), and "
+	addHint(f, tr("The focal length and the sensor tell the field of view the way a photographer's lens does (50 mm on a 36 mm sensor is about 40 degrees across), and "
 	                           "the picture's shape crops the sensor, as in a real camera. The aperture sets the lens radius for a scene where one unit is a metre (50 mm at f/1.8 "
 	                           "is 0.014): a lens radius above 0 blurs what is not at the focus distance (depth of field), the more the wider the opening and the longer the lens."));
-	hint->setWordWrap(true);
-	f->addRow(hint);
 	addHeading(f, tr("Picture"));
 	addInt(f, tr("Width (pixels)"), [this]() { return &m_doc.render.width; }, 1, 16384);
 	addInt(f, tr("Height (pixels)"), [this]() { return &m_doc.render.height; }, 1, 16384);
@@ -537,11 +535,9 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 			addNum(f, tr("Travels under the surface: blue"), [mat]() { return mat() ? &mat()->scatterDistance.b : nullptr; }, 0.001, 1000, 0.01, 3);
 			addNum(f, tr("Index of refraction"), [mat]() { return mat() ? &mat()->ior : nullptr; }, 1.0, 3.0, 0.05, 2);
 			addNum(f, tr("Surface roughness"), [mat]() { return mat() ? &mat()->roughness : nullptr; }, 0, 1, 0.02, 2);
-			auto *hint = new QLabel(tr("Light goes into the surface, wanders about and comes out somewhere else, which softens the shading the way skin, wax, milk and marble are soft. The "
+			addHint(f, tr("Light goes into the surface, wanders about and comes out somewhere else, which softens the shading the way skin, wax, milk and marble are soft. The "
 			                           "distances are how far each colour travels before it scatters, in the scene's units: a tenth to a half of the object's size looks translucent, "
 			                           "much more looks like fog inside glass. A colour that travels further glows further from where the light went in (skin's red does)."));
-			hint->setWordWrap(true);
-			f->addRow(hint);
 			break;
 		}
 	}
@@ -615,13 +611,11 @@ void SceneBuilderWidget::inspectVolume(QFormLayout *f, int i) {
 		addNum(f, tr("Wispiness"), [obj]() { return obj() ? &obj()->volume.wispiness : nullptr; }, 0, 2, 0.1, 2);
 		addNum(f, tr("Detail (lumps across)"), [obj]() { return obj() ? &obj()->volume.frequency : nullptr; }, 0.5, 30, 0.5, 1);
 	}
-	auto *hint = new QLabel(o.volume.kind == VolumeKind::Cloud
+	addHint(f, o.volume.kind == VolumeKind::Cloud
 	                            ? tr("A cloud scatters light and never absorbs it. Density is how thick it is: about 6 is a solid white cloud, 1 is a thin haze. Forward scattering above 0 "
 	                                 "gives the bright silver edge against the sun.")
 	                            : tr("Density is how quickly the light is scattered or absorbed per unit of distance: 0.3 is a light mist in a sphere a few units across, 2 is thick. "
 	                                 "The colour is what is scattered: white fog only scatters, so it glows; a dark colour absorbs the rest and looks like smoke."));
-	hint->setWordWrap(true);
-	f->addRow(hint);
 }
 
 void SceneBuilderWidget::inspectObject(QFormLayout *f, int i) {
@@ -753,11 +747,9 @@ void SceneBuilderWidget::inspectLight(QFormLayout *f, int i) {
 		addVec3(f, tr("Aims at"), [lt]() { return lt() ? &lt()->target : nullptr; }, 0.25);
 		addNum(f, tr("Field of view"), [lt]() { return lt() ? &lt()->fov : nullptr; }, 1, 170, 1, 1, QString::fromUtf8(" \xC2\xB0"));
 		addFile(f, tr("Slide picture"), [lt]() { return lt() ? &lt()->imageFile : nullptr; }, tr("Images (*.png *.jpg *.jpeg *.bmp *.tga *.exr *.hdr)"));
-		auto *hint = new QLabel(tr("A slide projector: the picture shines out through a frustum, onto whatever it falls on, with the colours of the picture. The field of view is the angle across "
+		addHint(f, tr("A slide projector: the picture shines out through a frustum, onto whatever it falls on, with the colours of the picture. The field of view is the angle across "
 		                           "the picture's shorter side. Strength is the brightness of the whitest part of the picture; a surface facing the projector from distance d is lit with "
 		                           "Strength / d squared. The top of the picture points up as far as the aim allows."));
-		hint->setWordWrap(true);
-		f->addRow(hint);
 	}
 	if (l.kind == LightKind::Distant) {
 		addVec3(f, tr("Shines from"), [lt]() { return lt() ? &lt()->position : nullptr; }, 0.25);
@@ -796,18 +788,14 @@ void SceneBuilderWidget::inspectLight(QFormLayout *f, int i) {
 			addNum(f, tr("Sun direction"), [lt]() { return lt() ? &lt()->sky.sunAzimuth : nullptr; }, 0, 360, 5, 0, QString::fromUtf8(" \xC2\xB0"));
 			addNum(f, tr("Haze"), [lt]() { return lt() ? &lt()->sky.turbidity : nullptr; }, 1.7, 10, 0.1, 1);
 			addNum(f, tr("Ground brightness"), [lt]() { return lt() ? &lt()->sky.groundAlbedo : nullptr; }, 0, 1, 0.05, 2);
-			auto *hint = new QLabel(tr("The sky picture and the Sun light are made from these settings; change the sun here rather than moving the Sun light. Direction 0 is "
+			addHint(f, tr("The sky picture and the Sun light are made from these settings; change the sun here rather than moving the Sun light. Direction 0 is "
 			                           "towards +X, 90 away from the starting camera, 180 towards -X, 270 behind it. Brightness 1 is a daylight scene."));
-			hint->setWordWrap(true);
-			f->addRow(hint);
 		} else {
 			addFile(f, tr("Sky image"), [lt]() { return lt() ? &lt()->imageFile : nullptr; }, tr("Images (*.exr *.hdr *.png *.jpg *.jpeg)"), false,
 			        [](const QString &) {});   // (a choice shows the rotation row)
 			if (!l.imageFile.empty()) addNum(f, tr("Rotate sky"), [lt]() { return lt() ? &lt()->skySpin : nullptr; }, -360, 360, 5, 0, QString::fromUtf8(" \xC2\xB0"));
-			auto *hint = new QLabel(tr("Leave the image empty for a plain colour sky. An image is an equirectangular (lat-long) panorama; Rotate sky turns it about the vertical axis "
+			addHint(f, tr("Leave the image empty for a plain colour sky. An image is an equirectangular (lat-long) panorama; Rotate sky turns it about the vertical axis "
 			                           "(counter-clockwise seen from above), to put the bright part of the picture where you want the light to come from."));
-			hint->setWordWrap(true);
-			f->addRow(hint);
 		}
 	}
 	if (l.kind == LightKind::Projector) {}   // (the picture gives the colour)
