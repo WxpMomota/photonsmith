@@ -31,6 +31,7 @@ inline bool available() {
 	MetalDiagnostics d{};
 	return metal_get_diagnostics(&d);
 }
+inline bool prepare() { return metal_prepare_renderer(); }   // build and cache the GPU renderer (see metal_interface.h): `--prepare-gpu`
 inline int render(int width, int height, int samples, int maxDepth, const char* outputPath, const char* sceneId, double camX, double camY, double camZ,
                   int forceCameraOverride, const RenderOptions& options) {
 	return metal_render_main(width, height, samples, maxDepth, outputPath, sceneId, camX, camY, camZ, forceCameraOverride, options);
@@ -42,6 +43,7 @@ inline const char* entryPoint() { return "optix_render_main"; }
 inline const char* reportTag() { return "OptiX"; }
 inline const char* failureHint() { return nullptr; }   // nullptr: report_render_result() prints the error code's own text
 inline bool available() { return optix_is_available(); }
+inline bool prepare() { return true; }   // OptiX has nothing to build ahead of time
 inline int render(int width, int height, int samples, int maxDepth, const char* outputPath, const char* sceneId, double camX, double camY, double camZ,
                   int forceCameraOverride, const RenderOptions& options) {
 	return optix_render_main(width, height, samples, maxDepth, outputPath, sceneId, camX, camY, camZ, forceCameraOverride, options);

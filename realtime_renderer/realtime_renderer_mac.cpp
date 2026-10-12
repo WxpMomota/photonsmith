@@ -8,6 +8,7 @@
 // samples and the GUI accumulates frames itself. realtime_backend_features() tells the GUI which controls to offer.
 #include <atomic>
 
+#include "../gpu/metal/metal_interface.h"   // metal_prepare_renderer()
 #include "../gpu/metal/metal_live_preview.h"
 #include "../src/shared/realtime_api.h"
 
@@ -28,6 +29,10 @@ RT_REALTIME_API bool realtime_render_frame(
 		cam_x, cam_y, cam_z, has_custom_lookat, lookat_x, lookat_y, lookat_z,
 		max_component_value, frame.fetch_add(1u), out_rgb_buffer, out_world_pos_buffer, out_camera_basis,
 		aperture_override, focus_distance_override);
+}
+
+RT_REALTIME_API bool realtime_warm_up() {
+	return metal_prepare_renderer();
 }
 
 RT_REALTIME_API const char* realtime_get_last_error() {

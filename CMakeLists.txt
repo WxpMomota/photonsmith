@@ -742,6 +742,11 @@ if(RT_BUILD_METAL)
         set_tests_properties(metal_poc_consistency PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" TIMEOUT 900)
     endif()
 
+    # `ray_tracer --prepare-gpu` builds the renderer for this Mac (both shader variants) and exits 0: about a second when Metal's cache has them, about four minutes on a Mac that has
+    # never built this source (the first run of a fresh build). The GUI starts the same thing in the background at launch.
+    add_test(NAME metal_poc_prepare_gpu COMMAND $<TARGET_FILE:ray_tracer> --prepare-gpu)
+    set_tests_properties(metal_poc_prepare_gpu PROPERTIES PASS_REGULAR_EXPRESSION "The GPU renderer is ready" TIMEOUT 900)
+
     add_test(NAME metal_poc_seed_reproducible
         COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/metal_poc_seed_test.sh"
             $<TARGET_FILE:ray_tracer> "${CMAKE_BINARY_DIR}")

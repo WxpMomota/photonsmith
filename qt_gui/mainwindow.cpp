@@ -1,4 +1,6 @@
 #include "mainwindow.h"
+#include "gpu_warmup.h"
+#include <QStatusBar>
 #include "app_log.h"
 #include "startup_profile.h"
 #include "window_geometry.h"
@@ -1005,6 +1007,17 @@ MainWindow::MainWindow(QWidget *parent, const QString &startupLanguageCode)
 	m_metalGpuAvailable = probeMetalGpuAvailable();
 #endif
 	{ startup_profile::Stage s("setupUI"); setupUI(); }
+#ifdef Q_OS_MAC
+	// Metal builds its renderer for this Mac the first time (about a minute and a half): do it now, in the background, and say so (gpu_warmup.h).
+	if (m_metalGpuAvailable) {
+		GpuWarmup *warmup = new GpuWarmup(this);
+		connect(warmup, &GpuWarmup::slow, this, [this] { statusBar()->showMessage(tr("Preparing the GPU renderer for this Mac (first run only, about a minute or two)..."), 0); });
+		connect(warmup, &GpuWarmup::done, this, [this](bool ok, bool wasSlow) {
+			if (wasSlow) statusBar()->showMessage(ok ? tr("The GPU renderer is ready.") : tr("The GPU renderer could not be prepared ahead of time; the first GPU render will build it."), 8000);
+		});
+		warmup->start();
+	}
+#endif
 	{ startup_profile::Stage s("theme and font"); applyTheme(m_activeTheme); applyFont(m_startupFontId); restyleThemedWidgets(); }
 
 	// Notification-only tray icon: the app has no tray menu and never hides

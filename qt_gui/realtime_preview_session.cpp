@@ -31,6 +31,7 @@ struct DllHandle {
 	RealtimeSetObjectOffsetFn setObjectOffsetFn = nullptr;
 	RealtimeResetObjectsFn resetObjectsFn = nullptr;
 	RealtimeExportArrangementFn exportArrangementFn = nullptr;
+	RealtimeWarmUpFn warmUpFn = nullptr;                       // optional: an older library has none
 };
 
 #ifdef Q_OS_WIN
@@ -70,6 +71,8 @@ DllHandle& handle() {
 			cross_abi_library::lookupSymbol(h.module, "realtime_reset_objects"));
 		h.exportArrangementFn = reinterpret_cast<RealtimeExportArrangementFn>(
 			cross_abi_library::lookupSymbol(h.module, "realtime_export_arrangement"));
+		h.warmUpFn = reinterpret_cast<RealtimeWarmUpFn>(
+			cross_abi_library::lookupSymbol(h.module, "realtime_warm_up"));
 	});
 	return h;
 }
@@ -78,6 +81,11 @@ DllHandle& handle() {
 
 bool RealtimePreviewSession::isAvailable() {
 	return handle().renderFrameFn != nullptr;
+}
+
+bool RealtimePreviewSession::warmUp() {
+	const RealtimeWarmUpFn fn = handle().warmUpFn;
+	return fn ? fn() : true;
 }
 
 bool RealtimePreviewSession::objectEditingAvailable() {

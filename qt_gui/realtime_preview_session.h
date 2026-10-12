@@ -646,6 +646,8 @@ public:
 	// symbol - callers should grey out/hide the Live Preview UI entirely
 	// when this is false rather than let start() silently fail every frame.
 	static bool isAvailable();
+	// Builds the renderer for this machine ahead of the first frame and blocks until done (see realtime_warm_up()); true when the library has nothing to build or has none.
+	static bool warmUp();
 	// Which optional Live Preview features the loaded library really implements (see src/shared/realtime_api.h): the GUI offers only those controls.
 	// A library without the answer is taken to be the OptiX one, except on a Mac, where it is the Metal one.
 	static RealtimeBackendFeatures backendFeatures();

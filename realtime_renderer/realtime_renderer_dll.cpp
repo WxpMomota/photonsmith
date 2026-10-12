@@ -35,6 +35,11 @@ RT_REALTIME_API bool realtime_render_frame(
 		enable_adaptive_sampling, in_active_pixel_mask);
 }
 
+// Nothing to build ahead of time on OptiX.
+RT_REALTIME_API bool realtime_warm_up() {
+	return true;
+}
+
 RT_REALTIME_API const char* realtime_get_last_error() {
 	return rt_realtime_get_last_error();
 }
