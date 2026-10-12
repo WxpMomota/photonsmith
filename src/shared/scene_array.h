@@ -112,6 +112,9 @@ inline double footprintRadius(const Object& o) {
 	switch (o.shape) {
 		case ShapeKind::Box:
 		case ShapeKind::Wedge:
+		case ShapeKind::RoundedBox:
+		case ShapeKind::Cyclorama:
+		case ShapeKind::Terrain:
 		case ShapeKind::Stairs:
 		case ShapeKind::Quad:
 		case ShapeKind::Pyramid: return 0.5 * std::sqrt(o.size.x * o.size.x + o.size.z * o.size.z);

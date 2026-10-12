@@ -128,6 +128,9 @@ inline ShapeMesh meshOfShape(const Object& o) {
 		case ShapeKind::Torus: return torusMesh(o.radius, o.radius2);
 		case ShapeKind::Capsule: return capsuleMesh(o.radius, o.height);
 		case ShapeKind::Dome: return domeMesh(o.radius);
+		case ShapeKind::RoundedBox: return roundedBoxMesh(o.size.x, o.size.y, o.size.z, o.radius);
+		case ShapeKind::Cyclorama: return cycloramaMesh(o.size.x, o.size.y, o.size.z, o.radius);
+		case ShapeKind::Terrain: return terrainMesh(o.size.x, o.size.y, o.size.z, o.steps, o.radius, o.radius2, o.seed);
 		case ShapeKind::Tube: return tubeMesh(o.radius, o.radius2, o.height);
 		default: break;
 	}
@@ -190,6 +193,9 @@ inline void writeShape(std::ostringstream& os, const Object& o, const std::strin
 		case ShapeKind::Torus:
 		case ShapeKind::Capsule:
 		case ShapeKind::Dome:
+		case ShapeKind::RoundedBox:
+		case ShapeKind::Cyclorama:
+		case ShapeKind::Terrain:
 		case ShapeKind::Tube:
 			writeGenerated(os, meshOfShape(o), ind, uvPlaceOf(o));
 			break;

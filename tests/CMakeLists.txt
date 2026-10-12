@@ -321,6 +321,7 @@ add_executable(cpu_integrator_tests
     unit/scene_projector_tests.cpp
     unit/scene_mix_tests.cpp
     unit/scene_uv_tests.cpp
+    unit/scene_more_shapes_tests.cpp
     unit/aov_pass_tests.cpp
     ${CMAKE_SOURCE_DIR}/../cpu_renderer/cpu_interface.cpp
     ${CMAKE_SOURCE_DIR}/../cpu_renderer/cpu_interface_bdpt.cpp

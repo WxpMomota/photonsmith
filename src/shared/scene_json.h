@@ -374,6 +374,7 @@ inline std::string toJson(const Document& d) {
 		j.set("radius", Json::number(o.radius)).set("height", Json::number(o.height)).set("size", detail::toJson(o.size));
 		j.set("radius2", Json::number(o.radius2)).set("steps", Json::number(o.steps));
 		j.set("meshScale", Json::number(o.meshScale)).set("meshFile", Json::string(o.meshFile));
+		if (o.shape == ShapeKind::Terrain) j.set("seed", Json::number(o.seed));   // (only for a terrain: every other scene writes what it always did)
 		j.set("material", detail::materialToJson(o.material));
 		if (o.volume.kind != VolumeKind::None) {   // (only when it is one, so every scene without volumes writes exactly what it always did)
 			Json v = Json::object();
@@ -474,7 +475,7 @@ inline bool fromJson(const std::string& text, Document& out, std::string& err) {
 			std::string shape = toString(o.shape);
 			ok = ok && detail::readStr(j, "name", o.name) && detail::readStr(j, "shape", shape) && shapeKindFromString(shape, o.shape) &&
 			     detail::readVec(j, "position", o.position) && detail::readVec(j, "rotation", o.rotation) && detail::readNum(j, "radius", o.radius) &&
-			     detail::readNum(j, "height", o.height) && detail::readVec(j, "size", o.size) && detail::readNum(j, "meshScale", o.meshScale) && detail::readNum(j, "radius2", o.radius2) && detail::readInt(j, "steps", o.steps) &&
+			     detail::readNum(j, "height", o.height) && detail::readVec(j, "size", o.size) && detail::readNum(j, "meshScale", o.meshScale) && detail::readNum(j, "radius2", o.radius2) && detail::readInt(j, "steps", o.steps) && detail::readInt(j, "seed", o.seed) &&
 			     detail::readStr(j, "meshFile", o.meshFile) && detail::readBool(j, "emissive", o.emissive) && detail::readRgb(j, "emission", o.emission) &&
 			     detail::readNum(j, "emissionStrength", o.emissionStrength) && detail::readBool(j, "twoSided", o.twoSided) && detail::readStr(j, "group", o.group) &&
 			     detail::readBool(j, "hidden", o.hidden) && detail::readBool(j, "locked", o.locked);

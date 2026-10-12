@@ -78,6 +78,22 @@ inline std::vector<Problem> validate(const Document& d) {
 				if (!(o.size.x > 0.0 && o.size.z > 0.0 && o.height > 0.0)) err(who + "the pyramid's base and height must be above zero.");
 				break;
 			case ShapeKind::Dome: if (!(o.radius > 0.0)) err(who + "the radius must be above zero."); break;
+			case ShapeKind::RoundedBox:
+				if (!(o.size.x > 0.0 && o.size.y > 0.0 && o.size.z > 0.0)) err(who + "every size must be above zero.");
+				else if (o.radius < 0.0) err(who + "the roundness cannot be negative.");
+				else if (o.radius > 0.5 * std::min({o.size.x, o.size.y, o.size.z})) warn(who + "the roundness is more than half the smallest side, so it is as round as the box allows.");
+				break;
+			case ShapeKind::Cyclorama:
+				if (!(o.size.x > 0.0 && o.size.y > 0.0 && o.size.z > 0.0)) err(who + "the width, height and depth must be above zero.");
+				else if (o.radius < 0.0) err(who + "the radius of the curve cannot be negative.");
+				else if (o.radius > std::min(o.size.y, o.size.z)) warn(who + "the curve is bigger than the backdrop's height or depth, so it is as large as they allow.");
+				break;
+			case ShapeKind::Terrain:
+				if (!(o.size.x > 0.0 && o.size.z > 0.0) || o.size.y < 0.0) err(who + "the terrain's width and depth must be above zero and its height not negative.");
+				if (o.steps < 2 || o.steps > kMaxTerrainResolution) err(who + "the terrain's grid must be between 2 and " + std::to_string(kMaxTerrainResolution) + " cells across.");
+				if (o.radius < 0.0 || o.radius > 1.0) err(who + "the terrain's roughness must be between 0 and 1.");
+				if (!(o.radius2 >= 0.25 && o.radius2 <= 50.0)) err(who + "the number of hills across the terrain must be between 0.25 and 50.");
+				break;
 			case ShapeKind::Capsule:
 				if (!(o.radius > 0.0) || !(o.height > 0.0)) err(who + "the radius and height must be above zero.");
 				else if (o.height < 2 * o.radius) warn(who + "the capsule is shorter than its two rounded ends, so it is as tall as they need (twice the radius).");

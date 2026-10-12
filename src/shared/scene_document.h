@@ -60,6 +60,9 @@ inline Object makeObject(ShapeKind shape, const std::string& name) {
 		case ShapeKind::Capsule: o.radius = 0.5; o.height = 2.0; o.position = {0, 1.0, 0}; break;
 		case ShapeKind::Dome: o.radius = 1.2; o.position = {0, 0.6, 0}; break;
 		case ShapeKind::Tube: o.radius = 0.7; o.radius2 = 0.5; o.height = 1.6; o.position = {0, 0.8, 0}; break;
+		case ShapeKind::RoundedBox: o.size = {1.5, 1.5, 1.5}; o.radius = 0.2; o.position = {0, 0.75, 0}; break;
+		case ShapeKind::Cyclorama: o.size = {12, 6, 10}; o.radius = 2.5; o.position = {0, 3.0, 0}; break;
+		case ShapeKind::Terrain: o.size = {10, 1.5, 10}; o.steps = 48; o.radius = 0.5; o.radius2 = 3.0; o.seed = 1; o.position = {0, 0.75, 0}; break;
 	}
 	return o;
 }

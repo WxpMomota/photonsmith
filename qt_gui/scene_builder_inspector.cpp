@@ -673,6 +673,21 @@ void SceneBuilderWidget::inspectObject(QFormLayout *f, int i) {
 		case ShapeKind::Box:
 			addVec3(f, tr("Size"), [obj]() { return obj() ? &obj()->size : nullptr; }, 0.25);
 			break;
+		case ShapeKind::RoundedBox:
+			addVec3(f, tr("Size"), [obj]() { return obj() ? &obj()->size : nullptr; }, 0.25);
+			addNum(f, tr("Roundness of the edges"), [obj]() { return obj() ? &obj()->radius : nullptr; }, 0, 10000, 0.05, 3);
+			break;
+		case ShapeKind::Cyclorama:
+			addVec3(f, tr("Size (width, height, depth)"), [obj]() { return obj() ? &obj()->size : nullptr; }, 0.5);
+			addNum(f, tr("Radius of the curve"), [obj]() { return obj() ? &obj()->radius : nullptr; }, 0, 10000, 0.25, 2);
+			break;
+		case ShapeKind::Terrain:
+			addVec3(f, tr("Size (width, hill height, depth)"), [obj]() { return obj() ? &obj()->size : nullptr; }, 0.5);
+			addInt(f, tr("Detail (grid cells across)"), [obj]() { return obj() ? &obj()->steps : nullptr; }, 2, scene_doc::kMaxTerrainResolution);
+			addNum(f, tr("Hills across"), [obj]() { return obj() ? &obj()->radius2 : nullptr; }, 0.25, 50, 0.5, 2);
+			addNum(f, tr("Roughness"), [obj]() { return obj() ? &obj()->radius : nullptr; }, 0, 1, 0.05, 2);
+			addInt(f, tr("Seed (which ground)"), [obj]() { return obj() ? &obj()->seed : nullptr; }, 0, 999999);
+			break;
 		case ShapeKind::Quad:
 			addNum(f, tr("Width (X)"), [obj]() { return obj() ? &obj()->size.x : nullptr; }, 0.001, 10000, 0.5);
 			addNum(f, tr("Depth (Z)"), [obj]() { return obj() ? &obj()->size.z : nullptr; }, 0.001, 10000, 0.5);

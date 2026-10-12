@@ -7,6 +7,7 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <vector>
@@ -204,6 +205,162 @@ inline ShapeMesh tubeMesh(double radius, double inner, double height) {
 		{inner, -hy, 0, -1}, {radius, -hy, 0, -1},   // the bottom rim
 	};
 	lathe(m, profile, 36);
+	return m;
+}
+
+// A box with rounded edges and corners: `size` is the whole box, `radius` the roundness of every edge (clamped to what fits: at most half the smallest side; 0 is a plain box with
+// its edges still sharp). Made from a grid on each face of the box with the inner (flat) box pushed out by `radius` along the direction from the inner box to each grid point, which
+// makes the faces flat, the edges exact quarter cylinders and the corners eighth spheres, with the true normal at every vertex.
+inline ShapeMesh roundedBoxMesh(double sx, double sy, double sz, double radius) {
+	using namespace scene_shapes_detail;
+	ShapeMesh m;
+	const double h[3] = {std::max(1e-6, sx) / 2, std::max(1e-6, sy) / 2, std::max(1e-6, sz) / 2};
+	const double r = std::clamp(radius, 0.0, std::min({h[0], h[1], h[2]}));
+	const int k = r > 1e-9 ? 5 : 0;   // grid lines across each rounded edge
+	for (int a = 0; a < 3; ++a)
+		for (int sign = -1; sign <= 1; sign += 2) {
+			const int t1 = (a + 1) % 3, t2 = (a + 2) % 3;
+			// The grid lines along a tangent axis: the flat part's two ends, and k lines across each rounded edge at the angles that sample a quarter circle evenly.
+			const auto lines = [&](int axis) {
+				const double inner = h[axis] - r;
+				std::vector<double> c;
+				for (int j = k; j >= 1; --j) c.push_back(-(inner + r * std::tan(j * 0.78539816339744831 / k)));
+				c.push_back(-inner);
+				c.push_back(inner);
+				for (int j = 1; j <= k; ++j) c.push_back(inner + r * std::tan(j * 0.78539816339744831 / k));
+				return c;
+			};
+			const std::vector<double> c1 = lines(t1), c2 = lines(t2);
+			std::vector<int> ids;
+			for (double v2 : c2)
+				for (double v1 : c1) {
+					double p[3];
+					p[a] = sign * h[a];
+					p[t1] = v1;
+					p[t2] = v2;
+					double q[3], d[3];
+					for (int i = 0; i < 3; ++i) {
+						const double inner = h[i] - r;
+						q[i] = std::clamp(p[i], -inner, inner);
+						d[i] = p[i] - q[i];
+					}
+					V n{d[0], d[1], d[2]};
+					if (length(n) < 1e-12) { n = {0, 0, 0}; (a == 0 ? n.x : a == 1 ? n.y : n.z) = sign; }
+					n = unit(n);
+					const V pos{q[0] + r * n.x, q[1] + r * n.y, q[2] + r * n.z};
+					const double tp1 = t1 == 0 ? pos.x : t1 == 1 ? pos.y : pos.z, tp2 = t2 == 0 ? pos.x : t2 == 1 ? pos.y : pos.z;
+					ids.push_back(addVertex(m, pos, n, (tp1 + h[t1]) / (2 * h[t1]), (tp2 + h[t2]) / (2 * h[t2])));
+				}
+			const int w = static_cast<int>(c1.size());
+			for (std::size_t j = 0; j + 1 < c2.size(); ++j)
+				for (int i = 0; i + 1 < w; ++i) {
+					const int a0 = ids[j * w + i], b0 = ids[j * w + i + 1], c0 = ids[(j + 1) * w + i + 1], d0 = ids[(j + 1) * w + i];
+					for (const std::array<int, 3>& tri : {std::array<int, 3>{a0, b0, c0}, std::array<int, 3>{a0, c0, d0}}) {
+						V centre{0, 0, 0};
+						for (int id : tri) { centre.x += m.P[id * 3]; centre.y += m.P[id * 3 + 1]; centre.z += m.P[id * 3 + 2]; }
+						addTriangle(m, tri[0], tri[1], tri[2], centre);   // (the shape is convex and holds the origin, so the direction from it to a triangle is outwards)
+					}
+				}
+		}
+	return m;
+}
+
+// A photographer's cyclorama: a seamless studio backdrop. A floor (its front edge at +Z) that curves up, with `radius` of curve, into a wall at the back (-Z); `width` along X,
+// `height` the whole height of the wall and `depth` from the front edge of the floor to the wall. A sheet, facing the camera side (up and towards +Z); in its own space it fills
+// the box width x height x depth about the origin, with the floor along the bottom.
+inline ShapeMesh cycloramaMesh(double width, double height, double depth, double radius) {
+	using namespace scene_shapes_detail;
+	ShapeMesh m;
+	const double hx = std::max(1e-6, width) / 2, hy = std::max(1e-6, height) / 2, hz = std::max(1e-6, depth) / 2;
+	const double r = std::clamp(radius, 0.0, std::min(2 * hy, 2 * hz));
+	struct Point { double z, y, nz, ny, along; };
+	std::vector<Point> profile;
+	profile.push_back({hz, -hy, 0, 1, 0});                                      // the front edge of the floor
+	profile.push_back({-hz + r, -hy, 0, 1, 0});                                 // where the curve starts
+	const int segments = r > 1e-9 ? 14 : 0;
+	const double zc = -hz + r, yc = -hy + r;
+	for (int s = 1; s <= segments; ++s) {
+		const double phi = 1.57079632679489662 * s / segments;
+		profile.push_back({zc - r * std::sin(phi), yc - r * std::cos(phi), std::sin(phi), std::cos(phi), 0});
+	}
+	profile.push_back({-hz, hy, 1, 0, 0});                                      // the top of the wall
+	double total = 0;
+	for (std::size_t i = 1; i < profile.size(); ++i) {
+		total += std::hypot(profile[i].z - profile[i - 1].z, profile[i].y - profile[i - 1].y);
+		profile[i].along = total;
+	}
+	std::vector<int> left, right;
+	for (const Point& p : profile) {
+		const double v = total > 0 ? p.along / total : 0.0;
+		left.push_back(addVertex(m, {-hx, p.y, p.z}, {0, p.ny, p.nz}, 0.0, v));
+		right.push_back(addVertex(m, {hx, p.y, p.z}, {0, p.ny, p.nz}, 1.0, v));
+	}
+	for (std::size_t i = 0; i + 1 < profile.size(); ++i) {
+		const V toward{0, (profile[i].ny + profile[i + 1].ny) / 2, (profile[i].nz + profile[i + 1].nz) / 2};
+		addTriangle(m, left[i], right[i], right[i + 1], toward);
+		addTriangle(m, left[i], right[i + 1], left[i + 1], toward);
+	}
+	return m;
+}
+
+// Terrain: rolling ground made from noise, a grid of `resolution` cells across each side over `width` x `depth`, with hills up to `height` high (the ground is centred on its box, so
+// the highest hills reach +height/2 and the lowest dips -height/2). `hills` is how many hills the biggest features have across the ground, `roughness` (0 to 1) how much smaller
+// lumps are added on top of them, and `seed` picks which ground (the same numbers always make the same ground, on every machine: the noise is made from integer hashing).
+constexpr int kMaxTerrainResolution = 128;
+
+namespace scene_shapes_detail {
+inline double latticeValue(int x, int y, unsigned seed) {
+	unsigned h = seed * 374761393u + static_cast<unsigned>(x) * 668265263u + static_cast<unsigned>(y) * 2246822519u;
+	h = (h ^ (h >> 13)) * 1274126177u;
+	h ^= h >> 16;
+	return static_cast<double>(h) / 4294967295.0;
+}
+inline double valueNoise(double x, double y, unsigned seed) {
+	const int ix = static_cast<int>(std::floor(x)), iy = static_cast<int>(std::floor(y));
+	const double fx = x - ix, fy = y - iy;
+	const auto fade = [](double t) { return t * t * t * (t * (t * 6 - 15) + 10); };
+	const double u = fade(fx), v = fade(fy);
+	const double a = latticeValue(ix, iy, seed), b = latticeValue(ix + 1, iy, seed), c = latticeValue(ix, iy + 1, seed), d = latticeValue(ix + 1, iy + 1, seed);
+	return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+}
+// Height of the ground at (u, v) in 0..1, 0 to 1.
+inline double terrainHeight(double u, double v, double hills, double roughness, unsigned seed) {
+	double sum = 0, norm = 0, amplitude = 1, frequency = std::max(0.25, hills);
+	for (int octave = 0; octave < 5; ++octave) {
+		sum += amplitude * valueNoise(u * frequency + 17.0 * octave, v * frequency + 31.0 * octave, seed + 101u * octave);
+		norm += amplitude;
+		amplitude *= std::clamp(roughness, 0.0, 1.0);
+		frequency *= 2.0;
+	}
+	const double f = norm > 0 ? sum / norm : 0.5;
+	return std::clamp((f - 0.5) * 1.8 + 0.5, 0.0, 1.0);   // (noise bunches round the middle: stretch it so the hills use the whole height)
+}
+}  // namespace scene_shapes_detail
+
+inline ShapeMesh terrainMesh(double width, double height, double depth, int resolution, double roughness, double hills, int seed) {
+	using namespace scene_shapes_detail;
+	ShapeMesh m;
+	const int n = std::min(kMaxTerrainResolution, std::max(2, resolution));
+	const double hx = std::max(1e-6, width) / 2, hz = std::max(1e-6, depth) / 2, hy = std::max(0.0, height);
+	const unsigned s = static_cast<unsigned>(seed);
+	std::vector<double> y(static_cast<std::size_t>(n + 1) * (n + 1));
+	for (int j = 0; j <= n; ++j)
+		for (int i = 0; i <= n; ++i) y[static_cast<std::size_t>(j) * (n + 1) + i] = (terrainHeight(static_cast<double>(i) / n, static_cast<double>(j) / n, hills, roughness, s) - 0.5) * hy;
+	const auto at = [&](int i, int j) { return y[static_cast<std::size_t>(std::clamp(j, 0, n)) * (n + 1) + std::clamp(i, 0, n)]; };
+	const double dx = 2 * hx / n, dz = 2 * hz / n;
+	std::vector<int> ids;
+	for (int j = 0; j <= n; ++j)
+		for (int i = 0; i <= n; ++i) {
+			const double slopeX = (at(i + 1, j) - at(i - 1, j)) / ((i == 0 || i == n ? 1 : 2) * dx), slopeZ = (at(i, j + 1) - at(i, j - 1)) / ((j == 0 || j == n ? 1 : 2) * dz);
+			ids.push_back(addVertex(m, {-hx + i * dx, at(i, j), -hz + j * dz}, unit({-slopeX, 1.0, -slopeZ}), static_cast<double>(i) / n, static_cast<double>(j) / n));
+		}
+	for (int j = 0; j < n; ++j)
+		for (int i = 0; i < n; ++i) {
+			const int a = ids[static_cast<std::size_t>(j) * (n + 1) + i], b = ids[static_cast<std::size_t>(j) * (n + 1) + i + 1];
+			const int c = ids[static_cast<std::size_t>(j + 1) * (n + 1) + i + 1], d = ids[static_cast<std::size_t>(j + 1) * (n + 1) + i];
+			addTriangle(m, a, d, c, {0, 1, 0});
+			addTriangle(m, a, c, b, {0, 1, 0});
+		}
 	return m;
 }
 

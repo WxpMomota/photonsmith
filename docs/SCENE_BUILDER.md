@@ -100,8 +100,11 @@ Besides the sphere, box, quad, disk, cylinder, cone and mesh file, the Add menu 
 | Capsule | radius, height | a cylinder with rounded ends; the height includes the ends (never less than twice the radius) |
 | Dome (half sphere) | radius | flat bottom, `radius` tall |
 | Tube (pipe) | outer radius, hole radius, height | a hollow cylinder, open at both ends |
+| Rounded box | size X, Y, Z, roundness of the edges | a box whose edges are quarter cylinders and corners eighth spheres, with exact smooth normals; roundness 0 is a plain box, and it is clamped to half the smallest side (a round ball) |
+| Cyclorama (studio backdrop) | size (width, height, depth), radius of the curve | the seamless backdrop of a photo studio: a floor that curves up into a back wall; a single sheet (front edge of the floor at +Z, wall at -Z) facing into the room, so put the subject on its floor and the camera in front. Pairs with the Studio and Light box lightings |
+| Terrain (rolling ground) | size (width, hill height, depth), detail (grid cells across, 2 to 128), hills across, roughness (0 to 1), seed | ground from smooth noise: `hills across` is how many hills the biggest features have across it, `roughness` adds smaller lumps on top, and the **seed** picks which ground; the same numbers make exactly the same ground on every machine (the noise is made from integer hashing). The hills fill the height, centred on the object's box (the highest reach half the height above its position) |
 
-Each one has a picture-friendly set of texture coordinates, so the checker pattern works on them.
+Each one has a picture-friendly set of texture coordinates, so the checker pattern and a picture work on them (and their repeats and shift, see Texture placement under Materials). The meshes are `scene_shapes.h`; `tests/unit/scene_more_shapes_tests.cpp` checks the rounded box's and the cyclorama's surface area against closed forms (the rounded box's is `2[(a-2r)(b-2r)+(b-2r)(c-2r)+(a-2r)(c-2r)] + 2*pi*r*(a+b+c-6r) + 4*pi*r^2`), that every triangle faces the way its normals do, that the terrain is the same every time and different for another seed, and that all three are written, saved, checked, scaled and read by the renderer's loader like the others.
 
 ## Picking several things
 

@@ -189,6 +189,9 @@ QList<QPointF> SceneLayoutView::silhouette(const Object &o) const {
 		case ShapeKind::Torus:
 		case ShapeKind::Capsule:
 		case ShapeKind::Dome:
+		case ShapeKind::RoundedBox:
+		case ShapeKind::Cyclorama:
+		case ShapeKind::Terrain:
 		case ShapeKind::Tube: {
 			const scene_doc::ShapeMesh mesh = scene_doc::generatedMesh(o);
 			for (std::size_t i = 0; i + 2 < mesh.P.size(); i += 3) local.append(Float3{mesh.P[i], mesh.P[i + 1], mesh.P[i + 2]});

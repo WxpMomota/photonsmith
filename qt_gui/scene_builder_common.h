@@ -55,6 +55,9 @@ inline QString shapeLabel(ShapeKind k) {
 		case ShapeKind::Capsule: return QObject::tr("Capsule");
 		case ShapeKind::Dome: return QObject::tr("Dome (half sphere)");
 		case ShapeKind::Tube: return QObject::tr("Tube (pipe)");
+		case ShapeKind::RoundedBox: return QObject::tr("Rounded box");
+		case ShapeKind::Cyclorama: return QObject::tr("Cyclorama (studio backdrop)");
+		case ShapeKind::Terrain: return QObject::tr("Terrain (rolling ground)");
 	}
 	return QString();
 }

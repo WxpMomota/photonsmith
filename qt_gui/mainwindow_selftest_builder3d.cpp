@@ -325,6 +325,36 @@ void MainWindow::selfTestTexturePlacement(SceneBuilderWidget *sb, const std::fun
 	sb->selectObject(1);
 }
 
+// The terrain, rounded box and cyclorama (scene_shapes.h): added from the search box, their properties have their own rows, and a terrain's seed picks another ground (a different mesh in
+// the file); one undo takes each away.
+void MainWindow::selfTestMoreShapes(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
+	const size_t before = sb->document().objects.size();
+	check(sb->runActionForTest("add terrain") && sb->document().objects.back().shape == scene_doc::ShapeKind::Terrain, "Add > Terrain (rolling ground) adds a terrain");
+	QApplication::processEvents();
+	bool seedRow = false, hillsRow = false;
+	for (QLabel *l : sb->findChildren<QLabel *>()) {
+		seedRow = seedRow || l->text() == QStringLiteral("Seed (which ground)");
+		hillsRow = hillsRow || l->text() == QStringLiteral("Hills across");
+	}
+	check(seedRow && hillsRow, "its properties have the detail, hills, roughness and seed rows");
+	const QString first = sb->pbrtTextForTest();
+	QSpinBox *seed = nullptr;
+	for (QSpinBox *s : sb->findChildren<QSpinBox *>())
+		if (s->minimum() == 0 && s->maximum() == 999999) seed = s;
+	check(seed != nullptr, "the seed is a number box");
+	if (seed) {
+		seed->setValue(5);
+		QApplication::processEvents();
+		check(sb->document().objects.back().seed == 5 && sb->pbrtTextForTest() != first, "another seed makes another ground in the file");
+	}
+	check(sb->runActionForTest("add rounded") && sb->document().objects.back().shape == scene_doc::ShapeKind::RoundedBox, "Add > Rounded box adds a rounded box");
+	check(sb->runActionForTest("add cyclorama") && sb->document().objects.back().shape == scene_doc::ShapeKind::Cyclorama, "Add > Cyclorama (studio backdrop) adds a cyclorama");
+	check(!scene_doc::hasErrors(scene_doc::validate(sb->document())), "the three give no errors");
+	while (sb->document().objects.size() > before && sb->undo()) {}
+	check(sb->document().objects.size() == before, "undo takes them away");
+	sb->selectObject(1);
+}
+
 // The light kinds the Scene Builder adds beyond the plain ones: a projector, the ready-made lightings and the turn of an image sky (called from selfTestShapes).
 void MainWindow::selfTestLights(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
 	// A projector light (a slide shining through a frustum): added from the search box with a slide of its own, its properties have the field of view and the slide, the 3D view draws
@@ -568,6 +598,7 @@ void MainWindow::selfTestShapes(SceneBuilderWidget *sb, const std::function<void
 	selfTestLights(sb, check);
 	selfTestMixedMaterial(sb, check);
 	selfTestTexturePlacement(sb, check);
+	selfTestMoreShapes(sb, check);
 	// The Preset list in a material's properties: choosing "Gold" in the real combo box makes the selected object a gold conductor, as one undo step.
 	{
 		sb->selectObject(1);

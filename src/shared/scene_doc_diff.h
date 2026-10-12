@@ -22,7 +22,7 @@ inline std::string v(const Rgb& c) { return v(c.r) + "," + v(c.g) + "," + v(c.b)
 inline Fields fieldsOf(const Object& o) {
 	return {{"name", o.name}, {"shape", toString(o.shape)}, {"position", v(o.position)}, {"rotation", v(o.rotation)}, {"radius", v(o.radius)},
 	        {"radius2", v(o.radius2)}, {"height", v(o.height)}, {"size", v(o.size)}, {"steps", std::to_string(o.steps)}, {"meshScale", v(o.meshScale)},
-	        {"meshFile", o.meshFile}, {"material", toString(o.material.kind)}, {"color", v(o.material.color)}, {"checker", o.material.checker ? "1" : "0"},
+	        {"meshFile", o.meshFile}, {"seed", std::to_string(o.seed)}, {"material", toString(o.material.kind)}, {"color", v(o.material.color)}, {"checker", o.material.checker ? "1" : "0"},
 	        {"color2", v(o.material.color2)}, {"checkerCount", v(o.material.checkerCount)}, {"roughness", v(o.material.roughness)}, {"ior", v(o.material.ior)},
 	        {"transmittance", v(o.material.transmittance)}, {"picture", o.material.imageFile}, {"pattern", toString(o.material.pattern)},
 	        {"patternScale", v(o.material.patternScale)}, {"patternVariation", v(o.material.patternVariation)}, {"scatterDistance", v(o.material.scatterDistance)},

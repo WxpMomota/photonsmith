@@ -99,19 +99,19 @@ struct Volume {
 	double frequency = 4.0;            // Cloud: how many lumps across (higher is finer detail)
 };
 
-enum class ShapeKind { Sphere, Box, Quad, Disk, Cylinder, Cone, Mesh, Pyramid, Wedge, Stairs, Torus, Capsule, Dome, Tube };
+enum class ShapeKind { Sphere, Box, Quad, Disk, Cylinder, Cone, Mesh, Pyramid, Wedge, Stairs, Torus, Capsule, Dome, Tube, RoundedBox, Cyclorama, Terrain };
 
 // Every shape, in the order the GUI lists them.
 inline const std::vector<ShapeKind>& allShapeKinds() {
 	static const std::vector<ShapeKind> all = {ShapeKind::Sphere,  ShapeKind::Box,   ShapeKind::Quad,    ShapeKind::Disk,  ShapeKind::Cylinder,
 	                                           ShapeKind::Cone,    ShapeKind::Pyramid, ShapeKind::Wedge, ShapeKind::Stairs, ShapeKind::Torus,
-	                                           ShapeKind::Capsule, ShapeKind::Dome,  ShapeKind::Tube,    ShapeKind::Mesh};
+	                                           ShapeKind::Capsule, ShapeKind::Dome,  ShapeKind::Tube,    ShapeKind::RoundedBox, ShapeKind::Cyclorama, ShapeKind::Terrain, ShapeKind::Mesh};
 	return all;
 }
 // A shape that is written as a generated triangle mesh (scene_shapes.h) rather than one of pbrt's own shapes.
 inline bool isGeneratedShape(ShapeKind k) {
 	return k == ShapeKind::Pyramid || k == ShapeKind::Wedge || k == ShapeKind::Stairs || k == ShapeKind::Torus || k == ShapeKind::Capsule ||
-	       k == ShapeKind::Dome || k == ShapeKind::Tube;
+	       k == ShapeKind::Dome || k == ShapeKind::Tube || k == ShapeKind::RoundedBox || k == ShapeKind::Cyclorama || k == ShapeKind::Terrain;
 }
 
 struct Object {
@@ -119,11 +119,13 @@ struct Object {
 	ShapeKind shape = ShapeKind::Sphere;
 	Float3 position{};
 	Float3 rotation{};                   // degrees, about world X, Y, Z (applied in that order)
-	double radius = 1.0;               // Sphere, Disk, Cylinder, Cone, Capsule, Dome; Torus: the ring; Tube: outside
-	double radius2 = 0.25;             // Torus: the tube's radius; Tube: the hole's radius
+	double radius = 1.0;               // Sphere, Disk, Cylinder, Cone, Capsule, Dome; Torus: the ring; Tube: outside; RoundedBox: the roundness of the edges; Cyclorama: the radius of the curve;
+	                                   // Terrain: the roughness, 0 to 1
+	double radius2 = 0.25;             // Torus: the tube's radius; Tube: the hole's radius; Terrain: how many hills the biggest features have across
 	double height = 1.0;               // Cylinder, Cone, Pyramid, Capsule, Tube
-	Float3 size{1.0, 1.0, 1.0};          // Box, Wedge, Stairs (x, y, z); Quad (x and z); Pyramid (x and z, the base)
-	int steps = 5;                     // Stairs
+	Float3 size{1.0, 1.0, 1.0};          // Box, Wedge, Stairs, RoundedBox, Cyclorama, Terrain (x, y, z); Quad (x and z); Pyramid (x and z, the base)
+	int steps = 5;                     // Stairs; Terrain: the grid cells across each side
+	int seed = 1;                      // Terrain: which ground the noise makes
 	double meshScale = 1.0;            // Mesh
 	std::string meshFile;              // Mesh: a .ply file
 	Material material;
@@ -145,6 +147,9 @@ inline double boundingRadius(const Object& o) {
 		case ShapeKind::Sphere: r = o.radius; break;
 		case ShapeKind::Box:
 		case ShapeKind::Wedge:
+		case ShapeKind::RoundedBox:
+		case ShapeKind::Cyclorama:
+		case ShapeKind::Terrain:
 		case ShapeKind::Stairs: r = 0.5 * std::sqrt(o.size.x * o.size.x + o.size.y * o.size.y + o.size.z * o.size.z); break;
 		case ShapeKind::Quad: r = 0.5 * std::sqrt(o.size.x * o.size.x + o.size.z * o.size.z); break;
 		case ShapeKind::Pyramid: r = 0.5 * std::sqrt(o.size.x * o.size.x + o.height * o.height + o.size.z * o.size.z); break;
@@ -290,6 +295,9 @@ inline const char* toString(ShapeKind k) {
 		case ShapeKind::Capsule: return "capsule";
 		case ShapeKind::Dome: return "dome";
 		case ShapeKind::Tube: return "tube";
+		case ShapeKind::RoundedBox: return "roundedbox";
+		case ShapeKind::Cyclorama: return "cyclorama";
+		case ShapeKind::Terrain: return "terrain";
 	}
 	return "sphere";
 }

@@ -470,6 +470,9 @@ std::vector<Scene3DView::Face> &Scene3DView::faces() const {
 			case ShapeKind::Torus:
 			case ShapeKind::Capsule:
 			case ShapeKind::Dome:
+			case ShapeKind::RoundedBox:
+			case ShapeKind::Cyclorama:
+			case ShapeKind::Terrain:
 			case ShapeKind::Tube: {
 				const scene_doc::ShapeMesh mesh = scene_doc::generatedMesh(o);
 				auto vertex = [&mesh](int k) { return Float3{mesh.P[k * 3], mesh.P[k * 3 + 1], mesh.P[k * 3 + 2]}; };
