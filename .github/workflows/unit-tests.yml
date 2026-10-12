@@ -86,12 +86,24 @@ jobs:
         # this was never actually a Windows-specific issue.
         run: .\tests\build\Release\unit_tests.exe --gtest_color=yes
 
+      - name: Build the launcher (ray_tracer)
+        # The Scene Builder's render tests (tests/unit/scene_*_tests.cpp: the mix blend, the projector slide, the sky, volumes, the starter scene) render through the
+        # launcher and compare with closed forms. They skip when it is not found, which on CI used to be every time (15 tests reported SKIPPED on both platforms
+        # while this job stayed green). It is the plain CPU build, no CUDA, OptiX or Qt; the next step names it with RT_LAUNCHER and refuses to skip.
+        timeout-minutes: 40
+        run: |
+          cmake -S . -B build_rt -A x64
+          cmake --build build_rt --config Release --target ray_tracer
+
       - name: Run CPU integrator agreement tests
         # The CPU path tracer, BDPT, MLT, SPPM and the debug integrators rendered on small pbrt scenes and compared with each other and with closed forms
         # (tests/unit/cpu_integrator_agreement_tests.cpp; every defect they pin read 1-25% off before it was fixed). Built by the "Build (Release)" step
         # above (the default target builds everything). From the repo root, like unit_tests, so pbrt_scenes/ resolves. They render, so allow a few
         # minutes on a hosted runner.
         timeout-minutes: 20
+        env:
+          RT_LAUNCHER: ${{ github.workspace }}\build_rt\Release\ray_tracer.exe
+          RT_REQUIRE_LAUNCHER: "1"   # a render test that cannot find the launcher fails instead of skipping
         run: .\tests\build\Release\cpu_integrator_tests.exe --gtest_color=yes
 
   unit-tests-macos:
@@ -127,10 +139,19 @@ jobs:
           TEMP: ${{ runner.temp }}
         run: build_tests/unit_tests --gtest_color=yes
 
+      - name: Build the launcher (ray_tracer)
+        # See the Windows job: the Scene Builder's render tests need it, and must not skip.
+        run: >
+          cmake -S . -B build_rt -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          && cmake --build build_rt --target ray_tracer
+
       - name: Run CPU integrator agreement tests
         timeout-minutes: 20
         env:
           TEMP: ${{ runner.temp }}
+          RT_LAUNCHER: ${{ github.workspace }}/build_rt/ray_tracer
+          RT_REQUIRE_LAUNCHER: "1"
         run: build_tests/cpu_integrator_tests --gtest_color=yes
 
   metal-poc:
@@ -183,6 +204,7 @@ jobs:
         run: ctest --output-on-failure -R '^metal_poc_math_tests$'
 
       - name: Run device-dependent tests (shader tests + smoke render/validate)
+        timeout-minutes: 60
         working-directory: build
         # See this workflow's own top-of-file comment for the full
         # rationale: treat "no usable/no-raytracing-capable Metal
@@ -201,7 +223,10 @@ jobs:
         # device" skip handling below applies to them.
         run: |
           set +e
-          ctest --output-on-failure -R '^metal_poc_(shader_tests|smoke_render|smoke_validate|isolate_pbrt_lighting_smoke|isolate_pbrt_lighting_validate|write_failure_exit_code|seed_reproducible|crop_window|cpu_gpu_parity)$'
+          # Every Metal ctest, not a named subset: the subset had fallen behind (the alpha cutout, cloud furnace, subsurface, NanoVDB, media lights, clipped medium,
+          # subsurface sky, consistency sweep, GPU prepare and Live Preview object tests were all outside it, and an untracked picture one of them loads went unnoticed).
+          # The first GPU test builds the shader pipelines (about 90 s per variant on a fast Mac; Metal caches them for the rest).
+          ctest --output-on-failure --timeout 1200
           rc=$?
           set -e
           if [ $rc -ne 0 ]; then

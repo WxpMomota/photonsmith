@@ -455,14 +455,7 @@ TEST(SceneDocumentValidateTest, APictureThatExistsOrIsRelativeIsNotMentioned) {
 
 namespace {
 
-std::string findLauncher() {
-	namespace fs = std::filesystem;
-	std::error_code ec;
-	for (const char* c : {"ray_tracer.exe", "../ray_tracer.exe", "../../ray_tracer.exe", "x64/Release/ray_tracer.exe", "../x64/Release/ray_tracer.exe",
-	                      "../../x64/Release/ray_tracer.exe", "ray_tracer", "../ray_tracer", "../../ray_tracer"})
-		if (fs::is_regular_file(c, ec)) return fs::absolute(c, ec).string();
-	return "";
-}
+std::string findLauncher() { return findRayTracerLauncher(); }   // agreement_test_helpers.h: RT_LAUNCHER, then the usual places
 
 // Renders scene text with the launcher on the CPU; returns false if it cannot.
 bool renderWithLauncher(const std::string& launcher, const std::string& sceneText, const char* tag, int size, int spp, int depth, std::vector<float>& rgb, int& w,

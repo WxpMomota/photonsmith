@@ -73,12 +73,22 @@ inline bool loadLinearRgbPixels(const std::string& path, int& w, int& h, std::ve
 // ---------------------------------------------------------------------------------------------------------------------------------
 
 // The `ray_tracer` launcher next to the tests (or one level up), as an absolute path; empty when it was not built (the render tests then skip).
+// RT_LAUNCHER=<path> names it outright (what CI sets: the launcher is built in its own folder, not next to the tests). With RT_REQUIRE_LAUNCHER set, a launcher that is not found is a
+// failure of the test that asked, not a skip: CI must never go quiet because the render tests could not find the program they render with.
 inline std::string findRayTracerLauncher() {
 	namespace fs = std::filesystem;
 	std::error_code ec;
+	if (const char* named = std::getenv("RT_LAUNCHER"))
+		if (named[0] && fs::is_regular_file(named, ec)) return fs::absolute(named, ec).string();
+	struct RequireWhenMissing {
+		bool found = false;
+		~RequireWhenMissing() {
+			if (!found && std::getenv("RT_REQUIRE_LAUNCHER")) ADD_FAILURE() << "ray_tracer was not found, and RT_REQUIRE_LAUNCHER is set (RT_LAUNCHER=<path> names it)";
+		}
+	} require;
 	for (const char* c : {"ray_tracer.exe", "../ray_tracer.exe", "../../ray_tracer.exe", "x64/Release/ray_tracer.exe", "../x64/Release/ray_tracer.exe",
 	                      "../../x64/Release/ray_tracer.exe", "ray_tracer", "../ray_tracer", "../../ray_tracer"})
-		if (fs::is_regular_file(c, ec)) return fs::absolute(c, ec).string();
+		if (fs::is_regular_file(c, ec)) { require.found = true; return fs::absolute(c, ec).string(); }
 	return "";
 }
 
