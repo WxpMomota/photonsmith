@@ -10,9 +10,10 @@
 // RT_NO_GPU_WARMUP=1 turns it off, and the GUI self-test (RT_GUI_SELFTEST) never starts it.
 
 #include <QObject>
+#include <QPointer>
+#include <QThread>
 
 class QProcess;
-class QThread;
 
 class GpuWarmup : public QObject {
 	Q_OBJECT
@@ -33,7 +34,7 @@ private:
 	bool m_ok = true;
 	bool m_slow = false;
 	QProcess *m_process = nullptr;
-	QThread *m_thread = nullptr;
+	QPointer<QThread> m_thread;   // a guarded pointer: the thread deletes itself when it finishes, long before this object goes
 };
 
 #endif  // GPU_WARMUP_H

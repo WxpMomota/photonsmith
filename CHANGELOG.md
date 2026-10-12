@@ -6,6 +6,7 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## Unreleased
 
+* **Crash when closing the program on a Mac fixed**: the GPU warm-up added in 0.1.1 read a thread that had already deleted itself when the window closed, so on a Mac the program crashed (SIGSEGV) every time it was quit, and the next start asked about the unexpected exit. The thread is held by a guarded pointer now.
 * **Photo helper on a Mac no longer needs Python installed first**: Install Photo Helper failed on a Mac with only an old or no Python 3.10 to 3.12 (a program started from Finder also has no Homebrew on its PATH). The installer now says which Pythons it found and skipped, downloads a private, checksum-verified Python 3.12 into its own folder when none fits, and a failure points at the log file.
 
 ## 0.1.1 (2026-10-12)
