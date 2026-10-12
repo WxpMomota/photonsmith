@@ -40,7 +40,7 @@ std::string readAll(const std::string& path) {
 	return out;
 }
 
-// The text with every decimal number rounded to 10 significant digits. The scene's positions come out of sin, cos and pow, which differ in the last one or two digits between the
+// The text with every decimal number rounded to 10 significant digits (and the ones below 1e-12 made 0). The scene's positions come out of sin, cos and pow, which differ in the last one or two digits between the
 // C libraries of Windows and macOS (5.131678516375649 against 5.13167851637565), so an exact comparison of the committed file passed where it was written and failed on the macOS CI
 // runner. Ten digits are far beyond what a scene can show and far below that noise.
 std::string roundNumbers(const std::string& text) {
@@ -60,8 +60,11 @@ std::string roundNumbers(const std::string& text) {
 		}
 		const std::string token = text.substr(i, j - i);
 		if (decimal) {
+			// A matrix element that is 0 in exact arithmetic comes out as -6.9e-18 on one platform and 0 or 1e-17 on another: below 1e-12 it is 0.
+			double v = std::strtod(token.c_str(), nullptr);
+			if (std::fabs(v) < 1e-12) v = 0.0;
 			char buf[64];
-			std::snprintf(buf, sizeof buf, "%.10g", std::strtod(token.c_str(), nullptr));
+			std::snprintf(buf, sizeof buf, "%.10g", v);
 			out += buf;
 		} else {
 			out += token;
