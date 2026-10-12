@@ -1418,6 +1418,14 @@ int main(int argc, char** argv) {
 	// `ray_tracer --print-scene-size <scene id, name or .pbrt path>`: prints the scene's size (the largest side of its bounding box, in its own units) and
 	// nothing else, for scripts/stamp_scene_sizes.py and for people who want the "# @rt-size" line for a scene of their own. Handled before the banner and the
 	// argument parser: it is a measurement, not a render. Exit 0 and a number on success (0 means a scene with nothing to measure), exit 1 if it cannot be loaded.
+	// `ray_tracer --prepare-gpu`: builds the GPU renderer for this machine and exits (a Mac's first Metal render otherwise waits about a minute and a half for it). The GUI runs
+	// this in the background at its start. Exit code 0 when it is ready or there is nothing to prepare.
+	if (argc >= 2 && std::string(argv[1]) == "--prepare-gpu") {
+		if (!gpu_backend::available()) { std::cerr << "No GPU renderer on this machine: nothing to prepare.\n"; return 0; }
+		const bool ok = gpu_backend::prepare();
+		std::cerr << (ok ? "The GPU renderer is ready.\n" : "The GPU renderer could not be prepared.\n");
+		return ok ? 0 : 1;
+	}
 	if (argc >= 2 && std::string(argv[1]) == "--print-scene-size") {
 		if (argc < 3) {
 			std::cerr << "usage: " << argv[0] << " --print-scene-size <scene id, name or .pbrt path>\n";

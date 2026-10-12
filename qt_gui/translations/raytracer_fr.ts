@@ -5298,6 +5298,21 @@ Les scènes des autres catégories ne sont pas touchées. Vous pouvez les récup
             <numerusform>%n scènes déplacées vers %1.</numerusform>
         </translation>
     </message>
+    <message>
+        <location filename="../mainwindow.cpp" line="1013"/>
+        <source>Preparing the GPU renderer for this Mac (first run only, about a minute or two)...</source>
+        <translation>Préparation du moteur de rendu GPU pour ce Mac (la première fois seulement, environ une à deux minutes)...</translation>
+    </message>
+    <message>
+        <location filename="../mainwindow.cpp" line="1013"/>
+        <source>The GPU renderer is ready.</source>
+        <translation>Le moteur de rendu GPU est prêt.</translation>
+    </message>
+    <message>
+        <location filename="../mainwindow.cpp" line="1013"/>
+        <source>The GPU renderer could not be prepared ahead of time; the first GPU render will build it.</source>
+        <translation>Le moteur de rendu GPU n'a pas pu être préparé à l'avance ; le premier rendu GPU le préparera.</translation>
+    </message>
 </context>
 <context>
     <name>MaterialPreset</name>

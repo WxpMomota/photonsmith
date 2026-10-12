@@ -133,6 +133,19 @@ The GitHub macOS runner has no hardware ray tracing, so CI builds and runs what 
 before every PR that touches `gpu/metal/` or shared headers (and rebuild after `git pull` first - a stale binary has produced a false "CPU bug" before).
 A change that must not alter pictures (a refactor) should be checked with a byte compare of rendered PNGs against a build of the previous `main`.
 
+## The first run on a Mac
+
+Metal compiles the whole path tracer (every material and medium in one kernel) into machine code for the GPU the first time an app asks, and keeps the result for that app. On an M2 that
+is about 90 seconds per shader variant (two variants: a scene with an any-hit triangle test, for an alpha mask or a subsurface material, and one without). It is the compute pipeline
+creation in `createKernelPipeline()` (`metal_poc_dispatch.mm`) that takes the time; compiling the source is about one second. Everything after is a cache hit (no time at all), until the source,
+the app or the OS changes.
+
+So nothing waits for it on screen: `ray_tracer --prepare-gpu` and `metal_prepare_renderer()` build both variants and exit, the GUI runs them in the background at its start (`qt_gui/gpu_warmup.h`:
+a low-priority thread for the library Live Preview uses, which runs in the GUI's own process, and a niced `ray_tracer --prepare-gpu` for the renders the Render button starts: each process has
+a cache of its own), and a run that is still building after three seconds prints a line saying so. The status bar says "Preparing the GPU renderer for this Mac (first run only...)" while it
+works. `RT_NO_GPU_WARMUP=1` turns the background build off; the GUI self-test never starts it, so after a new build run `ray_tracer --prepare-gpu` (or let ctest's `metal_poc_prepare_gpu`
+do it) before `gui_selftest.py`, or its first run waits the full time.
+
 ## Environment switches
 
 | variable | effect |
