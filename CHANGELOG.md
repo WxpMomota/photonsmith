@@ -4,6 +4,10 @@ Release notes for the next tagged release, summarising the large correctness eff
 Before this, see `git log`. Each item has a commit with the measurements behind it, and
 [docs/PBRT_SUPPORT.md](docs/PBRT_SUPPORT.md) has the per-feature, per-backend detail.
 
+## Unreleased
+
+* **Photo helper on a Mac no longer needs Python installed first**: Install Photo Helper failed on a Mac with only an old or no Python 3.10 to 3.12 (a program started from Finder also has no Homebrew on its PATH). The installer now says which Pythons it found and skipped, downloads a private, checksum-verified Python 3.12 into its own folder when none fits, and a failure points at the log file.
+
 ## 0.1.1 (2026-10-12)
 
 * **Metal**: texture repeats and shift, and pictures on disks and cylinders; a pbrt `uniformgrid` medium is drawn; the GPU renderer is built in the background so the first render no longer looks hung.
