@@ -20,7 +20,10 @@
 #import <Metal/Metal.h>
 #import <Foundation/Foundation.h>
 #include <algorithm>
+#include <atomic>
+#include <memory>
 #include "metal_poc_app.h"
+#include "metal_interface.h"   // metal_prepare_renderer()
 #include "metal_poc_shader_files.h"
 // PixelFilterDispatch/FilterSampler<float,32> - see Uniforms::filterKind's
 // own comment (metal_poc_gpu_types.h) for why this table is built here,
@@ -91,8 +94,10 @@ struct MetalPocApp::DispatchState {
     id<MTLBuffer> uniformBuffer;   // stage E
 };
 
-// Stage A: Concatenates the shader source files and compiles them into the Metal library.
-bool MetalPocApp::dsLoadShaderLibrary(DispatchState& s) {
+// Compiles the shader library (every metal_poc_*.metal fragment, concatenated) for one variant: the scene needs the any-hit triangle test (an alpha mask, a subsurface material) or not.
+// A render gets it through dsLoadShaderLibrary(); metal_prepare_renderer() builds both variants ahead of time. Compiling the source takes about a second; the expensive step is building
+// the compute pipeline from it (createKernelPipeline below), which Metal then caches for this Mac.
+static id<MTLLibrary> compileShaderLibrary(id<MTLDevice> dev, bool triangleAnyHit) {
     // --- Compile the shader library from source at runtime ---------
     NSError* error = nil;
     // Three DIRECTORY candidates, tried in priority order (unchanged from
@@ -159,63 +164,87 @@ bool MetalPocApp::dsLoadShaderLibrary(DispatchState& s) {
         if (!fragSource) {
             fprintf(stderr, "Failed to read shader source at %s: %s\n",
                 fragPath.UTF8String, error.localizedDescription.UTF8String);
-            return false;
+            return nil;
         }
         [shaderSource appendString:fragSource];
     }
     MTLCompileOptions* compileOpts = [MTLCompileOptions new];
-    if (havePbrtTriangleAnyHit) compileOpts.preprocessorMacros = @{@"METAL_TRIANGLE_ANY_HIT": @1};
-    id<MTLLibrary> library = [device newLibraryWithSource:shaderSource options:compileOpts error:&error];
+    if (triangleAnyHit) compileOpts.preprocessorMacros = @{@"METAL_TRIANGLE_ANY_HIT": @1};
+    id<MTLLibrary> library = [dev newLibraryWithSource:shaderSource options:compileOpts error:&error];
     if (!library) {
         fprintf(stderr, "Shader compile failed: %s\n", error.localizedDescription.UTF8String);
-        return false;
+        return nil;
     }
-    s.error = error;
+    return library;
+}
+
+// Stage A: Compiles the shader library for this scene's variant.
+bool MetalPocApp::dsLoadShaderLibrary(DispatchState& s) {
+    id<MTLLibrary> library = compileShaderLibrary(device, havePbrtTriangleAnyHit);
+    if (!library) return false;
+    s.error = nil;
     s.library = library;
     return true;
 }
 
-// Stage B: Looks up the kernel and the intersection functions, builds the compute pipeline that links them, and fills the intersection function table.
-bool MetalPocApp::dsBuildPipeline(DispatchState& s) {
-    auto& error = s.error;
-    auto& library = s.library;
-    id<MTLFunction> kernelFn = [library newFunctionWithName:@"primaryRayKernel"];
-    id<MTLFunction> sphereIntersectFn = [library newFunctionWithName:@"sphereIntersectionFunction"];
-    id<MTLFunction> diskIntersectFn = [library newFunctionWithName:@"diskIntersectionFunction"];
-    id<MTLFunction> cylinderIntersectFn = [library newFunctionWithName:@"cylinderIntersectionFunction"];
-    id<MTLFunction> triangleAnyHitFn = [library newFunctionWithName:@"triangleAnyHitFunction"];
-    // newFunctionWithName: returns nil (it doesn't throw) for a name that
-    // isn't in the compiled library - and a nil inside the @[...] literal
-    // below would then raise an uncaught NSInvalidArgumentException instead
-    // of this function's normal print-and-return-false failure path.
-    if (!kernelFn || !sphereIntersectFn || !diskIntersectFn || !cylinderIntersectFn || !triangleAnyHitFn) {
+// The kernel and the four intersection functions it links.
+struct KernelFunctions {
+    id<MTLFunction> kernel, sphere, disk, cylinder, triangleAnyHit;
+};
+
+// Looks up the kernel and the intersection functions in `library`, links them and builds the compute pipeline. This is the slow step of a Mac's first run: the compiler turns the
+// whole path tracer (every material and medium in one kernel) into machine code for this GPU, about 90 seconds on an M2, and Metal keeps the result in a cache for this app, so
+// every later run takes no time at all. A render and metal_prepare_renderer() both come through here, so they share that cache. A message says so after three seconds, because
+// nothing else on screen does.
+static id<MTLComputePipelineState> createKernelPipeline(id<MTLDevice> dev, id<MTLLibrary> library, KernelFunctions& f, NSError** error) {
+    f.kernel = [library newFunctionWithName:@"primaryRayKernel"];
+    f.sphere = [library newFunctionWithName:@"sphereIntersectionFunction"];
+    f.disk = [library newFunctionWithName:@"diskIntersectionFunction"];
+    f.cylinder = [library newFunctionWithName:@"cylinderIntersectionFunction"];
+    f.triangleAnyHit = [library newFunctionWithName:@"triangleAnyHitFunction"];
+    // newFunctionWithName: returns nil (it doesn't throw) for a name that isn't in the compiled library - and a nil inside the @[...] literal below would then raise an uncaught
+    // NSInvalidArgumentException instead of this function's normal print-and-return-nil failure path.
+    if (!f.kernel || !f.sphere || !f.disk || !f.cylinder || !f.triangleAnyHit) {
         fprintf(stderr, "Shader function lookup failed (nil): primaryRayKernel=%s "
                         "sphereIntersectionFunction=%s diskIntersectionFunction=%s "
                         "cylinderIntersectionFunction=%s - a function was renamed/removed "
                         "in the .metal sources without updating this lookup.\n",
-                kernelFn ? "ok" : "MISSING", sphereIntersectFn ? "ok" : "MISSING",
-                diskIntersectFn ? "ok" : "MISSING", cylinderIntersectFn ? "ok" : "MISSING");
-        return false;
+                f.kernel ? "ok" : "MISSING", f.sphere ? "ok" : "MISSING",
+                f.disk ? "ok" : "MISSING", f.cylinder ? "ok" : "MISSING");
+        return nil;
     }
-
-    // The intersection function has to be LINKED into the compute
-    // pipeline (MTLLinkedFunctions) before an MTLIntersectionFunction
-    // Table naming it can be built - a plain newComputePipelineState
-    // WithFunction: (used for step 1/2's triangle-only pipeline) has
-    // nowhere to put that linkage, hence the switch to the descriptor-
-    // based pipeline creation call here.
+    // The intersection functions have to be LINKED into the compute pipeline (MTLLinkedFunctions) before an MTLIntersectionFunctionTable naming them can be built - a plain
+    // newComputePipelineStateWithFunction: has nowhere to put that linkage, hence the descriptor-based creation call here.
     MTLComputePipelineDescriptor* pipelineDesc = [MTLComputePipelineDescriptor new];
-    pipelineDesc.computeFunction = kernelFn;
+    pipelineDesc.computeFunction = f.kernel;
     MTLLinkedFunctions* linkedFns = [MTLLinkedFunctions new];
-    linkedFns.functions = @[sphereIntersectFn, diskIntersectFn, cylinderIntersectFn, triangleAnyHitFn];
+    linkedFns.functions = @[f.sphere, f.disk, f.cylinder, f.triangleAnyHit];
     pipelineDesc.linkedFunctions = linkedFns;
+    auto finished = std::make_shared<std::atomic<bool>>(false);
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        if (!finished->load())
+            fprintf(stderr, "Metal: preparing the GPU renderer for this Mac. This happens once (about a minute or two); the next runs start at once.\n");
+    });
+    const double start = CFAbsoluteTimeGetCurrent();
+    id<MTLComputePipelineState> pipeline = [dev newComputePipelineStateWithDescriptor:pipelineDesc options:MTLPipelineOptionNone reflection:nil error:error];
+    finished->store(true);
+    const double seconds = CFAbsoluteTimeGetCurrent() - start;
+    if (seconds > 3.0) fprintf(stderr, "Metal: the GPU renderer is ready (prepared in %.0f s).\n", seconds);
+    return pipeline;
+}
 
-    id<MTLComputePipelineState> pipeline = [device newComputePipelineStateWithDescriptor:pipelineDesc
-        options:MTLPipelineOptionNone reflection:nil error:&error];
+// Stage B: Builds the compute pipeline that links the intersection functions, and fills the intersection function table.
+bool MetalPocApp::dsBuildPipeline(DispatchState& s) {
+    auto& error = s.error;
+    auto& library = s.library;
+    KernelFunctions fns;
+    id<MTLComputePipelineState> pipeline = createKernelPipeline(device, library, fns, &error);
     if (!pipeline) {
-        fprintf(stderr, "Pipeline creation failed: %s\n", error.localizedDescription.UTF8String);
+        if (fns.kernel) fprintf(stderr, "Pipeline creation failed: %s\n", error.localizedDescription.UTF8String);
         return false;
     }
+    id<MTLFunction> kernelFn = fns.kernel, sphereIntersectFn = fns.sphere, diskIntersectFn = fns.disk, cylinderIntersectFn = fns.cylinder, triangleAnyHitFn = fns.triangleAnyHit;
+    (void)kernelFn;
 
     // --- Intersection function table: two slots now, matching --------
     // bboxGeomDesc's own intersectionFunctionTableOffset (0) and
@@ -1298,4 +1327,25 @@ bool MetalPocApp::compileShaderAndDispatch(int argc, const char** argv) {
     // caller updates the camera/seed/sample-count uniforms through `tweak` before each one.
     if (liveSession) liveRender = renderFrame;
     return renderFrame(nullptr);
+}
+
+// Builds the shader library and the compute pipeline for both variants (a scene with an any-hit triangle test, one without) and throws them away: the point is Metal's cache, which
+// the next real render then hits. Called in the background at the GUI's start (the library has the same entry for Live Preview, which runs in the GUI's own process, where the cache
+// is its own) and by `ray_tracer --prepare-gpu` (the renders the GUI starts run in that program). False when the GPU or a compile fails.
+bool metal_prepare_renderer() {
+    @autoreleasepool {
+        id<MTLDevice> dev = MTLCreateSystemDefaultDevice();
+        if (!dev) return false;
+        for (bool anyHit : {false, true}) {
+            id<MTLLibrary> library = compileShaderLibrary(dev, anyHit);
+            if (!library) return false;
+            KernelFunctions fns;
+            NSError* error = nil;
+            if (!createKernelPipeline(dev, library, fns, &error)) {
+                if (error) fprintf(stderr, "Pipeline creation failed: %s\n", error.localizedDescription.UTF8String);
+                return false;
+            }
+        }
+    }
+    return true;
 }

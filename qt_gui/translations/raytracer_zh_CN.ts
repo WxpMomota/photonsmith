@@ -5201,6 +5201,21 @@ The scenes in the other categories are not touched. You can get them back from %
             <numerusform>已将 %n 个场景移到%1。</numerusform>
         </translation>
     </message>
+    <message>
+        <location filename="../mainwindow.cpp" line="1013"/>
+        <source>Preparing the GPU renderer for this Mac (first run only, about a minute or two)...</source>
+        <translation>正在为这台 Mac 准备 GPU 渲染器(仅首次运行,大约一到两分钟)...</translation>
+    </message>
+    <message>
+        <location filename="../mainwindow.cpp" line="1013"/>
+        <source>The GPU renderer is ready.</source>
+        <translation>GPU 渲染器已就绪。</translation>
+    </message>
+    <message>
+        <location filename="../mainwindow.cpp" line="1013"/>
+        <source>The GPU renderer could not be prepared ahead of time; the first GPU render will build it.</source>
+        <translation>无法提前准备 GPU 渲染器;第一次 GPU 渲染时会进行准备。</translation>
+    </message>
 </context>
 <context>
     <name>MaterialPreset</name>

@@ -62,6 +62,11 @@ RT_REALTIME_API bool realtime_render_frame(
 // Detail of the most recent failure on the calling thread ("" if none). Valid until the next realtime_render_frame() on that thread.
 RT_REALTIME_API const char* realtime_get_last_error();
 
+// Builds the renderer for this machine ahead of the first frame and blocks until done (the Metal library: about a minute and a half on a Mac's first run, then cached; the OptiX
+// library has nothing to build and returns true at once). The GUI calls it on a background thread at its start. False when it could not be built.
+RT_REALTIME_API bool realtime_warm_up();
+using RealtimeWarmUpFn = decltype(&realtime_warm_up);
+
 // What the GUI loads the two functions as.
 using RealtimeRenderFrameFn = decltype(&realtime_render_frame);
 using RealtimeGetLastErrorFn = decltype(&realtime_get_last_error);

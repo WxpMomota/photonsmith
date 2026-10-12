@@ -82,6 +82,7 @@ SOURCES += \
 	scene_packs.cpp \
 	../src/external/miniz.c \
 	realtime_preview_session.cpp \
+	gpu_warmup.cpp \
 	live_object_editor.cpp \
 	theme.cpp \
 	theme_switch.cpp \
@@ -138,6 +139,7 @@ HEADERS += \
 	asset_downloader.h \
 	scene_packs.h \
 	realtime_preview_session.h \
+	gpu_warmup.h \
 	live_object_editor.h \
 	live_object_pick.h \
 	object_drag_math.h \

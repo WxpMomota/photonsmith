@@ -5195,6 +5195,21 @@ The scenes in the other categories are not touched. You can get them back from %
             <numerusform>%n 個のシーンを%1に移動しました。</numerusform>
         </translation>
     </message>
+    <message>
+        <location filename="../mainwindow.cpp" line="1013"/>
+        <source>Preparing the GPU renderer for this Mac (first run only, about a minute or two)...</source>
+        <translation>このMac用にGPUレンダラーを準備しています(初回のみ、1〜2分ほどかかります)...</translation>
+    </message>
+    <message>
+        <location filename="../mainwindow.cpp" line="1013"/>
+        <source>The GPU renderer is ready.</source>
+        <translation>GPUレンダラーの準備ができました。</translation>
+    </message>
+    <message>
+        <location filename="../mainwindow.cpp" line="1013"/>
+        <source>The GPU renderer could not be prepared ahead of time; the first GPU render will build it.</source>
+        <translation>GPUレンダラーを事前に準備できませんでした。最初のGPUレンダリングで準備されます。</translation>
+    </message>
 </context>
 <context>
     <name>MaterialPreset</name>

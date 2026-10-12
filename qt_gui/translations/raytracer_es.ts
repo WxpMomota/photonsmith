@@ -5246,6 +5246,21 @@ Las escenas de las demás categorías no se tocan. Puedes recuperarlas desde %1.
             <numerusform>Se movieron %n escenas a %1.</numerusform>
         </translation>
     </message>
+    <message>
+        <location filename="../mainwindow.cpp" line="1013"/>
+        <source>Preparing the GPU renderer for this Mac (first run only, about a minute or two)...</source>
+        <translation>Preparando el renderizador de GPU para este Mac (solo la primera vez, aproximadamente uno o dos minutos)...</translation>
+    </message>
+    <message>
+        <location filename="../mainwindow.cpp" line="1013"/>
+        <source>The GPU renderer is ready.</source>
+        <translation>El renderizador de GPU está listo.</translation>
+    </message>
+    <message>
+        <location filename="../mainwindow.cpp" line="1013"/>
+        <source>The GPU renderer could not be prepared ahead of time; the first GPU render will build it.</source>
+        <translation>No se pudo preparar el renderizador de GPU con antelación; el primer renderizado en GPU lo preparará.</translation>
+    </message>
 </context>
 <context>
     <name>MaterialPreset</name>
