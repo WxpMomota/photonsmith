@@ -271,7 +271,7 @@ TEST(SceneSkyTest, SkySettingsSurviveTheJsonAndTheSceneStaysValidAndLoads) {
 
 namespace {
 
-std::string findLauncherForSky() { return findRayTracerLauncher(); }
+std::string findLauncherForSky() { return findRayTracerLauncher(); }   // agreement_test_helpers.h: RT_LAUNCHER, then the usual places
 
 }  // namespace
 

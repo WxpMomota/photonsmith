@@ -455,7 +455,7 @@ TEST(SceneDocumentValidateTest, APictureThatExistsOrIsRelativeIsNotMentioned) {
 
 namespace {
 
-std::string findLauncher() { return findRayTracerLauncher(); }
+std::string findLauncher() { return findRayTracerLauncher(); }   // agreement_test_helpers.h: RT_LAUNCHER, then the usual places
 
 // Renders scene text with the launcher on the CPU; returns false if it cannot.
 bool renderWithLauncher(const std::string& launcher, const std::string& sceneText, const char* tag, int size, int spp, int depth, std::vector<float>& rgb, int& w,
