@@ -146,11 +146,6 @@ inline std::vector<Problem> validate(const Document& d) {
 			const Material& m = o.material;
 			if (!std::isfinite(m.uvScaleU + m.uvScaleV + m.uvOffsetU + m.uvOffsetV) || m.uvScaleU == 0.0 || m.uvScaleV == 0.0)
 				err(who + "the texture's repeats cannot be zero.");
-#ifdef __APPLE__
-			// (The CPU and OptiX renderers place the texture of a sphere, disk, cylinder, cone or mesh file themselves, from the Texture's uscale/vscale/udelta/vdelta; Metal does not yet.)
-			else if (o.shape == ShapeKind::Sphere || o.shape == ShapeKind::Disk || o.shape == ShapeKind::Cylinder || o.shape == ShapeKind::Cone || o.shape == ShapeKind::Mesh)
-				warn(who + "on a Mac the repeats and shift of a texture are drawn on a box, a quad and the ready-made shapes only (the CPU render does them on a " + toString(o.shape) + " too).");
-#endif
 		}
 		if (isMix(o.material)) {
 			if (o.material.mixWith.size() != 1) err(who + "a mixed material has exactly one second material.");

@@ -224,11 +224,12 @@ inline void perturbShadingNormal(thread const KernelRes& R, thread PathState& P,
     // Image bump map ("texture displacement"): perturbs ONLY the shading normal of a triangle hit, like materialType 7 below.
     if (mat.bumpWidth > 0 && !isBoundingBox && !isSuzanneInstance && !isPbrtInstance) {
         const float2 bumpUV = texCoordFor(primId, result.triangle_barycentric_coord, uvs);
+        const float4 bumpMap = float4(mat.bumpUvScaleU, mat.bumpUvScaleV, mat.bumpUvDeltaU, mat.bumpUvDeltaV);
         float3 bumpDpdu, bumpDpdv;
         triangleDpduDpdv(primId, vertices, uvs, facingNormal, bumpDpdu, bumpDpdv);
         if (mat.bumpIsNormalMap != 0) {
             facingNormal = imageNormalMapNormal(rgbGridData, mat.bumpOffset, mat.bumpWidth, mat.bumpHeight,
-                                                bumpUV.x, bumpUV.y, facingNormal, bumpDpdu);
+                                                bumpMap.x * bumpUV.x + bumpMap.z, bumpMap.y * bumpUV.y + bumpMap.w, facingNormal, bumpDpdu);
         } else {
             float footprint = 0.0;
             if (depth == 0u && uniforms.cameraOrthographic == 0u && uniforms.cameraSpherical == 0u &&
@@ -236,7 +237,7 @@ inline void perturbShadingNormal(thread const KernelRes& R, thread PathState& P,
                 footprint = bumpFootprintStep(uniforms, rayOrigin, rayDir, hitPoint, facingNormal, bumpDpdu, bumpDpdv);
             }
             facingNormal = imageBumpNormal(rgbGridData, mat.bumpOffset, mat.bumpWidth, mat.bumpHeight, mat.bumpScale,
-                                           bumpUV.x, bumpUV.y, facingNormal, bumpDpdu, footprint);
+                                           bumpUV.x, bumpUV.y, bumpMap, facingNormal, bumpDpdu, footprint);
         }
     }
     CENSUS_PUSH(mat.materialType);
@@ -491,15 +492,17 @@ inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread
         // own texture had no wrapping "scale").
         float2 uv = isSphere ? equirectangularUV(float3(normal.x, normal.y, -normal.z))
                               : texCoordFor(primId, result.triangle_barycentric_coord, uvs);
-        albedo = pbrtDiffuseTexture.sample(textureSampler, float2(uv.x, 1.0 - uv.y)).rgb * mat.roughness;
+        const float2 muv = float2(mat.uvScaleU * uv.x + mat.uvDeltaU, mat.uvScaleV * uv.y + mat.uvDeltaV);   // pbrt imagemap uscale/vscale/udelta/vdelta
+        albedo = pbrtDiffuseTexture.sample(textureSampler, float2(muv.x, 1.0 - muv.y)).rgb * mat.roughness;
     } else if (mat.materialType == METAL_MAT_DIFFUSE_TRANSMISSION && mat.conductorK.y > 8.5) {
         // DiffuseTransmission with image-textured reflectance (diffuse slot) and/or transmittance
         // (second slot) - J2. conductorK.x = 1 when reflectance is an image, conductorK.z = 1 when
         // transmittance is; otherwise the flat colour in color / transmitColor is used. The shade
         // function reads mat.transmitColor, so the sampled transmittance is written back into it.
         float2 uv9 = texCoordFor(primId, result.triangle_barycentric_coord, uvs);
+        const float2 muv9 = float2(mat.uvScaleU * uv9.x + mat.uvDeltaU, mat.uvScaleV * uv9.y + mat.uvDeltaV);   // the reflectance picture's mapping
         albedo = (mat.conductorK.x > 0.5)
-            ? pbrtDiffuseTexture.sample(textureSampler, float2(uv9.x, 1.0 - uv9.y)).rgb
+            ? pbrtDiffuseTexture.sample(textureSampler, float2(muv9.x, 1.0 - muv9.y)).rgb
             : float3(mat.color);
         if (mat.conductorK.z > 0.5)
             mat.transmitColor = packed_float3(pbrtTransmitTexture.sample(textureSampler, float2(uv9.x, 1.0 - uv9.y)).rgb);

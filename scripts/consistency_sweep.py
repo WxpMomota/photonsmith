@@ -216,6 +216,8 @@ class Scene:
         "disk": 'Shape "disk" "float radius" [ 1 ]',
         "cone": 'Shape "cone" "float radius" [ 0.8 ] "float height" [ 1.2 ]',
         "paraboloid": 'Shape "paraboloid" "float radius" [ 0.8 ] "float zmax" [ 1.0 ]',
+        # a square facing the camera with texture coordinates 0..1 (the shapes above make their own): for a picture looked up through a mapping
+        "uvquad": 'Shape "trianglemesh" "integer indices" [ 0 1 2 0 2 3 ] "point3 P" [ -0.8 -0.8 0  0.8 -0.8 0  0.8 0.8 0  -0.8 0.8 0 ] "point2 uv" [ 0 0  1 0  1 1  0 1 ]',
         "cube": 'Shape "trianglemesh" "integer indices" [ 0 2 1 0 3 2  4 5 6 4 6 7  0 1 5 0 5 4  2 3 7 2 7 6  0 4 7 0 7 3  1 2 6 1 6 5 ] '
                 '"point3 P" [ -0.7 -0.7 -0.7  0.7 -0.7 -0.7  0.7 0.7 -0.7  -0.7 0.7 -0.7  -0.7 -0.7 0.7  0.7 -0.7 0.7  0.7 0.7 0.7  -0.7 0.7 0.7 ]',
     }
@@ -309,6 +311,11 @@ class Sweep:
         write_png(self.pattern, 8, 8, pattern_pixel)
         self.pattern_tiled = os.path.join(workdir, "pattern_tiled.png").replace("\\", "/")
         write_png(self.pattern_tiled, 16, 16, lambda x, y: pattern_pixel(x % 8, y % 8))
+        self.height = os.path.join(workdir, "height.png").replace("\\", "/")   # a grey picture, so it is a height map
+        height_pixel = lambda x, y: ((25 * (x % 8) + 8 * (y % 8),) * 3)
+        write_png(self.height, 8, 8, height_pixel)
+        self.height_tiled = os.path.join(workdir, "height_tiled.png").replace("\\", "/")
+        write_png(self.height_tiled, 16, 16, lambda x, y: height_pixel(x % 8, y % 8))
         self.n = 0
         self.cache = {}
 
@@ -419,7 +426,14 @@ def run(args):
             check("texturemap", "picture with uscale/vscale 2 = picture tiled by hand, %s" % shape, backend,
                   Scene(material_text='Material "diffuse" "texture reflectance" [ "t" ]', prelude=repeat_decl % (sw.pattern_tiled, ""), shape=shape),
                   Scene(material_text='Material "diffuse" "texture reflectance" [ "t" ]', prelude=repeat_decl % (sw.pattern, ' "float uscale" [ 2 ] "float vscale" [ 2 ]'), shape=shape),
-                  tolerance=max(tol, 6.0))
+                  tolerance=1.0)   # tight: Metal without the mapping was 5.1% off on the sphere
+        # the same for a bump map: a height picture looked up through uscale/vscale 2 is the picture tiled by hand (the slope is per unit of the surface's own coordinates)
+        bump_decl = ('Texture "h" "float" "imagemap" "string filename" [ "%s" ] "string wrap" [ "repeat" ] "string encoding" [ "linear" ]%s\n'
+                     'Texture "b" "float" "scale" "texture tex" [ "h" ] "float scale" [ 1.5 ]')
+        bump_material = 'Material "diffuse" "rgb reflectance" [ 0.7 0.7 0.7 ] "texture displacement" [ "b" ]'
+        check("texturemap", "bump map with uscale/vscale 2 = bump map tiled by hand", backend,
+              Scene(material_text=bump_material, prelude=bump_decl % (sw.height_tiled, ""), shape="uvquad"),
+              Scene(material_text=bump_material, prelude=bump_decl % (sw.height, ' "float uscale" [ 2 ] "float vscale" [ 2 ]'), shape="uvquad"), tolerance=1.0)   # tight: a bump map looked up without the mapping is only 1.4% (CPU) to 3.6% (Metal) off
         # bump and normal maps that change nothing: a constant displacement, and a flat normal map
         check("texture", "constant displacement texture changes nothing", backend, Scene(material_text=diffuse_inline),
               Scene(material_text='Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "texture displacement" [ "d" ]', prelude='Texture "d" "float" "constant" "float value" [ 0.3 ]'), tolerance=tol)

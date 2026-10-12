@@ -451,6 +451,10 @@ void MetalPocApp::loadPbrtRemainingTriangles(const pbrt_flatten::FlatScene& scen
             mat.bumpHeight = it->second[2];
             mat.bumpScale = (float)m.displacementScale;
             mat.bumpIsNormalMap = it->second[3];
+            mat.bumpUvScaleU = (float)m.displacementMapping.su;
+            mat.bumpUvScaleV = (float)m.displacementMapping.sv;
+            mat.bumpUvDeltaU = (float)m.displacementMapping.du;
+            mat.bumpUvDeltaV = (float)m.displacementMapping.dv;
         }
     };
     pbrtAlphaMasks.clear();   // applyPbrtAlphaMask() decodes each mask file once; the instanced groups (loadPbrtObjectInstances, later) reuse the table

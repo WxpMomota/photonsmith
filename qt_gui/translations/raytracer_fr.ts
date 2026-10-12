@@ -6974,11 +6974,6 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
         <translation>Laisse passer</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="551"/>
-        <source>On a Mac the repeats and shift are drawn on a box, a quad and the ready-made shapes only; on this shape the CPU render shows them but the GPU preview does not yet.</source>
-        <translation>Sur un Mac, les répétitions et le décalage ne sont dessinés que sur une boîte, un quadrilatère et les formes prédéfinies ; sur cette forme le rendu CPU les montre, mais l'aperçu GPU pas encore.</translation>
-    </message>
-    <message>
         <location filename="../scene_builder_inspector.cpp" line="626"/>
         <source>Object</source>
         <translation>Objet</translation>
