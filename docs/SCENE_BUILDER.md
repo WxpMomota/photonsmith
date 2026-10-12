@@ -339,6 +339,10 @@ The scene's **name** is the field at the top right of the tab (it is also the *T
 * A mesh (`.ply` or `.obj`) is shown in the layout view only as a small marker at its position, because the view does not read the file; its scale and rotation apply when it renders.
 * No animation of objects. The camera can fly along a path through saved views (*Camera views*, *Flythrough...*) or orbit (*Turntable...*), but nothing else moves between frames.
 * The 3D view shows shapes, not materials or lighting (switch on **Rendered** for those), and a mesh as its bounding box and a sample of its points. Use it with the flat views, or type exact numbers in the properties.
+* The renderers agree on every shape under every material and lighting the Builder offers, except in three places (found by `scripts/combo_sweep.py`, which renders 232 small scenes, every shape under 15 material treatments and the showcase under each lighting, on the CPU and both OptiX backends and compares the pictures):
+  * a **height map** on a sphere, disk or cylinder is drawn by the CPU only (OptiX draws it on triangle shapes; Metal also on a disk and cylinder), and the properties say so;
+  * a **glass** shape whose flat face lies exactly on the floor (a glass pyramid or box standing on a quad at height 0) is a little darker on the GPU than on the CPU where you see through it: the CPU ignores a surface closer than 0.001 along the ray, so light refracted down through the contact slips under the floor, while OptiX meets the floor, as pbrt does. Lift the shape a hair (0.01) and all three agree;
+  * **subsurface scattering on a single open sheet** (a quad seen from its front) draws differently on every renderer: it needs a closed shape (a sphere, box, ready-made solid) to mean anything.
 
 ## How it is checked
 

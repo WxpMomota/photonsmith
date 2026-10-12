@@ -12,6 +12,7 @@
 #include "../../src/shared/scene_document.h"
 #include "../../src/shared/scene_array.h"
 #include "../../src/shared/scene_props.h"
+#include "../../src/shared/scene_showcase.h"
 #include "../../src/shared/pbrt_load.h"
 #include "../../src/shared/pbrt_discover.h"
 
@@ -19,6 +20,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <set>
 #include <sstream>
 
@@ -1534,4 +1536,111 @@ TEST(SceneMaterialsMoreTest, WritesOneSceneForEveryPresetWhenAsked) {
 		write(preset.id, m);
 	}
 	for (const scene_doc::MixPreset& preset : scene_doc::mixPresets()) write(std::string("mix-") + preset.id, preset.material);   // (the pictures of the mix list)
+}
+
+// RT_COMBO_SCENES_DIR=<folder> writes one small scene for every shape the Scene Builder has under every material treatment it offers (a plain colour, each material type, a mix, an
+// emitter, a picture, a checker, a marble, a height map and a normal map, a mix whose first material has a picture or a bump), named <shape>__<treatment>.pbrt, for
+// scripts/combo_sweep.py to render on the CPU and both OptiX backends and compare: a combination one renderer cannot draw, or draws differently, shows there.
+TEST(SceneCombosTest, WritesOneSceneForEveryShapeAndMaterialTreatmentWhenAsked) {
+	const char* dirEnv = std::getenv("RT_COMBO_SCENES_DIR");
+	if (!dirEnv) GTEST_SKIP() << "set RT_COMBO_SCENES_DIR=<folder> to write the combination scenes";
+	const std::string dir = std::filesystem::absolute(dirEnv).string();
+	const auto writeFile = [&](const std::string& name, const std::string& bytes) { std::ofstream(dir + "/" + name, std::ios::binary) << bytes; return dir + "/" + name; };
+	std::vector<unsigned char> picture, ramp, tilt;
+	for (int i = 0; i < 16; ++i) {   // a 4x4 picture of four colours
+		const int x = i % 4, y = i / 4;
+		const bool a = ((x + y) % 2) == 0;
+		for (unsigned char v : (a ? std::vector<unsigned char>{230, 60, 40} : std::vector<unsigned char>{40, 90, 230})) picture.push_back(v);
+	}
+	for (int y = 0; y < 4; ++y)
+		for (int x = 0; x < 16; ++x) for (int c = 0; c < 3; ++c) ramp.push_back(static_cast<unsigned char>(255 * x / 15));
+	for (int i = 0; i < 4; ++i) { tilt.push_back(238); tilt.push_back(128); tilt.push_back(191); }   // a normal tilted 60 degrees about +x
+	const std::string pictureFile = writeFile("combo_picture.bmp", bmpFile(4, 4, picture)), rampFile = writeFile("combo_ramp.bmp", bmpFile(16, 4, ramp)),
+	                  tiltFile = writeFile("combo_tilt.bmp", bmpFile(2, 2, tilt));
+	struct Treatment {
+		const char* name;
+		std::function<void(Object&)> apply;
+	};
+	const auto kind = [](MaterialKind k, scene_doc::Rgb c, double roughness = 0.0, double ior = 1.5) {
+		return [=](Object& o) {
+			o.material.kind = k;
+			o.material.color = c;
+			o.material.roughness = roughness;
+			o.material.ior = ior;
+		};
+	};
+	std::vector<Treatment> treatments = {
+	    {"diffuse", kind(MaterialKind::Diffuse, {0.7, 0.5, 0.3})},
+	    {"conductor", kind(MaterialKind::Conductor, {0.95, 0.64, 0.54}, 0.2)},
+	    {"glass", kind(MaterialKind::Dielectric, {0.8, 0.8, 0.8}, 0.0, 1.5)},
+	    {"coated", kind(MaterialKind::CoatedDiffuse, {0.7, 0.1, 0.1}, 0.05, 1.5)},
+	    {"transmission", [](Object& o) { o.material.kind = MaterialKind::DiffuseTransmission; o.material.color = {0.5, 0.6, 0.3}; o.material.transmittance = {0.3, 0.4, 0.1}; }},
+	    {"subsurface", [](Object& o) { scene_doc::applyMaterialPreset(o.material, "skin"); }},
+	    {"mix", [](Object& o) { scene_doc::applyMixPreset(o.material, "rusty-metal"); }},
+	    {"emitter", [](Object& o) { o.emissive = true; o.emission = {1.0, 0.8, 0.5}; o.emissionStrength = 3.0; }},
+	    {"picture", [=](Object& o) { o.material.imageFile = pictureFile; o.material.uvScaleU = 3.0; o.material.uvScaleV = 2.0; o.material.uvOffsetU = 0.25; }},
+	    {"checker", [](Object& o) { o.material.checker = true; o.material.color = {0.9, 0.9, 0.9}; o.material.color2 = {0.1, 0.2, 0.6}; o.material.checkerCount = 4; o.material.uvScaleU = 2.0; o.material.uvOffsetU = 0.3; }},
+	    {"marble", [](Object& o) { o.material.pattern = Pattern::Marble; }},
+	    {"heightmap", [=](Object& o) { o.material.color = {0.8, 0.8, 0.8}; o.material.bumpFile = rampFile; o.material.bumpKind = BumpKind::Height; o.material.bumpStrength = 3.0; o.material.uvScaleU = 6.0; }},
+	    {"normalmap", [=](Object& o) { o.material.color = {0.8, 0.8, 0.8}; o.material.bumpFile = tiltFile; o.material.bumpKind = BumpKind::Normal; }},
+	    {"mix_picture", [=](Object& o) { scene_doc::applyMixPreset(o.material, "chipped-paint"); o.material.imageFile = pictureFile; o.material.uvScaleU = 2.0; }},
+	    {"mix_normalmap", [=](Object& o) { scene_doc::applyMixPreset(o.material, "worn-leather"); o.material.bumpFile = tiltFile; o.material.bumpKind = BumpKind::Normal; }},
+	};
+	int written = 0;
+	for (ShapeKind shape : scene_doc::allShapeKinds()) {
+		if (shape == ShapeKind::Mesh || shape == ShapeKind::Cyclorama) continue;   // (a mesh needs a file; a cyclorama is a backdrop bigger than the frame)
+		for (const Treatment& t : treatments) {
+			Document d;
+			d.camera.position = {3.2, 2.4, 4.8};
+			d.camera.target = {0, 0.8, 0};
+			d.camera.fov = 40;
+			d.render = {64, 64, 48, 8};
+			Object floorObj = makeObject(ShapeKind::Quad, "Floor");
+			floorObj.material.color = {0.55, 0.55, 0.55};
+			d.objects.push_back(floorObj);
+			Object o = makeObject(shape, "Subject");
+			if (shape == ShapeKind::Quad) { o.size = {2, 1, 2}; o.position = {0, 1.0, 0}; o.rotation = {-70, 0, 0}; }
+			if (shape == ShapeKind::Terrain) { o.size = {4, 1, 4}; o.position = {0, 0.5, 0}; }
+			t.apply(o);
+			d.objects.push_back(o);
+			Light sky;
+			sky.kind = LightKind::Infinite;
+			sky.color = {0.62, 0.72, 0.95};
+			sky.intensity = 0.7;
+			d.lights.push_back(sky);
+			Light sun;
+			sun.kind = LightKind::Distant;
+			sun.position = {3, 5, 4};
+			sun.target = {0, 0, 0};
+			sun.color = {1.0, 0.96, 0.9};
+			sun.intensity = 3.0;
+			d.lights.push_back(sun);
+			writeFile(std::string(scene_doc::toString(shape)) + "__" + t.name + ".pbrt", toPbrt(d));
+			++written;
+		}
+	}
+	// The showcase scene (a mix, a subsurface ball, glass, a tiled picture, a projector) under each ready-made lighting, with its own pictures given by absolute path.
+	const std::string repoScenes = std::filesystem::absolute("pbrt_scenes").string();
+	const std::string presetNames[] = {"studio", "overcast", "sunny", "goldenhour", "moonlit", "lightbox"};
+	int p = 0;
+	for (scene_doc::lighting::Preset preset : scene_doc::lighting::allPresets()) {
+		Document d = scene_doc::makeShowcaseScene();
+		for (Object& o : d.objects)
+			if (!o.material.imageFile.empty()) o.material.imageFile = repoScenes + "/" + o.material.imageFile;
+		scene_doc::lighting::apply(d, preset);
+		d.render = {64, 64, 48, 8};
+		writeFile("showcase__" + presetNames[p++] + ".pbrt", toPbrt(d));
+		++written;
+	}
+	{   // and as it ships: the studio rig with the window projector
+		Document d = scene_doc::makeShowcaseScene();
+		for (Object& o : d.objects)
+			if (!o.material.imageFile.empty()) o.material.imageFile = repoScenes + "/" + o.material.imageFile;
+		for (Light& l : d.lights)
+			if (!l.imageFile.empty()) l.imageFile = repoScenes + "/" + l.imageFile;
+		d.render = {64, 64, 48, 8};
+		writeFile("showcase__asshipped.pbrt", toPbrt(d));
+		++written;
+	}
+	EXPECT_GT(written, 150);
 }
