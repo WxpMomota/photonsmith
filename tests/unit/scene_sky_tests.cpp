@@ -271,14 +271,7 @@ TEST(SceneSkyTest, SkySettingsSurviveTheJsonAndTheSceneStaysValidAndLoads) {
 
 namespace {
 
-std::string findLauncherForSky() {
-	namespace fs = std::filesystem;
-	std::error_code ec;
-	for (const char* c : {"ray_tracer.exe", "../ray_tracer.exe", "../../ray_tracer.exe", "x64/Release/ray_tracer.exe", "../x64/Release/ray_tracer.exe",
-	                      "../../x64/Release/ray_tracer.exe", "ray_tracer", "../ray_tracer", "../../ray_tracer"})
-		if (fs::is_regular_file(c, ec)) return fs::absolute(c, ec).string();
-	return "";
-}
+std::string findLauncherForSky() { return findRayTracerLauncher(); }
 
 }  // namespace
 

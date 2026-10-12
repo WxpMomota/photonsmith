@@ -70,6 +70,14 @@ jobs:
         working-directory: tests
         run: cmake --build build --config Release
 
+      - name: Build the launcher (CPU only)
+        # The Scene Builder's render tests (lighting, projector, mixed materials, texture repeats, the sky, the showcase scene...) render scenes through the real `ray_tracer`
+        # launcher and compare the pictures with closed forms. They skip when there is no launcher, and the portable test target does not build one, so for a long time
+        # fifteen of them reported SKIPPED here. The root CMake project builds the launcher for the CPU alone (no CUDA/OptiX needed); the tests find it through RT_LAUNCHER.
+        run: |
+          cmake -B build_launcher -A x64
+          cmake --build build_launcher --config Release --target ray_tracer
+
       - name: Run unit_tests
         # Deliberately NOT working-directory: tests, unlike the two steps
         # above - several tests (e.g. PbrtCpuBuildTest.NanoVdbTemperature
@@ -84,6 +92,8 @@ jobs:
         # corrupt-data problem - reproduced locally on macOS by running
         # the exact same binary from tests/ instead of the repo root, so
         # this was never actually a Windows-specific issue.
+        env:
+          RT_LAUNCHER: ${{ github.workspace }}\build_launcher\Release\ray_tracer.exe
         run: .\tests\build\Release\unit_tests.exe --gtest_color=yes
 
       - name: Run CPU integrator agreement tests
@@ -92,6 +102,8 @@ jobs:
         # above (the default target builds everything). From the repo root, like unit_tests, so pbrt_scenes/ resolves. They render, so allow a few
         # minutes on a hosted runner.
         timeout-minutes: 20
+        env:
+          RT_LAUNCHER: ${{ github.workspace }}\build_launcher\Release\ray_tracer.exe
         run: .\tests\build\Release\cpu_integrator_tests.exe --gtest_color=yes
 
   unit-tests-macos:
@@ -119,18 +131,27 @@ jobs:
       - name: Build (Release)
         run: cmake --build build_tests --target unit_tests cpu_integrator_tests
 
+      - name: Build the launcher (CPU only)
+        # See the Windows job: the Scene Builder's render tests need the real `ray_tracer`; they find it through RT_LAUNCHER.
+        run: >
+          cmake -S . -B build_launcher -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_OBJCXX_COMPILER_LAUNCHER=ccache
+          && cmake --build build_launcher --target ray_tracer
+
       - name: Run unit_tests
         # From the repo root, not tests/ - see the Windows job's own comment on why (fixtures under pbrt_scenes/ are found relative to the cwd).
         # TEMP: several tests build scratch folders under $TEMP (set on Windows, not on macOS); without it they would litter the repo root. The `runner`
         # context is not available at job level, so it is set on the steps that run tests.
         env:
           TEMP: ${{ runner.temp }}
+          RT_LAUNCHER: ${{ github.workspace }}/build_launcher/ray_tracer
         run: build_tests/unit_tests --gtest_color=yes
 
       - name: Run CPU integrator agreement tests
         timeout-minutes: 20
         env:
           TEMP: ${{ runner.temp }}
+          RT_LAUNCHER: ${{ github.workspace }}/build_launcher/ray_tracer
         run: build_tests/cpu_integrator_tests --gtest_color=yes
 
   metal-poc:

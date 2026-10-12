@@ -72,10 +72,13 @@ inline bool loadLinearRgbPixels(const std::string& path, int& w, int& h, std::ve
 // Rendering a scene text through the launcher built beside the tests (used by the Scene Builder's render tests: lighting, projector, mix, texture placement).
 // ---------------------------------------------------------------------------------------------------------------------------------
 
-// The `ray_tracer` launcher next to the tests (or one level up), as an absolute path; empty when it was not built (the render tests then skip).
+// The `ray_tracer` launcher, as an absolute path; empty when there is none (the render tests then skip). The environment variable RT_LAUNCHER names it (CI builds the launcher in a
+// folder of its own); otherwise it is looked for next to the tests, in the folders above, and in the MSBuild solution's x64/Release.
 inline std::string findRayTracerLauncher() {
 	namespace fs = std::filesystem;
 	std::error_code ec;
+	if (const char* named = std::getenv("RT_LAUNCHER"))
+		if (*named && fs::is_regular_file(named, ec)) return fs::absolute(named, ec).string();
 	for (const char* c : {"ray_tracer.exe", "../ray_tracer.exe", "../../ray_tracer.exe", "x64/Release/ray_tracer.exe", "../x64/Release/ray_tracer.exe",
 	                      "../../x64/Release/ray_tracer.exe", "ray_tracer", "../ray_tracer", "../../ray_tracer"})
 		if (fs::is_regular_file(c, ec)) return fs::absolute(c, ec).string();
