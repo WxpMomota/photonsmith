@@ -29,6 +29,7 @@
 #include <cmath>
 #include <functional>
 #include <map>
+#include <mutex>
 #include <utility>
 #include <string>
 #include <vector>
@@ -67,6 +68,8 @@ namespace flatten_detail {
 // materials at most, usually sharing one pair).
 inline const BSSRDFTable &beamDiffusionTable(double g, double eta) {
 	static std::map<std::pair<double, double>, BSSRDFTable> cache;
+	static std::mutex cacheMutex;   // two threads can flatten at once (a Live Preview worker and the GUI); std::map keeps references valid across inserts
+	std::lock_guard<std::mutex> lock(cacheMutex);
 	auto it = cache.find({g, eta});
 	if (it == cache.end()) {
 		BSSRDFTable table(100, 64);

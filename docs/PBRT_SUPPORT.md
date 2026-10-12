@@ -534,7 +534,7 @@ loader and no longer match the code:
   renders); the same sphere-hit-triggered dispatch caveat as the other grid
   media; the file is read once per process (`cachedNanovdbGrid()`), like
   the image cache, so Live Preview does not re-read it per camera move.
-  Metal does not read `.nvdb` files yet.
+  Metal reads them too (2026-10-09): the same host-side read, drawn by Metal's per-voxel RGB grid medium (`gpu/metal/metal_poc_pbrt_nanovdb.mm`); a `temperaturename` glow is dropped with a warning.
 
 - `MakeNamedMedium`'s own `"rgb Le"`/`"float Lescale"` (pbrt-v4) — a real
   self-emitting medium (fire/plasma/glowing fog) — is decoded for

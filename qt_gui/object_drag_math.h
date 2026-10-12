@@ -74,7 +74,7 @@ struct DragSession {
 		} else if (vertical != lastVertical) {
 			base = total;   // the move so far, as the caller last saw it
 			Vec3 atSwitch;
-			modeOffset = dragDelta(cb, grab + base, s1, t1, vertical, 0.0, atSwitch) ? atSwitch : Vec3{};
+			modeOffset = dragDelta(cb, grab + base, s1, t1, vertical, maxLength, atSwitch) ? atSwitch : Vec3{};   // clamped like the deltas that follow, or the object would jump when the cap applies
 			lastVertical = vertical;
 		}
 		Vec3 delta;

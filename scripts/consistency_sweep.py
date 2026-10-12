@@ -22,6 +22,7 @@ Exit code 1 when a pair is off by more than the tolerance. See docs/CONSISTENCY_
 import argparse
 import math
 import os
+import shutil
 import struct
 import subprocess
 import sys
@@ -313,10 +314,17 @@ class Sweep:
         pbrt = os.path.join(self.dir, "s%d.pbrt" % self.n)
         out = os.path.join(self.dir, "s%d.exr" % self.n)
         open(pbrt, "w").write(scene.text())
-        r = subprocess.run([self.exe, "--" + backend, "--seed", str(seed), "--output", out, str(scene.size), str(scene.spp), str(scene.depth), pbrt], capture_output=True, text=True, cwd=REPO)
+        try:
+            r = subprocess.run([self.exe, "--" + backend, "--seed", str(seed), "--output", out, str(scene.size), str(scene.spp), str(scene.depth), pbrt], capture_output=True, text=True, cwd=REPO, timeout=1200)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("%s render did not finish in 20 minutes" % backend)
         if r.returncode != 0 or not os.path.exists(out):
             raise RuntimeError("%s render failed: %s" % (backend, (r.stdout + r.stderr)[-300:]))
-        self.cache[key] = read_exr_means(out)
+        means = read_exr_means(out)
+        # Two black pictures are "equal": a lamp that did not light, or a shape that was not drawn, must not pass as 0% off. Every scene here has a sky or a lamp.
+        if max(means) < 1e-5:
+            raise RuntimeError("%s drew a black picture" % backend)
+        self.cache[key] = means
         return self.cache[key]
 
     def compare(self, label, backend, a, b, tolerance, seed_b=3):
@@ -464,7 +472,12 @@ def run(args):
             spp = 512 if name in NOISY else 64   # a glass ball lit through by a small lamp has caustics: one backend's few fireflies can move a 64-sample mean by 9%
             for label, scene in (("constant sky", Scene(material=name, spp=spp)), ("picture sky", Scene(material=name, sky="picture", sky_png=sw.gradient, spp=spp))):
                 total += 1
-                ma, mb = sw.render("cpu", scene), sw.render("gpu", scene)
+                try:
+                    ma, mb = sw.render("cpu", scene), sw.render("gpu", scene)
+                except RuntimeError as e:
+                    print("  both cpu vs gpu, %s, %s: FAILED TO RENDER: %s" % (label, name, e))
+                    failures.append(("backends", "both", "%s, %s" % (label, name)))
+                    continue
                 worst = max(abs(x - y) / max(abs(x), 1e-6) for x, y in zip(ma, mb)) * 100.0
                 limit = max(noise_tol(name), BACKEND_TOLERANCE.get(name, 6.0))
                 if worst > limit or args.verbose:
@@ -472,6 +485,10 @@ def run(args):
                 if worst > limit:
                     failures.append(("backends", "both", "%s, %s" % (label, name)))
     print("\n%d pairs, %d off by more than %g%%" % (total, len(failures), tol))
+    if not args.keep:
+        shutil.rmtree(workdir, ignore_errors=True)
+    else:
+        print("scenes and pictures kept in %s" % workdir)
     return 1 if failures else 0
 
 
@@ -482,6 +499,7 @@ def main():
     ap.add_argument("--only", default="")
     ap.add_argument("--tolerance", type=float, default=4.0, help="percent, per colour channel")
     ap.add_argument("-v", "--verbose", action="store_true")
+    ap.add_argument("--keep", action="store_true", help="keep the folder of generated scenes and pictures (removed by default)")
     args = ap.parse_args()
     args.backends = [b for b in args.backends.split(",") if b]
     if not os.path.exists(args.exe):

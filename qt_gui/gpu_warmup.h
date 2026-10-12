@@ -18,6 +18,7 @@ class GpuWarmup : public QObject {
 	Q_OBJECT
 public:
 	explicit GpuWarmup(QObject *parent = nullptr);
+	~GpuWarmup() override;
 	void start();
 	bool running() const { return m_pending > 0; }
 

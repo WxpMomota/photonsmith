@@ -70,6 +70,8 @@ Stages 1 and 2 need both sides, so the Mac session should review this before any
 
 ## Mac session review (2026-10-08)
 
+*Historical: this review and the proposal above describe the code of 2026-10-08. Since then Metal has subsurface (BSSRDF), NanoVDB, tessellated cones and paraboloids through `gpu_tessellate.h`, and OptiX tessellates cones and paraboloids too: see the sections further down and `docs/BACKEND_SUPPORT.md` for what is true now.*
+
 Read against `gpu/metal/metal_poc_pbrt_loader.mm` (1,789 lines) and `metal_poc_pbrt_materials.mm` (599) on main at 40f30a7.
 
 **Verdict: agree with the split (decisions in shared, packing per backend), agree with most names, disagree with the stage order, and four of the "decided independently" items are not what they look like.**

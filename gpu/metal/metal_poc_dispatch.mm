@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include "metal_poc_app.h"
 #include "metal_interface.h"   // metal_prepare_renderer()
 #include "metal_poc_shader_files.h"
@@ -220,6 +221,10 @@ static id<MTLComputePipelineState> createKernelPipeline(id<MTLDevice> dev, id<MT
     MTLLinkedFunctions* linkedFns = [MTLLinkedFunctions new];
     linkedFns.functions = @[f.sphere, f.disk, f.cylinder, f.triangleAnyHit];
     pipelineDesc.linkedFunctions = linkedFns;
+    // One build at a time in this process: a Live Preview that starts while the GUI's background warm-up is still compiling waits for it and then finds the result in Metal's cache, instead of
+    // compiling the same pipeline a second time beside it.
+    static std::mutex buildMutex;
+    std::lock_guard<std::mutex> lock(buildMutex);
     auto finished = std::make_shared<std::atomic<bool>>(false);
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
         if (!finished->load())
