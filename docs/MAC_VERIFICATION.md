@@ -62,3 +62,23 @@ By hand: things the renderers draw (spot-check against a CPU render of the same 
 - [ ] Preview live and Edit in Builder still round-trip a scene that now contains a projector or a Lighting setup.
 
 Report back by editing this section, or by sending the failing `FAIL:` lines.
+
+### Mac results (2026-10-11)
+
+Everything here ran on an M2 Mac with Metal; nothing was clicked by hand, so what the checklist calls "by hand" is covered where a test can say it and left unticked where only eyes can.
+
+Automated
+
+- [x] Rebuilt, `ctest` 23 of 23, unit tests 3,934 pass. `scene_viewport_tests` is in `unit_tests`; `scene_lighting_tests` and `scene_projector_tests` are in `cpu_integrator_tests` (102 pass; their render tests run, the launcher is found when the tests run from `build_macos/<a subfolder>`). The same render tests run against **Metal** (`--gpu` instead of `--cpu`, compiled by hand): all 15 lighting and projector tests pass.
+- [x] `RT_GUI_SELFTEST=builder` ends `RESULT: OK` (and `livepreview` too), including the Rendered viewport steps: it produces frames and refines them, the red box is in the picture, recolouring it changes the picture, **dragging the box moves it with 0 restarts**, orbiting keeps the picture coming, and the switch turns it off. One thing to know: the GPU preview step of `builder` takes about **90 seconds on a cold shader cache** (Metal compiles the renderer on first use after a new build), and `gui_selftest.py` used to give a mode 60 seconds, so the first runs after every build reported "hung" and a rerun passed. The waits are 300 s for `builder` and 240 s for `livepreview` now.
+
+By hand (Metal)
+
+- [x] Rendered viewport: the steps above are the self-test's own, on Metal. Not checked: starting Live Preview from the toolbar with Rendered on switches the viewport off.
+- [ ] Orbit and zoom by eye, and the six **Lighting** presets: not looked at. The overcast plate (albedo times sky brightness) and the studio rig's irradiance are tests, and they pass on Metal.
+- [x] **Rotate sky**: `TurningAnImageSkyHalfWayRoundMovesItsLightToTheOtherSideOfABall` passes on Metal (and the CPU).
+- [x] **Projector**: all three render tests pass on Metal: the slide lands on the wall right way up and not mirrored aimed level, down and sideways, and a white slide lights a surface like a point light of the same strength. Not checked: the dotted frustum in the 3D view.
+- [x] **Volumes**: the Beer-Lambert absorber and the "white volume in a uniform sky is invisible" tests pass on Metal. The third volume test, a grid medium in a box bigger than its sphere, **failed on Metal: a `uniformgrid` inside an interface sphere drew as nothing at all**. Fixed (the loader hands it to Metal's RGB grid medium; CPU and Metal now agree to 0.3% on that test and on `uniformgrid-medium.pbrt`), see the CHANGELOG. Fog, smoke and cloud by eye: not looked at.
+- [x] **Normal map**: the tilt test (`cos 30`) passes on Metal. Subsurface skin and candle wax, marble and noise, and a bump picture by eye: not looked at.
+- [ ] Camera focus and depth of field in the 3D view: not run.
+- [ ] Preview live and Edit in Builder with a projector or Lighting setup: not run.

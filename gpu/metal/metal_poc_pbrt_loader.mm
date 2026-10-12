@@ -67,6 +67,25 @@ constexpr double kChromaticFogSpread = 0.01;
 // gpu_tessellate::tessellateForBackend() in src/shared/gpu_tessellate.h (moved there from this file so OptiX shares it; the numbers
 // are unchanged).
 
+// Metal draws a pbrt "uniformgrid" medium (one density per voxel, scaled by a single sigma_s) with the per-voxel RGB grid medium it already has for "rgbgrid": the density times
+// each channel of sigma_s per voxel, and no absorption (the CPU's uniformgrid is pure scattering: its sigma_a is forced to 0). Before this a uniformgrid inside an interface sphere
+// drew as nothing at all on a Mac (found by the Scene Builder's volume test run against Metal). A grid with no usable density stays as it was (invisible, with the flattener's warning).
+static void uniformGridsAsRgbGrids(pbrt_flatten::FlatScene& scene) {
+    for (pbrt_flatten::Medium& m : scene.media) {
+        if (m.type != "uniformgrid") continue;
+        const size_t voxels = (size_t)m.nx * m.ny * m.nz;
+        if (voxels == 0 || m.gridDensity.size() != voxels) continue;
+        std::vector<double>* sigmaS[3] = {&m.sigma_s_r, &m.sigma_s_g, &m.sigma_s_b};
+        std::vector<double>* sigmaA[3] = {&m.sigma_a_r, &m.sigma_a_g, &m.sigma_a_b};
+        for (int c = 0; c < 3; ++c) {
+            sigmaS[c]->resize(voxels);
+            for (size_t i = 0; i < voxels; ++i) (*sigmaS[c])[i] = m.gridDensity[i] * m.sigma_s[c];
+            sigmaA[c]->assign(voxels, 0.0);
+        }
+        m.type = "rgbgrid";
+    }
+}
+
 void MetalPocApp::loadPbrtScene() {
     pbrt_load::LoadResult result = pbrt_load::loadFile(pbrtScenePath);
     if (!result.ok) {
@@ -82,6 +101,7 @@ void MetalPocApp::loadPbrtScene() {
     pbrtTriangleFiberTangent.clear();
     if (const size_t added = gpu_tessellate::tessellateForBackend(result.scene, gpu_tessellate::TessellationCaps::all(), &pbrtTriangleFiberTangent))
         fprintf(stderr, "loadPbrtScene: tessellated bilinear patch/cone/paraboloid/curve shapes into %zu triangle(s)\n", added);
+    uniformGridsAsRgbGrids(result.scene);
     const pbrt_flatten::FlatScene& scene = result.scene;
     for (const pbrt_scene::Warning& w : scene.warnings) {
         fprintf(stderr, "loadPbrtScene: pbrt loader warning: %s\n", w.message.c_str());

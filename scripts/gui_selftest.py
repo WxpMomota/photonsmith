@@ -194,7 +194,7 @@ def main():
         modes.append("livepreview_objects")
     if args.live_preview and IS_MAC and "livepreview_arrange" not in modes:
         modes.append("livepreview_arrange")   # Save arrangement of a Scene Builder scene, opened again in the Builder
-    waits = {"livepreview": 60, "livepreview_objects": 150, "livepreview_arrange": 90}
+    waits = {"builder": 300, "livepreview": 240, "livepreview_objects": 150, "livepreview_arrange": 90}
     ok = True
     try:
         for mode in modes:
