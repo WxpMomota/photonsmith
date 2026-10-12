@@ -89,10 +89,15 @@ inline bool applyMaterialPreset(Material& m, const std::string& id) {
 	const std::string bumpFile = m.bumpFile;   // (a bump slot is the surface's relief, not its colour: it stays)
 	const BumpKind bumpKind = m.bumpKind;
 	const double bumpStrength = m.bumpStrength;
+	const double uvScaleU = m.uvScaleU, uvScaleV = m.uvScaleV, uvOffsetU = m.uvOffsetU, uvOffsetV = m.uvOffsetV;   // (where the bump picture sits)
 	m = p->material;
 	m.bumpFile = bumpFile;
 	m.bumpKind = bumpKind;
 	m.bumpStrength = bumpStrength;
+	m.uvScaleU = uvScaleU;
+	m.uvScaleV = uvScaleV;
+	m.uvOffsetU = uvOffsetU;
+	m.uvOffsetV = uvOffsetV;
 	m.imageFile.clear();
 	m.checker = false;
 	m.pattern = Pattern::None;

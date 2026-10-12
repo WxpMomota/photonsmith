@@ -866,6 +866,17 @@ inline std::string displayNameFor(const pbrt_discover::Discovered& d) {
 inline std::deque<std::string>& namesPool() { static std::deque<std::string> p; return p; }
 inline std::deque<std::string>& descriptionsPool() { static std::deque<std::string> p; return p; }
 
+// Seeds the numbering of the scenes found on disk so that each continues its category after the scenes already in `registry`: a file that says "# @rt-category Materials" must be
+// B-something-new, not "B1", which the built-in Rough Metal Spheres already is (the renderer resolves a scene by its id, so the file's id sent every render of it to that scene).
+// Ids of the per-user scenes (kUserSceneIdBase and above) are persistent and numbered separately, so they are left out.
+inline void seedNextNumbers(const std::vector<SceneDescriptor>& registry, std::map<char, int>& nextNumber) {
+    for (const SceneDescriptor& s : registry) {
+        if (s.id.size() < 2) continue;
+        const int number = std::atoi(s.id.c_str() + 1);
+        if (number > 0 && number < pbrt_discover::kUserSceneIdBase) nextNumber[s.id[0]] = std::max(nextNumber[s.id[0]], number);
+    }
+}
+
 // Lists one scene found on disk: builds its descriptor and appends it to `registry`. Returns false (and adds nothing) for a file that does not parse
 // or that a curated entry already lists. `nextNumber`, `takenSlugs` and `legacy_id` are the running state of the numbering (see append()).
 inline bool appendOne(std::vector<SceneDescriptor>& registry, const pbrt_discover::Discovered& d, std::map<char, int>& nextNumber,
@@ -1024,6 +1035,7 @@ inline void append(std::vector<SceneDescriptor>& registry) {
     // Ids continue per category letter: a scene found on disk is numbered within its own category (K1, K2, ... for Custom Scenes, L1, ... for Test
     // Scenes), in the order the files were found.
     std::map<char, int> nextNumber;
+    seedNextNumbers(registry, nextNumber);
     // Every slug already taken (the built-in scenes'), so a file's slug never clashes with one.
     std::set<std::string> takenSlugs;
     for (const SceneDescriptor& existing : registry)
@@ -1114,6 +1126,7 @@ inline int refresh_user_scenes(bool prune = false) {
     for (const SceneDescriptor& s : registry)
         if (!s.slug.empty()) takenSlugs.insert(s.slug);
     std::map<char, int> nextNumber;
+    pbrt_scene_registry::seedNextNumbers(registry, nextNumber);
     int added = 0;
     for (pbrt_discover::Discovered& d : pbrt_discover::scanDirectory(dir)) {
         if (registry.size() >= registry.capacity()) {

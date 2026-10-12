@@ -58,7 +58,7 @@ struct Material {
 	BumpKind bumpKind = BumpKind::Height;
 	double bumpStrength = 0.05;        // Height map: how tall the relief is (the picture's 0..1 times this, in scene units)
 	// Where the surface's texture coordinates put a picture, a checker and a bump map: the texture is repeated `uvScale` times across (U) and up (V) the surface and moved by
-	// `uvOffset` of a repeat, so a picture of bricks can tile a wall and be shifted to start on a brick. (u, v) become ((u - offsetU) * scaleU, (v - offsetV) * scaleV); the texture's
+	// `uvOffset` repeats, so a picture of bricks can tile a wall and be shifted to start on a brick. (u, v) become (u * scaleU - offsetU, v * scaleV - offsetV); the texture's
 	// edges repeat. Only the shapes that write their own texture coordinates (a box, a quad, the ready-made shapes) take it; a sphere, disk, cylinder, cone or mesh file has the
 	// renderer's own.
 	double uvScaleU = 1.0, uvScaleV = 1.0;

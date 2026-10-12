@@ -166,3 +166,34 @@ TEST(SceneViewportTest, MovingObjectsWithTheBaseSignatureGivesTheSameOffsetsAsWi
 	other.objects[3].material.color = {0.1, 0.9, 0.2};
 	EXPECT_TRUE(translationOnly(a, sceneSignature(a), other).empty());
 }
+
+TEST(SceneViewportTest, AVolumeThatStaysPutDoesNotStopOtherObjectsFromMovingByOffset) {
+	Document base = makeStarterScene();
+	base.objects.push_back(scene_doc::makeVolume(scene_doc::VolumeKind::Fog, "Fog"));
+	Document now = base;
+	now.objects[2].position.x += 0.5;
+	const auto offsets = translationOnly(base, now);
+	ASSERT_EQ(offsets.size(), base.objects.size());
+	EXPECT_NEAR(offsets[2][0], 0.5, 1e-12);
+	now.objects.back().position.x += 1.0;
+	EXPECT_TRUE(translationOnly(base, now).empty()) << "moving the volume itself restarts";
+}
+
+TEST(SceneViewportTest, TheSignatureIsTheDocumentsJsonWithoutWhatOnlyTheViewsUse) {
+	Document a = makeStarterScene();
+	a.objects.push_back(scene_doc::makeVolume(scene_doc::VolumeKind::Fog, "Fog"));
+	const std::string sig = sceneSignature(a);
+	EXPECT_FALSE(sig.empty());
+	EXPECT_EQ(sig.find("\"title\":\"" + a.title), std::string::npos) << "the title is not part of it";
+	Document b = a;
+	b.objects[0].group = "a group";
+	b.lights[0].name = "Another name";
+	b.lights[0].hidden = true;
+	EXPECT_EQ(sceneSignature(b), sig);
+	Document c = a;
+	c.objects[1].material.roughness += 0.1;
+	EXPECT_NE(sceneSignature(c), sig);
+	Document e = a;
+	e.objects.back().volume.density *= 2.0;
+	EXPECT_NE(sceneSignature(e), sig);
+}

@@ -157,7 +157,7 @@ private:
 	std::uint64_t geometrySignature() const;
 	const scene_doc::Float3 *handle(const BuilderSelection &s, int which) const;
 	const scene_doc::Float3 *viewHandle(int viewIndex, int which) const;   // a saved view's eye or target in the document, or null
-	bool pathShown() const { return m_showPath && m_doc && m_doc->cameraViews.size() >= 2; }
+	bool pathShown() const { return m_showPath && m_doc && m_doc->cameraViews.size() >= 2 && !m_throughCamera && !m_previewing; }   // (it is not drawn while looking through the camera, so it is not there to be dragged either)
 	const scene_doc::Object *selectedObject() const;
 	GizmoMode effectiveGizmo() const;   // Rotate and Scale only apply to objects; for a light or the camera the Move tool shows
 	double gizmoLength(const scene_view::View &v, const scene_view::V3 &at) const;

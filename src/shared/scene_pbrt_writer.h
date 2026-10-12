@@ -73,12 +73,13 @@ inline void writeMaterial(std::ostringstream& os, const Material& m, const std::
 	os << ind << "Material \"mix\" \"string materials\" [ \"" << a << "\" \"" << b << "\" ] \"float amount\" [ " << num(std::clamp(m.mixAmount, 0.0, 1.0)) << " ]\n";
 }
 
-// How an object places its texture coordinates (Material::uvScaleU...): (u, v) -> ((u - offsetU) * scaleU, (v - offsetV) * scaleV), only for a material that has a texture to place.
+// How an object places its texture coordinates (Material::uvScaleU...): (u, v) -> (u * scaleU - offsetU, v * scaleV - offsetV), only for a material that has a texture to place. The shift is
+// in repeats of the texture, so 0.5 moves it half a picture whatever the repeats are.
 struct UvPlace {
 	double su = 1.0, sv = 1.0, ou = 0.0, ov = 0.0;
 	void apply(double& u, double& v) const {
-		u = (u - ou) * su;
-		v = (v - ov) * sv;
+		u = u * su - ou;
+		v = v * sv - ov;
 	}
 };
 inline UvPlace uvPlaceOf(const Object& o) {
@@ -270,7 +271,11 @@ inline std::string toPbrt(const Document& d) {
 
 	const Camera& c = d.camera;
 	os << "LookAt " << detail::vec(c.position) << "  " << detail::vec(c.target) << "  " << detail::vec(c.up) << "\n";
-	os << "Camera \"perspective\" \"float fov\" [ " << detail::num(c.fov) << " ]";
+	// The document's field of view is the vertical one; pbrt's is the angle across the shorter side of the picture, which is the same on a landscape one and the horizontal angle on a portrait one.
+	double writtenFov = c.fov;
+	if (d.render.width > 0 && d.render.height > d.render.width)
+		writtenFov = 2.0 * std::atan(std::tan(c.fov * 3.14159265358979323846 / 360.0) * static_cast<double>(d.render.width) / d.render.height) * 180.0 / 3.14159265358979323846;
+	os << "Camera \"perspective\" \"float fov\" [ " << detail::num(writtenFov) << " ]";
 	if (c.lensRadius > 0.0) os << " \"float lensradius\" [ " << detail::num(c.lensRadius) << " ] \"float focaldistance\" [ " << detail::num(c.focusDistance) << " ]";
 	os << "\n";
 	os << "Film \"rgb\" \"integer xresolution\" [ " << d.render.width << " ] \"integer yresolution\" [ " << d.render.height << " ]\n";

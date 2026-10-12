@@ -51,37 +51,42 @@ inline void renderSize(int width, int height, int maxWidth, int& outWidth, int& 
 	outHeight = std::max(16, static_cast<int>(std::lround(height * scale)));
 }
 
-// What the scene is, for deciding whether a change of the document changes the picture: the scene text with the camera, the picture settings, the title, the saved views and every
-// comment (names, the builder's own JSON copy, which carries what is only for the views) left out. Two documents with the same signature render the same picture.
-inline std::string sceneSignature(const scene_doc::Document& d) {
+// The document with everything that does not change the picture cleared: the camera and the picture settings (the viewport has its own), the title, the saved views, and the names, groups and
+// hidden and locked flags (only the views use them).
+inline scene_doc::Document pictureOf(const scene_doc::Document& d) {
 	scene_doc::Document copy = d;
 	copy.camera = scene_doc::Camera{};
 	copy.render = scene_doc::RenderSettings{};
 	copy.title.clear();
 	copy.cameraViews.clear();
-	const std::string text = scene_doc::toPbrt(copy);
-	std::string out;
-	std::size_t at = text.find("WorldBegin");
-	if (at == std::string::npos) at = 0;
-	for (std::size_t start = at; start < text.size();) {
-		std::size_t end = text.find('\n', start);
-		if (end == std::string::npos) end = text.size();
-		if (text[start] != '#') out.append(text, start, end - start + 1);
-		start = end + 1;
+	for (scene_doc::Object& o : copy.objects) {
+		o.name.clear();
+		o.group.clear();
+		o.hidden = false;
+		o.locked = false;
 	}
-	return out;
+	for (scene_doc::Light& l : copy.lights) {
+		l.name.clear();
+		l.hidden = false;
+		l.locked = false;
+	}
+	return copy;
 }
+
+// What the scene is, for deciding whether a change of the document changes the picture: pictureOf() as JSON. Two documents with the same signature render the same picture. (It is the
+// JSON and not the pbrt text because that holds the parameters of every shape and not the thousands of numbers of a terrain or a rounded box: it is worked out for every step of a drag.)
+inline std::string sceneSignature(const scene_doc::Document& d) { return scene_doc::toJson(pictureOf(d)); }
 
 // Whether `now` differs from `base` (the document the renderer's copy was written from, `baseSignature` its sceneSignature(), which the caller keeps so that it is not worked out again for
 // every step of a drag) only in where objects are, and by how much: the offset of each object (absolute from where
 // `base` has it, so all zeros when nothing moved). The renderer numbers objects as the copy's AttributeBegin blocks in file order, which are the document's objects in order, so an
-// offset's index is the object's. Nothing is returned (an empty vector) when the change is more than a move, or for a scene where the numbering cannot be trusted or a move would not
-// carry everything along: a cone (the GPU does not draw it as one of the shapes it can move), a mesh (its file may not load, which leaves no object), and a volume (the medium of a cloud
-// stays where it was declared). Those restart instead.
+// offset's index is the object's. Nothing is returned (an empty vector) when the change is more than a move, or for a scene where the numbering cannot be trusted (a cone, which the GPU
+// does not draw as one of the shapes it can move, or a mesh, whose file may not load, leaves a different number of objects than the document has), or when a volume is moved (the
+// medium of a cloud stays where it was declared). Those restart instead.
 inline std::vector<std::array<double, 3>> translationOnly(const scene_doc::Document& base, const std::string& baseSignature, const scene_doc::Document& now) {
 	if (base.objects.size() != now.objects.size() || base.objects.empty()) return {};
 	for (const scene_doc::Object& o : now.objects)
-		if (o.shape == scene_doc::ShapeKind::Cone || o.shape == scene_doc::ShapeKind::Mesh || o.volume.kind != scene_doc::VolumeKind::None) return {};
+		if (o.shape == scene_doc::ShapeKind::Cone || o.shape == scene_doc::ShapeKind::Mesh) return {};
 	scene_doc::Document unmoved = now;
 	std::vector<std::array<double, 3>> offsets(now.objects.size());
 	for (std::size_t i = 0; i < now.objects.size(); ++i) {
@@ -91,6 +96,8 @@ inline std::vector<std::array<double, 3>> translationOnly(const scene_doc::Docum
 		unmoved.objects[i].position = a;
 	}
 	if (sceneSignature(unmoved) != baseSignature) return {};
+	for (std::size_t i = 0; i < offsets.size(); ++i)   // (a volume is an object like another to the renderer, but its medium does not move with it: moving one is a restart, standing still is nothing)
+		if (now.objects[i].volume.kind != scene_doc::VolumeKind::None && (offsets[i][0] != 0.0 || offsets[i][1] != 0.0 || offsets[i][2] != 0.0)) return {};
 	return offsets;
 }
 inline std::vector<std::array<double, 3>> translationOnly(const scene_doc::Document& base, const scene_doc::Document& now) { return translationOnly(base, sceneSignature(base), now); }

@@ -455,6 +455,7 @@ inline bool fromJson(const std::string& text, Document& out, std::string& err) {
 			CameraView v;
 			v.camera = d.camera;   // a field a view does not carry is the scene camera's
 			ok = ok && detail::readCamera(j, v.camera) && detail::readStr(j, "name", v.name) && detail::readNum(j, "hold", v.hold);
+			if (!j.find("sensorWidthMm")) v.camera.sensorWidthMm = 36.0;   // (the width is written only when it is not 36, so a view without it was saved at 36, whatever the scene camera has now)
 			if (!(v.hold >= 0.0 && v.hold <= 3600.0)) v.hold = 0.0;
 			if (!ok) break;
 			d.cameraViews.push_back(v);
