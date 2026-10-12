@@ -5349,6 +5349,46 @@ The scenes in the other categories are not touched. You can get them back from %
         <source>Candle wax</source>
         <translation>蜡烛蜡</translation>
     </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Rusty metal</source>
+        <translation>生锈的金属</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Chipped paint</source>
+        <translation>剥落的油漆</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Dusty glass</source>
+        <translation>蒙尘的玻璃</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Mossy stone</source>
+        <translation>长苔的石头</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Wet sand</source>
+        <translation>湿沙</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Worn leather</source>
+        <translation>磨损的皮革</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Scuffed plastic</source>
+        <translation>刮花的塑料</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Dirty snow</source>
+        <translation>脏雪</translation>
+    </message>
 </context>
 <context>
     <name>MaterialPresetGroup</name>
@@ -8922,6 +8962,16 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <location filename="../scene_builder_common.h" line="40"/>
         <source>About this</source>
         <translation>说明</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_mix.cpp" line="1"/>
+        <source>Choose a ready-made mix (replaces the material)...</source>
+        <translation>选择现成的混合材质（替换当前材质）...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_mix.cpp" line="1"/>
+        <source>Ready-made mix</source>
+        <translation>现成的混合材质</translation>
     </message>
 </context>
 <context>

@@ -17,7 +17,7 @@ import tempfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Presets whose pictures are noisy at the ordinary sample count (light that goes through glass or under a surface is found by chance): they get four times as many.
-NOISY = {"skin", "milk", "marble-stone", "jade", "candle-wax", "glass", "frosted-glass", "water", "diamond"}
+NOISY = {"mix-dusty-glass", "skin", "milk", "marble-stone", "jade", "candle-wax", "glass", "frosted-glass", "water", "diamond"}
 
 
 def main():

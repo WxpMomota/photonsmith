@@ -287,6 +287,22 @@ void MainWindow::selfTestMixedMaterial(SceneBuilderWidget *sb, const std::functi
 	sb->undo();   // (the amount)
 	sb->undo();   // (the switch on)
 	check(!scene_doc::isMix(sb->document().objects[3].material), "undo takes the mix away");
+	// A ready-made mix: picked from the list under the switch, it sets both materials and the amount at once (even though the switch was off), is valid, is in the file, and is one undo step.
+	QComboBox *presets = nullptr;
+	for (QComboBox *c : sb->findChildren<QComboBox *>())
+		if (c->count() > 1 && c->itemText(0).startsWith(QStringLiteral("Choose a ready-made mix"))) presets = c;
+	check(presets != nullptr && presets->count() == static_cast<int>(scene_doc::mixPresets().size()) + 1, "the mix properties have a list of ready-made mixes, one row for each plus the heading");
+	if (presets) {
+		const scene_doc::MixPreset &rusty = scene_doc::mixPresets()[0];
+		presets->setCurrentIndex(1);
+		emit presets->activated(1);
+		QApplication::processEvents();
+		const scene_doc::Material &mixed = sb->document().objects[3].material;
+		check(scene_doc::isMix(mixed) && mixed.mixAmount == rusty.material.mixAmount && mixed.kind == rusty.material.kind && mixed.mixWith[0].kind == rusty.material.mixWith[0].kind,
+		      "picking Rusty metal gives the object that mix, with its amount");
+		check(sb->pbrtTextForTest().contains("Material \"mix\"") && !scene_doc::hasErrors(scene_doc::validate(sb->document())), "and the file has it, and the scene is valid");
+		check(sb->undo() && !scene_doc::isMix(sb->document().objects[3].material), "one undo takes it away again");
+	}
 	sb->selectObject(1);
 }
 

@@ -1491,16 +1491,16 @@ TEST(SceneMaterialsMoreTest, ANormalMapTiltsTheShadingByTheAngleItEncodes) {
 TEST(SceneMaterialsMoreTest, WritesOneSceneForEveryPresetWhenAsked) {
 	const char* dir = std::getenv("RT_PRESET_SCENES_DIR");
 	if (!dir) GTEST_SKIP() << "set RT_PRESET_SCENES_DIR=<folder> to write the preset scenes";
-	for (const scene_doc::MaterialPreset& preset : scene_doc::materialPresets()) {
+	const auto write = [&](const std::string& file, const scene_doc::Material& material) {
 		Document d;
 		d.camera.position = {0, 0.55, 4.6};
 		d.camera.target = {0, 0.0, 0};
 		d.camera.fov = 28;
 		d.render = {64, 64, 96, 12};
-		Object ball = makeObject(ShapeKind::Sphere, preset.id);
+		Object ball = makeObject(ShapeKind::Sphere, file);
 		ball.position = {0, 0, 0};
 		ball.radius = 1.0;
-		scene_doc::applyMaterialPreset(ball.material, preset.id);
+		ball.material = material;
 		d.objects.push_back(ball);
 		Object floorObj = makeObject(ShapeKind::Quad, "Floor");
 		floorObj.position = {0, -1.0, 0};
@@ -1519,6 +1519,12 @@ TEST(SceneMaterialsMoreTest, WritesOneSceneForEveryPresetWhenAsked) {
 		sun.color = {1.0, 0.96, 0.9};
 		sun.intensity = 3.0;
 		d.lights.push_back(sun);
-		std::ofstream(std::string(dir) + "/" + preset.id + ".pbrt", std::ios::binary) << toPbrt(d);
+		std::ofstream(std::string(dir) + "/" + file + ".pbrt", std::ios::binary) << toPbrt(d);
+	};
+	for (const scene_doc::MaterialPreset& preset : scene_doc::materialPresets()) {
+		scene_doc::Material m;
+		scene_doc::applyMaterialPreset(m, preset.id);
+		write(preset.id, m);
 	}
+	for (const scene_doc::MixPreset& preset : scene_doc::mixPresets()) write(std::string("mix-") + preset.id, preset.material);   // (the pictures of the mix list)
 }

@@ -104,4 +104,61 @@ inline bool applyMaterialPreset(Material& m, const std::string& id) {
 	return true;
 }
 
+// Ready-made mixes: a material worn, dirtied or chipped so that a second one shows through (Material::mixWith, scene_model.h), chosen afresh at each point. `material` is the whole
+// thing, the first material with the second in mixWith and the amount in mixAmount. The second material is always a plain one (no picture, pattern or bump), as a mix requires.
+struct MixPreset {
+	const char* id;  // stable, never shown; also the name of the picture the list shows (qt_gui/material_thumbs/mix-<id>.png)
+	const char* name;
+	Material material;
+};
+
+namespace presets_detail {
+inline Material mixed(Material first, const Material& second, double amount) {
+	first.mixWith.assign(1, second);
+	first.mixAmount = amount;
+	return first;
+}
+}  // namespace presets_detail
+
+inline const std::vector<MixPreset>& mixPresets() {
+	using namespace presets_detail;
+	static const std::vector<MixPreset> all = {
+		{"rusty-metal", "Rusty metal", mixed(make(MaterialKind::Conductor, {0.62, 0.62, 0.64}, 0.25), make(MaterialKind::Diffuse, {0.55, 0.20, 0.06}), 0.50)},
+		{"chipped-paint", "Chipped paint", mixed(make(MaterialKind::CoatedDiffuse, {0.10, 0.25, 0.55}, 0.03, 1.5), make(MaterialKind::Conductor, {0.62, 0.62, 0.64}, 0.30), 0.25)},
+		{"dusty-glass", "Dusty glass", mixed(make(MaterialKind::Dielectric, {0.8, 0.8, 0.8}, 0.0, 1.5), make(MaterialKind::Diffuse, {0.55, 0.50, 0.42}), 0.25)},
+		{"mossy-stone", "Mossy stone", mixed(make(MaterialKind::Diffuse, {0.45, 0.44, 0.42}), make(MaterialKind::Diffuse, {0.09, 0.30, 0.05}), 0.40)},
+		{"wet-sand", "Wet sand", mixed(make(MaterialKind::Diffuse, {0.62, 0.52, 0.36}), make(MaterialKind::CoatedDiffuse, {0.25, 0.19, 0.12}, 0.02, 1.33), 0.50)},
+		{"worn-leather", "Worn leather", mixed(make(MaterialKind::CoatedDiffuse, {0.28, 0.14, 0.07}, 0.25, 1.5), make(MaterialKind::Diffuse, {0.50, 0.36, 0.24}), 0.25)},
+		{"scuffed-plastic", "Scuffed plastic", mixed(make(MaterialKind::CoatedDiffuse, {0.05, 0.12, 0.65}, 0.08, 1.5), make(MaterialKind::Diffuse, {0.30, 0.34, 0.62}), 0.30)},
+		{"dirty-snow", "Dirty snow", mixed(make(MaterialKind::Diffuse, {0.90, 0.92, 0.95}), make(MaterialKind::Diffuse, {0.20, 0.16, 0.12}), 0.30)},
+	};
+	return all;
+}
+
+inline const MixPreset* findMixPreset(const std::string& id) {
+	for (const MixPreset& p : mixPresets())
+		if (id == p.id) return &p;
+	return nullptr;
+}
+
+// Gives `m` the preset's two materials and amount, keeping the bump slot and where its picture sits (as applyMaterialPreset does); the picture and the checker pattern are dropped. Returns
+// false for an unknown id.
+inline bool applyMixPreset(Material& m, const std::string& id) {
+	const MixPreset* p = findMixPreset(id);
+	if (!p) return false;
+	const std::string bumpFile = m.bumpFile;
+	const BumpKind bumpKind = m.bumpKind;
+	const double bumpStrength = m.bumpStrength;
+	const double uvScaleU = m.uvScaleU, uvScaleV = m.uvScaleV, uvOffsetU = m.uvOffsetU, uvOffsetV = m.uvOffsetV;
+	m = p->material;
+	m.bumpFile = bumpFile;
+	m.bumpKind = bumpKind;
+	m.bumpStrength = bumpStrength;
+	m.uvScaleU = uvScaleU;
+	m.uvScaleV = uvScaleV;
+	m.uvOffsetU = uvOffsetU;
+	m.uvOffsetV = uvOffsetV;
+	return true;
+}
+
 }  // namespace scene_doc

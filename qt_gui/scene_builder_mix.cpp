@@ -7,6 +7,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFormLayout>
+#include <QIcon>
 #include <QLabel>
 #include <QTimer>
 
@@ -42,6 +43,19 @@ void SceneBuilderWidget::addMixRows(QFormLayout *f, int i) {
 		QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
 	});
 	f->addRow(on);
+	// A ready-made mix (rusty metal, chipped paint, mossy stone...) sets both materials and the amount in one go, whether or not the object was mixed; they can be tuned afterwards.
+	auto *preset = new QComboBox;
+	preset->addItem(tr("Choose a ready-made mix (replaces the material)..."), QString());
+	preset->setIconSize(QSize(36, 36));   // (the pictures are made by scripts/make_material_thumbnails.py, like the single materials')
+	for (const scene_doc::MixPreset &p : scene_doc::mixPresets())
+		preset->addItem(QIcon(QStringLiteral(":/material_thumbs/mix-%1.png").arg(QString::fromLatin1(p.id))), presetLabel(p.name), QString::fromLatin1(p.id));
+	connect(preset, QOverload<int>::of(&QComboBox::activated), this, [this, i, preset](int idx) {
+		const QString id = preset->itemData(idx).toString();
+		if (m_loading || id.isEmpty() || i >= static_cast<int>(m_doc.objects.size())) return;
+		edit(QString(), [&]() { scene_doc::applyMixPreset(m_doc.objects[i].material, id.toStdString()); });
+		QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
+	});
+	f->addRow(tr("Ready-made mix"), preset);
 	if (!on->isChecked()) return;
 
 	auto *heading = new QLabel("<b>" + tr("Second material").toHtmlEscaped() + "</b>");

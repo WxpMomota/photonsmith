@@ -5343,6 +5343,46 @@ The scenes in the other categories are not touched. You can get them back from %
         <source>Candle wax</source>
         <translation>キャンドルワックス</translation>
     </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Rusty metal</source>
+        <translation>錆びた金属</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Chipped paint</source>
+        <translation>剥がれた塗装</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Dusty glass</source>
+        <translation>ほこりをかぶったガラス</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Mossy stone</source>
+        <translation>苔むした石</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Wet sand</source>
+        <translation>濡れた砂</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Worn leather</source>
+        <translation>使い込んだ革</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Scuffed plastic</source>
+        <translation>傷だらけのプラスチック</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Dirty snow</source>
+        <translation>汚れた雪</translation>
+    </message>
 </context>
 <context>
     <name>MaterialPresetGroup</name>
@@ -8916,6 +8956,16 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <location filename="../scene_builder_common.h" line="40"/>
         <source>About this</source>
         <translation>これについて</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_mix.cpp" line="1"/>
+        <source>Choose a ready-made mix (replaces the material)...</source>
+        <translation>既成のミックスを選択（マテリアルを置き換え）...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_mix.cpp" line="1"/>
+        <source>Ready-made mix</source>
+        <translation>既成のミックス</translation>
     </message>
 </context>
 <context>

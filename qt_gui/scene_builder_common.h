@@ -253,6 +253,14 @@ inline QString presetGroupLabel(const char *group) { return QCoreApplication::tr
 	QT_TRANSLATE_NOOP("MaterialPreset", "Wax"); QT_TRANSLATE_NOOP("MaterialPreset", "Leaf"); QT_TRANSLATE_NOOP("MaterialPreset", "Paper");
 	QT_TRANSLATE_NOOP("MaterialPreset", "Skin"); QT_TRANSLATE_NOOP("MaterialPreset", "Milk"); QT_TRANSLATE_NOOP("MaterialPreset", "Marble stone");
 	QT_TRANSLATE_NOOP("MaterialPreset", "Jade"); QT_TRANSLATE_NOOP("MaterialPreset", "Candle wax");
+	QT_TRANSLATE_NOOP("MaterialPreset", "Rusty metal");
+	QT_TRANSLATE_NOOP("MaterialPreset", "Chipped paint");
+	QT_TRANSLATE_NOOP("MaterialPreset", "Dusty glass");
+	QT_TRANSLATE_NOOP("MaterialPreset", "Mossy stone");
+	QT_TRANSLATE_NOOP("MaterialPreset", "Wet sand");
+	QT_TRANSLATE_NOOP("MaterialPreset", "Worn leather");
+	QT_TRANSLATE_NOOP("MaterialPreset", "Scuffed plastic");
+	QT_TRANSLATE_NOOP("MaterialPreset", "Dirty snow");
 	QT_TRANSLATE_NOOP("MaterialPresetGroup", "Matte"); QT_TRANSLATE_NOOP("MaterialPresetGroup", "Plastic"); QT_TRANSLATE_NOOP("MaterialPresetGroup", "Metal");
 	QT_TRANSLATE_NOOP("MaterialPresetGroup", "Glass"); QT_TRANSLATE_NOOP("MaterialPresetGroup", "Translucent"); QT_TRANSLATE_NOOP("MaterialPresetGroup", "Subsurface");
 }

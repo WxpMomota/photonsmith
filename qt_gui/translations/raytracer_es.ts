@@ -5394,6 +5394,46 @@ Las escenas de las demás categorías no se tocan. Puedes recuperarlas desde %1.
         <source>Candle wax</source>
         <translation>Cera de vela</translation>
     </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Rusty metal</source>
+        <translation>Metal oxidado</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Chipped paint</source>
+        <translation>Pintura desconchada</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Dusty glass</source>
+        <translation>Vidrio polvoriento</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Mossy stone</source>
+        <translation>Piedra con musgo</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Wet sand</source>
+        <translation>Arena mojada</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Worn leather</source>
+        <translation>Cuero desgastado</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Scuffed plastic</source>
+        <translation>Plástico rayado</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_common.h" line="1"/>
+        <source>Dirty snow</source>
+        <translation>Nieve sucia</translation>
+    </message>
 </context>
 <context>
     <name>MaterialPresetGroup</name>
@@ -8967,6 +9007,16 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <location filename="../scene_builder_common.h" line="40"/>
         <source>About this</source>
         <translation>Acerca de esto</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_mix.cpp" line="1"/>
+        <source>Choose a ready-made mix (replaces the material)...</source>
+        <translation>Elegir una mezcla prediseñada (reemplaza el material)...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_mix.cpp" line="1"/>
+        <source>Ready-made mix</source>
+        <translation>Mezcla prediseñada</translation>
     </message>
 </context>
 <context>

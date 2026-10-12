@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <sstream>
 
 using namespace scene_doc;
@@ -170,4 +171,109 @@ TEST(SceneMixRenderTest, AMixOfTwoMatteMaterialsReadsTheBlendOfTheirAlbedos) {
 		const double want = (1.0 - t) * A + t * B;
 		EXPECT_NEAR(mean, want, 0.06 * want) << "amount " << t;
 	}
+}
+
+// ---- Ready-made mixes (scene_materials.h) ----
+
+TEST(SceneMixPresetTest, EveryPresetIsAValidMixWithAPlainSecondMaterialAndOneOfAKind) {
+	std::set<std::string> ids, names;
+	ASSERT_GE(mixPresets().size(), 8u);
+	for (const MixPreset& p : mixPresets()) {
+		EXPECT_TRUE(ids.insert(p.id).second) << "id " << p.id << " appears twice";
+		EXPECT_TRUE(names.insert(p.name).second) << "name " << p.name << " appears twice";
+		ASSERT_TRUE(isMix(p.material)) << p.id;
+		EXPECT_GT(p.material.mixAmount, 0.0) << p.id;
+		EXPECT_LT(p.material.mixAmount, 1.0) << p.id;
+		const Material& second = p.material.mixWith[0];
+		EXPECT_TRUE(second.mixWith.empty()) << p.id << ": no mix inside a mix";
+		EXPECT_TRUE(second.imageFile.empty() && !second.checker && second.pattern == Pattern::None && second.bumpFile.empty()) << p.id << ": the second material is a plain one";
+		EXPECT_TRUE(p.material.imageFile.empty() && !p.material.checker && p.material.pattern == Pattern::None) << p.id << ": a preset has no picture of its own";
+		const bool same = p.material.kind == second.kind && p.material.color.r == second.color.r && p.material.color.g == second.color.g && p.material.color.b == second.color.b &&
+		                  p.material.roughness == second.roughness;
+		EXPECT_FALSE(same) << p.id << ": two identical materials would not look mixed";
+		Document d = makeStarterScene();
+		d.objects[1].material = p.material;
+		EXPECT_FALSE(hasErrors(validate(d))) << p.id;
+		const std::string text = toPbrt(d);
+		EXPECT_NE(text.find("Material \"mix\""), std::string::npos) << p.id << ": it is written as a pbrt mix";
+		Document back;
+		std::string error;
+		ASSERT_TRUE(fromJson(toJson(d), back, error)) << p.id << ": " << error;
+		EXPECT_EQ(toJson(back), toJson(d)) << p.id << ": it survives the file";
+		EXPECT_NE(findMixPreset(p.id), nullptr);
+	}
+	EXPECT_EQ(findMixPreset("no-such-mix"), nullptr);
+}
+
+TEST(SceneMixPresetTest, ApplyingOneReplacesBothMaterialsAndKeepsTheBumpSlot) {
+	Material m = matte(0.2, 0.3, 0.4);
+	m.imageFile = "picture.png";
+	m.checker = true;
+	m.pattern = Pattern::Marble;
+	m.bumpFile = "relief.png";
+	m.bumpKind = BumpKind::Normal;
+	m.bumpStrength = 0.7;
+	m.uvScaleU = 3;
+	m.uvOffsetV = 0.25;
+	ASSERT_TRUE(applyMixPreset(m, "rusty-metal"));
+	const MixPreset* p = findMixPreset("rusty-metal");
+	ASSERT_NE(p, nullptr);
+	EXPECT_TRUE(isMix(m));
+	EXPECT_EQ(m.kind, p->material.kind);
+	EXPECT_EQ(m.mixAmount, p->material.mixAmount);
+	EXPECT_EQ(m.mixWith[0].kind, p->material.mixWith[0].kind);
+	EXPECT_TRUE(m.imageFile.empty());
+	EXPECT_FALSE(m.checker);
+	EXPECT_EQ(m.pattern, Pattern::None);
+	EXPECT_EQ(m.bumpFile, "relief.png");
+	EXPECT_EQ(m.bumpKind, BumpKind::Normal);
+	EXPECT_EQ(m.bumpStrength, 0.7);
+	EXPECT_EQ(m.uvScaleU, 3);
+	EXPECT_EQ(m.uvOffsetV, 0.25);
+	Material untouched = matte(0.1, 0.1, 0.1);
+	EXPECT_FALSE(applyMixPreset(untouched, "no-such-mix"));
+	EXPECT_FALSE(isMix(untouched));
+	// Applying a plain material preset afterwards drops the mix (a preset is the whole material).
+	ASSERT_TRUE(applyMaterialPreset(m, "gold"));
+	EXPECT_FALSE(isMix(m));
+}
+
+// Under a white sky a level plate reads its albedo (the existing mix render test): the dirty-snow preset, which is two matte materials, reads the blend its amount says, and each of its
+// materials alone reads lighter or darker than that.
+TEST(SceneMixPresetRenderTest, ADirtySnowPresetReadsTheBlendItsAmountSays) {
+	if (findLauncher().empty()) GTEST_SKIP() << "ray_tracer.exe was not found next to the tests";
+	const MixPreset* snow = findMixPreset("dirty-snow");
+	ASSERT_NE(snow, nullptr);
+	const auto meanOf = [&](const Material& mat, const char* tag) {
+		Document d;
+		Object plate = makeObject(ShapeKind::Quad, "Plate");
+		plate.size = {400, 1, 400};
+		plate.material = mat;
+		d.objects.push_back(plate);
+		d.camera.position = {0.0, 6.0, 0.0};
+		d.camera.target = {0.0, 0.0, 0.0};
+		d.camera.up = {0.0, 0.0, -1.0};
+		d.camera.fov = 8.0;
+		d.render.width = 64;
+		d.render.height = 64;
+		Light sky;
+		sky.name = "Sky";
+		sky.kind = LightKind::Infinite;
+		sky.color = {1.0, 1.0, 1.0};
+		sky.intensity = 1.0;
+		d.lights.push_back(sky);
+		std::vector<float> rgb;
+		int w = 0, h = 0;
+		EXPECT_TRUE(render(d, tag, 48, rgb, w, h));
+		double mean = 0;
+		for (size_t i = 0; i < rgb.size() / 3; ++i) mean += rgb[3 * i + 1];
+		return rgb.empty() ? 0.0 : mean / static_cast<double>(rgb.size() / 3);
+	};
+	Material onlyFirst = snow->material, onlySecond = snow->material;
+	onlyFirst.mixAmount = 0.0;
+	onlySecond.mixAmount = 1.0;
+	const double a = meanOf(onlyFirst, "mixpreset_first"), b = meanOf(onlySecond, "mixpreset_second"), mixed = meanOf(snow->material, "mixpreset_whole");
+	EXPECT_GT(a, b + 0.2) << "snow is lighter than its dirt";
+	const double want = (1.0 - snow->material.mixAmount) * a + snow->material.mixAmount * b;
+	EXPECT_NEAR(mixed, want, 0.06 * want) << "the preset's amount is the share of the second material";
 }
