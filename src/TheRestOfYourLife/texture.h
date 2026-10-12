@@ -591,6 +591,29 @@ class scaled_texture : public texture {
 };
 
 
+// An image texture looked up through pbrt-v4's UVMapping: (su * u + du, sv * v + dv) instead of (u, v), so a picture repeats `su` times across the surface and can be moved (the texture
+// image's own wrap mode decides what happens outside 0 to 1: Repeat tiles it). The screen-space footprint of the lookup scales by the same factors, so a tiled picture is filtered
+// for the smaller texels it now covers. (pbrt_flatten::UvMapping; the identity is not wrapped at all.)
+class uv_mapped_texture : public texture {
+  public:
+    uv_mapped_texture(shared_ptr<texture> inner, double su, double sv, double du, double dv)
+        : inner(inner), su(su), sv(sv), du(du), dv(dv) {}
+
+    color value(double u, double v, const point3& p) const override {
+        return inner->value(su * u + du, sv * v + dv, p);
+    }
+
+    color value_diff(double u, double v, const point3& p,
+                      double dudx, double dvdx, double dudy, double dvdy) const override {
+        return inner->value_diff(su * u + du, sv * v + dv, p, su * dudx, sv * dvdx, su * dudy, sv * dvdy);
+    }
+
+  private:
+    shared_ptr<texture> inner;
+    double su, sv, du, dv;
+};
+
+
 class mix_texture : public texture {
   public:
     mix_texture(shared_ptr<texture> tex1, shared_ptr<texture> tex2, double amount)

@@ -28,6 +28,15 @@ namespace pbrt_flatten {
 // transmittance/roughness slots below can carry the identical resolution
 // without duplicating those 3 fields a second and third time - see
 // resolveTextureDecodeOptions() (flatten_detail, below) for how it's built.
+// pbrt-v4's UVMapping of an imagemap Texture ("float uscale"/"vscale"/"udelta"/"vdelta"): the texture is looked up at (su * u + du, sv * v + dv) instead of (u, v), so a picture
+// repeats `su` times across the surface and is moved by `du`. The default is the identity. Resolved for the reflectance image (Material::textureMapping) and the displacement
+// (bump or normal map) image (Material::displacementMapping); every other image slot uses the surface's own coordinates.
+struct UvMapping {
+	double su = 1.0, sv = 1.0, du = 0.0, dv = 0.0;
+	bool identity() const { return su == 1.0 && sv == 1.0 && du == 0.0 && dv == 0.0; }
+	bool operator==(const UvMapping& o) const { return su == o.su && sv == o.sv && du == o.du && dv == o.dv; }
+};
+
 struct TextureDecodeOptions {
 	double gamma = kDefaultTextureGamma;
 	std::string wrap = "repeat";
@@ -235,6 +244,8 @@ struct Material {
 	// bundled scene needs DiffuseTransmission's own reflectance bound to
 	// either.
 	std::string textureFilename;
+	// How the reflectance image above is placed on the surface: pbrt's imagemap uscale/vscale/udelta/vdelta (UvMapping's comment). Identity unless the Texture says otherwise.
+	UvMapping textureMapping;
 
 	// A "scale"-class Texture's own "float scale" when textureFilename came
 	// from unwrapping one (pbrt's own real syntax for this: a named "scale"
@@ -511,6 +522,7 @@ struct Material {
 	// (mesh.h) once resolved - see pbrt_cpu_builder.h/pbrt_gpu_builder.h's
 	// own comments on how this field is consumed.
 	std::string displacementTextureFilename;
+	UvMapping displacementMapping;   // the same for the displacement image (a bump or normal map)
 	// A scale factor from a "scale"-class texture wrapping the actual
 	// imagemap (e.g. barcelona-pavilion's water material: "texture
 	// displacement" ["water-bump"], where "water-bump" is itself

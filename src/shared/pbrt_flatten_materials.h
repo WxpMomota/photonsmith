@@ -151,6 +151,7 @@ inline void readMaterialBindings(const pbrt_scene::Scene &scene, FlatScene &out,
 				const std::string filename = imgTex->params.getString("filename", "");
 				if (!filename.empty()) {
 					m.textureFilename = filename;
+					m.textureMapping = uvMappingOf(*imgTex);
 					m.textureScale = texScale;
 					// imageMapOptionsFor() (pbrt_cpu_builder.h) and GPU's
 					// own call sites read these 3 loose fields by name
@@ -519,6 +520,7 @@ inline void readMaterialBindings(const pbrt_scene::Scene &scene, FlatScene &out,
 				const std::string filename = tex->params.getString("filename", "");
 				if (!filename.empty()) {
 					m.displacementTextureFilename = filename;
+					m.displacementMapping = uvMappingOf(*tex);
 					m.displacementScale = scale;
 					warnIfImagemapOptionsIgnored(*tex, "displacement", warn);
 					continue;   // resolved to an image, not a "not supported" warning

@@ -303,6 +303,12 @@ class Sweep:
         write_png(self.sun, 64, 64, lambda x, y: (255, 255, 230) if (x - 20) ** 2 + (y - 18) ** 2 < 5 else (20, 25, 40))
         self.grey = os.path.join(workdir, "grey.png").replace("\\", "/")   # a uniform image for the texture pair, written with a linear encoding
         write_png(self.grey, 8, 8, lambda x, y: (153, 102, 77))
+        # A picture with something in every corner, and the same picture tiled twice across and up: a lookup through uscale/vscale 2 of the first must be the second (texture placement)
+        self.pattern = os.path.join(workdir, "pattern.png").replace("\\", "/")
+        pattern_pixel = lambda x, y: (40 + 25 * (x % 8), 220 - 22 * (y % 8), 60 + 45 * ((x + y) % 4))
+        write_png(self.pattern, 8, 8, pattern_pixel)
+        self.pattern_tiled = os.path.join(workdir, "pattern_tiled.png").replace("\\", "/")
+        write_png(self.pattern_tiled, 16, 16, lambda x, y: pattern_pixel(x % 8, y % 8))
         self.n = 0
         self.cache = {}
 
@@ -406,6 +412,14 @@ def run(args):
               Scene(material_text='Material "coateddiffuse" "rgb reflectance" [ 0.5 0.3 0.2 ] "texture roughness" [ "r" ]', prelude=roughness_tex), tolerance=tol)
         check("texture", "coateddiffuse reflectance as a texture", backend, Scene(material="coateddiffuse"),
               Scene(material_text='Material "coateddiffuse" "texture reflectance" [ "t" ] "float roughness" [ 0.1 ]', prelude='Texture "t" "spectrum" "constant" "rgb value" [ 0.5 0.3 0.2 ]'), tolerance=tol)
+        # texture placement: a picture looked up through the Texture's own uscale/vscale (the renderers' UVMapping, which is how a sphere, disk, cylinder, cone or a mesh file gets the Scene
+        # Builder's texture repeats) is the same picture tiled by hand. Every shape that makes its own texture coordinates; on a Mac this is the Metal renderer's job too.
+        repeat_decl = 'Texture "t" "spectrum" "imagemap" "string filename" [ "%s" ] "string wrap" [ "repeat" ]%s'
+        for shape in ("sphere", "disk", "cylinder"):
+            check("texturemap", "picture with uscale/vscale 2 = picture tiled by hand, %s" % shape, backend,
+                  Scene(material_text='Material "diffuse" "texture reflectance" [ "t" ]', prelude=repeat_decl % (sw.pattern_tiled, ""), shape=shape),
+                  Scene(material_text='Material "diffuse" "texture reflectance" [ "t" ]', prelude=repeat_decl % (sw.pattern, ' "float uscale" [ 2 ] "float vscale" [ 2 ]'), shape=shape),
+                  tolerance=max(tol, 6.0))
         # bump and normal maps that change nothing: a constant displacement, and a flat normal map
         check("texture", "constant displacement texture changes nothing", backend, Scene(material_text=diffuse_inline),
               Scene(material_text='Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "texture displacement" [ "d" ]', prelude='Texture "d" "float" "constant" "float value" [ 0.3 ]'), tolerance=tol)

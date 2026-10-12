@@ -87,6 +87,19 @@ inline UvPlace uvPlaceOf(const Object& o) {
 	if (uvPlaced(o.material) && hasUvTexture(o.material)) p = {o.material.uvScaleU, o.material.uvScaleV, o.material.uvOffsetU, o.material.uvOffsetV};
 	return p;
 }
+// Whether a shape writes its own texture coordinates, which is where the placement of a texture is put for it (UvPlace). The shapes the renderer makes the coordinates of (a sphere, disk,
+// cylinder, cone and a mesh file) have the placement written on the Texture instead, as pbrt's imagemap uscale/vscale/udelta/vdelta (textureMappingParams); the renderers read those.
+inline bool uvIsBaked(ShapeKind k) { return k == ShapeKind::Box || k == ShapeKind::Quad || isGeneratedShape(k); }
+
+// The " \"float uscale\" [ ... ] ..." parameters of an imagemap Texture that place it as the object's material says, for a shape that does not write its own coordinates; empty otherwise.
+// pbrt looks the texture up at (uscale * u + udelta, vscale * v + vdelta), and the Scene Builder's placement is u * repeats - shift, so udelta is minus the shift.
+inline std::string textureMappingParams(const Object& o) {
+	if (uvIsBaked(o.shape) || !uvPlaced(o.material)) return std::string();
+	const Material& m = o.material;
+	return " \"float uscale\" [ " + num(m.uvScaleU) + " ] \"float vscale\" [ " + num(m.uvScaleV) + " ] \"float udelta\" [ " + num(m.uvOffsetU == 0.0 ? 0.0 : -m.uvOffsetU) +
+	       " ] \"float vdelta\" [ " + num(m.uvOffsetV == 0.0 ? 0.0 : -m.uvOffsetV) + " ]";
+}
+
 // Writes the pairs of uv numbers `uv` (u, v, u, v...) placed by `place`.
 inline void writeUv(std::ostringstream& os, const double* uv, std::size_t count, const UvPlace& place) {
 	for (std::size_t i = 0; i + 1 < count; i += 2) {
@@ -344,7 +357,7 @@ inline std::string toPbrt(const Document& d) {
 		if (pictured) {
 			textureName = "picture-" + std::to_string(++textureIndex);
 			os << "Texture \"" << textureName << "\" \"spectrum\" \"imagemap\" \"string filename\" [ " << detail::quoted(detail::pbrtPath(o.material.imageFile))
-			   << " ]\n";
+			   << " ]" << detail::textureMappingParams(o) << "\n";
 		} else if (o.material.pattern != Pattern::None && !o.material.checker && (o.material.kind == MaterialKind::Diffuse || o.material.kind == MaterialKind::CoatedDiffuse)) {
 			textureName = "pattern-" + std::to_string(++textureIndex);
 			if (o.material.pattern == Pattern::Marble)
@@ -354,8 +367,10 @@ inline std::string toPbrt(const Document& d) {
 				os << "Texture \"" << textureName << "\" \"spectrum\" \"fbm\"\n";
 		} else if (o.material.checker && o.material.kind == MaterialKind::Diffuse && o.shape != ShapeKind::Box) {
 			textureName = "checks-" + std::to_string(++textureIndex);
-			os << "Texture \"" << textureName << "\" \"spectrum\" \"checkerboard\" \"float uscale\" [ " << detail::num(o.material.checkerCount)
-			   << " ] \"float vscale\" [ " << detail::num(o.material.checkerCount) << " ] \"rgb tex1\" [ " << detail::rgb(o.material.color)
+			// (on a shape that does not write its own coordinates the repeats multiply the checks; a checkerboard has no shift)
+			const bool placedHere = uvPlaced(o.material) && !detail::uvIsBaked(o.shape);
+			os << "Texture \"" << textureName << "\" \"spectrum\" \"checkerboard\" \"float uscale\" [ " << detail::num(o.material.checkerCount * (placedHere ? o.material.uvScaleU : 1.0))
+			   << " ] \"float vscale\" [ " << detail::num(o.material.checkerCount * (placedHere ? o.material.uvScaleV : 1.0)) << " ] \"rgb tex1\" [ " << detail::rgb(o.material.color)
 			   << " ] \"rgb tex2\" [ " << detail::rgb(o.material.color2) << " ]\n";
 		}
 		// A bump slot: a height map is a float image scaled to its height; a normal map is the colour image itself (the renderer reads either as the material's displacement).
@@ -364,10 +379,12 @@ inline std::string toPbrt(const Document& d) {
 		if (canBump && !o.material.bumpFile.empty()) {
 			displacement = "bump-" + std::to_string(++textureIndex);
 			if (o.material.bumpKind == BumpKind::Height) {
-				os << "Texture \"" << displacement << "-image\" \"float\" \"imagemap\" \"string filename\" [ " << detail::quoted(detail::pbrtPath(o.material.bumpFile)) << " ]\n";
+				os << "Texture \"" << displacement << "-image\" \"float\" \"imagemap\" \"string filename\" [ " << detail::quoted(detail::pbrtPath(o.material.bumpFile)) << " ]"
+				   << detail::textureMappingParams(o) << "\n";
 				os << "Texture \"" << displacement << "\" \"float\" \"scale\" \"texture tex\" [ \"" << displacement << "-image\" ] \"float scale\" [ " << detail::num(o.material.bumpStrength) << " ]\n";
 			} else {
-				os << "Texture \"" << displacement << "\" \"spectrum\" \"imagemap\" \"string filename\" [ " << detail::quoted(detail::pbrtPath(o.material.bumpFile)) << " ]\n";
+				os << "Texture \"" << displacement << "\" \"spectrum\" \"imagemap\" \"string filename\" [ " << detail::quoted(detail::pbrtPath(o.material.bumpFile)) << " ]"
+				   << detail::textureMappingParams(o) << "\n";
 			}
 		}
 		os << "AttributeBegin\n";

@@ -14,6 +14,10 @@ struct TextureData {
 	// stays at the zero-init Clamp default regardless of what the scene's
 	// own imagemap "wrap" declares.
 	GpuWrapMode wrapMode = GpuWrapMode::Clamp;
+	// Image only: pbrt's UVMapping of the imagemap Texture (uscale/vscale/udelta/vdelta; pbrt_flatten::UvMapping). The lookup is at (uvScaleU * u + uvDeltaU, uvScaleV * v + uvDeltaV), done
+	// inside the one place that reads an image's texels (sample_texture's sampleImage, its wavefront copy, and gpu_sample_displacement), so every kernel gets it. The identity (1, 1, 0, 0)
+	// is the default; the loader sets these only for the reflectance and the displacement image, every other image slot keeps the surface's own coordinates.
+	float uvScaleU = 1.0f, uvScaleV = 1.0f, uvDeltaU = 0.0f, uvDeltaV = 0.0f;
 	// Image only: texturePixels holds the file's own sRGB-encoded bytes, decoded per texel at lookup
 	// (texel_rgb above). False (the zero-init default) for every linear texture: normal maps, alpha
 	// masks, inverted images, HDR-derived data, native scenes.

@@ -187,6 +187,17 @@ inline void warnIfImagemapOptionsIgnored(const pbrt_scene::TextureDecl &imgTex,
 	}
 }
 
+// The imagemap Texture's own texture-coordinate mapping: pbrt-v4's "uv" mapping with "uscale"/"vscale"/"udelta"/"vdelta" (any other "mapping" - spherical, cylindrical, planar - is not
+// supported and is left as the identity, which is what this loader did before it read these at all).
+inline UvMapping uvMappingOf(const pbrt_scene::TextureDecl &imgTex) {
+	UvMapping m;
+	m.su = imgTex.params.getFloat("uscale", 1.0);
+	m.sv = imgTex.params.getFloat("vscale", 1.0);
+	m.du = imgTex.params.getFloat("udelta", 0.0);
+	m.dv = imgTex.params.getFloat("vdelta", 0.0);
+	return m;
+}
+
 // One shape to emit, where to put it, and under which transform. Routing the
 // single shape loop through this is what lets the same code serve three
 // callers - scene geometry, an instance definition's object-space geometry,

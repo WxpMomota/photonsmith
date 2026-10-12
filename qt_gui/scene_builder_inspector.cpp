@@ -546,11 +546,13 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 		addNum(f, tr("Texture shift across"), [mat]() { return mat() ? &mat()->uvOffsetU : nullptr; }, -1000, 1000, 0.05, 3);
 		addNum(f, tr("Texture shift up"), [mat]() { return mat() ? &mat()->uvOffsetV : nullptr; }, -1000, 1000, 0.05, 3);
 		const ShapeKind shape = m_doc.objects[i].shape;
+#ifdef Q_OS_MACOS
 		if (shape == ShapeKind::Sphere || shape == ShapeKind::Disk || shape == ShapeKind::Cylinder || shape == ShapeKind::Cone || shape == ShapeKind::Mesh) {
-			auto *note = new QLabel(tr("Repeats and shift apply to a box, a quad and the ready-made shapes; this shape keeps the renderer's own texture coordinates, so they have no effect here."));
+			auto *note = new QLabel(tr("On a Mac the repeats and shift are drawn on a box, a quad and the ready-made shapes only; on this shape the CPU render shows them but the GPU preview does not yet."));
 			note->setWordWrap(true);
 			f->addRow(note);
 		}
+#endif
 	}
 	addMixRows(f, i);
 }

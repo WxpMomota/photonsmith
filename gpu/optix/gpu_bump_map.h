@@ -23,8 +23,10 @@ inline __host__ __device__ float gpu_sample_displacement(const TextureData* text
 														 int texIdx, float u, float v) {
 	const TextureData& t = textures[texIdx];
 	if (t.width <= 0 || t.height <= 0) return 0.0f;
-	const float uw = fminf(fmaxf(u, -1024.0f), 1024.0f);
-	const float vw = fminf(fmaxf(1.0f - v, -1024.0f), 1024.0f);
+	const float um = t.uvScaleU * u + t.uvDeltaU;   // the displacement Texture's own UVMapping: the finite differences below are then across the surface's own coordinates, as the CPU's
+	const float vm = t.uvScaleV * v + t.uvDeltaV;
+	const float uw = fminf(fmaxf(um, -1024.0f), 1024.0f);
+	const float vw = fminf(fmaxf(1.0f - vm, -1024.0f), 1024.0f);
 	const double x = (double)uw * t.width - 0.5;
 	const double y = (double)vw * t.height - 0.5;
 	const int x0 = static_cast<int>(floor(x)), y0 = static_cast<int>(floor(y));

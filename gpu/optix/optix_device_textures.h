@@ -48,8 +48,10 @@ __device__ __forceinline__ float3 sample_texture(int textureIdx, float u, float 
 	// common one for small/debug textures), which needs no mip chain at all.
 	auto sampleImage = [&](const TextureData& t) -> float3 {
 		if (t.width <= 0 || t.height <= 0) return make_float3(0.0f, 1.0f, 1.0f);
-		const float uw = fminf(fmaxf(u, -1024.0f), 1024.0f);
-		const float vw = fminf(fmaxf(1.0f - v, -1024.0f), 1024.0f);
+		const float um = t.uvScaleU * u + t.uvDeltaU;   // the Texture's own UVMapping (identity unless it said uscale/udelta...)
+		const float vm = t.uvScaleV * v + t.uvDeltaV;
+		const float uw = fminf(fmaxf(um, -1024.0f), 1024.0f);
+		const float vw = fminf(fmaxf(1.0f - vm, -1024.0f), 1024.0f);
 		// double, not float, for the multiply - matches CPU's own bilerp()
 		// (src/shared/mipmap.h), which promotes to double for this exact
 		// computation: a wide-tiled UV (now possible here too, via the

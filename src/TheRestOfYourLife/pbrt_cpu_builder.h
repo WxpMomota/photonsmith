@@ -185,7 +185,9 @@ private:
 			}
 			if (disp->second.tex) {
 				const bool grayscale = disp->second.grayscale;
-				auto disp_tex = disp->second.tex;
+				shared_ptr<texture> disp_tex = disp->second.tex;
+				if (!m.displacementMapping.identity())   // (the Texture's own uscale/vscale/udelta/vdelta: the finite-difference slope is then taken across the surface's own coordinates)
+					disp_tex = std::make_shared<uv_mapped_texture>(disp_tex, m.displacementMapping.su, m.displacementMapping.sv, m.displacementMapping.du, m.displacementMapping.dv);
 				base = grayscale
 					? std::static_pointer_cast<material>(
 						  std::make_shared<bump_map_material>(disp_tex, base, m.displacementScale))

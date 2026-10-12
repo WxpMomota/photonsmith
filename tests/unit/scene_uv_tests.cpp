@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include "agreement_test_helpers.h"
+#include "../../src/shared/pbrt_load.h"
 #include "../../src/shared/scene_document.h"
 
 #include <cmath>
@@ -152,7 +153,7 @@ TEST(SceneUvTest, ItOnlyActsWhereThereIsATextureToPlace) {
 	EXPECT_NE(uvOf(toPbrt(d)), before) << "and so is a bump map";
 }
 
-TEST(SceneUvTest, TheChecksCatchAZeroRepeatAndSayWhereItHasNoEffect) {
+TEST(SceneUvTest, TheChecksCatchAZeroRepeatAndOnlyAMacHasShapesWhereItHasNoEffect) {
 	Document d;
 	d.objects.push_back(texturedObject(ShapeKind::Quad));
 	d.objects[0].material.uvScaleU = 2.0;
@@ -163,11 +164,55 @@ TEST(SceneUvTest, TheChecksCatchAZeroRepeatAndSayWhereItHasNoEffect) {
 	for (ShapeKind k : {ShapeKind::Sphere, ShapeKind::Disk, ShapeKind::Cylinder, ShapeKind::Cone}) {
 		d.objects[0].shape = k;
 		bool warned = false;
-		for (const Problem& p : validate(d)) warned = warned || p.message.find("keeps the renderer's own texture coordinates") != std::string::npos;
-		EXPECT_TRUE(warned) << toString(k);
+		for (const Problem& p : validate(d)) warned = warned || p.message.find("on a Mac the repeats and shift") != std::string::npos;
+#ifdef __APPLE__
+		EXPECT_TRUE(warned) << toString(k) << ": Metal does not place the texture of this shape yet";
+#else
+		EXPECT_FALSE(warned) << toString(k) << ": the CPU and OptiX renderers place it, so there is nothing to warn about";
+#endif
 	}
 	d.objects[0].shape = ShapeKind::Box;
-	for (const Problem& p : validate(d)) EXPECT_EQ(p.message.find("keeps the renderer's own"), std::string::npos);
+	for (const Problem& p : validate(d)) EXPECT_EQ(p.message.find("on a Mac the repeats"), std::string::npos);
+}
+
+TEST(SceneUvTest, ABoxBakesThePlacementIntoItsCoordinatesAndASphereGivesItToTheTexture) {
+	for (ShapeKind k : {ShapeKind::Sphere, ShapeKind::Disk, ShapeKind::Cylinder, ShapeKind::Cone, ShapeKind::Mesh}) {
+		Document d;
+		d.objects.push_back(texturedObject(k));
+		d.objects[0].material.uvScaleU = 3.0;
+		d.objects[0].material.uvScaleV = 2.0;
+		d.objects[0].material.uvOffsetU = 0.5;
+		d.objects[0].material.uvOffsetV = 0.0;
+		const std::string text = toPbrt(d);
+		const size_t at = text.find("Texture \"picture-1\"");
+		ASSERT_NE(at, std::string::npos) << toString(k);
+		const std::string line = text.substr(at, text.find('\n', at) - at);
+		EXPECT_NE(line.find("\"float uscale\" [ 3 ]"), std::string::npos) << toString(k) << ": " << line;
+		EXPECT_NE(line.find("\"float vscale\" [ 2 ]"), std::string::npos) << toString(k);
+		EXPECT_NE(line.find("\"float udelta\" [ -0.5 ]"), std::string::npos) << toString(k) << ": pbrt's delta is minus the shift";
+		EXPECT_NE(line.find("\"float vdelta\" [ 0 ]"), std::string::npos) << toString(k) << " (no '-0')";
+	}
+	for (ShapeKind k : {ShapeKind::Quad, ShapeKind::Box, ShapeKind::Torus}) {
+		Document d;
+		d.objects.push_back(texturedObject(k));
+		d.objects[0].material.uvScaleU = 3.0;
+		const std::string text = toPbrt(d);
+		const size_t at = text.find("Texture \"picture-1\"");
+		ASSERT_NE(at, std::string::npos) << toString(k);
+		EXPECT_EQ(text.substr(at, text.find('\n', at) - at).find("uscale"), std::string::npos) << toString(k) << ": its own coordinates carry the placement, it is not applied twice";
+	}
+	Document bump;
+	bump.objects.push_back(makeObject(ShapeKind::Sphere, "Ball"));
+	bump.objects[0].material.bumpFile = "bump.png";
+	bump.objects[0].material.uvScaleU = 4.0;
+	const std::string text = toPbrt(bump);
+	EXPECT_NE(text.find("\"bump-1-image\" \"float\" \"imagemap\" \"string filename\" [ \"bump.png\" ] \"float uscale\" [ 4 ]"), std::string::npos) << "a bump map is placed too";
+	Document checks;
+	checks.objects.push_back(makeObject(ShapeKind::Sphere, "Ball"));
+	checks.objects[0].material.checker = true;
+	checks.objects[0].material.checkerCount = 8.0;
+	checks.objects[0].material.uvScaleU = 3.0;
+	EXPECT_NE(toPbrt(checks).find("\"checkerboard\" \"float uscale\" [ 24 ] \"float vscale\" [ 8 ]"), std::string::npos) << "a checker's repeats multiply its checks";
 }
 
 // A picture that is red on its left half and blue on its right, on a level quad seen from above, with a uniform sky. The difference of red and blue over the left and the right half of the
@@ -223,4 +268,96 @@ TEST(SceneUvRenderTest, APictureRepeatsAndMovesAcrossAQuad) {
 	EXPECT_LT(side[2][0] * side[2][1], 0.0) << "shifted: still one of each side";
 	EXPECT_LT(side[0][0] * side[2][0], 0.0) << "and the halves have swapped";
 	EXPECT_LT(side[0][1] * side[2][1], 0.0);
+}
+
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// The renderers' own texture mapping: pbrt's imagemap uscale/vscale/udelta/vdelta (pbrt_flatten::UvMapping), which a sphere, disk, cylinder, cone or mesh file gets the Scene Builder's
+// repeats and shift through.
+// ---------------------------------------------------------------------------------------------------------------------------------
+
+TEST(UvMappingTest, TheLoaderReadsAnImagemapsUscaleVscaleUdeltaVdeltaForTheReflectanceAndTheDisplacementImage) {
+	const std::vector<float> grey(4 * 4 * 3, 0.5f);   // three small pictures, so that the loader finds the files it is told about
+	std::string files[3];
+	for (int i = 0; i < 3; ++i) {
+		files[i] = std::filesystem::absolute(std::string("uv_mapping_load_") + char('a' + i) + ".hdr").string();
+		std::ofstream out(files[i], std::ios::binary);
+		out << scene_doc::sky::encodeHdr(grey, 4, 4);
+	}
+	const std::string text =
+	    "LookAt 0 0 5 0 0 0 0 1 0\nCamera \"perspective\" \"float fov\" [ 40 ]\nFilm \"rgb\" \"integer xresolution\" [ 16 ] \"integer yresolution\" [ 16 ]\nWorldBegin\n"
+	    "Texture \"a\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + files[0] + "\" ] \"float uscale\" [ 3 ] \"float vscale\" [ 2 ] \"float udelta\" [ 0.25 ] \"float vdelta\" [ -0.5 ]\n"
+	    "Texture \"b\" \"float\" \"imagemap\" \"string filename\" [ \"" + files[1] + "\" ] \"float uscale\" [ 4 ]\n"
+	    "Texture \"plain\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + files[2] + "\" ]\n"
+	    "MakeNamedMaterial \"m1\" \"string type\" [ \"diffuse\" ] \"texture reflectance\" \"a\" \"texture displacement\" \"b\"\n"
+	    "MakeNamedMaterial \"m2\" \"string type\" [ \"diffuse\" ] \"texture reflectance\" \"plain\"\n"
+	    "NamedMaterial \"m1\"\nShape \"sphere\" \"float radius\" [ 1 ]\nNamedMaterial \"m2\"\nShape \"sphere\" \"float radius\" [ 1 ]\n";
+	const std::string path = "uv_mapping_load.pbrt";
+	{
+		std::ofstream out(path, std::ios::binary);
+		out << text;
+	}
+	const pbrt_load::LoadResult r = pbrt_load::loadFile(path);
+	std::remove(path.c_str());
+	for (const std::string& f : files) std::remove(f.c_str());
+	ASSERT_TRUE(r.ok) << r.error;
+	const pbrt_flatten::Material* mapped = nullptr;
+	const pbrt_flatten::Material* plain = nullptr;
+	for (const auto& m : r.scene.materials) {
+		if (m.textureFilename.find("uv_mapping_load_a") != std::string::npos) mapped = &m;
+		if (m.textureFilename.find("uv_mapping_load_c") != std::string::npos) plain = &m;
+	}
+	ASSERT_NE(mapped, nullptr);
+	ASSERT_NE(plain, nullptr);
+	EXPECT_EQ(mapped->textureMapping.su, 3.0);
+	EXPECT_EQ(mapped->textureMapping.sv, 2.0);
+	EXPECT_EQ(mapped->textureMapping.du, 0.25);
+	EXPECT_EQ(mapped->textureMapping.dv, -0.5);
+	EXPECT_EQ(mapped->displacementMapping.su, 4.0);
+	EXPECT_EQ(mapped->displacementMapping.sv, 1.0);
+	EXPECT_TRUE(plain->textureMapping.identity()) << "an imagemap that says nothing is not placed";
+	EXPECT_TRUE(plain->displacementMapping.identity());
+}
+
+// A quad textured through the Texture's own mapping renders as the quad whose own coordinates were scaled and shifted by hand: the same picture, to within the tiny difference of the
+// texture filter's footprint (the mapped texture scales its screen-space derivatives, the baked one gets them from the scaled coordinates).
+TEST(UvMappingRenderTest, ATextureMappedByItsUscaleVscaleUdeltaVdeltaRendersAsTheSameQuadWithCoordinatesScaledAndShiftedByHand) {
+	if (findRayTracerLauncher().empty()) GTEST_SKIP() << "ray_tracer.exe was not found next to the tests";
+	const int n = 8;
+	std::vector<float> img(static_cast<size_t>(n) * n * 3, 0.0f);
+	for (int y = 0; y < n; ++y)
+		for (int x = 0; x < n; ++x) {
+			float* p = &img[(static_cast<size_t>(y) * n + x) * 3];
+			if ((x < n / 2) == (y < n / 2)) { p[0] = 1.0f; p[1] = 0.9f; } else { p[2] = 1.0f; }
+		}
+	const std::string picture = std::filesystem::absolute("uv_mapping_picture.hdr").string();
+	{
+		std::ofstream out(picture, std::ios::binary);
+		out << scene_doc::sky::encodeHdr(img, n, n);
+	}
+	const auto scene = [&](const std::string& mapping, const std::string& uv) {
+		return std::string("LookAt 0 0 6 0 0 0 0 1 0\nCamera \"perspective\" \"float fov\" [ 30 ]\nFilm \"rgb\" \"integer xresolution\" [ 64 ] \"integer yresolution\" [ 64 ]\nWorldBegin\n"
+		                   "LightSource \"infinite\" \"rgb L\" [ 1 1 1 ]\nTexture \"t\" \"spectrum\" \"imagemap\" \"string filename\" [ \"") + picture + "\" ] \"string wrap\" \"repeat\"" + mapping +
+		       "\nMaterial \"diffuse\" \"texture reflectance\" \"t\"\nShape \"trianglemesh\" \"integer indices\" [ 0 1 2 0 2 3 ] \"point3 P\" [ -2 -2 0 2 -2 0 2 2 0 -2 2 0 ] \"point2 uv\" [ " + uv + " ]\n";
+	};
+	std::vector<float> a, b;
+	int w = 0, h = 0, w2 = 0, h2 = 0;
+	ASSERT_TRUE(renderPbrtTextCpu(scene(" \"float uscale\" [ 3 ] \"float vscale\" [ 2 ] \"float udelta\" [ 0.25 ] \"float vdelta\" [ -0.1 ]", "0 0 1 0 1 1 0 1"), "uvmap_mapped", 48, a, w, h));
+	ASSERT_TRUE(renderPbrtTextCpu(scene("", "0.25 -0.1 3.25 -0.1 3.25 1.9 0.25 1.9"), "uvmap_baked", 48, b, w2, h2));
+	std::remove(picture.c_str());
+	ASSERT_EQ(w, w2);
+	ASSERT_EQ(h, h2);
+	double diff = 0, level = 0;
+	for (size_t i = 0; i < a.size(); ++i) {
+		diff += std::fabs(a[i] - b[i]);
+		level += b[i];
+	}
+	EXPECT_GT(level / static_cast<double>(b.size()), 0.2) << "the picture shows";
+	EXPECT_LT(diff / level, 0.02) << "mapped and by-hand coordinates render the same picture";
+	// and the mapping is not the identity: without it the picture is different
+	std::vector<float> plain;
+	ASSERT_TRUE(renderPbrtTextCpu(scene("", "0 0 1 0 1 1 0 1"), "uvmap_plain", 48, plain, w2, h2));
+	double plainDiff = 0;
+	for (size_t i = 0; i < a.size(); ++i) plainDiff += std::fabs(a[i] - plain[i]);
+	EXPECT_GT(plainDiff / level, 0.2) << "the mapping changes the picture";
 }

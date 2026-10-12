@@ -202,7 +202,8 @@ inline int getOrBuildPbrtImageTexture(const std::string& resolvedPath, SceneData
 									  std::map<std::string, int>& cache,
 									  float gamma = kGpuImagemapDefaultGamma,
 									  GpuWrapMode wrap = GpuWrapMode::Clamp,
-									  bool invert = false) {
+									  bool invert = false,
+									  const pbrt_flatten::UvMapping& uv = pbrt_flatten::UvMapping{}) {
 	// Always a composite key - `cache` is a fresh std::map local to one
 	// buildPbrtMaterials() call and never read/written anywhere but this
 	// function, so there's no external reader relying on a plain-path key
@@ -217,8 +218,14 @@ inline int getOrBuildPbrtImageTexture(const std::string& resolvedPath, SceneData
 	// collide, silently sharing pixel bytes baked for the wrong exponent.
 	std::uint32_t gammaBits;
 	std::memcpy(&gammaBits, &gamma, sizeof(gammaBits));
-	const std::string cacheKey = resolvedPath + "|g" + std::to_string(gammaBits) + "|w" +
+	std::string cacheKey = resolvedPath + "|g" + std::to_string(gammaBits) + "|w" +
 		std::to_string(static_cast<int>(wrap)) + "|i" + (invert ? "1" : "0");
+	if (!uv.identity()) {   // (the same file placed differently is a different texture entry; the decoded pixels below are shared by the key without it)
+		const float placed[4] = {static_cast<float>(uv.su), static_cast<float>(uv.sv), static_cast<float>(uv.du), static_cast<float>(uv.dv)};
+		std::uint32_t bits[4];
+		std::memcpy(bits, placed, sizeof bits);
+		cacheKey += "|m" + std::to_string(bits[0]) + "," + std::to_string(bits[1]) + "," + std::to_string(bits[2]) + "," + std::to_string(bits[3]);
+	}
 	const auto it = cache.find(cacheKey);
 	if (it != cache.end()) return it->second;
 
@@ -232,9 +239,10 @@ inline int getOrBuildPbrtImageTexture(const std::string& resolvedPath, SceneData
 	const DecodedImage* decoded;
 	{
 		std::lock_guard<std::mutex> lock(s_decodedImageCacheMutex);
-		auto decodedIt = s_decodedImageCache.find(cacheKey);
+		const std::string decodeKey = resolvedPath + "|g" + std::to_string(gammaBits) + "|i" + (invert ? "1" : "0");   // (the pixels do not depend on the wrap mode or the placement)
+		auto decodedIt = s_decodedImageCache.find(decodeKey);
 		if (decodedIt == s_decodedImageCache.end())
-			decodedIt = s_decodedImageCache.emplace(cacheKey, gpu_scene_textures::decodeColourImage(resolvedPath, gamma, invert)).first;
+			decodedIt = s_decodedImageCache.emplace(decodeKey, gpu_scene_textures::decodeColourImage(resolvedPath, gamma, invert)).first;
 		decoded = &decodedIt->second;
 	}
 
@@ -250,6 +258,10 @@ inline int getOrBuildPbrtImageTexture(const std::string& resolvedPath, SceneData
 	tex.width = decoded->width;
 	tex.height = decoded->height;
 	tex.wrapMode = wrap;
+	tex.uvScaleU = static_cast<float>(uv.su);
+	tex.uvScaleV = static_cast<float>(uv.sv);
+	tex.uvDeltaU = static_cast<float>(uv.du);
+	tex.uvDeltaV = static_cast<float>(uv.dv);
 	tex.srgb = decoded->srgb;
 	out.texturePixels.insert(out.texturePixels.end(), decoded->pixels.begin(), decoded->pixels.end());
 
@@ -812,7 +824,7 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 		d.type = MaterialType::CoatedDiffuse;
 		if (!m.textureFilename.empty()) {
 			d.textureIdx = getOrBuildPbrtImageTexture(m.textureFilename, out, imageTextureCache,
-				static_cast<float>(m.textureGamma), static_cast<GpuWrapMode>(m.textureWrapIndex), m.textureInvert);
+				static_cast<float>(m.textureGamma), static_cast<GpuWrapMode>(m.textureWrapIndex), m.textureInvert, m.textureMapping);
 			d.emissionScale = static_cast<float>(m.textureScale);
 		}
 		// m.hasCheckerReflectance/hasFbmReflectance/hasMarbleReflectance/
@@ -856,7 +868,7 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 		// its independent scale.
 		if (!m.textureFilename.empty()) {
 			d.textureIdx = getOrBuildPbrtImageTexture(m.textureFilename, out, imageTextureCache,
-				static_cast<float>(m.textureGamma), static_cast<GpuWrapMode>(m.textureWrapIndex), m.textureInvert);
+				static_cast<float>(m.textureGamma), static_cast<GpuWrapMode>(m.textureWrapIndex), m.textureInvert, m.textureMapping);
 			d.emissionScale = static_cast<float>(m.textureScale);
 		}
 		if (!m.transmittanceTextureFilename.empty()) {
@@ -978,7 +990,7 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 		d.type = MaterialType::Lambertian;
 		if (!m.textureFilename.empty()) {
 			d.textureIdx = getOrBuildPbrtImageTexture(m.textureFilename, out, imageTextureCache,
-				static_cast<float>(m.textureGamma), static_cast<GpuWrapMode>(m.textureWrapIndex), m.textureInvert);
+				static_cast<float>(m.textureGamma), static_cast<GpuWrapMode>(m.textureWrapIndex), m.textureInvert, m.textureMapping);
 			d.emissionScale = static_cast<float>(m.textureScale);
 		}
 		// m.hasCheckerReflectance/hasFbmReflectance/hasMarbleReflectance/
@@ -1077,14 +1089,14 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 	if (!m.displacementTextureFilename.empty() && d.type != MaterialType::DiffuseLight) {
 		// Read with the default Repeat wrap, like the CPU's bilinear_wrap_texture for both kinds of map.
 		const int dispTexIdx = getOrBuildPbrtImageTexture(m.displacementTextureFilename, out, imageTextureCache,
-														  kGpuImagemapDefaultGamma, GpuWrapMode::Repeat);
+														  kGpuImagemapDefaultGamma, GpuWrapMode::Repeat, false, m.displacementMapping);
 		if (dispTexIdx >= 0) {
 			if (!isPbrtTextureGrayscale(out, dispTexIdx)) {
 				if (d.type == MaterialType::Lambertian && d.textureIdx < 0) {
 					// A tangent-space normal map is read LINEAR (pbrt scene.cpp: Image::Read(..., ColorEncoding::Linear)); the
 					// default build above keeps the file's sRGB bytes, which the lookup would decode and tilt every texel.
 					const int linearIdx = getOrBuildPbrtImageTexture(m.displacementTextureFilename, out, imageTextureCache,
-																	 1.0f, GpuWrapMode::Repeat);
+																	 1.0f, GpuWrapMode::Repeat, false, m.displacementMapping);
 					if (linearIdx >= 0) {
 						d.type = MaterialType::NormalMappedLambertian;
 						d.textureIdx = linearIdx;

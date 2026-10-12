@@ -121,8 +121,10 @@ __device__ __forceinline__ float3 wf_sample_texture(
 	// finding) this fixes.
 	auto sampleImage = [&](const TextureData& t) -> float3 {
 		if (t.width <= 0 || t.height <= 0) return make_float3(0.0f, 1.0f, 1.0f);
-		const float uw = fminf(fmaxf(u, -1024.0f), 1024.0f);
-		const float vw = fminf(fmaxf(1.0f - v, -1024.0f), 1024.0f);
+		const float um = t.uvScaleU * u + t.uvDeltaU;   // the Texture's own UVMapping, as in optix_device_textures.h
+		const float vm = t.uvScaleV * v + t.uvDeltaV;
+		const float uw = fminf(fmaxf(um, -1024.0f), 1024.0f);
+		const float vw = fminf(fmaxf(1.0f - vm, -1024.0f), 1024.0f);
 		// double, not float - see optix_device_helpers.h's identical
 		// sampleImage comment for why (matches CPU's own bilerp() promotion,
 		// mipmap.h - guards against float's 2^24 exact-integer limit for a
