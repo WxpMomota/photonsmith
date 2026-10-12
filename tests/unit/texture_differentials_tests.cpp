@@ -378,28 +378,30 @@ TEST(CameraDifferentials, PrimaryRayHasDifferentials) {
     EXPECT_TRUE(r.has_differentials());
 }
 
-TEST(CameraDifferentials, RxDirectionStepMatchesOnePixelStep) {
-    camera cam;
-    cam.lookfrom = point3(0, 0, -10);
-    cam.lookat   = point3(0, 0, 0);
-    cam.vfov = 40;
-    cam.image_width = 100;
-    cam.samples_per_pixel = 4;
-    cam.max_depth = 1;
-    cam.background = color(0,0,0);
-    cam.initialize();
+// pbrt scales the camera ray differentials by max(1/8, 1/sqrt(spp)) (RayIntegrator::EvaluatePixelSample): n samples per pixel each stand for a smaller piece of the pixel. At 1 sample it
+// is a whole pixel, at 4 half of one, and from 64 samples on an eighth.
+TEST(CameraDifferentials, RxDirectionStepIsThePixelStepScaledLikePbrt) {
+    for (const int spp : {1, 4, 256}) {
+        camera cam;
+        cam.lookfrom = point3(0, 0, -10);
+        cam.lookat   = point3(0, 0, 0);
+        cam.vfov = 40;
+        cam.image_width = 100;
+        cam.samples_per_pixel = spp;
+        cam.max_depth = 1;
+        cam.background = color(0,0,0);
+        cam.initialize();
 
-    // Same offset, adjacent pixel columns - the primary-direction delta
-    // between these two calls IS one full pixel_delta_u step (by
-    // get_ray()'s own construction), so it's a fixture-free way to check
-    // that rx_direction's offset from the primary ray matches that same
-    // step, without needing to expose pixel_delta_u from the class.
-    ray r0 = cam.get_ray(50, 50, 0, 0, vec3(0,0,0));
-    ray r1 = cam.get_ray(51, 50, 0, 0, vec3(0,0,0));
-    vec3 one_pixel_step = r1.direction() - r0.direction();
-    vec3 rx_step = r0.rx_direction() - r0.direction();
+        // Same offset, adjacent pixel columns - the primary-direction delta between these two calls IS one full pixel_delta_u step (by get_ray()'s own construction), so it's
+        // a fixture-free way to check rx_direction's offset against that same step, without exposing pixel_delta_u from the class.
+        ray r0 = cam.get_ray(50, 50, 0, 0, vec3(0,0,0));
+        ray r1 = cam.get_ray(51, 50, 0, 0, vec3(0,0,0));
+        const double scale = std::max(0.125, 1.0 / std::sqrt(static_cast<double>(spp)));
+        vec3 one_pixel_step = (r1.direction() - r0.direction()) * scale;
+        vec3 rx_step = r0.rx_direction() - r0.direction();
 
-    EXPECT_NEAR(rx_step.x(), one_pixel_step.x(), 1e-9);
-    EXPECT_NEAR(rx_step.y(), one_pixel_step.y(), 1e-9);
-    EXPECT_NEAR(rx_step.z(), one_pixel_step.z(), 1e-9);
+        EXPECT_NEAR(rx_step.x(), one_pixel_step.x(), 1e-9) << "spp " << spp;
+        EXPECT_NEAR(rx_step.y(), one_pixel_step.y(), 1e-9) << "spp " << spp;
+        EXPECT_NEAR(rx_step.z(), one_pixel_step.z(), 1e-9) << "spp " << spp;
+    }
 }

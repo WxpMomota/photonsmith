@@ -638,7 +638,7 @@ void WavefrontPathTracer::renderPrepareLaunch(RenderCall &rc) {
 	lp.framebuffer   = d_fbPtr;
 	lp.width         = (unsigned int)width;
 	lp.height        = (unsigned int)height;
-	lp.bumpFootprint = gpu_make_bump_footprint(camera, width, height);
+	lp.bumpFootprint = gpu_make_bump_footprint(camera, width, height, samples_per_pixel);
 	lp.cameraMediumSigmaT       = camera.cameraMediumSigmaT;
 	lp.cameraMediumMaterialIdx  = camera.cameraMediumMaterialIdx;
 	lp.traversable   = gas_handle;

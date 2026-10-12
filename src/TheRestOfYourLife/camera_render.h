@@ -928,8 +928,11 @@ inline ray camera::get_ray(int i, int j, int /*s_i*/, int /*s_j*/, const vec3& o
     // (see ray.h's own comment). Only the primary pixel-sample path
     // generates these; the alt-camera branch above returns early
     // without them (has_differentials() stays false there).
-    auto rx_sample = pixel_sample + pixel_delta_u;
-    auto ry_sample = pixel_sample + pixel_delta_v;
+    // pbrt scales the differentials by the image sampling rate (SamplesPerPixel() = n: max(1/8, 1/sqrt(n)), integrators.cpp RayIntegrator::EvaluatePixelSample), since n
+    // samples per pixel each stand for a smaller piece of it: a bump map's finite-difference step and a filtered texture's footprint are that much finer at 256 samples than at 1.
+    const double ray_diff_scale = std::max(0.125, 1.0 / std::sqrt(static_cast<double>(std::max(1, samples_per_pixel))));
+    auto rx_sample = pixel_sample + ray_diff_scale * pixel_delta_u;
+    auto ry_sample = pixel_sample + ray_diff_scale * pixel_delta_v;
     r.set_differentials(ray_origin, rx_sample - ray_origin,
                          ray_origin, ry_sample - ray_origin);
 

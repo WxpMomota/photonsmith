@@ -241,7 +241,7 @@ extern "C" __global__ void __closesthit__triangle() {
 		// prev_brdf_pdf arrives in payload p12 and is 0 for the primary ray or a specular bounce.
 		float bump_step = 0.0f;
 		if (__uint_as_float(optixGetPayload_12()) == 0.0f)
-			bump_step = gpu_bump_footprint_step(gpu_make_bump_footprint(params.camera, (int)params.width, (int)params.height),
+			bump_step = gpu_bump_footprint_step(gpu_make_bump_footprint(params.camera, (int)params.width, (int)params.height, (int)params.samplesPerPixel),
 												ray_orig, normalize(ray_dir), hit_point, final_normal, bump_dpdu, bump_dpdv);
 		shade_normal = gpu_bump_shading_normal(params.textures, params.texturePixels, mat.bumpTexIdx,
 											   mat.bumpScale, uv_u, uv_v, final_normal, bump_dpdu, bump_step);

@@ -1164,3 +1164,28 @@ per-`MaterialKind` behavior.)
   ignored there — those slots still only ever get this codebase's original
   gamma-2.2/Clamp/no-invert defaults on either backend, regardless of what
   the scene's own imagemap declares.
+
+
+## Compared with real pbrt-v4 (2026-10-12)
+
+Everything above compares this project's renderers with each other, or with the pbrt-v4 *source*. `scripts/pbrt_compare.py` compares them with pbrt-v4's own **pictures**: it renders the Scene Builder's 244 combination scenes (`scripts/combo_sweep.py`'s: every shape under 15 material treatments, and the showcase under each lighting) with a real `pbrt.exe` and with this project's CPU renderer, at the same sample count, and compares the linear pictures in 4x4 blocks.
+
+**Building pbrt-v4 on Windows** (about 15 minutes; nothing in this repository depends on it): in a scratch folder `git clone <your pbrt-v4 clone> pb4`, then `git submodule update --init --depth 1` there (twelve small dependencies from their own GitHub repositories); then, in a Visual Studio developer prompt (`vcvars64.bat`, which also puts `cmake` on the path), `cmake -S pb4 -B pb4/build -A x64` (it fetches Imath once) and `cmake --build pb4/build --config Release --target pbrt_exe -- /m`. The result is `pb4/build/Release/pbrt.exe`.
+
+```
+RT_COMBO_SCENES_DIR=<dir> ray_tracer_tests --gtest_filter='SceneCombosTest.*'
+python scripts/pbrt_compare.py --pbrt <pbrt.exe> --dir <dir> --mirror
+```
+
+What it found, with plain diffuse, conductor, coated and glass spheres, boxes, rounded boxes, capsules, domes, tori, tubes, cylinders and pyramids agreeing with pbrt to 0.0 to 0.1% in the mean:
+
+| Finding | Status |
+|---|---|
+| **A pbrt file renders left-right mirrored.** pbrt-v4 is left-handed: for `LookAt 0 0 5  0 0 0  0 1 0` it draws world +x on the *left* of the picture (a red sphere at x = +1.2 is centred at pixel 11 of 64). This project's CPU, recursive OptiX and wavefront OptiX renderers (and presumably Metal) draw it on the right (pixel 52): the camera's right vector is `cross(vup, w)` (right-handed, as in the book the CPU renderer started from), where pbrt's is `cross(up, dir)`. Every pbrt scene with anything asymmetric in it comes out as its mirror image, and so does every Scene Builder file opened in real pbrt. | **Open, a decision:** flipping the camera would fix it for pbrt files but turn every Builder scene, picture and test that assumes +x on the right round; the Builder writer would then need `Scale -1 1 1` before `LookAt` (what Blender's pbrt exporters do). `pbrt_compare.py --mirror` flips our picture so the rest can be compared. |
+| **`Shape "cone"` is not pbrt-v4.** pbrt-v4 has no cone (it was removed after pbrt-v3), so a Builder scene with a cone is rejected by real pbrt (`cone: shape type unknown`). | Open: the writer could write a cone as a triangle mesh like the other ready-made shapes. |
+| **A normal map is not valid pbrt-v4 either.** The writer writes `"texture displacement"` naming a *spectrum* imagemap; pbrt wants a float texture there (`Couldn't find float texture named "bump-1"`), and a normal map goes in `"string normalmap" "file"`. This project's loader reads both. | Open: write `"string normalmap"` when the map has no repeat or shift (pbrt has no mapping for it). |
+| **Bump map footprint: fixed.** pbrt scales its camera ray differentials by `max(1/8, 1/sqrt(spp))`, so a bump map's finite-difference step is finer at 256 samples than at 1. This project used the whole pixel, which gave different shading at a height map's sharp edges (a tiled ramp: 224 blocks off, mean 0.6460 against pbrt's 0.6437). The CPU camera (`camera_render.h`) and both OptiX backends (`gpu_bump_map.h`, `diffScale`) now scale it: the quad matches pbrt in every block and CPU, recursive and wavefront agree. | **Done** (CPU and OptiX). Metal's bump footprint still uses the whole pixel: see `GPU_SCENE_COMMON.md`. |
+| **An emitter does not reflect.** An `AreaLightSource` shape in pbrt also has its material (a diffuse sheet with `L` shines on one side and reflects sky light on both); here an emissive object is only a light, so the non-emitting side of an emissive sheet is black where pbrt's is lit (-20% on the picture of an emissive quad) and an emissive solid is about 2% darker overall. | Open, by design of the emissive material. |
+| **Subsurface is paler than pbrt's.** A skin-preset sphere (`reflectance 0.8 0.58 0.48`, `mfp 0.14 0.055 0.036`): over the ball the red agrees (0.641 both) but green is 0.63 against pbrt's 0.57 and blue 0.61 against 0.54, about 10% too bright and less saturated; the whole-picture mean is 2 to 3% high on every shape. The inversion of reflectance and mfp into coefficients is a port of pbrt's; the difference is in the walk or the entry/exit. | **Open, not understood.** |
+| Glass resting exactly on the floor, subsurface on one open sheet, a flat disk lying in the floor plane: coplanar or open geometry, where renderers resolve ties differently (see `SCENE_BUILDER.md`). | Known. |
+| An explicit `"string encoding" [ "linear" ]` on a height map reads about 1% off pbrt; the default (sRGB) matches. | Minor, open. |

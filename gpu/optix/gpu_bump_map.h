@@ -109,9 +109,10 @@ struct GpuBumpFootprint {
 	float3 horizontal;   // the whole viewport's extent, so one pixel is horizontal / width
 	float3 vertical;
 	int    width, height;
+	float  diffScale;    // pbrt scales camera ray differentials by max(1/8, 1/sqrt(samples per pixel)): a bump map's step is that much finer at many samples than at one
 };
 
-inline __host__ __device__ GpuBumpFootprint gpu_make_bump_footprint(const GpuCameraParams& cam, int width, int height) {
+inline __host__ __device__ GpuBumpFootprint gpu_make_bump_footprint(const GpuCameraParams& cam, int width, int height, int samplesPerPixel = 1) {
 	GpuBumpFootprint f;
 	f.enabled    = (cam.kind == CameraKind::Perspective && !cam.animated && width > 0 && height > 0) ? 1 : 0;
 	f.lowerLeft  = cam.lower_left_corner;
@@ -119,6 +120,7 @@ inline __host__ __device__ GpuBumpFootprint gpu_make_bump_footprint(const GpuCam
 	f.vertical   = cam.vertical;
 	f.width      = width;
 	f.height     = height;
+	f.diffScale  = fmaxf(0.125f, 1.0f / sqrtf((float)(samplesPerPixel > 1 ? samplesPerPixel : 1)));
 	return f;
 }
 
@@ -140,8 +142,8 @@ inline __host__ __device__ float gpu_bump_footprint_step(const GpuBumpFootprint&
 	// Length of the UNnormalized primary direction (pixel sample - ray origin): it lands on the viewport plane.
 	const float L = dot(pn, f.lowerLeft - O) / den;
 	const float3 D  = d * L;
-	const float3 Dx = D + f.horizontal * (1.0f / (float)f.width);
-	const float3 Dy = D + f.vertical   * (1.0f / (float)f.height);
+	const float3 Dx = D + f.horizontal * (f.diffScale / (float)f.width);
+	const float3 Dy = D + f.vertical   * (f.diffScale / (float)f.height);
 	const float dnx = dot(n, Dx), dny = dot(n, Dy);
 	if (dnx == 0.0f || dny == 0.0f) return 0.0f;
 	const float3 pop = p - O;
