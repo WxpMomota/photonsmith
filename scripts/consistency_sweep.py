@@ -92,6 +92,7 @@ MATERIALS = {
     "fog": lambda sc: 'Material "interface"\n  MediumInterface "m" ""',
     "cloud": lambda sc: 'Material "interface"\n  MediumInterface "puffcloud" ""',
     "rgbgrid": lambda sc: 'Material "interface"\n  MediumInterface "grid" ""',
+    "uniformgrid": lambda sc: 'Material "interface"\n  MediumInterface "ugrid" ""',
 }
 
 # materials whose light paths go through a specular chain a point light cannot reach (a point light cannot be hit by a random walk through glass, so the caustic a sphere
@@ -100,7 +101,7 @@ SPECULAR = {"dielectric", "roughdielectric", "thindielectric"}
 ROTATE_MATERIALS = {"diffuse", "conductor", "coateddiffuse", "dielectric", "subsurface"}
 SHAPE_MATERIALS = {"diffuse", "conductor", "coateddiffuse", "dielectric", "fog"}
 LIGHT_MATERIALS = {"diffuse", "conductor", "coateddiffuse", "diffusetransmission", "subsurface"}
-BACKEND_TOLERANCE = {}   # a material whose two backends are known to differ by more than the default 6%, with the reason
+BACKEND_TOLERANCE = {"uniformgrid": 8.0}   # a material whose two backends are known to differ by more than the default 6%: Metal draws a uniformgrid with its RGB grid medium and reads 5% brighter than the CPU (rgbgrid: 3 to 4%)
 SHAPE_LIST = ("cylinder", "disk", "cone", "paraboloid", "cube")
 CAMERA_MATERIALS = ("diffuse", "coateddiffuse", "dielectric")
 SUN_MATERIALS = ("diffuse", "conductor", "coateddiffuse")
@@ -117,6 +118,12 @@ def medium_prelude(sc):
         c = sc.p(0, 0, 0) if sc.fill else sc.p(0.5, 1.0, 0)
         return ('AttributeBegin\n  Translate %s\n  Scale %g %g %g\n  Translate -0.5 -0.5 -0.5\n  MakeNamedMedium "puffcloud" "string type" [ "cloud" ] "rgb sigma_a" [ 0 0 0 ] "rgb sigma_s" [ %g %g %g ] '
                 '"float g" [ 0.3 ] "float density" [ 1 ] "float wispiness" [ 1 ] "float frequency" [ 4 ]\nAttributeEnd') % (sc.f(c), 2.4 * s_, 2.4 * s_, 2.4 * s_, 0.5 / s_, 0.5 / s_, 0.5 / s_)
+    if sc.material == "uniformgrid":
+        # a 2x2x2 grid of different densities scaling one sigma_s, its box bigger than the interface sphere (the sphere clips it)
+        c = sc.p(0, 0, 0) if sc.fill else sc.p(0.5, 1.0, 0)
+        dens = [0.4, 1.0, 0.7, 1.6, 0.2, 1.2, 0.9, 1.4]
+        return ('AttributeBegin\n  Translate %s\n  Scale %g %g %g\n  Translate -0.5 -0.5 -0.5\n  MakeNamedMedium "ugrid" "string type" [ "uniformgrid" ] "integer nx" [ 2 ] "integer ny" [ 2 ] "integer nz" [ 2 ] '
+                '"float g" [ 0.3 ] "rgb sigma_s" [ %g %g %g ] "float density" [ %s ]\nAttributeEnd') % (sc.f(c), 2.4 * s_, 2.4 * s_, 2.4 * s_, 0.5 / s_, 0.7 / s_, 0.9 / s_, " ".join("%g" % d for d in dens))
     if sc.material == "rgbgrid":
         # a 2x2x2 grid of different scattering and absorption per voxel and colour, its box bigger than the interface sphere (the sphere clips it)
         c = sc.p(0, 0, 0) if sc.fill else sc.p(0.5, 1.0, 0)
