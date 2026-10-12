@@ -460,7 +460,9 @@ __device__ __forceinline__ bool wf_material_supported_on_disk_cylinder_geom(Mate
 	// geometry (MediumInterface is sphere/cylinder only - see pbrt_gpu_
 	// builder.h's disk loop comment).
 	if (type == MaterialType::DielectricMedium) return geomType == 5;
-	return !wf_material_requires_sphere_only_handling(type) && type != MaterialType::NormalMappedLambertian;
+	// NormalMappedLambertian is real on a disk and a cylinder too: their closest-hit programs record the surface's uv and analytic dpdu (HitWorkItem::objDpdu) unconditionally, which is all
+	// the tangent-space normal map needs (it used to trap here, which failed the whole render for a normal map on either shape).
+	return !wf_material_requires_sphere_only_handling(type);
 }
 
 // Henyey-Greenstein phase function direction sample. Duplicated from

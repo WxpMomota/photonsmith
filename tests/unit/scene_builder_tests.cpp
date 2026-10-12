@@ -1413,13 +1413,20 @@ TEST(SceneMaterialsMoreTest, ProblemsWithTheNewMaterialFieldsAreReported) {
 	EXPECT_TRUE(replaced) << "a picture replaces the pattern";
 	d.objects.back().material.imageFile.clear();
 	d.objects.back().material.bumpFile = "bumps.png";
-	bool gpu = false;
-	for (const Problem& p : validate(d)) gpu = gpu || p.message.find("GPU renderers apply a bump") != std::string::npos;
-	EXPECT_TRUE(gpu) << "a bump map on a sphere shows on the CPU only";
+	const auto heightMapWarned = [&]() {
+		bool warned = false;
+		for (const Problem& p : validate(d)) warned = warned || p.message.find("does not draw a height map") != std::string::npos || p.message.find("do not draw a height map") != std::string::npos;
+		return warned;
+	};
+	EXPECT_TRUE(heightMapWarned()) << "a height map on a sphere shows on the CPU only";
+	d.objects.back().shape = ShapeKind::Disk;
+	EXPECT_TRUE(heightMapWarned()) << "OptiX does not draw one on a disk (Metal does)";
+	d.objects.back().shape = ShapeKind::Cylinder;
+	EXPECT_TRUE(heightMapWarned());
+	d.objects.back().shape = ShapeKind::Cone;
+	EXPECT_FALSE(heightMapWarned()) << "a cone is drawn as triangles: both GPU renderers apply it";
 	d.objects.back().shape = ShapeKind::Box;
-	gpu = false;
-	for (const Problem& p : validate(d)) gpu = gpu || p.message.find("GPU renderers apply a bump") != std::string::npos;
-	EXPECT_FALSE(gpu) << "a box is made of triangles: the GPU applies it";
+	EXPECT_FALSE(heightMapWarned()) << "a box is made of triangles: the GPU applies it";
 	d.objects.back().material.kind = MaterialKind::Dielectric;
 	bool onlyFor = false;
 	for (const Problem& p : validate(d)) onlyFor = onlyFor || p.message.find("only applies to matte, glossy paint and metal") != std::string::npos;

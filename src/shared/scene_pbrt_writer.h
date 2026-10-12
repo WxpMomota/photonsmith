@@ -89,6 +89,7 @@ inline UvPlace uvPlaceOf(const Object& o) {
 }
 // Whether a shape writes its own texture coordinates, which is where the placement of a texture is put for it (UvPlace). The shapes the renderer makes the coordinates of (a sphere, disk,
 // cylinder, cone and a mesh file) have the placement written on the Texture instead, as pbrt's imagemap uscale/vscale/udelta/vdelta (textureMappingParams); the renderers read those.
+// (Baking stays for the rest because the renderers read that mapping for an imagemap only: a checker on a box, quad or ready-made shape gets its repeats and shift through the uv.)
 inline bool uvIsBaked(ShapeKind k) { return k == ShapeKind::Box || k == ShapeKind::Quad || isGeneratedShape(k); }
 
 // The " \"float uscale\" [ ... ] ..." parameters of an imagemap Texture that place it as the object's material says, for a shape that does not write its own coordinates; empty otherwise.

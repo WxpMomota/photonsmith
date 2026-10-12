@@ -439,6 +439,10 @@ def run(args):
               Scene(material_text='Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "texture displacement" [ "d" ]', prelude='Texture "d" "float" "constant" "float value" [ 0.3 ]'), tolerance=tol)
         check("texture", "flat normal map changes nothing", backend, Scene(material_text=diffuse_inline),
               Scene(material_text='Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "string normalmap" [ "%s" ]' % sw.flat_normal), tolerance=tol)
+        # a normal map on a shape the renderer draws as an analytic surface: a disk and a cylinder used to stop the whole OptiX render ("MaterialType 14 is not supported"), and a flat map changes nothing
+        for shape in ("disk", "cylinder"):
+            check("normalmap", "flat normal map changes nothing, %s" % shape, backend, Scene(material_text=diffuse_inline, shape=shape),
+                  Scene(material_text='Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "string normalmap" [ "%s" ]' % sw.flat_normal, shape=shape), tolerance=tol)
         # the sky's scale: a constant sky at 0.4 against a white picture at scale 0.4
         check("skyscale", "constant sky at 0.4 vs white picture at scale 0.4", backend, Scene(material="diffuse", sky="constant", sky_scale=0.4, fill=True),
               Scene(material="diffuse", sky="picture", sky_png=sw.white, sky_scale=0.4, fill=True), tolerance=tol)

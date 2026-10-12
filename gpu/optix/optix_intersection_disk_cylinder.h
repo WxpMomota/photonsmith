@@ -25,6 +25,26 @@
 // too, and optix_device_helpers.h is included before this file).
 
 //==============================================================================
+// Normal maps on a disk and a cylinder
+//==============================================================================
+
+// The shading normal of a NormalMappedLambertian hit on a disk or cylinder, as the sphere and triangle closest-hit programs compute it: the map's tangent-space normal (2*RGB-1,
+// normalised, (0,0,1) if degenerate) turned into the surface's frame by its analytic dpdu (CPU normal_map_material::apply). The caller shades the hit as a plain Lambertian with
+// this normal. (These two used to __trap() on a normal map, which failed the whole render; the Scene Builder lets a person put one on any shape.)
+__device__ __forceinline__ float3 dc_normal_mapped_normal(const MaterialData& mat, float u, float v, const float3& hit_point, const float3& normal, const float3& dpdu) {
+	const float3 packed = sample_texture(mat.textureIdx, u, v, hit_point);
+	float ns_x = 2.0f * packed.x - 1.0f;
+	float ns_y = 2.0f * packed.y - 1.0f;
+	float ns_z = 2.0f * packed.z - 1.0f;
+	const float ns_len = sqrtf(ns_x * ns_x + ns_y * ns_y + ns_z * ns_z);
+	if (ns_len > 1e-8f) { ns_x /= ns_len; ns_y /= ns_len; ns_z /= ns_len; }
+	else                { ns_x = 0.0f; ns_y = 0.0f; ns_z = 1.0f; }
+	float out_nx, out_ny, out_nz;
+	apply_normal_map(ns_x, ns_y, ns_z, normal.x, normal.y, normal.z, dpdu.x, dpdu.y, dpdu.z, out_nx, out_ny, out_nz);
+	return make_float3(out_nx, out_ny, out_nz);
+}
+
+//==============================================================================
 // Disk
 //==============================================================================
 
@@ -147,8 +167,7 @@ extern "C" __global__ void __closesthit__disk() {
 		// place - see pbrt_gpu_builder.h's disk/cylinder loop - so this trap is
 		// unreachable today, but kept loud rather than silently wrong if that
 		// ever changes).
-		if (material_requires_sphere_only_handling(mat.type) ||
-			mat.type == MaterialType::NormalMappedLambertian) {
+		if (material_requires_sphere_only_handling(mat.type)) {
 			printf("[DISK-SHADE] MaterialType %d is not supported on disk geometry\n", (int)mat.type);
 			__trap();
 		}
@@ -156,9 +175,19 @@ extern "C" __global__ void __closesthit__disk() {
 		// Integrator "bool regularize" - see current_do_regularize()'s own
 		// comment (optix_device_helpers.h).
 		const bool do_regularize = current_do_regularize();
-		shade_material(mat, matIdx, normal, ray_dir, hit_point, front_face, uv_u, uv_v, disk_dpdu, do_regularize, seed,
-			attenuation, scattered_dir, scattered, is_specular, is_medium_boundary, brdf_pdf_override, emission,
-			bssrdf_exit, bssrdf_exit_pos, out_eta, rgbChannel);
+		if (mat.type == MaterialType::NormalMappedLambertian) {
+			// Shaded as a plain Lambertian with the map's perturbed normal (textureIdx means "normal map" for this type, not an albedo texture) - the sphere's identical substitution.
+			MaterialData effective = mat;
+			effective.type = MaterialType::Lambertian;
+			effective.textureIdx = -1;
+			shade_material(effective, matIdx, dc_normal_mapped_normal(mat, uv_u, uv_v, hit_point, normal, disk_dpdu), ray_dir, hit_point, front_face, uv_u, uv_v, disk_dpdu, do_regularize, seed,
+				attenuation, scattered_dir, scattered, is_specular, is_medium_boundary, brdf_pdf_override, emission,
+				bssrdf_exit, bssrdf_exit_pos, out_eta, rgbChannel);
+		} else {
+			shade_material(mat, matIdx, normal, ray_dir, hit_point, front_face, uv_u, uv_v, disk_dpdu, do_regularize, seed,
+				attenuation, scattered_dir, scattered, is_specular, is_medium_boundary, brdf_pdf_override, emission,
+				bssrdf_exit, bssrdf_exit_pos, out_eta, rgbChannel);
+		}
 	}
 
 	optixSetPayload_3(__float_as_uint(emission.x));
@@ -704,16 +733,24 @@ extern "C" __global__ void __closesthit__cylinder() {
 		}
 		scattered = rdm_scatter_ok;
 	} else {
-		if (material_requires_sphere_only_handling(mat.type) ||
-			mat.type == MaterialType::NormalMappedLambertian) {
+		if (material_requires_sphere_only_handling(mat.type)) {
 			printf("[CYLINDER-SHADE] MaterialType %d is not supported on cylinder geometry\n", (int)mat.type);
 			__trap();
 		}
 
 		// do_regularize already hoisted above (see its own comment).
-		shade_material(mat, matIdx, normal, ray_dir, hit_point, front_face, uv_u, uv_v, cyl_dpdu, do_regularize, seed,
-			attenuation, scattered_dir, scattered, is_specular, is_medium_boundary, brdf_pdf_override, emission,
-			bssrdf_exit, bssrdf_exit_pos, out_eta, rgbChannel);
+		if (mat.type == MaterialType::NormalMappedLambertian) {
+			MaterialData effective = mat;   // (as on the disk: a plain Lambertian with the perturbed normal)
+			effective.type = MaterialType::Lambertian;
+			effective.textureIdx = -1;
+			shade_material(effective, matIdx, dc_normal_mapped_normal(mat, uv_u, uv_v, hit_point, normal, cyl_dpdu), ray_dir, hit_point, front_face, uv_u, uv_v, cyl_dpdu, do_regularize, seed,
+				attenuation, scattered_dir, scattered, is_specular, is_medium_boundary, brdf_pdf_override, emission,
+				bssrdf_exit, bssrdf_exit_pos, out_eta, rgbChannel);
+		} else {
+			shade_material(mat, matIdx, normal, ray_dir, hit_point, front_face, uv_u, uv_v, cyl_dpdu, do_regularize, seed,
+				attenuation, scattered_dir, scattered, is_specular, is_medium_boundary, brdf_pdf_override, emission,
+				bssrdf_exit, bssrdf_exit_pos, out_eta, rgbChannel);
+		}
 	}
 
 	optixSetPayload_3(__float_as_uint(emission.x));
