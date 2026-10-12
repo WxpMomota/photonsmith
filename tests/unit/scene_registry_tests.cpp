@@ -148,17 +148,16 @@ TEST(SceneRegistryTest, LoadedScenesAppendAfterTheBuiltInsWithoutDisturbingThem)
 		EXPECT_EQ(all[i].id, builtins[i].id);
 		EXPECT_STREQ(all[i].name, builtins[i].name);
 	}
-	// Scenes found on disk come after the built-ins (the built-in ones use no Custom Scenes or Test Scenes category) and are numbered within their own
-	// category's letter, in the order they were found: K1, K2, ... for Custom Scenes, L1, L2, ... for Test Scenes. Derived via letter_for_category()
-	// rather than hardcoded literals, so a new category cannot make this stale (see BuiltinIdLetterMatchesItsCategory).
+	// Scenes found on disk come after the built-ins and are numbered within their own category's letter, in the order they were found: K1, K2, ... for Custom Scenes, L1, L2, ... for Test
+	// Scenes (which have no built-in scenes), and, for a file that names a category the built-in scenes use (it says "# @rt-category Materials"), the number after the last built-in one of
+	// that letter, so its id is never one a built-in scene already has. Derived via letter_for_category() rather than hardcoded literals, so a new category cannot make this stale
+	// (see BuiltinIdLetterMatchesItsCategory).
 	std::map<char, int> number;
+	for (const auto& b : builtins) number[b.id[0]] = std::max(number[b.id[0]], std::atoi(b.id.c_str() + 1));
 	for (std::size_t i = builtins.size(); i < all.size(); ++i) {
-		const std::string category = all[i].category;
-		EXPECT_TRUE(category == SceneCategories::CustomScenes || category == SceneCategories::Tests || category == SceneCategories::MyScenes)
-			<< "a scene past the built-ins should be a loaded one: " << all[i].id << " is in " << category;
 		const char letter = SceneCategories::letter_for_category(all[i].category);
 		EXPECT_EQ(all[i].id, std::string(1, letter) + std::to_string(++number[letter]))
-			<< "loaded scene ids must continue their category's sequence without gaps";
+			<< "loaded scene ids must continue their category's sequence without gaps (and after its built-in scenes)";
 	}
 }
 
@@ -1069,6 +1068,24 @@ TEST(SceneHeaderTagsTest, BundledFixturesAreTestScenesAndUntaggedFilesAreCustom)
 	for (const SceneDescriptor& s : get_scene_registry())
 		if (s.category == std::string(SceneCategories::CustomScenes))
 			EXPECT_FALSE(std::string(s.description).empty()) << s.id;
+}
+
+// A file that says "# @rt-category Materials" is listed in that category with an id of its own: numbered after the built-in scenes, not from 1, where "B1" is already Rough Metal Spheres.
+// (The renderer resolves a scene by its id, so a clash sent every render of the file to the built-in scene.) Every id in the list is different, and each finds its own scene.
+TEST(SceneHeaderTagsTest, ATaggedFileInABuiltInCategoryGetsAFreshIdAndEveryIdIsUnique) {
+	std::set<std::string> ids;
+	for (const SceneDescriptor& s : get_scene_registry()) EXPECT_TRUE(ids.insert(s.id).second) << "the id " << s.id << " is used by more than one scene";
+	const SceneDescriptor* showcase = find_scene_by_file_stem("studio-showcase");
+	if (!showcase) GTEST_SKIP() << "pbrt_scenes/studio-showcase.pbrt was not discovered - run from the repository root";
+	EXPECT_EQ(showcase->category, std::string(SceneCategories::Materials));
+	int builtinMax = 0;
+	for (const SceneDescriptor& s : get_builtin_scene_registry())
+		if (s.id[0] == showcase->id[0]) builtinMax = std::max(builtinMax, std::atoi(s.id.c_str() + 1));
+	EXPECT_GT(std::atoi(showcase->id.c_str() + 1), builtinMax) << showcase->id << " continues the category after its built-in scenes";
+	const SceneDescriptor* byId = find_scene(showcase->id.c_str());
+	ASSERT_NE(byId, nullptr);
+	EXPECT_EQ(byId->slug, showcase->slug) << "its id finds it, not another scene";
+	EXPECT_EQ(std::string(byId->name), std::string(showcase->name));
 }
 
 // ===========================================================================

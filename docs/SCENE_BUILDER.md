@@ -4,7 +4,11 @@ Build a scene from shapes, materials and lights, move things around, see a pictu
 
 ![The Scene Builder tab: the scene list, a top view with the camera and its field of view, a preview render, and the properties of the selected gold ball](gallery/scene-builder.jpg)
 
-## A first scene
+## A scene to look at first: Studio Showcase
+
+**Studio Showcase** (in the Settings tab under *Materials*, or `pbrt_scenes/studio-showcase.pbrt`, which **Open** loads here for editing) is a small photo studio made with the Builder, to show what it can do together: a **cyclorama** backdrop lit by the **Studio** three-light rig and a **window-pattern projector**; a **rounded box** of red car paint worn through to copper (a **mixed material**); a candle-wax ball (**subsurface**); a clear glass ball on a tile with a **tiled picture** (texture repeats); and a gold ball. It renders the same on the CPU and OptiX (the means of the two pictures agree to 0.1%). Switch **Rendered** on after opening it to look around it and drag things while it refines. The scene is defined in code, `src/shared/scene_showcase.h`, and `tests/unit/scene_showcase_tests.cpp` checks that the file is exactly what the code writes and that it is a valid Builder scene (`RT_SHOWCASE_OUT=<the file> ray_tracer_tests --gtest_filter=SceneShowcaseTest.WriteTheFile` writes it again after a change).
+
+## Looking at and moving things
 
 1. Open the **Scene Builder** tab. It starts with an example (a checkered floor, glass and gold balls, a red box, a ceiling light and a pale sky).
 2. Press **Preview**. A small picture appears in a second or two (Draft quality, on the CPU).
