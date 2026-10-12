@@ -707,6 +707,8 @@ TEST(SceneDocumentShapesTest, GeneratedMeshesAreClosedOutwardFacingAndSizedAsAsk
 			volume += (p[0][0] * (p[1][1] * p[2][2] - p[1][2] * p[2][1]) - p[0][1] * (p[1][0] * p[2][2] - p[1][2] * p[2][0]) +
 			           p[0][2] * (p[1][0] * p[2][1] - p[1][1] * p[2][0])) / 6.0;
 		}
+		const bool sheet = sh == ShapeKind::Cyclorama || sh == ShapeKind::Terrain;   // (a backdrop and the ground are single sheets, not solids: no volume, and the ground's hills need not be level)
+		if (sheet) continue;
 		EXPECT_GT(volume, 0.01) << toString(sh) << " is not a closed, outward-facing solid";
 		for (int a = 0; a < 3; ++a) EXPECT_NEAR(lo[a], -hi[a], 1e-6 + 0.2 * (hi[a] - lo[a])) << toString(sh) << " is not centred on its position (axis " << a << ")";
 	}
