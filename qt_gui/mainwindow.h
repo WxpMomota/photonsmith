@@ -149,6 +149,7 @@ public:
 #endif
 	void selfTestSceneList(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check);   // part of the "builder" mode
 	void selfTestLights(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check);      // (mainwindow_selftest_builder3d.cpp)
+	void selfTestMixedMaterial(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check);      // (mainwindow_selftest_builder3d.cpp)
 	void selfTestShapes(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check);      // (mainwindow_selftest_builder3d.cpp)
 	void runDenoiserSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot); void runTourSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);
 	void runQueueSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_builder3d.cpp

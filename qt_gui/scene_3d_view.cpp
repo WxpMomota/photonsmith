@@ -374,7 +374,7 @@ std::uint64_t Scene3DView::geometrySignature() const {
 		mix(h, o.shape);
 		mix(h, o.position); mix(h, o.rotation); mix(h, o.size);
 		mix(h, o.radius); mix(h, o.radius2); mix(h, o.height); mix(h, o.steps); mix(h, o.meshScale);
-		mix(h, o.material.kind); mix(h, o.material.color); mix(h, o.material.pattern);
+		mix(h, o.material.kind); mix(h, scene_doc::displayColor(o.material)); mix(h, o.material.pattern);
 		mix(h, o.emissive);
 		mix(h, o.volume.kind); mix(h, o.volume.color); mix(h, o.hidden);
 		mix(h, o.meshFile.data(), o.meshFile.size());
@@ -392,7 +392,7 @@ std::vector<Scene3DView::Face> &Scene3DView::faces() const {
 	for (int i = 0; i < static_cast<int>(m_doc->objects.size()); ++i) {
 		const Object &o = m_doc->objects[i];
 		if (o.hidden) continue;
-		QColor base = toQColor(o.material.color);
+		QColor base = toQColor(scene_doc::displayColor(o.material));
 		if (o.material.kind == MaterialKind::Dielectric) base = QColor(150, 200, 240);
 		else if (o.material.kind == MaterialKind::Conductor) base = base.lighter(115);
 		if (o.emissive) base = QColor(255, 220, 120);
@@ -669,7 +669,7 @@ void Scene3DView::drawMeshPoints(Ctx &c, int i) const {
 	const mesh_preview::MeshPreview *m = meshPreview(o.meshFile);
 	if (!m) return;
 	const bool selected = isPicked({BuilderSelection::Kind::Object, i});
-	QColor dot = selected ? c.accent : toQColor(o.material.color).lighter(130);
+	QColor dot = selected ? c.accent : toQColor(scene_doc::displayColor(o.material)).lighter(130);
 	dot.setAlpha(210);
 	c.p->setPen(QPen(dot, 2.0, Qt::SolidLine, Qt::RoundCap));
 	QList<QPointF> pts;

@@ -370,6 +370,7 @@ private:
 	void inspectObject(QFormLayout *f, int i);
 	void inspectLight(QFormLayout *f, int i);
 	void inspectMaterial(QFormLayout *f, int i);
+	void addMixRows(QFormLayout *f, int i);   // the last of a material's rows: mix it with a second material (scene_builder_mix.cpp)
 
 	QString workFolder() const;
 	bool writeSceneFile(const QString &path, QString *error, const scene_doc::Document *doc = nullptr) const;   // the scene (or `doc`) as pbrt text, for a renderer to read

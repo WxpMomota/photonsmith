@@ -535,6 +535,7 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 		}
 	}
 	if (bumpable) addBump();
+	addMixRows(f, i);
 }
 
 // Hidden in the views / Locked, for an object or a light: they live in the builder's own copy of the document (scene_arrange.h) and never reach the .pbrt text.

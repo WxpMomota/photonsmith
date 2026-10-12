@@ -101,6 +101,7 @@ SOURCES += \
 	scene_builder_arrange.cpp \
 	scene_builder_actions.cpp \
 	scene_builder_rendered.cpp \
+	scene_builder_mix.cpp \
 	scene_builder_camera_views.cpp \
 	scene_builder_turntable.cpp \
 	photo_import.cpp \

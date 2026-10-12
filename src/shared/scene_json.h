@@ -319,6 +319,28 @@ inline bool readCamera(const Json& cam, Camera& c) {
 
 }  // namespace detail
 
+namespace detail {
+// A material as JSON. The newer fields are written only when they are in use, so a scene that does not use them writes exactly what it always did.
+inline Json materialToJson(const Material& mat) {
+	Json m = Json::object();
+	m.set("kind", Json::string(toString(mat.kind))).set("color", toJson(mat.color));
+	m.set("checker", Json::boolean(mat.checker)).set("color2", toJson(mat.color2));
+	m.set("checkerCount", Json::number(mat.checkerCount)).set("roughness", Json::number(mat.roughness));
+	m.set("ior", Json::number(mat.ior)).set("transmittance", toJson(mat.transmittance));
+	m.set("imageFile", Json::string(mat.imageFile));
+	if (mat.pattern != Pattern::None)
+		m.set("pattern", Json::string(toString(mat.pattern))).set("patternScale", Json::number(mat.patternScale)).set("patternVariation", Json::number(mat.patternVariation));
+	if (mat.kind == MaterialKind::Subsurface) m.set("scatterDistance", toJson(mat.scatterDistance));
+	if (!mat.bumpFile.empty())
+		m.set("bumpFile", Json::string(mat.bumpFile)).set("bumpKind", Json::string(toString(mat.bumpKind))).set("bumpStrength", Json::number(mat.bumpStrength));
+	if (!mat.mixWith.empty()) {
+		m.set("mixAmount", Json::number(mat.mixAmount));
+		m.set("mixWith", materialToJson(mat.mixWith[0]));
+	}
+	return m;
+}
+}  // namespace detail
+
 inline std::string toJson(const Document& d) {
 	using detail::Json;
 	Json root = Json::object();
@@ -350,19 +372,7 @@ inline std::string toJson(const Document& d) {
 		j.set("radius", Json::number(o.radius)).set("height", Json::number(o.height)).set("size", detail::toJson(o.size));
 		j.set("radius2", Json::number(o.radius2)).set("steps", Json::number(o.steps));
 		j.set("meshScale", Json::number(o.meshScale)).set("meshFile", Json::string(o.meshFile));
-		Json m = Json::object();
-		m.set("kind", Json::string(toString(o.material.kind))).set("color", detail::toJson(o.material.color));
-		m.set("checker", Json::boolean(o.material.checker)).set("color2", detail::toJson(o.material.color2));
-		m.set("checkerCount", Json::number(o.material.checkerCount)).set("roughness", Json::number(o.material.roughness));
-		m.set("ior", Json::number(o.material.ior)).set("transmittance", detail::toJson(o.material.transmittance));
-		m.set("imageFile", Json::string(o.material.imageFile));
-		// The newer material fields are written only when they are in use, so a scene that does not use them writes exactly what it always did.
-		if (o.material.pattern != Pattern::None)
-			m.set("pattern", Json::string(toString(o.material.pattern))).set("patternScale", Json::number(o.material.patternScale)).set("patternVariation", Json::number(o.material.patternVariation));
-		if (o.material.kind == MaterialKind::Subsurface) m.set("scatterDistance", detail::toJson(o.material.scatterDistance));
-		if (!o.material.bumpFile.empty())
-			m.set("bumpFile", Json::string(o.material.bumpFile)).set("bumpKind", Json::string(toString(o.material.bumpKind))).set("bumpStrength", Json::number(o.material.bumpStrength));
-		j.set("material", std::move(m));
+		j.set("material", detail::materialToJson(o.material));
 		if (o.volume.kind != VolumeKind::None) {   // (only when it is one, so every scene without volumes writes exactly what it always did)
 			Json v = Json::object();
 			v.set("kind", Json::string(toString(o.volume.kind))).set("density", Json::number(o.volume.density)).set("color", detail::toJson(o.volume.color));
@@ -401,6 +411,27 @@ inline std::string toJson(const Document& d) {
 	detail::dump(root, out);
 	return out;
 }
+
+namespace detail {
+// Reads a material (an object's, or the second of a mix); a field that is missing keeps its default. False for a field of the wrong type.
+inline bool readMaterial(const Json& m, Material& mat, int depth = 0) {
+	if (m.type != Json::Type::Obj) return false;
+	std::string kind = toString(mat.kind);
+	bool ok = readStr(m, "kind", kind) && materialKindFromString(kind, mat.kind) && readRgb(m, "color", mat.color) && readBool(m, "checker", mat.checker) &&
+	          readRgb(m, "color2", mat.color2) && readNum(m, "checkerCount", mat.checkerCount) && readNum(m, "roughness", mat.roughness) && readNum(m, "ior", mat.ior) &&
+	          readRgb(m, "transmittance", mat.transmittance) && readStr(m, "imageFile", mat.imageFile);
+	std::string pattern = toString(mat.pattern), bumpKind = toString(mat.bumpKind);
+	ok = ok && readStr(m, "pattern", pattern) && patternFromString(pattern, mat.pattern) && readNum(m, "patternScale", mat.patternScale) &&
+	     readNum(m, "patternVariation", mat.patternVariation) && readRgb(m, "scatterDistance", mat.scatterDistance) && readStr(m, "bumpFile", mat.bumpFile) &&
+	     readStr(m, "bumpKind", bumpKind) && bumpKindFromString(bumpKind, mat.bumpKind) && readNum(m, "bumpStrength", mat.bumpStrength) && readNum(m, "mixAmount", mat.mixAmount);
+	if (const Json* other = m.find("mixWith")) {
+		Material second;
+		if (depth > 0 || !readMaterial(*other, second, depth + 1)) return false;   // (a mix inside a mix is not something the Scene Builder makes)
+		mat.mixWith.assign(1, second);
+	}
+	return ok;
+}
+}  // namespace detail
 
 inline bool fromJson(const std::string& text, Document& out, std::string& err) {
 	using detail::Json;
@@ -444,22 +475,7 @@ inline bool fromJson(const std::string& text, Document& out, std::string& err) {
 			     detail::readStr(j, "meshFile", o.meshFile) && detail::readBool(j, "emissive", o.emissive) && detail::readRgb(j, "emission", o.emission) &&
 			     detail::readNum(j, "emissionStrength", o.emissionStrength) && detail::readBool(j, "twoSided", o.twoSided) && detail::readStr(j, "group", o.group) &&
 			     detail::readBool(j, "hidden", o.hidden) && detail::readBool(j, "locked", o.locked);
-			if (const Json* m = j.find("material")) {
-				if (m->type != Json::Type::Obj) ok = false;
-				else {
-					std::string kind = toString(o.material.kind);
-					ok = ok && detail::readStr(*m, "kind", kind) && materialKindFromString(kind, o.material.kind) &&
-					     detail::readRgb(*m, "color", o.material.color) && detail::readBool(*m, "checker", o.material.checker) &&
-					     detail::readRgb(*m, "color2", o.material.color2) && detail::readNum(*m, "checkerCount", o.material.checkerCount) &&
-					     detail::readNum(*m, "roughness", o.material.roughness) && detail::readNum(*m, "ior", o.material.ior) &&
-					     detail::readRgb(*m, "transmittance", o.material.transmittance) && detail::readStr(*m, "imageFile", o.material.imageFile);
-					std::string pattern = toString(o.material.pattern), bumpKind = toString(o.material.bumpKind);
-					ok = ok && detail::readStr(*m, "pattern", pattern) && patternFromString(pattern, o.material.pattern) && detail::readNum(*m, "patternScale", o.material.patternScale) &&
-					     detail::readNum(*m, "patternVariation", o.material.patternVariation) && detail::readRgb(*m, "scatterDistance", o.material.scatterDistance) &&
-					     detail::readStr(*m, "bumpFile", o.material.bumpFile) && detail::readStr(*m, "bumpKind", bumpKind) && bumpKindFromString(bumpKind, o.material.bumpKind) &&
-					     detail::readNum(*m, "bumpStrength", o.material.bumpStrength);
-				}
-			}
+			if (const Json* m = j.find("material")) ok = ok && detail::readMaterial(*m, o.material);
 			if (const Json* vol = j.find("volume")) {
 				if (vol->type != Json::Type::Obj) ok = false;
 				else {

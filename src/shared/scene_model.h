@@ -57,7 +57,22 @@ struct Material {
 	std::string bumpFile;              // Diffuse / CoatedDiffuse / Conductor: a picture that bumps the shading (empty: none)
 	BumpKind bumpKind = BumpKind::Height;
 	double bumpStrength = 0.05;        // Height map: how tall the relief is (the picture's 0..1 times this, in scene units)
+	// A mix (pbrt's "mix" material): when `mixWith` holds a material, the surface is this material at some points and that one at the others, `mixAmount` being the fraction of points
+	// that are the second (0 is all this one, 1 all the other), chosen afresh at each point of the surface so the two grade into one another. The second material is a plain one:
+	// its picture, pattern, checker and bump fields are not used, and it is not itself a mix. (A vector so that Material can hold a Material; it never has more than one.)
+	std::vector<Material> mixWith;
+	double mixAmount = 0.5;
 };
+
+inline bool isMix(const Material& m) { return !m.mixWith.empty(); }
+
+// The colour a material looks like on average, for drawing it in the views: a mix is the blend of its two.
+inline Rgb displayColor(const Material& m) {
+	if (!isMix(m)) return m.color;
+	const double t = std::clamp(m.mixAmount, 0.0, 1.0);
+	const Rgb& o = m.mixWith[0].color;
+	return {m.color.r * (1.0 - t) + o.r * t, m.color.g * (1.0 - t) + o.g * t, m.color.b * (1.0 - t) + o.b * t};
+}
 
 // A volume is an object that is not a surface but a region of participating medium: fog, smoke or a cloud, inside a sphere (or, for fog and smoke, a cylinder). A surface's material,
 // picture and light do not apply to it; the renderer's media do (pbrt `MakeNamedMedium` with a `MediumInterface` on the shape). The strength of the medium is `density`, how much

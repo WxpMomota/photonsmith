@@ -126,6 +126,19 @@ inline std::vector<Problem> validate(const Document& d) {
 			if (o.material.pattern == Pattern::Marble && (!(o.material.patternScale > 0.0) || !(o.material.patternVariation >= 0.0)))
 				err(who + "the marble's scale must be above zero and its variation not negative.");
 		}
+		if (isMix(o.material)) {
+			if (o.material.mixWith.size() != 1) err(who + "a mixed material has exactly one second material.");
+			else {
+				const Material& other = o.material.mixWith[0];
+				if (!(o.material.mixAmount >= 0.0 && o.material.mixAmount <= 1.0)) err(who + "the amount of the second material in a mix must be between 0 and 1.");
+				if (isMix(other)) err(who + "the second material of a mix cannot itself be a mix.");
+				if (other.roughness < 0.0 || other.roughness > 1.0) err(who + "the second material's roughness must be between 0 and 1.");
+				if (other.kind == MaterialKind::Subsurface && !(other.scatterDistance.r > 0.0 && other.scatterDistance.g > 0.0 && other.scatterDistance.b > 0.0))
+					err(who + "the distance light travels under the second material's surface must be above zero in every colour.");
+				if (other.kind == MaterialKind::Diffuse && (other.color.r > 1 || other.color.g > 1 || other.color.b > 1 || other.color.r < 0 || other.color.g < 0 || other.color.b < 0))
+					warn(who + "the second material's reflectance colour outside 0 to 1 gives more light out than in.");
+			}
+		}
 		if (o.material.kind == MaterialKind::Subsurface) {
 			const Rgb& d = o.material.scatterDistance;
 			if (!(d.r > 0.0 && d.g > 0.0 && d.b > 0.0)) err(who + "the distance light travels under the surface must be above zero in every colour.");

@@ -27,39 +27,50 @@ namespace detail {
 
 // `textureName`, when not empty, is a Texture already declared: it replaces the flat reflectance of a diffuse or coated material. `displacement`, when not empty, is a Texture
 // already declared that bumps (a height map) or perturbs the normal (a normal map) of a diffuse, coated or conductor surface.
-inline void writeMaterial(std::ostringstream& os, const Material& m, const std::string& ind, const std::string& textureName = std::string(),
-                          const std::string& displacement = std::string()) {
+// The pbrt type and the parameters (each starting with a space) of a single, unmixed material: what `Material "<type>" ...` and `MakeNamedMaterial "<name>" "string type" [ "<type>" ] ...`
+// both take.
+inline std::pair<std::string, std::string> materialTypeAndParams(const Material& m, const std::string& textureName, const std::string& displacement) {
 	const auto reflectance = [&]() {
-		return textureName.empty() ? "\"rgb reflectance\" [ " + rgb(m.color) + " ]" : "\"texture reflectance\" \"" + textureName + "\"";
+		return textureName.empty() ? " \"rgb reflectance\" [ " + rgb(m.color) + " ]" : " \"texture reflectance\" \"" + textureName + "\"";
 	};
 	const std::string bump = displacement.empty() ? std::string() : " \"texture displacement\" \"" + displacement + "\"";
+	std::string p;
 	switch (m.kind) {
 		case MaterialKind::Diffuse:
-			os << ind << "Material \"diffuse\" " << reflectance() << bump << "\n";
-			break;
+			return {"diffuse", reflectance() + bump};
 		case MaterialKind::Conductor:
-			os << ind << "Material \"conductor\" \"rgb reflectance\" [ " << rgb(m.color) << " ] \"float roughness\" [ " << num(m.roughness) << " ]" << bump << "\n";
-			break;
+			return {"conductor", " \"rgb reflectance\" [ " + rgb(m.color) + " ] \"float roughness\" [ " + num(m.roughness) + " ]" + bump};
 		case MaterialKind::Dielectric:
-			os << ind << "Material \"dielectric\" \"float eta\" [ " << num(m.ior) << " ]";
-			if (m.roughness > 0.0) os << " \"float roughness\" [ " << num(m.roughness) << " ]";
-			os << "\n";
-			break;
+			p = " \"float eta\" [ " + num(m.ior) + " ]";
+			if (m.roughness > 0.0) p += " \"float roughness\" [ " + num(m.roughness) + " ]";
+			return {"dielectric", p};
 		case MaterialKind::CoatedDiffuse:
-			os << ind << "Material \"coateddiffuse\" " << reflectance() << " \"float eta\" [ " << num(m.ior) << " ] \"float roughness\" [ "
-			   << num(m.roughness) << " ]" << bump << "\n";
-			break;
+			return {"coateddiffuse", reflectance() + " \"float eta\" [ " + num(m.ior) + " ] \"float roughness\" [ " + num(m.roughness) + " ]" + bump};
 		case MaterialKind::Subsurface:
 			// pbrt's subsurface from a colour and a mean free path: the renderer inverts the colour into scattering coefficients (the same on every backend).
-			os << ind << "Material \"subsurface\" \"rgb reflectance\" [ " << rgb(m.color) << " ] \"rgb mfp\" [ " << rgb(m.scatterDistance) << " ] \"float eta\" [ " << num(m.ior) << " ]";
-			if (m.roughness > 0.0) os << " \"float roughness\" [ " << num(m.roughness) << " ]";
-			os << "\n";
-			break;
+			p = " \"rgb reflectance\" [ " + rgb(m.color) + " ] \"rgb mfp\" [ " + rgb(m.scatterDistance) + " ] \"float eta\" [ " + num(m.ior) + " ]";
+			if (m.roughness > 0.0) p += " \"float roughness\" [ " + num(m.roughness) + " ]";
+			return {"subsurface", p};
 		case MaterialKind::DiffuseTransmission:
-			os << ind << "Material \"diffusetransmission\" \"rgb reflectance\" [ " << rgb(m.color) << " ] \"rgb transmittance\" [ " << rgb(m.transmittance)
-			   << " ]\n";
-			break;
+			return {"diffusetransmission", " \"rgb reflectance\" [ " + rgb(m.color) + " ] \"rgb transmittance\" [ " + rgb(m.transmittance) + " ]"};
 	}
+	return {"diffuse", reflectance()};
+}
+
+// A material, as the directive that sets the current one. A mix (Material::mixWith) is two named materials, `mix-<n>-a` (this one, with its picture, pattern and bump) and
+// `mix-<n>-b` (the second, plain), and pbrt's "mix" material over them; `mixCounter` numbers them.
+inline void writeMaterial(std::ostringstream& os, const Material& m, const std::string& ind, const std::string& textureName = std::string(),
+                          const std::string& displacement = std::string(), int* mixCounter = nullptr) {
+	const auto first = materialTypeAndParams(m, textureName, displacement);
+	if (!isMix(m) || !mixCounter) {
+		os << ind << "Material \"" << first.first << "\"" << first.second << "\n";
+		return;
+	}
+	const std::string a = "mix-" + std::to_string(++*mixCounter) + "-a", b = "mix-" + std::to_string(*mixCounter) + "-b";
+	const auto second = materialTypeAndParams(m.mixWith[0], std::string(), std::string());
+	os << ind << "MakeNamedMaterial \"" << a << "\" \"string type\" [ \"" << first.first << "\" ]" << first.second << "\n";
+	os << ind << "MakeNamedMaterial \"" << b << "\" \"string type\" [ \"" << second.first << "\" ]" << second.second << "\n";
+	os << ind << "Material \"mix\" \"string materials\" [ \"" << a << "\" \"" << b << "\" ] \"float amount\" [ " << num(std::clamp(m.mixAmount, 0.0, 1.0)) << " ]\n";
 }
 
 // Box faces (outward winding), 4 vertices each with their own uv so a texture can be applied per face.
@@ -271,7 +282,7 @@ inline std::string toPbrt(const Document& d) {
 	}
 	if (!d.lights.empty()) os << "\n";
 
-	int textureIndex = 0, mediumIndex = 0;
+	int textureIndex = 0, mediumIndex = 0, mixIndex = 0;
 	for (const Object& o : d.objects) {
 		os << "# " << detail::commentText(o.name) << "\n";
 		if (o.volume.kind != VolumeKind::None) {   // fog, smoke or a cloud: a medium, with no material or light of its own
@@ -321,7 +332,7 @@ inline std::string toPbrt(const Document& d) {
 		if (o.rotation.z != 0.0) os << ind << "Rotate " << detail::num(o.rotation.z) << " 0 0 1\n";
 		if (o.rotation.y != 0.0) os << ind << "Rotate " << detail::num(o.rotation.y) << " 0 1 0\n";
 		if (o.rotation.x != 0.0) os << ind << "Rotate " << detail::num(o.rotation.x) << " 1 0 0\n";
-		detail::writeMaterial(os, o.material, ind, textureName, displacement);
+		detail::writeMaterial(os, o.material, ind, textureName, displacement, &mixIndex);
 		if (o.emissive) {
 			os << ind << "AreaLightSource \"diffuse\" \"rgb L\" [ " << detail::rgb(detail::scaled(o.emission, o.emissionStrength)) << " ]";
 			if (o.twoSided) os << " \"bool twosided\" true";

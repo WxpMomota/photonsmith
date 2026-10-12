@@ -245,6 +245,51 @@ void MainWindow::runBuilder3dSelfTest(const std::function<void(const QString &)>
 }
 
 // Part of the "builder" mode: every ready-made shape and prop can be added, leaves the scene without problems, and is one undo step each.
+// A mixed material (Material::mixWith): the Mix switch in an object's material properties, how much of the second there is, the second material's own rows, the file's `mix` material,
+// and that unticking and undo put the single material back.
+void MainWindow::selfTestMixedMaterial(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
+	sb->selectObject(3);
+	QApplication::processEvents();
+	const auto findSwitch = [sb]() {
+		QCheckBox *found = nullptr;
+		for (QCheckBox *c : sb->findChildren<QCheckBox *>())
+			if (c->text() == QStringLiteral("Mix with a second material")) found = c;
+		return found;
+	};
+	QCheckBox *on = findSwitch();
+	check(on != nullptr && !on->isChecked(), "a material's properties end with a Mix with a second material switch, off to begin with");
+	if (!on) return;
+	on->click();
+	QApplication::processEvents();
+	const scene_doc::Material &m = sb->document().objects[3].material;
+	check(scene_doc::isMix(m) && m.mixAmount == 0.5, "ticking it mixes the material with a second one, half and half");
+	check(sb->pbrtTextForTest().contains("Material \"mix\" \"string materials\"") && sb->pbrtTextForTest().contains("\"float amount\" [ 0.5 ]"), "and the file has a mix material");
+	bool secondRows = false;
+	for (QLabel *l : sb->findChildren<QLabel *>()) secondRows = secondRows || l->text() == QStringLiteral("Second: Type");
+	check(secondRows, "the second material has its own rows (Second: Type, colour, roughness...)");
+	QDoubleSpinBox *amount = nullptr;
+	for (QDoubleSpinBox *s : sb->findChildren<QDoubleSpinBox *>())
+		if (s->minimum() == 0.0 && s->maximum() == 1.0 && s->singleStep() == 0.05 && std::fabs(s->value() - 0.5) < 1e-9) amount = s;
+	check(amount != nullptr, "and an amount of the second material");
+	if (amount) {
+		amount->setValue(0.2);
+		QApplication::processEvents();
+		check(sb->document().objects[3].material.mixAmount == 0.2 && sb->pbrtTextForTest().contains("\"float amount\" [ 0.2 ]"), "changing it changes the mix and the file");
+	}
+	check(!scene_doc::hasErrors(scene_doc::validate(sb->document())), "the scene is still valid");
+	on = findSwitch();
+	if (on) {
+		on->click();   // off again
+		QApplication::processEvents();
+		check(!scene_doc::isMix(sb->document().objects[3].material) && !sb->pbrtTextForTest().contains("Material \"mix\""), "unticking it makes the material a single one again");
+	}
+	sb->undo();   // (the switch off)
+	sb->undo();   // (the amount)
+	sb->undo();   // (the switch on)
+	check(!scene_doc::isMix(sb->document().objects[3].material), "undo takes the mix away");
+	sb->selectObject(1);
+}
+
 // The light kinds the Scene Builder adds beyond the plain ones: a projector, the ready-made lightings and the turn of an image sky (called from selfTestShapes).
 void MainWindow::selfTestLights(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
 	// A projector light (a slide shining through a frustum): added from the search box with a slide of its own, its properties have the field of view and the slide, the 3D view draws
@@ -486,6 +531,7 @@ void MainWindow::selfTestShapes(SceneBuilderWidget *sb, const std::function<void
 		sb->selectObject(1);
 	}
 	selfTestLights(sb, check);
+	selfTestMixedMaterial(sb, check);
 	// The Preset list in a material's properties: choosing "Gold" in the real combo box makes the selected object a gold conductor, as one undo step.
 	{
 		sb->selectObject(1);
