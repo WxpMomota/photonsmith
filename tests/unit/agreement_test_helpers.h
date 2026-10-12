@@ -9,6 +9,9 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -63,4 +66,43 @@ inline bool loadLinearRgbPixels(const std::string& path, int& w, int& h, std::ve
 		for (int c = 0; c < 3; ++c) rgb[3 * static_cast<size_t>(i) + c] = std::isfinite(rgba[4 * i + c]) ? rgba[4 * i + c] : 0.0f;
 	free(rgba);
 	return true;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Rendering a scene text through the launcher built beside the tests (used by the Scene Builder's render tests: lighting, projector, mix, texture placement).
+// ---------------------------------------------------------------------------------------------------------------------------------
+
+// The `ray_tracer` launcher next to the tests (or one level up), as an absolute path; empty when it was not built (the render tests then skip).
+inline std::string findRayTracerLauncher() {
+	namespace fs = std::filesystem;
+	std::error_code ec;
+	for (const char* c : {"ray_tracer.exe", "../ray_tracer.exe", "../../ray_tracer.exe", "x64/Release/ray_tracer.exe", "../x64/Release/ray_tracer.exe",
+	                      "../../x64/Release/ray_tracer.exe", "ray_tracer", "../ray_tracer", "../../ray_tracer"})
+		if (fs::is_regular_file(c, ec)) return fs::absolute(c, ec).string();
+	return "";
+}
+
+// Writes `pbrtText` to a scratch file, renders it on the CPU at `spp` samples through the launcher and reads the linear picture (w x h, rgb floats); the scratch files are removed.
+// False if the launcher is missing, fails, or the picture cannot be read.
+inline bool renderPbrtTextCpu(const std::string& pbrtText, const char* tag, int spp, std::vector<float>& rgb, int& w, int& h) {
+	const std::string launcher = findRayTracerLauncher();
+	if (launcher.empty()) return false;
+	const std::string scenePath = std::string("render_test_") + tag + ".pbrt", outPath = std::string("render_test_") + tag + ".exr", logPath = scenePath + ".log";
+	{
+		std::ofstream out(scenePath, std::ios::binary);
+		out << pbrtText;
+	}
+	std::remove(outPath.c_str());
+	std::ostringstream cmd;
+	cmd << "\"" << launcher << "\" --cpu --output \"" << outPath << "\" " << spp << " 256 1 \"" << scenePath << "\" > \"" << logPath << "\" 2>&1";
+	std::string command = cmd.str();
+#ifdef _WIN32
+	command = "\"" + command + "\"";
+#endif
+	const bool ran = std::system(command.c_str()) == 0 && loadLinearRgbPixels(outPath, w, h, rgb);
+	std::remove(scenePath.c_str());
+	std::remove(outPath.c_str());
+	std::remove((outPath + ".run_marker.txt").c_str());
+	std::remove(logPath.c_str());
+	return ran;
 }

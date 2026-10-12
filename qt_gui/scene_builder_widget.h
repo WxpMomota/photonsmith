@@ -358,7 +358,9 @@ private:
 	scene_doc::Document m_viewportBase;                      // the document the renderer's copy was written from
 	std::vector<std::array<double, 3>> m_viewportOffsets;    // where the renderer has been told each object is, from the copy (empty: none)
 	int m_viewportRestarts = 0;
-	int m_viewportFramesAtStart = 0;                         // frames seen when the copy was last started: offsets are sent only once the renderer has drawn it
+	bool m_viewportAwaitNew = false;                         // the copy was just started and no frame of it has arrived: a move would not be known to the renderer yet
+	int m_viewportSamplesAtRestart = 0;                      // the samples of the last frame of the render before (a new render's frames have fewer)
+	std::string m_viewportBaseSignature;                     // scene_viewport::sceneSignature of m_viewportBase
 	QString m_viewportSceneId;
 	int m_viewportFrames = 0;
 	int m_viewportSamples = 0;

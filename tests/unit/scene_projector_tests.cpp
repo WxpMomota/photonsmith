@@ -18,36 +18,9 @@ namespace {
 
 constexpr double kPi = 3.14159265358979323846;
 
-std::string findLauncher() {
-	namespace fs = std::filesystem;
-	std::error_code ec;
-	for (const char* c : {"ray_tracer.exe", "../ray_tracer.exe", "../../ray_tracer.exe", "x64/Release/ray_tracer.exe", "../x64/Release/ray_tracer.exe",
-	                      "../../x64/Release/ray_tracer.exe", "ray_tracer", "../ray_tracer", "../../ray_tracer"})
-		if (fs::is_regular_file(c, ec)) return fs::absolute(c, ec).string();
-	return "";
-}
+std::string findLauncher() { return findRayTracerLauncher(); }
 
-bool render(const Document& d, const char* tag, int spp, std::vector<float>& rgb, int& w, int& h) {
-	const std::string launcher = findLauncher();
-	const std::string scenePath = std::string("scene_projector_") + tag + ".pbrt", outPath = std::string("scene_projector_") + tag + ".exr";
-	{
-		std::ofstream out(scenePath, std::ios::binary);
-		out << toPbrt(d);
-	}
-	std::remove(outPath.c_str());
-	std::ostringstream cmd;
-	cmd << "\"" << launcher << "\" --cpu --output \"" << outPath << "\" " << spp << " 256 1 \"" << scenePath << "\" > " << scenePath << ".log 2>&1";
-	std::string command = cmd.str();
-#ifdef _WIN32
-	command = "\"" + command + "\"";
-#endif
-	const bool ran = std::system(command.c_str()) == 0 && loadLinearRgbPixels(outPath, w, h, rgb);
-	std::remove(scenePath.c_str());
-	std::remove(outPath.c_str());
-	std::remove((outPath + ".run_marker.txt").c_str());
-	std::remove((scenePath + ".log").c_str());
-	return ran;
-}
+bool render(const Document& d, const char* tag, int spp, std::vector<float>& rgb, int& w, int& h) { return renderPbrtTextCpu(toPbrt(d), tag, spp, rgb, w, h); }
 
 // A 16 x 16 slide: red top left, green top right, blue bottom left, white bottom right.
 std::string writeSlide() {

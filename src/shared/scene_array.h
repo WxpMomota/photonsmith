@@ -98,8 +98,10 @@ inline std::string uniqueObjectName(const std::string& wanted, const std::vector
 
 // Multiplies every length of the object by `s` (a mesh's scale included). Its position is not touched.
 inline void scaleObject(Object& o, double s) {
-	o.radius *= s;
-	o.radius2 *= s;
+	if (o.shape != ShapeKind::Terrain) {   // (a terrain's radius and radius2 are its roughness and how many hills there are, not lengths: only its size scales)
+		o.radius *= s;
+		o.radius2 *= s;
+	}
 	o.height *= s;
 	o.size.x *= s;
 	o.size.y *= s;

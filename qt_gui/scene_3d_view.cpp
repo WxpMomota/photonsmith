@@ -77,6 +77,10 @@ bool Scene3DView::surfaceAt(const QPointF &px, Float3 &where) const {
 }
 
 void Scene3DView::setOrthographic(bool on) {
+	if (on && !m_orthoAllowed) {   // (refused: tell whoever shows the switch, so it is not left ticked)
+		emit displayModeChanged();
+		return;
+	}
 	if (on == m_cam.ortho && !m_throughCamera) return;
 	leaveCameraView();
 	m_cam.ortho = on;
@@ -373,7 +377,7 @@ std::uint64_t Scene3DView::geometrySignature() const {
 	for (const Object &o : m_doc->objects) {
 		mix(h, o.shape);
 		mix(h, o.position); mix(h, o.rotation); mix(h, o.size);
-		mix(h, o.radius); mix(h, o.radius2); mix(h, o.height); mix(h, o.steps); mix(h, o.meshScale);
+		mix(h, o.radius); mix(h, o.radius2); mix(h, o.height); mix(h, o.steps); mix(h, o.seed); mix(h, o.meshScale);
 		mix(h, o.material.kind); mix(h, scene_doc::displayColor(o.material)); mix(h, o.material.pattern);
 		mix(h, o.emissive);
 		mix(h, o.volume.kind); mix(h, o.volume.color); mix(h, o.hidden);

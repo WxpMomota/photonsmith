@@ -193,8 +193,18 @@ QList<QPointF> SceneLayoutView::silhouette(const Object &o) const {
 		case ShapeKind::Cyclorama:
 		case ShapeKind::Terrain:
 		case ShapeKind::Tube: {
-			const scene_doc::ShapeMesh mesh = scene_doc::generatedMesh(o);
-			for (std::size_t i = 0; i + 2 < mesh.P.size(); i += 3) local.append(Float3{mesh.P[i], mesh.P[i + 1], mesh.P[i + 2]});
+			std::uint64_t key = 14695981039346656037ull;
+			for (double v : {static_cast<double>(o.shape), o.size.x, o.size.y, o.size.z, o.radius, o.radius2, o.height, static_cast<double>(o.steps), static_cast<double>(o.seed)})
+				key = (key ^ std::hash<double>()(v)) * 1099511628211ull;
+			auto cached = m_generatedPoints.find(key);
+			if (cached == m_generatedPoints.end()) {
+				if (m_generatedPoints.size() > 64) m_generatedPoints.clear();
+				QList<Float3> points;
+				const scene_doc::ShapeMesh mesh = scene_doc::generatedMesh(o);
+				for (std::size_t i = 0; i + 2 < mesh.P.size(); i += 3) points.append(Float3{mesh.P[i], mesh.P[i + 1], mesh.P[i + 2]});
+				cached = m_generatedPoints.emplace(key, std::move(points)).first;
+			}
+			local = cached->second;
 			break;
 		}
 		case ShapeKind::Mesh: {

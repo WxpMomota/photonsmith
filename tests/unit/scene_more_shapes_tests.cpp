@@ -5,6 +5,7 @@
 #include "agreement_test_helpers.h"
 #include "../../src/shared/pbrt_load.h"
 #include "../../src/shared/scene_document.h"
+#include "../../src/shared/scene_array.h"
 #include "../../src/shared/scene_gizmo.h"
 
 #include <cmath>
@@ -192,4 +193,35 @@ TEST(MoreShapesTest, TheSeedIsSavedOnlyForATerrainAndTheChecksCatchBadValues) {
 	bool warned = false;
 	for (const Problem& p : validate(d)) warned = warned || p.message.find("as round as the box allows") != std::string::npos;
 	EXPECT_TRUE(warned);
+}
+
+TEST(MoreShapesTest, ScalingATerrainScalesItsSizeButNotItsRoughnessOrHillCount) {
+	Object t = makeObject(ShapeKind::Terrain, "Ground");
+	const double roughness = t.radius, hills = t.radius2, width = t.size.x, steps = t.steps;
+	scaleObject(t, 3.0);
+	EXPECT_NEAR(t.size.x, width * 3.0, 1e-9);
+	EXPECT_EQ(t.radius, roughness) << "roughness is 0 to 1, not a length";
+	EXPECT_EQ(t.radius2, hills) << "the number of hills is not a length";
+	EXPECT_EQ(t.steps, steps);
+	Document d;
+	d.objects.push_back(t);
+	d.lights.push_back(Light());
+	EXPECT_FALSE(hasErrors(validate(d)));
+	Object box = makeObject(ShapeKind::RoundedBox, "Box");
+	const double round = box.radius;
+	scaleObject(box, 2.0);
+	EXPECT_NEAR(box.radius, round * 2.0, 1e-9) << "a rounded box's roundness is a length and scales with it";
+}
+
+TEST(CycloramaTest, WithNoCurveTheFloorAndTheWallKeepTheirOwnNormals) {
+	const ShapeMesh m = cycloramaMesh(8, 4, 6, 0.0);
+	expectWellFormed(m, "sharp cyclorama");
+	for (std::size_t t = 0; t + 2 < m.indices.size(); t += 3) {
+		const int a = m.indices[t], b = m.indices[t + 1], c = m.indices[t + 2];
+		for (int k = 0; k < 3; ++k) {
+			EXPECT_NEAR(m.N[a * 3 + k], m.N[b * 3 + k], 1e-9) << "a triangle of a flat part has one normal";
+			EXPECT_NEAR(m.N[a * 3 + k], m.N[c * 3 + k], 1e-9);
+		}
+	}
+	EXPECT_NEAR(meshArea(m), 8.0 * (6.0 + 4.0), 1e-9) << "floor plus wall, nothing between";
 }

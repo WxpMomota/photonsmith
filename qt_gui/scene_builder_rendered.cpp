@@ -61,12 +61,17 @@ void SceneBuilderWidget::setRenderedViewport(bool on) {
 	m_viewportOn = true;
 	show3dView(true);
 	if (m_view3d->orthographic()) m_view3d->setOrthographic(false);   // (the renderer draws in perspective: the picture would not line up with the overlays)
+	m_view3d->setOrthographicAllowed(false);                           // ...so it cannot be switched on again (the button, the View menu and the numpad 5 all end here) until the viewport is off
+	if (m_orthoButton) m_orthoButton->setEnabled(false);
 	emit renderedViewportStarting();
 	if (!m_viewportSession) {
 		m_viewportSession = new RealtimePreviewSession(this);
 		connect(m_viewportSession, &RealtimePreviewSession::frameReady, this, [this](QImage image, int samples) {
 			if (!m_viewportOn) return;
 			++m_viewportFrames;
+			// A frame of the scene just started has fewer samples than the last frame of the one before it (a session's count only grows), which is how it is told from a late frame of the
+			// old one still on its way: until then the renderer has not built the new scene and would drop a move.
+			if (m_viewportAwaitNew && (m_viewportSamplesAtRestart <= 1 || samples < m_viewportSamplesAtRestart)) m_viewportAwaitNew = false;
 			m_viewportSamples = samples;
 			m_viewportImage = image;
 			m_view3d->setRenderedNote(QString());
@@ -104,6 +109,8 @@ void SceneBuilderWidget::stopRenderedViewport() {
 	if (m_viewportSession) m_viewportSession->stop();
 	m_view3d->setRenderedMode(false);
 	m_view3d->setRenderedNote(QString());
+	m_view3d->setOrthographicAllowed(true);
+	if (m_orthoButton) m_orthoButton->setEnabled(true);
 	if (m_renderedButton && m_renderedButton->isChecked()) {
 		QSignalBlocker block(m_renderedButton);
 		m_renderedButton->setChecked(false);
@@ -120,6 +127,10 @@ scene_viewport::Pose SceneBuilderWidget::viewportPose() const {
 	p.target[0] = c.target.x; p.target[1] = c.target.y; p.target[2] = c.target.z;
 	p.fovDeg = c.fovDeg;
 	scene_viewport::renderSize(m_view3d->width(), m_view3d->height(), kMaxViewportWidth, p.width, p.height);
+	if (m_view3d->throughCamera() && m_doc.camera.lensRadius > 0.0) {   // (depth of field only through the scene's own camera: that is the picture a render makes)
+		p.lensRadius = m_doc.camera.lensRadius;
+		p.focusDistance = m_doc.camera.focusDistance;
+	}
 	return p;
 }
 
@@ -153,10 +164,10 @@ void SceneBuilderWidget::syncRenderedViewport() {
 }
 
 // A drag only moved objects: tell the renderer where each one is now, from where its copy has it, and it redraws at once without a restart. False when the change is more than that
-// (or the renderer has not drawn the copy yet, when it would not know the objects), and the copy is written again.
+// (or the renderer has not drawn the new copy yet, when it would not know the objects and would drop the move), and the copy is written again.
 bool SceneBuilderWidget::moveViewportObjects() {
-	if (!m_viewportRunning || m_viewportFrames <= m_viewportFramesAtStart || !RealtimePreviewSession::objectEditingAvailable()) return false;
-	const std::vector<std::array<double, 3>> offsets = scene_viewport::translationOnly(m_viewportBase, m_doc);
+	if (!m_viewportRunning || m_viewportAwaitNew || !RealtimePreviewSession::objectEditingAvailable()) return false;
+	const std::vector<std::array<double, 3>> offsets = scene_viewport::translationOnly(m_viewportBase, m_viewportBaseSignature, m_doc);
 	if (offsets.empty()) return false;
 	if (m_viewportOffsets.size() != offsets.size()) m_viewportOffsets.assign(offsets.size(), {0.0, 0.0, 0.0});
 	for (std::size_t i = 0; i < offsets.size(); ++i) {
@@ -175,14 +186,15 @@ void SceneBuilderWidget::startViewportSession(const scene_viewport::Pose &pose) 
 		m_view3d->setRenderedNote(error);
 		return;
 	}
-	const bool lens = m_view3d->throughCamera() && m_doc.camera.lensRadius > 0.0;   // (depth of field only through the scene's own camera: that is the picture a render makes)
+	const bool lens = pose.lensRadius > 0.0;
 	scene_doc::Document copy = m_doc;
 	copy.title += " (live preview)";
 	copy.camera.position = {pose.eye[0], pose.eye[1], pose.eye[2]};
 	copy.camera.target = {pose.target[0], pose.target[1], pose.target[2]};
 	copy.camera.up = {0.0, 1.0, 0.0};
 	copy.camera.fov = pose.fovDeg;
-	copy.camera.lensRadius = lens ? m_doc.camera.lensRadius : 0.0;
+	copy.camera.lensRadius = pose.lensRadius;
+	copy.camera.focusDistance = pose.focusDistance;
 	copy.render.width = pose.width;
 	copy.render.height = pose.height;
 	if (!writeSceneCopy(copy, path)) {
@@ -204,11 +216,13 @@ void SceneBuilderWidget::startViewportSession(const scene_viewport::Pose &pose) 
 	m_viewportSession->start(id, pose.width, pose.height, pose.eye[0], pose.eye[1], pose.eye[2], pose.target[0], pose.target[1], pose.target[2],
 	                         /*denoise*/ false, 0.0, false, /*svgf*/ false, /*restirGi*/ true, /*restirDi*/ true, /*probeCache*/ false, /*pathGuiding*/ false,
 	                         /*spp*/ 1, std::min(m_doc.render.maxDepth, 8), /*fireflyClamp*/ 50.0, /*temporalUpscale*/ false, 1, /*nrc*/ false, /*neuralUpscale*/ false,
-	                         lens, lens ? m_doc.camera.lensRadius : 0.0, lens ? m_doc.camera.focusDistance : 0.0);
+	                         lens, pose.lensRadius, pose.focusDistance);
 	m_viewportSent = pose;
 	m_viewportBase = m_doc;
+	m_viewportBaseSignature = m_viewportSignature;   // (the signature of the document as it is now: syncRenderedViewport worked it out just before starting)
 	m_viewportOffsets.clear();
-	m_viewportFramesAtStart = m_viewportFrames;
+	m_viewportAwaitNew = true;
+	m_viewportSamplesAtRestart = m_viewportSamples;
 	++m_viewportRestarts;
 	m_viewportRunning = true;
 	m_viewportSceneId = id;

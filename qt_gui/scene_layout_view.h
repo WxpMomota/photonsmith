@@ -6,6 +6,8 @@
 #include <QRectF>
 #include <QWidget>
 
+#include <cstdint>
+#include <map>
 #include <vector>
 
 #include "../src/shared/scene_document.h"
@@ -81,6 +83,7 @@ private:
 	QPointF toUV(const scene_doc::Float3 &p) const;
 	scene_doc::Float3 fromScreen(const QPointF &px, const scene_doc::Float3 &keep) const;
 	QList<QPointF> silhouette(const scene_doc::Object &o) const;
+	mutable std::map<std::uint64_t, QList<scene_doc::Float3>> m_generatedPoints;   // the vertices of the generated shapes, by what shapes them (a terrain is thousands)
 	Hit hitTest(const QPointF &px) const;
 	const scene_doc::Float3 *handlePosition(const BuilderSelection &s, int which) const;
 	bool isPicked(const BuilderSelection &s) const;   // the main item or one of the extra ones

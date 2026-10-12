@@ -138,3 +138,31 @@ TEST(SceneViewportTest, AMoveWithAnotherChangeOrAnUntrustedObjectIsNotJustAMove)
 	conedMoved.objects[2].position.x += 1.0;
 	EXPECT_TRUE(translationOnly(coned, conedMoved).empty());
 }
+
+TEST(SceneViewportTest, ALensChangeRestartsBecauseTheLensIsFixedWhenTheRenderStarts) {
+	const Pose a = somePose();
+	Pose b = a;
+	b.lensRadius = 0.05;
+	b.focusDistance = 6.0;
+	EXPECT_EQ(classify(a, b), Change::Restart) << "depth of field turned on";
+	Pose c = b;
+	c.focusDistance = 8.0;
+	EXPECT_EQ(classify(b, c), Change::Restart) << "a new focus distance";
+	Pose d = b;
+	d.lensRadius = 0.0;
+	d.focusDistance = 8.0;
+	EXPECT_EQ(classify(b, d), Change::Restart) << "depth of field turned off";
+	Pose pinholeA = a, pinholeB = a;
+	pinholeB.focusDistance = 20.0;   // (nothing is out of focus with no lens: the distance means nothing)
+	EXPECT_EQ(classify(pinholeA, pinholeB), Change::None);
+}
+
+TEST(SceneViewportTest, MovingObjectsWithTheBaseSignatureGivesTheSameOffsetsAsWithout) {
+	const Document a = makeStarterScene();
+	Document now = a;
+	now.objects[2].position.x += 0.5;
+	EXPECT_EQ(translationOnly(a, sceneSignature(a), now), translationOnly(a, now));
+	Document other = now;
+	other.objects[3].material.color = {0.1, 0.9, 0.2};
+	EXPECT_TRUE(translationOnly(a, sceneSignature(a), other).empty());
+}

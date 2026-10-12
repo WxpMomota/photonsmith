@@ -283,6 +283,7 @@ inline ShapeMesh cycloramaMesh(double width, double height, double depth, double
 		const double phi = 1.57079632679489662 * s / segments;
 		profile.push_back({zc - r * std::sin(phi), yc - r * std::cos(phi), std::sin(phi), std::cos(phi), 0});
 	}
+	if (segments == 0) profile.push_back({-hz, -hy, 1, 0, 0});                  // (no curve: the corner is two vertices, so the floor and the wall keep their own normals; the sliver between is dropped)
 	profile.push_back({-hz, hy, 1, 0, 0});                                      // the top of the wall
 	double total = 0;
 	for (std::size_t i = 1; i < profile.size(); ++i) {

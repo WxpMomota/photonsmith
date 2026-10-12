@@ -700,6 +700,8 @@ static void selfTestRenderedViewport(SceneBuilderWidget *sb, const std::function
 		}
 	mean /= (first.height() / 4.0) * (first.width() / 4.0);
 	check(mean > 20.0 && hi.red() - lo.red() > 60, QString("and it is a picture of the lit scene (mean grey %1, from %2 to %3)").arg(mean, 0, 'f', 1).arg(lo.red()).arg(hi.red()));
+	sb->view3dForTest()->setOrthographic(true);
+	check(!sb->view3dForTest()->orthographic(), "orthographic cannot be switched on over the rendered picture (it is perspective only)");
 	const int redBefore = redPixels(first);
 	check(redBefore > 40, QString("the red box is in it (%1 red pixels)").arg(redBefore));
 	// Edit and see: the box turns green; the picture follows once the edit has paused.
@@ -738,6 +740,9 @@ static void selfTestRenderedViewport(SceneBuilderWidget *sb, const std::function
 	sb->undo();
 	sb->setRenderedViewport(false);
 	check(!sb->renderedViewport() && !sb->view3dForTest()->renderedMode(), "the Rendered switch turns it off again (the 3D view draws its faces)");
+	sb->view3dForTest()->setOrthographic(true);
+	check(sb->view3dForTest()->orthographic(), "and orthographic is available again");
+	sb->view3dForTest()->setOrthographic(false);
 	sb->show3dView(false);
 	sb->selectObject(1);
 }

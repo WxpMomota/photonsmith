@@ -70,6 +70,7 @@ public:
 	void setWireframe(bool on) { m_wireframe = on; update(); emit displayModeChanged(); }
 	bool wireframe() const { return m_wireframe; }
 	void setOrthographic(bool on);
+	void setOrthographicAllowed(bool ok) { m_orthoAllowed = ok; }   // false while a rendered picture (perspective only) is under the view: switching orthographic on is refused
 	bool orthographic() const { return m_cam.ortho; }
 	void setStandardView(scene_view::StandardView v);
 	QString viewName() const { return m_viewName; }   // "Front", "Top"...: empty once the view is turned by hand
@@ -215,6 +216,7 @@ private:
 	int m_activeView = -1;          // the saved view whose marker was pressed last: its target is drawn and can be dragged too
 	bool m_pickFocus = false;       // the next click picks the focus point
 	mutable std::map<std::string, double> m_slideAspects;
+	bool m_orthoAllowed = true;
 	bool m_renderedMode = false;
 	QImage m_rendered;
 	int m_renderedSamples = 0;

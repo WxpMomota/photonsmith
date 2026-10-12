@@ -91,3 +91,12 @@ Two more Scene Builder features that have only run on Windows: new test files `s
 - [ ] By eye: select an object, tick **Mix with a second material** at the bottom of its material properties (the second starts as a rough copper), set the amount to 0.5 and the first material to red matte: the ball should look like red paint worn through to metal, in a fine grain, in the 3D view's Rendered mode and in a normal Render, with CPU and Metal looking alike.
 - [ ] `scene_uv_tests`: `APictureRepeatsAndMovesAcrossAQuad` on Metal: a picture that is red on its left half and blue on its right, on a quad, with **Texture repeats across** 1, 2 and with **Texture shift across** 0.5: unrepeated one half is red and the other blue, repeated twice each half has one of each, shifted by half the halves swap.
 - [ ] By eye: a box with a picture and **Texture repeats across/up** 4: the picture tiles four times on each face; a negative number mirrors it. A sphere with a picture says in its properties that the repeats have no effect on it.
+
+
+## Rounded box, cyclorama and terrain (Windows, 2026-10-11)
+
+Three more generated shapes (`scene_more_shapes_tests.cpp`, no render tests: they are plain triangle meshes, so only the usual Metal drawing of triangles is involved).
+
+- [ ] By eye, with Rendered on and in a normal Render on Metal: Add > **Cyclorama (studio backdrop)** with the **Studio** lighting and a **Rounded box** standing on its floor: the floor should curve smoothly up into the wall with no visible seam or crease, the rounded box should have smooth rounded edges (no faceting at its corners), and both should look like the CPU render of the same scene.
+- [ ] Add > **Terrain (rolling ground)**: smooth rolling hills lit by a sun; change **Seed**: a different ground each time; detail 128: still renders without trouble. Compare with the CPU.
+- [ ] Review fixes (self-test covers them; by eye on the Mac): with **Rendered** on, the Orthographic button is greyed and the numpad 5 key does nothing; **Through camera** with a lens radius above 0 restarts the render with depth of field.

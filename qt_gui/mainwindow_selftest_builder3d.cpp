@@ -338,6 +338,10 @@ void MainWindow::selfTestMoreShapes(SceneBuilderWidget *sb, const std::function<
 	}
 	check(seedRow && hillsRow, "its properties have the detail, hills, roughness and seed rows");
 	const QString first = sb->pbrtTextForTest();
+	sb->show3dView(true);
+	sb->frame3dForTest();
+	QApplication::processEvents();
+	const QImage groundBefore = sb->view3dForTest()->grab().toImage();
 	QSpinBox *seed = nullptr;
 	for (QSpinBox *s : sb->findChildren<QSpinBox *>())
 		if (s->minimum() == 0 && s->maximum() == 999999) seed = s;
@@ -346,7 +350,9 @@ void MainWindow::selfTestMoreShapes(SceneBuilderWidget *sb, const std::function<
 		seed->setValue(5);
 		QApplication::processEvents();
 		check(sb->document().objects.back().seed == 5 && sb->pbrtTextForTest() != first, "another seed makes another ground in the file");
+		check(sb->view3dForTest()->grab().toImage() != groundBefore, "and in the 3D view (its drawn faces follow the seed)");
 	}
+	sb->show3dView(false);
 	check(sb->runActionForTest("add rounded") && sb->document().objects.back().shape == scene_doc::ShapeKind::RoundedBox, "Add > Rounded box adds a rounded box");
 	check(sb->runActionForTest("add cyclorama") && sb->document().objects.back().shape == scene_doc::ShapeKind::Cyclorama, "Add > Cyclorama (studio backdrop) adds a cyclorama");
 	check(!scene_doc::hasErrors(scene_doc::validate(sb->document())), "the three give no errors");

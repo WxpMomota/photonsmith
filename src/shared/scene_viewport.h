@@ -26,6 +26,8 @@ struct Pose {
 	double target[3] = {0, 0, -1};
 	double fovDeg = 40.0;    // vertical
 	int width = 0, height = 0;   // the picture being rendered, in pixels
+	double lensRadius = 0.0;     // depth of field: 0 is a pinhole (everything sharp); otherwise the lens radius and the distance that is in focus
+	double focusDistance = 0.0;
 };
 
 enum class Change { None, Camera, Restart };
@@ -33,6 +35,7 @@ enum class Change { None, Camera, Restart };
 // What the renderer must do to go from the pose it was last given to `now`.
 inline Change classify(const Pose& sent, const Pose& now) {
 	if (sent.width != now.width || sent.height != now.height || std::fabs(sent.fovDeg - now.fovDeg) > 1e-6) return Change::Restart;
+	if (std::fabs(sent.lensRadius - now.lensRadius) > 1e-9 || (now.lensRadius > 0.0 && std::fabs(sent.focusDistance - now.focusDistance) > 1e-9)) return Change::Restart;   // (the lens is fixed when it starts)
 	for (int a = 0; a < 3; ++a)
 		if (std::fabs(sent.eye[a] - now.eye[a]) > 1e-9 || std::fabs(sent.target[a] - now.target[a]) > 1e-9) return Change::Camera;
 	return Change::None;
@@ -69,12 +72,13 @@ inline std::string sceneSignature(const scene_doc::Document& d) {
 	return out;
 }
 
-// Whether `now` differs from `base` (the document the renderer's copy was written from) only in where objects are, and by how much: the offset of each object (absolute from where
+// Whether `now` differs from `base` (the document the renderer's copy was written from, `baseSignature` its sceneSignature(), which the caller keeps so that it is not worked out again for
+// every step of a drag) only in where objects are, and by how much: the offset of each object (absolute from where
 // `base` has it, so all zeros when nothing moved). The renderer numbers objects as the copy's AttributeBegin blocks in file order, which are the document's objects in order, so an
 // offset's index is the object's. Nothing is returned (an empty vector) when the change is more than a move, or for a scene where the numbering cannot be trusted or a move would not
 // carry everything along: a cone (the GPU does not draw it as one of the shapes it can move), a mesh (its file may not load, which leaves no object), and a volume (the medium of a cloud
 // stays where it was declared). Those restart instead.
-inline std::vector<std::array<double, 3>> translationOnly(const scene_doc::Document& base, const scene_doc::Document& now) {
+inline std::vector<std::array<double, 3>> translationOnly(const scene_doc::Document& base, const std::string& baseSignature, const scene_doc::Document& now) {
 	if (base.objects.size() != now.objects.size() || base.objects.empty()) return {};
 	for (const scene_doc::Object& o : now.objects)
 		if (o.shape == scene_doc::ShapeKind::Cone || o.shape == scene_doc::ShapeKind::Mesh || o.volume.kind != scene_doc::VolumeKind::None) return {};
@@ -86,8 +90,9 @@ inline std::vector<std::array<double, 3>> translationOnly(const scene_doc::Docum
 		offsets[i] = {b.x - a.x, b.y - a.y, b.z - a.z};
 		unmoved.objects[i].position = a;
 	}
-	if (sceneSignature(unmoved) != sceneSignature(base)) return {};
+	if (sceneSignature(unmoved) != baseSignature) return {};
 	return offsets;
 }
+inline std::vector<std::array<double, 3>> translationOnly(const scene_doc::Document& base, const scene_doc::Document& now) { return translationOnly(base, sceneSignature(base), now); }
 
 }  // namespace scene_viewport

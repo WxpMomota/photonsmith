@@ -457,7 +457,8 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 	};
 	// A picture that bumps the surface (a grayscale height map) or tilts its normals (an RGB normal map), for matte, glossy paint and metal.
 	const auto addBump = [&]() {
-		addFile(f, tr("Bump or normal map"), [mat]() { return mat() ? &mat()->bumpFile : nullptr; }, tr("Images (*.png *.jpg *.jpeg *.bmp *.tga *.exr *.hdr)"), true);
+		addFile(f, tr("Bump or normal map"), [mat]() { return mat() ? &mat()->bumpFile : nullptr; }, tr("Images (*.png *.jpg *.jpeg *.bmp *.tga *.exr *.hdr)"), true,
+		        [](const QString &) {});   // (a choice rebuilds the properties: the kind of picture, its height and the texture repeats now apply)
 		if (m.bumpFile.empty()) return;
 		auto *bumpKind = new QComboBox;
 		bumpKind->addItem(tr("Height map (grayscale: light is high)"), static_cast<int>(scene_doc::BumpKind::Height));
