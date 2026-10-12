@@ -977,6 +977,9 @@ struct TriangleMaterial {
     int alphaOffset;
     int alphaWidth;
     int alphaHeight;
+    // UV mapping of the reflectance picture and of the bump / normal-map picture: see metal_poc_gpu_types.h. (1, 1, 0, 0) = identity.
+    float uvScaleU, uvScaleV, uvDeltaU, uvDeltaV;
+    float bumpUvScaleU, bumpUvScaleV, bumpUvDeltaU, bumpUvDeltaV;
 };
 
 // E2/section 178: a real heterogeneous, procedural Perlin-FBm-density

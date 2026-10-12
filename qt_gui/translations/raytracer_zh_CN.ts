@@ -6917,11 +6917,6 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>透射</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="551"/>
-        <source>On a Mac the repeats and shift are drawn on a box, a quad and the ready-made shapes only; on this shape the CPU render shows them but the GPU preview does not yet.</source>
-        <translation>在 Mac 上，重复和偏移只会绘制在立方体、四边形和预设形状上；对于此形状，CPU 渲染会显示它们，但 GPU 预览暂时还不会。</translation>
-    </message>
-    <message>
         <location filename="../scene_builder_inspector.cpp" line="626"/>
         <source>Object</source>
         <translation>物体</translation>

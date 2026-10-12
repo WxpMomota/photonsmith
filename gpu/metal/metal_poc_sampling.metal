@@ -564,12 +564,14 @@ inline float bumpFootprintStep(constant Uniforms& u, float3 O, float3 d, float3 
 }
 
 // The perturbed shading normal for `n` (unit, facing the ray) at texture coordinate (u, v).
-inline float3 imageBumpNormal(device const float* data, int offset, int w, int h, float scale, float u, float v,
+// (u, v) are the surface's own coordinates; uvMap = (su, sv, du, dv) is the picture's imagemap mapping, applied to each of the three height
+// lookups. The finite-difference step stays in surface units, so a tiled picture's slope is its slope per surface unit (as on the CPU).
+inline float3 imageBumpNormal(device const float* data, int offset, int w, int h, float scale, float u, float v, float4 uvMap,
                               float3 n, float3 dpdu, float footprintStep) {
     const float step = footprintStep > 1e-8 ? footprintStep : 0.001;   // 0.001: the CPU's no-footprint fallback
-    const float disp   = scale * bumpHeightSample(data, offset, w, h, u,        v);
-    const float dispU  = scale * bumpHeightSample(data, offset, w, h, u + step, v);
-    const float dispV  = scale * bumpHeightSample(data, offset, w, h, u,        v + step);
+    const float disp   = scale * bumpHeightSample(data, offset, w, h, uvMap.x * u          + uvMap.z, uvMap.y * v          + uvMap.w);
+    const float dispU  = scale * bumpHeightSample(data, offset, w, h, uvMap.x * (u + step) + uvMap.z, uvMap.y * v          + uvMap.w);
+    const float dispV  = scale * bumpHeightSample(data, offset, w, h, uvMap.x * u          + uvMap.z, uvMap.y * (v + step) + uvMap.w);
     float3 dpdv = cross(n, dpdu);
     if (dot(dpdv, dpdv) < 1e-12) dpdv = float3(0.0, 1.0, 0.0);
     const float3 newDpdu = dpdu + ((dispU - disp) / step) * n;

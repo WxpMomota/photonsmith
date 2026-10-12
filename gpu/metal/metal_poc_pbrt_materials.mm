@@ -56,6 +56,15 @@ static size_t appendMeasuredBrdf(const MeasuredBRDFData& m, std::vector<float>& 
     return base;
 }
 
+// pbrt imagemap uscale/vscale/udelta/vdelta of the reflectance picture, resolved by the flattener into Material::textureMapping; the shader looks
+// the picture up at (su*u + du, sv*v + dv). The identity (the default) leaves the TriangleMaterial's own defaults alone.
+static void applyReflectanceMapping(TriangleMaterial& mat, const pbrt_flatten::Material& m) {
+    mat.uvScaleU = (float)m.textureMapping.su;
+    mat.uvScaleV = (float)m.textureMapping.sv;
+    mat.uvDeltaU = (float)m.textureMapping.du;
+    mat.uvDeltaV = (float)m.textureMapping.dv;
+}
+
 // pbrt Diffuse: flat colour, or one of the textured variants (checkerboard, procedural noise, image) that the shader implements as modes of
 // materialType 25/26 (see the comments below). Split out of mapPbrtMaterial(), where this one case was 215 of its ~530 lines.
 TriangleMaterial MetalPocApp::mapPbrtDiffuseMaterial(const pbrt_flatten::Material& m, float sceneScale, float3 bboxCenter, float3 sceneOffset) {
@@ -270,8 +279,10 @@ TriangleMaterial MetalPocApp::mapPbrtDiffuseMaterial(const pbrt_flatten::Materia
             // true for F5/F9, the scenes this materialType
             // was originally built for, so this change is a
             // no-op for them.
-            return TriangleMaterial{color, /*materialType=*/METAL_MAT_IMAGE_LAMBERTIAN, /*ior=*/1.0f,
-                                     PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/(float)m.textureScale};
+            TriangleMaterial imageMat{color, /*materialType=*/METAL_MAT_IMAGE_LAMBERTIAN, /*ior=*/1.0f,
+                                      PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/(float)m.textureScale};
+            applyReflectanceMapping(imageMat, m);
+            return imageMat;
         }
     }
     return TriangleMaterial{color, /*materialType=*/METAL_MAT_LAMBERTIAN, /*ior=*/1.0f,
@@ -573,6 +584,7 @@ TriangleMaterial MetalPocApp::mapPbrtMaterial(PbrtMaterialMapState& st, const pb
                     transImg = havePbrtTransmitImage;
                 }
                 if (reflImg || transImg) mat.conductorK = PackedFloat3{reflImg ? 1.0f : 0.0f, 9.0f, transImg ? 1.0f : 0.0f};
+                if (reflImg) applyReflectanceMapping(mat, m);
             }
             return mat;
         }

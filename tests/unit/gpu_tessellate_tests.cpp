@@ -119,3 +119,56 @@ TEST(GpuTessellateTest, MaterialAndAreaLightCarryOverToTheTriangles) {
 		EXPECT_EQ(t.areaLight, 5);
 	}
 }
+
+namespace {
+
+// A scene of one picture-textured disk and one picture-textured cylinder (material 0), plus a plain disk (material 1).
+pbrt_flatten::FlatScene scenePicturedQuadrics() {
+	pbrt_flatten::FlatScene s;
+	pbrt_flatten::Material pictured;
+	pictured.textureFilename = "wood.png";
+	s.materials.push_back(pictured);
+	s.materials.push_back(pbrt_flatten::Material());
+	pbrt_flatten::Disk d;
+	d.radius = 2.0;
+	d.material = 0;
+	s.disks.push_back(d);
+	pbrt_flatten::Cylinder cy;
+	cy.material = 0;
+	s.cylinders.push_back(cy);
+	d.material = 1;
+	s.disks.push_back(d);
+	return s;
+}
+
+}  // namespace
+
+TEST(GpuTessellateTest, AnAnalyticQuadricWithAPictureBecomesTrianglesWithPbrtCoordinates) {
+	pbrt_flatten::FlatScene s = scenePicturedQuadrics();
+	const size_t added = tessellateForBackend(s, TessellationCaps::all(), nullptr);
+	EXPECT_EQ(added, size_t(2 * (48 * 2 + 64 * 1)));   // the disk's 48 x 2 cells and the cylinder's 64 x 1
+	ASSERT_EQ(s.disks.size(), 1u) << "only the plain disk stays analytic";
+	EXPECT_EQ(s.disks[0].material, 1);
+	EXPECT_TRUE(s.cylinders.empty());
+	// pbrt's disk: v = 0 at the outer rim, 1 at the inner radius (here the centre); u runs round the circle
+	for (size_t i = 0; i < size_t(2 * 48 * 2); ++i) {
+		const pbrt_flatten::Triangle& t = s.triangles[i];
+		ASSERT_TRUE(t.hasUVs);
+		for (int c = 0; c < 3; ++c) {
+			const double r = std::hypot(t.v[c * 3], t.v[c * 3 + 1]);
+			EXPECT_NEAR(r, 2.0 * (1.0 - t.uv[c * 2 + 1]), 1e-9);
+		}
+	}
+}
+
+TEST(GpuTessellateTest, AQuadricWithoutAPictureOrCaughtByAnotherRuleStaysAnalytic) {
+	pbrt_flatten::FlatScene s = scenePicturedQuadrics();
+	s.disks[0].areaLight = 0;                       // a light is sampled analytically
+	s.cylinders[0].xformEnd[3] = 1.0;               // a moving shape keeps its motion
+	EXPECT_EQ(tessellateForBackend(s, TessellationCaps::all(), nullptr), 0u);
+	EXPECT_EQ(s.disks.size(), 2u);
+	EXPECT_EQ(s.cylinders.size(), 1u);
+	s = scenePicturedQuadrics();
+	EXPECT_EQ(tessellateForBackend(s, TessellationCaps::conesAndParaboloids(), nullptr), 0u) << "OptiX draws them natively";
+	EXPECT_EQ(s.disks.size(), 2u);
+}

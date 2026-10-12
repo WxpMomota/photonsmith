@@ -153,7 +153,7 @@ TEST(SceneUvTest, ItOnlyActsWhereThereIsATextureToPlace) {
 	EXPECT_NE(uvOf(toPbrt(d)), before) << "and so is a bump map";
 }
 
-TEST(SceneUvTest, TheChecksCatchAZeroRepeatAndOnlyAMacHasShapesWhereItHasNoEffect) {
+TEST(SceneUvTest, TheChecksCatchAZeroRepeatAndNoShapeNeedsAWarningOnAnyRenderer) {
 	Document d;
 	d.objects.push_back(texturedObject(ShapeKind::Quad));
 	d.objects[0].material.uvScaleU = 2.0;
@@ -165,11 +165,7 @@ TEST(SceneUvTest, TheChecksCatchAZeroRepeatAndOnlyAMacHasShapesWhereItHasNoEffec
 		d.objects[0].shape = k;
 		bool warned = false;
 		for (const Problem& p : validate(d)) warned = warned || p.message.find("on a Mac the repeats and shift") != std::string::npos;
-#ifdef __APPLE__
-		EXPECT_TRUE(warned) << toString(k) << ": Metal does not place the texture of this shape yet";
-#else
-		EXPECT_FALSE(warned) << toString(k) << ": the CPU and OptiX renderers place it, so there is nothing to warn about";
-#endif
+		EXPECT_FALSE(warned) << toString(k) << ": the CPU, OptiX and Metal renderers all place it, so there is nothing to warn about";
 	}
 	d.objects[0].shape = ShapeKind::Box;
 	for (const Problem& p : validate(d)) EXPECT_EQ(p.message.find("on a Mac the repeats"), std::string::npos);

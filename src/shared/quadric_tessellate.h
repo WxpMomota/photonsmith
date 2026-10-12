@@ -98,12 +98,13 @@ inline void tessellateCylinder(const Cylinder& cy, std::vector<Triangle>& out) {
     });
 }
 
-// Disk (an annulus in the plane z = height, normal +z): inner radius to radius, phiMax round.
+// Disk (an annulus in the plane z = height, normal +z): inner radius to radius, phiMax round. As pbrt's own disk: u = phi / phiMax, v runs from 0 at the
+// outer rim to 1 at the inner radius.
 inline void tessellateDisk(const Disk& d, std::vector<Triangle>& out) {
     const pbrt_scene::Matrix4 xf = matrixOf(d.xform);
     const double phiMax = d.phiMaxDeg * kPi / 180.0;
     tessellateGrid(out, 48, 2, d.material, d.areaLight, [&](double u, double v, double* p, double* n) {
-        const double ph = u * phiMax, rad = d.innerRadius + v * (d.radius - d.innerRadius);
+        const double ph = u * phiMax, rad = d.radius - v * (d.radius - d.innerRadius);
         flatten_detail::transformPoint(xf, rad * std::cos(ph), rad * std::sin(ph), d.height, p);
         flatten_detail::transformNormal(xf, 0.0, 0.0, 1.0, n);
         normalize3(n);

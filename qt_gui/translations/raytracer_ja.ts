@@ -6911,11 +6911,6 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>透過</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="551"/>
-        <source>On a Mac the repeats and shift are drawn on a box, a quad and the ready-made shapes only; on this shape the CPU render shows them but the GPU preview does not yet.</source>
-        <translation>Mac では、繰り返しとずらしはボックス、四角形、用意されたシェイプにのみ描画されます。このシェイプでは CPU レンダリングには反映されますが、GPU プレビューにはまだ反映されません。</translation>
-    </message>
-    <message>
         <location filename="../scene_builder_inspector.cpp" line="626"/>
         <source>Object</source>
         <translation>オブジェクト</translation>
