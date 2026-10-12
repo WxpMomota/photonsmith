@@ -1992,6 +1992,18 @@ Download it now?</source>
         <translation>安装未完成：%1</translation>
     </message>
     <message>
+        <location filename="../mainwindow_photo_install.cpp" line="117"/>
+        <source>If there is no suitable Python, a private copy of Python 3.12 (about 25 MB, from GitHub, checked against its published checksum) is downloaded into the same folder.</source>
+        <translation>如果没有合适的 Python，会把一份私有的 Python 3.12（约 25 MB，来自 GitHub，并用其公布的校验和核对）下载到同一文件夹。</translation>
+    </message>
+    <message>
+        <location filename="../mainwindow_photo_install.cpp" line="117"/>
+        <source>Everything the installer printed is in the box below and in the log file (Help &gt; Show Log Folder):
+%1</source>
+        <translation>安装程序输出的全部内容都在下方的框中和日志文件里（帮助 &gt; 显示日志文件夹）：
+%1</translation>
+    </message>
+    <message>
         <location filename="../mainwindow_photo_install.cpp" line="118"/>
         <source>Close</source>
         <translation>关闭</translation>

@@ -1993,6 +1993,18 @@ Download it now?</source>
         <translation>インストールは完了しませんでした: %1</translation>
     </message>
     <message>
+        <location filename="../mainwindow_photo_install.cpp" line="117"/>
+        <source>If there is no suitable Python, a private copy of Python 3.12 (about 25 MB, from GitHub, checked against its published checksum) is downloaded into the same folder.</source>
+        <translation>適切な Python がない場合は、Python 3.12 の専用コピー（約 25 MB、GitHub から、公開されたチェックサムで検証）が同じフォルダーにダウンロードされます。</translation>
+    </message>
+    <message>
+        <location filename="../mainwindow_photo_install.cpp" line="117"/>
+        <source>Everything the installer printed is in the box below and in the log file (Help &gt; Show Log Folder):
+%1</source>
+        <translation>インストーラーが出力した内容は、下のボックスとログファイル（ヘルプ &gt; ログフォルダーを表示）にあります:
+%1</translation>
+    </message>
+    <message>
         <location filename="../mainwindow_photo_install.cpp" line="118"/>
         <source>Close</source>
         <translation>閉じる</translation>

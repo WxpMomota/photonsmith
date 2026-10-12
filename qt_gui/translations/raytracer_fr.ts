@@ -2004,6 +2004,18 @@ Le télécharger maintenant ?</translation>
         <translation>L&apos;installation ne s&apos;est pas terminée : %1</translation>
     </message>
     <message>
+        <location filename="../mainwindow_photo_install.cpp" line="117"/>
+        <source>If there is no suitable Python, a private copy of Python 3.12 (about 25 MB, from GitHub, checked against its published checksum) is downloaded into the same folder.</source>
+        <translation>S'il n'y a pas de Python adapté, une copie privée de Python 3.12 (environ 25 Mo, depuis GitHub, vérifiée avec son empreinte publiée) est téléchargée dans le même dossier.</translation>
+    </message>
+    <message>
+        <location filename="../mainwindow_photo_install.cpp" line="117"/>
+        <source>Everything the installer printed is in the box below and in the log file (Help &gt; Show Log Folder):
+%1</source>
+        <translation>Tout ce que l'installateur a affiché se trouve dans la zone ci-dessous et dans le fichier journal (Aide &gt; Afficher le dossier des journaux) :
+%1</translation>
+    </message>
+    <message>
         <location filename="../mainwindow_photo_install.cpp" line="118"/>
         <source>Close</source>
         <translation>Fermer</translation>
