@@ -494,3 +494,6 @@ mcparity_*.exr
 
 # the Scene Builder's material preset pictures are Qt resources (qt_gui/resources.qrc lists them), so they are committed
 !qt_gui/material_thumbs/*.png
+
+# test pictures a Metal ctest scene loads (subsurface-sky-image.pbrt names white-sky.png): tracked, or a clean checkout fails that test
+!gpu/metal/test_scenes/*.png

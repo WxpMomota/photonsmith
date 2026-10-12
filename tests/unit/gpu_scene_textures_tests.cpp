@@ -163,3 +163,16 @@ TEST(GpuSceneTexturesGrayscaleTest, ACustomAccessorGetsXThenY) {
 	EXPECT_TRUE(gray);
 	EXPECT_EQ(calls, 64);
 }
+
+TEST(ImagemapEncodingTest, AFloatPictureKeepsItsValuesButStillInverts) {
+	// stb's float load of an 8-bit picture has applied gamma 2.2; applyImagemapEncoding redoes it for another encoding. A .exr/.hdr is linear already (no curve), but "invert" applies.
+	std::vector<float> png = {0.25f, 0.5f};
+	gpu_scene_textures::applyImagemapEncoding(png, "a.png", 1.0, false);   // linear: v^(1/2.2)
+	EXPECT_NEAR(png[0], std::pow(0.25f, 1.0f / 2.2f), 1e-6);
+	std::vector<float> exr = {0.25f, 0.5f};
+	gpu_scene_textures::applyImagemapEncoding(exr, "a.exr", 1.0, false);
+	EXPECT_FLOAT_EQ(exr[0], 0.25f);   // untouched
+	gpu_scene_textures::applyImagemapEncoding(exr, "A.EXR", 1.0, true);
+	EXPECT_FLOAT_EQ(exr[0], 0.75f);   // inverted
+	EXPECT_FLOAT_EQ(exr[1], 0.5f);
+}

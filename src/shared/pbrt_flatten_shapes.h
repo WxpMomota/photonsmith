@@ -963,8 +963,13 @@ inline bool flattenCurveShape(const pbrt_scene::Scene &scene, FlatScene &out, co
 // A disk, cylinder, cone or paraboloid inside an ObjectBegin/ObjectEnd definition: the definition has no list for these (an instance group holds triangles and
 // spheres), so the shape becomes triangles in the group, in object space like the group's other geometry. Only a plain surface: an emissive shape or one bounding a
 // medium needs more than triangles and stays unsupported. False when `shape` is not one of the four, or its own list exists (a top-level shape: the backend draws it).
-inline bool flattenQuadricAsTriangles(const pbrt_scene::ShapeDecl &shape, const flatten_detail::ShapeWork &w) {
+inline bool flattenQuadricAsTriangles(const FlatScene &out, const pbrt_scene::ShapeDecl &shape, const flatten_detail::ShapeWork &w) {
 	if (!w.triangles || shape.areaLightIndex >= 0 || shape.insideMedium >= 0) return false;
+	// A shape with Material "interface" only bounds a medium: left out (transparent), as gpu_tessellate does for the same shapes at the top level.
+	const bool isQuadric = shape.type == "disk" || shape.type == "cylinder" || shape.type == "cone" || shape.type == "paraboloid";
+	if (isQuadric && shape.materialIndex >= 0 && static_cast<std::size_t>(shape.materialIndex) < out.materials.size() &&
+	    out.materials[static_cast<std::size_t>(shape.materialIndex)].kind == MaterialKind::Interface)
+		return true;
 	const pbrt_scene::Matrix4 &xform = w.xform;
 	if (shape.type == "disk" && !w.disks) {
 		Disk d;
@@ -1004,6 +1009,7 @@ inline bool flattenQuadricAsTriangles(const pbrt_scene::ShapeDecl &shape, const 
 		pb.zMin = shape.params.getFloat("zmin", 0.0);
 		pb.zMax = shape.params.getFloat("zmax", 1.0);
 		pb.phiMaxDeg = shape.params.getFloat("phimax", 360.0);
+		if (!(pb.zMax > 0.0) || !(pb.zMax > pb.zMin) || !(pb.radius > 0.0)) return false;   // a degenerate paraboloid would tessellate to NaN: the generic "not supported" warning instead
 		fromMatrix4(xform, pb.xform);
 		pb.material = shape.materialIndex;
 		quadric_tessellate::tessellateParaboloid(pb, *w.triangles);
@@ -1148,7 +1154,7 @@ inline void flattenShapes(const pbrt_scene::Scene &scene, FlatScene &out, const 
 			if (flattenSphereShape(scene, out, meshes, w)) continue;
 		}
 
-		if (flattenQuadricAsTriangles(shape, w)) continue;   // inside an object definition
+		if (flattenQuadricAsTriangles(out, shape, w)) continue;   // inside an object definition
 
 		if (shape.type == "disk" && w.disks) {
 			if (flattenDiskShape(scene, out, meshes, w)) continue;
