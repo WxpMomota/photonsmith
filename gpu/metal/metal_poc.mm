@@ -845,7 +845,7 @@ void MetalPocApp::applyCameraOverride(double cam_x, double cam_y, double cam_z) 
     const float3 trueUp = simd::cross(right, forward);
     pbrtCameraPos = lookfrom;
     pbrtCameraForward = forward;
-    pbrtCameraRight = right;
+    pbrtCameraRight = pbrtPerspectiveLeftHanded ? -right : right;
     pbrtCameraUp = trueUp;
 }
 
@@ -1146,6 +1146,6 @@ void MetalPocApp::applyCameraLookAt(double cam_x, double cam_y, double cam_z, bo
     const float3 right = simd::normalize(simd::cross(forward, up));
     pbrtCameraPos = lookfrom;
     pbrtCameraForward = forward;
-    pbrtCameraRight = right;
+    pbrtCameraRight = pbrtPerspectiveLeftHanded ? -right : right;
     pbrtCameraUp = simd::cross(right, forward);
 }
