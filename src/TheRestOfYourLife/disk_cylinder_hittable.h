@@ -107,11 +107,16 @@ class disk_hittable : public hittable {
 		const point3 ro = apply_point(w2o, r.origin());
 		const vec3   rd = apply_vector(w2o, r.direction());   // NOT normalised - see file comment
 
+		// A disk lying exactly on a triangle (a Scene Builder disk on the floor, where it usually is) ties with it to the last bit, so which one a ray saw was a coin toss
+		// per ray: a speckle of the two (the triangle found first leaves the disk a `max` it is a rounding error beyond). The disk is looked for a hair further than the
+		// closest hit so far and reported a hair in front of where it is, 1e-9 of its distance (Metal does the same with 2e-5, in diskIntersectionFunction: a float), so it wins every time;
+		// the hit point below is the true one.
 		const auto h = shape_.intersect(ro.x(), ro.y(), ro.z(), rd.x(), rd.y(), rd.z(),
-										 ray_t.min, ray_t.max);
+										 ray_t.min, ray_t.max * (1.0 + 1e-7));
 		if (!h) return false;
-
-		rec.t = h->t;
+		const double reported = std::max(h->t * (1.0 - 1e-9), ray_t.min);
+		if (!(reported <= ray_t.max)) return false;
+		rec.t = reported;
 		const double hx = ro.x() + h->t * rd.x();
 		const double hy = ro.y() + h->t * rd.y();
 		rec.p = apply_point(o2w, point3(hx, hy, shape_.height));

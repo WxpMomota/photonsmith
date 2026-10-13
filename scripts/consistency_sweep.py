@@ -441,6 +441,11 @@ def run(args):
         check("texturemap", "bump map with uscale/vscale 2 = bump map tiled by hand", backend,
               Scene(material_text=bump_material, prelude=bump_decl % (sw.height_tiled, ""), shape="uvquad"),
               Scene(material_text=bump_material, prelude=bump_decl % (sw.height, ' "float uscale" [ 2 ] "float vscale" [ 2 ]'), shape="uvquad"), tolerance=1.0)   # tight: a bump map looked up without the mapping is only a few % off
+        # a disk lying exactly on the floor ties with it to the last bit: it must still be drawn (Metal drew the floor, the CPU a speckle of the two): the same disk a hair above
+        # the floor gives the same picture
+        def disk_at(y):
+            return 'AttributeBegin\n  Material "diffuse" "rgb reflectance" [ 0.9 0.05 0.05 ]\n  Translate -1.2 %g 1.5\n  Rotate -90 1 0 0\n  Shape "disk" "float radius" [ 1.1 ]\nAttributeEnd' % y
+        check("shapeform", "a disk lying on the floor is drawn as one just above it", backend, Scene(material="diffuse", prelude=disk_at(0.0)), Scene(material="diffuse", prelude=disk_at(0.01)), tolerance=2.0)
         # bump and normal maps that change nothing: a constant displacement, and a flat normal map
         check("texture", "constant displacement texture changes nothing", backend, Scene(material_text=diffuse_inline),
               Scene(material_text='Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "texture displacement" [ "d" ]', prelude='Texture "d" "float" "constant" "float value" [ 0.3 ]'), tolerance=tol)

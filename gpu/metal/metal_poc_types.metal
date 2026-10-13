@@ -1363,14 +1363,19 @@ DiskIntersectionResult diskIntersectionFunction(
     if (fabs(denom) < 1e-6) return result; // ray parallel to the disk's plane
 
     float t = dot(center - origin, normal) / denom;
-    if (t < minDistance || t > maxDistance) return result;
+    // A disk lying exactly on a triangle (a Scene Builder disk on the floor, which is where it usually is) ties with it to the last bit, and the tie went to the floor
+    // every time: the disk was not drawn at all (the CPU showed a speckle of the two, and now draws the disk too). The disk is reported a hair in front, 2e-5 of its
+    // distance, so it wins; the hit point is that much in front of the plane, far inside what the rays' offsets already allow. (It must also get past the closest hit
+    // so far when that is the tying triangle, hence the comparison with the reported distance.)
+    const float reported = max(t * (1.0 - 2e-5), minDistance);
+    if (t < minDistance || reported > maxDistance) return result;
 
     float3 hitPoint = origin + direction * t;
     float distSq = length_squared(hitPoint - center);
     if (distSq > disk.radius * disk.radius) return result;
 
     result.accept = true;
-    result.distance = t;
+    result.distance = reported;
     return result;
 }
 
