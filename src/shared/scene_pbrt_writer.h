@@ -394,7 +394,16 @@ inline std::string toPbrt(const Document& d) {
 		if (o.rotation.z != 0.0) os << ind << "Rotate " << detail::num(o.rotation.z) << " 0 0 1\n";
 		if (o.rotation.y != 0.0) os << ind << "Rotate " << detail::num(o.rotation.y) << " 0 1 0\n";
 		if (o.rotation.x != 0.0) os << ind << "Rotate " << detail::num(o.rotation.x) << " 1 0 0\n";
-		detail::writeMaterial(os, o.material, ind, textureName, displacement, &mixIndex);
+		if (o.emissive) {
+			// A pbrt light shape keeps its own material (the back of a one-sided panel, or a lit panel face, shows it), but the CPU and OptiX renderers treat the shape as an emitter only.
+			// Writing a black body says what they do, so every renderer agrees (Metal follows pbrt and reflects: a coloured emitter was 15% off the CPU's picture).
+			Material body;
+			body.kind = MaterialKind::Diffuse;
+			body.color = {0.0, 0.0, 0.0};
+			detail::writeMaterial(os, body, ind, std::string(), std::string(), &mixIndex);
+		} else {
+			detail::writeMaterial(os, o.material, ind, textureName, displacement, &mixIndex);
+		}
 		if (o.emissive) {
 			os << ind << "AreaLightSource \"diffuse\" \"rgb L\" [ " << detail::rgb(detail::scaled(o.emission, o.emissionStrength)) << " ]";
 			if (o.twoSided) os << " \"bool twosided\" true";

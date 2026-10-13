@@ -4,6 +4,10 @@ Release notes for the next tagged release, summarising the large correctness eff
 Before this, see `git log`. Each item has a commit with the measurements behind it, and
 [docs/PBRT_SUPPORT.md](docs/PBRT_SUPPORT.md) has the per-feature, per-backend detail.
 
+## Unreleased
+
+* **Emitters agree on every renderer; Metal's bump maps follow pbrt's footprint**: the Scene Builder writes an emissive object with a black body (a pbrt light shape keeps its own material; the CPU and OptiX draw it as an emitter only, Metal and real pbrt reflect, so a coloured emitter was 15% off on a Mac), and Metal's height-map step uses pbrt's `max(1/8, 1/sqrt(samples per pixel))` ray-differential scale like the CPU and OptiX.
+
 ## 0.1.2 (2026-10-12)
 
 * **Crash when closing the program on a Mac fixed**: the GPU warm-up added in 0.1.1 read a thread that had already deleted itself when the window closed, so on a Mac the program crashed (SIGSEGV) every time it was quit, and the next start asked about the unexpected exit. The thread is held by a guarded pointer now.

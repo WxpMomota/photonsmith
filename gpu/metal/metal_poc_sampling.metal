@@ -546,8 +546,11 @@ inline float bumpFootprintStep(constant Uniforms& u, float3 O, float3 d, float3 
     const float cf = dot(fwd, d);
     if (cf <= 1e-6) return 0.0;
     const float3 D = d / cf;   // the unnormalized direction that lands on the viewport plane (distance 1 along forward)
-    const float3 Dx = D + float3(u.cameraRight) * (2.0 / float(u.width));
-    const float3 Dy = D + float3(u.cameraUp) * (2.0 / float(u.height));
+    // pbrt scales camera ray differentials by max(1/8, 1/sqrt(samples per pixel)) (RayIntegrator::EvaluatePixelSample), as the CPU and OptiX now do: with many samples the
+    // step is a fraction of a pixel, not the whole of it. (The sample count of the whole render, which is what uniforms.samplesPerPixel is.)
+    const float diffScale = max(0.125, 1.0 / sqrt(float(max(u.samplesPerPixel, 1u))));
+    const float3 Dx = D + float3(u.cameraRight) * (diffScale * 2.0 / float(u.width));
+    const float3 Dy = D + float3(u.cameraUp) * (diffScale * 2.0 / float(u.height));
     const float dnx = dot(n, Dx), dny = dot(n, Dy);
     if (dnx == 0.0 || dny == 0.0) return 0.0;
     const float3 pop = p - O;

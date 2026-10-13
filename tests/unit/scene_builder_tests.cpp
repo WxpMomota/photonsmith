@@ -785,6 +785,28 @@ TEST(SceneDocumentShapesTest, NewShapesRoundTripValidateAndWriteAsPlainPbrt) {
 }
 
 // A corrupt file asking for two billion steps is reported by validate(), and drawing it makes at most scene_doc::kMaxStairSteps steps - never a huge mesh.
+// pbrt keeps a light shape's own material (a one-sided panel shows it from behind), but the CPU and OptiX renderers draw such a shape as an emitter only, and Metal follows pbrt: a
+// coloured emitter was 15% off the CPU's picture on Metal (scripts/combo_sweep.py, quad__emitter). The builder writes a black body for an emissive object, so all three agree.
+TEST(SceneBuilderTest, AnEmissiveObjectIsWrittenWithABlackBodyWhateverItsMaterial) {
+	Document d = makeStarterScene();
+	Object panel = makeObject(ShapeKind::Quad, "Panel");
+	panel.material.kind = MaterialKind::CoatedDiffuse;
+	panel.material.color = {0.9, 0.1, 0.1};
+	panel.emissive = true;
+	d.objects.push_back(panel);
+	const std::string text = toPbrt(d);
+	const size_t at = text.find("# Panel");
+	ASSERT_NE(at, std::string::npos);
+	const std::string block = text.substr(at, text.find("AttributeEnd", at) - at);
+	EXPECT_NE(block.find("Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]"), std::string::npos) << block;
+	EXPECT_EQ(block.find("coateddiffuse"), std::string::npos) << block;
+	EXPECT_NE(block.find("AreaLightSource"), std::string::npos);
+	Document back;
+	std::string error;
+	ASSERT_TRUE(fromPbrt(text, back, error)) << error;
+	EXPECT_EQ(back.objects.back().material.kind, MaterialKind::CoatedDiffuse) << "the document still keeps the material it was given";
+}
+
 TEST(SceneBuilderTest, AHugeStepCountMakesABoundedMesh) {
 	Object o = makeObject(ShapeKind::Stairs, "s");
 	o.steps = 2000000000;
