@@ -469,7 +469,7 @@ def run(args):
         for name in CAMERA_MATERIALS:
             check("camera", "pinhole vs tiny lens, %s" % name, backend, Scene(material=name), Scene(material=name, camera="tinylens"), tolerance=noise_tol(name))
             check("camera", "pinhole vs lens radius 0.15, %s" % name, backend, Scene(material=name), Scene(material=name, camera="lens"), tolerance=max(noise_tol(name), 6.0))
-            check("camera", "far perspective vs orthographic, %s" % name, backend, Scene(material=name, camera="far"), Scene(material=name, camera="ortho"), tolerance=max(noise_tol(name), 6.0))
+            check("camera", "far perspective vs orthographic, %s" % name, backend, Scene(material=name, camera="far", size=96), Scene(material=name, camera="ortho", size=96), tolerance=max(noise_tol(name), 6.0))   # (96 pixels: the lamp is a few pixels of a very bright disk, and at 48 its coverage made Metal read 6.5% off on one noise draw)
         # the sampler, the integrator and the film's exposure: the same picture however it is asked for
         for name in ("diffuse", "coateddiffuse", "conductor"):
             for sampler in ("independent", "sobol", "zsobol", "pmj02bn", "stratified", "paddedsobol"):
