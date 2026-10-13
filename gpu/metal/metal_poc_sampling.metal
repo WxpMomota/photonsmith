@@ -525,7 +525,10 @@ inline void triangleDpduDpdv(uint primId, device const packed_float3* verts, dev
     const float3 e1 = p1 - p0, e2 = p2 - p0;
     const float2 d1 = uv1 - uv0, d2 = uv2 - uv0;
     const float det = d1.x * d2.y - d1.y * d2.x;
-    if (abs(det) > 1e-12) {
+    // A triangle without uvs of its own is stored with the corner uvs (0,0), (1,0), (0,1) (so u, v are the barycentric coordinates, as on the CPU): the CPU then uses the
+    // unit first edge for dpdu and cross(n, dpdu) for dpdv rather than the Jacobian solve.
+    const bool noUvs = all(uv0 == float2(0.0, 0.0)) && all(uv1 == float2(1.0, 0.0)) && all(uv2 == float2(0.0, 1.0));
+    if (abs(det) > 1e-12 && !noUvs) {
         const float inv = 1.0 / det;
         dpdu = inv * (d2.y * e1 - d1.y * e2);
         dpdv = inv * (-d2.x * e1 + d1.x * e2);
@@ -566,22 +569,57 @@ inline float bumpFootprintStep(constant Uniforms& u, float3 O, float3 d, float3 
     return (step == step && step < 1e8) ? step : 0.0;
 }
 
-// The perturbed shading normal for `n` (unit, facing the ray) at texture coordinate (u, v).
-// (u, v) are the surface's own coordinates; uvMap = (su, sv, du, dv) is the picture's imagemap mapping, applied to each of the three height
-// lookups. The finite-difference step stays in surface units, so a tiled picture's slope is its slope per surface unit (as on the CPU).
+// dndu and dndv of a triangle's interpolated shading normal from its three vertex normals and uvs (src/shared/normal_map.h triangle_dndu_dndv, pbrt-v4
+// Triangle::InteractionFromIntersection): what a bump map's `displacement * dndu` term needs. A degenerate uv mapping gives zero.
+inline void triangleDnduDndv(uint primId, device const packed_float3* normals, device const packed_float2* uvs, thread float3& dndu, thread float3& dndv) {
+    const float3 n0 = float3(normals[primId * 3 + 0]), n1 = float3(normals[primId * 3 + 1]), n2 = float3(normals[primId * 3 + 2]);
+    const float2 uv0 = uvs[primId * 3 + 0], uv1 = uvs[primId * 3 + 1], uv2 = uvs[primId * 3 + 2];
+    const float du02 = uv0.x - uv2.x, dv02 = uv0.y - uv2.y, du12 = uv1.x - uv2.x, dv12 = uv1.y - uv2.y;
+    const float det = du02 * dv12 - dv02 * du12;
+    if (abs(det) < 1e-9) { dndu = float3(0.0); dndv = float3(0.0); return; }
+    const float inv = 1.0 / det;
+    const float3 dn1 = n0 - n2, dn2 = n1 - n2;
+    dndu = (dv12 * dn1 - dv02 * dn2) * inv;
+    dndv = (du02 * dn2 - du12 * dn1) * inv;
+}
+
+// Does the triangle carry vertex normals that differ (a smooth mesh)? The shader cannot tell "has normals" from "has flat normals", so equal corner normals count as flat.
+inline bool triangleIsSmooth(uint primId, device const packed_float3* normals) {
+    const float3 n0 = float3(normals[primId * 3 + 0]), n1 = float3(normals[primId * 3 + 1]), n2 = float3(normals[primId * 3 + 2]);
+    return any(abs(n0 - n1) > 1e-5) || any(abs(n0 - n2) > 1e-5);
+}
+
+// The perturbed shading normal at texture coordinate (u, v): pbrt-v4's BumpMap() as the CPU and OptiX do (src/shared/normal_map.h apply_bump_map_pbrt):
+//   dpdu' = shading.dpdu + (disp_u - disp) / du * n + disp * dndu,  dpdv' likewise,  ns = normalize(cross(dpdu', dpdv')) on the side of n
+// where n is the shading normal AS AUTHORED (not turned toward the ray; the caller turns the result toward the viewer), and for a smooth triangle the tangents are
+// pbrt's ts = cross(n, dpdu), ss = cross(ts, n). (u, v) are the surface's own coordinates; uvMap = (su, sv, du, dv) is the picture's imagemap mapping, applied to each of the
+// three height lookups. The finite-difference step stays in surface units, so a tiled picture's slope is its slope per surface unit (as on the CPU).
 inline float3 imageBumpNormal(device const float* data, int offset, int w, int h, float scale, float u, float v, float4 uvMap,
-                              float3 n, float3 dpdu, float footprintStep) {
+                              float3 n, bool smooth, float3 dpdu, float3 dpdv, float3 dndu, float3 dndv, float footprintStep) {
     const float step = footprintStep > 1e-8 ? footprintStep : 0.001;   // 0.001: the CPU's no-footprint fallback
     const float disp   = scale * bumpHeightSample(data, offset, w, h, uvMap.x * u          + uvMap.z, uvMap.y * v          + uvMap.w);
     const float dispU  = scale * bumpHeightSample(data, offset, w, h, uvMap.x * (u + step) + uvMap.z, uvMap.y * v          + uvMap.w);
     const float dispV  = scale * bumpHeightSample(data, offset, w, h, uvMap.x * u          + uvMap.z, uvMap.y * (v + step) + uvMap.w);
-    float3 dpdv = cross(n, dpdu);
+    if (dot(dpdv, dpdv) < 1e-12) dpdv = cross(n, dpdu);
     if (dot(dpdv, dpdv) < 1e-12) dpdv = float3(0.0, 1.0, 0.0);
-    const float3 newDpdu = dpdu + ((dispU - disp) / step) * n;
-    const float3 newDpdv = dpdv + ((dispV - disp) / step) * n;
-    float3 nn = cross(newDpdu, newDpdv);
+    float3 su = dpdu, sv = dpdv;
+    if (smooth) {
+        const float3 ts = cross(n, dpdu);
+        if (dot(ts, ts) > 0.0) {
+            su = cross(ts, n);
+            sv = ts;
+        } else {   // dpdu along the normal: any frame round it (pbrt's CoordinateSystem)
+            const float sgn = n.z >= 0.0 ? 1.0 : -1.0;
+            const float a = -1.0 / (sgn + n.z), b = n.x * n.y * a;
+            su = float3(1.0 + sgn * n.x * n.x * a, sgn * b, -sgn * n.x);
+            sv = float3(b, sgn + n.y * n.y * a, -n.y);
+        }
+    }
+    const float3 bu = su + ((dispU - disp) / step) * n + disp * dndu;
+    const float3 bv = sv + ((dispV - disp) / step) * n + disp * dndv;
+    float3 nn = cross(bu, bv);
     const float len2 = dot(nn, nn);
-    if (!(len2 > 1e-8)) return n;
+    if (!(len2 > 1e-16) || isnan(len2) || isinf(len2)) return n;
     nn *= rsqrt(len2);
     return dot(nn, n) < 0.0 ? -nn : nn;
 }
