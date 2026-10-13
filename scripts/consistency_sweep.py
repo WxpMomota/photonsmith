@@ -429,6 +429,11 @@ def run(args):
                   Scene(material_text='Material "diffuse" "texture reflectance" [ "t" ]', prelude=repeat_decl % (sw.pattern_tiled, ""), shape=shape),
                   Scene(material_text='Material "diffuse" "texture reflectance" [ "t" ]', prelude=repeat_decl % (sw.pattern, ' "float uscale" [ 2 ] "float vscale" [ 2 ]'), shape=shape),
                   tolerance=1.0)   # tight: Metal without the mapping was 5.1% off on the sphere
+        # (a coated paint with a picture is another material path on Metal: the layered coat over the picture, which once ignored the repeats)
+        coated_picture = 'Material "coateddiffuse" "texture reflectance" [ "t" ] "float eta" [ 1.5 ] "float roughness" [ 0.03 ]'
+        check("texturemap", "coated paint: picture with uscale/vscale 2 = picture tiled by hand, sphere", backend,
+              Scene(material_text=coated_picture, prelude=repeat_decl % (sw.pattern_tiled, ""), shape="sphere"),
+              Scene(material_text=coated_picture, prelude=repeat_decl % (sw.pattern, ' "float uscale" [ 2 ] "float vscale" [ 2 ]'), shape="sphere"), tolerance=1.0)
         # the same for a bump map: a height picture looked up through uscale/vscale 2 is the picture tiled by hand (the slope is per unit of the surface's own coordinates)
         bump_decl = ('Texture "h" "float" "imagemap" "string filename" [ "%s" ] "string wrap" [ "repeat" ] "string encoding" [ "linear" ]%s\n'
                      'Texture "b" "float" "scale" "texture tex" [ "h" ] "float scale" [ 1.5 ]')
@@ -528,8 +533,12 @@ def run(args):
         tilted = ('Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "texture displacement" [ "nm" ]', 'Texture "nm" "float" "imagemap" "string filename" [ "%s" ] "string encoding" [ "linear" ]' % sw.tilted_normal)
         height = ('Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "texture displacement" [ "b" ]',
                   'Texture "h" "float" "imagemap" "string filename" [ "%s" ] "string wrap" [ "repeat" ] "string encoding" [ "linear" ]\nTexture "b" "float" "scale" "texture tex" [ "h" ] "float scale" [ 1.5 ]' % sw.height)
-        for shape in ("disk", "cylinder", "uvquad", "cone", "cube"):
-            for label, (mat, decl) in (("tilted normal map", tilted), ("height map", height)):
+        coated = ('Material "coateddiffuse" "texture reflectance" [ "t" ] "float eta" [ 1.5 ] "float roughness" [ 0.03 ]',
+                  'Texture "t" "spectrum" "imagemap" "string filename" [ "%s" ] "string wrap" [ "repeat" ]' % sw.pattern)   # (Metal once read this at +7%: an old single-bounce coat)
+        for shape in ("disk", "cylinder", "uvquad", "cone", "cube", "sphere"):
+            for label, (mat, decl) in (("tilted normal map", tilted), ("height map", height), ("coated paint with a picture", coated)):
+                if shape == "sphere" and label != "coated paint with a picture":
+                    continue   # a map on a sphere is not drawn on Metal
                 scene = Scene(material_text=mat, prelude=decl, shape=shape)
                 total += 1
                 try:
