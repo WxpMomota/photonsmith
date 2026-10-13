@@ -929,6 +929,9 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 		// same field NormalizedFresnel(ior=eta) reads at the found exit
 		// point (shade_material()'s probe-walk success path).
 		d.textureIdx = getOrBuildBssrdfTable(m.g, m.ior, out, bssrdfTableCache);
+		// The entry interface's roughness (pbrt's "roughness"; 0 = the smooth dielectric): u and v axes, remapped on the device like RoughDielectric's.
+		d.roughness  = static_cast<float>(m.roughness_u);
+		d.roughnessV = static_cast<float>(m.roughness_v);
 		break;
 	case pbrt_flatten::MaterialKind::Principled:
 		// Not real pbrt-v4 (see MaterialKind::Principled's own comment,

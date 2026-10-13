@@ -1453,8 +1453,13 @@ class subsurface : public material {
     // sigma_a/sigma_s are ALREADY resolved and scaled by the material's
     // "scale" parameter - see pbrt_flatten.h's flatten(), Subsurface branch,
     // for how a scene's name/sigma_a+sigma_s/defaults get turned into these.
-    subsurface(double eta, const double sigma_a[3], const double sigma_s[3], double g)
-        : eta_(eta), table_(100, 64) {
+    // roughness_u/v: pbrt's "roughness" of the entry interface (0 = the smooth dielectric), remapped to a GGX alpha unless remap_roughness is false.
+    subsurface(double eta, const double sigma_a[3], const double sigma_s[3], double g,
+               double roughness_u = 0.0, double roughness_v = 0.0, bool remap_roughness = true)
+        : eta_(eta),
+          alpha_x_(roughness_or_alpha(roughness_u, remap_roughness)),
+          alpha_y_(roughness_or_alpha(roughness_v, remap_roughness)),
+          table_(100, 64) {
         ComputeBeamDiffusionBSSRDF(g, eta, &table_);
         for (int c = 0; c < 3; ++c) {
             sigma_a_[c] = sigma_a[c];
@@ -1481,6 +1486,7 @@ class subsurface : public material {
     bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec,
                  bool do_regularize = false) const override {
         auto ctx = MaterialContext<double>::from_hit(rec, r_in);
+        if (!TrowbridgeReitz<double>(alpha_x_, alpha_y_).EffectivelySmooth()) return scatter_rough(r_in, rec, ctx, srec);
         BxDF bxdf{ eta_ };
         vec3 in_dir = unit_vector(r_in.direction());
         auto res = bxdf.sample(in_dir.x(), in_dir.y(), in_dir.z(),
@@ -1508,7 +1514,32 @@ class subsurface : public material {
     const shared_ptr<material>& get_exit_bsdf() const { return exit_bsdf_; }
 
   private:
+    // A rough entry interface: one GGX dielectric sample (reflection or refraction) weighted by f*|cos|/pdf, and no direct-light sample at
+    // this vertex (a glossy highlight of a point light is missing; an area light seen in the reflection is found by the sample itself). A
+    // refracted sample is flagged is_transmission, which sends the path on to the BSSRDF exit like the smooth entry's refraction.
+    bool scatter_rough(const ray& r_in, const hit_record& rec, const MaterialContext<double>& ctx, scatter_record& srec) const {
+        using RoughBxDF = RoughDielectricBxDF<double>;
+        RoughBxDF bxdf{ eta_, alpha_x_, alpha_y_ };
+        auto frame = ShadingFrame<double>::from_dpdu(ctx.dpdu_x, ctx.dpdu_y, ctx.dpdu_z, ctx.nx, ctx.ny, ctx.nz);
+        const double eta = ctx.front_face ? (1.0 / eta_) : eta_;
+        double wi_x, wi_y, wi_z;
+        frame.to_local(ctx.wo_x, ctx.wo_y, ctx.wo_z, wi_x, wi_y, wi_z);
+        if (wi_z < 0.0) { wi_z = -wi_z; wi_x = -wi_x; wi_y = -wi_y; }
+        auto res = bxdf.sample_weighted_local(wi_x, wi_y, wi_z, eta, random_double(), random_double(), random_double());
+        if (!res.valid) return false;
+        double wd_x, wd_y, wd_z;
+        frame.to_world(res.wo_x, res.wo_y, res.wo_z, wd_x, wd_y, wd_z);
+        srec.attenuation     = color(res.r, res.g, res.b);
+        srec.pdf_ptr         = nullptr;
+        srec.skip_pdf        = true;
+        srec.skip_pdf_ray    = ray(rec.p, unit_vector(vec3(wd_x, wd_y, wd_z)), r_in.time());
+        srec.eta             = res.is_transmission ? (double)res.eta : 1.0;
+        srec.is_transmission = res.is_transmission;
+        return true;
+    }
+
     double eta_;
+    double alpha_x_, alpha_y_;       // entry interface GGX alpha (0 = smooth)
     double sigma_a_[3];
     double sigma_s_[3];
     BSSRDFTable table_;              // owns the profile grid; bssrdf_ points into it

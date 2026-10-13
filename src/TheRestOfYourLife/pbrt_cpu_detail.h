@@ -431,7 +431,7 @@ inline std::shared_ptr<material> makeMaterial(const pbrt_flatten::Material &m,
 		return std::make_shared<diffuse_transmission>(albedo, transmittance, rTex, tTex);
 	}
 	case pbrt_flatten::MaterialKind::Subsurface:
-		return std::make_shared<subsurface>(m.ior, m.sigma_a, m.sigma_s, m.g);
+		return std::make_shared<subsurface>(m.ior, m.sigma_a, m.sigma_s, m.g, m.roughness_u, m.roughness_v, m.remapRoughness);
 	case pbrt_flatten::MaterialKind::Principled:
 		// Not real pbrt-v4 (see MaterialKind::Principled's own comment,
 		// pbrt_flatten.h) - m.color/m.roughness/m.ior are already generically

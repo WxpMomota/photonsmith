@@ -483,15 +483,39 @@ extern "C" __global__ void evaluate_materials(
 		// HitWorkItem::frontFace itself isn't usable here regardless - it's
 		// only populated for sphere hits (__closesthit__wf_sphere), and the
 		// SSS dragon scenes this targets are triangle meshes.
-		float3 sdir = wf_dielectric_scatter(h.rayDir, normal, /*front_face=*/true, mat.ior, seed);
-		bool is_transmission = dot(sdir, normal) < 0.0f;
+		//
+		// A rough entry ("roughness" on the material): one GGX dielectric sample weighted by G2/G1 instead (the sample the recursive backend and
+		// the CPU take too), with no direct-light sample at this vertex.
+		float3 sdir;
+		float entryWeight = 1.0f;
+		bool is_transmission;
+		const float ssAlphaX = mat.remapRoughness ? sqrtf(mat.roughness) : mat.roughness;
+		const float ssAlphaY = ResolveAnisotropicAlphaV(mat.roughnessV, mat.roughness, mat.remapRoughness);
+		if (!TrowbridgeReitz<float>(ssAlphaX, ssAlphaY).EffectivelySmooth()) {
+			float3 ssTan, ssBitan;
+			BuildDpduTangentFrame(normal.x, normal.y, normal.z, h.objDpdu.x, h.objDpdu.y, h.objDpdu.z,
+								  ssTan.x, ssTan.y, ssTan.z, ssBitan.x, ssBitan.y, ssBitan.z);
+			const float3 ssWi = normalize(-h.rayDir);
+			float wi_x = dot(ssWi, ssTan), wi_y = dot(ssWi, ssBitan), wi_z = dot(ssWi, normal);
+			if (wi_z < 0.0f) { wi_x = -wi_x; wi_y = -wi_y; wi_z = -wi_z; }
+			RoughDielectricBxDF<float> ssBxdf{ mat.ior, ssAlphaX, ssAlphaY };
+			const auto ssRes = ssBxdf.sample_weighted_local(wi_x, wi_y, wi_z, 1.0f / mat.ior,
+				wf_rand(seed), wf_rand(seed), wf_rand(seed));
+			if (!ssRes.valid) return;
+			sdir = normalize(ssRes.wo_x * ssTan + ssRes.wo_y * ssBitan + ssRes.wo_z * normal);
+			entryWeight = ssRes.r;
+			is_transmission = ssRes.is_transmission;
+		} else {
+			sdir = wf_dielectric_scatter(h.rayDir, normal, /*front_face=*/true, mat.ior, seed);
+			is_transmission = dot(sdir, normal) < 0.0f;
+		}
 		if (!is_transmission) {
 			// Specular reflection off the entry interface - identical to
 			// Dielectric's own reflection case; falls through to the shared
 			// tail below as an ordinary specular bounce (no NEE, no probe
 			// walk needed).
 			scattered_dir = sdir;
-			attenuation   = SS(1.f);
+			attenuation   = SS(entryWeight);
 			scattered     = true;
 			is_specular   = true;
 			break;
@@ -526,7 +550,7 @@ extern "C" __global__ void evaluate_materials(
 			// walk - see RayWorkItem::filterWeight's own comment.
 			probeItem.filterWeight = h.filterWeight;
 			for (int i = 0; i < kWFNWavelengths; ++i) {
-				probeItem.throughput[i]      = throughput[i];
+				probeItem.throughput[i]      = throughput[i] * entryWeight;
 				probeItem.radiance[i]        = radiance[i];
 				probeItem.wavelengths[i]     = swl.lambda[i];
 				probeItem.wavelength_pdfs[i] = swl.pdf[i];
