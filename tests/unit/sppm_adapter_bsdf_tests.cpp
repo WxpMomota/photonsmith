@@ -685,3 +685,43 @@ TEST(SubsurfaceUnsupportedWarning, OnlyASubsurfaceMaterialReportsAsSubsurface) {
 	subsurface sss(1.33, sigma_a, sigma_s, 0.0);
 	EXPECT_EQ(sss.as_subsurface(rec), &sss);
 }
+
+// A subsurface material with "roughness" enters through a GGX dielectric sample weighted by G2/G1 (pbrt's SubsurfaceMaterial uses a rough dielectric BxDF);
+// without it the entry is the smooth one. A refracted sample is flagged as a transmission (it goes on to the BSSRDF exit), and the weights stay in [0, 1].
+TEST(SubsurfaceRoughEntry, SamplesAWeightedGlossyDielectricAndFlagsRefractions) {
+	const double sigma_a[3] = {0.1, 0.1, 0.1}, sigma_s[3] = {1.0, 1.0, 1.0};
+	subsurface smooth(1.33, sigma_a, sigma_s, 0.0);
+	subsurface rough(1.33, sigma_a, sigma_s, 0.0, 0.35, 0.35);
+	hit_record rec;
+	rec.p = point3(0, 0, 0);
+	rec.normal = vec3(0, 0, 1);
+	rec.front_face = true;
+	const ray in(point3(0.5, 0, 1), unit_vector(vec3(-0.5, 0, -1)));
+	double weight_sum = 0.0, min_w = 1e9, max_w = 0.0, smooth_w_min = 1e9, smooth_w_max = 0.0;
+	int transmitted = 0, n = 0;
+	for (int i = 0; i < 20000; ++i) {
+		scatter_record s;
+		if (!rough.scatter(in, rec, s)) continue;
+		++n;
+		EXPECT_TRUE(s.skip_pdf);
+		const bool goes_in = dot(s.skip_pdf_ray.direction(), rec.normal) < 0.0;
+		EXPECT_EQ(s.is_transmission, goes_in);
+		weight_sum += s.attenuation.x();
+		min_w = std::min(min_w, s.attenuation.x());
+		max_w = std::max(max_w, s.attenuation.x());
+		if (s.is_transmission) ++transmitted;
+		scatter_record t;
+		ASSERT_TRUE(smooth.scatter(in, rec, t));
+		smooth_w_min = std::min(smooth_w_min, t.attenuation.x());
+		smooth_w_max = std::max(smooth_w_max, t.attenuation.x());
+	}
+	EXPECT_GT(n, 18000);
+	EXPECT_GE(min_w, 0.0);
+	EXPECT_LE(max_w, 1.0 + 1e-9);
+	EXPECT_LT(min_w, 1.0) << "a rough entry's weight is G2/G1, not 1";
+	EXPECT_NEAR(smooth_w_min, 1.0, 1e-3);
+	EXPECT_NEAR(smooth_w_max, 1.0, 1e-3);
+	EXPECT_GT(weight_sum / n, 0.85);
+	EXPECT_GT(transmitted, 0.9 * n);   // Fresnel reflectance is a few percent here
+	EXPECT_LT(transmitted, n);
+}

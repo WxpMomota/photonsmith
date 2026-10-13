@@ -302,6 +302,27 @@ struct RoughDielectricBxDF {
 		return res;
 	}
 
+	// sample_local() with the real throughput weight: f*|cos|/pdf = G(wo,wi)/G1(wi) for either lobe under VNDF sampling, in the same
+	// importance-transport convention as f() below (no 1/eta'^2). For a caller that continues the path with this one sample and takes no
+	// direct-light sample at this vertex: the rough entry of a subsurface material, whose refracted sample leaves for the BSSRDF exit.
+	CPU_GPU BxDFSampleResult<T> sample_weighted_local(
+		T wi_x, T wi_y, T wi_z, T eta, T u1, T u2, T u3) const
+	{
+		BxDFSampleResult<T> res = sample_local(wi_x, wi_y, wi_z, eta, u1, u2, u3);
+		if (!res.valid) return res;
+		TrowbridgeReitz<T> dist(alpha_x, alpha_y);
+#if defined(__CUDACC__)
+		const T wo_z = fabsf(res.wo_z);
+#else
+		const T wo_z = std::fabs(res.wo_z);
+#endif
+		const T G2  = dist.G(wi_x, wi_y, wi_z, res.wo_x, res.wo_y, wo_z);
+		const T G1i = dist.G1(wi_x, wi_y, wi_z);
+		const T w   = (G1i > T(1e-8)) ? (G2 / G1i) : T(0);
+		res.r = w; res.g = w; res.b = w;
+		return res;
+	}
+
 	// f(wi, eta, wo) -- real closed-form BSDF value (reflection + transmission
 	// lobes) at an arbitrary queried direction wo, for real NEE/MIS. Mirrors
 	// pbrt-v4 DielectricBxDF::f(), translated into this struct's own

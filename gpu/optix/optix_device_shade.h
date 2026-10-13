@@ -410,17 +410,40 @@ __device__ __forceinline__ void shade_material(
 			// emission field, that slot is bssrdf_sigma_a here, see
 			// optix_types.h's MaterialType::Subsurface comment - so no reset
 			// needed here anymore).
-			scattered_dir = dielectric_scatter(ray_dir, normal, front_face, mat.ior, seed);
-			bool is_transmission = dot(scattered_dir, normal) < 0.0f;
+			//
+			// A rough entry ("roughness" on the material): one GGX dielectric sample weighted by G2/G1 instead (the same sample CPU's
+			// subsurface::scatter_rough takes), with no direct-light sample at this vertex.
+			float3 entry_weight = make_float3(1.0f, 1.0f, 1.0f);
+			bool is_transmission;
+			const float ss_alpha_x = mat.remapRoughness ? sqrtf(mat.roughness) : mat.roughness;
+			const float ss_alpha_y = ResolveAnisotropicAlphaV(mat.roughnessV, mat.roughness, mat.remapRoughness);
+			if (!TrowbridgeReitz<float>(ss_alpha_x, ss_alpha_y).EffectivelySmooth()) {
+				float3 ss_tan, ss_bitan;
+				BuildDpduTangentFrame(normal.x, normal.y, normal.z, dpdu.x, dpdu.y, dpdu.z, ss_tan.x, ss_tan.y, ss_tan.z, ss_bitan.x, ss_bitan.y, ss_bitan.z);
+				const float3 ss_wi = normalize(-ray_dir);
+				float wi_x = dot(ss_wi, ss_tan), wi_y = dot(ss_wi, ss_bitan), wi_z = dot(ss_wi, normal);
+				if (wi_z < 0.0f) { wi_x = -wi_x; wi_y = -wi_y; wi_z = -wi_z; }
+				const float ss_ri = front_face ? (1.0f / mat.ior) : mat.ior;
+				RoughDielectricBxDF<float> ss_bxdf{ mat.ior, ss_alpha_x, ss_alpha_y };
+				const auto ss_res = ss_bxdf.sample_weighted_local(wi_x, wi_y, wi_z, ss_ri,
+					random_float(seed), random_float(seed), random_float(seed));
+				if (!ss_res.valid) { scattered = false; break; }
+				scattered_dir = normalize(ss_res.wo_x * ss_tan + ss_res.wo_y * ss_bitan + ss_res.wo_z * normal);
+				entry_weight  = make_float3(ss_res.r, ss_res.g, ss_res.b);
+				is_transmission = ss_res.is_transmission;
+			} else {
+				scattered_dir = dielectric_scatter(ray_dir, normal, front_face, mat.ior, seed);
+				is_transmission = dot(scattered_dir, normal) < 0.0f;
+			}
 			// pbrt-v4 etaScale, entry interface only - matches CPU camera.h's
 			// `entry_eta` (captured once here, before the exit-surface's own
 			// NormalizedFresnel shading below, which does NOT independently
 			// contribute another etaScale factor).
 			if (is_transmission) eta = front_face ? (1.0f / mat.ior) : mat.ior;
 			if (!is_transmission) {
-				// Specular reflection off the entry interface - identical
-				// to Dielectric's own reflection case.
-				attenuation = make_float3(1.0f, 1.0f, 1.0f);
+				// Reflection off the entry interface - identical
+				// to Dielectric's own reflection case (weight 1 when smooth).
+				attenuation = entry_weight;
 				scattered   = true;
 				is_specular = true;
 				break;
@@ -436,7 +459,7 @@ __device__ __forceinline__ void shade_material(
 				scattered = false;
 				break;
 			}
-			const float3 sss_weight = Sp / (sample_prob * pdf);
+			const float3 sss_weight = entry_weight * Sp / (sample_prob * pdf);
 
 			// Shade the exit point as pbrt-v4's Sw (NormalizedFresnel(eta))
 			// via shade_normalized_fresnel() - the same standalone function
