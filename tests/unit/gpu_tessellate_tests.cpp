@@ -172,3 +172,63 @@ TEST(GpuTessellateTest, AQuadricWithoutAPictureOrCaughtByAnotherRuleStaysAnalyti
 	EXPECT_EQ(tessellateForBackend(s, TessellationCaps::conesAndParaboloids(), nullptr), 0u) << "OptiX draws them natively";
 	EXPECT_EQ(s.disks.size(), 2u);
 }
+
+TEST(GpuTessellateTest, ASphereWithABumpMapBecomesTrianglesWithTheProjectsSphereCoordinates) {
+	pbrt_flatten::FlatScene s;
+	pbrt_flatten::Material mapped;
+	mapped.displacementTextureFilename = "bump.png";
+	s.materials.push_back(mapped);
+	s.materials.push_back(pbrt_flatten::Material());
+	pbrt_flatten::Sphere sp;
+	sp.center[0] = 1.0;
+	sp.center[1] = 2.0;
+	sp.center[2] = 3.0;
+	sp.center1[0] = 1.0;
+	sp.center1[1] = 2.0;
+	sp.center1[2] = 3.0;
+	sp.radius = 2.0;
+	sp.material = 0;
+	s.spheres.push_back(sp);
+	sp.material = 1;   // a plain sphere stays analytic
+	s.spheres.push_back(sp);
+	const size_t added = tessellateForBackend(s, TessellationCaps::all(), nullptr);
+	EXPECT_EQ(added, size_t(2 * 96 * 48));
+	ASSERT_EQ(s.spheres.size(), 1u);
+	EXPECT_EQ(s.spheres[0].material, 1);
+	const double kPi = 3.14159265358979323846;
+	for (size_t i = 0; i < s.triangles.size(); i += 97) {
+		const pbrt_flatten::Triangle& t = s.triangles[i];
+		ASSERT_TRUE(t.hasUVs && t.hasNormals);
+		for (int c = 0; c < 3; ++c) {
+			const double x = t.v[c * 3] - 1.0, y = t.v[c * 3 + 1] - 2.0, z = t.v[c * 3 + 2] - 3.0;
+			EXPECT_NEAR(std::sqrt(x * x + y * y + z * z), 2.0, 1e-9);
+			// the project's get_sphere_uv: theta = acos(-y / r) = pi v, phi = atan2(-z, x) + pi = 2 pi u
+			EXPECT_NEAR(std::acos(-y / 2.0), kPi * t.uv[c * 2 + 1], 1e-9);
+			if (std::fabs(y) < 1.99) {   // (away from the poles, where u is not defined)
+				double phi = std::atan2(-z, x) + kPi, u = 2.0 * kPi * t.uv[c * 2];
+				double d = std::fabs(phi - u);
+				d = std::min(d, 2.0 * kPi - d);
+				EXPECT_NEAR(d, 0.0, 1e-9);
+			}
+		}
+	}
+}
+
+TEST(GpuTessellateTest, ASphereThatIsALightMovesOrIsClippedStaysAnalytic) {
+	pbrt_flatten::FlatScene s;
+	pbrt_flatten::Material mapped;
+	mapped.displacementTextureFilename = "bump.png";
+	s.materials.push_back(mapped);
+	pbrt_flatten::Sphere sp;
+	sp.material = 0;
+	sp.areaLight = 0;
+	s.spheres.push_back(sp);
+	sp.areaLight = -1;
+	sp.center1[0] = 0.5;   // moving
+	s.spheres.push_back(sp);
+	sp.center1[0] = 0.0;
+	sp.clipped = true;
+	s.spheres.push_back(sp);
+	EXPECT_EQ(tessellateForBackend(s, TessellationCaps::all(), nullptr), 0u);
+	EXPECT_EQ(s.spheres.size(), 3u);
+}

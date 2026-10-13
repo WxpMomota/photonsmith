@@ -31,8 +31,9 @@ struct TessellationCaps {
 	bool curves = false;
 	bool cones = false;
 	bool paraboloids = false;
-	// A disk or cylinder whose material draws a picture, a checker or a bump map through the surface's (u, v). Metal's analytic disk and cylinder carry no
-	// coordinates, so a picture on one would not be drawn at all (and its repeats and shift could not apply); as triangles they get pbrt's own (u, v).
+	// A disk or cylinder whose material draws a picture, a checker or a bump map through the surface's (u, v), and a sphere whose material has a bump or normal map. Metal's analytic
+	// disk and cylinder carry no coordinates, so a picture on one would not be drawn at all (and its repeats and shift could not apply), and its analytic sphere has no tangent
+	// frame for a bump or normal map; as triangles they get the shape's own (u, v).
 	bool texturedQuadrics = false;
 	static TessellationCaps all() { return {true, true, true, true, true}; }            // Metal: only triangles and the three analytic shapes it has
 	static TessellationCaps conesAndParaboloids() { return {false, false, true, true, false}; }   // OptiX: its patches and curve dicing are native
@@ -56,6 +57,15 @@ inline bool tessellateAsTextured(const pbrt_flatten::FlatScene& scene, const Qua
     if (q.areaLight >= 0 || q.medium >= 0 || !usesSurfaceCoordinates(scene, q.material)) return false;
     for (int i = 0; i < 16; ++i) if (q.xform[i] != q.xformEnd[i]) return false;
     return true;
+}
+
+// A full sphere with a bump or normal map that Metal should draw as triangles: not a light, not in a medium, not clipped, not moving. (A picture or a checker on a sphere is read from
+// its position by the analytic sphere already.)
+inline bool tessellateSphereWithMap(const pbrt_flatten::FlatScene& scene, const pbrt_flatten::Sphere& sp) {
+    if (sp.areaLight >= 0 || sp.medium >= 0 || sp.clipped) return false;
+    for (int a = 0; a < 3; ++a) if (sp.center[a] != sp.center1[a]) return false;
+    if (sp.material < 0 || sp.material >= (int)scene.materials.size()) return false;
+    return !scene.materials[sp.material].displacementTextureFilename.empty();
 }
 
 using pbrt_flatten::quadric_tessellate::kPi;
@@ -107,10 +117,16 @@ inline size_t tessellateForBackend(pbrt_flatten::FlatScene& scene, const Tessell
         pbrt_flatten::quadric_tessellate::tessellateParaboloid(pa, out);
     }
 
-    // A textured disk or cylinder (caps.texturedQuadrics): triangles with pbrt's (u, v), so the picture is drawn and its repeats and shift apply.
+    // A textured disk or cylinder (caps.texturedQuadrics): triangles with pbrt's (u, v), so the picture is drawn and its repeats and shift apply; and a sphere with a bump or normal
+    // map.
     std::vector<pbrt_flatten::Disk> keptDisks;
     std::vector<pbrt_flatten::Cylinder> keptCylinders;
+    std::vector<pbrt_flatten::Sphere> keptSpheres;
     if (caps.texturedQuadrics) {
+        for (const pbrt_flatten::Sphere& sp : scene.spheres) {
+            if (isInterface(sp.material) || !tessellate_detail::tessellateSphereWithMap(scene, sp)) { keptSpheres.push_back(sp); continue; }
+            pbrt_flatten::quadric_tessellate::tessellateSphere(sp, out);
+        }
         for (const pbrt_flatten::Disk& d : scene.disks) {
             if (isInterface(d.material) || !tessellate_detail::tessellateAsTextured(scene, d)) { keptDisks.push_back(d); continue; }
             pbrt_flatten::quadric_tessellate::tessellateDisk(d, out);
@@ -164,7 +180,7 @@ inline size_t tessellateForBackend(pbrt_flatten::FlatScene& scene, const Tessell
     if (caps.cones) scene.cones.clear();
     if (caps.paraboloids) scene.paraboloids.clear();
     if (caps.curves) scene.curves.clear();
-    if (caps.texturedQuadrics) { scene.disks = std::move(keptDisks); scene.cylinders = std::move(keptCylinders); }
+    if (caps.texturedQuadrics) { scene.disks = std::move(keptDisks); scene.cylinders = std::move(keptCylinders); scene.spheres = std::move(keptSpheres); }
     return out.size();
 }
 
