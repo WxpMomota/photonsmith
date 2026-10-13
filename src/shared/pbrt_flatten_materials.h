@@ -1062,6 +1062,15 @@ inline void flattenOneMaterial(const pbrt_scene::Scene &scene, FlatScene &out,
 	Material m;
 	readMaterialBindings(scene, out, namedMaterialIndex, md, m);
 	readMaterialKindParams(scene, out, namedMaterialIndex, md, m);
+	// pbrt's own spelling of a normal map: a material parameter `"string normalmap" "file"` naming an image (a tangent-space normal in RGB, read linear), not a texture. The renderers'
+	// displacement slot tells a normal map from a height map by the picture itself, so it goes there (and a `texture displacement` of the same material, which pbrt would also read, wins).
+	{
+		const std::string normalMap = md.params.getString("normalmap", "");
+		if (!normalMap.empty() && m.displacementTextureFilename.empty()) {
+			m.displacementTextureFilename = normalMap;
+			m.displacementScale = 1.0;
+		}
+	}
 	out.materials.push_back(m);
 }
 

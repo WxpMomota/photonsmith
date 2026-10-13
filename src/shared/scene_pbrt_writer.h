@@ -25,15 +25,18 @@ namespace scene_doc {
 
 namespace detail {
 
+// `normalMap`, when not empty, is the file of a normal map, written as pbrt's own `"string normalmap"` parameter (a plain pbrt-v4 reads that; it has no texture mapping, so the Builder writes it only
+// where the placement is not needed or is already in the shape's texture coordinates).
 // `textureName`, when not empty, is a Texture already declared: it replaces the flat reflectance of a diffuse or coated material. `displacement`, when not empty, is a Texture
 // already declared that bumps (a height map) or perturbs the normal (a normal map) of a diffuse, coated or conductor surface.
 // The pbrt type and the parameters (each starting with a space) of a single, unmixed material: what `Material "<type>" ...` and `MakeNamedMaterial "<name>" "string type" [ "<type>" ] ...`
 // both take.
-inline std::pair<std::string, std::string> materialTypeAndParams(const Material& m, const std::string& textureName, const std::string& displacement) {
+inline std::pair<std::string, std::string> materialTypeAndParams(const Material& m, const std::string& textureName, const std::string& displacement, const std::string& normalMap = std::string()) {
 	const auto reflectance = [&]() {
 		return textureName.empty() ? " \"rgb reflectance\" [ " + rgb(m.color) + " ]" : " \"texture reflectance\" \"" + textureName + "\"";
 	};
-	const std::string bump = displacement.empty() ? std::string() : " \"texture displacement\" \"" + displacement + "\"";
+	const std::string bump = !displacement.empty() ? " \"texture displacement\" \"" + displacement + "\""
+	                         : !normalMap.empty() ? " \"string normalmap\" [ " + quoted(pbrtPath(normalMap)) + " ]" : std::string();
 	std::string p;
 	switch (m.kind) {
 		case MaterialKind::Diffuse:
@@ -60,8 +63,8 @@ inline std::pair<std::string, std::string> materialTypeAndParams(const Material&
 // A material, as the directive that sets the current one. A mix (Material::mixWith) is two named materials, `mix-<n>-a` (this one, with its picture, pattern and bump) and
 // `mix-<n>-b` (the second, plain), and pbrt's "mix" material over them; `mixCounter` numbers them.
 inline void writeMaterial(std::ostringstream& os, const Material& m, const std::string& ind, const std::string& textureName = std::string(),
-                          const std::string& displacement = std::string(), int* mixCounter = nullptr) {
-	const auto first = materialTypeAndParams(m, textureName, displacement);
+                          const std::string& displacement = std::string(), int* mixCounter = nullptr, const std::string& normalMap = std::string()) {
+	const auto first = materialTypeAndParams(m, textureName, displacement, normalMap);
 	if (!isMix(m) || !mixCounter) {
 		os << ind << "Material \"" << first.first << "\"" << first.second << "\n";
 		return;
@@ -90,7 +93,7 @@ inline UvPlace uvPlaceOf(const Object& o) {
 // Whether a shape writes its own texture coordinates, which is where the placement of a texture is put for it (UvPlace). The shapes the renderer makes the coordinates of (a sphere, disk,
 // cylinder, cone and a mesh file) have the placement written on the Texture instead, as pbrt's imagemap uscale/vscale/udelta/vdelta (textureMappingParams); the renderers read those.
 // (Baking stays for the rest because the renderers read that mapping for an imagemap only: a checker on a box, quad or ready-made shape gets its repeats and shift through the uv.)
-inline bool uvIsBaked(ShapeKind k) { return k == ShapeKind::Box || k == ShapeKind::Quad || isGeneratedShape(k); }
+inline bool uvIsBaked(ShapeKind k) { return k == ShapeKind::Box || k == ShapeKind::Quad || k == ShapeKind::Cone || isGeneratedShape(k); }
 
 // The " \"float uscale\" [ ... ] ..." parameters of an imagemap Texture that place it as the object's material says, for a shape that does not write its own coordinates; empty otherwise.
 // pbrt looks the texture up at (uscale * u + udelta, vscale * v + vdelta), and the Scene Builder's placement is u * repeats - shift, so udelta is minus the shift.
@@ -147,6 +150,7 @@ inline ShapeMesh meshOfShape(const Object& o) {
 		case ShapeKind::Cyclorama: return cycloramaMesh(o.size.x, o.size.y, o.size.z, o.radius);
 		case ShapeKind::Terrain: return terrainMesh(o.size.x, o.size.y, o.size.z, o.steps, o.radius, o.radius2, o.seed);
 		case ShapeKind::Tube: return tubeMesh(o.radius, o.radius2, o.height);
+		case ShapeKind::Cone: return coneMesh(o.radius, o.height);   // (pbrt-v4 has no cone shape: written as the mesh it is)
 		default: break;
 	}
 	return ShapeMesh();
@@ -198,10 +202,7 @@ inline void writeShape(std::ostringstream& os, const Object& o, const std::strin
 			   << ind << "Shape \"cylinder\" \"float radius\" [ " << num(o.radius) << " ] \"float zmin\" [ " << num(-o.height / 2) << " ] \"float zmax\" [ "
 			   << num(o.height / 2) << " ]\n";
 			break;
-		case ShapeKind::Cone:
-			os << ind << "Rotate -90 1 0 0\n" << ind << "Translate 0 0 " << num(-o.height / 2) << "\n"
-			   << ind << "Shape \"cone\" \"float radius\" [ " << num(o.radius) << " ] \"float height\" [ " << num(o.height) << " ]\n";
-			break;
+		case ShapeKind::Cone:   // (pbrt-v4 has no cone shape: written as the mesh coneMesh() makes of it, with the old cone's own texture coordinates)
 		case ShapeKind::Pyramid:
 		case ShapeKind::Wedge:
 		case ShapeKind::Stairs:
@@ -378,9 +379,15 @@ inline std::string toPbrt(const Document& d) {
 			   << " ] \"rgb tex2\" [ " << detail::rgb(o.material.color2) << " ]\n";
 		}
 		// A bump slot: a height map is a float image scaled to its height; a normal map is the colour image itself (the renderer reads either as the material's displacement).
-		std::string displacement;
+		std::string displacement, normalMapFile;
 		const bool canBump = o.material.kind == MaterialKind::Diffuse || o.material.kind == MaterialKind::CoatedDiffuse || o.material.kind == MaterialKind::Conductor;
-		if (canBump && !o.material.bumpFile.empty()) {
+		// A normal map is pbrt's own `"string normalmap"` parameter wherever its placement is not needed (none set) or is already in the shape's texture coordinates (a box, a quad, a cone and
+		// the ready-made shapes bake it): that is valid pbrt-v4, which a texture slot holding a colour picture is not. Only a sphere, disk, cylinder or mesh file with a placement keeps the
+		// texture (this project's renderers read it; pbrt has no mapping for a normal map).
+		const bool standardNormalMap = o.material.bumpKind == BumpKind::Normal && (!uvPlaced(o.material) || detail::uvIsBaked(o.shape));
+		if (canBump && !o.material.bumpFile.empty() && standardNormalMap) {
+			normalMapFile = o.material.bumpFile;
+		} else if (canBump && !o.material.bumpFile.empty()) {
 			displacement = "bump-" + std::to_string(++textureIndex);
 			if (o.material.bumpKind == BumpKind::Height) {
 				os << "Texture \"" << displacement << "-image\" \"float\" \"imagemap\" \"string filename\" [ " << detail::quoted(detail::pbrtPath(o.material.bumpFile)) << " ]"
@@ -405,7 +412,7 @@ inline std::string toPbrt(const Document& d) {
 			body.color = {0.0, 0.0, 0.0};
 			detail::writeMaterial(os, body, ind, std::string(), std::string(), &mixIndex);
 		} else {
-			detail::writeMaterial(os, o.material, ind, textureName, displacement, &mixIndex);
+			detail::writeMaterial(os, o.material, ind, textureName, displacement, &mixIndex, normalMapFile);
 		}
 		if (o.emissive) {
 			os << ind << "AreaLightSource \"diffuse\" \"rgb L\" [ " << detail::rgb(detail::scaled(o.emission, o.emissionStrength)) << " ]";

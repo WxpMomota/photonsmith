@@ -4209,3 +4209,20 @@ TEST(PbrtFlattenShapeRangesTest, AShapeThatMakesNothingGetsNoRange) {
 	const FlatScene s = flattenSource("WorldBegin\nShape \"sphere\" \"float radius\" [ 1 ]\nShape \"notashape\"\n");
 	EXPECT_EQ(s.shapeRanges.size(), 1u);
 }
+
+// pbrt's own spelling of a normal map: a material parameter naming an image, not a texture. The loader puts it in the same slot a displacement texture's picture goes (the renderers tell a
+// normal map from a height map by the picture), and a displacement texture on the same material wins.
+TEST(PbrtFlattenNormalMapTest, AStringNormalMapParameterBecomesTheMaterialsDisplacementPicture) {
+	const FlatScene s = flattenSource(std::string("WorldBegin\nMaterial \"diffuse\" \"string normalmap\" [ \"bumps.png\" ]\n") + kQuadMesh);
+	ASSERT_FALSE(s.materials.empty());
+	EXPECT_EQ(s.materials.back().displacementTextureFilename, "bumps.png");
+	EXPECT_DOUBLE_EQ(s.materials.back().displacementScale, 1.0);
+	const FlatScene plain = flattenSource(std::string("WorldBegin\nMaterial \"diffuse\"\n") + kQuadMesh);
+	EXPECT_TRUE(plain.materials.back().displacementTextureFilename.empty());
+}
+
+TEST(PbrtFlattenNormalMapTest, ADisplacementTextureOnTheSameMaterialWins) {
+	const FlatScene s = flattenSource(std::string("Texture \"d\" \"float\" \"imagemap\" \"string filename\" [ \"height.png\" ]\nWorldBegin\n") +
+	                                  "Material \"diffuse\" \"texture displacement\" \"d\" \"string normalmap\" [ \"normals.png\" ]\n" + kQuadMesh);
+	EXPECT_EQ(s.materials.back().displacementTextureFilename, "height.png");
+}

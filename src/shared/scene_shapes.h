@@ -175,6 +175,38 @@ inline ShapeMesh capsuleMesh(double radius, double height) {
 	return m;
 }
 
+// An open cone (no base disc): a circle of `radius` at the bottom (y = -height/2) narrowing to the apex at y = +height/2, with the exact outward normal at every vertex. It is what
+// the Builder used to write as pbrt's `Shape "cone"`, which pbrt-v4 does not have (it went with pbrt-v3), so real pbrt could not open the file. The texture coordinates are the old
+// cone's own, pbrt-v3's: u = phi / 2 pi with phi measured as the cone's local x-y plane saw it (the scene's x towards minus z), v = 0 at the base and 1 at the apex, so a picture or a
+// checker lies on it as it did.
+inline ShapeMesh coneMesh(double radius, double height) {
+	using namespace scene_shapes_detail;
+	const double pi = 3.14159265358979323846;
+	ShapeMesh m;
+	const int segments = 96, rows = 4;
+	const double r = std::max(radius, 1e-6), h = std::max(height, 1e-6);
+	const std::size_t first = m.vertexCount();
+	for (int i = 0; i <= segments; ++i) {
+		const double phi = 2 * pi * i / segments, c = std::cos(phi), s = -std::sin(phi);   // (x, -z): the local y axis became the scene's -z
+		for (int j = 0; j <= rows; ++j) {
+			const double f = static_cast<double>(j) / rows, ring = r * (1.0 - f);
+			addVertex(m, {ring * c, -h / 2 + h * f, ring * s}, unit({h * c, r, h * s}), static_cast<double>(i) / segments, f);
+		}
+	}
+	const int stride = rows + 1;
+	for (int i = 0; i < segments; ++i)
+		for (int j = 0; j < rows; ++j) {
+			const int a = static_cast<int>(first) + i * stride + j, b2 = static_cast<int>(first) + (i + 1) * stride + j;
+			const int c2 = b2 + 1, d = a + 1;
+			const auto outward = [&](int k) { return V{m.N[k * 3], m.N[k * 3 + 1], m.N[k * 3 + 2]}; };
+			const V o1{outward(a).x + outward(b2).x + outward(c2).x, outward(a).y + outward(b2).y + outward(c2).y, outward(a).z + outward(b2).z + outward(c2).z};
+			const V o2{outward(a).x + outward(c2).x + outward(d).x, outward(a).y + outward(c2).y + outward(d).y, outward(a).z + outward(c2).z + outward(d).z};
+			addTriangle(m, a, b2, c2, o1);   // (the triangles at the apex have no area and are dropped)
+			addTriangle(m, a, c2, d, o2);
+		}
+	return m;
+}
+
 // Half a sphere with a flat bottom, `radius` across; the whole thing is `radius` high, centred on its position.
 inline ShapeMesh domeMesh(double radius) {
 	using namespace scene_shapes_detail;

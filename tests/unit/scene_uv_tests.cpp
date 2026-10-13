@@ -172,7 +172,7 @@ TEST(SceneUvTest, TheChecksCatchAZeroRepeatAndNoShapeNeedsAWarningOnAnyRenderer)
 }
 
 TEST(SceneUvTest, ABoxBakesThePlacementIntoItsCoordinatesAndASphereGivesItToTheTexture) {
-	for (ShapeKind k : {ShapeKind::Sphere, ShapeKind::Disk, ShapeKind::Cylinder, ShapeKind::Cone, ShapeKind::Mesh}) {
+	for (ShapeKind k : {ShapeKind::Sphere, ShapeKind::Disk, ShapeKind::Cylinder, ShapeKind::Mesh}) {
 		Document d;
 		d.objects.push_back(texturedObject(k));
 		d.objects[0].material.uvScaleU = 3.0;
@@ -188,7 +188,7 @@ TEST(SceneUvTest, ABoxBakesThePlacementIntoItsCoordinatesAndASphereGivesItToTheT
 		EXPECT_NE(line.find("\"float udelta\" [ -0.5 ]"), std::string::npos) << toString(k) << ": pbrt's delta is minus the shift";
 		EXPECT_NE(line.find("\"float vdelta\" [ 0 ]"), std::string::npos) << toString(k) << " (no '-0')";
 	}
-	for (ShapeKind k : {ShapeKind::Quad, ShapeKind::Box, ShapeKind::Torus}) {
+	for (ShapeKind k : {ShapeKind::Quad, ShapeKind::Box, ShapeKind::Torus, ShapeKind::Cone}) {   // (a cone is a mesh with its own coordinates: pbrt-v4 has no cone shape)
 		Document d;
 		d.objects.push_back(texturedObject(k));
 		d.objects[0].material.uvScaleU = 3.0;
@@ -356,4 +356,38 @@ TEST(UvMappingRenderTest, ATextureMappedByItsUscaleVscaleUdeltaVdeltaRendersAsTh
 	double plainDiff = 0;
 	for (size_t i = 0; i < a.size(); ++i) plainDiff += std::fabs(a[i] - plain[i]);
 	EXPECT_GT(plainDiff / level, 0.2) << "the mapping changes the picture";
+}
+
+// A normal map is pbrt's own `"string normalmap"` parameter (valid pbrt-v4, which a colour picture in a displacement texture is not) wherever the placement is not needed or is in the
+// shape's coordinates; only a sphere, disk, cylinder or mesh file with a placement keeps the texture, which this project's renderers read and pbrt has no mapping for.
+TEST(SceneUvTest, ANormalMapIsPbrtsOwnParameterUnlessAShapeThatCannotBakeItsPlacementNeedsTheTexture) {
+	const auto written = [](ShapeKind k, bool placed) {
+		Document d;
+		Object o = makeObject(k, "Thing");
+		o.material.bumpFile = "normals.png";
+		o.material.bumpKind = BumpKind::Normal;
+		if (placed) o.material.uvScaleU = 3.0;
+		d.objects.push_back(o);
+		return toPbrt(d);
+	};
+	for (ShapeKind k : {ShapeKind::Sphere, ShapeKind::Disk, ShapeKind::Cylinder, ShapeKind::Box, ShapeKind::Cone, ShapeKind::Torus}) {
+		const std::string text = written(k, false);
+		EXPECT_NE(text.find("\"string normalmap\" [ \"normals.png\" ]"), std::string::npos) << toString(k);
+		EXPECT_EQ(text.find("texture displacement"), std::string::npos) << toString(k) << ": no texture slot holding a colour picture";
+	}
+	for (ShapeKind k : {ShapeKind::Box, ShapeKind::Cone, ShapeKind::Torus}) {
+		const std::string text = written(k, true);
+		EXPECT_NE(text.find("\"string normalmap\""), std::string::npos) << toString(k) << ": its own coordinates carry the placement";
+	}
+	for (ShapeKind k : {ShapeKind::Sphere, ShapeKind::Disk, ShapeKind::Cylinder}) {
+		const std::string text = written(k, true);
+		EXPECT_EQ(text.find("\"string normalmap\""), std::string::npos) << toString(k) << ": pbrt has no mapping for a normal map, so the placement needs the texture";
+		EXPECT_NE(text.find("texture displacement"), std::string::npos) << toString(k);
+	}
+	Document hm;
+	Object h = makeObject(ShapeKind::Box, "Box");
+	h.material.bumpFile = "relief.png";
+	h.material.bumpKind = BumpKind::Height;
+	hm.objects.push_back(h);
+	EXPECT_EQ(toPbrt(hm).find("string normalmap"), std::string::npos) << "a height map stays a float texture";
 }

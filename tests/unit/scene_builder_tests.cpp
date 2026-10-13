@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include "agreement_test_helpers.h"
+#include "external/stb_image_write.h"   // (stbi_write_png: its implementation is in mtl_material_tests.cpp)
 #include "../../src/shared/scene_document.h"
 #include "../../src/shared/scene_array.h"
 #include "../../src/shared/scene_props.h"
@@ -1039,7 +1040,8 @@ TEST(SceneArrayDocumentTest, AScatteredSceneRoundTripsLoadsAndStaysSmall) {
 	EXPECT_LT(toJson(d).size(), 600u * 1024u) << "an undo step of a big scene stays a few hundred kilobytes";
 	const pbrt_load::LoadResult r = loadText(pbrt, "scattered");
 	ASSERT_TRUE(r.ok) << r.error;
-	EXPECT_EQ(r.scene.cones.size(), 301u) << "the original pine and its 300 copies";
+	EXPECT_EQ(r.scene.cones.size(), 0u) << "pbrt-v4 has no cone shape: the pine's cones are written as meshes";
+	EXPECT_GE(r.scene.triangles.size(), 301u * scene_doc::coneMesh(1.0, 1.0).triangleCount()) << "the original pine's cones and its 300 copies' (a mesh each)";
 }
 
 TEST(SceneArrayDocumentTest, TheSceneSizeCoversTheWholeScatter) {
@@ -1577,8 +1579,13 @@ TEST(SceneCombosTest, WritesOneSceneForEveryShapeAndMaterialTreatmentWhenAsked) 
 	for (int y = 0; y < 4; ++y)
 		for (int x = 0; x < 16; ++x) for (int c = 0; c < 3; ++c) ramp.push_back(static_cast<unsigned char>(255 * x / 15));
 	for (int i = 0; i < 4; ++i) { tilt.push_back(238); tilt.push_back(128); tilt.push_back(191); }   // a normal tilted 60 degrees about +x
-	const std::string pictureFile = writeFile("combo_picture.bmp", bmpFile(4, 4, picture)), rampFile = writeFile("combo_ramp.bmp", bmpFile(16, 4, ramp)),
-	                  tiltFile = writeFile("combo_tilt.bmp", bmpFile(2, 2, tilt));
+	// PNG, not BMP: pbrt-v4 reads a PNG with the encoding it is asked for (a normal map linear) but decodes every other format (BMP, JPG, TGA) as sRGB whatever it is asked, which
+	// would make its picture of a normal map differ from ours for a reason that is not ours (docs/PBRT_SUPPORT.md).
+	const auto writePng = [&](const std::string& name, int w, int h, const std::vector<unsigned char>& rgb) {
+		stbi_write_png((dir + "/" + name).c_str(), w, h, 3, rgb.data(), w * 3);
+		return dir + "/" + name;
+	};
+	const std::string pictureFile = writePng("combo_picture.png", 4, 4, picture), rampFile = writePng("combo_ramp.png", 16, 4, ramp), tiltFile = writePng("combo_tilt.png", 2, 2, tilt);
 	struct Treatment {
 		const char* name;
 		std::function<void(Object&)> apply;

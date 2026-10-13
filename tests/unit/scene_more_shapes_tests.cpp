@@ -9,6 +9,7 @@
 #include "../../src/shared/scene_gizmo.h"
 
 #include <cmath>
+#include <cstdio>
 #include <fstream>
 
 using namespace scene_doc;
@@ -224,4 +225,108 @@ TEST(CycloramaTest, WithNoCurveTheFloorAndTheWallKeepTheirOwnNormals) {
 		}
 	}
 	EXPECT_NEAR(meshArea(m), 8.0 * (6.0 + 4.0), 1e-9) << "floor plus wall, nothing between";
+}
+
+// ---- The cone: pbrt-v4 has no cone shape (it went with pbrt-v3), so the Builder writes one as a mesh ----
+
+TEST(ConeMeshTest, ItsAreaIsTheClosedFormItIsOpenAtTheBaseAndFacesOutward) {
+	const double r = 0.8, h = 2.0;
+	const ShapeMesh m = coneMesh(r, h);
+	// The lateral surface of a cone: pi r sqrt(r^2 + h^2); the 96-sided polygon is a little under it.
+	const double exact = kPi * r * std::sqrt(r * r + h * h);
+	EXPECT_NEAR(meshArea(m), exact, 0.002 * exact);
+	double lo[3] = {1e9, 1e9, 1e9}, hi[3] = {-1e9, -1e9, -1e9};
+	for (std::size_t i = 0; i < m.P.size(); ++i) {
+		lo[i % 3] = std::min(lo[i % 3], m.P[i]);
+		hi[i % 3] = std::max(hi[i % 3], m.P[i]);
+	}
+	EXPECT_NEAR(lo[1], -h / 2, 1e-9) << "the base is at -height/2";
+	EXPECT_NEAR(hi[1], h / 2, 1e-9) << "the apex at +height/2";
+	EXPECT_NEAR(hi[0], r, 1e-9);
+	EXPECT_NEAR(lo[0], -r, 1e-9);
+	EXPECT_NEAR(hi[2], r, 1e-9);
+	for (std::size_t t = 0; t + 2 < m.indices.size(); t += 3) {   // each triangle's own normal agrees with its vertices' (outward)
+		const int a = m.indices[t], b = m.indices[t + 1], c = m.indices[t + 2];
+		const double ux = m.P[b * 3] - m.P[a * 3], uy = m.P[b * 3 + 1] - m.P[a * 3 + 1], uz = m.P[b * 3 + 2] - m.P[a * 3 + 2];
+		const double vx = m.P[c * 3] - m.P[a * 3], vy = m.P[c * 3 + 1] - m.P[a * 3 + 1], vz = m.P[c * 3 + 2] - m.P[a * 3 + 2];
+		const double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+		const double dot = nx * (m.N[a * 3] + m.N[b * 3] + m.N[c * 3]) + ny * (m.N[a * 3 + 1] + m.N[b * 3 + 1] + m.N[c * 3 + 1]) + nz * (m.N[a * 3 + 2] + m.N[b * 3 + 2] + m.N[c * 3 + 2]);
+		ASSERT_GT(dot, 0.0) << "triangle " << t / 3 << " faces inward";
+	}
+	for (std::size_t v = 0; v < m.vertexCount(); ++v) {
+		const double len = std::sqrt(m.N[v * 3] * m.N[v * 3] + m.N[v * 3 + 1] * m.N[v * 3 + 1] + m.N[v * 3 + 2] * m.N[v * 3 + 2]);
+		ASSERT_NEAR(len, 1.0, 1e-9);
+		// the exact cone normal: perpendicular to the slant line (radial * h, up * r)
+		const double radial = std::hypot(m.P[v * 3], m.P[v * 3 + 2]);
+		if (radial > 1e-6) ASSERT_NEAR(m.N[v * 3 + 1] * h - std::hypot(m.N[v * 3], m.N[v * 3 + 2]) * r, 0.0, 1e-9) << "vertex " << v;
+	}
+}
+
+TEST(ConeMeshTest, ItsTextureCoordinatesAreTheOldAnalyticCones) {
+	// pbrt-v3's cone: u = phi / phiMax with phi measured in the cone's own x-y plane (which became the scene's x and -z), v = 0 at the base and 1 at the apex.
+	const ShapeMesh m = coneMesh(1.0, 2.0);
+	for (std::size_t v = 0; v < m.vertexCount(); ++v) {
+		const double x = m.P[v * 3], y = m.P[v * 3 + 1], z = m.P[v * 3 + 2];
+		EXPECT_NEAR(m.UV[v * 2 + 1], (y + 1.0) / 2.0, 1e-9) << "v runs from the base to the apex";
+		const double radial = std::hypot(x, z);
+		if (radial < 1e-6) continue;   // (at the apex u is whatever the segment says)
+		double phi = std::atan2(-z, x);
+		if (phi < 0) phi += 2 * kPi;
+		const double u = m.UV[v * 2];
+		EXPECT_TRUE(std::fabs(u - phi / (2 * kPi)) < 1e-9 || std::fabs(u - 1.0 - phi / (2 * kPi)) < 1e-9 || std::fabs(u - (phi / (2 * kPi) - 1.0)) < 1e-9 || (u == 1.0 && phi < 1e-9)) << "vertex " << v;
+	}
+}
+
+TEST(ConeMeshTest, ItIsWrittenAsAMeshNotAShapePbrtV4DoesNotHaveAndTheRendererLoadsIt) {
+	Document d;
+	d.objects.push_back(makeObject(ShapeKind::Cone, "Pine"));
+	const std::string text = toPbrt(d);
+	EXPECT_EQ(text.find("Shape \"cone\""), std::string::npos) << "pbrt-v4 has no cone shape (the document's own JSON line still says the object is a cone)";
+	EXPECT_NE(text.find("trianglemesh"), std::string::npos);
+	{
+		std::ofstream out("cone_mesh_test.pbrt", std::ios::binary);
+		out << text;
+	}
+	const pbrt_load::LoadResult r = pbrt_load::loadFile("cone_mesh_test.pbrt");
+	std::remove("cone_mesh_test.pbrt");
+	ASSERT_TRUE(r.ok) << r.error;
+	EXPECT_TRUE(r.scene.cones.empty());
+	EXPECT_EQ(r.scene.triangles.size(), coneMesh(0.8, 2.0).triangleCount());
+	Document back;
+	std::string err;
+	ASSERT_TRUE(fromPbrt(text, back, err)) << err;
+	EXPECT_EQ(toJson(back), toJson(d)) << "the file still opens in the Builder as a cone";
+}
+
+// A mesh cone and pbrt's own analytic cone (the shape the Builder wrote before, which this renderer still reads from a file) light a ball-sized scene the same, within what 96 flat sides cost.
+TEST(ConeMeshTest, ItRendersLikeTheAnalyticConeItReplaced) {
+	if (findRayTracerLauncher().empty()) GTEST_SKIP() << "ray_tracer.exe was not found next to the tests";
+	const auto scene = [](const std::string& shape) {
+		return "LookAt 3 2 5  0 0 0  0 1 0\nCamera \"perspective\" \"float fov\" [ 40 ]\nFilm \"rgb\" \"integer xresolution\" [ 48 ] \"integer yresolution\" [ 48 ]\n"
+		       "Sampler \"independent\" \"integer pixelsamples\" [ 64 ]\nIntegrator \"path\" \"integer maxdepth\" [ 3 ]\nWorldBegin\n"
+		       "LightSource \"infinite\" \"rgb L\" [ 0.5 0.6 0.8 ]\nLightSource \"distant\" \"point3 from\" [ 3 5 2 ] \"point3 to\" [ 0 0 0 ] \"rgb L\" [ 3 3 3 ]\n"
+		       "AttributeBegin\n  Material \"diffuse\" \"rgb reflectance\" [ 0.7 0.5 0.3 ]\n" + shape + "AttributeEnd\n";
+	};
+	Document d;
+	d.objects.push_back(makeObject(ShapeKind::Cone, "Cone"));
+	d.objects[0].position = {0, 0, 0};
+	d.objects[0].radius = 1.0;
+	d.objects[0].height = 2.0;
+	d.objects[0].material.color = {0.7, 0.5, 0.3};   // (the analytic scene's colour)
+	const std::string written = toPbrt(d);
+	const size_t at = written.find("AttributeBegin"), end = written.rfind("AttributeEnd");
+	std::string mesh = written.substr(at, end - at);   // the Builder's own object block: Translate, material, mesh
+	const size_t mat = mesh.find("Material");
+	mesh = mesh.substr(mat);   // (drop AttributeBegin and Translate: placed at the origin)
+	const std::string analytic = "  Material \"diffuse\" \"rgb reflectance\" [ 0.7 0.5 0.3 ]\n  Rotate -90 1 0 0\n  Translate 0 0 -1\n  Shape \"cone\" \"float radius\" [ 1 ] \"float height\" [ 2 ]\n";
+	std::vector<float> a, b;
+	int w = 0, h = 0, w2 = 0, h2 = 0;
+	ASSERT_TRUE(renderPbrtTextCpu(scene(analytic), "cone_analytic", 48, a, w, h));
+	ASSERT_TRUE(renderPbrtTextCpu(scene("  " + mesh), "cone_mesh", 48, b, w2, h2));
+	double ma = 0, mb = 0;
+	for (float v : a) ma += v;
+	for (float v : b) mb += v;
+	ma /= a.size();
+	mb /= b.size();
+	EXPECT_NEAR(mb, ma, 0.02 * ma) << "mean of the analytic cone's picture " << ma << ", the mesh's " << mb;
 }
