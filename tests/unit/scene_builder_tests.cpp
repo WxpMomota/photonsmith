@@ -1444,7 +1444,7 @@ TEST(SceneMaterialsMoreTest, ProblemsWithTheNewMaterialFieldsAreReported) {
 		for (const Problem& p : validate(d)) warned = warned || p.message.find("does not draw a height map") != std::string::npos || p.message.find("do not draw a height map") != std::string::npos;
 		return warned;
 	};
-	EXPECT_TRUE(heightMapWarned()) << "a height map on a sphere shows on the CPU only";
+	EXPECT_TRUE(heightMapWarned()) << "OptiX does not draw one on a sphere (Metal does)";
 	d.objects.back().shape = ShapeKind::Disk;
 	EXPECT_TRUE(heightMapWarned()) << "OptiX does not draw one on a disk (Metal does)";
 	d.objects.back().shape = ShapeKind::Cylinder;

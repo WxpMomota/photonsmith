@@ -113,4 +113,18 @@ inline void tessellateDisk(const Disk& d, std::vector<Triangle>& out) {
     });
 }
 
+// A full sphere, with the (u, v) this project's sphere has everywhere (sphere.h get_sphere_uv, which the Metal analytic sphere's lookup matches): the poles are on the world's y axis,
+// phi = 2 pi u = atan2(-z, x) + pi and theta = pi v = acos(-y/r), so p = c + r * (-sin(theta) cos(phi), -cos(theta), sin(theta) sin(phi)). 96 x 48 cells: the silhouette is
+// 5e-4 of the radius off at worst. Not a clipped sphere (it has its own transform and parameters), not a moving one.
+inline void tessellateSphere(const Sphere& sp, std::vector<Triangle>& out) {
+    tessellateGrid(out, 96, 48, sp.material, sp.areaLight, [&](double u, double v, double* p, double* n) {
+        const double phi = 2.0 * kPi * u, theta = kPi * v;
+        const double s = std::sin(theta);
+        n[0] = -s * std::cos(phi);
+        n[1] = -std::cos(theta);
+        n[2] = s * std::sin(phi);
+        for (int a = 0; a < 3; ++a) p[a] = sp.center[a] + sp.radius * n[a];
+    });
+}
+
 }  // namespace quadric_tessellate

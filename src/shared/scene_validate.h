@@ -168,9 +168,7 @@ inline std::vector<Problem> validate(const Document& d) {
 			const MaterialKind k = o.material.kind;
 			if (k != MaterialKind::Diffuse && k != MaterialKind::CoatedDiffuse && k != MaterialKind::Conductor)
 				warn(who + "a bump or normal map only applies to matte, glossy paint and metal materials.");
-			else if (o.shape == ShapeKind::Sphere)
-				warn(who + "the GPU renderers do not draw a height map (a grayscale picture) on a sphere, which has no triangle coordinates: it shows in the CPU preview only. A normal map (a colour picture) is drawn.");
-			else if (o.shape == ShapeKind::Disk || o.shape == ShapeKind::Cylinder)
+			else if (o.shape == ShapeKind::Sphere || o.shape == ShapeKind::Disk || o.shape == ShapeKind::Cylinder)
 				warn(who + "OptiX does not draw a height map (a grayscale picture) on a " + toString(o.shape) + " (Metal does): it shows in the CPU preview and on a Mac only. A normal map (a colour picture) is drawn.");
 			if (o.material.bumpKind == BumpKind::Height && !(o.material.bumpStrength >= 0.0)) err(who + "the bump height cannot be negative.");
 			if (detail::absoluteFileMissing(o.material.bumpFile))
