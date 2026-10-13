@@ -630,8 +630,16 @@ TriangleMaterial MetalPocApp::mapPbrtMaterial(PbrtMaterialMapState& st, const pb
                     }
                 }
                 if (havePbrtDiffuseImage) {
-                    return TriangleMaterial{color, /*materialType=*/METAL_MAT_IMAGE_CLEARCOAT, /*ior=*/1.0f,
-                                             PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/(float)m.textureScale};
+                    // The layered coat of materialType 19 over a base that is the picture: `ior` is the coat's, `conductorEta.x` its alpha (`roughness` holds the picture's scale,
+                    // as for materialType 26). It used to be the old single-bounce clearcoat with a fixed IOR 1.5 and no roughness, 7% too bright against the CPU, and it never got
+                    // the texture repeats and shift.
+                    const double coatRough = m.roughness_u;
+                    const float coatAlpha = (float)(m.remapRoughness ? std::sqrt(coatRough) : coatRough);
+                    TriangleMaterial imageMat{color, /*materialType=*/METAL_MAT_IMAGE_CLEARCOAT, /*ior=*/(float)m.ior,
+                                              PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/(float)m.textureScale};
+                    imageMat.conductorEta = PackedFloat3{coatAlpha, 0.0f, 0.0f};
+                    applyReflectanceMapping(imageMat, m);
+                    return imageMat;
                 }
             }
             // pbrt-v4 LayeredBxDF coated diffuse (materialType 19): `ior` = coat IOR, `roughness` = alpha.

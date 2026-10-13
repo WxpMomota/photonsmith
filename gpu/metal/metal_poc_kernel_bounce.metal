@@ -37,14 +37,20 @@ inline bool scatterAtSurface(thread const KernelRes& R, thread PathState& P, thr
     } else if (mat.materialType == METAL_MAT_THIN_DIELECTRIC) {
         if (!shadeThinDielectric(mat, hitPoint, normal, facingNormal,
                                   rayDir, rayOrigin, throughput, specularBounce, rngState)) return false;
-    } else if (mat.materialType == METAL_MAT_CLEARCOAT || mat.materialType == METAL_MAT_IMAGE_CLEARCOAT) {
-        // materialType 27 (J1, section 172): the SAME clearcoat
-        // shading materialType 8 already uses, just with `albedo`
-        // (computed above) sourced from a real per-hit texture
-        // sample instead of `mat.color` - shadeClearcoat() itself
-        // needs no changes at all, it already takes `albedo` as
-        // an explicit parameter rather than reading `mat.color`
-        // directly.
+    } else if (mat.materialType == METAL_MAT_IMAGE_CLEARCOAT) {
+        // materialType 27: a pbrt CoatedDiffuse whose reflectance is a picture: the layered coat of materialType 19 over a base whose colour is the sampled picture
+        // (`albedo`, computed above); the coat's IOR is `ior` and its alpha `conductorEta.x` (`roughness` is the picture's scale).
+        TriangleMaterial coated = mat;
+        coated.color = packed_float3(albedo);
+        coated.roughness = mat.conductorEta.x;
+        if (!shadeCoatedDiffuse(coated, hitPoint, facingNormal, uniforms,
+                          lights, pointLights, directionalLights, projectionLights, goniometricLights,
+                          envMarginalCDF, envConditionalCDF, uniforms.envMapWidth, uniforms.envMapHeight,
+                          pbrtEnvMarginalCDF, pbrtEnvConditionalCDF, uniforms.pbrtEnvMapWidth, uniforms.pbrtEnvMapHeight,
+                          earthTexture, pbrtEnvTexture, goniometricTexture, pbrtGoniometricTexture, pbrtProjectionTexture, pbrtAreaLightTexture, textureSampler,
+                          isect, accelStructure, functionTable,
+                          rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState)) return false;
+    } else if (mat.materialType == METAL_MAT_CLEARCOAT) {
         if (!shadeClearcoat(mat, albedo, hitPoint, facingNormal, uniforms,
                              lights, pointLights, directionalLights, projectionLights, goniometricLights,
                              envMarginalCDF, envConditionalCDF, uniforms.envMapWidth, uniforms.envMapHeight,

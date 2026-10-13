@@ -6,6 +6,7 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## Unreleased
 
+* **Metal: coated paint with a picture**: a glossy paint (coateddiffuse) whose colour is a picture used an old single-bounce clearcoat on a Mac (a fixed coat index, no coat roughness), about 7% too bright against the CPU, and it ignored the texture repeats and shift. It now uses the same layered coat as flat coated paint, over the picture, and honours the repeats and shift. This was the cause of the Scene Builder's ready-made mixes with a picture reading 1-3% off on Metal.
 * **Emitters agree on every renderer; Metal's bump maps follow pbrt's footprint**: the Scene Builder writes an emissive object with a black body (a pbrt light shape keeps its own material; the CPU and OptiX draw it as an emitter only, Metal and real pbrt reflect, so a coloured emitter was 15% off on a Mac), and Metal's height-map step uses pbrt's `max(1/8, 1/sqrt(samples per pixel))` ray-differential scale like the CPU and OptiX.
 
 ## 0.1.2 (2026-10-12)
