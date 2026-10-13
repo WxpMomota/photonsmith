@@ -142,7 +142,24 @@ struct SphereData {
 	// own v-coordinate comment for why re-deriving it per-hit was flagged as
 	// wasted work.
 	float thetaZMin, thetaZMax;
+	// A sphere loaded from a pbrt file keeps pbrt's texture coordinates (poles on the OBJECT's z axis, phi = atan2(y, x)): hasUvRot is set and uvRot (row-major 3x3,
+	// pbrt_flatten::Sphere::uvRot) carries the object-space direction into the frame the plain sphere's own (u, v) are defined in (poles on y, get_sphere_uv). Zero-init
+	// (every sphere a scene builds in code) leaves hasUvRot at 0: the plain sphere's own coordinates, unrotated.
+	int hasUvRot;
+	float uvRot[9];
 };
+
+// The direction d in the frame a sphere's texture coordinates are defined in, and back (the rotation is orthonormal: the inverse is the transpose).
+inline __host__ __device__ float3 sphere_to_uv_frame(const SphereData& s, const float3& d) {
+	return make_float3(s.uvRot[0] * d.x + s.uvRot[1] * d.y + s.uvRot[2] * d.z,
+					   s.uvRot[3] * d.x + s.uvRot[4] * d.y + s.uvRot[5] * d.z,
+					   s.uvRot[6] * d.x + s.uvRot[7] * d.y + s.uvRot[8] * d.z);
+}
+inline __host__ __device__ float3 sphere_from_uv_frame(const SphereData& s, const float3& d) {
+	return make_float3(s.uvRot[0] * d.x + s.uvRot[3] * d.y + s.uvRot[6] * d.z,
+					   s.uvRot[1] * d.x + s.uvRot[4] * d.y + s.uvRot[7] * d.z,
+					   s.uvRot[2] * d.x + s.uvRot[5] * d.y + s.uvRot[8] * d.z);
+}
 
 // Quad geometry data (custom primitive)
 struct QuadData {

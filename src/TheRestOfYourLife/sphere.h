@@ -36,6 +36,14 @@ class sphere : public hittable {
         bbox = aabb(box1, box2);
     }
 
+    // A sphere loaded from a pbrt file keeps pbrt's texture coordinates: the poles on the OBJECT's z axis, which the sphere forgot when it was baked to a centre and a radius
+    // (pbrt_flatten::Sphere::uvRot). `rot` (row-major 3x3) carries a world-space direction into this class's own frame (poles on y, get_sphere_uv below); a sphere that never
+    // calls this keeps that frame and its own (u, v), as every scene built in code has them.
+    void set_uv_rotation(const double rot[9]) {
+        for (int i = 0; i < 9; ++i) uv_rot[i] = rot[i];
+        has_uv_rot = true;
+    }
+
     bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
         point3 current_center = center.at(r.time());
         vec3 oc = current_center - r.origin();
@@ -61,7 +69,9 @@ class sphere : public hittable {
         rec.p = r.at(rec.t);
         vec3 outward_normal = (rec.p - current_center) / radius;
         rec.set_face_normal(r, outward_normal);
-        get_sphere_uv(outward_normal, rec.u, rec.v);
+        // The direction in the frame the texture coordinates are defined in (the world's own unless set_uv_rotation() was called).
+        const vec3 uv_dir = has_uv_rot ? to_uv_frame(outward_normal) : outward_normal;
+        get_sphere_uv(uv_dir, rec.u, rec.v);
         rec.mat = mat;
         // Analytic parametric derivatives, matching get_sphere_uv()'s own
         // convention exactly (theta = pi*v, phi = 2*pi*u; inverting
@@ -109,11 +119,15 @@ class sphere : public hittable {
             // compute_differentials() for hits landing just inside the
             // threshold.
             if (rec.dpdu.length_squared() < 1e-14) {
-                vec3 tangent = cross(vec3(0,1,0), outward_normal);
+                vec3 tangent = cross(vec3(0,1,0), uv_dir);
                 double tlen = tangent.length();
                 vec3 dir = (tlen > 1e-6) ? (tangent / tlen) : vec3(1, 0, 0);
                 rec.dpdu = dir * (radius * 2.0 * pi * sin_theta);
-                rec.dpdv = cross(outward_normal, dir) * (radius * pi);
+                rec.dpdv = cross(uv_dir, dir) * (radius * pi);
+            }
+            if (has_uv_rot) {   // the tangents above are in the texture frame: back to the world
+                rec.dpdu = from_uv_frame(rec.dpdu);
+                rec.dpdv = from_uv_frame(rec.dpdv);
             }
             // n = (p - centre) / radius, so its derivatives are the tangents over the radius (pbrt's Weingarten result for a sphere).
             rec.dndu = rec.dpdu / radius;
@@ -175,7 +189,7 @@ class sphere : public hittable {
         vec3 n_local(r*std::cos(phi), r*std::sin(phi), z);   // unit sphere point
         out.n = n_local;
         out.p = center.at(0) + radius * n_local;
-        get_sphere_uv(n_local, out.u, out.v);
+        get_sphere_uv(has_uv_rot ? to_uv_frame(n_local) : n_local, out.u, out.v);
         out.pdf_pos = (radius > 0.0) ? 1.0 / (4.0 * pi * radius * radius) : 0.0;
         return true;
     }
@@ -185,6 +199,19 @@ class sphere : public hittable {
     double radius;
     shared_ptr<material> mat;
     aabb bbox;
+    double uv_rot[9] = {1, 0, 0,  0, 1, 0,  0, 0, 1};
+    bool has_uv_rot = false;
+
+    vec3 to_uv_frame(const vec3& d) const {
+        return vec3(uv_rot[0] * d.x() + uv_rot[1] * d.y() + uv_rot[2] * d.z(),
+                    uv_rot[3] * d.x() + uv_rot[4] * d.y() + uv_rot[5] * d.z(),
+                    uv_rot[6] * d.x() + uv_rot[7] * d.y() + uv_rot[8] * d.z());
+    }
+    vec3 from_uv_frame(const vec3& d) const {   // the transpose: the rotation is orthonormal
+        return vec3(uv_rot[0] * d.x() + uv_rot[3] * d.y() + uv_rot[6] * d.z(),
+                    uv_rot[1] * d.x() + uv_rot[4] * d.y() + uv_rot[7] * d.z(),
+                    uv_rot[2] * d.x() + uv_rot[5] * d.y() + uv_rot[8] * d.z());
+    }
 
     static void get_sphere_uv(const point3& p, double& u, double& v) {
         // p: a given point on the sphere of radius one, centered at the origin.

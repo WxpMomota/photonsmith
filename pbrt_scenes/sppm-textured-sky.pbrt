@@ -25,4 +25,10 @@ LightSource "infinite" "rgb L" [ 1 1 1 ]
 Texture "checks" "spectrum" "checkerboard" "float uscale" [ 8 ] "float vscale" [ 4 ]
   "rgb tex1" [ 0.9 0.2 0.2 ] "rgb tex2" [ 0.1 0.1 0.8 ]
 Material "diffuse" "texture reflectance" [ "checks" ]
+AttributeBegin
+# pbrt's sphere has its texture poles on its own z axis; these two turns stand it up with its poles on y and its seam where this scene's picture
+# has always been (the renderers used to keep the poles on y whatever the sphere's transform was).
+Rotate 180 0 1 0
+Rotate -90 1 0 0
 Shape "sphere" "float radius" [ 1 ]
+AttributeEnd

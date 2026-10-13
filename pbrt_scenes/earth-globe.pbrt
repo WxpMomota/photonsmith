@@ -34,7 +34,13 @@ AttributeEnd
 
 Texture "earth-tex" "spectrum" "imagemap" "string filename" [ "images/earthmap.jpg" ]
 Material "diffuse" "texture reflectance" [ "earth-tex" ]
+AttributeBegin
+# pbrt's sphere has its texture poles on its own z axis; these two turns stand it up with its poles on y and its seam where this scene's picture
+# has always been (the renderers used to keep the poles on y whatever the sphere's transform was).
+Rotate 180 0 1 0
+Rotate -90 1 0 0
 Shape "sphere" "float radius" [ 2 ]
+AttributeEnd
 
 Material "diffuse" "rgb reflectance" [ 0.6 0.6 0.62 ]
 AttributeBegin

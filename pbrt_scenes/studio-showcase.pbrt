@@ -1028,6 +1028,7 @@ AttributeEnd
 AttributeBegin
   Translate -0.1 0.9 -0.8
   Material "subsurface" "rgb reflectance" [ 0.9 0.78 0.52 ] "rgb mfp" [ 0.105 0.066 0.036 ] "float eta" [ 1.45 ] "float roughness" [ 0.2 ]
+  Rotate -90 1 0 0
   Shape "sphere" "float radius" [ 0.9 ]
 AttributeEnd
 
@@ -1045,6 +1046,7 @@ AttributeEnd
 AttributeBegin
   Translate 2.5 0.87 1.1
   Material "dielectric" "float eta" [ 1.5 ]
+  Rotate -90 1 0 0
   Shape "sphere" "float radius" [ 0.75 ]
 AttributeEnd
 
@@ -1052,6 +1054,7 @@ AttributeEnd
 AttributeBegin
   Translate -0.7 0.4 2.3
   Material "conductor" "rgb reflectance" [ 1 0.766 0.336 ] "float roughness" [ 0.08 ]
+  Rotate -90 1 0 0
   Shape "sphere" "float radius" [ 0.4 ]
 AttributeEnd
 

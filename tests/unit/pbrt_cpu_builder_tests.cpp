@@ -2807,3 +2807,67 @@ TEST(PbrtCpuBuildTest, ParaboloidWithMediumScattersReliablyEnteringThroughTheOpe
 	}
 }
 
+// A sphere loaded from a pbrt file has pbrt's texture coordinates: u = atan2(y, x) / 2 pi and v = 1 - acos(z) / pi about the OBJECT's z axis (pbrt-v4 Sphere::InteractionFromIntersection),
+// whatever the sphere's transform is. The loader used to bake a full sphere to a centre and a radius and keep the poles on world y, so a picture on a turned sphere did not turn with it.
+namespace {
+struct Rot3 { double m[9]; };
+// Rotation by `deg` about the axis (ax, ay, az): the matrix of pbrt's Rotate directive.
+Rot3 rotation(double deg, double ax, double ay, double az) {
+	const double len = std::sqrt(ax * ax + ay * ay + az * az);
+	ax /= len; ay /= len; az /= len;
+	const double a = deg * 3.14159265358979323846 / 180.0, c = std::cos(a), s = std::sin(a), t = 1 - c;
+	return {{t * ax * ax + c, t * ax * ay - s * az, t * ax * az + s * ay,
+	         t * ax * ay + s * az, t * ay * ay + c, t * ay * az - s * ax,
+	         t * ax * az - s * ay, t * ay * az + s * ax, t * az * az + c}};
+}
+}  // namespace
+
+TEST(PbrtSphereUv, FollowsPbrtsObjectSpaceParametrisationForATurnedSphere) {
+	const Rot3 R = rotation(35.0, 1.0, 2.0, 3.0);
+	const pbrt_cpu::BuildResult b = buildFrom(
+		"AttributeBegin\n  Translate 1 2 3\n  Rotate 35 1 2 3\n  Shape \"sphere\" \"float radius\" [ 2 ]\nAttributeEnd\n");
+	const double pi = 3.14159265358979323846;
+	const point3 centre(1, 2, 3);
+	int checked = 0;
+	for (int i = 0; i < 40; ++i) {
+		// a direction from the centre, in the world; the ray comes in along it
+		const double az = 0.31 + 0.157 * i, el = -1.3 + 0.067 * i * 1.9;
+		vec3 dir(std::cos(el) * std::cos(az), std::sin(el), std::cos(el) * std::sin(az));
+		dir = unit_vector(dir);
+		hit_record rec;
+		const ray r(centre + 10.0 * dir, -dir);
+		ASSERT_TRUE(b.world->hit(r, interval(0.001, infinity), rec));
+		// the hit point's direction in the object frame: R^T * dir
+		const double ox = R.m[0] * dir.x() + R.m[3] * dir.y() + R.m[6] * dir.z();
+		const double oy = R.m[1] * dir.x() + R.m[4] * dir.y() + R.m[7] * dir.z();
+		const double oz = R.m[2] * dir.x() + R.m[5] * dir.y() + R.m[8] * dir.z();
+		double u = std::atan2(oy, ox) / (2 * pi);
+		if (u < 0) u += 1.0;
+		const double v = 1.0 - std::acos(std::fmin(1.0, std::fmax(-1.0, oz))) / pi;
+		const double du = std::fabs(rec.u - u);
+		EXPECT_TRUE(du < 1e-9 || std::fabs(du - 1.0) < 1e-9) << "u at i=" << i << ": " << rec.u << " against " << u;
+		EXPECT_NEAR(rec.v, v, 1e-9) << "v at i=" << i;
+		++checked;
+	}
+	EXPECT_EQ(checked, 40);
+}
+
+// The tangents follow the (u, v): dpdu runs round the object's z axis (increasing phi), dpdv towards the south pole (pbrt's dpdv = -pi * ...), and both are in the world frame.
+TEST(PbrtSphereUv, TangentsAreWorldSpaceAndMatchPbrt) {
+	const pbrt_cpu::BuildResult b = buildFrom("Shape \"sphere\" \"float radius\" [ 2 ]\n");   // a sphere that is not turned: the pole is world z
+	hit_record rec;
+	ASSERT_TRUE(b.world->hit(ray(point3(5, 0, 0), vec3(-1, 0, 0)), interval(0.001, infinity), rec));   // the point (2, 0, 0): phi = 0, theta = pi / 2
+	EXPECT_NEAR(rec.u, 0.0, 1e-9);
+	EXPECT_NEAR(rec.v, 0.5, 1e-9);
+	const double pi = 3.14159265358979323846;
+	// pbrt: dpdu = phiMax * (-y, x, 0) = 2 pi * (0, 2, 0); dpdv = (thetaZMax - thetaZMin) * (z cos(phi), z sin(phi), -r sin(theta)) = -pi * (0, 0, -2) = (0, 0, 2 pi)
+	EXPECT_NEAR(rec.dpdu.x(), 0.0, 1e-9);
+	EXPECT_NEAR(rec.dpdu.y(), 2 * pi * 2.0, 1e-9);
+	EXPECT_NEAR(rec.dpdu.z(), 0.0, 1e-9);
+	EXPECT_NEAR(rec.dpdv.x(), 0.0, 1e-9);
+	EXPECT_NEAR(rec.dpdv.y(), 0.0, 1e-9);
+	EXPECT_NEAR(rec.dpdv.z(), 2 * pi, 1e-9);
+	// the north pole (z = r) is v = 1
+	ASSERT_TRUE(b.world->hit(ray(point3(0, 0, 5), vec3(0, 0, -1)), interval(0.001, infinity), rec));
+	EXPECT_NEAR(rec.v, 1.0, 1e-6);
+}

@@ -142,6 +142,11 @@ struct Sphere {
 	// only by the pre-existing full-sphere-cone NEE approximation (see
 	// GpuMediumShapeKind::ClippedSphere's comment, optix_types.h), never for
 	// hit-testing.
+	// Where the sphere's texture coordinates are. A full sphere is baked to a centre and a radius, which forgets how it is turned, but its (u, v) are pbrt's: u = phi / 2 pi
+	// with phi = atan2(y, x) about the OBJECT's z axis and v = 1 - theta / pi from the object's +z pole. The renderers' own sphere has its poles on y and phi from -x
+	// (this project's get_sphere_uv), so this is the 3x3 (row-major) that carries a world-space direction into that frame: the object's axes (the columns of the transform,
+	// unit length) as rows -x, z, y. A sphere that was not turned gives {-1,0,0, 0,0,1, 0,1,0}, which puts pbrt's z pole where the renderers have their y pole.
+	double uvRot[9] = {-1, 0, 0,  0, 0, 1,  0, 1, 0};
 	bool clipped = false;
 	double radiusLocal = 1.0;
 	double zMin = -1.0, zMax = 1.0;   // object-space, matches radiusLocal's units

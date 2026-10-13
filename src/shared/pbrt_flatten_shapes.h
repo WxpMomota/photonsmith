@@ -72,6 +72,21 @@ inline bool flattenSphereShape(const pbrt_scene::Scene &scene, FlatScene &out, c
 		}
 	}
 	s.radius = r * hi;
+	{
+		// The object's axes in world space, normalised (the columns of the row-major transform); see Sphere::uvRot.
+		double ax[3][3];
+		for (int c = 0; c < 3; ++c) {
+			double len = 0.0;
+			for (int a = 0; a < 3; ++a) { ax[c][a] = xform.m[4 * a + c]; len += ax[c][a] * ax[c][a]; }
+			len = std::sqrt(len);
+			if (len > 1e-12) for (int a = 0; a < 3; ++a) ax[c][a] /= len;
+		}
+		for (int a = 0; a < 3; ++a) {
+			s.uvRot[a]     = -ax[0][a];   // x of the legacy frame = -x of the object
+			s.uvRot[3 + a] =  ax[2][a];   // y = the object's z (the pole)
+			s.uvRot[6 + a] =  ax[1][a];   // z = the object's y
+		}
+	}
 
 	// Object motion blur (pbrt-v4's ActiveTransform "StartTime"/
 	// "EndTime" around a Shape "sphere") - bake a second, end-time

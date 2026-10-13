@@ -487,20 +487,25 @@ private:
 				// baked center/radius path below.
 				sp = std::make_shared<sphere_clipped_hittable>(
 					s.radiusLocal, s.zMin, s.zMax, degrees_to_radians(s.phiMaxDeg), toMatrix4(s.xform), mat);
-			} else if (s.center1[0] != s.center[0] || s.center1[1] != s.center[1] ||
-					   s.center1[2] != s.center[2]) {
-				// Object motion blur (pbrt_flatten::Sphere::center1's own
-				// comment) - the existing two-centre moving constructor
-				// (sphere.h) already stores center as a ray and interpolates
-				// via center.at(r.time()) in hit(); ray.time() is sampled once
-				// per camera ray in camera.h and threaded through every bounce
-				// already, so no other CPU change is needed for this to work.
-				sp = std::make_shared<sphere>(point3(s.center[0], s.center[1], s.center[2]),
-											   point3(s.center1[0], s.center1[1], s.center1[2]),
-											   s.radius, mat);
 			} else {
-				sp = std::make_shared<sphere>(point3(s.center[0], s.center[1], s.center[2]),
-											   s.radius, mat);
+				std::shared_ptr<sphere> plain;
+				if (s.center1[0] != s.center[0] || s.center1[1] != s.center[1] ||
+					s.center1[2] != s.center[2]) {
+					// Object motion blur (pbrt_flatten::Sphere::center1's own
+					// comment) - the existing two-centre moving constructor
+					// (sphere.h) already stores center as a ray and interpolates
+					// via center.at(r.time()) in hit(); ray.time() is sampled once
+					// per camera ray in camera.h and threaded through every bounce
+					// already, so no other CPU change is needed for this to work.
+					plain = std::make_shared<sphere>(point3(s.center[0], s.center[1], s.center[2]),
+												   point3(s.center1[0], s.center1[1], s.center1[2]),
+												   s.radius, mat);
+				} else {
+					plain = std::make_shared<sphere>(point3(s.center[0], s.center[1], s.center[2]),
+												   s.radius, mat);
+				}
+				plain->set_uv_rotation(s.uvRot);   // pbrt's texture coordinates: the poles on the object's z axis (pbrt_flatten::Sphere::uvRot)
+				sp = plain;
 			}
 			world.add(sp);
 			if (s.areaLight >= 0) lights.add(sp);

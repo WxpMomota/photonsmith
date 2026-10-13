@@ -930,6 +930,9 @@ Texture "earth-tex" "spectrum" "imagemap" "string filename" [ "images/earthmap.j
 Material "diffuse" "texture reflectance" [ "earth-tex" ]
 AttributeBegin
   Translate 400 200 400
+  # (the sphere is stood up with its poles on y, as the renderers used to keep them: see earth-globe.pbrt)
+  Rotate 180 0 1 0
+  Rotate -90 1 0 0
   Shape "sphere" "float radius" [ 100 ]
 AttributeEnd
 
