@@ -148,6 +148,8 @@ inline float generateCameraRay(thread const KernelRes& R, thread PathState& P, u
         float3 fwd = normalize(float3(uniforms.cameraLookAtBlur) - interpOrigin);
         float3 right = normalize(cross(fwd, float3(uniforms.cameraUpRawBlur)));
         float3 up = cross(right, fwd);
+        // a pbrt file's perspective camera is left-handed: the host's cameraRight is then the negation of cross(forward, up), and the blurred basis follows it
+        if (dot(right, float3(uniforms.cameraRight)) < 0.0) right = -right;
         rayOrigin = interpOrigin;
         rayDir = normalize(fwd + screen.x * right + screen.y * up);
     } else {

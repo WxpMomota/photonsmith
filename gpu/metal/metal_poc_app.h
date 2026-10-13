@@ -180,6 +180,11 @@ struct MetalPocApp {
     bool havePbrtTriangleAnyHit = false;   // some triangle has an alpha-cutout mask or a subsurface material: the triangle geometry is then non-opaque and tested by triangleAnyHitFunction
     float3 pbrtCameraPos{0, 0, 0};
     float3 pbrtCameraForward{0, 0, -1};
+    // pbrt is left-handed: a pbrt file's perspective camera draws what is on the world's +x side on the LEFT of the picture (pbrt_flatten::Camera::leftHanded, true for a plain
+    // LookAt; false once the file mirrors the camera with `Scale -1 1 1` before it). The kernels build the picture from cross(forward, up) with signs that give pbrt's picture
+    // for the orthographic, spherical and realistic cameras of a plain LookAt, and the opposite for the perspective camera, so this is set (and `pbrtCameraRight` below is the
+    // NEGATION of cross(forward, up); `pbrtCameraUp` stays the true up) for a perspective camera of a plain LookAt, and for the other cameras of a mirrored file.
+    bool pbrtPerspectiveLeftHanded = false;
     float3 pbrtCameraRight{1, 0, 0};
     float3 pbrtCameraUp{0, 1, 0};
     float pbrtTanHalfFov = 1.0f;

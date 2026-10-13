@@ -1560,9 +1560,10 @@ void MetalPocApp::loadPbrtCamera(const pbrt_flatten::FlatScene& scene, const Pbr
     const float3 forward = simd::normalize(lookat - lookfrom);
     const float3 right = simd::normalize(simd::cross(forward, up));
     const float3 trueUp = simd::cross(right, forward);
+    pbrtPerspectiveLeftHanded = (cam.type == "perspective") ? cam.leftHanded : !cam.leftHanded;   // (see the field's comment)
     pbrtCameraPos = lookfrom;
     pbrtCameraForward = forward;
-    pbrtCameraRight = right;
+    pbrtCameraRight = pbrtPerspectiveLeftHanded ? -right : right;
     pbrtCameraUp = trueUp;
     pbrtTanHalfFov = tanf(0.5f * (float)cam.vfov * (float)M_PI / 180.0f);
     havePbrtCamera = true;

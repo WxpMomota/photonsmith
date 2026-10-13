@@ -20,8 +20,9 @@ int main(int argc, char** argv) {
     const double tol = atof(argv[2]) / 100.0;
     struct Win { const char* what; int x0, y0, x1, y1; double expect[3]; };
     const Win wins[] = {
-        {"big ball",   32,  64,  64, 102, {76.6, 80.9, 74.4}},
-        {"small ball", 78,  92,  96, 108, {55.9, 50.4, 44.8}},
+        // (pbrt is left-handed and the picture of a pbrt file follows it: the balls' x ranges are mirrored, 128 - x, from the right-handed pictures these numbers were taken from)
+        {"big ball",   64,  64,  96, 102, {76.6, 80.9, 74.4}},
+        {"small ball", 32,  92,  50, 108, {55.9, 50.4, 44.8}},
         {"back wall",  38,  19,  90,  38, {98.8, 91.3, 84.1}},
         {"floor",      26, 108, 102, 124, {109.9, 108.5, 104.9}},
     };
