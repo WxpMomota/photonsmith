@@ -1137,7 +1137,8 @@ extern "C" __global__ void __closesthit__sphere() {
 			float out_nx, out_ny, out_nz;
 			apply_normal_map(ns_x, ns_y, ns_z, normal.x, normal.y, normal.z,
 				dpdu.x, dpdu.y, dpdu.z, out_nx, out_ny, out_nz);
-			const float3 perturbed_normal = make_float3(out_nx, out_ny, out_nz);
+			float3 perturbed_normal = make_float3(out_nx, out_ny, out_nz);
+			if (dot(perturbed_normal, ray_dir) > 0.0f) perturbed_normal = -perturbed_normal;   // (two-sided about the shading normal, as pbrt's BSDF and the CPU's normal_map_material)
 
 			// Shade as plain Lambertian (mat.albedo) using the perturbed
 			// normal - reuses shade_material()'s existing Lambertian NEE/

@@ -191,7 +191,7 @@ TEST(NormalMapMaterial, FlatMapScatterMatchesBareInner) {
 	ray r_in(point3(0,2,0), vec3(0,-1,0));
 
 	// Check that apply() returns the same normal for a flat map
-	hit_record modified = nm_mat.apply(rec);
+	hit_record modified = nm_mat.apply(r_in, rec);
 	EXPECT_NEAR(modified.normal.x(), rec.normal.x(), 1e-6);
 	EXPECT_NEAR(modified.normal.y(), rec.normal.y(), 1e-6);
 	EXPECT_NEAR(modified.normal.z(), rec.normal.z(), 1e-6);
@@ -215,7 +215,7 @@ TEST(NormalMapMaterial, PerturbedNormalScatterOnCorrectHemisphere) {
 	ray r_in(point3(0,2,0), vec3(0,-1,0));
 
 	// The apply() result must be on the same hemisphere as geometric normal
-	hit_record modified = nm_mat.apply(rec);
+	hit_record modified = nm_mat.apply(r_in, rec);
 	double d = dot(modified.normal, rec.normal);
 	EXPECT_GT(d, 0.0);
 
@@ -237,7 +237,7 @@ TEST(BumpMapMaterial, ZeroDisplacementUnchanged) {
 	hit_record rec = make_rec(vec3(0,1,0), vec3(1,0,0));
 	ray r_in(point3(0,2,0), vec3(0,-1,0));
 
-	hit_record modified = bm_mat.apply(rec);
+	hit_record modified = bm_mat.apply(r_in, rec);
 	EXPECT_NEAR(modified.normal.x(), rec.normal.x(), 1e-6);
 	EXPECT_NEAR(modified.normal.y(), rec.normal.y(), 1e-6);
 	EXPECT_NEAR(modified.normal.z(), rec.normal.z(), 1e-6);
@@ -253,7 +253,8 @@ TEST(BumpMapMaterial, BumpedNormalOnSameHemisphere) {
 	// Use different UV offsets so disp_u != disp at u+step
 	// With a solid color the bump should be zero (uniform field -> no gradient)
 	hit_record rec = make_rec(vec3(0,1,0), vec3(1,0,0));
-	hit_record modified = bm_mat.apply(rec);
+	ray r_in(point3(0,2,0), vec3(0,-1,0));
+	hit_record modified = bm_mat.apply(r_in, rec);
 
 	double d = dot(modified.normal, rec.normal);
 	EXPECT_GT(d, 0.0);
@@ -271,4 +272,70 @@ TEST(BumpMapMaterial, ScatterSucceeds) {
 	scatter_record srec;
 	bool ok = bm_mat.scatter(r_in, rec, srec);
 	EXPECT_TRUE(ok);
+}
+
+// ---------------------------------------------------------------------------
+// pbrt-v4 BumpMap with its shading geometry (apply_bump_map_pbrt, triangle_dndu_dndv)
+// ---------------------------------------------------------------------------
+
+// The `displacement * dndu` term: on a unit sphere (dndu = dpdu, dndv = dpdv) a displacement of 2 with a slope of 1 along u gives
+// dpdu' = (1,0,0) + 1 * n + 2 * dndu = (3,0,1) and dpdv' = (0,3,0), so n' is (-3, 0, 9) normalised; without the term it would be (-1, 0, 1) normalised.
+TEST(BumpMapPbrt, DisplacementTimesDndu) {
+	double nx, ny, nz;
+	apply_bump_map_pbrt<double>(2.0, 2.0 + 0.001, 2.0, 0.001, 0.001, 0.0, 0.0, 1.0, false, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, nx, ny, nz);
+	const double len = std::sqrt(9.0 + 81.0);
+	EXPECT_NEAR(nx, -3.0 / len, 1e-9);
+	EXPECT_NEAR(ny, 0.0, 1e-9);
+	EXPECT_NEAR(nz, 9.0 / len, 1e-9);
+}
+
+// A surface with shading normals (a smooth triangle mesh) has pbrt's re-orthogonalised tangents: ts = cross(ns, dpdu), ss = cross(ts, ns), so dpdv is a turned copy of dpdu, not the
+// surface's own dpdv. dpdu = (2,0,0) and a true dpdv = (0,1,0): with a slope of 0.5 along each, the smooth result is (-1,-1,4) normalised and the plain one (-0.5,-1,2) normalised.
+TEST(BumpMapPbrt, SmoothSurfacesUseTheOrthogonalisedTangents) {
+	const double d = 0.5;
+	double sx, sy, sz, px, py, pz;
+	apply_bump_map_pbrt<double>(0.0, d * 0.001, d * 0.001, 0.001, 0.001, 0, 0, 1, true, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, sx, sy, sz);
+	apply_bump_map_pbrt<double>(0.0, d * 0.001, d * 0.001, 0.001, 0.001, 0, 0, 1, false, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, px, py, pz);
+	const double sl = std::sqrt(1 + 1 + 16.0), pl = std::sqrt(0.25 + 1 + 4.0);
+	EXPECT_NEAR(sx, -1.0 / sl, 1e-9);
+	EXPECT_NEAR(sy, -1.0 / sl, 1e-9);
+	EXPECT_NEAR(sz, 4.0 / sl, 1e-9);
+	EXPECT_NEAR(px, -0.5 / pl, 1e-9);
+	EXPECT_NEAR(py, -1.0 / pl, 1e-9);
+	EXPECT_NEAR(pz, 2.0 / pl, 1e-9);
+}
+
+TEST(BumpMapPbrt, TheResultIsOnTheSideOfTheAuthoredNormal) {
+	double nx, ny, nz;
+	// tangents whose cross product points down (a mirrored parametrisation): the result is turned back to the normal's side (pbrt: FaceForward(ns, n))
+	apply_bump_map_pbrt<double>(0.0, 0.0, 0.0, 0.001, 0.001, 0, 0, 1, false, 1, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, nx, ny, nz);
+	EXPECT_NEAR(nz, 1.0, 1e-12);
+}
+
+// dndu and dndv of a triangle's normals: n(u, v) is linear over the triangle, so for uv (0,0), (1,0), (0,1) they are n1 - n0 and n2 - n0.
+TEST(TriangleDndu, IsTheNormalsDifferenceOverTheUvEdges) {
+	const double n0[3] = {0, 0, 1}, n1[3] = {1, 0, 0}, n2[3] = {0, 1, 0};
+	double dndu[3], dndv[3];
+	triangle_dndu_dndv<double>(0, 0, 1, 0, 0, 1, n0, n1, n2, dndu, dndv);
+	EXPECT_NEAR(dndu[0], 1.0, 1e-12); EXPECT_NEAR(dndu[1], 0.0, 1e-12); EXPECT_NEAR(dndu[2], -1.0, 1e-12);
+	EXPECT_NEAR(dndv[0], 0.0, 1e-12); EXPECT_NEAR(dndv[1], 1.0, 1e-12); EXPECT_NEAR(dndv[2], -1.0, 1e-12);
+	triangle_dndu_dndv<double>(0, 0, 0, 0, 0, 0, n0, n1, n2, dndu, dndv);   // no usable (u, v): none
+	EXPECT_EQ(dndu[0], 0.0);
+	EXPECT_EQ(dndv[2], 0.0);
+}
+
+// pbrt's BSDF is two-sided about the shading normal: a bump that tilts the normal away from the viewer must turn it back toward the viewer, not toward the unperturbed surface.
+TEST(BumpMapMaterial, ATiltedNormalIsTurnedTowardTheViewer) {
+	auto inner = std::make_shared<lambertian>(color(0.5, 0.5, 0.5));
+	// a texture whose value grows with u: a steep slope along +x that tilts the normal toward -x far enough to lie behind a ray travelling almost along the surface
+	class u_ramp : public texture {
+	  public:
+		color value(double u, double, const point3&) const override { return color(u, u, u); }
+	};
+	bump_map_material bm(std::make_shared<u_ramp>(), inner, 400.0, 0.001);
+	hit_record rec = make_rec(vec3(0, 1, 0), vec3(1, 0, 0));
+	rec.dpdv = vec3(0, 0, 1);
+	ray grazing(point3(-5, 0.02, 0), unit_vector(vec3(1, -0.004, 0)));   // almost along +x, just above the surface
+	const hit_record bumped = bm.apply(grazing, rec);
+	EXPECT_LE(dot(bumped.normal, unit_vector(grazing.direction())), 1e-12) << "the shading normal faces the viewer";
 }

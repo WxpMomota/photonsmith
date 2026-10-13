@@ -115,6 +115,9 @@ class sphere : public hittable {
                 rec.dpdu = dir * (radius * 2.0 * pi * sin_theta);
                 rec.dpdv = cross(outward_normal, dir) * (radius * pi);
             }
+            // n = (p - centre) / radius, so its derivatives are the tangents over the radius (pbrt's Weingarten result for a sphere).
+            rec.dndu = rec.dpdu / radius;
+            rec.dndv = rec.dpdv / radius;
         }
 
         return true;

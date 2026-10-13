@@ -91,6 +91,20 @@ class transform_instance : public hittable {
         // The surface tangents are object-space vectors too: a normal or bump map builds its frame from dpdu.
         rec.dpdu = affine_transform::apply_vector(o2w, rec.dpdu);
         rec.dpdv = affine_transform::apply_vector(o2w, rec.dpdv);
+        // The derivatives of the normal: n_world = normalize(M^-T n), so its derivative is M^-T dn with the part along the normal removed, over |M^-T n|.
+        {
+            const vec3 t = affine_transform::apply_normal(w2o, outward);
+            const double tl = t.length();
+            if (tl > 0) {
+                const vec3 nw = t / tl;
+                const auto carry = [&](const vec3& dn) {
+                    const vec3 d = affine_transform::apply_normal(w2o, dn);
+                    return (d - dot(d, nw) * nw) / tl;
+                };
+                rec.dndu = carry(rec.dndu);
+                rec.dndv = carry(rec.dndv);
+            }
+        }
         return true;
     }
 

@@ -51,22 +51,37 @@ inline __host__ __device__ float gpu_sample_displacement(const TextureData* text
 				  fy  * ((1.0f - fx) * texel(x0, y0 + 1) + fx * texel(x0 + 1, y0 + 1));
 }
 
-// `n` is the unit shading normal facing the ray, `dpdu` the UNNORMALIZED surface tangent (world units per unit
-// u, as the CPU's rec.dpdu): the finite-difference slope is per unit u, so its length sets how steep the relief
-// reads. dpdv = cross(n, dpdu) as bump_map_material::apply() does.
+// `n` is the unit shading normal AS AUTHORED (not turned toward the ray: pbrt's BumpMap pushes along shading.n), `dpdu` and `dpdv` the UNNORMALIZED surface tangents (world units per unit
+// u and v, as the CPU's rec.dpdu and rec.dpdv): the finite-difference slope is per unit u, so their length sets how steep the relief reads. `smooth`: the mesh has vertex normals, whose
+// shading tangents pbrt re-orthogonalises; dndu / dndv are the derivatives of the interpolated normal (the displacement * dndu term). Returns the bumped normal on n's side; the caller
+// turns it toward the ray as it did n. The same apply_bump_map_pbrt() as the CPU's bump_map_material.
 inline __host__ __device__ float3 gpu_bump_shading_normal(const TextureData* textures, const unsigned char* pixels,
 														  int texIdx, float scale, float u, float v,
-														  const float3& n, const float3& dpdu, float footprintStep) {
+														  const float3& n, bool smooth, const float3& dpdu, const float3& dpdv_in,
+														  const float3& dndu, const float3& dndv, float footprintStep) {
 	const float step = footprintStep > 1e-8f ? footprintStep : 0.001f;   // 0.001: the CPU's no-footprint fallback
 	const float disp   = scale * gpu_sample_displacement(textures, pixels, texIdx, u,        v);
 	const float disp_u = scale * gpu_sample_displacement(textures, pixels, texIdx, u + step, v);
 	const float disp_v = scale * gpu_sample_displacement(textures, pixels, texIdx, u,        v + step);
-	float3 dpdv = cross(n, dpdu);
+	float3 dpdv = dpdv_in;
+	if (dot(dpdv, dpdv) < 1e-12f) dpdv = cross(n, dpdu);
 	if (dot(dpdv, dpdv) < 1e-12f) dpdv = make_float3(0.0f, 1.0f, 0.0f);
 	float ox, oy, oz;
-	apply_bump_map<float>(disp, disp_u, disp_v, step, step, n.x, n.y, n.z, dpdu.x, dpdu.y, dpdu.z,
-						  dpdv.x, dpdv.y, dpdv.z, ox, oy, oz);
+	apply_bump_map_pbrt<float>(disp, disp_u, disp_v, step, step, n.x, n.y, n.z, smooth, dpdu.x, dpdu.y, dpdu.z,
+							   dpdv.x, dpdv.y, dpdv.z, dndu.x, dndu.y, dndu.z, dndv.x, dndv.y, dndv.z, ox, oy, oz);
 	return make_float3(ox, oy, oz);
+}
+
+// dndu / dndv of a triangle's interpolated normal (the CPU's triangle_dndu_dndv, with pbrt's default uv for a mesh that has none).
+inline __host__ __device__ void gpu_triangle_dndu_dndv(const float3& n0, const float3& n1, const float3& n2,
+													   const float2& uv0, const float2& uv1, const float2& uv2, bool hasUVs,
+													   float3& dndu, float3& dndv) {
+	const float a0[3] = {n0.x, n0.y, n0.z}, a1[3] = {n1.x, n1.y, n1.z}, a2[3] = {n2.x, n2.y, n2.z};
+	float du[3], dv[3];
+	if (hasUVs) triangle_dndu_dndv<float>(uv0.x, uv0.y, uv1.x, uv1.y, uv2.x, uv2.y, a0, a1, a2, du, dv);
+	else        triangle_dndu_dndv<float>(0.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, a0, a1, a2, du, dv);
+	dndu = make_float3(du[0], du[1], du[2]);
+	dndv = make_float3(dv[0], dv[1], dv[2]);
 }
 
 // The CPU's rec.dpdu and rec.dpdv for a triangle: the 2x2 UV-edge Jacobian solve, UNNORMALIZED, in double. The

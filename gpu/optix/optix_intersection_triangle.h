@@ -152,6 +152,7 @@ extern "C" __global__ void __closesthit__triangle() {
 	// scene actually rendering, gating this call on instBase costs nothing on
 	// the identity path (skipped entirely rather than executed as a no-op) and
 	// is what makes instanced normals correct once instances exist.
+	const float3 shading_normal_obj = shading_normal;   // (an instance's bump map needs the length of the transformed normal, below)
 	if (instBase >= 0) {
 		shading_normal = normalize(optixTransformNormalFromObjectToWorldSpace(shading_normal));
 	}
@@ -243,8 +244,25 @@ extern "C" __global__ void __closesthit__triangle() {
 		if (__uint_as_float(optixGetPayload_12()) == 0.0f)
 			bump_step = gpu_bump_footprint_step(gpu_make_bump_footprint(params.camera, (int)params.width, (int)params.height, (int)params.samplesPerPixel),
 												ray_orig, normalize(ray_dir), hit_point, final_normal, bump_dpdu, bump_dpdv);
-		shade_normal = gpu_bump_shading_normal(params.textures, params.texturePixels, mat.bumpTexIdx,
-											   mat.bumpScale, uv_u, uv_v, final_normal, bump_dpdu, bump_step);
+		// The derivatives of the interpolated normal (pbrt's dndu / dndv): an instance carries them as the CPU's transform_instance does.
+		float3 bump_dndu = make_float3(0.0f, 0.0f, 0.0f), bump_dndv = make_float3(0.0f, 0.0f, 0.0f);
+		if (tri.hasNormals) {
+			gpu_triangle_dndu_dndv(tri.n0, tri.n1, tri.n2, tri.uv0, tri.uv1, tri.uv2, tri.hasUVs, bump_dndu, bump_dndv);
+			if (instBase >= 0) {
+				const float3 t = optixTransformNormalFromObjectToWorldSpace(shading_normal_obj);
+				const float tl = length(t);
+				if (tl > 0.0f) {
+					const float3 nw = t / tl;
+					float3 du = optixTransformNormalFromObjectToWorldSpace(bump_dndu), dv = optixTransformNormalFromObjectToWorldSpace(bump_dndv);
+					bump_dndu = (du - dot(du, nw) * nw) / tl;
+					bump_dndv = (dv - dot(dv, nw) * nw) / tl;
+				}
+			}
+		}
+		const float3 bumped = gpu_bump_shading_normal(params.textures, params.texturePixels, mat.bumpTexIdx,
+											   mat.bumpScale, uv_u, uv_v, shading_normal, tri.hasNormals, bump_dpdu, bump_dpdv, bump_dndu, bump_dndv, bump_step);
+		// (pbrt's BSDF is two-sided about the shading normal: it is turned toward the viewer, as the CPU's bump_map_material does)
+		shade_normal = dot(bumped, ray_dir) > 0.0f ? -bumped : bumped;
 	}
 	if (mat.type == MaterialType::NormalMappedLambertian) {
 		const float3& dpdu = tri_dpdu;
@@ -257,9 +275,10 @@ extern "C" __global__ void __closesthit__triangle() {
 		else                { ns_x = 0.0f; ns_y = 0.0f; ns_z = 1.0f; }
 
 		float out_nx, out_ny, out_nz;
-		apply_normal_map(ns_x, ns_y, ns_z, final_normal.x, final_normal.y, final_normal.z,
+		apply_normal_map(ns_x, ns_y, ns_z, shading_normal.x, shading_normal.y, shading_normal.z,   // (pbrt's frame is the shading normal as authored)
 			dpdu.x, dpdu.y, dpdu.z, out_nx, out_ny, out_nz);
 		shade_normal = make_float3(out_nx, out_ny, out_nz);
+		if (dot(shade_normal, ray_dir) > 0.0f) shade_normal = -shade_normal;   // (two-sided about the shading normal, as pbrt's BSDF and the CPU's normal_map_material)
 
 		// Reuses shade_material()'s existing Lambertian NEE/MIS logic
 		// verbatim rather than duplicating it; textureIdx is cleared since

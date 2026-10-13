@@ -213,3 +213,95 @@ CPU_GPU void apply_bump_map(
 		out_nx = -out_nx; out_ny = -out_ny; out_nz = -out_nz;
 	}
 }
+
+// ---------------------------------------------------------------------------
+// triangle_dndu_dndv
+//
+// pbrt-v4 Triangle::InteractionFromIntersection: the derivatives of the interpolated shading normal with respect to u and v,
+// from the vertex normals and the vertices' texture coordinates (pbrt's dndu / dndv, which a bump map's `displacement * dndu`
+// term needs). n0..n2 are the three vertex normals, each as (x, y, z). A degenerate parametrisation gives zero (pbrt then picks
+// an arbitrary frame: a surface with no usable (u, v) has no bump either).
+// ---------------------------------------------------------------------------
+template<typename T>
+CPU_GPU void triangle_dndu_dndv(T u0, T v0, T u1, T v1, T u2, T v2,
+								const T* n0, const T* n1, const T* n2,
+								T* dndu, T* dndv)
+{
+	const T du02 = u0 - u2, dv02 = v0 - v2, du12 = u1 - u2, dv12 = v1 - v2;
+	const T det = du02 * dv12 - dv02 * du12;
+#if defined(__CUDACC__)
+	const bool degenerate = fabsf(det) < T(1e-9);
+#else
+	const bool degenerate = std::fabs(det) < T(1e-9);
+#endif
+	if (degenerate) {
+		for (int a = 0; a < 3; ++a) { dndu[a] = T(0); dndv[a] = T(0); }
+		return;
+	}
+	const T inv = T(1) / det;
+	for (int a = 0; a < 3; ++a) {
+		const T dn1 = n0[a] - n2[a], dn2 = n1[a] - n2[a];
+		dndu[a] = (dv12 * dn1 - dv02 * dn2) * inv;
+		dndv[a] = (du02 * dn2 - du12 * dn1) * inv;
+	}
+}
+
+// ---------------------------------------------------------------------------
+// apply_bump_map_pbrt
+//
+// pbrt-v4 BumpMap() (materials.h) with the shading geometry pbrt gives it:
+//   dpdu' = shading.dpdu + (disp_u - disp) / du * n + disp * dndu
+//   dpdv' = shading.dpdv + (disp_v - disp) / dv * n + disp * dndv
+//   ns    = normalize(cross(dpdu', dpdv')), on the side of n
+// where n is the shading normal AS AUTHORED (not turned toward the ray), and shading.dpdu / dpdv are, for a surface that has shading
+// normals (`smooth`: a triangle mesh with vertex normals), pbrt's Triangle tangents: ts = cross(ns, dpdu), ss = cross(ts, ns), so
+// both are perpendicular to ns and the same length; for any other surface they are its own dpdu and dpdv. The `disp * dndu` term is
+// what keeps a tall relief on a curved surface (a ball bumped by 0.3 of its radius) the shape pbrt draws: omitting it made a
+// bump of height 1 on a dome 2-5% darker than pbrt's picture.
+// ---------------------------------------------------------------------------
+template<typename T>
+CPU_GPU void apply_bump_map_pbrt(
+	T disp, T disp_u, T disp_v,
+	T du,    T dv,
+	T nx,    T ny,    T nz,          // shading normal as authored (unit)
+	bool smooth,
+	T dpdu_x, T dpdu_y, T dpdu_z,
+	T dpdv_x, T dpdv_y, T dpdv_z,
+	T dndu_x, T dndu_y, T dndu_z,
+	T dndv_x, T dndv_y, T dndv_z,
+	T& out_nx, T& out_ny, T& out_nz)
+{
+	T su_x = dpdu_x, su_y = dpdu_y, su_z = dpdu_z;
+	T sv_x = dpdv_x, sv_y = dpdv_y, sv_z = dpdv_z;
+	if (smooth) {
+		T tx, ty, tz;
+		nm_cross(nx, ny, nz, dpdu_x, dpdu_y, dpdu_z, tx, ty, tz);   // ts = cross(ns, ss)
+		if (tx*tx + ty*ty + tz*tz > T(0)) {
+			nm_cross(tx, ty, tz, nx, ny, nz, su_x, su_y, su_z);       // ss = cross(ts, ns)
+			sv_x = tx; sv_y = ty; sv_z = tz;
+		} else {
+			// dpdu along the normal: any frame round it (pbrt's CoordinateSystem)
+#if defined(__CUDACC__)
+			const T sign = copysignf(T(1), nz);
+#else
+			const T sign = std::copysign(T(1), nz);
+#endif
+			const T a = T(-1) / (sign + nz), b = nx * ny * a;
+			su_x = T(1) + sign * nx * nx * a; su_y = sign * b; su_z = -sign * nx;
+			sv_x = b; sv_y = sign + ny * ny * a; sv_z = -ny;
+		}
+	}
+	const T gu = (disp_u - disp) / du, gv = (disp_v - disp) / dv;
+	const T bu_x = su_x + gu * nx + disp * dndu_x, bu_y = su_y + gu * ny + disp * dndu_y, bu_z = su_z + gu * nz + disp * dndu_z;
+	const T bv_x = sv_x + gv * nx + disp * dndv_x, bv_y = sv_y + gv * ny + disp * dndv_y, bv_z = sv_z + gv * nz + disp * dndv_z;
+	nm_cross(bu_x, bu_y, bu_z, bv_x, bv_y, bv_z, out_nx, out_ny, out_nz);
+	const T len2 = out_nx*out_nx + out_ny*out_ny + out_nz*out_nz;
+#if defined(__CUDACC__)
+	const bool bad = !(len2 > T(1e-16)) || !isfinite(len2);
+#else
+	const bool bad = !(len2 > T(1e-16)) || !std::isfinite(len2);
+#endif
+	if (bad) { out_nx = nx; out_ny = ny; out_nz = nz; return; }
+	nm_normalize(out_nx, out_ny, out_nz);
+	if (nm_dot(out_nx, out_ny, out_nz, nx, ny, nz) < T(0)) { out_nx = -out_nx; out_ny = -out_ny; out_nz = -out_nz; }
+}

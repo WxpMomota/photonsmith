@@ -171,6 +171,7 @@ extern "C" __global__ void __closesthit__wf_triangle() {
 	float3 geom_normal = tri.hasNormals
 		? interpolate_shading_normal(tri.n0, tri.n1, tri.n2, b0, b1, b2, facet_normal)
 		: facet_normal;
+	const float3 geom_normal_obj = geom_normal;   // (an instance's bump map needs the length of the transformed normal, below)
 	if (instBase >= 0)
 		geom_normal = normalize(optixTransformNormalFromObjectToWorldSpace(geom_normal));
 	bool front_face = dot(ray_dir, geom_normal) < 0.0f;
@@ -242,8 +243,24 @@ extern "C" __global__ void __closesthit__wf_triangle() {
 			if (payload->primaryRay)
 				bump_step = gpu_bump_footprint_step(wf_params.bumpFootprint, ray_orig, normalize(ray_dir), hit_point,
 													normal, bump_dpdu, bump_dpdv);
-			normal = gpu_bump_shading_normal(wf_params.textures, wf_params.texturePixels, hitMat.bumpTexIdx,
-											 hitMat.bumpScale, uv_u, uv_v, normal, bump_dpdu, bump_step);
+			// The derivatives of the interpolated normal (pbrt's dndu / dndv): an instance carries them as the CPU's transform_instance does.
+			float3 bump_dndu = make_float3(0.0f, 0.0f, 0.0f), bump_dndv = make_float3(0.0f, 0.0f, 0.0f);
+			if (tri.hasNormals) {
+				gpu_triangle_dndu_dndv(tri.n0, tri.n1, tri.n2, tri.uv0, tri.uv1, tri.uv2, tri.hasUVs, bump_dndu, bump_dndv);
+				if (instBase >= 0) {
+					const float3 t = optixTransformNormalFromObjectToWorldSpace(geom_normal_obj);
+					const float tl = length(t);
+					if (tl > 0.0f) {
+						const float3 nw = t / tl;
+						float3 du = optixTransformNormalFromObjectToWorldSpace(bump_dndu), dv = optixTransformNormalFromObjectToWorldSpace(bump_dndv);
+						bump_dndu = (du - dot(du, nw) * nw) / tl;
+						bump_dndv = (dv - dot(dv, nw) * nw) / tl;
+					}
+				}
+			}
+			const float3 bumped = gpu_bump_shading_normal(wf_params.textures, wf_params.texturePixels, hitMat.bumpTexIdx,
+											 hitMat.bumpScale, uv_u, uv_v, geom_normal, tri.hasNormals, bump_dpdu, bump_dpdv, bump_dndu, bump_dndv, bump_step);
+			normal = dot(bumped, ray_dir) > 0.0f ? -bumped : bumped;   // (pbrt's BSDF is two-sided about the shading normal: turned toward the viewer, as the CPU's bump_map_material does)
 		}
 	}
 

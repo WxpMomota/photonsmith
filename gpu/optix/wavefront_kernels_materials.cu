@@ -1519,7 +1519,9 @@ extern "C" __global__ void evaluate_materials(
 		float out_nx, out_ny, out_nz;
 		apply_normal_map(ns_x, ns_y, ns_z, normal.x, normal.y, normal.z,
 			dpdu.x, dpdu.y, dpdu.z, out_nx, out_ny, out_nz);
-		normal = make_float3(out_nx, out_ny, out_nz);  // perturbed shading normal;
+		normal = make_float3(out_nx, out_ny, out_nz);
+		if (dot(normal, h.rayDir) > 0.0f) normal = -normal;   // two-sided about the shading normal, as pbrt's BSDF and the CPU's normal_map_material
+		                                                       // perturbed shading normal;
 		                                                // NEE below reads this same
 		                                                // outer-scope `normal`.
 

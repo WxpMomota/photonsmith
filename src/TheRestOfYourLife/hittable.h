@@ -24,6 +24,10 @@ class hit_record {
     vec3 normal;
     vec3 dpdu;      // surface tangent along U (world space) -- for normal/bump mapping
     vec3 dpdv;      // surface tangent along V (world space) -- for texture-differential filtering
+    // The derivatives of the surface normal along U and V (pbrt's dndu / dndv): what a bump map's `displacement * dndu` term needs. Zero for a flat surface and where a shape
+    // does not fill them in. `smooth_shading_normals`: the surface has shading normals (a triangle mesh with vertex normals), whose tangents pbrt re-orthogonalises to the normal.
+    vec3 dndu, dndv;
+    bool smooth_shading_normals = false;
     shared_ptr<material> mat;
     double t;
     double u;

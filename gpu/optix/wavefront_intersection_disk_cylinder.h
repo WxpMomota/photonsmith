@@ -42,7 +42,11 @@ extern "C" __global__ void __intersection__wf_disk() {
 
 	if (rd.z == 0.0f) return;
 	const float t = (disk.height - ro.z) / rd.z;
-	if (t < ray_tmin || t > ray_tmax) return;
+	// A disk that lies exactly on a triangle (a Scene Builder disk on the floor) ties with it to the last bit, and which of two equal hits the closest-hit program gets is arbitrary: the disk
+	// (its colour or picture) was missing from the picture. It is reported a hair in front, as the CPU's disk and Metal's do (a few thousand float ulps at most; never before ray_tmin), and
+	// that shifted distance is what is compared with ray_tmax: a triangle found first leaves ray_tmax a rounding error short of the disk's own t.
+	const float t_report = fmaxf(t - 3.0e-5f * fabsf(t), ray_tmin);
+	if (t < ray_tmin || t_report > ray_tmax) return;
 
 	const float hx = ro.x + t * rd.x;
 	const float hy = ro.y + t * rd.y;
@@ -53,7 +57,7 @@ extern "C" __global__ void __intersection__wf_disk() {
 	if (phi < 0.0f) phi += 6.283185307179586f;
 	if (phi > disk.phiMax) return;
 
-	optixReportIntersection(t, 0, 0, 0, 0, 0);
+	optixReportIntersection(t_report, 0, 0, 0, 0, 0);
 }
 
 extern "C" __global__ void __closesthit__wf_disk() {

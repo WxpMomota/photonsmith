@@ -31,7 +31,7 @@
 // The shading normal of a NormalMappedLambertian hit on a disk or cylinder, as the sphere and triangle closest-hit programs compute it: the map's tangent-space normal (2*RGB-1,
 // normalised, (0,0,1) if degenerate) turned into the surface's frame by its analytic dpdu (CPU normal_map_material::apply). The caller shades the hit as a plain Lambertian with
 // this normal. (These two used to __trap() on a normal map, which failed the whole render; the Scene Builder lets a person put one on any shape.)
-__device__ __forceinline__ float3 dc_normal_mapped_normal(const MaterialData& mat, float u, float v, const float3& hit_point, const float3& normal, const float3& dpdu) {
+__device__ __forceinline__ float3 dc_normal_mapped_normal(const MaterialData& mat, float u, float v, const float3& hit_point, const float3& normal, const float3& dpdu, const float3& ray_dir) {
 	const float3 packed = sample_texture(mat.textureIdx, u, v, hit_point);
 	float ns_x = 2.0f * packed.x - 1.0f;
 	float ns_y = 2.0f * packed.y - 1.0f;
@@ -41,7 +41,9 @@ __device__ __forceinline__ float3 dc_normal_mapped_normal(const MaterialData& ma
 	else                { ns_x = 0.0f; ns_y = 0.0f; ns_z = 1.0f; }
 	float out_nx, out_ny, out_nz;
 	apply_normal_map(ns_x, ns_y, ns_z, normal.x, normal.y, normal.z, dpdu.x, dpdu.y, dpdu.z, out_nx, out_ny, out_nz);
-	return make_float3(out_nx, out_ny, out_nz);
+	const float3 mapped = make_float3(out_nx, out_ny, out_nz);
+	// pbrt's BSDF is two-sided about the shading normal: a viewer behind the perturbed plane is lit as if the normal faced them, so it is turned toward the viewer (as the CPU's normal_map_material)
+	return dot(mapped, ray_dir) > 0.0f ? -mapped : mapped;
 }
 
 //==============================================================================
@@ -62,7 +64,11 @@ extern "C" __global__ void __intersection__disk() {
 
 	if (rd.z == 0.0f) return;  // Ray parallel to the disk's plane
 	const float t = (disk.height - ro.z) / rd.z;
-	if (t < ray_tmin || t > ray_tmax) return;
+	// A disk that lies exactly on a triangle (a Scene Builder disk on the floor) ties with it to the last bit, and which of two equal hits the closest-hit program gets is arbitrary: the disk
+	// (its colour or picture) was missing from the picture. It is reported a hair in front, as the CPU's disk and Metal's do (a few thousand float ulps at most; never before ray_tmin), and
+	// that shifted distance is what is compared with ray_tmax: a triangle found first leaves ray_tmax a rounding error short of the disk's own t.
+	const float t_report = fmaxf(t - 3.0e-5f * fabsf(t), ray_tmin);
+	if (t < ray_tmin || t_report > ray_tmax) return;
 
 	const float hx = ro.x + t * rd.x;
 	const float hy = ro.y + t * rd.y;
@@ -73,7 +79,7 @@ extern "C" __global__ void __intersection__disk() {
 	if (phi < 0.0f) phi += 6.283185307179586f;
 	if (phi > disk.phiMax) return;
 
-	optixReportIntersection(t, 0, 0, 0, 0, 0);
+	optixReportIntersection(t_report, 0, 0, 0, 0, 0);
 }
 
 extern "C" __global__ void __closesthit__disk() {
@@ -180,7 +186,7 @@ extern "C" __global__ void __closesthit__disk() {
 			MaterialData effective = mat;
 			effective.type = MaterialType::Lambertian;
 			effective.textureIdx = -1;
-			shade_material(effective, matIdx, dc_normal_mapped_normal(mat, uv_u, uv_v, hit_point, normal, disk_dpdu), ray_dir, hit_point, front_face, uv_u, uv_v, disk_dpdu, do_regularize, seed,
+			shade_material(effective, matIdx, dc_normal_mapped_normal(mat, uv_u, uv_v, hit_point, normal, disk_dpdu, ray_dir), ray_dir, hit_point, front_face, uv_u, uv_v, disk_dpdu, do_regularize, seed,
 				attenuation, scattered_dir, scattered, is_specular, is_medium_boundary, brdf_pdf_override, emission,
 				bssrdf_exit, bssrdf_exit_pos, out_eta, rgbChannel);
 		} else {
@@ -743,7 +749,7 @@ extern "C" __global__ void __closesthit__cylinder() {
 			MaterialData effective = mat;   // (as on the disk: a plain Lambertian with the perturbed normal)
 			effective.type = MaterialType::Lambertian;
 			effective.textureIdx = -1;
-			shade_material(effective, matIdx, dc_normal_mapped_normal(mat, uv_u, uv_v, hit_point, normal, cyl_dpdu), ray_dir, hit_point, front_face, uv_u, uv_v, cyl_dpdu, do_regularize, seed,
+			shade_material(effective, matIdx, dc_normal_mapped_normal(mat, uv_u, uv_v, hit_point, normal, cyl_dpdu, ray_dir), ray_dir, hit_point, front_face, uv_u, uv_v, cyl_dpdu, do_regularize, seed,
 				attenuation, scattered_dir, scattered, is_specular, is_medium_boundary, brdf_pdf_override, emission,
 				bssrdf_exit, bssrdf_exit_pos, out_eta, rgbChannel);
 		} else {

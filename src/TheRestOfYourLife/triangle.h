@@ -17,6 +17,7 @@
 #include "texture.h"
 #include "../shared/sampling.h"
 #include "../shared/ray_hash.h"
+#include "../shared/normal_map.h"   // triangle_dndu_dndv
 #include <array>
 #include <memory>
 
@@ -230,6 +231,23 @@ class triangle : public hittable {
 				rec.dpdu = e1v.length_squared() > 1e-14 ? unit_vector(e1v) : vec3(1,0,0);
 				rec.dpdv = cross(shading_n, rec.dpdu);
 			}
+		}
+
+		// dndu / dndv of the interpolated normal, for a bump map's displacement * dndu term (pbrt-v4 Triangle::InteractionFromIntersection).
+		if (mesh->has_normals()) {
+			rec.smooth_shading_normals = true;
+			double n0v[3] = {mesh->normals[idx[0]].x(), mesh->normals[idx[0]].y(), mesh->normals[idx[0]].z()};
+			double n1v[3] = {mesh->normals[idx[1]].x(), mesh->normals[idx[1]].y(), mesh->normals[idx[1]].z()};
+			double n2v[3] = {mesh->normals[idx[2]].x(), mesh->normals[idx[2]].y(), mesh->normals[idx[2]].z()};
+			double dnu[3], dnv[3];
+			if (mesh->has_uvs()) {
+				triangle_dndu_dndv(mesh->uvs[2*idx[0]], mesh->uvs[2*idx[0]+1], mesh->uvs[2*idx[1]], mesh->uvs[2*idx[1]+1],
+								   mesh->uvs[2*idx[2]], mesh->uvs[2*idx[2]+1], n0v, n1v, n2v, dnu, dnv);
+			} else {
+				triangle_dndu_dndv(0.0, 0.0, 1.0, 0.0, 1.0, 1.0, n0v, n1v, n2v, dnu, dnv);   // pbrt's own default uv of a mesh without any
+			}
+			rec.dndu = vec3(dnu[0], dnu[1], dnu[2]);
+			rec.dndv = vec3(dnv[0], dnv[1], dnv[2]);
 		}
 
 		rec.mat = mat;

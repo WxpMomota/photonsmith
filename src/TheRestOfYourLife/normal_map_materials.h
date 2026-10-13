@@ -17,7 +17,7 @@ class normal_map_material : public material {
 	// Also recomputes rec.dpdu so the shading frame stays consistent with
 	// the perturbed normal (pbrt-v4: NormalMap() recomputes dpdu/dpdv via
 	// GramSchmidt after the normal is set).
-	hit_record apply(const hit_record& rec) const {
+	hit_record apply(const ray& r_in, const hit_record& rec) const {
 		color packed = normal_tex->value(rec.u, rec.v, rec.p);
 		double ns_tx = 2.0*packed.x() - 1.0;
 		double ns_ty = 2.0*packed.y() - 1.0;
@@ -25,12 +25,17 @@ class normal_map_material : public material {
 		double ns_len = std::sqrt(ns_tx*ns_tx + ns_ty*ns_ty + ns_tz*ns_tz);
 		if (ns_len > 1e-8) { ns_tx /= ns_len; ns_ty /= ns_len; ns_tz /= ns_len; }
 		else               { ns_tx = 0; ns_ty = 0; ns_tz = 1; }
+		// pbrt's frame is the shading normal as authored; rec.normal is turned toward the ray.
+		const vec3 n_authored = rec.front_face ? rec.normal : -rec.normal;
 		double out_nx, out_ny, out_nz;
 		apply_normal_map(ns_tx, ns_ty, ns_tz,
-			rec.normal.x(), rec.normal.y(), rec.normal.z(),
+			n_authored.x(), n_authored.y(), n_authored.z(),
 			rec.dpdu.x(),   rec.dpdu.y(),   rec.dpdu.z(),
 			out_nx, out_ny, out_nz);
 		hit_record r2 = rec;
+		// pbrt's BSDF is two-sided about the shading normal: a viewer behind the perturbed plane is lit as if the normal faced them. A strongly tilted normal at a grazing angle
+		// is exactly that case, so the normal is turned toward the viewer, not toward the unperturbed surface.
+		if (dot(vec3(out_nx, out_ny, out_nz), unit_vector(r_in.direction())) > 0.0) { out_nx = -out_nx; out_ny = -out_ny; out_nz = -out_nz; }
 		r2.normal = vec3(out_nx, out_ny, out_nz);
 		// Recompute dpdu AND dpdv so the shading frame stays orthonormal to
 		// the new normal (pbrt-v4 NormalMap, materials.h:
@@ -55,15 +60,15 @@ class normal_map_material : public material {
 
 	color emitted(const ray& r_in, const hit_record& rec,
 				  double u, double v, const point3& p) const override {
-		return inner->emitted(r_in, apply(rec), u, v, p);
+		return inner->emitted(r_in, apply(r_in, rec), u, v, p);
 	}
 	bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec,
 				 bool do_regularize = false) const override {
-		return inner->scatter(r_in, apply(rec), srec, do_regularize);
+		return inner->scatter(r_in, apply(r_in, rec), srec, do_regularize);
 	}
 	double scattering_pdf(const ray& r_in, const hit_record& rec,
 						  const ray& scattered) const override {
-		return inner->scattering_pdf(r_in, apply(rec), scattered);
+		return inner->scattering_pdf(r_in, apply(r_in, rec), scattered);
 	}
 
 	shared_ptr<texture>  get_normal_tex() const { return normal_tex; }
@@ -82,7 +87,7 @@ class bump_map_material : public material {
 		: bump_tex(bump_tex), inner(inner), scale(scale), step(step) {}
 
 	// Perturb rec.normal using finite differences of a scalar displacement texture.
-	hit_record apply(const hit_record& rec) const {
+	hit_record apply(const ray& r_in, const hit_record& rec) const {
 		// Ray-differential-adaptive step (pbrt-v4 BumpMap, materials.h:116-127):
 		// du = 0.5*(|dudx|+|dudy|), matching normal_map.h's apply_bump_map()
 		// doc comment, which already documented this as the intended step and
@@ -102,32 +107,40 @@ class bump_map_material : public material {
 		double disp   = sample_disp(rec.u,             rec.v);
 		double disp_u = sample_disp(rec.u + eff_step,  rec.v);
 		double disp_v = sample_disp(rec.u,             rec.v + eff_step);
-		vec3 n    = rec.normal;
+		// pbrt's BumpMap pushes along the shading normal as authored, not the one turned toward the ray: rec.normal faces the ray, so undo that.
+		const vec3 n_authored = rec.front_face ? rec.normal : -rec.normal;
 		vec3 dpdu = rec.dpdu;
-		vec3 dpdv = cross(n, dpdu);
+		vec3 dpdv = rec.dpdv;
+		if (dpdv.length_squared() < 1e-12) dpdv = cross(n_authored, dpdu);
 		if (dpdv.length_squared() < 1e-12) dpdv = vec3(0, 1, 0);
 		double out_nx, out_ny, out_nz;
-		apply_bump_map(disp, disp_u, disp_v, eff_step, eff_step,
-			n.x(), n.y(), n.z(),
+		apply_bump_map_pbrt(disp, disp_u, disp_v, eff_step, eff_step,
+			n_authored.x(), n_authored.y(), n_authored.z(), rec.smooth_shading_normals,
 			dpdu.x(), dpdu.y(), dpdu.z(),
 			dpdv.x(), dpdv.y(), dpdv.z(),
+			rec.dndu.x(), rec.dndu.y(), rec.dndu.z(),
+			rec.dndv.x(), rec.dndv.y(), rec.dndv.z(),
 			out_nx, out_ny, out_nz);
 		hit_record r2 = rec;
-		r2.normal = vec3(out_nx, out_ny, out_nz);
+		// The bumped normal is on the authored normal's side. pbrt's BSDF is two-sided about it: a viewer behind the bumped plane is lit as if the normal faced them (the
+		// shading frame's wo.z < 0 case), which a tall relief seen at a grazing angle is full of. So turn it toward the viewer.
+		vec3 bumped(out_nx, out_ny, out_nz);
+		if (dot(bumped, unit_vector(r_in.direction())) > 0.0) bumped = -bumped;
+		r2.normal = bumped;
 		return r2;
 	}
 
 	color emitted(const ray& r_in, const hit_record& rec,
 				  double u, double v, const point3& p) const override {
-		return inner->emitted(r_in, apply(rec), u, v, p);
+		return inner->emitted(r_in, apply(r_in, rec), u, v, p);
 	}
 	bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec,
 				 bool do_regularize = false) const override {
-		return inner->scatter(r_in, apply(rec), srec, do_regularize);
+		return inner->scatter(r_in, apply(r_in, rec), srec, do_regularize);
 	}
 	double scattering_pdf(const ray& r_in, const hit_record& rec,
 						  const ray& scattered) const override {
-		return inner->scattering_pdf(r_in, apply(rec), scattered);
+		return inner->scattering_pdf(r_in, apply(r_in, rec), scattered);
 	}
 
 	shared_ptr<texture>  get_bump_tex() const { return bump_tex; }
