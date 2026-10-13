@@ -20,11 +20,12 @@ int main(int argc, char** argv) {
     const double tol = atof(argv[2]) / 100.0;
     struct Win { const char* what; int x0, y0, x1, y1; double expect[3]; };
     const Win wins[] = {
-        // (pbrt is left-handed and the picture of a pbrt file follows it: the balls' x ranges are mirrored, 128 - x, from the right-handed pictures these numbers were taken from)
-        {"big ball",   64,  64,  96, 102, {76.6, 80.9, 74.4}},
-        {"small ball", 32,  92,  50, 108, {55.9, 50.4, 44.8}},
-        {"back wall",  38,  19,  90,  38, {98.8, 91.3, 84.1}},
-        {"floor",      26, 108, 102, 124, {109.9, 108.5, 104.9}},
+        // (pbrt is left-handed and the picture of a pbrt file follows it, so the balls' x ranges are the mirror of an older picture's. The expected means are the CPU's with the
+        // subsurface table that agrees with pbrt-v4 (592b2b2), which moved these four means by up to 12% from the numbers this checker had.)
+        {"big ball",   64,  64,  96, 102, {85.8, 88.3, 80.2}},
+        {"small ball", 32,  92,  50, 108, {62.0, 52.6, 46.2}},
+        {"back wall",  38,  19,  90,  38, {103.3, 95.5, 88.0}},
+        {"floor",      26, 108, 102, 124, {113.3, 111.6, 107.8}},
     };
     int bad = 0;
     for (const Win& win : wins) {
