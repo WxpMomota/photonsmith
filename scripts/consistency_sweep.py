@@ -553,7 +553,7 @@ def run(args):
                 worst = max(abs(x - y) / max(abs(x), 1e-6) for x, y in zip(ma, mb)) * 100.0
                 limit = 4.0
                 if label == "height map":   # a height map's slope is a finite difference of a coarse 8-texel picture: the renderers' footprints differ by a little more
-                    limit = 7.0 if shape == "sphere" else 5.0   # (a sphere is Metal's triangles against the CPU's analytic surface: 4.6% at every size, not yet understood)
+                    limit = 5.0   # (a sphere, disk or cylinder is Metal's triangles against the CPU's analytic surface: up to 4.6% on this extreme picture)
                 # Known, open: the recursive OptiX backend draws a tilted normal map on a cube 3 to 5% brighter than the CPU (red most; the wavefront backend does not; 2.9% with a
                 # right-handed camera, 4.7% with pbrt's, over several seeds), so this one pair has a looser limit until that is understood (docs/PBRT_SUPPORT.md, "Compared with real pbrt-v4").
                 if label == "tilted normal map" and shape == "cube" and os.environ.get("RAY_TRACER_WAVEFRONT") != "1": limit = 6.0
