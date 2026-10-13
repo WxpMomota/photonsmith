@@ -230,3 +230,17 @@ TEST(BSSRDFTest, MultiChannelIndependence) {
 	EXPECT_GT(r0, 0.0);
 	EXPECT_GT(r1, 0.0);
 }
+
+// ---- 14. Same numbers as real pbrt-v4 -------------------------------------
+// Values printed by pbrt-v4's own ComputeBeamDiffusionBSSRDF / SubsurfaceFromDiffuse
+// (100 x 64 table, g = 0, eta = 1.33). A wrong Fresnel-moment polynomial once made
+// the profile 25-50% off near the entry point and 30%+ too wide in the tail while
+// every property test above still passed.
+TEST(BSSRDFTest, MatchesPbrtV4Reference) {
+	BSSRDFTable t(100, 64);
+	ComputeBeamDiffusionBSSRDF(0.0, 1.33, &t);
+	double sa, ss;
+	SubsurfaceFromDiffuse(t, 0.5, 0.2, sa, ss);
+	EXPECT_NEAR(sa, 0.152347, 1e-3);
+	EXPECT_NEAR(ss, 4.847653, 1e-3);
+}

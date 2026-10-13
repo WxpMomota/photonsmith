@@ -69,9 +69,10 @@ inline double fr_dielectric(double cos_theta_i, double eta) {
 inline double fresnel_moment2(double eta) {
 	double eta2 = eta*eta, eta3 = eta2*eta, eta4 = eta3*eta, eta5 = eta4*eta;
 	if (eta < 1.0)
-		return 0.27614 - 0.87350*eta + 1.12077*eta2 - 0.65095*eta3 + 0.07883*eta4 + 0.04942*eta5;
-	else
-		return -9.23372 + 22.2272*eta - 20.9292*eta2 + 10.2291*eta3 - 2.54396*eta4 + 0.254913*eta5;
+		return 0.27614 - 0.87350*eta + 1.12077*eta2 - 0.65095*eta3 + 0.07883*eta4 + 0.04860*eta5;
+	double r_eta = 1.0 / eta, r_eta2 = r_eta*r_eta, r_eta3 = r_eta2*r_eta;
+	return -547.033 + 45.3087*r_eta3 - 218.725*r_eta2 + 458.843*r_eta + 404.557*eta
+		 - 189.519*eta2 + 54.9327*eta3 - 9.00603*eta4 + 0.63942*eta5;
 }
 
 // Henyey-Greenstein phase function evaluation (cosTheta = dot(wo, wi))
