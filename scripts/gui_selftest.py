@@ -13,6 +13,7 @@ result. Screenshots are of the app's own window (never the screen) and are writt
   diagnostics  the Diagnostics report is produced
   tour         (not in the default set) a screenshot of every tab, for looking over the UI: RT_GUI_SELFTEST_WIDTH/_HEIGHT size the window, RT_GUI_SELFTEST_THEME
                picks a theme id (e.g. solarized-light)
+  quitwarm     (a Mac) waits for the GPU renderer's background warm-up to finish, then quits: the exit status must be 0 (quitting once crashed after a warm-up)
   installphoto the Diagnostics tab's "Install Photo Helper" flow with stand-in installer scripts (not in the default set; no big download)
   livepreview  (--live-preview) selects Live Preview, starts it, lets it render, orbits the camera like a mouse drag, and requires
                frames to flow AND the picture to change
@@ -135,6 +136,8 @@ def run_mode(exe, mode, wait_s, out, plugins, fake_home, gpu=False):
         env["RT_GUI_SELFTEST_GPU"] = "1"   # the builder mode also previews through "Use the GPU"
     if mode == "installphoto":
         env.update(installphoto_env(fake_home))
+    if mode == "quitwarm" and IS_MAC:
+        env["MallocScribble"] = "1"   # freed memory is overwritten, so a read after a delete crashes every time instead of sometimes (the bug this mode guards)
     cmd = (["arch", "-x86_64"] if needs_rosetta(exe) else []) + [exe]
     with open(prefix + ".stdout", "wb") as log:
         # cwd is the root folder on purpose (see the module docstring), except on Windows: the OptiX renderer looks for its .ptx files relative to the working directory.
@@ -173,7 +176,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("app", nargs="?", help="RayTracerGUI.app, RayTracerGUI.exe, or the folder holding it")
     ap.add_argument("--out", help="directory for logs and screenshots (default: a new temp directory)")
-    ap.add_argument("--modes", default="ui,options,builder,queue,diagnostics", help="comma-separated self-test modes (default: %(default)s)")
+    ap.add_argument("--modes", default="ui,options,builder,queue,diagnostics,quitwarm", help="comma-separated self-test modes (default: %(default)s)")
     ap.add_argument("--live-preview", action="store_true", help="also require an enabled Live Preview item and run the livepreview mode (needs a GPU)")
     ap.add_argument("--plugins", help="directory holding Qt's offscreen platform plugin")
     args = ap.parse_args()
@@ -194,7 +197,7 @@ def main():
         modes.append("livepreview_objects")
     if args.live_preview and IS_MAC and "livepreview_arrange" not in modes:
         modes.append("livepreview_arrange")   # Save arrangement of a Scene Builder scene, opened again in the Builder
-    waits = {"builder": 300, "livepreview": 240, "livepreview_objects": 150, "livepreview_arrange": 90}
+    waits = {"quitwarm": 240, "builder": 300, "livepreview": 240, "livepreview_objects": 150, "livepreview_arrange": 90}
     ok = True
     try:
         for mode in modes:
