@@ -839,8 +839,9 @@ __device__ __forceinline__ float3 wf_sample_sphere_light(const SphereData& sph, 
 		out_v = (sph.thetaZMax > sph.thetaZMin)
 			? (theta - sph.thetaZMin) / (sph.thetaZMax - sph.thetaZMin) : 0.0f;
 	} else {
-		const float sphere_theta = acosf(fmaxf(-1.0f, fminf(1.0f, -local.y)));
-		const float sphere_phi = atan2f(-local.z, local.x) + 3.14159265358979323846f;
+		const float3 uv_local = sph.hasUvRot ? sphere_to_uv_frame(sph, local) : local;   // (a pbrt sphere's poles are on the object's z axis)
+		const float sphere_theta = acosf(fmaxf(-1.0f, fminf(1.0f, -uv_local.y)));
+		const float sphere_phi = atan2f(-uv_local.z, uv_local.x) + 3.14159265358979323846f;
 		out_u = sphere_phi / (2.0f * 3.14159265358979323846f);
 		out_v = sphere_theta / 3.14159265358979323846f;
 	}

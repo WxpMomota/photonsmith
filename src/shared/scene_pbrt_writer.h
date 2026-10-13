@@ -178,7 +178,9 @@ inline void writeGenerated(std::ostringstream& os, const ShapeMesh& m, const std
 inline void writeShape(std::ostringstream& os, const Object& o, const std::string& ind, bool pictured = false) {
 	switch (o.shape) {
 		case ShapeKind::Sphere:
-			os << ind << "Shape \"sphere\" \"float radius\" [ " << num(o.radius) << " ]\n";
+			// pbrt's sphere has its poles on its own z axis (and so does every renderer here, for a pbrt file); the document's up is y, so it is stood up like a disk is
+			// (the picture and checker of a sphere then run round a vertical axis, as a globe's do, in real pbrt-v4 as well).
+			os << ind << "Rotate -90 1 0 0\n" << ind << "Shape \"sphere\" \"float radius\" [ " << num(o.radius) << " ]\n";
 			break;
 		case ShapeKind::Box:
 			writeBox(os, o.size, ind, uvPlaceOf(o));

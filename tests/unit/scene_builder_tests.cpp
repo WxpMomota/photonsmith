@@ -1884,3 +1884,24 @@ TEST(SceneInstancingTest, InstancedForestRendersLikeThePlainOne) {
 		}
 	EXPECT_LT(worst, 0.05) << "the largest difference between two blocks, per channel";
 }
+
+// A sphere's pole in pbrt is its own z axis: the Builder stands it up (as a disk) so that a picture or a checker on it runs round a vertical axis, the way a globe does.
+TEST(SceneDocumentPbrtTest, ASphereIsStoodUpSoItsTexturePolesAreVertical) {
+	Document d = makeStarterScene();
+	d.objects.clear();
+	d.lights.clear();
+	Object ball = makeObject(ShapeKind::Sphere, "Ball");
+	ball.position = {1, 2, 3};
+	ball.radius = 0.7;
+	d.objects.push_back(ball);
+	const std::string text = toPbrt(d);
+	EXPECT_NE(text.find("Rotate -90 1 0 0\n  Shape \"sphere\""), std::string::npos) << text;
+	const pbrt_load::LoadResult r = loadText(text, "sphere_pole");
+	ASSERT_TRUE(r.ok) << r.error;
+	ASSERT_EQ(r.scene.spheres.size(), 1u);
+	const auto& rot = r.scene.spheres[0].uvRot;
+	// world up carried into the frame the sphere's own (u, v) are defined in is that frame's pole (y): v = 1 at the top of the ball
+	EXPECT_NEAR(rot[3] * 0 + rot[4] * 1 + rot[5] * 0, 1.0, 1e-12);
+	EXPECT_NEAR(rot[0] * 0 + rot[1] * 1 + rot[2] * 0, 0.0, 1e-12);
+	EXPECT_NEAR(rot[6] * 0 + rot[7] * 1 + rot[8] * 0, 0.0, 1e-12);
+}

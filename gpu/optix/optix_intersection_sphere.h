@@ -497,8 +497,10 @@ extern "C" __global__ void __closesthit__sphere() {
 		sphere_uv_v = (sphere.thetaZMax > sphere.thetaZMin)
 			? (sphere_theta - sphere.thetaZMin) / (sphere.thetaZMax - sphere.thetaZMin) : 0.0f;
 	} else {
-		sphere_theta = acosf(-obj_normal.y);
-		sphere_phi = atan2f(-obj_normal.z, obj_normal.x) + 3.14159265358979323846f;
+		// (a sphere loaded from a pbrt file has pbrt's poles, on the object's z axis: its direction is carried into this frame first)
+		const float3 uv_n = sphere.hasUvRot ? sphere_to_uv_frame(sphere, obj_normal) : obj_normal;
+		sphere_theta = acosf(-uv_n.y);
+		sphere_phi = atan2f(-uv_n.z, uv_n.x) + 3.14159265358979323846f;
 		sphere_uv_u = sphere_phi / (2.0f * 3.14159265358979323846f);
 		sphere_uv_v = sphere_theta / 3.14159265358979323846f;
 	}
@@ -552,11 +554,12 @@ extern "C" __global__ void __closesthit__sphere() {
 				* (sphere_radius * 2.0f * 3.14159265358979323846f);
 			if (dot(sphere_dpdu, sphere_dpdu) < 1e-14f) {
 				const float3 world_up = make_float3(0.0f, 1.0f, 0.0f);
-				const float3 t = cross(world_up, obj_normal);
+				const float3 t = cross(world_up, sphere.hasUvRot ? sphere_to_uv_frame(sphere, obj_normal) : obj_normal);
 				const float tlen = length(t);
 				const float3 dir = (tlen > 1e-6f) ? (t / tlen) : make_float3(1.0f, 0.0f, 0.0f);
 				sphere_dpdu = dir * (sphere_radius * 2.0f * 3.14159265358979323846f * sin_theta);
 			}
+			if (sphere.hasUvRot) sphere_dpdu = sphere_from_uv_frame(sphere, sphere_dpdu);   // (computed in the texture frame above)
 			if (instBase >= 0) sphere_dpdu = normalize(optixTransformVectorFromObjectToWorldSpace(sphere_dpdu));
 		}
 	}

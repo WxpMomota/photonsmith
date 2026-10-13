@@ -195,8 +195,9 @@ extern "C" __global__ void __closesthit__sppm_sphere() {
 
 	// (u,v) from the outward normal, the plain-sphere convention of optix_intersection_sphere.h (theta from the Y pole, phi around it).
 	const float kPi = 3.14159265358979323846f;
-	payload->u = (atan2f(-outward_normal.z, outward_normal.x) + kPi) / (2.0f * kPi);
-	payload->v = acosf(fminf(1.0f, fmaxf(-1.0f, -outward_normal.y))) / kPi;
+	const float3 uv_n = sph.hasUvRot ? sphere_to_uv_frame(sph, outward_normal) : outward_normal;   // (a pbrt sphere's poles are on the object's z axis)
+	payload->u = (atan2f(-uv_n.z, uv_n.x) + kPi) / (2.0f * kPi);
+	payload->v = acosf(fminf(1.0f, fmaxf(-1.0f, -uv_n.y))) / kPi;
 	payload->hitPoint    = hit_point;
 	payload->normal      = normal;
 	payload->materialIdx = sph.materialIdx;

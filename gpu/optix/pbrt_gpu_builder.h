@@ -924,6 +924,8 @@ inline void addSpheres(BuildCtx &c) {
 			continue;
 		}
 		SphereData sd = {};
+		sd.hasUvRot = 1;   // pbrt's texture coordinates (pbrt_flatten::Sphere::uvRot)
+		for (int i = 0; i < 9; ++i) sd.uvRot[i] = static_cast<float>(s.uvRot[i]);
 		sd.center = f3(s.center);
 		// Object motion blur - pbrt_flatten::Sphere::center1 already carries
 		// the real end-time centre (defaults to == center for a static
@@ -1374,6 +1376,8 @@ inline void addInstances(BuildCtx &c) {
 				continue;
 			}
 			SphereData sd = {};
+			sd.hasUvRot = 1;   // pbrt's texture coordinates, as for a sphere outside an object definition
+			for (int i = 0; i < 9; ++i) sd.uvRot[i] = static_cast<float>(s.uvRot[i]);
 			sd.center = f3(s.center);
 			// Object motion blur - same fix as the top-level sphere loop above
 			// (see its own comment): pbrt_flatten.h already bakes a real,
