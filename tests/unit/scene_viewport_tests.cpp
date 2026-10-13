@@ -132,11 +132,47 @@ TEST(SceneViewportTest, AMoveWithAnotherChangeOrAnUntrustedObjectIsNotJustAMove)
 	Document fogMoved = fogged;
 	fogMoved.objects.back().position.x += 1.0;
 	EXPECT_TRUE(translationOnly(fogged, fogMoved).empty()) << "a volume restarts: its medium would stay where it was declared";
-	Document coned = base;
-	coned.objects[2].shape = scene_doc::ShapeKind::Cone;
-	Document conedMoved = coned;
-	conedMoved.objects[2].position.x += 1.0;
-	EXPECT_TRUE(translationOnly(coned, conedMoved).empty());
+	Document meshed = base;
+	meshed.objects[2].shape = scene_doc::ShapeKind::Mesh;
+	meshed.objects[2].meshFile = "no-such-file.ply";
+	Document meshMoved = meshed;
+	meshMoved.objects[2].position.x += 1.0;
+	EXPECT_TRUE(translationOnly(meshed, meshMoved).empty()) << "a mesh file may not load, so the numbering cannot be trusted";
+}
+
+// A cone is written as a triangle mesh, which the renderer moves like any other object.
+TEST(SceneViewportTest, AConeCanMoveByOffset) {
+	Document base = makeStarterScene();
+	base.objects[2].shape = scene_doc::ShapeKind::Cone;
+	Document now = base;
+	now.objects[2].position.x += 1.0;
+	const auto offsets = translationOnly(base, now);
+	ASSERT_EQ(offsets.size(), base.objects.size());
+	EXPECT_NEAR(offsets[2][0], 1.0, 1e-12);
+}
+
+// Copies of a heavy shape are written as instances, and the renderer lists the placements of instances after every plain object (FlatScene::shapeRanges): the offsets
+// follow that order, not the document's.
+TEST(SceneViewportTest, InstancedObjectsComeAfterThePlainOnesInTheRenderersNumbering) {
+	Document base;
+	for (int i = 0; i < 5; ++i) {
+		scene_doc::Object o = scene_doc::makeObject(i % 2 == 0 ? scene_doc::ShapeKind::Cone : scene_doc::ShapeKind::Sphere, "Thing " + std::to_string(i));
+		o.position.x = i;
+		base.objects.push_back(o);
+	}
+	// objects 0, 2, 4 are equal cones (instanced); 1 and 3 are spheres (plain)
+	ASSERT_EQ(scene_doc::planInstances(base).templates(), 1);
+	Document now = base;
+	now.objects[0].position.z += 1.0;   // an instance
+	now.objects[3].position.z += 2.0;   // a plain one
+	const auto offsets = translationOnly(base, now);
+	ASSERT_EQ(offsets.size(), 5u);
+	// renderer order: the plain 1, 3, then the instances 0, 2, 4
+	EXPECT_NEAR(offsets[0][2], 0.0, 1e-12);   // sphere 1
+	EXPECT_NEAR(offsets[1][2], 2.0, 1e-12);   // sphere 3
+	EXPECT_NEAR(offsets[2][2], 1.0, 1e-12);   // cone 0
+	EXPECT_NEAR(offsets[3][2], 0.0, 1e-12);   // cone 2
+	EXPECT_NEAR(offsets[4][2], 0.0, 1e-12);   // cone 4
 }
 
 TEST(SceneViewportTest, ALensChangeRestartsBecauseTheLensIsFixedWhenTheRenderStarts) {

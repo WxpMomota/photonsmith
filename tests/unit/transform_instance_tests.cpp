@@ -148,3 +148,34 @@ TEST(TransformInstanceTest, TheSameGeometryCanBePlacedTwiceWithoutCopying) {
 	EXPECT_EQ(shared.use_count(), before + 2)
 		<< "the geometry was copied rather than shared";
 }
+
+TEST(TransformInstanceTest, AHitFromInsideASolidIsABackFaceWithTheNormalAgainstTheRay) {
+	// A ray that starts inside the placed (moved, scaled) sphere and leaves it hits the shape from inside: front_face must be false and the normal must face
+	// the ray, as for the same sphere written out plainly. (The instance used to take the child's already-flipped normal for the outward one and call every
+	// such hit a front face, which made glass and subsurface seen from inside an instanced mesh come out wrong.)
+	pbrt_scene::Matrix4 scaled = scaling(2, 2, 2);
+	scaled.m[3] = 5.0;   // scale 2 about the origin, then move to x = 5
+	const transform_instance t(unitSphere(), scaled);
+	const ray inside(point3(5, 0, 0), vec3(1, 0, 0));
+	hit_record rec;
+	ASSERT_TRUE(t.hit(inside, interval(0.001, infinity), rec));
+	EXPECT_NEAR(rec.p.x(), 7.0, 1e-9) << "the far side of a sphere of radius 2 centred at x = 5";
+	EXPECT_FALSE(rec.front_face);
+	EXPECT_NEAR(rec.normal.x(), -1.0, 1e-9) << "faces back along the ray";
+	const ray outside(point3(100, 0, 0), vec3(-1, 0, 0));
+	hit_record rec2;
+	ASSERT_TRUE(t.hit(outside, interval(0.001, infinity), rec2));
+	EXPECT_TRUE(rec2.front_face);
+	EXPECT_NEAR(rec2.normal.x(), 1.0, 1e-9);
+}
+
+TEST(TransformInstanceTest, TheSurfaceTangentsArePlacedWithTheGeometry) {
+	// dpdu (the tangent a normal or bump map builds its frame from) is a vector of the object's own space: scaled the way the geometry is.
+	const transform_instance t(unitSphere(), scaling(3, 3, 3));
+	hit_record plain, placed;
+	ASSERT_TRUE(unitSphere()->hit(ray(point3(0.3, 0, 100), vec3(0, 0, -1)), interval(0.001, infinity), plain));
+	ASSERT_TRUE(t.hit(ray(point3(0.9, 0, 100), vec3(0, 0, -1)), interval(0.001, infinity), placed));   // the same point of the sphere, three times as far out
+	ASSERT_GT(plain.dpdu.length(), 0.0) << "the sphere reports a tangent";
+	EXPECT_NEAR(placed.dpdu.length(), 3.0 * plain.dpdu.length(), 1e-6 * placed.dpdu.length());
+	EXPECT_NEAR(dot(unit_vector(placed.dpdu), unit_vector(plain.dpdu)), 1.0, 1e-9);
+}

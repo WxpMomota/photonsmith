@@ -190,7 +190,11 @@ By default an array copies the one object. To copy a thing made of several objec
 
 The copies are ordinary objects with their own numbered names: move, recolour or delete them one by one. The whole array is one undo step, and the original is never changed. One array makes at most 500 copies and 2,000 objects in all (fifty copies of a forty-block creature, say); the window says when it has cut it short, and, for a scatter that keeps copies apart, when the area is too small for them all. The turn about the vertical adds to the object's own turn, so it suits upright objects. The numbers come from a small generator written into the program, so a scatter looks the same on every platform and in every build.
 
-A scatter is not an instance: each copy is a separate object in the saved file (a few hundred bytes of text), which is why the limit exists.
+**Instances.** Copies stay separate objects in the document (a few hundred bytes of the builder's own data each, which is why the limit exists), but in the scene text the renderers read, copies of a *heavy* shape are written once and placed: pbrt's `ObjectBegin` / `ObjectInstance`. A forest of a hundred pines is one cone mesh and a hundred transforms, not a hundred cone meshes of 700 triangles; the file, the load and the memory on the CPU and the GPU shrink accordingly.
+
+* It is worked out when the scene is written, from the objects themselves: two objects are copies when they are the same shape with the same material and every length of one is the other's times one factor (what Array and Scatter do), wherever they stand and however they are turned. Recolour or reshape one and it simply stops being a copy and is written on its own; nothing to switch on, and nothing in the document remembers it.
+* The shapes worth it are the ones written as big triangle meshes: **cone, torus, capsule, dome, tube, rounded box, terrain** and a **mesh file**. A sphere, disk, cylinder, box, quad, pyramid, wedge or stairs is a few lines of text, so it is written as it always was. An emitter (pbrt does not allow an area light in an instance), a volume and a marble or noise pattern (a texture of the position in space) are never instanced; a height map is shared only by copies of the same size (its relief does not scale with the instance).
+* It changes nothing in the picture: the same scene written both ways renders alike on the CPU and both OptiX backends (`SceneInstancingTest`, and the instanced scenes of `scripts/combo_sweep.py`). Moving things in the Rendered viewport works on a copy as on any object.
 
 ## Volumes: fog, smoke and clouds
 
@@ -335,7 +339,7 @@ The scene's **name** is the field at the top right of the tab (it is also the *T
 ## What it does not do (yet)
 
 * Groups are for editing here: the saved `.pbrt` has no groups, so Live Preview's *Move objects* still moves the members one at a time. Scaling several things is uniform (the same in every direction): stretching a set along one axis would shear the turned objects in it.
-* Hair, the principled material and instanced copies; a box-shaped volume (the renderer's media fill a sphere, or a cylinder for fog) and a medium around the camera: use a hand-written pbrt file for those ([PBRT_SUPPORT.md](PBRT_SUPPORT.md) lists what the renderer accepts).
+* Hair and the principled material; instances of a sphere, disk, cylinder, box or other light shape, or of a group written as one instance (copies are instanced one object at a time: a tree's trunk and crown are two templates, not one); a box-shaped volume (the renderer's media fill a sphere, or a cylinder for fog) and a medium around the camera: use a hand-written pbrt file for those ([PBRT_SUPPORT.md](PBRT_SUPPORT.md) lists what the renderer accepts).
 * A mesh (`.ply` or `.obj`) is shown in the layout view only as a small marker at its position, because the view does not read the file; its scale and rotation apply when it renders.
 * No animation of objects. The camera can fly along a path through saved views (*Camera views*, *Flythrough...*) or orbit (*Turntable...*), but nothing else moves between frames.
 * The 3D view shows shapes, not materials or lighting (switch on **Rendered** for those), and a mesh as its bounding box and a sample of its points. Use it with the flat views, or type exact numbers in the properties.

@@ -744,6 +744,54 @@ static void selfTestRenderedViewport(SceneBuilderWidget *sb, const std::function
 	sb->orbit3dForTest(70.0, 25.0);
 	const bool moved = wait(30000, [&]() { return sb->renderedFramesForTest() > framesBefore + 3; });
 	check(moved, "orbiting the view keeps the picture coming");
+	// Copies of a cone are written as instances (scene_instancing.h), which the renderer numbers after every plain object: moving one of them still moves that one, and not the sphere
+	// that follows them in the document.
+	{
+		const auto centreOf = [](const QImage &img, const std::function<bool(const QColor &)> &is) {
+			double sx = 0;
+			int n = 0;
+			for (int y = 0; y < img.height(); ++y)
+				for (int x = 0; x < img.width(); ++x)
+					if (is(img.pixelColor(x, y))) { sx += x; ++n; }
+			return n > 20 ? sx / n : -1.0;
+		};
+		const auto isGreen = [](const QColor &c) { return c.green() > c.red() + 50 && c.green() > c.blue() + 50; };
+		const auto isMagenta = [](const QColor &c) { return c.red() > c.green() + 80 && c.blue() > c.green() + 80; };
+		scene_doc::Object pine = scene_doc::makeObject(scene_doc::ShapeKind::Cone, "Pine");
+		pine.radius = 0.5;
+		pine.height = 1.6;
+		pine.position = {-2.4, 0.8, 1.6};
+		pine.material.color = {0.1, 0.8, 0.15};
+		scene_doc::Object pine2 = pine;
+		scene_doc::scaleObject(pine2, 1.25);
+		pine2.name = "Pine 2";
+		pine2.position = {2.4, 1.0, 1.6};
+		scene_doc::Object marker = scene_doc::makeObject(scene_doc::ShapeKind::Sphere, "Marker");
+		marker.radius = 0.5;
+		marker.position = {0.0, 0.5, 2.4};
+		marker.material.color = {0.9, 0.1, 0.9};
+		sb->addCopies({pine, pine2});
+		sb->addCopies({marker});
+		const int pine2Index = static_cast<int>(sb->document().objects.size()) - 2;
+		check(sb->pbrtTextForTest().contains("ObjectInstance"), "two equal cones are written as instances of one");
+		sb->frame3dForTest();
+		const bool seen = wait(90000, [&]() { return centreOf(sb->renderedImageForTest(), isGreen) >= 0.0 && centreOf(sb->renderedImageForTest(), isMagenta) >= 0.0; });
+		check(seen, "the cones and the sphere are in the rendered picture");
+		if (seen) {
+			wait(8000, []() { return false; });   // (let the picture refine a little, and the renderer settle after the restart)
+			const double greenBefore = centreOf(sb->renderedImageForTest(), isGreen), markerBefore = centreOf(sb->renderedImageForTest(), isMagenta);
+			const int restartsBefore = sb->renderedRestartsForTest();
+			sb->setGizmoToolForTest(0);
+			const bool dragged = sb->dragAxis3dForTest(pine2Index, 0, 130);
+			const bool followed = wait(60000, [&]() { return std::abs(centreOf(sb->renderedImageForTest(), isGreen) - greenBefore) > 3.0; });
+			check(dragged && followed, QString("dragging the second cone moves it in the picture (green centre %1 -> %2)").arg(greenBefore, 0, 'f', 1).arg(centreOf(sb->renderedImageForTest(), isGreen), 0, 'f', 1));
+			check(std::abs(centreOf(sb->renderedImageForTest(), isMagenta) - markerBefore) < 2.0, "and the sphere did not move");
+			check(sb->renderedRestartsForTest() == restartsBefore, QString("and the renderer was told the move, not started again (%1 restarts)").arg(sb->renderedRestartsForTest() - restartsBefore));
+		}
+		sb->undo();   // (the drag, the marker, the cones)
+		sb->undo();
+		sb->undo();
+	}
 	sb->undo();   // (the move, and then the recolour)
 	sb->undo();
 	sb->setRenderedViewport(false);

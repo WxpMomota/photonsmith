@@ -20,6 +20,7 @@
 #include "scene_json.h"
 #include "scene_shapes.h"
 #include "scene_projector.h"
+#include "scene_instancing.h"
 
 namespace scene_doc {
 
@@ -251,6 +252,86 @@ inline void writeVolume(std::ostringstream& os, const Object& o, int n, const st
 	writeShape(os, o, ind);
 }
 
+// The name an instance's template is declared and placed under.
+inline std::string instanceName(int t) { return "instance-" + std::to_string(t + 1); }
+
+// The Texture directives an object's material needs (a picture, a pattern or checker, a bump or normal map), written where the stream is, and the names to use for them.
+struct ObjectTextures {
+	std::string textureName, displacement, normalMapFile;
+	bool pictured = false;
+};
+inline ObjectTextures writeObjectTextures(std::ostringstream& os, const Object& o, int& textureIndex) {
+	ObjectTextures t;
+	std::string& textureName = t.textureName;
+	const bool pictured = !o.material.imageFile.empty() && (o.material.kind == MaterialKind::Diffuse || o.material.kind == MaterialKind::CoatedDiffuse);
+	if (pictured) {
+		textureName = "picture-" + std::to_string(++textureIndex);
+		os << "Texture \"" << textureName << "\" \"spectrum\" \"imagemap\" \"string filename\" [ " << quoted(pbrtPath(o.material.imageFile))
+		   << " ]" << textureMappingParams(o) << "\n";
+	} else if (o.material.pattern != Pattern::None && !o.material.checker && (o.material.kind == MaterialKind::Diffuse || o.material.kind == MaterialKind::CoatedDiffuse)) {
+		textureName = "pattern-" + std::to_string(++textureIndex);
+		if (o.material.pattern == Pattern::Marble)
+			os << "Texture \"" << textureName << "\" \"spectrum\" \"marble\" \"float scale\" [ " << num(o.material.patternScale) << " ] \"float variation\" [ "
+			   << num(o.material.patternVariation) << " ]\n";
+		else
+			os << "Texture \"" << textureName << "\" \"spectrum\" \"fbm\"\n";
+	} else if (o.material.checker && o.material.kind == MaterialKind::Diffuse && o.shape != ShapeKind::Box) {
+		textureName = "checks-" + std::to_string(++textureIndex);
+		// (on a shape that does not write its own coordinates the repeats multiply the checks; a checkerboard has no shift)
+		const bool placedHere = uvPlaced(o.material) && !uvIsBaked(o.shape);
+		os << "Texture \"" << textureName << "\" \"spectrum\" \"checkerboard\" \"float uscale\" [ " << num(o.material.checkerCount * (placedHere ? o.material.uvScaleU : 1.0))
+		   << " ] \"float vscale\" [ " << num(o.material.checkerCount * (placedHere ? o.material.uvScaleV : 1.0)) << " ] \"rgb tex1\" [ " << rgb(o.material.color)
+		   << " ] \"rgb tex2\" [ " << rgb(o.material.color2) << " ]\n";
+	}
+	// A bump slot: a height map is a float image scaled to its height; a normal map is the colour image itself (the renderer reads either as the material's displacement).
+	std::string& displacement = t.displacement;
+	std::string& normalMapFile = t.normalMapFile;
+	t.pictured = pictured;
+	const bool canBump = o.material.kind == MaterialKind::Diffuse || o.material.kind == MaterialKind::CoatedDiffuse || o.material.kind == MaterialKind::Conductor;
+	// A normal map is pbrt's own `"string normalmap"` parameter wherever its placement is not needed (none set) or is already in the shape's texture coordinates (a box, a quad, a cone and
+	// the ready-made shapes bake it): that is valid pbrt-v4, which a texture slot holding a colour picture is not. Only a sphere, disk, cylinder or mesh file with a placement keeps the
+	// texture (this project's renderers read it; pbrt has no mapping for a normal map).
+	const bool standardNormalMap = o.material.bumpKind == BumpKind::Normal && (!uvPlaced(o.material) || uvIsBaked(o.shape));
+	if (canBump && !o.material.bumpFile.empty() && standardNormalMap) {
+		normalMapFile = o.material.bumpFile;
+	} else if (canBump && !o.material.bumpFile.empty()) {
+		displacement = "bump-" + std::to_string(++textureIndex);
+		if (o.material.bumpKind == BumpKind::Height) {
+			os << "Texture \"" << displacement << "-image\" \"float\" \"imagemap\" \"string filename\" [ " << quoted(pbrtPath(o.material.bumpFile)) << " ]"
+			   << textureMappingParams(o) << "\n";
+			os << "Texture \"" << displacement << "\" \"float\" \"scale\" \"texture tex\" [ \"" << displacement << "-image\" ] \"float scale\" [ " << num(o.material.bumpStrength) << " ]\n";
+		} else {
+			os << "Texture \"" << displacement << "\" \"spectrum\" \"imagemap\" \"string filename\" [ " << quoted(pbrtPath(o.material.bumpFile)) << " ]"
+			   << textureMappingParams(o) << "\n";
+		}
+	}
+	return t;
+}
+
+// The material and shape of an object (and its area light), after whatever places it: the body of an AttributeBegin for a plain object and of an ObjectBegin for an instance's template.
+inline void writeObjectBody(std::ostringstream& os, const Object& o, const std::string& ind, const ObjectTextures& t, int& mixIndex) {
+	const std::string& textureName = t.textureName;
+	const std::string& displacement = t.displacement;
+	const std::string& normalMapFile = t.normalMapFile;
+	const bool pictured = t.pictured;
+	if (o.emissive) {
+		// A pbrt light shape keeps its own material (the back of a one-sided panel, or a lit panel face, shows it), but the CPU and OptiX renderers treat the shape as an emitter only.
+		// Writing a black body says what they do, so every renderer agrees (Metal follows pbrt and reflects: a coloured emitter was 15% off the CPU's picture).
+		Material body;
+		body.kind = MaterialKind::Diffuse;
+		body.color = {0.0, 0.0, 0.0};
+		writeMaterial(os, body, ind, std::string(), std::string(), &mixIndex);
+	} else {
+		writeMaterial(os, o.material, ind, textureName, displacement, &mixIndex, normalMapFile);
+	}
+	if (o.emissive) {
+		os << ind << "AreaLightSource \"diffuse\" \"rgb L\" [ " << rgb(scaled(o.emission, o.emissionStrength)) << " ]";
+		if (o.twoSided) os << " \"bool twosided\" true";
+		os << "\n";
+	}
+	writeShape(os, o, ind, pictured);
+}
+
 }  // namespace detail
 
 // The triangle mesh of one of the generated shapes (isGeneratedShape), in the object's own space; the GUI's previews draw it too.
@@ -276,7 +357,8 @@ inline double documentSize(const Document& d) {
 	return std::round(size / unit) * unit;
 }
 
-inline std::string toPbrt(const Document& d) {
+// `instancing` off writes every object on its own (the tests compare the two).
+inline std::string toPbrt(const Document& d, bool instancing = true) {
 	std::ostringstream os;
 	os.imbue(std::locale::classic());
 	os << "# " << detail::commentText(d.title) << "\n";
@@ -345,7 +427,20 @@ inline std::string toPbrt(const Document& d) {
 	if (!d.lights.empty()) os << "\n";
 
 	int textureIndex = 0, mediumIndex = 0, mixIndex = 0;
-	for (const Object& o : d.objects) {
+	// Copies of one heavy shape (a forest from Array or Scatter) are written once, as an ObjectBegin, and each copy places it (scene_instancing.h).
+	const InstancePlan plan = instancing ? planInstances(d) : InstancePlan{std::vector<int>(d.objects.size(), -1), std::vector<double>(d.objects.size(), 1.0), {}};
+	for (int t = 0; t < plan.templates(); ++t) {
+		const Object& src = d.objects[static_cast<std::size_t>(plan.source[static_cast<std::size_t>(t)])];
+		int copies = 0;
+		for (int id : plan.templateOf) copies += id == t ? 1 : 0;
+		os << "# " << detail::commentText(src.name) << ", placed " << copies << " times below\n";
+		const detail::ObjectTextures textures = detail::writeObjectTextures(os, src, textureIndex);
+		os << "ObjectBegin \"" << detail::instanceName(t) << "\"\n";
+		detail::writeObjectBody(os, src, "  ", textures, mixIndex);
+		os << "ObjectEnd\n\n";
+	}
+	for (std::size_t index = 0; index < d.objects.size(); ++index) {
+		const Object& o = d.objects[index];
 		os << "# " << detail::commentText(o.name) << "\n";
 		if (o.volume.kind != VolumeKind::None) {   // fog, smoke or a cloud: a medium, with no material or light of its own
 			os << "AttributeBegin\n";
@@ -357,69 +452,21 @@ inline std::string toPbrt(const Document& d) {
 			os << "AttributeEnd\n\n";
 			continue;
 		}
-		std::string textureName;
-		const bool pictured = !o.material.imageFile.empty() && (o.material.kind == MaterialKind::Diffuse || o.material.kind == MaterialKind::CoatedDiffuse);
-		if (pictured) {
-			textureName = "picture-" + std::to_string(++textureIndex);
-			os << "Texture \"" << textureName << "\" \"spectrum\" \"imagemap\" \"string filename\" [ " << detail::quoted(detail::pbrtPath(o.material.imageFile))
-			   << " ]" << detail::textureMappingParams(o) << "\n";
-		} else if (o.material.pattern != Pattern::None && !o.material.checker && (o.material.kind == MaterialKind::Diffuse || o.material.kind == MaterialKind::CoatedDiffuse)) {
-			textureName = "pattern-" + std::to_string(++textureIndex);
-			if (o.material.pattern == Pattern::Marble)
-				os << "Texture \"" << textureName << "\" \"spectrum\" \"marble\" \"float scale\" [ " << detail::num(o.material.patternScale) << " ] \"float variation\" [ "
-				   << detail::num(o.material.patternVariation) << " ]\n";
-			else
-				os << "Texture \"" << textureName << "\" \"spectrum\" \"fbm\"\n";
-		} else if (o.material.checker && o.material.kind == MaterialKind::Diffuse && o.shape != ShapeKind::Box) {
-			textureName = "checks-" + std::to_string(++textureIndex);
-			// (on a shape that does not write its own coordinates the repeats multiply the checks; a checkerboard has no shift)
-			const bool placedHere = uvPlaced(o.material) && !detail::uvIsBaked(o.shape);
-			os << "Texture \"" << textureName << "\" \"spectrum\" \"checkerboard\" \"float uscale\" [ " << detail::num(o.material.checkerCount * (placedHere ? o.material.uvScaleU : 1.0))
-			   << " ] \"float vscale\" [ " << detail::num(o.material.checkerCount * (placedHere ? o.material.uvScaleV : 1.0)) << " ] \"rgb tex1\" [ " << detail::rgb(o.material.color)
-			   << " ] \"rgb tex2\" [ " << detail::rgb(o.material.color2) << " ]\n";
-		}
-		// A bump slot: a height map is a float image scaled to its height; a normal map is the colour image itself (the renderer reads either as the material's displacement).
-		std::string displacement, normalMapFile;
-		const bool canBump = o.material.kind == MaterialKind::Diffuse || o.material.kind == MaterialKind::CoatedDiffuse || o.material.kind == MaterialKind::Conductor;
-		// A normal map is pbrt's own `"string normalmap"` parameter wherever its placement is not needed (none set) or is already in the shape's texture coordinates (a box, a quad, a cone and
-		// the ready-made shapes bake it): that is valid pbrt-v4, which a texture slot holding a colour picture is not. Only a sphere, disk, cylinder or mesh file with a placement keeps the
-		// texture (this project's renderers read it; pbrt has no mapping for a normal map).
-		const bool standardNormalMap = o.material.bumpKind == BumpKind::Normal && (!uvPlaced(o.material) || detail::uvIsBaked(o.shape));
-		if (canBump && !o.material.bumpFile.empty() && standardNormalMap) {
-			normalMapFile = o.material.bumpFile;
-		} else if (canBump && !o.material.bumpFile.empty()) {
-			displacement = "bump-" + std::to_string(++textureIndex);
-			if (o.material.bumpKind == BumpKind::Height) {
-				os << "Texture \"" << displacement << "-image\" \"float\" \"imagemap\" \"string filename\" [ " << detail::quoted(detail::pbrtPath(o.material.bumpFile)) << " ]"
-				   << detail::textureMappingParams(o) << "\n";
-				os << "Texture \"" << displacement << "\" \"float\" \"scale\" \"texture tex\" [ \"" << displacement << "-image\" ] \"float scale\" [ " << detail::num(o.material.bumpStrength) << " ]\n";
-			} else {
-				os << "Texture \"" << displacement << "\" \"spectrum\" \"imagemap\" \"string filename\" [ " << detail::quoted(detail::pbrtPath(o.material.bumpFile)) << " ]"
-				   << detail::textureMappingParams(o) << "\n";
-			}
-		}
+		const int instance = plan.templateOf[index];
+		const detail::ObjectTextures textures = instance >= 0 ? detail::ObjectTextures() : detail::writeObjectTextures(os, o, textureIndex);
 		os << "AttributeBegin\n";
 		const std::string ind = "  ";
 		os << ind << "Translate " << detail::vec(o.position) << "\n";
 		if (o.rotation.z != 0.0) os << ind << "Rotate " << detail::num(o.rotation.z) << " 0 0 1\n";
 		if (o.rotation.y != 0.0) os << ind << "Rotate " << detail::num(o.rotation.y) << " 0 1 0\n";
 		if (o.rotation.x != 0.0) os << ind << "Rotate " << detail::num(o.rotation.x) << " 1 0 0\n";
-		if (o.emissive) {
-			// A pbrt light shape keeps its own material (the back of a one-sided panel, or a lit panel face, shows it), but the CPU and OptiX renderers treat the shape as an emitter only.
-			// Writing a black body says what they do, so every renderer agrees (Metal follows pbrt and reflects: a coloured emitter was 15% off the CPU's picture).
-			Material body;
-			body.kind = MaterialKind::Diffuse;
-			body.color = {0.0, 0.0, 0.0};
-			detail::writeMaterial(os, body, ind, std::string(), std::string(), &mixIndex);
+		if (instance >= 0) {
+			const double sc = plan.scale[index];
+			if (std::fabs(sc - 1.0) > 1e-9) os << ind << "Scale " << detail::num(sc) << " " << detail::num(sc) << " " << detail::num(sc) << "\n";
+			os << ind << "ObjectInstance \"" << detail::instanceName(instance) << "\"\n";
 		} else {
-			detail::writeMaterial(os, o.material, ind, textureName, displacement, &mixIndex, normalMapFile);
+			detail::writeObjectBody(os, o, ind, textures, mixIndex);
 		}
-		if (o.emissive) {
-			os << ind << "AreaLightSource \"diffuse\" \"rgb L\" [ " << detail::rgb(detail::scaled(o.emission, o.emissionStrength)) << " ]";
-			if (o.twoSided) os << " \"bool twosided\" true";
-			os << "\n";
-		}
-		detail::writeShape(os, o, ind, pictured);
 		os << "AttributeEnd\n\n";
 	}
 	return os.str();
