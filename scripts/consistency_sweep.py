@@ -531,6 +531,20 @@ def run(args):
                     print("  %-4s %-34s %s  %.4f vs %.4f  off by %.1f%%" % ("both", "cpu vs gpu, %s, %s" % (label, name), "ok   " if worst <= limit else "WRONG", ma[1], mb[1], worst))
                 if worst > limit:
                     failures.append(("backends", "both", "%s, %s" % (label, name)))
+    # a subsurface ball under a constant sky, held to 1% instead of the 6% above: the wavefront backend weighed the sky sample of every BSSRDF exit with the pdf of the wrong direction
+    # and read 2% bright for a long time under that looser limit (docs/PBRT_SUPPORT.md, "Subsurface")
+    if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "subsurface" in only):
+        total += 1
+        try:
+            ma, mb = sw.render("cpu", Scene(material="subsurface", spp=1024)), sw.render("gpu", Scene(material="subsurface", spp=1024))
+            worst = max(abs(x - y) / max(abs(x), 1e-6) for x, y in zip(ma, mb)) * 100.0
+            if worst > 1.0 or args.verbose:
+                print("  %-4s %-34s %s  %.4f vs %.4f  off by %.1f%%" % ("both", "cpu vs gpu, constant sky, subsurface (tight)", "ok   " if worst <= 1.0 else "WRONG", ma[1], mb[1], worst))
+            if worst > 1.0:
+                failures.append(("backends", "both", "constant sky, subsurface (tight)"))
+        except RuntimeError as e:
+            print("  both cpu vs gpu, constant sky, subsurface (tight): FAILED TO RENDER: %s" % e)
+            failures.append(("backends", "both", "constant sky, subsurface (tight)"))
     # a normal map and a height map on every shape the GPU draws as triangles, and on a disk, cylinder and sphere (analytic surfaces on OptiX; Metal draws them as triangles when they have
     # a map): the CPU's picture. (OptiX draws a height map on none of those three, which is documented.)
     if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "maps" in only):

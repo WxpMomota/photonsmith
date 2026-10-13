@@ -631,6 +631,10 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 			if (nf_c <= 0.0f) nf_c = 1e-6f;
 			float fr_l = FrDielectric(cos_l, nfEta);
 			outBsdfVal = (1.0f - fr_l) / (nf_c * 3.14159265f);
+			// The pdf the one-sample MIS weighs this light direction with is the BSDF's value times the cosine AT the light direction (the recursive backend's
+			// brdf_pdf_l). Left at 0 the callers fell back to brdf_pdf_override, which is the pdf at the unrelated continuation direction, so the NEE and BSDF-hit
+			// weights did not add up to 1 and a subsurface ball under a sky read 2% bright (the exit of every BSSRDF is shaded here).
+			outGlossyPdf = outBsdfVal * cos_l;
 		} else if (matType == MaterialType::DiffuseTransmission) {
 			// pbrt-v4 DiffuseTransmissionBxDF: R/pi for a light on wo's side of the surface, T/pi through it; the BSDF picks between the two cosine lobes
 			// with probabilities pr/(pr+pt) and pt/(pr+pt), so the density at lightDir is that lobe's probability times |cos|/pi (cos_l is |cos| here).
