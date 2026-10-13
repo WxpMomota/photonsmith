@@ -226,19 +226,26 @@ inline void perturbShadingNormal(thread const KernelRes& R, thread PathState& P,
         const float2 bumpUV = texCoordFor(primId, result.triangle_barycentric_coord, uvs);
         const float4 bumpMap = float4(mat.bumpUvScaleU, mat.bumpUvScaleV, mat.bumpUvDeltaU, mat.bumpUvDeltaV);
         float3 bumpDpdu, bumpDpdv;
-        triangleDpduDpdv(primId, vertices, uvs, facingNormal, bumpDpdu, bumpDpdv);
+        triangleDpduDpdv(primId, vertices, uvs, normal, bumpDpdu, bumpDpdv);
+        // pbrt works with the shading normal as authored (`normal`), then its BSDF is two-sided about the perturbed normal: a viewer behind the perturbed plane is lit as if the
+        // normal faced them, so the result is turned toward the viewer (as the CPU and OptiX do).
+        float3 bumped = normal;
         if (mat.bumpIsNormalMap != 0) {
-            facingNormal = imageNormalMapNormal(rgbGridData, mat.bumpOffset, mat.bumpWidth, mat.bumpHeight,
-                                                bumpMap.x * bumpUV.x + bumpMap.z, bumpMap.y * bumpUV.y + bumpMap.w, facingNormal, bumpDpdu);
+            bumped = imageNormalMapNormal(rgbGridData, mat.bumpOffset, mat.bumpWidth, mat.bumpHeight,
+                                          bumpMap.x * bumpUV.x + bumpMap.z, bumpMap.y * bumpUV.y + bumpMap.w, normal, bumpDpdu);
         } else {
             float footprint = 0.0;
             if (depth == 0u && uniforms.cameraOrthographic == 0u && uniforms.cameraSpherical == 0u &&
                 uniforms.cameraRealistic == 0u && uniforms.hasCameraOrbitBlur == 0u) {
-                footprint = bumpFootprintStep(uniforms, rayOrigin, rayDir, hitPoint, facingNormal, bumpDpdu, bumpDpdv);
+                footprint = bumpFootprintStep(uniforms, rayOrigin, rayDir, hitPoint, normal, bumpDpdu, bumpDpdv);
             }
-            facingNormal = imageBumpNormal(rgbGridData, mat.bumpOffset, mat.bumpWidth, mat.bumpHeight, mat.bumpScale,
-                                           bumpUV.x, bumpUV.y, bumpMap, facingNormal, bumpDpdu, footprint);
+            const bool smooth = triangleIsSmooth(primId, normals);
+            float3 dndu = float3(0.0), dndv = float3(0.0);
+            if (smooth) triangleDnduDndv(primId, normals, uvs, dndu, dndv);
+            bumped = imageBumpNormal(rgbGridData, mat.bumpOffset, mat.bumpWidth, mat.bumpHeight, mat.bumpScale,
+                                     bumpUV.x, bumpUV.y, bumpMap, normal, smooth, bumpDpdu, bumpDpdv, dndu, dndv, footprint);
         }
+        facingNormal = dot(bumped, rayDir) > 0.0 ? -bumped : bumped;
     }
     CENSUS_PUSH(mat.materialType);
     if (mat.materialType == METAL_MAT_BUMP_LAMBERTIAN && !isSphere && !isDisk && !isSuzanneInstance && !isPbrtInstance) {
