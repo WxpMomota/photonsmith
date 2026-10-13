@@ -5,6 +5,7 @@
 // available in this build.
 #include "mainwindow.h"
 #include "app_log.h"
+#include "gpu_warmup.h"
 #include "../src/shared/pbrt_asset_check.h"
 
 #include <QApplication>
@@ -100,6 +101,24 @@ void MainWindow::runSelfTest(const QString &mode, const QString &outPrefix) {
 	}
 
 	if (mode == "options") { runOptionsSelfTest(log, shot); return; }
+
+	// RT_GUI_SELFTEST=quitwarm: wait for the GPU warm-up (a Mac) to finish, then quit. The check is the exit status: the warm-up's thread deletes itself when it is done, and
+	// ~GpuWarmup used to read it afterwards, a crash at every quit that no other mode could see because the warm-up is off in them.
+	if (mode == "quitwarm") {
+		auto *poll = new QTimer(this);
+		auto waited = std::make_shared<int>(0);
+		connect(poll, &QTimer::timeout, this, [this, poll, log, waited]() {
+			const GpuWarmup *warmup = findChild<GpuWarmup *>();
+			// Up to 3 minutes while it runs (a cold Metal build takes about two), and never under 6 s: the thread must be gone, and its memory reused, before the window is destroyed.
+			if (++*waited < 30 || (warmup && warmup->running() && *waited < 900)) return;
+			poll->stop();
+			log(warmup ? "the GPU warm-up is over after " + QString::number(*waited * 0.2, 'f', 1) + " s; quitting" : "no GPU warm-up on this computer; quitting");
+			log("RESULT: OK");
+			QApplication::exit(0);
+		});
+		poll->start(200);
+		return;
+	}
 
 	if (mode == "builder") { runBuilderSelfTest(log, shot, outPrefix); return; }
 

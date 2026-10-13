@@ -30,7 +30,8 @@ GpuWarmup::~GpuWarmup() {
 
 void GpuWarmup::start() {
 #ifdef Q_OS_MAC
-	if (m_pending > 0 || qEnvironmentVariableIsSet("RT_GUI_SELFTEST") || qEnvironmentVariableIsSet("RT_NO_GPU_WARMUP")) return;
+	// (the "quitwarm" self-test is the one that wants it: it quits the window once the warm-up is over, which is when ~GpuWarmup once crashed)
+	if (m_pending > 0 || (qEnvironmentVariableIsSet("RT_GUI_SELFTEST") && qEnvironmentVariable("RT_GUI_SELFTEST") != "quitwarm") || qEnvironmentVariableIsSet("RT_NO_GPU_WARMUP")) return;
 	m_pending = 0;
 	// 1. This process: the library Live Preview calls.
 	if (RealtimePreviewSession::isAvailable()) {
