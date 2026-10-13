@@ -85,7 +85,7 @@ def run_scene(args, name):
             problems.append("%s: mean %.3f vs %.3f, block p99 %.3f, blocks > 0.1: %d" % (t, a, b, p99, many))
         elif rel > 0.06 or p99 > tol or many >= 3:
             known = (name.split("__")[0] in KNOWN_NO_HEIGHT_MAP and name.endswith("__heightmap")) or name in KNOWN_OTHER
-            why = "OptiX draws no height map on a sphere, disk or cylinder; Metal does on the last two" if name.endswith("__heightmap") else KNOWN_OTHER.get(name, "")
+            why = "OptiX draws no height map on a sphere, disk or cylinder; Metal does" if name.endswith("__heightmap") else KNOWN_OTHER.get(name, "")
             problems.append(("KNOWN (%s): " % why if known else "") + "%s differs from cpu: mean %.3f vs %.3f (%.1f%% off), 99th percentile of 4x4 block differences %.3f, %d blocks off by > 0.1" % (t, a, b, rel * 100, p99, many))
     return name, problems
 
