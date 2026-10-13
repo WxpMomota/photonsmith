@@ -75,10 +75,22 @@ class transform_instance : public hittable {
         // is given the WORLD ray. Calling it again rather than transforming
         // the child's flag keeps a mirroring transform (negative determinant,
         // which flips winding) consistent with the geometry the camera sees.
-        vec3 n = affine_transform::apply_normal(w2o, rec.normal);
+        //
+        // It needs the OUTWARD normal. The child's rec.normal already faces
+        // against the ray (the child called set_face_normal itself), so a hit
+        // from inside a closed shape arrives pointing inward; carrying that
+        // through as if it were outward made every back-face hit look like a
+        // front-face one, which broke what depends on the side a ray is on:
+        // glass and subsurface seen from inside an instanced mesh were 4-8%
+        // off the same mesh written out plainly.
+        const vec3 outward = rec.front_face ? rec.normal : -rec.normal;
+        vec3 n = affine_transform::apply_normal(w2o, outward);
         const double len = n.length();
         if (len > 0) n = n / len;
         rec.set_face_normal(r, n);
+        // The surface tangents are object-space vectors too: a normal or bump map builds its frame from dpdu.
+        rec.dpdu = affine_transform::apply_vector(o2w, rec.dpdu);
+        rec.dpdv = affine_transform::apply_vector(o2w, rec.dpdv);
         return true;
     }
 

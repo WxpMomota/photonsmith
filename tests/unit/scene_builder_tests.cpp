@@ -1041,7 +1041,9 @@ TEST(SceneArrayDocumentTest, AScatteredSceneRoundTripsLoadsAndStaysSmall) {
 	const pbrt_load::LoadResult r = loadText(pbrt, "scattered");
 	ASSERT_TRUE(r.ok) << r.error;
 	EXPECT_EQ(r.scene.cones.size(), 0u) << "pbrt-v4 has no cone shape: the pine's cones are written as meshes";
-	EXPECT_GE(r.scene.triangles.size(), 301u * scene_doc::coneMesh(1.0, 1.0).triangleCount()) << "the original pine's cones and its 300 copies' (a mesh each)";
+	EXPECT_EQ(r.scene.instances.size(), 301u) << "the original pine and its 300 copies are placements of one cone mesh (scene_instancing.h)";
+	ASSERT_EQ(r.scene.groups.size(), 1u);
+	EXPECT_EQ(r.scene.groups[0].triangles.size(), scene_doc::coneMesh(1.0, 1.0).triangleCount()) << "stated once";
 }
 
 TEST(SceneArrayDocumentTest, TheSceneSizeCoversTheWholeScatter) {
@@ -1648,6 +1650,52 @@ TEST(SceneCombosTest, WritesOneSceneForEveryShapeAndMaterialTreatmentWhenAsked) 
 			++written;
 		}
 	}
+	// Copies of the heavy shapes, which the writer places as instances of one template (scene_instancing.h): three of the subject, moved, turned and one scaled, under each treatment
+	// an instance can take, named inst_<shape>__<treatment>.pbrt. The renderers draw them as they draw the plain copies, and real pbrt-v4 reads them (pbrt_compare.py).
+	for (ShapeKind shape : {ShapeKind::Cone, ShapeKind::Torus, ShapeKind::Capsule, ShapeKind::Dome, ShapeKind::Tube, ShapeKind::RoundedBox, ShapeKind::Terrain}) {
+		for (const Treatment& t : treatments) {
+			if (std::string(t.name) == "emitter" || std::string(t.name) == "marble") continue;   // (an emitter and a pattern are not instanced)
+			Document d;
+			d.camera.position = {3.6, 2.8, 5.4};
+			d.camera.target = {0, 0.7, 0};
+			d.camera.fov = 44;
+			d.render = {64, 64, 48, 8};
+			Object floorObj = makeObject(ShapeKind::Quad, "Floor");
+			floorObj.material.color = {0.55, 0.55, 0.55};
+			d.objects.push_back(floorObj);
+			Object o = makeObject(shape, "Subject");
+			if (shape == ShapeKind::Terrain) { o.size = {2, 0.6, 2}; o.position = {0, 0.3, 0}; }
+			t.apply(o);
+			const double scales[3] = {1.0, 0.7, 1.0};
+			const scene_doc::Float3 where[3] = {{-1.3, 0, 0.3}, {1.4, 0, -0.5}, {0.1, 0, 1.5}};
+			const double turn[3] = {0.0, 40.0, 90.0};
+			for (int i = 0; i < 3; ++i) {
+				Object c = o;
+				c.name = "Copy " + std::to_string(i + 1);
+				scene_doc::scaleObject(c, scales[i]);
+				c.position = {where[i].x, o.position.y * scales[i], where[i].z};
+				c.rotation = {0.0, turn[i], 0.0};
+				d.objects.push_back(c);
+			}
+			Light sky;
+			sky.kind = LightKind::Infinite;
+			sky.color = {0.62, 0.72, 0.95};
+			sky.intensity = 0.7;
+			d.lights.push_back(sky);
+			Light sun;
+			sun.kind = LightKind::Distant;
+			sun.position = {3, 5, 4};
+			sun.target = {0, 0, 0};
+			sun.color = {1.0, 0.96, 0.9};
+			sun.intensity = 3.0;
+			d.lights.push_back(sun);
+			const std::string text = toPbrt(d);
+			EXPECT_NE(text.find("ObjectInstance"), std::string::npos) << toString(shape) << " " << t.name << " should be instanced (a heightmap on a scaled copy is the one case that is not)";
+			writeFile(std::string("inst_") + scene_doc::toString(shape) + "__" + t.name + ".pbrt", text);
+			writeFile(std::string("flat_") + scene_doc::toString(shape) + "__" + t.name + ".pbrt", toPbrt(d, false));   // (the same scene with every copy written on its own: the baseline of the sweeps)
+			++written;
+		}
+	}
 	// The showcase scene (a mix, a subsurface ball, glass, a tiled picture, a projector) under each ready-made lighting, with its own pictures given by absolute path.
 	const std::string repoScenes = std::filesystem::absolute("pbrt_scenes").string();
 	const std::string presetNames[] = {"studio", "overcast", "sunny", "goldenhour", "moonlit", "lightbox"};
@@ -1672,4 +1720,167 @@ TEST(SceneCombosTest, WritesOneSceneForEveryShapeAndMaterialTreatmentWhenAsked) 
 		++written;
 	}
 	EXPECT_GT(written, 150);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Instances: copies of one heavy shape are written once (scene_instancing.h)
+// ---------------------------------------------------------------------------------------------------------------------------------
+
+namespace {
+std::size_t countOf(const std::string& text, const std::string& what) {
+	std::size_t n = 0;
+	for (std::size_t at = text.find(what); at != std::string::npos; at = text.find(what, at + what.size())) ++n;
+	return n;
+}
+
+Document forestDocument(int copies) {
+	Document d = makeStarterScene();
+	d.objects.clear();
+	d.lights.clear();
+	Object pine = makeObject(ShapeKind::Cone, "Pine");
+	pine.radius = 0.5;
+	pine.height = 2.0;
+	pine.position = {0, 1.0, 0};
+	pine.material.color = {0.1, 0.5, 0.1};
+	d.objects.push_back(pine);
+	scene_doc::ScatterParams p;
+	p.count = copies;
+	p.width = 10.0;
+	p.tiltDegrees = 5.0;
+	for (const Object& o : scene_doc::scatter({pine}, p, d.objects).objects) d.objects.push_back(o);
+	return d;
+}
+}  // namespace
+
+TEST(SceneInstancingTest, CopiesOfAHeavyShapeAreWrittenOnceAndPlacedPerCopy) {
+	const Document d = forestDocument(20);
+	ASSERT_EQ(d.objects.size(), 21u);
+	const std::string text = toPbrt(d), flat = toPbrt(d, false);
+	EXPECT_EQ(countOf(text, "ObjectBegin"), 1u);
+	EXPECT_EQ(countOf(text, "ObjectInstance"), 21u) << "the original is a placement too";
+	EXPECT_EQ(countOf(flat, "ObjectBegin"), 0u);
+	EXPECT_LT(text.size() * 5, flat.size()) << "the triangles are stated once, not once per copy";
+	// The scale of a copy is the factor of its lengths over the template's (a scatter scales each copy by 0.8 to 1.2).
+	EXPECT_GT(countOf(text, "  Scale "), 15u);
+	const pbrt_load::LoadResult r = loadText(text, "forest_instanced");
+	ASSERT_TRUE(r.ok) << r.error;
+	EXPECT_EQ(r.scene.instances.size(), 21u);
+	ASSERT_EQ(r.scene.groups.size(), 1u);
+	EXPECT_EQ(r.scene.groups[0].triangles.size(), scene_doc::coneMesh(0.5, 2.0).triangleCount());
+	EXPECT_EQ(r.scene.triangles.size(), 0u);
+	// Each copy is still one object of the file, in the document's order (the rendered viewport numbers them like that).
+	EXPECT_EQ(r.scene.shapeRanges.size(), 21u);
+	Document back;
+	std::string err;
+	ASSERT_TRUE(fromPbrt(text, back, err)) << err;
+	EXPECT_EQ(toJson(back), toJson(d));
+}
+
+TEST(SceneInstancingTest, OnlyRealCopiesAreInstanced) {
+	{   // a different colour on one: it is no copy; the others still are
+		Document d = forestDocument(5);
+		d.objects[3].material.color = {0.9, 0.1, 0.1};
+		const scene_doc::InstancePlan plan = scene_doc::planInstances(d);
+		EXPECT_EQ(plan.templates(), 1);
+		EXPECT_EQ(plan.templateOf[3], -1);
+		EXPECT_EQ(plan.templateOf[2], 0);
+	}
+	{   // lengths that are not all in proportion: a taller one is a different shape
+		Document d = forestDocument(3);
+		d.objects[1].height *= 1.5;
+		const scene_doc::InstancePlan plan = scene_doc::planInstances(d);
+		EXPECT_EQ(plan.templateOf[1], -1);
+	}
+	{   // a lone object is written plainly
+		Document d = forestDocument(0);
+		EXPECT_EQ(scene_doc::planInstances(d).templates(), 0);
+		EXPECT_EQ(countOf(toPbrt(d), "ObjectBegin"), 0u);
+	}
+	{   // light shapes (a sphere is one line of text), emitters, volumes and patterns are never instanced
+		Document d = makeStarterScene();
+		d.objects.clear();
+		for (int i = 0; i < 4; ++i) d.objects.push_back(makeObject(ShapeKind::Sphere, "Ball"));
+		for (int i = 0; i < 3; ++i) {
+			Object lamp = makeObject(ShapeKind::Cone, "Lamp");
+			lamp.emissive = true;
+			d.objects.push_back(lamp);
+		}
+		for (int i = 0; i < 3; ++i) {
+			Object marble = makeObject(ShapeKind::Torus, "Marble ring");
+			marble.material.pattern = Pattern::Marble;
+			d.objects.push_back(marble);
+		}
+		for (int i = 0; i < 3; ++i) d.objects.push_back(scene_doc::makeVolume(VolumeKind::Fog, "Fog"));
+		EXPECT_EQ(scene_doc::planInstances(d).templates(), 0);
+		EXPECT_EQ(countOf(toPbrt(d), "ObjectBegin"), 0u);
+	}
+	{   // two terrains with another seed are two different grounds
+		Document d = makeStarterScene();
+		d.objects.clear();
+		Object a = makeObject(ShapeKind::Terrain, "Hills");
+		Object b = a;
+		b.seed = 2;
+		d.objects = {a, b};
+		EXPECT_EQ(scene_doc::planInstances(d).templates(), 0);
+		b.seed = 1;
+		b.position = {20, 0, 0};
+		b.rotation = {0, 90, 0};
+		d.objects = {a, b};
+		EXPECT_EQ(scene_doc::planInstances(d).templates(), 1) << "the same ground moved and turned is a copy";
+	}
+	{   // a height map's relief does not scale with an instance, so only an equal-sized copy may share it
+		Document d = forestDocument(2);
+		for (Object& o : d.objects) o.material.bumpFile = "bump.png";
+		d.objects[1].radius = d.objects[0].radius * 2;
+		d.objects[1].height = d.objects[0].height * 2;
+		d.objects[1].size = {d.objects[0].size.x * 2, d.objects[0].size.y * 2, d.objects[0].size.z * 2};
+		d.objects[1].radius2 = d.objects[0].radius2 * 2;
+		d.objects[1].meshScale = d.objects[0].meshScale * 2;
+		EXPECT_EQ(scene_doc::planInstances(d).templates(), 0);
+	}
+}
+
+// The same forest as instances and as plain shapes must give the same picture.
+TEST(SceneInstancingTest, InstancedForestRendersLikeThePlainOne) {
+	const std::string launcher = findLauncher();
+	if (launcher.empty()) GTEST_SKIP() << "ray_tracer.exe was not found next to the tests";
+	Document d = forestDocument(12);
+	Object floor = makeObject(ShapeKind::Quad, "Floor");
+	floor.size = {14, 1, 14};
+	d.objects.push_back(floor);
+	d.camera.position = {0, 9, 11};
+	d.camera.target = {0, 0.5, 0};
+	d.camera.fov = 45;
+	Light sky;
+	sky.kind = LightKind::Infinite;
+	sky.color = {0.7, 0.8, 1.0};
+	sky.intensity = 0.8;
+	d.lights.push_back(sky);
+	Light sun;
+	sun.kind = LightKind::Distant;
+	sun.position = {-4, 8, 5};
+	sun.target = {0, 0, 0};
+	sun.intensity = 3.0;
+	d.lights.push_back(sun);
+	ASSERT_FALSE(hasErrors(validate(d)));
+	std::vector<float> a, b;
+	int wa = 0, ha = 0, wb = 0, hb = 0;
+	ASSERT_TRUE(renderWithLauncher(launcher, toPbrt(d), "forest_inst", 48, 96, 4, a, wa, ha));
+	ASSERT_TRUE(renderWithLauncher(launcher, toPbrt(d, false), "forest_flat", 48, 96, 4, b, wb, hb));
+	ASSERT_EQ(a.size(), b.size());
+	for (int c = 0; c < 3; ++c) EXPECT_NEAR(channelMean(a, c), channelMean(b, c), 0.02 * channelMean(b, c)) << "channel " << c;
+	// ...and where the trees stand: the pictures agree by blocks of 8 x 8 pixels (the noise of 96 samples averages out there)
+	double worst = 0.0;
+	for (int by = 0; by + 8 <= ha; by += 8)
+		for (int bx = 0; bx + 8 <= wa; bx += 8) {
+			double sa = 0, sb = 0;
+			for (int y = by; y < by + 8; ++y)
+				for (int x = bx; x < bx + 8; ++x)
+					for (int c = 0; c < 3; ++c) {
+						sa += a[3 * (static_cast<std::size_t>(y) * wa + x) + c];
+						sb += b[3 * (static_cast<std::size_t>(y) * wa + x) + c];
+					}
+			worst = std::max(worst, std::fabs(sa - sb) / (3 * 64));
+		}
+	EXPECT_LT(worst, 0.05) << "the largest difference between two blocks, per channel";
 }

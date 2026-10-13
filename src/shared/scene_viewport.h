@@ -78,15 +78,16 @@ inline scene_doc::Document pictureOf(const scene_doc::Document& d) {
 inline std::string sceneSignature(const scene_doc::Document& d) { return scene_doc::toJson(pictureOf(d)); }
 
 // Whether `now` differs from `base` (the document the renderer's copy was written from, `baseSignature` its sceneSignature(), which the caller keeps so that it is not worked out again for
-// every step of a drag) only in where objects are, and by how much: the offset of each object (absolute from where
-// `base` has it, so all zeros when nothing moved). The renderer numbers objects as the copy's AttributeBegin blocks in file order, which are the document's objects in order, so an
-// offset's index is the object's. Nothing is returned (an empty vector) when the change is more than a move, or for a scene where the numbering cannot be trusted (a cone, which the GPU
-// does not draw as one of the shapes it can move, or a mesh, whose file may not load, leaves a different number of objects than the document has), or when a volume is moved (the
-// medium of a cloud stays where it was declared). Those restart instead.
+// every step of a drag) only in where objects are, and by how much: the offset of each object (absolute from where `base` has it, so all zeros when nothing moved).
+// The renderer numbers objects as the copy's AttributeBegin blocks in file order, which are the document's objects in order, so an offset's index is the object's, except that the
+// placements of instances (scene_instancing.h) come after every plain object: the loader lists the shapes first and the instances after them (FlatScene::shapeRanges). The offsets
+// are given in that order: the plain objects in document order, then the instanced ones in document order.
+// Nothing is returned (an empty vector) when the change is more than a move, or for a scene where the numbering cannot be trusted (a mesh, whose file may not load, leaves a
+// different number of objects than the document has), or when a volume is moved (the medium of a cloud stays where it was declared). Those restart instead.
 inline std::vector<std::array<double, 3>> translationOnly(const scene_doc::Document& base, const std::string& baseSignature, const scene_doc::Document& now) {
 	if (base.objects.size() != now.objects.size() || base.objects.empty()) return {};
 	for (const scene_doc::Object& o : now.objects)
-		if (o.shape == scene_doc::ShapeKind::Cone || o.shape == scene_doc::ShapeKind::Mesh) return {};
+		if (o.shape == scene_doc::ShapeKind::Mesh) return {};
 	scene_doc::Document unmoved = now;
 	std::vector<std::array<double, 3>> offsets(now.objects.size());
 	for (std::size_t i = 0; i < now.objects.size(); ++i) {
@@ -98,7 +99,15 @@ inline std::vector<std::array<double, 3>> translationOnly(const scene_doc::Docum
 	if (sceneSignature(unmoved) != baseSignature) return {};
 	for (std::size_t i = 0; i < offsets.size(); ++i)   // (a volume is an object like another to the renderer, but its medium does not move with it: moving one is a restart, standing still is nothing)
 		if (now.objects[i].volume.kind != scene_doc::VolumeKind::None && (offsets[i][0] != 0.0 || offsets[i][1] != 0.0 || offsets[i][2] != 0.0)) return {};
-	return offsets;
+	const scene_doc::InstancePlan plan = scene_doc::planInstances(now);
+	if (plan.templates() == 0) return offsets;
+	std::vector<std::array<double, 3>> inRendererOrder;
+	inRendererOrder.reserve(offsets.size());
+	for (std::size_t i = 0; i < offsets.size(); ++i)
+		if (plan.templateOf[i] < 0) inRendererOrder.push_back(offsets[i]);
+	for (std::size_t i = 0; i < offsets.size(); ++i)
+		if (plan.templateOf[i] >= 0) inRendererOrder.push_back(offsets[i]);
+	return inRendererOrder;
 }
 inline std::vector<std::array<double, 3>> translationOnly(const scene_doc::Document& base, const scene_doc::Document& now) { return translationOnly(base, sceneSignature(base), now); }
 
