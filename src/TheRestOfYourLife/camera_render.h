@@ -754,7 +754,7 @@ inline void camera::initialize()
     }
 
     // Calculate the u,v,w unit basis vectors for the camera coordinate frame.
-    compute_lookat_basis(lookfrom, lookat, vup, u, v, w);
+    compute_lookat_basis(lookfrom, lookat, vup, u, v, w, mirror_x);
 
     // Calculate the camera defocus disk radius.
     auto defocus_radius = focus_dist * std::tan(degrees_to_radians(defocus_angle / 2));
@@ -775,7 +775,7 @@ inline void camera::initialize()
         // identical formulas, just with the canonical axes substituted
         // for u/v/w/center. These never change per ray; only the
         // camera-to-world placement applied to them in get_ray() does.
-        const vec3 local_u(1,0,0), local_v(0,1,0), local_w(0,0,1);
+        const vec3 local_u(mirror_x ? -1 : 1, 0, 0), local_v(0,1,0), local_w(0,0,1);   // (the keyframes below stay right-handed rotations: a mirror is not one, and cannot be interpolated; it is this local axis)
         const point3 local_center(0,0,0);
         compute_viewport_geometry(local_u, local_v, local_w, local_center,
                                    viewport_width, viewport_height, focus_dist,

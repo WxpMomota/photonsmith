@@ -274,6 +274,7 @@ inline Discovered describe(const std::string &path, const std::string &text) {
 	// already resolved it to numeric params, no geometry needed either.
 	const pbrt_flatten::FlatScene flat = pbrt_flatten::flatten(parsed.scene);
 	d.camera = flat.camera;
+	if (pbrt_flatten::isLegacyRightHandedBuilderFile(text)) d.camera.leftHanded = false;
 	d.filter = flat.filter;
 	d.regularize = flat.regularize;
 	d.cropX0 = flat.cropX0; d.cropX1 = flat.cropX1;

@@ -410,6 +410,7 @@ inline LoadResult loadFile(const std::string &path,
 		r.scene = pbrt_flatten::flatten(parsed.scene, meshes);
 	}
 	r.ok = true;
+	if (pbrt_flatten::isLegacyRightHandedBuilderFile(text)) r.scene.camera.leftHanded = false;   // (see that function)
 
 	// A Shape naming "file.obj#group" is reported missing by flatten() whenever the mesh callback fails - including when the FILE exists but has no
 	// such group (a newer upstream copy of an OBJ that dropped or renamed a material). That is not a missing file: it keeps its warning but must

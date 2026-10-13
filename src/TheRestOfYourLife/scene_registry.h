@@ -58,6 +58,9 @@ struct CameraConfig {
     double lookfrom_t1_x = 0.0, lookfrom_t1_y = 0.0, lookfrom_t1_z = 0.0;
     double lookat_t1_x   = 0.0, lookat_t1_y   = 0.0, lookat_t1_z   = 0.0;
     double shutter_open  = 0.0, shutter_close = 1.0;
+    // pbrt's left-handed horizontal axis (see camera::mirror_x, pbrt_flatten::Camera::leftHanded): the picture of this scene is the mirror of what the book-style basis of
+    // lookfrom/lookat/up would draw. Set for a loaded pbrt perspective camera; what Live Preview's mouse and keys use to turn left and right the way the picture does.
+    bool   left_handed = false;
 };
 
 
@@ -382,6 +385,7 @@ namespace pbrt_scene_registry {
             d.camera.lookat1[0],   d.camera.lookat1[1],   d.camera.lookat1[2],
             d.camera.shutterOpen, d.camera.shutterClose
         };
+        s.camera.left_handed = d.camera.leftHanded && d.camera.type == "perspective";
 
         // A failed load yields an empty world rather than a crash - the
         // error above already said why, and an empty render is a legible
@@ -461,6 +465,7 @@ namespace pbrt_scene_registry {
         const double pmaxComponentValue = d.maxComponentValue;
         s.setup_camera = [ux, uy, uz, pcam, pfilter, pregularize, pcropX0, pcropX1, pcropY0, pcropY1, pmaxComponentValue, path](camera_t& cam) {
             cam.vup = vec3(ux, uy, uz);
+            cam.mirror_x = pcam.leftHanded;   // pbrt's left-handed horizontal axis (camera::mirror_x); only the perspective camera reads it
             // PixelFilter - see that struct's own comment (pbrt_flatten.h)
             // for why this is applied unconditionally (unlike sampler_kind)
             // and regardless of camera type, unlike the ortho/spherical/

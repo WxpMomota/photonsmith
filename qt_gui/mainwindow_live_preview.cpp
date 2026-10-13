@@ -485,7 +485,7 @@ void MainWindow::pushLiveSvgfTuningToSession() {
 // arrow-key paths, which differ only in how they convert their own raw
 // input (pixel deltas vs. discrete steps) into radians before calling this.
 void MainWindow::applyOrbitDelta(double azimuthDelta, double elevationDelta) {
-	m_orbit.azimuth += azimuthDelta;
+	m_orbit.azimuth += m_currentSceneLeftHanded ? -azimuthDelta : azimuthDelta;   // (a pbrt scene's picture is mirrored: a drag to the right still turns the scene to the right)
 	m_orbit.elevation += elevationDelta;
 	constexpr double kMaxElevation = 1.5533;  // 89 degrees in radians
 	if (m_orbit.elevation > kMaxElevation) m_orbit.elevation = kMaxElevation;
@@ -536,7 +536,7 @@ void MainWindow::applyTranslateDelta(double forwardDelta, double rightDelta, dou
 	// and well-defined at every elevation, including both poles, while
 	// matching cross(forward, kWorldUp)'s own direction everywhere else.
 	const camera_math::Vec3 right{std::cos(m_orbit.azimuth), 0.0, -std::sin(m_orbit.azimuth)};
-	const camera_math::Vec3 delta = forward * forwardDelta + right * rightDelta + kWorldUp * upDelta;
+	const camera_math::Vec3 delta = forward * forwardDelta + right * (m_currentSceneLeftHanded ? -rightDelta : rightDelta) + kWorldUp * upDelta;   // (right on a pbrt scene's picture is the other way)
 	// Camera and pivot translate by the IDENTICAL delta, preserving
 	// distance/orientation between them - re-deriving m_orbit via
 	// cartesianToOrbit() rather than assuming it stays numerically

@@ -194,6 +194,7 @@
     <ClCompile Include="unit\scene_lighting_tests.cpp" />
     <ClCompile Include="unit\scene_projector_tests.cpp" />
     <ClCompile Include="unit\scene_mix_tests.cpp" />
+    <ClCompile Include="unit\pbrt_handedness_tests.cpp" />
     <ClCompile Include="unit\scene_uv_tests.cpp" />
     <ClCompile Include="unit\scene_more_shapes_tests.cpp" />
     <ClCompile Include="unit\scene_showcase_tests.cpp" />

@@ -248,6 +248,12 @@ struct Camera {
 	double up[3] = {0, 1, 0};
 	double vfov = 90.0;          // degrees, VERTICAL - see the note in flatten()
 	double aperture = 0.0;
+	// pbrt is left-handed: for the same eye, target and up its perspective camera puts what is on the world's +x side of the view on the LEFT of the picture, where the
+	// book-style camera of camera.h (u = cross(vup, w), right-handed) puts it on the right. True when the file's world-to-camera matrix is a proper rotation (determinant +1:
+	// what LookAt builds), which is when the renderer must mirror its horizontal axis to draw pbrt's picture; false when the file mirrors the camera itself (`Scale -1 1 1`
+	// before LookAt, the exporter idiom for a right-handed tool: determinant -1), whose picture the right-handed basis already is. Only the perspective camera reads it:
+	// the orthographic, spherical and realistic cameras already use pbrt's basis (cameras.h make_look_at).
+	bool leftHanded = false;
 	// pbrt's own default, and it is a sentinel meaning "effectively at
 	// infinity", not a measurement. See focusDistanceFor() before using it.
 	double focusDistance = 1e6;

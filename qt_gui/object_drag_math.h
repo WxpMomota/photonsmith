@@ -92,7 +92,9 @@ inline bool keyMove(const CameraBasis &cb, int forwardSteps, int rightSteps, int
 	forward.y = 0.0;
 	forward = camera_math::normalized(forward);
 	if (camera_math::length(forward) < 0.5) return false;
-	const Vec3 right = camera_math::normalized(camera_math::cross(forward, Vec3{0.0, 1.0, 0.0}));
+	// To the right of the PICTURE: the viewport's own horizontal axis, flattened onto the floor (a pbrt scene's picture is mirrored, so this is not always cross(forward, up)).
+	Vec3 right = camera_math::normalized(Vec3{cb.horizontal.x, 0.0, cb.horizontal.z});
+	if (camera_math::length(right) < 0.5) right = camera_math::normalized(camera_math::cross(forward, Vec3{0.0, 1.0, 0.0}));
 	delta = forward * (forwardSteps * step) + right * (rightSteps * step) + Vec3{0.0, upSteps * step, 0.0};
 	return true;
 }

@@ -290,6 +290,10 @@ class camera {
     point3 lookfrom = point3(0,0,0);   // Point camera is looking from
     point3 lookat   = point3(0,0,-1);  // Point camera is looking at
     vec3   vup      = vec3(0,1,0);     // Camera-relative "up" direction
+    // pbrt's camera is left-handed (see pbrt_flatten::Camera::leftHanded): for the same eye, target and up it puts world +x on the LEFT of the picture where this class's
+    // book-style basis (u = cross(vup, w)) puts it on the right. A scene file that is pbrt's sets this and the perspective picture's horizontal axis runs the other way;
+    // every scene compiled into the program keeps the book's convention (false). The vertical axis never changes.
+    bool   mirror_x = false;
 
     // pbrt-v4 Camera "perspective" "float screenwindow" (xmin,xmax,ymin,ymax,
     // in NDC units where the default, unset window already matches this
@@ -452,10 +456,12 @@ class camera {
     // from independent copy-paste edits.
     static void compute_lookat_basis(const point3& from, const point3& at,
                                       const vec3& vup,
-                                      vec3& out_u, vec3& out_v, vec3& out_w) {
+                                      vec3& out_u, vec3& out_v, vec3& out_w,
+                                      bool mirror_x = false) {
         out_w = unit_vector(from - at);
-        out_u = unit_vector(cross(vup, out_w));
-        out_v = cross(out_w, out_u);
+        const vec3 right = unit_vector(cross(vup, out_w));
+        out_v = cross(out_w, right);          // up stays the book's, whichever way the picture's horizontal axis runs
+        out_u = mirror_x ? -right : right;    // (the basis (u, v, w) is then left-handed: pbrt's)
     }
 
     // Shared by initialize()'s world-space and (camera_is_animated) local-

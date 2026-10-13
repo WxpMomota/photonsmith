@@ -173,12 +173,14 @@ namespace {
 	// edits").
 	inline void compute_lookat_basis_gpu(
 		const float3& from, const float3& at, const float3& vup,
-		float3& out_u, float3& out_v, float3& out_w)
+		float3& out_u, float3& out_v, float3& out_w, bool mirror_x = false)
 	{
 		const float3 view_direction = make_float3(from.x - at.x, from.y - at.y, from.z - at.z);
 		out_w = normalize(view_direction);
-		out_u = normalize(cross(vup, out_w));
-		out_v = cross(out_w, out_u);
+		const float3 right = normalize(cross(vup, out_w));
+		out_v = cross(out_w, right);   // up stays the book's, whichever way the picture's horizontal axis runs
+		// pbrt's camera is left-handed (src/TheRestOfYourLife/camera.h, camera::mirror_x): its picture's horizontal axis is the opposite of the book's.
+		out_u = mirror_x ? make_float3(-right.x, -right.y, -right.z) : right;
 	}
 
 	// Perspective viewport dimensions from vertical FOV/aspect/focus
@@ -219,7 +221,7 @@ namespace {
 		float vfov_degrees, float aspect, float focus_dist,
 		float* camera_params,
 		float3* out_u = nullptr, float3* out_v = nullptr, float3* out_w = nullptr,
-		const float* screen_window = nullptr
+		const float* screen_window = nullptr, bool mirror_x = false
 	) {
 		float viewport_width, viewport_height;
 		float center_shift_u = 0.0f, center_shift_v = 0.0f;
@@ -235,7 +237,7 @@ namespace {
 		}
 
 		float3 u, v, w;
-		compute_lookat_basis_gpu(lookfrom, lookat, vup, u, v, w);
+		compute_lookat_basis_gpu(lookfrom, lookat, vup, u, v, w, mirror_x);
 
 		const float3 horizontal = make_float3(viewport_width * u.x, viewport_width * u.y, viewport_width * u.z);
 		const float3 vertical = make_float3(viewport_height * v.x, viewport_height * v.y, viewport_height * v.z);
@@ -281,7 +283,8 @@ namespace {
 		const float3& vup, float vfov_degrees, float aspect,
 		float defocus_angle_deg, float focus_dist,
 		float* camera_params,
-		GpuCameraParams* out_camera_extra
+		GpuCameraParams* out_camera_extra,
+		bool mirror_x = false
 	) {
 		// Viewport scale is arbitrary when there's no lens to blur through -
 		// see build_pinhole_camera_params's own call sites for this exact
@@ -290,7 +293,9 @@ namespace {
 
 		float3 u0, v0, w0;
 		build_pinhole_camera_params(lookfrom0, lookat0, vup, vfov_degrees, aspect,
-			fd_for_viewport, camera_params, &u0, &v0, &w0);
+			fd_for_viewport, camera_params, &u0, &v0, &w0, nullptr, mirror_x);
+		// The keyframe matrices below must stay rotations (a mirror cannot be interpolated): the mirror is the local horizontal axis instead.
+		if (mirror_x) u0 = make_float3(-u0.x, -u0.y, -u0.z);
 
 		// camera_params (the static-fallback buffer) is now valid regardless
 		// of out_camera_extra - scene_builder.h documents out_camera_extra
@@ -356,9 +361,10 @@ namespace {
 
 		float viewport_width, viewport_height;
 		compute_viewport_dims_gpu(vfov_degrees, aspect, fd_for_viewport, viewport_width, viewport_height);
-		out_camera_extra->localHorizontal = make_float3(viewport_width, 0.0f, 0.0f);
+		const float localSign = mirror_x ? -1.0f : 1.0f;
+		out_camera_extra->localHorizontal = make_float3(localSign * viewport_width, 0.0f, 0.0f);
 		out_camera_extra->localVertical   = make_float3(0.0f, viewport_height, 0.0f);
-		out_camera_extra->localLowerLeftCorner = make_float3(-viewport_width / 2.0f, -viewport_height / 2.0f, -fd_for_viewport);
+		out_camera_extra->localLowerLeftCorner = make_float3(-localSign * viewport_width / 2.0f, -viewport_height / 2.0f, -fd_for_viewport);
 
 		if (defocus_angle_deg > 0.0f) {
 			// Untested: no bundled scene currently combines an animated
@@ -1187,7 +1193,7 @@ static bool build_loaded_pbrt_scene(
 			static_cast<float>(c.lookat1[0]), static_cast<float>(c.lookat1[1]), static_cast<float>(c.lookat1[2]));
 		build_gpu_animated_camera_params(animLookfrom0, animLookat0, animLookfrom1, animLookat1,
 			vup, static_cast<float>(c.vfov), aspect, defocus_angle_deg, focus_dist_world,
-			camera_params, out_camera_extra);
+			camera_params, out_camera_extra, c.leftHanded);
 		return true;
 	}
 	// pbrt-v4 Camera "perspective" "float screenwindow" - mirrors CPU's own
@@ -1209,7 +1215,7 @@ static bool build_loaded_pbrt_scene(
 		float3 dof_u, dof_v;
 		build_pinhole_camera_params(
 			lookfrom, lookat, vup, vfovUsed, aspect,
-			focus_dist_world, camera_params, &dof_u, &dof_v, nullptr, screenWindowPtr);
+			focus_dist_world, camera_params, &dof_u, &dof_v, nullptr, screenWindowPtr, c.leftHanded);
 		if (out_camera_extra) {
 			// A nonzero defocus disk opts this scene out of
 			// optix_interface.cpp's generic camera_params->cameraExtra
@@ -1231,7 +1237,7 @@ static bool build_loaded_pbrt_scene(
 	} else {
 		build_pinhole_camera_params(
 			lookfrom, lookat, vup, vfovUsed, aspect,
-			1.0f, camera_params, nullptr, nullptr, nullptr, screenWindowPtr);
+			1.0f, camera_params, nullptr, nullptr, nullptr, screenWindowPtr, c.leftHanded);
 	}
 
 	// Route non-perspective Camera directives to their GPU camera model, the
