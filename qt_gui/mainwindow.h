@@ -1405,6 +1405,7 @@ private:
 	// wildly outside the geometry of any other scene (e.g. scene 1's
 	// spheres sit within roughly +-15 units of the origin).
 	double m_currentSceneCamDistance = 1078.0;
+	bool   m_currentSceneLeftHanded = false;   // the scene's picture is pbrt's left-handed one (CameraConfig::left_handed): Live Preview's orbit and strafe turn the other way
 
 	// Scene selection
 	// Two-level filter: m_sceneAvailabilityTabs splits every scene into

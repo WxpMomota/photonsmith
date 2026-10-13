@@ -187,6 +187,7 @@ struct SceneMetadata {
 	QString recommendedLightSampler;
 	double camLookfromX = 0.0, camLookfromY = 0.0, camLookfromZ = 0.0;
 	double camLookatX = 0.0, camLookatY = 0.0, camLookatZ = 0.0;
+	bool camLeftHanded = false;   // pbrt's left-handed picture: Live Preview's left and right controls are the other way round (CameraConfig::left_handed)
 	// One of camera_path.h's named path types ("orbit"/"linear"/"figure8"/
 	// "spiral") - see scene_registry.h's recommended_camera_path_for() for
 	// the curated per-scene choice. Never empty - defaults to "orbit" the

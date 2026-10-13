@@ -63,6 +63,8 @@ struct SceneMetadataSnapshot {
 	// is known-good.
 	double cam_lookfrom_x, cam_lookfrom_y, cam_lookfrom_z;
 	double cam_lookat_x, cam_lookat_y, cam_lookat_z;
+	// 1 when the scene's picture is pbrt's left-handed one (CameraConfig::left_handed): the Live Preview turns left and right the way the picture does.
+	int cam_left_handed;
 	// One of launcher/camera_path.h's named path types ("orbit", "linear",
 	// "figure8", "spiral") - see scene_registry.h's
 	// recommended_camera_path_for() for how this is chosen and why it

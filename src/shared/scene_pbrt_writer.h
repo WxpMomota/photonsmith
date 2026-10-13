@@ -284,6 +284,9 @@ inline std::string toPbrt(const Document& d) {
 	os << "# @rt-builder-doc " << toJson(d) << "\n\n";
 
 	const Camera& c = d.camera;
+	// The document is right-handed (+x to the right of the picture, as the Builder's views draw it); pbrt is left-handed and would draw it mirrored. The mirror before LookAt is the
+	// idiom every exporter from a right-handed tool writes: it turns the picture back, in real pbrt and (which reads the camera's own matrix) in this project's renderers.
+	os << "Scale -1 1 1\n";
 	os << "LookAt " << detail::vec(c.position) << "  " << detail::vec(c.target) << "  " << detail::vec(c.up) << "\n";
 	// The document's field of view is the vertical one; pbrt's is the angle across the shorter side of the picture, which is the same on a landscape one and the horizontal angle on a portrait one.
 	double writtenFov = c.fov;

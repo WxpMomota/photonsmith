@@ -603,6 +603,10 @@ inline Camera cameraFromWorldToCamera(const pbrt_scene::Matrix4 &w2c, double loo
 
 	const double fwd[3] = {m[8], m[9], m[10]};
 	c.up[0] = m[4]; c.up[1] = m[5]; c.up[2] = m[6];
+	// The rows of the rotation part are the camera's right, up and forward in world space; their determinant is +1 for pbrt's LookAt (right = cross(up, forward)) and -1 once a
+	// reflection is multiplied in. See Camera::leftHanded.
+	const double det = m[0] * (m[5] * m[10] - m[6] * m[9]) - m[1] * (m[4] * m[10] - m[6] * m[8]) + m[2] * (m[4] * m[9] - m[5] * m[8]);
+	c.leftHanded = det > 0.0;
 	const double dist = (lookAtDistance > 0.0) ? lookAtDistance : 1.0;
 	for (int i = 0; i < 3; ++i) c.lookat[i] = c.lookfrom[i] + fwd[i] * dist;
 	return c;
@@ -798,6 +802,13 @@ inline void flattenSettings(const pbrt_scene::Scene &scene, FlatScene &out) {
 }
 
 } // namespace flatten_detail
+
+// A Scene Builder file written before the Builder wrote pbrt's mirror (`Scale -1 1 1` before LookAt, scene_pbrt_writer.h) is a right-handed scene whose picture has always been the
+// book's way (the Builder's views draw +x on the right): such a file keeps it, rather than coming out mirrored now that a pbrt camera is left-handed (Camera::leftHanded). The Builder
+// found its own files by the "@rt-builder-doc" line.
+inline bool isLegacyRightHandedBuilderFile(const std::string &text) {
+	return text.find("@rt-builder-doc") != std::string::npos && text.find("Scale -1 1 1") == std::string::npos;
+}
 
 inline FlatScene flatten(const pbrt_scene::Scene &scene,
 						 const MeshResolver &meshes = {}) {

@@ -206,8 +206,11 @@ class BDPTSceneAdapter {
 		// aspect, the u/v/w basis from lookfrom/lookat/vup).
 		camForward_ = unit_vector(cam_.lookat - cam_.lookfrom);
 		camW_       = -camForward_;
-		camRight_   = unit_vector(cross(cam_.vup, camW_));
-		camUp_      = cross(camW_, camRight_);
+		{
+			const vec3 rightRh = unit_vector(cross(cam_.vup, camW_));
+			camUp_    = cross(camW_, rightRh);
+			camRight_ = cam_.mirror_x ? -rightRh : rightRh;   // (pbrt's left-handed horizontal axis, see camera::mirror_x)
+		}
 		{
 			double theta = degrees_to_radians(cam_.vfov);
 			double h = std::tan(theta / 2.0);

@@ -283,6 +283,7 @@ bool sceneMetadata(const QString& scene_id, SceneMetadata& out) {
 	out.camLookatX = raw.cam_lookat_x;
 	out.camLookatY = raw.cam_lookat_y;
 	out.camLookatZ = raw.cam_lookat_z;
+	out.camLeftHanded = raw.cam_left_handed != 0;
 	out.recommendedCameraPath = QString::fromUtf8(raw.recommended_camera_path);
 	out.sceneSize = raw.scene_size;
 	return true;

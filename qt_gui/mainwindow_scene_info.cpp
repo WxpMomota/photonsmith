@@ -436,6 +436,7 @@ void MainWindow::onSceneChanged(int index) {
 		m_currentLookatX = meta.camLookatX;
 		m_currentLookatY = meta.camLookatY;
 		m_currentLookatZ = meta.camLookatZ;
+		m_currentSceneLeftHanded = meta.camLeftHanded;
 		// This scene's own default viewing distance - the reference every
 		// named preset in m_cameraPresetCombo scales against (see its setup
 		// comment). Falls back to the Cornell-scale default (1078) if the
