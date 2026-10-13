@@ -105,7 +105,9 @@ inline void tessellateDisk(const Disk& d, std::vector<Triangle>& out) {
     const double phiMax = d.phiMaxDeg * kPi / 180.0;
     tessellateGrid(out, 48, 2, d.material, d.areaLight, [&](double u, double v, double* p, double* n) {
         const double ph = u * phiMax, rad = d.radius - v * (d.radius - d.innerRadius);
-        flatten_detail::transformPoint(xf, rad * std::cos(ph), rad * std::sin(ph), d.height, p);
+        // 1e-4 of the radius above the plane: a disk lying exactly on another surface (a Scene Builder disk on the floor) would tie with it triangle against triangle, and
+        // the floor won in patches. The lift is far below anything visible.
+        flatten_detail::transformPoint(xf, rad * std::cos(ph), rad * std::sin(ph), d.height + 1e-4 * d.radius, p);
         flatten_detail::transformNormal(xf, 0.0, 0.0, 1.0, n);
         normalize3(n);
     });
