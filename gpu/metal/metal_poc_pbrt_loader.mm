@@ -1280,6 +1280,14 @@ void MetalPocApp::loadPbrtPunctualLights(const pbrt_flatten::FlatScene& scene, c
                         pbrt_load::detail::decodeInfiniteLightImage(pl.filename, bytes,
                             pbrtProjectionImagePixels, pbrtProjectionImageWidth, pbrtProjectionImageHeight)) {
                         havePbrtProjectionImage = true;
+                        // pbrt-v4 builds the light's frame with a y flip (ProjectionLight::Create, `renderFromLight * Scale(1, -1, 1)`): the slide's first row is at the TOP
+                        // of what the light projects, so the rows are stored upside down for the lookup, as the CPU's loader does (a bright band at the top of the slide
+                        // lit the bottom of the floor on the CPU and the top on Metal).
+                        for (int row = 0; row < pbrtProjectionImageHeight / 2; ++row) {
+                            float* a = &pbrtProjectionImagePixels[(size_t)row * pbrtProjectionImageWidth * 3];
+                            float* b = &pbrtProjectionImagePixels[(size_t)(pbrtProjectionImageHeight - 1 - row) * pbrtProjectionImageWidth * 3];
+                            std::swap_ranges(a, a + (size_t)pbrtProjectionImageWidth * 3, b);
+                        }
                         const float3 pos = toWorld(float3{(float)pl.pos[0], (float)pl.pos[1], (float)pl.pos[2]});
                         const float3 forward = punctualLightWorldForward(pl.worldToLight);
                         // Same look-at-style right/up derivation
