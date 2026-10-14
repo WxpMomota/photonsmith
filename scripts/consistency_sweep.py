@@ -684,6 +684,30 @@ def run(args):
                 print("  %-4s %-34s %s  %.4f vs %.4f  off by %.1f%%" % ("both", "cpu vs gpu, %s" % scene_name, "ok   " if worst <= 4.0 else "WRONG", means["cpu"], means["gpu"], worst))
             if worst > 4.0:
                 failures.append(("refraction", "both", scene_name))
+    # coloured fog (extinction that differs by channel), each colour held on its own: a medium sphere and the camera medium. Metal weighed every channel with the MEAN sigma_t (the
+    # sphere's free flight; the camera fog's light sampling from surfaces), so the blue channel read 17 to 28% bright and the red 13 to 24% dark.
+    if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "fog" in only or "bundled" in only):
+        print("[cpu vs gpu, coloured fog]")
+        for scene_name in ("chromatic-fog-room", "chromatic-camera-medium"):
+            total += 1
+            means = {}
+            try:
+                for backend in ("cpu", "gpu"):
+                    out = os.path.join(workdir, "fog_%s_%s.exr" % (scene_name, backend))
+                    r = subprocess.run([args.exe, "--" + backend, "--seed", "3", "--output", out, "64", "128", "8", os.path.join(REPO, "pbrt_scenes", scene_name + ".pbrt")], capture_output=True, text=True, cwd=REPO, timeout=1200)
+                    if r.returncode != 0 or not os.path.exists(out):
+                        raise RuntimeError("%s render failed: %s" % (backend, (r.stdout + r.stderr)[-200:]))
+                    means[backend] = read_exr_means(out)
+            except RuntimeError as e:
+                print("  both cpu vs gpu, %s: FAILED TO RENDER: %s" % (scene_name, e))
+                failures.append(("fog", "both", scene_name))
+                continue
+            worst = max(abs(g - c) / max(abs(c), 1e-9) for c, g in zip(means["cpu"], means["gpu"])) * 100.0
+            if worst > 6.0 or args.verbose:
+                print("  %-4s %-34s %s  rgb %s vs %s  off by %.1f%%" % ("both", "cpu vs gpu, %s" % scene_name, "ok   " if worst <= 6.0 else "WRONG",
+                      ["%.3f" % x for x in means["cpu"]], ["%.3f" % x for x in means["gpu"]], worst))
+            if worst > 6.0:
+                failures.append(("fog", "both", scene_name))
     print("\n%d pairs, %d off by more than %g%%" % (total, len(failures), tol))
     if not args.keep:
         shutil.rmtree(workdir, ignore_errors=True)

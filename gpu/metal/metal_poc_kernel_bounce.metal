@@ -173,8 +173,11 @@ inline void updateMediumStateAfterBounce(thread const KernelRes& R, thread PathS
                         glassChan = fogChan;   // the camera medium already fixed this path's colour channel
                     } else if (enteringNested && glassChan >= 0) {
                         // the shell already fixed this path's hero channel; keep it
+                    } else if (mat.conductorK.z > 0.5 && mediumChan >= 0) {
+                        glassChan = mediumChan;   // an earlier chromatic medium on this path already fixed the hero channel
                     } else if (mat.conductorK.z > 0.5) {
                         glassChan = min(int(randFloat(rngState) * 3.0), 2);
+                        mediumChan = glassChan;
                         float3 chanMask = float3(glassChan == 0 ? 3.0 : 0.0, glassChan == 1 ? 3.0 : 0.0, glassChan == 2 ? 3.0 : 0.0);
                         throughput *= chanMask;
                     } else {
@@ -215,6 +218,7 @@ inline bool traceBounce(thread const KernelRes& R, thread PathState& P) {
     // invisible to a pure occlusion test.
     spherePayload = SpherePayload{shutterT, false};
     shadowSpherePayload = SpherePayload{shutterT, true};
+    shadowSpherePayload.shadowChannel = mediumChan;   // a shadow ray through a chromatic medium uses the path's hero channel
     result =
         isect.intersect(r, accelStructure, functionTable, spherePayload);
     mediumOriginBefore = rayOrigin;

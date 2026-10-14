@@ -822,6 +822,13 @@ inline float rayBoxExitDistance(float3 origin, float3 dir, float3 boxMin, float3
     return min(min(tFar.x, tFar.y), tFar.z);
 }
 
+// The camera medium's transmittance over `dist` as a per-channel colour: a chromatic fog (uniforms.fogChromatic) attenuates each channel by its own sigma_t. The path's
+// throughput is masked to the hero channel, so this vector only ever reaches that channel; the scalar mean used before was the wrong sigma_t for it.
+inline float3 fogTransmittance(constant Uniforms& u, float dist) {
+    if (!(u.fogSigmaT > 0.0)) return float3(1.0);
+    return u.fogChromatic != 0u ? exp(-float3(u.fogSigmaT3) * dist) : float3(exp(-u.fogSigmaT * dist));
+}
+
 // materialType: 0 = Lambertian diffuse, 1 = mirror (perfect specular),
 // 2 = dielectric (glass), 3 = textured Lambertian (same BSDF/NEE code path
 // as 0, just samples `earthTexture` at the hit's interpolated UV for
@@ -1261,7 +1268,9 @@ SphereIntersectionResult sphereIntersectionFunction(
             if (t1 <= t0) return result;
             float chord = (t1 - t0) * sqrt(msA);
             float sigmaForShadow;
-            if (mt == 28u && sphereMaterials[primitiveIndex].ior > 0.0) {
+            if (mt == 28u && sphereMaterials[primitiveIndex].ior > 0.0 && sphereMaterials[primitiveIndex].conductorK.z > 0.5 && payload.shadowChannel >= 0) {
+                sigmaForShadow = float3(sphereMaterials[primitiveIndex].conductorEta)[payload.shadowChannel];   // a chromatic medium: the path's hero channel
+            } else if (mt == 28u && sphereMaterials[primitiveIndex].ior > 0.0) {
                 sigmaForShadow = sphereMaterials[primitiveIndex].ior;
             } else {   // glass-with-medium, or a pure absorber (sigma_t 0, per-channel sigma_a in conductorEta)
                 const float3 gEta = float3(sphereMaterials[primitiveIndex].conductorEta);
@@ -1502,7 +1511,9 @@ CylinderIntersectionResult cylinderIntersectionFunction(
         if (chordT1 <= chordT0) return result;
         const float chord = (chordT1 - chordT0) * length(direction);
         const float3 absorbSigma = float3(cylinderMaterials[primitiveIndex].conductorEta);
-        const float sigmaForShadow = cylinderMaterials[primitiveIndex].ior > 0.0 ? cylinderMaterials[primitiveIndex].ior
+        const float sigmaForShadow = (cylinderMaterials[primitiveIndex].ior > 0.0 && cylinderMaterials[primitiveIndex].conductorK.z > 0.5 && payload.shadowChannel >= 0)
+            ? absorbSigma[payload.shadowChannel]   // a chromatic medium: the path's hero channel (per-channel sigma_t in conductorEta)
+            : cylinderMaterials[primitiveIndex].ior > 0.0 ? cylinderMaterials[primitiveIndex].ior
             : (payload.shadowChannel >= 0 ? absorbSigma[payload.shadowChannel] : (absorbSigma.x + absorbSigma.y + absorbSigma.z) * (1.0 / 3.0));
         uint h = as_type<uint>(origin.x) * 73856093u ^ as_type<uint>(origin.y) * 19349663u
                ^ as_type<uint>(origin.z) * 83492791u ^ as_type<uint>(direction.x) * 2654435761u
