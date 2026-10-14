@@ -482,22 +482,11 @@ void MetalPocApp::loadPbrtRemainingTriangles(const pbrt_flatten::FlatScene& scen
             for (int c = 0; c < 3; ++c)
                 uvs.push_back(PackedFloat2{(float)t.uv[c * 2 + 0], (float)t.uv[c * 2 + 1]});
         } else {
-            // pbrt-v4's own real default UV for a trianglemesh with no
-            // authored "point2 uv" (J1, section 172; Triangle::hasUVs's
-            // own comment, pbrt_flatten.h, already named this exact
-            // convention: "CPU triangle.h's own barycentric fallback") -
-            // vertex 0/1/2 map to (0,0)/(1,0)/(0,1), so texCoordFor()'s
-            // EXISTING barycentric interpolation (unchanged) reduces to
-            // the hit's own two barycentric weights directly, matching
-            // src/TheRestOfYourLife/triangle.h's `rec.u = b1; rec.v = b2;`
-            // exactly - not a flat (0,0) for every point on the triangle,
-            // which is what this bare `{0,0}` for all three vertices
-            // actually produced before (never a real varying UV at all,
-            // however deep any subsequent texture sampling scaffolding
-            // went - found via J1's own real-imagemap CoatedDiffuse
-            // texture rendering as one FLAT, unvarying colour instead of
-            // the checker image's own real pattern, not assumed).
-            uvs.push_back(PackedFloat2{0, 0}); uvs.push_back(PackedFloat2{1, 0}); uvs.push_back(PackedFloat2{0, 1});
+            // pbrt-v4's own default UV for a trianglemesh with no authored "point2 uv" (Triangle::InteractionFromIntersection): vertex 0/1/2 map to (0,0)/(1,0)/(1,1),
+            // so texCoordFor()'s barycentric interpolation gives u = b1 + b2, v = b2, as src/TheRestOfYourLife/triangle.h does (and a bump map's dpdu = p1 - p0,
+            // dpdv = p2 - p1 fall out of the uv solve). It was (0,0)/(1,0)/(0,1), the barycentric (b1, b2) the CPU used before it followed pbrt, and before that a flat
+            // (0,0) for all three vertices (a picture on a uv-less mesh drew as one colour).
+            uvs.push_back(PackedFloat2{0, 0}); uvs.push_back(PackedFloat2{1, 0}); uvs.push_back(PackedFloat2{1, 1});
         }
         TriangleMaterial mat = materialFor(t.material);
         if (mat.materialType == METAL_MAT_SUBSURFACE) havePbrtTriangleAnyHit = true;   // shadow rays must pass through it: triangleAnyHitFunction
@@ -1101,8 +1090,8 @@ void MetalPocApp::loadPbrtObjectInstances(const pbrt_flatten::FlatScene& scene, 
                 if (tri.hasUVs) {
                     for (int c = 0; c < 3; ++c) uvs.push_back(PackedFloat2{(float)tri.uv[c * 2 + 0], (float)tri.uv[c * 2 + 1]});
                 } else {
-                    // Same default UVs as loadPbrtRemainingTriangles() (J1, section 172).
-                    uvs.push_back(PackedFloat2{0, 0}); uvs.push_back(PackedFloat2{1, 0}); uvs.push_back(PackedFloat2{0, 1});
+                    // Same default UVs as loadPbrtRemainingTriangles() (J1, section 172): pbrt-v4's own for a mesh with no "uv", (0,0), (1,0), (1,1) at the three vertices of each triangle (u = b1 + b2, v = b2).
+                    uvs.push_back(PackedFloat2{0, 0}); uvs.push_back(PackedFloat2{1, 0}); uvs.push_back(PackedFloat2{1, 1});
                 }
                 TriangleMaterial groupMat = materialFor(tri.material);
                 if (groupMat.materialType == METAL_MAT_SUBSURFACE) havePbrtTriangleAnyHit = true;
