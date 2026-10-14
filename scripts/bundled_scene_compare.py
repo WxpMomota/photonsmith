@@ -59,9 +59,18 @@ def main():
             h = len(line) // 2
             a, b = sum(line[:h]), sum(line[h:])
             return (a - b) / max(a + b, 1e-9)
+        def correlation(a, b):
+            n = len(a)
+            ma, mb = sum(a) / n, sum(b) / n
+            da, db = [x - ma for x in a], [x - mb for x in b]
+            denom = (sum(x * x for x in da) * sum(x * x for x in db)) ** 0.5
+            return sum(x * y for x, y in zip(da, db)) / denom if denom > 0 else 0.0
+
         flips = []
-        for what, lc, lg in (("left-right", lopsided(cc), lopsided(cg)), ("top-bottom", lopsided(rc), lopsided(rg))):
-            if abs(lc) > 0.06 and lc * lg < 0 and abs(lg) > 0.02:
+        for what, lc, lg, pc_, pg in (("left-right", lopsided(cc), lopsided(cg), cc, cg), ("top-bottom", lopsided(rc), lopsided(rg), rc, rg)):
+            # Lopsided the other way is not enough: a noisy picture (the realistic camera's, at 48 pixels) is lopsided by chance. The GPU's profile must also fit the CPU's
+            # reversed profile clearly better than the CPU's own.
+            if abs(lc) > 0.06 and lc * lg < 0 and abs(lg) > 0.02 and correlation(pc_, list(reversed(pg))) > correlation(pc_, pg) + 0.2:
                 flips.append(what)
         if worst > args.tolerance or flips:
             bad += 1

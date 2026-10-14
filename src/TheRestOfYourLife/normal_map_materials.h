@@ -101,8 +101,11 @@ class bump_map_material : public material {
 		// angle, aliasing into moiré wherever pbrt-v4 stays smooth.
 		double eff_step = 0.5 * (std::fabs(rec.dudx) + std::fabs(rec.dudy));
 		if (eff_step < 1e-8) eff_step = step;
+		// The height is read with the same footprint as the step (pbrt-v4 passes the shifted context's own dudx.. to the displacement texture): a mipmapped height map
+		// answers from the level that fits the footprint, so a finely textured floor seen from afar is blurred flat instead of read texel by texel, which tilted its
+		// normals hard and made it read 2x too bright at a grazing light (sibenik, against pbrt).
 		auto sample_disp = [&](double u, double v) -> double {
-			return scale * bump_tex->value(u, v, rec.p).x();
+			return scale * bump_tex->value_diff(u, v, rec.p, rec.dudx, rec.dvdx, rec.dudy, rec.dvdy).x();
 		};
 		double disp   = sample_disp(rec.u,             rec.v);
 		double disp_u = sample_disp(rec.u + eff_step,  rec.v);

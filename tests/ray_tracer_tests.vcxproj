@@ -129,6 +129,8 @@
     <ClCompile Include="unit\pbrt_gpu_light_coverage_tests.cpp" />
     <ClCompile Include="unit\cpu_integrator_agreement_tests.cpp" />
     <ClCompile Include="unit\pbrt_reference_pack_tests.cpp" />
+    <ClCompile Include="unit\bump_footprint_cpu_tests.cpp" />
+    <ClCompile Include="unit\bump_footprint_gpu_tests.cpp" />
     <ClCompile Include="unit\scene_text_tests.cpp" />
     <ClCompile Include="unit\pbrt_reference_pack_gpu_tests.cpp" />
     <ClCompile Include="unit\pbrt_example_scenes_tests.cpp" />

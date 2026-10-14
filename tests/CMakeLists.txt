@@ -316,6 +316,8 @@ endif()
 add_executable(cpu_integrator_tests
     unit/cpu_integrator_agreement_tests.cpp
     unit/pbrt_reference_pack_tests.cpp
+    unit/bump_footprint_cpu_tests.cpp
+    unit/bump_footprint_gpu_tests.cpp
     unit/scene_text_tests.cpp
     unit/scene_builder_tests.cpp
     unit/scene_sky_tests.cpp

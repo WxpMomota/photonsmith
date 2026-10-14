@@ -839,6 +839,21 @@ inline void camera::initialize()
     }
 }
 
+inline ray camera::approximate_footprint_ray(const point3& p) const {
+    const vec3 d = p - center;
+    ray r(center, d);
+    if (alt_ortho_cam || alt_spherical_cam || alt_realistic_cam || camera_is_animated) return r;
+    // Where the line from the camera to p crosses the viewport (the plane of the pixel centres).
+    const vec3 viewport_normal = cross(pixel_delta_u, pixel_delta_v);
+    const double den = dot(viewport_normal, d);
+    if (std::fabs(den) < 1e-12) return r;
+    const double t = dot(viewport_normal, pixel00_loc - center) / den;
+    const point3 pixel_point = center + t * d;
+    const double scale = std::max(0.125, 1.0 / std::sqrt(static_cast<double>(std::max(1, samples_per_pixel))));
+    r.set_differentials(center, (pixel_point + scale * pixel_delta_u) - center, center, (pixel_point + scale * pixel_delta_v) - center);
+    return r;
+}
+
 inline ray camera::get_ray(int i, int j, int /*s_i*/, int /*s_j*/, const vec3& offset,
     double* out_camera_weight) const
 {

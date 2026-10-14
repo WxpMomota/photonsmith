@@ -22,6 +22,13 @@ struct TextureData {
 	// (texel_rgb above). False (the zero-init default) for every linear texture: normal maps, alpha
 	// masks, inverted images, HDR-derived data, native scenes.
 	bool srgb = false;
+	// Image used as a bump height map (MaterialData::bumpTexIdx), level 0 only: the loader builds its mip chain as `bumpLevels` more entries of this array, starting at
+	// `bumpFirstLevel` (that entry is the half-size level, the next a quarter...), so a lookup can read the level that fits the pixel footprint as pbrt's default "bilinear"
+	// filter does. A chain entry stores heights as bytes remapped over [heightLo, heightLo + heightRange] (coarse levels hold small differences that 8 bits of 0..1 would
+	// lose); heightRange 0 (every other image) is a plain image.
+	int   bumpLevels = 0;
+	int   bumpFirstLevel = -1;
+	float heightLo = 0.0f, heightRange = 0.0f;
 	float noiseScale;  // Noise: scale param. Checker: 1/scale (checker_texture's own inv_scale). Unused otherwise.
 	float3 color1;     // Checker/UVChecker: "even"/tex1 cell color. Mix: tex1. Unused otherwise.
 	float3 color2;     // Checker/UVChecker: "odd"/tex2 cell color. Mix: tex2. Unused otherwise.

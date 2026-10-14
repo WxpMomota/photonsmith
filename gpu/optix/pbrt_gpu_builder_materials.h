@@ -271,6 +271,60 @@ inline int getOrBuildPbrtImageTexture(const std::string& resolvedPath, SceneData
 	return idx;
 }
 
+// The mip chain of a bump height map (TextureData::bumpLevels): level 0 is the entry at `idx`; each further level is a 2x2 box average of the one above (the size rounded up,
+// the far edge repeated), kept as extra entries whose heights are bytes remapped over the level's own range. pbrt reads the level that fits the footprint, so a height map
+// seen from afar is smooth. Done once per image entry (the entry carries the result).
+inline void buildBumpMipChain(SceneData& out, int idx) {
+	if (idx < 0 || idx >= static_cast<int>(out.textures.size())) return;
+	const TextureData base = out.textures[static_cast<std::size_t>(idx)];
+	if (base.kind != TextureKind::Image || base.bumpLevels > 0 || base.width <= 0 || base.height <= 0 || base.heightRange > 0.0f) return;
+	int w = base.width, h = base.height;
+	std::vector<float> cur(static_cast<std::size_t>(w) * h);
+	for (int y = 0; y < h; ++y)
+		for (int x = 0; x < w; ++x)
+			cur[static_cast<std::size_t>(y) * w + x] = texel_rgb(&out.texturePixels[static_cast<std::size_t>(base.pixelOffset) + (static_cast<std::size_t>(y) * w + x) * 3], base.srgb).x;
+	int first = -1, count = 0;
+	while (w > 1 || h > 1) {
+		const int nw = std::max(1, (w + 1) / 2), nh = std::max(1, (h + 1) / 2);
+		std::vector<float> next(static_cast<std::size_t>(nw) * nh);
+		float lo = 1e30f, hi = -1e30f;
+		for (int y = 0; y < nh; ++y)
+			for (int x = 0; x < nw; ++x) {
+				const int x1 = std::min(2 * x + 1, w - 1), y1 = std::min(2 * y + 1, h - 1);
+				const float v = 0.25f * (cur[static_cast<std::size_t>(2 * y) * w + 2 * x] + cur[static_cast<std::size_t>(2 * y) * w + x1] +
+										 cur[static_cast<std::size_t>(y1) * w + 2 * x] + cur[static_cast<std::size_t>(y1) * w + x1]);
+				next[static_cast<std::size_t>(y) * nw + x] = v;
+				lo = std::min(lo, v);
+				hi = std::max(hi, v);
+			}
+		TextureData level = base;
+		level.width = nw;
+		level.height = nh;
+		level.pixelOffset = static_cast<int>(out.texturePixels.size());
+		level.srgb = false;
+		level.bumpLevels = 0;
+		level.bumpFirstLevel = -1;
+		level.heightLo = lo;
+		level.heightRange = std::max(hi - lo, 1e-9f);
+		for (const float v : next) {
+			const float t = std::min(1.0f, std::max(0.0f, (v - lo) / level.heightRange));
+			const unsigned char byte = static_cast<unsigned char>(t * 255.0f + 0.5f);
+			out.texturePixels.push_back(byte);
+			out.texturePixels.push_back(byte);
+			out.texturePixels.push_back(byte);
+		}
+		const int at = static_cast<int>(out.textures.size());
+		out.textures.push_back(level);
+		if (first < 0) first = at;
+		++count;
+		cur.swap(next);
+		w = nw;
+		h = nh;
+	}
+	out.textures[static_cast<std::size_t>(idx)].bumpLevels = count;
+	out.textures[static_cast<std::size_t>(idx)].bumpFirstLevel = first;
+}
+
 // A representative average color for an already-built Image texture (see
 // getOrBuildPbrtImageTexture() above) - used ONLY as a light-selection
 // power estimate for a textured DiffuseLight (see that emission branch's
@@ -1122,6 +1176,7 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 				// RGB normal-map case. Scaled by the wrapping "scale" texture, like the CPU.
 				d.bumpTexIdx = dispTexIdx;
 				d.bumpScale  = static_cast<float>(m.displacementScale);
+				buildBumpMipChain(out, dispTexIdx);   // (pbrt reads the level that fits the footprint)
 			}
 		}
 	}

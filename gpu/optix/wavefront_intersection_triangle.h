@@ -238,11 +238,8 @@ extern "C" __global__ void __closesthit__wf_triangle() {
 				bump_dpdu = optixTransformVectorFromObjectToWorldSpace(bump_dpdu);
 				bump_dpdv = optixTransformVectorFromObjectToWorldSpace(bump_dpdv);
 			}
-			// Footprint step for a camera ray, like the CPU (which gives only the primary ray differentials).
-			float bump_step = 0.0f;
-			if (payload->primaryRay)
-				bump_step = gpu_bump_footprint_step(wf_params.bumpFootprint, ray_orig, normalize(ray_dir), hit_point,
-													normal, bump_dpdu, bump_dpdv);
+			// The footprint of the pixel at this point, as the CPU and pbrt give it: the camera's estimate at every hit (a bounce included).
+			const GpuBumpDiff bump_diff = gpu_bump_footprint_at(wf_params.bumpFootprint, hit_point, normal, bump_dpdu, bump_dpdv);
 			// The derivatives of the interpolated normal (pbrt's dndu / dndv): an instance carries them as the CPU's transform_instance does.
 			float3 bump_dndu = make_float3(0.0f, 0.0f, 0.0f), bump_dndv = make_float3(0.0f, 0.0f, 0.0f);
 			if (tri.hasNormals) {
@@ -259,7 +256,7 @@ extern "C" __global__ void __closesthit__wf_triangle() {
 				}
 			}
 			const float3 bumped = gpu_bump_shading_normal(wf_params.textures, wf_params.texturePixels, hitMat.bumpTexIdx,
-											 hitMat.bumpScale, uv_u, uv_v, geom_normal, tri.hasNormals, bump_dpdu, bump_dpdv, bump_dndu, bump_dndv, bump_step);
+											 hitMat.bumpScale, uv_u, uv_v, geom_normal, tri.hasNormals, bump_dpdu, bump_dpdv, bump_dndu, bump_dndv, bump_diff);
 			normal = dot(bumped, ray_dir) > 0.0f ? -bumped : bumped;   // (pbrt's BSDF is two-sided about the shading normal: turned toward the viewer, as the CPU's bump_map_material does)
 		}
 	}

@@ -179,9 +179,9 @@ private:
 						return f;
 					};
 					if (entry.grayscale) {
-						// A scalar height map is a float imagemap: pbrt decodes a PNG as sRGB unless told otherwise (the default here).
-						entry.tex = std::make_shared<bilinear_wrap_texture>(disp_probe.width(), disp_probe.height(),
-							texelsOf(disp_probe), MipWrapMode::Repeat);
+						// A scalar height map is a float imagemap: pbrt decodes a PNG as sRGB unless told otherwise (the default here), repeats it, and (its default
+						// "bilinear" filter) reads the mip level that fits the footprint - so a distant finely textured surface is smooth, not noisy.
+						entry.tex = sharedMipmapTexture(m.displacementTextureFilename.c_str());
 					} else {
 						// A tangent-space normal map is read LINEAR (pbrt scene.cpp: Image::Read(filename, ..., ColorEncoding::Linear)); the
 						// default image load above is sRGB-decoded, which tilts every texel (a flat 128,128,255 map would read as (-.57,-.57,1)).

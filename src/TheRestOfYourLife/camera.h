@@ -538,6 +538,12 @@ class camera {
     ray get_ray(int i, int j, int /*s_i*/, int /*s_j*/, const vec3& offset,
                 double* out_camera_weight = nullptr) const;
 
+    // The footprint pbrt-v4 gives a hit whose own ray carries no differentials (every diffuse or glossy bounce): CameraBase::Approximate_dp_dxy() takes the pixel
+    // the camera would see `p` through and the two one-pixel neighbours, as if a camera ray had hit there. This is that camera ray from the lens centre through `p`,
+    // with the two differential rays (scaled by the sampling rate, as get_ray()'s are). Without differentials (has_differentials() false) for every camera but the
+    // plain perspective one, which is what the primary rays of the others lack too.
+    ray approximate_footprint_ray(const point3& p) const;
+
     // Stratified [0,1)^2 draw for sub-pixel grid stratum (s_i, s_j) - feeds
     // FilterSampler::sample() (filter_sampler.h) at both ray_color() and
     // ray_color_spectral()'s own call sites, which CDF-inverts it into the

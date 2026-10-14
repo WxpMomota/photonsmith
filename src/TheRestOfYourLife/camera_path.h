@@ -381,7 +381,12 @@ template <typename Sampler>
         // existing, unmodified compute_differentials() (surface_
         // interaction.h) rather than reimplementing its least-squares
         // solve here.
-        if (bounces_left == depth && current_ray.has_differentials()) {
+        // pbrt-v4 gives every other hit the camera's own estimate of the footprint there (CameraBase::Approximate_dp_dxy): a bump map's finite-difference step
+        // and a filtered texture's footprint at a bounce are those of a camera ray seeing the point, not a hair's breadth. Without it the bumps seen by bounced
+        // light were fully sharp, and sibenik's bump maps read 30% too bright against pbrt.
+        const bool primary_hit = bounces_left == depth && current_ray.has_differentials();
+        const ray footprint_ray = primary_hit ? current_ray : approximate_footprint_ray(rec.p);
+        if (footprint_ray.has_differentials()) {
             SurfaceInteraction<double> si(
                 rec.p.x(), rec.p.y(), rec.p.z(),
                 rec.normal.x(), rec.normal.y(), rec.normal.z(),
@@ -390,10 +395,10 @@ template <typename Sampler>
                 rec.dpdu.x(), rec.dpdu.y(), rec.dpdu.z(),
                 rec.dpdv.x(), rec.dpdv.y(), rec.dpdv.z());
             si.compute_differentials(true,
-                current_ray.rx_origin().x(), current_ray.rx_origin().y(), current_ray.rx_origin().z(),
-                current_ray.rx_direction().x(), current_ray.rx_direction().y(), current_ray.rx_direction().z(),
-                current_ray.ry_origin().x(), current_ray.ry_origin().y(), current_ray.ry_origin().z(),
-                current_ray.ry_direction().x(), current_ray.ry_direction().y(), current_ray.ry_direction().z());
+                footprint_ray.rx_origin().x(), footprint_ray.rx_origin().y(), footprint_ray.rx_origin().z(),
+                footprint_ray.rx_direction().x(), footprint_ray.rx_direction().y(), footprint_ray.rx_direction().z(),
+                footprint_ray.ry_origin().x(), footprint_ray.ry_origin().y(), footprint_ray.ry_origin().z(),
+                footprint_ray.ry_direction().x(), footprint_ray.ry_direction().y(), footprint_ray.ry_direction().z());
             rec.dudx = si.dudx; rec.dvdx = si.dvdx;
             rec.dudy = si.dudy; rec.dvdy = si.dvdy;
         }
@@ -825,7 +830,12 @@ template <typename Sampler>
 
         // Texture-lookup footprint - identical to ray_color(), no
         // spectral dependence (see that function's own comment).
-        if (bounces_left == depth && current_ray.has_differentials()) {
+        // pbrt-v4 gives every other hit the camera's own estimate of the footprint there (CameraBase::Approximate_dp_dxy): a bump map's finite-difference step
+        // and a filtered texture's footprint at a bounce are those of a camera ray seeing the point, not a hair's breadth. Without it the bumps seen by bounced
+        // light were fully sharp, and sibenik's bump maps read 30% too bright against pbrt.
+        const bool primary_hit = bounces_left == depth && current_ray.has_differentials();
+        const ray footprint_ray = primary_hit ? current_ray : approximate_footprint_ray(rec.p);
+        if (footprint_ray.has_differentials()) {
             SurfaceInteraction<double> si(
                 rec.p.x(), rec.p.y(), rec.p.z(),
                 rec.normal.x(), rec.normal.y(), rec.normal.z(),
@@ -834,10 +844,10 @@ template <typename Sampler>
                 rec.dpdu.x(), rec.dpdu.y(), rec.dpdu.z(),
                 rec.dpdv.x(), rec.dpdv.y(), rec.dpdv.z());
             si.compute_differentials(true,
-                current_ray.rx_origin().x(), current_ray.rx_origin().y(), current_ray.rx_origin().z(),
-                current_ray.rx_direction().x(), current_ray.rx_direction().y(), current_ray.rx_direction().z(),
-                current_ray.ry_origin().x(), current_ray.ry_origin().y(), current_ray.ry_origin().z(),
-                current_ray.ry_direction().x(), current_ray.ry_direction().y(), current_ray.ry_direction().z());
+                footprint_ray.rx_origin().x(), footprint_ray.rx_origin().y(), footprint_ray.rx_origin().z(),
+                footprint_ray.rx_direction().x(), footprint_ray.rx_direction().y(), footprint_ray.rx_direction().z(),
+                footprint_ray.ry_origin().x(), footprint_ray.ry_origin().y(), footprint_ray.ry_origin().z(),
+                footprint_ray.ry_direction().x(), footprint_ray.ry_direction().y(), footprint_ray.ry_direction().z());
             rec.dudx = si.dudx; rec.dvdx = si.dvdx;
             rec.dudy = si.dudy; rec.dvdy = si.dvdy;
         }
