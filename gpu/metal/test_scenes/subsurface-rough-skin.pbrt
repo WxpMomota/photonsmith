@@ -1,0 +1,13 @@
+# A skin-coloured subsurface ball with roughness 0.35 under a constant sky: pbrt reads 0.748 0.550 0.457 in a window where the CPU reads 0.747 0.551 0.459 (docs/GPU_SCENE_COMMON.md, "Subsurface roughness").
+# The CPU/GPU sweep compares Metal with the CPU on it (scripts/consistency_sweep.py --only bundled).
+LookAt 0 0 5   0 0 0   0 1 0
+Camera "perspective" "float fov" [ 10 ]
+Film "rgb" "integer xresolution" [ 48 ] "integer yresolution" [ 48 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+Integrator "volpath" "integer maxdepth" [ 30 ]
+WorldBegin
+LightSource "infinite" "rgb L" [ 1 1 1 ]
+AttributeBegin
+  Material "subsurface" "rgb mfp" [ 0.14 0.055 0.036 ] "rgb reflectance" [ 0.8 0.58 0.48 ] "float eta" [ 1.4 ] "float roughness" [ 0.35 ]
+  Shape "sphere" "float radius" [ 1 ]
+AttributeEnd

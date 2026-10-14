@@ -665,13 +665,13 @@ def run(args):
     if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "refraction" in only or "bundled" in only):
         print("[cpu vs gpu, light and camera inside glass, a goniometric light]")
         # (goniometric-projection: pbrt's profile frame has the light's up as its pole and its lookup is nearest; 38% off on Metal before it did both)
-        for scene_name in ("lamp-inside-glass", "lamp-inside-rough-glass", "camera-inside-glass", "rough-glass-from-inside", "goniometric-projection"):
+        for scene_name in ("lamp-inside-glass", "lamp-inside-rough-glass", "camera-inside-glass", "rough-glass-from-inside", "goniometric-projection", "gpu/metal/test_scenes/subsurface-rough-skin"):
             total += 1
             means = {}
             try:
                 for backend in ("cpu", "gpu"):
                     out = os.path.join(workdir, "bundled_%s_%s.exr" % (scene_name, backend))
-                    r = subprocess.run([args.exe, "--" + backend, "--seed", "3", "--output", out, "64", "64", "8", os.path.join(REPO, "pbrt_scenes", scene_name + ".pbrt")], capture_output=True, text=True, cwd=REPO, timeout=1200)
+                    r = subprocess.run([args.exe, "--" + backend, "--seed", "3", "--output", out, "64", "64", "8", os.path.join(REPO, scene_name + ".pbrt") if "/" in scene_name else os.path.join(REPO, "pbrt_scenes", scene_name + ".pbrt")], capture_output=True, text=True, cwd=REPO, timeout=1200)
                     if r.returncode != 0 or not os.path.exists(out):
                         raise RuntimeError("%s render failed: %s" % (backend, (r.stdout + r.stderr)[-200:]))
                     means[backend] = read_exr_means(out)[1]

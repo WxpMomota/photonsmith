@@ -7,7 +7,8 @@
 //
 // The material (TriangleMaterial, written by MetalPocApp::mapPbrtMaterial): color = sigma_a and transmitColor = sigma_s per colour channel, both
 // per Metal-scene unit (the pbrt values divided by the scene scale), ior = eta, roughness = the NormalizedFresnel constant c of the exit BSDF,
-// conductorEta.x = the table's element offset in the shared float buffer (an integer-valued float: a bit-cast int would be a denormal).
+// conductorEta.x = the table's element offset in the shared float buffer (an integer-valued float: a bit-cast int would be a denormal),
+// conductorEta.y = the GGX alpha of a rough entry interface (pbrt's "roughness"; below 1e-3 the interface is smooth).
 
 // "The same material" for the probe walk: pbrt compares the material objects; here, the parameters that define it.
 inline bool sameSubsurfaceMaterial(TriangleMaterial a, TriangleMaterial b) {
@@ -123,6 +124,39 @@ inline bool subsurfaceProbeWalk(thread const KernelRes& R, thread PathState& P, 
 // side of a closed shape hits it from inside, where a normal flipped to face the ray would point INTO the object: the exit BSDF's hemisphere would then be the inside, the
 // light sent out would go into the object instead of the room, and the picture came out dark and disagreed with itself (a ball under a constant sky read 0.31, the same
 // ball under an image sky 0.38). The CPU renderer had the same convention and was fixed with this.
+// The rough entry interface (pbrt's "roughness" of a subsurface material): one GGX dielectric sample weighted by G2/G1, in the importance-transport form with no eta^2 and no direct-light
+// sample (the CPU's subsurface::scatter_rough and OptiX's, RoughDielectricBxDF::sample_weighted_local). Sets the continuation ray and the throughput; `refracted` says which way it went (a
+// reflection continues as a bounce, a refraction goes on to the probe walk). False ends the path (a sample that lands in the wrong hemisphere carries no energy).
+inline bool subsurfaceRoughEntry(float alpha, float ior, float3 hitPoint, float3 normal, float3 facingNormal, bool frontFace,
+                                 thread float3& rayDir, thread float3& rayOrigin, thread float3& throughput, thread uint& rngState, thread bool& refracted) {
+    const float refractionRatio = frontFace ? (1.0 / ior) : ior;
+    float3 tangent, bitangent;
+    buildOnb(facingNormal, tangent, bitangent);
+    const float3 woWorld = -rayDir;
+    float3 woLocal = float3(dot(woWorld, tangent), dot(woWorld, bitangent), dot(woWorld, facingNormal));
+    woLocal.z = max(woLocal.z, 0.0001);
+    const float3 hLocal = sampleGGXVNDF(woLocal, alpha, alpha, rngState);
+    const float3 hWorld = normalize(hLocal.x * tangent + hLocal.y * bitangent + hLocal.z * facingNormal);
+    const float3 unitDir = normalize(rayDir);
+    const float cosTheta = clamp(dot(-unitDir, hWorld), 0.0, 1.0);
+    const float sinTheta = sqrt(max(0.0, 1.0 - cosTheta * cosTheta));
+    const bool cannotRefract = refractionRatio * sinTheta > 1.0;
+    float3 newDir;
+    if (cannotRefract || frDielectric(cosTheta, 1.0 / refractionRatio) > randFloat(rngState)) {
+        newDir = reflect(unitDir, hWorld);
+        refracted = false;
+    } else {
+        newDir = refract(unitDir, hWorld, refractionRatio);
+        refracted = true;
+    }
+    const float3 newDirLocal = float3(dot(newDir, tangent), dot(newDir, bitangent), dot(newDir, facingNormal));
+    if (refracted ? (newDirLocal.z >= 0.0) : (newDirLocal.z <= 0.0)) return false;
+    throughput *= ggxG(woLocal, newDirLocal, alpha, alpha) / max(ggxG1(woLocal, alpha, alpha), 1e-6);
+    rayDir = newDir;
+    rayOrigin = hitPoint + (dot(newDir, normal) > 0.0 ? normal : -normal) * 0.001f;
+    return true;
+}
+
 // The whole material at one hit: the smooth dielectric interface (reflect, or refract in); on refraction the probe walk, then the exit point
 // shaded by NormalizedFresnel (Sw) with the path weighted by Sp / (selection probability * pdf). Returns false when the path ends.
 inline bool shadeSubsurface(thread const KernelRes& R, thread PathState& P, thread BounceState& B) {
@@ -132,11 +166,15 @@ inline bool shadeSubsurface(thread const KernelRes& R, thread PathState& P, thre
     // The interface is a plain DielectricBxDF(eta): no absorption (the medium's is in the BSSRDF).
     TriangleMaterial entryMat = mat;
     entryMat.color = float3(0.0);
-    if (!shadeDielectric(entryMat, hitPoint, normal, facingNormal, frontFace, result.distance, rayDir, rayOrigin, throughput, specularBounce, rngState)) return false;
-    if (dot(rayDir, facingNormal) >= 0.0) return true;   // reflected off the interface: an ordinary specular bounce
-    // The entry interface carries no radiance-mode eta^2 (shadeDielectric multiplied the refraction by it): pbrt's subsurface entry/exit pair has none either (the exit is shaded
-    // by NormalizedFresnel, whose own normalization stands in for it), as on the CPU and OptiX.
-    {
+    if (mat.conductorEta.y >= 1e-3) {   // a rough interface (pbrt's EffectivelySmooth: alpha below 1e-3)
+        bool refracted = false;
+        if (!subsurfaceRoughEntry(mat.conductorEta.y, mat.ior, hitPoint, normal, facingNormal, frontFace, rayDir, rayOrigin, throughput, rngState, refracted)) return false;
+        if (!refracted) { specularBounce = true; return true; }   // reflected off the interface: a bounce (no direct-light sample at the rough entry, as on the CPU)
+    } else {
+        if (!shadeDielectric(entryMat, hitPoint, normal, facingNormal, frontFace, result.distance, rayDir, rayOrigin, throughput, specularBounce, rngState)) return false;
+        if (dot(rayDir, facingNormal) >= 0.0) return true;   // reflected off the interface: an ordinary specular bounce
+        // The entry interface carries no radiance-mode eta^2 (shadeDielectric multiplied the refraction by it): pbrt's subsurface entry/exit pair has none either (the exit is shaded
+        // by NormalizedFresnel, whose own normalization stands in for it), as on the CPU and OptiX.
         const float entryRatio = frontFace ? (1.0 / entryMat.ior) : entryMat.ior;
         throughput /= entryRatio * entryRatio;
     }
