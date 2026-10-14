@@ -662,9 +662,10 @@ def run(args):
                 failures.append(("orientation", "both", label))
     # bundled scenes that pin pbrt's radiance-mode refraction factor (eta^2 at every crossing): a lamp or the camera inside glass. pbrt-v4's own means at 64 x 64, 64 samples,
     # depth 8: 0.0414, 0.0296, 3.30 and 9.84 (docs/GPU_SCENE_COMMON.md); the CPU is within 2%, and every backend must agree with it.
-    if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "refraction" in only):
-        print("[cpu vs gpu, light and camera inside glass]")
-        for scene_name in ("lamp-inside-glass", "lamp-inside-rough-glass", "camera-inside-glass", "rough-glass-from-inside"):
+    if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "refraction" in only or "bundled" in only):
+        print("[cpu vs gpu, light and camera inside glass, a goniometric light]")
+        # (goniometric-projection: pbrt's profile frame has the light's up as its pole and its lookup is nearest; 38% off on Metal before it did both)
+        for scene_name in ("lamp-inside-glass", "lamp-inside-rough-glass", "camera-inside-glass", "rough-glass-from-inside", "goniometric-projection"):
             total += 1
             means = {}
             try:

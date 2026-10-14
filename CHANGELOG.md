@@ -6,6 +6,7 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## Unreleased
 
+* **Metal's goniometric light reads its profile like pbrt**: nearest texel (LookupNearest, as the CPU does) instead of a linear blend; with the profile's pole on the light's up axis (the Windows frame fix, which Metal already followed through the flattener) a floor under a light aimed sideways read 0.0004 where the CPU and pbrt read about 0, 38% off in goniometric-projection.pbrt; now within 1%.
 * **Metal's sphere texture coordinates are pbrt's** (about the sphere's own z axis, `Sphere::uvRot`): a pictured, checked or bumped sphere that is turned has its seam and poles where the CPU and OptiX have them; the sphere drawn as triangles for a bump or normal map follows too.
 * **Metal's projection light slide is the right way up** (pbrt flips the light's frame in y, so the slide's first row lights the far side; Metal drew it upside down), and the consistency sweep now checks where things land in the picture (a sphere at +x on the left, the exporter's mirror, a slide's band) so a mirrored or flipped picture cannot pass on its mean.
 * **Metal carries pbrt's radiance-mode refraction factor** (eta^2 at every crossing of a dielectric: 1/2.25 entering glass of index 1.5, 2.25 leaving it): a lamp inside glass reads 1/2.25 of its radiance from outside and a camera inside reads 2.25x, as in pbrt-v4 (lamp-inside-glass 0.0415 against pbrt's 0.0414, camera-inside-glass 3.23 against 3.30, rough-glass-from-inside 9.90 against 9.84; a closed glass object is unchanged).

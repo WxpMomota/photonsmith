@@ -738,7 +738,10 @@ inline float3 goniometricLightRadiance(float3 wiFromLight, packed_float3 lightFo
     float3 wi = normalize(wiFromLight);
     float3 local = float3(dot(wi, float3(lightRight)), dot(wi, float3(lightUp)), dot(wi, float3(lightForward)));
     float2 uv = equalAreaSphereToSquare(local);
-    float intensity = image.sample(s, uv).r;
+    // pbrt's GoniometricLight::I reads the profile with LookupNearest (the CPU's image_lookup is a nearest texel as well): a linear lookup blurs the profile's edges, which a
+    // light aimed at a dark part of the profile shows (a floor under a light whose pole points sideways read 0.0004 where the CPU and pbrt read about 0).
+    constexpr sampler nearestSampler(coord::normalized, address::clamp_to_edge, filter::nearest);
+    float intensity = image.sample(nearestSampler, uv).r;
     return float3(emission) * intensity * scale;
 }
 
