@@ -35,7 +35,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
     float pt = max(mat.transmitColor.x, max(mat.transmitColor.y, mat.transmitColor.z));
     float pSum = max(pr + pt, 1e-6);
 
-    if (all(mat.emission == float3(0.0))) {
+    {   // a lamp reflects too (see GPU_SCENE_COMMON.md, "An emitter reflects")
         LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         float3 toLight = ls.point - hitPoint;
         float distSq = dot(toLight, toLight);
@@ -306,7 +306,7 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
     // idea where albedo came from): next-event estimation against a
     // randomly picked light, then continue the path via cosine-weighted
     // hemisphere sampling for indirect light.
-    if (all(mat.emission == float3(0.0))) {
+    {   // a lamp reflects too (see GPU_SCENE_COMMON.md, "An emitter reflects")
         LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         float3 toLight = ls.point - hitPoint;
         float distSq = dot(toLight, toLight);
