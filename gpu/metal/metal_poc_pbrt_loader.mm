@@ -522,7 +522,17 @@ static TriangleMaterial homogeneousMediumMaterial(const pbrt_flatten::Medium& m,
     for (int c = 0; c < 3; ++c) a[c] = sigmaT[c] > 1e-9 ? (float)(m.sigma_s[c] / sigmaT[c]) : 0.0f;
     TriangleMaterial mat{albedo, /*materialType=*/METAL_MAT_MEDIUM_HOMOGENEOUS, /*ior (sigma_t)=*/(float)(meanSigmaT / sceneScale),
                          PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness (g)=*/(float)m.g};
+    {
+        double lo = sigmaT[0], hi = sigmaT[0];
+        for (int c = 1; c < 3; ++c) { lo = std::min(lo, sigmaT[c]); hi = std::max(hi, sigmaT[c]); }
+        if (hi > 0.0 && (hi - lo) > kChromaticFogSpread * hi) {
+            // chromatic extinction: per-channel sigma_t in conductorEta, flagged in conductorK.z, for the shader's hero-channel path (the mean in `ior` stays for shadow tests of a grey fallback)
+            mat.conductorEta = PackedFloat3{(float)(sigmaT[0] / sceneScale), (float)(sigmaT[1] / sceneScale), (float)(sigmaT[2] / sceneScale)};
+            mat.conductorK = PackedFloat3{0.0f, 0.0f, 1.0f};
+        }
+    }
     if (m.sigma_s[0] == 0.0 && m.sigma_s[1] == 0.0 && m.sigma_s[2] == 0.0 && meanSigmaT > 0.0) {
+        mat.conductorK = PackedFloat3{0.0f, 0.0f, 0.0f};
         mat.ior = 0.0f;
         mat.conductorEta = PackedFloat3{(float)(m.sigma_a[0] / sceneScale), (float)(m.sigma_a[1] / sceneScale),
                                         (float)(m.sigma_a[2] / sceneScale)};

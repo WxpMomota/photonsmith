@@ -83,6 +83,7 @@ struct PathState {
     float3 glassAlbedo = float3(1.0);
     int glassChan = -1;
     int fogChan = -1;
+    int mediumChan = -1;   // the path's hero colour channel once any chromatic medium (camera fog, glass interior, medium sphere/tube) fixed one, else -1
     uint rgbChannel = kRgbChannelUnset;
     uint cen0 = 0u;
     uint cen1 = 0u;
@@ -179,6 +180,7 @@ struct BounceState {
     thread float3& glassAlbedo = (P).glassAlbedo; \
     thread int& glassChan = (P).glassChan; \
     thread int& fogChan = (P).fogChan; \
+    thread int& mediumChan = (P).mediumChan; \
     thread uint& rgbChannel = (P).rgbChannel; \
     thread uint& cen0 = (P).cen0; \
     thread uint& cen1 = (P).cen1; \

@@ -110,8 +110,25 @@ inline void shadeHomogeneousMediumSpan(
     thread float3& rayDir, thread float3& rayOrigin,
     thread float3& throughput, thread float3& radiance,
     thread float& bsdfPdf, thread bool& specularBounce, thread uint& rngState,
-    thread bool& scatteredInMedium, thread bool& passedThroughMediumSphere) {
+    thread bool& scatteredInMedium, thread bool& passedThroughMediumSphere, thread int& mediumChan) {
     float sigmaT = mediumMat.ior;
+    // A chromatic medium (per-channel sigma_t in conductorEta, flag in conductorK.z): this path follows ONE colour channel (the same hero channel the camera fog and glass
+    // interiors use, weight x3 on it), so free flight, the albedo and the shadow rays' transmittance all use that channel's own sigma_t. One scalar (the mean) for every
+    // channel mis-weighted each channel's transmittance when absorption and scattering differ across colours.
+    const bool chromatic = mediumMat.conductorK.z > 0.5 && sigmaT > 0.0;
+    if (chromatic) {
+        if (mediumChan < 0) {
+            mediumChan = min(int(randFloat(rngState) * 3.0), 2);
+            throughput *= float3(mediumChan == 0 ? 3.0 : 0.0, mediumChan == 1 ? 3.0 : 0.0, mediumChan == 2 ? 3.0 : 0.0);
+        }
+        sigmaT = float3(mediumMat.conductorEta)[mediumChan];
+        shadowSpherePayload.shadowChannel = mediumChan;
+        if (!(sigmaT > 1e-9)) {   // this channel sees no medium at all
+            rayOrigin = rayOrigin + rayDir * exitT;
+            passedThroughMediumSphere = true;
+            return;
+        }
+    }
     // A pure absorber (no scattering; sigma_t == 0 here and the per-channel absorption in conductorEta): colour-dependent
     // absorption cannot be expressed as one scalar free-flight distance, so apply exp(-sigma_a * chord) per channel instead.
     const float3 absorbSigma = float3(mediumMat.conductorEta);
@@ -264,7 +281,7 @@ inline void shadeHomogeneousMediumSphere(
     thread float3& rayDir, thread float3& rayOrigin,
     thread float3& throughput, thread float3& radiance,
     thread float& bsdfPdf, thread bool& specularBounce, thread uint& rngState,
-    thread bool& scatteredInMedium, thread bool& passedThroughMediumSphere) {
+    thread bool& scatteredInMedium, thread bool& passedThroughMediumSphere, thread int& mediumChan) {
     SphereData mediumSphere = spheres[mediumPrimId];
     float3 sphereCenter = float3(mediumSphere.center) + shutterT * float3(mediumSphere.centerDelta1);
     // `entryDistance` is the first root the intersection function accepted
@@ -285,7 +302,7 @@ inline void shadeHomogeneousMediumSphere(
     shadeHomogeneousMediumSpan(mediumMat, entryT, exitT, lights, pointLights, directionalLights, uniforms, medEnv, pbrtAreaLightTexture, textureSampler,
         isect, accelStructure, functionTable, shadowSpherePayload,
         rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState,
-        scatteredInMedium, passedThroughMediumSphere);
+        scatteredInMedium, passedThroughMediumSphere, mediumChan);
 }
 
 // The same shader for a tube (Shape "cylinder" with MediumInterface): the medium fills the SOLID cylinder (cylinderSolidInterval),
@@ -301,13 +318,13 @@ inline void shadeHomogeneousMediumCylinder(
     thread float3& rayDir, thread float3& rayOrigin,
     thread float3& throughput, thread float3& radiance,
     thread float& bsdfPdf, thread bool& specularBounce, thread uint& rngState,
-    thread bool& scatteredInMedium, thread bool& passedThroughMediumSphere) {
+    thread bool& scatteredInMedium, thread bool& passedThroughMediumSphere, thread int& mediumChan) {
     float s0 = 0.0, s1 = 0.0;
     if (!cylinderSolidInterval(rayOrigin, rayDir, cyl, s0, s1)) return;
     shadeHomogeneousMediumSpan(mediumMat, max(s0, 0.0f), s1, lights, pointLights, directionalLights, uniforms, medEnv, pbrtAreaLightTexture, textureSampler,
         isect, accelStructure, functionTable, shadowSpherePayload,
         rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState,
-        scatteredInMedium, passedThroughMediumSphere);
+        scatteredInMedium, passedThroughMediumSphere, mediumChan);
 }
 
 // Ratio-tracked transmittance of a shadow ray that leaves the cloud from `mediumPoint` along `wi`, for at most `maxDist`: every majorant collision multiplies by the

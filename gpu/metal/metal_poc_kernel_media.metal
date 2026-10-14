@@ -74,7 +74,7 @@ inline bool traverseBoundedMedia(thread const KernelRes& R, thread PathState& P,
                 spheres, shutterT, lights, pointLights, directionalLights, uniforms, medEnv, pbrtAreaLightTexture, textureSampler,
                 isect, accelStructure, functionTable, shadowSpherePayload,
                 rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState,
-                scatteredInMedium, passedThroughMediumSphere);
+                scatteredInMedium, passedThroughMediumSphere, mediumChan);
         } else if (mediumMat.materialType == METAL_MAT_MEDIUM_HETEROGENEOUS) {
             shadeCloudMediumSphere(mediumMat, mediumPrimId, result.distance, spheres, shutterT,
                 cloudMediums, lights, pointLights, directionalLights, uniforms, medEnv, pbrtAreaLightTexture, textureSampler,
@@ -95,7 +95,7 @@ inline bool traverseBoundedMedia(thread const KernelRes& R, thread PathState& P,
             lights, pointLights, directionalLights, uniforms, medEnv, pbrtAreaLightTexture, textureSampler,
             isect, accelStructure, functionTable, shadowSpherePayload,
             rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState,
-            scatteredInMedium, passedThroughMediumSphere);
+            scatteredInMedium, passedThroughMediumSphere, mediumChan);
     }
     return true;
 }
