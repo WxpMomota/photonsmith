@@ -1,0 +1,21 @@
+# @rt-category Test Scenes
+# @rt-description A lone subsurface ball under a white sky: nothing can shade it, so it reads one number, which pbrt-v4 and the renderers must agree on.
+# @rt-performance Fast
+# @rt-size 2
+# subsurface-sky-ball.pbrt -- a ball of pbrt's subsurface material filling the picture, lit only by a uniform white sky.
+#
+# A convex ball under a constant sky has no occluder and no other lamp, so every renderer should draw it at the same value (pbrt-v4: 0.5768). A subsurface exit that keeps
+# the ENTRY's refraction (the radiance-mode 1 / eta^2 of a boundary it did not cross) darkens every exit on the side away from the camera: 7% here, 9% with a longer
+# mean free path. Original, so it carries no licence constraints.
+
+LookAt 0 0 5   0 0 0   0 1 0
+Camera "perspective" "float fov" [ 10 ]
+Film "rgb" "integer xresolution" [ 48 ] "integer yresolution" [ 48 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+Integrator "volpath" "integer maxdepth" [ 30 ]
+WorldBegin
+LightSource "infinite" "rgb L" [ 1 1 1 ]
+AttributeBegin
+  Material "subsurface" "rgb mfp" [ 0.4 0.4 0.4 ] "rgb reflectance" [ 0.8 0.8 0.8 ] "float eta" [ 1.33 ] "float roughness" [ 0 ]
+  Shape "sphere" "float radius" [ 1 ]
+AttributeEnd

@@ -492,7 +492,8 @@ void MainWindow::selfTestLights(SceneBuilderWidget *sb, const std::function<void
 	}
 }
 
-void MainWindow::selfTestShapes(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
+// 3D text, made from a real font (called from selfTestShapes).
+void MainWindow::selfTestText(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
 	// 3D text, made from a real font: Add > Text adds it, the properties show the text and its font rows, the letters become a mesh with real volume, and it is one undo step.
 	{
 		const size_t before = sb->document().objects.size();
@@ -535,6 +536,10 @@ void MainWindow::selfTestShapes(SceneBuilderWidget *sb, const std::function<void
 		sb->undo();   // (the text added)
 		check(sb->document().objects.size() == before, "undo takes the text away");
 	}
+}
+
+void MainWindow::selfTestShapes(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
+	selfTestText(sb, check);
 	// Every ready-made shape can be added (and drawn in the layout and 3D views), leaves the scene without problems, and is one undo step each.
 	{
 		const size_t before = sb->document().objects.size();

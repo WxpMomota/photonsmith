@@ -162,7 +162,13 @@ inline bool camera::sample_bssrdf_exit(hit_record& rec, scatter_record& srec,
     rec.front_face = exit_hit.front_face;
     rec.mat        = ss->get_exit_bsdf();   // Sw = normalized_fresnel(eta)
 
-    return rec.mat->scatter(current_ray, rec, srec, false);
+    if (!rec.mat->scatter(current_ray, rec, srec, false)) return false;
+    // srec now describes the EXIT vertex, a plain reflection lobe: it still carried the entry's refraction (is_transmission, eta_i / eta_t), which the radiance-mode
+    // 1 / etap^2 of the direct-light samples and the bounce below read as "this direction crossed a boundary" for every exit on the side away from the camera,
+    // dimming them by eta^2 (a lone subsurface ball under a constant sky read 7% dark against pbrt, 9% with a long mean free path).
+    srec.is_transmission = false;
+    srec.eta = 1.0;
+    return true;
 }
 
 template <typename Sampler>
@@ -1145,4 +1151,4 @@ template <typename Sampler>
     // averaging.
     XYZResult xyz = SampledSpectrumToXYZ<4>(L, swl, CIE_X, CIE_Y, CIE_Z);
     return color(static_cast<double>(xyz.x), static_cast<double>(xyz.y), static_cast<double>(xyz.z));
-}
+}

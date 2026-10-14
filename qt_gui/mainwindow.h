@@ -153,6 +153,7 @@ public:
 	void selfTestMixedMaterial(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check);      // (mainwindow_selftest_builder3d.cpp)
 	void selfTestTexturePlacement(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check);      // (mainwindow_selftest_builder3d.cpp)
 	void selfTestMoreShapes(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check);      // (mainwindow_selftest_builder3d.cpp)
+	void selfTestText(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check);      // (mainwindow_selftest_builder3d.cpp)
 	void selfTestShapes(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check);      // (mainwindow_selftest_builder3d.cpp)
 	void runDenoiserSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot); void runTourSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);
 	void runBuilderUiSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // (mainwindow_selftest_builderui.cpp)
