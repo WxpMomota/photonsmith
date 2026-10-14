@@ -440,7 +440,7 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 			        if (o.shape == ShapeKind::Quad && px.isValid() && px.width() > 0) o.size.z = o.size.x * px.height() / px.width();
 		        });
 	};
-	// What the surface's colour is, when it is not a picture: a plain colour, a checker (matte only), or the renderer's marble or noise (their own colours).
+	// What the surface's colour is, when it is not a picture: a plain colour, a checker (matte only), the renderer's marble or noise (their own colours), or dots.
 	// Returns true when the colour is a plain one (or a checker's first colour), so the caller shows the colour row.
 	const auto addPattern = [&](bool checkerToo) {
 		auto *pattern = new QComboBox;
@@ -448,7 +448,8 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 		if (checkerToo) pattern->addItem(tr("Checker"), 1);
 		pattern->addItem(tr("Marble"), 2);
 		pattern->addItem(tr("Noise (soft clouds)"), 3);
-		const int current = (checkerToo && m.checker) ? 1 : m.pattern == scene_doc::Pattern::Marble ? 2 : m.pattern == scene_doc::Pattern::Noise ? 3 : 0;
+		pattern->addItem(tr("Dots"), 4);
+		const int current = (checkerToo && m.checker) ? 1 : m.pattern == scene_doc::Pattern::Marble ? 2 : m.pattern == scene_doc::Pattern::Noise ? 3 : m.pattern == scene_doc::Pattern::Dots ? 4 : 0;
 		pattern->setCurrentIndex(pattern->findData(current));
 		connect(pattern, QOverload<int>::of(&QComboBox::activated), this, [this, i, pattern](int idx) {
 			if (m_loading || i >= static_cast<int>(m_doc.objects.size())) return;
@@ -456,7 +457,7 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 			edit(QString(), [&]() {
 				scene_doc::Material &mm = m_doc.objects[i].material;
 				mm.checker = what == 1;
-				mm.pattern = what == 2 ? scene_doc::Pattern::Marble : what == 3 ? scene_doc::Pattern::Noise : scene_doc::Pattern::None;
+				mm.pattern = what == 2 ? scene_doc::Pattern::Marble : what == 3 ? scene_doc::Pattern::Noise : what == 4 ? scene_doc::Pattern::Dots : scene_doc::Pattern::None;
 			});
 			QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
 		});
@@ -496,6 +497,12 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 				break;
 			}
 			if (m.pattern == scene_doc::Pattern::Noise) break;
+			if (m.pattern == scene_doc::Pattern::Dots) {
+				addColor(f, tr("Dots"), [mat]() { return mat() ? &mat()->color : nullptr; });
+				addColor(f, tr("Ground"), [mat]() { return mat() ? &mat()->color2 : nullptr; });
+				addNum(f, tr("Dots across"), [mat]() { return mat() ? &mat()->checkerCount : nullptr; }, 1, 1000, 1, 0);
+				break;
+			}
 			addColor(f, m.checker ? tr("Colour A") : tr("Colour"), [mat]() { return mat() ? &mat()->color : nullptr; });
 			if (m.checker) {
 				addColor(f, tr("Colour B"), [mat]() { return mat() ? &mat()->color2 : nullptr; });
@@ -519,6 +526,10 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 				if (m.pattern == scene_doc::Pattern::Marble) {
 					addNum(f, tr("Veins"), [mat]() { return mat() ? &mat()->patternScale : nullptr; }, 0.1, 100, 0.5, 1);
 					addNum(f, tr("Wander"), [mat]() { return mat() ? &mat()->patternVariation : nullptr; }, 0, 5, 0.1, 2);
+				} else if (m.pattern == scene_doc::Pattern::Dots) {
+					addColor(f, tr("Dots"), [mat]() { return mat() ? &mat()->color : nullptr; });
+					addColor(f, tr("Ground"), [mat]() { return mat() ? &mat()->color2 : nullptr; });
+					addNum(f, tr("Dots across"), [mat]() { return mat() ? &mat()->checkerCount : nullptr; }, 1, 1000, 1, 0);
 				} else if (m.pattern == scene_doc::Pattern::None) {
 					addColor(f, tr("Paint colour"), [mat]() { return mat() ? &mat()->color : nullptr; });
 				}

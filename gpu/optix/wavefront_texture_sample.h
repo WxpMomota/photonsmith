@@ -197,7 +197,7 @@ __device__ __forceinline__ float3 wf_sample_texture(
 	} else if (tex.kind == TextureKind::Wrinkled) {
 		return wf_sample_wrinkled_texture(tex, p);
 	} else if (tex.kind == TextureKind::Dots) {
-		const bool inside = wf_is_inside_dot(u, v);
+		const bool inside = wf_is_inside_dot(tex.uvScaleU * u + tex.uvDeltaU, tex.uvScaleV * v + tex.uvDeltaV);   // (the Texture's own uscale/vscale/udelta/vdelta)
 		return inside
 			? ((tex.tex1ImageIdx >= 0) ? sampleImage(textures[tex.tex1ImageIdx]) : tex.color1)
 			: ((tex.tex2ImageIdx >= 0) ? sampleImage(textures[tex.tex2ImageIdx]) : tex.color2);

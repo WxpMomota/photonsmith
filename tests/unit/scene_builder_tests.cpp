@@ -1905,3 +1905,54 @@ TEST(SceneDocumentPbrtTest, ASphereIsStoodUpSoItsTexturePolesAreVertical) {
 	EXPECT_NEAR(rot[0] * 0 + rot[1] * 1 + rot[2] * 0, 0.0, 1e-12);
 	EXPECT_NEAR(rot[6] * 0 + rot[7] * 1 + rot[8] * 0, 0.0, 1e-12);
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Dots: pbrt's polka-dot texture as a material pattern
+
+TEST(SceneDotsPatternTest, DotsAreWrittenAsPbrtsDotsTextureAndTheRendererLoadsThem) {
+	Document d = makeStarterScene();
+	Object spotted = makeObject(ShapeKind::Quad, "Spotted");
+	spotted.material.pattern = Pattern::Dots;
+	spotted.material.color = {0.9, 0.1, 0.1};
+	spotted.material.color2 = {0.95, 0.95, 0.9};
+	spotted.material.checkerCount = 12.0;
+	d.objects.push_back(spotted);
+	Object coated = makeObject(ShapeKind::Sphere, "Coated spots");
+	coated.material.kind = MaterialKind::CoatedDiffuse;
+	coated.material.pattern = Pattern::Dots;
+	d.objects.push_back(coated);
+	ASSERT_FALSE(hasErrors(validate(d)));
+	const std::string text = toPbrt(d);
+	EXPECT_NE(text.find("\"spectrum\" \"dots\" \"float uscale\" [ 12 ] \"float vscale\" [ 12 ] \"rgb inside\" [ 0.95 0.95 0.9 ] \"rgb outside\" [ 0.9 0.1 0.1 ]"), std::string::npos) << text;
+	const pbrt_load::LoadResult r = loadText(text, "dots_pattern");
+	ASSERT_TRUE(r.ok) << r.error;
+	int dotted = 0;
+	for (const auto& m : r.scene.materials) {
+		if (!m.hasDotsReflectance) continue;
+		++dotted;
+		if (m.dotsInsideColor[0] > 0.85) {   // the quad's (the sphere's use the default colours)
+			EXPECT_NEAR(m.dotsInsideColor[1], 0.1, 1e-9);
+			EXPECT_NEAR(m.dotsOutsideColor[2], 0.9, 1e-9);
+		}
+	}
+	EXPECT_EQ(dotted, 2) << "both the matte and the glossy paint object carry the dots";
+	Document back;
+	std::string error;
+	ASSERT_TRUE(fromPbrt(text, back, error)) << error;
+	EXPECT_EQ(toJson(back), toJson(d)) << "a saved scene reopens with its dots";
+}
+
+TEST(SceneDotsPatternTest, ADotsPatternNeedsACountAndANonBlankMaterialKind) {
+	Document d = makeStarterScene();
+	Object o = makeObject(ShapeKind::Quad, "Spotted");
+	o.material.pattern = Pattern::Dots;
+	o.material.checkerCount = 0.0;
+	d.objects.push_back(o);
+	EXPECT_TRUE(hasErrors(validate(d))) << "no cells across";
+	d.objects.back().material.checkerCount = 6.0;
+	EXPECT_FALSE(hasErrors(validate(d)));
+	d.objects.back().material.kind = MaterialKind::Dielectric;
+	bool warned = false;
+	for (const Problem& p : validate(d)) warned = warned || p.message.find("dots patterns only apply") != std::string::npos;
+	EXPECT_TRUE(warned);
+}

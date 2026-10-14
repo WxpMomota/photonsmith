@@ -401,7 +401,7 @@ std::vector<Scene3DView::Face> &Scene3DView::faces() const {
 		else if (o.material.kind == MaterialKind::Conductor) base = base.lighter(115);
 		if (o.emissive) base = QColor(255, 220, 120);
 		if (o.material.kind == MaterialKind::Dielectric) base.setAlpha(150);
-		if (o.material.pattern != scene_doc::Pattern::None && o.material.imageFile.empty() && !o.material.checker) base = patternDrawColor(o.material.pattern);
+		if (o.material.pattern != scene_doc::Pattern::None && o.material.pattern != scene_doc::Pattern::Dots && o.material.imageFile.empty() && !o.material.checker) base = patternDrawColor(o.material.pattern);
 		if (o.volume.kind != scene_doc::VolumeKind::None) base = volumeDrawColor(o.volume);
 
 		auto addFace = [&](std::vector<Float3> local) {

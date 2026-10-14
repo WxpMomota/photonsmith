@@ -2879,8 +2879,9 @@ TEST(FlattenMaterialTest, DiffuseReflectanceDotsResolvesToAProceduralTexture) {
 		+ std::string(kQuadMesh));
 	ASSERT_EQ(s.materials.size(), 1u);
 	EXPECT_TRUE(s.materials[0].hasDotsReflectance);
-	EXPECT_DOUBLE_EQ(s.materials[0].dotsInsideColor[0], 1.0);
-	EXPECT_DOUBLE_EQ(s.materials[0].dotsOutsideColor[2], 1.0);
+	// pbrt-v4 swaps the two (its constructor takes (outside, inside), Create() passes (inside, outside)): the file's "outside" colours the dots, its "inside" the ground.
+	EXPECT_DOUBLE_EQ(s.materials[0].dotsInsideColor[2], 1.0) << "the dots are the \"outside\" colour";
+	EXPECT_DOUBLE_EQ(s.materials[0].dotsOutsideColor[0], 1.0) << "the ground is the \"inside\" colour";
 	EXPECT_FALSE(warnedAbout(s, "diffuse"));
 }
 
@@ -2891,8 +2892,21 @@ TEST(FlattenMaterialTest, DotsDefaultsMatchPbrtV4InsideWhiteOutsideBlack) {
 		+ std::string(kQuadMesh));
 	ASSERT_EQ(s.materials.size(), 1u);
 	EXPECT_TRUE(s.materials[0].hasDotsReflectance);
-	EXPECT_DOUBLE_EQ(s.materials[0].dotsInsideColor[0], 1.0);
-	EXPECT_DOUBLE_EQ(s.materials[0].dotsOutsideColor[0], 0.0);
+	// "inside" defaults to white and "outside" to black, and pbrt-v4 uses them the other way round: black dots on a white ground.
+	EXPECT_DOUBLE_EQ(s.materials[0].dotsInsideColor[0], 0.0);
+	EXPECT_DOUBLE_EQ(s.materials[0].dotsOutsideColor[0], 1.0);
+}
+
+TEST(FlattenMaterialTest, ADotsTextureCarriesItsOwnUvMapping) {
+	const FlatScene s = flattenSource(
+		"Texture \"polka\" \"spectrum\" \"dots\" \"float uscale\" [ 6 ] \"float vscale\" [ 3 ] \"float udelta\" [ 0.25 ]\n"
+		"Material \"diffuse\" \"texture reflectance\" [ \"polka\" ]\n"
+		+ std::string(kQuadMesh));
+	ASSERT_EQ(s.materials.size(), 1u);
+	EXPECT_DOUBLE_EQ(s.materials[0].dotsMapping.su, 6.0);
+	EXPECT_DOUBLE_EQ(s.materials[0].dotsMapping.sv, 3.0);
+	EXPECT_DOUBLE_EQ(s.materials[0].dotsMapping.du, 0.25);
+	EXPECT_DOUBLE_EQ(s.materials[0].dotsMapping.dv, 0.0);
 }
 
 TEST(FlattenMaterialTest, CoatedDiffuseReflectanceBilerpResolvesToAProceduralTexture) {

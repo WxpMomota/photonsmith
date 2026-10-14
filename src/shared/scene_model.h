@@ -34,8 +34,8 @@ struct Rgb {
 enum class MaterialKind { Diffuse, Conductor, Dielectric, CoatedDiffuse, DiffuseTransmission, Subsurface };
 
 // A procedural pattern for the colour of a Diffuse or CoatedDiffuse surface (with no picture and no checker): the renderer's own marble (pale stone with veins) and fbm noise
-// (soft grey clouds); both give their own colours.
-enum class Pattern { None, Marble, Noise };
+// (soft grey clouds), which give their own colours, and pbrt's dots (round spots of `color` scattered over a `color2` ground, `checkerCount` cells across).
+enum class Pattern { None, Marble, Noise, Dots };
 
 // What a bump slot's picture is: a grayscale height map (light is high; the surface is shaded as if it had that relief), or a tangent-space normal map (RGB: the shading normal).
 enum class BumpKind { Height, Normal };
@@ -45,12 +45,12 @@ struct Material {
 	Rgb color{0.8, 0.8, 0.8};          // diffuse / coated reflectance, conductor reflectance; unused by Dielectric
 	bool checker = false;              // Diffuse only: a checkerboard of `color` and `color2`
 	Rgb color2{0.2, 0.2, 0.2};
-	double checkerCount = 8.0;         // checks across the object (its width), for Quad / Disk / Sphere
+	double checkerCount = 8.0;         // checks (or dots' cells) across the object (its width), for Quad / Disk / Sphere
 	double roughness = 0.0;            // Conductor, Dielectric, CoatedDiffuse: 0 = smooth
 	double ior = 1.5;                  // Dielectric and CoatedDiffuse
 	Rgb transmittance{0.5, 0.5, 0.5};  // DiffuseTransmission (its reflectance is `color`)
 	std::string imageFile;             // Diffuse / CoatedDiffuse: a picture used as the surface colour (replaces `color` and the checker)
-	Pattern pattern = Pattern::None;   // Diffuse / CoatedDiffuse: marble or noise instead of `color` (not with a picture or a checker)
+	Pattern pattern = Pattern::None;   // Diffuse / CoatedDiffuse: marble, noise or dots instead of `color` (not with a picture or a checker)
 	double patternScale = 4.0;         // Marble: how many veins (the renderer's marble "scale")
 	double patternVariation = 0.3;     // Marble: how much the veins wander
 	Rgb scatterDistance{0.10, 0.07, 0.05};   // Subsurface: mean free path per channel, in scene units
@@ -245,11 +245,12 @@ inline const char* toString(Pattern p) {
 		case Pattern::None: return "none";
 		case Pattern::Marble: return "marble";
 		case Pattern::Noise: return "noise";
+		case Pattern::Dots: return "dots";
 	}
 	return "none";
 }
 inline bool patternFromString(const std::string& s, Pattern& out) {
-	for (Pattern p : {Pattern::None, Pattern::Marble, Pattern::Noise})
+	for (Pattern p : {Pattern::None, Pattern::Marble, Pattern::Noise, Pattern::Dots})
 		if (s == toString(p)) { out = p; return true; }
 	return false;
 }

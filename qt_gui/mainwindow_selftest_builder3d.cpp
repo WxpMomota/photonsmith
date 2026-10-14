@@ -720,7 +720,7 @@ void MainWindow::selfTestShapes(SceneBuilderWidget *sb, const std::function<void
 		QApplication::processEvents();
 		QComboBox *pattern = nullptr, *bumpKind = nullptr;
 		for (QComboBox *c : sb->findChildren<QComboBox *>()) {
-			if (c->count() >= 3 && c->count() <= 4 && c->findData(2) >= 0 && c->currentData().toInt() == 2) pattern = c;   // Plain colour / (Checker) / Marble / Noise, on Marble
+			if (c->count() >= 3 && c->count() <= 5 && c->findData(2) >= 0 && c->currentData().toInt() == 2) pattern = c;   // Plain colour / (Checker) / Marble / Noise / Dots, on Marble
 			if (c->count() == 2 && c->findData(static_cast<int>(scene_doc::BumpKind::Normal)) >= 0 && c->currentData().toInt() == static_cast<int>(scene_doc::BumpKind::Height)) bumpKind = c;
 		}
 		check(pattern != nullptr, "a marble material shows Marble in its Pattern list");
@@ -734,14 +734,31 @@ void MainWindow::selfTestShapes(SceneBuilderWidget *sb, const std::function<void
 		}
 		pattern = nullptr;   // (the change rebuilt the properties: look the list up again)
 		for (QComboBox *c : sb->findChildren<QComboBox *>())
-			if (c->count() >= 3 && c->count() <= 4 && c->findData(2) >= 0 && c->currentData().toInt() == 2) pattern = c;
+			if (c->count() >= 3 && c->count() <= 5 && c->findData(2) >= 0 && c->currentData().toInt() == 2) pattern = c;
 		if (pattern) {
 			const int plainRow = pattern->findData(0);
 			pattern->setCurrentIndex(plainRow);
 			emit pattern->activated(plainRow);
 			QApplication::processEvents();
 			check(sb->document().objects[1].material.pattern == scene_doc::Pattern::None, "choosing Plain colour drops the marble");
+			// The Dots row, and its three rows (the dots' colour, the ground and how many across) once chosen. (The change rebuilt the properties: look the list up again.)
+			pattern = nullptr;
+			for (QComboBox *c : sb->findChildren<QComboBox *>())
+				if (c->count() >= 3 && c->count() <= 5 && c->findData(4) >= 0 && c->currentData().toInt() == 0) pattern = c;
+			check(pattern != nullptr, "the Pattern list offers Dots");
+			if (pattern) {
+				const int dotsRow = pattern->findData(4);
+				pattern->setCurrentIndex(dotsRow);
+				emit pattern->activated(dotsRow);
+				QApplication::processEvents();
+				QApplication::processEvents();
+			}
+			check(sb->document().objects[1].material.pattern == scene_doc::Pattern::Dots, "choosing Dots is saved");
+			bool dotsAcross = false;
+			for (QLabel *l : sb->findChildren<QLabel *>()) dotsAcross = dotsAcross || l->text() == sb->tr("Dots across");
+			check(dotsAcross, "and the properties then ask how many dots across");
 		}
+		sb->undo();
 		sb->undo();
 		sb->undo();
 		sb->undo();

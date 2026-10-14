@@ -419,23 +419,28 @@ inline void readMaterialBindings(const pbrt_scene::Scene &scene, FlatScene &out,
 				tex && tex->cls == "dots") {
 				// Same one-level-nested-bare-imagemap support for
 				// inside/outside as checkerboard's own tex1/tex2 above.
-				const pbrt_scene::Param *insideP = tex->params.find("inside");
-				const pbrt_scene::Param *outsideP = tex->params.find("outside");
-				const bool insideIsNested = insideP && insideP->type == "texture";
-				const bool outsideIsNested = outsideP && outsideP->type == "texture";
-				const std::string insideImg = insideIsNested ? resolveNestedImagemap(insideP) : std::string();
-				const std::string outsideImg = outsideIsNested ? resolveNestedImagemap(outsideP) : std::string();
-				if ((!insideIsNested || !insideImg.empty()) && (!outsideIsNested || !outsideImg.empty())) {
-					if (insideIsNested) {
-						m.dotsInsideTexFilename = insideImg;
+				//
+				// pbrt-v4 has the two swapped: SpectrumDotsTexture's constructor takes (mapping, outsideDot, insideDot) but Create() passes ("inside",
+				// "outside") in that order, so in real pbrt the "inside" parameter colours the GROUND and the "outside" parameter (default 0, black) colours the
+				// DOTS (textures.cpp:331, textures.h:429). dotsInside* below is what the dots are drawn with, so it reads "outside", and dotsOutside* reads "inside".
+				m.dotsMapping = uvMappingOf(*tex);
+				const pbrt_scene::Param *dotP = tex->params.find("outside");
+				const pbrt_scene::Param *groundP = tex->params.find("inside");
+				const bool dotIsNested = dotP && dotP->type == "texture";
+				const bool groundIsNested = groundP && groundP->type == "texture";
+				const std::string dotImg = dotIsNested ? resolveNestedImagemap(dotP) : std::string();
+				const std::string groundImg = groundIsNested ? resolveNestedImagemap(groundP) : std::string();
+				if ((!dotIsNested || !dotImg.empty()) && (!groundIsNested || !groundImg.empty())) {
+					if (dotIsNested) {
+						m.dotsInsideTexFilename = dotImg;
 					} else {
-						const pbrt_scene::Vec3 c1 = tex->params.getVec3("inside", {1.0, 1.0, 1.0});
+						const pbrt_scene::Vec3 c1 = tex->params.getVec3("outside", {0.0, 0.0, 0.0});
 						m.dotsInsideColor[0] = c1.x; m.dotsInsideColor[1] = c1.y; m.dotsInsideColor[2] = c1.z;
 					}
-					if (outsideIsNested) {
-						m.dotsOutsideTexFilename = outsideImg;
+					if (groundIsNested) {
+						m.dotsOutsideTexFilename = groundImg;
 					} else {
-						const pbrt_scene::Vec3 c2 = tex->params.getVec3("outside", {0.0, 0.0, 0.0});
+						const pbrt_scene::Vec3 c2 = tex->params.getVec3("inside", {1.0, 1.0, 1.0});
 						m.dotsOutsideColor[0] = c2.x; m.dotsOutsideColor[1] = c2.y; m.dotsOutsideColor[2] = c2.z;
 					}
 					m.hasDotsReflectance = true;

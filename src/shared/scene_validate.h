@@ -136,11 +136,13 @@ inline std::vector<Problem> validate(const Document& d) {
 		if (o.shape == ShapeKind::Mesh && detail::absoluteFileMissing(o.meshFile))
 			warn(who + "the mesh file was not found (" + o.meshFile + "). Choose it again.");
 		if (o.material.pattern != Pattern::None) {
-			if (o.material.kind != MaterialKind::Diffuse && o.material.kind != MaterialKind::CoatedDiffuse) warn(who + "the marble and noise patterns only apply to diffuse and glossy paint materials.");
+			if (o.material.kind != MaterialKind::Diffuse && o.material.kind != MaterialKind::CoatedDiffuse) warn(who + "the marble, noise and dots patterns only apply to diffuse and glossy paint materials.");
 			else if (!o.material.imageFile.empty()) warn(who + "the picture replaces the " + toString(o.material.pattern) + " pattern.");
 			else if (o.material.checker) warn(who + "the checker pattern replaces the " + toString(o.material.pattern) + " pattern.");
 			if (o.material.pattern == Pattern::Marble && (!(o.material.patternScale > 0.0) || !(o.material.patternVariation >= 0.0)))
 				err(who + "the marble's scale must be above zero and its variation not negative.");
+			if (o.material.pattern == Pattern::Dots && !(o.material.checkerCount > 0.0))
+				err(who + "the dots' count across must be above zero.");
 		}
 		if (uvPlaced(o.material) && hasUvTexture(o.material)) {   // (with no picture, checker or bump map there is nothing to place, and the rows that would fix it are hidden)
 			const Material& m = o.material;

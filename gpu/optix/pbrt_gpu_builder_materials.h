@@ -552,6 +552,11 @@ inline bool resolveProceduralReflectanceTexture(const pbrt_flatten::Material &m,
 	if (m.hasDotsReflectance) {
 		TextureData tex{};
 		tex.kind = TextureKind::Dots;
+		// The Texture's own (uscale, vscale, udelta, vdelta): the cells are counted in (su * u + du, sv * v + dv), as an imagemap's lookup is.
+		tex.uvScaleU = static_cast<float>(m.dotsMapping.su);
+		tex.uvScaleV = static_cast<float>(m.dotsMapping.sv);
+		tex.uvDeltaU = static_cast<float>(m.dotsMapping.du);
+		tex.uvDeltaV = static_cast<float>(m.dotsMapping.dv);
 		tex.color1 = make_float3(static_cast<float>(m.dotsInsideColor[0]),
 								 static_cast<float>(m.dotsInsideColor[1]),
 								 static_cast<float>(m.dotsInsideColor[2]));

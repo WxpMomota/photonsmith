@@ -717,42 +717,42 @@
 <context>
     <name>LensPreset</name>
     <message>
-        <location filename="../scene_builder_common.h" line="205"/>
+        <location filename="../scene_builder_common.h" line="241"/>
         <source>14 mm ultra wide</source>
         <translation>14 mm 超広角</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="205"/>
+        <location filename="../scene_builder_common.h" line="241"/>
         <source>24 mm wide</source>
         <translation>24 mm 広角</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="205"/>
+        <location filename="../scene_builder_common.h" line="241"/>
         <source>35 mm street</source>
         <translation>35 mm ストリート</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="206"/>
+        <location filename="../scene_builder_common.h" line="242"/>
         <source>50 mm normal</source>
         <translation>50 mm 標準</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="206"/>
+        <location filename="../scene_builder_common.h" line="242"/>
         <source>85 mm portrait</source>
         <translation>85 mm ポートレート</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="206"/>
+        <location filename="../scene_builder_common.h" line="242"/>
         <source>135 mm telephoto</source>
         <translation>135 mm 望遠</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="207"/>
+        <location filename="../scene_builder_common.h" line="243"/>
         <source>200 mm long telephoto</source>
         <translation>200 mm 望遠 (長)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="207"/>
+        <location filename="../scene_builder_common.h" line="243"/>
         <source>400 mm super telephoto</source>
         <translation>400 mm 超望遠</translation>
     </message>
@@ -997,7 +997,7 @@
     </message>
     <message>
         <location filename="../mainwindow_actions.cpp" line="88"/>
-        <location filename="../mainwindow_tabs_render.cpp" line="351"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="352"/>
         <source>Open Output &amp;Folder</source>
         <translation>出力フォルダーを開く(&amp;F)</translation>
     </message>
@@ -1008,7 +1008,7 @@
     </message>
     <message>
         <location filename="../mainwindow_actions.cpp" line="98"/>
-        <location filename="../mainwindow_tabs_render.cpp" line="363"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="364"/>
         <source>Open in Default &amp;Viewer</source>
         <translation>既定のビューアーで開く(&amp;V)</translation>
     </message>
@@ -1908,7 +1908,7 @@ They will be saved in:
         <translation>Python 3.10〜3.12 (例: brew install python@3.12) と git (xcode-select --install) が必要です</translation>
     </message>
     <message>
-        <location filename="../mainwindow_photo_install.cpp" line="57"/>
+        <location filename="../mainwindow_photo_install.cpp" line="58"/>
         <source>Install the photo helper?
 
 This downloads about 5 GB and installs it for your user only, in %1:
@@ -1940,12 +1940,12 @@ Missing now:
     </message>
     <message>
         <location filename="../mainwindow_photo_install.cpp" line="43"/>
-        <location filename="../mainwindow_photo_install.cpp" line="64"/>
+        <location filename="../mainwindow_photo_install.cpp" line="65"/>
         <source>Install the photo helper</source>
         <translation>写真ヘルパーのインストール</translation>
     </message>
     <message>
-        <location filename="../mainwindow_photo_install.cpp" line="69"/>
+        <location filename="../mainwindow_photo_install.cpp" line="70"/>
         <source>Installing the photo helper</source>
         <translation>写真ヘルパーをインストール中</translation>
     </message>
@@ -1968,7 +1968,7 @@ Download it now?</source>
         <location filename="../mainwindow_denoiser.cpp" line="38"/>
         <location filename="../mainwindow_downloads.cpp" line="75"/>
         <location filename="../mainwindow_downloads.cpp" line="162"/>
-        <location filename="../mainwindow_photo_install.cpp" line="86"/>
+        <location filename="../mainwindow_photo_install.cpp" line="87"/>
         <source>Cancel</source>
         <translation>キャンセル</translation>
     </message>
@@ -1983,29 +1983,29 @@ Download it now?</source>
         <translation>デノイザーをインストールできませんでした: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_photo_install.cpp" line="117"/>
+        <location filename="../mainwindow_photo_install.cpp" line="118"/>
         <source>Installed. Running the diagnostics again to check it...</source>
         <translation>インストールしました。確認のため診断を再実行しています...</translation>
     </message>
     <message>
-        <location filename="../mainwindow_photo_install.cpp" line="117"/>
+        <location filename="../mainwindow_photo_install.cpp" line="119"/>
         <source>The installation did not finish: %1</source>
         <translation>インストールは完了しませんでした: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_photo_install.cpp" line="117"/>
+        <location filename="../mainwindow_photo_install.cpp" line="55"/>
         <source>If there is no suitable Python, a private copy of Python 3.12 (about 25 MB, from GitHub, checked against its published checksum) is downloaded into the same folder.</source>
         <translation>適切な Python がない場合は、Python 3.12 の専用コピー（約 25 MB、GitHub から、公開されたチェックサムで検証）が同じフォルダーにダウンロードされます。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_photo_install.cpp" line="117"/>
+        <location filename="../mainwindow_photo_install.cpp" line="119"/>
         <source>Everything the installer printed is in the box below and in the log file (Help &gt; Show Log Folder):
 %1</source>
         <translation>インストーラーが出力した内容は、下のボックスとログファイル（ヘルプ &gt; ログフォルダーを表示）にあります:
 %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_photo_install.cpp" line="118"/>
+        <location filename="../mainwindow_photo_install.cpp" line="120"/>
         <source>Close</source>
         <translation>閉じる</translation>
     </message>
@@ -4466,37 +4466,37 @@ Off by default (genuinely random every render).</source>
     </message>
     <message>
         <location filename="../mainwindow_live_preview.cpp" line="142"/>
-        <location filename="../mainwindow_tabs_render.cpp" line="133"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="134"/>
         <source>Saved, but the scene list could not list it until the program is restarted.</source>
         <translation>保存しましたが、プログラムを再起動するまでシーンリストには表示できません。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="137"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="138"/>
         <source>Added to the scene list as %1 (Settings tab).</source>
         <translation>%1 としてシーンリストに追加しました (設定タブ)。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="139"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="140"/>
         <source>Scene Builder</source>
         <translation>シーンビルダー</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="145"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="146"/>
         <source>The preview copy could not be opened in Live Preview.</source>
         <translation>プレビュー用のコピーをライブプレビューで開けませんでした。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="354"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="355"/>
         <source>Show the folder containing the active tab&apos;s render in Explorer</source>
         <translation>アクティブなタブのレンダリング結果が格納されているフォルダをエクスプローラーで開く</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="366"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="367"/>
         <source>Open the active tab&apos;s render in the system viewer</source>
         <translation>アクティブなタブのレンダリング結果をシステムのビューアーで開く</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="392"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="393"/>
         <source>Preview</source>
         <translation>プレビュー</translation>
     </message>
@@ -4532,7 +4532,7 @@ Drag to orbit, scroll or +/- to zoom, WASD to move, Up/Down to fly</source>
     <message>
         <location filename="../mainwindow_denoiser.cpp" line="38"/>
         <location filename="../mainwindow_live_preview.cpp" line="270"/>
-        <location filename="../mainwindow_photo_install.cpp" line="72"/>
+        <location filename="../mainwindow_photo_install.cpp" line="73"/>
         <source>Starting...</source>
         <translation>開始中...</translation>
     </message>
@@ -4557,13 +4557,13 @@ Drag to orbit, scroll or +/- to zoom, WASD to move, Up/Down to fly</source>
         <translation>[ライブプレビュー] エラー: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="435"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="436"/>
         <source>&lt;b&gt;Why it looks this way&lt;/b&gt;&lt;br&gt;%1</source>
         <translation>&lt;b&gt;なぜこのように見えるのか&lt;/b&gt;&lt;br&gt;%1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="561"/>
-        <location filename="../mainwindow_tabs_render.cpp" line="574"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="562"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="575"/>
         <location filename="../mainwindow_tabs_settings_groups.cpp" line="278"/>
         <location filename="../mainwindow_thumbnails.cpp" line="126"/>
         <location filename="../mainwindow_thumbnails.cpp" line="165"/>
@@ -4571,12 +4571,12 @@ Drag to orbit, scroll or +/- to zoom, WASD to move, Up/Down to fly</source>
         <translation>一時停止</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="574"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="575"/>
         <source>Play</source>
         <translation>再生</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="584"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="585"/>
         <source>Video playback error (%1): %2</source>
         <translation>動画再生エラー(%1): %2</translation>
     </message>
@@ -5222,176 +5222,181 @@ The scenes in the other categories are not touched. You can get them back from %
         <source>The GPU renderer could not be prepared ahead of time; the first GPU render will build it.</source>
         <translation>GPUレンダラーを事前に準備できませんでした。最初のGPUレンダリングで準備されます。</translation>
     </message>
+    <message>
+        <location filename="../mainwindow_selftest_builderui.cpp" line="83"/>
+        <source>Add</source>
+        <translation>追加</translation>
+    </message>
 </context>
 <context>
     <name>MaterialPreset</name>
     <message>
-        <location filename="../scene_builder_common.h" line="211"/>
+        <location filename="../scene_builder_common.h" line="247"/>
         <source>Chalk</source>
         <translation>チョーク</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="211"/>
+        <location filename="../scene_builder_common.h" line="247"/>
         <source>Black rubber</source>
         <translation>黒いゴム</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="211"/>
+        <location filename="../scene_builder_common.h" line="247"/>
         <source>Terracotta</source>
         <translation>テラコッタ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="212"/>
+        <location filename="../scene_builder_common.h" line="248"/>
         <source>Concrete</source>
         <translation>コンクリート</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="212"/>
+        <location filename="../scene_builder_common.h" line="248"/>
         <source>Red plastic</source>
         <translation>赤いプラスチック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="212"/>
+        <location filename="../scene_builder_common.h" line="248"/>
         <source>Blue plastic</source>
         <translation>青いプラスチック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="213"/>
+        <location filename="../scene_builder_common.h" line="249"/>
         <source>White ceramic</source>
         <translation>白い陶器</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="213"/>
+        <location filename="../scene_builder_common.h" line="249"/>
         <source>Car paint</source>
         <translation>車の塗装</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="213"/>
+        <location filename="../scene_builder_common.h" line="249"/>
         <source>Gold</source>
         <translation>金</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="214"/>
+        <location filename="../scene_builder_common.h" line="250"/>
         <source>Copper</source>
         <translation>銅</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="214"/>
+        <location filename="../scene_builder_common.h" line="250"/>
         <source>Silver</source>
         <translation>銀</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="214"/>
+        <location filename="../scene_builder_common.h" line="250"/>
         <source>Aluminium</source>
         <translation>アルミニウム</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="215"/>
+        <location filename="../scene_builder_common.h" line="251"/>
         <source>Chrome</source>
         <translation>クローム</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="215"/>
+        <location filename="../scene_builder_common.h" line="251"/>
         <source>Brushed steel</source>
         <translation>ヘアライン仕上げの鋼</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="215"/>
+        <location filename="../scene_builder_common.h" line="251"/>
         <source>Clear glass</source>
         <translation>透明ガラス</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="216"/>
+        <location filename="../scene_builder_common.h" line="252"/>
         <source>Frosted glass</source>
         <translation>すりガラス</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="216"/>
+        <location filename="../scene_builder_common.h" line="252"/>
         <source>Water</source>
         <translation>水</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="216"/>
+        <location filename="../scene_builder_common.h" line="252"/>
         <source>Diamond</source>
         <translation>ダイヤモンド</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="217"/>
+        <location filename="../scene_builder_common.h" line="253"/>
         <source>Wax</source>
         <translation>蝋</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="217"/>
+        <location filename="../scene_builder_common.h" line="253"/>
         <source>Leaf</source>
         <translation>葉</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="217"/>
+        <location filename="../scene_builder_common.h" line="253"/>
         <source>Paper</source>
         <translation>紙</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="218"/>
+        <location filename="../scene_builder_common.h" line="254"/>
         <source>Skin</source>
         <translation>肌</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="218"/>
+        <location filename="../scene_builder_common.h" line="254"/>
         <source>Milk</source>
         <translation>ミルク</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="218"/>
+        <location filename="../scene_builder_common.h" line="254"/>
         <source>Marble stone</source>
         <translation>大理石 (石材)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="219"/>
+        <location filename="../scene_builder_common.h" line="255"/>
         <source>Jade</source>
         <translation>翡翠</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="219"/>
+        <location filename="../scene_builder_common.h" line="255"/>
         <source>Candle wax</source>
         <translation>キャンドルワックス</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="1"/>
+        <location filename="../scene_builder_common.h" line="256"/>
         <source>Rusty metal</source>
         <translation>錆びた金属</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="1"/>
+        <location filename="../scene_builder_common.h" line="257"/>
         <source>Chipped paint</source>
         <translation>剥がれた塗装</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="1"/>
+        <location filename="../scene_builder_common.h" line="258"/>
         <source>Dusty glass</source>
         <translation>ほこりをかぶったガラス</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="1"/>
+        <location filename="../scene_builder_common.h" line="259"/>
         <source>Mossy stone</source>
         <translation>苔むした石</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="1"/>
+        <location filename="../scene_builder_common.h" line="260"/>
         <source>Wet sand</source>
         <translation>濡れた砂</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="1"/>
+        <location filename="../scene_builder_common.h" line="261"/>
         <source>Worn leather</source>
         <translation>使い込んだ革</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="1"/>
+        <location filename="../scene_builder_common.h" line="262"/>
         <source>Scuffed plastic</source>
         <translation>傷だらけのプラスチック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="1"/>
+        <location filename="../scene_builder_common.h" line="263"/>
         <source>Dirty snow</source>
         <translation>汚れた雪</translation>
     </message>
@@ -5399,32 +5404,32 @@ The scenes in the other categories are not touched. You can get them back from %
 <context>
     <name>MaterialPresetGroup</name>
     <message>
-        <location filename="../scene_builder_common.h" line="220"/>
+        <location filename="../scene_builder_common.h" line="264"/>
         <source>Matte</source>
         <translation>マット</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="220"/>
+        <location filename="../scene_builder_common.h" line="264"/>
         <source>Plastic</source>
         <translation>プラスチック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="220"/>
+        <location filename="../scene_builder_common.h" line="264"/>
         <source>Metal</source>
         <translation>金属</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="221"/>
+        <location filename="../scene_builder_common.h" line="265"/>
         <source>Glass</source>
         <translation>ガラス</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="221"/>
+        <location filename="../scene_builder_common.h" line="265"/>
         <source>Translucent</source>
         <translation>半透明</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="221"/>
+        <location filename="../scene_builder_common.h" line="265"/>
         <source>Subsurface</source>
         <translation>サブサーフェス</translation>
     </message>
@@ -6013,97 +6018,97 @@ The scenes in the other categories are not touched. You can get them back from %
         <translation>このシーンには、レンダリング技法の解説がまだ用意されていません。現時点では、上の「Self-Contained」タブにある自己完結型のシーン集についてのみ解説が用意されています。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="44"/>
+        <location filename="../scene_builder_common.h" line="80"/>
         <source>Sphere</source>
         <translation>球</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="45"/>
+        <location filename="../scene_builder_common.h" line="81"/>
         <source>Box</source>
         <translation>ボックス</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="46"/>
+        <location filename="../scene_builder_common.h" line="82"/>
         <source>Quad (flat panel)</source>
         <translation>四角形（平らなパネル）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="47"/>
+        <location filename="../scene_builder_common.h" line="83"/>
         <source>Disk</source>
         <translation>円盤</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="48"/>
+        <location filename="../scene_builder_common.h" line="84"/>
         <source>Cylinder</source>
         <translation>円柱</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="49"/>
+        <location filename="../scene_builder_common.h" line="85"/>
         <source>Cone</source>
         <translation>円錐</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="50"/>
+        <location filename="../scene_builder_common.h" line="86"/>
         <source>Mesh (.ply file)</source>
         <translation>メッシュ (.ply ファイル)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="51"/>
+        <location filename="../scene_builder_common.h" line="87"/>
         <source>Pyramid</source>
         <translation>ピラミッド</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="52"/>
+        <location filename="../scene_builder_common.h" line="88"/>
         <source>Wedge (ramp)</source>
         <translation>くさび (スロープ)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="53"/>
+        <location filename="../scene_builder_common.h" line="89"/>
         <source>Stairs</source>
         <translation>階段</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="54"/>
+        <location filename="../scene_builder_common.h" line="90"/>
         <source>Torus (ring)</source>
         <translation>トーラス (リング)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="55"/>
+        <location filename="../scene_builder_common.h" line="91"/>
         <source>Capsule</source>
         <translation>カプセル</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="56"/>
+        <location filename="../scene_builder_common.h" line="92"/>
         <source>Dome (half sphere)</source>
         <translation>ドーム (半球)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="57"/>
+        <location filename="../scene_builder_common.h" line="93"/>
         <source>Tube (pipe)</source>
         <translation>チューブ (パイプ)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="58"/>
+        <location filename="../scene_builder_common.h" line="94"/>
         <source>Rounded box</source>
         <translation>角丸ボックス</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="59"/>
+        <location filename="../scene_builder_common.h" line="95"/>
         <source>Cyclorama (studio backdrop)</source>
         <translation>サイクロラマ (スタジオ背景)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="60"/>
+        <location filename="../scene_builder_common.h" line="96"/>
         <source>Terrain (rolling ground)</source>
         <translation>地形 (起伏のある地面)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="68"/>
+        <location filename="../scene_builder_common.h" line="104"/>
         <source>Option</source>
         <translation>Option</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="76"/>
+        <location filename="../scene_builder_common.h" line="112"/>
         <source>Command</source>
         <translation>Command</translation>
     </message>
@@ -6116,332 +6121,332 @@ The scenes in the other categories are not touched. You can get them back from %
         <translation type="vanished">背景のドラッグ: 回り込み (Shift+ドラッグ: 画面移動)。右ドラッグでも画面移動できます。ホイール: ズーム。移動・回転・拡大縮小 (W、E、R) を選び、矢印・リング・四角をドラッグします。オブジェクトをドラッグすると床の上をスライドし、Shift+ドラッグで持ち上げ、白い点のドラッグ (または %1 を押しながらドラッグ) で好きな方向へ動かせます。Shift または %1 を押しながらクリックすると (ドラッグしない場合)、項目を選択に追加または除外します。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="83"/>
+        <location filename="../scene_builder_common.h" line="119"/>
         <source>Wheel: zoom. Drag the background or right-drag: pan. %1- or Shift-click adds an item to what is picked or takes it out; %1- or Shift-drag the background picks what a box holds. The arrow keys nudge what is picked (Page Up and Page Down lift it; Shift: a whole unit, %1: a fine step).</source>
         <translation>ホイール: ズーム。背景のドラッグまたは右ドラッグ: 画面移動。%1 または Shift を押しながらクリックすると項目を選択に追加または除外します。%1 または Shift を押しながら背景をドラッグすると、枠の中のものをまとめて選択します。矢印キーで選択中のものを少しずつ動かせます (Page Up と Page Down で上下。Shift: 1 単位、%1: 細かい刻み)。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="86"/>
+        <location filename="../scene_builder_common.h" line="122"/>
         <source>Drag the background: orbit (Shift-drag: pan). Right-drag also pans. Wheel: zoom. Pick Move, Rotate or Scale (W, E, R) and drag the arrows, rings or squares; drag an object to slide it on the floor, Shift-drag to lift it, and drag the white dot (or hold %1 while dragging) to move it in any direction. Shift- or %1-click (without dragging) adds an item to what is picked or takes it out. The arrow keys nudge what is picked (Page Up and Page Down lift it; Shift: a whole unit, %1: a fine step).</source>
         <translation>背景のドラッグ: 回り込み (Shift+ドラッグ: 画面移動)。右ドラッグでも画面移動できます。ホイール: ズーム。移動・回転・拡大縮小 (W、E、R) を選び、矢印・リング・四角をドラッグします。オブジェクトをドラッグすると床の上をスライドし、Shift+ドラッグで持ち上げ、白い点のドラッグ (または %1 を押しながらドラッグ) で好きな方向へ動かせます。Shift または %1 を押しながらクリックすると (ドラッグしない場合)、項目を選択に追加または除外します。矢印キーで選択中のものを少しずつ動かせます (Page Up と Page Down で上下。Shift: 1 単位、%1: 細かい刻み)。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="91"/>
+        <location filename="../scene_builder_common.h" line="127"/>
         <source>Table</source>
         <translation>テーブル</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="92"/>
+        <location filename="../scene_builder_common.h" line="128"/>
         <source>Chair</source>
         <translation>椅子</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="93"/>
+        <location filename="../scene_builder_common.h" line="129"/>
         <source>Tree</source>
         <translation>木</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="94"/>
+        <location filename="../scene_builder_common.h" line="130"/>
         <source>Snowman</source>
         <translation>雪だるま</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="95"/>
+        <location filename="../scene_builder_common.h" line="131"/>
         <source>Column</source>
         <translation>円柱</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="96"/>
+        <location filename="../scene_builder_common.h" line="132"/>
         <source>Street lamp</source>
         <translation>街灯</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="103"/>
+        <location filename="../scene_builder_common.h" line="139"/>
         <source>Grass block</source>
         <translation>草ブロック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="104"/>
+        <location filename="../scene_builder_common.h" line="140"/>
         <source>Dirt block</source>
         <translation>土ブロック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="105"/>
+        <location filename="../scene_builder_common.h" line="141"/>
         <source>Stone block</source>
         <translation>石ブロック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="106"/>
+        <location filename="../scene_builder_common.h" line="142"/>
         <source>Planks block</source>
         <translation>板材ブロック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="107"/>
+        <location filename="../scene_builder_common.h" line="143"/>
         <source>Log block</source>
         <translation>原木ブロック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="108"/>
+        <location filename="../scene_builder_common.h" line="144"/>
         <source>Sand block</source>
         <translation>砂ブロック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="109"/>
+        <location filename="../scene_builder_common.h" line="145"/>
         <source>Glass block</source>
         <translation>ガラスブロック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="110"/>
+        <location filename="../scene_builder_common.h" line="146"/>
         <source>Water block</source>
         <translation>水ブロック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="111"/>
+        <location filename="../scene_builder_common.h" line="147"/>
         <source>TNT block</source>
         <translation>TNT ブロック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="112"/>
+        <location filename="../scene_builder_common.h" line="148"/>
         <source>Gold block</source>
         <translation>金ブロック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="113"/>
+        <location filename="../scene_builder_common.h" line="149"/>
         <source>Diamond ore</source>
         <translation>ダイヤ鉱石</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="114"/>
+        <location filename="../scene_builder_common.h" line="150"/>
         <source>Glowing block</source>
         <translation>発光ブロック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="115"/>
+        <location filename="../scene_builder_common.h" line="151"/>
         <source>Lava block</source>
         <translation>溶岩ブロック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="116"/>
+        <location filename="../scene_builder_common.h" line="152"/>
         <source>Pumpkin</source>
         <translation>カボチャ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="117"/>
+        <location filename="../scene_builder_common.h" line="153"/>
         <source>Lantern pumpkin</source>
         <translation>ジャック・オ・ランタン</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="118"/>
+        <location filename="../scene_builder_common.h" line="154"/>
         <source>Green monster</source>
         <translation>緑のモンスター</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="119"/>
+        <location filename="../scene_builder_common.h" line="155"/>
         <source>Pig</source>
         <translation>ブタ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="120"/>
+        <location filename="../scene_builder_common.h" line="156"/>
         <source>Sheep</source>
         <translation>ヒツジ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="121"/>
+        <location filename="../scene_builder_common.h" line="157"/>
         <source>Explorer</source>
         <translation>探検家</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="122"/>
+        <location filename="../scene_builder_common.h" line="158"/>
         <source>Skeleton</source>
         <translation>スケルトン</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="123"/>
+        <location filename="../scene_builder_common.h" line="159"/>
         <source>Oak tree</source>
         <translation>オークの木</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="124"/>
+        <location filename="../scene_builder_common.h" line="160"/>
         <source>Cottage</source>
         <translation>小屋</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="125"/>
+        <location filename="../scene_builder_common.h" line="161"/>
         <source>Torch</source>
         <translation>松明</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="126"/>
+        <location filename="../scene_builder_common.h" line="162"/>
         <source>Chest</source>
         <translation>チェスト</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="127"/>
+        <location filename="../scene_builder_common.h" line="163"/>
         <source>Crafting table</source>
         <translation>作業台</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="128"/>
+        <location filename="../scene_builder_common.h" line="164"/>
         <source>Furnace</source>
         <translation>かまど</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="129"/>
+        <location filename="../scene_builder_common.h" line="165"/>
         <source>Bed</source>
         <translation>ベッド</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="130"/>
+        <location filename="../scene_builder_common.h" line="166"/>
         <source>Poppy</source>
         <translation>ポピー</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="131"/>
+        <location filename="../scene_builder_common.h" line="167"/>
         <source>Dandelion</source>
         <translation>タンポポ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="132"/>
+        <location filename="../scene_builder_common.h" line="168"/>
         <source>Fence</source>
         <translation>フェンス</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="133"/>
+        <location filename="../scene_builder_common.h" line="169"/>
         <source>Rainbow wool</source>
         <translation>レインボーウール</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="134"/>
+        <location filename="../scene_builder_common.h" line="170"/>
         <source>Purple portal</source>
         <translation>紫のポータル</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="140"/>
+        <location filename="../scene_builder_common.h" line="176"/>
         <source>Fog</source>
         <translation>霧</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="141"/>
+        <location filename="../scene_builder_common.h" line="177"/>
         <source>Smoke</source>
         <translation>煙</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="142"/>
+        <location filename="../scene_builder_common.h" line="178"/>
         <source>Cloud</source>
         <translation>雲</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="157"/>
+        <location filename="../scene_builder_common.h" line="193"/>
         <source>Point light</source>
         <translation>点光源</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="158"/>
+        <location filename="../scene_builder_common.h" line="194"/>
         <source>Spotlight</source>
         <translation>スポットライト</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="159"/>
+        <location filename="../scene_builder_common.h" line="195"/>
         <source>Sun (distant light)</source>
         <translation>太陽光（平行光源）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="160"/>
+        <location filename="../scene_builder_common.h" line="196"/>
         <source>Sky (surrounds the scene)</source>
         <translation>空（シーンを取り囲む）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="161"/>
+        <location filename="../scene_builder_common.h" line="197"/>
         <source>Projector (slide light)</source>
         <translation>プロジェクター (スライド光)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="168"/>
+        <location filename="../scene_builder_common.h" line="204"/>
         <source>Studio (three lights)</source>
         <translation>スタジオ (3 灯)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="169"/>
+        <location filename="../scene_builder_common.h" line="205"/>
         <source>Overcast day</source>
         <translation>曇りの日</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="170"/>
+        <location filename="../scene_builder_common.h" line="206"/>
         <source>Sunny day</source>
         <translation>晴れの日</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="171"/>
+        <location filename="../scene_builder_common.h" line="207"/>
         <source>Golden hour</source>
         <translation>ゴールデンアワー</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="172"/>
+        <location filename="../scene_builder_common.h" line="208"/>
         <source>Moonlit night</source>
         <translation>月夜</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="173"/>
+        <location filename="../scene_builder_common.h" line="209"/>
         <source>Light box</source>
         <translation>ライトボックス</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="179"/>
+        <location filename="../scene_builder_common.h" line="215"/>
         <source>A key light from the camera&apos;s left, a softer fill from its right and a rim light from behind, on a dark backdrop.</source>
         <translation>カメラの左からのキーライト、右からのやわらかいフィルライト、後ろからのリムライトを、暗い背景の前に置きます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="180"/>
+        <location filename="../scene_builder_common.h" line="216"/>
         <source>Even, soft light from a grey-white sky with no sun and no hard shadows.</source>
         <translation>太陽のない灰白色の空からの、均一でやわらかい光です。濃い影はできません。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="181"/>
+        <location filename="../scene_builder_common.h" line="217"/>
         <source>A clear sky with the sun high behind the camera&apos;s right shoulder.</source>
         <translation>晴れた空で、太陽はカメラの右後ろの高い位置にあります。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="182"/>
+        <location filename="../scene_builder_common.h" line="218"/>
         <source>A clear sky with the sun low and to the side, long shadows and warm light.</source>
         <translation>晴れた空で、太陽は低く横にあります。長い影と暖かい光になります。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="183"/>
+        <location filename="../scene_builder_common.h" line="219"/>
         <source>A dark blue sky and a dim cool moon from above and behind.</source>
         <translation>暗い青の空と、上の後ろ側からの弱く冷たい月明かりです。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="184"/>
+        <location filename="../scene_builder_common.h" line="220"/>
         <source>A bright white surround with a little light from above, as for a product shot.</source>
         <translation>明るい白の背景と、上からのわずかな光です。商品撮影のような設定です。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="226"/>
+        <location filename="../scene_builder_common.h" line="270"/>
         <source>Matte (diffuse)</source>
         <translation>マット（拡散）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="227"/>
+        <location filename="../scene_builder_common.h" line="271"/>
         <source>Metal</source>
         <translation>金属</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="228"/>
+        <location filename="../scene_builder_common.h" line="272"/>
         <source>Glass</source>
         <translation>ガラス</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="229"/>
+        <location filename="../scene_builder_common.h" line="273"/>
         <source>Glossy paint (coated)</source>
         <translation>光沢塗装（コーティング）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="230"/>
+        <location filename="../scene_builder_common.h" line="274"/>
         <source>Translucent (paper, leaves)</source>
         <translation>半透明（紙、葉）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="231"/>
+        <location filename="../scene_builder_common.h" line="275"/>
         <source>Subsurface (skin, wax, milk)</source>
         <translation>サブサーフェス (肌、ワックス、ミルク)</translation>
     </message>
@@ -6553,13 +6558,13 @@ Output:
 <context>
     <name>RenderQueueModel</name>
     <message>
-        <location filename="../mainwindow_selftest_builder3d.cpp" line="899"/>
+        <location filename="../mainwindow_selftest_builder3d.cpp" line="965"/>
         <location filename="../render_queue_model.cpp" line="114"/>
         <source>Waiting</source>
         <translation>待機中</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_builder3d.cpp" line="917"/>
+        <location filename="../mainwindow_selftest_builder3d.cpp" line="983"/>
         <location filename="../render_queue_model.cpp" line="136"/>
         <source>%1 s</source>
         <translation>%1 秒</translation>
@@ -6696,7 +6701,7 @@ Output:
 <context>
     <name>SceneBuilderWidget</name>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="85"/>
+        <location filename="../scene_builder_inspector.cpp" line="87"/>
         <source>Pick something in the list or the layout view to edit it.
 
 Add shapes and lights with the Add button. Drag them in the layout view, then press Preview to see the picture. Save writes an ordinary .pbrt file that the renderer (and this tab) can open.</source>
@@ -6705,71 +6710,71 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
 「追加」ボタンで形状やライトを追加し、レイアウトビューでドラッグして動かしてから、「プレビュー」を押すと画像を確認できます。「保存」は、レンダラー（およびこのタブ）で開ける通常の .pbrt ファイルを書き出します。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="207"/>
+        <location filename="../scene_builder_inspector.cpp" line="215"/>
         <source>Click to choose a colour. Colours are picked as ordinary (sRGB) colours and stored as linear values for the renderer.</source>
         <translation>クリックして色を選びます。色は通常の (sRGB) 色として選び、レンダラー用にリニア値で保存されます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="220"/>
+        <location filename="../scene_builder_inspector.cpp" line="228"/>
         <source>Choose a colour</source>
         <translation>色を選択</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="280"/>
+        <location filename="../scene_builder_inspector.cpp" line="289"/>
         <source>Browse...</source>
         <translation>参照...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="284"/>
+        <location filename="../scene_builder_inspector.cpp" line="293"/>
         <source>Choose a file</source>
         <translation>ファイルを選択</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="296"/>
+        <location filename="../scene_builder_inspector.cpp" line="305"/>
         <source>Clear</source>
         <translation>クリア</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="310"/>
+        <location filename="../scene_builder_inspector.cpp" line="319"/>
         <source>Scene</source>
         <translation>シーン</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="311"/>
+        <location filename="../scene_builder_inspector.cpp" line="320"/>
         <source>Title</source>
         <translation>タイトル</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="312"/>
+        <location filename="../scene_builder_inspector.cpp" line="321"/>
         <source>Camera</source>
         <translation>カメラ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="313"/>
-        <location filename="../scene_builder_inspector.cpp" line="600"/>
-        <location filename="../scene_builder_inspector.cpp" line="639"/>
-        <location filename="../scene_builder_inspector.cpp" line="739"/>
+        <location filename="../scene_builder_inspector.cpp" line="322"/>
+        <location filename="../scene_builder_inspector.cpp" line="608"/>
+        <location filename="../scene_builder_inspector.cpp" line="645"/>
+        <location filename="../scene_builder_inspector.cpp" line="745"/>
         <source>Position</source>
         <translation>位置</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="314"/>
+        <location filename="../scene_builder_inspector.cpp" line="323"/>
         <source>Looks at</source>
         <translation>注視点</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="315"/>
-        <location filename="../scene_builder_inspector.cpp" line="747"/>
+        <location filename="../scene_builder_inspector.cpp" line="324"/>
+        <location filename="../scene_builder_inspector.cpp" line="753"/>
         <source>Field of view</source>
         <translation>視野角</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="359"/>
+        <location filename="../scene_builder_inspector.cpp" line="368"/>
         <source>Lens radius</source>
         <translation>レンズ半径</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="360"/>
+        <location filename="../scene_builder_inspector.cpp" line="369"/>
         <source>Focus distance</source>
         <translation>焦点距離</translation>
     </message>
@@ -6778,86 +6783,86 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation type="vanished">レンズ半径が 0 より大きいと、焦点距離にないものがぼやけます（被写界深度）。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="371"/>
-        <location filename="../scene_builder_inspector.cpp" line="427"/>
+        <location filename="../scene_builder_inspector.cpp" line="378"/>
+        <location filename="../scene_builder_inspector.cpp" line="434"/>
         <source>Picture</source>
         <translation>画像</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="372"/>
+        <location filename="../scene_builder_inspector.cpp" line="379"/>
         <source>Width (pixels)</source>
         <translation>幅 (ピクセル)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="373"/>
+        <location filename="../scene_builder_inspector.cpp" line="380"/>
         <source>Height (pixels)</source>
         <translation>高さ (ピクセル)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="375"/>
+        <location filename="../scene_builder_inspector.cpp" line="382"/>
         <source>Set height from width...</source>
         <translation>幅から高さを設定...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="384"/>
+        <location filename="../scene_builder_inspector.cpp" line="391"/>
         <source>Aspect ratio</source>
         <translation>アスペクト比</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="385"/>
+        <location filename="../scene_builder_inspector.cpp" line="392"/>
         <source>Samples per pixel</source>
         <translation>ピクセルあたりのサンプル数</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="386"/>
+        <location filename="../scene_builder_inspector.cpp" line="393"/>
         <source>Light bounces (max depth)</source>
         <translation>光の反射回数（最大深度）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="391"/>
+        <location filename="../scene_builder_inspector.cpp" line="398"/>
         <source>Material</source>
         <translation>マテリアル</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="394"/>
+        <location filename="../scene_builder_inspector.cpp" line="401"/>
         <source>Choose a ready-made material...</source>
         <translation>既成のマテリアルを選択...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="405"/>
-        <location filename="../scene_builder_inspector.cpp" line="787"/>
+        <location filename="../scene_builder_inspector.cpp" line="412"/>
+        <location filename="../scene_builder_inspector.cpp" line="791"/>
         <source>Preset</source>
         <translation>プリセット</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="422"/>
-        <location filename="../scene_builder_inspector.cpp" line="586"/>
-        <location filename="../scene_builder_inspector.cpp" line="737"/>
-        <location filename="../scene_builder_mix.cpp" line="70"/>
+        <location filename="../scene_builder_inspector.cpp" line="429"/>
+        <location filename="../scene_builder_inspector.cpp" line="594"/>
+        <location filename="../scene_builder_inspector.cpp" line="743"/>
+        <location filename="../scene_builder_mix.cpp" line="84"/>
         <source>Type</source>
         <translation>種類</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="427"/>
-        <location filename="../scene_builder_inspector.cpp" line="460"/>
-        <location filename="../scene_builder_inspector.cpp" line="748"/>
+        <location filename="../scene_builder_inspector.cpp" line="434"/>
+        <location filename="../scene_builder_inspector.cpp" line="468"/>
+        <location filename="../scene_builder_inspector.cpp" line="754"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.tga *.exr *.hdr)</source>
         <translation>画像 (*.png *.jpg *.jpeg *.bmp *.tga *.exr *.hdr)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="492"/>
+        <location filename="../scene_builder_inspector.cpp" line="506"/>
         <source>Colour A</source>
         <translation>色 A</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="492"/>
-        <location filename="../scene_builder_inspector.cpp" line="500"/>
-        <location filename="../scene_builder_inspector.cpp" line="527"/>
-        <location filename="../scene_builder_inspector.cpp" line="605"/>
-        <location filename="../scene_builder_inspector.cpp" line="807"/>
-        <location filename="../scene_builder_mix.cpp" line="75"/>
-        <location filename="../scene_builder_mix.cpp" line="78"/>
-        <location filename="../scene_builder_mix.cpp" line="95"/>
+        <location filename="../scene_builder_inspector.cpp" line="506"/>
+        <location filename="../scene_builder_inspector.cpp" line="514"/>
+        <location filename="../scene_builder_inspector.cpp" line="545"/>
+        <location filename="../scene_builder_inspector.cpp" line="613"/>
+        <location filename="../scene_builder_inspector.cpp" line="817"/>
+        <location filename="../scene_builder_mix.cpp" line="89"/>
+        <location filename="../scene_builder_mix.cpp" line="92"/>
+        <location filename="../scene_builder_mix.cpp" line="109"/>
         <source>Colour</source>
         <translation>色</translation>
     </message>
@@ -6866,243 +6871,262 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation type="vanished">チェッカー模様</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="494"/>
+        <location filename="../scene_builder_inspector.cpp" line="508"/>
         <source>Colour B</source>
         <translation>色 B</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="495"/>
+        <location filename="../scene_builder_inspector.cpp" line="509"/>
         <source>Checks across</source>
         <translation>横方向のマス数</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="501"/>
-        <location filename="../scene_builder_inspector.cpp" line="505"/>
-        <location filename="../scene_builder_inspector.cpp" line="694"/>
-        <location filename="../scene_builder_mix.cpp" line="79"/>
-        <location filename="../scene_builder_mix.cpp" line="83"/>
+        <location filename="../scene_builder_inspector.cpp" line="515"/>
+        <location filename="../scene_builder_inspector.cpp" line="519"/>
+        <location filename="../scene_builder_inspector.cpp" line="700"/>
+        <location filename="../scene_builder_mix.cpp" line="93"/>
+        <location filename="../scene_builder_mix.cpp" line="97"/>
         <source>Roughness</source>
         <translation>粗さ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="504"/>
-        <location filename="../scene_builder_inspector.cpp" line="531"/>
-        <location filename="../scene_builder_mix.cpp" line="82"/>
-        <location filename="../scene_builder_mix.cpp" line="99"/>
+        <location filename="../scene_builder_inspector.cpp" line="518"/>
+        <location filename="../scene_builder_inspector.cpp" line="549"/>
+        <location filename="../scene_builder_mix.cpp" line="96"/>
+        <location filename="../scene_builder_mix.cpp" line="113"/>
         <source>Index of refraction</source>
         <translation>屈折率</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="516"/>
-        <location filename="../scene_builder_mix.cpp" line="86"/>
+        <location filename="../scene_builder_inspector.cpp" line="534"/>
+        <location filename="../scene_builder_mix.cpp" line="100"/>
         <source>Paint colour</source>
         <translation>塗装の色</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="519"/>
-        <location filename="../scene_builder_mix.cpp" line="87"/>
+        <location filename="../scene_builder_inspector.cpp" line="537"/>
+        <location filename="../scene_builder_mix.cpp" line="101"/>
         <source>Coat index of refraction</source>
         <translation>コートの屈折率</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="520"/>
-        <location filename="../scene_builder_mix.cpp" line="88"/>
+        <location filename="../scene_builder_inspector.cpp" line="538"/>
+        <location filename="../scene_builder_mix.cpp" line="102"/>
         <source>Coat roughness</source>
         <translation>コートの粗さ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="523"/>
-        <location filename="../scene_builder_mix.cpp" line="91"/>
+        <location filename="../scene_builder_inspector.cpp" line="541"/>
+        <location filename="../scene_builder_mix.cpp" line="105"/>
         <source>Reflects</source>
         <translation>反射</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="524"/>
-        <location filename="../scene_builder_mix.cpp" line="92"/>
+        <location filename="../scene_builder_inspector.cpp" line="542"/>
+        <location filename="../scene_builder_mix.cpp" line="106"/>
         <source>Lets through</source>
         <translation>透過</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="626"/>
+        <location filename="../scene_builder_inspector.cpp" line="632"/>
         <source>Object</source>
         <translation>オブジェクト</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="571"/>
-        <location filename="../scene_builder_inspector.cpp" line="627"/>
-        <location filename="../scene_builder_inspector.cpp" line="726"/>
+        <location filename="../scene_builder_inspector.cpp" line="579"/>
+        <location filename="../scene_builder_inspector.cpp" line="633"/>
+        <location filename="../scene_builder_inspector.cpp" line="732"/>
         <source>Name</source>
         <translation>名前</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="318"/>
+        <location filename="../scene_builder_inspector.cpp" line="327"/>
         <source>Focal length</source>
         <translation>焦点距離</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="319"/>
-        <location filename="../scene_builder_inspector.cpp" line="350"/>
+        <location filename="../scene_builder_inspector.cpp" line="328"/>
+        <location filename="../scene_builder_inspector.cpp" line="359"/>
         <source> mm</source>
         <translation> mm</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="321"/>
+        <location filename="../scene_builder_inspector.cpp" line="330"/>
         <source>Choose a lens...</source>
         <translation>レンズを選ぶ...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="330"/>
+        <location filename="../scene_builder_inspector.cpp" line="339"/>
         <source>Lens</source>
         <translation>レンズ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="333"/>
+        <location filename="../scene_builder_inspector.cpp" line="342"/>
         <source>Other</source>
         <translation>その他</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="349"/>
+        <location filename="../scene_builder_inspector.cpp" line="358"/>
         <source>Sensor</source>
         <translation>センサー</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="350"/>
+        <location filename="../scene_builder_inspector.cpp" line="359"/>
         <source>Sensor width</source>
         <translation>センサーの幅</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="351"/>
+        <location filename="../scene_builder_inspector.cpp" line="360"/>
         <source>Aperture (f-number)</source>
         <translation>絞り (F 値)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="358"/>
+        <location filename="../scene_builder_inspector.cpp" line="367"/>
         <source>Pinhole (everything sharp)</source>
         <translation>ピンホール (すべてにピント)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="361"/>
+        <location filename="../scene_builder_inspector.cpp" line="370"/>
         <source>Pick focus in the 3D view</source>
         <translation>3D ビューでピントを選ぶ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="363"/>
+        <location filename="../scene_builder_inspector.cpp" line="372"/>
         <source>Then click what should be sharp: the focus distance becomes how far that is from the camera along the way it looks</source>
         <translation>そのあとピントを合わせたいものをクリックすると、ピント距離がカメラの向いている方向でのその距離になります</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="366"/>
+        <location filename="../scene_builder_inspector.cpp" line="375"/>
         <source>The focal length and the sensor tell the field of view the way a photographer&apos;s lens does (50 mm on a 36 mm sensor is about 40 degrees across), and the picture&apos;s shape crops the sensor, as in a real camera. The aperture sets the lens radius for a scene where one unit is a metre (50 mm at f/1.8 is 0.014): a lens radius above 0 blurs what is not at the focus distance (depth of field), the more the wider the opening and the longer the lens.</source>
         <translation>焦点距離とセンサーから、写真家のレンズと同じように画角が決まります (36 mm センサーで 50 mm なら幅で約 40 度)。画像の縦横比は実際のカメラと同様にセンサーを切り取ります。絞りは 1 単位が 1 メートルのシーンでのレンズ半径を決めます (50 mm の f/1.8 で 0.014)。レンズ半径が 0 より大きいと、ピント距離にないものがぼけます (被写界深度)。絞りが開くほど、レンズが長いほど強くぼけます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="440"/>
+        <location filename="../scene_builder_inspector.cpp" line="447"/>
         <source>Plain colour</source>
         <translation>単色</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="441"/>
+        <location filename="../scene_builder_inspector.cpp" line="448"/>
         <source>Checker</source>
         <translation>チェッカー</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="443"/>
+        <location filename="../scene_builder_inspector.cpp" line="450"/>
         <source>Noise (soft clouds)</source>
         <translation>ノイズ (やわらかな雲)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="456"/>
+        <location filename="../scene_builder_inspector.cpp" line="451"/>
+        <location filename="../scene_builder_inspector.cpp" line="501"/>
+        <location filename="../scene_builder_inspector.cpp" line="530"/>
+        <source>Dots</source>
+        <translation>ドット</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="464"/>
         <source>Pattern</source>
         <translation>パターン</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="460"/>
+        <location filename="../scene_builder_inspector.cpp" line="468"/>
         <source>Bump or normal map</source>
         <translation>バンプマップ / 法線マップ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="464"/>
+        <location filename="../scene_builder_inspector.cpp" line="472"/>
         <source>Height map (grayscale: light is high)</source>
         <translation>ハイトマップ (グレースケール: 明るいほど高い)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="465"/>
+        <location filename="../scene_builder_inspector.cpp" line="473"/>
         <source>Normal map (colour)</source>
         <translation>法線マップ (カラー)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="472"/>
+        <location filename="../scene_builder_inspector.cpp" line="480"/>
         <source>Picture is a</source>
         <translation>画像の種類</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="473"/>
+        <location filename="../scene_builder_inspector.cpp" line="481"/>
         <source>The renderer tells the two apart by the picture itself: a grayscale picture is a height map and a colour one a normal map, whichever is chosen here.</source>
         <translation>レンダラーは画像そのものから両者を判別します。グレースケールの画像は高さマップ、カラーの画像は法線マップとして扱われ、ここでの選択は関係ありません。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="477"/>
+        <location filename="../scene_builder_inspector.cpp" line="485"/>
         <source>Bump height</source>
         <translation>バンプの高さ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="487"/>
-        <location filename="../scene_builder_inspector.cpp" line="513"/>
+        <location filename="../scene_builder_inspector.cpp" line="495"/>
+        <location filename="../scene_builder_inspector.cpp" line="527"/>
         <source>Veins</source>
         <translation>筋の数</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="488"/>
-        <location filename="../scene_builder_inspector.cpp" line="514"/>
+        <location filename="../scene_builder_inspector.cpp" line="496"/>
+        <location filename="../scene_builder_inspector.cpp" line="528"/>
         <source>Wander</source>
         <translation>うねり</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="528"/>
-        <location filename="../scene_builder_mix.cpp" line="96"/>
+        <location filename="../scene_builder_inspector.cpp" line="502"/>
+        <location filename="../scene_builder_inspector.cpp" line="531"/>
+        <source>Ground</source>
+        <translation>地の色</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="503"/>
+        <location filename="../scene_builder_inspector.cpp" line="532"/>
+        <source>Dots across</source>
+        <translation>横のドット数</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="546"/>
+        <location filename="../scene_builder_mix.cpp" line="110"/>
         <source>Travels under the surface: red</source>
         <translation>表面下で進む距離: 赤</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="529"/>
-        <location filename="../scene_builder_mix.cpp" line="97"/>
+        <location filename="../scene_builder_inspector.cpp" line="547"/>
+        <location filename="../scene_builder_mix.cpp" line="111"/>
         <source>Travels under the surface: green</source>
         <translation>表面下で進む距離: 緑</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="530"/>
-        <location filename="../scene_builder_mix.cpp" line="98"/>
+        <location filename="../scene_builder_inspector.cpp" line="548"/>
+        <location filename="../scene_builder_mix.cpp" line="112"/>
         <source>Travels under the surface: blue</source>
         <translation>表面下で進む距離: 青</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="532"/>
-        <location filename="../scene_builder_mix.cpp" line="100"/>
+        <location filename="../scene_builder_inspector.cpp" line="550"/>
+        <location filename="../scene_builder_mix.cpp" line="114"/>
         <source>Surface roughness</source>
         <translation>表面の粗さ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="533"/>
+        <location filename="../scene_builder_inspector.cpp" line="551"/>
         <source>Light goes into the surface, wanders about and comes out somewhere else, which softens the shading the way skin, wax, milk and marble are soft. The distances are how far each colour travels before it scatters, in the scene&apos;s units: a tenth to a half of the object&apos;s size looks translucent, much more looks like fog inside glass. A colour that travels further glows further from where the light went in (skin&apos;s red does).</source>
         <translation>光は表面の内部に入り、中を巡ってから別の場所から出てくるため、肌・ワックス・ミルク・大理石のようにやわらかい陰影になります。距離は各色が散乱するまでに進む長さで、シーンの単位で指定します。オブジェクトの大きさの 10 分の 1 から半分ほどなら半透明に見え、それよりずっと大きいとガラスの中の霧のように見えます。遠くまで進む色ほど、光が入った場所から離れて光ります (肌の赤がそうです)。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="544"/>
+        <location filename="../scene_builder_inspector.cpp" line="560"/>
         <source>Texture repeats across</source>
         <translation>テクスチャの横方向の繰り返し</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="545"/>
+        <location filename="../scene_builder_inspector.cpp" line="561"/>
         <source>Texture repeats up</source>
         <translation>テクスチャの縦方向の繰り返し</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="546"/>
+        <location filename="../scene_builder_inspector.cpp" line="562"/>
         <source>Texture shift across</source>
         <translation>テクスチャの横方向のずらし</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="547"/>
+        <location filename="../scene_builder_inspector.cpp" line="563"/>
         <source>Texture shift up</source>
         <translation>テクスチャの縦方向のずらし</translation>
     </message>
@@ -7111,334 +7135,339 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation type="vanished">繰り返しとずらしは、ボックス、四角形、用意されたシェイプに適用されます。このシェイプはレンダラー自身のテクスチャ座標を使うので、ここでは効果がありません。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="562"/>
+        <location filename="../scene_builder_inspector.cpp" line="570"/>
         <source>Hidden in the views</source>
         <translation>ビューで非表示</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="563"/>
+        <location filename="../scene_builder_inspector.cpp" line="571"/>
         <source>Locked</source>
         <translation>ロック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="570"/>
+        <location filename="../scene_builder_inspector.cpp" line="578"/>
         <source>Volume</source>
         <translation>ボリューム</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="598"/>
-        <location filename="../scene_builder_inspector.cpp" line="638"/>
+        <location filename="../scene_builder_inspector.cpp" line="606"/>
+        <location filename="../scene_builder_inspector.cpp" line="644"/>
         <source>Shape</source>
         <translation>形状</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="601"/>
-        <location filename="../scene_builder_inspector.cpp" line="640"/>
+        <location filename="../scene_builder_inspector.cpp" line="609"/>
+        <location filename="../scene_builder_inspector.cpp" line="646"/>
         <source>Rotation (degrees)</source>
         <translation>回転 (度)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="602"/>
-        <location filename="../scene_builder_inspector.cpp" line="646"/>
-        <location filename="../scene_builder_inspector.cpp" line="650"/>
-        <location filename="../scene_builder_inspector.cpp" line="654"/>
-        <location filename="../scene_builder_inspector.cpp" line="657"/>
+        <location filename="../scene_builder_inspector.cpp" line="610"/>
+        <location filename="../scene_builder_inspector.cpp" line="652"/>
+        <location filename="../scene_builder_inspector.cpp" line="656"/>
+        <location filename="../scene_builder_inspector.cpp" line="660"/>
+        <location filename="../scene_builder_inspector.cpp" line="663"/>
         <source>Radius</source>
         <translation>半径</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="603"/>
-        <location filename="../scene_builder_inspector.cpp" line="651"/>
-        <location filename="../scene_builder_inspector.cpp" line="667"/>
-        <location filename="../scene_builder_inspector.cpp" line="672"/>
+        <location filename="../scene_builder_inspector.cpp" line="611"/>
+        <location filename="../scene_builder_inspector.cpp" line="657"/>
+        <location filename="../scene_builder_inspector.cpp" line="673"/>
+        <location filename="../scene_builder_inspector.cpp" line="678"/>
         <source>Height</source>
         <translation>高さ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="604"/>
+        <location filename="../scene_builder_inspector.cpp" line="612"/>
         <source>Density</source>
         <translation>密度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="606"/>
+        <location filename="../scene_builder_inspector.cpp" line="614"/>
         <source>Forward scattering</source>
         <translation>前方散乱</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="608"/>
+        <location filename="../scene_builder_inspector.cpp" line="616"/>
         <source>Wispiness</source>
         <translation>ほつれ具合</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="609"/>
+        <location filename="../scene_builder_inspector.cpp" line="617"/>
         <source>Detail (lumps across)</source>
         <translation>ディテール (横方向のかたまりの数)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="612"/>
+        <location filename="../scene_builder_inspector.cpp" line="620"/>
         <source>A cloud scatters light and never absorbs it. Density is how thick it is: about 6 is a solid white cloud, 1 is a thin haze. Forward scattering above 0 gives the bright silver edge against the sun.</source>
         <translation>雲は光を散乱させるだけで、吸収しません。密度は濃さで、6 前後でしっかりした白い雲、1 だと薄いもやです。前方散乱を 0 より大きくすると、太陽に向かった縁が銀色に明るく光ります。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="614"/>
+        <location filename="../scene_builder_inspector.cpp" line="622"/>
         <source>Density is how quickly the light is scattered or absorbed per unit of distance: 0.3 is a light mist in a sphere a few units across, 2 is thick. The colour is what is scattered: white fog only scatters, so it glows; a dark colour absorbs the rest and looks like smoke.</source>
         <translation>密度は、単位距離あたりに光が散乱または吸収される速さです。数単位の幅の球で 0.3 なら薄いもや、2 なら濃い状態です。色は散乱される分を表し、白い霧は散乱するだけなので光って見え、暗い色は残りを吸収して煙のように見えます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="658"/>
+        <location filename="../scene_builder_inspector.cpp" line="664"/>
         <source>Height (with the rounded ends)</source>
         <translation>高さ (丸い端を含む)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="661"/>
+        <location filename="../scene_builder_inspector.cpp" line="667"/>
         <source>Ring radius</source>
         <translation>リングの半径</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="662"/>
+        <location filename="../scene_builder_inspector.cpp" line="668"/>
         <source>Tube radius</source>
         <translation>チューブの半径</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="665"/>
+        <location filename="../scene_builder_inspector.cpp" line="671"/>
         <source>Outer radius</source>
         <translation>外側の半径</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="666"/>
+        <location filename="../scene_builder_inspector.cpp" line="672"/>
         <source>Hole radius</source>
         <translation>穴の半径</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="670"/>
+        <location filename="../scene_builder_inspector.cpp" line="676"/>
         <source>Base width (X)</source>
         <translation>底面の幅 (X)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="671"/>
+        <location filename="../scene_builder_inspector.cpp" line="677"/>
         <source>Base depth (Z)</source>
         <translation>底面の奥行き (Z)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="675"/>
-        <location filename="../scene_builder_inspector.cpp" line="680"/>
-        <location filename="../scene_builder_inspector.cpp" line="683"/>
+        <location filename="../scene_builder_inspector.cpp" line="681"/>
+        <location filename="../scene_builder_inspector.cpp" line="686"/>
+        <location filename="../scene_builder_inspector.cpp" line="689"/>
         <source>Size</source>
         <translation>サイズ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="676"/>
+        <location filename="../scene_builder_inspector.cpp" line="682"/>
         <source>Steps</source>
         <translation>段数</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="684"/>
+        <location filename="../scene_builder_inspector.cpp" line="690"/>
         <source>Roundness of the edges</source>
         <translation>エッジの丸み</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="687"/>
+        <location filename="../scene_builder_inspector.cpp" line="693"/>
         <source>Size (width, height, depth)</source>
         <translation>サイズ (幅、高さ、奥行き)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="688"/>
+        <location filename="../scene_builder_inspector.cpp" line="694"/>
         <source>Radius of the curve</source>
         <translation>カーブの半径</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="691"/>
+        <location filename="../scene_builder_inspector.cpp" line="697"/>
         <source>Size (width, hill height, depth)</source>
         <translation>サイズ (幅、丘の高さ、奥行き)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="692"/>
+        <location filename="../scene_builder_inspector.cpp" line="698"/>
         <source>Detail (grid cells across)</source>
         <translation>ディテール (グリッドの分割数)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="693"/>
+        <location filename="../scene_builder_inspector.cpp" line="699"/>
         <source>Hills across</source>
         <translation>丘の数 (横方向)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="695"/>
+        <location filename="../scene_builder_inspector.cpp" line="701"/>
         <source>Seed (which ground)</source>
         <translation>シード (どの地面か)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="698"/>
+        <location filename="../scene_builder_inspector.cpp" line="704"/>
         <source>Width (X)</source>
         <translation>幅 (X)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="699"/>
+        <location filename="../scene_builder_inspector.cpp" line="705"/>
         <source>Depth (Z)</source>
         <translation>奥行き (Z)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="702"/>
+        <location filename="../scene_builder_inspector.cpp" line="708"/>
         <source>Mesh file</source>
         <translation>メッシュファイル</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="702"/>
-        <location filename="../scene_builder_widget.cpp" line="723"/>
+        <location filename="../scene_builder_inspector.cpp" line="708"/>
+        <location filename="../scene_builder_widget.cpp" line="728"/>
         <source>Meshes (*.ply *.obj)</source>
         <translation>メッシュ (*.ply *.obj)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="703"/>
+        <location filename="../scene_builder_inspector.cpp" line="709"/>
         <location filename="../scene_builder_multi.cpp" line="317"/>
         <location filename="../scene_builder_views.cpp" line="53"/>
         <source>Scale</source>
         <translation>スケール</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="709"/>
-        <location filename="../scene_builder_inspector.cpp" line="725"/>
+        <location filename="../scene_builder_inspector.cpp" line="715"/>
+        <location filename="../scene_builder_inspector.cpp" line="731"/>
         <source>Light</source>
         <translation>ライト</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="710"/>
+        <location filename="../scene_builder_inspector.cpp" line="716"/>
         <source>Gives off light</source>
         <translation>発光する</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="712"/>
+        <location filename="../scene_builder_inspector.cpp" line="718"/>
         <source>Light colour</source>
         <translation>ライトの色</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="713"/>
-        <location filename="../scene_builder_inspector.cpp" line="808"/>
+        <location filename="../scene_builder_inspector.cpp" line="719"/>
+        <location filename="../scene_builder_inspector.cpp" line="818"/>
         <source>Strength</source>
         <translation>強さ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="714"/>
+        <location filename="../scene_builder_inspector.cpp" line="720"/>
         <source>Both sides</source>
         <translation>両面</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="716"/>
+        <location filename="../scene_builder_inspector.cpp" line="722"/>
         <source>A quad or disk lights the side that faces up. Rotate it 180 degrees about X to make a ceiling light.</source>
         <translation>四角形や円盤は、上を向いた面を照らします。天井の照明にするには、X 軸まわりに 180 度回転させてください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="741"/>
-        <location filename="../scene_builder_inspector.cpp" line="746"/>
+        <location filename="../scene_builder_inspector.cpp" line="747"/>
+        <location filename="../scene_builder_inspector.cpp" line="752"/>
         <source>Aims at</source>
         <translation>照準先</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="742"/>
+        <location filename="../scene_builder_inspector.cpp" line="748"/>
         <source>Cone angle</source>
         <translation>円錐角</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="743"/>
+        <location filename="../scene_builder_inspector.cpp" line="749"/>
         <source>Soft edge</source>
         <translation>ぼかし</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="748"/>
+        <location filename="../scene_builder_inspector.cpp" line="754"/>
         <source>Slide picture</source>
         <translation>スライドの画像</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="749"/>
+        <location filename="../scene_builder_inspector.cpp" line="755"/>
         <source>A slide projector: the picture shines out through a frustum, onto whatever it falls on, with the colours of the picture. The field of view is the angle across the picture&apos;s shorter side. Strength is the brightness of the whitest part of the picture; a surface facing the projector from distance d is lit with Strength / d squared. The top of the picture points up as far as the aim allows.</source>
         <translation>スライドプロジェクターです。画像が錐台の形に広がって当たったものに映り、画像の色がそのまま出ます。視野角は画像の短い辺にわたる角度です。強さは画像でいちばん白い部分の明るさで、投影方向を向いた面が距離 d にあるとき、強さ / d の二乗の明るさで照らされます。画像の上側は、向きの許す範囲で上を向きます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="756"/>
+        <location filename="../scene_builder_inspector.cpp" line="760"/>
         <source>Shines from</source>
         <translation>光の出発点</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="757"/>
+        <location filename="../scene_builder_inspector.cpp" line="761"/>
         <source>Towards</source>
         <translation>向き</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="761"/>
+        <location filename="../scene_builder_inspector.cpp" line="765"/>
         <source>Sun &amp;&amp; sky (a clear sky for a time of day)</source>
         <translation>太陽と空 (時刻に合わせた晴天の空)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="777"/>
+        <location filename="../scene_builder_inspector.cpp" line="781"/>
         <source>Time of day...</source>
         <translation>時刻...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="778"/>
+        <location filename="../scene_builder_inspector.cpp" line="782"/>
         <source>Sunrise</source>
         <translation>日の出</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="778"/>
+        <location filename="../scene_builder_inspector.cpp" line="782"/>
         <source>Morning</source>
         <translation>朝</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="778"/>
+        <location filename="../scene_builder_inspector.cpp" line="782"/>
         <source>Noon</source>
         <translation>正午</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="779"/>
+        <location filename="../scene_builder_inspector.cpp" line="783"/>
         <source>Afternoon</source>
         <translation>午後</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="779"/>
+        <location filename="../scene_builder_inspector.cpp" line="783"/>
         <source>Sunset</source>
         <translation>日没</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="788"/>
+        <location filename="../scene_builder_inspector.cpp" line="793"/>
+        <source>Sky gallery...</source>
+        <translation>空のギャラリー...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="802"/>
         <source>Sun height</source>
         <translation>太陽の高さ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="789"/>
+        <location filename="../scene_builder_inspector.cpp" line="803"/>
         <source>Sun direction</source>
         <translation>太陽の方向</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="790"/>
+        <location filename="../scene_builder_inspector.cpp" line="804"/>
         <source>Haze</source>
         <translation>もや</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="791"/>
+        <location filename="../scene_builder_inspector.cpp" line="805"/>
         <source>Ground brightness</source>
         <translation>地面の明るさ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="792"/>
+        <location filename="../scene_builder_inspector.cpp" line="806"/>
         <source>The sky picture and the Sun light are made from these settings; change the sun here rather than moving the Sun light. Direction 0 is towards +X, 90 away from the starting camera, 180 towards -X, 270 behind it. Brightness 1 is a daylight scene.</source>
         <translation>空の画像と太陽の光はこれらの設定から作られます。太陽の光を動かすのではなく、ここで太陽を変更してください。方向 0 は +X、90 は開始カメラから遠ざかる向き、180 は -X、270 はカメラの後ろです。明るさ 1 は昼間のシーンです。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="797"/>
+        <location filename="../scene_builder_inspector.cpp" line="809"/>
         <source>Sky image</source>
         <translation>空の画像</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="797"/>
+        <location filename="../scene_builder_inspector.cpp" line="809"/>
         <source>Images (*.exr *.hdr *.png *.jpg *.jpeg)</source>
         <translation>画像 (*.exr *.hdr *.png *.jpg *.jpeg)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="799"/>
+        <location filename="../scene_builder_inspector.cpp" line="811"/>
         <source>Rotate sky</source>
         <translation>空を回転</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="800"/>
+        <location filename="../scene_builder_inspector.cpp" line="812"/>
         <source>Leave the image empty for a plain colour sky. An image is an equirectangular (lat-long) panorama; Rotate sky turns it about the vertical axis (counter-clockwise seen from above), to put the bright part of the picture where you want the light to come from.</source>
         <translation>画像を空にすると単色の空になります。画像は正距円筒図法 (緯度経度) のパノラマです。「空を回転」は垂直軸まわりに (上から見て反時計回りに) 回し、画像の明るい部分を光を来させたい方向に合わせます。</translation>
     </message>
@@ -7447,127 +7476,127 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation type="vanished">画像を空にすると単色の空になります。画像は正距円筒図法（緯度経度）のパノラマです。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="808"/>
+        <location filename="../scene_builder_inspector.cpp" line="818"/>
         <source>Brightness</source>
         <translation>明るさ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="132"/>
+        <location filename="../scene_builder_widget.cpp" line="133"/>
         <source>New</source>
         <translation>新規</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="132"/>
+        <location filename="../scene_builder_widget.cpp" line="133"/>
         <source>Start again from the example scene</source>
         <translation>サンプルシーンからやり直す</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="133"/>
+        <location filename="../scene_builder_widget.cpp" line="134"/>
         <source>Open...</source>
         <translation>開く...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="133"/>
+        <location filename="../scene_builder_widget.cpp" line="134"/>
         <source>Open a .pbrt file saved by the Scene Builder</source>
         <translation>シーンビルダーで保存した .pbrt ファイルを開く</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="134"/>
+        <location filename="../scene_builder_widget.cpp" line="135"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="134"/>
+        <location filename="../scene_builder_widget.cpp" line="135"/>
         <source>Save the scene as a .pbrt file</source>
         <translation>シーンを .pbrt ファイルとして保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="135"/>
+        <location filename="../scene_builder_widget.cpp" line="136"/>
         <source>Save As...</source>
         <translation>名前を付けて保存...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="135"/>
+        <location filename="../scene_builder_widget.cpp" line="136"/>
         <source>Save the scene under a new name</source>
         <translation>シーンを新しい名前で保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="136"/>
+        <location filename="../scene_builder_widget.cpp" line="137"/>
         <source>Add to scene list</source>
         <translation>シーンリストに追加</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="137"/>
+        <location filename="../scene_builder_widget.cpp" line="138"/>
         <source>Preview live</source>
         <translation>ライブでプレビュー</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="137"/>
+        <location filename="../scene_builder_widget.cpp" line="138"/>
         <source>Open this scene in Live Preview: walk around it and move things. It is saved as a separate &quot;(live preview)&quot; scene in the scene list; your scene and its own listing are not changed.</source>
         <translation>このシーンをライブプレビューで開きます。歩き回ったり、物を動かしたりできます。シーン一覧には別のシーン「（ライブプレビュー）」として保存され、元のシーンとその登録は変更されません。</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="72"/>
-        <location filename="../scene_builder_widget.cpp" line="140"/>
+        <location filename="../scene_builder_widget.cpp" line="141"/>
         <source>Undo</source>
         <translation>元に戻す</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="73"/>
-        <location filename="../scene_builder_widget.cpp" line="141"/>
+        <location filename="../scene_builder_widget.cpp" line="142"/>
         <source>Redo</source>
         <translation>やり直し</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="146"/>
+        <location filename="../scene_builder_widget.cpp" line="147"/>
         <source>Scene name</source>
         <translation>シーン名</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="147"/>
+        <location filename="../scene_builder_widget.cpp" line="148"/>
         <source>The name of this scene, shown in the scene list</source>
         <translation>このシーンの名前です。シーンリストに表示されます</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="167"/>
+        <location filename="../scene_builder_widget.cpp" line="168"/>
         <source>Name:</source>
         <translation>名前:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="204"/>
+        <location filename="../scene_builder_widget.cpp" line="207"/>
         <source>Volumes (fog, smoke, cloud)</source>
         <translation>ボリューム (霧、煙、雲)</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
-        <location filename="../scene_builder_widget.cpp" line="235"/>
+        <location filename="../scene_builder_widget.cpp" line="238"/>
         <source>Arrange</source>
         <translation>整理</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="236"/>
+        <location filename="../scene_builder_widget.cpp" line="239"/>
         <source>Rename, put on the floor, frame, hide and lock what is picked (also on a right-click in the list)</source>
         <translation>選択中のものの名前変更、床に置く、フレーミング、非表示、ロック (リストの右クリックでも使えます)</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="98"/>
-        <location filename="../scene_builder_widget.cpp" line="322"/>
+        <location filename="../scene_builder_widget.cpp" line="326"/>
         <source>Turntable...</source>
         <translation>ターンテーブル...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="324"/>
+        <location filename="../scene_builder_widget.cpp" line="328"/>
         <source>Make a video of the scene from a camera that goes once round it</source>
         <translation>カメラがシーンのまわりを 1 周する動画を作ります</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="99"/>
-        <location filename="../scene_builder_widget.cpp" line="325"/>
+        <location filename="../scene_builder_widget.cpp" line="329"/>
         <source>Flythrough...</source>
         <translation>フライスルー...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="327"/>
+        <location filename="../scene_builder_widget.cpp" line="331"/>
         <source>Make a video of the scene from a camera that flies through your saved camera views (needs two or more)</source>
         <translation>保存したカメラビューを順にたどって飛ぶカメラの動画を作ります (2 つ以上必要)</translation>
     </message>
@@ -7609,7 +7638,7 @@ From: %3</source>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
         <location filename="../scene_builder_models.cpp" line="118"/>
-        <location filename="../scene_builder_widget.cpp" line="190"/>
+        <location filename="../scene_builder_widget.cpp" line="191"/>
         <source>Add</source>
         <translation>追加</translation>
     </message>
@@ -7624,81 +7653,81 @@ From: %3</source>
         <translation>そのモデルを読み込めませんでした。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="193"/>
+        <location filename="../scene_builder_widget.cpp" line="194"/>
         <source>Objects</source>
         <translation>オブジェクト</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="196"/>
+        <location filename="../scene_builder_widget.cpp" line="199"/>
         <source>Props (several objects at once)</source>
         <translation>小道具 (複数のオブジェクトをまとめて追加)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="199"/>
+        <location filename="../scene_builder_widget.cpp" line="202"/>
         <source>Blocky (several objects at once)</source>
         <translation>ブロック風 (複数のオブジェクトを一度に)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="200"/>
+        <location filename="../scene_builder_widget.cpp" line="203"/>
         <source>Blocks</source>
         <translation>ブロック</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="200"/>
+        <location filename="../scene_builder_widget.cpp" line="203"/>
         <source>Creatures</source>
         <translation>生き物</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="200"/>
+        <location filename="../scene_builder_widget.cpp" line="203"/>
         <source>Things</source>
         <translation>もの</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="207"/>
+        <location filename="../scene_builder_widget.cpp" line="210"/>
         <source>More</source>
         <translation>その他</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="61"/>
-        <location filename="../scene_builder_widget.cpp" line="208"/>
+        <location filename="../scene_builder_widget.cpp" line="211"/>
         <source>Model library...</source>
         <translation>モデルライブラリ...</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="62"/>
-        <location filename="../scene_builder_widget.cpp" line="209"/>
+        <location filename="../scene_builder_widget.cpp" line="212"/>
         <source>Object from a photo...</source>
         <translation>写真からオブジェクトを作成...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="210"/>
+        <location filename="../scene_builder_widget.cpp" line="213"/>
         <source>Light panel (emitting quad)</source>
         <translation>ライトパネル (発光する四角形)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="219"/>
+        <location filename="../scene_builder_widget.cpp" line="222"/>
         <source>Lights</source>
         <translation>ライト</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="66"/>
-        <location filename="../scene_builder_widget.cpp" line="230"/>
+        <location filename="../scene_builder_widget.cpp" line="233"/>
         <source>Duplicate</source>
         <translation>複製</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="231"/>
+        <location filename="../scene_builder_widget.cpp" line="234"/>
         <source>Make a copy of the selected item beside it (%1)</source>
         <translation>選択した項目のコピーをその横に作ります (%1)</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="67"/>
-        <location filename="../scene_builder_widget.cpp" line="232"/>
+        <location filename="../scene_builder_widget.cpp" line="235"/>
         <source>Array...</source>
         <translation>配列...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="233"/>
+        <location filename="../scene_builder_widget.cpp" line="236"/>
         <source>Make many copies of the selected object: a grid, a ring round a point, or a random scatter</source>
         <translation>選択したオブジェクトのコピーをたくさん作ります。グリッド、点のまわりのリング、またはランダムな散布</translation>
     </message>
@@ -7759,125 +7788,125 @@ From: %3</source>
         <translation>フライスルー:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="67"/>
+        <location filename="../scene_builder_camera_views.cpp" line="68"/>
         <source>Slide along the path through the saved views to see what the camera sees on the way, at the pace of a flythrough video (pauses included). Needs two or more saved views. Orbit, pan or zoom to leave.</source>
         <translation>保存したビューを通る経路に沿ってスライドすると、フライスルー動画と同じペース (停止時間を含む) で、途中でカメラに見える映像を確認できます。保存したビューが 2 つ以上必要です。オービット、パン、ズームで終了します。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="69"/>
-        <location filename="../scene_builder_camera_views.cpp" line="150"/>
+        <location filename="../scene_builder_camera_views.cpp" line="70"/>
+        <location filename="../scene_builder_camera_views.cpp" line="151"/>
         <source>Play</source>
         <translation>再生</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="73"/>
+        <location filename="../scene_builder_camera_views.cpp" line="74"/>
         <source>Play the flythrough in the 3D view, at the pace of the video (10 seconds for the whole path). Click again to pause; moving the slider also stops it.</source>
         <translation>3D ビューでフライスルーを動画と同じペース (経路全体で 10 秒) で再生します。もう一度クリックすると一時停止し、スライダーを動かしても止まります。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="108"/>
+        <location filename="../scene_builder_camera_views.cpp" line="109"/>
         <source>Save view</source>
         <translation>ビューを保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="108"/>
+        <location filename="../scene_builder_camera_views.cpp" line="109"/>
         <source>Name of the view:</source>
         <translation>ビューの名前:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="140"/>
+        <location filename="../scene_builder_camera_views.cpp" line="141"/>
         <source>Pause</source>
         <translation>一時停止</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="196"/>
+        <location filename="../scene_builder_camera_views.cpp" line="199"/>
         <source>No saved views</source>
         <translation>保存したビューはありません</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="196"/>
+        <location filename="../scene_builder_camera_views.cpp" line="199"/>
         <source>Saved views</source>
         <translation>保存したビュー</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="214"/>
+        <location filename="../scene_builder_camera_views.cpp" line="217"/>
         <source>Click what should be in focus in the 3D view (Escape cancels).</source>
         <translation>3D ビューでピントを合わせたいものをクリックしてください (Esc で取り消し)。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="222"/>
+        <location filename="../scene_builder_camera_views.cpp" line="225"/>
         <source>The camera is where the view is.</source>
         <translation>カメラをビューの位置に合わせました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="230"/>
+        <location filename="../scene_builder_camera_views.cpp" line="233"/>
         <source>There are already %1 saved views: delete one first.</source>
         <translation>すでに %1 個のビューが保存されています。先に 1 つ削除してください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="234"/>
+        <location filename="../scene_builder_camera_views.cpp" line="237"/>
         <source>Saved the view &quot;%1&quot;.</source>
         <translation>ビュー「%1」を保存しました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="296"/>
+        <location filename="../scene_builder_camera_views.cpp" line="299"/>
         <source>&lt;b&gt;Saved views&lt;/b&gt;</source>
         <translation>&lt;b&gt;保存したビュー&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="300"/>
+        <location filename="../scene_builder_camera_views.cpp" line="303"/>
         <source>None yet. Save the camera as a view to come back to it: a front view, a close-up, a bird&apos;s-eye shot.</source>
         <translation>まだありません。カメラをビューとして保存すると、あとで戻れます (正面、クローズアップ、俯瞰など)。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="327"/>
+        <location filename="../scene_builder_camera_views.cpp" line="330"/>
         <source>How long a flythrough stays at this view before flying on (0: it does not stop)</source>
         <translation>フライスルーがこのビューにとどまってから先へ進むまでの時間 (0: 止まらない)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="328"/>
+        <location filename="../scene_builder_camera_views.cpp" line="331"/>
         <source>Hold:</source>
         <translation>停止:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="330"/>
+        <location filename="../scene_builder_camera_views.cpp" line="333"/>
         <source>Use</source>
         <translation>使う</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="330"/>
+        <location filename="../scene_builder_camera_views.cpp" line="333"/>
         <source>Put the camera at this view</source>
         <translation>カメラをこのビューの位置に移します</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="331"/>
+        <location filename="../scene_builder_camera_views.cpp" line="334"/>
         <source>Update</source>
         <translation>更新</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="331"/>
+        <location filename="../scene_builder_camera_views.cpp" line="334"/>
         <source>Save the camera as it is now over this view</source>
         <translation>現在のカメラでこのビューを上書き保存します</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="68"/>
-        <location filename="../scene_builder_camera_views.cpp" line="332"/>
-        <location filename="../scene_builder_widget.cpp" line="234"/>
+        <location filename="../scene_builder_camera_views.cpp" line="335"/>
+        <location filename="../scene_builder_widget.cpp" line="237"/>
         <source>Delete</source>
         <translation>削除</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="332"/>
+        <location filename="../scene_builder_camera_views.cpp" line="335"/>
         <source>Remove this saved view</source>
         <translation>この保存ビューを削除します</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="336"/>
+        <location filename="../scene_builder_camera_views.cpp" line="339"/>
         <source>Save camera as a view</source>
         <translation>カメラをビューとして保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="337"/>
+        <location filename="../scene_builder_camera_views.cpp" line="340"/>
         <source>Remember the camera as it is now under a name (a saved view can be used from the 3D view&apos;s list too)</source>
         <translation>現在のカメラに名前を付けて記憶します (保存したビューは 3D ビューの一覧からも使えます)</translation>
     </message>
@@ -8119,12 +8148,12 @@ From: %3</source>
         <translation>両方のビューを選択中のものに合わせてズームします (F)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="442"/>
+        <location filename="../scene_builder_inspector.cpp" line="449"/>
         <source>Marble</source>
         <translation>大理石</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_builder3d.cpp" line="700"/>
+        <location filename="../mainwindow_selftest_builder3d.cpp" line="766"/>
         <location filename="../scene_builder_views.cpp" line="150"/>
         <source>Snap to grid</source>
         <translation>グリッドにスナップ</translation>
@@ -8152,44 +8181,44 @@ From: %3</source>
         <translation>すべてを表示</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="310"/>
+        <location filename="../scene_builder_widget.cpp" line="313"/>
         <source>Draft</source>
         <translation>ドラフト</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="311"/>
+        <location filename="../scene_builder_widget.cpp" line="314"/>
         <source>Good</source>
         <translation>標準</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="312"/>
+        <location filename="../scene_builder_widget.cpp" line="315"/>
         <source>Best</source>
         <translation>最高</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="315"/>
+        <location filename="../scene_builder_widget.cpp" line="318"/>
         <source>Use the GPU</source>
         <translation>GPU を使用</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="316"/>
+        <location filename="../scene_builder_widget.cpp" line="319"/>
         <source>Render on the graphics card (NVIDIA OptiX on Windows, Metal on a Mac). Much faster for large pictures; needs a supported GPU.</source>
         <translation>グラフィックスカードでレンダリングします (Windows では NVIDIA OptiX、Mac では Metal)。大きな画像ではずっと高速ですが、対応する GPU が必要です。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="164"/>
+        <location filename="../scene_builder_render.cpp" line="195"/>
         <location filename="../scene_builder_turntable.cpp" line="244"/>
-        <location filename="../scene_builder_widget.cpp" line="317"/>
+        <location filename="../scene_builder_widget.cpp" line="321"/>
         <source>Preview</source>
         <translation>プレビュー</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="319"/>
+        <location filename="../scene_builder_widget.cpp" line="323"/>
         <source>Render picture...</source>
         <translation>画像をレンダリング...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="321"/>
+        <location filename="../scene_builder_widget.cpp" line="325"/>
         <source>Render at the image size and sample count set under Camera, and save the picture as a PNG</source>
         <translation>カメラで設定した画像サイズとサンプル数でレンダリングし、PNG として保存</translation>
     </message>
@@ -8224,7 +8253,7 @@ From: %3</source>
         <translation>保存したカメラビューを保存した順にたどって飛ぶカメラから見たシーンの動画を作ります: %1。最初の画像が最初のビュー、最後の画像が最後のビューになります。各ビューの画角とレンズもそのビューと一緒に反映されます。すべてのフレームをレンダリングするので、長い動画や大きな動画は時間がかかります。まずは「ドラフト」から試してください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_views.cpp" line="324"/>
+        <location filename="../scene_builder_camera_views.cpp" line="327"/>
         <location filename="../scene_builder_turntable.cpp" line="76"/>
         <source> s</source>
         <translation> 秒</translation>
@@ -8276,7 +8305,7 @@ From: %3</source>
     </message>
     <message>
         <location filename="../scene_builder_turntable.cpp" line="94"/>
-        <location filename="../scene_builder_widget.cpp" line="329"/>
+        <location filename="../scene_builder_widget.cpp" line="333"/>
         <source>Quality:</source>
         <translation>品質:</translation>
     </message>
@@ -8406,108 +8435,108 @@ From: %3</source>
         <translation type="vanished">ターンテーブルに失敗しました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="346"/>
+        <location filename="../scene_builder_widget.cpp" line="351"/>
         <source>Press Preview to see the scene.</source>
         <translation>「プレビュー」を押すとシーンが表示されます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="87"/>
+        <location filename="../scene_builder_files.cpp" line="88"/>
         <source>Cannot open %1.</source>
         <translation>%1 を開けません。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="141"/>
+        <location filename="../scene_builder_files.cpp" line="146"/>
         <source>Unsaved changes</source>
         <translation>未保存の変更</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="141"/>
+        <location filename="../scene_builder_files.cpp" line="146"/>
         <source>The scene has changes that are not saved. Save them first?</source>
         <translation>シーンに未保存の変更があります。先に保存しますか？</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="153"/>
+        <location filename="../scene_builder_files.cpp" line="158"/>
         <source>Open a Scene Builder scene</source>
         <translation>シーンビルダーのシーンを開く</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="154"/>
-        <location filename="../scene_builder_files.cpp" line="172"/>
+        <location filename="../scene_builder_files.cpp" line="159"/>
+        <location filename="../scene_builder_files.cpp" line="177"/>
         <source>pbrt scenes (*.pbrt)</source>
         <translation>pbrt シーン (*.pbrt)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="157"/>
-        <location filename="../scene_builder_files.cpp" line="297"/>
+        <location filename="../scene_builder_files.cpp" line="162"/>
+        <location filename="../scene_builder_files.cpp" line="302"/>
         <source>Cannot open the scene</source>
         <translation>シーンを開けません</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="165"/>
-        <location filename="../scene_builder_files.cpp" line="175"/>
-        <location filename="../scene_builder_files.cpp" line="328"/>
+        <location filename="../scene_builder_files.cpp" line="170"/>
+        <location filename="../scene_builder_files.cpp" line="180"/>
+        <location filename="../scene_builder_files.cpp" line="333"/>
         <source>Cannot save</source>
         <translation>保存できません</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="165"/>
-        <location filename="../scene_builder_files.cpp" line="175"/>
-        <location filename="../scene_builder_files.cpp" line="241"/>
-        <location filename="../scene_builder_files.cpp" line="275"/>
-        <location filename="../scene_builder_render.cpp" line="85"/>
+        <location filename="../scene_builder_files.cpp" line="170"/>
+        <location filename="../scene_builder_files.cpp" line="180"/>
+        <location filename="../scene_builder_files.cpp" line="246"/>
+        <location filename="../scene_builder_files.cpp" line="280"/>
+        <location filename="../scene_builder_render.cpp" line="114"/>
         <location filename="../scene_builder_rendered.cpp" line="204"/>
         <location filename="../scene_builder_turntable.cpp" line="183"/>
         <source>Could not write %1.</source>
         <translation>%1 に書き込めませんでした。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="166"/>
-        <location filename="../scene_builder_files.cpp" line="176"/>
+        <location filename="../scene_builder_files.cpp" line="171"/>
+        <location filename="../scene_builder_files.cpp" line="181"/>
         <source>Saved %1</source>
         <translation>%1 を保存しました</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="172"/>
+        <location filename="../scene_builder_files.cpp" line="177"/>
         <source>Save the scene</source>
         <translation>シーンを保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="257"/>
+        <location filename="../scene_builder_files.cpp" line="262"/>
         <source>There is no scenes folder to write the preview copy to.</source>
         <translation>プレビュー用のコピーを書き込むシーンフォルダがありません。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="286"/>
+        <location filename="../scene_builder_files.cpp" line="291"/>
         <source>Cannot preview</source>
         <translation>プレビューできません</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="308"/>
+        <location filename="../scene_builder_files.cpp" line="313"/>
         <source>No scenes folder</source>
         <translation>シーンフォルダーがありません</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="315"/>
+        <location filename="../scene_builder_files.cpp" line="320"/>
         <source>Add to the scene list</source>
         <translation>シーンリストに追加</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="316"/>
+        <location filename="../scene_builder_files.cpp" line="321"/>
         <source>This scene is already in the list as &quot;%1&quot;.</source>
         <translation>このシーンは「%1」としてすでにリストにあります。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="317"/>
+        <location filename="../scene_builder_files.cpp" line="322"/>
         <source>Add as a new scene</source>
         <translation>新しいシーンとして追加</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="318"/>
+        <location filename="../scene_builder_files.cpp" line="323"/>
         <source>Update the existing one</source>
         <translation>既存のものを更新</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="333"/>
+        <location filename="../scene_builder_files.cpp" line="338"/>
         <source>Saved a copy as %1.
 
 It is in the scene list now (Settings tab, My Scenes).</source>
@@ -8516,114 +8545,114 @@ It is in the scene list now (Settings tab, My Scenes).</source>
 シーンリスト（設定タブの「マイシーン」）に追加されました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="869"/>
+        <location filename="../scene_builder_widget.cpp" line="874"/>
         <source>(%1)%2  |  %3 objects, %4 lights</source>
         <translation>(%1)%2  |  オブジェクト %3 個、ライト %4 個</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="723"/>
+        <location filename="../scene_builder_widget.cpp" line="728"/>
         <source>Choose a mesh</source>
         <translation>メッシュを選択</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="224"/>
+        <location filename="../scene_builder_files.cpp" line="229"/>
         <source>The scenes folder (pbrt_scenes) was not found next to the program. Use Save As to put the file where you like, and set the environment variable RAY_TRACER_PBRT_DIR to that folder to have the program list it.</source>
         <translation>プログラムと同じ場所にシーンフォルダー (pbrt_scenes) が見つかりません。「名前を付けて保存」で好きな場所にファイルを保存し、環境変数 RAY_TRACER_PBRT_DIR にそのフォルダーを設定すると、プログラムの一覧に表示されます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="136"/>
+        <location filename="../scene_builder_widget.cpp" line="137"/>
         <source>Save the scene into the scenes folder so it shows up in the Settings tab</source>
         <translation>シーンをシーンフォルダーに保存し、設定タブに表示されるようにする</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="140"/>
+        <location filename="../scene_builder_widget.cpp" line="141"/>
         <source>Undo the last change (%1)</source>
         <translation>直前の変更を元に戻す (%1)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="141"/>
+        <location filename="../scene_builder_widget.cpp" line="142"/>
         <source>Redo (%1)</source>
         <translation>やり直し (%1)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="223"/>
+        <location filename="../scene_builder_widget.cpp" line="226"/>
         <source>Lighting (replaces the lights)</source>
         <translation>ライティング (ライトを置き換え)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="314"/>
+        <location filename="../scene_builder_widget.cpp" line="317"/>
         <source>Draft: 480 pixels wide, 16 samples. Good: 720 wide, 64 samples. Best: 960 wide, 256 samples.</source>
         <translation>ドラフト: 幅 480 ピクセル、16 サンプル。標準: 幅 720、64 サンプル。最高: 幅 960、256 サンプル。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="332"/>
+        <location filename="../scene_builder_files.cpp" line="337"/>
         <source>Added to the scene list</source>
         <translation>シーンリストに追加しました</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="541"/>
+        <location filename="../scene_builder_widget.cpp" line="546"/>
         <source>Camera and image</source>
         <translation>カメラと画像</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="582"/>
+        <location filename="../scene_builder_widget.cpp" line="587"/>
         <source>, light</source>
         <translation>、ライト</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="770"/>
+        <location filename="../scene_builder_widget.cpp" line="775"/>
         <source>Lighting: %1. %2</source>
         <translation>ライティング: %1。%2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="863"/>
+        <location filename="../scene_builder_widget.cpp" line="868"/>
         <source>not saved yet</source>
         <translation>未保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="897"/>
+        <location filename="../scene_builder_widget.cpp" line="902"/>
         <source>No problems found.</source>
         <translation>問題は見つかりませんでした。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="903"/>
+        <location filename="../scene_builder_widget.cpp" line="908"/>
         <source>Fix this:</source>
         <translation>修正してください:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="903"/>
+        <location filename="../scene_builder_widget.cpp" line="908"/>
         <source>Note:</source>
         <translation>注意:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="95"/>
+        <location filename="../scene_builder_render.cpp" line="124"/>
         <source>Save the rendered picture</source>
         <translation>レンダリングした画像を保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="95"/>
+        <location filename="../scene_builder_render.cpp" line="124"/>
         <source>PNG images (*.png)</source>
         <translation>PNG 画像 (*.png)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="99"/>
+        <location filename="../scene_builder_render.cpp" line="128"/>
         <source>The render failed</source>
         <translation>レンダリングに失敗しました</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="111"/>
+        <location filename="../scene_builder_render.cpp" line="140"/>
         <location filename="../scene_builder_turntable.cpp" line="167"/>
         <source>A render is already running.</source>
         <translation>すでにレンダリング中です。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="113"/>
+        <location filename="../scene_builder_render.cpp" line="142"/>
         <location filename="../scene_builder_turntable.cpp" line="170"/>
         <source>Fix the problems listed under the properties first.</source>
         <translation>先にプロパティに表示されている問題を修正してください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="114"/>
+        <location filename="../scene_builder_render.cpp" line="143"/>
         <location filename="../scene_builder_turntable.cpp" line="171"/>
         <source>The renderer (%1) was not found next to the program.</source>
         <translation>プログラムと同じ場所にレンダラー (%1) が見つかりません。</translation>
@@ -8695,7 +8724,7 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
     </message>
     <message>
         <location filename="../scene_builder_photo.cpp" line="87"/>
-        <location filename="../scene_builder_render.cpp" line="149"/>
+        <location filename="../scene_builder_render.cpp" line="180"/>
         <location filename="../scene_builder_turntable.cpp" line="227"/>
         <source>Cancel</source>
         <translation>キャンセル</translation>
@@ -8721,57 +8750,57 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>写真から %1 を追加しました。形は推測なので、あらゆる角度から確認してください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="152"/>
+        <location filename="../scene_builder_render.cpp" line="183"/>
         <source>Rendering %1 x %2, %3 samples...</source>
         <translation>%1 x %2、%3 サンプルでレンダリング中...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="180"/>
+        <location filename="../scene_builder_render.cpp" line="211"/>
         <source>The render was cancelled.</source>
         <translation>レンダリングはキャンセルされました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="180"/>
+        <location filename="../scene_builder_render.cpp" line="211"/>
         <location filename="../scene_builder_turntable.cpp" line="270"/>
         <source>The renderer stopped unexpectedly.</source>
         <translation>レンダラーが予期せず停止しました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="180"/>
+        <location filename="../scene_builder_render.cpp" line="211"/>
         <source>The renderer did not produce a picture (exit code %1).
 %2</source>
         <translation>レンダラーは画像を生成しませんでした (終了コード %1)。
 %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="181"/>
+        <location filename="../scene_builder_render.cpp" line="212"/>
         <source>The render failed.</source>
         <translation>レンダリングに失敗しました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="187"/>
+        <location filename="../scene_builder_render.cpp" line="218"/>
         <source>Done in %1 s (%2 x %3).</source>
         <translation>%1 秒で完了しました (%2 x %3)。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="190"/>
+        <location filename="../scene_builder_render.cpp" line="221"/>
         <source>Saved %1.</source>
         <translation>%1 を保存しました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="191"/>
+        <location filename="../scene_builder_render.cpp" line="222"/>
         <source>Could not save to %1.</source>
         <translation>%1 に保存できませんでした。</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="462"/>
-        <location filename="../scene_builder_widget.cpp" line="566"/>
+        <location filename="../scene_builder_widget.cpp" line="571"/>
         <source>, locked</source>
         <translation>、ロック中</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="476"/>
-        <location filename="../scene_builder_widget.cpp" line="565"/>
+        <location filename="../scene_builder_widget.cpp" line="570"/>
         <source>, hidden</source>
         <translation>、非表示</translation>
     </message>
@@ -8935,52 +8964,52 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>シーン一覧にプレビュー用のコピーを載せられませんでした。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_mix.cpp" line="29"/>
+        <location filename="../scene_builder_mix.cpp" line="30"/>
         <source>Mix with a second material</source>
         <translation>2 つ目のマテリアルと混ぜる</translation>
     </message>
     <message>
-        <location filename="../scene_builder_mix.cpp" line="47"/>
+        <location filename="../scene_builder_mix.cpp" line="61"/>
         <source>Second material</source>
         <translation>2 つ目のマテリアル</translation>
     </message>
     <message>
-        <location filename="../scene_builder_mix.cpp" line="51"/>
+        <location filename="../scene_builder_mix.cpp" line="65"/>
         <source>Amount of the second material</source>
         <translation>2 つ目のマテリアルの割合</translation>
     </message>
     <message>
-        <location filename="../scene_builder_mix.cpp" line="53"/>
+        <location filename="../scene_builder_mix.cpp" line="67"/>
         <source>Second: %1</source>
         <translation>2 つ目: %1</translation>
     </message>
     <message>
-        <location filename="../scene_builder_mix.cpp" line="103"/>
+        <location filename="../scene_builder_mix.cpp" line="117"/>
         <source>The surface is the first material at some points and the second at others, chosen afresh at each point, so the two grade into one another: 0 is all the first, 1 all the second, 0.5 half each. Use it for worn paint over metal, rust, dirt, a glaze that has chipped. The second material is a plain one (no picture, pattern or bump); the first keeps all of its own.</source>
         <translation>表面は、点ごとに最初のマテリアルか 2 つ目のマテリアルのどちらかになり、その選択は点ごとにやり直されるので、2 つが混ざり合って見えます。0 は最初のみ、1 は 2 つ目のみ、0.5 は半々です。金属の上のはげた塗装、錆、汚れ、欠けた釉薬などに使えます。2 つ目は単純なマテリアル (画像・パターン・バンプなし) で、最初のマテリアルはそのまま全機能を保ちます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="40"/>
+        <location filename="../scene_builder_common.h" line="48"/>
         <source>About this</source>
         <translation>これについて</translation>
     </message>
     <message>
-        <location filename="../scene_builder_mix.cpp" line="1"/>
+        <location filename="../scene_builder_mix.cpp" line="48"/>
         <source>Choose a ready-made mix (replaces the material)...</source>
         <translation>既成のミックスを選択（マテリアルを置き換え）...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_mix.cpp" line="1"/>
+        <location filename="../scene_builder_mix.cpp" line="58"/>
         <source>Ready-made mix</source>
         <translation>既成のミックス</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="1"/>
+        <location filename="../scene_builder_render.cpp" line="79"/>
         <source>Denoise</source>
         <translation>ノイズ除去</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="1"/>
+        <location filename="../scene_builder_render.cpp" line="80"/>
         <source>Clean the grain out of the Preview picture with an AI denoiser. A Draft picture has only 16 samples per pixel, so it is grainy without it. Uses Intel Open Image Denoise on the CPU (downloaded once, with your permission) and NVIDIA&apos;s denoiser with the GPU. The final picture (Render picture...) is not denoised.</source>
         <translation>AIノイズ除去でプレビューのざらつきを取り除きます。下書き画質は1ピクセル16サンプルしかないため、これがないとざらつきます。CPUではIntel Open Image Denoise（許可を得て一度だけダウンロード）、GPUではNVIDIAのノイズ除去を使います。最終画像（画像をレンダリング...）にはかけません。</translation>
     </message>
@@ -9117,49 +9146,57 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
 <context>
     <name>SensorPreset</name>
     <message>
-        <location filename="../scene_builder_common.h" line="201"/>
+        <location filename="../scene_builder_common.h" line="237"/>
         <source>Full frame (36 x 24 mm)</source>
         <translation>フルサイズ (36 x 24 mm)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="201"/>
+        <location filename="../scene_builder_common.h" line="237"/>
         <source>APS-C (23.5 x 15.6 mm)</source>
         <translation>APS-C (23.5 x 15.6 mm)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="201"/>
+        <location filename="../scene_builder_common.h" line="237"/>
         <source>APS-C Canon (22.3 x 14.9 mm)</source>
         <translation>APS-C キヤノン (22.3 x 14.9 mm)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="202"/>
+        <location filename="../scene_builder_common.h" line="238"/>
         <source>Micro Four Thirds (17.3 x 13 mm)</source>
         <translation>マイクロフォーサーズ (17.3 x 13 mm)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="202"/>
+        <location filename="../scene_builder_common.h" line="238"/>
         <source>Super 35 film (24.9 x 18.7 mm)</source>
         <translation>スーパー 35 フィルム (24.9 x 18.7 mm)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="203"/>
+        <location filename="../scene_builder_common.h" line="239"/>
         <source>Medium format (43.8 x 32.9 mm)</source>
         <translation>中判 (43.8 x 32.9 mm)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="203"/>
+        <location filename="../scene_builder_common.h" line="239"/>
         <source>IMAX 70 mm film (70.4 x 52.6 mm)</source>
         <translation>IMAX 70 mm フィルム (70.4 x 52.6 mm)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="204"/>
+        <location filename="../scene_builder_common.h" line="240"/>
         <source>1 inch (13.2 x 8.8 mm)</source>
         <translation>1 インチ (13.2 x 8.8 mm)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_common.h" line="204"/>
+        <location filename="../scene_builder_common.h" line="240"/>
         <source>Phone (7.6 x 5.7 mm)</source>
         <translation>スマートフォン (7.6 x 5.7 mm)</translation>
+    </message>
+</context>
+<context>
+    <name>SkyGallery</name>
+    <message>
+        <location filename="../scene_builder_sky_gallery.cpp" line="35"/>
+        <source>Sky gallery</source>
+        <translation>空のギャラリー</translation>
     </message>
 </context>
 <context>

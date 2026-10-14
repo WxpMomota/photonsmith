@@ -480,6 +480,7 @@ struct Material {
 	double dotsOutsideColor[3] = {0.0, 0.0, 0.0};
 	std::string dotsInsideTexFilename;   // set instead of dotsInsideColor when "inside" nests a bare imagemap
 	std::string dotsOutsideTexFilename;  // set instead of dotsOutsideColor when "outside" nests a bare imagemap
+	UvMapping dotsMapping;               // the Texture's own "uscale"/"vscale"/"udelta"/"vdelta": the dots' cells are counted in (su * u + du, sv * v + dv); identity by default
 
 	// A Diffuse/CoatedDiffuse "reflectance" bound to a "bilerp" Texture
 	// (pbrt-v4 BilerpTexture - plain bilinear blend of 4 corner colours by

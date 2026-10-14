@@ -2919,3 +2919,51 @@ TEST(PbrtEmitterReflects, AnEmitterKeepsWhateverMaterialItWasGiven) {
 	EXPECT_DOUBLE_EQ(emitted, 2.0);
 	EXPECT_TRUE(scatters);
 }
+
+// ---- A "dots" Texture's own uscale/vscale/udelta/vdelta -----------------------------------------------------------------------------------------------------
+//
+// pbrt-v4's DotsTexture counts its cells in the UVMapping's coordinates (su * u + du, sv * v + dv); the renderers used to read every dots texture in the surface's own
+// (u, v), so `"float uscale" [ 8 ]` drew one big dot instead of eight across.
+
+namespace {
+
+// The colour the surface scatters at (x, y) of a unit quad whose texture coordinates run to (uvMax, uvMax). (The dots are red: in pbrt-v4 the "outside" parameter colours them.)
+color dotsColourAt(const char *mappingParams, double uvMax, double x, double y) {
+	const std::string text =
+		std::string("Texture \"spots\" \"spectrum\" \"dots\" \"rgb inside\" [ 0 0 1 ] \"rgb outside\" [ 1 0 0 ] ") + mappingParams + "\n"
+		"Material \"diffuse\" \"texture reflectance\" [ \"spots\" ]\n"
+		"Shape \"trianglemesh\" \"integer indices\" [ 0 1 2  0 2 3 ] \"point3 P\" [ 0 0 0  1 0 0  1 1 0  0 1 0 ]\n"
+		"  \"point2 uv\" [ 0 0  " + std::to_string(uvMax) + " 0  " + std::to_string(uvMax) + " " + std::to_string(uvMax) + "  0 " + std::to_string(uvMax) + " ]\n";
+	const pbrt_cpu::BuildResult b = buildFrom(text);
+	hit_record rec;
+	const ray r(point3(x, y, 2), vec3(0, 0, -1));
+	EXPECT_TRUE(b.world->hit(r, interval(0.001, infinity), rec));
+	scatter_record srec;
+	EXPECT_TRUE(rec.mat->scatter(r, rec, srec));
+	return srec.attenuation;
+}
+
+}  // namespace
+
+TEST(PbrtDotsMapping, AUscaleCountsTheCellsInTheTexturesOwnCoordinates) {
+	int inside = 0, outside = 0;
+	for (int i = 0; i < 24; ++i)
+		for (int j = 0; j < 24; ++j) {
+			const double x = (i + 0.5) / 24.0, y = (j + 0.5) / 24.0;
+			const color scaled = dotsColourAt("\"float uscale\" [ 8 ] \"float vscale\" [ 8 ]", 1.0, x, y);   // the texture's own scale on a quad with uv 0..1
+			const color baked = dotsColourAt("", 8.0, x, y);                                                   // the same dots with the scale in the quad's uv
+			EXPECT_EQ(scaled.x() > 0.5, baked.x() > 0.5) << "at (" << x << ", " << y << ")";
+			(scaled.x() > 0.5 ? inside : outside)++;
+		}
+	EXPECT_GT(inside, 20) << "dots show up";
+	EXPECT_GT(outside, inside) << "on a ground";
+}
+
+TEST(PbrtDotsMapping, TheDeltasMoveTheCells) {
+	for (int i = 0; i < 9; ++i) {   // (x + 0.125 stays on the quad)
+		const double x = (i + 0.5) / 12.0, y = 0.37;
+		const color moved = dotsColourAt("\"float uscale\" [ 4 ] \"float vscale\" [ 4 ] \"float udelta\" [ 0.5 ] \"float vdelta\" [ 0.25 ]", 1.0, x, y);
+		const color reference = dotsColourAt("\"float uscale\" [ 4 ] \"float vscale\" [ 4 ]", 1.0, x + 0.5 / 4.0, y + 0.25 / 4.0);   // the same point seen through the shift
+		EXPECT_EQ(moved.x() > 0.5, reference.x() > 0.5) << "at x = " << x;
+	}
+}

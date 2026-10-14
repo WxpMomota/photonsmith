@@ -143,7 +143,7 @@ __device__ __forceinline__ float3 sample_texture(int textureIdx, float u, float 
 		// Same one-level-nested-imagemap convention as UVChecker/Mix above -
 		// tex1ImageIdx/tex2ImageIdx (-1 by default) let inside/outside each
 		// independently be a bare imagemap instead of the flat color1/color2.
-		const bool inside = is_inside_dot(u, v);
+		const bool inside = is_inside_dot(tex.uvScaleU * u + tex.uvDeltaU, tex.uvScaleV * v + tex.uvDeltaV);   // (the Texture's own uscale/vscale/udelta/vdelta)
 		return inside
 			? ((tex.tex1ImageIdx >= 0) ? sampleImage(params.textures[tex.tex1ImageIdx]) : tex.color1)
 			: ((tex.tex2ImageIdx >= 0) ? sampleImage(params.textures[tex.tex2ImageIdx]) : tex.color2);

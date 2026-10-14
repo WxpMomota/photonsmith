@@ -273,7 +273,15 @@ inline ObjectTextures writeObjectTextures(std::ostringstream& os, const Object& 
 		   << " ]" << textureMappingParams(o) << "\n";
 	} else if (o.material.pattern != Pattern::None && !o.material.checker && (o.material.kind == MaterialKind::Diffuse || o.material.kind == MaterialKind::CoatedDiffuse)) {
 		textureName = "pattern-" + std::to_string(++textureIndex);
-		if (o.material.pattern == Pattern::Marble)
+		if (o.material.pattern == Pattern::Dots) {
+			// (pbrt's dots texture: a spot in about half of the unit cells of its coordinates, counted across like a checker's. pbrt-v4 has its two colours the wrong way round:
+			// "inside" colours the ground and "outside" the spots (SpectrumDotsTexture's constructor takes them in the other order from Create()). So the spots' colour is written
+			// as "outside" and the ground's as "inside", which is what real pbrt and these renderers both draw.)
+			const bool placedHere = uvPlaced(o.material) && !uvIsBaked(o.shape);
+			os << "Texture \"" << textureName << "\" \"spectrum\" \"dots\" \"float uscale\" [ " << num(o.material.checkerCount * (placedHere ? o.material.uvScaleU : 1.0))
+			   << " ] \"float vscale\" [ " << num(o.material.checkerCount * (placedHere ? o.material.uvScaleV : 1.0)) << " ] \"rgb inside\" [ " << rgb(o.material.color2)
+			   << " ] \"rgb outside\" [ " << rgb(o.material.color) << " ]\n";
+		} else if (o.material.pattern == Pattern::Marble)
 			os << "Texture \"" << textureName << "\" \"spectrum\" \"marble\" \"float scale\" [ " << num(o.material.patternScale) << " ] \"float variation\" [ "
 			   << num(o.material.patternVariation) << " ]\n";
 		else

@@ -188,6 +188,14 @@ inline MipMapOptions toMipMapOptions(const pbrt_flatten::TextureDecodeOptions &o
 	return opts;
 }
 
+// A "dots" Texture's dots: its cells are counted in the Texture's own (uscale, vscale, udelta, vdelta) coordinates (pbrt_flatten::UvMapping).
+inline shared_ptr<texture> dotsTextureOf(const pbrt_flatten::Material &m, shared_ptr<texture> insideTex, shared_ptr<texture> outsideTex) {
+	shared_ptr<texture> tex = std::make_shared<dots_texture>(insideTex, outsideTex);
+	const pbrt_flatten::UvMapping &map = m.dotsMapping;
+	if (!map.identity()) tex = std::make_shared<uv_mapped_texture>(tex, map.su, map.sv, map.du, map.dv);
+	return tex;
+}
+
 // The image of a material's reflectance slot: the shared mipmap, looked up through the Texture's own uscale/vscale/udelta/vdelta when it has any (pbrt_flatten::UvMapping).
 inline shared_ptr<texture> reflectanceImageTexture(const pbrt_flatten::Material &m) {
 	shared_ptr<texture> tex = sharedMipmapTexture(m.textureFilename.c_str(), imageMapOptionsFor(m));
@@ -390,7 +398,7 @@ inline std::shared_ptr<material> makeMaterial(const pbrt_flatten::Material &m,
 			shared_ptr<texture> insideTex = checkerOrMixSlot(m.dotsInsideTexFilename, m.dotsInsideColor);
 			shared_ptr<texture> outsideTex = checkerOrMixSlot(m.dotsOutsideTexFilename, m.dotsOutsideColor);
 			return std::make_shared<coated_diffuse>(
-				std::make_shared<dots_texture>(insideTex, outsideTex),
+				dotsTextureOf(m, insideTex, outsideTex),
 				m.ior, m.roughness_u, m.roughness_v, m.remapRoughness);
 		}
 		if (m.hasBilerpReflectance) {
@@ -586,7 +594,7 @@ inline std::shared_ptr<material> makeMaterial(const pbrt_flatten::Material &m,
 		if (m.hasDotsReflectance) {
 			shared_ptr<texture> insideTex = checkerOrMixSlot(m.dotsInsideTexFilename, m.dotsInsideColor);
 			shared_ptr<texture> outsideTex = checkerOrMixSlot(m.dotsOutsideTexFilename, m.dotsOutsideColor);
-			return std::make_shared<lambertian>(std::make_shared<dots_texture>(insideTex, outsideTex));
+			return std::make_shared<lambertian>(dotsTextureOf(m, insideTex, outsideTex));
 		}
 		if (m.hasBilerpReflectance) {
 			const color v00(m.bilerpV00[0], m.bilerpV00[1], m.bilerpV00[2]);

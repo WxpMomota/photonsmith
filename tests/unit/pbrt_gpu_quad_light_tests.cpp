@@ -153,3 +153,25 @@ TEST(PbrtGpuEmitterReflectsTest, ABlackBodyLampReflectsNothing) {
 	EXPECT_EQ(m.albedo.y, 0.0f);
 	EXPECT_EQ(m.albedo.z, 0.0f);
 }
+
+// A "dots" Texture's own uscale/vscale/udelta/vdelta reach both OptiX backends through TextureData's (shared) uv placement fields.
+TEST(PbrtGpuDotsMappingTest, TheTexturesOwnUvMappingIsCarriedToTheGpuTexture) {
+	const pbrt_scene::ParseResult r = pbrt_scene::parse(
+		"WorldBegin\n"
+		"Texture \"spots\" \"spectrum\" \"dots\" \"float uscale\" [ 6 ] \"float vscale\" [ 3 ] \"float udelta\" [ 0.25 ] \"float vdelta\" [ 0.5 ]\n"
+		"Material \"diffuse\" \"texture reflectance\" [ \"spots\" ]\n"
+		"Shape \"trianglemesh\" \"integer indices\" [ 0 1 2  0 2 3 ] \"point3 P\" [ 0 0 0  1 0 0  1 1 0  0 1 0 ]\n");
+	ASSERT_TRUE(r.ok) << r.error;
+	SceneData scene;
+	pbrt_gpu::build(pbrt_flatten::flatten(r.scene), scene);
+	bool found = false;
+	for (const TextureData &t : scene.textures) {
+		if (t.kind != TextureKind::Dots) continue;
+		found = true;
+		EXPECT_FLOAT_EQ(t.uvScaleU, 6.0f);
+		EXPECT_FLOAT_EQ(t.uvScaleV, 3.0f);
+		EXPECT_FLOAT_EQ(t.uvDeltaU, 0.25f);
+		EXPECT_FLOAT_EQ(t.uvDeltaV, 0.5f);
+	}
+	EXPECT_TRUE(found);
+}
