@@ -449,7 +449,8 @@ bool triangleAnyHitFunction(
     // The scene's own triangles are instance 0 (triBase 0); a pbrt ObjectInstance's group stores its triangles once, after them, at that instance's triBase.
     const uint primitiveIndex = groupPrimitiveIndex + instanceTransforms[instanceIndex].triBase;
     const TriangleMaterial mat = triMaterials[primitiveIndex];
-    if (payload.isShadowRay && mat.materialType == METAL_MAT_SUBSURFACE) return false;
+    // (A subsurface surface blocks a shadow ray like every pbrt-v4 surface that has a material: it used to be skipped here, and the floor under and beside a subsurface ball read
+    // 17% bright; the CPU and both OptiX backends block it now too.)
     if (mat.alphaWidth <= 0) return true;
     const float2 uv = texCoordFor(primitiveIndex, barycentric, uvs);
     const float u = clamp(uv.x, 0.0, 1.0);
