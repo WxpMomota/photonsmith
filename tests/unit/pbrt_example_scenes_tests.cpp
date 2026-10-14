@@ -804,6 +804,17 @@ TEST(PbrtReferenceTest, GpuSppmLampAndCameraInsideGlassReadLikePbrt) {
 		EXPECT_LT(mean, 1.05 * ref) << c.first;
 	}
 }
+// A square infinite-light image is pbrt-v4's equal-area octahedral map, not a latitude-longitude panorama (pbrt_load.h resamples it once on load, so every backend
+// reads it). pbrt-v4's own means of these two scenes (64x64, depth 8): a 4x4 picture (it read 0.31 here, 66% bright, as a lat-long image) and a 64x64 sky with a sun, a red
+// band and a dark ground, turned by a rotation (+1.5% before the lat-long image was made fine enough for the octahedral map's diagonal edges).
+TEST(PbrtReferenceTest, SquareEnvironmentImagesAreEqualAreaLikePbrt) {
+	expectCpuMeanNearPbrt("infinite-light-image", 128, 0.19013, 0.03);
+	expectCpuMeanNearPbrt("equal-area-sky", 128, 0.24637, 0.03);
+}
+TEST(PbrtBackendAgreementTest, SquareEnvironmentImagesAgreeAcrossBackends) {
+	expectBackendsAgree("infinite-light-image", 128, 0.97, 1.03);
+	expectBackendsAgree("equal-area-sky", 128, 0.97, 1.03);
+}
 TEST(PbrtBackendAgreementTest, LampAndCameraInsideGlassAgreeAcrossBackends) {
 	expectBackendsAgree("lamp-inside-glass", 128, 0.985, 1.015);
 	expectBackendsAgree("lamp-inside-rough-glass", 128, 0.97, 1.03);
