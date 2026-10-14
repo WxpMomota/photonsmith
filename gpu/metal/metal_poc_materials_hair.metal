@@ -444,7 +444,12 @@ inline BxDFSampleResultGPU hairSample(HairBxDFParams hp,
     if (pdf < 1e-8) return res;
 
     const float kMaxAttenuation = 50.0;
-    float ratio_r = fr / pdf, ratio_g = fg / pdf, ratio_b = fb / pdf;
+    // hairEvalLocal() divides by |wi.z| (as pbrt's HairBxDF::f() does) and pbrt's integrator multiplies f by |wi . ns| = |wi.z| again; this renderer's hair path has no cosine
+    // factor, so the weight is f * |wi.z| / pdf (src/shared/bxdfs_hair.h, which the CPU and OptiX now do). Without it every sample was 1 / (cos(theta_i) |sin(phi_i)|) too heavy:
+    // a fibre in a white sky read 5.4 where pbrt reads 1.0.
+    float absCosWi = fabs(wi_out_lz);
+    if (absCosWi < 1e-6) absCosWi = max(cosTheta_i, 1e-6);   // (hairEvalLocal's own fallback)
+    float ratio_r = fr * absCosWi / pdf, ratio_g = fg * absCosWi / pdf, ratio_b = fb * absCosWi / pdf;
     res.wo_x = wo_wx; res.wo_y = wo_wy; res.wo_z = wo_wz;
     res.r = min(ratio_r, kMaxAttenuation);
     res.g = min(ratio_g, kMaxAttenuation);
