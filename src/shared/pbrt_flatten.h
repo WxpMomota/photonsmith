@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <functional>
 #include <map>
@@ -143,6 +144,19 @@ inline std::string resolveTextureWrap(const pbrt_scene::TextureDecl &imgTex,
 	return "repeat";
 }
 
+// Resolves an "imagemap" Texture's "string filter": pbrt-v4's "point", "bilinear" (its default), "trilinear" and "ewa" (case does not matter) as MipFilter's ordinal; an unknown name warns and
+// gives bilinear.
+inline int resolveTextureFilter(const pbrt_scene::TextureDecl &imgTex, const std::function<void(const std::string&)> &warn) {
+	std::string f = imgTex.params.getString("filter", "bilinear");
+	for (char &c : f) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+	if (f == "point") return 0;
+	if (f == "bilinear") return 1;
+	if (f == "trilinear") return 2;
+	if (f == "ewa") return 3;
+	warn("Texture \"imagemap\" \"string filter\" \"" + f + "\" is not recognized (expected \"point\", \"bilinear\", \"trilinear\" or \"ewa\"); using \"bilinear\" instead");
+	return 1;
+}
+
 // Resolves an "imagemap" Texture's full "encoding"/"wrap"/"invert" set into
 // one TextureDecodeOptions - the single per-slot resolution point every
 // slot that carries this options struct (currently textureFilename's own 3
@@ -158,6 +172,7 @@ inline TextureDecodeOptions resolveTextureDecodeOptions(const pbrt_scene::Textur
 	// `wrap` above, the single resolution point for both.
 	opts.wrapIndex = (opts.wrap == "clamp") ? 0 : (opts.wrap == "black") ? 2 : 1;
 	opts.invert = imgTex.params.getBool("invert", false);
+	opts.filterIndex = resolveTextureFilter(imgTex, warn);
 	return opts;
 }
 

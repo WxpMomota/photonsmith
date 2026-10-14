@@ -172,6 +172,7 @@ inline MipMapOptions imageMapOptionsFor(const pbrt_flatten::Material &m) {
 	// it by construction, so this just recovers the enum rather than
 	// re-parsing the string a second time.
 	opts.wrap = static_cast<MipWrapMode>(m.textureWrapIndex);
+	opts.filter = static_cast<MipFilter>(m.textureFilterIndex);   // "string filter" (the default, bilinear, is pbrt's)
 	return opts;
 }
 
@@ -183,6 +184,7 @@ inline MipMapOptions toMipMapOptions(const pbrt_flatten::TextureDecodeOptions &o
 	opts.gamma = static_cast<float>(o.gamma);
 	opts.invert = o.invert;
 	opts.wrap = static_cast<MipWrapMode>(o.wrapIndex);
+	opts.filter = static_cast<MipFilter>(o.filterIndex);
 	return opts;
 }
 

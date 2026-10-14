@@ -2698,6 +2698,28 @@ TEST(FlattenMaterialTest, ReflectanceImagemapUnrecognizedWrapFallsBackToRepeatAn
 	EXPECT_TRUE(warnedAbout(s, "wrap"));
 }
 
+// "string filter": point / bilinear (pbrt's default) / trilinear / ewa, case-insensitive; an unknown name warns and gives bilinear.
+TEST(FlattenMaterialTest, ReflectanceImagemapFilterIsThreadedThroughAndDefaultsToBilinear) {
+	const auto filterOf = [](const char *filterParam) {
+		const FlatScene s = flattenSource(
+			std::string("Texture \"tmap\" \"spectrum\" \"imagemap\" \"string filename\" [ \"x.png\" ] ") + filterParam + "\n"
+			"Material \"diffuse\" \"texture reflectance\" [ \"tmap\" ]\n" + std::string(kQuadMesh));
+		EXPECT_EQ(s.materials.size(), 1u);
+		return s.materials.empty() ? -1 : s.materials[0].textureFilterIndex;
+	};
+	EXPECT_EQ(filterOf(""), 1);
+	EXPECT_EQ(filterOf("\"string filter\" [ \"point\" ]"), 0);
+	EXPECT_EQ(filterOf("\"string filter\" [ \"bilinear\" ]"), 1);
+	EXPECT_EQ(filterOf("\"string filter\" [ \"trilinear\" ]"), 2);
+	EXPECT_EQ(filterOf("\"string filter\" [ \"EWA\" ]"), 3);
+	const FlatScene bad = flattenSource(
+		"Texture \"tmap\" \"spectrum\" \"imagemap\" \"string filename\" [ \"x.png\" ] \"string filter\" [ \"cubic\" ]\n"
+		"Material \"diffuse\" \"texture reflectance\" [ \"tmap\" ]\n" + std::string(kQuadMesh));
+	ASSERT_EQ(bad.materials.size(), 1u);
+	EXPECT_EQ(bad.materials[0].textureFilterIndex, 1);
+	EXPECT_TRUE(warnedAbout(bad, "filter"));
+}
+
 TEST(FlattenMaterialTest, RoughnessImagemapEncodingIsNowResolvedNotIgnored) {
 	// Superseded by DielectricRoughnessEncodingWrapInvertAreNowResolved
 	// (below in this file) once roughness gained real encoding/wrap/invert

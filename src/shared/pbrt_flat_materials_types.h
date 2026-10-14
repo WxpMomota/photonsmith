@@ -42,6 +42,9 @@ struct TextureDecodeOptions {
 	std::string wrap = "repeat";
 	int wrapIndex = 1;   // Repeat - see Material::textureWrapIndex's own comment
 	bool invert = false;
+	// pbrt's "string filter": 0 point, 1 bilinear (the default), 2 trilinear, 3 ewa - MipFilter's own enumerator order (src/shared/mipmap.h). Only the CPU honours all four;
+	// the OptiX backends and Metal sample an image bilinearly whatever it says.
+	int filterIndex = 1;
 };
 
 // A second level of checkerboard/mix nesting: tex1/tex2 (or mix's amount)
@@ -305,6 +308,7 @@ struct Material {
 	// still useful as a human-readable value for anything that wants one.
 	int textureWrapIndex = 1;  // Repeat, matching textureWrap's own default
 	bool textureInvert = false;
+	int textureFilterIndex = 1;   // "string filter" (TextureDecodeOptions::filterIndex): bilinear by default, as pbrt's
 
 	// DiffuseTransmission only: an "imagemap" Texture bound to
 	// "transmittance", same "raw as written, resolved later by

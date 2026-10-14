@@ -167,6 +167,7 @@ inline void readMaterialBindings(const pbrt_scene::Scene &scene, FlatScene &out,
 						m.textureWrap = opts.wrap;
 						m.textureWrapIndex = opts.wrapIndex;
 						m.textureInvert = opts.invert;
+						m.textureFilterIndex = opts.filterIndex;
 					}
 					continue;   // resolved to an image, not a "not supported" warning
 				}
