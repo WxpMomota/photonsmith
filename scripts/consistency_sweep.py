@@ -618,6 +618,44 @@ def run(args):
                     print("  %-4s %-34s %s  %.4f vs %.4f  off by %.1f%%" % ("both", "cpu vs gpu, %s, %s" % (label, shape), "ok   " if worst <= limit else "WRONG", ma[1], mb[1], worst))
                 if worst > limit:
                     failures.append(("maps", "both", "%s, %s" % (label, shape)))
+    # A height map on a quad that is placed directly and as an ObjectInstance, at scale 1 (rotated), 2, 0.5 and stretched. Metal drew no bump on an instanced mesh at all, and a
+    # height map's heights were not rescaled with the scene on Metal (8% dark at scale 2, 17% bright at 0.5 for the direct quad).
+    if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "maps" in only or "instbump" in only):
+        print("[cpu vs gpu, a height map on a placed and an instanced quad]")
+        scene_head = ('LookAt 0 3 7  0 0 0  0 1 0\nCamera "perspective" "float fov" [ 40 ]\nFilm "rgb" "integer xresolution" [ 64 ] "integer yresolution" [ 64 ]\n'
+                      'Sampler "halton" "integer pixelsamples" [ 64 ]\nWorldBegin\nLightSource "distant" "point3 from" [ 2 4 3 ] "point3 to" [ 0 0 0 ] "rgb L" [ 4 4 4 ]\n'
+                      'Texture "h" "float" "imagemap" "string filename" [ "%s" ] "string wrap" [ "repeat" ] "string encoding" [ "linear" ]\n'
+                      'Texture "b" "float" "scale" "texture tex" [ "h" ] "float scale" [ 1.5 ]\n' % sw.height)
+        quad_mat = 'Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "texture displacement" [ "b" ]\n'
+        quad = 'Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ] "point3 P" [ -1 -1 0  1 -1 0  1 1 0  -1 1 0 ] "point2 uv" [ 0 0 1 0 1 1 0 1 ]\n'
+        for tlabel, placement in (("rotated", "Translate 0.3 0 0\nRotate 40 0 1 0\nRotate -30 1 0 0\n"), ("scale 2", "Rotate 25 0 1 0\nScale 2 2 2\n"),
+                                  ("scale 0.5", "Rotate 25 0 1 0\nScale 0.5 0.5 0.5\n"), ("stretched", "Rotate 25 0 1 0\nScale 2 1 1\n")):
+            for how in ("placed", "instanced"):
+                label = "%s, %s" % (how, tlabel)
+                total += 1
+                if how == "placed":
+                    text = scene_head + "AttributeBegin\n" + placement + quad_mat + quad + "AttributeEnd\n"
+                else:
+                    text = scene_head + 'ObjectBegin "q"\n' + quad_mat + quad + 'ObjectEnd\nAttributeBegin\n' + placement + 'ObjectInstance "q"\nAttributeEnd\n'
+                path = os.path.join(workdir, "instbump.pbrt")
+                open(path, "w").write(text)
+                means = {}
+                try:
+                    for backend in ("cpu", "gpu"):
+                        out = os.path.join(workdir, "instbump_%s.exr" % backend)
+                        r = subprocess.run([args.exe, "--" + backend, "--seed", "3", "--output", out, "64", "128", "8", path], capture_output=True, text=True, cwd=REPO, timeout=1200)
+                        if r.returncode != 0 or not os.path.exists(out):
+                            raise RuntimeError("%s render failed: %s" % (backend, (r.stdout + r.stderr)[-200:]))
+                        means[backend] = read_exr_means(out)[1]
+                except RuntimeError as e:
+                    print("  both cpu vs gpu, %s: FAILED TO RENDER: %s" % (label, e))
+                    failures.append(("instbump", "both", label))
+                    continue
+                worst = abs(means["gpu"] - means["cpu"]) / max(abs(means["cpu"]), 1e-9) * 100.0
+                if worst > 4.0 or args.verbose:
+                    print("  %-4s %-34s %s  %.4f vs %.4f  off by %.1f%%" % ("both", "cpu vs gpu, " + label, "ok   " if worst <= 4.0 else "WRONG", means["cpu"], means["gpu"], worst))
+                if worst > 4.0:
+                    failures.append(("instbump", "both", label))
     # Where things land in the picture (a mean cannot see a mirror): pbrt's camera is left-handed (+x on the LEFT of the picture for a plain LookAt) and a projection light's slide is
     # stored upside down for the lookup (the slide's first row lights the far side of what the light projects). The CPU is the reference; every backend must put them where it does.
     if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "orientation" in only):

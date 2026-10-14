@@ -150,6 +150,7 @@ void MetalPocApp::loadPbrtScene() {
     if (pbrtSceneEdit) pbrtSceneEdit(result.scene);   // after the frame: an edit never changes the scale or the centre
     const float maxExtent = frame.extent;
     const float sceneScale = frame.scale;
+    pbrtBumpHeightScale = sceneScale;   // a height map's heights are in the scene's units, which this rescales (the geometry is)
     const float3 bboxCenter{frame.centre[0], frame.centre[1], frame.centre[2]};
     const float3 sceneOffset{frame.offset[0], frame.offset[1], frame.offset[2]};
     auto toWorld = [=](float3 p) { return (p - bboxCenter) * sceneScale + sceneOffset; };
@@ -400,6 +401,53 @@ void MetalPocApp::applyPbrtAlphaMask(TriangleMaterial& mat, const pbrt_flatten::
     }
 }
 
+// Image bump maps ("texture displacement"): each distinct grayscale image is decoded once into the shared float buffer.
+// filename -> {element offset, width, height, 1 if a normal map}; width 0 = could not be used (missing/undecodable).
+// A grayscale image is a height map (1 float per texel, sRGB-decoded); anything else is read as a tangent-space RGB normal map
+// (3 floats per texel, LINEAR - a normal map holds vectors, not colours), as the CPU classifies and reads them.
+void MetalPocApp::applyPbrtImageBump(TriangleMaterial& mat, const pbrt_flatten::Material& m) {
+    if (m.displacementTextureFilename.empty() || mat.lightId >= 0 || mat.twoSided != 0u) return;
+    auto it = pbrtBumpImages.find(m.displacementTextureFilename);
+    if (it == pbrtBumpImages.end()) {
+        std::array<int, 4> entry{0, 0, 0, 0};
+        std::string bytes;
+        if (pbrt_load::loadFileNear(pbrtScenePath, m.displacementTextureFilename, bytes)) {
+            int w = 0, h = 0, ch = 0;
+            unsigned char* px = stbi_load_from_memory(reinterpret_cast<const unsigned char*>(bytes.data()),
+                                                      (int)bytes.size(), &w, &h, &ch, 3);
+            if (px && w > 0 && h > 0) {
+                // The CPU classifies a displacement image by content: grayscale = height map (bump), otherwise a normal map.
+                if (gpu_scene_textures::isGrayscaleRgb8(px, w, h)) {
+                    entry = {(int)rgbGridData.size(), w, h, 0};
+                    rgbGridData.reserve(rgbGridData.size() + (size_t)w * h);
+                    for (size_t k = 0; k < (size_t)w * h; ++k) rgbGridData.push_back(srgb_decode::byteToLinear(px[k * 3]));   // pbrt decodes an 8-bit image as sRGB
+                } else {
+                    entry = {(int)rgbGridData.size(), w, h, 1};
+                    rgbGridData.reserve(rgbGridData.size() + (size_t)w * h * 3);
+                    for (size_t k = 0; k < (size_t)w * h * 3; ++k) rgbGridData.push_back(px[k] / 255.0f);
+                }
+            } else {
+                fprintf(stderr, "loadPbrtScene: displacement image '%s' could not be decoded; ignoring it\n", m.displacementTextureFilename.c_str());
+            }
+            if (px) stbi_image_free(px);
+        } else {
+            fprintf(stderr, "loadPbrtScene: displacement image '%s' not found; ignoring it\n", m.displacementTextureFilename.c_str());
+        }
+        it = pbrtBumpImages.emplace(m.displacementTextureFilename, entry).first;
+    }
+    if (it->second[1] > 0) {
+        mat.bumpOffset = it->second[0];
+        mat.bumpWidth = it->second[1];
+        mat.bumpHeight = it->second[2];
+        mat.bumpScale = (float)m.displacementScale * pbrtBumpHeightScale;
+        mat.bumpIsNormalMap = it->second[3];
+        mat.bumpUvScaleU = (float)m.displacementMapping.su;
+        mat.bumpUvScaleV = (float)m.displacementMapping.sv;
+        mat.bumpUvDeltaU = (float)m.displacementMapping.du;
+        mat.bumpUvDeltaV = (float)m.displacementMapping.dv;
+    }
+}
+
 // Every triangle loadPbrtAreaLights() didn't already consume as a
 // light's own quad - ordinary geometry, or an unhandled (non-quad)
 // light's own triangles (emissive via `unhandledLightEmission`, not
@@ -410,53 +458,8 @@ void MetalPocApp::loadPbrtRemainingTriangles(const pbrt_flatten::FlatScene& scen
     auto vertexAt = [toWorld](const double* v, int i) {
         return toWorld(float3{(float)v[i * 3 + 0], (float)v[i * 3 + 1], (float)v[i * 3 + 2]});
     };
-    // Image bump maps ("texture displacement"): each distinct grayscale image is decoded once into the shared float buffer.
-    // filename -> {element offset, width, height, 1 if a normal map}; width 0 = could not be used (missing/undecodable).
-    // A grayscale image is a height map (1 float per texel, sRGB-decoded); anything else is read as a tangent-space RGB normal map
-    // (3 floats per texel, LINEAR - a normal map holds vectors, not colours), as the CPU classifies and reads them.
-    std::map<std::string, std::array<int, 4>> bumpImages;
-    auto applyImageBump = [&](TriangleMaterial& mat, const pbrt_flatten::Material& m) {
-        if (m.displacementTextureFilename.empty() || mat.lightId >= 0 || mat.twoSided != 0u) return;
-        auto it = bumpImages.find(m.displacementTextureFilename);
-        if (it == bumpImages.end()) {
-            std::array<int, 4> entry{0, 0, 0, 0};
-            std::string bytes;
-            if (pbrt_load::loadFileNear(pbrtScenePath, m.displacementTextureFilename, bytes)) {
-                int w = 0, h = 0, ch = 0;
-                unsigned char* px = stbi_load_from_memory(reinterpret_cast<const unsigned char*>(bytes.data()),
-                                                          (int)bytes.size(), &w, &h, &ch, 3);
-                if (px && w > 0 && h > 0) {
-                    // The CPU classifies a displacement image by content: grayscale = height map (bump), otherwise a normal map.
-                    if (gpu_scene_textures::isGrayscaleRgb8(px, w, h)) {
-                        entry = {(int)rgbGridData.size(), w, h, 0};
-                        rgbGridData.reserve(rgbGridData.size() + (size_t)w * h);
-                        for (size_t k = 0; k < (size_t)w * h; ++k) rgbGridData.push_back(srgb_decode::byteToLinear(px[k * 3]));   // pbrt decodes an 8-bit image as sRGB
-                    } else {
-                        entry = {(int)rgbGridData.size(), w, h, 1};
-                        rgbGridData.reserve(rgbGridData.size() + (size_t)w * h * 3);
-                        for (size_t k = 0; k < (size_t)w * h * 3; ++k) rgbGridData.push_back(px[k] / 255.0f);
-                    }
-                } else {
-                    fprintf(stderr, "loadPbrtScene: displacement image '%s' could not be decoded; ignoring it\n", m.displacementTextureFilename.c_str());
-                }
-                if (px) stbi_image_free(px);
-            } else {
-                fprintf(stderr, "loadPbrtScene: displacement image '%s' not found; ignoring it\n", m.displacementTextureFilename.c_str());
-            }
-            it = bumpImages.emplace(m.displacementTextureFilename, entry).first;
-        }
-        if (it->second[1] > 0) {
-            mat.bumpOffset = it->second[0];
-            mat.bumpWidth = it->second[1];
-            mat.bumpHeight = it->second[2];
-            mat.bumpScale = (float)m.displacementScale;
-            mat.bumpIsNormalMap = it->second[3];
-            mat.bumpUvScaleU = (float)m.displacementMapping.su;
-            mat.bumpUvScaleV = (float)m.displacementMapping.sv;
-            mat.bumpUvDeltaU = (float)m.displacementMapping.du;
-            mat.bumpUvDeltaV = (float)m.displacementMapping.dv;
-        }
-    };
+    pbrtBumpImages.clear();   // applyPbrtImageBump() decodes each image once; the instanced groups (loadPbrtObjectInstances, later) reuse the table
+    auto applyImageBump = [&](TriangleMaterial& mat, const pbrt_flatten::Material& m) { applyPbrtImageBump(mat, m); };
     pbrtAlphaMasks.clear();   // applyPbrtAlphaMask() decodes each mask file once; the instanced groups (loadPbrtObjectInstances, later) reuse the table
     auto applyAlphaMask = [&](TriangleMaterial& mat, const pbrt_flatten::Material& m) { applyPbrtAlphaMask(mat, m); };
     for (int i = 0; i < (int)scene.triangles.size(); ++i) {
@@ -1109,6 +1112,7 @@ void MetalPocApp::loadPbrtObjectInstances(const pbrt_flatten::FlatScene& scene, 
                 TriangleMaterial groupMat = materialFor(tri.material);
                 if (groupMat.materialType == METAL_MAT_SUBSURFACE) havePbrtTriangleAnyHit = true;
                 if (tri.material >= 0 && tri.material < (int)scene.materials.size()) applyPbrtAlphaMask(groupMat, scene.materials[tri.material]);   // an alpha mask on an instanced mesh
+                if (tri.material >= 0 && tri.material < (int)scene.materials.size()) applyPbrtImageBump(groupMat, scene.materials[tri.material]);   // a bump or normal map on an instanced mesh (the shader carries its tangent frame to world space)
                 materials.push_back(groupMat);
             }
         }

@@ -552,6 +552,9 @@ struct MetalPocApp {
         const std::unordered_map<int, std::pair<float3, bool>>& unhandledLightEmission);
     void applyPbrtAlphaMask(TriangleMaterial& mat, const pbrt_flatten::Material& m);
     std::map<std::string, std::array<int, 3>> pbrtAlphaMasks;   // alpha mask file -> {offset in rgbGridData, width, height}
+    void applyPbrtImageBump(TriangleMaterial& mat, const pbrt_flatten::Material& m);
+    float pbrtBumpHeightScale = 1.0f;   // the scene rescale factor, applied to a height map's scale
+    std::map<std::string, std::array<int, 4>> pbrtBumpImages;   // displacement image file -> {offset in rgbGridData, width, height, 1 if a normal map}; width 0 = unusable
     void loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, const std::vector<pbrt_flatten::Sphere>& sphereList, const PbrtToWorldFn& toWorld,
         const PbrtMaterialForFn& materialFor, float sceneScale);
     void loadPbrtDisks(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
