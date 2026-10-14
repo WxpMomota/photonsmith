@@ -553,6 +553,10 @@ void MetalPocApp::loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, const st
             const float3 center1 = toWorld(float3{(float)s.center1[0], (float)s.center1[1], (float)s.center1[2]});
             sd.centerDelta1 = PackedFloat3{center1.x - center.x, center1.y - center.y, center1.z - center.z};
         }
+        // pbrt's texture coordinates of a sphere are taken about its own z axis (Sphere::uvRot, row-major, world -> the legacy frame the shader's mapping is defined in)
+        sd.uvRot0 = PackedFloat3{(float)s.uvRot[0], (float)s.uvRot[1], (float)s.uvRot[2]};
+        sd.uvRot1 = PackedFloat3{(float)s.uvRot[3], (float)s.uvRot[4], (float)s.uvRot[5]};
+        sd.uvRot2 = PackedFloat3{(float)s.uvRot[6], (float)s.uvRot[7], (float)s.uvRot[8]};
         spheres.push_back(sd);
         TriangleMaterial mat = materialFor(s.material);
         // A `Material "interface"` sphere bounding a homogeneous medium
@@ -1280,6 +1284,14 @@ void MetalPocApp::loadPbrtPunctualLights(const pbrt_flatten::FlatScene& scene, c
                         pbrt_load::detail::decodeInfiniteLightImage(pl.filename, bytes,
                             pbrtProjectionImagePixels, pbrtProjectionImageWidth, pbrtProjectionImageHeight)) {
                         havePbrtProjectionImage = true;
+                        // pbrt-v4 builds the light's frame with a y flip (ProjectionLight::Create, `renderFromLight * Scale(1, -1, 1)`): the slide's first row is at the TOP
+                        // of what the light projects, so the rows are stored upside down for the lookup, as the CPU's loader does (a bright band at the top of the slide
+                        // lit the bottom of the floor on the CPU and the top on Metal).
+                        for (int row = 0; row < pbrtProjectionImageHeight / 2; ++row) {
+                            float* a = &pbrtProjectionImagePixels[(size_t)row * pbrtProjectionImageWidth * 3];
+                            float* b = &pbrtProjectionImagePixels[(size_t)(pbrtProjectionImageHeight - 1 - row) * pbrtProjectionImageWidth * 3];
+                            std::swap_ranges(a, a + (size_t)pbrtProjectionImageWidth * 3, b);
+                        }
                         const float3 pos = toWorld(float3{(float)pl.pos[0], (float)pl.pos[1], (float)pl.pos[2]});
                         const float3 forward = punctualLightWorldForward(pl.worldToLight);
                         // Same look-at-style right/up derivation

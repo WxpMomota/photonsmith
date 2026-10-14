@@ -322,7 +322,7 @@ inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread
         // scene_id (caught by that comparison, not by eye alone -
         // an equirectangular texture looks equally "plausible"
         // from any longitude).
-        float2 uv = isSphere ? equirectangularUV(float3(normal.x, normal.y, -normal.z))
+        float2 uv = isSphere ? sphereUV(spheres[primId].uvRot0, spheres[primId].uvRot1, spheres[primId].uvRot2, normal)
                               : texCoordFor(primId, result.triangle_barycentric_coord, uvs);
         albedo = earthTexture.sample(textureSampler, uv).rgb;
     } else if (mat.materialType == METAL_MAT_CHECKER_LAMBERTIAN) {
@@ -396,7 +396,7 @@ inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread
         if (texMode == 8) {
             // Checkerboard of an imagemap, optionally nested one level (J3/J6; loader comment):
             // the same uv drives every level, each checker with its own scale.
-            float2 uv8 = isSphere ? equirectangularUV(float3(normal.x, normal.y, -normal.z))
+            float2 uv8 = isSphere ? sphereUV(spheres[primId].uvRot0, spheres[primId].uvRot1, spheres[primId].uvRot2, normal)
                                   : texCoordFor(primId, result.triangle_barycentric_coord, uvs);
             float2 outerTile = floor(uv8 * float2(mat.conductorEta.x, mat.conductorEta.y));
             if ((int(outerTile.x) + int(outerTile.y)) & 1) {
@@ -426,7 +426,7 @@ inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread
             }
             albedo = float3(clamp(tv, 0.0, 1.0));
         } else if (texMode == 6 || texMode == 7) {
-            float2 uvp = isSphere ? equirectangularUV(float3(normal.x, normal.y, -normal.z))
+            float2 uvp = isSphere ? sphereUV(spheres[primId].uvRot0, spheres[primId].uvRot1, spheres[primId].uvRot2, normal)
                                   : texCoordFor(primId, result.triangle_barycentric_coord, uvs);
             if (texMode == 7) {
                 // bilerp: v00 = color, v01 = transmitColor, v10 = conductorEta, v11 = (K.x, roughness, K.z)
@@ -458,7 +458,7 @@ inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread
             int cellSum = int(floor(tp.x)) + int(floor(tp.y)) + int(floor(tp.z));
             albedo = ((cellSum & 1) == 0) ? float3(mat.color) : float3(mat.transmitColor);
         } else {
-        float2 uv = isSphere ? equirectangularUV(float3(normal.x, normal.y, -normal.z))
+        float2 uv = isSphere ? sphereUV(spheres[primId].uvRot0, spheres[primId].uvRot1, spheres[primId].uvRot2, normal)
                               : texCoordFor(primId, result.triangle_barycentric_coord, uvs);
         float2 tile = floor(uv * float2(mat.conductorEta.x, mat.conductorEta.y));
         float parity = fmod(tile.x + tile.y, 2.0);
@@ -497,7 +497,7 @@ inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread
         // TriangleMaterial construction now sets `roughness` to
         // this value (1.0, a provable no-op, when the scene's
         // own texture had no wrapping "scale").
-        float2 uv = isSphere ? equirectangularUV(float3(normal.x, normal.y, -normal.z))
+        float2 uv = isSphere ? sphereUV(spheres[primId].uvRot0, spheres[primId].uvRot1, spheres[primId].uvRot2, normal)
                               : texCoordFor(primId, result.triangle_barycentric_coord, uvs);
         const float2 muv = float2(mat.uvScaleU * uv.x + mat.uvDeltaU, mat.uvScaleV * uv.y + mat.uvDeltaV);   // pbrt imagemap uscale/vscale/udelta/vdelta
         albedo = pbrtDiffuseTexture.sample(textureSampler, float2(muv.x, 1.0 - muv.y)).rgb * mat.roughness;

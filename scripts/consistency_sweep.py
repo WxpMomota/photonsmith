@@ -74,6 +74,49 @@ def read_exr_means(path):
     return [sums[c] / (W * H) for c in ("R", "G", "B")]
 
 
+def read_exr_rows_columns(path):
+    """Mean of the green channel of each row and of each column of a scanline OpenEXR file (what read_exr_means does for the whole picture): where in the picture
+    something is, which a mean cannot tell (it does not change when a picture is mirrored)."""
+    b = open(path, "rb").read()
+    assert b[:4] == b"v/1\x01", "not an OpenEXR file"
+    i = 8
+    attrs = {}
+    while b[i] != 0:
+        j = b.index(b"\0", i); name = b[i:j].decode(); i = j + 1
+        j = b.index(b"\0", i); i = j + 1
+        size = struct.unpack("<I", b[i:i + 4])[0]; i += 4
+        attrs[name] = b[i:i + size]; i += size
+    pos = i + 1
+    ch = attrs["channels"]; names = []; k = 0
+    while ch[k] != 0:
+        j = ch.index(b"\0", k); names.append(ch[k:j].decode()); k = j + 1 + 16
+    comp = attrs["compression"][0]; lpb = _LINES[comp]
+    x0, y0, x1, y1 = struct.unpack("<4i", attrs["dataWindow"])
+    W, H = x1 - x0 + 1, y1 - y0 + 1
+    nb = (H + lpb - 1) // lpb
+    offs = struct.unpack("<%dQ" % nb, b[pos:pos + 8 * nb])
+    rows, cols = [0.0] * H, [0.0] * W
+    for off in offs:
+        y, size = struct.unpack("<ii", b[off:off + 8]); data = b[off + 8:off + 8 + size]
+        n_rows = min(lpb, H - (y - y0)); raw = n_rows * len(names) * W * 4
+        if comp != 0 and size < raw:
+            data = zlib.decompress(data)
+            a = bytearray(data)
+            for t in range(1, len(a)):
+                a[t] = (a[t - 1] + a[t] - 128) & 0xFF
+            half = (len(a) + 1) // 2
+            d = bytearray(len(a)); d[0::2] = a[:half]; d[1::2] = a[half:]; data = bytes(d)
+        vals = struct.unpack("<%df" % (n_rows * len(names) * W), data)
+        p = 0
+        for r in range(n_rows):
+            for n in names:
+                if n == "G":
+                    for x in range(W):
+                        rows[y - y0 + r] += vals[p + x]; cols[x] += vals[p + x]
+                p += W
+    return [v / W for v in rows], [v / H for v in cols]
+
+
 # ---- the scene: a floor, a ball of the material under test and a lamp, in a sky --------------------------------------------------------------------------------
 
 MATERIALS = {
@@ -575,6 +618,72 @@ def run(args):
                     print("  %-4s %-34s %s  %.4f vs %.4f  off by %.1f%%" % ("both", "cpu vs gpu, %s, %s" % (label, shape), "ok   " if worst <= limit else "WRONG", ma[1], mb[1], worst))
                 if worst > limit:
                     failures.append(("maps", "both", "%s, %s" % (label, shape)))
+    # Where things land in the picture (a mean cannot see a mirror): pbrt's camera is left-handed (+x on the LEFT of the picture for a plain LookAt) and a projection light's slide is
+    # stored upside down for the lookup (the slide's first row lights the far side of what the light projects). The CPU is the reference; every backend must put them where it does.
+    if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "orientation" in only):
+        print("[cpu vs gpu, orientation]")
+        slide = os.path.join(workdir, "orientation_slide.png").replace("\\", "/")
+        write_png(slide, 16, 16, lambda x, y: ((250, 250, 250) if y < 5 else (10, 10, 10)))   # a bright band along the TOP of the slide
+        header = 'Film "rgb" "integer xresolution" [ 64 ] "integer yresolution" [ 64 ]\nSampler "halton" "integer pixelsamples" [ 16 ]\nWorldBegin\n'
+        checks = (
+            ("a red sphere at world +x is in the left half", 'LookAt 0 0 5  0 0 0  0 1 0\nCamera "perspective" "float fov" [ 40 ]\n' + header + 'LightSource "infinite" "rgb L" [ 1 1 1 ]\n'
+             'Material "diffuse" "rgb reflectance" [ 0.9 0.05 0.05 ]\nTranslate 1.2 0 0\nShape "sphere" "float radius" [ 0.8 ]\n', "cols"),
+            ("the same sphere with the exporter's mirror is in the right half", 'Scale -1 1 1\nLookAt 0 0 5  0 0 0  0 1 0\nCamera "perspective" "float fov" [ 40 ]\n' + header +
+             'LightSource "infinite" "rgb L" [ 1 1 1 ]\nMaterial "diffuse" "rgb reflectance" [ 0.9 0.05 0.05 ]\nTranslate 1.2 0 0\nShape "sphere" "float radius" [ 0.8 ]\n', "cols"),
+            ("a slide's top band lights the bottom of the picture", 'LookAt 0 8 0.001  0 0 0  0 1 0\nCamera "perspective" "float fov" [ 40 ]\n' + header +
+             'Material "diffuse" "rgb reflectance" [ 0.5 0.5 0.55 ]\nShape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ] "point3 P" [ -10 0 -10   10 0 -10   10 0 10   -10 0 10 ]\n'
+             'AttributeBegin\n  Translate 0 4 0\n  Rotate 90 1 0 0\n  LightSource "projection" "float scale" [ 300 ] "float fov" [ 45 ] "string filename" [ "%s" ]\nAttributeEnd\n' % slide, "rows"),
+        )
+        for label, text, axis in checks:
+            total += 1
+            where = {}
+            try:
+                path = os.path.join(workdir, "orientation_%d.pbrt" % total)
+                open(path, "w").write(text)
+                for backend in ("cpu", "gpu"):
+                    out = path + "." + backend + ".exr"
+                    r = subprocess.run([args.exe, "--" + backend, "--seed", "3", "--output", out, "64", "16", "4", path], capture_output=True, text=True, cwd=REPO, timeout=1200)
+                    if r.returncode != 0 or not os.path.exists(out):
+                        raise RuntimeError("%s render failed: %s" % (backend, (r.stdout + r.stderr)[-200:]))
+                    rows_g, cols_g = read_exr_rows_columns(out)
+                    line = rows_g if axis == "rows" else cols_g
+                    half = len(line) // 2
+                    first, second = sum(line[:half]), sum(line[half:])
+                    # the sphere is red (little green): the half with the LESS green holds it; the slide lights (more green) the half it lights
+                    where[backend] = ("first" if first < second else "second") if axis == "cols" else ("first" if first > second else "second")
+            except RuntimeError as e:
+                print("  both cpu vs gpu, %s: FAILED TO RENDER: %s" % (label, e))
+                failures.append(("orientation", "both", label))
+                continue
+            ok = where["cpu"] == where["gpu"]
+            if not ok or args.verbose:
+                print("  %-4s %-34s %s  cpu: %s half, gpu: %s half" % ("both", label, "ok   " if ok else "WRONG", where["cpu"], where["gpu"]))
+            if not ok:
+                failures.append(("orientation", "both", label))
+    # bundled scenes that pin pbrt's radiance-mode refraction factor (eta^2 at every crossing): a lamp or the camera inside glass. pbrt-v4's own means at 64 x 64, 64 samples,
+    # depth 8: 0.0414, 0.0296, 3.30 and 9.84 (docs/GPU_SCENE_COMMON.md); the CPU is within 2%, and every backend must agree with it.
+    if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "refraction" in only or "bundled" in only):
+        print("[cpu vs gpu, light and camera inside glass, a goniometric light]")
+        # (goniometric-projection: pbrt's profile frame has the light's up as its pole and its lookup is nearest; 38% off on Metal before it did both)
+        for scene_name in ("lamp-inside-glass", "lamp-inside-rough-glass", "camera-inside-glass", "rough-glass-from-inside", "goniometric-projection"):
+            total += 1
+            means = {}
+            try:
+                for backend in ("cpu", "gpu"):
+                    out = os.path.join(workdir, "bundled_%s_%s.exr" % (scene_name, backend))
+                    r = subprocess.run([args.exe, "--" + backend, "--seed", "3", "--output", out, "64", "64", "8", os.path.join(REPO, "pbrt_scenes", scene_name + ".pbrt")], capture_output=True, text=True, cwd=REPO, timeout=1200)
+                    if r.returncode != 0 or not os.path.exists(out):
+                        raise RuntimeError("%s render failed: %s" % (backend, (r.stdout + r.stderr)[-200:]))
+                    means[backend] = read_exr_means(out)[1]
+            except RuntimeError as e:
+                print("  both cpu vs gpu, %s: FAILED TO RENDER: %s" % (scene_name, e))
+                failures.append(("refraction", "both", scene_name))
+                continue
+            worst = abs(means["gpu"] - means["cpu"]) / max(abs(means["cpu"]), 1e-9) * 100.0
+            if worst > 4.0 or args.verbose:
+                print("  %-4s %-34s %s  %.4f vs %.4f  off by %.1f%%" % ("both", "cpu vs gpu, %s" % scene_name, "ok   " if worst <= 4.0 else "WRONG", means["cpu"], means["gpu"], worst))
+            if worst > 4.0:
+                failures.append(("refraction", "both", scene_name))
     print("\n%d pairs, %d off by more than %g%%" % (total, len(failures), tol))
     if not args.keep:
         shutil.rmtree(workdir, ignore_errors=True)

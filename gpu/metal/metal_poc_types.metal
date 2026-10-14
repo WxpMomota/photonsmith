@@ -738,7 +738,10 @@ inline float3 goniometricLightRadiance(float3 wiFromLight, packed_float3 lightFo
     float3 wi = normalize(wiFromLight);
     float3 local = float3(dot(wi, float3(lightRight)), dot(wi, float3(lightUp)), dot(wi, float3(lightForward)));
     float2 uv = equalAreaSphereToSquare(local);
-    float intensity = image.sample(s, uv).r;
+    // pbrt's GoniometricLight::I reads the profile with LookupNearest (the CPU's image_lookup is a nearest texel as well): a linear lookup blurs the profile's edges, which a
+    // light aimed at a dark part of the profile shows (a floor under a light whose pole points sideways read 0.0004 where the CPU and pbrt read about 0).
+    constexpr sampler nearestSampler(coord::normalized, address::clamp_to_edge, filter::nearest);
+    float intensity = image.sample(nearestSampler, uv).r;
     return float3(emission) * intensity * scale;
 }
 
@@ -1083,6 +1086,10 @@ struct SphereData {
     // property gpu/optix/optix_intersection_sphere.h's own
     // center/center1 pair relies on (that file's own comment).
     packed_float3 centerDelta1;
+    // The rows of the matrix that carries a world direction into the frame this renderer's older sphere (u, v) are defined in (see metal_poc_gpu_types.h).
+    packed_float3 uvRot0;
+    packed_float3 uvRot1;
+    packed_float3 uvRot2;
 };
 
 // Per-ray side-channel for sphereIntersectionFunction below - Metal's
@@ -1225,7 +1232,7 @@ SphereIntersectionResult sphereIntersectionFunction(
     // so it's unaffected by this check.
     {
         uint mt = sphereMaterials[primitiveIndex].materialType;
-        if (payload.isShadowRay && (mt == 29u || mt == 30u || mt == METAL_MAT_SUBSURFACE)) return result;   // (a shadow ray passes through a medium trigger sphere or a subsurface surface)
+        if (payload.isShadowRay && (mt == 29u || mt == 30u)) return result;   // (a shadow ray passes through a medium trigger sphere; a subsurface surface blocks it, as in pbrt)
         // A glass sphere that bounds a medium is NOT in this list: like every pbrt-v4 surface with a material it is opaque to NEE
         // shadow rays (VolPathIntegrator::SampleLd), so a scatter vertex inside it cannot see a light through its own shell and the fog is
         // lit only along specular chains - the same rule the CPU and both OptiX backends follow (commit 2f8dc3d). A boundary that should

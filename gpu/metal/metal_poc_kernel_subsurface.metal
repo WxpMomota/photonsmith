@@ -134,6 +134,12 @@ inline bool shadeSubsurface(thread const KernelRes& R, thread PathState& P, thre
     entryMat.color = float3(0.0);
     if (!shadeDielectric(entryMat, hitPoint, normal, facingNormal, frontFace, result.distance, rayDir, rayOrigin, throughput, specularBounce, rngState)) return false;
     if (dot(rayDir, facingNormal) >= 0.0) return true;   // reflected off the interface: an ordinary specular bounce
+    // The entry interface carries no radiance-mode eta^2 (shadeDielectric multiplied the refraction by it): pbrt's subsurface entry/exit pair has none either (the exit is shaded
+    // by NormalizedFresnel, whose own normalization stands in for it), as on the CPU and OptiX.
+    {
+        const float entryRatio = frontFace ? (1.0 / entryMat.ior) : entryMat.ior;
+        throughput /= entryRatio * entryRatio;
+    }
 
     float3 exitPos, exitNormal, sp;
     float pdf, sampleProb;

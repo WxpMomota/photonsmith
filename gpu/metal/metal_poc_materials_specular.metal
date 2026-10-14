@@ -73,6 +73,7 @@ inline bool shadeDielectric(TriangleMaterial mat, float3 hitPoint, float3 normal
         newDir = reflect(unitDir, facingNormal);
     } else {
         newDir = refract(unitDir, facingNormal, refractionRatio);
+        throughput *= refractionRatio * refractionRatio;   // pbrt's radiance-mode refraction factor: a refraction multiplies the path throughput by eta^2, eta = eta_i / eta_t of this crossing (1/2.25 entering glass of index 1.5, 2.25 leaving it), as the CPU's camera_path.h and both OptiX backends do; a closed glass object cancels the two, a lamp inside glass reads 1/2.25 of its radiance from outside, a camera inside reads 2.25x.
     }
     rayDir = newDir;
     // Offset along the GEOMETRIC (unflipped-for-facing) normal signed
@@ -163,6 +164,7 @@ inline bool shadeDispersiveDielectric(TriangleMaterial mat, float3 hitPoint, flo
         newDir = reflect(unitDir, facingNormal);
     } else {
         newDir = refract(unitDir, facingNormal, refractionRatio);
+        throughput *= refractionRatio * refractionRatio;   // (the radiance-mode eta^2, see shadeDielectric)
     }
     rayDir = newDir;
     rayOrigin = hitPoint + (dot(newDir, normal) > 0.0 ? normal : -normal) * 0.001f;
@@ -267,7 +269,9 @@ inline bool shadeRoughDielectric(TriangleMaterial mat, float3 hitPoint, float3 n
                 if (shadowResult.type == intersection_type::none) {
                     const float pdfSolidAngle = (distSq / (ls.area * abs(cosLight))) * ls.pmf;
                     const float weight = (pdfSolidAngle * pdfSolidAngle) / (pdfSolidAngle * pdfSolidAngle + bsdfDensity * bsdfDensity);
-                    radiance += throughput * bsdfValue * abs(wiLocal.z) * ls.emission / pdfSolidAngle * weight;
+                    // (the light across the surface: the same radiance-mode eta^2 a sampled refraction carries, see shadeDielectric)
+                    const float refractionScale = wiLocal.z < 0.0 ? refractionRatio * refractionRatio : 1.0;
+                    radiance += throughput * (bsdfValue * refractionScale) * abs(wiLocal.z) * ls.emission / pdfSolidAngle * weight;
                 }
             }
         }
@@ -298,6 +302,7 @@ inline bool shadeRoughDielectric(TriangleMaterial mat, float3 hitPoint, float3 n
     float roughDielectricG = ggxG(woLocal, newDirLocal, alpha, alpha);
     float roughDielectricG1 = ggxG1(woLocal, alpha, alpha);
     throughput *= roughDielectricG / max(roughDielectricG1, 1e-6);
+    if (!tookReflection) throughput *= refractionRatio * refractionRatio;   // (the radiance-mode eta^2, see shadeDielectric)
     rayDir = newDir;
     rayOrigin = hitPoint + (dot(newDir, normal) > 0.0 ? normal : -normal) * 0.001f;
     if (lightSampling) {
@@ -376,6 +381,7 @@ inline bool shadeDispersiveRoughDielectric(TriangleMaterial mat, float3 hitPoint
     float roughDielectricG = ggxG(woLocal, newDirLocal, alpha, alpha);
     float roughDielectricG1 = ggxG1(woLocal, alpha, alpha);
     throughput *= roughDielectricG / max(roughDielectricG1, 1e-6);
+    if (!tookReflection) throughput *= refractionRatio * refractionRatio;   // (the radiance-mode eta^2, see shadeDielectric)
     rayDir = newDir;
     rayOrigin = hitPoint + (dot(newDir, normal) > 0.0 ? normal : -normal) * 0.001f;
     applyBeerLambertAbsorption(throughput, mat.color, frontFace, hitDistance);

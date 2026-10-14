@@ -449,7 +449,8 @@ bool triangleAnyHitFunction(
     // The scene's own triangles are instance 0 (triBase 0); a pbrt ObjectInstance's group stores its triangles once, after them, at that instance's triBase.
     const uint primitiveIndex = groupPrimitiveIndex + instanceTransforms[instanceIndex].triBase;
     const TriangleMaterial mat = triMaterials[primitiveIndex];
-    if (payload.isShadowRay && mat.materialType == METAL_MAT_SUBSURFACE) return false;
+    // (A subsurface surface blocks a shadow ray like every pbrt-v4 surface that has a material: it used to be skipped here, and the floor under and beside a subsurface ball read
+    // 17% bright; the CPU and both OptiX backends block it now too.)
     if (mat.alphaWidth <= 0) return true;
     const float2 uv = texCoordFor(primitiveIndex, barycentric, uvs);
     const float u = clamp(uv.x, 0.0, 1.0);
@@ -712,6 +713,13 @@ inline float2 equirectangularUV(float3 dir) {
     float u = atan2(dir.z, dir.x) * (1.0 / (2.0 * M_PI_F)) + 0.5;
     float v = asin(clamp(dir.y, -1.0, 1.0)) * (1.0 / M_PI_F) + 0.5;
     return float2(u, v);
+}
+
+// (u, v) of the outward normal `n` of a sphere: pbrt's coordinates, about the sphere's own z axis. The rows of `uvRot` carry the world direction into the frame the older
+// mapping above is defined in (the project's get_sphere_uv: theta = acos(-y), phi = atan2(-z, x) + pi), where it is called as before with z negated.
+inline float2 sphereUV(packed_float3 row0, packed_float3 row1, packed_float3 row2, float3 n) {
+    const float3 d = float3(dot(float3(row0), n), dot(float3(row1), n), dot(float3(row2), n));
+    return equirectangularUV(float3(d.x, d.y, -d.z));
 }
 
 // The environment-map (sky image) mapping, the one the CPU's sky_light and the OptiX backends use: row 0 of the image is straight up
