@@ -527,6 +527,11 @@ struct SphereData {
     PackedFloat3 center;
     float radius;
     PackedFloat3 centerDelta1{0, 0, 0};
+    // pbrt's sphere texture coordinates are taken about the sphere's OWN z axis: these three rows (pbrt_flatten::Sphere::uvRot, row-major) carry a world direction into the frame
+    // the project's older (u, v) are defined in (get_sphere_uv, what equirectangularUV(float3(n.x, n.y, -n.z)) computes). The identity keeps a hardcoded sphere's old mapping.
+    PackedFloat3 uvRot0{1, 0, 0};
+    PackedFloat3 uvRot1{0, 1, 0};
+    PackedFloat3 uvRot2{0, 0, 1};
 };
 
 // Mirrors metal_poc.metal's InstanceTransform byte-for-byte (4 packed

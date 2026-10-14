@@ -553,6 +553,10 @@ void MetalPocApp::loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, const st
             const float3 center1 = toWorld(float3{(float)s.center1[0], (float)s.center1[1], (float)s.center1[2]});
             sd.centerDelta1 = PackedFloat3{center1.x - center.x, center1.y - center.y, center1.z - center.z};
         }
+        // pbrt's texture coordinates of a sphere are taken about its own z axis (Sphere::uvRot, row-major, world -> the legacy frame the shader's mapping is defined in)
+        sd.uvRot0 = PackedFloat3{(float)s.uvRot[0], (float)s.uvRot[1], (float)s.uvRot[2]};
+        sd.uvRot1 = PackedFloat3{(float)s.uvRot[3], (float)s.uvRot[4], (float)s.uvRot[5]};
+        sd.uvRot2 = PackedFloat3{(float)s.uvRot[6], (float)s.uvRot[7], (float)s.uvRot[8]};
         spheres.push_back(sd);
         TriangleMaterial mat = materialFor(s.material);
         // A `Material "interface"` sphere bounding a homogeneous medium

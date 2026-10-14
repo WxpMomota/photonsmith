@@ -1083,6 +1083,10 @@ struct SphereData {
     // property gpu/optix/optix_intersection_sphere.h's own
     // center/center1 pair relies on (that file's own comment).
     packed_float3 centerDelta1;
+    // The rows of the matrix that carries a world direction into the frame this renderer's older sphere (u, v) are defined in (see metal_poc_gpu_types.h).
+    packed_float3 uvRot0;
+    packed_float3 uvRot1;
+    packed_float3 uvRot2;
 };
 
 // Per-ray side-channel for sphereIntersectionFunction below - Metal's

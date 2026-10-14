@@ -113,16 +113,17 @@ inline void tessellateDisk(const Disk& d, std::vector<Triangle>& out) {
     });
 }
 
-// A full sphere, with the (u, v) this project's sphere has everywhere (sphere.h get_sphere_uv, which the Metal analytic sphere's lookup matches): the poles are on the world's y axis,
-// phi = 2 pi u = atan2(-z, x) + pi and theta = pi v = acos(-y/r), so p = c + r * (-sin(theta) cos(phi), -cos(theta), sin(theta) sin(phi)). 96 x 48 cells: the silhouette is
-// 5e-4 of the radius off at worst. Not a clipped sphere (it has its own transform and parameters), not a moving one.
+// A full sphere with pbrt's (u, v), taken about the sphere's own z axis. Sphere::uvRot carries a world direction into the frame of sphere.h's older get_sphere_uv, in which the poles are
+// on the y axis, phi = 2 pi u = atan2(-z, x) + pi and theta = pi v = acos(-y / r), i.e. direction = (-sin(theta) cos(phi), -cos(theta), sin(theta) sin(phi)); the vertices take
+// that direction back to the world through uvRot's transpose. 96 x 48 cells: the silhouette is 5e-4 of the radius off at worst. Not a clipped sphere (it has its own transform
+// and parameters), not a moving one.
 inline void tessellateSphere(const Sphere& sp, std::vector<Triangle>& out) {
     tessellateGrid(out, 96, 48, sp.material, sp.areaLight, [&](double u, double v, double* p, double* n) {
         const double phi = 2.0 * kPi * u, theta = kPi * v;
         const double s = std::sin(theta);
-        n[0] = -s * std::cos(phi);
-        n[1] = -std::cos(theta);
-        n[2] = s * std::sin(phi);
+        const double d[3] = {-s * std::cos(phi), -std::cos(theta), s * std::sin(phi)};   // the direction in the frame the project's older (u, v) are defined in
+        // Sphere::uvRot carries a world direction into that frame, so its transpose (it is a rotation or a mirror) carries the direction back
+        for (int a = 0; a < 3; ++a) n[a] = sp.uvRot[a] * d[0] + sp.uvRot[3 + a] * d[1] + sp.uvRot[6 + a] * d[2];
         for (int a = 0; a < 3; ++a) p[a] = sp.center[a] + sp.radius * n[a];
     });
 }
