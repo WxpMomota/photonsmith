@@ -324,7 +324,8 @@ struct Uniforms {
     uint pathRegen;
     // 1 when the camera medium has different extinction per colour channel: the kernel then follows ONE channel per path
     // (chosen uniformly, weight x3 on it, as for a chromatic glass medium) and uses that channel of fogSigmaT3 for free
-    // flight and shadow-ray attenuation. 0: grey medium, the scalar fogSigmaT is used.
+    // flight and shadow-ray attenuation. 0: grey medium, the scalar fogSigmaT is used. Bit 1 (value 2): a medium sphere or tube is chromatic, so every
+    // path fixes its hero channel at the camera (a shadow ray from a surface that crosses the medium before the path ever enters it needs one too).
     uint fogChromatic;
     packed_float3 fogSigmaT3;
     // 1 during a Live Preview session: the kernel records each pixel's first hit position in worldPosTexture.
@@ -826,7 +827,7 @@ inline float rayBoxExitDistance(float3 origin, float3 dir, float3 boxMin, float3
 // throughput is masked to the hero channel, so this vector only ever reaches that channel; the scalar mean used before was the wrong sigma_t for it.
 inline float3 fogTransmittance(constant Uniforms& u, float dist) {
     if (!(u.fogSigmaT > 0.0)) return float3(1.0);
-    return u.fogChromatic != 0u ? exp(-float3(u.fogSigmaT3) * dist) : float3(exp(-u.fogSigmaT * dist));
+    return (u.fogChromatic & 1u) != 0u ? exp(-float3(u.fogSigmaT3) * dist) : float3(exp(-u.fogSigmaT * dist));
 }
 
 // materialType: 0 = Lambertian diffuse, 1 = mirror (perfect specular),

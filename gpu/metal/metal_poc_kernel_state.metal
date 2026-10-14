@@ -83,6 +83,8 @@ struct PathState {
     float3 glassAlbedo = float3(1.0);
     int glassChan = -1;
     int fogChan = -1;
+    bool nullCrossing = false;   // the last bounce only crossed the boundary of a medium sphere or tube (no scattering vertex): it does not count against maxDepth, as in pbrt
+    uint nullCrossings = 0u;     // how many such free crossings this path has had (capped, so a degenerate scene cannot loop forever)
     int mediumChan = -1;   // the path's hero colour channel once any chromatic medium (camera fog, glass interior, medium sphere/tube) fixed one, else -1
     uint rgbChannel = kRgbChannelUnset;
     uint cen0 = 0u;

@@ -687,15 +687,18 @@ def run(args):
     # coloured fog (extinction that differs by channel), each colour held on its own: a medium sphere and the camera medium. Metal weighed every channel with the MEAN sigma_t (the
     # sphere's free flight; the camera fog's light sampling from surfaces), so the blue channel read 17 to 28% bright and the red 13 to 24% dark.
     if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "fog" in only or "bundled" in only):
-        print("[cpu vs gpu, coloured fog and a clamped small bright sphere light]")
+        print("[cpu vs gpu, coloured fog, a clamped small bright sphere light, a lamp that reflects the sky]")
         # (maxcomponentvalue-firefly-clamp: a radius-0.15 sphere light of L 400 under Film maxcomponentvalue 4; Metal sampled the sphere by area, 19% darker once the clamp cut its heavy tail)
-        for scene_name in ("chromatic-fog-room", "chromatic-camera-medium", "maxcomponentvalue-firefly-clamp"):
+        # (earth-globe: its backdrop lamp keeps pbrt's default diffuse 0.5 material and reflects the sky; the CPU was a pure emitter there until 2026-10-14, 8% off)
+        for scene_name in ("chromatic-fog-room", "chromatic-camera-medium", "maxcomponentvalue-firefly-clamp", "earth-globe", "chromatic-fog-room@2"):   # (@2: depth 2; crossing a medium sphere's boundary once counted as a bounce on Metal, 7 to 10% dark there)
+            scene_name, _, depth = scene_name.partition("@")
+            depth = depth or "8"
             total += 1
             means = {}
             try:
                 for backend in ("cpu", "gpu"):
-                    out = os.path.join(workdir, "fog_%s_%s.exr" % (scene_name, backend))
-                    r = subprocess.run([args.exe, "--" + backend, "--seed", "3", "--output", out, "64", "128", "8", os.path.join(REPO, "pbrt_scenes", scene_name + ".pbrt")], capture_output=True, text=True, cwd=REPO, timeout=1200)
+                    out = os.path.join(workdir, "fog_%s_%s_%s.exr" % (scene_name, depth, backend))
+                    r = subprocess.run([args.exe, "--" + backend, "--seed", "3", "--output", out, "64", "128", depth, os.path.join(REPO, "pbrt_scenes", scene_name + ".pbrt")], capture_output=True, text=True, cwd=REPO, timeout=1200)
                     if r.returncode != 0 or not os.path.exists(out):
                         raise RuntimeError("%s render failed: %s" % (backend, (r.stdout + r.stderr)[-200:]))
                     means[backend] = read_exr_means(out)
@@ -705,7 +708,7 @@ def run(args):
                 continue
             worst = max(abs(g - c) / max(abs(c), 1e-9) for c, g in zip(means["cpu"], means["gpu"])) * 100.0
             if worst > 6.0 or args.verbose:
-                print("  %-4s %-34s %s  rgb %s vs %s  off by %.1f%%" % ("both", "cpu vs gpu, %s" % scene_name, "ok   " if worst <= 6.0 else "WRONG",
+                print("  %-4s %-34s %s  rgb %s vs %s  off by %.1f%%" % ("both", "cpu vs gpu, %s depth %s" % (scene_name, depth), "ok   " if worst <= 6.0 else "WRONG",
                       ["%.3f" % x for x in means["cpu"]], ["%.3f" % x for x in means["gpu"]], worst))
             if worst > 6.0:
                 failures.append(("fog", "both", scene_name))
