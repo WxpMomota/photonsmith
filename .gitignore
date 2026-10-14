@@ -499,3 +499,5 @@ mcparity_*.exr
 
 # test pictures a Metal ctest scene loads (subsurface-sky-image.pbrt names white-sky.png): tracked, or a clean checkout fails that test
 !gpu/metal/test_scenes/*.png
+# The frozen pbrt-v4 reference means the pbrt reference pack tests read (scripts/pbrt_reference_pack.py writes it) - a data file, not a stray log.
+!tests/data/pbrt_reference_means.txt
