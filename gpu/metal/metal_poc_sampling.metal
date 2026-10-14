@@ -525,10 +525,8 @@ inline void triangleDpduDpdv(uint primId, device const packed_float3* verts, dev
     const float3 e1 = p1 - p0, e2 = p2 - p0;
     const float2 d1 = uv1 - uv0, d2 = uv2 - uv0;
     const float det = d1.x * d2.y - d1.y * d2.x;
-    // A triangle without uvs of its own is stored with the corner uvs (0,0), (1,0), (0,1) (so u, v are the barycentric coordinates, as on the CPU): the CPU then uses the
-    // unit first edge for dpdu and cross(n, dpdu) for dpdv rather than the Jacobian solve.
-    const bool noUvs = all(uv0 == float2(0.0, 0.0)) && all(uv1 == float2(1.0, 0.0)) && all(uv2 == float2(0.0, 1.0));
-    if (abs(det) > 1e-12 && !noUvs) {
+    // (A triangle without uvs of its own is stored with pbrt's default corner uvs (0,0), (1,0), (1,1), whose solve is dpdu = p1 - p0, dpdv = p2 - p1, as on the CPU.)
+    if (abs(det) > 1e-12) {
         const float inv = 1.0 / det;
         dpdu = inv * (d2.y * e1 - d1.y * e2);
         dpdv = inv * (-d2.x * e1 + d1.x * e2);
