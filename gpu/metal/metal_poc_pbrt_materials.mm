@@ -314,6 +314,8 @@ TriangleMaterial MetalPocApp::mapPbrtSubsurfaceMaterial(PbrtMaterialMapState& st
     mat.transmitColor = PackedFloat3{(float)m.sigma_s[0] * invScale, (float)m.sigma_s[1] * invScale, (float)m.sigma_s[2] * invScale};
     const int tableOffset = bssrdfTableOffset(st, m.g, m.ior);
     mat.conductorEta.x = (float)tableOffset;   // exact below 2^24 floats; an int's bits would be a denormal, which the GPU may flush to zero
+    // pbrt's "roughness" roughens the entry interface (a GGX dielectric): conductorEta.y = its alpha, remapped from the perceptual roughness as pbrt does; 0 keeps the smooth interface.
+    mat.conductorEta.y = (float)(m.remapRoughness ? std::sqrt(std::max(m.roughness_u, 0.0)) : m.roughness_u);
     return mat;
 }
 
