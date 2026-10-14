@@ -57,6 +57,15 @@ class curve_shape_hittable : public hittable {
         rec.p = r.at(rec.t);
         vec3 outward_normal = unit_vector(vec3(ch.nx, ch.ny, ch.nz));
         rec.set_face_normal(r, outward_normal);
+        // CurveShape reports the ray at the depth where it passes closest to the strand's AXIS (pbrt-v4's tHit), which is inside the tube. pbrt-v4 then spawns every bounce
+        // and shadow ray from a point pushed out along the normal by the curve's error bound, the strand's whole width times |n|_1 (a curve's intersection error is
+        // `hitWidth` in every axis), so a ray leaves from outside the strand and cannot meet its own body. Here rays left from inside it and met it again: a strand read 17%
+        // too dark in the pbrt comparison (curve-tuft). The ray origin is pushed out the same way, on the side the ray arrived on (where a diffuse strand reflects).
+        {
+            const double width = curve.width0 + ch.u * (curve.width1 - curve.width0);
+            const vec3 n = rec.normal;
+            rec.p = rec.p + n * (std::fabs(width) * (std::fabs(n.x()) + std::fabs(n.y()) + std::fabs(n.z())));
+        }
         rec.u = ch.u;
         rec.v = ch.v;
         rec.dpdu = unit_vector(vec3(ch.dpdu_x, ch.dpdu_y, ch.dpdu_z));

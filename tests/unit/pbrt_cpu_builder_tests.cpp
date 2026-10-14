@@ -2967,3 +2967,25 @@ TEST(PbrtDotsMapping, TheDeltasMoveTheCells) {
 		EXPECT_EQ(moved.x() > 0.5, reference.x() > 0.5) << "at x = " << x;
 	}
 }
+
+// ---- Rays leave a curve from outside its strand ------------------------------------------------------------------------------------------------------------
+//
+// A curve's hit is reported where the ray passes closest to the strand's axis, which is inside the tube. pbrt-v4 spawns every ray from a point pushed out by the curve's
+// width (its error bound); rays that left from inside the strand met it again and a strand read 17% too dark (curve-tuft).
+
+TEST(PbrtCurveHit, TheRayOriginIsOutsideTheStrand) {
+	const pbrt_cpu::BuildResult b = buildFrom(
+		"Shape \"curve\" \"string type\" [ \"cylinder\" ] \"float width0\" [ 0.2 ] \"float width1\" [ 0.2 ]\n"
+		"  \"point3 P\" [ 0 0 0  0 1 0  0 2 0  0 3 0 ]\n");
+	hit_record rec;
+	const ray r(point3(0.03, 1.5, 3), vec3(0, 0, -1));
+	ASSERT_TRUE(b.world->hit(r, interval(0.001, infinity), rec));
+	EXPECT_NEAR(rec.t, 3.0, 1e-6) << "the reported distance is still pbrt's: the depth of the axis";
+	const double fromAxis = std::hypot(rec.p.x(), rec.p.z());
+	EXPECT_GT(fromAxis, 0.1) << "a ray spawned here starts outside the strand (radius 0.1)";
+	EXPECT_GT(dot(rec.normal, vec3(0, 0, 1)), 0.0) << "the normal faces the side the ray arrived on";
+	// A ray leaving that point towards the side it arrived on does not hit the strand it came from.
+	hit_record again;
+	const ray leaving(rec.p, unit_vector(vec3(0.5, 0.2, 1.0)));
+	EXPECT_FALSE(b.world->hit(leaving, interval(0.001, infinity), again));
+}
