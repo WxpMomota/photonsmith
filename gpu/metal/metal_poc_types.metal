@@ -1190,6 +1190,15 @@ struct InstanceTransform {
 // scene ever constructs is rigid, so that distinction is deliberately
 // not implemented here (documented, not silently assumed away, same
 // spirit as this POC's other explicitly-scoped simplifications).
+// Inverse of a 3x3 matrix (the instance's normal matrix back to its linear part); the identity for a singular one.
+inline float3x3 inverse3x3(float3x3 m) {
+    const float3 c0 = m[0], c1 = m[1], c2 = m[2];
+    const float3 r0 = cross(c1, c2), r1 = cross(c2, c0), r2 = cross(c0, c1);
+    const float det = dot(c0, r0);
+    if (abs(det) < 1e-20f) return float3x3(1.0f);
+    return transpose(float3x3(r0, r1, r2)) * (1.0f / det);
+}
+
 inline float3 transformNormalByInstance(float3 objectNormal, InstanceTransform xf) {
     float3x3 linear = float3x3(float3(xf.col0), float3(xf.col1), float3(xf.col2));
     return normalize(linear * objectNormal);
