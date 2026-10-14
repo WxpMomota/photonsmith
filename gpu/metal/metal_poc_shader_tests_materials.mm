@@ -162,6 +162,12 @@ void testShadeDielectric(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCom
                 : simd::float3{(float)std::exp(-c.absorption.x * c.hitDistance),
                                (float)std::exp(-c.absorption.y * c.hitDistance),
                                (float)std::exp(-c.absorption.z * c.hitDistance)};
+            // pbrt's radiance-mode refraction factor: a refraction (not a reflection) multiplies the throughput by eta^2, eta = eta_i / eta_t of the crossing
+            // (1/ior entering, ior leaving): 1 for matched media.
+            if (!c.expectReflect) {
+                const float ratio = c.frontFace ? 1.0f / c.ior : c.ior;
+                expectedThroughput *= ratio * ratio;
+            }
             snprintf(label, sizeof(label), "shadeDielectric: %s (seed %d) - Beer-Lambert throughput", c.name, seedIdx);
             expectNear(label, simd::length(simd::float3(o.throughput) - expectedThroughput), 0.0, 1e-5);
         }

@@ -575,6 +575,29 @@ def run(args):
                     print("  %-4s %-34s %s  %.4f vs %.4f  off by %.1f%%" % ("both", "cpu vs gpu, %s, %s" % (label, shape), "ok   " if worst <= limit else "WRONG", ma[1], mb[1], worst))
                 if worst > limit:
                     failures.append(("maps", "both", "%s, %s" % (label, shape)))
+    # bundled scenes that pin pbrt's radiance-mode refraction factor (eta^2 at every crossing): a lamp or the camera inside glass. pbrt-v4's own means at 64 x 64, 64 samples,
+    # depth 8: 0.0414, 0.0296, 3.30 and 9.84 (docs/GPU_SCENE_COMMON.md); the CPU is within 2%, and every backend must agree with it.
+    if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "refraction" in only):
+        print("[cpu vs gpu, light and camera inside glass]")
+        for scene_name in ("lamp-inside-glass", "lamp-inside-rough-glass", "camera-inside-glass", "rough-glass-from-inside"):
+            total += 1
+            means = {}
+            try:
+                for backend in ("cpu", "gpu"):
+                    out = os.path.join(workdir, "bundled_%s_%s.exr" % (scene_name, backend))
+                    r = subprocess.run([args.exe, "--" + backend, "--seed", "3", "--output", out, "64", "64", "8", os.path.join(REPO, "pbrt_scenes", scene_name + ".pbrt")], capture_output=True, text=True, cwd=REPO, timeout=1200)
+                    if r.returncode != 0 or not os.path.exists(out):
+                        raise RuntimeError("%s render failed: %s" % (backend, (r.stdout + r.stderr)[-200:]))
+                    means[backend] = read_exr_means(out)[1]
+            except RuntimeError as e:
+                print("  both cpu vs gpu, %s: FAILED TO RENDER: %s" % (scene_name, e))
+                failures.append(("refraction", "both", scene_name))
+                continue
+            worst = abs(means["gpu"] - means["cpu"]) / max(abs(means["cpu"]), 1e-9) * 100.0
+            if worst > 4.0 or args.verbose:
+                print("  %-4s %-34s %s  %.4f vs %.4f  off by %.1f%%" % ("both", "cpu vs gpu, %s" % scene_name, "ok   " if worst <= 4.0 else "WRONG", means["cpu"], means["gpu"], worst))
+            if worst > 4.0:
+                failures.append(("refraction", "both", scene_name))
     print("\n%d pairs, %d off by more than %g%%" % (total, len(failures), tol))
     if not args.keep:
         shutil.rmtree(workdir, ignore_errors=True)
