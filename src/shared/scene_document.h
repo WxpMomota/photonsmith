@@ -63,6 +63,7 @@ inline Object makeObject(ShapeKind shape, const std::string& name) {
 		case ShapeKind::RoundedBox: o.size = {1.5, 1.5, 1.5}; o.radius = 0.2; o.position = {0, 0.75, 0}; break;
 		case ShapeKind::Cyclorama: o.size = {12, 6, 10}; o.radius = 2.5; o.position = {0, 3.0, 0}; break;
 		case ShapeKind::Terrain: o.size = {10, 1.5, 10}; o.steps = 48; o.radius = 0.5; o.radius2 = 3.0; o.seed = 1; o.position = {0, 0.75, 0}; break;
+		case ShapeKind::Text: o.size = {1.0, 1.0, 0.25}; o.text = TextParams{}; o.position = {0, 0.6, 0}; break;
 	}
 	return o;
 }

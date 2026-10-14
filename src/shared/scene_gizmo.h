@@ -33,6 +33,7 @@ inline scene_doc::Object scaledObject(const scene_doc::Object& o, int axis, doub
 		case ShapeKind::RoundedBox:
 		case ShapeKind::Cyclorama:
 		case ShapeKind::Terrain:
+		case ShapeKind::Text:
 		case ShapeKind::Stairs: (axis == 0 ? r.size.x : axis == 1 ? r.size.y : r.size.z) = (axis == 0 ? o.size.x : axis == 1 ? o.size.y : o.size.z) * factor; break;
 		case ShapeKind::Pyramid:
 			if (axis == 0) r.size.x = o.size.x * factor;

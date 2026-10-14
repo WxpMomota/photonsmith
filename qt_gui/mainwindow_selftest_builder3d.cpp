@@ -29,6 +29,7 @@
 #include <QKeyEvent>
 #include <QListWidget>
 #include <QRegularExpression>
+#include <QPlainTextEdit>
 #include <QTextEdit>
 #include <QComboBox>
 #include <QScreen>
@@ -492,6 +493,48 @@ void MainWindow::selfTestLights(SceneBuilderWidget *sb, const std::function<void
 }
 
 void MainWindow::selfTestShapes(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
+	// 3D text, made from a real font: Add > Text adds it, the properties show the text and its font rows, the letters become a mesh with real volume, and it is one undo step.
+	{
+		const size_t before = sb->document().objects.size();
+		sb->addObject(scene_doc::ShapeKind::Text);
+		check(sb->document().objects.size() == before + 1 && sb->document().objects.back().shape == scene_doc::ShapeKind::Text, "Add > Text (3D letters) adds a text object");
+		const scene_doc::Object &t = sb->document().objects.back();
+		check(t.name.rfind("Text", 0) == 0, "named Text (" + QString::fromStdString(t.name) + ")");
+		sb->selectObject(static_cast<int>(sb->document().objects.size()) - 1);
+		sb->setObjectTextForTest(static_cast<int>(sb->document().objects.size()) - 1, "Hello\nRay 3D");
+		QApplication::processEvents();
+		const scene_doc::Object &o = sb->document().objects.back();
+		check(o.text.text == "Hello\nRay 3D", "the text can be changed");
+		const scene_doc::ShapeMesh mesh = scene_doc::generatedMesh(o);
+		check(mesh.triangleCount() > 400, QString("the letters become a mesh (%1 triangles)").arg(mesh.triangleCount()));
+		double volume = 0, lo[3] = {1e9, 1e9, 1e9}, hi[3] = {-1e9, -1e9, -1e9};
+		for (std::size_t k = 0; k + 2 < mesh.indices.size(); k += 3) {
+			const double *a = &mesh.P[static_cast<std::size_t>(mesh.indices[k]) * 3], *b = &mesh.P[static_cast<std::size_t>(mesh.indices[k + 1]) * 3], *c = &mesh.P[static_cast<std::size_t>(mesh.indices[k + 2]) * 3];
+			volume += (a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0])) / 6.0;
+		}
+		for (std::size_t k = 0; k < mesh.P.size(); ++k) { lo[k % 3] = std::min(lo[k % 3], mesh.P[k]); hi[k % 3] = std::max(hi[k % 3], mesh.P[k]); }
+		check(volume > 0.01, QString("every triangle faces outward: the solid has a volume (%1)").arg(volume));
+		check(hi[0] - lo[0] > 2.0 * (hi[2] - lo[2]) && hi[1] - lo[1] > 1.0 && hi[1] - lo[1] < 4.0, QString("two lines of letters, wider than thick (%1 x %2 x %3)").arg(hi[0] - lo[0]).arg(hi[1] - lo[1]).arg(hi[2] - lo[2]));
+		check(sb->problemsText().isEmpty(), "a text gives no problems or notes");
+		bool fontRows = false, textBox = false;
+		for (QLabel *l : sb->findChildren<QLabel *>()) fontRows = fontRows || l->text() == sb->tr("Font");
+		for (QPlainTextEdit *e : sb->findChildren<QPlainTextEdit *>()) textBox = textBox || e->toPlainText() == "Hello\nRay 3D";
+		check(fontRows, "the properties have a Font row");
+		check(textBox, "and a box with the text in it");
+		QFile tf(QDir::tempPath() + "/builder_text_selftest.pbrt");
+		if (tf.open(QIODevice::WriteOnly)) {
+			scene_doc::Document d = scene_doc::makeStarterScene();
+			scene_doc::Object word = o;
+			word.position = {0, 1.0, 0};
+			word.material.color = {0.8, 0.2, 0.1};
+			d.objects.push_back(word);
+			tf.write(QByteArray::fromStdString(scene_doc::toPbrt(d)));
+			tf.close();
+		}
+		sb->undo();   // (the text change)
+		sb->undo();   // (the text added)
+		check(sb->document().objects.size() == before, "undo takes the text away");
+	}
 	// Every ready-made shape can be added (and drawn in the layout and 3D views), leaves the scene without problems, and is one undo step each.
 	{
 		const size_t before = sb->document().objects.size();

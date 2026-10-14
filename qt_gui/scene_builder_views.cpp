@@ -387,6 +387,12 @@ void SceneBuilderWidget::setMaterialForTest(int index, const scene_doc::Material
 	rebuildInspector();
 }
 
+void SceneBuilderWidget::setObjectTextForTest(int index, const std::string &text) {
+	if (index < 0 || index >= static_cast<int>(m_doc.objects.size())) return;
+	edit(QString(), [&]() { m_doc.objects[static_cast<std::size_t>(index)].text.text = text; });
+	rebuildInspector();
+}
+
 // A real drag of a saved view's marker (its eye, or with `which` 1 its target) by `deltaPx` in the 3D view. A target can only be pressed once its view is the active one, so
 // that is done first with a click on its eye. True if the view's point moved.
 bool SceneBuilderWidget::dragViewMarker3dForTest(int viewIndex, int which, const QPointF &deltaPx, Qt::KeyboardModifiers mods) {

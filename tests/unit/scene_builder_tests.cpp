@@ -683,6 +683,7 @@ TEST(SceneBuilderRenderTest, APicturedQuadShowsItsPictureUprightAndNotMirrored) 
 TEST(SceneDocumentShapesTest, GeneratedMeshesAreClosedOutwardFacingAndSizedAsAsked) {
 	for (ShapeKind sh : scene_doc::allShapeKinds()) {
 		if (!scene_doc::isGeneratedShape(sh)) continue;
+		if (sh == ShapeKind::Text) continue;   // (made from a font the GUI provides: scene_text_tests.cpp and SceneTextObjectTest check its mesh the same way, with a stand-in font)
 		const Object o = makeObject(sh, toString(sh));
 		const scene_doc::ShapeMesh m = scene_doc::generatedMesh(o);
 		ASSERT_GT(m.triangleCount(), 0u) << toString(sh);
@@ -1955,4 +1956,134 @@ TEST(SceneDotsPatternTest, ADotsPatternNeedsACountAndANonBlankMaterialKind) {
 	bool warned = false;
 	for (const Problem& p : validate(d)) warned = warned || p.message.find("dots patterns only apply") != std::string::npos;
 	EXPECT_TRUE(warned);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// 3D text
+
+namespace {
+
+// Stands in for the GUI's font: one block per character, 1 wide and 2 tall with a gap of 0.5.
+bool blockFont(const scene_doc::TextParams& p, scene_doc::TextOutline& out) {
+	std::size_t column = 0;
+	double row = 0;
+	for (char c : p.text) {
+		if (c == '\n') { column = 0; row -= 3.0; continue; }
+		if (c == ' ') { ++column; continue; }
+		const double x = column * 1.5;
+		out.contours.push_back({{x, row}, {x + 1.0, row}, {x + 1.0, row + 2.0}, {x, row + 2.0}});
+		++column;
+	}
+	out.capHeight = 2.0;
+	return !out.contours.empty();
+}
+
+struct WithBlockFont {
+	WithBlockFont() { scene_doc::setTextOutlineProvider(&blockFont); }
+	~WithBlockFont() { scene_doc::setTextOutlineProvider(nullptr); }
+};
+
+}  // namespace
+
+TEST(SceneTextObjectTest, ANewTextObjectHasSensibleDefaultsAndRoundTripsThroughTheDocument) {
+	Object o = makeObject(ShapeKind::Text, "Words");
+	EXPECT_EQ(o.text.text, "Text");
+	EXPECT_DOUBLE_EQ(o.size.x, 1.0) << "no stretch";
+	EXPECT_DOUBLE_EQ(o.size.y, 1.0) << "a capital letter a unit tall";
+	EXPECT_GT(o.size.z, 0.0);
+	EXPECT_TRUE(isGeneratedShape(ShapeKind::Text));
+	o.text.text = std::string("Hi\nthere \xC3\xA9 \"quoted\"");
+	o.text.font = "Times New Roman";
+	o.text.bold = true;
+	o.text.italic = true;
+	o.text.align = 2;
+	o.size = {1.2, 0.8, 0.3};
+	Document d = makeStarterScene();
+	d.objects.push_back(o);
+	Document back;
+	std::string error;
+	ASSERT_TRUE(fromJson(toJson(d), back, error)) << error;
+	ASSERT_EQ(back.objects.size(), d.objects.size());
+	const Object& r = back.objects.back();
+	EXPECT_EQ(r.shape, ShapeKind::Text);
+	EXPECT_EQ(r.text.text, o.text.text);
+	EXPECT_EQ(r.text.font, "Times New Roman");
+	EXPECT_TRUE(r.text.bold);
+	EXPECT_TRUE(r.text.italic);
+	EXPECT_EQ(r.text.align, 2);
+	EXPECT_DOUBLE_EQ(r.size.y, 0.8);
+	EXPECT_EQ(toJson(back), toJson(d));
+}
+
+TEST(SceneTextObjectTest, OnlyATextObjectWritesTextFieldsToTheDocument) {
+	const Document d = makeStarterScene();
+	EXPECT_EQ(toJson(d).find("\"italic\""), std::string::npos) << "scenes without text write exactly what they always did";
+}
+
+TEST(SceneTextObjectTest, TheTextIsWrittenAsATriangleMeshTheRendererLoads) {
+	WithBlockFont font;
+	Document d = makeStarterScene();
+	Object o = makeObject(ShapeKind::Text, "Words");
+	o.text.text = "AB";
+	o.material.color = {0.2, 0.4, 0.9};
+	d.objects.push_back(o);
+	ASSERT_FALSE(hasErrors(validate(d)));
+	const std::string text = toPbrt(d);
+	EXPECT_NE(text.find("Shape \"trianglemesh\""), std::string::npos);
+	const pbrt_load::LoadResult r = loadText(text, "text_object");
+	ASSERT_TRUE(r.ok) << r.error;
+	EXPECT_GE(r.scene.triangles.size(), 2u * 2u * 3u) << "front, back and four walls for each of the two letters";
+	Document back;
+	std::string error;
+	ASSERT_TRUE(fromPbrt(text, back, error)) << error;
+	EXPECT_EQ(toJson(back), toJson(d)) << "a saved scene reopens with its text";
+}
+
+TEST(SceneTextObjectTest, ChangingTheTextOrTheSizeChangesTheMesh) {
+	WithBlockFont font;
+	Object o = makeObject(ShapeKind::Text, "Words");
+	o.text.text = "AB";
+	const std::size_t two = generatedMesh(o).triangleCount();
+	o.text.text = "ABC";
+	EXPECT_EQ(generatedMesh(o).triangleCount(), two / 2 * 3);
+	const auto width = [](const Object& t) {
+		const scene_doc::ShapeMesh m = generatedMesh(t);
+		double lo = 1e9, hi = -1e9;
+		for (std::size_t i = 0; i < m.P.size(); i += 3) { lo = std::min(lo, m.P[i]); hi = std::max(hi, m.P[i]); }
+		return hi - lo;
+	};
+	const double w = width(o);
+	o.size.y *= 2;
+	EXPECT_NEAR(width(o), 2 * w, 1e-9) << "twice the height, twice the width";
+	o.size.x = 1.5;
+	EXPECT_NEAR(width(o), 3 * w, 1e-9) << "and stretched by a half again";
+}
+
+TEST(SceneTextObjectTest, ATextWithNoLettersWritesNoShapeAndIsReported) {
+	WithBlockFont font;
+	Document d = makeStarterScene();
+	Object o = makeObject(ShapeKind::Text, "Nothing");
+	o.text.text = "  ";
+	d.objects.push_back(o);
+	EXPECT_FALSE(hasErrors(validate(d)));
+	bool warned = false;
+	for (const Problem& p : validate(d)) warned = warned || p.message.find("text is empty") != std::string::npos;
+	EXPECT_TRUE(warned);
+	const pbrt_load::LoadResult r = loadText(toPbrt(d), "text_empty");
+	EXPECT_TRUE(r.ok) << r.error;
+	d.objects.back().text.text = "x";
+	d.objects.back().size.y = 0.0;
+	EXPECT_TRUE(hasErrors(validate(d))) << "a text with no height";
+}
+
+TEST(SceneTextObjectTest, DuplicatingAndScalingATextKeepsItsLettersInProportion) {
+	Object o = makeObject(ShapeKind::Text, "Words");
+	o.text.text = "Hello";
+	o.size = {1.4, 1.0, 0.25};
+	scaleObject(o, 2.0);
+	EXPECT_DOUBLE_EQ(o.size.x, 1.4) << "the stretch is not a length";
+	EXPECT_DOUBLE_EQ(o.size.y, 2.0);
+	EXPECT_DOUBLE_EQ(o.size.z, 0.5);
+	EXPECT_GT(boundingRadius(o), 1.0);
+	EXPECT_GT(footprintRadius(o), 0.0);
 }

@@ -375,6 +375,10 @@ inline std::string toJson(const Document& d) {
 		j.set("radius2", Json::number(o.radius2)).set("steps", Json::number(o.steps));
 		j.set("meshScale", Json::number(o.meshScale)).set("meshFile", Json::string(o.meshFile));
 		if (o.shape == ShapeKind::Terrain) j.set("seed", Json::number(o.seed));   // (only for a terrain: every other scene writes what it always did)
+		if (o.shape == ShapeKind::Text) {   // (and the text only for a text)
+			j.set("text", Json::string(o.text.text)).set("font", Json::string(o.text.font)).set("bold", Json::boolean(o.text.bold));
+			j.set("italic", Json::boolean(o.text.italic)).set("align", Json::number(o.text.align));
+		}
 		j.set("material", detail::materialToJson(o.material));
 		if (o.volume.kind != VolumeKind::None) {   // (only when it is one, so every scene without volumes writes exactly what it always did)
 			Json v = Json::object();
@@ -479,7 +483,9 @@ inline bool fromJson(const std::string& text, Document& out, std::string& err) {
 			     detail::readNum(j, "height", o.height) && detail::readVec(j, "size", o.size) && detail::readNum(j, "meshScale", o.meshScale) && detail::readNum(j, "radius2", o.radius2) && detail::readInt(j, "steps", o.steps) && detail::readInt(j, "seed", o.seed) &&
 			     detail::readStr(j, "meshFile", o.meshFile) && detail::readBool(j, "emissive", o.emissive) && detail::readRgb(j, "emission", o.emission) &&
 			     detail::readNum(j, "emissionStrength", o.emissionStrength) && detail::readBool(j, "twoSided", o.twoSided) && detail::readStr(j, "group", o.group) &&
-			     detail::readBool(j, "hidden", o.hidden) && detail::readBool(j, "locked", o.locked);
+			     detail::readBool(j, "hidden", o.hidden) && detail::readBool(j, "locked", o.locked) && detail::readStr(j, "text", o.text.text) &&
+			     detail::readStr(j, "font", o.text.font) && detail::readBool(j, "bold", o.text.bold) && detail::readBool(j, "italic", o.text.italic) &&
+			     detail::readInt(j, "align", o.text.align);
 			if (const Json* m = j.find("material")) ok = ok && detail::readMaterial(*m, o.material);
 			if (const Json* vol = j.find("volume")) {
 				if (vol->type != Json::Type::Obj) ok = false;

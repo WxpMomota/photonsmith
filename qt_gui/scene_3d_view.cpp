@@ -382,6 +382,11 @@ std::uint64_t Scene3DView::geometrySignature() const {
 		mix(h, o.emissive);
 		mix(h, o.volume.kind); mix(h, o.volume.color); mix(h, o.hidden);
 		mix(h, o.meshFile.data(), o.meshFile.size());
+		if (o.shape == scene_doc::ShapeKind::Text) {   // (the letters, their font and how they line up)
+			mix(h, o.text.text.data(), o.text.text.size());
+			mix(h, o.text.font.data(), o.text.font.size());
+			mix(h, o.text.bold); mix(h, o.text.italic); mix(h, o.text.align);
+		}
 	}
 	return h;
 }
@@ -477,6 +482,7 @@ std::vector<Scene3DView::Face> &Scene3DView::faces() const {
 			case ShapeKind::RoundedBox:
 			case ShapeKind::Cyclorama:
 			case ShapeKind::Terrain:
+			case ShapeKind::Text:
 			case ShapeKind::Tube: {
 				const scene_doc::ShapeMesh mesh = scene_doc::generatedMesh(o);
 				auto vertex = [&mesh](int k) { return Float3{mesh.P[k * 3], mesh.P[k * 3 + 1], mesh.P[k * 3 + 2]}; };

@@ -94,6 +94,11 @@ inline std::vector<Problem> validate(const Document& d) {
 				if (o.radius < 0.0 || o.radius > 1.0) err(who + "the terrain's roughness must be between 0 and 1.");
 				if (!(o.radius2 >= 0.25 && o.radius2 <= 50.0)) err(who + "the number of hills across the terrain must be between 0.25 and 50.");
 				break;
+			case ShapeKind::Text:
+				if (!(o.size.x > 0.0 && o.size.y > 0.0 && o.size.z > 0.0)) err(who + "the text's stretch, height and thickness must be above zero.");
+				if (o.text.text.find_first_not_of(" \t\r\n") == std::string::npos) warn(who + "the text is empty, so there is nothing to see.");
+				else if (static_cast<int>(o.text.text.size()) > kMaxTextLength) warn(who + "the text is longer than " + std::to_string(kMaxTextLength) + " characters, so it is cut there.");
+				break;
 			case ShapeKind::Capsule:
 				if (!(o.radius > 0.0) || !(o.height > 0.0)) err(who + "the radius and height must be above zero.");
 				else if (o.height < 2 * o.radius) warn(who + "the capsule is shorter than its two rounded ends, so it is as tall as they need (twice the radius).");
