@@ -446,7 +446,7 @@ __device__ __forceinline__ bool rough_dielectric_scatter_and_nee(
 				float llx = dot(to_light, tan), lly = dot(to_light, bitan), llz = dot(to_light, n);
 				if (rd_flip) { llx=-llx; lly=-lly; llz=-llz; }
 				if (llz != 0.0f && trace_shadow_ray_stochastic(hit_point, to_light, max_dist, seed, nee_shadow_rgb)) {
-					float fval = rd_bxdf.f(wi_x, wi_y, wi_z, rd_ri, llx, lly, llz);
+					float fval = rd_bxdf.f(wi_x, wi_y, wi_z, rd_ri, llx, lly, llz) * (llz < 0.0f ? rd_ri * rd_ri : 1.0f);   // (radiance-mode eta^2 of a crossing, as the sampled one in the throughput)
 					float brdf_pdf = rd_bxdf.pdf(wi_x, wi_y, wi_z, rd_ri, llx, lly, llz);
 					float mis_weight = mis_power_heuristic(light_pdf, brdf_pdf);
 					emission = emission + mis_weight * make_float3(fval, fval, fval) * sampled_light_emission * fabsf(llz) / light_pdf
@@ -462,7 +462,7 @@ __device__ __forceinline__ bool rough_dielectric_scatter_and_nee(
 			if (rd_flip) { plx=-plx; ply=-ply; plz=-plz; }
 			if (plz == 0.0f) continue;
 			if (trace_shadow_ray_stochastic(hit_point, wi_p, t_max_p, seed, nee_shadow_rgb)) {
-				float fval = rd_bxdf.f(wi_x, wi_y, wi_z, rd_ri, plx, ply, plz);
+				float fval = rd_bxdf.f(wi_x, wi_y, wi_z, rd_ri, plx, ply, plz) * (plz < 0.0f ? rd_ri * rd_ri : 1.0f);
 				emission = emission + make_float3(fval, fval, fval) * Li_p * fabsf(plz) * (camera_medium_shadow_trans(t_max_p) * nee_shadow_rgb);
 			}
 		}
@@ -475,7 +475,7 @@ __device__ __forceinline__ bool rough_dielectric_scatter_and_nee(
 				float skx = dot(sky_dir, tan), sky_y = dot(sky_dir, bitan), skz = dot(sky_dir, n);
 				if (rd_flip) { skx=-skx; sky_y=-sky_y; skz=-skz; }
 				if (skz != 0.0f && pdf_sky > 0.0f && trace_shadow_ray_stochastic(hit_point, sky_dir, 1e30f, seed, nee_shadow_rgb)) {
-					float fval = rd_bxdf.f(wi_x, wi_y, wi_z, rd_ri, skx, sky_y, skz);
+					float fval = rd_bxdf.f(wi_x, wi_y, wi_z, rd_ri, skx, sky_y, skz) * (skz < 0.0f ? rd_ri * rd_ri : 1.0f);
 					float brdf_pdf_sky = rd_bxdf.pdf(wi_x, wi_y, wi_z, rd_ri, skx, sky_y, skz);
 					float mis_weight = mis_power_heuristic(pdf_sky, brdf_pdf_sky);
 					emission = emission + mis_weight * make_float3(fval, fval, fval) * sky_Le_val * fabsf(skz) / pdf_sky

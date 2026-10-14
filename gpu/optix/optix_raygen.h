@@ -536,7 +536,13 @@ extern "C" __global__ void __raygen__rg() {
 				// just when RR actually runs below - matches CPU's camera.h
 				// (`if (srec.is_transmission) eta_scale *= srec.eta * srec.eta;`
 				// runs unconditionally on every bounce, independent of depth).
-				eta_scale *= payload.eta * payload.eta;
+				// pbrt-v4's radiance-mode refraction carries 1 / etap^2 = eta^2 (eta = eta_i / eta_t): entering glass dims the path, leaving it brightens, so a
+				// closed object cancels and a lamp or the camera INSIDE glass reads as in pbrt (the lamp 2.25 times dimmer from outside). A smooth or rough
+				// dielectric reports its eta positive and the factor goes into the throughput here, so etaScale (Russian roulette only) does not repeat it.
+				// A BSSRDF entry reports it negative: that interface stays in the importance-transport form (its exit has no matching eta^2), so the factor
+				// only joins etaScale, as before.
+				if (payload.eta < 0.0f) eta_scale *= payload.eta * payload.eta;
+				else throughput = throughput * (payload.eta * payload.eta);
 
 				// Russian Roulette (pbrt-v4 PathIntegrator pattern)
 				// Start after depth > 1 so the primary ray and first bounce

@@ -481,8 +481,12 @@ template <typename Sampler>
             // etaScale understated rr_beta right after a refraction,
             // giving RR a higher kill probability than pbrt-v4 intends
             // for exactly the paths this mechanism exists to protect.
+            // pbrt-v4's radiance-mode refraction carries 1 / etap^2 (Sqr(bs->eta) is etaScale, the same product, kept apart for Russian roulette): entering
+            // glass dims the path by eta^2, leaving it brightens by the same, so a closed object cancels and an emitter or a camera INSIDE glass reads as in
+            // pbrt (a lamp in a glass ball 2.25 times dimmer from outside). The factor is in beta, so etaScale below only holds what is NOT in beta (the BSSRDF
+            // entry, which stays in the importance-transport form: its exit does not carry the matching eta^2 either).
             if (srec.is_transmission)
-                eta_scale *= srec.eta * srec.eta;
+                new_beta = new_beta * (srec.eta * srec.eta);
             if (bounces_left < depth) {
                 // pbrt-v4: rrBeta = beta * etaScale to avoid killing transmission paths
                 color rr_beta = new_beta * eta_scale;
@@ -504,6 +508,14 @@ template <typename Sampler>
         // Non-specular: NEE shadow ray + BSDF path continuation
         // Mirrors pbrt-v4: L += beta * SampleLd(...)  then SpawnRay(bsdf_sample)
         hittable_pdf light_pdf(lights, rec.p);
+
+        // A direction that crosses a refractive boundary at this vertex (rough glass: srec.is_transmission with srec.eta = eta_i / eta_t) carries pbrt's radiance-mode
+        // 1 / etap^2 = srec.eta^2 (see the specular branch above); the BSDF value scattering_pdf() returns is the importance-transport one.
+        auto refraction_scale = [&](const vec3& dir) -> double {
+            if (!srec.is_transmission) return 1.0;
+            const bool crossed = dot(dir, rec.normal) * dot(-unit_vector(current_ray.direction()), rec.normal) < 0.0;
+            return crossed ? srec.eta * srec.eta : 1.0;
+        };
 
         // Camera-medium shadow-ray attenuation (closes the gap
         // ambient_medium's own "v1 scope" comment documents:
@@ -546,7 +558,7 @@ template <typename Sampler>
                         color Le_d = light_rec.mat->emitted(
                             shadow_ray, light_rec, light_rec.u, light_rec.v, light_rec.p);
                         if (Le_d.x() > 0 || Le_d.y() > 0 || Le_d.z() > 0) {
-                            color atten = rec.mat->scattering_attenuation(current_ray, rec, shadow_ray, srec.attenuation);
+                            color atten = rec.mat->scattering_attenuation(current_ray, rec, shadow_ray, srec.attenuation) * refraction_scale(light_dir);
                             // shadow_ray_hit() restarts its ray at every transmissive surface it walks through (an interface
                             // shell, glass), so light_rec.t is measured from the LAST of those, not from shadow_ray's origin.
                             // The distance to the light's hit point is the real extent of the segment the media see.
@@ -588,7 +600,7 @@ template <typename Sampler>
                         double lr, lg, lb;
                         portal->eval_Le_rgb(rec.p.x(), rec.p.y(), rec.p.z(), wx, wy, wz, lr, lg, lb);
                         color Le_portal(lr, lg, lb);
-                        color atten = rec.mat->scattering_attenuation(current_ray, rec, portal_shadow, srec.attenuation);
+                        color atten = rec.mat->scattering_attenuation(current_ray, rec, portal_shadow, srec.attenuation) * refraction_scale(portal_dir);
                         color med_trans = camera_medium_trans(infinity) * shape_media_trans(portal_shadow, infinity);
                         L += beta * w_portal * atten * trans * med_trans * f_pdf * Le_portal / pdf_portal;
                     }
@@ -610,7 +622,7 @@ template <typename Sampler>
                         render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
                     if (!shadow_ray_hit(world, sky_shadow, sky_rec, infinity, &trans)) {
                         color Le_sky = sky->Le(unit_vector(sky_dir));
-                        color atten = rec.mat->scattering_attenuation(current_ray, rec, sky_shadow, srec.attenuation);
+                        color atten = rec.mat->scattering_attenuation(current_ray, rec, sky_shadow, srec.attenuation) * refraction_scale(sky_dir);
                         color med_trans = camera_medium_trans(infinity) * shape_media_trans(sky_shadow, infinity);
                         L += beta * w_sky * atten * trans * med_trans * f_pdf * Le_sky / pdf_sky;
                     }
@@ -634,7 +646,7 @@ template <typename Sampler>
                     render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
                 if (!shadow_ray_hit(world, punct_ray, shadow_rec, shadow_t_max, &trans)) {
                     // delta light: pdf=1, no MIS weight needed
-                    color atten = rec.mat->scattering_attenuation(current_ray, rec, punct_ray, srec.attenuation);
+                    color atten = rec.mat->scattering_attenuation(current_ray, rec, punct_ray, srec.attenuation) * refraction_scale(ps.wi);
                     color med_trans = camera_medium_trans(ps.t_max) * shape_media_trans(punct_ray, shadow_t_max);
                     L += beta * atten * trans * med_trans * f_pdf * ps.Li;
                 }
@@ -694,16 +706,11 @@ template <typename Sampler>
             // (the overwhelming majority - diffuse_transmission's own R/T
             // lobes are geometric hemisphere flips, not IOR refractions)
             // is completely unaffected, since the `&&` short-circuits.
-            if (srec.is_transmission) {
-                bool crossed_boundary =
-                    dot(bsdf_dir, rec.normal) *
-                    dot(-unit_vector(current_ray.direction()), rec.normal) < 0.0;
-                if (crossed_boundary)
-                    eta_scale *= srec.eta * srec.eta;
-            }
+            // (The radiance-mode eta^2 of a crossing is in beta now - see the specular branch above - so etaScale is not touched here.)
+            const double crossing_scale = refraction_scale(bsdf_dir);
 
             // Russian Roulette after first bounce
-            color new_beta = clamp_throughput(beta * rec.mat->scattering_attenuation(current_ray, rec, bsdf_ray, srec.attenuation) * f_pdf / pdf_b);
+            color new_beta = clamp_throughput(beta * rec.mat->scattering_attenuation(current_ray, rec, bsdf_ray, srec.attenuation) * (f_pdf * crossing_scale / pdf_b));
             if (bounces_left < depth) {
                 // pbrt-v4: rrBeta = beta * etaScale
                 color rr_beta = new_beta * eta_scale;
@@ -921,8 +928,9 @@ template <typename Sampler>
         // Specular bounce: no NEE, update beta and advance ray.
         if (srec.skip_pdf) {
             SS new_beta = clamp_throughput(beta * albedo(srec.attenuation));
+            // Radiance-mode refraction: 1 / etap^2 in beta, not in etaScale (see ray_color()'s specular branch).
             if (srec.is_transmission)
-                eta_scale *= srec.eta * srec.eta;
+                new_beta = new_beta * static_cast<float>(srec.eta * srec.eta);
             if (bounces_left < depth) {
                 SS rr_beta = new_beta * static_cast<float>(eta_scale);
                 float rr_max = rr_beta.MaxComponentValue();
@@ -942,6 +950,14 @@ template <typename Sampler>
 
         // Non-specular: NEE shadow ray + BSDF path continuation
         hittable_pdf light_pdf(lights, rec.p);
+
+        // A direction that crosses a refractive boundary at this vertex (rough glass: srec.is_transmission with srec.eta = eta_i / eta_t) carries pbrt's radiance-mode
+        // 1 / etap^2 = srec.eta^2 (see the specular branch above); the BSDF value scattering_pdf() returns is the importance-transport one.
+        auto refraction_scale = [&](const vec3& dir) -> double {
+            if (!srec.is_transmission) return 1.0;
+            const bool crossed = dot(dir, rec.normal) * dot(-unit_vector(current_ray.direction()), rec.normal) < 0.0;
+            return crossed ? srec.eta * srec.eta : 1.0;
+        };
 
         // Every scattering_pdf() call below goes through this instead of
         // calling rec.mat->scattering_pdf(...) directly, so a dispersive
@@ -978,7 +994,7 @@ template <typename Sampler>
                         color Le_d_rgb = light_rec.mat->emitted(
                             shadow_ray, light_rec, light_rec.u, light_rec.v, light_rec.p);
                         if (Le_d_rgb.x() > 0 || Le_d_rgb.y() > 0 || Le_d_rgb.z() > 0) {
-                            color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, shadow_ray, srec.attenuation);
+                            color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, shadow_ray, srec.attenuation) * refraction_scale(light_dir);
                             float scale = static_cast<float>(w_l * f_pdf / pdf_l);
                             L += beta * scale * albedo(atten_rgb) * albedo(trans) * illuminant(Le_d_rgb);
                         }
@@ -1008,7 +1024,7 @@ template <typename Sampler>
                     if (!shadow_ray_hit(world, portal_shadow, portal_rec, infinity, &trans)) {
                         double lr, lg, lb;
                         portal->eval_Le_rgb(rec.p.x(), rec.p.y(), rec.p.z(), wx, wy, wz, lr, lg, lb);
-                        color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, portal_shadow, srec.attenuation);
+                        color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, portal_shadow, srec.attenuation) * refraction_scale(portal_dir);
                         float scale = static_cast<float>(w_portal * f_pdf / pdf_portal);
                         L += beta * scale * albedo(atten_rgb) * albedo(trans)
                            * illuminant(color(lr, lg, lb));
@@ -1030,7 +1046,7 @@ template <typename Sampler>
                     if (render_stats::enabled())
                         render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
                     if (!shadow_ray_hit(world, sky_shadow, sky_rec, infinity, &trans)) {
-                        color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, sky_shadow, srec.attenuation);
+                        color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, sky_shadow, srec.attenuation) * refraction_scale(sky_dir);
                         float scale = static_cast<float>(w_sky * f_pdf / pdf_sky);
                         L += beta * scale * albedo(atten_rgb) * albedo(trans)
                            * illuminant(sky->Le(unit_vector(sky_dir)));
@@ -1052,7 +1068,7 @@ template <typename Sampler>
                 if (render_stats::enabled())
                     render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
                 if (!shadow_ray_hit(world, punct_ray, shadow_rec, shadow_t_max, &trans)) {
-                    color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, punct_ray, srec.attenuation);
+                    color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, punct_ray, srec.attenuation) * refraction_scale(ps.wi);
                     L += beta * static_cast<float>(f_pdf) * albedo(atten_rgb) * albedo(trans) * illuminant(ps.Li);
                 }
             });
@@ -1089,16 +1105,10 @@ template <typename Sampler>
             double f_pdf = scattering_pdf_at(bsdf_ray);
             if (f_pdf <= 0.0) break;
 
-            if (srec.is_transmission) {
-                bool crossed_boundary =
-                    dot(bsdf_dir, rec.normal) *
-                    dot(-unit_vector(current_ray.direction()), rec.normal) < 0.0;
-                if (crossed_boundary)
-                    eta_scale *= srec.eta * srec.eta;
-            }
+            const double crossing_scale = refraction_scale(bsdf_dir);   // (radiance-mode eta^2 of a crossing, in beta - see the specular branch)
 
             SS new_beta = clamp_throughput(
-                beta * albedo(rec.mat->scattering_attenuation(current_ray, rec, bsdf_ray, srec.attenuation)) * static_cast<float>(f_pdf / pdf_b));
+                beta * albedo(rec.mat->scattering_attenuation(current_ray, rec, bsdf_ray, srec.attenuation)) * static_cast<float>(f_pdf * crossing_scale / pdf_b));
             if (bounces_left < depth) {
                 SS rr_beta = new_beta * static_cast<float>(eta_scale);
                 float rr_max = rr_beta.MaxComponentValue();

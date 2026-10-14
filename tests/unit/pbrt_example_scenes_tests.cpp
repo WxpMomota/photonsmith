@@ -721,6 +721,33 @@ TEST(PbrtBackendAgreementTest, RoughGlassFromInsideAgreesAcrossBackends) {
 	expectBackendsAgree("rough-glass-from-inside", 128, 0.985, 1.015);
 }
 
+// pbrt-v4's radiance-mode refraction carries 1 / etap^2 (entering glass divides the path's radiance by eta^2, leaving it multiplies by it). A closed glass
+// object cancels the two; an emitter inside glass (nothing divides it back: it reads 1 / 2.25 of its radiance from outside) and a camera inside glass (2.25
+// times brighter outside) do not, and every renderer here read both at the importance-transport value until the factor went into the throughput. The expected
+// means are real pbrt-v4's own (64x64, depth 8, the same scene text through pbrt.exe): the CPU's reads them within a few percent, and the two OptiX backends agree.
+static void expectCpuMeanNearPbrt(const char* stem, int spp, double pbrtMean, double tol) {
+	const SceneDescriptor* s = find_example_scene(stem);
+	if (!s) GTEST_SKIP() << stem << ".pbrt was not discovered - is pbrt_scenes/ present?";
+	const std::string out = std::string("pbrt_ref_") + stem + "_cpu.exr";
+	ASSERT_EQ(cpu_render_main(64, 64, spp, 8, out.c_str(), s->id.c_str(), 0.0, 0.0, 0.0), 0);
+	double m = 0.0;
+	const bool ok = loadLinearMean(out, m);
+	std::remove(out.c_str());
+	ASSERT_TRUE(ok) << stem << ": no readable EXR";
+	std::printf("[pbrt] %s: CPU linear mean %.4f against pbrt-v4's %.4f (%.1f%%)\n", stem, m, pbrtMean, 100.0 * m / pbrtMean);
+	EXPECT_GT(m, (1.0 - tol) * pbrtMean) << stem;
+	EXPECT_LT(m, (1.0 + tol) * pbrtMean) << stem;
+}
+TEST(PbrtReferenceTest, LampInsideGlassReadsLikePbrt) { expectCpuMeanNearPbrt("lamp-inside-glass", 128, 0.04137, 0.03); }
+TEST(PbrtReferenceTest, LampInsideRoughGlassReadsLikePbrt) { expectCpuMeanNearPbrt("lamp-inside-rough-glass", 128, 0.02959, 0.04); }
+TEST(PbrtReferenceTest, CameraInsideGlassReadsLikePbrt) { expectCpuMeanNearPbrt("camera-inside-glass", 128, 3.298, 0.03); }
+TEST(PbrtReferenceTest, CameraInsideRoughGlassReadsLikePbrt) { expectCpuMeanNearPbrt("rough-glass-from-inside", 128, 9.838, 0.03); }
+TEST(PbrtBackendAgreementTest, LampAndCameraInsideGlassAgreeAcrossBackends) {
+	expectBackendsAgree("lamp-inside-glass", 128, 0.985, 1.015);
+	expectBackendsAgree("lamp-inside-rough-glass", 128, 0.97, 1.03);
+	expectBackendsAgree("camera-inside-glass", 128, 0.985, 1.015);
+}
+
 // A rough copper sphere lit by an out-of-view lamp, so the whole image is glossy direct light. Both GPU backends skipped NEE
 // at vertices whose BSDF continuation sample was rejected (86% / 75% of the CPU at roughness 0.25 / 1.0), and the CPU took the
 // conductor's Fresnel at the view-normal cosine instead of the half-vector (104% / 108% of a pbrt-v4 path-level reference).

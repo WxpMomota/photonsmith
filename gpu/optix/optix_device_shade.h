@@ -439,7 +439,7 @@ __device__ __forceinline__ void shade_material(
 			// `entry_eta` (captured once here, before the exit-surface's own
 			// NormalizedFresnel shading below, which does NOT independently
 			// contribute another etaScale factor).
-			if (is_transmission) eta = front_face ? (1.0f / mat.ior) : mat.ior;
+			if (is_transmission) eta = -(front_face ? (1.0f / mat.ior) : mat.ior);   // (negative: Russian roulette only - see optix_raygen.h)
 			if (!is_transmission) {
 				// Reflection off the entry interface - identical
 				// to Dielectric's own reflection case (weight 1 when smooth).

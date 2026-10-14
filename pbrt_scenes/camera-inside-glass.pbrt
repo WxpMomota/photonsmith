@@ -1,0 +1,28 @@
+# @rt-category Test Scenes
+# @rt-description The camera inside a big glass sphere looking out at a lamp and a sky. Seen from inside, the world is 2.25 times brighter, as in pbrt.
+# @rt-performance Fast
+# @rt-size 41
+# camera-inside-glass.pbrt -- the camera INSIDE a smooth glass sphere (radius 20), a lamp and a blue sky outside. Leaving the glass brightens radiance by eta^2 = 2.25 in pbrt-v4
+# (the refraction is radiance transport: 1 / eta'^2 with eta' = 1 / 1.5), and nothing divides it back, so everything seen through the wall is 2.25 times brighter than it
+# would be through no glass. Measured mean (64x64, 64 samples, depth 8): pbrt-v4 3.298, CPU / recursive / wavefront OptiX 3.299 / 3.297 / 3.301 (about 1.47 before).
+#
+# Original, not derived from any distributed scene, so it carries no licence constraints.
+
+LookAt 0 0 0   0 0 -1   0 1 0
+Camera "perspective" "float fov" [ 40 ]
+Film "rgb" "integer xresolution" [ 200 ] "integer yresolution" [ 200 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+
+WorldBegin
+
+LightSource "infinite" "rgb L" [ 0.2 0.3 0.5 ]
+AttributeBegin
+  Translate 0 0 -40
+  Material "diffuse" "rgb reflectance" [ 0 0 0 ]
+  AreaLightSource "diffuse" "rgb L" [ 20 20 20 ]
+  Shape "sphere" "float radius" [ 4 ]
+AttributeEnd
+AttributeBegin
+  Material "dielectric" "float eta" [ 1.5 ]
+  Shape "sphere" "float radius" [ 20 ]
+AttributeEnd

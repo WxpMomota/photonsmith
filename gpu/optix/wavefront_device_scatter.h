@@ -531,6 +531,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 		} else if (matType == MaterialType::RoughDielectric) {
 			RoughDielectricBxDF<float> bx{ fm.ior, glossy_alpha, glossy_alpha_v };
 			float v = bx.f(glossy_wi_x, glossy_wi_y, glossy_wi_z, nfEta, wo_x, wo_y, wo_z);
+			if (wo_z < 0.0f) v *= nfEta * nfEta;   // pbrt's radiance-mode 1 / etap^2 of a crossing (the sampled one is in the throughput: wavefront_kernels_materials*.cu)
 			fr = fg = fb = v;
 			outPdf = bx.pdf(glossy_wi_x, glossy_wi_y, glossy_wi_z, nfEta, wo_x, wo_y, wo_z);
 		} else if (matType == MaterialType::CoatedDiffuse) {

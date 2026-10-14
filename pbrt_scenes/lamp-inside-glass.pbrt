@@ -1,0 +1,30 @@
+# @rt-category Test Scenes
+# @rt-description A small glowing ball inside a glass ball. Seen from outside it is 2.25 times dimmer than its own radiance, as in pbrt.
+# @rt-performance Fast
+# @rt-size 4
+# lamp-inside-glass.pbrt -- an emitter INSIDE a smooth glass sphere, the camera outside.
+#
+# pbrt-v4 carries the radiance change of every refraction (1 / eta'^2, where eta' is the index of the medium the ray enters over the one it leaves): going into glass
+# a ray's radiance is divided by 2.25, coming out it is multiplied by it. For a glass object seen from outside the two cancel; for a lamp inside the glass nothing
+# cancels the division, so the lamp reads 1 / 2.25 of its radiance (times the Fresnel losses of two crossings). Every renderer here read it at full strength until the
+# factor was carried in the path throughput. Measured mean over the picture (64x64, 64 samples, depth 8): pbrt-v4 0.0414, CPU / recursive / wavefront OptiX 0.0413 / 0.0413 / 0.0415
+# (they read 0.093 before).
+#
+# Original, not derived from any distributed scene, so it carries no licence constraints.
+
+LookAt 0 0 8   0 0 0   0 1 0
+Camera "perspective" "float fov" [ 30 ]
+Film "rgb" "integer xresolution" [ 200 ] "integer yresolution" [ 200 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+
+WorldBegin
+
+AttributeBegin
+  Material "diffuse" "rgb reflectance" [ 0 0 0 ]
+  AreaLightSource "diffuse" "rgb L" [ 1 1 1 ]
+  Shape "sphere" "float radius" [ 0.5 ]
+AttributeEnd
+AttributeBegin
+  Material "dielectric" "float eta" [ 1.5 ]
+  Shape "sphere" "float radius" [ 2 ]
+AttributeEnd
