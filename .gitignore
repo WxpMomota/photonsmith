@@ -218,6 +218,8 @@ RayTracer_Package/tls/
 # as uv-checker.bmp above.
 !pbrt_scenes/cornell-goniometric-profile.bmp
 !pbrt_scenes/cornell-projection-slide.bmp
+# an equal-area environment picture (pbrt_scenes/equal-area-sky.pbrt), same reasoning
+!pbrt_scenes/equal-area-sky.bmp
 
 # Test output
 test_*.ppm

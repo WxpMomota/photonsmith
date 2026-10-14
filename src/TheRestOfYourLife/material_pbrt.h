@@ -1457,8 +1457,11 @@ class subsurface : public material {
     subsurface(double eta, const double sigma_a[3], const double sigma_s[3], double g,
                double roughness_u = 0.0, double roughness_v = 0.0, bool remap_roughness = true)
         : eta_(eta),
-          alpha_x_(roughness_or_alpha(roughness_u, remap_roughness)),
-          alpha_y_(roughness_or_alpha(roughness_v, remap_roughness)),
+          // layered_alpha(), not roughness_or_alpha(): pbrt's default roughness 0 is an exactly smooth interface, and roughness_or_alpha()'s floor (alpha 0.01) made
+          // it a nearly smooth GGX one that takes the rough sample - which rejects a sample now and then, so the "smooth" entry's scatter() returned false about
+          // once in 30,000 calls (a flaky SubsurfaceRoughEntry test) and the ordinary smooth ball paid for the rough path.
+          alpha_x_(layered_alpha(roughness_u, remap_roughness)),
+          alpha_y_(layered_alpha(roughness_v, remap_roughness)),
           table_(100, 64) {
         ComputeBeamDiffusionBSSRDF(g, eta, &table_);
         for (int c = 0; c < 3; ++c) {

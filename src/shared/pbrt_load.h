@@ -33,6 +33,7 @@
 #include "pbrt_asset_check.h"
 #include "pbrt_scene.h"
 #include "ply_mesh.h"
+#include "sampling.h"         // EqualAreaSphereToSquare, WrapEqualAreaSquare - a square environment image is pbrt's equal-area form
 #include "measured_bxdf_loader.h"
 
 #include "../external/stb_image.h"
@@ -220,6 +221,48 @@ inline void applyInfiniteLightOrientation(const pbrt_scene::Matrix4 &xform,
 		}
 	}
 	pixels.swap(rotated);
+}
+
+// pbrt-v4 reads the image of a LightSource "infinite" as an EQUAL-AREA OCTAHEDRAL square (ImageInfiniteLight: a non-square image is an error, "it's unlikely this is an
+// equal area environment map"): the direction wLight = renderFromLight^-1 (w) is mapped by EqualAreaSphereToSquare(), +z at the middle of the square, and the pixel under it
+// is read nearest (LookupNearest, with WrapMode::OctahedralSphere). Every renderer here (sky_light.h on the CPU, the three OptiX sky samplers, Metal) reads a latitude-longitude
+// image in this project's own convention instead, so a square image is resampled ONCE, here, into that convention - with the light's CTM baked in, as
+// applyInfiniteLightOrientation() does for a lat-long image - and none of them has to know. The result is 8N x 4N for an N x N source (between 512 x 256 and 4096 x 2048: a 4 x 4 picture would
+// otherwise be a tiny lat-long one, which the bilinear lookup smears, and the diagonal edges of an octahedral map need the resolution), read nearest like pbrt, so it carries the source's pixels' edges. A non-square image stays lat-long
+// (pbrt rejects it; the Scene Builder's panoramas are such). Returns false (pixels untouched) for a singular CTM.
+inline bool convertEqualAreaInfiniteLight(const pbrt_scene::Matrix4 &xform, std::vector<float> &pixels, int &w, int &h) {
+	if (w <= 0 || w != h) return false;
+	pbrt_scene::Matrix4 inv;
+	if (!xform.inverseAffine(inv)) return false;
+	const int n = w;
+	const int outH = std::min(2048, std::max(256, 4 * n)), outW = 2 * outH;
+	const double pi = 3.14159265358979323846;
+	std::vector<float> out(static_cast<std::size_t>(outW) * outH * 3);
+	for (int y = 0; y < outH; ++y) {
+		const double theta = (y + 0.5) / outH * pi;
+		const double sinTheta = std::sin(theta), cosTheta = std::cos(theta);
+		for (int x = 0; x < outW; ++x) {
+			const double phi = (x + 0.5) / outW * 2.0 * pi;
+			// The world direction this lat-long pixel stands for (sky_light.h's convention), carried into the light's own frame.
+			const double dx = sinTheta * std::cos(phi), dy = cosTheta, dz = -sinTheta * std::sin(phi);
+			double lx = inv.m[0]*dx + inv.m[1]*dy + inv.m[2]*dz;
+			double ly = inv.m[4]*dx + inv.m[5]*dy + inv.m[6]*dz;
+			double lz = inv.m[8]*dx + inv.m[9]*dy + inv.m[10]*dz;
+			const double len = std::sqrt(lx*lx + ly*ly + lz*lz);
+			float *dst = &out[(static_cast<std::size_t>(y) * outW + x) * 3];
+			if (len < 1e-12) { dst[0] = dst[1] = dst[2] = 0.0f; continue; }
+			lx /= len; ly /= len; lz /= len;
+			double u, v;
+			EqualAreaSphereToSquare(lx, ly, lz, u, v);
+			WrapEqualAreaSquare(u, v);
+			const int sx = std::min(std::max(static_cast<int>(u * n), 0), n - 1), sy = std::min(std::max(static_cast<int>(v * n), 0), n - 1);
+			const float *src = &pixels[(static_cast<std::size_t>(sy) * n + sx) * 3];
+			dst[0] = src[0]; dst[1] = src[1]; dst[2] = src[2];
+		}
+	}
+	pixels.swap(out);
+	w = outW; h = outH;
+	return true;
 }
 
 // Decodes an infinite light's environment-map bytes into row-major RGB float
@@ -448,6 +491,8 @@ inline LoadResult loadFile(const std::string &path,
 				r.scene.warnings.push_back(
 					{0, path, "infinite light image '" + sky.imageFile +
 						"' could not be decoded; using its constant colour instead"});
+			} else if (!sky.hasPortal && sky.imageWidth == sky.imageHeight && convertEqualAreaInfiniteLight(sky.xform, sky.imagePixels, sky.imageWidth, sky.imageHeight)) {
+				// A square image is pbrt's equal-area form (see convertEqualAreaInfiniteLight()): now a lat-long image with the CTM baked in.
 			} else if (!sky.hasPortal) {
 				// Bakes the LightSource "infinite" directive's own CTM into
 				// the pixels themselves - see applyInfiniteLightOrientation()'s

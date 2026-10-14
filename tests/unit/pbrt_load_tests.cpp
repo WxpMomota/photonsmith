@@ -524,6 +524,50 @@ AttributeEnd
 	EXPECT_NE(a.imagePixels, b.imagePixels) << "a 90 degree rotation left the environment image untouched";
 }
 
+// A SQUARE environment image is pbrt-v4's equal-area octahedral map (+z in the middle of the picture), and this loader resamples it into the latitude-longitude convention
+// every renderer reads (pbrt_load.h, convertEqualAreaInfiniteLight()). A 4x4 picture whose pixel (2, 2) is red and whose pixel (2, 3) is blue.
+TEST_F(TempTree, ASquareInfiniteLightImageIsPbrtsEqualAreaMap) {
+	std::string hdr = "#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 4 +X 4\n";
+	for (int i = 0; i < 16; ++i) {
+		const unsigned char px[4] = { static_cast<unsigned char>(i == 10 ? 255 : 32), static_cast<unsigned char>(32), static_cast<unsigned char>(i == 14 ? 255 : 32), 129 };
+		hdr.append(reinterpret_cast<const char *>(px), 4);
+	}
+	write("sq.hdr", hdr);
+	write("sq.pbrt", "LookAt 0 0 5  0 0 0  0 1 0\nCamera \"perspective\"\nWorldBegin\nLightSource \"infinite\" \"string filename\" [\"sq.hdr\"]\n");
+	static const unsigned char kWide[8] = { 128, 128, 128, 129, 128, 128, 128, 129 };
+	std::string wide = "#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 1 +X 2\n";
+	wide.append(reinterpret_cast<const char *>(kWide), sizeof(kWide));
+	write("wide.hdr", wide);
+	write("wide.pbrt", "LookAt 0 0 5  0 0 0  0 1 0\nCamera \"perspective\"\nWorldBegin\nLightSource \"infinite\" \"string filename\" [\"wide.hdr\"]\n");
+
+	const pbrt_load::LoadResult sq = pbrt_load::loadFile(path("sq.pbrt"));
+	ASSERT_TRUE(sq.ok) << sq.error;
+	const auto &sky = sq.scene.infiniteLight;
+	ASSERT_EQ(sky.imageWidth, 2 * sky.imageHeight) << "a lat-long image is twice as wide as it is tall";
+	ASSERT_GE(sky.imageHeight, 256);
+	const auto at = [&](int x, int y, int c) { return sky.imagePixels[(static_cast<std::size_t>(y) * sky.imageWidth + x) * 3 + c]; };
+	// Every source pixel's centre direction (pbrt's EqualAreaSquareToSphere, light space = world here) lands on the lat-long pixel that holds that source pixel's colour.
+	const double pi = 3.14159265358979323846;
+	for (int sy = 0; sy < 4; ++sy) {
+		for (int sx = 0; sx < 4; ++sx) {
+			double x, y, z;
+			EqualAreaSquareToSphere((sx + 0.5) / 4.0, (sy + 0.5) / 4.0, x, y, z);
+			double phi = std::atan2(-z, x);
+			if (phi < 0.0) phi += 2.0 * pi;
+			const int px = std::min(static_cast<int>(phi / (2.0 * pi) * sky.imageWidth), sky.imageWidth - 1);
+			const int py = std::min(static_cast<int>(std::acos(std::max(-1.0, std::min(1.0, y))) / pi * sky.imageHeight), sky.imageHeight - 1);
+			const int i = sy * 4 + sx;
+			EXPECT_NEAR(at(px, py, 0), i == 10 ? 1.99f : 0.25f, 0.05f) << "source pixel (" << sx << ", " << sy << ")";
+			EXPECT_NEAR(at(px, py, 2), i == 14 ? 1.99f : 0.25f, 0.05f) << "source pixel (" << sx << ", " << sy << ")";
+		}
+	}
+
+	const pbrt_load::LoadResult wideLoad = pbrt_load::loadFile(path("wide.pbrt"));
+	ASSERT_TRUE(wideLoad.ok) << wideLoad.error;
+	EXPECT_EQ(wideLoad.scene.infiniteLight.imageWidth, 2) << "a non-square image is not resampled: it stays the latitude-longitude panorama it always was";
+	EXPECT_EQ(wideLoad.scene.infiniteLight.imageHeight, 1);
+}
+
 // ---------------------------------------------------------------------------
 // pbrt_asset_check - the GUI's "this scene's files are missing" warning. A text scan of the
 // scene (and its Includes) for the files it refers to, using the loader's own lookups.
