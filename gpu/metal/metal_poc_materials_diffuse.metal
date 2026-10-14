@@ -36,7 +36,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
     float pSum = max(pr + pt, 1e-6);
 
     if (all(mat.emission == float3(0.0))) {
-        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler);
+        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         float3 toLight = ls.point - hitPoint;
         float distSq = dot(toLight, toLight);
         float dist = sqrt(distSq);
@@ -307,7 +307,7 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
     // randomly picked light, then continue the path via cosine-weighted
     // hemisphere sampling for indirect light.
     if (all(mat.emission == float3(0.0))) {
-        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler);
+        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         float3 toLight = ls.point - hitPoint;
         float distSq = dot(toLight, toLight);
         float dist = sqrt(distSq);

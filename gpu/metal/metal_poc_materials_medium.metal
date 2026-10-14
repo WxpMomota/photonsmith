@@ -188,7 +188,7 @@ inline void shadeHomogeneousMediumSpan(
         }
 
         if (uniforms.lightCount > 0u) {
-        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler);
+        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, scatterPoint);
         float3 toLight = ls.point - scatterPoint;
         float distSq = dot(toLight, toLight);
         float dist = sqrt(distSq);
@@ -524,7 +524,7 @@ inline void shadeCloudMediumSphere(
         // of CPU's own soft grey one, not assumed correct
         // from the formula alone.
         if (uniforms.lightCount > 0u) {
-        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler);
+        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, mediumPoint);
         float3 toLight = ls.point - mediumPoint;
         float distSq = dot(toLight, toLight);
         float dist = sqrt(distSq);
@@ -831,7 +831,7 @@ inline void shadeRgbGridMediumSphere(
         }
         // Area lights.
         if (uniforms.lightCount > 0u) {
-            LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler);
+            LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, mediumPoint);
             float3 toLight = ls.point - mediumPoint;
             float distSq = dot(toLight, toLight);
             float dist = sqrt(distSq);
