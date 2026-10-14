@@ -151,6 +151,7 @@ inline ShapeMesh meshOfShape(const Object& o) {
 		case ShapeKind::RoundedBox: return roundedBoxMesh(o.size.x, o.size.y, o.size.z, o.radius);
 		case ShapeKind::Cyclorama: return cycloramaMesh(o.size.x, o.size.y, o.size.z, o.radius);
 		case ShapeKind::Terrain: return terrainMesh(o.size.x, o.size.y, o.size.z, o.steps, o.radius, o.radius2, o.seed);
+		case ShapeKind::Text: return textMesh(o.text, o.size.y, o.size.x, o.size.z);
 		case ShapeKind::Tube: return tubeMesh(o.radius, o.radius2, o.height);
 		case ShapeKind::Cone: return coneMesh(o.radius, o.height);   // (pbrt-v4 has no cone shape: written as the mesh it is)
 		default: break;
@@ -216,8 +217,12 @@ inline void writeShape(std::ostringstream& os, const Object& o, const std::strin
 		case ShapeKind::RoundedBox:
 		case ShapeKind::Cyclorama:
 		case ShapeKind::Terrain:
+		case ShapeKind::Text:
 		case ShapeKind::Tube:
-			writeGenerated(os, meshOfShape(o), ind, uvPlaceOf(o));
+			{
+				const ShapeMesh generated = meshOfShape(o);
+				if (generated.triangleCount() > 0) writeGenerated(os, generated, ind, uvPlaceOf(o));   // (a text with no letters has no shape to write)
+			}
 			break;
 		case ShapeKind::Mesh:
 			os << ind << "Scale " << num(o.meshScale) << " " << num(o.meshScale) << " " << num(o.meshScale) << "\n"

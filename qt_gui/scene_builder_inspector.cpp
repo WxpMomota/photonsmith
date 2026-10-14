@@ -20,6 +20,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFontDatabase>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QKeySequence>
@@ -32,6 +33,7 @@
 #include <QImageReader>
 #include <QPainter>
 #include <QPixmap>
+#include <QPlainTextEdit>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QPushButton>
@@ -254,6 +256,20 @@ void SceneBuilderWidget::addText(QFormLayout *f, const QString &label, const std
 		edit(key, [&]() { if (std::string *v = ref()) *v = t.toStdString(); });
 	});
 	f->addRow(new QLabel(label));   // (the label above and the box across the page: beside the label column a name like "Worn paint box" had room for half of itself)
+	f->addRow(e);
+}
+
+void SceneBuilderWidget::addMultilineText(QFormLayout *f, const QString &label, const std::function<std::string *()> &ref) {
+	auto *e = new QPlainTextEdit;
+	e->setTabChangesFocus(true);
+	e->setFixedHeight(76);
+	if (std::string *v = ref()) e->setPlainText(QString::fromStdString(*v));
+	const QString key = QString("%1:%2:%3").arg(static_cast<int>(m_sel.kind)).arg(m_sel.index).arg(label);
+	connect(e, &QPlainTextEdit::textChanged, this, [this, e, ref, key]() {
+		if (m_loading) return;
+		edit(key, [&]() { if (std::string *v = ref()) *v = e->toPlainText().toStdString(); });
+	});
+	f->addRow(new QLabel(label));
 	f->addRow(e);
 }
 
@@ -700,6 +716,37 @@ void SceneBuilderWidget::inspectObject(QFormLayout *f, int i) {
 			addNum(f, tr("Roughness"), [obj]() { return obj() ? &obj()->radius : nullptr; }, 0, 1, 0.05, 2);
 			addInt(f, tr("Seed (which ground)"), [obj]() { return obj() ? &obj()->seed : nullptr; }, 0, 999999);
 			break;
+		case ShapeKind::Text: {
+			addMultilineText(f, tr("Text"), [obj]() { return obj() ? &obj()->text.text : nullptr; });
+			auto *font = new QComboBox;
+			font->addItem(tr("Default font"), QString());
+			for (const QString &family : QFontDatabase::families()) font->addItem(family, family);
+			const QString wanted = QString::fromStdString(o.text.font);
+			if (!wanted.isEmpty() && font->findData(wanted) < 0) font->addItem(tr("%1 (not on this computer)").arg(wanted), wanted);
+			font->setCurrentIndex(std::max(0, font->findData(wanted)));
+			connect(font, QOverload<int>::of(&QComboBox::activated), this, [this, i, font](int idx) {
+				if (m_loading || i >= static_cast<int>(m_doc.objects.size())) return;
+				edit(QString(), [&]() { m_doc.objects[i].text.font = font->itemData(idx).toString().toStdString(); });
+			});
+			f->addRow(tr("Font"), font);
+			addBool(f, tr("Bold"), [obj]() { return obj() ? &obj()->text.bold : nullptr; });
+			addBool(f, tr("Italic"), [obj]() { return obj() ? &obj()->text.italic : nullptr; });
+			auto *align = new QComboBox;
+			align->addItem(tr("Left"), 0);
+			align->addItem(tr("Centre"), 1);
+			align->addItem(tr("Right"), 2);
+			align->setCurrentIndex(std::max(0, align->findData(o.text.align)));
+			connect(align, QOverload<int>::of(&QComboBox::activated), this, [this, i, align](int idx) {
+				if (m_loading || i >= static_cast<int>(m_doc.objects.size())) return;
+				edit(QString(), [&]() { m_doc.objects[i].text.align = align->itemData(idx).toInt(); });
+			});
+			f->addRow(tr("Lines line up"), align);
+			addNum(f, tr("Height of a capital letter"), [obj]() { return obj() ? &obj()->size.y : nullptr; }, 0.001, 10000, 0.1, 3);
+			addNum(f, tr("Thickness"), [obj]() { return obj() ? &obj()->size.z : nullptr; }, 0.001, 10000, 0.05, 3);
+			addNum(f, tr("Stretch sideways"), [obj]() { return obj() ? &obj()->size.x : nullptr; }, 0.05, 20, 0.05, 2);
+			addHint(f, tr("The letters are made from the chosen font and written into the scene as a mesh, so the scene file shows the same words on any computer. A new line starts a new row of letters."));
+			break;
+		}
 		case ShapeKind::Quad:
 			addNum(f, tr("Width (X)"), [obj]() { return obj() ? &obj()->size.x : nullptr; }, 0.001, 10000, 0.5);
 			addNum(f, tr("Depth (Z)"), [obj]() { return obj() ? &obj()->size.z : nullptr; }, 0.001, 10000, 0.5);

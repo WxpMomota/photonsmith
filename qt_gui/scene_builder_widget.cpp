@@ -66,6 +66,7 @@ using namespace scene_builder_ui;
 // =====================================================================================================================================
 
 SceneBuilderWidget::SceneBuilderWidget(QWidget *parent) : QWidget(parent) {
+	installTextOutlineProvider();   // (3D text is made from the fonts Qt has)
 	m_autosaveEnabled = !qEnvironmentVariableIsSet("RT_GUI_SELFTEST");
 	m_autosaveTimer = new QTimer(this);
 	m_autosaveTimer->setSingleShot(true);

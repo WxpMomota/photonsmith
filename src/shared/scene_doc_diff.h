@@ -19,10 +19,21 @@ inline std::string v(double x) { std::ostringstream s; s.imbue(std::locale::clas
 inline std::string v(const Float3& p) { return v(p.x) + "," + v(p.y) + "," + v(p.z); }
 inline std::string v(const Rgb& c) { return v(c.r) + "," + v(c.g) + "," + v(c.b); }
 
+// A text on one line of the log: its line breaks shown as " / ".
+inline std::string singleLine(std::string t) {
+	std::string out;
+	for (char c : t) {
+		if (c == '\n') out += " / ";
+		else if (c != '\r') out += c;
+	}
+	return out;
+}
+
 inline Fields fieldsOf(const Object& o) {
 	return {{"name", o.name}, {"shape", toString(o.shape)}, {"position", v(o.position)}, {"rotation", v(o.rotation)}, {"radius", v(o.radius)},
 	        {"radius2", v(o.radius2)}, {"height", v(o.height)}, {"size", v(o.size)}, {"steps", std::to_string(o.steps)}, {"meshScale", v(o.meshScale)},
-	        {"meshFile", o.meshFile}, {"seed", std::to_string(o.seed)}, {"material", toString(o.material.kind)}, {"color", v(o.material.color)}, {"checker", o.material.checker ? "1" : "0"},
+	        {"meshFile", o.meshFile}, {"seed", std::to_string(o.seed)}, {"text", singleLine(o.text.text)}, {"font", o.text.font},
+	        {"textStyle", std::string(o.text.bold ? "bold " : "") + (o.text.italic ? "italic " : "") + std::to_string(o.text.align)}, {"material", toString(o.material.kind)}, {"color", v(o.material.color)}, {"checker", o.material.checker ? "1" : "0"},
 	        {"color2", v(o.material.color2)}, {"checkerCount", v(o.material.checkerCount)}, {"roughness", v(o.material.roughness)}, {"ior", v(o.material.ior)},
 	        {"transmittance", v(o.material.transmittance)}, {"picture", o.material.imageFile}, {"pattern", toString(o.material.pattern)},
 	        {"patternScale", v(o.material.patternScale)}, {"patternVariation", v(o.material.patternVariation)}, {"scatterDistance", v(o.material.scatterDistance)},

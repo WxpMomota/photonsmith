@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "scene_shapes.h"
+#include "scene_text.h"
 
 namespace scene_doc {
 
@@ -99,19 +100,19 @@ struct Volume {
 	double frequency = 4.0;            // Cloud: how many lumps across (higher is finer detail)
 };
 
-enum class ShapeKind { Sphere, Box, Quad, Disk, Cylinder, Cone, Mesh, Pyramid, Wedge, Stairs, Torus, Capsule, Dome, Tube, RoundedBox, Cyclorama, Terrain };
+enum class ShapeKind { Sphere, Box, Quad, Disk, Cylinder, Cone, Mesh, Pyramid, Wedge, Stairs, Torus, Capsule, Dome, Tube, RoundedBox, Cyclorama, Terrain, Text };
 
 // Every shape, in the order the GUI lists them.
 inline const std::vector<ShapeKind>& allShapeKinds() {
 	static const std::vector<ShapeKind> all = {ShapeKind::Sphere,  ShapeKind::Box,   ShapeKind::Quad,    ShapeKind::Disk,  ShapeKind::Cylinder,
 	                                           ShapeKind::Cone,    ShapeKind::Pyramid, ShapeKind::Wedge, ShapeKind::Stairs, ShapeKind::Torus,
-	                                           ShapeKind::Capsule, ShapeKind::Dome,  ShapeKind::Tube,    ShapeKind::RoundedBox, ShapeKind::Cyclorama, ShapeKind::Terrain, ShapeKind::Mesh};
+	                                           ShapeKind::Capsule, ShapeKind::Dome,  ShapeKind::Tube,    ShapeKind::RoundedBox, ShapeKind::Cyclorama, ShapeKind::Terrain, ShapeKind::Text, ShapeKind::Mesh};
 	return all;
 }
 // A shape that is written as a generated triangle mesh (scene_shapes.h) rather than one of pbrt's own shapes.
 inline bool isGeneratedShape(ShapeKind k) {
 	return k == ShapeKind::Pyramid || k == ShapeKind::Wedge || k == ShapeKind::Stairs || k == ShapeKind::Torus || k == ShapeKind::Capsule ||
-	       k == ShapeKind::Dome || k == ShapeKind::Tube || k == ShapeKind::RoundedBox || k == ShapeKind::Cyclorama || k == ShapeKind::Terrain;
+	       k == ShapeKind::Dome || k == ShapeKind::Tube || k == ShapeKind::RoundedBox || k == ShapeKind::Cyclorama || k == ShapeKind::Terrain || k == ShapeKind::Text;
 }
 
 struct Object {
@@ -123,9 +124,11 @@ struct Object {
 	                                   // Terrain: the roughness, 0 to 1
 	double radius2 = 0.25;             // Torus: the tube's radius; Tube: the hole's radius; Terrain: how many hills the biggest features have across
 	double height = 1.0;               // Cylinder, Cone, Pyramid, Capsule, Tube
-	Float3 size{1.0, 1.0, 1.0};          // Box, Wedge, Stairs, RoundedBox, Cyclorama, Terrain (x, y, z); Quad (x and z); Pyramid (x and z, the base)
+	Float3 size{1.0, 1.0, 1.0};          // Box, Wedge, Stairs, RoundedBox, Cyclorama, Terrain (x, y, z); Quad (x and z); Pyramid (x and z, the base);
+	                                   // Text: x how much the letters are stretched sideways (1 = as the font draws them), y the height of a capital letter, z how thick they are
 	int steps = 5;                     // Stairs; Terrain: the grid cells across each side
 	int seed = 1;                      // Terrain: which ground the noise makes
+	TextParams text;                   // Text: what it says (lines split by a newline), in which font, how it is lined up
 	double meshScale = 1.0;            // Mesh
 	std::string meshFile;              // Mesh: a .ply file
 	Material material;
@@ -138,6 +141,18 @@ struct Object {
 	bool hidden = false;               // not drawn in the Scene Builder's views (it still renders): to see what is behind it while editing (scene_arrange.h)
 	bool locked = false;               // cannot be picked or moved by clicking and dragging in the views, so it is not moved by accident (it can still be picked in the list)
 };
+
+// About how big a Text object's box is (width, height, depth), from how many letters its longest line has and how many lines there are. The real outlines come from the GUI's
+// font, which the document does not have: this is for spacing copies and for the scene's size, not for drawing.
+inline Float3 textBoxEstimate(const Object& o) {
+	int lines = 1, longest = 0, run = 0;
+	for (char c : o.text.text) {
+		if (c == '\n') { ++lines; longest = std::max(longest, run); run = 0; }
+		else if ((static_cast<unsigned char>(c) & 0xC0) != 0x80) ++run;   // (a letter, not the second byte of one)
+	}
+	longest = std::max(longest, run);
+	return {0.65 * o.size.y * o.size.x * std::max(1, longest), o.size.y * (1.0 + 0.45 * (lines - 1)), o.size.z};
+}
 
 // The radius of a sphere around the object's position that holds all of it, whatever its rotation (a mesh, whose size the document does not know, counts as its
 // scale). Used for the scene's size (scene_pbrt_writer.h documentSize) and for spacing copies (scene_array.h).
@@ -154,6 +169,7 @@ inline double boundingRadius(const Object& o) {
 		case ShapeKind::Quad: r = 0.5 * std::sqrt(o.size.x * o.size.x + o.size.z * o.size.z); break;
 		case ShapeKind::Pyramid: r = 0.5 * std::sqrt(o.size.x * o.size.x + o.height * o.height + o.size.z * o.size.z); break;
 		case ShapeKind::Mesh: r = std::fabs(o.meshScale); break;
+		case ShapeKind::Text: { const Float3 b = textBoxEstimate(o); r = 0.5 * std::sqrt(b.x * b.x + b.y * b.y + b.z * b.z); break; }
 		default: r = std::sqrt((o.radius + o.radius2) * (o.radius + o.radius2) + o.height * o.height); break;   // disk, cylinder, cone, capsule, dome, torus, tube
 	}
 	return std::fabs(r);
@@ -299,6 +315,7 @@ inline const char* toString(ShapeKind k) {
 		case ShapeKind::RoundedBox: return "roundedbox";
 		case ShapeKind::Cyclorama: return "cyclorama";
 		case ShapeKind::Terrain: return "terrain";
+		case ShapeKind::Text: return "text";
 	}
 	return "sphere";
 }

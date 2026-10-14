@@ -103,7 +103,7 @@ inline void scaleObject(Object& o, double s) {
 		o.radius2 *= s;
 	}
 	o.height *= s;
-	o.size.x *= s;
+	if (o.shape != ShapeKind::Text) o.size.x *= s;   // (a text's x is how much the letters are stretched, not a length)
 	o.size.y *= s;
 	o.size.z *= s;
 	o.meshScale *= s;
@@ -121,6 +121,7 @@ inline double footprintRadius(const Object& o) {
 		case ShapeKind::Quad:
 		case ShapeKind::Pyramid: return 0.5 * std::sqrt(o.size.x * o.size.x + o.size.z * o.size.z);
 		case ShapeKind::Mesh: return std::fabs(o.meshScale);
+		case ShapeKind::Text: return 0.5 * std::sqrt(textBoxEstimate(o).x * textBoxEstimate(o).x + o.size.z * o.size.z);
 		case ShapeKind::Torus: return std::fabs(o.radius) + std::fabs(o.radius2);
 		default: return std::fabs(o.radius);   // sphere, disk, cylinder, cone, capsule, dome, tube
 	}

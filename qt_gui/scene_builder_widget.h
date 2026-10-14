@@ -137,6 +137,7 @@ public:
 	bool dragScale3dForTest(int index, int axis, double ratio);
 	BuilderSelection selectionForTest() const { return m_sel; }
 	void setMaterialForTest(int index, const scene_doc::Material &m);   // an object's material set as the user would leave it, and the properties rebuilt
+	void setObjectTextForTest(int index, const std::string &text);      // a text object's words set, and the properties rebuilt
 	bool dragViewMarker3dForTest(int viewIndex, int which, const QPointF &deltaPx, Qt::KeyboardModifiers mods = Qt::NoModifier);   // a saved view's marker in the 3D view
 	void orbit3dForTest(double yawDeg, double pitchDeg);
 	void frame3dForTest() { m_view3d->frameAll(); }
@@ -331,6 +332,7 @@ private:
 	void addColor(QFormLayout *f, const QString &label, const std::function<scene_doc::Rgb *()> &ref);
 	void addBool(QFormLayout *f, const QString &label, const std::function<bool *()> &ref, bool rebuildAfter = false);
 	void addText(QFormLayout *f, const QString &label, const std::function<std::string *()> &ref);
+	void addMultilineText(QFormLayout *f, const QString &label, const std::function<std::string *()> &ref);   // (a text with line breaks, in a box of its own)
 	// A file row: read-only path, Browse (and Clear, when `clearable`). `alsoApply`, if given, runs inside the same undo step as the choice.
 	void addFile(QFormLayout *f, const QString &label, const std::function<std::string *()> &ref, const QString &filter, bool clearable = false,
 	             const std::function<void(const QString &)> &alsoApply = nullptr);

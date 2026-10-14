@@ -95,6 +95,7 @@ SOURCES += \
 	scene_builder_widget.cpp \
 	scene_builder_files.cpp \
 	scene_builder_sky_gallery.cpp \
+	scene_builder_text.cpp \
 	scene_builder_autosave.cpp \
 	scene_builder_render.cpp \
 	scene_builder_inspector.cpp \
