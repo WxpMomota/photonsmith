@@ -395,7 +395,8 @@ TEST(PbrtBackendAgreementTest, NanoVdbFurnaceStaysInvisibleOnEveryBackend) {
 TEST(PbrtBackendAgreementTest, NanoVdbThinCubeReadsItsSingleScatterClosedForm) {
 	const double L = 0.1 * 0.09375 / (4.0 * 3.14159265358979323846);
 	const double expected[3] = {L, L, L};
-	expectChannelMeans("nanovdb-thin-slab", 256, 8, expected, 0.03, 0.05);
+	// (5%: at 3% a CPU median came out 4% off once in a few dozen full runs - noise of a thin medium at 256 samples; the defect this guards moved the mean by 2x.)
+	expectChannelMeans("nanovdb-thin-slab", 256, 8, expected, 0.05, 0.06);
 }
 
 // A fog whose scattering differs by colour but absorbs nothing is invisible under a uniform sky in every channel. A collision weight

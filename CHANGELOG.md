@@ -4,6 +4,10 @@ Release notes for the next tagged release, summarising the large correctness eff
 Before this, see `git log`. Each item has a commit with the measurements behind it, and
 [docs/PBRT_SUPPORT.md](docs/PBRT_SUPPORT.md) has the per-feature, per-backend detail.
 
+## Unreleased
+
+* **Scene Builder: a Sky gallery** for Sun & sky (a button under Preset): 12 thumbnails of ready-made skies - sunrise, morning, clear and hazy noon, afternoon, golden hour, sunset, low sun in haze, heavy haze, snow field, dark ground, desert - made by the program's own sky model, each shown as a view from the ground toward the sun. Choosing one sets the sun height, haze and ground and keeps the sun's direction; nothing is downloaded.
+
 ## 0.1.3 (2026-10-14)
 
 * **An imagemap's `"string filter"` is read** (`point`, `bilinear`, `trilinear`, `ewa`; pbrt's default is bilinear): on the CPU a picture asked to be `point` is drawn with hard texels as pbrt draws it (it was blurred: block difference 0.29 against pbrt, 0.02 now). The OptiX backends and Metal still sample every image bilinearly. Also checked: `thin-dielectric-medium` was not a bias (the 6-8% of the screening was noise: -0.3% / -0.2% / +0.1% of pbrt at 4096 samples).

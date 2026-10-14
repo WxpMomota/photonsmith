@@ -2,6 +2,8 @@
 #include "scene_builder_widget.h"
 
 #include "scene_builder_common.h"
+#include "scene_builder_sky_gallery.h"
+#include "../src/shared/scene_sky.h"
 
 #include <QApplication>
 #include <QButtonGroup>
@@ -776,6 +778,16 @@ void SceneBuilderWidget::inspectLight(QFormLayout *f, int i) {
 				QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
 			});
 			f->addRow(tr("Preset"), time);
+			// The gallery: thumbnails of the ready-made skies (scene_sky.h presets); choosing one sets the sun's height, the haze and the ground, and keeps the direction.
+			auto *gallery = new QPushButton(tr("Sky gallery..."));
+			connect(gallery, &QPushButton::clicked, this, [this, i]() {
+				if (m_loading || i >= static_cast<int>(m_doc.lights.size())) return;
+				const int chosen = chooseSkyPreset(this, scene_doc::sky::presetIndexOf(m_doc.lights[i].sky));
+				if (chosen < 0 || chosen >= static_cast<int>(scene_doc::sky::presets().size())) return;
+				edit(QString(), [&]() { scene_doc::sky::applyPreset(m_doc.lights[i].sky, scene_doc::sky::presets()[static_cast<size_t>(chosen)]); });
+				QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
+			});
+			f->addRow(QString(), gallery);
 			addNum(f, tr("Sun height"), [lt]() { return lt() ? &lt()->sky.sunElevation : nullptr; }, 0.5, 90, 1, 1, QString::fromUtf8(" \xC2\xB0"));
 			addNum(f, tr("Sun direction"), [lt]() { return lt() ? &lt()->sky.sunAzimuth : nullptr; }, 0, 360, 5, 0, QString::fromUtf8(" \xC2\xB0"));
 			addNum(f, tr("Haze"), [lt]() { return lt() ? &lt()->sky.turbidity : nullptr; }, 1.7, 10, 0.1, 1);

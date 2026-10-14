@@ -232,5 +232,90 @@ inline bool applySunAndSky(std::vector<Light>& lights, size_t skyIndex, const st
 	return true;
 }
 
+// ---- The sky gallery: ready-made skies for the Sun & sky light (the Builder's "Sky gallery..." window) ----------------------------------------------------------------
+// A preset is the sun's height, the haze and the ground brightness; the sun's direction is the scene's own and is kept when one is chosen.
+struct SkyPreset {
+	const char* name;
+	double sunElevation, turbidity, groundAlbedo;
+};
+
+inline const std::vector<SkyPreset>& presets() {
+	static const std::vector<SkyPreset> list = {
+		{"Sunrise", 4.0, 3.0, 0.3},       {"Morning", 25.0, 3.0, 0.3},       {"Noon, clear", 70.0, 1.9, 0.3},   {"Noon, hazy", 70.0, 6.0, 0.3},
+		{"Afternoon", 40.0, 3.0, 0.3},    {"Golden hour", 12.0, 3.5, 0.3},   {"Sunset", 3.0, 3.5, 0.3},         {"Low sun, hazy", 15.0, 8.0, 0.3},
+		{"Heavy haze", 50.0, 10.0, 0.3},  {"Snow field", 35.0, 2.5, 0.85},   {"Dark ground", 35.0, 3.0, 0.05},  {"Desert", 60.0, 2.2, 0.45},
+	};
+	return list;
+}
+
+// What choosing a preset does to a sky light: its height, haze and ground, nothing else (the direction and the brightness stay).
+inline void applyPreset(SkyParams& p, const SkyPreset& preset) {
+	p.sunElevation = preset.sunElevation;
+	p.turbidity = preset.turbidity;
+	p.groundAlbedo = preset.groundAlbedo;
+}
+
+// The index of the preset a sky is (within a little), or -1 when it is none of them.
+inline int presetIndexOf(const SkyParams& p) {
+	const std::vector<SkyPreset>& list = presets();
+	for (size_t i = 0; i < list.size(); ++i)
+		if (std::fabs(p.sunElevation - list[i].sunElevation) < 0.05 && std::fabs(p.turbidity - list[i].turbidity) < 0.05 && std::fabs(p.groundAlbedo - list[i].groundAlbedo) < 0.005)
+			return static_cast<int>(i);
+	return -1;
+}
+
+// A thumbnail of a preset: a view of the sky from the ground, 100 degrees wide, looking toward the sun's side and tilted up 14 degrees (the horizon and its glow in the
+// lower part, the sun when it is high enough to be in frame), as 8-bit sRGB (RGB, row 0 = up). Exposed so the picture's own 85th-percentile brightness is a mid-light grey
+// (every preset reads in a window of the same size, a low sun as well as a noon one) with a soft shoulder so the sun's glow does not clip to white.
+inline std::vector<unsigned char> thumbnail(const SkyParams& p, int width, int height) {
+	const int pw = 512, ph = 256;
+	const std::vector<float> pano = renderSkyImage(p, pw, ph);
+	const Float3 sun = sunDirection(p);
+	double fx = sun.x, fz = sun.z;
+	const double flen = std::sqrt(fx * fx + fz * fz);
+	if (flen < 1e-6) { fx = 1.0; fz = 0.0; } else { fx /= flen; fz /= flen; }
+	const double pitch = 14.0 * kPi / 180.0, tanH = std::tan(50.0 * kPi / 180.0), tanV = tanH * height / width;
+	const double rx = -fz, rz = fx;   // (forward x up)
+	const double cp = std::cos(pitch), sp = std::sin(pitch);
+	std::vector<float> img(static_cast<size_t>(width) * height * 3);
+	for (int j = 0; j < height; ++j) {
+		for (int i = 0; i < width; ++i) {
+			const double u = (i + 0.5) / width * 2.0 - 1.0, v = 1.0 - (j + 0.5) / height * 2.0;
+			// forward tilted up by the pitch, plus the sideways and the up offsets of this pixel
+			double dx = cp * fx - u * tanH * rx * -1.0 + v * tanV * (-sp * fx);
+			double dy = sp + v * tanV * cp;
+			double dz = cp * fz - u * tanH * rz * -1.0 + v * tanV * (-sp * fz);
+			const double len = std::sqrt(dx * dx + dy * dy + dz * dz);
+			dx /= len; dy /= len; dz /= len;
+			const double theta = std::acos(std::min(1.0, std::max(-1.0, dy)));
+			double phi = std::atan2(-dz, dx);
+			if (phi < 0.0) phi += 2.0 * kPi;
+			const double px = phi / (2.0 * kPi) * pw - 0.5, py = theta / kPi * ph - 0.5;
+			const int x0 = static_cast<int>(std::floor(px)), y0 = static_cast<int>(std::floor(py));
+			const double tx = px - x0, ty = py - y0;
+			const int X0 = ((x0 % pw) + pw) % pw, X1 = (((x0 + 1) % pw) + pw) % pw, Y0 = std::min(ph - 1, std::max(0, y0)), Y1 = std::min(ph - 1, std::max(0, y0 + 1));
+			for (int c = 0; c < 3; ++c) {
+				const double a = pano[(static_cast<size_t>(Y0) * pw + X0) * 3 + c], b = pano[(static_cast<size_t>(Y0) * pw + X1) * 3 + c];
+				const double d = pano[(static_cast<size_t>(Y1) * pw + X0) * 3 + c], e = pano[(static_cast<size_t>(Y1) * pw + X1) * 3 + c];
+				img[(static_cast<size_t>(j) * width + i) * 3 + c] = static_cast<float>((a + (b - a) * tx) * (1.0 - ty) + (d + (e - d) * tx) * ty);
+			}
+		}
+	}
+	std::vector<float> lum(static_cast<size_t>(width) * height);
+	for (size_t i = 0; i < lum.size(); ++i) lum[i] = 0.2126f * img[3 * i] + 0.7152f * img[3 * i + 1] + 0.0722f * img[3 * i + 2];
+	std::vector<float> sorted = lum;
+	std::sort(sorted.begin(), sorted.end());
+	const float ref = std::max(1e-6f, sorted[static_cast<size_t>(0.85 * (sorted.size() - 1))]);
+	const double k = 0.5 / ref;
+	std::vector<unsigned char> out(img.size());
+	for (size_t i = 0; i < img.size(); ++i) {
+		const double vv = img[i] * k;
+		const double mapped = vv / (1.0 + vv);   // soft shoulder
+		const double srgb = mapped <= 0.0031308 ? 12.92 * mapped : 1.055 * std::pow(mapped, 1.0 / 2.4) - 0.055;
+		out[i] = static_cast<unsigned char>(std::min(255.0, std::max(0.0, srgb * 255.0 * 1.35 + 0.5)));
+	}
+	return out;
+}
+
 }  // namespace sky
 }  // namespace scene_doc

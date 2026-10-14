@@ -409,3 +409,72 @@ TEST(SceneSkyEqualAreaTest, TheWriterNamesTheCopyAndKeepsThePanoramaInTheDocumen
 	ASSERT_EQ(back.lights.size(), 1u);
 	EXPECT_EQ(back.lights[0].imageFile, "C:/skies/pano.hdr") << "opening the saved scene edits the panorama again";
 }
+
+// ---- The sky gallery (scene_sky.h presets) ----
+
+TEST(SceneSkyGalleryTest, EveryPresetIsAValidSkyThatKeepsTheDirectionAndIsFoundAgain) {
+	const auto& list = sky::presets();
+	ASSERT_GE(list.size(), 9u);
+	for (size_t i = 0; i < list.size(); ++i) {
+		for (size_t j = i + 1; j < list.size(); ++j) EXPECT_STRNE(list[i].name, list[j].name) << "names are distinct";
+		SkyParams p;
+		p.sunAzimuth = 123.0;
+		sky::applyPreset(p, list[i]);
+		EXPECT_EQ(p.sunAzimuth, 123.0) << list[i].name << ": the scene's own sun direction stays";
+		EXPECT_EQ(p.sunElevation, list[i].sunElevation);
+		const SkyParams c = sky::clamped(p);
+		EXPECT_EQ(c.sunElevation, p.sunElevation) << list[i].name << ": inside the model's range";
+		EXPECT_EQ(c.turbidity, p.turbidity);
+		EXPECT_EQ(sky::presetIndexOf(p), static_cast<int>(i)) << list[i].name << " is recognised";
+	}
+	SkyParams custom;
+	custom.sunElevation = 33.3;
+	EXPECT_EQ(sky::presetIndexOf(custom), -1);
+}
+
+TEST(SceneSkyGalleryTest, ThumbnailsAreSizedExposedAlikeAndTheLowSunIsRedder) {
+	std::vector<double> means;
+	for (const auto& preset : sky::presets()) {
+		SkyParams p;
+		sky::applyPreset(p, preset);
+		const std::vector<unsigned char> px = sky::thumbnail(p, 96, 48);
+		ASSERT_EQ(px.size(), static_cast<size_t>(96) * 48 * 3) << preset.name;
+		double sum = 0;
+		for (unsigned char v : px) sum += v;
+		means.push_back(sum / px.size());
+	}
+	for (double m : means) {
+		EXPECT_GT(m, 20.0);
+		EXPECT_LT(m, 235.0) << "no thumbnail is a white or black rectangle";
+	}
+	SkyParams noon, sunrise;
+	sky::applyPreset(noon, sky::presets()[2]);
+	sky::applyPreset(sunrise, sky::presets()[0]);
+	const auto redness = [](const std::vector<unsigned char>& px) {
+		double r = 0, b = 0;
+		for (size_t i = 0; i + 2 < px.size(); i += 3) { r += px[i]; b += px[i + 2]; }
+		return r / b;
+	};
+	EXPECT_GT(redness(sky::thumbnail(sunrise, 96, 48)), redness(sky::thumbnail(noon, 96, 48))) << "a sunrise sky is redder than a noon one";
+}
+
+// RT_SKY_GALLERY_OUT=<file.ppm> writes a contact sheet of the gallery's thumbnails (to look at them); without it this test does nothing.
+TEST(SceneSkyGalleryTest, ContactSheetForLooking) {
+	const char* out = std::getenv("RT_SKY_GALLERY_OUT");
+	if (!out) GTEST_SKIP() << "RT_SKY_GALLERY_OUT is not set";
+	const auto& list = sky::presets();
+	const int tw = 192, th = 96, cols = 4, rows = static_cast<int>((list.size() + cols - 1) / cols);
+	std::vector<unsigned char> sheet(static_cast<size_t>(cols) * tw * rows * th * 3, 30);
+	for (size_t i = 0; i < list.size(); ++i) {
+		SkyParams p;
+		sky::applyPreset(p, list[i]);
+		const std::vector<unsigned char> px = sky::thumbnail(p, tw, th);
+		const int cx = static_cast<int>(i) % cols, cy = static_cast<int>(i) / cols;
+		for (int y = 0; y < th; ++y)
+			for (int x = 0; x < tw; ++x)
+				for (int c = 0; c < 3; ++c) sheet[(static_cast<size_t>(cy * th + y) * cols * tw + cx * tw + x) * 3 + c] = px[(static_cast<size_t>(y) * tw + x) * 3 + c];
+	}
+	std::ofstream f(out, std::ios::binary);
+	f << "P6\n" << cols * tw << " " << rows * th << "\n255\n";
+	f.write(reinterpret_cast<const char*>(sheet.data()), static_cast<std::streamsize>(sheet.size()));
+}
