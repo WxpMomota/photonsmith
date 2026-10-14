@@ -294,10 +294,10 @@ extern "C" __global__ void __anyhit__shadow_sphere() {
 		return;
 	}
 
-	// Transmissive materials let light through -- ignore them in shadow rays. A Subsurface sphere is one of them, like a Subsurface mesh (the triangle any-hit
-	// below) and CPU's `class subsurface::is_shadow_transmissive()`: its entry interface is a dielectric, which this project's NEE shadow rays see through. Without it a
-	// subsurface ball cast a shadow here and none on the CPU: a lit floor read 7% dark on OptiX in the consistency sweep (`backends`, `lightform` pairs).
-	if (mat.type == MaterialType::Interface || mat.type == MaterialType::Subsurface) {
+	// Only an "interface" lets light through: every other surface that has a material is opaque to NEE shadow rays in pbrt-v4 (VolPathIntegrator::SampleLd), a Subsurface
+	// ball included (its light enters at the surface and comes out elsewhere, it does not travel through). This used to skip Subsurface too, to agree with the CPU's
+	// `subsurface::is_shadow_transmissive()`, and a ball then cast no shadow: the floor under and beside it read 17% bright in subsurface-ball.pbrt against pbrt.
+	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();  // continue traversal (not an occluder)
 		return;
 	}
@@ -508,20 +508,8 @@ extern "C" __global__ void __anyhit__shadow_triangle() {
 		}
 	}
 
-	// MaterialType::Subsurface belongs in this list: its entry interface IS a
-	// plain dielectric surface (see MaterialType::Subsurface's own comment,
-	// shade_material() in optix_device_helpers.h - "the exact same smooth
-	// DielectricBxDF sample as MaterialType::Dielectric"), and CPU's
-	// equivalent `class subsurface::is_shadow_transmissive()`
-	// (material_pbrt.h) returns true with a comment explicitly stating it
-	// matches this list - Subsurface's own omission here was a real bug
-	// (the CPU code was written assuming GPU parity that didn't actually
-	// exist): any NEE shadow ray crossing a Subsurface-shaded mesh (skin,
-	// wax, marble - Subsurface is triangle-only in this backend, which is
-	// why only this triangle any-hit needs it, not the sphere one above)
-	// was wrongly reported fully occluded instead of passing through.
-	if (mat.type == MaterialType::Subsurface ||
-		mat.type == MaterialType::Interface) {
+	// Only an "interface" lets a shadow ray through (a Subsurface surface is opaque, as in pbrt-v4: see the sphere any-hit above).
+	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();
 		return;
 	}

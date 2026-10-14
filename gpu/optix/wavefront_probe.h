@@ -585,7 +585,11 @@ __device__ __forceinline__ bool wf_bssrdf_probe_walk(
 				chosen_normal = hit.normal;
 			}
 		}
-		const float step = t_local + 1e-4f;
+		// Step past this hit by more than the float resolution at the segment's distance from the origin. A translucent object has a probe segment thousands of units long (r_max is
+		// 35 radii for a ball with a mean free path of a quarter of its radius and an albedo of 0.9996), where a float is only good to 2.4e-4: a fixed 1e-4 step could land on
+		// the surface it had just found, which was then counted again as another candidate and doubled the weight (a ball read 5% bright against the CPU and pbrt).
+		const float step_eps = fmaxf(1e-4f, 1.0e-6f * fmaxf(fmaxf(fabsf(base.x), fabsf(base.y)), fmaxf(fabsf(base.z), t_local)));
+		const float step = t_local + step_eps;
 		base = base + step * seg_dir;
 		remaining -= step;
 	}

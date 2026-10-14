@@ -176,7 +176,8 @@ class triangle : public hittable {
 			rec.u = b0*u0 + b1*u1 + b2*u2;
 			rec.v = b0*v0 + b1*v1 + b2*v2;
 		} else {
-			rec.u = b1;  // barycentric fallback
+			// pbrt-v4 (Triangle::InteractionFromIntersection): a mesh with no "uv" has (0,0), (1,0), (1,1) at the three vertices of each triangle, so u = b1 + b2, v = b2.
+			rec.u = b1 + b2;
 			rec.v = b2;
 		}
 
@@ -228,8 +229,10 @@ class triangle : public hittable {
 					rec.dpdv = cross(shading_n, rec.dpdu);
 				}
 			} else {
-				rec.dpdu = e1v.length_squared() > 1e-14 ? unit_vector(e1v) : vec3(1,0,0);
-				rec.dpdv = cross(shading_n, rec.dpdu);
+				// The same default coordinates: (u, v) = (0,0), (1,0), (1,1) gives dpdu = p1 - p0 and dpdv = p2 - p1.
+				rec.dpdu = e1v;
+				rec.dpdv = e2v - e1v;
+				if (e1v.length_squared() < 1e-14) { rec.dpdu = vec3(1,0,0); rec.dpdv = cross(shading_n, rec.dpdu); }
 			}
 		}
 
@@ -341,7 +344,7 @@ class triangle : public hittable {
 			out.u = b0*uv0u + b1*uv1u + b2*uv2u;
 			out.v = b0*uv0v + b1*uv1v + b2*uv2v;
 		} else {
-			out.u = b1;   // barycentric fallback, matching hit()'s own
+			out.u = b1 + b2;   // pbrt's default coordinates, matching hit()'s own
 			out.v = b2;
 		}
 

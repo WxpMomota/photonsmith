@@ -1302,6 +1302,11 @@ private:
 			sh.materialIndex = gs_.materialIndex;
 			sh.areaLightIndex = gs_.areaLightIndex;
 			sh.insideMedium = gs_.insideMedium;
+			// The same medium on both sides is no boundary (pbrt-v4 makes a shape a medium transition only when the two differ). When that medium is the camera's own
+			// ambient medium it is already everywhere here, and reading it as "this shape is full of it" would turn the camera medium off (a scene with both is not
+			// supported): `MediumInterface "fog" "fog"` after WorldBegin is how a pbrt file keeps its surfaces from cutting the camera's fog.
+			if (gs_.insideMedium >= 0 && gs_.insideMedium == gs_.outsideMedium && gs_.insideMedium == s_.cameraMediumIndex)
+				sh.insideMedium = -1;
 			sh.reverseOrientation = gs_.reverseOrientation;
 			sh.group = gs_.group;
 			sh.srcFile = t_[pos_ - 1].file;

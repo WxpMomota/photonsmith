@@ -638,14 +638,33 @@ inline pbrt_scene::Vec3 blackbodyKelvinToRGB(float T,
 	if (T <= 0.0f) return pbrt_scene::Vec3{0.0, 0.0, 0.0};
 	const BlackbodySpectrum bb(T);
 	const XYZ xyz = SpectrumToXYZ(bb);
-	const float photometric = InnerProduct(GetCIE_Y(), bb);
-	const float norm = (photometric > 0.0f) ? (1.0f / photometric) : 0.0f;
+	// pbrt scales a light by 1 / SpectrumToPhotometric(L), the plain integral of Y(lambda) L(lambda), and its film sensor then sums X, Y and Z against L with no division by
+	// the CIE Y integral either: the light's luminance comes out as exactly `scale`. SpectrumToXYZ() here does divide by that integral (106.856), so the whole XYZ is
+	// divided by its own Y instead (the same thing). Dividing by the photometric integral, as this did, left a blackbody light 1 / 106.856 as bright as pbrt's.
+	const float norm = (xyz.Y > 0.0f) ? (1.0f / xyz.Y) : 0.0f;
 	float r, g, b;
 	colorSpace.FromXYZ(xyz.X * norm, xyz.Y * norm, xyz.Z * norm, r, g, b);
 	// Small negative components are possible near the edge of the sRGB
 	// gamut even for a physically real source - clamp rather than let a
 	// negative emission subtract light, matching every other colour path in
 	// this loader's own convention of clamping at the edges.
+	return pbrt_scene::Vec3{ std::fmax(0.0, static_cast<double>(r)),
+							  std::fmax(0.0, static_cast<double>(g)),
+							  std::fmax(0.0, static_cast<double>(b)) };
+}
+
+// The RGB of pbrt's BlackbodySpectrum(T) itself, peak-normalised (1 at its brightest wavelength) and seen through the film sensor with no photometric scaling: what a
+// GridMedium's per-voxel "temperaturename" emission is in pbrt (`scale * BlackbodySpectrum(temp)`), as opposed to a light's or a homogeneous medium's "blackbody L" / "Le",
+// which pbrt divides by SpectrumToPhotometric() to a luminance of 1 (blackbodyKelvinToRGB above). A peak-normalised spectrum has a luminance around 100: the sensor
+// sums against X, Y, Z without the 1 / 106.856 that SpectrumToXYZ() applies.
+inline pbrt_scene::Vec3 blackbodyPeakNormalizedRGB(float T,
+                                                    const RGBColorSpace &colorSpace = RGBColorSpace::sRGB()) {
+	if (T <= 0.0f) return pbrt_scene::Vec3{0.0, 0.0, 0.0};
+	const BlackbodySpectrum bb(T);
+	const XYZ xyz = SpectrumToXYZ(bb);
+	const float s = static_cast<float>(kCIE_Y_integral);
+	float r, g, b;
+	colorSpace.FromXYZ(xyz.X * s, xyz.Y * s, xyz.Z * s, r, g, b);
 	return pbrt_scene::Vec3{ std::fmax(0.0, static_cast<double>(r)),
 							  std::fmax(0.0, static_cast<double>(g)),
 							  std::fmax(0.0, static_cast<double>(b)) };

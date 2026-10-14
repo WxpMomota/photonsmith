@@ -100,8 +100,7 @@ class MitchellFilter {
 class GaussianFilter {
   public:
 	explicit GaussianFilter(double radius = 0.5, double sigma = 0.5)
-		: radius_(radius), sigma_(sigma),
-		  exp_val_(std::exp(-sigma_ * sigma_ * radius_ * radius_)) {}
+		: radius_(radius), sigma_(sigma), exp_val_(gaussian(radius)) {}
 
 	double evaluate(double ox, double oy) const {
 		return gauss1d(ox) * gauss1d(oy);
@@ -122,8 +121,13 @@ class GaussianFilter {
 	}
 
   private:
+	// pbrt-v4's Gaussian(x, 0, sigma): the normal density exp(-x^2 / (2 sigma^2)) / sqrt(2 pi sigma^2). (This used exp(-sigma^2 x^2), which at pbrt's default sigma = 0.5
+	// is a Gaussian of standard deviation 1.41 instead of 0.5: the default filter was about 2.8 times too wide and every picture softer than pbrt's.)
+	double gaussian(double x) const {
+		return std::exp(-x * x / (2.0 * sigma_ * sigma_)) / std::sqrt(2.0 * 3.14159265358979323846 * sigma_ * sigma_);
+	}
 	double gauss1d(double x) const {
-		double v = std::exp(-sigma_ * sigma_ * x * x) - exp_val_;
+		double v = gaussian(x) - exp_val_;
 		return (v > 0.0) ? v : 0.0;
 	}
 

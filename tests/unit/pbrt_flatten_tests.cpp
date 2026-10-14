@@ -219,52 +219,49 @@ TEST(FlattenTest, AreaLightFilenameAndTwoSidedDefaultToUnsetAndFalse) {
 // whose "power" input round-trips back to no scale change is a strong,
 // exactly-checkable correctness signal, not just "some scale got applied".
 TEST(FlattenTest, AreaLightPowerConvertsToScaleForUnitQuad) {
-	// area=1 (kQuadMesh is a unit square), twoSided=false, L defaults to
-	// (1,1,1) (luminance 1.0) - Phi = L*pi*area*1 = pi, so power=pi should
-	// reproduce scale=1.0 exactly, matching a power-free light's own default.
+	// pbrt-v4 applies "power" to each triangle of a mesh on its own: kQuadMesh is
+	// a unit square of two triangles of area 0.5, so Phi = L*pi*0.5 = pi/2 per
+	// triangle, and power=pi/2 should reproduce scale=1.0 exactly.
 	const FlatScene s = flattenSource(
-		std::string("AttributeBegin\n  AreaLightSource \"diffuse\" \"float power\" [ 3.14159265358979323846 ]\n")
+		std::string("AttributeBegin\n  AreaLightSource \"diffuse\" \"float power\" [ 1.57079632679489661923 ]\n")
 		+ kQuadMesh + "AttributeEnd\n");
 	ASSERT_EQ(s.areaLights.size(), 1u);
 	EXPECT_TRUE(s.areaLights[0].hasPower);
 	EXPECT_NEAR(s.areaLights[0].scale, 1.0, 1e-9);
 }
 
-TEST(FlattenTest, AreaLightPowerScalesLinearlyWithArea) {
-	// Two adjacent unit quads sharing one area light (area=2) - the same
-	// power now spreads over twice the area, so achieving Phi=pi with twice
-	// the area needs half the scale (an L held fixed at 1.0 over 2x the
-	// area would emit 2x the naive-default Phi, so power=pi should now
-	// halve scale instead of leaving it at 1.0 - a check that area is
-	// really SUMMED across every shape under one areaLight index, not just
-	// read from the first).
+TEST(FlattenTest, AreaLightPowerFollowsEachPrimitivesOwnArea) {
+	// A unit quad (two triangles of 0.5) and a quad of side 2 (two of 2.0) under
+	// one AreaLightSource: pbrt-v4 gives every triangle the scale its OWN area
+	// asks for (power=pi: 2 for a small triangle, 0.5 for a big one), not one
+	// scale from the summed area. The two small triangles share a light, the two
+	// big ones another.
 	const FlatScene s = flattenSource(
 		std::string("AttributeBegin\n  AreaLightSource \"diffuse\" \"float power\" [ 3.14159265358979323846 ]\n")
 		+ kQuadMesh +
 		"Shape \"trianglemesh\" \"integer indices\" [ 0 1 2  0 2 3 ]\n"
-		"  \"point3 P\" [ 1 0 0  2 0 0  2 1 0  1 1 0 ]\n"
+		"  \"point3 P\" [ 2 0 0  4 0 0  4 2 0  2 2 0 ]\n"
 		"AttributeEnd\n");
-	ASSERT_EQ(s.areaLights.size(), 1u);
-	EXPECT_NEAR(s.areaLights[0].scale, 0.5, 1e-9);
+	ASSERT_EQ(s.areaLights.size(), 2u);
+	ASSERT_EQ(s.triangles.size(), 4u);
+	EXPECT_EQ(s.triangles[0].areaLight, s.triangles[1].areaLight);
+	EXPECT_EQ(s.triangles[2].areaLight, s.triangles[3].areaLight);
+	EXPECT_NE(s.triangles[0].areaLight, s.triangles[2].areaLight);
+	EXPECT_NEAR(s.areaLights[s.triangles[0].areaLight].scale, 2.0, 1e-9);
+	EXPECT_NEAR(s.areaLights[s.triangles[2].areaLight].scale, 0.5, 1e-9);
 }
 
 TEST(FlattenTest, AreaLightPowerHonoursTwoSidedAndExistingLColour) {
-	// twoSided doubles the area term (kE = pi*area*2), and the scale is
-	// normalized by L's own relativeLuminance() (0.2126*2 = 0.4252 for pure
-	// red at 2.0) before being scaled to hit the requested power - the same
-	// "normalize by luminance, then scale to the target" composition used
-	// for point/spot (see relativeLuminance()'s own comment for why: it
-	// keeps a power-driven light's brightness independent of how bright L
-	// happened to be typed in as). L's own colour RATIO should survive
-	// unmodified - only `scale` changes.
+	// twoSided doubles the area term (kE = pi*area*2). pbrt-v4 does not divide by
+	// the colour's luminance (SpectrumToPhotometric of an RGB light uses only its
+	// illuminant), so an L of (2,0,0) keeps its 2 and only `scale` changes.
 	const FlatScene s = flattenSource(
 		std::string("AttributeBegin\n  AreaLightSource \"diffuse\" \"rgb L\" [ 2 0 0 ]"
 					" \"bool twosided\" [ true ] \"float power\" [ 3.14159265358979323846 ]\n")
 		+ kQuadMesh + "AttributeEnd\n");
 	ASSERT_EQ(s.areaLights.size(), 1u);
-	// kE = pi*area(1)*2 = 2*pi; lum(2,0,0) = 0.4252;
-	// scale = (power/kE)/lum = (pi/(2*pi))/0.4252 = 1.1759172154280337.
-	EXPECT_NEAR(s.areaLights[0].scale, 1.1759172154280337, 1e-9);
+	// Per triangle: kE = pi*area(0.5)*2 = pi; scale = power/kE = 1.
+	EXPECT_NEAR(s.areaLights[0].scale, 1.0, 1e-9);
 	EXPECT_DOUBLE_EQ(s.areaLights[0].L[0], 2.0);
 	EXPECT_DOUBLE_EQ(s.areaLights[0].L[1], 0.0);
 	EXPECT_DOUBLE_EQ(s.areaLights[0].L[2], 0.0);
@@ -2363,10 +2360,14 @@ TEST(FlattenCameraTest, SphericalCameraReadsItsMappingParameter) {
 	EXPECT_EQ(s.camera.sphericalMapping, "equalarea");
 }
 
-TEST(FlattenCameraTest, SphericalCameraDefaultsToEquirectangular) {
+TEST(FlattenCameraTest, SphericalCameraDefaultsToEqualArea) {
+	// pbrt-v4's own default (SphericalCamera::Create: `mapping` is "equalarea"); "equirectangular" has to be asked for.
 	const FlatScene s = flattenSource(
 		"Camera \"spherical\"\nWorldBegin\n" + std::string(kQuadMesh));
-	EXPECT_EQ(s.camera.sphericalMapping, "equirectangular");
+	EXPECT_EQ(s.camera.sphericalMapping, "equalarea");
+	const FlatScene t = flattenSource(
+		"Camera \"spherical\" \"string mapping\" [ \"equirectangular\" ]\nWorldBegin\n" + std::string(kQuadMesh));
+	EXPECT_EQ(t.camera.sphericalMapping, "equirectangular");
 }
 
 TEST(FlattenCameraTest, RealisticCameraReadsItsOwnParameters) {

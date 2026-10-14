@@ -11,6 +11,8 @@
 # 80% of the CPU at roughness 0.25, 63% at 0.6, 50% at 1.0 (1 / (1 + alpha^2), alpha = sqrt(roughness)). Now all three
 # agree to 0.2% at every roughness. A scene whose glass is seen from outside mostly shows the lamp itself (94% of the image
 # energy in rough-glass-lamp.pbrt), which hid the problem from whole-image means.
+# Real pbrt-v4 draws this scene 2.25 times brighter (mean 9.84 against 4.37): its radiance-mode refraction carries 1 / eta^2, which cancels for a closed glass
+# object seen from outside but not for a camera inside it (docs/PBRT_SUPPORT.md, "The bundled pbrt_scenes compared with pbrt-v4"). The three renderers here agree.
 # Original, not derived from any distributed scene, so it carries no licence constraints.
 
 LookAt  0 0 0    0 0 -1    0 1 0

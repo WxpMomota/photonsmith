@@ -15,15 +15,15 @@
 # which uses lookfrom.z()+1.0 for the same reason - see that lambda's own
 # comment on why lookat isn't used directly: a degenerate cross(up,forward)
 # if lookat truly equaled lookfrom). Equirectangular is this loader's own
-# default mapping (matches native's own SphericalCamera<double>::
-# EquiRectangular explicit choice), so no "string mapping" override is
-# needed.
+# mapping choice (matches native's own SphericalCamera<double>::
+# EquiRectangular explicit choice); pbrt-v4's own default is "equalarea",
+# so it is asked for here.
 #
 # Original, not derived from any distributed scene, so it carries no licence
 # constraints.
 
 LookAt  278 278 278    278 278 279    0 1 0
-Camera "spherical"
+Camera "spherical" "string mapping" [ "equirectangular" ]
 
 Film "rgb" "integer xresolution" [ 600 ] "integer yresolution" [ 600 ]
 Sampler "halton" "integer pixelsamples" [ 200 ]

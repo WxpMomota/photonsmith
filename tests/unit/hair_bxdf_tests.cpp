@@ -165,9 +165,8 @@ TEST(HairBxDF, AbsorptionReducesAttenuation) {
 //
 // We use importance sampling via sample() for numerical stability.
 // The estimator:
-//   weight_i = (f.r + f.g + f.b) / 3 * |wi_lz|
-//            = (eval_local / |wi_lz|) / pdf * |wi_lz|   [since res = f/pdf, f = eval/|lz|]
-//            = fsum / pdf
+//   weight_i = (f.r + f.g + f.b) / 3 * |wi_lz| / pdf
+//            = (eval_local / |wi_lz|) * |wi_lz| / pdf = fsum / pdf   [sample() returns exactly this]
 //   => E_pdf[weight] = integral of fsum over sphere = 1 for energy conservation
 //
 // We iterate over h (cross-section offset) as a QMC parameter per sample,
@@ -235,7 +234,8 @@ TEST(HairBxDF, WhiteFurnaceBound) {
 				//   res.r = eval_local.r / pdf = (fsum.r / |wi_lz|) / pdf
 				//   res.r * |wi_lz| = fsum.r / pdf
 				//   E_pdf[fsum.avg / pdf] = integral of fsum.avg over sphere = 1
-				double weight = (res.r + res.g + res.b) / 3.0 * abs_wi_lz;
+				double weight = (res.r + res.g + res.b) / 3.0;   // (sample() already carries the |wi.z| that f() divides by: the path has no cosine factor)
+				(void)abs_wi_lz;
 				if (std::isfinite(weight) && weight >= 0.0) {
 					ySum += weight;
 					++n_valid;

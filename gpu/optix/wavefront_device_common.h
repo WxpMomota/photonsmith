@@ -72,9 +72,11 @@ __device__ __forceinline__ float gpu_filter_evaluate(
 	// real default instead.
 	if (sigma <= 0.0f) sigma = 0.5f;
 	{
-		const float expVal = expf(-sigma*sigma*radius*radius);
-		auto gauss1d = [sigma, expVal](float x) -> float {
-			float v = expf(-sigma*sigma*x*x) - expVal;
+		// pbrt-v4's Gaussian(x, 0, sigma) = exp(-x^2 / (2 sigma^2)) / sqrt(2 pi sigma^2), minus its value at the radius (the CPU's GaussianFilter, src/shared/filter.h).
+		const float inv_norm = 1.0f / sqrtf(2.0f * 3.14159265358979323846f * sigma * sigma);
+		const float expVal = inv_norm * expf(-radius*radius / (2.0f*sigma*sigma));
+		auto gauss1d = [sigma, expVal, inv_norm](float x) -> float {
+			float v = inv_norm * expf(-x*x / (2.0f*sigma*sigma)) - expVal;
 			return (v > 0.0f) ? v : 0.0f;
 		};
 		return gauss1d(ox) * gauss1d(oy);

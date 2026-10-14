@@ -201,7 +201,7 @@ constexpr float kGpuImagemapDefaultGamma = gpu_scene_textures::kDefaultImagemapG
 inline int getOrBuildPbrtImageTexture(const std::string& resolvedPath, SceneData& out,
 									  std::map<std::string, int>& cache,
 									  float gamma = kGpuImagemapDefaultGamma,
-									  GpuWrapMode wrap = GpuWrapMode::Clamp,
+									  GpuWrapMode wrap = GpuWrapMode::Repeat,   // pbrt's imagemap default (a nested checkerboard/mix image passes no options): at u = 1 exactly it blends with the far side
 									  bool invert = false,
 									  const pbrt_flatten::UvMapping& uv = pbrt_flatten::UvMapping{}) {
 	// Always a composite key - `cache` is a fresh std::map local to one

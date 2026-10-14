@@ -1501,12 +1501,6 @@ class subsurface : public material {
         return true;
     }
 
-    // See material::is_shadow_transmissive()'s comment - matches
-    // optix_anyhit_shadow.h's MaterialType::Dielectric skip: this material's
-    // entry interface IS a dielectric, so it should not block shadow rays
-    // outright any more than `class dielectric` does.
-    bool is_shadow_transmissive(const hit_record&) const override { return true; }
-
     const subsurface* as_subsurface(const hit_record&) const override { return this; }
 
     double get_ior() const { return eta_; }

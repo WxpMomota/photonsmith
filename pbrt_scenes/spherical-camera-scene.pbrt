@@ -15,7 +15,7 @@
 # constraints.
 
 LookAt  0 1 0    0 1 1    0 1 0
-Camera "spherical"
+Camera "spherical" "string mapping" [ "equirectangular" ]   # (pbrt-v4's own default is "equalarea")
 
 Film "rgb" "integer xresolution" [ 600 ] "integer yresolution" [ 600 ]
 Sampler "halton" "integer pixelsamples" [ 200 ]

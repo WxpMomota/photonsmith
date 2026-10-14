@@ -866,12 +866,12 @@ extern "C" __global__ void evaluate_materials(
 		if (dtReflect) {
 			scattered_dir = normalize(normal + wf_rand_unit(seed));
 			if (wf_near_zero(scattered_dir)) scattered_dir = normal;
-			attenuation = albedoSpectrum(R / p_refl);
+			attenuation = albedoSpectrum(R) * (1.0f / p_refl);   // R / p can pass 1 (R = 0.6 of p = 0.43): the albedo uplift clamps to [0,1], so divide after it
 		} else {
 			float3 neg_n = -normal;
 			scattered_dir = normalize(neg_n + wf_rand_unit(seed));
 			if (wf_near_zero(scattered_dir)) scattered_dir = neg_n;
-			attenuation = albedoSpectrum(T_col / (1.0f - p_refl));
+			attenuation = albedoSpectrum(T_col) * (1.0f / (1.0f - p_refl));
 		}
 		scattered   = true;
 		is_specular = false;
@@ -1516,8 +1516,12 @@ extern "C" __global__ void evaluate_materials(
 		if (ns_len > 1e-8f) { ns_x /= ns_len; ns_y /= ns_len; ns_z /= ns_len; }
 		else                { ns_x = 0.0f; ns_y = 0.0f; ns_z = 1.0f; }
 
+		// The map's frame is the shading normal AS AUTHORED (pbrt's NormalMap, and the recursive backend's closest-hit programs), not the one turned toward the
+		// ray that `normal` is: seen from the back of a surface the tangent-space x and y push the other way. A plane written with its normal pointing down and
+		// seen from above read 45% dark here (normal-mapped-plane.pbrt).
+		const float3 authoredNormal = h.frontFace ? normal : -normal;
 		float out_nx, out_ny, out_nz;
-		apply_normal_map(ns_x, ns_y, ns_z, normal.x, normal.y, normal.z,
+		apply_normal_map(ns_x, ns_y, ns_z, authoredNormal.x, authoredNormal.y, authoredNormal.z,
 			dpdu.x, dpdu.y, dpdu.z, out_nx, out_ny, out_nz);
 		normal = make_float3(out_nx, out_ny, out_nz);
 		if (dot(normal, h.rayDir) > 0.0f) normal = -normal;   // two-sided about the shading normal, as pbrt's BSDF and the CPU's normal_map_material

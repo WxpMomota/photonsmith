@@ -69,8 +69,20 @@ inline color reflectanceToConductorK(const color& r) {
 // 8192x8192 atlases) would otherwise decode and keep a private copy per material -
 // tens of gigabytes. Weak references, so the pixels still go away with the last
 // material that uses them (a later scene load does not inherit a stale gigabyte).
+inline MipMapOptions pbrtDefaultMipMapOptions() {
+	// pbrt-v4's "string filter" for an imagemap defaults to "bilinear" (Texture "imagemap": FilterFunction::Bilinear): the level that fits the pixel footprint, a plain bilinear
+	// lookup in it. This project's own default is EWA, whose Gaussian footprint reads a small picture as round blobs when it is magnified (a 4x4 picture on a quad,
+	// pbrt_scenes/nested-checker-texture.pbrt, differed from pbrt in its whole area). "string filter" itself is not read.
+	// Its "wrap" defaults to "repeat" too (this project's MipMapOptions says clamp): a nested imagemap read at u = 1 exactly, the far edge of a triangle with
+	// no "uv", blends with the picture's other side in pbrt.
+	MipMapOptions opts;
+	opts.filter = MipFilter::Bilinear;
+	opts.wrap = MipWrapMode::Repeat;
+	return opts;
+}
+
 inline std::shared_ptr<mipmap_texture> sharedMipmapTexture(const char *filename,
-														   MipMapOptions opts = MipMapOptions{}) {
+														   MipMapOptions opts = pbrtDefaultMipMapOptions()) {
 	static std::mutex mutex;
 	static std::map<std::string, std::weak_ptr<mipmap_texture>> cache;
 	std::string key = filename;
@@ -148,7 +160,7 @@ inline shared_ptr<texture> checkerPatternTexture(const pbrt_flatten::Material &m
 // etc.) still deliberately keeps using the default-constructed
 // MipMapOptions{} (gamma 2.2, Clamp, no invert) - unchanged.
 inline MipMapOptions imageMapOptionsFor(const pbrt_flatten::Material &m) {
-	MipMapOptions opts;
+	MipMapOptions opts = pbrtDefaultMipMapOptions();
 	// static_cast, matching the identical GPU-side cast already used for
 	// this same double(pbrt)->float(MipMapOptions) field 3x in
 	// gpu/optix/pbrt_gpu_builder_materials.h.
@@ -167,7 +179,7 @@ inline MipMapOptions imageMapOptionsFor(const pbrt_flatten::Material &m) {
 // own pbrt_flatten::TextureDecodeOptions (transmittance/roughness) instead
 // of 3 loose Material fields - see that struct's own comment.
 inline MipMapOptions toMipMapOptions(const pbrt_flatten::TextureDecodeOptions &o) {
-	MipMapOptions opts;
+	MipMapOptions opts = pbrtDefaultMipMapOptions();
 	opts.gamma = static_cast<float>(o.gamma);
 	opts.invert = o.invert;
 	opts.wrap = static_cast<MipWrapMode>(o.wrapIndex);

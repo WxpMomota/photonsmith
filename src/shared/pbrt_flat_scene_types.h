@@ -264,7 +264,7 @@ struct Camera {
 	// list - lookfrom/lookat/up above still apply to all of them (they come
 	// from the world-to-camera matrix, which every pbrt camera type shares).
 	std::string type = "perspective";                  // as pbrt spells it
-	std::string sphericalMapping = "equirectangular";   // spherical/environment only
+	std::string sphericalMapping = "equalarea";         // spherical/environment only: pbrt-v4's own default (SphericalCamera::Create), "equirectangular" must be asked for
 	std::string lensFile;                               // realistic only: path, relative to the scene file
 	double filmDiagonalMM = 35.0;      // realistic only - pbrt-v4's own default
 	double apertureDiameterMM = 1.0;   // realistic only - pbrt-v4's own default

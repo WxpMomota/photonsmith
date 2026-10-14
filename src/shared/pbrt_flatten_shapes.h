@@ -1283,10 +1283,18 @@ inline void resolveAfterShapes(const pbrt_scene::Scene &scene, FlatScene &out) {
 	// (twoSided ? 2 : 1) - inverted here into the `scale` multiplier that
 	// achieves the requested Phi. Can only run now, not in the area-light
 	// parsing loop above: AreaLightSource is declared BEFORE the Shape it
-	// attaches to in pbrt syntax, so a light's attached area isn't known
-	// until every shape referencing it (by `areaLight` index, possibly more
-	// than one - a mesh light is often several triangles) has been built,
-	// which just finished above.
+	// attaches to in pbrt syntax, so the attached area isn't known until the
+	// shapes referencing it (by `areaLight` index) have been built, which just
+	// finished above.
+	//
+	// pbrt creates one DiffuseAreaLight for every PRIMITIVE, a mesh's triangle
+	// included, and applies "power" to each against that primitive's own area
+	// (`shape.Area()` in DiffuseAreaLight::Create): "power" 40 on a quad of two
+	// triangles emits 40 W from each triangle, 80 W in all, and a small triangle
+	// of the same mesh is brighter than a big one. This does the same: each
+	// primitive gets the emission scale its own area asks for, a clone of the
+	// light when two primitives of one AreaLightSource need different scales
+	// (a quad's two triangles share one).
 	//
 	// Triangle/unclipped-Sphere/BilinearPatch carry a plain world-space area
 	// formula. Disk/Cylinder/Cone/Paraboloid are excluded: unlike Sphere,
@@ -1304,6 +1312,9 @@ inline void resolveAfterShapes(const pbrt_scene::Scene &scene, FlatScene &out) {
 					 [](const Emission &e) { return e.hasPower; })) {
 		std::vector<double> area(out.areaLights.size(), 0.0);
 		std::vector<bool> excluded(out.areaLights.size(), false);
+		struct PrimitiveArea { int *areaLight; double area; };
+		std::vector<PrimitiveArea> primitives;
+		std::vector<bool> powered(out.areaLights.size(), false);
 		auto triangleArea = [](const double a[3], const double b[3], const double c[3]) {
 			double e1[3], e2[3];
 			for (int k = 0; k < 3; ++k) { e1[k] = b[k] - a[k]; e2[k] = c[k] - a[k]; }
@@ -1312,14 +1323,18 @@ inline void resolveAfterShapes(const pbrt_scene::Scene &scene, FlatScene &out) {
 			const double cz = e1[0]*e2[1] - e1[1]*e2[0];
 			return 0.5 * std::sqrt(cx*cx + cy*cy + cz*cz);
 		};
-		for (const Triangle &t : out.triangles) {
+		for (Triangle &t : out.triangles) {
 			if (t.areaLight < 0) continue;
-			area[t.areaLight] += triangleArea(&t.v[0], &t.v[3], &t.v[6]);
+			const double a = triangleArea(&t.v[0], &t.v[3], &t.v[6]);
+			area[t.areaLight] += a;
+			primitives.push_back({&t.areaLight, a});
 		}
-		for (const Sphere &s : out.spheres) {
+		for (Sphere &s : out.spheres) {
 			if (s.areaLight < 0) continue;
 			if (s.clipped) { excluded[s.areaLight] = true; continue; }
-			area[s.areaLight] += 4.0 * 3.14159265358979323846 * s.radius * s.radius;
+			const double a = 4.0 * 3.14159265358979323846 * s.radius * s.radius;
+			area[s.areaLight] += a;
+			primitives.push_back({&s.areaLight, a});
 		}
 		for (const Disk &d : out.disks) {
 			if (d.areaLight >= 0) excluded[d.areaLight] = true;
@@ -1327,14 +1342,16 @@ inline void resolveAfterShapes(const pbrt_scene::Scene &scene, FlatScene &out) {
 		for (const Cylinder &c : out.cylinders) {
 			if (c.areaLight >= 0) excluded[c.areaLight] = true;
 		}
-		for (const BilinearPatch &bp : out.bilinearPatches) {
+		for (BilinearPatch &bp : out.bilinearPatches) {
 			if (bp.areaLight < 0) continue;
 			// Split along the (p00,p10,p01,p11) diagonal into two triangles -
 			// exact for a planar patch (the common case a flat panel light
 			// actually is) and the same approximation real pbrt-v4's own
 			// BilinearPatch::Area() falls back to for a non-rectangular one.
-			area[bp.areaLight] += triangleArea(bp.p[0], bp.p[1], bp.p[2]) +
-								   triangleArea(bp.p[1], bp.p[3], bp.p[2]);
+			const double a = triangleArea(bp.p[0], bp.p[1], bp.p[2]) +
+							 triangleArea(bp.p[1], bp.p[3], bp.p[2]);
+			area[bp.areaLight] += a;
+			primitives.push_back({&bp.areaLight, a});
 		}
 		for (const Curve &c : out.curves) {
 			if (c.areaLight >= 0) excluded[c.areaLight] = true;
@@ -1389,8 +1406,35 @@ inline void resolveAfterShapes(const pbrt_scene::Scene &scene, FlatScene &out) {
 					 "measurable area; \"scale\"/L used as given instead");
 				continue;
 			}
-			const double kE = 3.14159265358979323846 * area[i] * (e.twoSided ? 2.0 : 1.0);
-			e.scale *= (e.power / kE) / relativeLuminance(e.L);
+			powered[i] = true;
+		}
+		// One scale per (light, primitive area): the first primitive of a light
+		// takes the light itself, a primitive of another size a copy of it.
+		// Unscaled copies are taken first: `scale` is written as each is made.
+		const std::vector<Emission> unscaled = out.areaLights;
+		std::map<std::pair<int, double>, int> perArea;
+		for (const PrimitiveArea &pr : primitives) {
+			const int light = *pr.areaLight;
+			if (!powered[light] || pr.area <= 1e-12) continue;
+			const auto key = std::make_pair(light, pr.area);
+			auto found = perArea.find(key);
+			if (found == perArea.end()) {
+				// pbrt does not divide by the colour's luminance here: SpectrumToPhotometric
+				// of an RGB illuminant spectrum takes only the illuminant ("the RGB
+				// separately ... we currently don't"), so a coloured L keeps its colour.
+				const Emission &base = unscaled[light];
+				const double kE = 3.14159265358979323846 * pr.area * (base.twoSided ? 2.0 : 1.0);
+				int index = light;
+				if (perArea.count(std::make_pair(light, -1.0)) == 0) {
+					perArea[std::make_pair(light, -1.0)] = light;   // the light itself is taken
+				} else {
+					index = static_cast<int>(out.areaLights.size());
+					out.areaLights.push_back(base);
+				}
+				out.areaLights[static_cast<std::size_t>(index)].scale = base.scale * (base.power / kE);
+				found = perArea.emplace(key, index).first;
+			}
+			*pr.areaLight = found->second;
 		}
 	}
 }

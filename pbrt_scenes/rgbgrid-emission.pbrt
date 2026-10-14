@@ -8,6 +8,9 @@
 # it by the share of the collision that is absorption, so sigma_a > 0 is what makes it glow. A Metal renderer that ignores "rgb Le"
 # renders this scene black.
 #
+# "Lescale" is small on purpose: pbrt-v4 does not normalise the emission of an rgbgrid medium (its lights and its other media divide by
+# SpectrumToPhotometric), so the same number draws 106.9 times brighter there than anywhere else, and this project reads a file the same way.
+#
 # Original, not derived from any distributed scene, so it carries no licence constraints.
 
 LookAt  0 0 6    0 0 0    0 1 0
@@ -24,7 +27,7 @@ AttributeBegin
   MakeNamedMedium "glow" "string type" [ "rgbgrid" ]
     "integer nx" [ 2 ] "integer ny" [ 2 ] "integer nz" [ 2 ]
     "float g" [ 0 ]
-    "float Lescale" [ 2 ]
+    "float Lescale" [ 0.0187 ]
     "rgb sigma_a" [ 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 0.6 ]
     "rgb sigma_s" [ 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 ]
     "rgb Le" [ 1.0 0.5 0.2  0.1 0.4 0.8  1.0 0.5 0.2  0.1 0.4 0.8  1.0 0.5 0.2  0.1 0.4 0.8  1.0 0.5 0.2  0.1 0.4 0.8 ]

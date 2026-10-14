@@ -472,9 +472,11 @@ inline void buildPunctualLights(const pbrt_flatten::FlatScene &scene, BuildResul
 					if (img.width() > 0 && img.height() > 0) {
 						const int nx = img.width(), ny = img.height();
 						std::vector<double> image(static_cast<std::size_t>(nx) * ny * 3);
+						// pbrt-v4 builds the light's frame with a y flip (ProjectionLight::Create, `renderFromLight * Scale(1, -1, 1)`): the slide's first
+						// row is at the TOP of what the light projects, so the rows are stored upside down for the lookup, which takes screen y upward.
 						for (int v = 0; v < ny; ++v) {
 							for (int u = 0; u < nx; ++u) {
-								const float *px = img.float_pixel_data(u, v);
+								const float *px = img.float_pixel_data(u, ny - 1 - v);
 								const std::size_t i = (static_cast<std::size_t>(v) * nx + u) * 3;
 								image[i + 0] = px[0];
 								image[i + 1] = px[1];
@@ -570,7 +572,7 @@ inline std::shared_ptr<hittable> bakeNanovdbMedium(const pbrt_flatten::Medium &m
 			const int bucket = static_cast<int>(std::lround(t / kKelvinBucketSize));
 			auto [it, inserted] = kelvinBucketCache.try_emplace(bucket);
 			if (inserted) {
-				it->second = pbrt_flatten::blackbodyKelvinToRGB(bucket * kKelvinBucketSize);
+				it->second = pbrt_flatten::blackbodyPeakNormalizedRGB(bucket * kKelvinBucketSize);   // pbrt: scale * BlackbodySpectrum(temp), peak-normalised, not a luminance of 1
 			}
 			le_r[i] = it->second.x; le_g[i] = it->second.y; le_b[i] = it->second.z;
 		}

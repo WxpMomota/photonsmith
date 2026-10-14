@@ -237,7 +237,16 @@ inline void flattenMedia(const pbrt_scene::Scene &scene, FlatScene &out) {
 			} else {
 				deinterleave("Le", medium.Le_r, medium.Le_g, medium.Le_b);
 			}
-			medium.Le_scale = md.params.getFloat("Lescale", 1.0);
+			// pbrt-v4's RGBGridMedium (unlike its homogeneous and grid media, and its
+			// lights) does not divide the emission by SpectrumToPhotometric: the
+			// per-voxel RGB is an RGBIlluminantSpectrum that keeps the full D65
+			// illuminant, which the film reads as CIE_Y_integral (106.856) times the
+			// radiance the same number means anywhere else. A real pbrt file's
+			// "Lescale" is written for that, so it is read that way here: pbrt draws
+			// "Lescale" 0.0187 where a plain 2 would be needed otherwise
+			// (`pbrt_scenes/rgbgrid-emission.pbrt`, measured 106.9 on a dim grid).
+			constexpr double kPbrtRgbGridLeNorm = 106.856495;
+			medium.Le_scale = md.params.getFloat("Lescale", 1.0) * kPbrtRgbGridLeNorm;
 			// "Lescale" set but no (valid) "Le" array ended up populated -
 			// silently has no effect otherwise (RGBGridMediumData::
 			// is_emissive() correctly stays false), which a code-review
@@ -384,11 +393,11 @@ inline void flattenLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 			pl.scale = ld.params.getFloat("scale", 1.0);
 			// pbrt-v4's "power" (total emitted Phi, watts): an isotropic point
 			// source radiates over the full 4*pi sphere, so I = Phi/(4*pi) -
-			// matching PointLight::Create exactly, up to the RGB-luminance
-			// stand-in relativeLuminance() uses for its spectral normalization
-			// (see that function's own comment). Multiplies into `scale`
+			// matching PointLight::Create exactly. Multiplies into `scale`
 			// rather than replacing it, so a scene giving both "power" and
 			// "scale" gets both, the same composition pbrt-v4 itself performs.
+			// pbrt does not divide by the colour's luminance either: its
+			// SpectrumToPhotometric takes only the illuminant of an RGB light.
 			// Guarded on phi > 0, matching pbrt-v4's own PointLight::Create
 			// (`if (phi_v > 0)`) - a zero or negative "power" is treated as
 			// "not given" rather than literally zeroing or negating the
@@ -396,7 +405,7 @@ inline void flattenLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 			if (const pbrt_scene::Param *p = ld.params.find("power")) {
 				if (!p->numbers.empty() && p->numbers[0] > 0.0) {
 					const double phi = p->numbers[0];
-					pl.scale *= (phi / (4.0 * 3.14159265358979323846)) / relativeLuminance(pl.intensity);
+					pl.scale *= phi / (4.0 * 3.14159265358979323846);   // no division by the colour's luminance: pbrt's SpectrumToPhotometric takes only the illuminant of an RGB spectrum
 				}
 			}
 			out.punctualLights.push_back(pl);
@@ -443,9 +452,8 @@ inline void flattenLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 			// it as contributing half its solid angle on average -
 			// Phi = 2*pi*I*((1-cosFalloffStart) + (cosFalloffStart-cosFalloffEnd)/2)
 			// - inverted for I here exactly like the point-light case just
-			// above (same relativeLuminance() stand-in, same "multiplies into
-			// scale" composition with an explicit "scale" param, same phi > 0
-			// guard matching pbrt-v4's own SpotLight::Create).
+			// above (same "multiplies into scale" composition with an explicit
+			// "scale" param, same phi > 0 guard matching pbrt-v4's own SpotLight::Create).
 			if (const pbrt_scene::Param *p = ld.params.find("power")) {
 				if (!p->numbers.empty() && p->numbers[0] > 0.0) {
 					const double phi = p->numbers[0];
@@ -454,7 +462,7 @@ inline void flattenLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 					const double kE = 2.0 * 3.14159265358979323846 *
 						((1.0 - cosFalloffStart) + (cosFalloffStart - cosFalloffEnd) * 0.5);
 					if (std::fabs(kE) > 1e-12) {
-						pl.scale *= (phi / kE) / relativeLuminance(pl.intensity);
+						pl.scale *= phi / kE;   // likewise no luminance division
 					} else {
 						// A degenerate cone (e.g. "coneangle" 0) has no solid
 						// angle to spread Phi over - same class of problem as
@@ -513,6 +521,9 @@ inline void flattenLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 			pl.kind = PunctualLightKind::Goniometric;
 			transformPoint(ld.xform, 0.0, 0.0, 0.0, pl.pos);
 			worldToLightRotation(ld.xform, pl.worldToLight);
+			// pbrt-v4 (GoniometricLight::Create) puts a swap of y and z between the light's frame and the profile's: the profile's own pole, the z the equal-area
+			// mapping is built around, is the light's +y, "up" for a light that has not been turned. The direction handed to the profile is the swap of the light-space one.
+			for (int c = 0; c < 3; ++c) std::swap(pl.worldToLight[3 + c], pl.worldToLight[6 + c]);
 			const pbrt_scene::Vec3 I = resolveEmissionColor(ld.params, "I", pbrt_scene::Vec3{1, 1, 1}, RGBColorSpaceFromName(ld.colorSpaceName));
 			pl.intensity[0] = I.x; pl.intensity[1] = I.y; pl.intensity[2] = I.z;
 			pl.scale = ld.params.getFloat("scale", 1.0);

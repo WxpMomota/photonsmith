@@ -376,7 +376,16 @@ struct HairBxDF {
 		// light intensity, not this - see build_hair_fibers()'s comment -
 		// this clamp is a general defensive safety net, kept regardless.)
 		const T kMaxAttenuation = T(50);
-		T ratio_r = fr / pdf, ratio_g = fg / pdf, ratio_b = fb / pdf;
+		// eval_local() divides by |wi.z| (pbrt's HairBxDF::f() does, and pbrt's integrator multiplies f by |wi . ns| = |wi.z| again). This renderer's hair path has no
+		// cosine factor (skip_pdf, attenuation only), so the weight is f * |wi.z| / pdf: the Mp * Ap * Np sum over the sampling pdf, which does not depend on which frame
+		// the fibre's perpendicular axes were built in. Without it every sample was 1 / (cos(theta_i) |sin(phi_i)|) too heavy (a fibre in a white sky read 5.4 where pbrt reads 1.0).
+#if defined(__CUDACC__)
+		T absCosWi = fabsf(wi_out_lz);
+#else
+		T absCosWi = std::fabs(wi_out_lz);
+#endif
+		if (absCosWi < T(1e-6)) absCosWi = cosTheta_i > T(1e-6) ? cosTheta_i : T(1e-6);   // (eval_local's own fallback)
+		T ratio_r = fr * absCosWi / pdf, ratio_g = fg * absCosWi / pdf, ratio_b = fb * absCosWi / pdf;
 		res.wo_x = wo_wx; res.wo_y = wo_wy; res.wo_z = wo_wz;
 		res.r = ratio_r < kMaxAttenuation ? ratio_r : kMaxAttenuation;
 		res.g = ratio_g < kMaxAttenuation ? ratio_g : kMaxAttenuation;

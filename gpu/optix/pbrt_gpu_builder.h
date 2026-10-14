@@ -1243,8 +1243,14 @@ inline void addTrianglesAndQuads(BuildCtx &c) {
 			td.uv0 = f2(&t.uv[0]);
 			td.uv1 = f2(&t.uv[2]);
 			td.uv2 = f2(&t.uv[4]);
+		} else {
+			// pbrt-v4 gives a triangle of a mesh with no "uv" the coordinates (0,0), (1,0), (1,1) at its three vertices (Triangle::InteractionFromIntersection), so u = b1 + b2 and
+			// v = b2 over each triangle. The device programs treat a mesh with uvs and one without alike, from these.
+			td.uv0 = make_float2(0.0f, 0.0f);
+			td.uv1 = make_float2(1.0f, 0.0f);
+			td.uv2 = make_float2(1.0f, 1.0f);
 		}
-		td.hasUVs = t.hasUVs;
+		td.hasUVs = true;
 		td.materialIdx = materialIndex(t.material, t.areaLight);
 		// An emissive triangle that would not fold into a parallelogram is
 		// registered as a light in its own right. It used to be emitted as
@@ -1310,8 +1316,12 @@ inline void addInstances(BuildCtx &c) {
 				td.uv0 = f2(&t.uv[0]);
 				td.uv1 = f2(&t.uv[2]);
 				td.uv2 = f2(&t.uv[4]);
+			} else {
+				td.uv0 = make_float2(0.0f, 0.0f);   // pbrt's own default coordinates of a mesh with no "uv" (see the triangle loop above)
+				td.uv1 = make_float2(1.0f, 0.0f);
+				td.uv2 = make_float2(1.0f, 1.0f);
 			}
-			td.hasUVs = t.hasUVs;
+			td.hasUVs = true;
 			td.materialIdx = materialIndex(t.material, t.areaLight);
 			out.instanceTriangles.push_back(td);
 		}
@@ -1720,7 +1730,7 @@ inline void addPunctualLights(BuildCtx &c) {
 					const int ny = std::max(1, static_cast<int>(height * fitScale + 0.5f));
 					pr.nx = nx; pr.ny = ny;
 					for (int v = 0; v < ny; ++v) {
-						const int sv = v * height / ny;
+						const int sv = (ny - 1 - v) * height / ny;   // rows upside down: pbrt flips the light's y (see pbrt_cpu_stages.h)
 						for (int u = 0; u < nx; ++u) {
 							const int su = u * width / nx;
 							const float *px = fdata + (static_cast<std::size_t>(sv) * width + su) * 3;

@@ -402,12 +402,12 @@ inline std::string toPbrt(const Document& d, bool instancing = true) {
 				   << " ] \"rgb L\" [ " << detail::rgb(col) << " ]\n";
 				break;
 			case LightKind::Projector: {
-				// The light looks along +Z of its own space, from the origin. pbrt's projection light puts the slide in its picture turned half way round (its screen runs up and to the
-				// right, the picture's rows down and to the left), so the frame's X and Y axes are the slide's left and bottom: a Transform (column-major) puts that frame in the scene
-				// and the slide lands as it looks (scene_projector_tests.cpp checks it with renders).
+				// The light looks along +Z of its own space, from the origin. pbrt's projection light has the slide's columns run along the frame's +X (its left edge on -X) and, from the
+				// `renderFromLight * Scale(1, -1, 1)` in ProjectionLight::Create, its rows from +Y (the top) to -Y: so the frame's X axis is the slide's left and Y its top. A Transform
+				// (column-major) puts that frame in the scene and the slide lands as it looks (scene_projector_tests.cpp checks it with renders).
 				const projector::Frame f = projector::frameOf(l);
-				const Float3 left{-f.right.x, -f.right.y, -f.right.z}, bottom{-f.up.x, -f.up.y, -f.up.z};
-				os << "AttributeBegin\n  Transform [ " << detail::vec(left) << " 0  " << detail::vec(bottom) << " 0  " << detail::vec(f.dir) << " 0  " << detail::vec(l.position) << " 1 ]\n"
+				const Float3 left{-f.right.x, -f.right.y, -f.right.z}, top{f.up.x, f.up.y, f.up.z};
+				os << "AttributeBegin\n  Transform [ " << detail::vec(left) << " 0  " << detail::vec(top) << " 0  " << detail::vec(f.dir) << " 0  " << detail::vec(l.position) << " 1 ]\n"
 				   << "  LightSource \"projection\" \"float scale\" [ " << detail::num(l.intensity) << " ] \"float fov\" [ " << detail::num(l.fov) << " ]";
 				if (!l.imageFile.empty()) os << " \"string filename\" [ " << detail::quoted(detail::pbrtPath(l.imageFile)) << " ]";
 				os << "\nAttributeEnd\n";

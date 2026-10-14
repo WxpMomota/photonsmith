@@ -28,6 +28,9 @@ Film "rgb" "integer xresolution" [ 64 ] "integer yresolution" [ 64 ]
 Sampler "halton" "integer pixelsamples" [ 64 ]
 
 WorldBegin
+# The same medium on both sides of every surface below: pbrt-v4 gives a shape the MediumInterface current when it is made, and the one before the
+# Camera ("" outside, "fog" inside) would make each surface a boundary to nothing; this project reads the camera medium as ambient everywhere.
+MediumInterface "fog" "fog"
 
 LightSource "point" "rgb I" [ 300 300 300 ] "point3 from" [ 0 3 -6 ]
 

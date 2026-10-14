@@ -69,9 +69,8 @@ extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 	// on the sphere's near side and the ray never reaches it - a hit here is a DIFFERENT emitter, or the light's own
 	// far side, in the way. It used to be ignored, so an emissive sphere hanging in front of a lamp cast no shadow
 	// (a dim emissive ball under a quad lamp over a floor: 117% of the CPU on both GPU backends).
-	// Subsurface too: its entry interface is a dielectric, which this project's NEE shadow rays see through (CPU `subsurface::is_shadow_transmissive()`, and the triangle
-	// any-hit below). Without it a subsurface ball cast a shadow here and none on the CPU: a lit floor read 6% dark (consistency sweep, `backends` and `lightform` pairs).
-	if (mat.type == MaterialType::Interface || mat.type == MaterialType::Subsurface) {
+	// Only an "interface" lets a shadow ray through: a Subsurface surface is opaque to NEE shadow rays like every other surface with a material in pbrt-v4.
+	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();
 		return;
 	}
@@ -323,7 +322,7 @@ extern "C" __global__ void __anyhit__wf_shadow_quad() {
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
 
-	if (mat.type == MaterialType::Interface || mat.type == MaterialType::Subsurface) {  // Subsurface: transmissive to NEE shadow rays, like the CPU
+	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();
 		return;
 	}
@@ -342,7 +341,7 @@ extern "C" __global__ void __anyhit__wf_shadow_bilinear_patch() {
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
 
-	if (mat.type == MaterialType::Interface || mat.type == MaterialType::Subsurface) {  // Subsurface: transmissive to NEE shadow rays, like the CPU
+	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();
 		return;
 	}
@@ -386,7 +385,7 @@ extern "C" __global__ void __anyhit__wf_shadow_triangle() {
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
 
-	if (mat.type == MaterialType::Interface || mat.type == MaterialType::Subsurface) {  // Subsurface: transmissive to NEE shadow rays, like the CPU
+	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();
 		return;
 	}
@@ -411,7 +410,7 @@ extern "C" __global__ void __anyhit__wf_shadow_disk() {
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
 
-	if (mat.type == MaterialType::Interface || mat.type == MaterialType::Subsurface) {  // Subsurface: transmissive to NEE shadow rays, like the CPU
+	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();
 		return;
 	}
@@ -432,7 +431,7 @@ extern "C" __global__ void __anyhit__wf_shadow_cylinder() {
 	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
 		optixGetPayload_0(), optixGetPayload_1());
 
-	if (mat.type == MaterialType::Interface || mat.type == MaterialType::Subsurface) {  // Subsurface: transmissive to NEE shadow rays, like the CPU
+	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();
 		return;
 	}
