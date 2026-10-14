@@ -607,8 +607,14 @@ static __device__ __forceinline__ bool sppm_is_delta_material(const MaterialData
 // The diffuse colour of a hit: the material's texture at the hit's (u,v) when it has one (scaled by emissionScale, as the other backends do), else its flat
 // albedo. GPU SPPM used to read mat.albedo only, so a textured diffuse surface rendered in whatever flat colour the material carries (an Earth-textured sphere
 // read 0.33x of the path tracer).
+// A lamp that also reflects (pbrt-v4: an AreaLightSource keeps the shape's Material; the builder stores a flat diffuse reflectance in `albedo`, zero for a black body): its
+// light is added and it is then a diffuse surface like any other, for the camera pass's visible point and the photons. (Its texture, if any, is its emission.)
+static __device__ __forceinline__ bool sppm_lamp_reflects(const MaterialData& mat) {
+	return mat.type == MaterialType::DiffuseLight && (mat.albedo.x > 0.0f || mat.albedo.y > 0.0f || mat.albedo.z > 0.0f);
+}
+
 static __device__ __forceinline__ float3 sppm_diffuse_albedo(const MaterialData& mat, float u, float v, const float3& p) {
-	if (mat.textureIdx >= 0 && sppm_params.textures)
+	if (mat.type != MaterialType::DiffuseLight && mat.textureIdx >= 0 && sppm_params.textures)
 		return wf_sample_texture(sppm_params.textures, sppm_params.texturePixels, mat.textureIdx, u, v, p) * mat.emissionScale;
 	return mat.albedo;
 }
@@ -966,7 +972,7 @@ extern "C" __global__ void __raygen__sppm_camera_pass() {
 
 		if (mat.type == MaterialType::DiffuseLight) {
 			pixel.Ld = pixel.Ld + beta * mat.emission;
-			break;
+			if (!sppm_lamp_reflects(mat)) break;   // (a lamp that reflects goes on as a diffuse surface below)
 		}
 
 		if (mat.type == MaterialType::RoughDielectric) {
@@ -1051,9 +1057,16 @@ extern "C" __global__ void __raygen__sppm_camera_pass() {
 				light_emission = sppm_params.materials[q.materialIdx].emission;
 			}
 
+			// A visible point on the sphere light itself (a lamp that reflects) does not light itself: the sampler gives a direction that leaves the sphere, and nothing in
+			// the way stops the shadow ray, so the lamp would read its own emission back (+1.1 on a lamp of 10 that should reflect 0.09).
+			bool lights_itself = false;
+			if (is_sphere_light) {
+				const SphereData& own = sppm_params.spheres[prim_idx];
+				lights_itself = length(pixel.vp_p - own.center) < own.radius * 1.01f && sppm_lamp_reflects(mat);
+			}
 			float light_pdf = selection_pdf * geom_pdf;
 			float cos_l = dot(to_light, pixel.vp_n);
-			if (light_pdf > 1e-6f && cos_l > 0.0f) {
+			if (light_pdf > 1e-6f && cos_l > 0.0f && !lights_itself) {
 				// f(wo,wi) via the shared helper above (Lambertian's
 				// albedo/pi, or real GGX for a glossy Conductor/RoughMetal
 				// visible point). No MIS weight -- see this file's top
@@ -1200,7 +1213,7 @@ extern "C" __global__ void __raygen__sppm_photon_pass() {
 		// fix (see sppm_is_delta_material()'s own comment) - sppm_bsdf_f()
 		// below dispatches per the visible point's own mat.type instead of
 		// assuming Lambertian.
-		if (depth > 0 && !sppm_is_delta_material(mat) && mat.type != MaterialType::DiffuseLight) {
+		if (depth > 0 && !sppm_is_delta_material(mat) && (mat.type != MaterialType::DiffuseLight || sppm_lamp_reflects(mat))) {
 			int bucket = sppm_hash_bucket(sppm_params.hashGrid, payload.hitPoint.x, payload.hitPoint.y, payload.hitPoint.z);
 			int slotIdx = sppm_params.cellHead[bucket];
 			while (slotIdx != -1) {
@@ -1249,8 +1262,8 @@ extern "C" __global__ void __raygen__sppm_photon_pass() {
 			float3 atten;
 			if (!sppm_sample_delta_material(dir_cur, payload.normal, mat, seed, new_dir, atten, /*photon=*/true, payload.front_face)) break;
 			beta_new = beta * atten;
-		} else if (mat.type == MaterialType::DiffuseLight) {
-			break; // photon paths don't continue off emitters
+		} else if (mat.type == MaterialType::DiffuseLight && !sppm_lamp_reflects(mat)) {
+			break; // photon paths don't continue off emitters (one that reflects continues below, as a diffuse surface)
 		} else {
 			// Lambertian (Phase 1's only remaining material): cosine-weighted
 			// bounce, f*cosI/pdf collapses to exactly `albedo` (see

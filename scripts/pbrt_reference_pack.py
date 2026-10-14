@@ -98,7 +98,7 @@ def one(args, name):
                 cols.append((0.0, 0.0)); continue
             ratio = float(m.mean() / ref_scalar)
             runs = []
-            for s in range(args.noise_runs if backend == "cpu" else max(2, args.noise_runs // 2)):
+            for s in range(args.noise_runs):   # (the OptiX renders are quick: as many runs as the CPU, or the noise of a spectral wavefront scene is underestimated and its test flaky)
                 v = ours_mean(args, "gpu" if backend == "recursive" else kind, path, args.test_spp, 100 + s, name + "_" + backend + "_n%d" % s)
                 if v is not None:
                     runs.append(float(v.mean()))

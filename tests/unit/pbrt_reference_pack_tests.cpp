@@ -9,6 +9,7 @@
  * Header-only helper: pbrt_reference_pack.h. The OptiX backends: pbrt_reference_pack_gpu_tests.cpp.
  */
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -45,6 +46,30 @@ TEST_P(PbrtReferencePackCpuTest, TheCpuRenderStaysWhereItWasAgainstPbrt) {
 
 INSTANTIATE_TEST_SUITE_P(BundledScenes, PbrtReferencePackCpuTest, ::testing::ValuesIn(packRows()),
                          [](const ::testing::TestParamInfo<PbrtPackRow>& info) { return pbrtPackTestName(info.param.name); });
+
+// The other CPU integrators draw a lamp that reflects (a lamp keeps the shape's material in pbrt-v4) through the same material, so they land on pbrt's mean too. A lamp that
+// ended their paths read 13% (the occluder ball) and 8% (the backdrop quad of earth-globe) dark.
+TEST(PbrtReferencePackTest, TheBidirectionalAndPhotonIntegratorsAlsoReflectLamps) {
+	const std::vector<PbrtPackRow> rows = packRows();
+	for (const char* name : {"emissive-sphere-occluder", "earth-globe"}) {
+		const auto it = std::find_if(rows.begin(), rows.end(), [&](const PbrtPackRow& r) { return r.name == name; });
+		const SceneDescriptor* s = find_example_scene(name);
+		if (it == rows.end() || !s) { ADD_FAILURE() << name << " is not in the table or not discovered"; continue; }
+		struct Run { const char* label; double tolerance; };
+		for (const Run& run : {Run{"bdpt", 0.04}, Run{"sppm", 0.06}}) {
+			const std::string out = std::string("pbrt_pack_") + name + "_" + run.label + ".exr";
+			int rc = -1;
+			if (std::string(run.label) == "bdpt") rc = cpu_render_main_bdpt(48, 48, 128, it->depth, out.c_str(), s->id.c_str(), s->camera.lookfrom_x, s->camera.lookfrom_y, s->camera.lookfrom_z);
+			else rc = cpu_render_main_sppm(32, 32, 60, 30000, it->depth, out.c_str(), s->id.c_str(), s->camera.lookfrom_x, s->camera.lookfrom_y, s->camera.lookfrom_z);
+			ASSERT_EQ(rc, 0) << name << " " << run.label;
+			double mean = 0.0;
+			const bool ok = loadLinearMean(out, mean);
+			std::remove(out.c_str());
+			ASSERT_TRUE(ok);
+			EXPECT_NEAR(mean / it->pbrtMean(), 1.0, run.tolerance) << name << " under " << run.label << ": " << mean << " against pbrt's " << it->pbrtMean();
+		}
+	}
+}
 
 TEST(PbrtReferencePackTest, TheTableIsPresentAndCoversTheBundledScenes) {
 	const std::vector<PbrtPackRow> rows = packRows();

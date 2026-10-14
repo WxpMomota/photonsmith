@@ -3,6 +3,7 @@
  * @brief The OptiX backends against the pbrt-v4 reference table (tests/data/pbrt_reference_means.txt): see pbrt_reference_pack_tests.cpp. Skips without OptiX.
  */
 #include <gtest/gtest.h>
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -56,6 +57,28 @@ class PbrtReferencePackGpuTest : public ::testing::TestWithParam<PbrtPackRow> {
 
 TEST_P(PbrtReferencePackGpuTest, TheRecursiveBackendStaysWhereItWasAgainstPbrt) { check(1, "0", "recursive"); }
 TEST_P(PbrtReferencePackGpuTest, TheWavefrontBackendStaysWhereItWasAgainstPbrt) { check(2, "1", "wavefront"); }
+
+// GPU SPPM only handles scenes of spheres and quads; earth-globe is one, and its backdrop is a lamp that reflects the sky (it read 8% dark while GPU SPPM ended photon and
+// camera paths at a lamp).
+TEST(PbrtReferencePackGpuSppmTest, ALampThatReflectsIsDrawnLikePbrtDoes) {
+	if (!optix_is_available()) GTEST_SKIP() << "OptiX not available";
+	const std::vector<PbrtPackRow> rows = packRows();
+	// earth-globe: the lamp is a quad that reflects the sky (it read 8% dark). spherical-camera-scene: the lamp is a sphere seen directly; a visible point on the sphere used to
+	// sample the sphere itself and read its own emission back (the lamp pixels, 10 on a lamp of 10, came out 11.2).
+	for (const char* name : {"earth-globe", "spherical-camera-scene"}) {
+		const auto it = std::find_if(rows.begin(), rows.end(), [&](const PbrtPackRow& r) { return r.name == name; });
+		const SceneDescriptor* s = find_example_scene(name);
+		if (it == rows.end() || !s) { ADD_FAILURE() << name << " is not in the table or not discovered"; continue; }
+		const std::string out = std::string("pbrt_pack_") + pbrtPackTestName(name) + "_gpu_sppm.exr";
+		const int rc = optix_render_main_sppm(48, 48, 60, 60000, it->depth, out.c_str(), s->id.c_str(), s->camera.lookfrom_x, s->camera.lookfrom_y, s->camera.lookfrom_z);
+		ASSERT_EQ(rc, 0) << name;
+		double mean = 0.0;
+		const bool ok = loadLinearMean(out, mean);
+		std::remove(out.c_str());
+		ASSERT_TRUE(ok) << name;
+		EXPECT_NEAR(mean / it->pbrtMean(), 1.0, 0.06) << name << ": " << mean << " against pbrt's " << it->pbrtMean();
+	}
+}
 
 INSTANTIATE_TEST_SUITE_P(BundledScenes, PbrtReferencePackGpuTest, ::testing::ValuesIn(packRows()),
                          [](const ::testing::TestParamInfo<PbrtPackRow>& info) { return pbrtPackTestName(info.param.name); });
