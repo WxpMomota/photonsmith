@@ -7,6 +7,7 @@
 #include "atomic_file.h"
 #include "../src/shared/scene_doc_diff.h"
 #include "../src/shared/pbrt_asset_check.h"
+#include "../src/shared/scene_sky_equal_area.h"
 
 #include <QApplication>
 #include <QButtonGroup>
@@ -117,14 +118,18 @@ bool SceneBuilderWidget::openFile(const QString &path, QString *error) {
 }
 
 // Writes the scene as pbrt text to `path`, without touching which file the document belongs to.
-static bool writeSceneText(const Document &doc, const QString &path) {
-	const std::string text = scene_doc::toPbrt(doc);
+// A sky picture is written as the equal-area square copy of the panorama (made once in <skies>/equal-area, scene_sky_equal_area.h), because pbrt-v4 reads an infinite light's
+// picture as an equal-area map: the saved file is then an ordinary pbrt scene that real pbrt draws with the same sky. The renderers here read the copy back as the panorama
+// (pbrt_load.h converts a square picture). The document inside the file keeps the panorama, so opening the scene again edits the panorama.
+static bool writeSceneText(const Document &doc, const QString &path, const QString &skyFolder) {
+	const std::string cache = QDir(skyFolder).filePath(QStringLiteral("equal-area")).toStdString();
+	const std::string text = scene_doc::toPbrt(doc, true, [&cache](const std::string &picture) { return scene_doc::sky_equal_area::ensureCopy(picture, cache); });
 	return writeFileAtomically(path, QByteArray::fromRawData(text.data(), static_cast<qsizetype>(text.size())));   // the old file survives a failed write
 }
 
 bool SceneBuilderWidget::saveFile(const QString &path) {
 	flushEditLog();
-	if (!writeSceneText(m_doc, path)) {
+	if (!writeSceneText(m_doc, path, skyImageFolder())) {
 		AppLog::error(QStringLiteral("builder"), QStringLiteral("save %1: could not write the file").arg(path));
 		return false;
 	}
@@ -236,7 +241,7 @@ QString SceneBuilderWidget::addToSceneList(QString *error, bool update) {
 		for (int n = 2; QFileInfo::exists(path); ++n) path = folder + "/" + name + "-" + QString::number(n) + ".pbrt";
 	}
 	// A copy for the scene list: the document keeps its own file and its unsaved state.
-	if (!writeSceneText(m_doc, path)) {
+	if (!writeSceneText(m_doc, path, skyImageFolder())) {
 		AppLog::error(QStringLiteral("builder"), QStringLiteral("add to scene list: could not write %1").arg(path));
 		if (error) *error = tr("Could not write %1.").arg(path);
 		return QString();
@@ -263,7 +268,7 @@ QString SceneBuilderWidget::livePreviewCopyPath(QString *error) {
 	return folder + "/" + name + "-live-preview.pbrt";
 }
 
-bool SceneBuilderWidget::writeSceneCopy(const Document &doc, const QString &path) { return writeSceneText(doc, path); }
+bool SceneBuilderWidget::writeSceneCopy(const Document &doc, const QString &path) { return writeSceneText(doc, path, skyImageFolder()); }
 
 QString SceneBuilderWidget::writeLivePreviewCopy(QString *error) {
 	flushEditLog();
@@ -271,7 +276,7 @@ QString SceneBuilderWidget::writeLivePreviewCopy(QString *error) {
 	if (path.isEmpty()) return QString();
 	Document copy = m_doc;
 	copy.title += " (live preview)";
-	if (!writeSceneText(copy, path)) {
+	if (!writeSceneText(copy, path, skyImageFolder())) {
 		if (error) *error = tr("Could not write %1.").arg(path);
 		return QString();
 	}

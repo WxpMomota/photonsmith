@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <functional>
 #include <iomanip>
 #include <locale>
 #include <sstream>
@@ -359,8 +360,10 @@ inline double documentSize(const Document& d) {
 	return std::round(size / unit) * unit;
 }
 
-// `instancing` off writes every object on its own (the tests compare the two).
-inline std::string toPbrt(const Document& d, bool instancing = true) {
+// `instancing` off writes every object on its own (the tests compare the two). `imageForPbrt` maps a sky picture's path to the file the LightSource line should name (an
+// empty answer, or no function, keeps the path as it is): Save passes the equal-area square of a panorama, since pbrt-v4 reads an infinite light's picture as an
+// equal-area map and rejects a lat-long one (scene_sky_equal_area.h). The document itself (the JSON line) keeps the panorama.
+inline std::string toPbrt(const Document& d, bool instancing = true, const std::function<std::string(const std::string&)>& imageForPbrt = nullptr) {
 	std::ostringstream os;
 	os.imbue(std::locale::classic());
 	os << "# " << detail::commentText(d.title) << "\n";
@@ -417,7 +420,9 @@ inline std::string toPbrt(const Document& d, bool instancing = true) {
 				if (!l.imageFile.empty()) {
 					const bool spun = l.skySpin != 0.0 && !l.physicalSky;   // (the generated sky is tied to its sun: it is not turned)
 					if (spun) os << "AttributeBegin\n  Rotate " << detail::num(l.skySpin) << " 0 1 0\n  ";
-					os << "LightSource \"infinite\" \"string filename\" [ " << detail::quoted(detail::pbrtPath(l.imageFile)) << " ] \"float scale\" [ "
+					std::string skyFile = imageForPbrt ? imageForPbrt(l.imageFile) : std::string();
+					if (skyFile.empty()) skyFile = l.imageFile;
+					os << "LightSource \"infinite\" \"string filename\" [ " << detail::quoted(detail::pbrtPath(skyFile)) << " ] \"float scale\" [ "
 					   << detail::num(l.intensity) << " ]\n";
 					if (spun) os << "AttributeEnd\n";
 				}

@@ -82,6 +82,7 @@ SOURCES += \
 	asset_downloader.cpp \
 	scene_packs.cpp \
 	../src/external/miniz.c \
+	../src/external/tinyexr_impl.cpp \
 	realtime_preview_session.cpp \
 	gpu_warmup.cpp \
 	live_object_editor.cpp \

@@ -66,6 +66,7 @@ public:
 	void selectLight(int index);   // (the self-test picks the sky)
 	void setSkyImageForTest(int light, const QString &path);   // a light's sky picture chosen as the Browse button would leave it, and the properties rebuilt
 	QString pbrtTextForTest() const { return QString::fromStdString(scene_doc::toPbrt(m_doc)); }
+	bool writeSavedCopyForTest(const QString &path) { return writeSceneCopy(m_doc, path); }   // what Save writes (a sky picture as its equal-area copy), without changing which file the scene is
 	// Several items at once (scene_builder_multi.cpp): Ctrl- or Shift-click and a box in the views, Ctrl/Shift-click in the list, and groups. Everything acts on all of them.
 	void pickObjects(const std::vector<int> &objects, const std::vector<int> &lights = {});   // replaces the selection; the first one given is the main one
 	scene_doc::ItemSet pickedItems() const;   // the main item and the others picked along with it (never the camera)

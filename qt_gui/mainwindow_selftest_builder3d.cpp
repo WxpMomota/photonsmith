@@ -442,6 +442,27 @@ void MainWindow::selfTestLights(SceneBuilderWidget *sb, const std::function<void
 		      "the Sunny lighting is Sun & sky: the sky picture is made and the Sun light follows it");
 		check(sb->runActionForTest("lighting sunny") && sb->document().lights.size() == 2 && QFileInfo::exists(QString::fromStdString(sb->document().lights[0].imageFile)),
 		      "applying the Sunny lighting again (the same sky settings) still makes the sky picture and the Sun");
+		// Save writes the sky as the equal-area square pbrt-v4 reads (scene_sky_equal_area.h), the document keeps the panorama: the copy is made, named on the LightSource line, and
+		// the running preview text (which renders the panorama itself) still names the panorama.
+		{
+			const QString saved = QDir::temp().filePath("rt_sky_ea_selftest.pbrt");
+			check(sb->writeSavedCopyForTest(saved), "Save writes the scene file");
+			QFile f(saved);
+			QString text;
+			if (f.open(QIODevice::ReadOnly)) text = QString::fromUtf8(f.readAll());
+			f.close();
+			const int at = text.indexOf(QStringLiteral("LightSource \"infinite\""));
+			const int from = text.indexOf(QStringLiteral("equalarea_v1_"), at);
+			check(at >= 0 && from > at, "the saved LightSource line names an equal-area copy of the sky picture");
+			const int to = text.indexOf(QStringLiteral(".exr"), from);
+			const QString copyName = from >= 0 && to > from ? text.mid(from, to + 4 - from) : QString();
+			bool copyExists = false;
+			for (const QString &dirPath : {QFileInfo(QString::fromStdString(sb->document().lights[0].imageFile)).dir().filePath(QStringLiteral("equal-area"))})
+				copyExists = copyExists || QFileInfo::exists(QDir(dirPath).filePath(copyName));
+			check(copyExists, "and the copy exists beside the generated skies");
+			check(sb->document().lights[0].imageFile.find("equalarea") == std::string::npos, "the document still names the panorama");
+			QFile::remove(saved);
+		}
 		sb->undo();
 		check(sb->undo() && sb->document().lights.size() == lightsBefore && sb->document().lights[0].sky.sunElevation == scene_doc::SkyParams().sunElevation, "undo brings the starter lights back, Sun included");
 		// the sky picture of the starter scene's own image: any picture file will do for the row
