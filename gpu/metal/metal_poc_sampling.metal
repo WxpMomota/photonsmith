@@ -499,6 +499,17 @@ inline float3 tangentFor(uint primId, device const packed_float3* verts, device 
 // Image bump mapping (pbrt "texture displacement" with a grayscale height map) - port of gpu/optix/gpu_bump_map.h, which
 // reproduces the CPU's bump_map_material: displacement = scale * height(u, v) from a bilinear, Repeat lookup (image row 0 at the
 // top, texel centres at (i + 0.5) / size), finite differences at +step along u and v, then pbrt's BumpMap perturbation.
+// A look-up in a picture at pbrt texture coordinates (s, t) (t up, before the image's top-down row order), honouring the texture's "string wrap": clamp reads the edge texel
+// beyond the picture, black reads black beyond it, repeat (the sampler's own mode) tiles it. 0 clamp, 1 repeat, 2 black (MipWrapMode).
+inline float4 samplePictureWrapped(texture2d<float, access::sample> picture, sampler pictureSampler, float2 st, int wrapMode) {
+    if (wrapMode == 2 && (st.x < 0.0 || st.x > 1.0 || st.y < 0.0 || st.y > 1.0)) return float4(0.0);
+    if (wrapMode == 0) {
+        const float2 halfTexel = 0.5 / float2(float(picture.get_width()), float(picture.get_height()));
+        st = clamp(st, halfTexel, 1.0 - halfTexel);
+    }
+    return picture.sample(pictureSampler, float2(st.x, 1.0 - st.y));
+}
+
 // ---------------------------------------------------------------------------
 inline float bumpHeightAt(device const float* data, int offset, int w, int h, int x, int y) {
     x = ((x % w) + w) % w;
@@ -515,6 +526,23 @@ inline float bumpHeightSample(device const float* data, int offset, int w, int h
     const float fx = x - float(x0), fy = y - float(y0);
     return (1.0 - fy) * ((1.0 - fx) * bumpHeightAt(data, offset, w, h, x0, y0) + fx * bumpHeightAt(data, offset, w, h, x0 + 1, y0))
          +        fy  * ((1.0 - fx) * bumpHeightAt(data, offset, w, h, x0, y0 + 1) + fx * bumpHeightAt(data, offset, w, h, x0 + 1, y0 + 1));
+}
+
+// The height at (u, v) from the mip level that fits `width` = pbrt's 2 * max(|dsdx|, |dtdx|, |dsdy|, |dtdy|) in the texture's own (s, t) coordinates (MIPMap::Filter with the
+// default Bilinear filter: level = levels - 1 + log2(width); the coarsest texel when that reaches the last level, otherwise the bilinear lookup in floor(level)). The levels follow
+// level 0 in `data`, each a 2x2 box average of the one above (size (n + 1) / 2, the far edge repeated: buildBumpMipChain in metal_poc_pbrt_loader.mm / gpu/optix). A width of 0
+// is the full-resolution lookup, which is what a hit with no footprint reads.
+inline float bumpHeightFiltered(device const float* data, int offset, int w, int h, float u, float v, float width) {
+    if (!(width > 0.0)) return bumpHeightSample(data, offset, w, h, u, v);
+    int levels = 1;
+    int cw = w, ch = h;
+    while (cw > 1 || ch > 1) { cw = max(1, (cw + 1) / 2); ch = max(1, (ch + 1) / 2); ++levels; }
+    const float level = float(levels - 1) + log2(max(width, 1e-8f));
+    const int want = level >= float(levels - 1) ? levels - 1 : (level > 0.0f ? int(floor(level)) : 0);
+    int lw = w, lh = h, off = offset;
+    for (int i = 0; i < want; ++i) { off += lw * lh; lw = max(1, (lw + 1) / 2); lh = max(1, (lh + 1) / 2); }
+    if (level >= float(levels - 1)) return data[off];   // the 1x1 level
+    return bumpHeightSample(data, off, lw, lh, u, v);
 }
 
 // The triangle's UNnormalized dpdu and dpdv (the 2x2 UV-edge Jacobian solve), as the CPU's rec.dpdu / rec.dpdv. A degenerate UV mapping
@@ -538,34 +566,38 @@ inline void triangleDpduDpdv(uint primId, device const packed_float3* verts, dev
     dpdv = cross(n, dpdu);
 }
 
-// 0.5 * (|dudx| + |dudy|) for a PRIMARY ray (origin O, unit direction d) of the perspective camera that hit the surface at p: the two
+// (dudx, dvdx, dudy, dvdy) of the pixel's footprint at p for a ray (origin O, unit direction d) of the perspective camera that hit the surface at p: the two
 // one-pixel-offset rays are intersected with the tangent plane (n, p) and the offsets projected onto (dpdu, dpdv) by least squares -
 // the CPU's SurfaceInteraction::compute_differentials(), as in gpu_bump_footprint_step(). 0 where the CPU would have no footprint
-// (callers then use 0.001). The pixel footprint matters: on a distant or tiled surface it spans many texels, so the CPU's primary bump
+// (all zero; callers then use 0.001). The finite-difference step is 0.5 * (|dudx| + |dudy|); pbrt gives every hit this footprint (CameraBase::Approximate_dp_dxy), as if a camera ray from its origin saw the point. The pixel footprint matters: on a distant or tiled surface it spans many texels, so the CPU's primary bump
 // is a smoothed one and a fixed small step would read the texture at full detail and render it too bright.
-inline float bumpFootprintStep(constant Uniforms& u, float3 O, float3 d, float3 p, float3 n, float3 dpdu, float3 dpdv) {
+inline float4 bumpFootprint(constant Uniforms& u, float3 O, float3 d, float3 p, float3 n, float3 dpdu, float3 dpdv) {
     const float3 fwd = float3(u.cameraForward);
     const float cf = dot(fwd, d);
-    if (cf <= 1e-6) return 0.0;
+    if (cf <= 1e-6) return float4(0.0);
     const float3 D = d / cf;   // the unnormalized direction that lands on the viewport plane (distance 1 along forward)
     // pbrt scales camera ray differentials by max(1/8, 1/sqrt(samples per pixel)) (RayIntegrator::EvaluatePixelSample), as the CPU and OptiX now do: with many samples the
     // step is a fraction of a pixel, not the whole of it. (The sample count of the whole render, which is what uniforms.samplesPerPixel is.)
     const float diffScale = max(0.125, 1.0 / sqrt(float(max(u.samplesPerPixel, 1u))));
-    const float3 Dx = D + float3(u.cameraRight) * (diffScale * 2.0 / float(u.width));
-    const float3 Dy = D + float3(u.cameraUp) * (diffScale * 2.0 / float(u.height));
+    // cameraRight / cameraUp are unit vectors: the viewport at distance 1 along forward is 2 * tanHalfFov * (aspect, 1) wide, so one pixel is that over the pixel counts.
+    const float3 Dx = D + float3(u.cameraRight) * (diffScale * 2.0 * u.tanHalfFov * u.aspect / float(u.width));
+    const float3 Dy = D + float3(u.cameraUp) * (diffScale * 2.0 * u.tanHalfFov / float(u.height));
     const float dnx = dot(n, Dx), dny = dot(n, Dy);
-    if (dnx == 0.0 || dny == 0.0) return 0.0;
+    if (dnx == 0.0 || dny == 0.0) return float4(0.0);
     const float3 pop = p - O;
     const float3 dpdx = Dx * (dot(n, pop) / dnx) - pop;
     const float3 dpdy = Dy * (dot(n, pop) / dny) - pop;
     const float a00 = dot(dpdu, dpdu), a01 = dot(dpdu, dpdv), a11 = dot(dpdv, dpdv);
     const float det = a00 * a11 - a01 * a01;
-    if (!(abs(det) > 0.0)) return 0.0;
+    if (!(abs(det) > 0.0)) return float4(0.0);
     const float inv = 1.0 / det;
-    const float dudx = (a11 * dot(dpdu, dpdx) - a01 * dot(dpdv, dpdx)) * inv;
-    const float dudy = (a11 * dot(dpdu, dpdy) - a01 * dot(dpdv, dpdy)) * inv;
+    const float bx0 = dot(dpdu, dpdx), bx1 = dot(dpdv, dpdx), by0 = dot(dpdu, dpdy), by1 = dot(dpdv, dpdy);
+    const float dudx = (a11 * bx0 - a01 * bx1) * inv;
+    const float dudy = (a11 * by0 - a01 * by1) * inv;
+    const float dvdx = (a00 * bx1 - a01 * bx0) * inv;
+    const float dvdy = (a00 * by1 - a01 * by0) * inv;
     const float step = 0.5 * (abs(dudx) + abs(dudy));
-    return (step == step && step < 1e8) ? step : 0.0;
+    return (step == step && step < 1e8) ? float4(dudx, dvdx, dudy, dvdy) : float4(0.0);
 }
 
 // dndu and dndv of a triangle's interpolated shading normal from its three vertex normals and uvs (src/shared/normal_map.h triangle_dndu_dndv, pbrt-v4
@@ -594,11 +626,16 @@ inline bool triangleIsSmooth(uint primId, device const packed_float3* normals) {
 // pbrt's ts = cross(n, dpdu), ss = cross(ts, n). (u, v) are the surface's own coordinates; uvMap = (su, sv, du, dv) is the picture's imagemap mapping, applied to each of the
 // three height lookups. The finite-difference step stays in surface units, so a tiled picture's slope is its slope per surface unit (as on the CPU).
 inline float3 imageBumpNormal(device const float* data, int offset, int w, int h, float scale, float u, float v, float4 uvMap,
-                              float3 n, bool smooth, float3 dpdu, float3 dpdv, float3 dndu, float3 dndv, float footprintStep) {
+                              float3 n, bool smooth, float3 dpdu, float3 dpdv, float3 dndu, float3 dndv, float4 footprint) {
+    const float footprintStep = 0.5 * (abs(footprint.x) + abs(footprint.z));
     const float step = footprintStep > 1e-8 ? footprintStep : 0.001;   // 0.001: the CPU's no-footprint fallback
-    const float disp   = scale * bumpHeightSample(data, offset, w, h, uvMap.x * u          + uvMap.z, uvMap.y * v          + uvMap.w);
-    const float dispU  = scale * bumpHeightSample(data, offset, w, h, uvMap.x * (u + step) + uvMap.z, uvMap.y * v          + uvMap.w);
-    const float dispV  = scale * bumpHeightSample(data, offset, w, h, uvMap.x * u          + uvMap.z, uvMap.y * (v + step) + uvMap.w);
+    // The height is read through the pixel's footprint in the displacement texture's own coordinates, like the CPU (pbrt hands the shifted context's dudx.. on).
+    float width = 0.0;
+    if (footprintStep > 1e-8)
+        width = 2.0 * max(max(abs(uvMap.x * footprint.x), abs(uvMap.y * footprint.y)), max(abs(uvMap.x * footprint.z), abs(uvMap.y * footprint.w)));
+    const float disp   = scale * bumpHeightFiltered(data, offset, w, h, uvMap.x * u          + uvMap.z, uvMap.y * v          + uvMap.w, width);
+    const float dispU  = scale * bumpHeightFiltered(data, offset, w, h, uvMap.x * (u + step) + uvMap.z, uvMap.y * v          + uvMap.w, width);
+    const float dispV  = scale * bumpHeightFiltered(data, offset, w, h, uvMap.x * u          + uvMap.z, uvMap.y * (v + step) + uvMap.w, width);
     if (dot(dpdv, dpdv) < 1e-12) dpdv = cross(n, dpdu);
     if (dot(dpdv, dpdv) < 1e-12) dpdv = float3(0.0, 1.0, 0.0);
     float3 su = dpdu, sv = dpdv;

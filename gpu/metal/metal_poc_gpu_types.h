@@ -485,6 +485,8 @@ struct TriangleMaterial {
     // (1, 1, 0, 0) is the identity. The other image slots use the surface coordinates as they are.
     float uvScaleU = 1.0f, uvScaleV = 1.0f, uvDeltaU = 0.0f, uvDeltaV = 0.0f;
     float bumpUvScaleU = 1.0f, bumpUvScaleV = 1.0f, bumpUvDeltaU = 0.0f, bumpUvDeltaV = 0.0f;
+    // pbrt imagemap "string wrap" of the reflectance picture, as MipWrapMode: 0 clamp, 1 repeat (the default), 2 black. Read where the picture is looked up at (su*u + du, sv*v + dv).
+    int32_t textureWrap = 1;
 };
 
 // Mirrors metal_poc_types.metal's GpuCloudMedium byte-for-byte (E2,

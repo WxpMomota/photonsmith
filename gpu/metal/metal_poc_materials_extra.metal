@@ -73,7 +73,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
     layeredCoatedConductorParts(mat.ior, alpha, conductorEta, conductorK, deltaTop, deltaBottom, baseAlpha);
     const bool takesLightSamples = !layerIsDelta(deltaTop, deltaBottom);
 
-    if (takesLightSamples && all(mat.emission == float3(0.0))) {
+    if (takesLightSamples) {
         LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         float3 toLight = ls.point - hitPoint;
         float distSq = dot(toLight, toLight);
@@ -363,7 +363,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
     // Lambertian/Oren-Nayar's own direction-dependent cosTheta/pi.
     float uniformPdf = 1.0 / (2.0 * M_PI_F);
 
-    if (all(mat.emission == float3(0.0))) {
+    {   // a lamp reflects too (see GPU_SCENE_COMMON.md, "An emitter reflects")
         LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         float3 toLight = ls.point - hitPoint;
         float distSq = dot(toLight, toLight);
@@ -1115,7 +1115,7 @@ inline bool shadeMeasured(TriangleMaterial mat, float3 hitPoint, float3 facingNo
     float3 woLocal = float3(dot(woWorld, tangent), dot(woWorld, bitangent), dot(woWorld, facingNormal));
     const float3 origin = hitPoint + facingNormal * 0.001f;
 
-    if (all(mat.emission == float3(0.0))) {
+    {   // a lamp reflects too (see GPU_SCENE_COMMON.md, "An emitter reflects")
         LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         float3 toLight = ls.point - hitPoint;
         float distSq = dot(toLight, toLight);

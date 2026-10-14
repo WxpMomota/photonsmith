@@ -41,7 +41,7 @@ inline bool shadeOrenNayar(TriangleMaterial mat, float3 albedo, float3 hitPoint,
                             thread float& bsdfPdf, thread bool& specularBounce, thread uint& rngState) {
     float3 woWorld = -rayDir;
 
-    if (all(mat.emission == float3(0.0))) {
+    {   // a lamp reflects too (see GPU_SCENE_COMMON.md, "An emitter reflects")
         LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         float3 toLight = ls.point - hitPoint;
         float distSq = dot(toLight, toLight);
@@ -309,7 +309,7 @@ inline bool shadeNormalizedFresnel(TriangleMaterial mat, float3 hitPoint, float3
                             thread float3& rayDir, thread float3& rayOrigin,
                             thread float3& throughput, thread float3& radiance,
                             thread float& bsdfPdf, thread bool& specularBounce, thread uint& rngState) {
-    if (all(mat.emission == float3(0.0))) {
+    {   // a lamp reflects too (see GPU_SCENE_COMMON.md, "An emitter reflects")
         LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         float3 toLight = ls.point - hitPoint;
         float distSq = dot(toLight, toLight);
@@ -591,7 +591,7 @@ inline bool shadeCoatedDiffuse(TriangleMaterial mat, float3 hitPoint, float3 fac
     woLocal.z = max(woLocal.z, 0.0001);
 
     // A Lambertian base always scatters diffusely: never a delta BSDF, so light samples are always taken (pbrt Flags()).
-    if (all(mat.emission == float3(0.0))) {
+    {   // a lamp reflects too (see GPU_SCENE_COMMON.md, "An emitter reflects")
         LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         float3 toLight = ls.point - hitPoint;
         float distSq = dot(toLight, toLight);

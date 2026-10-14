@@ -245,10 +245,13 @@ inline void perturbShadingNormal(thread const KernelRes& R, thread PathState& P,
             bumped = imageNormalMapNormal(rgbGridData, mat.bumpOffset, mat.bumpWidth, mat.bumpHeight,
                                           bumpMap.x * bumpUV.x + bumpMap.z, bumpMap.y * bumpUV.y + bumpMap.w, normal, bumpDpdu);
         } else {
-            float footprint = 0.0;
-            if (depth == 0u && uniforms.cameraOrthographic == 0u && uniforms.cameraSpherical == 0u &&
-                uniforms.cameraRealistic == 0u && uniforms.hasCameraOrbitBlur == 0u) {
-                footprint = bumpFootprintStep(uniforms, rayOrigin, rayDir, hitPoint, normal, bumpDpdu, bumpDpdv);
+            // Every hit has the camera's footprint, as pbrt-v4 gives one to a hit whose ray has no differentials (a bounce): as if a camera ray from its position saw the point
+            // (CameraBase::Approximate_dp_dxy). For a pinhole camera that is the camera ray's own at a primary hit.
+            float4 footprint = float4(0.0);
+            if (uniforms.cameraOrthographic == 0u && uniforms.cameraSpherical == 0u && uniforms.cameraRealistic == 0u && uniforms.hasCameraOrbitBlur == 0u) {
+                const float3 camToHit = hitPoint - float3(uniforms.cameraPos);
+                const float camDist = length(camToHit);
+                if (camDist > 1e-9) footprint = bumpFootprint(uniforms, float3(uniforms.cameraPos), camToHit / camDist, hitPoint, normal, bumpDpdu, bumpDpdv);
             }
             const bool smooth = triangleIsSmooth(primId, normals);
             float3 dndu = float3(0.0), dndv = float3(0.0);
@@ -446,7 +449,8 @@ inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread
                 albedo = (1.0 - uvp.x) * (1.0 - uvp.y) * float3(mat.color) + uvp.x * (1.0 - uvp.y) * float3(mat.conductorEta)
                        + (1.0 - uvp.x) * uvp.y * float3(mat.transmitColor) + uvp.x * uvp.y * v11;
             } else {
-                // dots: port of dots_texture::is_inside_dot (cell-jittered discs from Perlin noise)
+                // dots: port of dots_texture::is_inside_dot (cell-jittered discs from Perlin noise). pbrt counts the cells in the texture's own mapping, (su * u + du, sv * v + dv)
+                uvp = float2(mat.uvScaleU * uvp.x + mat.uvDeltaU, mat.uvScaleV * uvp.y + mat.uvDeltaV);
                 float sCell = floor(uvp.x + 0.5), tCell = floor(uvp.y + 0.5);
                 bool inside = false;
                 if (perlinNoise3D(float3(sCell + 0.5, tCell + 0.5, 0.5)) > 0.0) {
@@ -512,7 +516,7 @@ inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread
         float2 uv = isSphere ? sphereUV(spheres[primId].uvRot0, spheres[primId].uvRot1, spheres[primId].uvRot2, normal)
                               : texCoordFor(primId, result.triangle_barycentric_coord, uvs);
         const float2 muv = float2(mat.uvScaleU * uv.x + mat.uvDeltaU, mat.uvScaleV * uv.y + mat.uvDeltaV);   // pbrt imagemap uscale/vscale/udelta/vdelta
-        albedo = pbrtDiffuseTexture.sample(textureSampler, float2(muv.x, 1.0 - muv.y)).rgb * mat.roughness;
+        albedo = samplePictureWrapped(pbrtDiffuseTexture, textureSampler, muv, mat.textureWrap).rgb * mat.roughness;
     } else if (mat.materialType == METAL_MAT_DIFFUSE_TRANSMISSION && mat.conductorK.y > 8.5) {
         // DiffuseTransmission with image-textured reflectance (diffuse slot) and/or transmittance
         // (second slot) - J2. conductorK.x = 1 when reflectance is an image, conductorK.z = 1 when
@@ -521,7 +525,7 @@ inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread
         float2 uv9 = texCoordFor(primId, result.triangle_barycentric_coord, uvs);
         const float2 muv9 = float2(mat.uvScaleU * uv9.x + mat.uvDeltaU, mat.uvScaleV * uv9.y + mat.uvDeltaV);   // the reflectance picture's mapping
         albedo = (mat.conductorK.x > 0.5)
-            ? pbrtDiffuseTexture.sample(textureSampler, float2(muv9.x, 1.0 - muv9.y)).rgb
+            ? samplePictureWrapped(pbrtDiffuseTexture, textureSampler, muv9, mat.textureWrap).rgb
             : float3(mat.color);
         if (mat.conductorK.z > 0.5)
             mat.transmitColor = packed_float3(pbrtTransmitTexture.sample(textureSampler, float2(uv9.x, 1.0 - uv9.y)).rgb);
