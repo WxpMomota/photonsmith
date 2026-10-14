@@ -226,6 +226,7 @@ inline bool traceBounce(thread const KernelRes& R, thread PathState& P) {
     passedThroughMediumSphere = false;
     if (!traverseBoundedMedia(R, P, B)) return false;
     if (scatteredInMedium) fromMediumScatter = false;   // a bounded medium samples the image sky itself
+    P.nullCrossing = passedThroughMediumSphere;
     if (passedThroughMediumSphere) mediumSkippedDist += length(rayOrigin - mediumOriginBefore);
     else if (scatteredInMedium) mediumSkippedDist = 0.0;
 
