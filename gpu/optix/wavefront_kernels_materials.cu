@@ -263,6 +263,7 @@ extern "C" __global__ void evaluate_materials(
 	// any other arrival adds it weighted by the MIS complement of the NEE shadow ray taken at the
 	// previous vertex, so the two strategies together count the lamp exactly once.
 	// -------------------------------------------------------------------------
+	const bool lampReflects = mat.type == MaterialType::DiffuseLight && (mat.albedo.x > 0.0f || mat.albedo.y > 0.0f || mat.albedo.z > 0.0f);
 	if (mat.type == MaterialType::DiffuseLight) {
 		// A BSDF-sampled arrival (not specular, not the camera ray) is MIS-weighted against the NEE sample that
 		// the previous vertex took at this same point - see wf_emitter_hit_mis_weight().
@@ -310,8 +311,12 @@ extern "C" __global__ void evaluate_materials(
 					radiance = radiance + (throughput * emitMis) * wf_lift_rgb_to_spectrum(le, swl, /*isIlluminant=*/true);
 			}
 		}
-		addToFramebuffer(h.pixelIndex, radiance * h.filterWeight);
-		return; // path ends at emissive surface
+		// A lamp that also reflects (pbrt-v4: an AreaLightSource keeps the shape's Material, default diffuse 0.5; the builder stores the reflectance in
+		// `albedo`) goes on to scatter as a diffuse surface below; any other emitter ends the path here.
+		if (!lampReflects) {
+			addToFramebuffer(h.pixelIndex, radiance * h.filterWeight);
+			return; // path ends at emissive surface
+		}
 	}
 
 	if (h.depth >= maxDepth) {
@@ -402,7 +407,7 @@ extern "C" __global__ void evaluate_materials(
 	// MIS decision, a real bias a true duplicate would need to additionally
 	// take over next-ray-setup/RR/throughput logic to avoid - this
 	// substitution avoids that trade-off entirely instead.
-	MaterialType effectiveMatType = mat.type;
+	MaterialType effectiveMatType = lampReflects ? MaterialType::Lambertian : mat.type;
 
 	// Helper: uplift RGB albedo to SampledSpectrum via device sigmoid polynomial
 	auto albedoSpectrum = [&](float3 rgb) -> SS {
@@ -450,6 +455,15 @@ extern "C" __global__ void evaluate_materials(
 	};
 
 	switch (mat.type) {
+	case MaterialType::DiffuseLight: {
+		// Only a lamp that also reflects gets here (every other emitter returned above): a diffuse surface of the lamp's flat reflectance.
+		scattered_dir = normalize(normal + wf_rand_unit(seed));
+		if (wf_near_zero(scattered_dir)) scattered_dir = normal;
+		attenuation = albedoSpectrum(mat.albedo);
+		scattered   = true;
+		is_specular = false;
+		break;
+	}
 	case MaterialType::Lambertian: {
 		scattered_dir = normalize(normal + wf_rand_unit(seed));
 		if (wf_near_zero(scattered_dir)) scattered_dir = normal;

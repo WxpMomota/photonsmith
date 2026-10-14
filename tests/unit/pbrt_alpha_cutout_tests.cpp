@@ -172,6 +172,29 @@ TEST_F(AlphaCutoutTempTree, ABlackAlphaMaskCutsTheShapeOutEntirely) {
 		   "out, exactly like OBJ/MTL's own map_d";
 }
 
+// A ray that goes through a cutout and strikes the surface behind it must come back describing THAT surface. triangle::hit() used to write t, p, the normal and the
+// uv into the record before it ran the alpha test, so when the BVH had already found the wall and then tried the cutout (a nearer, rejected hit) the wall's
+// material came back with the cutout's position: a wall seen through foliage was shaded as if it sat in the leaf's plane, and every shadow cast by an opaque
+// part of a cutout went missing.
+TEST_F(AlphaCutoutTempTree, ARejectedCutoutLeavesTheSurfaceBehindItUntouched) {
+	const std::string wall =
+		"Material \"diffuse\" \"rgb reflectance\" [ .5 .5 .5 ]\n"
+		"Shape \"trianglemesh\" \"integer indices\" [ 0 1 2  0 2 3 ]\n"
+		"  \"point3 P\" [ -2 -2 1  2 -2 1  2 2 1  -2 2 1 ]\n";
+	const std::string cutout = quadSceneWithAlpha("mask");
+	for (const bool wallFirst : {true, false}) {
+		write("scene.pbrt", wallFirst ? wall + cutout : cutout + wall);
+		write("mask.bmp", solidBmp1x1(0, 0, 0));
+		const pbrt_load::LoadResult loaded = pbrt_load::loadFile(path("scene.pbrt"));
+		ASSERT_TRUE(loaded.ok) << loaded.error;
+		const pbrt_cpu::BuildResult b = pbrt_cpu::build(loaded.scene);
+		hit_record rec;
+		ASSERT_TRUE(b.world->hit(ray(point3(0.5, 0.5, -5), vec3(0, 0, 1)), interval(0.001, infinity), rec));
+		EXPECT_NEAR(rec.t, 6.0, 1e-9) << (wallFirst ? "wall listed first" : "cutout listed first");
+		EXPECT_NEAR(rec.p.z(), 1.0, 1e-9) << (wallFirst ? "wall listed first" : "cutout listed first");
+	}
+}
+
 TEST_F(AlphaCutoutTempTree, AShapeWithNoAlphaParameterIsUnaffected) {
 	write("scene.pbrt",
 		  "Material \"diffuse\" \"rgb reflectance\" [ .5 .5 .5 ]\n"

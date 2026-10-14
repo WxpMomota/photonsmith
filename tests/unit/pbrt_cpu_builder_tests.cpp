@@ -2871,3 +2871,51 @@ TEST(PbrtSphereUv, TangentsAreWorldSpaceAndMatchPbrt) {
 	ASSERT_TRUE(b.world->hit(ray(point3(0, 0, 5), vec3(0, 0, -1)), interval(0.001, infinity), rec));
 	EXPECT_NEAR(rec.v, 1.0, 1e-6);
 }
+
+// ---- An emitter keeps the shape's material in pbrt-v4 -----------------------------------------------------------------------------------------------------------
+//
+// An AreaLightSource attaches to the shape and the shape keeps the Material in effect (the default is diffuse 0.5), so a lamp lit by another light reflects it. The
+// Scene Builder writes a black body (diffuse reflectance 0) for an emitter, which must stay a plain emitter.
+
+namespace {
+
+// Fires a ray at the emissive quad and reports whether its surface scatters, and its emission.
+void lampHit(const char *materialLine, bool &scatters, double &emitted) {
+	const std::string text = std::string(materialLine) +
+		"AreaLightSource \"diffuse\" \"rgb L\" [ 2 2 2 ]\n"
+		"Shape \"trianglemesh\" \"integer indices\" [ 0 1 2  0 2 3 ]\n"
+		"  \"point3 P\" [ 0 0 0  1 0 0  1 1 0  0 1 0 ]\n";
+	const pbrt_cpu::BuildResult b = buildFrom(text);
+	hit_record rec;
+	const ray r(point3(0.5, 0.5, 3), vec3(0, 0, -1));
+	ASSERT_TRUE(b.world->hit(r, interval(0.001, infinity), rec));
+	emitted = rec.mat->emitted(r, rec, rec.u, rec.v, rec.p).x();
+	scatter_record srec;
+	scatters = rec.mat->scatter(r, rec, srec);
+}
+
+}  // namespace
+
+TEST(PbrtEmitterReflects, AnEmitterWithTheDefaultMaterialAlsoScattersLight) {
+	bool scatters = false;
+	double emitted = 0.0;
+	lampHit("", scatters, emitted);
+	EXPECT_DOUBLE_EQ(emitted, 2.0);
+	EXPECT_TRUE(scatters) << "pbrt-v4's lamp keeps the default diffuse material (0.5), so it reflects the light that reaches it";
+}
+
+TEST(PbrtEmitterReflects, AnEmitterWithABlackBodyStaysAPlainEmitter) {
+	bool scatters = true;
+	double emitted = 0.0;
+	lampHit("Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]\n", scatters, emitted);
+	EXPECT_DOUBLE_EQ(emitted, 2.0);
+	EXPECT_FALSE(scatters) << "the Scene Builder writes a black body for an emitter: nothing to reflect";
+}
+
+TEST(PbrtEmitterReflects, AnEmitterKeepsWhateverMaterialItWasGiven) {
+	bool scatters = false;
+	double emitted = 0.0;
+	lampHit("Material \"conductor\" \"float roughness\" [ 0.3 ]\n", scatters, emitted);
+	EXPECT_DOUBLE_EQ(emitted, 2.0);
+	EXPECT_TRUE(scatters);
+}

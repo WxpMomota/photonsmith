@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## Unreleased
 
+* **An emitter reflects, as in pbrt-v4**: a lamp keeps the shape's material (the default is diffuse 0.5), so a lamp lit by another light reflects it. It was a pure emitter on every backend: `emissive-sphere-occluder` read 13% dark, `earth-globe` 8%, `two-sphere-lights` 2.6%. Now on the CPU and both OptiX backends (Metal and BDPT/MLT/SPPM not yet); the Scene Builder's black-body emitters are unchanged.
+* **CPU alpha cutouts shaded the surface behind them wrongly** (foliage, fences, any `"texture alpha"`): a rejected cutout hit left its position in the hit record, so a wall seen through a leaf was lit as if it were in the leaf's plane (1.8 times too bright in a measured case) and opaque parts of a cutout never cast shadows. `alpha-cutout` was +5.5% against pbrt, now 0.0%.
 * **A pbrt reference pack**: `tests/data/pbrt_reference_means.txt` holds what real pbrt-v4 draws of 143 bundled scenes (mean picture value, with each renderer's ratio and a tolerance from measured noise) and the CPU and both OptiX backends are tested against it, so drift from pbrt is caught on a machine without pbrt. Regenerate with `scripts/pbrt_reference_pack.py`.
 * **Scene Builder: a Sky gallery** for Sun & sky (a button under Preset): 12 thumbnails of ready-made skies - sunrise, morning, clear and hazy noon, afternoon, golden hour, sunset, low sun in haze, heavy haze, snow field, dark ground, desert - made by the program's own sky model, each shown as a view from the ground toward the sun. Choosing one sets the sun height, haze and ground and keeps the sun's direction; nothing is downloaded.
 

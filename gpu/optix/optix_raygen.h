@@ -515,6 +515,11 @@ extern "C" __global__ void __raygen__rg() {
 				// RAY_TYPE_PROBE comment for why this needed new payload
 				// registers rather than reusing that mechanism).
 
+				// A lamp that also reflects hands its own, already MIS-weighted light over in p13-p15 (lamp_own_emission()); flag 3 uses those
+				// registers for the exit point instead, and every other flag-1 hit leaves them zero. Added even on the final trace, where the
+				// lamp is what that last continuation ray found.
+				if (flag == 1) radiance = radiance + throughput * explicit_origin;
+
 				// The final, emission-only trace: this vertex's light sampling and scatter are not part of the path (the hit program
 				// ran them anyway - see the loop's own comment - and their result is dropped here).
 				if (final_trace) break;

@@ -313,6 +313,36 @@ class diffuse_light : public material {
 };
 
 
+// An emitter that also reflects, as in pbrt-v4: an AreaLightSource attaches to the shape and the shape keeps the Material in effect (the default is
+// diffuse 0.5), so a lamp lit by another light reflects it. It stays a diffuse_light (the light list and the BDPT/SPPM adapters find emitters by that
+// class and treat it as a pure emitter), and everything about how it scatters is the wrapped material's.
+class reflective_diffuse_light : public diffuse_light {
+  public:
+    reflective_diffuse_light(const diffuse_light& emitter, shared_ptr<material> surface)
+        : diffuse_light(emitter), surface_(std::move(surface)) {}
+
+    bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec, bool do_regularize = false) const override {
+        return surface_->scatter(r_in, rec, srec, do_regularize);
+    }
+    double scattering_pdf(const ray& r_in, const hit_record& rec, const ray& scattered) const override {
+        return surface_->scattering_pdf(r_in, rec, scattered);
+    }
+    bool is_delta_bsdf() const override { return surface_->is_delta_bsdf(); }
+    bool is_delta_bsdf(const hit_record& rec) const override { return surface_->is_delta_bsdf(rec); }
+    color scattering_attenuation(const hit_record& rec, const ray& scattered, const color& srec_attenuation) const override {
+        return surface_->scattering_attenuation(rec, scattered, srec_attenuation);
+    }
+    color scattering_attenuation(const ray& r_in, const hit_record& rec, const ray& scattered, const color& srec_attenuation) const override {
+        return surface_->scattering_attenuation(r_in, rec, scattered, srec_attenuation);
+    }
+    const subsurface* as_subsurface(const hit_record& rec) const override { return surface_->as_subsurface(rec); }
+    const dispersive_material* as_dispersive(const hit_record& rec) const override { return surface_->as_dispersive(rec); }
+
+  private:
+    shared_ptr<material> surface_;
+};
+
+
 class isotropic : public material {
   public:
     isotropic(const color& albedo) : tex(make_shared<solid_color>(albedo)) {}

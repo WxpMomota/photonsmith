@@ -188,31 +188,8 @@ extern "C" __global__ void __closesthit__quad() {
 	optixSetPayload_22(__float_as_uint(out_eta));  // pbrt-v4 etaScale - see PathTracingPayload::eta
 	optixSetPayload_24(rgbChannel);  // dispersion channel - see shade_material()'s inout_rgb_channel comment
 
-	if (scattered) {
-		// Return surface attenuation ONLY (raygen will multiply with throughput)
-		float t_hit = optixGetRayTmax();  // Hit distance
-		// p12: BRDF PDF for MIS on the next bounce.
-		// Specular (Metal/Dielectric): 0 = no MIS (pbrt-v4 specularBounce pattern).
-		// Lambertian: cosine_pdf of the sampled direction.
-		float brdf_pdf_out = is_specular ? 0.0f
-						  : (brdf_pdf_override >= 0.0f ? brdf_pdf_override : cosine_pdf(scattered_dir, final_normal));
-
-		optixSetPayload_0(__float_as_uint(attenuation.x));
-		optixSetPayload_1(__float_as_uint(attenuation.y));
-		optixSetPayload_2(__float_as_uint(attenuation.z));
-		optixSetPayload_6(__float_as_uint(scattered_dir.x));  // Scatter direction
-		optixSetPayload_7(__float_as_uint(scattered_dir.y));
-		optixSetPayload_8(__float_as_uint(scattered_dir.z));
-		optixSetPayload_10(pack_scatter_flag(bssrdf_exit, is_medium_boundary, is_specular));  // scattered (see pack_scatter_flag's own comment)
-		optixSetPayload_11(__float_as_uint(t_hit));
-		optixSetPayload_12(__float_as_uint(brdf_pdf_out));
-		if (bssrdf_exit) {
-			optixSetPayload_13(__float_as_uint(bssrdf_exit_pos.x));
-			optixSetPayload_14(__float_as_uint(bssrdf_exit_pos.y));
-			optixSetPayload_15(__float_as_uint(bssrdf_exit_pos.z));
-		}
-	} else if (mat.type == MaterialType::DiffuseLight) {
-		// p12: NEE PDF for the incoming ray direction reaching this quad light.
+	// The light pdf of this quad for the incoming direction (a light hit's MIS weight, and a reflecting lamp's own emission below).
+	const auto quad_light_pdf = [&]() -> float {
 		float light_pdf_for_incoming = 0.0f;
 		const float3 mis_o = mis_origin_from_payload();  // last real vertex, not the (possibly moved) ray origin
 		if (params.aliasTable && params.numLights > 0) {
@@ -236,6 +213,45 @@ extern "C" __global__ void __closesthit__quad() {
 			if (cos_theta > 1e-6f && area > 1e-6f && dist_sq > 1e-6f)
 				light_pdf_for_incoming = sel_pdf * dist_sq / (cos_theta * area);
 		}
+		return light_pdf_for_incoming;
+	};
+
+	if (scattered) {
+		// Return surface attenuation ONLY (raygen will multiply with throughput)
+		float t_hit = optixGetRayTmax();  // Hit distance
+		// A lamp that also reflects: its own light, weighted against the light sampling (p13-p15, which only a subsurface exit otherwise uses; raygen adds it
+		// for flag 1). The input p12 (the arriving BSDF pdf) is read here, before this program overwrites it.
+		float3 lamp_le = make_float3(0.0f, 0.0f, 0.0f);
+		if (lamp_reflects(mat))
+			lamp_le = lamp_own_emission(material_emission(mat, front_face, uv_u, uv_v, hit_point), __uint_as_float(optixGetPayload_12()), quad_light_pdf());
+		// p12: BRDF PDF for MIS on the next bounce.
+		// Specular (Metal/Dielectric): 0 = no MIS (pbrt-v4 specularBounce pattern).
+		// Lambertian: cosine_pdf of the sampled direction.
+		float brdf_pdf_out = is_specular ? 0.0f
+						  : (brdf_pdf_override >= 0.0f ? brdf_pdf_override : cosine_pdf(scattered_dir, final_normal));
+
+		optixSetPayload_0(__float_as_uint(attenuation.x));
+		optixSetPayload_1(__float_as_uint(attenuation.y));
+		optixSetPayload_2(__float_as_uint(attenuation.z));
+		optixSetPayload_6(__float_as_uint(scattered_dir.x));  // Scatter direction
+		optixSetPayload_7(__float_as_uint(scattered_dir.y));
+		optixSetPayload_8(__float_as_uint(scattered_dir.z));
+		optixSetPayload_10(pack_scatter_flag(bssrdf_exit, is_medium_boundary, is_specular));  // scattered (see pack_scatter_flag's own comment)
+		optixSetPayload_11(__float_as_uint(t_hit));
+		optixSetPayload_12(__float_as_uint(brdf_pdf_out));
+		if (lamp_le.x > 0.0f || lamp_le.y > 0.0f || lamp_le.z > 0.0f) {
+			optixSetPayload_13(__float_as_uint(lamp_le.x));
+			optixSetPayload_14(__float_as_uint(lamp_le.y));
+			optixSetPayload_15(__float_as_uint(lamp_le.z));
+		}
+		if (bssrdf_exit) {
+			optixSetPayload_13(__float_as_uint(bssrdf_exit_pos.x));
+			optixSetPayload_14(__float_as_uint(bssrdf_exit_pos.y));
+			optixSetPayload_15(__float_as_uint(bssrdf_exit_pos.z));
+		}
+	} else if (mat.type == MaterialType::DiffuseLight) {
+		// p12: NEE PDF for the incoming ray direction reaching this quad light.
+		const float light_pdf_for_incoming = quad_light_pdf();
 		optixSetPayload_10(2);  // hit_light
 		optixSetPayload_11(__float_as_uint(optixGetRayTmax()));  // camera-medium clip distance (see optix_raygen.h's own call site)
 		optixSetPayload_12(__float_as_uint(light_pdf_for_incoming));

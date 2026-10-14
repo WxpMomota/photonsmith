@@ -26,7 +26,7 @@
 // usual `hit_point + t_hit*ray_dir` reconstruction every other material
 // (including the Medium family's own t-along-the-original-ray override)
 // relies on. See optix_raygen.h's flag==3 handling.
-__device__ __forceinline__ void shade_material(
+__device__ __forceinline__ void shade_material_surface(
 	const MaterialData& mat,
 	int matIdx,
 	const float3& normal,
@@ -961,4 +961,61 @@ __device__ __forceinline__ void shade_material(
 	out_bssrdf_exit = bssrdf_exit;
 	out_bssrdf_exit_pos = bssrdf_exit_pos;
 	out_eta = eta;
+}
+
+// A lamp that also reflects (pbrt-v4: an AreaLightSource keeps the shape's Material, default diffuse 0.5; the builder stores the reflectance in `albedo`, which an
+// emitter otherwise leaves at zero). It shades as a diffuse surface: the caller's `emission` is reset to just the light that surface collects, and the lamp's OWN
+// light, weighted against the light sampling like any emitter hit, is added by the hit program (lamp_own_emission()) since only it knows the shape's light pdf.
+__device__ __forceinline__ bool lamp_reflects(const MaterialData& mat) {
+	return mat.type == MaterialType::DiffuseLight && (mat.albedo.x > 0.0f || mat.albedo.y > 0.0f || mat.albedo.z > 0.0f);
+}
+
+__device__ __forceinline__ void shade_material(
+	const MaterialData& mat,
+	int matIdx,
+	const float3& normal,
+	const float3& ray_dir,
+	const float3& hit_point,
+	bool front_face,
+	float uv_u, float uv_v,
+	const float3& dpdu,
+	bool do_regularize,
+	unsigned int& seed,
+	float3& out_attenuation,
+	float3& out_scattered_dir,
+	bool& out_scattered,
+	bool& out_is_specular,
+	bool& out_is_medium_boundary,
+	float& out_brdf_pdf_override,
+	float3& emission,
+	bool& out_bssrdf_exit,
+	float3& out_bssrdf_exit_pos,
+	float& out_eta,
+	unsigned int& inout_rgb_channel
+) {
+	if (lamp_reflects(mat)) {
+		MaterialData view = mat;
+		view.type = MaterialType::Lambertian;
+		view.textureIdx = -1;   // (the texture of a lamp is its emission, not its reflectance)
+		emission = make_float3(0.0f, 0.0f, 0.0f);
+		shade_material_surface(view, matIdx, normal, ray_dir, hit_point, front_face, uv_u, uv_v, dpdu, do_regularize, seed,
+			out_attenuation, out_scattered_dir, out_scattered, out_is_specular, out_is_medium_boundary, out_brdf_pdf_override, emission,
+			out_bssrdf_exit, out_bssrdf_exit_pos, out_eta, inout_rgb_channel);
+		return;
+	}
+	shade_material_surface(mat, matIdx, normal, ray_dir, hit_point, front_face, uv_u, uv_v, dpdu, do_regularize, seed,
+		out_attenuation, out_scattered_dir, out_scattered, out_is_specular, out_is_medium_boundary, out_brdf_pdf_override, emission,
+		out_bssrdf_exit, out_bssrdf_exit_pos, out_eta, inout_rgb_channel);
+}
+
+// What a reflecting lamp's own emission adds to a path that arrived by a BSDF-sampled bounce: its light, weighted against the light sampling by the power
+// heuristic exactly as raygen weights a plain emitter hit (a primary or specular arrival, prev_brdf_pdf == 0, or a lamp with no light pdf takes it whole).
+// `prev_brdf_pdf` is the INPUT payload register p12, read before the hit program overwrites it; `light_pdf` is the shape's own light pdf for the incoming direction.
+__device__ __forceinline__ float3 lamp_own_emission(const float3& le, float prev_brdf_pdf, float light_pdf) {
+	if (!(le.x > 0.0f || le.y > 0.0f || le.z > 0.0f)) return make_float3(0.0f, 0.0f, 0.0f);
+	if (prev_brdf_pdf > 0.0f && light_pdf > 0.0f) {
+		const float w = mis_power_heuristic(prev_brdf_pdf, light_pdf);
+		return make_float3(le.x * w, le.y * w, le.z * w);
+	}
+	return le;
 }

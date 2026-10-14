@@ -1205,41 +1205,8 @@ extern "C" __global__ void __closesthit__sphere() {
 	optixSetPayload_22(__float_as_uint(out_eta));  // pbrt-v4 etaScale - see PathTracingPayload::eta
 	optixSetPayload_24(rgbChannel);  // dispersion channel - see shade_material()'s inout_rgb_channel comment
 
-	if (scattered) {
-		// Return surface attenuation ONLY (raygen will multiply with throughput)
-		// Medium: the scatter/exit point is not the sphere's entry surface
-		// (optixGetRayTmax()) - use the distance computed in the Medium
-		// case above instead.
-		float t_hit = is_medium ? medium_t_hit : optixGetRayTmax();  // Hit distance
-		// p12: BRDF PDF for MIS on the next bounce.
-		// Specular (Metal/Dielectric): 0 = no MIS (pbrt-v4 specularBounce pattern).
-		// Lambertian: cosine_pdf of the sampled direction.
-		// NormalizedFresnel: (1-Fr)*cos/(c*pi) stored in brdf_pdf_override.
-		float brdf_pdf_out = is_specular ? 0.0f
-						  : (brdf_pdf_override >= 0.0f ? brdf_pdf_override : cosine_pdf(scattered_dir, normal));
-
-		optixSetPayload_0(__float_as_uint(attenuation.x));
-		optixSetPayload_1(__float_as_uint(attenuation.y));
-		optixSetPayload_2(__float_as_uint(attenuation.z));
-		optixSetPayload_6(__float_as_uint(scattered_dir.x));  // Scatter direction
-		optixSetPayload_7(__float_as_uint(scattered_dir.y));
-		optixSetPayload_8(__float_as_uint(scattered_dir.z));
-		// MaterialType::Subsurface (and therefore bssrdf_exit) never applies
-		// to spheres in this loader, but flag 3 / p13-15 are packed the same
-		// way triangle/quad/bilinear-patch do for consistency - see
-		// optix_intersection_quad.h's p0-p15 layout comment. flag==4:
-		// MaterialType::Interface - see optix_raygen.h's own flag==4 branch.
-		optixSetPayload_10(pack_scatter_flag(bssrdf_exit, is_medium_boundary, is_specular));  // scattered (see pack_scatter_flag's own comment)
-		optixSetPayload_11(__float_as_uint(t_hit));
-		optixSetPayload_12(__float_as_uint(brdf_pdf_out));
-		if (bssrdf_exit) {
-			optixSetPayload_13(__float_as_uint(bssrdf_exit_pos.x));
-			optixSetPayload_14(__float_as_uint(bssrdf_exit_pos.y));
-			optixSetPayload_15(__float_as_uint(bssrdf_exit_pos.z));
-		}
-	} else if (mat.type == MaterialType::DiffuseLight) {
-		// p12: NEE PDF for the incoming ray direction reaching this sphere light.
-		// This is the solid-angle PDF used by the NEE sampler, enabling MIS in raygen.
+	// The light pdf of this primitive for the incoming direction: a light hit's MIS weight, and a reflecting lamp's own emission in the scattered branch.
+	const auto sphere_light_pdf = [&]() -> float {
 		float light_pdf_for_incoming = 0.0f;
 		const float3 mis_o = mis_origin_from_payload();  // last real vertex, not the (possibly moved) ray origin
 		if (params.aliasTable && params.numLights > 0) {
@@ -1286,6 +1253,55 @@ extern "C" __global__ void __closesthit__sphere() {
 				light_pdf_for_incoming = sel_pdf / solid_angle;
 			}
 		}
+		return light_pdf_for_incoming;
+	};
+
+	if (scattered) {
+		// A lamp that also reflects: its own light, weighted against the light sampling (p13-p15, which only a subsurface exit otherwise uses; raygen
+		// adds it for flag 1). The input p12 (the arriving BSDF pdf) is read here, before this program overwrites it.
+		float3 lamp_le = make_float3(0.0f, 0.0f, 0.0f);
+		if (lamp_reflects(mat))
+			lamp_le = lamp_own_emission(material_emission(mat, front_face, sphere_uv_u, sphere_uv_v, hit_point), __uint_as_float(optixGetPayload_12()), sphere_light_pdf());
+		// Return surface attenuation ONLY (raygen will multiply with throughput)
+		// Medium: the scatter/exit point is not the sphere's entry surface
+		// (optixGetRayTmax()) - use the distance computed in the Medium
+		// case above instead.
+		float t_hit = is_medium ? medium_t_hit : optixGetRayTmax();  // Hit distance
+		// p12: BRDF PDF for MIS on the next bounce.
+		// Specular (Metal/Dielectric): 0 = no MIS (pbrt-v4 specularBounce pattern).
+		// Lambertian: cosine_pdf of the sampled direction.
+		// NormalizedFresnel: (1-Fr)*cos/(c*pi) stored in brdf_pdf_override.
+		float brdf_pdf_out = is_specular ? 0.0f
+						  : (brdf_pdf_override >= 0.0f ? brdf_pdf_override : cosine_pdf(scattered_dir, normal));
+
+		optixSetPayload_0(__float_as_uint(attenuation.x));
+		optixSetPayload_1(__float_as_uint(attenuation.y));
+		optixSetPayload_2(__float_as_uint(attenuation.z));
+		optixSetPayload_6(__float_as_uint(scattered_dir.x));  // Scatter direction
+		optixSetPayload_7(__float_as_uint(scattered_dir.y));
+		optixSetPayload_8(__float_as_uint(scattered_dir.z));
+		// MaterialType::Subsurface (and therefore bssrdf_exit) never applies
+		// to spheres in this loader, but flag 3 / p13-15 are packed the same
+		// way triangle/quad/bilinear-patch do for consistency - see
+		// optix_intersection_quad.h's p0-p15 layout comment. flag==4:
+		// MaterialType::Interface - see optix_raygen.h's own flag==4 branch.
+		optixSetPayload_10(pack_scatter_flag(bssrdf_exit, is_medium_boundary, is_specular));  // scattered (see pack_scatter_flag's own comment)
+		optixSetPayload_11(__float_as_uint(t_hit));
+		optixSetPayload_12(__float_as_uint(brdf_pdf_out));
+		if (lamp_le.x > 0.0f || lamp_le.y > 0.0f || lamp_le.z > 0.0f) {
+			optixSetPayload_13(__float_as_uint(lamp_le.x));
+			optixSetPayload_14(__float_as_uint(lamp_le.y));
+			optixSetPayload_15(__float_as_uint(lamp_le.z));
+		}
+		if (bssrdf_exit) {
+			optixSetPayload_13(__float_as_uint(bssrdf_exit_pos.x));
+			optixSetPayload_14(__float_as_uint(bssrdf_exit_pos.y));
+			optixSetPayload_15(__float_as_uint(bssrdf_exit_pos.z));
+		}
+	} else if (mat.type == MaterialType::DiffuseLight) {
+		// p12: NEE PDF for the incoming ray direction reaching this sphere light.
+		// This is the solid-angle PDF used by the NEE sampler, enabling MIS in raygen.
+		const float light_pdf_for_incoming = sphere_light_pdf();
 		optixSetPayload_10(2);  // hit_light
 		optixSetPayload_11(__float_as_uint(optixGetRayTmax()));  // camera-medium clip distance (see optix_raygen.h's own call site)
 		optixSetPayload_12(__float_as_uint(light_pdf_for_incoming));

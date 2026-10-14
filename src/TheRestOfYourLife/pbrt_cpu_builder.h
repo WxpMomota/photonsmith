@@ -138,6 +138,16 @@ private:
 				: kDefault;
 		std::shared_ptr<material> base = makeMaterial(m, em, scene.materials, /*depth=*/0, forCurve);
 
+		// An emitter keeps the shape's material in pbrt-v4 (the default is diffuse 0.5), so it reflects what other lights shed on it. A black body (what the Scene
+		// Builder writes for an emitter) or an interface material reflects nothing, and stays a plain emitter.
+		const bool reflects = em && m.kind != pbrt_flatten::MaterialKind::Interface &&
+			!(m.kind == pbrt_flatten::MaterialKind::Diffuse && m.textureFilename.empty() && m.color[0] <= 0.0 && m.color[1] <= 0.0 && m.color[2] <= 0.0);
+		if (reflects) {
+			if (const auto emitter = std::dynamic_pointer_cast<diffuse_light>(base))
+				if (auto surface = makeMaterial(m, nullptr, scene.materials, /*depth=*/0, forCurve))
+					base = std::make_shared<reflective_diffuse_light>(*emitter, std::move(surface));
+		}
+
 		// Material "texture displacement" (bump mapping - Material::
 		// displacementTextureFilename's own comment). Wraps whatever base
 		// material was just built, mirroring mesh.h's own OBJ/MTL map_Bump

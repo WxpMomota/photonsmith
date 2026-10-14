@@ -661,6 +661,11 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 				static_cast<float>(emission->L[1] * emission->scale),
 				static_cast<float>(emission->L[2] * emission->scale));
 		}
+		// An emitter keeps the shape's material in pbrt-v4 (default diffuse 0.5), so it reflects what other lights shed on it. A flat diffuse reflectance is stored
+		// in `albedo` (zero otherwise, which is also what a black body - the Scene Builder's emitter - reads as); other materials on a lamp are not reflected here (the
+		// CPU builder wraps any material), and a textured reflectance uses its flat colour.
+		if (m.kind == pbrt_flatten::MaterialKind::Diffuse)
+			d.albedo = make_float3(static_cast<float>(m.color[0]), static_cast<float>(m.color[1]), static_cast<float>(m.color[2]));
 		return d;
 	}
 

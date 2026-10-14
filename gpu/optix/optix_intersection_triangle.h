@@ -347,42 +347,8 @@ extern "C" __global__ void __closesthit__triangle() {
 	optixSetPayload_22(__float_as_uint(out_eta));  // pbrt-v4 etaScale - see PathTracingPayload::eta
 	optixSetPayload_24(rgbChannel);  // dispersion channel - see shade_material()'s inout_rgb_channel comment
 
-	if (scattered) {
-		float t_hit = optixGetRayTmax();
-		float brdf_pdf_out = is_specular ? 0.0f
-						  : (brdf_pdf_override >= 0.0f ? brdf_pdf_override : cosine_pdf(scattered_dir, final_normal));
-
-		optixSetPayload_0(__float_as_uint(attenuation.x));
-		optixSetPayload_1(__float_as_uint(attenuation.y));
-		optixSetPayload_2(__float_as_uint(attenuation.z));
-		optixSetPayload_6(__float_as_uint(scattered_dir.x));
-		optixSetPayload_7(__float_as_uint(scattered_dir.y));
-		optixSetPayload_8(__float_as_uint(scattered_dir.z));
-		// flag 3 (not 1): MaterialType::Subsurface's probe walk found an
-		// exit point off to the side of this ray - the next ray must
-		// originate there, not at hit_point (see optix_raygen.h's flag==3
-		// handling and shade_material()'s own out_bssrdf_exit comment).
-		// flag 4: MaterialType::Interface - see optix_raygen.h's flag==4 branch.
-		optixSetPayload_10(pack_scatter_flag(bssrdf_exit, is_medium_boundary, is_specular));  // scattered (see pack_scatter_flag's own comment)
-		optixSetPayload_11(__float_as_uint(t_hit));
-		optixSetPayload_12(__float_as_uint(brdf_pdf_out));
-		if (bssrdf_exit) {
-			optixSetPayload_13(__float_as_uint(bssrdf_exit_pos.x));
-			optixSetPayload_14(__float_as_uint(bssrdf_exit_pos.y));
-			optixSetPayload_15(__float_as_uint(bssrdf_exit_pos.z));
-		}
-	} else if (mat.type == MaterialType::DiffuseLight) {
-		// NEE pdf for the incoming direction reaching this triangle light, so
-		// MIS in raygen can weight a BSDF-sampled path that happened to land
-		// here against the light-sampled estimate of the same thing. Mirrors
-		// the quad program's block exactly, differing only in halving the
-		// parallelogram's area - see sample_triangle_light().
-		//
-		// This used to be an unconditional pdf=0 on the grounds that no scene
-		// emits from a triangle. A pbrt file whose area light will not fold
-		// into a parallelogram now does, and leaving the pdf at zero would
-		// hand MIS a weight of 1 for the BSDF strategy - double-counting the
-		// light rather than merely losing a little quality.
+	// The light pdf of this primitive for the incoming direction: a light hit's MIS weight, and a reflecting lamp's own emission in the scattered branch.
+	const auto tri_light_pdf = [&]() -> float {
 		float light_pdf_for_incoming = 0.0f;
 		const float3 mis_o = mis_origin_from_payload();  // last real vertex, not the (possibly moved) ray origin
 		if (params.aliasTable && params.numLights > 0) {
@@ -414,6 +380,56 @@ extern "C" __global__ void __closesthit__triangle() {
 					light_pdf_for_incoming = sel_pdf * dist_sq / (cosine * area);
 			}
 		}
+		return light_pdf_for_incoming;
+	};
+
+	if (scattered) {
+		// A lamp that also reflects: its own light, weighted against the light sampling (p13-p15, which only a subsurface exit otherwise uses; raygen
+		// adds it for flag 1). The input p12 (the arriving BSDF pdf) is read here, before this program overwrites it.
+		float3 lamp_le = make_float3(0.0f, 0.0f, 0.0f);
+		if (lamp_reflects(mat))
+			lamp_le = lamp_own_emission(material_emission(mat, front_face, uv_u, uv_v, hit_point), __uint_as_float(optixGetPayload_12()), tri_light_pdf());
+		float t_hit = optixGetRayTmax();
+		float brdf_pdf_out = is_specular ? 0.0f
+						  : (brdf_pdf_override >= 0.0f ? brdf_pdf_override : cosine_pdf(scattered_dir, final_normal));
+
+		optixSetPayload_0(__float_as_uint(attenuation.x));
+		optixSetPayload_1(__float_as_uint(attenuation.y));
+		optixSetPayload_2(__float_as_uint(attenuation.z));
+		optixSetPayload_6(__float_as_uint(scattered_dir.x));
+		optixSetPayload_7(__float_as_uint(scattered_dir.y));
+		optixSetPayload_8(__float_as_uint(scattered_dir.z));
+		// flag 3 (not 1): MaterialType::Subsurface's probe walk found an
+		// exit point off to the side of this ray - the next ray must
+		// originate there, not at hit_point (see optix_raygen.h's flag==3
+		// handling and shade_material()'s own out_bssrdf_exit comment).
+		// flag 4: MaterialType::Interface - see optix_raygen.h's flag==4 branch.
+		optixSetPayload_10(pack_scatter_flag(bssrdf_exit, is_medium_boundary, is_specular));  // scattered (see pack_scatter_flag's own comment)
+		optixSetPayload_11(__float_as_uint(t_hit));
+		optixSetPayload_12(__float_as_uint(brdf_pdf_out));
+		if (lamp_le.x > 0.0f || lamp_le.y > 0.0f || lamp_le.z > 0.0f) {
+			optixSetPayload_13(__float_as_uint(lamp_le.x));
+			optixSetPayload_14(__float_as_uint(lamp_le.y));
+			optixSetPayload_15(__float_as_uint(lamp_le.z));
+		}
+		if (bssrdf_exit) {
+			optixSetPayload_13(__float_as_uint(bssrdf_exit_pos.x));
+			optixSetPayload_14(__float_as_uint(bssrdf_exit_pos.y));
+			optixSetPayload_15(__float_as_uint(bssrdf_exit_pos.z));
+		}
+	} else if (mat.type == MaterialType::DiffuseLight) {
+		// NEE pdf for the incoming direction reaching this triangle light, so
+		// MIS in raygen can weight a BSDF-sampled path that happened to land
+		// here against the light-sampled estimate of the same thing. Mirrors
+		// the quad program's block exactly, differing only in halving the
+		// parallelogram's area - see sample_triangle_light().
+		//
+		// This used to be an unconditional pdf=0 on the grounds that no scene
+		// emits from a triangle. A pbrt file whose area light will not fold
+		// into a parallelogram now does, and leaving the pdf at zero would
+		// hand MIS a weight of 1 for the BSDF strategy - double-counting the
+		// light rather than merely losing a little quality.
+		const float light_pdf_for_incoming = tri_light_pdf();
 		optixSetPayload_10(2);
 		optixSetPayload_11(__float_as_uint(optixGetRayTmax()));  // camera-medium clip distance (see optix_raygen.h's own call site)
 		optixSetPayload_12(__float_as_uint(light_pdf_for_incoming));

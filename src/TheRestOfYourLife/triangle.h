@@ -151,8 +151,48 @@ class triangle : public hittable {
 		// ------------------------------------------------------------------
 		// Fill hit_record
 		// ------------------------------------------------------------------
+		// UV (computed first: the alpha test below must decide before anything is written to rec)
+		double hit_u, hit_v;
+		if (mesh->has_uvs()) {
+			double u0 = mesh->uvs[2*idx[0]], v0 = mesh->uvs[2*idx[0]+1];
+			double u1 = mesh->uvs[2*idx[1]], v1 = mesh->uvs[2*idx[1]+1];
+			double u2 = mesh->uvs[2*idx[2]], v2 = mesh->uvs[2*idx[2]+1];
+			hit_u = b0*u0 + b1*u1 + b2*u2;
+			hit_v = b0*v0 + b1*v1 + b2*v2;
+		} else {
+			// pbrt-v4 (Triangle::InteractionFromIntersection): a mesh with no "uv" has (0,0), (1,0), (1,1) at the three vertices of each triangle, so u = b1 + b2, v = b2.
+			hit_u = b1 + b2;
+			hit_v = b2;
+		}
+
+		// Alpha-cutout (OBJ/.mtl map_d, see load_obj_mtl()'s own comment):
+		// a triangle has at most one intersection with a given ray, so
+		// "reject" is simply "this triangle isn't a hit for this ray" - the
+		// BVH naturally continues to whatever's behind it, no re-search-
+		// along-this-triangle complexity. pbrt-v4's stochastic alpha test
+		// (cpu/primitive.cpp:57-71): keep the hit with probability `alpha`,
+		// decided by a hash of the ray (ray_hash.h), identical on both GPU
+		// backends (passes_alpha_cutout(), wf_passes_alpha_cutout()). No-op
+		// for the overwhelming majority of triangles, whose material has no
+		// alpha mask.
+		//
+		// This runs BEFORE rec is touched: a rejected hit used to leave its t, p, normal and uv in rec, and the BVH kept the surface found behind it
+		// (the hit it returned true for) with the cutout's position - a wall seen through a cutout was shaded as if it sat in the cutout's plane (a point
+		// light 8 away read as 6 away, 1.8 times too bright, and every cast shadow went missing).
+		if (alpha_mask) {
+			const point3 hit_p = r.at(t);
+			const float a = static_cast<float>(alpha_mask->value(hit_u, hit_v, hit_p).x());
+			const point3 o = r.origin();
+			const vec3 d = r.direction();
+			if (!ray_hash::alphaPasses(a, static_cast<float>(o.x()), static_cast<float>(o.y()), static_cast<float>(o.z()),
+									   static_cast<float>(d.x()), static_cast<float>(d.y()), static_cast<float>(d.z())))
+				return false;
+		}
+
 		rec.t = t;
 		rec.p = r.at(t);
+		rec.u = hit_u;
+		rec.v = hit_v;
 
 		// Interpolated normal
 		vec3 shading_n;
@@ -167,38 +207,6 @@ class triangle : public hittable {
 			shading_n = geom_normal;
 		}
 		rec.set_face_normal(r, shading_n);
-
-		// UV
-		if (mesh->has_uvs()) {
-			double u0 = mesh->uvs[2*idx[0]], v0 = mesh->uvs[2*idx[0]+1];
-			double u1 = mesh->uvs[2*idx[1]], v1 = mesh->uvs[2*idx[1]+1];
-			double u2 = mesh->uvs[2*idx[2]], v2 = mesh->uvs[2*idx[2]+1];
-			rec.u = b0*u0 + b1*u1 + b2*u2;
-			rec.v = b0*v0 + b1*v1 + b2*v2;
-		} else {
-			// pbrt-v4 (Triangle::InteractionFromIntersection): a mesh with no "uv" has (0,0), (1,0), (1,1) at the three vertices of each triangle, so u = b1 + b2, v = b2.
-			rec.u = b1 + b2;
-			rec.v = b2;
-		}
-
-		// Alpha-cutout (OBJ/.mtl map_d, see load_obj_mtl()'s own comment):
-		// a triangle has at most one intersection with a given ray, so
-		// "reject" is simply "this triangle isn't a hit for this ray" - the
-		// BVH naturally continues to whatever's behind it, no re-search-
-		// along-this-triangle complexity. pbrt-v4's stochastic alpha test
-		// (cpu/primitive.cpp:57-71): keep the hit with probability `alpha`,
-		// decided by a hash of the ray (ray_hash.h), identical on both GPU
-		// backends (passes_alpha_cutout(), wf_passes_alpha_cutout()). No-op
-		// for the overwhelming majority of triangles, whose material has no
-		// alpha mask.
-		if (alpha_mask) {
-			const float a = static_cast<float>(alpha_mask->value(rec.u, rec.v, rec.p).x());
-			const point3 o = r.origin();
-			const vec3 d = r.direction();
-			if (!ray_hash::alphaPasses(a, static_cast<float>(o.x()), static_cast<float>(o.y()), static_cast<float>(o.z()),
-									   static_cast<float>(d.x()), static_cast<float>(d.y()), static_cast<float>(d.z())))
-				return false;
-		}
 
 		// dpdu/dpdv: standard 2x2 UV-edge Jacobian solve (pbrt-v4's own
 		// technique) so both surface tangents fall out of one linear solve,

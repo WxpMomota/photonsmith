@@ -111,3 +111,45 @@ TEST(PbrtGpuQuadLightTest, NormalIsUnitLengthAndPerpendicularToTheQuad) {
 	EXPECT_NEAR(dot(q.normal, q.u), 0.0f, 1e-3f);
 	EXPECT_NEAR(dot(q.normal, q.v), 0.0f, 1e-3f);
 }
+
+// An emitter keeps the shape's material in pbrt-v4 (the default is diffuse 0.5): the lamp reflects the light that reaches it. The OptiX backends take a flat diffuse
+// reflectance from MaterialData::albedo, which an emitter otherwise leaves at zero; a black body (the Scene Builder's emitter) stays at zero.
+namespace {
+
+MaterialData lampMaterialFor(const char *materialLine) {
+	const pbrt_scene::ParseResult r = pbrt_scene::parse(std::string("WorldBegin\n") + materialLine +
+		"AreaLightSource \"diffuse\" \"rgb L\" [ 2 2 2 ]\n"
+		"Shape \"trianglemesh\" \"integer indices\" [ 0 1 2  0 2 3 ]\n"
+		"  \"point3 P\" [ 0 0 0  1 0 0  1 1 0  0 1 0 ]\n");
+	EXPECT_TRUE(r.ok) << r.error;
+	SceneData scene;
+	pbrt_gpu::build(pbrt_flatten::flatten(r.scene), scene);
+	for (const MaterialData &m : scene.materials)
+		if (m.type == MaterialType::DiffuseLight) return m;
+	ADD_FAILURE() << "no emissive material was built";
+	return MaterialData{};
+}
+
+} // namespace
+
+TEST(PbrtGpuEmitterReflectsTest, ALampWithTheDefaultMaterialCarriesTheDefaultDiffuseReflectance) {
+	const MaterialData m = lampMaterialFor("");
+	EXPECT_NEAR(m.albedo.x, 0.5f, 1e-6f);
+	EXPECT_NEAR(m.albedo.y, 0.5f, 1e-6f);
+	EXPECT_NEAR(m.albedo.z, 0.5f, 1e-6f);
+	EXPECT_NEAR(m.emission.x, 2.0f, 1e-6f);
+}
+
+TEST(PbrtGpuEmitterReflectsTest, ALampWithAGivenDiffuseReflectanceCarriesIt) {
+	const MaterialData m = lampMaterialFor("Material \"diffuse\" \"rgb reflectance\" [ 0.2 0.4 0.6 ]\n");
+	EXPECT_NEAR(m.albedo.x, 0.2f, 1e-6f);
+	EXPECT_NEAR(m.albedo.y, 0.4f, 1e-6f);
+	EXPECT_NEAR(m.albedo.z, 0.6f, 1e-6f);
+}
+
+TEST(PbrtGpuEmitterReflectsTest, ABlackBodyLampReflectsNothing) {
+	const MaterialData m = lampMaterialFor("Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]\n");
+	EXPECT_EQ(m.albedo.x, 0.0f);
+	EXPECT_EQ(m.albedo.y, 0.0f);
+	EXPECT_EQ(m.albedo.z, 0.0f);
+}
