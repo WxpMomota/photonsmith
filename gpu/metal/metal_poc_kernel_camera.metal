@@ -197,9 +197,11 @@ inline void initPathState(thread const KernelRes& R, thread PathState& P, float 
     // Chromatic camera medium: follow one colour channel for this whole path (chosen uniformly, weight x3 on it);
     // averaged over paths every channel is recovered, and free flight / shadow rays can use that channel's sigma_t.
     fogChan = -1;
+    mediumChan = -1;
     if (uniforms.fogChromatic != 0u && uniforms.fogSigmaT > 0.0) {
         fogChan = min(int(randFloat(rngState) * 3.0), 2);
         throughput *= float3(fogChan == 0 ? 3.0 : 0.0, fogChan == 1 ? 3.0 : 0.0, fogChan == 2 ? 3.0 : 0.0);
+        mediumChan = fogChan;
     }
     radiance = float3(0.0);
     // MIS bookkeeping across bounces: the light quad can be reached
@@ -252,6 +254,7 @@ inline void initPathState(thread const KernelRes& R, thread PathState& P, float 
         } else if (camGlass.conductorK.z > 0.5) {
             glassChan = min(int(randFloat(rngState) * 3.0), 2);
             throughput *= float3(glassChan == 0 ? 3.0 : 0.0, glassChan == 1 ? 3.0 : 0.0, glassChan == 2 ? 3.0 : 0.0);
+            mediumChan = glassChan;
         }
     }
     // Recursive-backend dispersion state (materialType 22, B23/B24) -
