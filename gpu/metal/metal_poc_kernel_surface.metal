@@ -222,11 +222,22 @@ inline void perturbShadingNormal(thread const KernelRes& R, thread PathState& P,
     // 7's own comment above) - never true for a sphere/disk/
     // Suzanne-instance hit, so this is simply skipped for those.
     // Image bump map ("texture displacement"): perturbs ONLY the shading normal of a triangle hit, like materialType 7 below.
-    if (mat.bumpWidth > 0 && !isBoundingBox && !isSuzanneInstance && !isPbrtInstance) {
+    if (mat.bumpWidth > 0 && !isBoundingBox && !isSuzanneInstance) {
         const float2 bumpUV = texCoordFor(primId, result.triangle_barycentric_coord, uvs);
         const float4 bumpMap = float4(mat.bumpUvScaleU, mat.bumpUvScaleV, mat.bumpUvDeltaU, mat.bumpUvDeltaV);
         float3 bumpDpdu, bumpDpdv;
-        triangleDpduDpdv(primId, vertices, uvs, normal, bumpDpdu, bumpDpdv);
+        // A pbrt ObjectInstance placement: the triangle's vertices, uvs and normals are in OBJECT space, but pbrt evaluates a bump map on the
+        // placed (world-space) surface, where scaling an instance changes the slope a given height makes. So the tangent frame is carried to world space
+        // here: dp/du, dp/dv by the instance's linear part (the table holds its inverse transpose, the normal matrix), dn/du, dn/dv by the normal matrix.
+        float3x3 instNormalMat = float3x3(1.0f);
+        float3x3 instLinear = float3x3(1.0f);
+        if (isPbrtInstance) {
+            const InstanceTransform bumpXf = instanceTransforms[result.instance_id];
+            instNormalMat = float3x3(float3(bumpXf.col0), float3(bumpXf.col1), float3(bumpXf.col2));
+            instLinear = transpose(inverse3x3(instNormalMat));
+        }
+        triangleDpduDpdv(primId, vertices, uvs, isPbrtInstance ? shadingNormalFor(primId, result.triangle_barycentric_coord, normals, vertices) : normal, bumpDpdu, bumpDpdv);
+        if (isPbrtInstance) { bumpDpdu = instLinear * bumpDpdu; bumpDpdv = instLinear * bumpDpdv; }
         // pbrt works with the shading normal as authored (`normal`), then its BSDF is two-sided about the perturbed normal: a viewer behind the perturbed plane is lit as if the
         // normal faced them, so the result is turned toward the viewer (as the CPU and OptiX do).
         float3 bumped = normal;
@@ -242,6 +253,7 @@ inline void perturbShadingNormal(thread const KernelRes& R, thread PathState& P,
             const bool smooth = triangleIsSmooth(primId, normals);
             float3 dndu = float3(0.0), dndv = float3(0.0);
             if (smooth) triangleDnduDndv(primId, normals, uvs, dndu, dndv);
+            if (isPbrtInstance) { dndu = instNormalMat * dndu; dndv = instNormalMat * dndv; }
             bumped = imageBumpNormal(rgbGridData, mat.bumpOffset, mat.bumpWidth, mat.bumpHeight, mat.bumpScale,
                                      bumpUV.x, bumpUV.y, bumpMap, normal, smooth, bumpDpdu, bumpDpdv, dndu, dndv, footprint);
         }
