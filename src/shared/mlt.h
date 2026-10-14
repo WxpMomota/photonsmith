@@ -361,6 +361,11 @@ MLTPathResult<T> MLTEvalPath(MLTSampler<T>& sampler, int depth,
 						 T new_dir[3], T f_val[3], T& pdf, bool& is_specular) const {
 			return scene.BSDFSampleF(id, wo, n, u1, u2, new_dir, f_val, pdf, is_specular);
 		}
+		// The wrapped scene's own light-walk sampler when it has one, its BSDFSampleF otherwise (bdpt.h's bsdf_sample_f_light() makes that choice).
+		bool BSDFSampleFLight(int id, const T wo[3], const T n[3], T u1, T u2,
+							  T new_dir[3], T f_val[3], T& pdf, bool& is_specular) const {
+			return bdpt_detail::bsdf_sample_f_light(scene, id, wo, n, u1, u2, new_dir, f_val, pdf, is_specular, 0);
+		}
 		T BSDFPdf(int id, const T wo[3], const T wi[3], const T n[3]) const {
 			return scene.BSDFPdf(id, wo, wi, n);
 		}

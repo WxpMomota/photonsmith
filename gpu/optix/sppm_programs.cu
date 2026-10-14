@@ -70,6 +70,7 @@ struct SPPMHitPayload {
 	float  u, v;          // surface (u,v), as the other backends compute them: what a texture is looked up with
 	int    materialIdx;
 	bool   hit;
+	bool   front_face;    // the ray arrived on the outward-normal side (`normal` is always turned toward the ray); a dielectric needs it to know entering from leaving
 };
 
 // ---- RNG: PCG hash, identical algorithm to wavefront_kernels.cu's wf_pcg/
@@ -201,6 +202,7 @@ extern "C" __global__ void __closesthit__sppm_sphere() {
 	payload->hitPoint    = hit_point;
 	payload->normal      = normal;
 	payload->materialIdx = sph.materialIdx;
+	payload->front_face  = front_face;
 	payload->hit         = true;
 }
 
@@ -226,6 +228,7 @@ extern "C" __global__ void __closesthit__sppm_quad() {
 	payload->hitPoint    = hit_point;
 	payload->normal      = normal;
 	payload->materialIdx = q.materialIdx;
+	payload->front_face  = front_face;
 	payload->hit         = true;
 }
 
@@ -489,9 +492,15 @@ static __device__ float3 sppm_sample_sphere_light(const SphereData& sph, const f
 // unset) on the wi_z<=0 grazing-incidence edge case -- caller must treat
 // that as a terminated path, matching the camera pass's original inline
 // `break` here before this was extracted.
+//
+// `out_crossing` is the weight of a refraction through the interface (1 for a reflection): pbrt-v4's radiance-mode eta^2 for a path traced from the CAMERA
+// (eta = eta_i / eta_t of the crossing: entering glass dims the path, leaving it brightens), the reciprocal for a PHOTON (`photon`), which crosses the same
+// interface in the direction the camera path does not (a photon from a lamp inside glass that leaves it is, seen from the camera, one that enters it).
+// Without it an emitter inside glass read 2.25 times too bright (CPU path tracer, see camera_path.h).
 static __device__ __forceinline__ bool sppm_sample_rough_dielectric(
 	const float3& dir_in, const float3& n, const MaterialData& mat,
-	unsigned int& seed, float3& out_dir) {
+	unsigned int& seed, float3& out_dir, bool photon, float& out_crossing, bool front_face) {
+	out_crossing = 1.0f;
 	// mat.roughnessV<0 means "isotropic" - see MaterialData::roughnessV's
 	// own comment (optix_types.h). remapRoughness now gates both axes here
 	// too (previously this function unconditionally sqrt'd regardless of
@@ -520,8 +529,11 @@ static __device__ __forceinline__ bool sppm_sample_rough_dielectric(
 		out_dir = normalize(wo_x*tan_v + wo_y*bitan + wo_z*n);
 	} else {
 		float3 wm_world = wm_x*tan_v + wm_y*bitan + wm_z*n;
-		float eta = dot(dir_in, n) < 0.0f ? (1.0f / mat.ior) : mat.ior;
+		// (`n` is turned toward the ray, so dot(dir_in, n) < 0 always: entering or leaving is the hit's front_face. It used to be read off that dot, which made every
+		// ray - one leaving a glass sphere included - refract as if entering it.)
+		float eta = front_face ? (1.0f / mat.ior) : mat.ior;
 		out_dir = cpu_gpu_refract<float3, float>(normalize(dir_in), wm_world, eta);
+		out_crossing = photon ? 1.0f / (eta * eta) : eta * eta;
 	}
 	return true;
 }
@@ -652,7 +664,7 @@ static __device__ __forceinline__ float3 sppm_bsdf_f(
 // than two independent copies.
 static __device__ __forceinline__ bool sppm_sample_delta_material(
 	const float3& dir_in, const float3& n, const MaterialData& mat,
-	unsigned int& seed, float3& out_dir, float3& out_atten) {
+	unsigned int& seed, float3& out_dir, float3& out_atten, bool photon, bool front_face) {
 	switch (mat.type) {
 	case MaterialType::Metal: {
 		float3 reflected = cpu_gpu_reflect(normalize(dir_in), n);
@@ -663,7 +675,7 @@ static __device__ __forceinline__ bool sppm_sample_delta_material(
 		return true;
 	}
 	case MaterialType::Dielectric: {
-		float  eta      = dot(dir_in, n) < 0.0f ? (1.0f / mat.ior) : mat.ior;
+		float  eta      = front_face ? (1.0f / mat.ior) : mat.ior;   // (front_face, not the sign of dot(dir_in, n): `n` faces the ray)
 		float3 unit_dir = normalize(dir_in);
 		float  cos_t    = fminf(dot(-unit_dir, n), 1.0f);
 		float  sin_t    = sqrtf(fmaxf(0.0f, 1.0f - cos_t * cos_t));
@@ -682,6 +694,8 @@ static __device__ __forceinline__ bool sppm_sample_delta_material(
 		// add_dielectric()'s transmission_filter comment (identical
 		// convention on both other backends' Dielectric cases).
 		out_atten = is_transmission ? mat.transmission_filter : make_float3(1.0f, 1.0f, 1.0f);
+		// pbrt-v4's radiance-mode eta^2 of the crossing for a path from the camera, its reciprocal for a photon (see sppm_sample_rough_dielectric()).
+		if (is_transmission) out_atten = out_atten * (photon ? 1.0f / (eta * eta) : eta * eta);
 		return true;
 	}
 	case MaterialType::Conductor: {
@@ -968,9 +982,10 @@ extern "C" __global__ void __raygen__sppm_camera_pass() {
 			// RoughDielectricBxDF's own "attenuation = white" convention
 			// (src/shared/bxdfs_conductor.h).
 			float3 new_dir;
-			if (!sppm_sample_rough_dielectric(dir, payload.normal, mat, seed, new_dir)) break;
+			float crossing;
+			if (!sppm_sample_rough_dielectric(dir, payload.normal, mat, seed, new_dir, /*photon=*/false, crossing, payload.front_face)) break;
 
-			beta = beta * mat.albedo;
+			beta = beta * mat.albedo * crossing;
 			org = payload.hitPoint;
 			dir = new_dir;
 			continue;
@@ -990,7 +1005,7 @@ extern "C" __global__ void __raygen__sppm_camera_pass() {
 			// to the visible-point path below instead of landing here - see
 			// sppm_is_delta_material()'s own comment.
 			float3 new_dir, atten;
-			if (!sppm_sample_delta_material(dir, payload.normal, mat, seed, new_dir, atten)) break;
+			if (!sppm_sample_delta_material(dir, payload.normal, mat, seed, new_dir, atten, /*photon=*/false, payload.front_face)) break;
 
 			beta = beta * atten;
 			org = payload.hitPoint;
@@ -1215,8 +1230,9 @@ extern "C" __global__ void __raygen__sppm_photon_pass() {
 		float3 beta_new;
 		float3 new_dir;
 		if (mat.type == MaterialType::RoughDielectric) {
-			if (!sppm_sample_rough_dielectric(dir_cur, payload.normal, mat, seed, new_dir)) break;
-			beta_new = beta * mat.albedo;
+			float crossing;
+			if (!sppm_sample_rough_dielectric(dir_cur, payload.normal, mat, seed, new_dir, /*photon=*/true, crossing, payload.front_face)) break;
+			beta_new = beta * mat.albedo * crossing;
 		} else if (mat.type == MaterialType::Metal || mat.type == MaterialType::Dielectric ||
 		           mat.type == MaterialType::Conductor || mat.type == MaterialType::RoughMetal ||
 		           mat.type == MaterialType::DiffuseTransmission) {
@@ -1231,7 +1247,7 @@ extern "C" __global__ void __raygen__sppm_photon_pass() {
 			// just deposited above) still continues the walk through here
 			// exactly like a smooth one always did.
 			float3 atten;
-			if (!sppm_sample_delta_material(dir_cur, payload.normal, mat, seed, new_dir, atten)) break;
+			if (!sppm_sample_delta_material(dir_cur, payload.normal, mat, seed, new_dir, atten, /*photon=*/true, payload.front_face)) break;
 			beta_new = beta * atten;
 		} else if (mat.type == MaterialType::DiffuseLight) {
 			break; // photon paths don't continue off emitters

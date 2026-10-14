@@ -424,8 +424,8 @@ void SPPMPhotonPass(std::vector<SPPMPixel<T>>& pixels,
 			T new_dir[3], f_val[3], pdf;
 			bool is_spec;
 			T su1 = scene.RandFloat(), su2 = scene.RandFloat();
-			if (!scene.BSDFSampleF(hit.bsdf_id, hit.wo, hit.shading_n,
-								   su1, su2, new_dir, f_val, pdf, is_spec))
+			if (!bdpt_detail::bsdf_sample_f_light(scene, hit.bsdf_id, hit.wo, hit.shading_n,
+												  su1, su2, new_dir, f_val, pdf, is_spec, 0))
 				break;
 			if (pdf <= T(0)) break;
 

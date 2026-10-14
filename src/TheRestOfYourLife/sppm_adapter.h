@@ -224,6 +224,15 @@ class SPPMSceneAdapter {
 		return sppm_bsdf_sample_f(ctx, wo, n, u1, u2, new_dir, f_val, pdf, is_specular);
 	}
 
+	// A photon is traced from the light (pbrt's importance transport): a refraction weighs it by the reciprocal of the radiance-mode eta^2 a path from the camera
+	// would (see sppm_bsdf_sample_f()'s `light_walk`).
+	bool BSDFSampleFLight(int id, const double wo[3], const double n[3],
+	                      double u1, double u2,
+	                      double new_dir[3], double f_val[3], double& pdf, bool& is_specular) const {
+		const SPPMShadingContext& ctx = (id == kTransientId) ? transient_ctx_ : durable_ctx_[id];
+		return sppm_bsdf_sample_f(ctx, wo, n, u1, u2, new_dir, f_val, pdf, is_specular, /*light_walk=*/true);
+	}
+
 	void BSDFf(int id, const double wo[3], const double wi[3], const double n[3], double out[3]) const {
 		const SPPMShadingContext& ctx = (id == kTransientId) ? transient_ctx_ : durable_ctx_[id];
 		sppm_bsdf_f(ctx, wo, wi, n, out);
@@ -773,8 +782,8 @@ inline void sppm_photon_pass_mt(std::vector<SPPMPixel<double>>& pixels,
 				double new_dir[3], f_val[3], pdf;
 				bool is_spec;
 				double su1 = scene.RandFloat(), su2 = scene.RandFloat();
-				if (!scene.BSDFSampleF(hit.bsdf_id, hit.wo, hit.shading_n,
-				                       su1, su2, new_dir, f_val, pdf, is_spec))
+				if (!bdpt_detail::bsdf_sample_f_light(scene, hit.bsdf_id, hit.wo, hit.shading_n,
+				                                      su1, su2, new_dir, f_val, pdf, is_spec, 0))
 					break;
 				if (pdf <= 0.0) break;
 

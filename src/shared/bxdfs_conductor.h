@@ -399,7 +399,7 @@ struct RoughDielectricBxDF {
 			// struct's relative eta = eta_i/eta_t, that is the expression above divided by eta^2.
 			// The path tracers (CPU camera_path.h, both OptiX backends) multiply the throughput by eta^2 at every refraction, pbrt's radiance-mode 1 / etap^2, and
 			// this value by the same where the direct-light sample crosses the surface (an emitter or camera inside glass reads right that way); a closed object
-			// cancels the entering and leaving factors, so this importance-form f() and the unscaled sample weights stay what the other consumers (BDPT, SPPM, MLT) read.
+			// cancels the entering and leaving factors, so this importance-form f() and the unscaled sample weights stay what the shared BSDF bridge starts from (it picks the mode per vertex for BDPT, SPPM and MLT: bsdf_bridge.h).
 			// (Evaluating the radiance-mode value here, as this function used to, over-counted NEE at every exit vertex by
 			// eta^2 = 2.25 for glass: a rough glass sphere under a small lamp read 17-22% bright against a pbrt-v4
 			// path-level reference, and 2-3% bright under a sky. The old white-furnace test missed it because it only

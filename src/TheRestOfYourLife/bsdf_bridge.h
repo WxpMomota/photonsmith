@@ -252,7 +252,12 @@ inline hit_record sppm_reconstruct_hit_record(const SPPMShadingContext& ctx, con
 // for why that has to happen there rather than being handled with a
 // closed-form f() the way diffuse_transmission was) -- ctx.mat here is
 // always one of the real, concrete material classes.
-inline void sppm_bsdf_f(const SPPMShadingContext& ctx, const double wo[3], const double wi[3],
+// TRANSPORT MODES. This is the value the path tracer's NEE and BSDF-sample weights use, `f(wo toward the camera, wi toward the light)` in this codebase's
+// convention: for a refraction it is pbrt-v4's IMPORTANCE-mode value (RoughDielectricBxDF::f() leaves out the 1 / etap^2 that pbrt's radiance mode divides by,
+// and a sampled smooth refraction weighs 1: a path integrator multiplies the radiance-mode eta^2 in itself, camera_path.h). The bidirectional integrators and
+// SPPM need pbrt's two modes per vertex, and they get them from the three functions below: sppm_bsdf_f() (a camera-subpath vertex, radiance), sppm_bsdf_f_adjoint()
+// (a light-subpath vertex or photon, importance) and the `light_walk` flag of sppm_bsdf_sample_f().
+inline void sppm_bsdf_f_importance(const SPPMShadingContext& ctx, const double wo[3], const double wi[3],
                          const double n[3], double out[3]) {
 	out[0] = out[1] = out[2] = 0.0;
 	if (!ctx.mat) return;
@@ -372,17 +377,35 @@ inline void sppm_bsdf_f(const SPPMShadingContext& ctx, const double wo[3], const
 // that equals f(wo_v, wi_next); for a refraction it does not (this codebase's dielectric f carries a 1/eta^2 that depends on which side wo is), so
 // BDPT/MLT's light subpaths read 4% (smooth-glass-free rough glass sphere) to 20% too bright through rough dielectrics from s = 3 on. The side of
 // `wi_next` also decides the entering/leaving flag, since ctx.front_face describes the side of `wo_v`.
-inline void sppm_bsdf_f_adjoint(const SPPMShadingContext& ctx, const double wo_v[3], const double wi_next[3],
+inline void sppm_bsdf_f_swapped(const SPPMShadingContext& ctx, const double wo_v[3], const double wi_next[3],
                                  const double n[3], double out[3]) {
 	const double cos_next = wi_next[0]*n[0] + wi_next[1]*n[1] + wi_next[2]*n[2];
 	if (cos_next >= 0.0) {
-		sppm_bsdf_f(ctx, wi_next, wo_v, n, out);
+		sppm_bsdf_f_importance(ctx, wi_next, wo_v, n, out);
 		return;
 	}
 	SPPMShadingContext flipped = ctx;
 	flipped.front_face = !ctx.front_face;
 	const double n_flipped[3] = { -n[0], -n[1], -n[2] };
-	sppm_bsdf_f(flipped, wi_next, wo_v, n_flipped, out);
+	sppm_bsdf_f_importance(flipped, wi_next, wo_v, n_flipped, out);
+}
+
+// f(wo toward the camera, wi toward the light) of a vertex on a path traced from the CAMERA, in pbrt-v4's radiance mode: the importance value of the swapped pair
+// (the radiance and importance forms of a refraction are each other's adjoint, f_radiance(wo, wi) = f_importance(wi, wo)). Only a rough dielectric is not its own
+// adjoint; every other BSDF here is symmetric, and keeps the plain value.
+inline void sppm_bsdf_f(const SPPMShadingContext& ctx, const double wo[3], const double wi[3],
+                         const double n[3], double out[3]) {
+	if (ctx.mat && dynamic_cast<const rough_dielectric*>(ctx.mat.get()))
+		sppm_bsdf_f_swapped(ctx, wo, wi, n, out);
+	else
+		sppm_bsdf_f_importance(ctx, wo, wi, n, out);
+}
+
+// f of a vertex on a path traced from the LIGHT (a light subpath or a photon), pbrt-v4's importance mode: light arrives along wo_v and leaves toward wi_next,
+// and the importance value of that very pair is what the throughput of a path from the light multiplies (it equals the radiance value of the swapped pair).
+inline void sppm_bsdf_f_adjoint(const SPPMShadingContext& ctx, const double wo_v[3], const double wi_next[3],
+                                 const double n[3], double out[3]) {
+	sppm_bsdf_f_importance(ctx, wo_v, wi_next, n, out);
 }
 
 // Importance-samples a new direction at a captured shading context, shaped
@@ -411,9 +434,14 @@ inline void sppm_bsdf_f_adjoint(const SPPMShadingContext& ctx, const double wo_v
 // this codebase's existing material::scatter() interface rather than a
 // pbrt-v4-style BxDF::Sample_f(u) interface; worth calling out so it isn't
 // later mistaken for an oversight (see bdpt_adapter.h's own file comment).
+//
+// `light_walk` says which way the path is being traced (pbrt's transport mode): false = from the camera (radiance, the default), true = from the light (a light
+// subpath or a photon, importance). It changes the weight of a refraction only: a path from the camera multiplies the radiance-mode eta^2 of the crossing
+// (entering glass dims it, leaving brightens it), a path from the light the reciprocal, eta^-2, because it crosses the same interface in the opposite direction
+// (a ray from a lamp inside glass that leaves it is, seen from the camera, one that enters it). The product over a whole path is the same either way.
 inline bool sppm_bsdf_sample_f(const SPPMShadingContext& ctx, const double wo[3], const double n[3],
                                 double /*u1*/, double /*u2*/,
-                                double new_dir[3], double f_val[3], double& pdf, bool& is_specular) {
+                                double new_dir[3], double f_val[3], double& pdf, bool& is_specular, bool light_walk = false) {
 	if (!ctx.mat) return false;
 	hit_record rec = sppm_reconstruct_hit_record(ctx, n);
 	ray fake_in(ctx.p, -vec3(wo[0], wo[1], wo[2]));
@@ -426,9 +454,14 @@ inline bool sppm_bsdf_sample_f(const SPPMShadingContext& ctx, const double wo[3]
 		new_dir[0] = d.x(); new_dir[1] = d.y(); new_dir[2] = d.z();
 		double cosI = std::fabs(d.x()*n[0] + d.y()*n[1] + d.z()*n[2]);
 		cosI = std::max(cosI, 1e-6);
-		f_val[0] = srec.attenuation.x() / cosI;
-		f_val[1] = srec.attenuation.y() / cosI;
-		f_val[2] = srec.attenuation.z() / cosI;
+		// A refraction through a dielectric interface (not the subsurface entry, which stays in the importance-transport form: its exit carries no matching
+		// eta^2 either): srec.eta is eta_i / eta_t of the crossing in the direction the path travels.
+		double crossing = 1.0;
+		if (srec.is_transmission && srec.eta > 0.0 && !ctx.mat->as_subsurface(rec))
+			crossing = light_walk ? 1.0 / (srec.eta * srec.eta) : srec.eta * srec.eta;
+		f_val[0] = srec.attenuation.x() * crossing / cosI;
+		f_val[1] = srec.attenuation.y() * crossing / cosI;
+		f_val[2] = srec.attenuation.z() * crossing / cosI;
 		pdf = 1.0;
 		is_specular = true;
 		return true;
@@ -444,7 +477,8 @@ inline bool sppm_bsdf_sample_f(const SPPMShadingContext& ctx, const double wo[3]
 	vec3 dn = unit_vector(d);
 	double wi[3] = { dn.x(), dn.y(), dn.z() };
 	double f[3];
-	sppm_bsdf_f(ctx, wo, wi, n, f);
+	if (light_walk) sppm_bsdf_f_adjoint(ctx, wo, wi, n, f);
+	else            sppm_bsdf_f(ctx, wo, wi, n, f);
 	new_dir[0] = dn.x(); new_dir[1] = dn.y(); new_dir[2] = dn.z();
 	f_val[0] = f[0]; f_val[1] = f[1]; f_val[2] = f[2];
 	pdf = p;

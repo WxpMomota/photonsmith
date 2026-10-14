@@ -219,6 +219,20 @@ inline void bsdf_f_light(const Scene& scene, int id, const T wo[3], const T wi[3
 	scene.BSDFf(id, wo, wi, n, out);
 }
 
+// Sample a direction at a vertex of a path traced from the LIGHT (pbrt's TransportMode::Importance). A scene whose weight of a sampled refraction depends on the
+// direction of travel provides BSDFSampleFLight(); for every other scene the camera-oriented BSDFSampleF() is the same.
+template<typename Scene, typename T>
+inline auto bsdf_sample_f_light(const Scene& scene, int id, const T wo[3], const T n[3], T u1, T u2,
+                                T new_dir[3], T f_val[3], T& pdf, bool& is_specular, int)
+	-> decltype(scene.BSDFSampleFLight(id, wo, n, u1, u2, new_dir, f_val, pdf, is_specular), bool()) {
+	return scene.BSDFSampleFLight(id, wo, n, u1, u2, new_dir, f_val, pdf, is_specular);
+}
+template<typename Scene, typename T>
+inline bool bsdf_sample_f_light(const Scene& scene, int id, const T wo[3], const T n[3], T u1, T u2,
+                                T new_dir[3], T f_val[3], T& pdf, bool& is_specular, long) {
+	return scene.BSDFSampleF(id, wo, n, u1, u2, new_dir, f_val, pdf, is_specular);
+}
+
 // Default SplatFn for BDPTLi() below - lets callers that don't want t==1
 // light-tracing contributions (e.g. unit tests exercising a single
 // strategy directly) omit the splat argument entirely via BDPTLi's own
@@ -812,8 +826,9 @@ int BDPTRandomWalk(const T ray_o[3], const T ray_d[3],
 		T f_val[3];
 		T pdf_bsdf;
 		bool is_specular;
-		bool sampled = scene.BSDFSampleF(hit.bsdf_id, wo, hit.shading_n, u1, u2,
-										  new_dir, f_val, pdf_bsdf, is_specular);
+		bool sampled = camera_mode
+			? scene.BSDFSampleF(hit.bsdf_id, wo, hit.shading_n, u1, u2, new_dir, f_val, pdf_bsdf, is_specular)
+			: bdpt_detail::bsdf_sample_f_light(scene, hit.bsdf_id, wo, hit.shading_n, u1, u2, new_dir, f_val, pdf_bsdf, is_specular, 0);
 		if (!sampled || pdf_bsdf == T(0)) break;
 
 		// A light subpath carries importance: its throughput uses the adjoint value (see bdpt_detail::bsdf_f_light()). A specular sample keeps

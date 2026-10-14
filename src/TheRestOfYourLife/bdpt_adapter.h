@@ -415,6 +415,14 @@ class BDPTSceneAdapter {
 		return sppm_bsdf_sample_f(*ctx, wo, n, u1, u2, new_dir, f_val, pdf, is_specular);
 	}
 
+	// The same sample for a vertex of a path traced from the light (a light subpath, light tracing): see sppm_bsdf_sample_f()'s `light_walk`.
+	bool BSDFSampleFLight(int id, const double wo[3], const double n[3], double u1, double u2,
+	                       double new_dir[3], double f_val[3], double& pdf, bool& is_specular) const {
+		const SPPMShadingContext* ctx = context_for(id);
+		if (!ctx) return false;
+		return sppm_bsdf_sample_f(*ctx, wo, n, u1, u2, new_dir, f_val, pdf, is_specular, /*light_walk=*/true);
+	}
+
 	double BSDFPdf(int id, const double wo[3], const double wi[3], const double n[3]) const {
 		const SPPMShadingContext* ctx = context_for(id);
 		if (!ctx) return 0.0;
@@ -526,19 +534,16 @@ class BDPTSceneAdapter {
 	// importance transport only differ for non-symmetric scattering (real
 	// refraction through a dielectric interface picks up an eta^2 factor --
 	// see pbrt-v4's own BxDF::Sample_f(..., TransportMode::Importance)
-	// documentation) -- this adapter does not apply that correction, so
-	// --lightpath output through the dielectric family is an approximation
-	// (exact for every purely-reflective material this codebase's BSDF
-	// bridge supports). Documented, not hidden -- see launcher_args.h's
-	// --lightpath help text, same "debug/reference integrator, not
-	// radiometrically exact everywhere" framing as --ao/--randomwalk.
+	// documentation): these are the light-walk forms of the bridge
+	// (sppm_bsdf_f_adjoint(), sppm_bsdf_sample_f(..., light_walk)), so a lamp
+	// inside glass is traced as pbrt traces it.
 	void BSDFfImportance(int id, const double wo[3], const double wi[3], const double n[3], double out[3]) const {
-		BSDFf(id, wo, wi, n, out);
+		BSDFfAdjoint(id, wo, wi, n, out);
 	}
 	bool BSDFSampleFImportance(int id, const double wo[3], const double n[3], double u1, double u2,
 	                            double new_dir[3], double f_val[3], double& pdf) const {
 		bool is_specular = false;
-		return BSDFSampleF(id, wo, n, u1, u2, new_dir, f_val, pdf, is_specular);
+		return BSDFSampleFLight(id, wo, n, u1, u2, new_dir, f_val, pdf, is_specular);
 	}
 
 	// LightPathTrace's own light-emission sample -- same power-weighted-

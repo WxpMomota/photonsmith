@@ -742,6 +742,68 @@ TEST(PbrtReferenceTest, LampInsideGlassReadsLikePbrt) { expectCpuMeanNearPbrt("l
 TEST(PbrtReferenceTest, LampInsideRoughGlassReadsLikePbrt) { expectCpuMeanNearPbrt("lamp-inside-rough-glass", 128, 0.02959, 0.04); }
 TEST(PbrtReferenceTest, CameraInsideGlassReadsLikePbrt) { expectCpuMeanNearPbrt("camera-inside-glass", 128, 3.298, 0.03); }
 TEST(PbrtReferenceTest, CameraInsideRoughGlassReadsLikePbrt) { expectCpuMeanNearPbrt("rough-glass-from-inside", 128, 9.838, 0.03); }
+// The bidirectional integrators and SPPM against pbrt-v4's own means of the same scenes (see above). pbrt's BDPT and SPPM carry the same radiance / importance
+// split of a refraction as its path tracer: a path from the camera multiplies eta^2 of every crossing, a path from the light (a light subpath, a photon) the
+// reciprocal, and a vertex's f is evaluated in the mode of the path it belongs to (bsdf_bridge.h). Without it a lamp inside glass read 2.25 times bright and a
+// camera inside glass 2.25 times dark under --bdpt, --mlt and --sppm, and GPU SPPM refracted every ray that LEFT glass as if it entered (its normal faces the
+// ray, so entering and leaving were read off a dot product that is always negative): the sphere-lamp scene read 14% dark.
+static double cpuIntegratorMean(const char* integrator, const char* stem, int depth) {
+	const SceneDescriptor* s = find_example_scene(stem);
+	if (!s) return -2.0;
+	const std::string out = std::string("pbrt_ref_") + stem + "_" + integrator + ".exr";
+	const std::string name = integrator;
+	int rc = -1;
+	if (name == "bdpt") rc = cpu_render_main_bdpt(48, 48, 256, depth, out.c_str(), s->id.c_str(), 0.0, 0.0, 0.0);
+	else if (name == "mlt") rc = cpu_render_main_mlt(48, 48, 200000, 8000000, depth, out.c_str(), s->id.c_str(), 0.0, 0.0, 0.0);
+	else if (name == "sppm") rc = cpu_render_main_sppm(48, 48, 100, 20000, depth, out.c_str(), s->id.c_str(), 0.0, 0.0, 0.0);
+	double m = -1.0;
+	if (rc == 0) loadLinearMean(out, m);
+	std::remove(out.c_str());
+	return m;
+}
+static void expectIntegratorNearPbrt(const char* integrator, const char* stem, double pbrtMean, double tol) {
+	if (!find_example_scene(stem)) GTEST_SKIP() << stem << ".pbrt was not discovered - is pbrt_scenes/ present?";
+	const double m = cpuIntegratorMean(integrator, stem, 8);
+	ASSERT_GT(m, 0.0) << stem << " " << integrator << ": no readable render";
+	std::printf("[pbrt] %s %s: mean %.4f against pbrt-v4's %.4f (%.1f%%)\n", stem, integrator, m, pbrtMean, 100.0 * m / pbrtMean);
+	EXPECT_GT(m, (1.0 - tol) * pbrtMean) << stem << " " << integrator;
+	EXPECT_LT(m, (1.0 + tol) * pbrtMean) << stem << " " << integrator;
+}
+TEST(PbrtReferenceTest, BdptLampAndCameraInsideGlassReadLikePbrt) {
+	expectIntegratorNearPbrt("bdpt", "lamp-inside-glass", 0.04137, 0.04);
+	expectIntegratorNearPbrt("bdpt", "lamp-inside-rough-glass", 0.02959, 0.05);
+	expectIntegratorNearPbrt("bdpt", "camera-inside-glass", 3.298, 0.04);
+	expectIntegratorNearPbrt("bdpt", "rough-glass-from-inside", 9.838, 0.04);
+}
+TEST(PbrtReferenceTest, MltLampAndCameraInsideGlassReadLikePbrt) {
+	// (MLT's mean wanders by a few percent between seeds: bounds wide enough for that and far inside the 2.25x of the defect.)
+	expectIntegratorNearPbrt("mlt", "lamp-inside-glass", 0.04137, 0.08);
+	expectIntegratorNearPbrt("mlt", "camera-inside-glass", 3.298, 0.08);
+}
+TEST(PbrtReferenceTest, SppmLampAndCameraInsideGlassReadLikePbrt) {
+	expectIntegratorNearPbrt("sppm", "lamp-inside-glass", 0.04137, 0.06);
+	expectIntegratorNearPbrt("sppm", "camera-inside-glass", 3.298, 0.06);
+}
+TEST(PbrtReferenceTest, GpuSppmLampAndCameraInsideGlassReadLikePbrt) {
+	if (!optix_is_available()) GTEST_SKIP() << "OptiX not available";
+	for (const auto& c : {std::pair<const char*, double>{"lamp-inside-glass", 0.04137}, std::pair<const char*, double>{"camera-inside-glass", 3.298},
+	                      std::pair<const char*, double>{"glass-sphere-lamp", -1.0}}) {
+		const SceneDescriptor* s = find_example_scene(c.first);
+		if (!s) GTEST_SKIP() << c.first << ".pbrt was not discovered - is pbrt_scenes/ present?";
+		double ref = c.second;
+		if (ref < 0.0) {   // no pbrt number: the CPU path tracer (the scene is a closed glass object, which agrees with pbrt)
+			ASSERT_EQ(cpu_render_main(48, 48, 256, 8, "pbrt_ref_gpusppm_pt.exr", s->id.c_str(), 0.0, 0.0, 0.0), 0);
+			ASSERT_TRUE(loadLinearMean("pbrt_ref_gpusppm_pt.exr", ref));
+			std::remove("pbrt_ref_gpusppm_pt.exr");
+		}
+		double m[3];
+		ASSERT_TRUE(gpuSppmMeans(s->id, 48, 100, 20000, 8, m));
+		const double mean = (m[0] + m[1] + m[2]) / 3.0;
+		std::printf("[pbrt] %s gpu sppm: mean %.4f against %.4f (%.1f%%)\n", c.first, mean, ref, 100.0 * mean / ref);
+		EXPECT_GT(mean, 0.95 * ref) << c.first;
+		EXPECT_LT(mean, 1.05 * ref) << c.first;
+	}
+}
 TEST(PbrtBackendAgreementTest, LampAndCameraInsideGlassAgreeAcrossBackends) {
 	expectBackendsAgree("lamp-inside-glass", 128, 0.985, 1.015);
 	expectBackendsAgree("lamp-inside-rough-glass", 128, 0.97, 1.03);
