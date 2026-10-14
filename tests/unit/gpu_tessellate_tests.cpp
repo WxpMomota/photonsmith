@@ -173,7 +173,7 @@ TEST(GpuTessellateTest, AQuadricWithoutAPictureOrCaughtByAnotherRuleStaysAnalyti
 	EXPECT_EQ(s.disks.size(), 2u);
 }
 
-TEST(GpuTessellateTest, ASphereWithABumpMapBecomesTrianglesWithTheProjectsSphereCoordinates) {
+TEST(GpuTessellateTest, ASphereWithABumpMapBecomesTrianglesWithPbrtsSphereCoordinates) {
 	pbrt_flatten::FlatScene s;
 	pbrt_flatten::Material mapped;
 	mapped.displacementTextureFilename = "bump.png";
@@ -202,14 +202,37 @@ TEST(GpuTessellateTest, ASphereWithABumpMapBecomesTrianglesWithTheProjectsSphere
 		for (int c = 0; c < 3; ++c) {
 			const double x = t.v[c * 3] - 1.0, y = t.v[c * 3 + 1] - 2.0, z = t.v[c * 3 + 2] - 3.0;
 			EXPECT_NEAR(std::sqrt(x * x + y * y + z * z), 2.0, 1e-9);
-			// the project's get_sphere_uv: theta = acos(-y / r) = pi v, phi = atan2(-z, x) + pi = 2 pi u
-			EXPECT_NEAR(std::acos(-y / 2.0), kPi * t.uv[c * 2 + 1], 1e-9);
-			if (std::fabs(y) < 1.99) {   // (away from the poles, where u is not defined)
-				double phi = std::atan2(-z, x) + kPi, u = 2.0 * kPi * t.uv[c * 2];
-				double d = std::fabs(phi - u);
-				d = std::min(d, 2.0 * kPi - d);
+			// pbrt's Sphere::InteractionFromIntersection about the object's own z axis (here the world's: the sphere is not turned): v = 1 - acos(z / r) / pi, u = atan2(y, x) / 2 pi
+			EXPECT_NEAR(1.0 - std::acos(z / 2.0) / kPi, t.uv[c * 2 + 1], 1e-9);
+			if (std::fabs(z) < 1.99) {   // (away from the poles, where u is not defined)
+				double u = std::atan2(y, x) / (2.0 * kPi);
+				if (u < 0.0) u += 1.0;
+				double d = std::fabs(u - t.uv[c * 2]);
+				d = std::min(d, 1.0 - d);
 				EXPECT_NEAR(d, 0.0, 1e-9);
 			}
+		}
+	}
+}
+
+TEST(GpuTessellateTest, ATurnedSpheresCoordinatesFollowItsOwnZAxis) {
+	pbrt_flatten::FlatScene s;
+	pbrt_flatten::Material mapped;
+	mapped.displacementTextureFilename = "bump.png";
+	s.materials.push_back(mapped);
+	pbrt_flatten::Sphere sp;
+	sp.material = 0;
+	// poles on the world's +y: the object's z axis is the world's y (a Rotate -90 about x), its y axis the world's -z; uvRot rows = (-object x, object z, object y)
+	const double rot[9] = {-1, 0, 0,  0, 1, 0,  0, 0, -1};
+	for (int a = 0; a < 9; ++a) sp.uvRot[a] = rot[a];
+	s.spheres.push_back(sp);
+	tessellateForBackend(s, TessellationCaps::all(), nullptr);
+	const double kPi = 3.14159265358979323846;
+	for (size_t i = 0; i < s.triangles.size(); i += 53) {
+		const pbrt_flatten::Triangle& t = s.triangles[i];
+		for (int c = 0; c < 3; ++c) {
+			const double y = t.v[c * 3 + 1];   // the pole axis is the world's y
+			EXPECT_NEAR(1.0 - std::acos(std::max(-1.0, std::min(1.0, y))) / kPi, t.uv[c * 2 + 1], 1e-9);
 		}
 	}
 }

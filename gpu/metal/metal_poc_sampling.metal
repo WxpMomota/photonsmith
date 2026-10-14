@@ -714,6 +714,13 @@ inline float2 equirectangularUV(float3 dir) {
     return float2(u, v);
 }
 
+// (u, v) of the outward normal `n` of a sphere: pbrt's coordinates, about the sphere's own z axis. The rows of `uvRot` carry the world direction into the frame the older
+// mapping above is defined in (the project's get_sphere_uv: theta = acos(-y), phi = atan2(-z, x) + pi), where it is called as before with z negated.
+inline float2 sphereUV(packed_float3 row0, packed_float3 row1, packed_float3 row2, float3 n) {
+    const float3 d = float3(dot(float3(row0), n), dot(float3(row1), n), dot(float3(row2), n));
+    return equirectangularUV(float3(d.x, d.y, -d.z));
+}
+
 // The environment-map (sky image) mapping, the one the CPU's sky_light and the OptiX backends use: row 0 of the image is straight up
 // (v = theta / pi, theta measured from +y) and u = phi / (2 pi) with phi = atan2(-z, x) taken into [0, 1). equirectangularUV() above is a
 // different, older convention (v = 1 at +y, longitude mirrored and shifted) that the procedural patterns and sphere textures still use, so
