@@ -6,6 +6,7 @@
 #include "../../src/shared/hosek_sky.h"
 #include "../../src/shared/pbrt_load.h"
 #include "../../src/shared/scene_document.h"
+#include "../../src/shared/scene_sky_equal_area.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -347,4 +348,64 @@ TEST(SceneSkyRenderTest, ALevelPlateReadsAlbedoOverPiTimesTheIrradiance) {
 		std::error_code ec;
 		std::filesystem::remove_all("scene_sky_test_dirs", ec);
 	}
+}
+
+// ---- Save writes a lat-long sky as the equal-area square pbrt-v4 reads (scene_sky_equal_area.h) ----
+
+TEST(SceneSkyEqualAreaTest, ASavedPanoramaIsASquareCopyThatReadsBackAsThePanorama) {
+	const std::string dir = tempDir("equal_area");
+	SkyParams p;
+	p.sunElevation = 40.0;
+	p.sunAzimuth = 90.0;
+	const int w = 256, h = 128;
+	const std::vector<float> pano = sky::renderSkyImage(p, w, h);
+	const std::string hdr = dir + "/pano.hdr";
+	{
+		std::ofstream out(hdr, std::ios::binary);
+		const std::string data = sky::encodeHdr(pano, w, h);
+		out.write(data.data(), static_cast<std::streamsize>(data.size()));
+	}
+	const std::string cache = dir + "/cache";
+	const std::string copy = sky_equal_area::ensureCopy(hdr, cache);
+	ASSERT_FALSE(copy.empty());
+	EXPECT_EQ(sky_equal_area::ensureCopy(hdr, cache), copy) << "made once, reused";
+	EXPECT_EQ(sky_equal_area::ensureCopy(dir + "/missing.hdr", cache), "") << "nothing to convert";
+
+	// pbrt reads the copy as a square; this project's loader turns it back into a lat-long panorama: the same colours toward the same directions.
+	const pbrt_load::LoadResult r = loadText("Camera \"perspective\"\nWorldBegin\nLightSource \"infinite\" \"string filename\" [\"" + std::filesystem::absolute(copy).generic_string() + "\"]\n", "equal_area");
+	ASSERT_TRUE(r.ok) << r.error;
+	const auto& sky_ = r.scene.infiniteLight;
+	ASSERT_GT(sky_.imageWidth, 0);
+	ASSERT_EQ(sky_.imageWidth, 2 * sky_.imageHeight);
+	const double dirs[][3] = {{0, 1, 0.0001}, {1, 1, 0}, {-1, 1, 0}, {0, 0.2, 1}, {0, 0.2, -1}, {0.7, -0.3, 0.7}};
+	for (const auto& d : dirs) {
+		const double want = luminance(pixelTowards(pano, w, h, d[0], d[1], d[2]));
+		const double got = luminance(pixelTowards(sky_.imagePixels, sky_.imageWidth, sky_.imageHeight, d[0], d[1], d[2]));
+		EXPECT_NEAR(got, want, 0.12 * want + 0.002) << "toward (" << d[0] << ", " << d[1] << ", " << d[2] << ")";
+	}
+	std::error_code ec;
+	std::filesystem::remove_all("scene_sky_test_dirs", ec);
+}
+
+TEST(SceneSkyEqualAreaTest, TheWriterNamesTheCopyAndKeepsThePanoramaInTheDocument) {
+	Document d;
+	Light l;
+	l.kind = LightKind::Infinite;
+	l.imageFile = "C:/skies/pano.hdr";
+	d.lights.push_back(l);
+	const std::string plain = toPbrt(d);
+	EXPECT_NE(plain.find("pano.hdr"), std::string::npos);
+	const std::string saved = toPbrt(d, true, [](const std::string& f) { return f == "C:/skies/pano.hdr" ? std::string("C:/cache/equalarea.exr") : std::string(); });
+	const size_t light = saved.find("LightSource \"infinite\"");
+	ASSERT_NE(light, std::string::npos);
+	EXPECT_NE(saved.find("equalarea.exr", light), std::string::npos) << "the LightSource line names the equal-area copy";
+	EXPECT_NE(saved.find("pano.hdr"), std::string::npos) << "the document's JSON line still has the panorama";
+	EXPECT_EQ(saved.find("pano.hdr", light), std::string::npos) << "...and nowhere on or after the LightSource line";
+	const std::string kept = toPbrt(d, true, [](const std::string&) { return std::string(); });
+	EXPECT_EQ(kept, plain) << "an empty answer keeps the path";
+	Document back;
+	std::string error;
+	ASSERT_TRUE(fromPbrt(saved, back, error)) << error;
+	ASSERT_EQ(back.lights.size(), 1u);
+	EXPECT_EQ(back.lights[0].imageFile, "C:/skies/pano.hdr") << "opening the saved scene edits the panorama again";
 }

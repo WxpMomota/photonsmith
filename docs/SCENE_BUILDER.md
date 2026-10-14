@@ -278,7 +278,7 @@ A **Picture** (matte and glossy paint) replaces the colour with an image on any 
 | Point light | a tiny bulb: position, colour, strength |
 | Spotlight | a cone of light: position, the point it aims at, cone angle, soft edge |
 | Sun (distant light) | parallel light from a direction: where it shines from and towards |
-| Sky | light from every direction: a colour, an equirectangular panorama image (`.exr`, `.hdr`, `.png`, `.jpg`; 2:1 - a SQUARE picture is read as pbrt's equal-area map, see `PBRT_SUPPORT.md`), or **Sun & sky** (below) |
+| Sky | light from every direction: a colour, an equirectangular panorama image (`.exr`, `.hdr`, `.png`, `.jpg`; 2:1 - a SQUARE picture is read as pbrt's equal-area map, see `PBRT_SUPPORT.md`; Save writes a square equal-area copy of the panorama for the file to name, so real pbrt-v4 draws the same sky), or **Sun & sky** (below) |
 | Projector (slide light) | a slide projector: a picture shines out through a frustum, with the colours of the picture (window light through blinds, a logo, a pattern on a wall) |
 | any shape with *Gives off light* | an area light; a panel or a ball makes soft shadows |
 

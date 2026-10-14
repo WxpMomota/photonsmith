@@ -87,7 +87,8 @@ TEST(AovPassTest, TheCornellBoxPassesDescribeItsSurfaces) {
 			}
 		}
 	EXPECT_GT(coverage / (w * h), 0.9) << "the camera sits inside a closed box: nearly every pixel hits a surface";
-	EXPECT_GT(surfacePixels, w * h * 9 / 10);
+	// (The picture reaches about 90% surface pixels (918-925 of 1024 from run to run, the pixels random-jittered), so a 90% bound was a coin toss.)
+	EXPECT_GT(surfacePixels, w * h * 85 / 100);
 	EXPECT_GE(minAlbedo, 0.0);
 	EXPECT_LE(maxAlbedo, 1.0001);
 	// The Cornell box's two side walls are different colours: opposite sides of the frame differ in which of red / green dominates.
