@@ -532,8 +532,7 @@ static TriangleMaterial homogeneousMediumMaterial(const pbrt_flatten::Medium& m,
         }
     }
     if (m.sigma_s[0] == 0.0 && m.sigma_s[1] == 0.0 && m.sigma_s[2] == 0.0 && meanSigmaT > 0.0) {
-        mat.conductorK = PackedFloat3{0.0f, 0.0f, 0.0f};
-        mat.ior = 0.0f;
+        mat.ior = 0.0f;   // (conductorK.z keeps the chromatic flag: a path follows one colour channel through a coloured absorber too, so its shadow rays use that channel)
         mat.conductorEta = PackedFloat3{(float)(m.sigma_a[0] / sceneScale), (float)(m.sigma_a[1] / sceneScale),
                                         (float)(m.sigma_a[2] / sceneScale)};
     }

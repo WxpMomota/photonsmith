@@ -226,7 +226,8 @@ kernel void primaryRayKernel(
         // a uniform sky read 0 at depth 1 instead of 0.5; a room lit only indirectly read 3-19% dark).
         if (depth <= uniforms.maxDepth) continuePath = traceBounce(R, P);
         if (continuePath) {
-            ++depth;
+            // pbrt's interface material is skipped without a bounce: a ray that only crossed a medium sphere's boundary keeps its depth (at most 64 such crossings, then they count)
+            if (P.nullCrossing && P.nullCrossings < 64u) ++P.nullCrossings; else ++depth;
             if (depth <= uniforms.maxDepth) continue;   // next bounce of this path (other lanes may be starting new ones)
         }
         // The path is finished (terminated, or out of depth): finalize this sample below.

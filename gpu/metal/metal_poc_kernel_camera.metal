@@ -198,10 +198,16 @@ inline void initPathState(thread const KernelRes& R, thread PathState& P, float 
     // averaged over paths every channel is recovered, and free flight / shadow rays can use that channel's sigma_t.
     fogChan = -1;
     mediumChan = -1;
-    if (uniforms.fogChromatic != 0u && uniforms.fogSigmaT > 0.0) {
+    P.nullCrossing = false;
+    P.nullCrossings = 0u;
+    if ((uniforms.fogChromatic & 1u) != 0u && uniforms.fogSigmaT > 0.0) {
         fogChan = min(int(randFloat(rngState) * 3.0), 2);
         throughput *= float3(fogChan == 0 ? 3.0 : 0.0, fogChan == 1 ? 3.0 : 0.0, fogChan == 2 ? 3.0 : 0.0);
         mediumChan = fogChan;
+    } else if ((uniforms.fogChromatic & 2u) != 0u) {
+        // a chromatic medium sphere or tube somewhere in the scene: fix the hero channel now, not on first entering it
+        mediumChan = min(int(randFloat(rngState) * 3.0), 2);
+        throughput *= float3(mediumChan == 0 ? 3.0 : 0.0, mediumChan == 1 ? 3.0 : 0.0, mediumChan == 2 ? 3.0 : 0.0);
     }
     radiance = float3(0.0);
     // MIS bookkeeping across bounces: the light quad can be reached

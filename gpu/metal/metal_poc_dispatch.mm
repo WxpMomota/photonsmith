@@ -901,10 +901,17 @@ bool MetalPocApp::dsFillUniforms(DispatchState& s, int argc, const char** argv) 
         // member's own comment. {0,0,0} (every scene but D13) is an
         // exact no-op, identical to this line's own previous literal.
         uniforms.cameraVelocity = sceneCameraVelocity;
+        // bit 1 (value 2): some medium sphere or tube has a different extinction per colour channel, so every path fixes its hero channel at the camera (see fogChromatic)
+        uint32_t chromaticShapeMedium = 0u;
+        for (const TriangleMaterial& sm : sphereMaterials)
+            if (sm.materialType == METAL_MAT_MEDIUM_HOMOGENEOUS && sm.conductorK.z > 0.5f) chromaticShapeMedium = 2u;
+        for (const TriangleMaterial& cm : cylinderMaterials)
+            if (cm.materialType == METAL_MAT_MEDIUM_HOMOGENEOUS && cm.conductorK.z > 0.5f) chromaticShapeMedium = 2u;
+        uniforms.fogChromatic = chromaticShapeMedium;
         if (havePbrtMedium) {
             uniforms.fogSigmaT = pbrtFogSigmaT;
             uniforms.fogSigmaT3 = PackedFloat3{pbrtFogSigmaT3.x, pbrtFogSigmaT3.y, pbrtFogSigmaT3.z};
-            uniforms.fogChromatic = pbrtFogChromatic ? 1u : 0u;
+            uniforms.fogChromatic = chromaticShapeMedium | (pbrtFogChromatic ? 1u : 0u);
             uniforms.fogAlbedo = PackedFloat3{pbrtFogAlbedo.x, pbrtFogAlbedo.y, pbrtFogAlbedo.z};
             uniforms.fogAsymmetryG = pbrtFogAsymmetryG;
         } else {
