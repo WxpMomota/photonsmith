@@ -6,6 +6,7 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## Unreleased
 
+* **CPU curves (hair, fur, grass strands) were 17% too dark**: shadow and bounce rays left a strand from inside its tube and met it again. They now leave from outside it, as pbrt-v4 spawns them, and the curve scenes agree with pbrt to 0.1-0.4% (they read 2-3% dark).
 * **Scene Builder: 3D text** (Add > Text (3D letters)): type some words (several lines, any language the font has), pick a font, bold, italic, how the lines line up, the height of a capital letter, the thickness and a sideways stretch, and the letters are pulled out into a solid, with the holes of an O or an 8 cut out, sharp corners and smooth curves. It is written into the scene file as a mesh, so every renderer draws it and the file reads the same without the font.
 * **Scene Builder: a Dots pattern** for matte and glossy paint (Pattern list): round spots of one colour over a ground colour, any number of cells across, written as pbrt's own `dots` texture (so every renderer draws it).
 * **An emitter reflects, as in pbrt-v4**: a lamp keeps the shape's material (the default is diffuse 0.5), so a lamp lit by another light reflects it. It was a pure emitter on every backend: `emissive-sphere-occluder` read 13% dark, `earth-globe` 8%, `two-sphere-lights` 2.6%. Now on the CPU and both OptiX backends (Metal and BDPT/MLT/SPPM not yet); the Scene Builder's black-body emitters are unchanged.
