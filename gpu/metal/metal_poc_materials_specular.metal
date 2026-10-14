@@ -247,7 +247,7 @@ inline bool shadeRoughDielectric(TriangleMaterial mat, float3 hitPoint, float3 n
     // other vertex.
     const bool lightSampling = uniforms.lightCount > 0u && all(mat.emission == float3(0.0));
     if (lightSampling) {
-        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler);
+        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         const float3 toLight = ls.point - hitPoint;
         const float distSq = dot(toLight, toLight);
         const float dist = sqrt(distSq);
@@ -480,7 +480,7 @@ inline bool shadeConductor(TriangleMaterial mat, float3 hitPoint, float3 normal,
     const float energyScale = 1.0;
 
     if (all(mat.emission == float3(0.0))) {
-        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler);
+        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         float3 toLight = ls.point - hitPoint;
         float distSq = dot(toLight, toLight);
         float dist = sqrt(distSq);
@@ -838,7 +838,7 @@ inline bool shadeClearcoat(TriangleMaterial mat, float3 albedo, float3 hitPoint,
         specularBounce = true;
     } else {
         if (all(mat.emission == float3(0.0))) {
-            LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler);
+            LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
             float3 toLight = ls.point - hitPoint;
             float distSq = dot(toLight, toLight);
             float dist = sqrt(distSq);

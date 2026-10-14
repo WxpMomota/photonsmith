@@ -687,8 +687,9 @@ def run(args):
     # coloured fog (extinction that differs by channel), each colour held on its own: a medium sphere and the camera medium. Metal weighed every channel with the MEAN sigma_t (the
     # sphere's free flight; the camera fog's light sampling from surfaces), so the blue channel read 17 to 28% bright and the red 13 to 24% dark.
     if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "fog" in only or "bundled" in only):
-        print("[cpu vs gpu, coloured fog]")
-        for scene_name in ("chromatic-fog-room", "chromatic-camera-medium"):
+        print("[cpu vs gpu, coloured fog and a clamped small bright sphere light]")
+        # (maxcomponentvalue-firefly-clamp: a radius-0.15 sphere light of L 400 under Film maxcomponentvalue 4; Metal sampled the sphere by area, 19% darker once the clamp cut its heavy tail)
+        for scene_name in ("chromatic-fog-room", "chromatic-camera-medium", "maxcomponentvalue-firefly-clamp"):
             total += 1
             means = {}
             try:

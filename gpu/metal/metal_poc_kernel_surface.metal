@@ -649,6 +649,11 @@ inline void addHitEmission(thread const KernelRes& R, thread PathState& P, threa
             float3 lightNormalAtHit = (light.kind > 0.5 && light.kind < 1.5) || (light.kind > 2.5 && light.kind < 3.5) ? normal : float3(light.normal);
             float cosLight = max(abs(dot(lightNormalAtHit, -rayDir)), 0.0001);
             float pdfLight = (distSq / (light.area * cosLight)) * light.pmf;
+            if (light.kind > 0.5 && light.kind < 1.5) {   // a sphere light is cone-sampled from outside (sampleAreaLight): the same pdf here
+                const float3 prevPoint = hitPoint - rayDir * hitDistFromBounce;
+                if (sphereLightSeenFrom(float3(light.center), light.edgeU.x, prevPoint))
+                    pdfLight = sphereLightConePdf(float3(light.center), light.edgeU.x, prevPoint) * light.pmf;
+            }
             float weight = (bsdfPdf * bsdfPdf) / (bsdfPdf * bsdfPdf + pdfLight * pdfLight);
             radiance += throughput * hitEmission * weight;
         }

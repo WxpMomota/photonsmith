@@ -42,7 +42,7 @@ inline bool shadeOrenNayar(TriangleMaterial mat, float3 albedo, float3 hitPoint,
     float3 woWorld = -rayDir;
 
     if (all(mat.emission == float3(0.0))) {
-        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler);
+        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         float3 toLight = ls.point - hitPoint;
         float distSq = dot(toLight, toLight);
         float dist = sqrt(distSq);
@@ -310,7 +310,7 @@ inline bool shadeNormalizedFresnel(TriangleMaterial mat, float3 hitPoint, float3
                             thread float3& throughput, thread float3& radiance,
                             thread float& bsdfPdf, thread bool& specularBounce, thread uint& rngState) {
     if (all(mat.emission == float3(0.0))) {
-        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler);
+        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         float3 toLight = ls.point - hitPoint;
         float distSq = dot(toLight, toLight);
         float dist = sqrt(distSq);
@@ -592,7 +592,7 @@ inline bool shadeCoatedDiffuse(TriangleMaterial mat, float3 hitPoint, float3 fac
 
     // A Lambertian base always scatters diffusely: never a delta BSDF, so light samples are always taken (pbrt Flags()).
     if (all(mat.emission == float3(0.0))) {
-        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler);
+        LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         float3 toLight = ls.point - hitPoint;
         float distSq = dot(toLight, toLight);
         float dist = sqrt(distSq);
