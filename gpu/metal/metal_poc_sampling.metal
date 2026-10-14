@@ -1738,8 +1738,49 @@ inline float2 cylinderLightTexCoord(AreaLight light, float3 p) {
     return float2(phi * (0.5 / M_PI_F), 1.0 - v);
 }
 
+// pbrt-v4's sphere light (Sphere::Sample(ctx, u), PDF(ctx, wi)): from a point OUTSIDE the sphere, sample the cone of directions it subtends instead of its surface. Uniform
+// area sampling spends half its samples on the far side (no light) and weighs the rest by 1/cos, so a small bright sphere (radius 0.15, L 400) gave a few huge samples and many
+// zeros: the same mean, but far more variance, which Film "maxcomponentvalue" turned into a darker picture (19% on maxcomponentvalue-firefly-clamp). Inside the sphere, or
+// without a reference point, the caller keeps uniform area sampling. The pdf is solid angle: 1 / (2 pi (1 - cos(theta max))).
+inline float sphereLightOneMinusCosMax(float radius, float distSq) {
+    const float sin2 = radius * radius / distSq;
+    return sin2 < 0.00068523f ? sin2 * 0.5f + sin2 * sin2 * 0.125f : 1.0f - sqrt(max(0.0f, 1.0f - sin2));
+}
+inline bool sphereLightSeenFrom(float3 center, float radius, float3 ref) {
+    const float3 d = center - ref;
+    return isfinite(ref.x) && dot(d, d) > radius * radius * 1.0001f;
+}
+// The solid-angle pdf of the cone sample (one light, before the light-selection pmf).
+inline float sphereLightConePdf(float3 center, float radius, float3 ref) {
+    const float3 d = center - ref;
+    return 1.0f / (2.0f * M_PI_F * sphereLightOneMinusCosMax(radius, dot(d, d)));
+}
+inline void sampleSphereLightCone(float3 center, float radius, float3 ref, float2 u, thread float3& point, thread float3& normal) {
+    const float3 toCenter = center - ref;
+    const float d2 = dot(toCenter, toCenter);
+    const float sin2Max = radius * radius / d2;
+    const float sinMax = sqrt(sin2Max);
+    float cosTheta, sin2Theta;
+    if (sin2Max < 0.00068523f) {   // small angle: avoid 1 - cos cancelling
+        sin2Theta = sin2Max * u.x;
+        cosTheta = sqrt(1.0f - sin2Theta);
+    } else {
+        const float cosMax = sqrt(max(0.0f, 1.0f - sin2Max));
+        cosTheta = (cosMax - 1.0f) * u.x + 1.0f;
+        sin2Theta = 1.0f - cosTheta * cosTheta;
+    }
+    const float cosAlpha = sin2Theta / sinMax + cosTheta * sqrt(max(0.0f, 1.0f - sin2Theta / sin2Max));
+    const float sinAlpha = sqrt(max(0.0f, 1.0f - cosAlpha * cosAlpha));
+    const float phi = 2.0f * M_PI_F * u.y;
+    float3 t, b;
+    const float3 wc = toCenter * rsqrt(d2);
+    buildOnb(wc, t, b);
+    normal = -(sinAlpha * cos(phi) * t + sinAlpha * sin(phi) * b + cosAlpha * wc);
+    point = center + radius * normal;
+}
+
 inline LightSample sampleAreaLight(device const AreaLight* lights, uint lightCount, thread uint& rngState,
-                                    texture2d<float, access::sample> pbrtAreaLightTexture, sampler textureSampler) {
+                                    texture2d<float, access::sample> pbrtAreaLightTexture, sampler textureSampler, float3 refPoint = float3(INFINITY)) {
     // max(lightCount, 1u) guards the `- 1` below from underflowing (uint
     // wraps to 0xFFFFFFFF, not -1) if this were ever called on a 0-light
     // scene - not reachable with this POC's own hardcoded 2-light scene,
@@ -1761,6 +1802,7 @@ inline LightSample sampleAreaLight(device const AreaLight* lights, uint lightCou
     AreaLight light = lights[idx];
     float2 u = float2(randFloat(rngState), randFloat(rngState));
     LightSample result;
+    float coneArea = 0.0f;
     if (light.kind > 0.5 && light.kind < 1.5) {
         // Sphere light (B14, section 184) - uniform-AREA sampling (not
         // pbrt-v4's own lower-variance cone-sampling, which would need
@@ -1788,6 +1830,14 @@ inline LightSample sampleAreaLight(device const AreaLight* lights, uint lightCou
         result.point = float3(light.center) + radius * dir;
         result.normal = dir;
         result.emission = float3(light.emission);
+        if (sphereLightSeenFrom(float3(light.center), radius, refPoint)) {
+            sampleSphereLightCone(float3(light.center), radius, refPoint, u, result.point, result.normal);
+            // the callers turn an area into a solid-angle pdf as distSq / (area * cos): hand them the area that gives the cone's pdf
+            const float3 toPoint = result.point - refPoint;
+            const float distSq = dot(toPoint, toPoint);
+            const float cosL = max(abs(dot(result.normal, -toPoint * rsqrt(distSq))), 1e-6f);
+            coneArea = distSq / (cosL * sphereLightConePdf(float3(light.center), radius, refPoint));
+        }
     } else if (light.kind > 1.5 && light.kind < 2.5) {
         // Disk light (pbrt "disk" AreaLightSource): uniform-area sampling of a flat disk.
         // center = disk centre, edgeU.x = radius, normal = the emitting side's normal,
@@ -1843,7 +1893,7 @@ inline LightSample sampleAreaLight(device const AreaLight* lights, uint lightCou
                 ? checkerColor(u, light.patternScale, float3(light.emission), float3(light.emission) * light.patternTileB)
                 : float3(light.emission);
     }
-    result.area = light.area;
+    result.area = coneArea > 0.0f ? coneArea : light.area;
     result.pmf = light.pmf;
     result.twoSided = light.twoSided;
     result.spherePrimId = light.spherePrimId;

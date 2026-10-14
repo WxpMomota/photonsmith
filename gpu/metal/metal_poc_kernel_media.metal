@@ -190,7 +190,7 @@ inline bool scatterInGlobalMedium(thread const KernelRes& R, thread PathState& P
             // applied explicitly or it would silently ignore the
             // fog lying between the scatter point and the light.
             float3 wo = -rayDir;
-            LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler);
+            LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, scatterPoint);
             float3 toLight = ls.point - scatterPoint;
             float distSq = dot(toLight, toLight);
             float dist = sqrt(distSq);
