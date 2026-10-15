@@ -557,6 +557,12 @@ struct MetalPocApp {
     std::map<std::string, std::array<int, 4>> pbrtBumpImages;   // displacement image file -> {offset in rgbGridData, width, height, 1 if a normal map}; width 0 = unusable
     void loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, const std::vector<pbrt_flatten::Sphere>& sphereList, const PbrtToWorldFn& toWorld,
         const PbrtMaterialForFn& materialFor, float sceneScale);
+    // The pieces of loadPbrtSpheres: a sphere's material (or the medium it bounds), and its sphere-light registration.
+    TriangleMaterial sphereMaterial(const pbrt_flatten::FlatScene& scene, const pbrt_flatten::Sphere& s, const PbrtToWorldFn& toWorld,
+        const PbrtMaterialForFn& materialFor, float sceneScale);
+    void rgbGridSphereMaterial(const pbrt_flatten::Medium& gm, const PbrtToWorldFn& toWorld, float sceneScale, TriangleMaterial& mat);
+    void cloudSphereMaterial(const pbrt_flatten::Medium& cm, const PbrtToWorldFn& toWorld, float sceneScale, TriangleMaterial& mat);
+    void emitSphereLight(const pbrt_flatten::FlatScene& scene, const pbrt_flatten::Sphere& s, const SphereData& sd, const float3& center, TriangleMaterial& mat);
     void loadPbrtDisks(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
         const PbrtMaterialForFn& materialFor, float sceneScale);
     void loadPbrtCylinders(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
@@ -564,6 +570,8 @@ struct MetalPocApp {
     void loadPbrtObjectInstances(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
         const PbrtMaterialForFn& materialFor, float sceneScale);
     void loadPbrtPunctualLights(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld, float sceneScale);
+    bool addGoniometricImageLight(const pbrt_flatten::PunctualLight& pl, const PbrtToWorldFn& toWorld, const float3& emission);
+    bool addProjectionImageLight(const pbrt_flatten::PunctualLight& pl, const PbrtToWorldFn& toWorld, float intensityScale);
     void loadPbrtMedium(const pbrt_flatten::FlatScene& scene, float sceneScale);
     void loadPbrtInfiniteLight(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld);
     void loadPbrtCamera(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
@@ -1006,6 +1014,12 @@ struct MetalPocApp {
     bool dsUploadTextures(DispatchState& s);
     bool dsUploadSamplingTables(DispatchState& s);
     bool dsFillUniforms(DispatchState& s, int argc, const char** argv);
+    // Parts of dsFillUniforms: what a loaded pbrt scene overrides in the defaults, and the filter table.
+    void applyPbrtCameraUniforms(Uniforms& uniforms);
+    void applyPbrtMediumUniforms(Uniforms& uniforms);
+    void applyPbrtSkyUniforms(Uniforms& uniforms);
+    void applyPbrtFilterUniforms(Uniforms& uniforms);
+    void fillFilterSamplerTable(Uniforms& uniforms);
     bool dsCheckResources(DispatchState& s);
     std::function<bool(const std::function<void(Uniforms&)>&)> dsMakeRenderFrame(DispatchState& s);
 
