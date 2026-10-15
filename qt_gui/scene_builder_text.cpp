@@ -38,6 +38,12 @@ bool qtTextOutline(const scene_doc::TextParams &p, scene_doc::TextOutline &out) 
 		path.addText(QPointF(x, i * advance), font, lines[i]);
 	}
 	if (path.isEmpty()) return false;
+	// A font fills its outlines with the non-zero winding rule, and many modern fonts build a letter from overlapping contours (a bold k, an accented letter, italic glyphs that
+	// touch): read by parity (as scene_text.h's triangulator does) the overlap would be a hole. Simplifying the path under the winding rule merges what overlaps into outlines
+	// that do not cross, which parity reads right.
+	path.setFillRule(Qt::WindingFill);
+	path = path.simplified();
+	if (path.isEmpty()) return false;
 	// (Qt's y runs down: the letters are turned over to stand up.)
 	for (const QPolygonF &polygon : path.toSubpathPolygons(QTransform())) {
 		scene_doc::TextContour contour;

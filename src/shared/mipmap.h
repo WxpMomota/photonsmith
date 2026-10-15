@@ -31,6 +31,7 @@
 // color (= vec3) is defined via rtweekend.h -> color.h -> vec3.h.
 // Callers must include rtweekend.h before this header, or include it here.
 #include "../TheRestOfYourLife/rtweekend.h"
+#include "image_resample.h"
 
 // ---------------------------------------------------------------------------
 // Wrap mode
@@ -149,12 +150,33 @@ public:
 	//   width, height : dimensions of level 0
 	//   opts  : filter mode, anisotropy cap, wrap mode
 	// -----------------------------------------------------------------------
-	mipmap(const std::vector<color>& pixels, int width, int height,
+	mipmap(const std::vector<color>& pixels_in, int width, int height,
 		   MipMapOptions opts = MipMapOptions{})
 		: width0_(width), height0_(height), opts_(opts)
 	{
 		assert(width > 0 && height > 0);
-		assert((int)pixels.size() == width * height);
+		assert((int)pixels_in.size() == width * height);
+
+		// pbrt-v4 (Image::GeneratePyramid): a picture whose sides are not powers of two is resampled up to the next power of two first, and the pyramid is built from that
+		// (level 0 is the resampled picture, and a 1000-wide one has the levels of a 1024-wide one).
+		std::vector<color> resampled;
+		if (!image_resample::isPowerOf2(width) || !image_resample::isPowerOf2(height)) {
+			const std::size_t n = pixels_in.size();
+			std::vector<float> chan(n);
+			int nw = width, nh = height;
+			std::vector<std::vector<float>> up(3);
+			for (int c = 0; c < 3; ++c) {
+				for (std::size_t i = 0; i < n; ++i) chan[i] = static_cast<float>(c == 0 ? pixels_in[i].x() : c == 1 ? pixels_in[i].y() : pixels_in[i].z());
+				up[static_cast<std::size_t>(c)] = image_resample::resizeUpToPowerOf2(chan, width, height, static_cast<int>(opts.wrap), nw, nh);
+			}
+			resampled.resize(static_cast<std::size_t>(nw) * nh);
+			for (std::size_t i = 0; i < resampled.size(); ++i) resampled[i] = color(up[0][i], up[1][i], up[2][i]);
+			width = nw;
+			height = nh;
+			width0_ = nw;
+			height0_ = nh;
+		}
+		const std::vector<color>& pixels = resampled.empty() ? pixels_in : resampled;
 
 		// Build level 0
 		pyramid_.push_back(pixels);

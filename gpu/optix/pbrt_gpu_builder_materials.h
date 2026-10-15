@@ -271,8 +271,9 @@ inline int getOrBuildPbrtImageTexture(const std::string& resolvedPath, SceneData
 	return idx;
 }
 
-// The mip chain of a bump height map (TextureData::bumpLevels): level 0 is the entry at `idx`; each further level is a 2x2 box average of the one above (the size rounded up,
-// the far edge repeated), kept as extra entries whose heights are bytes remapped over the level's own range. pbrt reads the level that fits the footprint, so a height map
+// The mip chain of a bump height map (TextureData::bumpLevels): level 0 is the entry at `idx` (for a picture whose sides are not powers of two, pbrt's level 0 is the
+// picture resampled up to the next power of two - Image::GeneratePyramid - and that becomes an entry of its own, TextureData::bumpLevel0); each further level is a 2x2 box
+// average of the one above, kept as extra entries whose heights are bytes remapped over the level's own range. pbrt reads the level that fits the footprint, so a height map
 // seen from afar is smooth. Done once per image entry (the entry carries the result).
 inline void buildBumpMipChain(SceneData& out, int idx) {
 	if (idx < 0 || idx >= static_cast<int>(out.textures.size())) return;
@@ -283,38 +284,49 @@ inline void buildBumpMipChain(SceneData& out, int idx) {
 	for (int y = 0; y < h; ++y)
 		for (int x = 0; x < w; ++x)
 			cur[static_cast<std::size_t>(y) * w + x] = texel_rgb(&out.texturePixels[static_cast<std::size_t>(base.pixelOffset) + (static_cast<std::size_t>(y) * w + x) * 3], base.srgb).x;
-	int first = -1, count = 0;
-	while (w > 1 || h > 1) {
-		const int nw = std::max(1, (w + 1) / 2), nh = std::max(1, (h + 1) / 2);
-		std::vector<float> next(static_cast<std::size_t>(nw) * nh);
+	const auto addLevel = [&](const std::vector<float>& values, int lw, int lh) -> int {
 		float lo = 1e30f, hi = -1e30f;
-		for (int y = 0; y < nh; ++y)
-			for (int x = 0; x < nw; ++x) {
-				const int x1 = std::min(2 * x + 1, w - 1), y1 = std::min(2 * y + 1, h - 1);
-				const float v = 0.25f * (cur[static_cast<std::size_t>(2 * y) * w + 2 * x] + cur[static_cast<std::size_t>(2 * y) * w + x1] +
-										 cur[static_cast<std::size_t>(y1) * w + 2 * x] + cur[static_cast<std::size_t>(y1) * w + x1]);
-				next[static_cast<std::size_t>(y) * nw + x] = v;
-				lo = std::min(lo, v);
-				hi = std::max(hi, v);
-			}
+		for (const float v : values) { lo = std::min(lo, v); hi = std::max(hi, v); }
 		TextureData level = base;
-		level.width = nw;
-		level.height = nh;
+		level.width = lw;
+		level.height = lh;
 		level.pixelOffset = static_cast<int>(out.texturePixels.size());
 		level.srgb = false;
 		level.bumpLevels = 0;
 		level.bumpFirstLevel = -1;
+		level.bumpLevel0 = -1;
 		level.heightLo = lo;
 		level.heightRange = std::max(hi - lo, 1e-9f);
-		for (const float v : next) {
+		for (const float v : values) {
 			const float t = std::min(1.0f, std::max(0.0f, (v - lo) / level.heightRange));
 			const unsigned char byte = static_cast<unsigned char>(t * 255.0f + 0.5f);
 			out.texturePixels.push_back(byte);
 			out.texturePixels.push_back(byte);
 			out.texturePixels.push_back(byte);
 		}
-		const int at = static_cast<int>(out.textures.size());
 		out.textures.push_back(level);
+		return static_cast<int>(out.textures.size()) - 1;
+	};
+	int level0 = -1;
+	if (!image_resample::isPowerOf2(w) || !image_resample::isPowerOf2(h)) {
+		const int wrap = base.wrapMode == GpuWrapMode::Repeat ? image_resample::kRepeat : base.wrapMode == GpuWrapMode::Black ? image_resample::kBlack : image_resample::kClamp;
+		int nw = w, nh = h;
+		cur = image_resample::resizeUpToPowerOf2(cur, w, h, wrap, nw, nh);
+		w = nw;
+		h = nh;
+		level0 = addLevel(cur, w, h);
+	}
+	int first = -1, count = 0;
+	while (w > 1 || h > 1) {
+		const int nw = std::max(1, (w + 1) / 2), nh = std::max(1, (h + 1) / 2);
+		std::vector<float> next(static_cast<std::size_t>(nw) * nh);
+		for (int y = 0; y < nh; ++y)
+			for (int x = 0; x < nw; ++x) {
+				const int x1 = std::min(2 * x + 1, w - 1), y1 = std::min(2 * y + 1, h - 1);
+				next[static_cast<std::size_t>(y) * nw + x] = 0.25f * (cur[static_cast<std::size_t>(2 * y) * w + 2 * x] + cur[static_cast<std::size_t>(2 * y) * w + x1] +
+																			 cur[static_cast<std::size_t>(y1) * w + 2 * x] + cur[static_cast<std::size_t>(y1) * w + x1]);
+			}
+		const int at = addLevel(next, nw, nh);
 		if (first < 0) first = at;
 		++count;
 		cur.swap(next);
@@ -323,6 +335,7 @@ inline void buildBumpMipChain(SceneData& out, int idx) {
 	}
 	out.textures[static_cast<std::size_t>(idx)].bumpLevels = count;
 	out.textures[static_cast<std::size_t>(idx)].bumpFirstLevel = first;
+	out.textures[static_cast<std::size_t>(idx)].bumpLevel0 = level0;
 }
 
 // A representative average color for an already-built Image texture (see
@@ -725,6 +738,8 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 		// CPU builder wraps any material), and a textured reflectance uses its flat colour.
 		if (m.kind == pbrt_flatten::MaterialKind::Diffuse)
 			d.albedo = make_float3(static_cast<float>(m.color[0]), static_cast<float>(m.color[1]), static_cast<float>(m.color[2]));
+		// (the CPU builder reflects anything but an interface or a black diffuse body: count what the flat diffuse above does not stand for, so the scene builder can say so)
+		if (m.kind != pbrt_flatten::MaterialKind::Interface && !(m.kind == pbrt_flatten::MaterialKind::Diffuse && m.textureFilename.empty())) ++out.lampMaterialsNotReflected;
 		return d;
 	}
 

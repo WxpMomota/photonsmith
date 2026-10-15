@@ -28,6 +28,7 @@ struct TextureData {
 	// lose); heightRange 0 (every other image) is a plain image.
 	int   bumpLevels = 0;
 	int   bumpFirstLevel = -1;
+	int   bumpLevel0 = -1;   // a picture with sides that are not powers of two: pbrt's level 0 is the picture resampled up to powers of two, an entry of its own (-1: this entry is level 0)
 	float heightLo = 0.0f, heightRange = 0.0f;
 	float noiseScale;  // Noise: scale param. Checker: 1/scale (checker_texture's own inv_scale). Unused otherwise.
 	float3 color1;     // Checker/UVChecker: "even"/tex1 cell color. Mix: tex1. Unused otherwise.
@@ -390,6 +391,18 @@ struct MaterialData {
 	float  chromaScaleA = 0.0f;
 	float  chromaScaleS = 0.0f;
 };
+
+// A lamp that also reflects (pbrt-v4: an AreaLightSource keeps the shape's Material, default diffuse 0.5). The builder (pbrt_gpu_builder_materials.h makeMaterial) stores a flat
+// diffuse reflectance in `albedo`, which an emitter otherwise leaves at zero (a black body, the Scene Builder's emitter, reads as none): that is the whole test, and the one
+// place it is written - the recursive hit programs, the wavefront material kernel and SPPM all ask it.
+#ifdef __CUDACC__
+#define RT_LAMP_FN __host__ __device__ __forceinline__
+#else
+#define RT_LAMP_FN inline
+#endif
+RT_LAMP_FN bool lamp_reflects(const MaterialData& mat) {
+	return mat.type == MaterialType::DiffuseLight && (mat.albedo.x > 0.0f || mat.albedo.y > 0.0f || mat.albedo.z > 0.0f);
+}
 
 // Punctual (delta) light kinds - point/spot/distant. These are evaluated
 // deterministically at every hit (pdf=0, no MIS, not part of lightIndices/

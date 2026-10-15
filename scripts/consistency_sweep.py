@@ -413,7 +413,7 @@ def run(args):
         try:
             if not sw.compare(label, backend, a, b, tolerance if tolerance is not None else tol, seed_b):
                 failures.append((group, backend, label))
-        except RuntimeError as e:
+        except (RuntimeError, subprocess.TimeoutExpired) as e:
             print("  %-4s %-34s FAILED TO RENDER: %s" % (backend, label, e))
             failures.append((group, backend, label))
 
@@ -564,7 +564,7 @@ def run(args):
                 total += 1
                 try:
                     ma, mb = sw.render("cpu", scene), sw.render("gpu", scene)
-                except RuntimeError as e:
+                except (RuntimeError, subprocess.TimeoutExpired) as e:
                     print("  both cpu vs gpu, %s, %s: FAILED TO RENDER: %s" % (label, name, e))
                     failures.append(("backends", "both", "%s, %s" % (label, name)))
                     continue
@@ -585,7 +585,7 @@ def run(args):
                 print("  %-4s %-34s %s  %.4f vs %.4f  off by %.1f%%" % ("both", "cpu vs gpu, constant sky, subsurface (tight)", "ok   " if worst <= 1.0 else "WRONG", ma[1], mb[1], worst))
             if worst > 1.0:
                 failures.append(("backends", "both", "constant sky, subsurface (tight)"))
-        except RuntimeError as e:
+        except (RuntimeError, subprocess.TimeoutExpired) as e:
             print("  both cpu vs gpu, constant sky, subsurface (tight): FAILED TO RENDER: %s" % e)
             failures.append(("backends", "both", "constant sky, subsurface (tight)"))
     # a normal map and a height map on every shape the GPU draws as triangles, and on a disk, cylinder and sphere (analytic surfaces on OptiX; Metal draws them as triangles when they have
@@ -603,7 +603,7 @@ def run(args):
                 total += 1
                 try:
                     ma, mb = sw.render("cpu", scene), sw.render("gpu", scene)
-                except RuntimeError as e:
+                except (RuntimeError, subprocess.TimeoutExpired) as e:
                     print("  both cpu vs gpu, %s, %s: FAILED TO RENDER: %s" % (label, shape, e))
                     failures.append(("maps", "both", "%s, %s" % (label, shape)))
                     continue
@@ -647,7 +647,7 @@ def run(args):
                         if r.returncode != 0 or not os.path.exists(out):
                             raise RuntimeError("%s render failed: %s" % (backend, (r.stdout + r.stderr)[-200:]))
                         means[backend] = read_exr_means(out)[1]
-                except RuntimeError as e:
+                except (RuntimeError, subprocess.TimeoutExpired) as e:
                     print("  both cpu vs gpu, %s: FAILED TO RENDER: %s" % (label, e))
                     failures.append(("instbump", "both", label))
                     continue
@@ -689,7 +689,7 @@ def run(args):
                     first, second = sum(line[:half]), sum(line[half:])
                     # the sphere is red (little green): the half with the LESS green holds it; the slide lights (more green) the half it lights
                     where[backend] = ("first" if first < second else "second") if axis == "cols" else ("first" if first > second else "second")
-            except RuntimeError as e:
+            except (RuntimeError, subprocess.TimeoutExpired) as e:
                 print("  both cpu vs gpu, %s: FAILED TO RENDER: %s" % (label, e))
                 failures.append(("orientation", "both", label))
                 continue
@@ -713,7 +713,7 @@ def run(args):
                     if r.returncode != 0 or not os.path.exists(out):
                         raise RuntimeError("%s render failed: %s" % (backend, (r.stdout + r.stderr)[-200:]))
                     means[backend] = read_exr_means(out)[1]
-            except RuntimeError as e:
+            except (RuntimeError, subprocess.TimeoutExpired) as e:
                 print("  both cpu vs gpu, %s: FAILED TO RENDER: %s" % (scene_name, e))
                 failures.append(("refraction", "both", scene_name))
                 continue
@@ -740,7 +740,7 @@ def run(args):
                     if r.returncode != 0 or not os.path.exists(out):
                         raise RuntimeError("%s render failed: %s" % (backend, (r.stdout + r.stderr)[-200:]))
                     means[backend] = read_exr_means(out)
-            except RuntimeError as e:
+            except (RuntimeError, subprocess.TimeoutExpired) as e:
                 print("  both cpu vs gpu, %s: FAILED TO RENDER: %s" % (scene_name, e))
                 failures.append(("fog", "both", scene_name))
                 continue

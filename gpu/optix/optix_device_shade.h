@@ -963,13 +963,8 @@ __device__ __forceinline__ void shade_material_surface(
 	out_eta = eta;
 }
 
-// A lamp that also reflects (pbrt-v4: an AreaLightSource keeps the shape's Material, default diffuse 0.5; the builder stores the reflectance in `albedo`, which an
-// emitter otherwise leaves at zero). It shades as a diffuse surface: the caller's `emission` is reset to just the light that surface collects, and the lamp's OWN
-// light, weighted against the light sampling like any emitter hit, is added by the hit program (lamp_own_emission()) since only it knows the shape's light pdf.
-__device__ __forceinline__ bool lamp_reflects(const MaterialData& mat) {
-	return mat.type == MaterialType::DiffuseLight && (mat.albedo.x > 0.0f || mat.albedo.y > 0.0f || mat.albedo.z > 0.0f);
-}
-
+// A lamp that also reflects (lamp_reflects(), optix_types_material.h) shades as a diffuse surface: the caller's `emission` is reset to just the light that surface collects, and
+// the lamp's OWN light, weighted against the light sampling like any emitter hit, is added by the hit program (lamp_own_emission()) since only it knows the shape's light pdf.
 __device__ __forceinline__ void shade_material(
 	const MaterialData& mat,
 	int matIdx,

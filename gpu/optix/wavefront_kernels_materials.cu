@@ -263,7 +263,7 @@ extern "C" __global__ void evaluate_materials(
 	// any other arrival adds it weighted by the MIS complement of the NEE shadow ray taken at the
 	// previous vertex, so the two strategies together count the lamp exactly once.
 	// -------------------------------------------------------------------------
-	const bool lampReflects = mat.type == MaterialType::DiffuseLight && (mat.albedo.x > 0.0f || mat.albedo.y > 0.0f || mat.albedo.z > 0.0f);
+	const bool lampReflects = lamp_reflects(mat);
 	if (mat.type == MaterialType::DiffuseLight) {
 		// A BSDF-sampled arrival (not specular, not the camera ray) is MIS-weighted against the NEE sample that
 		// the previous vertex took at this same point - see wf_emitter_hit_mis_weight().

@@ -65,13 +65,14 @@ inline __host__ __device__ float gpu_sample_displacement(const TextureData* text
 inline __host__ __device__ float gpu_sample_displacement_filtered(const TextureData* textures, const unsigned char* pixels,
 																  int texIdx, float u, float v, float footprint) {
 	const TextureData& t0 = textures[texIdx];
-	if (!(footprint > 0.0f) || t0.bumpLevels <= 0 || t0.bumpFirstLevel < 0)
-		return gpu_sample_displacement(textures, pixels, texIdx, u, v);
+	if (t0.bumpLevels <= 0 || t0.bumpFirstLevel < 0) return gpu_sample_displacement(textures, pixels, texIdx, u, v);
+	const int level0 = t0.bumpLevel0 >= 0 ? t0.bumpLevel0 : texIdx;   // (level 0 of the pyramid: the resampled picture for sides that are not powers of two)
+	if (!(footprint > 0.0f)) return gpu_sample_displacement(textures, pixels, level0, u, v);
 	const int levels = t0.bumpLevels + 1;
 	const float level = (float)(levels - 1) + log2f(fmaxf(footprint, 1e-8f));
 	if (level >= (float)(levels - 1)) return gpu_sample_displacement(textures, pixels, t0.bumpFirstLevel + t0.bumpLevels - 1, 0.5f, 0.5f);   // (the 1x1 level)
 	const int i = level > 0.0f ? (int)floorf(level) : 0;
-	return gpu_sample_displacement(textures, pixels, i == 0 ? texIdx : t0.bumpFirstLevel + i - 1, u, v);
+	return gpu_sample_displacement(textures, pixels, i == 0 ? level0 : t0.bumpFirstLevel + i - 1, u, v);
 }
 
 // `n` is the unit shading normal AS AUTHORED (not turned toward the ray: pbrt's BumpMap pushes along shading.n), `dpdu` and `dpdv` the UNNORMALIZED surface tangents (world units per unit

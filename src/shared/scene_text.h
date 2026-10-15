@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -48,11 +49,14 @@ inline TextOutlineProvider& textOutlineProviderSlot() {
 	return provider;
 }
 
-// The last few text meshes made (see textMesh()); a new provider empties it.
+// The text meshes made lately (see textMesh()), newest last; a new provider empties it. Kept by pointer so a hit costs no copy of the mesh, and bounded by the triangles they
+// hold (not by a count of texts: a scene of many short labels all stay, one of a few huge ones does not fill the memory).
 struct TextMeshCache {
 	std::mutex mutex;
-	std::vector<std::pair<std::string, ShapeMesh>> recent;
+	std::vector<std::pair<std::string, std::shared_ptr<const ShapeMesh>>> recent;
+	std::size_t triangles = 0;
 };
+constexpr std::size_t kTextMeshCacheTriangles = 600000;
 inline TextMeshCache& textMeshCache() {
 	static TextMeshCache cache;
 	return cache;
@@ -62,9 +66,26 @@ inline void setTextOutlineProvider(TextOutlineProvider provider) {
 	TextMeshCache& cache = textMeshCache();
 	std::lock_guard<std::mutex> lock(cache.mutex);
 	cache.recent.clear();
+	cache.triangles = 0;
 }
 
 constexpr int kMaxTextLength = 400;   // characters (a longer text is cut): the mesh is written into the scene file
+
+// How many characters a UTF-8 text has (a continuation byte is not one), and the start of it that has at most `maxCharacters` of them - never ending inside one.
+inline int textCharacterCount(const std::string& text) {
+	int n = 0;
+	for (char c : text)
+		if ((static_cast<unsigned char>(c) & 0xC0) != 0x80) ++n;
+	return n;
+}
+inline std::string cutTextToCharacters(const std::string& text, int maxCharacters) {
+	int n = 0;
+	for (std::size_t i = 0; i < text.size(); ++i) {
+		if ((static_cast<unsigned char>(text[i]) & 0xC0) == 0x80) continue;
+		if (++n > maxCharacters) return text.substr(0, i);
+	}
+	return text;
+}
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Triangulation
@@ -224,6 +245,18 @@ struct Ring {
 		                                                          : triArea(na.x, na.y, nb.x, nb.y, pa.x, pa.y) < 0 || triArea(na.x, na.y, xa.x, xa.y, nb.x, nb.y) < 0;
 	}
 
+	// Whether the corner at `m` (between its neighbours) contains the corner at `p`: of two candidate bridge points that tie on slope and x, the one whose corner opens toward
+	// the other is the one the bridge may use without crossing the outline (earcut's sectorContainsSector).
+	bool sectorContainsSector(int m, int p) const {
+		const Node& nm = at(m);
+		const Node& np = at(p);
+		const Node& mp = at(nm.prev);
+		const Node& mn = at(nm.next);
+		const Node& pp = at(np.prev);
+		const Node& pn = at(np.next);
+		return triArea(mp.x, mp.y, nm.x, nm.y, pp.x, pp.y) < 0 && triArea(pn.x, pn.y, nm.x, nm.y, mn.x, mn.y) < 0;
+	}
+
 	// Where a hole is joined to the outline: the point of the outline the hole's leftmost point can see to the left (earcut's findHoleBridge).
 	int findHoleBridge(int hole, int outer) const {
 		int p = outer;
@@ -253,7 +286,7 @@ struct Ring {
 			if (hx >= n.x && n.x >= mx && hx != n.x &&
 			    pointInTriangle(hy < my ? hx : qx, hy, mx, my, hy < my ? qx : hx, hy, n.x, n.y)) {
 				const double t = std::fabs(hy - n.y) / (hx - n.x);
-				if (locallyInside(p, hole) && (t < tanMin || (t == tanMin && (n.x > at(m).x || (n.x == at(m).x && true))))) {
+				if (locallyInside(p, hole) && (t < tanMin || (t == tanMin && (n.x > at(m).x || (n.x == at(m).x && sectorContainsSector(m, p)))))) {
 					m = p;
 					tanMin = t;
 				}
@@ -436,13 +469,13 @@ inline ShapeMesh extrudeOutlines(const TextOutline& outline, double height, doub
 	return m;
 }
 
-// The mesh of an object's text, or an empty mesh when no provider is set or the text has no outlines (a space, an empty string). The last few meshes are kept: the views, the
-// writer and the snapping all ask for the same one, and making it means a font lookup and a triangulation.
-inline ShapeMesh textMesh(const TextParams& params, double height, double stretch, double depth) {
+// The mesh of an object's text, or an empty mesh when no provider is set or the text has no outlines (a space, an empty string). The meshes made lately are kept: the views, the
+// writer and the snapping all ask for the same one, and making it means a font lookup and a triangulation. textMeshShared() hands out the kept one without copying it.
+inline std::shared_ptr<const ShapeMesh> textMeshShared(const TextParams& params, double height, double stretch, double depth) {
 	TextOutlineProvider provider = textOutlineProviderSlot();
-	if (!provider) return ShapeMesh();
+	if (!provider) return std::make_shared<const ShapeMesh>();
 	TextParams p = params;
-	if (static_cast<int>(p.text.size()) > kMaxTextLength) p.text.resize(static_cast<std::size_t>(kMaxTextLength));
+	p.text = cutTextToCharacters(p.text, kMaxTextLength);
 	char numbers[160];
 	std::snprintf(numbers, sizeof numbers, "%.17g|%.17g|%.17g|%d|%d|%d|", height, stretch, depth, p.bold ? 1 : 0, p.italic ? 1 : 0, p.align);
 	const std::string key = std::string(numbers) + p.font + "|" + p.text;
@@ -455,12 +488,18 @@ inline ShapeMesh textMesh(const TextParams& params, double height, double stretc
 	TextOutline outline;
 	ShapeMesh mesh;
 	if (provider(p, outline)) mesh = extrudeOutlines(outline, height, stretch, depth);
+	const auto made = std::make_shared<const ShapeMesh>(std::move(mesh));
 	{
 		std::lock_guard<std::mutex> lock(cache.mutex);
-		if (cache.recent.size() >= 8) cache.recent.erase(cache.recent.begin());
-		cache.recent.emplace_back(key, mesh);
+		cache.triangles += made->triangleCount();
+		while (!cache.recent.empty() && cache.triangles > kTextMeshCacheTriangles) {   // (the oldest go first)
+			cache.triangles -= std::min(cache.triangles, cache.recent.front().second->triangleCount());
+			cache.recent.erase(cache.recent.begin());
+		}
+		cache.recent.emplace_back(key, made);
 	}
-	return mesh;
+	return made;
 }
+inline ShapeMesh textMesh(const TextParams& params, double height, double stretch, double depth) { return *textMeshShared(params, height, stretch, depth); }
 
 }  // namespace scene_doc

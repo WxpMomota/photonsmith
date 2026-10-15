@@ -32,6 +32,9 @@ sys.path.insert(0, HERE)
 import pbrt_compare as pc            # (the PFM and EXR readers)
 import pbrt_scene_compare as psc     # (prepare(): the scene text both renderers get)
 
+KMAXPIN = 0.05   # the largest gap between a test-count mean and the converged one that the table pins as the expected value
+KMAXTOL = 0.25   # the widest tolerance a row may have (a scene that needs more is too noisy to guard: it is listed as NOISY)
+
 GPU_LOCK = threading.Lock()   # one GPU: the OptiX renders run one at a time
 
 
@@ -89,6 +92,7 @@ def one(args, name):
             return name, None, "black in pbrt"
         pbrt_noise = float(abs(a.mean() - b.mean()) / ref_scalar)
         cols = []
+        chroma = 0.0
         for backend in ("cpu", "recursive", "wavefront"):
             if backend != "cpu" and not args.gpu:
                 cols.append((0.0, 0.0)); continue
@@ -97,6 +101,8 @@ def one(args, name):
             if m is None:
                 cols.append((0.0, 0.0)); continue
             ratio = float(m.mean() / ref_scalar)
+            if backend == 'cpu':   # how far a colour channel is from pbrt's, relative to the whole picture (an error the mean cannot show)
+                chroma = max([abs((m[c] / ref[c]) / (m.mean() / ref_scalar) - 1.0) for c in range(3) if ref[c] >= 0.1 * ref_scalar] or [0.0])
             runs = []
             for s in range(args.noise_runs):   # (the OptiX renders are quick: as many runs as the CPU, or the noise of a spectral wavefront scene is underestimated and its test flaky)
                 v = ours_mean(args, "gpu" if backend == "recursive" else kind, path, args.test_spp, 100 + s, name + "_" + backend + "_n%d" % s)
@@ -104,14 +110,21 @@ def one(args, name):
                     runs.append(float(v.mean()))
             sigma = float(np.std(runs, ddof=1) / np.mean(runs)) if len(runs) >= 2 and np.mean(runs) > 0 else 0.1
             # A sampler that ignores the seed (halton) lands on the same value at every seed, a few % from its own converged mean at a low sample count (pbrt's does the
-            # same): when the test-count mean is further from the converged one than noise explains, the table holds that value and the test watches it.
+            # same): when the test-count mean is further from the converged one than noise explains, the table holds that value and the test watches it - but only up to
+            # kMaxPin: a larger gap is a real bias at the converged count too, which the table must not absorb (the test then fails and someone looks).
             if len(runs) >= 2 and np.mean(runs) > 0:
                 off = float(np.mean(runs) / m.mean()) - 1.0
                 if abs(off) > max(3.0 * sigma / len(runs) ** 0.5, 0.01):
-                    ratio = float(np.mean(runs) / ref_scalar)
-            tol = min(0.6, max(0.03, 4.0 * sigma + pbrt_noise))
+                    if abs(off) <= KMAXPIN:
+                        ratio = float(np.mean(runs) / ref_scalar)
+                        print('  pinned  %-34s %-9s test count reads %+.1f%% from its converged mean' % (name, backend, 100.0 * off), file=sys.stderr)
+                    else:
+                        print('  UNPINNED %-33s %-9s test count reads %+.1f%% from its converged mean (kept the converged ratio)' % (name, backend, 100.0 * off), file=sys.stderr)
+            tol = min(KMAXTOL, max(0.03, 4.0 * sigma + pbrt_noise))
+            if 4.0 * sigma + pbrt_noise > KMAXTOL:
+                print('  NOISY   %-34s %-9s wants a %.0f%% tolerance, capped at %.0f%%' % (name, backend, 100.0 * (4.0 * sigma + pbrt_noise), 100.0 * KMAXTOL), file=sys.stderr)
             cols.append((ratio, tol))
-        return name, (ref, pbrt_noise, cols), ""
+        return name, (ref, pbrt_noise, cols, chroma), ""
     except Exception as e:   # (a scene must not stop the run)
         return name, None, repr(e)
     finally:
@@ -155,7 +168,7 @@ def main():
                 print("skip %-44s %s" % (name, why), flush=True)
             else:
                 rows[name] = data
-                ref, noise, cols = data
+                ref, noise, cols, chroma = data
                 print("ok   %-44s pbrt %.4f (noise %.1f%%)  cpu %.3f/%.0f%%  rec %.3f/%.0f%%  wf %.3f/%.0f%%" % (
                     name, ref.mean(), 100 * noise, cols[0][0], 100 * cols[0][1], cols[1][0], 100 * cols[1][1], cols[2][0], 100 * cols[2][1]), flush=True)
     if args.only and os.path.exists(args.out):   # a partial run updates its own rows and keeps the rest of the table
@@ -164,14 +177,14 @@ def main():
                 kept[line.split()[0]] = line.rstrip("\n")
     with open(args.out, "w", newline="\n") as f:
         f.write("# pbrt-v4 reference means of the bundled scenes, and how far each renderer is from them. Written by scripts/pbrt_reference_pack.py; read by tests/unit/pbrt_reference_pack_tests.cpp.\n")
-        f.write("# name test_spp depth size pbrt_mean_r pbrt_mean_g pbrt_mean_b pbrt_noise cpu_ratio cpu_tol recursive_ratio recursive_tol wavefront_ratio wavefront_tol\n")
+        f.write("# name test_spp depth size pbrt_mean_r pbrt_mean_g pbrt_mean_b pbrt_noise cpu_ratio cpu_tol recursive_ratio recursive_tol wavefront_ratio wavefront_tol cpu_chroma(optional)\n")
         for name in sorted(set(rows) | set(kept)):
             if name not in rows:
                 f.write(kept[name] + "\n")
                 continue
-            ref, noise, cols = rows[name]
-            f.write("%s %d %d %d %.7g %.7g %.7g %.4f %s\n" % (
-                name, args.test_spp, args.depth, args.size, ref[0], ref[1], ref[2], noise, " ".join("%.4f %.4f" % c for c in cols)))
+            ref, noise, cols, chroma = rows[name]
+            f.write("%s %d %d %d %.7g %.7g %.7g %.4f %s %.4f\n" % (
+                name, args.test_spp, args.depth, args.size, ref[0], ref[1], ref[2], noise, " ".join("%.4f %.4f" % c for c in cols), chroma))
     print("\n%d scenes in the table, %d skipped (%s), %.0f s" % (len(rows), len(skipped), "pbrt cannot read or black" if skipped else "-", time.time() - t0))
 
 

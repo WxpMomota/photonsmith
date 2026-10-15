@@ -97,7 +97,7 @@ inline std::vector<Problem> validate(const Document& d) {
 			case ShapeKind::Text:
 				if (!(o.size.x > 0.0 && o.size.y > 0.0 && o.size.z > 0.0)) err(who + "the text's stretch, height and thickness must be above zero.");
 				if (o.text.text.find_first_not_of(" \t\r\n") == std::string::npos) warn(who + "the text is empty, so there is nothing to see.");
-				else if (static_cast<int>(o.text.text.size()) > kMaxTextLength) warn(who + "the text is longer than " + std::to_string(kMaxTextLength) + " characters, so it is cut there.");
+				else if (textCharacterCount(o.text.text) > kMaxTextLength) warn(who + "the text is longer than " + std::to_string(kMaxTextLength) + " characters, so it is cut there.");
 				break;
 			case ShapeKind::Capsule:
 				if (!(o.radius > 0.0) || !(o.height > 0.0)) err(who + "the radius and height must be above zero.");

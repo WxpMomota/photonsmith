@@ -216,6 +216,19 @@ TEST(SceneTextMesh, ALongTextIsCut) {
 	setTextOutlineProvider(nullptr);
 }
 
+// The cap counts characters, not bytes: a text of 3-byte characters keeps all kMaxTextLength of them and is never cut inside one.
+TEST(SceneTextMesh, TheLengthCapCountsCharactersNotBytes) {
+	std::string wide;
+	for (int i = 0; i < kMaxTextLength + 50; ++i) wide += "\xE6\x97\xA5";   // (a CJK character, 3 bytes)
+	EXPECT_EQ(textCharacterCount(wide), kMaxTextLength + 50);
+	const std::string cut = cutTextToCharacters(wide, kMaxTextLength);
+	EXPECT_EQ(textCharacterCount(cut), kMaxTextLength);
+	EXPECT_EQ(cut.size(), static_cast<std::size_t>(kMaxTextLength) * 3) << "ends on a character boundary";
+	EXPECT_EQ(cutTextToCharacters("short", kMaxTextLength), "short");
+	EXPECT_EQ(cutTextToCharacters("abc", 3), "abc");
+	EXPECT_EQ(cutTextToCharacters("abcd", 3), "abc");
+}
+
 // A deterministic jagged outline with many points and deep notches, like a heavily curved letter: the area must still come out exact.
 TEST(SceneTextTriangulation, JaggedAndManyPointedOutlinesAreFilledExactly) {
 	unsigned state = 12345u;

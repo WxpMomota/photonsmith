@@ -187,10 +187,10 @@ inline QColor volumeDrawColor(const scene_doc::Volume &v) {
 	c.setAlpha(v.kind == scene_doc::VolumeKind::Smoke ? 115 : 80);
 	return c;
 }
-// The colour a marble or noise pattern is drawn in, in the views (they only show a flat colour per object): the renderer's marble is pale stone, its noise soft grey.
 // Sets the font outlines the 3D text shape is made from (scene_builder_text.cpp); safe to call again.
 void installTextOutlineProvider();
 
+// The colour a marble or noise pattern is drawn in, in the views (they only show a flat colour per object): the renderer's marble is pale stone, its noise soft grey.
 inline QColor patternDrawColor(scene_doc::Pattern p) { return p == scene_doc::Pattern::Marble ? QColor(222, 222, 230) : QColor(160, 160, 168); }
 inline QString lightLabel(LightKind k) {
 	switch (k) {

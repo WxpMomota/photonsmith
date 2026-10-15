@@ -41,6 +41,22 @@ TEST(MipMap, LevelCountNonPowerOfTwo) {
     EXPECT_EQ(m.height(m.levels()-1), 1);
 }
 
+// pbrt-v4 (Image::GeneratePyramid) resamples a picture whose sides are not powers of two UP to the next power of two before building the levels: a 6 x 3 picture is an 8 x 4
+// level 0 and has the levels of an 8-wide one (8, 4, 2, 1), and a flat colour stays that colour.
+TEST(MipMap, NonPowerOfTwoPictureIsResampledUpLikePbrt) {
+    mipmap m(solid_img(6, 3, color(0.25, 0.5, 0.75)), 6, 3);
+    EXPECT_EQ(m.width(0), 8);
+    EXPECT_EQ(m.height(0), 4);
+    EXPECT_EQ(m.levels(), 4) << "8 -> 4 -> 2 -> 1";
+    // (the value at a point and at a footprint wider than the picture - the coarsest level: a flat colour stays flat at every level)
+    for (float footprint : {0.0f, 10.0f}) {
+        const color c = m.filter(0.5f, 0.5f, footprint, footprint, footprint, footprint);
+        EXPECT_NEAR(c.x(), 0.25, 1e-4) << footprint;
+        EXPECT_NEAR(c.y(), 0.5, 1e-4) << footprint;
+        EXPECT_NEAR(c.z(), 0.75, 1e-4) << footprint;
+    }
+}
+
 TEST(MipMap, Level0IsFullResolution) {
     mipmap m(solid_img(32, 16, color(0.5,0.5,0.5)), 32, 16);
     EXPECT_EQ(m.width(0),  32);

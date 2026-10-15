@@ -836,6 +836,12 @@ static void apply_loaded_scene_settings(const char* path,
 		}
 	}
 
+	// A lamp that keeps a material other than a flat diffuse one (pbrt-v4: an AreaLightSource keeps the shape's material, so it reflects): the CPU reflects it as that
+	// material, both OptiX backends draw a pure emitter, so a lamp panel with a metal or coated or textured material differs between the two.
+	if (scene.lampMaterialsNotReflected > 0)
+		std::cerr << "[OptiX] Warning: " << scene.lampMaterialsNotReflected << " lamp material(s) are not a flat diffuse colour (coated, metal, glass, textured...); the CPU "
+		             "reflects light off them as that material, this renderer draws them as pure emitters - use --cpu if the lamp's own surface matters.\n";
+
 	// Any pbrt_flatten::Medium::type mediumMaterialIndex() (pbrt_gpu_
 	// builder.h) had no real branch for - a type added to the scene format that
 	// the GPU builder has not learned yet - falls through to the

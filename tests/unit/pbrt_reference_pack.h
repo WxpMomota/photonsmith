@@ -14,6 +14,7 @@ struct PbrtPackRow {
 	double mean[3] = {0, 0, 0};
 	double noise = 0.0;
 	double ratio[3] = {0, 0, 0}, tol[3] = {0, 0, 0};   // cpu, recursive OptiX, wavefront OptiX; ratio 0 = not measured, skip
+	double chroma = 0.0;   // the CPU's largest colour-channel offset from pbrt's relative to the whole picture, when the table has it (a row without it: 0)
 	double pbrtMean() const { return (mean[0] + mean[1] + mean[2]) / 3.0; }
 };
 
@@ -30,8 +31,10 @@ inline std::vector<PbrtPackRow> loadPbrtReferencePack() {
 		if (line.empty() || line[0] == '#') continue;
 		std::istringstream ss(line);
 		PbrtPackRow r;
-		if (ss >> r.name >> r.spp >> r.depth >> r.size >> r.mean[0] >> r.mean[1] >> r.mean[2] >> r.noise >> r.ratio[0] >> r.tol[0] >> r.ratio[1] >> r.tol[1] >> r.ratio[2] >> r.tol[2])
+		if (ss >> r.name >> r.spp >> r.depth >> r.size >> r.mean[0] >> r.mean[1] >> r.mean[2] >> r.noise >> r.ratio[0] >> r.tol[0] >> r.ratio[1] >> r.tol[1] >> r.ratio[2] >> r.tol[2]) {
+			ss >> r.chroma;   // (optional last column)
 			rows.push_back(r);
+		}
 	}
 	return rows;
 }

@@ -62,6 +62,30 @@ TEST(BumpMipChain, HalvesDownToOneTexelAndAveragesTheBoxes) {
 	EXPECT_EQ(scene.textures.size(), entries);
 }
 
+// pbrt resamples a picture whose sides are not powers of two up to the next power of two first (Image::GeneratePyramid): a 6 x 6 height map is an 8 x 8 level 0 (an entry of its
+// own) with 8 -> 4 -> 2 -> 1 below it, and a flat height stays flat through the resampling.
+TEST(BumpMipChain, ANonPowerOfTwoMapIsResampledUpToPowersOfTwoLikePbrt) {
+	SceneData scene;
+	TextureData t{};
+	t.kind = TextureKind::Image;
+	t.width = 6;
+	t.height = 6;
+	t.wrapMode = GpuWrapMode::Repeat;
+	t.srgb = false;
+	t.pixelOffset = 0;
+	for (int i = 0; i < 36 * 3; ++i) scene.texturePixels.push_back(128);
+	scene.textures.push_back(t);
+	pbrt_gpu::detail::buildBumpMipChain(scene, 0);
+	const TextureData& base = scene.textures[0];
+	EXPECT_EQ(base.bumpLevels, 3) << "8 -> 4 -> 2 -> 1";
+	ASSERT_GE(base.bumpLevel0, 1);
+	EXPECT_EQ(scene.textures[static_cast<std::size_t>(base.bumpLevel0)].width, 8);
+	EXPECT_EQ(scene.textures[static_cast<std::size_t>(base.bumpLevel0)].height, 8);
+	const float flat = 128.0f / 255.0f;
+	EXPECT_NEAR(gpu_sample_displacement_filtered(scene.textures.data(), scene.texturePixels.data(), 0, 0.4f, 0.6f, 0.0f), flat, 0.01f) << "no footprint: the resampled level 0";
+	EXPECT_NEAR(gpu_sample_displacement_filtered(scene.textures.data(), scene.texturePixels.data(), 0, 0.4f, 0.6f, 5.0f), flat, 0.01f) << "wider than the picture: the coarsest texel";
+}
+
 TEST(BumpMipChain, TheLevelFollowsTheFootprintAsPbrtsBilinearFilterDoes) {
 	int idx = 0;
 	SceneData scene = checkerHeights(8, idx);

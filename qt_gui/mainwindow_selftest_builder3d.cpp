@@ -14,6 +14,7 @@
 #include "settings_keys.h"
 #include "../src/shared/oidn_runtime.h"
 #include "../src/shared/mesh_preview.h"
+#include "../src/shared/scene_text.h"
 #include <random>
 #include <set>
 #include "scene_metadata_client.h"
@@ -42,6 +43,9 @@
 #include <QVBoxLayout>
 #include <QWheelEvent>
 #include <QFileInfo>
+#include <QPainterPath>
+#include <QPolygonF>
+#include <QTransform>
 #include <QCoreApplication>
 #include <QEventLoop>
 #include <QThread>
@@ -494,6 +498,27 @@ void MainWindow::selfTestLights(SceneBuilderWidget *sb, const std::function<void
 
 // 3D text, made from a real font (called from selfTestShapes).
 void MainWindow::selfTestText(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check) {
+	// Overlapping contours (many modern fonts build a letter that way) are one filled shape under the non-zero winding rule: simplified like the text provider does it, two
+	// overlapping squares triangulate to their union (7), not to a union with the overlap cut out by parity.
+	{
+		QPainterPath overlap;
+		overlap.setFillRule(Qt::WindingFill);
+		overlap.addRect(0, 0, 2, 2);
+		overlap.addRect(1, 1, 2, 2);
+		std::vector<scene_doc::TextContour> contours;
+		for (const QPolygonF &polygon : overlap.simplified().toSubpathPolygons(QTransform())) {
+			scene_doc::TextContour c;
+			for (const QPointF &pt : polygon) c.push_back({pt.x(), pt.y()});
+			contours.push_back(std::move(c));
+		}
+		const scene_doc::TextFace face = scene_doc::triangulateOutlines(contours);
+		double area = 0.0;
+		for (std::size_t t = 0; t + 2 < face.triangles.size(); t += 3) {
+			const auto &a = face.points[static_cast<std::size_t>(face.triangles[t])], &b = face.points[static_cast<std::size_t>(face.triangles[t + 1])], &c = face.points[static_cast<std::size_t>(face.triangles[t + 2])];
+			area += 0.5 * std::fabs((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1]));
+		}
+		check(std::fabs(area - 7.0) < 1e-6, "overlapping letter contours are filled as one shape (area " + QString::number(area) + " of 7)");
+	}
 	// 3D text, made from a real font: Add > Text adds it, the properties show the text and its font rows, the letters become a mesh with real volume, and it is one undo step.
 	{
 		const size_t before = sb->document().objects.size();

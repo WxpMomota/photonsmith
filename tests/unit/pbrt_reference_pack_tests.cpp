@@ -34,14 +34,28 @@ TEST_P(PbrtReferencePackCpuTest, TheCpuRenderStaysWhereItWasAgainstPbrt) {
 	if (!s) GTEST_SKIP() << row.name << ".pbrt was not discovered - is pbrt_scenes/ present?";
 	const std::string out = "pbrt_pack_" + pbrtPackTestName(row.name) + "_cpu.exr";
 	ASSERT_EQ(cpu_render_main(row.size, row.size, row.spp, row.depth, out.c_str(), s->id.c_str(), s->camera.lookfrom_x, s->camera.lookfrom_y, s->camera.lookfrom_z), 0);
-	double mean = 0.0;
-	const bool ok = loadLinearMean(out, mean);
+	int w = 0, h = 0;
+	std::vector<float> rgb;
+	const bool ok = loadLinearRgbPixels(out, w, h, rgb);
 	std::remove(out.c_str());
 	ASSERT_TRUE(ok) << row.name << ": no readable EXR";
+	double channelMean[3] = {0.0, 0.0, 0.0};
+	for (std::size_t i = 0; i < rgb.size(); ++i) channelMean[i % 3] += rgb[i];
+	for (double& c : channelMean) c /= std::max(1, w * h);
+	const double mean = (channelMean[0] + channelMean[1] + channelMean[2]) / 3.0;
 	const double expected = row.pbrtMean() * row.ratio[0];
 	std::printf("[pack] %-40s cpu %.5f  expected %.5f (pbrt %.5f x %.3f, tolerance %.1f%%): %+.1f%%\n", row.name.c_str(), mean, expected, row.pbrtMean(), row.ratio[0], 100.0 * row.tol[0], 100.0 * (mean / expected - 1.0));
 	EXPECT_GT(mean, (1.0 - row.tol[0]) * expected) << row.name << " reads darker than it did against pbrt-v4";
 	EXPECT_LT(mean, (1.0 + row.tol[0]) * expected) << row.name << " reads brighter than it did against pbrt-v4";
+	// The mean over the channels cannot see a colour error whose channels cancel (swapped dots colours, a tinted light): each channel that carries a share of the picture is
+	// compared with pbrt's own channel, relative to how the whole picture reads against pbrt (the documented offset of the scene stays out of it).
+	const double wholeRatio = mean / row.pbrtMean();
+	const double channelTolerance = std::max(0.10, row.chroma + std::max(0.05, 2.0 * row.tol[0]));   // (the scene's own recorded offset, plus room for noise)
+	for (int c = 0; c < 3; ++c) {
+		if (row.mean[c] < 0.1 * row.pbrtMean() || wholeRatio <= 0.0) continue;
+		const double relative = (channelMean[c] / row.mean[c]) / wholeRatio;
+		EXPECT_NEAR(relative, 1.0, channelTolerance) << row.name << ": channel " << "RGB"[c] << " reads " << channelMean[c] << " against pbrt-v4's " << row.mean[c];
+	}
 }
 
 INSTANTIATE_TEST_SUITE_P(BundledScenes, PbrtReferencePackCpuTest, ::testing::ValuesIn(packRows()),

@@ -8,6 +8,9 @@
 
 // Scene container
 struct SceneData {
+	// Lamps (area-light shapes) whose own material the CPU reflects but this builder cannot: anything but a flat diffuse reflectance (a textured diffuse, coated,
+	// conductor, dielectric...). They are pure emitters on both OptiX backends; scene_builder.cpp warns with the count.
+	int lampMaterialsNotReflected = 0;
 	std::vector<SphereData> spheres;
 	std::vector<QuadData> quads;
 	std::vector<BilinearPatchData> bilinearPatches;

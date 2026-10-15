@@ -16,6 +16,18 @@
 #include "../shared/mipmap.h"
 #include "../shared/scalar_math.h"   // Clamp() - see mipmap_texture::wide_clamp()
 #include "../shared/procedural_textures.h"   // checkerboard_weight_2d() - see uv_checker_texture::value_diff()
+#include <atomic>
+
+// How many live objects read a hit's texture footprint (rec.dudx.. - mip-filtered images, the filtered checker, a bump map's step). The path tracer computes pbrt's footprint
+// estimate at every bounce (camera::approximate_footprint_ray) only while this is above zero: a scene of plain colours has nobody to read it, and the least-squares solve is
+// not free at every hit of every path. A process-wide count is conservative (once any such texture exists the footprint is computed), which only costs time.
+inline std::atomic<int>& footprint_consumer_count() { static std::atomic<int> n{0}; return n; }
+struct footprint_consumer_token {
+    footprint_consumer_token() { ++footprint_consumer_count(); }
+    footprint_consumer_token(const footprint_consumer_token&) { ++footprint_consumer_count(); }
+    footprint_consumer_token& operator=(const footprint_consumer_token&) { return *this; }
+    ~footprint_consumer_token() { --footprint_consumer_count(); }
+};
 
 
 class texture {
@@ -121,6 +133,7 @@ class checker_texture : public texture {
 // pbrt's UV-based convention). Kept as a separate class rather than a
 // checker_texture variant so neither one's semantics have to compromise.
 class uv_checker_texture : public texture {
+    footprint_consumer_token footprint_token_;   // (value_diff() filters the checker by the footprint)
   public:
     uv_checker_texture(double uscale, double vscale,
                         shared_ptr<texture> tex1, shared_ptr<texture> tex2)
@@ -680,6 +693,7 @@ class mix_texture : public texture {
 // full anisotropic quality.
 // ---------------------------------------------------------------------------
 class mipmap_texture : public texture {
+    footprint_consumer_token footprint_token_;   // (value_diff() picks the mip level / EWA ellipse from the footprint)
   public:
     mipmap_texture(const char* filename,
                    MipMapOptions opts = MipMapOptions{})

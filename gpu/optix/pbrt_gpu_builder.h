@@ -38,6 +38,7 @@
 #include <utility>
 
 #include "../../src/shared/srgb_decode.h"   // srgb8 helpers used with the texture table
+#include "../../src/shared/image_resample.h"   // pbrt's resize-up to powers of two, before a bump height map's mip chain
 #include "../../src/shared/nanovdb_dense.h"   // MakeNamedMedium "nanovdb": the file -> dense grid step, shared with the CPU builder
 #include "../../src/shared/gpu_scene_materials.h"   // reflectanceToConductorK(), shared with the CPU builder and the Metal loader
 #include "../../src/shared/gpu_scene_textures.h"   // image / alpha-mask decode and the grayscale test, shared with the Metal loader

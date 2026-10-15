@@ -81,6 +81,7 @@ class normal_map_material : public material {
 
 
 class bump_map_material : public material {
+    footprint_consumer_token footprint_token_;   // (the finite-difference step and the height lookup come from the footprint)
   public:
 	bump_map_material(shared_ptr<texture> bump_tex, shared_ptr<material> inner,
 					  double scale = 1.0, double step = 0.001)

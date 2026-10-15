@@ -391,7 +391,7 @@ template <typename Sampler>
         // and a filtered texture's footprint at a bounce are those of a camera ray seeing the point, not a hair's breadth. Without it the bumps seen by bounced
         // light were fully sharp, and sibenik's bump maps read 30% too bright against pbrt.
         const bool primary_hit = bounces_left == depth && current_ray.has_differentials();
-        const ray footprint_ray = primary_hit ? current_ray : approximate_footprint_ray(rec.p);
+        const ray footprint_ray = primary_hit ? current_ray : (footprint_consumer_count().load(std::memory_order_relaxed) > 0 ? approximate_footprint_ray(rec.p) : ray());   // (nobody reads it in a scene of plain colours)
         if (footprint_ray.has_differentials()) {
             SurfaceInteraction<double> si(
                 rec.p.x(), rec.p.y(), rec.p.z(),
@@ -840,7 +840,7 @@ template <typename Sampler>
         // and a filtered texture's footprint at a bounce are those of a camera ray seeing the point, not a hair's breadth. Without it the bumps seen by bounced
         // light were fully sharp, and sibenik's bump maps read 30% too bright against pbrt.
         const bool primary_hit = bounces_left == depth && current_ray.has_differentials();
-        const ray footprint_ray = primary_hit ? current_ray : approximate_footprint_ray(rec.p);
+        const ray footprint_ray = primary_hit ? current_ray : (footprint_consumer_count().load(std::memory_order_relaxed) > 0 ? approximate_footprint_ray(rec.p) : ray());   // (nobody reads it in a scene of plain colours)
         if (footprint_ray.has_differentials()) {
             SurfaceInteraction<double> si(
                 rec.p.x(), rec.p.y(), rec.p.z(),
