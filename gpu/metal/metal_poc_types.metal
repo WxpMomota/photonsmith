@@ -995,6 +995,9 @@ struct TriangleMaterial {
     int textureWrap;
     // The geometric normal of the hit on the ray's side, for spawnSide() (see metal_poc_gpu_types.h); zero = not set.
     packed_float3 spawnNormal;
+    // The path's colour channel through a chromatic medium (-1: none) and the time of its camera sample, for traceShadowAnyM() (see metal_poc_gpu_types.h).
+    int shadowChannel;
+    float rayTime;
 };
 
 // E2/section 178: a real heterogeneous, procedural Perlin-FBm-density

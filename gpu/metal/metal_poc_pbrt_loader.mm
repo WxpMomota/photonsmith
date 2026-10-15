@@ -807,6 +807,16 @@ void MetalPocApp::loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, const st
     }
 }
 
+// A disk or cylinder inside an ActiveTransform pair has object motion blur on the CPU (a full animated transform per ray); Metal bakes them at their start pose and draws them still,
+// so say it once per kind instead of letting the picture differ without a word (pbrt_scenes/disk-cylinder-motion-blur.pbrt; spheres and meshes do move).
+static void warnShapeMotionIgnored(const char* kind) {
+    static bool warnedDisk = false, warnedCylinder = false;
+    bool& warned = kind[0] == 'd' ? warnedDisk : warnedCylinder;
+    if (warned) return;
+    warned = true;
+    fprintf(stderr, "loadPbrtScene: warning: a %s moves during the exposure (ActiveTransform); the Metal renderer draws it at its start pose, so it will not be blurred as on the CPU\n", kind);
+}
+
 // --- Disks (section 101) - the plain, common "full circle" case only:
     // this loader's own DiskData primitive (metal_poc.metal, matching the
     // hardcoded room's own single disk) is center/normal/radius with no
@@ -845,6 +855,7 @@ void MetalPocApp::loadPbrtDisks(const pbrt_flatten::FlatScene& scene, const Pbrt
                scene.materials[idx].kind == pbrt_flatten::MaterialKind::Interface;
     };
     for (const pbrt_flatten::Disk& d : scene.disks) {
+        if (std::memcmp(d.xform, d.xformEnd, sizeof(d.xform)) != 0) warnShapeMotionIgnored("disk");
         if (isInterfaceMaterial(d.material)) continue;   // medium boundary only: transparent, not an opaque gray disk
         if (d.innerRadius != 0.0 || d.phiMaxDeg != 360.0) { ++skippedDisks; continue; }
 
@@ -942,6 +953,7 @@ void MetalPocApp::loadPbrtCylinders(const pbrt_flatten::FlatScene& scene, const 
                scene.materials[idx].kind == pbrt_flatten::MaterialKind::Interface;
     };
     for (const pbrt_flatten::Cylinder& cy : scene.cylinders) {
+        if (std::memcmp(cy.xform, cy.xformEnd, sizeof(cy.xform)) != 0) warnShapeMotionIgnored("cylinder");
         // A Material "interface" tube is a medium boundary only. Bounding a homogeneous medium it becomes a bounded-medium tube
         // (materialType 28); any other interface tube stays transparent rather than an opaque gray one.
         const bool mediumTube = isInterfaceMaterial(cy.material) && cy.areaLight < 0 && cy.medium >= 0 &&

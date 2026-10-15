@@ -89,7 +89,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
             shadowRay.max_distance = dist - 0.002f;
             reaimShadowRay(shadowRay, hitPoint, dist);
             intersection_result<instancing, triangle_data> shadowResult =
-                traceShadowAny(isect, shadowRay, accelStructure, functionTable);
+                traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat);
             if (shadowResult.type == intersection_type::none) {
                 float3 wiLocal = float3(dot(wi, tangent), dot(wi, bitangent), dot(wi, facingNormal));
                 float3 f = layeredCoatedConductorF(wiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatThickness);
@@ -117,7 +117,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                 plShadowRay.max_distance = plDist - 0.002f;
                 reaimShadowRay(plShadowRay, hitPoint, plDist);
                 intersection_result<instancing, triangle_data> plShadowResult =
-                    traceShadowAny(isect, plShadowRay, accelStructure, functionTable);
+                    traceShadowAnyM(isect, plShadowRay, accelStructure, functionTable, mat);
                 if (plShadowResult.type == intersection_type::none) {
                     float3 plWiLocal = float3(dot(plWi, tangent), dot(plWi, bitangent), dot(plWi, facingNormal));
                     float3 plF = layeredCoatedConductorF(plWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatThickness);
@@ -139,7 +139,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                 dlShadowRay.min_distance = 0.001f;
                 dlShadowRay.max_distance = kDirectionalLightMaxDistance;
                 intersection_result<instancing, triangle_data> dlShadowResult =
-                    traceShadowAny(isect, dlShadowRay, accelStructure, functionTable);
+                    traceShadowAnyM(isect, dlShadowRay, accelStructure, functionTable, mat);
                 if (dlShadowResult.type == intersection_type::none) {
                     float3 dlWiLocal = float3(dot(dlWi, tangent), dot(dlWi, bitangent), dot(dlWi, facingNormal));
                     float3 dlF = layeredCoatedConductorF(dlWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatThickness);
@@ -174,7 +174,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                     pjShadowRay.max_distance = pjDist - 0.002f;
                     reaimShadowRay(pjShadowRay, hitPoint, pjDist);
                     intersection_result<instancing, triangle_data> pjShadowResult =
-                        traceShadowAny(isect, pjShadowRay, accelStructure, functionTable);
+                        traceShadowAnyM(isect, pjShadowRay, accelStructure, functionTable, mat);
                     if (pjShadowResult.type == intersection_type::none) {
                         float3 pjWiLocal = float3(dot(pjWi, tangent), dot(pjWi, bitangent), dot(pjWi, facingNormal));
                         float3 pjF = layeredCoatedConductorF(pjWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatThickness);
@@ -204,7 +204,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                     glShadowRay.max_distance = glDist - 0.002f;
                     reaimShadowRay(glShadowRay, hitPoint, glDist);
                     intersection_result<instancing, triangle_data> glShadowResult =
-                        traceShadowAny(isect, glShadowRay, accelStructure, functionTable);
+                        traceShadowAnyM(isect, glShadowRay, accelStructure, functionTable, mat);
                     if (glShadowResult.type == intersection_type::none) {
                         float3 glWiLocal = float3(dot(glWi, tangent), dot(glWi, bitangent), dot(glWi, facingNormal));
                         float3 glF = layeredCoatedConductorF(glWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatThickness);
@@ -232,7 +232,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                 envShadowRay.min_distance = 0.001f;
                 envShadowRay.max_distance = 1e5f;
                 intersection_result<instancing, triangle_data> envShadowResult =
-                    traceShadowAny(isect, envShadowRay, accelStructure, functionTable);
+                    traceShadowAnyM(isect, envShadowRay, accelStructure, functionTable, mat);
                 if (envShadowResult.type == intersection_type::none) {
                     float3 envWiLocal = float3(dot(envWi, tangent), dot(envWi, bitangent), dot(envWi, facingNormal));
                     float3 envF = layeredCoatedConductorF(envWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatThickness);
@@ -255,7 +255,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                 pbrtEnvShadowRay.min_distance = 0.001f;
                 pbrtEnvShadowRay.max_distance = 1e5f;
                 intersection_result<instancing, triangle_data> pbrtEnvShadowResult =
-                    traceShadowAny(isect, pbrtEnvShadowRay, accelStructure, functionTable);
+                    traceShadowAnyM(isect, pbrtEnvShadowRay, accelStructure, functionTable, mat);
                 if (pbrtEnvShadowResult.type == intersection_type::none) {
                     float3 pbrtEnvWiLocal = float3(dot(pbrtEnvWi, tangent), dot(pbrtEnvWi, bitangent), dot(pbrtEnvWi, facingNormal));
                     float3 pbrtEnvF = layeredCoatedConductorF(pbrtEnvWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatThickness);
@@ -379,7 +379,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
             shadowRay.max_distance = dist - 0.002f;
             reaimShadowRay(shadowRay, hitPoint, dist);
             intersection_result<instancing, triangle_data> shadowResult =
-                traceShadowAny(isect, shadowRay, accelStructure, functionTable);
+                traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat);
             if (shadowResult.type == intersection_type::none) {
                 float pdfSolidAngle = (distSq / (ls.area * abs(cosLight))) * ls.pmf;
                 float weight = (pdfSolidAngle * pdfSolidAngle)
@@ -405,7 +405,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
                 plShadowRay.max_distance = plDist - 0.002f;
                 reaimShadowRay(plShadowRay, hitPoint, plDist);
                 intersection_result<instancing, triangle_data> plShadowResult =
-                    traceShadowAny(isect, plShadowRay, accelStructure, functionTable);
+                    traceShadowAnyM(isect, plShadowRay, accelStructure, functionTable, mat);
                 if (plShadowResult.type == intersection_type::none) {
                     float3 plTransmittance = fogTransmittance(uniforms, plDist);
                     float plSpot = spotLightFalloff(-plWi, float3(pl.direction), pl.cosOuterAngle, pl.cosInnerAngle);
@@ -426,7 +426,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
                 dlShadowRay.min_distance = 0.001f;
                 dlShadowRay.max_distance = kDirectionalLightMaxDistance;
                 intersection_result<instancing, triangle_data> dlShadowResult =
-                    traceShadowAny(isect, dlShadowRay, accelStructure, functionTable);
+                    traceShadowAnyM(isect, dlShadowRay, accelStructure, functionTable, mat);
                 if (dlShadowResult.type == intersection_type::none) {
                     // Skip when there is no fog - rayBoxExitDistance()
                     // is only valid for an origin INSIDE the hardcoded
@@ -460,7 +460,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
                     pjShadowRay.max_distance = pjDist - 0.002f;
                     reaimShadowRay(pjShadowRay, hitPoint, pjDist);
                     intersection_result<instancing, triangle_data> pjShadowResult =
-                        traceShadowAny(isect, pjShadowRay, accelStructure, functionTable);
+                        traceShadowAnyM(isect, pjShadowRay, accelStructure, functionTable, mat);
                     if (pjShadowResult.type == intersection_type::none) {
                         float3 pjTransmittance = fogTransmittance(uniforms, pjDist);
                         radiance += throughput * albedo * velvetF(woWorld, pjWi, facingNormal, mat.ior)
@@ -489,7 +489,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
                     glShadowRay.max_distance = glDist - 0.002f;
                     reaimShadowRay(glShadowRay, hitPoint, glDist);
                     intersection_result<instancing, triangle_data> glShadowResult =
-                        traceShadowAny(isect, glShadowRay, accelStructure, functionTable);
+                        traceShadowAnyM(isect, glShadowRay, accelStructure, functionTable, mat);
                     if (glShadowResult.type == intersection_type::none) {
                         float3 glTransmittance = fogTransmittance(uniforms, glDist);
                         radiance += throughput * albedo * velvetF(woWorld, glWi, facingNormal, mat.ior)
@@ -514,7 +514,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
                 envShadowRay.min_distance = 0.001f;
                 envShadowRay.max_distance = 1e5f;
                 intersection_result<instancing, triangle_data> envShadowResult =
-                    traceShadowAny(isect, envShadowRay, accelStructure, functionTable);
+                    traceShadowAnyM(isect, envShadowRay, accelStructure, functionTable, mat);
                 if (envShadowResult.type == intersection_type::none) {
                     float2 envUV = envMapUV(envWi);
                     float3 envRadiance = earthTexture.sample(textureSampler, envUV).rgb;
@@ -541,7 +541,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
                 pbrtEnvShadowRay.min_distance = 0.001f;
                 pbrtEnvShadowRay.max_distance = 1e5f;
                 intersection_result<instancing, triangle_data> pbrtEnvShadowResult =
-                    traceShadowAny(isect, pbrtEnvShadowRay, accelStructure, functionTable);
+                    traceShadowAnyM(isect, pbrtEnvShadowRay, accelStructure, functionTable, mat);
                 if (pbrtEnvShadowResult.type == intersection_type::none) {
                     float3 pbrtEnvRadianceSample = pbrtEnvLeAt(uniforms, pbrtEnvConditionalCDF, pbrtEnvTexture, textureSampler, hitPoint, pbrtEnvWi);
                     float pbrtEnvWeight = (pbrtEnvPdfSolidAngle * pbrtEnvPdfSolidAngle)
@@ -971,12 +971,32 @@ inline void measuredPL2DInvert(device const float* g, thread const MeasuredPL2D&
     outPdf = pdf * invx * invy;
 }
 
+// How a measured BSDF's spectral table becomes RGB (src/shared/measured_rgb_quadrature.h, generated by scripts/measured_rgb_weights.py from pbrt's CIE tables and D65): the table is
+// evaluated at 18 wavelengths and weighted into R, G and B, each value clamped at zero first and each sum too. The CPU and both OptiX backends do exactly this; three fixed
+// wavelengths (612, 549, 465 nm) read the bundled tables' blue 16-17 percent high against pbrt. The numbers below are COPIES of the header's macros: the shader test
+// "measured quadrature table" fails if they drift.
+constant float kMeasuredLambda[18] = { 390.845635f, 411.806565f, 432.159598f, 451.195786f, 470.844598f, 490.787813f, 510.739156f, 529.987140f, 549.508248f, 569.210297f, 588.855155f, 608.645447f, 628.146402f, 647.738846f, 667.456214f, 687.199878f, 707.806178f, 728.996220f };
+constant float kMeasuredWr[18] = { 0.000529f, 0.007101f, 0.033721f, 0.030599f, -0.030359f, -0.093262f, -0.162158f, -0.159538f, -0.026531f, 0.178962f, 0.361298f, 0.411440f, 0.273844f, 0.122161f, 0.039676f, 0.009625f, 0.002343f, 0.000550f };
+constant float kMeasuredWg[18] = { -0.000454f, -0.006252f, -0.031574f, -0.038082f, 0.006951f, 0.078932f, 0.188159f, 0.287347f, 0.280864f, 0.193717f, 0.077741f, -0.000774f, -0.019332f, -0.011735f, -0.004157f, -0.001039f, -0.000255f, -0.000060f };
+constant float kMeasuredWb[18] = { 0.003187f, 0.044442f, 0.242582f, 0.402608f, 0.299849f, 0.104223f, 0.015906f, -0.023143f, -0.032574f, -0.027481f, -0.016885f, -0.008197f, -0.003133f, -0.001012f, -0.000286f, -0.000066f, -0.000016f, -0.000004f };
+
+inline float3 measuredSpectraToRgb(device const float* g, thread const MeasuredTables& tab, float px, float py, thread float* p) {
+    float r = 0.0f, gr = 0.0f, b = 0.0f;
+    for (int k = 0; k < 18; ++k) {
+        p[2] = kMeasuredLambda[k];
+        const float v = max(0.0f, measuredPL2DEval(g, tab.spec, px, py, p));
+        r += kMeasuredWr[k] * v;
+        gr += kMeasuredWg[k] * v;
+        b += kMeasuredWb[k] * v;
+    }
+    return float3(max(0.0f, r), max(0.0f, gr), max(0.0f, b));
+}
+
 // MeasuredBxDF::f() and pdf() in one function (they share the half vector and the vndf inversion), local shading frame (z = normal).
 // Returns false (f = 0, pdf = 0) for a pair the table gives no reflectance.
 inline bool measuredFPdf(device const float* g, thread const MeasuredTables& tab, float3 wo, float3 wi,
                          thread float3& f, thread float& pdfOut) {
     const float kPi = 3.14159265358979323846f;
-    const float3 lambda = float3(612.0f, 549.0f, 465.0f);   // the CPU's fixed R/G/B query wavelengths (material_pbrt.h kLambdaR/G/B)
     f = float3(0.0f); pdfOut = 0.0f;
     if (wo.z * wi.z <= 0.0f) return false;
     if (wo.z < 0.0f) { wo = -wo; wi = -wi; }
@@ -996,16 +1016,12 @@ inline bool measuredFPdf(device const float* g, thread const MeasuredTables& tab
     float uiX, uiY, uiPdf;
     measuredPL2DInvert(g, tab.vndf, uWmX, uWmY, p, uiX, uiY, uiPdf);
 
-    float val[3];
-    for (int c = 0; c < 3; ++c) {
-        p[2] = lambda[c];
-        val[c] = max(0.0f, measuredPL2DEval(g, tab.spec, uiX, uiY, p));
-    }
+    const float3 val = measuredSpectraToRgb(g, tab, uiX, uiY, p);
     const float ndfVal = measuredPL2DEval(g, tab.ndf, uWmX, uWmY, p);
     const float sigmaVal = measuredPL2DEval(g, tab.sigma, uWoX, uWoY, p);
     const float denom = 4.0f * sigmaVal * fabs(wi.z);
     if (denom == 0.0f) return false;
-    f = float3(val[0], val[1], val[2]) * (ndfVal / denom);
+    f = val * (ndfVal / denom);
 
     p[2] = 0.0f;
     const float lum = measuredPL2DEval(g, tab.lum, uiX, uiY, p);
@@ -1020,7 +1036,6 @@ inline bool measuredFPdf(device const float* g, thread const MeasuredTables& tab
 inline bool measuredSampleF(device const float* g, thread const MeasuredTables& tab, float3 wo, float u0, float u1,
                             thread float3& wiOut, thread float3& weightOut, thread float& pdfOut) {
     const float kPi = 3.14159265358979323846f;
-    const float3 lambda = float3(612.0f, 549.0f, 465.0f);
     weightOut = float3(0.0f); pdfOut = 0.0f;
     const bool flip = wo.z < 0.0f;
     if (flip) wo = -wo;
@@ -1047,11 +1062,7 @@ inline bool measuredSampleF(device const float* g, thread const MeasuredTables& 
     if (wi.z <= 0.0f) return false;
 
     // The spectra are evaluated at the luminance-warped point, as pbrt-v4 Sample_f (and f() via vndf.Invert) do.
-    float val[3];
-    for (int c = 0; c < 3; ++c) {
-        p[2] = lambda[c];
-        val[c] = max(0.0f, measuredPL2DEval(g, tab.spec, lumPx, lumPy, p));
-    }
+    const float3 val = measuredSpectraToRgb(g, tab, lumPx, lumPy, p);
     const float uWoX = sqrt(thetaO * (2.0f / kPi)), uWoY = phiO * (0.5f / kPi) + 0.5f;
     const float ndfVal = measuredPL2DEval(g, tab.ndf, uWmX, uWmY, p);
     const float sigmaVal = measuredPL2DEval(g, tab.sigma, uWoX, uWoY, p);
@@ -1065,7 +1076,7 @@ inline bool measuredSampleF(device const float* g, thread const MeasuredTables& 
     if (finalPdf == 0.0f) return false;
 
     wiOut = flip ? -wi : wi;
-    weightOut = float3(val[0], val[1], val[2]) * (scale * absCosWi / finalPdf);
+    weightOut = val * (scale * absCosWi / finalPdf);
     pdfOut = finalPdf;
     return true;
 }
@@ -1132,7 +1143,7 @@ inline bool shadeMeasured(TriangleMaterial mat, float3 hitPoint, float3 facingNo
                 shadowRay.min_distance = 0.001f;
                 shadowRay.max_distance = dist - 0.002f;
                 reaimShadowRay(shadowRay, hitPoint, dist);
-                if (traceShadowAny(isect, shadowRay, accelStructure, functionTable).type == intersection_type::none) {
+                if (traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat).type == intersection_type::none) {
                     float pdfSolidAngle = (distSq / (ls.area * abs(cosLight))) * ls.pmf;
                     float weight = (pdfSolidAngle * pdfSolidAngle) / (pdfSolidAngle * pdfSolidAngle + pdfBsdf * pdfBsdf);
                     float3 transmittance = fogTransmittance(uniforms, dist);
@@ -1157,7 +1168,7 @@ inline bool shadeMeasured(TriangleMaterial mat, float3 hitPoint, float3 facingNo
                     shadowRay.min_distance = 0.001f;
                     shadowRay.max_distance = pDist - 0.002f;
                     reaimShadowRay(shadowRay, hitPoint, pDist);
-                    if (traceShadowAny(isect, shadowRay, accelStructure, functionTable).type == intersection_type::none) {
+                    if (traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat).type == intersection_type::none) {
                         float spot = spotLightFalloff(-pWi, float3(pl.direction), pl.cosOuterAngle, pl.cosInnerAngle);
                         radiance += throughput * f * float3(pl.emission) * pCos * spot * fogTransmittance(uniforms, pDist) / pDistSq;
                     }
@@ -1177,7 +1188,7 @@ inline bool shadeMeasured(TriangleMaterial mat, float3 hitPoint, float3 facingNo
                     shadowRay.direction = dWi;
                     shadowRay.min_distance = 0.001f;
                     shadowRay.max_distance = kDirectionalLightMaxDistance;
-                    if (traceShadowAny(isect, shadowRay, accelStructure, functionTable).type == intersection_type::none) {
+                    if (traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat).type == intersection_type::none) {
                         float3 dTrans = (uniforms.fogSigmaT > 0.0)
                             ? fogTransmittance(uniforms, rayBoxExitDistance(shadowRay.origin, dWi, kRoomBoundsMin, kRoomBoundsMax))
                             : float3(1.0);
@@ -1206,7 +1217,7 @@ inline bool shadeMeasured(TriangleMaterial mat, float3 hitPoint, float3 facingNo
                     shadowRay.min_distance = 0.001f;
                     shadowRay.max_distance = pDist - 0.002f;
                     reaimShadowRay(shadowRay, hitPoint, pDist);
-                    if (traceShadowAny(isect, shadowRay, accelStructure, functionTable).type == intersection_type::none)
+                    if (traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat).type == intersection_type::none)
                         radiance += throughput * f * pjRadiance * pCos * fogTransmittance(uniforms, pDist) / pDistSq;
                 }
             }
@@ -1231,7 +1242,7 @@ inline bool shadeMeasured(TriangleMaterial mat, float3 hitPoint, float3 facingNo
                     shadowRay.min_distance = 0.001f;
                     shadowRay.max_distance = gDist - 0.002f;
                     reaimShadowRay(shadowRay, hitPoint, gDist);
-                    if (traceShadowAny(isect, shadowRay, accelStructure, functionTable).type == intersection_type::none)
+                    if (traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat).type == intersection_type::none)
                         radiance += throughput * f * glRadiance * gCos * fogTransmittance(uniforms, gDist) / gDistSq;
                 }
             }
@@ -1251,7 +1262,7 @@ inline bool shadeMeasured(TriangleMaterial mat, float3 hitPoint, float3 facingNo
                 shadowRay.direction = envWi;
                 shadowRay.min_distance = 0.001f;
                 shadowRay.max_distance = 1e5f;
-                if (traceShadowAny(isect, shadowRay, accelStructure, functionTable).type == intersection_type::none) {
+                if (traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat).type == intersection_type::none) {
                     float3 envRadiance = earthTexture.sample(textureSampler, envMapUV(envWi)).rgb;
                     float envWeight = (envPdf * envPdf) / (envPdf * envPdf + pdfBsdf * pdfBsdf);
                     radiance += throughput * f * envRadiance * envCos / envPdf * envWeight;
@@ -1271,7 +1282,7 @@ inline bool shadeMeasured(TriangleMaterial mat, float3 hitPoint, float3 facingNo
                 shadowRay.direction = envWi;
                 shadowRay.min_distance = 0.001f;
                 shadowRay.max_distance = 1e5f;
-                if (traceShadowAny(isect, shadowRay, accelStructure, functionTable).type == intersection_type::none) {
+                if (traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat).type == intersection_type::none) {
                     float3 envRadiance = pbrtEnvLeAt(uniforms, pbrtEnvConditionalCDF, pbrtEnvTexture, textureSampler, hitPoint, envWi);
                     float envWeight = (envPdf * envPdf) / (envPdf * envPdf + pdfBsdf * pdfBsdf);
                     radiance += throughput * f * envRadiance * envCos / envPdf * envWeight;

@@ -215,6 +215,8 @@ inline void resolveHit(thread const KernelRes& R, thread PathState& P, thread Bo
         }
     }
     mat.spawnNormal = packed_float3(dot(geometricNormal, rayDir) < 0.0 ? geometricNormal : -geometricNormal);
+    mat.shadowChannel = mediumChan;   // what a shadow ray from here needs of the path: its colour channel through a chromatic medium and the time of its sample
+    mat.rayTime = shutterT;
 }
 
 // Perturbs the shading normal (facingNormal) for the bump-mapped and normal-mapped materials. Also records the material in the census.

@@ -712,6 +712,8 @@ kernel void test_shadeDielectric(
     DielectricTestInput in = inputs[tid];
     TriangleMaterial mat;
     mat.spawnNormal = packed_float3(0.0);
+    mat.shadowChannel = -1;
+    mat.rayTime = 0.0;
     mat.ior = in.ior;
     mat.color = packed_float3(in.absorption);
     float3 rayDir = in.rayDir;
@@ -736,6 +738,8 @@ kernel void test_shadeThinDielectric(
     DielectricTestInput in = inputs[tid];
     TriangleMaterial mat;
     mat.spawnNormal = packed_float3(0.0);
+    mat.shadowChannel = -1;
+    mat.rayTime = 0.0;
     mat.ior = in.ior;
     float3 rayDir = in.rayDir;
     float3 rayOrigin = float3(0.0);
@@ -816,5 +820,19 @@ kernel void test_spawnSide(
 {
     TriangleMaterial mat;
     mat.spawnNormal = packed_float3(geometric[tid]);
+    mat.shadowChannel = -1;
+    mat.rayTime = 0.0;
     outputs[tid] = spawnSide(mat, fallbacks[tid], dirs[tid]);
+}
+
+
+// The measured-BSDF quadrature table of the shader (metal_poc_materials_extra.metal: copies of src/shared/measured_rgb_quadrature.h) read back, to check the copies have not drifted.
+kernel void test_measuredQuadratureTable(
+    device float* outputs [[buffer(0)]],
+    uint tid [[thread_position_in_grid]])
+{
+    outputs[tid * 4 + 0] = kMeasuredLambda[tid];
+    outputs[tid * 4 + 1] = kMeasuredWr[tid];
+    outputs[tid * 4 + 2] = kMeasuredWg[tid];
+    outputs[tid * 4 + 3] = kMeasuredWb[tid];
 }
