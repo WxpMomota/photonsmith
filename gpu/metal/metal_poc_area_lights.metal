@@ -2,6 +2,10 @@
 // Area-light sampling: the LightSample result, image-textured disk / cylinder lights, sphere-light cone sampling, and sampleAreaLight().
 // Split out of metal_poc_sampling.metal (pure code motion) for the code-size limit; concatenated in the order of metal_poc_shader_files.h.
 
+// An AreaLightSource "filename" image is read with CLAMP, not repeat: pbrt's Image::Bilerp clamps its pixel coordinates (an imagemap Texture's default is repeat, which is what the shared
+// textureSampler does). textured-twosided-lights read blue 5% high on Metal with the repeating sampler (its picture's edge blended with the opposite edge).
+constexpr sampler areaLightImageSampler(coord::normalized, address::clamp_to_edge, filter::linear);
+
 // Picks one light from `lights`, power-proportionally (see AreaLight's own
 // `pmf`/`aliasProb`/`aliasIndex` comment - replaces this POC's old uniform
 // 1/lightCount picking), and samples a uniform point on its parallelogram -
@@ -168,7 +172,7 @@ inline LightSample sampleAreaLight(device const AreaLight* lights, uint lightCou
         result.point = float3(light.center) + rr * (cos(ph) * t + sin(ph) * b);
         result.normal = n;
         result.emission = (light.useTexture > 0.0)
-            ? pbrtAreaLightTexture.sample(textureSampler, float2(ph * (0.5 / M_PI_F), rr / max(light.edgeU.x, 1e-6))).rgb * float3(light.emission)
+            ? pbrtAreaLightTexture.sample(areaLightImageSampler, float2(ph * (0.5 / M_PI_F), rr / max(light.edgeU.x, 1e-6))).rgb * float3(light.emission)
             : float3(light.emission);
     } else if (light.kind > 2.5 && light.kind < 3.5) {
         // Cylinder light (pbrt "cylinder", lateral surface only): uniform-area sampling.
@@ -183,7 +187,7 @@ inline LightSample sampleAreaLight(device const AreaLight* lights, uint lightCou
         result.point = float3(light.center) + axis * (light.edgeV.y * u.x) + radial * light.edgeV.x;
         result.normal = radial;
         result.emission = (light.useTexture > 0.0)
-            ? pbrtAreaLightTexture.sample(textureSampler, float2(ph * (0.5 / M_PI_F), 1.0 - u.x)).rgb * float3(light.emission)
+            ? pbrtAreaLightTexture.sample(areaLightImageSampler, float2(ph * (0.5 / M_PI_F), 1.0 - u.x)).rgb * float3(light.emission)
             : float3(light.emission);
     } else if (light.kind > 3.5) {
         // Triangle light (one triangle of a non-quad emissive mesh, e.g. a fan): center =
@@ -205,7 +209,7 @@ inline LightSample sampleAreaLight(device const AreaLight* lights, uint lightCou
         // <= 0.0` (every light before this one) skips this entirely,
         // reproducing flat `light.emission` exactly.
         result.emission = (light.useTexture > 0.0)
-            ? pbrtAreaLightTexture.sample(textureSampler, u).rgb * float3(light.emission)
+            ? pbrtAreaLightTexture.sample(areaLightImageSampler, u).rgb * float3(light.emission)
             : (light.patternScale > 0.0)
                 ? checkerColor(u, light.patternScale, float3(light.emission), float3(light.emission) * light.patternTileB)
                 : float3(light.emission);

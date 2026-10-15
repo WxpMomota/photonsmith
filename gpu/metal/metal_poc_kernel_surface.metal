@@ -624,7 +624,7 @@ inline void addHitEmission(thread const KernelRes& R, thread PathState& P, threa
             if (isDisk && mat.lightId >= 0) texUV = diskLightTexCoord(lights[mat.lightId], hitPoint);
             else if (isCylinder && mat.lightId >= 0) texUV = cylinderLightTexCoord(lights[mat.lightId], hitPoint);
             else texUV = texCoordFor(primId, result.triangle_barycentric_coord, uvs);
-            hitEmission = pbrtAreaLightTexture.sample(textureSampler, texUV).rgb * hitEmission;
+            hitEmission = pbrtAreaLightTexture.sample(areaLightImageSampler, texUV).rgb * hitEmission;
         }
         if (specularBounce || mat.lightId < 0) {
             // No competing NEE sample could have produced this

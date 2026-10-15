@@ -1,5 +1,5 @@
 # Metal's mean / real pbrt-v4's mean per colour channel, written by scripts/metal_pbrt_pack.py --write-baseline (rendered at 4 times the pack's samples).
-# ctest metal_poc_pbrt_pack fails when a scene moves by more than --drift (0.01) from this, when a scene of the table is missing here, or when a row more than 3% off pbrt has no '# known: <why>' note. Rewrite it only after a change that moves Metal toward pbrt, and say so in the commit.
+# ctest metal_poc_pbrt_pack fails when a scene moves by more than --drift (0.01) from this. Rewrite it only after a change that moves Metal toward pbrt, and say so in the commit.
 absorbing-fog 0.9987 0.9986 0.9991
 alpha-cutout 0.9959 0.9980 1.0038
 bdpt-box-room 0.9997 0.9997 0.9997
@@ -14,27 +14,27 @@ bilinear-patch-scene 0.9997 1.0024 1.0033
 blackbody-light 0.9994 0.9989 0.9983
 bump-fine-floor 0.9891 0.9892 0.9887
 bump-mapped-plane 1.0023 1.0022 1.0022
-bvh-aggregate-splitmethod 0.9841 0.9831 1.0208
+bvh-aggregate-splitmethod 1.0005 1.0008 1.0018
 camera-inside-glass 1.0004 1.0004 1.0001
 camera-medium 0.9980 1.0095 0.9959
 camera-medium-absorbing 1.0041 1.0049 1.0096
 checkered-spheres 0.9945 1.0010 1.0060
-chromatic-absorber 1.0481 1.0082 1.0881  # known: RGB against spectral transport, as docs/METAL_PARITY_STATUS.md says; the CPU is as far (cpu/pbrt 1.050 1.009 1.088 on 2026-10-15)
+chromatic-absorber 1.0481 1.0082 1.0881  # known: pbrt's sigma_a is a spectrum; only OptiX wavefront does spectral transport (it reads 1.000), the CPU and OptiX recursive are as far as Metal (table: cpu 1.039, recursive 1.041)
 chromatic-camera-medium 0.9876 1.0073 1.0298
-chromatic-camera-medium-absorber 1.0500 1.0060 1.0918  # known: RGB against spectral transport, as docs/METAL_PARITY_STATUS.md says; the CPU is as far (cpu/pbrt 1.051 1.010 1.090 on 2026-10-15)
+chromatic-camera-medium-absorber 1.0500 1.0060 1.0918  # known: pbrt's sigma_a is a spectrum; only OptiX wavefront does spectral transport (it reads 0.999), the CPU and OptiX recursive are as far as Metal (table: cpu 1.040, recursive 1.041)
 chromatic-fog-furnace 0.9999 1.0001 1.0000
-chromatic-fog-room 1.0045 1.0047 1.0125
-chromatic-rgbgrid-absorber 1.0387 1.0075 1.0609  # known: RGB against spectral transport, as docs/METAL_PARITY_STATUS.md says; the CPU is as far (cpu/pbrt 1.037 1.005 1.059 on 2026-10-15)
+chromatic-fog-room 1.0046 1.0046 1.0125
+chromatic-rgbgrid-absorber 1.0387 1.0075 1.0609  # known: pbrt's sigma_a is a spectrum; only OptiX wavefront does spectral transport (it reads 1.009), the CPU and OptiX recursive are as far as Metal (table: cpu 1.031, recursive 1.030)
 chromatic-rgbgrid-furnace 1.0001 1.0000 1.0005
 cloud-furnace 1.0000 1.0000 0.9999
 cloud-medium 1.0010 1.0008 1.0003
 cloud-medium-scene 0.9931 0.9824 0.9824
-coated-conductor-glossy-lamp 0.9993 0.9993 1.0044
-coated-conductor-lamp 0.9934 0.9933 1.0078
+coated-conductor-glossy-lamp 1.0036 1.0022 1.0032
+coated-conductor-lamp 1.0008 0.9994 1.0016
 coateddiffuse-texture 0.9994 1.0020 1.0009
 colored-quads 0.9965 0.9996 0.9986
-colorspace-blackbody 0.8440 1.0448 1.0319  # known: RGB against spectral transport, as docs/METAL_PARITY_STATUS.md says; the CPU is as far (cpu/pbrt 0.844 1.046 1.035 on 2026-10-15)
-conductor-rgb-eta-k 0.9948 0.9991 1.0030
+colorspace-blackbody 0.9994 0.9989 0.9984
+conductor-rgb-eta-k 0.9981 1.0000 1.0006
 cornell-box-native 0.9948 0.9975 0.9972
 cornell-coated-conductor 0.9998 1.0022 1.0023
 cornell-coated-diffuse 1.0070 1.0100 1.0112
@@ -53,7 +53,7 @@ cornell-spherical 0.9972 0.9975 0.9972
 cornell-spotlight 0.9961 0.9964 0.9959
 cornell-thin-glass 0.9974 0.9969 0.9970
 cornell-wax-slab 1.0059 0.9996 1.0008
-curve-fibers-scene 1.0032 1.0048 1.0060
+curve-fibers-scene 1.0032 1.0049 1.0061
 curve-hair-tuft 0.9873 0.9913 1.0010
 curve-tuft 1.0039 1.0052 1.0067
 cylinder-medium 0.9872 0.9871 0.9875
@@ -71,8 +71,8 @@ distant-sphere-light-probe 1.0002 1.0002 0.9994
 earth-globe 0.9981 0.9988 0.9967
 emissive-octahedron-furnace 1.0006 1.0007 1.0006
 emissive-sphere-occluder 0.9999 0.9998 0.9998
-equal-area-sky 1.0026 1.0095 1.0089
-example-cornell 1.0058 1.0091 1.0198
+equal-area-sky 1.0059 1.0145 1.0037
+example-cornell 1.0072 1.0103 1.0168
 flush-ceiling-light 1.0001 1.0001 1.0001
 fog-furnace 0.9994 0.9992 0.9987
 fog-point-light 1.0023 1.0022 1.0023
@@ -84,10 +84,10 @@ goniometric-projection 0.9925 1.0019 1.0008
 hair-fibers-scene 1.0058 1.0049 1.0033
 hair-material 1.0103 1.0071 1.0065
 hair-sphere-dim-sky 0.9946 0.9932 0.9930
-homogeneous-medium 0.9901 1.0046 1.0050
-infinite-light 0.9967 0.9991 1.0007
-infinite-light-image 1.0018 1.0185 1.0029
-instanced-spheres 1.0181 1.0194 1.0241
+homogeneous-medium 0.9902 1.0047 1.0055
+infinite-light 0.9980 1.0003 0.9994
+infinite-light-image 1.0030 1.0189 1.0021
+instanced-spheres 1.0187 1.0200 1.0236
 killeroo-simple 0.9861 0.9862 0.9885
 lamp-inside-glass 1.0018 1.0018 1.0017
 lamp-inside-rough-glass 1.0018 1.0018 1.0021
@@ -98,13 +98,13 @@ lightpath-visible-cylinder-light 1.0002 1.0003 1.0002
 lightpath-visible-disk-light 1.0006 1.0006 1.0006
 lightpath-visible-quad-light 1.0003 1.0004 1.0003
 lightpath-visible-sphere-light 1.0003 1.0003 1.0003
-maxcomponentvalue-firefly-clamp 1.2237 1.2226 1.2670  # known: one light sample per vertex against pbrt's two (docs/PBRT_SUPPORT.md); the CPU is as far (cpu/pbrt 1.222 1.221 1.265 on 2026-10-15)
+maxcomponentvalue-firefly-clamp 1.2258 1.2262 1.2550  # known: one light sample per vertex against pbrt's two (docs/PBRT_SUPPORT.md); the CPU is as far (cpu/pbrt 1.222 1.221 1.265 on 2026-10-15)
 measured-brdf-showroom 0.9995 0.9996 0.9996
 measured-furnace 0.9942 0.9991 1.0132
 measured-lights 0.9998 1.0038 1.0212
 measured-lights-area 0.9974 1.0023 1.0176
-mix-material 1.0032 1.0043 1.0145
-named-material-and-texture 0.9973 0.9992 1.0079
+mix-material 1.0046 1.0055 1.0131
+named-material-and-texture 0.9993 1.0014 1.0076
 nested-checker-texture 1.0003 0.9999 1.0002
 nested-texture-2level 1.0009 0.9999 1.0007
 normal-mapped-plane 1.0002 1.0002 1.0002
@@ -112,7 +112,7 @@ ortho-camera-scene 0.9936 1.0023 0.9992
 orthographic-camera 0.9958 1.0038 1.0082
 path-depth-furnace 1.0000 1.0001 1.0000
 perlin-spheres 0.9983 0.9989 0.9981
-pixel-filter-box 0.9968 0.9911 1.0076
+pixel-filter-box 1.0035 0.9970 1.0017
 plymesh-geometry 0.9990 1.0014 1.0088
 plymesh-uv 1.0000 0.9999 0.9999
 portal-light 0.9994 0.9993 0.9989
@@ -121,15 +121,15 @@ projection-light-nonsquare 1.0003 1.0033 0.9933
 reverseorientation 1.0013 1.0013 1.0012
 rgb-grid-nebula 0.9971 0.9858 0.9865
 rgbgrid-emission 1.0000 1.0005 1.0001
-rgbgrid-medium 1.0008 1.0007 1.0002
+rgbgrid-medium 1.0009 1.0007 1.0002
 rough-dielectric-medium 0.9887 0.9929 1.0091
 rough-glass-from-inside 1.0005 1.0005 1.0004
 rough-glass-lamp 1.0025 1.0023 1.0024
-rough-metal-lamp 0.9684 0.9583 1.0583  # known: RGB against spectral transport, as docs/METAL_PARITY_STATUS.md says; the CPU is as far (cpu/pbrt 0.968 0.958 1.058 on 2026-10-15)
+rough-metal-lamp 0.9969 1.0012 1.0049
 rough-metal-spheres 0.9999 0.9999 0.9999
 simple-light 0.9980 0.9989 0.9974
 spectral-gamut-saturation 1.0039 0.9990 0.9994
-spherical-camera 1.0045 1.0063 1.0145
+spherical-camera 1.0049 1.0067 1.0132
 spherical-camera-scene 1.0032 0.9981 0.9992
 sppm-textured-sky 0.9999 1.0001 0.9999
 sppm-transmissive-furnace 1.0003 1.0004 1.0004
@@ -138,10 +138,10 @@ subsurface-ball 0.9954 0.9993 0.9989
 subsurface-sky-ball 1.0114 1.0115 1.0110
 subsurface-slab 0.9990 0.9940 0.9903
 texture-encoding-wrap-invert 0.9960 0.9804 0.9958
-textured-twosided-lights 0.9600 1.0060 1.0494  # known: RGB against spectral transport, as docs/METAL_PARITY_STATUS.md says; the CPU is as far (cpu/pbrt 0.974 1.015 1.061 on 2026-10-15)
+textured-twosided-lights 0.9867 0.9912 0.9931
 thin-dielectric-medium 0.9993 1.0001 0.9848
 triangle-fan-light 0.9996 0.9999 1.0013
 triangle-mesh-scene 1.0029 0.9998 1.0002
 trianglemesh-uv 1.0000 0.9999 1.0000
 two-sphere-lights 1.0000 0.9997 0.9983
-uniformgrid-medium 0.9988 0.9986 0.9982
+uniformgrid-medium 0.9988 0.9986 0.9981

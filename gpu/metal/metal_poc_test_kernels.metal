@@ -827,15 +827,17 @@ kernel void test_spawnSide(
 }
 
 
-// The measured-BSDF quadrature table of the shader (metal_poc_materials_extra.metal: copies of src/shared/measured_rgb_quadrature.h) read back, to check the copies have not drifted.
-kernel void test_measuredQuadratureTable(
-    device float* outputs [[buffer(0)]],
+// measuredSpectraToRgb() (metal_poc_materials_extra.metal) direct dispatch: a measured BSDF's colour from the RGB tables of a descriptor at index 0 of `g` (metal_poc_measured_table.h), at q = (px, py, phi_i, theta_i);
+// see testMeasuredSpectraRgb in metal_poc_shader_tests_geometry.mm.
+kernel void test_measuredSpectraRgb(
+    device const float* g [[buffer(0)]],
+    device const float4* q [[buffer(1)]],
+    device float3* outputs [[buffer(2)]],
     uint tid [[thread_position_in_grid]])
 {
-    outputs[tid * 4 + 0] = kMeasuredLambda[tid];
-    outputs[tid * 4 + 1] = kMeasuredWr[tid];
-    outputs[tid * 4 + 2] = kMeasuredWg[tid];
-    outputs[tid * 4 + 3] = kMeasuredWb[tid];
+    const MeasuredTables tab = measuredReadTables(g, 0);
+    float p[3] = {q[tid].z, q[tid].w, 0.0f};
+    outputs[tid] = measuredSpectraToRgb(g, tab, q[tid].x, q[tid].y, p);
 }
 
 // approximateDpDxy() (metal_poc_bump.metal) direct dispatch: pbrt's Approximate_dp_dxy, cross-checked against src/shared/camera_footprint.h (see metal_poc_shader_tests_geometry.mm).
