@@ -31,6 +31,7 @@
 // host-side, from the SAME shared headers CPU/OptiX already use.
 #include "../../src/shared/filter.h"
 #include "../../src/shared/filter_sampler.h"
+#include "../../src/shared/camera_footprint.h"   // pbrt's Approximate_dp_dxy: the camera's smallest pixel differentials
 
 // Every buffer/texture the compute encoder below binds can be nil if its
 // own newBufferWith.../newTextureWithDescriptor call failed - OOM, or a
@@ -346,6 +347,28 @@ bool MetalPocApp::dsCreateRenderTargets(DispatchState& s) {
     return true;
 }
 
+// A decoded linear float RGB image (3 floats per pixel) as an RGBA32Float texture: no sRGB decode, alpha 1. With no image it is a 1x1 black
+// texture, because Metal needs SOME texture at every slot the shader binds; the scene's own use-flag decides whether the shader reads it.
+static id<MTLTexture> rgbFloatTexture(id<MTLDevice> device, bool haveImage, int width, int height, const std::vector<float>& rgb) {
+    const uint32_t w = haveImage ? (uint32_t)width : 1u;
+    const uint32_t h = haveImage ? (uint32_t)height : 1u;
+    MTLTextureDescriptor* desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA32Float width:w height:h mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead;
+    desc.storageMode = MTLStorageModeShared;
+    id<MTLTexture> texture = [device newTextureWithDescriptor:desc];
+    std::vector<float> rgba((size_t)w * h * 4, 0.0f);
+    if (haveImage) {
+        for (size_t i = 0; i < (size_t)w * h; ++i) {
+            rgba[i * 4 + 0] = rgb[i * 3 + 0];
+            rgba[i * 4 + 1] = rgb[i * 3 + 1];
+            rgba[i * 4 + 2] = rgb[i * 3 + 2];
+            rgba[i * 4 + 3] = 1.0f;
+        }
+    }
+    [texture replaceRegion:MTLRegionMake2D(0, 0, w, h) mipmapLevel:0 withBytes:rgba.data() bytesPerRow:(NSUInteger)w * 4 * sizeof(float)];
+    return texture;
+}
+
 // Stage D: Textures: the earth image (and the environment distribution built from it) and the pbrt environment, goniometric, projection, area-light, diffuse and transmit images.
 bool MetalPocApp::dsUploadTextures(DispatchState& s) {
     // --- Earth texture (the back wall's materialType=3 source) -----
@@ -444,155 +467,29 @@ bool MetalPocApp::dsUploadTextures(DispatchState& s) {
     // used slot) when the scene has no image-based infinite light -
     // harmless, since pbrtHasImageEnvLight gates whether the shader
     // ever actually samples it.
-    id<MTLTexture> pbrtEnvTexture = nil;
-    {
-        const uint32_t pw = havePbrtImageEnvLight ? (uint32_t)pbrtEnvImageWidth : 1u;
-        const uint32_t ph = havePbrtImageEnvLight ? (uint32_t)pbrtEnvImageHeight : 1u;
-        MTLTextureDescriptor* pbrtEnvDesc = [MTLTextureDescriptor
-            texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA32Float
-            width:pw height:ph mipmapped:NO];
-        pbrtEnvDesc.usage = MTLTextureUsageShaderRead;
-        pbrtEnvDesc.storageMode = MTLStorageModeShared;
-        pbrtEnvTexture = [device newTextureWithDescriptor:pbrtEnvDesc];
-        std::vector<float> rgba((size_t)pw * ph * 4, 0.0f);
-        if (havePbrtImageEnvLight) {
-            for (size_t i = 0; i < (size_t)pw * ph; ++i) {
-                rgba[i * 4 + 0] = pbrtEnvImagePixels[i * 3 + 0];
-                rgba[i * 4 + 1] = pbrtEnvImagePixels[i * 3 + 1];
-                rgba[i * 4 + 2] = pbrtEnvImagePixels[i * 3 + 2];
-                rgba[i * 4 + 3] = 1.0f;
-            }
-        }
-        [pbrtEnvTexture replaceRegion:MTLRegionMake2D(0, 0, pw, ph) mipmapLevel:0
-            withBytes:rgba.data() bytesPerRow:(NSUInteger)pw * 4 * sizeof(float)];
-    }
+    id<MTLTexture> pbrtEnvTexture = rgbFloatTexture(device, havePbrtImageEnvLight, pbrtEnvImageWidth, pbrtEnvImageHeight, pbrtEnvImagePixels);
 
     // A pbrt-loaded scene's own real per-light goniometric/projection
     // profile images (section 98) - same upload pattern as pbrtEnvTexture
     // above (already-decoded linear float RGB -> RGBA32Float, 1x1 black
     // fallback when there's no such light, harmless since usePbrtTexture
     // gates whether any light actually reads it).
-    id<MTLTexture> pbrtGoniometricTexture = nil;
-    {
-        const uint32_t pw = havePbrtGoniometricImage ? (uint32_t)pbrtGoniometricImageWidth : 1u;
-        const uint32_t ph = havePbrtGoniometricImage ? (uint32_t)pbrtGoniometricImageHeight : 1u;
-        MTLTextureDescriptor* desc = [MTLTextureDescriptor
-            texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA32Float
-            width:pw height:ph mipmapped:NO];
-        desc.usage = MTLTextureUsageShaderRead;
-        desc.storageMode = MTLStorageModeShared;
-        pbrtGoniometricTexture = [device newTextureWithDescriptor:desc];
-        std::vector<float> rgba((size_t)pw * ph * 4, 0.0f);
-        if (havePbrtGoniometricImage) {
-            for (size_t i = 0; i < (size_t)pw * ph; ++i) {
-                rgba[i * 4 + 0] = pbrtGoniometricImagePixels[i * 3 + 0];
-                rgba[i * 4 + 1] = pbrtGoniometricImagePixels[i * 3 + 1];
-                rgba[i * 4 + 2] = pbrtGoniometricImagePixels[i * 3 + 2];
-                rgba[i * 4 + 3] = 1.0f;
-            }
-        }
-        [pbrtGoniometricTexture replaceRegion:MTLRegionMake2D(0, 0, pw, ph) mipmapLevel:0
-            withBytes:rgba.data() bytesPerRow:(NSUInteger)pw * 4 * sizeof(float)];
-    }
+    id<MTLTexture> pbrtGoniometricTexture = rgbFloatTexture(device, havePbrtGoniometricImage, pbrtGoniometricImageWidth, pbrtGoniometricImageHeight, pbrtGoniometricImagePixels);
 
-    id<MTLTexture> pbrtProjectionTexture = nil;
-    {
-        const uint32_t pw = havePbrtProjectionImage ? (uint32_t)pbrtProjectionImageWidth : 1u;
-        const uint32_t ph = havePbrtProjectionImage ? (uint32_t)pbrtProjectionImageHeight : 1u;
-        MTLTextureDescriptor* desc = [MTLTextureDescriptor
-            texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA32Float
-            width:pw height:ph mipmapped:NO];
-        desc.usage = MTLTextureUsageShaderRead;
-        desc.storageMode = MTLStorageModeShared;
-        pbrtProjectionTexture = [device newTextureWithDescriptor:desc];
-        std::vector<float> rgba((size_t)pw * ph * 4, 0.0f);
-        if (havePbrtProjectionImage) {
-            for (size_t i = 0; i < (size_t)pw * ph; ++i) {
-                rgba[i * 4 + 0] = pbrtProjectionImagePixels[i * 3 + 0];
-                rgba[i * 4 + 1] = pbrtProjectionImagePixels[i * 3 + 1];
-                rgba[i * 4 + 2] = pbrtProjectionImagePixels[i * 3 + 2];
-                rgba[i * 4 + 3] = 1.0f;
-            }
-        }
-        [pbrtProjectionTexture replaceRegion:MTLRegionMake2D(0, 0, pw, ph) mipmapLevel:0
-            withBytes:rgba.data() bytesPerRow:(NSUInteger)pw * 4 * sizeof(float)];
-    }
+    id<MTLTexture> pbrtProjectionTexture = rgbFloatTexture(device, havePbrtProjectionImage, pbrtProjectionImageWidth, pbrtProjectionImageHeight, pbrtProjectionImagePixels);
 
     // A pbrt-loaded scene's own image-based AreaLightSource (section
     // 105) - same upload pattern as pbrtGoniometricTexture/
     // pbrtProjectionTexture above.
-    id<MTLTexture> pbrtAreaLightTexture = nil;
-    {
-        const uint32_t pw = havePbrtAreaLightImage ? (uint32_t)pbrtAreaLightImageWidth : 1u;
-        const uint32_t ph = havePbrtAreaLightImage ? (uint32_t)pbrtAreaLightImageHeight : 1u;
-        MTLTextureDescriptor* desc = [MTLTextureDescriptor
-            texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA32Float
-            width:pw height:ph mipmapped:NO];
-        desc.usage = MTLTextureUsageShaderRead;
-        desc.storageMode = MTLStorageModeShared;
-        pbrtAreaLightTexture = [device newTextureWithDescriptor:desc];
-        std::vector<float> rgba((size_t)pw * ph * 4, 0.0f);
-        if (havePbrtAreaLightImage) {
-            for (size_t i = 0; i < (size_t)pw * ph; ++i) {
-                rgba[i * 4 + 0] = pbrtAreaLightImagePixels[i * 3 + 0];
-                rgba[i * 4 + 1] = pbrtAreaLightImagePixels[i * 3 + 1];
-                rgba[i * 4 + 2] = pbrtAreaLightImagePixels[i * 3 + 2];
-                rgba[i * 4 + 3] = 1.0f;
-            }
-        }
-        [pbrtAreaLightTexture replaceRegion:MTLRegionMake2D(0, 0, pw, ph) mipmapLevel:0
-            withBytes:rgba.data() bytesPerRow:(NSUInteger)pw * 4 * sizeof(float)];
-    }
+    id<MTLTexture> pbrtAreaLightTexture = rgbFloatTexture(device, havePbrtAreaLightImage, pbrtAreaLightImageWidth, pbrtAreaLightImageHeight, pbrtAreaLightImagePixels);
 
     // A pbrt-loaded Diffuse/CoatedDiffuse material's own real imagemap-
     // bound "texture reflectance" (F5/F9, section 166) - same upload
     // pattern as pbrtAreaLightTexture/pbrtGoniometricTexture above.
-    id<MTLTexture> pbrtDiffuseTexture = nil;
-    {
-        const uint32_t pw = havePbrtDiffuseImage ? (uint32_t)pbrtDiffuseImageWidth : 1u;
-        const uint32_t ph = havePbrtDiffuseImage ? (uint32_t)pbrtDiffuseImageHeight : 1u;
-        MTLTextureDescriptor* desc = [MTLTextureDescriptor
-            texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA32Float
-            width:pw height:ph mipmapped:NO];
-        desc.usage = MTLTextureUsageShaderRead;
-        desc.storageMode = MTLStorageModeShared;
-        pbrtDiffuseTexture = [device newTextureWithDescriptor:desc];
-        std::vector<float> rgba((size_t)pw * ph * 4, 0.0f);
-        if (havePbrtDiffuseImage) {
-            for (size_t i = 0; i < (size_t)pw * ph; ++i) {
-                rgba[i * 4 + 0] = pbrtDiffuseImagePixels[i * 3 + 0];
-                rgba[i * 4 + 1] = pbrtDiffuseImagePixels[i * 3 + 1];
-                rgba[i * 4 + 2] = pbrtDiffuseImagePixels[i * 3 + 2];
-                rgba[i * 4 + 3] = 1.0f;
-            }
-        }
-        [pbrtDiffuseTexture replaceRegion:MTLRegionMake2D(0, 0, pw, ph) mipmapLevel:0
-            withBytes:rgba.data() bytesPerRow:(NSUInteger)pw * 4 * sizeof(float)];
-    }
+    id<MTLTexture> pbrtDiffuseTexture = rgbFloatTexture(device, havePbrtDiffuseImage, pbrtDiffuseImageWidth, pbrtDiffuseImageHeight, pbrtDiffuseImagePixels);
 
     // Second image slot (see MetalPocApp::havePbrtTransmitImage): a DiffuseTransmission material's transmittance image.
-    id<MTLTexture> pbrtTransmitTexture = nil;
-    {
-        const uint32_t tw = havePbrtTransmitImage ? (uint32_t)pbrtTransmitImageWidth : 1u;
-        const uint32_t th = havePbrtTransmitImage ? (uint32_t)pbrtTransmitImageHeight : 1u;
-        MTLTextureDescriptor* tdesc = [MTLTextureDescriptor
-            texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA32Float
-            width:tw height:th mipmapped:NO];
-        tdesc.usage = MTLTextureUsageShaderRead;
-        tdesc.storageMode = MTLStorageModeShared;
-        pbrtTransmitTexture = [device newTextureWithDescriptor:tdesc];
-        std::vector<float> trgba((size_t)tw * th * 4, 0.0f);
-        if (havePbrtTransmitImage) {
-            for (size_t i = 0; i < (size_t)tw * th; ++i) {
-                trgba[i * 4 + 0] = pbrtTransmitImagePixels[i * 3 + 0];
-                trgba[i * 4 + 1] = pbrtTransmitImagePixels[i * 3 + 1];
-                trgba[i * 4 + 2] = pbrtTransmitImagePixels[i * 3 + 2];
-                trgba[i * 4 + 3] = 1.0f;
-            }
-        }
-        [pbrtTransmitTexture replaceRegion:MTLRegionMake2D(0, 0, tw, th) mipmapLevel:0
-            withBytes:trgba.data() bytesPerRow:(NSUInteger)tw * 4 * sizeof(float)];
-    }
+    id<MTLTexture> pbrtTransmitTexture = rgbFloatTexture(device, havePbrtTransmitImage, pbrtTransmitImageWidth, pbrtTransmitImageHeight, pbrtTransmitImagePixels);
     s.earthTexture = earthTexture;
     s.pbrtEnvTexture = pbrtEnvTexture;
     s.pbrtGoniometricTexture = pbrtGoniometricTexture;
@@ -649,7 +546,7 @@ bool MetalPocApp::dsUploadSamplingTables(DispatchState& s) {
     id<MTLBuffer> pbrtEnvMarginalCDFBuffer;
     id<MTLBuffer> pbrtEnvConditionalCDFBuffer;
     if (havePbrtPortalLight) {
-        // Portal light (see metal_poc_sampling.metal, portalSampleLi): the distribution's cell values then its summed-area table in the "marginal"
+        // Portal light (see metal_poc_environment.metal, portalSampleLi): the distribution's cell values then its summed-area table in the "marginal"
         // slot, the rectified RGB image in the "conditional" slot. The shader's plain-environment sites read these buffers through
         // pbrtEnvSampleDirection()/pbrtEnvLeAt()/pbrtEnvPdfAt(), which switch on Uniforms::pbrtHasPortalLight.
         std::vector<float> distAndSat(pbrtPortalDistFunc);
@@ -700,6 +597,220 @@ bool MetalPocApp::dsUploadSamplingTables(DispatchState& s) {
     s.ggxEnergyTable = ggxEnergyTable;
     s.ggxEnergyTableBuffer = ggxEnergyTableBuffer;
     return true;
+}
+
+// A loaded pbrt scene's camera: placement, lens, orbit motion blur, realistic lens, shutter velocity, and the glass medium the camera may sit inside.
+void MetalPocApp::applyPbrtCameraUniforms(Uniforms& uniforms) {
+    uniforms.cameraPos = PackedFloat3{pbrtCameraPos.x, pbrtCameraPos.y, pbrtCameraPos.z};
+    // A glass sphere bounding a medium that CONTAINS the camera (A9's radius-5000 world haze): paths start inside its medium. The outermost
+    // such sphere wins (a smaller one nested inside is entered and left by refraction as usual).
+    uniforms.cameraGlassPrim = 0;   // 1 + the sphere index, 0 = none
+    {
+        float bestRadius = 0.0f;
+        for (size_t si = 0; si < spheres.size() && si < sphereMaterials.size(); ++si) {
+            const TriangleMaterial& sm = sphereMaterials[si];
+            const bool glassMedium = (sm.materialType == METAL_MAT_DIELECTRIC || sm.materialType == METAL_MAT_ROUGH_DIELECTRIC || sm.materialType == METAL_MAT_THIN_DIELECTRIC) && sm.conductorK.y > 0.5f;
+            if (!glassMedium) continue;
+            const float dx = pbrtCameraPos.x - spheres[si].center.x, dy = pbrtCameraPos.y - spheres[si].center.y, dz = pbrtCameraPos.z - spheres[si].center.z;
+            if (dx * dx + dy * dy + dz * dz < spheres[si].radius * spheres[si].radius && spheres[si].radius > bestRadius) {
+                bestRadius = spheres[si].radius;
+                uniforms.cameraGlassPrim = (int32_t)si + 1;
+            }
+        }
+    }
+    uniforms.cameraForward = PackedFloat3{pbrtCameraForward.x, pbrtCameraForward.y, pbrtCameraForward.z};
+    uniforms.cameraRight = PackedFloat3{pbrtCameraRight.x, pbrtCameraRight.y, pbrtCameraRight.z};
+    uniforms.cameraUp = PackedFloat3{pbrtCameraUp.x, pbrtCameraUp.y, pbrtCameraUp.z};
+    uniforms.tanHalfFov = pbrtTanHalfFov;
+    // D13 (section 174): real orbit-style camera motion blur, gated
+    // on the scene's own sceneCameraVelocity actually being nonzero
+    // (every other scene leaves it at its own {0,0,0} default, so
+    // this is 0/false for all of them - a provable no-op). Always
+    // copies pbrtCameraLookAtWorld/pbrtCameraUpRaw regardless -
+    // both already exist for applyCameraOverride()'s own sake, and
+    // are simply unread by the shader whenever hasCameraOrbitBlur
+    // is 0.
+    uniforms.cameraLookAtBlur = PackedFloat3{pbrtCameraLookAtWorld.x, pbrtCameraLookAtWorld.y, pbrtCameraLookAtWorld.z};
+    uniforms.cameraUpRawBlur = PackedFloat3{pbrtCameraUpRaw.x, pbrtCameraUpRaw.y, pbrtCameraUpRaw.z};
+    uniforms.hasCameraOrbitBlur = (sceneCameraVelocity.x != 0.0f || sceneCameraVelocity.y != 0.0f ||
+                                    sceneCameraVelocity.z != 0.0f) ? 1u : 0u;
+    // pbrt v1 still doesn't read a pbrt FILE's own "float lensradius"/
+    // "float focaldistance" Camera parameters (a genuinely separate,
+    // still-open gap) - but a hand-authored scene (D5, section 137)
+    // has no pbrt file to parse from at all, so its own
+    // pbrtLensRadius/pbrtFocusDistance (defaulting to 0/1, "no DOF" -
+    // every scene before D5) are read directly here instead.
+    // focusDistance is unread by the shader whenever lensRadius == 0.
+    uniforms.lensRadius = pbrtLensRadius;
+    uniforms.focusDistance = pbrtFocusDistance;
+    // See MetalPocApp::havePbrtOrthographic's own comment - reuses
+    // pbrtTanHalfFov (already copied to uniforms.tanHalfFov above)
+    // as the orthographic screen window's own half-extent.
+    uniforms.cameraOrthographic = havePbrtOrthographic ? 1u : 0u;
+    // See MetalPocApp::havePbrtSpherical's own comment.
+    uniforms.cameraSpherical = havePbrtSpherical ? 1u : 0u;
+    // See MetalPocApp::havePbrtSphericalEqualArea's own comment.
+    uniforms.sphericalMappingEqualArea = havePbrtSphericalEqualArea ? 1u : 0u;
+    // See MetalPocApp::havePbrtRealisticCamera's own comment.
+    uniforms.cameraRealistic = havePbrtRealisticCamera ? 1u : 0u;
+    uniforms.numLensElements = (uint32_t)realisticLensElements.size();
+    uniforms.numExitPupilBounds = (uint32_t)realisticExitPupilBounds.size();
+    uniforms.filmHalfX = realisticFilmHalfX;
+    uniforms.filmHalfY = realisticFilmHalfY;
+    uniforms.lensRearZ = realisticLensRearZ;
+    // Adaptive sampling (enabled by default just above,
+    // uniforms.adaptiveSampling=1) OFF for a real multi-element-lens
+    // camera - a real, found-by-rendering bug, not a style choice.
+    // Its convergence test (metal_poc.metal's own shading-loop
+    // comment) checks standardError/mean against a fixed threshold,
+    // which assumes a roughly UNIMODAL per-sample radiance
+    // distribution (true for every earlier camera mode's own noise,
+    // which is why the heuristic was tuned/validated against those).
+    // A real lens's own per-sample radiance is instead strongly
+    // BIMODAL: most exit-pupil samples land outside the true
+    // (non-rectangular) aperture and get vignetted to EXACTLY 0
+    // (sampleRealisticCameraRay's own comment), while the rest carry
+    // the entire `cameraWeight`-scaled contribution. Many exact
+    // zeros pull the running mean/variance down together, so the
+    // ratio can cross the threshold after just a handful of samples
+    // even though the NONZERO tail is still wildly undersampled -
+    // confirmed empirically: with adaptive sampling on, a 3000spp
+    // D4 render finished in ~4s (barely slower than 100spp) and was
+    // JUST as speckled; forcing every sample through to the full
+    // requested budget (this override) made that same 3000spp
+    // render converge to a clean, smooth image. The visible
+    // "speckle" itself is this per-pixel undersampling residual,
+    // amplified into colour fringing by postProcessAndWrite()'s own
+    // always-on chromatic aberration (a small, fixed per-channel
+    // pixel-space shift - invisible on an already-smooth image, but
+    // it visibly decorrelates R/G/B on a noisy one).
+    if (havePbrtRealisticCamera) uniforms.adaptiveSampling = 0u;
+    // D13 (section 174): reads the scene's own sceneCameraVelocity
+    // instead of unconditionally zeroing this out - see that
+    // member's own comment. {0,0,0} (every scene but D13) is an
+    // exact no-op, identical to this line's own previous literal.
+    uniforms.cameraVelocity = sceneCameraVelocity;
+}
+
+// The scene's participating medium around the camera (fog), and whether any medium sphere or tube is chromatic.
+void MetalPocApp::applyPbrtMediumUniforms(Uniforms& uniforms) {
+    // bit 1 (value 2): some medium sphere or tube has a different extinction per colour channel, so every path fixes its hero channel at the camera (see fogChromatic)
+    uint32_t chromaticShapeMedium = 0u;
+    for (const TriangleMaterial& sm : sphereMaterials)
+        if (sm.materialType == METAL_MAT_MEDIUM_HOMOGENEOUS && sm.conductorK.z > 0.5f) chromaticShapeMedium = 2u;
+    for (const TriangleMaterial& cm : cylinderMaterials)
+        if (cm.materialType == METAL_MAT_MEDIUM_HOMOGENEOUS && cm.conductorK.z > 0.5f) chromaticShapeMedium = 2u;
+    uniforms.fogChromatic = chromaticShapeMedium;
+    if (havePbrtMedium) {
+        uniforms.fogSigmaT = pbrtFogSigmaT;
+        uniforms.fogSigmaT3 = PackedFloat3{pbrtFogSigmaT3.x, pbrtFogSigmaT3.y, pbrtFogSigmaT3.z};
+        uniforms.fogChromatic = chromaticShapeMedium | (pbrtFogChromatic ? 1u : 0u);
+        uniforms.fogAlbedo = PackedFloat3{pbrtFogAlbedo.x, pbrtFogAlbedo.y, pbrtFogAlbedo.z};
+        uniforms.fogAsymmetryG = pbrtFogAsymmetryG;
+    } else {
+        uniforms.fogSigmaT = 0.0f;                      // no participating medium in this scene
+    }
+}
+
+// The miss-ray background: none (black), a constant light, an image light or a portal light.
+void MetalPocApp::applyPbrtSkyUniforms(Uniforms& uniforms) {
+    uniforms.useEnvironmentMap = 0u;                    // this scene's own sky, if any, replaces the hardcoded room's earthTexture-based one below
+    // See Uniforms::isPbrtScene's own comment (metal_poc_types.metal)
+    // - a real pbrt scene with no infinite light gets a BLACK
+    // miss-path background, not the hardcoded room's own sky
+    // gradient. Deliberately `!pbrtScenePath.empty()`, NOT the
+    // broader `havePbrtCamera` this whole block is already gated
+    // on - havePbrtCamera is true for every HAND-AUTHORED scene's
+    // own camera setup too (buildCornellBoxA1() and nearly every
+    // other builder set it), not just a genuinely loaded pbrt FILE.
+    // A first version of this fix used havePbrtCamera directly and
+    // made A1/G1/every other hand-authored scene's own background
+    // incorrectly black too (caught by this PR's own before/after
+    // hash sweep across EVERY scene, not just the pbrt-file ones
+    // this fix was meant for - exactly the discipline that check
+    // exists to catch).
+    uniforms.isPbrtScene = pbrtScenePath.empty() ? 0u : 1u;
+    if (havePbrtConstantEnvLight) {
+        uniforms.pbrtHasConstantEnvLight = 1u;
+        uniforms.pbrtEnvColor = PackedFloat3{pbrtEnvColor.x, pbrtEnvColor.y, pbrtEnvColor.z};
+    } else if (havePbrtImageEnvLight) {
+        uniforms.pbrtHasImageEnvLight = 1u;
+    } else if (havePbrtPortalLight) {
+        // The miss path and every environment-NEE site are gated on pbrtHasImageEnvLight / pbrtEnvMapWidth; the portal switch is below them.
+        uniforms.pbrtHasImageEnvLight = 1u;
+        uniforms.pbrtHasPortalLight = 1u;
+        uniforms.pbrtPortalWidth = (uint32_t)pbrtPortalWidth;
+        uniforms.pbrtPortalHeight = (uint32_t)pbrtPortalHeight;
+        uniforms.pbrtPortalScale = pbrtPortalScale;
+        uniforms.portalFrameX = PackedFloat3{pbrtPortalFrameX.x, pbrtPortalFrameX.y, pbrtPortalFrameX.z};
+        uniforms.portalFrameY = PackedFloat3{pbrtPortalFrameY.x, pbrtPortalFrameY.y, pbrtPortalFrameY.z};
+        uniforms.portalFrameZ = PackedFloat3{pbrtPortalFrameZ.x, pbrtPortalFrameZ.y, pbrtPortalFrameZ.z};
+        uniforms.portalP0 = PackedFloat3{pbrtPortalP0.x, pbrtPortalP0.y, pbrtPortalP0.z};
+        uniforms.portalP2 = PackedFloat3{pbrtPortalP2.x, pbrtPortalP2.y, pbrtPortalP2.z};
+    }
+}
+
+// The film's own pixel filter.
+void MetalPocApp::applyPbrtFilterUniforms(Uniforms& uniforms) {
+    // Film's own PixelFilter - see MetalPocApp::pbrtFilterKind's own
+    // comment. Same int mapping gpu/optix/scene_builder.cpp uses for
+    // its own identical GpuCameraParams::filterKind wiring.
+    uniforms.filterKind = (pbrtFilterKind == "box") ? 1u
+        : (pbrtFilterKind == "triangle") ? 2u
+        : (pbrtFilterKind == "mitchell") ? 3u
+        : (pbrtFilterKind == "sinc") ? 4u
+        : 0u;  // "gaussian", or any unrecognized kind (pbrt_flatten's own parser already rejects those at load time)
+    uniforms.filterB = pbrtFilterB;
+    uniforms.filterC = pbrtFilterC;
+    uniforms.filterSigma = pbrtFilterSigma;
+    uniforms.filterTau = pbrtFilterTau;
+    uniforms.filterRadius = pbrtFilterRadius;
+}
+
+// The pixel filter's sampling table (a FilterSampler<float, 32>), copied into the Uniforms.
+void MetalPocApp::fillFilterSamplerTable(Uniforms& uniforms) {
+    // uniforms.filterKind/B/C/sigma/tau/radius are now final (either the
+    // pbrt override just above, or this struct's own in-class defaults -
+    // gaussian, radius 1.5 - for a HAND-AUTHORED scene, which never
+    // enters the havePbrtCamera block above at all). Build this scene's
+    // own FilterSampler<float,32> table and copy it into the Uniforms
+    // struct itself - see that struct's own filterConditionalCDF comment
+    // for why a separate kernel buffer isn't used here. A fresh build
+    // every render (not cached across Live-Preview-style repeated calls,
+    // unlike gpu/optix/optix_renderer_render.cpp's own cached version) -
+    // this POC's own compileShaderAndDispatch() already runs once per
+    // process invocation, never in a tight per-frame loop, so there is
+    // no repeated-rebuild cost to amortize here.
+    {
+        static const char* const kFilterKindNames[] = { "gaussian", "box", "triangle", "mitchell", "sinc" };
+        const uint32_t kind = (uniforms.filterKind <= 4u) ? uniforms.filterKind : 0u;
+        const PixelFilterDispatch dispatch(kFilterKindNames[kind], uniforms.filterRadius,
+                                            uniforms.filterB, uniforms.filterC,
+                                            uniforms.filterSigma, uniforms.filterTau);
+        const FilterSampler<float, 32> sampler(dispatch);
+        uniforms.filterIntegral = sampler.integral();
+        memcpy(uniforms.filterConditionalCDF, &sampler.conditionalCDF(), sizeof(uniforms.filterConditionalCDF));
+        memcpy(uniforms.filterMarginalCDF, &sampler.marginalCDF(), sizeof(uniforms.filterMarginalCDF));
+    }
+}
+
+// pbrt's Approximate_dp_dxy for a bounced hit (bumpFootprintApprox() in metal_poc_bump.metal): the camera's smallest pixel differentials, found once here the way
+// pbrt's CameraBase::FindMinimumDifferentials does. Only a plain perspective camera has them (the others' primary rays carry no differentials either).
+void MetalPocApp::fillFootprintCameraUniforms(Uniforms& uniforms) {
+    uniforms.footprintValid = 0;
+    if (uniforms.cameraOrthographic != 0u || uniforms.cameraSpherical != 0u || uniforms.cameraRealistic != 0u || uniforms.hasCameraOrbitBlur != 0u) return;
+    if (uniforms.width == 0 || uniforms.height == 0) return;
+    using namespace camera_footprint;
+    const auto v = [](const PackedFloat3& a) { return make(a.x, a.y, a.z); };
+    const double halfH = uniforms.tanHalfFov, halfW = uniforms.tanHalfFov * uniforms.aspect;   // the viewport at distance 1 along forward
+    const V3 origin = v(uniforms.cameraPos), right = unit(v(uniforms.cameraRight)), up = unit(v(uniforms.cameraUp)), fwd = unit(v(uniforms.cameraForward));
+    const V3 du = right * (2.0 * halfW / uniforms.width), dv = up * (-2.0 * halfH / uniforms.height);
+    const V3 pixel00 = origin + fwd + up * halfH - right * halfW + du * 0.5 + dv * 0.5;
+    const Camera cam = makeCamera(origin, pixel00, du, dv, (int)uniforms.width, (int)uniforms.height, 1);
+    if (!cam.valid) return;
+    uniforms.footprintMinDirX = PackedFloat3{(float)cam.minDirX.x, (float)cam.minDirX.y, (float)cam.minDirX.z};
+    uniforms.footprintMinDirY = PackedFloat3{(float)cam.minDirY.x, (float)cam.minDirY.y, (float)cam.minDirY.z};
+    uniforms.footprintValid = 1;
 }
 
 // Stage E: Fills the Uniforms (camera, lights, media, filter, options) and uploads them.
@@ -804,190 +915,13 @@ bool MetalPocApp::dsFillUniforms(DispatchState& s, int argc, const char** argv) 
     if (const char* regenEnv = getenv("METAL_REGEN")) uniforms.pathRegen = atoi(regenEnv) ? 1u : 0u;   // tuning/diagnostics
 
     if (havePbrtCamera) {
-        // A real pbrt scene was loaded (loadPbrtScene()) - override every
-        // scale/placement-dependent field the defaults above assumed,
-        // all tuned for the hardcoded room's own [-1,1] scale, not a
-        // real pbrt scene's own (often much larger - e.g. a ~500-unit
-        // classic Cornell box) world scale. fogSigmaT=0.05 alone would
-        // otherwise make an 800-unit sightline read as solid black
-        // (exp(-0.05*800) ~ 0) - not a subtle atmospheric tweak, a
-        // completely broken render.
-        uniforms.cameraPos = PackedFloat3{pbrtCameraPos.x, pbrtCameraPos.y, pbrtCameraPos.z};
-        // A glass sphere bounding a medium that CONTAINS the camera (A9's radius-5000 world haze): paths start inside its medium. The outermost
-        // such sphere wins (a smaller one nested inside is entered and left by refraction as usual).
-        uniforms.cameraGlassPrim = 0;   // 1 + the sphere index, 0 = none
-        {
-            float bestRadius = 0.0f;
-            for (size_t si = 0; si < spheres.size() && si < sphereMaterials.size(); ++si) {
-                const TriangleMaterial& sm = sphereMaterials[si];
-                const bool glassMedium = (sm.materialType == METAL_MAT_DIELECTRIC || sm.materialType == METAL_MAT_ROUGH_DIELECTRIC || sm.materialType == METAL_MAT_THIN_DIELECTRIC) && sm.conductorK.y > 0.5f;
-                if (!glassMedium) continue;
-                const float dx = pbrtCameraPos.x - spheres[si].center.x, dy = pbrtCameraPos.y - spheres[si].center.y, dz = pbrtCameraPos.z - spheres[si].center.z;
-                if (dx * dx + dy * dy + dz * dz < spheres[si].radius * spheres[si].radius && spheres[si].radius > bestRadius) {
-                    bestRadius = spheres[si].radius;
-                    uniforms.cameraGlassPrim = (int32_t)si + 1;
-                }
-            }
-        }
-        uniforms.cameraForward = PackedFloat3{pbrtCameraForward.x, pbrtCameraForward.y, pbrtCameraForward.z};
-        uniforms.cameraRight = PackedFloat3{pbrtCameraRight.x, pbrtCameraRight.y, pbrtCameraRight.z};
-        uniforms.cameraUp = PackedFloat3{pbrtCameraUp.x, pbrtCameraUp.y, pbrtCameraUp.z};
-        uniforms.tanHalfFov = pbrtTanHalfFov;
-        // D13 (section 174): real orbit-style camera motion blur, gated
-        // on the scene's own sceneCameraVelocity actually being nonzero
-        // (every other scene leaves it at its own {0,0,0} default, so
-        // this is 0/false for all of them - a provable no-op). Always
-        // copies pbrtCameraLookAtWorld/pbrtCameraUpRaw regardless -
-        // both already exist for applyCameraOverride()'s own sake, and
-        // are simply unread by the shader whenever hasCameraOrbitBlur
-        // is 0.
-        uniforms.cameraLookAtBlur = PackedFloat3{pbrtCameraLookAtWorld.x, pbrtCameraLookAtWorld.y, pbrtCameraLookAtWorld.z};
-        uniforms.cameraUpRawBlur = PackedFloat3{pbrtCameraUpRaw.x, pbrtCameraUpRaw.y, pbrtCameraUpRaw.z};
-        uniforms.hasCameraOrbitBlur = (sceneCameraVelocity.x != 0.0f || sceneCameraVelocity.y != 0.0f ||
-                                        sceneCameraVelocity.z != 0.0f) ? 1u : 0u;
-        // pbrt v1 still doesn't read a pbrt FILE's own "float lensradius"/
-        // "float focaldistance" Camera parameters (a genuinely separate,
-        // still-open gap) - but a hand-authored scene (D5, section 137)
-        // has no pbrt file to parse from at all, so its own
-        // pbrtLensRadius/pbrtFocusDistance (defaulting to 0/1, "no DOF" -
-        // every scene before D5) are read directly here instead.
-        // focusDistance is unread by the shader whenever lensRadius == 0.
-        uniforms.lensRadius = pbrtLensRadius;
-        uniforms.focusDistance = pbrtFocusDistance;
-        // See MetalPocApp::havePbrtOrthographic's own comment - reuses
-        // pbrtTanHalfFov (already copied to uniforms.tanHalfFov above)
-        // as the orthographic screen window's own half-extent.
-        uniforms.cameraOrthographic = havePbrtOrthographic ? 1u : 0u;
-        // See MetalPocApp::havePbrtSpherical's own comment.
-        uniforms.cameraSpherical = havePbrtSpherical ? 1u : 0u;
-        // See MetalPocApp::havePbrtSphericalEqualArea's own comment.
-        uniforms.sphericalMappingEqualArea = havePbrtSphericalEqualArea ? 1u : 0u;
-        // See MetalPocApp::havePbrtRealisticCamera's own comment.
-        uniforms.cameraRealistic = havePbrtRealisticCamera ? 1u : 0u;
-        uniforms.numLensElements = (uint32_t)realisticLensElements.size();
-        uniforms.numExitPupilBounds = (uint32_t)realisticExitPupilBounds.size();
-        uniforms.filmHalfX = realisticFilmHalfX;
-        uniforms.filmHalfY = realisticFilmHalfY;
-        uniforms.lensRearZ = realisticLensRearZ;
-        // Adaptive sampling (enabled by default just above,
-        // uniforms.adaptiveSampling=1) OFF for a real multi-element-lens
-        // camera - a real, found-by-rendering bug, not a style choice.
-        // Its convergence test (metal_poc.metal's own shading-loop
-        // comment) checks standardError/mean against a fixed threshold,
-        // which assumes a roughly UNIMODAL per-sample radiance
-        // distribution (true for every earlier camera mode's own noise,
-        // which is why the heuristic was tuned/validated against those).
-        // A real lens's own per-sample radiance is instead strongly
-        // BIMODAL: most exit-pupil samples land outside the true
-        // (non-rectangular) aperture and get vignetted to EXACTLY 0
-        // (sampleRealisticCameraRay's own comment), while the rest carry
-        // the entire `cameraWeight`-scaled contribution. Many exact
-        // zeros pull the running mean/variance down together, so the
-        // ratio can cross the threshold after just a handful of samples
-        // even though the NONZERO tail is still wildly undersampled -
-        // confirmed empirically: with adaptive sampling on, a 3000spp
-        // D4 render finished in ~4s (barely slower than 100spp) and was
-        // JUST as speckled; forcing every sample through to the full
-        // requested budget (this override) made that same 3000spp
-        // render converge to a clean, smooth image. The visible
-        // "speckle" itself is this per-pixel undersampling residual,
-        // amplified into colour fringing by postProcessAndWrite()'s own
-        // always-on chromatic aberration (a small, fixed per-channel
-        // pixel-space shift - invisible on an already-smooth image, but
-        // it visibly decorrelates R/G/B on a noisy one).
-        if (havePbrtRealisticCamera) uniforms.adaptiveSampling = 0u;
-        // D13 (section 174): reads the scene's own sceneCameraVelocity
-        // instead of unconditionally zeroing this out - see that
-        // member's own comment. {0,0,0} (every scene but D13) is an
-        // exact no-op, identical to this line's own previous literal.
-        uniforms.cameraVelocity = sceneCameraVelocity;
-        // bit 1 (value 2): some medium sphere or tube has a different extinction per colour channel, so every path fixes its hero channel at the camera (see fogChromatic)
-        uint32_t chromaticShapeMedium = 0u;
-        for (const TriangleMaterial& sm : sphereMaterials)
-            if (sm.materialType == METAL_MAT_MEDIUM_HOMOGENEOUS && sm.conductorK.z > 0.5f) chromaticShapeMedium = 2u;
-        for (const TriangleMaterial& cm : cylinderMaterials)
-            if (cm.materialType == METAL_MAT_MEDIUM_HOMOGENEOUS && cm.conductorK.z > 0.5f) chromaticShapeMedium = 2u;
-        uniforms.fogChromatic = chromaticShapeMedium;
-        if (havePbrtMedium) {
-            uniforms.fogSigmaT = pbrtFogSigmaT;
-            uniforms.fogSigmaT3 = PackedFloat3{pbrtFogSigmaT3.x, pbrtFogSigmaT3.y, pbrtFogSigmaT3.z};
-            uniforms.fogChromatic = chromaticShapeMedium | (pbrtFogChromatic ? 1u : 0u);
-            uniforms.fogAlbedo = PackedFloat3{pbrtFogAlbedo.x, pbrtFogAlbedo.y, pbrtFogAlbedo.z};
-            uniforms.fogAsymmetryG = pbrtFogAsymmetryG;
-        } else {
-            uniforms.fogSigmaT = 0.0f;                      // no participating medium in this scene
-        }
-        uniforms.useEnvironmentMap = 0u;                    // this scene's own sky, if any, replaces the hardcoded room's earthTexture-based one below
-        // See Uniforms::isPbrtScene's own comment (metal_poc_types.metal)
-        // - a real pbrt scene with no infinite light gets a BLACK
-        // miss-path background, not the hardcoded room's own sky
-        // gradient. Deliberately `!pbrtScenePath.empty()`, NOT the
-        // broader `havePbrtCamera` this whole block is already gated
-        // on - havePbrtCamera is true for every HAND-AUTHORED scene's
-        // own camera setup too (buildCornellBoxA1() and nearly every
-        // other builder set it), not just a genuinely loaded pbrt FILE.
-        // A first version of this fix used havePbrtCamera directly and
-        // made A1/G1/every other hand-authored scene's own background
-        // incorrectly black too (caught by this PR's own before/after
-        // hash sweep across EVERY scene, not just the pbrt-file ones
-        // this fix was meant for - exactly the discipline that check
-        // exists to catch).
-        uniforms.isPbrtScene = pbrtScenePath.empty() ? 0u : 1u;
-        if (havePbrtConstantEnvLight) {
-            uniforms.pbrtHasConstantEnvLight = 1u;
-            uniforms.pbrtEnvColor = PackedFloat3{pbrtEnvColor.x, pbrtEnvColor.y, pbrtEnvColor.z};
-        } else if (havePbrtImageEnvLight) {
-            uniforms.pbrtHasImageEnvLight = 1u;
-        } else if (havePbrtPortalLight) {
-            // The miss path and every environment-NEE site are gated on pbrtHasImageEnvLight / pbrtEnvMapWidth; the portal switch is below them.
-            uniforms.pbrtHasImageEnvLight = 1u;
-            uniforms.pbrtHasPortalLight = 1u;
-            uniforms.pbrtPortalWidth = (uint32_t)pbrtPortalWidth;
-            uniforms.pbrtPortalHeight = (uint32_t)pbrtPortalHeight;
-            uniforms.pbrtPortalScale = pbrtPortalScale;
-            uniforms.portalFrameX = PackedFloat3{pbrtPortalFrameX.x, pbrtPortalFrameX.y, pbrtPortalFrameX.z};
-            uniforms.portalFrameY = PackedFloat3{pbrtPortalFrameY.x, pbrtPortalFrameY.y, pbrtPortalFrameY.z};
-            uniforms.portalFrameZ = PackedFloat3{pbrtPortalFrameZ.x, pbrtPortalFrameZ.y, pbrtPortalFrameZ.z};
-            uniforms.portalP0 = PackedFloat3{pbrtPortalP0.x, pbrtPortalP0.y, pbrtPortalP0.z};
-            uniforms.portalP2 = PackedFloat3{pbrtPortalP2.x, pbrtPortalP2.y, pbrtPortalP2.z};
-        }
-        // Film's own PixelFilter - see MetalPocApp::pbrtFilterKind's own
-        // comment. Same int mapping gpu/optix/scene_builder.cpp uses for
-        // its own identical GpuCameraParams::filterKind wiring.
-        uniforms.filterKind = (pbrtFilterKind == "box") ? 1u
-            : (pbrtFilterKind == "triangle") ? 2u
-            : (pbrtFilterKind == "mitchell") ? 3u
-            : (pbrtFilterKind == "sinc") ? 4u
-            : 0u;  // "gaussian", or any unrecognized kind (pbrt_flatten's own parser already rejects those at load time)
-        uniforms.filterB = pbrtFilterB;
-        uniforms.filterC = pbrtFilterC;
-        uniforms.filterSigma = pbrtFilterSigma;
-        uniforms.filterTau = pbrtFilterTau;
-        uniforms.filterRadius = pbrtFilterRadius;
+        applyPbrtCameraUniforms(uniforms);
+        applyPbrtMediumUniforms(uniforms);
+        applyPbrtSkyUniforms(uniforms);
+        applyPbrtFilterUniforms(uniforms);
     }
-    // uniforms.filterKind/B/C/sigma/tau/radius are now final (either the
-    // pbrt override just above, or this struct's own in-class defaults -
-    // gaussian, radius 1.5 - for a HAND-AUTHORED scene, which never
-    // enters the havePbrtCamera block above at all). Build this scene's
-    // own FilterSampler<float,32> table and copy it into the Uniforms
-    // struct itself - see that struct's own filterConditionalCDF comment
-    // for why a separate kernel buffer isn't used here. A fresh build
-    // every render (not cached across Live-Preview-style repeated calls,
-    // unlike gpu/optix/optix_renderer_render.cpp's own cached version) -
-    // this POC's own compileShaderAndDispatch() already runs once per
-    // process invocation, never in a tight per-frame loop, so there is
-    // no repeated-rebuild cost to amortize here.
-    {
-        static const char* const kFilterKindNames[] = { "gaussian", "box", "triangle", "mitchell", "sinc" };
-        const uint32_t kind = (uniforms.filterKind <= 4u) ? uniforms.filterKind : 0u;
-        const PixelFilterDispatch dispatch(kFilterKindNames[kind], uniforms.filterRadius,
-                                            uniforms.filterB, uniforms.filterC,
-                                            uniforms.filterSigma, uniforms.filterTau);
-        const FilterSampler<float, 32> sampler(dispatch);
-        uniforms.filterIntegral = sampler.integral();
-        memcpy(uniforms.filterConditionalCDF, &sampler.conditionalCDF(), sizeof(uniforms.filterConditionalCDF));
-        memcpy(uniforms.filterMarginalCDF, &sampler.marginalCDF(), sizeof(uniforms.filterMarginalCDF));
-    }
+    fillFootprintCameraUniforms(uniforms);
+    fillFilterSamplerTable(uniforms);
 
     uniforms.pbrtInstanceFirst = pbrtInstanceFirstId;
     id<MTLBuffer> uniformBuffer = [device newBufferWithBytes:&uniforms length:sizeof(Uniforms) options:MTLResourceStorageModeShared];
@@ -1056,6 +990,53 @@ bool MetalPocApp::dsCheckResources(DispatchState& s) {
     checkGpuResource(pbrtTransmitTexture, "pbrtTransmitTexture", device, &anyResourceFailed);
     if (anyResourceFailed) return false;
     return true;
+}
+
+// The divergence census a --census render asks for, printed to stderr: per 8x4 tile (the dispatch's SIMD group) and bounce, how many serial passes
+// the megakernel pays (one per distinct material among the active lanes) against what sorted / compacted wavefront queues would pay.
+static void printDivergenceCensus(id<MTLTexture> censusTexture, uint32_t width, uint32_t height) {
+    std::vector<uint32_t> cen((size_t)width * height * 4);
+    [censusTexture getBytes:cen.data() bytesPerRow:width * 16 fromRegion:MTLRegionMake2D(0, 0, width, height) mipmapLevel:0];
+    double sumDistinct = 0, sumAnyActive = 0, sumActive = 0, lanesTotal = 0, pathLenSum = 0, pathCount = 0;
+    double shDistinct = 0, shGroups = 0, shActive = 0;   // shading only: lanes that hit a material or a medium (not a miss)
+    long codeCount[256] = {0};
+    for (uint32_t ty = 0; ty < height; ty += 4) {
+        for (uint32_t tx = 0; tx < width; tx += 8) {
+            int len[32], lanes = 0; uint8_t codes[32][8];
+            for (uint32_t y = ty; y < std::min(height, ty + 4); ++y)
+                for (uint32_t x = tx; x < std::min(width, tx + 8); ++x) {
+                    const uint32_t* p = &cen[((size_t)y * width + x) * 4];
+                    len[lanes] = (int)std::min<uint32_t>(p[2], 8u);
+                    for (int k = 0; k < 8; ++k) codes[lanes][k] = (uint8_t)((k < 4 ? p[0] >> (8 * k) : p[1] >> (8 * (k - 4))) & 0xFFu);
+                    pathLenSum += len[lanes]; pathCount += 1;
+                    for (int k = 0; k < len[lanes]; ++k) codeCount[codes[lanes][k]]++;
+                    ++lanes;
+                }
+            lanesTotal += lanes;
+            for (int k = 0; k < 8; ++k) {
+                bool seen[256] = {false}; int active = 0, distinct = 0, shAct = 0, shDist = 0; bool shSeen[256] = {false};
+                for (int l = 0; l < lanes; ++l)
+                    if (len[l] > k) {
+                        ++active; if (!seen[codes[l][k]]) { seen[codes[l][k]] = true; ++distinct; }
+                        if (codes[l][k] != 255) { ++shAct; if (!shSeen[codes[l][k]]) { shSeen[codes[l][k]] = true; ++shDist; } }
+                    }
+                if (shAct > 0) { shDistinct += shDist; shGroups += 1; shActive += shAct; }
+                if (active == 0) continue;
+                sumDistinct += distinct; sumAnyActive += 1; sumActive += active;
+            }
+        }
+    }
+    const double idealPasses = sumActive / 32.0, idealShade = shActive / 32.0;
+    fprintf(stderr, "[census] %ux%u  mean recorded bounces/path %.2f  lane utilisation per group-bounce %.1f%%  "
+                    "distinct materials per active group-bounce %.2f\n", width, height, pathLenSum / std::max(1.0, pathCount),
+            100.0 * sumActive / std::max(1.0, 32.0 * sumAnyActive), sumDistinct / std::max(1.0, sumAnyActive));
+    fprintf(stderr, "[census] SHADING only (misses excluded): lane utilisation %.1f%%, distinct materials per group-bounce %.2f, passes %.2fx fewer if sorted+compacted\n",
+            100.0 * shActive / std::max(1.0, 32.0 * shGroups), shDistinct / std::max(1.0, shGroups), shDistinct / std::max(1e-9, idealShade));
+    fprintf(stderr, "[census] upper bound: all-event passes %.2fx fewer with sorted queues, traversal passes %.2fx fewer with compaction\n",
+            sumDistinct / std::max(1e-9, idealPasses), sumAnyActive / std::max(1e-9, idealPasses));
+    fprintf(stderr, "[census] event mix:");
+    for (int c = 0; c < 256; ++c) if (codeCount[c] > 0) fprintf(stderr, " %s%d=%.1f%%", c == 255 ? "miss" : (c == 100 ? "medium" : "mat"), c == 255 || c == 100 ? 0 : c, 100.0 * codeCount[c] / std::max(1.0, pathLenSum));
+    fprintf(stderr, "\n");
 }
 
 // Stage G: Builds the re-runnable per-frame dispatch (row bands, read-back, crop). It owns copies of every GPU resource it needs.
@@ -1249,52 +1230,7 @@ std::function<bool(const std::function<void(Uniforms&)>&)> MetalPocApp::dsMakeRe
     }
     if (liveSession && !fixedBands) liveBandHint = bandHeight;
 
-    if (censusOn) {
-        // Divergence census: per 8x4 tile (the dispatch's SIMD group) and bounce, how many serial passes the megakernel pays
-        // (one per distinct material among the active lanes) against what sorted/compacted wavefront queues would pay.
-        std::vector<uint32_t> cen((size_t)width * height * 4);
-        [censusTexture getBytes:cen.data() bytesPerRow:width * 16 fromRegion:MTLRegionMake2D(0, 0, width, height) mipmapLevel:0];
-        double sumDistinct = 0, sumAnyActive = 0, sumActive = 0, lanesTotal = 0, pathLenSum = 0, pathCount = 0;
-        double shDistinct = 0, shGroups = 0, shActive = 0;   // shading only: lanes that hit a material or a medium (not a miss)
-        long codeCount[256] = {0};
-        for (uint32_t ty = 0; ty < height; ty += 4) {
-            for (uint32_t tx = 0; tx < width; tx += 8) {
-                int len[32], lanes = 0; uint8_t codes[32][8];
-                for (uint32_t y = ty; y < std::min(height, ty + 4); ++y)
-                    for (uint32_t x = tx; x < std::min(width, tx + 8); ++x) {
-                        const uint32_t* p = &cen[((size_t)y * width + x) * 4];
-                        len[lanes] = (int)std::min<uint32_t>(p[2], 8u);
-                        for (int k = 0; k < 8; ++k) codes[lanes][k] = (uint8_t)((k < 4 ? p[0] >> (8 * k) : p[1] >> (8 * (k - 4))) & 0xFFu);
-                        pathLenSum += len[lanes]; pathCount += 1;
-                        for (int k = 0; k < len[lanes]; ++k) codeCount[codes[lanes][k]]++;
-                        ++lanes;
-                    }
-                lanesTotal += lanes;
-                for (int k = 0; k < 8; ++k) {
-                    bool seen[256] = {false}; int active = 0, distinct = 0, shAct = 0, shDist = 0; bool shSeen[256] = {false};
-                    for (int l = 0; l < lanes; ++l)
-                        if (len[l] > k) {
-                            ++active; if (!seen[codes[l][k]]) { seen[codes[l][k]] = true; ++distinct; }
-                            if (codes[l][k] != 255) { ++shAct; if (!shSeen[codes[l][k]]) { shSeen[codes[l][k]] = true; ++shDist; } }
-                        }
-                    if (shAct > 0) { shDistinct += shDist; shGroups += 1; shActive += shAct; }
-                    if (active == 0) continue;
-                    sumDistinct += distinct; sumAnyActive += 1; sumActive += active;
-                }
-            }
-        }
-        const double idealPasses = sumActive / 32.0, idealShade = shActive / 32.0;
-        fprintf(stderr, "[census] %ux%u  mean recorded bounces/path %.2f  lane utilisation per group-bounce %.1f%%  "
-                        "distinct materials per active group-bounce %.2f\n", width, height, pathLenSum / std::max(1.0, pathCount),
-                100.0 * sumActive / std::max(1.0, 32.0 * sumAnyActive), sumDistinct / std::max(1.0, sumAnyActive));
-        fprintf(stderr, "[census] SHADING only (misses excluded): lane utilisation %.1f%%, distinct materials per group-bounce %.2f, passes %.2fx fewer if sorted+compacted\n",
-                100.0 * shActive / std::max(1.0, 32.0 * shGroups), shDistinct / std::max(1.0, shGroups), shDistinct / std::max(1e-9, idealShade));
-        fprintf(stderr, "[census] upper bound: all-event passes %.2fx fewer with sorted queues, traversal passes %.2fx fewer with compaction\n",
-                sumDistinct / std::max(1e-9, idealPasses), sumAnyActive / std::max(1e-9, idealPasses));
-        fprintf(stderr, "[census] event mix:");
-        for (int c = 0; c < 256; ++c) if (codeCount[c] > 0) fprintf(stderr, " %s%d=%.1f%%", c == 255 ? "miss" : (c == 100 ? "medium" : "mat"), c == 255 || c == 100 ? 0 : c, 100.0 * codeCount[c] / std::max(1.0, pathLenSum));
-        fprintf(stderr, "\n");
-    }
+    if (censusOn) printDivergenceCensus(censusTexture, width, height);
 
     // --- Read back into `pixels` (post-processed and written to disk
     // by postProcessAndWrite(), below) --------------------------------

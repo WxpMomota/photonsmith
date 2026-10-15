@@ -49,7 +49,7 @@ kernel void test_diffuseTransmissionPdf(
 // Full-pipeline cross-check for shadeConductor()'s own rough-metal
 // BRDF/PDF: from raw local-frame directions all the way through
 // ggxD()/ggxG()/ggxG1()/frComplexRGB() to ggxConductorF()/
-// ggxConductorPdf() (metal_poc_sampling.metal) - the SAME sequence
+// ggxConductorPdf() (metal_poc_bsdf_math.metal) - the SAME sequence
 // shadeConductor() itself runs, not just the final combining step in
 // isolation, mirroring testHairEvalAndPdf()'s own "call the real
 // production path end to end" rigor. `wo`/`wi` here match
@@ -251,7 +251,7 @@ kernel void test_cauchyEta(
     outputs[tid] = cauchyEta(inputs[tid].x, inputs[tid].y, inputs[tid].z);
 }
 
-// perlinNoise3D() (metal_poc_sampling.metal) direct dispatch - already
+// perlinNoise3D() (metal_poc_procedural.metal) direct dispatch - already
 // a standalone, pure function (a re-transcription of the SAME fixed
 // pbrt-v4 permutation table/formula src/shared/noise.h's own
 // perlin_noise<T>() uses, per that function's own header comment) -
@@ -265,7 +265,7 @@ kernel void test_perlinNoise3D(
     outputs[tid] = perlinNoise3D(points[tid]);
 }
 
-// gpuCloudDensity() (metal_poc_sampling.metal) direct dispatch -
+// gpuCloudDensity() (metal_poc_media_math.metal) direct dispatch -
 // cross-checked against CloudMedium<double>::compute_density() called
 // with wispiness=0 (see this file's own kernel/metal_poc_shader_tests.mm
 // comment for why: gpuCloudDensity() is a deliberate GPU-only port that
@@ -297,7 +297,7 @@ kernel void test_gpuCloudDensity(
     outputs[tid] = gpuCloudDensity(clouds[tid], p.x, p.y, p.z);
 }
 
-// gpuRgbGridTrilinear() (metal_poc_sampling.metal) direct dispatch -
+// gpuRgbGridTrilinear() (metal_poc_media_math.metal) direct dispatch -
 // cross-checked against SampledGrid<double>::lookup(px,py,pz)
 // (src/shared/sampled_grid.h) at genuinely INTERIOR grid points only
 // (see this file's own kernel/metal_poc_shader_tests.mm comment: the
@@ -317,7 +317,7 @@ kernel void test_gpuRgbGridTrilinear(
     outputs[tid] = gpuRgbGridTrilinear(gridData, dims.x, dims.y, dims.z, p.x, p.y, p.z);
 }
 
-// sampleHenyeyGreenstein() (metal_poc_sampling.metal) - property test,
+// sampleHenyeyGreenstein() (metal_poc_media_math.metal) - property test,
 // not a numeric cross-check: a genuine stochastic direction sample (same
 // "consumes rngState directly" shape as the layered coated materials'
 // own walk functions, section 193), on the SAME structurally-different-
@@ -712,6 +712,8 @@ kernel void test_shadeDielectric(
     DielectricTestInput in = inputs[tid];
     TriangleMaterial mat;
     mat.spawnNormal = packed_float3(0.0);
+    mat.shadowChannel = -1;
+    mat.rayTime = 0.0;
     mat.ior = in.ior;
     mat.color = packed_float3(in.absorption);
     float3 rayDir = in.rayDir;
@@ -736,6 +738,8 @@ kernel void test_shadeThinDielectric(
     DielectricTestInput in = inputs[tid];
     TriangleMaterial mat;
     mat.spawnNormal = packed_float3(0.0);
+    mat.shadowChannel = -1;
+    mat.rayTime = 0.0;
     mat.ior = in.ior;
     float3 rayDir = in.rayDir;
     float3 rayOrigin = float3(0.0);
@@ -772,6 +776,7 @@ kernel void test_structLayouts(
     FIELD_OFFSET(liveWorldPos) FIELD_OFFSET(adaptiveThreshold) FIELD_OFFSET(cameraGlassPrim) FIELD_OFFSET(pbrtHasPortalLight)
     FIELD_OFFSET(pbrtPortalWidth) FIELD_OFFSET(pbrtPortalHeight) FIELD_OFFSET(pbrtPortalScale) FIELD_OFFSET(portalFrameX)
     FIELD_OFFSET(portalFrameY) FIELD_OFFSET(portalFrameZ) FIELD_OFFSET(portalP0) FIELD_OFFSET(portalP2) FIELD_OFFSET(pbrtInstanceFirst)
+    FIELD_OFFSET(footprintMinDirX) FIELD_OFFSET(footprintMinDirY) FIELD_OFFSET(footprintValid)
 #undef FIELD_OFFSET
 }
 
@@ -788,7 +793,7 @@ kernel void test_bumpHeightFiltered(
     outputs[tid] = bumpHeightFiltered(data, 0, dims[0], dims[1], q[tid].x, q[tid].y, q[tid].z);
 }
 
-// sampleSphereLightCone() / sphereLightConePdf() (metal_poc_sampling.metal) direct dispatch: pbrt-v4's cone sampling of a sphere light from a point outside it.
+// sampleSphereLightCone() / sphereLightConePdf() (metal_poc_area_lights.metal) direct dispatch: pbrt-v4's cone sampling of a sphere light from a point outside it.
 kernel void test_sphereLightCone(
     device const float3* centers [[buffer(0)]],
     device const float* radii [[buffer(1)]],
@@ -816,5 +821,34 @@ kernel void test_spawnSide(
 {
     TriangleMaterial mat;
     mat.spawnNormal = packed_float3(geometric[tid]);
+    mat.shadowChannel = -1;
+    mat.rayTime = 0.0;
     outputs[tid] = spawnSide(mat, fallbacks[tid], dirs[tid]);
+}
+
+
+// The measured-BSDF quadrature table of the shader (metal_poc_materials_extra.metal: copies of src/shared/measured_rgb_quadrature.h) read back, to check the copies have not drifted.
+kernel void test_measuredQuadratureTable(
+    device float* outputs [[buffer(0)]],
+    uint tid [[thread_position_in_grid]])
+{
+    outputs[tid * 4 + 0] = kMeasuredLambda[tid];
+    outputs[tid * 4 + 1] = kMeasuredWr[tid];
+    outputs[tid * 4 + 2] = kMeasuredWg[tid];
+    outputs[tid * 4 + 3] = kMeasuredWb[tid];
+}
+
+// approximateDpDxy() (metal_poc_bump.metal) direct dispatch: pbrt's Approximate_dp_dxy, cross-checked against src/shared/camera_footprint.h (see metal_poc_shader_tests_geometry.mm).
+// outputs[2 * tid] = dpdx, outputs[2 * tid + 1] = dpdy, both zero when it gives none.
+kernel void test_approximateDpDxy(
+    constant Uniforms& u [[buffer(0)]],
+    device const float3* points [[buffer(1)]],
+    device const float3* normals [[buffer(2)]],
+    device float3* outputs [[buffer(3)]],
+    uint tid [[thread_position_in_grid]])
+{
+    float3 dpdx, dpdy;
+    approximateDpDxy(u, points[tid], normals[tid], dpdx, dpdy);
+    outputs[2 * tid] = dpdx;
+    outputs[2 * tid + 1] = dpdy;
 }

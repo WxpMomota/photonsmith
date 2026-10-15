@@ -20,14 +20,16 @@ around it. The shader source is **compiled at run time** from the `.metal` files
 | file | role |
 |---|---|
 | `metal_poc_main.mm`, `metal_poc.mm` | the `metal_poc` CLI and `MetalPocApp`: argument parsing, the hand-built demo room (`buildScene`), post-processing and writing the image |
-| `metal_poc_pbrt_loader.mm` | `loadPbrtScene()`: flattened pbrt scene -> host arrays (geometry, area/point/spot/distant/projection/goniometric/infinite lights, media, camera) |
+| `metal_poc_pbrt_loader.mm`, `metal_poc_pbrt_loader_punctual.mm` | `loadPbrtScene()`: flattened pbrt scene -> host arrays (geometry, area lights, spheres and the media they bound, infinite lights, media, camera); the second file holds the point/spot/distant/goniometric/projection lights |
 | `metal_poc_pbrt_materials.mm` | pbrt material -> the shader's `TriangleMaterial` (`mapPbrtMaterial`, `mapPbrtDiffuseMaterial`), measured-BRDF tables |
 | `metal_poc_gpu_resources.mm` | uploads buffers and builds the acceleration structures |
 | `metal_poc_dispatch.mm` | `compileShaderAndDispatch()`: eight named stages (library, pipeline, targets, textures, sampling tables, uniforms, resource check, per-frame dispatch) over a `DispatchState` |
 | `metal_poc_app.h`, `metal_poc_gpu_types.h`, `metal_poc_host_math.h`, `metal_poc_scene_helpers.h` | the host-side class, the host copies of the shader structs, math, scene-building helpers |
 | `metal_poc_material_ids.metal` | the `METAL_MAT_*` names of every `materialType` (included by host and shader) |
 | `metal_poc_types.metal` | the shader copies of the structs (`Uniforms`, `TriangleMaterial`, lights, media), intersection functions |
-| `metal_poc_sampling.metal`, `metal_poc_layered_bxdf.metal` | sampling, microfacet, environment/portal light, layered BxDF code |
+| `metal_poc_sampling.metal` | camera and pixel-filter sampling, hemisphere sampling, shading normals, texture lookups, shadow-ray tracing (`traceShadowAny*`) |
+| `metal_poc_environment.metal`, `_procedural.metal`, `_bsdf_math.metal`, `_media_math.metal`, `_area_lights.metal` | environment/portal lights; checker, noise and marble; Fresnel, Beer-Lambert and GGX; Henyey-Greenstein, cloud and RGB-grid density; `sampleAreaLight()` and sphere-light cone sampling (all split out of `metal_poc_sampling.metal`) |
+| `metal_poc_bump.metal`, `metal_poc_layered_bxdf.metal` | image bump and normal maps; layered BxDF code |
 | `metal_poc_materials_*.metal` | one `shadeXxx()` per material family (specular, diffuse, layered, extra, medium, hair) |
 | `metal_poc_kernel_state.metal` | the three bundles `primaryRayKernel` passes around (`KernelRes`, `PathState`, `BounceState`) and the macros that give their members their old names |
 | `metal_poc_kernel_camera.metal`, `_media.metal`, `_surface.metal`, `_bounce.metal` | the kernel's steps: camera ray and fresh path state; bounded and global media; escape, hit resolution, normal perturbation, albedo, emission; scattering by material, glass-medium bookkeeping and `traceBounce()` |

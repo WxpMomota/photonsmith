@@ -63,6 +63,22 @@ inline void triangleDpduDpdv(uint primId, device const packed_float3* verts, dev
     dpdv = cross(n, dpdu);
 }
 
+// The two least-squares unknowns of SurfaceInteraction::compute_differentials(): (dudx, dvdx, dudy, dvdy) from the surface offsets dpdx and dpdy of one pixel step and the
+// tangents dpdu and dpdv. All zero where the mapping is degenerate.
+inline float4 bumpFootprintSolve(float3 dpdx, float3 dpdy, float3 dpdu, float3 dpdv) {
+    const float a00 = dot(dpdu, dpdu), a01 = dot(dpdu, dpdv), a11 = dot(dpdv, dpdv);
+    const float det = a00 * a11 - a01 * a01;
+    if (!(abs(det) > 0.0)) return float4(0.0);
+    const float inv = 1.0 / det;
+    const float bx0 = dot(dpdu, dpdx), bx1 = dot(dpdv, dpdx), by0 = dot(dpdu, dpdy), by1 = dot(dpdv, dpdy);
+    const float dudx = (a11 * bx0 - a01 * bx1) * inv;
+    const float dudy = (a11 * by0 - a01 * by1) * inv;
+    const float dvdx = (a00 * bx1 - a01 * bx0) * inv;
+    const float dvdy = (a00 * by1 - a01 * by0) * inv;
+    const float step = 0.5 * (abs(dudx) + abs(dudy));
+    return (step == step && step < 1e8) ? float4(dudx, dvdx, dudy, dvdy) : float4(0.0);
+}
+
 // (dudx, dvdx, dudy, dvdy) of the pixel's footprint at p for a ray (origin O, unit direction d) of the perspective camera that hit the surface at p: the two
 // one-pixel-offset rays are intersected with the tangent plane (n, p) and the offsets projected onto (dpdu, dpdv) by least squares -
 // the CPU's SurfaceInteraction::compute_differentials(), as in gpu_bump_footprint_step(). 0 where the CPU would have no footprint
@@ -84,17 +100,66 @@ inline float4 bumpFootprint(constant Uniforms& u, float3 O, float3 d, float3 p, 
     const float3 pop = p - O;
     const float3 dpdx = Dx * (dot(n, pop) / dnx) - pop;
     const float3 dpdy = Dy * (dot(n, pop) / dny) - pop;
-    const float a00 = dot(dpdu, dpdu), a01 = dot(dpdu, dpdv), a11 = dot(dpdv, dpdv);
-    const float det = a00 * a11 - a01 * a01;
-    if (!(abs(det) > 0.0)) return float4(0.0);
-    const float inv = 1.0 / det;
-    const float bx0 = dot(dpdu, dpdx), bx1 = dot(dpdv, dpdx), by0 = dot(dpdu, dpdy), by1 = dot(dpdv, dpdy);
-    const float dudx = (a11 * bx0 - a01 * bx1) * inv;
-    const float dudy = (a11 * by0 - a01 * by1) * inv;
-    const float dvdx = (a00 * bx1 - a01 * bx0) * inv;
-    const float dvdy = (a00 * by1 - a01 * by0) * inv;
-    const float step = 0.5 * (abs(dudx) + abs(dudy));
-    return (step == step && step < 1e8) ? float4(dudx, dvdx, dudy, dvdy) : float4(0.0);
+    return bumpFootprintSolve(dpdx, dpdy, dpdu, dpdv);
+}
+
+// pbrt's RotateFromTo(from, to) (src/shared/camera_footprint.h rotateFromTo): the rotation taking the unit vector `from` to `to`, built from two reflections; r is row major.
+inline void footprintRotateFromTo(float3 from, float3 to, thread float r[3][3]) {
+    float3 refl;
+    if (abs(from.x) < 0.72 && abs(to.x) < 0.72) refl = float3(1.0, 0.0, 0.0);
+    else if (abs(from.y) < 0.72 && abs(to.y) < 0.72) refl = float3(0.0, 1.0, 0.0);
+    else refl = float3(0.0, 0.0, 1.0);
+    const float3 u = refl - from, v = refl - to;
+    const float uu = dot(u, u), vv = dot(v, v), uv = dot(u, v);
+    const float ua[3] = {u.x, u.y, u.z}, va[3] = {v.x, v.y, v.z};
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            r[i][j] = (i == j ? 1.0 : 0.0) - 2.0 / uu * ua[i] * ua[j] - 2.0 / vv * va[i] * va[j] + 4.0 * uv / (uu * vv) * va[i] * ua[j];
+}
+
+// The footprint pbrt-v4 gives a hit whose own ray carries no differentials (every diffuse or glossy bounce): CameraBase::Approximate_dp_dxy(p, n), a port of
+// src/shared/camera_footprint.h approximate(). pbrt does NOT trace a camera ray through the hit point: it rotates the point onto the camera's +z axis and intersects the
+// surface's tangent plane with two rays of the camera's SMALLEST pixel differentials (uniforms.footprintMinDir*, found on the host once), scaled by max(1/8, 1/sqrt(spp)). A
+// camera ray through the point gives a pixel that shrinks with cos^2 of the angle off the picture's axis, so a floor running out of the picture was read through ever finer mip
+// levels (bump-fine-floor, 7% too bright against pbrt). False (dpdx = dpdy = 0) when the camera gives no differentials or the plane is parallel to a differential ray.
+inline bool approximateDpDxy(constant Uniforms& u, float3 p, float3 n, thread float3& dpdx, thread float3& dpdy) {
+    dpdx = float3(0.0);
+    dpdy = float3(0.0);
+    if (u.footprintValid == 0u) return false;
+    const float3 right = float3(u.cameraRight), up = float3(u.cameraUp), fwd = float3(u.cameraForward);
+    const float3 v = p - float3(u.cameraPos);
+    const float3 pCamera = float3(dot(v, right), dot(v, up), dot(v, fwd));
+    const float pLen = length(pCamera);
+    if (!(pLen > 1e-12)) return false;
+    float R[3][3];
+    footprintRotateFromTo(pCamera / pLen, float3(0.0, 0.0, 1.0), R);
+    const float3 nCamera = float3(dot(n, right), dot(n, up), dot(n, fwd));
+    const float3 pDownZ = float3(R[0][0] * pCamera.x + R[0][1] * pCamera.y + R[0][2] * pCamera.z,
+                                 R[1][0] * pCamera.x + R[1][1] * pCamera.y + R[1][2] * pCamera.z,
+                                 R[2][0] * pCamera.x + R[2][1] * pCamera.y + R[2][2] * pCamera.z);
+    const float3 nDownZ = float3(R[0][0] * nCamera.x + R[0][1] * nCamera.y + R[0][2] * nCamera.z,
+                                 R[1][0] * nCamera.x + R[1][1] * nCamera.y + R[1][2] * nCamera.z,
+                                 R[2][0] * nCamera.x + R[2][1] * nCamera.y + R[2][2] * nCamera.z);
+    const float d = nDownZ.z * pDownZ.z;
+    // rays from the camera's origin: the minimum position differentials of a pinhole camera are zero
+    const float3 dirX = float3(0.0, 0.0, 1.0) + float3(u.footprintMinDirX), dirY = float3(0.0, 0.0, 1.0) + float3(u.footprintMinDirY);
+    const float denomX = dot(nDownZ, dirX), denomY = dot(nDownZ, dirY);
+    if (denomX == 0.0 || denomY == 0.0) return false;
+    const float3 dX = dirX * (d / denomX) - pDownZ, dY = dirY * (d / denomY) - pDownZ;
+    const float sppScale = max(0.125, 1.0 / sqrt(float(max(u.samplesPerPixel, 1u))));
+    // back to world space: the inverse (transpose) of R, then the camera's axes
+    const float3 cx = float3(R[0][0] * dX.x + R[1][0] * dX.y + R[2][0] * dX.z, R[0][1] * dX.x + R[1][1] * dX.y + R[2][1] * dX.z, R[0][2] * dX.x + R[1][2] * dX.y + R[2][2] * dX.z);
+    const float3 cy = float3(R[0][0] * dY.x + R[1][0] * dY.y + R[2][0] * dY.z, R[0][1] * dY.x + R[1][1] * dY.y + R[2][1] * dY.z, R[0][2] * dY.x + R[1][2] * dY.y + R[2][2] * dY.z);
+    dpdx = (right * cx.x + up * cx.y + fwd * cx.z) * sppScale;
+    dpdy = (right * cy.x + up * cy.y + fwd * cy.z) * sppScale;
+    return true;
+}
+
+// (dudx, dvdx, dudy, dvdy) of a bounced hit at p (geometric normal n) from pbrt's Approximate_dp_dxy; all zero where it gives none (callers then use 0.001).
+inline float4 bumpFootprintApprox(constant Uniforms& u, float3 p, float3 n, float3 dpdu, float3 dpdv) {
+    float3 dpdx, dpdy;
+    if (!approximateDpDxy(u, p, n, dpdx, dpdy)) return float4(0.0);
+    return bumpFootprintSolve(dpdx, dpdy, dpdu, dpdv);
 }
 
 // dndu and dndv of a triangle's interpolated shading normal from its three vertex normals and uvs (src/shared/normal_map.h triangle_dndu_dndv, pbrt-v4

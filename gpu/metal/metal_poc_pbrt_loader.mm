@@ -553,6 +553,245 @@ static TriangleMaterial homogeneousMediumMaterial(const pbrt_flatten::Medium& m,
     return mat;
 }
 
+// A `Material "interface"` sphere bounding a pbrt "rgbgrid" medium: its TriangleMaterial (materialType 30) and the grid it points at.
+void MetalPocApp::rgbGridSphereMaterial(const pbrt_flatten::Medium& gm, const PbrtToWorldFn& toWorld, float sceneScale, TriangleMaterial& mat) {
+    // pbrt "rgbgrid" medium (E7): a per-voxel RGB scattering grid inside the interface sphere, rendered by
+    // shadeRgbGridMediumSphere (materialType 30; this sphere is its trigger volume, the grid's own AABB
+    // clips the actual medium). Distances are rescaled by sceneScale, so every sigma is divided by it.
+    // pbrt gives the medium sigma_a = 1 when the scene has no sigma_a grid (a mostly ABSORBING nebula, which
+    // is what CPU renders), so that is the constant absorption here; a sigma_a grid is approximated by its
+    // mean (the shader has no per-voxel absorption).
+    const size_t voxels = (size_t)gm.nx * gm.ny * gm.nz;
+    const bool hasScatter = gm.sigma_s_r.size() == voxels && gm.sigma_s_g.size() == voxels && gm.sigma_s_b.size() == voxels;
+    const bool hasAbsorb = gm.sigma_a_r.size() == voxels && gm.sigma_a_g.size() == voxels && gm.sigma_a_b.size() == voxels;
+    const float invScale = 1.0f / sceneScale;
+    GpuRgbGridMedium grid{};
+    for (int i = 0; i < 3; ++i) { grid.boundsMin[i] = (float)gm.p0[i]; grid.boundsMax[i] = (float)gm.p1[i]; }
+    // pbrt world p = (pMetal - sceneOffset)/sceneScale + bboxCenter; medium = M p + t.
+    const float3 cOff = -toWorld(float3{0.0f, 0.0f, 0.0f}) * invScale;   // = bboxCenter - sceneOffset/sceneScale
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 3; ++c) grid.worldToMediumMat[r * 3 + c] = (float)gm.toMediumMat[r * 3 + c] * invScale;
+        grid.worldToMediumTranslate[r] = (float)gm.toMediumTranslate[r]
+            + (float)(gm.toMediumMat[r * 3 + 0] * cOff.x + gm.toMediumMat[r * 3 + 1] * cOff.y + gm.toMediumMat[r * 3 + 2] * cOff.z);
+    }
+    grid.nx = gm.nx; grid.ny = gm.ny; grid.nz = gm.nz;
+    grid.dataOffset = (int)rgbGridData.size();
+    grid.sigmaScale = invScale;
+    grid.phaseG = (float)gm.g;
+    // Per-channel sigma_s and sigma_a, both per voxel: the shader does spectral tracking (a real event with probability
+    // mean_c(sigma_t_c)/majorant, per-channel weights - the same model as the CPU's rgb_grid_medium_hittable.h and
+    // OptiX's heterogeneous_tracking_step), so it needs each channel's own coefficients, not a mean or a maximum.
+    // `majorant` bounds max_c(sigma_s_c + sigma_a_c) everywhere (the sum of the per-channel voxel maxima, trilinear
+    // interpolation never exceeds them).
+    float maxS[3] = {0.0f, 0.0f, 0.0f}, maxA[3] = {0.0f, 0.0f, 0.0f};
+    int ci = 0;
+    for (const std::vector<double>* ch : {&gm.sigma_s_r, &gm.sigma_s_g, &gm.sigma_s_b}) {
+        if (hasScatter) {
+            for (double v : *ch) { rgbGridData.push_back((float)v); maxS[ci] = std::max(maxS[ci], (float)v); }
+        } else {
+            rgbGridData.insert(rgbGridData.end(), voxels, 1.0f);   // pbrt's default sigma_s grid value
+            maxS[ci] = 1.0f;
+        }
+        ++ci;
+    }
+    if (hasAbsorb) {
+        grid.saDataOffset = (int)rgbGridData.size();
+        grid.sigmaAConst = 0.0f;
+        ci = 0;
+        for (const std::vector<double>* ch : {&gm.sigma_a_r, &gm.sigma_a_g, &gm.sigma_a_b}) {
+            for (double v : *ch) { rgbGridData.push_back((float)v); maxA[ci] = std::max(maxA[ci], (float)v); }
+            ++ci;
+        }
+    } else {
+        grid.saDataOffset = -1;
+        grid.sigmaAConst = 1.0f * invScale;   // pbrt: no "rgb sigma_a" means sigma_a = 1 everywhere
+        for (int c = 0; c < 3; ++c) maxA[c] = 1.0f;
+    }
+    // pbrt "rgb Le" per voxel (plus "Lescale"): the grid emits at its real collisions (shadeRgbGridMediumSphere).
+    if (gm.Le_scale > 0.0 && gm.Le_r.size() == voxels && gm.Le_g.size() == voxels && gm.Le_b.size() == voxels) {
+        grid.leDataOffset = (int)rgbGridData.size();
+        grid.leScale = (float)gm.Le_scale;
+        for (const std::vector<double>* ch : {&gm.Le_r, &gm.Le_g, &gm.Le_b})
+            for (double v : *ch) rgbGridData.push_back((float)v);
+    } else {
+        grid.leDataOffset = -1;
+    }
+    float maxT = 0.0f;
+    for (int c = 0; c < 3; ++c) maxT = std::max(maxT, maxS[c] + maxA[c]);
+    grid.sigmaMaj = maxT * invScale * 1.01f;
+    const int gridIdx = (int)rgbGridMediums.size();
+    rgbGridMediums.push_back(grid);
+    mat = TriangleMaterial{};
+    mat.materialType = METAL_MAT_MEDIUM_RGB_GRID;
+    mat.lightId = -1;
+    mat.conductorEta = PackedFloat3{(float)gridIdx, 0.0f, 0.0f};
+}
+
+// The same for a pbrt "cloud" medium (materialType 29).
+void MetalPocApp::cloudSphereMaterial(const pbrt_flatten::Medium& cm, const PbrtToWorldFn& toWorld, float sceneScale, TriangleMaterial& mat) {
+    // pbrt "cloud" medium (E5): procedural Perlin-noise density inside the interface sphere, rendered by
+    // shadeCloudMediumSphere (materialType 29; the sphere is its trigger volume, the cloud's own medium-space box
+    // [p0,p1] clips the actual medium). Same field mapping as OptiX's pbrt_gpu_builder.h: pure scattering with the
+    // luminance of sigma_s (sigma_a = 0), phase g in `roughness`, albedo 1. The world->medium map and sigma are
+    // rescaled by sceneScale exactly as for the rgbgrid medium above (optical depth must survive the rescale).
+    const float invScale = 1.0f / sceneScale;
+    GpuCloudMedium cloud{};
+    for (int i = 0; i < 3; ++i) { cloud.boundsMin[i] = (float)cm.p0[i]; cloud.boundsMax[i] = (float)cm.p1[i]; }
+    const float3 cOff = -toWorld(float3{0.0f, 0.0f, 0.0f}) * invScale;
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 3; ++c) cloud.worldToMediumMat[r * 3 + c] = (float)cm.toMediumMat[r * 3 + c] * invScale;
+        cloud.worldToMediumTranslate[r] = (float)cm.toMediumTranslate[r]
+            + (float)(cm.toMediumMat[r * 3 + 0] * cOff.x + cm.toMediumMat[r * 3 + 1] * cOff.y + cm.toMediumMat[r * 3 + 2] * cOff.z);
+    }
+    cloud.sigmaA = 0.0f;
+    cloud.sigmaS = (float)(0.2126 * cm.sigma_s[0] + 0.7152 * cm.sigma_s[1] + 0.0722 * cm.sigma_s[2]) * invScale;
+    cloud.density = (float)cm.density;
+    cloud.wispiness = (float)cm.wispiness;
+    cloud.frequency = (float)cm.frequency;
+    const int cloudIdx = (int)cloudMediums.size();
+    cloudMediums.push_back(cloud);
+    mat = TriangleMaterial{};
+    mat.color = PackedFloat3{1.0f, 1.0f, 1.0f};
+    mat.materialType = METAL_MAT_MEDIUM_HETEROGENEOUS;
+    mat.lightId = -1;
+    mat.roughness = (float)cm.g;
+    mat.conductorEta = PackedFloat3{(float)cloudIdx, 0.0f, 0.0f};
+}
+
+// What a sphere is drawn with: its pbrt material, or, for a `Material "interface"` sphere, the medium it bounds; a glass sphere that also bounds a medium carries the medium in its spare fields.
+TriangleMaterial MetalPocApp::sphereMaterial(const pbrt_flatten::FlatScene& scene, const pbrt_flatten::Sphere& s, const PbrtToWorldFn& toWorld, const PbrtMaterialForFn& materialFor, float sceneScale) {
+    TriangleMaterial mat = materialFor(s.material);
+    // A `Material "interface"` sphere bounding a homogeneous medium
+    // (MediumInterface "fog" "") has no BSDF of its own: it is only the
+    // boundary of a participating volume. materialFor() has no case for
+    // MaterialKind::Interface, so it would fall back to an OPAQUE gray
+    // Lambertian sphere - which, for a fog sphere filling a Cornell box
+    // (E1), blocks every light path and renders the whole scene nearly
+    // black. Map it to the bounded-medium sphere (materialType 28,
+    // shadeHomogeneousMediumSphere) instead: `color` = per-channel
+    // single-scattering albedo, `ior` = sigma_t, `roughness` = HG g
+    // (that shader's own TriangleMaterial slot reuse). sigma_t is mean
+    // over RGB (the shader takes one scalar) and divided by sceneScale
+    // for the same reason loadPbrtMedium() does it for the camera fog:
+    // optical depth = sigma_t * distance must survive the rescale.
+    // Other medium types (uniformgrid/nanovdb/...) and a real surface material
+    // on a medium-bounded sphere are not covered here.
+    const bool interfaceSphere = s.areaLight < 0 && s.material >= 0 && s.material < (int)scene.materials.size() &&
+        scene.materials[s.material].kind == pbrt_flatten::MaterialKind::Interface;
+    if (s.medium >= 0 && s.medium < (int)scene.media.size() && s.areaLight < 0 &&
+        s.material >= 0 && s.material < (int)scene.materials.size() &&
+        scene.materials[s.material].kind == pbrt_flatten::MaterialKind::Interface &&
+        scene.media[s.medium].type == "homogeneous") {
+        mat = homogeneousMediumMaterial(scene.media[s.medium], sceneScale);
+    } else if (interfaceSphere && s.medium >= 0 && s.medium < (int)scene.media.size() &&
+               scene.media[s.medium].type == "rgbgrid" && scene.media[s.medium].nx > 0 &&
+               scene.media[s.medium].ny > 0 && scene.media[s.medium].nz > 0) {
+        rgbGridSphereMaterial(scene.media[s.medium], toWorld, sceneScale, mat);
+    } else if (interfaceSphere && s.medium >= 0 && s.medium < (int)scene.media.size() && scene.media[s.medium].type == "nanovdb") {
+        // pbrt "nanovdb" medium (E9): the file is baked to a dense density grid on the host and drawn by the RGB grid medium (metal_poc_pbrt_nanovdb.mm); this sphere is
+        // its trigger volume, exactly as for rgbgrid above. An unusable file falls through to the transparent boundary below, as every unsupported medium does.
+        const float3 nanoOff = -toWorld(float3{0.0f, 0.0f, 0.0f}) * (1.0f / sceneScale);
+        TriangleMaterial gridMat;
+        if (mapNanovdbMedium(scene.media[s.medium], sceneScale, nanoOff.x, nanoOff.y, nanoOff.z, gridMat)) mat = gridMat;
+        else mat = TriangleMaterial{PackedFloat3{1, 1, 1}, METAL_MAT_MEDIUM_HOMOGENEOUS, 0.0f, PackedFloat3{0, 0, 0}, -1, 0.0f};
+    } else if (interfaceSphere && s.medium >= 0 && s.medium < (int)scene.media.size() &&
+               scene.media[s.medium].type == "cloud") {
+        cloudSphereMaterial(scene.media[s.medium], toWorld, sceneScale, mat);
+    } else if (interfaceSphere) {
+        // An interface sphere whose medium this loader cannot represent (rgbgrid/
+        // nanovdb/cloud/..., or no medium at all). The gray-Lambertian fallback
+        // would make it an OPAQUE ball; the boundary itself has no BSDF, so make it
+        // transparent instead: a zero-density medium sphere. The volume's own
+        // scattering is missing, but the surrounding scene is no longer blocked.
+        mat = TriangleMaterial{PackedFloat3{1, 1, 1}, /*materialType=*/METAL_MAT_MEDIUM_HOMOGENEOUS, /*ior (sigma_t)=*/0.0f,
+                               PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness (g)=*/0.0f};
+    }
+    // A glass sphere (dielectric / thin / rough) that also bounds a homogeneous medium (E3/E11/E12/
+    // A9/B13): the medium is simulated for real. The kernel tracks "inside a glass medium" per path and
+    // free-flight-samples scattering inside the sphere; shadow rays pass through the sphere with
+    // stochastic attenuation (sphereIntersectionFunction), as CPU's do. Parameters ride in this
+    // material's spare fields: conductorEta = per-channel sigma_t, conductorK = (g, 1 = has medium, chromatic), transmitColor = per-channel
+    // single-scattering albedo; sigma_t is the RGB mean divided by sceneScale (like the camera fog).
+    // `color` (the exit-time Beer-Lambert absorption of a plain dielectric) is zeroed - absorption is now
+    // part of the medium (albedo < 1), and applying both would double count.
+    if ((mat.materialType == METAL_MAT_DIELECTRIC || mat.materialType == METAL_MAT_ROUGH_DIELECTRIC || mat.materialType == METAL_MAT_THIN_DIELECTRIC) &&
+        s.medium >= 0 && s.medium < (int)scene.media.size() &&
+        scene.media[s.medium].type == "homogeneous") {
+        const pbrt_flatten::Medium& gm = scene.media[s.medium];
+        double gSigmaT[3], gMeanSigmaT = 0.0;
+        for (int c = 0; c < 3; ++c) { gSigmaT[c] = gm.sigma_a[c] + gm.sigma_s[c]; gMeanSigmaT += gSigmaT[c]; }
+        gMeanSigmaT /= 3.0;
+        mat.color = PackedFloat3{0, 0, 0};
+        mat.transmitColor = PackedFloat3{gSigmaT[0] > 1e-9 ? (float)(gm.sigma_s[0] / gSigmaT[0]) : 0.0f,
+                                         gSigmaT[1] > 1e-9 ? (float)(gm.sigma_s[1] / gSigmaT[1]) : 0.0f,
+                                         gSigmaT[2] > 1e-9 ? (float)(gm.sigma_s[2] / gSigmaT[2]) : 0.0f};
+        // conductorEta = per-channel sigma_t; conductorK = (g, has-medium flag, chromatic flag). A chromatic
+        // medium makes each path pick ONE colour channel when it enters the sphere (see the kernel), a grey one
+        // needs no such colour noise.
+        const double gMaxSig = std::max(gSigmaT[0], std::max(gSigmaT[1], gSigmaT[2]));
+        const double gMinSig = std::min(gSigmaT[0], std::min(gSigmaT[1], gSigmaT[2]));
+        const bool chromatic = (gMaxSig - gMinSig) > kChromaticGlassMediumSpread * std::max(gMaxSig, 1e-12);
+        mat.conductorEta = PackedFloat3{(float)(gSigmaT[0] / sceneScale), (float)(gSigmaT[1] / sceneScale), (float)(gSigmaT[2] / sceneScale)};
+        mat.conductorK = PackedFloat3{(float)gm.g, 1.0f, chromatic ? 1.0f : 0.0f};
+        (void)gMeanSigmaT;
+    }
+    return mat;
+}
+
+// An emissive sphere: its radiance, and its registration as a sphere light for next-event estimation.
+void MetalPocApp::emitSphereLight(const pbrt_flatten::FlatScene& scene, const pbrt_flatten::Sphere& s, const SphereData& sd, const float3& center, TriangleMaterial& mat) {
+    if (s.areaLight >= 0 && s.areaLight < (int)scene.areaLights.size()) {
+        // Emissive hit handled here; NEE registration (a real sphere light
+        // in `lights[]`) follows below. (Originally this tier was "visible
+        // but not explicitly sampled", like a disk light still is.) `sphereMaterials` is plain
+        // TriangleMaterial, so the SAME unconditional direct-hit
+        // emissive/MIS-weight code every other emissive material
+        // already goes through handles this correctly with no
+        // further shader changes needed. A real, previously
+        // undiscovered gap (section 164): unlike loadPbrtDisks() just
+        // above, this function never read `s.areaLight` at all - a
+        // sphere-shaped light rendered as a plain non-emissive grey
+        // sphere, contributing NO light to the scene whatsoever (not
+        // merely noisier/unsampled - fully absent), closer to the
+        // ORIGINAL bug loadPbrtAreaLights()'s own comment describes
+        // fixing for non-quad triangle-mesh lights than to the
+        // disk-shaped case's own already-correct "noisier but
+        // present" tier.
+        const pbrt_flatten::Emission& em = scene.areaLights[s.areaLight];
+        mat.emission = pbrtFlatLightEmission(pbrtScenePath, em);
+        mat.lightId = -1;
+        mat.twoSided = em.twoSided ? 1u : 0u;
+        // Register it for NEE as a real sphere light (AreaLightData::kind 1,
+        // uniform-area sampling - the B14 mechanism in sampleAreaLight()).
+        // Left unregistered, a sphere light is only ever found by BSDF-
+        // sampled rays: unbiased, but a fog scatter point (which can only
+        // reach a light via NEE) never sees it at all (E10 rendered
+        // near-black), and everything else is far noisier than CPU.
+        // Registered, `lightId` must be set too so the emissive-hit MIS
+        // weight pairs with the NEE strategy instead of double counting.
+        // Skipped for a moving sphere (the light list holds a fixed
+        // position) and an image-textured light (not representable here).
+        const bool movingSphere = sd.centerDelta1.x != 0.0f || sd.centerDelta1.y != 0.0f || sd.centerDelta1.z != 0.0f;
+        if (!movingSphere) {
+            const int32_t lightId = (int32_t)lights.size();
+            const float lightArea = 4.0f * (float)M_PI * sd.radius * sd.radius;
+            lights.push_back(AreaLightData{
+                PackedFloat3{center.x, center.y, center.z},
+                PackedFloat3{sd.radius, 0.0f, 0.0f},      // edgeU.x = radius for a sphere light
+                PackedFloat3{0.0f, 0.0f, 0.0f},
+                PackedFloat3{0.0f, 0.0f, 0.0f},
+                lightArea,
+                mat.emission,
+                /*patternTileB=*/0.0f, /*patternScale=*/0.0f,
+                /*twoSided=*/0.0f, /*useTexture=*/0.0f,
+                /*pmf=*/0.0f, /*aliasProb=*/1.0f, /*aliasIndex=*/0u,
+                /*kind=*/1.0f,
+                /*spherePrimId=*/(int32_t)spheres.size() - 1});
+            mat.lightId = lightId;
+        }
+    }
+}
+
 void MetalPocApp::loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, const std::vector<pbrt_flatten::Sphere>& sphereList, const PbrtToWorldFn& toWorld,
     const PbrtMaterialForFn& materialFor, float sceneScale) {
     for (const pbrt_flatten::Sphere& s : sphereList) {
@@ -581,230 +820,20 @@ void MetalPocApp::loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, const st
         sd.uvRot1 = PackedFloat3{(float)s.uvRot[3], (float)s.uvRot[4], (float)s.uvRot[5]};
         sd.uvRot2 = PackedFloat3{(float)s.uvRot[6], (float)s.uvRot[7], (float)s.uvRot[8]};
         spheres.push_back(sd);
-        TriangleMaterial mat = materialFor(s.material);
-        // A `Material "interface"` sphere bounding a homogeneous medium
-        // (MediumInterface "fog" "") has no BSDF of its own: it is only the
-        // boundary of a participating volume. materialFor() has no case for
-        // MaterialKind::Interface, so it would fall back to an OPAQUE gray
-        // Lambertian sphere - which, for a fog sphere filling a Cornell box
-        // (E1), blocks every light path and renders the whole scene nearly
-        // black. Map it to the bounded-medium sphere (materialType 28,
-        // shadeHomogeneousMediumSphere) instead: `color` = per-channel
-        // single-scattering albedo, `ior` = sigma_t, `roughness` = HG g
-        // (that shader's own TriangleMaterial slot reuse). sigma_t is mean
-        // over RGB (the shader takes one scalar) and divided by sceneScale
-        // for the same reason loadPbrtMedium() does it for the camera fog:
-        // optical depth = sigma_t * distance must survive the rescale.
-        // Other medium types (uniformgrid/nanovdb/...) and a real surface material
-        // on a medium-bounded sphere are not covered here.
-        const bool interfaceSphere = s.areaLight < 0 && s.material >= 0 && s.material < (int)scene.materials.size() &&
-            scene.materials[s.material].kind == pbrt_flatten::MaterialKind::Interface;
-        if (s.medium >= 0 && s.medium < (int)scene.media.size() && s.areaLight < 0 &&
-            s.material >= 0 && s.material < (int)scene.materials.size() &&
-            scene.materials[s.material].kind == pbrt_flatten::MaterialKind::Interface &&
-            scene.media[s.medium].type == "homogeneous") {
-            mat = homogeneousMediumMaterial(scene.media[s.medium], sceneScale);
-        } else if (interfaceSphere && s.medium >= 0 && s.medium < (int)scene.media.size() &&
-                   scene.media[s.medium].type == "rgbgrid" && scene.media[s.medium].nx > 0 &&
-                   scene.media[s.medium].ny > 0 && scene.media[s.medium].nz > 0) {
-            // pbrt "rgbgrid" medium (E7): a per-voxel RGB scattering grid inside the interface sphere, rendered by
-            // shadeRgbGridMediumSphere (materialType 30; this sphere is its trigger volume, the grid's own AABB
-            // clips the actual medium). Distances are rescaled by sceneScale, so every sigma is divided by it.
-            // pbrt gives the medium sigma_a = 1 when the scene has no sigma_a grid (a mostly ABSORBING nebula, which
-            // is what CPU renders), so that is the constant absorption here; a sigma_a grid is approximated by its
-            // mean (the shader has no per-voxel absorption).
-            const pbrt_flatten::Medium& gm = scene.media[s.medium];
-            const size_t voxels = (size_t)gm.nx * gm.ny * gm.nz;
-            const bool hasScatter = gm.sigma_s_r.size() == voxels && gm.sigma_s_g.size() == voxels && gm.sigma_s_b.size() == voxels;
-            const bool hasAbsorb = gm.sigma_a_r.size() == voxels && gm.sigma_a_g.size() == voxels && gm.sigma_a_b.size() == voxels;
-            const float invScale = 1.0f / sceneScale;
-            GpuRgbGridMedium grid{};
-            for (int i = 0; i < 3; ++i) { grid.boundsMin[i] = (float)gm.p0[i]; grid.boundsMax[i] = (float)gm.p1[i]; }
-            // pbrt world p = (pMetal - sceneOffset)/sceneScale + bboxCenter; medium = M p + t.
-            const float3 cOff = -toWorld(float3{0.0f, 0.0f, 0.0f}) * invScale;   // = bboxCenter - sceneOffset/sceneScale
-            for (int r = 0; r < 3; ++r) {
-                for (int c = 0; c < 3; ++c) grid.worldToMediumMat[r * 3 + c] = (float)gm.toMediumMat[r * 3 + c] * invScale;
-                grid.worldToMediumTranslate[r] = (float)gm.toMediumTranslate[r]
-                    + (float)(gm.toMediumMat[r * 3 + 0] * cOff.x + gm.toMediumMat[r * 3 + 1] * cOff.y + gm.toMediumMat[r * 3 + 2] * cOff.z);
-            }
-            grid.nx = gm.nx; grid.ny = gm.ny; grid.nz = gm.nz;
-            grid.dataOffset = (int)rgbGridData.size();
-            grid.sigmaScale = invScale;
-            grid.phaseG = (float)gm.g;
-            // Per-channel sigma_s and sigma_a, both per voxel: the shader does spectral tracking (a real event with probability
-            // mean_c(sigma_t_c)/majorant, per-channel weights - the same model as the CPU's rgb_grid_medium_hittable.h and
-            // OptiX's heterogeneous_tracking_step), so it needs each channel's own coefficients, not a mean or a maximum.
-            // `majorant` bounds max_c(sigma_s_c + sigma_a_c) everywhere (the sum of the per-channel voxel maxima, trilinear
-            // interpolation never exceeds them).
-            float maxS[3] = {0.0f, 0.0f, 0.0f}, maxA[3] = {0.0f, 0.0f, 0.0f};
-            int ci = 0;
-            for (const std::vector<double>* ch : {&gm.sigma_s_r, &gm.sigma_s_g, &gm.sigma_s_b}) {
-                if (hasScatter) {
-                    for (double v : *ch) { rgbGridData.push_back((float)v); maxS[ci] = std::max(maxS[ci], (float)v); }
-                } else {
-                    rgbGridData.insert(rgbGridData.end(), voxels, 1.0f);   // pbrt's default sigma_s grid value
-                    maxS[ci] = 1.0f;
-                }
-                ++ci;
-            }
-            if (hasAbsorb) {
-                grid.saDataOffset = (int)rgbGridData.size();
-                grid.sigmaAConst = 0.0f;
-                ci = 0;
-                for (const std::vector<double>* ch : {&gm.sigma_a_r, &gm.sigma_a_g, &gm.sigma_a_b}) {
-                    for (double v : *ch) { rgbGridData.push_back((float)v); maxA[ci] = std::max(maxA[ci], (float)v); }
-                    ++ci;
-                }
-            } else {
-                grid.saDataOffset = -1;
-                grid.sigmaAConst = 1.0f * invScale;   // pbrt: no "rgb sigma_a" means sigma_a = 1 everywhere
-                for (int c = 0; c < 3; ++c) maxA[c] = 1.0f;
-            }
-            // pbrt "rgb Le" per voxel (plus "Lescale"): the grid emits at its real collisions (shadeRgbGridMediumSphere).
-            if (gm.Le_scale > 0.0 && gm.Le_r.size() == voxels && gm.Le_g.size() == voxels && gm.Le_b.size() == voxels) {
-                grid.leDataOffset = (int)rgbGridData.size();
-                grid.leScale = (float)gm.Le_scale;
-                for (const std::vector<double>* ch : {&gm.Le_r, &gm.Le_g, &gm.Le_b})
-                    for (double v : *ch) rgbGridData.push_back((float)v);
-            } else {
-                grid.leDataOffset = -1;
-            }
-            float maxT = 0.0f;
-            for (int c = 0; c < 3; ++c) maxT = std::max(maxT, maxS[c] + maxA[c]);
-            grid.sigmaMaj = maxT * invScale * 1.01f;
-            const int gridIdx = (int)rgbGridMediums.size();
-            rgbGridMediums.push_back(grid);
-            mat = TriangleMaterial{};
-            mat.materialType = METAL_MAT_MEDIUM_RGB_GRID;
-            mat.lightId = -1;
-            mat.conductorEta = PackedFloat3{(float)gridIdx, 0.0f, 0.0f};
-        } else if (interfaceSphere && s.medium >= 0 && s.medium < (int)scene.media.size() && scene.media[s.medium].type == "nanovdb") {
-            // pbrt "nanovdb" medium (E9): the file is baked to a dense density grid on the host and drawn by the RGB grid medium (metal_poc_pbrt_nanovdb.mm); this sphere is
-            // its trigger volume, exactly as for rgbgrid above. An unusable file falls through to the transparent boundary below, as every unsupported medium does.
-            const float3 nanoOff = -toWorld(float3{0.0f, 0.0f, 0.0f}) * (1.0f / sceneScale);
-            TriangleMaterial gridMat;
-            if (mapNanovdbMedium(scene.media[s.medium], sceneScale, nanoOff.x, nanoOff.y, nanoOff.z, gridMat)) mat = gridMat;
-            else mat = TriangleMaterial{PackedFloat3{1, 1, 1}, METAL_MAT_MEDIUM_HOMOGENEOUS, 0.0f, PackedFloat3{0, 0, 0}, -1, 0.0f};
-        } else if (interfaceSphere && s.medium >= 0 && s.medium < (int)scene.media.size() &&
-                   scene.media[s.medium].type == "cloud") {
-            // pbrt "cloud" medium (E5): procedural Perlin-noise density inside the interface sphere, rendered by
-            // shadeCloudMediumSphere (materialType 29; the sphere is its trigger volume, the cloud's own medium-space box
-            // [p0,p1] clips the actual medium). Same field mapping as OptiX's pbrt_gpu_builder.h: pure scattering with the
-            // luminance of sigma_s (sigma_a = 0), phase g in `roughness`, albedo 1. The world->medium map and sigma are
-            // rescaled by sceneScale exactly as for the rgbgrid medium above (optical depth must survive the rescale).
-            const pbrt_flatten::Medium& cm = scene.media[s.medium];
-            const float invScale = 1.0f / sceneScale;
-            GpuCloudMedium cloud{};
-            for (int i = 0; i < 3; ++i) { cloud.boundsMin[i] = (float)cm.p0[i]; cloud.boundsMax[i] = (float)cm.p1[i]; }
-            const float3 cOff = -toWorld(float3{0.0f, 0.0f, 0.0f}) * invScale;
-            for (int r = 0; r < 3; ++r) {
-                for (int c = 0; c < 3; ++c) cloud.worldToMediumMat[r * 3 + c] = (float)cm.toMediumMat[r * 3 + c] * invScale;
-                cloud.worldToMediumTranslate[r] = (float)cm.toMediumTranslate[r]
-                    + (float)(cm.toMediumMat[r * 3 + 0] * cOff.x + cm.toMediumMat[r * 3 + 1] * cOff.y + cm.toMediumMat[r * 3 + 2] * cOff.z);
-            }
-            cloud.sigmaA = 0.0f;
-            cloud.sigmaS = (float)(0.2126 * cm.sigma_s[0] + 0.7152 * cm.sigma_s[1] + 0.0722 * cm.sigma_s[2]) * invScale;
-            cloud.density = (float)cm.density;
-            cloud.wispiness = (float)cm.wispiness;
-            cloud.frequency = (float)cm.frequency;
-            const int cloudIdx = (int)cloudMediums.size();
-            cloudMediums.push_back(cloud);
-            mat = TriangleMaterial{};
-            mat.color = PackedFloat3{1.0f, 1.0f, 1.0f};
-            mat.materialType = METAL_MAT_MEDIUM_HETEROGENEOUS;
-            mat.lightId = -1;
-            mat.roughness = (float)cm.g;
-            mat.conductorEta = PackedFloat3{(float)cloudIdx, 0.0f, 0.0f};
-        } else if (interfaceSphere) {
-            // An interface sphere whose medium this loader cannot represent (rgbgrid/
-            // nanovdb/cloud/..., or no medium at all). The gray-Lambertian fallback
-            // would make it an OPAQUE ball; the boundary itself has no BSDF, so make it
-            // transparent instead: a zero-density medium sphere. The volume's own
-            // scattering is missing, but the surrounding scene is no longer blocked.
-            mat = TriangleMaterial{PackedFloat3{1, 1, 1}, /*materialType=*/METAL_MAT_MEDIUM_HOMOGENEOUS, /*ior (sigma_t)=*/0.0f,
-                                   PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness (g)=*/0.0f};
-        }
-        // A glass sphere (dielectric / thin / rough) that also bounds a homogeneous medium (E3/E11/E12/
-        // A9/B13): the medium is simulated for real. The kernel tracks "inside a glass medium" per path and
-        // free-flight-samples scattering inside the sphere; shadow rays pass through the sphere with
-        // stochastic attenuation (sphereIntersectionFunction), as CPU's do. Parameters ride in this
-        // material's spare fields: conductorEta = per-channel sigma_t, conductorK = (g, 1 = has medium, chromatic), transmitColor = per-channel
-        // single-scattering albedo; sigma_t is the RGB mean divided by sceneScale (like the camera fog).
-        // `color` (the exit-time Beer-Lambert absorption of a plain dielectric) is zeroed - absorption is now
-        // part of the medium (albedo < 1), and applying both would double count.
-        if ((mat.materialType == METAL_MAT_DIELECTRIC || mat.materialType == METAL_MAT_ROUGH_DIELECTRIC || mat.materialType == METAL_MAT_THIN_DIELECTRIC) &&
-            s.medium >= 0 && s.medium < (int)scene.media.size() &&
-            scene.media[s.medium].type == "homogeneous") {
-            const pbrt_flatten::Medium& gm = scene.media[s.medium];
-            double gSigmaT[3], gMeanSigmaT = 0.0;
-            for (int c = 0; c < 3; ++c) { gSigmaT[c] = gm.sigma_a[c] + gm.sigma_s[c]; gMeanSigmaT += gSigmaT[c]; }
-            gMeanSigmaT /= 3.0;
-            mat.color = PackedFloat3{0, 0, 0};
-            mat.transmitColor = PackedFloat3{gSigmaT[0] > 1e-9 ? (float)(gm.sigma_s[0] / gSigmaT[0]) : 0.0f,
-                                             gSigmaT[1] > 1e-9 ? (float)(gm.sigma_s[1] / gSigmaT[1]) : 0.0f,
-                                             gSigmaT[2] > 1e-9 ? (float)(gm.sigma_s[2] / gSigmaT[2]) : 0.0f};
-            // conductorEta = per-channel sigma_t; conductorK = (g, has-medium flag, chromatic flag). A chromatic
-            // medium makes each path pick ONE colour channel when it enters the sphere (see the kernel), a grey one
-            // needs no such colour noise.
-            const double gMaxSig = std::max(gSigmaT[0], std::max(gSigmaT[1], gSigmaT[2]));
-            const double gMinSig = std::min(gSigmaT[0], std::min(gSigmaT[1], gSigmaT[2]));
-            const bool chromatic = (gMaxSig - gMinSig) > kChromaticGlassMediumSpread * std::max(gMaxSig, 1e-12);
-            mat.conductorEta = PackedFloat3{(float)(gSigmaT[0] / sceneScale), (float)(gSigmaT[1] / sceneScale), (float)(gSigmaT[2] / sceneScale)};
-            mat.conductorK = PackedFloat3{(float)gm.g, 1.0f, chromatic ? 1.0f : 0.0f};
-            (void)gMeanSigmaT;
-        }
-        if (s.areaLight >= 0 && s.areaLight < (int)scene.areaLights.size()) {
-            // Emissive hit handled here; NEE registration (a real sphere light
-            // in `lights[]`) follows below. (Originally this tier was "visible
-            // but not explicitly sampled", like a disk light still is.) `sphereMaterials` is plain
-            // TriangleMaterial, so the SAME unconditional direct-hit
-            // emissive/MIS-weight code every other emissive material
-            // already goes through handles this correctly with no
-            // further shader changes needed. A real, previously
-            // undiscovered gap (section 164): unlike loadPbrtDisks() just
-            // above, this function never read `s.areaLight` at all - a
-            // sphere-shaped light rendered as a plain non-emissive grey
-            // sphere, contributing NO light to the scene whatsoever (not
-            // merely noisier/unsampled - fully absent), closer to the
-            // ORIGINAL bug loadPbrtAreaLights()'s own comment describes
-            // fixing for non-quad triangle-mesh lights than to the
-            // disk-shaped case's own already-correct "noisier but
-            // present" tier.
-            const pbrt_flatten::Emission& em = scene.areaLights[s.areaLight];
-            mat.emission = pbrtFlatLightEmission(pbrtScenePath, em);
-            mat.lightId = -1;
-            mat.twoSided = em.twoSided ? 1u : 0u;
-            // Register it for NEE as a real sphere light (AreaLightData::kind 1,
-            // uniform-area sampling - the B14 mechanism in sampleAreaLight()).
-            // Left unregistered, a sphere light is only ever found by BSDF-
-            // sampled rays: unbiased, but a fog scatter point (which can only
-            // reach a light via NEE) never sees it at all (E10 rendered
-            // near-black), and everything else is far noisier than CPU.
-            // Registered, `lightId` must be set too so the emissive-hit MIS
-            // weight pairs with the NEE strategy instead of double counting.
-            // Skipped for a moving sphere (the light list holds a fixed
-            // position) and an image-textured light (not representable here).
-            const bool movingSphere = sd.centerDelta1.x != 0.0f || sd.centerDelta1.y != 0.0f || sd.centerDelta1.z != 0.0f;
-            if (!movingSphere) {
-                const int32_t lightId = (int32_t)lights.size();
-                const float lightArea = 4.0f * (float)M_PI * sd.radius * sd.radius;
-                lights.push_back(AreaLightData{
-                    PackedFloat3{center.x, center.y, center.z},
-                    PackedFloat3{sd.radius, 0.0f, 0.0f},      // edgeU.x = radius for a sphere light
-                    PackedFloat3{0.0f, 0.0f, 0.0f},
-                    PackedFloat3{0.0f, 0.0f, 0.0f},
-                    lightArea,
-                    mat.emission,
-                    /*patternTileB=*/0.0f, /*patternScale=*/0.0f,
-                    /*twoSided=*/0.0f, /*useTexture=*/0.0f,
-                    /*pmf=*/0.0f, /*aliasProb=*/1.0f, /*aliasIndex=*/0u,
-                    /*kind=*/1.0f,
-                    /*spherePrimId=*/(int32_t)spheres.size() - 1});
-                mat.lightId = lightId;
-            }
-        }
+        TriangleMaterial mat = sphereMaterial(scene, s, toWorld, materialFor, sceneScale);
+        emitSphereLight(scene, s, sd, center, mat);
         sphereMaterials.push_back(mat);
     }
+}
+
+// A disk or cylinder inside an ActiveTransform pair has object motion blur on the CPU (a full animated transform per ray); Metal bakes them at their start pose and draws them still,
+// so say it once per kind instead of letting the picture differ without a word (pbrt_scenes/disk-cylinder-motion-blur.pbrt; spheres and meshes do move).
+static void warnShapeMotionIgnored(const char* kind) {
+    static bool warnedDisk = false, warnedCylinder = false;
+    bool& warned = kind[0] == 'd' ? warnedDisk : warnedCylinder;
+    if (warned) return;
+    warned = true;
+    fprintf(stderr, "loadPbrtScene: warning: a %s moves during the exposure (ActiveTransform); the Metal renderer draws it at its start pose, so it will not be blurred as on the CPU\n", kind);
 }
 
 // --- Disks (section 101) - the plain, common "full circle" case only:
@@ -845,6 +874,7 @@ void MetalPocApp::loadPbrtDisks(const pbrt_flatten::FlatScene& scene, const Pbrt
                scene.materials[idx].kind == pbrt_flatten::MaterialKind::Interface;
     };
     for (const pbrt_flatten::Disk& d : scene.disks) {
+        if (std::memcmp(d.xform, d.xformEnd, sizeof(d.xform)) != 0) warnShapeMotionIgnored("disk");
         if (isInterfaceMaterial(d.material)) continue;   // medium boundary only: transparent, not an opaque gray disk
         if (d.innerRadius != 0.0 || d.phiMaxDeg != 360.0) { ++skippedDisks; continue; }
 
@@ -942,6 +972,7 @@ void MetalPocApp::loadPbrtCylinders(const pbrt_flatten::FlatScene& scene, const 
                scene.materials[idx].kind == pbrt_flatten::MaterialKind::Interface;
     };
     for (const pbrt_flatten::Cylinder& cy : scene.cylinders) {
+        if (std::memcmp(cy.xform, cy.xformEnd, sizeof(cy.xform)) != 0) warnShapeMotionIgnored("cylinder");
         // A Material "interface" tube is a medium boundary only. Bounding a homogeneous medium it becomes a bounded-medium tube
         // (materialType 28); any other interface tube stays transparent rather than an opaque gray one.
         const bool mediumTube = isInterfaceMaterial(cy.material) && cy.areaLight < 0 && cy.medium >= 0 &&
@@ -1149,261 +1180,6 @@ void MetalPocApp::loadPbrtObjectInstances(const pbrt_flatten::FlatScene& scene, 
     if (skippedInstancedSpheres > 0)
         fprintf(stderr, "loadPbrtScene: %zu instanced sphere(s) skipped - a non-uniformly-scaled, emissive, medium-bounded or clipped "
                         "instanced sphere can't be represented by this loader's analytic sphere primitive\n", skippedInstancedSpheres);
-}
-
-// --- Punctual lights (point/spot/distant) ---------------------------
-void MetalPocApp::loadPbrtPunctualLights(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld, float sceneScale) {
-    // Point and spot both reuse PointLightData - the SAME GPU buffer/
-    // shading path the hardcoded room's own point+spot lights already use
-    // (see that struct's own comment: direction/cosOuterAngle/
-    // cosInnerAngle default to "omnidirectional" unless a spot cone
-    // overrides them, exactly PointLightData's own existing convention).
-    // Distant reuses DirectionalLightData.
-    //
-    // Intensity/radiance scale compensation: this app's own point/spot
-    // falloff is a real 1/distance^2 term evaluated in ITS OWN internal
-    // (rescaled) coordinate space (metal_poc.metal's own `/ plDistSq`
-    // division, on toWorld()-transformed positions) - leaving a
-    // pbrt-authored "I" unchanged while every point/spot light's own
-    // distance to a hit point shrinks by sceneScale would inflate
-    // apparent brightness by 1/sceneScale^2 relative to the same scene
-    // rendered at its own native scale. Multiplying by sceneScale*
-    // sceneScale exactly cancels that: irradiance = I/d^2, d'=d*
-    // sceneScale => I'=I*sceneScale^2 keeps I'/d'^2 == I/d^2. Distant
-    // lights need no such compensation - a directional light's own
-    // contribution has no distance term at all (metal_poc.metal's own
-    // DirectionalLight comment), the same reason this loader's area
-    // lights above also need none (their own area shrinks by
-    // sceneScale^2 in lockstep with d^2, cancelling exactly).
-    //
-    // Goniometric/Projection real profile/slide images: the FIRST light
-    // of each kind that names one gets it (section 98, below); a SECOND
-    // one of the same kind, or one whose image fails to load/decode,
-    // falls back to the Approx (no-image) case and is counted here.
-    const float intensityScale = sceneScale * sceneScale;
-    size_t skippedImageBasedLights = 0;
-    for (const pbrt_flatten::PunctualLight& pl : scene.punctualLights) {
-        const float3 baseEmission{(float)(pl.intensity[0] * pl.scale),
-                                   (float)(pl.intensity[1] * pl.scale),
-                                   (float)(pl.intensity[2] * pl.scale)};
-        switch (pl.kind) {
-            case pbrt_flatten::PunctualLightKind::Point: {
-                const float3 pos = toWorld(float3{(float)pl.pos[0], (float)pl.pos[1], (float)pl.pos[2]});
-                const float3 emission = baseEmission * intensityScale;
-                pointLights.push_back(PointLightData{
-                    PackedFloat3{pos.x, pos.y, pos.z},
-                    PackedFloat3{emission.x, emission.y, emission.z}});
-                break;
-            }
-            case pbrt_flatten::PunctualLightKind::Spot: {
-                const float3 pos = toWorld(float3{(float)pl.pos[0], (float)pl.pos[1], (float)pl.pos[2]});
-                const float3 dir = simd::normalize(float3{(float)pl.dir[0], (float)pl.dir[1], (float)pl.dir[2]});
-                const float3 emission = baseEmission * intensityScale;
-                pointLights.push_back(PointLightData{
-                    PackedFloat3{pos.x, pos.y, pos.z},
-                    PackedFloat3{emission.x, emission.y, emission.z},
-                    PackedFloat3{dir.x, dir.y, dir.z},
-                    /*cosOuterAngle=*/cosf((float)pl.coneAngleDeg * (float)M_PI / 180.0f),
-                    /*cosInnerAngle=*/cosf((float)pl.falloffStartAngleDeg * (float)M_PI / 180.0f)});
-                break;
-            }
-            case pbrt_flatten::PunctualLightKind::Distant: {
-                // pl.dir is "wi" (toward the light, see PunctualLight's own
-                // field comment); DirectionalLightData::direction is the
-                // light's own direction of TRAVEL - the sign convention
-                // the hardcoded room's own existing directional light
-                // already establishes (its `direction` points along -z,
-                // "through the room's own open front", i.e. the way the
-                // light travels, not back toward its source).
-                const float3 wi = simd::normalize(float3{(float)pl.dir[0], (float)pl.dir[1], (float)pl.dir[2]});
-                directionalLights.push_back(DirectionalLightData{
-                    PackedFloat3{-wi.x, -wi.y, -wi.z},
-                    PackedFloat3{baseEmission.x, baseEmission.y, baseEmission.z}});
-                break;
-            }
-            case pbrt_flatten::PunctualLightKind::Goniometric: {
-                // A real per-light IES profile image (section 98) - only
-                // the FIRST such light in the scene gets one (this loader
-                // has one dedicated pbrtGoniometricTexture slot, same
-                // "one shared texture" constraint the hardcoded room's
-                // own single goniometricTexture already has - see
-                // metal_poc.h's own havePbrtGoniometricImage comment). A
-                // second one, or a decode failure, falls back to the
-                // Approx case below exactly as if no filename were named
-                // at all - erring toward a safe, working (if less
-                // accurate) render over dropping the light entirely.
-                if (pl.hadImageFilename && !havePbrtGoniometricImage) {
-                    std::string bytes;
-                    if (pbrt_load::loadFileNear(pbrtScenePath, pl.filename, bytes) &&
-                        pbrt_load::detail::decodeInfiniteLightImage(pl.filename, bytes,
-                            pbrtGoniometricImagePixels, pbrtGoniometricImageWidth, pbrtGoniometricImageHeight)) {
-                        havePbrtGoniometricImage = true;
-                        const float3 pos = toWorld(float3{(float)pl.pos[0], (float)pl.pos[1], (float)pl.pos[2]});
-                        const float3 emission = baseEmission * intensityScale;
-                        // Same equal-area octahedral mapping the hardcoded
-                        // room's own goniometric light already uses
-                        // (equalAreaSphereToSquare(), section 57) - a
-                        // right/up frame is needed to express "local"
-                        // direction the same way. A real IES profile can
-                        // have genuine azimuthal (non-rotationally-
-                        // symmetric) variation, so the roll matters here
-                        // too, not just for Projection below - using the
-                        // scene's own real worldToLight-derived up
-                        // (punctualLightWorldUp(), section 98) as the
-                        // worldUp hint into the SAME cross-product formula
-                        // makeGoniometricLight() already uses recovers
-                        // that real roll instead of guessing at it.
-                        const float3 forward = punctualLightWorldForward(pl.worldToLight);
-                        const float3 worldUpHint = punctualLightWorldUp(pl.worldToLight);
-                        const float3 right = simd::normalize(simd::cross(forward, worldUpHint));
-                        const float3 up = simd::cross(right, forward);
-                        goniometricLights.push_back(GoniometricLightData{
-                            PackedFloat3{pos.x, pos.y, pos.z},
-                            PackedFloat3{forward.x, forward.y, forward.z},
-                            PackedFloat3{right.x, right.y, right.z},
-                            PackedFloat3{up.x, up.y, up.z},
-                            PackedFloat3{emission.x, emission.y, emission.z},
-                            // pl.scale is ALREADY folded into `emission`
-                            // above (baseEmission = intensity*pl.scale,
-                            // see this function's own top-of-loop
-                            // comment) - GoniometricLightData::scale is
-                            // an INDEPENDENT multiplier the shader applies
-                            // on top (the hardcoded room's own light,
-                            // above, passes emission=I with no pl.scale
-                            // baked in and a real scale=1.0f here);
-                            // passing pl.scale a second time here would
-                            // double-count it.
-                            /*scale=*/1.0f,
-                            /*usePbrtTexture=*/1u});
-                        break;
-                    }
-                    fprintf(stderr, "loadPbrtScene: goniometric light's profile image '%s' could not be "
-                                    "read/decoded; falling back to the Approx (uniform) case\n", pl.filename.c_str());
-                }
-                if (pl.hadImageFilename) ++skippedImageBasedLights;
-                // No profile image named (or a second one/a decode
-                // failure, both handled above) - pbrt-v4's own documented
-                // "Approx" fallback (uniform isotropic intensity, see
-                // pbrt_scenes/punctual-lights.pbrt's own header comment
-                // for why this is the common case, not just a
-                // simplification), which is EXACTLY what a plain
-                // omnidirectional PointLightData already represents -
-                // isotropic has no direction to get right at all, unlike
-                // Projection's own cone/aim (still deferred below), so
-                // this needed no new geometry work.
-                const float3 pos = toWorld(float3{(float)pl.pos[0], (float)pl.pos[1], (float)pl.pos[2]});
-                const float3 emission = baseEmission * intensityScale;
-                pointLights.push_back(PointLightData{
-                    PackedFloat3{pos.x, pos.y, pos.z},
-                    PackedFloat3{emission.x, emission.y, emission.z}});
-                break;
-            }
-            case pbrt_flatten::PunctualLightKind::Projection: {
-                // A real per-light slide image (section 98) - same "one
-                // dedicated slot, first light wins, decode failure falls
-                // back to Approx" reasoning as Goniometric above.
-                if (pl.hadImageFilename && !havePbrtProjectionImage) {
-                    std::string bytes;
-                    if (pbrt_load::loadFileNear(pbrtScenePath, pl.filename, bytes) &&
-                        pbrt_load::detail::decodeInfiniteLightImage(pl.filename, bytes,
-                            pbrtProjectionImagePixels, pbrtProjectionImageWidth, pbrtProjectionImageHeight)) {
-                        havePbrtProjectionImage = true;
-                        // pbrt-v4 builds the light's frame with a y flip (ProjectionLight::Create, `renderFromLight * Scale(1, -1, 1)`): the slide's first row is at the TOP
-                        // of what the light projects, so the rows are stored upside down for the lookup, as the CPU's loader does (a bright band at the top of the slide
-                        // lit the bottom of the floor on the CPU and the top on Metal).
-                        for (int row = 0; row < pbrtProjectionImageHeight / 2; ++row) {
-                            float* a = &pbrtProjectionImagePixels[(size_t)row * pbrtProjectionImageWidth * 3];
-                            float* b = &pbrtProjectionImagePixels[(size_t)(pbrtProjectionImageHeight - 1 - row) * pbrtProjectionImageWidth * 3];
-                            std::swap_ranges(a, a + (size_t)pbrtProjectionImageWidth * 3, b);
-                        }
-                        const float3 pos = toWorld(float3{(float)pl.pos[0], (float)pl.pos[1], (float)pl.pos[2]});
-                        const float3 forward = punctualLightWorldForward(pl.worldToLight);
-                        // Same look-at-style right/up derivation
-                        // makeProjectionLight() already uses for the
-                        // hardcoded room's own light, but with the
-                        // scene's own REAL worldToLight-derived up
-                        // (punctualLightWorldUp(), section 98) as the
-                        // worldUp hint instead of a generic axis - a
-                        // projected slide has a real, meaningful roll
-                        // (the image's own up direction), which only the
-                        // scene's own rotation can supply correctly.
-                        const float3 worldUpHint = punctualLightWorldUp(pl.worldToLight);
-                        const float3 right = simd::normalize(simd::cross(forward, worldUpHint));
-                        const float3 up = simd::cross(right, forward);
-                        // pl.fovDeg is pbrt's own single "fov" parameter,
-                        // which real pbrt-v4 (and this project's own
-                        // src/shared/projection_light.h port, already
-                        // proven on the CPU/OptiX backends - see its own
-                        // "screenBounds"/"aspect" comments) always applies
-                        // to the SHORTER image axis: screen bounds are
-                        // [-aspect,aspect]x[-1,1] when aspect=width/height
-                        // >= 1 (a wide image, so Y/vertical is the fixed,
-                        // fov-sized axis and X/horizontal is the wider
-                        // one), or [-1,1]x[-1/aspect,1/aspect] when
-                        // aspect < 1 (a tall image, X fixed, Y taller).
-                        // tanHalfFovBase below is that fixed axis's own
-                        // half-angle; the other axis scales by aspect (or
-                        // 1/aspect) exactly as projection_light.h derives.
-                        const float tanHalfFovBase = tanf((float)pl.fovDeg * 0.5f * (float)M_PI / 180.0f);
-                        const float imageAspect = (pbrtProjectionImageHeight > 0)
-                            ? (float)pbrtProjectionImageWidth / (float)pbrtProjectionImageHeight : 1.0f;
-                        const bool wide = imageAspect >= 1.0f;
-                        const float tanHalfFovX = wide ? tanHalfFovBase * imageAspect : tanHalfFovBase;
-                        const float tanHalfFovYFinal = wide ? tanHalfFovBase : tanHalfFovBase / imageAspect;
-                        projectionLights.push_back(ProjectionLightData{
-                            PackedFloat3{pos.x, pos.y, pos.z},
-                            PackedFloat3{forward.x, forward.y, forward.z},
-                            PackedFloat3{right.x, right.y, right.z},
-                            PackedFloat3{up.x, up.y, up.z},
-                            tanHalfFovX,
-                            tanHalfFovYFinal,
-                            (float)pl.scale * intensityScale,
-                            /*usePbrtTexture=*/1u});
-                        break;
-                    }
-                    fprintf(stderr, "loadPbrtScene: projection light's slide image '%s' could not be "
-                                    "read/decoded; falling back to the Approx (uniform beam) case\n", pl.filename.c_str());
-                }
-                if (pl.hadImageFilename) ++skippedImageBasedLights;
-                // No slide image named - pbrt-v4's own documented
-                // "Approx" fallback: a uniform white cone-shaped beam
-                // (ProjectionLight::make_uniform(), matching this
-                // project's own CPU builder - see pbrt_cpu_builder.h's
-                // own kUniformSlide comment). Represented here as a
-                // hard-edged PointLightData spot (cosOuterAngle ==
-                // cosInnerAngle - spotLightFalloff()'s own
-                // max(...,1e-6) denominator guard keeps this a clean
-                // cutoff, not a divide-by-zero) rather than a genuinely
-                // new light type: a uniform intensity within a cone and
-                // zero outside it is exactly what a spot cone already
-                // is, just without the smoothstep edge softening a real
-                // spot's inner/outer split gives.
-                //
-                // Aim direction: see punctualLightWorldForward()'s own
-                // comment (metal_poc_host_math.h) for the full
-                // derivation - verified there against a known rotation
-                // case, not just by hand here.
-                const float3 pos = toWorld(float3{(float)pl.pos[0], (float)pl.pos[1], (float)pl.pos[2]});
-                const float3 dir = punctualLightWorldForward(pl.worldToLight);
-                const float3 emission = baseEmission * intensityScale;
-                const float cosHalfFov = cosf(0.5f * (float)pl.fovDeg * (float)M_PI / 180.0f);
-                pointLights.push_back(PointLightData{
-                    PackedFloat3{pos.x, pos.y, pos.z},
-                    PackedFloat3{emission.x, emission.y, emission.z},
-                    PackedFloat3{dir.x, dir.y, dir.z},
-                    /*cosOuterAngle=*/cosHalfFov,
-                    /*cosInnerAngle=*/cosHalfFov});
-                break;
-            }
-            default:
-                break;
-        }
-    }
-    if (skippedImageBasedLights > 0)
-        fprintf(stderr, "loadPbrtScene: %zu goniometric/projection light(s) with a real profile/slide "
-                        "image fell back to the Approx (uniform) case - only the first light of each "
-                        "kind gets its own image, and a failed decode also falls back here\n",
-                skippedImageBasedLights);
 }
 
 // --- Homogeneous participating medium (fog) -------------------------

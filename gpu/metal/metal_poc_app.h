@@ -324,7 +324,7 @@ struct MetalPocApp {
 
     // Set by loadPbrtScene() for an image infinite light with a portal[4] window (pbrt-v4's PortalImageInfiniteLight). Mutually exclusive with
     // havePbrtImageEnvLight: the plain environment texture/CDFs are not built for it. The three arrays come from a real host-side
-    // PortalImageInfiniteLightData (exactly what the CPU builds), uploaded into the pbrtEnv buffers - see portalSampleLi() in metal_poc_sampling.metal.
+    // PortalImageInfiniteLightData (exactly what the CPU builds), uploaded into the pbrtEnv buffers - see portalSampleLi() in metal_poc_environment.metal.
     bool havePbrtPortalLight = false;
     std::vector<float> pbrtPortalRectified;   // w*h*3, scale NOT applied
     std::vector<float> pbrtPortalDistFunc;    // w*h
@@ -557,6 +557,12 @@ struct MetalPocApp {
     std::map<std::string, std::array<int, 4>> pbrtBumpImages;   // displacement image file -> {offset in rgbGridData, width, height, 1 if a normal map}; width 0 = unusable
     void loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, const std::vector<pbrt_flatten::Sphere>& sphereList, const PbrtToWorldFn& toWorld,
         const PbrtMaterialForFn& materialFor, float sceneScale);
+    // The pieces of loadPbrtSpheres: a sphere's material (or the medium it bounds), and its sphere-light registration.
+    TriangleMaterial sphereMaterial(const pbrt_flatten::FlatScene& scene, const pbrt_flatten::Sphere& s, const PbrtToWorldFn& toWorld,
+        const PbrtMaterialForFn& materialFor, float sceneScale);
+    void rgbGridSphereMaterial(const pbrt_flatten::Medium& gm, const PbrtToWorldFn& toWorld, float sceneScale, TriangleMaterial& mat);
+    void cloudSphereMaterial(const pbrt_flatten::Medium& cm, const PbrtToWorldFn& toWorld, float sceneScale, TriangleMaterial& mat);
+    void emitSphereLight(const pbrt_flatten::FlatScene& scene, const pbrt_flatten::Sphere& s, const SphereData& sd, const float3& center, TriangleMaterial& mat);
     void loadPbrtDisks(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
         const PbrtMaterialForFn& materialFor, float sceneScale);
     void loadPbrtCylinders(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
@@ -564,6 +570,8 @@ struct MetalPocApp {
     void loadPbrtObjectInstances(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
         const PbrtMaterialForFn& materialFor, float sceneScale);
     void loadPbrtPunctualLights(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld, float sceneScale);
+    bool addGoniometricImageLight(const pbrt_flatten::PunctualLight& pl, const PbrtToWorldFn& toWorld, const float3& emission);
+    bool addProjectionImageLight(const pbrt_flatten::PunctualLight& pl, const PbrtToWorldFn& toWorld, float intensityScale);
     void loadPbrtMedium(const pbrt_flatten::FlatScene& scene, float sceneScale);
     void loadPbrtInfiniteLight(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld);
     void loadPbrtCamera(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
@@ -939,7 +947,7 @@ struct MetalPocApp {
     // different from CPU/OptiX's real importance-sampled gold BRDF. This
     // function is kept only as the first (and still only) example of this
     // loader's sphere-light NEE support (AreaLight::kind==1,
-    // metal_poc_sampling.metal's sampleAreaLight()) - see its own comment
+    // metal_poc_area_lights.metal's sampleAreaLight()) - see its own comment
     // and section 184, docs/history/METAL_GPU_FEASIBILITY.md - not as a current
     // description of what scene_id "B14" renders.
     // B13: Subsurface Slab - a Cornell box with a dielectric wax slab
@@ -1006,6 +1014,13 @@ struct MetalPocApp {
     bool dsUploadTextures(DispatchState& s);
     bool dsUploadSamplingTables(DispatchState& s);
     bool dsFillUniforms(DispatchState& s, int argc, const char** argv);
+    // Parts of dsFillUniforms: what a loaded pbrt scene overrides in the defaults, and the filter table.
+    void applyPbrtCameraUniforms(Uniforms& uniforms);
+    void applyPbrtMediumUniforms(Uniforms& uniforms);
+    void applyPbrtSkyUniforms(Uniforms& uniforms);
+    void applyPbrtFilterUniforms(Uniforms& uniforms);
+    void fillFilterSamplerTable(Uniforms& uniforms);
+    void fillFootprintCameraUniforms(Uniforms& uniforms);
     bool dsCheckResources(DispatchState& s);
     std::function<bool(const std::function<void(Uniforms&)>&)> dsMakeRenderFrame(DispatchState& s);
 

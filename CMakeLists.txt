@@ -391,6 +391,7 @@ if(RT_BUILD_METAL)
         # "Stage 2.5" block grew past a third of it, same pure-code-motion
         # precedent as the other metal_poc_*.mm splits.
         gpu/metal/metal_poc_pbrt_loader.mm
+        gpu/metal/metal_poc_pbrt_loader_punctual.mm   # point / spot / distant / goniometric / projection lights
         gpu/metal/metal_poc_pbrt_materials.mm
         gpu/metal/metal_poc_pbrt_nanovdb.mm   # "nanovdb" media: read on the host, drawn by the RGB grid medium
         # Stage 3 (GPU buffer/acceleration-structure upload) and Stage 4
@@ -745,13 +746,15 @@ if(RT_BUILD_METAL)
         # height map on an instance and of odd size, a far tilted normal map, the subsurface ball): the groups of the sweep that need BOTH backends, which the gpu-only test below skips.
         add_test(NAME metal_poc_cpu_gpu_sweep
             COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/consistency_sweep.py"
-                --exe $<TARGET_FILE:ray_tracer> --only fog,dots,wrap,spawn,instbump,oddmap,subsurface --tolerance 4)
+                --exe $<TARGET_FILE:ray_tracer> --only fog,dots,wrap,spawn,instbump,oddmap,motion,subsurface --tolerance 4)
         set_tests_properties(metal_poc_cpu_gpu_sweep PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" TIMEOUT 1800)
-        # Metal against real pbrt-v4's means (tests/data/pbrt_reference_means.txt), 144 scenes: the only check against ground truth rather than against the CPU. It compares with the
-        # ratios of gpu/metal/pbrt_pack_baseline.txt and fails when a scene moves by more than 4% (about 7 minutes; rewrite the baseline only after a change you understand).
+        # Metal against real pbrt-v4's means (tests/data/pbrt_reference_means.txt), every scene of the table: the only check against ground truth rather than against the CPU. It compares with
+        # the ratios of gpu/metal/pbrt_pack_baseline.txt (a render is deterministic per seed, and code motion moved no scene by 0.5%, so the gate is 1%) and fails when a scene moves by more
+        # than that, when a scene of the table is not in the baseline (a new row must be looked at and added), or when a scene is off pbrt by more than 3% and its baseline row has no
+        # "# known: <why>" note. About 7 minutes; rewrite the baseline only after a change you understand.
         add_test(NAME metal_poc_pbrt_pack
             COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/metal_pbrt_pack.py"
-                --exe $<TARGET_FILE:ray_tracer> --spp-factor 4 --baseline "${CMAKE_SOURCE_DIR}/gpu/metal/pbrt_pack_baseline.txt" --drift 0.04)
+                --exe $<TARGET_FILE:ray_tracer> --spp-factor 4 --baseline "${CMAKE_SOURCE_DIR}/gpu/metal/pbrt_pack_baseline.txt" --drift 0.01 --max-off 0.03)
         set_tests_properties(metal_poc_pbrt_pack PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" TIMEOUT 3600)
         add_test(NAME metal_poc_consistency
             COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/consistency_sweep.py"

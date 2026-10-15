@@ -335,7 +335,7 @@ struct Uniforms {
     // 1 + the primitive index of the OUTERMOST glass sphere that bounds a medium and contains the camera (a "world haze" shell), or 0 for none (so zero-initialised Uniforms mean none). A path then
     // starts inside that medium instead of entering it by refraction, and returns to it on leaving a nested glass-medium sphere.
     int cameraGlassPrim;
-    // pbrt-v4 portal (windowed) infinite light (see portalSampleLi() in metal_poc_sampling.metal). 1 = the pbrt scene's image infinite light has a portal[4] window; its
+    // pbrt-v4 portal (windowed) infinite light (see portalSampleLi() in metal_poc_environment.metal). 1 = the pbrt scene's image infinite light has a portal[4] window; its
     // data then rides in the pbrtEnv buffers instead of the plain environment distribution. Frame = the portal quad's orthonormal frame, P0/P2 its diagonal corners.
     uint pbrtHasPortalLight;
     uint pbrtPortalWidth;
@@ -348,6 +348,11 @@ struct Uniforms {
     packed_float3 portalP2;
     // Metal instance id of the first pbrt ObjectInstance placement, 0xFFFFFFFF = none (see the host copy in metal_poc_gpu_types.h).
     uint pbrtInstanceFirst;
+    // pbrt's Approximate_dp_dxy (the footprint of a bounced hit, bumpFootprintApprox() in metal_poc_bump.metal): the camera's smallest pixel differentials in the frame round a ray, found on
+    // the host (src/shared/camera_footprint.h makeCamera); footprintValid is 0 for every camera but a plain perspective one.
+    packed_float3 footprintMinDirX;
+    packed_float3 footprintMinDirY;
+    uint footprintValid;
 };
 
 // A real light LIST entry, replacing the single hardcoded kLightCenter/
@@ -995,6 +1000,9 @@ struct TriangleMaterial {
     int textureWrap;
     // The geometric normal of the hit on the ray's side, for spawnSide() (see metal_poc_gpu_types.h); zero = not set.
     packed_float3 spawnNormal;
+    // The path's colour channel through a chromatic medium (-1: none) and the time of its camera sample, for traceShadowAnyM() (see metal_poc_gpu_types.h).
+    int shadowChannel;
+    float rayTime;
 };
 
 // E2/section 178: a real heterogeneous, procedural Perlin-FBm-density

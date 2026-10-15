@@ -226,6 +226,10 @@ struct Uniforms {
     // instance with id >= this is a pbrt group placement: its hit primitive is group-local, InstanceTransform::triBase + primitive_id indexes the
     // shared triangle arrays, and the shading normal is transformed by the instance's normal matrix.
     uint32_t pbrtInstanceFirst = 0xFFFFFFFFu;
+    // see the shader's copy (metal_poc_types.metal): pbrt's Approximate_dp_dxy camera, made on the host
+    PackedFloat3 footprintMinDirX{};
+    PackedFloat3 footprintMinDirY{};
+    uint32_t footprintValid = 0;
 };
 
 // Mirrors metal_poc.metal's own LensElement byte-for-byte - a single
@@ -490,6 +494,10 @@ struct TriangleMaterial {
     // The geometric normal of the hit, on the side the ray came from (set per hit by resolveHit(); zero where it was not): rays spawned from the surface (light samples, the next bounce)
     // start 0.001 along it toward THEIR side, as pbrt offsets them, so a direction a shading normal (bumped, normal-mapped or interpolated) sends below the surface leaves it.
     PackedFloat3 spawnNormal{0, 0, 0};
+    // What a shadow ray from this hit needs to know about the path: the colour channel it follows through a chromatic medium (-1: none) and the time of its camera sample (a moving
+    // sphere is where it is at that time). Set per hit by resolveHit(); read by traceShadowAnyM().
+    int32_t shadowChannel = -1;
+    float rayTime = 0.0f;
 };
 
 // Mirrors metal_poc_types.metal's GpuCloudMedium byte-for-byte (E2,

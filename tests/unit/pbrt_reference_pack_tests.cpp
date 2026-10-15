@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -92,6 +93,8 @@ TEST(PbrtReferencePackTest, TheSibenikCathedralLoadsAndRendersOnTheCpu) {
 	const SceneDescriptor* s = find_example_scene("environment-sibenik-cathedral");
 	if (!s) GTEST_SKIP() << "environment-sibenik-cathedral.pbrt was not discovered - is pbrt_scenes/ present?";
 	if (std::getenv("RT_SKIP_GALLERY")) GTEST_SKIP() << "RT_SKIP_GALLERY is set";
+	// The mesh is git-ignored (too large to commit), so a clean checkout - the hosted CI - has none: skip rather than fail on a missing asset.
+	if (!std::ifstream("models/sibenik_cathedral.obj")) GTEST_SKIP() << "models/sibenik_cathedral.obj is not installed";
 	const std::string out = "pbrt_pack_sibenik_smoke.exr";
 	ASSERT_EQ(cpu_render_main(48, 32, 4, 4, out.c_str(), s->id.c_str(), s->camera.lookfrom_x, s->camera.lookfrom_y, s->camera.lookfrom_z), 0);
 	double mean = 0.0;

@@ -335,7 +335,7 @@ void testLambertianAndDiffuseTransmissionPdf(id<MTLDevice> device, id<MTLLibrary
     }
 }
 
-// ggxConductorF()/ggxConductorPdf() (metal_poc_sampling.metal), full
+// ggxConductorF()/ggxConductorPdf() (metal_poc_bsdf_math.metal), full
 // pipeline (raw local-frame directions -> ggxD/ggxG/ggxG1/frComplexRGB
 // -> the final combine) - numeric cross-check against pbrt-v4's own
 // ConductorBxDF<double>::f()/pdf() (src/shared/bxdfs_conductor.h), the

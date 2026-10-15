@@ -67,6 +67,8 @@ int main() {
         testBumpHeightFiltered(device, library, queue);
         testSphereLightCone(device, library, queue);
         testSpawnSide(device, library, queue);
+        testApproximateDpDxy(device, library, queue);
+        testMeasuredQuadratureTable(device, library, queue);
         testGpuCloudDensity(device, library, queue);
         testBssrdfProfile(device, library, queue);
         testGpuRgbGridTrilinear(device, library, queue);
