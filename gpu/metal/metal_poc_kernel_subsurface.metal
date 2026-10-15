@@ -188,6 +188,7 @@ inline bool shadeSubsurface(thread const KernelRes& R, thread PathState& P, thre
     // already seeing the weighted throughput.
     TriangleMaterial exitMat = mat;
     exitMat.materialType = METAL_MAT_NORMALIZED_FRESNEL;
+    exitMat.spawnNormal = packed_float3(0.0);   // the entry hit's geometric normal is not the exit's: spawn from the exit normal as before
     return shadeNormalizedFresnel(exitMat, exitPos, exitNormal, uniforms,
                           lights, pointLights, directionalLights, projectionLights, goniometricLights,
                           envMarginalCDF, envConditionalCDF, uniforms.envMapWidth, uniforms.envMapHeight,

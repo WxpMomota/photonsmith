@@ -83,7 +83,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
         float cosLight = dot(ls.normal, -wi);
         if (cosSurface > 0.0 && (cosLight > 0.0 || (ls.twoSided != 0.0 && cosLight < 0.0))) {
             ray shadowRay;
-            shadowRay.origin = hitPoint + facingNormal * 0.001f;
+            shadowRay.origin = hitPoint + spawnSide(mat, facingNormal, wi) * 0.001f;
             shadowRay.direction = wi;
             shadowRay.min_distance = 0.001f;
             shadowRay.max_distance = dist - 0.002f;
@@ -111,7 +111,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
             float plCosSurface = dot(facingNormal, plWi);
             if (plCosSurface > 0.0) {
                 ray plShadowRay;
-                plShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                plShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, plWi) * 0.001f;
                 plShadowRay.direction = plWi;
                 plShadowRay.min_distance = 0.001f;
                 plShadowRay.max_distance = plDist - 0.002f;
@@ -134,7 +134,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
             float dlCosSurface = dot(facingNormal, dlWi);
             if (dlCosSurface > 0.0) {
                 ray dlShadowRay;
-                dlShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                dlShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, dlWi) * 0.001f;
                 dlShadowRay.direction = dlWi;
                 dlShadowRay.min_distance = 0.001f;
                 dlShadowRay.max_distance = kDirectionalLightMaxDistance;
@@ -168,7 +168,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                                                              (pj.usePbrtTexture != 0u ? pbrtProjectionTexture : earthTexture), textureSampler);
                 if (any(pjRadiance > float3(0.0))) {
                     ray pjShadowRay;
-                    pjShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                    pjShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, pjWi) * 0.001f;
                     pjShadowRay.direction = pjWi;
                     pjShadowRay.min_distance = 0.001f;
                     pjShadowRay.max_distance = pjDist - 0.002f;
@@ -198,7 +198,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                                                               (gl.usePbrtTexture != 0u ? pbrtGoniometricTexture : goniometricTexture), textureSampler);
                 if (any(glRadiance > float3(0.0))) {
                     ray glShadowRay;
-                    glShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                    glShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, glWi) * 0.001f;
                     glShadowRay.direction = glWi;
                     glShadowRay.min_distance = 0.001f;
                     glShadowRay.max_distance = glDist - 0.002f;
@@ -227,7 +227,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
             float envCosSurface = dot(facingNormal, envWi);
             if (envCosSurface > 0.0 && envPdfSolidAngle > 1e-9) {
                 ray envShadowRay;
-                envShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                envShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, envWi) * 0.001f;
                 envShadowRay.direction = envWi;
                 envShadowRay.min_distance = 0.001f;
                 envShadowRay.max_distance = 1e5f;
@@ -250,7 +250,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
             float pbrtEnvCosSurface = dot(facingNormal, pbrtEnvWi);
             if (pbrtEnvCosSurface > 0.0 && pbrtEnvPdfSolidAngle > 1e-9) {
                 ray pbrtEnvShadowRay;
-                pbrtEnvShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                pbrtEnvShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, pbrtEnvWi) * 0.001f;
                 pbrtEnvShadowRay.direction = pbrtEnvWi;
                 pbrtEnvShadowRay.min_distance = 0.001f;
                 pbrtEnvShadowRay.max_distance = 1e5f;
@@ -276,7 +276,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
     float3 newDirLocal = smp.wi;
     float3 newDirWorld = normalize(newDirLocal.x * tangent + newDirLocal.y * bitangent + newDirLocal.z * facingNormal);
     rayDir = newDirWorld;
-    rayOrigin = hitPoint + facingNormal * 0.001f;
+    rayOrigin = hitPoint + spawnSide(mat, facingNormal, rayDir) * 0.001f;
     throughput *= beta;
     if (smp.specular) {
         specularBounce = true;
@@ -373,7 +373,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
         float cosLight = dot(ls.normal, -wi);
         if (cosSurface > 0.0 && (cosLight > 0.0 || (ls.twoSided != 0.0 && cosLight < 0.0))) {
             ray shadowRay;
-            shadowRay.origin = hitPoint + facingNormal * 0.001f;
+            shadowRay.origin = hitPoint + spawnSide(mat, facingNormal, wi) * 0.001f;
             shadowRay.direction = wi;
             shadowRay.min_distance = 0.001f;
             shadowRay.max_distance = dist - 0.002f;
@@ -399,7 +399,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
             float plCosSurface = dot(facingNormal, plWi);
             if (plCosSurface > 0.0) {
                 ray plShadowRay;
-                plShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                plShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, plWi) * 0.001f;
                 plShadowRay.direction = plWi;
                 plShadowRay.min_distance = 0.001f;
                 plShadowRay.max_distance = plDist - 0.002f;
@@ -421,7 +421,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
             float dlCosSurface = dot(facingNormal, dlWi);
             if (dlCosSurface > 0.0) {
                 ray dlShadowRay;
-                dlShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                dlShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, dlWi) * 0.001f;
                 dlShadowRay.direction = dlWi;
                 dlShadowRay.min_distance = 0.001f;
                 dlShadowRay.max_distance = kDirectionalLightMaxDistance;
@@ -454,7 +454,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
                                                              (pj.usePbrtTexture != 0u ? pbrtProjectionTexture : earthTexture), textureSampler);
                 if (any(pjRadiance > float3(0.0))) {
                     ray pjShadowRay;
-                    pjShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                    pjShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, pjWi) * 0.001f;
                     pjShadowRay.direction = pjWi;
                     pjShadowRay.min_distance = 0.001f;
                     pjShadowRay.max_distance = pjDist - 0.002f;
@@ -483,7 +483,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
                                                               (gl.usePbrtTexture != 0u ? pbrtGoniometricTexture : goniometricTexture), textureSampler);
                 if (any(glRadiance > float3(0.0))) {
                     ray glShadowRay;
-                    glShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                    glShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, glWi) * 0.001f;
                     glShadowRay.direction = glWi;
                     glShadowRay.min_distance = 0.001f;
                     glShadowRay.max_distance = glDist - 0.002f;
@@ -509,7 +509,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
             float envCosSurface = dot(facingNormal, envWi);
             if (envCosSurface > 0.0 && envPdfSolidAngle > 1e-9) {
                 ray envShadowRay;
-                envShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                envShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, envWi) * 0.001f;
                 envShadowRay.direction = envWi;
                 envShadowRay.min_distance = 0.001f;
                 envShadowRay.max_distance = 1e5f;
@@ -536,7 +536,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
             float pbrtEnvCosSurface = dot(facingNormal, pbrtEnvWi);
             if (pbrtEnvCosSurface > 0.0 && pbrtEnvPdfSolidAngle > 1e-9) {
                 ray pbrtEnvShadowRay;
-                pbrtEnvShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                pbrtEnvShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, pbrtEnvWi) * 0.001f;
                 pbrtEnvShadowRay.direction = pbrtEnvWi;
                 pbrtEnvShadowRay.min_distance = 0.001f;
                 pbrtEnvShadowRay.max_distance = 1e5f;
@@ -562,7 +562,7 @@ inline bool shadeVelvet(TriangleMaterial mat, float3 albedo, float3 hitPoint, fl
     // does not).
     float3 newDir = sampleUniformHemisphere(facingNormal, rngState);
     rayDir = newDir;
-    rayOrigin = hitPoint + facingNormal * 0.001f;
+    rayOrigin = hitPoint + spawnSide(mat, facingNormal, rayDir) * 0.001f;
     float newDirCos = max(dot(facingNormal, newDir), 0.0001);
     throughput *= albedo * velvetF(woWorld, newDir, facingNormal, mat.ior) * newDirCos * (2.0 * M_PI_F);
     bsdfPdf = uniformPdf;
@@ -737,7 +737,7 @@ inline bool shadePrincipled(TriangleMaterial mat, float3 hitPoint, float3 facing
 
     float3 newDirWorld = normalize(woOutLocal.x * tangent + woOutLocal.y * bitangent + woOutLocal.z * facingNormal);
     rayDir = newDirWorld;
-    rayOrigin = hitPoint + facingNormal * 0.001f;
+    rayOrigin = hitPoint + spawnSide(mat, facingNormal, rayDir) * 0.001f;
     throughput *= weight;
     specularBounce = true;
     return true;

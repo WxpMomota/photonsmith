@@ -506,6 +506,15 @@ inline float4 samplePictureWrapped(texture2d<float, access::sample> picture, sam
     return picture.sample(pictureSampler, float2(st.x, 1.0 - st.y));
 }
 
+// The offset direction for a ray spawned at a hit: 0.001 along the GEOMETRIC normal toward the side of `dir`, as pbrt-v4 offsets spawned rays (SpawnRay), so a direction the shading
+// normal sends below the surface (a bumped or normal-mapped one, or an interpolated one at a grazing angle) leaves it instead of starting above it and hitting it. `fallback` is
+// what the offset was before, used where the geometric normal was not set.
+inline float3 spawnSide(TriangleMaterial mat, float3 fallback, float3 dir) {
+    const float3 g = float3(mat.spawnNormal);
+    if (dot(g, g) < 0.5) return fallback;
+    return dot(dir, g) >= 0.0 ? g : -g;
+}
+
 // Procedural "egg carton" bump map - an analytic height field h(u,v)
 // instead of a sampled normal-map texture (no new image asset needed for
 // this POC to demonstrate genuine tangent-space shading-normal

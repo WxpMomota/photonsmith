@@ -203,6 +203,18 @@ inline void resolveHit(thread const KernelRes& R, thread PathState& P, thread Bo
     // the-ray version used by every other material below discards.
     frontFace = dot(normal, rayDir) < 0.0;
     facingNormal = frontFace ? normal : -normal;
+    // The geometric normal of this hit (the interpolated normal of a smooth triangle is a shading normal, not that), on the ray's side: what spawned rays are offset along.
+    float3 geometricNormal = normal;
+    if (isTriangleHit && !isSuzanneInstance) {
+        const float3 gp0 = float3(vertices[primId * 3 + 0]), gp1 = float3(vertices[primId * 3 + 1]), gp2 = float3(vertices[primId * 3 + 2]);
+        float3 gn = cross(gp1 - gp0, gp2 - gp0);
+        const float gl2 = dot(gn, gn);
+        if (gl2 > 1e-30) {
+            gn *= rsqrt(gl2);
+            geometricNormal = isPbrtInstance ? transformNormalByInstance(gn, instanceTransforms[result.instance_id]) : gn;
+        }
+    }
+    mat.spawnNormal = packed_float3(dot(geometricNormal, rayDir) < 0.0 ? geometricNormal : -geometricNormal);
 }
 
 // Perturbs the shading normal (facingNormal) for the bump-mapped and normal-mapped materials. Also records the material in the census.
