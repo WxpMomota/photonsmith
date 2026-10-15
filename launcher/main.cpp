@@ -604,30 +604,9 @@ static CameraPosition keyframe_camera_for_frame(const camera_keyframes::Path &ke
     return CameraPosition{key.pos[0], key.pos[1], key.pos[2], key.target[0], key.target[1], key.target[2], 0.0, 1.0, 0.0};
 }
 
-// --video: renders the frames along a camera path, converts them to PNG as they finish, and assembles an MP4.
-static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
-	const bool use_gpu = s.use_gpu;
-	const int image_width = s.image_width;
-	const int image_height = s.image_height;
-	const int samples_per_pixel = s.samples_per_pixel;
-	const int max_ray_depth = s.max_ray_depth;
-	const std::string &scene_id = s.scene_id;
-	double cam_x = s.cam_x;
-	double cam_y = s.cam_y;
-	double cam_z = s.cam_z;
-	const int video_frames = s.video_frames;
-	const int video_fps = s.video_fps;
-	const double video_speed = s.video_speed;
-	const std::string &camera_path = s.camera_path;
-	const std::string &out_path = s.out_path;
-
-    std::cout << "\n========================================" << std::endl;
-    std::cout << "VIDEO RENDERING" << std::endl;
-    std::cout << "========================================" << std::endl;
-
-    // --camera-keyframes: read and check the file before any frame is rendered.
-    camera_keyframes::Path keyframes;
-    const bool use_keyframes = !s.camera_keyframes_file.empty();
+// --camera-keyframes: read and check the file before any frame is rendered. SUCCESS, or the error code to exit with.
+static int loadVideoKeyframes(const RenderSetup &s, camera_keyframes::Path &keyframes, bool &use_keyframes) {
+    use_keyframes = !s.camera_keyframes_file.empty();
     if (use_keyframes) {
         const camera_keyframes::ParseResult parsed = camera_keyframes::load(s.camera_keyframes_file);
         if (!parsed.ok) {
@@ -637,7 +616,11 @@ static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
         keyframes = parsed.path;
         std::cout << "Camera path: " << keyframes.keys.size() << " keyframes from " << s.camera_keyframes_file << (keyframes.ease ? " (eased)" : "") << std::endl;
     }
+    return SUCCESS;
+}
 
+// How many frames the video really renders: --frames spread by --speed, capped. SUCCESS, or the error code for a bad --frames or --speed.
+static int resolveVideoFrameCount(int video_frames, double video_speed, int video_fps, int &render_frame_count) {
     if (video_frames < 1) {
         std::cerr << "ERROR: --frames must be >= 1 (got " << video_frames << ")" << std::endl;
         return ERR_INVALID_ARGUMENTS;
@@ -653,7 +636,7 @@ static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
     // more frames (and more real time at the same fps) to cover the
     // exact same path, instead of covering less of the path in the same
     // frame count. --frames is the "1.0x" baseline frame count.
-    int render_frame_count = static_cast<int>(std::llround(video_frames / video_speed));
+    render_frame_count = static_cast<int>(std::llround(video_frames / video_speed));
     if (render_frame_count < 1) render_frame_count = 1;
     const int kMaxVideoFrames = 5000;
     if (render_frame_count > kMaxVideoFrames) {
@@ -669,7 +652,11 @@ static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
                    << (static_cast<double>(render_frame_count) / video_fps) << "s at " << video_fps << " fps)."
                    << std::endl;
     }
+    return SUCCESS;
+}
 
+// Pins the CPU thread count once for the whole video (see the comment).
+static void pinThreadsForVideo(bool use_gpu) {
     // cam.render() (called once per CPU frame, inside cpu_render_main())
     // auto-detects a "free core" count by sampling system idle time over
     // 200ms - fine for a single image, but that's 200ms wasted on every
@@ -684,11 +671,20 @@ static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
         set_env_var("RAY_TRACER_THREADS", nthreads_str.c_str());
         std::cout << "Pinned CPU thread count to " << nthreads << " for the whole video (skips per-frame detection)." << std::endl;
     }
+}
 
-    // Prepare output directory for temporary frames
+struct VideoPaths {
+    std::filesystem::path frames_dir;
+    std::filesystem::path video_path;
+};
+
+// The temporary frame directory (emptied) and the output video path. SUCCESS, or ERR_FILE_WRITE_FAILED.
+static int prepareVideoDirectories(const std::string &out_path, int render_frame_count, VideoPaths &paths) {
     std::filesystem::path out_path_obj(out_path);
     std::filesystem::path frames_dir = out_path_obj.parent_path() / "frames";
     std::filesystem::path video_path = out_path_obj.parent_path() / (out_path_obj.stem().string() + "_video.mp4");
+    paths.frames_dir = frames_dir;
+    paths.video_path = video_path;
 
     try {
         // Clear any frames left over from a previous video render - otherwise
@@ -706,7 +702,18 @@ static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
     std::cout << "Temporary frame directory: " << frames_dir << std::endl;
     std::cout << "Output video: " << video_path << std::endl;
     std::cout << "Rendering " << render_frame_count << " frames..." << std::endl;
+    return SUCCESS;
+}
 
+struct VideoCameraStart {
+    double from_x, from_y, from_z;
+    double at_x, at_y, at_z;
+};
+
+// Where the camera path starts: the scene's recommended camera, or the explicit --camera position.
+static VideoCameraStart videoCameraStart(const LaunchArgs &args, const RenderSetup &s) {
+    const std::string &scene_id = s.scene_id;
+    const double cam_x = s.cam_x, cam_y = s.cam_y, cam_z = s.cam_z;
     // Scale and phase-align the camera-path animation to this scene's
     // actual recommended camera, rather than every video using the same
     // Cornell-Box-scale orbit (radius 800 around (278,278,278), starting
@@ -740,6 +747,24 @@ static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
         std::cout << "Camera path overridden to start at (" << path_lookfrom_x << ", " << path_lookfrom_y
                    << ", " << path_lookfrom_z << ") (explicit camera position)." << std::endl;
     }
+    return {path_lookfrom_x, path_lookfrom_y, path_lookfrom_z, path_lookat_x, path_lookat_y, path_lookat_z};
+}
+
+// Renders every frame (the camera moving along the path), converts them to PNG on a background thread, and reports the counts. SUCCESS, or the error code to exit with;
+// `converted` is the number of PNG frames the assembly will read.
+static int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const VideoPaths &paths, int render_frame_count, const camera_keyframes::Path &keyframes,
+                             bool use_keyframes, const VideoCameraStart &start, int &converted) {
+    const bool use_gpu = s.use_gpu;
+    const int image_width = s.image_width;
+    const int image_height = s.image_height;
+    const int samples_per_pixel = s.samples_per_pixel;
+    const int max_ray_depth = s.max_ray_depth;
+    const std::string &scene_id = s.scene_id;
+    const int video_fps = s.video_fps;
+    const std::string &camera_path = s.camera_path;
+    const std::filesystem::path &frames_dir = paths.frames_dir;
+    const double path_lookfrom_x = start.from_x, path_lookfrom_y = start.from_y, path_lookfrom_z = start.from_z;
+    const double path_lookat_x = start.at_x, path_lookat_y = start.at_y, path_lookat_z = start.at_z;
 
     auto video_start_time = std::chrono::high_resolution_clock::now();
     int successful_frames = 0;
@@ -926,7 +951,7 @@ static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
     // waits for the queue to drain (typically near-instant, since
     // conversion is far faster than a render) and gets the final count.
     std::cout << "Finishing PNG conversion..." << std::endl;
-    int converted = png_converter.finish();
+    converted = png_converter.finish();
 
     std::cout << "Rendered: " << successful_frames << " frames, converted: " << converted << " PNG files" << std::endl;
 
@@ -934,7 +959,11 @@ static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
         std::cerr << "ERROR: No frames converted to PNG successfully!" << std::endl;
         return ERR_FILE_WRITE_FAILED;
     }
+    return SUCCESS;
+}
 
+// Assembles the PNG sequence into the MP4: AVFoundation on a Mac, ffmpeg otherwise (and as the fallback). SUCCESS or ERR_VIDEO_ASSEMBLY_FAILED.
+static int assembleVideoFile(const std::filesystem::path &frames_dir, int converted, int video_fps, const std::filesystem::path &video_path) {
     // Assemble the PNG sequence into an MP4 with ffmpeg
     std::cout << "\n========================================" << std::endl;
     std::cout << "ASSEMBLING VIDEO WITH FFMPEG" << std::endl;
@@ -995,11 +1024,36 @@ static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
         return ERR_VIDEO_ASSEMBLY_FAILED;
     }
     }   // if (!video_done): the ffmpeg fallback
+    return SUCCESS;
+}
+
+// --video: renders the frames along a camera path, converts them to PNG as they finish, and assembles an MP4.
+static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
+    const int image_width = s.image_width;
+    const int image_height = s.image_height;
+
+    std::cout << "\n========================================" << std::endl;
+    std::cout << "VIDEO RENDERING" << std::endl;
+    std::cout << "========================================" << std::endl;
+
+    camera_keyframes::Path keyframes;
+    bool use_keyframes = false;
+    if (int rc = loadVideoKeyframes(s, keyframes, use_keyframes); rc != SUCCESS) return rc;
+    int render_frame_count = 0;
+    if (int rc = resolveVideoFrameCount(s.video_frames, s.video_speed, s.video_fps, render_frame_count); rc != SUCCESS) return rc;
+    pinThreadsForVideo(s.use_gpu);
+    VideoPaths paths;
+    if (int rc = prepareVideoDirectories(s.out_path, render_frame_count, paths); rc != SUCCESS) return rc;
+    const VideoCameraStart start = videoCameraStart(args, s);
+
+    int converted = 0;
+    if (int rc = renderVideoFrames(args, s, paths, render_frame_count, keyframes, use_keyframes, start, converted); rc != SUCCESS) return rc;
+    if (int rc = assembleVideoFile(paths.frames_dir, converted, s.video_fps, paths.video_path); rc != SUCCESS) return rc;
 
     std::cout << "\n========================================" << std::endl;
     std::cout << "VIDEO COMPLETE!" << std::endl;
     std::cout << "========================================" << std::endl;
-    std::cout << "Output video: " << video_path << std::endl;
+    std::cout << "Output video: " << paths.video_path << std::endl;
     std::cout << "Resolution: " << image_width << "x" << image_height << std::endl;
     std::cout << "========================================" << std::endl;
 
@@ -1057,47 +1111,12 @@ static void write_aov_passes(const std::string &out_path, int width, int height,
 	std::cout << "  - " << image.filename().string() << " now also holds the render passes (multilayer EXR: R G B + albedo, normal, depth, uv, A)" << std::endl;
 }
 
-static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
-	const bool use_gpu = s.use_gpu;
-	const int image_width = s.image_width;
-	const int image_height = s.image_height;
-	const int samples_per_pixel = s.samples_per_pixel;
-	const int max_ray_depth = s.max_ray_depth;
-	const std::string &scene_id = s.scene_id;
-	double cam_x = s.cam_x;
-	double cam_y = s.cam_y;
-	double cam_z = s.cam_z;
-	const bool use_sppm = s.use_sppm;
-	const bool use_bdpt = s.use_bdpt;
-	const bool use_mlt = s.use_mlt;
-	const bool use_randomwalk = s.use_randomwalk;
-	const bool use_ao = s.use_ao;
-	const bool use_simplepath = s.use_simplepath;
-	const bool use_simplevolpath = s.use_simplevolpath;
-	const bool use_lightpath = s.use_lightpath;
-	const bool use_debug_integrator = s.use_debug_integrator;
-	const std::string &out_path = s.out_path;
-
-    // If the caller didn't explicitly pass cam_x/y/z, cam_x/y/z are just
-    // sitting at LaunchArgs' generic Cornell-Box-scale struct defaults
-    // (278,278,-800) - forcing that onto every scene regardless of its own
-    // actual coordinate scale would misplace the camera exactly like a
-    // stale leftover GUI spinbox value would (e.g. scene 1's spheres sit
-    // within roughly +-15 units of the origin). Use the selected scene's
-    // own recommended camera instead in that case. Either way,
-    // force_camera_override=1 below makes sure the renderer actually uses
-    // whichever of these two is now in cam_x/y/z, regardless of the
-    // scene's CameraConfig.mode (Fixed scenes would otherwise silently
-    // ignore it and use their own registry lookfrom unconditionally).
-    if (!args.cam_explicit) {
-        cpu_scene_recommended_camera(scene_id.c_str(), &cam_x, &cam_y, &cam_z, nullptr, nullptr, nullptr);
-    }
-
-    // Start timing for performance measurement
-    auto start_time = std::chrono::high_resolution_clock::now();
-
-    int render_result = -1; // 0 = success, non-zero = error
-
+// --exposure, --tonemap and --seed reach only the default path tracer: a warning for each one passed with an integrator that ignores it.
+static void warnFlagsIgnoredByIntegrator(const LaunchArgs &args, const RenderSetup &s) {
+    const bool use_sppm = s.use_sppm;
+    const bool use_bdpt = s.use_bdpt;
+    const bool use_mlt = s.use_mlt;
+    const bool use_debug_integrator = s.use_debug_integrator;
     // --exposure only reaches cpu_render_main()/optix_render_main()/
     // metal_render_main() (the plain path-tracer entry points, now all
     // three backends per section 148, docs/history/METAL_GPU_FEASIBILITY.md) -
@@ -1132,12 +1151,26 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
                      "--randomwalk/--ao/--simplepath/--simplevolpath/--lightpath "
                      "(only the default path tracer supports it) - this render will not be reproducible.\n";
     }
+}
 
-    // Used by the plain path-tracer branches only (use_gpu/else below) -
-    // BDPT/MLT/SPPM/the debug integrators have no RenderOptions parameter
-    // at all (see the warnings just above). See src/shared/
-    // render_options.h's own field comments.
-    RenderOptions render_opts = render_options_from_args(args);
+// Runs the integrator the flags chose (BDPT, MLT, the debug integrators, SPPM, the GPU path tracer or the CPU path tracer) and reports its result.
+// False when the render failed or the GPU is missing: `render_result` is then the code to exit with.
+static bool runIntegrator(const LaunchArgs &args, const RenderSetup &s, double cam_x, double cam_y, double cam_z, const RenderOptions &render_opts, int &render_result) {
+    const bool use_gpu = s.use_gpu;
+    const int image_width = s.image_width;
+    const int image_height = s.image_height;
+    const int samples_per_pixel = s.samples_per_pixel;
+    const int max_ray_depth = s.max_ray_depth;
+    const std::string &scene_id = s.scene_id;
+    const bool use_sppm = s.use_sppm;
+    const bool use_bdpt = s.use_bdpt;
+    const bool use_mlt = s.use_mlt;
+    const bool use_randomwalk = s.use_randomwalk;
+    const bool use_ao = s.use_ao;
+    const bool use_simplepath = s.use_simplepath;
+    const bool use_simplevolpath = s.use_simplevolpath;
+    const bool use_lightpath = s.use_lightpath;
+    const std::string &out_path = s.out_path;
 
     if (use_bdpt) {
         // BDPT Renderer, CPU path (Bidirectional Path Tracing). Implemented
@@ -1152,7 +1185,7 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
                                               args.bdpt_max_depth, out_path.c_str(),
                                               scene_id.c_str(), cam_x, cam_y, cam_z, 1);  // force_camera_override
         if (!report_render_result(render_result, "cpu_render_main_bdpt", "BDPT", "BDPT", out_path))
-            return render_result;
+            return false;
     } else if (use_mlt) {
         // MLT Renderer, CPU path (Metropolis Light Transport). Implemented
         // in cpu_renderer/cpu_interface_bdpt.cpp - same priority reasoning
@@ -1162,14 +1195,14 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
                                              args.mlt_mutations, args.mlt_max_depth, out_path.c_str(),
                                              scene_id.c_str(), cam_x, cam_y, cam_z, 1);  // force_camera_override
         if (!report_render_result(render_result, "cpu_render_main_mlt", "MLT", "MLT", out_path))
-            return render_result;
+            return false;
     } else if (use_randomwalk) {
         std::cout << "Calling cpu_render_main_randomwalk(...) in-process..." << std::endl;
         render_result = cpu_render_main_randomwalk(image_width, image_height, samples_per_pixel,
                                                      max_ray_depth, out_path.c_str(),
                                                      scene_id.c_str(), cam_x, cam_y, cam_z, 1);
         if (!report_render_result(render_result, "cpu_render_main_randomwalk", "RandomWalk", "RANDOMWALK", out_path))
-            return render_result;
+            return false;
     } else if (use_ao) {
         std::cout << "Calling cpu_render_main_ao(...) in-process..." << std::endl;
         render_result = cpu_render_main_ao(image_width, image_height, samples_per_pixel,
@@ -1177,7 +1210,7 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
                                             args.ao_illum_r, args.ao_illum_g, args.ao_illum_b,
                                             out_path.c_str(), scene_id.c_str(), cam_x, cam_y, cam_z, 1);
         if (!report_render_result(render_result, "cpu_render_main_ao", "AO", "AO", out_path))
-            return render_result;
+            return false;
     } else if (use_simplepath) {
         std::cout << "Calling cpu_render_main_simplepath(...) in-process..." << std::endl;
         render_result = cpu_render_main_simplepath(image_width, image_height, samples_per_pixel,
@@ -1185,21 +1218,21 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
                                                      args.simplepath_sample_bsdf ? 1 : 0, out_path.c_str(),
                                                      scene_id.c_str(), cam_x, cam_y, cam_z, 1);
         if (!report_render_result(render_result, "cpu_render_main_simplepath", "SimplePath", "SIMPLEPATH", out_path))
-            return render_result;
+            return false;
     } else if (use_simplevolpath) {
         std::cout << "Calling cpu_render_main_simplevolpath(...) in-process..." << std::endl;
         render_result = cpu_render_main_simplevolpath(image_width, image_height, samples_per_pixel,
                                                         max_ray_depth, out_path.c_str(),
                                                         scene_id.c_str(), cam_x, cam_y, cam_z, 1);
         if (!report_render_result(render_result, "cpu_render_main_simplevolpath", "SimpleVolPath", "SIMPLEVOLPATH", out_path))
-            return render_result;
+            return false;
     } else if (use_lightpath) {
         std::cout << "Calling cpu_render_main_lightpath(...) in-process..." << std::endl;
         render_result = cpu_render_main_lightpath(image_width, image_height, samples_per_pixel,
                                                     max_ray_depth, out_path.c_str(),
                                                     scene_id.c_str(), cam_x, cam_y, cam_z, 1);
         if (!report_render_result(render_result, "cpu_render_main_lightpath", "LightPath", "LIGHTPATH", out_path))
-            return render_result;
+            return false;
     } else if (use_sppm && use_gpu) {
         // SPPM Renderer, GPU/OptiX path. Scope (which scenes are actually
         // supported) is determined dynamically from the built scene's real
@@ -1211,14 +1244,15 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
         // reaches the GPU path instead of silently falling back to CPU.
         if (!optix_is_available()) {
             std::cerr << "ERROR: OptiX is not available! (--sppm --gpu requires OptiX)" << std::endl;
-            return ERR_GPU_NO_DEVICE;
+            render_result = ERR_GPU_NO_DEVICE;
+            return false;
         }
         std::cout << "Calling optix_render_main_sppm(...) in-process (OptiX)..." << std::endl;
         render_result = optix_render_main_sppm(image_width, image_height, args.sppm_iterations,
                                                 args.sppm_photons, max_ray_depth, out_path.c_str(),
                                                 scene_id.c_str(), cam_x, cam_y, cam_z, 1);  // force_camera_override
         if (!report_render_result(render_result, "optix_render_main_sppm", "GPU SPPM", "GPU SPPM", out_path))
-            return render_result;
+            return false;
     } else if (use_sppm) {
         // SPPM Renderer, CPU path (Stochastic Progressive Photon Mapping).
         // Implemented in cpu_renderer/cpu_interface.cpp - takes priority
@@ -1229,13 +1263,14 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
                                               args.sppm_photons, max_ray_depth, out_path.c_str(),
                                               scene_id.c_str(), cam_x, cam_y, cam_z, 1);  // force_camera_override
         if (!report_render_result(render_result, "cpu_render_main_sppm", "SPPM", "SPPM", out_path))
-            return render_result;
+            return false;
     } else if (use_gpu) {
         // The GPU renderer this build has: Metal on a Mac (gpu/metal/metal_poc.mm renders a pbrt-file-backed scene_id and, for any other, prints a clear
         // message and returns non-zero), OptiX on Windows. Both are called through launcher/gpu_backend.h.
         if (!gpu_backend::available()) {
             std::cerr << "ERROR: " << gpu_backend::name() << " is not available!" << std::endl;
-            return ERR_GPU_NO_DEVICE;
+            render_result = ERR_GPU_NO_DEVICE;
+            return false;
         }
         std::cout << "Calling " << gpu_backend::entryPoint() << "(...) in-process (" << gpu_backend::name() << ")..." << std::endl;
         std::cout << "[DEBUG] Camera: (" << cam_x << ", " << cam_y << ", " << cam_z << ")" << std::endl;
@@ -1253,25 +1288,20 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
             render_opts
         );
         if (!report_render_result(render_result, gpu_backend::entryPoint(), gpu_backend::name(), gpu_backend::reportTag(), out_path, gpu_backend::failureHint()))
-            return render_result;
+            return false;
     } else {
         // CPU Renderer (multithreaded C++)
         // Implemented in cpu_renderer/cpu_interface.cpp
         std::cout << "Calling cpu_render_main(...) in-process..." << std::endl;
         render_result = cpu_render_main(image_width, image_height, samples_per_pixel, max_ray_depth, out_path.c_str(), scene_id.c_str(), cam_x, cam_y, cam_z, 1, render_opts);  // force_camera_override
         if (!report_render_result(render_result, "cpu_render_main", "in-process CPU", "CPU", out_path))
-            return render_result;
+            return false;
     }
+    return true;
+}
 
-    // ========================================================================
-    // Performance Reporting
-    // ========================================================================
-    // Calculate and display render time in appropriate units
-
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-    double seconds = duration.count() / 1000.0;
-
+// "RENDER TIME: 850 ms / 12.34 seconds / 2 min 3.4 sec" between two rules.
+static void printRenderTime(std::chrono::milliseconds duration, double seconds) {
     std::cout << "\n========================================" << std::endl;
     std::cout << "RENDER TIME: ";
     if (seconds < 1.0) {
@@ -1284,8 +1314,18 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
         std::cout << minutes << " min " << std::fixed << std::setprecision(1) << remainingSeconds << " sec" << std::endl;
     }
     std::cout << "========================================" << std::endl;
+}
 
-    // ========================================================================
+// --stats on the CPU path tracer: the ray counts (render_stats.h) and samples per second.
+static void printCpuStats(const LaunchArgs &args, const RenderSetup &s, double seconds) {
+    const bool use_gpu = s.use_gpu;
+    const bool use_bdpt = s.use_bdpt;
+    const bool use_mlt = s.use_mlt;
+    const bool use_sppm = s.use_sppm;
+    const bool use_debug_integrator = s.use_debug_integrator;
+    const int image_width = s.image_width;
+    const int image_height = s.image_height;
+    const int samples_per_pixel = s.samples_per_pixel;
     // Stats reporting (--stats, opt-in - see src/shared/render_stats.h)
     // ========================================================================
     // Same "default path tracer only" scope cut as --exposure/--sampler
@@ -1338,14 +1378,11 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
                    << "\n";
         std::cout << "[STATS] ─────────────────────────────────────────────\n";
     }
+}
 
-    // ========================================================================
-    // Format Conversion
-    // ========================================================================
-    // Convert PPM (raw format) to PNG (compressed, widely supported)
-    // PNG is more convenient for viewing and sharing
-
-    if (render_result == 0) {
+// After a successful render: PPM to PNG (Metal and EXR output are already final) and the list of files to open.
+static void announceRenderedFile(const std::string &out_path, bool use_gpu) {
+    (void)use_gpu;  // (read only by the Metal branch)
         std::filesystem::path ppm_path_obj(out_path);
 
 #ifdef RT_HAVE_METAL
@@ -1408,7 +1445,63 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
             std::cout << "  - " << png_path.filename() << " (PNG - lossless, widely supported)" << std::endl;
             std::cout << "  - " << ppm_path_obj.filename() << " (PPM - raw data)" << std::endl;
         }
+}
+
+static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
+	const bool use_gpu = s.use_gpu;
+	const int image_width = s.image_width;
+	const int image_height = s.image_height;
+	const int samples_per_pixel = s.samples_per_pixel;
+	const std::string &scene_id = s.scene_id;
+	double cam_x = s.cam_x;
+	double cam_y = s.cam_y;
+	double cam_z = s.cam_z;
+	const std::string &out_path = s.out_path;
+
+    // If the caller didn't explicitly pass cam_x/y/z, cam_x/y/z are just
+    // sitting at LaunchArgs' generic Cornell-Box-scale struct defaults
+    // (278,278,-800) - forcing that onto every scene regardless of its own
+    // actual coordinate scale would misplace the camera exactly like a
+    // stale leftover GUI spinbox value would (e.g. scene 1's spheres sit
+    // within roughly +-15 units of the origin). Use the selected scene's
+    // own recommended camera instead in that case. Either way,
+    // force_camera_override=1 below makes sure the renderer actually uses
+    // whichever of these two is now in cam_x/y/z, regardless of the
+    // scene's CameraConfig.mode (Fixed scenes would otherwise silently
+    // ignore it and use their own registry lookfrom unconditionally).
+    if (!args.cam_explicit) {
+        cpu_scene_recommended_camera(scene_id.c_str(), &cam_x, &cam_y, &cam_z, nullptr, nullptr, nullptr);
     }
+
+    // Start timing for performance measurement
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    int render_result = -1; // 0 = success, non-zero = error
+
+    warnFlagsIgnoredByIntegrator(args, s);
+
+    // Used by the plain path-tracer branches only (use_gpu/else below) -
+    // BDPT/MLT/SPPM/the debug integrators have no RenderOptions parameter
+    // at all (see the warnings just above). See src/shared/
+    // render_options.h's own field comments.
+    RenderOptions render_opts = render_options_from_args(args);
+
+    if (!runIntegrator(args, s, cam_x, cam_y, cam_z, render_opts, render_result)) return render_result;
+
+    // ========================================================================
+    // Performance Reporting
+    // ========================================================================
+    // Calculate and display render time in appropriate units
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    double seconds = duration.count() / 1000.0;
+
+    printRenderTime(duration, seconds);
+
+    printCpuStats(args, s, seconds);
+
+    if (render_result == 0) announceRenderedFile(out_path, use_gpu);
 
     if (render_result == 0 && args.aovs) write_aov_passes(out_path, image_width, image_height, samples_per_pixel, scene_id, cam_x, cam_y, cam_z);
     return render_result;
