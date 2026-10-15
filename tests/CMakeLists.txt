@@ -161,6 +161,9 @@ add_executable(unit_tests
     # (see the pbrt_gpu_*_tests.cpp comment below) - it #includes
     # pbrt_gpu_builder.h directly, which transitively #includes <optix.h>.
     unit/pbrt_cpu_builder_tests.cpp
+    unit/pbrt_cpu_builder_accelerator_tests.cpp
+    unit/pbrt_cpu_builder_features_tests.cpp
+    unit/pbrt_cpu_builder_files_tests.cpp
     unit/pbrt_discover_tests.cpp
     # pbrt_example_scenes_tests.cpp is deliberately NOT listed here - it's a
     # real end-to-end render-smoke test calling cpu_render_main AND
@@ -173,6 +176,10 @@ add_executable(unit_tests
     # pbrt_gpu_*_tests.cpp comment below explains staying out of this
     # portable, SDK-independent target for.
     unit/pbrt_flatten_tests.cpp
+    unit/pbrt_flatten_camera_tests.cpp
+    unit/pbrt_flatten_lights_tests.cpp
+    unit/pbrt_flatten_materials_tests.cpp
+    unit/pbrt_flatten_media_tests.cpp
     unit/live_object_edit_tests.cpp
     unit/pbrt_arrangement_tests.cpp
     # pbrt_gpu_*_tests.cpp (bilinear_light/disk_cylinder/instance_sphere/
@@ -320,6 +327,7 @@ add_executable(cpu_integrator_tests
     unit/bump_footprint_cpu_tests.cpp
     unit/scene_text_tests.cpp
     unit/scene_builder_tests.cpp
+    unit/scene_builder_more_tests.cpp
     unit/scene_sky_tests.cpp
     unit/scene_lighting_tests.cpp
     unit/scene_projector_tests.cpp
