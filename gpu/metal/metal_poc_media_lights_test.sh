@@ -7,8 +7,8 @@ RT="$1"; CHK="$2"; DIR="$3"
 status=0
 for name in distant-homogeneous point-homogeneous distant-cloud point-cloud; do
   scene="gpu/metal/test_scenes/media-$name.pbrt"
-  "$RT" --cpu --seed 3 --output "$DIR/media_${name}_cpu.exr" 48 64 12 "$scene" >/dev/null 2>&1 || { echo "$name: CPU render failed"; exit 1; }
-  "$RT" --gpu --seed 3 --output "$DIR/media_${name}_metal.exr" 48 64 12 "$scene" >/dev/null 2>&1 || { echo "$name: Metal render failed"; exit 1; }
+  "$RT" --cpu --seed 3 --output "$DIR/media_${name}_cpu.exr" 48 64 12 "$scene" >"$DIR/media_lights_render.log" 2>&1 || { echo "$name: CPU render failed"; tail -15 "$DIR/media_lights_render.log"; exit 1; }
+  "$RT" --gpu --seed 3 --output "$DIR/media_${name}_metal.exr" 48 64 12 "$scene" >"$DIR/media_lights_render.log" 2>&1 || { echo "$name: Metal render failed"; tail -15 "$DIR/media_lights_render.log"; exit 1; }
   "$CHK" "$name" "$DIR/media_${name}_cpu.exr" "$DIR/media_${name}_metal.exr" 5 || status=1
 done
 [ $status -eq 0 ] && echo MEDIA_LIGHTS_TEST_OK
