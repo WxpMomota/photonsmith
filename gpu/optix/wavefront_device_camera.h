@@ -764,7 +764,7 @@ __device__ __forceinline__ float wf_emitter_hit_mis_weight(
 // itself stays free of any site-specific branching.
 __device__ __forceinline__ void wf_push_nee_shadow_ray(
 	WorkQueue<ShadowRayWorkItem>& shadowQueue,
-	const float3& hit_point, const float3& normal, bool isPhase, float shadow_eps,
+	const float3& hit_point, const float3& offsetNormal, bool isPhase, float shadow_eps,
 	float raw_cos, const float3& lightDir, float tMax,
 	const SampledSpectrum<kWFNWavelengths>& Ld, float filterWeight,
 	const SampledWavelengths<kWFNWavelengths>& swl,
@@ -779,7 +779,12 @@ __device__ __forceinline__ void wf_push_nee_shadow_ray(
 	// to the far side of the surface instead of back into the same
 	// hemisphere the ray isn't going toward).
 	ShadowRayWorkItem shadow;
-	shadow.origin    = hit_point + (isPhase ? make_float3(0.0f, 0.0f, 0.0f) : copysignf(shadow_eps, raw_cos) * normal)
+	// The origin is offset along `offsetNormal` - the GEOMETRIC normal where the caller has one - toward the side the light is on, as pbrt's SpawnRayTo offsets along the
+	// geometric normal: along a bump- or normal-mapped surface's perturbed shading normal it dipped below the surface where that normal tilts away from it, the shadow ray
+	// then started under the floor and hit it, and a strongly bumped floor at a grazing light read 7% dark (bump-fine-floor, wavefront). For a surface with no such normal the
+	// offset normal is the shading normal and the side is raw_cos's, as before.
+	(void)raw_cos;
+	shadow.origin    = hit_point + (isPhase ? make_float3(0.0f, 0.0f, 0.0f) : copysignf(shadow_eps, dot(offsetNormal, normalize(lightDir))) * offsetNormal)
 		+ shadow_eps * normalize(lightDir);
 	// Aimed at the sampled target from the shifted origin - see shadow_ray_toward().
 	shadow_ray_toward(hit_point, shadow.origin, normalize(lightDir), tMax, shadow.direction, shadow.tMax);

@@ -8,9 +8,9 @@
 # (CameraBase::Approximate_dp_dxy). A renderer that reads the height texel by texel, or only gives the camera ray a footprint, tilts the normals of a finely textured floor seen from
 # afar by texel-sized noise. A wall faces the camera and is lit only by light the floor sheds on it, so the floor is mostly hit by bounced paths. The map (images/bump-marble.png) repeats 30 times across the floor, so a pixel covers many texels.
 #
-# At the pack's size (64 pixels, 8 bounces) real pbrt reads 0.0439 of it; the CPU and the recursive OptiX backend read within 1.5% of that, the wavefront backend 7% low (open: its
-# bounced-hit footprint differs from the recursive one, a coarser map - uscale 1, scale 0.6 - agrees on all four). The mean is very sensitive to the footprint: with the bounced footprint
-# lost altogether it moves by 18%, and the pack row fails at 3%.
+# At the pack's size (64 pixels, 8 bounces) real pbrt reads 0.0439 of it and the CPU (0.985), the recursive OptiX backend (0.990) and the wavefront backend (0.988) agree.
+# The mean is very sensitive to the footprint: with the bounced footprint lost altogether it moves by 18%, and the pack row fails at 3%. (The wavefront backend used to read 7%
+# low here: its shadow ray started along the PERTURBED normal, under the floor.)
 #
 # Original, so it carries no licence constraints. See tests/data/pbrt_reference_means.txt (the pack row).
 

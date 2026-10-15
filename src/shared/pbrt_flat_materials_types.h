@@ -680,7 +680,11 @@ inline pbrt_scene::Vec3 resolveEmissionColor(const pbrt_scene::ParamList &params
                                               const RGBColorSpace &colorSpace = RGBColorSpace::sRGB()) {
 	const pbrt_scene::Param *p = params.find(name);
 	if (p && p->type == "blackbody" && !p->numbers.empty()) {
-		return blackbodyKelvinToRGB(static_cast<float>(p->numbers[0]), colorSpace);
+		// A blackbody is a physical spectrum, and the picture comes out in the film's colour space whatever ColorSpace the scene set for its RGB values: real pbrt-v4 draws
+		// pbrt_scenes/colorspace-blackbody.pbrt (ColorSpace "rec2020") exactly as blackbody-light.pbrt (means 2.0724 1.2294 1.0335 both). Converting it into the scene's
+		// colour space, as this did, read the first one red 5% and 11% low (a mean), green 10% high on every backend. `colorSpace` is kept for the callers and unused here.
+		(void)colorSpace;
+		return blackbodyKelvinToRGB(static_cast<float>(p->numbers[0]), RGBColorSpace::sRGB());
 	}
 	return params.getVec3(name, def);
 }

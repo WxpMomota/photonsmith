@@ -708,7 +708,9 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 		// emission-lookup time via emissionScale instead of baked in here,
 		// since the image data itself is shared/cached across materials.
 		if (!emission->filename.empty()) {
-			d.textureIdx = getOrBuildPbrtImageTexture(emission->filename, out, imageTextureCache);
+			// (pbrt's DiffuseAreaLight reads its image with Image::BilerpChannel, whose default wrap is CLAMP, not an imagemap Texture's repeat: at the picture's edge a
+			// repeating lookup blends in the opposite side's colour - textured-twosided-lights read blue 6% high on the CPU and 2.5% on OptiX because of it.)
+			d.textureIdx = getOrBuildPbrtImageTexture(emission->filename, out, imageTextureCache, kGpuImagemapDefaultGamma, GpuWrapMode::Clamp);
 			d.emissionScale = static_cast<float>(emission->scale);
 			// d.emission itself is never READ for a textured light's actual
 			// per-sample radiance (material_emission()/sample_area_light_by_

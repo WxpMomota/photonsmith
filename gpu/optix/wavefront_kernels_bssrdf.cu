@@ -178,7 +178,7 @@ extern "C" __global__ void resolve_bssrdf_exit(
 		item.etaScale,
 		item.filterWeight,
 		maxComponentValue,
-		item.exitNormal, item.exitPos,
+		item.exitNormal, /*geomNormal=*/make_float3(0.0f, 0.0f, 0.0f), item.exitPos,
 		/*dpdu=*/make_float3(0.0f, 0.0f, 0.0f),  // never reaches glossy_isType - see glossyAlpha comment above
 		seed,
 		weightedThroughput, radiance, swl, attenuation, scattered_dir,

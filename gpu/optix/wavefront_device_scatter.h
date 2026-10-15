@@ -77,7 +77,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 	// comment below and GpuCameraParams::maxComponentValue's own comment
 	// (optix_types.h). 1e9f (unbounded) when not requested.
 	float maxComponentValue,
-	const float3& normal, const float3& hit_point,
+	const float3& normal, const float3& geomNormalIn, const float3& hit_point,
 	// World-space surface tangent (dp/du) at this shading point - real
 	// per-shape value from the caller (see HitWorkItem::objDpdu's own
 	// comment), used ONLY by evalGlossyF's UV-aligned frame construction
@@ -803,7 +803,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 			// resolves occlusion, whenever this is a depth==1 hit whose
 			// originating x0 was GI-eligible; a no-op (false) for every other
 			// call (depth==0's own NEE, or GI disabled/ineligible this frame).
-			wf_push_nee_shadow_ray(shadowQueue, hit_point, normal, isPhase, shadow_eps,
+			wf_push_nee_shadow_ray(shadowQueue, hit_point, (dot(geomNormalIn, geomNormalIn) > 0.5f ? geomNormalIn : normal), isPhase, shadow_eps,
 				raw_cos, to_light, max_dist - 0.002f, Ld, filterWeight, swl,
 				pixelIndex, time, giCandidateEligible, wf_pcg(seed));
 		}
@@ -881,7 +881,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 			// uses copysignf(shadow_eps, raw_cos) rather than always
 			// +shadow_eps, and why tMax is the unadjusted 1e30f sentinel here
 			// (unlike the area/punctual sites' max_dist/t_max - 0.002f).
-			wf_push_nee_shadow_ray(shadowQueue, hit_point, normal, isPhase, shadow_eps,
+			wf_push_nee_shadow_ray(shadowQueue, hit_point, (dot(geomNormalIn, geomNormalIn) > 0.5f ? geomNormalIn : normal), isPhase, shadow_eps,
 				raw_cos, sky_dir, 1e30f, Ld, filterWeight, swl,
 				pixelIndex, time, giCandidateEligible, wf_pcg(seed));
 		}
@@ -954,7 +954,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 		// wf_rand(seed)-consuming call between iterations to decorrelate them
 		// - mixing in pli keeps two lights on the same hit from getting
 		// identical ratio-tracking noise if they both cross the same medium.
-		wf_push_nee_shadow_ray(shadowQueue, hit_point, normal, isPhase, shadow_eps,
+		wf_push_nee_shadow_ray(shadowQueue, hit_point, (dot(geomNormalIn, geomNormalIn) > 0.5f ? geomNormalIn : normal), isPhase, shadow_eps,
 			raw_cos, wi, t_max - 0.002f, Ld, filterWeight, swl,
 			pixelIndex, time, giCandidateEligible, wf_pcg(seed ^ (pli * 0x9E3779B9u)));
 	}

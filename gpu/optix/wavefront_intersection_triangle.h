@@ -176,6 +176,13 @@ extern "C" __global__ void __closesthit__wf_triangle() {
 		geom_normal = normalize(optixTransformNormalFromObjectToWorldSpace(geom_normal));
 	bool front_face = dot(ray_dir, geom_normal) < 0.0f;
 	float3 normal = front_face ? geom_normal : -geom_normal;
+	// The true geometric normal (the cross of the edges, not the interpolated vertex normal), on the ray's side: a spawned ray's origin is offset along it, as pbrt does.
+	float3 geometricOnRaySide;
+	{
+		float3 gn = normalize(cross(tri.p1 - tri.p0, tri.p2 - tri.p0));
+		if (instBase >= 0) gn = normalize(optixTransformNormalFromObjectToWorldSpace(gn));
+		geometricOnRaySide = dot(gn, ray_dir) < 0.0f ? gn : -gn;
+	}
 
 	// Barycentric-interpolated UV, matching optix_intersection_triangle.h's
 	// closesthit exactly - tri.hasUVs gates it the same way tri.hasNormals
@@ -266,6 +273,7 @@ extern "C" __global__ void __closesthit__wf_triangle() {
 
 	payload->hitPoint    = hit_point;
 	payload->normal      = normal;
+	payload->geomNormal  = geometricOnRaySide;
 	payload->t           = t_hit;
 	payload->materialIdx = tri.materialIdx;
 	payload->geomType    = 3;

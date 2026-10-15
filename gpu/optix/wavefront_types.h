@@ -130,6 +130,7 @@ struct HitWorkItem {
 	// Surface geometry
 	float3 hitPoint;
 	float3 normal;             // shading normal (outward)
+	float3 geomNormal;         // the geometric normal on the ray's side (zero = `normal`): what a spawned ray's origin is offset along, as in pbrt - a bump-mapped surface's shading normal can dip below the surface
 	float  t;                  // ray parameter at hit
 
 	// Material info

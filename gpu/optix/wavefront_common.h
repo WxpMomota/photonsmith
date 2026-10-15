@@ -328,6 +328,7 @@ __device__ __forceinline__ float gpu_rgb_grid_trilinear(const float* d, int nx, 
 struct WfHitPayload {
 	float3 hitPoint;
 	float3 normal;
+	float3 geomNormal;   // the GEOMETRIC normal on the ray's side where it differs from `normal` (a bump- or normal-mapped triangle: `normal` is the perturbed one); zero = same as `normal`
 	float  t;
 	int    materialIdx;
 	int    geomType;   // 0 = sphere, 1 = quad, 2 = bilinear patch, 4 = disk, 5 = cylinder

@@ -5,14 +5,11 @@
 #
 # Identical geometry/lighting to blackbody-light.pbrt (same two 2500K/9000K
 # panel lights, same "float scale", same camera) except for one added
-# "ColorSpace \"rec2020\"" directive near the top. The only consumer of a
-# scene's working color space in this loader is resolveEmissionColor()'s
-# blackbody-temperature-to-RGB conversion (pbrt_flatten.h) - so this scene's
-# panels should render a visibly different colour than blackbody-light.pbrt's
-# for the exact same Kelvin values, proving the directive is genuinely
-# threaded through rather than parsed-and-ignored. If ColorSpace regressed
-# back to "recognized but not implemented," this scene's output would become
-# pixel-identical to blackbody-light.pbrt's.
+# "ColorSpace \"rec2020\"" directive near the top. The directive is for RGB values,
+# not for a blackbody: real pbrt-v4 draws this scene exactly as blackbody-light.pbrt
+# (the same means to four digits), so a blackbody's colour must NOT depend on it.
+# (This loader used to convert the blackbody into the scene's colour space and
+# read this scene red 5-11% low and green 10% high.)
 #
 # Original, not derived from any distributed scene, so it carries no licence
 # constraints.

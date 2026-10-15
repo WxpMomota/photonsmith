@@ -12,6 +12,11 @@
 // {wavelength, value} pairs in each array — identical to pbrt-v4's
 // PiecewiseLinearSpectrum::operator()(lambda).
 //
+// k is NOT read at those wavelengths any more: pbrt's film turns the reflected spectrum into RGB, and three wavelengths gave copper a normal-incidence reflectance of
+// (0.924, 0.610, 0.569) where the film sees (0.951, 0.638, 0.540) (pbrt_scenes/rough-metal-lamp.pbrt read red 3% and green 4% low and blue 6% high on every backend), and gold
+// red 8% low and blue 12% high. eta is as sampled; k is solved so that R0 = ((n-1)^2 + k^2) / ((n+1)^2 + k^2) is the RGB reflectance of the spectra projected through the CIE
+// quadrature of measured_rgb_quadrature.h (scripts/conductor_rgb_presets.py prints the numbers; R0 is capped at 0.995).
+//
 // Reference: pbrt-v4 §9.6 "Conductor BRDF", spectrum data in spectrum.cpp
 // ---------------------------------------------------------------------------
 
@@ -34,28 +39,28 @@ struct ConductorPreset {
 static constexpr ConductorPreset kConductorAu = {
 	"Au",
 	0.184f,  0.457f,  1.354f,   // eta R/G/B  (630/532/467 nm)
-	3.070f,  2.408f,  1.818f    // k   R/G/B
+	12.065f, 2.524f,  1.654f    // k   R/G/B (solved for the film's R0: 0.995, 0.785, 0.346)
 };
 
 // Silver (Ag) — near-achromatic; highest reflectance of any metal
 static constexpr ConductorPreset kConductorAg = {
 	"Ag",
 	0.130f,  0.130f,  0.137f,   // eta R/G/B
-	3.963f,  3.194f,  2.640f    // k   R/G/B
+	4.187f,  3.413f,  2.311f    // k   R/G/B (R0 0.971, 0.960, 0.917)
 };
 
 // Aluminium (Al) — bright bluish-white; used for brushed metal
 static constexpr ConductorPreset kConductorAl = {
 	"Al",
 	1.357f,  0.884f,  0.669f,   // eta R/G/B
-	7.588f,  6.470f,  5.690f    // k   R/G/B
+	7.553f,  6.442f,  5.700f    // k   R/G/B (R0 0.913, 0.921, 0.924)
 };
 
 // Copper (Cu) — warm orange/red tint; k rises into the blue
 static constexpr ConductorPreset kConductorCu = {
 	"Cu",
 	0.246f,  1.072f,  1.155f,   // eta R/G/B
-	3.378f,  2.591f,  2.469f    // k   R/G/B
+	4.308f,  2.750f,  2.325f    // k   R/G/B (R0 0.951, 0.638, 0.540)
 };
 
 // Iron (Fe) — neutral dark grey; placeholder using typical published values

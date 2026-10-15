@@ -32,6 +32,7 @@ extern "C" __global__ void __raygen__wf_intersect() {
 
 	WfHitPayload payload;
 	payload.hit = false;
+	payload.geomNormal = make_float3(0.0f, 0.0f, 0.0f);
 	payload.primaryRay = (ray.depth == 0) ? 1 : 0;
 
 	unsigned int p0, p1;
@@ -92,6 +93,7 @@ extern "C" __global__ void __raygen__wf_intersect() {
 		if (ambientScatter) {
 			h.hitPoint    = ray.origin + ambientT * ray.direction;
 			h.normal      = -ray.direction;
+			h.geomNormal  = make_float3(0.0f, 0.0f, 0.0f);
 			h.t           = ambientT;
 			h.materialIdx = wf_params.cameraMediumMaterialIdx;
 			h.geomType    = kWfGeomCameraMedium;
@@ -104,6 +106,7 @@ extern "C" __global__ void __raygen__wf_intersect() {
 		} else {
 			h.hitPoint    = payload.hitPoint;
 			h.normal      = payload.normal;
+			h.geomNormal  = payload.geomNormal;
 			h.t           = payload.t;
 			h.materialIdx = payload.materialIdx;
 			h.geomType    = payload.geomType;

@@ -238,7 +238,11 @@ inline std::shared_ptr<material> makeMaterial(const pbrt_flatten::Material &m,
 		// own plain (non-EWA) image emission lookup - see diffuse_light's
 		// own comment on that flag.
 		if (!emission->filename.empty()) {
-			shared_ptr<texture> tex = sharedMipmapTexture(emission->filename.c_str());
+			// pbrt's DiffuseAreaLight reads its image with Image::BilerpChannel, whose default wrap is CLAMP (an imagemap Texture's is repeat): at the edge of the picture
+			// a repeating lookup blends in the opposite side's colour.
+			MipMapOptions lightOpts = pbrtDefaultMipMapOptions();
+			lightOpts.wrap = MipWrapMode::Clamp;
+			shared_ptr<texture> tex = sharedMipmapTexture(emission->filename.c_str(), lightOpts);
 			if (emission->scale != 1.0)
 				tex = std::make_shared<scaled_texture>(tex, emission->scale);
 			return std::make_shared<diffuse_light>(tex, emission->twoSided, /*point_sample=*/true);

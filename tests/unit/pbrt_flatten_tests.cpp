@@ -3670,12 +3670,12 @@ TEST(FlattenMaterialTest, BlackbodyKelvinToRGBZeroForNonPositiveTemperature) {
 	EXPECT_DOUBLE_EQ(rgb.z, 0.0);
 }
 
-TEST(FlattenMaterialTest, ColorSpaceDirectiveChangesBlackbodyConversion) {
-	// The one place a ColorSpace directive's selection actually reaches
-	// downstream (GraphicsState::colorSpaceName's own comment, pbrt_scene.h):
-	// the same blackbody temperature must convert to a genuinely different
-	// RGB triple under a different working color space's primaries, not
-	// just have the directive parse without effect.
+TEST(FlattenMaterialTest, ColorSpaceDirectiveDoesNotChangeABlackbody) {
+	// A blackbody is a physical spectrum and the picture comes out in the film's colour
+	// space: real pbrt-v4 draws a blackbody light identically with and without
+	// ColorSpace "rec2020" (colorspace-blackbody.pbrt against blackbody-light.pbrt:
+	// means 2.0724 1.2294 1.0335 both). The directive used to convert it into the
+	// scene's colour space, which read red 5-11% low and green 10% high on every backend.
 	const FlatScene srgbLight = flattenSource(
 		"AttributeBegin\n"
 		"  AreaLightSource \"diffuse\" \"blackbody L\" [ 4000 ]\n"
@@ -3689,9 +3689,8 @@ TEST(FlattenMaterialTest, ColorSpaceDirectiveChangesBlackbodyConversion) {
 	ASSERT_EQ(rec2020Light.areaLights.size(), 1u);
 	const double (&srgb)[3] = srgbLight.areaLights[0].L;
 	const double (&rec2020)[3] = rec2020Light.areaLights[0].L;
-	EXPECT_FALSE(srgb[0] == rec2020[0] && srgb[1] == rec2020[1] && srgb[2] == rec2020[2])
-		<< "same blackbody temperature must resolve to a different RGB triple "
-		   "under Rec.2020's wider primaries than under the sRGB default";
+	for (int c = 0; c < 3; ++c)
+		EXPECT_DOUBLE_EQ(srgb[c], rec2020[c]) << "channel " << c << ": a blackbody does not depend on the scene's colour space";
 }
 
 TEST(FlattenPunctualLightTest, PointLightBlackbodyIntensityIsConverted) {
