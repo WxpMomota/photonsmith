@@ -17,6 +17,7 @@
 #include "../../src/shared/gpu_tessellate.h"
 #include "../../src/shared/gpu_scene_frame.h"
 #include "../../src/shared/gpu_scene_textures.h"   // isGrayscaleRgb8
+#include "../../src/shared/image_resample.h"   // pbrt's resize-up of a picture whose sides are not powers of two
 
 // When an RGB extinction counts as chromatic (so the kernel follows one colour channel per path instead of one grey scalar): the spread
 // (max - min) over this fraction of the maximum. A glass sphere's medium and the camera fog have always used different values here;
@@ -418,9 +419,16 @@ void MetalPocApp::applyPbrtImageBump(TriangleMaterial& mat, const pbrt_flatten::
             if (px && w > 0 && h > 0) {
                 // The CPU classifies a displacement image by content: grayscale = height map (bump), otherwise a normal map.
                 if (gpu_scene_textures::isGrayscaleRgb8(px, w, h)) {
+                    // pbrt decodes an 8-bit image as sRGB; and builds its mip levels from a power-of-two copy (Image::GeneratePyramid resamples a picture whose sides are not powers of
+                    // two up first, so level 0 of a 100 x 60 height map is its 128 x 64 copy), as the CPU's mipmap and the OptiX bump chain do (src/shared/image_resample.h).
+                    std::vector<float> heights((size_t)w * h);
+                    for (size_t k = 0; k < (size_t)w * h; ++k) heights[k] = srgb_decode::byteToLinear(px[k * 3]);
+                    int bw = w, bh = h;
+                    if (!image_resample::isPowerOf2(w) || !image_resample::isPowerOf2(h))
+                        heights = image_resample::resizeUpToPowerOf2(heights, w, h, image_resample::kRepeat, bw, bh);
+                    w = bw; h = bh;
                     entry = {(int)rgbGridData.size(), w, h, 0};
-                    rgbGridData.reserve(rgbGridData.size() + (size_t)w * h);
-                    for (size_t k = 0; k < (size_t)w * h; ++k) rgbGridData.push_back(srgb_decode::byteToLinear(px[k * 3]));   // pbrt decodes an 8-bit image as sRGB
+                    rgbGridData.insert(rgbGridData.end(), heights.begin(), heights.end());
                     // The mip chain, straight after level 0 (bumpHeightFiltered reads the level that fits the footprint): each level a 2x2 box average of the one above, the size
                     // rounded up and the far edge repeated, down to one texel.
                     {
