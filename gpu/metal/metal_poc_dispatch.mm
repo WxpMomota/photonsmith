@@ -31,6 +31,7 @@
 // host-side, from the SAME shared headers CPU/OptiX already use.
 #include "../../src/shared/filter.h"
 #include "../../src/shared/filter_sampler.h"
+#include "../../src/shared/camera_footprint.h"   // pbrt's Approximate_dp_dxy: the camera's smallest pixel differentials
 
 // Every buffer/texture the compute encoder below binds can be nil if its
 // own newBufferWith.../newTextureWithDescriptor call failed - OOM, or a
@@ -793,6 +794,25 @@ void MetalPocApp::fillFilterSamplerTable(Uniforms& uniforms) {
     }
 }
 
+// pbrt's Approximate_dp_dxy for a bounced hit (bumpFootprintApprox() in metal_poc_bump.metal): the camera's smallest pixel differentials, found once here the way
+// pbrt's CameraBase::FindMinimumDifferentials does. Only a plain perspective camera has them (the others' primary rays carry no differentials either).
+void MetalPocApp::fillFootprintCameraUniforms(Uniforms& uniforms) {
+    uniforms.footprintValid = 0;
+    if (uniforms.cameraOrthographic != 0u || uniforms.cameraSpherical != 0u || uniforms.cameraRealistic != 0u || uniforms.hasCameraOrbitBlur != 0u) return;
+    if (uniforms.width == 0 || uniforms.height == 0) return;
+    using namespace camera_footprint;
+    const auto v = [](const PackedFloat3& a) { return make(a.x, a.y, a.z); };
+    const double halfH = uniforms.tanHalfFov, halfW = uniforms.tanHalfFov * uniforms.aspect;   // the viewport at distance 1 along forward
+    const V3 origin = v(uniforms.cameraPos), right = unit(v(uniforms.cameraRight)), up = unit(v(uniforms.cameraUp)), fwd = unit(v(uniforms.cameraForward));
+    const V3 du = right * (2.0 * halfW / uniforms.width), dv = up * (-2.0 * halfH / uniforms.height);
+    const V3 pixel00 = origin + fwd + up * halfH - right * halfW + du * 0.5 + dv * 0.5;
+    const Camera cam = makeCamera(origin, pixel00, du, dv, (int)uniforms.width, (int)uniforms.height, 1);
+    if (!cam.valid) return;
+    uniforms.footprintMinDirX = PackedFloat3{(float)cam.minDirX.x, (float)cam.minDirX.y, (float)cam.minDirX.z};
+    uniforms.footprintMinDirY = PackedFloat3{(float)cam.minDirY.x, (float)cam.minDirY.y, (float)cam.minDirY.z};
+    uniforms.footprintValid = 1;
+}
+
 // Stage E: Fills the Uniforms (camera, lights, media, filter, options) and uploads them.
 bool MetalPocApp::dsFillUniforms(DispatchState& s, int argc, const char** argv) {
     auto& censusOn = s.censusOn;
@@ -900,6 +920,7 @@ bool MetalPocApp::dsFillUniforms(DispatchState& s, int argc, const char** argv) 
         applyPbrtSkyUniforms(uniforms);
         applyPbrtFilterUniforms(uniforms);
     }
+    fillFootprintCameraUniforms(uniforms);
     fillFilterSamplerTable(uniforms);
 
     uniforms.pbrtInstanceFirst = pbrtInstanceFirstId;

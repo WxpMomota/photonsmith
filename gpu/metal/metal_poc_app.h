@@ -1020,6 +1020,7 @@ struct MetalPocApp {
     void applyPbrtSkyUniforms(Uniforms& uniforms);
     void applyPbrtFilterUniforms(Uniforms& uniforms);
     void fillFilterSamplerTable(Uniforms& uniforms);
+    void fillFootprintCameraUniforms(Uniforms& uniforms);
     bool dsCheckResources(DispatchState& s);
     std::function<bool(const std::function<void(Uniforms&)>&)> dsMakeRenderFrame(DispatchState& s);
 

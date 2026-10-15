@@ -4,6 +4,8 @@
 // picture. The pictures themselves are checked against the CPU by scripts/consistency_sweep.py (the oddmap, spawn and fog groups, and metal_poc_cpu_gpu_sweep in ctest).
 #include "metal_poc_shader_tests_common.h"
 #include "metal_poc_bump_mip.h"
+#include "metal_poc_gpu_types.h"   // the host Uniforms
+#include "../../src/shared/camera_footprint.h"   // pbrt's Approximate_dp_dxy on the host: the reference for the shader's port
 #include "../../src/shared/measured_rgb_quadrature.h"   // the wavelengths and weights a measured BSDF's table becomes RGB with (macros only)
 
 // (metal_poc_shader_tests_mipmap_ref.cpp: the CPU mipmap, in a translation unit of its own)
@@ -161,4 +163,66 @@ void testMeasuredQuadratureTable(id<MTLDevice> device, id<MTLLibrary> library, i
     expectNear("measured quadrature: the red weights sum to 1", sum[0], 1.0, 2e-3);
     expectNear("measured quadrature: the green weights sum to 1", sum[1], 1.0, 2e-3);
     expectNear("measured quadrature: the blue weights sum to 1", sum[2], 1.0, 2e-3);
+}
+
+// approximateDpDxy() against camera_footprint::approximate() (the CPU camera's and both OptiX backends' pbrt Approximate_dp_dxy, in double): the same dpdx and dpdy for random hit points and
+// normals seen from a perspective camera that is turned and has a wide field of view, so the rotation to +z, the tangent-plane intersection and the way back to world space are all exercised off the
+// picture's axis (where the answer differs most from a camera ray through the point). A mutation of any of the three, or of the sample-count scale, fails it.
+void testApproximateDpDxy(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue) {
+    using namespace camera_footprint;
+    const int width = 96, height = 64, spp = 16;
+    const double tanHalf = std::tan(0.5 * 70.0 * M_PI / 180.0), aspect = (double)width / height;
+    const V3 origin = make(1.5, 2.0, -3.0), fwdRaw = make(0.3, -0.1, 1.0);
+    const V3 fwd = unit(fwdRaw), right = unit(make(fwd.z, 0.0, -fwd.x)), up = make(fwd.y * right.z - fwd.z * right.y, fwd.z * right.x - fwd.x * right.z, fwd.x * right.y - fwd.y * right.x);
+    const V3 du = right * (2.0 * tanHalf * aspect / width), dv = up * (-2.0 * tanHalf / height);
+    const V3 pixel00 = origin + fwd + up * tanHalf - right * (tanHalf * aspect) + du * 0.5 + dv * 0.5;
+    Camera cam = makeCamera(origin, pixel00, du, dv, width, height, spp);
+    expectTrue("the test camera has minimum differentials", cam.valid == 1);
+    auto f3 = [](const V3& v) { return simd::float3{(float)v.x, (float)v.y, (float)v.z}; };
+    Uniforms u{};
+    u.cameraPos = PackedFloat3{(float)origin.x, (float)origin.y, (float)origin.z};
+    u.cameraRight = PackedFloat3{(float)cam.right.x, (float)cam.right.y, (float)cam.right.z};
+    u.cameraUp = PackedFloat3{(float)cam.up.x, (float)cam.up.y, (float)cam.up.z};
+    u.cameraForward = PackedFloat3{(float)cam.forward.x, (float)cam.forward.y, (float)cam.forward.z};
+    u.footprintMinDirX = PackedFloat3{(float)cam.minDirX.x, (float)cam.minDirX.y, (float)cam.minDirX.z};
+    u.footprintMinDirY = PackedFloat3{(float)cam.minDirY.x, (float)cam.minDirY.y, (float)cam.minDirY.z};
+    u.footprintValid = 1;
+    u.samplesPerPixel = spp;
+
+    std::mt19937 rng(20261015);
+    std::uniform_real_distribution<double> ang(-1.0, 1.0), dist(0.5, 40.0), nrm(-1.0, 1.0);
+    const int n = 400;
+    std::vector<simd::float3> pts(n), nor(n);
+    std::vector<V3> refX(n), refY(n);
+    std::vector<char> refOk(n);
+    for (int i = 0; i < n; ++i) {
+        // a point in the camera's frustum (up to the corner and a bit beyond), at a distance of 0.5 to 40 units
+        const V3 dir = unit(fwd + right * (ang(rng) * tanHalf * aspect * 1.3) + up * (ang(rng) * tanHalf * 1.3));
+        const V3 p = origin + dir * dist(rng);
+        V3 nn = unit(make(nrm(rng), nrm(rng), nrm(rng)));
+        if (dot(nn, dir) > 0.0) nn = nn * -1.0;   // facing the camera
+        pts[i] = f3(p);
+        nor[i] = f3(nn);
+        V3 dx, dy;
+        refOk[i] = approximate(cam, make(pts[i].x, pts[i].y, pts[i].z), make(nor[i].x, nor[i].y, nor[i].z), dx, dy) ? 1 : 0;
+        refX[i] = dx; refY[i] = dy;
+    }
+    id<MTLBuffer> uBuf = makeBuffer(device, &u, sizeof(u));
+    id<MTLBuffer> pBuf = makeBuffer(device, pts.data(), n * sizeof(simd::float3));
+    id<MTLBuffer> nBuf = makeBuffer(device, nor.data(), n * sizeof(simd::float3));
+    id<MTLBuffer> oBuf = makeOutputBuffer(device, 2 * n * sizeof(simd::float3));
+    if (!runKernel(device, library, queue, @"test_approximateDpDxy", @[uBuf, pBuf, nBuf, oBuf], nil, n)) return;
+    const simd::float3* out = (const simd::float3*)oBuf.contents;
+    int bad = 0, nonZero = 0;
+    double worst = 0.0;
+    for (int i = 0; i < n; ++i) {
+        const V3 gx = make(out[2 * i].x, out[2 * i].y, out[2 * i].z), gy = make(out[2 * i + 1].x, out[2 * i + 1].y, out[2 * i + 1].z);
+        const double scale = std::max(1e-6, length(refX[i]) + length(refY[i]));
+        const double err = (length(gx - refX[i]) + length(gy - refY[i])) / scale;
+        if (refOk[i]) { ++nonZero; worst = std::max(worst, err); }
+        if (err > 2e-3) ++bad;
+    }
+    char label[200];
+    snprintf(label, sizeof(label), "approximateDpDxy matches camera_footprint::approximate on %d points (%d off, worst relative error %.2g)", nonZero, bad, worst);
+    expectTrue(label, bad == 0 && nonZero > n / 2);
 }

@@ -259,13 +259,18 @@ inline void perturbShadingNormal(thread const KernelRes& R, thread PathState& P,
             bumped = imageNormalMapNormal(rgbGridData, mat.bumpOffset, mat.bumpWidth, mat.bumpHeight,
                                           bumpMap.x * bumpUV.x + bumpMap.z, bumpMap.y * bumpUV.y + bumpMap.w, normal, bumpDpdu);
         } else {
-            // Every hit has the camera's footprint, as pbrt-v4 gives one to a hit whose ray has no differentials (a bounce): as if a camera ray from its position saw the point
-            // (CameraBase::Approximate_dp_dxy). For a pinhole camera that is the camera ray's own at a primary hit.
+            // The footprint of the pixel at this hit, as the CPU and pbrt give it: the camera ray's own differentials for a primary hit (or one after a specular bounce, which
+            // keeps them: a camera ray through the point), and pbrt's Approximate_dp_dxy - the camera's smallest pixel seen in the direction of the hit - for a hit after a
+            // diffuse or glossy bounce, whose ray has none (specularBounce is true until the first non-specular bounce).
             float4 footprint = float4(0.0);
             if (uniforms.cameraOrthographic == 0u && uniforms.cameraSpherical == 0u && uniforms.cameraRealistic == 0u && uniforms.hasCameraOrbitBlur == 0u) {
-                const float3 camToHit = hitPoint - float3(uniforms.cameraPos);
-                const float camDist = length(camToHit);
-                if (camDist > 1e-9) footprint = bumpFootprint(uniforms, float3(uniforms.cameraPos), camToHit / camDist, hitPoint, normal, bumpDpdu, bumpDpdv);
+                if (!specularBounce) {
+                    footprint = bumpFootprintApprox(uniforms, hitPoint, normal, bumpDpdu, bumpDpdv);
+                } else {
+                    const float3 camToHit = hitPoint - float3(uniforms.cameraPos);
+                    const float camDist = length(camToHit);
+                    if (camDist > 1e-9) footprint = bumpFootprint(uniforms, float3(uniforms.cameraPos), camToHit / camDist, hitPoint, normal, bumpDpdu, bumpDpdv);
+                }
             }
             const bool smooth = triangleIsSmooth(primId, normals);
             float3 dndu = float3(0.0), dndv = float3(0.0);
