@@ -2937,7 +2937,10 @@ color dotsColourAt(const char *mappingParams, double uvMax, double x, double y) 
 	const pbrt_cpu::BuildResult b = buildFrom(text);
 	hit_record rec;
 	const ray r(point3(x, y, 2), vec3(0, 0, -1));
-	EXPECT_TRUE(b.world->hit(r, interval(0.001, infinity), rec));
+	if (!b.world->hit(r, interval(0.001, infinity), rec) || !rec.mat) {   // (not an EXPECT then a null dereference: a miss must fail the test, not crash it)
+		ADD_FAILURE() << "the ray at (" << x << ", " << y << ") missed the quad";
+		return color(0, 0, 0);
+	}
 	scatter_record srec;
 	EXPECT_TRUE(rec.mat->scatter(r, rec, srec));
 	return srec.attenuation;
@@ -2949,7 +2952,7 @@ TEST(PbrtDotsMapping, AUscaleCountsTheCellsInTheTexturesOwnCoordinates) {
 	int inside = 0, outside = 0;
 	for (int i = 0; i < 24; ++i)
 		for (int j = 0; j < 24; ++j) {
-			const double x = (i + 0.5) / 24.0, y = (j + 0.5) / 24.0;
+			const double x = (i + 0.5) / 24.0, y = (j + 0.5) / 24.0 + 0.0123;   // (not exactly x == y: that ray runs along the quad's diagonal, the edge its two triangles share, where it may hit neither on an ARM machine)
 			const color scaled = dotsColourAt("\"float uscale\" [ 8 ] \"float vscale\" [ 8 ]", 1.0, x, y);   // the texture's own scale on a quad with uv 0..1
 			const color baked = dotsColourAt("", 8.0, x, y);                                                   // the same dots with the scale in the quad's uv
 			EXPECT_EQ(scaled.x() > 0.5, baked.x() > 0.5) << "at (" << x << ", " << y << ")";

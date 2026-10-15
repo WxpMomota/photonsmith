@@ -316,6 +316,11 @@ void testShadeThinDielectric(id<MTLDevice> device, id<MTLLibrary> library, id<MT
 
 // metal_poc_shader_tests_media.mm - participating-medium/volumetric and
 // phase-function checks (Perlin noise, cloud/RGB-grid density, HG phase).
+// metal_poc_shader_tests_geometry.mm - the bump height map's mip lookup, pbrt's cone sampling of a sphere light, and the side a spawned ray leaves from.
+void testBumpHeightFiltered(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue);
+void testSphereLightCone(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue);
+void testSpawnSide(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue);
+
 void testPerlinNoise3D(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue);
 void testGpuCloudDensity(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue);
 void testBssrdfProfile(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue);

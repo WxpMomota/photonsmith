@@ -35,6 +35,10 @@ import pbrt_scene_compare as psc     # (prepare(): the scene text both renderers
 KMAXPIN = 0.05   # the largest gap between a test-count mean and the converged one that the table pins as the expected value
 KMAXTOL = 0.25   # the widest tolerance a row may have (a scene that needs more is too noisy to guard: it is listed as NOISY)
 
+# Scenes whose single render has a heavy tail (a point light inside fog: the CPU's four runs of one render read 1.568, 1.580, 1.980 and 1.540, then 1.897 on a CI machine): the spread of a few
+# runs underestimates it, a 13% tolerance failed a hosted run, so the CPU gets the widest tolerance a row may have (the GPU renders are bit-reproducible and keep theirs).
+HEAVY_TAIL_CPU = {'camera-medium-absorbing'}
+
 GPU_LOCK = threading.Lock()   # one GPU: the OptiX renders run one at a time
 
 
@@ -121,6 +125,8 @@ def one(args, name):
                     else:
                         print('  UNPINNED %-33s %-9s test count reads %+.1f%% from its converged mean (kept the converged ratio)' % (name, backend, 100.0 * off), file=sys.stderr)
             tol = min(KMAXTOL, max(0.03, 4.0 * sigma + pbrt_noise))
+            if backend == 'cpu' and name in HEAVY_TAIL_CPU:
+                tol = KMAXTOL
             if 4.0 * sigma + pbrt_noise > KMAXTOL:
                 print('  NOISY   %-34s %-9s wants a %.0f%% tolerance, capped at %.0f%%' % (name, backend, 100.0 * (4.0 * sigma + pbrt_noise), 100.0 * KMAXTOL), file=sys.stderr)
             cols.append((ratio, tol))
