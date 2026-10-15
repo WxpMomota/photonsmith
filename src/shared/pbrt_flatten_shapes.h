@@ -338,47 +338,11 @@ inline bool flattenBilinearMeshShape(const pbrt_scene::Scene &scene, FlatScene &
 	return false;   // not handled here: fall through to the generic 'not supported' warning
 }
 
-// Shape "trianglemesh", "plymesh" and "loopsubdiv".
-inline bool flattenTriangleMeshShape(const pbrt_scene::Scene &scene, FlatScene &out, const MeshResolver &meshes,
-							 const flatten_detail::ShapeWork &w) {
+// A shape's "texture alpha" (an alpha-cutout mask): attached to its resolved material, with a warning for every way it can fail to resolve.
+inline void attachShapeAlphaMask(const pbrt_scene::Scene &scene, FlatScene &out, const pbrt_scene::ShapeDecl &shape) {
 	const auto warn = [&out](const std::string &msg) {
 		out.warnings.push_back({0, std::string(), msg});
 	};
-	const pbrt_scene::ShapeDecl &shape = *w.shape;
-	const pbrt_scene::Matrix4 &xform = w.xform;
-
-	// Real object motion blur (AnimatedTriangleMesh's own comment) -
-	// gated on ShapeWork::isTopLevelScene (see that field's own
-	// comment) - true only for a plain top-level scene shape, false
-	// for both an ObjectInstance DEFINITION's own object-space
-	// geometry (InstanceGroup::triangles has no xformEnd concept at
-	// all and keeps baking to xform only - a genuinely rare "animated
-	// mesh nested inside an instance definition" combination, scoped
-	// out rather than adding motion blur to the instancing system
-	// too) and an instanced EMISSIVE shape baked into world space
-	// (excluded explicitly, not just via the separate
-	// `shape.areaLightIndex < 0` check just below - see
-	// isTopLevelScene's own comment for why relying on that check
-	// alone, via a `triangles == &out.triangles` pointer-identity
-	// gate, was a real fragility a code-review pass on this
-	// feature's own commit caught and this field replaced).
-	const bool meshCouldAnimate =
-		w.isTopLevelScene && xform.differsFrom(w.xformEnd);
-	// A MediumInterface on a mesh shape is silently dropped - Triangle
-	// (unlike Sphere/Disk/Cylinder) has no `medium` field to carry it,
-	// and neither CPU's addMediumIfPresent() nor GPU's sphere-only
-	// MaterialType::Medium can attach one to a mesh. This used to be
-	// loud (Material "none" fell to Unsupported and warned by name);
-	// now that "none"/"" resolves to the real MaterialKind::Interface
-	// with no warning of its own, a mesh-bounded medium boundary would
-	// otherwise go silent - warn here instead, so the gap stays
-	// visible even though real mesh-medium support isn't implemented.
-	if (shape.insideMedium >= 0) {
-		warn("shape '" + shape.type + "' has a MediumInterface, but "
-			 "this loader only supports an attached medium on an "
-			 "unclipped sphere/disk/cylinder shape - the medium will "
-			 "be dropped");
-	}
 	// "texture alpha" - an alpha-cutout mask authored per-Shape (see
 	// Material::alphaTextureFilename's own comment for why it lands
 	// on the Shape's resolved material rather than a new per-
@@ -425,12 +389,14 @@ inline bool flattenTriangleMeshShape(const pbrt_scene::Scene &scene, FlatScene &
 			}
 		}
 	}
+}
 
-	std::vector<double> P;
-	std::vector<int> indices;
-	std::vector<double> N;    // per-vertex, object space; empty = none
-	std::vector<double> UV;   // per-vertex, (u,v) pairs; empty = none authored
-
+// The vertices, indices, normals and uvs of a "trianglemesh", "plymesh" or "loopsubdiv" (refined here). False when the shape has to be skipped (a warning says why).
+inline bool readMeshSource(FlatScene &out, const pbrt_scene::ShapeDecl &shape, const MeshResolver &meshes,
+						   std::vector<double> &P, std::vector<int> &indices, std::vector<double> &N, std::vector<double> &UV) {
+	const auto warn = [&out](const std::string &msg) {
+		out.warnings.push_back({0, std::string(), msg});
+	};
 	if (shape.type == "loopsubdiv") {
 		// A subdivision surface is a control cage plus a refinement
 		// rule, so it arrives looking exactly like a trianglemesh and
@@ -446,7 +412,7 @@ inline bool flattenTriangleMeshShape(const pbrt_scene::Scene &scene, FlatScene &
 		const pbrt_scene::Param *pi = shape.params.find("indices");
 		if (!pp || !pi) {
 			warn("a loopsubdiv is missing its P or indices parameter; skipped");
-			return true;
+			return false;
 		}
 
 		std::vector<std::array<double, 3>> cage(pp->numbers.size() / 3);
@@ -494,7 +460,7 @@ inline bool flattenTriangleMeshShape(const pbrt_scene::Scene &scene, FlatScene &
 		const pbrt_scene::Param *pi = shape.params.find("indices");
 		if (!pp || !pi) {
 			warn("a trianglemesh is missing its P or indices parameter; skipped");
-			return true;
+			return false;
 		}
 		P = pp->numbers;
 		indices.reserve(pi->numbers.size());
@@ -507,10 +473,10 @@ inline bool flattenTriangleMeshShape(const pbrt_scene::Scene &scene, FlatScene &
 		if (const pbrt_scene::Param *puv = shape.params.find("uv")) UV = puv->numbers;
 	} else {
 		const std::string file = shape.params.getString("filename", "");
-		if (file.empty()) { warn("a plymesh has no filename; skipped"); return true; }
+		if (file.empty()) { warn("a plymesh has no filename; skipped"); return false; }
 		if (!meshes) {
 			warn("plymesh '" + file + "' skipped: no mesh resolver supplied");
-			return true;
+			return false;
 		}
 		std::vector<float> pos;
 		std::vector<float> uvs;
@@ -518,7 +484,7 @@ inline bool flattenTriangleMeshShape(const pbrt_scene::Scene &scene, FlatScene &
 		if (!meshes(file, pos, indices, uvs, nrm)) {
 			warn("plymesh '" + file + "' could not be read; skipped");
 			out.missingFiles.push_back(file);
-			return true;
+			return false;
 		}
 		P.assign(pos.begin(), pos.end());
 		// Real per-vertex UV when the PLY file carried "u"/"v" (or
@@ -533,6 +499,58 @@ inline bool flattenTriangleMeshShape(const pbrt_scene::Scene &scene, FlatScene &
 		// from its "N" parameter, so the shared validation below applies.
 		if (!nrm.empty()) N.assign(nrm.begin(), nrm.end());
 	}
+	return true;
+}
+
+// Shape "trianglemesh", "plymesh" and "loopsubdiv".
+inline bool flattenTriangleMeshShape(const pbrt_scene::Scene &scene, FlatScene &out, const MeshResolver &meshes,
+							 const flatten_detail::ShapeWork &w) {
+	const auto warn = [&out](const std::string &msg) {
+		out.warnings.push_back({0, std::string(), msg});
+	};
+	const pbrt_scene::ShapeDecl &shape = *w.shape;
+	const pbrt_scene::Matrix4 &xform = w.xform;
+
+	// Real object motion blur (AnimatedTriangleMesh's own comment) -
+	// gated on ShapeWork::isTopLevelScene (see that field's own
+	// comment) - true only for a plain top-level scene shape, false
+	// for both an ObjectInstance DEFINITION's own object-space
+	// geometry (InstanceGroup::triangles has no xformEnd concept at
+	// all and keeps baking to xform only - a genuinely rare "animated
+	// mesh nested inside an instance definition" combination, scoped
+	// out rather than adding motion blur to the instancing system
+	// too) and an instanced EMISSIVE shape baked into world space
+	// (excluded explicitly, not just via the separate
+	// `shape.areaLightIndex < 0` check just below - see
+	// isTopLevelScene's own comment for why relying on that check
+	// alone, via a `triangles == &out.triangles` pointer-identity
+	// gate, was a real fragility a code-review pass on this
+	// feature's own commit caught and this field replaced).
+	const bool meshCouldAnimate =
+		w.isTopLevelScene && xform.differsFrom(w.xformEnd);
+	// A MediumInterface on a mesh shape is silently dropped - Triangle
+	// (unlike Sphere/Disk/Cylinder) has no `medium` field to carry it,
+	// and neither CPU's addMediumIfPresent() nor GPU's sphere-only
+	// MaterialType::Medium can attach one to a mesh. This used to be
+	// loud (Material "none" fell to Unsupported and warned by name);
+	// now that "none"/"" resolves to the real MaterialKind::Interface
+	// with no warning of its own, a mesh-bounded medium boundary would
+	// otherwise go silent - warn here instead, so the gap stays
+	// visible even though real mesh-medium support isn't implemented.
+	if (shape.insideMedium >= 0) {
+		warn("shape '" + shape.type + "' has a MediumInterface, but "
+			 "this loader only supports an attached medium on an "
+			 "unclipped sphere/disk/cylinder shape - the medium will "
+			 "be dropped");
+	}
+	attachShapeAlphaMask(scene, out, shape);
+
+	std::vector<double> P;
+	std::vector<int> indices;
+	std::vector<double> N;    // per-vertex, object space; empty = none
+	std::vector<double> UV;   // per-vertex, (u,v) pairs; empty = none authored
+
+	if (!readMeshSource(out, shape, meshes, P, indices, N, UV)) return true;
 
 	const std::size_t vertexCount = P.size() / 3;
 	if (indices.size() % 3 != 0)

@@ -268,47 +268,9 @@ namespace pbrt_scene_registry {
         std::string missingMeshesError;   // see SceneDescriptor::missing_meshes_error
     };
 
-    // Wires every field of `s` that must be derived from - and stay
-    // consistent with - a pbrt-v4 file on disk: the lazy-load/cache,
-    // world/lights/sky/punct accessors, recommended_spp, the camera itself,
-    // and setup_camera's ortho/spherical/realistic dispatch (read from the
-    // file's own Camera directive, never hand-transcribed). Shared by both
-    // append() (below), which discovers files at startup, and any curated
-    // builtin entry that wraps a specific bundled file under its own id/
-    // category/description (build_instanced_spheres_descriptor() today).
-    //
-    // This exists because "the same file, wired independently by hand
-    // twice" is exactly what let those two wirings drift out of sync
-    // before this function did: once on SceneDescriptor::requires_files
-    // (a curated entry hardcoded true for a file the discovery path had
-    // just correctly started reporting false for), and again on the CPU/
-    // GPU light-count parity test's assumptions about build_lights()'s
-    // shape. One implementation, called from both places, makes that
-    // specific class of drift impossible rather than merely caught later.
-    //
-    // `path` only needs to be valid for the duration of this call: every
-    // lambda below captures it BY VALUE (`[state, path]`, `[..., path]`),
-    // so each gets its own copy and neither `s` nor the closures it holds
-    // reference the caller's string after this function returns.
-    inline void wire_pbrt_backed_scene(SceneDescriptor& s,
-                                        const pbrt_discover::Discovered& d,
-                                        const std::string& path,
-                                        // CameraMode::Fixed (the default) matches every
-                                        // pre-existing caller's behavior unchanged. A
-                                        // migrated scene that was CameraMode::UserControlled
-                                        // natively (the Cornell-box family's own
-                                        // the Cornell-box family's shared camera)
-                                        // needs this passed explicitly as UserControlled,
-                                        // or --cam_x/y/z and the GUI's own camera controls
-                                        // silently stop moving the camera for that scene
-                                        // once it's pbrt-backed - a real, user-visible
-                                        // regression on exactly the scenes (A1 and its
-                                        // siblings) most likely to be interactively
-                                        // navigated, found and fixed here rather than
-                                        // accepted as a side effect of migration.
-                                        CameraMode mode = CameraMode::Fixed) {
-        const auto state = std::make_shared<Loaded>();
-        const auto ensure = [state, path]() -> pbrt_cpu::BuildResult& {
+    // The lazy load of a pbrt-backed scene: the first call reads the file, builds it for the CPU and prints what was built; every call returns the same result.
+    inline auto pbrt_backed_loader(const std::shared_ptr<Loaded>& state, const std::string& path) {
+        return [state, path]() -> pbrt_cpu::BuildResult& {
             if (!state->attempted) {
                 state->attempted = true;
                 // Read here, not captured at lambda-creation time above -
@@ -351,14 +313,11 @@ namespace pbrt_scene_registry {
             }
             return state->built;
         };
+    }
 
-        s.recommended_spp = d.samplesPerPixel;
-        s.recommended_max_depth = d.maxDepth;
-        s.recommended_integrator = d.integrator;
-        s.recommended_sampler = d.samplerType;
-        s.recommended_light_sampler = d.lightSamplerType;
-        s.is_pbrt_backed = true;
-        s.camera = CameraConfig{
+    // The CameraConfig a pbrt file's own Camera directive gives (the scene's camera, DOF, motion blur and handedness).
+    inline CameraConfig pbrt_camera_config(const pbrt_discover::Discovered& d, CameraMode mode) {
+        CameraConfig config = CameraConfig{
             d.camera.vfov,
             d.camera.lookfrom[0], d.camera.lookfrom[1], d.camera.lookfrom[2],
             d.camera.lookat[0],   d.camera.lookat[1],   d.camera.lookat[2],
@@ -385,7 +344,59 @@ namespace pbrt_scene_registry {
             d.camera.lookat1[0],   d.camera.lookat1[1],   d.camera.lookat1[2],
             d.camera.shutterOpen, d.camera.shutterClose
         };
-        s.camera.left_handed = d.camera.leftHanded && d.camera.type == "perspective";
+        config.left_handed = d.camera.leftHanded && d.camera.type == "perspective";
+        return config;
+    }
+
+    // Wires every field of `s` that must be derived from - and stay
+    // consistent with - a pbrt-v4 file on disk: the lazy-load/cache,
+    // world/lights/sky/punct accessors, recommended_spp, the camera itself,
+    // and setup_camera's ortho/spherical/realistic dispatch (read from the
+    // file's own Camera directive, never hand-transcribed). Shared by both
+    // append() (below), which discovers files at startup, and any curated
+    // builtin entry that wraps a specific bundled file under its own id/
+    // category/description (build_instanced_spheres_descriptor() today).
+    //
+    // This exists because "the same file, wired independently by hand
+    // twice" is exactly what let those two wirings drift out of sync
+    // before this function did: once on SceneDescriptor::requires_files
+    // (a curated entry hardcoded true for a file the discovery path had
+    // just correctly started reporting false for), and again on the CPU/
+    // GPU light-count parity test's assumptions about build_lights()'s
+    // shape. One implementation, called from both places, makes that
+    // specific class of drift impossible rather than merely caught later.
+    //
+    // `path` only needs to be valid for the duration of this call: every
+    // lambda below captures it BY VALUE (`[state, path]`, `[..., path]`),
+    // so each gets its own copy and neither `s` nor the closures it holds
+    // reference the caller's string after this function returns.
+    inline void wire_pbrt_backed_scene(SceneDescriptor& s,
+                                        const pbrt_discover::Discovered& d,
+                                        const std::string& path,
+                                        // CameraMode::Fixed (the default) matches every
+                                        // pre-existing caller's behavior unchanged. A
+                                        // migrated scene that was CameraMode::UserControlled
+                                        // natively (the Cornell-box family's own
+                                        // the Cornell-box family's shared camera)
+                                        // needs this passed explicitly as UserControlled,
+                                        // or --cam_x/y/z and the GUI's own camera controls
+                                        // silently stop moving the camera for that scene
+                                        // once it's pbrt-backed - a real, user-visible
+                                        // regression on exactly the scenes (A1 and its
+                                        // siblings) most likely to be interactively
+                                        // navigated, found and fixed here rather than
+                                        // accepted as a side effect of migration.
+                                        CameraMode mode = CameraMode::Fixed) {
+        const auto state = std::make_shared<Loaded>();
+        const auto ensure = pbrt_backed_loader(state, path);
+
+        s.recommended_spp = d.samplesPerPixel;
+        s.recommended_max_depth = d.maxDepth;
+        s.recommended_integrator = d.integrator;
+        s.recommended_sampler = d.samplerType;
+        s.recommended_light_sampler = d.lightSamplerType;
+        s.is_pbrt_backed = true;
+        s.camera = pbrt_camera_config(d, mode);
 
         // A failed load yields an empty world rather than a crash - the
         // error above already said why, and an empty render is a legible

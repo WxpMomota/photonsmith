@@ -8,6 +8,194 @@
 
 namespace flatten_detail {
 
+// A "cloud" medium: density, wispiness and frequency.
+inline void readCloudMedium(FlatScene &out, const pbrt_scene::MediumDecl &md, Medium &medium) {
+	const auto warn = [&out](const std::string &msg) {
+		out.warnings.push_back({0, std::string(), msg});
+	};
+	// pbrt-v4's real per-param defaults (media.cpp's
+	// CloudMedium::Create) - see Medium::density's own comment for
+	// why these differ from this codebase's own E2 showcase scene.
+	medium.density = md.params.getFloat("density", 1.0);
+	medium.wispiness = md.params.getFloat("wispiness", 1.0);
+	medium.frequency = md.params.getFloat("frequency", 5.0);
+	// cloud_medium_hittable.h forces sigma_a to 0 (pure scattering) -
+	// same convention constant_medium already uses, see that
+	// header's own comment for why - so a scene that gave a real
+	// absorption coefficient silently loses it. Worth a warning:
+	// unlike most of this loader's approximations, this one can't
+	// be inferred from the render (a too-bright cloud looks like a
+	// lighting choice, not a dropped parameter).
+	if (isNonzeroRGB(medium.sigma_a)) {
+		warn("cloud medium '" + md.name + "' has a nonzero sigma_a; "
+			 "cloud media only model scattering (sigma_a is forced to 0)");
+	}
+}
+
+// An "rgbgrid" medium: the per-voxel sigma_a/sigma_s/Le arrays and the emission scale.
+inline void readRgbGridMedium(FlatScene &out, const pbrt_scene::MediumDecl &md, Medium &medium, std::size_t voxels) {
+	const auto warn = [&out](const std::string &msg) {
+		out.warnings.push_back({0, std::string(), msg});
+	};
+	// "rgb sigma_a"/"rgb sigma_s": a flat array of one RGB triple
+	// PER VOXEL (length 3*nx*ny*nz), NOT the single flat colour the
+	// generic Vec3 read above assumed - de-interleave into
+	// per-channel vectors here, matching RGBGridMediumData::build()'s
+	// own (sa_r,sa_g,sa_b,...) parameter shape. Either array is
+	// optional (empty vector = "channel group absent" - see
+	// RGBGridMediumData::build()'s own comment); a present array
+	// whose length doesn't match voxels*3 is dropped with a warning
+	// rather than read out of bounds or silently truncated/padded.
+	const auto deinterleave = [&](const char *name, std::vector<double> &r,
+								   std::vector<double> &g, std::vector<double> &b) {
+		const pbrt_scene::Param *p = md.params.find(name);
+		if (!p || p->numbers.empty()) return;
+		if (p->numbers.size() != voxels * 3) {
+			warn("medium '" + md.name + "'s \"" + name + "\" array has "
+				 + std::to_string(p->numbers.size()) + " numbers, expected "
+				 + std::to_string(voxels * 3) + " (3 * nx*ny*nz); ignored");
+			return;
+		}
+		r.resize(voxels); g.resize(voxels); b.resize(voxels);
+		for (std::size_t i = 0; i < voxels; ++i) {
+			r[i] = p->numbers[i*3+0]; g[i] = p->numbers[i*3+1]; b[i] = p->numbers[i*3+2];
+		}
+	};
+	deinterleave("sigma_a", medium.sigma_a_r, medium.sigma_a_g, medium.sigma_a_b);
+	deinterleave("sigma_s", medium.sigma_s_r, medium.sigma_s_g, medium.sigma_s_b);
+
+	// "rgb Le"/"float Lescale" - real per-voxel emission, pbrt-v4's
+	// own RGBGridMedium::LeGrid/LeScale - see Medium::Le_r's own
+	// comment for why this is parsed separately from the
+	// homogeneous-only flat "Le" above. Lescale is NOT baked into
+	// the array here (unlike homogeneous's own medium.Le, which
+	// bakes its scale in at parse time) - RGBGridMediumData<T>::
+	// sample_point() applies Le_scale at sample time itself
+	// (`Le_out[c] = Le_scale * le;`), matching how sigma_scale
+	// (this same struct's "scale" param, applied inside
+	// RGBGridMediumData::build() too) already works for sigma_a/
+	// sigma_s. Defaults to 0.0 (matches RGBGridMediumData::
+	// Le_scale's own default and pbrt-v4's real "Lescale" default
+	// of 1 - but see is_emissive()'s own `Le_scale > 0` gate: a
+	// scene that sets a real "Le" array but never touches
+	// "Lescale" at all should still glow, so the DEFAULT here is
+	// 1.0 when omitted, matching pbrt-v4's spec exactly; only an
+	// explicit "Lescale" of 0 (or omitting "Le" entirely, leaving
+	// Le_r/g/b empty) turns emission off).
+	// "blackbody Le" (a single Kelvin temperature) is a
+	// homogeneous-only convenience - rgbgrid's own real "Le" is
+	// always a per-voxel RGB array (one triple per voxel), which a
+	// single temperature can't express. Checked explicitly (rather
+	// than falling through to deinterleave()'s own generic
+	// wrong-length warning below) since a code-review pass found
+	// that generic message actively misleading here - it reads
+	// "array has 1 numbers, expected N" which implies "supply more
+	// numbers", not "this syntax isn't supported for rgbgrid".
+	const pbrt_scene::Param *leParam = md.params.find("Le");
+	if (leParam && leParam->type == "blackbody") {
+		warn("medium '" + md.name + "' (\"rgbgrid\") has a \"blackbody Le\", "
+			 "but rgbgrid media only support a per-voxel \"rgb Le\" array, not "
+			 "a single blackbody temperature; the emission is dropped");
+	} else {
+		deinterleave("Le", medium.Le_r, medium.Le_g, medium.Le_b);
+	}
+	// pbrt-v4's RGBGridMedium (unlike its homogeneous and grid media, and its
+	// lights) does not divide the emission by SpectrumToPhotometric: the
+	// per-voxel RGB is an RGBIlluminantSpectrum that keeps the full D65
+	// illuminant, which the film reads as CIE_Y_integral (106.856) times the
+	// radiance the same number means anywhere else. A real pbrt file's
+	// "Lescale" is written for that, so it is read that way here: pbrt draws
+	// "Lescale" 0.0187 where a plain 2 would be needed otherwise
+	// (`pbrt_scenes/rgbgrid-emission.pbrt`, measured 106.9 on a dim grid).
+	constexpr double kPbrtRgbGridLeNorm = 106.856495;
+	medium.Le_scale = md.params.getFloat("Lescale", 1.0) * kPbrtRgbGridLeNorm;
+	// "Lescale" set but no (valid) "Le" array ended up populated -
+	// silently has no effect otherwise (RGBGridMediumData::
+	// is_emissive() correctly stays false), which a code-review
+	// pass found gives no hint to a scene author who forgot/
+	// mistyped "Le" - warn, matching homogeneous Le's own "nonzero
+	// param with no effect" diagnostic precedent above.
+	if (md.params.find("Lescale") &&
+		medium.Le_r.empty() && medium.Le_g.empty() && medium.Le_b.empty()) {
+		warn("medium '" + md.name + "' (\"rgbgrid\") sets \"Lescale\" but has no "
+			 "valid \"rgb Le\" array; \"Lescale\" has no effect without one");
+	}
+}
+
+// A "uniformgrid" medium: the per-voxel density array.
+inline void readUniformGridMedium(FlatScene &out, const pbrt_scene::MediumDecl &md, Medium &medium, std::size_t voxels) {
+	const auto warn = [&out](const std::string &msg) {
+		out.warnings.push_back({0, std::string(), msg});
+	};
+	// "float density": pbrt-v4's own REQUIRED flat scalar array,
+	// exactly one value per voxel (length nx*ny*nz) - not a colour,
+	// not the "cloud"-only scalar `density` field above. sigma_a/
+	// sigma_s (the generic Vec3 read at the top of this loop) supply
+	// the base coefficients each voxel's density multiplies (see
+	// GridMediumData<T>::sample_sigma()). A missing or wrong-length
+	// array is dropped with a warning (leaves gridDensity empty),
+	// matching rgbgrid's own "wrong length -> warn and ignore rather
+	// than read out of bounds" convention.
+	const pbrt_scene::Param *p = md.params.find("density");
+	if (!p || p->numbers.empty()) {
+		warn("uniformgrid medium '" + md.name + "' has no \"float density\" "
+			 "array (pbrt-v4 requires one); treated as empty (invisible)");
+	} else if (p->numbers.size() != voxels) {
+		warn("medium '" + md.name + "'s \"density\" array has "
+			 + std::to_string(p->numbers.size()) + " numbers, expected "
+			 + std::to_string(voxels) + " (nx*ny*nz); ignored");
+	} else {
+		medium.gridDensity = p->numbers;
+	}
+	// grid_medium_hittable.h forces sigma_a to 0 (pure scattering) -
+	// same convention/reason as cloud above (see that block's own
+	// comment) - so a scene that gave a real absorption coefficient
+	// silently loses it.
+	if (isNonzeroRGB(medium.sigma_a)) {
+		warn("uniformgrid medium '" + md.name + "' has a nonzero sigma_a; "
+			 "uniformgrid media only model scattering (sigma_a is forced to 0)");
+	}
+}
+
+// A "nanovdb" medium: the file, the grids and the transform.
+inline void readNanoVdbMedium(FlatScene &out, const pbrt_scene::MediumDecl &md, Medium &medium) {
+	const auto warn = [&out](const std::string &msg) {
+		out.warnings.push_back({0, std::string(), msg});
+	};
+	// "string filename" - REQUIRED (Medium::nanovdbFilename's own
+	// comment); left as written here, resolved to a real filesystem
+	// path by pbrt_load.h afterward. An empty/missing filename is
+	// caught there (same "empty means unresolved, warn and skip"
+	// convention as every other filename field), not here - this
+	// loader has no filesystem access to confirm the file even
+	// exists yet at flatten() time.
+	medium.nanovdbFilename = md.params.getString("filename", "");
+	if (medium.nanovdbFilename.empty()) {
+		warn("nanovdb medium '" + md.name + "' has no \"string filename\" "
+			 "(pbrt-v4 requires one); treated as empty (invisible)");
+	}
+	medium.nanovdbGridName = md.params.getString("gridname", "density");
+	// See Medium::nanovdbTemperatureGridName's own comment.
+	medium.nanovdbTemperatureGridName = md.params.getString("temperaturename", "");
+	medium.nanovdbLeScale = md.params.getFloat("Lescale", 1.0);
+	// See Medium::nanovdbXform's own comment for why this is passed
+	// through unbaked instead of pre-composing world<->medium here
+	// the way every other medium type's p0/p1 block above does.
+	for (int i = 0; i < 16; ++i) medium.nanovdbXform[i] = md.xform.m[i];
+	// pbrt_cpu_builder.h's nanovdb path forces sigma_a to 0 (pure
+	// scattering) UNLESS a "temperaturename" grid is present (see
+	// Medium::nanovdbTemperatureGridName's own comment - real
+	// blackbody emission needs a real, nonzero sigma_a to be
+	// anything other than a physical no-op) - same convention/
+	// reason as uniformgrid just above for the plain-scattering
+	// case.
+	if (isNonzeroRGB(medium.sigma_a) && medium.nanovdbTemperatureGridName.empty()) {
+		warn("nanovdb medium '" + md.name + "' has a nonzero sigma_a; "
+			 "this loader's nanovdb media only model scattering (sigma_a is "
+			 "forced to 0) unless a \"temperaturename\" grid is also given");
+	}
+}
+
 // MakeNamedMedium -> out.media (1:1).
 inline void flattenMedia(const pbrt_scene::Scene &scene, FlatScene &out) {
 	const auto warn = [&out](const std::string &msg) {
@@ -146,25 +334,7 @@ inline void flattenMedia(const pbrt_scene::Scene &scene, FlatScene &out) {
 		// comment) - parsed in the isNanoVdb block below, alongside
 		// nanovdbFilename/nanovdbGridName.
 
-		if (isCloud) {
-			// pbrt-v4's real per-param defaults (media.cpp's
-			// CloudMedium::Create) - see Medium::density's own comment for
-			// why these differ from this codebase's own E2 showcase scene.
-			medium.density = md.params.getFloat("density", 1.0);
-			medium.wispiness = md.params.getFloat("wispiness", 1.0);
-			medium.frequency = md.params.getFloat("frequency", 5.0);
-			// cloud_medium_hittable.h forces sigma_a to 0 (pure scattering) -
-			// same convention constant_medium already uses, see that
-			// header's own comment for why - so a scene that gave a real
-			// absorption coefficient silently loses it. Worth a warning:
-			// unlike most of this loader's approximations, this one can't
-			// be inferred from the render (a too-bright cloud looks like a
-			// lighting choice, not a dropped parameter).
-			if (isNonzeroRGB(medium.sigma_a)) {
-				warn("cloud medium '" + md.name + "' has a nonzero sigma_a; "
-					 "cloud media only model scattering (sigma_a is forced to 0)");
-			}
-		}
+		if (isCloud) readCloudMedium(out, md, medium);
 
 		if (isRgbGrid || isUniformGrid) {
 			medium.nx = md.params.getInt("nx", 1);
@@ -174,157 +344,11 @@ inline void flattenMedia(const pbrt_scene::Scene &scene, FlatScene &out) {
 		const std::size_t voxels = static_cast<std::size_t>(medium.nx)
 			* static_cast<std::size_t>(medium.ny) * static_cast<std::size_t>(medium.nz);
 
-		if (isRgbGrid) {
-			// "rgb sigma_a"/"rgb sigma_s": a flat array of one RGB triple
-			// PER VOXEL (length 3*nx*ny*nz), NOT the single flat colour the
-			// generic Vec3 read above assumed - de-interleave into
-			// per-channel vectors here, matching RGBGridMediumData::build()'s
-			// own (sa_r,sa_g,sa_b,...) parameter shape. Either array is
-			// optional (empty vector = "channel group absent" - see
-			// RGBGridMediumData::build()'s own comment); a present array
-			// whose length doesn't match voxels*3 is dropped with a warning
-			// rather than read out of bounds or silently truncated/padded.
-			const auto deinterleave = [&](const char *name, std::vector<double> &r,
-										   std::vector<double> &g, std::vector<double> &b) {
-				const pbrt_scene::Param *p = md.params.find(name);
-				if (!p || p->numbers.empty()) return;
-				if (p->numbers.size() != voxels * 3) {
-					warn("medium '" + md.name + "'s \"" + name + "\" array has "
-						 + std::to_string(p->numbers.size()) + " numbers, expected "
-						 + std::to_string(voxels * 3) + " (3 * nx*ny*nz); ignored");
-					return;
-				}
-				r.resize(voxels); g.resize(voxels); b.resize(voxels);
-				for (std::size_t i = 0; i < voxels; ++i) {
-					r[i] = p->numbers[i*3+0]; g[i] = p->numbers[i*3+1]; b[i] = p->numbers[i*3+2];
-				}
-			};
-			deinterleave("sigma_a", medium.sigma_a_r, medium.sigma_a_g, medium.sigma_a_b);
-			deinterleave("sigma_s", medium.sigma_s_r, medium.sigma_s_g, medium.sigma_s_b);
+		if (isRgbGrid) readRgbGridMedium(out, md, medium, voxels);
 
-			// "rgb Le"/"float Lescale" - real per-voxel emission, pbrt-v4's
-			// own RGBGridMedium::LeGrid/LeScale - see Medium::Le_r's own
-			// comment for why this is parsed separately from the
-			// homogeneous-only flat "Le" above. Lescale is NOT baked into
-			// the array here (unlike homogeneous's own medium.Le, which
-			// bakes its scale in at parse time) - RGBGridMediumData<T>::
-			// sample_point() applies Le_scale at sample time itself
-			// (`Le_out[c] = Le_scale * le;`), matching how sigma_scale
-			// (this same struct's "scale" param, applied inside
-			// RGBGridMediumData::build() too) already works for sigma_a/
-			// sigma_s. Defaults to 0.0 (matches RGBGridMediumData::
-			// Le_scale's own default and pbrt-v4's real "Lescale" default
-			// of 1 - but see is_emissive()'s own `Le_scale > 0` gate: a
-			// scene that sets a real "Le" array but never touches
-			// "Lescale" at all should still glow, so the DEFAULT here is
-			// 1.0 when omitted, matching pbrt-v4's spec exactly; only an
-			// explicit "Lescale" of 0 (or omitting "Le" entirely, leaving
-			// Le_r/g/b empty) turns emission off).
-			// "blackbody Le" (a single Kelvin temperature) is a
-			// homogeneous-only convenience - rgbgrid's own real "Le" is
-			// always a per-voxel RGB array (one triple per voxel), which a
-			// single temperature can't express. Checked explicitly (rather
-			// than falling through to deinterleave()'s own generic
-			// wrong-length warning below) since a code-review pass found
-			// that generic message actively misleading here - it reads
-			// "array has 1 numbers, expected N" which implies "supply more
-			// numbers", not "this syntax isn't supported for rgbgrid".
-			const pbrt_scene::Param *leParam = md.params.find("Le");
-			if (leParam && leParam->type == "blackbody") {
-				warn("medium '" + md.name + "' (\"rgbgrid\") has a \"blackbody Le\", "
-					 "but rgbgrid media only support a per-voxel \"rgb Le\" array, not "
-					 "a single blackbody temperature; the emission is dropped");
-			} else {
-				deinterleave("Le", medium.Le_r, medium.Le_g, medium.Le_b);
-			}
-			// pbrt-v4's RGBGridMedium (unlike its homogeneous and grid media, and its
-			// lights) does not divide the emission by SpectrumToPhotometric: the
-			// per-voxel RGB is an RGBIlluminantSpectrum that keeps the full D65
-			// illuminant, which the film reads as CIE_Y_integral (106.856) times the
-			// radiance the same number means anywhere else. A real pbrt file's
-			// "Lescale" is written for that, so it is read that way here: pbrt draws
-			// "Lescale" 0.0187 where a plain 2 would be needed otherwise
-			// (`pbrt_scenes/rgbgrid-emission.pbrt`, measured 106.9 on a dim grid).
-			constexpr double kPbrtRgbGridLeNorm = 106.856495;
-			medium.Le_scale = md.params.getFloat("Lescale", 1.0) * kPbrtRgbGridLeNorm;
-			// "Lescale" set but no (valid) "Le" array ended up populated -
-			// silently has no effect otherwise (RGBGridMediumData::
-			// is_emissive() correctly stays false), which a code-review
-			// pass found gives no hint to a scene author who forgot/
-			// mistyped "Le" - warn, matching homogeneous Le's own "nonzero
-			// param with no effect" diagnostic precedent above.
-			if (md.params.find("Lescale") &&
-				medium.Le_r.empty() && medium.Le_g.empty() && medium.Le_b.empty()) {
-				warn("medium '" + md.name + "' (\"rgbgrid\") sets \"Lescale\" but has no "
-					 "valid \"rgb Le\" array; \"Lescale\" has no effect without one");
-			}
-		}
+		if (isUniformGrid) readUniformGridMedium(out, md, medium, voxels);
 
-		if (isUniformGrid) {
-			// "float density": pbrt-v4's own REQUIRED flat scalar array,
-			// exactly one value per voxel (length nx*ny*nz) - not a colour,
-			// not the "cloud"-only scalar `density` field above. sigma_a/
-			// sigma_s (the generic Vec3 read at the top of this loop) supply
-			// the base coefficients each voxel's density multiplies (see
-			// GridMediumData<T>::sample_sigma()). A missing or wrong-length
-			// array is dropped with a warning (leaves gridDensity empty),
-			// matching rgbgrid's own "wrong length -> warn and ignore rather
-			// than read out of bounds" convention.
-			const pbrt_scene::Param *p = md.params.find("density");
-			if (!p || p->numbers.empty()) {
-				warn("uniformgrid medium '" + md.name + "' has no \"float density\" "
-					 "array (pbrt-v4 requires one); treated as empty (invisible)");
-			} else if (p->numbers.size() != voxels) {
-				warn("medium '" + md.name + "'s \"density\" array has "
-					 + std::to_string(p->numbers.size()) + " numbers, expected "
-					 + std::to_string(voxels) + " (nx*ny*nz); ignored");
-			} else {
-				medium.gridDensity = p->numbers;
-			}
-			// grid_medium_hittable.h forces sigma_a to 0 (pure scattering) -
-			// same convention/reason as cloud above (see that block's own
-			// comment) - so a scene that gave a real absorption coefficient
-			// silently loses it.
-			if (isNonzeroRGB(medium.sigma_a)) {
-				warn("uniformgrid medium '" + md.name + "' has a nonzero sigma_a; "
-					 "uniformgrid media only model scattering (sigma_a is forced to 0)");
-			}
-		}
-
-		if (isNanoVdb) {
-			// "string filename" - REQUIRED (Medium::nanovdbFilename's own
-			// comment); left as written here, resolved to a real filesystem
-			// path by pbrt_load.h afterward. An empty/missing filename is
-			// caught there (same "empty means unresolved, warn and skip"
-			// convention as every other filename field), not here - this
-			// loader has no filesystem access to confirm the file even
-			// exists yet at flatten() time.
-			medium.nanovdbFilename = md.params.getString("filename", "");
-			if (medium.nanovdbFilename.empty()) {
-				warn("nanovdb medium '" + md.name + "' has no \"string filename\" "
-					 "(pbrt-v4 requires one); treated as empty (invisible)");
-			}
-			medium.nanovdbGridName = md.params.getString("gridname", "density");
-			// See Medium::nanovdbTemperatureGridName's own comment.
-			medium.nanovdbTemperatureGridName = md.params.getString("temperaturename", "");
-			medium.nanovdbLeScale = md.params.getFloat("Lescale", 1.0);
-			// See Medium::nanovdbXform's own comment for why this is passed
-			// through unbaked instead of pre-composing world<->medium here
-			// the way every other medium type's p0/p1 block above does.
-			for (int i = 0; i < 16; ++i) medium.nanovdbXform[i] = md.xform.m[i];
-			// pbrt_cpu_builder.h's nanovdb path forces sigma_a to 0 (pure
-			// scattering) UNLESS a "temperaturename" grid is present (see
-			// Medium::nanovdbTemperatureGridName's own comment - real
-			// blackbody emission needs a real, nonzero sigma_a to be
-			// anything other than a physical no-op) - same convention/
-			// reason as uniformgrid just above for the plain-scattering
-			// case.
-			if (isNonzeroRGB(medium.sigma_a) && medium.nanovdbTemperatureGridName.empty()) {
-				warn("nanovdb medium '" + md.name + "' has a nonzero sigma_a; "
-					 "this loader's nanovdb media only model scattering (sigma_a is "
-					 "forced to 0) unless a \"temperaturename\" grid is also given");
-			}
-		}
+		if (isNanoVdb) readNanoVdbMedium(out, md, medium);
 
 		out.media.push_back(medium);
 	}

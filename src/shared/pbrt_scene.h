@@ -935,13 +935,9 @@ private:
 		return list;
 	}
 
-	bool dispatch() {
-		const std::string d = t_[pos_].text;
-		const int line = t_[pos_].line;
-		const std::size_t directiveBegin = t_[pos_].begin;
-		++pos_;
-
-		// Identity/Translate/Scale/Rotate/LookAt/Transform/ConcatTransform all
+	// Identity/Translate/Scale/Rotate/LookAt/Transform/ConcatTransform/ActiveTransform/TransformTimes/WorldBegin. `handled` says whether `d` was one of these; the result is false for a parse error.
+	bool dispatchTransformDirective(const std::string &d, int line, bool &handled) {
+		handled = true;
 		// write whichever of ctm/ctmEnd GraphicsState::activeTransformBits
 		// currently selects (see ActiveTransform's own comment below) - both
 		// by default (a scene that never declares ActiveTransform keeps
@@ -1052,6 +1048,13 @@ private:
 			inWorld_ = true;
 			return true;
 		}
+		handled = false;
+		return true;
+	}
+
+	// WorldEnd, Attribute/Transform Begin/End, ObjectBegin/End/Instance, ReverseOrientation.
+	bool dispatchScopeDirective(const std::string &d, int line, std::size_t directiveBegin, bool &handled) {
+		handled = true;
 		if (d == "WorldEnd") return true;   // pbrt-v4 dropped it; tolerate v3 files
 
 		// TransformBegin/End were removed in pbrt-v4 but appear in v3 scenes,
@@ -1118,6 +1121,13 @@ private:
 		}
 		if (d == "ReverseOrientation") { gs_.reverseOrientation = !gs_.reverseOrientation; return true; }
 
+		handled = false;
+		return true;
+	}
+
+	// Camera, Film, Sampler, PixelFilter, Integrator, Accelerator.
+	bool dispatchOptionDirective(const std::string &d, int line, bool &handled) {
+		handled = true;
 		if (d == "Camera") {
 			s_.cameraDeclared = true;
 			// See Scene::cameraMediumIndex's own comment - matches real
@@ -1193,6 +1203,13 @@ private:
 			return true;
 		}
 
+		handled = false;
+		return true;
+	}
+
+	// Material, NamedMaterial, Texture, MakeNamedMedium, MediumInterface.
+	bool dispatchMaterialDirective(const std::string &d, int line, bool &handled) {
+		handled = true;
 		if (d == "Material" || d == "MakeNamedMaterial") {
 			MaterialDecl m;
 			if (pos_ < t_.size() && t_[pos_].quoted) {
@@ -1279,6 +1296,13 @@ private:
 			gs_.outsideMedium = resolve(outsideName);
 			return true;
 		}
+		handled = false;
+		return true;
+	}
+
+	// LightSource, Shape, ColorSpace, CoordinateSystem, CoordSysTransform.
+	bool dispatchShapeDirective(const std::string &d, int line, std::size_t directiveBegin, bool &handled) {
+		handled = true;
 		if (d == "LightSource" || d == "AreaLightSource") {
 			LightDecl l;
 			if (pos_ < t_.size() && t_[pos_].quoted) { l.type = t_[pos_].text; ++pos_; }
@@ -1372,6 +1396,39 @@ private:
 				warn(line, "CoordSysTransform: unknown coordinate system \"" + name + "\"");
 			}
 			return true;
+		}
+		handled = false;
+		return true;
+	}
+
+	bool dispatch() {
+		const std::string d = t_[pos_].text;
+		const int line = t_[pos_].line;
+		const std::size_t directiveBegin = t_[pos_].begin;
+		++pos_;
+
+		// Identity/Translate/Scale/Rotate/LookAt/Transform/ConcatTransform all
+
+		bool handled = false;
+		{
+			const bool ok = dispatchTransformDirective(d, line, handled);
+			if (handled) return ok;
+		}
+		{
+			const bool ok = dispatchScopeDirective(d, line, directiveBegin, handled);
+			if (handled) return ok;
+		}
+		{
+			const bool ok = dispatchOptionDirective(d, line, handled);
+			if (handled) return ok;
+		}
+		{
+			const bool ok = dispatchMaterialDirective(d, line, handled);
+			if (handled) return ok;
+		}
+		{
+			const bool ok = dispatchShapeDirective(d, line, directiveBegin, handled);
+			if (handled) return ok;
 		}
 
 		// Recognised pbrt, not implemented. Skip its arguments and carry on -

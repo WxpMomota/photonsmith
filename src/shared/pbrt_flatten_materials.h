@@ -58,6 +58,490 @@ inline void bakeConstantTextureParams(const pbrt_scene::Scene &scene, FlatScene 
 	}
 }
 
+// One warning on the scene, not tied to a line.
+inline void materialWarn(FlatScene &out, const std::string &msg) {
+	out.warnings.push_back({0, std::string(), msg});
+}
+
+inline std::function<void(const std::string &)> materialWarner(FlatScene &out) {
+	return [&out](const std::string &msg) { materialWarn(out, msg); };
+}
+
+// Shared by checkerboard/mix below: resolves a "texture"-typed
+// tex1/tex2 param to a bare imagemap's filename, ONE level
+// only - returns empty if the referenced Texture isn't a
+// bare "imagemap" (itself nested further, or a different
+// class), which the caller treats as "can't resolve, fall
+// through to the generic warning" (see hasCheckerReflectance/
+// hasMixReflectance's own comments).
+inline std::string resolveNestedImagemap(const pbrt_scene::Scene &scene, const pbrt_scene::Param *p) {
+	if (!p || p->strings.empty()) return std::string();
+	// Last-declaration-wins, matching every other texture-
+	// name lookup in this loop (e.g. the "reflectance" tex
+	// lookup above) - pbrt's own redeclare-by-name-overrides
+	// convention. Keep walking rather than returning on the
+	// first match, or a scene that redeclares a Texture name
+	// (imagemap first, something else later) would silently
+	// resolve to the STALE earlier declaration instead of
+	// correctly falling through to the generic warning.
+	const pbrt_scene::TextureDecl *found = findTexture(scene, p->strings[0]);
+	if (found && found->cls == "imagemap")
+		return found->params.getString("filename", "");
+	return std::string();
+}
+
+// Second level: resolves a "texture"-typed tex1/tex2 param to
+// ANOTHER checkerboard/mix Texture - see NestedProceduralTexture's
+// own comment for the exact (deliberately bounded) scope. Returns
+// a struct with an empty `kind` if the reference isn't itself a
+// checkerboard/mix (a different class, or unresolved), which the
+// caller treats as "can't resolve at this level either, fall
+// through to the generic warning" - same contract as
+// resolveNestedImagemap above.
+inline NestedProceduralTexture resolveNestedProcedural(const pbrt_scene::Scene &scene, const pbrt_scene::Param *p) {
+	NestedProceduralTexture out2;
+	if (!p || p->strings.empty()) return out2;
+	const pbrt_scene::TextureDecl *found = findTexture(scene, p->strings[0]);
+	if (!found || (found->cls != "checkerboard" && found->cls != "mix"))
+		return out2;
+	const pbrt_scene::Param *t1p = found->params.find("tex1");
+	const pbrt_scene::Param *t2p = found->params.find("tex2");
+	const bool t1Nested = t1p && t1p->type == "texture";
+	const bool t2Nested = t2p && t2p->type == "texture";
+	const std::string t1Img = t1Nested ? resolveNestedImagemap(scene, t1p) : std::string();
+	const std::string t2Img = t2Nested ? resolveNestedImagemap(scene, t2p) : std::string();
+	// This level's own tex1/tex2 may only be a flat literal or a
+	// bare imagemap - not nested further (the bound this struct's
+	// own comment documents). A nested-but-unresolvable slot here
+	// fails the WHOLE second level, same "all or nothing per
+	// texture" rule the top level already enforces.
+	if ((t1Nested && t1Img.empty()) || (t2Nested && t2Img.empty()))
+		return out2;
+	out2.kind = found->cls;
+	if (t1Nested) out2.tex1Filename = t1Img;
+	else {
+		const pbrt_scene::Vec3 c1 = found->params.getVec3(
+			"tex1", found->cls == "checkerboard" ? pbrt_scene::Vec3{1.0, 1.0, 1.0}
+												  : pbrt_scene::Vec3{0.0, 0.0, 0.0});
+		out2.color1[0] = c1.x; out2.color1[1] = c1.y; out2.color1[2] = c1.z;
+	}
+	if (t2Nested) out2.tex2Filename = t2Img;
+	else {
+		const pbrt_scene::Vec3 c2 = found->params.getVec3(
+			"tex2", found->cls == "checkerboard" ? pbrt_scene::Vec3{0.0, 0.0, 0.0}
+												  : pbrt_scene::Vec3{1.0, 1.0, 1.0});
+		out2.color2[0] = c2.x; out2.color2[1] = c2.y; out2.color2[2] = c2.z;
+	}
+	if (found->cls == "checkerboard") {
+		out2.uscale = found->params.getFloat("uscale", 1.0);
+		out2.vscale = found->params.getFloat("vscale", 1.0);
+	} else {
+		const pbrt_scene::Param *amtp = found->params.find("amount");
+		if (amtp && amtp->type == "texture") {
+			out2.amountFilename = resolveNestedImagemap(scene, amtp);
+			if (out2.amountFilename.empty()) { out2.kind.clear(); return out2; }
+		} else {
+			out2.amount = found->params.getFloat("amount", 0.5);
+		}
+	}
+	return out2;
+}
+
+// "reflectance" bound to an "imagemap" (optionally wrapped in a "scale" texture). True when resolved to an image.
+inline bool bindReflectanceImagemap(const pbrt_scene::Scene &scene, FlatScene &out, Material &m, const pbrt_scene::TextureDecl *tex) {
+	const auto warn = materialWarner(out);
+	// "reflectance" bound to a "scale"-class Texture wrapping an
+	// imagemap (barcelona-pavilion's own dominant pattern, e.g.
+	// materials.pbrt's "concrete-kd": Texture "concrete-kd"
+	// "scale" "texture tex" ["concrete-kd-img"]) - same unwrap as
+	// "displacement" below, applied here too so reflectance gets
+	// the same real-scene coverage rather than falling through
+	// to the generic warning for every scale-wrapped case.
+	// Diffuse/CoatedDiffuse/DiffuseTransmission all apply
+	// m.textureScale for reflectance now (scaled_texture on CPU,
+	// MaterialData::emissionScale reused on GPU) - checkerboard/
+	// fbm/marble/mix stay Diffuse/CoatedDiffuse-only below (no
+	// bundled scene binds any of those to a DiffuseTransmission
+	// reflectance), so this stays narrower than the bare-imagemap
+	// case just below, which all three kinds already handle
+	// correctly. No kind-check needed here beyond the enclosing
+	// `if` above (already exactly these three kinds) - unlike the
+	// checkerboard/fbm/marble/mix branches below, which DO still
+	// need their own narrower gate.
+	// Unwrapped into a SEPARATE variable (imgTex), not reassigned
+	// into `tex` itself: the checkerboard/fbm/marble/mix branches
+	// below must still see the ORIGINAL (possibly "scale") decl
+	// and correctly fall through to the generic warning for e.g.
+	// a scale-wrapped checkerboard - unwrapping `tex` in place
+	// would silently drop that scale factor and treat it as a
+	// bare checkerboard instead.
+	const pbrt_scene::TextureDecl *imgTex = tex;
+	double texScale = 1.0;
+	if (imgTex && imgTex->cls == "scale") {
+		texScale = imgTex->params.getFloat("scale", 1.0);
+		const pbrt_scene::Param *inner = imgTex->params.find("tex");
+		imgTex = (inner && inner->type == "texture" && !inner->strings.empty())
+			? findTexture(scene, inner->strings[0]) : nullptr;
+	}
+	if (imgTex && imgTex->cls == "imagemap") {
+		const std::string filename = imgTex->params.getString("filename", "");
+		if (!filename.empty()) {
+			m.textureFilename = filename;
+			m.textureMapping = uvMappingOf(*imgTex);
+			m.textureScale = texScale;
+			// imageMapOptionsFor() (pbrt_cpu_builder.h) and GPU's
+			// own call sites read these 3 loose fields by name
+			// (kept as-is rather than switched to a
+			// TextureDecodeOptions field, to avoid touching every
+			// existing reader) - resolveTextureDecodeOptions() is
+			// still the single resolution point feeding them,
+			// same as transmittanceTextureOptions/
+			// roughnessTextureOptions below use directly.
+			{
+				const TextureDecodeOptions opts = resolveTextureDecodeOptions(*imgTex, warn);
+				m.textureGamma = opts.gamma;
+				m.textureWrap = opts.wrap;
+				m.textureWrapIndex = opts.wrapIndex;
+				m.textureInvert = opts.invert;
+				m.textureFilterIndex = opts.filterIndex;
+			}
+			return true;   // resolved to an image, not a "not supported" warning
+		}
+	}
+	return false;
+}
+
+// "reflectance" bound to a "checkerboard" (each side a colour, an image or one more level of checkerboard/mix). True when resolved.
+inline bool bindCheckerReflectance(const pbrt_scene::Scene &scene, Material &m, const pbrt_scene::TextureDecl *tex) {
+	if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) &&
+		tex && tex->cls == "checkerboard") {
+		const pbrt_scene::Param *tex1p = tex->params.find("tex1");
+		const pbrt_scene::Param *tex2p = tex->params.find("tex2");
+		const bool tex1IsNested = tex1p && tex1p->type == "texture";
+		const bool tex2IsNested = tex2p && tex2p->type == "texture";
+		const std::string tex1Img = tex1IsNested ? resolveNestedImagemap(scene, tex1p) : std::string();
+		const std::string tex2Img = tex2IsNested ? resolveNestedImagemap(scene, tex2p) : std::string();
+		// A nested slot that isn't a bare imagemap gets one more
+		// try at the second level (another checkerboard/mix)
+		// before giving up - see resolveNestedProcedural's own
+		// comment for that level's own (narrower) scope.
+		const NestedProceduralTexture tex1Proc =
+			(tex1IsNested && tex1Img.empty()) ? resolveNestedProcedural(scene, tex1p) : NestedProceduralTexture{};
+		const NestedProceduralTexture tex2Proc =
+			(tex2IsNested && tex2Img.empty()) ? resolveNestedProcedural(scene, tex2p) : NestedProceduralTexture{};
+		const bool tex1Resolved = !tex1IsNested || !tex1Img.empty() || !tex1Proc.kind.empty();
+		const bool tex2Resolved = !tex2IsNested || !tex2Img.empty() || !tex2Proc.kind.empty();
+		if (tex1Resolved && tex2Resolved) {
+			if (tex1IsNested && !tex1Img.empty()) {
+				m.checkerTex1Filename = tex1Img;
+			} else if (tex1IsNested) {
+				m.checkerTex1Nested = tex1Proc;
+				// GPU has no representation for a nested procedural
+				// sub-texture (TextureData's tex1ImageIdx/tex2ImageIdx
+				// are image-only - see pbrt_gpu_builder.h's
+				// resolveProceduralReflectanceTexture()) - leave
+				// checkerColor1 as a flat average-of-the-nested-
+				// pattern stand-in for GPU (real GPU-side warning
+				// lives in scene_builder.cpp, matching every other
+				// CPU-real/GPU-approximated gap's own convention).
+				nestedProceduralAverageColor(tex1Proc, m.checkerColor1);
+			} else {
+				const pbrt_scene::Vec3 c1 = tex->params.getVec3("tex1", {1.0, 1.0, 1.0});
+				m.checkerColor1[0] = c1.x; m.checkerColor1[1] = c1.y; m.checkerColor1[2] = c1.z;
+			}
+			if (tex2IsNested && !tex2Img.empty()) {
+				m.checkerTex2Filename = tex2Img;
+			} else if (tex2IsNested) {
+				m.checkerTex2Nested = tex2Proc;
+				nestedProceduralAverageColor(tex2Proc, m.checkerColor2);
+			} else {
+				const pbrt_scene::Vec3 c2 = tex->params.getVec3("tex2", {0.0, 0.0, 0.0});
+				m.checkerColor2[0] = c2.x; m.checkerColor2[1] = c2.y; m.checkerColor2[2] = c2.z;
+			}
+			m.checkerUScale = tex->params.getFloat("uscale", 1.0);
+			m.checkerVScale = tex->params.getFloat("vscale", 1.0);
+			// "integer dimension" [3] - pbrt-v4's real 3D world-space
+			// checker variant (Material::checkerIs3D's own comment).
+			// worldToTexture is the CTM's inverse at Texture-
+			// declaration time; inverseAffine() fails only for a
+			// singular (zero-scale-on-some-axis) CTM, which would
+			// make the checker degenerate on any renderer anyway -
+			// falls back to identity (whole-world one cell) rather
+			// than propagating a failure, matching this loader's
+			// own "render something sensible, don't abort the
+			// load" convention for a malformed-but-present feature.
+			if (tex->params.getInt("dimension", 2) == 3) {
+				m.checkerIs3D = true;
+				pbrt_scene::Matrix4 worldToTexture;
+				if (!tex->xform.inverseAffine(worldToTexture))
+					worldToTexture = pbrt_scene::Matrix4::identity();
+				for (int i = 0; i < 16; ++i) m.checkerWorldToTexture[i] = worldToTexture.m[i];
+			}
+			m.hasCheckerReflectance = true;
+			return true;   // resolved to a procedural checker, not a "not supported" warning
+		}
+	}
+	return false;
+}
+
+// "reflectance" bound to procedural "fbm" or "marble" noise. True when resolved.
+inline bool bindFbmOrMarbleReflectance(Material &m, const pbrt_scene::TextureDecl *tex) {
+	if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) &&
+		tex && tex->cls == "fbm") {
+		m.fbmOctaves = tex->params.getInt("octaves", 8);
+		m.fbmRoughness = tex->params.getFloat("roughness", 0.5);
+		m.hasFbmReflectance = true;
+		return true;   // resolved to procedural fbm noise, not a "not supported" warning
+	}
+	if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) &&
+		tex && tex->cls == "marble") {
+		m.marbleOctaves = tex->params.getInt("octaves", 8);
+		m.marbleRoughness = tex->params.getFloat("roughness", 0.5);
+		m.marbleScale = tex->params.getFloat("scale", 1.0);
+		m.marbleVariation = tex->params.getFloat("variation", 0.2);
+		m.hasMarbleReflectance = true;
+		return true;   // resolved to procedural marble, not a "not supported" warning
+	}
+	return false;
+}
+
+// "reflectance" bound to a "mix" of two colours/images/procedurals. True when resolved.
+inline bool bindMixReflectance(const pbrt_scene::Scene &scene, Material &m, const pbrt_scene::TextureDecl *tex) {
+	if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) &&
+		tex && tex->cls == "mix") {
+		// See hasMixReflectance's own comment - tex1/tex2/amount
+		// all support up to two levels (bare imagemap, or a
+		// further checkerboard/mix via resolveNestedProcedural);
+		// a nested slot that resolves at neither level still
+		// falls through to the generic warning below.
+		const pbrt_scene::Param *tex1p = tex->params.find("tex1");
+		const pbrt_scene::Param *tex2p = tex->params.find("tex2");
+		const pbrt_scene::Param *amountp = tex->params.find("amount");
+		const bool tex1IsNested = tex1p && tex1p->type == "texture";
+		const bool tex2IsNested = tex2p && tex2p->type == "texture";
+		const bool amountIsNested = amountp && amountp->type == "texture";
+		const std::string tex1Img = tex1IsNested ? resolveNestedImagemap(scene, tex1p) : std::string();
+		const std::string tex2Img = tex2IsNested ? resolveNestedImagemap(scene, tex2p) : std::string();
+		const std::string amountImg = amountIsNested ? resolveNestedImagemap(scene, amountp) : std::string();
+		const NestedProceduralTexture tex1Proc =
+			(tex1IsNested && tex1Img.empty()) ? resolveNestedProcedural(scene, tex1p) : NestedProceduralTexture{};
+		const NestedProceduralTexture tex2Proc =
+			(tex2IsNested && tex2Img.empty()) ? resolveNestedProcedural(scene, tex2p) : NestedProceduralTexture{};
+		const NestedProceduralTexture amountProc =
+			(amountIsNested && amountImg.empty()) ? resolveNestedProcedural(scene, amountp) : NestedProceduralTexture{};
+		const bool tex1Resolved = !tex1IsNested || !tex1Img.empty() || !tex1Proc.kind.empty();
+		const bool tex2Resolved = !tex2IsNested || !tex2Img.empty() || !tex2Proc.kind.empty();
+		const bool amountResolved = !amountIsNested || !amountImg.empty() || !amountProc.kind.empty();
+		if (tex1Resolved && tex2Resolved && amountResolved) {
+			if (tex1IsNested && !tex1Img.empty()) {
+				m.mixTex1Filename = tex1Img;
+			} else if (tex1IsNested) {
+				m.mixTex1Nested = tex1Proc;
+				// See the checkerboard case's identical comment above -
+				// same GPU-approximation, same reason.
+				nestedProceduralAverageColor(tex1Proc, m.mixColor1);
+			} else {
+				const pbrt_scene::Vec3 c1 = tex->params.getVec3("tex1", {0.0, 0.0, 0.0});
+				m.mixColor1[0] = c1.x; m.mixColor1[1] = c1.y; m.mixColor1[2] = c1.z;
+			}
+			if (tex2IsNested && !tex2Img.empty()) {
+				m.mixTex2Filename = tex2Img;
+			} else if (tex2IsNested) {
+				m.mixTex2Nested = tex2Proc;
+				nestedProceduralAverageColor(tex2Proc, m.mixColor2);
+			} else {
+				const pbrt_scene::Vec3 c2 = tex->params.getVec3("tex2", {1.0, 1.0, 1.0});
+				m.mixColor2[0] = c2.x; m.mixColor2[1] = c2.y; m.mixColor2[2] = c2.z;
+			}
+			if (amountIsNested && !amountImg.empty()) {
+				m.mixAmountTextureFilename = amountImg;
+			} else if (amountIsNested) {
+				m.mixAmountNested = amountProc;
+				// See tex1/tex2's own identical GPU-approximation
+				// comment above - same reason, scalar instead of
+				// colour (nestedProceduralAverageScalar's own
+				// comment).
+				m.mixAmount = nestedProceduralAverageScalar(amountProc);
+			} else {
+				m.mixAmount = tex->params.getFloat("amount", 0.5);
+			}
+			m.hasMixReflectance = true;
+			// A backend with no mix texture of its own (Metal) draws the flat colour: the blend of the two inputs at the amount (an image or an amount image
+			// stays at the default). Exact for two plain colours, an average for nested procedurals. Found by scripts/consistency_sweep.py: a mix of two
+			// equal colours drew as the default grey on Metal.
+			if (m.mixTex1Filename.empty() && m.mixTex2Filename.empty() && m.mixAmountTextureFilename.empty()) {
+				for (int c = 0; c < 3; ++c) m.color[c] = (1.0 - m.mixAmount) * m.mixColor1[c] + m.mixAmount * m.mixColor2[c];
+			}
+			return true;   // resolved to a procedural mix, not a "not supported" warning
+		}
+	}
+	return false;
+}
+
+// "reflectance" bound to "windy", "wrinkled", "dots" or "bilerp". True when resolved.
+inline bool bindOtherProceduralReflectance(const pbrt_scene::Scene &scene, Material &m, const pbrt_scene::TextureDecl *tex) {
+	if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) &&
+		tex && tex->cls == "windy") {
+		// Parameterless in real pbrt-v4 - nothing to read.
+		m.hasWindyReflectance = true;
+		return true;   // resolved to procedural windy noise, not a "not supported" warning
+	}
+	if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) &&
+		tex && tex->cls == "wrinkled") {
+		m.wrinkledOctaves = tex->params.getInt("octaves", 8);
+		m.wrinkledRoughness = tex->params.getFloat("roughness", 0.5);
+		m.hasWrinkledReflectance = true;
+		return true;   // resolved to procedural wrinkled turbulence, not a "not supported" warning
+	}
+	if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) &&
+		tex && tex->cls == "dots") {
+		// Same one-level-nested-bare-imagemap support for
+		// inside/outside as checkerboard's own tex1/tex2 above.
+		//
+		// pbrt-v4 has the two swapped: SpectrumDotsTexture's constructor takes (mapping, outsideDot, insideDot) but Create() passes ("inside",
+		// "outside") in that order, so in real pbrt the "inside" parameter colours the GROUND and the "outside" parameter (default 0, black) colours the
+		// DOTS (textures.cpp:331, textures.h:429). dotsInside* below is what the dots are drawn with, so it reads "outside", and dotsOutside* reads "inside".
+		m.dotsMapping = uvMappingOf(*tex);
+		const pbrt_scene::Param *dotP = tex->params.find("outside");
+		const pbrt_scene::Param *groundP = tex->params.find("inside");
+		const bool dotIsNested = dotP && dotP->type == "texture";
+		const bool groundIsNested = groundP && groundP->type == "texture";
+		const std::string dotImg = dotIsNested ? resolveNestedImagemap(scene, dotP) : std::string();
+		const std::string groundImg = groundIsNested ? resolveNestedImagemap(scene, groundP) : std::string();
+		if ((!dotIsNested || !dotImg.empty()) && (!groundIsNested || !groundImg.empty())) {
+			if (dotIsNested) {
+				m.dotsInsideTexFilename = dotImg;
+			} else {
+				const pbrt_scene::Vec3 c1 = tex->params.getVec3("outside", {0.0, 0.0, 0.0});
+				m.dotsInsideColor[0] = c1.x; m.dotsInsideColor[1] = c1.y; m.dotsInsideColor[2] = c1.z;
+			}
+			if (groundIsNested) {
+				m.dotsOutsideTexFilename = groundImg;
+			} else {
+				const pbrt_scene::Vec3 c2 = tex->params.getVec3("inside", {1.0, 1.0, 1.0});
+				m.dotsOutsideColor[0] = c2.x; m.dotsOutsideColor[1] = c2.y; m.dotsOutsideColor[2] = c2.z;
+			}
+			m.hasDotsReflectance = true;
+			return true;   // resolved to a procedural dots pattern, not a "not supported" warning
+		}
+	}
+	if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) &&
+		tex && tex->cls == "bilerp") {
+		const pbrt_scene::Vec3 v00 = tex->params.getVec3("v00", {0.0, 0.0, 0.0});
+		const pbrt_scene::Vec3 v01 = tex->params.getVec3("v01", {1.0, 1.0, 1.0});
+		const pbrt_scene::Vec3 v10 = tex->params.getVec3("v10", {0.0, 0.0, 0.0});
+		const pbrt_scene::Vec3 v11 = tex->params.getVec3("v11", {1.0, 1.0, 1.0});
+		m.bilerpV00[0] = v00.x; m.bilerpV00[1] = v00.y; m.bilerpV00[2] = v00.z;
+		m.bilerpV01[0] = v01.x; m.bilerpV01[1] = v01.y; m.bilerpV01[2] = v01.z;
+		m.bilerpV10[0] = v10.x; m.bilerpV10[1] = v10.y; m.bilerpV10[2] = v10.z;
+		m.bilerpV11[0] = v11.x; m.bilerpV11[1] = v11.y; m.bilerpV11[2] = v11.z;
+		m.hasBilerpReflectance = true;
+		return true;   // resolved to a procedural bilerp blend, not a "not supported" warning
+	}
+	return false;
+}
+
+// "reflectance" bound to a Texture on a diffuse-like material: an image, or one of the procedural patterns. True when it was resolved (so no "not supported" warning).
+inline bool bindReflectanceTexture(const pbrt_scene::Scene &scene, FlatScene &out, Material &m, const pbrt_scene::Param &p) {
+	if (!((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse ||
+		   m.kind == MaterialKind::DiffuseTransmission) &&
+		  p.name == "reflectance" && !p.strings.empty())) return false;
+	const pbrt_scene::TextureDecl *tex = findTexture(scene, p.strings[0]);
+	if (bindReflectanceImagemap(scene, out, m, tex)) return true;
+	if (bindCheckerReflectance(scene, m, tex)) return true;
+	if (bindFbmOrMarbleReflectance(m, tex)) return true;
+	if (bindMixReflectance(scene, m, tex)) return true;
+	if (bindOtherProceduralReflectance(scene, m, tex)) return true;
+	return false;
+}
+
+// DiffuseTransmission's own "transmittance" - same "scale"-wrap
+// support as "reflectance" just above (Material::
+// transmittanceTextureScale's own comment), still no procedural
+// (checkerboard/fbm/marble/mix) support - no bundled scene binds
+// any of those to a DiffuseTransmission transmittance either.
+inline bool bindTransmittanceTexture(const pbrt_scene::Scene &scene, FlatScene &out, Material &m, const pbrt_scene::Param &p) {
+	const auto warn = materialWarner(out);
+	if (m.kind == MaterialKind::DiffuseTransmission &&
+		p.name == "transmittance" && !p.strings.empty()) {
+		// No separate `tex`-vs-`imgTex` split needed here (unlike
+		// reflectance's own block above): transmittance has no
+		// checkerboard/fbm/marble/mix fallback that needs the
+		// original (pre-unwrap) declaration, so unwrapping straight
+		// into `imgTex` is safe.
+		const pbrt_scene::TextureDecl *imgTex = findTexture(scene, p.strings[0]);
+		double texScale = 1.0;
+		if (imgTex && imgTex->cls == "scale") {
+			texScale = imgTex->params.getFloat("scale", 1.0);
+			const pbrt_scene::Param *inner = imgTex->params.find("tex");
+			imgTex = (inner && inner->type == "texture" && !inner->strings.empty())
+				? findTexture(scene, inner->strings[0]) : nullptr;
+		}
+		if (imgTex && imgTex->cls == "imagemap") {
+			const std::string filename = imgTex->params.getString("filename", "");
+			if (!filename.empty()) {
+				m.transmittanceTextureFilename = filename;
+				m.transmittanceTextureScale = texScale;
+				m.transmittanceTextureOptions = resolveTextureDecodeOptions(*imgTex, warn);
+				return true;   // resolved to an image, not a "not supported" warning
+			}
+		}
+	}
+	return false;
+}
+
+// Dielectric's own "roughness" - bare imagemap only (see
+// Material::roughnessTextureFilename's own comment); no
+// "scale"-wrap or procedural (checkerboard/fbm/marble/mix)
+// support, same scope narrowing as transmittance above.
+inline bool bindRoughnessTexture(const pbrt_scene::Scene &scene, FlatScene &out, Material &m, const pbrt_scene::Param &p) {
+	const auto warn = materialWarner(out);
+	if (m.kind == MaterialKind::Dielectric &&
+		p.name == "roughness" && !p.strings.empty()) {
+		const pbrt_scene::TextureDecl *tex = findTexture(scene, p.strings[0]);
+		if (tex && tex->cls == "imagemap") {
+			const std::string filename = tex->params.getString("filename", "");
+			if (!filename.empty()) {
+				m.roughnessTextureFilename = filename;
+				m.roughnessTextureOptions = resolveTextureDecodeOptions(*tex, warn);
+				return true;   // resolved to an image, not a "not supported" warning
+			}
+		}
+	}
+	return false;
+}
+
+// "displacement" (bump mapping) - not gated on `kind`, since real
+// scenes bind it on coateddiffuse/dielectric/etc, not just
+// Diffuse. Handles both forms real scenes use (barcelona-
+// pavilion): a direct "imagemap" texture, or one wrapped in a
+// "scale"-class texture (its own "texture tex" naming the real
+// imagemap, its "float scale" becoming displacementScale).
+inline bool bindDisplacementTexture(const pbrt_scene::Scene &scene, FlatScene &out, Material &m, const pbrt_scene::Param &p) {
+	const auto warn = materialWarner(out);
+	if (p.name == "displacement" && !p.strings.empty()) {
+		const pbrt_scene::TextureDecl *tex = findTexture(scene, p.strings[0]);
+		double scale = 1.0;
+		if (tex && tex->cls == "scale") {
+			scale = tex->params.getFloat("scale", 1.0);
+			const pbrt_scene::Param *inner = tex->params.find("tex");
+			tex = (inner && inner->type == "texture" && !inner->strings.empty())
+				? findTexture(scene, inner->strings[0]) : nullptr;
+		}
+		if (tex && tex->cls == "imagemap") {
+			const std::string filename = tex->params.getString("filename", "");
+			if (!filename.empty()) {
+				m.displacementTextureFilename = filename;
+				m.displacementMapping = uvMappingOf(*tex);
+				m.displacementScale = scale;
+				warnIfImagemapOptionsIgnored(*tex, "displacement", warn);
+				return true;   // resolved to an image, not a "not supported" warning
+			}
+		}
+	}
+	return false;
+}
+
 // Material type, base colour and every texture binding (reflectance, roughness, transmittance, alpha, displacement,
 // checker/mix/scale wrappers, ...).
 inline void readMaterialBindings(const pbrt_scene::Scene &scene, FlatScene &out,
@@ -110,442 +594,18 @@ inline void readMaterialBindings(const pbrt_scene::Scene &scene, FlatScene &out,
 	// references) still just warns.
 	for (const pbrt_scene::Param &p : md.params.items) {
 		if (p.type != "texture") continue;
-		if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse ||
-			 m.kind == MaterialKind::DiffuseTransmission) &&
-			p.name == "reflectance" && !p.strings.empty()) {
-			const pbrt_scene::TextureDecl *tex = findTexture(scene, p.strings[0]);
-			// "reflectance" bound to a "scale"-class Texture wrapping an
-			// imagemap (barcelona-pavilion's own dominant pattern, e.g.
-			// materials.pbrt's "concrete-kd": Texture "concrete-kd"
-			// "scale" "texture tex" ["concrete-kd-img"]) - same unwrap as
-			// "displacement" below, applied here too so reflectance gets
-			// the same real-scene coverage rather than falling through
-			// to the generic warning for every scale-wrapped case.
-			// Diffuse/CoatedDiffuse/DiffuseTransmission all apply
-			// m.textureScale for reflectance now (scaled_texture on CPU,
-			// MaterialData::emissionScale reused on GPU) - checkerboard/
-			// fbm/marble/mix stay Diffuse/CoatedDiffuse-only below (no
-			// bundled scene binds any of those to a DiffuseTransmission
-			// reflectance), so this stays narrower than the bare-imagemap
-			// case just below, which all three kinds already handle
-			// correctly. No kind-check needed here beyond the enclosing
-			// `if` above (already exactly these three kinds) - unlike the
-			// checkerboard/fbm/marble/mix branches below, which DO still
-			// need their own narrower gate.
-			// Unwrapped into a SEPARATE variable (imgTex), not reassigned
-			// into `tex` itself: the checkerboard/fbm/marble/mix branches
-			// below must still see the ORIGINAL (possibly "scale") decl
-			// and correctly fall through to the generic warning for e.g.
-			// a scale-wrapped checkerboard - unwrapping `tex` in place
-			// would silently drop that scale factor and treat it as a
-			// bare checkerboard instead.
-			const pbrt_scene::TextureDecl *imgTex = tex;
-			double texScale = 1.0;
-			if (imgTex && imgTex->cls == "scale") {
-				texScale = imgTex->params.getFloat("scale", 1.0);
-				const pbrt_scene::Param *inner = imgTex->params.find("tex");
-				imgTex = (inner && inner->type == "texture" && !inner->strings.empty())
-					? findTexture(scene, inner->strings[0]) : nullptr;
-			}
-			if (imgTex && imgTex->cls == "imagemap") {
-				const std::string filename = imgTex->params.getString("filename", "");
-				if (!filename.empty()) {
-					m.textureFilename = filename;
-					m.textureMapping = uvMappingOf(*imgTex);
-					m.textureScale = texScale;
-					// imageMapOptionsFor() (pbrt_cpu_builder.h) and GPU's
-					// own call sites read these 3 loose fields by name
-					// (kept as-is rather than switched to a
-					// TextureDecodeOptions field, to avoid touching every
-					// existing reader) - resolveTextureDecodeOptions() is
-					// still the single resolution point feeding them,
-					// same as transmittanceTextureOptions/
-					// roughnessTextureOptions below use directly.
-					{
-						const TextureDecodeOptions opts = resolveTextureDecodeOptions(*imgTex, warn);
-						m.textureGamma = opts.gamma;
-						m.textureWrap = opts.wrap;
-						m.textureWrapIndex = opts.wrapIndex;
-						m.textureInvert = opts.invert;
-						m.textureFilterIndex = opts.filterIndex;
-					}
-					continue;   // resolved to an image, not a "not supported" warning
-				}
-			}
-			// Shared by checkerboard/mix below: resolves a "texture"-typed
-			// tex1/tex2 param to a bare imagemap's filename, ONE level
-			// only - returns empty if the referenced Texture isn't a
-			// bare "imagemap" (itself nested further, or a different
-			// class), which the caller treats as "can't resolve, fall
-			// through to the generic warning" (see hasCheckerReflectance/
-			// hasMixReflectance's own comments).
-			auto resolveNestedImagemap = [&](const pbrt_scene::Param *p) -> std::string {
-				if (!p || p->strings.empty()) return std::string();
-				// Last-declaration-wins, matching every other texture-
-				// name lookup in this loop (e.g. the "reflectance" tex
-				// lookup above) - pbrt's own redeclare-by-name-overrides
-				// convention. Keep walking rather than returning on the
-				// first match, or a scene that redeclares a Texture name
-				// (imagemap first, something else later) would silently
-				// resolve to the STALE earlier declaration instead of
-				// correctly falling through to the generic warning.
-				const pbrt_scene::TextureDecl *found = findTexture(scene, p->strings[0]);
-				if (found && found->cls == "imagemap")
-					return found->params.getString("filename", "");
-				return std::string();
-			};
-			// Second level: resolves a "texture"-typed tex1/tex2 param to
-			// ANOTHER checkerboard/mix Texture - see NestedProceduralTexture's
-			// own comment for the exact (deliberately bounded) scope. Returns
-			// a struct with an empty `kind` if the reference isn't itself a
-			// checkerboard/mix (a different class, or unresolved), which the
-			// caller treats as "can't resolve at this level either, fall
-			// through to the generic warning" - same contract as
-			// resolveNestedImagemap above.
-			auto resolveNestedProcedural = [&](const pbrt_scene::Param *p) -> NestedProceduralTexture {
-				NestedProceduralTexture out2;
-				if (!p || p->strings.empty()) return out2;
-				const pbrt_scene::TextureDecl *found = findTexture(scene, p->strings[0]);
-				if (!found || (found->cls != "checkerboard" && found->cls != "mix"))
-					return out2;
-				const pbrt_scene::Param *t1p = found->params.find("tex1");
-				const pbrt_scene::Param *t2p = found->params.find("tex2");
-				const bool t1Nested = t1p && t1p->type == "texture";
-				const bool t2Nested = t2p && t2p->type == "texture";
-				const std::string t1Img = t1Nested ? resolveNestedImagemap(t1p) : std::string();
-				const std::string t2Img = t2Nested ? resolveNestedImagemap(t2p) : std::string();
-				// This level's own tex1/tex2 may only be a flat literal or a
-				// bare imagemap - not nested further (the bound this struct's
-				// own comment documents). A nested-but-unresolvable slot here
-				// fails the WHOLE second level, same "all or nothing per
-				// texture" rule the top level already enforces.
-				if ((t1Nested && t1Img.empty()) || (t2Nested && t2Img.empty()))
-					return out2;
-				out2.kind = found->cls;
-				if (t1Nested) out2.tex1Filename = t1Img;
-				else {
-					const pbrt_scene::Vec3 c1 = found->params.getVec3(
-						"tex1", found->cls == "checkerboard" ? pbrt_scene::Vec3{1.0, 1.0, 1.0}
-															  : pbrt_scene::Vec3{0.0, 0.0, 0.0});
-					out2.color1[0] = c1.x; out2.color1[1] = c1.y; out2.color1[2] = c1.z;
-				}
-				if (t2Nested) out2.tex2Filename = t2Img;
-				else {
-					const pbrt_scene::Vec3 c2 = found->params.getVec3(
-						"tex2", found->cls == "checkerboard" ? pbrt_scene::Vec3{0.0, 0.0, 0.0}
-															  : pbrt_scene::Vec3{1.0, 1.0, 1.0});
-					out2.color2[0] = c2.x; out2.color2[1] = c2.y; out2.color2[2] = c2.z;
-				}
-				if (found->cls == "checkerboard") {
-					out2.uscale = found->params.getFloat("uscale", 1.0);
-					out2.vscale = found->params.getFloat("vscale", 1.0);
-				} else {
-					const pbrt_scene::Param *amtp = found->params.find("amount");
-					if (amtp && amtp->type == "texture") {
-						out2.amountFilename = resolveNestedImagemap(amtp);
-						if (out2.amountFilename.empty()) { out2.kind.clear(); return out2; }
-					} else {
-						out2.amount = found->params.getFloat("amount", 0.5);
-					}
-				}
-				return out2;
-			};
-			if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) &&
-				tex && tex->cls == "checkerboard") {
-				const pbrt_scene::Param *tex1p = tex->params.find("tex1");
-				const pbrt_scene::Param *tex2p = tex->params.find("tex2");
-				const bool tex1IsNested = tex1p && tex1p->type == "texture";
-				const bool tex2IsNested = tex2p && tex2p->type == "texture";
-				const std::string tex1Img = tex1IsNested ? resolveNestedImagemap(tex1p) : std::string();
-				const std::string tex2Img = tex2IsNested ? resolveNestedImagemap(tex2p) : std::string();
-				// A nested slot that isn't a bare imagemap gets one more
-				// try at the second level (another checkerboard/mix)
-				// before giving up - see resolveNestedProcedural's own
-				// comment for that level's own (narrower) scope.
-				const NestedProceduralTexture tex1Proc =
-					(tex1IsNested && tex1Img.empty()) ? resolveNestedProcedural(tex1p) : NestedProceduralTexture{};
-				const NestedProceduralTexture tex2Proc =
-					(tex2IsNested && tex2Img.empty()) ? resolveNestedProcedural(tex2p) : NestedProceduralTexture{};
-				const bool tex1Resolved = !tex1IsNested || !tex1Img.empty() || !tex1Proc.kind.empty();
-				const bool tex2Resolved = !tex2IsNested || !tex2Img.empty() || !tex2Proc.kind.empty();
-				if (tex1Resolved && tex2Resolved) {
-					if (tex1IsNested && !tex1Img.empty()) {
-						m.checkerTex1Filename = tex1Img;
-					} else if (tex1IsNested) {
-						m.checkerTex1Nested = tex1Proc;
-						// GPU has no representation for a nested procedural
-						// sub-texture (TextureData's tex1ImageIdx/tex2ImageIdx
-						// are image-only - see pbrt_gpu_builder.h's
-						// resolveProceduralReflectanceTexture()) - leave
-						// checkerColor1 as a flat average-of-the-nested-
-						// pattern stand-in for GPU (real GPU-side warning
-						// lives in scene_builder.cpp, matching every other
-						// CPU-real/GPU-approximated gap's own convention).
-						nestedProceduralAverageColor(tex1Proc, m.checkerColor1);
-					} else {
-						const pbrt_scene::Vec3 c1 = tex->params.getVec3("tex1", {1.0, 1.0, 1.0});
-						m.checkerColor1[0] = c1.x; m.checkerColor1[1] = c1.y; m.checkerColor1[2] = c1.z;
-					}
-					if (tex2IsNested && !tex2Img.empty()) {
-						m.checkerTex2Filename = tex2Img;
-					} else if (tex2IsNested) {
-						m.checkerTex2Nested = tex2Proc;
-						nestedProceduralAverageColor(tex2Proc, m.checkerColor2);
-					} else {
-						const pbrt_scene::Vec3 c2 = tex->params.getVec3("tex2", {0.0, 0.0, 0.0});
-						m.checkerColor2[0] = c2.x; m.checkerColor2[1] = c2.y; m.checkerColor2[2] = c2.z;
-					}
-					m.checkerUScale = tex->params.getFloat("uscale", 1.0);
-					m.checkerVScale = tex->params.getFloat("vscale", 1.0);
-					// "integer dimension" [3] - pbrt-v4's real 3D world-space
-					// checker variant (Material::checkerIs3D's own comment).
-					// worldToTexture is the CTM's inverse at Texture-
-					// declaration time; inverseAffine() fails only for a
-					// singular (zero-scale-on-some-axis) CTM, which would
-					// make the checker degenerate on any renderer anyway -
-					// falls back to identity (whole-world one cell) rather
-					// than propagating a failure, matching this loader's
-					// own "render something sensible, don't abort the
-					// load" convention for a malformed-but-present feature.
-					if (tex->params.getInt("dimension", 2) == 3) {
-						m.checkerIs3D = true;
-						pbrt_scene::Matrix4 worldToTexture;
-						if (!tex->xform.inverseAffine(worldToTexture))
-							worldToTexture = pbrt_scene::Matrix4::identity();
-						for (int i = 0; i < 16; ++i) m.checkerWorldToTexture[i] = worldToTexture.m[i];
-					}
-					m.hasCheckerReflectance = true;
-					continue;   // resolved to a procedural checker, not a "not supported" warning
-				}
-			}
-			if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) &&
-				tex && tex->cls == "fbm") {
-				m.fbmOctaves = tex->params.getInt("octaves", 8);
-				m.fbmRoughness = tex->params.getFloat("roughness", 0.5);
-				m.hasFbmReflectance = true;
-				continue;   // resolved to procedural fbm noise, not a "not supported" warning
-			}
-			if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) &&
-				tex && tex->cls == "marble") {
-				m.marbleOctaves = tex->params.getInt("octaves", 8);
-				m.marbleRoughness = tex->params.getFloat("roughness", 0.5);
-				m.marbleScale = tex->params.getFloat("scale", 1.0);
-				m.marbleVariation = tex->params.getFloat("variation", 0.2);
-				m.hasMarbleReflectance = true;
-				continue;   // resolved to procedural marble, not a "not supported" warning
-			}
-			if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) &&
-				tex && tex->cls == "mix") {
-				// See hasMixReflectance's own comment - tex1/tex2/amount
-				// all support up to two levels (bare imagemap, or a
-				// further checkerboard/mix via resolveNestedProcedural);
-				// a nested slot that resolves at neither level still
-				// falls through to the generic warning below.
-				const pbrt_scene::Param *tex1p = tex->params.find("tex1");
-				const pbrt_scene::Param *tex2p = tex->params.find("tex2");
-				const pbrt_scene::Param *amountp = tex->params.find("amount");
-				const bool tex1IsNested = tex1p && tex1p->type == "texture";
-				const bool tex2IsNested = tex2p && tex2p->type == "texture";
-				const bool amountIsNested = amountp && amountp->type == "texture";
-				const std::string tex1Img = tex1IsNested ? resolveNestedImagemap(tex1p) : std::string();
-				const std::string tex2Img = tex2IsNested ? resolveNestedImagemap(tex2p) : std::string();
-				const std::string amountImg = amountIsNested ? resolveNestedImagemap(amountp) : std::string();
-				const NestedProceduralTexture tex1Proc =
-					(tex1IsNested && tex1Img.empty()) ? resolveNestedProcedural(tex1p) : NestedProceduralTexture{};
-				const NestedProceduralTexture tex2Proc =
-					(tex2IsNested && tex2Img.empty()) ? resolveNestedProcedural(tex2p) : NestedProceduralTexture{};
-				const NestedProceduralTexture amountProc =
-					(amountIsNested && amountImg.empty()) ? resolveNestedProcedural(amountp) : NestedProceduralTexture{};
-				const bool tex1Resolved = !tex1IsNested || !tex1Img.empty() || !tex1Proc.kind.empty();
-				const bool tex2Resolved = !tex2IsNested || !tex2Img.empty() || !tex2Proc.kind.empty();
-				const bool amountResolved = !amountIsNested || !amountImg.empty() || !amountProc.kind.empty();
-				if (tex1Resolved && tex2Resolved && amountResolved) {
-					if (tex1IsNested && !tex1Img.empty()) {
-						m.mixTex1Filename = tex1Img;
-					} else if (tex1IsNested) {
-						m.mixTex1Nested = tex1Proc;
-						// See the checkerboard case's identical comment above -
-						// same GPU-approximation, same reason.
-						nestedProceduralAverageColor(tex1Proc, m.mixColor1);
-					} else {
-						const pbrt_scene::Vec3 c1 = tex->params.getVec3("tex1", {0.0, 0.0, 0.0});
-						m.mixColor1[0] = c1.x; m.mixColor1[1] = c1.y; m.mixColor1[2] = c1.z;
-					}
-					if (tex2IsNested && !tex2Img.empty()) {
-						m.mixTex2Filename = tex2Img;
-					} else if (tex2IsNested) {
-						m.mixTex2Nested = tex2Proc;
-						nestedProceduralAverageColor(tex2Proc, m.mixColor2);
-					} else {
-						const pbrt_scene::Vec3 c2 = tex->params.getVec3("tex2", {1.0, 1.0, 1.0});
-						m.mixColor2[0] = c2.x; m.mixColor2[1] = c2.y; m.mixColor2[2] = c2.z;
-					}
-					if (amountIsNested && !amountImg.empty()) {
-						m.mixAmountTextureFilename = amountImg;
-					} else if (amountIsNested) {
-						m.mixAmountNested = amountProc;
-						// See tex1/tex2's own identical GPU-approximation
-						// comment above - same reason, scalar instead of
-						// colour (nestedProceduralAverageScalar's own
-						// comment).
-						m.mixAmount = nestedProceduralAverageScalar(amountProc);
-					} else {
-						m.mixAmount = tex->params.getFloat("amount", 0.5);
-					}
-					m.hasMixReflectance = true;
-					// A backend with no mix texture of its own (Metal) draws the flat colour: the blend of the two inputs at the amount (an image or an amount image
-					// stays at the default). Exact for two plain colours, an average for nested procedurals. Found by scripts/consistency_sweep.py: a mix of two
-					// equal colours drew as the default grey on Metal.
-					if (m.mixTex1Filename.empty() && m.mixTex2Filename.empty() && m.mixAmountTextureFilename.empty()) {
-						for (int c = 0; c < 3; ++c) m.color[c] = (1.0 - m.mixAmount) * m.mixColor1[c] + m.mixAmount * m.mixColor2[c];
-					}
-					continue;   // resolved to a procedural mix, not a "not supported" warning
-				}
-			}
-			if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) &&
-				tex && tex->cls == "windy") {
-				// Parameterless in real pbrt-v4 - nothing to read.
-				m.hasWindyReflectance = true;
-				continue;   // resolved to procedural windy noise, not a "not supported" warning
-			}
-			if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) &&
-				tex && tex->cls == "wrinkled") {
-				m.wrinkledOctaves = tex->params.getInt("octaves", 8);
-				m.wrinkledRoughness = tex->params.getFloat("roughness", 0.5);
-				m.hasWrinkledReflectance = true;
-				continue;   // resolved to procedural wrinkled turbulence, not a "not supported" warning
-			}
-			if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) &&
-				tex && tex->cls == "dots") {
-				// Same one-level-nested-bare-imagemap support for
-				// inside/outside as checkerboard's own tex1/tex2 above.
-				//
-				// pbrt-v4 has the two swapped: SpectrumDotsTexture's constructor takes (mapping, outsideDot, insideDot) but Create() passes ("inside",
-				// "outside") in that order, so in real pbrt the "inside" parameter colours the GROUND and the "outside" parameter (default 0, black) colours the
-				// DOTS (textures.cpp:331, textures.h:429). dotsInside* below is what the dots are drawn with, so it reads "outside", and dotsOutside* reads "inside".
-				m.dotsMapping = uvMappingOf(*tex);
-				const pbrt_scene::Param *dotP = tex->params.find("outside");
-				const pbrt_scene::Param *groundP = tex->params.find("inside");
-				const bool dotIsNested = dotP && dotP->type == "texture";
-				const bool groundIsNested = groundP && groundP->type == "texture";
-				const std::string dotImg = dotIsNested ? resolveNestedImagemap(dotP) : std::string();
-				const std::string groundImg = groundIsNested ? resolveNestedImagemap(groundP) : std::string();
-				if ((!dotIsNested || !dotImg.empty()) && (!groundIsNested || !groundImg.empty())) {
-					if (dotIsNested) {
-						m.dotsInsideTexFilename = dotImg;
-					} else {
-						const pbrt_scene::Vec3 c1 = tex->params.getVec3("outside", {0.0, 0.0, 0.0});
-						m.dotsInsideColor[0] = c1.x; m.dotsInsideColor[1] = c1.y; m.dotsInsideColor[2] = c1.z;
-					}
-					if (groundIsNested) {
-						m.dotsOutsideTexFilename = groundImg;
-					} else {
-						const pbrt_scene::Vec3 c2 = tex->params.getVec3("inside", {1.0, 1.0, 1.0});
-						m.dotsOutsideColor[0] = c2.x; m.dotsOutsideColor[1] = c2.y; m.dotsOutsideColor[2] = c2.z;
-					}
-					m.hasDotsReflectance = true;
-					continue;   // resolved to a procedural dots pattern, not a "not supported" warning
-				}
-			}
-			if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) &&
-				tex && tex->cls == "bilerp") {
-				const pbrt_scene::Vec3 v00 = tex->params.getVec3("v00", {0.0, 0.0, 0.0});
-				const pbrt_scene::Vec3 v01 = tex->params.getVec3("v01", {1.0, 1.0, 1.0});
-				const pbrt_scene::Vec3 v10 = tex->params.getVec3("v10", {0.0, 0.0, 0.0});
-				const pbrt_scene::Vec3 v11 = tex->params.getVec3("v11", {1.0, 1.0, 1.0});
-				m.bilerpV00[0] = v00.x; m.bilerpV00[1] = v00.y; m.bilerpV00[2] = v00.z;
-				m.bilerpV01[0] = v01.x; m.bilerpV01[1] = v01.y; m.bilerpV01[2] = v01.z;
-				m.bilerpV10[0] = v10.x; m.bilerpV10[1] = v10.y; m.bilerpV10[2] = v10.z;
-				m.bilerpV11[0] = v11.x; m.bilerpV11[1] = v11.y; m.bilerpV11[2] = v11.z;
-				m.hasBilerpReflectance = true;
-				continue;   // resolved to a procedural bilerp blend, not a "not supported" warning
-			}
-		}
-		// DiffuseTransmission's own "transmittance" - same "scale"-wrap
-		// support as "reflectance" just above (Material::
-		// transmittanceTextureScale's own comment), still no procedural
-		// (checkerboard/fbm/marble/mix) support - no bundled scene binds
-		// any of those to a DiffuseTransmission transmittance either.
-		if (m.kind == MaterialKind::DiffuseTransmission &&
-			p.name == "transmittance" && !p.strings.empty()) {
-			// No separate `tex`-vs-`imgTex` split needed here (unlike
-			// reflectance's own block above): transmittance has no
-			// checkerboard/fbm/marble/mix fallback that needs the
-			// original (pre-unwrap) declaration, so unwrapping straight
-			// into `imgTex` is safe.
-			const pbrt_scene::TextureDecl *imgTex = findTexture(scene, p.strings[0]);
-			double texScale = 1.0;
-			if (imgTex && imgTex->cls == "scale") {
-				texScale = imgTex->params.getFloat("scale", 1.0);
-				const pbrt_scene::Param *inner = imgTex->params.find("tex");
-				imgTex = (inner && inner->type == "texture" && !inner->strings.empty())
-					? findTexture(scene, inner->strings[0]) : nullptr;
-			}
-			if (imgTex && imgTex->cls == "imagemap") {
-				const std::string filename = imgTex->params.getString("filename", "");
-				if (!filename.empty()) {
-					m.transmittanceTextureFilename = filename;
-					m.transmittanceTextureScale = texScale;
-					m.transmittanceTextureOptions = resolveTextureDecodeOptions(*imgTex, warn);
-					continue;   // resolved to an image, not a "not supported" warning
-				}
-			}
-		}
-		// Dielectric's own "roughness" - bare imagemap only (see
-		// Material::roughnessTextureFilename's own comment); no
-		// "scale"-wrap or procedural (checkerboard/fbm/marble/mix)
-		// support, same scope narrowing as transmittance above.
-		if (m.kind == MaterialKind::Dielectric &&
-			p.name == "roughness" && !p.strings.empty()) {
-			const pbrt_scene::TextureDecl *tex = findTexture(scene, p.strings[0]);
-			if (tex && tex->cls == "imagemap") {
-				const std::string filename = tex->params.getString("filename", "");
-				if (!filename.empty()) {
-					m.roughnessTextureFilename = filename;
-					m.roughnessTextureOptions = resolveTextureDecodeOptions(*tex, warn);
-					continue;   // resolved to an image, not a "not supported" warning
-				}
-			}
-		}
-		// "displacement" (bump mapping) - not gated on `kind`, since real
-		// scenes bind it on coateddiffuse/dielectric/etc, not just
-		// Diffuse. Handles both forms real scenes use (barcelona-
-		// pavilion): a direct "imagemap" texture, or one wrapped in a
-		// "scale"-class texture (its own "texture tex" naming the real
-		// imagemap, its "float scale" becoming displacementScale).
-		if (p.name == "displacement" && !p.strings.empty()) {
-			const pbrt_scene::TextureDecl *tex = findTexture(scene, p.strings[0]);
-			double scale = 1.0;
-			if (tex && tex->cls == "scale") {
-				scale = tex->params.getFloat("scale", 1.0);
-				const pbrt_scene::Param *inner = tex->params.find("tex");
-				tex = (inner && inner->type == "texture" && !inner->strings.empty())
-					? findTexture(scene, inner->strings[0]) : nullptr;
-			}
-			if (tex && tex->cls == "imagemap") {
-				const std::string filename = tex->params.getString("filename", "");
-				if (!filename.empty()) {
-					m.displacementTextureFilename = filename;
-					m.displacementMapping = uvMappingOf(*tex);
-					m.displacementScale = scale;
-					warnIfImagemapOptionsIgnored(*tex, "displacement", warn);
-					continue;   // resolved to an image, not a "not supported" warning
-				}
-			}
-		}
+		if (bindReflectanceTexture(scene, out, m, p)) continue;
+		if (bindTransmittanceTexture(scene, out, m, p)) continue;
+		if (bindRoughnessTexture(scene, out, m, p)) continue;
+		if (bindDisplacementTexture(scene, out, m, p)) continue;
 		warn("material '" + md.type + "' binds its '" + p.name +
 			 "' to a texture, which is not supported; a constant colour is "
 			 "used instead");
 	}
 }
 
-// The scalar parameters of each material kind (roughness, coat, conductor eta/k, subsurface, hair, measured, mix, ...).
-inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &out,
-								const std::map<std::string, int> &namedMaterialIndex,
-								pbrt_scene::MaterialDecl &md, Material &m) {
-	const auto warn = [&out](const std::string &msg) {
-		out.warnings.push_back({0, std::string(), msg});
-	};
+// "roughness" (isotropic and per axis, remapping) and the layered materials' coat roughness and thickness.
+inline void readRoughnessAndLayers(FlatScene &out, pbrt_scene::MaterialDecl &md, Material &m) {
 	// "roughness" is pbrt's isotropic spelling; a scene that instead gives
 	// separate "uroughness"/"vroughness" (its anisotropic spelling) has no
 	// isotropic value to find, and without this fallback chain silently
@@ -593,11 +653,15 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 			(albedoP->numbers.size() < 3 || albedoP->numbers[0] != 0.0 || albedoP->numbers[1] != 0.0 || albedoP->numbers[2] != 0.0);
 		if (hasMediumAlbedo || md.params.getFloat("g", 0.0) != 0.0 ||
 			md.params.getInt("maxdepth", 10) != 10 || md.params.getInt("nsamples", 1) != 1)
-			warn("material '" + md.type + "' sets \"albedo\"/\"g\"/\"maxdepth\"/\"nsamples\", which are not supported; "
+			materialWarn(out, "material '" + md.type + "' sets \"albedo\"/\"g\"/\"maxdepth\"/\"nsamples\", which are not supported; "
 				 "a clear layer, 10 interactions and 1 sample are used");
 		if (m.kind == MaterialKind::CoatedDiffuse && md.params.getFloat("thickness", 0.01) != 0.01)
-			warn("material 'coateddiffuse' sets \"thickness\", which is not supported; 0.01 is used");
+			materialWarn(out, "material 'coateddiffuse' sets \"thickness\", which is not supported; 0.01 is used");
 	}
+}
+
+// The index of refraction: "eta"/"ior", a named glass spectrum, and the coated conductor's "interface.eta".
+inline void readIndexOfRefraction(FlatScene &out, pbrt_scene::MaterialDecl &md, Material &m) {
 	// "eta" is pbrt's name for index of refraction on dielectrics.
 	//
 	// CoatedConductor is a real exception to this: it ALSO conventionally
@@ -639,7 +703,7 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 				const std::string glass = glassElementFromSpectrumName(ie->strings[0]);
 				const GlassPreset *preset = glass.empty() ? nullptr : FindGlassPreset(glass.c_str());
 				if (preset) m.ior = preset->nd;
-				else warn("material 'coatedconductor' binds \"interface.eta\" to \"" + ie->strings[0] +
+				else materialWarn(out, "material 'coatedconductor' binds \"interface.eta\" to \"" + ie->strings[0] +
 				          "\", which is not a recognized glass preset; eta=" + std::to_string(m.ior) + " is used instead");
 			}
 		}
@@ -682,12 +746,12 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 					if (const GlassPreset *preset = FindGlassPreset(glass.c_str())) {
 						m.ior = preset->nd;
 					} else {
-						warn("material '" + md.type + "' names an unrecognized glass "
+						materialWarn(out, "material '" + md.type + "' names an unrecognized glass "
 							 "\"" + etaName + "\" for \"spectrum eta\"; eta=" +
 							 std::to_string(m.ior) + " is used instead");
 					}
 				} else {
-					warn("material '" + md.type + "' binds \"eta\" to the named spectrum "
+					materialWarn(out, "material '" + md.type + "' binds \"eta\" to the named spectrum "
 						 "\"" + etaName + "\", which is not a recognized glass preset; eta=" +
 						 std::to_string(m.ior) + " is used instead");
 				}
@@ -701,14 +765,17 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 				// 400) as if it were the IOR itself, which is worse than
 				// the plain default - reset to the ior-or-1.5 fallback
 				// and warn instead of rendering with a nonsensical eta.
-				warn("material '" + md.type + "' gives \"spectrum eta\" as inline "
+				materialWarn(out, "material '" + md.type + "' gives \"spectrum eta\" as inline "
 					 "wavelength/value data, which is not supported; eta=" +
 					 std::to_string(md.params.getFloat("ior", 1.5)) + " is used instead");
 				m.ior = md.params.getFloat("ior", 1.5);
 			}
 		}
 	}
+}
 
+// Principled's metallic/clearcoat and a dielectric's Abbe number and transmission filter.
+inline void readPrincipledAndDielectricParams(FlatScene &out, pbrt_scene::MaterialDecl &md, Material &m) {
 	// Principled only (this loader's own non-standard material - see
 	// MaterialKind::Principled's own comment): "metallic"/"clearcoat"/
 	// "clearcoatroughness" plain float params, same defaults as
@@ -734,10 +801,13 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 		// rather than silently rendering clear glass for a rough/dispersive one.
 		if ((tf.x != 1.0 || tf.y != 1.0 || tf.z != 1.0) &&
 			(m.roughness_u > 0.0 || m.roughness_v > 0.0 || m.abbeNumber > 0.0))
-			warn("Material \"dielectric\" \"rgb tf\" is ignored on a rough or dispersive "
+			materialWarn(out, "Material \"dielectric\" \"rgb tf\" is ignored on a rough or dispersive "
 				 "dielectric (only smooth, non-dispersive glass applies the transmission filter)");
 	}
+}
 
+// A conductor's (or coated conductor's) complex IOR: a named metal, explicit RGB eta/k, or pbrt's copper default.
+inline void readConductorParams(FlatScene &out, pbrt_scene::MaterialDecl &md, Material &m) {
 	// Conductor OR CoatedConductor: pbrt describes a conductor's complex
 	// IOR via "spectrum eta"/"spectrum k" bound to a NAMED spectrum
 	// ("metal-Ag-eta"/"metal-Ag-k", etc.), not the plain floats/RGB
@@ -806,13 +876,10 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 			}
 		}
 	}
+}
 
-	// DiffuseTransmission only, but harmless to read unconditionally: no
-	// other material kind has a "transmittance" parameter to collide with.
-	const pbrt_scene::Vec3 defT{m.transmittance[0], m.transmittance[1], m.transmittance[2]};
-	const pbrt_scene::Vec3 t = md.params.getVec3("transmittance", defT);
-	m.transmittance[0] = t.x; m.transmittance[1] = t.y; m.transmittance[2] = t.z;
-
+// Subsurface: sigma_a/sigma_s from a preset, explicit coefficients or reflectance+mfp, and eta.
+inline void readSubsurfaceParams(FlatScene &out, pbrt_scene::MaterialDecl &md, Material &m) {
 	// Subsurface: resolve sigma_a/sigma_s the way pbrt-v4's own
 	// SubsurfaceMaterial::Create does (materials.cpp) - "4 mutually
 	// exclusive ways to specify the subsurface properties": a named preset,
@@ -841,11 +908,11 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 				// pbrt-v4: "Enforce g=0 (the database specifies reduced
 				// scattering coefficients)".
 				if (g != 0.0)
-					warn("material 'subsurface' ignores \"g\" when \"name\" "
+					materialWarn(out, "material 'subsurface' ignores \"g\" when \"name\" "
 						 "selects a measured scattering preset (matches pbrt-v4)");
 				g = 0.0;
 			} else {
-				warn("material 'subsurface' names unknown scattering preset '" +
+				materialWarn(out, "material 'subsurface' names unknown scattering preset '" +
 					 name + "'; using the default coefficients instead");
 			}
 		} else if (hasSigmaA && hasSigmaS) {
@@ -856,11 +923,11 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 			sigA[0] = a.x; sigA[1] = a.y; sigA[2] = a.z;
 			sigS[0] = s.x; sigS[1] = s.y; sigS[2] = s.z;
 		} else if (hasSigmaA != hasSigmaS) {
-			warn("material 'subsurface' gives only one of \"sigma_a\"/\"sigma_s\"; "
+			materialWarn(out, "material 'subsurface' gives only one of \"sigma_a\"/\"sigma_s\"; "
 				 "both are required together, so the default coefficients are used instead");
 		} else if (const pbrt_scene::Param *reflP = md.params.find("reflectance")) {
 			if (reflP->type == "texture") {
-				warn("material 'subsurface' binds \"reflectance\" to a texture; this loader inverts a constant "
+				materialWarn(out, "material 'subsurface' binds \"reflectance\" to a texture; this loader inverts a constant "
 					 "reflectance+mfp into scattering coefficients, so the default coefficients are used instead");
 			} else {
 				reflectanceMode = true;
@@ -896,7 +963,7 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 			// the same as "nothing given" instead, and say so, rather
 			// than silently keeping a default this material kind never
 			// actually uses.
-			warn("material 'subsurface' binds \"eta\" to a spectrum, which "
+			materialWarn(out, "material 'subsurface' binds \"eta\" to a spectrum, which "
 				 "is not supported (pbrt-v4's own SubsurfaceMaterial reads "
 				 "eta as a plain float only); the default eta (1.33) is "
 				 "used instead");
@@ -915,7 +982,10 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 			}
 		}
 	}
+}
 
+// Hair: sigma_a from sigma_a, reflectance, melanin concentrations or the default brown, and eta.
+inline void readHairParams(FlatScene &out, pbrt_scene::MaterialDecl &md, Material &m) {
 	// Hair: resolve sigma_a the way pbrt-v4's own HairMaterial::Create
 	// does (materials.cpp) - "sigma_a" wins if present; else
 	// "reflectance"/"color"; else "eumelanin"/"pheomelanin"; else the
@@ -940,7 +1010,7 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 			// texture only (materials.cpp: GetFloatTexture) - no
 			// spectrum support - so a "spectrum eta" has no usable
 			// value here either.
-			warn("material 'hair' binds \"eta\" to a spectrum, which is "
+			materialWarn(out, "material 'hair' binds \"eta\" to a spectrum, which is "
 				 "not supported (pbrt-v4's own HairMaterial reads eta as "
 				 "a float only); the default eta (1.55) is used instead");
 			m.ior = 1.55;
@@ -982,7 +1052,7 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 
 		if (hasSigmaA) {
 			if (hasReflectance || hasEumelanin || hasPheomelanin)
-				warn("material 'hair' gives \"sigma_a\" together with "
+				materialWarn(out, "material 'hair' gives \"sigma_a\" together with "
 					 "\"reflectance\"/\"eumelanin\"/\"pheomelanin\"; "
 					 "\"sigma_a\" wins (matches pbrt-v4)");
 			const pbrt_scene::Vec3 a = md.params.getVec3("sigma_a",
@@ -990,7 +1060,7 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 			m.sigma_a[0] = a.x; m.sigma_a[1] = a.y; m.sigma_a[2] = a.z;
 		} else if (hasReflectance) {
 			if (hasEumelanin || hasPheomelanin)
-				warn("material 'hair' gives \"reflectance\"/\"color\" together "
+				materialWarn(out, "material 'hair' gives \"reflectance\"/\"color\" together "
 					 "with \"eumelanin\"/\"pheomelanin\"; \"reflectance\" wins "
 					 "(matches pbrt-v4)");
 			const pbrt_scene::Vec3 def{0.5, 0.3, 0.2};
@@ -1007,7 +1077,10 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 			sigmaAFromConcentration(1.3, 0.0);
 		}
 	}
+}
 
+// Measured: the as-written filename.
+inline void readMeasuredParams(FlatScene &out, pbrt_scene::MaterialDecl &md, Material &m) {
 	// Measured: just the as-written filename (see Material::
 	// measuredFilename's own comment for why resolution/loading happens
 	// later, in pbrt_load.h). pbrt-v4's own MeasuredMaterial has no
@@ -1016,11 +1089,14 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 	if (m.kind == MaterialKind::Measured) {
 		m.measuredFilename = md.params.getString("filename", "");
 		if (m.measuredFilename.empty()) {
-			warn("material 'measured' has no \"filename\"; "
+			materialWarn(out, "material 'measured' has no \"filename\"; "
 				 "it will fall back to a diffuse approximation");
 		}
 	}
+}
 
+// Mix: the two named materials and the amount (an unresolvable mix is downgraded to Unsupported).
+inline void readMixParams(FlatScene &out, pbrt_scene::MaterialDecl &md, Material &m, const std::map<std::string, int> &namedMaterialIndex) {
 	// Mix: resolve "materials" (two names) against namedMaterialIndex,
 	// built above. A "mix" that cannot be resolved is downgraded to
 	// Unsupported here rather than left half-populated - the generic
@@ -1032,14 +1108,14 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 	if (m.kind == MaterialKind::Mix) {
 		const pbrt_scene::Param *mats = md.params.find("materials");
 		if (!mats || mats->strings.size() < 2) {
-			warn("material 'mix' needs two names in \"materials\"; "
+			materialWarn(out, "material 'mix' needs two names in \"materials\"; "
 				 "it will fall back to a diffuse approximation");
 			m.kind = MaterialKind::Unsupported;
 		} else {
 			const auto itA = namedMaterialIndex.find(mats->strings[0]);
 			const auto itB = namedMaterialIndex.find(mats->strings[1]);
 			if (itA == namedMaterialIndex.end() || itB == namedMaterialIndex.end()) {
-				warn("material 'mix' names an unknown material in \"materials\"; "
+				materialWarn(out, "material 'mix' names an unknown material in \"materials\"; "
 					 "it will fall back to a diffuse approximation");
 				m.kind = MaterialKind::Unsupported;
 			} else {
@@ -1056,6 +1132,27 @@ inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &ou
 			}
 		}
 	}
+}
+
+// The scalar parameters of each material kind (roughness, coat, conductor eta/k, subsurface, hair, measured, mix, ...).
+inline void readMaterialKindParams(const pbrt_scene::Scene &scene, FlatScene &out,
+								const std::map<std::string, int> &namedMaterialIndex,
+								pbrt_scene::MaterialDecl &md, Material &m) {
+	readRoughnessAndLayers(out, md, m);
+	readIndexOfRefraction(out, md, m);
+	readPrincipledAndDielectricParams(out, md, m);
+	readConductorParams(out, md, m);
+
+	// DiffuseTransmission only, but harmless to read unconditionally: no
+	// other material kind has a "transmittance" parameter to collide with.
+	const pbrt_scene::Vec3 defT{m.transmittance[0], m.transmittance[1], m.transmittance[2]};
+	const pbrt_scene::Vec3 t = md.params.getVec3("transmittance", defT);
+	m.transmittance[0] = t.x; m.transmittance[1] = t.y; m.transmittance[2] = t.z;
+
+	readSubsurfaceParams(out, md, m);
+	readHairParams(out, md, m);
+	readMeasuredParams(out, md, m);
+	readMixParams(out, md, m, namedMaterialIndex);
 }
 
 // One scene.materials entry -> out.materials (1:1, same order).

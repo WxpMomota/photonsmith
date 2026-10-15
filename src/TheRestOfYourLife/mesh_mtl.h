@@ -165,47 +165,27 @@ inline std::string resolve_mtl_texture_path(const std::string& relative_path, co
 // pattern pbrt_cpu_builder.h already uses for .pbrt area lights. Left null
 // (the default) for callers that don't need it; empty for a mesh whose .mtl
 // has no real Ke data regardless (Sponza/Bistro/Rungholt today).
-// ---------------------------------------------------------------------------
-inline std::shared_ptr<hittable> load_obj_mtl(
-		const std::string& filepath,
-		std::shared_ptr<material> fallback_mat,
-		double scale = 1.0,
-		point3 offset = point3(0,0,0),
-		bool smooth_normals = false,
-		const std::string& texture_dir = "",
-		hittable_list* out_lights = nullptr)
-{
-	// Tracks which search prefix (if any) actually located filepath, so
-	// texture_dir (a path relative to models/, e.g. "sponza_textures") can
-	// be resolved with the same number of ".." climbs the .obj itself
-	// needed - texture_dir alone doesn't know how deep under models/ the
-	// current working directory actually is (RayTracer_Package/, bin/
-	// Release/, a test binary's own cwd, ...).
-	std::string found_prefix;
-	std::ifstream file(filepath);
-	if (!file.is_open()) {
-		static const char* kSearchPrefixes[] = {
-			"models/", "../models/", "../../models/",
-			"../../../models/", "../../../../models/", "../../../../../models/"
-		};
-		for (const char* prefix : kSearchPrefixes) {
-			file.clear();
-			file.open(prefix + filepath);
-			if (file.is_open()) { found_prefix = prefix; break; }
-		}
-	}
-	if (!file.is_open())
-		throw std::runtime_error("load_obj_mtl: cannot open file: " + filepath);
+struct ObjMtlFaceVertex { int p, t, n; };
+struct ObjMtlFace { std::array<ObjMtlFaceVertex,3> v; std::string mtl; };
 
+// What an OBJ file holds: positions, normals, uvs, triangulated faces (each with the material that was current) and the mtllib name.
+struct ObjMtlSource {
 	std::vector<point3> raw_pos;
 	std::vector<vec3>   raw_norm;
 	std::vector<double> raw_u, raw_v;
-
-	struct FaceVertex { int p, t, n; };
-	struct Face { std::array<FaceVertex,3> v; std::string mtl; };
-	std::vector<Face> faces;
-
+	std::vector<ObjMtlFace> faces;
 	std::string mtllib_name;
+};
+
+// The OBJ file's lines: v/vn/vt/mtllib/usemtl/f (a face with more than three vertices is fanned into triangles).
+inline void read_obj_mtl_source(std::ifstream &file, double scale, const point3 &offset, ObjMtlSource &src) {
+	using FaceVertex = ObjMtlFaceVertex;
+	using Face = ObjMtlFace;
+	std::vector<point3> &raw_pos = src.raw_pos;
+	std::vector<vec3> &raw_norm = src.raw_norm;
+	std::vector<double> &raw_u = src.raw_u, &raw_v = src.raw_v;
+	std::vector<Face> &faces = src.faces;
+	std::string &mtllib_name = src.mtllib_name;
 	std::string current_mtl;
 
 	std::string line;
@@ -264,20 +244,35 @@ inline std::shared_ptr<hittable> load_obj_mtl(
 		}
 		// All other tokens (o, g, #, s) are silently ignored, same as load_obj()
 	}
+}
 
-	if (raw_pos.empty() || faces.empty())
-		throw std::runtime_error("load_obj_mtl: no geometry in file: " + filepath);
+// Everything the companion .mtl says, by material name.
+struct MtlTables {
+	std::unordered_map<std::string, color> colors;
+	std::unordered_map<std::string, std::string> textures;
+	std::unordered_map<std::string, color> emission;
+	std::unordered_map<std::string, mtl_specular_params> specular;
+	std::unordered_map<std::string, std::string> bump_textures;
+	std::unordered_map<std::string, std::string> ke_textures;
+	std::unordered_map<std::string, std::string> alpha_textures;
+	std::string path_used;
+};
 
+// Locates the companion .mtl (the file's own mtllib directive, else "<same name as the .obj>.mtl") and reads what is wanted from it.
+inline MtlTables load_mtl_tables(const std::string &filepath, const std::string &mtllib_name, const std::string &texture_dir, bool wants_emission) {
+	MtlTables t;
+	std::unordered_map<std::string, color> &mtl_colors = t.colors;
+	std::unordered_map<std::string, std::string> &mtl_textures = t.textures;
+	std::unordered_map<std::string, color> &mtl_emission = t.emission;
+	std::unordered_map<std::string, mtl_specular_params> &mtl_specular = t.specular;
+	std::unordered_map<std::string, std::string> &mtl_bump_textures = t.bump_textures;
+	std::unordered_map<std::string, std::string> &mtl_ke_textures = t.ke_textures;
+	std::unordered_map<std::string, std::string> &mtl_alpha_textures = t.alpha_textures;
+	std::string &mtl_path_used = t.path_used;
+	mtl_path_used = mtllib_name;
 	// Locate the companion .mtl: prefer the file's own mtllib directive,
 	// falling back to "<same name as the .obj>.mtl" if that's missing,
 	// unreadable, or defines no Kd colors at all.
-	std::unordered_map<std::string, color> mtl_colors;
-	std::unordered_map<std::string, std::string> mtl_textures;
-	std::unordered_map<std::string, color> mtl_emission;
-	std::unordered_map<std::string, mtl_specular_params> mtl_specular;
-	std::unordered_map<std::string, std::string> mtl_bump_textures;
-	std::unordered_map<std::string, std::string> mtl_ke_textures;
-	std::string mtl_path_used = mtllib_name;
 	if (!mtllib_name.empty())
 		mtl_colors = parse_mtl(mtllib_name);
 	if (mtl_colors.empty()) {
@@ -285,19 +280,197 @@ inline std::shared_ptr<hittable> load_obj_mtl(
 		mtl_path_used = (dot == std::string::npos ? filepath : filepath.substr(0, dot)) + ".mtl";
 		mtl_colors = parse_mtl(mtl_path_used);
 	}
-	std::unordered_map<std::string, std::string> mtl_alpha_textures;
 	if (!texture_dir.empty() && !mtl_path_used.empty()) {
 		mtl_textures = parse_mtl_textures(mtl_path_used);
 		mtl_bump_textures = parse_mtl_bump_textures(mtl_path_used);
 		mtl_alpha_textures = parse_mtl_alpha_textures(mtl_path_used);
 	}
-	if (out_lights && !mtl_path_used.empty()) {
+	if (wants_emission && !mtl_path_used.empty()) {
 		mtl_emission = parse_mtl_emission(mtl_path_used);
 		if (!texture_dir.empty())
 			mtl_ke_textures = parse_mtl_ke_textures(mtl_path_used);
 	}
 	if (!mtl_path_used.empty())
 		mtl_specular = parse_mtl_specular(mtl_path_used);
+	return t;
+}
+
+// The material for one .mtl material name: an emitter (Ke), a glass (illum 7, or 4/6 with a real Tf), a glossy metal (illum 2/3 with a real Ks), a textured or flat
+// lambertian (map_Kd / Kd), then wrapped by a bump or normal map (map_Bump). Null when the name has none of these. Emissive names are added to `emissive_mats`
+// (and, unless textured, to `nee_light_mats`).
+inline std::shared_ptr<material> resolve_mtl_material(const std::string &name, const MtlTables &mt, const std::string &texture_dir, const std::string &found_prefix,
+												  std::unordered_set<std::string> &emissive_mats, std::unordered_set<std::string> &nee_light_mats) {
+	constexpr double kMeaningfulKsComponent = 0.02;
+	const auto &mtl_colors = mt.colors;
+	const auto &mtl_textures = mt.textures;
+	const auto &mtl_emission = mt.emission;
+	const auto &mtl_specular = mt.specular;
+	const auto &mtl_bump_textures = mt.bump_textures;
+	const auto &mtl_ke_textures = mt.ke_textures;
+	std::shared_ptr<material> resolved;
+	auto ke_it = mtl_emission.find(name);
+	if (ke_it != mtl_emission.end()) {
+		resolved = std::make_shared<diffuse_light>(ke_it->second);
+		emissive_mats.insert(name);
+		nee_light_mats.insert(name);
+	}
+	if (!resolved) {
+		auto ke_tex_it = mtl_ke_textures.find(name);
+		if (!texture_dir.empty() && ke_tex_it != mtl_ke_textures.end()) {
+			// map_Ke with no scalar Ke line (Gallery's own case) -
+			// same decode-once-then-move pattern as the map_Kd
+			// textured-lambertian branch below, but into a
+			// texture-backed diffuse_light instead: diffuse_light
+			// already supports a shared_ptr<texture> emission
+			// source (see material_simple.h), so this needed no
+			// material-class changes, only the parsing/dispatch
+			// wiring here. Deliberately NOT added to
+			// nee_light_mats - see that set's own comment.
+			std::string ke_img_path = resolve_mtl_texture_path(ke_tex_it->second, found_prefix + texture_dir);
+			rtw_image probe(ke_img_path.c_str());
+			if (probe.height() > 0) {
+				resolved = std::make_shared<diffuse_light>(std::make_shared<mipmap_texture>(std::move(probe)));
+				emissive_mats.insert(name);
+			}
+		}
+	}
+	if (!resolved) {
+		auto spec_it = mtl_specular.find(name);
+		if (spec_it != mtl_specular.end()) {
+			const mtl_specular_params& sp = spec_it->second;
+			if (sp.illum == 7) {
+				// Tf tints the transmitted contribution only (see
+				// dielectric's own Tf-tint constructor comment) -
+				// a no-op (white) for every illum-7 material that
+				// doesn't set a real Tf, e.g. Bistro's
+				// MASTER_Glass_Clean.
+				resolved = std::make_shared<dielectric>(sp.ni > 0.0 ? sp.ni : 1.5, sp.tf);
+			} else if ((sp.illum == 4 || sp.illum == 6) && mtl_has_real_transmission_filter(sp.tf) &&
+					   mtl_textures.find(name) == mtl_textures.end()) {
+				// illum 4/6 ("transparency, glass on") only when a real,
+				// non-boilerplate Tf backs it up (see
+				// mtl_has_real_transmission_filter's comment) - some
+				// exporters (Breakfast Room's Blender export) write
+				// illum 4 as a blanket default on every material
+				// regardless of type, which would otherwise turn its
+				// Chrome/Ceramic/matte-black-paint materials into glass
+				// too. Also requires no map_Kd texture: a textured
+				// material (e.g. Artwork, Kd 0,0,0 like real glass but
+				// meant to show its picture) is clearly not glass either.
+				// Tf tints the transmitted contribution (Sibenik's
+				// colored stained-glass windows) - see dielectric's
+				// own Tf-tint constructor comment for why this is a
+				// flat per-surface tint rather than the volumetric
+				// MaterialType::DielectricMedium/constant_medium
+				// path this codebase already has for thick glass.
+				resolved = std::make_shared<dielectric>(sp.ni > 0.0 ? sp.ni : 1.5, sp.tf);
+			} else if ((sp.illum == 2 || sp.illum == 3) && std::max({sp.ks.x(), sp.ks.y(), sp.ks.z()}) > kMeaningfulKsComponent) {
+				// illum 3 ("diffuse+specular, reflection on") gets the
+				// same glossy-metal treatment as illum 2 - Salle de
+				// Bain's "Mirror" material (Kd 0,0,0, Ks 0.99, illum 3)
+				// would otherwise render as a plain black diffuse
+				// rectangle instead of anything mirror-like.
+				auto color_it = mtl_colors.find(name);
+				color kd = (color_it != mtl_colors.end()) ? color_it->second : color(1, 1, 1);
+				resolved = std::make_shared<metal>(kd, phong_to_roughness(sp.ns));
+			}
+		}
+	}
+	if (!resolved) {
+		auto tex_it = mtl_textures.find(name);
+		if (!texture_dir.empty() && tex_it != mtl_textures.end()) {
+			std::string img_path = resolve_mtl_texture_path(tex_it->second, found_prefix + texture_dir);
+			// Decode once: probe the load here, then move the
+			// already-decoded pixels into image_texture instead of
+			// having its own constructor decode the same file
+			// again (image_texture(rtw_image&&), texture.h).
+			rtw_image probe(img_path.c_str());
+			if (probe.height() > 0)
+				resolved = std::make_shared<lambertian>(std::make_shared<mipmap_texture>(std::move(probe)));
+		}
+	}
+	if (!resolved) {
+		auto color_it = mtl_colors.find(name);
+		if (color_it != mtl_colors.end())
+			resolved = std::make_shared<lambertian>(color_it->second);
+	}
+	// map_Bump wraps whatever base material was just resolved
+	// above (lambertian, metal, dielectric, ...) -- skipped for
+	// emissive materials, where perturbing the emitted-light
+	// normal has no meaningful effect.
+	if (resolved && !texture_dir.empty() && !emissive_mats.count(name)) {
+		auto bump_it = mtl_bump_textures.find(name);
+		if (bump_it != mtl_bump_textures.end()) {
+			std::string bump_path = resolve_mtl_texture_path(bump_it->second, found_prefix + texture_dir);
+			rtw_image bump_probe(bump_path.c_str());
+			if (bump_probe.height() > 0) {
+				bool grayscale = is_grayscale_image(bump_probe);
+				auto bump_tex = std::make_shared<image_texture>(std::move(bump_probe));
+				resolved = grayscale
+					? std::static_pointer_cast<material>(std::make_shared<bump_map_material>(bump_tex, resolved))
+					: std::static_pointer_cast<material>(std::make_shared<normal_map_material>(bump_tex, resolved));
+			}
+		}
+	}
+	return resolved;
+}
+
+// The map_d alpha-cutout mask for one .mtl material name, or null.
+inline std::shared_ptr<texture> resolve_mtl_alpha_mask(const std::string &name, const MtlTables &mt, const std::string &found_prefix, const std::string &texture_dir) {
+	auto alpha_it = mt.alpha_textures.find(name);
+	if (alpha_it == mt.alpha_textures.end()) return nullptr;
+	std::string alpha_path = resolve_mtl_texture_path(alpha_it->second, found_prefix + texture_dir);
+	rtw_image alpha_probe(alpha_path.c_str());
+	if (alpha_probe.height() > 0) return std::make_shared<image_texture>(std::move(alpha_probe));
+	return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+inline std::shared_ptr<hittable> load_obj_mtl(
+		const std::string& filepath,
+		std::shared_ptr<material> fallback_mat,
+		double scale = 1.0,
+		point3 offset = point3(0,0,0),
+		bool smooth_normals = false,
+		const std::string& texture_dir = "",
+		hittable_list* out_lights = nullptr)
+{
+	// Tracks which search prefix (if any) actually located filepath, so
+	// texture_dir (a path relative to models/, e.g. "sponza_textures") can
+	// be resolved with the same number of ".." climbs the .obj itself
+	// needed - texture_dir alone doesn't know how deep under models/ the
+	// current working directory actually is (RayTracer_Package/, bin/
+	// Release/, a test binary's own cwd, ...).
+	std::string found_prefix;
+	std::ifstream file(filepath);
+	if (!file.is_open()) {
+		static const char* kSearchPrefixes[] = {
+			"models/", "../models/", "../../models/",
+			"../../../models/", "../../../../models/", "../../../../../models/"
+		};
+		for (const char* prefix : kSearchPrefixes) {
+			file.clear();
+			file.open(prefix + filepath);
+			if (file.is_open()) { found_prefix = prefix; break; }
+		}
+	}
+	if (!file.is_open())
+		throw std::runtime_error("load_obj_mtl: cannot open file: " + filepath);
+
+	ObjMtlSource src;
+	read_obj_mtl_source(file, scale, offset, src);
+	using FaceVertex = ObjMtlFaceVertex;
+	std::vector<point3> &raw_pos = src.raw_pos;
+	std::vector<vec3> &raw_norm = src.raw_norm;
+	std::vector<double> &raw_u = src.raw_u, &raw_v = src.raw_v;
+	std::vector<ObjMtlFace> &faces = src.faces;
+
+	if (raw_pos.empty() || faces.empty())
+		throw std::runtime_error("load_obj_mtl: no geometry in file: " + filepath);
+
+
+	// The companion .mtl (see load_mtl_tables).
+	const MtlTables mt = load_mtl_tables(filepath, src.mtllib_name, texture_dir, out_lights != nullptr);
 
 	std::vector<vec3> generated_norm;
 	if (smooth_normals && raw_norm.empty()) {
@@ -370,7 +543,6 @@ inline std::shared_ptr<hittable> load_obj_mtl(
 	// alpha-cutout mask passed to each face's triangle constructor - see
 	// triangle::hit()'s own alpha test.
 	// ------------------------------------------------------------------
-	constexpr double kMeaningfulKsComponent = 0.02;
 	std::unordered_map<std::string, std::shared_ptr<material>> mat_cache;
 	std::unordered_map<std::string, std::shared_ptr<texture>> alpha_mask_cache;
 	std::unordered_set<std::string> emissive_mats;
@@ -406,111 +578,7 @@ inline std::shared_ptr<hittable> load_obj_mtl(
 			if (cached != mat_cache.end()) {
 				tri_mat = cached->second;
 			} else {
-				std::shared_ptr<material> resolved;
-				auto ke_it = mtl_emission.find(name);
-				if (ke_it != mtl_emission.end()) {
-					resolved = std::make_shared<diffuse_light>(ke_it->second);
-					emissive_mats.insert(name);
-					nee_light_mats.insert(name);
-				}
-				if (!resolved) {
-					auto ke_tex_it = mtl_ke_textures.find(name);
-					if (!texture_dir.empty() && ke_tex_it != mtl_ke_textures.end()) {
-						// map_Ke with no scalar Ke line (Gallery's own case) -
-						// same decode-once-then-move pattern as the map_Kd
-						// textured-lambertian branch below, but into a
-						// texture-backed diffuse_light instead: diffuse_light
-						// already supports a shared_ptr<texture> emission
-						// source (see material_simple.h), so this needed no
-						// material-class changes, only the parsing/dispatch
-						// wiring here. Deliberately NOT added to
-						// nee_light_mats - see that set's own comment.
-						std::string ke_img_path = resolve_mtl_texture_path(ke_tex_it->second, found_prefix + texture_dir);
-						rtw_image probe(ke_img_path.c_str());
-						if (probe.height() > 0) {
-							resolved = std::make_shared<diffuse_light>(std::make_shared<mipmap_texture>(std::move(probe)));
-							emissive_mats.insert(name);
-						}
-					}
-				}
-				if (!resolved) {
-					auto spec_it = mtl_specular.find(name);
-					if (spec_it != mtl_specular.end()) {
-						const mtl_specular_params& sp = spec_it->second;
-						if (sp.illum == 7) {
-							// Tf tints the transmitted contribution only (see
-							// dielectric's own Tf-tint constructor comment) -
-							// a no-op (white) for every illum-7 material that
-							// doesn't set a real Tf, e.g. Bistro's
-							// MASTER_Glass_Clean.
-							resolved = std::make_shared<dielectric>(sp.ni > 0.0 ? sp.ni : 1.5, sp.tf);
-						} else if ((sp.illum == 4 || sp.illum == 6) && mtl_has_real_transmission_filter(sp.tf) &&
-								   mtl_textures.find(name) == mtl_textures.end()) {
-							// illum 4/6 ("transparency, glass on") only when a real,
-							// non-boilerplate Tf backs it up (see
-							// mtl_has_real_transmission_filter's comment) - some
-							// exporters (Breakfast Room's Blender export) write
-							// illum 4 as a blanket default on every material
-							// regardless of type, which would otherwise turn its
-							// Chrome/Ceramic/matte-black-paint materials into glass
-							// too. Also requires no map_Kd texture: a textured
-							// material (e.g. Artwork, Kd 0,0,0 like real glass but
-							// meant to show its picture) is clearly not glass either.
-							// Tf tints the transmitted contribution (Sibenik's
-							// colored stained-glass windows) - see dielectric's
-							// own Tf-tint constructor comment for why this is a
-							// flat per-surface tint rather than the volumetric
-							// MaterialType::DielectricMedium/constant_medium
-							// path this codebase already has for thick glass.
-							resolved = std::make_shared<dielectric>(sp.ni > 0.0 ? sp.ni : 1.5, sp.tf);
-						} else if ((sp.illum == 2 || sp.illum == 3) && std::max({sp.ks.x(), sp.ks.y(), sp.ks.z()}) > kMeaningfulKsComponent) {
-							// illum 3 ("diffuse+specular, reflection on") gets the
-							// same glossy-metal treatment as illum 2 - Salle de
-							// Bain's "Mirror" material (Kd 0,0,0, Ks 0.99, illum 3)
-							// would otherwise render as a plain black diffuse
-							// rectangle instead of anything mirror-like.
-							auto color_it = mtl_colors.find(name);
-							color kd = (color_it != mtl_colors.end()) ? color_it->second : color(1, 1, 1);
-							resolved = std::make_shared<metal>(kd, phong_to_roughness(sp.ns));
-						}
-					}
-				}
-				if (!resolved) {
-					auto tex_it = mtl_textures.find(name);
-					if (!texture_dir.empty() && tex_it != mtl_textures.end()) {
-						std::string img_path = resolve_mtl_texture_path(tex_it->second, found_prefix + texture_dir);
-						// Decode once: probe the load here, then move the
-						// already-decoded pixels into image_texture instead of
-						// having its own constructor decode the same file
-						// again (image_texture(rtw_image&&), texture.h).
-						rtw_image probe(img_path.c_str());
-						if (probe.height() > 0)
-							resolved = std::make_shared<lambertian>(std::make_shared<mipmap_texture>(std::move(probe)));
-					}
-				}
-				if (!resolved) {
-					auto color_it = mtl_colors.find(name);
-					if (color_it != mtl_colors.end())
-						resolved = std::make_shared<lambertian>(color_it->second);
-				}
-				// map_Bump wraps whatever base material was just resolved
-				// above (lambertian, metal, dielectric, ...) -- skipped for
-				// emissive materials, where perturbing the emitted-light
-				// normal has no meaningful effect.
-				if (resolved && !texture_dir.empty() && !emissive_mats.count(name)) {
-					auto bump_it = mtl_bump_textures.find(name);
-					if (bump_it != mtl_bump_textures.end()) {
-						std::string bump_path = resolve_mtl_texture_path(bump_it->second, found_prefix + texture_dir);
-						rtw_image bump_probe(bump_path.c_str());
-						if (bump_probe.height() > 0) {
-							bool grayscale = is_grayscale_image(bump_probe);
-							auto bump_tex = std::make_shared<image_texture>(std::move(bump_probe));
-							resolved = grayscale
-								? std::static_pointer_cast<material>(std::make_shared<bump_map_material>(bump_tex, resolved))
-								: std::static_pointer_cast<material>(std::make_shared<normal_map_material>(bump_tex, resolved));
-						}
-					}
-				}
+				std::shared_ptr<material> resolved = resolve_mtl_material(name, mt, texture_dir, found_prefix, emissive_mats, nee_light_mats);
 				tri_mat = resolved ? resolved : fallback_mat;
 				mat_cache[name] = tri_mat;
 
@@ -521,13 +589,7 @@ inline std::shared_ptr<hittable> load_obj_mtl(
 				// same as tri_mat itself, so a mask shared by thousands of
 				// foliage triangles is decoded once, not per-triangle.
 				if (!texture_dir.empty()) {
-					auto alpha_it = mtl_alpha_textures.find(name);
-					if (alpha_it != mtl_alpha_textures.end()) {
-						std::string alpha_path = resolve_mtl_texture_path(alpha_it->second, found_prefix + texture_dir);
-						rtw_image alpha_probe(alpha_path.c_str());
-						if (alpha_probe.height() > 0)
-							alpha_mask_cache[name] = std::make_shared<image_texture>(std::move(alpha_probe));
-					}
+					if (auto mask = resolve_mtl_alpha_mask(name, mt, found_prefix, texture_dir)) alpha_mask_cache[name] = mask;
 				}
 			}
 		}
