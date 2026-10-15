@@ -20,7 +20,7 @@ around it. The shader source is **compiled at run time** from the `.metal` files
 | file | role |
 |---|---|
 | `metal_poc_main.mm`, `metal_poc.mm` | the `metal_poc` CLI and `MetalPocApp`: argument parsing, the hand-built demo room (`buildScene`), post-processing and writing the image |
-| `metal_poc_pbrt_loader.mm` | `loadPbrtScene()`: flattened pbrt scene -> host arrays (geometry, area/point/spot/distant/projection/goniometric/infinite lights, media, camera) |
+| `metal_poc_pbrt_loader.mm`, `metal_poc_pbrt_loader_punctual.mm` | `loadPbrtScene()`: flattened pbrt scene -> host arrays (geometry, area lights, spheres and the media they bound, infinite lights, media, camera); the second file holds the point/spot/distant/goniometric/projection lights |
 | `metal_poc_pbrt_materials.mm` | pbrt material -> the shader's `TriangleMaterial` (`mapPbrtMaterial`, `mapPbrtDiffuseMaterial`), measured-BRDF tables |
 | `metal_poc_gpu_resources.mm` | uploads buffers and builds the acceleration structures |
 | `metal_poc_dispatch.mm` | `compileShaderAndDispatch()`: eight named stages (library, pipeline, targets, textures, sampling tables, uniforms, resource check, per-frame dispatch) over a `DispatchState` |

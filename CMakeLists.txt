@@ -391,6 +391,7 @@ if(RT_BUILD_METAL)
         # "Stage 2.5" block grew past a third of it, same pure-code-motion
         # precedent as the other metal_poc_*.mm splits.
         gpu/metal/metal_poc_pbrt_loader.mm
+        gpu/metal/metal_poc_pbrt_loader_punctual.mm   # point / spot / distant / goniometric / projection lights
         gpu/metal/metal_poc_pbrt_materials.mm
         gpu/metal/metal_poc_pbrt_nanovdb.mm   # "nanovdb" media: read on the host, drawn by the RGB grid medium
         # Stage 3 (GPU buffer/acceleration-structure upload) and Stage 4
