@@ -8,6 +8,7 @@
 #import <Metal/Metal.h>
 #import <Foundation/Foundation.h>
 #include "metal_poc_app.h"
+#include <set>
 #include "../../src/shared/curve_tessellate.h"
 #include "../../src/shared/fresnel.h"   // CauchyCoefficientsFromAbbe
 #include "../../src/shared/gpu_scene_materials.h"   // reflectanceToConductorK
@@ -64,6 +65,14 @@ static void applyReflectanceMapping(TriangleMaterial& mat, const pbrt_flatten::M
     mat.uvDeltaU = (float)m.textureMapping.du;
     mat.uvDeltaV = (float)m.textureMapping.dv;
     mat.textureWrap = m.textureWrapIndex;   // MipWrapMode: 0 clamp, 1 repeat, 2 black
+    // pbrt's "string filter" (0 point, 1 bilinear, 2 trilinear, 3 ewa): only the CPU honours all four. Metal samples a picture bilinearly with no mip chain, so say so once per file instead of
+    // drawing something different from the CPU without a word.
+    if (m.textureFilterIndex != 1 && !m.textureFilename.empty()) {
+        static std::set<std::string> warned;
+        if (warned.insert(m.textureFilename).second)
+            fprintf(stderr, "loadPbrtScene: warning: texture '%s' asks for the \"%s\" filter; the Metal renderer samples every picture bilinearly, so it will look different from the CPU's\n",
+                    m.textureFilename.c_str(), m.textureFilterIndex == 0 ? "point" : m.textureFilterIndex == 2 ? "trilinear" : "ewa");
+    }
 }
 
 // pbrt Diffuse: flat colour, or one of the textured variants (checkerboard, procedural noise, image) that the shader implements as modes of

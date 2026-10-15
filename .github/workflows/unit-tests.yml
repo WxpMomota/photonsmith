@@ -203,6 +203,10 @@ jobs:
         working-directory: build
         run: ctest --output-on-failure -R '^metal_poc_math_tests$'
 
+      - name: Compile the Metal shaders offline (no device needed)
+        # The renderer compiles its shaders at run time, on the machine that renders, so nothing else on a runner without a Metal device would notice a syntax error in one.
+        run: python3 scripts/check_metal_shaders.py
+
       - name: Run device-dependent tests (shader tests + smoke render/validate)
         timeout-minutes: 60
         working-directory: build

@@ -191,3 +191,18 @@ Still different from the CPU on Metal (none in a bundled scene except the first)
 * `chromatic-fog-room` red reads 2.5% low (the coloured cases at depth 8; grey is exact).
 * An imagemap's `"string filter"` (`point`, `trilinear`, `ewa`) is read on the CPU only; Metal samples bilinearly whatever it says (no bundled scene sets it; OptiX is the same).
 * Metal has no BDPT, MLT or SPPM (the GUI falls back to the CPU: `metal_poc_sppm_gpu_falls_back`).
+
+## What protects the Metal renderer, and where it runs (2026-10-15)
+
+| Layer | What it catches | Where it runs |
+|---|---|---|
+| `scripts/check_metal_shaders.py` (ctest `metal_poc_shader_compile`, a step of the CI `metal-poc` job) | A syntax error or an undeclared name in any shader file (both `METAL_TRIANGLE_ANY_HIT` variants), a file on disk that `metal_poc_shader_files.h` does not list; compiled offline by `xcrun metal`, about a second, no GPU | **CI** (hosted macOS) and every Mac |
+| `metal_poc_math_tests` | The host-side math | **CI** and every Mac |
+| `metal_poc_shader_tests` (device-side unit tests of shader functions against host references, e.g. `bumpHeightFiltered` against the CPU `mipmap`, the sphere-light cone sampling, `spawnSide`, BSDFs, noise, media) | A wrong index, level, pdf or sign inside one function, before it becomes a few percent of a picture | Any Mac with a Metal device (not the hosted runners: they have none) |
+| `metal_poc_cpu_gpu_sweep` (`scripts/consistency_sweep.py --only fog,dots,wrap,spawn,instbump,oddmap,subsurface`) | Metal against the CPU on the cases this project found wrong before: coloured fog, lamps, a clamped small lamp, an imagemap's wrap, a dots mapping, bump on an instance and of odd size, a far tilted normal map, subsurface | Any Mac |
+| `metal_poc_cpu_gpu_parity` (golden snapshot, `scripts/update_metal_golden.sh`), `metal_poc_consistency`, `metal_poc_subsurface*`, the media, alpha, cloud, nanovdb tests | The older scene-level checks | Any Mac |
+| `metal_poc_pbrt_pack` (`scripts/metal_pbrt_pack.py --baseline gpu/metal/pbrt_pack_baseline.txt`: Metal's mean against real pbrt-v4's on 144 scenes, compared with the stored ratios, a move of more than 4% fails; the only check against ground truth instead of the CPU) | Anything that moves a whole scene toward or away from pbrt, in a scene no sweep pair targets | Any Mac, about 7 minutes; rewrite the baseline (`--write-baseline`) only after a change you understand |
+| `scripts/bundled_scene_compare.py` (every bundled scene, CPU against Metal), `scripts/combo_sweep.py` (the Builder's 400-odd shape x material scenes), the full `scripts/consistency_sweep.py` | Everything else | By hand, before a release; not in ctest |
+| `scripts/gui_selftest_macos.sh` | The GUI, Live Preview and the render queue with a fresh app | By hand, before a release |
+
+Logging: a Metal failure is loud on every path. The command line prints the compiler's own errors (`Shader compile failed: ...`) and exits 1 (it does not fall back to the CPU); the GUI writes stderr to `ray_tracer_gui.log` (rotated, with a crash marker) and tags such lines `GPU` in the log view; the loader prints `loadPbrtScene: warning: ...` for what Metal does not draw as the CPU does (an unsupported feature, an instanced sphere, and since 2026-10-15 a texture `"string filter"` other than bilinear). Not logged: that the CPU-vs-Metal sweeps and the pbrt pack are not in CI (hosted runners have no Metal device).
