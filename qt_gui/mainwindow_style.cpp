@@ -61,69 +61,10 @@ QColor textOn(const QColor &fill, const theme::Palette &p) {
 	return fill.lightness() > 170 ? p.surface0 : QColor(Qt::white);
 }
 
-} // namespace
-
-void MainWindow::applyTheme(const theme::Palette &p) {
-	m_activeTheme = p;
-
-	// HorizontalTabBar's label paints itself rather than going through the
-	// stylesheet (see that class's own comment on why), so it needs these
-	// three colours handed to it directly instead of picking them up from
-	// QTabBar#previewSubTabsBar::tab the way the tab's shape/background
-	// still does. Matches that QSS rule's normal/hover/selected colours.
-	if (m_previewSubTabs) {
-		m_previewSubTabs->tabBar()->setColors(p.textMuted, p.textBody, p.accentSecondary);
-		m_previewSubTabs->setEmptyStateColors(p.textMuted, p.textBody, p.textMuted);
-	}
-
-	// ThemedScrollArea sets its own motif via a per-widget stylesheet on its
-	// viewport (that class's own comment on why the app-wide stylesheet
-	// alone doesn't reliably apply it) - found rather than tracked by member
-	// pointer, matching icon_tint.cpp's retint() pattern, since there is one
-	// per top-level tab (mainwindow_tabs.cpp's own objectName("tabScroll")
-	// call sites) and a new one should pick up theming for free.
-	for (ThemedScrollArea *scroll : findChildren<ThemedScrollArea *>())
-		scroll->setMotif(p.backgroundImage, p.backgroundTiled, p.backgroundPosition, p.id);
-
-	// Qt's own palette still matters: it is what non-stylesheet painting and
-	// native dialogs read, so it has to track the scheme too rather than being
-	// left on whatever the first theme set.
-	QPalette appPalette;
-	appPalette.setColor(QPalette::Window, p.surface0);
-	appPalette.setColor(QPalette::WindowText, p.textBody);
-	appPalette.setColor(QPalette::Base, p.surface1);
-	appPalette.setColor(QPalette::AlternateBase, p.surface2);
-	appPalette.setColor(QPalette::ToolTipBase, p.surface2);
-	appPalette.setColor(QPalette::ToolTipText, p.textBody);
-	appPalette.setColor(QPalette::Text, p.textBody);
-	appPalette.setColor(QPalette::Button, p.surface2);
-	appPalette.setColor(QPalette::ButtonText, p.textBody);
-	appPalette.setColor(QPalette::BrightText, p.accentPrimary);
-	appPalette.setColor(QPalette::Link, p.accentSecondary);
-	appPalette.setColor(QPalette::Highlight, p.accentDim);
-	appPalette.setColor(QPalette::HighlightedText, textOn(p.accentDim, p));
-
-	// Disabled state colors
-	appPalette.setColor(QPalette::Disabled, QPalette::WindowText, p.textDisabled);
-	appPalette.setColor(QPalette::Disabled, QPalette::Text, p.textDisabled);
-	appPalette.setColor(QPalette::Disabled, QPalette::ButtonText, p.textDisabled);
-
-	qApp->setPalette(appPalette);
-	qApp->setStyle(QStyleFactory::create("Fusion"));
-
-	// The font FAMILY is a fully independent choice (see font_switch.cpp) -
-	// applied once at startup and whenever the Font menu changes it, never
-	// here, so switching themes can no longer silently reset it back to
-	// Cyberpunk. Font SIZE is different: the rules below still set it per
-	// selector (that hierarchy - group box titles vs. captions vs. the
-	// primary button - is themeing, not something font_switch.cpp should
-	// know about), but every value is now an offset from m_activeFontId's
-	// own base size rather than a hardcoded number, so a font switch's point
-	// size is still visible everywhere instead of only in qApp->font().
-	const int basePt = fontPointSizeForId(m_activeFontId);
-
-	// Apply cyberpunk stylesheet for enhanced neon effects
-	QString stylesheet = QString(R"(
+// The application stylesheet, as a template: %NAME% placeholders (surfaces, accents, radii, font sizes) are filled in by MainWindow::applyTheme(). Three parts,
+// so that no one function is hundreds of lines long.
+QString themeStylesheetPart1() {  // the menus, buttons, group boxes and progress bars, up to the tab pane
+	return QString(R"(
 		/* The menu bar and its dropdown menus previously had no rules at
 		   all here, so they rendered as plain native OS chrome - a bright
 		   white Windows menu bar across the top of an otherwise fully
@@ -356,7 +297,11 @@ void MainWindow::applyTheme(const theme::Palette &p) {
 			background-color: %SURFACE0%;
 			top: -1px;
 		}
-		/* The scrolling tab pages. A theme's decorative motif (if any) is
+)");
+}
+
+QString themeStylesheetPart2() {  // the tab pane, scroll areas and lists
+	return QString(R"(		/* The scrolling tab pages. A theme's decorative motif (if any) is
 		   applied by ThemedScrollArea (mainwindow.h) via a per-widget
 		   stylesheet on its own viewport, not through this app-wide one -
 		   see that class's own comment for why. Not on QTabWidget::pane,
@@ -575,7 +520,11 @@ void MainWindow::applyTheme(const theme::Palette &p) {
 			border-radius: %RADIUS%;
 			color: %TEXT%;
 		}
-		QListView::item {
+)");
+}
+
+QString themeStylesheetPart3() {  // inputs, text, scroll bars, sliders, splitters and tooltips
+	return QString(R"(		QListView::item {
 			padding: 8px;
 			min-height: 30px;
 		}
@@ -809,7 +758,72 @@ void MainWindow::applyTheme(const theme::Palette &p) {
 			color: %TEXT%;
 			padding: 4px 8px;
 		}
-	)")
+	)");
+}
+
+} // namespace
+
+void MainWindow::applyTheme(const theme::Palette &p) {
+	m_activeTheme = p;
+
+	// HorizontalTabBar's label paints itself rather than going through the
+	// stylesheet (see that class's own comment on why), so it needs these
+	// three colours handed to it directly instead of picking them up from
+	// QTabBar#previewSubTabsBar::tab the way the tab's shape/background
+	// still does. Matches that QSS rule's normal/hover/selected colours.
+	if (m_previewSubTabs) {
+		m_previewSubTabs->tabBar()->setColors(p.textMuted, p.textBody, p.accentSecondary);
+		m_previewSubTabs->setEmptyStateColors(p.textMuted, p.textBody, p.textMuted);
+	}
+
+	// ThemedScrollArea sets its own motif via a per-widget stylesheet on its
+	// viewport (that class's own comment on why the app-wide stylesheet
+	// alone doesn't reliably apply it) - found rather than tracked by member
+	// pointer, matching icon_tint.cpp's retint() pattern, since there is one
+	// per top-level tab (mainwindow_tabs.cpp's own objectName("tabScroll")
+	// call sites) and a new one should pick up theming for free.
+	for (ThemedScrollArea *scroll : findChildren<ThemedScrollArea *>())
+		scroll->setMotif(p.backgroundImage, p.backgroundTiled, p.backgroundPosition, p.id);
+
+	// Qt's own palette still matters: it is what non-stylesheet painting and
+	// native dialogs read, so it has to track the scheme too rather than being
+	// left on whatever the first theme set.
+	QPalette appPalette;
+	appPalette.setColor(QPalette::Window, p.surface0);
+	appPalette.setColor(QPalette::WindowText, p.textBody);
+	appPalette.setColor(QPalette::Base, p.surface1);
+	appPalette.setColor(QPalette::AlternateBase, p.surface2);
+	appPalette.setColor(QPalette::ToolTipBase, p.surface2);
+	appPalette.setColor(QPalette::ToolTipText, p.textBody);
+	appPalette.setColor(QPalette::Text, p.textBody);
+	appPalette.setColor(QPalette::Button, p.surface2);
+	appPalette.setColor(QPalette::ButtonText, p.textBody);
+	appPalette.setColor(QPalette::BrightText, p.accentPrimary);
+	appPalette.setColor(QPalette::Link, p.accentSecondary);
+	appPalette.setColor(QPalette::Highlight, p.accentDim);
+	appPalette.setColor(QPalette::HighlightedText, textOn(p.accentDim, p));
+
+	// Disabled state colors
+	appPalette.setColor(QPalette::Disabled, QPalette::WindowText, p.textDisabled);
+	appPalette.setColor(QPalette::Disabled, QPalette::Text, p.textDisabled);
+	appPalette.setColor(QPalette::Disabled, QPalette::ButtonText, p.textDisabled);
+
+	qApp->setPalette(appPalette);
+	qApp->setStyle(QStyleFactory::create("Fusion"));
+
+	// The font FAMILY is a fully independent choice (see font_switch.cpp) -
+	// applied once at startup and whenever the Font menu changes it, never
+	// here, so switching themes can no longer silently reset it back to
+	// Cyberpunk. Font SIZE is different: the rules below still set it per
+	// selector (that hierarchy - group box titles vs. captions vs. the
+	// primary button - is themeing, not something font_switch.cpp should
+	// know about), but every value is now an offset from m_activeFontId's
+	// own base size rather than a hardcoded number, so a font switch's point
+	// size is still visible everywhere instead of only in qApp->font().
+	const int basePt = fontPointSizeForId(m_activeFontId);
+
+	// Apply cyberpunk stylesheet for enhanced neon effects
+	QString stylesheet = (themeStylesheetPart1() + themeStylesheetPart2() + themeStylesheetPart3())
 		.replace("%SURFACE0%",      hex(p.surface0))
 		.replace("%SURFACE1%",      hex(p.surface1))
 		.replace("%SURFACE2%",      hex(p.surface2))

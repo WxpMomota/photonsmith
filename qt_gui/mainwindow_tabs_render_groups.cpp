@@ -356,27 +356,8 @@ void MainWindow::buildIntegratorGroup(QWidget *optionsTab, QVBoxLayout *layout) 
 	layout->addWidget(m_integratorOptionsGroup);
 }
 
-// The Sampling & Spectral group (CPU default path tracer only).
-void MainWindow::buildSamplingGroup(QWidget *optionsTab, QVBoxLayout *layout) {
-	// ------------------------------------------------------------------
-	// Sampling & Spectral group - CPU default path tracer only
-	// ------------------------------------------------------------------
-	// "&&" (not "&") - a single "&" is a Qt mnemonic-accelerator marker,
-	// which would eat the "&" and underline the next letter instead of
-	// showing a literal ampersand.
-	InfoGroupBox *samplingGroup = new InfoGroupBox(tr("Sampling && Spectral"), optionsTab);
-	styleGroupBox(samplingGroup);
-	samplingGroup->setInfoIcon(createInfoIcon(
-		tr("Which random-sampling method is used, whether to simulate light "
-		"by individual wavelength, whether to stop early on pixels that "
-		"already look clean, and a time-limit alternative to a fixed sample "
-		"count. These control HOW samples are gathered, separately from HOW "
-		"MANY (set on the Settings tab).")));
-	QFormLayout *samplingLayout = new QFormLayout(samplingGroup);
-	samplingLayout->setVerticalSpacing(10);
-	samplingLayout->setHorizontalSpacing(10);
-	samplingLayout->setContentsMargins(15, 22, 15, 12);
-
+// The Sampler and Light Sampler rows of the Sampling & Spectral group.
+void MainWindow::addSamplerRows(QWidget *optionsTab, QFormLayout *samplingLayout) {
 	m_samplerCombo = new QComboBox(optionsTab);
 	// Same "(i)" mark + per-row tooltip as m_integratorCombo's own items -
 	// see that combo's construction comment for why icon_tint::addItem()
@@ -511,6 +492,30 @@ void MainWindow::buildSamplingGroup(QWidget *optionsTab, QVBoxLayout *layout) {
 	connect(m_lightSamplerCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
 		if (m_sceneCombo) updateSceneRecommendedSettingsHint(m_sceneCombo->currentData().toString());
 	});
+}
+
+// The Sampling & Spectral group (CPU default path tracer only).
+void MainWindow::buildSamplingGroup(QWidget *optionsTab, QVBoxLayout *layout) {
+	// ------------------------------------------------------------------
+	// Sampling & Spectral group - CPU default path tracer only
+	// ------------------------------------------------------------------
+	// "&&" (not "&") - a single "&" is a Qt mnemonic-accelerator marker,
+	// which would eat the "&" and underline the next letter instead of
+	// showing a literal ampersand.
+	InfoGroupBox *samplingGroup = new InfoGroupBox(tr("Sampling && Spectral"), optionsTab);
+	styleGroupBox(samplingGroup);
+	samplingGroup->setInfoIcon(createInfoIcon(
+		tr("Which random-sampling method is used, whether to simulate light "
+		"by individual wavelength, whether to stop early on pixels that "
+		"already look clean, and a time-limit alternative to a fixed sample "
+		"count. These control HOW samples are gathered, separately from HOW "
+		"MANY (set on the Settings tab).")));
+	QFormLayout *samplingLayout = new QFormLayout(samplingGroup);
+	samplingLayout->setVerticalSpacing(10);
+	samplingLayout->setHorizontalSpacing(10);
+	samplingLayout->setContentsMargins(15, 22, 15, 12);
+
+	addSamplerRows(optionsTab, samplingLayout);
 
 	m_spectralCheck = new QCheckBox(tr("Spectral rendering (--spectral)"), optionsTab);
 	m_spectralCheck->setToolTip(

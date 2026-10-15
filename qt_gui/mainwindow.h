@@ -9,6 +9,8 @@
 #include <QSpinBox>
 #include <QDoubleSpinBox>
 #include <QProgressBar>
+#include <QFormLayout>
+#include <QGridLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QAction>
@@ -289,6 +291,7 @@ private:
 	// The Render Options tab is built one group box at a time (each adds itself to `layout`).
 	void buildIntegratorGroup(QWidget *optionsTab, QVBoxLayout *layout);
 	void buildSamplingGroup(QWidget *optionsTab, QVBoxLayout *layout);
+	void addSamplerRows(QWidget *optionsTab, QFormLayout *samplingLayout);
 	void buildAcceleratorGroup(QWidget *optionsTab, QVBoxLayout *layout);
 	void buildPostProcessingGroup(QWidget *optionsTab, QVBoxLayout *layout);
 	void buildDenoiserGroup(QWidget *optionsTab, QVBoxLayout *layout);
@@ -308,7 +311,16 @@ private:
 	// from createRenderOptionsTab() at the exact positions the inline code
 	// used to occupy - no behavior change, purely a file-organization split.
 	void buildDenoiserLivePreviewSubsection(QWidget *optionsTab);
+	void fillSvgfTuningGroup();
 	void buildLivePreviewSettingsSection(QWidget *optionsTab, QVBoxLayout *layout);
+	// The rows of the Live Preview Settings grid, one call per block of related controls (buildLivePreviewSettingsSection() makes the group and the grid).
+	void addLiveToggleRows(QGridLayout *grid);
+	void addLiveUpscaleRows(QGridLayout *grid);
+	void addLiveNumericRows(QGridLayout *grid);
+	void addLiveAdaptiveRows(QGridLayout *grid);
+#ifdef Q_OS_MAC
+	void addLiveMetalRows(QGridLayout *grid);
+#endif
 	// Collapses the construct+setChecked+styleCheckBox+connect(toggled,...)
 	// sequence hand-repeated for every Live Preview toggle checkbox
 	// (ReSTIR GI/DI, Radiance Cache, Path Guiding, NRC, DOF, Neural
