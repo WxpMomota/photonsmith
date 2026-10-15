@@ -8,7 +8,7 @@
 # PASS_REGULAR_EXPRESSION), otherwise says which one failed.
 # usage: metal_poc_seed_test.sh <path-to-ray_tracer> <scratch-dir>
 RT="$1"; DIR="$2"
-render() { "$RT" --gpu $1 --output "$DIR/seed_test_$2.png" 64 4 2 A1 >/dev/null 2>&1 || { echo "render failed ($1)"; exit 1; }
+render() { "$RT" --gpu $1 --output "$DIR/seed_test_$2.png" 64 4 2 A1 >"$DIR/seed_render.log" 2>&1 || { echo "render failed ($1)"; tail -15 "$DIR/seed_render.log"; exit 1; }
            shasum -a 256 "$DIR/seed_test_$2.png" | cut -d' ' -f1; }
 A=$(render "--seed 5" a); B=$(render "--seed 5" b); C=$(render "--seed 6" c); D=$(render "" d)
 [ -n "$A" ] && [ "$A" = "$B" ] || { echo "same seed did NOT reproduce"; exit 1; }
