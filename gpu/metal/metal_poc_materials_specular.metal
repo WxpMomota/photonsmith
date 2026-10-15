@@ -245,7 +245,7 @@ inline bool shadeRoughDielectric(TriangleMaterial mat, float3 hitPoint, float3 n
     // light seen through frosted glass is found only by chance (sparse fireflies, an under-converged mean).
     // Glass that bounds a medium samples lights too: a path scattered inside reaches it, and pbrt takes the direct sample there like at any
     // other vertex.
-    const bool lightSampling = uniforms.lightCount > 0u && all(mat.emission == float3(0.0));
+    const bool lightSampling = uniforms.lightCount > 0u;
     if (lightSampling) {
         LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         const float3 toLight = ls.point - hitPoint;
@@ -479,7 +479,7 @@ inline bool shadeConductor(TriangleMaterial mat, float3 hitPoint, float3 normal,
     // (roughness 0.5 in a diffuse room). `energyScale` stays as a hook, fixed at 1; the GGX energy table is no longer read here.
     const float energyScale = 1.0;
 
-    if (all(mat.emission == float3(0.0))) {
+    {   // a lamp reflects too (see GPU_SCENE_COMMON.md, "An emitter reflects")
         LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
         float3 toLight = ls.point - hitPoint;
         float distSq = dot(toLight, toLight);
@@ -837,7 +837,7 @@ inline bool shadeClearcoat(TriangleMaterial mat, float3 albedo, float3 hitPoint,
         rayOrigin = hitPoint + facingNormal * 0.001f;
         specularBounce = true;
     } else {
-        if (all(mat.emission == float3(0.0))) {
+        {   // a lamp reflects too (see GPU_SCENE_COMMON.md, "An emitter reflects")
             LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
             float3 toLight = ls.point - hitPoint;
             float distSq = dot(toLight, toLight);

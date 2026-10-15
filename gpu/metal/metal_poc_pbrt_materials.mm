@@ -63,6 +63,7 @@ static void applyReflectanceMapping(TriangleMaterial& mat, const pbrt_flatten::M
     mat.uvScaleV = (float)m.textureMapping.sv;
     mat.uvDeltaU = (float)m.textureMapping.du;
     mat.uvDeltaV = (float)m.textureMapping.dv;
+    mat.textureWrap = m.textureWrapIndex;   // MipWrapMode: 0 clamp, 1 repeat, 2 black
 }
 
 // pbrt Diffuse: flat colour, or one of the textured variants (checkerboard, procedural noise, image) that the shader implements as modes of
@@ -114,6 +115,10 @@ TriangleMaterial MetalPocApp::mapPbrtDiffuseMaterial(const pbrt_flatten::Materia
                              /*materialType=*/METAL_MAT_TEXTURE_FAMILY, /*ior=*/1.0f, PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/0.0f};
         mat.transmitColor = PackedFloat3{(float)m.dotsOutsideColor[0], (float)m.dotsOutsideColor[1], (float)m.dotsOutsideColor[2]};
         mat.conductorK = PackedFloat3{0.0f, 6.0f, 0.0f};
+        mat.uvScaleU = (float)m.dotsMapping.su;   // the dots' cells are counted in (su * u + du, sv * v + dv) like an imagemap's lookup
+        mat.uvScaleV = (float)m.dotsMapping.sv;
+        mat.uvDeltaU = (float)m.dotsMapping.du;
+        mat.uvDeltaV = (float)m.dotsMapping.dv;
         return mat;
     }
     if (m.hasBilerpReflectance) {

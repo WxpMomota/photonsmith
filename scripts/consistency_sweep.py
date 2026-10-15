@@ -725,10 +725,11 @@ def run(args):
     # coloured fog (extinction that differs by channel), each colour held on its own: a medium sphere and the camera medium. Metal weighed every channel with the MEAN sigma_t (the
     # sphere's free flight; the camera fog's light sampling from surfaces), so the blue channel read 17 to 28% bright and the red 13 to 24% dark.
     if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "fog" in only or "bundled" in only):
-        print("[cpu vs gpu, coloured fog, a clamped small bright sphere light, a lamp that reflects the sky]")
+        print("[cpu vs gpu, coloured fog, a clamped small bright sphere light, a lamp that reflects the sky or another lamp]")
+        # (emissive-sphere-occluder, two-sphere-lights: a lamp keeps its material and reflects a light sampled at it; Metal skipped light sampling for every emissive surface, 7% dark)
         # (maxcomponentvalue-firefly-clamp: a radius-0.15 sphere light of L 400 under Film maxcomponentvalue 4; Metal sampled the sphere by area, 19% darker once the clamp cut its heavy tail)
         # (earth-globe: its backdrop lamp keeps pbrt's default diffuse 0.5 material and reflects the sky; the CPU was a pure emitter there until 2026-10-14, 8% off)
-        for scene_name in ("chromatic-fog-room", "chromatic-camera-medium", "maxcomponentvalue-firefly-clamp", "earth-globe", "chromatic-fog-room@2"):   # (@2: depth 2; crossing a medium sphere's boundary once counted as a bounce on Metal, 7 to 10% dark there)
+        for scene_name in ("chromatic-fog-room", "chromatic-camera-medium", "maxcomponentvalue-firefly-clamp", "earth-globe", "emissive-sphere-occluder", "two-sphere-lights", "chromatic-fog-room@2"):   # (@2: depth 2; crossing a medium sphere's boundary once counted as a bounce on Metal, 7 to 10% dark there)
             scene_name, _, depth = scene_name.partition("@")
             depth = depth or "8"
             total += 1
@@ -750,6 +751,72 @@ def run(args):
                       ["%.3f" % x for x in means["cpu"]], ["%.3f" % x for x in means["gpu"]], worst))
             if worst > 6.0:
                 failures.append(("fog", "both", scene_name))
+    # A dots texture counts its cells in the texture's own (uscale, vscale, udelta, vdelta) mapping: where the dots are is what a mean cannot see, so the rows and columns of the
+    # picture are compared (the profiles' difference against their own spread). Metal read every dots texture in the surface's own (u, v).
+    if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "mapping" in only or "dots" in only):
+        print("[cpu vs gpu, where the dots of a mapped dots texture are]")
+        text = ('LookAt 0 0 4  0 0 0  0 1 0\nCamera "perspective" "float fov" [ 30 ]\nFilm "rgb" "integer xresolution" [ 64 ] "integer yresolution" [ 64 ]\n'
+                'Sampler "halton" "integer pixelsamples" [ 32 ]\nWorldBegin\nLightSource "infinite" "rgb L" [ 1 1 1 ]\n'
+                'Texture "d" "spectrum" "dots" "float uscale" [ 5 ] "float vscale" [ 3 ] "float udelta" [ 0.3 ] "float vdelta" [ 0.1 ] "rgb inside" [ 0.9 0.9 0.9 ] "rgb outside" [ 0.05 0.05 0.05 ]\n'
+                'Material "diffuse" "texture reflectance" [ "d" ]\n'
+                'Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ] "point3 P" [ -1 -1 0  1 -1 0  1 1 0  -1 1 0 ] "point2 uv" [ 0 0 1 0 1 1 0 1 ]\n')
+        total += 1
+        path = os.path.join(workdir, "dots_mapped.pbrt")
+        open(path, "w").write(text)
+        profiles = {}
+        try:
+            for backend in ("cpu", "gpu"):
+                out = os.path.join(workdir, "dots_mapped_%s.exr" % backend)
+                r = subprocess.run([args.exe, "--" + backend, "--seed", "3", "--output", out, "64", "64", "8", path], capture_output=True, text=True, cwd=REPO, timeout=1200)
+                if r.returncode != 0 or not os.path.exists(out):
+                    raise RuntimeError("%s render failed: %s" % (backend, (r.stdout + r.stderr)[-200:]))
+                profiles[backend] = read_exr_rows_columns(out)
+        except RuntimeError as e:
+            print("  both cpu vs gpu, mapped dots: FAILED TO RENDER: %s" % e)
+            failures.append(("dots", "both", "mapped dots"))
+        else:
+            worst = 0.0
+            for axis in (0, 1):
+                a, b = profiles["cpu"][axis], profiles["gpu"][axis]
+                mean_a, mean_b = sum(a) / len(a), sum(b) / len(b)
+                spread = (sum((x - mean_a) ** 2 for x in a) / len(a)) ** 0.5
+                diff = (sum(((x - mean_a) - (y - mean_b)) ** 2 for x, y in zip(a, b)) / len(a)) ** 0.5
+                worst = max(worst, diff / max(spread, 1e-6))
+            if worst > 0.5 or args.verbose:
+                print("  %-4s %-34s %s  profile difference %.2f of the picture's own spread" % ("both", "cpu vs gpu, mapped dots", "ok   " if worst <= 0.5 else "WRONG", worst))
+            if worst > 0.5:
+                failures.append(("dots", "both", "mapped dots"))
+    # An imagemap's "string wrap" (clamp, black, repeat) with the picture tiled 3 times across the quad, so most of it lies beyond the picture: Metal looked every picture up with repeat
+    # (texture-encoding-wrap-invert read 4% off pbrt; the clamped quad was 34% off the CPU in red).
+    if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "mapping" in only or "wrap" in only):
+        print("[cpu vs gpu, an imagemap's wrap mode]")
+        for wrap in ("clamp", "black", "repeat"):
+            text = ('LookAt 0.45 0.45 3  0.45 0.45 0  0 1 0\nCamera "perspective" "float fov" [ 25 ]\nFilm "rgb" "integer xresolution" [ 64 ] "integer yresolution" [ 64 ]\n'
+                    'Sampler "halton" "integer pixelsamples" [ 64 ]\nWorldBegin\nLightSource "infinite" "rgb L" [ 1 1 1 ]\n'
+                    'Texture "t" "spectrum" "imagemap" "string filename" [ "%s" ] "float uscale" [ 3 ] "float vscale" [ 3 ] "string wrap" [ "%s" ]\n'
+                    'Material "diffuse" "texture reflectance" [ "t" ]\n'
+                    'Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ] "point3 P" [ 0 0 0  0.9 0 0  0.9 0.9 0  0 0.9 0 ]\n' % (sw.pattern, wrap))
+            total += 1
+            path = os.path.join(workdir, "wrap_%s.pbrt" % wrap)
+            open(path, "w").write(text)
+            means = {}
+            try:
+                for backend in ("cpu", "gpu"):
+                    out = os.path.join(workdir, "wrap_%s_%s.exr" % (wrap, backend))
+                    r = subprocess.run([args.exe, "--" + backend, "--seed", "3", "--output", out, "64", "64", "8", path], capture_output=True, text=True, cwd=REPO, timeout=1200)
+                    if r.returncode != 0 or not os.path.exists(out):
+                        raise RuntimeError("%s render failed: %s" % (backend, (r.stdout + r.stderr)[-200:]))
+                    means[backend] = read_exr_means(out)
+            except RuntimeError as e:
+                print("  both cpu vs gpu, wrap %s: FAILED TO RENDER: %s" % (wrap, e))
+                failures.append(("wrap", "both", wrap))
+                continue
+            worst = max(abs(g - c) / max(abs(c), 1e-9) for c, g in zip(means["cpu"], means["gpu"])) * 100.0
+            if worst > 4.0 or args.verbose:
+                print("  %-4s %-34s %s  rgb %s vs %s  off by %.1f%%" % ("both", "cpu vs gpu, wrap %s" % wrap, "ok   " if worst <= 4.0 else "WRONG",
+                      ["%.3f" % x for x in means["cpu"]], ["%.3f" % x for x in means["gpu"]], worst))
+            if worst > 4.0:
+                failures.append(("wrap", "both", wrap))
     print("\n%d pairs, %d off by more than %g%%" % (total, len(failures), tol))
     if not args.keep:
         shutil.rmtree(workdir, ignore_errors=True)

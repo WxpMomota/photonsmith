@@ -421,6 +421,24 @@ void MetalPocApp::applyPbrtImageBump(TriangleMaterial& mat, const pbrt_flatten::
                     entry = {(int)rgbGridData.size(), w, h, 0};
                     rgbGridData.reserve(rgbGridData.size() + (size_t)w * h);
                     for (size_t k = 0; k < (size_t)w * h; ++k) rgbGridData.push_back(srgb_decode::byteToLinear(px[k * 3]));   // pbrt decodes an 8-bit image as sRGB
+                    // The mip chain, straight after level 0 (bumpHeightFiltered reads the level that fits the footprint): each level a 2x2 box average of the one above, the size
+                    // rounded up and the far edge repeated, down to one texel.
+                    {
+                        int lw = w, lh = h;
+                        size_t cur = (size_t)entry[0];
+                        while (lw > 1 || lh > 1) {
+                            const int nw = std::max(1, (lw + 1) / 2), nh = std::max(1, (lh + 1) / 2);
+                            const size_t next = rgbGridData.size();
+                            for (int y = 0; y < nh; ++y)
+                                for (int x = 0; x < nw; ++x) {
+                                    const int x1 = std::min(2 * x + 1, lw - 1), y1 = std::min(2 * y + 1, lh - 1);
+                                    const float v = 0.25f * (rgbGridData[cur + (size_t)(2 * y) * lw + 2 * x] + rgbGridData[cur + (size_t)(2 * y) * lw + x1] +
+                                                             rgbGridData[cur + (size_t)y1 * lw + 2 * x] + rgbGridData[cur + (size_t)y1 * lw + x1]);
+                                    rgbGridData.push_back(v);
+                                }
+                            cur = next; lw = nw; lh = nh;
+                        }
+                    }
                 } else {
                     entry = {(int)rgbGridData.size(), w, h, 1};
                     rgbGridData.reserve(rgbGridData.size() + (size_t)w * h * 3);
