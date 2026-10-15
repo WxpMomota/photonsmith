@@ -711,6 +711,7 @@ kernel void test_shadeDielectric(
 {
     DielectricTestInput in = inputs[tid];
     TriangleMaterial mat;
+    mat.spawnNormal = packed_float3(0.0);
     mat.ior = in.ior;
     mat.color = packed_float3(in.absorption);
     float3 rayDir = in.rayDir;
@@ -734,6 +735,7 @@ kernel void test_shadeThinDielectric(
 {
     DielectricTestInput in = inputs[tid];
     TriangleMaterial mat;
+    mat.spawnNormal = packed_float3(0.0);
     mat.ior = in.ior;
     float3 rayDir = in.rayDir;
     float3 rayOrigin = float3(0.0);

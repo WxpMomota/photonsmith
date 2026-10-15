@@ -29,6 +29,7 @@ integration/skip_pdf_material_brightness_tests.cpp
 integration/spectral_rgb_parity_tests.cpp
 integration/sppm_first_slice_test.cpp
 integration/sppm_gpu_first_slice_test.cpp
+unit/bump_footprint_gpu_tests.cpp
 unit/energy_conservation_tests.cpp
 unit/gpu_render_tests.cpp
 unit/interface_tests.cpp
@@ -44,6 +45,7 @@ unit/pbrt_gpu_nanovdb_tests.cpp
 unit/pbrt_gpu_quad_light_tests.cpp
 unit/pbrt_gpu_texture_tests.cpp
 unit/pbrt_gpu_triangle_light_tests.cpp
+unit/pbrt_reference_pack_gpu_tests.cpp
 unit/quad_light_estimator_bias_tests.cpp
 unit/scene_registry_tests.cpp
 unit/shadow_ray_tests.cpp

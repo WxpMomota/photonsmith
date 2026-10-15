@@ -26,7 +26,7 @@
 // that can actually return false, so a future material added the same
 // way doesn't need special-casing at the call site to get this right.
 
-inline bool shadeMirror(float3 albedo, float3 hitPoint, float3 facingNormal,
+inline bool shadeMirror(TriangleMaterial mat, float3 albedo, float3 hitPoint, float3 facingNormal,
                          thread float3& rayDir, thread float3& rayOrigin,
                          thread float3& throughput, thread bool& specularBounce) {
     // Mirror: deterministic reflection, no light sampling (a specular
@@ -46,7 +46,7 @@ inline bool shadeMirror(float3 albedo, float3 hitPoint, float3 facingNormal,
     float cosTheta = max(dot(facingNormal, -rayDir), 0.0001);
     float3 fresnel = fresnelSchlickConductor(cosTheta, albedo);
     rayDir = newDir;
-    rayOrigin = hitPoint + facingNormal * 0.001f;
+    rayOrigin = hitPoint + spawnSide(mat, facingNormal, rayDir) * 0.001f;
     throughput *= fresnel;
     specularBounce = true;
     return true;
@@ -81,7 +81,7 @@ inline bool shadeDielectric(TriangleMaterial mat, float3 hitPoint, float3 normal
     // reflect() and refract() can each send the continuation ray to
     // either side of the surface here, and offsetting on the wrong side
     // re-intersects the same surface immediately (self-shadowing acne).
-    rayOrigin = hitPoint + (dot(newDir, normal) > 0.0 ? normal : -normal) * 0.001f;
+    rayOrigin = hitPoint + spawnSide(mat, (dot(newDir, normal) > 0.0 ? normal : -normal), rayDir) * 0.001f;
     applyBeerLambertAbsorption(throughput, mat.color, frontFace, hitDistance);
     specularBounce = true;
     return true;
@@ -167,7 +167,7 @@ inline bool shadeDispersiveDielectric(TriangleMaterial mat, float3 hitPoint, flo
         throughput *= refractionRatio * refractionRatio;   // (the radiance-mode eta^2, see shadeDielectric)
     }
     rayDir = newDir;
-    rayOrigin = hitPoint + (dot(newDir, normal) > 0.0 ? normal : -normal) * 0.001f;
+    rayOrigin = hitPoint + spawnSide(mat, (dot(newDir, normal) > 0.0 ? normal : -normal), rayDir) * 0.001f;
     applyBeerLambertAbsorption(throughput, mat.color, frontFace, hitDistance);
     specularBounce = true;
     return true;
@@ -259,7 +259,7 @@ inline bool shadeRoughDielectric(TriangleMaterial mat, float3 hitPoint, float3 n
             roughDielectricFPdf(woLocal, wiLocal, refractionRatio, alpha, bsdfValue, bsdfDensity);
             if (bsdfValue > 0.0) {
                 ray shadowRay;
-                shadowRay.origin = hitPoint + (dot(wiWorld, normal) > 0.0 ? normal : -normal) * 0.001f;
+                shadowRay.origin = hitPoint + spawnSide(mat, (dot(wiWorld, normal) > 0.0 ? normal : -normal), wiWorld) * 0.001f;
                 shadowRay.direction = wiWorld;
                 shadowRay.min_distance = 0.001f;
                 shadowRay.max_distance = dist - 0.002f;
@@ -304,7 +304,7 @@ inline bool shadeRoughDielectric(TriangleMaterial mat, float3 hitPoint, float3 n
     throughput *= roughDielectricG / max(roughDielectricG1, 1e-6);
     if (!tookReflection) throughput *= refractionRatio * refractionRatio;   // (the radiance-mode eta^2, see shadeDielectric)
     rayDir = newDir;
-    rayOrigin = hitPoint + (dot(newDir, normal) > 0.0 ? normal : -normal) * 0.001f;
+    rayOrigin = hitPoint + spawnSide(mat, (dot(newDir, normal) > 0.0 ? normal : -normal), rayDir) * 0.001f;
     if (lightSampling) {
         // The sampled direction's density, so an emitter it lands on is MIS-weighted against the light sampling above.
         float sampledValue, sampledDensity;
@@ -383,7 +383,7 @@ inline bool shadeDispersiveRoughDielectric(TriangleMaterial mat, float3 hitPoint
     throughput *= roughDielectricG / max(roughDielectricG1, 1e-6);
     if (!tookReflection) throughput *= refractionRatio * refractionRatio;   // (the radiance-mode eta^2, see shadeDielectric)
     rayDir = newDir;
-    rayOrigin = hitPoint + (dot(newDir, normal) > 0.0 ? normal : -normal) * 0.001f;
+    rayOrigin = hitPoint + spawnSide(mat, (dot(newDir, normal) > 0.0 ? normal : -normal), rayDir) * 0.001f;
     applyBeerLambertAbsorption(throughput, mat.color, frontFace, hitDistance);
     specularBounce = true;
     return true;
@@ -407,7 +407,7 @@ inline bool shadeThinDielectric(TriangleMaterial mat, float3 hitPoint, float3 no
         ? reflect(rayDir, facingNormal)
         : rayDir; // straight-through, no bending - zero-thickness slab
     rayDir = newDir;
-    rayOrigin = hitPoint + (dot(newDir, normal) > 0.0 ? normal : -normal) * 0.001f;
+    rayOrigin = hitPoint + spawnSide(mat, (dot(newDir, normal) > 0.0 ? normal : -normal), rayDir) * 0.001f;
     // No Beer-Lambert absorption, no material tint - pbrt-v4's own
     // ThinDielectricBxDF::Sample_f hardcodes r=g=b=1, a deliberate,
     // faithful match to the reference, not an oversight.
@@ -498,7 +498,7 @@ inline bool shadeConductor(TriangleMaterial mat, float3 hitPoint, float3 normal,
             float3 brdf = ggxConductorF(Dh, G, F, NdotO, NdotI) * energyScale;
 
             ray shadowRay;
-            shadowRay.origin = hitPoint + facingNormal * 0.001f;
+            shadowRay.origin = hitPoint + spawnSide(mat, facingNormal, wi) * 0.001f;
             shadowRay.direction = wi;
             shadowRay.min_distance = 0.001f;
             shadowRay.max_distance = dist - 0.002f;
@@ -533,7 +533,7 @@ inline bool shadeConductor(TriangleMaterial mat, float3 hitPoint, float3 normal,
                 float3 plBrdf = ggxConductorF(plDh, plG, plF, plNdotO, plNdotI) * energyScale;
 
                 ray plShadowRay;
-                plShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                plShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, plWi) * 0.001f;
                 plShadowRay.direction = plWi;
                 plShadowRay.min_distance = 0.001f;
                 plShadowRay.max_distance = plDist - 0.002f;
@@ -563,7 +563,7 @@ inline bool shadeConductor(TriangleMaterial mat, float3 hitPoint, float3 normal,
                 float3 dlBrdf = ggxConductorF(dlDh, dlG, dlF, dlNdotO, dlNdotI) * energyScale;
 
                 ray dlShadowRay;
-                dlShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                dlShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, dlWi) * 0.001f;
                 dlShadowRay.direction = dlWi;
                 dlShadowRay.min_distance = 0.001f;
                 dlShadowRay.max_distance = kDirectionalLightMaxDistance;
@@ -604,7 +604,7 @@ inline bool shadeConductor(TriangleMaterial mat, float3 hitPoint, float3 normal,
                     float3 pjBrdf = ggxConductorF(pjDh, pjG, pjF, pjNdotO, pjNdotI) * energyScale;
 
                     ray pjShadowRay;
-                    pjShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                    pjShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, pjWi) * 0.001f;
                     pjShadowRay.direction = pjWi;
                     pjShadowRay.min_distance = 0.001f;
                     pjShadowRay.max_distance = pjDist - 0.002f;
@@ -641,7 +641,7 @@ inline bool shadeConductor(TriangleMaterial mat, float3 hitPoint, float3 normal,
                     float3 glBrdf = ggxConductorF(glDh, glG, glF, glNdotO, glNdotI) * energyScale;
 
                     ray glShadowRay;
-                    glShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                    glShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, glWi) * 0.001f;
                     glShadowRay.direction = glWi;
                     glShadowRay.min_distance = 0.001f;
                     glShadowRay.max_distance = glDist - 0.002f;
@@ -693,7 +693,7 @@ inline bool shadeConductor(TriangleMaterial mat, float3 hitPoint, float3 normal,
                 float3 envBrdf = ggxConductorF(envDh, envG, envF, envNdotO, envNdotI) * energyScale;
 
                 ray envShadowRay;
-                envShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                envShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, envWi) * 0.001f;
                 envShadowRay.direction = envWi;
                 envShadowRay.min_distance = 0.001f;
                 envShadowRay.max_distance = 1e5f;
@@ -731,7 +731,7 @@ inline bool shadeConductor(TriangleMaterial mat, float3 hitPoint, float3 normal,
                 float3 pbrtEnvBrdf = ggxConductorF(pbrtEnvDh, pbrtEnvG, pbrtEnvF, pbrtEnvNdotO, pbrtEnvNdotI) * energyScale;
 
                 ray pbrtEnvShadowRay;
-                pbrtEnvShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                pbrtEnvShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, pbrtEnvWi) * 0.001f;
                 pbrtEnvShadowRay.direction = pbrtEnvWi;
                 pbrtEnvShadowRay.min_distance = 0.001f;
                 pbrtEnvShadowRay.max_distance = 1e5f;
@@ -766,7 +766,7 @@ inline bool shadeConductor(TriangleMaterial mat, float3 hitPoint, float3 normal,
     throughput *= F * (G / max(G1, 1e-6)) * energyScale;
 
     rayDir = wiWorld;
-    rayOrigin = hitPoint + facingNormal * 0.001f;
+    rayOrigin = hitPoint + spawnSide(mat, facingNormal, rayDir) * 0.001f;
     bsdfPdf = ggxConductorPdf(ggxD(hLocal, alphaX, alphaY), G1, NdotO);
     specularBounce = false;
     return true;
@@ -834,7 +834,7 @@ inline bool shadeClearcoat(TriangleMaterial mat, float3 albedo, float3 hitPoint,
     if (randFloat(rngState) < coatFresnel) {
         float3 newDir = reflect(rayDir, facingNormal);
         rayDir = newDir;
-        rayOrigin = hitPoint + facingNormal * 0.001f;
+        rayOrigin = hitPoint + spawnSide(mat, facingNormal, rayDir) * 0.001f;
         specularBounce = true;
     } else {
         {   // a lamp reflects too (see GPU_SCENE_COMMON.md, "An emitter reflects")
@@ -847,7 +847,7 @@ inline bool shadeClearcoat(TriangleMaterial mat, float3 albedo, float3 hitPoint,
             float cosLight = dot(ls.normal, -wi);
             if (cosSurface > 0.0 && (cosLight > 0.0 || (ls.twoSided != 0.0 && cosLight < 0.0))) {
                 ray shadowRay;
-                shadowRay.origin = hitPoint + facingNormal * 0.001f;
+                shadowRay.origin = hitPoint + spawnSide(mat, facingNormal, wi) * 0.001f;
                 shadowRay.direction = wi;
                 shadowRay.min_distance = 0.001f;
                 shadowRay.max_distance = dist - 0.002f;
@@ -875,7 +875,7 @@ inline bool shadeClearcoat(TriangleMaterial mat, float3 albedo, float3 hitPoint,
                 float plCosSurface = dot(facingNormal, plWi);
                 if (plCosSurface > 0.0) {
                     ray plShadowRay;
-                    plShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                    plShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, plWi) * 0.001f;
                     plShadowRay.direction = plWi;
                     plShadowRay.min_distance = 0.001f;
                     plShadowRay.max_distance = plDist - 0.002f;
@@ -898,7 +898,7 @@ inline bool shadeClearcoat(TriangleMaterial mat, float3 albedo, float3 hitPoint,
                 float dlCosSurface = dot(facingNormal, dlWi);
                 if (dlCosSurface > 0.0) {
                     ray dlShadowRay;
-                    dlShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                    dlShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, dlWi) * 0.001f;
                     dlShadowRay.direction = dlWi;
                     dlShadowRay.min_distance = 0.001f;
                     dlShadowRay.max_distance = kDirectionalLightMaxDistance;
@@ -932,7 +932,7 @@ inline bool shadeClearcoat(TriangleMaterial mat, float3 albedo, float3 hitPoint,
                                                                  (pj.usePbrtTexture != 0u ? pbrtProjectionTexture : earthTexture), textureSampler);
                     if (any(pjRadiance > float3(0.0))) {
                         ray pjShadowRay;
-                        pjShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                        pjShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, pjWi) * 0.001f;
                         pjShadowRay.direction = pjWi;
                         pjShadowRay.min_distance = 0.001f;
                         pjShadowRay.max_distance = pjDist - 0.002f;
@@ -962,7 +962,7 @@ inline bool shadeClearcoat(TriangleMaterial mat, float3 albedo, float3 hitPoint,
                                                                   (gl.usePbrtTexture != 0u ? pbrtGoniometricTexture : goniometricTexture), textureSampler);
                     if (any(glRadiance > float3(0.0))) {
                         ray glShadowRay;
-                        glShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                        glShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, glWi) * 0.001f;
                         glShadowRay.direction = glWi;
                         glShadowRay.min_distance = 0.001f;
                         glShadowRay.max_distance = glDist - 0.002f;
@@ -993,7 +993,7 @@ inline bool shadeClearcoat(TriangleMaterial mat, float3 albedo, float3 hitPoint,
                 float envCosSurface = dot(facingNormal, envWi);
                 if (envCosSurface > 0.0 && envPdfSolidAngle > 1e-9) {
                     ray envShadowRay;
-                    envShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                    envShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, envWi) * 0.001f;
                     envShadowRay.direction = envWi;
                     envShadowRay.min_distance = 0.001f;
                     envShadowRay.max_distance = 1e5f;
@@ -1022,7 +1022,7 @@ inline bool shadeClearcoat(TriangleMaterial mat, float3 albedo, float3 hitPoint,
                 float pbrtEnvCosSurface = dot(facingNormal, pbrtEnvWi);
                 if (pbrtEnvCosSurface > 0.0 && pbrtEnvPdfSolidAngle > 1e-9) {
                     ray pbrtEnvShadowRay;
-                    pbrtEnvShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                    pbrtEnvShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, pbrtEnvWi) * 0.001f;
                     pbrtEnvShadowRay.direction = pbrtEnvWi;
                     pbrtEnvShadowRay.min_distance = 0.001f;
                     pbrtEnvShadowRay.max_distance = 1e5f;
@@ -1042,7 +1042,7 @@ inline bool shadeClearcoat(TriangleMaterial mat, float3 albedo, float3 hitPoint,
         }
 
         rayDir = cosineSampleHemisphere(facingNormal, rngState);
-        rayOrigin = hitPoint + facingNormal * 0.001f;
+        rayOrigin = hitPoint + spawnSide(mat, facingNormal, rayDir) * 0.001f;
         float coatTransmitInNewDir = 1.0 - frDielectric(max(dot(facingNormal, rayDir), 0.0001), kClearcoatEta);
         throughput *= albedo * coatTransmitInNewDir;
         bsdfPdf = max(dot(facingNormal, rayDir), 0.0001) / M_PI_F;
