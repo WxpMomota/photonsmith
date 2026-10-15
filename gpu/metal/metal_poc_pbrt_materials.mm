@@ -24,38 +24,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-// A measured BRDF (pbrt "measured") for the Metal shader (materialType 32, metal_poc_materials_extra.metal): its five PiecewiseLinear2D
-// tables go into the shared float buffer `g` behind a 76-int descriptor. Descriptor fields are ints stored bit-for-bit in float slots and
-// every offset is an absolute index into `g`; the descriptor comes FIRST so its own index (stored in a float, exact below 2^24) stays small
-// however large the tables are. Returns that index.
-template <size_t Dim>
-static void putMeasuredPL2D(const PiecewiseLinear2D<Dim>& t, std::vector<float>& g, size_t descBase) {
-    int d[15] = {t.XSize(), t.YSize(), (int)Dim, 1, 1, 1, 0, 0, 0, -1, -1, -1, 0, -1, -1};
-    for (size_t i = 0; i < Dim; ++i) {
-        d[3 + i] = (int)t.ParamRes()[i];
-        d[6 + i] = (int)t.ParamStride()[i];
-        d[9 + i] = (int)g.size();
-        g.insert(g.end(), t.ParamValues(i).begin(), t.ParamValues(i).end());
-    }
-    d[12] = (int)g.size();
-    g.insert(g.end(), t.Data().begin(), t.Data().end());
-    if (!t.Mcdf().empty()) { d[13] = (int)g.size(); g.insert(g.end(), t.Mcdf().begin(), t.Mcdf().end()); }
-    if (!t.Ccdf().empty()) { d[14] = (int)g.size(); g.insert(g.end(), t.Ccdf().begin(), t.Ccdf().end()); }
-    std::memcpy(&g[descBase], d, sizeof(d));
-}
-
-static size_t appendMeasuredBrdf(const MeasuredBRDFData& m, std::vector<float>& g) {
-    const size_t base = g.size();
-    g.resize(base + 76, 0.0f);
-    putMeasuredPL2D(m.ndf, g, base);
-    putMeasuredPL2D(m.sigma, g, base + 15);
-    putMeasuredPL2D(m.vndf, g, base + 30);
-    putMeasuredPL2D(m.luminance, g, base + 45);
-    putMeasuredPL2D(m.spectra, g, base + 60);
-    const int iso = m.isotropic ? 1 : 0;
-    std::memcpy(&g[base + 75], &iso, sizeof(iso));
-    return base;
-}
+#include "metal_poc_measured_table.h"   // appendMeasuredBrdf(): a measured BRDF packed for the shader
 
 // pbrt imagemap uscale/vscale/udelta/vdelta of the reflectance picture, resolved by the flattener into Material::textureMapping; the shader looks
 // the picture up at (su*u + du, sv*v + dv). The identity (the default) leaves the TriangleMaterial's own defaults alone.
