@@ -852,6 +852,40 @@ def run(args):
                     print("  %-4s %-34s %s  %.4f vs %.4f  off by %.1f%%" % ("both", "cpu vs gpu, tilt %d, %s" % (tilt, label), "ok   " if worst <= 2.0 else "WRONG", means["cpu"], means["gpu"], worst))
                 if worst > 2.0:
                     failures.append(("spawn", "both", "tilt %d, %s" % (tilt, label)))
+    # A height map whose sides are not powers of two (13 x 9), tiled 6 times so the mip levels are read: pbrt builds its levels from a power-of-two copy (FloatResizeUp), so level 0 is
+    # that copy. Metal built them from the picture itself: 2.8% and 3.1% off the CPU here, 0.1% now. Held to 1.5%.
+    if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "maps" in only or "oddmap" in only):
+        print("[cpu vs gpu, a height map of odd size]")
+        import math
+        odd = os.path.join(workdir, "odd_height.png").replace("\\", "/")
+        write_png(odd, 13, 9, lambda x, y: ((int(128 + 100 * math.sin(x * 0.9) * math.cos(y * 1.3)),) * 3))
+        for scale in ("0.3", "1.5"):
+            text = ('LookAt 0 3 7  0 0 0  0 1 0\nCamera "perspective" "float fov" [ 40 ]\nFilm "rgb" "integer xresolution" [ 64 ] "integer yresolution" [ 64 ]\n'
+                    'Sampler "halton" "integer pixelsamples" [ 64 ]\nWorldBegin\nLightSource "distant" "point3 from" [ 2 4 3 ] "point3 to" [ 0 0 0 ] "rgb L" [ 4 4 4 ]\n'
+                    'Texture "h" "float" "imagemap" "string filename" [ "%s" ] "float uscale" [ 6 ] "float vscale" [ 6 ]\n'
+                    'Texture "b" "float" "scale" "texture tex" [ "h" ] "float scale" [ %s ]\n'
+                    'Material "diffuse" "rgb reflectance" [ 0.6 0.4 0.3 ] "texture displacement" [ "b" ]\n'
+                    'Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ] "point3 P" [ -3 0 -3  3 0 -3  3 0 3  -3 0 3 ] "point2 uv" [ 0 0 1 0 1 1 0 1 ]\n' % (odd, scale))
+            total += 1
+            path = os.path.join(workdir, "oddmap_%s.pbrt" % scale)
+            open(path, "w").write(text)
+            means = {}
+            try:
+                for backend in ("cpu", "gpu"):
+                    out = path.replace(".pbrt", "_%s.exr" % backend)
+                    r = subprocess.run([args.exe, "--" + backend, "--seed", "3", "--output", out, "64", "128", "8", path], capture_output=True, text=True, cwd=REPO, timeout=1200)
+                    if r.returncode != 0 or not os.path.exists(out):
+                        raise RuntimeError("%s render failed: %s" % (backend, (r.stdout + r.stderr)[-200:]))
+                    means[backend] = read_exr_means(out)[1]
+            except RuntimeError as e:
+                print("  both cpu vs gpu, odd height map %s: FAILED TO RENDER: %s" % (scale, e))
+                failures.append(("oddmap", "both", scale))
+                continue
+            worst = abs(means["gpu"] - means["cpu"]) / max(abs(means["cpu"]), 1e-9) * 100.0
+            if worst > 1.5 or args.verbose:
+                print("  %-4s %-34s %s  %.4f vs %.4f  off by %.1f%%" % ("both", "cpu vs gpu, odd height map, scale %s" % scale, "ok   " if worst <= 1.5 else "WRONG", means["cpu"], means["gpu"], worst))
+            if worst > 1.5:
+                failures.append(("oddmap", "both", scale))
     print("\n%d pairs, %d off by more than %g%%" % (total, len(failures), tol))
     if not args.keep:
         shutil.rmtree(workdir, ignore_errors=True)
