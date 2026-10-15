@@ -21,7 +21,7 @@ build, how to test, what a good change looks like, and where help is wanted.
 
 * **Windows**: build `ray_tracer_tests`, then run
   `powershell -ExecutionPolicy Bypass -File scripts/run_tests_parallel.ps1 -Tier Split`
-  (under ten minutes on a desktop GPU; `-Tier Fast` skips the GPU tests, `-Filter` narrows
+  (about six minutes on a desktop GPU; `-Tier Fast` is the cheap tests only, about 40 s, `-Filter` narrows
   by name). The suite has over 5,000 tests and needs to stay green.
 * **Anywhere, and on GitHub CI** (no GPU): the CMake targets `unit_tests` and
   `cpu_integrator_tests` (see `tests/CMakeLists.txt` and `.github/workflows/unit-tests.yml`).

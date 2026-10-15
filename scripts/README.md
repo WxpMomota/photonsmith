@@ -82,8 +82,9 @@ Utility scripts for building, packaging, and testing the ray tracer.
 - **`run_tests_parallel.ps1`** - Shards `ray_tracer_tests.exe` across multiple
   parallel processes (`GTEST_TOTAL_SHARDS`), with per-shard scratch
   directories to avoid output-file collisions
-  - `-Tier Fast|Slow|All` selects/excludes GPU-touching and thread-pool-
-    oversubscribing tests
+  - `-Tier Fast|Render|Slow|Split|All` selects the cheap tests (sharded 16 ways, ~40 s), the CPU-render suites
+    (4 shards, ~154 s), the GPU tests (one process, ~270 s), or Fast then Render and Slow at the same time
+    (`Split`, ~375 s for the whole suite); see BUILD.md
   - See `tests/TESTING_GUIDE.md` for the full usage pattern
 
 - **`render_baseline.py`** (+ `exr_io.py`, its EXR reader) - Renders 15 scenes on the CPU and both GPU backends and compares them with a

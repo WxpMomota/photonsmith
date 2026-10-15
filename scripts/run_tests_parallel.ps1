@@ -81,10 +81,14 @@
 	    pools themselves, so sharding them provides no benefit and only
 	    reintroduces the exact oversubscription/contention -Tier Fast
 	    exists to avoid.
+	  - Render: the CPU-render suites that make up most of what used to be Fast (the backend agreement, chromatic-media, bundled-scene and
+	    reference-pack tests: about 380 of Fast's 426 s of test time, October 2026). Each already renders with every core, so sharding them
+	    only oversubscribes the machine: a 16-shard Fast run of that mix timed out after 1800 s. They run in 4 shards (-RenderShards N; 4 or 8
+	    take 154 s, one process 338 s, 16 shards 187 s). Matched by $renderSuites below; a heavy new suite that is not listed lands in
+	    Fast, which still works but loses time.
 	  - All: no tier filter (original behavior).
-	  - Split: the whole suite as Fast then Slow, one after the other (~250 s here against ~370 s for All, which runs everything in one
-	    process): Fast spreads over every core, Slow keeps the GPU tests alone. Exits non-zero if either part fails. -Filter is not
-	    supported (see Slow).
+	  - Split: the whole suite: Fast (cheap tests, 16 shards, seconds), then Render and Slow at the same time (Render is CPU-bound, Slow
+	    mostly waits on the GPU), or one after the other with -Sequential. Exits non-zero if any part fails. -Filter is not supported (see Slow).
 	    Measured: sharding Slow over 2-4 processes is NOT faster (170 s with 1, 193-198 s with 2-4) - separate processes time-slice the GPU.
 	NAMING-CONVENTION CAVEAT: the GPU exclusion pattern relies on GPU
 	tests naming themselves with Gpu/GPU/gpu somewhere in the suite OR
@@ -117,8 +121,15 @@ param(
 
 	[string]$Filter = "",
 
-	[ValidateSet("All", "Fast", "Slow", "Split")]
+	[ValidateSet("All", "Fast", "Render", "Slow", "Split")]
 	[string]$Tier = "All",
+
+	# -Tier Render / Split: how many processes the CPU-render tests are spread over (each gets its share of the cores). Measured on 16 cores (509 tests): 1 process 338 s,
+	# 4 or 8 processes 154 s, 16 processes 187 s.
+	[int]$RenderShards = 4,
+
+	# -Tier Split: run Render and Slow one after the other instead of at the same time.
+	[switch]$Sequential,
 
 	# Generous default (the full serial suite alone takes ~215s) - exists so
 	# one hung shard can't block the script forever, not to tightly bound
@@ -130,15 +141,40 @@ $ErrorActionPreference = "Stop"
 
 if ($Tier -eq "Split") {
 	if ($Filter) { Write-Host "[FAIL] -Filter cannot be combined with -Tier Split." -ForegroundColor Red; exit 1 }
+	$splitTimer = [System.Diagnostics.Stopwatch]::StartNew()
 	& $PSCommandPath -Configuration $Configuration -Shards $Shards -Tier Fast -TimeoutSeconds $TimeoutSeconds
 	$fastExit = $LASTEXITCODE
-	& $PSCommandPath -Configuration $Configuration -Tier Slow -TimeoutSeconds $TimeoutSeconds
-	$slowExit = $LASTEXITCODE
-	if ($fastExit -ne 0 -or $slowExit -ne 0) {
-		Write-Host "[FAIL] Split: Fast exit $fastExit, Slow exit $slowExit" -ForegroundColor Red
+	Write-Host ("Split: Fast took {0:N0} s" -f $splitTimer.Elapsed.TotalSeconds) -ForegroundColor Cyan
+	if ($Sequential) {
+		& $PSCommandPath -Configuration $Configuration -Shards $RenderShards -Tier Render -TimeoutSeconds $TimeoutSeconds
+		$renderExit = $LASTEXITCODE
+		& $PSCommandPath -Configuration $Configuration -Tier Slow -TimeoutSeconds $TimeoutSeconds
+		$slowExit = $LASTEXITCODE
+	} else {
+		# Two child scripts at once, each with its own scratch directory and TEMP (see the per-shard setup below), their output in files shown afterwards.
+		$splitLogDir = Join-Path $env:TEMP "ray_tracer_split_${PID}_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+		New-Item -ItemType Directory -Force -Path $splitLogDir | Out-Null
+		$children = foreach ($part in @(@("Render", $RenderShards), @("Slow", 1))) {
+			$childArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Configuration $Configuration -Tier $($part[0]) -Shards $($part[1]) -TimeoutSeconds $TimeoutSeconds"
+			$proc = Start-Process -FilePath "powershell.exe" -ArgumentList $childArgs -NoNewWindow -PassThru `
+				-RedirectStandardOutput (Join-Path $splitLogDir "$($part[0]).log") -RedirectStandardError (Join-Path $splitLogDir "$($part[0]).err")
+			$null = $proc.Handle   # keeps the exit code readable after the process ends
+			[pscustomobject]@{ Name = $part[0]; Process = $proc }
+		}
+		foreach ($child in $children) { $child.Process.WaitForExit() }
+		foreach ($child in $children) {
+			Write-Host "----- $($child.Name) -----" -ForegroundColor Cyan
+			Get-Content (Join-Path $splitLogDir "$($child.Name).log") | Select-Object -Last 12
+		}
+		$renderExit = ($children | Where-Object Name -eq "Render").Process.ExitCode
+		$slowExit = ($children | Where-Object Name -eq "Slow").Process.ExitCode
+	}
+	Write-Host ("Split: total {0:N0} s" -f $splitTimer.Elapsed.TotalSeconds) -ForegroundColor Cyan
+	if ($fastExit -ne 0 -or $renderExit -ne 0 -or $slowExit -ne 0) {
+		Write-Host "[FAIL] Split: Fast exit $fastExit, Render exit $renderExit, Slow exit $slowExit" -ForegroundColor Red
 		exit 1
 	}
-	Write-Host "Split: Fast and Slow both passed." -ForegroundColor Green
+	Write-Host "Split: Fast, Render and Slow all passed." -ForegroundColor Green
 	exit 0
 }
 
@@ -148,7 +184,16 @@ if ($Tier -eq "Split") {
 # from its CPU siblings even within suites that mix both - the two
 # entries after it are the only suites found that don't follow the
 # naming convention at all.
-$gpuAndOversubscribingFilter = "*GPU*:*Gpu*:*gpu*:WavefrontRenderTest.*:OptixValidationSweepTest.*:BdptFirstRender.*:SppmFirstSlice.*"
+# LivePreview*: the Live Preview integration tests (tests/integration/live_preview_*_test.cpp) render on the GPU but do not say so in their names. In Fast they made every shard
+# JIT-compile the OptiX modules at once after a device-code change (16 processes x about 2 CPU-minutes, so a "seconds" tier ran for the full timeout).
+$gpuAndOversubscribingFilter = "*GPU*:*Gpu*:*gpu*:LivePreview*:WavefrontRenderTest.*:OptixValidationSweepTest.*:BdptFirstRender.*:SppmFirstSlice.*"
+
+# The CPU-render suites (see -Tier Render above), measured in a full serial run (October 2026, seconds in brackets): PbrtBackendAgreementTest [97], ChromaticMediaPerChannelTest [87],
+# BundledPbrtLightCoverageTest [72], PbrtReferencePackCpuTest [39], SceneBuilderRenderTest [23], PbrtReferenceTest [10], RenderIntegrationTest [8],
+# PbrtExampleSceneTest [6], SceneVolumeRenderTest [6]. Parameterized suites carry a prefix ("Bundled/..."), hence the leading *. Anything that also matches the GPU filter stays in Slow.
+$renderSuites = "PbrtBackendAgreementTest.*:ChromaticMediaPerChannelTest.*:*BundledPbrtLightCoverageTest.*:*PbrtReferencePackCpuTest.*:SceneBuilderRenderTest.*:PbrtReferenceTest.*:RenderIntegrationTest.*:*PbrtExampleSceneTest.*:SceneVolumeRenderTest.*"
+$renderFilter = "$renderSuites-$gpuAndOversubscribingFilter"
+$cheapExclusion = "${gpuAndOversubscribingFilter}:$renderSuites"
 
 # gtest's own --gtest_filter grammar is positivePatterns[-negativePatterns],
 # split on the FIRST '-' in the whole string, each side colon-separated.
@@ -179,7 +224,14 @@ function Add-GTestExclusion {
 
 switch ($Tier) {
 	"Fast" {
-		$Filter = Add-GTestExclusion -Filter $Filter -ExcludePattern $gpuAndOversubscribingFilter
+		$Filter = Add-GTestExclusion -Filter $Filter -ExcludePattern $cheapExclusion
+	}
+	"Render" {
+		if ($Filter) {
+			Write-Host "[WARN] -Filter is ignored with -Tier Render (gtest can't intersect two positive-pattern lists)." -ForegroundColor Yellow
+		}
+		$Filter = $renderFilter
+		if (-not $PSBoundParameters.ContainsKey("Shards")) { $Shards = $RenderShards }
 	}
 	"Slow" {
 		if ($Filter) {
@@ -223,14 +275,15 @@ function Get-GTestCount {
 
 if ($Tier -ne "All") {
 	$totalCount = Get-GTestCount -Exe $testsExe -Filter ""
-	$fastCount = Get-GTestCount -Exe $testsExe -Filter "-$gpuAndOversubscribingFilter"
+	$fastCount = Get-GTestCount -Exe $testsExe -Filter "-$cheapExclusion"
+	$renderCount = Get-GTestCount -Exe $testsExe -Filter $renderFilter
 	$slowCount = Get-GTestCount -Exe $testsExe -Filter $gpuAndOversubscribingFilter
-	if ($fastCount + $slowCount -ne $totalCount) {
-		Write-Host "[FAIL] Tier partition check failed: Fast ($fastCount) + Slow ($slowCount) = $($fastCount + $slowCount), expected $totalCount total tests." -ForegroundColor Red
+	if ($fastCount + $renderCount + $slowCount -ne $totalCount) {
+		Write-Host "[FAIL] Tier partition check failed: Fast ($fastCount) + Render ($renderCount) + Slow ($slowCount) = $($fastCount + $renderCount + $slowCount), expected $totalCount total tests." -ForegroundColor Red
 		Write-Host "`$gpuAndOversubscribingFilter no longer exactly partitions the suite - most likely a new GPU test's name doesn't follow the Gpu/GPU/gpu convention (see -Tier's own doc comment above) and needs to be added to it explicitly. Fix that before trusting -Tier Fast/Slow results." -ForegroundColor Red
 		exit 1
 	}
-	Write-Host "[OK] Tier partition verified: Fast ($fastCount) + Slow ($slowCount) = $totalCount total tests" -ForegroundColor Green
+	Write-Host "[OK] Tier partition verified: Fast ($fastCount) + Render ($renderCount) + Slow ($slowCount) = $totalCount total tests" -ForegroundColor Green
 }
 
 Write-Host "Running $Shards shards of $testsExe" -ForegroundColor Cyan
