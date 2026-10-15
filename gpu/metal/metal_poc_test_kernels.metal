@@ -774,3 +774,47 @@ kernel void test_structLayouts(
     FIELD_OFFSET(portalFrameY) FIELD_OFFSET(portalFrameZ) FIELD_OFFSET(portalP0) FIELD_OFFSET(portalP2) FIELD_OFFSET(pbrtInstanceFirst)
 #undef FIELD_OFFSET
 }
+
+
+// bumpHeightFiltered() (metal_poc_bump.metal) direct dispatch - a height map's mip chain (metal_poc_bump_mip.h) read at the level that fits `width`, cross-checked against the
+// CPU's mipmap::filter() with the Bilinear filter and the Repeat wrap (see metal_poc_shader_tests_geometry.mm). q = (u, v, width), dims = (w, h) of level 0.
+kernel void test_bumpHeightFiltered(
+    device const float* data [[buffer(0)]],
+    device const float3* q [[buffer(1)]],
+    device const int* dims [[buffer(2)]],
+    device float* outputs [[buffer(3)]],
+    uint tid [[thread_position_in_grid]])
+{
+    outputs[tid] = bumpHeightFiltered(data, 0, dims[0], dims[1], q[tid].x, q[tid].y, q[tid].z);
+}
+
+// sampleSphereLightCone() / sphereLightConePdf() (metal_poc_sampling.metal) direct dispatch: pbrt-v4's cone sampling of a sphere light from a point outside it.
+kernel void test_sphereLightCone(
+    device const float3* centers [[buffer(0)]],
+    device const float* radii [[buffer(1)]],
+    device const float3* refs [[buffer(2)]],
+    device const float2* us [[buffer(3)]],
+    device float3* outPoints [[buffer(4)]],
+    device float3* outNormals [[buffer(5)]],
+    device float* outPdfs [[buffer(6)]],
+    uint tid [[thread_position_in_grid]])
+{
+    float3 p, n;
+    sampleSphereLightCone(centers[tid], radii[tid], refs[tid], us[tid], p, n);
+    outPoints[tid] = p;
+    outNormals[tid] = n;
+    outPdfs[tid] = sphereLightConePdf(centers[tid], radii[tid], refs[tid]);
+}
+
+// spawnSide() (metal_poc_sampling.metal) direct dispatch: the side of the geometric normal a spawned ray leaves from.
+kernel void test_spawnSide(
+    device const float3* geometric [[buffer(0)]],
+    device const float3* fallbacks [[buffer(1)]],
+    device const float3* dirs [[buffer(2)]],
+    device float3* outputs [[buffer(3)]],
+    uint tid [[thread_position_in_grid]])
+{
+    TriangleMaterial mat;
+    mat.spawnNormal = packed_float3(geometric[tid]);
+    outputs[tid] = spawnSide(mat, fallbacks[tid], dirs[tid]);
+}

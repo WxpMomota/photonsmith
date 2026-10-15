@@ -64,6 +64,9 @@ int main() {
         testLayeredCoatedProperties(device, library, queue);
         testCauchyEta(device, library, queue);
         testPerlinNoise3D(device, library, queue);
+        testBumpHeightFiltered(device, library, queue);
+        testSphereLightCone(device, library, queue);
+        testSpawnSide(device, library, queue);
         testGpuCloudDensity(device, library, queue);
         testBssrdfProfile(device, library, queue);
         testGpuRgbGridTrilinear(device, library, queue);
