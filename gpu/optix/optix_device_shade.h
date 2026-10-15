@@ -258,13 +258,10 @@ __device__ __forceinline__ void shade_material_surface(
 			const float3 m_wo_world = normalize(-ray_dir);
 			float m_wox, m_woy, m_woz;
 			m_frame.to_local(m_wo_world.x, m_wo_world.y, m_wo_world.z, m_wox, m_woy, m_woz);
-			// sRGB-primary approximations - the same fixed query wavelengths as material_pbrt.h's `measured` (kLambdaR/G/B)
-			const float m_lambda[3] = { 612.0f, 549.0f, 465.0f };
-
 			float m_wix, m_wiy, m_wiz, m_wr, m_wg, m_wb, m_spdf;
 			const bool m_ok = gpu_measured_sample_f(m_tab, m_tab.isotropic != 0,
 				params.measuredParamValues, params.measuredData, params.measuredMcdf, params.measuredCcdf,
-				m_wox, m_woy, m_woz, random_float(seed), random_float(seed), m_lambda,
+				m_wox, m_woy, m_woz, random_float(seed), random_float(seed),
 				m_wix, m_wiy, m_wiz, m_wr, m_wg, m_wb, m_spdf);
 			// A rejected sample (grazing wo, zero pdf, a reflection below the horizon) must not skip this vertex's NEE (pbrt takes the
 			// direct-light sample whether or not the sample that follows succeeds): it carries zero weight and the path ends after the NEE.
@@ -288,7 +285,7 @@ __device__ __forceinline__ void shade_material_surface(
 					float fr, fg, fb, brdf_pdf;
 					if (llz > 0.0f && gpu_measured_f_pdf(m_tab, m_tab.isotropic != 0,
 							params.measuredParamValues, params.measuredData, params.measuredMcdf, params.measuredCcdf,
-							m_wox, m_woy, m_woz, llx, lly, llz, m_lambda, fr, fg, fb, brdf_pdf)
+							m_wox, m_woy, m_woz, llx, lly, llz, fr, fg, fb, brdf_pdf)
 						&& trace_shadow_ray_stochastic(hit_point, to_light, max_dist, seed, nee_shadow_rgb)) {
 						float mis_weight = mis_power_heuristic(light_pdf, brdf_pdf);
 						emission = emission + mis_weight * make_float3(fr, fg, fb) * sampled_light_emission * llz / light_pdf
@@ -306,7 +303,7 @@ __device__ __forceinline__ void shade_material_surface(
 				float fr, fg, fb, brdf_pdf;
 				if (!gpu_measured_f_pdf(m_tab, m_tab.isotropic != 0,
 						params.measuredParamValues, params.measuredData, params.measuredMcdf, params.measuredCcdf,
-						m_wox, m_woy, m_woz, plx, ply, plz, m_lambda, fr, fg, fb, brdf_pdf)) continue;
+						m_wox, m_woy, m_woz, plx, ply, plz, fr, fg, fb, brdf_pdf)) continue;
 				if (trace_shadow_ray_stochastic(hit_point, wi_p, t_max_p, seed, nee_shadow_rgb)) {
 					emission = emission + make_float3(fr, fg, fb) * Li_p * plz * (camera_medium_shadow_trans(t_max_p) * nee_shadow_rgb);
 				}
@@ -323,7 +320,7 @@ __device__ __forceinline__ void shade_material_surface(
 					if (skz > 0.0f && pdf_sky > 0.0f
 						&& gpu_measured_f_pdf(m_tab, m_tab.isotropic != 0,
 							params.measuredParamValues, params.measuredData, params.measuredMcdf, params.measuredCcdf,
-							m_wox, m_woy, m_woz, skx, sky_y, skz, m_lambda, fr, fg, fb, brdf_pdf_sky)
+							m_wox, m_woy, m_woz, skx, sky_y, skz, fr, fg, fb, brdf_pdf_sky)
 						&& trace_shadow_ray_stochastic(hit_point, sky_dir, 1e30f, seed, nee_shadow_rgb)) {
 						float mis_weight = mis_power_heuristic(pdf_sky, brdf_pdf_sky);
 						emission = emission + mis_weight * make_float3(fr, fg, fb) * sky_Le_val * skz / pdf_sky

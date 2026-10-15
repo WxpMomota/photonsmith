@@ -13,6 +13,7 @@
 
 #include "optix_renderer.h"
 #include "optix_math_helpers.h"
+#include "gpu_bump_map.h"   // gpu_make_bump_footprint(): the camera's minimum pixel differentials, for the bump-map footprint of a bounced hit
 #include "wavefront_path_tracer.h"
 #include "sppm_path_tracer.h"
 #include <cuda.h>
@@ -260,6 +261,7 @@ bool OptiXRenderer::render(
 
 	// Camera setup
 	params.camera = gpuCam;
+	params.bumpCamera = gpu_make_bump_footprint(gpuCam, static_cast<int>(width), static_cast<int>(height), static_cast<int>(samplesPerPixel)).approx;
 
 	// Scene 
 	params.traversable = gasHandle_;

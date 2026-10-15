@@ -336,7 +336,7 @@ TEST(MeasuredBxdfRealFile, WhiteFurnaceEnergyConservation) {
 		measured_bxdf_io::GetMeasuredBRDFDataCached(path, error);
 	ASSERT_TRUE(data) << error;
 
-	MeasuredBxDF<double> bxdf(data.get(), 612.0f, 549.0f, 465.0f);
+	MeasuredBxDF<double> bxdf(data.get());
 
 	// Directly numerically integrate f(wo,wi)*cos(theta_i) over the
 	// hemisphere via f() itself, on a fine deterministic (theta_i,phi_i)
@@ -402,7 +402,7 @@ TEST(MeasuredBxdfRealFile, SampleFAndPDFAgree) {
 		measured_bxdf_io::GetMeasuredBRDFDataCached(path, error);
 	ASSERT_TRUE(data) << error;
 
-	MeasuredBxDF<double> bxdf(data.get(), 612.0f, 549.0f, 465.0f);
+	MeasuredBxDF<double> bxdf(data.get());
 	std::mt19937 rng(777);
 	std::uniform_real_distribution<float> unif(0.0f, 1.0f);
 
@@ -448,7 +448,7 @@ TEST(MeasuredBxdfRealFile, ApproximateReciprocity) {
 		measured_bxdf_io::GetMeasuredBRDFDataCached(path, error);
 	ASSERT_TRUE(data) << error;
 
-	MeasuredBxDF<double> bxdf(data.get(), 612.0f, 549.0f, 465.0f);
+	MeasuredBxDF<double> bxdf(data.get());
 
 	struct Pair { double thetaA, phiA, thetaB, phiB; };
 	const Pair pairs[] = {
@@ -583,7 +583,7 @@ TEST(MeasuredBxdfConsistency, SampleFAlbedoMatchesEvalFAlbedo) {
 	std::string err;
 	const auto data = measured_bxdf_io::GetMeasuredBRDFDataCached(path, err);
 	ASSERT_TRUE(data) << err;
-	MeasuredBxDF<double> bxdf(data.get(), 612.0f, 549.0f, 465.0f);
+	MeasuredBxDF<double> bxdf(data.get());
 	const double kPi = 3.141592653589793;
 	for (const double thetaDeg : {0.0, 30.0, 60.0}) {
 		const double wox = std::sin(thetaDeg * kPi / 180.0), woz = std::cos(thetaDeg * kPi / 180.0);

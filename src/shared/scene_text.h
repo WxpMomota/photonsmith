@@ -61,6 +61,17 @@ inline TextMeshCache& textMeshCache() {
 	static TextMeshCache cache;
 	return cache;
 }
+// Where a text that makes no letters is reported (the GUI sets it to its log): once per distinct text, with the reason. Null: silent.
+using TextLogFn = void (*)(const std::string& message);
+inline TextLogFn& textLogSlot() {
+	static TextLogFn fn = nullptr;
+	return fn;
+}
+inline void setTextLog(TextLogFn fn) { textLogSlot() = fn; }
+inline void logText(const std::string& message) {
+	if (TextLogFn fn = textLogSlot()) fn(message);
+}
+
 inline void setTextOutlineProvider(TextOutlineProvider provider) {
 	textOutlineProviderSlot() = provider;
 	TextMeshCache& cache = textMeshCache();
@@ -473,7 +484,11 @@ inline ShapeMesh extrudeOutlines(const TextOutline& outline, double height, doub
 // writer and the snapping all ask for the same one, and making it means a font lookup and a triangulation. textMeshShared() hands out the kept one without copying it.
 inline std::shared_ptr<const ShapeMesh> textMeshShared(const TextParams& params, double height, double stretch, double depth) {
 	TextOutlineProvider provider = textOutlineProviderSlot();
-	if (!provider) return std::make_shared<const ShapeMesh>();
+	if (!provider) {
+		static bool told = false;   // (once: every repaint asks)
+		if (!told && !params.text.empty()) { told = true; logText("text: no font outline provider is installed, so 3D text makes no letters here"); }
+		return std::make_shared<const ShapeMesh>();
+	}
 	TextParams p = params;
 	p.text = cutTextToCharacters(p.text, kMaxTextLength);
 	char numbers[160];
@@ -487,7 +502,10 @@ inline std::shared_ptr<const ShapeMesh> textMeshShared(const TextParams& params,
 	}
 	TextOutline outline;
 	ShapeMesh mesh;
-	if (provider(p, outline)) mesh = extrudeOutlines(outline, height, stretch, depth);
+	const bool provided = provider(p, outline);
+	if (provided) mesh = extrudeOutlines(outline, height, stretch, depth);
+	if (mesh.triangleCount() == 0 && p.text.find_first_not_of(" \t\r\n") != std::string::npos)   // (blank text is meant to be empty)
+		logText(std::string("text: \"") + p.text.substr(0, 40) + "\" made no letters (" + (provided ? "the font has no outlines for it" : "the outline provider failed - no font available") + ", font \"" + (p.font.empty() ? "default" : p.font) + "\")");
 	const auto made = std::make_shared<const ShapeMesh>(std::move(mesh));
 	{
 		std::lock_guard<std::mutex> lock(cache.mutex);

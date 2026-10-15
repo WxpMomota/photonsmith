@@ -519,6 +519,29 @@ void MainWindow::selfTestText(SceneBuilderWidget *sb, const std::function<void(b
 		}
 		check(std::fabs(area - 7.0) < 1e-6, "overlapping letter contours are filled as one shape (area " + QString::number(area) + " of 7)");
 	}
+	// ... and a counter (the hole of an "O", an opposite winding inside the outline) survives that simplification: a ring of 4 x 4 with a 2 x 2 hole is 12, not 16.
+	{
+		QPainterPath ring;
+		ring.setFillRule(Qt::WindingFill);
+		ring.addRect(0, 0, 4, 4);
+		QPolygonF inner;
+		inner << QPointF(1, 1) << QPointF(1, 3) << QPointF(3, 3) << QPointF(3, 1);   // (the other way round from addRect's)
+		ring.addPolygon(inner);
+		ring.closeSubpath();
+		std::vector<scene_doc::TextContour> contours;
+		for (const QPolygonF &polygon : ring.simplified().toSubpathPolygons(QTransform())) {
+			scene_doc::TextContour c;
+			for (const QPointF &pt : polygon) c.push_back({pt.x(), pt.y()});
+			contours.push_back(std::move(c));
+		}
+		const scene_doc::TextFace face = scene_doc::triangulateOutlines(contours);
+		double area = 0.0;
+		for (std::size_t t = 0; t + 2 < face.triangles.size(); t += 3) {
+			const auto &a = face.points[static_cast<std::size_t>(face.triangles[t])], &b = face.points[static_cast<std::size_t>(face.triangles[t + 1])], &c = face.points[static_cast<std::size_t>(face.triangles[t + 2])];
+			area += 0.5 * std::fabs((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1]));
+		}
+		check(std::fabs(area - 12.0) < 1e-6, "a counter survives the simplification (area " + QString::number(area) + " of 12)");
+	}
 	// 3D text, made from a real font: Add > Text adds it, the properties show the text and its font rows, the letters become a mesh with real volume, and it is one undo step.
 	{
 		const size_t before = sb->document().objects.size();

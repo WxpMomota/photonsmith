@@ -270,7 +270,7 @@ __device__ __forceinline__ void wf_gpu_measured_spectra_rgb(const GpuPL2DTable& 
 __device__ __forceinline__ bool wf_gpu_measured_f_pdf(
 	const GpuMeasuredTable& tab, bool isotropic,
 	const float* paramValues, const float* data, const float* mcdf, const float* ccdf,
-	float wox, float woy, float woz, float wix, float wiy, float wiz, const float lambda[3],
+	float wox, float woy, float woz, float wix, float wiy, float wiz,
 	float& fr, float& fg, float& fb, float& pdf_out)
 {
 	const float kPi = 3.14159265358979323846f;
@@ -321,7 +321,7 @@ __device__ __forceinline__ bool wf_gpu_measured_sample_f(
 	const GpuMeasuredTable& tab, bool isotropic,
 	const float* paramValues, const float* data, const float* mcdf, const float* ccdf,
 	float wox, float woy, float woz,
-	float u0, float u1, const float lambda[3],
+	float u0, float u1,
 	float& wix, float& wiy, float& wiz,
 	float& fr, float& fg, float& fb, float& pdf_out)
 {
@@ -442,15 +442,12 @@ __device__ __forceinline__ bool wf_sample_measured_material(
 	float wox, woy, woz;
 	frame.to_local(wo_world.x, wo_world.y, wo_world.z, wox, woy, woz);
 
-	// sRGB-primary approximations - matches material_pbrt.h `class
-	// measured`'s kLambdaR/G/B exactly (same fixed-query-wavelength
-	// convention as optix_measured_bxdf.h's own copy).
-	const float lambda[3] = { 612.0f, 549.0f, 465.0f };
+	// (the spectral table is read as RGB by quadrature, measured_rgb_quadrature.h, as in optix_measured_bxdf.h)
 
 	float wix, wiy, wiz, fr, fg, fb;
 	if (!wf_gpu_measured_sample_f(tab, tab.isotropic != 0,
 			measuredParamValues, measuredData, measuredMcdf, measuredCcdf,
-			wox, woy, woz, wf_rand(seed), wf_rand(seed), lambda,
+			wox, woy, woz, wf_rand(seed), wf_rand(seed),
 			wix, wiy, wiz, fr, fg, fb, pdf_out))
 		return false;
 

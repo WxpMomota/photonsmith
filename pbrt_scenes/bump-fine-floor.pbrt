@@ -1,0 +1,35 @@
+# @rt-category Test Scenes
+# @rt-description A long floor with a finely repeated height map, seen from far off at a grazing angle and lit from the side: the bump must be read through the mip level that fits each pixel, at every bounce.
+# @rt-performance Fast
+# @rt-size 40
+# bump-fine-floor.pbrt -- regression scene for pbrt's bump-map footprint (the Sibenik cathedral's 30% bug, in a scene real pbrt can read).
+#
+# pbrt reads a height map through its mip pyramid, at the level that fits the pixel's footprint, and gives EVERY hit (a bounce included) the camera's own estimate of that footprint
+# (CameraBase::Approximate_dp_dxy). A renderer that reads the height texel by texel, or only gives the camera ray a footprint, tilts the normals of a finely textured floor seen from
+# afar by texel-sized noise. A wall faces the camera and is lit only by light the floor sheds on it, so the floor is mostly hit by bounced paths. The map (images/bump-marble.png) repeats 30 times across the floor, so a pixel covers many texels.
+#
+# At the pack's size (64 pixels, 8 bounces) real pbrt reads 0.0439 of it; the CPU and the recursive OptiX backend read within 1.5% of that, the wavefront backend 7% low (open: its
+# bounced-hit footprint differs from the recursive one, a coarser map - uscale 1, scale 0.6 - agrees on all four). The mean is very sensitive to the footprint: with the bounced footprint
+# lost altogether it moves by 18%, and the pack row fails at 3%.
+#
+# Original, so it carries no licence constraints. See tests/data/pbrt_reference_means.txt (the pack row).
+
+LookAt 0 3 40  0 3 0  0 1 0
+Camera "perspective" "float fov" [ 16 ]
+Film "rgb" "integer xresolution" [ 96 ] "integer yresolution" [ 96 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+
+WorldBegin
+
+LightSource "distant" "point3 from" [ -3 0.6 -1.5 ] "point3 to" [ 0 0 0 ] "rgb L" [ 5 5 5 ]
+
+Texture "bumpimg" "float" "imagemap" "string filename" [ "../images/bump-marble.png" ] "float uscale" [ 30 ] "float vscale" [ 30 ]
+Texture "bump" "float" "scale" "texture tex" [ "bumpimg" ] "float scale" [ 0.2 ]
+
+Material "diffuse" "rgb reflectance" [ 0.7 0.7 0.7 ] "texture displacement" [ "bump" ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ] "point3 P" [ -40 0 -40   40 0 -40   40 0 40   -40 0 40 ] "point2 uv" [ 0 0  1 0  1 1  0 1 ]
+
+# A white wall facing the camera, lit only by what the floor sheds on it (the light arrives from behind it): the floor is hit by bounced paths, which pbrt gives the camera's
+# own estimate of the footprint.
+Material "diffuse" "rgb reflectance" [ 0.8 0.8 0.8 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ] "point3 P" [ -12 0 0   12 0 0   12 8 0   -12 8 0 ]

@@ -50,21 +50,9 @@ TEST(MeasuredMaterialTest, DefaultConstruct) {
 	EXPECT_EQ(mat.brdf, nullptr);
 }
 
-TEST(MeasuredMaterialTest, WavelengthDefaults) {
-	MeasuredMaterial mat;
-	// Default wavelengths mirror the sRGB primary approximations used in
-	// pbrt-v4's measured material tests (R~612nm, G~549nm, B~465nm).
-	EXPECT_NEAR(mat.lambda_r, 612.0f, 1.0f);
-	EXPECT_NEAR(mat.lambda_g, 549.0f, 1.0f);
-	EXPECT_NEAR(mat.lambda_b, 465.0f, 1.0f);
-}
-
 TEST(MeasuredMaterialTest, ConstructFromPointer) {
-	MeasuredMaterial mat(&g_dummy_data, 630.0f, 532.0f, 468.0f);
+	MeasuredMaterial mat(&g_dummy_data);
 	EXPECT_EQ(mat.brdf, &g_dummy_data);
-	EXPECT_FLOAT_EQ(mat.lambda_r, 630.0f);
-	EXPECT_FLOAT_EQ(mat.lambda_g, 532.0f);
-	EXPECT_FLOAT_EQ(mat.lambda_b, 468.0f);
 }
 
 TEST(MeasuredMaterialTest, HasSubsurfaceScattering) {
@@ -77,26 +65,16 @@ TEST(MeasuredMaterialTest, HasSubsurfaceScattering) {
 }
 
 TEST(MeasuredMaterialTest, GetBxdf_PropagatesPointer) {
-	MeasuredMaterial mat(&g_dummy_data, 612.0f, 549.0f, 465.0f);
+	MeasuredMaterial mat(&g_dummy_data);
 	auto ctx = make_ctx();
 	MeasuredBxDF<double> bxdf = mat.get_bxdf(ctx);
 	EXPECT_EQ(bxdf.data, &g_dummy_data);
 }
 
-TEST(MeasuredMaterialTest, GetBxdf_PropagatesWavelengths) {
-	const float lr = 700.0f, lg = 550.0f, lb = 440.0f;
-	MeasuredMaterial mat(&g_dummy_data, lr, lg, lb);
-	auto ctx = make_ctx();
-	MeasuredBxDF<double> bxdf = mat.get_bxdf(ctx);
-	EXPECT_FLOAT_EQ(bxdf.lambda[0], lr);
-	EXPECT_FLOAT_EQ(bxdf.lambda[1], lg);
-	EXPECT_FLOAT_EQ(bxdf.lambda[2], lb);
-}
-
 TEST(MeasuredMaterialTest, GetBxdf_IgnoresContext) {
 	// MeasuredMaterial has no textures: different contexts must yield the
-	// same BxDF (same pointer + wavelengths).
-	MeasuredMaterial mat(&g_dummy_data, 612.0f, 549.0f, 465.0f);
+	// same BxDF (same pointer).
+	MeasuredMaterial mat(&g_dummy_data);
 
 	auto ctx1 = make_ctx(0, 0, 0,  0, 1, 0,  0, 0, 1,  0.1, 0.2);
 	auto ctx2 = make_ctx(5, 3, 1,  0, 0, 1,  1, 0, 0,  0.9, 0.7);
@@ -105,9 +83,6 @@ TEST(MeasuredMaterialTest, GetBxdf_IgnoresContext) {
 	MeasuredBxDF<double> b2 = mat.get_bxdf(ctx2);
 
 	EXPECT_EQ(b1.data, b2.data);
-	EXPECT_FLOAT_EQ(b1.lambda[0], b2.lambda[0]);
-	EXPECT_FLOAT_EQ(b1.lambda[1], b2.lambda[1]);
-	EXPECT_FLOAT_EQ(b1.lambda[2], b2.lambda[2]);
 }
 
 TEST(MeasuredMaterialTest, NullBrdf_GetBxdfReturnsNullData) {
@@ -115,4 +90,53 @@ TEST(MeasuredMaterialTest, NullBrdf_GetBxdfReturnsNullData) {
 	auto ctx = make_ctx();
 	MeasuredBxDF<double> bxdf = mat.get_bxdf(ctx);
 	EXPECT_EQ(bxdf.data, nullptr);
+}
+
+// ---------------------------------------------------------------------------
+// The spectral table as RGB (measured_rgb_quadrature.h): a quadrature over the CIE matching functions under D65, so a measured table reads the colour pbrt's film gives it
+// (the three fixed wavelengths it replaced read the bundled tables' blue 16% high).
+// ---------------------------------------------------------------------------
+namespace {
+struct FakeSpectra {
+	float (*value)(float lambda);
+	float Eval(float, float, float, float, float lambda) const { return value(lambda); }
+};
+}  // namespace
+
+TEST(MeasuredRgbQuadrature, EachChannelsWeightsSumToOne) {
+	const float lambda[RT_MEASURED_BINS] = {RT_MEASURED_LAMBDAS};
+	const float wr[RT_MEASURED_BINS] = {RT_MEASURED_WR}, wg[RT_MEASURED_BINS] = {RT_MEASURED_WG}, wb[RT_MEASURED_BINS] = {RT_MEASURED_WB};
+	double sr = 0, sg = 0, sb = 0;
+	for (int k = 0; k < RT_MEASURED_BINS; ++k) {
+		sr += wr[k]; sg += wg[k]; sb += wb[k];
+		EXPECT_GT(lambda[k], 360.0f);
+		EXPECT_LT(lambda[k], 830.0f);
+		if (k > 0) EXPECT_GT(lambda[k], lambda[k - 1]) << "wavelengths ascend";
+	}
+	EXPECT_NEAR(sr, 1.0, 1e-5);
+	EXPECT_NEAR(sg, 1.0, 1e-5);
+	EXPECT_NEAR(sb, 1.0, 1e-5);
+}
+
+TEST(MeasuredRgbQuadrature, AFlatSpectrumReadsAsTheSameFlatColour) {
+	const FakeSpectra half{[](float) { return 0.5f; }};
+	float rgb[3];
+	mbxdf_detail::SpectraToRgb(half, 0.3f, 0.7f, 0.1f, 0.2f, rgb);
+	for (float c : rgb) EXPECT_NEAR(c, 0.5f, 1e-5f);
+}
+
+TEST(MeasuredRgbQuadrature, AReddishSpectrumReadsRedAndABluishOneBlue) {
+	float rgb[3];
+	mbxdf_detail::SpectraToRgb(FakeSpectra{[](float l) { return l > 590.0f ? 1.0f : 0.0f; }}, 0, 0, 0, 0, rgb);
+	EXPECT_GT(rgb[0], 0.5f);
+	EXPECT_LT(rgb[2], 0.1f);
+	mbxdf_detail::SpectraToRgb(FakeSpectra{[](float l) { return l < 490.0f ? 1.0f : 0.0f; }}, 0, 0, 0, 0, rgb);
+	EXPECT_GT(rgb[2], 0.5f);
+	EXPECT_LT(rgb[0], 0.1f);
+}
+
+TEST(MeasuredRgbQuadrature, NegativeValuesAreClampedAtEveryStep) {
+	float rgb[3];
+	mbxdf_detail::SpectraToRgb(FakeSpectra{[](float) { return -2.0f; }}, 0, 0, 0, 0, rgb);
+	for (float c : rgb) EXPECT_EQ(c, 0.0f);
 }

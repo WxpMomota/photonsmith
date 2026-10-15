@@ -155,7 +155,7 @@ TEST(MeasuredBRDFData, BuildSucceeds) {
 
 TEST(MeasuredBxDFf, SameHemisphereRequired) {
 	MeasuredBRDFData d = MakeConstantData();
-	MeasuredBxDF<float> bxdf(&d, 630.0f, 530.0f, 460.0f);
+	MeasuredBxDF<float> bxdf(&d);
 	float fr, fg, fb;
 	// wi below horizon: different hemispheres -> f = 0
 	bxdf.f(0.0f, 0.0f, 1.0f,   0.0f, 0.0f, -1.0f,  fr, fg, fb);
@@ -165,7 +165,7 @@ TEST(MeasuredBxDFf, SameHemisphereRequired) {
 }
 
 TEST(MeasuredBxDFf, NullDataReturnsZero) {
-	MeasuredBxDF<float> bxdf(nullptr, 630.0f, 530.0f, 460.0f);
+	MeasuredBxDF<float> bxdf(nullptr);
 	float fr, fg, fb;
 	bxdf.f(0.0f, 0.0f, 1.0f,  0.0f, 0.0f, 1.0f,  fr, fg, fb);
 	EXPECT_FLOAT_EQ(fr, 0.0f);
@@ -175,7 +175,7 @@ TEST(MeasuredBxDFf, TwoSidedFlip) {
 	// f evaluated from below should equal f evaluated from above
 	// (because we flip both directions)
 	MeasuredBRDFData d = MakeConstantData();
-	MeasuredBxDF<float> bxdf(&d, 630.0f, 530.0f, 460.0f);
+	MeasuredBxDF<float> bxdf(&d);
 	float s = std::sqrt(2.0f) / 2.0f;
 	float fr1, fg1, fb1, fr2, fg2, fb2;
 	// upper hemisphere
@@ -190,7 +190,7 @@ TEST(MeasuredBxDFf, TwoSidedFlip) {
 TEST(MeasuredBxDFf, NonNegative) {
 	// BRDF values must always be non-negative
 	MeasuredBRDFData d = MakeConstantData();
-	MeasuredBxDF<float> bxdf(&d, 630.0f, 530.0f, 460.0f);
+	MeasuredBxDF<float> bxdf(&d);
 	float dirs[4][3] = {
 		{0.0f,  0.0f,  1.0f},
 		{0.5f,  0.0f,  0.866f},
@@ -211,7 +211,7 @@ TEST(MeasuredBxDFf, NonNegative) {
 TEST(MeasuredBxDFf, ChannelsEqualForConstantSpectra) {
 	// With constant spectra and isotropic data, R==G==B
 	MeasuredBRDFData d = MakeConstantData(1.0f, 1.0f, 1.0f, 1.0f);
-	MeasuredBxDF<float> bxdf(&d, 630.0f, 530.0f, 460.0f);
+	MeasuredBxDF<float> bxdf(&d);
 	float s = std::sqrt(2.0f) / 2.0f;
 	float fr, fg, fb;
 	bxdf.f(0.0f, 0.0f, 1.0f,  s, 0.0f, s,  fr, fg, fb);
@@ -225,7 +225,7 @@ TEST(MeasuredBxDFf, ChannelsEqualForConstantSpectra) {
 
 TEST(MeasuredBxDFpdf, SameHemisphereRequired) {
 	MeasuredBRDFData d = MakeConstantData();
-	MeasuredBxDF<float> bxdf(&d, 630.0f, 530.0f, 460.0f);
+	MeasuredBxDF<float> bxdf(&d);
 	// Opposite hemispheres -> pdf = 0
 	float p = bxdf.pdf(0.0f, 0.0f, 1.0f,  0.0f, 0.0f, -1.0f);
 	EXPECT_FLOAT_EQ(p, 0.0f);
@@ -233,7 +233,7 @@ TEST(MeasuredBxDFpdf, SameHemisphereRequired) {
 
 TEST(MeasuredBxDFpdf, NonNegative) {
 	MeasuredBRDFData d = MakeConstantData();
-	MeasuredBxDF<float> bxdf(&d, 630.0f, 530.0f, 460.0f);
+	MeasuredBxDF<float> bxdf(&d);
 	float dirs[3][3] = {
 		{0.0f, 0.0f, 1.0f},
 		{0.5f, 0.0f, 0.866f},
@@ -248,7 +248,7 @@ TEST(MeasuredBxDFpdf, NonNegative) {
 }
 
 TEST(MeasuredBxDFpdf, NullDataReturnsZero) {
-	MeasuredBxDF<float> bxdf(nullptr, 630.0f, 530.0f, 460.0f);
+	MeasuredBxDF<float> bxdf(nullptr);
 	float p = bxdf.pdf(0.0f, 0.0f, 1.0f,  0.577f, 0.577f, 0.577f);
 	EXPECT_FLOAT_EQ(p, 0.0f);
 }
@@ -258,7 +258,7 @@ TEST(MeasuredBxDFpdf, NullDataReturnsZero) {
 // ---------------------------------------------------------------------------
 
 TEST(MeasuredBxDFSample, NullDataReturnsFalse) {
-	MeasuredBxDF<float> bxdf(nullptr, 630.0f, 530.0f, 460.0f);
+	MeasuredBxDF<float> bxdf(nullptr);
 	float wix, wiy, wiz, fr, fg, fb, pdf;
 	bool ok = bxdf.sample_f(0.0f, 0.0f, 1.0f,  0.3f, 0.7f,
 							 wix, wiy, wiz, fr, fg, fb, pdf);
@@ -268,7 +268,7 @@ TEST(MeasuredBxDFSample, NullDataReturnsFalse) {
 TEST(MeasuredBxDFSample, WiInUpperHemisphere) {
 	// Sampled wi must have z > 0 when wo has z > 0
 	MeasuredBRDFData d = MakeConstantData();
-	MeasuredBxDF<float> bxdf(&d, 630.0f, 530.0f, 460.0f);
+	MeasuredBxDF<float> bxdf(&d);
 	int success = 0;
 	for (int i = 0; i < 50; ++i) {
 		float u0 = (i + 0.5f) / 50.0f;
@@ -287,7 +287,7 @@ TEST(MeasuredBxDFSample, WiInUpperHemisphere) {
 
 TEST(MeasuredBxDFSample, PDFPositiveWhenSampleValid) {
 	MeasuredBRDFData d = MakeConstantData();
-	MeasuredBxDF<float> bxdf(&d, 630.0f, 530.0f, 460.0f);
+	MeasuredBxDF<float> bxdf(&d);
 	float wix, wiy, wiz, fr, fg, fb, p;
 	bool ok = bxdf.sample_f(0.0f, 0.0f, 1.0f, 0.5f, 0.5f,
 							 wix, wiy, wiz, fr, fg, fb, p);
@@ -299,7 +299,7 @@ TEST(MeasuredBxDFSample, PDFPositiveWhenSampleValid) {
 TEST(MeasuredBxDFSample, BelowHorizonWoReturnsFalse) {
 	// wo pointing straight down: sample_f should reject
 	MeasuredBRDFData d = MakeConstantData();
-	MeasuredBxDF<float> bxdf(&d, 630.0f, 530.0f, 460.0f);
+	MeasuredBxDF<float> bxdf(&d);
 	float wix, wiy, wiz, fr, fg, fb, p;
 	// wo.z = 0 exactly (grazing)
 	bool ok = bxdf.sample_f(1.0f, 0.0f, 0.0f, 0.5f, 0.5f,
@@ -319,7 +319,7 @@ TEST(MeasuredBxDFConsistency, SamplePDFMatchesDirectPDF) {
 	// for high-resolution tables; the 2x2 synthetic table is too coarse.
 	// The PL2D round-trip accuracy is covered by piecewise_linear_2d_tests.
 	MeasuredBRDFData d = MakeConstantData();
-	MeasuredBxDF<float> bxdf(&d, 630.0f, 530.0f, 460.0f);
+	MeasuredBxDF<float> bxdf(&d);
 
 	int matched = 0;
 	for (int i = 0; i < 20; ++i) {
@@ -350,7 +350,7 @@ TEST(MeasuredBxDFConsistency, SamplePDFMatchesDirectPDF) {
 // ---------------------------------------------------------------------------
 TEST(MeasuredBxDFf, Reciprocity) {
 	MeasuredBRDFData d = MakeConstantData();
-	MeasuredBxDF<float> bxdf(&d, 630.0f, 530.0f, 460.0f);
+	MeasuredBxDF<float> bxdf(&d);
 	float s = std::sqrt(2.0f) / 2.0f;
 	float fr1, fg1, fb1, fr2, fg2, fb2;
 	// f(wo -> wi)
@@ -373,7 +373,7 @@ TEST(MeasuredBxDFf, EnergyConservationBound) {
 	MeasuredBRDFData d = MakeConstantData(
 		1.0f / (4.0f * mbxdf_detail::kPi),  // ndf: small enough to keep reflectance < 1
 		1.0f, 1.0f, 1.0f);
-	MeasuredBxDF<float> bxdf(&d, 630.0f, 530.0f, 460.0f);
+	MeasuredBxDF<float> bxdf(&d);
 
 	const int N = 500;
 	double sum = 0.0;

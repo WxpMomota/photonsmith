@@ -414,7 +414,7 @@ TEST(PbrtBackendAgreementTest, MeasuredFurnaceReadsTheTablesOwnAlbedoOnEveryBack
 	const auto table = measured_bxdf_io::GetMeasuredBRDFDataCached("pbrt_scenes/synthetic-gold.bsdf", loadError);
 	ASSERT_TRUE(table) << "synthetic-gold.bsdf did not load: " << loadError;
 	ASSERT_TRUE(table->isotropic) << "the reference ignores the azimuth, so it needs an isotropic table";
-	MeasuredBxDF<double> bxdf(table.get(), 612.0f, 549.0f, 465.0f);
+	MeasuredBxDF<double> bxdf(table.get());
 
 	const double kPi = 3.141592653589793;
 	const int kAngles = 91, kSamples = 20000;

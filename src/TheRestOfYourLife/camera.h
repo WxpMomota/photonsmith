@@ -36,6 +36,7 @@
 #include "../shared/filter_sampler.h"
 #include "../shared/cameras.h"
 #include "../shared/surface_interaction.h"  // compute_differentials() for texture-filtering footprint
+#include "../shared/camera_footprint.h"    // pbrt's Approximate_dp_dxy for hits whose ray has no differentials
 #include "../shared/exr_writer.h"
 #include "../shared/render_stats.h"
 #include "../shared/oidn_runtime.h"   // --denoise on the CPU
@@ -418,6 +419,7 @@ class camera {
     point3 pixel00_loc;          // Location of pixel 0, 0
     vec3   pixel_delta_u;        // Offset to pixel to the right
     vec3   pixel_delta_v;        // Offset to pixel below
+    camera_footprint::Camera footprint_cam = camera_footprint::Camera();   // pbrt's Approximate_dp_dxy for this camera (set by initialize(); valid only for the plain perspective camera)
     vec3   u, v, w;              // Camera frame basis vectors
     vec3   defocus_disk_u;       // Defocus disk horizontal radius
     vec3   defocus_disk_v;       // Defocus disk vertical radius
@@ -538,11 +540,11 @@ class camera {
     ray get_ray(int i, int j, int /*s_i*/, int /*s_j*/, const vec3& offset,
                 double* out_camera_weight = nullptr) const;
 
-    // The footprint pbrt-v4 gives a hit whose own ray carries no differentials (every diffuse or glossy bounce): CameraBase::Approximate_dp_dxy() takes the pixel
-    // the camera would see `p` through and the two one-pixel neighbours, as if a camera ray had hit there. This is that camera ray from the lens centre through `p`,
-    // with the two differential rays (scaled by the sampling rate, as get_ray()'s are). Without differentials (has_differentials() false) for every camera but the
-    // plain perspective one, which is what the primary rays of the others lack too.
-    ray approximate_footprint_ray(const point3& p) const;
+    // The footprint pbrt-v4 gives a hit whose own ray carries no differentials (every diffuse or glossy bounce): CameraBase::Approximate_dp_dxy(p, n) - the camera's SMALLEST
+    // pixel differentials, seen in the direction of `p` and intersected with the tangent plane (src/shared/camera_footprint.h), scaled by the sampling rate. Returned as a ray
+    // from the camera through `p` carrying the two differential rays that meet the tangent plane at p + dpdx and p + dpdy. Without differentials (has_differentials() false)
+    // for every camera but the plain perspective one, which is what the primary rays of the others lack too.
+    ray approximate_footprint_ray(const point3& p, const vec3& n) const;
 
     // Stratified [0,1)^2 draw for sub-pixel grid stratum (s_i, s_j) - feeds
     // FilterSampler::sample() (filter_sampler.h) at both ray_color() and

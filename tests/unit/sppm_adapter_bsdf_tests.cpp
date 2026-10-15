@@ -554,7 +554,7 @@ TEST(SppmBsdfSampleF, MeasuredEnergyConservationMatchesTheTablesAlbedo) {
 	const double wo[3] = { std::sin(0.5), std::cos(0.5), 0.0 };   // about 29 degrees off the normal
 
 	// reference: pi * E[f()] over cosine-weighted directions, from the BxDF alone (the local frame's z is the normal, y here)
-	MeasuredBxDF<double> bxdf(mat->get_data(), 612.0f, 549.0f, 465.0f);
+	MeasuredBxDF<double> bxdf(mat->get_data());
 	auto frame = ShadingFrame<double>::from_normal(0, 1, 0);
 	double lwo_x, lwo_y, lwo_z;
 	frame.to_local(wo[0], wo[1], wo[2], lwo_x, lwo_y, lwo_z);

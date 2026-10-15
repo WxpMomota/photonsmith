@@ -1554,7 +1554,7 @@ class subsurface : public material {
 class measured_bsdf_pdf : public pdf {
   public:
     measured_bsdf_pdf(const MeasuredBRDFData* data, const ShadingFrame<double>& frame, double wo_x, double wo_y, double wo_z)
-        : bxdf_(data, 612.0, 549.0, 465.0), frame_(frame), wo_x_(wo_x), wo_y_(wo_y), wo_z_(wo_z) {}
+        : bxdf_(data), frame_(frame), wo_x_(wo_x), wo_y_(wo_y), wo_z_(wo_z) {}
 
     double value(const vec3& direction) const override {
         const vec3 d = unit_vector(direction);
@@ -1689,7 +1689,7 @@ class measured : public material {
     double sampling_pdf(const ray& r_in, const hit_record& rec, const ray& scattered) const {
         if (!data_) return 0.0;
         auto ctx = MaterialContext<double>::from_hit(rec, r_in);
-        BxDF bxdf(data_.get(), kLambdaR, kLambdaG, kLambdaB);
+        BxDF bxdf(data_.get());
         auto frame = ShadingFrame<double>::from_normal(ctx.nx, ctx.ny, ctx.nz);
         double wo_x, wo_y, wo_z;
         frame.to_local(ctx.wo_x, ctx.wo_y, ctx.wo_z, wo_x, wo_y, wo_z);
@@ -1707,7 +1707,7 @@ class measured : public material {
         fr = fg = fb = 0.0;
         if (!data_) return false;
         auto ctx = MaterialContext<double>::from_hit(rec, r_in);
-        BxDF bxdf(data_.get(), kLambdaR, kLambdaG, kLambdaB);
+        BxDF bxdf(data_.get());
         auto frame = ShadingFrame<double>::from_normal(ctx.nx, ctx.ny, ctx.nz);
         double wo_x, wo_y, wo_z;
         frame.to_local(ctx.wo_x, ctx.wo_y, ctx.wo_z, wo_x, wo_y, wo_z);
@@ -1719,9 +1719,6 @@ class measured : public material {
     }
 
     // sRGB-primary approximations - see this class's own comment above.
-    static constexpr double kLambdaR = 612.0;
-    static constexpr double kLambdaG = 549.0;
-    static constexpr double kLambdaB = 465.0;
 
     shared_ptr<const MeasuredBRDFData> data_;
 };

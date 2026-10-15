@@ -837,20 +837,22 @@ inline void camera::initialize()
                          "StartTime pose, not the requested motion blur.\n";
         }
     }
+
+    // pbrt's footprint for hits whose ray has no differentials: only the plain perspective camera has any (the others' primary rays have none either).
+    footprint_cam = camera_footprint::Camera();
+    if (!alt_ortho_cam && !alt_spherical_cam && !alt_realistic_cam && !camera_is_animated)
+        footprint_cam = camera_footprint::makeCamera({center.x(), center.y(), center.z()}, {pixel00_loc.x(), pixel00_loc.y(), pixel00_loc.z()},
+            {pixel_delta_u.x(), pixel_delta_u.y(), pixel_delta_u.z()}, {pixel_delta_v.x(), pixel_delta_v.y(), pixel_delta_v.z()}, image_width, image_height, samples_per_pixel);
 }
 
-inline ray camera::approximate_footprint_ray(const point3& p) const {
-    const vec3 d = p - center;
-    ray r(center, d);
-    if (alt_ortho_cam || alt_spherical_cam || alt_realistic_cam || camera_is_animated) return r;
-    // Where the line from the camera to p crosses the viewport (the plane of the pixel centres).
-    const vec3 viewport_normal = cross(pixel_delta_u, pixel_delta_v);
-    const double den = dot(viewport_normal, d);
-    if (std::fabs(den) < 1e-12) return r;
-    const double t = dot(viewport_normal, pixel00_loc - center) / den;
-    const point3 pixel_point = center + t * d;
-    const double scale = std::max(0.125, 1.0 / std::sqrt(static_cast<double>(std::max(1, samples_per_pixel))));
-    r.set_differentials(center, (pixel_point + scale * pixel_delta_u) - center, center, (pixel_point + scale * pixel_delta_v) - center);
+inline ray camera::approximate_footprint_ray(const point3& p, const vec3& n) const {
+    ray r(center, p - center);
+    camera_footprint::V3 dpdx, dpdy;
+    if (!camera_footprint::approximate(footprint_cam, {p.x(), p.y(), p.z()}, {n.x(), n.y(), n.z()}, dpdx, dpdy)) return r;
+    // Two rays that meet the tangent plane at p + dpdx and p + dpdy (compute_differentials() intersects them with it): from one unit above the surface, straight down.
+    const vec3 un = unit_vector(n);
+    const point3 ox = p + vec3(dpdx.x, dpdx.y, dpdx.z) + un, oy = p + vec3(dpdy.x, dpdy.y, dpdy.z) + un;
+    r.set_differentials(ox, -un, oy, -un);
     return r;
 }
 

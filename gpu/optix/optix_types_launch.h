@@ -1,4 +1,5 @@
 #pragma once
+#include "../../src/shared/camera_footprint.h"   // camera_footprint::Camera (LaunchParams::bumpCamera)
 // optix_types_launch.h -- part 5 of 5 of optix_types.h (included by it, in order; not meant to be included on its own).
 
 // Launch parameters (passed to all OptiX programs)
@@ -21,6 +22,7 @@ struct LaunchParams {
 
 	// Camera
 	GpuCameraParams camera;
+	camera_footprint::Camera bumpCamera;   // pbrt's Approximate_dp_dxy for this camera, made on the host (gpu_make_bump_footprint): the footprint of a bounced hit
 
 	// Scene
 	OptixTraversableHandle traversable;  // Acceleration structure handle

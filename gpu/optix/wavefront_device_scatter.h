@@ -558,9 +558,8 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 			float mwox, mwoy, mwoz, mwix, mwiy, mwiz;
 			mframe.to_local(phaseWo.x, phaseWo.y, phaseWo.z, mwox, mwoy, mwoz);
 			mframe.to_local(queryDir.x, queryDir.y, queryDir.z, mwix, mwiy, mwiz);
-			const float mlambda[3] = { 612.0f, 549.0f, 465.0f };   // the fixed query wavelengths, as the sampling side uses
 			if (!wf_gpu_measured_f_pdf(mtab, mtab.isotropic != 0, measured->paramValues, measured->data, measured->mcdf, measured->ccdf,
-			                           mwox, mwoy, mwoz, mwix, mwiy, mwiz, mlambda, fr, fg, fb, outPdf))
+			                           mwox, mwoy, mwoz, mwix, mwiy, mwiz, fr, fg, fb, outPdf))
 				return false;
 		} else {
 			float cond_ax = glossyCondAlpha, cond_ay = glossyCondAlphaV;

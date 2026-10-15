@@ -314,7 +314,7 @@ __device__ __forceinline__ void gpu_measured_spectra_rgb(const GpuPL2DTable& spe
 __device__ __forceinline__ bool gpu_measured_f_pdf(
 	const GpuMeasuredTable& tab, bool isotropic,
 	const float* paramValues, const float* data, const float* mcdf, const float* ccdf,
-	float wox, float woy, float woz, float wix, float wiy, float wiz, const float lambda[3],
+	float wox, float woy, float woz, float wix, float wiy, float wiz,
 	float& fr, float& fg, float& fb, float& pdf_out)
 {
 	const float kPi = 3.14159265358979323846f;
@@ -366,9 +366,8 @@ __device__ __forceinline__ bool gpu_measured_f_pdf(
 // sample_measured_material() below, this file's own caller, which builds
 // that frame using this codebase's existing shared CPU/GPU shading-frame
 // helper, src/shared/shading_frame.h - the exact same one material_pbrt.h's
-// `class measured` already uses with T=double). `lambda` holds the fixed
-// R/G/B query wavelengths (matches `class measured`'s kLambdaR/G/B exactly -
-// see sample_measured_material()'s own comment for the values).
+// `class measured` already uses with T=double). The spectral table
+// is read as RGB by quadrature (measured_rgb_quadrature.h), as `class measured` does.
 //
 // Returns false (outputs untouched) on any of the same rejection paths CPU
 // has: grazing/degenerate wo, zero luminance/vndf sampling pdf, a reflected
@@ -388,7 +387,7 @@ __device__ __forceinline__ bool gpu_measured_sample_f(
 	const GpuMeasuredTable& tab, bool isotropic,
 	const float* paramValues, const float* data, const float* mcdf, const float* ccdf,
 	float wox, float woy, float woz,
-	float u0, float u1, const float lambda[3],
+	float u0, float u1,
 	float& wix, float& wiy, float& wiz,
 	float& fr, float& fg, float& fb, float& pdf_out)
 {

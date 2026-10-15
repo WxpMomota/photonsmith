@@ -1,6 +1,7 @@
 // scene_builder_text.cpp -- the outlines of 3D text: Qt turns a font and a string into the letters' outlines, which src/shared/scene_text.h triangulates and extrudes.
 // The Scene Builder sets this as the text provider once (installTextOutlineProvider); the unit tests use a fake one.
 #include "scene_builder_common.h"
+#include "app_log.h"
 
 #include <QFont>
 #include <QFontMetricsF>
@@ -60,6 +61,9 @@ bool qtTextOutline(const scene_doc::TextParams &p, scene_doc::TextOutline &out) 
 namespace scene_builder_ui {
 void installTextOutlineProvider() {
 	static std::once_flag once;
-	std::call_once(once, []() { scene_doc::setTextOutlineProvider(&qtTextOutline); });
+	std::call_once(once, []() {
+		scene_doc::setTextOutlineProvider(&qtTextOutline);
+		scene_doc::setTextLog([](const std::string &message) { AppLog::warn(QStringLiteral("builder"), QString::fromStdString(message)); });
+	});
 }
 }  // namespace scene_builder_ui

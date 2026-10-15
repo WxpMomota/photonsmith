@@ -16,6 +16,7 @@
 #include "optix_types.h"
 #include "optix_math_helpers.h"
 #include "../../src/shared/normal_map.h"
+#include "../../src/shared/camera_footprint.h"   // pbrt's Approximate_dp_dxy for a hit whose ray has no differentials
 
 // What the pixel's footprint on the surface says in the surface's (u, v): the finite-difference step 0.5 * (|dudx| + |dudy|) and the four derivatives that choose a mip level.
 // All zero where there is no footprint (a camera that gives none, or a degenerate mapping).
@@ -155,6 +156,7 @@ struct GpuBumpFootprint {
 	float3 lowerLeft;
 	float3 horizontal;   // the whole viewport's extent, so one pixel is horizontal / width
 	float3 vertical;
+	camera_footprint::Camera approx;   // the camera's minimum differentials, made once on the host (gpu_make_bump_footprint)
 	int    width, height;
 	float  diffScale;    // pbrt scales camera ray differentials by max(1/8, 1/sqrt(samples per pixel)): a bump map's step is that much finer at many samples than at one
 };
@@ -169,7 +171,39 @@ inline __host__ __device__ GpuBumpFootprint gpu_make_bump_footprint(const GpuCam
 	f.width      = width;
 	f.height     = height;
 	f.diffScale  = fmaxf(0.125f, 1.0f / sqrtf((float)(samplesPerPixel > 1 ? samplesPerPixel : 1)));
+	f.approx     = camera_footprint::Camera();
+#ifndef __CUDA_ARCH__
+	// (host only: it searches 512 film points; the launch parameters carry the result to the device)
+	if (f.enabled) {
+		const auto v = [](const float3& a) { return camera_footprint::make(a.x, a.y, a.z); };
+		const camera_footprint::V3 du = v(cam.horizontal) * (1.0 / width), dv = v(cam.vertical) * (-1.0 / height);
+		const camera_footprint::V3 pixel00 = v(cam.lower_left_corner) + v(cam.horizontal) * (0.5 / width) + v(cam.vertical) * (1.0 - 0.5 / height);
+		f.approx = camera_footprint::makeCamera(v(cam.origin), pixel00, du, dv, width, height, samplesPerPixel);
+	}
+#endif
 	return f;
+}
+
+// The two least-squares unknowns of SurfaceInteraction::compute_differentials(): (dudx, dvdx) and (dudy, dvdy) from the surface offsets dpdx and dpdy of one pixel step and
+// the tangents dpdu and dpdv. Zero where the mapping is degenerate.
+inline __host__ __device__ GpuBumpDiff gpu_bump_solve(const float3& dpdx, const float3& dpdy, const float3& dpdu, const float3& dpdv) {
+	const GpuBumpDiff none = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+	const double a00 = dot(dpdu, dpdu), a01 = dot(dpdu, dpdv), a11 = dot(dpdv, dpdv);
+	const double det = a00 * a11 - a01 * a01;
+	if (!(fabs(det) > 0.0)) return none;
+	const double inv = 1.0 / det;
+	const double bx0 = dot(dpdu, dpdx), bx1 = dot(dpdv, dpdx);
+	const double by0 = dot(dpdu, dpdy), by1 = dot(dpdv, dpdy);
+	const double dudx = (a11 * bx0 - a01 * bx1) * inv;
+	const double dudy = (a11 * by0 - a01 * by1) * inv;
+	const double dvdx = (a00 * bx1 - a01 * bx0) * inv;
+	const double dvdy = (a00 * by1 - a01 * by0) * inv;
+	const double step = 0.5 * (fabs(dudx) + fabs(dudy));
+	if (!(step == step && step < 1e8)) return none;
+	GpuBumpDiff out;
+	out.step = (float)step;
+	out.dudx = (float)dudx; out.dvdx = (float)dvdx; out.dudy = (float)dudy; out.dvdy = (float)dvdy;
+	return out;
 }
 
 // 0.5 * (|dudx| + |dudy|) for a primary ray (origin O, unit direction d) that hit the surface at p: the two
@@ -198,30 +232,16 @@ inline __host__ __device__ GpuBumpDiff gpu_bump_footprint(const GpuBumpFootprint
 	const float3 pop = p - O;
 	const float3 dpdx = Dx * (dot(n, pop) / dnx) - pop;     // (O + tx * Dx) - p
 	const float3 dpdy = Dy * (dot(n, pop) / dny) - pop;
-	const double a00 = dot(dpdu, dpdu), a01 = dot(dpdu, dpdv), a11 = dot(dpdv, dpdv);
-	const double det = a00 * a11 - a01 * a01;
-	if (!(fabs(det) > 0.0)) return none;
-	const double inv = 1.0 / det;
-	const double bx0 = dot(dpdu, dpdx), bx1 = dot(dpdv, dpdx);
-	const double by0 = dot(dpdu, dpdy), by1 = dot(dpdv, dpdy);
-	const double dudx = (a11 * bx0 - a01 * bx1) * inv;
-	const double dudy = (a11 * by0 - a01 * by1) * inv;
-	const double dvdx = (a00 * bx1 - a01 * bx0) * inv;
-	const double dvdy = (a00 * by1 - a01 * by0) * inv;
-	const double step = 0.5 * (fabs(dudx) + fabs(dudy));
-	if (!(step == step && step < 1e8)) return none;
-	GpuBumpDiff out;
-	out.step = (float)step;
-	out.dudx = (float)dudx; out.dvdx = (float)dvdx; out.dudy = (float)dudy; out.dvdy = (float)dvdy;
-	return out;
+	return gpu_bump_solve(dpdx, dpdy, dpdu, dpdv);
 }
 
-// The footprint of a hit at p as pbrt-v4 gives one to every hit whose ray has no differentials (every diffuse or glossy bounce): the camera's own estimate, as if a camera
-// ray from its origin saw p (CameraBase::Approximate_dp_dxy). Used for every hit here, the camera ray's too (the same thing for a pinhole camera).
+// The footprint of a hit at p as pbrt-v4 gives one to every hit whose ray has no differentials (every diffuse or glossy bounce): CameraBase::Approximate_dp_dxy, the camera's
+// smallest pixel differentials seen in the direction of p (src/shared/camera_footprint.h), not a camera ray through p. A hit that is the camera ray's own uses gpu_bump_footprint().
 inline __host__ __device__ GpuBumpDiff gpu_bump_footprint_at(const GpuBumpFootprint& f, const float3& p, const float3& n,
 															 const float3& dpdu, const float3& dpdv) {
-	const float3 toHit = p - f.origin;
-	const float len = sqrtf(dot(toHit, toHit));
-	if (!(len > 1e-9f)) return GpuBumpDiff{0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
-	return gpu_bump_footprint(f, f.origin, toHit * (1.0f / len), p, n, dpdu, dpdv);
+	if (!f.enabled) return GpuBumpDiff{0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+	camera_footprint::V3 dpdx, dpdy;
+	if (!camera_footprint::approximate(f.approx, camera_footprint::make(p.x, p.y, p.z), camera_footprint::make(n.x, n.y, n.z), dpdx, dpdy)) return GpuBumpDiff{0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+	return gpu_bump_solve(make_float3((float)dpdx.x, (float)dpdx.y, (float)dpdx.z), make_float3((float)dpdy.x, (float)dpdy.y, (float)dpdy.z), dpdu, dpdv);
 }
+

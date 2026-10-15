@@ -105,6 +105,7 @@ add_executable(unit_tests
     unit/bvh_tests.cpp
     unit/bxdf_tests.cpp
     unit/camera_tests.cpp
+    unit/image_resample_tests.cpp
     unit/cameras_tests.cpp
     unit/catmull_rom_tests.cpp
     unit/cie_data_tests.cpp

@@ -325,9 +325,9 @@ enum class MaterialType : int {
 	// convention as MaterialType::Subsurface's own textureIdx reuse just
 	// above; a measured material never carries a real texture in this
 	// loader, so this reuse is unambiguous on both backends. No other
-	// MaterialData field is used - the query wavelengths (612/549/465nm,
-	// approximating sRGB primaries, matching `class measured`'s kLambdaR/G/B
-	// exactly) are fixed constants in the device code, not per-material data.
+	// MaterialData field is used - the table's wavelengths and RGB weights
+	// (measured_rgb_quadrature.h) are fixed constants in the device code, not
+	// per-material data.
 	Measured = 19,
 	// GGX microfacet metal with a flat RGB tint standing in for Fresnel, no
 	// complex IOR (pbrt-v4/RTOW rough_metal, src/shared/bxdfs_conductor.h's

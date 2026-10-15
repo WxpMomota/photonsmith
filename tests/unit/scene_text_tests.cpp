@@ -261,3 +261,31 @@ TEST(SceneTextTriangulation, ARingOfHolesLikeAnEightOrAColander) {
 	const TextFace f = triangulateOutlines(all);
 	EXPECT_NEAR(faceArea(f), polygonArea(outer) - holes, 1e-7);
 }
+
+// A text that makes no letters is reported once, with the reason (the GUI sends it to its log); blank text is meant to be empty and is not.
+namespace {
+std::vector<std::string>& textLogLines() {
+	static std::vector<std::string> lines;
+	return lines;
+}
+bool failingProvider(const TextParams&, TextOutline&) { return false; }
+}  // namespace
+
+TEST(SceneTextLog, ATextThatMakesNoLettersIsReportedOnce) {
+	textLogLines().clear();
+	setTextLog([](const std::string& message) { textLogLines().push_back(message); });
+	setTextOutlineProvider(&failingProvider);
+	TextParams p;
+	p.text = "Hello";
+	p.font = "Nowhere Sans";
+	EXPECT_EQ(textMesh(p, 1.0, 1.0, 0.3).triangleCount(), 0u);
+	EXPECT_EQ(textMesh(p, 1.0, 1.0, 0.3).triangleCount(), 0u);   // (cached: not reported again)
+	ASSERT_EQ(textLogLines().size(), 1u);
+	EXPECT_NE(textLogLines()[0].find("Hello"), std::string::npos);
+	EXPECT_NE(textLogLines()[0].find("Nowhere Sans"), std::string::npos);
+	p.text = "   ";
+	textMesh(p, 1.0, 1.0, 0.3);
+	EXPECT_EQ(textLogLines().size(), 1u) << "blank text is meant to be empty";
+	setTextOutlineProvider(nullptr);
+	setTextLog(nullptr);
+}

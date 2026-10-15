@@ -27,13 +27,10 @@ __device__ __forceinline__ float random_float(unsigned int& seed) {
 // kRgbChannelWavelengthNm are the sRGB primaries' own commonly-cited
 // dominant wavelengths (not importance-sampled - a fixed, representative
 // value per channel), used as CauchyEta()'s lambda_nm input. Deliberately
-// the SAME values as this codebase's own pre-existing "3 fixed
-// representative wavelengths" convention (src/TheRestOfYourLife/
-// material_pbrt.h's `measured` class kLambdaR/G/B, mirrored on GPU at
-// gpu/optix/optix_measured_bxdf.h's own `lambda[3]` local) - a code-review
-// pass on this feature's own first version found it had hand-picked a
-// near-duplicate, off-by-1nm table (611/464 vs the established 612/465)
-// instead of matching the one already in use for the identical purpose.
+// the SAME values as the "3 fixed representative wavelengths" this codebase
+// used for a measured BSDF's table before it moved to quadrature over the CIE
+// matching functions (measured_rgb_quadrature.h): a dispersion channel is
+// still one representative wavelength.
 static constexpr unsigned int kRgbChannelUnset = 3u;
 __device__ __constant__ float kRgbChannelWavelengthNm[3] = { 612.0f, 549.0f, 465.0f };
 

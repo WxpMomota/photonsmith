@@ -231,7 +231,7 @@ struct MeasuredBRDFData {
 //
 // Usage
 // -----
-//   MeasuredBxDF<float> bxdf(&data, lambda_r, lambda_g, lambda_b);
+//   MeasuredBxDF<float> bxdf(&data);
 //   // directions in local shading frame (z = normal):
 //   float fr, fg, fb;
 //   bxdf.f(wo_x, wo_y, wo_z,  wi_x, wi_y, wi_z,  fr, fg, fb);
@@ -243,19 +243,11 @@ template <typename T>
 struct MeasuredBxDF {
 
 	const MeasuredBRDFData* data = nullptr;
-	// Per-wavelength query values for the 3-channel spectral interpolant.
-	// Index 0 = R, 1 = G, 2 = B.  Store as float for PL2D compatibility.
-	float lambda[3] = { 0.0f, 0.0f, 0.0f };
+	// (The spectral table is read as RGB by quadrature - mbxdf_detail::SpectraToRgb - so there are no per-channel query wavelengths to hold.)
 
 	MeasuredBxDF() = default;
 
-	CPU_GPU MeasuredBxDF(const MeasuredBRDFData* d,
-						 float lambda_r, float lambda_g, float lambda_b)
-		: data(d) {
-		lambda[0] = lambda_r;
-		lambda[1] = lambda_g;
-		lambda[2] = lambda_b;
-	}
+	CPU_GPU explicit MeasuredBxDF(const MeasuredBRDFData* d) : data(d) {}
 
 	// ------------------------------------------------------------------
 	// f(wo, wi) -- BRDF evaluation
@@ -270,7 +262,7 @@ struct MeasuredBxDF {
 	//      theta2u / phi2u parameterization
 	//   5. For isotropic BRDF: use relative phi: phi_m - phi_o
 	//   6. Invert VNDF warp at u_wm given (phi_o, theta_o) -> uniform sample ui
-	//   7. Evaluate 5D spectral interpolant at (ui, phi_o, theta_o, lambda[c])
+	//   7. Evaluate 5D spectral interpolant at (ui, phi_o, theta_o) and the quadrature wavelengths, as RGB
 	//   8. Return spectra * ndf(u_wm) / (4 * sigma(u_wo) * cosTheta(wi))
 	// ------------------------------------------------------------------
 	CPU_GPU void f(T wox, T woy, T woz,

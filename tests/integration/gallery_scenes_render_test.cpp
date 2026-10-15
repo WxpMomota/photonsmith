@@ -82,7 +82,9 @@ TEST_P(GalleryGpuRenderTest, RendersARealImage) {
 	if (!s->gpu_compatible) GTEST_SKIP() << s->name << " is not GPU-compatible";
 	if (!optix_is_available()) GTEST_SKIP() << "OptiX not available";
 	if (std::getenv("RT_SKIP_GALLERY")) GTEST_SKIP() << "RT_SKIP_GALLERY is set";
-	if (std::strcmp(s->category, SceneCategories::LargeScene) == 0 && !std::getenv("RT_GALLERY_ALL"))
+	// (the big scenes are opt-in, but the Sibenik cathedral - 75k triangles, bump-mapped marble, the scene the mip-filtered bump and footprint work was found on - runs by default)
+	const bool defaultLarge = std::strstr(s->name, "Sibenik") != nullptr;
+	if (std::strcmp(s->category, SceneCategories::LargeScene) == 0 && !defaultLarge && !std::getenv("RT_GALLERY_ALL"))
 		GTEST_SKIP() << s->name << " is a Large Scene (set RT_GALLERY_ALL=1 to render it)";
 	if (isTwinOfAnEarlierScene(s->id)) GTEST_SKIP() << s->name << " loads the same file as an earlier entry";
 

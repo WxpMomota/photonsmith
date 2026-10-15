@@ -13,6 +13,8 @@
 #include "rtweekend.h"
 #include "camera.h"
 #include "vec3.h"
+#include "texture.h"
+#include "normal_map_materials.h"
 #include <cmath>
 
 // ============================================================================
@@ -663,4 +665,76 @@ TEST(CameraTest, AnimatedCameraStaysWithinKeyframeBounds) {
 		EXPECT_NEAR(r.origin().y(), 278.0, 1e-6);
 		EXPECT_NEAR(r.origin().z(), -800.0, 1e-6);
 	}
+}
+
+// ============================================================================
+// The footprint a bounced hit gets (pbrt-v4 CameraBase::Approximate_dp_dxy)
+// ============================================================================
+
+namespace {
+camera footprintCamera(int spp) {
+	camera cam;
+	cam.lookfrom = point3(0, 0, 0);
+	cam.lookat = point3(0, 0, -1);
+	cam.vup = vec3(0, 1, 0);
+	cam.vfov = 40;
+	cam.image_width = 100;
+	cam.aspect_ratio = 1.0;
+	cam.samples_per_pixel = spp;
+	cam.max_depth = 4;
+	cam.background = color(0, 0, 0);
+	cam.initialize();
+	return cam;
+}
+// |dpdx| of a hit at p on a plane that faces the camera, from the two differential rays approximate_footprint_ray() returns (they meet the plane at p + dpdx and p + dpdy,
+// starting one unit above it).
+double dpdxLength(const camera& cam, const point3& p) {
+	const vec3 n = unit_vector(cam.center - p);
+	const ray r = cam.approximate_footprint_ray(p, n);
+	EXPECT_TRUE(r.has_differentials());
+	const vec3 dpdx = r.rx_origin() - p - n;
+	return dpdx.length();
+}
+}  // namespace
+
+// pbrt rotates the hit to the camera's axis and uses the camera's SMALLEST pixel differentials there, so the footprint of a hit does not shrink as it lies further off the
+// image's axis (a camera ray through the point would: a rectilinear pixel's angular size falls with cos^2 of the angle). A floor running out of the picture was read through
+// ever finer mip levels, and a bump map on it read 7% too bright against pbrt (pbrt_scenes/bump-fine-floor.pbrt).
+TEST(CameraFootprintTest, DoesNotShrinkOffTheAxis) {
+	const camera cam = footprintCamera(1);
+	const double onAxis = dpdxLength(cam, point3(0, 0, -10)) / 10.0;
+	const double farOff = dpdxLength(cam, point3(10.0 * std::tan(60.0 * 3.14159265358979 / 180.0), 0, -10)) / (10.0 / std::cos(60.0 * 3.14159265358979 / 180.0));
+	EXPECT_NEAR(farOff / onAxis, 1.0, 0.01) << "the angular size of the footprint is the same 60 degrees off the axis";
+	// The size itself: the smallest pixel of the camera (a corner's: cos^2 of the corner's angle, 0.79 here) in angle, so between 0.75 and 1 times the centre pixel's.
+	const double pixel = 2.0 * std::tan(20.0 * 3.14159265358979 / 180.0) / 100.0;   // (the centre pixel: the viewport's width over its distance, 40 degrees over 100 pixels)
+	EXPECT_GT(onAxis, 0.75 * pixel);
+	EXPECT_LT(onAxis, 1.0 * pixel);
+}
+
+TEST(CameraFootprintTest, IsScaledByTheSamplingRate) {
+	const double one = dpdxLength(footprintCamera(1), point3(0, 0, -10));
+	const double four = dpdxLength(footprintCamera(4), point3(0, 0, -10));
+	const double many = dpdxLength(footprintCamera(1024), point3(0, 0, -10));
+	EXPECT_NEAR(four / one, 0.5, 1e-9) << "1 / sqrt(4)";
+	EXPECT_NEAR(many / one, 0.125, 1e-9) << "never finer than 1/8";
+}
+
+TEST(CameraFootprintTest, AnAnimatedCameraGivesNone) {
+	camera cam = footprintCamera(1);
+	cam.camera_is_animated = true;
+	cam.initialize();
+	EXPECT_FALSE(cam.approximate_footprint_ray(point3(0, 0, -10), vec3(0, 0, 1)).has_differentials());
+}
+
+// The path tracer computes that footprint at bounces only while something reads it: a mip-filtered image, a filtered checker or a bump map each hold a token while they exist.
+// A texture class that stopped registering would silently turn the bounce footprint off (bump maps seen by bounced light read full resolution again).
+TEST(CameraFootprintTest, ConsumersRegisterWhileTheyExist) {
+	const int before = footprint_consumer_count().load();
+	{
+		uv_checker_texture checker(2.0, 2.0, color(0, 0, 0), color(1, 1, 1));
+		EXPECT_EQ(footprint_consumer_count().load(), before + 1);
+		bump_map_material bump(make_shared<solid_color>(color(0.5, 0.5, 0.5)), make_shared<lambertian>(color(0.5, 0.5, 0.5)));
+		EXPECT_EQ(footprint_consumer_count().load(), before + 2);
+	}
+	EXPECT_EQ(footprint_consumer_count().load(), before) << "released when they are gone";
 }

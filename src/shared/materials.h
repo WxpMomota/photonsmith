@@ -730,23 +730,15 @@ struct MixMaterial {
 //       MeasuredMaterial::GetBxDF -> return MeasuredBxDF(brdf, lambda)
 //       HasSubsurfaceScattering() -> false
 //
-//     Adaptation note: pbrt-v4 passes a SampledWavelengths object; locally
-//     we decompose that into three float wavelengths (R/G/B) matching the
-//     local MeasuredBxDF<T>(data, lr, lg, lb) constructor.
+//     Adaptation note: pbrt-v4 passes a SampledWavelengths object; locally the
+//     BxDF reads its spectral table as RGB by quadrature over the CIE matching
+//     functions (measured_rgb_quadrature.h), so it needs no wavelengths.
 // ---------------------------------------------------------------------------
 struct MeasuredMaterial {
 	const MeasuredBRDFData* brdf = nullptr;
-	// Wavelength samples for the 3-channel spectral interpolant (R/G/B).
-	// Defaults match the sRGB primary wavelengths used in pbrt-v4 tests.
-	float lambda_r = 612.0f;  // red   channel wavelength (nm)
-	float lambda_g = 549.0f;  // green channel wavelength (nm)
-	float lambda_b = 465.0f;  // blue  channel wavelength (nm)
-
-	// Construct from a pre-built data table and explicit wavelength samples.
+	// Construct from a pre-built data table (read as RGB by quadrature, measured_rgb_quadrature.h).
 	MeasuredMaterial() = default;
-	CPU_GPU MeasuredMaterial(const MeasuredBRDFData* d,
-							 float lr = 612.0f, float lg = 549.0f, float lb = 465.0f)
-		: brdf(d), lambda_r(lr), lambda_g(lg), lambda_b(lb) {}
+	CPU_GPU explicit MeasuredMaterial(const MeasuredBRDFData* d) : brdf(d) {}
 
 	// get_bxdf() mirrors pbrt-v4 MeasuredMaterial::GetBxDF():
 	//   return MeasuredBxDF(brdf, lambda)
@@ -755,7 +747,7 @@ struct MeasuredMaterial {
 	// materials have no textures).
 	template <typename T>
 	CPU_GPU MeasuredBxDF<T> get_bxdf(const MaterialEvalContext<T>& /*ctx*/) const {
-		return MeasuredBxDF<T>(brdf, lambda_r, lambda_g, lambda_b);
+		return MeasuredBxDF<T>(brdf);
 	}
 
 	static constexpr bool has_subsurface_scattering() { return false; }

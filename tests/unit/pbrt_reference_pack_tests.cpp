@@ -85,6 +85,23 @@ TEST(PbrtReferencePackTest, TheBidirectionalAndPhotonIntegratorsAlsoReflectLamps
 	}
 }
 
+// A large scene on the CPU, which needs no GPU (so CI runs it): the Sibenik cathedral (75k triangles, bump-mapped marble: the scene the mip-filtered bump and footprint work was
+// found on) loads - OBJ, materials, bump maps, mip pyramids - and renders a picture that is neither black nor blown out. The other large scenes stay opt-in
+// (RT_GALLERY_ALL, tests/integration/gallery_scenes_render_test.cpp) because they take minutes to load.
+TEST(PbrtReferencePackTest, TheSibenikCathedralLoadsAndRendersOnTheCpu) {
+	const SceneDescriptor* s = find_example_scene("environment-sibenik-cathedral");
+	if (!s) GTEST_SKIP() << "environment-sibenik-cathedral.pbrt was not discovered - is pbrt_scenes/ present?";
+	if (std::getenv("RT_SKIP_GALLERY")) GTEST_SKIP() << "RT_SKIP_GALLERY is set";
+	const std::string out = "pbrt_pack_sibenik_smoke.exr";
+	ASSERT_EQ(cpu_render_main(48, 32, 4, 4, out.c_str(), s->id.c_str(), s->camera.lookfrom_x, s->camera.lookfrom_y, s->camera.lookfrom_z), 0);
+	double mean = 0.0;
+	const bool ok = loadLinearMean(out, mean);
+	std::remove(out.c_str());
+	ASSERT_TRUE(ok) << "the CPU render produced no readable EXR";
+	EXPECT_GT(mean, 0.01) << "a lit cathedral is not black";
+	EXPECT_LT(mean, 20.0) << "...nor blown out";
+}
+
 TEST(PbrtReferencePackTest, TheTableIsPresentAndCoversTheBundledScenes) {
 	const std::vector<PbrtPackRow> rows = packRows();
 	ASSERT_GT(rows.size(), 100u) << "tests/data/pbrt_reference_means.txt is missing or short (run from the repository root)";

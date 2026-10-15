@@ -114,10 +114,15 @@ TEST(BumpFootprint, EveryHitGetsTheCamerasEstimate) {
 	// A hit straight ahead on a plane facing the camera, 5 away; (u, v) = (x, y) in world units.
 	const float3 p = make_float3(0.0f, 0.0f, -5.0f), n = make_float3(0.0f, 0.0f, 1.0f);
 	const GpuBumpDiff d = gpu_bump_footprint_at(f, p, n, make_float3(1.0f, 0.0f, 0.0f), make_float3(0.0f, 1.0f, 0.0f));
-	// One pixel is 2 / 100 of the viewport (1 away) = 0.02, which is 0.1 at 5 away; scaled by max(1/8, 1/sqrt(1)) = 1.
-	EXPECT_NEAR(d.dudx, 0.1f, 1e-4f);
-	EXPECT_NEAR(d.dvdy, 0.1f, 1e-4f);
-	EXPECT_NEAR(d.step, 0.05f, 1e-4f) << "0.5 * (|dudx| + |dudy|), and here a pixel row does not move u";
+	// pbrt's Approximate_dp_dxy: the camera's smallest pixel (a corner's, cos^2 of its angle smaller than the centre pixel's 0.1 at 5 away: 0.0x), whatever the direction of the hit.
+	EXPECT_GT(d.step, 0.02f);
+	EXPECT_LT(d.step, 0.1f);
+	// A hit 60 degrees off the axis (on a plane that faces the camera) has the same angular footprint: its step grows with its distance (5 / cos 60 = 10), it does not shrink.
+	const float3 far = make_float3(5.0f * 1.7320508f, 0.0f, -5.0f), farN = make_float3(-0.8660254f, 0.0f, 0.5f);
+	const float3 farU = make_float3(0.5f, 0.0f, 0.8660254f), farV = make_float3(0.0f, 1.0f, 0.0f);
+	const GpuBumpDiff off = gpu_bump_footprint_at(f, far, farN, farU, farV);
+	EXPECT_GT(off.step, 0.0f);
+	EXPECT_NEAR(off.step / d.step, 2.0f, 0.8f) << "twice as far, the same angle: twice the step (orientation of the differentials moves it a little)";
 	// The same hit seen from anywhere else (a bounce) has the same footprint: it is the camera's estimate of the point, not a property of the ray that arrived.
 	const GpuBumpDiff again = gpu_bump_footprint_at(f, p, n, make_float3(1.0f, 0.0f, 0.0f), make_float3(0.0f, 1.0f, 0.0f));
 	EXPECT_FLOAT_EQ(again.step, d.step);

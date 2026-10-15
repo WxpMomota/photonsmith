@@ -238,8 +238,11 @@ extern "C" __global__ void __closesthit__wf_triangle() {
 				bump_dpdu = optixTransformVectorFromObjectToWorldSpace(bump_dpdu);
 				bump_dpdv = optixTransformVectorFromObjectToWorldSpace(bump_dpdv);
 			}
-			// The footprint of the pixel at this point, as the CPU and pbrt give it: the camera's estimate at every hit (a bounce included).
-			const GpuBumpDiff bump_diff = gpu_bump_footprint_at(wf_params.bumpFootprint, hit_point, normal, bump_dpdu, bump_dpdv);
+			// The footprint of the pixel at this point, as the CPU and pbrt give it: the camera ray's own differentials for a primary hit, the camera's approximate estimate
+			// (pbrt's Approximate_dp_dxy) for every bounced one.
+			const GpuBumpDiff bump_diff = payload->primaryRay
+				? gpu_bump_footprint(wf_params.bumpFootprint, ray_orig, normalize(ray_dir), hit_point, normal, bump_dpdu, bump_dpdv)
+				: gpu_bump_footprint_at(wf_params.bumpFootprint, hit_point, normal, bump_dpdu, bump_dpdv);
 			// The derivatives of the interpolated normal (pbrt's dndu / dndv): an instance carries them as the CPU's transform_instance does.
 			float3 bump_dndu = make_float3(0.0f, 0.0f, 0.0f), bump_dndv = make_float3(0.0f, 0.0f, 0.0f);
 			if (tri.hasNormals) {

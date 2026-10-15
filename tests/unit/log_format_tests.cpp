@@ -169,3 +169,19 @@ TEST(WindowPlacementTest, ASizeIsNeverLargerThanTheScreen) {
 	EXPECT_EQ(clamped.h, 1080);
 	EXPECT_EQ(window_placement::clampSize({0, 0, 800, 600}, {0, 0, 1920, 1080}).w, 800);
 }
+
+// The Sun & sky settings (the Sky gallery sets three of them at once) are in the edit log: a changed sky used to leave no line at all.
+TEST(SceneDocDiffTest, LogsTheSunAndSkySettings) {
+	using namespace scene_doc;
+	Document a = makeStarterScene();
+	a.lights.push_back(Light());
+	a.lights.back().kind = LightKind::Infinite;
+	Document b = a;
+	b.lights.back().sky.sunElevation = 4.0;
+	b.lights.back().sky.turbidity = 8.0;
+	b.lights.back().sky.groundAlbedo = 0.85;
+	const std::string changed = describeChange(a, b);
+	EXPECT_NE(changed.find("sunElevation"), std::string::npos) << changed;
+	EXPECT_NE(changed.find("haze"), std::string::npos) << changed;
+	EXPECT_NE(changed.find("groundAlbedo"), std::string::npos) << changed;
+}

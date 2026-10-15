@@ -113,6 +113,8 @@
     <ClCompile Include="unit\bvh_tests.cpp" />
     <ClCompile Include="unit\bxdf_tests.cpp" />
     <ClCompile Include="unit\camera_tests.cpp" />
+    <ClCompile Include="unit\pbrt_gpu_lamp_material_tests.cpp" />
+    <ClCompile Include="unit\image_resample_tests.cpp" />
     <ClCompile Include="unit\shadow_ray_tests.cpp" />
     <ClCompile Include="unit\pbrt_gpu_quad_light_tests.cpp" />
     <ClCompile Include="unit\pbrt_gpu_instance_sphere_tests.cpp" />
