@@ -649,7 +649,7 @@ bool MetalPocApp::dsUploadSamplingTables(DispatchState& s) {
     id<MTLBuffer> pbrtEnvMarginalCDFBuffer;
     id<MTLBuffer> pbrtEnvConditionalCDFBuffer;
     if (havePbrtPortalLight) {
-        // Portal light (see metal_poc_sampling.metal, portalSampleLi): the distribution's cell values then its summed-area table in the "marginal"
+        // Portal light (see metal_poc_environment.metal, portalSampleLi): the distribution's cell values then its summed-area table in the "marginal"
         // slot, the rectified RGB image in the "conditional" slot. The shader's plain-environment sites read these buffers through
         // pbrtEnvSampleDirection()/pbrtEnvLeAt()/pbrtEnvPdfAt(), which switch on Uniforms::pbrtHasPortalLight.
         std::vector<float> distAndSat(pbrtPortalDistFunc);

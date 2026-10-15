@@ -247,7 +247,7 @@ void testHenyeyGreensteinPhase(id<MTLDevice> device, id<MTLLibrary> library, id<
     }
 }
 
-// sampleFreePathDistance() (metal_poc_sampling.metal) - the free-flight
+// sampleFreePathDistance() (metal_poc_bsdf_math.metal) - the free-flight
 // distance formula shared by the global-fog path (primaryRayKernel) and
 // shadeHomogeneousMediumSphere() (materialType 28), extracted specifically
 // for this test (previously duplicated inline verbatim at both call

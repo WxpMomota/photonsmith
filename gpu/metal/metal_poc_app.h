@@ -324,7 +324,7 @@ struct MetalPocApp {
 
     // Set by loadPbrtScene() for an image infinite light with a portal[4] window (pbrt-v4's PortalImageInfiniteLight). Mutually exclusive with
     // havePbrtImageEnvLight: the plain environment texture/CDFs are not built for it. The three arrays come from a real host-side
-    // PortalImageInfiniteLightData (exactly what the CPU builds), uploaded into the pbrtEnv buffers - see portalSampleLi() in metal_poc_sampling.metal.
+    // PortalImageInfiniteLightData (exactly what the CPU builds), uploaded into the pbrtEnv buffers - see portalSampleLi() in metal_poc_environment.metal.
     bool havePbrtPortalLight = false;
     std::vector<float> pbrtPortalRectified;   // w*h*3, scale NOT applied
     std::vector<float> pbrtPortalDistFunc;    // w*h
@@ -939,7 +939,7 @@ struct MetalPocApp {
     // different from CPU/OptiX's real importance-sampled gold BRDF. This
     // function is kept only as the first (and still only) example of this
     // loader's sphere-light NEE support (AreaLight::kind==1,
-    // metal_poc_sampling.metal's sampleAreaLight()) - see its own comment
+    // metal_poc_area_lights.metal's sampleAreaLight()) - see its own comment
     // and section 184, docs/history/METAL_GPU_FEASIBILITY.md - not as a current
     // description of what scene_id "B14" renders.
     // B13: Subsurface Slab - a Cornell box with a dielectric wax slab

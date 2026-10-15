@@ -33,7 +33,12 @@ inline const char* const* metalShaderFileNames(int* outCount) {
     static const char* const kFiles[] = {
         "metal_poc_material_ids.metal",   // materialType names (METAL_MAT_*), shared with the host: must come first
         "metal_poc_types.metal",
-        "metal_poc_sampling.metal",
+        "metal_poc_sampling.metal",        // camera / filter / hemisphere sampling, shading normals, texture lookups, shadow-ray tracing
+        "metal_poc_environment.metal",     // environment-map and portal infinite lights (split out of sampling for the code-size limit)
+        "metal_poc_procedural.metal",      // procedural textures: checker, noise, marble
+        "metal_poc_bsdf_math.metal",       // Fresnel, Beer-Lambert, GGX (D, G, VNDF), orthonormal bases
+        "metal_poc_media_math.metal",      // Henyey-Greenstein, procedural cloud density, RGB density grids
+        "metal_poc_area_lights.metal",     // LightSample, textured disk / cylinder lights, sphere cone sampling, sampleAreaLight()
         "metal_poc_bump.metal",            // image bump and normal maps (split out of sampling for the code-size limit)
         "metal_poc_layered_bxdf.metal",
         "metal_poc_materials_specular.metal",
