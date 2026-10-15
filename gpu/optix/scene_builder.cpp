@@ -621,6 +621,14 @@ namespace {
 // C++ program - not a new or different layout.
 
 
+// A lamp that keeps a material other than a flat diffuse one (pbrt-v4: an AreaLightSource keeps the shape's material, so it reflects): the CPU reflects it as that
+// material, both OptiX backends draw a pure emitter, so a lamp panel with a metal or coated or textured material differs between the two.
+static void warn_lamp_materials_not_reflected(const SceneData& scene) {
+	if (scene.lampMaterialsNotReflected > 0)
+		std::cerr << "[OptiX] Warning: " << scene.lampMaterialsNotReflected << " lamp material(s) are not a flat diffuse colour (coated, metal, glass, textured...); the CPU "
+		             "reflects light off them as that material, this renderer draws them as pure emitters - use --cpu if the lamp's own surface matters.\n";
+}
+
 // Everything a loaded .pbrt scene says about the render besides geometry and camera placement (sky, filter, firefly clamp, crop window, media, textures, lights),
 // copied into `scene` and `out_camera_extra`. A pure split of build_loaded_pbrt_scene(); nothing here changed.
 static void apply_loaded_scene_settings(const char* path,
@@ -836,12 +844,7 @@ static void apply_loaded_scene_settings(const char* path,
 		}
 	}
 
-	// A lamp that keeps a material other than a flat diffuse one (pbrt-v4: an AreaLightSource keeps the shape's material, so it reflects): the CPU reflects it as that
-	// material, both OptiX backends draw a pure emitter, so a lamp panel with a metal or coated or textured material differs between the two.
-	if (scene.lampMaterialsNotReflected > 0)
-		std::cerr << "[OptiX] Warning: " << scene.lampMaterialsNotReflected << " lamp material(s) are not a flat diffuse colour (coated, metal, glass, textured...); the CPU "
-		             "reflects light off them as that material, this renderer draws them as pure emitters - use --cpu if the lamp's own surface matters.\n";
-
+	warn_lamp_materials_not_reflected(scene);
 	// Any pbrt_flatten::Medium::type mediumMaterialIndex() (pbrt_gpu_
 	// builder.h) had no real branch for - a type added to the scene format that
 	// the GPU builder has not learned yet - falls through to the
