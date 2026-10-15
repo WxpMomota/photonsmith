@@ -54,6 +54,7 @@
 #include <vector>
 
 #include "piecewise_linear_2d.h"   // PiecewiseLinear2D<N>, PLSample
+#include "measured_rgb_quadrature.h"   // the wavelengths and weights the spectral table becomes RGB with
 
 // ---------------------------------------------------------------------------
 // Local geometry helpers (mirrors pbrt-v4 util/vecmath.h / scattering.h)
@@ -116,6 +117,26 @@ inline float theta2u(float theta) { return std::sqrt(theta * (2.0f * kInvPi)); }
 inline float phi2u(float phi)     { return phi * kInv2Pi + 0.5f; }
 inline float u2theta(float u)     { return u * u * (kPi * 0.5f); }
 inline float u2phi(float u)       { return (2.0f * u - 1.0f) * kPi; }
+
+// The RGB of the spectral table at one interpolation point: the table (a reflectance over wavelength) is evaluated at RT_MEASURED_LAMBDAS and weighted into R, G and B
+// (measured_rgb_quadrature.h), as pbrt's film sensor turns the spectrum into RGB; each wavelength's value is clamped at zero first, as pbrt's f() does, and so is the sum.
+template <class Spectra>
+inline void SpectraToRgb(const Spectra& spectra, float px, float py, float phi_o, float theta_o, float rgb[3]) {
+	static constexpr float kLambda[RT_MEASURED_BINS] = { RT_MEASURED_LAMBDAS };
+	static constexpr float kWr[RT_MEASURED_BINS] = { RT_MEASURED_WR };
+	static constexpr float kWg[RT_MEASURED_BINS] = { RT_MEASURED_WG };
+	static constexpr float kWb[RT_MEASURED_BINS] = { RT_MEASURED_WB };
+	float r = 0.0f, g = 0.0f, b = 0.0f;
+	for (int k = 0; k < RT_MEASURED_BINS; ++k) {
+		const float v = std::max(0.0f, spectra.Eval(px, py, phi_o, theta_o, kLambda[k]));
+		r += kWr[k] * v;
+		g += kWg[k] * v;
+		b += kWb[k] * v;
+	}
+	rgb[0] = std::max(0.0f, r);
+	rgb[1] = std::max(0.0f, g);
+	rgb[2] = std::max(0.0f, b);
+}
 
 } // namespace mbxdf_detail
 
@@ -292,9 +313,7 @@ struct MeasuredBxDF {
 
 		// Evaluate spectral interpolant for each channel
 		float val[3];
-		for (int c = 0; c < 3; ++c)
-			val[c] = std::max(0.0f, data->spectra.Eval(ui.px, ui.py,
-														phi_o, theta_o, lambda[c]));
+		mbxdf_detail::SpectraToRgb(data->spectra, ui.px, ui.py, phi_o, theta_o, val);
 
 		// Normalization: ndf(u_wm) / (4 * sigma(u_wo) * |cos(theta_wi)|)
 		float ndf_val   = data->ndf.Eval(u_wm_x, u_wm_y);
@@ -377,9 +396,7 @@ struct MeasuredBxDF {
 		// Step 5: evaluate spectral interpolant at (ui, phi_o, theta_o, lambda), where ui is the luminance-warped point (u0, u1 here), as
 		// pbrt-v4 Sample_f does and as f() does via vndf.Invert. This used to evaluate at u_wm, which made sample_f disagree with f() by up to 26%.
 		float val[3];
-		for (int c = 0; c < 3; ++c)
-			val[c] = std::max(0.0f, data->spectra.Eval(u0, u1,
-														phi_o, theta_o, lambda[c]));
+		mbxdf_detail::SpectraToRgb(data->spectra, u0, u1, phi_o, theta_o, val);
 
 		// Step 6: BRDF normalization
 		float u_wo_x    = mbxdf_detail::theta2u(theta_o);

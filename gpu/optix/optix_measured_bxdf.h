@@ -57,6 +57,7 @@
 // LookImpl<Dim> exactly (see this file's own header comment for why this is
 // an explicit corner-mask loop rather than a literal recursive-template port).
 // ---------------------------------------------------------------------------
+#include "../../src/shared/measured_rgb_quadrature.h"   // the wavelengths and weights a measured table becomes RGB with
 __device__ __forceinline__ float gpu_pl2d_look(const float* data, uint32_t i0, uint32_t sz,
 												  const float* pw, int dim, const int stride[3]) {
 	float result = 0.0f;
@@ -282,6 +283,29 @@ __device__ __forceinline__ void gpu_pl2d_invert(const GpuPL2DTable& tab,
 }
 
 // ---------------------------------------------------------------------------
+// A measured BSDF's spectral table as RGB (measured_rgb_quadrature.h; see src/shared/measured_bxdf.h's SpectraToRgb): the table is evaluated at the quadrature wavelengths
+// and weighted into R, G and B, each value clamped at zero first and the sums too, as pbrt's f() and film sensor do. The three fixed wavelengths this replaced read a table's
+// blue 16% high.
+static __device__ __constant__ float MeasuredLambda[RT_MEASURED_BINS] = { RT_MEASURED_LAMBDAS };
+static __device__ __constant__ float MeasuredWr[RT_MEASURED_BINS] = { RT_MEASURED_WR };
+static __device__ __constant__ float MeasuredWg[RT_MEASURED_BINS] = { RT_MEASURED_WG };
+static __device__ __constant__ float MeasuredWb[RT_MEASURED_BINS] = { RT_MEASURED_WB };
+__device__ __forceinline__ void gpu_measured_spectra_rgb(const GpuPL2DTable& spectra, const float* data, const float* paramValues,
+	float px, float py, float phi_o, float theta_o, float val[3])
+{
+	float r = 0.0f, g = 0.0f, b = 0.0f;
+	for (int k = 0; k < RT_MEASURED_BINS; ++k) {
+		const float spec_p[3] = { phi_o, theta_o, MeasuredLambda[k] };
+		const float v = fmaxf(0.0f, gpu_pl2d_eval(spectra, data, paramValues, px, py, spec_p));
+		r += MeasuredWr[k] * v;
+		g += MeasuredWg[k] * v;
+		b += MeasuredWb[k] * v;
+	}
+	val[0] = fmaxf(0.0f, r);
+	val[1] = fmaxf(0.0f, g);
+	val[2] = fmaxf(0.0f, b);
+}
+
 // gpu_measured_f_pdf() -- MeasuredBxDF<T>::f() and pdf() port in one function (they share the half-vector and the vndf inversion), for
 // direct-light sampling with MIS: f is the BRDF value for (wo, wi) in the local shading frame and pdf the density sample_f would have
 // produced wi with. Returns false (f = 0, pdf = 0) for a direction pair the table gives no reflectance (opposite hemispheres, a degenerate
@@ -315,12 +339,8 @@ __device__ __forceinline__ bool gpu_measured_f_pdf(
 	float ui_x, ui_y, ui_pdf;
 	gpu_pl2d_invert(tab.vndf, data, mcdf, ccdf, paramValues, u_wm_x, u_wm_y, vndf_p, ui_x, ui_y, ui_pdf);
 
-	float spec_p[3] = { phi_o, theta_o, 0.0f };
 	float val[3];
-	for (int c = 0; c < 3; ++c) {
-		spec_p[2] = lambda[c];
-		val[c] = fmaxf(0.0f, gpu_pl2d_eval(tab.spectra, data, paramValues, ui_x, ui_y, spec_p));
-	}
+	gpu_measured_spectra_rgb(tab.spectra, data, paramValues, ui_x, ui_y, phi_o, theta_o, val);
 	const float ndf_val   = gpu_pl2d_eval(tab.ndf,   data, paramValues, u_wm_x, u_wm_y, nullptr);
 	const float sigma_val = gpu_pl2d_eval(tab.sigma, data, paramValues, u_wo_x, u_wo_y, nullptr);
 	const float denom = 4.0f * sigma_val * fabsf(wiz);
@@ -425,15 +445,11 @@ __device__ __forceinline__ bool gpu_measured_sample_f(
 	const float wi_z = 2.0f * dot_wo_wm * wmz - woz;
 	if (wi_z <= 0.0f) return false;
 
-	float spec_p[3] = { phi_o, theta_o, 0.0f };
 	// The spectra are evaluated at the luminance-warped point (lum_px, lum_py), as pbrt-v4 MeasuredBxDF::Sample_f does (its `u` after the
 	// luminance Sample) and as f() does through vndf.Invert - NOT at u_wm, which this used to pass. With u_wm the sampled f disagreed with
 	// f() by up to 26% on the synthetic table; with this they agree to 4 digits on every table tried.
 	float val[3];
-	for (int c = 0; c < 3; ++c) {
-		spec_p[2] = lambda[c];
-		val[c] = fmaxf(0.0f, gpu_pl2d_eval(tab.spectra, data, paramValues, lum_px, lum_py, spec_p));
-	}
+	gpu_measured_spectra_rgb(tab.spectra, data, paramValues, lum_px, lum_py, phi_o, theta_o, val);
 
 	const float u_wo_x = sqrtf(theta_o * (2.0f / kPi));
 	const float u_wo_y = phi_o * (1.0f / (2.0f * kPi)) + 0.5f;

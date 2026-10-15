@@ -467,7 +467,9 @@ TEST(PbrtBackendAgreementTest, MeasuredLightsAgreeAcrossBackends) {
 // must read the same mean with ~1.5% noise, so this checks the new estimator is unbiased against an independent one. The expected RGB is the
 // light-sampled estimator's, whose luminance (0.2126 R + 0.7152 G + 0.0722 B) is that 0.0608.
 TEST(PbrtBackendAgreementTest, MeasuredAreaLightKeepsTheBsdfSamplingMean) {
-	const double expected[3] = {0.0685, 0.0608, 0.0384};
+	// (the spectral table read as RGB by quadrature over the CIE matching functions, measured_rgb_quadrature.h: real pbrt-v4 draws 0.0736 0.0586 0.0324 of this scene; the three fixed
+	// wavelengths this used to be read 0.0685 0.0608 0.0384, blue 17% high)
+	const double expected[3] = {0.0734, 0.0588, 0.0329};
 	expectChannelMeans("measured-lights-area", 512, 6, expected, 0.02, 0.02);
 }
 
