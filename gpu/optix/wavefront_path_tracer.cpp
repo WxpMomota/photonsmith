@@ -706,6 +706,231 @@ void WavefrontPathTracer::renderPrepareLaunch(RenderCall &rc) {
 	rc.progressPrintInterval = progressPrintInterval;
 }
 
+// One bounce's material phases on the hits the intersect launch queued: the general, simple (Lambertian/Metal) and dielectric hit queues (each on its own stream),
+// then the escaped rays. Fills the shadow and next-ray queues.
+void WavefrontPathTracer::evaluateBounceMaterials(RenderCall &rc, int numHits, int numSimpleHits, int numDielectricHits, int numMiss) {
+	const auto &camera = rc.camera;
+	const int max_depth = rc.max_depth;
+	const bool regularize = rc.regularize;
+	CUdeviceptr d_materials = rc.d_materials;
+	CUdeviceptr d_spheres = rc.d_spheres;
+	CUdeviceptr d_quads = rc.d_quads;
+	CUdeviceptr d_light_indices = rc.d_light_indices;
+	CUdeviceptr d_lightKinds = rc.d_lightKinds;
+	CUdeviceptr d_alias_table = rc.d_alias_table;
+	unsigned int num_materials = rc.num_materials;
+	unsigned int num_spheres = rc.num_spheres;
+	unsigned int num_quads = rc.num_quads;
+	unsigned int num_lights = rc.num_lights;
+	CUdeviceptr d_punctual_lights = rc.d_punctual_lights;
+	unsigned int num_punctual_lights = rc.num_punctual_lights;
+	CUdeviceptr d_bilinear_patches = rc.d_bilinear_patches;
+	unsigned int num_bilinear_patches = rc.num_bilinear_patches;
+	CUdeviceptr d_triangles = rc.d_triangles;
+	unsigned int num_triangles = rc.num_triangles;
+	CUdeviceptr d_disks = rc.d_disks;
+	unsigned int num_disks = rc.num_disks;
+	CUdeviceptr d_cylinders = rc.d_cylinders;
+	unsigned int num_cylinders = rc.num_cylinders;
+	float3* d_fbPtr = rc.d_fbPtr;
+
+	// ------------------------------------------------------------------
+	// Phase 3: Evaluate materials (fills shadowQueue + nextRayQueue)
+	// ------------------------------------------------------------------
+	launchEvaluateMaterials(
+		numHits, max_depth, regularize, camera.maxComponentValue,
+		reinterpret_cast<const SphereData*>(d_spheres), num_spheres,
+		reinterpret_cast<const QuadData*>(d_quads),     num_quads,
+		reinterpret_cast<const TriangleData*>(d_triangles), num_triangles,
+		reinterpret_cast<const BilinearPatchData*>(d_bilinear_patches), num_bilinear_patches,
+		reinterpret_cast<const DiskData*>(d_disks), num_disks,
+		reinterpret_cast<const CylinderData*>(d_cylinders), num_cylinders,
+		reinterpret_cast<const MaterialData*>(d_materials), num_materials,
+		reinterpret_cast<const int*>(d_light_indices),
+		reinterpret_cast<const GpuLightKind*>(d_lightKinds),
+		reinterpret_cast<const GpuAliasEntry*>(d_alias_table),
+		num_lights,
+		reinterpret_cast<const PunctualLightGPU*>(d_punctual_lights),
+		num_punctual_lights,
+		d_fbPtr, camera.backgroundColor, camera.shadowRayEpsilon, camera.skyDist, camera.portalLight);
+
+	// ------------------------------------------------------------------
+	// Phase 3b: Evaluate simple materials (Lambertian/Metal hits
+	// routed to simpleHitQueue at push time - see wavefront_types.h's
+	// WavefrontQueues::simpleHitQueue comment). Independent of the
+	// launch above - reads its own queue, writes into the same
+	// shadowQueue/nextRayQueue/framebuffer via the same atomicAdd-
+	// based WorkQueue::push() (safe for concurrent writers) and
+	// disjoint per-pixel framebuffer slots (a ray belongs to exactly
+	// one queue per bounce). Launched on simpleMaterialStream_ (its
+	// own stream, separate from stream_ - see that member's header
+	// comment) so this genuinely overlaps launchEvaluateMaterials
+	// above on the GPU instead of serializing two kernels with no
+	// real dependency on each other - both streams are synced below,
+	// before numMiss/numShadow are read.
+	// ------------------------------------------------------------------
+	launchEvaluateMaterialsSimple(
+		numSimpleHits, max_depth,
+		reinterpret_cast<const SphereData*>(d_spheres), num_spheres,
+		reinterpret_cast<const QuadData*>(d_quads),     num_quads,
+		reinterpret_cast<const TriangleData*>(d_triangles), num_triangles,
+		reinterpret_cast<const BilinearPatchData*>(d_bilinear_patches), num_bilinear_patches,
+		reinterpret_cast<const DiskData*>(d_disks), num_disks,
+		reinterpret_cast<const CylinderData*>(d_cylinders), num_cylinders,
+		reinterpret_cast<const MaterialData*>(d_materials), num_materials,
+		reinterpret_cast<const int*>(d_light_indices),
+		reinterpret_cast<const GpuLightKind*>(d_lightKinds),
+		reinterpret_cast<const GpuAliasEntry*>(d_alias_table),
+		num_lights,
+		reinterpret_cast<const PunctualLightGPU*>(d_punctual_lights),
+		num_punctual_lights,
+		d_fbPtr, camera.backgroundColor, camera.shadowRayEpsilon, camera.skyDist, camera.portalLight, camera.maxComponentValue);
+
+	// ------------------------------------------------------------------
+	// Phase 3c: Evaluate dielectric materials (Dielectric/RoughDielectric
+	// hits routed to dielectricHitQueue at push time - see
+	// wavefront_types.h's WavefrontQueues::dielectricHitQueue comment).
+	// Same independent-queue/own-stream overlap reasoning as Phase 3b
+	// above - launched on dielectricMaterialStream_, synced below
+	// alongside simpleMaterialStream_ before numMiss/numShadow are read.
+	// ------------------------------------------------------------------
+	launchEvaluateMaterialsDielectric(
+		numDielectricHits, max_depth, regularize, camera.maxComponentValue,
+		reinterpret_cast<const SphereData*>(d_spheres), num_spheres,
+		reinterpret_cast<const QuadData*>(d_quads),     num_quads,
+		reinterpret_cast<const TriangleData*>(d_triangles), num_triangles,
+		reinterpret_cast<const BilinearPatchData*>(d_bilinear_patches), num_bilinear_patches,
+		reinterpret_cast<const DiskData*>(d_disks), num_disks,
+		reinterpret_cast<const CylinderData*>(d_cylinders), num_cylinders,
+		reinterpret_cast<const MaterialData*>(d_materials), num_materials,
+		reinterpret_cast<const int*>(d_light_indices),
+		reinterpret_cast<const GpuLightKind*>(d_lightKinds),
+		reinterpret_cast<const GpuAliasEntry*>(d_alias_table),
+		num_lights,
+		reinterpret_cast<const PunctualLightGPU*>(d_punctual_lights),
+		num_punctual_lights,
+		d_fbPtr, camera.backgroundColor, camera.shadowRayEpsilon, camera.skyDist, camera.portalLight);
+
+	// ------------------------------------------------------------------
+	// Phase 4: Accumulate miss (escaped rays → background)
+	// ------------------------------------------------------------------
+	launchAccumulateMiss(numMiss, d_fbPtr, camera.backgroundColor, camera.skyDist, camera.portalLight, camera.maxComponentValue);
+}
+
+// The BSSRDF probe walk and exit resolve for the subsurface hits this bounce queued (skipped when none): the exits append their own NEE shadow rays to the shadow queue.
+void WavefrontPathTracer::runBssrdfProbeStage(RenderCall &rc, WavefrontLaunchParams &lp, int &numProbe, int &numExit) {
+	const auto &camera = rc.camera;
+	const int max_depth = rc.max_depth;
+	const bool regularize = rc.regularize;
+	CUdeviceptr d_materials = rc.d_materials;
+	CUdeviceptr d_spheres = rc.d_spheres;
+	CUdeviceptr d_quads = rc.d_quads;
+	CUdeviceptr d_light_indices = rc.d_light_indices;
+	CUdeviceptr d_lightKinds = rc.d_lightKinds;
+	CUdeviceptr d_alias_table = rc.d_alias_table;
+	unsigned int num_materials = rc.num_materials;
+	unsigned int num_spheres = rc.num_spheres;
+	unsigned int num_quads = rc.num_quads;
+	unsigned int num_lights = rc.num_lights;
+	CUdeviceptr d_punctual_lights = rc.d_punctual_lights;
+	unsigned int num_punctual_lights = rc.num_punctual_lights;
+	CUdeviceptr d_bilinear_patches = rc.d_bilinear_patches;
+	unsigned int num_bilinear_patches = rc.num_bilinear_patches;
+	CUdeviceptr d_triangles = rc.d_triangles;
+	unsigned int num_triangles = rc.num_triangles;
+	CUdeviceptr d_disks = rc.d_disks;
+	unsigned int num_disks = rc.num_disks;
+	CUdeviceptr d_cylinders = rc.d_cylinders;
+	unsigned int num_cylinders = rc.num_cylinders;
+	float3* d_fbPtr = rc.d_fbPtr;
+
+	numProbe = readQueueSize(reinterpret_cast<int*>(d_probeCounter_));
+	if (numProbe > 0) {
+		lp.bssrdfProbeQueue.items    = reinterpret_cast<BssrdfProbeWorkItem*>(d_probeItems_);
+		lp.bssrdfProbeQueue.counter  = reinterpret_cast<int*>(d_probeCounter_);
+		lp.bssrdfProbeQueue.capacity = queueCapacity_;
+
+		lp.bssrdfExitQueue.items    = reinterpret_cast<BssrdfExitWorkItem*>(d_exitItems_);
+		lp.bssrdfExitQueue.counter  = reinterpret_cast<int*>(d_exitCounter_);
+		lp.bssrdfExitQueue.capacity = queueCapacity_;
+
+		CUDA_CHECK(cudaMemcpyAsync(reinterpret_cast<void*>(d_wfLaunchParams_), &lp,
+								   sizeof(WavefrontLaunchParams), cudaMemcpyHostToDevice, stream_));
+
+		OPTIX_CHECK(optixLaunch(
+			intersectPipeline_, stream_,
+			d_wfLaunchParams_, sizeof(WavefrontLaunchParams),
+			&probeSBT_,
+			(unsigned int)numProbe, 1, 1));
+
+		CUDA_CHECK(cudaStreamSynchronize(stream_));
+
+		numExit = readQueueSize(reinterpret_cast<int*>(d_exitCounter_));
+		launchResolveBssrdfExit(
+			numExit,
+			reinterpret_cast<const MaterialData*>(d_materials), num_materials,
+			reinterpret_cast<const SphereData*>(d_spheres), num_spheres,
+			reinterpret_cast<const QuadData*>(d_quads), num_quads,
+			reinterpret_cast<const TriangleData*>(d_triangles), num_triangles,
+			reinterpret_cast<const BilinearPatchData*>(d_bilinear_patches), num_bilinear_patches,
+			reinterpret_cast<const DiskData*>(d_disks), num_disks,
+			reinterpret_cast<const CylinderData*>(d_cylinders), num_cylinders,
+			reinterpret_cast<const int*>(d_light_indices),
+			reinterpret_cast<const GpuLightKind*>(d_lightKinds),
+			reinterpret_cast<const GpuAliasEntry*>(d_alias_table),
+			num_lights,
+			reinterpret_cast<const PunctualLightGPU*>(d_punctual_lights),
+			num_punctual_lights,
+			d_fbPtr, camera.backgroundColor, camera.shadowRayEpsilon, camera.skyDist, camera.portalLight, camera.maxComponentValue);
+
+		CUDA_CHECK(cudaStreamSynchronize(stream_));
+	}
+}
+
+// The shadow rays this bounce queued: the occlusion launch, then the accumulation of the unoccluded contributions. Returns how many there were.
+int WavefrontPathTracer::runShadowStage(RenderCall &rc, WavefrontLaunchParams &lp) {
+	const auto &camera = rc.camera;
+	float3* d_fbPtr = rc.d_fbPtr;
+
+	int numShadow = readQueueSize(reinterpret_cast<int*>(d_shadowCounter_));
+
+	// ------------------------------------------------------------------
+	// Phase 5: OptiX shadow launch (determine occlusion)
+	// ------------------------------------------------------------------
+	if (numShadow > 0) {
+		// Store shadow queue pointers in lp for the shadow raygen.
+		lp.shadowQueue.items    = reinterpret_cast<ShadowRayWorkItem*>(d_shadowItems_);
+		lp.shadowQueue.counter  = reinterpret_cast<int*>(d_shadowCounter_);
+		lp.shadowQueue.capacity = shadowQueueCapacity_;
+
+		// Temporarily point framebuffer to the transmittance float
+		// array so __raygen__wf_shadow can write results there.
+		// (The kernel casts (float*)wf_params.framebuffer.)
+		WavefrontLaunchParams shadowLP = lp;
+		shadowLP.framebuffer = reinterpret_cast<float3*>(d_transmittance_);
+
+		CUDA_CHECK(cudaMemcpyAsync(reinterpret_cast<void*>(d_wfLaunchParams_), &shadowLP,
+								   sizeof(WavefrontLaunchParams),
+								   cudaMemcpyHostToDevice, stream_));
+
+		OPTIX_CHECK(optixLaunch(
+			shadowPipeline_, stream_,
+			d_wfLaunchParams_, sizeof(WavefrontLaunchParams),
+			&shadowSBT_,
+			(unsigned int)numShadow, 1, 1));
+
+		CUDA_CHECK(cudaStreamSynchronize(stream_));
+
+		// ------------------------------------------------------------------
+		// Phase 6: Accumulate shadow contributions
+		// ------------------------------------------------------------------
+		launchAccumulateShadow(numShadow,
+							   reinterpret_cast<const float*>(d_transmittance_),
+							   d_fbPtr, camera.maxComponentValue);
+		CUDA_CHECK(cudaStreamSynchronize(stream_));
+	}
+}
+
 void WavefrontPathTracer::renderSampleLoop(RenderCall &rc) {
 	int width = rc.width;
 	int height = rc.height;
@@ -838,190 +1063,18 @@ void WavefrontPathTracer::renderSampleLoop(RenderCall &rc) {
 			stats.dielectricHits += numDielectricHits;
 			stats.misses += numMiss;
 
-			// ------------------------------------------------------------------
-			// Phase 3: Evaluate materials (fills shadowQueue + nextRayQueue)
-			// ------------------------------------------------------------------
-			launchEvaluateMaterials(
-				numHits, max_depth, regularize, camera.maxComponentValue,
-				reinterpret_cast<const SphereData*>(d_spheres), num_spheres,
-				reinterpret_cast<const QuadData*>(d_quads),     num_quads,
-				reinterpret_cast<const TriangleData*>(d_triangles), num_triangles,
-				reinterpret_cast<const BilinearPatchData*>(d_bilinear_patches), num_bilinear_patches,
-				reinterpret_cast<const DiskData*>(d_disks), num_disks,
-				reinterpret_cast<const CylinderData*>(d_cylinders), num_cylinders,
-				reinterpret_cast<const MaterialData*>(d_materials), num_materials,
-				reinterpret_cast<const int*>(d_light_indices),
-				reinterpret_cast<const GpuLightKind*>(d_lightKinds),
-				reinterpret_cast<const GpuAliasEntry*>(d_alias_table),
-				num_lights,
-				reinterpret_cast<const PunctualLightGPU*>(d_punctual_lights),
-				num_punctual_lights,
-				d_fbPtr, camera.backgroundColor, camera.shadowRayEpsilon, camera.skyDist, camera.portalLight);
-
-			// ------------------------------------------------------------------
-			// Phase 3b: Evaluate simple materials (Lambertian/Metal hits
-			// routed to simpleHitQueue at push time - see wavefront_types.h's
-			// WavefrontQueues::simpleHitQueue comment). Independent of the
-			// launch above - reads its own queue, writes into the same
-			// shadowQueue/nextRayQueue/framebuffer via the same atomicAdd-
-			// based WorkQueue::push() (safe for concurrent writers) and
-			// disjoint per-pixel framebuffer slots (a ray belongs to exactly
-			// one queue per bounce). Launched on simpleMaterialStream_ (its
-			// own stream, separate from stream_ - see that member's header
-			// comment) so this genuinely overlaps launchEvaluateMaterials
-			// above on the GPU instead of serializing two kernels with no
-			// real dependency on each other - both streams are synced below,
-			// before numMiss/numShadow are read.
-			// ------------------------------------------------------------------
-			launchEvaluateMaterialsSimple(
-				numSimpleHits, max_depth,
-				reinterpret_cast<const SphereData*>(d_spheres), num_spheres,
-				reinterpret_cast<const QuadData*>(d_quads),     num_quads,
-				reinterpret_cast<const TriangleData*>(d_triangles), num_triangles,
-				reinterpret_cast<const BilinearPatchData*>(d_bilinear_patches), num_bilinear_patches,
-				reinterpret_cast<const DiskData*>(d_disks), num_disks,
-				reinterpret_cast<const CylinderData*>(d_cylinders), num_cylinders,
-				reinterpret_cast<const MaterialData*>(d_materials), num_materials,
-				reinterpret_cast<const int*>(d_light_indices),
-				reinterpret_cast<const GpuLightKind*>(d_lightKinds),
-				reinterpret_cast<const GpuAliasEntry*>(d_alias_table),
-				num_lights,
-				reinterpret_cast<const PunctualLightGPU*>(d_punctual_lights),
-				num_punctual_lights,
-				d_fbPtr, camera.backgroundColor, camera.shadowRayEpsilon, camera.skyDist, camera.portalLight, camera.maxComponentValue);
-
-			// ------------------------------------------------------------------
-			// Phase 3c: Evaluate dielectric materials (Dielectric/RoughDielectric
-			// hits routed to dielectricHitQueue at push time - see
-			// wavefront_types.h's WavefrontQueues::dielectricHitQueue comment).
-			// Same independent-queue/own-stream overlap reasoning as Phase 3b
-			// above - launched on dielectricMaterialStream_, synced below
-			// alongside simpleMaterialStream_ before numMiss/numShadow are read.
-			// ------------------------------------------------------------------
-			launchEvaluateMaterialsDielectric(
-				numDielectricHits, max_depth, regularize, camera.maxComponentValue,
-				reinterpret_cast<const SphereData*>(d_spheres), num_spheres,
-				reinterpret_cast<const QuadData*>(d_quads),     num_quads,
-				reinterpret_cast<const TriangleData*>(d_triangles), num_triangles,
-				reinterpret_cast<const BilinearPatchData*>(d_bilinear_patches), num_bilinear_patches,
-				reinterpret_cast<const DiskData*>(d_disks), num_disks,
-				reinterpret_cast<const CylinderData*>(d_cylinders), num_cylinders,
-				reinterpret_cast<const MaterialData*>(d_materials), num_materials,
-				reinterpret_cast<const int*>(d_light_indices),
-				reinterpret_cast<const GpuLightKind*>(d_lightKinds),
-				reinterpret_cast<const GpuAliasEntry*>(d_alias_table),
-				num_lights,
-				reinterpret_cast<const PunctualLightGPU*>(d_punctual_lights),
-				num_punctual_lights,
-				d_fbPtr, camera.backgroundColor, camera.shadowRayEpsilon, camera.skyDist, camera.portalLight);
-
-			// ------------------------------------------------------------------
-			// Phase 4: Accumulate miss (escaped rays → background)
-			// ------------------------------------------------------------------
-			launchAccumulateMiss(numMiss, d_fbPtr, camera.backgroundColor, camera.skyDist, camera.portalLight, camera.maxComponentValue);
+			evaluateBounceMaterials(rc, numHits, numSimpleHits, numDielectricHits, numMiss);
 
 			CUDA_CHECK(cudaStreamSynchronize(stream_));
 			CUDA_CHECK(cudaStreamSynchronize(simpleMaterialStream_));
 			CUDA_CHECK(cudaStreamSynchronize(dielectricMaterialStream_));
 
-			// ------------------------------------------------------------------
-			// Phase 4b: BSSRDF probe walk + exit resolve (MaterialType::
-			// Subsurface, Phase 2) - mirrors pbrt-v4's own SampleSubsurface
-			// dedicated stage, called once per bounce depth right after
-			// evaluate_materials (which queued any Subsurface-transmission
-			// hits this bounce into bssrdfProbeQueue instead of scattering
-			// them directly - see wavefront_types.h's BssrdfProbeWorkItem
-			// comment). Skipped entirely (both the extra optixLaunch and the
-			// CUDA kernel) when nothing was queued - the overwhelming
-			// majority of bounces on the overwhelming majority of scenes,
-			// since Subsurface materials are rare. Must run BEFORE the
-			// numShadow read below: resolve_bssrdf_exit() (wavefront_kernels.cu)
-			// appends its own NEE shadow rays into the SAME shadowQueue
-			// evaluate_materials already wrote to, so they need to be
-			// counted before the shadow pass launches.
-			// ------------------------------------------------------------------
-			int numProbe = readQueueSize(reinterpret_cast<int*>(d_probeCounter_));
+			int numProbe = 0, numExit = 0;
+			runBssrdfProbeStage(rc, lp, numProbe, numExit);
 			stats.probeRays += numProbe;
-			if (numProbe > 0) {
-				lp.bssrdfProbeQueue.items    = reinterpret_cast<BssrdfProbeWorkItem*>(d_probeItems_);
-				lp.bssrdfProbeQueue.counter  = reinterpret_cast<int*>(d_probeCounter_);
-				lp.bssrdfProbeQueue.capacity = queueCapacity_;
+			stats.probeExits += numExit;
 
-				lp.bssrdfExitQueue.items    = reinterpret_cast<BssrdfExitWorkItem*>(d_exitItems_);
-				lp.bssrdfExitQueue.counter  = reinterpret_cast<int*>(d_exitCounter_);
-				lp.bssrdfExitQueue.capacity = queueCapacity_;
-
-				CUDA_CHECK(cudaMemcpyAsync(reinterpret_cast<void*>(d_wfLaunchParams_), &lp,
-										   sizeof(WavefrontLaunchParams), cudaMemcpyHostToDevice, stream_));
-
-				OPTIX_CHECK(optixLaunch(
-					intersectPipeline_, stream_,
-					d_wfLaunchParams_, sizeof(WavefrontLaunchParams),
-					&probeSBT_,
-					(unsigned int)numProbe, 1, 1));
-
-				CUDA_CHECK(cudaStreamSynchronize(stream_));
-
-				int numExit = readQueueSize(reinterpret_cast<int*>(d_exitCounter_));
-				stats.probeExits += numExit;
-				launchResolveBssrdfExit(
-					numExit,
-					reinterpret_cast<const MaterialData*>(d_materials), num_materials,
-					reinterpret_cast<const SphereData*>(d_spheres), num_spheres,
-					reinterpret_cast<const QuadData*>(d_quads), num_quads,
-					reinterpret_cast<const TriangleData*>(d_triangles), num_triangles,
-					reinterpret_cast<const BilinearPatchData*>(d_bilinear_patches), num_bilinear_patches,
-					reinterpret_cast<const DiskData*>(d_disks), num_disks,
-					reinterpret_cast<const CylinderData*>(d_cylinders), num_cylinders,
-					reinterpret_cast<const int*>(d_light_indices),
-					reinterpret_cast<const GpuLightKind*>(d_lightKinds),
-					reinterpret_cast<const GpuAliasEntry*>(d_alias_table),
-					num_lights,
-					reinterpret_cast<const PunctualLightGPU*>(d_punctual_lights),
-					num_punctual_lights,
-					d_fbPtr, camera.backgroundColor, camera.shadowRayEpsilon, camera.skyDist, camera.portalLight, camera.maxComponentValue);
-
-				CUDA_CHECK(cudaStreamSynchronize(stream_));
-			}
-
-			int numShadow = readQueueSize(reinterpret_cast<int*>(d_shadowCounter_));
-			stats.shadowRays += numShadow;
-
-			// ------------------------------------------------------------------
-			// Phase 5: OptiX shadow launch (determine occlusion)
-			// ------------------------------------------------------------------
-			if (numShadow > 0) {
-				// Store shadow queue pointers in lp for the shadow raygen.
-				lp.shadowQueue.items    = reinterpret_cast<ShadowRayWorkItem*>(d_shadowItems_);
-				lp.shadowQueue.counter  = reinterpret_cast<int*>(d_shadowCounter_);
-				lp.shadowQueue.capacity = shadowQueueCapacity_;
-
-				// Temporarily point framebuffer to the transmittance float
-				// array so __raygen__wf_shadow can write results there.
-				// (The kernel casts (float*)wf_params.framebuffer.)
-				WavefrontLaunchParams shadowLP = lp;
-				shadowLP.framebuffer = reinterpret_cast<float3*>(d_transmittance_);
-
-				CUDA_CHECK(cudaMemcpyAsync(reinterpret_cast<void*>(d_wfLaunchParams_), &shadowLP,
-										   sizeof(WavefrontLaunchParams),
-										   cudaMemcpyHostToDevice, stream_));
-
-				OPTIX_CHECK(optixLaunch(
-					shadowPipeline_, stream_,
-					d_wfLaunchParams_, sizeof(WavefrontLaunchParams),
-					&shadowSBT_,
-					(unsigned int)numShadow, 1, 1));
-
-				CUDA_CHECK(cudaStreamSynchronize(stream_));
-
-				// ------------------------------------------------------------------
-				// Phase 6: Accumulate shadow contributions
-				// ------------------------------------------------------------------
-				launchAccumulateShadow(numShadow,
-									   reinterpret_cast<const float*>(d_transmittance_),
-									   d_fbPtr, camera.maxComponentValue);
-				CUDA_CHECK(cudaStreamSynchronize(stream_));
-			}
+			stats.shadowRays += runShadowStage(rc, lp);
 
 			// ReSTIR GI finalize (see wavefront_kernels_restir.cu's own
 			// restir_gi_finalize header comment) - runs once per SAMPLE,

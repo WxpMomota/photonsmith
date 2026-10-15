@@ -939,6 +939,234 @@ static void apply_loaded_scene_settings(const char* path,
 
 }
 
+// The focus distance and the defocus angle of a loaded scene's camera: its own (pbrt's lensradius and focusdistance), or the Live Preview/flythrough depth-of-field
+// override on top. (Computed before the caller decides whether there is any depth of field at all, so the override can both add DOF to a pinhole scene and
+// change or remove the scene's own.)
+static void loaded_camera_focus_and_defocus(const pbrt_flatten::Camera& c, bool has_dof_override, double aperture_override, double focus_distance_override,
+											 float& focus_dist_world, float& defocus_angle_deg) {
+	focus_dist_world = static_cast<float>(pbrt_flatten::focusDistanceFor(c));
+	defocus_angle_deg = static_cast<float>(
+		pbrt_flatten::defocusAngleDegreesFor(c, focus_dist_world));
+	// Depth-of-field override - computed BEFORE the "if (defocus_angle_deg
+	// > 0.0f)" gate below so the override can both ADD DOF to a pinhole
+	// scene and change/remove DOF on a scene that already has its own -
+	// see this project's own DOF plan.
+	if (has_dof_override) {
+		if (focus_distance_override > 0.0) focus_dist_world = static_cast<float>(focus_distance_override);
+		if (aperture_override >= 0.0) {
+			const double lens_radius = aperture_override * 0.5;
+			defocus_angle_deg = (lens_radius > 0.0 && focus_dist_world > 0.0)
+				? static_cast<float>(2.0 * std::atan(lens_radius / static_cast<double>(focus_dist_world)) * 180.0 / 3.14159265358979323846)
+				: 0.0f;
+		} else if (focus_distance_override > 0.0) {
+			// Aperture untouched but focus distance changed - the defocus
+			// angle depends on both, so recompute it for the NEW focus
+			// distance using the scene's OWN aperture (c.aperture) rather
+			// than silently scaling the effective aperture. Reuses
+			// defocusAngleDegreesFor() directly instead of duplicating its
+			// formula a second time (unlike the aperture-override branch
+			// above, which has no Camera object to call it on for an
+			// arbitrary override aperture).
+			defocus_angle_deg = static_cast<float>(pbrt_flatten::defocusAngleDegreesFor(c, focus_dist_world));
+		}
+	}
+}
+
+// A perspective camera for a loaded scene: the pinhole, or (a nonzero defocus angle) the thin-lens one with the defocus disk the optix_interface.cpp generic
+// camera fallback does not set up.
+static void setup_loaded_perspective_camera(const float3& lookfrom, const float3& lookat, const float3& vup, float vfovUsed, float aspect, float focus_dist_world,
+											 float defocus_angle_deg, const float* screenWindowPtr, bool leftHanded, float* camera_params, GpuCameraParams* out_camera_extra) {
+	if (defocus_angle_deg > 0.0f) {
+		float3 dof_u, dof_v;
+		build_pinhole_camera_params(
+			lookfrom, lookat, vup, vfovUsed, aspect,
+			focus_dist_world, camera_params, &dof_u, &dof_v, nullptr, screenWindowPtr, leftHanded);
+		if (out_camera_extra) {
+			// A nonzero defocus disk opts this scene out of
+			// optix_interface.cpp's generic camera_params->cameraExtra
+			// fallback (see CameraKind::Perspective's own comment there), so
+			// kind/origin/lower_left_corner/horizontal/vertical must be set
+			// explicitly here too - same full set case 1/the generic pbrt
+			// Depth-of-Field (D1) path set.
+			out_camera_extra->kind = CameraKind::Perspective;
+			out_camera_extra->origin = lookfrom;
+			out_camera_extra->lower_left_corner = make_float3(camera_params[3], camera_params[4], camera_params[5]);
+			out_camera_extra->horizontal = make_float3(camera_params[6], camera_params[7], camera_params[8]);
+			out_camera_extra->vertical = make_float3(camera_params[9], camera_params[10], camera_params[11]);
+
+			constexpr float kPi = 3.14159265358979323846f;
+			const float defocus_radius = focus_dist_world * tanf((defocus_angle_deg * kPi / 180.0f) / 2.0f);
+			out_camera_extra->defocus_disk_u = make_float3(dof_u.x * defocus_radius, dof_u.y * defocus_radius, dof_u.z * defocus_radius);
+			out_camera_extra->defocus_disk_v = make_float3(dof_v.x * defocus_radius, dof_v.y * defocus_radius, dof_v.z * defocus_radius);
+		}
+	} else {
+		build_pinhole_camera_params(
+			lookfrom, lookat, vup, vfovUsed, aspect,
+			1.0f, camera_params, nullptr, nullptr, nullptr, screenWindowPtr, leftHanded);
+	}
+}
+
+// A loaded scene's orthographic camera, from its own lookfrom/lookat/up/screenwindow (mirrors case 32's math in build_scene()).
+static void setup_loaded_orthographic_camera(const pbrt_flatten::Camera& c, GpuCameraParams* out_camera_extra, int image_width, int image_height,
+											  const float3& lookfrom, const float3& lookat, const float3& vup) {
+	// Mirrors case 32's own math (scene_builder.cpp, build_scene()),
+	// just driven by this scene's own lookfrom/lookat/up/screenwindow
+	// instead of a hardcoded built-in-scene camera.
+	float xmin, xmax, ymin, ymax;
+	if (c.hasScreenWindow) {
+		xmin = static_cast<float>(c.screenWindow[0]);
+		xmax = static_cast<float>(c.screenWindow[1]);
+		ymin = static_cast<float>(c.screenWindow[2]);
+		ymax = static_cast<float>(c.screenWindow[3]);
+	} else {
+		compute_screen_window<float>(image_width, image_height, xmin, xmax, ymin, ymax);
+	}
+	const float3 w = normalize(make_float3(lookfrom.x - lookat.x, lookfrom.y - lookat.y, lookfrom.z - lookat.z));
+	// pbrt-v4's own (left-handed) LookAt basis, matching CPU's
+	// OrthographicCamera (src/shared/cameras.h, built from
+	// make_look_at) and this same file's spherical/realistic cases
+	// below: right = cross(up, forward) = cross(w, up) (forward = -w),
+	// up' = cross(right, w). This block previously used the RTiOW
+	// perspective basis (u = cross(up, w), the NEGATIVE of this), which
+	// mirrored every GPU orthographic render left-to-right relative to
+	// CPU - found by the Phase 2 Cameras-category sweep (D6, see
+	// tests/integration/material_cpu_gpu_parity_tests.cpp).
+	const float3 u = normalize(cross(w, vup));
+	const float3 v = cross(u, w);
+	const float3 horizontal = make_float3((xmax - xmin) * u.x, (xmax - xmin) * u.y, (xmax - xmin) * u.z);
+	const float3 vertical   = make_float3((ymax - ymin) * v.x, (ymax - ymin) * v.y, (ymax - ymin) * v.z);
+	const float3 lower_left_corner = make_float3(
+		lookfrom.x + xmin * u.x + ymin * v.x,
+		lookfrom.y + xmin * u.y + ymin * v.y,
+		lookfrom.z + xmin * u.z + ymin * v.z);
+	out_camera_extra->kind = CameraKind::Orthographic;
+	out_camera_extra->lower_left_corner = lower_left_corner;
+	out_camera_extra->horizontal = horizontal;
+	out_camera_extra->vertical = vertical;
+	out_camera_extra->w = make_float3(-w.x, -w.y, -w.z);
+}
+
+// A loaded scene's realistic (lens system) camera: the lens tables (cached - building them traces thousands of rays) and the world-space basis of the current camera.
+static void setup_loaded_realistic_camera(const char* path, const pbrt_flatten::Camera& c, SceneData& scene, GpuCameraParams* out_camera_extra, int image_width, int image_height,
+											 const float3& lookfrom, const float3& lookat, const float3& vup) {
+	// c.lensFile is guaranteed non-empty here - pbrt_flatten.h already
+	// fell back to "perspective" at flatten() time if the scene gave
+	// none (see Camera's own comment). A missing/malformed file on
+	// disk is still possible and only detectable here, where actual
+	// file access happens.
+	//
+	// The expensive part - RealisticCamera's constructor, which
+	// traces 64 slabs x 1024 samples of real lens-refraction rays to
+	// bound the exit pupil per element (bound_exit_pupil(),
+	// realistic_camera.h) - depends only on the LENS SYSTEM (lens
+	// data, half-film-extents, focus distance, aperture diameter),
+	// never on camera_to_world (confirmed by reading that class:
+	// camera_to_world_ is only ever read by world_origin/right/up/
+	// forward() and generate_ray(), never by the constructor or the
+	// exit-pupil-bounding it does). This function reruns on every
+	// Live Preview frame the camera moves, so - like every other
+	// expensive per-triangle/per-file cost in this file - the lens
+	// system's own build output (lensElements/exitPupilBounds/
+	// filmHalf{X,Y}/lensRearZ) is cached here, keyed by everything
+	// that determines it; only the cheap world-space basis vectors
+	// (a plain 4x3 matrix-transform of the CURRENT ctw, computed
+	// fresh below without needing a RealisticCamera object at all -
+	// the identical math world_origin()/etc. themselves wrap) still
+	// depend on the moving camera and are recomputed every call.
+	struct RealisticCameraLensData {
+		std::vector<GpuLensElement> lensElements;
+		std::vector<GpuExitPupilBounds> exitPupilBounds;
+		float filmHalfX = 0.0f, filmHalfY = 0.0f, lensRearZ = 0.0f;
+	};
+	static std::unordered_map<std::string, RealisticCameraLensData> s_realisticLensCache;
+	static std::mutex s_realisticLensCacheMutex;
+
+	const float aspectF = (image_height > 0)
+		? static_cast<float>(image_width) / static_cast<float>(image_height) : 1.0f;
+	const float halfY = static_cast<float>(c.filmDiagonalMM) / (2.0f * std::sqrt(aspectF * aspectF + 1.0f));
+	const float halfX = aspectF * halfY;
+	const float focusDist = static_cast<float>(pbrt_flatten::focusDistanceFor(c));
+	const float apertureDiameter = static_cast<float>(c.apertureDiameterMM);
+	const std::string lensCacheKey = std::string(path) + "|" + c.lensFile +
+		"|hx" + float_bits_key(halfX) + "|hy" + float_bits_key(halfY) +
+		"|fd" + float_bits_key(focusDist) + "|ap" + float_bits_key(apertureDiameter);
+
+	bool lensFileMissing = false, lensFileEmpty = false;
+	const RealisticCameraLensData* lensData = get_or_build_cached(
+		s_realisticLensCache, s_realisticLensCacheMutex, lensCacheKey,
+		[&](RealisticCameraLensData& out) -> bool {
+			std::string lensText;
+			if (!pbrt_load::loadFileNear(path, c.lensFile, lensText)) {
+				lensFileMissing = true;
+				return false;
+			}
+			const std::vector<double> lensD = pbrt_load::parseLensFile(lensText);
+			if (lensD.empty()) {
+				lensFileEmpty = true;
+				return false;
+			}
+			std::vector<float> lens;
+			lens.reserve(lensD.size());
+			for (double v : lensD) lens.push_back(static_cast<float>(v));
+			// ctw doesn't matter here - identity is fine, since none
+			// of the fields read below depend on it (see this
+			// block's own comment above).
+			RealisticCamera<float> realCam(Mat4<float>{}, halfX, halfY, focusDist, apertureDiameter, lens);
+			for (int i = 0; i < realCam.num_elements(); ++i) {
+				GpuLensElement le{};
+				le.curvatureRadius = realCam.lens_curvature_radius(i);
+				le.thickness       = realCam.lens_thickness(i);
+				le.eta              = realCam.lens_eta(i);
+				le.apertureRadius   = realCam.lens_aperture_radius(i);
+				out.lensElements.push_back(le);
+			}
+			for (int i = 0; i < realCam.num_exit_pupil_bounds(); ++i) {
+				GpuExitPupilBounds b{};
+				b.xMin = realCam.exit_pupil_xmin(i);
+				b.xMax = realCam.exit_pupil_xmax(i);
+				b.yMin = realCam.exit_pupil_ymin(i);
+				b.yMax = realCam.exit_pupil_ymax(i);
+				b.degenerate = realCam.exit_pupil_degenerate(i) ? 1 : 0;
+				out.exitPupilBounds.push_back(b);
+			}
+			out.filmHalfX = realCam.film_half_x();
+			out.filmHalfY = realCam.film_half_y();
+			out.lensRearZ = realCam.lens_rear_z();
+			return true;
+		});
+
+	if (lensFileMissing) {
+		std::cerr << "[OptiX] warning: " << path << ": realistic camera lensfile '"
+			  << c.lensFile << "' not found; rendering as perspective instead\n";
+	} else if (lensFileEmpty) {
+		std::cerr << "[OptiX] warning: " << path << ": realistic camera lensfile '"
+			  << c.lensFile << "' has no usable rows; rendering as perspective instead\n";
+	} else if (lensData) {
+		scene.lensElements = lensData->lensElements;
+		scene.exitPupilBounds = lensData->exitPupilBounds;
+
+		const Mat4<float> ctw = make_look_at<float>(
+			lookfrom.x, lookfrom.y, lookfrom.z,
+			lookat.x, lookat.y, lookat.z,
+			vup.x, vup.y, vup.z);
+		const CamVec3<float> wo = ctw.transform_point(0.0f, 0.0f, 0.0f);
+		const CamVec3<float> wr = ctw.transform_vec(1.0f, 0.0f, 0.0f);
+		const CamVec3<float> wu = ctw.transform_vec(0.0f, 1.0f, 0.0f);
+		const CamVec3<float> wf = ctw.transform_vec(0.0f, 0.0f, 1.0f);
+
+		out_camera_extra->kind = CameraKind::Realistic;
+		out_camera_extra->origin = make_float3(wo.x, wo.y, wo.z);
+		out_camera_extra->su = make_float3(wr.x, wr.y, wr.z);
+		out_camera_extra->sv = make_float3(wu.x, wu.y, wu.z);
+		out_camera_extra->sw = make_float3(wf.x, wf.y, wf.z);
+		out_camera_extra->film_half_x = lensData->filmHalfX;
+		out_camera_extra->film_half_y = lensData->filmHalfY;
+		out_camera_extra->lens_rear_z = lensData->lensRearZ;
+		out_camera_extra->numLensElements = static_cast<int>(scene.lensElements.size());
+		out_camera_extra->numExitPupilBounds = static_cast<int>(scene.exitPupilBounds.size());
+	}
+}
+
 /// @brief Build a scene and configure the camera
 /// @param scene_id Scene identifier, category letter + number ("A1" = Cornell Box)
 /// @param image_width Output image width in pixels
@@ -1141,32 +1369,8 @@ static bool build_loaded_pbrt_scene(
 	// scene keeps the prior focus_dist=1.0f/no-DOF behavior untouched (see
 	// build_pinhole_camera_params's own viewport-scaling comment this
 	// replaces for why 1.0f, not a real distance, is deliberate there).
-	float focus_dist_world = static_cast<float>(pbrt_flatten::focusDistanceFor(c));
-	float defocus_angle_deg = static_cast<float>(
-		pbrt_flatten::defocusAngleDegreesFor(c, focus_dist_world));
-	// Depth-of-field override - computed BEFORE the "if (defocus_angle_deg
-	// > 0.0f)" gate below so the override can both ADD DOF to a pinhole
-	// scene and change/remove DOF on a scene that already has its own -
-	// see this project's own DOF plan.
-	if (has_dof_override) {
-		if (focus_distance_override > 0.0) focus_dist_world = static_cast<float>(focus_distance_override);
-		if (aperture_override >= 0.0) {
-			const double lens_radius = aperture_override * 0.5;
-			defocus_angle_deg = (lens_radius > 0.0 && focus_dist_world > 0.0)
-				? static_cast<float>(2.0 * std::atan(lens_radius / static_cast<double>(focus_dist_world)) * 180.0 / 3.14159265358979323846)
-				: 0.0f;
-		} else if (focus_distance_override > 0.0) {
-			// Aperture untouched but focus distance changed - the defocus
-			// angle depends on both, so recompute it for the NEW focus
-			// distance using the scene's OWN aperture (c.aperture) rather
-			// than silently scaling the effective aperture. Reuses
-			// defocusAngleDegreesFor() directly instead of duplicating its
-			// formula a second time (unlike the aperture-override branch
-			// above, which has no Camera object to call it on for an
-			// arbitrary override aperture).
-			defocus_angle_deg = static_cast<float>(pbrt_flatten::defocusAngleDegreesFor(c, focus_dist_world));
-		}
-	}
+	float focus_dist_world = 0.0f, defocus_angle_deg = 0.0f;
+	loaded_camera_focus_and_defocus(c, has_dof_override, aperture_override, focus_distance_override, focus_dist_world, defocus_angle_deg);
 	// Camera motion blur (pbrt-v4's real ActiveTransform "StartTime"/
 	// "EndTime" idiom, c.isAnimated - see pbrt_flatten::Camera::isAnimated's
 	// own comment). Perspective-only, matching CPU's camera_is_animated
@@ -1220,34 +1424,7 @@ static bool build_loaded_pbrt_scene(
 		sw[3] = static_cast<float>(c.screenWindow[3]);
 		screenWindowPtr = sw;
 	}
-	if (defocus_angle_deg > 0.0f) {
-		float3 dof_u, dof_v;
-		build_pinhole_camera_params(
-			lookfrom, lookat, vup, vfovUsed, aspect,
-			focus_dist_world, camera_params, &dof_u, &dof_v, nullptr, screenWindowPtr, c.leftHanded);
-		if (out_camera_extra) {
-			// A nonzero defocus disk opts this scene out of
-			// optix_interface.cpp's generic camera_params->cameraExtra
-			// fallback (see CameraKind::Perspective's own comment there), so
-			// kind/origin/lower_left_corner/horizontal/vertical must be set
-			// explicitly here too - same full set case 1/the generic pbrt
-			// Depth-of-Field (D1) path set.
-			out_camera_extra->kind = CameraKind::Perspective;
-			out_camera_extra->origin = lookfrom;
-			out_camera_extra->lower_left_corner = make_float3(camera_params[3], camera_params[4], camera_params[5]);
-			out_camera_extra->horizontal = make_float3(camera_params[6], camera_params[7], camera_params[8]);
-			out_camera_extra->vertical = make_float3(camera_params[9], camera_params[10], camera_params[11]);
-
-			constexpr float kPi = 3.14159265358979323846f;
-			const float defocus_radius = focus_dist_world * tanf((defocus_angle_deg * kPi / 180.0f) / 2.0f);
-			out_camera_extra->defocus_disk_u = make_float3(dof_u.x * defocus_radius, dof_u.y * defocus_radius, dof_u.z * defocus_radius);
-			out_camera_extra->defocus_disk_v = make_float3(dof_v.x * defocus_radius, dof_v.y * defocus_radius, dof_v.z * defocus_radius);
-		}
-	} else {
-		build_pinhole_camera_params(
-			lookfrom, lookat, vup, vfovUsed, aspect,
-			1.0f, camera_params, nullptr, nullptr, nullptr, screenWindowPtr, c.leftHanded);
-	}
+	setup_loaded_perspective_camera(lookfrom, lookat, vup, vfovUsed, aspect, focus_dist_world, defocus_angle_deg, screenWindowPtr, c.leftHanded, camera_params, out_camera_extra);
 
 	// Route non-perspective Camera directives to their GPU camera model, the
 	// same generic, data-driven way CPU's setup_camera lambda does (see
@@ -1255,41 +1432,7 @@ static bool build_loaded_pbrt_scene(
 	// the fallback optix_interface.cpp uses when kind ends up Perspective.
 	if (out_camera_extra && c.type != "perspective") {
 		if (c.type == "orthographic") {
-			// Mirrors case 32's own math (scene_builder.cpp, build_scene()),
-			// just driven by this scene's own lookfrom/lookat/up/screenwindow
-			// instead of a hardcoded built-in-scene camera.
-			float xmin, xmax, ymin, ymax;
-			if (c.hasScreenWindow) {
-				xmin = static_cast<float>(c.screenWindow[0]);
-				xmax = static_cast<float>(c.screenWindow[1]);
-				ymin = static_cast<float>(c.screenWindow[2]);
-				ymax = static_cast<float>(c.screenWindow[3]);
-			} else {
-				compute_screen_window<float>(image_width, image_height, xmin, xmax, ymin, ymax);
-			}
-			const float3 w = normalize(make_float3(lookfrom.x - lookat.x, lookfrom.y - lookat.y, lookfrom.z - lookat.z));
-			// pbrt-v4's own (left-handed) LookAt basis, matching CPU's
-			// OrthographicCamera (src/shared/cameras.h, built from
-			// make_look_at) and this same file's spherical/realistic cases
-			// below: right = cross(up, forward) = cross(w, up) (forward = -w),
-			// up' = cross(right, w). This block previously used the RTiOW
-			// perspective basis (u = cross(up, w), the NEGATIVE of this), which
-			// mirrored every GPU orthographic render left-to-right relative to
-			// CPU - found by the Phase 2 Cameras-category sweep (D6, see
-			// tests/integration/material_cpu_gpu_parity_tests.cpp).
-			const float3 u = normalize(cross(w, vup));
-			const float3 v = cross(u, w);
-			const float3 horizontal = make_float3((xmax - xmin) * u.x, (xmax - xmin) * u.y, (xmax - xmin) * u.z);
-			const float3 vertical   = make_float3((ymax - ymin) * v.x, (ymax - ymin) * v.y, (ymax - ymin) * v.z);
-			const float3 lower_left_corner = make_float3(
-				lookfrom.x + xmin * u.x + ymin * v.x,
-				lookfrom.y + xmin * u.y + ymin * v.y,
-				lookfrom.z + xmin * u.z + ymin * v.z);
-			out_camera_extra->kind = CameraKind::Orthographic;
-			out_camera_extra->lower_left_corner = lower_left_corner;
-			out_camera_extra->horizontal = horizontal;
-			out_camera_extra->vertical = vertical;
-			out_camera_extra->w = make_float3(-w.x, -w.y, -w.z);
+			setup_loaded_orthographic_camera(c, out_camera_extra, image_width, image_height, lookfrom, lookat, vup);
 		} else if (c.type == "spherical" || c.type == "environment") {
 			const Mat4<float> ctw = make_look_at<float>(
 				lookfrom.x, lookfrom.y, lookfrom.z,
@@ -1305,122 +1448,7 @@ static bool build_loaded_pbrt_scene(
 			out_camera_extra->sw = make_float3(sw.x, sw.y, sw.z);
 			out_camera_extra->sphericalMapping = (c.sphericalMapping == "equalarea") ? 1 : 0;
 		} else if (c.type == "realistic") {
-			// c.lensFile is guaranteed non-empty here - pbrt_flatten.h already
-			// fell back to "perspective" at flatten() time if the scene gave
-			// none (see Camera's own comment). A missing/malformed file on
-			// disk is still possible and only detectable here, where actual
-			// file access happens.
-			//
-			// The expensive part - RealisticCamera's constructor, which
-			// traces 64 slabs x 1024 samples of real lens-refraction rays to
-			// bound the exit pupil per element (bound_exit_pupil(),
-			// realistic_camera.h) - depends only on the LENS SYSTEM (lens
-			// data, half-film-extents, focus distance, aperture diameter),
-			// never on camera_to_world (confirmed by reading that class:
-			// camera_to_world_ is only ever read by world_origin/right/up/
-			// forward() and generate_ray(), never by the constructor or the
-			// exit-pupil-bounding it does). This function reruns on every
-			// Live Preview frame the camera moves, so - like every other
-			// expensive per-triangle/per-file cost in this file - the lens
-			// system's own build output (lensElements/exitPupilBounds/
-			// filmHalf{X,Y}/lensRearZ) is cached here, keyed by everything
-			// that determines it; only the cheap world-space basis vectors
-			// (a plain 4x3 matrix-transform of the CURRENT ctw, computed
-			// fresh below without needing a RealisticCamera object at all -
-			// the identical math world_origin()/etc. themselves wrap) still
-			// depend on the moving camera and are recomputed every call.
-			struct RealisticCameraLensData {
-				std::vector<GpuLensElement> lensElements;
-				std::vector<GpuExitPupilBounds> exitPupilBounds;
-				float filmHalfX = 0.0f, filmHalfY = 0.0f, lensRearZ = 0.0f;
-			};
-			static std::unordered_map<std::string, RealisticCameraLensData> s_realisticLensCache;
-			static std::mutex s_realisticLensCacheMutex;
-
-			const float aspectF = (image_height > 0)
-				? static_cast<float>(image_width) / static_cast<float>(image_height) : 1.0f;
-			const float halfY = static_cast<float>(c.filmDiagonalMM) / (2.0f * std::sqrt(aspectF * aspectF + 1.0f));
-			const float halfX = aspectF * halfY;
-			const float focusDist = static_cast<float>(pbrt_flatten::focusDistanceFor(c));
-			const float apertureDiameter = static_cast<float>(c.apertureDiameterMM);
-			const std::string lensCacheKey = std::string(path) + "|" + c.lensFile +
-				"|hx" + float_bits_key(halfX) + "|hy" + float_bits_key(halfY) +
-				"|fd" + float_bits_key(focusDist) + "|ap" + float_bits_key(apertureDiameter);
-
-			bool lensFileMissing = false, lensFileEmpty = false;
-			const RealisticCameraLensData* lensData = get_or_build_cached(
-				s_realisticLensCache, s_realisticLensCacheMutex, lensCacheKey,
-				[&](RealisticCameraLensData& out) -> bool {
-					std::string lensText;
-					if (!pbrt_load::loadFileNear(path, c.lensFile, lensText)) {
-						lensFileMissing = true;
-						return false;
-					}
-					const std::vector<double> lensD = pbrt_load::parseLensFile(lensText);
-					if (lensD.empty()) {
-						lensFileEmpty = true;
-						return false;
-					}
-					std::vector<float> lens;
-					lens.reserve(lensD.size());
-					for (double v : lensD) lens.push_back(static_cast<float>(v));
-					// ctw doesn't matter here - identity is fine, since none
-					// of the fields read below depend on it (see this
-					// block's own comment above).
-					RealisticCamera<float> realCam(Mat4<float>{}, halfX, halfY, focusDist, apertureDiameter, lens);
-					for (int i = 0; i < realCam.num_elements(); ++i) {
-						GpuLensElement le{};
-						le.curvatureRadius = realCam.lens_curvature_radius(i);
-						le.thickness       = realCam.lens_thickness(i);
-						le.eta              = realCam.lens_eta(i);
-						le.apertureRadius   = realCam.lens_aperture_radius(i);
-						out.lensElements.push_back(le);
-					}
-					for (int i = 0; i < realCam.num_exit_pupil_bounds(); ++i) {
-						GpuExitPupilBounds b{};
-						b.xMin = realCam.exit_pupil_xmin(i);
-						b.xMax = realCam.exit_pupil_xmax(i);
-						b.yMin = realCam.exit_pupil_ymin(i);
-						b.yMax = realCam.exit_pupil_ymax(i);
-						b.degenerate = realCam.exit_pupil_degenerate(i) ? 1 : 0;
-						out.exitPupilBounds.push_back(b);
-					}
-					out.filmHalfX = realCam.film_half_x();
-					out.filmHalfY = realCam.film_half_y();
-					out.lensRearZ = realCam.lens_rear_z();
-					return true;
-				});
-
-			if (lensFileMissing) {
-				std::cerr << "[OptiX] warning: " << path << ": realistic camera lensfile '"
-					  << c.lensFile << "' not found; rendering as perspective instead\n";
-			} else if (lensFileEmpty) {
-				std::cerr << "[OptiX] warning: " << path << ": realistic camera lensfile '"
-					  << c.lensFile << "' has no usable rows; rendering as perspective instead\n";
-			} else if (lensData) {
-				scene.lensElements = lensData->lensElements;
-				scene.exitPupilBounds = lensData->exitPupilBounds;
-
-				const Mat4<float> ctw = make_look_at<float>(
-					lookfrom.x, lookfrom.y, lookfrom.z,
-					lookat.x, lookat.y, lookat.z,
-					vup.x, vup.y, vup.z);
-				const CamVec3<float> wo = ctw.transform_point(0.0f, 0.0f, 0.0f);
-				const CamVec3<float> wr = ctw.transform_vec(1.0f, 0.0f, 0.0f);
-				const CamVec3<float> wu = ctw.transform_vec(0.0f, 1.0f, 0.0f);
-				const CamVec3<float> wf = ctw.transform_vec(0.0f, 0.0f, 1.0f);
-
-				out_camera_extra->kind = CameraKind::Realistic;
-				out_camera_extra->origin = make_float3(wo.x, wo.y, wo.z);
-				out_camera_extra->su = make_float3(wr.x, wr.y, wr.z);
-				out_camera_extra->sv = make_float3(wu.x, wu.y, wu.z);
-				out_camera_extra->sw = make_float3(wf.x, wf.y, wf.z);
-				out_camera_extra->film_half_x = lensData->filmHalfX;
-				out_camera_extra->film_half_y = lensData->filmHalfY;
-				out_camera_extra->lens_rear_z = lensData->lensRearZ;
-				out_camera_extra->numLensElements = static_cast<int>(scene.lensElements.size());
-				out_camera_extra->numExitPupilBounds = static_cast<int>(scene.exitPupilBounds.size());
-			}
+			setup_loaded_realistic_camera(path, c, scene, out_camera_extra, image_width, image_height, lookfrom, lookat, vup);
 		}
 	}
 

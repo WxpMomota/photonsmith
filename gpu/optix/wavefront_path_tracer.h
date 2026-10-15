@@ -387,6 +387,9 @@ private:
     void renderPrepareRestirSvgf(RenderCall &rc);
     void renderPrepareLaunch(RenderCall &rc);
     void renderSampleLoop(RenderCall &rc);
+    void evaluateBounceMaterials(RenderCall &rc, int numHits, int numSimpleHits, int numDielectricHits, int numMiss);
+    void runBssrdfProbeStage(RenderCall &rc, WavefrontLaunchParams &lp, int &numProbe, int &numExit);
+    int runShadowStage(RenderCall &rc, WavefrontLaunchParams &lp);
     void renderFinish(RenderCall &rc);
     // Resize-on-resolution-change helper for a per-pixel GPU buffer: frees
     // and reallocates only when `capacity` doesn't already match `numPixels`,

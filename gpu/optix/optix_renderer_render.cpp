@@ -20,15 +20,9 @@
 #include <iostream>
 #include <cstdlib>
 
-bool OptiXRenderer::render(
-	unsigned int width,
-	unsigned int height,
-	unsigned int samplesPerPixel,
-	unsigned int maxDepth,
-	const GpuCameraParams& camera,
-	float* outputFramebuffer
-) {
-	// Camera setup: inject the device pointers for the (host-precomputed,
+// The camera the launch uses: the caller's, with this renderer's device pointers patched in (pixel filter table, lens tables, sky and portal light distributions)
+// and the scene's motion-blur flag.
+GpuCameraParams OptiXRenderer::makeRenderCamera(const GpuCameraParams& camera) {
 	// scene-build-time-uploaded) lens/exit-pupil-bounds tables into a local
 	// mutable copy. scene_builder.cpp's out_camera_extra can't know these
 	// device pointers at scene-build time (they aren't allocated until
@@ -128,115 +122,82 @@ bool OptiXRenderer::render(
 		gpuCam.portalLight.distFunc = reinterpret_cast<const float*>(d_portalDistFunc_);
 		gpuCam.portalLight.satSum = reinterpret_cast<const double*>(d_portalSatSum_);
 	}
+	return gpuCam;
+}
 
-	// Delegate to WavefrontPathTracer if enabled
-	if (useWavefront_ && wavefrontTracer_) {
-		// pbrt-v4's own "camera medium" (GpuCameraParams::cameraMediumSigmaT's own comment, optix_types.h) is real
-		// on this backend too: __raygen__wf_trace samples its free flight and turns a scatter into a hit on the
-		// synthetic Medium material (SceneData::cameraMediumMaterialIdx), __raygen__wf_shadow attenuates shadow rays.
-		// Set per render rather than once at enable time, so a scene switch
-		// cannot leave a previous scene's table wired in - same reasoning
-		// as this backend's own enableDenoise()'s comment. WavefrontPathTracer
-		// has its own, independent denoiser/AOV-buffer implementation (see
-		// that class's own setDenoiseEnabled() comment for why it's not
-		// shared with this class's denoise()).
-		wavefrontTracer_->setDenoiseEnabled(denoiseEnabled_);
-		wavefrontTracer_->setDenoiseBlend(denoiseBlend_);
-		wavefrontTracer_->setWorldPosOutputEnabled(worldPosOutputEnabled_);
-		wavefrontTracer_->setRestirEnabled(restirEnabled_);
-		wavefrontTracer_->setRestirGiEnabled(restirGiEnabled_);
-		wavefrontTracer_->setSvgfEnabled(svgfEnabled_);
-		wavefrontTracer_->setSvgfTuning(svgfTuning_);
-		wavefrontTracer_->setProbeCacheEnabled(probeCacheEnabled_);
-		wavefrontTracer_->setPathGuidingEnabled(pathGuidingEnabled_);
-		wavefrontTracer_->setNrcEnabled(nrcEnabled_);
-		wavefrontTracer_->setTemporalUpscaleJitter(temporalUpscaleJitterEnabled_, temporalUpscaleFactor_, temporalJitterBaseIndex_);
-		wavefrontTracer_->setNeuralUpscaleEnabled(neuralUpscaleEnabled_);
-		wavefrontTracer_->setActivePixelMask(activePixelMaskHost_);
-		// See invalidateRestirHistory()'s own comment on why this is
-		// deferred-then-forwarded here instead of calling straight through.
-		if (restirHistoryInvalidationPending_) {
-			wavefrontTracer_->invalidateRestirHistory();
-			restirHistoryInvalidationPending_ = false;
-		}
-		wavefrontTracer_->setInstancePrimBase(d_instanceBase_);
-		wavefrontTracer_->setTextures(d_textures_, d_texturePixels_);
-		// See WavefrontPathTracer::setLightBvh()'s own comment. Reuses the
-		// SAME already-built/uploaded tree the recursive backend owns
-		// (d_lightBvhNodes_ etc.) - no separate build/upload.
-		wavefrontTracer_->setLightBvh(d_lightBvhNodes_, d_lightBvhBitTrail_, lightBvhNodeCount_,
-			lightBvhAllBMinX_, lightBvhAllBMinY_, lightBvhAllBMinZ_,
-			lightBvhAllBMaxX_, lightBvhAllBMaxY_, lightBvhAllBMaxZ_);
-		// World-space irradiance probe cache (Live Preview only) - see
-		// WavefrontPathTracer::setProbeGrid()'s own comment. Same "OptiXRenderer
-		// builds/owns it once at buildScene() time, forwarded every render()
-		// call" pattern as setLightBvh() just above.
-		wavefrontTracer_->setProbeGrid(d_probeGrid_, probeGridMeta_);
-		// Real-time path guiding (Live Preview only) - see WavefrontPathTracer::
-		// setGuidingHistograms()'s own comment. Same forwarding pattern as
-		// setProbeGrid() just above.
-		wavefrontTracer_->setGuidingHistograms(d_guidingHistograms_);
-		wavefrontTracer_->setCloudMediums(d_cloudMediums_, numCloudMediums_);
-		wavefrontTracer_->setRgbGridMediums(d_rgbGridMediums_, numRgbGridMediums_, d_rgbGridData_, rgbGridDataCount_);
-		wavefrontTracer_->setGridMediums(d_gridMediums_, numGridMediums_, d_gridData_, gridDataCount_);
-		wavefrontTracer_->setBssrdfTables(d_bssrdfTables_, numBssrdfTables_,
-			d_bssrdfRhoSamples_, d_bssrdfRadiusSamples_, d_bssrdfProfile_, d_bssrdfProfileCdf_);
-		wavefrontTracer_->setMeasuredTables(d_measuredTables_, numMeasuredTables_,
-			d_measuredParamValues_, d_measuredData_, d_measuredMcdf_, d_measuredCcdf_);
-		return wavefrontTracer_->render(
-			(int)width, (int)height, (int)samplesPerPixel, (int)maxDepth,
-			gpuCam,
-			outputFramebuffer,
-			gasHandle_,
-			d_materials_, d_spheres_, d_quads_,
-			d_lightIndices_, d_lightKinds_, d_aliasTable_,
-			numMaterials_, numSpheres_, numQuads_, numLights_,
-			d_punctualLights_, numPunctualLights_,
-			d_bilinearPatches_, numBilinearPatches_,
-			d_triangles_, numTriangles_,
-			d_disks_, numDisks_, d_cylinders_, numCylinders_);
+// Hands the render to the wavefront path tracer: every setting this renderer holds is forwarded first.
+bool OptiXRenderer::renderWavefront(unsigned int width, unsigned int height, unsigned int samplesPerPixel, unsigned int maxDepth,
+									 const GpuCameraParams& gpuCam, float* outputFramebuffer) {
+	// pbrt-v4's own "camera medium" (GpuCameraParams::cameraMediumSigmaT's own comment, optix_types.h) is real
+	// on this backend too: __raygen__wf_trace samples its free flight and turns a scatter into a hit on the
+	// synthetic Medium material (SceneData::cameraMediumMaterialIdx), __raygen__wf_shadow attenuates shadow rays.
+	// Set per render rather than once at enable time, so a scene switch
+	// cannot leave a previous scene's table wired in - same reasoning
+	// as this backend's own enableDenoise()'s comment. WavefrontPathTracer
+	// has its own, independent denoiser/AOV-buffer implementation (see
+	// that class's own setDenoiseEnabled() comment for why it's not
+	// shared with this class's denoise()).
+	wavefrontTracer_->setDenoiseEnabled(denoiseEnabled_);
+	wavefrontTracer_->setDenoiseBlend(denoiseBlend_);
+	wavefrontTracer_->setWorldPosOutputEnabled(worldPosOutputEnabled_);
+	wavefrontTracer_->setRestirEnabled(restirEnabled_);
+	wavefrontTracer_->setRestirGiEnabled(restirGiEnabled_);
+	wavefrontTracer_->setSvgfEnabled(svgfEnabled_);
+	wavefrontTracer_->setSvgfTuning(svgfTuning_);
+	wavefrontTracer_->setProbeCacheEnabled(probeCacheEnabled_);
+	wavefrontTracer_->setPathGuidingEnabled(pathGuidingEnabled_);
+	wavefrontTracer_->setNrcEnabled(nrcEnabled_);
+	wavefrontTracer_->setTemporalUpscaleJitter(temporalUpscaleJitterEnabled_, temporalUpscaleFactor_, temporalJitterBaseIndex_);
+	wavefrontTracer_->setNeuralUpscaleEnabled(neuralUpscaleEnabled_);
+	wavefrontTracer_->setActivePixelMask(activePixelMaskHost_);
+	// See invalidateRestirHistory()'s own comment on why this is
+	// deferred-then-forwarded here instead of calling straight through.
+	if (restirHistoryInvalidationPending_) {
+		wavefrontTracer_->invalidateRestirHistory();
+		restirHistoryInvalidationPending_ = false;
 	}
+	wavefrontTracer_->setInstancePrimBase(d_instanceBase_);
+	wavefrontTracer_->setTextures(d_textures_, d_texturePixels_);
+	// See WavefrontPathTracer::setLightBvh()'s own comment. Reuses the
+	// SAME already-built/uploaded tree the recursive backend owns
+	// (d_lightBvhNodes_ etc.) - no separate build/upload.
+	wavefrontTracer_->setLightBvh(d_lightBvhNodes_, d_lightBvhBitTrail_, lightBvhNodeCount_,
+		lightBvhAllBMinX_, lightBvhAllBMinY_, lightBvhAllBMinZ_,
+		lightBvhAllBMaxX_, lightBvhAllBMaxY_, lightBvhAllBMaxZ_);
+	// World-space irradiance probe cache (Live Preview only) - see
+	// WavefrontPathTracer::setProbeGrid()'s own comment. Same "OptiXRenderer
+	// builds/owns it once at buildScene() time, forwarded every render()
+	// call" pattern as setLightBvh() just above.
+	wavefrontTracer_->setProbeGrid(d_probeGrid_, probeGridMeta_);
+	// Real-time path guiding (Live Preview only) - see WavefrontPathTracer::
+	// setGuidingHistograms()'s own comment. Same forwarding pattern as
+	// setProbeGrid() just above.
+	wavefrontTracer_->setGuidingHistograms(d_guidingHistograms_);
+	wavefrontTracer_->setCloudMediums(d_cloudMediums_, numCloudMediums_);
+	wavefrontTracer_->setRgbGridMediums(d_rgbGridMediums_, numRgbGridMediums_, d_rgbGridData_, rgbGridDataCount_);
+	wavefrontTracer_->setGridMediums(d_gridMediums_, numGridMediums_, d_gridData_, gridDataCount_);
+	wavefrontTracer_->setBssrdfTables(d_bssrdfTables_, numBssrdfTables_,
+		d_bssrdfRhoSamples_, d_bssrdfRadiusSamples_, d_bssrdfProfile_, d_bssrdfProfileCdf_);
+	wavefrontTracer_->setMeasuredTables(d_measuredTables_, numMeasuredTables_,
+		d_measuredParamValues_, d_measuredData_, d_measuredMcdf_, d_measuredCcdf_);
+	return wavefrontTracer_->render(
+		(int)width, (int)height, (int)samplesPerPixel, (int)maxDepth,
+		gpuCam,
+		outputFramebuffer,
+		gasHandle_,
+		d_materials_, d_spheres_, d_quads_,
+		d_lightIndices_, d_lightKinds_, d_aliasTable_,
+		numMaterials_, numSpheres_, numQuads_, numLights_,
+		d_punctualLights_, numPunctualLights_,
+		d_bilinearPatches_, numBilinearPatches_,
+		d_triangles_, numTriangles_,
+		d_disks_, numDisks_, d_cylinders_, numCylinders_);
+}
 
-	// Allocate framebuffer on device
-	CUdeviceptr d_framebuffer;
-	size_t fbSize = width * height * sizeof(float3);
-	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_framebuffer), fbSize));
-
-	// Denoiser albedo/normal guide-layer AOV buffers (recursive backend
-	// only) - only touched when this render will actually be denoised.
-	// Persisted across render() calls via ensureAovBuffers() (same
-	// resolution-keyed recreate-on-change pattern as the denoiser's own
-	// state/scratch buffers - see denoise()'s comment), instead of a fresh
-	// cudaMalloc/cudaFree every call, which was wasted work on video mode's
-	// hundreds of same-resolution per-frame render() calls. raygen only
-	// writes to these when the LaunchParams pointer is non-null (see
-	// optix_raygen.h's own null-check), so leaving them 0 here when not
-	// denoising costs nothing extra on the device side.
-	CUdeviceptr d_albedo = 0;
-	CUdeviceptr d_normal = 0;
-	if (denoiseEnabled_) {
-		ensureAovBuffers(width, height);
-		d_albedo = denoiserResources_.albedoAov;
-		d_normal = denoiserResources_.normalAov;
-	}
-
-	// --stats device counters (see optix_types.h's LaunchParams::
-	// statsBounceRays/statsShadowRays own comment) - same "null unless
-	// requested, transient per-call alloc" shape as d_albedo/d_normal above,
-	// except these are cheap enough (8 bytes each) not to bother persisting
-	// across calls the way the AOV buffers do. Same RAY_TRACER_STATS env-var
-	// pattern main.cpp/wavefront_path_tracer.cpp already use.
-#pragma warning(suppress: 4996)
-	const bool statsEnabled = (std::getenv("RAY_TRACER_STATS") != nullptr);
-	CUdeviceptr d_statsBounceRays = 0;
-	CUdeviceptr d_statsShadowRays = 0;
-	if (statsEnabled) {
-		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_statsBounceRays), sizeof(unsigned long long)));
-		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_statsShadowRays), sizeof(unsigned long long)));
-		CUDA_CHECK(cudaMemset(reinterpret_cast<void*>(d_statsBounceRays), 0, sizeof(unsigned long long)));
-		CUDA_CHECK(cudaMemset(reinterpret_cast<void*>(d_statsShadowRays), 0, sizeof(unsigned long long)));
-	}
-
+// The recursive launch's parameters: the camera, every scene buffer, the light tables and the --stats counters.
+LaunchParams OptiXRenderer::makeLaunchParams(unsigned int width, unsigned int height, unsigned int samplesPerPixel, unsigned int maxDepth,
+											 const GpuCameraParams& gpuCam, CUdeviceptr d_framebuffer, CUdeviceptr d_albedo, CUdeviceptr d_normal,
+											 CUdeviceptr d_statsBounceRays, CUdeviceptr d_statsShadowRays) {
 	// Setup launch params. Zero-initialised on purpose: LaunchParams is a POD
 	// whose fields are assigned one by one below, so any field NOT assigned
 	// here would otherwise hold stack garbage. instancePrimBase is read on the
@@ -355,6 +316,65 @@ bool OptiXRenderer::render(
 	// --stats device counters - null unless statsEnabled (see alloc above).
 	params.statsBounceRays = reinterpret_cast<unsigned long long*>(d_statsBounceRays);
 	params.statsShadowRays = reinterpret_cast<unsigned long long*>(d_statsShadowRays);
+	return params;
+}
+
+bool OptiXRenderer::render(
+	unsigned int width,
+	unsigned int height,
+	unsigned int samplesPerPixel,
+	unsigned int maxDepth,
+	const GpuCameraParams& camera,
+	float* outputFramebuffer
+) {
+	GpuCameraParams gpuCam = makeRenderCamera(camera);
+
+	// Delegate to WavefrontPathTracer if enabled
+	if (useWavefront_ && wavefrontTracer_) return renderWavefront(width, height, samplesPerPixel, maxDepth, gpuCam, outputFramebuffer);
+
+
+	// Allocate framebuffer on device
+	CUdeviceptr d_framebuffer;
+	size_t fbSize = width * height * sizeof(float3);
+	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_framebuffer), fbSize));
+
+	// Denoiser albedo/normal guide-layer AOV buffers (recursive backend
+	// only) - only touched when this render will actually be denoised.
+	// Persisted across render() calls via ensureAovBuffers() (same
+	// resolution-keyed recreate-on-change pattern as the denoiser's own
+	// state/scratch buffers - see denoise()'s comment), instead of a fresh
+	// cudaMalloc/cudaFree every call, which was wasted work on video mode's
+	// hundreds of same-resolution per-frame render() calls. raygen only
+	// writes to these when the LaunchParams pointer is non-null (see
+	// optix_raygen.h's own null-check), so leaving them 0 here when not
+	// denoising costs nothing extra on the device side.
+	CUdeviceptr d_albedo = 0;
+	CUdeviceptr d_normal = 0;
+	if (denoiseEnabled_) {
+		ensureAovBuffers(width, height);
+		d_albedo = denoiserResources_.albedoAov;
+		d_normal = denoiserResources_.normalAov;
+	}
+
+	// --stats device counters (see optix_types.h's LaunchParams::
+	// statsBounceRays/statsShadowRays own comment) - same "null unless
+	// requested, transient per-call alloc" shape as d_albedo/d_normal above,
+	// except these are cheap enough (8 bytes each) not to bother persisting
+	// across calls the way the AOV buffers do. Same RAY_TRACER_STATS env-var
+	// pattern main.cpp/wavefront_path_tracer.cpp already use.
+#pragma warning(suppress: 4996)
+	const bool statsEnabled = (std::getenv("RAY_TRACER_STATS") != nullptr);
+	CUdeviceptr d_statsBounceRays = 0;
+	CUdeviceptr d_statsShadowRays = 0;
+	if (statsEnabled) {
+		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_statsBounceRays), sizeof(unsigned long long)));
+		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_statsShadowRays), sizeof(unsigned long long)));
+		CUDA_CHECK(cudaMemset(reinterpret_cast<void*>(d_statsBounceRays), 0, sizeof(unsigned long long)));
+		CUDA_CHECK(cudaMemset(reinterpret_cast<void*>(d_statsShadowRays), 0, sizeof(unsigned long long)));
+	}
+
+	const LaunchParams params = makeLaunchParams(width, height, samplesPerPixel, maxDepth, gpuCam, d_framebuffer, d_albedo, d_normal, d_statsBounceRays, d_statsShadowRays);
+
 
 	// Upload launch params
 	CUDA_CHECK(cudaMemcpy(

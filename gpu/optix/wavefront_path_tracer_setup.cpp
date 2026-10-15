@@ -11,6 +11,7 @@
 #include "rgb_to_spectrum_table.h"
 #include <optix_stack_size.h>
 #include "optix_module_parallel.h"
+#include "optix_program_group.h"
 #include <cuda.h>
 #include <algorithm>
 #include <fstream>
@@ -255,302 +256,63 @@ bool WavefrontPathTracer::loadModule() {
 // ============================================================================
 
 bool WavefrontPathTracer::createProgramGroups() {
-	char   log[2048];
-	size_t logSize;
-	OptixProgramGroupOptions pgOptions = {};
+	using namespace optix_pg;
+	const auto make = [this](const OptixProgramGroupDesc &desc, OptixProgramGroup *out) { create(context_, desc, out); };
 
 	// ----- Intersection pipeline -----
 
-	// Raygen
-	OptixProgramGroupDesc rgDesc = {};
-	rgDesc.kind                          = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-	rgDesc.raygen.module                 = wfModule_;
-	rgDesc.raygen.entryFunctionName      = "__raygen__wf_intersect";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &rgDesc, 1, &pgOptions,
-										 log, &logSize, &raygenIntersectPG_));
+	make(raygen(wfModule_, "__raygen__wf_intersect"), &raygenIntersectPG_);
+	make(miss(wfModule_, "__miss__wf_radiance"), &missRadiancePG_);
 
-	// Miss (radiance)
-	OptixProgramGroupDesc missDesc = {};
-	missDesc.kind                     = OPTIX_PROGRAM_GROUP_KIND_MISS;
-	missDesc.miss.module              = wfModule_;
-	missDesc.miss.entryFunctionName   = "__miss__wf_radiance";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &missDesc, 1, &pgOptions,
-										 log, &logSize, &missRadiancePG_));
-
-	// Sphere/quad closesthit paired with wavefront-native intersection programs
-	// (wavefront_programs.cu __intersection__wf_sphere/__intersection__wf_quad).
-	// These used to reuse __intersection__sphere/__intersection__quad from the
-	// recursive path's module_ instead of having their own copy, which OptiX
-	// rejects: combining programs from two modules compiled with different
-	// pipelineCompileOptions.numPayloadValues into one hitgroup fails payload-
-	// type resolution ("could not be resolved to a common payloadType"), even
-	// though neither intersection program actually touches payload registers.
-	// Compiling our own copies under wfModule_'s own pipeline options sidesteps
-	// the cross-module mismatch entirely - see wavefront_programs.cu for detail.
-	OptixProgramGroupDesc sphereHitDesc = {};
-	sphereHitDesc.kind                              = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	sphereHitDesc.hitgroup.moduleIS                 = wfModule_;
-	sphereHitDesc.hitgroup.entryFunctionNameIS      = "__intersection__wf_sphere";
-	sphereHitDesc.hitgroup.moduleCH                 = wfModule_;
-	sphereHitDesc.hitgroup.entryFunctionNameCH      = "__closesthit__wf_sphere";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &sphereHitDesc, 1, &pgOptions,
-										 log, &logSize, &hitSpherePG_));
-
-	OptixProgramGroupDesc quadHitDesc = {};
-	quadHitDesc.kind                            = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	quadHitDesc.hitgroup.moduleIS               = wfModule_;
-	quadHitDesc.hitgroup.entryFunctionNameIS    = "__intersection__wf_quad";
-	quadHitDesc.hitgroup.moduleCH               = wfModule_;
-	quadHitDesc.hitgroup.entryFunctionNameCH    = "__closesthit__wf_quad";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &quadHitDesc, 1, &pgOptions,
-										 log, &logSize, &hitQuadPG_));
-
-	OptixProgramGroupDesc blpHitDesc = {};
-	blpHitDesc.kind                            = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	blpHitDesc.hitgroup.moduleIS               = wfModule_;
-	blpHitDesc.hitgroup.entryFunctionNameIS    = "__intersection__wf_bilinear_patch";
-	blpHitDesc.hitgroup.moduleCH               = wfModule_;
-	blpHitDesc.hitgroup.entryFunctionNameCH    = "__closesthit__wf_bilinear_patch";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &blpHitDesc, 1, &pgOptions,
-										 log, &logSize, &hitBilinearPatchPG_));
-
-	// Any-hit added for alpha-cutout (MaterialData::alphaMaskTexIdx) - see
-	// __anyhit__wf_triangle's own comment (wavefront_programs.cu). Same hit
-	// group/program group as before, no new SBT record type - a no-op for
-	// the overwhelming majority of triangles.
-	OptixProgramGroupDesc triHitDesc = {};
-	triHitDesc.kind                            = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	triHitDesc.hitgroup.moduleIS               = wfModule_;
-	triHitDesc.hitgroup.entryFunctionNameIS    = "__intersection__wf_triangle";
-	triHitDesc.hitgroup.moduleCH               = wfModule_;
-	triHitDesc.hitgroup.entryFunctionNameCH    = "__closesthit__wf_triangle";
-	triHitDesc.hitgroup.moduleAH               = wfModule_;
-	triHitDesc.hitgroup.entryFunctionNameAH    = "__anyhit__wf_triangle";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &triHitDesc, 1, &pgOptions,
-										 log, &logSize, &hitTrianglePG_));
-
-	// Disk/Cylinder (Phase 4c) - appended last, after triangle, matching
-	// this backend's own trailing-region SBT placement (see buildSBT()'s
-	// own comment) and the recursive backend's diskCylinderSbtOffset.
-	OptixProgramGroupDesc diskHitDesc = {};
-	diskHitDesc.kind                            = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	diskHitDesc.hitgroup.moduleIS               = wfModule_;
-	diskHitDesc.hitgroup.entryFunctionNameIS    = "__intersection__wf_disk";
-	diskHitDesc.hitgroup.moduleCH               = wfModule_;
-	diskHitDesc.hitgroup.entryFunctionNameCH    = "__closesthit__wf_disk";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &diskHitDesc, 1, &pgOptions,
-										 log, &logSize, &hitDiskPG_));
-
-	OptixProgramGroupDesc cylinderHitDesc = {};
-	cylinderHitDesc.kind                            = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	cylinderHitDesc.hitgroup.moduleIS               = wfModule_;
-	cylinderHitDesc.hitgroup.entryFunctionNameIS    = "__intersection__wf_cylinder";
-	cylinderHitDesc.hitgroup.moduleCH               = wfModule_;
-	cylinderHitDesc.hitgroup.entryFunctionNameCH    = "__closesthit__wf_cylinder";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &cylinderHitDesc, 1, &pgOptions,
-										 log, &logSize, &hitCylinderPG_));
+	// Sphere/quad closesthit paired with wavefront-native intersection programs (wavefront_programs.cu __intersection__wf_sphere/__intersection__wf_quad). These used to
+	// reuse __intersection__sphere/__intersection__quad from the recursive path's module_ instead of having their own copy, which OptiX rejects: combining programs
+	// from two modules compiled with different pipelineCompileOptions.numPayloadValues into one hitgroup fails payload-type resolution ("could not be resolved to a
+	// common payloadType"), even though neither intersection program actually touches payload registers. Compiling our own copies under wfModule_'s own pipeline
+	// options sidesteps the cross-module mismatch entirely - see wavefront_programs.cu for detail.
+	make(hit(wfModule_, "__intersection__wf_sphere", "__closesthit__wf_sphere", nullptr), &hitSpherePG_);
+	make(hit(wfModule_, "__intersection__wf_quad", "__closesthit__wf_quad", nullptr), &hitQuadPG_);
+	make(hit(wfModule_, "__intersection__wf_bilinear_patch", "__closesthit__wf_bilinear_patch", nullptr), &hitBilinearPatchPG_);
+	// Any-hit added for alpha-cutout (MaterialData::alphaMaskTexIdx) - see __anyhit__wf_triangle's own comment (wavefront_programs.cu). Same hit group/program group as
+	// before, no new SBT record type - a no-op for the overwhelming majority of triangles.
+	make(hit(wfModule_, "__intersection__wf_triangle", "__closesthit__wf_triangle", "__anyhit__wf_triangle"), &hitTrianglePG_);
+	// Disk/Cylinder (Phase 4c) - appended last, after triangle, matching this backend's own trailing-region SBT placement (see buildSBT()'s own comment) and the
+	// recursive backend's diskCylinderSbtOffset.
+	make(hit(wfModule_, "__intersection__wf_disk", "__closesthit__wf_disk", nullptr), &hitDiskPG_);
+	make(hit(wfModule_, "__intersection__wf_cylinder", "__closesthit__wf_cylinder", nullptr), &hitCylinderPG_);
 
 	// ----- BSSRDF probe walk (MaterialType::Subsurface, Phase 2) -----
-	// Linked into the SAME intersect pipeline as the raygen/hit groups
-	// above (see linkPipeline()'s intersectGroups[] array and
-	// wavefront_probe.h's own header comment for why no new module/
-	// pipeline is needed here).
-
-	OptixProgramGroupDesc probeRgDesc = {};
-	probeRgDesc.kind                     = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-	probeRgDesc.raygen.module            = wfModule_;
-	probeRgDesc.raygen.entryFunctionName = "__raygen__wf_probe";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &probeRgDesc, 1, &pgOptions,
-										 log, &logSize, &raygenProbePG_));
-
-	// ----- Probe cache update rays (Live Preview only) -----
-	// Own raygen only - reuses the SAME hit/miss groups as the BSSRDF probe
-	// walk above (missProbePG_/hitProbeSpherePG_/...) via a second SBT
-	// (probeCacheSBT_) that shares probeSBT_'s own hit/miss record buffers -
-	// see buildSBT()'s own comment. No new hit/miss programs needed: this
-	// raygen wants exactly the same "find the closest surface hit, report
-	// position/normal/materialIdx" query the probe walk already has.
-	OptixProgramGroupDesc probeCacheRgDesc = {};
-	probeCacheRgDesc.kind                     = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-	probeCacheRgDesc.raygen.module            = wfModule_;
-	probeCacheRgDesc.raygen.entryFunctionName = "__raygen__wf_probe_cache";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &probeCacheRgDesc, 1, &pgOptions,
-										 log, &logSize, &raygenProbeCachePG_));
-
-	OptixProgramGroupDesc probeMissDesc = {};
-	probeMissDesc.kind                   = OPTIX_PROGRAM_GROUP_KIND_MISS;
-	probeMissDesc.miss.module            = wfModule_;
-	probeMissDesc.miss.entryFunctionName = "__miss__wf_probe";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &probeMissDesc, 1, &pgOptions,
-										 log, &logSize, &missProbePG_));
-
-	OptixProgramGroupDesc probeSphereDesc = {};
-	probeSphereDesc.kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	probeSphereDesc.hitgroup.moduleIS            = wfModule_;
-	probeSphereDesc.hitgroup.entryFunctionNameIS = "__intersection__wf_sphere";
-	probeSphereDesc.hitgroup.moduleCH            = wfModule_;
-	probeSphereDesc.hitgroup.entryFunctionNameCH = "__closesthit__wf_probe_sphere";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &probeSphereDesc, 1, &pgOptions,
-										 log, &logSize, &hitProbeSpherePG_));
-
-	OptixProgramGroupDesc probeQuadDesc = {};
-	probeQuadDesc.kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	probeQuadDesc.hitgroup.moduleIS            = wfModule_;
-	probeQuadDesc.hitgroup.entryFunctionNameIS = "__intersection__wf_quad";
-	probeQuadDesc.hitgroup.moduleCH            = wfModule_;
-	probeQuadDesc.hitgroup.entryFunctionNameCH = "__closesthit__wf_probe_quad";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &probeQuadDesc, 1, &pgOptions,
-										 log, &logSize, &hitProbeQuadPG_));
-
-	OptixProgramGroupDesc probeBlpDesc = {};
-	probeBlpDesc.kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	probeBlpDesc.hitgroup.moduleIS            = wfModule_;
-	probeBlpDesc.hitgroup.entryFunctionNameIS = "__intersection__wf_bilinear_patch";
-	probeBlpDesc.hitgroup.moduleCH            = wfModule_;
-	probeBlpDesc.hitgroup.entryFunctionNameCH = "__closesthit__wf_probe_bilinear_patch";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &probeBlpDesc, 1, &pgOptions,
-										 log, &logSize, &hitProbeBilinearPatchPG_));
-
-	// Deliberately no any-hit (alpha-cutout) here - see wavefront_probe.h's
-	// own header comment for the same documented simplification
+	// Linked into the SAME intersect pipeline as the raygen/hit groups above (see linkPipeline()'s intersectGroups[] array and wavefront_probe.h's own header comment
+	// for why no new module/pipeline is needed here).
+	make(raygen(wfModule_, "__raygen__wf_probe"), &raygenProbePG_);
+	// Probe cache update rays (Live Preview only): its own raygen only - it reuses the SAME hit/miss groups as the BSSRDF probe walk (missProbePG_/hitProbeSpherePG_/...)
+	// via a second SBT (probeCacheSBT_) that shares probeSBT_'s own hit/miss record buffers - see buildSBT()'s own comment. This raygen wants exactly the same "find the
+	// closest surface hit, report position/normal/materialIdx" query the probe walk already has.
+	make(raygen(wfModule_, "__raygen__wf_probe_cache"), &raygenProbeCachePG_);
+	make(miss(wfModule_, "__miss__wf_probe"), &missProbePG_);
+	make(hit(wfModule_, "__intersection__wf_sphere", "__closesthit__wf_probe_sphere", nullptr), &hitProbeSpherePG_);
+	make(hit(wfModule_, "__intersection__wf_quad", "__closesthit__wf_probe_quad", nullptr), &hitProbeQuadPG_);
+	make(hit(wfModule_, "__intersection__wf_bilinear_patch", "__closesthit__wf_probe_bilinear_patch", nullptr), &hitProbeBilinearPatchPG_);
+	// Deliberately no any-hit (alpha-cutout) on the triangle - see wavefront_probe.h's own header comment for the same documented simplification
 	// optix_probe_hit.h's recursive-backend twin already makes.
-	OptixProgramGroupDesc probeTriDesc = {};
-	probeTriDesc.kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	probeTriDesc.hitgroup.moduleIS            = wfModule_;
-	probeTriDesc.hitgroup.entryFunctionNameIS = "__intersection__wf_triangle";
-	probeTriDesc.hitgroup.moduleCH            = wfModule_;
-	probeTriDesc.hitgroup.entryFunctionNameCH = "__closesthit__wf_probe_triangle";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &probeTriDesc, 1, &pgOptions,
-										 log, &logSize, &hitProbeTrianglePG_));
-
-	OptixProgramGroupDesc probeDiskDesc = {};
-	probeDiskDesc.kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	probeDiskDesc.hitgroup.moduleIS            = wfModule_;
-	probeDiskDesc.hitgroup.entryFunctionNameIS = "__intersection__wf_disk";
-	probeDiskDesc.hitgroup.moduleCH            = wfModule_;
-	probeDiskDesc.hitgroup.entryFunctionNameCH = "__closesthit__wf_probe_disk";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &probeDiskDesc, 1, &pgOptions,
-										 log, &logSize, &hitProbeDiskPG_));
-
-	OptixProgramGroupDesc probeCylinderDesc = {};
-	probeCylinderDesc.kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	probeCylinderDesc.hitgroup.moduleIS            = wfModule_;
-	probeCylinderDesc.hitgroup.entryFunctionNameIS = "__intersection__wf_cylinder";
-	probeCylinderDesc.hitgroup.moduleCH            = wfModule_;
-	probeCylinderDesc.hitgroup.entryFunctionNameCH = "__closesthit__wf_probe_cylinder";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &probeCylinderDesc, 1, &pgOptions,
-										 log, &logSize, &hitProbeCylinderPG_));
+	make(hit(wfModule_, "__intersection__wf_triangle", "__closesthit__wf_probe_triangle", nullptr), &hitProbeTrianglePG_);
+	make(hit(wfModule_, "__intersection__wf_disk", "__closesthit__wf_probe_disk", nullptr), &hitProbeDiskPG_);
+	make(hit(wfModule_, "__intersection__wf_cylinder", "__closesthit__wf_probe_cylinder", nullptr), &hitProbeCylinderPG_);
 
 	// ----- Shadow pipeline -----
 
-	OptixProgramGroupDesc shadowRGDesc = {};
-	shadowRGDesc.kind                         = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-	shadowRGDesc.raygen.module                = wfModule_;
-	shadowRGDesc.raygen.entryFunctionName     = "__raygen__wf_shadow";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &shadowRGDesc, 1, &pgOptions,
-										 log, &logSize, &raygenShadowPG_));
-
-	OptixProgramGroupDesc shadowMissDesc = {};
-	shadowMissDesc.kind                      = OPTIX_PROGRAM_GROUP_KIND_MISS;
-	shadowMissDesc.miss.module               = wfModule_;
-	shadowMissDesc.miss.entryFunctionName    = "__miss__wf_shadow";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &shadowMissDesc, 1, &pgOptions,
-										 log, &logSize, &missShadowPG_));
-
-	// Shadow anyhit for sphere
-	OptixProgramGroupDesc shadowSphereDesc = {};
-	shadowSphereDesc.kind                          = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	shadowSphereDesc.hitgroup.moduleIS             = wfModule_;
-	shadowSphereDesc.hitgroup.entryFunctionNameIS  = "__intersection__wf_sphere";
-	shadowSphereDesc.hitgroup.moduleAH             = wfModule_;
-	shadowSphereDesc.hitgroup.entryFunctionNameAH  = "__anyhit__wf_shadow_sphere";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &shadowSphereDesc, 1, &pgOptions,
-										 log, &logSize, &anyhitShadowSpherePG_));
-
-	// Shadow anyhit for quad
-	OptixProgramGroupDesc shadowQuadDesc = {};
-	shadowQuadDesc.kind                          = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	shadowQuadDesc.hitgroup.moduleIS             = wfModule_;
-	shadowQuadDesc.hitgroup.entryFunctionNameIS  = "__intersection__wf_quad";
-	shadowQuadDesc.hitgroup.moduleAH             = wfModule_;
-	shadowQuadDesc.hitgroup.entryFunctionNameAH  = "__anyhit__wf_shadow_quad";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &shadowQuadDesc, 1, &pgOptions,
-										 log, &logSize, &anyhitShadowQuadPG_));
-
-	// Shadow anyhit for bilinear patch
-	OptixProgramGroupDesc shadowBlpDesc = {};
-	shadowBlpDesc.kind                          = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	shadowBlpDesc.hitgroup.moduleIS             = wfModule_;
-	shadowBlpDesc.hitgroup.entryFunctionNameIS  = "__intersection__wf_bilinear_patch";
-	shadowBlpDesc.hitgroup.moduleAH             = wfModule_;
-	shadowBlpDesc.hitgroup.entryFunctionNameAH  = "__anyhit__wf_shadow_bilinear_patch";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &shadowBlpDesc, 1, &pgOptions,
-										 log, &logSize, &anyhitShadowBilinearPatchPG_));
-
-	// Shadow anyhit for triangle
-	OptixProgramGroupDesc shadowTriDesc = {};
-	shadowTriDesc.kind                          = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	shadowTriDesc.hitgroup.moduleIS             = wfModule_;
-	shadowTriDesc.hitgroup.entryFunctionNameIS  = "__intersection__wf_triangle";
-	shadowTriDesc.hitgroup.moduleAH             = wfModule_;
-	shadowTriDesc.hitgroup.entryFunctionNameAH  = "__anyhit__wf_shadow_triangle";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &shadowTriDesc, 1, &pgOptions,
-										 log, &logSize, &anyhitShadowTrianglePG_));
-
+	make(raygen(wfModule_, "__raygen__wf_shadow"), &raygenShadowPG_);
+	make(miss(wfModule_, "__miss__wf_shadow"), &missShadowPG_);
+	make(hit(wfModule_, "__intersection__wf_sphere", nullptr, "__anyhit__wf_shadow_sphere"), &anyhitShadowSpherePG_);
+	make(hit(wfModule_, "__intersection__wf_quad", nullptr, "__anyhit__wf_shadow_quad"), &anyhitShadowQuadPG_);
+	make(hit(wfModule_, "__intersection__wf_bilinear_patch", nullptr, "__anyhit__wf_shadow_bilinear_patch"), &anyhitShadowBilinearPatchPG_);
+	make(hit(wfModule_, "__intersection__wf_triangle", nullptr, "__anyhit__wf_shadow_triangle"), &anyhitShadowTrianglePG_);
 	// Shadow anyhit for disk/cylinder (Phase 4c)
-	OptixProgramGroupDesc shadowDiskDesc = {};
-	shadowDiskDesc.kind                          = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	shadowDiskDesc.hitgroup.moduleIS             = wfModule_;
-	shadowDiskDesc.hitgroup.entryFunctionNameIS  = "__intersection__wf_disk";
-	shadowDiskDesc.hitgroup.moduleAH             = wfModule_;
-	shadowDiskDesc.hitgroup.entryFunctionNameAH  = "__anyhit__wf_shadow_disk";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &shadowDiskDesc, 1, &pgOptions,
-										 log, &logSize, &anyhitShadowDiskPG_));
+	make(hit(wfModule_, "__intersection__wf_disk", nullptr, "__anyhit__wf_shadow_disk"), &anyhitShadowDiskPG_);
+	make(hit(wfModule_, "__intersection__wf_cylinder", nullptr, "__anyhit__wf_shadow_cylinder"), &anyhitShadowCylinderPG_);
 
-	OptixProgramGroupDesc shadowCylinderDesc = {};
-	shadowCylinderDesc.kind                          = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	shadowCylinderDesc.hitgroup.moduleIS             = wfModule_;
-	shadowCylinderDesc.hitgroup.entryFunctionNameIS  = "__intersection__wf_cylinder";
-	shadowCylinderDesc.hitgroup.moduleAH             = wfModule_;
-	shadowCylinderDesc.hitgroup.entryFunctionNameAH  = "__anyhit__wf_shadow_cylinder";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &shadowCylinderDesc, 1, &pgOptions,
-										 log, &logSize, &anyhitShadowCylinderPG_));
-
-	// Exception program group -- see this file's pipelineCompileOptions_
-	// .exceptionFlags comment in initialize() for why this exists and why
-	// it's the real CUDA-718 fix, not just diagnostics.
-	OptixProgramGroupDesc excDesc = {};
-	excDesc.kind                        = OPTIX_PROGRAM_GROUP_KIND_EXCEPTION;
-	excDesc.exception.module            = wfModule_;
-	excDesc.exception.entryFunctionName = "__exception__wf_report";
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(context_, &excDesc, 1, &pgOptions,
-										 log, &logSize, &exceptionPG_));
+	// Exception program group -- see this file's pipelineCompileOptions_.exceptionFlags comment in initialize() for why this exists and why it's the real CUDA-718 fix,
+	// not just diagnostics.
+	make(exception(wfModule_, "__exception__wf_report"), &exceptionPG_);
 
 	std::cout << "[WavefrontPathTracer] Created 25 program groups\n";
 	return true;

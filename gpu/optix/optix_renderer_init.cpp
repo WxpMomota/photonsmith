@@ -25,6 +25,7 @@
 #include <optix_function_table_definition.h>
 #include <optix_stack_size.h>
 #include "optix_module_parallel.h"
+#include "optix_program_group.h"
 #include <cuda.h>
 #include <fstream>
 #include <iostream>
@@ -425,422 +426,42 @@ std::string OptiXRenderer::loadPTX(const char* filename) const {
 }
 
 bool OptiXRenderer::createProgramGroups() {
-	char log[2048];
-	size_t logSize;
+	using namespace optix_pg;
+	const auto make = [this](const OptixProgramGroupDesc &desc, OptixProgramGroup *out) { create(context_, desc, out); };
 
-	// Raygen program
-	OptixProgramGroupOptions pgOptions = {};
-	OptixProgramGroupDesc raygenDesc = {};
-	raygenDesc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-	raygenDesc.raygen.module = module_;
-	raygenDesc.raygen.entryFunctionName = "__raygen__rg";
+	// Raygen and miss programs (radiance, shadow, and the BSSRDF probe's no-op miss)
+	make(raygen(module_, "__raygen__rg"), &raygenPG_);
+	make(miss(module_, "__miss__ms"), &missPG_);
+	make(miss(module_, "__miss__shadow"), &shadowMissPG_);
 
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&raygenDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&raygenPG_
-	));
+	// Radiance hit groups: intersection + closest-hit per custom shape. A triangle uses OptiX's built-in hardware triangle test (no intersection program bound), and
+	// its any-hit is a no-op for the overwhelming majority of triangles (MaterialData::alphaMaskTexIdx < 0), only rejecting a candidate hit via
+	// optixIgnoreIntersection() for OBJ/.mtl alpha-cutout materials (map_d) - see __anyhit__triangle's own comment (optix_intersection_triangle.h).
+	make(hit(module_, "__intersection__sphere", "__closesthit__sphere", nullptr), &hitgroupSpherePG_);
+	make(hit(module_, "__intersection__quad", "__closesthit__quad", nullptr), &hitgroupQuadPG_);
+	make(hit(module_, "__intersection__bilinear_patch", "__closesthit__bilinear_patch", nullptr), &hitgroupBilinearPatchPG_);
+	make(hit(module_, "__intersection__disk", "__closesthit__disk", nullptr), &hitgroupDiskPG_);
+	make(hit(module_, "__intersection__cylinder", "__closesthit__cylinder", nullptr), &hitgroupCylinderPG_);
+	make(hit(module_, nullptr, "__closesthit__triangle", "__anyhit__triangle"), &hitgroupTrianglePG_);
 
-	// Miss program
-	OptixProgramGroupDesc missDesc = {};
-	missDesc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
-	missDesc.miss.module = module_;
-	missDesc.miss.entryFunctionName = "__miss__ms";
+	// Shadow hit groups: any-hit only (the triangle's with the hardware test, like the radiance group above)
+	make(hit(module_, "__intersection__sphere", nullptr, "__anyhit__shadow_sphere"), &shadowHitgroupSpherePG_);
+	make(hit(module_, "__intersection__quad", nullptr, "__anyhit__shadow_quad"), &shadowHitgroupQuadPG_);
+	make(hit(module_, "__intersection__bilinear_patch", nullptr, "__anyhit__shadow_bilinear_patch"), &shadowHitgroupBilinearPatchPG_);
+	make(hit(module_, "__intersection__disk", nullptr, "__anyhit__shadow_disk"), &shadowHitgroupDiskPG_);
+	make(hit(module_, "__intersection__cylinder", nullptr, "__anyhit__shadow_cylinder"), &shadowHitgroupCylinderPG_);
+	make(hit(module_, nullptr, nullptr, "__anyhit__shadow_triangle"), &shadowHitgroupTrianglePG_);
 
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&missDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&missPG_
-	));
-
-	// Shadow miss program
-	OptixProgramGroupDesc shadowMissDesc = {};
-	shadowMissDesc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
-	shadowMissDesc.miss.module = module_;
-	shadowMissDesc.miss.entryFunctionName = "__miss__shadow";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&shadowMissDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&shadowMissPG_
-	));
-
-	// Sphere hit group (intersection + closest-hit)
-	OptixProgramGroupDesc sphereHitDesc = {};
-	sphereHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	sphereHitDesc.hitgroup.moduleIS = module_;
-	sphereHitDesc.hitgroup.entryFunctionNameIS = "__intersection__sphere";
-	sphereHitDesc.hitgroup.moduleCH = module_;
-	sphereHitDesc.hitgroup.entryFunctionNameCH = "__closesthit__sphere";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&sphereHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&hitgroupSpherePG_
-	));
-
-	// Quad hit group (intersection + closest-hit)
-	OptixProgramGroupDesc quadHitDesc = {};
-	quadHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	quadHitDesc.hitgroup.moduleIS = module_;
-	quadHitDesc.hitgroup.entryFunctionNameIS = "__intersection__quad";
-	quadHitDesc.hitgroup.moduleCH = module_;
-	quadHitDesc.hitgroup.entryFunctionNameCH = "__closesthit__quad";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&quadHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&hitgroupQuadPG_
-	));
-
-	// Bilinear patch hit group (intersection + closest-hit)
-	OptixProgramGroupDesc bilinearPatchHitDesc = {};
-	bilinearPatchHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	bilinearPatchHitDesc.hitgroup.moduleIS = module_;
-	bilinearPatchHitDesc.hitgroup.entryFunctionNameIS = "__intersection__bilinear_patch";
-	bilinearPatchHitDesc.hitgroup.moduleCH = module_;
-	bilinearPatchHitDesc.hitgroup.entryFunctionNameCH = "__closesthit__bilinear_patch";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&bilinearPatchHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&hitgroupBilinearPatchPG_
-	));
-
-	// Disk hit group (intersection + closest-hit)
-	OptixProgramGroupDesc diskHitDesc = {};
-	diskHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	diskHitDesc.hitgroup.moduleIS = module_;
-	diskHitDesc.hitgroup.entryFunctionNameIS = "__intersection__disk";
-	diskHitDesc.hitgroup.moduleCH = module_;
-	diskHitDesc.hitgroup.entryFunctionNameCH = "__closesthit__disk";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&diskHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&hitgroupDiskPG_
-	));
-
-	// Cylinder hit group (intersection + closest-hit)
-	OptixProgramGroupDesc cylinderHitDesc = {};
-	cylinderHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	cylinderHitDesc.hitgroup.moduleIS = module_;
-	cylinderHitDesc.hitgroup.entryFunctionNameIS = "__intersection__cylinder";
-	cylinderHitDesc.hitgroup.moduleCH = module_;
-	cylinderHitDesc.hitgroup.entryFunctionNameCH = "__closesthit__cylinder";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&cylinderHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&hitgroupCylinderPG_
-	));
-
-	// Triangle hit group (closest-hit + any-hit - intersection is OptiX's
-	// built-in hardware triangle test, no custom IS program bound). The
-	// any-hit program is new: it's a no-op for the overwhelming majority of
-	// triangles (MaterialData::alphaMaskTexIdx < 0), only rejecting a
-	// candidate hit via optixIgnoreIntersection() for OBJ/.mtl alpha-cutout
-	// materials (map_d) - see __anyhit__triangle's own comment
-	// (optix_intersection_triangle.h) for why this doesn't touch the
-	// built-in intersection test at all.
-	OptixProgramGroupDesc triangleHitDesc = {};
-	triangleHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	triangleHitDesc.hitgroup.moduleCH = module_;
-	triangleHitDesc.hitgroup.entryFunctionNameCH = "__closesthit__triangle";
-	triangleHitDesc.hitgroup.moduleAH = module_;
-	triangleHitDesc.hitgroup.entryFunctionNameAH = "__anyhit__triangle";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&triangleHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&hitgroupTrianglePG_
-	));
-
-	// Shadow hit group for spheres (any-hit only, no closest-hit)
-	OptixProgramGroupDesc shadowSphereHitDesc = {};
-	shadowSphereHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	shadowSphereHitDesc.hitgroup.moduleIS = module_;
-	shadowSphereHitDesc.hitgroup.entryFunctionNameIS = "__intersection__sphere";
-	shadowSphereHitDesc.hitgroup.moduleAH = module_;
-	shadowSphereHitDesc.hitgroup.entryFunctionNameAH = "__anyhit__shadow_sphere";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&shadowSphereHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&shadowHitgroupSpherePG_
-	));
-
-	// Shadow hit group for quads (any-hit only, no closest-hit)
-	OptixProgramGroupDesc shadowQuadHitDesc = {};
-	shadowQuadHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	shadowQuadHitDesc.hitgroup.moduleIS = module_;
-	shadowQuadHitDesc.hitgroup.entryFunctionNameIS = "__intersection__quad";
-	shadowQuadHitDesc.hitgroup.moduleAH = module_;
-	shadowQuadHitDesc.hitgroup.entryFunctionNameAH = "__anyhit__shadow_quad";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&shadowQuadHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&shadowHitgroupQuadPG_
-	));
-
-	// Shadow hit group for bilinear patches (any-hit only, no closest-hit)
-	OptixProgramGroupDesc shadowBilinearPatchHitDesc = {};
-	shadowBilinearPatchHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	shadowBilinearPatchHitDesc.hitgroup.moduleIS = module_;
-	shadowBilinearPatchHitDesc.hitgroup.entryFunctionNameIS = "__intersection__bilinear_patch";
-	shadowBilinearPatchHitDesc.hitgroup.moduleAH = module_;
-	shadowBilinearPatchHitDesc.hitgroup.entryFunctionNameAH = "__anyhit__shadow_bilinear_patch";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&shadowBilinearPatchHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&shadowHitgroupBilinearPatchPG_
-	));
-
-	// Shadow hit group for disks (any-hit only, no closest-hit)
-	OptixProgramGroupDesc shadowDiskHitDesc = {};
-	shadowDiskHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	shadowDiskHitDesc.hitgroup.moduleIS = module_;
-	shadowDiskHitDesc.hitgroup.entryFunctionNameIS = "__intersection__disk";
-	shadowDiskHitDesc.hitgroup.moduleAH = module_;
-	shadowDiskHitDesc.hitgroup.entryFunctionNameAH = "__anyhit__shadow_disk";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&shadowDiskHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&shadowHitgroupDiskPG_
-	));
-
-	// Shadow hit group for cylinders (any-hit only, no closest-hit)
-	OptixProgramGroupDesc shadowCylinderHitDesc = {};
-	shadowCylinderHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	shadowCylinderHitDesc.hitgroup.moduleIS = module_;
-	shadowCylinderHitDesc.hitgroup.entryFunctionNameIS = "__intersection__cylinder";
-	shadowCylinderHitDesc.hitgroup.moduleAH = module_;
-	shadowCylinderHitDesc.hitgroup.entryFunctionNameAH = "__anyhit__shadow_cylinder";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&shadowCylinderHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&shadowHitgroupCylinderPG_
-	));
-
-	// Shadow hit group for triangles (any-hit only, no closest-hit, no
-	// custom IS - built-in hardware triangle test, same as the radiance
-	// hit group above).
-	OptixProgramGroupDesc shadowTriangleHitDesc = {};
-	shadowTriangleHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	shadowTriangleHitDesc.hitgroup.moduleAH = module_;
-	shadowTriangleHitDesc.hitgroup.entryFunctionNameAH = "__anyhit__shadow_triangle";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&shadowTriangleHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&shadowHitgroupTrianglePG_
-	));
-
-	// RAY_TYPE_PROBE program groups (recursive backend only, Phase 1 BSSRDF
-	// - see optix_types.h's RAY_TYPE_PROBE comment and optix_probe_hit.h).
-	// One dedicated miss program (a true no-op) plus one closest-hit-only
-	// hit group per geometry type, reusing each type's existing __intersection__
-	// program (only closest-hit differs per ray type).
-	OptixProgramGroupDesc probeMissDesc = {};
-	probeMissDesc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
-	probeMissDesc.miss.module = module_;
-	probeMissDesc.miss.entryFunctionName = "__miss__probe";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&probeMissDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&probeMissPG_
-	));
-
-	OptixProgramGroupDesc probeSphereHitDesc = {};
-	probeSphereHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	probeSphereHitDesc.hitgroup.moduleIS = module_;
-	probeSphereHitDesc.hitgroup.entryFunctionNameIS = "__intersection__sphere";
-	probeSphereHitDesc.hitgroup.moduleCH = module_;
-	probeSphereHitDesc.hitgroup.entryFunctionNameCH = "__closesthit__probe_sphere";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&probeSphereHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&probeHitgroupSpherePG_
-	));
-
-	OptixProgramGroupDesc probeQuadHitDesc = {};
-	probeQuadHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	probeQuadHitDesc.hitgroup.moduleIS = module_;
-	probeQuadHitDesc.hitgroup.entryFunctionNameIS = "__intersection__quad";
-	probeQuadHitDesc.hitgroup.moduleCH = module_;
-	probeQuadHitDesc.hitgroup.entryFunctionNameCH = "__closesthit__probe_quad";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&probeQuadHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&probeHitgroupQuadPG_
-	));
-
-	OptixProgramGroupDesc probeBilinearPatchHitDesc = {};
-	probeBilinearPatchHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	probeBilinearPatchHitDesc.hitgroup.moduleIS = module_;
-	probeBilinearPatchHitDesc.hitgroup.entryFunctionNameIS = "__intersection__bilinear_patch";
-	probeBilinearPatchHitDesc.hitgroup.moduleCH = module_;
-	probeBilinearPatchHitDesc.hitgroup.entryFunctionNameCH = "__closesthit__probe_bilinear_patch";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&probeBilinearPatchHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&probeHitgroupBilinearPatchPG_
-	));
-
-	OptixProgramGroupDesc probeDiskHitDesc = {};
-	probeDiskHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	probeDiskHitDesc.hitgroup.moduleIS = module_;
-	probeDiskHitDesc.hitgroup.entryFunctionNameIS = "__intersection__disk";
-	probeDiskHitDesc.hitgroup.moduleCH = module_;
-	probeDiskHitDesc.hitgroup.entryFunctionNameCH = "__closesthit__probe_disk";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&probeDiskHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&probeHitgroupDiskPG_
-	));
-
-	OptixProgramGroupDesc probeCylinderHitDesc = {};
-	probeCylinderHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	probeCylinderHitDesc.hitgroup.moduleIS = module_;
-	probeCylinderHitDesc.hitgroup.entryFunctionNameIS = "__intersection__cylinder";
-	probeCylinderHitDesc.hitgroup.moduleCH = module_;
-	probeCylinderHitDesc.hitgroup.entryFunctionNameCH = "__closesthit__probe_cylinder";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&probeCylinderHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&probeHitgroupCylinderPG_
-	));
-
-	OptixProgramGroupDesc probeTriangleHitDesc = {};
-	probeTriangleHitDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	probeTriangleHitDesc.hitgroup.moduleCH = module_;
-	probeTriangleHitDesc.hitgroup.entryFunctionNameCH = "__closesthit__probe_triangle";
-
-	logSize = sizeof(log);
-	OPTIX_CHECK(optixProgramGroupCreate(
-		context_,
-		&probeTriangleHitDesc,
-		1,
-		&pgOptions,
-		log,
-		&logSize,
-		&probeHitgroupTrianglePG_
-	));
+	// RAY_TYPE_PROBE program groups (recursive backend only, Phase 1 BSSRDF - see optix_types.h's RAY_TYPE_PROBE comment and optix_probe_hit.h): one dedicated miss
+	// program (a true no-op) plus one closest-hit-only hit group per geometry type, reusing each type's existing __intersection__ program (only closest-hit differs
+	// per ray type).
+	make(miss(module_, "__miss__probe"), &probeMissPG_);
+	make(hit(module_, "__intersection__sphere", "__closesthit__probe_sphere", nullptr), &probeHitgroupSpherePG_);
+	make(hit(module_, "__intersection__quad", "__closesthit__probe_quad", nullptr), &probeHitgroupQuadPG_);
+	make(hit(module_, "__intersection__bilinear_patch", "__closesthit__probe_bilinear_patch", nullptr), &probeHitgroupBilinearPatchPG_);
+	make(hit(module_, "__intersection__disk", "__closesthit__probe_disk", nullptr), &probeHitgroupDiskPG_);
+	make(hit(module_, "__intersection__cylinder", "__closesthit__probe_cylinder", nullptr), &probeHitgroupCylinderPG_);
+	make(hit(module_, nullptr, "__closesthit__probe_triangle", nullptr), &probeHitgroupTrianglePG_);
 
 	std::cout << "[OptiX] Created program groups: raygen, miss (radiance + shadow + probe), sphere hit (radiance + shadow + probe), quad hit (radiance + shadow + probe), bilinear patch hit (radiance + shadow + probe), disk hit (radiance + shadow + probe), cylinder hit (radiance + shadow + probe), triangle hit (radiance + shadow + probe)\n";
 	return true;

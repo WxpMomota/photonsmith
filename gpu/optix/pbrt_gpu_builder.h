@@ -464,6 +464,191 @@ inline std::shared_ptr<const nanovdb_dense::Grid> cachedNanovdbGrid(const std::s
 	return it->second;
 }
 
+// A "cloud" medium: a CloudMedium entry and the material that points at it. Returns the material index.
+inline int buildCloudMediumMaterial(SceneData &out, const pbrt_flatten::Medium &md, double sig_s) {
+	float toMediumMatF[9], toMediumTranslateF[3];
+	for (int i = 0; i < 9; ++i) toMediumMatF[i] = static_cast<float>(md.toMediumMat[i]);
+	for (int i = 0; i < 3; ++i) toMediumTranslateF[i] = static_cast<float>(md.toMediumTranslate[i]);
+	const CloudMedium<float> cloud = CloudMedium<float>::make(
+		static_cast<float>(md.p0[0]), static_cast<float>(md.p0[1]), static_cast<float>(md.p0[2]),
+		static_cast<float>(md.p1[0]), static_cast<float>(md.p1[1]), static_cast<float>(md.p1[2]),
+		toMediumMatF, toMediumTranslateF,
+		0.0f, static_cast<float>(sig_s), static_cast<float>(md.g),
+		static_cast<float>(md.density), static_cast<float>(md.wispiness), static_cast<float>(md.frequency));
+	const int cloudIdx = static_cast<int>(out.cloudMediums.size());
+	out.cloudMediums.push_back(cloud);
+	MaterialData d = {};
+	d.type = MaterialType::CloudMedium;
+	d.medium_albedo = make_float3(1.0f, 1.0f, 1.0f);
+	d.g = static_cast<float>(md.g);
+	d.cloud_medium_extra.cloudMediumIdx = static_cast<float>(cloudIdx);
+	const int idx = static_cast<int>(out.materials.size());
+	out.materials.push_back(d);
+	return idx;
+}
+
+// An "rgbgrid" medium: its per-voxel sigma_s/sigma_a/Le arrays, the majorant and the material that points at them. Returns the material index.
+inline int buildRgbGridMediumMaterial(SceneData &out, const pbrt_flatten::Medium &md) {
+	const std::size_t voxels = static_cast<std::size_t>(md.nx)
+		* static_cast<std::size_t>(md.ny) * static_cast<std::size_t>(md.nz);
+	// pbrt (and the CPU's RGBGridMediumData) default an absent "rgb sigma_s" / "rgb sigma_a" grid to 1 in every channel.
+	const bool hasScattering = md.sigma_s_r.size() == voxels
+		&& md.sigma_s_g.size() == voxels && md.sigma_s_b.size() == voxels;
+	const bool hasAbsorption = md.sigma_a_r.size() == voxels
+		&& md.sigma_a_g.size() == voxels && md.sigma_a_b.size() == voxels;
+	GpuRgbGridMedium meta{};
+	for (int i = 0; i < 3; ++i) {
+		meta.bounds_min[i] = static_cast<float>(md.worldMin[i]);
+		meta.bounds_max[i] = static_cast<float>(md.worldMax[i]);
+		meta.translate[i] = static_cast<float>(md.toMediumTranslate[i]);
+	}
+	for (int i = 0; i < 9; ++i) meta.mat[i] = static_cast<float>(md.toMediumMat[i]);
+	meta.nx = md.nx; meta.ny = md.ny; meta.nz = md.nz;
+	meta.sigma_scale = 1.0f;
+	meta.phase_g = static_cast<float>(md.g);
+	const auto toFloats = [](const std::vector<double> &v) {
+		std::vector<float> f(v.size());
+		std::transform(v.begin(), v.end(), f.begin(), [](double x) { return static_cast<float>(x); });
+		return f;
+	};
+	std::vector<float> rf, gf, bf;       // sigma_s
+	if (hasScattering) {
+		rf = toFloats(md.sigma_s_r); gf = toFloats(md.sigma_s_g); bf = toFloats(md.sigma_s_b);
+	} else {
+		rf.assign(voxels, 1.0f); gf.assign(voxels, 1.0f); bf.assign(voxels, 1.0f);
+	}
+	std::vector<float> arf, agf, abf;    // sigma_a (only when the scene gave one)
+	if (hasAbsorption) {
+		arf = toFloats(md.sigma_a_r); agf = toFloats(md.sigma_a_g); abf = toFloats(md.sigma_a_b);
+	}
+	// Global majorant: the largest sigma_a + sigma_s over every voxel and channel (a trilinear lookup of a sum never exceeds the
+	// largest voxel value of that sum), with the usual small safety margin.
+	float max_density = 0.0f;
+	for (std::size_t v = 0; v < voxels; ++v) {
+		const float sa_r = hasAbsorption ? arf[v] : 1.0f, sa_g = hasAbsorption ? agf[v] : 1.0f, sa_b = hasAbsorption ? abf[v] : 1.0f;
+		max_density = std::fmax(max_density, std::fmax(sa_r + rf[v], std::fmax(sa_g + gf[v], sa_b + bf[v])));
+	}
+	meta.sigma_maj = max_density * meta.sigma_scale * 1.01f;   // small safety margin, matches scene_builder.cpp's own convention
+	meta.dataOffset = static_cast<int>(out.rgbGridData.size());
+	out.rgbGridData.insert(out.rgbGridData.end(), rf.begin(), rf.end());
+	out.rgbGridData.insert(out.rgbGridData.end(), gf.begin(), gf.end());
+	out.rgbGridData.insert(out.rgbGridData.end(), bf.begin(), bf.end());
+	meta.saDataOffset = -1;
+	if (hasAbsorption) {
+		meta.saDataOffset = static_cast<int>(out.rgbGridData.size());
+		out.rgbGridData.insert(out.rgbGridData.end(), arf.begin(), arf.end());
+		out.rgbGridData.insert(out.rgbGridData.end(), agf.begin(), agf.end());
+		out.rgbGridData.insert(out.rgbGridData.end(), abf.begin(), abf.end());
+	}
+	// Real per-voxel "rgb Le"/"float Lescale" (pbrt-v4 RGBGridMedium::
+	// LeGrid/LeScale) - previously silently dropped entirely on GPU
+	// (both backends), unlike CPU's real RGBGridMediumData::Le_grids
+	// support (rgb_grid_medium_hittable.h). Same is_emissive() gate
+	// as CPU (RGBGridMediumData::is_emissive(): Le_grids present AND
+	// Le_scale > 0) - md.Le_scale defaults to 1.0 when "Lescale" was
+	// omitted (pbrt_flatten.h's own comment on that default), so a
+	// scene with only "rgb Le" and no "Lescale" still glows here too.
+	meta.leDataOffset = -1;
+	meta.Le_scale = static_cast<float>(md.Le_scale);
+	const bool hasLe = md.Le_r.size() == voxels && md.Le_g.size() == voxels
+		&& md.Le_b.size() == voxels;
+	if (hasLe && meta.Le_scale > 0.0f) {
+		// Inserted directly from md.Le_r/g/b (double) into
+		// out.rgbGridData (float) - unlike the sigma_s block above,
+		// which needs its own rf/gf/bf float copies to compute
+		// max_density from afterward, ler/leg/leb here had no second
+		// use, so the intermediate copy is skipped; insert() narrows
+		// double->float per element the same way the copy would have.
+		meta.leDataOffset = static_cast<int>(out.rgbGridData.size());
+		// std::transform + back_inserter, not insert(begin,end): same
+		// double->float narrowing as the sigma_s block above via an
+		// explicit cast instead of an implicit one, so MSVC's C4244
+		// is silenced without changing what value ends up stored.
+		std::transform(md.Le_r.begin(), md.Le_r.end(), std::back_inserter(out.rgbGridData),
+			[](double v) { return static_cast<float>(v); });
+		std::transform(md.Le_g.begin(), md.Le_g.end(), std::back_inserter(out.rgbGridData),
+			[](double v) { return static_cast<float>(v); });
+		std::transform(md.Le_b.begin(), md.Le_b.end(), std::back_inserter(out.rgbGridData),
+			[](double v) { return static_cast<float>(v); });
+	}
+	const int gridIdx = static_cast<int>(out.rgbGridMediums.size());
+	out.rgbGridMediums.push_back(meta);
+	MaterialData d = {};
+	d.type = MaterialType::RgbGridMedium;
+	d.rgb_grid_medium_extra.rgbGridMediumIdx = static_cast<float>(gridIdx);
+	const int idx = static_cast<int>(out.materials.size());
+	out.materials.push_back(d);
+	return idx;
+}
+
+// A "uniformgrid" medium: the density array (empty and invisible when the file gave none) and its material. Returns the material index.
+inline int buildUniformGridMediumMaterial(SceneData &out, const pbrt_flatten::Medium &md, double sig_s) {
+	// Single-channel twin of the rgbgrid branch just above - see
+	// that one's own comment. sigma_a is dropped the same way it is
+	// for cloud (pure scattering) - flatten() already warned about
+	// this. sig_s (luminance(md.sigma_s), already computed above for
+	// the cloud branch) is the per-voxel scattering multiplier,
+	// matching CPU's pbrt_cpu_builder.h uniformgrid branch exactly.
+	const std::size_t voxels = static_cast<std::size_t>(md.nx)
+		* static_cast<std::size_t>(md.ny) * static_cast<std::size_t>(md.nz);
+	const bool hasDensity = md.gridDensity.size() == voxels;
+	GpuGridMedium meta{};
+	for (int i = 0; i < 3; ++i) {
+		meta.bounds_min[i] = static_cast<float>(md.worldMin[i]);
+		meta.bounds_max[i] = static_cast<float>(md.worldMax[i]);
+		meta.translate[i] = static_cast<float>(md.toMediumTranslate[i]);
+	}
+	for (int i = 0; i < 9; ++i) meta.mat[i] = static_cast<float>(md.toMediumMat[i]);
+	meta.nx = md.nx; meta.ny = md.ny; meta.nz = md.nz;
+	meta.sigma_scale = static_cast<float>(sig_s);
+	meta.phase_g = static_cast<float>(md.g);
+	std::vector<float> df;
+	float max_density = 0.0f;
+	if (hasDensity) {
+		// See the sigma_s block above for why this is resize+transform
+		// rather than .assign(begin,end) - same double->float C4244.
+		df.resize(md.gridDensity.size());
+		std::transform(md.gridDensity.begin(), md.gridDensity.end(), df.begin(),
+			[](double v) { return static_cast<float>(v); });
+		for (float v : df) max_density = std::fmax(max_density, v);
+	} else {
+		// No density data (missing/wrong-length "float density" -
+		// flatten() already warned) - degrade to an empty, invisible
+		// grid rather than reading past the end of an empty vector.
+		df.assign(voxels, 0.0f);
+	}
+	const int idx = appendGridMediumMaterial(out, meta, df);
+	return idx;
+}
+
+// A "nanovdb" medium: the grid read and densified on the host (once per process, see cachedNanovdbGrid) and its material. Returns the material index.
+inline int buildNanovdbMediumMaterial(SceneData &out, BuildStats &stats, const pbrt_flatten::Medium &md, double sig_s) {
+	// A NanoVDB file is read and densified on the host (src/shared/nanovdb_dense.h, the same step the CPU renderer uses) and then rendered by the dense-grid
+	// medium "uniformgrid" already has, so no NanoVDB code runs on the device. Pure scattering with sigma_s = luminance(md.sigma_s), like CPU's bake. The grid has
+	// no per-voxel emission, so a "temperaturename" grid is counted and dropped (scene_builder.cpp warns).
+	GpuGridMedium meta{};
+	meta.nx = 1; meta.ny = 1; meta.nz = 1;
+	for (int i = 0; i < 3; ++i) meta.mat[i * 3 + i] = 1.0f;
+	std::vector<float> density(1, 0.0f);   // an unusable file degrades to an empty, invisible grid, as CPU's does
+	const std::shared_ptr<const nanovdb_dense::Grid> grid = cachedNanovdbGrid(md.nanovdbFilename, md.nanovdbGridName);
+	nanovdb_dense::Placement placement;
+	if (grid && grid->ok() && nanovdb_dense::placeInWorld(*grid, md.nanovdbXform, placement)) {
+		for (int i = 0; i < 3; ++i) {
+			meta.bounds_min[i] = static_cast<float>(placement.worldMin[i]);
+			meta.bounds_max[i] = static_cast<float>(placement.worldMax[i]);
+			meta.translate[i] = static_cast<float>(placement.toMediumTranslate[i]);
+		}
+		for (int i = 0; i < 9; ++i) meta.mat[i] = static_cast<float>(placement.toMediumMat[i]);
+		meta.nx = grid->nx; meta.ny = grid->ny; meta.nz = grid->nz;
+		density = grid->density;
+		if (!md.nanovdbTemperatureGridName.empty()) ++stats.nanovdbEmissionDropped;
+	}
+	meta.sigma_scale = static_cast<float>(sig_s);
+	meta.phase_g = static_cast<float>(md.g);
+	const int idx = appendGridMediumMaterial(out, meta, density);
+	return idx;
+}
+
 // Medium lookup: the Medium material a shape's MediumInterface turns into.
 inline void setupMediumLookup(BuildCtx &c) {
 	using namespace detail;
@@ -529,183 +714,22 @@ inline void setupMediumLookup(BuildCtx &c) {
 		// homogeneous MaterialType::Medium case above already has (see the
 		// sphere loop just below) - not a new constraint these two add.
 		if (md.type == "cloud") {
-			float toMediumMatF[9], toMediumTranslateF[3];
-			for (int i = 0; i < 9; ++i) toMediumMatF[i] = static_cast<float>(md.toMediumMat[i]);
-			for (int i = 0; i < 3; ++i) toMediumTranslateF[i] = static_cast<float>(md.toMediumTranslate[i]);
-			const CloudMedium<float> cloud = CloudMedium<float>::make(
-				static_cast<float>(md.p0[0]), static_cast<float>(md.p0[1]), static_cast<float>(md.p0[2]),
-				static_cast<float>(md.p1[0]), static_cast<float>(md.p1[1]), static_cast<float>(md.p1[2]),
-				toMediumMatF, toMediumTranslateF,
-				0.0f, static_cast<float>(sig_s), static_cast<float>(md.g),
-				static_cast<float>(md.density), static_cast<float>(md.wispiness), static_cast<float>(md.frequency));
-			const int cloudIdx = static_cast<int>(out.cloudMediums.size());
-			out.cloudMediums.push_back(cloud);
-			MaterialData d = {};
-			d.type = MaterialType::CloudMedium;
-			d.medium_albedo = make_float3(1.0f, 1.0f, 1.0f);
-			d.g = static_cast<float>(md.g);
-			d.cloud_medium_extra.cloudMediumIdx = static_cast<float>(cloudIdx);
-			const int idx = static_cast<int>(out.materials.size());
-			out.materials.push_back(d);
+			const int idx = buildCloudMediumMaterial(out, md, sig_s);
 			mediumCache.emplace(cacheKey, idx);
 			return idx;
 		}
 		if (md.type == "rgbgrid") {
-			const std::size_t voxels = static_cast<std::size_t>(md.nx)
-				* static_cast<std::size_t>(md.ny) * static_cast<std::size_t>(md.nz);
-			// pbrt (and the CPU's RGBGridMediumData) default an absent "rgb sigma_s" / "rgb sigma_a" grid to 1 in every channel.
-			const bool hasScattering = md.sigma_s_r.size() == voxels
-				&& md.sigma_s_g.size() == voxels && md.sigma_s_b.size() == voxels;
-			const bool hasAbsorption = md.sigma_a_r.size() == voxels
-				&& md.sigma_a_g.size() == voxels && md.sigma_a_b.size() == voxels;
-			GpuRgbGridMedium meta{};
-			for (int i = 0; i < 3; ++i) {
-				meta.bounds_min[i] = static_cast<float>(md.worldMin[i]);
-				meta.bounds_max[i] = static_cast<float>(md.worldMax[i]);
-				meta.translate[i] = static_cast<float>(md.toMediumTranslate[i]);
-			}
-			for (int i = 0; i < 9; ++i) meta.mat[i] = static_cast<float>(md.toMediumMat[i]);
-			meta.nx = md.nx; meta.ny = md.ny; meta.nz = md.nz;
-			meta.sigma_scale = 1.0f;
-			meta.phase_g = static_cast<float>(md.g);
-			const auto toFloats = [](const std::vector<double> &v) {
-				std::vector<float> f(v.size());
-				std::transform(v.begin(), v.end(), f.begin(), [](double x) { return static_cast<float>(x); });
-				return f;
-			};
-			std::vector<float> rf, gf, bf;       // sigma_s
-			if (hasScattering) {
-				rf = toFloats(md.sigma_s_r); gf = toFloats(md.sigma_s_g); bf = toFloats(md.sigma_s_b);
-			} else {
-				rf.assign(voxels, 1.0f); gf.assign(voxels, 1.0f); bf.assign(voxels, 1.0f);
-			}
-			std::vector<float> arf, agf, abf;    // sigma_a (only when the scene gave one)
-			if (hasAbsorption) {
-				arf = toFloats(md.sigma_a_r); agf = toFloats(md.sigma_a_g); abf = toFloats(md.sigma_a_b);
-			}
-			// Global majorant: the largest sigma_a + sigma_s over every voxel and channel (a trilinear lookup of a sum never exceeds the
-			// largest voxel value of that sum), with the usual small safety margin.
-			float max_density = 0.0f;
-			for (std::size_t v = 0; v < voxels; ++v) {
-				const float sa_r = hasAbsorption ? arf[v] : 1.0f, sa_g = hasAbsorption ? agf[v] : 1.0f, sa_b = hasAbsorption ? abf[v] : 1.0f;
-				max_density = std::fmax(max_density, std::fmax(sa_r + rf[v], std::fmax(sa_g + gf[v], sa_b + bf[v])));
-			}
-			meta.sigma_maj = max_density * meta.sigma_scale * 1.01f;   // small safety margin, matches scene_builder.cpp's own convention
-			meta.dataOffset = static_cast<int>(out.rgbGridData.size());
-			out.rgbGridData.insert(out.rgbGridData.end(), rf.begin(), rf.end());
-			out.rgbGridData.insert(out.rgbGridData.end(), gf.begin(), gf.end());
-			out.rgbGridData.insert(out.rgbGridData.end(), bf.begin(), bf.end());
-			meta.saDataOffset = -1;
-			if (hasAbsorption) {
-				meta.saDataOffset = static_cast<int>(out.rgbGridData.size());
-				out.rgbGridData.insert(out.rgbGridData.end(), arf.begin(), arf.end());
-				out.rgbGridData.insert(out.rgbGridData.end(), agf.begin(), agf.end());
-				out.rgbGridData.insert(out.rgbGridData.end(), abf.begin(), abf.end());
-			}
-			// Real per-voxel "rgb Le"/"float Lescale" (pbrt-v4 RGBGridMedium::
-			// LeGrid/LeScale) - previously silently dropped entirely on GPU
-			// (both backends), unlike CPU's real RGBGridMediumData::Le_grids
-			// support (rgb_grid_medium_hittable.h). Same is_emissive() gate
-			// as CPU (RGBGridMediumData::is_emissive(): Le_grids present AND
-			// Le_scale > 0) - md.Le_scale defaults to 1.0 when "Lescale" was
-			// omitted (pbrt_flatten.h's own comment on that default), so a
-			// scene with only "rgb Le" and no "Lescale" still glows here too.
-			meta.leDataOffset = -1;
-			meta.Le_scale = static_cast<float>(md.Le_scale);
-			const bool hasLe = md.Le_r.size() == voxels && md.Le_g.size() == voxels
-				&& md.Le_b.size() == voxels;
-			if (hasLe && meta.Le_scale > 0.0f) {
-				// Inserted directly from md.Le_r/g/b (double) into
-				// out.rgbGridData (float) - unlike the sigma_s block above,
-				// which needs its own rf/gf/bf float copies to compute
-				// max_density from afterward, ler/leg/leb here had no second
-				// use, so the intermediate copy is skipped; insert() narrows
-				// double->float per element the same way the copy would have.
-				meta.leDataOffset = static_cast<int>(out.rgbGridData.size());
-				// std::transform + back_inserter, not insert(begin,end): same
-				// double->float narrowing as the sigma_s block above via an
-				// explicit cast instead of an implicit one, so MSVC's C4244
-				// is silenced without changing what value ends up stored.
-				std::transform(md.Le_r.begin(), md.Le_r.end(), std::back_inserter(out.rgbGridData),
-					[](double v) { return static_cast<float>(v); });
-				std::transform(md.Le_g.begin(), md.Le_g.end(), std::back_inserter(out.rgbGridData),
-					[](double v) { return static_cast<float>(v); });
-				std::transform(md.Le_b.begin(), md.Le_b.end(), std::back_inserter(out.rgbGridData),
-					[](double v) { return static_cast<float>(v); });
-			}
-			const int gridIdx = static_cast<int>(out.rgbGridMediums.size());
-			out.rgbGridMediums.push_back(meta);
-			MaterialData d = {};
-			d.type = MaterialType::RgbGridMedium;
-			d.rgb_grid_medium_extra.rgbGridMediumIdx = static_cast<float>(gridIdx);
-			const int idx = static_cast<int>(out.materials.size());
-			out.materials.push_back(d);
+			const int idx = buildRgbGridMediumMaterial(out, md);
 			mediumCache.emplace(cacheKey, idx);
 			return idx;
 		}
 		if (md.type == "uniformgrid") {
-			// Single-channel twin of the rgbgrid branch just above - see
-			// that one's own comment. sigma_a is dropped the same way it is
-			// for cloud (pure scattering) - flatten() already warned about
-			// this. sig_s (luminance(md.sigma_s), already computed above for
-			// the cloud branch) is the per-voxel scattering multiplier,
-			// matching CPU's pbrt_cpu_builder.h uniformgrid branch exactly.
-			const std::size_t voxels = static_cast<std::size_t>(md.nx)
-				* static_cast<std::size_t>(md.ny) * static_cast<std::size_t>(md.nz);
-			const bool hasDensity = md.gridDensity.size() == voxels;
-			GpuGridMedium meta{};
-			for (int i = 0; i < 3; ++i) {
-				meta.bounds_min[i] = static_cast<float>(md.worldMin[i]);
-				meta.bounds_max[i] = static_cast<float>(md.worldMax[i]);
-				meta.translate[i] = static_cast<float>(md.toMediumTranslate[i]);
-			}
-			for (int i = 0; i < 9; ++i) meta.mat[i] = static_cast<float>(md.toMediumMat[i]);
-			meta.nx = md.nx; meta.ny = md.ny; meta.nz = md.nz;
-			meta.sigma_scale = static_cast<float>(sig_s);
-			meta.phase_g = static_cast<float>(md.g);
-			std::vector<float> df;
-			float max_density = 0.0f;
-			if (hasDensity) {
-				// See the sigma_s block above for why this is resize+transform
-				// rather than .assign(begin,end) - same double->float C4244.
-				df.resize(md.gridDensity.size());
-				std::transform(md.gridDensity.begin(), md.gridDensity.end(), df.begin(),
-					[](double v) { return static_cast<float>(v); });
-				for (float v : df) max_density = std::fmax(max_density, v);
-			} else {
-				// No density data (missing/wrong-length "float density" -
-				// flatten() already warned) - degrade to an empty, invisible
-				// grid rather than reading past the end of an empty vector.
-				df.assign(voxels, 0.0f);
-			}
-			const int idx = appendGridMediumMaterial(out, meta, df);
+			const int idx = buildUniformGridMediumMaterial(out, md, sig_s);
 			mediumCache.emplace(cacheKey, idx);
 			return idx;
 		}
 		if (md.type == "nanovdb") {
-			// A NanoVDB file is read and densified on the host (src/shared/nanovdb_dense.h, the same step the CPU renderer uses) and then rendered by the dense-grid
-			// medium "uniformgrid" already has, so no NanoVDB code runs on the device. Pure scattering with sigma_s = luminance(md.sigma_s), like CPU's bake. The grid has
-			// no per-voxel emission, so a "temperaturename" grid is counted and dropped (scene_builder.cpp warns).
-			GpuGridMedium meta{};
-			meta.nx = 1; meta.ny = 1; meta.nz = 1;
-			for (int i = 0; i < 3; ++i) meta.mat[i * 3 + i] = 1.0f;
-			std::vector<float> density(1, 0.0f);   // an unusable file degrades to an empty, invisible grid, as CPU's does
-			const std::shared_ptr<const nanovdb_dense::Grid> grid = cachedNanovdbGrid(md.nanovdbFilename, md.nanovdbGridName);
-			nanovdb_dense::Placement placement;
-			if (grid && grid->ok() && nanovdb_dense::placeInWorld(*grid, md.nanovdbXform, placement)) {
-				for (int i = 0; i < 3; ++i) {
-					meta.bounds_min[i] = static_cast<float>(placement.worldMin[i]);
-					meta.bounds_max[i] = static_cast<float>(placement.worldMax[i]);
-					meta.translate[i] = static_cast<float>(placement.toMediumTranslate[i]);
-				}
-				for (int i = 0; i < 9; ++i) meta.mat[i] = static_cast<float>(placement.toMediumMat[i]);
-				meta.nx = grid->nx; meta.ny = grid->ny; meta.nz = grid->nz;
-				density = grid->density;
-				if (!md.nanovdbTemperatureGridName.empty()) ++stats.nanovdbEmissionDropped;
-			}
-			meta.sigma_scale = static_cast<float>(sig_s);
-			meta.phase_g = static_cast<float>(md.g);
-			const int idx = appendGridMediumMaterial(out, meta, density);
+			const int idx = buildNanovdbMediumMaterial(out, stats, md, sig_s);
 			mediumCache.emplace(cacheKey, idx);
 			return idx;
 		}

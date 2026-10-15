@@ -152,6 +152,12 @@ public:
 		float* outputFramebuffer
 	);
 
+	// The pieces of render() (see optix_renderer_render.cpp).
+	GpuCameraParams makeRenderCamera(const GpuCameraParams& camera);
+	bool renderWavefront(unsigned int width, unsigned int height, unsigned int samplesPerPixel, unsigned int maxDepth, const GpuCameraParams& gpuCam, float* outputFramebuffer);
+	LaunchParams makeLaunchParams(unsigned int width, unsigned int height, unsigned int samplesPerPixel, unsigned int maxDepth, const GpuCameraParams& gpuCam,
+	                              CUdeviceptr d_framebuffer, CUdeviceptr d_albedo, CUdeviceptr d_normal, CUdeviceptr d_statsBounceRays, CUdeviceptr d_statsShadowRays);
+
 	/// @brief Check if OptiX is available on this system
 	/// @details Verifies driver support and SDK availability
 	/// @return true if OptiX can be used, false otherwise

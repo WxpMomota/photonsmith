@@ -263,6 +263,216 @@ void OptiXRenderer::uploadGeometryBuffers(const SceneInputs &in, SceneBuildState
 					  portalFrameX, portalFrameY, portalFrameZ, portalP0, portalP2);
 }
 
+// Per light: its power (phi = area * luminance(emission) * pi, doubled for a two-sided one; the power-weighted alias table is built from it) and its LightBounds
+// for the light BVH. The per-kind geometry both need is read once here.
+// Light BVH (pbrt-v4 §12.6, docs/FEATURE_INVENTORY.md's "no light BVH
+// on GPU" entry - see OptiXRenderer::d_lightBvhNodes_'s own comment)
+// - per-light world-space AABB + dominant emission direction/cone,
+// computed alongside the power estimate above since both need the
+// same per-kind geometry. Flat single-normal shapes (Quad/Triangle/
+// BilinearPatch) get a real, tight direction bound (cosTheta_o=1: the
+// normal never varies across a planar shape); curved shapes (Sphere/
+// Disk/Cylinder) get the conservative omnidirectional default
+// (cosTheta_o=-1, w arbitrary) rather than a real per-point normal
+// cone - CPU's own light_bounds_for() (bvh_light_sampler.h) makes the
+// identical simplification for any shape it doesn't special-case.
+// Only the SPATIAL/power partitioning benefit is lost for these, not
+// correctness - a conservative bound can only under-prune, never
+// wrongly zero out a light that should contribute.
+static void computeLightBounds(const SceneInputs &in, unsigned int numLights, std::vector<float> &powers, std::vector<LightBounds> &lightBoundsArr) {
+	const auto &spheres = in.spheres;
+	const auto &quads = in.quads;
+	const auto &materials = in.materials;
+	const auto &lightIndices = in.lightIndices;
+	const auto &lightKinds = in.lightKinds;
+	const auto &bilinearPatches = in.bilinearPatches;
+	const auto &triangles = in.triangles;
+	const auto &disks = in.disks;
+	const auto &cylinders = in.cylinders;
+	auto applyAffine = [](const float m[12], float x, float y, float z, float out[3]) {
+		out[0] = m[0]*x + m[1]*y + m[2]*z  + m[3];
+		out[1] = m[4]*x + m[5]*y + m[6]*z  + m[7];
+		out[2] = m[8]*x + m[9]*y + m[10]*z + m[11];
+	};
+	for (unsigned int i = 0; i < numLights; ++i) {
+		int prim_idx = lightIndices[i];
+		float3 emission = make_float3(0.f, 0.f, 0.f);
+		float area = 1.0f;
+		bool twoSided = false;
+		float bMin[3] = {0,0,0}, bMax[3] = {0,0,0};
+		float wx = 0.f, wy = 1.f, wz = 0.f, cosThetaO = -1.0f;
+		if (lightKinds[i] == GpuLightKind::Sphere) {
+			const SphereData& s = spheres[prim_idx];
+			const MaterialData& m = materials[s.materialIdx];
+			emission = m.emission;
+			twoSided = m.twoSided;
+			// A ClippedSphere's true emitting area is the visible cap/
+			// wedge, not the full sphere s.radius still carries (that
+			// field is deliberately the baked full-sphere radius, kept
+			// only for the NEE-sampling cone approximation - see
+			// SphereData's own comment). Using the full area here would
+			// over-select a small clipped cap in this power-weighted
+			// alias table far more often than its real contribution
+			// warrants - matches pbrt-v4's own Sphere::Area() (phiMax *
+			// r * (zMax-zMin), src/shared/shapes.h's SphereShape<T>::
+			// area()), reducing to the ordinary 4*pi*r^2 sphere area
+			// when phiMax=2*pi and zMax-zMin=2*r (an unclipped sphere).
+			area = (s.shapeKind == GpuMediumShapeKind::ClippedSphere)
+				? s.phiMax * s.radiusLocal * (s.zMax - s.zMin)
+				: 4.0f * 3.14159265f * s.radius * s.radius;  // surface area of sphere
+			bMin[0] = s.center.x - s.radius; bMax[0] = s.center.x + s.radius;
+			bMin[1] = s.center.y - s.radius; bMax[1] = s.center.y + s.radius;
+			bMin[2] = s.center.z - s.radius; bMax[2] = s.center.z + s.radius;
+		} else if (lightKinds[i] == GpuLightKind::Triangle) {
+			// Indexes `triangles`, not `quads` - and note this is the
+			// SCENE's triangle array, which is what lightIndices was built
+			// against; instanced triangles are never emissive (flatten()
+			// bakes emitters per placement), so no base offset applies.
+			const TriangleData& t = triangles[prim_idx];
+			const MaterialData& m = materials[t.materialIdx];
+			emission = m.emission;
+			twoSided = m.twoSided;
+			// Half the parallelogram the two edges span.
+			const float3 e1 = t.p1 - t.p0;
+			const float3 e2 = t.p2 - t.p0;
+			float3 n = cross(e1, e2);
+			area = 0.5f * length(n);
+			if (area > 1e-12f) { n = n / length(n); wx = n.x; wy = n.y; wz = n.z; cosThetaO = 1.0f; }
+			bMin[0] = fminf(t.p0.x, fminf(t.p1.x, t.p2.x)); bMax[0] = fmaxf(t.p0.x, fmaxf(t.p1.x, t.p2.x));
+			bMin[1] = fminf(t.p0.y, fminf(t.p1.y, t.p2.y)); bMax[1] = fmaxf(t.p0.y, fmaxf(t.p1.y, t.p2.y));
+			bMin[2] = fminf(t.p0.z, fminf(t.p1.z, t.p2.z)); bMax[2] = fmaxf(t.p0.z, fmaxf(t.p1.z, t.p2.z));
+		} else if (lightKinds[i] == GpuLightKind::BilinearPatch) {
+			// Indexes `bilinearPatches`, not `quads` - this branch must
+			// stay explicit (not fall into the trailing else below) or
+			// prim_idx gets reinterpreted against the wrong array, which
+			// for a scene with fewer quads than bilinear patches (e.g.
+			// sportscar-area-lights.pbrt has zero quads and 5 bilinear-
+			// patch lights) is an out-of-bounds read, not just a wrong
+			// number.
+			const BilinearPatchData& bp = bilinearPatches[prim_idx];
+			const MaterialData& m = materials[bp.materialIdx];
+			emission = m.emission;
+			twoSided = m.twoSided;
+			const float p00[3] = {bp.p00.x, bp.p00.y, bp.p00.z};
+			const float p10[3] = {bp.p10.x, bp.p10.y, bp.p10.z};
+			const float p01[3] = {bp.p01.x, bp.p01.y, bp.p01.z};
+			const float p11[3] = {bp.p11.x, bp.p11.y, bp.p11.z};
+			area = blp_area(p00, p10, p01, p11);
+			// Not necessarily planar in general (see BilinearPatchData's
+			// own comment) - a real per-point normal cone would need
+			// integrating over the surface, out of scope here; use the
+			// same conservative omnidirectional default as Sphere/Disk/
+			// Cylinder rather than a single (possibly wrong for a curved
+			// patch) corner normal.
+			bMin[0] = fminf(fminf(bp.p00.x,bp.p10.x), fminf(bp.p01.x,bp.p11.x));
+			bMax[0] = fmaxf(fmaxf(bp.p00.x,bp.p10.x), fmaxf(bp.p01.x,bp.p11.x));
+			bMin[1] = fminf(fminf(bp.p00.y,bp.p10.y), fminf(bp.p01.y,bp.p11.y));
+			bMax[1] = fmaxf(fmaxf(bp.p00.y,bp.p10.y), fmaxf(bp.p01.y,bp.p11.y));
+			bMin[2] = fminf(fminf(bp.p00.z,bp.p10.z), fminf(bp.p01.z,bp.p11.z));
+			bMax[2] = fmaxf(fmaxf(bp.p00.z,bp.p10.z), fmaxf(bp.p01.z,bp.p11.z));
+		} else if (lightKinds[i] == GpuLightKind::Disk) {
+			// Indexes `disks`, not `quads` - same "must stay explicit"
+			// reasoning as the BilinearPatch branch above. dc_area_disk()
+			// (optix_disk_cylinder_helpers.h) is tagged __host__
+			// __device__ specifically so this plain host C++ file can
+			// call it directly instead of hand-copying the formula.
+			const DiskData& d = disks[prim_idx];
+			const MaterialData& m = materials[d.materialIdx];
+			emission = m.emission;
+			twoSided = m.twoSided;
+			area = dc_area_disk(d);
+			// Not baked to world space (see DiskData's own comment) - a
+			// conservative object-space square around the outer radius,
+			// transformed to world by o2w, at 4 corners of the disk's own
+			// z=height plane.
+			bMin[0]=bMin[1]=bMin[2]= 1e30f; bMax[0]=bMax[1]=bMax[2]=-1e30f;
+			for (int cx = -1; cx <= 1; cx += 2) for (int cy = -1; cy <= 1; cy += 2) {
+				float p[3];
+				applyAffine(d.o2w, cx*d.radius, cy*d.radius, d.height, p);
+				for (int c = 0; c < 3; ++c) { bMin[c] = std::min(bMin[c], p[c]); bMax[c] = std::max(bMax[c], p[c]); }
+			}
+		} else if (lightKinds[i] == GpuLightKind::Cylinder) {
+			const CylinderData& c = cylinders[prim_idx];
+			const MaterialData& m = materials[c.materialIdx];
+			emission = m.emission;
+			twoSided = m.twoSided;
+			area = dc_area_cylinder(c);
+			// Same "not baked to world space, transform a conservative
+			// object-space box by o2w" approach as Disk above - 8 corners
+			// of the object-space [-r,r]x[-r,r]x[zMin,zMax] box.
+			bMin[0]=bMin[1]=bMin[2]= 1e30f; bMax[0]=bMax[1]=bMax[2]=-1e30f;
+			for (int cx = -1; cx <= 1; cx += 2) for (int cy = -1; cy <= 1; cy += 2) {
+				float pLo[3], pHi[3];
+				applyAffine(c.o2w, cx*c.radius, cy*c.radius, c.zMin, pLo);
+				applyAffine(c.o2w, cx*c.radius, cy*c.radius, c.zMax, pHi);
+				for (int cc = 0; cc < 3; ++cc) {
+					bMin[cc] = std::min(bMin[cc], std::min(pLo[cc], pHi[cc]));
+					bMax[cc] = std::max(bMax[cc], std::max(pLo[cc], pHi[cc]));
+				}
+			}
+		} else {
+			const QuadData& q = quads[prim_idx];
+			const MaterialData& m = materials[q.materialIdx];
+			emission = m.emission;
+			twoSided = m.twoSided;
+			// area = |u x v|
+			float3 cr = make_float3(
+				q.u.y*q.v.z - q.u.z*q.v.y,
+				q.u.z*q.v.x - q.u.x*q.v.z,
+				q.u.x*q.v.y - q.u.y*q.v.x);
+			area = sqrtf(cr.x*cr.x + cr.y*cr.y + cr.z*cr.z);
+			wx = q.normal.x; wy = q.normal.y; wz = q.normal.z; cosThetaO = 1.0f;
+			const float3 corners[4] = { q.Q, q.Q+q.u, q.Q+q.v, q.Q+q.u+q.v };
+			bMin[0]=bMin[1]=bMin[2]= 1e30f; bMax[0]=bMax[1]=bMax[2]=-1e30f;
+			for (const float3& p : corners) {
+				bMin[0]=std::min(bMin[0],p.x); bMax[0]=std::max(bMax[0],p.x);
+				bMin[1]=std::min(bMin[1],p.y); bMax[1]=std::max(bMax[1],p.y);
+				bMin[2]=std::min(bMin[2],p.z); bMax[2]=std::max(bMax[2],p.z);
+			}
+		}
+		float lum = 0.2126f*emission.x + 0.7152f*emission.y + 0.0722f*emission.z;
+		powers[i] = area * lum * 3.14159265f;  // phi = area * Le * pi
+		if (twoSided) powers[i] *= 2.0f;  // emits from both faces - pbrt-v4 doubles phi to match
+		if (powers[i] <= 0.f) powers[i] = 1e-6f;  // geometry-only target
+		// cosTheta_e=0 (Lambertian pi/2 cutoff) for every kind - matches
+		// CPU's own light_bounds_for() default and every emissive
+		// material this loader supports (no non-Lambertian area-light
+		// emission profile exists here on either backend).
+		lightBoundsArr[i] = LightBounds(bMin[0],bMin[1],bMin[2], bMax[0],bMax[1],bMax[2],
+										 wx, wy, wz, powers[i], cosThetaO, 0.0f, twoSided);
+	}
+}
+
+// Vose's alias method over the lights' powers.
+static std::vector<GpuAliasEntry> buildAliasTable(const std::vector<float> &powers) {
+	const unsigned int numLights = static_cast<unsigned int>(powers.size());
+	float total = 0.f;
+	for (float p : powers) total += p;
+	std::vector<GpuAliasEntry> table(numLights);
+	for (unsigned int i = 0; i < numLights; ++i) {
+		table[i].pdf = powers[i] / total;
+		table[i].q   = powers[i] / total * float(numLights);
+		table[i].alias = (int)i;
+	}
+	std::vector<int> small_idx, large_idx;
+	for (unsigned int i = 0; i < numLights; ++i) {
+		if (table[i].q < 1.f) small_idx.push_back(i);
+		else                  large_idx.push_back(i);
+	}
+	while (!small_idx.empty() && !large_idx.empty()) {
+		int s = small_idx.back(); small_idx.pop_back();
+		int l = large_idx.back(); large_idx.pop_back();
+		table[s].alias = l;
+		table[l].q -= (1.f - table[s].q);
+		if (table[l].q < 1.f) small_idx.push_back(l);
+		else                  large_idx.push_back(l);
+	}
+	// Residuals: floating-point rounding may leave items in either list; set q=1 (pbrt-v4 pattern)
+	while (!large_idx.empty()) { int l = large_idx.back(); large_idx.pop_back(); table[l].q = 1.f; table[l].alias = l; }
+	while (!small_idx.empty()) { int s = small_idx.back(); small_idx.pop_back(); table[s].q = 1.f; table[s].alias = s; }
+	return table;
+}
+
 void OptiXRenderer::uploadLightBuffers(const SceneInputs &in, SceneBuildState &st) {
 	const auto &spheres = in.spheres;
 	const auto &quads = in.quads;
@@ -322,199 +532,11 @@ void OptiXRenderer::uploadLightBuffers(const SceneInputs &in, SceneBuildState &s
 		// Build power-weighted alias table (pbrt-v4 PowerLightSampler / Vose method)
 		// phi_i = area * luminance(emission) * pi  (matches CPU power_light_sampler.h)
 		std::vector<float> powers(numLights_);
-		// Light BVH (pbrt-v4 §12.6, docs/FEATURE_INVENTORY.md's "no light BVH
-		// on GPU" entry - see OptiXRenderer::d_lightBvhNodes_'s own comment)
-		// - per-light world-space AABB + dominant emission direction/cone,
-		// computed alongside the power estimate above since both need the
-		// same per-kind geometry. Flat single-normal shapes (Quad/Triangle/
-		// BilinearPatch) get a real, tight direction bound (cosTheta_o=1: the
-		// normal never varies across a planar shape); curved shapes (Sphere/
-		// Disk/Cylinder) get the conservative omnidirectional default
-		// (cosTheta_o=-1, w arbitrary) rather than a real per-point normal
-		// cone - CPU's own light_bounds_for() (bvh_light_sampler.h) makes the
-		// identical simplification for any shape it doesn't special-case.
-		// Only the SPATIAL/power partitioning benefit is lost for these, not
-		// correctness - a conservative bound can only under-prune, never
-		// wrongly zero out a light that should contribute.
-		auto applyAffine = [](const float m[12], float x, float y, float z, float out[3]) {
-			out[0] = m[0]*x + m[1]*y + m[2]*z  + m[3];
-			out[1] = m[4]*x + m[5]*y + m[6]*z  + m[7];
-			out[2] = m[8]*x + m[9]*y + m[10]*z + m[11];
-		};
 		std::vector<LightBounds> lightBoundsArr(numLights_);
-		for (unsigned int i = 0; i < numLights_; ++i) {
-			int prim_idx = lightIndices[i];
-			float3 emission = make_float3(0.f, 0.f, 0.f);
-			float area = 1.0f;
-			bool twoSided = false;
-			float bMin[3] = {0,0,0}, bMax[3] = {0,0,0};
-			float wx = 0.f, wy = 1.f, wz = 0.f, cosThetaO = -1.0f;
-			if (lightKinds[i] == GpuLightKind::Sphere) {
-				const SphereData& s = spheres[prim_idx];
-				const MaterialData& m = materials[s.materialIdx];
-				emission = m.emission;
-				twoSided = m.twoSided;
-				// A ClippedSphere's true emitting area is the visible cap/
-				// wedge, not the full sphere s.radius still carries (that
-				// field is deliberately the baked full-sphere radius, kept
-				// only for the NEE-sampling cone approximation - see
-				// SphereData's own comment). Using the full area here would
-				// over-select a small clipped cap in this power-weighted
-				// alias table far more often than its real contribution
-				// warrants - matches pbrt-v4's own Sphere::Area() (phiMax *
-				// r * (zMax-zMin), src/shared/shapes.h's SphereShape<T>::
-				// area()), reducing to the ordinary 4*pi*r^2 sphere area
-				// when phiMax=2*pi and zMax-zMin=2*r (an unclipped sphere).
-				area = (s.shapeKind == GpuMediumShapeKind::ClippedSphere)
-					? s.phiMax * s.radiusLocal * (s.zMax - s.zMin)
-					: 4.0f * 3.14159265f * s.radius * s.radius;  // surface area of sphere
-				bMin[0] = s.center.x - s.radius; bMax[0] = s.center.x + s.radius;
-				bMin[1] = s.center.y - s.radius; bMax[1] = s.center.y + s.radius;
-				bMin[2] = s.center.z - s.radius; bMax[2] = s.center.z + s.radius;
-			} else if (lightKinds[i] == GpuLightKind::Triangle) {
-				// Indexes `triangles`, not `quads` - and note this is the
-				// SCENE's triangle array, which is what lightIndices was built
-				// against; instanced triangles are never emissive (flatten()
-				// bakes emitters per placement), so no base offset applies.
-				const TriangleData& t = triangles[prim_idx];
-				const MaterialData& m = materials[t.materialIdx];
-				emission = m.emission;
-				twoSided = m.twoSided;
-				// Half the parallelogram the two edges span.
-				const float3 e1 = t.p1 - t.p0;
-				const float3 e2 = t.p2 - t.p0;
-				float3 n = cross(e1, e2);
-				area = 0.5f * length(n);
-				if (area > 1e-12f) { n = n / length(n); wx = n.x; wy = n.y; wz = n.z; cosThetaO = 1.0f; }
-				bMin[0] = fminf(t.p0.x, fminf(t.p1.x, t.p2.x)); bMax[0] = fmaxf(t.p0.x, fmaxf(t.p1.x, t.p2.x));
-				bMin[1] = fminf(t.p0.y, fminf(t.p1.y, t.p2.y)); bMax[1] = fmaxf(t.p0.y, fmaxf(t.p1.y, t.p2.y));
-				bMin[2] = fminf(t.p0.z, fminf(t.p1.z, t.p2.z)); bMax[2] = fmaxf(t.p0.z, fmaxf(t.p1.z, t.p2.z));
-			} else if (lightKinds[i] == GpuLightKind::BilinearPatch) {
-				// Indexes `bilinearPatches`, not `quads` - this branch must
-				// stay explicit (not fall into the trailing else below) or
-				// prim_idx gets reinterpreted against the wrong array, which
-				// for a scene with fewer quads than bilinear patches (e.g.
-				// sportscar-area-lights.pbrt has zero quads and 5 bilinear-
-				// patch lights) is an out-of-bounds read, not just a wrong
-				// number.
-				const BilinearPatchData& bp = bilinearPatches[prim_idx];
-				const MaterialData& m = materials[bp.materialIdx];
-				emission = m.emission;
-				twoSided = m.twoSided;
-				const float p00[3] = {bp.p00.x, bp.p00.y, bp.p00.z};
-				const float p10[3] = {bp.p10.x, bp.p10.y, bp.p10.z};
-				const float p01[3] = {bp.p01.x, bp.p01.y, bp.p01.z};
-				const float p11[3] = {bp.p11.x, bp.p11.y, bp.p11.z};
-				area = blp_area(p00, p10, p01, p11);
-				// Not necessarily planar in general (see BilinearPatchData's
-				// own comment) - a real per-point normal cone would need
-				// integrating over the surface, out of scope here; use the
-				// same conservative omnidirectional default as Sphere/Disk/
-				// Cylinder rather than a single (possibly wrong for a curved
-				// patch) corner normal.
-				bMin[0] = fminf(fminf(bp.p00.x,bp.p10.x), fminf(bp.p01.x,bp.p11.x));
-				bMax[0] = fmaxf(fmaxf(bp.p00.x,bp.p10.x), fmaxf(bp.p01.x,bp.p11.x));
-				bMin[1] = fminf(fminf(bp.p00.y,bp.p10.y), fminf(bp.p01.y,bp.p11.y));
-				bMax[1] = fmaxf(fmaxf(bp.p00.y,bp.p10.y), fmaxf(bp.p01.y,bp.p11.y));
-				bMin[2] = fminf(fminf(bp.p00.z,bp.p10.z), fminf(bp.p01.z,bp.p11.z));
-				bMax[2] = fmaxf(fmaxf(bp.p00.z,bp.p10.z), fmaxf(bp.p01.z,bp.p11.z));
-			} else if (lightKinds[i] == GpuLightKind::Disk) {
-				// Indexes `disks`, not `quads` - same "must stay explicit"
-				// reasoning as the BilinearPatch branch above. dc_area_disk()
-				// (optix_disk_cylinder_helpers.h) is tagged __host__
-				// __device__ specifically so this plain host C++ file can
-				// call it directly instead of hand-copying the formula.
-				const DiskData& d = disks[prim_idx];
-				const MaterialData& m = materials[d.materialIdx];
-				emission = m.emission;
-				twoSided = m.twoSided;
-				area = dc_area_disk(d);
-				// Not baked to world space (see DiskData's own comment) - a
-				// conservative object-space square around the outer radius,
-				// transformed to world by o2w, at 4 corners of the disk's own
-				// z=height plane.
-				bMin[0]=bMin[1]=bMin[2]= 1e30f; bMax[0]=bMax[1]=bMax[2]=-1e30f;
-				for (int cx = -1; cx <= 1; cx += 2) for (int cy = -1; cy <= 1; cy += 2) {
-					float p[3];
-					applyAffine(d.o2w, cx*d.radius, cy*d.radius, d.height, p);
-					for (int c = 0; c < 3; ++c) { bMin[c] = std::min(bMin[c], p[c]); bMax[c] = std::max(bMax[c], p[c]); }
-				}
-			} else if (lightKinds[i] == GpuLightKind::Cylinder) {
-				const CylinderData& c = cylinders[prim_idx];
-				const MaterialData& m = materials[c.materialIdx];
-				emission = m.emission;
-				twoSided = m.twoSided;
-				area = dc_area_cylinder(c);
-				// Same "not baked to world space, transform a conservative
-				// object-space box by o2w" approach as Disk above - 8 corners
-				// of the object-space [-r,r]x[-r,r]x[zMin,zMax] box.
-				bMin[0]=bMin[1]=bMin[2]= 1e30f; bMax[0]=bMax[1]=bMax[2]=-1e30f;
-				for (int cx = -1; cx <= 1; cx += 2) for (int cy = -1; cy <= 1; cy += 2) {
-					float pLo[3], pHi[3];
-					applyAffine(c.o2w, cx*c.radius, cy*c.radius, c.zMin, pLo);
-					applyAffine(c.o2w, cx*c.radius, cy*c.radius, c.zMax, pHi);
-					for (int cc = 0; cc < 3; ++cc) {
-						bMin[cc] = std::min(bMin[cc], std::min(pLo[cc], pHi[cc]));
-						bMax[cc] = std::max(bMax[cc], std::max(pLo[cc], pHi[cc]));
-					}
-				}
-			} else {
-				const QuadData& q = quads[prim_idx];
-				const MaterialData& m = materials[q.materialIdx];
-				emission = m.emission;
-				twoSided = m.twoSided;
-				// area = |u x v|
-				float3 cr = make_float3(
-					q.u.y*q.v.z - q.u.z*q.v.y,
-					q.u.z*q.v.x - q.u.x*q.v.z,
-					q.u.x*q.v.y - q.u.y*q.v.x);
-				area = sqrtf(cr.x*cr.x + cr.y*cr.y + cr.z*cr.z);
-				wx = q.normal.x; wy = q.normal.y; wz = q.normal.z; cosThetaO = 1.0f;
-				const float3 corners[4] = { q.Q, q.Q+q.u, q.Q+q.v, q.Q+q.u+q.v };
-				bMin[0]=bMin[1]=bMin[2]= 1e30f; bMax[0]=bMax[1]=bMax[2]=-1e30f;
-				for (const float3& p : corners) {
-					bMin[0]=std::min(bMin[0],p.x); bMax[0]=std::max(bMax[0],p.x);
-					bMin[1]=std::min(bMin[1],p.y); bMax[1]=std::max(bMax[1],p.y);
-					bMin[2]=std::min(bMin[2],p.z); bMax[2]=std::max(bMax[2],p.z);
-				}
-			}
-			float lum = 0.2126f*emission.x + 0.7152f*emission.y + 0.0722f*emission.z;
-			powers[i] = area * lum * 3.14159265f;  // phi = area * Le * pi
-			if (twoSided) powers[i] *= 2.0f;  // emits from both faces - pbrt-v4 doubles phi to match
-			if (powers[i] <= 0.f) powers[i] = 1e-6f;  // geometry-only target
-			// cosTheta_e=0 (Lambertian pi/2 cutoff) for every kind - matches
-			// CPU's own light_bounds_for() default and every emissive
-			// material this loader supports (no non-Lambertian area-light
-			// emission profile exists here on either backend).
-			lightBoundsArr[i] = LightBounds(bMin[0],bMin[1],bMin[2], bMax[0],bMax[1],bMax[2],
-											 wx, wy, wz, powers[i], cosThetaO, 0.0f, twoSided);
-		}
+		computeLightBounds(in, numLights_, powers, lightBoundsArr);
 
 		// Vose alias method
-		float total = 0.f;
-		for (float p : powers) total += p;
-		std::vector<GpuAliasEntry> table(numLights_);
-		for (unsigned int i = 0; i < numLights_; ++i) {
-			table[i].pdf = powers[i] / total;
-			table[i].q   = powers[i] / total * float(numLights_);
-			table[i].alias = (int)i;
-		}
-		std::vector<int> small_idx, large_idx;
-		for (unsigned int i = 0; i < numLights_; ++i) {
-			if (table[i].q < 1.f) small_idx.push_back(i);
-			else                  large_idx.push_back(i);
-		}
-		while (!small_idx.empty() && !large_idx.empty()) {
-			int s = small_idx.back(); small_idx.pop_back();
-			int l = large_idx.back(); large_idx.pop_back();
-			table[s].alias = l;
-			table[l].q -= (1.f - table[s].q);
-			if (table[l].q < 1.f) small_idx.push_back(l);
-			else                  large_idx.push_back(l);
-		}
-		// Residuals: floating-point rounding may leave items in either list; set q=1 (pbrt-v4 pattern)
-		while (!large_idx.empty()) { int l = large_idx.back(); large_idx.pop_back(); table[l].q = 1.f; table[l].alias = l; }
-		while (!small_idx.empty()) { int s = small_idx.back(); small_idx.pop_back(); table[s].q = 1.f; table[s].alias = s; }
+		const std::vector<GpuAliasEntry> table = buildAliasTable(powers);
 
 		size_t aliasTableSize = table.size() * sizeof(GpuAliasEntry);
 		if (d_aliasTable_) cudaFree(reinterpret_cast<void*>(d_aliasTable_));
