@@ -20,15 +20,13 @@ int main(int argc, char** argv) {
     const double tol = atof(argv[2]) / 100.0;
     struct Win { const char* what; int x0, y0, x1, y1; double expect[3]; };
     const Win wins[] = {
-        // (pbrt is left-handed and the picture of a pbrt file follows it, so the balls' x ranges are the mirror of an older picture's. The expected means are the CPU's with the
-        // subsurface table that agrees with pbrt-v4 (592b2b2) and with subsurface surfaces blocking shadow rays as in pbrt (7a088ad), but WITHOUT the CPU's self-hit: since 7a088ad
-        // the CPU's shadow rays from the ball's own exit vertices hit the ball again within 0.02 of their origin (a lone ball under a constant sky read 0.5376 where it read 0.5795
-        // and pbrt reads the latter within 0.4%), so the live CPU picture reads 9 to 22% darker here. These numbers are the CPU renderer with that self-hit let through
-        // (docs/GPU_SCENE_COMMON.md, "Subsurface shadows"); replace them with the CPU's own once it is fixed, they agree within 1 to 4%.)
-        {"big ball",   64,  64,  96, 102, {75.4, 76.7, 69.2}},
-        {"small ball", 32,  92,  50, 108, {47.5, 37.3, 32.0}},
-        {"back wall",  38,  19,  90,  38, {99.7, 92.0, 84.8}},
-        {"floor",      26, 108, 102, 124, {59.7, 54.4, 48.5}},
+        // (pbrt is left-handed and the picture of a pbrt file follows it, so the balls' x ranges are the mirror of an older picture's. The expected means are the CPU renderer's own
+        // (subsurface table agreeing with pbrt-v4, shadow rays blocked by subsurface surfaces as in pbrt, and since 01692a9 the exit of the BSSRDF without the entry's refraction);
+        // Metal agrees with them within 1.5%.)
+        {"big ball",   64,  64,  96, 102, {75.6, 76.9, 69.2}},
+        {"small ball", 32,  92,  50, 108, {48.5, 38.9, 33.3}},
+        {"back wall",  38,  19,  90,  38, {99.5, 91.5, 84.2}},
+        {"floor",      26, 108, 102, 124, {59.6, 54.3, 48.4}},
     };
     int bad = 0;
     for (const Win& win : wins) {

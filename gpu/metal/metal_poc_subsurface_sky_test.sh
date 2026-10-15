@@ -8,9 +8,7 @@ for kind in constant image; do
   scene="gpu/metal/test_scenes/subsurface-sky-$kind.pbrt"
   "$RT" --cpu --seed 3 --output "$DIR/sss_${kind}_cpu.exr" 48 64 30 "$scene" >/dev/null 2>&1 || { echo "$kind: CPU render failed"; exit 1; }
   "$RT" --gpu --seed 3 --output "$DIR/sss_${kind}_metal.exr" 48 64 30 "$scene" >/dev/null 2>&1 || { echo "$kind: Metal render failed"; exit 1; }
-  # 10, not 5: since the CPU's subsurface surfaces block shadow rays (7a088ad) a lone ball under a sky reads 7% darker on the CPU, because the CPU's shadow rays from the ball's own
-  # exit vertices hit the ball again within 0.02 of their origin (letting that self-hit through gives 0.5795, Metal's 0.5820: docs/GPU_SCENE_COMMON.md, "Subsurface shadows"). Back to 5 once fixed.
-  "$CHK" "sky $kind (Metal vs CPU)" "$DIR/sss_${kind}_cpu.exr" "$DIR/sss_${kind}_metal.exr" 10 || status=1
+  "$CHK" "sky $kind (Metal vs CPU)" "$DIR/sss_${kind}_cpu.exr" "$DIR/sss_${kind}_metal.exr" 5 || status=1
 done
 "$CHK" "constant vs image sky (Metal)" "$DIR/sss_image_metal.exr" "$DIR/sss_constant_metal.exr" 8 || status=1
 [ $status -eq 0 ] && echo SUBSURFACE_SKY_TEST_OK

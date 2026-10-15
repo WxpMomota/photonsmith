@@ -34,6 +34,7 @@ inline const char* const* metalShaderFileNames(int* outCount) {
         "metal_poc_material_ids.metal",   // materialType names (METAL_MAT_*), shared with the host: must come first
         "metal_poc_types.metal",
         "metal_poc_sampling.metal",
+        "metal_poc_bump.metal",            // image bump and normal maps (split out of sampling for the code-size limit)
         "metal_poc_layered_bxdf.metal",
         "metal_poc_materials_specular.metal",
         "metal_poc_materials_diffuse.metal",
