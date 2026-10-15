@@ -746,10 +746,11 @@ def run(args):
                 failures.append(("fog", "both", scene_name))
                 continue
             worst = max(abs(g - c) / max(abs(c), 1e-9) for c, g in zip(means["cpu"], means["gpu"])) * 100.0
-            if worst > 6.0 or args.verbose:
-                print("  %-4s %-34s %s  rgb %s vs %s  off by %.1f%%" % ("both", "cpu vs gpu, %s depth %s" % (scene_name, depth), "ok   " if worst <= 6.0 else "WRONG",
+            limit = 2.5 if scene_name == "chromatic-fog-room" else 6.0   # (the coloured fog room read 3% low in red until its light samples followed the path's colour channel: held tight)
+            if worst > limit or args.verbose:
+                print("  %-4s %-34s %s  rgb %s vs %s  off by %.1f%%" % ("both", "cpu vs gpu, %s depth %s" % (scene_name, depth), "ok   " if worst <= limit else "WRONG",
                       ["%.3f" % x for x in means["cpu"]], ["%.3f" % x for x in means["gpu"]], worst))
-            if worst > 6.0:
+            if worst > limit:
                 failures.append(("fog", "both", scene_name))
     # A dots texture counts its cells in the texture's own (uscale, vscale, udelta, vdelta) mapping: where the dots are is what a mean cannot see, so the rows and columns of the
     # picture are compared (the profiles' difference against their own spread). Metal read every dots texture in the surface's own (u, v).
@@ -886,6 +887,44 @@ def run(args):
                 print("  %-4s %-34s %s  %.4f vs %.4f  off by %.1f%%" % ("both", "cpu vs gpu, odd height map, scale %s" % scale, "ok   " if worst <= 1.5 else "WRONG", means["cpu"], means["gpu"], worst))
             if worst > 1.5:
                 failures.append(("oddmap", "both", scale))
+    # Object motion blur (a sphere that moves while the shutter is open): where the streak and its shadow are, which a mean cannot see (a smear and a still disc have the same mean).
+    # Metal's acceleration-structure box held only the sphere's start position, so its streak stopped where that box ended (a third of the CPU's length) and its light samples cast
+    # the shadow from the sphere's position at time 0. The rows and columns of the picture are compared with the CPU's, against their own spread.
+    if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "motion" in only):
+        print("[cpu vs gpu, a sphere that moves during the exposure and its shadow]")
+        mover = ('LookAt 0 6 10  0 0 0  0 1 0\nCamera "perspective" "float fov" [ 40 ]\nFilm "rgb" "integer xresolution" [ 64 ] "integer yresolution" [ 64 ]\n'
+                 'Sampler "halton" "integer pixelsamples" [ 64 ]\nWorldBegin\nLightSource "distant" "point3 from" [ 0 10 0 ] "point3 to" [ 0 0 0 ] "rgb L" [ 3 3 3 ]\n'
+                 'Material "diffuse" "rgb reflectance" [ 0.7 0.7 0.7 ]\n'
+                 'Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ] "point3 P" [ -8 0 -8  8 0 -8  8 0 8  -8 0 8 ]\n'
+                 'AttributeBegin\n  ActiveTransform StartTime\n  Translate -3 2 0\n  ActiveTransform EndTime\n  Translate 3 2 0\n  ActiveTransform All\n'
+                 '  Material "diffuse" "rgb reflectance" [ 0.8 0.3 0.3 ]\n  Shape "sphere" "float radius" [ 1 ]\nAttributeEnd\n')
+        mover_path = os.path.join(workdir, "motion_mover.pbrt")
+        open(mover_path, "w").write(mover)
+        for label, scene_path in (("moving sphere over a floor", mover_path), ("object-motion-blur", os.path.join(REPO, "pbrt_scenes", "object-motion-blur.pbrt"))):
+            total += 1
+            profiles = {}
+            try:
+                for backend in ("cpu", "gpu"):
+                    out = os.path.join(workdir, "motion_%s_%s.exr" % (label.split()[0], backend))
+                    r = subprocess.run([args.exe, "--" + backend, "--seed", "3", "--output", out, "64", "128", "8", scene_path], capture_output=True, text=True, cwd=REPO, timeout=1200)
+                    if r.returncode != 0 or not os.path.exists(out):
+                        raise RuntimeError("%s render failed: %s" % (backend, (r.stdout + r.stderr)[-200:]))
+                    profiles[backend] = read_exr_rows_columns(out)
+            except RuntimeError as e:
+                print("  both cpu vs gpu, %s: FAILED TO RENDER: %s" % (label, e))
+                failures.append(("motion", "both", label))
+                continue
+            worst = 0.0
+            for axis in (0, 1):
+                a, b = profiles["cpu"][axis], profiles["gpu"][axis]
+                mean_a, mean_b = sum(a) / len(a), sum(b) / len(b)
+                spread = (sum((x - mean_a) ** 2 for x in a) / len(a)) ** 0.5
+                diff = (sum(((x - mean_a) - (y - mean_b)) ** 2 for x, y in zip(a, b)) / len(a)) ** 0.5
+                worst = max(worst, diff / max(spread, 1e-6))
+            if worst > 0.25 or args.verbose:
+                print("  %-4s %-34s %s  profile difference %.2f of the picture's own spread" % ("both", "cpu vs gpu, " + label, "ok   " if worst <= 0.25 else "WRONG", worst))
+            if worst > 0.25:
+                failures.append(("motion", "both", label))
     print("\n%d pairs, %d off by more than %g%%" % (total, len(failures), tol))
     if not args.keep:
         shutil.rmtree(workdir, ignore_errors=True)

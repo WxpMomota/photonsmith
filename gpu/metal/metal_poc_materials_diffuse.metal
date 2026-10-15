@@ -54,7 +54,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
             shadowRay.max_distance = dist - 0.002f;
             reaimShadowRay(shadowRay, hitPoint, dist);
             intersection_result<instancing, triangle_data> shadowResult =
-                traceShadowAny(isect, shadowRay, accelStructure, functionTable);
+                traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat);
             if (shadowResult.type == intersection_type::none) {
                 float pdfSolidAngle = (distSq / (ls.area * abs(cosLight))) * ls.pmf;
                 float pdfBsdfForThisDir = diffuseTransmissionPdf(cosSurface, pr, pt);
@@ -84,7 +84,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
                 plShadowRay.max_distance = plDist - 0.002f;
                 reaimShadowRay(plShadowRay, hitPoint, plDist);
                 intersection_result<instancing, triangle_data> plShadowResult =
-                    traceShadowAny(isect, plShadowRay, accelStructure, functionTable);
+                    traceShadowAnyM(isect, plShadowRay, accelStructure, functionTable, mat);
                 if (plShadowResult.type == intersection_type::none) {
                     float3 plTransmittance = fogTransmittance(uniforms, plDist);
                     float plSpot = spotLightFalloff(-plWi, float3(pl.direction), pl.cosOuterAngle, pl.cosInnerAngle);
@@ -108,7 +108,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
                 dlShadowRay.min_distance = 0.001f;
                 dlShadowRay.max_distance = kDirectionalLightMaxDistance;
                 intersection_result<instancing, triangle_data> dlShadowResult =
-                    traceShadowAny(isect, dlShadowRay, accelStructure, functionTable);
+                    traceShadowAnyM(isect, dlShadowRay, accelStructure, functionTable, mat);
                 if (dlShadowResult.type == intersection_type::none) {
                     // Skip when there is no fog - rayBoxExitDistance()
                     // is only valid for an origin INSIDE the hardcoded
@@ -145,7 +145,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
                     pjShadowRay.max_distance = pjDist - 0.002f;
                     reaimShadowRay(pjShadowRay, hitPoint, pjDist);
                     intersection_result<instancing, triangle_data> pjShadowResult =
-                        traceShadowAny(isect, pjShadowRay, accelStructure, functionTable);
+                        traceShadowAnyM(isect, pjShadowRay, accelStructure, functionTable, mat);
                     if (pjShadowResult.type == intersection_type::none) {
                         float3 pjTransmittance = fogTransmittance(uniforms, pjDist);
                         radiance += throughput * pjLobeTint * (1.0 / M_PI_F)
@@ -177,7 +177,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
                     glShadowRay.max_distance = glDist - 0.002f;
                     reaimShadowRay(glShadowRay, hitPoint, glDist);
                     intersection_result<instancing, triangle_data> glShadowResult =
-                        traceShadowAny(isect, glShadowRay, accelStructure, functionTable);
+                        traceShadowAnyM(isect, glShadowRay, accelStructure, functionTable, mat);
                     if (glShadowResult.type == intersection_type::none) {
                         float3 glTransmittance = fogTransmittance(uniforms, glDist);
                         radiance += throughput * glLobeTint * (1.0 / M_PI_F)
@@ -212,7 +212,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
                 envShadowRay.min_distance = 0.001f;
                 envShadowRay.max_distance = 1e5f;
                 intersection_result<instancing, triangle_data> envShadowResult =
-                    traceShadowAny(isect, envShadowRay, accelStructure, functionTable);
+                    traceShadowAnyM(isect, envShadowRay, accelStructure, functionTable, mat);
                 if (envShadowResult.type == intersection_type::none) {
                     float2 envUV = envMapUV(envWi);
                     float3 envRadiance = earthTexture.sample(textureSampler, envUV).rgb;
@@ -243,7 +243,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
                 pbrtEnvShadowRay.min_distance = 0.001f;
                 pbrtEnvShadowRay.max_distance = 1e5f;
                 intersection_result<instancing, triangle_data> pbrtEnvShadowResult =
-                    traceShadowAny(isect, pbrtEnvShadowRay, accelStructure, functionTable);
+                    traceShadowAnyM(isect, pbrtEnvShadowRay, accelStructure, functionTable, mat);
                 if (pbrtEnvShadowResult.type == intersection_type::none) {
                     float3 pbrtEnvRadianceSample = pbrtEnvLeAt(uniforms, pbrtEnvConditionalCDF, pbrtEnvTexture, textureSampler, hitPoint, pbrtEnvWi);
                     float pbrtEnvPdfBsdf = diffuseTransmissionPdf(pbrtEnvCosSurface, pr, pt);
@@ -344,7 +344,8 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
             // 3-arg intersect() overload (this function has no shutterT
             // of its own to thread through, matching every one of those
             // ~50 other sites exactly).
-            SpherePayload shadowPayload{};
+            SpherePayload shadowPayload{mat.rayTime, true, -1};   // (the path's own time and, below, colour channel: the defaults here made every Lambertian light sample a time-0, mean-extinction shadow ray)
+            shadowPayload.shadowChannel = mat.shadowChannel;
             shadowPayload.shadowIgnorePrimId = ls.spherePrimId;
             intersection_result<instancing, triangle_data> shadowResult =
                 traceShadowAnyP(isect, shadowRay, accelStructure, functionTable, shadowPayload);
@@ -381,7 +382,7 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
                 plShadowRay.max_distance = plDist - 0.002f;
                 reaimShadowRay(plShadowRay, hitPoint, plDist);
                 intersection_result<instancing, triangle_data> plShadowResult =
-                    traceShadowAny(isect, plShadowRay, accelStructure, functionTable);
+                    traceShadowAnyM(isect, plShadowRay, accelStructure, functionTable, mat);
                 if (plShadowResult.type == intersection_type::none) {
                     float3 plTransmittance = fogTransmittance(uniforms, plDist);
                     float plSpot = spotLightFalloff(-plWi, float3(pl.direction), pl.cosOuterAngle, pl.cosInnerAngle);
@@ -402,7 +403,7 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
                 dlShadowRay.min_distance = 0.001f;
                 dlShadowRay.max_distance = kDirectionalLightMaxDistance;
                 intersection_result<instancing, triangle_data> dlShadowResult =
-                    traceShadowAny(isect, dlShadowRay, accelStructure, functionTable);
+                    traceShadowAnyM(isect, dlShadowRay, accelStructure, functionTable, mat);
                 if (dlShadowResult.type == intersection_type::none) {
                     // Skip when there is no fog - rayBoxExitDistance()
                     // is only valid for an origin INSIDE the hardcoded
@@ -436,7 +437,7 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
                     pjShadowRay.max_distance = pjDist - 0.002f;
                     reaimShadowRay(pjShadowRay, hitPoint, pjDist);
                     intersection_result<instancing, triangle_data> pjShadowResult =
-                        traceShadowAny(isect, pjShadowRay, accelStructure, functionTable);
+                        traceShadowAnyM(isect, pjShadowRay, accelStructure, functionTable, mat);
                     if (pjShadowResult.type == intersection_type::none) {
                         float3 pjTransmittance = fogTransmittance(uniforms, pjDist);
                         radiance += throughput * albedo * (1.0 / M_PI_F)
@@ -465,7 +466,7 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
                     glShadowRay.max_distance = glDist - 0.002f;
                     reaimShadowRay(glShadowRay, hitPoint, glDist);
                     intersection_result<instancing, triangle_data> glShadowResult =
-                        traceShadowAny(isect, glShadowRay, accelStructure, functionTable);
+                        traceShadowAnyM(isect, glShadowRay, accelStructure, functionTable, mat);
                     if (glShadowResult.type == intersection_type::none) {
                         float3 glTransmittance = fogTransmittance(uniforms, glDist);
                         radiance += throughput * albedo * (1.0 / M_PI_F)
@@ -505,7 +506,7 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
                 envShadowRay.min_distance = 0.001f;
                 envShadowRay.max_distance = 1e5f;
                 intersection_result<instancing, triangle_data> envShadowResult =
-                    traceShadowAny(isect, envShadowRay, accelStructure, functionTable);
+                    traceShadowAnyM(isect, envShadowRay, accelStructure, functionTable, mat);
                 if (envShadowResult.type == intersection_type::none) {
                     float2 envUV = envMapUV(envWi);
                     float3 envRadiance = earthTexture.sample(textureSampler, envUV).rgb;
@@ -533,7 +534,7 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
                 pbrtEnvShadowRay.min_distance = 0.001f;
                 pbrtEnvShadowRay.max_distance = 1e5f;
                 intersection_result<instancing, triangle_data> pbrtEnvShadowResult =
-                    traceShadowAny(isect, pbrtEnvShadowRay, accelStructure, functionTable);
+                    traceShadowAnyM(isect, pbrtEnvShadowRay, accelStructure, functionTable, mat);
                 if (pbrtEnvShadowResult.type == intersection_type::none) {
                     float3 pbrtEnvRadianceSample = pbrtEnvLeAt(uniforms, pbrtEnvConditionalCDF, pbrtEnvTexture, textureSampler, hitPoint, pbrtEnvWi);
                     float pbrtEnvPdfBsdf = lambertianPdf(pbrtEnvCosSurface);

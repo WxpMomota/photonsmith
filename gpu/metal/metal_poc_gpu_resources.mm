@@ -254,8 +254,11 @@ bool MetalPocApp::buildAnalyticAS(GpuBuildState& s) {
     std::vector<MTLAxisAlignedBoundingBox> sphereBoundsList;
     for (const SphereData& s : spheres) {
         MTLAxisAlignedBoundingBox bounds;
-        bounds.min = MTLPackedFloat3Make(s.center.x - s.radius, s.center.y - s.radius, s.center.z - s.radius);
-        bounds.max = MTLPackedFloat3Make(s.center.x + s.radius, s.center.y + s.radius, s.center.z + s.radius);
+        // A moving sphere (object motion blur) is at center + t * centerDelta1 for t in [0, 1]: the box has to cover the whole path, or a ray that misses the box at t = 0 never
+        // reaches the intersection function and the blur is cut off where the start position's box ends (a sphere moving 2 units drew a streak a third as long).
+        const float endX = s.center.x + s.centerDelta1.x, endY = s.center.y + s.centerDelta1.y, endZ = s.center.z + s.centerDelta1.z;
+        bounds.min = MTLPackedFloat3Make(std::min(s.center.x, endX) - s.radius, std::min(s.center.y, endY) - s.radius, std::min(s.center.z, endZ) - s.radius);
+        bounds.max = MTLPackedFloat3Make(std::max(s.center.x, endX) + s.radius, std::max(s.center.y, endY) + s.radius, std::max(s.center.z, endZ) + s.radius);
         sphereBoundsList.push_back(bounds);
     }
     id<MTLBuffer> boundingBoxBuffer = sharedBufferOrPlaceholder(device, sphereBoundsList);

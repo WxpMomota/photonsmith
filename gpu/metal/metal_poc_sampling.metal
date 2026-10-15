@@ -1828,6 +1828,21 @@ inline intersection_result<instancing, triangle_data> traceShadowAny(
     return anyIsect.intersect(shadowRay, accelStructure, functionTable, payload);
 }
 
+// The shadow ray of a hit: as traceShadowAny(), with the path's own colour channel and time (TriangleMaterial::shadowChannel / rayTime, set by resolveHit()). Without them a shadow
+// ray through a chromatic medium sphere used the MEAN extinction while the path's throughput followed one channel (coloured fog read 3% off in red), and a moving sphere cast its
+// shadow from where it is at time 0, whatever the time of the sample.
+inline intersection_result<instancing, triangle_data> traceShadowAnyM(
+    intersector<instancing, triangle_data> isect, ray shadowRay,
+    instance_acceleration_structure accelStructure,
+    intersection_function_table<instancing, triangle_data> functionTable,
+    TriangleMaterial mat) {
+    intersector<instancing, triangle_data> anyIsect = isect;
+    anyIsect.accept_any_intersection(true);
+    SpherePayload payload{mat.rayTime, true, -1};
+    payload.shadowChannel = mat.shadowChannel;
+    return anyIsect.intersect(shadowRay, accelStructure, functionTable, payload);
+}
+
 inline intersection_result<instancing, triangle_data> traceShadowAnyP(
     intersector<instancing, triangle_data> isect, ray shadowRay,
     instance_acceleration_structure accelStructure,

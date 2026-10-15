@@ -22,7 +22,7 @@ chromatic-absorber 1.0481 1.0082 1.0881
 chromatic-camera-medium 0.9876 1.0073 1.0298
 chromatic-camera-medium-absorber 1.0500 1.0060 1.0918
 chromatic-fog-furnace 0.9999 1.0001 1.0000
-chromatic-fog-room 0.9747 1.0003 1.0218
+chromatic-fog-room 1.0045 1.0047 1.0125
 chromatic-rgbgrid-absorber 1.0387 1.0075 1.0609
 chromatic-rgbgrid-furnace 1.0001 1.0000 1.0005
 cloud-furnace 1.0000 1.0000 0.9999
@@ -47,7 +47,7 @@ cornell-point-light 0.9993 1.0046 1.0045
 cornell-projection 0.9976 0.9998 0.9998
 cornell-rough-glass 0.9928 0.9953 0.9952
 cornell-rough-metal 0.9983 1.0001 1.0004
-cornell-smoke 0.9962 0.9975 1.0023
+cornell-smoke 1.0007 0.9990 1.0007
 cornell-spherical 0.9972 0.9975 0.9972
 cornell-spotlight 0.9961 0.9964 0.9959
 cornell-thin-glass 0.9974 0.9969 0.9970
@@ -83,7 +83,7 @@ goniometric-projection 0.9925 1.0019 1.0008
 hair-fibers-scene 1.0058 1.0049 1.0033
 hair-material 1.0103 1.0071 1.0065
 hair-sphere-dim-sky 0.9946 0.9932 0.9930
-homogeneous-medium 0.9782 1.0046 1.0110
+homogeneous-medium 0.9901 1.0046 1.0050
 infinite-light 0.9967 0.9991 1.0007
 infinite-light-image 1.0018 1.0185 1.0029
 instanced-spheres 1.0181 1.0194 1.0241
@@ -98,10 +98,10 @@ lightpath-visible-disk-light 1.0006 1.0006 1.0006
 lightpath-visible-quad-light 1.0003 1.0004 1.0003
 lightpath-visible-sphere-light 1.0003 1.0003 1.0003
 maxcomponentvalue-firefly-clamp 1.2237 1.2226 1.2670
-measured-brdf-showroom 0.9967 1.0008 1.0028
-measured-furnace 0.9301 1.0327 1.1786
-measured-lights 0.9314 1.0394 1.1939
-measured-lights-area 0.9309 1.0371 1.1878
+measured-brdf-showroom 0.9995 0.9996 0.9996
+measured-furnace 0.9942 0.9991 1.0132
+measured-lights 0.9998 1.0038 1.0212
+measured-lights-area 0.9974 1.0023 1.0176
 mix-material 1.0032 1.0043 1.0145
 named-material-and-texture 0.9973 0.9992 1.0079
 nested-checker-texture 1.0003 0.9999 1.0002

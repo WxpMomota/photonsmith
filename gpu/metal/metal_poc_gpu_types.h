@@ -490,6 +490,10 @@ struct TriangleMaterial {
     // The geometric normal of the hit, on the side the ray came from (set per hit by resolveHit(); zero where it was not): rays spawned from the surface (light samples, the next bounce)
     // start 0.001 along it toward THEIR side, as pbrt offsets them, so a direction a shading normal (bumped, normal-mapped or interpolated) sends below the surface leaves it.
     PackedFloat3 spawnNormal{0, 0, 0};
+    // What a shadow ray from this hit needs to know about the path: the colour channel it follows through a chromatic medium (-1: none) and the time of its camera sample (a moving
+    // sphere is where it is at that time). Set per hit by resolveHit(); read by traceShadowAnyM().
+    int32_t shadowChannel = -1;
+    float rayTime = 0.0f;
 };
 
 // Mirrors metal_poc_types.metal's GpuCloudMedium byte-for-byte (E2,

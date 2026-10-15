@@ -4,6 +4,7 @@
 // picture. The pictures themselves are checked against the CPU by scripts/consistency_sweep.py (the oddmap, spawn and fog groups, and metal_poc_cpu_gpu_sweep in ctest).
 #include "metal_poc_shader_tests_common.h"
 #include "metal_poc_bump_mip.h"
+#include "../../src/shared/measured_rgb_quadrature.h"   // the wavelengths and weights a measured BSDF's table becomes RGB with (macros only)
 
 // (metal_poc_shader_tests_mipmap_ref.cpp: the CPU mipmap, in a translation unit of its own)
 void cpuMipmapReference(const float* pixels, int w, int h, const float* queries, int n, float* out);
@@ -139,4 +140,25 @@ void testSpawnSide(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQu
         snprintf(label, sizeof(label), "spawnSide case %d", i);
         expectTrue(label, simd::length(out[i] - expected[i]) < 1e-5f);
     }
+}
+
+// The measured-BSDF quadrature table in the shader is a copy of src/shared/measured_rgb_quadrature.h (the CPU and both OptiX backends read the header): they must be the same numbers.
+void testMeasuredQuadratureTable(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue) {
+    const float lambdas[RT_MEASURED_BINS] = { RT_MEASURED_LAMBDAS };
+    const float wr[RT_MEASURED_BINS] = { RT_MEASURED_WR }, wg[RT_MEASURED_BINS] = { RT_MEASURED_WG }, wb[RT_MEASURED_BINS] = { RT_MEASURED_WB };
+    id<MTLBuffer> outBuf = makeOutputBuffer(device, RT_MEASURED_BINS * 4 * sizeof(float));
+    if (!runKernel(device, library, queue, @"test_measuredQuadratureTable", @[outBuf], nil, RT_MEASURED_BINS)) return;
+    const float* out = (const float*)outBuf.contents;
+    int bad = 0;
+    for (int k = 0; k < RT_MEASURED_BINS; ++k)
+        if (out[4 * k] != lambdas[k] || out[4 * k + 1] != wr[k] || out[4 * k + 2] != wg[k] || out[4 * k + 3] != wb[k]) ++bad;
+    char label[160];
+    snprintf(label, sizeof(label), "measured quadrature table: the shader's %d wavelengths and weights equal measured_rgb_quadrature.h (%d differ)", RT_MEASURED_BINS, bad);
+    expectTrue(label, bad == 0);
+    // and, as the header promises, a flat spectrum of 1 reads (1, 1, 1)
+    double sum[3] = {0, 0, 0};
+    for (int k = 0; k < RT_MEASURED_BINS; ++k) { sum[0] += wr[k]; sum[1] += wg[k]; sum[2] += wb[k]; }
+    expectNear("measured quadrature: the red weights sum to 1", sum[0], 1.0, 2e-3);
+    expectNear("measured quadrature: the green weights sum to 1", sum[1], 1.0, 2e-3);
+    expectNear("measured quadrature: the blue weights sum to 1", sum[2], 1.0, 2e-3);
 }
