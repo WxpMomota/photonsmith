@@ -6,6 +6,7 @@
 #include "metal_poc_bump_mip.h"
 #include "metal_poc_gpu_types.h"   // the host Uniforms
 #include "../../src/shared/camera_footprint.h"   // pbrt's Approximate_dp_dxy on the host: the reference for the shader's port
+#include "metal_poc_measured_table.h"   // appendMeasuredBrdf(): the production packer of a measured BRDF
 #include "../../src/shared/measured_rgb_quadrature.h"   // the wavelengths and weights a measured BSDF's table becomes RGB with (macros only)
 
 // (metal_poc_shader_tests_mipmap_ref.cpp: the CPU mipmap, in a translation unit of its own)
@@ -144,25 +145,84 @@ void testSpawnSide(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQu
     }
 }
 
-// The measured-BSDF quadrature table in the shader is a copy of src/shared/measured_rgb_quadrature.h (the CPU and both OptiX backends read the header): they must be the same numbers.
-void testMeasuredQuadratureTable(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue) {
+// A measured BSDF's colour in the shader (measuredSpectraToRgb) against the formula it replaces: the spectral table read at the 18 wavelengths of measured_rgb_quadrature.h and weighted into R, G, B
+// (each value clamped at zero, the sum too), as the CPU does. The shader reads three RGB tables the host made once (metal_poc_measured_table.h); the reference is the spectral table's own Eval on
+// the host, so a wrong weight, wavelength bracket, parameter order or stride of the packed tables fails it. Two tables: the bundled synthetic-gold.bsdf (packed by the production packer), and a random
+// one with several nodes on every axis (the bundled one has one node on its angle axes, which would hide a wrong stride or axis order). It stands in for the old "the shader's copy of the quadrature
+// numbers equals the header" test: the numbers are no longer copied, the host reads the header itself.
+static void checkMeasuredSpectraRgb(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue, const char* name, const PiecewiseLinear2D<3>& spectra, std::vector<float>& g) {
     const float lambdas[RT_MEASURED_BINS] = { RT_MEASURED_LAMBDAS };
     const float wr[RT_MEASURED_BINS] = { RT_MEASURED_WR }, wg[RT_MEASURED_BINS] = { RT_MEASURED_WG }, wb[RT_MEASURED_BINS] = { RT_MEASURED_WB };
-    id<MTLBuffer> outBuf = makeOutputBuffer(device, RT_MEASURED_BINS * 4 * sizeof(float));
-    if (!runKernel(device, library, queue, @"test_measuredQuadratureTable", @[outBuf], nil, RT_MEASURED_BINS)) return;
-    const float* out = (const float*)outBuf.contents;
+    const std::vector<float>& phiAxis = spectra.ParamValues(0);
+    const std::vector<float>& thetaAxis = spectra.ParamValues(1);
+    std::mt19937 rng(246813579);
+    std::uniform_real_distribution<float> unit(0.0f, 1.0f);
+    const int n = 500;
+    std::vector<simd::float4> q(n);
+    std::vector<simd::float3> ref(n);
+    for (int i = 0; i < n; ++i) {
+        const float px = unit(rng), py = unit(rng);
+        const float phi = phiAxis.front() + unit(rng) * (phiAxis.back() - phiAxis.front());
+        const float theta = thetaAxis.front() + unit(rng) * (thetaAxis.back() - thetaAxis.front());
+        q[i] = simd::float4{px, py, phi, theta};
+        double c[3] = {0, 0, 0};
+        for (int k = 0; k < RT_MEASURED_BINS; ++k) {
+            const double v = std::max(0.0f, spectra.Eval(px, py, phi, theta, lambdas[k]));
+            c[0] += wr[k] * v; c[1] += wg[k] * v; c[2] += wb[k] * v;
+        }
+        ref[i] = simd::float3{(float)std::max(0.0, c[0]), (float)std::max(0.0, c[1]), (float)std::max(0.0, c[2])};
+    }
+    id<MTLBuffer> gBuf = makeBuffer(device, g.data(), g.size() * sizeof(float));
+    id<MTLBuffer> qBuf = makeBuffer(device, q.data(), n * sizeof(simd::float4));
+    id<MTLBuffer> oBuf = makeOutputBuffer(device, n * sizeof(simd::float3));
+    if (!runKernel(device, library, queue, @"test_measuredSpectraRgb", @[gBuf, qBuf, oBuf], nil, n)) return;
+    const simd::float3* out = (const simd::float3*)oBuf.contents;
     int bad = 0;
-    for (int k = 0; k < RT_MEASURED_BINS; ++k)
-        if (out[4 * k] != lambdas[k] || out[4 * k + 1] != wr[k] || out[4 * k + 2] != wg[k] || out[4 * k + 3] != wb[k]) ++bad;
-    char label[160];
-    snprintf(label, sizeof(label), "measured quadrature table: the shader's %d wavelengths and weights equal measured_rgb_quadrature.h (%d differ)", RT_MEASURED_BINS, bad);
-    expectTrue(label, bad == 0);
-    // and, as the header promises, a flat spectrum of 1 reads (1, 1, 1)
+    double worst = 0.0, scale = 0.0;
+    for (int i = 0; i < n; ++i) scale = std::max(scale, (double)std::max(ref[i].x, std::max(ref[i].y, ref[i].z)));
+    for (int i = 0; i < n; ++i) {
+        const double err = std::max(std::fabs(out[i].x - ref[i].x), std::max(std::fabs(out[i].y - ref[i].y), std::fabs(out[i].z - ref[i].z)));
+        worst = std::max(worst, err);
+        if (err > 2e-3 * scale + 1e-6) ++bad;
+    }
+    char label[240];
+    snprintf(label, sizeof(label), "measured spectra (%s): the shader's RGB tables equal the 18-wavelength sum on %d points (%d off, worst absolute error %.2g of values up to %.3g)", name, n, bad, worst, scale);
+    expectTrue(label, bad == 0 && scale > 0.0);
+}
+
+void testMeasuredSpectraRgb(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue) {
+    const float wr[RT_MEASURED_BINS] = { RT_MEASURED_WR }, wg[RT_MEASURED_BINS] = { RT_MEASURED_WG }, wb[RT_MEASURED_BINS] = { RT_MEASURED_WB };
+    // the weights sum to 1 per channel: a spectrum of 1 reads white
     double sum[3] = {0, 0, 0};
     for (int k = 0; k < RT_MEASURED_BINS; ++k) { sum[0] += wr[k]; sum[1] += wg[k]; sum[2] += wb[k]; }
     expectNear("measured quadrature: the red weights sum to 1", sum[0], 1.0, 2e-3);
     expectNear("measured quadrature: the green weights sum to 1", sum[1], 1.0, 2e-3);
     expectNear("measured quadrature: the blue weights sum to 1", sum[2], 1.0, 2e-3);
+
+    const std::string path = std::string(__FILE__).substr(0, std::string(__FILE__).rfind('/')) + "/../../pbrt_scenes/synthetic-gold.bsdf";
+    std::string error;
+    const std::shared_ptr<const MeasuredBRDFData> data = measured_bxdf_io::GetMeasuredBRDFDataCached(path, error);
+    if (!data) {
+        expectTrue(("measured spectra: the bundled table loads (" + error + ")").c_str(), false);
+    } else {
+        std::vector<float> g;
+        const size_t base = appendMeasuredBrdf(*data, g);
+        expectTrue("measured spectra: the descriptor is the first thing in the buffer", base == 0);
+        checkMeasuredSpectraRgb(device, library, queue, "synthetic-gold.bsdf", data->spectra, g);
+    }
+
+    // a random table: 7 x 5 cells, 4 phi, 3 theta and 6 wavelength nodes (not evenly spaced), values in [0, 1]
+    const int nx = 7, ny = 5, res[3] = {4, 3, 6};
+    const std::vector<float> axes[3] = {{0.0f, 0.4f, 1.1f, 2.0f}, {0.0f, 0.5f, 1.4f}, {380.0f, 440.0f, 500.0f, 560.0f, 650.0f, 760.0f}};
+    const float* axisPtr[3] = {axes[0].data(), axes[1].data(), axes[2].data()};
+    std::mt19937 rng(97531);
+    std::uniform_real_distribution<float> unit(0.0f, 1.0f);
+    std::vector<float> table((size_t)nx * ny * res[0] * res[1] * res[2]);
+    for (float& v : table) v = unit(rng);
+    const PiecewiseLinear2D<3> spectra(table.data(), nx, ny, res, axisPtr, false, false);
+    std::vector<float> g(121, 0.0f);
+    putMeasuredSpectraRgb(spectra, g, 76);
+    checkMeasuredSpectraRgb(device, library, queue, "random, several nodes on every axis", spectra, g);
 }
 
 // approximateDpDxy() against camera_footprint::approximate() (the CPU camera's and both OptiX backends' pbrt Approximate_dp_dxy, in double): the same dpdx and dpdy for random hit points and
