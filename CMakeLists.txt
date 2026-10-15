@@ -825,9 +825,11 @@ if(RT_BUILD_METAL)
     # The committed Metal snapshot the sweep also checks against (see "Golden snapshot" in the harness).
     target_compile_definitions(metal_cpu_gpu_parity_check PRIVATE
         RT_PARITY_GOLDEN_PATH="${CMAKE_SOURCE_DIR}/gpu/metal/parity_golden.txt")
-    # A real gate: METAL_PARITY_STRICT=1 (set below) makes the sweep exit non-zero - which fails
-    # ctest on its own, PASS_REGULAR_EXPRESSION only gates the exit-0 case - when a scene that is
-    # NOT a documented known gap exceeds tolerance. The sweep is reproducible (fixed RNG seed for
+    # A real gate: METAL_PARITY_STRICT=1 (set below) makes the sweep exit non-zero and print "FAIL: ..." when a scene that is
+    # NOT a documented known gap exceeds tolerance, or drifts from the golden snapshot. ctest does NOT fail on that exit status: with a
+    # PASS_REGULAR_EXPRESSION it looks at the output only, and the sweep runs as two processes (a worker takes half the scenes) whose
+    # outputs are joined - the worker prints its own "PASS (strict)" even when the first process printed "FAIL:" (a golden drift of C16 passed
+    # ctest for a whole afternoon that way). So FAIL_REGULAR_EXPRESSION, which wins over the pass pattern, catches the FAIL line. The sweep is reproducible (fixed RNG seed for
     # both backends) and a regional miss under 1.5x the tolerance is only "marginal", so sampling
     # noise on another machine does not turn this red, while a genuine regression (whole-image
     # brightness, per-channel, NaN pixels, or a gross regional miss) does. Run the binary directly
@@ -843,5 +845,6 @@ if(RT_BUILD_METAL)
     set_tests_properties(metal_poc_cpu_gpu_parity PROPERTIES
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
         ENVIRONMENT "METAL_PARITY_STRICT=1"
-        PASS_REGULAR_EXPRESSION "PASS \\((informational|strict)\\)|No Metal device available")
+        PASS_REGULAR_EXPRESSION "PASS \\((informational|strict)\\)|No Metal device available"
+        FAIL_REGULAR_EXPRESSION "(^|\n)FAIL: ")
 endif()
