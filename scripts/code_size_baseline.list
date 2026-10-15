@@ -2,22 +2,3 @@
 # CI fails when one grows or a new one appears. Lower or delete a line after splitting something. Format: <key> <lines>
 func gpu/metal/metal_poc_materials_specular.metal::shadeConductor 329
 func gpu/metal/metal_poc_pbrt_materials.mm::MetalPocApp::mapPbrtMaterial 336
-func gpu/optix/optix_device_shade.h::shade_material_surface 872
-func gpu/optix/optix_renderer_init.cpp::OptiXRenderer::createProgramGroups 421
-func gpu/optix/optix_renderer_render.cpp::OptiXRenderer::render 398
-func gpu/optix/optix_renderer_scene.cpp::OptiXRenderer::uploadLightBuffers 326
-func gpu/optix/pbrt_gpu_builder.h::setupMediumLookup 310
-func gpu/optix/scene_builder.cpp::build_loaded_pbrt_scene 431
-func gpu/optix/wavefront_path_tracer.cpp::WavefrontPathTracer::renderSampleLoop 387
-func gpu/optix/wavefront_path_tracer_setup.cpp::WavefrontPathTracer::createProgramGroups 301
-func src/TheRestOfYourLife/camera_path.h::camera::ray_color 557
-func src/TheRestOfYourLife/camera_path.h::camera::ray_color_spectral 395
-func src/TheRestOfYourLife/camera_render.h::camera::render 582
-func src/TheRestOfYourLife/mesh_mtl.h::load_obj_mtl 370
-func src/TheRestOfYourLife/scene_registry.h::wire_pbrt_backed_scene 312
-func src/shared/pbrt_flatten_materials.h::readMaterialBindings 462
-func src/shared/pbrt_flatten_materials.h::readMaterialKindParams 496
-func src/shared/pbrt_flatten_scene_parts.h::flattenMedia 311
-func src/shared/pbrt_flatten_shapes.h::flattenTriangleMeshShape 425
-func src/shared/pbrt_scene.h::dispatch 430
-func src/shared/vol_path.h::VolPathLi 403

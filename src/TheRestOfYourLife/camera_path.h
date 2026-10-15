@@ -171,6 +171,346 @@ inline bool camera::sample_bssrdf_exit(hit_record& rec, scatter_record& srec,
     return true;
 }
 
+namespace camera_path_detail {
+
+// Russian roulette on a path's throughput (pbrt-v4: rrBeta = beta * etaScale, so transmission paths are not killed too eagerly). False when the path is terminated; otherwise
+// `new_beta` is reweighted for the survival probability.
+template <typename Sampler>
+inline bool russian_roulette(color& new_beta, double eta_scale, Sampler& sampler) {
+    color rr_beta = new_beta * eta_scale;
+    double rr_max = std::max(rr_beta.x(), std::max(rr_beta.y(), rr_beta.z()));
+    if (rr_max < 1.0) {
+        double q = std::max(0.0, 1.0 - rr_max);
+        if (sampler.get() < q) return false;
+        new_beta = new_beta / (1.0 - q);
+    }
+    return true;
+}
+
+// Per-channel-extinction shape media: one free-flight event per medium over its chord up to the nearest surface, in order of entry (a collision ends the walk and replaces
+// `rec`; a pass multiplies `beta` by its importance weight).
+inline void sample_shape_media(const camera& cam, const ray& current_ray, bool& hit_something, hit_record& rec, color& beta) {
+    const auto& shape_media = cam.shape_media;
+    if (!shape_media.empty()) {
+        const event_medium* order_buf[8];
+        std::size_t n = 0;
+        std::vector<const event_medium*> order_heap;
+        const event_medium** order = order_buf;
+        if (shape_media.size() > 8) {
+            order_heap.resize(shape_media.size());
+            order = order_heap.data();
+        }
+        for (const auto& m : shape_media) order[n++] = m.get();
+        if (n > 1) {
+            double entry[64];
+            std::vector<double> entry_heap;
+            double* ent = entry;
+            if (n > 64) { entry_heap.resize(n); ent = entry_heap.data(); }
+            for (std::size_t i = 0; i < n; ++i) {
+                double t0, t1;
+                ent[i] = order[i]->chord(current_ray, t0, t1) ? t0 : infinity;
+            }
+            for (std::size_t i = 1; i < n; ++i) {   // insertion sort, n is tiny
+                for (std::size_t j = i; j > 0 && ent[j] < ent[j - 1]; --j) {
+                    std::swap(ent[j], ent[j - 1]);
+                    std::swap(order[j], order[j - 1]);
+                }
+            }
+        }
+        double t_limit = hit_something ? rec.t : infinity;
+        for (std::size_t i = 0; i < n; ++i) {
+            double entry_t = 0.0;
+            bool collided = false;
+            hit_record ev_rec;
+            color w(1, 1, 1);
+            if (!order[i]->sample_event(current_ray, t_limit, entry_t, collided, ev_rec, w)) continue;
+            if (collided) {
+                rec = ev_rec;
+                hit_something = true;
+                break;
+            }
+            beta = beta * w;
+        }
+    }
+}
+
+// pbrt-v4's own "camera medium" (camera::camera_medium's own comment) - an unbounded ambient medium the camera itself starts inside. Tested after world.hit() already ran,
+// so its free-path sample is clipped to the nearest real surface (or infinity, for an escaped ray); see ambient_medium's own comment (constant_medium.h) for why it
+// cannot be one more entry in the world's BVH. Applies on every bounce: once inside a medium that fills all of space, every segment of the path is inside it too.
+inline void sample_camera_medium(const camera& cam, const ray& current_ray, bool& hit_something, hit_record& rec, color& beta) {
+    const auto& camera_medium = cam.camera_medium;
+        const double surface_t = hit_something ? rec.t : infinity;
+        // sample_scatter() writes rec directly (safe: every one of
+        // its failure paths returns before touching rec, so there's
+        // no risk of it leaving rec partially mutated on a miss) and
+        // hands back the ray length it already computed internally,
+        // so the no-scatter branch doesn't need a second sqrt for
+        // the same value.
+        double ray_length = 0.0;
+        color  pass_weight(1, 1, 1);   // only a per-channel-extinction medium sets this
+        if (camera_medium->sample_scatter(current_ray, surface_t, rec, &ray_length, &pass_weight)) {
+            hit_something = true;
+        } else {
+            beta = beta * pass_weight;
+        }
+        // No scatter: the ray reaches the surface (or escapes) with weight 1. The free-flight sample
+        // above already decides scatter-or-pass with probabilities 1 - T and T, so multiplying beta by
+        // the transmittance T as well (as this branch used to) attenuated a ray that got through by T
+        // a second time: a surface seen through a pure absorber of optical depth 1 rendered at
+        // exp(-2) instead of exp(-1). (ray_length is only needed by sample_scatter() itself now.)
+        (void)ray_length;
+}
+
+// What an escaped ray adds: the portal or sky light (MIS-weighted against the last BSDF sample unless the path is still specular) or the flat background.
+inline void add_escaped_radiance(const camera& cam, const ray& current_ray, bool specular_bounce, double prev_bsdf_pdf, const color& beta, color& L) {
+    const auto& portal = cam.portal;
+    const auto& sky = cam.sky;
+    const auto& background = cam.background;
+    if (portal) {
+        // Windowed/portal infinite light - position-dependent
+        // (visibility through the finite window depends on the
+        // ray's OWN origin, unlike sky->Le()'s direction-only
+        // query), so pass current_ray.origin() as the reference
+        // point; eval_Le_rgb()/pdf_li() already return
+        // zero/black on their own when this escaped ray's
+        // origin can't see the window at all, or the direction
+        // falls outside it - no separate visibility check
+        // needed here.
+        point3 ro = current_ray.origin();
+        vec3 rd = unit_vector(current_ray.direction());
+        double lr, lg, lb;
+        portal->eval_Le_rgb(ro.x(), ro.y(), ro.z(), rd.x(), rd.y(), rd.z(), lr, lg, lb);
+        color Le(lr, lg, lb);
+        if (specular_bounce) {
+            L += beta * Le;
+        } else {
+            double p_l = portal->pdf_li(ro.x(), ro.y(), ro.z(), rd.x(), rd.y(), rd.z());
+            double w_b = camera::mis_power_heuristic(prev_bsdf_pdf, p_l);
+            L += beta * w_b * Le;
+        }
+    } else if (sky) {
+        color Le = sky->Le(unit_vector(current_ray.direction()));
+        if (specular_bounce) {
+            // Camera ray or post-specular: full contribution (no MIS needed)
+            L += beta * Le;
+        } else {
+            // MIS: balance BSDF-sample weight against sky PDF at this direction
+            // pbrt-v4: p_l = lightSampler.PMF(prevIntrCtx, light) * light.PDF_Li(...);
+            //          w_b = PowerHeuristic(1, p_b, 1, p_l);
+            double p_l = sky->pdf_Li(unit_vector(current_ray.direction()));
+            double w_b = camera::mis_power_heuristic(prev_bsdf_pdf, p_l);
+            L += beta * w_b * Le;
+        }
+    } else {
+        L += beta * background;
+    }
+}
+
+// The footprint a texture lookup at this hit uses (EWA/mipmap filtering): the primary camera ray's own differentials, else the camera's estimate for a bounce.
+inline void apply_texture_footprint(const camera& cam, const ray& current_ray, bool primary_hit, hit_record& rec) {
+    const ray footprint_ray = primary_hit ? current_ray : (footprint_consumer_count().load(std::memory_order_relaxed) > 0 ? cam.approximate_footprint_ray(rec.p, rec.normal) : ray());   // (nobody reads it in a scene of plain colours)
+    if (footprint_ray.has_differentials()) {
+        SurfaceInteraction<double> si(
+            rec.p.x(), rec.p.y(), rec.p.z(),
+            rec.normal.x(), rec.normal.y(), rec.normal.z(),
+            rec.u, rec.v, rec.t,
+            0.0, 0.0, 0.0,   // wo unused by compute_differentials()
+            rec.dpdu.x(), rec.dpdu.y(), rec.dpdu.z(),
+            rec.dpdv.x(), rec.dpdv.y(), rec.dpdv.z());
+        si.compute_differentials(true,
+            footprint_ray.rx_origin().x(), footprint_ray.rx_origin().y(), footprint_ray.rx_origin().z(),
+            footprint_ray.rx_direction().x(), footprint_ray.rx_direction().y(), footprint_ray.rx_direction().z(),
+            footprint_ray.ry_origin().x(), footprint_ray.ry_origin().y(), footprint_ray.ry_origin().z(),
+            footprint_ray.ry_direction().x(), footprint_ray.ry_direction().y(), footprint_ray.ry_direction().z());
+        rec.dudx = si.dudx; rec.dvdx = si.dvdx;
+        rec.dudy = si.dudy; rec.dvdy = si.dvdy;
+    }
+}
+
+// What an emitter hit adds: its full radiance on a camera or specular hit, else weighted by MIS against the light sampling at the previous vertex.
+inline void add_hit_emission(const hittable& lights, const ray& current_ray, const hit_record& rec, bool specular_bounce, double prev_bsdf_pdf, const point3& prev_surface_p, const color& beta, color& L) {
+    color Le = rec.mat->emitted(current_ray, rec, rec.u, rec.v, rec.p);
+    if (Le.x() > 0 || Le.y() > 0 || Le.z() > 0) {
+        if (specular_bounce) {
+            L += beta * Le;
+        } else {
+            // Use prev_surface_p as the PDF origin -- mirrors pbrt-v4 prevIntrCtx.
+            // The light PDF must be evaluated from where the BSDF ray was *spawned*
+            // (the previous surface), not from the emitter hit point (rec.p).
+            hittable_pdf light_pdf_mis(lights, prev_surface_p);
+            double pdf_l = light_pdf_mis.value(current_ray.direction());
+            double w_b   = camera::mis_power_heuristic(prev_bsdf_pdf, pdf_l);
+            L += beta * w_b * Le;
+        }
+    }
+}
+
+// pbrt-v4's radiance-mode 1 / etap^2 for a direction that crosses a refractive boundary at this vertex (rough glass: srec.is_transmission with srec.eta = eta_i / eta_t):
+// srec.eta^2 for a crossing direction, else 1. (The BSDF value scattering_pdf() returns is the importance-transport one.)
+inline double refraction_scale_for(const scatter_record& srec, const hit_record& rec, const ray& current_ray, const vec3& dir) {
+    if (!srec.is_transmission) return 1.0;
+    const bool crossed = dot(dir, rec.normal) * dot(-unit_vector(current_ray.direction()), rec.normal) < 0.0;
+    return crossed ? srec.eta * srec.eta : 1.0;
+}
+
+// The three next-event estimators of a non-specular vertex - area lights (A-1), the sky or portal light (A-2) and punctual delta lights (A-3) - each with its own shadow ray,
+inline void add_direct_lighting(const camera& cam, const hittable& world, const hittable& lights, const ray& current_ray, const hit_record& rec, scatter_record& srec,
+                                const color& beta, color& L) {
+    const auto& portal = cam.portal;
+    const auto& sky = cam.sky;
+    const auto& punct_lights = cam.punct_lights;
+    const auto& camera_medium = cam.camera_medium;
+    const auto& shape_media = cam.shape_media;
+    // Deterministic per-channel transmittance through the chromatic shape media along a shadow ray, up to parameter t_max: what the NEE strategies below multiply in
+    // (the media are invisible to shadow_ray_hit() while the chromatic-media scope of ray_color() is active).
+    auto shape_media_trans = [&](const ray& sr, double t_max) -> color {
+        color T(1, 1, 1);
+        for (const auto& m : shape_media) T = T * m->transmittance_along(sr, t_max);
+        return T;
+    };
+    auto refraction_scale = [&](const vec3& dir) -> double { return refraction_scale_for(srec, rec, current_ray, dir); };
+    hittable_pdf light_pdf(lights, rec.p);
+
+
+    // Camera-medium shadow-ray attenuation (closes the gap
+    // ambient_medium's own "v1 scope" comment documents:
+    // "no shadow-ray/NEE attenuation through it yet ... a light
+    // behind fog through this medium is not dimmed by it"). The
+    // camera medium is untraced geometry (see camera_medium's own
+    // comment above for why it isn't a hittable), so
+    // shadow_ray_hit()'s own transmittance walk never sees it - it
+    // has to be applied here, once per NEE strategy, exactly the
+    // same Beer-Lambert transmittance_over() the primary/bounce ray
+    // already applies each iteration (see the `if (camera_medium)`
+    // block right after world.hit() above). `distance` is real
+    // world units (already ray_length-scaled, matching that same
+    // call's `surface_t * ray_length`) - `infinity` is the correct,
+    // exact answer for a light at unbounded distance (sky, or the
+    // portal light's own window, both treated as infinitely distant
+    // for this purpose): transmittance_over(infinity) is 0 for any
+    // channel with real extinction, matching this same medium's own
+    // physical model (nothing is visible arbitrarily far through an
+    // unbounded absorbing/scattering fog).
+    auto camera_medium_trans = [&](double distance) -> color {
+        return camera_medium ? camera_medium->transmittance_over(distance) : color(1, 1, 1);
+    };
+
+    // Strategy A-1: NEE toward area lights (non-recursive shadow test)
+    {
+        vec3   light_dir = light_pdf.generate();
+        double pdf_l     = light_pdf.value(light_dir);
+        if (pdf_l > 0.0) {
+            ray    shadow_ray(rec.p, light_dir, current_ray.time());
+            double f_pdf = rec.mat->scattering_pdf(current_ray, rec, shadow_ray);
+            if (f_pdf > 0.0) {
+                double pdf_b_at_l = srec.mis_pdf().value(light_dir);
+                double w_l        = camera::mis_power_heuristic(pdf_l, pdf_b_at_l);
+                hit_record light_rec;
+                color trans;
+                if (render_stats::enabled())
+                    render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
+                if (shadow_ray_hit(world, shadow_ray, light_rec, infinity, &trans)) {
+                    color Le_d = light_rec.mat->emitted(
+                        shadow_ray, light_rec, light_rec.u, light_rec.v, light_rec.p);
+                    if (Le_d.x() > 0 || Le_d.y() > 0 || Le_d.z() > 0) {
+                        color atten = rec.mat->scattering_attenuation(current_ray, rec, shadow_ray, srec.attenuation) * refraction_scale(light_dir);
+                        // shadow_ray_hit() restarts its ray at every transmissive surface it walks through (an interface
+                        // shell, glass), so light_rec.t is measured from the LAST of those, not from shadow_ray's origin.
+                        // The distance to the light's hit point is the real extent of the segment the media see.
+                        const double dir_len = shadow_ray.direction().length();
+                        const double t_light = (light_rec.p - shadow_ray.origin()).length() / dir_len;
+                        color med_trans = camera_medium_trans(t_light * dir_len)
+                            * shape_media_trans(shadow_ray, t_light);
+                        L += beta * w_l * atten * trans * med_trans * f_pdf * Le_d / pdf_l;
+                    }
+                }
+            }
+        }
+    }
+
+    // Strategy A-2: NEE toward sky (pbrt-v4 SampleLd for infinite lights)
+    // Uses importance-sampled direction when HDR distribution is available,
+    // falling back to uniform sphere for solid-color skies.
+    if (portal) {
+        // Windowed/portal infinite light - sample_li() needs the
+        // shading point (visibility through the finite window is
+        // position-dependent, unlike sky->sample_Le()'s pure
+        // direction sample) and its own explicit (ru,rv) draw
+        // (sample_li() has no internal RNG the way sky_light does).
+        double ru = random_double(), rv = random_double();
+        double wx, wy, wz, pdf_portal;
+        if (portal->sample_li(ru, rv, rec.p.x(), rec.p.y(), rec.p.z(),
+                               wx, wy, wz, pdf_portal) && pdf_portal > 0.0) {
+            vec3 portal_dir(wx, wy, wz);
+            ray  portal_shadow(rec.p, portal_dir, current_ray.time());
+            double f_pdf = rec.mat->scattering_pdf(current_ray, rec, portal_shadow);
+            if (f_pdf > 0.0) {
+                double pdf_b_at_portal = srec.mis_pdf().value(portal_dir);
+                double w_portal         = camera::mis_power_heuristic(pdf_portal, pdf_b_at_portal);
+                hit_record portal_rec;
+                color trans;
+                if (render_stats::enabled())
+                    render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
+                if (!shadow_ray_hit(world, portal_shadow, portal_rec, infinity, &trans)) {
+                    double lr, lg, lb;
+                    portal->eval_Le_rgb(rec.p.x(), rec.p.y(), rec.p.z(), wx, wy, wz, lr, lg, lb);
+                    color Le_portal(lr, lg, lb);
+                    color atten = rec.mat->scattering_attenuation(current_ray, rec, portal_shadow, srec.attenuation) * refraction_scale(portal_dir);
+                    color med_trans = camera_medium_trans(infinity) * shape_media_trans(portal_shadow, infinity);
+                    L += beta * w_portal * atten * trans * med_trans * f_pdf * Le_portal / pdf_portal;
+                }
+            }
+        }
+    } else if (sky) {
+        SkyLiSample sky_smp = sky->sample_Le();
+        vec3   sky_dir  = sky_smp.direction;
+        double pdf_sky  = sky_smp.pdf;
+        if (pdf_sky > 0.0) {
+            ray    sky_shadow(rec.p, sky_dir, current_ray.time());
+            double f_pdf = rec.mat->scattering_pdf(current_ray, rec, sky_shadow);
+            if (f_pdf > 0.0) {
+                double pdf_b_at_sky = srec.mis_pdf().value(sky_dir);
+                double w_sky        = camera::mis_power_heuristic(pdf_sky, pdf_b_at_sky);
+                hit_record sky_rec;
+                color trans;
+                if (render_stats::enabled())
+                    render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
+                if (!shadow_ray_hit(world, sky_shadow, sky_rec, infinity, &trans)) {
+                    color Le_sky = sky->Le(unit_vector(sky_dir));
+                    color atten = rec.mat->scattering_attenuation(current_ray, rec, sky_shadow, srec.attenuation) * refraction_scale(sky_dir);
+                    color med_trans = camera_medium_trans(infinity) * shape_media_trans(sky_shadow, infinity);
+                    L += beta * w_sky * atten * trans * med_trans * f_pdf * Le_sky / pdf_sky;
+                }
+            }
+        }
+    }
+
+    // Strategy A-3: NEE toward punctual (delta) lights
+    // pbrt-v4: DeltaPosition/DeltaDirection lights bypass MIS -- PDF=1 (delta),
+    // contribution = beta * BSDF * Li (no MIS weight needed since PDF=1).
+    if (punct_lights && !punct_lights->empty()) {
+        punct_lights->for_each_sample(rec.p, [&](const PunctualLiSample& ps) {
+            if (ps.Li.x() <= 0 && ps.Li.y() <= 0 && ps.Li.z() <= 0) return;
+            ray punct_ray(rec.p, ps.wi, current_ray.time());
+            double f_pdf = rec.mat->scattering_pdf(current_ray, rec, punct_ray);
+            if (f_pdf <= 0.0) return;
+            hit_record shadow_rec;
+            double shadow_t_max = (ps.t_max == infinity) ? infinity : (ps.t_max - 0.001);
+            color trans;
+            if (render_stats::enabled())
+                render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
+            if (!shadow_ray_hit(world, punct_ray, shadow_rec, shadow_t_max, &trans)) {
+                // delta light: pdf=1, no MIS weight needed
+                color atten = rec.mat->scattering_attenuation(current_ray, rec, punct_ray, srec.attenuation) * refraction_scale(ps.wi);
+                color med_trans = camera_medium_trans(ps.t_max) * shape_media_trans(punct_ray, shadow_t_max);
+                L += beta * atten * trans * med_trans * f_pdf * ps.Li;
+            }
+        });
+    }
+}
+
+} // namespace camera_path_detail
+
 template <typename Sampler>
     inline color camera::ray_color(const ray& r, int depth, const hittable& world, const hittable& lights,
     Sampler& sampler)
@@ -197,13 +537,6 @@ template <typename Sampler>
         ~ChromaticMediaScope() { g_chromatic_media_integrator_managed = prev; }
     } chromatic_media_scope(!shape_media.empty());
 
-    // Deterministic per-channel transmittance through the chromatic shape media along a shadow ray, up to parameter t_max: what
-    // the NEE strategies below multiply in (the media are invisible to shadow_ray_hit() while the scope above is active).
-    auto shape_media_trans = [&](const ray& sr, double t_max) -> color {
-        color T(1, 1, 1);
-        for (const auto& m : shape_media) T = T * m->transmittance_along(sr, t_max);
-        return T;
-    };
 
     // Russian roulette below only fires when a path's throughput has
     // dropped under 1.0 - it terminates/reweights *dim* paths, but does
@@ -252,127 +585,15 @@ template <typename Sampler>
         hit_record rec;
         bool hit_something = world.hit(current_ray, interval(0.001, infinity), rec);
 
-        // Per-channel-extinction shape media: one free-flight event per medium over its chord up to the nearest surface, in
-        // order of entry (a collision ends the walk and replaces rec; a pass multiplies beta by its importance weight).
-        if (!shape_media.empty()) {
-            const event_medium* order_buf[8];
-            std::size_t n = 0;
-            std::vector<const event_medium*> order_heap;
-            const event_medium** order = order_buf;
-            if (shape_media.size() > 8) {
-                order_heap.resize(shape_media.size());
-                order = order_heap.data();
-            }
-            for (const auto& m : shape_media) order[n++] = m.get();
-            if (n > 1) {
-                double entry[64];
-                std::vector<double> entry_heap;
-                double* ent = entry;
-                if (n > 64) { entry_heap.resize(n); ent = entry_heap.data(); }
-                for (std::size_t i = 0; i < n; ++i) {
-                    double t0, t1;
-                    ent[i] = order[i]->chord(current_ray, t0, t1) ? t0 : infinity;
-                }
-                for (std::size_t i = 1; i < n; ++i) {   // insertion sort, n is tiny
-                    for (std::size_t j = i; j > 0 && ent[j] < ent[j - 1]; --j) {
-                        std::swap(ent[j], ent[j - 1]);
-                        std::swap(order[j], order[j - 1]);
-                    }
-                }
-            }
-            double t_limit = hit_something ? rec.t : infinity;
-            for (std::size_t i = 0; i < n; ++i) {
-                double entry_t = 0.0;
-                bool collided = false;
-                hit_record ev_rec;
-                color w(1, 1, 1);
-                if (!order[i]->sample_event(current_ray, t_limit, entry_t, collided, ev_rec, w)) continue;
-                if (collided) {
-                    rec = ev_rec;
-                    hit_something = true;
-                    break;
-                }
-                beta = beta * w;
-            }
-        }
+        // Per-channel-extinction shape media (see sample_shape_media).
+        if (!shape_media.empty()) camera_path_detail::sample_shape_media(*this, current_ray, hit_something, rec, beta);
 
-        // pbrt-v4's own "camera medium" (camera::camera_medium's own
-        // comment) - an unbounded ambient medium the camera itself
-        // starts inside. Tested here, AFTER world.hit() already ran, so
-        // its own free-path sample can be correctly clipped to whatever
-        // real surface (or infinity, for an escaped ray) is already
-        // known to be the nearest thing in front of it - see
-        // ambient_medium's own comment (constant_medium.h) for why this
-        // can't just be one more entry in world's own BVH/hittable_list.
-        // Applies on every bounce, not just the primary ray - once
-        // inside a medium that fills all of space, every ray segment of
-        // the path is inside it too (this v1 doesn't model a real exit
-        // via some other shape's own MediumInterface - see
-        // pbrt_flatten.h's own warning for that combination).
-        if (camera_medium) {
-            const double surface_t = hit_something ? rec.t : infinity;
-            // sample_scatter() writes rec directly (safe: every one of
-            // its failure paths returns before touching rec, so there's
-            // no risk of it leaving rec partially mutated on a miss) and
-            // hands back the ray length it already computed internally,
-            // so the no-scatter branch doesn't need a second sqrt for
-            // the same value.
-            double ray_length = 0.0;
-            color  pass_weight(1, 1, 1);   // only a per-channel-extinction medium sets this
-            if (camera_medium->sample_scatter(current_ray, surface_t, rec, &ray_length, &pass_weight)) {
-                hit_something = true;
-            } else {
-                beta = beta * pass_weight;
-            }
-            // No scatter: the ray reaches the surface (or escapes) with weight 1. The free-flight sample
-            // above already decides scatter-or-pass with probabilities 1 - T and T, so multiplying beta by
-            // the transmittance T as well (as this branch used to) attenuated a ray that got through by T
-            // a second time: a surface seen through a pure absorber of optical depth 1 rendered at
-            // exp(-2) instead of exp(-1). (ray_length is only needed by sample_scatter() itself now.)
-            (void)ray_length;
-        }
+        if (camera_medium) camera_path_detail::sample_camera_medium(*this, current_ray, hit_something, rec, beta);
 
         // Miss -- query sky (HDR env map) or fall back to flat background.
         // Mirrors pbrt-v4: "Incorporate emission from infinite lights for escaped ray"
         if (!hit_something) {
-            if (portal) {
-                // Windowed/portal infinite light - position-dependent
-                // (visibility through the finite window depends on the
-                // ray's OWN origin, unlike sky->Le()'s direction-only
-                // query), so pass current_ray.origin() as the reference
-                // point; eval_Le_rgb()/pdf_li() already return
-                // zero/black on their own when this escaped ray's
-                // origin can't see the window at all, or the direction
-                // falls outside it - no separate visibility check
-                // needed here.
-                point3 ro = current_ray.origin();
-                vec3 rd = unit_vector(current_ray.direction());
-                double lr, lg, lb;
-                portal->eval_Le_rgb(ro.x(), ro.y(), ro.z(), rd.x(), rd.y(), rd.z(), lr, lg, lb);
-                color Le(lr, lg, lb);
-                if (specular_bounce) {
-                    L += beta * Le;
-                } else {
-                    double p_l = portal->pdf_li(ro.x(), ro.y(), ro.z(), rd.x(), rd.y(), rd.z());
-                    double w_b = mis_power_heuristic(prev_bsdf_pdf, p_l);
-                    L += beta * w_b * Le;
-                }
-            } else if (sky) {
-                color Le = sky->Le(unit_vector(current_ray.direction()));
-                if (specular_bounce) {
-                    // Camera ray or post-specular: full contribution (no MIS needed)
-                    L += beta * Le;
-                } else {
-                    // MIS: balance BSDF-sample weight against sky PDF at this direction
-                    // pbrt-v4: p_l = lightSampler.PMF(prevIntrCtx, light) * light.PDF_Li(...);
-                    //          w_b = PowerHeuristic(1, p_b, 1, p_l);
-                    double p_l = sky->pdf_Li(unit_vector(current_ray.direction()));
-                    double w_b = mis_power_heuristic(prev_bsdf_pdf, p_l);
-                    L += beta * w_b * Le;
-                }
-            } else {
-                L += beta * background;
-            }
+            camera_path_detail::add_escaped_radiance(*this, current_ray, specular_bounce, prev_bsdf_pdf, beta, L);
             break;
         }
 
@@ -391,40 +612,11 @@ template <typename Sampler>
         // and a filtered texture's footprint at a bounce are those of a camera ray seeing the point, not a hair's breadth. Without it the bumps seen by bounced
         // light were fully sharp, and sibenik's bump maps read 30% too bright against pbrt.
         const bool primary_hit = bounces_left == depth && current_ray.has_differentials();
-        const ray footprint_ray = primary_hit ? current_ray : (footprint_consumer_count().load(std::memory_order_relaxed) > 0 ? approximate_footprint_ray(rec.p, rec.normal) : ray());   // (nobody reads it in a scene of plain colours)
-        if (footprint_ray.has_differentials()) {
-            SurfaceInteraction<double> si(
-                rec.p.x(), rec.p.y(), rec.p.z(),
-                rec.normal.x(), rec.normal.y(), rec.normal.z(),
-                rec.u, rec.v, rec.t,
-                0.0, 0.0, 0.0,   // wo unused by compute_differentials()
-                rec.dpdu.x(), rec.dpdu.y(), rec.dpdu.z(),
-                rec.dpdv.x(), rec.dpdv.y(), rec.dpdv.z());
-            si.compute_differentials(true,
-                footprint_ray.rx_origin().x(), footprint_ray.rx_origin().y(), footprint_ray.rx_origin().z(),
-                footprint_ray.rx_direction().x(), footprint_ray.rx_direction().y(), footprint_ray.rx_direction().z(),
-                footprint_ray.ry_origin().x(), footprint_ray.ry_origin().y(), footprint_ray.ry_origin().z(),
-                footprint_ray.ry_direction().x(), footprint_ray.ry_direction().y(), footprint_ray.ry_direction().z());
-            rec.dudx = si.dudx; rec.dvdx = si.dvdx;
-            rec.dudy = si.dudy; rec.dvdy = si.dvdy;
-        }
+        camera_path_detail::apply_texture_footprint(*this, current_ray, primary_hit, rec);
 
         // Emission -- full Le on camera/specular hits; MIS-weighted otherwise.
         // Mirrors pbrt-v4 "Compute MIS weight for area light".
-        color Le = rec.mat->emitted(current_ray, rec, rec.u, rec.v, rec.p);
-        if (Le.x() > 0 || Le.y() > 0 || Le.z() > 0) {
-            if (specular_bounce) {
-                L += beta * Le;
-            } else {
-                // Use prev_surface_p as the PDF origin -- mirrors pbrt-v4 prevIntrCtx.
-                // The light PDF must be evaluated from where the BSDF ray was *spawned*
-                // (the previous surface), not from the emitter hit point (rec.p).
-                hittable_pdf light_pdf_mis(lights, prev_surface_p);
-                double pdf_l = light_pdf_mis.value(current_ray.direction());
-                double w_b   = mis_power_heuristic(prev_bsdf_pdf, pdf_l);
-                L += beta * w_b * Le;
-            }
-        }
+        camera_path_detail::add_hit_emission(lights, current_ray, rec, specular_bounce, prev_bsdf_pdf, prev_surface_p, beta, L);
 
         // The final, emission-only iteration (see the loop's own comment): the emission above is all this vertex contributes; no light
         // sampling, no scattering.
@@ -498,16 +690,7 @@ template <typename Sampler>
             // entry, which stays in the importance-transport form: its exit does not carry the matching eta^2 either).
             if (srec.is_transmission)
                 new_beta = new_beta * (srec.eta * srec.eta);
-            if (bounces_left < depth) {
-                // pbrt-v4: rrBeta = beta * etaScale to avoid killing transmission paths
-                color rr_beta = new_beta * eta_scale;
-                double rr_max = std::max(rr_beta.x(), std::max(rr_beta.y(), rr_beta.z()));
-                if (rr_max < 1.0) {
-                    double q = std::max(0.0, 1.0 - rr_max);
-                    if (sampler.get() < q) break;
-                    new_beta = new_beta / (1.0 - q);
-                }
-            }
+            if (bounces_left < depth && !camera_path_detail::russian_roulette(new_beta, eta_scale, sampler)) break;
             beta            = new_beta;
             current_ray     = srec.skip_pdf_ray;
             specular_bounce = true;
@@ -516,153 +699,9 @@ template <typename Sampler>
             continue;
         }
 
-        // Non-specular: NEE shadow ray + BSDF path continuation
-        // Mirrors pbrt-v4: L += beta * SampleLd(...)  then SpawnRay(bsdf_sample)
-        hittable_pdf light_pdf(lights, rec.p);
+        // Non-specular: the NEE strategies (area lights, sky/portal, punctual lights), then the BSDF sample below becomes the next path ray.
+        camera_path_detail::add_direct_lighting(*this, world, lights, current_ray, rec, srec, beta, L);
 
-        // A direction that crosses a refractive boundary at this vertex (rough glass: srec.is_transmission with srec.eta = eta_i / eta_t) carries pbrt's radiance-mode
-        // 1 / etap^2 = srec.eta^2 (see the specular branch above); the BSDF value scattering_pdf() returns is the importance-transport one.
-        auto refraction_scale = [&](const vec3& dir) -> double {
-            if (!srec.is_transmission) return 1.0;
-            const bool crossed = dot(dir, rec.normal) * dot(-unit_vector(current_ray.direction()), rec.normal) < 0.0;
-            return crossed ? srec.eta * srec.eta : 1.0;
-        };
-
-        // Camera-medium shadow-ray attenuation (closes the gap
-        // ambient_medium's own "v1 scope" comment documents:
-        // "no shadow-ray/NEE attenuation through it yet ... a light
-        // behind fog through this medium is not dimmed by it"). The
-        // camera medium is untraced geometry (see camera_medium's own
-        // comment above for why it isn't a hittable), so
-        // shadow_ray_hit()'s own transmittance walk never sees it - it
-        // has to be applied here, once per NEE strategy, exactly the
-        // same Beer-Lambert transmittance_over() the primary/bounce ray
-        // already applies each iteration (see the `if (camera_medium)`
-        // block right after world.hit() above). `distance` is real
-        // world units (already ray_length-scaled, matching that same
-        // call's `surface_t * ray_length`) - `infinity` is the correct,
-        // exact answer for a light at unbounded distance (sky, or the
-        // portal light's own window, both treated as infinitely distant
-        // for this purpose): transmittance_over(infinity) is 0 for any
-        // channel with real extinction, matching this same medium's own
-        // physical model (nothing is visible arbitrarily far through an
-        // unbounded absorbing/scattering fog).
-        auto camera_medium_trans = [&](double distance) -> color {
-            return camera_medium ? camera_medium->transmittance_over(distance) : color(1, 1, 1);
-        };
-
-        // Strategy A-1: NEE toward area lights (non-recursive shadow test)
-        {
-            vec3   light_dir = light_pdf.generate();
-            double pdf_l     = light_pdf.value(light_dir);
-            if (pdf_l > 0.0) {
-                ray    shadow_ray(rec.p, light_dir, current_ray.time());
-                double f_pdf = rec.mat->scattering_pdf(current_ray, rec, shadow_ray);
-                if (f_pdf > 0.0) {
-                    double pdf_b_at_l = srec.mis_pdf().value(light_dir);
-                    double w_l        = mis_power_heuristic(pdf_l, pdf_b_at_l);
-                    hit_record light_rec;
-                    color trans;
-                    if (render_stats::enabled())
-                        render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
-                    if (shadow_ray_hit(world, shadow_ray, light_rec, infinity, &trans)) {
-                        color Le_d = light_rec.mat->emitted(
-                            shadow_ray, light_rec, light_rec.u, light_rec.v, light_rec.p);
-                        if (Le_d.x() > 0 || Le_d.y() > 0 || Le_d.z() > 0) {
-                            color atten = rec.mat->scattering_attenuation(current_ray, rec, shadow_ray, srec.attenuation) * refraction_scale(light_dir);
-                            // shadow_ray_hit() restarts its ray at every transmissive surface it walks through (an interface
-                            // shell, glass), so light_rec.t is measured from the LAST of those, not from shadow_ray's origin.
-                            // The distance to the light's hit point is the real extent of the segment the media see.
-                            const double dir_len = shadow_ray.direction().length();
-                            const double t_light = (light_rec.p - shadow_ray.origin()).length() / dir_len;
-                            color med_trans = camera_medium_trans(t_light * dir_len)
-                                * shape_media_trans(shadow_ray, t_light);
-                            L += beta * w_l * atten * trans * med_trans * f_pdf * Le_d / pdf_l;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Strategy A-2: NEE toward sky (pbrt-v4 SampleLd for infinite lights)
-        // Uses importance-sampled direction when HDR distribution is available,
-        // falling back to uniform sphere for solid-color skies.
-        if (portal) {
-            // Windowed/portal infinite light - sample_li() needs the
-            // shading point (visibility through the finite window is
-            // position-dependent, unlike sky->sample_Le()'s pure
-            // direction sample) and its own explicit (ru,rv) draw
-            // (sample_li() has no internal RNG the way sky_light does).
-            double ru = random_double(), rv = random_double();
-            double wx, wy, wz, pdf_portal;
-            if (portal->sample_li(ru, rv, rec.p.x(), rec.p.y(), rec.p.z(),
-                                   wx, wy, wz, pdf_portal) && pdf_portal > 0.0) {
-                vec3 portal_dir(wx, wy, wz);
-                ray  portal_shadow(rec.p, portal_dir, current_ray.time());
-                double f_pdf = rec.mat->scattering_pdf(current_ray, rec, portal_shadow);
-                if (f_pdf > 0.0) {
-                    double pdf_b_at_portal = srec.mis_pdf().value(portal_dir);
-                    double w_portal         = mis_power_heuristic(pdf_portal, pdf_b_at_portal);
-                    hit_record portal_rec;
-                    color trans;
-                    if (render_stats::enabled())
-                        render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
-                    if (!shadow_ray_hit(world, portal_shadow, portal_rec, infinity, &trans)) {
-                        double lr, lg, lb;
-                        portal->eval_Le_rgb(rec.p.x(), rec.p.y(), rec.p.z(), wx, wy, wz, lr, lg, lb);
-                        color Le_portal(lr, lg, lb);
-                        color atten = rec.mat->scattering_attenuation(current_ray, rec, portal_shadow, srec.attenuation) * refraction_scale(portal_dir);
-                        color med_trans = camera_medium_trans(infinity) * shape_media_trans(portal_shadow, infinity);
-                        L += beta * w_portal * atten * trans * med_trans * f_pdf * Le_portal / pdf_portal;
-                    }
-                }
-            }
-        } else if (sky) {
-            SkyLiSample sky_smp = sky->sample_Le();
-            vec3   sky_dir  = sky_smp.direction;
-            double pdf_sky  = sky_smp.pdf;
-            if (pdf_sky > 0.0) {
-                ray    sky_shadow(rec.p, sky_dir, current_ray.time());
-                double f_pdf = rec.mat->scattering_pdf(current_ray, rec, sky_shadow);
-                if (f_pdf > 0.0) {
-                    double pdf_b_at_sky = srec.mis_pdf().value(sky_dir);
-                    double w_sky        = mis_power_heuristic(pdf_sky, pdf_b_at_sky);
-                    hit_record sky_rec;
-                    color trans;
-                    if (render_stats::enabled())
-                        render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
-                    if (!shadow_ray_hit(world, sky_shadow, sky_rec, infinity, &trans)) {
-                        color Le_sky = sky->Le(unit_vector(sky_dir));
-                        color atten = rec.mat->scattering_attenuation(current_ray, rec, sky_shadow, srec.attenuation) * refraction_scale(sky_dir);
-                        color med_trans = camera_medium_trans(infinity) * shape_media_trans(sky_shadow, infinity);
-                        L += beta * w_sky * atten * trans * med_trans * f_pdf * Le_sky / pdf_sky;
-                    }
-                }
-            }
-        }
-
-        // Strategy A-3: NEE toward punctual (delta) lights
-        // pbrt-v4: DeltaPosition/DeltaDirection lights bypass MIS -- PDF=1 (delta),
-        // contribution = beta * BSDF * Li (no MIS weight needed since PDF=1).
-        if (punct_lights && !punct_lights->empty()) {
-            punct_lights->for_each_sample(rec.p, [&](const PunctualLiSample& ps) {
-                if (ps.Li.x() <= 0 && ps.Li.y() <= 0 && ps.Li.z() <= 0) return;
-                ray punct_ray(rec.p, ps.wi, current_ray.time());
-                double f_pdf = rec.mat->scattering_pdf(current_ray, rec, punct_ray);
-                if (f_pdf <= 0.0) return;
-                hit_record shadow_rec;
-                double shadow_t_max = (ps.t_max == infinity) ? infinity : (ps.t_max - 0.001);
-                color trans;
-                if (render_stats::enabled())
-                    render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
-                if (!shadow_ray_hit(world, punct_ray, shadow_rec, shadow_t_max, &trans)) {
-                    // delta light: pdf=1, no MIS weight needed
-                    color atten = rec.mat->scattering_attenuation(current_ray, rec, punct_ray, srec.attenuation) * refraction_scale(ps.wi);
-                    color med_trans = camera_medium_trans(ps.t_max) * shape_media_trans(punct_ray, shadow_t_max);
-                    L += beta * atten * trans * med_trans * f_pdf * ps.Li;
-                }
-            });
-        }
 
         // Strategy B: BSDF sample becomes next path ray
         if (srec.has_walk) {
@@ -672,15 +711,7 @@ template <typename Sampler>
             if (!srec.walk_valid) break;
             const ray bsdf_ray = srec.walk_ray;
             color new_beta = clamp_throughput(beta * srec.walk_weight);
-            if (bounces_left < depth) {
-                color rr_beta = new_beta * eta_scale;
-                double rr_max = std::max(rr_beta.x(), std::max(rr_beta.y(), rr_beta.z()));
-                if (rr_max < 1.0) {
-                    double q = std::max(0.0, 1.0 - rr_max);
-                    if (sampler.get() < q) break;
-                    new_beta = new_beta / (1.0 - q);
-                }
-            }
+            if (bounces_left < depth && !camera_path_detail::russian_roulette(new_beta, eta_scale, sampler)) break;
             beta            = new_beta;
             current_ray     = bsdf_ray;
             prev_bsdf_pdf   = srec.walk_specular ? 0.0 : srec.mis_pdf().value(bsdf_ray.direction());
@@ -718,20 +749,11 @@ template <typename Sampler>
             // lobes are geometric hemisphere flips, not IOR refractions)
             // is completely unaffected, since the `&&` short-circuits.
             // (The radiance-mode eta^2 of a crossing is in beta now - see the specular branch above - so etaScale is not touched here.)
-            const double crossing_scale = refraction_scale(bsdf_dir);
+            const double crossing_scale = camera_path_detail::refraction_scale_for(srec, rec, current_ray, bsdf_dir);
 
             // Russian Roulette after first bounce
             color new_beta = clamp_throughput(beta * rec.mat->scattering_attenuation(current_ray, rec, bsdf_ray, srec.attenuation) * (f_pdf * crossing_scale / pdf_b));
-            if (bounces_left < depth) {
-                // pbrt-v4: rrBeta = beta * etaScale
-                color rr_beta = new_beta * eta_scale;
-                double rr_max = std::max(rr_beta.x(), std::max(rr_beta.y(), rr_beta.z()));
-                if (rr_max < 1.0) {
-                    double q = std::max(0.0, 1.0 - rr_max);
-                    if (sampler.get() < q) break;
-                    new_beta = new_beta / (1.0 - q);
-                }
-            }
+            if (bounces_left < depth && !camera_path_detail::russian_roulette(new_beta, eta_scale, sampler)) break;
             beta            = new_beta;
             current_ray     = bsdf_ray;
             prev_bsdf_pdf   = pdf_b;
@@ -744,6 +766,187 @@ template <typename Sampler>
 
     return L;
 }
+
+namespace camera_path_detail {
+
+// ray_color_spectral()'s Russian roulette: ray_color()'s, on the largest spectral channel of the throughput.
+template <typename SS, typename Sampler>
+inline bool russian_roulette_spectral(SS& new_beta, double eta_scale, Sampler& sampler) {
+    SS rr_beta = new_beta * static_cast<float>(eta_scale);
+    float rr_max = rr_beta.MaxComponentValue();
+    if (rr_max < 1.0f) {
+        double q = std::max(0.0, 1.0 - static_cast<double>(rr_max));
+        if (sampler.get() < q) return false;
+        new_beta = new_beta / static_cast<float>(1.0 - q);
+    }
+    return true;
+}
+
+// What an escaped ray adds in ray_color_spectral(): the portal or sky light (MIS-weighted unless the path is still specular) or the background, spectral-uplifted
+// through `illuminant`.
+template <typename SS, typename IlluminantFn>
+inline void add_escaped_radiance_spectral(const camera& cam, const ray& current_ray, bool specular_bounce, double prev_bsdf_pdf, const SS& beta, SS& L, IlluminantFn&& illuminant) {
+    const auto& portal = cam.portal;
+    const auto& sky = cam.sky;
+    const auto& background = cam.background;
+    if (portal) {
+        // See ray_color()'s own portal miss-handling comment -
+        // identical logic, spectral-uplifted via illuminant().
+        point3 ro = current_ray.origin();
+        vec3 rd = unit_vector(current_ray.direction());
+        double lr, lg, lb;
+        portal->eval_Le_rgb(ro.x(), ro.y(), ro.z(), rd.x(), rd.y(), rd.z(), lr, lg, lb);
+        SS Le = illuminant(color(lr, lg, lb));
+        if (specular_bounce) {
+            L += beta * Le;
+        } else {
+            double p_l = portal->pdf_li(ro.x(), ro.y(), ro.z(), rd.x(), rd.y(), rd.z());
+            double w_b = camera::mis_power_heuristic(prev_bsdf_pdf, p_l);
+            L += beta * static_cast<float>(w_b) * Le;
+        }
+    } else if (sky) {
+        SS Le = illuminant(sky->Le(unit_vector(current_ray.direction())));
+        if (specular_bounce) {
+            L += beta * Le;
+        } else {
+            double p_l = sky->pdf_Li(unit_vector(current_ray.direction()));
+            double w_b = camera::mis_power_heuristic(prev_bsdf_pdf, p_l);
+            L += beta * static_cast<float>(w_b) * Le;
+        }
+    } else {
+        L += beta * illuminant(background);
+    }
+}
+
+// ray_color_spectral()'s next-event estimators at a non-specular vertex (area lights, sky or portal light, punctual lights), spectral-uplifted through `albedo` and
+// `illuminant`; a dispersive material evaluates its BSDF at the wavelength-specific eta scatter_dispersive() already resolved.
+template <typename SS, typename AlbedoFn, typename IlluminantFn>
+inline void add_direct_lighting_spectral(const camera& cam, const hittable& world, const hittable& lights, const ray& current_ray, const hit_record& rec, scatter_record& srec,
+                                         const dispersive_material* disp, double dispersive_eta, AlbedoFn&& albedo, IlluminantFn&& illuminant, const SS& beta, SS& L) {
+    const auto& portal = cam.portal;
+    const auto& sky = cam.sky;
+    const auto& punct_lights = cam.punct_lights;
+    auto refraction_scale = [&](const vec3& dir) -> double { return refraction_scale_for(srec, rec, current_ray, dir); };
+    hittable_pdf light_pdf(lights, rec.p);
+
+
+    // Every scattering_pdf() call below goes through this instead of
+    // calling rec.mat->scattering_pdf(...) directly, so a dispersive
+    // material's real NEE/MIS path (currently only rough_dielectric
+    // reaches this - smooth dielectric is always skip_pdf and never
+    // gets here) evaluates f*cos at the SAME per-wavelength eta
+    // scatter_dispersive() already resolved above (dispersive_eta),
+    // instead of every NEE strategy/Strategy B independently
+    // re-deriving it from the hero wavelength - see
+    // dispersive_material::scattering_pdf_dispersive()'s own comment
+    // (material_base.h). A no-op for every other material (disp is
+    // null), so this changes nothing for the common case.
+    auto scattering_pdf_at = [&](const ray& scattered) -> double {
+        return disp
+            ? disp->scattering_pdf_dispersive(current_ray, rec, scattered, dispersive_eta)
+            : rec.mat->scattering_pdf(current_ray, rec, scattered);
+    };
+
+    // Strategy A-1: NEE toward area lights
+    {
+        vec3   light_dir = light_pdf.generate();
+        double pdf_l     = light_pdf.value(light_dir);
+        if (pdf_l > 0.0) {
+            ray    shadow_ray(rec.p, light_dir, current_ray.time());
+            double f_pdf = scattering_pdf_at(shadow_ray);
+            if (f_pdf > 0.0) {
+                double pdf_b_at_l = srec.mis_pdf().value(light_dir);
+                double w_l        = camera::mis_power_heuristic(pdf_l, pdf_b_at_l);
+                hit_record light_rec;
+                color trans;
+                if (render_stats::enabled())
+                    render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
+                if (shadow_ray_hit(world, shadow_ray, light_rec, infinity, &trans)) {
+                    color Le_d_rgb = light_rec.mat->emitted(
+                        shadow_ray, light_rec, light_rec.u, light_rec.v, light_rec.p);
+                    if (Le_d_rgb.x() > 0 || Le_d_rgb.y() > 0 || Le_d_rgb.z() > 0) {
+                        color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, shadow_ray, srec.attenuation) * refraction_scale(light_dir);
+                        float scale = static_cast<float>(w_l * f_pdf / pdf_l);
+                        L += beta * scale * albedo(atten_rgb) * albedo(trans) * illuminant(Le_d_rgb);
+                    }
+                }
+            }
+        }
+    }
+
+    // Strategy A-2: NEE toward sky
+    if (portal) {
+        // See ray_color()'s own portal NEE comment - identical
+        // logic, spectral-uplifted via albedo()/illuminant().
+        double ru = random_double(), rv = random_double();
+        double wx, wy, wz, pdf_portal;
+        if (portal->sample_li(ru, rv, rec.p.x(), rec.p.y(), rec.p.z(),
+                               wx, wy, wz, pdf_portal) && pdf_portal > 0.0) {
+            vec3 portal_dir(wx, wy, wz);
+            ray  portal_shadow(rec.p, portal_dir, current_ray.time());
+            double f_pdf = scattering_pdf_at(portal_shadow);
+            if (f_pdf > 0.0) {
+                double pdf_b_at_portal = srec.mis_pdf().value(portal_dir);
+                double w_portal         = camera::mis_power_heuristic(pdf_portal, pdf_b_at_portal);
+                hit_record portal_rec;
+                color trans;
+                if (render_stats::enabled())
+                    render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
+                if (!shadow_ray_hit(world, portal_shadow, portal_rec, infinity, &trans)) {
+                    double lr, lg, lb;
+                    portal->eval_Le_rgb(rec.p.x(), rec.p.y(), rec.p.z(), wx, wy, wz, lr, lg, lb);
+                    color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, portal_shadow, srec.attenuation) * refraction_scale(portal_dir);
+                    float scale = static_cast<float>(w_portal * f_pdf / pdf_portal);
+                    L += beta * scale * albedo(atten_rgb) * albedo(trans)
+                       * illuminant(color(lr, lg, lb));
+                }
+            }
+        }
+    } else if (sky) {
+        SkyLiSample sky_smp = sky->sample_Le();
+        vec3   sky_dir  = sky_smp.direction;
+        double pdf_sky  = sky_smp.pdf;
+        if (pdf_sky > 0.0) {
+            ray    sky_shadow(rec.p, sky_dir, current_ray.time());
+            double f_pdf = scattering_pdf_at(sky_shadow);
+            if (f_pdf > 0.0) {
+                double pdf_b_at_sky = srec.mis_pdf().value(sky_dir);
+                double w_sky        = camera::mis_power_heuristic(pdf_sky, pdf_b_at_sky);
+                hit_record sky_rec;
+                color trans;
+                if (render_stats::enabled())
+                    render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
+                if (!shadow_ray_hit(world, sky_shadow, sky_rec, infinity, &trans)) {
+                    color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, sky_shadow, srec.attenuation) * refraction_scale(sky_dir);
+                    float scale = static_cast<float>(w_sky * f_pdf / pdf_sky);
+                    L += beta * scale * albedo(atten_rgb) * albedo(trans)
+                       * illuminant(sky->Le(unit_vector(sky_dir)));
+                }
+            }
+        }
+    }
+
+    // Strategy A-3: NEE toward punctual (delta) lights
+    if (punct_lights && !punct_lights->empty()) {
+        punct_lights->for_each_sample(rec.p, [&](const PunctualLiSample& ps) {
+            if (ps.Li.x() <= 0 && ps.Li.y() <= 0 && ps.Li.z() <= 0) return;
+            ray punct_ray(rec.p, ps.wi, current_ray.time());
+            double f_pdf = scattering_pdf_at(punct_ray);
+            if (f_pdf <= 0.0) return;
+            hit_record shadow_rec;
+            double shadow_t_max = (ps.t_max == infinity) ? infinity : (ps.t_max - 0.001);
+            color trans;
+            if (render_stats::enabled())
+                render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
+            if (!shadow_ray_hit(world, punct_ray, shadow_rec, shadow_t_max, &trans)) {
+                color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, punct_ray, srec.attenuation) * refraction_scale(ps.wi);
+                L += beta * static_cast<float>(f_pdf) * albedo(atten_rgb) * albedo(trans) * illuminant(ps.Li);
+            }
+        });
+    }
+}
+
+} // namespace camera_path_detail
 
 template <typename Sampler>
     inline color camera::ray_color_spectral(const ray& r, int depth, const hittable& world, const hittable& lights,
@@ -804,33 +1007,7 @@ template <typename Sampler>
         hit_record rec;
 
         if (!world.hit(current_ray, interval(0.001, infinity), rec)) {
-            if (portal) {
-                // See ray_color()'s own portal miss-handling comment -
-                // identical logic, spectral-uplifted via illuminant().
-                point3 ro = current_ray.origin();
-                vec3 rd = unit_vector(current_ray.direction());
-                double lr, lg, lb;
-                portal->eval_Le_rgb(ro.x(), ro.y(), ro.z(), rd.x(), rd.y(), rd.z(), lr, lg, lb);
-                SS Le = illuminant(color(lr, lg, lb));
-                if (specular_bounce) {
-                    L += beta * Le;
-                } else {
-                    double p_l = portal->pdf_li(ro.x(), ro.y(), ro.z(), rd.x(), rd.y(), rd.z());
-                    double w_b = mis_power_heuristic(prev_bsdf_pdf, p_l);
-                    L += beta * static_cast<float>(w_b) * Le;
-                }
-            } else if (sky) {
-                SS Le = illuminant(sky->Le(unit_vector(current_ray.direction())));
-                if (specular_bounce) {
-                    L += beta * Le;
-                } else {
-                    double p_l = sky->pdf_Li(unit_vector(current_ray.direction()));
-                    double w_b = mis_power_heuristic(prev_bsdf_pdf, p_l);
-                    L += beta * static_cast<float>(w_b) * Le;
-                }
-            } else {
-                L += beta * illuminant(background);
-            }
+            camera_path_detail::add_escaped_radiance_spectral(*this, current_ray, specular_bounce, prev_bsdf_pdf, beta, L, illuminant);
             break;
         }
 
@@ -840,23 +1017,7 @@ template <typename Sampler>
         // and a filtered texture's footprint at a bounce are those of a camera ray seeing the point, not a hair's breadth. Without it the bumps seen by bounced
         // light were fully sharp, and sibenik's bump maps read 30% too bright against pbrt.
         const bool primary_hit = bounces_left == depth && current_ray.has_differentials();
-        const ray footprint_ray = primary_hit ? current_ray : (footprint_consumer_count().load(std::memory_order_relaxed) > 0 ? approximate_footprint_ray(rec.p, rec.normal) : ray());   // (nobody reads it in a scene of plain colours)
-        if (footprint_ray.has_differentials()) {
-            SurfaceInteraction<double> si(
-                rec.p.x(), rec.p.y(), rec.p.z(),
-                rec.normal.x(), rec.normal.y(), rec.normal.z(),
-                rec.u, rec.v, rec.t,
-                0.0, 0.0, 0.0,
-                rec.dpdu.x(), rec.dpdu.y(), rec.dpdu.z(),
-                rec.dpdv.x(), rec.dpdv.y(), rec.dpdv.z());
-            si.compute_differentials(true,
-                footprint_ray.rx_origin().x(), footprint_ray.rx_origin().y(), footprint_ray.rx_origin().z(),
-                footprint_ray.rx_direction().x(), footprint_ray.rx_direction().y(), footprint_ray.rx_direction().z(),
-                footprint_ray.ry_origin().x(), footprint_ray.ry_origin().y(), footprint_ray.ry_origin().z(),
-                footprint_ray.ry_direction().x(), footprint_ray.ry_direction().y(), footprint_ray.ry_direction().z());
-            rec.dudx = si.dudx; rec.dvdx = si.dvdx;
-            rec.dudy = si.dudy; rec.dvdy = si.dvdy;
-        }
+        camera_path_detail::apply_texture_footprint(*this, current_ray, primary_hit, rec);
 
         color Le_rgb = rec.mat->emitted(current_ray, rec, rec.u, rec.v, rec.p);
         if (Le_rgb.x() > 0 || Le_rgb.y() > 0 || Le_rgb.z() > 0) {
@@ -947,15 +1108,7 @@ template <typename Sampler>
             // Radiance-mode refraction: 1 / etap^2 in beta, not in etaScale (see ray_color()'s specular branch).
             if (srec.is_transmission)
                 new_beta = new_beta * static_cast<float>(srec.eta * srec.eta);
-            if (bounces_left < depth) {
-                SS rr_beta = new_beta * static_cast<float>(eta_scale);
-                float rr_max = rr_beta.MaxComponentValue();
-                if (rr_max < 1.0f) {
-                    double q = std::max(0.0, 1.0 - static_cast<double>(rr_max));
-                    if (sampler.get() < q) break;
-                    new_beta = new_beta / static_cast<float>(1.0 - q);
-                }
-            }
+            if (bounces_left < depth && !camera_path_detail::russian_roulette_spectral(new_beta, eta_scale, sampler)) break;
             beta            = new_beta;
             current_ray     = srec.skip_pdf_ray;
             specular_bounce = true;
@@ -965,15 +1118,7 @@ template <typename Sampler>
         }
 
         // Non-specular: NEE shadow ray + BSDF path continuation
-        hittable_pdf light_pdf(lights, rec.p);
-
-        // A direction that crosses a refractive boundary at this vertex (rough glass: srec.is_transmission with srec.eta = eta_i / eta_t) carries pbrt's radiance-mode
-        // 1 / etap^2 = srec.eta^2 (see the specular branch above); the BSDF value scattering_pdf() returns is the importance-transport one.
-        auto refraction_scale = [&](const vec3& dir) -> double {
-            if (!srec.is_transmission) return 1.0;
-            const bool crossed = dot(dir, rec.normal) * dot(-unit_vector(current_ray.direction()), rec.normal) < 0.0;
-            return crossed ? srec.eta * srec.eta : 1.0;
-        };
+        camera_path_detail::add_direct_lighting_spectral(*this, world, lights, current_ray, rec, srec, disp, dispersive_eta, albedo, illuminant, beta, L);
 
         // Every scattering_pdf() call below goes through this instead of
         // calling rec.mat->scattering_pdf(...) directly, so a dispersive
@@ -992,103 +1137,6 @@ template <typename Sampler>
                 : rec.mat->scattering_pdf(current_ray, rec, scattered);
         };
 
-        // Strategy A-1: NEE toward area lights
-        {
-            vec3   light_dir = light_pdf.generate();
-            double pdf_l     = light_pdf.value(light_dir);
-            if (pdf_l > 0.0) {
-                ray    shadow_ray(rec.p, light_dir, current_ray.time());
-                double f_pdf = scattering_pdf_at(shadow_ray);
-                if (f_pdf > 0.0) {
-                    double pdf_b_at_l = srec.mis_pdf().value(light_dir);
-                    double w_l        = mis_power_heuristic(pdf_l, pdf_b_at_l);
-                    hit_record light_rec;
-                    color trans;
-                    if (render_stats::enabled())
-                        render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
-                    if (shadow_ray_hit(world, shadow_ray, light_rec, infinity, &trans)) {
-                        color Le_d_rgb = light_rec.mat->emitted(
-                            shadow_ray, light_rec, light_rec.u, light_rec.v, light_rec.p);
-                        if (Le_d_rgb.x() > 0 || Le_d_rgb.y() > 0 || Le_d_rgb.z() > 0) {
-                            color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, shadow_ray, srec.attenuation) * refraction_scale(light_dir);
-                            float scale = static_cast<float>(w_l * f_pdf / pdf_l);
-                            L += beta * scale * albedo(atten_rgb) * albedo(trans) * illuminant(Le_d_rgb);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Strategy A-2: NEE toward sky
-        if (portal) {
-            // See ray_color()'s own portal NEE comment - identical
-            // logic, spectral-uplifted via albedo()/illuminant().
-            double ru = random_double(), rv = random_double();
-            double wx, wy, wz, pdf_portal;
-            if (portal->sample_li(ru, rv, rec.p.x(), rec.p.y(), rec.p.z(),
-                                   wx, wy, wz, pdf_portal) && pdf_portal > 0.0) {
-                vec3 portal_dir(wx, wy, wz);
-                ray  portal_shadow(rec.p, portal_dir, current_ray.time());
-                double f_pdf = scattering_pdf_at(portal_shadow);
-                if (f_pdf > 0.0) {
-                    double pdf_b_at_portal = srec.mis_pdf().value(portal_dir);
-                    double w_portal         = mis_power_heuristic(pdf_portal, pdf_b_at_portal);
-                    hit_record portal_rec;
-                    color trans;
-                    if (render_stats::enabled())
-                        render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
-                    if (!shadow_ray_hit(world, portal_shadow, portal_rec, infinity, &trans)) {
-                        double lr, lg, lb;
-                        portal->eval_Le_rgb(rec.p.x(), rec.p.y(), rec.p.z(), wx, wy, wz, lr, lg, lb);
-                        color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, portal_shadow, srec.attenuation) * refraction_scale(portal_dir);
-                        float scale = static_cast<float>(w_portal * f_pdf / pdf_portal);
-                        L += beta * scale * albedo(atten_rgb) * albedo(trans)
-                           * illuminant(color(lr, lg, lb));
-                    }
-                }
-            }
-        } else if (sky) {
-            SkyLiSample sky_smp = sky->sample_Le();
-            vec3   sky_dir  = sky_smp.direction;
-            double pdf_sky  = sky_smp.pdf;
-            if (pdf_sky > 0.0) {
-                ray    sky_shadow(rec.p, sky_dir, current_ray.time());
-                double f_pdf = scattering_pdf_at(sky_shadow);
-                if (f_pdf > 0.0) {
-                    double pdf_b_at_sky = srec.mis_pdf().value(sky_dir);
-                    double w_sky        = mis_power_heuristic(pdf_sky, pdf_b_at_sky);
-                    hit_record sky_rec;
-                    color trans;
-                    if (render_stats::enabled())
-                        render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
-                    if (!shadow_ray_hit(world, sky_shadow, sky_rec, infinity, &trans)) {
-                        color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, sky_shadow, srec.attenuation) * refraction_scale(sky_dir);
-                        float scale = static_cast<float>(w_sky * f_pdf / pdf_sky);
-                        L += beta * scale * albedo(atten_rgb) * albedo(trans)
-                           * illuminant(sky->Le(unit_vector(sky_dir)));
-                    }
-                }
-            }
-        }
-
-        // Strategy A-3: NEE toward punctual (delta) lights
-        if (punct_lights && !punct_lights->empty()) {
-            punct_lights->for_each_sample(rec.p, [&](const PunctualLiSample& ps) {
-                if (ps.Li.x() <= 0 && ps.Li.y() <= 0 && ps.Li.z() <= 0) return;
-                ray punct_ray(rec.p, ps.wi, current_ray.time());
-                double f_pdf = scattering_pdf_at(punct_ray);
-                if (f_pdf <= 0.0) return;
-                hit_record shadow_rec;
-                double shadow_t_max = (ps.t_max == infinity) ? infinity : (ps.t_max - 0.001);
-                color trans;
-                if (render_stats::enabled())
-                    render_stats::shadow_rays().fetch_add(1, std::memory_order_relaxed);
-                if (!shadow_ray_hit(world, punct_ray, shadow_rec, shadow_t_max, &trans)) {
-                    color atten_rgb = rec.mat->scattering_attenuation(current_ray, rec, punct_ray, srec.attenuation) * refraction_scale(ps.wi);
-                    L += beta * static_cast<float>(f_pdf) * albedo(atten_rgb) * albedo(trans) * illuminant(ps.Li);
-                }
-            });
-        }
 
         // Strategy B: BSDF sample becomes next path ray
         if (srec.has_walk) {
@@ -1096,15 +1144,7 @@ template <typename Sampler>
             if (!srec.walk_valid) break;
             const ray bsdf_ray = srec.walk_ray;
             SS new_beta = clamp_throughput(beta * albedo(srec.walk_weight));
-            if (bounces_left < depth) {
-                SS rr_beta = new_beta * static_cast<float>(eta_scale);
-                float rr_max = rr_beta.MaxComponentValue();
-                if (rr_max < 1.0f) {
-                    double q = std::max(0.0, 1.0 - static_cast<double>(rr_max));
-                    if (sampler.get() < q) break;
-                    new_beta = new_beta / static_cast<float>(1.0 - q);
-                }
-            }
+            if (bounces_left < depth && !camera_path_detail::russian_roulette_spectral(new_beta, eta_scale, sampler)) break;
             beta            = new_beta;
             current_ray     = bsdf_ray;
             prev_bsdf_pdf   = srec.walk_specular ? 0.0 : srec.mis_pdf().value(bsdf_ray.direction());
@@ -1121,19 +1161,11 @@ template <typename Sampler>
             double f_pdf = scattering_pdf_at(bsdf_ray);
             if (f_pdf <= 0.0) break;
 
-            const double crossing_scale = refraction_scale(bsdf_dir);   // (radiance-mode eta^2 of a crossing, in beta - see the specular branch)
+            const double crossing_scale = camera_path_detail::refraction_scale_for(srec, rec, current_ray, bsdf_dir);   // (radiance-mode eta^2 of a crossing, in beta - see the specular branch)
 
             SS new_beta = clamp_throughput(
                 beta * albedo(rec.mat->scattering_attenuation(current_ray, rec, bsdf_ray, srec.attenuation)) * static_cast<float>(f_pdf * crossing_scale / pdf_b));
-            if (bounces_left < depth) {
-                SS rr_beta = new_beta * static_cast<float>(eta_scale);
-                float rr_max = rr_beta.MaxComponentValue();
-                if (rr_max < 1.0f) {
-                    double q = std::max(0.0, 1.0 - static_cast<double>(rr_max));
-                    if (sampler.get() < q) break;
-                    new_beta = new_beta / static_cast<float>(1.0 - q);
-                }
-            }
+            if (bounces_left < depth && !camera_path_detail::russian_roulette_spectral(new_beta, eta_scale, sampler)) break;
             beta            = new_beta;
             current_ray     = bsdf_ray;
             prev_bsdf_pdf   = pdf_b;

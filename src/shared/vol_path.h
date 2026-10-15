@@ -307,6 +307,348 @@ void VolPathSampleLd(const T p[3], const T wo[3], const T n[3],
 //   scene        -- scene query adapter
 //   L_out[3]     -- output radiance (RGB)
 
+// The state a path carries from one vertex to the next (pbrt-v4 VolPathIntegrator::Li's locals).
+template<typename T>
+struct VolPathState {
+	T L[3]    = {T(0), T(0), T(0)};
+	T beta[3] = {T(1), T(1), T(1)};
+	T r_u     = T(1);
+	T r_l     = T(1);
+	bool specularBounce = true;
+	bool any_non_specular_bounce = false;
+	T etaScale = T(1);
+	int depth  = 0;
+	T ray_o[3] = {T(0), T(0), T(0)};
+	T ray_d[3] = {T(0), T(0), T(0)};
+};
+
+// Whether the path loop goes on with the next ray or ends.
+enum class VolPathFlow { Break, Continue };
+
+// 2. The participating medium along the ray segment (up to t_max): emission, absorption, real scatter (with NEE and a phase-function sample) and null scatter. `scattered`
+// says the path was scattered into a new ray (restart the loop), `terminated` that it ended.
+template<typename T, typename Scene>
+void VolPathWalkMedium(VolPathState<T>& st, const Scene& scene, int maxDepth, T t_max, bool& scattered, bool& terminated) {
+	T (&L)[3] = st.L;
+	T (&beta)[3] = st.beta;
+	T &r_u = st.r_u;
+	T &r_l = st.r_l;
+	bool &specularBounce = st.specularBounce;
+	int &depth = st.depth;
+	T (&ray_o)[3] = st.ray_o;
+	T (&ray_d)[3] = st.ray_d;
+if (scene.HasMedium(ray_o, ray_d)) {
+	T u_maj = scene.RandFloat();
+	T T_maj_final = scene.SampleTMaj(ray_o, ray_d, t_max, u_maj,
+		[&](const T p_med[3],
+			const VolPathMediumProps<T>& mp,
+			T sigma_maj, T T_maj_val) -> bool {
+
+			if (beta[0]==T(0) && beta[1]==T(0) && beta[2]==T(0)) {
+				terminated = true; return false;
+			}
+
+			// Medium emission
+			if (depth < maxDepth && mp.Le > T(0)) {
+				T pdf_e = sigma_maj * T_maj_val;
+				if (pdf_e > T(0)) {
+					T r_e = r_u * sigma_maj * T_maj_val / pdf_e;
+					if (r_e > T(0)) {
+						T contrib = T_maj_val * mp.sigma_a * mp.Le / pdf_e / r_e;
+						for (int c = 0; c < 3; ++c) L[c] += beta[c] * contrib;
+					}
+				}
+			}
+
+			// Event probabilities
+			T pAbsorb  = (sigma_maj > T(0)) ? mp.sigma_a / sigma_maj : T(0);
+			T pScatter = (sigma_maj > T(0)) ? mp.sigma_s / sigma_maj : T(0);
+			T pNull    = std::max(T(0), T(1) - pAbsorb - pScatter);
+
+			// Sample event type
+			T um = scene.RandFloat();
+			if (um < pAbsorb) {
+				// Absorption: terminate
+				terminated = true;
+				return false;
+			} else if (um < pAbsorb + pScatter) {
+				// Real scatter
+				if (depth++ >= maxDepth) { terminated = true; return false; }
+
+				T pdf_s = T_maj_val * mp.sigma_s;
+				if (pdf_s > T(0)) {
+					for (int c = 0; c < 3; ++c)
+						beta[c] *= T_maj_val * mp.sigma_s / pdf_s;
+					r_u *= T_maj_val * mp.sigma_s / pdf_s;
+				}
+
+				// NEE at medium scatter point
+				T zero_n[3] = {T(0), T(0), T(0)};
+				T Ld[3];
+				VolPathSampleLd(p_med, ray_d, zero_n,
+								/*bsdf_id=*/-1, mp.g,
+								beta, r_u, scene, Ld);
+				for (int c = 0; c < 3; ++c) L[c] += Ld[c];
+
+				// Sample new direction (phase function)
+				T new_d[3]; T phase_pdf;
+				T up1 = scene.RandFloat(), up2 = scene.RandFloat();
+				if (!scene.SamplePhase(ray_d, mp.g, up1, up2,
+									   new_d, phase_pdf) ||
+					phase_pdf == T(0)) {
+					terminated = true; return false;
+				}
+
+				T ph = scene.PhaseP(ray_d, new_d, mp.g);
+				for (int c = 0; c < 3; ++c)
+					beta[c] *= ph / phase_pdf;
+				r_l = r_u / phase_pdf;
+
+				// Advance ray
+				ray_o[0]=p_med[0]; ray_o[1]=p_med[1]; ray_o[2]=p_med[2];
+				ray_d[0]=new_d[0]; ray_d[1]=new_d[1]; ray_d[2]=new_d[2];
+				specularBounce = false;
+						scattered = true;
+						return false;  // stop the majorant walk; restart outer loop
+
+					} else {
+						// Null scatter: update beta, r_u, and r_l
+						// pbrt-v4: beta *= T_maj * sigma_n / pdf
+						//          r_u  *= T_maj * sigma_n / pdf
+						//          r_l  *= T_maj * sigma_maj / pdf   <-- majorant weight
+						T sigma_n = std::max(T(0),
+							sigma_maj - mp.sigma_a - mp.sigma_s);
+						T pdf_n = T_maj_val * sigma_maj;
+						if (pdf_n > T(0)) {
+							for (int c = 0; c < 3; ++c)
+								beta[c] *= T_maj_val * sigma_n / pdf_n;
+							r_u *= T_maj_val * sigma_n / pdf_n;
+							r_l *= T_maj_val * sigma_maj / pdf_n;
+						} else {
+							// pdf==0 means sigma_maj==0: pure vacuum, no update needed
+						}
+						return (beta[0] != T(0) || beta[1] != T(0) || beta[2] != T(0));
+					}
+				});
+
+	// Apply final residual T_maj factor from the end of the segment
+	if (!scattered && !terminated && T_maj_final != T(1)) {
+		for (int c = 0; c < 3; ++c) beta[c] *= T_maj_final;
+		r_u *= T_maj_final;
+		r_l *= T_maj_final;
+	}
+}
+}
+
+// 3. A ray that missed the scene: the infinite lights (MIS-weighted against the last BSDF sample unless the path is still specular).
+template<typename T, typename Scene>
+void VolPathEscaped(VolPathState<T>& st, const Scene& scene) {
+	T (&L)[3] = st.L;
+	T (&beta)[3] = st.beta;
+	T &r_u = st.r_u;
+	T &r_l = st.r_l;
+	bool &specularBounce = st.specularBounce;
+	int &depth = st.depth;
+	T (&ray_o)[3] = st.ray_o;
+	T (&ray_d)[3] = st.ray_d;
+	T Le_inf[3];
+	scene.InfiniteLightLe(ray_d, Le_inf);
+	if (Le_inf[0] != T(0) || Le_inf[1] != T(0) || Le_inf[2] != T(0)) {
+		if (depth == 0 || specularBounce) {
+			// Direct: weight by r_u only
+			if (r_u > T(0))
+				for (int c = 0; c < 3; ++c)
+					L[c] += beta[c] * Le_inf[c] / r_u;
+		} else {
+			// MIS: (r_u + r_l).Average() -- scalar/RGB has no
+			// spectral dimension, so this is just the plain sum
+			// (see VolPathSampleLd's comment on Average()).
+			T r_l_cur = r_l * scene.InfiniteLightPMF()
+					  * scene.InfiniteLightPDF_Li(ray_o, ray_d);
+			T denom = r_u + r_l_cur;
+			if (denom > T(0))
+				for (int c = 0; c < 3; ++c)
+					L[c] += beta[c] * Le_inf[c] / denom;
+		}
+	}
+}
+
+// 4. Emission of the area light on the surface that was hit.
+template<typename T, typename Scene>
+void VolPathSurfaceEmission(VolPathState<T>& st, const Scene& scene, BDPTHit<T>& hit) {
+	T (&L)[3] = st.L;
+	T (&beta)[3] = st.beta;
+	T &r_u = st.r_u;
+	T &r_l = st.r_l;
+	bool &specularBounce = st.specularBounce;
+	int &depth = st.depth;
+	T (&ray_o)[3] = st.ray_o;
+	T (&ray_d)[3] = st.ray_d;
+{
+	T* Le = hit.area_Le;
+	if (Le[0] != T(0) || Le[1] != T(0) || Le[2] != T(0)) {
+		if (depth == 0 || specularBounce) {
+			if (r_u > T(0))
+				for (int c = 0; c < 3; ++c)
+					L[c] += beta[c] * Le[c] / r_u;
+		} else {
+			// MIS with light-sampling PDF (plain sum -- see
+			// VolPathSampleLd's comment on Average()).
+			T p_l = scene.LightPMF(hit.light_id)
+				  * scene.LightPDF_Li(hit.light_id, ray_o, ray_d);
+			T r_l_cur = r_l * p_l;
+			T denom = r_u + r_l_cur;
+			if (denom > T(0))
+				for (int c = 0; c < 3; ++c)
+					L[c] += beta[c] * Le[c] / denom;
+		}
+	}
+}
+}
+
+// 8. The BSSRDF subsurface scattering branch (pbrt-v4 VolPathIntegrator::Li lines 1187-1255) of a path that entered a surface with one: it abandons the refracted ray and finds
+// the exit point by probing the geometry, then samples the exit BSDF. Continue with the ray from the exit point, or Break when the path ends.
+template<typename T, typename Scene>
+VolPathFlow VolPathBssrdfExit(VolPathState<T>& st, const Scene& scene, BDPTHit<T>& hit, bool regularize) {
+	T (&L)[3] = st.L;
+	T (&beta)[3] = st.beta;
+	T &r_u = st.r_u;
+	T &r_l = st.r_l;
+	bool &specularBounce = st.specularBounce;
+	int &depth = st.depth;
+	T (&ray_o)[3] = st.ray_o;
+	T (&ray_d)[3] = st.ray_d;
+	bool &any_non_specular_bounce = st.any_non_specular_bounce;
+	T &etaScale = st.etaScale;
+	// Sample the probe segment endpoints
+	T uc = scene.RandFloat();
+	T up1 = scene.RandFloat(), up2 = scene.RandFloat();
+	BSSRDFProbeSegment<T> seg{};
+	if (!scene.SampleBSSRDFProbe(hit, up1, up2, seg))
+		return VolPathFlow::Break;
+
+	// Walk the probe segment and reservoir-sample one exit hit
+	// with uniform probability (all intersecting faces of the
+	// same material are weighted equally, mirroring pbrt-v4's
+	// WeightedReservoirSampler<SubsurfaceInteraction> with weight=1).
+	uint64_t rs_seed = static_cast<uint64_t>(
+		*reinterpret_cast<const uint32_t*>(&uc) ^
+		static_cast<uint32_t>(depth * 2654435761u));
+	WeightedReservoirSampler<BDPTHit<T>> wrs(rs_seed);
+	{
+		// Segment direction and length
+		T seg_d[3] = {
+			seg.p1[0] - seg.p0[0],
+			seg.p1[1] - seg.p0[1],
+			seg.p1[2] - seg.p0[2]
+		};
+		T seg_len = std::sqrt(seg_d[0]*seg_d[0] +
+							  seg_d[1]*seg_d[1] +
+							  seg_d[2]*seg_d[2]);
+		if (seg_len < T(1e-8)) return VolPathFlow::Break;
+		seg_d[0] /= seg_len;
+		seg_d[1] /= seg_len;
+		seg_d[2] /= seg_len;
+
+		// Walk: intersect the probe segment repeatedly,
+		// advancing the origin past each hit, collecting
+		// exit-surface candidates.
+		T base[3] = { seg.p0[0], seg.p0[1], seg.p0[2] };
+		T remaining = seg_len;
+		while (remaining > T(1e-8)) {
+			BDPTHit<T> probe_hit{};
+			if (!scene.Intersect(base, seg_d, remaining, probe_hit))
+				break;
+			// Uniform weight = 1 for each candidate hit
+			wrs.add(probe_hit, 1.0);
+			// Advance past this hit
+			T step = probe_hit.t_hit + T(1e-4);
+			base[0] += step * seg_d[0];
+			base[1] += step * seg_d[1];
+			base[2] += step * seg_d[2];
+			remaining -= step;
+		}
+	}
+
+	if (!wrs.has_sample()) return VolPathFlow::Break;
+
+	// Convert the chosen exit hit to a BSSRDFSample
+	BSSRDFSample<T> bss{};
+	if (!scene.SampleBSSRDF(hit, wrs.sample(),
+							static_cast<T>(wrs.sample_probability()),
+							bss))
+		return VolPathFlow::Break;
+	if (bss.pdf <= T(0)) return VolPathFlow::Break;
+
+	// Update path throughput and unidirectional PDF ratio
+	// beta *= Sp / (sample_prob * pdf)  -- mirrors pbrt-v4
+	// r_u  *= pdf / pdf_ch0             -- multi-channel correction
+	//   (for RGB, pdf is scalar so r_u is unchanged; kept for correctness)
+	T inv_pdf = T(1) / (static_cast<T>(wrs.sample_probability()) * bss.pdf);
+	for (int c = 0; c < 3; ++c)
+		beta[c] *= bss.Sp[c] * inv_pdf;
+	// r_u unchanged for scalar pdf (bss.pdf == bss.pdf for all channels)
+
+	// Subsurface scatter is always diffuse (pbrt-v4: anyNonSpecularBounces=true)
+	any_non_specular_bounce = true;
+	specularBounce = false;
+
+	// Possibly regularize exit-point BSDF (pbrt-v4 lines 1234-1239)
+	if (regularize)
+		scene.BSDFRegularize(bss.exit_bsdf_id);
+
+	// NEE at exit point
+	if (scene.BSDFIsNonSpecular(bss.exit_bsdf_id)) {
+		T Ld[3] = {};
+		const BDPTHit<T>& exit_hit = wrs.sample();
+		VolPathSampleLd(exit_hit.p, bss.wo, exit_hit.shading_n,
+						bss.exit_bsdf_id, T(0),
+						beta, r_u, scene, Ld);
+		for (int c = 0; c < 3; ++c) L[c] += Ld[c];
+	}
+
+	// Indirect scatter at exit point (depth NOT incremented)
+	{
+		const BDPTHit<T>& exit_hit = wrs.sample();
+		T ex_u1 = scene.RandFloat(), ex_u2 = scene.RandFloat();
+		T ex_dir[3] = {}, ex_f[3] = {}, ex_pdf = T(0);
+			bool ex_spec = false, ex_trans = false;
+			if (!scene.BSDFSampleF(bss.exit_bsdf_id, bss.wo,
+								   exit_hit.shading_n,
+								   ex_u1, ex_u2,
+								   ex_dir, ex_f, ex_pdf, ex_spec, ex_trans))
+			return VolPathFlow::Break;
+		if (ex_pdf <= T(0)) return VolPathFlow::Break;
+
+		T ex_cos = std::abs(ex_dir[0]*exit_hit.shading_n[0] +
+							ex_dir[1]*exit_hit.shading_n[1] +
+							ex_dir[2]*exit_hit.shading_n[2]);
+		for (int c = 0; c < 3; ++c)
+			beta[c] *= ex_f[c] * ex_cos / ex_pdf;
+
+		r_l = r_u / ex_pdf;
+		specularBounce = ex_spec;
+
+		// Spawn ray from exit point
+		T ex_o[3], ex_d[3];
+		scene.SpawnRay(exit_hit, ex_dir, ex_o, ex_d);
+		ray_o[0] = ex_o[0]; ray_o[1] = ex_o[1]; ray_o[2] = ex_o[2];
+		ray_d[0] = ex_d[0]; ray_d[1] = ex_d[1]; ray_d[2] = ex_d[2];
+	}
+
+	// ---------------------------------------------------------------
+	// 9. Russian roulette (after BSSRDF scatter)
+	// ---------------------------------------------------------------
+	T rrBeta_ss = std::max({beta[0], beta[1], beta[2]}) * etaScale;
+	if (r_u > T(0)) rrBeta_ss /= r_u;
+	if (rrBeta_ss < T(1) && depth > 1) {
+		T q = std::max(T(0), T(1) - rrBeta_ss);
+		if (scene.RandFloat() < q) return VolPathFlow::Break;
+		for (int c = 0; c < 3; ++c) beta[c] /= T(1) - q;
+	}
+	return VolPathFlow::Continue; // restart outer loop with new ray from exit point
+}
+
 template<typename T, typename Scene>
 void VolPathLi(const T org[3], const T dir[3],
 			   int maxDepth,
@@ -316,17 +658,19 @@ void VolPathLi(const T org[3], const T dir[3],
 	L_out[0] = L_out[1] = L_out[2] = T(0);
 
 	// Path state (mirrors pbrt-v4 VolPathIntegrator::Li locals)
-	T L[3]    = {T(0), T(0), T(0)};
-	T beta[3] = {T(1), T(1), T(1)};
-	T r_u     = T(1);
-	T r_l     = T(1);
-	bool specularBounce = true;
-	bool any_non_specular_bounce = false;
-	T etaScale = T(1);
-	int depth  = 0;
+	VolPathState<T> st;
+	T (&L)[3] = st.L;
+	T (&beta)[3] = st.beta;
+	T &r_u = st.r_u;
+	T &r_l = st.r_l;
+	bool &specularBounce = st.specularBounce;
+	int &depth = st.depth;
+	T (&ray_o)[3] = st.ray_o;
+	T (&ray_d)[3] = st.ray_d;
+	bool &any_non_specular_bounce = st.any_non_specular_bounce;
+	T &etaScale = st.etaScale;
 
-	T ray_o[3] = { org[0], org[1], org[2] };
-	T ray_d[3] = { dir[0], dir[1], dir[2] };
+	for (int c = 0; c < 3; ++c) { ray_o[c] = org[c]; ray_d[c] = dir[c]; }
 
 	while (true) {
 		// ---------------------------------------------------------------
@@ -343,107 +687,7 @@ void VolPathLi(const T org[3], const T dir[3],
 		bool scattered   = false;
 		bool terminated  = false;
 
-		if (scene.HasMedium(ray_o, ray_d)) {
-			T u_maj = scene.RandFloat();
-			T T_maj_final = scene.SampleTMaj(ray_o, ray_d, t_max, u_maj,
-				[&](const T p_med[3],
-					const VolPathMediumProps<T>& mp,
-					T sigma_maj, T T_maj_val) -> bool {
-
-					if (beta[0]==T(0) && beta[1]==T(0) && beta[2]==T(0)) {
-						terminated = true; return false;
-					}
-
-					// Medium emission
-					if (depth < maxDepth && mp.Le > T(0)) {
-						T pdf_e = sigma_maj * T_maj_val;
-						if (pdf_e > T(0)) {
-							T r_e = r_u * sigma_maj * T_maj_val / pdf_e;
-							if (r_e > T(0)) {
-								T contrib = T_maj_val * mp.sigma_a * mp.Le / pdf_e / r_e;
-								for (int c = 0; c < 3; ++c) L[c] += beta[c] * contrib;
-							}
-						}
-					}
-
-					// Event probabilities
-					T pAbsorb  = (sigma_maj > T(0)) ? mp.sigma_a / sigma_maj : T(0);
-					T pScatter = (sigma_maj > T(0)) ? mp.sigma_s / sigma_maj : T(0);
-					T pNull    = std::max(T(0), T(1) - pAbsorb - pScatter);
-
-					// Sample event type
-					T um = scene.RandFloat();
-					if (um < pAbsorb) {
-						// Absorption: terminate
-						terminated = true;
-						return false;
-					} else if (um < pAbsorb + pScatter) {
-						// Real scatter
-						if (depth++ >= maxDepth) { terminated = true; return false; }
-
-						T pdf_s = T_maj_val * mp.sigma_s;
-						if (pdf_s > T(0)) {
-							for (int c = 0; c < 3; ++c)
-								beta[c] *= T_maj_val * mp.sigma_s / pdf_s;
-							r_u *= T_maj_val * mp.sigma_s / pdf_s;
-						}
-
-						// NEE at medium scatter point
-						T zero_n[3] = {T(0), T(0), T(0)};
-						T Ld[3];
-						VolPathSampleLd(p_med, ray_d, zero_n,
-										/*bsdf_id=*/-1, mp.g,
-										beta, r_u, scene, Ld);
-						for (int c = 0; c < 3; ++c) L[c] += Ld[c];
-
-						// Sample new direction (phase function)
-						T new_d[3]; T phase_pdf;
-						T up1 = scene.RandFloat(), up2 = scene.RandFloat();
-						if (!scene.SamplePhase(ray_d, mp.g, up1, up2,
-											   new_d, phase_pdf) ||
-							phase_pdf == T(0)) {
-							terminated = true; return false;
-						}
-
-						T ph = scene.PhaseP(ray_d, new_d, mp.g);
-						for (int c = 0; c < 3; ++c)
-							beta[c] *= ph / phase_pdf;
-						r_l = r_u / phase_pdf;
-
-						// Advance ray
-						ray_o[0]=p_med[0]; ray_o[1]=p_med[1]; ray_o[2]=p_med[2];
-						ray_d[0]=new_d[0]; ray_d[1]=new_d[1]; ray_d[2]=new_d[2];
-						specularBounce = false;
-								scattered = true;
-								return false;  // stop the majorant walk; restart outer loop
-
-							} else {
-								// Null scatter: update beta, r_u, and r_l
-								// pbrt-v4: beta *= T_maj * sigma_n / pdf
-								//          r_u  *= T_maj * sigma_n / pdf
-								//          r_l  *= T_maj * sigma_maj / pdf   <-- majorant weight
-								T sigma_n = std::max(T(0),
-									sigma_maj - mp.sigma_a - mp.sigma_s);
-								T pdf_n = T_maj_val * sigma_maj;
-								if (pdf_n > T(0)) {
-									for (int c = 0; c < 3; ++c)
-										beta[c] *= T_maj_val * sigma_n / pdf_n;
-									r_u *= T_maj_val * sigma_n / pdf_n;
-									r_l *= T_maj_val * sigma_maj / pdf_n;
-								} else {
-									// pdf==0 means sigma_maj==0: pure vacuum, no update needed
-								}
-								return (beta[0] != T(0) || beta[1] != T(0) || beta[2] != T(0));
-							}
-						});
-
-			// Apply final residual T_maj factor from the end of the segment
-			if (!scattered && !terminated && T_maj_final != T(1)) {
-				for (int c = 0; c < 3; ++c) beta[c] *= T_maj_final;
-				r_u *= T_maj_final;
-				r_l *= T_maj_final;
-			}
-		}
+		VolPathWalkMedium(st, scene, maxDepth, t_max, scattered, terminated);
 
 		if (terminated) break;
 		if (scattered)  continue;
@@ -452,26 +696,7 @@ void VolPathLi(const T org[3], const T dir[3],
 		// 3. Handle ray that missed the scene (background / infinite lights)
 		// ---------------------------------------------------------------
 		if (!did_hit) {
-			T Le_inf[3];
-			scene.InfiniteLightLe(ray_d, Le_inf);
-			if (Le_inf[0] != T(0) || Le_inf[1] != T(0) || Le_inf[2] != T(0)) {
-				if (depth == 0 || specularBounce) {
-					// Direct: weight by r_u only
-					if (r_u > T(0))
-						for (int c = 0; c < 3; ++c)
-							L[c] += beta[c] * Le_inf[c] / r_u;
-				} else {
-					// MIS: (r_u + r_l).Average() -- scalar/RGB has no
-					// spectral dimension, so this is just the plain sum
-					// (see VolPathSampleLd's comment on Average()).
-					T r_l_cur = r_l * scene.InfiniteLightPMF()
-							  * scene.InfiniteLightPDF_Li(ray_o, ray_d);
-					T denom = r_u + r_l_cur;
-					if (denom > T(0))
-						for (int c = 0; c < 3; ++c)
-							L[c] += beta[c] * Le_inf[c] / denom;
-				}
-			}
+			VolPathEscaped(st, scene);
 			break;
 		}
 
@@ -479,26 +704,7 @@ void VolPathLi(const T org[3], const T dir[3],
 		// 4. Surface hit: emission
 		// ---------------------------------------------------------------
 		// Area light emission on the hit surface
-		{
-			T* Le = hit.area_Le;
-			if (Le[0] != T(0) || Le[1] != T(0) || Le[2] != T(0)) {
-				if (depth == 0 || specularBounce) {
-					if (r_u > T(0))
-						for (int c = 0; c < 3; ++c)
-							L[c] += beta[c] * Le[c] / r_u;
-				} else {
-					// MIS with light-sampling PDF (plain sum -- see
-					// VolPathSampleLd's comment on Average()).
-					T p_l = scene.LightPMF(hit.light_id)
-						  * scene.LightPDF_Li(hit.light_id, ray_o, ray_d);
-					T r_l_cur = r_l * p_l;
-					T denom = r_u + r_l_cur;
-					if (denom > T(0))
-						for (int c = 0; c < 3; ++c)
-							L[c] += beta[c] * Le[c] / denom;
-				}
-			}
-		}
+		VolPathSurfaceEmission(st, scene, hit);
 
 		// ---------------------------------------------------------------
 		// 5. Terminate at max depth
@@ -566,132 +772,7 @@ void VolPathLi(const T org[3], const T dir[3],
 		// depth this time").
 		// ---------------------------------------------------------------
 		if (is_transmission && scene.HasBSSRDF(hit)) {
-			// Sample the probe segment endpoints
-			T uc = scene.RandFloat();
-			T up1 = scene.RandFloat(), up2 = scene.RandFloat();
-			BSSRDFProbeSegment<T> seg{};
-			if (!scene.SampleBSSRDFProbe(hit, up1, up2, seg))
-				break;
-
-			// Walk the probe segment and reservoir-sample one exit hit
-			// with uniform probability (all intersecting faces of the
-			// same material are weighted equally, mirroring pbrt-v4's
-			// WeightedReservoirSampler<SubsurfaceInteraction> with weight=1).
-			uint64_t rs_seed = static_cast<uint64_t>(
-				*reinterpret_cast<const uint32_t*>(&uc) ^
-				static_cast<uint32_t>(depth * 2654435761u));
-			WeightedReservoirSampler<BDPTHit<T>> wrs(rs_seed);
-			{
-				// Segment direction and length
-				T seg_d[3] = {
-					seg.p1[0] - seg.p0[0],
-					seg.p1[1] - seg.p0[1],
-					seg.p1[2] - seg.p0[2]
-				};
-				T seg_len = std::sqrt(seg_d[0]*seg_d[0] +
-									  seg_d[1]*seg_d[1] +
-									  seg_d[2]*seg_d[2]);
-				if (seg_len < T(1e-8)) break;
-				seg_d[0] /= seg_len;
-				seg_d[1] /= seg_len;
-				seg_d[2] /= seg_len;
-
-				// Walk: intersect the probe segment repeatedly,
-				// advancing the origin past each hit, collecting
-				// exit-surface candidates.
-				T base[3] = { seg.p0[0], seg.p0[1], seg.p0[2] };
-				T remaining = seg_len;
-				while (remaining > T(1e-8)) {
-					BDPTHit<T> probe_hit{};
-					if (!scene.Intersect(base, seg_d, remaining, probe_hit))
-						break;
-					// Uniform weight = 1 for each candidate hit
-					wrs.add(probe_hit, 1.0);
-					// Advance past this hit
-					T step = probe_hit.t_hit + T(1e-4);
-					base[0] += step * seg_d[0];
-					base[1] += step * seg_d[1];
-					base[2] += step * seg_d[2];
-					remaining -= step;
-				}
-			}
-
-			if (!wrs.has_sample()) break;
-
-			// Convert the chosen exit hit to a BSSRDFSample
-			BSSRDFSample<T> bss{};
-			if (!scene.SampleBSSRDF(hit, wrs.sample(),
-									static_cast<T>(wrs.sample_probability()),
-									bss))
-				break;
-			if (bss.pdf <= T(0)) break;
-
-			// Update path throughput and unidirectional PDF ratio
-			// beta *= Sp / (sample_prob * pdf)  -- mirrors pbrt-v4
-			// r_u  *= pdf / pdf_ch0             -- multi-channel correction
-			//   (for RGB, pdf is scalar so r_u is unchanged; kept for correctness)
-			T inv_pdf = T(1) / (static_cast<T>(wrs.sample_probability()) * bss.pdf);
-			for (int c = 0; c < 3; ++c)
-				beta[c] *= bss.Sp[c] * inv_pdf;
-			// r_u unchanged for scalar pdf (bss.pdf == bss.pdf for all channels)
-
-			// Subsurface scatter is always diffuse (pbrt-v4: anyNonSpecularBounces=true)
-			any_non_specular_bounce = true;
-			specularBounce = false;
-
-			// Possibly regularize exit-point BSDF (pbrt-v4 lines 1234-1239)
-			if (regularize)
-				scene.BSDFRegularize(bss.exit_bsdf_id);
-
-			// NEE at exit point
-			if (scene.BSDFIsNonSpecular(bss.exit_bsdf_id)) {
-				T Ld[3] = {};
-				const BDPTHit<T>& exit_hit = wrs.sample();
-				VolPathSampleLd(exit_hit.p, bss.wo, exit_hit.shading_n,
-								bss.exit_bsdf_id, T(0),
-								beta, r_u, scene, Ld);
-				for (int c = 0; c < 3; ++c) L[c] += Ld[c];
-			}
-
-			// Indirect scatter at exit point (depth NOT incremented)
-			{
-				const BDPTHit<T>& exit_hit = wrs.sample();
-				T ex_u1 = scene.RandFloat(), ex_u2 = scene.RandFloat();
-				T ex_dir[3] = {}, ex_f[3] = {}, ex_pdf = T(0);
-					bool ex_spec = false, ex_trans = false;
-					if (!scene.BSDFSampleF(bss.exit_bsdf_id, bss.wo,
-										   exit_hit.shading_n,
-										   ex_u1, ex_u2,
-										   ex_dir, ex_f, ex_pdf, ex_spec, ex_trans))
-					break;
-				if (ex_pdf <= T(0)) break;
-
-				T ex_cos = std::abs(ex_dir[0]*exit_hit.shading_n[0] +
-									ex_dir[1]*exit_hit.shading_n[1] +
-									ex_dir[2]*exit_hit.shading_n[2]);
-				for (int c = 0; c < 3; ++c)
-					beta[c] *= ex_f[c] * ex_cos / ex_pdf;
-
-				r_l = r_u / ex_pdf;
-				specularBounce = ex_spec;
-
-				// Spawn ray from exit point
-				T ex_o[3], ex_d[3];
-				scene.SpawnRay(exit_hit, ex_dir, ex_o, ex_d);
-				ray_o[0] = ex_o[0]; ray_o[1] = ex_o[1]; ray_o[2] = ex_o[2];
-				ray_d[0] = ex_d[0]; ray_d[1] = ex_d[1]; ray_d[2] = ex_d[2];
-			}
-
-			// ---------------------------------------------------------------
-			// 9. Russian roulette (after BSSRDF scatter)
-			// ---------------------------------------------------------------
-			T rrBeta_ss = std::max({beta[0], beta[1], beta[2]}) * etaScale;
-			if (r_u > T(0)) rrBeta_ss /= r_u;
-			if (rrBeta_ss < T(1) && depth > 1) {
-				T q = std::max(T(0), T(1) - rrBeta_ss);
-				if (scene.RandFloat() < q) break;
-				for (int c = 0; c < 3; ++c) beta[c] /= T(1) - q;
-			}
+			if (VolPathBssrdfExit(st, scene, hit, regularize) == VolPathFlow::Break) break;
 			continue; // restart outer loop with new ray from exit point
 		}
 

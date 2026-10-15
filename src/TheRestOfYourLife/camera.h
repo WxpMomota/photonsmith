@@ -363,6 +363,10 @@ class camera {
                 const std::string& output_path = std::string());
 
   private:
+    // The per-thread sampler objects render() builds once per worker, and the one-pixel step of its sample loop (camera_render.h).
+    struct RenderSamplers;
+    color render_pixel(int i, int j, RenderSamplers& smp, const hittable& world, const hittable& lights);
+
     // --seed support (see camera::seed's own comment above).
     //
     // Reseeding has to happen PER SCANLINE, not once per worker thread at
