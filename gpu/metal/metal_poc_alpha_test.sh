@@ -6,7 +6,7 @@
 RT="$1"; CHK="$2"; DIR="$3"
 # the square as a plain mesh, and the same square as an ObjectInstance (an instanced mesh's mask is tested through the instance's triangle base)
 for scene in pbrt_scenes/alpha-cutout.pbrt gpu/metal/test_scenes/alpha-cutout-instanced.pbrt gpu/metal/test_scenes/alpha-cutout-mix.pbrt; do
-    "$RT" --gpu --seed 5 --output "$DIR/alpha_test.png" 128 32 4 "$scene" >/dev/null 2>&1 || { echo "render failed: $scene"; exit 1; }
+    "$RT" --gpu --seed 5 --output "$DIR/alpha_test.png" 128 32 4 "$scene" >"$DIR/alpha_render.log" 2>&1 || { echo "render failed: $scene"; tail -15 "$DIR/alpha_render.log"; exit 1; }
     echo "$scene"
     "$CHK" "$DIR/alpha_test.png" || exit 1
 done

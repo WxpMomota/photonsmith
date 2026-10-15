@@ -846,5 +846,23 @@ if(RT_BUILD_METAL)
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
         ENVIRONMENT "METAL_PARITY_STRICT=1"
         PASS_REGULAR_EXPRESSION "PASS \\((informational|strict)\\)|No Metal device available"
-        FAIL_REGULAR_EXPRESSION "(^|\n)FAIL: ")
+        FAIL_REGULAR_EXPRESSION "(^|\n)FAIL: "
+        TIMEOUT 1800)
+    # Every test gets a time limit, and the GPU is used by one test at a time.
+    #  * Time limit: ctest has none by default here (enable_testing() without include(CTest) does not set DART_TESTING_TIMEOUT), and a GPU command buffer that never completes is not
+    #    hypothetical: on 2026-10-15 the parity test sat in -[MTLCommandBuffer waitUntilCompleted] for THREE HOURS (its worker had exited; the main process slept at 0% CPU) and ctest
+    #    waited with it. Ten minutes is far above the slowest test alone (the parity test, 3 to 5 minutes, has its own limit above).
+    #  * One GPU user at a time (RESOURCE_LOCK): under `ctest -j4` the sweeps, the parity test and the small render tests all use the GPU at once, and macOS's watchdog then kills renders that
+    #    are fine alone: kIOGPUCommandBufferCallbackErrorHang on a 64-sample sphere, kIOGPUCommandBufferCallbackErrorInnocentVictim ("discarded, victim of GPU error/recovery") on the test
+    #    beside it, a pack row "no longer renders", and the hang above. Four of seven full -j4 runs that afternoon failed this way (once the shader cache was warm and nothing was staggered by
+    #    a compile any more); every one of those tests passes alone (pack 58 s, consistency 81 s, sweep 23 s, parity 3 to 4 minutes). The host-only tests (math, validate) take the lock too:
+    #    they last milliseconds.
+    get_directory_property(_all_tests TESTS)
+    foreach(_t ${_all_tests})
+        get_test_property(${_t} TIMEOUT _t_timeout)
+        if(NOT _t_timeout)
+            set_tests_properties(${_t} PROPERTIES TIMEOUT 600)
+        endif()
+        set_tests_properties(${_t} PROPERTIES RESOURCE_LOCK metal_gpu)
+    endforeach()
 endif()
