@@ -4,7 +4,7 @@ Release notes for the next tagged release, summarising the large correctness eff
 Before this, see `git log`. Each item has a commit with the measurements behind it, and
 [docs/PBRT_SUPPORT.md](docs/PBRT_SUPPORT.md) has the per-feature, per-backend detail.
 
-## 0.1.4 (2026-10-14)
+## 0.1.4 (2026-10-15)
 
 This release is about what the new pbrt reference pack showed: every bundled scene pbrt-v4 can read now has pbrt's own mean in a table the tests read, and the differences that surfaced were fixed. Highlights, with the full list below:
 
