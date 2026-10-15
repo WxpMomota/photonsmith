@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Metal against real pbrt-v4: renders every scene of tests/data/pbrt_reference_means.txt on the Metal backend (and, with --cpu, the CPU too) at the size, sample count and depth the
-pack was made with, and prints each scene's mean per channel as a ratio of pbrt's. A scene is listed when a channel is off by more than --tolerance percent (default 3, plus pbrt's own
-noise). The pack's own cpu_ratio column says how far the CPU is, so a scene where Metal is off and the CPU is not is Metal's to fix.
+pack was made with, and prints each scene's mean per channel as a ratio of pbrt's. A scene is listed when a channel is off by more than --tolerance percent (default 3).
+The pack's own cpu_ratio column says how far the CPU is, so a scene where Metal is off and the CPU is not is Metal's to fix.
 
   python3 scripts/metal_pbrt_pack.py [--exe build_macos/ray_tracer] [--tolerance 3] [--only name,name] [--cpu] [--spp-factor 4]
 
@@ -32,7 +32,6 @@ def main():
         f = line.split()
         name, spp, depth, size = f[0], str(int(f[1]) * args.spp_factor), f[2], f[3]
         ref = [float(x) for x in f[4:7]]
-        noise = float(f[7])
         cpu_ratio = [float(f[8])]
         if only and name not in only:
             continue
@@ -53,7 +52,7 @@ def main():
             continue
         ratio = [g / p if p > 1e-9 else 1.0 for g, p in zip(res["gpu"], ref)]
         worst = max(abs(x - 1.0) for x in ratio) * 100.0
-        flag = worst > args.tolerance + noise * 100.0 / max(min(ref), 1e-9) * 0.0
+        flag = worst > args.tolerance
         if flag:
             bad.append((name, worst))
         line_out = "%-48s metal/pbrt %s%s  (pbrt cpu ratio %.3f)" % (name, " ".join("%.3f" % x for x in ratio), "  <-- %.1f%%" % worst if flag else "", cpu_ratio[0])
