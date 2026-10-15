@@ -348,6 +348,11 @@ struct Uniforms {
     packed_float3 portalP2;
     // Metal instance id of the first pbrt ObjectInstance placement, 0xFFFFFFFF = none (see the host copy in metal_poc_gpu_types.h).
     uint pbrtInstanceFirst;
+    // pbrt's Approximate_dp_dxy (the footprint of a bounced hit, bumpFootprintApprox() in metal_poc_bump.metal): the camera's smallest pixel differentials in the frame round a ray, found on
+    // the host (src/shared/camera_footprint.h makeCamera); footprintValid is 0 for every camera but a plain perspective one.
+    packed_float3 footprintMinDirX;
+    packed_float3 footprintMinDirY;
+    uint footprintValid;
 };
 
 // A real light LIST entry, replacing the single hardcoded kLightCenter/

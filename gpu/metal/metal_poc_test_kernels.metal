@@ -776,6 +776,7 @@ kernel void test_structLayouts(
     FIELD_OFFSET(liveWorldPos) FIELD_OFFSET(adaptiveThreshold) FIELD_OFFSET(cameraGlassPrim) FIELD_OFFSET(pbrtHasPortalLight)
     FIELD_OFFSET(pbrtPortalWidth) FIELD_OFFSET(pbrtPortalHeight) FIELD_OFFSET(pbrtPortalScale) FIELD_OFFSET(portalFrameX)
     FIELD_OFFSET(portalFrameY) FIELD_OFFSET(portalFrameZ) FIELD_OFFSET(portalP0) FIELD_OFFSET(portalP2) FIELD_OFFSET(pbrtInstanceFirst)
+    FIELD_OFFSET(footprintMinDirX) FIELD_OFFSET(footprintMinDirY) FIELD_OFFSET(footprintValid)
 #undef FIELD_OFFSET
 }
 
@@ -835,4 +836,19 @@ kernel void test_measuredQuadratureTable(
     outputs[tid * 4 + 1] = kMeasuredWr[tid];
     outputs[tid * 4 + 2] = kMeasuredWg[tid];
     outputs[tid * 4 + 3] = kMeasuredWb[tid];
+}
+
+// approximateDpDxy() (metal_poc_bump.metal) direct dispatch: pbrt's Approximate_dp_dxy, cross-checked against src/shared/camera_footprint.h (see metal_poc_shader_tests_geometry.mm).
+// outputs[2 * tid] = dpdx, outputs[2 * tid + 1] = dpdy, both zero when it gives none.
+kernel void test_approximateDpDxy(
+    constant Uniforms& u [[buffer(0)]],
+    device const float3* points [[buffer(1)]],
+    device const float3* normals [[buffer(2)]],
+    device float3* outputs [[buffer(3)]],
+    uint tid [[thread_position_in_grid]])
+{
+    float3 dpdx, dpdy;
+    approximateDpDxy(u, points[tid], normals[tid], dpdx, dpdy);
+    outputs[2 * tid] = dpdx;
+    outputs[2 * tid + 1] = dpdy;
 }

@@ -320,6 +320,7 @@ void testShadeThinDielectric(id<MTLDevice> device, id<MTLLibrary> library, id<MT
 void testBumpHeightFiltered(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue);
 void testSphereLightCone(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue);
 void testSpawnSide(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue);
+void testApproximateDpDxy(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue);
 void testMeasuredQuadratureTable(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue);
 
 void testPerlinNoise3D(id<MTLDevice> device, id<MTLLibrary> library, id<MTLCommandQueue> queue);

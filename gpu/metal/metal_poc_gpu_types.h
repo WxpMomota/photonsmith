@@ -226,6 +226,10 @@ struct Uniforms {
     // instance with id >= this is a pbrt group placement: its hit primitive is group-local, InstanceTransform::triBase + primitive_id indexes the
     // shared triangle arrays, and the shading normal is transformed by the instance's normal matrix.
     uint32_t pbrtInstanceFirst = 0xFFFFFFFFu;
+    // see the shader's copy (metal_poc_types.metal): pbrt's Approximate_dp_dxy camera, made on the host
+    PackedFloat3 footprintMinDirX{};
+    PackedFloat3 footprintMinDirY{};
+    uint32_t footprintValid = 0;
 };
 
 // Mirrors metal_poc.metal's own LensElement byte-for-byte - a single
