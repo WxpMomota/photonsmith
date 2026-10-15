@@ -993,6 +993,8 @@ struct TriangleMaterial {
     float bumpUvScaleU, bumpUvScaleV, bumpUvDeltaU, bumpUvDeltaV;
     // The reflectance picture's "string wrap": 0 clamp, 1 repeat, 2 black (see metal_poc_gpu_types.h).
     int textureWrap;
+    // The geometric normal of the hit on the ray's side, for spawnSide() (see metal_poc_gpu_types.h); zero = not set.
+    packed_float3 spawnNormal;
 };
 
 // E2/section 178: a real heterogeneous, procedural Perlin-FBm-density

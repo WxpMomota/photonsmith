@@ -317,7 +317,6 @@ add_executable(cpu_integrator_tests
     unit/cpu_integrator_agreement_tests.cpp
     unit/pbrt_reference_pack_tests.cpp
     unit/bump_footprint_cpu_tests.cpp
-    unit/bump_footprint_gpu_tests.cpp
     unit/scene_text_tests.cpp
     unit/scene_builder_tests.cpp
     unit/scene_sky_tests.cpp
@@ -333,6 +332,7 @@ add_executable(cpu_integrator_tests
     ${CMAKE_SOURCE_DIR}/../cpu_renderer/cpu_interface_bdpt.cpp
     ${CMAKE_SOURCE_DIR}/../src/data/rgb_spectrum_table_data.cpp
     ${CMAKE_SOURCE_DIR}/../src/external/stb_image_impl.cpp
+    ${CMAKE_SOURCE_DIR}/../src/external/image_writer.cpp   # stbi_write_png, which scene_builder_tests.cpp calls (the MSBuild target gets it from mtl_material_tests.cpp)
     ${CMAKE_SOURCE_DIR}/../src/external/tinyexr_impl.cpp
     ${CMAKE_SOURCE_DIR}/../src/external/miniz.c
 )

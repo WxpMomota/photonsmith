@@ -33,7 +33,7 @@ inline bool scatterAtSurface(thread const KernelRes& R, thread PathState& P, thr
                              isect, accelStructure, functionTable,
                              rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState)) return false;
     } else if (mat.materialType == METAL_MAT_MIRROR) {
-        if (!shadeMirror(albedo, hitPoint, facingNormal, rayDir, rayOrigin, throughput, specularBounce)) return false;
+        if (!shadeMirror(mat, albedo, hitPoint, facingNormal, rayDir, rayOrigin, throughput, specularBounce)) return false;
     } else if (mat.materialType == METAL_MAT_THIN_DIELECTRIC) {
         if (!shadeThinDielectric(mat, hitPoint, normal, facingNormal,
                                   rayDir, rayOrigin, throughput, specularBounce, rngState)) return false;

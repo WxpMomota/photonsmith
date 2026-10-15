@@ -487,6 +487,9 @@ struct TriangleMaterial {
     float bumpUvScaleU = 1.0f, bumpUvScaleV = 1.0f, bumpUvDeltaU = 0.0f, bumpUvDeltaV = 0.0f;
     // pbrt imagemap "string wrap" of the reflectance picture, as MipWrapMode: 0 clamp, 1 repeat (the default), 2 black. Read where the picture is looked up at (su*u + du, sv*v + dv).
     int32_t textureWrap = 1;
+    // The geometric normal of the hit, on the side the ray came from (set per hit by resolveHit(); zero where it was not): rays spawned from the surface (light samples, the next bounce)
+    // start 0.001 along it toward THEIR side, as pbrt offsets them, so a direction a shading normal (bumped, normal-mapped or interpolated) sends below the surface leaves it.
+    PackedFloat3 spawnNormal{0, 0, 0};
 };
 
 // Mirrors metal_poc_types.metal's GpuCloudMedium byte-for-byte (E2,

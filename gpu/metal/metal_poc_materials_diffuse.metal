@@ -48,7 +48,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
             float3 lobeTint = reflect ? albedo : mat.transmitColor;
             float absCos = abs(cosSurface);
             ray shadowRay;
-            shadowRay.origin = hitPoint + (reflect ? facingNormal : -facingNormal) * 0.001f;
+            shadowRay.origin = hitPoint + spawnSide(mat, (reflect ? facingNormal : -facingNormal), wi) * 0.001f;
             shadowRay.direction = wi;
             shadowRay.min_distance = 0.001f;
             shadowRay.max_distance = dist - 0.002f;
@@ -78,7 +78,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
                 float3 plLobeTint = plReflect ? albedo : mat.transmitColor;
                 float plAbsCos = abs(plCosSurface);
                 ray plShadowRay;
-                plShadowRay.origin = hitPoint + (plReflect ? facingNormal : -facingNormal) * 0.001f;
+                plShadowRay.origin = hitPoint + spawnSide(mat, (plReflect ? facingNormal : -facingNormal), plWi) * 0.001f;
                 plShadowRay.direction = plWi;
                 plShadowRay.min_distance = 0.001f;
                 plShadowRay.max_distance = plDist - 0.002f;
@@ -103,7 +103,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
                 float3 dlLobeTint = dlReflect ? albedo : mat.transmitColor;
                 float dlAbsCos = abs(dlCosSurface);
                 ray dlShadowRay;
-                dlShadowRay.origin = hitPoint + (dlReflect ? facingNormal : -facingNormal) * 0.001f;
+                dlShadowRay.origin = hitPoint + spawnSide(mat, (dlReflect ? facingNormal : -facingNormal), dlWi) * 0.001f;
                 dlShadowRay.direction = dlWi;
                 dlShadowRay.min_distance = 0.001f;
                 dlShadowRay.max_distance = kDirectionalLightMaxDistance;
@@ -139,7 +139,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
                     float3 pjLobeTint = pjReflect ? albedo : mat.transmitColor;
                     float pjAbsCos = abs(pjCosSurface);
                     ray pjShadowRay;
-                    pjShadowRay.origin = hitPoint + (pjReflect ? facingNormal : -facingNormal) * 0.001f;
+                    pjShadowRay.origin = hitPoint + spawnSide(mat, (pjReflect ? facingNormal : -facingNormal), pjWi) * 0.001f;
                     pjShadowRay.direction = pjWi;
                     pjShadowRay.min_distance = 0.001f;
                     pjShadowRay.max_distance = pjDist - 0.002f;
@@ -171,7 +171,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
                     float3 glLobeTint = glReflect ? albedo : mat.transmitColor;
                     float glAbsCos = abs(glCosSurface);
                     ray glShadowRay;
-                    glShadowRay.origin = hitPoint + (glReflect ? facingNormal : -facingNormal) * 0.001f;
+                    glShadowRay.origin = hitPoint + spawnSide(mat, (glReflect ? facingNormal : -facingNormal), glWi) * 0.001f;
                     glShadowRay.direction = glWi;
                     glShadowRay.min_distance = 0.001f;
                     glShadowRay.max_distance = glDist - 0.002f;
@@ -207,7 +207,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
                 float3 envLobeTint = envReflect ? albedo : mat.transmitColor;
                 float envAbsCos = abs(envCosSurface);
                 ray envShadowRay;
-                envShadowRay.origin = hitPoint + (envReflect ? facingNormal : -facingNormal) * 0.001f;
+                envShadowRay.origin = hitPoint + spawnSide(mat, (envReflect ? facingNormal : -facingNormal), envWi) * 0.001f;
                 envShadowRay.direction = envWi;
                 envShadowRay.min_distance = 0.001f;
                 envShadowRay.max_distance = 1e5f;
@@ -238,7 +238,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
                 float3 pbrtEnvLobeTint = pbrtEnvReflect ? albedo : mat.transmitColor;
                 float pbrtEnvAbsCos = abs(pbrtEnvCosSurface);
                 ray pbrtEnvShadowRay;
-                pbrtEnvShadowRay.origin = hitPoint + (pbrtEnvReflect ? facingNormal : -facingNormal) * 0.001f;
+                pbrtEnvShadowRay.origin = hitPoint + spawnSide(mat, (pbrtEnvReflect ? facingNormal : -facingNormal), pbrtEnvWi) * 0.001f;
                 pbrtEnvShadowRay.direction = pbrtEnvWi;
                 pbrtEnvShadowRay.min_distance = 0.001f;
                 pbrtEnvShadowRay.max_distance = 1e5f;
@@ -259,7 +259,7 @@ inline bool shadeDiffuseTransmission(TriangleMaterial mat, float3 albedo, float3
     bool reflect = randFloat(rngState) < (pr / pSum);
     float3 lobeNormal = reflect ? facingNormal : -facingNormal;
     rayDir = cosineSampleHemisphere(lobeNormal, rngState);
-    rayOrigin = hitPoint + lobeNormal * 0.001f;
+    rayOrigin = hitPoint + spawnSide(mat, lobeNormal, rayDir) * 0.001f;
     // The lobe was chosen with probability p = pr/(pr+pt) (reflect) or pt/(pr+pt) (transmit), so the sample weight f*cos/pdf is the lobe colour
     // DIVIDED by p, as in pbrt-v4 (R*(pr+pt)/pr, T*(pr+pt)/pt). Weighting by the bare colour lost a factor 1/p per bounce: a closed
     // R=0.2, T=0.6 shell under a white sky read 0.05 at depth 1 (closed form 0.2) and 0.26 at depth 8 (0.65).
@@ -316,7 +316,7 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
         float cosLight = dot(ls.normal, -wi);
         if (cosSurface > 0.0 && (cosLight > 0.0 || (ls.twoSided != 0.0 && cosLight < 0.0))) {
             ray shadowRay;
-            shadowRay.origin = hitPoint + facingNormal * 0.001f;
+            shadowRay.origin = hitPoint + spawnSide(mat, facingNormal, wi) * 0.001f;
             shadowRay.direction = wi;
             shadowRay.min_distance = 0.001f;
             shadowRay.max_distance = dist - 0.002f;
@@ -375,7 +375,7 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
             float plCosSurface = dot(facingNormal, plWi);
             if (plCosSurface > 0.0) {
                 ray plShadowRay;
-                plShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                plShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, plWi) * 0.001f;
                 plShadowRay.direction = plWi;
                 plShadowRay.min_distance = 0.001f;
                 plShadowRay.max_distance = plDist - 0.002f;
@@ -397,7 +397,7 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
             float dlCosSurface = dot(facingNormal, dlWi);
             if (dlCosSurface > 0.0) {
                 ray dlShadowRay;
-                dlShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                dlShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, dlWi) * 0.001f;
                 dlShadowRay.direction = dlWi;
                 dlShadowRay.min_distance = 0.001f;
                 dlShadowRay.max_distance = kDirectionalLightMaxDistance;
@@ -430,7 +430,7 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
                                                              (pj.usePbrtTexture != 0u ? pbrtProjectionTexture : earthTexture), textureSampler);
                 if (any(pjRadiance > float3(0.0))) {
                     ray pjShadowRay;
-                    pjShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                    pjShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, pjWi) * 0.001f;
                     pjShadowRay.direction = pjWi;
                     pjShadowRay.min_distance = 0.001f;
                     pjShadowRay.max_distance = pjDist - 0.002f;
@@ -459,7 +459,7 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
                                                               (gl.usePbrtTexture != 0u ? pbrtGoniometricTexture : goniometricTexture), textureSampler);
                 if (any(glRadiance > float3(0.0))) {
                     ray glShadowRay;
-                    glShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                    glShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, glWi) * 0.001f;
                     glShadowRay.direction = glWi;
                     glShadowRay.min_distance = 0.001f;
                     glShadowRay.max_distance = glDist - 0.002f;
@@ -500,7 +500,7 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
             float envCosSurface = dot(facingNormal, envWi);
             if (envCosSurface > 0.0 && envPdfSolidAngle > 1e-9) {
                 ray envShadowRay;
-                envShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                envShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, envWi) * 0.001f;
                 envShadowRay.direction = envWi;
                 envShadowRay.min_distance = 0.001f;
                 envShadowRay.max_distance = 1e5f;
@@ -528,7 +528,7 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
             float pbrtEnvCosSurface = dot(facingNormal, pbrtEnvWi);
             if (pbrtEnvCosSurface > 0.0 && pbrtEnvPdfSolidAngle > 1e-9) {
                 ray pbrtEnvShadowRay;
-                pbrtEnvShadowRay.origin = hitPoint + facingNormal * 0.001f;
+                pbrtEnvShadowRay.origin = hitPoint + spawnSide(mat, facingNormal, pbrtEnvWi) * 0.001f;
                 pbrtEnvShadowRay.direction = pbrtEnvWi;
                 pbrtEnvShadowRay.min_distance = 0.001f;
                 pbrtEnvShadowRay.max_distance = 1e5f;
@@ -547,7 +547,7 @@ inline bool shadeLambertian(TriangleMaterial mat, float3 albedo, float3 hitPoint
     }
 
     rayDir = cosineSampleHemisphere(facingNormal, rngState);
-    rayOrigin = hitPoint + facingNormal * 0.001f;
+    rayOrigin = hitPoint + spawnSide(mat, facingNormal, rayDir) * 0.001f;
     throughput *= albedo;
     bsdfPdf = lambertianPdf(max(dot(facingNormal, rayDir), 0.0001f));
     specularBounce = false;
