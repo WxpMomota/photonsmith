@@ -30,8 +30,11 @@ are distinguished by prefix instead - see File Structure below.
 - `optix_renderer.h` + `optix_renderer_init.cpp`/`_scene.cpp`/`_render.cpp` -
   the recursive backend's host-side `OptiXRenderer` class, split by concern
   (init/scene-build/render) rather than one large file.
-- `optix_programs.cu` - recursive backend's OptiX device programs (raygen,
-  miss, closest-hit, intersection).
+- `optix_programs.cu` - recursive backend's core OptiX device programs (raygen,
+  miss, shadow any-hit, probe rays); `optix_programs_sphere.cu`, `_quad.cu`
+  (quad and bilinear patch), `_disk.cu`, `_cylinder.cu` and `_triangle.cu` hold
+  each shape's intersection and closest-hit programs. Six PTX modules compiled
+  in parallel - see the comment at the top of `optix_programs.cu`.
 - `optix_device_helpers.h` - recursive backend's shared `__device__` helpers:
   material shading dispatch (`shade_material()`) and texture sampling.
 - `optix_device_helpers_lighting.h` - split out of `optix_device_helpers.h`;

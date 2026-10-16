@@ -522,7 +522,13 @@ private:
 	// Pipeline and Shaders
 	// -------------------------------------------------------------------
 	OptixPipeline pipeline_ = nullptr;                      ///< Compiled pipeline
-	OptixModule module_ = nullptr;                          ///< PTX module
+	OptixModule module_ = nullptr;                          ///< Core PTX module (optix_programs.ptx): raygen, miss, shadow any-hit, probe programs
+	// The geometry modules (optix_programs_<shape>.ptx - see optix_programs.cu for why the recursive programs are several modules).
+	OptixModule moduleSphere_ = nullptr;
+	OptixModule moduleQuad_ = nullptr;                      ///< quad and bilinear patch
+	OptixModule moduleDisk_ = nullptr;
+	OptixModule moduleCylinder_ = nullptr;
+	OptixModule moduleTriangle_ = nullptr;
 	OptixPipelineCompileOptions pipelineCompileOptions_{};  ///< Pipeline compilation options
 
 	// Program groups

@@ -131,6 +131,11 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\gpu\optix\optix_programs.cu" />
+    <None Include="..\gpu\optix\optix_programs_sphere.cu" />
+    <None Include="..\gpu\optix\optix_programs_quad.cu" />
+    <None Include="..\gpu\optix\optix_programs_disk.cu" />
+    <None Include="..\gpu\optix\optix_programs_cylinder.cu" />
+    <None Include="..\gpu\optix\optix_programs_triangle.cu" />
     <None Include="..\gpu\optix\wavefront_programs.cu" />
     <None Include="..\gpu\optix\wavefront_kernels_camera.cu" />
     <None Include="..\gpu\optix\wavefront_kernels_materials.cu" />
@@ -159,6 +164,11 @@
     <!-- Copy PTX shader to package directory -->
     <Message Text="[Post-Build] Copying optix_programs.ptx to RayTracer_Package..." Importance="high" />
     <Copy SourceFiles="$(PtxSource)" DestinationFiles="$(PackageDir)\optix_programs.ptx" SkipUnchangedFiles="false" Condition="Exists('$(PtxSource)')" />
+    <!-- The geometry modules of the recursive backend (optix_programs_sphere.ptx, ...): see gpu\optix\optix_programs.cu. -->
+    <ItemGroup>
+      <OptixModulePtx Include="$(MSBuildProjectDirectory)\..\gpu\optix\optix_programs_*.ptx" />
+    </ItemGroup>
+    <Copy SourceFiles="@(OptixModulePtx)" DestinationFolder="$(PackageDir)" SkipUnchangedFiles="false" />
     <Copy SourceFiles="$(MSBuildProjectDirectory)\..\gpu\optix\wavefront_programs.ptx" DestinationFiles="$(PackageDir)\wavefront_programs.ptx" SkipUnchangedFiles="false" Condition="Exists('$(MSBuildProjectDirectory)\..\gpu\optix\wavefront_programs.ptx')" />
     <Copy SourceFiles="$(MSBuildProjectDirectory)\..\gpu\optix\sppm_programs.ptx" DestinationFiles="$(PackageDir)\sppm_programs.ptx" SkipUnchangedFiles="false" Condition="Exists('$(MSBuildProjectDirectory)\..\gpu\optix\sppm_programs.ptx')" />
     <Message Text="[Post-Build] Deployed: $(PackageDir)\optix_programs.ptx" Importance="high" Condition="Exists('$(PtxSource)')" />

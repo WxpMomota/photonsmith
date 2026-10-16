@@ -228,7 +228,7 @@ if(RT_BUILD_GPU)
 
     # --- PTX-only device programs (loaded at runtime via optixModuleCreate,
     #     never linked into an executable) -----------------------------------
-    foreach(ptx_name optix_programs wavefront_programs sppm_programs)
+    foreach(ptx_name optix_programs optix_programs_sphere optix_programs_quad optix_programs_disk optix_programs_cylinder optix_programs_triangle wavefront_programs sppm_programs)
         add_library(${ptx_name}_ptx OBJECT gpu/optix/${ptx_name}.cu)
         target_include_directories(${ptx_name}_ptx PRIVATE
             ${RT_OPTIX_INCLUDE} gpu/optix src/shared)
@@ -346,7 +346,7 @@ if(RT_BUILD_GPU)
         # variable (kPi in scene_builder.cpp) that ConformanceMode's
         # stricter/more-standard-conformant mode accepts.
         $<$<COMPILE_LANGUAGE:CXX>:/permissive->)
-    add_dependencies(optix_renderer optix_programs_ptx wavefront_programs_ptx sppm_programs_ptx)
+    add_dependencies(optix_renderer optix_programs_ptx optix_programs_sphere_ptx optix_programs_quad_ptx optix_programs_disk_ptx optix_programs_cylinder_ptx optix_programs_triangle_ptx wavefront_programs_ptx sppm_programs_ptx)
 
     # ray_tracer links optix_renderer instead of the CPU-only default and
     # gains RT_HAVE_OPTIX so launcher/main.cpp takes the real-OptiX branch

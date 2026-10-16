@@ -46,6 +46,8 @@ __device__ __forceinline__ float3 dc_normal_mapped_normal(const MaterialData& ma
 	return dot(mapped, ray_dir) > 0.0f ? -mapped : mapped;
 }
 
+// The disk and the cylinder sections can be compiled alone (optix_programs_disk.cu defines RT_OPTIX_DISK_ONLY, optix_programs_cylinder.cu RT_OPTIX_CYLINDER_ONLY): each is its own PTX module.
+#ifndef RT_OPTIX_CYLINDER_ONLY
 //==============================================================================
 // Disk
 //==============================================================================
@@ -281,6 +283,9 @@ extern "C" __global__ void __closesthit__disk() {
 	}
 }
 
+#endif  // RT_OPTIX_CYLINDER_ONLY
+
+#ifndef RT_OPTIX_DISK_ONLY
 //==============================================================================
 // Cylinder
 //==============================================================================
@@ -855,3 +860,4 @@ extern "C" __global__ void __closesthit__cylinder() {
 		optixSetPayload_12(0);
 	}
 }
+#endif  // RT_OPTIX_DISK_ONLY

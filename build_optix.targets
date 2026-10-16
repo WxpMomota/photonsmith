@@ -32,6 +32,11 @@
   <ItemGroup>
     <!-- Recursive path tracer OptiX programs -> PTX -->
     <OptixSource Include="$(MSBuildProjectDirectory)\..\gpu\optix\optix_programs.cu" />
+    <OptixSource Include="$(MSBuildProjectDirectory)\..\gpu\optix\optix_programs_sphere.cu" />
+    <OptixSource Include="$(MSBuildProjectDirectory)\..\gpu\optix\optix_programs_quad.cu" />
+    <OptixSource Include="$(MSBuildProjectDirectory)\..\gpu\optix\optix_programs_disk.cu" />
+    <OptixSource Include="$(MSBuildProjectDirectory)\..\gpu\optix\optix_programs_cylinder.cu" />
+    <OptixSource Include="$(MSBuildProjectDirectory)\..\gpu\optix\optix_programs_triangle.cu" />
     <!-- Wavefront OptiX device programs -> PTX (loaded at runtime) -->
     <WavefrontPtxSource Include="$(MSBuildProjectDirectory)\..\gpu\optix\wavefront_programs.cu" />
     <!-- Wavefront CUDA compute kernels -> .obj (linked into optix_renderer.lib).
@@ -102,7 +107,13 @@
 
     <ItemGroup>
       <!-- source <TAB> output <TAB> flags -->
+      <!-- The recursive programs are six PTX modules (see optix_programs.cu), compiled side by side: one module took 171 s in a single cicc process. -->
       <CudaJobLine Include="$(CudaGpuDir)\optix_programs.cu&#9;$(CudaGpuDir)\optix_programs.ptx&#9;$(CudaPtxJobFlags)" />
+      <CudaJobLine Include="$(CudaGpuDir)\optix_programs_sphere.cu&#9;$(CudaGpuDir)\optix_programs_sphere.ptx&#9;$(CudaPtxJobFlags)" />
+      <CudaJobLine Include="$(CudaGpuDir)\optix_programs_quad.cu&#9;$(CudaGpuDir)\optix_programs_quad.ptx&#9;$(CudaPtxJobFlags)" />
+      <CudaJobLine Include="$(CudaGpuDir)\optix_programs_disk.cu&#9;$(CudaGpuDir)\optix_programs_disk.ptx&#9;$(CudaPtxJobFlags)" />
+      <CudaJobLine Include="$(CudaGpuDir)\optix_programs_cylinder.cu&#9;$(CudaGpuDir)\optix_programs_cylinder.ptx&#9;$(CudaPtxJobFlags)" />
+      <CudaJobLine Include="$(CudaGpuDir)\optix_programs_triangle.cu&#9;$(CudaGpuDir)\optix_programs_triangle.ptx&#9;$(CudaPtxJobFlags)" />
       <CudaJobLine Include="$(CudaGpuDir)\wavefront_programs.cu&#9;$(CudaGpuDir)\wavefront_programs.ptx&#9;$(CudaPtxSharedJobFlags)" />
       <CudaJobLine Include="$(CudaGpuDir)\sppm_programs.cu&#9;$(CudaGpuDir)\sppm_programs.ptx&#9;$(CudaPtxSharedJobFlags)" />
       <CudaJobLine Include="@(WavefrontObjSource->'%(FullPath)&#9;$(CudaGpuDir)\%(Filename).obj&#9;$(CudaObjJobFlags)')" />

@@ -31,6 +31,8 @@
 #include <iostream>
 #include <sstream>
 #include <array>
+#include <iterator>   // std::size
+#include <vector>
 #include <algorithm>     // std::min, for getDiagnostics()'s bounded string copy
 #include <cstdlib>       // getenv, for RAY_TRACER_OPTIX_VALIDATION
 
@@ -322,13 +324,6 @@ bool OptiXRenderer::createContext() {
 /// @brief Load PTX shader and create OptiX module
 /// @return true if module created successfully, false otherwise
 bool OptiXRenderer::createModule() {
-	// Load PTX shader code from file
-	const std::string ptx = loadPTX("optix_programs.ptx");
-	if (ptx.empty()) {
-		std::cerr << "Failed to load PTX\n";
-		return false;
-	}
-
 	// Module compile options
 	OptixModuleCompileOptions moduleCompileOptions = {};
 	moduleCompileOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
@@ -382,22 +377,35 @@ bool OptiXRenderer::createModule() {
 	pipelineCompileOptions_.usesPrimitiveTypeFlags =
 		OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM | OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE;
 
-	// Create module
-	char log[2048];
-	size_t logSize = sizeof(log);
-	OPTIX_CHECK(optixModuleCreateParallel(
-		context_,
-		&moduleCompileOptions,
-		&pipelineCompileOptions_,
-		ptx.c_str(),
-		ptx.size(),
-		log,
-		&logSize,
-		&module_
-	));
-
-	if (logSize > 1) {
-		std::cout << "[OptiX] Module creation log:\n" << log << "\n";
+	// The recursive programs are one core module and one module per geometry type (see optix_programs.cu); they all share the pipeline options above.
+	struct ModuleFile { const char *file; OptixModule *module; };
+	const ModuleFile modules[] = {
+		{"optix_programs.ptx", &module_},
+		{"optix_programs_sphere.ptx", &moduleSphere_},
+		{"optix_programs_quad.ptx", &moduleQuad_},
+		{"optix_programs_disk.ptx", &moduleDisk_},
+		{"optix_programs_cylinder.ptx", &moduleCylinder_},
+		{"optix_programs_triangle.ptx", &moduleTriangle_},
+	};
+	// All six are created in one call so OptiX's compile tasks of every module share the cores (see optixModulesCreateParallel).
+	std::string ptxFiles[std::size(modules)];
+	char logs[std::size(modules)][2048];
+	size_t logSizes[std::size(modules)];
+	std::vector<OptixModuleRequest> requests;
+	for (size_t i = 0; i < std::size(modules); ++i) {
+		ptxFiles[i] = loadPTX(modules[i].file);
+		if (ptxFiles[i].empty()) {
+			std::cerr << "Failed to load PTX\n";
+			return false;
+		}
+		logSizes[i] = sizeof(logs[i]);
+		requests.push_back({ptxFiles[i].c_str(), ptxFiles[i].size(), logs[i], &logSizes[i], modules[i].module});
+	}
+	OPTIX_CHECK(optixModulesCreateParallel(context_, &moduleCompileOptions, &pipelineCompileOptions_, requests));
+	for (size_t i = 0; i < std::size(modules); ++i) {
+		if (logSizes[i] > 1) {
+			std::cout << "[OptiX] Module creation log (" << modules[i].file << "):\n" << logs[i] << "\n";
+		}
 	}
 
 	return true;
@@ -429,39 +437,49 @@ bool OptiXRenderer::createProgramGroups() {
 	using namespace optix_pg;
 	const auto make = [this](const OptixProgramGroupDesc &desc, OptixProgramGroup *out) { create(context_, desc, out); };
 
+	// Where each program lives (see optix_programs.cu): the core module holds the raygen, miss, shadow any-hit and probe programs; each geometry module holds that shape's
+	// intersection and closest-hit programs (the triangle's any-hit too). A hit group takes each of its programs from its own module.
+	const OptixModule core = module_;
+	const auto sphereIs = Prog{moduleSphere_, "__intersection__sphere"};
+	const auto quadIs = Prog{moduleQuad_, "__intersection__quad"};
+	const auto bilinearIs = Prog{moduleQuad_, "__intersection__bilinear_patch"};
+	const auto diskIs = Prog{moduleDisk_, "__intersection__disk"};
+	const auto cylinderIs = Prog{moduleCylinder_, "__intersection__cylinder"};
+	const Prog none{nullptr, nullptr};
+
 	// Raygen and miss programs (radiance, shadow, and the BSSRDF probe's no-op miss)
-	make(raygen(module_, "__raygen__rg"), &raygenPG_);
-	make(miss(module_, "__miss__ms"), &missPG_);
-	make(miss(module_, "__miss__shadow"), &shadowMissPG_);
+	make(raygen(core, "__raygen__rg"), &raygenPG_);
+	make(miss(core, "__miss__ms"), &missPG_);
+	make(miss(core, "__miss__shadow"), &shadowMissPG_);
 
 	// Radiance hit groups: intersection + closest-hit per custom shape. A triangle uses OptiX's built-in hardware triangle test (no intersection program bound), and
 	// its any-hit is a no-op for the overwhelming majority of triangles (MaterialData::alphaMaskTexIdx < 0), only rejecting a candidate hit via
 	// optixIgnoreIntersection() for OBJ/.mtl alpha-cutout materials (map_d) - see __anyhit__triangle's own comment (optix_intersection_triangle.h).
-	make(hit(module_, "__intersection__sphere", "__closesthit__sphere", nullptr), &hitgroupSpherePG_);
-	make(hit(module_, "__intersection__quad", "__closesthit__quad", nullptr), &hitgroupQuadPG_);
-	make(hit(module_, "__intersection__bilinear_patch", "__closesthit__bilinear_patch", nullptr), &hitgroupBilinearPatchPG_);
-	make(hit(module_, "__intersection__disk", "__closesthit__disk", nullptr), &hitgroupDiskPG_);
-	make(hit(module_, "__intersection__cylinder", "__closesthit__cylinder", nullptr), &hitgroupCylinderPG_);
-	make(hit(module_, nullptr, "__closesthit__triangle", "__anyhit__triangle"), &hitgroupTrianglePG_);
+	make(hit(sphereIs, Prog{moduleSphere_, "__closesthit__sphere"}, none), &hitgroupSpherePG_);
+	make(hit(quadIs, Prog{moduleQuad_, "__closesthit__quad"}, none), &hitgroupQuadPG_);
+	make(hit(bilinearIs, Prog{moduleQuad_, "__closesthit__bilinear_patch"}, none), &hitgroupBilinearPatchPG_);
+	make(hit(diskIs, Prog{moduleDisk_, "__closesthit__disk"}, none), &hitgroupDiskPG_);
+	make(hit(cylinderIs, Prog{moduleCylinder_, "__closesthit__cylinder"}, none), &hitgroupCylinderPG_);
+	make(hit(none, Prog{moduleTriangle_, "__closesthit__triangle"}, Prog{moduleTriangle_, "__anyhit__triangle"}), &hitgroupTrianglePG_);
 
 	// Shadow hit groups: any-hit only (the triangle's with the hardware test, like the radiance group above)
-	make(hit(module_, "__intersection__sphere", nullptr, "__anyhit__shadow_sphere"), &shadowHitgroupSpherePG_);
-	make(hit(module_, "__intersection__quad", nullptr, "__anyhit__shadow_quad"), &shadowHitgroupQuadPG_);
-	make(hit(module_, "__intersection__bilinear_patch", nullptr, "__anyhit__shadow_bilinear_patch"), &shadowHitgroupBilinearPatchPG_);
-	make(hit(module_, "__intersection__disk", nullptr, "__anyhit__shadow_disk"), &shadowHitgroupDiskPG_);
-	make(hit(module_, "__intersection__cylinder", nullptr, "__anyhit__shadow_cylinder"), &shadowHitgroupCylinderPG_);
-	make(hit(module_, nullptr, nullptr, "__anyhit__shadow_triangle"), &shadowHitgroupTrianglePG_);
+	make(hit(sphereIs, none, Prog{core, "__anyhit__shadow_sphere"}), &shadowHitgroupSpherePG_);
+	make(hit(quadIs, none, Prog{core, "__anyhit__shadow_quad"}), &shadowHitgroupQuadPG_);
+	make(hit(bilinearIs, none, Prog{core, "__anyhit__shadow_bilinear_patch"}), &shadowHitgroupBilinearPatchPG_);
+	make(hit(diskIs, none, Prog{core, "__anyhit__shadow_disk"}), &shadowHitgroupDiskPG_);
+	make(hit(cylinderIs, none, Prog{core, "__anyhit__shadow_cylinder"}), &shadowHitgroupCylinderPG_);
+	make(hit(none, none, Prog{core, "__anyhit__shadow_triangle"}), &shadowHitgroupTrianglePG_);
 
 	// RAY_TYPE_PROBE program groups (recursive backend only, Phase 1 BSSRDF - see optix_types.h's RAY_TYPE_PROBE comment and optix_probe_hit.h): one dedicated miss
 	// program (a true no-op) plus one closest-hit-only hit group per geometry type, reusing each type's existing __intersection__ program (only closest-hit differs
 	// per ray type).
-	make(miss(module_, "__miss__probe"), &probeMissPG_);
-	make(hit(module_, "__intersection__sphere", "__closesthit__probe_sphere", nullptr), &probeHitgroupSpherePG_);
-	make(hit(module_, "__intersection__quad", "__closesthit__probe_quad", nullptr), &probeHitgroupQuadPG_);
-	make(hit(module_, "__intersection__bilinear_patch", "__closesthit__probe_bilinear_patch", nullptr), &probeHitgroupBilinearPatchPG_);
-	make(hit(module_, "__intersection__disk", "__closesthit__probe_disk", nullptr), &probeHitgroupDiskPG_);
-	make(hit(module_, "__intersection__cylinder", "__closesthit__probe_cylinder", nullptr), &probeHitgroupCylinderPG_);
-	make(hit(module_, nullptr, "__closesthit__probe_triangle", nullptr), &probeHitgroupTrianglePG_);
+	make(miss(core, "__miss__probe"), &probeMissPG_);
+	make(hit(sphereIs, Prog{core, "__closesthit__probe_sphere"}, none), &probeHitgroupSpherePG_);
+	make(hit(quadIs, Prog{core, "__closesthit__probe_quad"}, none), &probeHitgroupQuadPG_);
+	make(hit(bilinearIs, Prog{core, "__closesthit__probe_bilinear_patch"}, none), &probeHitgroupBilinearPatchPG_);
+	make(hit(diskIs, Prog{core, "__closesthit__probe_disk"}, none), &probeHitgroupDiskPG_);
+	make(hit(cylinderIs, Prog{core, "__closesthit__probe_cylinder"}, none), &probeHitgroupCylinderPG_);
+	make(hit(none, Prog{core, "__closesthit__probe_triangle"}, none), &probeHitgroupTrianglePG_);
 
 	std::cout << "[OptiX] Created program groups: raygen, miss (radiance + shadow + probe), sphere hit (radiance + shadow + probe), quad hit (radiance + shadow + probe), bilinear patch hit (radiance + shadow + probe), disk hit (radiance + shadow + probe), cylinder hit (radiance + shadow + probe), triangle hit (radiance + shadow + probe)\n";
 	return true;

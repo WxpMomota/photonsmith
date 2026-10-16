@@ -253,6 +253,10 @@ if ($Tier -ne "Lite") {
 	if ($Tier -eq "Full") {
 		Copy-RequiredFile "$BuildDir\realtime_renderer.dll"
 		Copy-RequiredFile "$RepoRoot\gpu\optix\optix_programs.ptx"
+		# The recursive backend's geometry modules (optix_programs_sphere.ptx, ...), also required: the renderer creates all of them.
+		foreach ($moduleName in @("sphere", "quad", "disk", "cylinder", "triangle")) {
+			Copy-RequiredFile "$RepoRoot\gpu\optix\optix_programs_$moduleName.ptx"
+		}
 		# wavefront_programs.ptx only exists as a separate file on some
 		# branches/configurations of this project - optional, not required,
 		# unlike optix_programs.ptx above.
@@ -439,7 +443,7 @@ if ($Zip) {
 	$zipExcludeNames = [System.Collections.Generic.List[string]]@("output")
 	$zipExcludePatterns = @("test_*", "debug_*", "verify_*", "working_*", "cornell_*", "*.run_marker.txt", "*.ppm", "gui_selftest*")
 	if ($Tier -eq "Lite") {
-		$zipExcludeNames.AddRange([string[]]@("RayTracerGUI.exe", "scene_metadata.dll", "realtime_renderer.dll", "optix_programs.ptx", "wavefront_programs.ptx", "platforms", "styles", "imageformats", "multimedia", "iconengines", "generic", "networkinformation", "tls"))
+		$zipExcludeNames.AddRange([string[]]@("RayTracerGUI.exe", "scene_metadata.dll", "realtime_renderer.dll", "optix_programs.ptx", "optix_programs_sphere.ptx", "optix_programs_quad.ptx", "optix_programs_disk.ptx", "optix_programs_cylinder.ptx", "optix_programs_triangle.ptx", "wavefront_programs.ptx", "platforms", "styles", "imageformats", "multimedia", "iconengines", "generic", "networkinformation", "tls"))
 		# Allow-list, not a Qt6*.dll deny-list: windeployqt also drops non-
 		# Qt6-prefixed runtime deps alongside Qt6*.dll (ffmpeg codecs, the
 		# ANGLE/D3D compiler, the opengl32sw software rasterizer - exact set
@@ -452,7 +456,7 @@ if ($Zip) {
 			Where-Object { $liteDllAllowList -notcontains $_.Name } |
 			ForEach-Object { $zipExcludeNames.Add($_.Name) }
 	} elseif ($Tier -eq "Medium") {
-		$zipExcludeNames.AddRange([string[]]@("realtime_renderer.dll", "optix_programs.ptx", "wavefront_programs.ptx"))
+		$zipExcludeNames.AddRange([string[]]@("realtime_renderer.dll", "optix_programs.ptx", "optix_programs_sphere.ptx", "optix_programs_quad.ptx", "optix_programs_disk.ptx", "optix_programs_cylinder.ptx", "optix_programs_triangle.ptx", "wavefront_programs.ptx"))
 	}
 	$itemsToZip = Get-ChildItem $OutputDir | Where-Object {
 		$name = $_.Name

@@ -38,7 +38,8 @@ ray_tracer/
 ├── gpu/optix/                     # OptiX GPU implementation - all three GPU backends share this one
 │   │                              #   flat directory (a single OptiX pipeline/PTX build), distinguished
 │   │                              #   by filename prefix rather than subdirectory:
-│   ├── optix_programs.cu         # Recursive (mega-kernel) backend - bare names, no prefix
+│   ├── optix_programs.cu         # Recursive (mega-kernel) backend, core module - bare names, no prefix
+│   ├── optix_programs_{sphere,quad,disk,cylinder,triangle}.cu  # ... and one module per shape (parallel compile)
 │   ├── optix_device_helpers.h    # Recursive backend's shared __device__ helpers (material shading, NEE)
 │   ├── wavefront_*.cu/.h         # Queue-based wavefront path tracer (alt. GPU backend)
 │   ├── sppm_*.cu/.h              # GPU SPPM (photon mapping) backend

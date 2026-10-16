@@ -32,3 +32,4 @@ extern "C" { __constant__ LaunchParams params; }
 #include "optix_device_scatter_helpers.h"
 #include "optix_device_shade.h"
 #include "optix_device_mix_camera.h"
+#include "optix_device_media_helpers.h"

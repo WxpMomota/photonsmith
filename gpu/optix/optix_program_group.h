@@ -36,14 +36,25 @@ inline OptixProgramGroupDesc exception(OptixModule module, const char *entry) {
 	return desc;
 }
 
-// A hit group of up to three programs from one module: intersection, closest-hit and any-hit (a null name leaves that program out).
-inline OptixProgramGroupDesc hit(OptixModule module, const char *intersection, const char *closestHit, const char *anyHit) {
+// A program of a hit group: its module and entry function name (a null name leaves the program out).
+struct Prog {
+	OptixModule module;
+	const char *name;
+};
+
+// A hit group of up to three programs, each from its own module: intersection, closest-hit and any-hit (a null name leaves that program out).
+inline OptixProgramGroupDesc hit(Prog intersection, Prog closestHit, Prog anyHit) {
 	OptixProgramGroupDesc desc = {};
 	desc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-	if (intersection) { desc.hitgroup.moduleIS = module; desc.hitgroup.entryFunctionNameIS = intersection; }
-	if (closestHit)   { desc.hitgroup.moduleCH = module; desc.hitgroup.entryFunctionNameCH = closestHit; }
-	if (anyHit)       { desc.hitgroup.moduleAH = module; desc.hitgroup.entryFunctionNameAH = anyHit; }
+	if (intersection.name) { desc.hitgroup.moduleIS = intersection.module; desc.hitgroup.entryFunctionNameIS = intersection.name; }
+	if (closestHit.name)   { desc.hitgroup.moduleCH = closestHit.module;   desc.hitgroup.entryFunctionNameCH = closestHit.name; }
+	if (anyHit.name)       { desc.hitgroup.moduleAH = anyHit.module;       desc.hitgroup.entryFunctionNameAH = anyHit.name; }
 	return desc;
+}
+
+// The same, every program from one module.
+inline OptixProgramGroupDesc hit(OptixModule module, const char *intersection, const char *closestHit, const char *anyHit) {
+	return hit(Prog{module, intersection}, Prog{module, closestHit}, Prog{module, anyHit});
 }
 
 inline void create(OptixDeviceContext context, const OptixProgramGroupDesc &desc, OptixProgramGroup *out) {

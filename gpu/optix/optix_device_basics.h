@@ -32,7 +32,7 @@ __device__ __forceinline__ float random_float(unsigned int& seed) {
 // matching functions (measured_rgb_quadrature.h): a dispersion channel is
 // still one representative wavelength.
 static constexpr unsigned int kRgbChannelUnset = 3u;
-__device__ __constant__ float kRgbChannelWavelengthNm[3] = { 612.0f, 549.0f, 465.0f };
+static __device__ __constant__ float kRgbChannelWavelengthNm[3] = { 612.0f, 549.0f, 465.0f };
 
 // Pixel reconstruction filter weight for a sample at sub-pixel offset
 // (ox, oy) in [-0.5, 0.5] - device-side port of src/shared/filter.h's

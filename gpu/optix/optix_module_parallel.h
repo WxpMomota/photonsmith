@@ -16,24 +16,37 @@
 #include <thread>
 #include <vector>
 
-inline OptixResult optixModuleCreateParallel(OptixDeviceContext context,
-                                             const OptixModuleCompileOptions* moduleCompileOptions,
-                                             const OptixPipelineCompileOptions* pipelineCompileOptions,
-                                             const char* input, size_t inputSize,
-                                             char* logString, size_t* logStringSize,
-                                             OptixModule* module) {
-	OptixTask firstTask = nullptr;
-	OptixResult result = optixModuleCreateWithTasks(context, moduleCompileOptions, pipelineCompileOptions, input, inputSize,
-	                                                logString, logStringSize, module, &firstTask);
-	if (result != OPTIX_SUCCESS || firstTask == nullptr) return result;
+// One module to create: its PTX (or OptiX-IR) and where to put the module and the compile log.
+struct OptixModuleRequest {
+	const char* input;
+	size_t inputSize;
+	char* logString;
+	size_t* logStringSize;
+	OptixModule* module;
+};
+
+// Creates several modules at once. The first tasks of ALL of them go into one queue worked by every core: a module with only a few entry functions (the recursive
+// backend's geometry modules have two to four) would otherwise leave most cores idle while it compiles, and the modules are created one after another.
+inline OptixResult optixModulesCreateParallel(OptixDeviceContext context,
+                                              const OptixModuleCompileOptions* moduleCompileOptions,
+                                              const OptixPipelineCompileOptions* pipelineCompileOptions,
+                                              const std::vector<OptixModuleRequest>& requests) {
+	std::vector<OptixTask> queue;
+	for (const OptixModuleRequest& r : requests) {
+		OptixTask firstTask = nullptr;
+		const OptixResult result = optixModuleCreateWithTasks(context, moduleCompileOptions, pipelineCompileOptions, r.input, r.inputSize,
+		                                                      r.logString, r.logStringSize, r.module, &firstTask);
+		if (result != OPTIX_SUCCESS) return result;
+		if (firstTask != nullptr) queue.push_back(firstTask);
+	}
+	if (queue.empty()) return OPTIX_SUCCESS;
 
 	const unsigned int workers = std::clamp(std::thread::hardware_concurrency(), 1u, 32u);
 	const unsigned int maxAdditional = workers * 2;
 
 	std::mutex mutex;
 	std::condition_variable wake;
-	std::vector<OptixTask> queue{firstTask};
-	size_t unfinished = 1;  // queued + executing
+	size_t unfinished = queue.size();  // queued + executing
 	OptixResult firstError = OPTIX_SUCCESS;
 
 	auto work = [&]() {
@@ -67,4 +80,14 @@ inline OptixResult optixModuleCreateParallel(OptixDeviceContext context,
 	work();
 	for (std::thread& t : threads) t.join();
 	return firstError;
+}
+
+// One module: optixModuleCreate with the compile work spread over every core.
+inline OptixResult optixModuleCreateParallel(OptixDeviceContext context,
+                                             const OptixModuleCompileOptions* moduleCompileOptions,
+                                             const OptixPipelineCompileOptions* pipelineCompileOptions,
+                                             const char* input, size_t inputSize,
+                                             char* logString, size_t* logStringSize,
+                                             OptixModule* module) {
+	return optixModulesCreateParallel(context, moduleCompileOptions, pipelineCompileOptions, {OptixModuleRequest{input, inputSize, logString, logStringSize, module}});
 }

@@ -600,6 +600,11 @@ void OptiXRenderer::cleanup() noexcept {
 
 	// Destroy module and pipeline
 	if (module_) optixModuleDestroy(module_);
+	if (moduleSphere_) optixModuleDestroy(moduleSphere_);
+	if (moduleQuad_) optixModuleDestroy(moduleQuad_);
+	if (moduleDisk_) optixModuleDestroy(moduleDisk_);
+	if (moduleCylinder_) optixModuleDestroy(moduleCylinder_);
+	if (moduleTriangle_) optixModuleDestroy(moduleTriangle_);
 	if (pipeline_) optixPipelineDestroy(pipeline_);
 
 	// Destroy context
