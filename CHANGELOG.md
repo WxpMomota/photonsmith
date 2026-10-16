@@ -8,6 +8,14 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 * **The first Metal render after an install waits about two minutes, not four**: Metal turns the path tracer into machine code once per Mac, for two shader variants (the second is for alpha masks and subsurface), and the app built them one after the other (108 s then 121 s on an M2). They are now built side by side (about 125 s in all: `ray_tracer --prepare-gpu` 231 s -> 136 s, measured with a cold cache). A Live Preview that starts during the warm-up still waits for the build of its own variant instead of compiling it twice.
 
+## Unreleased (after 0.1.4)
+
+* **The OptiX recursive backend is six PTX modules, not one** (`optix_programs.cu` is the core, `optix_programs_{sphere,quad,disk,cylinder,triangle}.cu` hold each shape): the single 55 MB module took 171 s in one compiler process, the six compile side by side in about 76 s, so editing a device header costs about 85 s of build instead of 175 s. The first run after a device edit still compiles the modules for the GPU once (about 250 s, as before; `optixModulesCreateParallel` shares that work across every core). Packages now carry all six `.ptx` files.
+* **The test runner has a Render tier** (`scripts/run_tests_parallel.ps1 -Tier Render`): the CPU-render suites and the Live Preview tests no longer sit in the "Fast" tier, which went from timing out at 1800 s to 40 s; `-Tier Split` (Fast, then Render and Slow at once) takes about six minutes with a warm OptiX cache.
+* **The pbrt reference pack is tighter**: the tolerance floor is 1.5% instead of 3% (`--min-tol`), so about 2% bands around each scene's measured offset; expected values did not move.
+* **README and gallery refreshed**: all twelve renders redone with the current build (eleven look the same, the Final scene is brighter and less noisy), a row of three Cornell material scenes and the Studio Showcase added, the social preview carries the Photonsmith name, and the counts (66 test scenes, nearly 6,000 tests) are current.
+* Looked at and left (recorded in `docs/PBRT_SUPPORT.md`): the 2-4% excess of chromatic absorbers in the RGB renderers (pbrt averages over wavelengths; the spectral wavefront backend already agrees) and the flat-shaded OptiX strands.
+
 ## 0.1.4 (2026-10-15)
 
 This release is about what the new pbrt reference pack showed: every bundled scene pbrt-v4 can read now has pbrt's own mean in a table the tests read, and the differences that surfaced were fixed. Highlights, with the full list below:
