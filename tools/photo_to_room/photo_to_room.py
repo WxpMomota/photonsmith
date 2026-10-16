@@ -193,20 +193,42 @@ def add_furniture(image, geometry, result, out_folder, count, device_choice, bas
     if not chosen:
         result["notes"].append("No furniture was recognised in the photo.")
         return
-    sys.path.insert(0, os.path.join(os.path.dirname(HERE), "photo_to_mesh"))
-    import photo_to_mesh
-    try:
-        maker = photo_to_mesh.ObjectMaker(device=device_choice if device_choice != "auto" else "auto", report=band(base_percent + 4, base_percent + 8))
-    except photo_to_mesh.ObjectError as e:
-        result["notes"].append("Furniture was skipped: %s" % e)
-        return
     names = {}
     result["objects"] = []
-    span = (top_percent - base_percent - 8) / float(len(chosen))
-    for k, seg in enumerate(chosen):
+
+    def title_of(label):
+        names[label] = names.get(label, 0) + 1
+        return "%s %d" % (label.replace("-merged", "").replace("-", " ").capitalize(), names[label])
+
+    # Tables and plain blocks are built from measured boxes; only what is left needs the 3D model (and its time and its download)
+    remaining = []
+    for seg in chosen:
+        label = seg["label"]
+        place = room_objects.place_object(geometry, seg["mask"], label=label)
+        parts = None
+        if place is not None and (label in room_objects.TABLES or label in room_objects.BLOCKS):
+            title = title_of(label)
+            if label in room_objects.TABLES:
+                parts = room_objects.table_parts(geometry, seg["mask"], title)
+            else:
+                parts = room_objects.block_parts(geometry, seg["mask"], label, place, title)
+            if parts:
+                result["objects"].append({"name": title, "label": label, "score": round(seg["score"], 3), "kind": "boxes", "parts": parts})
+                continue
+            names[label] -= 1   # (no boxes came out: the title goes back, and the 3D model has a go)
+        remaining.append((seg, place))
+    if remaining:
+        sys.path.insert(0, os.path.join(os.path.dirname(HERE), "photo_to_mesh"))
+        import photo_to_mesh
+        try:
+            maker = photo_to_mesh.ObjectMaker(device=device_choice if device_choice != "auto" else "auto", report=band(base_percent + 4, base_percent + 8))
+        except photo_to_mesh.ObjectError as e:
+            result["notes"].append("Some furniture was skipped: %s" % e)
+            remaining = []
+    span = (top_percent - base_percent - 8) / float(max(len(remaining), 1))
+    for k, (seg, place) in enumerate(remaining):
         label = seg["label"]
         lo = base_percent + 8 + span * k
-        place = room_objects.place_object(geometry, seg["mask"])
         if place is None:
             result["notes"].append("The %s could not be placed (the photo gave too little depth for it)." % label)
             continue
@@ -231,12 +253,10 @@ def add_furniture(image, geometry, result, out_folder, count, device_choice, bas
         final = room_objects.finalize_object(place, info["size"], geometry["box"])
         if final is None:
             continue
-        names[label] = names.get(label, 0) + 1
-        title = label.replace("-merged", "").replace("-", " ").capitalize()
-        result["objects"].append({"name": "%s %d" % (title, names[label]), "label": label, "score": round(seg["score"], 3),
+        result["objects"].append({"name": title_of(label), "label": label, "score": round(seg["score"], 3),
                                   "mesh": "object_%d/mesh.obj" % (k + 1), "texture": "object_%d/texture.png" % (k + 1), **final})
     if result["objects"]:
-        result["notes"].append("%d piece(s) of furniture were made from the photo (%s). Each is a guess with an invented back: move, resize or delete them." %
+        result["notes"].append("%d piece(s) of furniture were made from the photo (%s). Tables and blocks are measured boxes, the rest guesses with an invented back: move, resize or delete them." %
                                (len(result["objects"]), ", ".join(o["name"] for o in result["objects"])))
 
 

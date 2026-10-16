@@ -19,6 +19,14 @@ FURNITURE = {
     "chair", "couch", "bed", "dining table", "table-merged", "toilet", "tv", "laptop", "potted plant", "vase", "clock", "refrigerator", "oven", "microwave", "sink", "bench",
     "cabinet-merged", "shelf", "counter", "pillow", "teddy bear", "suitcase", "book", "bottle", "cup", "wine glass", "bowl", "toaster", "hair drier", "umbrella",
 }
+# Things that stand on the floor: their lowest visible point is no guide (a table's thin legs and a chair's feet vanish in a depth map and the lowest point read is the seat or the
+# tabletop), so they are taken to stand on it. Plants, vases, cups and the like are not here: they are as often on a table.
+FLOOR_STANDING = {"chair", "couch", "bed", "dining table", "table-merged", "toilet", "refrigerator", "oven", "bench", "cabinet-merged", "counter", "shelf", "sink", "suitcase"}
+FLOOR_PRIOR_BELOW = 0.7      # ... when the lowest point read is below this height (above it, the piece really is on something)
+# Furniture that is a slab and four legs or a plain block is built from measured boxes instead of being guessed by the 3D model, which turns thin legs into lumps: the table, and
+# the blocks with the depth to give one when the photo only shows the front (metres).
+TABLES = {"dining table", "table-merged"}
+BLOCKS = {"refrigerator": 0.7, "oven": 0.6, "cabinet-merged": 0.55, "counter": 0.6, "shelf": 0.35, "bed": 2.0}
 MIN_AREA = 0.012       # an object must cover at least this fraction of the picture (smaller ones come out as blobs)
 MAX_OBJECTS = 6
 MIN_SCORE = 0.5
@@ -64,9 +72,8 @@ def choose_objects(segments, max_count=MAX_OBJECTS, min_area=MIN_AREA, min_score
     return chosen
 
 
-def place_object(geometry, mask, min_points=20):
-    """Where one object stands, from its mask: {"front": (x, z) the middle of the visible side, "dir": (x, z) the unit vector from the camera towards it, "bottom", "height", "width"}
-    in the photo's own frame (x to the right), or None when too little of it has depth to say. `geometry` is what room_fit.fit_room(..., return_geometry=True) gives."""
+def masked_points(geometry, mask, min_points=20):
+    """The 3D points (and the photo's colours there, as display RGB 0..1) of an object's mask, without depth outliers; (None, None) when there are too few."""
     points, ok, step = geometry["points"], geometry["ok"], geometry["step"]
     h, w = ok.shape
     m = np.asarray(mask, dtype=bool)[::step, ::step]
@@ -74,19 +81,145 @@ def place_object(geometry, mask, min_points=20):
         fixed = np.zeros(ok.shape, dtype=bool)
         fixed[:min(h, m.shape[0]), :min(w, m.shape[1])] = m[:h, :w]
         m = fixed
-    p = points[m & ok]
+    sel = m & ok
+    inner = m.copy()   # one pixel in from the border: a border pixel's blurred depth lands in mid-air between the object and what is behind it
+    inner[1:] &= m[:-1]
+    inner[:-1] &= m[1:]
+    inner[:, 1:] &= m[:, :-1]
+    inner[:, :-1] &= m[:, 1:]
+    if int((inner & ok).sum()) >= max(2 * min_points, 0.4 * int(sel.sum())):
+        sel = inner & ok
+    p = points[sel]
     if len(p) < min_points:
-        return None
-    # depth outliers (an edge pixel that took the wall's depth): keep what is near the median distance from the camera
+        return None, None, m
+    colours = geometry["image"][sel] if "image" in geometry else np.full((len(p), 3), 0.5)
     dist = np.hypot(p[:, 0], p[:, 2])
     med = float(np.median(dist))
-    p = p[np.abs(dist - med) < max(0.8, 0.5 * med)]
-    if len(p) < min_points:
+    keep = np.abs(dist - med) < max(0.8, 0.5 * med)
+    if int(keep.sum()) < min_points:
+        return None, None, m
+    return p[keep], colours[keep], m
+
+
+def reflectance(display_rgb, exposure):
+    """A surface's colour from the photo's pixels there, the way room_fit does it for the walls: linear light, the median, brightened by the room's exposure with the hue kept."""
+    a = np.asarray(display_rgb, dtype=np.float64)
+    lin = np.where(a <= 0.04045, a / 12.92, ((a + 0.055) / 1.055) ** 2.4)
+    c = np.maximum(np.median(lin, axis=0) * float(exposure), 1e-4)
+    c = c * min(1.0, 0.9 / float(c.max()))
+    return [round(float(v), 4) for v in np.maximum(c, 0.03)]
+
+
+def mirror_box(lo, hi):
+    """A box from the photo's frame (x to the right) in the Scene Builder's (x mirrored): min and max, x swapped."""
+    return [round(-hi[0], 4), round(lo[1], 4), round(lo[2], 4)], [round(-lo[0], 4), round(hi[1], 4), round(hi[2], 4)]
+
+
+def top_footprint(geometry, m, top_y):
+    """The footprint (x0, x1, z0, z1) of a flat top at height top_y, from the rays through the pixels that see it: each ray is meant for the plane y = top_y, so a pixel whose depth was
+    thrown off (a top is seen at a grazing angle, and its far rows sit against a big depth jump to the wall) still gives the right place. None when the camera is below the top or too few pixels."""
+    pts, cam = geometry["points"][m], geometry["camera"]
+    if top_y >= cam[1] - 0.05 or len(pts) < 8:
         return None
-    bottom = float(np.percentile(p[:, 1], 2))
+    rows = np.nonzero(m)[0]
+    ys = geometry["points"][m][:, 1]
+    row_mean = {int(r): float(ys[rows == r].mean()) for r in np.unique(rows)}
+    top_rows = [r for r, v in row_mean.items() if v >= top_y - 0.12]
+    if len(top_rows) < 2:
+        return None
+    on_top = np.isin(rows, top_rows)
+    d = pts[on_top] - cam
+    d[:, 1] = np.minimum(d[:, 1], -1e-6)   # (looking down onto the top)
+    tt = (top_y - cam[1]) / d[:, 1]
+    hit = cam + d * tt[:, None]
+    xmin, xmax, zmin, zmax, _ = geometry["box"]
+    inside = (hit[:, 0] > xmin - 0.1) & (hit[:, 0] < xmax + 0.1) & (hit[:, 2] > zmin - 0.1) & (hit[:, 2] < zmax + 0.1)
+    hit = hit[inside]
+    if len(hit) < 8:
+        return None
+    return (float(np.percentile(hit[:, 0], 2)), float(np.percentile(hit[:, 0], 98)), float(np.percentile(hit[:, 2], 2)), float(np.percentile(hit[:, 2], 98)))
+
+
+def table_parts(geometry, mask, name="Table"):
+    """A table from its top: a slab the size of the visible top (the camera looks down on it) on four legs to the floor. [{name, min, max, color}] in the Scene Builder's frame, or None
+    when too little of the top is seen."""
+    p, colours, m = masked_points(geometry, mask)
+    if p is None:
+        return None
+    top_y = float(np.percentile(p[:, 1], 98))
+    if top_y < 0.3 or top_y > 1.6:
+        return None
+    top = p[:, 1] >= top_y - 0.08
+    if int(top.sum()) < 25:
+        return None
+    x0, x1 = float(np.percentile(p[top, 0], 2)) - 0.03, float(np.percentile(p[top, 0], 98)) + 0.03
+    z0, z1 = float(np.percentile(p[top, 2], 2)) - 0.03, float(np.percentile(p[top, 2], 98)) + 0.03
+    seen = top_footprint(geometry, m, top_y)   # the rays see more of the top than the depth does: never less than the depth said
+    if seen is not None:
+        x0, x1, z0, z1 = min(x0, seen[0]), max(x1, seen[1]), min(z0, seen[2]), max(z1, seen[3])
+    if x1 - x0 < 0.3 or z1 - z0 < 0.3:
+        return None
+    colour = reflectance(colours[top], geometry.get("exposure", 1.0))
+    thick, leg, inset = 0.045, 0.06, 0.03
+    parts = [("%s top" % name, (x0, top_y - thick, z0), (x1, top_y, z1))]
+    for i, (lx, lz) in enumerate(((x0 + inset, z0 + inset), (x1 - inset - leg, z0 + inset), (x0 + inset, z1 - inset - leg), (x1 - inset - leg, z1 - inset - leg))):
+        parts.append(("%s leg %d" % (name, i + 1), (lx, 0.0, lz), (lx + leg, top_y - thick, lz + leg)))
+    out = []
+    for n, lo, hi in parts:
+        a, b = mirror_box(lo, hi)
+        out.append({"name": n, "min": a, "max": b, "color": colour})
+    return out
+
+
+def block_parts(geometry, mask, label, place, name="Block"):
+    """A plain block (a fridge, a cabinet, a counter, a bed) from what the photo shows: as wide and as tall as the visible side, as deep as the top if the camera sees it, else a
+    typical depth for the kind (and out to the wall when one is just behind). Standing on the floor, the front facing the camera along the nearer room axis. [{name, min, max, color}]
+    in the Scene Builder's frame, or None."""
+    p, colours, _ = masked_points(geometry, mask)
+    if p is None:
+        return None
+    top_y = float(np.percentile(p[:, 1], 98))
+    if top_y < 0.2 or top_y > geometry["box"][4]:
+        return None
+    dx, dz = place["dir"]
+    along_z = abs(dz) >= abs(dx)   # the front faces the camera along z (else along x)
+    xmin, xmax, zmin, zmax, _ = geometry["box"]
+    lo = np.array([float(np.percentile(p[:, 0], 2)), 0.0, float(np.percentile(p[:, 2], 2))])
+    hi = np.array([float(np.percentile(p[:, 0], 98)), top_y, float(np.percentile(p[:, 2], 98))])
+    axis = 2 if along_z else 0
+    sign = 1.0 if (dz if along_z else dx) > 0 else -1.0   # +1: the object is further out along the axis than the camera, so its far side is at higher values
+    measured = hi[axis] - lo[axis]
+    depth = max(measured, BLOCKS.get(label, 0.5))
+    wall = (zmax if along_z else xmax) if sign > 0 else (zmin if along_z else xmin)
+    if sign > 0:
+        far = lo[axis] + depth
+        if abs(wall - far) < 0.35 or far > wall:
+            far = wall
+        lo[axis], hi[axis] = lo[axis], far
+    else:
+        far = hi[axis] - depth
+        if abs(wall - far) < 0.35 or far < wall:
+            far = wall
+        lo[axis], hi[axis] = far, hi[axis]
+    if np.any(hi - lo < 0.1):
+        return None
+    a, b = mirror_box(lo, hi)
+    return [{"name": name, "min": a, "max": b, "color": reflectance(colours, geometry.get("exposure", 1.0))}]
+
+
+def place_object(geometry, mask, min_points=20, label=None):
+    """Where one object stands, from its mask: {"front": (x, z) the middle of the visible side, "dir": (x, z) the unit vector from the camera towards it, "bottom", "height", "width"}
+    in the photo's own frame (x to the right), or None when too little of it has depth to say. `geometry` is what room_fit.fit_room(..., return_geometry=True) gives; `label` (its
+    name) lets a piece of furniture that stands on the floor be put there whatever its thin legs showed."""
+    p, _, m = masked_points(geometry, mask, min_points)
+    if p is None:
+        return None
+    bottom = float(np.percentile(p[:, 1], 6))   # (not the very lowest: a few border pixels with blurred depth hang in mid-air below an object)
     top = float(np.percentile(p[:, 1], 98))
     if bottom < 0.12 or m[-3:].any():
         bottom = 0.0   # it stands on the floor; an object that runs off the bottom of the picture shows no base at all, and is taken to stand there too
+    elif label in FLOOR_STANDING and bottom < FLOOR_PRIOR_BELOW:
+        bottom = 0.0   # (see FLOOR_STANDING)
     height = top - bottom
     if height < 0.08:
         return None

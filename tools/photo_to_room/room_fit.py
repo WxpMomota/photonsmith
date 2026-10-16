@@ -484,7 +484,7 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geom
     geometry = {
         # the photo's pixels as 3D points in the room's own frame BEFORE the mirror (x as the photo sees it: to the right), on the same grid the fit used: (h, w, 3), the matching
         # "this pixel has a surface" mask, and the step that grid is subsampled by from the full-size picture
-        "points": PRimg, "ok": ok, "step": step, "camera": pos.copy(),
+        "points": PRimg, "ok": ok, "step": step, "camera": pos.copy(), "image": img, "exposure": k,
         "box": (xmin, xmax, zmin, zmax, ceiling_y),
     }
     result = mirror_x({

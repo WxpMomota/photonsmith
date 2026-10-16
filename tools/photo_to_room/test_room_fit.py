@@ -75,16 +75,18 @@ def photograph(width=240, height=180, hfov=70.0, yaw=20.0, pitch=10.0, roll=0.0,
         rgb[win] = 1.0
     mask = np.zeros((height, width), dtype=bool)
     if obstacle is not None:
-        lo, hi = np.array(obstacle[0], float), np.array(obstacle[1], float)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            t0 = (lo - origin) / d
-            t1 = (hi - origin) / d
-        near = np.minimum(t0, t1).max(axis=-1)
-        far = np.maximum(t0, t1).min(axis=-1)
-        hit_box = (far >= np.maximum(near, 0.0)) & (near > 0) & (near < t)
-        t = np.where(hit_box, near, t)
-        rgb[hit_box] = srgb((150, 130, 100))
-        mask = hit_box
+        boxes = obstacle if isinstance(obstacle[0][0], (tuple, list)) else [obstacle]   # one box, or several (a table: a top and its legs)
+        for box_lo, box_hi in boxes:
+            lo, hi = np.array(box_lo, float), np.array(box_hi, float)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                t0 = (lo - origin) / d
+                t1 = (hi - origin) / d
+            near = np.minimum(t0, t1).max(axis=-1)
+            far = np.maximum(t0, t1).min(axis=-1)
+            hit_box = (far >= np.maximum(near, 0.0)) & (near > 0) & (near < t)
+            t = np.where(hit_box, near, t)
+            rgb[hit_box] = srgb((150, 130, 100))
+            mask = mask | hit_box
     depth = t.copy()
     if noise:
         depth = depth * (1.0 + noise * np.random.default_rng(seed).standard_normal(depth.shape))

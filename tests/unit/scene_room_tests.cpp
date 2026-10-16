@@ -271,6 +271,34 @@ TEST(SceneRoomTest, FurnitureBecomesMeshObjectsAndABadPieceIsLeftOutNotFatal) {
 	std::filesystem::remove_all(folder, ec);
 }
 
+TEST(SceneRoomTest, FurnitureMadeOfMeasuredBoxesBecomesGroupedBoxes) {
+	scene_room::Import room;
+	std::string err;
+	const std::string table = R"json(, "objects": [
+	  {"name": "Dining table 1", "label": "dining table", "kind": "boxes", "parts": [
+	    {"name": "Dining table 1 top", "min": [-0.6, 0.70, 2.2], "max": [0.6, 0.75, 3.0], "color": [0.3, 0.2, 0.1]},
+	    {"name": "Dining table 1 leg 1", "min": [-0.58, 0.0, 2.22], "max": [-0.52, 0.70, 2.28], "color": [0.3, 0.2, 0.1]}]},
+	  {"name": "Fridge 1", "label": "refrigerator", "kind": "boxes", "parts": [
+	    {"name": "Fridge 1", "min": [-0.3, 0.0, 3.5], "max": [0.3, 1.8, 4.0], "color": [0.8, 0.8, 0.8]}]},
+	  {"name": "Broken", "label": "bed", "kind": "boxes", "parts": [{"name": "Broken", "min": [0, 0, 0], "max": [0, 1, 1], "color": [1, 1, 1]}]}])json";
+	ASSERT_TRUE(scene_room::fromJson(roomJson(table), room, err)) << err;
+	ASSERT_EQ(room.furniture.size(), 3u) << "a two-part table and a one-part fridge; the part with no volume leaves its piece out";
+	EXPECT_EQ(room.furniture[0].shape, ShapeKind::Box);
+	EXPECT_EQ(room.furniture[0].name, "Dining table 1 top");
+	EXPECT_EQ(room.furniture[0].group, "Dining table 1") << "the parts of one piece are picked and moved together";
+	EXPECT_EQ(room.furniture[1].group, "Dining table 1");
+	EXPECT_NEAR(room.furniture[0].size.x, 1.2, 1e-9);
+	EXPECT_NEAR(room.furniture[0].position.y, 0.725, 1e-9);
+	EXPECT_NEAR(room.furniture[0].material.color.r, 0.3, 1e-9);
+	EXPECT_TRUE(room.furniture[2].group.empty()) << "a single box needs no group";
+	EXPECT_FALSE(room.furniture[0].locked);
+	EXPECT_TRUE(std::any_of(room.notes.begin(), room.notes.end(), [](const std::string& n) { return n.find("Broken") != std::string::npos; }));
+	Document d = makeStarterScene();
+	scene_room::applyTo(room, d, "Room");
+	EXPECT_EQ(d.objects.size(), 6u + 1u + 3u);
+	EXPECT_FALSE(hasErrors(validate(d)));
+}
+
 TEST(SceneRoomTest, AMeshTurnedToFaceTheCameraShowsItsFrontNotItsBack) {
 	const std::string launcher = findLauncher();
 	if (launcher.empty()) GTEST_SKIP() << "ray_tracer.exe was not found next to the tests";

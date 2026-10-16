@@ -109,6 +109,73 @@ class RoomObjectsTests(unittest.TestCase):
         self.assertAlmostEqual(place["height"], 0.3, delta=0.1)
 
 
+# a table 1.2 x 0.8 with a 5 cm top at 0.75 m and four thin legs, ahead of the camera: x -0.6..0.6, z 2.2..3.0
+TABLE = [((-0.6, 0.70, 2.2), (0.6, 0.75, 3.0)),
+         ((-0.58, 0.0, 2.22), (-0.52, 0.70, 2.28)), ((0.52, 0.0, 2.22), (0.58, 0.70, 2.28)),
+         ((-0.58, 0.0, 2.92), (-0.52, 0.70, 2.98)), ((0.52, 0.0, 2.92), (0.58, 0.70, 2.98))]
+
+
+@unittest.skipUnless(HAVE_NUMPY, "numpy is not installed")
+class MeasuredFurnitureTests(unittest.TestCase):
+    def test_a_table_is_a_top_the_size_of_the_visible_top_on_four_legs_to_the_floor(self):
+        _, geometry, mask = fit_with_object(obstacle=TABLE)
+        parts = room_objects.table_parts(geometry, mask, "Table 1")
+        self.assertIsNotNone(parts)
+        self.assertEqual(len(parts), 5)
+        top = parts[0]
+        self.assertEqual(top["name"], "Table 1 top")
+        self.assertAlmostEqual(top["max"][1], 0.75, delta=0.08)
+        self.assertAlmostEqual(top["max"][0] - top["min"][0], 1.2, delta=0.25)
+        self.assertAlmostEqual(top["max"][2] - top["min"][2], 0.8, delta=0.25)
+        self.assertAlmostEqual((top["min"][2] + top["max"][2]) / 2, 2.6, delta=0.25)
+        for leg in parts[1:]:
+            self.assertEqual(leg["min"][1], 0.0, "a leg stands on the floor")
+            self.assertAlmostEqual(leg["max"][1], top["min"][1], delta=1e-3)   # and reaches the underside of the top
+            self.assertGreater(leg["max"][0] - leg["min"][0], 0.02)
+        for part in parts:
+            self.assertTrue(all(a < b for a, b in zip(part["min"], part["max"])))
+            self.assertTrue(all(0.03 <= c <= 0.9 for c in part["color"]))
+
+    def test_a_table_the_photo_barely_shows_is_left_to_the_3d_model(self):
+        _, geometry, mask = fit_with_object(obstacle=TABLE)
+        tiny = np.zeros_like(mask)
+        ys, xs = np.nonzero(mask)
+        tiny[ys[:30], xs[:30]] = True
+        self.assertIsNone(room_objects.table_parts(geometry, tiny))
+
+    def test_floor_standing_furniture_stands_on_the_floor_whatever_its_legs_showed(self):
+        seat = ((-0.2, 0.40, 2.5), (0.2, 0.65, 2.9))   # a chair seen as a seat and the foot of its back at 0.4 m: its legs are too thin for a depth map
+        _, geometry, mask = fit_with_object(obstacle=seat)
+        self.assertAlmostEqual(room_objects.place_object(geometry, mask)["bottom"], 0.4, delta=0.1, msg="without a label the lowest point is believed")
+        placed = room_objects.place_object(geometry, mask, label="chair")
+        self.assertEqual(placed["bottom"], 0.0)
+        self.assertAlmostEqual(placed["height"], 0.65, delta=0.1)
+        # a vase on a table is not on the floor
+        vase = ((-0.15, 0.80, 2.4), (0.15, 1.15, 2.8))   # (a table lamp's size: a small thing is too few pixels to place)
+        _, geometry, mask = fit_with_object(obstacle=vase)
+        self.assertAlmostEqual(room_objects.place_object(geometry, mask, label="vase")["bottom"], 0.8, delta=0.1)
+
+    def test_a_block_against_the_wall_is_as_deep_as_the_gap_to_the_wall(self):
+        fridge = ((-0.3, 0.0, 3.5), (0.3, 1.8, 3.9))   # its visible front is at z = 3.5; the back wall is at 4.5
+        _, geometry, mask = fit_with_object(obstacle=fridge)
+        place = room_objects.place_object(geometry, mask, label="refrigerator")
+        parts = room_objects.block_parts(geometry, mask, "refrigerator", place, "Refrigerator 1")
+        self.assertEqual(len(parts), 1)
+        b = parts[0]
+        self.assertAlmostEqual(b["max"][1], 1.8, delta=0.15)
+        self.assertAlmostEqual(b["max"][0] - b["min"][0], 0.6, delta=0.2)
+        self.assertAlmostEqual(b["min"][2], 3.5, delta=0.15)
+        self.assertAlmostEqual(b["max"][2], 4.5, delta=0.15, msg="out to the wall just behind it")
+        self.assertEqual(b["min"][1], 0.0)
+
+    def test_a_block_with_nothing_behind_it_gets_the_typical_depth(self):
+        cabinet = ((-0.3, 0.0, 2.0), (0.3, 0.9, 2.2))   # a wide thin front: 0.6 x 0.9, only its front seen, nothing near the back wall
+        _, geometry, mask = fit_with_object(obstacle=cabinet)
+        place = room_objects.place_object(geometry, mask, label="cabinet-merged")
+        b = room_objects.block_parts(geometry, mask, "cabinet-merged", place, "Cabinet 1")[0]
+        self.assertAlmostEqual(b["max"][2] - b["min"][2], 0.55, delta=0.15)   # (the kind's typical depth; the top is seen a little)
+
+
 @unittest.skipUnless(HAVE_NUMPY, "numpy is not installed")
 class RelightTextureTests(unittest.TestCase):
     @staticmethod

@@ -145,6 +145,31 @@ inline bool fromJson(const std::string& text, Import& out, std::string& err, con
 		namespace fs = std::filesystem;
 		const auto resolve = [&](const std::string& rel) { return baseFolder.empty() ? rel : (fs::path(baseFolder) / rel).string(); };
 		for (const Json& o : objects->a) {
+			// A piece made of measured boxes (a table: a top and four legs; a cabinet: one block): each part is a Box, all of them one group so the piece is picked and moved as one
+			if (const Json* parts = o.type == Json::Type::Obj ? o.find("parts") : nullptr) {
+				std::string name = "Furniture";
+				scene_doc::detail::readStr(o, "name", name);
+				bool all = parts->type == Json::Type::Arr && !parts->a.empty();
+				std::vector<scene_doc::Object> made;
+				std::string why;
+				for (const Json& part : parts->a) {
+					scene_doc::Float3 lo, hi;
+					std::string partName = name;
+					scene_doc::detail::readStr(part, "name", partName);
+					scene_doc::Rgb colour{0.6, 0.6, 0.6};
+					if (!detail::readBox(part, lo, hi, why, partName) || !readRgb(part, "color", colour)) { all = false; break; }
+					scene_doc::Object box = detail::boxObject(partName, lo, hi);
+					box.material.color = {std::clamp(colour.r, 0.0, 1.0), std::clamp(colour.g, 0.0, 1.0), std::clamp(colour.b, 0.0, 1.0)};
+					if (parts->a.size() > 1) box.group = name;
+					made.push_back(box);
+				}
+				if (!all) {
+					out.notes.push_back("A piece of furniture in the room file (" + name + ") could not be used and was left out.");
+					continue;
+				}
+				for (scene_doc::Object& box : made) out.furniture.push_back(box);
+				continue;
+			}
 			std::string name = "Furniture", mesh, texture;
 			scene_doc::Float3 pos{};
 			double yaw = 0.0, scale = 1.0;
