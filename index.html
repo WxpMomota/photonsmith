@@ -76,7 +76,11 @@ footer{margin:64px 0 40px;color:var(--muted);font-size:.9rem;border-top:1px soli
 <figure><img src="assets/G12-trophy-room.jpg" alt="Trophy room with four meshes" loading="lazy"><figcaption><b>Trophy room</b><br>four meshes, mixed materials</figcaption></figure>
 <figure><img src="assets/B3-rough-glass.jpg" alt="GGX rough glass" loading="lazy"><figcaption><b>Rough glass</b><br>GGX rough dielectric</figcaption></figure>
 <figure><img src="assets/B13-wax-and-jade.jpg" alt="Wax and jade, subsurface translucency" loading="lazy"><figcaption><b>Wax and jade</b><br>subsurface translucency</figcaption></figure>
+<figure><img src="assets/B4-cornell-conductor.jpg" alt="Cornell box with a polished gold sphere and an aluminium box" loading="lazy"><figcaption><b>Cornell conductor</b><br>polished gold and aluminium, GGX with complex Fresnel</figcaption></figure>
+<figure><img src="assets/B8-cornell-wax-slab.jpg" alt="Cornell box with a translucent wax sphere" loading="lazy"><figcaption><b>Cornell wax</b><br>diffuse transmission through the wax</figcaption></figure>
+<figure><img src="assets/B9-cornell-crystal.jpg" alt="Cornell box with a crystal sphere" loading="lazy"><figcaption><b>Cornell crystal</b><br>Fresnel-weighted diffuse reflection</figcaption></figure>
 </div>
+<figure style="margin:1.2rem 0"><img src="assets/studio-showcase.jpg" alt="The Studio Showcase: a cyclorama with rounded boxes, a wax ball, a gold ball and a glass ball on a tiled picture" loading="lazy" style="width:100%;height:auto"><figcaption><b>Studio Showcase</b>, made in the Scene Builder: a cyclorama lit by a three-light rig and a window-pattern projector, red car paint worn through to copper, mossy stone, candle wax, glass and gold (1280 x 720).</figcaption></figure>
 <p style="color:var(--muted);font-size:.9rem">Rendered with this project at 720 x 720, 2048 samples per pixel, with the OptiX backend and the OptiX denoiser.</p>
 
 <h2>The Scene Builder</h2>
@@ -87,7 +91,8 @@ footer{margin:64px 0 40px;color:var(--muted);font-size:.9rem;border-top:1px soli
 <ul class="points">
 <li><b>Closed forms.</b> A diffuse sphere under a white sky must read its albedo; a closed diffuse-transmission shell, Beer-Lambert absorbers and a point light over a plate have exact answers the renderers must hit.</li>
 <li><b>Consistency sweep.</b> The same scene written two ways (a constant sky against the same sky as a picture, the scene moved, scaled, mirrored, turned, a light written as a point or a sphere, a shape as a mesh or an instance, and so on) must give the same picture, for every material, on every backend. <a href="https://github.com/XinpeiWang/photonsmith/blob/main/docs/CONSISTENCY_SWEEP.md">500+ pairs</a>; it found tilted cameras turned the wrong way, instanced shapes that vanished, and light that was missing under an image sky.</li>
-<li><b>Cross-checks and over 5,000 automated tests</b> across the CPU, OptiX and Metal renderers. <a href="https://github.com/XinpeiWang/photonsmith/blob/main/docs/CLOSED_FORMS_FOUND_THE_BUGS.md">How closed forms found the bugs</a>.</li>
+<li><b>Real pbrt-v4 as the reference.</b> 145 of the bundled scenes were rendered by an actual pbrt-v4 build and its mean picture value is kept in a table the tests read: the CPU and both OptiX renderers must stay within about 2% of it, with no pbrt installed. About 140 of the 145 read within 1.5% of pbrt.</li>
+<li><b>Cross-checks and nearly 6,000 automated tests</b> across the CPU, OptiX and Metal renderers. <a href="https://github.com/XinpeiWang/photonsmith/blob/main/docs/CLOSED_FORMS_FOUND_THE_BUGS.md">How closed forms found the bugs</a>.</li>
 </ul>
 
 <h2>Try it</h2>
