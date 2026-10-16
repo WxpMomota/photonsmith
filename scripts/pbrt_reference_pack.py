@@ -9,7 +9,7 @@ pbrt_scene_compare.py compares the bundled scenes with pbrt, but only where a pb
 Per scene (64 x 64, depth 8): pbrt's mean picture value (the mean of every value of every channel, unclipped) at --pbrt-spp samples, twice with different seeds (their
 disagreement is the noise of the reference); then for each renderer the ratio ours / pbrt at --ref-spp samples (1.0 for a scene that agrees, the known offset for one that does not:
 the test then watches the offset, not just the agreement) and the noise of a single render at the test's own sample count (--test-spp, over --noise-runs seeds), which sets the
-tolerance: max(3%, 4 x that noise + the reference's own).
+tolerance: max(--min-tol, 4 x that noise + the reference's own). --min-tol is 1.5%: with the old 3% floor a 1% bias in a quiet scene went unseen (mutation test, October 2026).
 
 Table columns (whitespace separated, `#` lines are comments):
     name  test_spp  depth  size  pbrt_mean_r  pbrt_mean_g  pbrt_mean_b  pbrt_noise  cpu_ratio cpu_tol  recursive_ratio recursive_tol  wavefront_ratio wavefront_tol
@@ -124,7 +124,7 @@ def one(args, name):
                         print('  pinned  %-34s %-9s test count reads %+.1f%% from its converged mean' % (name, backend, 100.0 * off), file=sys.stderr)
                     else:
                         print('  UNPINNED %-33s %-9s test count reads %+.1f%% from its converged mean (kept the converged ratio)' % (name, backend, 100.0 * off), file=sys.stderr)
-            tol = min(KMAXTOL, max(0.03, 4.0 * sigma + pbrt_noise))
+            tol = min(KMAXTOL, max(args.min_tol, 4.0 * sigma + pbrt_noise))
             if backend == 'cpu' and name in HEAVY_TAIL_CPU:
                 tol = KMAXTOL
             if 4.0 * sigma + pbrt_noise > KMAXTOL:
@@ -154,6 +154,7 @@ def main():
     ap.add_argument("--ref-spp", type=int, default=512)
     ap.add_argument("--test-spp", type=int, default=64)
     ap.add_argument("--noise-runs", type=int, default=6)
+    ap.add_argument("--min-tol", type=float, default=0.015, help="the narrowest tolerance a row may have")
     ap.add_argument("--timeout", type=int, default=180)
     ap.add_argument("--no-gpu", dest="gpu", action="store_false")
     args = ap.parse_args()
