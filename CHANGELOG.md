@@ -4,6 +4,10 @@ Release notes for the next tagged release, summarising the large correctness eff
 Before this, see `git log`. Each item has a commit with the measurements behind it, and
 [docs/PBRT_SUPPORT.md](docs/PBRT_SUPPORT.md) has the per-feature, per-backend detail.
 
+## Unreleased
+
+* **The first Metal render after an install waits about two minutes, not four**: Metal turns the path tracer into machine code once per Mac, for two shader variants (the second is for alpha masks and subsurface), and the app built them one after the other (108 s then 121 s on an M2). They are now built side by side (about 125 s in all: `ray_tracer --prepare-gpu` 231 s -> 136 s, measured with a cold cache). A Live Preview that starts during the warm-up still waits for the build of its own variant instead of compiling it twice.
+
 ## 0.1.4 (2026-10-15)
 
 This release is about what the new pbrt reference pack showed: every bundled scene pbrt-v4 can read now has pbrt's own mean in a table the tests read, and the differences that surfaced were fixed. Highlights, with the full list below:
