@@ -18,6 +18,8 @@ import math
 
 import numpy as np
 
+import room_textures
+
 WALL_THICKNESS = 0.1
 DEFAULT_CEILING = 2.6
 MIN_ROOM_SIDE = 1.0
@@ -262,6 +264,7 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geom
         img = img.astype(np.float64) / 255.0
     img = img.astype(np.float64)
     h0, w0 = depth.shape
+    depth_full, img_full = depth, img   # (kept at full size: room_textures reads the photo's own pixels)
     step = max(1, int(math.ceil(max(h0, w0) / float(max_side))))
     depth = box_blur(downsample(depth, step), 1)
     img = downsample(img, step)
@@ -485,6 +488,7 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geom
         # the photo's pixels as 3D points in the room's own frame BEFORE the mirror (x as the photo sees it: to the right), on the same grid the fit used: (h, w, 3), the matching
         # "this pixel has a surface" mask, and the step that grid is subsampled by from the full-size picture
         "points": PRimg, "ok": ok, "step": step, "camera": pos.copy(), "image": img, "exposure": k,
+        "textures": room_textures.camera_model(depth_full, img_full, hfov_deg, R, theta, pos, scale),
         "box": (xmin, xmax, zmin, zmax, ceiling_y),
     }
     result = mirror_x({

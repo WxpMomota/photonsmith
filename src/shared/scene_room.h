@@ -116,6 +116,14 @@ inline bool fromJson(const std::string& text, Import& out, std::string& err, con
 		if (!readRgb(s, "color", c)) { err = "the surface \"" + name + "\" has a bad colour"; return false; }
 		o.material.color = {std::clamp(c.r, 0.0, 1.0), std::clamp(c.g, 0.0, 1.0), std::clamp(c.b, 0.0, 1.0)};
 		o.locked = true;   // a wall is not dragged by accident; it can still be picked in the list
+		// The photo's own look on the surface: a picture named relative to the room.json's folder (the flat colour stays under it, and is what shows when the picture is missing)
+		std::string picture;
+		if (scene_doc::detail::readStr(s, "texture", picture) && !picture.empty()) {
+			std::error_code ec;
+			const std::string path = baseFolder.empty() ? picture : (std::filesystem::path(baseFolder) / picture).string();
+			if (std::filesystem::exists(path, ec)) o.material.imageFile = path;
+			else out.notes.push_back("The picture of the " + name + " was not found, so it keeps its flat colour.");
+		}
 		out.surfaces.push_back(o);
 	}
 

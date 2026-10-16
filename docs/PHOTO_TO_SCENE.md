@@ -131,7 +131,7 @@ It runs on your own computer; **the photo is not uploaded anywhere**. The room *
 
 ![On the left, a picture of a dining room (the bundled Breakfast Room scene, rendered, used as the test photo); on the right, the room made from it: walls, floor, a lamp, and three chairs and a table in the same places](gallery/room-from-photo.jpg)
 
-*Left: the photo (here a render of a view of the bundled Breakfast Room scene, because its true layout is known). Right: the room the program made from it, rendered from the camera it placed. The walls, the corner and the brightness follow the photo; the table (built from measured boxes: a top and four legs) and the chairs (3D models of the photo's chairs) stand where the photo has them. The pictures on the wall, the lamps and every surface detail do not.*
+*Left: the photo (here a render of a view of the bundled Breakfast Room scene, because its true layout is known). Right: the room the program made from it, rendered from the camera it placed. The floor's tiles and grout, the painting on the wall, the corner and the brightness come from the photo; the table (measured boxes: a top and four legs) and the chairs (3D models of the photo's chairs) stand where the photo has them. The lamps, the window's view and small things do not.*
 
 It is a first draft, not a scan:
 
@@ -139,7 +139,7 @@ It is a first draft, not a scan:
 - a wall, floor or ceiling the photo **does not show is assumed** (the program lists those after it finishes), and the room is a plain box, so alcoves and sloping ceilings are lost;
 - the **size** is only as good as the depth model's sense of scale: it is usually within a fifth, sometimes further. If you know how high the camera was above the floor, say so in the dialog
   and everything is scaled to match;
-- the **colours** are what the photo shows on each surface, turned into a reflectance (a lit photo is not a reflectance, so a dark room's walls are only partly brightened);
+- the **surfaces carry the photo's own look**: for every point of the floor, ceiling and each wall the photo shows, the program finds the pixel that sees it and takes its colour, so a wood floor keeps its grain, a tiled one its grout, and wallpaper and the pictures hanging on a wall come with the wall. A point something stands in front of (a chair in front of a wall) is skipped, found by comparing the depth the photo measured with the point's distance, and what the photo does not show or furniture hid is filled in smoothly from what it does, so a hidden patch of floor is a soft blend of its surroundings, not more grain. The colours are brightened like a flat colour would be (a lit photo is not a reflectance, so a dark room's walls are only partly brightened), and what the photo shows only a little of keeps one flat colour. The pictures are in `textures\` beside `room.json`;
 - a patch that is clipped to white in the photo (a window, a lamp) becomes an emitting panel on the wall or ceiling it is on, and if the photo has none, one light goes in the middle of the ceiling.
   The **light level** is set by rendering a small draft of the room and turning the lights until its average brightness matches the photo's, so the rendered room is about as bright as the
   photographed one (the first render also shows how far off the colours are: change them in the properties).
@@ -168,7 +168,7 @@ camera is fine). Avoid mirrors and large windows with a bright view (the model r
 
 ### Where things go
 
-Each room's result is in the same per-user folder as the photo objects, in `photo_meshes\room-<photo name>-<date and time>\`: `room.json` (the room: its boxes, lights, camera and what was assumed) and
+Each room's result is in the same per-user folder as the photo objects, in `photo_meshes\room-<photo name>-<date and time>\`: `room.json` (the room: its boxes, lights, camera and what was assumed), `textures\` (the pictures of its surfaces) and
 `depth.png` (the depth map as a grey picture, white = near, to see what the model saw). The scene itself is an ordinary Builder scene made of boxes: save it like any other.
 
 You can also run the helper by itself:
@@ -224,8 +224,8 @@ ceiling and a few walls, which a depth map shows well, so *Room from a photo* bu
 ## For developers
 
 - *Room from a photo* is two Python files that need no model for their tests: `tools/photo_to_room/room_fit.py` (the geometry: depth map to a box room, colours, lights, camera; numpy only) and
-  `photo_to_room.py` (the model wrapper). `python -m unittest tools/photo_to_room/test_room_fit.py` fits rooms of known size photographed analytically (a turned, tilted and rolled camera, noisy
-  depth, walls out of view) and `test_room_objects.py` (furniture of known size and place: where it stands, how tall, which way it faces, what counts as furniture, the texture's exposure). The Builder's side is `src/shared/scene_room.h` (reads `room.json`, builds the objects, and the light-level solver) with `tests/unit/scene_room_tests.cpp`, which also renders
+  `room_textures.py` (the pictures of the surfaces, read off the photo with the fitted camera) and `photo_to_room.py` (the model wrapper). `python -m unittest tools/photo_to_room/test_room_fit.py` fits rooms of known size photographed analytically (a turned, tilted and rolled camera, noisy
+  depth, walls out of view) `test_room_textures.py` (a room painted with "where on the surface am I": the pictures show it where they should, upright, with furniture left out and holes filled) and `test_room_objects.py` (furniture of known size and place: where it stands, how tall, which way it faces, what counts as furniture, the texture's exposure). The Builder's side is `src/shared/scene_room.h` (reads `room.json`, builds the objects, and the light-level solver) with `tests/unit/scene_room_tests.cpp`, which also renders
   a room to check that the photo's left stays left. The GUI self-test mode `room` (`RT_GUI_SELFTEST=room RT_GUI_SELFTEST_ROOM_PHOTO=<image>`) runs the whole flow and writes the room as
   `<prefix>_room.pbrt` (`RT_GUI_SELFTEST_ROOM_FURNITURE=<n>` asks for furniture too).
 - The helper's pure parts have tests that need no model: `%LOCALAPPDATA%\RayTracerPhoto\venv\Scripts\python.exe -m unittest tools/photo_to_mesh/test_photo_to_mesh.py`

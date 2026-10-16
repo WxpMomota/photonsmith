@@ -36,7 +36,7 @@ COLORS = {
 WINDOW = (0.2, 1.4, 0.9, 2.2)
 
 
-def photograph(width=240, height=180, hfov=70.0, yaw=20.0, pitch=10.0, roll=0.0, cam_height=1.4, noise=0.0, window=True, seed=1, obstacle=None, want_mask=False):
+def photograph(width=240, height=180, hfov=70.0, yaw=20.0, pitch=10.0, roll=0.0, cam_height=1.4, noise=0.0, window=True, seed=1, obstacle=None, want_mask=False, pattern=False):
     """(depth, rgb uint8) of the room from a camera at (0, cam_height, 0): yawed about the vertical (positive turns towards +x), pitched down by `pitch`, rolled by `roll`.
     `obstacle` is a box ((x0, y0, z0), (x1, y1, z1)) of furniture standing in the room; with `want_mask` the answer also holds the (height, width) mask of the pixels that see it."""
     f = (width / 2.0) / math.tan(math.radians(hfov) / 2.0)
@@ -69,6 +69,14 @@ def photograph(width=240, height=180, hfov=70.0, yaw=20.0, pitch=10.0, roll=0.0,
         name[neg] = neg_name
     for key, c in COLORS.items():
         rgb[name == key] = c
+    if pattern:
+        # every surface shows where on it each pixel is: two colour channels run with the two coordinates along the surface (0..1 across the room), the third is fixed
+        span = ROOM_MAX - ROOM_MIN
+        f = (hit - ROOM_MIN) / span
+        for key, (r, g, b) in {"floor": (0, 0.5, 2), "ceiling": (0, 0.9, 2), "left": (0.3, 1, 2), "right": (0.7, 1, 2), "back": (0, 1, 0.3), "front": (0, 1, 0.7)}.items():
+            sel = name == key
+            rgb[sel] = np.stack([f[..., r] if isinstance(r, int) else np.full_like(f[..., 0], r), f[..., g] if isinstance(g, int) else np.full_like(f[..., 0], g),
+                                 f[..., b] if isinstance(b, int) else np.full_like(f[..., 0], b)], axis=-1)[sel]
     if window:
         x0, x1, y0, y1 = WINDOW
         win = (name == "back") & (hit[..., 0] > x0) & (hit[..., 0] < x1) & (hit[..., 1] > y0) & (hit[..., 1] < y1)

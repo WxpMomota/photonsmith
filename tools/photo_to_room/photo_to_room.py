@@ -260,6 +260,32 @@ def add_furniture(image, geometry, result, out_folder, count, device_choice, bas
                                (len(result["objects"]), ", ".join(o["name"] for o in result["objects"])))
 
 
+def add_textures(result, geometry, out_folder):
+    """Gives each surface the photo's own look (room_textures.py): a picture in textures/ and "texture" in the surface. A surface the photo shows too little of keeps its flat colour."""
+    import numpy as np
+    from PIL import Image
+    import room_textures
+
+    folder = os.path.join(out_folder, "textures")
+    made = []
+    for s in result["surfaces"]:
+        spec = room_textures.FACES.get(s["name"])
+        if spec is None:
+            continue
+        image, seen = room_textures.surface_texture(geometry["textures"], s["min"], s["max"], spec)
+        if image is None:
+            continue
+        os.makedirs(folder, exist_ok=True)
+        slug = s["name"].lower().replace(" ", "_")
+        pixels = room_textures.to_reflectance_png(image, geometry["exposure"])
+        # PNG rows run top to bottom: row 0 is v = 1, which is how surface_texture lays the picture out
+        Image.fromarray(pixels).save(os.path.join(folder, slug + ".png"))
+        s["texture"] = "textures/%s.png" % slug
+        made.append(s["name"].lower())
+    if made:
+        result["notes"].append("The photo's own look is on the %s (read from the picture; what it does not show is filled in)." % ", ".join(made))
+
+
 def write_depth_picture(depth, path):
     import numpy as np
     from PIL import Image
@@ -323,6 +349,7 @@ def main():
         result, geometry = room_fit.fit_room(depth, np.asarray(image), hfov, camera_height=args.camera_height, return_geometry=True)
     except ValueError as e:
         fail("could not find a room in this photo (%s). A photo taken inside a room, showing a floor and at least one wall, works best." % e)
+    add_textures(result, geometry, args.out)
     if args.furniture > 0:
         add_furniture(image, geometry, result, args.out, args.furniture, args.device)
     result["photo"] = {"width": image.width, "height": image.height, "hfov": round(hfov, 3), "fov_source": fov_source,

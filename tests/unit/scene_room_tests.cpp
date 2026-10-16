@@ -271,6 +271,81 @@ TEST(SceneRoomTest, FurnitureBecomesMeshObjectsAndABadPieceIsLeftOutNotFatal) {
 	std::filesystem::remove_all(folder, ec);
 }
 
+TEST(SceneRoomTest, ASurfacesPictureIsReadAndAMissingOneKeepsTheFlatColour) {
+	const std::string folder = "scene_room_test_textures";
+	std::error_code ec;
+	std::filesystem::create_directories(folder, ec);
+	{
+		std::ofstream tex(folder + "/floor.bmp", std::ios::binary);
+		tex << bmpFile(1, 1, {10, 20, 30});
+	}
+	std::string text = roomJson();
+	text.replace(text.find("\"name\": \"Floor\","), 16, "\"name\": \"Floor\", \"texture\": \"floor.bmp\",");
+	text.replace(text.find("\"name\": \"Ceiling\","), 18, "\"name\": \"Ceiling\", \"texture\": \"nowhere.png\",");
+	scene_room::Import room;
+	std::string err;
+	ASSERT_TRUE(scene_room::fromJson(text, room, err, folder)) << err;
+	EXPECT_NE(room.surfaces[0].material.imageFile.find("floor.bmp"), std::string::npos);
+	EXPECT_TRUE(room.surfaces[1].material.imageFile.empty());
+	EXPECT_NEAR(room.surfaces[1].material.color.r, 0.8, 1e-9) << "the flat colour stays";
+	EXPECT_TRUE(std::any_of(room.notes.begin(), room.notes.end(), [](const std::string& n) { return n.find("Ceiling") != std::string::npos; }));
+	std::filesystem::remove_all(folder, ec);
+}
+
+TEST(SceneRoomTest, AFloorPictureLandsTheWayRoundTheTextureConventionSays) {
+	const std::string launcher = findLauncher();
+	if (launcher.empty()) GTEST_SKIP() << "ray_tracer.exe was not found next to the tests";
+	// room_textures.py lays a floor picture out on the slab's top (+Y) face: u runs along +z (near the camera to far), v along +x of the Scene Builder's frame with the TOP row of the
+	// picture at v = 1. The Builder is mirrored in x, so the picture's top row is the photo's LEFT. A 2 x 2 picture: top row [red, green], bottom row [blue, yellow]:
+	// near-left red, far-left green, near-right blue, far-right yellow.
+	const std::string folder = "scene_room_test_floor";
+	std::error_code ec;
+	std::filesystem::create_directories(folder, ec);
+	{
+		// 16 x 16, four solid quadrants (texture filtering blends a tiny picture across the whole face): top-left red, top-right green, bottom-left blue, bottom-right yellow
+		std::vector<unsigned char> rgb;
+		for (int y = 0; y < 16; ++y)
+			for (int x = 0; x < 16; ++x) {
+				const bool top = y < 8, left = x < 8;
+				const unsigned char c[3] = {static_cast<unsigned char>(top && left ? 255 : (!top && !left ? 255 : 0)), static_cast<unsigned char>(top && !left ? 255 : (!top && !left ? 255 : 0)),
+				                            static_cast<unsigned char>(!top && left ? 255 : 0)};
+				rgb.insert(rgb.end(), c, c + 3);
+			}
+		std::ofstream tex(folder + "/floor.bmp", std::ios::binary);
+		tex << bmpFile(16, 16, rgb);
+	}
+	std::string text = roomJson();
+	text.replace(text.find("\"name\": \"Floor\","), 16, "\"name\": \"Floor\", \"texture\": \"floor.bmp\",");
+	scene_room::Import room;
+	std::string err;
+	ASSERT_TRUE(scene_room::fromJson(text, room, err, folder)) << err;
+	room.camera.fov = 90.0;
+	for (size_t i = 1; i < room.surfaces.size(); ++i) room.surfaces[i].material.color = {0.6, 0.6, 0.6};
+	Document d = makeStarterScene();
+	scene_room::applyTo(room, d, "Room");
+	std::vector<float> rgb;
+	int w = 0, h = 0;
+	ASSERT_TRUE(renderWithLauncher(launcher, toPbrt(d), "room_floor", 96, 64, 5, rgb, w, h));
+	auto mean = [&](double x0, double x1, double y0, double y1, double out[3]) {
+		out[0] = out[1] = out[2] = 0;
+		int n = 0;
+		for (int y = static_cast<int>(y0 * h); y < static_cast<int>(y1 * h); ++y)
+			for (int x = static_cast<int>(x0 * w); x < static_cast<int>(x1 * w); ++x, ++n)
+				for (int c = 0; c < 3; ++c) out[c] += rgb[(static_cast<size_t>(y) * w + x) * 3 + c];
+		for (int c = 0; c < 3; ++c) out[c] /= std::max(n, 1);
+	};
+	double nearLeft[3], farLeft[3], nearRight[3], farRight[3];
+	mean(0.05, 0.30, 0.93, 0.99, nearLeft);
+	mean(0.05, 0.30, 0.60, 0.80, farLeft);
+	mean(0.70, 0.95, 0.93, 0.99, nearRight);
+	mean(0.70, 0.95, 0.60, 0.80, farRight);
+	EXPECT_GT(nearLeft[0], 2.0 * nearLeft[1]) << "near left is red";
+	EXPECT_GT(farLeft[1], 2.0 * farLeft[0]) << "far left is green";
+	EXPECT_GT(nearRight[2], 2.0 * nearRight[0]) << "near right is blue";
+	EXPECT_TRUE(farRight[0] > 2.0 * farRight[2] && farRight[1] > 2.0 * farRight[2]) << "far right is yellow";
+	std::filesystem::remove_all(folder, ec);
+}
+
 TEST(SceneRoomTest, FurnitureMadeOfMeasuredBoxesBecomesGroupedBoxes) {
 	scene_room::Import room;
 	std::string err;
