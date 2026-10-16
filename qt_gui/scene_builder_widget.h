@@ -51,6 +51,8 @@ class QTimer;
 #include "scene_layout_view.h"
 
 
+namespace scene_room { struct Import; }
+
 class SceneBuilderWidget : public QWidget {
 	Q_OBJECT
 public:
@@ -163,11 +165,18 @@ public:
 	void addLight(scene_doc::LightKind kind);
 	void applyLightingPreset(scene_doc::lighting::Preset preset);   // the lights become a ready-made lighting (one undo step)
 	void addObjectFromPhoto();  // scene_builder_photo.cpp: needs the optional photo helper
+	void addRoomFromPhoto();    // scene_builder_photo.cpp: a photo of a room becomes a room (the same helper environment, plus a depth model)
 	void showModelLibrary();    // scene_builder_models.cpp: the dialog behind Add > Model library...
 	// Adds one library model (the stem of models/<stem>.obj) at a handy size, standing on the floor under the drop point, as one undo step. False when it is not found.
 	bool addLibraryModel(const QString &stem);
 	// Runs the helper on one photo (progress dialog) and adds the mesh. False with `error` set (empty when cancelled) if nothing was added.
 	bool importPhoto(const QString &photo, QString *error);
+	// Runs the room helper on one photo of a room (progress dialog) and REPLACES the scene with the room it finds (one undo step). Camera height in metres and the photo's horizontal
+	// field of view in degrees, 0 to let the helper decide. False with `error` set (empty when cancelled) if the scene was left alone; `notes` gets what the helper had to assume.
+	bool importRoom(const QString &photo, double cameraHeight, double fov, QString *error, QStringList *notes = nullptr);
+	// Sets the room's lights so that a small draft render of it is as bright as the photo (the helper's own light level is a guess that can be several times off); returns the factor
+	// it applied (1 when the file has no brightness or the renderer is not there). `folder` is where the draft's scratch files go.
+	double calibrateRoomLight(scene_room::Import &room, const QString &folder);
 	// See scene_builder_inspector.cpp: an upright copy of a picture whose EXIF tag asks for a rotation (the renderer ignores that tag).
 	static QString uprightPictureCopy(const QString &path, QSize *size);
 	// Arrange (scene_builder_arrange.cpp): hide and lock what is picked, put it on the floor, rename it, frame it.

@@ -22,6 +22,7 @@ struct Setup {
 	bool ready = false;
 	QString python;   // the environment's python
 	QString script;   // photo_to_mesh.py
+	QString roomScript;   // tools/photo_to_room/photo_to_room.py (runs in the same Python environment; "" when it is not next to the program)
 	QString why;      // when not ready: what is missing, in a sentence
 };
 
@@ -103,10 +104,13 @@ public:
 	~PhotoToMeshJob() override;
 	void start();
 	void cancel();
+	// Run the room helper (photo_to_room.py) instead of the object one: the result is room.json in outFolder. A camera height (metres) or field of view (degrees) of 0 leaves it to
+	// the helper (the depth model's own estimate; the photo's EXIF lens). Call before start().
+	void useRoomHelper(double cameraHeightMetres, double horizontalFovDegrees);
 
 signals:
 	void progress(int percent, const QString &message);
-	// ok: mesh and texture are in outFolder. When not ok, `message` says why.
+	// ok: mesh and texture (room.json for the room helper) are in outFolder. When not ok, `message` says why.
 	void finished(bool ok, const QString &message);
 
 private:
@@ -123,4 +127,6 @@ private:
 	QStringList m_tail;     // the last few lines the helper printed that were not progress
 	bool m_cancelled = false;
 	bool m_done = false;
+	bool m_room = false;
+	double m_cameraHeight = 0.0, m_fov = 0.0;
 };

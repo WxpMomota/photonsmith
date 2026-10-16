@@ -1,12 +1,13 @@
 # From a picture to a scene
 
-Three ways to get a real-world picture into a rendered scene, from simple to ambitious. The first two are in the
-[Scene Builder](SCENE_BUILDER.md); the third is a workflow using free tools, with the renderer at the end of it.
+Four ways to get a real-world picture into a rendered scene, from simple to ambitious. The first three are in the
+[Scene Builder](SCENE_BUILDER.md); the fourth is a workflow using free tools, with the renderer at the end of it.
 
 | You have | You want | Use |
 |---|---|---|
 | any picture | it on a wall, a floor, a ball, a statue | **Pictures** (built in, nothing to install) |
 | **one** photo of an object | a 3D version of it to light and render | **Object from a photo** (optional helper, runs on your computer) |
+| **one** photo of a room | an editable room: walls, floor, ceiling, windows, and the camera | **Room from a photo** (the same helper) |
 | **many** photos of an object or place | an accurate 3D copy | **A photo scan** with COLMAP or Meshroom, then bring the mesh in |
 
 ## Pictures
@@ -121,6 +122,67 @@ the reflections as part of the object), and objects cut off by the edge of the p
 | the object comes out lying down or upside down | Use the Rotation fields on the object (the model assumes the photo shows it upright). |
 | setup fails with a "path too long" error | Pass a shorter `-Folder`. |
 
+## Room from a photo
+
+**Add > Room from a photo...** turns one photo of a room into a room you can edit: its **floor, ceiling and walls** at about the right size and colour, the **windows and
+lamps** as lights, and a **camera** that sees what the photo saw, so the first picture you render is the photo's view. A small depth model ([Depth Anything
+V2](https://github.com/DepthAnything/Depth-Anything-V2), "Metric Indoor Small", 25 million parameters) guesses how far away every pixel is, and a geometry step fits a box-shaped room to that.
+It runs on your own computer; **the photo is not uploaded anywhere**. The room **replaces the current scene** (Undo brings it back).
+
+![On the left, a picture of a living room (the bundled Fireplace Room scene, rendered, used as the test photo); on the right, the room made from it: dark brown walls, a floor, the window on the left wall](gallery/room-from-photo.jpg)
+
+*Left: the photo (here a render of the bundled Fireplace Room scene, because its true layout is known). Right: the room the program made from it, rendered from the camera it placed. The walls, the corner, the window and the brightness follow the photo; the furniture, the skirting boards and the wood grain do not.*
+
+It is a first draft, not a scan:
+
+- the room is **empty**: furniture, pictures and plants are not modelled (add them with *Object from a photo*, shapes or the model library);
+- a wall, floor or ceiling the photo **does not show is assumed** (the program lists those after it finishes), and the room is a plain box, so alcoves and sloping ceilings are lost;
+- the **size** is only as good as the depth model's sense of scale: it is usually within a fifth, sometimes further. If you know how high the camera was above the floor, say so in the dialog
+  and everything is scaled to match;
+- the **colours** are what the photo shows on each surface, turned into a reflectance (a lit photo is not a reflectance, so a dark room's walls are only partly brightened);
+- a patch that is clipped to white in the photo (a window, a lamp) becomes an emitting panel on the wall or ceiling it is on, and if the photo has none, one light goes in the middle of the ceiling.
+  The **light level** is set by rendering a small draft of the room and turning the lights until its average brightness matches the photo's, so the rendered room is about as bright as the
+  photographed one (the first render also shows how far off the colours are: change them in the properties).
+
+The dialog also asks for the photo's **field of view** (how wide it sees, left to right). Leave it at 0 and the program reads it from the photo's own data (the 35 mm equivalent focal length
+that phones and cameras store), or assumes a phone camera's about 67 degrees; a room that looks stretched or squashed in the first picture has the wrong value, and the camera's field of view
+in the Camera section fixes it.
+
+### Setting it up
+
+It uses the **same helper environment as Object from a photo** (the setup above: *Diagnostics > Install Photo Helper*). The first run downloads the depth model (about 100 MB, from Hugging Face)
+and says so; after that it works offline. Unlike the object helper it needs no graphics card: the model is small, a photo takes a few seconds on the processor and about a second on a graphics card.
+
+The depth model is a fine-tune of Depth Anything V2's "Small" model, which is released under the Apache-2.0 licence; the metric fine-tune's own model card does not name a licence, so look at
+the [model page](https://huggingface.co/depth-anything/Depth-Anything-V2-Metric-Indoor-Small-hf) before using results commercially. The model is downloaded on your computer and never shipped with the program.
+
+### Taking a good photo
+
+Stand in the room, hold the camera at eye level and level (not tilted much), and show **the floor, the corner where two walls meet, and some ceiling**. Wide views work best (a phone's main
+camera is fine). Avoid mirrors and large windows with a bright view (the model reads them as holes in the wall) and very dark rooms. One room per photo.
+
+### Where things go
+
+Each room's result is in the same per-user folder as the photo objects, in `photo_meshes\room-<photo name>-<date and time>\`: `room.json` (the room: its boxes, lights, camera and what was assumed) and
+`depth.png` (the depth map as a grey picture, white = near, to see what the model saw). The scene itself is an ordinary Builder scene made of boxes: save it like any other.
+
+You can also run the helper by itself:
+
+```powershell
+%LOCALAPPDATA%\RayTracerPhoto\venv\Scripts\python.exe tools\photo_to_room\photo_to_room.py photo.jpg --out out_folder [--fov 65] [--camera-height 1.5]
+```
+
+### If it does not work
+
+| Message or symptom | What to do |
+|---|---|
+| "The photo helper has not been set up" | Install the photo helper (Diagnostics tab), as for Object from a photo. |
+| "could not find a room in this photo" | Use a photo taken inside a room that shows a floor and at least one wall. |
+| the room is the wrong size | Say how high the camera was in the dialog (the size follows it), or scale the room's objects in the Builder. |
+| the room looks stretched or squashed in the first picture | The photo's field of view was guessed wrong: give it in the dialog, or set the camera's field of view. |
+| the walls are crooked | The photo was tilted or showed mostly one wall; try one that shows a corner and some floor. |
+| runs out of graphics memory | Close other programs that use the graphics card, or run the helper by hand with `--device cpu`. |
+
 ## A photo scan (many photos)
 
 For an accurate copy of a real object or place, take 30 to 100 overlapping photos while moving around it and let
@@ -147,14 +209,19 @@ Things that do not carry over yet:
 - Scans are **not relightable** beyond the colour they carry: shadows and highlights from the day they were photographed are
   in the texture. Photograph in even, overcast light to keep that small.
 
-## Why not turn a photo into a whole scene?
+## Why is the room empty?
 
-One photo does not hold enough information to rebuild a room: depth is ambiguous and everything hidden is unknown. Research
-systems guess room layouts, but they are not reliable enough to ship. Neural scene models (NeRF, Gaussian splatting) give
-beautiful new views of a scene but are not geometry and materials a path tracer can re-light, so they are not offered here.
+One photo does not hold enough information to rebuild a room's furniture: depth is ambiguous and everything hidden is unknown. A room is different, because it is mostly a box: the floor, the
+ceiling and a few walls, which a depth map shows well, so *Room from a photo* builds that. Furniture and objects are guesses with an invented back, so they are left to *Object from a photo* (one
+object at a time) and to you. Neural scene models (NeRF, Gaussian splatting) give beautiful new views of a scene but are not geometry and materials a path tracer can re-light, so they are not offered here.
 
 ## For developers
 
+- *Room from a photo* is two Python files that need no model for their tests: `tools/photo_to_room/room_fit.py` (the geometry: depth map to a box room, colours, lights, camera; numpy only) and
+  `photo_to_room.py` (the model wrapper). `python -m unittest tools/photo_to_room/test_room_fit.py` fits rooms of known size photographed analytically (a turned, tilted and rolled camera, noisy
+  depth, walls out of view). The Builder's side is `src/shared/scene_room.h` (reads `room.json`, builds the objects, and the light-level solver) with `tests/unit/scene_room_tests.cpp`, which also renders
+  a room to check that the photo's left stays left. The GUI self-test mode `room` (`RT_GUI_SELFTEST=room RT_GUI_SELFTEST_ROOM_PHOTO=<image>`) runs the whole flow and writes the room as
+  `<prefix>_room.pbrt`.
 - The helper's pure parts have tests that need no model: `%LOCALAPPDATA%\RayTracerPhoto\venv\Scripts\python.exe -m unittest tools/photo_to_mesh/test_photo_to_mesh.py`
   (mesh orientation, the colour baker, the `--check` report; they skip without numpy and scipy).
 - The Qt-free text handling (`src/shared/photo_helper_report.h`: progress lines, the missing-facts parser, the line splitter that copes with

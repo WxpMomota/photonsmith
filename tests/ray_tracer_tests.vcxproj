@@ -215,6 +215,7 @@
     <ClCompile Include="unit\scene_showcase_tests.cpp" />
     <ClCompile Include="unit\aov_pass_tests.cpp" />
     <ClCompile Include="unit\photo_helper_report_tests.cpp" />
+    <ClCompile Include="unit\scene_room_tests.cpp" />
     <ClCompile Include="unit\scene_view_math_tests.cpp" />
     <ClCompile Include="unit\mesh_preview_tests.cpp" />
     <ClCompile Include="unit\log_format_tests.cpp" />

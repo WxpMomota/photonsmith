@@ -331,6 +331,7 @@ add_executable(cpu_integrator_tests
     unit/scene_sky_tests.cpp
     unit/scene_lighting_tests.cpp
     unit/scene_projector_tests.cpp
+    unit/scene_room_tests.cpp
     unit/scene_mix_tests.cpp
     unit/pbrt_handedness_tests.cpp
     unit/scene_uv_tests.cpp

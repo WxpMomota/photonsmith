@@ -270,7 +270,7 @@ The sun follows these settings only when they change; a Sun light you move by ha
 
 A **Picture** (matte and glossy paint) replaces the colour with an image on any shape; **Clear** goes back to a colour. On a quad it also gives the quad the picture's shape and the picture stands upright when the quad is rotated 90 degrees about X (a wall). On a sphere the picture (and a checker) runs round the vertical axis, as a globe's does, and turns with the sphere when you rotate it. On a mesh the mesh's own texture coordinates decide where it goes. See [PHOTO_TO_SCENE.md](PHOTO_TO_SCENE.md).
 
-**Add > Object from a photo...** turns one photo into a textured mesh with an optional helper that runs on your computer (an AI model; it has to be set up once, about 5 GB). The shape is a guess. It, and how to bring in a many-photo scan, are in [PHOTO_TO_SCENE.md](PHOTO_TO_SCENE.md).
+**Add > Object from a photo...** turns one photo into a textured mesh with an optional helper that runs on your computer (an AI model; it has to be set up once, about 5 GB). The shape is a guess. **Add > Room from a photo...** does the same for a photo of a room: it makes the walls, floor, ceiling, windows and camera (an empty room, a first draft) and replaces the scene. Both, and how to bring in a many-photo scan, are in [PHOTO_TO_SCENE.md](PHOTO_TO_SCENE.md).
 
 ## Lights
 

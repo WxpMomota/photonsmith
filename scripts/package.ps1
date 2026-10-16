@@ -352,10 +352,13 @@ foreach ($must in @("ray_tracer.exe", "pbrt_scenes\cornell-box-native.pbrt", "im
 
 # The optional "Object from a photo" helper (Scene Builder, Add menu) is two small text files: the GUI finds the script at
 # <package>\tools\photo_to_mesh\ and tells the user to run <package>\scripts\setup_photo_to_mesh.ps1 once. The model itself
-# (several GB) is never shipped; the setup script downloads it. Lite has no GUI, so it gets neither.
+# (several GB) is never shipped; the setup script downloads it. "Room from a photo" is two more (tools\photo_to_room\), run by the same Python environment.
+# Lite has no GUI, so it gets none of it.
 if ($Tier -ne "Lite") {
 	$photoFiles = @(
 		@{ From = (Join-Path $RepoRoot "tools\photo_to_mesh\photo_to_mesh.py"); To = (Join-Path $OutputDir "tools\photo_to_mesh") },
+		@{ From = (Join-Path $RepoRoot "tools\photo_to_room\photo_to_room.py"); To = (Join-Path $OutputDir "tools\photo_to_room") },
+		@{ From = (Join-Path $RepoRoot "tools\photo_to_room\room_fit.py"); To = (Join-Path $OutputDir "tools\photo_to_room") },
 		@{ From = (Join-Path $RepoRoot "scripts\setup_photo_to_mesh.ps1"); To = (Join-Path $OutputDir "scripts") })
 	foreach ($f in $photoFiles) {
 		if (Test-Path $f.From) {

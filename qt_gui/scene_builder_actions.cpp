@@ -60,6 +60,7 @@ std::vector<SceneBuilderWidget::Command> SceneBuilderWidget::buildCommands() {
 	for (scene_doc::BlockyKind k : scene_doc::allBlockyKinds()) add(kAdd, blockyLabel(k), [this, k]() { addBlocky(k); });
 	add(kAdd, tr("Model library..."), [this]() { showModelLibrary(); });
 	add(kAdd, tr("Object from a photo..."), [this]() { addObjectFromPhoto(); });
+	add(kAdd, tr("Room from a photo..."), [this]() { addRoomFromPhoto(); });
 
 	for (scene_doc::lighting::Preset p : scene_doc::lighting::allPresets()) add(kLighting, lightingLabel(p), [this, p]() { applyLightingPreset(p); });
 

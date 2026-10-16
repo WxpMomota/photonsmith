@@ -1,4 +1,6 @@
 // RT_GUI_SELFTEST=photo RT_GUI_SELFTEST_PHOTO=<image> RT_GUI_SELFTEST_OUT=<prefix>: the Scene Builder's "Object from a photo" without its dialogs.
+// RT_GUI_SELFTEST=room RT_GUI_SELFTEST_ROOM_PHOTO=<image> [RT_GUI_SELFTEST_ROOM_FOV=<degrees>] [RT_GUI_SELFTEST_ROOM_HEIGHT=<metres>]: "Room from a photo" the same way
+// (see runRoomSelfTest at the end of this file).
 // Runs the photo helper on the image (it must be set up; RAY_TRACER_PHOTO3D_PYTHON points at another install), checks the mesh object it adds, and
 // renders a preview of it. Screenshots <prefix>_photo_edit.png and <prefix>_photo_preview.png; exit 0 if every step held.
 #include "mainwindow.h"
@@ -133,4 +135,61 @@ void MainWindow::runInstallPhotoSelfTest(const std::function<void(const QString 
 		}
 	});
 	poll->start(300);
+}
+
+// RT_GUI_SELFTEST=room: the Scene Builder's "Room from a photo" without its dialogs. Runs the room helper on the photo (the photo helper must be set up, with a depth model
+// downloaded or a network to get it), checks the scene it makes (surfaces, a light, a usable camera, no errors from the checks) and renders a preview of it.
+// Screenshots <prefix>_room_edit.png and <prefix>_room_preview.png; exit 0 if every step held.
+void MainWindow::runRoomSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {
+	if (m_sceneBuilder) m_tabWidget->setCurrentWidget(m_sceneBuilder);
+	resize(1500, 950);
+	SceneBuilderWidget *sb = m_sceneBuilder;
+	bool ok = sb != nullptr;
+	auto check = [&ok, log](bool cond, const QString &what) {
+		log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what));
+		ok = ok && cond;
+	};
+	QString err;
+	QString badError;
+	const bool badOk = sb && sb->importRoom("C:/no/such/photo_for_the_selftest.png", 0.0, 0.0, &badError);
+	check(sb && !badOk && !badError.isEmpty(), "a missing photo fails with a message: " + badError.left(100));
+	const QString photo = qEnvironmentVariable("RT_GUI_SELFTEST_ROOM_PHOTO");
+	const double fov = qEnvironmentVariable("RT_GUI_SELFTEST_ROOM_FOV").toDouble();
+	const double height = qEnvironmentVariable("RT_GUI_SELFTEST_ROOM_HEIGHT").toDouble();
+	QStringList notes;
+	const size_t before = sb ? sb->document().objects.size() : 0;
+	check(sb && sb->importRoom(photo, height, fov, &err, &notes), "made a room from " + photo + " " + err);
+	if (sb && ok) {
+		const scene_doc::Document &doc = sb->document();
+		int emitters = 0, boxes = 0;
+		for (const scene_doc::Object &o : doc.objects) {
+			if (o.emissive) ++emitters;
+			if (o.shape == scene_doc::ShapeKind::Box) ++boxes;
+		}
+		check(boxes >= 7 && emitters >= 1, QString("the scene is a room of boxes with a light (%1 boxes, %2 lights; it had %3 objects before)").arg(boxes).arg(emitters).arg(before));
+		check(doc.camera.fov > 10.0 && doc.camera.fov < 140.0, QString("the camera has a believable field of view (%1 degrees)").arg(doc.camera.fov));
+		check(!scene_doc::hasErrors(scene_doc::validate(doc)), "the scene has no errors");
+		for (const QString &n : notes) log("note: " + n);
+		// The room as the file the Builder would save, so a caller can render it at full quality: <prefix>_room.pbrt.
+		const QString outPrefix = qEnvironmentVariable("RT_GUI_SELFTEST_OUT");
+		QFile scene(outPrefix + "_room.pbrt");
+		if (!outPrefix.isEmpty() && scene.open(QIODevice::WriteOnly)) scene.write(QByteArray::fromStdString(scene_doc::toPbrt(doc)));
+	}
+	QTimer::singleShot(600, this, [this, shot, log, sb, ok]() {
+		shot("room_edit");
+		if (!ok) {
+			log("RESULT: FAIL");
+			QApplication::exit(1);
+			return;
+		}
+		log("starting a preview render");
+		sb->startPreview([this, shot, log](bool done, const QString &message) {
+			log(QString("preview: %1 - %2").arg(done ? "ok" : "FAIL", message));
+			QTimer::singleShot(300, this, [shot, log, done]() {
+				shot("room_preview");
+				log(done ? "RESULT: OK" : "RESULT: FAIL");
+				QApplication::exit(done ? 0 : 1);
+			});
+		});
+	});
 }

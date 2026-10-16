@@ -211,6 +211,7 @@ void SceneBuilderWidget::buildUi() {
 	addMenu->addSection(tr("More"));
 	addMenu->addAction(tr("Model library..."), this, [this]() { showModelLibrary(); });
 	addMenu->addAction(tr("Object from a photo..."), this, [this]() { addObjectFromPhoto(); });
+	addMenu->addAction(tr("Room from a photo..."), this, [this]() { addRoomFromPhoto(); });
 	addMenu->addAction(tr("Light panel (emitting quad)"), this, [this]() {
 		edit(QString(), [this]() {
 			scene_doc::Object o = scene_doc::makeAreaLightPanel(QString("Light panel %1").arg(m_doc.objects.size() + 1).toStdString());

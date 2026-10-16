@@ -36,6 +36,7 @@ QProcess *newProcess(QObject *parent, bool python) {
 		QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
 		env.insert("PYTHONIOENCODING", "utf-8");
 		env.insert("PYTHONUNBUFFERED", "1");
+		env.insert("HF_HUB_DISABLE_SYMLINKS_WARNING", "1");   // (Hugging Face's download warning about symlinks on Windows is noise in a progress window)
 		p->setProcessEnvironment(env);
 	}
 	return p;
@@ -78,6 +79,7 @@ static QString environmentPython() {
 Setup locate() {
 	Setup s;
 	s.script = nextToProgram("tools/photo_to_mesh/photo_to_mesh.py");
+	s.roomScript = nextToProgram("tools/photo_to_room/photo_to_room.py");
 	const QString overridePython = qEnvironmentVariable("RAY_TRACER_PHOTO3D_PYTHON");
 	s.python = overridePython.isEmpty() ? environmentPython() : overridePython;
 	if (s.script.isEmpty())
@@ -300,9 +302,20 @@ void PhotoToMeshJob::start() {
 			emit finished(false, tr("Could not start the photo helper (%1).").arg(m_setup.python));
 		}
 	});
-	QStringList args{m_setup.script, m_image, "--out", m_out};
-	if (!m_removeBackground) args << "--no-remove-bg";
+	QStringList args{m_room ? m_setup.roomScript : m_setup.script, m_image, "--out", m_out};
+	if (m_room) {
+		if (m_fov > 0.0) args << "--fov" << QString::number(m_fov, 'f', 2);
+		if (m_cameraHeight > 0.0) args << "--camera-height" << QString::number(m_cameraHeight, 'f', 3);
+	} else if (!m_removeBackground) {
+		args << "--no-remove-bg";
+	}
 	m_process->start(m_setup.python, args);
+}
+
+void PhotoToMeshJob::useRoomHelper(double cameraHeightMetres, double horizontalFovDegrees) {
+	m_room = true;
+	m_cameraHeight = cameraHeightMetres;
+	m_fov = horizontalFovDegrees;
 }
 
 void PhotoToMeshJob::cancel() {
@@ -337,7 +350,7 @@ void PhotoToMeshJob::onFinished(int exitCode, QProcess::ExitStatus status) {
 		emit finished(false, tr("Cancelled."));
 		return;
 	}
-	const bool made = QFileInfo::exists(m_out + "/mesh.obj") && QFileInfo::exists(m_out + "/texture.png");
+	const bool made = m_room ? QFileInfo::exists(m_out + "/room.json") : (QFileInfo::exists(m_out + "/mesh.obj") && QFileInfo::exists(m_out + "/texture.png"));
 	if (status == QProcess::NormalExit && exitCode == 0 && made) {
 		emit finished(true, m_note);
 		return;

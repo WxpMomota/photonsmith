@@ -451,6 +451,7 @@ tests/build_test/dda_mini.cpp
 !scripts/*.py
 # The optional photo-to-mesh helper the Scene Builder runs (a maintained tool, shipped in the package)
 !tools/photo_to_mesh/*.py
+!tools/photo_to_room/*.py
 total.txt
 *.txt
 # Licence texts under licenses/ are real files, not stray logs.
