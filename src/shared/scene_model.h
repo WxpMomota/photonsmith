@@ -136,6 +136,7 @@ struct Object {
 	bool emissive = false;             // an area light
 	Rgb emission{1.0, 1.0, 1.0};
 	double emissionStrength = 10.0;    // radiance = emission * strength
+	std::string emissionImage;         // a picture the light takes its colours from (a window's view): the radiance at a point is the picture there times `emissionStrength`; empty: `emission`
 	bool twoSided = false;             // emits from both sides
 	std::string group;                 // objects with the same non-empty group are picked, moved, copied and deleted together in the Scene Builder (scene_selection.h)
 	bool hidden = false;               // not drawn in the Scene Builder's views (it still renders): to see what is behind it while editing (scene_arrange.h)

@@ -271,6 +271,96 @@ TEST(SceneRoomTest, FurnitureBecomesMeshObjectsAndABadPieceIsLeftOutNotFatal) {
 	std::filesystem::remove_all(folder, ec);
 }
 
+TEST(SceneRoomTest, ALightsPictureIsWrittenReadAndSurvivesTheFileAndTheChecks) {
+	const std::string folder = std::filesystem::absolute("scene_room_test_view").string();   // (the missing-file check only looks at absolute paths, which is what the helper writes)
+	std::error_code ec;
+	std::filesystem::create_directories(folder, ec);
+	{
+		std::ofstream tex(folder + "/window.bmp", std::ios::binary);
+		tex << bmpFile(1, 1, {200, 220, 255});
+	}
+	std::string text = roomJson();
+	text.replace(text.find("\"name\": \"Ceiling light 1\","), 26, "\"name\": \"Ceiling light 1\", \"picture\": \"window.bmp\",");
+	scene_room::Import room;
+	std::string err;
+	ASSERT_TRUE(scene_room::fromJson(text, room, err, folder)) << err;
+	ASSERT_EQ(room.lights.size(), 1u);
+	EXPECT_NE(room.lights[0].emissionImage.find("window.bmp"), std::string::npos);
+
+	Document d = makeStarterScene();
+	scene_room::applyTo(room, d, "Room");
+	const std::string pbrt = toPbrt(d);
+	EXPECT_NE(pbrt.find("AreaLightSource \"diffuse\" \"string filename\""), std::string::npos) << "a picture on the light is written as pbrt's image area light";
+	EXPECT_NE(pbrt.find("\"float scale\" [ 12 ]"), std::string::npos) << "with the strength as its scale";
+	EXPECT_TRUE(loadText(pbrt, "room_view").ok);
+	Document back;
+	std::string perr;
+	ASSERT_TRUE(fromJson(toJson(d), back, perr)) << perr;
+	EXPECT_EQ(toPbrt(back), pbrt) << "the picture survives the document's own file";
+	EXPECT_FALSE(hasErrors(validate(d)));
+	std::filesystem::remove_all(folder, ec);
+
+	// a picture that is not there is a warning, not a failure
+	const auto problems = validate(d);
+	bool warned = false;
+	for (const auto& p : problems) warned = warned || p.message.find("light's picture was not found") != std::string::npos;
+	EXPECT_TRUE(warned);
+}
+
+TEST(SceneRoomTest, AWindowsPictureLandsOnItsFaceTheWayRoundTheTextureConventionSays) {
+	const std::string launcher = findLauncher();
+	if (launcher.empty()) GTEST_SKIP() << "ray_tracer.exe was not found next to the tests";
+	// A light panel on the back wall carries a picture that is red on its left half and green on its right half: room_textures.py lays a wall's picture out as the wall is seen from
+	// inside the room (not mirrored), so the camera that looks at the wall must see red on the left and green on the right. (The Scene Builder's -Z face has u running along -x.)
+	const std::string folder = "scene_room_test_window";
+	std::error_code ec;
+	std::filesystem::create_directories(folder, ec);
+	{
+		std::vector<unsigned char> rgb;
+		for (int y = 0; y < 8; ++y)
+			for (int x = 0; x < 16; ++x) {
+				const unsigned char c[3] = {static_cast<unsigned char>(x < 8 ? 255 : 0), static_cast<unsigned char>(x < 8 ? 0 : 255), 0};
+				rgb.insert(rgb.end(), c, c + 3);
+			}
+		std::ofstream tex(folder + "/window.bmp", std::ios::binary);
+		tex << bmpFile(16, 8, rgb);
+	}
+	scene_room::Import room;
+	std::string err;
+	ASSERT_TRUE(scene_room::fromJson(roomJson(), room, err, folder)) << err;
+	room.camera.fov = 90.0;
+	for (scene_doc::Object& o : room.surfaces) o.material.color = {0.05, 0.05, 0.05};   // (dark walls: only the window shows colour)
+	scene_doc::Object window = scene_doc::makeObject(scene_doc::ShapeKind::Box, "Window");
+	window.position = {0.0, 1.5, 3.985};
+	window.size = {2.0, 1.2, 0.03};
+	window.emissive = true;
+	window.emission = {1.0, 1.0, 1.0};
+	window.emissionStrength = 6.0;
+	window.emissionImage = folder + "/window.bmp";
+	room.lights.clear();
+	room.lights.push_back(window);
+	Document d = makeStarterScene();
+	scene_room::applyTo(room, d, "Room");
+	std::vector<float> rgb;
+	int w = 0, h = 0;
+	ASSERT_TRUE(renderWithLauncher(launcher, toPbrt(d), "room_window", 96, 64, 5, rgb, w, h));
+	auto mean = [&](double x0, double x1, double y0, double y1, double out[3]) {
+		out[0] = out[1] = out[2] = 0;
+		int n = 0;
+		for (int y = static_cast<int>(y0 * h); y < static_cast<int>(y1 * h); ++y)
+			for (int x = static_cast<int>(x0 * w); x < static_cast<int>(x1 * w); ++x, ++n)
+				for (int c = 0; c < 3; ++c) out[c] += rgb[(static_cast<size_t>(y) * w + x) * 3 + c];
+		for (int c = 0; c < 3; ++c) out[c] /= std::max(n, 1);
+	};
+	double left[3], right[3];
+	mean(0.37, 0.48, 0.35, 0.55, left);
+	mean(0.52, 0.63, 0.35, 0.55, right);
+	EXPECT_GT(left[0], 3.0 * left[1]) << "the window's left half is red";
+	EXPECT_GT(right[1], 3.0 * right[0]) << "its right half is green";
+	EXPECT_GT(left[0], 0.2) << "and it glows";
+	std::filesystem::remove_all(folder, ec);
+}
+
 TEST(SceneRoomTest, ASurfacesPictureIsReadAndAMissingOneKeepsTheFlatColour) {
 	const std::string folder = "scene_room_test_textures";
 	std::error_code ec;

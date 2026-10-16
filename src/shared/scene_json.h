@@ -388,6 +388,7 @@ inline std::string toJson(const Document& d) {
 		}
 		j.set("emissive", Json::boolean(o.emissive)).set("emission", detail::toJson(o.emission));
 		j.set("emissionStrength", Json::number(o.emissionStrength)).set("twoSided", Json::boolean(o.twoSided));
+		if (!o.emissionImage.empty()) j.set("emissionImage", Json::string(o.emissionImage));   // (only when there is one: older scenes write what they always did)
 		if (!o.group.empty()) j.set("group", Json::string(o.group));
 		if (o.hidden) j.set("hidden", Json::boolean(true));   // (only when set: a scene that hides and locks nothing writes what it always did)
 		if (o.locked) j.set("locked", Json::boolean(true));
@@ -482,7 +483,7 @@ inline bool fromJson(const std::string& text, Document& out, std::string& err) {
 			     detail::readVec(j, "position", o.position) && detail::readVec(j, "rotation", o.rotation) && detail::readNum(j, "radius", o.radius) &&
 			     detail::readNum(j, "height", o.height) && detail::readVec(j, "size", o.size) && detail::readNum(j, "meshScale", o.meshScale) && detail::readNum(j, "radius2", o.radius2) && detail::readInt(j, "steps", o.steps) && detail::readInt(j, "seed", o.seed) &&
 			     detail::readStr(j, "meshFile", o.meshFile) && detail::readBool(j, "emissive", o.emissive) && detail::readRgb(j, "emission", o.emission) &&
-			     detail::readNum(j, "emissionStrength", o.emissionStrength) && detail::readBool(j, "twoSided", o.twoSided) && detail::readStr(j, "group", o.group) &&
+			     detail::readNum(j, "emissionStrength", o.emissionStrength) && detail::readStr(j, "emissionImage", o.emissionImage) && detail::readBool(j, "twoSided", o.twoSided) && detail::readStr(j, "group", o.group) &&
 			     detail::readBool(j, "hidden", o.hidden) && detail::readBool(j, "locked", o.locked) && detail::readStr(j, "text", o.text.text) &&
 			     detail::readStr(j, "font", o.text.font) && detail::readBool(j, "bold", o.text.bold) && detail::readBool(j, "italic", o.text.italic) &&
 			     detail::readInt(j, "align", o.text.align);

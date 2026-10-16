@@ -35,7 +35,7 @@ inline Fields fieldsOf(const Object& o) {
 	        {"meshFile", o.meshFile}, {"seed", std::to_string(o.seed)}, {"text", singleLine(o.text.text)}, {"font", o.text.font},
 	        {"textStyle", std::string(o.text.bold ? "bold " : "") + (o.text.italic ? "italic " : "") + std::to_string(o.text.align)}, {"material", toString(o.material.kind)}, {"color", v(o.material.color)}, {"checker", o.material.checker ? "1" : "0"},
 	        {"color2", v(o.material.color2)}, {"checkerCount", v(o.material.checkerCount)}, {"roughness", v(o.material.roughness)}, {"ior", v(o.material.ior)},
-	        {"transmittance", v(o.material.transmittance)}, {"picture", o.material.imageFile}, {"pattern", toString(o.material.pattern)},
+	        {"transmittance", v(o.material.transmittance)}, {"picture", o.material.imageFile}, {"lightPicture", o.emissionImage}, {"pattern", toString(o.material.pattern)},
 	        {"patternScale", v(o.material.patternScale)}, {"patternVariation", v(o.material.patternVariation)}, {"scatterDistance", v(o.material.scatterDistance)},
 	        {"bump", o.material.bumpFile}, {"bumpKind", toString(o.material.bumpKind)}, {"bumpStrength", v(o.material.bumpStrength)},
 	        {"uvScale", v(o.material.uvScaleU) + " " + v(o.material.uvScaleV)}, {"uvOffset", v(o.material.uvOffsetU) + " " + v(o.material.uvOffsetV)},

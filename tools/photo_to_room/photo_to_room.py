@@ -284,6 +284,24 @@ def add_textures(result, geometry, out_folder):
         made.append(s["name"].lower())
     if made:
         result["notes"].append("The photo's own look is on the %s (read from the picture; what it does not show is filled in)." % ", ".join(made))
+    # A window shows what the photo shows there (the blinds, the view): its pixels become the picture the glowing panel takes its colours from.
+    walls = {"left": "Left wall", "right": "Right wall", "back": "Back wall", "front": "Front wall"}
+    windows = 0
+    for light in result["lights"]:
+        spec = room_textures.FACES.get(walls.get(light.get("surface")))
+        if spec is None:
+            continue
+        image, seen = room_textures.surface_texture(geometry["textures"], light["min"], light["max"], spec, texels_per_metre=240, max_size=512, min_seen=0.5, check_depth=False)
+        if image is None:
+            continue
+        os.makedirs(folder, exist_ok=True)
+        windows += 1
+        slug = "window_%d" % windows
+        # (no exposure correction: the picture is light, not a reflectance; the panel's strength sets how much)
+        Image.fromarray((np.clip(image, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)).save(os.path.join(folder, slug + ".png"))
+        light["picture"] = "textures/%s.png" % slug
+    if windows:
+        result["notes"].append("%d window(s) show what the photo shows there." % windows)
 
 
 def write_depth_picture(depth, path):

@@ -141,6 +141,14 @@ inline bool fromJson(const std::string& text, Import& out, std::string& err, con
 			if (!readRgb(l, "color", c) || !readNum(l, "strength", strength)) { err = "the light \"" + name + "\" has a bad colour or strength"; return false; }
 			o.emissive = true;
 			o.emission = {std::clamp(c.r, 0.0, 1.0), std::clamp(c.g, 0.0, 1.0), std::clamp(c.b, 0.0, 1.0)};
+			// A window's view: the picture the helper cut out of the photo, which the light then takes its colours from (the colour above is what shows without it)
+			std::string view;
+			if (scene_doc::detail::readStr(l, "picture", view) && !view.empty()) {
+				std::error_code ec;
+				const std::string path = baseFolder.empty() ? view : (std::filesystem::path(baseFolder) / view).string();
+				if (std::filesystem::exists(path, ec)) o.emissionImage = path;
+				else out.notes.push_back("The picture of the light \"" + name + "\" was not found, so it is a plain light.");
+			}
 			o.emissionStrength = std::clamp(strength, 0.0, 1000.0);
 			o.material.color = {0.0, 0.0, 0.0};   // a lamp only emits
 			out.lights.push_back(o);

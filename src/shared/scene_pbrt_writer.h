@@ -341,7 +341,10 @@ inline void writeObjectBody(std::ostringstream& os, const Object& o, const std::
 		writeMaterial(os, o.material, ind, textureName, displacement, &mixIndex, normalMapFile);
 	}
 	if (o.emissive) {
-		os << ind << "AreaLightSource \"diffuse\" \"rgb L\" [ " << rgb(scaled(o.emission, o.emissionStrength)) << " ]";
+		if (!o.emissionImage.empty())   // (a picture on the light: the renderers read the shape's own texture coordinates, the same ones a picture on its surface would use)
+			os << ind << "AreaLightSource \"diffuse\" \"string filename\" [ " << quoted(pbrtPath(o.emissionImage)) << " ] \"float scale\" [ " << num(o.emissionStrength) << " ]";
+		else
+			os << ind << "AreaLightSource \"diffuse\" \"rgb L\" [ " << rgb(scaled(o.emission, o.emissionStrength)) << " ]";
 		if (o.twoSided) os << " \"bool twosided\" true";
 		os << "\n";
 	}

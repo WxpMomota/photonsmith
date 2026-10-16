@@ -36,7 +36,7 @@ COLORS = {
 WINDOW = (0.2, 1.4, 0.9, 2.2)
 
 
-def photograph(width=240, height=180, hfov=70.0, yaw=20.0, pitch=10.0, roll=0.0, cam_height=1.4, noise=0.0, window=True, seed=1, obstacle=None, want_mask=False, pattern=False):
+def photograph(width=240, height=180, hfov=70.0, yaw=20.0, pitch=10.0, roll=0.0, cam_height=1.4, noise=0.0, window=True, seed=1, obstacle=None, want_mask=False, pattern=False, window_view=False):
     """(depth, rgb uint8) of the room from a camera at (0, cam_height, 0): yawed about the vertical (positive turns towards +x), pitched down by `pitch`, rolled by `roll`.
     `obstacle` is a box ((x0, y0, z0), (x1, y1, z1)) of furniture standing in the room; with `want_mask` the answer also holds the (height, width) mask of the pixels that see it."""
     f = (width / 2.0) / math.tan(math.radians(hfov) / 2.0)
@@ -81,6 +81,8 @@ def photograph(width=240, height=180, hfov=70.0, yaw=20.0, pitch=10.0, roll=0.0,
         x0, x1, y0, y1 = WINDOW
         win = (name == "back") & (hit[..., 0] > x0) & (hit[..., 0] < x1) & (hit[..., 1] > y0) & (hit[..., 1] < y1)
         rgb[win] = 1.0
+        if window_view:   # a view in the window: the red channel runs from 0.94 to 1.0 across it (still clipped white to the eye, and above the bright-patch threshold)
+            rgb[win, 0] = 0.94 + 0.06 * np.clip((hit[..., 0][win] - x0) / (x1 - x0), 0.0, 1.0)
     mask = np.zeros((height, width), dtype=bool)
     if obstacle is not None:
         boxes = obstacle if isinstance(obstacle[0][0], (tuple, list)) else [obstacle]   # one box, or several (a table: a top and its legs)

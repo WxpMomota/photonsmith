@@ -764,6 +764,7 @@ void SceneBuilderWidget::inspectObject(QFormLayout *f, int i) {
 	if (o.emissive) {
 		addColor(f, tr("Light colour"), [obj]() { return obj() ? &obj()->emission : nullptr; });
 		addNum(f, tr("Strength"), [obj]() { return obj() ? &obj()->emissionStrength : nullptr; }, 0, 100000, 1, 2);
+		addFile(f, tr("Light picture"), [obj]() { return obj() ? &obj()->emissionImage : nullptr; }, tr("Images (*.png *.jpg *.jpeg *.bmp *.tga *.exr *.hdr)"), true);   // (a window's view: the light takes its colours from it)
 		addBool(f, tr("Both sides"), [obj]() { return obj() ? &obj()->twoSided : nullptr; });
 		if (o.shape == ShapeKind::Quad || o.shape == ShapeKind::Disk) {
 			auto *hint = new QLabel(tr("A quad or disk lights the side that faces up. Rotate it 180 degrees about X to make a ceiling light."));

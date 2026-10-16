@@ -73,9 +73,10 @@ def project(model, world):
     return u, v, zc
 
 
-def sample(model, u, v, zc, tolerance=0.12):
+def sample(model, u, v, zc, tolerance=0.12, check_depth=True):
     """The photo's colour at pixel (u, v) for each point, and whether it is a good sample: inside the picture, in front of the camera, and not hidden (the depth the photo measured
-    there is about the point's own distance; something nearer means the pixel shows that instead)."""
+    there is about the point's own distance; something nearer means the pixel shows that instead). check_depth=False skips that test: a window is on its wall by definition, and what
+    the depth model measures through glass (the view outside) means nothing."""
     h, w = model["h"], model["w"]
     ok = (zc > 0.05) & (u >= 1) & (u <= w - 2) & (v >= 1) & (v <= h - 2)
     uu = np.clip(u, 0, w - 1.001)
@@ -86,8 +87,9 @@ def sample(model, u, v, zc, tolerance=0.12):
     colour = (img[y0, x0] * (1 - fx) * (1 - fy) + img[y0, x0 + 1] * fx * (1 - fy) + img[y0 + 1, x0] * (1 - fx) * fy + img[y0 + 1, x0 + 1] * fx * fy)
     d = model["depth_near"]
     measured = np.minimum.reduce([d[y0, x0], d[y0, x0 + 1], d[y0 + 1, x0], d[y0 + 1, x0 + 1]])   # (the nearest thing around the pixel: an occluder's edge counts)
-    with np.errstate(invalid="ignore"):
-        ok &= np.abs(measured - zc) < tolerance * zc + 0.1
+    if check_depth:
+        with np.errstate(invalid="ignore"):
+            ok &= np.abs(measured - zc) < tolerance * zc + 0.1
     return colour, ok
 
 
@@ -150,7 +152,7 @@ def face_points(box_min, box_max, spec, width, height):
     return pts
 
 
-def surface_texture(model, box_min, box_max, spec, exposure=1.0, texels_per_metre=180, max_size=1024, min_seen=0.15):
+def surface_texture(model, box_min, box_max, spec, exposure=1.0, texels_per_metre=180, max_size=1024, min_seen=0.15, check_depth=True):
     """A picture of one surface from the photo: (uint8 RGB array, the fraction of it the photo actually showed), or (None, fraction) when the photo showed too little of it.
     box_min / box_max: the slab in the Scene Builder's frame (x mirrored, as room_fit's result has it)."""
     lo, hi = np.asarray(box_min, float), np.asarray(box_max, float)
@@ -162,7 +164,7 @@ def surface_texture(model, box_min, box_max, spec, exposure=1.0, texels_per_metr
     pts_photo = pts.copy()
     pts_photo[:, 0] = -pts_photo[:, 0]   # the photo's frame has x to the right: undo the Scene Builder's mirror
     u, v, zc = project(model, pts_photo)
-    colour, good = sample(model, u, v, zc)
+    colour, good = sample(model, u, v, zc, check_depth=check_depth)
     seen = float(good.mean())
     if seen < min_seen:
         return None, seen

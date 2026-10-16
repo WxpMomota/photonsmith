@@ -112,6 +112,36 @@ class RoomTexturesTests(unittest.TestCase):
         self.assertGreater(float(filled[:, 8:, 0].min()), 0.9, "the unseen half takes the seen colour")
         self.assertLess(float(filled[:, 8:, 1].max()), 0.1)
 
+    def test_a_windows_picture_is_what_the_photo_shows_there_the_right_way_round(self):
+        depth, rgb = photograph(window=True, window_view=True, yaw=0.0, pitch=0.0)
+        result, geometry = room_fit.fit_room(depth, rgb, 70.0, return_geometry=True)
+        light = next(l for l in result["lights"] if l.get("surface") == "back")
+        image, seen = room_textures.surface_texture(geometry["textures"], light["min"], light["max"], room_textures.FACES["Back wall"], texels_per_metre=240, check_depth=False, min_seen=0.5)
+        self.assertIsNotNone(image, "the window is in the picture (seen %.2f)" % seen)
+        # the view's red runs from 0.94 at the window's left (as seen from inside the room) to 1.0 at its right; green and blue are clipped white
+        self.assertGreater(float(image[:, -6:, 0].mean()), float(image[:, :6, 0].mean()) + 0.03)
+        self.assertGreater(float(image[..., 1].mean()), 0.93)
+
+    def test_the_helper_writes_a_picture_for_every_surface_and_window(self):
+        import tempfile
+        import photo_to_room
+        from PIL import Image
+        depth, rgb = photograph(window=True, window_view=True, yaw=0.0, pitch=0.0)
+        result, geometry = room_fit.fit_room(depth, rgb, 70.0, return_geometry=True)
+        with tempfile.TemporaryDirectory() as folder:
+            photo_to_room.add_textures(result, geometry, folder)
+            made = {s["name"]: s.get("texture") for s in result["surfaces"]}
+            self.assertEqual(made["Floor"], "textures/floor.png")
+            self.assertEqual(made["Back wall"], "textures/back_wall.png")
+            self.assertIsNone(made["Front wall"], "behind the camera: no picture")
+            for rel in (made["Floor"], made["Back wall"]):
+                with Image.open(os.path.join(folder, rel)) as picture:
+                    self.assertEqual(picture.mode, "RGB")
+            windows = [l for l in result["lights"] if l.get("picture")]
+            self.assertEqual(len(windows), 1)
+            self.assertTrue(os.path.isfile(os.path.join(folder, windows[0]["picture"])))
+            self.assertTrue(any("window" in n for n in result["notes"]))
+
     def test_every_face_names_a_world_axis_for_u_and_v(self):
         for name, spec in room_textures.FACES.items():
             self.assertEqual(len({spec["face"][0], spec["u"][0], spec["v"][0]}), 3, name)

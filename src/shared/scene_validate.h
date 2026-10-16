@@ -131,6 +131,8 @@ inline std::vector<Problem> validate(const Document& d) {
 			continue;
 		}
 		if (o.emissive && o.emissionStrength <= 0.0) warn(who + "it is an area light with no strength, so it gives no light.");
+		if (o.emissive && !o.emissionImage.empty() && detail::absoluteFileMissing(o.emissionImage))
+			warn(who + "the light's picture was not found (" + o.emissionImage + "), so it will render as a plain light. Choose it again.");
 		if (!o.material.imageFile.empty()) {
 			if (o.material.kind != MaterialKind::Diffuse && o.material.kind != MaterialKind::CoatedDiffuse)
 				warn(who + "a picture only applies to diffuse and glossy paint materials.");
