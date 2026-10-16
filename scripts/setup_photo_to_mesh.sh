@@ -104,7 +104,7 @@ else
 fi
 
 echo "Installing the other packages..."
-"$PYTHON" -m pip install omegaconf einops "transformers>=4.40,<5" trimesh "rembg[cpu]" huggingface-hub xatlas scikit-image scipy pillow numpy onnxruntime "${EXTRA_PINS[@]+"${EXTRA_PINS[@]}"}" \
+"$PYTHON" -m pip install omegaconf einops "transformers>=4.40,<5" trimesh "rembg[cpu]" huggingface-hub xatlas scikit-image scipy pillow numpy onnxruntime timm "${EXTRA_PINS[@]+"${EXTRA_PINS[@]}"}" \
 	|| { echo "Installing the packages failed." >&2; exit 1; }
 
 TRIPOSR="$FOLDER/TripoSR"

@@ -171,6 +171,125 @@ def check_environment(triposr_arg):
         fact("Background Remover Model (U2-Net)", "missing (about 176 MB, downloaded the first time a photo needs its background removed)")
 
 
+class ObjectError(Exception):
+    """A photo the helper cannot make an object from (the message says why, in words for the user)."""
+
+
+class ObjectMaker:
+    """TripoSR, loaded once, turning photos (or cut-outs) of single objects into textured meshes. photo_to_mesh.py's command line makes one; photo_to_room.py makes several
+    in one process so the model is not loaded for each. `report(percent, message)` receives the progress of the load and of every make()."""
+
+    def __init__(self, triposr_dir=None, device="auto", report=progress):
+        report(2, "Loading the libraries")
+        try:
+            import numpy as np
+            import torch
+            import trimesh  # noqa: F401  (checked here so a missing package is reported before the model is loaded)
+            import xatlas  # noqa: F401
+            from PIL import Image  # noqa: F401
+        except ImportError as e:
+            raise ObjectError("a Python package is missing (%s). Run scripts/setup_photo_to_mesh.ps1 (Windows) or .sh (macOS) first." % e)
+        triposr = find_triposr(triposr_dir)
+        if not triposr:
+            raise ObjectError("TripoSR was not found. Run scripts/setup_photo_to_mesh.ps1 (Windows) or .sh (macOS), or pass --triposr-dir.")
+        if triposr not in sys.path:
+            sys.path.insert(0, triposr)
+        patch_marching_cubes(np, torch)
+        from tsr.system import TSR
+
+        if device == "auto":
+            device = "cuda:0" if torch.cuda.is_available() else ("mps" if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available() else "cpu")
+        if device == "cpu":
+            print("NOTE no graphics card was found for PyTorch, so this runs on the processor and takes several minutes.", flush=True)
+        report(8, "Loading the model (the first run downloads about 1.7 GB)")
+        self.model = TSR.from_pretrained("stabilityai/TripoSR", config_name="config.yaml", weight_name="model.ckpt")
+        self.model.renderer.set_chunk_size(8192)
+        self.model.to(device)
+        self.device = device
+
+    def make(self, image, out_dir, remove_bg=True, foreground_ratio=0.85, resolution=256, texture_size=1024, report=progress):
+        """Makes mesh.obj, texture.png and result.json in out_dir from a PIL image (a photo of one object; an RGBA image with transparency is used as a cut-out as it is).
+        Returns {"size", "triangles", "seconds"}; raises ObjectError when the model finds no object."""
+        import numpy as np
+        import torch
+        import trimesh
+        import xatlas
+        from PIL import Image, ImageOps
+        from tsr.utils import remove_background, resize_foreground
+
+        started = time.time()
+        os.makedirs(out_dir, exist_ok=True)
+        report(25, "Preparing the photo")
+        img = ImageOps.exif_transpose(image)  # a phone photo is often stored sideways with a rotation flag
+        img = img.copy()
+        img.thumbnail((1024, 1024))  # the model looks at 512 pixels anyway; a phone photo's 12 megapixels only slow the background removal down
+        if not remove_bg:
+            prepared = img.convert("RGB")
+        else:
+            if img.mode in ("RGBA", "LA") and np.asarray(img.convert("RGBA"))[:, :, 3].min() < 250:
+                rgba = img.convert("RGBA")  # a cut-out already: its transparency is the mask
+            else:
+                import rembg
+                rgba = remove_background(img, rembg.new_session("u2net"))  # U2-Net: Apache-2.0, 176 MB (rembg's own default is a 1 GB non-commercial model)
+            rgba = resize_foreground(rgba, foreground_ratio)
+            arr = np.array(rgba).astype(np.float32) / 255.0
+            arr = arr[:, :, :3] * arr[:, :, 3:4] + (1 - arr[:, :, 3:4]) * 0.5  # grey background, as the model expects
+            prepared = Image.fromarray((arr * 255.0).astype(np.uint8))
+
+        def run_model(dev):
+            report(35, "Guessing the 3D shape")
+            with torch.no_grad():
+                codes = self.model([prepared], device=dev)
+            report(60, "Building the mesh")
+            return self.model.extract_mesh(codes, True, resolution=resolution)[0]  # trimesh with vertex colours
+
+        try:
+            mesh = run_model(self.device)
+        except Exception as e:  # Apple's GPU backend (MPS) cannot run every operation this model uses: the processor always can
+            if self.device != "mps":
+                raise
+            print("NOTE the Apple GPU could not run the model (%s); running on the processor instead, which takes several minutes." % str(e)[:200], flush=True)
+            self.device = "cpu"
+            self.model.to(self.device)
+            mesh = run_model(self.device)
+        verts = np.asarray(mesh.vertices, dtype=np.float64)
+        faces = np.asarray(mesh.faces, dtype=np.int64)
+        colours = np.asarray(mesh.visual.vertex_colors)[:, :3].astype(np.float32) / 255.0
+        if len(faces) == 0:
+            raise ObjectError("the model found no object in the photo. Try a clearer photo of one object on a plain background.")
+
+        verts, faces = orient_mesh(np, verts, faces)
+
+        report(72, "Unwrapping the surface")
+        vmapping, indices, uvs = xatlas.parametrize(verts.astype(np.float32), faces.astype(np.uint32))
+        report(82, "Painting the texture")
+        tex = bake_vertex_colours(np, np.asarray(uvs, dtype=np.float32), np.asarray(indices, dtype=np.int64), colours[vmapping], texture_size)
+        # In pbrt, v = 0 is the bottom of the image; PNG rows run top to bottom.
+        Image.fromarray((np.clip(tex, 0, 1) * 255.0 + 0.5).astype(np.uint8)).transpose(Image.FLIP_TOP_BOTTOM).save(os.path.join(out_dir, "texture.png"))
+
+        report(95, "Writing the files")
+        out_verts = verts[vmapping]
+        normals = trimesh.Trimesh(vertices=out_verts, faces=np.asarray(indices), process=False).vertex_normals
+        mesh_path = os.path.join(out_dir, "mesh.obj")
+        with open(mesh_path, "w", newline="\n") as f:
+            f.write("# made by photo_to_mesh.py (TripoSR); Y up, standing on y = 0\n")
+            for v in out_verts:
+                f.write("v %.6f %.6f %.6f\n" % (v[0], v[1], v[2]))
+            for uv in np.asarray(uvs):
+                f.write("vt %.6f %.6f\n" % (uv[0], uv[1]))
+            for n in normals:
+                f.write("vn %.6f %.6f %.6f\n" % (n[0], n[1], n[2]))
+            for tri in np.asarray(indices):
+                a, b, c = (int(i) + 1 for i in tri)
+                f.write("f %d/%d/%d %d/%d/%d %d/%d/%d\n" % (a, a, a, b, b, b, c, c, c))
+        size = (out_verts.max(axis=0) - out_verts.min(axis=0)).tolist()
+        seconds = round(time.time() - started, 1)
+        with open(os.path.join(out_dir, "result.json"), "w") as f:
+            json.dump({"mesh": "mesh.obj", "texture": "texture.png", "size": size, "triangles": int(len(indices)), "seconds": seconds}, f)
+        report(100, "Done in %.0f s" % seconds)
+        return {"size": size, "triangles": int(len(indices)), "seconds": seconds}
+
+
 def main():
     ap = argparse.ArgumentParser(description="One photo -> a textured mesh (TripoSR, runs locally).")
     ap.add_argument("image", nargs="?", help="a photo of one object")
@@ -192,103 +311,14 @@ def main():
     if not os.path.isfile(args.image):
         fail("the photo %s was not found." % args.image)
     os.makedirs(args.out, exist_ok=True)
-    started = time.time()
 
-    progress(2, "Loading the libraries")
     try:
-        import numpy as np
-        import torch
-        import trimesh
-        import xatlas
         from PIL import Image
-    except ImportError as e:
-        fail("a Python package is missing (%s). Run scripts/setup_photo_to_mesh.ps1 (Windows) or .sh (macOS) first." % e)
-    triposr = find_triposr(args.triposr_dir)
-    if not triposr:
-        fail("TripoSR was not found. Run scripts/setup_photo_to_mesh.ps1 (Windows) or .sh (macOS), or pass --triposr-dir.")
-    sys.path.insert(0, triposr)
-    patch_marching_cubes(np, torch)
-    from tsr.system import TSR
-    from tsr.utils import remove_background, resize_foreground
-
-    device = args.device
-    if device == "auto":
-        device = "cuda:0" if torch.cuda.is_available() else ("mps" if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available() else "cpu")
-    if device == "cpu":
-        print("NOTE no graphics card was found for PyTorch, so this runs on the processor and takes several minutes.", flush=True)
-
-    progress(8, "Loading the model (the first run downloads about 1.7 GB)")
-    model = TSR.from_pretrained("stabilityai/TripoSR", config_name="config.yaml", weight_name="model.ckpt")
-    model.renderer.set_chunk_size(8192)
-    model.to(device)
-
-    progress(25, "Preparing the photo")
-    from PIL import ImageOps
-    img = ImageOps.exif_transpose(Image.open(args.image))  # a phone photo is often stored sideways with a rotation flag
-    img.thumbnail((1024, 1024))  # the model looks at 512 pixels anyway; a phone photo's 12 megapixels only slow the background removal down
-    if args.no_remove_bg:
-        prepared = img.convert("RGB")
-    else:
-        if img.mode in ("RGBA", "LA") and np.asarray(img.convert("RGBA"))[:, :, 3].min() < 250:
-            rgba = img.convert("RGBA")  # a cut-out already: its transparency is the mask
-        else:
-            import rembg
-            rgba = remove_background(img, rembg.new_session("u2net"))  # U2-Net: Apache-2.0, 176 MB (rembg's own default is a 1 GB non-commercial model)
-        rgba = resize_foreground(rgba, args.foreground_ratio)
-        arr = np.array(rgba).astype(np.float32) / 255.0
-        arr = arr[:, :, :3] * arr[:, :, 3:4] + (1 - arr[:, :, 3:4]) * 0.5  # grey background, as the model expects
-        prepared = Image.fromarray((arr * 255.0).astype(np.uint8))
-
-    def run_model(dev):
-        progress(35, "Guessing the 3D shape")
-        with torch.no_grad():
-            codes = model([prepared], device=dev)
-        progress(60, "Building the mesh")
-        return model.extract_mesh(codes, True, resolution=args.resolution)[0]  # trimesh with vertex colours
-
-    try:
-        mesh = run_model(device)
-    except Exception as e:  # Apple's GPU backend (MPS) cannot run every operation this model uses: the processor always can
-        if device != "mps":
-            raise
-        print("NOTE the Apple GPU could not run the model (%s); running on the processor instead, which takes several minutes." % str(e)[:200], flush=True)
-        device = "cpu"
-        model.to(device)
-        mesh = run_model(device)
-    verts = np.asarray(mesh.vertices, dtype=np.float64)
-    faces = np.asarray(mesh.faces, dtype=np.int64)
-    colours = np.asarray(mesh.visual.vertex_colors)[:, :3].astype(np.float32) / 255.0
-    if len(faces) == 0:
-        fail("the model found no object in the photo. Try a clearer photo of one object on a plain background.")
-
-    verts, faces = orient_mesh(np, verts, faces)
-
-    progress(72, "Unwrapping the surface")
-    vmapping, indices, uvs = xatlas.parametrize(verts.astype(np.float32), faces.astype(np.uint32))
-    progress(82, "Painting the texture")
-    tex = bake_vertex_colours(np, np.asarray(uvs, dtype=np.float32), np.asarray(indices, dtype=np.int64), colours[vmapping], args.texture_size)
-    # In pbrt, v = 0 is the bottom of the image; PNG rows run top to bottom.
-    Image.fromarray((np.clip(tex, 0, 1) * 255.0 + 0.5).astype(np.uint8)).transpose(Image.FLIP_TOP_BOTTOM).save(os.path.join(args.out, "texture.png"))
-
-    progress(95, "Writing the files")
-    out_verts = verts[vmapping]
-    normals = trimesh.Trimesh(vertices=out_verts, faces=np.asarray(indices), process=False).vertex_normals
-    mesh_path = os.path.join(args.out, "mesh.obj")
-    with open(mesh_path, "w", newline="\n") as f:
-        f.write("# made by photo_to_mesh.py (TripoSR); Y up, standing on y = 0\n")
-        for p in out_verts:
-            f.write("v %.6f %.6f %.6f\n" % (p[0], p[1], p[2]))
-        for t in np.asarray(uvs):
-            f.write("vt %.6f %.6f\n" % (t[0], t[1]))
-        for n in normals:
-            f.write("vn %.6f %.6f %.6f\n" % (n[0], n[1], n[2]))
-        for tri in np.asarray(indices):
-            a, b, c = (int(i) + 1 for i in tri)
-            f.write("f %d/%d/%d %d/%d/%d %d/%d/%d\n" % (a, a, a, b, b, b, c, c, c))
-    size = (out_verts.max(axis=0) - out_verts.min(axis=0)).tolist()
-    with open(os.path.join(args.out, "result.json"), "w") as f:
-        json.dump({"mesh": "mesh.obj", "texture": "texture.png", "size": size, "triangles": int(len(indices)), "seconds": round(time.time() - started, 1)}, f)
-    progress(100, "Done in %.0f s" % (time.time() - started))
+        maker = ObjectMaker(args.triposr_dir, args.device)
+        maker.make(Image.open(args.image), args.out, remove_bg=not args.no_remove_bg, foreground_ratio=args.foreground_ratio,
+                   resolution=args.resolution, texture_size=args.texture_size)
+    except ObjectError as e:
+        fail(str(e))
 
 
 if __name__ == "__main__":

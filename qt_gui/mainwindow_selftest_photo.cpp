@@ -151,14 +151,15 @@ void MainWindow::runRoomSelfTest(const std::function<void(const QString &)> &log
 	};
 	QString err;
 	QString badError;
-	const bool badOk = sb && sb->importRoom("C:/no/such/photo_for_the_selftest.png", 0.0, 0.0, &badError);
+	const bool badOk = sb && sb->importRoom("C:/no/such/photo_for_the_selftest.png", 0.0, 0.0, 0, &badError);
 	check(sb && !badOk && !badError.isEmpty(), "a missing photo fails with a message: " + badError.left(100));
 	const QString photo = qEnvironmentVariable("RT_GUI_SELFTEST_ROOM_PHOTO");
 	const double fov = qEnvironmentVariable("RT_GUI_SELFTEST_ROOM_FOV").toDouble();
 	const double height = qEnvironmentVariable("RT_GUI_SELFTEST_ROOM_HEIGHT").toDouble();
+	const int furniture = qEnvironmentVariable("RT_GUI_SELFTEST_ROOM_FURNITURE").toInt();
 	QStringList notes;
 	const size_t before = sb ? sb->document().objects.size() : 0;
-	check(sb && sb->importRoom(photo, height, fov, &err, &notes), "made a room from " + photo + " " + err);
+	check(sb && sb->importRoom(photo, height, fov, furniture, &err, &notes), "made a room from " + photo + " " + err);
 	if (sb && ok) {
 		const scene_doc::Document &doc = sb->document();
 		int emitters = 0, boxes = 0;
@@ -167,6 +168,11 @@ void MainWindow::runRoomSelfTest(const std::function<void(const QString &)> &log
 			if (o.shape == scene_doc::ShapeKind::Box) ++boxes;
 		}
 		check(boxes >= 7 && emitters >= 1, QString("the scene is a room of boxes with a light (%1 boxes, %2 lights; it had %3 objects before)").arg(boxes).arg(emitters).arg(before));
+		int meshes = 0;
+		for (const scene_doc::Object &o : doc.objects)
+			if (o.shape == scene_doc::ShapeKind::Mesh && QFile::exists(QString::fromStdString(o.meshFile))) ++meshes;
+		log(QString("furniture: %1 mesh object(s) asked for up to %2").arg(meshes).arg(furniture));
+		if (furniture > 0) check(meshes >= 1, "at least one piece of furniture was made");
 		check(doc.camera.fov > 10.0 && doc.camera.fov < 140.0, QString("the camera has a believable field of view (%1 degrees)").arg(doc.camera.fov));
 		check(!scene_doc::hasErrors(scene_doc::validate(doc)), "the scene has no errors");
 		for (const QString &n : notes) log("note: " + n);

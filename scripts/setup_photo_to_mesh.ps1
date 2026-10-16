@@ -69,7 +69,7 @@ if ($useGpu) {
 if ($LASTEXITCODE -ne 0) { throw "Installing PyTorch failed." }
 
 Write-Host "Installing the other packages..."
-& $python -m pip install omegaconf einops "transformers>=4.40,<5" trimesh "rembg[cpu]" huggingface-hub xatlas scikit-image scipy pillow numpy onnxruntime
+& $python -m pip install omegaconf einops "transformers>=4.40,<5" trimesh "rembg[cpu]" huggingface-hub xatlas scikit-image scipy pillow numpy onnxruntime timm
 if ($LASTEXITCODE -ne 0) { throw "Installing the packages failed." }
 
 $triposr = Join-Path $Folder "TripoSR"

@@ -36,8 +36,9 @@ COLORS = {
 WINDOW = (0.2, 1.4, 0.9, 2.2)
 
 
-def photograph(width=240, height=180, hfov=70.0, yaw=20.0, pitch=10.0, roll=0.0, cam_height=1.4, noise=0.0, window=True, seed=1):
-    """(depth, rgb uint8) of the room from a camera at (0, cam_height, 0): yawed about the vertical (positive turns towards +x), pitched down by `pitch`, rolled by `roll`."""
+def photograph(width=240, height=180, hfov=70.0, yaw=20.0, pitch=10.0, roll=0.0, cam_height=1.4, noise=0.0, window=True, seed=1, obstacle=None, want_mask=False):
+    """(depth, rgb uint8) of the room from a camera at (0, cam_height, 0): yawed about the vertical (positive turns towards +x), pitched down by `pitch`, rolled by `roll`.
+    `obstacle` is a box ((x0, y0, z0), (x1, y1, z1)) of furniture standing in the room; with `want_mask` the answer also holds the (height, width) mask of the pixels that see it."""
     f = (width / 2.0) / math.tan(math.radians(hfov) / 2.0)
     u = np.arange(width) + 0.5
     v = np.arange(height) + 0.5
@@ -72,10 +73,23 @@ def photograph(width=240, height=180, hfov=70.0, yaw=20.0, pitch=10.0, roll=0.0,
         x0, x1, y0, y1 = WINDOW
         win = (name == "back") & (hit[..., 0] > x0) & (hit[..., 0] < x1) & (hit[..., 1] > y0) & (hit[..., 1] < y1)
         rgb[win] = 1.0
+    mask = np.zeros((height, width), dtype=bool)
+    if obstacle is not None:
+        lo, hi = np.array(obstacle[0], float), np.array(obstacle[1], float)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            t0 = (lo - origin) / d
+            t1 = (hi - origin) / d
+        near = np.minimum(t0, t1).max(axis=-1)
+        far = np.maximum(t0, t1).min(axis=-1)
+        hit_box = (far >= np.maximum(near, 0.0)) & (near > 0) & (near < t)
+        t = np.where(hit_box, near, t)
+        rgb[hit_box] = srgb((150, 130, 100))
+        mask = hit_box
     depth = t.copy()
     if noise:
         depth = depth * (1.0 + noise * np.random.default_rng(seed).standard_normal(depth.shape))
-    return depth, (np.clip(rgb, 0, 1) * 255 + 0.5).astype(np.uint8)
+    picture = (np.clip(rgb, 0, 1) * 255 + 0.5).astype(np.uint8)
+    return (depth, picture, mask) if want_mask else (depth, picture)
 
 
 @unittest.skipUnless(HAVE_NUMPY, "numpy is not installed")

@@ -9,7 +9,7 @@ pbrt_scene_compare.py compares the bundled scenes with pbrt, but only where a pb
 Per scene (64 x 64, depth 8): pbrt's mean picture value (the mean of every value of every channel, unclipped) at --pbrt-spp samples, twice with different seeds (their
 disagreement is the noise of the reference); then for each renderer the ratio ours / pbrt at --ref-spp samples (1.0 for a scene that agrees, the known offset for one that does not:
 the test then watches the offset, not just the agreement) and the noise of a single render at the test's own sample count (--test-spp, over --noise-runs seeds), which sets the
-tolerance: max(--min-tol, 4 x that noise + the reference's own). --min-tol is 1.5%: with the old 3% floor a 1% bias in a quiet scene went unseen (mutation test, October 2026).
+tolerance: max(--min-tol, 4 x that noise (6 x on the CPU) + the reference's own). --min-tol is 1.5%: with the old 3% floor a 1% bias in a quiet scene went unseen (mutation test, October 2026).
 
 Table columns (whitespace separated, `#` lines are comments):
     name  test_spp  depth  size  pbrt_mean_r  pbrt_mean_g  pbrt_mean_b  pbrt_noise  cpu_ratio cpu_tol  recursive_ratio recursive_tol  wavefront_ratio wavefront_tol
@@ -34,6 +34,8 @@ import pbrt_scene_compare as psc     # (prepare(): the scene text both renderers
 
 KMAXPIN = 0.05   # the largest gap between a test-count mean and the converged one that the table pins as the expected value
 KMAXTOL = 0.25   # the widest tolerance a row may have (a scene that needs more is too noisy to guard: it is listed as NOISY)
+CPU_SIGMAS = 6.0
+GPU_SIGMAS = 4.0
 
 # Scenes whose single render has a heavy tail (a point light inside fog: the CPU's four runs of one render read 1.568, 1.580, 1.980 and 1.540, then 1.897 on a CI machine): the spread of a few
 # runs underestimates it, a 13% tolerance failed a hosted run, so the CPU gets the widest tolerance a row may have (the GPU renders are bit-reproducible and keep theirs).
@@ -124,11 +126,14 @@ def one(args, name):
                         print('  pinned  %-34s %-9s test count reads %+.1f%% from its converged mean' % (name, backend, 100.0 * off), file=sys.stderr)
                     else:
                         print('  UNPINNED %-33s %-9s test count reads %+.1f%% from its converged mean (kept the converged ratio)' % (name, backend, 100.0 * off), file=sys.stderr)
-            tol = min(KMAXTOL, max(args.min_tol, 4.0 * sigma + pbrt_noise))
+            # A CPU render differs from run to run (threads), and sigma comes from only a few runs, so the CPU's band is 6 sigma wide, the GPU's (reproducible) 4: a 4-sigma CPU band failed a full run
+            # on a heavy-tailed scene (+3.5% against 3.2%) that read within 0.6% in three isolated runs.
+            factor = CPU_SIGMAS if backend == 'cpu' else GPU_SIGMAS
+            tol = min(KMAXTOL, max(args.min_tol, factor * sigma + pbrt_noise))
             if backend == 'cpu' and name in HEAVY_TAIL_CPU:
                 tol = KMAXTOL
-            if 4.0 * sigma + pbrt_noise > KMAXTOL:
-                print('  NOISY   %-34s %-9s wants a %.0f%% tolerance, capped at %.0f%%' % (name, backend, 100.0 * (4.0 * sigma + pbrt_noise), 100.0 * KMAXTOL), file=sys.stderr)
+            if factor * sigma + pbrt_noise > KMAXTOL:
+                print('  NOISY   %-34s %-9s wants a %.0f%% tolerance, capped at %.0f%%' % (name, backend, 100.0 * (factor * sigma + pbrt_noise), 100.0 * KMAXTOL), file=sys.stderr)
             cols.append((ratio, tol))
         return name, (ref, pbrt_noise, cols, chroma), ""
     except Exception as e:   # (a scene must not stop the run)

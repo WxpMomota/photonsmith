@@ -6,10 +6,14 @@
 // Python and are unit-tested with hand-written files) and makes ordinary Builder objects, so the room can be edited like any scene: the surfaces are Boxes (locked, so a stray
 // drag does not move a wall; they can still be picked in the list), the lights are emissive Boxes.
 //
+// With --furniture the helper also makes a mesh of each piece of furniture it finds (TripoSR, the Object from a photo model); room.json lists them and each becomes a Mesh object
+// standing where the photo shows it, facing the camera. The mesh files are named relative to the room.json's folder.
+//
 // Header-only, standard library only; part of the Scene Builder's document (scene_document.h).
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -24,6 +28,7 @@ struct Import {
 	int width = 800, height = 600;                 // the render size: the photo's proportions
 	std::vector<scene_doc::Object> surfaces;       // floor, ceiling, walls
 	std::vector<scene_doc::Object> lights;         // emissive panels
+	std::vector<scene_doc::Object> furniture;      // meshes the helper made of the furniture it found (empty without --furniture)
 	std::vector<std::string> notes;                // what the helper had to assume, for the user
 	double photoBrightness = 0.0;                  // how bright the photo looks (pictureBrightness of it), 0 when the file does not say: the lights are then left as the helper set them
 	scene_doc::Float3 roomMin, roomMax;
@@ -55,8 +60,9 @@ inline scene_doc::Object boxObject(const std::string& name, const scene_doc::Flo
 
 }  // namespace detail
 
-// Reads the helper's room.json. Returns false with `err` set when the file is not one the Builder can use; otherwise `out` holds the room.
-inline bool fromJson(const std::string& text, Import& out, std::string& err) {
+// Reads the helper's room.json. Returns false with `err` set when the file is not one the Builder can use; otherwise `out` holds the room. `baseFolder` is the folder the file is in:
+// the furniture's mesh and texture files are named relative to it (a piece whose files are not there, or whose numbers are not believable, is left out, and the notes say so).
+inline bool fromJson(const std::string& text, Import& out, std::string& err, const std::string& baseFolder = std::string()) {
 	using scene_doc::detail::Json;
 	using scene_doc::detail::readNum;
 	using scene_doc::detail::readRgb;
@@ -133,6 +139,34 @@ inline bool fromJson(const std::string& text, Import& out, std::string& err) {
 		}
 	}
 
+	// ---- furniture: a mesh and a texture each, placed and turned
+	if (const Json* objects = root.find("objects")) {
+		if (objects->type != Json::Type::Arr) { err = "the furniture in the room file is not a list"; return false; }
+		namespace fs = std::filesystem;
+		const auto resolve = [&](const std::string& rel) { return baseFolder.empty() ? rel : (fs::path(baseFolder) / rel).string(); };
+		for (const Json& o : objects->a) {
+			std::string name = "Furniture", mesh, texture;
+			scene_doc::Float3 pos{};
+			double yaw = 0.0, scale = 1.0;
+			const bool readable = o.type == Json::Type::Obj && scene_doc::detail::readStr(o, "name", name) && scene_doc::detail::readStr(o, "mesh", mesh) &&
+			                      scene_doc::detail::readStr(o, "texture", texture) && readVec(o, "position", pos) && readNum(o, "yaw", yaw) && readNum(o, "scale", scale);
+			const bool believable = readable && !mesh.empty() && detail::finite3(pos.x, pos.y, pos.z) && std::fabs(pos.x) < 500 && std::fabs(pos.y) < 500 && std::fabs(pos.z) < 500 &&
+			                        std::isfinite(yaw) && scale > 0.001 && scale < 100.0;
+			std::error_code ec;
+			if (!believable || !fs::exists(resolve(mesh), ec) || (!texture.empty() && !fs::exists(resolve(texture), ec))) {
+				out.notes.push_back("A piece of furniture in the room file (" + name + ") could not be used and was left out.");
+				continue;
+			}
+			scene_doc::Object m = scene_doc::makeObject(scene_doc::ShapeKind::Mesh, name);
+			m.meshFile = resolve(mesh);
+			m.material.imageFile = texture.empty() ? std::string() : resolve(texture);
+			m.meshScale = scale;
+			m.position = pos;
+			m.rotation = {0.0, yaw, 0.0};
+			out.furniture.push_back(m);
+		}
+	}
+
 	if (const Json* notes = root.find("notes")) {
 		if (notes->type == Json::Type::Arr)
 			for (const Json& n : notes->a)
@@ -195,6 +229,7 @@ inline void applyTo(const Import& room, scene_doc::Document& doc, const std::str
 	doc.cameraViews.clear();
 	for (const scene_doc::Object& o : room.surfaces) doc.objects.push_back(o);
 	for (const scene_doc::Object& o : room.lights) doc.objects.push_back(o);
+	for (const scene_doc::Object& o : room.furniture) doc.objects.push_back(o);
 	doc.camera = room.camera;
 	doc.camera.focusDistance = std::max(1.0, std::sqrt((room.roomMax.x - room.roomMin.x) * (room.roomMax.x - room.roomMin.x) + (room.roomMax.z - room.roomMin.z) * (room.roomMax.z - room.roomMin.z)) / 2.0);
 	doc.render.width = room.width;

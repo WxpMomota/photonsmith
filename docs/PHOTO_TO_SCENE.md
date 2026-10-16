@@ -125,17 +125,17 @@ the reflections as part of the object), and objects cut off by the edge of the p
 ## Room from a photo
 
 **Add > Room from a photo...** turns one photo of a room into a room you can edit: its **floor, ceiling and walls** at about the right size and colour, the **windows and
-lamps** as lights, and a **camera** that sees what the photo saw, so the first picture you render is the photo's view. A small depth model ([Depth Anything
+lamps** as lights, a **camera** that sees what the photo saw (so the first picture you render is the photo's view) and, if you ask for it, the **furniture** it recognises. A small depth model ([Depth Anything
 V2](https://github.com/DepthAnything/Depth-Anything-V2), "Metric Indoor Small", 25 million parameters) guesses how far away every pixel is, and a geometry step fits a box-shaped room to that.
 It runs on your own computer; **the photo is not uploaded anywhere**. The room **replaces the current scene** (Undo brings it back).
 
-![On the left, a picture of a living room (the bundled Fireplace Room scene, rendered, used as the test photo); on the right, the room made from it: dark brown walls, a floor, the window on the left wall](gallery/room-from-photo.jpg)
+![On the left, a picture of a dining room (the bundled Breakfast Room scene, rendered, used as the test photo); on the right, the room made from it: walls, floor, a lamp, and three chairs and a table in the same places](gallery/room-from-photo.jpg)
 
-*Left: the photo (here a render of the bundled Fireplace Room scene, because its true layout is known). Right: the room the program made from it, rendered from the camera it placed. The walls, the corner, the window and the brightness follow the photo; the furniture, the skirting boards and the wood grain do not.*
+*Left: the photo (here a render of a view of the bundled Breakfast Room scene, because its true layout is known). Right: the room the program made from it, rendered from the camera it placed. The walls, the corner and the brightness follow the photo, and the chairs stand where the photo has them; the pictures on the wall, the lamps, the table's legs and every surface detail do not.*
 
 It is a first draft, not a scan:
 
-- the room is **empty**: furniture, pictures and plants are not modelled (add them with *Object from a photo*, shapes or the model library);
+- the **furniture is a guess** (the next section): only what the model can name is found, each piece has an invented back, and the room itself is empty of everything else (pictures, rugs, small things: add them with *Object from a photo*, shapes or the model library);
 - a wall, floor or ceiling the photo **does not show is assumed** (the program lists those after it finishes), and the room is a plain box, so alcoves and sloping ceilings are lost;
 - the **size** is only as good as the depth model's sense of scale: it is usually within a fifth, sometimes further. If you know how high the camera was above the floor, say so in the dialog
   and everything is scaled to match;
@@ -144,14 +144,19 @@ It is a first draft, not a scan:
   The **light level** is set by rendering a small draft of the room and turning the lights until its average brightness matches the photo's, so the rendered room is about as bright as the
   photographed one (the first render also shows how far off the colours are: change them in the properties).
 
+### Furniture
+
+The dialog's **Furniture to add** (0 to 8, 4 to start with) is how many pieces to look for. A second small model (DETR, Apache-2.0, about 170 MB, downloaded the first time) outlines and names what is in the photo; the program keeps the chairs, sofas, beds, tables, plants, shelves, cabinets, appliances and a few other things it knows (not people or animals) that cover at least about 1% of the picture, the biggest first, then cuts each one out and has the Object-from-a-photo model (TripoSR) make a 3D mesh of it. Each is stood where the photo shows it: how tall it is and where it stands come from the depth, and it faces the camera (or lines up with the room's walls when it is nearly so, like a sofa against a wall). Its colours are brightened the way the walls are. A piece takes a few seconds on a graphics card and minutes on the processor.
+
+Expect a draft you tidy up: a piece that is **cut off by the picture's edge or half hidden behind another** comes out lumpy or in the wrong place (the model cannot see what is not there); **thin legs and open frames** (a table's legs, a chair's back) come out solid or missing, so a tabletop may float; and the model only knows common household things (COCO's categories), so a piano or an unusual lamp is left out. Move, resize or delete any piece in the Builder; the notes list what was made. The cut-out each piece was made from is saved next to it as `cutout.png`.
+
 The dialog also asks for the photo's **field of view** (how wide it sees, left to right). Leave it at 0 and the program reads it from the photo's own data (the 35 mm equivalent focal length
 that phones and cameras store), or assumes a phone camera's about 67 degrees; a room that looks stretched or squashed in the first picture has the wrong value, and the camera's field of view
 in the Camera section fixes it.
 
 ### Setting it up
 
-It uses the **same helper environment as Object from a photo** (the setup above: *Diagnostics > Install Photo Helper*). The first run downloads the depth model (about 100 MB, from Hugging Face)
-and says so; after that it works offline. Unlike the object helper it needs no graphics card: the model is small, a photo takes a few seconds on the processor and about a second on a graphics card.
+It uses the **same helper environment as Object from a photo** (the setup above: *Diagnostics > Install Photo Helper*; furniture also needs the small `timm` package, which the setup script now installs: if you set the helper up earlier, run the setup script again or `pip install timm` in its environment). The first run downloads the depth model (about 100 MB, from Hugging Face) and says so; furniture downloads its model (about 170 MB) the first time it is asked for. After that it works offline. Unlike the object helper it needs no graphics card: the model is small, a photo takes a few seconds on the processor and about a second on a graphics card.
 
 The depth model is a fine-tune of Depth Anything V2's "Small" model, which is released under the Apache-2.0 licence; the metric fine-tune's own model card does not name a licence, so look at
 the [model page](https://huggingface.co/depth-anything/Depth-Anything-V2-Metric-Indoor-Small-hf) before using results commercially. The model is downloaded on your computer and never shipped with the program.
@@ -178,6 +183,8 @@ You can also run the helper by itself:
 |---|---|
 | "The photo helper has not been set up" | Install the photo helper (Diagnostics tab), as for Object from a photo. |
 | "could not find a room in this photo" | Use a photo taken inside a room that shows a floor and at least one wall. |
+| "No furniture was recognised in the photo" | Nothing the model knows covered enough of the picture; move closer, or add pieces yourself. |
+| a piece is black, lumpy, floating or in the wrong place | It was cut off by the picture's edge, half hidden or thin: delete it and use *Object from a photo* on a clearer picture of it. |
 | the room is the wrong size | Say how high the camera was in the dialog (the size follows it), or scale the room's objects in the Builder. |
 | the room looks stretched or squashed in the first picture | The photo's field of view was guessed wrong: give it in the dialog, or set the camera's field of view. |
 | the walls are crooked | The photo was tilted or showed mostly one wall; try one that shows a corner and some floor. |
@@ -209,19 +216,18 @@ Things that do not carry over yet:
 - Scans are **not relightable** beyond the colour they carry: shadows and highlights from the day they were photographed are
   in the texture. Photograph in even, overcast light to keep that small.
 
-## Why is the room empty?
+## Why is the furniture only a guess?
 
 One photo does not hold enough information to rebuild a room's furniture: depth is ambiguous and everything hidden is unknown. A room is different, because it is mostly a box: the floor, the
-ceiling and a few walls, which a depth map shows well, so *Room from a photo* builds that. Furniture and objects are guesses with an invented back, so they are left to *Object from a photo* (one
-object at a time) and to you. Neural scene models (NeRF, Gaussian splatting) give beautiful new views of a scene but are not geometry and materials a path tracer can re-light, so they are not offered here.
+ceiling and a few walls, which a depth map shows well, so *Room from a photo* builds that reliably. Furniture is the same job as *Object from a photo* (one object, one view, an invented back), done several times, with the extra problem that pieces hide one another, so it is offered as a starting point to edit. Neural scene models (NeRF, Gaussian splatting) give beautiful new views of a scene but are not geometry and materials a path tracer can re-light, so they are not offered here.
 
 ## For developers
 
 - *Room from a photo* is two Python files that need no model for their tests: `tools/photo_to_room/room_fit.py` (the geometry: depth map to a box room, colours, lights, camera; numpy only) and
   `photo_to_room.py` (the model wrapper). `python -m unittest tools/photo_to_room/test_room_fit.py` fits rooms of known size photographed analytically (a turned, tilted and rolled camera, noisy
-  depth, walls out of view). The Builder's side is `src/shared/scene_room.h` (reads `room.json`, builds the objects, and the light-level solver) with `tests/unit/scene_room_tests.cpp`, which also renders
+  depth, walls out of view) and `test_room_objects.py` (furniture of known size and place: where it stands, how tall, which way it faces, what counts as furniture, the texture's exposure). The Builder's side is `src/shared/scene_room.h` (reads `room.json`, builds the objects, and the light-level solver) with `tests/unit/scene_room_tests.cpp`, which also renders
   a room to check that the photo's left stays left. The GUI self-test mode `room` (`RT_GUI_SELFTEST=room RT_GUI_SELFTEST_ROOM_PHOTO=<image>`) runs the whole flow and writes the room as
-  `<prefix>_room.pbrt`.
+  `<prefix>_room.pbrt` (`RT_GUI_SELFTEST_ROOM_FURNITURE=<n>` asks for furniture too).
 - The helper's pure parts have tests that need no model: `%LOCALAPPDATA%\RayTracerPhoto\venv\Scripts\python.exe -m unittest tools/photo_to_mesh/test_photo_to_mesh.py`
   (mesh orientation, the colour baker, the `--check` report; they skip without numpy and scipy).
 - The Qt-free text handling (`src/shared/photo_helper_report.h`: progress lines, the missing-facts parser, the line splitter that copes with

@@ -12,6 +12,8 @@
 #include "../../src/shared/scene_room.h"
 
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
 #include <string>
 
 using namespace scene_doc;
@@ -203,6 +205,107 @@ TEST(SceneRoomTest, TheLightSolverGivesUpGracefully) {
 	EXPECT_GE(g, 0.02);
 	// nonsense target
 	EXPECT_EQ(scene_room::solveLightFactor([](double x) { return x; }, 0.0), 1.0);
+}
+
+namespace {
+
+// An upright quad mesh facing +z (its front), 1 wide and 1 tall, standing on y = 0, whose picture is red on its left half and green on its right half as seen from the front.
+// Written with its texture to `folder`; returns false if it cannot.
+bool writeTwoColourQuad(const std::string& folder) {
+	std::error_code ec;
+	std::filesystem::create_directories(folder, ec);
+	{
+		std::ofstream obj(folder + "/mesh.obj", std::ios::binary);
+		obj << "v -0.5 0 0\nv 0.5 0 0\nv 0.5 1 0\nv -0.5 1 0\nvt 0 0\nvt 1 0\nvt 1 1\nvt 0 1\nvn 0 0 1\nf 1/1/1 2/2/1 3/3/1\nf 1/1/1 3/3/1 4/4/1\n";
+		if (!obj) return false;
+	}
+	const std::vector<unsigned char> rgb = {255, 0, 0, 0, 255, 0};   // 2 x 1, from the top row: red, green
+	std::ofstream tex(folder + "/texture.bmp", std::ios::binary);
+	tex << bmpFile(2, 1, rgb);
+	return static_cast<bool>(tex);
+}
+
+std::string roomWithOneFurniture(const std::string& position, const std::string& yaw) {
+	return roomJson(R"(, "objects": [{"name": "Poster 1", "label": "chair", "score": 0.9, "mesh": "mesh.obj", "texture": "texture.bmp", "position": )" + position +
+	                R"(, "yaw": )" + yaw + R"(, "scale": 1.5, "size": [1.5, 1.5, 0.0]}])");
+}
+
+}  // namespace
+
+TEST(SceneRoomTest, FurnitureBecomesMeshObjectsAndABadPieceIsLeftOutNotFatal) {
+	const std::string folder = "scene_room_test_furniture";
+	ASSERT_TRUE(writeTwoColourQuad(folder));
+	scene_room::Import room;
+	std::string err;
+	ASSERT_TRUE(scene_room::fromJson(roomWithOneFurniture("[0.5, 0, 2]", "180"), room, err, folder)) << err;
+	ASSERT_EQ(room.furniture.size(), 1u);
+	const Object& m = room.furniture[0];
+	EXPECT_EQ(m.shape, ShapeKind::Mesh);
+	EXPECT_EQ(m.name, "Poster 1");
+	EXPECT_NEAR(m.position.x, 0.5, 1e-9);
+	EXPECT_NEAR(m.rotation.y, 180.0, 1e-9);
+	EXPECT_NEAR(m.meshScale, 1.5, 1e-9);
+	EXPECT_NE(m.meshFile.find("mesh.obj"), std::string::npos);
+	EXPECT_NE(m.material.imageFile.find("texture.bmp"), std::string::npos);
+	EXPECT_FALSE(m.locked) << "furniture is there to be moved";
+
+	// a piece whose files are missing, or whose numbers are nonsense, is left out and the rest of the room is still made
+	scene_room::Import missing;
+	ASSERT_TRUE(scene_room::fromJson(roomWithOneFurniture("[0, 0, 2]", "0"), missing, err, folder + "/nowhere")) << err;
+	EXPECT_TRUE(missing.furniture.empty());
+	EXPECT_EQ(missing.surfaces.size(), 6u);
+	EXPECT_TRUE(std::any_of(missing.notes.begin(), missing.notes.end(), [](const std::string& n) { return n.find("Poster 1") != std::string::npos; }));
+	scene_room::Import silly;
+	std::string text = roomWithOneFurniture("[0, 0, 2]", "0");
+	text.replace(text.find("\"scale\": 1.5"), 12, "\"scale\": -3");
+	ASSERT_TRUE(scene_room::fromJson(text, silly, err, folder)) << err;
+	EXPECT_TRUE(silly.furniture.empty());
+
+	// the room replaces the scene with the furniture in it, and the document is still one the Builder accepts and the renderer loads
+	Document d = makeStarterScene();
+	scene_room::applyTo(room, d, "Room");
+	EXPECT_EQ(d.objects.size(), 8u) << "six surfaces, a lamp and a piece of furniture";
+	EXPECT_FALSE(hasErrors(validate(d)));
+	EXPECT_TRUE(loadText(toPbrt(d), "room_furniture").ok);
+	std::error_code ec;
+	std::filesystem::remove_all(folder, ec);
+}
+
+TEST(SceneRoomTest, AMeshTurnedToFaceTheCameraShowsItsFrontNotItsBack) {
+	const std::string launcher = findLauncher();
+	if (launcher.empty()) GTEST_SKIP() << "ray_tracer.exe was not found next to the tests";
+	const std::string folder = "scene_room_test_facing";
+	ASSERT_TRUE(writeTwoColourQuad(folder));
+	// The camera is at the origin looking +z. A piece 1.5 to the Builder's +x (the photo's left) and 3 ahead faces back towards the camera: the front (+z) has to turn to point at
+	// (-1.5, -3), a turn of atan2(-1.5, -3) = -153.43 degrees about +y (see room_objects.finalize_object). Seen from the front its red half is to the left of its green half; seen from
+	// behind (a turn of the wrong sign) the two swap.
+	for (const double yaw : {-153.4349488, 0.0}) {
+		scene_room::Import room;
+		std::string err;
+		ASSERT_TRUE(scene_room::fromJson(roomWithOneFurniture("[1.5, 0, 3]", scene_doc::detail::num(yaw)), room, err, folder)) << err;
+		room.camera.fov = 70.0;
+		for (scene_doc::Object& o : room.surfaces) o.material.color = {0.6, 0.6, 0.6};   // (the example room's own side walls are red and green: not here)
+		Document d = makeStarterScene();
+		scene_room::applyTo(room, d, "Room");
+		std::vector<float> rgb;
+		int w = 0, h = 0;
+		ASSERT_TRUE(renderWithLauncher(launcher, toPbrt(d), "room_facing", 96, 64, 5, rgb, w, h));
+		double redX = 0, redN = 0, greenX = 0, greenN = 0;
+		for (int y = 0; y < h; ++y)
+			for (int x = 0; x < w; ++x) {
+				const float* p = &rgb[(static_cast<size_t>(y) * w + x) * 3];
+				if (p[0] > 2.0f * p[1] && p[0] > 0.05f) { redX += x; ++redN; }
+				if (p[1] > 2.0f * p[0] && p[1] > 0.05f) { greenX += x; ++greenN; }
+			}
+		ASSERT_GT(redN, 10.0) << "the piece is in the picture (yaw " << yaw << ")";
+		ASSERT_GT(greenN, 10.0);
+		if (yaw != 0.0)
+			EXPECT_LT(redX / redN, greenX / greenN) << "facing the camera, the red half is to the left of the green half";
+		else
+			EXPECT_GT(redX / redN, greenX / greenN) << "turned the other way it shows its back, and the two halves swap";
+	}
+	std::error_code ec;
+	std::filesystem::remove_all(folder, ec);
 }
 
 TEST(SceneRoomTest, LeftStaysLeftTheLampLightsTheRoomAndTheCameraSeesIt) {

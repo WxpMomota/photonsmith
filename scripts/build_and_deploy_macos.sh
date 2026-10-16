@@ -243,6 +243,7 @@ mkdir -p "$APP_BUNDLE/Contents/MacOS/tools/photo_to_mesh" "$APP_BUNDLE/Contents/
 cp "$REPO_ROOT/tools/photo_to_mesh/photo_to_mesh.py" "$APP_BUNDLE/Contents/MacOS/tools/photo_to_mesh/photo_to_mesh.py"
 cp "$REPO_ROOT/tools/photo_to_room/photo_to_room.py" "$APP_BUNDLE/Contents/MacOS/tools/photo_to_room/photo_to_room.py"
 cp "$REPO_ROOT/tools/photo_to_room/room_fit.py" "$APP_BUNDLE/Contents/MacOS/tools/photo_to_room/room_fit.py"
+cp "$REPO_ROOT/tools/photo_to_room/room_objects.py" "$APP_BUNDLE/Contents/MacOS/tools/photo_to_room/room_objects.py"
 cp "$REPO_ROOT/scripts/setup_photo_to_mesh.sh" "$APP_BUNDLE/Contents/MacOS/scripts/setup_photo_to_mesh.sh"
 chmod +x "$APP_BUNDLE/Contents/MacOS/scripts/setup_photo_to_mesh.sh"
 

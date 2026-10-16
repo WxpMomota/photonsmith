@@ -23,6 +23,7 @@
 #include <QMessageBox>
 #include <QProcess>
 #include <QProgressDialog>
+#include <QSpinBox>
 #include <QSettings>
 #include <QVBoxLayout>
 
@@ -156,7 +157,7 @@ bool SceneBuilderWidget::importPhoto(const QString &photo, QString *error) {
 static const char *kRoomNoticeKey = "sceneBuilder/roomNoticeSeen";
 
 // The two things only the person who took the photo knows: how high the camera was and (when the photo carries no lens) how wide it saw. 0 means "let the helper decide".
-static bool askRoomOptions(QWidget *parent, double *cameraHeight, double *fov) {
+static bool askRoomOptions(QWidget *parent, double *cameraHeight, double *fov, int *furniture) {
 	QDialog dialog(parent);
 	dialog.setWindowTitle(QObject::tr("Room from a photo"));
 	auto *layout = new QVBoxLayout(&dialog);
@@ -180,6 +181,12 @@ static bool askRoomOptions(QWidget *parent, double *cameraHeight, double *fov) {
 	angle->setToolTip(QObject::tr("How wide the photo sees, left to right. A phone's main camera is about 65 to 70 degrees. 0 reads it from the photo's own data, or assumes a phone."));
 	form->addRow(QObject::tr("Camera height above the floor"), height);
 	form->addRow(QObject::tr("Photo's field of view (horizontal)"), angle);
+	auto *pieces = new QSpinBox(&dialog);
+	pieces->setRange(0, 8);
+	pieces->setValue(4);
+	pieces->setSpecialValueText(QObject::tr("none (an empty room)"));
+	pieces->setToolTip(QObject::tr("How many pieces of furniture (chairs, sofas, tables, plants...) to find in the photo and make 3D objects of. Each takes some seconds on a graphics card and minutes on the processor."));
+	form->addRow(QObject::tr("Furniture to add (at most)"), pieces);
 	layout->addLayout(form);
 	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
 	QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
@@ -188,6 +195,7 @@ static bool askRoomOptions(QWidget *parent, double *cameraHeight, double *fov) {
 	if (dialog.exec() != QDialog::Accepted) return false;
 	*cameraHeight = height->value();
 	*fov = angle->value();
+	*furniture = pieces->value();
 	return true;
 }
 
@@ -208,8 +216,8 @@ void SceneBuilderWidget::addRoomFromPhoto() {
 		QMessageBox box(QMessageBox::Information, tr("Room from a photo"),
 		                tr("A photo of a room becomes a room you can edit: its walls, floor and ceiling at about the right size and colour, windows and lamps as lights, and a camera that sees what the "
 		                   "photo saw. A small AI model on this computer guesses the distances; the photo is not uploaded anywhere.\n\n"
-		                   "It is a first draft: the room is empty (furniture is not modelled), a wall the photo does not show is assumed, and the size can be off by a fifth or more. "
-		                   "The first run downloads the model (about 100 MB).\n\n"
+		                   "It is a first draft: a wall the photo does not show is assumed, the size can be off by a fifth or more, and any furniture is a guess (a 3D model of each piece, made from the "
+		                   "photo, with an invented back). The first run downloads the depth model (about 100 MB), and the first time furniture is asked for, a second one (about 170 MB).\n\n"
 		                   "This replaces the scene you have now (Undo brings it back)."),
 		                QMessageBox::Ok | QMessageBox::Cancel, this);
 		auto *again = new QCheckBox(tr("Do not show this again"), &box);
@@ -220,20 +228,21 @@ void SceneBuilderWidget::addRoomFromPhoto() {
 	const QString photo = QFileDialog::getOpenFileName(this, tr("Choose a photo of a room"), QString(), tr("Photos (*.png *.jpg *.jpeg *.bmp *.webp)"));
 	if (photo.isEmpty()) return;
 	double height = 0.0, fov = 0.0;
-	if (!askRoomOptions(this, &height, &fov)) return;
+	int furniture = 0;
+	if (!askRoomOptions(this, &height, &fov, &furniture)) return;
 	QString error;
 	QStringList notes;
-	if (!importRoom(photo, height, fov, &error, &notes)) {
+	if (!importRoom(photo, height, fov, furniture, &error, &notes)) {
 		if (!error.isEmpty()) QMessageBox::warning(this, tr("Could not make the room"), error);
 		return;
 	}
 	if (!notes.isEmpty()) QMessageBox::information(this, tr("About this room"), tr("What the program had to assume:\n\n- %1").arg(notes.join("\n- ")));
 }
 
-bool SceneBuilderWidget::importRoom(const QString &photo, double cameraHeight, double fov, QString *error, QStringList *notes) {
+bool SceneBuilderWidget::importRoom(const QString &photo, double cameraHeight, double fov, int furniture, QString *error, QStringList *notes) {
 	const photo_import::Setup setup = photo_import::locate();
-	AppLog::info(QStringLiteral("photo"), QStringLiteral("room from a photo: %1 (helper %2, camera height %3, fov %4)")
-	                                          .arg(photo, setup.ready ? QStringLiteral("ready") : QStringLiteral("not ready: ") + setup.why, QString::number(cameraHeight), QString::number(fov)));
+	AppLog::info(QStringLiteral("photo"), QStringLiteral("room from a photo: %1 (helper %2, camera height %3, fov %4, furniture %5)")
+	                                          .arg(photo, setup.ready ? QStringLiteral("ready") : QStringLiteral("not ready: ") + setup.why, QString::number(cameraHeight), QString::number(fov), QString::number(furniture)));
 	if (!setup.ready || setup.roomScript.isEmpty()) {
 		if (error) *error = setup.ready ? tr("The room script (tools/photo_to_room/photo_to_room.py) was not found next to the program.") : setup.why;
 		return false;
@@ -253,7 +262,7 @@ bool SceneBuilderWidget::importRoom(const QString &photo, double cameraHeight, d
 	progress.setValue(0);
 
 	PhotoToMeshJob job(setup, photo, outFolder, true);
-	job.useRoomHelper(cameraHeight, fov);
+	job.useRoomHelper(cameraHeight, fov, furniture);
 	bool ok = false, cancelled = false;
 	QString message;
 	QEventLoop loop;
@@ -283,7 +292,7 @@ bool SceneBuilderWidget::importRoom(const QString &photo, double cameraHeight, d
 			problem = tr("The helper finished but its room file could not be read.");
 		} else {
 			std::string why;
-			if (!scene_room::fromJson(file.readAll().toStdString(), room, why)) problem = tr("The helper's room file is not usable: %1").arg(QString::fromStdString(why));
+			if (!scene_room::fromJson(file.readAll().toStdString(), room, why, outFolder.toStdString())) problem = tr("The helper's room file is not usable: %1").arg(QString::fromStdString(why));
 		}
 		if (!problem.isEmpty()) {
 			ok = false;
@@ -310,7 +319,8 @@ bool SceneBuilderWidget::importRoom(const QString &photo, double cameraHeight, d
 	setSelection(m_sel);
 	if (notes)
 		for (const std::string &n : room.notes) *notes << QString::fromStdString(n);
-	emit statusMessage(tr("Made a room from %1. It is empty and a first draft: add furniture, and check the size.").arg(baseName));
+	emit statusMessage(room.furniture.empty() ? tr("Made a room from %1. It is empty and a first draft: add furniture, and check the size.").arg(baseName)
+	                                          : tr("Made a room from %1 with %2 piece(s) of furniture. All of it is a first draft: each piece is a guess with an invented back.").arg(baseName).arg(room.furniture.size()));
 	return true;
 }
 
@@ -330,6 +340,7 @@ double SceneBuilderWidget::calibrateRoomLight(scene_room::Import &room, const QS
 		QCoreApplication::processEvents();
 		scene_room::Import trial = room;
 		scene_room::scaleLights(trial, factor);
+		trial.furniture.clear();   // (the draft is the bare room: the furniture would only slow every render down)
 		scene_doc::Document d;
 		scene_room::applyTo(trial, d, "calibration");
 		d.render.width = w;

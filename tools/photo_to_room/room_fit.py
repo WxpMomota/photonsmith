@@ -243,11 +243,12 @@ def box(name, lo, hi, color=None, **extra):
     return d
 
 
-def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160):
+def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geometry=False):
     """Fits a room to one photo's depth map.
 
     depth: (H, W) metres along the viewing direction. rgb: (H, W, 3) uint8 (or floats in 0..1) of the same photo. hfov_deg: the photo's horizontal field of view.
     camera_height: when given (metres), everything is scaled so the camera is that high above the floor (the depth model's scale is a guess).
+    return_geometry: also return what room_objects.py needs to put furniture in the room (see below): (result, geometry) instead of result.
     Returns a dict:
       camera   {position, target, up, vfov}   where the photo was taken from, in the room's frame
       room     {min, max}                      the inside of the room (x, y, z), floor at y = 0
@@ -318,6 +319,7 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160):
     fx, fz = turn_xz(forward[0], forward[2], theta)
     forward_room = np.array([fx, forward[1], fz])
     PR = np.stack([X, P[:, 1], Z], axis=-1)
+    PRimg = PR.reshape(h, w, 3)
 
     nvert = max(int(vertical.sum()), 1)
     support = max(8, int(0.03 * nvert))
@@ -414,7 +416,6 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160):
         return np.array([dx, d[1], dz])
 
     surfaces_to_try = [("ceiling", 1, ceiling_y), ("left", 0, xmin), ("right", 0, xmax), ("back", 2, zmax), ("front", 2, zmin)]
-    PRimg = PR.reshape(h, w, 3)
     panel_thickness = 0.03
     for pix in blobs:
         rays = np.array([ray(r, c) for r, c in pix])
@@ -480,11 +481,18 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160):
 
     target = pos + forward_room
     vfov = 2.0 * math.degrees(math.atan(math.tan(math.radians(hfov_deg) / 2.0) * h0 / float(w0)))
-    return mirror_x({
+    geometry = {
+        # the photo's pixels as 3D points in the room's own frame BEFORE the mirror (x as the photo sees it: to the right), on the same grid the fit used: (h, w, 3), the matching
+        # "this pixel has a surface" mask, and the step that grid is subsampled by from the full-size picture
+        "points": PRimg, "ok": ok, "step": step, "camera": pos.copy(),
+        "box": (xmin, xmax, zmin, zmax, ceiling_y),
+    }
+    result = mirror_x({
         "camera": {"position": [round(float(v), 4) for v in pos], "target": [round(float(v), 4) for v in target], "up": [round(float(v), 5) for v in cam_up], "vfov": round(vfov, 3)},
         "room": {"min": [round(xmin, 4), 0.0, round(zmin, 4)], "max": [round(xmax, 4), round(ceiling_y, 4), round(zmax, 4)]},
         "surfaces": surfaces,
         "lights": lights,
         "notes": notes,
-        "info": {"turn_degrees": round(math.degrees(theta), 2), "turn_confidence": round(sure, 3), "camera_height": round(cam_h, 3), "depth_scale": round(scale, 4), "walls_seen": seen},
+        "info": {"turn_degrees": round(math.degrees(theta), 2), "turn_confidence": round(sure, 3), "camera_height": round(cam_h, 3), "depth_scale": round(scale, 4), "walls_seen": seen, "exposure": round(k, 4)},
     })
+    return (result, geometry) if return_geometry else result

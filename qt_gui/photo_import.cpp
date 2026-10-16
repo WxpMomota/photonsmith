@@ -306,14 +306,16 @@ void PhotoToMeshJob::start() {
 	if (m_room) {
 		if (m_fov > 0.0) args << "--fov" << QString::number(m_fov, 'f', 2);
 		if (m_cameraHeight > 0.0) args << "--camera-height" << QString::number(m_cameraHeight, 'f', 3);
+		if (m_furniture > 0) args << "--furniture" << QString::number(m_furniture);
 	} else if (!m_removeBackground) {
 		args << "--no-remove-bg";
 	}
 	m_process->start(m_setup.python, args);
 }
 
-void PhotoToMeshJob::useRoomHelper(double cameraHeightMetres, double horizontalFovDegrees) {
+void PhotoToMeshJob::useRoomHelper(double cameraHeightMetres, double horizontalFovDegrees, int furniture) {
 	m_room = true;
+	m_furniture = furniture;
 	m_cameraHeight = cameraHeightMetres;
 	m_fov = horizontalFovDegrees;
 }

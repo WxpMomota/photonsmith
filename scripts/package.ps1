@@ -359,6 +359,7 @@ if ($Tier -ne "Lite") {
 		@{ From = (Join-Path $RepoRoot "tools\photo_to_mesh\photo_to_mesh.py"); To = (Join-Path $OutputDir "tools\photo_to_mesh") },
 		@{ From = (Join-Path $RepoRoot "tools\photo_to_room\photo_to_room.py"); To = (Join-Path $OutputDir "tools\photo_to_room") },
 		@{ From = (Join-Path $RepoRoot "tools\photo_to_room\room_fit.py"); To = (Join-Path $OutputDir "tools\photo_to_room") },
+		@{ From = (Join-Path $RepoRoot "tools\photo_to_room\room_objects.py"); To = (Join-Path $OutputDir "tools\photo_to_room") },
 		@{ From = (Join-Path $RepoRoot "scripts\setup_photo_to_mesh.ps1"); To = (Join-Path $OutputDir "scripts") })
 	foreach ($f in $photoFiles) {
 		if (Test-Path $f.From) {

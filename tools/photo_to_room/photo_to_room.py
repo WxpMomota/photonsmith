@@ -7,9 +7,14 @@ the "Metric Indoor Small" fine-tune: 25 million parameters, about 100 MB, downlo
 (next to this file) fits a box-shaped room to that. The result is a first draft to edit, not a scan: furniture is not modelled (the room is empty), a wall the photo does
 not show is assumed, and the size is only as good as the depth guess (give --camera-height when you know it).
 
+With --furniture N it also looks for furniture: a second small model (DETR, Apache-2.0, about 170 MB) finds the chairs, sofas, tables, plants... in the photo, each is cut out and
+TripoSR (the Object from a photo model) guesses a 3D mesh of it, and room_objects.py stands the mesh where the photo shows the object, as big and facing the way the photo shows it.
+Each is a guess with an invented back; they are there to be moved, deleted or replaced.
+
 Output, in --out:
-    room.json   the room (see room_fit.fit_room) plus {"photo": {...}, "model": ...}
+    room.json   the room (see room_fit.fit_room) plus {"photo": {...}, "model": ..., "objects": [...]}
     depth.png   the depth map as a grey picture (white = near), for checking what the model saw
+    object_1/ ...  with --furniture: mesh.obj and texture.png of each piece (the same files Object from a photo makes)
 
 While it runs it prints lines "PROGRESS <percent> <message>" so a caller can show a progress bar, and "ERROR <message>" / "NOTE <message>" lines.
 
@@ -25,6 +30,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 MODEL = "depth-anything/Depth-Anything-V2-Metric-Indoor-Small-hf"
+SEGMENTATION_MODEL = "facebook/detr-resnet-50-panoptic"
 DEFAULT_F35 = 26.0   # the 35 mm equivalent focal length assumed when the photo has none: a phone's main camera
 EXIF_FOCAL_35 = 41989
 EXIF_IFD = 0x8769
@@ -61,10 +67,15 @@ def photo_fov(image, width, height, override):
     return horizontal_fov(width, height, DEFAULT_F35), "assumed (a phone camera, %.0f mm equivalent)" % DEFAULT_F35
 
 
-def model_folder():
-    """The Hugging Face cache folder of the depth model, whether or not it is there yet."""
+def model_folder(model=MODEL):
+    """The Hugging Face cache folder of a model, whether or not it is there yet."""
     base = os.environ.get("HF_HUB_CACHE") or os.path.join(os.environ.get("HF_HOME") or os.path.join(os.path.expanduser("~"), ".cache", "huggingface"), "hub")
-    return os.path.join(base, "models--" + MODEL.replace("/", "--"))
+    return os.path.join(base, "models--" + model.replace("/", "--"))
+
+
+def model_cached(model):
+    snapshots = os.path.join(model_folder(model), "snapshots")
+    return os.path.isdir(snapshots) and bool(os.listdir(snapshots))
 
 
 def check_environment():
@@ -83,11 +94,19 @@ def check_environment():
         fact("Room Helper Transformers", "present (%s)" % transformers.__version__)
     except ImportError:
         fact("Room Helper Transformers", "missing")
-    folder = model_folder()
-    if os.path.isdir(os.path.join(folder, "snapshots")) and os.listdir(os.path.join(folder, "snapshots")):
+    if model_cached(MODEL):
         fact("Room Depth Model", "present (%s)" % MODEL)
     else:
         fact("Room Depth Model", "not downloaded yet (%s, about 100 MB, fetched on first use)" % MODEL)
+    try:
+        import timm
+        fact("Room Furniture timm", "present (%s)" % timm.__version__)
+    except ImportError:
+        fact("Room Furniture timm", "missing (furniture needs it; run the photo helper's setup script)")
+    if model_cached(SEGMENTATION_MODEL):
+        fact("Room Furniture Model", "present (%s)" % SEGMENTATION_MODEL)
+    else:
+        fact("Room Furniture Model", "not downloaded yet (%s, about 170 MB, fetched the first time furniture is asked for)" % SEGMENTATION_MODEL)
 
 
 def pick_device(torch, choice):
@@ -120,6 +139,107 @@ def estimate_depth(image, device_choice):
     return depth.cpu().numpy().astype(np.float64), device
 
 
+def segment_objects(image, device_choice):
+    """What is in the photo, as [{"label", "score", "mask"}] (mask: a bool array the size of the photo): DETR's panoptic segmentation, which names COCO's things and some stuff."""
+    import numpy as np
+    import torch
+    from transformers import DetrForSegmentation, DetrImageProcessor
+
+    device = pick_device(torch, device_choice)
+    processor = DetrImageProcessor.from_pretrained(SEGMENTATION_MODEL)
+    model = DetrForSegmentation.from_pretrained(SEGMENTATION_MODEL).to(device).eval()
+    inputs = processor(images=image, return_tensors="pt").to(device)
+    with torch.no_grad():
+        out = model(**inputs)
+    result = processor.post_process_panoptic_segmentation(out, threshold=0.5, target_sizes=[(image.height, image.width)])[0]
+    segmentation = result["segmentation"].cpu().numpy()
+    segments = []
+    for info in result["segments_info"]:
+        segments.append({"label": model.config.id2label[info["label_id"]], "score": float(info["score"]), "mask": segmentation == info["id"]})
+    del model
+    if device == "cuda":
+        torch.cuda.empty_cache()
+    return segments
+
+
+def cut_out(image, mask, margin=0.06):
+    """The photo cropped to the mask's box (a little loose) with everything outside the mask transparent: what TripoSR makes an object from."""
+    import numpy as np
+    from PIL import Image
+    ys, xs = np.nonzero(mask)
+    y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+    pad_y, pad_x = int(margin * (y1 - y0)) + 2, int(margin * (x1 - x0)) + 2
+    y0, y1 = max(0, y0 - pad_y), min(mask.shape[0], y1 + pad_y)
+    x0, x1 = max(0, x0 - pad_x), min(mask.shape[1], x1 + pad_x)
+    rgba = np.dstack([np.asarray(image.convert("RGB"))[y0:y1, x0:x1], (mask[y0:y1, x0:x1] * 255).astype(np.uint8)])
+    return Image.fromarray(rgba, "RGBA")
+
+
+def add_furniture(image, geometry, result, out_folder, count, device_choice, base_percent=62, top_percent=98):
+    """Finds furniture in the photo, makes a mesh of each piece and puts them in `result` ("objects", and what could not be done in "notes")."""
+    import room_objects
+    from PIL import Image
+
+    def band(lo, hi):   # progress inside [lo, hi] for a step that reports 0..100
+        return lambda percent, message: progress(int(lo + (hi - lo) * percent / 100.0), message)
+
+    progress(base_percent, "Looking for furniture (the first time this downloads about 170 MB)")
+    try:
+        segments = segment_objects(image, device_choice)
+    except ImportError as e:
+        result["notes"].append("Furniture was skipped: a Python package is missing (%s); run the photo helper's setup script." % e)
+        return
+    chosen = room_objects.choose_objects(segments, max_count=count)
+    if not chosen:
+        result["notes"].append("No furniture was recognised in the photo.")
+        return
+    sys.path.insert(0, os.path.join(os.path.dirname(HERE), "photo_to_mesh"))
+    import photo_to_mesh
+    try:
+        maker = photo_to_mesh.ObjectMaker(device=device_choice if device_choice != "auto" else "auto", report=band(base_percent + 4, base_percent + 8))
+    except photo_to_mesh.ObjectError as e:
+        result["notes"].append("Furniture was skipped: %s" % e)
+        return
+    names = {}
+    result["objects"] = []
+    span = (top_percent - base_percent - 8) / float(len(chosen))
+    for k, seg in enumerate(chosen):
+        label = seg["label"]
+        lo = base_percent + 8 + span * k
+        place = room_objects.place_object(geometry, seg["mask"])
+        if place is None:
+            result["notes"].append("The %s could not be placed (the photo gave too little depth for it)." % label)
+            continue
+        folder = os.path.join(out_folder, "object_%d" % (k + 1))
+        try:
+            cutout = cut_out(image, seg["mask"])
+            os.makedirs(folder, exist_ok=True)
+            cutout.save(os.path.join(folder, "cutout.png"))   # what the 3D model was shown (to see why a piece came out as it did)
+            info = maker.make(cutout, folder, remove_bg=True, resolution=192, texture_size=1024, report=band(lo, lo + span))
+        except photo_to_mesh.ObjectError as e:
+            result["notes"].append("The %s could not be made into a 3D object: %s" % (label, e))
+            continue
+        except Exception as e:   # (a model failure on one piece must not lose the room)
+            result["notes"].append("The %s could not be made into a 3D object (%s)." % (label, str(e).splitlines()[0][:120] if str(e) else type(e).__name__))
+            continue
+        exposure = float(result.get("info", {}).get("exposure", 1.0))
+        if abs(exposure - 1.0) > 0.02:   # the same correction the room's surfaces got: a lit photo is not a reflectance
+            import numpy as np
+            texture_path = os.path.join(folder, "texture.png")
+            pixels = np.asarray(Image.open(texture_path).convert("RGB"))
+            Image.fromarray(room_objects.relight_texture(pixels, exposure)).save(texture_path)
+        final = room_objects.finalize_object(place, info["size"], geometry["box"])
+        if final is None:
+            continue
+        names[label] = names.get(label, 0) + 1
+        title = label.replace("-merged", "").replace("-", " ").capitalize()
+        result["objects"].append({"name": "%s %d" % (title, names[label]), "label": label, "score": round(seg["score"], 3),
+                                  "mesh": "object_%d/mesh.obj" % (k + 1), "texture": "object_%d/texture.png" % (k + 1), **final})
+    if result["objects"]:
+        result["notes"].append("%d piece(s) of furniture were made from the photo (%s). Each is a guess with an invented back: move, resize or delete them." %
+                               (len(result["objects"]), ", ".join(o["name"] for o in result["objects"])))
+
+
 def write_depth_picture(depth, path):
     import numpy as np
     from PIL import Image
@@ -133,6 +253,7 @@ def main():
     ap.add_argument("--out", help="the folder the result goes in")
     ap.add_argument("--fov", type=float, help="the photo's horizontal field of view in degrees (default: from the photo's EXIF, else a phone camera's)")
     ap.add_argument("--camera-height", type=float, help="how high the camera was above the floor, in metres (default: the depth model's own estimate)")
+    ap.add_argument("--furniture", type=int, default=0, metavar="N", help="also find up to N pieces of furniture in the photo and make a 3D object of each (slower: a model per piece)")
     ap.add_argument("--device", default="auto", choices=["auto", "cuda", "mps", "cpu"])
     ap.add_argument("--check", action="store_true", help="print what the helper needs and what is missing, then exit")
     args = ap.parse_args()
@@ -177,11 +298,13 @@ def main():
         fail("the depth model failed (%s)" % e)
     write_depth_picture(depth, os.path.join(args.out, "depth.png"))
 
-    progress(75, "Fitting the room")
+    progress(55 if args.furniture > 0 else 75, "Fitting the room")
     try:
-        result = room_fit.fit_room(depth, np.asarray(image), hfov, camera_height=args.camera_height)
+        result, geometry = room_fit.fit_room(depth, np.asarray(image), hfov, camera_height=args.camera_height, return_geometry=True)
     except ValueError as e:
         fail("could not find a room in this photo (%s). A photo taken inside a room, showing a floor and at least one wall, works best." % e)
+    if args.furniture > 0:
+        add_furniture(image, geometry, result, args.out, args.furniture, args.device)
     result["photo"] = {"width": image.width, "height": image.height, "hfov": round(hfov, 3), "fov_source": fov_source,
                        "brightness": round(room_fit.picture_brightness(np.asarray(image)), 4)}   # (the Scene Builder renders a draft and sets the lights to match this)
     result["model"] = MODEL
