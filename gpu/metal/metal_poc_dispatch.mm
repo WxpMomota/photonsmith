@@ -23,6 +23,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include "metal_poc_app.h"
 #include "metal_interface.h"   // metal_prepare_renderer()
 #include "metal_poc_shader_files.h"
@@ -198,7 +199,7 @@ struct KernelFunctions {
 // whole path tracer (every material and medium in one kernel) into machine code for this GPU, about 90 seconds on an M2, and Metal keeps the result in a cache for this app, so
 // every later run takes no time at all. A render and metal_prepare_renderer() both come through here, so they share that cache. A message says so after three seconds, because
 // nothing else on screen does.
-static id<MTLComputePipelineState> createKernelPipeline(id<MTLDevice> dev, id<MTLLibrary> library, KernelFunctions& f, NSError** error) {
+static id<MTLComputePipelineState> createKernelPipeline(id<MTLDevice> dev, id<MTLLibrary> library, bool anyHitVariant, KernelFunctions& f, NSError** error) {
     f.kernel = [library newFunctionWithName:@"primaryRayKernel"];
     f.sphere = [library newFunctionWithName:@"sphereIntersectionFunction"];
     f.disk = [library newFunctionWithName:@"diskIntersectionFunction"];
@@ -222,13 +223,16 @@ static id<MTLComputePipelineState> createKernelPipeline(id<MTLDevice> dev, id<MT
     MTLLinkedFunctions* linkedFns = [MTLLinkedFunctions new];
     linkedFns.functions = @[f.sphere, f.disk, f.cylinder, f.triangleAnyHit];
     pipelineDesc.linkedFunctions = linkedFns;
-    // One build at a time in this process: a Live Preview that starts while the GUI's background warm-up is still compiling waits for it and then finds the result in Metal's cache, instead of
-    // compiling the same pipeline a second time beside it.
-    static std::mutex buildMutex;
-    std::lock_guard<std::mutex> lock(buildMutex);
+    // One build of each VARIANT at a time in this process: a Live Preview that starts while the GUI's background warm-up is still compiling the same variant waits for it and then finds the result
+    // in Metal's cache, instead of compiling the same pipeline a second time beside it. The two variants do not wait for each other: Metal compiles them side by side in about the time of one
+    // (measured on an M2, 2026-10-15: 122 s and 124 s together, against 108 s then 121 s one after the other), which halves a new install's first-run wait.
+    static std::mutex buildMutex[2];
+    std::lock_guard<std::mutex> lock(buildMutex[anyHitVariant ? 1 : 0]);
     auto finished = std::make_shared<std::atomic<bool>>(false);
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-        if (!finished->load())
+        // (said once: the two variants are built side by side and both would say it)
+        static std::atomic<bool> said{false};
+        if (!finished->load() && !said.exchange(true))
             fprintf(stderr, "Metal: preparing the GPU renderer for this Mac. This happens once (about a minute or two); the next runs start at once.\n");
     });
     const double start = CFAbsoluteTimeGetCurrent();
@@ -244,7 +248,7 @@ bool MetalPocApp::dsBuildPipeline(DispatchState& s) {
     auto& error = s.error;
     auto& library = s.library;
     KernelFunctions fns;
-    id<MTLComputePipelineState> pipeline = createKernelPipeline(device, library, fns, &error);
+    id<MTLComputePipelineState> pipeline = createKernelPipeline(device, library, havePbrtTriangleAnyHit, fns, &error);
     if (!pipeline) {
         if (fns.kernel) fprintf(stderr, "Pipeline creation failed: %s\n", error.localizedDescription.UTF8String);
         return false;
@@ -1284,16 +1288,24 @@ bool metal_prepare_renderer() {
     @autoreleasepool {
         id<MTLDevice> dev = MTLCreateSystemDefaultDevice();
         if (!dev) return false;
-        for (bool anyHit : {false, true}) {
-            id<MTLLibrary> library = compileShaderLibrary(dev, anyHit);
-            if (!library) return false;
-            KernelFunctions fns;
-            NSError* error = nil;
-            if (!createKernelPipeline(dev, library, fns, &error)) {
-                if (error) fprintf(stderr, "Pipeline creation failed: %s\n", error.localizedDescription.UTF8String);
-                return false;
+        // Both variants at once (see createKernelPipeline): the wait is the longer of the two, not their sum.
+        auto build = [dev](bool anyHit) -> bool {
+            @autoreleasepool {
+                id<MTLLibrary> library = compileShaderLibrary(dev, anyHit);
+                if (!library) return false;
+                KernelFunctions fns;
+                NSError* error = nil;
+                if (!createKernelPipeline(dev, library, anyHit, fns, &error)) {
+                    if (error) fprintf(stderr, "Pipeline creation failed: %s\n", error.localizedDescription.UTF8String);
+                    return false;
+                }
+                return true;
             }
-        }
+        };
+        bool anyHitOk = false;
+        std::thread anyHitThread([&] { anyHitOk = build(true); });
+        const bool defaultOk = build(false);
+        anyHitThread.join();
+        return defaultOk && anyHitOk;
     }
-    return true;
 }
