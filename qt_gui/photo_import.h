@@ -106,7 +106,7 @@ public:
 	void cancel();
 	// Run the room helper (photo_to_room.py) instead of the object one: the result is room.json in outFolder. A camera height (metres) or field of view (degrees) of 0 leaves it to
 	// the helper (the depth model's own estimate; the photo's EXIF lens). `furniture` is how many pieces of furniture to find and make 3D objects of (0: none). Call before start().
-	void useRoomHelper(double cameraHeightMetres, double horizontalFovDegrees, int furniture = 0);
+	void useRoomHelper(double cameraHeightMetres, double horizontalFovDegrees, int furniture = 0, bool plainBox = false);
 
 signals:
 	void progress(int percent, const QString &message);
@@ -130,4 +130,5 @@ private:
 	bool m_room = false;
 	double m_cameraHeight = 0.0, m_fov = 0.0;
 	int m_furniture = 0;
+	bool m_plainBox = false;
 };

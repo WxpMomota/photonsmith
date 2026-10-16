@@ -174,7 +174,7 @@ public:
 	// Runs the room helper on one photo of a room (progress dialog) and REPLACES the scene with the room it finds (one undo step). Camera height in metres and the photo's horizontal
 	// field of view in degrees, 0 to let the helper decide; `furniture` is how many pieces of furniture to find and make 3D objects of (0: an empty room). False with `error` set (empty
 	// when cancelled) if the scene was left alone; `notes` gets what the helper had to assume.
-	bool importRoom(const QString &photo, double cameraHeight, double fov, int furniture, QString *error, QStringList *notes = nullptr);
+	bool importRoom(const QString &photo, double cameraHeight, double fov, int furniture, QString *error, QStringList *notes = nullptr, bool plainBox = false);
 	// Sets the room's lights so that a small draft render of it is as bright as the photo (the helper's own light level is a guess that can be several times off); returns the factor
 	// it applied (1 when the file has no brightness or the renderer is not there). `folder` is where the draft's scratch files go.
 	double calibrateRoomLight(scene_room::Import &room, const QString &folder);

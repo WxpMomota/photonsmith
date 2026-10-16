@@ -269,7 +269,8 @@ def add_textures(result, geometry, out_folder):
     folder = os.path.join(out_folder, "textures")
     made = []
     for s in result["surfaces"]:
-        spec = room_textures.FACES.get(s["name"])
+        # a wall says which way its visible face looks (a room that is not a box has any number of walls); the floor and the ceiling are named
+        spec = room_textures.face_spec(*s["face"]) if "face" in s else room_textures.FACES.get(s["name"])
         if spec is None:
             continue
         image, seen = room_textures.surface_texture(geometry["textures"], s["min"], s["max"], spec)
@@ -285,12 +286,11 @@ def add_textures(result, geometry, out_folder):
     if made:
         result["notes"].append("The photo's own look is on the %s (read from the picture; what it does not show is filled in)." % ", ".join(made))
     # A window shows what the photo shows there (the blinds, the view): its pixels become the picture the glowing panel takes its colours from.
-    walls = {"left": "Left wall", "right": "Right wall", "back": "Back wall", "front": "Front wall"}
     windows = 0
     for light in result["lights"]:
-        spec = room_textures.FACES.get(walls.get(light.get("surface")))
-        if spec is None:
+        if "face" not in light:   # (a ceiling light has no view)
             continue
+        spec = room_textures.face_spec(*light["face"])
         image, seen = room_textures.surface_texture(geometry["textures"], light["min"], light["max"], spec, texels_per_metre=240, max_size=512, min_seen=0.5, check_depth=False)
         if image is None:
             continue
@@ -317,6 +317,7 @@ def main():
     ap.add_argument("--out", help="the folder the result goes in")
     ap.add_argument("--fov", type=float, help="the photo's horizontal field of view in degrees (default: from the photo's EXIF, else a phone camera's)")
     ap.add_argument("--camera-height", type=float, help="how high the camera was above the floor, in metres (default: the depth model's own estimate)")
+    ap.add_argument("--box", action="store_true", help="keep the room a plain box (the default also reads an L, an alcove or a recess off the photo's walls)")
     ap.add_argument("--furniture", type=int, default=0, metavar="N", help="also find up to N pieces of furniture in the photo and make a 3D object of each (slower: a model per piece)")
     ap.add_argument("--device", default="auto", choices=["auto", "cuda", "mps", "cpu"])
     ap.add_argument("--check", action="store_true", help="print what the helper needs and what is missing, then exit")
@@ -364,7 +365,7 @@ def main():
 
     progress(55 if args.furniture > 0 else 75, "Fitting the room")
     try:
-        result, geometry = room_fit.fit_room(depth, np.asarray(image), hfov, camera_height=args.camera_height, return_geometry=True)
+        result, geometry = room_fit.fit_room(depth, np.asarray(image), hfov, camera_height=args.camera_height, return_geometry=True, allow_outline=not args.box)
     except ValueError as e:
         fail("could not find a room in this photo (%s). A photo taken inside a room, showing a floor and at least one wall, works best." % e)
     add_textures(result, geometry, args.out)

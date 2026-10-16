@@ -245,6 +245,7 @@ cp "$REPO_ROOT/tools/photo_to_room/photo_to_room.py" "$APP_BUNDLE/Contents/MacOS
 cp "$REPO_ROOT/tools/photo_to_room/room_fit.py" "$APP_BUNDLE/Contents/MacOS/tools/photo_to_room/room_fit.py"
 cp "$REPO_ROOT/tools/photo_to_room/room_objects.py" "$APP_BUNDLE/Contents/MacOS/tools/photo_to_room/room_objects.py"
 cp "$REPO_ROOT/tools/photo_to_room/room_textures.py" "$APP_BUNDLE/Contents/MacOS/tools/photo_to_room/room_textures.py"
+cp "$REPO_ROOT/tools/photo_to_room/room_outline.py" "$APP_BUNDLE/Contents/MacOS/tools/photo_to_room/room_outline.py"
 cp "$REPO_ROOT/scripts/setup_photo_to_mesh.sh" "$APP_BUNDLE/Contents/MacOS/scripts/setup_photo_to_mesh.sh"
 chmod +x "$APP_BUNDLE/Contents/MacOS/scripts/setup_photo_to_mesh.sh"
 

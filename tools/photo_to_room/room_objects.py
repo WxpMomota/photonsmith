@@ -171,6 +171,25 @@ def table_parts(geometry, mask, name="Table"):
     return out
 
 
+def wall_behind(geometry, axis, sign, near_edge, lateral_lo, lateral_hi):
+    """The coordinate of the wall behind an object (in the photo's frame): of the walls across `axis` that the room lies in front of (when the object is further out, at higher values, that
+    is a wall with the room at lower values), the nearest one beyond the object's near edge whose stretch covers at least half of the object's width. None when there is none."""
+    best = None
+    width = max(lateral_hi - lateral_lo, 1e-6)
+    for wl in geometry.get("walls", ()):
+        if wl["axis"] != axis or wl["side"] != (-1 if sign > 0 else 1):
+            continue
+        beyond = wl["value"] - near_edge if sign > 0 else near_edge - wl["value"]
+        if beyond < -0.05:
+            continue
+        overlap = min(lateral_hi, wl["hi"]) - max(lateral_lo, wl["lo"])
+        if overlap < 0.5 * width:
+            continue
+        if best is None or beyond < best[0]:
+            best = (beyond, wl["value"])
+    return best[1] if best else None
+
+
 def block_parts(geometry, mask, label, place, name="Block"):
     """A plain block (a fridge, a cabinet, a counter, a bed) from what the photo shows: as wide and as tall as the visible side, as deep as the top if the camera sees it, else a
     typical depth for the kind (and out to the wall when one is just behind). Standing on the floor, the front facing the camera along the nearer room axis. [{name, min, max, color}]
@@ -190,7 +209,10 @@ def block_parts(geometry, mask, label, place, name="Block"):
     sign = 1.0 if (dz if along_z else dx) > 0 else -1.0   # +1: the object is further out along the axis than the camera, so its far side is at higher values
     measured = hi[axis] - lo[axis]
     depth = max(measured, BLOCKS.get(label, 0.5))
-    wall = (zmax if along_z else xmax) if sign > 0 else (zmin if along_z else xmin)
+    other = 0 if along_z else 2
+    wall = wall_behind(geometry, axis, sign, lo[axis] if sign > 0 else hi[axis], lo[other], hi[other])
+    if wall is None:
+        wall = (zmax if along_z else xmax) if sign > 0 else (zmin if along_z else xmin)
     if sign > 0:
         far = lo[axis] + depth
         if abs(wall - far) < 0.35 or far > wall:

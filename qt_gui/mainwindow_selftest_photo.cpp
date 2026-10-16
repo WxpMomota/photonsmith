@@ -159,7 +159,7 @@ void MainWindow::runRoomSelfTest(const std::function<void(const QString &)> &log
 	const int furniture = qEnvironmentVariable("RT_GUI_SELFTEST_ROOM_FURNITURE").toInt();
 	QStringList notes;
 	const size_t before = sb ? sb->document().objects.size() : 0;
-	check(sb && sb->importRoom(photo, height, fov, furniture, &err, &notes), "made a room from " + photo + " " + err);
+	check(sb && sb->importRoom(photo, height, fov, furniture, &err, &notes, !qEnvironmentVariable("RT_GUI_SELFTEST_ROOM_BOX").isEmpty()), "made a room from " + photo + " " + err);
 	if (sb && ok) {
 		const scene_doc::Document &doc = sb->document();
 		int emitters = 0, boxes = 0;

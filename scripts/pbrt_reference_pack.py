@@ -9,7 +9,7 @@ pbrt_scene_compare.py compares the bundled scenes with pbrt, but only where a pb
 Per scene (64 x 64, depth 8): pbrt's mean picture value (the mean of every value of every channel, unclipped) at --pbrt-spp samples, twice with different seeds (their
 disagreement is the noise of the reference); then for each renderer the ratio ours / pbrt at --ref-spp samples (1.0 for a scene that agrees, the known offset for one that does not:
 the test then watches the offset, not just the agreement) and the noise of a single render at the test's own sample count (--test-spp, over --noise-runs seeds), which sets the
-tolerance: max(--min-tol, 4 x that noise (6 x on the CPU) + the reference's own). --min-tol is 1.5%: with the old 3% floor a 1% bias in a quiet scene went unseen (mutation test, October 2026).
+tolerance: max(--min-tol (--min-tol-cpu on the CPU: 2.5%), 4 x that noise (6 x on the CPU) + the reference's own). --min-tol is 1.5%: with the old 3% floor a 1% bias in a quiet scene went unseen (mutation test, October 2026).
 
 Table columns (whitespace separated, `#` lines are comments):
     name  test_spp  depth  size  pbrt_mean_r  pbrt_mean_g  pbrt_mean_b  pbrt_noise  cpu_ratio cpu_tol  recursive_ratio recursive_tol  wavefront_ratio wavefront_tol
@@ -129,7 +129,8 @@ def one(args, name):
             # A CPU render differs from run to run (threads), and sigma comes from only a few runs, so the CPU's band is 6 sigma wide, the GPU's (reproducible) 4: a 4-sigma CPU band failed a full run
             # on a heavy-tailed scene (+3.5% against 3.2%) that read within 0.6% in three isolated runs.
             factor = CPU_SIGMAS if backend == 'cpu' else GPU_SIGMAS
-            tol = min(KMAXTOL, max(args.min_tol, factor * sigma + pbrt_noise))
+            floor = args.min_tol_cpu if backend == 'cpu' else args.min_tol   # (the CPU's floor is wider: see CPU_SIGMAS)
+            tol = min(KMAXTOL, max(floor, factor * sigma + pbrt_noise))
             if backend == 'cpu' and name in HEAVY_TAIL_CPU:
                 tol = KMAXTOL
             if factor * sigma + pbrt_noise > KMAXTOL:
@@ -159,7 +160,8 @@ def main():
     ap.add_argument("--ref-spp", type=int, default=512)
     ap.add_argument("--test-spp", type=int, default=64)
     ap.add_argument("--noise-runs", type=int, default=6)
-    ap.add_argument("--min-tol", type=float, default=0.015, help="the narrowest tolerance a row may have")
+    ap.add_argument("--min-tol", type=float, default=0.015, help="the narrowest tolerance a GPU row may have")
+    ap.add_argument("--min-tol-cpu", type=float, default=0.025, help="the narrowest tolerance a CPU row may have (CPU renders differ from run to run, more so under load: a 1.5% floor failed a full run at +1.5% on a scene that reads within 0.4% alone)")
     ap.add_argument("--timeout", type=int, default=180)
     ap.add_argument("--no-gpu", dest="gpu", action="store_false")
     args = ap.parse_args()

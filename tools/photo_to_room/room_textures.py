@@ -48,6 +48,20 @@ def min_filter(a, radius):
     return out
 
 
+# The layout of a Box's picture on each of its six faces (scene_pbrt_writer.h writeBox), as (axis, sign) of the world axis u and v run along.
+_FACE_LAYOUT = {
+    (0, +1): ((1, +1), (2, +1)), (0, -1): ((1, +1), (2, -1)),
+    (1, +1): ((2, +1), (0, +1)), (1, -1): ((2, -1), (0, +1)),
+    (2, +1): ((0, +1), (1, +1)), (2, -1): ((0, -1), (1, +1)),
+}
+
+
+def face_spec(axis, sign):
+    """The picture layout (as in FACES) of the face of a slab that looks along `sign` of `axis`: the face a wall shows the room is the one facing the room's inside."""
+    u, v = _FACE_LAYOUT[(int(axis), 1 if sign > 0 else -1)]
+    return {"face": (int(axis), 1 if sign > 0 else -1), "u": u, "v": v}
+
+
 def camera_model(depth_full, img_full, hfov_deg, R, theta, pos, scale):
     """What projecting a room point back into the photo needs. depth_full (h0, w0) metres, img_full (h0, w0, 3) display RGB 0..1, R the matrix that levelled the camera, theta the
     room's turn about the vertical, pos the camera in the room frame (before the mirror), scale the depth scale (1 unless the camera height was given)."""

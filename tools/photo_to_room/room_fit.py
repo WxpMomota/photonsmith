@@ -18,6 +18,7 @@ import math
 
 import numpy as np
 
+import room_outline
 import room_textures
 
 WALL_THICKNESS = 0.1
@@ -232,8 +233,12 @@ def mirror_x(result):
     for key in ("position", "target", "up"):
         result["camera"][key][0] = -result["camera"][key][0]
     flip_box(result["room"])
+    if "outline" in result["room"]:
+        result["room"]["outline"] = [[round(-x, 4), z] for x, z in result["room"]["outline"]]
     for b in result["surfaces"] + result["lights"]:
         flip_box(b)
+        if "face" in b and b["face"][0] == 0:   # (the face a surface shows the room: its sign along x flips with the mirror)
+            b["face"][1] = -b["face"][1]
     return result
 
 
@@ -245,11 +250,12 @@ def box(name, lo, hi, color=None, **extra):
     return d
 
 
-def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geometry=False):
+def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geometry=False, allow_outline=True):
     """Fits a room to one photo's depth map.
 
     depth: (H, W) metres along the viewing direction. rgb: (H, W, 3) uint8 (or floats in 0..1) of the same photo. hfov_deg: the photo's horizontal field of view.
     camera_height: when given (metres), everything is scaled so the camera is that high above the floor (the depth model's scale is a guess).
+    allow_outline: false keeps the room a plain box even when its walls do not sit on one (see room_outline.py).
     return_geometry: also return what room_objects.py needs to put furniture in the room (see below): (result, geometry) instead of result.
     Returns a dict:
       camera   {position, target, up, vfov}   where the photo was taken from, in the room's frame
@@ -363,6 +369,28 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geom
         notes.append("The ceiling is not in the photo; it is assumed %.1f m high." % ceiling_y)
     ceiling_y = float(min(max(ceiling_y, cam_h + 0.3), 6.0))
 
+    # ---- the walls: the box's four, or (when the photo's walls do not sit on the box) the outline's
+    t = WALL_THICKNESS
+    outline = None
+    profile = room_outline.boundary_profile(PRimg, NX.reshape(h, w), NZ.reshape(h, w), vertical.reshape(h, w), ceiling_y)
+    found = room_outline.fit_outline(profile, (xmin, xmax, zmin, zmax), (-forward_room[0], -forward_room[2])) if allow_outline else None
+    if found:
+        outline = found["polygon"]
+        walls = room_outline.walls_from_polygon(outline, t)
+        for i, wl in enumerate(walls):
+            wl["key"], wl["name"] = "wall%d" % (i + 1), "Wall %d" % (i + 1)
+        xmin, xmax = min(p[0] for p in outline), max(p[0] for p in outline)
+        zmin, zmax = min(p[1] for p in outline), max(p[1] for p in outline)
+        notes.append("The room is not a plain box: the photo shows %d walls, and what it does not show is taken to run square." % len(walls))
+    else:
+        walls = [
+            {"key": "left", "name": "Left wall", "axis": 0, "value": xmin, "lo": zmin, "hi": zmax, "side": 1, "ext_lo": t, "ext_hi": t},
+            {"key": "right", "name": "Right wall", "axis": 0, "value": xmax, "lo": zmin, "hi": zmax, "side": -1, "ext_lo": t, "ext_hi": t},
+            {"key": "back", "name": "Back wall", "axis": 2, "value": zmax, "lo": xmin, "hi": xmax, "side": -1, "ext_lo": 0.0, "ext_hi": 0.0},
+            {"key": "front", "name": "Front wall", "axis": 2, "value": zmin, "lo": xmin, "hi": xmax, "side": 1, "ext_lo": 0.0, "ext_hi": 0.0},
+        ]
+    floor_area = room_outline.polygon_area(outline) if outline else (xmax - xmin) * (zmax - zmin)
+
     # ---- colours: what the photo shows on each surface, as linear reflectance
     lin = srgb_to_linear(img).reshape(-1, 3)
     near_tol = 0.12
@@ -370,11 +398,10 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geom
     planes = {
         "floor": (PR[:, 1] < near_tol, N[:, 1] > 0.7),
         "ceiling": (np.abs(PR[:, 1] - ceiling_y) < near_tol * 1.5, N[:, 1] < -0.7),
-        "left": (np.abs(PR[:, 0] - xmin) < near_tol, NX > 0.7),
-        "right": (np.abs(PR[:, 0] - xmax) < near_tol, NX < -0.7),
-        "back": (np.abs(PR[:, 2] - zmax) < near_tol, NZ < -0.7),
-        "front": (np.abs(PR[:, 2] - zmin) < near_tol, NZ > 0.7),
     }
+    for wl in walls:
+        coord, other, normal = (PR[:, 0], PR[:, 2], NX) if wl["axis"] == 0 else (PR[:, 2], PR[:, 0], NZ)
+        planes[wl["key"]] = ((np.abs(coord - wl["value"]) < near_tol) & (other > wl["lo"] - 0.15) & (other < wl["hi"] + 0.15), normal * wl["side"] > 0.7)
     for key, (near_plane, facing) in planes.items():
         assign[key] = OK & near_plane & facing
     lum_all = []
@@ -383,10 +410,10 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geom
         if int(m.sum()) >= 6:
             colors[key] = np.median(lin[m], axis=0)
             lum_all.append(lin[m] @ np.array([0.2126, 0.7152, 0.0722]))
-    defaults = {"floor": (0.35, 0.3, 0.26), "ceiling": (0.8, 0.8, 0.8), "left": (0.7, 0.68, 0.64), "right": (0.7, 0.68, 0.64), "back": (0.72, 0.7, 0.66), "front": (0.7, 0.68, 0.64)}
+    defaults = {"floor": (0.35, 0.3, 0.26), "ceiling": (0.8, 0.8, 0.8), "back": (0.72, 0.7, 0.66)}
     for key in planes:
         if key not in colors:
-            colors[key] = np.array(defaults[key])
+            colors[key] = np.array(defaults.get(key, (0.7, 0.68, 0.64)))
     # A photo is lit; reflectance is what the surface does with light. Without knowing the light, scale so the photo's typical surface is a typical room's 0.45.
     k = 1.0
     if lum_all:
@@ -398,15 +425,15 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geom
         c = c * min(1.0, 0.9 / float(c.max()))              # too bright: scale all three, so the hue stays (a per-channel clip turns a floor orange)
         colors[key] = np.maximum(c, 0.03)
 
-    t = WALL_THICKNESS
     surfaces = [
         box("Floor", (xmin - t, -t, zmin - t), (xmax + t, 0.0, zmax + t), colors["floor"]),
         box("Ceiling", (xmin - t, ceiling_y, zmin - t), (xmax + t, ceiling_y + t, zmax + t), colors["ceiling"]),
-        box("Left wall", (xmin - t, 0.0, zmin - t), (xmin, ceiling_y, zmax + t), colors["left"]),
-        box("Right wall", (xmax, 0.0, zmin - t), (xmax + t, ceiling_y, zmax + t), colors["right"]),
-        box("Back wall", (xmin, 0.0, zmax), (xmax, ceiling_y, zmax + t), colors["back"]),
-        box("Front wall", (xmin, 0.0, zmin - t), (xmax, ceiling_y, zmin), colors["front"]),
     ]
+    for wl in walls:
+        a0, a1 = (wl["value"] - t, wl["value"]) if wl["side"] > 0 else (wl["value"], wl["value"] + t)   # across the wall: outward from the room
+        b0, b1 = wl["lo"] - wl["ext_lo"], wl["hi"] + wl["ext_hi"]                                      # along it
+        lo3, hi3 = ((a0, 0.0, b0), (a1, ceiling_y, b1)) if wl["axis"] == 0 else ((b0, 0.0, a0), (b1, ceiling_y, a1))
+        surfaces.append(box(wl["name"], lo3, hi3, colors[wl["key"]], face=[wl["axis"], wl["side"]]))
 
     # ---- lights: patches that are clipped to white in the photo (a window, a lamp)
     lights = []
@@ -418,14 +445,14 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geom
         dx, dz = turn_xz(d[0], d[2], theta)
         return np.array([dx, d[1], dz])
 
-    surfaces_to_try = [("ceiling", 1, ceiling_y), ("left", 0, xmin), ("right", 0, xmax), ("back", 2, zmax), ("front", 2, zmin)]
+    surfaces_to_try = [("ceiling", 1, ceiling_y, None, None, -1)] + [(wl["key"], wl["axis"], wl["value"], wl["lo"], wl["hi"], wl["side"]) for wl in walls]
     panel_thickness = 0.03
     for pix in blobs:
         rays = np.array([ray(r, c) for r, c in pix])
         measured = PRimg[pix[:, 0], pix[:, 1]]
         # Which surface is the patch on: the one most of its pixels' rays hit inside the room, and where the depth model's own points are closest to it.
         best = None
-        for name, axis, value in surfaces_to_try:
+        for name, axis, value, wlo, whi, wside in surfaces_to_try:
             with np.errstate(divide="ignore", invalid="ignore"):
                 tt = (value - pos[axis]) / rays[:, axis]
             good = tt > 0.05
@@ -434,28 +461,35 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geom
             hit = pos[None, :] + rays * tt[:, None]
             inside = ((hit[:, 0] > xmin - 0.05) & (hit[:, 0] < xmax + 0.05) & (hit[:, 1] > -0.05) & (hit[:, 1] < ceiling_y + 0.05)
                       & (hit[:, 2] > zmin - 0.05) & (hit[:, 2] < zmax + 0.05))
+            if wlo is not None:   # (a wall of an outline covers only its own stretch)
+                other = hit[:, 2] if axis == 0 else hit[:, 0]
+                inside &= (other > wlo - 0.05) & (other < whi + 0.05)
             frac = float((good & inside).mean())
             gap = float(np.median(np.abs(measured[:, axis] - value)))
             score = frac - 0.15 * min(gap, 3.0)
             if frac > 0.5 and (best is None or score > best[0]):
-                best = (score, name, axis, value, hit[good & inside])
+                best = (score, name, axis, value, hit[good & inside], wside, wlo, whi)
         if best is None:
             continue
-        _, name, axis, value, hit = best
+        _, name, axis, value, hit, wside, wlo, whi = best
         color = np.clip(srgb_to_linear(img[pix[:, 0], pix[:, 1]]).mean(axis=0), 0.0, 1.0)
         color = color / max(float(color.max()), 1e-6)
         lo, hi = hit.min(axis=0), hit.max(axis=0)
         # a thin panel just inside the room: the surfaces at the low end of an axis (left, front) are entered going up, the others going down
-        if name in ("left", "front"):
+        if wside > 0:
             lo[axis], hi[axis] = value, value + panel_thickness
         else:
             lo[axis], hi[axis] = value - panel_thickness, value
         lo = np.maximum(lo, [xmin, 0.0, zmin])   # (kept on the wall)
         hi = np.minimum(hi, [xmax, ceiling_y, zmax])
+        if wlo is not None:
+            other = 2 if axis == 0 else 0
+            lo[other], hi[other] = max(lo[other], wlo), min(hi[other], whi)
         if np.any(hi - lo <= 0):
             continue
         kind = "Ceiling light" if name == "ceiling" else "Window light"
-        lights.append(box("%s %d" % (kind, len(lights) + 1), lo, hi, color, strength=8.0 if name == "ceiling" else 6.0, surface=name))
+        extra = {} if name == "ceiling" else {"face": [axis, wside]}
+        lights.append(box("%s %d" % (kind, len(lights) + 1), lo, hi, color, strength=8.0 if name == "ceiling" else 6.0, surface=name, **extra))
     if not lights:
         cx, cz = (xmin + xmax) / 2.0, (zmin + zmax) / 2.0
         half = min(0.4, (xmax - xmin) / 6.0, (zmax - zmin) / 6.0)
@@ -465,15 +499,16 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geom
     # How strong the lights are: bright enough that the room's average picture value is the photo's. A closed room lit by panels of radiance L and total area A_p has walls of about
     # rho * Phi / (pi * A_tot * (1 - rho)) with Phi = pi * L * A_p, and the picture value is that radiance through the renderer's tone curve; this inverts it. It is a rough
     # guess (furniture, windows' own light and the room's shape all change it), so the strength is limited and is easy to change in the Builder.
-    area_total = 2.0 * ((xmax - xmin) * (ceiling_y) + (xmax - xmin) * (zmax - zmin) + ceiling_y * (zmax - zmin))
+    area_total = 2.0 * floor_area + sum((wl["hi"] - wl["lo"]) * ceiling_y for wl in walls)
     panel_area = 0.0
     for lt in lights:
         e = sorted(np.array(lt["max"]) - np.array(lt["min"]))
         panel_area += float(e[1] * e[2])
     mean_display = float(np.clip(img.mean(), 0.02, 0.95))
     target = tone_curve_inverse(float(srgb_to_linear(mean_display)))
-    areas = {"floor": (xmax - xmin) * (zmax - zmin), "ceiling": (xmax - xmin) * (zmax - zmin), "left": ceiling_y * (zmax - zmin), "right": ceiling_y * (zmax - zmin),
-             "back": ceiling_y * (xmax - xmin), "front": ceiling_y * (xmax - xmin)}
+    areas = {"floor": floor_area, "ceiling": floor_area}
+    for wl in walls:
+        areas[wl["key"]] = (wl["hi"] - wl["lo"]) * ceiling_y
     lum_w = np.array([0.2126, 0.7152, 0.0722])
     rho = sum(areas[key] * float(colors[key] @ lum_w) for key in areas) / max(sum(areas.values()), 1e-6)
     rho = float(np.clip(rho, 0.05, 0.8))
@@ -489,11 +524,12 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geom
         # "this pixel has a surface" mask, and the step that grid is subsampled by from the full-size picture
         "points": PRimg, "ok": ok, "step": step, "camera": pos.copy(), "image": img, "exposure": k,
         "textures": room_textures.camera_model(depth_full, img_full, hfov_deg, R, theta, pos, scale),
-        "box": (xmin, xmax, zmin, zmax, ceiling_y),
+        "box": (xmin, xmax, zmin, zmax, ceiling_y), "walls": walls,
     }
     result = mirror_x({
         "camera": {"position": [round(float(v), 4) for v in pos], "target": [round(float(v), 4) for v in target], "up": [round(float(v), 5) for v in cam_up], "vfov": round(vfov, 3)},
-        "room": {"min": [round(xmin, 4), 0.0, round(zmin, 4)], "max": [round(xmax, 4), round(ceiling_y, 4), round(zmax, 4)]},
+        "room": dict({"min": [round(xmin, 4), 0.0, round(zmin, 4)], "max": [round(xmax, 4), round(ceiling_y, 4), round(zmax, 4)]},
+                     **({"outline": [[round(x, 4), round(z, 4)] for x, z in outline]} if outline else {})),
         "surfaces": surfaces,
         "lights": lights,
         "notes": notes,
