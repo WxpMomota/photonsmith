@@ -102,6 +102,7 @@ SOURCES += \
 	scene_builder_material_photo.cpp \
 	scene_builder_light_photo.cpp \
 	scene_builder_camera_photo.cpp \
+	scene_builder_composite.cpp \
 	scene_builder_photo.cpp \
 	scene_builder_models.cpp \
 	scene_builder_array_dialog.cpp \

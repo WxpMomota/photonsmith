@@ -9,6 +9,7 @@ Four ways to get a real-world picture into a rendered scene, from simple to ambi
 | a photo of a **surface** (wood, tile, fabric, a wall) | a material that repeats over any object, with a bump map | **Material from a photo** (built in, nothing to install) |
 | a photo of an **outdoor scene** with sky | the sun's height and direction and the haze, to light a render the same way | **Light from a photo** (built in, nothing to install) |
 | a photo with a **horizon** | the camera's lens, tilt and roll and the picture's shape, so a scene is seen the way the photo was | **Camera from a photo** (built in, nothing to install) |
+| the same photo, with a scene matched to it | the scene's objects in the photo, with their shadows on its ground | **Render into the photo** (built in, nothing to install) |
 | **one** photo of an object | a 3D version of it to light and render | **Object from a photo** (optional helper, runs on your computer) |
 | **one** photo of a room | an editable room: walls, floor, ceiling, windows, and the camera | **Room from a photo** (the same helper) |
 | **many** photos of an object or place | an accurate 3D copy | **A photo scan** with COLMAP or Meshroom, then bring the mesh in |
@@ -130,8 +131,37 @@ How good it is:
   hills, where the sky's lower edge is not a clean straight line, gave a warning ("check them by eye, or give them"), and a photo with only a sliver of sky said so.
 - **A horizon hidden by buildings or trees along the whole of it** is read as the skyline, which is not level: the camera then comes out tilted or rolled wrongly. The warning catches a ragged edge, not a clean
   roof line, so check the tilt and roll by eye against the photo laid over the view.
-- It does not give a **shadow catcher or a photo backdrop in the final render**: the renderers draw the scene on its own (the photo is laid over the view in the Builder, to line things up); to put a render
-  into the photo, composite the two in an image editor. Light from a photo sets the light to match.
+- The renderers draw the scene on its own (the photo is laid over the view in the Builder, to line things up); **Render into the photo...** (below) puts the scene into the photo with its shadows. Light from a photo sets the light to match.
+
+## Render into the photo
+
+Once the camera has been matched to a photo (see Camera from a photo), **Render into the photo...** (in the Camera section, below *Show the photo over the camera view*) puts the scene into that
+photo: the objects, and the shadows and reflections they cast on the ground the photo already shows. Nothing has to be installed; it uses the renderer you already have.
+
+How it works (a shadow catcher without any change to the renderer): the scene is rendered three times from the matched camera,
+
+1. **as it is**;
+2. **without the inserted objects** (the ground and the lights only): what the photo's ground would look like with nothing on it;
+3. **as a mask** of the inserted objects (plain white on black, the ground black so that it hides what is behind it).
+
+The ratio of the first two, in linear light, is what the objects do to the ground: a shadow darkens it, the glow or reflection of a bright object lightens it. It multiplies the photo. The objects themselves
+are pasted in where the mask says, with the ground's share taken off their edge pixels first (or they would carry a halo of the render's ground). The ratio is smoothed a little and has a small dead-band round 1,
+so that the render's noise does not grain the photo; everywhere the objects do nothing, the picture is the photo's own pixels.
+
+In the dialog, **tick the objects that are the ground** (the floor the objects stand on: the photo already has it, so it is not drawn, only the shadows it catches count). A floor called Floor or Ground
+starts ticked. Lights are never pasted. **Exposure of the objects** brightens or darkens them (a stop doubles or halves their light) to match the photo, whose own exposure is not known; **Samples per
+pixel** smooths the shadows. The picture is saved as a PNG (at most 1000 pixels across) and shown. The scene is rendered three times, so it takes about three times as long as one picture.
+
+What to expect:
+
+- The **ground must be a plane the camera sees as the photo does**: put the floor at the height of the real ground (the camera is 1.6 m above it unless you gave another height), and tick it.
+- **Lines up only as well as the camera matches.** If the tilt, roll or lens are a little off, the objects stand on the ground in a slightly wrong place: check with the photo laid over the view first.
+- **Light from the same photo** (the tick box in Match to a photo, or Light from a photo) makes the shadows fall the way the photo's do; a shadow in the wrong direction is the most obvious sign of a pasted object.
+- The objects are tone mapped the way the renderer shows any picture (ACES filmic); the photo is not touched except under shadows. Use Exposure when they look too bright or too dark.
+- What it does **not** do: the objects do not catch the photo's colours (a red wall beside them does not tint them), reflective objects reflect the scene's sky and not the photo, and anything in front of the
+  objects in the photo (a railing, a branch) stays behind them.
+- Checked with synthetic pictures of known answers (the far field is exactly the photo, a halved light is a halved shadow, a half-covered edge is un-matted, noise does not show), by rendering a sphere and
+  a sun through the launcher and testing the pixels, and by a headless GUI test of the whole thing.
 
 ## Object from a photo
 

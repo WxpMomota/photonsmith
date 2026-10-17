@@ -346,6 +346,11 @@ void SceneBuilderWidget::inspectCamera(QFormLayout *f) {
 		show->setChecked(m_cameraPhotoShown);
 		connect(show, &QCheckBox::toggled, this, [this](bool on) { m_cameraPhotoShown = on; updateCameraPhotoOverlay(); });
 		f->addRow(show);
+		auto *composite = new QPushButton(tr("Render into the photo..."));
+		composite->setAutoDefault(false);
+		composite->setToolTip(tr("Render the scene through this camera and put it into the photo, with the shadows it casts on the ground. Tick the floor as the ground: the photo already has it."));
+		connect(composite, &QPushButton::clicked, this, [this]() { renderIntoPhotoDialog(); });
+		f->addRow(composite);
 		auto *opacity = new QDoubleSpinBox;
 		opacity->setRange(0.1, 1.0);
 		opacity->setSingleStep(0.1);

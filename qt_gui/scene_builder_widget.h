@@ -198,6 +198,11 @@ public:
 	void cameraFromPhoto();
 	bool applyCameraPhoto(const QString &photo, double hfov, double heightMetres, bool tiltGiven, double tilt, bool rollGiven, double roll, bool alsoSky, QString *error, QStringList *notes = nullptr);
 	static double exifHorizontalFov(const QString &photo);   // the photo's horizontal field of view from its EXIF lens data, 0 when it has none
+	// Render into the photo (scene_builder_composite.cpp, src/shared/photo_composite.h): needs the photo the camera was matched to. The scene is rendered three times (as it is, without the
+	// inserted objects, and as a mask of them) and put into the photo with its shadows. `groundObjects` are the indices of the objects that are the ground the photo already has (not drawn,
+	// only their shadows count); lights stay lights; the rest is inserted. `exposureStops` brightens or darkens the inserted objects. Saves a PNG; false with `error` set when it cannot.
+	void renderIntoPhotoDialog();
+	bool renderIntoPhoto(const QString &outPng, const std::vector<int> &groundObjects, double exposureStops, int samples, QString *error, QStringList *notes = nullptr);
 	void updateCameraPhotoOverlay();                         // shows (or takes away) the photo over the camera view
 	bool cameraPhotoShownForTest() const { return m_cameraPhotoShown && !m_cameraPhoto.isNull(); }
 	// See scene_builder_inspector.cpp: an upright copy of a picture whose EXIF tag asks for a rotation (the renderer ignores that tag).

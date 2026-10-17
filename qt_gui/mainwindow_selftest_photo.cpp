@@ -20,6 +20,7 @@
 
 #include <QApplication>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QImage>
 #include <QPushButton>
@@ -438,6 +439,81 @@ void MainWindow::runCameraSelfTest(const std::function<void(const QString &)> &l
 	}
 	QTimer::singleShot(600, this, [this, shot, log, ok]() {
 		shot("camera_edit");
+		log(ok ? "RESULT: OK" : "RESULT: FAIL");
+		QApplication::exit(ok ? 0 : 1);
+	});
+}
+
+// RT_GUI_SELFTEST=composite RT_GUI_SELFTEST_OUT=<prefix>: the Scene Builder's "Render into the photo..." without its dialogs. Matches the starter scene's camera to a made-up photo (a pale sky over a flat
+// green ground, the camera 1.6 m up and tilted 6 degrees), renders the scene into it with the floor as the ground, and checks the picture that was saved: the photo's shape, the sky and the far
+// ground exactly the photo's, the objects put in (many pixels changed), the shadows (some ground pixels darker), and that a scene with only ground and lights, or no photo, fails with a message.
+void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {
+	if (m_sceneBuilder) m_tabWidget->setCurrentWidget(m_sceneBuilder);
+	resize(1500, 950);
+	SceneBuilderWidget *sb = m_sceneBuilder;
+	bool ok = sb != nullptr;
+	auto check = [&ok, log](bool cond, const QString &what) {
+		log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what));
+		ok = ok && cond;
+	};
+	if (sb) {
+		sb->setUseGpu(false);
+		const QString out = QDir::tempPath() + "/rt_selftest_composite_out.png";
+		QFile::remove(out);
+		QString noPhotoError;
+		const bool noPhotoOk = sb->renderIntoPhoto(out, {0}, 0.0, 16, &noPhotoError);   // (the message is built after the call: argument evaluation order is not defined)
+		check(!noPhotoOk && !noPhotoError.isEmpty(), "with no photo it fails with a message: " + noPhotoError.left(100));
+
+		const int w = 640, h = 480;
+		const double focal = (w / 2.0) / std::tan(65.0 * camera_from_photo::kPi / 360.0), cx = w / 2.0, cy = h / 2.0;
+		const double t = 6.0 * camera_from_photo::kPi / 180.0;
+		QImage photo(w, h, QImage::Format_RGB32);
+		for (int y = 0; y < h; ++y)
+			for (int x = 0; x < w; ++x) {
+				const double Y = y + 0.5 - cy, horizon = focal * std::tan(t);
+				if (Y >= horizon) { photo.setPixel(x, y, qRgb(76, 92, 56)); continue; }
+				const double e = std::min(1.0, (horizon - Y) / (h * 0.6));
+				photo.setPixel(x, y, qRgb(static_cast<int>(190 - 120 * e), static_cast<int>(210 - 80 * e), static_cast<int>(240 - 10 * e)));
+			}
+		const QString path = QDir::tempPath() + "/rt_selftest_composite.png";
+		photo.save(path);
+		QString err;
+		check(sb->applyCameraPhoto(path, 65.0, 1.6, false, 0.0, false, 0.0, false, &err), "the camera was matched to the photo " + err);
+
+		QStringList notes;
+		QElapsedTimer clock;
+		clock.start();
+		const bool made = sb->renderIntoPhoto(out, {0}, 0.0, 16, &err, &notes);
+		check(made, QString("the scene was rendered into the photo (%1 s) %2").arg(clock.elapsed() / 1000.0, 0, 'f', 1).arg(err));
+		if (made) {
+			QImage result(out);
+			check(!result.isNull() && result.width() == w && result.height() == h, QString("the picture has the photo's shape (%1 x %2)").arg(result.width()).arg(result.height()));
+			if (!result.isNull() && result.width() == w && result.height() == h) {
+				result = result.convertToFormat(QImage::Format_RGB32);
+				int skyChanged = 0, skyPixels = 0, changed = 0, darker = 0;
+				for (int y = 0; y < h; ++y)
+					for (int x = 0; x < w; ++x) {
+						const QRgb a = photo.pixel(x, y), b = result.pixel(x, y);
+						const int d = std::abs(qRed(a) - qRed(b)) + std::abs(qGreen(a) - qGreen(b)) + std::abs(qBlue(a) - qBlue(b));
+						if (y < h / 4) { ++skyPixels; skyChanged += d > 3 ? 1 : 0; }
+						changed += d > 30 ? 1 : 0;
+						darker += (qGreen(b) < qGreen(a) * 0.85) ? 1 : 0;
+					}
+				check(skyChanged == 0 && skyPixels > 0, QString("the sky is the photo's own (%1 of %2 pixels changed)").arg(skyChanged).arg(skyPixels));
+				check(changed > 1500, QString("the objects were put into the photo (%1 pixels changed)").arg(changed));
+				check(darker > 100, QString("they cast shadows on the ground (%1 pixels darker)").arg(darker));
+			}
+			check(!notes.isEmpty(), "the user is told what was done: " + notes.join(" / ").left(120));
+		}
+		// every object marked as the ground (and the lamp is a light): nothing to put into the photo
+		std::vector<int> all;
+		for (size_t i = 0; i < sb->document().objects.size(); ++i) all.push_back(static_cast<int>(i));
+		QString nothing;
+		const bool nothingOk = sb->renderIntoPhoto(out, all, 0.0, 16, &nothing);
+		check(!nothingOk && !nothing.isEmpty(), "with everything marked as the ground there is nothing to put in, and it says so: " + nothing.left(100));
+	}
+	QTimer::singleShot(600, this, [this, shot, log, ok]() {
+		shot("composite_edit");
 		log(ok ? "RESULT: OK" : "RESULT: FAIL");
 		QApplication::exit(ok ? 0 : 1);
 	});
