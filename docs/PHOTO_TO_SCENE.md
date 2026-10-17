@@ -135,7 +135,7 @@ How good it is:
 
 ## Render into the photo
 
-Once the camera has been matched to a photo (see Camera from a photo), **Render into the photo...** (in the Camera section, below *Show the photo over the camera view*) puts the scene into that
+**Render into the photo...** (in the Camera section, under *Match to a photo...*; it needs the camera to have been matched to a photo first, see Camera from a photo, and says so if not) puts the scene into that
 photo: the objects, and the shadows and reflections they cast on the ground the photo already shows. Nothing has to be installed; it uses the renderer you already have.
 
 How it works (a shadow catcher without any change to the renderer): the scene is rendered three times from the matched camera,

@@ -341,16 +341,16 @@ void SceneBuilderWidget::inspectCamera(QFormLayout *f) {
 	matchPhoto->setToolTip(tr("Choose a photo: the camera takes its lens, tilt and roll, and the picture its shape. The photo can then be laid over the camera view to line your scene up against it."));
 	connect(matchPhoto, &QPushButton::clicked, this, [this]() { cameraFromPhoto(); });
 	f->addRow(matchPhoto);
+	auto *composite = new QPushButton(tr("Render into the photo..."));
+	composite->setAutoDefault(false);
+	composite->setToolTip(tr("Render the scene through this camera and put it into the photo, with the shadows it casts on the ground. Tick the floor as the ground: the photo already has it."));
+	connect(composite, &QPushButton::clicked, this, [this]() { renderIntoPhotoDialog(); });
+	f->addRow(composite);
 	if (!m_cameraPhoto.isNull()) {
 		auto *show = new QCheckBox(tr("Show the photo over the camera view"));
 		show->setChecked(m_cameraPhotoShown);
 		connect(show, &QCheckBox::toggled, this, [this](bool on) { m_cameraPhotoShown = on; updateCameraPhotoOverlay(); });
 		f->addRow(show);
-		auto *composite = new QPushButton(tr("Render into the photo..."));
-		composite->setAutoDefault(false);
-		composite->setToolTip(tr("Render the scene through this camera and put it into the photo, with the shadows it casts on the ground. Tick the floor as the ground: the photo already has it."));
-		connect(composite, &QPushButton::clicked, this, [this]() { renderIntoPhotoDialog(); });
-		f->addRow(composite);
 		auto *opacity = new QDoubleSpinBox;
 		opacity->setRange(0.1, 1.0);
 		opacity->setSingleStep(0.1);
