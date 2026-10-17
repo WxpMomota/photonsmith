@@ -86,6 +86,17 @@ class RoomObjectsTests(unittest.TestCase):
         self.assertGreaterEqual(final["scale"], 0.88 * 0.5 * 0.999)   # the height alone says 0.5; a thin view of it may only take 12% off
         self.assertLessEqual(final["scale"], 0.5 * 1.0001)
 
+    def test_a_floor_piece_read_far_too_low_is_kept_to_a_believable_height(self):
+        box = (-5.0, 5.0, -1.0, 8.0, 3.0)
+        place = {"front": (0.0, 3.0), "dir": (0.0, 1.0), "bottom": 0.0, "height": 0.18, "width": 1.6}   # a bed the depth reads 18 cm high
+        low, high = room_objects.HEIGHT_RANGE["bed"]
+        self.assertAlmostEqual(room_objects.finalize_object(place, MESH, box, "bed")["size"][1], low, delta=0.13 * low)
+        self.assertAlmostEqual(room_objects.finalize_object(dict(place, height=3.0), MESH, box, "bed")["size"][1], high, delta=0.13 * high)
+        self.assertAlmostEqual(room_objects.finalize_object(dict(place, height=0.6), MESH, box, "bed")["size"][1], 0.6, delta=0.08)   # a believable one is left alone
+        self.assertAlmostEqual(room_objects.finalize_object(place, MESH, box)["size"][1], 0.18, delta=0.025)                         # no name, no prior
+        lifted = dict(place, bottom=0.8)   # something standing on something else is not held to a floor piece's range
+        self.assertAlmostEqual(room_objects.finalize_object(lifted, MESH, box, "bed")["size"][1], 0.18, delta=0.025)
+
     def test_it_stays_inside_the_room(self):
         place = {"front": (9.0, 9.0), "dir": (0.7, 0.7), "bottom": 0.0, "height": 1.0, "width": 0.5}
         final = room_objects.finalize_object(place, MESH, (-2.0, 2.0, -0.4, 4.0, 2.7))

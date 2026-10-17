@@ -25,6 +25,9 @@ FLOOR_STANDING = {"chair", "couch", "bed", "dining table", "table-merged", "toil
 FLOOR_PRIOR_BELOW = 0.7      # ... when the lowest point read is below this height (above it, the piece really is on something)
 # Furniture that is a slab and four legs or a plain block is built from measured boxes instead of being guessed by the 3D model, which turns thin legs into lumps: the table, and
 # the blocks with the depth to give one when the photo only shows the front (metres).
+# How tall a piece that stands on the floor really is, (low, high) in metres. A single photo's depth can read a far object much too low (a bed 0.2 m high, a chair 0.4 m): what is measured
+# is kept within this, so a piece is never a toy or a giant. Only used for a piece found standing on the floor.
+HEIGHT_RANGE = {"chair": (0.65, 1.2), "couch": (0.6, 1.1), "bed": (0.4, 1.3), "toilet": (0.35, 0.9), "potted plant": (0.2, 1.8), "bench": (0.4, 0.7), "suitcase": (0.4, 0.9)}
 TABLES = {"dining table", "table-merged"}
 BLOCKS = {"refrigerator": 0.7, "oven": 0.6, "cabinet-merged": 0.55, "counter": 0.6, "shelf": 0.35, "bed": 2.0}
 MIN_STAIR_WIDTH = 0.9   # metres
@@ -328,12 +331,16 @@ def place_object(geometry, mask, min_points=20, label=None):
     return {"front": (cx, cz), "dir": (dx, dz), "bottom": bottom, "height": height, "width": max(width, 0.05)}
 
 
-def finalize_object(place, mesh_size, box):
+def finalize_object(place, mesh_size, box, label=None):
     """The mesh's placement in the Scene Builder's frame. `mesh_size` is the generated mesh's (width, height, depth) (it stands on y = 0, centred, its front towards +z, about 2 tall);
     `box` is room_fit's (xmin, xmax, zmin, zmax, ceiling) in the photo's frame. Returns {"position": [x, y, z], "yaw": degrees, "scale": s, "size": [w, h, d]} (size is the scaled
-    mesh's), or None when the mesh has no size."""
+    mesh's), or None when the mesh has no size. `label` (its name) keeps a piece standing on the floor to a believable height (see HEIGHT_RANGE)."""
     mw, mh, md = (max(float(v), 1e-6) for v in mesh_size)
-    sh = place["height"] / mh
+    height = place["height"]
+    if label in HEIGHT_RANGE and place["bottom"] <= 0.001:
+        low, high = HEIGHT_RANGE[label]
+        height = min(max(height, low), high)
+    sh = height / mh
     sw = place["width"] / mw
     # The height is the surest of the two (the width is read across a view that may hide part of the object, or see it at an angle); the width only nudges the size, by 12% at most
     scale = sh * min(max(math.sqrt(sw / sh), 0.88), 1.12)

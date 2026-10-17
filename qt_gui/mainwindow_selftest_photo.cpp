@@ -172,7 +172,11 @@ void MainWindow::runRoomSelfTest(const std::function<void(const QString &)> &log
 		for (const scene_doc::Object &o : doc.objects)
 			if (o.shape == scene_doc::ShapeKind::Mesh && QFile::exists(QString::fromStdString(o.meshFile))) ++meshes;
 		log(QString("furniture: %1 mesh object(s) asked for up to %2").arg(meshes).arg(furniture));
-		if (furniture > 0) check(meshes >= 1, "at least one piece of furniture was made");
+		// (a photo may give only measured boxes, such as a bed or a table, and no mesh: the helper's own note counts both)
+		bool madeFurniture = meshes >= 1;
+		for (const QString &n : notes)
+			if (n.contains("of furniture were made")) madeFurniture = true;
+		if (furniture > 0) check(madeFurniture, "at least one piece of furniture was made");
 		check(doc.camera.fov > 10.0 && doc.camera.fov < 140.0, QString("the camera has a believable field of view (%1 degrees)").arg(doc.camera.fov));
 		check(!scene_doc::hasErrors(scene_doc::validate(doc)), "the scene has no errors");
 		for (const QString &n : notes) log("note: " + n);

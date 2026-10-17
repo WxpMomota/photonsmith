@@ -263,7 +263,7 @@ def add_furniture(image, geometry, result, out_folder, segments, count, device_c
             texture_path = os.path.join(folder, "texture.png")
             pixels = np.asarray(Image.open(texture_path).convert("RGB"))
             Image.fromarray(room_objects.relight_texture(pixels, exposure)).save(texture_path)
-        final = room_objects.finalize_object(place, info["size"], geometry["box"])
+        final = room_objects.finalize_object(place, info["size"], geometry["box"], label)
         if final is None:
             continue
         result["objects"].append({"name": title_of(label), "label": label, "score": round(seg["score"], 3),
