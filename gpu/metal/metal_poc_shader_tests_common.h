@@ -165,6 +165,8 @@ struct AreaLightGPU {
     uint32_t aliasIndex;
     float kind = 0.0f;  // 0=quad, 1=sphere - see AreaLight::kind's own comment
     int32_t spherePrimId = -1;
+    float imageScaleU = 1.0f, imageScaleV = 1.0f, imageOffsetU = 0.0f, imageOffsetV = 0.0f;   // the light's picture in the atlas (AreaLightData, metal_poc_host_math.h)
+    float triU0 = 0.0f, triV0 = 0.0f, triU1 = 1.0f, triV1 = 0.0f, triU2 = 1.0f, triV2 = 1.0f;
 };
 
 // Mirrors metal_poc_test_kernels.metal's own DielectricTestInput/

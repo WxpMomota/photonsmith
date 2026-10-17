@@ -91,6 +91,11 @@ struct AreaLightData {
     // A sphere light's own index into `spheres[]` (-1 for a quad light) -
     // see metal_poc.metal's own AreaLight::spherePrimId comment.
     int32_t spherePrimId = -1;
+    // The light's picture (an AreaLightSource "filename"): where it sits in the shared picture atlas, (scale u, scale v, offset u, offset v) - the picture's own (u, v) in [0, 1]
+    // is read at (offset + scale * (u, v)) - and, for a triangle light (kind 4), the texture coordinates of its three vertices (a point of the triangle takes the picture where
+    // the mesh's own uv put it). The defaults read a whole texture and a quad's own (u, v). See metal_poc_area_lights.metal, areaLightPicture().
+    float imageScaleU = 1.0f, imageScaleV = 1.0f, imageOffsetU = 0.0f, imageOffsetV = 0.0f;
+    float triU0 = 0.0f, triV0 = 0.0f, triU1 = 1.0f, triV1 = 0.0f, triU2 = 1.0f, triV2 = 1.0f;
 };
 
 // Power-proportional light picking - a direct port of the Vose alias-
