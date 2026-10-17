@@ -49,6 +49,17 @@ These are data, not code, and the MIT licence **does not apply to them**.
 * **`images/`**: `earthmap.jpg` is NASA's Blue Marble in equirectangular projection
   (from Wikimedia Commons, public domain: created solely by NASA). `bump-marble.png`
   and `normal-checker.png` are small textures generated for this project's tests.
+* **`qt_gui/sample_photos/`** (built into the GUI, for trying the photo features): five free-licence
+  photos from Wikimedia Commons, each scaled to 1280 pixels across (a change; nothing else was
+  done to them). `beach.jpg`: Dietmar Rabich, "Juist, Strand -- 2014 -- 3658", CC BY-SA 4.0.
+  `north-sea.jpg`: Dietmar Rabich, "Norderney, Nordstrand -- 2016 -- 5172", CC BY-SA 4.0.
+  `heath.jpg`: Dietmar Rabich, "Vreden, Zwillbrocker Venn -- 2016 -- 4122", CC BY-SA 4.0.
+  `meadow.jpg`: vastateparksstaff, "Touch the Sky at Sky Meadows", CC BY 2.0.
+  `overcast.jpg`: paul morris oldskool2016, "Overcast sky over Snowdonia", CC0 (public domain).
+  The photos keep their own licences (the three CC BY-SA photos stay under CC BY-SA 4.0, which
+  applies to the photos and to nothing else in this repository); the source page of each is
+  `https://commons.wikimedia.org/wiki/File:` followed by the title, and the program's photo picker
+  shows each credit.
 * **`pbrt_scenes/`**: a scene whose header says "Original, not derived from any
   distributed scene" is original to this project and under its MIT licence. Scenes
   taken or derived from the pbrt-v4 scene collection (https://github.com/mmp/pbrt-v4-scenes)

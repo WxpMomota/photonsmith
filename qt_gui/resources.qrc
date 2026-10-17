@@ -71,5 +71,11 @@
              separate "/icons" prefix - a "/fonts" prefix here would double
              to ":/fonts/fonts/...". -->
         <file>fonts/NotoSansSC-Regular.ttf</file>
+        <!-- The Scene Builder's sample photos (sample_photos.h): free-licence photos from Wikimedia Commons, scaled to 1280 pixels across; credits in sample_photos.cpp and docs/PHOTO_TO_SCENE.md. -->
+        <file>sample_photos/beach.jpg</file>
+        <file>sample_photos/north-sea.jpg</file>
+        <file>sample_photos/heath.jpg</file>
+        <file>sample_photos/meadow.jpg</file>
+        <file>sample_photos/overcast.jpg</file>
     </qresource>
 </RCC>

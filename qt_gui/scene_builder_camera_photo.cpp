@@ -5,6 +5,7 @@
 // camera and the picture's shape, keeps the photo for the camera view and (if asked) sets the Sun & sky from the same photo.
 #include "scene_builder_widget.h"
 #include "app_log.h"
+#include "sample_photos.h"
 #include "scene_3d_view.h"
 #include "../src/shared/camera_from_photo.h"
 #include "../src/shared/scene_arrange.h"
@@ -116,7 +117,7 @@ void SceneBuilderWidget::updateCameraPhotoOverlay() {
 }
 
 void SceneBuilderWidget::cameraFromPhoto() {
-	const QString photo = QFileDialog::getOpenFileName(this, tr("Choose the photo to match the camera to"), QString(), tr("Images (*.png *.jpg *.jpeg *.bmp *.tga)"));
+	const QString photo = sample_photos::choose(this, tr("Choose the photo to match the camera to"));
 	if (photo.isEmpty()) return;
 	QImageReader shape(photo);
 	shape.setAutoTransform(true);
@@ -181,6 +182,7 @@ void SceneBuilderWidget::cameraFromPhoto() {
 		QMessageBox::warning(this, tr("Could not read the camera"), error);
 		return;
 	}
+	if (photo.startsWith(QLatin1String(":/"))) notes << tr("Next: pick an object in the list, press Place the picked object by clicking... in its properties, click the ground in the picture, then press Render into the photo... on Camera and image.");
 	QMessageBox::information(this, tr("Camera from a photo"), tr("The camera was set from %1:\n\n- %2").arg(QFileInfo(photo).fileName(), notes.join("\n- ")));
 }
 

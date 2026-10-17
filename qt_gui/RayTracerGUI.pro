@@ -103,6 +103,7 @@ SOURCES += \
 	scene_builder_light_photo.cpp \
 	scene_builder_camera_photo.cpp \
 	scene_builder_composite.cpp \
+	sample_photos.cpp \
 	scene_builder_photo.cpp \
 	scene_builder_models.cpp \
 	scene_builder_array_dialog.cpp \
@@ -157,6 +158,7 @@ HEADERS += \
 	theme.h \
 	win_taskbar.h \
 	scene_builder_widget.h \
+	sample_photos.h \
 	scene_builder_array_dialog.h \
 	scene_builder_common.h \
 	photo_import.h \

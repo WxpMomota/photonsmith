@@ -5,6 +5,7 @@
 // where the Builder camera looks) and sets the light.
 #include "scene_builder_widget.h"
 #include "app_log.h"
+#include "sample_photos.h"
 #include "../src/shared/light_from_photo.h"
 
 #include <QCheckBox>
@@ -88,7 +89,7 @@ bool SceneBuilderWidget::applyLightPhoto(int lightIndex, const QString &photo, d
 
 void SceneBuilderWidget::lightFromPhoto(int lightIndex) {
 	if (lightIndex < 0 || lightIndex >= static_cast<int>(m_doc.lights.size())) return;
-	const QString photo = QFileDialog::getOpenFileName(this, tr("Choose a photo with the sky in it"), QString(), tr("Images (*.png *.jpg *.jpeg *.bmp *.tga)"));
+	const QString photo = sample_photos::choose(this, tr("Choose a photo with the sky in it"));
 	if (photo.isEmpty()) return;
 
 	QDialog dialog(this);

@@ -9215,92 +9215,90 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <translation>Elige una foto de la superficie</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="28"/>
+        <location filename="../scene_builder_light_photo.cpp" line="29"/>
         <source>There is no sky light to set.</source>
         <translation>No hay ninguna luz de cielo que ajustar.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="47"/>
-        <location filename="../scene_builder_light_photo.cpp" line="35"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="48"/>
+        <location filename="../scene_builder_light_photo.cpp" line="36"/>
         <source>The photo %1 could not be read: %2</source>
         <translation>No se pudo leer la foto %1: %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="79"/>
+        <location filename="../scene_builder_light_photo.cpp" line="80"/>
         <source>The sky is even (overcast), so the sun&apos;s direction cannot be told: it is set high and the haze to its most. Change Sun height and Sun direction by hand if you know them.</source>
         <translation>El cielo es uniforme (nublado), así que no se puede saber la dirección del sol: se pone alto y la calima al máximo. Cambia Altura del sol y Dirección del sol a mano si las conoces.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="80"/>
+        <location filename="../scene_builder_light_photo.cpp" line="81"/>
         <source>The sun is in the photo: its height and direction are read straight off it.</source>
         <translation>El sol está en la foto: su altura y su dirección se leen directamente de ella.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="81"/>
+        <location filename="../scene_builder_light_photo.cpp" line="82"/>
         <source>The sun is not in the photo: its height and direction are fitted to how the sky&apos;s brightness varies (confidence %1%).</source>
         <translation>El sol no está en la foto: su altura y su dirección se ajustan a cómo varía el brillo del cielo (confianza %1%).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="82"/>
+        <location filename="../scene_builder_light_photo.cpp" line="83"/>
         <source>The camera was tilted %1 degrees (read off the horizon).</source>
         <translation>La cámara estaba inclinada %1 grados (leído del horizonte).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="84"/>
+        <location filename="../scene_builder_light_photo.cpp" line="85"/>
         <source>The sun&apos;s direction is set relative to where the Builder&apos;s camera looks now, as it was relative to where the photo looks. The photo&apos;s exposure is not known, so the sky&apos;s Brightness stays as it was.</source>
         <translation>La dirección del sol se fija respecto a hacia dónde mira ahora la cámara del Builder, como estaba respecto a hacia dónde mira la foto. La exposición de la foto no se conoce, así que el Brillo del cielo se queda como estaba.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="119"/>
-        <location filename="../scene_builder_light_photo.cpp" line="91"/>
         <location filename="../scene_builder_material_photo.cpp" line="149"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.tga)</source>
         <translation>Imágenes (*.png *.jpg *.jpeg *.bmp *.tga)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="91"/>
+        <location filename="../scene_builder_light_photo.cpp" line="92"/>
         <source>Choose a photo with the sky in it</source>
         <translation>Elige una foto en la que se vea el cielo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="95"/>
-        <location filename="../scene_builder_light_photo.cpp" line="136"/>
+        <location filename="../scene_builder_light_photo.cpp" line="96"/>
+        <location filename="../scene_builder_light_photo.cpp" line="137"/>
         <source>Light from a photo</source>
         <translation>Luz a partir de una foto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="97"/>
+        <location filename="../scene_builder_light_photo.cpp" line="98"/>
         <source>The sun&apos;s height and direction and the haze are read from the sky in the photo (a blue or white sky that reaches the top of the picture), and the Sun &amp;&amp; sky settings are set to match. The photo should show some sky and, for the height, the horizon. Both settings below are optional.</source>
         <translation>La altura y la dirección del sol y la calima se leen del cielo de la foto (un cielo azul o blanco que llega a la parte de arriba de la imagen), y los ajustes de Sol y cielo se fijan para que coincidan. La foto debe mostrar algo de cielo y, para la altura, el horizonte. Los dos ajustes de abajo son opcionales.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="138"/>
-        <location filename="../scene_builder_light_photo.cpp" line="111"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="139"/>
+        <location filename="../scene_builder_light_photo.cpp" line="112"/>
         <source> degrees</source>
         <translation> grados</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="112"/>
+        <location filename="../scene_builder_light_photo.cpp" line="113"/>
         <source>How wide the photo sees, left to right. A phone&apos;s main camera is about 65 to 70 degrees; a wide-angle one 100 or more.</source>
         <translation>Cuánto abarca la foto, de izquierda a derecha. La cámara principal de un móvil ronda los 65 a 70 grados; un gran angular, 100 o más.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="91"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="92"/>
         <source>The lens was read from the photo&apos;s own data: %1 degrees across.</source>
         <translation>El objetivo se leyó de los datos de la propia foto: %1 grados de ancho.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="92"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="93"/>
         <source>The photo does not say what lens took it, so a phone&apos;s field of view was assumed (%1 degrees across); set it if you know it.</source>
         <translation>La foto no dice qué objetivo la tomó, así que se supuso el campo de visión de un móvil (%1 grados de ancho); indícalo si lo conoces.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="93"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="94"/>
         <source>The horizon in the photo gave the camera&apos;s tilt (%1 degrees up) and roll (%2 degrees).</source>
         <translation>El horizonte de la foto dio la inclinación de la cámara (%1 grados hacia arriba) y su giro (%2 grados).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="95"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="96"/>
         <source>The camera keeps the direction it looked in, is %1 m above the ground, and the picture has the photo&apos;s shape. The photo is laid over the camera view (Camera section: Show the photo) to line your scene up against it.</source>
         <translation>La cámara conserva la dirección en la que miraba, está a %1 m del suelo y la imagen tiene la forma de la foto. La foto se superpone a la vista de la cámara (sección Cámara: Mostrar la foto) para alinear tu escena con ella.</translation>
     </message>
@@ -9309,106 +9307,111 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <translation type="vanished">Sol y cielo también se ajustaron a partir de la foto: %1</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="104"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="105"/>
         <source>The Sun &amp; sky were set from the photo too: %1</source>
         <translation>El Sol y cielo también se ajustaron a partir de la foto: %1</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="106"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="107"/>
         <source>There is no sky light, so the sun was not set from the photo.</source>
         <translation>No hay luz de cielo, así que el sol no se ajustó a partir de la foto.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="106"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="107"/>
         <source>The sun was not set from the photo: %1</source>
         <translation>El sol no se ajustó a partir de la foto: %1</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="119"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="120"/>
         <source>Choose the photo to match the camera to</source>
         <translation>Elige la foto con la que ajustar la cámara</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="127"/>
-        <location filename="../scene_builder_camera_photo.cpp" line="184"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="128"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="186"/>
         <source>Camera from a photo</source>
         <translation>Cámara a partir de una foto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="129"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="130"/>
         <source>The camera takes the photo&apos;s lens (from the photo&apos;s own data when it has it), tilt and roll (read off the horizon: the lower edge of a blue or white sky), and the picture takes the photo&apos;s shape. The photo can then be laid over the camera view. All the settings below are optional.</source>
         <translation>La cámara toma el objetivo de la foto (de los datos de la propia foto cuando los tiene), su inclinación y su giro (leídos del horizonte: el borde inferior de un cielo azul o blanco), y la imagen toma la forma de la foto. Después se puede superponer la foto a la vista de la cámara. Todos los ajustes de abajo son opcionales.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="139"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="140"/>
         <source>from the photo (%1)</source>
         <translation>de la foto (%1)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="139"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="140"/>
         <source>from the photo (not in it: a phone&apos;s)</source>
         <translation>de la foto (no figura: el de un móvil)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="141"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="142"/>
         <source>How wide the photo sees, left to right. Left at the lowest setting it is read from the photo&apos;s own data when it has it, else a phone&apos;s is assumed.</source>
         <translation>Cuánto abarca la foto, de izquierda a derecha. En el valor más bajo se lee de los datos de la propia foto cuando los tiene; si no, se supone el de un móvil.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="142"/>
-        <location filename="../scene_builder_light_photo.cpp" line="113"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="143"/>
+        <location filename="../scene_builder_light_photo.cpp" line="114"/>
         <source>Photo&apos;s field of view (horizontal)</source>
         <translation>Campo de visión de la foto (horizontal)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="147"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="148"/>
         <source> m</source>
         <translation> m</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="149"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="150"/>
         <source>How high the camera was above the ground. Standing at eye level is about 1.6 m.</source>
         <translation>A qué altura estaba la cámara sobre el suelo. A la altura de los ojos, de pie, son unos 1,6 m.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="150"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="151"/>
         <source>Camera height above the ground</source>
         <translation>Altura de la cámara sobre el suelo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="154"/>
-        <location filename="../scene_builder_camera_photo.cpp" line="161"/>
-        <location filename="../scene_builder_light_photo.cpp" line="117"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="155"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="162"/>
+        <location filename="../scene_builder_light_photo.cpp" line="118"/>
         <source>from the horizon</source>
         <translation>a partir del horizonte</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="156"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="157"/>
         <source>How far the camera looked up (+) or down (-). Left at the lowest setting it is read off the horizon.</source>
         <translation>Cuánto miraba la cámara hacia arriba (+) o hacia abajo (-). En el valor más bajo se lee del horizonte.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="163"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="164"/>
         <source>How far the camera was rolled (+ counter-clockwise seen from behind it: the horizon then runs down to the right). Left at the lowest setting it is read off the horizon.</source>
         <translation>Cuánto estaba girada la cámara (+ en sentido antihorario visto desde atrás: el horizonte baja entonces hacia la derecha). En el valor más bajo se lee del horizonte.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="164"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="165"/>
         <source>Camera roll</source>
         <translation>Giro de la cámara</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="167"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="168"/>
         <source>Also set the sun and sky from the photo</source>
         <translation>Ajustar también el sol y el cielo a partir de la foto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="181"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="182"/>
         <source>Could not read the camera</source>
         <translation>No se pudo leer la cámara</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="184"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="185"/>
+        <source>Next: pick an object in the list, press Place the picked object by clicking... in its properties, click the ground in the picture, then press Render into the photo... on Camera and image.</source>
+        <translation>Siguiente: elige un objeto en la lista, pulsa Colocar el objeto elegido con un clic... en sus propiedades, haz clic en el suelo de la imagen y luego pulsa Renderizar en la foto... en Cámara e imagen.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_photo.cpp" line="186"/>
         <source>The camera was set from %1:
 
 - %2</source>
@@ -9417,59 +9420,59 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
 - %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="191"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="193"/>
         <source>Pick an object first (click it in the list or the view), then Place by clicking.</source>
         <translation>Elige primero un objeto (haz clic en él en la lista o en la vista) y luego Colocar con un clic.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="197"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="199"/>
         <source>Click the ground in the picture to stand the picked object there. Click again to move it; Esc stops.</source>
         <translation>Haz clic en el suelo de la imagen para colocar allí el objeto elegido. Haz clic otra vez para moverlo; Esc termina.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="208"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="210"/>
         <source>Placed on the ground. It is %1 m tall; the camera is %2 m above the ground. Click again to move it, Esc stops, or set its real height.</source>
         <translation>Colocado en el suelo. Mide %1 m de alto; la cámara está a %2 m del suelo. Haz clic otra vez para moverlo, Esc termina, o fija su altura real.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="226"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="228"/>
         <source>Pick an object first: its height is made what you say, about the middle of its base.</source>
         <translation>Elige primero un objeto: su altura se hace la que indiques, respecto al centro de su base.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="230"/>
         <location filename="../scene_builder_camera_photo.cpp" line="232"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="234"/>
         <source>Real height</source>
         <translation>Altura real</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="230"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="232"/>
         <source>How tall is it in the photo (metres)? The picked object is scaled about the middle of its base.</source>
         <translation>¿Qué altura tiene en la foto (metros)? El objeto elegido se escala respecto al centro de su base.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="232"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="234"/>
         <source>It cannot be made that tall (the size may change by up to 100 times).</source>
         <translation>No se puede hacer tan alto (el tamaño puede cambiar hasta 100 veces).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="119"/>
+        <location filename="../scene_builder_light_photo.cpp" line="120"/>
         <source>How far the camera looked up (+) or down (-). Left at the lowest setting it is read off where the sky ends, which works when the horizon is in the photo and not hidden by buildings or trees.</source>
         <translation>Cuánto miraba la cámara hacia arriba (+) o hacia abajo (-). En el valor más bajo se lee de dónde termina el cielo, lo cual funciona cuando el horizonte está en la foto y no lo tapan edificios o árboles.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="157"/>
-        <location filename="../scene_builder_light_photo.cpp" line="121"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="158"/>
+        <location filename="../scene_builder_light_photo.cpp" line="122"/>
         <source>Camera tilt</source>
         <translation>Inclinación de la cámara</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="133"/>
+        <location filename="../scene_builder_light_photo.cpp" line="134"/>
         <source>Could not read the light</source>
         <translation>No se pudo leer la luz</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="136"/>
+        <location filename="../scene_builder_light_photo.cpp" line="137"/>
         <source>The sky was set from %1:
 
 - %2</source>
@@ -10270,6 +10273,84 @@ Comprueba que tienes permiso para escribir allí y que el disco no está lleno.<
         <location filename="../denoiser_installer.cpp" line="197"/>
         <source>The denoiser is installed.</source>
         <translation>El eliminador de ruido está instalado.</translation>
+    </message>
+</context>
+<context>
+    <name>sample_photos</name>
+    <message>
+        <location filename="../sample_photos.cpp" line="21"/>
+        <source>Beach, blue sky</source>
+        <translation>Playa, cielo azul</translation>
+    </message>
+    <message>
+        <location filename="../sample_photos.cpp" line="22"/>
+        <source>A clean horizon and a clear sky: the camera, the sun and the exposure all read well from it. The best one to start with.</source>
+        <translation>Un horizonte limpio y un cielo despejado: la cámara, el sol y la exposición se leen bien de ella. La mejor para empezar.</translation>
+    </message>
+    <message>
+        <location filename="../sample_photos.cpp" line="24"/>
+        <source>North Sea beach</source>
+        <translation>Playa del mar del Norte</translation>
+    </message>
+    <message>
+        <location filename="../sample_photos.cpp" line="25"/>
+        <source>A beach under a blue sky with the sea behind it: a straight horizon.</source>
+        <translation>Una playa bajo un cielo azul con el mar detrás: un horizonte recto.</translation>
+    </message>
+    <message>
+        <location filename="../sample_photos.cpp" line="27"/>
+        <source>Heath under clouds</source>
+        <translation>Brezal bajo las nubes</translation>
+    </message>
+    <message>
+        <location filename="../sample_photos.cpp" line="28"/>
+        <source>Open ground under a cloudy sky: the sky is mostly cloud, so the objects&apos; exposure is left for you to set.</source>
+        <translation>Terreno abierto bajo un cielo nublado: el cielo es sobre todo nubes, así que la exposición de los objetos queda para que la fijes tú.</translation>
+    </message>
+    <message>
+        <location filename="../sample_photos.cpp" line="30"/>
+        <source>Meadow, partly cloudy</source>
+        <translation>Prado, parcialmente nublado</translation>
+    </message>
+    <message>
+        <location filename="../sample_photos.cpp" line="31"/>
+        <source>A meadow with hills on the horizon: the sky&apos;s lower edge is not a clean line, so check the camera&apos;s tilt by eye.</source>
+        <translation>Un prado con colinas en el horizonte: el borde inferior del cielo no es una línea limpia, así que revisa a ojo la inclinación de la cámara.</translation>
+    </message>
+    <message>
+        <location filename="../sample_photos.cpp" line="33"/>
+        <source>Overcast hills</source>
+        <translation>Colinas nubladas</translation>
+    </message>
+    <message>
+        <location filename="../sample_photos.cpp" line="34"/>
+        <source>A grey sky with no sun: the light comes out as an overcast sky.</source>
+        <translation>Un cielo gris sin sol: la luz sale como la de un cielo cubierto.</translation>
+    </message>
+    <message>
+        <location filename="../sample_photos.cpp" line="43"/>
+        <source>Try a sample photo, or use one of your own.</source>
+        <translation>Prueba una foto de ejemplo o usa una tuya.</translation>
+    </message>
+    <message>
+        <location filename="../sample_photos.cpp" line="68"/>
+        <source>Photo: %1</source>
+        <translation>Foto: %1</translation>
+    </message>
+    <message>
+        <location filename="../sample_photos.cpp" line="73"/>
+        <source>Use this photo</source>
+        <translation>Usar esta foto</translation>
+    </message>
+    <message>
+        <location filename="../sample_photos.cpp" line="74"/>
+        <source>Choose my own photo...</source>
+        <translation>Elegir una foto propia...</translation>
+    </message>
+    <message>
+        <location filename="../sample_photos.cpp" line="85"/>
+        <source>Images (*.png *.jpg *.jpeg *.bmp *.tga)</source>
+        <translation>Imágenes (*.png *.jpg *.jpeg *.bmp *.tga)</translation>
     </message>
 </context>
 <context>

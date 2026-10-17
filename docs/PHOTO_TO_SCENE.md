@@ -133,6 +133,22 @@ How good it is:
   roof line, so check the tilt and roll by eye against the photo laid over the view.
 - The renderers draw the scene on its own (the photo is laid over the view in the Builder, to line things up); **Render into the photo...** (below) puts the scene into the photo with its shadows. Light from a photo sets the light to match.
 
+## Sample photos
+
+Camera from a photo and Light from a photo open a picker with **five sample photos built into the program** (a picture of each, what it is good for, and its credit), so you can try them without a photo of your own;
+**Choose my own photo...** is there too. Start with *Beach, blue sky*: a clean horizon and a clear sky, from which the camera, the sun and the exposure of Render into the photo all read well.
+
+| sample | good for | credit |
+|---|---|---|
+| Beach, blue sky | everything: a straight horizon, a clear sky | Dietmar Rabich, "Juist, Strand -- 2014 -- 3658", CC BY-SA 4.0 |
+| North Sea beach | a second straight horizon | Dietmar Rabich, "Norderney, Nordstrand -- 2016 -- 5172", CC BY-SA 4.0 |
+| Heath under clouds | a cloudy sky: the objects' exposure is left to you | Dietmar Rabich, "Vreden, Zwillbrocker Venn -- 2016 -- 4122", CC BY-SA 4.0 |
+| Meadow, partly cloudy | hills on the horizon: check the tilt by eye | vastateparksstaff, "Touch the Sky at Sky Meadows", CC BY 2.0 |
+| Overcast hills | a grey sky: the light comes out overcast | paul morris oldskool2016, "Overcast sky over Snowdonia", CC0 |
+
+The photos are from Wikimedia Commons, scaled to 1280 pixels across (that is the only change); they are in `qt_gui/sample_photos/` and compiled into the program (`resources.qrc`). Their licences are in
+`THIRD_PARTY_NOTICES.md`. After you choose one for the camera, the message says what to do next: pick an object, place it by clicking the ground, and render into the photo.
+
 ## Place objects on the photo's ground
 
 With the camera matched to a photo, an object is put where you want it in the photo by clicking: pick the object, then **Place the picked object by clicking...** (in its properties, under Rotation; also in the

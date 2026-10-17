@@ -13,6 +13,7 @@
 
 #include "photo_import.h"
 #include "scene_builder_widget.h"
+#include "sample_photos.h"
 #include "scene_3d_view.h"
 
 #include "../src/shared/camera_from_photo.h"
@@ -21,10 +22,12 @@
 #include "../src/shared/scene_arrange.h"
 
 #include <QApplication>
+#include <QDialog>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QImage>
+#include <QListWidget>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QTimer>
@@ -551,6 +554,31 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			view->endPickPlace();
 			check(!view->pickingPlace(), "and stops when asked to");
 		}
+		// the sample photos built into the program: each one is there, is a 1280-pixel picture, and sets a camera and a sky; the beach is put into with the exposure matched
+		const QList<sample_photos::Sample> samples = sample_photos::all();
+		check(samples.size() >= 4, QString("the program has %1 sample photos").arg(samples.size()));
+		for (const sample_photos::Sample &s : samples) {
+			const QImage picture(s.resource);
+			check(!picture.isNull() && picture.width() == 1280 && !s.credit.isEmpty() && s.credit.contains("CC"), QString("sample %1 is in the program (%2 x %3) with its credit").arg(s.resource).arg(picture.width()).arg(picture.height()));
+			QString sampleError;
+			check(sb->applyCameraPhoto(s.resource, 0.0, 1.6, false, 0.0, false, 0.0, true, &sampleError), QString("the camera and sky are set from %1 %2").arg(s.resource, sampleError));
+		}
+		// the picker: it opens (a picture of it is saved), lists every sample, and a cancel gives nothing
+		QString pickerSeen;
+		QTimer::singleShot(400, [&pickerSeen]() {
+			if (QWidget *w = QApplication::activeModalWidget()) {
+				w->grab().save(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_picker.png");
+				for (QListWidget *list : w->findChildren<QListWidget *>()) pickerSeen = QString::number(list->count());
+				if (QDialog *d = qobject_cast<QDialog *>(w)) d->reject();
+			}
+		});
+		const QString picked = sample_photos::choose(this, "Choose a photo");
+		check(picked.isEmpty() && pickerSeen == QString::number(samples.size()), QString("the picker listed %1 samples and a cancel chose nothing").arg(pickerSeen));
+		QStringList beachNotes;
+		QString beachError;
+		const bool beachOk = sb->applyCameraPhoto(samples[0].resource, 0.0, 1.6, false, 0.0, false, 0.0, true, &beachError) && sb->renderIntoPhoto(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_sample.png", {0}, 0.0, 24, true, &beachError, &beachNotes);
+		check(beachOk, "the beach sample was put into " + beachError);
+		check(beachNotes.join(" ").contains("matched to the photo's sky"), "and its sky gave the objects' exposure: " + beachNotes.join(" / ").right(160));
 		// a real photo, when one is given: the camera, the sky and the picture from it (the result is saved next to the log for a look)
 		const QString real = qEnvironmentVariable("RT_GUI_SELFTEST_COMPOSITE_PHOTO");
 		if (!real.isEmpty()) {

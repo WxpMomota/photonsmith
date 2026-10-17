@@ -181,6 +181,8 @@ RayTracer_Package/tls/
 # Keep example/reference images if needed
 !docs/*.png
 !docs/*.jpg
+# The Scene Builder's sample photos (qt_gui/sample_photos/, built into the program; credits in docs/PHOTO_TO_SCENE.md and the program's picker).
+!qt_gui/sample_photos/*.jpg
 # The README gallery (docs/gallery/): a few small renders, not generated test output.
 !docs/gallery/*.png
 !docs/gallery/*.jpg
