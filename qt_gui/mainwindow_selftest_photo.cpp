@@ -14,9 +14,16 @@
 #include "photo_import.h"
 #include "scene_builder_widget.h"
 
+#include "../src/shared/material_from_photo.h"
+
 #include <QApplication>
+#include <QDir>
 #include <QFile>
+#include <QImage>
+#include <QPushButton>
 #include <QTimer>
+
+#include <cmath>
 
 #include <memory>
 
@@ -201,5 +208,84 @@ void MainWindow::runRoomSelfTest(const std::function<void(const QString &)> &log
 				QApplication::exit(done ? 0 : 1);
 			});
 		});
+	});
+}
+
+// RT_GUI_SELFTEST=material [RT_GUI_SELFTEST_MATERIAL_PHOTO=<image>] RT_GUI_SELFTEST_OUT=<prefix>: the Scene Builder's "Make from a photo..." for a material, without its dialogs. With no
+// photo given one is made here (warm planks with dark grooves, lit by a window on the right). Adds a quad, makes the material on it, checks the picture and bump map it gets (they exist,
+// the picture repeats with no joins, the relief is a height map) and the repeat count, and writes <prefix>_material.pbrt so a caller can render it. Exit 0 if every step held.
+void MainWindow::runMaterialSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {
+	if (m_sceneBuilder) m_tabWidget->setCurrentWidget(m_sceneBuilder);
+	resize(1500, 950);
+	SceneBuilderWidget *sb = m_sceneBuilder;
+	bool ok = sb != nullptr;
+	auto check = [&ok, log](bool cond, const QString &what) {
+		log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what));
+		ok = ok && cond;
+	};
+	if (sb) {
+		QString badError;
+		const bool badOk = sb->applyMaterialPhoto(0, "C:/no/such/photo_for_the_selftest.png", 0, 40.0, &badError);
+		check(!badOk && !badError.isEmpty(), "a missing photo fails with a message: " + badError.left(100));
+		QString photo = qEnvironmentVariable("RT_GUI_SELFTEST_MATERIAL_PHOTO");
+		if (photo.isEmpty()) {
+			QImage planks(1200, 800, QImage::Format_RGB32);
+			for (int y = 0; y < planks.height(); ++y)
+				for (int x = 0; x < planks.width(); ++x) {
+					const double groove = (x % 160) < 8 ? 0.25 : 1.0;
+					const double grain = 0.85 + 0.15 * std::sin(y * 0.05 + (x / 160) * 1.7) * std::sin(x * 0.31);
+					const double light = 0.35 + 0.65 * x / (planks.width() - 1);
+					const double v = groove * grain * light;
+					planks.setPixel(x, y, qRgb(static_cast<int>(230 * v), static_cast<int>(150 * v), static_cast<int>(85 * v)));
+				}
+			photo = QDir::tempPath() + "/rt_selftest_planks.png";
+			planks.save(photo);
+		}
+		sb->addObject(scene_doc::ShapeKind::Quad);
+		const int index = static_cast<int>(sb->document().objects.size()) - 1;
+		QString err;
+		QStringList notes;
+		const bool made = sb->applyMaterialPhoto(index, photo, 0, 40.0, &err, &notes);
+		check(made, "a material was made from " + photo + " " + err);
+		if (made) {
+			const scene_doc::Object &o = sb->document().objects[static_cast<size_t>(index)];
+			const scene_doc::Material &m = o.material;
+			check(m.kind == scene_doc::MaterialKind::CoatedDiffuse && m.roughness > 0.0, "wood is a coated diffuse with a rough coat");
+			check(QFile::exists(QString::fromStdString(m.imageFile)) && QFile::exists(QString::fromStdString(m.bumpFile)), "the picture and the bump map were saved");
+			check(m.bumpKind == scene_doc::BumpKind::Height && m.bumpStrength > 0.0 && m.bumpStrength < 0.02, "the bump map is a height map a few millimetres tall");
+			check(std::fabs(m.uvScaleU - o.size.x / 0.4) < 1e-6 && std::fabs(m.uvScaleV - o.size.z / 0.4) < 1e-6, QString("the picture repeats as often as a 40 cm patch says (%1 x %2 across a %3 x %4 quad)").arg(m.uvScaleU).arg(m.uvScaleV).arg(o.size.x).arg(o.size.z));
+			QImage colour(QString::fromStdString(m.imageFile));
+			QImage relief(QString::fromStdString(m.bumpFile));
+			check(!colour.isNull() && colour.width() == colour.height() && colour.width() >= 256, "the picture is square");
+			if (!colour.isNull()) {
+				colour = colour.convertToFormat(QImage::Format_RGB888);
+				std::vector<unsigned char> px(static_cast<size_t>(colour.width()) * colour.width() * 3);
+				for (int y = 0; y < colour.height(); ++y) std::copy(colour.constScanLine(y), colour.constScanLine(y) + colour.width() * 3, px.begin() + static_cast<std::ptrdiff_t>(y) * colour.width() * 3);
+				const double seam = material_from_photo::seamRatio(px.data(), colour.width());
+				check(seam < 2.0, QString("the picture repeats with no visible join (the seam is %1 times a normal pixel step; the photo's own is far more)").arg(seam, 0, 'f', 2));
+			}
+			check(!relief.isNull() && relief.format() == QImage::Format_Grayscale8, "the bump map is grayscale");
+			check(!notes.isEmpty(), "the user is told what was assumed: " + notes.join(" / ").left(120));
+			check(!scene_doc::hasErrors(scene_doc::validate(sb->document())), "the scene has no errors");
+			const QString outPrefix = qEnvironmentVariable("RT_GUI_SELFTEST_OUT");
+			QFile scene(outPrefix + "_material.pbrt");
+			if (!outPrefix.isEmpty() && scene.open(QIODevice::WriteOnly)) scene.write(QByteArray::fromStdString(scene_doc::toPbrt(sb->document())));
+		}
+	}
+	QTimer::singleShot(600, this, [this, shot, log, sb, ok]() {
+		shot("material_edit");
+		// the button is in the properties of the object that was picked (a quad with a picture: matte or glossy paint)
+		bool found = false;
+		if (sb) {
+			QWidget *page = sb->inspectorContentForTest();
+			for (QPushButton *b : page->findChildren<QPushButton *>())
+				if (b->text().startsWith("Make from a photo")) found = true;
+			const QString outPrefix = qEnvironmentVariable("RT_GUI_SELFTEST_OUT");
+			if (!outPrefix.isEmpty()) page->grab().save(outPrefix + "_material_properties.png");
+		}
+		log(QString("%1: the properties have the Make from a photo button").arg(found ? "ok" : "FAIL"));
+		const bool all = ok && found;
+		log(all ? "RESULT: OK" : "RESULT: FAIL");
+		QApplication::exit(all ? 0 : 1);
 	});
 }

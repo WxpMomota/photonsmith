@@ -178,6 +178,12 @@ public:
 	// Sets the room's lights so that a small draft render of it is as bright as the photo (the helper's own light level is a guess that can be several times off); returns the factor
 	// it applied (1 when the file has no brightness or the renderer is not there). `folder` is where the draft's scratch files go.
 	double calibrateRoomLight(scene_room::Import &room, const QString &folder);
+	// Material from a photo (scene_builder_material_photo.cpp): the "Make from a photo..." button of a material. materialFromPhoto asks for the photo and the kind of surface and applies it
+	// (one undo step); applyMaterialPhoto is that without the dialogs: the photo becomes a seamless colour picture and a height map saved with the Builder's pictures, and the object's
+	// material takes them (a coated or plain diffuse by `surfaceKind`, an index into material_from_photo::surfaceKinds()), with the picture repeated as often as `patchCm`, the width in
+	// centimetres of the photographed patch, says (0: repeats left as they were). False with `error` set when it cannot; `notes` gets what the user should know.
+	void materialFromPhoto(int objectIndex);
+	bool applyMaterialPhoto(int objectIndex, const QString &photo, int surfaceKind, double patchCm, QString *error, QStringList *notes = nullptr);
 	// See scene_builder_inspector.cpp: an upright copy of a picture whose EXIF tag asks for a rotation (the renderer ignores that tag).
 	static QString uprightPictureCopy(const QString &path, QSize *size);
 	// Arrange (scene_builder_arrange.cpp): hide and lock what is picked, put it on the floor, rename it, frame it.

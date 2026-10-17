@@ -6,6 +6,7 @@ Four ways to get a real-world picture into a rendered scene, from simple to ambi
 | You have | You want | Use |
 |---|---|---|
 | any picture | it on a wall, a floor, a ball, a statue | **Pictures** (built in, nothing to install) |
+| a photo of a **surface** (wood, tile, fabric, a wall) | a material that repeats over any object, with a bump map | **Material from a photo** (built in, nothing to install) |
 | **one** photo of an object | a 3D version of it to light and render | **Object from a photo** (optional helper, runs on your computer) |
 | **one** photo of a room | an editable room: walls, floor, ceiling, windows, and the camera | **Room from a photo** (the same helper) |
 | **many** photos of an object or place | an accurate 3D copy | **A photo scan** with COLMAP or Meshroom, then bring the mesh in |
@@ -27,6 +28,36 @@ A diffuse or glossy-paint material can be coloured by a picture instead of a fla
   copy under its data folder (`pictures\`) and uses that, so the picture is the right way up and a quad takes the right shape.
 
 For a sky, give the **Sky** light an image instead (an equirectangular panorama).
+
+## Material from a photo
+
+A photo of a real surface (a wood floor, a tiled wall, fabric, a plastered ceiling) can become a material that covers any object. Select an object whose material is **Matte** or
+**Glossy paint**, and under **Picture** press **Make from a photo...**. Nothing has to be installed: it is plain image processing, the same on every system, and the photo stays on
+your computer.
+
+1. Choose the photo. The middle of it (a square a little inside its edges) is used, so frame a patch of the surface that fills the picture and holds nothing else (no furniture, no
+   edge of the floor).
+2. The dialog shows what you will get: the picture **repeated twice across and down** (any joins would show here) and the **bump map** (light is high).
+3. Say **what it is** (wood, tile or polished stone, brick or rough stone or concrete, fabric or carpet, leather, plaster or paint, something else). That sets the starting gloss (a
+   varnished floor, a glazed tile and leather get a clear coat, so the material becomes Glossy paint; the others stay Matte) and how tall the relief is (a millimetre or two for wood
+   grain, four for brick). They are starting values; every one can be changed in the properties.
+4. Say **how wide the patch in the photo really is**. The picture then repeats across the object at that size: a 40 cm patch on a 6 m floor repeats 15 times. (On a quad or a box;
+   other shapes keep their own texture repeats, and 0 leaves the repeats as they were.)
+
+What it makes, from the photo:
+
+- **A colour picture with the photo's light taken out.** A window's glow across a floor, or a shadow, is not part of the wood: the broad light and shade is divided out (the colour is
+  kept), so the surface is as bright on average everywhere and takes the light of your scene instead.
+- **A picture that repeats with no joins.** The patch is blended with a copy of itself shifted by half its size, with the weight 1 in the middle and 0 at the edges, so the edges are made
+  of continuous content; the contrast lost in the blend is put back. It works best on an even texture (wood, stone, plaster, fabric); a pattern with large regular features (a brick wall,
+  a tile floor) can show its blend as a slight smear where two bricks are mixed, and a patch with a single distinct thing in it (a knot, a stain) repeats that thing.
+- **A bump map guessed from the picture.** Dark is low and light is high at two scales (the fine grain and the coarse pattern), so grout, cracks and the gaps between threads dip. It is a
+  guess from the colours alone, not a measurement of the surface: **Bump height** in the properties makes it stronger or flatter, and a surface whose colour does not follow its relief (a
+  flat painted wall with a pattern printed on it) gets a relief it does not have.
+
+Limits: the gloss is a starting value by kind, not measured from the photo (a photo does not tell a coat's roughness); a surface with strong perspective in the photo (a floor seen at a
+steep angle) is read as if it were flat-on, so stand above the surface when you can; the pictures are 256, 512 or 1024 pixels square by the photo's size and are kept with the Builder's
+other pictures, not inside the scene file.
 
 ## Object from a photo
 

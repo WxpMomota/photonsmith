@@ -456,6 +456,14 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 			        if (o.shape == ShapeKind::Quad && px.isValid() && px.width() > 0) o.size.z = o.size.x * px.height() / px.width();
 		        });
 	};
+	// A photo of a real surface (a floor, a wall, fabric) becomes the picture and the bump map, made to repeat (scene_builder_material_photo.cpp).
+	const auto addMaterialPhoto = [&]() {
+		auto *button = new QPushButton(tr("Make from a photo..."));
+		button->setAutoDefault(false);
+		button->setToolTip(tr("Choose a photo of a surface (wood, tile, fabric, a wall): it becomes this material's picture, repeated with no joins, with a bump map guessed from it."));
+		connect(button, &QPushButton::clicked, this, [this, i]() { materialFromPhoto(i); });
+		f->addRow(QString(), button);
+	};
 	// What the surface's colour is, when it is not a picture: a plain colour, a checker (matte only), the renderer's marble or noise (their own colours), or dots.
 	// Returns true when the colour is a plain one (or a checker's first colour), so the caller shows the colour row.
 	const auto addPattern = [&](bool checkerToo) {
@@ -505,6 +513,7 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 		case MaterialKind::Diffuse:
 			bumpable = true;
 			addPicture();
+			addMaterialPhoto();
 			if (!m.imageFile.empty()) break;  // the picture is the colour
 			addPattern(true);
 			if (m.pattern == scene_doc::Pattern::Marble) {
@@ -537,6 +546,7 @@ void SceneBuilderWidget::inspectMaterial(QFormLayout *f, int i) {
 		case MaterialKind::CoatedDiffuse:
 			bumpable = true;
 			addPicture();
+			addMaterialPhoto();
 			if (m.imageFile.empty()) {
 				addPattern(false);
 				if (m.pattern == scene_doc::Pattern::Marble) {

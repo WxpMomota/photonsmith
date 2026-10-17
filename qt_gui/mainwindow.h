@@ -167,6 +167,7 @@ public:
 	void runBuilder3dSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);  // mainwindow_selftest_builder3d.cpp
 	void runPhotoSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);  // mainwindow_selftest_photo.cpp
 	void runRoomSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_photo.cpp
+	void runMaterialSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_photo.cpp
 
 	// Called from main.cpp, before any MainWindow exists, to decide which
 	// QTranslator (if any) to install - see language_switch.cpp's own
