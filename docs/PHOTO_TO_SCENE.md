@@ -178,7 +178,9 @@ so that the render's noise does not grain the photo; everywhere the objects do n
 
 In the dialog, **tick the objects that are the ground** (the floor the objects stand on: the photo already has it, so it is not drawn, only the shadows it catches count). A floor called Floor or Ground
 starts ticked. Lights are never pasted. **Exposure of the objects** brightens or darkens them (a stop doubles or halves their light) to match the photo, whose own exposure is not known; **Samples per
-pixel** smooths the shadows. The picture is saved as a PNG (at most 1000 pixels across) and shown. The scene is rendered three times, so it takes about three times as long as one picture.
+pixel** smooths the shadows. The picture (at most 1000 pixels across) appears **in the Builder's preview pane**, below the 3D view, where Preview's pictures appear: nothing is saved until you press **Save picture...** (next to Preview), which saves whatever the preview pane shows as a PNG. The scene is rendered three times, so it takes about three times as long as one picture; the Log Output tab shows each render as it runs.
+
+**Preview in the photo** (next to Preview) is the quick form: no questions, the Preview's Quality (Draft, Good or Best), the ground, exposure and matching last used in the dialog (the first time the floor is the ground and the sky's exposure is matched when the scene has a Sun & sky), and the picture appears in the preview pane. Use it while placing objects; use the dialog for the final picture.
 
 What to expect:
 

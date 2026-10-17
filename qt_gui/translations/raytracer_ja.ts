@@ -6899,170 +6899,193 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>アスペクト比</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="59"/>
-        <location filename="../scene_builder_composite.cpp" line="228"/>
+        <location filename="../scene_builder_composite.cpp" line="74"/>
+        <location filename="../scene_builder_composite.cpp" line="239"/>
         <source>Match the camera to a photo first (Camera section: Match to a photo...): the scene is put into that photo.</source>
         <translation>先にカメラを写真に合わせてください (カメラの項目: 写真に合わせる...)。シーンはその写真の中に合成されます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="88"/>
+        <location filename="../scene_builder_composite.cpp" line="103"/>
         <source>Every object is marked as the ground or a light, so there is nothing to put into the photo.</source>
         <translation>すべてのオブジェクトが地面またはライトに設定されているため、写真に合成するものがありません。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="97"/>
+        <location filename="../scene_builder_composite.cpp" line="112"/>
         <source>Rendering the scene for the photo...</source>
         <translation>写真用にシーンをレンダリングしています...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="98"/>
-        <location filename="../scene_builder_composite.cpp" line="228"/>
-        <location filename="../scene_builder_composite.cpp" line="233"/>
-        <location filename="../scene_builder_composite.cpp" line="294"/>
+        <location filename="../scene_builder_composite.cpp" line="113"/>
+        <location filename="../scene_builder_composite.cpp" line="239"/>
+        <location filename="../scene_builder_composite.cpp" line="244"/>
         <source>Render into the photo</source>
         <translation>写真にレンダリング</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="110"/>
+        <location filename="../scene_builder_composite.cpp" line="125"/>
         <source>Rendering the scene for the photo: %1 of 3...</source>
         <translation>写真用にシーンをレンダリング中: %1 / 3...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="143"/>
+        <location filename="../scene_builder_composite.cpp" line="158"/>
         <source>Rendering the scene for the photo: %1 of 3, %2%...</source>
         <translation>写真用にシーンをレンダリング中: %1 / 3、%2%...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="162"/>
+        <location filename="../scene_builder_composite.cpp" line="177"/>
         <source>A render took too long and was stopped.</source>
         <translation>レンダリングに時間がかかりすぎたため停止しました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="168"/>
+        <location filename="../scene_builder_composite.cpp" line="183"/>
         <source>The renderer could not make the %1 picture. Its output:
 %2</source>
         <translation>レンダラーは「%1」の画像を作れませんでした。出力:
 %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="174"/>
+        <location filename="../scene_builder_composite.cpp" line="189"/>
         <source>The renderer made a picture of %1 x %2, not the %3 x %4 asked for.</source>
         <translation>レンダラーが作った画像は %1 x %2 で、依頼した %3 x %4 ではありませんでした。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="189"/>
+        <location filename="../scene_builder_composite.cpp" line="204"/>
         <source>The objects&apos; exposure was not matched to the photo: that reads the photo&apos;s sky, and the scene has no Sun &amp; sky (set it from the same photo with Light from a photo).</source>
         <translation>オブジェクトの露出は写真に合わせられませんでした。これは写真の空から読み取るもので、シーンに「太陽と空」がありません (同じ写真から「写真から光を設定」で設定してください)。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="196"/>
+        <location filename="../scene_builder_composite.cpp" line="211"/>
         <source>The objects&apos; exposure (%1 stops) and colour were matched to the photo&apos;s sky.</source>
         <translation>オブジェクトの露出 (%1 段) と色を写真の空に合わせました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="199"/>
+        <location filename="../scene_builder_composite.cpp" line="214"/>
         <source>The objects&apos; exposure was not matched to the photo: %1</source>
         <translation>オブジェクトの露出は写真に合わせられませんでした: %1</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="205"/>
+        <location filename="../scene_builder_composite.cpp" line="220"/>
         <source>The picture could not be put together.</source>
         <translation>画像を合成できませんでした。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="211"/>
+        <location filename="../scene_builder_composite.cpp" line="64"/>
         <source>The picture could not be saved as %1.</source>
         <translation>画像を %1 として保存できませんでした。</translation>
     </message>
     <message numerus="yes">
-        <location filename="../scene_builder_composite.cpp" line="218"/>
+        <location filename="../scene_builder_composite.cpp" line="229"/>
         <source>%n object(s) were put into the photo; the ground they stand on is not drawn (only the shadows and reflections they cause are).</source>
         <translation>
             <numerusform>%n 個のオブジェクトを写真に合成しました。置かれている地面は描かれません (それが作る影と映り込みだけが描かれます)。</numerusform>
         </translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="220"/>
+        <location filename="../scene_builder_composite.cpp" line="231"/>
         <source>The objects are shown at the exposure the Builder gives them%1; the photo&apos;s own exposure is not known, so use Exposure if they look too bright or too dark.</source>
         <translation>オブジェクトはビルダーが与える露出で表示されます%1。写真の露出はわからないため、明るすぎる・暗すぎる場合は「露出」で調整してください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="220"/>
+        <location filename="../scene_builder_composite.cpp" line="231"/>
         <source> (%1 stops)</source>
         <translation> (%1 段)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="221"/>
+        <location filename="../scene_builder_composite.cpp" line="232"/>
         <source>No object is marked as the ground, so there are no shadows on the photo: tick the floor the objects stand on.</source>
         <translation>地面に設定されたオブジェクトがないため、写真に影はできません。オブジェクトが置かれている床にチェックを入れてください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="235"/>
+        <location filename="../scene_builder_composite.cpp" line="246"/>
         <source>The scene, seen through the camera matched to the photo, is rendered and put into the photo, with the shadows and reflections it casts on the ground. Tick the objects that are the ground: the photo already has it, so it is not drawn, and only the shadows it catches count. Everything else (except lights) is put into the photo. The scene is rendered three times, so it takes about three times as long as one picture.</source>
         <translation>写真に合わせたカメラから見たシーンをレンダリングし、地面に落ちる影や映り込みとともに写真に合成します。地面にあたるオブジェクトにチェックを入れてください。地面は写真にすでにあるため描かれず、その地面が受ける影だけが使われます。それ以外 (ライトを除く) はすべて写真に合成されます。シーンは3回レンダリングするため、1枚の画像の約3倍の時間がかかります。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="250"/>
+        <location filename="../scene_builder_composite.cpp" line="262"/>
         <source>Ticked: the ground the photo already has (its shadows are used, it is not drawn). Unticked: put into the photo.</source>
         <translation>チェックあり: 写真にすでにある地面 (その影が使われ、描かれません)。チェックなし: 写真に合成されます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="255"/>
+        <location filename="../scene_builder_composite.cpp" line="267"/>
         <source>Match the objects&apos; exposure and colour to the photo&apos;s sky</source>
         <translation>オブジェクトの露出と色を写真の空に合わせる</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="257"/>
+        <location filename="../scene_builder_composite.cpp" line="269"/>
         <source>Reads how bright and how warm or cool the photo&apos;s sky is, and gives the objects the same exposure and colour cast. Needs the Sun &amp; sky set from the same photo (Light from a photo). The setting below is added to it.</source>
         <translation>写真の空の明るさと暖かさ・冷たさを読み取り、オブジェクトに同じ露出と色かぶりを与えます。同じ写真から設定した「太陽と空」が必要です (写真から光を設定)。下の設定はこれに加算されます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="263"/>
+        <location filename="../scene_builder_composite.cpp" line="275"/>
         <source> stops</source>
         <translation> 段</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="264"/>
+        <location filename="../scene_builder_composite.cpp" line="277"/>
         <source>How much brighter (+) or darker (-) the objects are made, to match the photo&apos;s exposure. Each stop doubles or halves their light.</source>
         <translation>写真の露出に合わせて、オブジェクトをどれだけ明るく (+) または暗く (-) するか。1段ごとに光が2倍または半分になります。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="265"/>
+        <location filename="../scene_builder_composite.cpp" line="278"/>
         <source>Exposure of the objects</source>
         <translation>オブジェクトの露出</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="269"/>
+        <location filename="../scene_builder_composite.cpp" line="282"/>
         <source>Samples per pixel: more makes the shadows smoother and takes longer.</source>
         <translation>ピクセルあたりのサンプル数: 増やすと影が滑らかになりますが、時間がかかります。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="270"/>
+        <location filename="../scene_builder_composite.cpp" line="283"/>
         <location filename="../scene_builder_inspector.cpp" line="441"/>
         <source>Samples per pixel</source>
         <translation>ピクセルあたりのサンプル数</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="281"/>
+        <location filename="../scene_builder_composite.cpp" line="312"/>
+        <source>Put into the photo in %1 s (%2 x %3). %4</source>
+        <translation>%1 秒で写真に合成しました (%2 x %3)。%4</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_composite.cpp" line="318"/>
+        <source>Match the camera to a photo first (Camera and image: Match to a photo...): the scene is put into that photo.</source>
+        <translation>先にカメラを写真に合わせてください (カメラと画像: 写真に合わせる...)。シーンはその写真の中に合成されます。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_composite.cpp" line="333"/>
+        <source>Putting the scene into the photo...</source>
+        <translation>シーンを写真に合成しています...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_composite.cpp" line="344"/>
+        <source>Put into the photo in %1 s (%2 x %3, %4 samples). %5</source>
+        <translation>%1 秒で写真に合成しました (%2 x %3、%4 サンプル)。%5</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_composite.cpp" line="353"/>
+        <source>The picture is in the preview pane.</source>
+        <translation>画像はプレビューペインにあります。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_composite.cpp" line="359"/>
         <source>Save the picture as</source>
         <translation>画像の保存先</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="281"/>
+        <location filename="../scene_builder_composite.cpp" line="359"/>
         <source>PNG pictures (*.png)</source>
         <translation>PNG 画像 (*.png)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="289"/>
+        <location filename="../scene_builder_composite.cpp" line="308"/>
         <source>Could not render into the photo</source>
         <translation>写真にレンダリングできませんでした</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="303"/>
         <source>Saved as %1.
 
 - %2</source>
-        <translation>%1 として保存しました。
+        <translation type="vanished">%1 として保存しました。
 
 - %2</translation>
     </message>
@@ -7681,7 +7704,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="808"/>
-        <location filename="../scene_builder_widget.cpp" line="730"/>
+        <location filename="../scene_builder_widget.cpp" line="744"/>
         <source>Meshes (*.ply *.obj)</source>
         <translation>メッシュ (*.ply *.obj)</translation>
     </message>
@@ -7926,6 +7949,26 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>このシーンをライブプレビューで開きます。歩き回ったり、物を動かしたりできます。シーン一覧には別のシーン「（ライブプレビュー）」として保存され、元のシーンとその登録は変更されません。</translation>
     </message>
     <message>
+        <location filename="../scene_builder_widget.cpp" line="325"/>
+        <source>Preview in the photo</source>
+        <translation>写真でプレビュー</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="327"/>
+        <source>Render the scene through the camera that was matched to a photo and show it here, put into the photo with its shadows. Same Quality as Preview. (Camera and image &gt; Render into the photo... asks for more.)</source>
+        <translation>写真に合わせたカメラを通してシーンをレンダリングし、影とともに写真に合成してここに表示します。品質はプレビューと同じです。(「カメラと画像」&gt;「写真にレンダリング...」ではさらに設定できます。)</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="328"/>
+        <source>Save picture...</source>
+        <translation>画像を保存...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="331"/>
+        <source>Save the picture shown below as a PNG</source>
+        <translation>下に表示されている画像を PNG として保存します</translation>
+    </message>
+    <message>
         <location filename="../scene_builder_actions.cpp" line="73"/>
         <location filename="../scene_builder_widget.cpp" line="142"/>
         <source>Undo</source>
@@ -7970,23 +8013,23 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="99"/>
-        <location filename="../scene_builder_widget.cpp" line="328"/>
+        <location filename="../scene_builder_widget.cpp" line="335"/>
         <source>Turntable...</source>
         <translation>ターンテーブル...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="330"/>
+        <location filename="../scene_builder_widget.cpp" line="337"/>
         <source>Make a video of the scene from a camera that goes once round it</source>
         <translation>カメラがシーンのまわりを 1 周する動画を作ります</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="100"/>
-        <location filename="../scene_builder_widget.cpp" line="331"/>
+        <location filename="../scene_builder_widget.cpp" line="338"/>
         <source>Flythrough...</source>
         <translation>フライスルー...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="333"/>
+        <location filename="../scene_builder_widget.cpp" line="340"/>
         <source>Make a video of the scene from a camera that flies through your saved camera views (needs two or more)</source>
         <translation>保存したカメラビューを順にたどって飛ぶカメラの動画を作ります (2 つ以上必要)</translation>
     </message>
@@ -8610,12 +8653,12 @@ From: %3</source>
         <translation>プレビュー</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="325"/>
+        <location filename="../scene_builder_widget.cpp" line="332"/>
         <source>Render picture...</source>
         <translation>画像をレンダリング...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="327"/>
+        <location filename="../scene_builder_widget.cpp" line="334"/>
         <source>Render at the image size and sample count set under Camera, and save the picture as a PNG</source>
         <translation>カメラで設定した画像サイズとサンプル数でレンダリングし、PNG として保存</translation>
     </message>
@@ -8702,7 +8745,7 @@ From: %3</source>
     </message>
     <message>
         <location filename="../scene_builder_turntable.cpp" line="94"/>
-        <location filename="../scene_builder_widget.cpp" line="335"/>
+        <location filename="../scene_builder_widget.cpp" line="342"/>
         <source>Quality:</source>
         <translation>品質:</translation>
     </message>
@@ -8832,7 +8875,7 @@ From: %3</source>
         <translation type="vanished">ターンテーブルに失敗しました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="353"/>
+        <location filename="../scene_builder_widget.cpp" line="364"/>
         <source>Press Preview to see the scene.</source>
         <translation>「プレビュー」を押すとシーンが表示されます。</translation>
     </message>
@@ -8876,7 +8919,7 @@ From: %3</source>
         <translation>保存できません</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="116"/>
+        <location filename="../scene_builder_composite.cpp" line="131"/>
         <location filename="../scene_builder_files.cpp" line="170"/>
         <location filename="../scene_builder_files.cpp" line="180"/>
         <location filename="../scene_builder_files.cpp" line="246"/>
@@ -8943,12 +8986,12 @@ It is in the scene list now (Settings tab, My Scenes).</source>
 シーンリスト（設定タブの「マイシーン」）に追加されました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="876"/>
+        <location filename="../scene_builder_widget.cpp" line="891"/>
         <source>(%1)%2  |  %3 objects, %4 lights</source>
         <translation>(%1)%2  |  オブジェクト %3 個、ライト %4 個</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="730"/>
+        <location filename="../scene_builder_widget.cpp" line="744"/>
         <source>Choose a mesh</source>
         <translation>メッシュを選択</translation>
     </message>
@@ -8988,37 +9031,37 @@ It is in the scene list now (Settings tab, My Scenes).</source>
         <translation>シーンリストに追加しました</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="548"/>
+        <location filename="../scene_builder_widget.cpp" line="562"/>
         <source>Camera and image</source>
         <translation>カメラと画像</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="589"/>
+        <location filename="../scene_builder_widget.cpp" line="603"/>
         <source>, light</source>
         <translation>、ライト</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="777"/>
+        <location filename="../scene_builder_widget.cpp" line="791"/>
         <source>Lighting: %1. %2</source>
         <translation>ライティング: %1。%2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="870"/>
+        <location filename="../scene_builder_widget.cpp" line="885"/>
         <source>not saved yet</source>
         <translation>未保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="904"/>
+        <location filename="../scene_builder_widget.cpp" line="919"/>
         <source>No problems found.</source>
         <translation>問題は見つかりませんでした。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="910"/>
+        <location filename="../scene_builder_widget.cpp" line="925"/>
         <source>Fix this:</source>
         <translation>修正してください:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="910"/>
+        <location filename="../scene_builder_widget.cpp" line="925"/>
         <source>Note:</source>
         <translation>注意:</translation>
     </message>
@@ -9044,14 +9087,14 @@ It is in the scene list now (Settings tab, My Scenes).</source>
         <translation>すでにレンダリング中です。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="67"/>
+        <location filename="../scene_builder_composite.cpp" line="82"/>
         <location filename="../scene_builder_render.cpp" line="152"/>
         <location filename="../scene_builder_turntable.cpp" line="170"/>
         <source>Fix the problems listed under the properties first.</source>
         <translation>先にプロパティに表示されている問題を修正してください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="63"/>
+        <location filename="../scene_builder_composite.cpp" line="78"/>
         <location filename="../scene_builder_render.cpp" line="153"/>
         <location filename="../scene_builder_turntable.cpp" line="171"/>
         <source>The renderer (%1) was not found next to the program.</source>
@@ -9524,7 +9567,7 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>%1 からマテリアルを作成しました。%2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="97"/>
+        <location filename="../scene_builder_composite.cpp" line="112"/>
         <location filename="../scene_builder_photo.cpp" line="98"/>
         <location filename="../scene_builder_photo.cpp" line="262"/>
         <location filename="../scene_builder_photo.cpp" line="334"/>
@@ -9662,6 +9705,7 @@ This replaces the scene you have now (Undo brings it back).</source>
         <translation>%1 x %2、%3 サンプルでレンダリング中...</translation>
     </message>
     <message>
+        <location filename="../scene_builder_composite.cpp" line="341"/>
         <location filename="../scene_builder_render.cpp" line="221"/>
         <source>The render was cancelled.</source>
         <translation>レンダリングはキャンセルされました。</translation>
@@ -9685,29 +9729,31 @@ This replaces the scene you have now (Undo brings it back).</source>
         <translation>レンダリングに失敗しました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="228"/>
+        <location filename="../scene_builder_render.cpp" line="229"/>
         <source>Done in %1 s (%2 x %3).</source>
         <translation>%1 秒で完了しました (%2 x %3)。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="231"/>
+        <location filename="../scene_builder_composite.cpp" line="363"/>
+        <location filename="../scene_builder_render.cpp" line="232"/>
         <source>Saved %1.</source>
         <translation>%1 を保存しました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="232"/>
+        <location filename="../scene_builder_composite.cpp" line="366"/>
+        <location filename="../scene_builder_render.cpp" line="233"/>
         <source>Could not save to %1.</source>
         <translation>%1 に保存できませんでした。</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="462"/>
-        <location filename="../scene_builder_widget.cpp" line="573"/>
+        <location filename="../scene_builder_widget.cpp" line="587"/>
         <source>, locked</source>
         <translation>、ロック中</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="476"/>
-        <location filename="../scene_builder_widget.cpp" line="572"/>
+        <location filename="../scene_builder_widget.cpp" line="586"/>
         <source>, hidden</source>
         <translation>、非表示</translation>
     </message>

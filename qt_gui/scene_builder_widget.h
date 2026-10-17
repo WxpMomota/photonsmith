@@ -205,6 +205,14 @@ public:
 	void renderIntoPhotoDialog();
 	// `matchToPhoto`: the objects' exposure and colour cast are read from the photo's sky (photo_composite::matchToPhoto; needs the Sun & sky set from the same photo) and `exposureStops` is added to it.
 	bool renderIntoPhoto(const QString &outPng, const std::vector<int> &groundObjects, double exposureStops, int samples, bool matchToPhoto, QString *error, QStringList *notes = nullptr);
+	// The same, giving the picture itself (at most `maxWidth` pixels across) instead of a file: the Builder shows it in its preview pane (showInPreview).
+	bool renderIntoPhotoImage(QImage *result, const std::vector<int> &groundObjects, double exposureStops, int samples, int maxWidth, bool matchToPhoto, QString *error, QStringList *notes = nullptr);
+	// "Preview in the photo": the same at the Quality setting of the Preview, with the ground, exposure and matching last used (the first time: the floor is the ground, the sky matches when there is one).
+	void previewIntoPhoto();
+	void showInPreview(const QPixmap &picture, const QString &status);   // the preview pane shows this picture (and "Save picture..." can save it)
+	void onSavePictureClicked();                                           // "Save picture...": the picture in the preview pane, as a PNG
+	bool previewHasPictureForTest() const { return !m_previewPixmap.isNull(); }
+	QSize previewPictureSizeForTest() const { return m_previewPixmap.size(); }
 	void updateCameraPhotoOverlay();                         // shows (or takes away) the photo over the camera view
 	// Place on the photo's ground (scene_builder_camera_photo.cpp): placeByClicking looks through the camera and waits for clicks on the ground in the picture; each click stands the picked items
 	// there (placePickedAt, one undo step), on the ground y = 0 (the camera is `height` above it). setPickedHeight makes the picked items `metres` tall about the middle of their base.
@@ -506,6 +514,11 @@ private:
 	void createDenoiseCheck(QWidget *parent);   // scene_builder_render.cpp: the Preview row's Denoise tick
 	QCheckBox *m_denoiseCheck = nullptr;     // Denoise: the Preview picture is cleaned by the AI denoiser (OIDN on the CPU, OptiX's own with the GPU on Windows)
 	QPushButton *m_previewButton = nullptr;
+	QPushButton *m_inPhotoButton = nullptr;   // "Preview in the photo"
+	QPushButton *m_saveButton = nullptr;      // "Save picture..." (the picture in the preview pane)
+	std::vector<std::string> m_compositeGround;   // the names of the objects last ticked as the ground in Render into the photo
+	bool m_compositeGroundSet = false;
+	double m_compositeExposure = 0.0;            // the exposure last given there
 	QPushButton *m_finalButton = nullptr;
 	QPushButton *m_turntableButton = nullptr;
 	QPushButton *m_flythroughButton = nullptr;
@@ -518,6 +531,7 @@ private:
 	QWidget *m_inspectorPanel = nullptr;  // the properties column
 	QSplitter *m_mainSplit = nullptr;     // list | view and preview | properties; its sizes are remembered between runs (window_geometry.h)
 	QSplitter *m_centreSplit = nullptr;   // view above preview
+	QScrollArea *m_centreScroll = nullptr;   // the scrolling column that holds them (the preview is below the fold in a short window)
 	QWidget *m_leftPanel = nullptr;  // the list column; widened to fit its buttons when shown
 	QPushButton *m_liveButton = nullptr;   // "Preview live"; hidden until the main window says Live Preview is there
 	QPushButton *m_undoButton = nullptr;

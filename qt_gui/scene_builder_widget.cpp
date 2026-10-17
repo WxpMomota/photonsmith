@@ -322,6 +322,13 @@ void SceneBuilderWidget::buildUi() {
 	createDenoiseCheck(previewBox);   // the Preview's Denoise tick (scene_builder_render.cpp)
 	m_previewButton = new QPushButton(tr("Preview"), previewBox);
 	m_previewButton->setAutoDefault(false);
+	m_inPhotoButton = new QPushButton(tr("Preview in the photo"), previewBox);
+	m_inPhotoButton->setAutoDefault(false);
+	m_inPhotoButton->setToolTip(tr("Render the scene through the camera that was matched to a photo and show it here, put into the photo with its shadows. Same Quality as Preview. (Camera and image > Render into the photo... asks for more.)"));
+	m_saveButton = new QPushButton(tr("Save picture..."), previewBox);
+	m_saveButton->setAutoDefault(false);
+	m_saveButton->setEnabled(false);
+	m_saveButton->setToolTip(tr("Save the picture shown below as a PNG"));
 	m_finalButton = new QPushButton(tr("Render picture..."), previewBox);
 	m_finalButton->setAutoDefault(false);
 	m_finalButton->setToolTip(tr("Render at the image size and sample count set under Camera, and save the picture as a PNG"));
@@ -340,6 +347,10 @@ void SceneBuilderWidget::buildUi() {
 	scene_builder_ui::compactStyle(m_finalButton);
 	renderRow->addWidget(m_previewButton);
 	renderRow->addWidget(m_finalButton);
+	scene_builder_ui::compactStyle(m_inPhotoButton);
+	scene_builder_ui::compactStyle(m_saveButton);
+	renderRow->addWidget(m_inPhotoButton);
+	renderRow->addWidget(m_saveButton);
 	scene_builder_ui::compactStyle(m_turntableButton);
 	renderRow->addWidget(m_turntableButton);
 	scene_builder_ui::compactStyle(m_flythroughButton);
@@ -363,6 +374,8 @@ void SceneBuilderWidget::buildUi() {
 		startPreview();
 	});
 	connect(m_finalButton, &QPushButton::clicked, this, &SceneBuilderWidget::onRenderFinalClicked);
+	connect(m_inPhotoButton, &QPushButton::clicked, this, &SceneBuilderWidget::previewIntoPhoto);
+	connect(m_saveButton, &QPushButton::clicked, this, &SceneBuilderWidget::onSavePictureClicked);
 	connect(m_turntableButton, &QPushButton::clicked, this, &SceneBuilderWidget::showTurntableDialog);
 	connect(m_flythroughButton, &QPushButton::clicked, this, &SceneBuilderWidget::showFlythroughDialog);
 
@@ -393,6 +406,7 @@ void SceneBuilderWidget::buildUi() {
 	split->addWidget(left);
 	auto *centreScroll = new QScrollArea(split);
 	centreScroll->setWidget(centre);
+	m_centreScroll = centreScroll;
 	centreScroll->setWidgetResizable(true);
 	centreScroll->setFrameShape(QFrame::NoFrame);
 	centreScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);  // always there, so it is clear the column scrolls when the window is short
@@ -862,6 +876,7 @@ void SceneBuilderWidget::updateActions() {
 	const bool ok = !scene_doc::hasErrors(m_problems);   // from the last refreshProblems(): the document has not changed since
 	m_previewButton->setEnabled(ok || m_process);
 	m_finalButton->setEnabled(ok && !m_process);
+	m_inPhotoButton->setEnabled(ok && !m_process);
 	m_turntableButton->setEnabled(ok && !m_process);
 	m_flythroughButton->setEnabled(ok && !m_process && m_doc.cameraViews.size() >= 2);
 }

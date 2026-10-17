@@ -8,6 +8,7 @@
 #include "../src/external/tinyexr.h"
 
 #include <QCheckBox>
+#include <QComboBox>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDialog>
@@ -26,11 +27,13 @@
 #include <QProcess>
 #include <QRegularExpression>
 #include <QProgressDialog>
+#include <QPushButton>
 #include <QScrollArea>
 #include <QSpinBox>
 #include <QStandardPaths>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 
@@ -55,6 +58,18 @@ bool readLinear(const QString &path, int *w, int *h, std::vector<float> *rgb) {
 }  // namespace
 
 bool SceneBuilderWidget::renderIntoPhoto(const QString &outPng, const std::vector<int> &groundObjects, double exposureStops, int samples, bool matchToPhoto, QString *error, QStringList *notes) {
+	QImage picture;
+	if (!renderIntoPhotoImage(&picture, groundObjects, exposureStops, samples, 1000, matchToPhoto, error, notes)) return false;
+	if (!QDir().mkpath(QFileInfo(outPng).absolutePath()) || !picture.save(outPng)) {
+		if (error) *error = tr("The picture could not be saved as %1.").arg(outPng);
+		logLine(QStringLiteral("photo"), QStringLiteral("  the picture could not be saved as %1").arg(outPng), log_format::Level::Error);
+		return false;
+	}
+	logLine(QStringLiteral("photo"), QStringLiteral("  saved %1").arg(outPng));
+	return true;
+}
+
+bool SceneBuilderWidget::renderIntoPhotoImage(QImage *resultImage, const std::vector<int> &groundObjects, double exposureStops, int samples, int maxWidth, bool matchToPhoto, QString *error, QStringList *notes) {
 	if (m_cameraPhoto.isNull()) {
 		if (error) *error = tr("Match the camera to a photo first (Camera section: Match to a photo...): the scene is put into that photo.");
 		return false;
@@ -67,8 +82,8 @@ bool SceneBuilderWidget::renderIntoPhoto(const QString &outPng, const std::vecto
 		if (error) *error = tr("Fix the problems listed under the properties first.");
 		return false;
 	}
-	// the picture: the photo, at most 1000 pixels across (three renders at that size)
-	const int w = std::min(m_cameraPhoto.width(), 1000);
+	// the picture: the photo, at most `maxWidth` pixels across (three renders at that size)
+	const int w = std::min(m_cameraPhoto.width(), std::max(64, maxWidth));
 	const int h = std::max(16, static_cast<int>(std::lround(static_cast<double>(w) * m_cameraPhoto.height() / m_cameraPhoto.width())));
 	const QImage photo = m_cameraPhoto.scaled(w, h, Qt::IgnoreAspectRatio, Qt::SmoothTransformation).convertToFormat(QImage::Format_RGB888);
 	std::vector<unsigned char> photoPixels(static_cast<size_t>(w) * h * 3);
@@ -207,12 +222,8 @@ bool SceneBuilderWidget::renderIntoPhoto(const QString &outPng, const std::vecto
 	}
 	QImage result(w, h, QImage::Format_RGB888);
 	for (int y = 0; y < h; ++y) std::copy(out.begin() + static_cast<std::ptrdiff_t>(y) * w * 3, out.begin() + static_cast<std::ptrdiff_t>(y + 1) * w * 3, result.scanLine(y));
-	if (!QDir().mkpath(QFileInfo(outPng).absolutePath()) || !result.save(outPng)) {
-		if (error) *error = tr("The picture could not be saved as %1.").arg(outPng);
-		logLine(cat, QStringLiteral("  the picture could not be saved as %1").arg(outPng), log_format::Level::Error);
-		return false;
-	}
-	logLine(QStringLiteral("photo"), QStringLiteral("render into the photo done: saved %1 (%2 x %3, %4 inserted objects, %5 ground, %6 samples, %7 s in all)").arg(outPng).arg(w).arg(h).arg(inserted).arg(grounds).arg(samples).arg(clock.elapsed() / 1000.0, 0, 'f', 1));
+	if (resultImage) *resultImage = result;
+	logLine(QStringLiteral("photo"), QStringLiteral("render into the photo done (%1 x %2, %3 inserted objects, %4 ground, %5 samples, %6 s in all)").arg(w).arg(h).arg(inserted).arg(grounds).arg(samples).arg(clock.elapsed() / 1000.0, 0, 'f', 1));
 	if (!matchNote.isEmpty()) logLine(cat, QStringLiteral("  %1").arg(matchNote), matched ? log_format::Level::Info : log_format::Level::Warn);
 	if (notes) {
 		*notes << tr("%n object(s) were put into the photo; the ground they stand on is not drawn (only the shadows and reflections they cause are).", "", inserted);
@@ -244,7 +255,8 @@ void SceneBuilderWidget::renderIntoPhotoDialog() {
 		if (guessed[i] == photo_composite::Role::Light) continue;   // (a lamp lights the scene and is not put into the photo)
 		auto *item = new QListWidgetItem(QString::fromStdString(m_doc.objects[i].name), objects);
 		item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
-		item->setCheckState(guessed[i] == photo_composite::Role::Ground ? Qt::Checked : Qt::Unchecked);
+		const bool ground = m_compositeGroundSet ? std::find(m_compositeGround.begin(), m_compositeGround.end(), m_doc.objects[i].name) != m_compositeGround.end() : guessed[i] == photo_composite::Role::Ground;
+		item->setCheckState(ground ? Qt::Checked : Qt::Unchecked);
 		indices.push_back(static_cast<int>(i));
 	}
 	objects->setToolTip(tr("Ticked: the ground the photo already has (its shadows are used, it is not drawn). Unticked: put into the photo."));
@@ -261,6 +273,7 @@ void SceneBuilderWidget::renderIntoPhotoDialog() {
 	exposure->setSingleStep(0.25);
 	exposure->setDecimals(2);
 	exposure->setSuffix(tr(" stops"));
+	exposure->setValue(m_compositeExposure);
 	exposure->setToolTip(tr("How much brighter (+) or darker (-) the objects are made, to match the photo's exposure. Each stop doubles or halves their light."));
 	form->addRow(tr("Exposure of the objects"), exposure);
 	auto *quality = new QSpinBox(&dialog);
@@ -274,38 +287,82 @@ void SceneBuilderWidget::renderIntoPhotoDialog() {
 	connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
 	layout->addWidget(buttons);
 	if (dialog.exec() != QDialog::Accepted) return;
+	m_compositeGround.clear();
+	m_compositeGroundSet = true;
 	std::vector<int> ground;
 	for (int row = 0; row < objects->count(); ++row)
-		if (objects->item(row)->checkState() == Qt::Checked) ground.push_back(indices[static_cast<size_t>(row)]);
-	const QString suggested = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) + "/render-into-photo-" + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss") + ".png";
-	const QString path = QFileDialog::getSaveFileName(this, tr("Save the picture as"), suggested, tr("PNG pictures (*.png)"));
-	if (path.isEmpty()) return;
+		if (objects->item(row)->checkState() == Qt::Checked) {
+			ground.push_back(indices[static_cast<size_t>(row)]);
+			m_compositeGround.push_back(m_doc.objects[static_cast<size_t>(indices[static_cast<size_t>(row)])].name);
+		}
+	m_compositeExposure = exposure->value();
 
+	QImage picture;
 	QString error;
 	QStringList notes;
-	if (!renderIntoPhoto(path, ground, exposure->value(), quality->value(), match->isChecked(), &error, &notes)) {
+	QElapsedTimer clock;
+	clock.start();
+	if (!renderIntoPhotoImage(&picture, ground, exposure->value(), quality->value(), 1000, match->isChecked(), &error, &notes)) {
 		if (!error.isEmpty()) {
 			logLine(QStringLiteral("photo"), QStringLiteral("render into the photo failed: %1").arg(error), log_format::Level::Warn);
 			QMessageBox::warning(this, tr("Could not render into the photo"), error);
 		}
 		return;
 	}
-	QDialog shown(this);
-	shown.setWindowTitle(tr("Render into the photo"));
-	auto *box = new QVBoxLayout(&shown);
-	auto *picture = new QLabel(&shown);
-	const QPixmap pixmap(path);
-	picture->setPixmap(pixmap.width() > 900 ? pixmap.scaledToWidth(900, Qt::SmoothTransformation) : pixmap);
-	auto *scroll = new QScrollArea(&shown);
-	scroll->setWidget(picture);
-	scroll->setMinimumSize(std::min(920, pixmap.width() + 20), std::min(640, pixmap.height() + 20));
-	box->addWidget(scroll);
-	auto *text = new QLabel(tr("Saved as %1.\n\n- %2").arg(QDir::toNativeSeparators(path), notes.join("\n- ")), &shown);
-	text->setWordWrap(true);
-	text->setTextInteractionFlags(Qt::TextSelectableByMouse);
-	box->addWidget(text);
-	auto *ok = new QDialogButtonBox(QDialogButtonBox::Ok, &shown);
-	connect(ok, &QDialogButtonBox::accepted, &shown, &QDialog::accept);
-	box->addWidget(ok);
-	shown.exec();
+	showInPreview(QPixmap::fromImage(picture), tr("Put into the photo in %1 s (%2 x %3). %4").arg(clock.elapsed() / 1000.0, 0, 'f', 1).arg(picture.width()).arg(picture.height()).arg(notes.join(QLatin1Char(' '))));
+}
+
+// "Preview in the photo": no questions, the Preview's Quality, what was last given in the dialog (the first time: the floor is the ground and the sky's exposure is matched when there is a Sun & sky).
+void SceneBuilderWidget::previewIntoPhoto() {
+	if (m_cameraPhoto.isNull()) {
+		m_previewStatus->setText(tr("Match the camera to a photo first (Camera and image: Match to a photo...): the scene is put into that photo."));
+		return;
+	}
+	flushEditLog();
+	static const int widths[3] = {480, 720, 960};
+	static const int spps[3] = {16, 64, 256};
+	const int q = std::clamp(m_qualityCombo->currentData().toInt(), 0, 2);
+	const std::vector<photo_composite::Role> guessed = photo_composite::guessRoles(m_doc);
+	std::vector<int> ground;
+	for (size_t i = 0; i < m_doc.objects.size(); ++i) {
+		const bool isGround = m_compositeGroundSet ? std::find(m_compositeGround.begin(), m_compositeGround.end(), m_doc.objects[i].name) != m_compositeGround.end() : guessed[i] == photo_composite::Role::Ground;
+		if (isGround && guessed[i] != photo_composite::Role::Light) ground.push_back(static_cast<int>(i));
+	}
+	bool physicalSky = false;
+	for (const scene_doc::Light &l : m_doc.lights) physicalSky = physicalSky || (l.kind == scene_doc::LightKind::Infinite && l.physicalSky);
+	m_previewStatus->setText(tr("Putting the scene into the photo..."));
+	QImage picture;
+	QString error;
+	QStringList notes;
+	QElapsedTimer clock;
+	clock.start();
+	if (!renderIntoPhotoImage(&picture, ground, m_compositeExposure, spps[q], widths[q], physicalSky, &error, &notes)) {
+		logLine(QStringLiteral("photo"), QStringLiteral("preview in the photo failed: %1").arg(error), log_format::Level::Warn);
+		m_previewStatus->setText(error.isEmpty() ? tr("The render was cancelled.") : error);
+		return;
+	}
+	showInPreview(QPixmap::fromImage(picture), tr("Put into the photo in %1 s (%2 x %3, %4 samples). %5").arg(clock.elapsed() / 1000.0, 0, 'f', 1).arg(picture.width()).arg(picture.height()).arg(spps[q]).arg(notes.join(QLatin1Char(' '))));
+}
+
+void SceneBuilderWidget::showInPreview(const QPixmap &picture, const QString &status) {
+	m_previewPixmap = picture;
+	updatePreviewPixmap();
+	m_previewStatus->setText(status);
+	if (m_saveButton) m_saveButton->setEnabled(!picture.isNull());
+	if (m_centreScroll) m_centreScroll->ensureWidgetVisible(m_previewLabel, 0, 40);   // (the preview pane is below the fold in a short window: scroll to the picture)
+	emit statusMessage(tr("The picture is in the preview pane."));
+}
+
+void SceneBuilderWidget::onSavePictureClicked() {
+	if (m_previewPixmap.isNull()) return;
+	const QString suggested = QStandardPaths::writableLocation(QStandardPaths::PicturesLocation) + "/scene-" + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss") + ".png";
+	QString path = QFileDialog::getSaveFileName(this, tr("Save the picture as"), suggested, tr("PNG pictures (*.png)"));
+	if (path.isEmpty()) return;
+	if (!path.endsWith(".png", Qt::CaseInsensitive)) path += ".png";
+	if (m_previewPixmap.save(path)) {
+		m_previewStatus->setText(tr("Saved %1.").arg(QDir::toNativeSeparators(path)));
+		logLine(QStringLiteral("builder-render"), QStringLiteral("saved the picture in the preview pane as %1").arg(path));
+	} else {
+		m_previewStatus->setText(tr("Could not save to %1.").arg(path));
+	}
 }

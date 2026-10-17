@@ -224,6 +224,7 @@ void SceneBuilderWidget::onPreviewFinished(int exitCode) {
 		return;
 	}
 	m_previewPixmap = pix;
+	m_saveButton->setEnabled(true);
 	updatePreviewPixmap();
 	QString message = tr("Done in %1 s (%2 x %3).").arg(secs, 0, 'f', 1).arg(pix.width()).arg(pix.height());
 	if (!m_pendingFinalPng.isEmpty()) {

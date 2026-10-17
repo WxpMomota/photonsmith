@@ -497,7 +497,7 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			QFile paneFile(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_pane.txt");   // (kept next to the log, to read what the pane showed)
 			if (paneFile.open(QIODevice::WriteOnly)) paneFile.write(pane.toUtf8());
 		}
-		check(pane.contains("[Scene Builder] render into the photo:") && pane.contains("render 1 of 3") && pane.contains("render 3 of 3 done") && pane.contains("render into the photo done: saved"),
+		check(pane.contains("[Scene Builder] render into the photo:") && pane.contains("render 1 of 3") && pane.contains("render 3 of 3 done") && pane.contains("render into the photo done (") && pane.contains("saved "),
 		      "the Log Output pane shows the three renders and the saved picture: " + pane.right(300).replace(QChar(10), " | "));
 		if (made) {
 			QImage result(out);
@@ -525,6 +525,11 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 		QString nothing;
 		const bool nothingOk = sb->renderIntoPhoto(out, all, 0.0, 16, false, &nothing);
 		check(!nothingOk && !nothing.isEmpty(), "with everything marked as the ground there is nothing to put in, and it says so: " + nothing.left(100));
+		// "Preview in the photo": no questions, and the picture appears in the preview pane (at the Preview's Draft size) with Save picture... ready
+		sb->previewIntoPhoto();
+		check(sb->previewHasPictureForTest() && sb->previewPictureSizeForTest() == QSize(480, 360), QString("Preview in the photo shows its picture in the preview pane (%1 x %2)").arg(sb->previewPictureSizeForTest().width()).arg(sb->previewPictureSizeForTest().height()));
+		QApplication::processEvents();
+		shot("composite_preview");
 		// with the Sun & sky set from the photo too, the objects' exposure and colour are read from the photo's sky (or it says why not): the picture is made either way
 		QStringList matchNotes;
 		QString matchError;
