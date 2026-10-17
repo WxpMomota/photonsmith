@@ -857,6 +857,11 @@ void SceneBuilderWidget::inspectLight(QFormLayout *f, int i) {
 				QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
 			});
 			f->addRow(QString(), gallery);
+			// A photo of an outdoor scene sets the sun and the haze (scene_builder_light_photo.cpp).
+			auto *matchPhoto = new QPushButton(tr("Match to a photo..."));
+			matchPhoto->setToolTip(tr("Choose a photo of an outdoor scene with the sky in it: the sun's height and direction and the haze are read from the sky and set here."));
+			connect(matchPhoto, &QPushButton::clicked, this, [this, i]() { lightFromPhoto(i); });
+			f->addRow(QString(), matchPhoto);
 			addNum(f, tr("Sun height"), [lt]() { return lt() ? &lt()->sky.sunElevation : nullptr; }, 0.5, 90, 1, 1, QString::fromUtf8(" \xC2\xB0"));
 			addNum(f, tr("Sun direction"), [lt]() { return lt() ? &lt()->sky.sunAzimuth : nullptr; }, 0, 360, 5, 0, QString::fromUtf8(" \xC2\xB0"));
 			addNum(f, tr("Haze"), [lt]() { return lt() ? &lt()->sky.turbidity : nullptr; }, 1.7, 10, 0.1, 1);

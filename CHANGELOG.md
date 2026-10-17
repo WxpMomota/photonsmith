@@ -4,6 +4,10 @@ Release notes for the next tagged release, summarising the large correctness eff
 Before this, see `git log`. Each item has a commit with the measurements behind it, and
 [docs/PBRT_SUPPORT.md](docs/PBRT_SUPPORT.md) has the per-feature, per-backend detail.
 
+## Unreleased (after 0.1.5)
+
+* **Scene Builder: Match to a photo... for a Sun & sky light** (under Sky gallery; plain image analysis, nothing to install, `src/shared/light_from_photo.h`): a photo of an outdoor scene sets the sun's height and direction and the haze. The sky is found as the blue or white region hanging from the top of the picture, the camera's tilt is read off the horizon (or given), the sun is read straight off the picture when it is in it (a small clipped spot), and otherwise the Hosek-Wilkie sky the Builder renders with is fitted to the sky's brightness in each direction, up to one gain since the exposure is not known. The direction is set relative to where the Builder camera looks. Checked on 64 skies made from the model with known suns (the mean error is under 5 degrees in height and direction, the sun in the picture or not, with a building hiding part of the sky) and by a headless GUI test; not yet on real photographs. A low hazy sun, a sunset sky (the sky finder looks for blue and white) and an overcast sky (no gradient: it says so) are not read; the brightness stays as it was.
+
 ## 0.1.5 (2026-10-16)
 
 * **The first Metal render after an install waits about two minutes, not four**: Metal turns the path tracer into machine code once per Mac, for two shader variants (the second is for alpha masks and subsurface), and the app built them one after the other (108 s then 121 s on an M2). They are now built side by side (about 125 s in all: `ray_tracer --prepare-gpu` 231 s -> 136 s, measured with a cold cache). A Live Preview that starts during the warm-up still waits for the build of its own variant instead of compiling it twice.

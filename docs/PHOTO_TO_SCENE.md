@@ -7,6 +7,7 @@ Four ways to get a real-world picture into a rendered scene, from simple to ambi
 |---|---|---|
 | any picture | it on a wall, a floor, a ball, a statue | **Pictures** (built in, nothing to install) |
 | a photo of a **surface** (wood, tile, fabric, a wall) | a material that repeats over any object, with a bump map | **Material from a photo** (built in, nothing to install) |
+| a photo of an **outdoor scene** with sky | the sun's height and direction and the haze, to light a render the same way | **Light from a photo** (built in, nothing to install) |
 | **one** photo of an object | a 3D version of it to light and render | **Object from a photo** (optional helper, runs on your computer) |
 | **one** photo of a room | an editable room: walls, floor, ceiling, windows, and the camera | **Room from a photo** (the same helper) |
 | **many** photos of an object or place | an accurate 3D copy | **A photo scan** with COLMAP or Meshroom, then bring the mesh in |
@@ -61,6 +62,38 @@ What it makes, from the photo:
 Limits: the gloss is a starting value by kind, not measured from the photo (a photo does not tell a coat's roughness); a surface with strong perspective in the photo (a floor seen at a
 steep angle) is read as if it were flat-on, so stand above the surface when you can; the pictures are 256, 512 or 1024 pixels square by the photo's size and are kept with the Builder's
 other pictures, not inside the scene file.
+
+## Light from a photo
+
+A photo of an outdoor scene can set the Builder's **Sun & sky** so that a rendered object is lit as the photographed scene was. Tick **Sun & sky** in a sky light's properties and press
+**Match to a photo...** (under Sky gallery). Nothing has to be installed: it is plain image analysis, the same on every system, and the photo stays on your computer.
+
+The dialog asks for two things, both optional: the photo's **field of view** (65 degrees is a phone's main camera; a wide-angle lens is 100 or more) and the **camera tilt** (left at "from
+the horizon" it is read off where the sky ends). It then sets the sun's **height**, its **direction** and the **haze** and tells you how it read the photo; one Undo puts the sky back.
+
+How it reads the photo:
+
+- **The sky** is the blue or white region that hangs from the top of the picture, column by column, down to where something else (trees, a building, the ground) begins.
+- **The tilt of the camera** comes from the lower edge of the sky, taken to be the horizon. If the horizon is not in the photo, or hidden by buildings or trees, the camera is taken to look
+  level and the tilt can be given.
+- **The sun**, if it is in the picture (a small clipped white spot in the sky), is read straight off it: height and direction to within a few degrees.
+- **If the sun is out of the picture**, the Hosek-Wilkie sky (the model the Builder renders its sky with) is fitted to how bright the sky is in each direction: for every sun height, direction
+  and haze it predicts the sky's brightness everywhere, and the sky that follows the photo's brightness best wins (up to one overall gain, since the photo's exposure is not known). A sky is
+  brighter towards the sun and near the horizon, and that is what is fitted. The result says how much of the sky's variation the fit explains.
+- **The direction** is set relative to where the Builder's camera looks now, as the sun was relative to where the photo looks: a sun 20 degrees to the right of the photo's centre is 20
+  degrees to the right of the Builder camera's view.
+
+Checked on 64 skies made from the same model with known suns (heights from 8 to 70 degrees, directions all round, two hazes, a building hiding part of the sky): the mean error is under 5
+degrees in height and in direction, with the sun in the picture or outside it. The limits:
+
+- **A low, hazy sun** (about 8 degrees, with haze) turns the sky warm, and the sky finder looks for blue and white: such a sky is cut short and the tilt and height come out wrong.
+  **A sunset or sunrise sky is not read**; set those by hand or with the Sky gallery.
+- **An overcast sky** has no gradient to read: the sun is set high with the haze at its most, and it says so.
+- **The brightness** stays as it was: the photo's exposure is not known. Use the light's strength.
+- **The ground's brightness** is not read (a snow field and a dark ground look alike here).
+- **A photo with little sky**, or none, is refused; one with clouds and clear blue mixed may give a rougher fit (not tried).
+- It was checked on made-up skies, so a real photo's own tone curve, lens vignetting and clouds may cost some accuracy. Check the result by eye and change **Sun height** and **Sun direction** if
+  it is off.
 
 ## Object from a photo
 

@@ -184,6 +184,12 @@ public:
 	// centimetres of the photographed patch, says (0: repeats left as they were). False with `error` set when it cannot; `notes` gets what the user should know.
 	void materialFromPhoto(int objectIndex);
 	bool applyMaterialPhoto(int objectIndex, const QString &photo, int surfaceKind, double patchCm, QString *error, QStringList *notes = nullptr);
+	// Light from a photo (scene_builder_light_photo.cpp): the "Match to a photo..." button of a Sun & sky light. lightFromPhoto asks for the photo and applies it; applyLightPhoto is that
+	// without the dialogs: the sky in the photo (src/shared/light_from_photo.h) sets lights[lightIndex] (an Infinite light, made a Sun & sky if it was not) to the sun height, direction
+	// (relative to where the Builder camera looks) and haze it shows, one undo step. `hfov` is the photo's horizontal field of view in degrees, `tilt` how far the camera looked up when
+	// `tiltGiven` (else it is read off the horizon). False with `error` set when the photo cannot be used; `notes` gets what the user should know.
+	void lightFromPhoto(int lightIndex);
+	bool applyLightPhoto(int lightIndex, const QString &photo, double hfov, bool tiltGiven, double tilt, QString *error, QStringList *notes = nullptr);
 	// See scene_builder_inspector.cpp: an upright copy of a picture whose EXIF tag asks for a rotation (the renderer ignores that tag).
 	static QString uprightPictureCopy(const QString &path, QSize *size);
 	// Arrange (scene_builder_arrange.cpp): hide and lock what is picked, put it on the floor, rename it, frame it.

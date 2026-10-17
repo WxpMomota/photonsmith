@@ -100,6 +100,7 @@ SOURCES += \
 	scene_builder_render.cpp \
 	scene_builder_inspector.cpp \
 	scene_builder_material_photo.cpp \
+	scene_builder_light_photo.cpp \
 	scene_builder_photo.cpp \
 	scene_builder_models.cpp \
 	scene_builder_array_dialog.cpp \

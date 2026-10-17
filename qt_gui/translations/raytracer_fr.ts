@@ -7053,7 +7053,7 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
         <location filename="../scene_builder_inspector.cpp" line="539"/>
         <location filename="../scene_builder_inspector.cpp" line="571"/>
         <location filename="../scene_builder_inspector.cpp" line="639"/>
-        <location filename="../scene_builder_inspector.cpp" line="875"/>
+        <location filename="../scene_builder_inspector.cpp" line="880"/>
         <location filename="../scene_builder_mix.cpp" line="89"/>
         <location filename="../scene_builder_mix.cpp" line="92"/>
         <location filename="../scene_builder_mix.cpp" line="109"/>
@@ -7600,7 +7600,7 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="776"/>
-        <location filename="../scene_builder_inspector.cpp" line="876"/>
+        <location filename="../scene_builder_inspector.cpp" line="881"/>
         <source>Strength</source>
         <translation>Intensité</translation>
     </message>
@@ -7696,47 +7696,57 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
         <translation>Galerie de ciels...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="860"/>
+        <location filename="../scene_builder_inspector.cpp" line="861"/>
+        <source>Match to a photo...</source>
+        <translation>Accorder à une photo...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="862"/>
+        <source>Choose a photo of an outdoor scene with the sky in it: the sun&apos;s height and direction and the haze are read from the sky and set here.</source>
+        <translation>Choisissez la photo d&apos;un paysage en extérieur où l&apos;on voit le ciel : la hauteur et la direction du soleil et la brume sont lues dans le ciel et réglées ici.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="865"/>
         <source>Sun height</source>
         <translation>Hauteur du soleil</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="861"/>
+        <location filename="../scene_builder_inspector.cpp" line="866"/>
         <source>Sun direction</source>
         <translation>Direction du soleil</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="862"/>
+        <location filename="../scene_builder_inspector.cpp" line="867"/>
         <source>Haze</source>
         <translation>Brume</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="863"/>
+        <location filename="../scene_builder_inspector.cpp" line="868"/>
         <source>Ground brightness</source>
         <translation>Luminosité du sol</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="864"/>
+        <location filename="../scene_builder_inspector.cpp" line="869"/>
         <source>The sky picture and the Sun light are made from these settings; change the sun here rather than moving the Sun light. Direction 0 is towards +X, 90 away from the starting camera, 180 towards -X, 270 behind it. Brightness 1 is a daylight scene.</source>
         <translation>L&apos;image du ciel et la lumière du Soleil sont générées à partir de ces réglages ; changez le soleil ici plutôt que de déplacer la lumière du Soleil. La direction 0 va vers +X, 90 s&apos;éloigne de la caméra de départ, 180 va vers -X et 270 est derrière elle. Une luminosité de 1 correspond à une scène en plein jour.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="867"/>
+        <location filename="../scene_builder_inspector.cpp" line="872"/>
         <source>Sky image</source>
         <translation>Image du ciel</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="867"/>
+        <location filename="../scene_builder_inspector.cpp" line="872"/>
         <source>Images (*.exr *.hdr *.png *.jpg *.jpeg)</source>
         <translation>Images (*.exr *.hdr *.png *.jpg *.jpeg)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="869"/>
+        <location filename="../scene_builder_inspector.cpp" line="874"/>
         <source>Rotate sky</source>
         <translation>Tourner le ciel</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="870"/>
+        <location filename="../scene_builder_inspector.cpp" line="875"/>
         <source>Leave the image empty for a plain colour sky. An image is an equirectangular (lat-long) panorama; Rotate sky turns it about the vertical axis (counter-clockwise seen from above), to put the bright part of the picture where you want the light to come from.</source>
         <translation>Laissez l&apos;image vide pour un ciel de couleur unie. Une image est un panorama équirectangulaire (lat-long) ; Tourner le ciel le fait pivoter autour de l&apos;axe vertical (dans le sens antihoraire vu de dessus), pour placer la partie lumineuse de l&apos;image là d&apos;où vous voulez que la lumière vienne.</translation>
     </message>
@@ -7745,7 +7755,7 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
         <translation type="vanished">Laissez l&apos;image vide pour un ciel de couleur unie. Une image est un panorama équirectangulaire (latitude-longitude).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="876"/>
+        <location filename="../scene_builder_inspector.cpp" line="881"/>
         <source>Brightness</source>
         <translation>Luminosité</translation>
     </message>
@@ -9014,122 +9024,218 @@ La forme est une estimation : l&apos;arrière est inventé et les détails fins 
         <translation>Les images du matériau n&apos;ont pas pu être enregistrées dans %1.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="138"/>
+        <location filename="../scene_builder_material_photo.cpp" line="139"/>
         <source>The photo was lit unevenly (the light varied %1 to 1 across it); that was taken out, so the colour is the surface&apos;s own.</source>
         <translation>La photo était éclairée de façon inégale (la lumière variait de %1 à 1) ; cela a été retiré, la couleur est donc celle de la surface elle-même.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="139"/>
+        <location filename="../scene_builder_material_photo.cpp" line="140"/>
         <source>The relief is a guess made from the picture alone (dark is low, light is high); change Bump height if it looks too strong or too flat.</source>
         <translation>Le relief est une supposition faite à partir de l&apos;image seule (le sombre est bas, le clair est haut) ; changez Hauteur du relief s&apos;il paraît trop fort ou trop plat.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="140"/>
+        <location filename="../scene_builder_material_photo.cpp" line="141"/>
         <source>This shape sets its own texture coordinates, so the number of repeats was not set: use the Texture repeats rows if the pattern looks too big or too small.</source>
         <translation>Cette forme définit ses propres coordonnées de texture, le nombre de répétitions n&apos;a donc pas été réglé : utilisez les lignes de répétition de la texture si le motif paraît trop grand ou trop petit.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="141"/>
+        <location filename="../scene_builder_material_photo.cpp" line="142"/>
         <source>The number of repeats was left as it was: use the Texture repeats rows to make the pattern the right size.</source>
         <translation>Le nombre de répétitions n&apos;a pas été modifié : utilisez les lignes de répétition de la texture pour donner au motif la bonne taille.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="148"/>
+        <location filename="../scene_builder_material_photo.cpp" line="149"/>
         <source>Choose a photo of the surface</source>
         <translation>Choisissez la photo de la surface</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="148"/>
+        <location filename="../scene_builder_light_photo.cpp" line="28"/>
+        <source>There is no sky light to set.</source>
+        <translation>Il n&apos;y a aucune lumière de ciel à régler.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="35"/>
+        <source>The photo %1 could not be read: %2</source>
+        <translation>La photo %1 n&apos;a pas pu être lue : %2</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="78"/>
+        <source>The sky is even (overcast), so the sun&apos;s direction cannot be told: it is set high and the haze to its most. Change Sun height and Sun direction by hand if you know them.</source>
+        <translation>Le ciel est uniforme (couvert), la direction du soleil ne peut donc pas être déterminée : il est placé haut et la brume au maximum. Modifiez Hauteur du soleil et Direction du soleil à la main si vous les connaissez.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="79"/>
+        <source>The sun is in the photo: its height and direction are read straight off it.</source>
+        <translation>Le soleil est dans la photo : sa hauteur et sa direction en sont lues directement.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="80"/>
+        <source>The sun is not in the photo: its height and direction are fitted to how the sky&apos;s brightness varies (confidence %1%).</source>
+        <translation>Le soleil n&apos;est pas dans la photo : sa hauteur et sa direction sont ajustées d&apos;après la façon dont la luminosité du ciel varie (confiance %1 %).</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="81"/>
+        <source>The camera was tilted %1 degrees (read off the horizon).</source>
+        <translation>L&apos;appareil était incliné de %1 degrés (lu d&apos;après l&apos;horizon).</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="83"/>
+        <source>The sun&apos;s direction is set relative to where the Builder&apos;s camera looks now, as it was relative to where the photo looks. The photo&apos;s exposure is not known, so the sky&apos;s Brightness stays as it was.</source>
+        <translation>La direction du soleil est réglée par rapport à l&apos;endroit où regarde maintenant la caméra du Builder, comme elle l&apos;était par rapport à l&apos;endroit où regarde la photo. L&apos;exposition de la photo n&apos;est pas connue : la Luminosité du ciel reste telle quelle.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="90"/>
+        <location filename="../scene_builder_material_photo.cpp" line="149"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.tga)</source>
         <translation>Images (*.png *.jpg *.jpeg *.bmp *.tga)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="156"/>
+        <location filename="../scene_builder_light_photo.cpp" line="90"/>
+        <source>Choose a photo with the sky in it</source>
+        <translation>Choisissez une photo où l&apos;on voit le ciel</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="94"/>
+        <location filename="../scene_builder_light_photo.cpp" line="131"/>
+        <source>Light from a photo</source>
+        <translation>Lumière à partir d&apos;une photo</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="96"/>
+        <source>The sun&apos;s height and direction and the haze are read from the sky in the photo (a blue or white sky that reaches the top of the picture), and the Sun &amp;&amp; sky settings are set to match. The photo should show some sky and, for the height, the horizon. Both settings below are optional.</source>
+        <translation>La hauteur et la direction du soleil et la brume sont lues dans le ciel de la photo (un ciel bleu ou blanc qui atteint le haut de l&apos;image), et les réglages Soleil et ciel sont accordés en conséquence. La photo doit montrer un peu de ciel et, pour la hauteur, l&apos;horizon. Les deux réglages ci-dessous sont facultatifs.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="106"/>
+        <source> degrees</source>
+        <translation> degrés</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="107"/>
+        <source>How wide the photo sees, left to right. A phone&apos;s main camera is about 65 to 70 degrees; a wide-angle one 100 or more.</source>
+        <translation>L&apos;ouverture de la photo, de gauche à droite. L&apos;appareil principal d&apos;un téléphone fait environ 65 à 70 degrés ; un grand angle, 100 ou plus.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="108"/>
+        <source>Photo&apos;s field of view (horizontal)</source>
+        <translation>Champ de vision de la photo (horizontal)</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="112"/>
+        <source>from the horizon</source>
+        <translation>d&apos;après l&apos;horizon</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="114"/>
+        <source>How far the camera looked up (+) or down (-). Left at the lowest setting it is read off where the sky ends, which works when the horizon is in the photo and not hidden by buildings or trees.</source>
+        <translation>De combien l&apos;appareil regardait vers le haut (+) ou vers le bas (-). Au réglage le plus bas, elle est lue là où le ciel s&apos;arrête, ce qui marche quand l&apos;horizon est dans la photo et n&apos;est pas masqué par des bâtiments ou des arbres.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="116"/>
+        <source>Camera tilt</source>
+        <translation>Inclinaison de l&apos;appareil</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="128"/>
+        <source>Could not read the light</source>
+        <translation>Impossible de lire la lumière</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="131"/>
+        <source>The sky was set from %1:
+
+- %2</source>
+        <translation>Le ciel a été réglé d&apos;après %1 :
+
+- %2</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_material_photo.cpp" line="157"/>
         <source>Could not read the photo</source>
         <translation>Impossible de lire la photo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="172"/>
+        <location filename="../scene_builder_material_photo.cpp" line="173"/>
         <source>Material from a photo</source>
         <translation>Matériau à partir d&apos;une photo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="174"/>
+        <location filename="../scene_builder_material_photo.cpp" line="175"/>
         <source>The photo becomes the object&apos;s picture, made to repeat with no joins and with its uneven light taken out, plus a bump map that guesses the relief from it. On the left the picture repeated twice across and down; on the right the bump map (light is high).</source>
         <translation>La photo devient l&apos;image de l&apos;objet, faite pour se répéter sans raccord et débarrassée de son éclairage inégal, avec en plus une carte de relief qui en déduit le relief. À gauche, l&apos;image répétée deux fois en largeur et en hauteur ; à droite, la carte de relief (le clair est haut).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Wood</source>
         <translation>Bois</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Tile or polished stone</source>
         <translation>Carrelage ou pierre polie</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Brick, rough stone or concrete</source>
         <translation>Brique, pierre brute ou béton</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Fabric or carpet</source>
         <translation>Tissu ou moquette</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Leather</source>
         <translation>Cuir</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Plaster or paint</source>
         <translation>Plâtre ou peinture</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Something else</source>
         <translation>Autre chose</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="192"/>
+        <location filename="../scene_builder_material_photo.cpp" line="193"/>
         <source>Sets the gloss (a varnished floor, a glazed tile, leather have a coat) and how tall the relief is. These are starting values: change them in the properties.</source>
         <translation>Règle la brillance (un parquet verni, un carreau émaillé et le cuir ont une couche) et la hauteur du relief. Ce sont des valeurs de départ : modifiez-les dans les propriétés.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="193"/>
+        <location filename="../scene_builder_material_photo.cpp" line="194"/>
         <source>What it is</source>
         <translation>De quoi il s&apos;agit</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="199"/>
+        <location filename="../scene_builder_material_photo.cpp" line="200"/>
         <source> cm</source>
         <translation> cm</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="200"/>
+        <location filename="../scene_builder_material_photo.cpp" line="201"/>
         <source>leave the repeats as they are</source>
         <translation>laisser les répétitions telles quelles</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="201"/>
+        <location filename="../scene_builder_material_photo.cpp" line="202"/>
         <source>How wide the photographed patch really is. The picture then repeats across the object at that size (a quad or a box; other shapes keep their own texture repeats).</source>
         <translation>La largeur réelle de la zone photographiée. L&apos;image se répète alors sur l&apos;objet à cette taille (un quad ou une boîte ; les autres formes gardent leurs propres répétitions de texture).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="202"/>
+        <location filename="../scene_builder_material_photo.cpp" line="203"/>
         <source>Width of the patch in the photo</source>
         <translation>Largeur de la zone sur la photo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="213"/>
+        <location filename="../scene_builder_material_photo.cpp" line="214"/>
         <source>Could not make the material</source>
         <translation>Impossible de créer le matériau</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="216"/>
+        <location filename="../scene_builder_material_photo.cpp" line="217"/>
         <source>Made a material from %1. %2</source>
         <translation>Un matériau a été créé à partir de %1. %2</translation>
     </message>

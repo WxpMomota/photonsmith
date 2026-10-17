@@ -6956,7 +6956,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <location filename="../scene_builder_inspector.cpp" line="539"/>
         <location filename="../scene_builder_inspector.cpp" line="571"/>
         <location filename="../scene_builder_inspector.cpp" line="639"/>
-        <location filename="../scene_builder_inspector.cpp" line="875"/>
+        <location filename="../scene_builder_inspector.cpp" line="880"/>
         <location filename="../scene_builder_mix.cpp" line="89"/>
         <location filename="../scene_builder_mix.cpp" line="92"/>
         <location filename="../scene_builder_mix.cpp" line="109"/>
@@ -7503,7 +7503,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="776"/>
-        <location filename="../scene_builder_inspector.cpp" line="876"/>
+        <location filename="../scene_builder_inspector.cpp" line="881"/>
         <source>Strength</source>
         <translation>强度</translation>
     </message>
@@ -7599,47 +7599,57 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>天空图库...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="860"/>
+        <location filename="../scene_builder_inspector.cpp" line="861"/>
+        <source>Match to a photo...</source>
+        <translation>匹配照片...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="862"/>
+        <source>Choose a photo of an outdoor scene with the sky in it: the sun&apos;s height and direction and the haze are read from the sky and set here.</source>
+        <translation>选择一张能看到天空的户外照片：太阳的高度和方向以及雾霾会从天空中读出并在此设置。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="865"/>
         <source>Sun height</source>
         <translation>太阳高度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="861"/>
+        <location filename="../scene_builder_inspector.cpp" line="866"/>
         <source>Sun direction</source>
         <translation>太阳方向</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="862"/>
+        <location filename="../scene_builder_inspector.cpp" line="867"/>
         <source>Haze</source>
         <translation>雾霾</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="863"/>
+        <location filename="../scene_builder_inspector.cpp" line="868"/>
         <source>Ground brightness</source>
         <translation>地面亮度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="864"/>
+        <location filename="../scene_builder_inspector.cpp" line="869"/>
         <source>The sky picture and the Sun light are made from these settings; change the sun here rather than moving the Sun light. Direction 0 is towards +X, 90 away from the starting camera, 180 towards -X, 270 behind it. Brightness 1 is a daylight scene.</source>
         <translation>天空图像和太阳光由这些设置生成；请在这里调整太阳，而不是移动太阳光。方向 0 朝向 +X，90 远离初始相机，180 朝向 -X，270 在相机后方。亮度 1 为白天场景。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="867"/>
+        <location filename="../scene_builder_inspector.cpp" line="872"/>
         <source>Sky image</source>
         <translation>天空图像</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="867"/>
+        <location filename="../scene_builder_inspector.cpp" line="872"/>
         <source>Images (*.exr *.hdr *.png *.jpg *.jpeg)</source>
         <translation>图像 (*.exr *.hdr *.png *.jpg *.jpeg)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="869"/>
+        <location filename="../scene_builder_inspector.cpp" line="874"/>
         <source>Rotate sky</source>
         <translation>旋转天空</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="870"/>
+        <location filename="../scene_builder_inspector.cpp" line="875"/>
         <source>Leave the image empty for a plain colour sky. An image is an equirectangular (lat-long) panorama; Rotate sky turns it about the vertical axis (counter-clockwise seen from above), to put the bright part of the picture where you want the light to come from.</source>
         <translation>图像留空则为纯色天空。图像是等距柱状（经纬度）全景图；“旋转天空”会绕竖直轴旋转（从上方看为逆时针），使图像中最亮的部分对准你希望光线来自的方向。</translation>
     </message>
@@ -7648,7 +7658,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation type="vanished">图像留空则使用纯色天空。图像应为等距柱状（经纬度）全景图。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="876"/>
+        <location filename="../scene_builder_inspector.cpp" line="881"/>
         <source>Brightness</source>
         <translation>亮度</translation>
     </message>
@@ -8917,122 +8927,218 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>无法将材质的图片保存到 %1。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="138"/>
+        <location filename="../scene_builder_material_photo.cpp" line="139"/>
         <source>The photo was lit unevenly (the light varied %1 to 1 across it); that was taken out, so the colour is the surface&apos;s own.</source>
         <translation>照片的光照不均匀（亮度在 %1 比 1 之间变化）；已将其去除，所以颜色就是表面本身的颜色。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="139"/>
+        <location filename="../scene_builder_material_photo.cpp" line="140"/>
         <source>The relief is a guess made from the picture alone (dark is low, light is high); change Bump height if it looks too strong or too flat.</source>
         <translation>凹凸是仅根据画面推测的（暗处低，亮处高）；如果看起来太强或太平，请调整“凹凸高度”。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="140"/>
+        <location filename="../scene_builder_material_photo.cpp" line="141"/>
         <source>This shape sets its own texture coordinates, so the number of repeats was not set: use the Texture repeats rows if the pattern looks too big or too small.</source>
         <translation>此形状使用自己的纹理坐标，因此没有设置重复次数；如果图案看起来太大或太小，请使用纹理重复次数的各行。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="141"/>
+        <location filename="../scene_builder_material_photo.cpp" line="142"/>
         <source>The number of repeats was left as it was: use the Texture repeats rows to make the pattern the right size.</source>
         <translation>重复次数保持原样；要调整图案大小，请使用纹理重复次数的各行。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="148"/>
+        <location filename="../scene_builder_material_photo.cpp" line="149"/>
         <source>Choose a photo of the surface</source>
         <translation>选择表面的照片</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="148"/>
+        <location filename="../scene_builder_light_photo.cpp" line="28"/>
+        <source>There is no sky light to set.</source>
+        <translation>没有可设置的天空光源。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="35"/>
+        <source>The photo %1 could not be read: %2</source>
+        <translation>无法读取照片 %1：%2</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="78"/>
+        <source>The sky is even (overcast), so the sun&apos;s direction cannot be told: it is set high and the haze to its most. Change Sun height and Sun direction by hand if you know them.</source>
+        <translation>天空是均匀的（阴天），无法判断太阳的方向：太阳被设得较高，雾霾设为最大。如果你知道，请手动修改“太阳高度”和“太阳方向”。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="79"/>
+        <source>The sun is in the photo: its height and direction are read straight off it.</source>
+        <translation>太阳就在照片中：其高度和方向直接从照片中读出。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="80"/>
+        <source>The sun is not in the photo: its height and direction are fitted to how the sky&apos;s brightness varies (confidence %1%).</source>
+        <translation>太阳不在照片中：其高度和方向根据天空亮度的变化拟合得出（置信度 %1%）。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="81"/>
+        <source>The camera was tilted %1 degrees (read off the horizon).</source>
+        <translation>相机倾斜了 %1 度（由地平线读出）。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="83"/>
+        <source>The sun&apos;s direction is set relative to where the Builder&apos;s camera looks now, as it was relative to where the photo looks. The photo&apos;s exposure is not known, so the sky&apos;s Brightness stays as it was.</source>
+        <translation>太阳的方向是相对于 Builder 相机当前朝向来设置的，就像它相对于照片朝向那样。照片的曝光未知，所以天空的“亮度”保持不变。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="90"/>
+        <location filename="../scene_builder_material_photo.cpp" line="149"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.tga)</source>
         <translation>图像 (*.png *.jpg *.jpeg *.bmp *.tga)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="156"/>
+        <location filename="../scene_builder_light_photo.cpp" line="90"/>
+        <source>Choose a photo with the sky in it</source>
+        <translation>选择一张能看到天空的照片</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="94"/>
+        <location filename="../scene_builder_light_photo.cpp" line="131"/>
+        <source>Light from a photo</source>
+        <translation>由照片生成光照</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="96"/>
+        <source>The sun&apos;s height and direction and the haze are read from the sky in the photo (a blue or white sky that reaches the top of the picture), and the Sun &amp;&amp; sky settings are set to match. The photo should show some sky and, for the height, the horizon. Both settings below are optional.</source>
+        <translation>从照片的天空（延伸到图像顶部的蓝色或白色天空）中读出太阳的高度和方向以及雾霾，并设置“太阳与天空”使之匹配。照片中应有一些天空，要读出高度还需要有地平线。下面两项设置都是可选的。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="106"/>
+        <source> degrees</source>
+        <translation> 度</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="107"/>
+        <source>How wide the photo sees, left to right. A phone&apos;s main camera is about 65 to 70 degrees; a wide-angle one 100 or more.</source>
+        <translation>照片从左到右的视野宽度。手机主摄大约是 65 到 70 度；广角镜头为 100 度或更多。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="108"/>
+        <source>Photo&apos;s field of view (horizontal)</source>
+        <translation>照片的视野（水平）</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="112"/>
+        <source>from the horizon</source>
+        <translation>由地平线得出</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="114"/>
+        <source>How far the camera looked up (+) or down (-). Left at the lowest setting it is read off where the sky ends, which works when the horizon is in the photo and not hidden by buildings or trees.</source>
+        <translation>相机向上 (+) 或向下 (-) 看了多少。保持最低设置时，会根据天空结束的位置读出，这在照片中有地平线且未被建筑或树木遮挡时有效。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="116"/>
+        <source>Camera tilt</source>
+        <translation>相机倾斜</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="128"/>
+        <source>Could not read the light</source>
+        <translation>无法读出光照</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="131"/>
+        <source>The sky was set from %1:
+
+- %2</source>
+        <translation>已根据 %1 设置天空：
+
+- %2</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_material_photo.cpp" line="157"/>
         <source>Could not read the photo</source>
         <translation>无法读取照片</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="172"/>
+        <location filename="../scene_builder_material_photo.cpp" line="173"/>
         <source>Material from a photo</source>
         <translation>由照片生成材质</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="174"/>
+        <location filename="../scene_builder_material_photo.cpp" line="175"/>
         <source>The photo becomes the object&apos;s picture, made to repeat with no joins and with its uneven light taken out, plus a bump map that guesses the relief from it. On the left the picture repeated twice across and down; on the right the bump map (light is high).</source>
         <translation>照片会成为物体的画面，经过处理后可无缝重复，并去除了不均匀的光照，同时生成一张由它推测凹凸的凹凸贴图。左边是画面横向和纵向各重复两次，右边是凹凸贴图（亮处高）。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Wood</source>
         <translation>木头</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Tile or polished stone</source>
         <translation>瓷砖或抛光石材</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Brick, rough stone or concrete</source>
         <translation>砖、粗糙石材或混凝土</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Fabric or carpet</source>
         <translation>布料或地毯</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Leather</source>
         <translation>皮革</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Plaster or paint</source>
         <translation>灰泥或涂料</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Something else</source>
         <translation>其他</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="192"/>
+        <location filename="../scene_builder_material_photo.cpp" line="193"/>
         <source>Sets the gloss (a varnished floor, a glazed tile, leather have a coat) and how tall the relief is. These are starting values: change them in the properties.</source>
         <translation>设置光泽（上过清漆的地板、上釉瓷砖和皮革有一层涂层）以及凹凸的高度。这些只是初始值：可在属性中修改。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="193"/>
+        <location filename="../scene_builder_material_photo.cpp" line="194"/>
         <source>What it is</source>
         <translation>它是什么</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="199"/>
+        <location filename="../scene_builder_material_photo.cpp" line="200"/>
         <source> cm</source>
         <translation> cm</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="200"/>
+        <location filename="../scene_builder_material_photo.cpp" line="201"/>
         <source>leave the repeats as they are</source>
         <translation>保持重复次数不变</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="201"/>
+        <location filename="../scene_builder_material_photo.cpp" line="202"/>
         <source>How wide the photographed patch really is. The picture then repeats across the object at that size (a quad or a box; other shapes keep their own texture repeats).</source>
         <translation>所拍摄区域的实际宽度。画面随后会以这个尺寸在物体上重复（适用于 quad 和立方体；其他形状保留各自的纹理重复）。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="202"/>
+        <location filename="../scene_builder_material_photo.cpp" line="203"/>
         <source>Width of the patch in the photo</source>
         <translation>照片中该区域的宽度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="213"/>
+        <location filename="../scene_builder_material_photo.cpp" line="214"/>
         <source>Could not make the material</source>
         <translation>无法生成材质</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="216"/>
+        <location filename="../scene_builder_material_photo.cpp" line="217"/>
         <source>Made a material from %1. %2</source>
         <translation>已由 %1 生成材质。%2</translation>
     </message>

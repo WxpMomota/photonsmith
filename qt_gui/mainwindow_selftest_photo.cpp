@@ -14,6 +14,7 @@
 #include "photo_import.h"
 #include "scene_builder_widget.h"
 
+#include "../src/shared/light_from_photo.h"
 #include "../src/shared/material_from_photo.h"
 
 #include <QApplication>
@@ -287,5 +288,77 @@ void MainWindow::runMaterialSelfTest(const std::function<void(const QString &)> 
 		const bool all = ok && found;
 		log(all ? "RESULT: OK" : "RESULT: FAIL");
 		QApplication::exit(all ? 0 : 1);
+	});
+}
+
+// RT_GUI_SELFTEST=sky RT_GUI_SELFTEST_OUT=<prefix>: the Scene Builder's "Match to a photo..." for a Sun & sky light, without its dialogs. Makes a photo of a sky with the sun in it (a blue
+// gradient, a grass ground, a white sun disc 20 degrees to the right of the centre and 12 degrees above the horizon, the camera looking 8 degrees down so that the horizon is in the picture), sets the starter scene's sky from it, and checks the
+// sun's height, its direction on the Builder's compass (the starter camera looks along -Z, compass 90, so 20 degrees to its right is 70), the sky picture that was made and that one undo
+// puts it back. Exit 0 if every step held.
+void MainWindow::runSkySelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {
+	if (m_sceneBuilder) m_tabWidget->setCurrentWidget(m_sceneBuilder);
+	resize(1500, 950);
+	SceneBuilderWidget *sb = m_sceneBuilder;
+	bool ok = sb != nullptr;
+	auto check = [&ok, log](bool cond, const QString &what) {
+		log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what));
+		ok = ok && cond;
+	};
+	if (sb) {
+		int skyIndex = -1;
+		for (size_t i = 0; i < sb->document().lights.size(); ++i)
+			if (sb->document().lights[i].kind == scene_doc::LightKind::Infinite) { skyIndex = static_cast<int>(i); break; }
+		check(skyIndex >= 0, "the starter scene has a sky light");
+		const double beforeElevation = skyIndex >= 0 ? sb->document().lights[static_cast<size_t>(skyIndex)].sky.sunElevation : 0.0;
+		const bool wasSky = skyIndex >= 0 && sb->document().lights[static_cast<size_t>(skyIndex)].physicalSky;
+		QString badError;
+		const bool badOk = sb->applyLightPhoto(skyIndex, "C:/no/such/photo_for_the_selftest.png", 65.0, false, 0.0, &badError);
+		check(!badOk && !badError.isEmpty(), "a missing photo fails with a message: " + badError.left(100));
+		// the photo
+		const int w = 640, h = 480;
+		const double focal = (w / 2.0) / std::tan(65.0 * light_from_photo::kPi / 360.0), cx = w / 2.0, cy = h / 2.0, tilt = -8.0 * light_from_photo::kPi / 180.0;
+		const double horizon = cy + focal * std::tan(tilt);
+		QImage photo(w, h, QImage::Format_RGB32);
+		for (int y = 0; y < h; ++y)
+			for (int x = 0; x < w; ++x) {
+				if (y >= horizon) { photo.setPixel(x, y, qRgb(70, 105, 55)); continue; }
+				const double t = y / horizon;   // 0 at the top, 1 at the horizon
+				photo.setPixel(x, y, qRgb(static_cast<int>(55 + 140 * t), static_cast<int>(105 + 100 * t), static_cast<int>(230 + 15 * t)));
+			}
+		const double el = 12.0 * light_from_photo::kPi / 180.0, az = 20.0 * light_from_photo::kPi / 180.0;
+		const double dx = std::cos(el) * std::sin(az), dy = std::sin(el), dz = std::cos(el) * std::cos(az);
+		const double yc = dy * std::cos(tilt) - dz * std::sin(tilt), zc = dy * std::sin(tilt) + dz * std::cos(tilt);
+		const double su = cx + focal * dx / zc, sv = cy - focal * yc / zc;
+		for (int y = 0; y < h; ++y)
+			for (int x = 0; x < w; ++x)
+				if ((x - su) * (x - su) + (y - sv) * (y - sv) < 25.0) photo.setPixel(x, y, qRgb(255, 255, 255));
+		const QString path = QDir::tempPath() + "/rt_selftest_sky.png";
+		photo.save(path);
+
+		QString err;
+		QStringList notes;
+		const bool made = sb->applyLightPhoto(skyIndex, path, 65.0, false, 0.0, &err, &notes);
+		check(made, "the sky was set from " + path + " " + err);
+		if (made) {
+			const scene_doc::Light &sky = sb->document().lights[static_cast<size_t>(skyIndex)];
+			check(sky.physicalSky, "the light is a Sun & sky now");
+			check(std::fabs(sky.sky.sunElevation - 12.0) < 4.0, QString("the sun is 12 degrees up (set to %1)").arg(sky.sky.sunElevation));
+			check(std::fabs(sky.sky.sunAzimuth - 70.0) < 4.0, QString("the sun is 20 degrees to the right of the Builder camera's view: compass 70 (set to %1)").arg(sky.sky.sunAzimuth));
+			check(!sky.imageFile.empty() && QFile::exists(QString::fromStdString(sky.imageFile)), "the sky picture of that sun was made");
+			bool sunLight = false;
+			for (const scene_doc::Light &l : sb->document().lights)
+				if (l.kind == scene_doc::LightKind::Distant) sunLight = std::fabs(l.position.x - l.target.x) > 1.0 && l.position.y > l.target.y;
+			check(sunLight, "the Sun light follows: it shines from the right and above");
+			check(!notes.isEmpty() && notes.join(" ").contains("in the photo"), "the user is told how it was read: " + notes.join(" / ").left(120));
+			check(!scene_doc::hasErrors(scene_doc::validate(sb->document())), "the scene has no errors");
+			check(sb->undo(), "undo is available");
+			const scene_doc::Light &back = sb->document().lights[static_cast<size_t>(skyIndex)];
+			check(back.sky.sunElevation == beforeElevation && back.physicalSky == wasSky, "one undo puts the sky back as it was");
+		}
+	}
+	QTimer::singleShot(600, this, [this, shot, log, ok]() {
+		shot("sky_edit");
+		log(ok ? "RESULT: OK" : "RESULT: FAIL");
+		QApplication::exit(ok ? 0 : 1);
 	});
 }

@@ -126,6 +126,7 @@ void MainWindow::runSelfTest(const QString &mode, const QString &outPrefix) {
 	if (mode == "photo") { runPhotoSelfTest(log, shot); return; }
 	if (mode == "room") { runRoomSelfTest(log, shot); return; }   // see mainwindow_selftest_photo.cpp
 	if (mode == "material") { runMaterialSelfTest(log, shot); return; }   // see mainwindow_selftest_photo.cpp
+	if (mode == "sky") { runSkySelfTest(log, shot); return; }   // see mainwindow_selftest_photo.cpp
 	if (mode == "builder3d") { runBuilder3dSelfTest(log, shot); return; }
 	if (mode == "denoiser") { runDenoiserSelfTest(log, shot); return; }
 	if (mode == "tour") { runTourSelfTest(log, shot); return; }

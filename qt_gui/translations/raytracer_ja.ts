@@ -6950,7 +6950,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <location filename="../scene_builder_inspector.cpp" line="539"/>
         <location filename="../scene_builder_inspector.cpp" line="571"/>
         <location filename="../scene_builder_inspector.cpp" line="639"/>
-        <location filename="../scene_builder_inspector.cpp" line="875"/>
+        <location filename="../scene_builder_inspector.cpp" line="880"/>
         <location filename="../scene_builder_mix.cpp" line="89"/>
         <location filename="../scene_builder_mix.cpp" line="92"/>
         <location filename="../scene_builder_mix.cpp" line="109"/>
@@ -7497,7 +7497,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="776"/>
-        <location filename="../scene_builder_inspector.cpp" line="876"/>
+        <location filename="../scene_builder_inspector.cpp" line="881"/>
         <source>Strength</source>
         <translation>強さ</translation>
     </message>
@@ -7593,47 +7593,57 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>空のギャラリー...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="860"/>
+        <location filename="../scene_builder_inspector.cpp" line="861"/>
+        <source>Match to a photo...</source>
+        <translation>写真に合わせる...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="862"/>
+        <source>Choose a photo of an outdoor scene with the sky in it: the sun&apos;s height and direction and the haze are read from the sky and set here.</source>
+        <translation>空が写っている屋外の写真を選ぶと、空から太陽の高さと方向ともやを読み取って、ここに設定します。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="865"/>
         <source>Sun height</source>
         <translation>太陽の高さ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="861"/>
+        <location filename="../scene_builder_inspector.cpp" line="866"/>
         <source>Sun direction</source>
         <translation>太陽の方向</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="862"/>
+        <location filename="../scene_builder_inspector.cpp" line="867"/>
         <source>Haze</source>
         <translation>もや</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="863"/>
+        <location filename="../scene_builder_inspector.cpp" line="868"/>
         <source>Ground brightness</source>
         <translation>地面の明るさ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="864"/>
+        <location filename="../scene_builder_inspector.cpp" line="869"/>
         <source>The sky picture and the Sun light are made from these settings; change the sun here rather than moving the Sun light. Direction 0 is towards +X, 90 away from the starting camera, 180 towards -X, 270 behind it. Brightness 1 is a daylight scene.</source>
         <translation>空の画像と太陽の光はこれらの設定から作られます。太陽の光を動かすのではなく、ここで太陽を変更してください。方向 0 は +X、90 は開始カメラから遠ざかる向き、180 は -X、270 はカメラの後ろです。明るさ 1 は昼間のシーンです。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="867"/>
+        <location filename="../scene_builder_inspector.cpp" line="872"/>
         <source>Sky image</source>
         <translation>空の画像</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="867"/>
+        <location filename="../scene_builder_inspector.cpp" line="872"/>
         <source>Images (*.exr *.hdr *.png *.jpg *.jpeg)</source>
         <translation>画像 (*.exr *.hdr *.png *.jpg *.jpeg)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="869"/>
+        <location filename="../scene_builder_inspector.cpp" line="874"/>
         <source>Rotate sky</source>
         <translation>空を回転</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="870"/>
+        <location filename="../scene_builder_inspector.cpp" line="875"/>
         <source>Leave the image empty for a plain colour sky. An image is an equirectangular (lat-long) panorama; Rotate sky turns it about the vertical axis (counter-clockwise seen from above), to put the bright part of the picture where you want the light to come from.</source>
         <translation>画像を空にすると単色の空になります。画像は正距円筒図法 (緯度経度) のパノラマです。「空を回転」は垂直軸まわりに (上から見て反時計回りに) 回し、画像の明るい部分を光を来させたい方向に合わせます。</translation>
     </message>
@@ -7642,7 +7652,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation type="vanished">画像を空にすると単色の空になります。画像は正距円筒図法（緯度経度）のパノラマです。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="876"/>
+        <location filename="../scene_builder_inspector.cpp" line="881"/>
         <source>Brightness</source>
         <translation>明るさ</translation>
     </message>
@@ -8911,122 +8921,218 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>マテリアルの画像を %1 に保存できませんでした。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="138"/>
+        <location filename="../scene_builder_material_photo.cpp" line="139"/>
         <source>The photo was lit unevenly (the light varied %1 to 1 across it); that was taken out, so the colour is the surface&apos;s own.</source>
         <translation>写真の照明にムラがありました (明るさが %1 対 1 の範囲で変化)。これを取り除いたので、色は表面そのものの色です。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="139"/>
+        <location filename="../scene_builder_material_photo.cpp" line="140"/>
         <source>The relief is a guess made from the picture alone (dark is low, light is high); change Bump height if it looks too strong or too flat.</source>
         <translation>凹凸は画像だけから推定したものです (暗いところは低く、明るいところは高い)。強すぎる、または平らすぎる場合は「バンプの高さ」を変更してください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="140"/>
+        <location filename="../scene_builder_material_photo.cpp" line="141"/>
         <source>This shape sets its own texture coordinates, so the number of repeats was not set: use the Texture repeats rows if the pattern looks too big or too small.</source>
         <translation>この形状は独自のテクスチャ座標を使うため、繰り返し回数は設定されませんでした。模様が大きすぎる、または小さすぎる場合は、テクスチャの繰り返しの行を使ってください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="141"/>
+        <location filename="../scene_builder_material_photo.cpp" line="142"/>
         <source>The number of repeats was left as it was: use the Texture repeats rows to make the pattern the right size.</source>
         <translation>繰り返し回数は変更していません。模様のサイズを合わせるには、テクスチャの繰り返しの行を使ってください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="148"/>
+        <location filename="../scene_builder_material_photo.cpp" line="149"/>
         <source>Choose a photo of the surface</source>
         <translation>表面の写真を選択</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="148"/>
+        <location filename="../scene_builder_light_photo.cpp" line="28"/>
+        <source>There is no sky light to set.</source>
+        <translation>設定する空のライトがありません。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="35"/>
+        <source>The photo %1 could not be read: %2</source>
+        <translation>写真 %1 を読み込めませんでした: %2</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="78"/>
+        <source>The sky is even (overcast), so the sun&apos;s direction cannot be told: it is set high and the haze to its most. Change Sun height and Sun direction by hand if you know them.</source>
+        <translation>空が一様 (曇り) なので太陽の方向はわかりません。太陽は高く、もやは最大に設定しました。わかっている場合は「太陽の高さ」と「太陽の方向」を手で変更してください。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="79"/>
+        <source>The sun is in the photo: its height and direction are read straight off it.</source>
+        <translation>太陽が写っているので、その高さと方向を写真から直接読み取りました。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="80"/>
+        <source>The sun is not in the photo: its height and direction are fitted to how the sky&apos;s brightness varies (confidence %1%).</source>
+        <translation>太陽は写っていないので、空の明るさの変化に合わせて高さと方向を推定しました (信頼度 %1%)。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="81"/>
+        <source>The camera was tilted %1 degrees (read off the horizon).</source>
+        <translation>カメラは %1 度傾いていました (地平線から読み取り)。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="83"/>
+        <source>The sun&apos;s direction is set relative to where the Builder&apos;s camera looks now, as it was relative to where the photo looks. The photo&apos;s exposure is not known, so the sky&apos;s Brightness stays as it was.</source>
+        <translation>太陽の方向は、写真が向いている方向に対する関係と同じ関係で、Builder のカメラが今向いている方向に対して設定されます。写真の露出はわからないため、空の「明るさ」はそのままです。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="90"/>
+        <location filename="../scene_builder_material_photo.cpp" line="149"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.tga)</source>
         <translation>画像 (*.png *.jpg *.jpeg *.bmp *.tga)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="156"/>
+        <location filename="../scene_builder_light_photo.cpp" line="90"/>
+        <source>Choose a photo with the sky in it</source>
+        <translation>空が写っている写真を選択</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="94"/>
+        <location filename="../scene_builder_light_photo.cpp" line="131"/>
+        <source>Light from a photo</source>
+        <translation>写真からライトを作成</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="96"/>
+        <source>The sun&apos;s height and direction and the haze are read from the sky in the photo (a blue or white sky that reaches the top of the picture), and the Sun &amp;&amp; sky settings are set to match. The photo should show some sky and, for the height, the horizon. Both settings below are optional.</source>
+        <translation>写真の空 (画像の上端まで届く青または白の空) から太陽の高さと方向ともやを読み取り、「太陽と空」の設定をそれに合わせます。写真には空が写っている必要があり、高さを読むには地平線も必要です。以下の 2 つの設定は省略できます。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="106"/>
+        <source> degrees</source>
+        <translation> 度</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="107"/>
+        <source>How wide the photo sees, left to right. A phone&apos;s main camera is about 65 to 70 degrees; a wide-angle one 100 or more.</source>
+        <translation>写真が左右にどれだけの範囲を捉えているか。スマートフォンのメインカメラは約 65〜70 度、広角では 100 度以上です。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="108"/>
+        <source>Photo&apos;s field of view (horizontal)</source>
+        <translation>写真の視野角 (水平)</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="112"/>
+        <source>from the horizon</source>
+        <translation>地平線から</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="114"/>
+        <source>How far the camera looked up (+) or down (-). Left at the lowest setting it is read off where the sky ends, which works when the horizon is in the photo and not hidden by buildings or trees.</source>
+        <translation>カメラが上 (+) または下 (-) にどれだけ向いていたか。最小の設定のままにすると、空が途切れる位置から読み取ります。地平線が写っていて、建物や木で隠れていない場合に有効です。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="116"/>
+        <source>Camera tilt</source>
+        <translation>カメラの傾き</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="128"/>
+        <source>Could not read the light</source>
+        <translation>ライトを読み取れませんでした</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="131"/>
+        <source>The sky was set from %1:
+
+- %2</source>
+        <translation>%1 から空を設定しました:
+
+- %2</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_material_photo.cpp" line="157"/>
         <source>Could not read the photo</source>
         <translation>写真を読み込めませんでした</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="172"/>
+        <location filename="../scene_builder_material_photo.cpp" line="173"/>
         <source>Material from a photo</source>
         <translation>写真からマテリアルを作成</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="174"/>
+        <location filename="../scene_builder_material_photo.cpp" line="175"/>
         <source>The photo becomes the object&apos;s picture, made to repeat with no joins and with its uneven light taken out, plus a bump map that guesses the relief from it. On the left the picture repeated twice across and down; on the right the bump map (light is high).</source>
         <translation>写真がオブジェクトの画像になります。継ぎ目なく繰り返されるように処理され、ムラのある照明は取り除かれ、そこから凹凸を推定したバンプマップも作られます。左は画像を縦横に 2 回ずつ繰り返したもの、右はバンプマップ (明るいほど高い) です。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Wood</source>
         <translation>木材</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Tile or polished stone</source>
         <translation>タイルまたは磨いた石</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Brick, rough stone or concrete</source>
         <translation>レンガ、粗い石、コンクリート</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Fabric or carpet</source>
         <translation>布またはカーペット</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Leather</source>
         <translation>革</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Plaster or paint</source>
         <translation>漆喰または塗装</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="190"/>
+        <location filename="../scene_builder_material_photo.cpp" line="191"/>
         <source>Something else</source>
         <translation>その他</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="192"/>
+        <location filename="../scene_builder_material_photo.cpp" line="193"/>
         <source>Sets the gloss (a varnished floor, a glazed tile, leather have a coat) and how tall the relief is. These are starting values: change them in the properties.</source>
         <translation>光沢 (ニス塗りの床、釉薬のかかったタイル、革にはコーティングがあります) と凹凸の高さを設定します。これらは初期値です。プロパティで変更できます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="193"/>
+        <location filename="../scene_builder_material_photo.cpp" line="194"/>
         <source>What it is</source>
         <translation>種類</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="199"/>
+        <location filename="../scene_builder_material_photo.cpp" line="200"/>
         <source> cm</source>
         <translation> cm</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="200"/>
+        <location filename="../scene_builder_material_photo.cpp" line="201"/>
         <source>leave the repeats as they are</source>
         <translation>繰り返し回数はそのまま</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="201"/>
+        <location filename="../scene_builder_material_photo.cpp" line="202"/>
         <source>How wide the photographed patch really is. The picture then repeats across the object at that size (a quad or a box; other shapes keep their own texture repeats).</source>
         <translation>撮影した部分の実際の幅です。画像はこの大きさでオブジェクト全体に繰り返されます (クアッドとボックスのみ。他の形状は独自のテクスチャの繰り返しを保持します)。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="202"/>
+        <location filename="../scene_builder_material_photo.cpp" line="203"/>
         <source>Width of the patch in the photo</source>
         <translation>写真に写っている部分の幅</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="213"/>
+        <location filename="../scene_builder_material_photo.cpp" line="214"/>
         <source>Could not make the material</source>
         <translation>マテリアルを作成できませんでした</translation>
     </message>
     <message>
-        <location filename="../scene_builder_material_photo.cpp" line="216"/>
+        <location filename="../scene_builder_material_photo.cpp" line="217"/>
         <source>Made a material from %1. %2</source>
         <translation>%1 からマテリアルを作成しました。%2</translation>
     </message>
