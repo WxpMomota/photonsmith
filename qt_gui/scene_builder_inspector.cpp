@@ -335,6 +335,34 @@ void SceneBuilderWidget::inspectCamera(QFormLayout *f) {
 	addHeading(f, tr("Scene"));
 	addText(f, tr("Title"), [this]() { return &m_doc.title; });
 	addHeading(f, tr("Camera"));
+	// A photo sets the lens, the tilt and the roll (scene_builder_camera_photo.cpp), and can be laid over the camera view.
+	auto *matchPhoto = new QPushButton(tr("Match to a photo..."));
+	matchPhoto->setAutoDefault(false);
+	matchPhoto->setToolTip(tr("Choose a photo: the camera takes its lens, tilt and roll, and the picture its shape. The photo can then be laid over the camera view to line your scene up against it."));
+	connect(matchPhoto, &QPushButton::clicked, this, [this]() { cameraFromPhoto(); });
+	f->addRow(matchPhoto);
+	if (!m_cameraPhoto.isNull()) {
+		auto *show = new QCheckBox(tr("Show the photo over the camera view"));
+		show->setChecked(m_cameraPhotoShown);
+		connect(show, &QCheckBox::toggled, this, [this](bool on) { m_cameraPhotoShown = on; updateCameraPhotoOverlay(); });
+		f->addRow(show);
+		auto *opacity = new QDoubleSpinBox;
+		opacity->setRange(0.1, 1.0);
+		opacity->setSingleStep(0.1);
+		opacity->setDecimals(1);
+		opacity->setValue(m_cameraPhotoOpacity);
+		connect(opacity, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double v) { m_cameraPhotoOpacity = v; updateCameraPhotoOverlay(); });
+		f->addRow(tr("Photo opacity"), opacity);
+		auto *remove = new QPushButton(tr("Remove the photo"));
+		remove->setAutoDefault(false);
+		connect(remove, &QPushButton::clicked, this, [this]() {
+			m_cameraPhoto = QImage();
+			m_cameraPhotoShown = false;
+			updateCameraPhotoOverlay();
+			QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
+		});
+		f->addRow(remove);
+	}
 	addVec3(f, tr("Position"), [this]() { return &m_doc.camera.position; }, 0.25);
 	addVec3(f, tr("Looks at"), [this]() { return &m_doc.camera.target; }, 0.25);
 	addNum(f, tr("Field of view"), [this]() { return &m_doc.camera.fov; }, 1, 170, 1, 1, QString::fromUtf8(" \xC2\xB0"));

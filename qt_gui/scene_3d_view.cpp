@@ -554,6 +554,13 @@ void Scene3DView::paintEvent(QPaintEvent *) {
 	}
 	drawTool(c);
 	drawSnapGuides(c);
+	if (m_throughCamera && !m_photoOverlay.isNull() && m_doc) {   // the photo over the picture frame, to line the scene up against
+		const double aspect = m_doc->render.height > 0 ? double(m_doc->render.width) / m_doc->render.height : 1.0;
+		const scene_view::FrameRect f = scene_view::pictureFrame(std::max(1, width()), std::max(1, height()), aspect);
+		p.setOpacity(std::clamp(m_photoOpacity, 0.0, 1.0));
+		p.drawImage(QRectF(f.x, f.y, f.w, f.h), m_photoOverlay);
+		p.setOpacity(1.0);
+	}
 	if (m_throughCamera) drawCameraFrame(p);
 	else if (m_cam.ortho || !m_viewName.isEmpty() || m_renderedMode) {   // which standard view this is, that it is orthographic, and how the rendering is getting on
 		QStringList parts;

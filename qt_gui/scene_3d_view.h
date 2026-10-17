@@ -49,6 +49,8 @@ public:
 	// the frame is dimmed), and follows the camera while it is edited. Orbiting, panning, zooming or Frame all leaves it (cameraViewLeft()).
 	void setThroughCamera(bool on);
 	bool throughCamera() const { return m_throughCamera; }
+	// A photo laid over the picture frame while looking through the camera, `opacity` thick, to line the scene up against it (nothing in the document; a null image takes it away).
+	void setPhotoOverlay(const QImage &photo, double opacity) { m_photoOverlay = photo; m_photoOpacity = opacity; update(); }
 	// The flythrough scrub: looks through `camera` (a point along the saved views' path, `progress` 0..1 of the way) instead of the scene's camera, with the picture's frame over it
 	// like Through camera. Ended by setThroughCamera(), or by orbiting, panning or zooming (cameraViewLeft(), as for Through camera). It changes nothing in the document.
 	void setFlythroughPreview(const scene_doc::Camera &camera, double progress);
@@ -225,6 +227,8 @@ private:
 	QString m_viewName;             // the standard view the camera is in, until it is turned by hand
 	bool numpadKey(QKeyEvent *e);   // a numpad view key; true if it was one
 	bool m_showPath = true;         // draw the flythrough's camera path (setShowCameraPath)
+	QImage m_photoOverlay;          // the photo laid over the camera view (setPhotoOverlay)
+	double m_photoOpacity = 0.5;
 	bool m_throughCamera = false;   // the view is the scene's camera (m_cam is kept for when it is switched off)
 
 	Mode m_mode = Mode::None;

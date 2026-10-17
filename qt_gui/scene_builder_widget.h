@@ -97,6 +97,7 @@ public:
 	void cameraFromView();                    // the scene's camera goes where the 3D view is
 	void lookThroughCamera(bool on);          // the 3D view looks through the scene's camera
 	bool lookingThroughCameraForTest() const { return m_view3d && m_view3d->throughCamera(); }
+	bool view3dShownForTest() const;   // the 3D view is the one showing (not Top, Front or Side)
 	scene_doc::Float3 viewEyeForTest() const {   // where the 3D view's eye is now
 		const scene_view::V3 e = m_view3d->currentPose().eye();
 		return {e.x, e.y, e.z};
@@ -190,6 +191,15 @@ public:
 	// `tiltGiven` (else it is read off the horizon). False with `error` set when the photo cannot be used; `notes` gets what the user should know.
 	void lightFromPhoto(int lightIndex);
 	bool applyLightPhoto(int lightIndex, const QString &photo, double hfov, bool tiltGiven, double tilt, QString *error, QStringList *notes = nullptr);
+	// Camera from a photo (scene_builder_camera_photo.cpp): the "Match to a photo..." button of the camera. cameraFromPhoto asks for the photo and the settings and applies it; applyCameraPhoto is
+	// that without the dialogs: the photo's lens (`hfov`, its horizontal field of view in degrees; 0: from the photo's EXIF data, else a phone's), tilt and roll (read off the horizon unless
+	// given) become the scene's camera, which keeps the heading it has and is put `heightMetres` above the ground; the picture takes the photo's shape; the photo is laid over the camera view;
+	// and with `alsoSky` the Sun & sky are set from the photo too. One undo step for the camera. False with `error` set when the photo cannot be read; `notes` gets what the user should know.
+	void cameraFromPhoto();
+	bool applyCameraPhoto(const QString &photo, double hfov, double heightMetres, bool tiltGiven, double tilt, bool rollGiven, double roll, bool alsoSky, QString *error, QStringList *notes = nullptr);
+	static double exifHorizontalFov(const QString &photo);   // the photo's horizontal field of view from its EXIF lens data, 0 when it has none
+	void updateCameraPhotoOverlay();                         // shows (or takes away) the photo over the camera view
+	bool cameraPhotoShownForTest() const { return m_cameraPhotoShown && !m_cameraPhoto.isNull(); }
 	// See scene_builder_inspector.cpp: an upright copy of a picture whose EXIF tag asks for a rotation (the renderer ignores that tag).
 	static QString uprightPictureCopy(const QString &path, QSize *size);
 	// Arrange (scene_builder_arrange.cpp): hide and lock what is picked, put it on the floor, rename it, frame it.
@@ -440,6 +450,9 @@ private:
 	QListWidget *m_list = nullptr;
 	SceneLayoutView *m_view = nullptr;
 	Scene3DView *m_view3d = nullptr;
+	QImage m_cameraPhoto;                  // the photo the camera was matched to, laid over the camera view while m_cameraPhotoShown
+	bool m_cameraPhotoShown = false;
+	double m_cameraPhotoOpacity = 0.5;
 	QStackedWidget *m_viewStack = nullptr;  // m_view (Top / Front / Side) or m_view3d, one at a time
 	QLabel *m_viewHint = nullptr;
 	QWidget *m_gizmoBar = nullptr;           // the 3D view's Move / Rotate / Scale buttons

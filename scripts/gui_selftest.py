@@ -13,6 +13,7 @@ result. Screenshots are of the app's own window (never the screen) and are writt
   diagnostics  the Diagnostics report is produced
   material     the Scene Builder's "Make from a photo..." for a material: a made-up photo becomes a seamless picture and a bump map on a quad (the button is in the properties)
   sky          the Scene Builder's "Match to a photo..." for a Sun & sky light: a made-up photo of a sky with the sun in it sets the sun's height, its direction on the compass and the haze
+  camera       the Scene Builder's "Match to a photo..." for the camera: a made-up photo of a tilted, rolled camera sets the camera's height, tilt, roll and lens, the picture's shape and the photo laid over the camera view
   tour         (not in the default set) a screenshot of every tab, for looking over the UI: RT_GUI_SELFTEST_WIDTH/_HEIGHT size the window, RT_GUI_SELFTEST_THEME
                picks a theme id (e.g. solarized-light)
   quitwarm     (a Mac) waits for the GPU renderer's background warm-up to finish, then quits: the exit status must be 0 (quitting once crashed after a warm-up)
@@ -178,7 +179,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("app", nargs="?", help="RayTracerGUI.app, RayTracerGUI.exe, or the folder holding it")
     ap.add_argument("--out", help="directory for logs and screenshots (default: a new temp directory)")
-    ap.add_argument("--modes", default="ui,options,builder,queue,diagnostics,quitwarm,material,sky", help="comma-separated self-test modes (default: %(default)s)")
+    ap.add_argument("--modes", default="ui,options,builder,queue,diagnostics,quitwarm,material,sky,camera", help="comma-separated self-test modes (default: %(default)s)")
     ap.add_argument("--live-preview", action="store_true", help="also require an enabled Live Preview item and run the livepreview mode (needs a GPU)")
     ap.add_argument("--plugins", help="directory holding Qt's offscreen platform plugin")
     args = ap.parse_args()

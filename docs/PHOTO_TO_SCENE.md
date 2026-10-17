@@ -8,6 +8,7 @@ Four ways to get a real-world picture into a rendered scene, from simple to ambi
 | any picture | it on a wall, a floor, a ball, a statue | **Pictures** (built in, nothing to install) |
 | a photo of a **surface** (wood, tile, fabric, a wall) | a material that repeats over any object, with a bump map | **Material from a photo** (built in, nothing to install) |
 | a photo of an **outdoor scene** with sky | the sun's height and direction and the haze, to light a render the same way | **Light from a photo** (built in, nothing to install) |
+| a photo with a **horizon** | the camera's lens, tilt and roll and the picture's shape, so a scene is seen the way the photo was | **Camera from a photo** (built in, nothing to install) |
 | **one** photo of an object | a 3D version of it to light and render | **Object from a photo** (optional helper, runs on your computer) |
 | **one** photo of a room | an editable room: walls, floor, ceiling, windows, and the camera | **Room from a photo** (the same helper) |
 | **many** photos of an object or place | an accurate 3D copy | **A photo scan** with COLMAP or Meshroom, then bring the mesh in |
@@ -94,7 +95,7 @@ degrees in height and in direction, with the sun in the picture or outside it. T
 - **An overcast sky** has no gradient to read: the sun is set high with the haze at its most, and it says so. A clear blue sky seen high up and away from the sun is even too, but it is blue, not
   grey: it is not called overcast, and its haze is left ordinary.
 - **No horizon in the picture** (a camera looking high up): the camera is taken to look level, which makes the sky read hazier than it is; give the tilt when you know it.
-- **The field of view** is a phone's 65 degrees along the long side of the photo; for a portrait photo the dialog starts at 51, the same lens across its short side.
+- **The field of view** is read from the photo's own EXIF data when it has it; else it is a phone's 65 degrees along the long side of the photo (for a portrait photo the dialog starts at 51, the same lens across its short side).
 - **The brightness** stays as it was: the photo's exposure is not known. Use the light's strength.
 - **The ground's brightness** is not read (a snow field and a dark ground look alike here).
 - **A photo with little sky**, or none, is refused; one with clouds and clear blue mixed may give a rougher fit (not tried).
@@ -103,6 +104,34 @@ degrees in height and in direction, with the sun in the picture or outside it. T
   and an overcast sky with big clouds gave a low confidence and say so; a hazy sunrise (a warm sky) was found as only a sliver of sky and says so; a beach with a thin strip of sky was not
   claimed to be well fitted. Trying them found three faults, now fixed and tested: a blue sea counted as sky, bright cloud tops taken for the sun, and a near-perfect confidence from a thin
   strip of sky. A real photo's own tone curve, lens vignetting and clouds still cost accuracy: check the result by eye and change **Sun height** and **Sun direction** if it is off.
+
+## Camera from a photo
+
+A photo can set the Builder's **camera** so that a scene is seen the way the photo was taken. In the **Camera and image** properties press **Match to a photo...** at the top. Nothing has to be
+installed: it is plain image analysis, the same on every system, and the photo stays on your computer.
+
+The camera takes:
+
+- **the lens** (the photo's field of view), read from the photo's own EXIF data when it has it (the 35 mm equivalent focal length a phone or camera writes into a JPEG), else a phone's is assumed
+  (65 degrees across the long side, 51 across the short side of a portrait photo). You can also type it;
+- **the tilt** (looking up or down) and **the roll** (a tilted horizon), read off the horizon, which is the lower edge of a blue or white sky: a line is fitted through it, its slope is the roll and its
+  distance from the middle of the picture is the tilt. You can give either instead;
+- **a height** above the ground (1.6 m, eye level, to start with), which only you know; and it **keeps the direction it looked in**: where the camera stands and which way it faces are not in a photo
+  (the Builder camera is turned up or down and rolled as the photo's was, along the heading it has).
+
+The **picture takes the photo's shape** (the width stays, the height follows), the 3D view looks **through the camera**, and the photo is laid over it at half opacity so a scene can be lined up against it;
+**Show the photo over the camera view**, **Photo opacity** and **Remove the photo** are in the Camera section. A tick box sets the **Sun & sky from the same photo** (see Light from a photo).
+
+How good it is:
+
+- Checked on photos made from a camera of known tilt and roll (to within a degree), and by rendering a scene through the camera it makes (a huge ground under a plain sky): the horizon in the render lands where
+  the photo's did, with the signs of the tilt and the roll right all the way through the Builder's document, the pbrt file and the renderer.
+- Tried on nine free-licence photos from the web (no ground truth): the clean horizons (two beaches, a heath) gave plausible tilt and roll and said nothing; hills, dunes, a roof edge and a skyline of far
+  hills, where the sky's lower edge is not a clean straight line, gave a warning ("check them by eye, or give them"), and a photo with only a sliver of sky said so.
+- **A horizon hidden by buildings or trees along the whole of it** is read as the skyline, which is not level: the camera then comes out tilted or rolled wrongly. The warning catches a ragged edge, not a clean
+  roof line, so check the tilt and roll by eye against the photo laid over the view.
+- It does not give a **shadow catcher or a photo backdrop in the final render**: the renderers draw the scene on its own (the photo is laid over the view in the Builder, to line things up); to put a render
+  into the photo, composite the two in an image editor. Light from a photo sets the light to match.
 
 ## Object from a photo
 

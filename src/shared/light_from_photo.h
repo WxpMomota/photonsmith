@@ -94,6 +94,28 @@ inline bool skyLike(const float* c) {
 // Clipped to (nearly) white: a sun is often warm, so one channel may stop short of full.
 inline bool clipped(const float* c) { return std::min({c[0], c[1], c[2]}) >= 0.85f && luminance(c) >= 0.95; }
 
+// For each column of the picture, the row where the sky ends: down from the top while the pixels look like sky, stopping where the brightness drops well below what the sky has been (a blue
+// sea is darker than the sky above it; a sky gets brighter towards the horizon, it does not fall off). 0 for a column with no sky at its top.
+inline std::vector<int> skyColumnEnds(const Picture& pic) {
+	std::vector<int> end(static_cast<size_t>(pic.w), 0);
+	for (int x = 0; x < pic.w; ++x) {
+		int y = 0, sinceClipped = 1000;
+		while (y < pic.h && skyLike(pic.at(x, y))) {
+			const double lum = luminance(pic.at(x, y));
+			// the brightest the sky was in the last 20 rows (not the whole column: the glare round a sun is far brighter than the sky just past it), leaving out clipped pixels and the
+			// rows just after them
+			double recent = 0.0;
+			for (int k = std::max(0, y - 20); k < y; ++k)
+				if (!clipped(pic.at(x, k))) recent = std::max(recent, luminance(pic.at(x, k)));
+			if (y >= 3 && sinceClipped > 20 && lum < 0.6 * recent) break;
+			sinceClipped = clipped(pic.at(x, y)) ? 0 : sinceClipped + 1;
+			++y;
+		}
+		end[static_cast<size_t>(x)] = y < 3 ? 0 : y;
+	}
+	return end;
+}
+
 }  // namespace detail
 
 // Reads the sky of a photo (`rgb8`, w x h, three 8-bit sRGB values per pixel).
@@ -107,26 +129,10 @@ inline Estimate estimate(const unsigned char* rgb8, int w, int h, const Options&
 	const double focal = (pic.w / 2.0) / std::tan(std::min(160.0, std::max(10.0, options.hfovDegrees)) * kPi / 360.0);   // pixels
 	const double cx = pic.w / 2.0, cy = pic.h / 2.0;
 
-	// ---- the sky: down each column from the top while the pixels look like sky, and stop where the brightness drops well below what the sky has been (a blue sea is darker than the sky
-	// above it; a sky gets brighter towards the horizon, it does not fall off)
-	std::vector<int> end(static_cast<size_t>(pic.w), 0);
+	// ---- the sky: down each column from the top (detail::skyColumnEnds)
+	const std::vector<int> end = detail::skyColumnEnds(pic);
 	size_t skyPixels = 0;
-	for (int x = 0; x < pic.w; ++x) {
-		int y = 0, sinceClipped = 1000;
-		while (y < pic.h && detail::skyLike(pic.at(x, y))) {
-			const double lum = detail::luminance(pic.at(x, y));
-			// the brightest the sky was in the last 20 rows (not the whole column: the glare round a sun is far brighter than the sky just past it), leaving out clipped pixels and the
-			// rows just after them
-			double recent = 0.0;
-			for (int k = std::max(0, y - 20); k < y; ++k)
-				if (!detail::clipped(pic.at(x, k))) recent = std::max(recent, detail::luminance(pic.at(x, k)));
-			if (y >= 3 && sinceClipped > 20 && lum < 0.6 * recent) break;
-			sinceClipped = detail::clipped(pic.at(x, y)) ? 0 : sinceClipped + 1;
-			++y;
-		}
-		end[static_cast<size_t>(x)] = y < 3 ? 0 : y;
-		skyPixels += static_cast<size_t>(end[static_cast<size_t>(x)]);
-	}
+	for (const int e : end) skyPixels += static_cast<size_t>(e);
 	out.skyFraction = static_cast<double>(skyPixels) / (static_cast<double>(pic.w) * pic.h);
 	if (out.skyFraction < 0.03) {
 		out.why = "No sky was found: it looks for a blue or white sky that reaches the top of the picture.";

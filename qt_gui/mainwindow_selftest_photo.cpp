@@ -14,6 +14,7 @@
 #include "photo_import.h"
 #include "scene_builder_widget.h"
 
+#include "../src/shared/camera_from_photo.h"
 #include "../src/shared/light_from_photo.h"
 #include "../src/shared/material_from_photo.h"
 
@@ -364,6 +365,79 @@ void MainWindow::runSkySelfTest(const std::function<void(const QString &)> &log,
 	}
 	QTimer::singleShot(600, this, [this, shot, log, ok]() {
 		shot("sky_edit");
+		log(ok ? "RESULT: OK" : "RESULT: FAIL");
+		QApplication::exit(ok ? 0 : 1);
+	});
+}
+
+// RT_GUI_SELFTEST=camera RT_GUI_SELFTEST_OUT=<prefix>: the Scene Builder's "Match to a photo..." for the camera, without its dialogs. Makes a 4:3 photo of a camera tilted 6 degrees up and rolled 3
+// degrees clockwise (a pale blue sky over a green ground, the horizon where that geometry puts it), matches the starter scene's camera to it and checks the camera's height, pitch and roll, the
+// picture's new shape, the photo laid over the camera view, that one undo puts the camera back, and (with the sky asked for) the Sun & sky. Exit 0 if every step held.
+void MainWindow::runCameraSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {
+	if (m_sceneBuilder) m_tabWidget->setCurrentWidget(m_sceneBuilder);
+	resize(1500, 950);
+	SceneBuilderWidget *sb = m_sceneBuilder;
+	bool ok = sb != nullptr;
+	auto check = [&ok, log](bool cond, const QString &what) {
+		log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what));
+		ok = ok && cond;
+	};
+	if (sb) {
+		QString badError;
+		const bool badOk = sb->applyCameraPhoto("C:/no/such/photo_for_the_selftest.png", 65.0, 1.6, false, 0.0, false, 0.0, false, &badError);
+		check(!badOk && !badError.isEmpty(), "a missing photo fails with a message: " + badError.left(100));
+		// the photo: x right, y up, z ahead; the camera tilted up by t and rolled counter-clockwise by r (here -3: clockwise); the horizon is where a ray runs level
+		const int w = 640, h = 480;
+		const double focal = (w / 2.0) / std::tan(65.0 * camera_from_photo::kPi / 360.0), cx = w / 2.0, cy = h / 2.0;
+		const double t = 6.0 * camera_from_photo::kPi / 180.0, r = -3.0 * camera_from_photo::kPi / 180.0;
+		QImage photo(w, h, QImage::Format_RGB32);
+		for (int y = 0; y < h; ++y)
+			for (int x = 0; x < w; ++x) {
+				const double X = x + 0.5 - cx, Y = y + 0.5 - cy;
+				const double horizon = (focal * std::tan(t) + X * std::sin(r)) / std::cos(r);   // the row (from the middle) where the horizon is at this column
+				if (Y >= horizon) { photo.setPixel(x, y, qRgb(76, 92, 56)); continue; }
+				const double e = std::min(1.0, (horizon - Y) / (h * 0.6));   // paler towards the horizon, deeper blue above
+				photo.setPixel(x, y, qRgb(static_cast<int>(190 - 120 * e), static_cast<int>(210 - 80 * e), static_cast<int>(240 - 10 * e)));
+			}
+		const QString path = QDir::tempPath() + "/rt_selftest_camera.png";
+		photo.save(path);
+
+		const scene_doc::Camera before = sb->document().camera;
+		const int beforeHeight = sb->document().render.height;
+		QString err;
+		QStringList notes;
+		const bool made = sb->applyCameraPhoto(path, 65.0, 1.6, false, 0.0, false, 0.0, false, &err, &notes);
+		check(made, "the camera was matched to " + path + " " + err);
+		if (made) {
+			const scene_doc::Camera &c = sb->document().camera;
+			const double fx = c.target.x - c.position.x, fy = c.target.y - c.position.y, fz = c.target.z - c.position.z, fl = std::sqrt(fx * fx + fy * fy + fz * fz);
+			check(std::fabs(c.position.y - 1.6) < 1e-9 && std::fabs(c.position.x - before.position.x) < 1e-9 && std::fabs(c.position.z - before.position.z) < 1e-9, "the camera is 1.6 m up, where it stood");
+			check(std::fabs(std::asin(fy / fl) * 180.0 / camera_from_photo::kPi - 6.0) < 1.0, QString("it looks 6 degrees up (%1)").arg(std::asin(fy / fl) * 180.0 / camera_from_photo::kPi));
+			// the roll: up against the unrolled up, about the way it looks
+			const double hl = std::sqrt(fx * fx + fz * fz), hx = fx / hl, hz = fz / hl, pitch = std::asin(fy / fl);
+			const double u0[3] = {-hx * std::sin(pitch), std::cos(pitch), -hz * std::sin(pitch)}, f[3] = {fx / fl, fy / fl, fz / fl};
+			const double right[3] = {f[1] * u0[2] - f[2] * u0[1], f[2] * u0[0] - f[0] * u0[2], f[0] * u0[1] - f[1] * u0[0]};
+			const double rollDegrees = std::atan2(-(c.up.x * right[0] + c.up.y * right[1] + c.up.z * right[2]), c.up.x * u0[0] + c.up.y * u0[1] + c.up.z * u0[2]) * 180.0 / camera_from_photo::kPi;
+			check(std::fabs(rollDegrees + 3.0) < 1.0, QString("and is rolled 3 degrees clockwise (%1)").arg(rollDegrees));
+			check(std::fabs(c.fov - 2.0 * std::atan(std::tan(32.5 * camera_from_photo::kPi / 180.0) * 0.75) * 180.0 / camera_from_photo::kPi) < 0.01, QString("the field of view is that of 65 degrees across a 4:3 picture (%1 up and down)").arg(c.fov));
+			check(sb->document().render.width == 800 && sb->document().render.height == 600, QString("the picture has the photo's shape (%1 x %2)").arg(sb->document().render.width).arg(sb->document().render.height));
+			check(sb->cameraPhotoShownForTest() && sb->lookingThroughCameraForTest() && sb->view3dShownForTest(), "the photo is laid over the camera view, which is looked through and showing");
+			check(!notes.isEmpty() && notes.join(" ").contains("horizon"), "the user is told how it was read: " + notes.join(" / ").left(140));
+			check(!scene_doc::hasErrors(scene_doc::validate(sb->document())), "the scene has no errors");
+			check(sb->undo(), "undo is available");
+			const scene_doc::Camera &back = sb->document().camera;
+			check(std::fabs(back.position.y - before.position.y) < 1e-9 && std::fabs(back.fov - before.fov) < 1e-9 && sb->document().render.height == beforeHeight, "one undo puts the camera and the picture's shape back");
+		}
+		// with the sky asked for
+		QStringList skyNotes;
+		const bool both = sb->applyCameraPhoto(path, 65.0, 1.6, false, 0.0, false, 0.0, true, &err, &skyNotes);
+		check(both, "the camera and the sun and sky were set from the photo " + err);
+		bool physical = false;
+		for (const scene_doc::Light &l : sb->document().lights) physical = physical || (l.kind == scene_doc::LightKind::Infinite && l.physicalSky);
+		check(physical, "the sky light is a Sun & sky now: " + skyNotes.join(" / ").right(120));
+	}
+	QTimer::singleShot(600, this, [this, shot, log, ok]() {
+		shot("camera_edit");
 		log(ok ? "RESULT: OK" : "RESULT: FAIL");
 		QApplication::exit(ok ? 0 : 1);
 	});

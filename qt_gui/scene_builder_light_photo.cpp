@@ -106,7 +106,8 @@ void SceneBuilderWidget::lightFromPhoto(int lightIndex) {
 	QImageReader shape(photo);
 	shape.setAutoTransform(true);
 	const QSize shown = shape.size();
-	fov->setValue(shown.isValid() && shown.height() > shown.width() ? 51.0 : 65.0);   // (65 degrees is along a phone photo's long side: across a portrait one it is about 51)
+	const double fromExif = exifHorizontalFov(photo);   // (the photo's own lens data, when it has it)
+	fov->setValue(fromExif > 0.0 ? std::clamp(std::round(fromExif), 20.0, 140.0) : shown.isValid() && shown.height() > shown.width() ? 51.0 : 65.0);   // (else 65 degrees, along a phone photo's long side: across a portrait one it is about 51)
 	fov->setSuffix(tr(" degrees"));
 	fov->setToolTip(tr("How wide the photo sees, left to right. A phone's main camera is about 65 to 70 degrees; a wide-angle one 100 or more."));
 	form->addRow(tr("Photo's field of view (horizontal)"), fov);
