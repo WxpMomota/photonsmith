@@ -48,9 +48,12 @@ What it makes, from the photo:
 
 - **A colour picture with the photo's light taken out.** A window's glow across a floor, or a shadow, is not part of the wood: the broad light and shade is divided out (the colour is
   kept), so the surface is as bright on average everywhere and takes the light of your scene instead.
-- **A picture that repeats with no joins.** The patch is blended with a copy of itself shifted by half its size, with the weight 1 in the middle and 0 at the edges, so the edges are made
-  of continuous content; the contrast lost in the blend is put back. It works best on an even texture (wood, stone, plaster, fabric); a pattern with large regular features (a brick wall,
-  a tile floor) can show its blend as a slight smear where two bricks are mixed, and a patch with a single distinct thing in it (a knot, a stain) repeats that thing.
+- **A picture that repeats with no joins.** The patch is laid over a copy of itself shifted by half its size: the picture's edges must come from the shifted copy (which is continuous
+  across the wrap) and its middle from the photo, and the line where one gives way to the other is cut along the path where the two nearly agree (found for the across and then the down
+  direction), a few pixels wide, with the difference in brightness at the cut spread into the copy. So planks, grain and grout stay sharp, with no ghosting. If the two agree nowhere better
+  than anywhere else (a strong ramp of light that is not an even texture) there is no path to hide a cut in, and the two are blended instead, which is softer. Either way it works best on
+  an even texture (wood, stone, plaster, fabric); a patch with a single distinct thing in it (a knot, a stain) repeats that thing, and a large regular feature (a tile with its grout) repeats
+  as the grid it is.
 - **A bump map guessed from the picture.** Dark is low and light is high at two scales (the fine grain and the coarse pattern), so grout, cracks and the gaps between threads dip. It is a
   guess from the colours alone, not a measurement of the surface: **Bump height** in the properties makes it stronger or flatter, and a surface whose colour does not follow its relief (a
   flat painted wall with a pattern printed on it) gets a relief it does not have.

@@ -104,11 +104,102 @@ TEST(MaterialFromPhotoTest, ThePictureRepeatsWithNoVisibleJoin) {
 	EXPECT_LT(material_from_photo::seamRatio(full.albedo.data(), size), 1.6);
 }
 
+TEST(MaterialFromPhotoTest, TheCutKeepsThePhotosOwnContentWhereTheBlendWouldMixTheTwoCopies) {
+	const int size = 256;
+	// a smooth wavy texture (three waves at unrelated angles and periods that do not divide the size): the photo and its half-shifted copy agree only along thin paths, so a blend of the
+	// two makes values that are in neither copy, and a cut does not
+	const std::vector<unsigned char> stripes = picture(size, [](int x, int y) {
+		static double c[3];
+		const double v = 0.5 + 0.22 * std::sin(0.21 * x + 0.17 * y) + 0.18 * std::sin(0.13 * x - 0.29 * y + 1.0) + 0.1 * std::sin(0.43 * x + 0.31 * y + 2.0);
+		c[0] = c[1] = c[2] = v;
+		return c;
+	});
+	// the share of the result's pixels that are not (within 20 of 255: the brightness carried across a join is allowed, a mixture is not) the photo's or its copy shifted by half across, down or both:
+	// new content, made by mixing
+	const auto invented = [&](const std::vector<unsigned char>& px) {
+		size_t n = 0;
+		for (int y = 0; y < size; ++y)
+			for (int x = 0; x < size; ++x) {
+				const int value = px[(static_cast<size_t>(y) * size + x) * 3];
+				bool copied = false;
+				for (const int sx : {0, size / 2})
+					for (const int sy : {0, size / 2})
+						copied = copied || std::abs(value - stripes[(static_cast<size_t>((y + sy) % size) * size + (x + sx) % size) * 3]) <= 20;
+				n += copied ? 0 : 1;
+			}
+		return static_cast<double>(n) / (static_cast<double>(size) * size);
+	};
+	Options flatOff;
+	flatOff.flattenLighting = false;
+	Options cut = flatOff, blend = flatOff;
+	cut.seamMethod = material_from_photo::SeamMethod::Cut;
+	blend.seamMethod = material_from_photo::SeamMethod::Blend;
+	const Result a = material_from_photo::make(stripes.data(), size, cut);
+	const Result b = material_from_photo::make(stripes.data(), size, blend);
+	EXPECT_TRUE(a.usedCut);
+	EXPECT_FALSE(b.usedCut);
+	EXPECT_LT(invented(a.albedo), 0.03) << "the cut is the photo and its shifted copies, with only the join mixed (" << invented(a.albedo) << ")";
+	EXPECT_GT(invented(b.albedo), 3.0 * invented(a.albedo)) << "the blend mixes the two copies into values that are in neither (" << invented(b.albedo) << " against " << invented(a.albedo) << ")";
+	EXPECT_LT(material_from_photo::seamRatio(a.albedo.data(), size), 1.8) << "and the cut repeats with no visible join (the wrap edges look like the inside)";
+	const Result autoMade = material_from_photo::make(stripes.data(), size, flatOff);
+	EXPECT_TRUE(autoMade.usedCut) << "the automatic choice takes the cut when it finds a path where the two copies agree better than they do on average (ratio " << autoMade.cutRatio << ")";
+	EXPECT_LT(autoMade.cutRatio, 0.85);
+}
+
+TEST(MaterialFromPhotoTest, WhereThePhotoAndItsShiftedCopyNeverAgreeTheBlendIsUsed) {
+	const int size = 256;
+	const std::vector<unsigned char> ramp = picture(size, [size](int x, int) {   // dark on the left, light on the right, nothing else: the shifted copy is 0.35 off everywhere
+		static double c[3];
+		c[0] = c[1] = c[2] = 0.15 + 0.7 * x / (size - 1);
+		return c;
+	});
+	Options keepRamp;
+	keepRamp.flattenLighting = false;
+	const Result r = material_from_photo::make(ramp.data(), size, keepRamp);
+	EXPECT_FALSE(r.usedCut);
+	EXPECT_GT(r.cutDisagreement, 0.12);
+	EXPECT_LT(material_from_photo::seamRatio(r.albedo.data(), size), 2.0) << "the blend still joins it up (the photo as it is: over 4)";
+}
+
+TEST(MaterialFromPhotoTest, NeitherWayOfJoiningLeavesAStepOfItsOwnInTheMiddleOfThePicture) {
+	const int size = 256;
+	// the shifted copy has its own join in the middle of the picture, which the weights must hide whichever way the picture is made to repeat (a blend that used the product of an across and a
+	// down weight let it show near the top and bottom edges)
+	const std::vector<unsigned char> waves = picture(size, [](int x, int y) {
+		static double c[3];
+		const double v = 0.5 + 0.22 * std::sin(0.21 * x + 0.17 * y) + 0.18 * std::sin(0.13 * x - 0.29 * y + 1.0) + 0.1 * std::sin(0.43 * x + 0.31 * y + 2.0);
+		c[0] = c[1] = c[2] = v;
+		return c;
+	});
+	const auto stepAt = [&](const Result& r, bool column, int at) {   // the mean step between line `at` and the next, over the whole picture
+		double sum = 0.0;
+		for (int i = 0; i < size; ++i)
+			for (int k = 0; k < 3; ++k) {
+				const size_t a = column ? (static_cast<size_t>(i) * size + at) * 3 + k : (static_cast<size_t>(at) * size + i) * 3 + k;
+				const size_t b = column ? (static_cast<size_t>(i) * size + at + 1) * 3 + k : (static_cast<size_t>(at + 1) * size + i) * 3 + k;
+				sum += std::abs(static_cast<int>(r.albedo[a]) - static_cast<int>(r.albedo[b]));
+			}
+		return sum / (size * 3.0);
+	};
+	for (const auto method : {material_from_photo::SeamMethod::Cut, material_from_photo::SeamMethod::Blend}) {
+		Options o;
+		o.flattenLighting = false;
+		o.seamMethod = method;
+		const Result r = material_from_photo::make(waves.data(), size, o);
+		double typical = 0.0;
+		for (int i = 0; i + 1 < size; ++i) typical += stepAt(r, true, i);
+		typical /= size - 1;
+		const char* name = method == material_from_photo::SeamMethod::Cut ? "cut" : "blend";
+		EXPECT_LT(stepAt(r, true, size / 2 - 1), 3.0 * typical) << name << ": a step between the middle columns (typical step " << typical << ")";
+		EXPECT_LT(stepAt(r, false, size / 2 - 1), 3.0 * typical) << name << ": a step between the middle rows";
+	}
+}
+
 TEST(MaterialFromPhotoTest, TheGroovesAreLowInTheHeightMapAndItRepeatsToo) {
 	const int size = 256;
 	const std::vector<unsigned char> photo = picture(size, [](int x, int) {
 		static double c[3];
-		const double v = (x % 16) < 3 ? 0.12 : 0.7;   // a dark 3-pixel groove every 16 pixels, on a light surface
+		const double v = ((x + 8) % 16) < 3 ? 0.12 : 0.7;   // a dark 3-pixel groove every 16 pixels (at x = 8..10), on a light surface; the picture's own edge falls on the surface, not on a groove's edge
 		c[0] = c[1] = c[2] = v;
 		return c;
 	});
@@ -120,8 +211,8 @@ TEST(MaterialFromPhotoTest, TheGroovesAreLowInTheHeightMapAndItRepeatsToo) {
 	for (int y = 40; y < 216; ++y)
 		for (int x = 40; x < 216; ++x) {
 			const double h = r.height[static_cast<size_t>(y) * size + x];
-			if ((x % 16) >= 1 && (x % 16) < 2) { groove += h; ++nGroove; }          // the middle of a groove
-			else if ((x % 16) >= 8 && (x % 16) < 10) { ridge += h; ++nRidge; }      // the middle of the surface between two
+			if ((x % 16) == 9) { groove += h; ++nGroove; }                           // the middle of a groove
+			else if ((x % 16) >= 3 && (x % 16) < 5) { ridge += h; ++nRidge; }      // the middle of the surface between two
 		}
 	groove /= nGroove;
 	ridge /= nRidge;
