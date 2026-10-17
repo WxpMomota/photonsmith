@@ -156,6 +156,16 @@ class RoomFitTests(unittest.TestCase):
             side = np.cross(f, up)
             self.assertAlmostEqual(float(side[1]) / np.linalg.norm(side), 0.0, delta=0.05, msg="yaw %s pitch %s" % (yaw, pitch))
 
+    def test_a_given_camera_height_with_no_floor_in_view_does_not_rescale_the_depth(self):
+        # the camera looks well down at what is taken to be the floor, so no floor is found: the lens's height over "the lowest point seen" measures nothing, and dividing the given height
+        # by it once made a 1.4 m camera a 37-times-too-big room (166 m deep)
+        for pitch in (-20.0, -25.0):
+            depth, rgb = photograph(yaw=0.0, pitch=pitch, window=False)
+            r = room_fit.fit_room(depth, rgb, 70.0, camera_height=1.4)
+            self.assertAlmostEqual(r["info"]["camera_height"], 1.4, delta=0.001, msg="pitch %s" % pitch)
+            self.assertAlmostEqual(r["info"]["depth_scale"], 1.0, delta=0.01, msg="pitch %s" % pitch)
+            self.assertLess(r["room"]["max"][2], 12.0, "pitch %s: the room is about as deep as without the height" % pitch)
+
     def test_a_ceiling_is_never_at_or_below_the_camera(self):
         depth, rgb = photograph(yaw=0.0, pitch=0.0)
         r = room_fit.fit_room(depth, rgb, 70.0, camera_height=6.0)

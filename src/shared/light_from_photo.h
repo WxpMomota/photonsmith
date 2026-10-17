@@ -42,7 +42,8 @@ struct Estimate {
 	double tiltDegrees = 0.0;        // the tilt used
 	double skyFraction = 0.0;        // the share of the picture that is sky
 	double confidence = 0.0;         // 0..1: how much of the sky's brightness variation the fitted sky explains
-	bool flatSky = false;            // the sky has almost no gradient (overcast): the direction of the sun cannot be told
+	bool flatSky = false;            // the sky has almost no gradient: the direction of the sun cannot be told
+	bool evenBlue = false;           // ... and it is clearly blue, not grey: a clear sky looked at away from the sun, not an overcast one
 };
 
 namespace detail {
@@ -239,11 +240,13 @@ inline Estimate estimate(const unsigned char* rgb8, int w, int h, const Options&
 	std::vector<Sample> samples;
 	const size_t stride = std::max<size_t>(1, skyPixels / 900);
 	size_t counter = 0;
+	double blueSum = 0.0;   // how blue the sky is: blue over red, averaged
 	for (int x = 0; x < pic.w; ++x)
 		for (int y = 0; y < end[static_cast<size_t>(x)] - 3; ++y) {
 			if (counter++ % stride != 0) continue;
 			const float* c = pic.at(x, y);
 			if (detail::clipped(c)) continue;
+			blueSum += c[2] / std::max(c[0], 0.02f);
 			Sample s;
 			direction(x + 0.5, y + 0.5, s.d);
 			if (s.d[1] < 0.01) continue;
@@ -319,13 +322,20 @@ inline Estimate estimate(const unsigned char* rgb8, int w, int h, const Options&
 	out.sunAzimuth = bestAzimuth;
 	out.turbidity = bestTurbidity;
 	out.confidence = var0 > 1e-9 ? std::min(1.0, std::max(0.0, 1.0 - bestError / var0)) : 0.0;
-	if (var0 < 0.015 && out.skyFraction >= 0.15) {   // a sky with almost no gradient: overcast (a thin strip of sky says nothing of the kind)
+	const double blueness = blueSum / static_cast<double>(samples.size());
+	if (var0 < 0.015 && out.skyFraction >= 0.15) {   // a sky with almost no gradient (a thin strip of sky says nothing of the kind)
 		out.flatSky = true;
 		out.sunElevation = 45.0;
 		out.sunAzimuth = 0.0;
-		out.turbidity = 10.0;
 		out.confidence = 0.0;
-		out.why = "The sky is even (overcast): the sun's direction cannot be told, so it is set high and the haze to its most.";
+		if (blueness >= 1.25) {   // clearly blue: a clear sky seen away from the sun, not an overcast one
+			out.evenBlue = true;
+			out.turbidity = 3.0;
+			out.why = "The sky is blue and evenly bright (a clear sky seen away from the sun), so the sun's direction cannot be told: it is set high with ordinary haze. Change Sun height and Sun direction if you know them.";
+		} else {
+			out.turbidity = 10.0;
+			out.why = "The sky is even (overcast): the sun's direction cannot be told, so it is set high and the haze to its most.";
+		}
 	} else if (out.skyFraction < 0.15 && !out.sunSeen) {
 		out.confidence = std::min(out.confidence, 0.3);
 		out.why = "Only a small part of the picture is sky, so the fit rests on little: check the result by eye (a warm sunset or sunrise sky is not found as sky at all).";

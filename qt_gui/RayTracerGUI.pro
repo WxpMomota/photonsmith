@@ -179,7 +179,7 @@ win32 {
 
 	# Narrow-string paths are UTF-8 in this program (Qt's toStdString): the same manifest the renderer has (resources/utf8.manifest), merged into the one Qt embeds, so a user or
 	# folder name with an accented or non-Latin letter works.
-	win32-msvc: QMAKE_LFLAGS += /MANIFESTINPUT:$$shell_path($$PWD/../resources/utf8.manifest)
+	win32-msvc: QMAKE_LFLAGS += /MANIFESTINPUT:$$shell_quote($$shell_path($$PWD/../resources/utf8.manifest))
 
 	# win_taskbar.cpp drives the taskbar progress button through ITaskbarList3.
 	# Qt 6 has no API for this - QtWinExtras (QWinTaskbarProgress) was removed

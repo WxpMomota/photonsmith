@@ -75,7 +75,8 @@ bool SceneBuilderWidget::applyLightPhoto(int lightIndex, const QString &photo, d
 	                                          .arg(found.sunSeen ? QStringLiteral("sun seen") : found.flatSky ? QStringLiteral("overcast") : QStringLiteral("fitted"))
 	                                          .arg(found.confidence, 0, 'f', 2));
 	if (notes) {
-		if (found.flatSky) *notes << tr("The sky is even (overcast), so the sun's direction cannot be told: it is set high and the haze to its most. Change Sun height and Sun direction by hand if you know them.");
+		if (found.evenBlue) *notes << QString::fromStdString(found.why);
+		else if (found.flatSky) *notes << tr("The sky is even (overcast), so the sun's direction cannot be told: it is set high and the haze to its most. Change Sun height and Sun direction by hand if you know them.");
 		else if (found.sunSeen) *notes << tr("The sun is in the photo: its height and direction are read straight off it.");
 		else *notes << tr("The sun is not in the photo: its height and direction are fitted to how the sky's brightness varies (confidence %1%).").arg(static_cast<int>(found.confidence * 100));
 		if (found.horizonFound) *notes << tr("The camera was tilted %1 degrees (read off the horizon).").arg(found.tiltDegrees, 0, 'f', 1);
@@ -102,7 +103,10 @@ void SceneBuilderWidget::lightFromPhoto(int lightIndex) {
 	auto *fov = new QDoubleSpinBox(&dialog);
 	fov->setRange(20.0, 140.0);
 	fov->setDecimals(0);
-	fov->setValue(65.0);
+	QImageReader shape(photo);
+	shape.setAutoTransform(true);
+	const QSize shown = shape.size();
+	fov->setValue(shown.isValid() && shown.height() > shown.width() ? 51.0 : 65.0);   // (65 degrees is along a phone photo's long side: across a portrait one it is about 51)
 	fov->setSuffix(tr(" degrees"));
 	fov->setToolTip(tr("How wide the photo sees, left to right. A phone's main camera is about 65 to 70 degrees; a wide-angle one 100 or more."));
 	form->addRow(tr("Photo's field of view (horizontal)"), fov);

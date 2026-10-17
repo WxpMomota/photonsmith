@@ -166,7 +166,7 @@ TEST(SceneRoomTest, AFolderWithAccentedAndNonLatinLettersIsReadAsItIsSpelled) {
 		std::ofstream tex(folder + "/floor.bmp", std::ios::binary);
 		tex << bmpFile(1, 1, {10, 20, 30});
 	}
-	EXPECT_TRUE(fs::exists(fs::u8path(folder + "/floor.bmp"), ec)) << "the file was written under the name it was given, not an ANSI mangling of it";
+	EXPECT_TRUE(fs::exists(fs::u8path(folder + "/floor.bmp"), ec)) << "the file was written under the name it was given, not an ANSI mangling of it (the program needs resources/utf8.manifest: Directory.Build.props adds it to programs built with MSBuild or the Visual Studio generator inside the repo; a Ninja or out-of-tree build must add it)";
 	std::string text = roomJson();
 	text.replace(text.find("\"name\": \"Floor\","), 16, "\"name\": \"Floor\", \"texture\": \"floor.bmp\",");
 	scene_room::Import room;

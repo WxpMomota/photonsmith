@@ -310,19 +310,26 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geom
     else:
         floor_y = float(np.percentile(P[OK, 1], 3))
         notes.append("No floor could be found; the lowest point seen is taken as the floor.")
+    floor_found = int(upfacing.sum()) >= 20
     P[:, 1] -= floor_y
     cam_h = -floor_y
     given = camera_height is not None and camera_height > 0
-    if cam_h < (0.02 if given else 0.2):
-        P[:, 1] += 1.5 - cam_h   # (the points and the camera must agree: the lowest point seen is taken to be 1.5 m below the lens)
-        cam_h = 1.5
-        notes.append("The camera height could not be told; 1.5 m is assumed.")
     scale = 1.0
-    if camera_height is not None and camera_height > 0:
-        scale = camera_height / cam_h
-        P *= scale
-        cam_h = camera_height
-    elif not (0.4 <= cam_h <= 3.0):
+    if given and not floor_found:
+        # no floor was seen, so the height of the lens over "the lowest point seen" measures nothing and cannot be used to rescale the depth model's distances (that made a room 160 m
+        # deep): the camera is put the given height above that point and the depth model's own distances are kept
+        P[:, 1] += camera_height - cam_h
+        cam_h = float(camera_height)
+    else:
+        if cam_h < (0.02 if given else 0.2):
+            P[:, 1] += 1.5 - cam_h   # (the points and the camera must agree: the lowest point seen is taken to be 1.5 m below the lens)
+            cam_h = 1.5
+            notes.append("The camera height could not be told; 1.5 m is assumed.")
+        if given:
+            scale = camera_height / cam_h
+            P *= scale
+            cam_h = camera_height
+    if not given and not (0.4 <= cam_h <= 3.0):
         notes.append("The depth model put the camera %.1f m above the floor, which is unlikely; check the room's size (or give the camera height)." % cam_h)
     pos = np.array([0.0, cam_h, 0.0])
 

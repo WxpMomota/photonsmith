@@ -140,6 +140,22 @@ TEST(LightFromPhotoTest, AHazierSkyIsReadAsHazier) {
 	EXPECT_LT(ea.turbidity, eb.turbidity) << "clear " << ea.turbidity << ", hazy " << eb.turbidity;
 }
 
+TEST(LightFromPhotoTest, AnEvenBlueSkyIsNotCalledOvercast) {
+	// a clear sky looked at high up and away from the sun has almost no gradient, but it is blue: not an overcast one, and its haze is not set to the most
+	SkyShot shot;
+	shot.elevation = 25.0;
+	shot.azimuth = 180.0;   // behind the camera
+	shot.tilt = 50.0;       // looking high up: no horizon in the picture
+	shot.building = false;
+	const std::vector<unsigned char> px = photograph(shot);
+	const Estimate e = light_from_photo::estimate(px.data(), 320, 240);
+	ASSERT_TRUE(e.ok) << e.why;
+	ASSERT_TRUE(e.flatSky) << "the test sky is even (confidence " << e.confidence << ")";
+	EXPECT_TRUE(e.evenBlue);
+	EXPECT_LT(e.turbidity, 5.0) << "a clear blue sky is not given the haze of an overcast one";
+	EXPECT_EQ(e.why.find("overcast"), std::string::npos) << e.why;
+}
+
 TEST(LightFromPhotoTest, AGivenTiltIsUsedAndTheHorizonIsNotSearchedFor) {
 	SkyShot shot;
 	shot.azimuth = -48.0;

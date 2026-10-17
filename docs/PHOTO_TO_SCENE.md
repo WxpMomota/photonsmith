@@ -91,7 +91,10 @@ degrees in height and in direction, with the sun in the picture or outside it. T
 
 - **A low, hazy sun** (about 8 degrees, with haze) turns the sky warm, and the sky finder looks for blue and white: such a sky is cut short and the tilt and height come out wrong.
   **A sunset or sunrise sky is not read**; set those by hand or with the Sky gallery.
-- **An overcast sky** has no gradient to read: the sun is set high with the haze at its most, and it says so.
+- **An overcast sky** has no gradient to read: the sun is set high with the haze at its most, and it says so. A clear blue sky seen high up and away from the sun is even too, but it is blue, not
+  grey: it is not called overcast, and its haze is left ordinary.
+- **No horizon in the picture** (a camera looking high up): the camera is taken to look level, which makes the sky read hazier than it is; give the tilt when you know it.
+- **The field of view** is a phone's 65 degrees along the long side of the photo; for a portrait photo the dialog starts at 51, the same lens across its short side.
 - **The brightness** stays as it was: the photo's exposure is not known. Use the light's strength.
 - **The ground's brightness** is not read (a snow field and a dark ground look alike here).
 - **A photo with little sky**, or none, is refused; one with clouds and clear blue mixed may give a rougher fit (not tried).

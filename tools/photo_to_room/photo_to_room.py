@@ -228,7 +228,10 @@ def add_furniture(image, geometry, result, out_folder, segments, count, device_c
             if label in room_objects.TABLES:
                 parts = room_objects.table_parts(geometry, seg["mask"], title)
                 if parts:
-                    add_table_top_picture(geometry, seg["mask"], parts, out_folder, title)
+                    try:
+                        add_table_top_picture(geometry, seg["mask"], parts, out_folder, title)
+                    except Exception as e:   # (the top keeps its flat colour; the room and the other pieces are kept)
+                        result["notes"].append("The %s's top could not be given the photo's picture (%s)." % (title, str(e).splitlines()[0][:100] if str(e) else type(e).__name__))
             else:
                 parts = room_objects.block_parts(geometry, seg["mask"], label, place, title)
             if parts:

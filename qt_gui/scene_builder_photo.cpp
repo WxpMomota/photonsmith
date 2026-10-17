@@ -331,7 +331,7 @@ bool SceneBuilderWidget::importRoom(const QString &photo, double cameraHeight, d
 
 double SceneBuilderWidget::calibrateRoomLight(scene_room::Import &room, const QString &folder) {
 	if (room.photoBrightness <= 0.0 || !QFileInfo::exists(launcherPath())) return 1.0;
-	QProgressDialog busy(tr("Setting the room's light level..."), QString(), 0, 0, this);
+	QProgressDialog busy(tr("Setting the room's light level..."), tr("Cancel"), 0, 0, this);   // (a null label would make no Cancel button)
 	busy.setWindowTitle(tr("Making a room from the photo"));
 	busy.setWindowModality(Qt::WindowModal);
 	busy.setMinimumDuration(0);
