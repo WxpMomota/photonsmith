@@ -240,13 +240,12 @@ inline Estimate estimate(const unsigned char* rgb8, int w, int h, const Options&
 	std::vector<Sample> samples;
 	const size_t stride = std::max<size_t>(1, skyPixels / 900);
 	size_t counter = 0;
-	double blueSum = 0.0;   // how blue the sky is: blue over red, averaged
+	double redSum = 0.0, blueSum = 0.0;   // (of the sky pixels kept: how blue the sky is is blue over red)
 	for (int x = 0; x < pic.w; ++x)
 		for (int y = 0; y < end[static_cast<size_t>(x)] - 3; ++y) {
 			if (counter++ % stride != 0) continue;
 			const float* c = pic.at(x, y);
 			if (detail::clipped(c)) continue;
-			blueSum += c[2] / std::max(c[0], 0.02f);
 			Sample s;
 			direction(x + 0.5, y + 0.5, s.d);
 			if (s.d[1] < 0.01) continue;
@@ -254,6 +253,8 @@ inline Estimate estimate(const unsigned char* rgb8, int w, int h, const Options&
 			const double lum = detail::decode(c[0]) * 0.2126 + detail::decode(c[1]) * 0.7152 + detail::decode(c[2]) * 0.0722;
 			s.logY = std::log(std::max(lum, 1e-4));
 			samples.push_back(s);
+			redSum += c[0];
+			blueSum += c[2];
 		}
 	if (samples.size() < 60) {
 		out.why = "Too little sky to read the light from.";
@@ -322,7 +323,7 @@ inline Estimate estimate(const unsigned char* rgb8, int w, int h, const Options&
 	out.sunAzimuth = bestAzimuth;
 	out.turbidity = bestTurbidity;
 	out.confidence = var0 > 1e-9 ? std::min(1.0, std::max(0.0, 1.0 - bestError / var0)) : 0.0;
-	const double blueness = blueSum / static_cast<double>(samples.size());
+	const double blueness = blueSum / std::max(redSum, 1e-3);
 	if (var0 < 0.015 && out.skyFraction >= 0.15) {   // a sky with almost no gradient (a thin strip of sky says nothing of the kind)
 		out.flatSky = true;
 		out.sunElevation = 45.0;
