@@ -1679,7 +1679,7 @@ Use the pause/stop controls if a category turns out to take too long.</source>
     <message>
         <location filename="../mainwindow_live_preview.cpp" line="164"/>
         <location filename="../mainwindow_slots.cpp" line="359"/>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="47"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="191"/>
         <source>Live Preview</source>
         <translation>实时预览</translation>
     </message>
@@ -2861,7 +2861,7 @@ Doesn&apos;t change how many frames get rendered (that&apos;s Frame Count) - onl
         <translation>PNG 图像 (*.png);;PPM 图像 (*.ppm);;EXR 图像，线性 HDR (*.exr)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="355"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="780"/>
         <source>Live Preview Settings</source>
         <translation>实时预览设置</translation>
     </message>
@@ -2886,17 +2886,17 @@ Doesn&apos;t change how many frames get rendered (that&apos;s Frame Count) - onl
         <translation>缩放实时预览中 WASD/上/下移动、左/右方向键环绕以及 +/- 缩放的步进幅度。1x 为每次按键的适中幅度；数值越低越精细，越高每次按键移动越远。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="76"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="220"/>
         <source>OptiX AI Denoiser</source>
         <translation>OptiX AI 降噪器</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="110"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="254"/>
         <source>Show latest frame instead of accumulating</source>
         <translation>显示最新一帧，而非累积平均</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="77"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="221"/>
         <source>SVGF Denoiser (experimental)</source>
         <translation>SVGF 降噪器（实验性）</translation>
     </message>
@@ -2906,97 +2906,97 @@ Doesn&apos;t change how many frames get rendered (that&apos;s Frame Count) - onl
         <translation>⚠ 实时预览直接使用 GPU 渐进式路径追踪器——此标签页上的设置均不适用于它，唯独“降噪器”分区自己的“实时预览”子分区（在下方）除外。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="102"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="246"/>
         <source>Blend:</source>
         <translation>混合：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="133"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="277"/>
         <source>SVGF Advanced Tuning</source>
         <translation>SVGF 高级调优</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="157"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="301"/>
         <source>Denoiser:</source>
         <translation>降噪器：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="225"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="74"/>
         <source>Temporal Alpha:</source>
         <translation>时域 Alpha：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="231"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="80"/>
         <source>Max History Length:</source>
         <translation>最大历史长度：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="236"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="85"/>
         <source>Variance Bootstrap Frames:</source>
         <translation>方差引导帧数：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="244"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="93"/>
         <source>Variance Bootstrap Radius:</source>
         <translation>方差引导半径：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="248"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="97"/>
         <source>Sigma Normal:</source>
         <translation>法线 Sigma：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="254"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="103"/>
         <source>Sigma Depth:</source>
         <translation>深度 Sigma：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="260"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="109"/>
         <source>Sigma Luminance:</source>
         <translation>亮度 Sigma：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="266"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="115"/>
         <source>A-trous Radius:</source>
         <translation>A-trous 半径：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="271"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="120"/>
         <source>Min Albedo:</source>
         <translation>最小反照率：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="278"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="127"/>
         <source>A-trous Passes:</source>
         <translation>A-trous 遍数：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="285"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="134"/>
         <source>Reset to Defaults</source>
         <translation>恢复默认值</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="385"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="355"/>
         <source>ReSTIR GI</source>
         <translation>ReSTIR GI</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="401"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="371"/>
         <source>ReSTIR DI</source>
         <translation>ReSTIR DI</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="615"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="591"/>
         <source>Samples/Frame:</source>
         <translation>每帧采样数：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="628"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="604"/>
         <source>Max Bounces:</source>
         <translation>最大反弹次数：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="649"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="625"/>
         <source>Firefly Clamp:</source>
         <translation>萤火虫钳制：</translation>
     </message>
@@ -3295,107 +3295,107 @@ The quickest way to zoom in or pull back once you&apos;ve already found an angle
         <translation>关闭 BSDF 重要性采样</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="367"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="505"/>
         <source>Sampling &amp;&amp; Spectral</source>
         <translation>采样与光谱</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="385"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="366"/>
         <source>Sobol (default)</source>
         <translation>Sobol(默认)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="391"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="372"/>
         <source>Z-Sobol</source>
         <translation>Z-Sobol</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="397"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="378"/>
         <source>Padded Sobol</source>
         <translation>Padded Sobol</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="403"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="384"/>
         <source>Stratified</source>
         <translation>分层采样(Stratified)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="408"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="389"/>
         <source>PMJ02BN</source>
         <translation>PMJ02BN</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="413"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="394"/>
         <source>Halton</source>
         <translation>Halton</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="418"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="399"/>
         <source>Independent (no stratification)</source>
         <translation>独立采样(无分层)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="538"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="543"/>
         <source>Adaptive sampling (--adaptive)</source>
         <translation>自适应采样（--adaptive）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="581"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="586"/>
         <source>Time limit (--time-limit)</source>
         <translation>时间限制（--time-limit）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="592"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="597"/>
         <source> s</source>
         <translation> 秒</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="853"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="858"/>
         <source>Post-Processing &amp;&amp; Diagnostics</source>
         <translation>后期处理和诊断</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="957"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="962"/>
         <source>Denoiser</source>
         <translation>降噪器</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="960"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="965"/>
         <source>Every render mode&apos;s own denoiser settings, gathered in one place. Image/Video and Live Preview each have independent controls below - only the subsection for the currently selected Output Mode is active.</source>
         <translation>各渲染模式自身的降噪器设置，汇总在同一处。图像/视频与实时预览各有独立的控件，位于下方——仅当前所选输出模式对应的子分区处于激活状态。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="969"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="974"/>
         <source>Image &amp; Video</source>
         <translation>图像和视频</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="420"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="390"/>
         <source>Radiance Cache</source>
         <translation>辐射缓存</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="441"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="411"/>
         <source>Path Guiding</source>
         <translation>路径引导</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="534"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="507"/>
         <source>Temporal Upscale:</source>
         <translation>时域超分辨率：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="513"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="486"/>
         <source>Off</source>
         <translation>关闭</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="103"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="247"/>
         <source>Only matters when the OptiX AI Denoiser is selected above. Controls how much of the smoothing you actually see: 0.0 shows the fully smoothed image, 1.0 shows the original grainy image with no smoothing at all. Same control as the Image &amp; Video subsection&apos;s own Blend setting above, just set separately for Live Preview.</source>
         <translation>只有在上方选中了 OptiX AI 降噪器时才有意义。控制你实际看到多少平滑效果：0.0 显示完全平滑后的图像，1.0 显示带有原始噪点、完全未平滑的图像。这与“图像和视频”分区里自己的“混合”设置作用相同，只是这里是单独为实时预览设置的。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="158"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="302"/>
         <source>None: shows the image exactly as it&apos;s rendered, with all its natural graininess - no smoothing applied.
 
 OptiX AI Denoiser: cleans up the grainy, low-detail look Live Preview has while you&apos;re moving around, using the same AI-powered smoothing the Image &amp; Video subsection above applies to finished renders. This makes the preview look reasonably clean right away instead of waiting for it to gradually clear up on its own. Costs a small amount of extra GPU time per frame.
@@ -3408,259 +3408,259 @@ SVGF Denoiser: an alternative, experimental noise-reduction filter. Instead of b
 “SVGF 降噪器”：一种可选的实验性降噪滤镜。它不是把很多帧混合在一起，而是跟踪每个像素的亮度随时间的变化情况，并沿着物体的自然边缘进行平滑处理——在你持续移动相机时，效果比 AI 降噪器更稳定。它始终显示最新的平滑帧，而不是随时间逐渐变得更清晰（更多微调选项见下方的“SVGF 高级调节”分组）。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="184"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="328"/>
         <source>Only matters when the OptiX AI Denoiser is selected above. Shows each freshly smoothed frame on its own, instead of blending it together with earlier frames into a running average. You give up the extra quality that blending more frames together would eventually reach, in exchange for a view that always reflects only the most recent frame - useful while flying around with WASD, since older blended-in frames were rendered from a camera position you&apos;ve already left.</source>
         <translation>只有在上方选中了 OptiX AI 降噪器时才有意义。单独显示每一帧刚平滑处理过的画面，而不是把它与之前的帧混合成累计平均值。这样会放弃多帧混合累积原本能达到的更高画质，换来始终只反映最新一帧的画面——在用 WASD 到处飞行时很有用，因为混合进来的旧帧是在你已经离开的相机位置渲染的。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="226"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="75"/>
         <source>Controls how quickly the filter forgets older frames. Lower values hold onto history longer, which gives smoother results but reacts more slowly when the scene changes; higher values adapt faster but leave more visible noise.</source>
         <translation>控制滤镜遗忘旧帧的速度。数值越低，保留历史信息的时间越长，效果更平滑，但场景发生变化时反应也更慢；数值越高，适应变化越快，但留下的噪点也更明显。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="232"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="81"/>
         <source>The most frames of history a pixel is allowed to build up once it has settled down. Puts a ceiling on how &quot;sticky&quot; - i.e. slow to update - a settled pixel can become.</source>
         <translation>一个像素稳定下来后，最多允许累积多少帧的历史信息。这是给像素的“黏滞程度”（也就是更新有多慢）设置一个上限。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="237"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="86"/>
         <source>Until a pixel has built up at least this many frames of history, its noise estimate is smoothed using its neighboring pixels instead of trusted on its own. This helps a brand-new pixel - for example, one just uncovered by a moving object - get reasonable edge-detection behavior before it has enough history of its own to judge from.</source>
         <translation>在一个像素积累到至少这么多帧的历史信息之前，它的噪点估计会借助相邻像素来平滑，而不是单凭自己判断。这能帮助刚出现的新像素（比如刚被移动物体露出来的那部分）在积累出足够的自身历史之前，也能有比较合理的边缘识别效果。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="245"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="94"/>
         <source>How far out, in pixels, the neighbor-smoothing described above reaches. A radius of 3 means it looks at a 7x7 block of pixels.</source>
         <translation>上面所说的“借助相邻像素平滑”具体能延伸多远（以像素为单位）。半径为 3 表示会查看一个 7×7 的像素区块。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="249"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="98"/>
         <source>How sensitive the filter is to two neighboring pixels facing different directions. Higher values treat a smaller difference in surface angle as a different surface, which keeps the filter from blurring across curved surfaces or object edges.</source>
         <translation>滤镜对两个朝向不同方向的相邻像素有多敏感。数值越高，越小的表面角度差异就会被当作不同的表面，这样可以防止滤镜在弯曲表面或物体边缘上产生模糊。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="255"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="104"/>
         <source>How sensitive the filter is to two neighboring pixels sitting at different distances from the camera. Higher values tolerate more depth difference before treating a neighbor as a separate, unrelated surface.</source>
         <translation>滤镜对两个与相机距离不同的相邻像素有多敏感。数值越高，能容忍的深度差异就越大，超过这个差异才会把相邻像素当作不相关的独立表面。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="261"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="110"/>
         <source>How sensitive the filter is to two neighboring pixels having different brightness. Higher values let it blend across bigger brightness differences, which smooths more but risks blurring away real detail.</source>
         <translation>滤镜对两个亮度不同的相邻像素有多敏感。数值越高，允许混合的亮度差异就越大，平滑效果更强，但也更容易把真实细节也一并抹掉。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="267"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="116"/>
         <source>How wide an area, in pixels, each smoothing pass covers. Limited to 0-2, where 2 covers a 5x5 block - the filter&apos;s internal weighting table only supports that range.</source>
         <translation>每一轮平滑处理覆盖的区域宽度（以像素为单位）。取值范围限定在 0-2，其中 2 对应一个 5×5 的区块——因为滤镜内部的权重表只支持这个范围。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="272"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="121"/>
         <source>A minimum surface-color value the filter substitutes in when it temporarily factors out surface color to smooth the lighting on its own. Prevents a very dark or black surface from causing math errors that would show up as flickering noise or a solid black patch.</source>
         <translation>当滤镜暂时剔除表面颜色、单独对光照进行平滑处理时，用来代入的一个最小表面颜色数值。这可以防止非常暗或纯黑的表面引发计算错误，从而表现为闪烁的噪点或一整块死黑。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="279"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="128"/>
         <source>How many smoothing passes the filter runs, each one covering a wider area than the last (the step size doubles every pass: 1, 2, 4, 8, ...). More passes smooth a larger area but cost proportionally more GPU time.</source>
         <translation>滤镜要运行多少轮平滑处理，每一轮覆盖的范围都比上一轮更大（步长每轮翻倍：1、2、4、8……）。轮数越多，平滑覆盖的范围越大，但所耗费的 GPU 时间也会相应增加。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="358"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="783"/>
         <source>Covers ReSTIR DI/GI, the Radiance Cache, Path Guiding, Exposure, Samples/Max Bounces per frame, and the Firefly Clamp - all separate from the Advanced Parameters group below (which only affects Image/Video renders) and from the Denoiser section above. These settings only actually take effect when Output Mode above is set to &quot;Live Preview (interactive)&quot;, but you can still edit them in any mode.</source>
         <translation>包含 ReSTIR DI/GI、辐射缓存、路径引导、曝光、每帧采样数/最大反弹次数，以及萤火虫钳制——这些都独立于下方只影响图像/视频渲染的“高级参数”组，也独立于上方的“降噪器”部分。这些设置只有在上方的输出模式设为“实时预览（交互式）”时才会真正生效，但在任何模式下都可以编辑。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="391"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="361"/>
         <source>Improves indirect lighting - light that&apos;s bounced off at least one other surface before reaching what you&apos;re looking at - by reusing good light samples found at nearby pixels and in recent frames, instead of only trying once per pixel. Works independently of whichever denoiser is active above. Turning it off falls back to the simpler one-sample-per-pixel method, which looks noisier but is cheaper to render.</source>
         <translation>通过重复利用附近像素和最近几帧中找到的优质光照采样，而不是每个像素只尝试一次，来改善间接光照——也就是至少经过一次反弹才到达你所看画面的光。它的效果与上方启用的是哪种降噪器无关。关闭它会回退到更简单的每像素单采样方式，画面噪点更多，但渲染开销更低。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="407"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="377"/>
         <source>Improves direct lighting - light that reaches a surface straight from a light source, with no bounces - the same way ReSTIR GI above improves indirect lighting: by reusing good light samples found at nearby pixels and in recent frames instead of only trying once per pixel. Independent of ReSTIR GI above (that one handles light that&apos;s already bounced at least once; this one handles light hitting a surface directly). Turning it off falls back to picking one light sample per pixel the plain way, which is noisier in scenes with many lights but cheaper to render.</source>
         <translation>改善直接光照——也就是没有经过任何反弹、直接从光源到达表面的光——方式与上方 ReSTIR GI 改善间接光照的方式相同：重复利用附近像素和最近几帧中找到的优质光照采样，而不是每个像素只尝试一次。它与上方的 ReSTIR GI 相互独立（那个处理已经反弹过至少一次的光；这个处理直接照到表面的光）。关闭它会回退到每个像素只用普通方式挑选一个光照采样，在灯光较多的场景里噪点会更明显，但渲染开销更低。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="426"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="396"/>
         <source>Caches and reuses estimates of indirect lighting - light that&apos;s bounced two or more times - across frames and nearby points in space, instead of recalculating it completely from scratch every frame. Independent of ReSTIR GI above (that one only improves the very first bounce; this one covers every bounce after that). It needs a few seconds to catch up, so expect the lighting to look patchy or noisy right after you turn it on or fly the camera into a new area, then smooth out as it builds up data. Turning it off falls back to computing every bounce the plain way, which looks noisier in scenes with a lot of deep indirect light, but shows the correct result immediately with no warm-up delay.</source>
         <translation>在多帧画面和空间中相邻的点之间缓存并复用间接光照（即反弹两次或更多次的光）的估算结果，而不是每一帧都从头完全重新计算。它与上方的 ReSTIR GI 相互独立（那个只改善第一次反弹；这个覆盖第一次之后的每一次反弹）。它需要几秒钟才能跟上，所以刚打开它，或者把相机移动到新区域后，光照看起来可能会有些斑驳或带噪点，随着数据不断积累会逐渐平滑下来。关闭它会回退到用普通方式计算每一次反弹，在有大量深层间接光照的场景里噪点会更明显，但能立刻显示正确结果，没有预热延迟。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="447"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="417"/>
         <source>For shiny/metal surfaces, this learns roughly where the brightest light is coming from at each point in the scene, so bounce rays get aimed more toward useful directions instead of just guessing based on the surface&apos;s own reflective properties. Requires the Radiance Cache above to also be turned on - this feature reuses that cache&apos;s own data and does nothing without it. Like the Radiance Cache, it needs a few seconds to learn and improve; turning it off falls back to the material&apos;s own plain reflection-based guessing.</source>
         <translation>针对光滑/金属表面，这项功能会大致学习场景中每个点最亮的光是从哪个方向来的，让反弹光线更多地瞄准有用的方向，而不是单纯依据表面自身的反射特性去猜测。它需要同时开启上方的“辐射缓存”——因为这项功能复用的是辐射缓存自身的数据，缺了它就不起作用。和辐射缓存一样，它也需要几秒钟来学习和改进；关闭它会回退到材质自身基于反射特性的普通猜测方式。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="462"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="432"/>
         <source>Neural Radiance Cache</source>
         <translation>神经辐射缓存</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="468"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="438"/>
         <source>A small AI model, trained live while you render, that learns to predict indirect lighting for both plain matte surfaces and shiny/metal ones - unlike the Radiance Cache above, which only handles matte surfaces and doesn&apos;t account for the angle you&apos;re viewing from. Like the Radiance Cache, it takes a while to catch up, so expect it to need several frames to settle in after you turn it on or move the camera into a new area. Turning it off falls back to tracing every bounce the plain way (or to the Radiance Cache, if that&apos;s also turned on).</source>
         <translation>一个在你渲染过程中实时训练的小型 AI 模型，能同时学习预测哑光表面和光滑/金属表面的间接光照——这与上方的辐射缓存不同，后者只处理哑光表面，也不考虑观察角度。和辐射缓存一样，它也需要一段时间才能跟上，所以打开它或把相机移到新区域后，往往需要几帧才能稳定下来。关闭它会回退到用普通方式追踪每一次反弹（如果“辐射缓存”也开着，则回退到使用辐射缓存）。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="491"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="461"/>
         <source>Overrides the current scene&apos;s own camera lens size and focus distance with the Aperture and Focus Distance values below, without changing the scene file itself. Only works for scenes loaded from a scene file - it has no effect on the built-in demo gallery, which always uses its own fixed camera.</source>
         <translation>用下方的“光圈”和“对焦距离”数值，覆盖当前场景自身的镜头大小和对焦距离，且不会改动场景文件本身。这只对从场景文件加载的场景有效——对内置的演示场景库没有影响，那些场景始终使用各自固定的相机设置。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="514"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="487"/>
         <source>2x</source>
         <translation>2x</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="515"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="488"/>
         <source>4x</source>
         <translation>4x</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="535"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="508"/>
         <source>Builds up a sharper-looking image over several frames using a repeating pixel-shift pattern, instead of just stretching Live Preview&apos;s native low-resolution image to fit the window. The cost of rendering each individual frame doesn&apos;t change - 2x vs. 4x only changes how many frames it takes to reach a sharp image (4 frames for 2x, 16 frames for 4x, counting from when the camera stops moving). 4x uses noticeably more memory (roughly 150-200 MB) than 2x (roughly 40-50 MB). This doesn&apos;t combine with the Denoiser dropdown&apos;s SVGF mode or the &apos;Show latest frame&apos; option above - if either of those is on, it takes priority instead.</source>
         <translation>通过循环的像素偏移方式，用连续多帧逐步累积出更清晰的画面，而不是简单地把实时预览原本较低分辨率的图像拉伸以填满窗口。渲染每一帧本身的开销并不会改变——2 倍和 4 倍的区别只在于要多少帧才能得到清晰的画面（从相机停止移动算起，2 倍需要 4 帧，4 倍需要 16 帧）。4 倍所占用的内存（约 150-200 MB）明显多于 2 倍（约 40-50 MB）。这项功能不能与“降噪器”下拉菜单里的 SVGF 模式，或上方的“显示最新帧”选项同时使用——如果二者中任意一个开启，会优先生效。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="556"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="529"/>
         <source>Neural Reconstruction</source>
         <translation>神经网络重建</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="563"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="536"/>
         <source>Replaces Temporal Upscale&apos;s own basic image-building method with a small AI model, trained live while you render, that blends nearby samples together more smartly instead of just copying pixel blocks into place - this cuts down on the blocky, ghost-like artifacts the plain method can show around moving object edges. Requires Temporal Upscale above to be set to 2x or 4x (does nothing at Off). Like the Radiance Cache, it takes a few seconds after you turn it on to start looking good. Works best with Samples/Frame set to 1 - higher values get averaged together before this feature sees them, which blurs the data it&apos;s learning from.</source>
         <translation>用一个在你渲染过程中实时训练的小型 AI 模型，取代“时域超分辨率”原本简单的画面构建方式：它会更智能地混合邻近的采样数据，而不是单纯把像素块复制粘贴到位——这能减少普通方式在移动物体边缘常见的块状、重影般的瑕疵。需要上方的“时域超分辨率”设为 2 倍或 4 倍才会生效（设为“关闭”时不起作用）。和辐射缓存一样，开启后也需要几秒钟才能开始呈现良好效果。搭配“每帧采样数”设为 1 时效果最好——数值更高的话，采样会在这项功能看到之前就先被平均处理，模糊了它用来学习的数据。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="589"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="565"/>
         <source>A flat brightness multiplier applied to the image before final color adjustments. Same idea as this tab&apos;s own Output-group Exposure control above, but set separately just for Live Preview.</source>
         <translation>在最终颜色调整之前，对整幅图像统一施加的亮度乘数。原理和本标签页“输出”分组里的“曝光”控件一样，只是这里是单独为实时预览设置的。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="616"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="592"/>
         <source>How many light rays are traced per pixel each time Live Preview renders a frame - more samples means a cleaner image but a slower frame. Separate from the Advanced Parameters group below, which only affects Image/Video renders.</source>
         <translation>实时预览每渲染一帧，每个像素要追踪多少条光线——采样数越多，画面越干净，但每一帧渲染得越慢。这与下方只影响图像/视频渲染的“高级参数”组相互独立。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="629"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="605"/>
         <source>The most times a light ray is allowed to bounce off surfaces before Live Preview stops tracing it - higher lets light reach further into a scene (useful for mirrors, glass, or rooms lit indirectly) at a higher cost per frame. Separate from the Advanced Parameters group below, which only affects Image/Video renders.</source>
         <translation>在实时预览放弃追踪之前，一条光线最多允许在表面之间反弹多少次——数值越高，光线能在场景中传播得越远（对镜面、玻璃或依靠间接光照明的房间很有用），但每一帧的渲染开销也越高。这与下方只影响图像/视频渲染的“高级参数”组相互独立。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="650"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="626"/>
         <source>Puts a ceiling on how bright any single sample is allowed to be, to suppress fireflies - an isolated ray that happens to catch a very bright, small light at just the right angle, showing up as a stray bright speckle in the image. The tradeoff is that genuinely bright highlights can get dimmed too. Lower values clamp more aggressively.</source>
         <translation>给单个采样允许达到的亮度设置一个上限，用来抑制萤火虫噪点——也就是某条光线恰好以合适的角度捕捉到一个很亮的小光源，从而在画面上表现为一个突兀的亮点。代价是真正明亮的高光也可能因此被压暗。数值越低，限制就越严格。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="670"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="646"/>
         <source>How wide the camera&apos;s lens opening is, in scene units - bigger values create more blur outside the focus distance. 0 means a pinhole-sharp image with no blur at all.</source>
         <translation>相机镜头开口的宽度（以场景单位表示）——数值越大，对焦距离以外的区域就越模糊。0 表示针孔般的清晰画面，完全没有虚化。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="687"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="663"/>
         <source>How far from the camera things are in perfectly sharp focus, in scene units.</source>
         <translation>距离相机多远的位置能够完全清晰对焦（以场景单位表示）。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="698"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="677"/>
         <source>Adaptive Sampling</source>
         <translation>自适应采样</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="704"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="683"/>
         <source>Stops resampling a pixel once it&apos;s converged, and shows a black-and-white heatmap instead of the normal preview while it&apos;s on: white where a pixel is still noisy enough to need more samples (per the Convergence Threshold below), black where it&apos;s already converged and no longer being resampled.</source>
         <translation>一旦像素收敛就停止对其重新采样，并在启用期间以黑白热力图代替正常预览显示：白色表示该像素噪点仍然较多、需要更多采样（依据下方的收敛阈值判定），黑色表示该像素已经收敛、不再重新采样。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="722"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="701"/>
         <source>Convergence Threshold:</source>
         <translation>收敛阈值：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="723"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="702"/>
         <source>How settled a pixel&apos;s brightness needs to be, relative to its own noise level, before Adaptive Sampling above considers it converged - lower values demand more certainty (more of the image reads as still-noisy for longer) before treating a pixel as done. 0.01 matches this project&apos;s own CPU/offline --adaptive-threshold default and Blender Cycles&apos; own default.</source>
         <translation>表示像素亮度相对于自身噪点水平需要稳定到什么程度，才会被上方的自适应采样判定为已收敛——数值越低，要求的确定性越高（图像中会有更多区域在更长时间内显得仍有噪点），才会将某像素视为已完成。0.01 与本项目自身 CPU/离线版 --adaptive-threshold 的默认值以及 Blender Cycles 自身的默认值一致。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="735"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="717"/>
         <source>Smooth noisy pixels</source>
         <translation>平滑噪点像素</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="741"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="723"/>
         <source>Smooths the pixels that have only a few samples so far - right after a camera move, or in areas the move just revealed - using their neighbours on the same surface, so the picture looks calmer while it settles. It never touches pixels that have gathered enough samples, so a settled picture is exactly what was rendered, and it does not change what is accumulated. Turn it off to see the raw samples.</source>
         <translation>利用同一表面上的相邻像素，平滑那些目前采样数还很少的像素（相机刚移动之后，或移动刚露出的区域），让画面在收敛过程中显得更平静。已经收集到足够采样的像素绝不会被处理，因此收敛后的画面就是实际渲染的结果，也不会改变累积的内容。关闭它即可查看原始采样。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="748"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="730"/>
         <source>Auto exposure</source>
         <translation>自动曝光</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="754"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="736"/>
         <source>Brightens a dim scene so it does not come up nearly black: the average brightness of the lit pixels is brought up towards a mid-grey, up to 64x, following the picture smoothly. It never darkens anything - a normally exposed or bright scene looks exactly as it does with this off - and it multiplies the Exposure value above, which still works as a manual correction.</source>
         <translation>提亮较暗的场景，避免画面几乎全黑：把被照亮像素的平均亮度向中灰提升，最多 64 倍，并平滑地跟随画面变化。它绝不会让任何东西变暗，曝光正常或较亮的场景与关闭时完全一样。它会与上方的曝光值相乘，曝光值仍可作为手动修正。</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="94"/>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="760"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="742"/>
         <source>AI denoise</source>
         <translation>AI 降噪</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="780"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="762"/>
         <source>Cleans the grain out of the picture with Intel Open Image Denoise while it is still gathering samples - right after a camera move it looks calm instead of speckled. The effect fades out as the picture gains samples (gone at 512), so a settled picture is exactly what was rendered. Costs about 10 ms per frame. Needs the Open Image Denoise library: install it from the Diagnostics tab (the same one the Denoise option for finished renders uses). It replaces Smooth noisy pixels while it is on.</source>
         <translation>在图像仍在积累采样时，用 Intel Open Image Denoise 去除噪点：相机移动后立刻看起来平稳，而不是满是斑点。随着采样增多，效果逐渐减弱（达到 512 时消失），因此稳定后的画面就是实际渲染的结果。每帧约耗时 10 毫秒。需要 Open Image Denoise 库：请在诊断选项卡中安装（与已完成渲染的降噪选项使用的是同一个）。开启时它会取代“平滑噪点像素”。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="456"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="437"/>
         <source>BVH (default)</source>
         <translation>BVH(默认)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="463"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="444"/>
         <source>Auto (use scene&apos;s own request)</source>
         <translation>自动（使用场景自身的请求）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="470"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="451"/>
         <source>Power</source>
         <translation>光功率</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="477"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="458"/>
         <source>Uniform</source>
         <translation>均匀</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="492"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="473"/>
         <source>Light Sampler:</source>
         <translation>光源采样器:</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="641"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="646"/>
         <source>Path regularization (--regularize)</source>
         <translation>路径正则化(--regularize)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="669"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="674"/>
         <source>Firefly clamp (--maxcomponentvalue)</source>
         <translation>萤火虫噪点截断(--maxcomponentvalue)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="431"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="412"/>
         <source>Sampler:</source>
         <translation>采样器:</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="515"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="520"/>
         <source>Spectral rendering (--spectral)</source>
         <translation>光谱渲染(--spectral)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="632"/>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="588"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="637"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="564"/>
         <source>Exposure:</source>
         <translation>曝光:</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="633"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="638"/>
         <source>A flat brightness multiplier applied to the whole image, the same knob a camera&apos;s exposure setting is.
 
 1.0 leaves the image unchanged; below 1.0 darkens it, above 1.0 brightens it - useful for a scene that&apos;s rendering correctly but is just too dark or too bright to see clearly, without changing any actual light in the scene.</source>
@@ -3669,7 +3669,7 @@ SVGF Denoiser: an alternative, experimental noise-reduction filter. Instead of b
 1.0 保持画面不变;小于 1.0 会使画面变暗,大于 1.0 会使画面变亮——适用于场景本身渲染正确、只是太暗或太亮而看不清细节的情况,而无需改动场景中任何真实的光照。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="643"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="648"/>
         <source>Slightly softens a rough, reflective, or glassy surface&apos;s
 sharpness after the path&apos;s first non-mirror-like bounce - this
 calms down fireflies (isolated bright speckles) from hard-to-
@@ -3681,7 +3681,7 @@ removes it.</source>
         <translation>在路径第一次非镜面反弹之后，略微柔化粗糙、反光或玻璃表面的锐度；这能抑制难以追踪的光路所产生的萤火虫（孤立的亮斑），代价是多一点模糊。仅限 CPU 和 OptiX GPU 的默认路径追踪器；Metal（macOS GPU 渲染）下未实现。场景本身已经提出此要求时不受影响：此复选框只会添加该要求，绝不会取消。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="671"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="676"/>
         <source>Caps any single sample whose brightest color channel exceeds
 the value below, scaling all its channels down together so the
 color/hue stays the same. CPU and both OptiX GPU backends - the
@@ -3692,93 +3692,93 @@ rather than per whole sample). Not implemented under Metal
         <translation>限制最亮颜色通道超过下方数值的任何采样，同时按比例缩小它的所有通道，使颜色和色相保持不变。适用于 CPU 和两种 OptiX GPU 后端：递归 GPU 模式与 CPU 完全一致，而波前 GPU 模式的应用方式略有不同（按每次光线反弹而不是按整个采样）。Metal（macOS GPU 渲染）下未实现。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="730"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="735"/>
         <source>Accelerator</source>
         <translation>加速结构</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="746"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="751"/>
         <source>Scene&apos;s own choice (default)</source>
         <translation>场景自身选择（默认）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="751"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="756"/>
         <source>BVH</source>
         <translation>BVH</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="755"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="760"/>
         <source>Kd-tree</source>
         <translation>Kd 树</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="772"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="777"/>
         <source>Accelerator:</source>
         <translation>加速结构：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="794"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="799"/>
         <source>SAH (default)</source>
         <translation>SAH（默认）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="800"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="805"/>
         <source>Middle</source>
         <translation>Middle</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="805"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="810"/>
         <source>Equal counts</source>
         <translation>Equal counts</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="810"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="815"/>
         <source>HLBVH</source>
         <translation>HLBVH</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="824"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="829"/>
         <source>BVH split method:</source>
         <translation>BVH 分割方法：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="867"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="872"/>
         <source>ACES (default)</source>
         <translation>ACES(默认)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="868"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="873"/>
         <source>Reinhard</source>
         <translation>Reinhard</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="869"/>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="75"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="874"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="219"/>
         <source>None</source>
         <translation>无</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="875"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="880"/>
         <source>Tone mapping:</source>
         <translation>色调映射:</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="906"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="911"/>
         <source>Print render stats</source>
         <translation>打印渲染统计信息</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="920"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="925"/>
         <source>OptiX validation mode (slower, debugging only)</source>
         <translation>OptiX 验证模式(速度较慢,仅供调试)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1058"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1063"/>
         <source>Crop Window</source>
         <translation>裁剪窗口</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1070"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1075"/>
         <source>Render only part of the frame (--crop)</source>
         <translation>仅渲染画面的一部分(--crop)</translation>
     </message>
@@ -3877,47 +3877,47 @@ SPPM（一种光子映射技术）能处理普通路径追踪难以应付的复�
         <translation>默认开启。为每次反弹挑选新方向时，会更倾向于表面材质实际反射光线的方向，而不是盲目猜测。关闭它会回退到在各个方向上均匀随机挑选，效率更低。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="370"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="508"/>
         <source>Which random-sampling method is used, whether to simulate light by individual wavelength, whether to stop early on pixels that already look clean, and a time-limit alternative to a fixed sample count. These control HOW samples are gathered, separately from HOW MANY (set on the Settings tab).</source>
         <translation>使用哪种随机采样方法、是否按单独的光波长来模拟光线、是否对已经足够干净的像素提前停止采样，以及用时间上限来代替固定采样数的方案。这些控制的是采样“怎么采”，与“采多少”（在设置标签页设置）相互独立。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="385"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="366"/>
         <source>A well-spread pattern of sample points (mixed up differently in each pixel) that fills in gaps more evenly than pure randomness. The best general-purpose default - it cleans up the image quickly without leaving visible patterns.</source>
         <translation>一种分布均匀的采样点模式（每个像素采用不同的打乱方式），比纯随机采样更均匀地填补空白。这是最佳的通用默认选项——能快速让画面变干净，又不会留下肉眼可见的规律图案。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="391"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="372"/>
         <source>A variant of the Sobol pattern above, reordered to work better when samples are taken progressively (a few at a time) rather than all at once. Cleans up the image at least as well as plain Sobol, with better behavior when combined with adaptive sampling.</source>
         <translation>上面 Sobol 模式的一个变体，重新排列后更适合“渐进式”采样（每次只取一小部分，而不是一次性全部取完）的场景。让画面变干净的效果至少不逊于普通 Sobol，配合自适应采样时表现更好。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="397"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="378"/>
         <source>The Sobol pattern above, extended with extra random dimensions - this avoids repeating patterns showing up when a pixel needs more random choices than plain Sobol comfortably covers (for example, light paths with many bounces).</source>
         <translation>在上面 Sobol 模式的基础上扩展了额外的随机维度——当某个像素需要的随机选择数量超出普通 Sobol 能舒适覆盖的范围时（比如反弹次数很多的光路），这样可以避免出现重复的规律图案。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="403"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="384"/>
         <source>Splits each pixel into a small grid of sub-cells and takes one sample from each cell. Simple, predictable coverage - less refined than Sobol/Halton above, but useful as a plain reference to compare against.</source>
         <translation>把每个像素划分成一个小的子网格，每个格子取一个采样。覆盖方式简单、可预测——不如上面的 Sobol/Halton 精细，但可以用作简单的参考基准来做对比。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="408"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="389"/>
         <source>A sampling pattern designed to spread samples especially evenly between neighboring pixels (what&apos;s called &quot;blue-noise&quot; distribution), avoiding clumps of similar samples landing next to each other.</source>
         <translation>一种专门设计用来让相邻像素之间的采样点分布特别均匀的模式（也就是所谓的“蓝噪声”分布），避免相似的采样点扎堆出现在相邻位置。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="413"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="394"/>
         <source>A classic, well-spread sampling pattern built from a well-established mathematical formula. Well-tested, and avoids the grid-like clustering that plain stratified sampling above can show.</source>
         <translation>一种基于成熟数学公式构建的经典均匀采样模式。经过充分测试，能避免上面普通分层采样可能出现的网格状聚集现象。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="418"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="399"/>
         <source>Plain, ordinary random numbers, with none of the deliberate even-spacing the other options use. Included so a loaded .pbrt scene file that specifically asks for this can be reproduced faithfully - not a recommended choice otherwise.</source>
         <translation>普通的纯随机数，不具备其他选项那种刻意均匀分布的特性。保留这个选项，是为了让明确要求使用它的 .pbrt 场景文件能够被如实还原——除此之外并不建议选用。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="426"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="407"/>
         <source>Which method generates the random decisions used while
 rendering (all but Independent spread samples out more evenly
 than pure randomness). CPU default path tracer only - no effect
@@ -3925,7 +3925,7 @@ on GPU or under the alternate rendering methods above.</source>
         <translation>决定渲染过程中所用随机选择的生成方法（除“独立采样”外，其余选项都会让采样分布得比纯随机更均匀）。仅对 CPU 上的默认路径追踪器生效——对 GPU 或上方的备选渲染方式均无影响。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="432"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="413"/>
         <source>Rendering needs a lot of random numbers - which direction to bounce a ray, which point on a light to aim at, and so on - and HOW those &quot;random&quot; choices are generated changes how quickly the image builds up into a clean result.
 
 Ordinary random numbers tend to clump together in some spots and leave gaps in others. Most samplers here (Sobol, Halton, etc.) instead use patterns deliberately spread out to cover all the possibilities more evenly, which cleans up the image faster than true randomness would for the same number of samples. Independent is the exception - plain, uncorrelated random numbers, included so a loaded .pbrt scene file that specifically asks for it can be reproduced faithfully, not as a recommended choice.
@@ -3938,27 +3938,27 @@ Grayed out? This only affects the CPU renderer&apos;s default path tracer - swit
 显示为灰色？这个设置只影响 CPU 渲染器的默认路径追踪器——请到设置标签页把渲染器切换为 CPU 才能使用它。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="456"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="437"/>
         <source>Organizes the scene&apos;s lights into a quick-lookup index and weighs each one by both its brightness and how close it is to the point being shaded, adjusting per bounce instead of using one fixed weighting for the whole scene. The underlying renderer&apos;s own default - generally converges to a clean image fastest, at a small extra bookkeeping cost.</source>
         <translation>把场景中的光源整理成一个可以快速查找的索引，并根据每个光源的亮度和它与当前着色点的距离来加权，逐次反弹动态调整，而不是对整个场景使用一套固定权重。这是底层渲染器自身的默认选项——通常能最快让画面变干净，代价是稍微多一点点管理开销。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="463"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="444"/>
         <source>Uses whatever light-sampling method the loaded scene file itself asks for (falling back to BVH above if it doesn&apos;t ask for anything, or asks for something this app doesn&apos;t support) instead of a fixed choice. Picking this once and leaving it is the one choice here that stays correct as you switch between scenes with different recommendations.</source>
         <translation>使用加载的场景文件自身所要求的光源采样方法（如果场景文件没有指定，或者要求了本应用不支持的方法，则回退到上面的 BVH），而不是固定选用某一种方法。选定这一项之后不再更改，是在切换到推荐设置各不相同的场景时，唯一始终保持正确的选择。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="470"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="451"/>
         <source>Picks a light to sample with odds weighted by its overall brightness - brighter lights get picked more often than dim ones. Cleans up the image faster than picking lights with equal odds in scenes with a wide range of light brightness, but it ignores how far away or how blocked-off a light is.</source>
         <translation>按光源的整体亮度加权来挑选要采样的光源——更亮的光源会被更频繁地选中。在光源亮度差异很大的场景中，这比等概率挑选光源更快让画面变干净，但它不考虑光源的远近或被遮挡的程度。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="477"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="458"/>
         <source>Picks a light completely at random from everything in the scene, with equal odds regardless of brightness or distance. Simple, but cleans up slowly in scenes with many lights of very different brightness - a dim light gets picked just as often as a bright one.</source>
         <translation>从场景中所有光源里完全随机挑选一个，不论亮度或距离，每个光源被选中的概率都相同。简单，但在光源数量多、亮度差异很大的场景中，画面变干净的速度较慢——暗光源和亮光源被选中的次数一样多。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="485"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="466"/>
         <source>Which strategy picks the light to aim a ray at directly, each
 time a bounce tries to sample light straight from a source.
 Affects how grainy the image looks along the way and how fast it
@@ -3968,7 +3968,7 @@ methods above.</source>
         <translation>每次反弹尝试直接从光源采样光照时，用哪种策略来挑选要瞄准的光源。它影响的是渲染过程中画面的噪点多少以及变干净的速度，而不是最终会得到什么结果。仅对 CPU 上的默认路径追踪器生效——对 GPU 或上方的备选渲染方式均无影响。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="493"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="474"/>
         <source>Every bounce off a matte or semi-glossy surface needs to pick ONE light (out of potentially many in the scene) to aim a ray directly at - which light gets picked, and how fairly, changes how quickly the image cleans up, though never what it eventually looks like.
 
 BVH (the default) organizes the scene&apos;s lights into a quick-lookup index and adjusts its weighting for each point being shaded - both bright AND nearby lights get preferred. Auto instead uses whatever the loaded scene file itself asks for (falling back to BVH if it doesn&apos;t ask for anything). Power picks by brightness alone, ignoring position - simpler, and worse in scenes where lights are at very different distances. Uniform ignores both - every light is equally likely regardless of brightness or distance, included mainly for comparison and debugging.
@@ -3981,7 +3981,7 @@ BVH（默认选项）把场景中的光源整理成可快速查找的索引，�
 显示为灰色？这个设置只影响 CPU 渲染器的默认路径追踪器——请到设置标签页把渲染器切换为 CPU 才能使用它。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="517"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="522"/>
         <source>Simulates individual wavelengths of light (like a rainbow)
 instead of simplifying everything to red/green/blue. CPU default
 path tracer only. Only lambertian, metal, dielectric,
@@ -3991,7 +3991,7 @@ than silently rendering wrong colors. Noticeably slower per-sample.</source>
         <translation>按单独的光波长模拟光线（就像彩虹那样），而不是把一切都简化为红/绿/蓝三色。仅对 CPU 上的默认路径追踪器生效。只支持 lambertian、metal、dielectric、rough_dielectric、conductor 和 diffuse_light 这几种材质——使用其他材质的场景会直接渲染失败，而不是悄悄渲染出错误的颜色。每个采样的计算会明显变慢。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="525"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="530"/>
         <source>Ordinary rendering tracks light as just three numbers - red, green, blue - the same way a screen displays color.
 
 Real light is actually a continuous spectrum of wavelengths, and a few physical effects (like a prism splitting white light into a rainbow) only happen because different wavelengths bend by different amounts - plain red/green/blue can&apos;t represent that. This option tracks a handful of actual individual wavelengths per ray instead, at the cost of a grainier, slower render.
@@ -4004,7 +4004,7 @@ Grayed out? This only exists on the CPU renderer&apos;s default path tracer - sw
 显示为灰色？这个功能只存在于 CPU 渲染器的默认路径追踪器中——请到设置标签页把渲染器切换为 CPU 才能使用它。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="540"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="545"/>
         <source>Stops adding more samples to a pixel once it already looks
 clean, instead of always spending the full Samples budget on
 every pixel - Samples becomes a ceiling, not a fixed amount every
@@ -4012,13 +4012,13 @@ pixel must use. CPU default path tracer only.</source>
         <translation>一旦某个像素看起来已经足够干净，就停止继续为它增加采样，而不是始终对每个像素都用完完整的采样预算——“采样数”变成一个上限，而不是每个像素都必须用满的固定数量。仅对 CPU 默认路径追踪器生效。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="552"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="557"/>
         <source>How clean a pixel must look before it&apos;s considered done.
 Lower = cleaner but slower. 0.01 matches Blender Cycles&apos; own default.</source>
         <translation>一个像素需要看起来多干净才算“完成”。数值越低画面越干净，但速度也越慢。0.01 与 Blender Cycles 自身的默认值一致。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="563"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="568"/>
         <source>Rendering builds up an image from many random samples, so it looks grainy at first and gradually cleans up - but different pixels clean up at different speeds. A pixel on a bright, evenly-lit wall might look clean after just a few samples, while a dim corner lit only by a small window can take far more before its graininess settles down. Spending the same fixed number of samples on both wastes time on pixels that were already done.
 
 Adaptive sampling keeps track of how grainy each pixel still looks and stops adding samples to it early once that drops below the threshold below, letting Samples act as a ceiling rather than a flat amount every pixel must use - the same idea as Blender Cycles&apos; own adaptive sampling.
@@ -4031,20 +4031,20 @@ Grayed out? This only affects the CPU renderer&apos;s default path tracer - swit
 显示为灰色？这个设置只影响 CPU 渲染器的默认路径追踪器——请到设置标签页把渲染器切换为 CPU 才能使用它。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="583"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="588"/>
         <source>Stop rendering once this many seconds have passed, instead of
 always running until the whole image is finished. CPU default
 path tracer only.</source>
         <translation>渲染达到这么多秒后就停止，而不是始终运行到整幅图像完成为止。仅对 CPU 默认路径追踪器生效。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="595"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="600"/>
         <source>How many seconds to render before stopping, regardless of the
 Samples budget above.</source>
         <translation>渲染多少秒后就停止，不论上方的“采样数”预算是否用完。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="606"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="611"/>
         <source>Useful for a fixed preview or a shared-computer time budget, instead of guessing a sample count that happens to finish in time - lets Samples above stay a generous ceiling while this decides when to actually stop.
 
 It stops row by row: whichever rows of the image were already being worked on when time runs out still finish normally; any row that was never started is left black instead of skipped over, so you still get a valid (if incomplete) image rather than a broken file.
@@ -4061,14 +4061,14 @@ Grayed out? This only affects the CPU renderer&apos;s default path tracer - swit
 显示为灰色？这个设置只影响 CPU 渲染器的默认路径追踪器——请到设置标签页把渲染器切换为 CPU 才能使用它。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="628"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="633"/>
         <source>A flat brightness multiplier applied before the final
 brightness/contrast adjustment (1.0 = no change). Both CPU and
 GPU default path tracer only.</source>
         <translation>在最终的亮度/对比度调整之前，对画面统一施加的亮度乘数（1.0 = 不做改动）。仅对 CPU 和 GPU 上的默认路径追踪器生效。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="922"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="927"/>
         <source>Turns on extra GPU-side correctness checks, which have a real
 performance cost each time the GPU runs. OptiX GPU only (not
 available under Metal, macOS GPU rendering), meant for
@@ -4076,7 +4076,7 @@ debugging, not routine use.</source>
         <translation>启用额外的 GPU 端正确性检查，每次运行 GPU 时都会带来实际的性能开销。仅限 OptiX GPU（Metal 即 macOS GPU 渲染下不可用），用于调试，不适合日常使用。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="928"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="933"/>
         <source>Turns on extra correctness checks inside the GPU rendering process itself, catching certain kinds of bugs that would otherwise silently produce a wrong image or crash unpredictably.
 
 It&apos;s a debugging aid for people working on the renderer&apos;s own GPU code, not something a normal render benefits from - it has a real performance cost and doesn&apos;t change what a correct render looks like.
@@ -4085,7 +4085,7 @@ This is specific to the OptiX GPU backend (Windows); it has no Metal equivalent,
         <translation>在 GPU 渲染过程内部启用额外的正确性检查，用来发现某些类型的错误，否则这些错误会悄悄生成错误的图像或导致不可预测的崩溃。这是为开发渲染器 GPU 代码的人准备的调试辅助功能，对正常渲染没有好处：它有实际的性能开销，也不会改变正确渲染的外观。它专用于 OptiX GPU 后端（Windows）；Metal 没有对应功能，因此即使在 macOS 上把渲染器设为 GPU，它也保持灰色。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1072"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1077"/>
         <source>Restricts rendering to a rectangle of the frame, given as
 fractions of the full image from 0 to 1. Default path tracer
 only; works on the CPU and both GPU backends (OptiX and
@@ -4093,7 +4093,7 @@ Metal). Pixels outside the rectangle are left black.</source>
         <translation>把渲染限制在画面的一个矩形区域内，以占整幅图像 0 到 1 的比例给出。仅限默认路径追踪器；在 CPU 和两种 GPU 后端（OptiX 和 Metal）上均可使用。矩形之外的像素保持为黑色。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1258"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1263"/>
         <source>Makes this render reproduce byte-for-byte on a rerun with the
 same seed. Default path tracer only. On the GPU (both OptiX and
 Metal) renders are already repeatable by default; the seed picks a
@@ -4101,7 +4101,7 @@ different, but equally repeatable, random sequence.</source>
         <translation>使用相同的种子重新运行时，让此次渲染逐字节地重现。仅限默认路径追踪器。在 GPU 上（OptiX 和 Metal 均是）渲染默认就可重复；种子会选择另一个同样可重复的随机序列。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="653"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="658"/>
         <source>Some light paths are genuinely hard for a path tracer to find cleanly - light that bounces off a rough (but not mirror-perfect) surface, through another rough surface, into a small bright light. Those paths show up as fireflies: single rays that happen to catch a very bright, small light at just the right angle, appearing as an isolated bright speckle that takes a very long time to average away.
 
 This setting deliberately softens a surface&apos;s roughness a little more with each non-mirror-like bounce a light path has already taken - it introduces a small, technically-incorrect bias, but in exchange the fireflies clean up dramatically faster, which usually looks better in the final image.
@@ -4114,7 +4114,7 @@ Off by default. If a loaded .pbrt scene file already asks for this itself, it&ap
 默认关闭。如果加载的 .pbrt 场景文件本身已经要求这么做，无论此选框是否勾选都会生效——这个选框只能额外附加这个请求，不能取消它。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="702"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="707"/>
         <source>Ray-traced rendering occasionally comes up with a sample that&apos;s technically correct but extremely bright - a ray that happens to catch a small, intense light at just the right angle - and one such sample can dominate a pixel&apos;s average for a long time before enough other samples arrive to balance it out. These show up as fireflies: single bright speckles standing out against the rest of the image.
 
 This clamp caps how bright any single sample&apos;s brightest color channel is allowed to be before it gets averaged in, trading a small, controlled inaccuracy for a much cleaner-looking image at the same sample count - lower values clean up more aggressively but risk visibly dimming genuinely bright small lights, not just stray noise.
@@ -4127,27 +4127,27 @@ Off by default (effectively unlimited). CPU default path tracer only.</source>
 默认关闭（相当于无限制）。仅对 CPU 默认路径追踪器生效。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="733"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="738"/>
         <source>A CPU-only setting for the index the renderer builds to quickly skip past objects a ray obviously can&apos;t hit, instead of checking every single object in the scene, plus the strategy used to build that index. Applies to every rendering method, not just the default path tracer - the defaults work well for almost every scene.</source>
         <translation>一项仅限 CPU 的设置，用于配置渲染器构建的索引结构——它能让光线快速跳过明显不可能命中的物体，而不必逐一检查场景里的每个物体——以及构建该索引所用的策略。它对所有渲染方式都生效，不只是默认的路径追踪器——默认设置几乎适用于所有场景。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="746"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="751"/>
         <source>Leaves a loaded .pbrt scene file&apos;s own accelerator choice alone (falling back to BVH below if it didn&apos;t name one). Has no effect either way on a scene that isn&apos;t loaded from a .pbrt file.</source>
         <translation>保留加载的 .pbrt 场景文件自身选定的加速结构（如果文件没有指定，则回退到下方的 BVH）。对不是从 .pbrt 文件加载的场景没有任何影响。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="751"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="756"/>
         <source>An index built by grouping nearby objects inside a hierarchy of bounding boxes, using the split strategy chosen below - this app&apos;s default index type.</source>
         <translation>一种索引结构，通过下方选定的分割策略，把相邻的物体分组放入一套层级化的包围盒中——这是本应用默认的索引类型。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="755"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="760"/>
         <source>A different indexing structure that divides up space itself into regions, instead of grouping objects into boxes. It has no split-strategy option of its own (the combo below is ignored when this is chosen). Falls back to BVH above on a scene with moving-object motion blur (this app&apos;s version of this index type can&apos;t handle that) - a warning is printed when that happens.</source>
         <translation>另一种索引结构，它划分的是空间本身的区域，而不是把物体分组装进包围盒。它没有自己的分割策略选项（选中它时会忽略下方的下拉菜单）。在含有运动模糊物体的场景中会回退到上面的 BVH（本应用实现的这种索引类型无法处理运动模糊）——发生这种情况时会打印一条警告。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="765"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="770"/>
         <source>Which indexing structure organizes the scene&apos;s geometry for
 fast ray tests. Every choice renders the identical final image -
 this only affects build time and render speed, not quality. CPU
@@ -4157,7 +4157,7 @@ uses its own fixed index) or a scene that wasn&apos;t loaded from a
         <translation>用哪种索引结构来组织场景几何体，以加快光线检测速度。无论选哪一种，最终渲染出的图像都完全相同——它只影响构建时间和渲染速度，不影响画质。仅限 CPU，对所有渲染方式都生效——对 GPU（始终使用自己固定的索引结构）或不是从 .pbrt 文件加载的场景（详见日志）没有影响。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="773"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="778"/>
         <source>If the renderer had to check every single object in the scene for every ray, even simple scenes would be painfully slow. This index lets a ray quickly skip past objects it obviously can&apos;t hit, and only test the handful of objects actually near where it travels.
 
 BVH (grouping nearby objects into a hierarchy of boxes) and Kd-tree (dividing up space itself) are two different real strategies for organizing the same geometry - both produce the exact same rendered image, just at different build and render speeds depending on the scene&apos;s shape.
@@ -4170,27 +4170,27 @@ BVH（把相邻物体分组装进层级化的包围盒）和 Kd 树（划分空�
 只有从 .pbrt 文件加载的场景才有自己的加速结构选择可供覆盖——其他任何场景始终使用各自固定的 BVH 式索引，与此设置无关（如果你仍然选择了其他选项，会打印一条警告）。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="794"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="799"/>
         <source>Tries out several ways of splitting the index and estimates which one will be fastest to search later, then picks the cheapest. Slower to build than Middle/Equal Counts below, but produces the best-performing index for most scenes - this app&apos;s long-standing default.</source>
         <translation>尝试几种不同的分割方式，估算哪一种日后搜索起来最快，再从中挑选代价最小的方案。构建速度比下面的“居中分割”/“等数量分割”慢，但对大多数场景来说能构建出性能最好的索引——这是本应用长期以来的默认选项。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="800"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="805"/>
         <source>Splits each group of objects right down the middle of its longest side. Cheap and fast to build, with no cost estimation at all - but can perform poorly on unevenly-spread-out geometry.</source>
         <translation>沿每组物体最长的一条边正中间进行分割。构建代价小、速度快，完全不做任何成本估算——但在物体分布不均匀的几何体上可能表现不佳。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="805"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="810"/>
         <source>Splits each group so an equal number of objects fall on each side, regardless of how they&apos;re actually spread out in space. Cheap to build, but can produce badly-shaped groups when objects are clustered together.</source>
         <translation>分割每一组时让两侧的物体数量相等，而不考虑它们在空间中的实际分布。构建代价小，但当物体聚集在一起时，可能会产生形状很差的分组。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="810"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="815"/>
         <source>Builds the index from the bottom up using a fast spatial-sorting trick, making it the fastest of these four strategies to build for very large numbers of triangles - at some cost to how well the finished index performs later, compared to SAH above.</source>
         <translation>利用一种快速的空间排序技巧自底向上构建索引，是这四种策略中面对超大数量三角形时构建速度最快的一种——但代价是构建完成后的索引性能不如上面的 SAH。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="818"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="823"/>
         <source>How the BVH index above is built (ignored when Accelerator is
 set to Kd-tree). Every choice renders the identical final image.
 Falls back to SAH above on a scene with moving-object motion blur
@@ -4199,24 +4199,24 @@ is printed when that happens.</source>
         <translation>上面的 BVH 索引具体如何构建（当“加速结构”设为 Kd 树时会被忽略）。无论选哪一种，最终渲染出的图像都完全相同。在含有运动模糊物体的场景中会回退到上面的 SAH（这里的其他构建策略无法处理运动模糊）——发生这种情况时会打印一条警告。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="825"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="830"/>
         <source>Only used when the accelerator above is set to BVH (ignored for Kd-tree, which has no split-strategy option). All four strategies build the same general kind of index in a different way - SAH above spends more time building in exchange for a better-performing index; Middle and Equal Counts are cheap, simple fallbacks; HLBVH trades a little performance for the fastest build on very large scenes.</source>
         <translation>只有当上面的加速结构设为 BVH 时才会用到（Kd 树没有分割策略选项，会忽略此设置）。这四种策略构建的都是同一大类索引，只是方式不同——上面的 SAH 花更多时间构建，换取性能更好的索引；“居中分割”和“等数量分割”是代价低、简单的备选方案；HLBVH 则牺牲一点性能，换取在超大场景中最快的构建速度。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="856"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="861"/>
         <source>How the image&apos;s brightness/contrast is adjusted for display, whether to print render statistics, and a GPU debugging mode - these control how the final image is processed and reported, not what to render. Denoising (cleaning up graininess) has its own dedicated section further down this tab.</source>
         <translation>如何调整图像的亮度/对比度以便显示、是否打印渲染统计信息，以及一个 GPU 调试模式——这些控制的是最终图像如何处理和汇报，而不是渲染什么内容。降噪（清理画面噪点）在本标签页下方有专门的独立分区。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="871"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="876"/>
         <source>Which brightness/contrast curve to apply before converting to
 the final display colors. Applies to both CPU and GPU (both GPU
 modes) - no effect under the alternate rendering methods above.</source>
         <translation>在转换为最终显示颜色之前，使用哪种亮度/对比度曲线。对 CPU 和 GPU（两种 GPU 模式）均生效——对上方的备选渲染方式没有影响。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="876"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="881"/>
         <source>A rendered scene&apos;s true brightness values have no upper limit - a light bulb might be a hundred times brighter than a wall - but a screen can only show a fixed range of brightness. Tone mapping is the curve used to compress that huge range down into something a screen can actually display.
 
 ACES rolls off bright highlights gently, the way film does, giving a soft, filmic look; Reinhard is a simpler, older way of compressing brightness; None just clips anything too bright straight to flat white, which can look harsh.</source>
@@ -4225,12 +4225,12 @@ ACES rolls off bright highlights gently, the way film does, giving a soft, filmi
 ACES 会像胶片那样柔和地压低明亮的高光，呈现出柔和的胶片感；Reinhard 是一种更简单、更传统的亮度压缩方式；“无”则直接把过亮的部分截断为纯白，效果可能会比较生硬。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="887"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="892"/>
         <source>Also write render passes (albedo, normal, depth)</source>
         <translation>同时输出渲染通道（反照率、法线、深度）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="889"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="894"/>
         <source>Also writes what is at each pixel - the surface colour (albedo),
 its direction (normal), the distance from the camera (depth) and
 its texture coordinates - for compositing. Into the image&apos;s own
@@ -4239,7 +4239,7 @@ separate &lt;name&gt;.aovs.exr next to it. Works with every renderer.</source>
         <translation>同时输出每个像素处的信息：表面颜色（反照率）、朝向（法线）、到相机的距离（深度）和纹理坐标，用于合成。输出为 .exr 时写入图像文件本身（多层 EXR），否则写入旁边单独的 &lt;名称&gt;.aovs.exr。适用于所有渲染器。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="896"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="901"/>
         <source>A render pass shows one property of the scene instead of the finished lit picture. These are the ones compositing programs (Blender, Nuke, After Effects) ask for: albedo (the colour of each surface, without lighting), normal (which way each surface faces), depth (how far away it is) and UV (its texture coordinates), plus an alpha that is 0 where the camera sees only the background.
 
 They are computed separately from the render, so they cost little and never change the picture. Choose an .exr output (Settings tab) to get everything in a single file.</source>
@@ -4248,14 +4248,14 @@ They are computed separately from the render, so they cost little and never chan
 它们与渲染分开计算，开销很小，也不会改变画面。选择 .exr 输出（“设置”选项卡）可将所有内容放入同一个文件。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="908"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="913"/>
         <source>Print a small end-of-render statistics summary (rays cast,
 bounces, shadow rays, samples/sec) to the Log tab. Purely
 informational - it never changes the rendered image.</source>
         <translation>渲染结束后，在“日志”标签页打印一份简短的统计摘要（发射的光线数、反弹次数、阴影光线数、每秒采样数）。纯粹是提供信息——不会以任何方式改变渲染出的图像。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="913"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="918"/>
         <source>Prints a short summary after the render finishes - how many rays were cast, how many bounces happened, how many shadow rays were traced (rays checking whether a point can see a light), and samples per second.
 
 Purely informational: it never changes the rendered image, it just tells you what the renderer actually did.</source>
@@ -4264,17 +4264,17 @@ Purely informational: it never changes the rendered image, it just tells you wha
 纯粹是提供信息：它不会改变渲染出的图像，只是告诉你渲染器实际做了些什么。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="977"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="982"/>
         <source>AI denoiser (Open Image Denoise)</source>
         <translation>AI 降噪器 (Open Image Denoise)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="979"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="984"/>
         <source>AI denoiser (OptiX on the GPU, Open Image Denoise on the CPU)</source>
         <translation>AI 降噪器（GPU 使用 OptiX，CPU 使用 Open Image Denoise）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="983"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="988"/>
         <source>Runs Intel&apos;s Open Image Denoise on the finished render to smooth
 out graininess - a few samples per pixel then look like many.
 Works with the GPU (Metal) renderer. The first time you tick it
@@ -4283,7 +4283,7 @@ you are asked to download the denoiser (about 50 MB, once).</source>
 适用于 GPU (Metal) 渲染器。首次勾选时会提示下载降噪器（约 50 MB，仅一次）。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="989"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="994"/>
         <source>Runs an AI denoiser on the finished render to smooth out
 graininess. With the GPU renderer it is NVIDIA&apos;s OptiX denoiser
 (both GPU modes, guided by each pixel&apos;s base color and surface
@@ -4298,7 +4298,7 @@ you are asked to download it (about 57 MB, once).</source>
 会提示下载（约 57 MB，仅需一次）。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1004"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1009"/>
         <source>Blends between the grainy original and the fully denoised
 result (0.0 = fully denoised, 1.0 = original grainy image).
 Raise this toward 1.0 to keep back more fine texture/grain that
@@ -4306,7 +4306,7 @@ full-strength denoising can smooth away.</source>
         <translation>在带噪点的原始图像和完全降噪的结果之间混合（0.0 = 完全降噪，1.0 = 原始带噪点图像）。把数值调高、靠近 1.0，可以保留更多完整强度降噪会抹掉的细节纹理/颗粒感。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1018"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1023"/>
         <source>Rendering is grainy by nature when only a few samples are used, which is why more samples usually means a cleaner picture (but also a slower render).
 
 A denoiser is an AI model trained to recognize that graininess and smooth it away after the fact, without needing to trace additional rays - a way to get a clean-looking image faster, at some cost in fine detail. The number to its right blends between the noisy original and the fully denoised result - 0 is fully denoised (the default); raising it keeps back some of the original grain, useful when full-strength denoising smooths away texture you wanted to keep.
@@ -4319,12 +4319,12 @@ Grayed out? This needs the GPU renderer - switch Renderer to GPU on the Settings
 是灰色的？需要 GPU 渲染器：请在“设置”选项卡中将渲染器切换为 GPU。Windows 上是 NVIDIA 的 OptiX 降噪器（两种 GPU 模式）；Mac 上是搭配 Metal 渲染器的 Intel Open Image Denoise。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1061"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1066"/>
         <source>Render only a rectangular slice of the full frame, given as fractions from 0 to 1 of the image&apos;s width and height - useful for quickly test-rendering one area of a scene without paying for the whole image.</source>
         <translation>只渲染整个画面中的一个矩形区域，该区域用图像宽高的 0 到 1 之间的比例来表示——适合在不用渲染整幅图像的情况下，快速测试场景中的某一部分。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1078"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1083"/>
         <source>Renders only a rectangular slice of the full frame - everything outside it is left black - instead of the whole image. The rectangle is given as four fractions of the full frame&apos;s width/height, from 0 (left/top edge) to 1 (right/bottom edge), so it stays the same shape regardless of resolution.
 
 Useful for iterating faster on one troublesome part of a large, slow scene - the same total number of samples cleans up much faster when it only has to cover a corner of the frame instead of the whole thing.
@@ -4337,63 +4337,63 @@ Off by default (the full frame). If a loaded .pbrt scene file already requests i
 默认关闭（渲染整幅画面）。如果加载的 .pbrt 场景文件本身已经请求了自己的裁剪区域，勾选此项会用下方的矩形将其覆盖；不勾选则保留场景自身的请求（如果有的话）。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1122"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1127"/>
         <source>Left (X0):</source>
         <translation>左(X0):</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1123"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1128"/>
         <source>Left edge of the crop rectangle, as a fraction of the full frame width (0 = left edge, 1 = right edge).</source>
         <translation>裁剪矩形的左边缘，以完整帧宽度的比例表示（0 = 左边缘，1 = 右边缘）。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1125"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1130"/>
         <source>Top (Y0):</source>
         <translation>上(Y0):</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1126"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1131"/>
         <source>Top edge of the crop rectangle, as a fraction of the full frame height (0 = top edge, 1 = bottom edge).</source>
         <translation>裁剪矩形的上边缘，以完整帧高度的比例表示（0 = 上边缘，1 = 下边缘）。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1128"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1133"/>
         <source>Right (X1):</source>
         <translation>右(X1):</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1129"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1134"/>
         <source>Right edge of the crop rectangle, as a fraction of the full frame width - must be greater than Left (X0) to render anything.</source>
         <translation>裁剪矩形的右边缘，以完整帧宽度的比例表示——必须大于“左（X0）”才能渲染出任何内容。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1131"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1136"/>
         <source>Bottom (Y1):</source>
         <translation>下(Y1):</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1132"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1137"/>
         <source>Bottom edge of the crop rectangle, as a fraction of the full frame height - must be greater than Top (Y0) to render anything.</source>
         <translation>裁剪矩形的下边缘，以完整帧高度的比例表示——必须大于“上（Y0）”才能渲染出任何内容。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1175"/>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="485"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1180"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="455"/>
         <source>Depth of Field</source>
         <translation>景深</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1178"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1183"/>
         <source>Override the active scene&apos;s own camera lens diameter/focus distance without editing its scene file - only affects scenes loaded from a scene file; built-in demo-gallery scenes keep their own fixed camera.</source>
         <translation>在不编辑场景文件的情况下，覆盖当前场景自身相机的镜头直径/对焦距离——只对从场景文件加载的场景有效；内置演示场景库中的场景仍会保留各自固定的相机设置。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1187"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1192"/>
         <source>Override depth of field (--aperture/--focus-distance)</source>
         <translation>覆盖景深设置（--aperture/--focus-distance）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1189"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1194"/>
         <source>Sets the camera&apos;s lens diameter and focus distance, overriding
 whatever the scene&apos;s own Camera directive requests. Only affects
 scenes loaded from a scene file - has no effect on the built-in
@@ -4401,7 +4401,7 @@ demo gallery, which keeps its own fixed camera.</source>
         <translation>设置相机的镜头直径和对焦距离，覆盖场景自身 Camera 指令所请求的数值。只对从场景文件加载的场景有效——对内置演示场景库没有影响，那些场景会保留各自固定的相机设置。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1195"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1200"/>
         <source>Thin-lens depth-of-field blur is already fully supported for any scene loaded from a scene file - a &quot;lensradius&quot;/&quot;focaldistance&quot; Camera directive in the file is all it takes. This lets you set or change that without hand-editing the file: Aperture is the lens diameter in world units (0 = pinhole-sharp, no blur), and Focus Distance is how far away the plane of sharp focus sits.
 
 Off by default (the scene&apos;s own camera, unchanged). Only affects scenes loaded from a scene file - the built-in demo gallery&apos;s scenes keep their own author-chosen fixed camera regardless of this setting.</source>
@@ -4410,44 +4410,44 @@ Off by default (the scene&apos;s own camera, unchanged). Only affects scenes loa
 默认关闭（保持场景自身相机不变）。只对从场景文件加载的场景有效——内置演示场景库中的场景无论此设置如何，都会保留作者选定的固定相机。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1213"/>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="669"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1218"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="645"/>
         <source>Aperture:</source>
         <translation>光圈：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1214"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1219"/>
         <source>Lens diameter in world units - larger values blur more. 0 means pinhole-sharp (no blur).</source>
         <translation>以场景单位表示的镜头直径——数值越大，虚化效果越强。0 表示针孔般的清晰（没有虚化）。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1225"/>
-        <location filename="../mainwindow_tabs_render_live.cpp" line="686"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1230"/>
+        <location filename="../mainwindow_tabs_render_live.cpp" line="662"/>
         <source>Focus Distance:</source>
         <translation>对焦距离：</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1226"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1231"/>
         <source>Distance from the camera to the plane of sharp focus, in world units.</source>
         <translation>相机到清晰对焦平面的距离（以场景单位表示）。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1245"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1250"/>
         <source>Reproducibility</source>
         <translation>可复现性</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1248"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1253"/>
         <source>Fix the random seed so a render can be reproduced exactly, pixel-for-pixel, on a later run - useful for comparing settings changes without random noise differences confusing the comparison.</source>
         <translation>固定随机种子，以便渲染可以在之后的运行中精确、逐像素地复现——适合在比较设置变化时使用，不会被随机噪点差异干扰对比。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1256"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1261"/>
         <source>Reproducible render (--seed)</source>
         <translation>可复现渲染(--seed)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1264"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1269"/>
         <source>Renders normally use a different random sequence every time, so two runs of the same scene never match pixel-for-pixel even with identical settings. Checking this fixes the random seed, so the same seed value always reproduces the exact same image - useful for comparing before/after a scene edit, or for isolating whether a visual difference came from a code change or just random noise.
 
 Off by default (genuinely random every render).</source>
@@ -4456,12 +4456,12 @@ Off by default (genuinely random every render).</source>
 默认关闭(每次渲染都是真正随机的)。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1284"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1289"/>
         <source>Seed:</source>
         <translation>种子:</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render_groups.cpp" line="1285"/>
+        <location filename="../mainwindow_tabs_render_groups.cpp" line="1290"/>
         <source>The specific integer used to seed the render&apos;s random number generator. Only takes effect when Reproducible Render above is checked - the same seed on the same scene/settings always produces pixel-identical noise.</source>
         <translation>用于播种渲染随机数生成器的具体整数。仅当上方勾选了“可复现渲染”时才生效——相同的种子在相同的场景/设置下，总会产生像素完全相同的噪点。</translation>
     </message>
@@ -4867,7 +4867,7 @@ Speed 0.5x renders twice as many frames to cover the same journey more slowly an
         <translation>选择字体</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1263"/>
+        <location filename="../mainwindow_style.cpp" line="1277"/>
         <source>The general-purpose way this app simulates light, used everywhere else in the program. At each bounce it both aims a ray straight at a light (so straightforward lighting cleans up quickly) and sends a ray off in a direction chosen to match how the surface reflects light, then blends the two results together so the image converges with less speckly noise than either approach alone. It&apos;s the well-tested default; start here unless you have a specific reason not to.
 
 The alternates below trade that general-purpose approach for a specific technique - simulating light as bouncing particles, tracing extra paths starting from the light itself, or a handful of plain reference/debug modes used mainly for testing. All of them run on the CPU only except one (SPPM), and none can be combined with Generate Video mode. The Sampler/Spectral/Exposure/Tonemap/Stats settings above only affect this default Path Tracer.</source>
@@ -4876,7 +4876,7 @@ The alternates below trade that general-purpose approach for a specific techniqu
 下方的备选方式放弃了这种通用方式，换取某种特定技术——把光模拟成弹跳的粒子、从光源本身出发追踪额外的光路，或是几种主要用于测试的简单参考/调试模式。除了 SPPM 之外，它们都只能在 CPU 上运行，也都不能与“生成视频”模式同时使用。上方的采样器/光谱/曝光/色调映射/统计信息设置，只对这个默认的路径追踪器有效。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1281"/>
+        <location filename="../mainwindow_style.cpp" line="1295"/>
         <source>Simulates light as a spray of particles that bounce around the scene and settle near the camera. It&apos;s especially good at rendering the bright, focused patterns of light you see through glass or in water (like the shimmer at the bottom of a pool) - scenes ordinary path tracing has a hard time cleaning up.
 
 CPU: confirmed to work correctly on the Cornell Rough Glass scene; other scenes haven&apos;t been checked and only support matte surfaces plus perfectly mirror-like or glass-like materials.
@@ -4889,7 +4889,7 @@ CPU：已确认在“康奈尔粗糙玻璃”场景上能正确工作；其他�
 GPU：只支持部分经过逐场景验证的材质——哑光表面和普通光源，以及粗糙电介质、金属、电介质、导体、粗糙金属和漫透射这几种材质类型（并且只支持有实际大小或形状的光源，不支持点光源或天空光）。使用其他材质的场景会报错——请改用该模式的 CPU 版本。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1300"/>
+        <location filename="../mainwindow_style.cpp" line="1314"/>
         <source>Builds partial light paths starting from both the camera and the light source, then connects every pair of them together. This can handle some tricky lighting setups - like light squeezing through a narrow gap - better than tracing from the camera alone.
 
 CPU only. Only works with lights that have a physical size or shape (point lights and a sky/environment light aren&apos;t supported yet). Confirmed to work correctly on the Cornell Box scene only; other scenes haven&apos;t been checked.</source>
@@ -4898,7 +4898,7 @@ CPU only. Only works with lights that have a physical size or shape (point light
 仅限 CPU。只支持有实际大小或形状的光源（尚不支持点光源和天空/环境光）。仅确认在康奈尔盒场景上能正确工作；其他场景尚未验证。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1311"/>
+        <location filename="../mainwindow_style.cpp" line="1325"/>
         <source>Builds on the same path-connecting approach as Bidirectional Path Tracing above, but once it finds a light path that actually contributes, it keeps taking small random steps nearby to find more paths like it. Useful for scenes where most of the light arrives through just a few hard-to-find routes.
 
 CPU only. Same lights-must-have-a-physical-size-or-shape limitation and single-scene (Cornell Box) verification as Bidirectional Path Tracing above.</source>
@@ -4907,7 +4907,7 @@ CPU only. Same lights-must-have-a-physical-size-or-shape limitation and single-s
 仅限 CPU。与上方“双向路径追踪”一样，只支持有实际大小或形状的光源，且仅在康奈尔盒这一个场景上完成过验证。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1322"/>
+        <location filename="../mainwindow_style.cpp" line="1336"/>
         <source>A bare-bones renderer that bounces rays off surfaces in completely random directions, without any of the shortcuts the default Path Tracer uses to clean up noise faster. It&apos;s simpler, but the image stays grainy for much longer - useful mainly as a trustworthy reference to double-check that other modes are producing correct results.
 
 CPU only.</source>
@@ -4916,7 +4916,7 @@ CPU only.</source>
 仅限 CPU。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1331"/>
+        <location filename="../mainwindow_style.cpp" line="1345"/>
         <source>A visualization/debug mode rather than a finished picture - it shows how enclosed or exposed each point on a surface is based on nearby objects blocking it, similar to the soft shadows you see in the corners of a room. It ignores material colors and any bounced light entirely.
 
 CPU only.</source>
@@ -4925,7 +4925,7 @@ CPU only.</source>
 仅限 CPU。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1339"/>
+        <location filename="../mainwindow_style.cpp" line="1353"/>
         <source>A straightforward reference path tracer with two optional shortcuts, both on by default (see the toggles below): aiming some rays directly at lights to clean up noise faster, and biasing bounce directions toward the angles that matter most for how the surface reflects light.
 
 CPU only. When &quot;aim at lights&quot; is on, it only works with lights that have a physical size or shape - the same limitation as Bidirectional Path Tracing and Metropolis Light Transport above.</source>
@@ -4934,7 +4934,7 @@ CPU only. When &quot;aim at lights&quot; is on, it only works with lights that h
 仅限 CPU。当“瞄准光源”开启时，只支持有实际大小或形状的光源——这与上方“双向路径追踪”和“Metropolis 光传输”的限制相同。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1350"/>
+        <location filename="../mainwindow_style.cpp" line="1364"/>
         <source>The simplest mode for rendering see-through volumes like smoke or fog - it steps through empty space until it randomly hits something. It doesn&apos;t aim rays at lights, doesn&apos;t do any of the noise-cleanup blending the default Path Tracer uses, and doesn&apos;t handle solid surfaces at all.
 
 This app doesn&apos;t currently have any smoke/fog to render with it, so on ordinary solid-object scenes it mostly produces a black image, except where a camera ray happens to look straight at a light source - that matches the underlying renderer&apos;s normal behavior when there&apos;s nothing to render.
@@ -4947,7 +4947,7 @@ CPU only.</source>
 仅限 CPU。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1363"/>
+        <location filename="../mainwindow_style.cpp" line="1377"/>
         <source>Works backwards compared to every other mode here: instead of starting each ray at the camera, it starts at a light source and traces outward, adding its contribution to the image whenever a path happens to connect back to the camera.
 
 CPU only. Only works with lights that have a physical size or shape.</source>
@@ -4956,158 +4956,158 @@ CPU only. Only works with lights that have a physical size or shape.</source>
 仅限 CPU。只支持有实际大小或形状的光源。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1384"/>
+        <location filename="../mainwindow_style.cpp" line="1398"/>
         <source>Denoiser: on (blend %1)</source>
         <translation>降噪器：开启（混合 %1）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1385"/>
+        <location filename="../mainwindow_style.cpp" line="1399"/>
         <source>Denoiser: on</source>
         <translation>降噪器: 开启</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1387"/>
+        <location filename="../mainwindow_style.cpp" line="1401"/>
         <source>Stats: on</source>
         <translation>统计信息: 开启</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1388"/>
+        <location filename="../mainwindow_style.cpp" line="1402"/>
         <source>OptiX validation: on</source>
         <translation>OptiX 验证: 开启</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1389"/>
+        <location filename="../mainwindow_style.cpp" line="1403"/>
         <source>Exposure: %1</source>
         <translation>曝光: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1395"/>
+        <location filename="../mainwindow_style.cpp" line="1409"/>
         <source>Sampler: %1</source>
         <translation>采样器: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1396"/>
+        <location filename="../mainwindow_style.cpp" line="1410"/>
         <source>Light Sampler: %1</source>
         <translation>光源采样器: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1397"/>
+        <location filename="../mainwindow_style.cpp" line="1411"/>
         <source>Accelerator: %1</source>
         <translation>加速结构：%1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1398"/>
+        <location filename="../mainwindow_style.cpp" line="1412"/>
         <source>Split method: %1</source>
         <translation>分割方法：%1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1401"/>
+        <location filename="../mainwindow_style.cpp" line="1415"/>
         <source>Adaptive sampling: on (threshold %1)</source>
         <translation>自适应采样：开启（阈值 %1）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1402"/>
+        <location filename="../mainwindow_style.cpp" line="1416"/>
         <source>Adaptive sampling: on</source>
         <translation>自适应采样：开启</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1404"/>
+        <location filename="../mainwindow_style.cpp" line="1418"/>
         <source>Time limit: %1s</source>
         <translation>时间限制：%1 秒</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1405"/>
+        <location filename="../mainwindow_style.cpp" line="1419"/>
         <source>Spectral: on</source>
         <translation>光谱: 开启</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1406"/>
+        <location filename="../mainwindow_style.cpp" line="1420"/>
         <source>Tonemap: %1</source>
         <translation>色调映射: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1407"/>
+        <location filename="../mainwindow_style.cpp" line="1421"/>
         <source>Regularize: on</source>
         <translation>正则化: 开启</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1408"/>
+        <location filename="../mainwindow_style.cpp" line="1422"/>
         <source>Firefly clamp: %1</source>
         <translation>萤火虫噪点截断: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1410"/>
+        <location filename="../mainwindow_style.cpp" line="1424"/>
         <source>Crop: (%1,%2)-(%3,%4)</source>
         <translation>裁剪: (%1,%2)-(%3,%4)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1413"/>
+        <location filename="../mainwindow_style.cpp" line="1427"/>
         <source>Seed: %1</source>
         <translation>种子: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1424"/>
+        <location filename="../mainwindow_style.cpp" line="1438"/>
         <source>Iterations: %1</source>
         <translation>迭代次数: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1425"/>
+        <location filename="../mainwindow_style.cpp" line="1439"/>
         <source>Photons/iter: %1</source>
         <translation>每次迭代光子数: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1428"/>
-        <location filename="../mainwindow_style.cpp" line="1433"/>
+        <location filename="../mainwindow_style.cpp" line="1442"/>
+        <location filename="../mainwindow_style.cpp" line="1447"/>
         <source>Max depth: %1</source>
         <translation>最大深度: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1431"/>
+        <location filename="../mainwindow_style.cpp" line="1445"/>
         <source>Bootstrap: %1</source>
         <translation>引导采样数: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1432"/>
+        <location filename="../mainwindow_style.cpp" line="1446"/>
         <source>Mutations: %1</source>
         <translation>变异次数: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1439"/>
+        <location filename="../mainwindow_style.cpp" line="1453"/>
         <source>Max distance: %1</source>
         <translation>最大距离: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1440"/>
+        <location filename="../mainwindow_style.cpp" line="1454"/>
         <source>Uniform-hemisphere sampling</source>
         <translation>均匀半球采样</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1441"/>
+        <location filename="../mainwindow_style.cpp" line="1455"/>
         <source>Illumination scale: %1</source>
         <translation>照明强度倍率: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1443"/>
+        <location filename="../mainwindow_style.cpp" line="1457"/>
         <source>Occlusion color: (%1, %2, %3)</source>
         <translation>遮蔽颜色: (%1, %2, %3)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1446"/>
+        <location filename="../mainwindow_style.cpp" line="1460"/>
         <source>NEE disabled</source>
         <translation>已禁用 NEE</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1447"/>
+        <location filename="../mainwindow_style.cpp" line="1461"/>
         <source>BSDF importance sampling disabled</source>
         <translation>已禁用 BSDF 重要性采样</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1464"/>
+        <location filename="../mainwindow_style.cpp" line="1478"/>
         <source>&lt;b&gt;Rendering technique&lt;/b&gt;&lt;br&gt;%1</source>
         <translation>&lt;b&gt;渲染技术&lt;/b&gt;&lt;br&gt;%1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_style.cpp" line="1474"/>
+        <location filename="../mainwindow_style.cpp" line="1488"/>
         <source>&lt;br&gt;&lt;br&gt;&lt;b&gt;Settings used&lt;/b&gt;&lt;br&gt;%1</source>
         <translation>&lt;br&gt;&lt;br&gt;&lt;b&gt;使用的设置&lt;/b&gt;&lt;br&gt;%1</translation>
     </message>
@@ -5443,22 +5443,22 @@ The scenes in the other categories are not touched. You can get them back from %
 <context>
     <name>PhotoHelperInstaller</name>
     <message>
-        <location filename="../photo_import.cpp" line="126"/>
+        <location filename="../photo_import.cpp" line="128"/>
         <source>The installer script (scripts/setup_photo_to_mesh) was not found next to the program.</source>
         <translation>在程序旁边找不到安装脚本 (scripts/setup_photo_to_mesh)。</translation>
     </message>
     <message>
-        <location filename="../photo_import.cpp" line="139"/>
+        <location filename="../photo_import.cpp" line="141"/>
         <source>Cancelled.</source>
         <translation>已取消。</translation>
     </message>
     <message>
-        <location filename="../photo_import.cpp" line="140"/>
+        <location filename="../photo_import.cpp" line="142"/>
         <source>The installer stopped (exit code %1).</source>
         <translation>安装程序已停止（退出代码 %1）。</translation>
     </message>
     <message>
-        <location filename="../photo_import.cpp" line="152"/>
+        <location filename="../photo_import.cpp" line="154"/>
         <source>Could not start the installer (PowerShell on Windows, bash elsewhere).</source>
         <translation>无法启动安装程序（Windows 上为 PowerShell，其他系统为 bash）。</translation>
     </message>
@@ -5466,17 +5466,17 @@ The scenes in the other categories are not touched. You can get them back from %
 <context>
     <name>PhotoToMeshJob</name>
     <message>
-        <location filename="../photo_import.cpp" line="300"/>
+        <location filename="../photo_import.cpp" line="302"/>
         <source>Could not start the photo helper (%1).</source>
         <translation>无法启动照片辅助程序 (%1)。</translation>
     </message>
     <message>
-        <location filename="../photo_import.cpp" line="337"/>
+        <location filename="../photo_import.cpp" line="354"/>
         <source>Cancelled.</source>
         <translation>已取消。</translation>
     </message>
     <message>
-        <location filename="../photo_import.cpp" line="346"/>
+        <location filename="../photo_import.cpp" line="363"/>
         <source>The helper stopped unexpectedly (exit code %1).</source>
         <translation>辅助程序意外停止（退出代码 %1）。</translation>
     </message>
@@ -6462,23 +6462,23 @@ The scenes in the other categories are not touched. You can get them back from %
         <translation>次表面（皮肤、蜡、牛奶）</translation>
     </message>
     <message>
-        <location filename="../photo_import.cpp" line="61"/>
-        <location filename="../photo_import.cpp" line="66"/>
+        <location filename="../photo_import.cpp" line="62"/>
+        <location filename="../photo_import.cpp" line="67"/>
         <source>none yet</source>
         <translation>暂无</translation>
     </message>
     <message>
-        <location filename="../photo_import.cpp" line="67"/>
+        <location filename="../photo_import.cpp" line="68"/>
         <source>%1 folders, %2 MB</source>
         <translation>%1 个文件夹，%2 MB</translation>
     </message>
     <message>
-        <location filename="../photo_import.cpp" line="84"/>
+        <location filename="../photo_import.cpp" line="86"/>
         <source>The helper script (tools/photo_to_mesh/photo_to_mesh.py) was not found next to the program.</source>
         <translation>在程序旁边找不到辅助脚本 (tools/photo_to_mesh/photo_to_mesh.py)。</translation>
     </message>
     <message>
-        <location filename="../photo_import.cpp" line="86"/>
+        <location filename="../photo_import.cpp" line="88"/>
         <source>The photo helper has not been set up on this computer yet.</source>
         <translation>此计算机上尚未设置照片辅助程序。</translation>
     </message>
@@ -6531,6 +6531,81 @@ If the program keeps stopping at start, choose Start fresh: it resets the window
         <source>the Trash</source>
         <translation>废纸篓</translation>
     </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="162"/>
+        <source>Room from a photo</source>
+        <translation>由照片生成房间</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="164"/>
+        <source>Both are optional: leave a 0 and the program estimates it. The size of the room is only as good as the camera height, so if you know it, say it.</source>
+        <translation>两项都是可选的：保持为 0 则由程序估算。房间的尺寸取决于相机高度是否准确，所以如果你知道，请填写。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="172"/>
+        <source> m</source>
+        <translation> m</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="173"/>
+        <source>estimate</source>
+        <translation>估算</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="174"/>
+        <source>How high the camera was above the floor. Standing at eye level is about 1.5 m.</source>
+        <translation>拍摄时相机离地面的高度。站着以视线高度拍摄大约是 1.5 米。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="179"/>
+        <source> degrees</source>
+        <translation> 度</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="180"/>
+        <source>from the photo</source>
+        <translation>取自照片</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="181"/>
+        <source>How wide the photo sees, left to right. A phone&apos;s main camera is about 65 to 70 degrees. 0 reads it from the photo&apos;s own data, or assumes a phone.</source>
+        <translation>照片从左到右的视野宽度。手机主摄大约是 65 到 70 度。填 0 则从照片自带的数据中读取，读不到就按手机来估计。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="182"/>
+        <source>Camera height above the floor</source>
+        <translation>相机离地高度</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="183"/>
+        <source>Photo&apos;s field of view (horizontal)</source>
+        <translation>照片的视野（水平）</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="187"/>
+        <source>none (an empty room)</source>
+        <translation>无（空房间）</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="188"/>
+        <source>How many pieces of furniture (chairs, sofas, tables, plants...) to find in the photo and make 3D objects of. Each takes some seconds on a graphics card and minutes on the processor.</source>
+        <translation>要在照片中找出并生成 3D 物体的家具数量（椅子、沙发、桌子、植物等）。每件在显卡上需要几秒，在处理器上需要几分钟。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="189"/>
+        <source>Furniture to add (at most)</source>
+        <translation>要添加的家具（最多）</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="190"/>
+        <source>Keep the room a plain box</source>
+        <translation>保持房间为简单的方盒</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="191"/>
+        <source>By default an L-shaped room, an alcove or a recess is read off the photo&apos;s walls. Tick this to make a plain box whatever the walls do.</source>
+        <translation>默认会根据照片中的墙面读出 L 形房间、凹室或壁龛。勾选后，无论墙面如何，都做成简单的方盒。</translation>
+    </message>
 </context>
 <context>
     <name>RenderController</name>
@@ -6569,13 +6644,13 @@ Output:
 <context>
     <name>RenderQueueModel</name>
     <message>
-        <location filename="../mainwindow_selftest_builder3d.cpp" line="1015"/>
+        <location filename="../mainwindow_selftest_builder3d.cpp" line="1068"/>
         <location filename="../render_queue_model.cpp" line="114"/>
         <source>Waiting</source>
         <translation>等待中</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_builder3d.cpp" line="1033"/>
+        <location filename="../mainwindow_selftest_builder3d.cpp" line="1086"/>
         <location filename="../render_queue_model.cpp" line="136"/>
         <source>%1 s</source>
         <translation>%1 秒</translation>
@@ -6764,7 +6839,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <location filename="../scene_builder_inspector.cpp" line="338"/>
         <location filename="../scene_builder_inspector.cpp" line="624"/>
         <location filename="../scene_builder_inspector.cpp" line="661"/>
-        <location filename="../scene_builder_inspector.cpp" line="792"/>
+        <location filename="../scene_builder_inspector.cpp" line="793"/>
         <source>Position</source>
         <translation>位置</translation>
     </message>
@@ -6775,7 +6850,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="340"/>
-        <location filename="../scene_builder_inspector.cpp" line="800"/>
+        <location filename="../scene_builder_inspector.cpp" line="801"/>
         <source>Field of view</source>
         <translation>视野</translation>
     </message>
@@ -6841,14 +6916,14 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="428"/>
-        <location filename="../scene_builder_inspector.cpp" line="838"/>
+        <location filename="../scene_builder_inspector.cpp" line="839"/>
         <source>Preset</source>
         <translation>预设</translation>
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="445"/>
         <location filename="../scene_builder_inspector.cpp" line="610"/>
-        <location filename="../scene_builder_inspector.cpp" line="790"/>
+        <location filename="../scene_builder_inspector.cpp" line="791"/>
         <location filename="../scene_builder_mix.cpp" line="84"/>
         <source>Type</source>
         <translation>类型</translation>
@@ -6856,7 +6931,8 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     <message>
         <location filename="../scene_builder_inspector.cpp" line="450"/>
         <location filename="../scene_builder_inspector.cpp" line="484"/>
-        <location filename="../scene_builder_inspector.cpp" line="801"/>
+        <location filename="../scene_builder_inspector.cpp" line="767"/>
+        <location filename="../scene_builder_inspector.cpp" line="802"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.tga *.exr *.hdr)</source>
         <translation>图像 (*.png *.jpg *.jpeg *.bmp *.tga *.exr *.hdr)</translation>
     </message>
@@ -6870,7 +6946,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <location filename="../scene_builder_inspector.cpp" line="530"/>
         <location filename="../scene_builder_inspector.cpp" line="561"/>
         <location filename="../scene_builder_inspector.cpp" line="629"/>
-        <location filename="../scene_builder_inspector.cpp" line="864"/>
+        <location filename="../scene_builder_inspector.cpp" line="865"/>
         <location filename="../scene_builder_mix.cpp" line="89"/>
         <location filename="../scene_builder_mix.cpp" line="92"/>
         <location filename="../scene_builder_mix.cpp" line="109"/>
@@ -6946,7 +7022,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     <message>
         <location filename="../scene_builder_inspector.cpp" line="595"/>
         <location filename="../scene_builder_inspector.cpp" line="649"/>
-        <location filename="../scene_builder_inspector.cpp" line="779"/>
+        <location filename="../scene_builder_inspector.cpp" line="780"/>
         <source>Name</source>
         <translation>名称</translation>
     </message>
@@ -7378,7 +7454,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="755"/>
-        <location filename="../scene_builder_widget.cpp" line="729"/>
+        <location filename="../scene_builder_widget.cpp" line="730"/>
         <source>Meshes (*.ply *.obj)</source>
         <translation>网格 (*.ply *.obj)</translation>
     </message>
@@ -7391,7 +7467,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="762"/>
-        <location filename="../scene_builder_inspector.cpp" line="778"/>
+        <location filename="../scene_builder_inspector.cpp" line="779"/>
         <source>Light</source>
         <translation>光源</translation>
     </message>
@@ -7407,138 +7483,143 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="766"/>
-        <location filename="../scene_builder_inspector.cpp" line="865"/>
+        <location filename="../scene_builder_inspector.cpp" line="866"/>
         <source>Strength</source>
         <translation>强度</translation>
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="767"/>
+        <source>Light picture</source>
+        <translation>光源图片</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="768"/>
         <source>Both sides</source>
         <translation>双面</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="769"/>
+        <location filename="../scene_builder_inspector.cpp" line="770"/>
         <source>A quad or disk lights the side that faces up. Rotate it 180 degrees about X to make a ceiling light.</source>
         <translation>四边形或圆盘照亮朝上的那一面。绕 X 轴旋转 180 度即可做成顶灯。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="794"/>
-        <location filename="../scene_builder_inspector.cpp" line="799"/>
+        <location filename="../scene_builder_inspector.cpp" line="795"/>
+        <location filename="../scene_builder_inspector.cpp" line="800"/>
         <source>Aims at</source>
         <translation>对准</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="795"/>
+        <location filename="../scene_builder_inspector.cpp" line="796"/>
         <source>Cone angle</source>
         <translation>锥角</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="796"/>
+        <location filename="../scene_builder_inspector.cpp" line="797"/>
         <source>Soft edge</source>
         <translation>柔化边缘</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="801"/>
+        <location filename="../scene_builder_inspector.cpp" line="802"/>
         <source>Slide picture</source>
         <translation>幻灯片图片</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="802"/>
+        <location filename="../scene_builder_inspector.cpp" line="803"/>
         <source>A slide projector: the picture shines out through a frustum, onto whatever it falls on, with the colours of the picture. The field of view is the angle across the picture&apos;s shorter side. Strength is the brightness of the whitest part of the picture; a surface facing the projector from distance d is lit with Strength / d squared. The top of the picture points up as far as the aim allows.</source>
         <translation>幻灯片投影灯：图片通过一个视锥射出，投在所照到的物体上，并保留图片的颜色。视野角是图片较短一边所张的角度。强度是图片最白部分的亮度；正对投影灯、距离为 d 的表面所受照明为 强度 / d 的平方。图片的上方在瞄准方向允许的范围内朝上。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="807"/>
+        <location filename="../scene_builder_inspector.cpp" line="808"/>
         <source>Shines from</source>
         <translation>照射自</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="808"/>
+        <location filename="../scene_builder_inspector.cpp" line="809"/>
         <source>Towards</source>
         <translation>朝向</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="812"/>
+        <location filename="../scene_builder_inspector.cpp" line="813"/>
         <source>Sun &amp;&amp; sky (a clear sky for a time of day)</source>
         <translation>太阳与天空（随时间变化的晴朗天空）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="828"/>
+        <location filename="../scene_builder_inspector.cpp" line="829"/>
         <source>Time of day...</source>
         <translation>时间...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="829"/>
+        <location filename="../scene_builder_inspector.cpp" line="830"/>
         <source>Sunrise</source>
         <translation>日出</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="829"/>
+        <location filename="../scene_builder_inspector.cpp" line="830"/>
         <source>Morning</source>
         <translation>上午</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="829"/>
+        <location filename="../scene_builder_inspector.cpp" line="830"/>
         <source>Noon</source>
         <translation>正午</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="830"/>
+        <location filename="../scene_builder_inspector.cpp" line="831"/>
         <source>Afternoon</source>
         <translation>下午</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="830"/>
+        <location filename="../scene_builder_inspector.cpp" line="831"/>
         <source>Sunset</source>
         <translation>日落</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="840"/>
+        <location filename="../scene_builder_inspector.cpp" line="841"/>
         <source>Sky gallery...</source>
         <translation>天空图库...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="849"/>
+        <location filename="../scene_builder_inspector.cpp" line="850"/>
         <source>Sun height</source>
         <translation>太阳高度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="850"/>
+        <location filename="../scene_builder_inspector.cpp" line="851"/>
         <source>Sun direction</source>
         <translation>太阳方向</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="851"/>
+        <location filename="../scene_builder_inspector.cpp" line="852"/>
         <source>Haze</source>
         <translation>雾霾</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="852"/>
+        <location filename="../scene_builder_inspector.cpp" line="853"/>
         <source>Ground brightness</source>
         <translation>地面亮度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="853"/>
+        <location filename="../scene_builder_inspector.cpp" line="854"/>
         <source>The sky picture and the Sun light are made from these settings; change the sun here rather than moving the Sun light. Direction 0 is towards +X, 90 away from the starting camera, 180 towards -X, 270 behind it. Brightness 1 is a daylight scene.</source>
         <translation>天空图像和太阳光由这些设置生成；请在这里调整太阳，而不是移动太阳光。方向 0 朝向 +X，90 远离初始相机，180 朝向 -X，270 在相机后方。亮度 1 为白天场景。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="856"/>
+        <location filename="../scene_builder_inspector.cpp" line="857"/>
         <source>Sky image</source>
         <translation>天空图像</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="856"/>
+        <location filename="../scene_builder_inspector.cpp" line="857"/>
         <source>Images (*.exr *.hdr *.png *.jpg *.jpeg)</source>
         <translation>图像 (*.exr *.hdr *.png *.jpg *.jpeg)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="858"/>
+        <location filename="../scene_builder_inspector.cpp" line="859"/>
         <source>Rotate sky</source>
         <translation>旋转天空</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="859"/>
+        <location filename="../scene_builder_inspector.cpp" line="860"/>
         <source>Leave the image empty for a plain colour sky. An image is an equirectangular (lat-long) panorama; Rotate sky turns it about the vertical axis (counter-clockwise seen from above), to put the bright part of the picture where you want the light to come from.</source>
         <translation>图像留空则为纯色天空。图像是等距柱状（经纬度）全景图；“旋转天空”会绕竖直轴旋转（从上方看为逆时针），使图像中最亮的部分对准你希望光线来自的方向。</translation>
     </message>
@@ -7547,7 +7628,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation type="vanished">图像留空则使用纯色天空。图像应为等距柱状（经纬度）全景图。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="865"/>
+        <location filename="../scene_builder_inspector.cpp" line="866"/>
         <source>Brightness</source>
         <translation>亮度</translation>
     </message>
@@ -7607,13 +7688,13 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>在实时预览中打开此场景：可以在其中走动并移动物体。它会作为一个单独的“（实时预览）”场景保存到场景列表中；你的场景及其自己的条目不会改变。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="72"/>
+        <location filename="../scene_builder_actions.cpp" line="73"/>
         <location filename="../scene_builder_widget.cpp" line="142"/>
         <source>Undo</source>
         <translation>撤销</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="73"/>
+        <location filename="../scene_builder_actions.cpp" line="74"/>
         <location filename="../scene_builder_widget.cpp" line="143"/>
         <source>Redo</source>
         <translation>重做</translation>
@@ -7640,34 +7721,34 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
-        <location filename="../scene_builder_widget.cpp" line="239"/>
+        <location filename="../scene_builder_widget.cpp" line="240"/>
         <source>Arrange</source>
         <translation>整理</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="240"/>
+        <location filename="../scene_builder_widget.cpp" line="241"/>
         <source>Rename, put on the floor, frame, hide and lock what is picked (also on a right-click in the list)</source>
         <translation>对所选项重命名、放到地面、取景、隐藏和锁定（在列表中右键点击也可使用）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="98"/>
-        <location filename="../scene_builder_widget.cpp" line="327"/>
+        <location filename="../scene_builder_actions.cpp" line="99"/>
+        <location filename="../scene_builder_widget.cpp" line="328"/>
         <source>Turntable...</source>
         <translation>转台视频...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="329"/>
+        <location filename="../scene_builder_widget.cpp" line="330"/>
         <source>Make a video of the scene from a camera that goes once round it</source>
         <translation>制作一段视频：相机围绕场景转一整圈</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="99"/>
-        <location filename="../scene_builder_widget.cpp" line="330"/>
+        <location filename="../scene_builder_actions.cpp" line="100"/>
+        <location filename="../scene_builder_widget.cpp" line="331"/>
         <source>Flythrough...</source>
         <translation>飞行视频...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="332"/>
+        <location filename="../scene_builder_widget.cpp" line="333"/>
         <source>Make a video of the scene from a camera that flies through your saved camera views (needs two or more)</source>
         <translation>制作一段视频：相机依次飞过你保存的相机视图（需要两个或更多）</translation>
     </message>
@@ -7771,39 +7852,39 @@ From: %3</source>
         <translation>由照片生成物体...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="214"/>
+        <location filename="../scene_builder_widget.cpp" line="215"/>
         <source>Light panel (emitting quad)</source>
         <translation>灯板（发光四边形）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="223"/>
+        <location filename="../scene_builder_widget.cpp" line="224"/>
         <source>Lights</source>
         <translation>光源</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="66"/>
-        <location filename="../scene_builder_widget.cpp" line="234"/>
+        <location filename="../scene_builder_actions.cpp" line="67"/>
+        <location filename="../scene_builder_widget.cpp" line="235"/>
         <source>Duplicate</source>
         <translation>复制</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="235"/>
+        <location filename="../scene_builder_widget.cpp" line="236"/>
         <source>Make a copy of the selected item beside it (%1)</source>
         <translation>在所选项旁边制作一个副本（%1）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="67"/>
-        <location filename="../scene_builder_widget.cpp" line="236"/>
+        <location filename="../scene_builder_actions.cpp" line="68"/>
+        <location filename="../scene_builder_widget.cpp" line="237"/>
         <source>Array...</source>
         <translation>阵列...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="237"/>
+        <location filename="../scene_builder_widget.cpp" line="238"/>
         <source>Make many copies of the selected object: a grid, a ring round a point, or a random scatter</source>
         <translation>为所选对象制作许多副本：网格、绕一点的环形，或随机散布</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="94"/>
+        <location filename="../scene_builder_actions.cpp" line="95"/>
         <location filename="../scene_builder_camera_views.cpp" line="42"/>
         <source>Through camera</source>
         <translation>透过相机</translation>
@@ -7814,7 +7895,7 @@ From: %3</source>
         <translation>从相机的位置观看场景，并在上面绘制图像的取景框。环绕、平移或缩放即可退出。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="95"/>
+        <location filename="../scene_builder_actions.cpp" line="96"/>
         <location filename="../scene_builder_camera_views.cpp" line="45"/>
         <source>Camera from view</source>
         <translation>按视图设置相机</translation>
@@ -7960,9 +8041,9 @@ From: %3</source>
         <translation>用相机当前的状态覆盖此视图</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="68"/>
+        <location filename="../scene_builder_actions.cpp" line="69"/>
         <location filename="../scene_builder_camera_views.cpp" line="335"/>
-        <location filename="../scene_builder_widget.cpp" line="238"/>
+        <location filename="../scene_builder_widget.cpp" line="239"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
@@ -8012,7 +8093,7 @@ From: %3</source>
         <translation>组：</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="70"/>
+        <location filename="../scene_builder_actions.cpp" line="71"/>
         <location filename="../scene_builder_multi.cpp" line="243"/>
         <source>Group</source>
         <translation>编组</translation>
@@ -8023,7 +8104,7 @@ From: %3</source>
         <translation>把选中的对象编为一组：在视图中单击其中一个就会选中全部（%1）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="71"/>
+        <location filename="../scene_builder_actions.cpp" line="72"/>
         <location filename="../scene_builder_multi.cpp" line="246"/>
         <source>Ungroup</source>
         <translation>取消编组</translation>
@@ -8120,7 +8201,7 @@ From: %3</source>
         <translation>对焦距离 %1。只有启用景深时才看得出来：请设置光圈。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="92"/>
+        <location filename="../scene_builder_actions.cpp" line="93"/>
         <location filename="../scene_builder_views.cpp" line="70"/>
         <source>Wireframe</source>
         <translation>线框</translation>
@@ -8131,7 +8212,7 @@ From: %3</source>
         <translation>只绘制所有物体的边缘，以便透过物体观察</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="93"/>
+        <location filename="../scene_builder_actions.cpp" line="94"/>
         <location filename="../scene_builder_views.cpp" line="74"/>
         <source>Orthographic</source>
         <translation>正交</translation>
@@ -8153,20 +8234,20 @@ From: %3</source>
         <translation>从前、后、左、右、顶或底观察（小键盘 1、3、7；按住 Ctrl 为相反一侧）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="85"/>
+        <location filename="../scene_builder_actions.cpp" line="86"/>
         <location filename="../scene_builder_views.cpp" line="83"/>
         <source>Back</source>
         <translation>后</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="86"/>
+        <location filename="../scene_builder_actions.cpp" line="87"/>
         <location filename="../scene_builder_inspector.cpp" line="737"/>
         <location filename="../scene_builder_views.cpp" line="84"/>
         <source>Right</source>
         <translation>右</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="87"/>
+        <location filename="../scene_builder_actions.cpp" line="88"/>
         <location filename="../scene_builder_views.cpp" line="85"/>
         <source>Bottom</source>
         <translation>底</translation>
@@ -8174,7 +8255,7 @@ From: %3</source>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="516"/>
         <location filename="../mainwindow_selftest_modes.cpp" line="564"/>
-        <location filename="../scene_builder_actions.cpp" line="87"/>
+        <location filename="../scene_builder_actions.cpp" line="88"/>
         <location filename="../scene_builder_views.cpp" line="85"/>
         <location filename="../scene_builder_views.cpp" line="119"/>
         <source>Top</source>
@@ -8182,7 +8263,7 @@ From: %3</source>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="518"/>
-        <location filename="../scene_builder_actions.cpp" line="85"/>
+        <location filename="../scene_builder_actions.cpp" line="86"/>
         <location filename="../scene_builder_views.cpp" line="83"/>
         <location filename="../scene_builder_views.cpp" line="119"/>
         <source>Front</source>
@@ -8190,7 +8271,7 @@ From: %3</source>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="520"/>
-        <location filename="../scene_builder_actions.cpp" line="86"/>
+        <location filename="../scene_builder_actions.cpp" line="87"/>
         <location filename="../scene_builder_inspector.cpp" line="735"/>
         <location filename="../scene_builder_views.cpp" line="84"/>
         <source>Left</source>
@@ -8226,7 +8307,7 @@ From: %3</source>
         <translation>大理石</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_builder3d.cpp" line="816"/>
+        <location filename="../mainwindow_selftest_builder3d.cpp" line="869"/>
         <location filename="../scene_builder_views.cpp" line="150"/>
         <source>Snap to grid</source>
         <translation>吸附到网格</translation>
@@ -8237,7 +8318,7 @@ From: %3</source>
         <translation>拖动时以 0.25 为步长移动。按住 %1 可自由拖动。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="96"/>
+        <location filename="../scene_builder_actions.cpp" line="97"/>
         <location filename="../scene_builder_views.cpp" line="157"/>
         <source>Snap to objects</source>
         <translation>吸附到对象</translation>
@@ -8248,50 +8329,50 @@ From: %3</source>
         <translation>拖动时让对象与其他对象的边缘和中心对齐，并放在它们上面或地面上（橙色线条表示吸附到了哪里）。按住 %1 可自由拖动。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="84"/>
+        <location filename="../scene_builder_actions.cpp" line="85"/>
         <location filename="../scene_builder_views.cpp" line="161"/>
         <source>Frame all</source>
         <translation>显示全部</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="314"/>
+        <location filename="../scene_builder_widget.cpp" line="315"/>
         <source>Draft</source>
         <translation>草稿</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="315"/>
+        <location filename="../scene_builder_widget.cpp" line="316"/>
         <source>Good</source>
         <translation>良好</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="316"/>
+        <location filename="../scene_builder_widget.cpp" line="317"/>
         <source>Best</source>
         <translation>最佳</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="319"/>
+        <location filename="../scene_builder_widget.cpp" line="320"/>
         <source>Use the GPU</source>
         <translation>使用 GPU</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="320"/>
+        <location filename="../scene_builder_widget.cpp" line="321"/>
         <source>Render on the graphics card (NVIDIA OptiX on Windows, Metal on a Mac). Much faster for large pictures; needs a supported GPU.</source>
         <translation>在显卡上渲染（Windows 上为 NVIDIA OptiX，Mac 上为 Metal）。大幅面图像快得多，需要受支持的 GPU。</translation>
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="195"/>
         <location filename="../scene_builder_turntable.cpp" line="244"/>
-        <location filename="../scene_builder_widget.cpp" line="322"/>
+        <location filename="../scene_builder_widget.cpp" line="323"/>
         <source>Preview</source>
         <translation>预览</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="324"/>
+        <location filename="../scene_builder_widget.cpp" line="325"/>
         <source>Render picture...</source>
         <translation>渲染图像...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="326"/>
+        <location filename="../scene_builder_widget.cpp" line="327"/>
         <source>Render at the image size and sample count set under Camera, and save the picture as a PNG</source>
         <translation>按“相机”中设置的图像尺寸和采样数渲染，并将图像保存为 PNG</translation>
     </message>
@@ -8378,7 +8459,7 @@ From: %3</source>
     </message>
     <message>
         <location filename="../scene_builder_turntable.cpp" line="94"/>
-        <location filename="../scene_builder_widget.cpp" line="334"/>
+        <location filename="../scene_builder_widget.cpp" line="335"/>
         <source>Quality:</source>
         <translation>质量：</translation>
     </message>
@@ -8508,7 +8589,7 @@ From: %3</source>
         <translation type="vanished">转台视频失败。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="352"/>
+        <location filename="../scene_builder_widget.cpp" line="353"/>
         <source>Press Preview to see the scene.</source>
         <translation>点击“预览”查看场景。</translation>
     </message>
@@ -8618,12 +8699,12 @@ It is in the scene list now (Settings tab, My Scenes).</source>
 它现在已在场景列表中（“设置”标签页，我的场景）。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="875"/>
+        <location filename="../scene_builder_widget.cpp" line="876"/>
         <source>(%1)%2  |  %3 objects, %4 lights</source>
         <translation>(%1)%2  |  %3 个物体，%4 个光源</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="729"/>
+        <location filename="../scene_builder_widget.cpp" line="730"/>
         <source>Choose a mesh</source>
         <translation>选择网格</translation>
     </message>
@@ -8648,12 +8729,12 @@ It is in the scene list now (Settings tab, My Scenes).</source>
         <translation>重做 (%1)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="227"/>
+        <location filename="../scene_builder_widget.cpp" line="228"/>
         <source>Lighting (replaces the lights)</source>
         <translation>灯光方案（替换现有灯光）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="318"/>
+        <location filename="../scene_builder_widget.cpp" line="319"/>
         <source>Draft: 480 pixels wide, 16 samples. Good: 720 wide, 64 samples. Best: 960 wide, 256 samples.</source>
         <translation>草稿：宽 480 像素，16 个采样。良好：宽 720，64 个采样。最佳：宽 960，256 个采样。</translation>
     </message>
@@ -8663,37 +8744,37 @@ It is in the scene list now (Settings tab, My Scenes).</source>
         <translation>已添加到场景列表</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="547"/>
+        <location filename="../scene_builder_widget.cpp" line="548"/>
         <source>Camera and image</source>
         <translation>相机与画面</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="588"/>
+        <location filename="../scene_builder_widget.cpp" line="589"/>
         <source>, light</source>
         <translation>，光源</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="776"/>
+        <location filename="../scene_builder_widget.cpp" line="777"/>
         <source>Lighting: %1. %2</source>
         <translation>灯光：%1。%2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="869"/>
+        <location filename="../scene_builder_widget.cpp" line="870"/>
         <source>not saved yet</source>
         <translation>尚未保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="903"/>
+        <location filename="../scene_builder_widget.cpp" line="904"/>
         <source>No problems found.</source>
         <translation>未发现问题。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="909"/>
+        <location filename="../scene_builder_widget.cpp" line="910"/>
         <source>Fix this:</source>
         <translation>请修复：</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="909"/>
+        <location filename="../scene_builder_widget.cpp" line="910"/>
         <source>Note:</source>
         <translation>注意：</translation>
     </message>
@@ -8731,12 +8812,13 @@ It is in the scene list now (Settings tab, My Scenes).</source>
         <translation>在程序旁边找不到渲染器 (%1)。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_photo.cpp" line="35"/>
+        <location filename="../scene_builder_photo.cpp" line="46"/>
+        <location filename="../scene_builder_photo.cpp" line="209"/>
         <source>Photo helper not installed</source>
         <translation>未安装照片辅助程序</translation>
     </message>
     <message>
-        <location filename="../scene_builder_photo.cpp" line="36"/>
+        <location filename="../scene_builder_photo.cpp" line="47"/>
         <source>Turning a photo into a 3D object needs an optional helper: an AI model that runs on your own computer (about 5 GB to install, and an graphics card - NVIDIA on Windows, Apple silicon on a Mac - is strongly recommended).
 
 %1
@@ -8757,12 +8839,12 @@ Then choose this again. The guide (docs/PHOTO_TO_SCENE.md) explains what it does
 然后再次选择此项。指南 (docs/PHOTO_TO_SCENE.md) 说明了它的作用和局限。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_photo.cpp" line="53"/>
+        <location filename="../scene_builder_photo.cpp" line="64"/>
         <source>Object from a photo</source>
         <translation>由照片生成物体</translation>
     </message>
     <message>
-        <location filename="../scene_builder_photo.cpp" line="54"/>
+        <location filename="../scene_builder_photo.cpp" line="65"/>
         <source>One photo is turned into a 3D object by an AI model running on this computer; the photo is not uploaded anywhere.
 
 The shape is a guess: the back is invented and fine detail is soft. It works best on one object against a plain background. The first run downloads the model (about 1.7 GB) and can take several minutes.</source>
@@ -8771,56 +8853,163 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
 形状是推测出来的：背面是编造的，细节会比较模糊。对纯色背景上的单个物体效果最好。首次运行会下载模型（约 1.7 GB），可能需要几分钟。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_photo.cpp" line="58"/>
+        <location filename="../scene_builder_photo.cpp" line="69"/>
+        <location filename="../scene_builder_photo.cpp" line="227"/>
         <source>Do not show this again</source>
         <translation>不再显示此消息</translation>
     </message>
     <message>
-        <location filename="../scene_builder_photo.cpp" line="64"/>
+        <location filename="../scene_builder_photo.cpp" line="75"/>
         <source>Choose a photo</source>
         <translation>选择照片</translation>
     </message>
     <message>
-        <location filename="../scene_builder_photo.cpp" line="64"/>
+        <location filename="../scene_builder_photo.cpp" line="75"/>
+        <location filename="../scene_builder_photo.cpp" line="232"/>
         <source>Photos (*.png *.jpg *.jpeg *.bmp *.webp)</source>
         <translation>照片 (*.png *.jpg *.jpeg *.bmp *.webp)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_photo.cpp" line="67"/>
+        <location filename="../scene_builder_photo.cpp" line="78"/>
         <source>Could not make the object</source>
         <translation>无法生成物体</translation>
     </message>
     <message>
-        <location filename="../scene_builder_photo.cpp" line="83"/>
+        <location filename="../scene_builder_photo.cpp" line="94"/>
+        <location filename="../scene_builder_photo.cpp" line="258"/>
         <source>Could not create the folder %1.</source>
         <translation>无法创建文件夹 %1。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_photo.cpp" line="87"/>
+        <location filename="../scene_builder_photo.cpp" line="98"/>
+        <location filename="../scene_builder_photo.cpp" line="262"/>
         <location filename="../scene_builder_render.cpp" line="180"/>
         <location filename="../scene_builder_turntable.cpp" line="227"/>
         <source>Cancel</source>
         <translation>取消</translation>
     </message>
     <message>
-        <location filename="../scene_builder_photo.cpp" line="87"/>
+        <location filename="../scene_builder_photo.cpp" line="98"/>
+        <location filename="../scene_builder_photo.cpp" line="262"/>
         <source>Starting...</source>
         <translation>正在开始…</translation>
     </message>
     <message>
-        <location filename="../scene_builder_photo.cpp" line="88"/>
+        <location filename="../scene_builder_photo.cpp" line="99"/>
         <source>Making a 3D object from the photo</source>
         <translation>正在根据照片生成 3D 物体</translation>
     </message>
     <message>
-        <location filename="../scene_builder_photo.cpp" line="129"/>
+        <location filename="../scene_builder_photo.cpp" line="140"/>
         <source>Photo object</source>
         <translation>照片物体</translation>
     </message>
     <message>
-        <location filename="../scene_builder_photo.cpp" line="139"/>
+        <location filename="../scene_builder_photo.cpp" line="150"/>
         <source>Added %1 from the photo. The shape is a guess; check it from every side.</source>
         <translation>已根据照片添加 %1。形状是推测的，请从各个角度检查。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="210"/>
+        <source>Turning a photo of a room into a room needs the same optional helper as Object from a photo: an AI model that runs on your own computer.
+
+%1
+
+To set it up, use the Diagnostics tab: Run Diagnostics, then Install Photo Helper (about 5 GB). Then choose this again. The guide (docs/PHOTO_TO_SCENE.md) says what it does and where its limits are.</source>
+        <translation>将房间照片转换为房间需要与“由照片生成物体”相同的可选辅助程序：一个在你自己的计算机上运行的 AI 模型。
+
+%1
+
+要进行设置，请使用“诊断”标签页：先运行诊断，再点击“安装照片辅助程序”（约 5 GB）。然后再次选择此项。指南 (docs/PHOTO_TO_SCENE.md) 说明了它的作用和局限。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="213"/>
+        <location filename="../scene_builder_photo.cpp" line="252"/>
+        <source>The room script (tools/photo_to_room/photo_to_room.py) was not found next to the program.</source>
+        <translation>在程序旁边找不到房间脚本 (tools/photo_to_room/photo_to_room.py)。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="220"/>
+        <source>Room from a photo</source>
+        <translation>由照片生成房间</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="221"/>
+        <source>A photo of a room becomes a room you can edit: its walls, floor and ceiling at about the right size and colour, windows and lamps as lights, and a camera that sees what the photo saw. A small AI model on this computer guesses the distances; the photo is not uploaded anywhere.
+
+It is a first draft: a wall the photo does not show is assumed, the size can be off by a fifth or more, and any furniture is a guess (a 3D model of each piece, made from the photo, with an invented back). The first run downloads the depth model (about 100 MB), and the first time furniture is asked for, a second one (about 170 MB).
+
+This replaces the scene you have now (Undo brings it back).</source>
+        <translation>照片中的房间会变成可编辑的房间：墙面、地板和天花板的尺寸和颜色大致相符，窗户和灯作为光源，相机能看到照片所见的画面。距离由这台计算机上的一个小型 AI 模型估算；照片不会上传到任何地方。
+
+这只是初稿：照片没有显示的墙面是假设出来的，尺寸可能偏差五分之一或更多，所有家具都是猜测（由照片生成的每件家具的 3D 模型，背面是编造的）。首次运行会下载深度模型（约 100 MB），第一次要求添加家具时还会下载第二个模型（约 170 MB）。
+
+这会替换你当前的场景（可用撤销找回）。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="232"/>
+        <source>Choose a photo of a room</source>
+        <translation>选择一张房间照片</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="241"/>
+        <source>Could not make the room</source>
+        <translation>无法生成房间</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="244"/>
+        <source>About this room</source>
+        <translation>关于这个房间</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="244"/>
+        <source>What the program had to assume:
+
+- %1</source>
+        <translation>程序不得不做出的假设：
+
+- %1</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="263"/>
+        <location filename="../scene_builder_photo.cpp" line="335"/>
+        <source>Making a room from the photo</source>
+        <translation>正在由照片生成房间</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="297"/>
+        <source>The helper finished but its room file could not be read.</source>
+        <translation>辅助程序已完成，但无法读取它的房间文件。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="300"/>
+        <source>The helper&apos;s room file is not usable: %1</source>
+        <translation>辅助程序的房间文件无法使用：%1</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="318"/>
+        <source>Room from %1</source>
+        <translation>来自 %1 的房间</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="318"/>
+        <source>a photo</source>
+        <translation>一张照片</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="327"/>
+        <source>Made a room from %1. It is empty and a first draft: add furniture, and check the size.</source>
+        <translation>已由 %1 生成房间。它是空的，只是初稿：请添加家具并检查尺寸。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="328"/>
+        <source>Made a room from %1 with %2 piece(s) of furniture. All of it is a first draft: each piece is a guess with an invented back.</source>
+        <translation>已由 %1 生成房间，并添加了 %2 件家具。一切都只是初稿：每件家具都是猜测，背面是编造的。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_photo.cpp" line="334"/>
+        <source>Setting the room&apos;s light level...</source>
+        <translation>正在调整房间的光照强度...</translation>
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="183"/>
@@ -8867,13 +9056,13 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="462"/>
-        <location filename="../scene_builder_widget.cpp" line="572"/>
+        <location filename="../scene_builder_widget.cpp" line="573"/>
         <source>, locked</source>
         <translation>，已锁定</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="476"/>
-        <location filename="../scene_builder_widget.cpp" line="571"/>
+        <location filename="../scene_builder_widget.cpp" line="572"/>
         <source>, hidden</source>
         <translation>，已隐藏</translation>
     </message>
@@ -8963,66 +9152,72 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>灯光</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="69"/>
+        <location filename="../scene_builder_actions.cpp" line="63"/>
+        <location filename="../scene_builder_widget.cpp" line="214"/>
+        <source>Room from a photo...</source>
+        <translation>由照片生成房间...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_actions.cpp" line="70"/>
         <source>Select all</source>
         <translation>全选</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="75"/>
+        <location filename="../scene_builder_actions.cpp" line="76"/>
         <location filename="../scene_builder_arrange.cpp" line="146"/>
         <source>Rename...</source>
         <translation>重命名...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="76"/>
+        <location filename="../scene_builder_actions.cpp" line="77"/>
         <location filename="../scene_builder_arrange.cpp" line="147"/>
         <source>Drop to floor</source>
         <translation>放到地面</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="77"/>
+        <location filename="../scene_builder_actions.cpp" line="78"/>
         <location filename="../scene_builder_arrange.cpp" line="148"/>
         <location filename="../scene_builder_views.cpp" line="167"/>
         <source>Frame selected</source>
         <translation>取景所选项</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="78"/>
+        <location filename="../scene_builder_actions.cpp" line="79"/>
         <location filename="../scene_builder_arrange.cpp" line="150"/>
         <source>Hide in the views</source>
         <translation>在视图中隐藏</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="79"/>
+        <location filename="../scene_builder_actions.cpp" line="80"/>
         <location filename="../scene_builder_arrange.cpp" line="151"/>
         <source>Show everything hidden</source>
         <translation>显示所有隐藏项</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="80"/>
+        <location filename="../scene_builder_actions.cpp" line="81"/>
         <location filename="../scene_builder_arrange.cpp" line="152"/>
         <source>Lock</source>
         <translation>锁定</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="81"/>
+        <location filename="../scene_builder_actions.cpp" line="82"/>
         <location filename="../scene_builder_arrange.cpp" line="153"/>
         <source>Unlock</source>
         <translation>解锁</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="82"/>
+        <location filename="../scene_builder_actions.cpp" line="83"/>
         <location filename="../scene_builder_arrange.cpp" line="154"/>
         <source>Unlock everything locked</source>
         <translation>解锁所有已锁定项</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="127"/>
+        <location filename="../scene_builder_actions.cpp" line="128"/>
         <source>Search actions</source>
         <translation>搜索操作</translation>
     </message>
     <message>
-        <location filename="../scene_builder_actions.cpp" line="131"/>
+        <location filename="../scene_builder_actions.cpp" line="132"/>
         <source>Type what you want to do: wireframe, drop, add fog, top view...</source>
         <translation>输入你想做的事：线框、放到地面、添加雾、顶视图……</translation>
     </message>
