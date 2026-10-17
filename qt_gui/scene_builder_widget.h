@@ -205,6 +205,13 @@ public:
 	// `matchToPhoto`: the objects' exposure and colour cast are read from the photo's sky (photo_composite::matchToPhoto; needs the Sun & sky set from the same photo) and `exposureStops` is added to it.
 	bool renderIntoPhoto(const QString &outPng, const std::vector<int> &groundObjects, double exposureStops, int samples, bool matchToPhoto, QString *error, QStringList *notes = nullptr);
 	void updateCameraPhotoOverlay();                         // shows (or takes away) the photo over the camera view
+	// Place on the photo's ground (scene_builder_camera_photo.cpp): placeByClicking looks through the camera and waits for clicks on the ground in the picture; each click stands the picked items
+	// there (placePickedAt, one undo step), on the ground y = 0 (the camera is `height` above it). setPickedHeight makes the picked items `metres` tall about the middle of their base.
+	void placeByClicking();
+	bool placePickedAt(const scene_doc::Float3 &where);
+	bool setPickedHeight(double metres);
+	void setPickedHeightDialog();
+	Scene3DView *view3dForTest() const { return m_view3d; }
 	bool cameraPhotoShownForTest() const { return m_cameraPhotoShown && !m_cameraPhoto.isNull(); }
 	// See scene_builder_inspector.cpp: an upright copy of a picture whose EXIF tag asks for a rotation (the renderer ignores that tag).
 	static QString uprightPictureCopy(const QString &path, QSize *size);

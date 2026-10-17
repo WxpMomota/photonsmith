@@ -145,6 +145,7 @@ QMenu *SceneBuilderWidget::createArrangeMenu(QWidget *parent) {
 	menu->addSeparator();
 	menu->addAction(tr("Rename...") + key(QKeySequence(Qt::Key_F2)), this, [this]() { renameSelected(); });
 	menu->addAction(tr("Drop to floor") + key(QKeySequence(Qt::Key_End)), this, [this]() { dropSelectedToFloor(); });
+	menu->addAction(tr("Place on the ground by clicking..."), this, [this]() { placeByClicking(); });
 	menu->addAction(tr("Frame selected") + key(QKeySequence(Qt::Key_F)), this, [this]() { frameSelected(); });
 	menu->addSeparator();
 	menu->addAction(tr("Hide in the views") + key(QKeySequence(Qt::Key_H)), this, [this]() { hideSelected(true); });

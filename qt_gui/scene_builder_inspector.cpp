@@ -703,6 +703,16 @@ void SceneBuilderWidget::inspectObject(QFormLayout *f, int i) {
 	f->addRow(tr("Shape"), shape);
 	addVec3(f, tr("Position"), [obj]() { return obj() ? &obj()->position : nullptr; }, 0.25);
 	addVec3(f, tr("Rotation (degrees)"), [obj]() { return obj() ? &obj()->rotation : nullptr; }, 5.0);
+	auto *place = new QPushButton(tr("Place the picked object by clicking..."));
+	place->setAutoDefault(false);
+	place->setToolTip(tr("Look through the camera and click the ground in the picture: the picked object stands there. With a photo laid over the view, that is where it stands in the photo."));
+	connect(place, &QPushButton::clicked, this, [this]() { placeByClicking(); });
+	f->addRow(place);
+	auto *realHeight = new QPushButton(tr("Set the picked object's real height..."));
+	realHeight->setAutoDefault(false);
+	realHeight->setToolTip(tr("Say how tall the picked object is in the photo, in metres: it is scaled to that about the middle of its base, so it keeps standing where it is."));
+	connect(realHeight, &QPushButton::clicked, this, [this]() { setPickedHeightDialog(); });
+	f->addRow(realHeight);
 
 	const Object &o = m_doc.objects[i];
 	switch (o.shape) {

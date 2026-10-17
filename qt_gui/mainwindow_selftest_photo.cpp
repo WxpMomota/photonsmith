@@ -13,16 +13,19 @@
 
 #include "photo_import.h"
 #include "scene_builder_widget.h"
+#include "scene_3d_view.h"
 
 #include "../src/shared/camera_from_photo.h"
 #include "../src/shared/light_from_photo.h"
 #include "../src/shared/material_from_photo.h"
+#include "../src/shared/scene_arrange.h"
 
 #include <QApplication>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QImage>
+#include <QMouseEvent>
 #include <QPushButton>
 #include <QTimer>
 
@@ -518,6 +521,36 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 		const bool matchedOk = both && sb->renderIntoPhoto(out, {0}, 0.0, 16, true, &matchError, &matchNotes);
 		check(matchedOk, "with the exposure matched to the photo " + matchError);
 		check(matchNotes.join(" ").contains("exposure"), "and the user is told what was done about it: " + matchNotes.join(" / ").left(200));
+		// Place by clicking: the Red box is picked and a click on the ground low in the camera view stands it there; then it is made 1.8 m tall
+		sb->selectObject(3);
+		Scene3DView *view = sb->view3dForTest();
+		scene_doc::Float3 ground;
+		const bool onGround = view && view->groundAt(QPointF(view->width() * 0.5, view->height() * 0.85), ground);
+		check(onGround, "a click low in the camera view meets the ground");
+		if (onGround) {
+			check(sb->placePickedAt(ground), "the picked box is stood where the click met the ground");
+			const scene_doc::Object &box = sb->document().objects[3];
+			check(std::fabs(box.position.x - ground.x) < 1e-6 && std::fabs(box.position.z - ground.z) < 1e-6, QString("it is at the clicked place (%1, %2)").arg(ground.x).arg(ground.z));
+			scene_doc::Float3 lo, hi;
+			scene_doc::boundsOf(sb->document(), scene_doc::makeItemSet(sb->document(), {3}), lo, hi);
+			check(std::fabs(lo.y) < 1e-6, QString("and stands on the ground (its base is at %1)").arg(lo.y));
+			check(sb->setPickedHeight(1.8), "it is made 1.8 m tall");
+			scene_doc::boundsOf(sb->document(), scene_doc::makeItemSet(sb->document(), {3}), lo, hi);
+			check(std::fabs((hi.y - lo.y) - 1.8) < 1e-6 && std::fabs(lo.y) < 1e-6, QString("and is 1.8 m tall (%1) still on the ground").arg(hi.y - lo.y));
+			view->beginPickPlace();
+			check(view->pickingPlace(), "the view waits for clicks while placing");
+			// a real left click on the view while it waits: the picked box goes to the ground under the mouse
+			const QPointF at(view->width() * 0.3, view->height() * 0.9);
+			scene_doc::Float3 under;
+			check(view->groundAt(at, under), "the ground is under that pixel too");
+			QMouseEvent click(QEvent::MouseButtonPress, at, view->mapToGlobal(at), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+			QApplication::sendEvent(view, &click);
+			const scene_doc::Object &moved = sb->document().objects[3];
+			check(std::fabs(moved.position.x - under.x) < 1e-6 && std::fabs(moved.position.z - under.z) < 1e-6, QString("a click on the picture stands it under the mouse (%1, %2)").arg(moved.position.x).arg(moved.position.z));
+			check(view->pickingPlace(), "and the view goes on waiting for the next click");
+			view->endPickPlace();
+			check(!view->pickingPlace(), "and stops when asked to");
+		}
 		// a real photo, when one is given: the camera, the sky and the picture from it (the result is saved next to the log for a look)
 		const QString real = qEnvironmentVariable("RT_GUI_SELFTEST_COMPOSITE_PHOTO");
 		if (!real.isEmpty()) {

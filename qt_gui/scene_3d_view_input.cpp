@@ -116,6 +116,11 @@ void Scene3DView::mousePressEvent(QMouseEvent *e) {
 	setFocus();
 	const QPointF px = e->position();
 	m_last = px;
+	if (m_pickPlace && e->button() == Qt::LeftButton) {   // Place takes the click: the ground point under it is reported, and the next click places again
+		Float3 where;
+		if (groundAt(px, where)) emit placePicked(where);
+		return;
+	}
 	if (m_pickFocus && e->button() == Qt::LeftButton) {   // Pick focus takes the click: nothing is selected or dragged
 		m_pickFocus = false;
 		unsetCursor();

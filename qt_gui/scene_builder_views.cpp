@@ -109,6 +109,8 @@ void SceneBuilderWidget::createViews(QWidget *layoutBox, QVBoxLayout *layoutLayo
 	m_gizmoBar->setVisible(false);
 	createCameraBar(layoutBox);
 	connect(m_view3d, &Scene3DView::cameraViewRequested, this, [this]() { if (m_throughButton) m_throughButton->setChecked(true); });   // numpad 0
+	connect(m_view3d, &Scene3DView::placePicked, this, [this](const Float3 &where) { placePickedAt(where); });
+	connect(m_view3d, &Scene3DView::placeEnded, this, [this]() { emit statusMessage(tr("Place stopped.")); });
 	connect(m_view3d, &Scene3DView::focusPointPicked, this, [this](const Float3 &where) {
 		const double d = scene_doc::focusDistanceTo(m_doc.camera, where);
 		edit(QString(), [&]() { m_doc.camera.focusDistance = d; });

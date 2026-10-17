@@ -133,6 +133,18 @@ How good it is:
   roof line, so check the tilt and roll by eye against the photo laid over the view.
 - The renderers draw the scene on its own (the photo is laid over the view in the Builder, to line things up); **Render into the photo...** (below) puts the scene into the photo with its shadows. Light from a photo sets the light to match.
 
+## Place objects on the photo's ground
+
+With the camera matched to a photo, an object is put where you want it in the photo by clicking: pick the object, then **Place the picked object by clicking...** (in its properties, under Rotation; also in the
+Arrange menu as *Place on the ground by clicking...*). The 3D view looks through the camera, the cursor is a cross, and each click on the ground in the picture **stands the picked object there**: the middle of
+its base is under the click and its lowest point is on the ground (the plane y = 0, which the camera is 1.6 m above unless you gave another height). Click again to move it; Esc stops. Several picked objects are
+placed together, keeping their places relative to each other. A click above the horizon finds no ground and does nothing.
+
+The scene's units mean nothing in a photo, so **Set the picked object's real height...** says how tall the object is in the photo (metres): it is scaled to that, uniformly, about the middle of its base, so it keeps
+standing where it is. The camera's height gives the scale of everything else: a person in the photo is about 1.7 m, a door 2 m.
+
+Checked by unit tests (the base lands on the ground, a pick of two keeps its arrangement, a scaled object stays on the ground) and by the headless GUI test, which sends a real mouse click to the view.
+
 ## Render into the photo
 
 **Render into the photo...** (in the Camera section, under *Match to a photo...*; it needs the camera to have been matched to a photo first, see Camera from a photo, and says so if not) puts the scene into that

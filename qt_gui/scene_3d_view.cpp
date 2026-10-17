@@ -45,6 +45,27 @@ void Scene3DView::beginPickFocus() {
 	setFocus();
 }
 
+void Scene3DView::beginPickPlace() {
+	m_pickPlace = true;
+	setCursor(Qt::CrossCursor);
+	setFocus();
+}
+
+void Scene3DView::endPickPlace() {
+	if (!m_pickPlace) return;
+	m_pickPlace = false;
+	unsetCursor();
+	emit placeEnded();
+}
+
+bool Scene3DView::groundAt(const QPointF &px, Float3 &where) const {
+	if (!m_doc) return false;
+	V3 hit;
+	if (!scene_view::rayPlane(view().ray(px.x(), px.y()), {0, 0, 0}, {0, 1, 0}, hit)) return false;
+	where = toFloat3(hit);
+	return true;
+}
+
 // The point under a pixel: the nearest face the ray meets (a face is a flat polygon; the ray is cut with its plane, and the pixel must be inside the polygon as drawn), else the
 // floor (y = 0) if the ray reaches it.
 bool Scene3DView::surfaceAt(const QPointF &px, Float3 &where) const {
@@ -214,6 +235,11 @@ void Scene3DView::setGizmoMode(GizmoMode m) {
 }
 
 void Scene3DView::keyPressEvent(QKeyEvent *e) {
+	if (m_pickPlace && e->key() == Qt::Key_Escape) {
+		endPickPlace();
+		e->accept();
+		return;
+	}
 	if (m_pickFocus && e->key() == Qt::Key_Escape) {
 		m_pickFocus = false;
 		unsetCursor();

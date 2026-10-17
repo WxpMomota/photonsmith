@@ -7,6 +7,7 @@
 #include "app_log.h"
 #include "scene_3d_view.h"
 #include "../src/shared/camera_from_photo.h"
+#include "../src/shared/scene_arrange.h"
 
 #include <QCheckBox>
 #include <QDialog>
@@ -18,6 +19,7 @@
 #include <QFormLayout>
 #include <QImage>
 #include <QImageReader>
+#include <QInputDialog>
 #include <QLabel>
 #include <QMessageBox>
 #include <QTimer>
@@ -181,3 +183,52 @@ void SceneBuilderWidget::cameraFromPhoto() {
 	}
 	QMessageBox::information(this, tr("Camera from a photo"), tr("The camera was set from %1:\n\n- %2").arg(QFileInfo(photo).fileName(), notes.join("\n- ")));
 }
+
+// ---- Place on the photo's ground ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+void SceneBuilderWidget::placeByClicking() {
+	if (pickedItems().empty()) {
+		emit statusMessage(tr("Pick an object first (click it in the list or the view), then Place by clicking."));
+		return;
+	}
+	show3dView(true);
+	lookThroughCamera(true);   // (the click is on the picture the camera sees, which is the photo's when it was matched to one)
+	m_view3d->beginPickPlace();
+	emit statusMessage(tr("Click the ground in the picture to stand the picked object there. Click again to move it; Esc stops."));
+}
+
+bool SceneBuilderWidget::placePickedAt(const scene_doc::Float3 &where) {
+	const scene_doc::ItemSet items = pickedItems();
+	if (items.empty()) return false;
+	bool placed = false;
+	edit(QString(), [&]() { placed = scene_doc::placeOnGround(m_doc, items, where); });
+	if (!placed) return false;
+	refreshInspectorValues();
+	const double tall = scene_doc::heightOfItems(m_doc, items);
+	emit statusMessage(tr("Placed on the ground. It is %1 m tall; the camera is %2 m above the ground. Click again to move it, Esc stops, or set its real height.").arg(tall, 0, 'f', 2).arg(m_doc.camera.position.y, 0, 'f', 2));
+	AppLog::info(QStringLiteral("photo"), QStringLiteral("placed on the ground at (%1, %2): %3 m tall").arg(where.x, 0, 'f', 2).arg(where.z, 0, 'f', 2).arg(tall, 0, 'f', 2));
+	return true;
+}
+
+bool SceneBuilderWidget::setPickedHeight(double metres) {
+	const scene_doc::ItemSet items = pickedItems();
+	if (items.empty()) return false;
+	bool done = false;
+	edit(QString(), [&]() { done = scene_doc::setHeightOfItems(m_doc, items, metres); });
+	if (done) refreshInspectorValues();
+	return done;
+}
+
+void SceneBuilderWidget::setPickedHeightDialog() {
+	const scene_doc::ItemSet items = pickedItems();
+	const double now = scene_doc::heightOfItems(m_doc, items);
+	if (items.empty() || !(now > 1e-9)) {
+		emit statusMessage(tr("Pick an object first: its height is made what you say, about the middle of its base."));
+		return;
+	}
+	bool ok = false;
+	const double metres = QInputDialog::getDouble(this, tr("Real height"), tr("How tall is it in the photo (metres)? The picked object is scaled about the middle of its base."), now, 0.01, 1000.0, 2, &ok);
+	if (!ok) return;
+	if (!setPickedHeight(metres)) QMessageBox::warning(this, tr("Real height"), tr("It cannot be made that tall (the size may change by up to 100 times)."));
+}
+

@@ -80,6 +80,11 @@ public:
 	// surface (or on the floor if it hit none) is reported with focusPointPicked(); Escape, or the first click that finds nothing at all, ends it.
 	void beginPickFocus();
 	bool pickingFocus() const { return m_pickFocus; }
+	// Place: every click on the ground (the plane y = 0) is reported with placePicked() until Escape (or endPickPlace) ends it; the view takes the clicks (nothing is selected or dragged).
+	void beginPickPlace();
+	void endPickPlace();
+	bool pickingPlace() const { return m_pickPlace; }
+	bool groundAt(const QPointF &px, scene_doc::Float3 &where) const;   // where the ray through that pixel meets the plane y = 0 in front of the view; false if it does not
 	bool surfaceAt(const QPointF &px, scene_doc::Float3 &where) const;   // the point of the nearest face under that pixel (else of the floor); false if neither
 	// Rendered mode (the Scene Builder's rendered viewport): a path-traced picture of the scene is drawn behind the usual names, lights, camera and tool, instead of the flat-shaded
 	// faces, so everything (orbiting, picking, moving) works as before with the real picture under it. The picture is rendered by the owner for exactly this view (same eye, target,
@@ -119,6 +124,8 @@ signals:
 	// A saved view's marker dragged (the owner takes the view's eye or target to `world`); dragBegan() came first, as for everything else that is dragged.
 	void viewMarkerDragged(int viewIndex, int which, const scene_doc::Float3 &world);
 	void focusPointPicked(const scene_doc::Float3 &world);   // a click found this point (Pick focus)
+	void placePicked(const scene_doc::Float3 &world);        // a click found this point of the ground (Place)
+	void placeEnded();                                       // Place ended (Escape, or endPickPlace)
 	void frameSelectedRequested();   // the F key
 	void displayModeChanged();       // wireframe or orthographic changed (the numpad 5 key changes the latter)
 	void cameraViewRequested();      // the numpad 0 key: look through the scene's camera
@@ -217,6 +224,7 @@ private:
 	double m_previewProgress = 0.0;
 	int m_activeView = -1;          // the saved view whose marker was pressed last: its target is drawn and can be dragged too
 	bool m_pickFocus = false;       // the next click picks the focus point
+	bool m_pickPlace = false;       // every click is a place on the ground (beginPickPlace)
 	mutable std::map<std::string, double> m_slideAspects;
 	bool m_orthoAllowed = true;
 	bool m_renderedMode = false;

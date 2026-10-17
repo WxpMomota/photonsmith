@@ -144,3 +144,35 @@ TEST(SceneArrangeTest, TheBoundsOfThePickCoverEachObjectAndLight) {
 	EXPECT_NEAR(hi.x, 1.0, 1e-9);
 	EXPECT_FALSE(boundsOf(d, ItemSet{}, lo, hi));
 }
+
+TEST(SceneArrangeTest, PlacingOnTheGroundPutsTheMiddleOfTheBaseOnThePointAndTheBaseOnItsHeight) {
+	Document d = sceneOf({ballAt(3.0, 7.0, -2.0, 1.0)});
+	ASSERT_TRUE(placeOnGround(d, makeItemSet(d, {0}), Float3{5.0, 0.0, 9.0}));
+	EXPECT_NEAR(d.objects[0].position.x, 5.0, 1e-9);
+	EXPECT_NEAR(d.objects[0].position.z, 9.0, 1e-9);
+	EXPECT_NEAR(d.objects[0].position.y, 1.0, 1e-9) << "its lowest point is on the ground";
+	// a pick of two keeps their places relative to each other and is centred as a whole; a ground that is not at 0 is respected
+	Document two = sceneOf({ballAt(0, 4.0, 0, 1.0), ballAt(4, 6.0, 0, 1.0)});
+	ASSERT_TRUE(placeOnGround(two, makeItemSet(two, {0, 1}), Float3{10.0, 0.5, 10.0}));
+	EXPECT_NEAR(two.objects[0].position.x, 8.0, 1e-9);
+	EXPECT_NEAR(two.objects[1].position.x, 12.0, 1e-9);
+	EXPECT_NEAR(two.objects[0].position.y, 1.5, 1e-9) << "the lower ball rests on the ground at 0.5";
+	EXPECT_NEAR(two.objects[1].position.y - two.objects[0].position.y, 2.0, 1e-9);
+	EXPECT_FALSE(placeOnGround(two, ItemSet{}, Float3{0, 0, 0})) << "nothing picked";
+}
+
+TEST(SceneArrangeTest, SettingTheHeightScalesAboutTheMiddleOfTheBaseSoItStaysWhereItStands) {
+	Object box = makeObject(ShapeKind::Box, "Crate");
+	box.size = {1, 2, 1};
+	box.position = {4, 1, -3};   // stands on the floor
+	Document d = sceneOf({box});
+	EXPECT_NEAR(heightOfItems(d, makeItemSet(d, {0})), 2.0, 1e-9);
+	ASSERT_TRUE(setHeightOfItems(d, makeItemSet(d, {0}), 1.8));
+	EXPECT_NEAR(heightOfItems(d, makeItemSet(d, {0})), 1.8, 1e-9);
+	EXPECT_NEAR(d.objects[0].position.x, 4.0, 1e-9);
+	EXPECT_NEAR(d.objects[0].position.z, -3.0, 1e-9);
+	EXPECT_NEAR(d.objects[0].position.y - 0.9, 0.0, 1e-9) << "still on the floor";
+	EXPECT_FALSE(setHeightOfItems(d, makeItemSet(d, {0}), 0.0));
+	EXPECT_FALSE(setHeightOfItems(d, makeItemSet(d, {0}), 1000.0)) << "more than 100 times: refused";
+	EXPECT_NEAR(heightOfItems(d, ItemSet{}), 0.0, 1e-12);
+}
