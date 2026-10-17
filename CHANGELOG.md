@@ -4,7 +4,7 @@ Release notes for the next tagged release, summarising the large correctness eff
 Before this, see `git log`. Each item has a commit with the measurements behind it, and
 [docs/PBRT_SUPPORT.md](docs/PBRT_SUPPORT.md) has the per-feature, per-backend detail.
 
-## Unreleased (after 0.1.4)
+## 0.1.5 (2026-10-16)
 
 * **The first Metal render after an install waits about two minutes, not four**: Metal turns the path tracer into machine code once per Mac, for two shader variants (the second is for alpha masks and subsurface), and the app built them one after the other (108 s then 121 s on an M2). They are now built side by side (about 125 s in all: `ray_tracer --prepare-gpu` 231 s -> 136 s, measured with a cold cache). A Live Preview that starts during the warm-up still waits for the build of its own variant instead of compiling it twice.
 
@@ -22,6 +22,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 * **Scene Builder: Make from a photo... for a material** (under **Picture**, matte and glossy paint; plain image processing, nothing to install, `src/shared/material_from_photo.h`): one photo of a surface (wood, tile, fabric, a wall) becomes a colour picture with the photo's uneven light divided out and made to repeat with no joins (the patch is laid over a copy of itself shifted by half, and the join is cut along the path where the two nearly agree, so lines and grain stay sharp, with the brightness difference at the cut spread into the copy; where the two agree nowhere better than anywhere else, a ramp of light, they are blended instead), a bump map guessed from the picture at two scales, the average colour, the gloss and relief a kind of surface usually has (varnished wood, tile and leather get a clear coat) and the repeat count from the width of the photographed patch. The dialog previews the picture repeated twice across and down and the bump map. Checked with hand-made photos (a lit-from-one-side plank pattern, grooves, a ramp: the light is taken out, the join is gone, the grooves are low) and on three crops of the web photos (a wood floor, a stone floor, a wooden ceiling) rendered on a large quad. The relief is a guess from the colours; the gloss is a starting value, not measured. Not tried on a Mac.
 * **README and gallery refreshed**: all twelve renders redone with the current build (eleven look the same, the Final scene is brighter and less noisy), a row of three Cornell material scenes and the Studio Showcase added, the social preview carries the Photonsmith name, and the counts (66 test scenes, nearly 6,000 tests) are current.
 * Looked at and left (recorded in `docs/PBRT_SUPPORT.md`): the 2-4% excess of chromatic absorbers in the RGB renderers (pbrt averages over wavelengths; the spectral wavefront backend already agrees) and the flat-shaded OptiX strands.
+
+**Known in 0.1.5 on the Mac (Metal):** nothing new was run on a Mac. Room from a photo (its helper's setup script, the draft-render light level) and Light picture are untested there; on Metal a window's picture in a room made from a photo is expected to show as one flat colour (Metal keeps one area-light picture per scene and maps it on quads only; the room's windows are boxes), and Make from a photo for a material is plain Qt and C++ and should work unchanged. `docs/GPU_SCENE_COMMON.md` ("Room from a photo: what the Mac has to check") lists the checks.
 
 ## 0.1.4 (2026-10-15)
 
