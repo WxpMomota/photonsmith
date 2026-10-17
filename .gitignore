@@ -503,3 +503,7 @@ mcparity_*.exr
 !gpu/metal/test_scenes/*.png
 # The frozen pbrt-v4 reference means the pbrt reference pack tests read (scripts/pbrt_reference_pack.py writes it) - a data file, not a stray log.
 !tests/data/pbrt_reference_means.txt
+
+# Python bytecode (the photo helpers' tests)
+__pycache__/
+*.pyc
