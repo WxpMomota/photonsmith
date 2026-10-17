@@ -24,6 +24,7 @@
 #include <QMessageBox>
 #include <QPixmap>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QProgressDialog>
 #include <QScrollArea>
 #include <QSpinBox>
@@ -101,6 +102,9 @@ bool SceneBuilderWidget::renderIntoPhoto(const QString &outPng, const std::vecto
 	std::vector<float> rgb[3];
 	QElapsedTimer clock;
 	clock.start();
+	const QString cat = QStringLiteral("photo");
+	logLine(cat, QStringLiteral("render into the photo: %1 x %2, %3 samples, %4 inserted object(s), %5 ground object(s), %6; three renders (as it is, without the inserted objects, mask of them)")
+	                 .arg(w).arg(h).arg(samples).arg(inserted).arg(grounds).arg(m_gpuCheck && m_gpuCheck->isChecked() ? QStringLiteral("GPU") : QStringLiteral("CPU")));
 	for (int p = 0; p < 3; ++p) {
 		busy.setValue(p);
 		busy.setLabelText(tr("Rendering the scene for the photo: %1 of 3...").arg(p + 1));
@@ -117,22 +121,55 @@ bool SceneBuilderWidget::renderIntoPhoto(const QString &outPng, const std::vecto
 		QProcess process;
 		process.setProcessChannelMode(QProcess::MergedChannels);
 		process.setWorkingDirectory(QCoreApplication::applicationDirPath());
+		const QStringList launch = {m_gpuCheck && m_gpuCheck->isChecked() ? "--gpu" : "--cpu", "--output", exr, "--height", QString::number(h), QString::number(w), QString::number(list[p].samples), QString::number(list[p].depth), scene};
+		logLine(cat, QStringLiteral("  render %1 of 3 (%2, %3 samples): %4 %5").arg(p + 1).arg(QString::fromLatin1(list[p].name)).arg(list[p].samples).arg(launcherPath(), launch.join(QLatin1Char(' '))));
+		QElapsedTimer passClock;
+		passClock.start();
 		process.start(launcherPath(), {m_gpuCheck && m_gpuCheck->isChecked() ? "--gpu" : "--cpu", "--output", exr, "--height", QString::number(h), QString::number(w), QString::number(list[p].samples), QString::number(list[p].depth), scene});
+		// what the renderer says: its progress goes to the progress window and (a line in four) the log, the rest straight to the log
+		QString partial, outputTail;   // (outputTail: the last of what it said, for an error message)
+		int lastQuarter = -1, kept = 0;
+		auto drain = [&]() {
+			partial += QString::fromLocal8Bit(process.readAll());
+			const QStringList parts = partial.split(QRegularExpression(QStringLiteral("[%1r%1n]").arg(QChar(92))));
+			partial = parts.last();
+			for (int k = 0; k + 1 < parts.size(); ++k) {
+				const QString line = parts[k].trimmed();
+				if (line.isEmpty()) continue;
+				outputTail = (outputTail + line + QChar(10)).right(1200);
+				if (line.startsWith(QLatin1String("Scanlines remaining:"))) {
+					const int left = line.mid(20).trimmed().toInt();
+					const int percent = std::min(100, std::max(0, 100 * (h - left) / h));
+					busy.setLabelText(tr("Rendering the scene for the photo: %1 of 3, %2%...").arg(p + 1).arg(percent));
+					if (percent / 25 != lastQuarter) {
+						lastQuarter = percent / 25;
+						logLine(cat, QStringLiteral("    render %1 of 3: %2%").arg(p + 1).arg(percent));
+					}
+				} else if (kept++ < 80) {
+					logLine(cat, QStringLiteral("    renderer: %1").arg(line));
+				}
+			}
+		};
 		for (int waited = 0; process.state() != QProcess::NotRunning && waited < 20 * 60 * 1000 && !busy.wasCanceled(); waited += 50) {
 			process.waitForFinished(50);
+			drain();
 			QCoreApplication::processEvents();
 		}
+		drain();
 		if (process.state() != QProcess::NotRunning) {
 			process.kill();
 			process.waitForFinished(3000);
 			if (error && !busy.wasCanceled()) *error = tr("A render took too long and was stopped.");
+			logLine(cat, busy.wasCanceled() ? QStringLiteral("  cancelled by the user") : QStringLiteral("  a render took too long and was stopped"), log_format::Level::Warn);
 			return false;
 		}
 		int rw = 0, rh = 0;
 		if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0 || !readLinear(exr, &rw, &rh, &rgb[p])) {
-			if (error) *error = tr("The renderer could not make the %1 picture. Its output:\n%2").arg(QString::fromLatin1(list[p].name), QString::fromLocal8Bit(process.readAll()).right(400));
+			if (error) *error = tr("The renderer could not make the %1 picture. Its output:\n%2").arg(QString::fromLatin1(list[p].name), outputTail.right(400));
+			logLine(cat, QStringLiteral("  render %1 of 3 failed (exit code %2): %3").arg(p + 1).arg(process.exitCode()).arg(outputTail.right(400).simplified()), log_format::Level::Error);
 			return false;
 		}
+		logLine(cat, QStringLiteral("  render %1 of 3 done in %2 s (%3 x %4)").arg(p + 1).arg(passClock.elapsed() / 1000.0, 0, 'f', 1).arg(rw).arg(rh));
 		if (rw != w || rh != h) {
 			if (error) *error = tr("The renderer made a picture of %1 x %2, not the %3 x %4 asked for.").arg(rw).arg(rh).arg(w).arg(h);
 			return false;
@@ -172,9 +209,11 @@ bool SceneBuilderWidget::renderIntoPhoto(const QString &outPng, const std::vecto
 	for (int y = 0; y < h; ++y) std::copy(out.begin() + static_cast<std::ptrdiff_t>(y) * w * 3, out.begin() + static_cast<std::ptrdiff_t>(y + 1) * w * 3, result.scanLine(y));
 	if (!QDir().mkpath(QFileInfo(outPng).absolutePath()) || !result.save(outPng)) {
 		if (error) *error = tr("The picture could not be saved as %1.").arg(outPng);
+		logLine(cat, QStringLiteral("  the picture could not be saved as %1").arg(outPng), log_format::Level::Error);
 		return false;
 	}
-	AppLog::info(QStringLiteral("photo"), QStringLiteral("render into the photo: %1 (%2 x %3, %4 inserted objects, %5 ground, %6 samples, %7 s)").arg(outPng).arg(w).arg(h).arg(inserted).arg(grounds).arg(samples).arg(clock.elapsed() / 1000.0, 0, 'f', 1));
+	logLine(QStringLiteral("photo"), QStringLiteral("render into the photo done: saved %1 (%2 x %3, %4 inserted objects, %5 ground, %6 samples, %7 s in all)").arg(outPng).arg(w).arg(h).arg(inserted).arg(grounds).arg(samples).arg(clock.elapsed() / 1000.0, 0, 'f', 1));
+	if (!matchNote.isEmpty()) logLine(cat, QStringLiteral("  %1").arg(matchNote), matched ? log_format::Level::Info : log_format::Level::Warn);
 	if (notes) {
 		*notes << tr("%n object(s) were put into the photo; the ground they stand on is not drawn (only the shadows and reflections they cause are).", "", inserted);
 		if (!matchNote.isEmpty()) *notes << matchNote;
@@ -245,7 +284,10 @@ void SceneBuilderWidget::renderIntoPhotoDialog() {
 	QString error;
 	QStringList notes;
 	if (!renderIntoPhoto(path, ground, exposure->value(), quality->value(), match->isChecked(), &error, &notes)) {
-		if (!error.isEmpty()) QMessageBox::warning(this, tr("Could not render into the photo"), error);
+		if (!error.isEmpty()) {
+			logLine(QStringLiteral("photo"), QStringLiteral("render into the photo failed: %1").arg(error), log_format::Level::Warn);
+			QMessageBox::warning(this, tr("Could not render into the photo"), error);
+		}
 		return;
 	}
 	QDialog shown(this);

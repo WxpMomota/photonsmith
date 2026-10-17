@@ -121,6 +121,7 @@ void MainWindow::createRenderOptionsTab() {
 void MainWindow::createSceneBuilderTab() {
 	m_sceneBuilder = new SceneBuilderWidget(this);
 	connect(m_sceneBuilder, &SceneBuilderWidget::statusMessage, this, [this](const QString &text) { statusBar()->showMessage(text, 5000); });
+	connect(m_sceneBuilder, &SceneBuilderWidget::logMessage, this, &MainWindow::onLogMessage);   // what the Scene Builder is doing, in the Log Output pane
 	// "Add to scene list": list the saved file now (the registry grows while the program runs) and select it in the Settings tab.
 #ifdef RT_GUI_HAVE_LIVE_PREVIEW
 	// The rendered viewport and Live Preview cannot both have the GPU: starting the viewport stops a running Live Preview.

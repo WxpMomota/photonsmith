@@ -68,7 +68,7 @@ bool SceneBuilderWidget::applyLightPhoto(int lightIndex, const QString &photo, d
 		sky.sky.turbidity = std::round(found.turbidity * 10.0) / 10.0;
 	});
 	QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
-	AppLog::info(QStringLiteral("photo"), QStringLiteral("light from a photo: %1 (sun %2 deg high, %3 deg compass, haze %4, %5, confidence %6)")
+	logLine(QStringLiteral("photo"), QStringLiteral("light from a photo: %1 (sun %2 deg high, %3 deg compass, haze %4, %5, confidence %6)")
 	                                          .arg(photo)
 	                                          .arg(found.sunElevation, 0, 'f', 1)
 	                                          .arg(azimuth, 0, 'f', 0)
@@ -131,8 +131,10 @@ void SceneBuilderWidget::lightFromPhoto(int lightIndex) {
 	QStringList notes;
 	const bool tiltGiven = tilt->value() > tilt->minimum();
 	if (!applyLightPhoto(lightIndex, photo, fov->value(), tiltGiven, tilt->value(), &error, &notes)) {
+		logLine(QStringLiteral("photo"), QStringLiteral("light from a photo failed: %1").arg(error), log_format::Level::Warn);
 		QMessageBox::warning(this, tr("Could not read the light"), error);
 		return;
 	}
+	for (const QString &note : notes) logLine(QStringLiteral("photo"), QStringLiteral("  %1").arg(note));
 	QMessageBox::information(this, tr("Light from a photo"), tr("The sky was set from %1:\n\n- %2").arg(QFileInfo(photo).fileName(), notes.join("\n- ")));
 }

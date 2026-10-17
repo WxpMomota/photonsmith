@@ -997,7 +997,7 @@
     </message>
     <message>
         <location filename="../mainwindow_actions.cpp" line="88"/>
-        <location filename="../mainwindow_tabs_render.cpp" line="352"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="353"/>
         <source>Open Output &amp;Folder</source>
         <translation>打开输出文件夹(&amp;F)</translation>
     </message>
@@ -1008,7 +1008,7 @@
     </message>
     <message>
         <location filename="../mainwindow_actions.cpp" line="98"/>
-        <location filename="../mainwindow_tabs_render.cpp" line="364"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="365"/>
         <source>Open in Default &amp;Viewer</source>
         <translation>用默认查看器打开(&amp;V)</translation>
     </message>
@@ -4472,37 +4472,37 @@ Off by default (genuinely random every render).</source>
     </message>
     <message>
         <location filename="../mainwindow_live_preview.cpp" line="142"/>
-        <location filename="../mainwindow_tabs_render.cpp" line="134"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="135"/>
         <source>Saved, but the scene list could not list it until the program is restarted.</source>
         <translation>已保存，但在重启程序之前场景列表无法列出它。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="138"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="139"/>
         <source>Added to the scene list as %1 (Settings tab).</source>
         <translation>已作为 %1 添加到场景列表（“设置”标签页）。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="140"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="141"/>
         <source>Scene Builder</source>
         <translation>场景构建器</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="146"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="147"/>
         <source>The preview copy could not be opened in Live Preview.</source>
         <translation>无法在实时预览中打开预览副本。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="355"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="356"/>
         <source>Show the folder containing the active tab&apos;s render in Explorer</source>
         <translation>在资源管理器中显示当前标签页渲染结果所在的文件夹</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="367"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="368"/>
         <source>Open the active tab&apos;s render in the system viewer</source>
         <translation>使用系统查看器打开当前标签页的渲染结果</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="393"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="394"/>
         <source>Preview</source>
         <translation>预览</translation>
     </message>
@@ -4563,13 +4563,13 @@ Drag to orbit, scroll or +/- to zoom, WASD to move, Up/Down to fly</source>
         <translation>[实时预览] 错误：%1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="436"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="437"/>
         <source>&lt;b&gt;Why it looks this way&lt;/b&gt;&lt;br&gt;%1</source>
         <translation>&lt;b&gt;为什么看起来是这样&lt;/b&gt;&lt;br&gt;%1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="562"/>
-        <location filename="../mainwindow_tabs_render.cpp" line="575"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="563"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="576"/>
         <location filename="../mainwindow_tabs_settings_groups.cpp" line="278"/>
         <location filename="../mainwindow_thumbnails.cpp" line="126"/>
         <location filename="../mainwindow_thumbnails.cpp" line="165"/>
@@ -4577,12 +4577,12 @@ Drag to orbit, scroll or +/- to zoom, WASD to move, Up/Down to fly</source>
         <translation>暂停</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="575"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="576"/>
         <source>Play</source>
         <translation>播放</translation>
     </message>
     <message>
-        <location filename="../mainwindow_tabs_render.cpp" line="585"/>
+        <location filename="../mainwindow_tabs_render.cpp" line="586"/>
         <source>Video playback error (%1): %2</source>
         <translation>视频播放错误 (%1):%2</translation>
     </message>
@@ -6905,161 +6905,166 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>宽高比</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="58"/>
-        <location filename="../scene_builder_composite.cpp" line="189"/>
+        <location filename="../scene_builder_composite.cpp" line="59"/>
+        <location filename="../scene_builder_composite.cpp" line="228"/>
         <source>Match the camera to a photo first (Camera section: Match to a photo...): the scene is put into that photo.</source>
         <translation>请先让相机匹配一张照片（相机部分：匹配照片...）：场景会被放进那张照片里。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="87"/>
+        <location filename="../scene_builder_composite.cpp" line="88"/>
         <source>Every object is marked as the ground or a light, so there is nothing to put into the photo.</source>
         <translation>所有物体都被标记为地面或光源，因此没有可放进照片的东西。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="96"/>
+        <location filename="../scene_builder_composite.cpp" line="97"/>
         <source>Rendering the scene for the photo...</source>
         <translation>正在为照片渲染场景...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="97"/>
-        <location filename="../scene_builder_composite.cpp" line="189"/>
-        <location filename="../scene_builder_composite.cpp" line="194"/>
-        <location filename="../scene_builder_composite.cpp" line="252"/>
+        <location filename="../scene_builder_composite.cpp" line="98"/>
+        <location filename="../scene_builder_composite.cpp" line="228"/>
+        <location filename="../scene_builder_composite.cpp" line="233"/>
+        <location filename="../scene_builder_composite.cpp" line="294"/>
         <source>Render into the photo</source>
         <translation>渲染到照片中</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="106"/>
+        <location filename="../scene_builder_composite.cpp" line="110"/>
         <source>Rendering the scene for the photo: %1 of 3...</source>
         <translation>正在为照片渲染场景：第 %1 张，共 3 张...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="128"/>
+        <location filename="../scene_builder_composite.cpp" line="143"/>
+        <source>Rendering the scene for the photo: %1 of 3, %2%...</source>
+        <translation>正在为照片渲染场景：第 %1 张，共 3 张，%2%...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_composite.cpp" line="162"/>
         <source>A render took too long and was stopped.</source>
         <translation>有一次渲染耗时过长，已被停止。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="133"/>
+        <location filename="../scene_builder_composite.cpp" line="168"/>
         <source>The renderer could not make the %1 picture. Its output:
 %2</source>
         <translation>渲染器无法生成“%1”图像。它的输出：
 %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="137"/>
+        <location filename="../scene_builder_composite.cpp" line="174"/>
         <source>The renderer made a picture of %1 x %2, not the %3 x %4 asked for.</source>
         <translation>渲染器生成的图像为 %1 x %2，而不是要求的 %3 x %4。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="152"/>
+        <location filename="../scene_builder_composite.cpp" line="189"/>
         <source>The objects&apos; exposure was not matched to the photo: that reads the photo&apos;s sky, and the scene has no Sun &amp; sky (set it from the same photo with Light from a photo).</source>
         <translation>没有把物体的曝光与照片匹配：这需要读取照片的天空，而场景里没有“太阳与天空”（请用“由照片设置光照”根据同一张照片设置）。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="159"/>
+        <location filename="../scene_builder_composite.cpp" line="196"/>
         <source>The objects&apos; exposure (%1 stops) and colour were matched to the photo&apos;s sky.</source>
         <translation>已根据照片的天空匹配物体的曝光（%1 档）和颜色。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="162"/>
+        <location filename="../scene_builder_composite.cpp" line="199"/>
         <source>The objects&apos; exposure was not matched to the photo: %1</source>
         <translation>没有把物体的曝光与照片匹配：%1</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="168"/>
+        <location filename="../scene_builder_composite.cpp" line="205"/>
         <source>The picture could not be put together.</source>
         <translation>无法合成图像。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="174"/>
+        <location filename="../scene_builder_composite.cpp" line="211"/>
         <source>The picture could not be saved as %1.</source>
         <translation>无法将图像保存为 %1。</translation>
     </message>
     <message numerus="yes">
-        <location filename="../scene_builder_composite.cpp" line="179"/>
+        <location filename="../scene_builder_composite.cpp" line="218"/>
         <source>%n object(s) were put into the photo; the ground they stand on is not drawn (only the shadows and reflections they cause are).</source>
         <translation>
             <numerusform>已把 %n 个物体放进照片；它们所在的地面不会绘制（只绘制它们造成的阴影和反射）。</numerusform>
         </translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="181"/>
+        <location filename="../scene_builder_composite.cpp" line="220"/>
         <source>The objects are shown at the exposure the Builder gives them%1; the photo&apos;s own exposure is not known, so use Exposure if they look too bright or too dark.</source>
         <translation>物体按构建器给出的曝光显示%1；照片自身的曝光未知，如果它们看起来太亮或太暗，请使用“曝光”调整。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="181"/>
+        <location filename="../scene_builder_composite.cpp" line="220"/>
         <source> (%1 stops)</source>
         <translation>（%1 档）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="182"/>
+        <location filename="../scene_builder_composite.cpp" line="221"/>
         <source>No object is marked as the ground, so there are no shadows on the photo: tick the floor the objects stand on.</source>
         <translation>没有物体被标记为地面，因此照片上不会有阴影：请勾选物体所站的地面。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="196"/>
+        <location filename="../scene_builder_composite.cpp" line="235"/>
         <source>The scene, seen through the camera matched to the photo, is rendered and put into the photo, with the shadows and reflections it casts on the ground. Tick the objects that are the ground: the photo already has it, so it is not drawn, and only the shadows it catches count. Everything else (except lights) is put into the photo. The scene is rendered three times, so it takes about three times as long as one picture.</source>
         <translation>场景会透过与照片匹配的相机渲染，并连同它投在地面上的阴影和反射一起放进照片。请勾选作为地面的物体：照片里已经有地面，所以不会绘制它，只使用它接收到的阴影。其余所有物体（光源除外）都会放进照片。场景要渲染三次，所以耗时大约是一张图像的三倍。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="211"/>
+        <location filename="../scene_builder_composite.cpp" line="250"/>
         <source>Ticked: the ground the photo already has (its shadows are used, it is not drawn). Unticked: put into the photo.</source>
         <translation>已勾选：照片里已有的地面（使用它的阴影，不绘制）。未勾选：放进照片。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="216"/>
+        <location filename="../scene_builder_composite.cpp" line="255"/>
         <source>Match the objects&apos; exposure and colour to the photo&apos;s sky</source>
         <translation>根据照片的天空匹配物体的曝光和颜色</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="218"/>
+        <location filename="../scene_builder_composite.cpp" line="257"/>
         <source>Reads how bright and how warm or cool the photo&apos;s sky is, and gives the objects the same exposure and colour cast. Needs the Sun &amp; sky set from the same photo (Light from a photo). The setting below is added to it.</source>
         <translation>读取照片天空的亮度和冷暖，并给物体相同的曝光和色偏。需要根据同一张照片设置的“太阳与天空”（由照片设置光照）。下面的设置会叠加在其上。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="224"/>
+        <location filename="../scene_builder_composite.cpp" line="263"/>
         <source> stops</source>
         <translation> 档</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="225"/>
+        <location filename="../scene_builder_composite.cpp" line="264"/>
         <source>How much brighter (+) or darker (-) the objects are made, to match the photo&apos;s exposure. Each stop doubles or halves their light.</source>
         <translation>为匹配照片的曝光，把物体调亮 (+) 或调暗 (-) 多少。每一档会使它们的光加倍或减半。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="226"/>
+        <location filename="../scene_builder_composite.cpp" line="265"/>
         <source>Exposure of the objects</source>
         <translation>物体的曝光</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="230"/>
+        <location filename="../scene_builder_composite.cpp" line="269"/>
         <source>Samples per pixel: more makes the shadows smoother and takes longer.</source>
         <translation>每像素采样数：越多阴影越平滑，但耗时越长。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="231"/>
+        <location filename="../scene_builder_composite.cpp" line="270"/>
         <location filename="../scene_builder_inspector.cpp" line="441"/>
         <source>Samples per pixel</source>
         <translation>每像素采样数</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="242"/>
+        <location filename="../scene_builder_composite.cpp" line="281"/>
         <source>Save the picture as</source>
         <translation>将图像保存为</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="242"/>
+        <location filename="../scene_builder_composite.cpp" line="281"/>
         <source>PNG pictures (*.png)</source>
         <translation>PNG 图像 (*.png)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="248"/>
+        <location filename="../scene_builder_composite.cpp" line="289"/>
         <source>Could not render into the photo</source>
         <translation>无法渲染到照片中</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="261"/>
+        <location filename="../scene_builder_composite.cpp" line="303"/>
         <source>Saved as %1.
 
 - %2</source>
@@ -8604,7 +8609,7 @@ From: %3</source>
         <translation>在显卡上渲染（Windows 上为 NVIDIA OptiX，Mac 上为 Metal）。大幅面图像快得多，需要受支持的 GPU。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="195"/>
+        <location filename="../scene_builder_render.cpp" line="205"/>
         <location filename="../scene_builder_turntable.cpp" line="244"/>
         <location filename="../scene_builder_widget.cpp" line="323"/>
         <source>Preview</source>
@@ -8877,12 +8882,12 @@ From: %3</source>
         <translation>无法保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="112"/>
+        <location filename="../scene_builder_composite.cpp" line="116"/>
         <location filename="../scene_builder_files.cpp" line="170"/>
         <location filename="../scene_builder_files.cpp" line="180"/>
         <location filename="../scene_builder_files.cpp" line="246"/>
         <location filename="../scene_builder_files.cpp" line="280"/>
-        <location filename="../scene_builder_render.cpp" line="114"/>
+        <location filename="../scene_builder_render.cpp" line="124"/>
         <location filename="../scene_builder_rendered.cpp" line="204"/>
         <location filename="../scene_builder_turntable.cpp" line="183"/>
         <source>Could not write %1.</source>
@@ -9024,36 +9029,36 @@ It is in the scene list now (Settings tab, My Scenes).</source>
         <translation>注意：</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="124"/>
+        <location filename="../scene_builder_render.cpp" line="134"/>
         <source>Save the rendered picture</source>
         <translation>保存渲染的图像</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="124"/>
+        <location filename="../scene_builder_render.cpp" line="134"/>
         <source>PNG images (*.png)</source>
         <translation>PNG 图像 (*.png)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="128"/>
+        <location filename="../scene_builder_render.cpp" line="138"/>
         <source>The render failed</source>
         <translation>渲染失败</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="140"/>
+        <location filename="../scene_builder_render.cpp" line="150"/>
         <location filename="../scene_builder_turntable.cpp" line="167"/>
         <source>A render is already running.</source>
         <translation>已有渲染正在运行。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="66"/>
-        <location filename="../scene_builder_render.cpp" line="142"/>
+        <location filename="../scene_builder_composite.cpp" line="67"/>
+        <location filename="../scene_builder_render.cpp" line="152"/>
         <location filename="../scene_builder_turntable.cpp" line="170"/>
         <source>Fix the problems listed under the properties first.</source>
         <translation>请先修复属性中列出的问题。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="62"/>
-        <location filename="../scene_builder_render.cpp" line="143"/>
+        <location filename="../scene_builder_composite.cpp" line="63"/>
+        <location filename="../scene_builder_render.cpp" line="153"/>
         <location filename="../scene_builder_turntable.cpp" line="171"/>
         <source>The renderer (%1) was not found next to the program.</source>
         <translation>在程序旁边找不到渲染器 (%1)。</translation>
@@ -9216,7 +9221,7 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
     </message>
     <message>
         <location filename="../scene_builder_light_photo.cpp" line="96"/>
-        <location filename="../scene_builder_light_photo.cpp" line="137"/>
+        <location filename="../scene_builder_light_photo.cpp" line="139"/>
         <source>Light from a photo</source>
         <translation>由照片生成光照</translation>
     </message>
@@ -9282,7 +9287,7 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
     </message>
     <message>
         <location filename="../scene_builder_camera_photo.cpp" line="128"/>
-        <location filename="../scene_builder_camera_photo.cpp" line="186"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="188"/>
         <source>Camera from a photo</source>
         <translation>由照片设置相机</translation>
     </message>
@@ -9355,17 +9360,17 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>同时根据照片设置太阳和天空</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="182"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="183"/>
         <source>Could not read the camera</source>
         <translation>无法读出相机</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="185"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="187"/>
         <source>Next: pick an object in the list, press Place the picked object by clicking... in its properties, click the ground in the picture, then press Render into the photo... on Camera and image.</source>
         <translation>下一步：在列表中选择一个物体，在它的属性中点击“点击放置所选物体...”，再点击画面中的地面，然后在“相机与图像”上点击“渲染到照片中...”。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="186"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="188"/>
         <source>The camera was set from %1:
 
 - %2</source>
@@ -9374,38 +9379,38 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
 - %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="193"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="195"/>
         <source>Pick an object first (click it in the list or the view), then Place by clicking.</source>
         <translation>请先选择一个物体（在列表或视图中点击它），然后使用“点击放置”。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="199"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="201"/>
         <source>Click the ground in the picture to stand the picked object there. Click again to move it; Esc stops.</source>
         <translation>点击画面中的地面，把所选物体放在那里。再次点击可移动它；按 Esc 结束。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="210"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="212"/>
         <source>Placed on the ground. It is %1 m tall; the camera is %2 m above the ground. Click again to move it, Esc stops, or set its real height.</source>
         <translation>已放在地面上。它高 %1 米；相机离地 %2 米。再次点击可移动它，按 Esc 结束，也可以设置它的实际高度。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="228"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="230"/>
         <source>Pick an object first: its height is made what you say, about the middle of its base.</source>
         <translation>请先选择一个物体：它的高度会变为你给出的值，以底面中心为基准。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="232"/>
         <location filename="../scene_builder_camera_photo.cpp" line="234"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="236"/>
         <source>Real height</source>
         <translation>实际高度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="232"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="234"/>
         <source>How tall is it in the photo (metres)? The picked object is scaled about the middle of its base.</source>
         <translation>它在照片中有多高（米）？所选物体会以底面中心为基准缩放。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="234"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="236"/>
         <source>It cannot be made that tall (the size may change by up to 100 times).</source>
         <translation>无法调到这个高度（尺寸最多可变化 100 倍）。</translation>
     </message>
@@ -9421,12 +9426,12 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>相机倾斜</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="134"/>
+        <location filename="../scene_builder_light_photo.cpp" line="135"/>
         <source>Could not read the light</source>
         <translation>无法读出光照</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="137"/>
+        <location filename="../scene_builder_light_photo.cpp" line="139"/>
         <source>The sky was set from %1:
 
 - %2</source>
@@ -9525,11 +9530,11 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>已由 %1 生成材质。%2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="96"/>
+        <location filename="../scene_builder_composite.cpp" line="97"/>
         <location filename="../scene_builder_photo.cpp" line="98"/>
         <location filename="../scene_builder_photo.cpp" line="262"/>
         <location filename="../scene_builder_photo.cpp" line="334"/>
-        <location filename="../scene_builder_render.cpp" line="180"/>
+        <location filename="../scene_builder_render.cpp" line="190"/>
         <location filename="../scene_builder_turntable.cpp" line="227"/>
         <source>Cancel</source>
         <translation>取消</translation>
@@ -9658,45 +9663,45 @@ This replaces the scene you have now (Undo brings it back).</source>
         <translation>正在调整房间的光照强度...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="183"/>
+        <location filename="../scene_builder_render.cpp" line="193"/>
         <source>Rendering %1 x %2, %3 samples...</source>
         <translation>正在渲染 %1 x %2，%3 个采样…</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="211"/>
+        <location filename="../scene_builder_render.cpp" line="221"/>
         <source>The render was cancelled.</source>
         <translation>渲染已取消。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="211"/>
+        <location filename="../scene_builder_render.cpp" line="221"/>
         <location filename="../scene_builder_turntable.cpp" line="270"/>
         <source>The renderer stopped unexpectedly.</source>
         <translation>渲染器意外停止。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="211"/>
+        <location filename="../scene_builder_render.cpp" line="221"/>
         <source>The renderer did not produce a picture (exit code %1).
 %2</source>
         <translation>渲染器没有生成图像（退出代码 %1）。
 %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="212"/>
+        <location filename="../scene_builder_render.cpp" line="222"/>
         <source>The render failed.</source>
         <translation>渲染失败。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="218"/>
+        <location filename="../scene_builder_render.cpp" line="228"/>
         <source>Done in %1 s (%2 x %3).</source>
         <translation>用时 %1 秒完成 (%2 x %3)。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="221"/>
+        <location filename="../scene_builder_render.cpp" line="231"/>
         <source>Saved %1.</source>
         <translation>已保存 %1。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="222"/>
+        <location filename="../scene_builder_render.cpp" line="232"/>
         <source>Could not save to %1.</source>
         <translation>无法保存到 %1。</translation>
     </message>
@@ -9923,12 +9928,12 @@ This replaces the scene you have now (Undo brings it back).</source>
         <translation>现成的混合材质</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="79"/>
+        <location filename="../scene_builder_render.cpp" line="89"/>
         <source>Denoise</source>
         <translation>降噪</translation>
     </message>
     <message>
-        <location filename="../scene_builder_render.cpp" line="80"/>
+        <location filename="../scene_builder_render.cpp" line="90"/>
         <source>Clean the grain out of the Preview picture with an AI denoiser. A Draft picture has only 16 samples per pixel, so it is grainy without it. Uses Intel Open Image Denoise on the CPU (downloaded once, with your permission) and NVIDIA&apos;s denoiser with the GPU. The final picture (Render picture...) is not denoised.</source>
         <translation>用 AI 降噪器清除预览图的颗粒。草稿质量每像素只有 16 个采样，没有降噪会很粗糙。CPU 上使用 Intel Open Image Denoise（经你允许下载一次），GPU 上使用 NVIDIA 的降噪器。最终图片（渲染图片...）不会降噪。</translation>
     </message>

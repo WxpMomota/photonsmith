@@ -34,6 +34,7 @@
 #include <QListWidget>
 #include <QMenu>
 #include <QMessageBox>
+#include <QMetaMethod>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPixmap>
@@ -68,6 +69,15 @@ using namespace scene_builder_ui;
 // ---- rendering -------------------------------------------------------------------------------------------------------------------
 
 void SceneBuilderWidget::setUseGpu(bool on) { m_gpuCheck->setChecked(on); }
+
+void SceneBuilderWidget::logLine(const QString &category, const QString &text, log_format::Level level) {
+	if (isSignalConnected(QMetaMethod::fromSignal(&SceneBuilderWidget::logMessage))) {
+		const QString tag = level == log_format::Level::Error ? QStringLiteral("[ERROR] ") : level == log_format::Level::Warn ? QStringLiteral("[WARN] ") : QString();
+		emit logMessage(QStringLiteral("[Scene Builder] ") + tag + text);   // (the pane writes the log file too)
+	} else {
+		AppLog::write(level, category, text);
+	}
+}
 
 void SceneBuilderWidget::setSceneName(const QString &text) {
 	const std::string name = text.toStdString();
@@ -133,7 +143,7 @@ void SceneBuilderWidget::runRender(int width, int height, int samples, bool toFi
                                    const std::function<void(bool, const QString &)> &done) {
 	flushEditLog();   // the edits that led to this render come before it in the log
 	auto fail = [&](const QString &msg) {
-		AppLog::warn(QStringLiteral("builder-render"), QStringLiteral("not started: %1").arg(msg));
+		logLine(QStringLiteral("builder-render"), QStringLiteral("not started: %1").arg(msg), log_format::Level::Warn);
 		m_previewStatus->setText(msg);
 		if (done) done(false, msg);
 	};
@@ -175,8 +185,8 @@ void SceneBuilderWidget::runRender(int width, int height, int samples, bool toFi
 	connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this](int code, QProcess::ExitStatus st) {
 		onPreviewFinished(st == QProcess::NormalExit ? code : -2);
 	});
-	AppLog::info(QStringLiteral("builder-render"), QStringLiteral("start (%1): %2 %3").arg(toFinalFile ? QStringLiteral("final picture -> ") + finalPng : QStringLiteral("preview"), launcherPath(), args.join(QLatin1Char(' '))));
-	for (const auto &problem : problems) AppLog::warn(QStringLiteral("builder-render"), QStringLiteral("scene note: %1").arg(QString::fromStdString(problem.message)));
+	logLine(QStringLiteral("builder-render"), QStringLiteral("start (%1): %2 %3").arg(toFinalFile ? QStringLiteral("final picture -> ") + finalPng : QStringLiteral("preview"), launcherPath(), args.join(QLatin1Char(' '))));
+	for (const auto &problem : problems) logLine(QStringLiteral("builder-render"), QStringLiteral("scene note: %1").arg(QString::fromStdString(problem.message)), log_format::Level::Warn);
 	m_previewButton->setText(tr("Cancel"));
 	m_previewButton->setEnabled(true);
 	m_finalButton->setEnabled(false);
@@ -197,12 +207,12 @@ void SceneBuilderWidget::onPreviewFinished(int exitCode) {
 
 	const double secs = m_renderClock.elapsed() / 1000.0;
 	QPixmap pix(m_previewPng);
-	AppLog::write(exitCode != 0 || pix.isNull() ? log_format::Level::Error : log_format::Level::Info, QStringLiteral("builder-render"),
+	logLine(exitCode != 0 || pix.isNull() ? log_format::Level::Error : log_format::Level::Info, QStringLiteral("builder-render"),
 	              QStringLiteral("finished: exit code %1%2, %3 s, picture %4").arg(exitCode).arg(exitCode == -2 ? (m_cancelRequested ? QStringLiteral(" (cancelled)") : QStringLiteral(" (crashed or killed)")) : exitCode == -1 ? QStringLiteral(" (could not start)") : QString())
 	                  .arg(secs, 0, 'f', 1).arg(pix.isNull() ? QStringLiteral("missing") : QStringLiteral("%1 x %2").arg(pix.width()).arg(pix.height())));
 	if (exitCode != 0 || pix.isNull()) {
 		for (const QString &line : m_renderLog.split(QRegularExpression("[\r\n]+"), Qt::SkipEmptyParts).mid(std::max<qsizetype>(0, m_renderLog.split(QRegularExpression("[\r\n]+"), Qt::SkipEmptyParts).size() - 25)))
-			AppLog::error(QStringLiteral("builder-render"), QStringLiteral("renderer output: %1").arg(line));
+			logLine(QStringLiteral("builder-render"), QStringLiteral("renderer output: %1").arg(line), log_format::Level::Error);
 	}
 	if (exitCode != 0 || pix.isNull()) {
 		QString tail;

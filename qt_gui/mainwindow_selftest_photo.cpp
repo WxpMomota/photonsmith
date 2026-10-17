@@ -491,6 +491,14 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 		clock.start();
 		const bool made = sb->renderIntoPhoto(out, {0}, 0.0, 16, false, &err, &notes);
 		check(made, QString("the scene was rendered into the photo (%1 s) %2").arg(clock.elapsed() / 1000.0, 0, 'f', 1).arg(err));
+		// what it did is in the Log Output pane as it went: the three renders with their times, and the picture that was saved
+		const QString pane = m_logTextEdit ? m_logTextEdit->toPlainText() : QString();
+		{
+			QFile paneFile(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_pane.txt");   // (kept next to the log, to read what the pane showed)
+			if (paneFile.open(QIODevice::WriteOnly)) paneFile.write(pane.toUtf8());
+		}
+		check(pane.contains("[Scene Builder] render into the photo:") && pane.contains("render 1 of 3") && pane.contains("render 3 of 3 done") && pane.contains("render into the photo done: saved"),
+		      "the Log Output pane shows the three renders and the saved picture: " + pane.right(300).replace(QChar(10), " | "));
 		if (made) {
 			QImage result(out);
 			check(!result.isNull() && result.width() == w && result.height() == h, QString("the picture has the photo's shape (%1 x %2)").arg(result.width()).arg(result.height()));

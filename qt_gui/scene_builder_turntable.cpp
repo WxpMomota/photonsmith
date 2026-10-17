@@ -160,7 +160,7 @@ void SceneBuilderWidget::startCameraVideo(int frames, int fps, int width, int sa
                                           const std::function<void(bool, const QString &)> &done) {
 	flushEditLog();
 	const auto fail = [&](const QString &msg) {
-		AppLog::warn(QStringLiteral("builder-render"), QStringLiteral("video not started: %1").arg(msg));
+		logLine(QStringLiteral("builder-render"), QStringLiteral("video not started: %1").arg(msg), log_format::Level::Warn);
 		m_previewStatus->setText(msg);
 		if (done) done(false, msg);
 	};
@@ -223,7 +223,7 @@ void SceneBuilderWidget::startCameraVideo(int frames, int fps, int width, int sa
 	connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this](int code, QProcess::ExitStatus st) {
 		onTurntableFinished(st == QProcess::NormalExit ? code : -2);
 	});
-	AppLog::info(QStringLiteral("builder-render"), QStringLiteral("start (%1, %2 frames at %3 fps -> %4): %5 %6").arg(keyframes.isEmpty() ? QStringLiteral("turntable") : QStringLiteral("flythrough")).arg(frames).arg(fps).arg(outMp4, launcherPath(), args.join(QLatin1Char(' '))));
+	logLine(QStringLiteral("builder-render"), QStringLiteral("start (%1, %2 frames at %3 fps -> %4): %5 %6").arg(keyframes.isEmpty() ? QStringLiteral("turntable") : QStringLiteral("flythrough")).arg(frames).arg(fps).arg(outMp4, launcherPath(), args.join(QLatin1Char(' '))));
 	m_previewButton->setText(tr("Cancel"));
 	m_previewButton->setEnabled(true);
 	m_finalButton->setEnabled(false);
@@ -246,7 +246,7 @@ void SceneBuilderWidget::onTurntableFinished(int exitCode) {
 	const QString made = dir + "/turntable_video.mp4";
 	const double secs = m_renderClock.elapsed() / 1000.0;
 	const bool haveVideo = exitCode == 0 && QFileInfo(made).size() > 0;
-	AppLog::write(haveVideo ? log_format::Level::Info : log_format::Level::Error, QStringLiteral("builder-render"),
+	logLine(haveVideo ? log_format::Level::Info : log_format::Level::Error, QStringLiteral("builder-render"),
 	              QStringLiteral("video finished: exit code %1%2, %3 s, video %4").arg(exitCode).arg(exitCode == -2 ? (m_cancelRequested ? QStringLiteral(" (cancelled)") : QStringLiteral(" (crashed or killed)")) : exitCode == -1 ? QStringLiteral(" (could not start)") : QString())
 	                  .arg(secs, 0, 'f', 1).arg(haveVideo ? QStringLiteral("made") : QStringLiteral("missing")));
 	QString message;
@@ -263,7 +263,7 @@ void SceneBuilderWidget::onTurntableFinished(int exitCode) {
 		message = tr("The video was cancelled.");
 	} else {
 		const QStringList lines = m_renderLog.split(QRegularExpression("[\r\n]+"), Qt::SkipEmptyParts);
-		for (const QString &line : lines.mid(std::max<qsizetype>(0, lines.size() - 25))) AppLog::error(QStringLiteral("builder-render"), QStringLiteral("renderer output: %1").arg(line));
+		for (const QString &line : lines.mid(std::max<qsizetype>(0, lines.size() - 25))) logLine(QStringLiteral("builder-render"), QStringLiteral("renderer output: %1").arg(line), log_format::Level::Error);
 		QString tail;
 		for (qsizetype i = std::max<qsizetype>(0, lines.size() - 6); i < lines.size(); ++i) tail += lines[i] + "\n";
 		const bool noFfmpeg = m_renderLog.contains(QStringLiteral("ffmpeg"), Qt::CaseInsensitive) && m_renderLog.contains(QStringLiteral("Could not launch"));

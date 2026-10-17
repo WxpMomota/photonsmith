@@ -81,7 +81,7 @@ bool SceneBuilderWidget::applyCameraPhoto(const QString &photo, double hfov, dou
 	show3dView(true);   // (the overlay is drawn by the 3D view, looking through the camera)
 	lookThroughCamera(true);
 	QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
-	AppLog::info(QStringLiteral("photo"), QStringLiteral("camera from a photo: %1 (field of view %2 across%3, tilt %4, roll %5, %6)")
+	logLine(QStringLiteral("photo"), QStringLiteral("camera from a photo: %1 (field of view %2 across%3, tilt %4, roll %5, %6)")
 	                                          .arg(photo)
 	                                          .arg(hfov, 0, 'f', 1)
 	                                          .arg(fromExif ? QStringLiteral(" from EXIF") : QString())
@@ -179,9 +179,11 @@ void SceneBuilderWidget::cameraFromPhoto() {
 	QString error;
 	QStringList notes;
 	if (!applyCameraPhoto(photo, fov->value(), height->value(), tilt->value() > tilt->minimum(), tilt->value(), rollSpin->value() > rollSpin->minimum(), rollSpin->value(), sun->isChecked(), &error, &notes)) {
+		logLine(QStringLiteral("photo"), QStringLiteral("camera from a photo failed: %1").arg(error), log_format::Level::Warn);
 		QMessageBox::warning(this, tr("Could not read the camera"), error);
 		return;
 	}
+	for (const QString &note : notes) logLine(QStringLiteral("photo"), QStringLiteral("  %1").arg(note));
 	if (photo.startsWith(QLatin1String(":/"))) notes << tr("Next: pick an object in the list, press Place the picked object by clicking... in its properties, click the ground in the picture, then press Render into the photo... on Camera and image.");
 	QMessageBox::information(this, tr("Camera from a photo"), tr("The camera was set from %1:\n\n- %2").arg(QFileInfo(photo).fileName(), notes.join("\n- ")));
 }
@@ -208,7 +210,7 @@ bool SceneBuilderWidget::placePickedAt(const scene_doc::Float3 &where) {
 	refreshInspectorValues();
 	const double tall = scene_doc::heightOfItems(m_doc, items);
 	emit statusMessage(tr("Placed on the ground. It is %1 m tall; the camera is %2 m above the ground. Click again to move it, Esc stops, or set its real height.").arg(tall, 0, 'f', 2).arg(m_doc.camera.position.y, 0, 'f', 2));
-	AppLog::info(QStringLiteral("photo"), QStringLiteral("placed on the ground at (%1, %2): %3 m tall").arg(where.x, 0, 'f', 2).arg(where.z, 0, 'f', 2).arg(tall, 0, 'f', 2));
+	logLine(QStringLiteral("photo"), QStringLiteral("placed on the ground at (%1, %2): %3 m tall").arg(where.x, 0, 'f', 2).arg(where.z, 0, 'f', 2).arg(tall, 0, 'f', 2));
 	return true;
 }
 

@@ -18,6 +18,7 @@
 #include <array>
 #include <vector>
 
+#include "../src/shared/log_format.h"
 #include "../src/shared/scene_document.h"
 #include "../src/shared/snapshot_history.h"
 #include "../src/shared/scene_props.h"
@@ -279,6 +280,8 @@ public:
 signals:
 	void renderedViewportStarting();   // the main window stops a running Live Preview: only one renderer can have the GPU
 	void statusMessage(const QString &text);
+	// A line for the Log Output pane (the main window shows it with a time, and keeps it in the log file): what the Scene Builder is doing while it works, as the renders and the photo features report it.
+	void logMessage(const QString &line);
 	// A copy of the scene was saved into the scene-list folder ("Add to scene list"); the main window lists it without a restart.
 	void sceneListed(const QString &path);
 	// The Denoise tick was ticked and the CPU denoiser (Intel Open Image Denoise) is not installed: the main window offers to download it (its own prompt, shared with the Render Options tab).
@@ -314,6 +317,9 @@ private:
 	void rebuildList();
 	void refreshListLabels();
 	void rebuildInspector();
+	// Says what is being done: a line in the Log Output pane when the main window listens (it also writes the log file), else straight into the log file.
+	void logLine(const QString &category, const QString &text, log_format::Level level = log_format::Level::Info);
+	void logLine(log_format::Level level, const QString &category, const QString &text) { logLine(category, text, level); }   // (the order AppLog::write takes)
 	void refreshInspectorValues();
 	void updatePreviewPixmap();
 	void setSelection(const BuilderSelection &s, bool fromList = false);   // one item (or none): the others are let go
