@@ -97,6 +97,16 @@ class RoomObjectsTests(unittest.TestCase):
         lifted = dict(place, bottom=0.8)   # something standing on something else is not held to a floor piece's range
         self.assertAlmostEqual(room_objects.finalize_object(lifted, MESH, box, "bed")["size"][1], 0.18, delta=0.025)
 
+    def test_a_floor_piece_is_sunk_by_the_stray_low_points_of_its_mesh_but_never_far(self):
+        box = (-5.0, 5.0, -1.0, 8.0, 3.0)
+        place = {"front": (0.0, 3.0), "dir": (0.0, 1.0), "bottom": 0.0, "height": 1.0, "width": 0.5}   # MESH is 2 tall: scale 0.5
+        self.assertAlmostEqual(room_objects.finalize_object(place, MESH, box, None, 0.2)["position"][1], -0.1, delta=0.012)
+        self.assertEqual(room_objects.finalize_object(place, MESH, box)["position"][1], 0.0, "no foot given: as before")
+        far = room_objects.finalize_object(place, MESH, box, None, 1.5)["position"][1]
+        self.assertAlmostEqual(far, -room_objects.MAX_FOOT * 2.0 * 0.5, delta=0.012, msg="never more than 15% of the height")
+        lifted = dict(place, bottom=0.8)   # something resting on a thing, not on the floor, is not sunk
+        self.assertAlmostEqual(room_objects.finalize_object(lifted, MESH, box, None, 0.2)["position"][1], 0.8, delta=1e-6)
+
     def test_it_stays_inside_the_room(self):
         place = {"front": (9.0, 9.0), "dir": (0.7, 0.7), "bottom": 0.0, "height": 1.0, "width": 0.5}
         final = room_objects.finalize_object(place, MESH, (-2.0, 2.0, -0.4, 4.0, 2.7))

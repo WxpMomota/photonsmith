@@ -80,6 +80,65 @@ class OrientMeshTest(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_DEPS, "numpy and scipy are needed")
+class LevelBaseTest(unittest.TestCase):
+    def setUp(self):
+        self.helper = load_helper()
+        rng = np.random.default_rng(7)
+        # a sofa-like block 2 wide, 2 tall, 1 deep, its six faces sampled (as a surface mesh's vertices would be), standing on y = 0
+        lo, hi = np.array([-1.0, 0.0, -0.5]), np.array([1.0, 2.0, 0.5])
+        faces = []
+        for axis in range(3):
+            for side in (lo, hi):
+                p = rng.uniform(lo, hi, size=(1500, 3))
+                p[:, axis] = side[axis]
+                faces.append(p)
+        self.block = np.vstack(faces)
+
+    @staticmethod
+    def roll(points, degrees):
+        a = np.radians(degrees)
+        r = np.array([[np.cos(a), -np.sin(a), 0.0], [np.sin(a), np.cos(a), 0.0], [0.0, 0.0, 1.0]])
+        return points @ r.T
+
+    def base_tilt(self, v):
+        low = v[v[:, 1] < v[:, 1].min() + 0.12 * (v[:, 1].max() - v[:, 1].min())]
+        _, _, vt = np.linalg.svd(low - low.mean(axis=0), full_matrices=False)
+        n = vt[2] if vt[2][1] >= 0 else -vt[2]
+        return float(np.degrees(np.arccos(min(1.0, n[1]))))
+
+    def test_a_leaning_piece_is_stood_up_flat_on_the_floor(self):
+        leaning = self.roll(self.block, 12.0)
+        leaning = leaning - [0.0, leaning[:, 1].min(), 0.0]
+        self.assertGreater(self.base_tilt(leaning), 5.0)
+        out = self.helper.level_base(np, leaning)
+        self.assertLess(self.base_tilt(out), 1.5)
+        self.assertAlmostEqual(float(out[:, 1].min()), 0.0, places=6)
+        self.assertAlmostEqual(float(out[:, 1].max()), 2.0, places=6)
+        self.assertAlmostEqual(float(out[:, 0].min() + out[:, 0].max()), 0.0, places=6)
+
+    def test_a_turn_keeps_the_triangles_outward(self):
+        v, f = box(1.0, 2.0, 1.0)
+        rng = np.random.default_rng(3)
+        dense = np.vstack([v, rng.uniform(v.min(axis=0), v.max(axis=0), size=(3000, 3))])
+        out = self.helper.level_base(np, self.roll(dense, 9.0))[: len(v)]
+        self.assertGreater(volume(out, f), 0)
+
+    def test_what_is_not_worth_it_or_not_believable_is_left_alone(self):
+        slab = np.random.default_rng(9).uniform([-1.0, 0.0, -0.5], [1.0, 0.02, 0.5], size=(3000, 3))   # (a flat sheet: its plane is exactly what it was turned to)
+        for what, points, degrees in (("a barely leaning piece", self.block, 0.4), ("a sheet on its side", slab, 40.0)):
+            tilted = self.roll(points, degrees)
+            tilted = tilted - [0.0, tilted[:, 1].min(), 0.0]
+            self.assertTrue(np.array_equal(self.helper.level_base(np, tilted), tilted), "%s at %s degrees" % (what, degrees))
+        rng = np.random.default_rng(5)
+        pole = rng.uniform([-0.05, 0.0, -0.05], [0.05, 2.0, 0.05], size=(3000, 3))   # a stem: its base has no plane
+        pole = self.roll(pole, 10.0)
+        pole = pole - [0.0, pole[:, 1].min(), 0.0]
+        self.assertTrue(np.array_equal(self.helper.level_base(np, pole), pole))
+        few = self.block[:20]
+        self.assertTrue(np.array_equal(self.helper.level_base(np, few), few))
+
+
+@unittest.skipUnless(HAVE_DEPS, "numpy and scipy are needed")
 class BakeTest(unittest.TestCase):
     def setUp(self):
         self.helper = load_helper()

@@ -252,7 +252,7 @@ def add_furniture(image, geometry, result, out_folder, segments, count, device_c
             cutout = cut_out(image, seg["mask"])
             os.makedirs(folder, exist_ok=True)
             cutout.save(os.path.join(folder, "cutout.png"))   # what the 3D model was shown (to see why a piece came out as it did)
-            info = maker.make(cutout, folder, remove_bg=True, resolution=192, texture_size=1024, report=band(lo, lo + span))
+            info = maker.make(cutout, folder, remove_bg=True, resolution=192, texture_size=1024, report=band(lo, lo + span), level=place["bottom"] <= 0.001)
         except photo_to_mesh.ObjectError as e:
             result["notes"].append("The %s could not be made into a 3D object: %s" % (label, e))
             continue
@@ -265,7 +265,7 @@ def add_furniture(image, geometry, result, out_folder, segments, count, device_c
             texture_path = os.path.join(folder, "texture.png")
             pixels = np.asarray(Image.open(texture_path).convert("RGB"))
             Image.fromarray(room_objects.relight_texture(pixels, exposure)).save(texture_path)
-        final = room_objects.finalize_object(place, info["size"], geometry["box"], label)
+        final = room_objects.finalize_object(place, info["size"], geometry["box"], label, info.get("foot", 0.0))
         if final is None:
             continue
         result["objects"].append({"name": title_of(label), "label": label, "score": round(seg["score"], 3),

@@ -106,6 +106,39 @@ def orient_mesh(np, verts, faces):
     return verts, faces
 
 
+def level_base(np, verts, fraction=0.12, min_degrees=1.5, max_degrees=30.0, min_spread=0.1):
+    """Turns a mesh that came out pitched or rolled (TripoSR assumes a viewing angle: a sofa photographed from above comes out leaning) so its base is flat on the floor again. The base
+    is the lowest `fraction` of the height; its plane is the best fit through those points. A turn of less than `min_degrees` is not worth making, one of more than `max_degrees` is
+    more likely a wrong plane than a wrong mesh, and a base that is only a thin line or a spike (a plant's stem, a lamp's pole: less than `min_spread` of the half height across)
+    has no plane to speak of: all of those are left as they are. verts (n, 3) in the layout orient_mesh gives (Y up, on y = 0, 2 tall); returns the same layout."""
+    verts = np.asarray(verts, dtype=np.float64)
+    out = verts
+    for turn in range(3):   # (the lowest slice of a leaning piece is a wedge, not the whole base: a second look at the straightened piece sees more of it)
+        height = float(out[:, 1].max() - out[:, 1].min())
+        if height < 1e-9:
+            break
+        low = out[out[:, 1] < out[:, 1].min() + fraction * height]
+        if len(low) < 50:
+            break
+        centre = low.mean(axis=0)
+        _, s, vt = np.linalg.svd(low - centre, full_matrices=False)
+        if s[1] / np.sqrt(len(low)) < min_spread * (height / 2.0):
+            break
+        normal = vt[2] if vt[2][1] >= 0 else -vt[2]
+        angle = float(np.arccos(np.clip(normal[1], -1.0, 1.0)))
+        if angle < np.radians(min_degrees) or (turn == 0 and angle > np.radians(max_degrees)):
+            break
+        axis = np.cross(normal, [0.0, 1.0, 0.0])
+        axis /= np.linalg.norm(axis)
+        k = np.array([[0.0, -axis[2], axis[1]], [axis[2], 0.0, -axis[0]], [-axis[1], axis[0], 0.0]])
+        rot = np.eye(3) + np.sin(angle) * k + (1.0 - np.cos(angle)) * (k @ k)   # Rodrigues: takes the base's normal to +y
+        out = (out - centre) @ rot.T + centre
+    if out is verts:
+        return verts
+    out = out - [(out[:, 0].min() + out[:, 0].max()) / 2, out[:, 1].min(), (out[:, 2].min() + out[:, 2].max()) / 2]
+    return out * (2.0 / max(out[:, 1].max(), 1e-9))
+
+
 def check_environment(triposr_arg):
     """Prints one "Key: value" fact per line about everything the helper needs, for the Diagnostics tab. The wording is what the
     tab colours by: "present" / "available" are good, "missing" / "not available" / "not usable" are problems."""
@@ -207,8 +240,9 @@ class ObjectMaker:
         self.model.to(device)
         self.device = device
 
-    def make(self, image, out_dir, remove_bg=True, foreground_ratio=0.85, resolution=256, texture_size=1024, report=progress):
-        """Makes mesh.obj, texture.png and result.json in out_dir from a PIL image (a photo of one object; an RGBA image with transparency is used as a cut-out as it is).
+    def make(self, image, out_dir, remove_bg=True, foreground_ratio=0.85, resolution=256, texture_size=1024, report=progress, level=False):
+        """Makes mesh.obj, texture.png and result.json in out_dir from a PIL image (a photo of one object; an RGBA image with transparency is used as a cut-out as it is). level=True
+        also turns a leaning mesh so its base is flat (level_base): for a piece that stands on the floor.
         Returns {"size", "triangles", "seconds"}; raises ObjectError when the model finds no object."""
         import numpy as np
         import torch
@@ -259,6 +293,8 @@ class ObjectMaker:
             raise ObjectError("the model found no object in the photo. Try a clearer photo of one object on a plain background.")
 
         verts, faces = orient_mesh(np, verts, faces)
+        if level:
+            verts = level_base(np, verts)
 
         report(72, "Unwrapping the surface")
         vmapping, indices, uvs = xatlas.parametrize(verts.astype(np.float32), faces.astype(np.uint32))
@@ -283,11 +319,14 @@ class ObjectMaker:
                 a, b, c = (int(i) + 1 for i in tri)
                 f.write("f %d/%d/%d %d/%d/%d %d/%d/%d\n" % (a, a, a, b, b, b, c, c, c))
         size = (out_verts.max(axis=0) - out_verts.min(axis=0)).tolist()
+        # Where the body of the piece really starts: the lowest 2% of the vertices are often a few stray points or thin feet, so the mesh's own lowest point can be well below what touches
+        # the floor (a sofa made to stand on them floats). The room helper sinks a piece by this.
+        foot = float(np.percentile(out_verts[:, 1], 2.0))
         seconds = round(time.time() - started, 1)
         with open(os.path.join(out_dir, "result.json"), "w") as f:
-            json.dump({"mesh": "mesh.obj", "texture": "texture.png", "size": size, "triangles": int(len(indices)), "seconds": seconds}, f)
+            json.dump({"mesh": "mesh.obj", "texture": "texture.png", "size": size, "foot": foot, "triangles": int(len(indices)), "seconds": seconds}, f)
         report(100, "Done in %.0f s" % seconds)
-        return {"size": size, "triangles": int(len(indices)), "seconds": seconds}
+        return {"size": size, "foot": foot, "triangles": int(len(indices)), "seconds": seconds}
 
 
 def main():

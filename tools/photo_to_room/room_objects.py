@@ -331,10 +331,15 @@ def place_object(geometry, mask, min_points=20, label=None):
     return {"front": (cx, cz), "dir": (dx, dz), "bottom": bottom, "height": height, "width": max(width, 0.05)}
 
 
-def finalize_object(place, mesh_size, box, label=None):
+# How far a piece standing on the floor is sunk into it to make up for the stray low points of its mesh (see finalize_object), at most this fraction of its height
+MAX_FOOT = 0.15
+
+
+def finalize_object(place, mesh_size, box, label=None, foot=0.0):
     """The mesh's placement in the Scene Builder's frame. `mesh_size` is the generated mesh's (width, height, depth) (it stands on y = 0, centred, its front towards +z, about 2 tall);
     `box` is room_fit's (xmin, xmax, zmin, zmax, ceiling) in the photo's frame. Returns {"position": [x, y, z], "yaw": degrees, "scale": s, "size": [w, h, d]} (size is the scaled
-    mesh's), or None when the mesh has no size. `label` (its name) keeps a piece standing on the floor to a believable height (see HEIGHT_RANGE)."""
+    mesh's), or None when the mesh has no size. `label` (its name) keeps a piece standing on the floor to a believable height (see HEIGHT_RANGE). `foot` is the height in the mesh's own
+    units above its lowest point where its body starts (photo_to_mesh's result): a piece on the floor is sunk by it, so a mesh with a few stray low points does not float."""
     mw, mh, md = (max(float(v), 1e-6) for v in mesh_size)
     height = place["height"]
     if label in HEIGHT_RANGE and place["bottom"] <= 0.001:
@@ -362,5 +367,8 @@ def finalize_object(place, mesh_size, box, label=None):
         yaw += 360.0
     if yaw > 180.0:
         yaw -= 360.0
-    return {"position": [round(-cx, 4), round(place["bottom"], 4), round(cz, 4)], "yaw": round(yaw, 2), "scale": round(scale, 4),
+    sink = 0.0
+    if place["bottom"] <= 0.001 and foot > 0.0:
+        sink = min(float(foot), MAX_FOOT * mh) * scale
+    return {"position": [round(-cx, 4), round(place["bottom"] - sink, 4), round(cz, 4)], "yaw": round(yaw, 2), "scale": round(scale, 4),
             "size": [round(mw * scale, 4), round(mh * scale, 4), round(md * scale, 4)]}
