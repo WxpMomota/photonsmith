@@ -925,6 +925,83 @@ def run(args):
                 print("  %-4s %-34s %s  profile difference %.2f of the picture's own spread" % ("both", "cpu vs gpu, " + label, "ok   " if worst <= 0.25 else "WRONG", worst))
             if worst > 0.25:
                 failures.append(("motion", "both", label))
+    # Pictures on area lights (a room's windows): which picture is where, which a mean cannot see (a flat window and a picture of the same average colour have the same mean). A window is a thin
+    # emissive BOX (a mesh of triangles), the case the Scene Builder's Room from a photo writes; Metal drew every box window flat, and kept ONE picture per scene (a second window's picture was
+    # lost). Two box windows with different pictures and a quad window with a third, read through the rows and columns of the picture against the CPU's.
+    if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "lightpic" in only):
+        print("[cpu vs gpu, pictures on area lights: two box windows and a quad window]")
+        def sky(x, y):
+            t = y / 63.0
+            return (int(255 * (0.35 + 0.55 * t)), int(255 * (0.55 + 0.4 * t)), 255) if not (y >= 40 and 10 <= x < 50) else (13, 64, 13)
+        def sunset(x, y):
+            t = x / 95.0
+            f = 0.4 if y < 20 else 1.0
+            return (int(255 * f), int(255 * f * (0.45 + 0.4 * (1 - t))), int(255 * f * (0.15 + 0.3 * (1 - t))))
+        def stripes(x, y):
+            return (230, 230, 230) if (x // 12 + y // 12) % 2 == 0 else (40, 90, 200)
+        for name, fn in (("lightpic_sky.png", sky), ("lightpic_sunset.png", sunset), ("lightpic_stripes.png", stripes)):
+            write_png(os.path.join(workdir, name), 96, 64, fn)
+        box = ("  Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 0 2 3  4 6 5 4 7 6  8 9 10 8 10 11  12 14 13 12 15 14  16 17 18 16 18 19  20 22 21 20 23 22 ]\n"
+               "    \"point3 P\" [ 0.6 -0.5 -0.03  0.6 0.5 -0.03  0.6 0.5 0.03  0.6 -0.5 0.03  -0.6 -0.5 0.03  -0.6 0.5 0.03  -0.6 0.5 -0.03  -0.6 -0.5 -0.03\n"
+               "                -0.6 0.5 -0.03  -0.6 0.5 0.03  0.6 0.5 0.03  0.6 0.5 -0.03  -0.6 -0.5 0.03  -0.6 -0.5 -0.03  0.6 -0.5 -0.03  0.6 -0.5 0.03\n"
+               "                -0.6 -0.5 0.03  0.6 -0.5 0.03  0.6 0.5 0.03  -0.6 0.5 0.03  0.6 -0.5 -0.03  -0.6 -0.5 -0.03  -0.6 0.5 -0.03  0.6 0.5 -0.03 ]\n"
+               "    \"point2 uv\" [ " + "0 0 1 0 1 1 0 1  " * 6 + "]\n")
+        room = ('LookAt 0 1.4 4.2  0 1.2 0  0 1 0\nCamera "perspective" "float fov" [ 55 ]\nFilm "rgb" "integer xresolution" [ 96 ] "integer yresolution" [ 96 ]\n'
+                'Sampler "halton" "integer pixelsamples" [ 128 ]\nWorldBegin\nMaterial "diffuse" "rgb reflectance" [ 0.7 0.7 0.7 ]\n'
+                'Shape "trianglemesh" "integer indices" [ 0 1 2 0 2 3 ] "point3 P" [ -3 0 -3  3 0 -3  3 0 3  -3 0 3 ]\n'
+                'Shape "trianglemesh" "integer indices" [ 0 2 1 0 3 2 ] "point3 P" [ -3 2.6 -3  3 2.6 -3  3 2.6 3  -3 2.6 3 ]\n'
+                'Shape "trianglemesh" "integer indices" [ 0 1 2 0 2 3 ] "point3 P" [ -3 0 -3  3 0 -3  3 2.6 -3  -3 2.6 -3 ]\n'
+                'Shape "trianglemesh" "integer indices" [ 0 2 1 0 3 2 ] "point3 P" [ -3 0 -3  -3 0 3  -3 2.6 3  -3 2.6 -3 ]\n'
+                'Shape "trianglemesh" "integer indices" [ 0 1 2 0 2 3 ] "point3 P" [ 3 0 -3  3 0 3  3 2.6 3  3 2.6 -3 ]\n'
+                'Material "diffuse" "rgb reflectance" [ 0.8 0.5 0.4 ]\nShape "sphere" "float radius" [ 0.5 ]\n'
+                'AttributeBegin\n  Translate -1.6 1.5 -2.95\n  AreaLightSource "diffuse" "string filename" [ "lightpic_sky.png" ] "float scale" [ 6 ]\n' + box + 'AttributeEnd\n'
+                'AttributeBegin\n  Translate 0.2 1.5 -2.95\n  AreaLightSource "diffuse" "string filename" [ "lightpic_sunset.png" ] "float scale" [ 6 ]\n' + box + 'AttributeEnd\n'
+                'AttributeBegin\n  AreaLightSource "diffuse" "string filename" [ "lightpic_stripes.png" ] "float scale" [ 6 ]\n'
+                '  Shape "trianglemesh" "integer indices" [ 0 1 2 0 2 3 ] "point3 P" [ 1.4 1.0 -2.9  2.6 1.0 -2.9  2.6 2.0 -2.9  1.4 2.0 -2.9 ]\n'
+                '    "point2 uv" [ 0 0 1 0 1 1 0 1 ]\nAttributeEnd\n')
+        room_path = os.path.join(workdir, "lightpic_room.pbrt")
+        open(room_path, "w").write(room)
+        # a picture on the SURFACE of a box (a room's floor, walls and table tops are written so): four coloured quarters and a white spot, which show how the picture sits on the box
+        def quarters(x, y):
+            if 40 <= x < 56 and 24 <= y < 40:
+                return (255, 255, 255)
+            return {(True, True): (220, 40, 40), (False, True): (40, 200, 60), (True, False): (50, 60, 220), (False, False): (230, 210, 40)}[(x < 48, y < 32)]
+        write_png(os.path.join(workdir, "lightpic_quarters.png"), 96, 64, quarters)
+        floor = ('LookAt 0 5 3.5  0 0 0  0 1 0\nCamera "perspective" "float fov" [ 45 ]\nFilm "rgb" "integer xresolution" [ 96 ] "integer yresolution" [ 96 ]\n'
+                 'Sampler "halton" "integer pixelsamples" [ 128 ]\nWorldBegin\nLightSource "distant" "point3 from" [ 1 10 2 ] "point3 to" [ 0 0 0 ] "rgb L" [ 3 3 3 ]\n'
+                 'Texture "picture-1" "spectrum" "imagemap" "string filename" [ "lightpic_quarters.png" ]\nMaterial "diffuse" "texture reflectance" "picture-1"\n'
+                 '  Shape "trianglemesh" "integer indices" [ 0 1 2 0 2 3  4 6 5 4 7 6  8 9 10 8 10 11  12 14 13 12 15 14  16 17 18 16 18 19  20 22 21 20 23 22 ]\n'
+                 '    "point3 P" [ 2 -0.05 -1.5  2 0.05 -1.5  2 0.05 1.5  2 -0.05 1.5  -2 -0.05 1.5  -2 0.05 1.5  -2 0.05 -1.5  -2 -0.05 -1.5\n'
+                 '                -2 0.05 -1.5  -2 0.05 1.5  2 0.05 1.5  2 0.05 -1.5  -2 -0.05 1.5  -2 -0.05 -1.5  2 -0.05 -1.5  2 -0.05 1.5\n'
+                 '                -2 -0.05 1.5  2 -0.05 1.5  2 0.05 1.5  -2 0.05 1.5  2 -0.05 -1.5  -2 -0.05 -1.5  -2 0.05 -1.5  2 0.05 -1.5 ]\n'
+                 '    "point2 uv" [ ' + "0 0 1 0 1 1 0 1  " * 6 + "]\n")
+        floor_path = os.path.join(workdir, "lightpic_floor.pbrt")
+        open(floor_path, "w").write(floor)
+        for label, scene_path, size in (("windows with pictures", room_path, "96"), ("a picture on a box", floor_path, "96")):
+            total += 1
+            profiles = {}
+            try:
+                for backend in ("cpu", "gpu"):
+                    out = os.path.join(workdir, "lightpic_%s_%s.exr" % (label.split()[-1], backend))
+                    r = subprocess.run([args.exe, "--" + backend, "--seed", "3", "--output", out, size, "256", "8", scene_path], capture_output=True, text=True, cwd=REPO, timeout=1200)
+                    if r.returncode != 0 or not os.path.exists(out):
+                        raise RuntimeError("%s render failed: %s" % (backend, (r.stdout + r.stderr)[-200:]))
+                    profiles[backend] = read_exr_rows_columns(out)
+            except RuntimeError as e:
+                print("  both cpu vs gpu, %s: FAILED TO RENDER: %s" % (label, e))
+                failures.append(("lightpic", "both", label))
+                continue
+            worst = 0.0
+            for axis in (0, 1):
+                a, b = profiles["cpu"][axis], profiles["gpu"][axis]
+                mean_a, mean_b = sum(a) / len(a), sum(b) / len(b)
+                spread = (sum((x - mean_a) ** 2 for x in a) / len(a)) ** 0.5
+                diff = (sum(((x - mean_a) - (y - mean_b)) ** 2 for x, y in zip(a, b)) / len(a)) ** 0.5
+                worst = max(worst, diff / max(spread, 1e-6))
+            if worst > 0.25 or args.verbose:
+                print("  %-4s %-34s %s  profile difference %.2f of the picture's own spread" % ("both", "cpu vs gpu, " + label, "ok   " if worst <= 0.25 else "WRONG", worst))
+            if worst > 0.25:
+                failures.append(("lightpic", "both", label))
     print("\n%d pairs, %d off by more than %g%%" % (total, len(failures), tol))
     if not args.keep:
         shutil.rmtree(workdir, ignore_errors=True)

@@ -29,7 +29,7 @@ int testStructLayouts(id<MTLDevice> device, id<MTLLibrary> library, id<MTLComman
     LAYOUT_PROBE(DiskData, "DiskData") LAYOUT_PROBE(CylinderData, "CylinderData") LAYOUT_PROBE(PointLightData, "PointLight")
     LAYOUT_PROBE(DirectionalLightData, "DirectionalLight") LAYOUT_PROBE(ProjectionLightData, "ProjectionLight")
     LAYOUT_PROBE(GoniometricLightData, "GoniometricLight") LAYOUT_PROBE(GpuLensElementData, "LensElement")
-    LAYOUT_PROBE(GpuExitPupilBoundsData, "ExitPupilBounds")
+    LAYOUT_PROBE(GpuExitPupilBoundsData, "ExitPupilBounds") LAYOUT_PROBE(AreaLightData, "AreaLight")
 #undef LAYOUT_PROBE
 #define FIELD_OFFSET(f) expected.push_back((uint32_t)offsetof(Uniforms, f)); labels.push_back("offsetof(Uniforms, " #f ")");
     FIELD_OFFSET(fireflyClamp) FIELD_OFFSET(debugCensus) FIELD_OFFSET(pathRegen) FIELD_OFFSET(fogChromatic) FIELD_OFFSET(fogSigmaT3)

@@ -450,6 +450,10 @@ struct AreaLight {
     // relying purely on a distance epsilon, which a curved surface makes
     // unreliable.
     int spherePrimId;
+    // The light's picture: its place in the shared picture atlas (scale u, scale v, offset u, offset v) and, for a triangle light, the texture coordinates of its three vertices
+    // (mirrors AreaLightData in metal_poc_host_math.h).
+    float imageScaleU, imageScaleV, imageOffsetU, imageOffsetV;
+    float triU0, triV0, triU1, triV1, triU2, triV2;
 };
 
 // A true DELTA light - zero-area, zero-solid-angle, unlike every AreaLight
