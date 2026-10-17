@@ -53,7 +53,7 @@ bool readLinear(const QString &path, int *w, int *h, std::vector<float> *rgb) {
 
 }  // namespace
 
-bool SceneBuilderWidget::renderIntoPhoto(const QString &outPng, const std::vector<int> &groundObjects, double exposureStops, int samples, QString *error, QStringList *notes) {
+bool SceneBuilderWidget::renderIntoPhoto(const QString &outPng, const std::vector<int> &groundObjects, double exposureStops, int samples, bool matchToPhoto, QString *error, QStringList *notes) {
 	if (m_cameraPhoto.isNull()) {
 		if (error) *error = tr("Match the camera to a photo first (Camera section: Match to a photo...): the scene is put into that photo.");
 		return false;
@@ -143,6 +143,26 @@ bool SceneBuilderWidget::renderIntoPhoto(const QString &outPng, const std::vecto
 	for (size_t i = 0; i < mask.size(); ++i) mask[i] = std::min(1.0f, std::max(0.0f, (rgb[2][3 * i] + rgb[2][3 * i + 1] + rgb[2][3 * i + 2]) / 3.0f));
 	photo_composite::Options options;
 	options.exposureStops = exposureStops;
+	QString matchNote;
+	bool matched = false;
+	if (matchToPhoto) {
+		bool physicalSky = false;
+		for (const scene_doc::Light &l : m_doc.lights) physicalSky = physicalSky || (l.kind == scene_doc::LightKind::Infinite && l.physicalSky);
+		if (!physicalSky) {
+			matchNote = tr("The objects' exposure was not matched to the photo: that reads the photo's sky, and the scene has no Sun & sky (set it from the same photo with Light from a photo).");
+		} else {
+			const photo_composite::Match match = photo_composite::matchToPhoto(photoPixels.data(), rgb[0].data(), mask.data(), w, h);
+			if (match.ok) {
+				matched = true;
+				options.exposureStops += match.exposureStops;
+				for (int c = 0; c < 3; ++c) options.channelGain[c] = match.gain[c];
+				matchNote = tr("The objects' exposure (%1 stops) and colour were matched to the photo's sky.").arg(match.exposureStops, 0, 'f', 2);
+				if (!match.why.empty()) matchNote += QStringLiteral(" ") + QString::fromStdString(match.why);
+			} else {
+				matchNote = tr("The objects' exposure was not matched to the photo: %1").arg(QString::fromStdString(match.why));
+			}
+		}
+	}
 	const std::vector<unsigned char> out = photo_composite::composite(photoPixels.data(), rgb[0].data(), rgb[1].data(), mask.data(), w, h, options);
 	if (out.empty()) {
 		if (error) *error = tr("The picture could not be put together.");
@@ -157,7 +177,8 @@ bool SceneBuilderWidget::renderIntoPhoto(const QString &outPng, const std::vecto
 	AppLog::info(QStringLiteral("photo"), QStringLiteral("render into the photo: %1 (%2 x %3, %4 inserted objects, %5 ground, %6 samples, %7 s)").arg(outPng).arg(w).arg(h).arg(inserted).arg(grounds).arg(samples).arg(clock.elapsed() / 1000.0, 0, 'f', 1));
 	if (notes) {
 		*notes << tr("%n object(s) were put into the photo; the ground they stand on is not drawn (only the shadows and reflections they cause are).", "", inserted);
-		*notes << tr("The objects are shown at the exposure the Builder gives them%1; the photo's own exposure is not known, so use Exposure if they look too bright or too dark.").arg(exposureStops != 0.0 ? tr(" (%1 stops)").arg(exposureStops, 0, 'f', 2) : QString());
+		if (!matchNote.isEmpty()) *notes << matchNote;
+		if (!matched) *notes << tr("The objects are shown at the exposure the Builder gives them%1; the photo's own exposure is not known, so use Exposure if they look too bright or too dark.").arg(exposureStops != 0.0 ? tr(" (%1 stops)").arg(exposureStops, 0, 'f', 2) : QString());
 		if (grounds == 0) *notes << tr("No object is marked as the ground, so there are no shadows on the photo: tick the floor the objects stand on.");
 	}
 	return true;
@@ -190,6 +211,12 @@ void SceneBuilderWidget::renderIntoPhotoDialog() {
 	objects->setToolTip(tr("Ticked: the ground the photo already has (its shadows are used, it is not drawn). Unticked: put into the photo."));
 	layout->addWidget(objects);
 	auto *form = new QFormLayout();
+	bool physicalSky = false;
+	for (const scene_doc::Light &l : m_doc.lights) physicalSky = physicalSky || (l.kind == scene_doc::LightKind::Infinite && l.physicalSky);
+	auto *match = new QCheckBox(tr("Match the objects' exposure and colour to the photo's sky"), &dialog);
+	match->setChecked(physicalSky);
+	match->setToolTip(tr("Reads how bright and how warm or cool the photo's sky is, and gives the objects the same exposure and colour cast. Needs the Sun & sky set from the same photo (Light from a photo). The setting below is added to it."));
+	layout->addWidget(match);
 	auto *exposure = new QDoubleSpinBox(&dialog);
 	exposure->setRange(-4.0, 4.0);
 	exposure->setSingleStep(0.25);
@@ -217,7 +244,7 @@ void SceneBuilderWidget::renderIntoPhotoDialog() {
 
 	QString error;
 	QStringList notes;
-	if (!renderIntoPhoto(path, ground, exposure->value(), quality->value(), &error, &notes)) {
+	if (!renderIntoPhoto(path, ground, exposure->value(), quality->value(), match->isChecked(), &error, &notes)) {
 		if (!error.isEmpty()) QMessageBox::warning(this, tr("Could not render into the photo"), error);
 		return;
 	}

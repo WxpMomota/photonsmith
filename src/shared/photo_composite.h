@@ -15,6 +15,7 @@
 //
 // Header-only, std-only (plus scene_document.h for the three scene variants); shared by the Scene Builder (qt_gui/scene_builder_composite.cpp) and its tests.
 
+#include "light_from_photo.h"
 #include "scene_document.h"
 
 #include <algorithm>
@@ -31,6 +32,7 @@ struct Options {
 	double shadowStrength = 1.0;    // 1: the scene's shadows as rendered; 0: no shadows at all; above 1: darker ones
 	int smoothRadius = 2;           // the ratio is averaged over (2 r + 1)^2 pixels (not across the objects): render noise
 	double deadBand = 0.04;         // a ratio within this (as a natural log) of 1 is taken to be 1
+	double channelGain[3] = {1.0, 1.0, 1.0};   // the objects' colour cast (matchToPhoto): multiplies each channel of their tone mapped value
 };
 
 namespace detail {
@@ -93,13 +95,113 @@ inline std::vector<unsigned char> composite(const unsigned char* photo, const fl
 			if (m > 0.001) {
 				// un-matted: the render's pixel is m of the object and (1 - m) of the ground
 				const double objectLinear = std::max(0.0, (with[i * 3 + static_cast<size_t>(c)] - (1.0 - m) * ground[i * 3 + static_cast<size_t>(c)]) / std::max(m, 0.05)) * exposure;
-				const double object = detail::encode(detail::aces(std::isfinite(objectLinear) ? objectLinear : 0.0));
+				const double toned = detail::aces(std::isfinite(objectLinear) ? objectLinear : 0.0) * options.channelGain[c];
+				const double object = detail::encode(toned);
 				value = m * object + (1.0 - m) * background;
 			}
 			out[i * 3 + static_cast<size_t>(c)] = static_cast<unsigned char>(std::min(1.0, std::max(0.0, value)) * 255.0 + 0.5);
 		}
 	}
 	return out;
+}
+
+// ---- matching the objects to the photo ---------------------------------------------------------------------------------------------------------------------------------------------------
+
+// What the photo's sky says about how the objects should be exposed and coloured. The scene's sky (the Sun & sky set from the same photo, rendered with the same camera) and the photo's sky are the same
+// thing seen by two cameras: the render in physical units, the photo with whatever exposure and white balance it was taken with. So the exposure that makes the render's sky come out as the photo's sky
+// is the exposure the photo had, and the same goes for the colour cast. Pixel by pixel (the sky only: the photo's own sky, found as in light_from_photo.h, minus the objects, and not clipped), the
+// exposure that brings the tone mapped render to the photo's brightness is solved; the median of those is the answer (trees, a misplaced horizon and a sun disc are outliers). If too few pixels
+// agree with it, the scene's sky is not the photo's sky (no Sun & sky from the photo, or a camera that does not match) and the answer is "not ok" with the reason.
+struct Match {
+	bool ok = false;
+	std::string why;                  // what to know: why it is not ok, or a caution when it is
+	double exposureStops = 0.0;       // to give the objects (Options::exposureStops)
+	double gain[3] = {1, 1, 1};       // the colour cast (Options::channelGain), brightness-neutral
+	double skyShare = 0.0;            // the share of the picture that was used
+	double agreement = 0.0;           // the share of those pixels within half a stop of the answer
+	bool clamped = false;             // the exposure was held to +-3 stops
+};
+
+namespace detail {
+
+inline double median(std::vector<double>& v) {
+	const size_t mid = v.size() / 2;
+	std::nth_element(v.begin(), v.begin() + static_cast<std::ptrdiff_t>(mid), v.end());
+	return v[mid];
+}
+
+}  // namespace detail
+
+// `photo` w x h x 3 8-bit sRGB, `with` the FULL render (w x h x 3 linear radiance), `mask` the coverage of the inserted objects (w x h).
+inline Match matchToPhoto(const unsigned char* photo, const float* with, const float* mask, int w, int h) {
+	Match m;
+	if (!photo || !with || !mask || w < 8 || h < 8) { m.why = "There is no picture to match."; return m; }
+	const light_from_photo::detail::Picture pic = light_from_photo::detail::reduce(photo, w, h, w);
+	const std::vector<int> end = light_from_photo::detail::skyColumnEnds(pic);
+	struct Sample { double photoLin[3], radiance[3]; };
+	std::vector<Sample> samples;
+	size_t total = 0;
+	for (int y = 0; y < h; ++y)
+		for (int x = 0; x < w; ++x) {
+			const size_t i = static_cast<size_t>(y) * w + x;
+			if (y >= end[static_cast<size_t>(x)] - 6 || mask[i] > 0.02f) continue;
+			++total;
+			if (((x * 7 + y * 13) & 3) != 0) continue;   // (every fourth pixel is plenty)
+			const float* c = pic.at(x, y);
+			if (light_from_photo::detail::clipped(c) || std::max({c[0], c[1], c[2]}) > 0.985f) continue;   // (the sun and what is blown out says only that the sky is at least this bright)
+			Sample s;
+			bool usable = true;
+			for (int k = 0; k < 3; ++k) {
+				s.photoLin[k] = detail::decode(c[k]);
+				s.radiance[k] = with[i * 3 + static_cast<size_t>(k)];
+				usable = usable && std::isfinite(s.radiance[k]);
+			}
+			if (usable && detail::luminance(&with[i * 3]) > 1e-6) samples.push_back(s);
+		}
+	m.skyShare = static_cast<double>(total) / (static_cast<double>(w) * h);
+	if (m.skyShare < 0.04 || samples.size() < 200) { m.why = "The photo shows too little sky to read its exposure from."; return m; }
+	// per pixel: the exposure (log2) at which the tone mapped render's brightness equals the photo's
+	auto toned = [](const Sample& s, double e, double* out) {
+		for (int k = 0; k < 3; ++k) out[k] = detail::aces(s.radiance[k] * e);
+	};
+	std::vector<double> stops;
+	stops.reserve(samples.size());
+	for (const Sample& s : samples) {
+		const double target = 0.2126 * s.photoLin[0] + 0.7152 * s.photoLin[1] + 0.0722 * s.photoLin[2];
+		double lo = -8.0, hi = 8.0, a[3];
+		for (int it = 0; it < 24; ++it) {
+			const double mid = 0.5 * (lo + hi);
+			toned(s, std::exp2(mid), a);
+			(0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2] < target ? lo : hi) = mid;
+		}
+		stops.push_back(0.5 * (lo + hi));
+	}
+	const double centre = detail::median(stops);
+	size_t closeBy = 0;
+	for (const double s : stops) closeBy += std::fabs(s - centre) <= 0.5 ? 1 : 0;
+	m.agreement = static_cast<double>(closeBy) / static_cast<double>(stops.size());
+	if (m.agreement < 0.5) {
+		m.why = "The scene's sky does not look like the photo's sky (use Sun & sky from the same photo, with the camera matched to it), so the exposure cannot be read from it.";
+		return m;
+	}
+	m.exposureStops = std::min(3.0, std::max(-3.0, centre));
+	m.clamped = std::fabs(centre) > 3.0;
+	// the colour cast: what each channel of the toned render lacks or has too much of against the photo, kept brightness-neutral and modest
+	std::vector<double> ratio[3];
+	for (const Sample& s : samples) {
+		double a[3];
+		toned(s, std::exp2(m.exposureStops), a);
+		for (int k = 0; k < 3; ++k)
+			if (a[k] > 0.02) ratio[k].push_back(s.photoLin[k] / a[k]);
+	}
+	double g[3] = {1, 1, 1};
+	for (int k = 0; k < 3; ++k)
+		if (ratio[k].size() >= 100) g[k] = detail::median(ratio[k]);
+	const double lum = 0.2126 * g[0] + 0.7152 * g[1] + 0.0722 * g[2];
+	for (int k = 0; k < 3; ++k) m.gain[k] = std::min(1.2, std::max(1.0 / 1.2, g[k] / std::max(lum, 1e-6)));
+	m.ok = true;
+	if (m.clamped) m.why = "The photo's exposure is far from the scene's light, so the objects were held to +-3 stops; check the scene's light.";
+	return m;
 }
 
 // ---- the three scenes --------------------------------------------------------------------------------------------------------------------------------------------------------------------

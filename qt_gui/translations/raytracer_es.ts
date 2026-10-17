@@ -6950,63 +6950,78 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation>Relación de aspecto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="57"/>
-        <location filename="../scene_builder_composite.cpp" line="167"/>
+        <location filename="../scene_builder_composite.cpp" line="58"/>
+        <location filename="../scene_builder_composite.cpp" line="189"/>
         <source>Match the camera to a photo first (Camera section: Match to a photo...): the scene is put into that photo.</source>
         <translation>Ajusta primero la cámara a una foto (sección Cámara: Ajustar a una foto...): la escena se pone en esa foto.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="86"/>
+        <location filename="../scene_builder_composite.cpp" line="87"/>
         <source>Every object is marked as the ground or a light, so there is nothing to put into the photo.</source>
         <translation>Todos los objetos están marcados como suelo o como luz, así que no hay nada que poner en la foto.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="95"/>
+        <location filename="../scene_builder_composite.cpp" line="96"/>
         <source>Rendering the scene for the photo...</source>
         <translation>Renderizando la escena para la foto...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="96"/>
-        <location filename="../scene_builder_composite.cpp" line="167"/>
-        <location filename="../scene_builder_composite.cpp" line="172"/>
-        <location filename="../scene_builder_composite.cpp" line="224"/>
+        <location filename="../scene_builder_composite.cpp" line="97"/>
+        <location filename="../scene_builder_composite.cpp" line="189"/>
+        <location filename="../scene_builder_composite.cpp" line="194"/>
+        <location filename="../scene_builder_composite.cpp" line="252"/>
         <source>Render into the photo</source>
         <translation>Renderizar en la foto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="105"/>
+        <location filename="../scene_builder_composite.cpp" line="106"/>
         <source>Rendering the scene for the photo: %1 of 3...</source>
         <translation>Renderizando la escena para la foto: %1 de 3...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="127"/>
+        <location filename="../scene_builder_composite.cpp" line="128"/>
         <source>A render took too long and was stopped.</source>
         <translation>Un renderizado tardó demasiado y se detuvo.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="132"/>
+        <location filename="../scene_builder_composite.cpp" line="133"/>
         <source>The renderer could not make the %1 picture. Its output:
 %2</source>
         <translation>El renderizador no pudo hacer la imagen «%1». Su salida:
 %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="136"/>
+        <location filename="../scene_builder_composite.cpp" line="137"/>
         <source>The renderer made a picture of %1 x %2, not the %3 x %4 asked for.</source>
         <translation>El renderizador hizo una imagen de %1 x %2, no de los %3 x %4 pedidos.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="147"/>
+        <location filename="../scene_builder_composite.cpp" line="152"/>
+        <source>The objects&apos; exposure was not matched to the photo: that reads the photo&apos;s sky, and the scene has no Sun &amp; sky (set it from the same photo with Light from a photo).</source>
+        <translation>La exposición de los objetos no se ajustó a la foto: eso lee el cielo de la foto, y la escena no tiene Sol y cielo (ponlo a partir de la misma foto con Luz a partir de una foto).</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_composite.cpp" line="159"/>
+        <source>The objects&apos; exposure (%1 stops) and colour were matched to the photo&apos;s sky.</source>
+        <translation>La exposición de los objetos (%1 pasos) y su color se ajustaron al cielo de la foto.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_composite.cpp" line="162"/>
+        <source>The objects&apos; exposure was not matched to the photo: %1</source>
+        <translation>La exposición de los objetos no se ajustó a la foto: %1</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_composite.cpp" line="168"/>
         <source>The picture could not be put together.</source>
         <translation>No se pudo componer la imagen.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="153"/>
+        <location filename="../scene_builder_composite.cpp" line="174"/>
         <source>The picture could not be saved as %1.</source>
         <translation>No se pudo guardar la imagen como %1.</translation>
     </message>
     <message numerus="yes">
-        <location filename="../scene_builder_composite.cpp" line="158"/>
+        <location filename="../scene_builder_composite.cpp" line="179"/>
         <source>%n object(s) were put into the photo; the ground they stand on is not drawn (only the shadows and reflections they cause are).</source>
         <translation>
             <numerusform>Se puso %n objeto en la foto; el suelo en que se apoya no se dibuja (solo las sombras y los reflejos que provoca).</numerusform>
@@ -7014,73 +7029,83 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         </translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="159"/>
+        <location filename="../scene_builder_composite.cpp" line="181"/>
         <source>The objects are shown at the exposure the Builder gives them%1; the photo&apos;s own exposure is not known, so use Exposure if they look too bright or too dark.</source>
         <translation>Los objetos se muestran con la exposición que les da el Constructor%1; la exposición de la foto no se conoce, así que usa Exposición si se ven demasiado claros u oscuros.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="159"/>
+        <location filename="../scene_builder_composite.cpp" line="181"/>
         <source> (%1 stops)</source>
         <translation> (%1 pasos)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="160"/>
+        <location filename="../scene_builder_composite.cpp" line="182"/>
         <source>No object is marked as the ground, so there are no shadows on the photo: tick the floor the objects stand on.</source>
         <translation>Ningún objeto está marcado como suelo, así que la foto no tiene sombras: marca el suelo sobre el que están los objetos.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="174"/>
+        <location filename="../scene_builder_composite.cpp" line="196"/>
         <source>The scene, seen through the camera matched to the photo, is rendered and put into the photo, with the shadows and reflections it casts on the ground. Tick the objects that are the ground: the photo already has it, so it is not drawn, and only the shadows it catches count. Everything else (except lights) is put into the photo. The scene is rendered three times, so it takes about three times as long as one picture.</source>
         <translation>La escena, vista a través de la cámara ajustada a la foto, se renderiza y se pone en la foto, con las sombras y los reflejos que proyecta sobre el suelo. Marca los objetos que son el suelo: la foto ya lo tiene, así que no se dibuja y solo cuentan las sombras que recibe. Todo lo demás (salvo las luces) se pone en la foto. La escena se renderiza tres veces, así que tarda unas tres veces más que una imagen.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="189"/>
+        <location filename="../scene_builder_composite.cpp" line="211"/>
         <source>Ticked: the ground the photo already has (its shadows are used, it is not drawn). Unticked: put into the photo.</source>
         <translation>Marcado: el suelo que la foto ya tiene (se usan sus sombras, no se dibuja). Sin marcar: se pone en la foto.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="196"/>
+        <location filename="../scene_builder_composite.cpp" line="216"/>
+        <source>Match the objects&apos; exposure and colour to the photo&apos;s sky</source>
+        <translation>Ajustar la exposición y el color de los objetos al cielo de la foto</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_composite.cpp" line="218"/>
+        <source>Reads how bright and how warm or cool the photo&apos;s sky is, and gives the objects the same exposure and colour cast. Needs the Sun &amp; sky set from the same photo (Light from a photo). The setting below is added to it.</source>
+        <translation>Lee lo claro y lo cálido o frío que es el cielo de la foto, y da a los objetos la misma exposición y dominante de color. Necesita el Sol y cielo ajustado a partir de la misma foto (Luz a partir de una foto). El ajuste de abajo se suma a este.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_composite.cpp" line="224"/>
         <source> stops</source>
         <translation> pasos</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="197"/>
+        <location filename="../scene_builder_composite.cpp" line="225"/>
         <source>How much brighter (+) or darker (-) the objects are made, to match the photo&apos;s exposure. Each stop doubles or halves their light.</source>
         <translation>Cuánto más claros (+) o más oscuros (-) se hacen los objetos para igualar la exposición de la foto. Cada paso duplica o reduce a la mitad su luz.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="198"/>
+        <location filename="../scene_builder_composite.cpp" line="226"/>
         <source>Exposure of the objects</source>
         <translation>Exposición de los objetos</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="202"/>
+        <location filename="../scene_builder_composite.cpp" line="230"/>
         <source>Samples per pixel: more makes the shadows smoother and takes longer.</source>
         <translation>Muestras por píxel: más hacen las sombras más suaves y tardan más.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="203"/>
+        <location filename="../scene_builder_composite.cpp" line="231"/>
         <location filename="../scene_builder_inspector.cpp" line="441"/>
         <source>Samples per pixel</source>
         <translation>Muestras por píxel</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="214"/>
+        <location filename="../scene_builder_composite.cpp" line="242"/>
         <source>Save the picture as</source>
         <translation>Guardar la imagen como</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="214"/>
+        <location filename="../scene_builder_composite.cpp" line="242"/>
         <source>PNG pictures (*.png)</source>
         <translation>Imágenes PNG (*.png)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="220"/>
+        <location filename="../scene_builder_composite.cpp" line="248"/>
         <source>Could not render into the photo</source>
         <translation>No se pudo renderizar en la foto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="233"/>
+        <location filename="../scene_builder_composite.cpp" line="261"/>
         <source>Saved as %1.
 
 - %2</source>
@@ -7221,17 +7246,17 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation>Elige una foto: la cámara toma su objetivo, inclinación y giro, y la imagen toma su forma. Después se puede superponer la foto a la vista de la cámara para alinear tu escena con ella.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="345"/>
+        <location filename="../scene_builder_inspector.cpp" line="350"/>
         <source>Show the photo over the camera view</source>
         <translation>Mostrar la foto sobre la vista de la cámara</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="349"/>
+        <location filename="../scene_builder_inspector.cpp" line="344"/>
         <source>Render into the photo...</source>
         <translation>Renderizar en la foto...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="351"/>
+        <location filename="../scene_builder_inspector.cpp" line="346"/>
         <source>Render the scene through this camera and put it into the photo, with the shadows it casts on the ground. Tick the floor as the ground: the photo already has it.</source>
         <translation>Renderiza la escena a través de esta cámara y la pone en la foto, con las sombras que proyecta sobre el suelo. Marca el suelo como suelo: la foto ya lo tiene.</translation>
     </message>
@@ -8873,7 +8898,7 @@ Procedencia: %3</translation>
         <translation>No se puede guardar</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="111"/>
+        <location filename="../scene_builder_composite.cpp" line="112"/>
         <location filename="../scene_builder_files.cpp" line="170"/>
         <location filename="../scene_builder_files.cpp" line="180"/>
         <location filename="../scene_builder_files.cpp" line="246"/>
@@ -9041,14 +9066,14 @@ Ya está en la lista de escenas (pestaña Configuración, Mis escenas).</transla
         <translation>Ya hay un renderizado en curso.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="65"/>
+        <location filename="../scene_builder_composite.cpp" line="66"/>
         <location filename="../scene_builder_render.cpp" line="142"/>
         <location filename="../scene_builder_turntable.cpp" line="170"/>
         <source>Fix the problems listed under the properties first.</source>
         <translation>Corrige primero los problemas indicados en las propiedades.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="61"/>
+        <location filename="../scene_builder_composite.cpp" line="62"/>
         <location filename="../scene_builder_render.cpp" line="143"/>
         <location filename="../scene_builder_turntable.cpp" line="171"/>
         <source>The renderer (%1) was not found next to the program.</source>
@@ -9255,9 +9280,13 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <translation>La cámara conserva la dirección en la que miraba, está a %1 m del suelo y la imagen tiene la forma de la foto. La foto se superpone a la vista de la cámara (sección Cámara: Mostrar la foto) para alinear tu escena con ella.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="102"/>
         <source>The Sun &amp;&amp; sky were set from the photo too: %1</source>
-        <translation>Sol y cielo también se ajustaron a partir de la foto: %1</translation>
+        <translation type="vanished">Sol y cielo también se ajustaron a partir de la foto: %1</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_photo.cpp" line="102"/>
+        <source>The Sun &amp; sky were set from the photo too: %1</source>
+        <translation>El Sol y cielo también se ajustaron a partir de la foto: %1</translation>
     </message>
     <message>
         <location filename="../scene_builder_camera_photo.cpp" line="104"/>
@@ -9478,7 +9507,7 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <translation>Se creó un material a partir de %1. %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="95"/>
+        <location filename="../scene_builder_composite.cpp" line="96"/>
         <location filename="../scene_builder_photo.cpp" line="98"/>
         <location filename="../scene_builder_photo.cpp" line="262"/>
         <location filename="../scene_builder_photo.cpp" line="334"/>

@@ -99,7 +99,7 @@ bool SceneBuilderWidget::applyCameraPhoto(const QString &photo, double hfov, dou
 		QString skyError;
 		QStringList skyNotes;
 		if (sky >= 0 && applyLightPhoto(sky, photo, hfov, true, found.tiltDegrees, &skyError, &skyNotes)) {
-			if (notes) *notes << tr("The Sun && sky were set from the photo too: %1").arg(skyNotes.isEmpty() ? QString() : skyNotes.first());
+			if (notes) *notes << tr("The Sun & sky were set from the photo too: %1").arg(skyNotes.isEmpty() ? QString() : skyNotes.first());
 		} else if (notes) {
 			*notes << (sky < 0 ? tr("There is no sky light, so the sun was not set from the photo.") : tr("The sun was not set from the photo: %1").arg(skyError));
 		}

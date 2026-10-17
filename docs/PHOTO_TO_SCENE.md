@@ -157,7 +157,13 @@ What to expect:
 - The **ground must be a plane the camera sees as the photo does**: put the floor at the height of the real ground (the camera is 1.6 m above it unless you gave another height), and tick it.
 - **Lines up only as well as the camera matches.** If the tilt, roll or lens are a little off, the objects stand on the ground in a slightly wrong place: check with the photo laid over the view first.
 - **Light from the same photo** (the tick box in Match to a photo, or Light from a photo) makes the shadows fall the way the photo's do; a shadow in the wrong direction is the most obvious sign of a pasted object.
-- The objects are tone mapped the way the renderer shows any picture (ACES filmic); the photo is not touched except under shadows. Use Exposure when they look too bright or too dark.
+- The objects are tone mapped the way the renderer shows any picture (ACES filmic); the photo is not touched except under shadows.
+- **Match the objects' exposure and colour to the photo's sky** (ticked when the scene has a Sun & sky): the scene's sky, set from the same photo and rendered with the same camera, and the photo's sky are the same sky seen by two
+  cameras, so the exposure that makes the render's sky come out as the photo's is the exposure the photo had, and what its sky has too much or too little of in each colour is its colour cast. The objects get both (the cast
+  limited to +-20% per colour and brightness-neutral). It is read pixel by pixel from the photo's own sky (as Light from a photo finds it) with the objects left out and clipped pixels ignored; the median is
+  used, so trees, a sun disc and a cloud the model does not have are outliers. **When the photo's sky is mostly clouds the scene's sky does not look like it, and the dialog says so and leaves the exposure to you** (the Exposure
+  setting is added to the match, or used alone then). Tried on real photos: a clear beach sky matched (+0.1 stops, the objects looked right); an overcast heath photo was declined. Checked with synthetic skies of known
+  exposure and cast (within a quarter of a stop), with clouds, trees and objects in the way, and with a sky that is not the photo's. Use Exposure when the objects still look too bright or too dark.
 - What it does **not** do: the objects do not catch the photo's colours (a red wall beside them does not tint them), reflective objects reflect the scene's sky and not the photo, and anything in front of the
   objects in the photo (a railing, a branch) stays behind them.
 - Checked with synthetic pictures of known answers (the far field is exactly the photo, a halved light is a halved shadow, a half-covered edge is un-matted, noise does not show), by rendering a sphere and

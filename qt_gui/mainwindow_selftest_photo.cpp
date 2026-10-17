@@ -461,7 +461,7 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 		const QString out = QDir::tempPath() + "/rt_selftest_composite_out.png";
 		QFile::remove(out);
 		QString noPhotoError;
-		const bool noPhotoOk = sb->renderIntoPhoto(out, {0}, 0.0, 16, &noPhotoError);   // (the message is built after the call: argument evaluation order is not defined)
+		const bool noPhotoOk = sb->renderIntoPhoto(out, {0}, 0.0, 16, false, &noPhotoError);   // (the message is built after the call: argument evaluation order is not defined)
 		check(!noPhotoOk && !noPhotoError.isEmpty(), "with no photo it fails with a message: " + noPhotoError.left(100));
 
 		const int w = 640, h = 480;
@@ -483,7 +483,7 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 		QStringList notes;
 		QElapsedTimer clock;
 		clock.start();
-		const bool made = sb->renderIntoPhoto(out, {0}, 0.0, 16, &err, &notes);
+		const bool made = sb->renderIntoPhoto(out, {0}, 0.0, 16, false, &err, &notes);
 		check(made, QString("the scene was rendered into the photo (%1 s) %2").arg(clock.elapsed() / 1000.0, 0, 'f', 1).arg(err));
 		if (made) {
 			QImage result(out);
@@ -509,8 +509,24 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 		std::vector<int> all;
 		for (size_t i = 0; i < sb->document().objects.size(); ++i) all.push_back(static_cast<int>(i));
 		QString nothing;
-		const bool nothingOk = sb->renderIntoPhoto(out, all, 0.0, 16, &nothing);
+		const bool nothingOk = sb->renderIntoPhoto(out, all, 0.0, 16, false, &nothing);
 		check(!nothingOk && !nothing.isEmpty(), "with everything marked as the ground there is nothing to put in, and it says so: " + nothing.left(100));
+		// with the Sun & sky set from the photo too, the objects' exposure and colour are read from the photo's sky (or it says why not): the picture is made either way
+		QStringList matchNotes;
+		QString matchError;
+		const bool both = sb->applyCameraPhoto(path, 65.0, 1.6, false, 0.0, false, 0.0, true, &matchError);
+		const bool matchedOk = both && sb->renderIntoPhoto(out, {0}, 0.0, 16, true, &matchError, &matchNotes);
+		check(matchedOk, "with the exposure matched to the photo " + matchError);
+		check(matchNotes.join(" ").contains("exposure"), "and the user is told what was done about it: " + matchNotes.join(" / ").left(200));
+		// a real photo, when one is given: the camera, the sky and the picture from it (the result is saved next to the log for a look)
+		const QString real = qEnvironmentVariable("RT_GUI_SELFTEST_COMPOSITE_PHOTO");
+		if (!real.isEmpty()) {
+			QString realError;
+			QStringList realNotes;
+			const bool madeReal = sb->applyCameraPhoto(real, 0.0, 1.6, false, 0.0, false, 0.0, true, &realError, &realNotes) && sb->renderIntoPhoto(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_real.png", {0}, 0.0, 48, true, &realError, &realNotes);
+			check(madeReal, "the real photo " + real + " was put into: " + realError);
+			for (const QString &n : realNotes) log("note: " + n);
+		}
 	}
 	QTimer::singleShot(600, this, [this, shot, log, ok]() {
 		shot("composite_edit");

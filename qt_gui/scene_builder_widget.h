@@ -202,7 +202,8 @@ public:
 	// inserted objects, and as a mask of them) and put into the photo with its shadows. `groundObjects` are the indices of the objects that are the ground the photo already has (not drawn,
 	// only their shadows count); lights stay lights; the rest is inserted. `exposureStops` brightens or darkens the inserted objects. Saves a PNG; false with `error` set when it cannot.
 	void renderIntoPhotoDialog();
-	bool renderIntoPhoto(const QString &outPng, const std::vector<int> &groundObjects, double exposureStops, int samples, QString *error, QStringList *notes = nullptr);
+	// `matchToPhoto`: the objects' exposure and colour cast are read from the photo's sky (photo_composite::matchToPhoto; needs the Sun & sky set from the same photo) and `exposureStops` is added to it.
+	bool renderIntoPhoto(const QString &outPng, const std::vector<int> &groundObjects, double exposureStops, int samples, bool matchToPhoto, QString *error, QStringList *notes = nullptr);
 	void updateCameraPhotoOverlay();                         // shows (or takes away) the photo over the camera view
 	bool cameraPhotoShownForTest() const { return m_cameraPhotoShown && !m_cameraPhoto.isNull(); }
 	// See scene_builder_inspector.cpp: an upright copy of a picture whose EXIF tag asks for a rotation (the renderer ignores that tag).

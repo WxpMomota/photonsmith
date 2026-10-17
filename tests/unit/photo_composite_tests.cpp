@@ -224,3 +224,111 @@ TEST(PhotoCompositeTest, ARenderedSphereOnAGroundIsPutIntoThePhotoWithItsShadow)
 	EXPECT_EQ(skyChanged, 0u) << "the sky of " << skyPixels << " pixels is the photo's";
 	EXPECT_LE(static_cast<double>(untouchedChanged), 0.02 * untouched) << "where the render shows no shadow the photo is as it was (" << untouchedChanged << " of " << untouched << " pixels changed by more than 2)";
 }
+
+// ---- matching the objects to the photo ------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace {
+
+// A photo and the render of the same sky: the render's radiance, the photo what a camera with `stops` of exposure and a colour cast `gain` made of it (sky down to row 70 of 120, a dark ground below).
+struct SkyPair {
+	int w = 160, h = 120;
+	std::vector<unsigned char> photo;
+	std::vector<float> with, mask;
+};
+
+SkyPair makeSkyPair(double stops, const double gain[3], bool anticorrelated = false) {
+	SkyPair p;
+	p.photo.assign(static_cast<size_t>(p.w) * p.h * 3, 0);
+	p.with.assign(static_cast<size_t>(p.w) * p.h * 3, 0.0f);
+	p.mask.assign(static_cast<size_t>(p.w) * p.h, 0.0f);
+	const double base[3] = {0.35, 0.5, 0.9};
+	for (int y = 0; y < p.h; ++y)
+		for (int x = 0; x < p.w; ++x) {
+			const size_t i = static_cast<size_t>(y) * p.w + x;
+			const double t = y < 70 ? y / 70.0 : 1.0;
+			const double level = 0.4 + 1.2 * (anticorrelated ? 1.0 - t : t);
+			for (int c = 0; c < 3; ++c) {
+				const double radiance = y < 70 ? base[c] * level : 0.05;
+				p.with[i * 3 + static_cast<size_t>(c)] = static_cast<float>(radiance);
+				const double seen = y < 70 ? base[c] * (0.4 + 1.2 * t) : 0.05;   // (the photo's sky is always the gradient the camera saw)
+				const double shown = std::min(1.0, photo_composite::detail::aces(seen * std::exp2(stops)) * gain[c]);
+				p.photo[i * 3 + static_cast<size_t>(c)] = static_cast<unsigned char>(std::lround(encodeSrgb(y < 70 ? shown : 0.04) * 255.0));
+			}
+		}
+	return p;
+}
+
+}  // namespace
+
+TEST(PhotoCompositeMatchTest, TheExposureAndTheColourCastOfThePhotoAreReadFromItsSky) {
+	const double gain[3] = {1.08, 1.0, 0.92};
+	for (const double stops : {-1.0, 0.0, 0.7, 1.5}) {
+		const SkyPair p = makeSkyPair(stops, gain);
+		const photo_composite::Match m = photo_composite::matchToPhoto(p.photo.data(), p.with.data(), p.mask.data(), p.w, p.h);
+		ASSERT_TRUE(m.ok) << m.why;
+		EXPECT_NEAR(m.exposureStops, stops, 0.25) << "the exposure the camera had";
+		const double lum = 0.2126 * gain[0] + 0.7152 * gain[1] + 0.0722 * gain[2];
+		for (int c = 0; c < 3; ++c) EXPECT_NEAR(m.gain[c], gain[c] / lum, 0.06) << "channel " << c;
+		EXPECT_GT(m.skyShare, 0.5);
+		EXPECT_GT(m.agreement, 0.9);
+	}
+}
+
+TEST(PhotoCompositeMatchTest, CloudsTreesAndTheObjectsThemselvesDoNotMoveTheAnswer) {
+	const double gain[3] = {1.0, 1.0, 1.0};
+	SkyPair p = makeSkyPair(0.7, gain);
+	// a white cloud in the photo that the render does not have, a dark treetop, and an object in front of part of the sky
+	for (int y = 8; y < 30; ++y)
+		for (int x = 60; x < 110; ++x)
+			for (int c = 0; c < 3; ++c) p.photo[(static_cast<size_t>(y) * p.w + x) * 3 + static_cast<size_t>(c)] = 250;
+	for (int y = 0; y < 40; ++y)
+		for (int x = 0; x < 25; ++x) {
+			p.photo[(static_cast<size_t>(y) * p.w + x) * 3] = 25;
+			p.photo[(static_cast<size_t>(y) * p.w + x) * 3 + 1] = 60;
+			p.photo[(static_cast<size_t>(y) * p.w + x) * 3 + 2] = 25;
+		}
+	for (int y = 30; y < 60; ++y)
+		for (int x = 120; x < 150; ++x) {
+			p.mask[static_cast<size_t>(y) * p.w + x] = 1.0f;
+			for (int c = 0; c < 3; ++c) p.with[(static_cast<size_t>(y) * p.w + x) * 3 + static_cast<size_t>(c)] = 9.0f;
+		}
+	const photo_composite::Match m = photo_composite::matchToPhoto(p.photo.data(), p.with.data(), p.mask.data(), p.w, p.h);
+	ASSERT_TRUE(m.ok) << m.why;
+	EXPECT_NEAR(m.exposureStops, 0.7, 0.25);
+}
+
+TEST(PhotoCompositeMatchTest, ASkyThatIsNotThePhotosSkyIsSaidSoInsteadOfGuessed) {
+	const double gain[3] = {1.0, 1.0, 1.0};
+	const SkyPair wrong = makeSkyPair(0.0, gain, true);   // a render whose sky is brightest where the photo's is darkest
+	const photo_composite::Match m = photo_composite::matchToPhoto(wrong.photo.data(), wrong.with.data(), wrong.mask.data(), wrong.w, wrong.h);
+	EXPECT_FALSE(m.ok);
+	EXPECT_FALSE(m.why.empty());
+	// a photo of only ground
+	SkyPair ground = makeSkyPair(0.0, gain);
+	for (size_t i = 0; i < ground.photo.size(); ++i) ground.photo[i] = 40;
+	const photo_composite::Match none = photo_composite::matchToPhoto(ground.photo.data(), ground.with.data(), ground.mask.data(), ground.w, ground.h);
+	EXPECT_FALSE(none.ok);
+	EXPECT_NE(none.why.find("sky"), std::string::npos);
+	EXPECT_FALSE(photo_composite::matchToPhoto(nullptr, ground.with.data(), ground.mask.data(), 160, 120).ok);
+}
+
+TEST(PhotoCompositeMatchTest, TheColourCastOfTheMatchTintsTheObjectsAndNothingElse) {
+	const int w = 8, h = 8;
+	const size_t n = static_cast<size_t>(w) * h;
+	std::vector<unsigned char> photo(n * 3, 100);
+	std::vector<float> ground(n * 3, 0.3f), with(n * 3, 0.3f), mask(n, 0.0f);
+	for (size_t i = 0; i < n / 2; ++i) {
+		mask[i] = 1.0f;
+		for (int c = 0; c < 3; ++c) with[i * 3 + static_cast<size_t>(c)] = 0.5f;
+	}
+	photo_composite::Options plain, tinted;
+	tinted.channelGain[0] = 1.0;
+	tinted.channelGain[1] = 0.5;
+	tinted.channelGain[2] = 1.0;
+	const std::vector<unsigned char> a = photo_composite::composite(photo.data(), with.data(), ground.data(), mask.data(), w, h, plain);
+	const std::vector<unsigned char> b = photo_composite::composite(photo.data(), with.data(), ground.data(), mask.data(), w, h, tinted);
+	EXPECT_EQ(a[0], b[0]);
+	EXPECT_EQ(a[2], b[2]);
+	EXPECT_LT(b[1], a[1] - 20) << "the green of the object is halved";
+	for (size_t i = n / 2 * 3; i < n * 3; ++i) EXPECT_EQ(a[i], b[i]) << "the photo's own pixels do not change";
+}
