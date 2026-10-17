@@ -20,6 +20,7 @@
 #include <functional>
 #include <mach-o/dyld.h>
 #include <vector>
+#include <array>
 #include <unordered_map>
 #include <unordered_set>
 #include <cstdio>
@@ -367,9 +368,13 @@ struct MetalPocApp {
     // above, and QUAD-shaped lights only (see AreaLight::useTexture's
     // own comment for why a disk-shaped one still falls back to flat L).
     bool havePbrtAreaLightImage = false;
-    std::string pbrtAreaLightImageFilename;   // the one image the shared area-light texture slot holds (several lights may share it)
-    // Gives an image-textured area light the shared slot: true if `em` names an image and the slot holds (or now loads) that same image.
-    bool claimAreaLightImage(const pbrt_flatten::Emission& em);
+    // The pictures of the scene's area lights (AreaLightSource "filename") live in ONE atlas texture, stacked top to bottom (buildAreaLightAtlas): the pixels, the atlas's size, and for each
+    // picture file its place in it (scale u, scale v, offset u, offset v). A room's windows may each carry another picture.
+    std::unordered_map<std::string, std::array<float, 4>> pbrtAreaLightImagePlaces;
+    void buildAreaLightAtlas(const pbrt_flatten::FlatScene& scene);
+    // True if `em` names a picture that is in the atlas; `place` is then where.
+    bool claimAreaLightImage(const pbrt_flatten::Emission& em, std::array<float, 4>& place) const;
+    std::unordered_set<int> pbrtImageEmissiveTriangles;   // the triangles of a mesh light that carries a picture (they take it from their own uv)
     std::vector<float> pbrtAreaLightImagePixels;
     int pbrtAreaLightImageWidth = 0;
     int pbrtAreaLightImageHeight = 0;

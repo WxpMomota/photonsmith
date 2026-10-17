@@ -746,7 +746,7 @@ if(RT_BUILD_METAL)
         # height map on an instance and of odd size, a far tilted normal map, the subsurface ball): the groups of the sweep that need BOTH backends, which the gpu-only test below skips.
         add_test(NAME metal_poc_cpu_gpu_sweep
             COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/consistency_sweep.py"
-                --exe $<TARGET_FILE:ray_tracer> --only fog,dots,wrap,spawn,instbump,oddmap,motion,subsurface --tolerance 4)
+                --exe $<TARGET_FILE:ray_tracer> --only fog,dots,wrap,spawn,instbump,oddmap,motion,lightpic,subsurface --tolerance 4)
         set_tests_properties(metal_poc_cpu_gpu_sweep PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" TIMEOUT 1800)
         # Metal against real pbrt-v4's means (tests/data/pbrt_reference_means.txt), every scene of the table: the only check against ground truth rather than against the CPU. It compares with
         # the ratios of gpu/metal/pbrt_pack_baseline.txt (a render is deterministic per seed, and code motion moved no scene by 0.5%, so the gate is 1%) and fails when a scene moves by more

@@ -177,6 +177,7 @@ void MetalPocApp::loadPbrtScene() {
     // emissive (but NOT NEE-light-registered) instead of silently
     // dropping their emission.
     std::unordered_map<int, std::pair<float3, bool>> unhandledLightEmission;
+    buildAreaLightAtlas(scene);
     loadPbrtAreaLights(scene, toWorld, materialFor, triangleHandled, unhandledLightEmission);
     loadPbrtRemainingTriangles(scene, toWorld, materialFor, triangleHandled, unhandledLightEmission);
     loadPbrtSpheres(scene, scene.spheres, toWorld, materialFor, sceneScale);
@@ -226,22 +227,60 @@ static PackedFloat3 pbrtFlatLightEmission(const std::string& pbrtScenePath, cons
     return PackedFloat3{(float)(em.L[0] * em.scale), (float)(em.L[1] * em.scale), (float)(em.L[2] * em.scale)};
 }
 
-// The shared area-light texture slot holds ONE image. A light that names an image gets it if the slot is free (the image is decoded into it)
-// or already holds that same image, so a scene may light several shapes from one texture; a light naming a different image, or one that
-// cannot be decoded, falls back to its flat colour.
-bool MetalPocApp::claimAreaLightImage(const pbrt_flatten::Emission& em) {
-    if (em.filename.empty()) return false;
-    if (havePbrtAreaLightImage) return em.filename == pbrtAreaLightImageFilename;
-    std::string bytes;
-    if (pbrt_load::loadFileNear(pbrtScenePath, em.filename, bytes) &&
-        pbrt_load::detail::decodeInfiniteLightImage(em.filename, bytes,
-            pbrtAreaLightImagePixels, pbrtAreaLightImageWidth, pbrtAreaLightImageHeight)) {
-        havePbrtAreaLightImage = true;
-        pbrtAreaLightImageFilename = em.filename;
-        return true;
+// Every picture an AreaLightSource names goes into ONE atlas texture (the shader has one slot for them): each file decoded once, the pictures stacked top to bottom, and each given its place in
+// the atlas - (scale u, scale v, offset u, offset v), where the picture's own (u, v) in [0, 1] is read. A scene with one picture has it alone at (1, 1, 0, 0), as before. A picture that cannot be
+// read or decoded, or that would make the atlas larger than Metal's 16384 pixels, is left out and its lights keep their flat colour.
+void MetalPocApp::buildAreaLightAtlas(const pbrt_flatten::FlatScene& scene) {
+    struct Picture { std::string name; std::vector<float> rgb; int w = 0, h = 0; };
+    std::vector<Picture> pictures;
+    std::set<std::string> seen;
+    constexpr int kMaxAtlas = 16384;
+    int atlasW = 0, atlasH = 0;
+    for (const pbrt_flatten::Emission& em : scene.areaLights) {
+        if (em.filename.empty() || !seen.insert(em.filename).second) continue;
+        Picture pic;
+        pic.name = em.filename;
+        std::string bytes;
+        if (!(pbrt_load::loadFileNear(pbrtScenePath, em.filename, bytes) &&
+              pbrt_load::detail::decodeInfiniteLightImage(em.filename, bytes, pic.rgb, pic.w, pic.h))) {
+            fprintf(stderr, "loadPbrtScene: area light's own image '%s' could not be read/decoded; falling back to its flat colour\n", em.filename.c_str());
+            continue;
+        }
+        if (pic.w > kMaxAtlas || atlasH + pic.h > kMaxAtlas) {
+            fprintf(stderr, "loadPbrtScene: warning: area light's own image '%s' does not fit the picture atlas (%d pixels high at most, %d so far); falling back to its flat colour\n", em.filename.c_str(), kMaxAtlas, atlasH);
+            continue;
+        }
+        atlasW = std::max(atlasW, pic.w);
+        atlasH += pic.h;
+        pictures.push_back(std::move(pic));
     }
-    fprintf(stderr, "loadPbrtScene: area light's own image '%s' could not be read/decoded; falling back to its flat colour\n", em.filename.c_str());
-    return false;
+    pbrtAreaLightImagePlaces.clear();
+    havePbrtAreaLightImage = !pictures.empty();
+    if (pictures.empty()) return;
+    pbrtAreaLightImageWidth = atlasW;
+    pbrtAreaLightImageHeight = atlasH;
+    pbrtAreaLightImagePixels.assign((size_t)atlasW * atlasH * 3, 0.0f);
+    int row = 0;
+    for (const Picture& pic : pictures) {
+        for (int y = 0; y < pic.h; ++y)
+            std::copy(pic.rgb.begin() + (size_t)y * pic.w * 3, pic.rgb.begin() + (size_t)(y + 1) * pic.w * 3, pbrtAreaLightImagePixels.begin() + ((size_t)(row + y) * atlasW) * 3);
+        pbrtAreaLightImagePlaces[pic.name] = {(float)pic.w / (float)atlasW, (float)pic.h / (float)atlasH, 0.0f, (float)row / (float)atlasH};
+        row += pic.h;
+    }
+}
+
+bool MetalPocApp::claimAreaLightImage(const pbrt_flatten::Emission& em, std::array<float, 4>& place) const {
+    if (em.filename.empty()) return false;
+    const auto it = pbrtAreaLightImagePlaces.find(em.filename);
+    if (it == pbrtAreaLightImagePlaces.end()) return false;
+    place = it->second;
+    return true;
+}
+
+// A light's own copy with its picture's place in the atlas (see AreaLightData).
+static AreaLightData withImagePlace(AreaLightData light, const std::array<float, 4>& place) {
+    light.imageScaleU = place[0]; light.imageScaleV = place[1]; light.imageOffsetU = place[2]; light.imageOffsetV = place[3];
+    return light;
 }
 
 void MetalPocApp::loadPbrtAreaLights(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
@@ -263,6 +302,7 @@ void MetalPocApp::loadPbrtAreaLights(const pbrt_flatten::FlatScene& scene, const
         float3 emission{flatEm.x, flatEm.y, flatEm.z};
         uint32_t quadMaterialType = 0u;
         float useTextureFlag = 0.0f;
+        std::array<float, 4> imagePlace{1.0f, 1.0f, 0.0f, 0.0f};
         bool handled = false;
         if (idxs.size() == 2) {
             const pbrt_flatten::Triangle& t0 = scene.triangles[idxs[0]];
@@ -288,7 +328,7 @@ void MetalPocApp::loadPbrtAreaLights(const pbrt_flatten::FlatScene& scene, const
                 // filename were named, same "safe fallback over dropping
                 // the light" reasoning as every other image-based
                 // feature in this loader.
-                if (claimAreaLightImage(em)) {
+                if (claimAreaLightImage(em, imagePlace)) {
                     quadMaterialType = 15u;
                     useTextureFlag = 1.0f;
                     emission = float3{(float)em.scale, (float)em.scale, (float)em.scale};
@@ -305,7 +345,7 @@ void MetalPocApp::loadPbrtAreaLights(const pbrt_flatten::FlatScene& scene, const
                 const float3 normalV = simd::normalize(simd::cross(edgeU, edgeV));
                 const float area = simd::length(simd::cross(edgeU, edgeV));
                 const float3 center = a + 0.5f * edgeU + 0.5f * edgeV;
-                lights.push_back(AreaLightData{
+                lights.push_back(withImagePlace(AreaLightData{
                     PackedFloat3{center.x, center.y, center.z},
                     PackedFloat3{edgeU.x, edgeU.y, edgeU.z},
                     PackedFloat3{edgeV.x, edgeV.y, edgeV.z},
@@ -315,7 +355,7 @@ void MetalPocApp::loadPbrtAreaLights(const pbrt_flatten::FlatScene& scene, const
                     /*patternTileB=*/0.0f,
                     /*patternScale=*/0.0f,
                     /*twoSided=*/em.twoSided ? 1.0f : 0.0f,
-                    /*useTexture=*/useTextureFlag});
+                    /*useTexture=*/useTextureFlag}, imagePlace));
                 handled = true;
             }
         }
@@ -343,7 +383,13 @@ void MetalPocApp::loadPbrtAreaLights(const pbrt_flatten::FlatScene& scene, const
             // higher-variance estimator - the same "correct but noisier"
             // tier this loader's own constant/image-based infinite light
             // miss-path-only cases already use (sections 89/90).
-            for (int idx : idxs) unhandledLightEmission[idx] = {emission, em.twoSided};
+            // A picture on the mesh light (a window box): its triangles read it at their own uv (METAL_MAT_IMAGE_EMISSIVE) and the light's emission is the bare scale, as for a picture on a quad.
+            const bool texturedMesh = claimAreaLightImage(em, imagePlace);
+            if (texturedMesh) emission = float3{(float)em.scale, (float)em.scale, (float)em.scale};
+            for (int idx : idxs) {
+                unhandledLightEmission[idx] = {emission, em.twoSided};
+                if (texturedMesh) pbrtImageEmissiveTriangles.insert(idx);
+            }
             // UPDATE: each triangle is now ALSO registered as its own NEE light (AreaLightData
             // kind 4 - one triangle, uniform-area sampled), so a fan/mesh light is sampled
             // explicitly. The light-picking pmf is power-proportional (luminance*area) via the
@@ -360,14 +406,22 @@ void MetalPocApp::loadPbrtAreaLights(const pbrt_flatten::FlatScene& scene, const
                     if (len < 1e-12f) continue;
                     const float3 nrm = cr / len;
                     pbrtEmissiveTriangleLightId[idx] = (int32_t)lights.size();
-                    lights.push_back(AreaLightData{
+                    lights.push_back(withImagePlace(AreaLightData{
                         PackedFloat3{a.x, a.y, a.z}, PackedFloat3{e1.x, e1.y, e1.z}, PackedFloat3{e2.x, e2.y, e2.z},
                         PackedFloat3{nrm.x, nrm.y, nrm.z}, 0.5f * len,
                         PackedFloat3{emission.x, emission.y, emission.z},
                         /*patternTileB=*/0.0f, /*patternScale=*/0.0f,
-                        /*twoSided=*/em.twoSided ? 1.0f : 0.0f, /*useTexture=*/0.0f,
+                        /*twoSided=*/em.twoSided ? 1.0f : 0.0f, /*useTexture=*/texturedMesh ? 1.0f : 0.0f,
                         /*pmf=*/0.0f, /*aliasProb=*/1.0f, /*aliasIndex=*/0u,
-                        /*kind=*/4.0f, /*spherePrimId=*/-1});
+                        /*kind=*/4.0f, /*spherePrimId=*/-1}, imagePlace));
+                    if (texturedMesh) {
+                        // the mesh's own uv (pbrt-v4's default for a mesh with none: (0, 0), (1, 0), (1, 1), as loadPbrtRemainingTriangles gives its triangles)
+                        AreaLightData& al = lights.back();
+                        // (v flipped: see loadPbrtRemainingTriangles)
+                        al.triU0 = tl.hasUVs ? (float)tl.uv[0] : 0.0f; al.triV0 = 1.0f - (tl.hasUVs ? (float)tl.uv[1] : 0.0f);
+                        al.triU1 = tl.hasUVs ? (float)tl.uv[2] : 1.0f; al.triV1 = 1.0f - (tl.hasUVs ? (float)tl.uv[3] : 0.0f);
+                        al.triU2 = tl.hasUVs ? (float)tl.uv[4] : 1.0f; al.triV2 = 1.0f - (tl.hasUVs ? (float)tl.uv[5] : 1.0f);
+                    }
                 }
             }
             fprintf(stderr, "loadPbrtScene: area light with %zu triangle(s) is not a simple quad - "
@@ -492,9 +546,14 @@ void MetalPocApp::loadPbrtRemainingTriangles(const pbrt_flatten::FlatScene& scen
             const PackedFloat3 packedN{faceN.x, faceN.y, faceN.z};
             normals.push_back(packedN); normals.push_back(packedN); normals.push_back(packedN);
         }
+        // A mesh light's picture is read upside down relative to the mesh's own v (image rows run top to bottom, pbrt looks a light's picture up at (u, 1 - v)), so the triangles that carry
+        // one get v flipped here, and the light-sampling uv of the same triangles (loadPbrtAreaLights) is flipped the same way.
+        const bool flipV = pbrtImageEmissiveTriangles.count(i) != 0;
         if (t.hasUVs) {
             for (int c = 0; c < 3; ++c)
-                uvs.push_back(PackedFloat2{(float)t.uv[c * 2 + 0], (float)t.uv[c * 2 + 1]});
+                uvs.push_back(PackedFloat2{(float)t.uv[c * 2 + 0], flipV ? 1.0f - (float)t.uv[c * 2 + 1] : (float)t.uv[c * 2 + 1]});
+        } else if (flipV) {
+            uvs.push_back(PackedFloat2{0, 1}); uvs.push_back(PackedFloat2{1, 1}); uvs.push_back(PackedFloat2{1, 0});   // (0,0) (1,0) (1,1), v flipped
         } else {
             // pbrt-v4's own default UV for a trianglemesh with no authored "point2 uv" (Triangle::InteractionFromIntersection): vertex 0/1/2 map to (0,0)/(1,0)/(1,1),
             // so texCoordFor()'s barycentric interpolation gives u = b1 + b2, v = b2, as src/TheRestOfYourLife/triangle.h does (and a bump map's dpdu = p1 - p0,
@@ -515,6 +574,7 @@ void MetalPocApp::loadPbrtRemainingTriangles(const pbrt_flatten::FlatScene& scen
             mat.emission = PackedFloat3{unhandledEmission.x, unhandledEmission.y, unhandledEmission.z};
             mat.lightId = -1;
             mat.twoSided = unhandledIt->second.second ? 1u : 0u;
+            if (pbrtImageEmissiveTriangles.count(i)) mat.materialType = METAL_MAT_IMAGE_EMISSIVE;   // (the picture, at the triangle's own uv: metal_poc_kernel_surface.metal)
             auto triLightIt = pbrtEmissiveTriangleLightId.find(i);
             if (triLightIt != pbrtEmissiveTriangleLightId.end()) mat.lightId = triLightIt->second;
         }
@@ -913,7 +973,8 @@ void MetalPocApp::loadPbrtDisks(const pbrt_flatten::FlatScene& scene, const Pbrt
             mat.twoSided = em.twoSided ? 1u : 0u;
             // An image-textured disk light: pbrt maps the image over the disk (u = angle / 2pi from the object x axis towards y, v = (R - r) / R).
             // The shared texture slot is sampled by the light sampler and by direct hits; emission is then the pure scale.
-            const bool texturedLight = claimAreaLightImage(em);
+            std::array<float, 4> imagePlace{1.0f, 1.0f, 0.0f, 0.0f};
+            const bool texturedLight = claimAreaLightImage(em, imagePlace);
             float3 objectX{1, 0, 0};
             if (texturedLight) {
                 mat.emission = PackedFloat3{(float)em.scale, (float)em.scale, (float)em.scale};
@@ -926,7 +987,7 @@ void MetalPocApp::loadPbrtDisks(const pbrt_flatten::FlatScene& scene, const Pbrt
             {
                 const float diskRadius = sceneScale * scaleX * (float)d.radius;
                 const int32_t lightId = (int32_t)lights.size();
-                lights.push_back(AreaLightData{
+                lights.push_back(withImagePlace(AreaLightData{
                     PackedFloat3{center.x, center.y, center.z},
                     PackedFloat3{diskRadius, 0.0f, 0.0f}, PackedFloat3{objectX.x, objectX.y, objectX.z},   // edgeV: the object x axis (the image's u = 0 direction), used only when textured
                     PackedFloat3{normal.x, normal.y, normal.z},
@@ -935,7 +996,7 @@ void MetalPocApp::loadPbrtDisks(const pbrt_flatten::FlatScene& scene, const Pbrt
                     /*patternTileB=*/0.0f, /*patternScale=*/0.0f,
                     /*twoSided=*/em.twoSided ? 1.0f : 0.0f, /*useTexture=*/texturedLight ? 1.0f : 0.0f,
                     /*pmf=*/0.0f, /*aliasProb=*/1.0f, /*aliasIndex=*/0u,
-                    /*kind=*/2.0f, /*spherePrimId=*/-1});
+                    /*kind=*/2.0f, /*spherePrimId=*/-1}, imagePlace));
                 mat.lightId = lightId;
             }
         }
@@ -1013,7 +1074,8 @@ void MetalPocApp::loadPbrtCylinders(const pbrt_flatten::FlatScene& scene, const 
             mat.twoSided = em.twoSided ? 1u : 0u;
             // Image-textured: pbrt maps u = angle / 2pi (from the object x axis towards y), v = height fraction. The x axis goes in the
             // light's (otherwise unused) normal slot.
-            const bool texturedLight = claimAreaLightImage(em);
+            std::array<float, 4> imagePlace{1.0f, 1.0f, 0.0f, 0.0f};
+            const bool texturedLight = claimAreaLightImage(em, imagePlace);
             float3 objectX = axis;
             if (texturedLight) {
                 mat.emission = PackedFloat3{(float)em.scale, (float)em.scale, (float)em.scale};
@@ -1025,7 +1087,7 @@ void MetalPocApp::loadPbrtCylinders(const pbrt_flatten::FlatScene& scene, const 
             {
                 const float cylRadius = sceneScale * scaleX * (float)cy.radius;
                 const int32_t lightId = (int32_t)lights.size();
-                lights.push_back(AreaLightData{
+                lights.push_back(withImagePlace(AreaLightData{
                     PackedFloat3{base.x, base.y, base.z},
                     PackedFloat3{axis.x, axis.y, axis.z},          // edgeU = unit axis
                     PackedFloat3{cylRadius, height, 0.0f},         // edgeV = (radius, height)
@@ -1035,7 +1097,7 @@ void MetalPocApp::loadPbrtCylinders(const pbrt_flatten::FlatScene& scene, const 
                     /*patternTileB=*/0.0f, /*patternScale=*/0.0f,
                     /*twoSided=*/em.twoSided ? 1.0f : 0.0f, /*useTexture=*/texturedLight ? 1.0f : 0.0f,
                     /*pmf=*/0.0f, /*aliasProb=*/1.0f, /*aliasIndex=*/0u,
-                    /*kind=*/3.0f, /*spherePrimId=*/-1});
+                    /*kind=*/3.0f, /*spherePrimId=*/-1}, imagePlace));
                 mat.lightId = lightId;
             }
         }

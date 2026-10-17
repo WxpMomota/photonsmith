@@ -769,7 +769,7 @@ kernel void test_structLayouts(
     LAYOUT_PROBE(Uniforms) LAYOUT_PROBE(TriangleMaterial) LAYOUT_PROBE(GpuCloudMedium) LAYOUT_PROBE(GpuRgbGridMedium)
     LAYOUT_PROBE(SphereData) LAYOUT_PROBE(InstanceTransform) LAYOUT_PROBE(DiskData) LAYOUT_PROBE(CylinderData)
     LAYOUT_PROBE(PointLight) LAYOUT_PROBE(DirectionalLight) LAYOUT_PROBE(ProjectionLight) LAYOUT_PROBE(GoniometricLight)
-    LAYOUT_PROBE(LensElement) LAYOUT_PROBE(ExitPupilBounds)
+    LAYOUT_PROBE(LensElement) LAYOUT_PROBE(ExitPupilBounds) LAYOUT_PROBE(AreaLight)
 #undef LAYOUT_PROBE
 #define FIELD_OFFSET(f) out[n++] = (uint)((constant char*)&u.f - (constant char*)&u);
     FIELD_OFFSET(fireflyClamp) FIELD_OFFSET(debugCensus) FIELD_OFFSET(pathRegen) FIELD_OFFSET(fogChromatic) FIELD_OFFSET(fogSigmaT3)
