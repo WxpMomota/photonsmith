@@ -464,6 +464,63 @@ TEST(SceneRoomTest, FurnitureMadeOfMeasuredBoxesBecomesGroupedBoxes) {
 	EXPECT_FALSE(hasErrors(validate(d)));
 }
 
+TEST(SceneRoomTest, AStaircaseBecomesTheBuildersStairsAndClimbsTheWayItIsToldTo) {
+	const std::string launcher = findLauncher();
+	scene_room::Import room;
+	std::string err;
+	const auto stairs = [](const std::string& ascend) {
+		return std::string(R"json(, "objects": [{"name": "Stairs 1", "label": "stairs", "kind": "stairs", "min": [-0.5, 0.0, 1.5], "max": [0.5, 1.2, 3.5], "ascend": )json") + ascend +
+		       R"json(, "steps": 7, "color": [0.9, 0.1, 0.1]}])json";
+	};
+	ASSERT_TRUE(scene_room::fromJson(roomJson(stairs("[0, 1]")), room, err)) << err;
+	ASSERT_EQ(room.furniture.size(), 1u);
+	const Object& s = room.furniture[0];
+	EXPECT_EQ(s.shape, ShapeKind::Stairs);
+	EXPECT_NEAR(s.size.x, 1.0, 1e-9) << "its width";
+	EXPECT_NEAR(s.size.y, 1.2, 1e-9) << "its rise";
+	EXPECT_NEAR(s.size.z, 2.0, 1e-9) << "its run";
+	EXPECT_EQ(s.steps, 7);
+	EXPECT_NEAR(s.position.y, 0.6, 1e-9) << "stairs are centred on their box";
+	EXPECT_NEAR(s.rotation.y, 0.0, 1e-9);
+	scene_room::Import east, back;
+	ASSERT_TRUE(scene_room::fromJson(roomJson(stairs("[1, 0]")), east, err)) << err;
+	EXPECT_NEAR(east.furniture[0].rotation.y, 90.0, 1e-9);
+	EXPECT_NEAR(east.furniture[0].size.x, 2.0, 1e-9) << "climbing along x: the width is the box's z";
+	EXPECT_NEAR(east.furniture[0].size.z, 1.0, 1e-9);
+	ASSERT_TRUE(scene_room::fromJson(roomJson(stairs("[0, -1]")), back, err)) << err;
+	EXPECT_NEAR(back.furniture[0].rotation.y, 180.0, 1e-9);
+	Document d = makeStarterScene();
+	scene_room::applyTo(room, d, "Room");
+	EXPECT_FALSE(hasErrors(validate(d)));
+
+	if (launcher.empty()) GTEST_SKIP() << "ray_tracer.exe was not found next to the tests";
+	// Climbing away from the camera, the stairs' top edge is at the far end and so is near the horizon; climbing towards it, the high end is near the camera and the top edge is lower in
+	// the picture. (The red stairs on a grey room, a wide field of view so the rows tell the two apart.)
+	auto topRow = [&](const std::string& direction) {
+		scene_room::Import r;
+		std::string e;
+		EXPECT_TRUE(scene_room::fromJson(roomJson(stairs(direction)), r, e)) << e;
+		r.camera.fov = 90.0;
+		for (scene_doc::Object& o : r.surfaces) o.material.color = {0.5, 0.5, 0.5};
+		Document doc = makeStarterScene();
+		scene_room::applyTo(r, doc, "Room");
+		std::vector<float> rgb;
+		int w = 0, h = 0;
+		EXPECT_TRUE(renderWithLauncher(launcher, toPbrt(doc), "room_stairs", 96, 64, 5, rgb, w, h));
+		for (int y = 0; y < h; ++y) {
+			int red = 0;
+			for (int x = w / 2 - 3; x < w / 2 + 3; ++x) {
+				const float* p = &rgb[(static_cast<size_t>(y) * w + x) * 3];
+				if (p[0] > 4.0f * p[1] && p[0] > 0.3f) ++red;   // (bright red: the stairs, not the dim red-tinted light they bounce onto the ceiling)
+			}
+			if (red >= 5) return y;   // (most of the centre pixels of the row: one noisy pixel is not the stairs)
+		}
+		return h;
+	};
+	const int away = topRow("[0, 1]"), towards = topRow("[0, -1]");
+	EXPECT_LT(away, towards - 1) << "climbing away: the top edge is higher in the picture (row " << away << " against " << towards << ")";
+}
+
 TEST(SceneRoomTest, AMeshTurnedToFaceTheCameraShowsItsFrontNotItsBack) {
 	const std::string launcher = findLauncher();
 	if (launcher.empty()) GTEST_SKIP() << "ray_tracer.exe was not found next to the tests";

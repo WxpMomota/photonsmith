@@ -181,9 +181,10 @@ def turn_xz(x, z, theta):
     return x * c + z * s, -x * s + z * c
 
 
-def dense_extreme(values, support, low, bin_size=0.06, min_count=8):
+def dense_extreme(values, support, low, bin_size=0.06, min_count=8, lateral=None, min_lateral=0.0):
     """The position of the outermost dense band of `values` on the low side (low=True: the smallest) or the high side, ignoring thin scatter: a band is a bin (of bin_size)
-    holding at least `support` samples, plus the bins next to it. Returns None when nothing is dense enough."""
+    holding at least `support` samples, plus the bins next to it. With `lateral` (where along the wall each sample is) a band must also be at least `min_lateral` wide, so a doorway or a
+    narrow recess (a plane much further out than the wall around it) is not taken for the wall. Returns None when nothing is dense enough."""
     if values.size < min_count:
         return None
     lo, hi = float(values.min()), float(values.max())
@@ -193,13 +194,18 @@ def dense_extreme(values, support, low, bin_size=0.06, min_count=8):
     good = np.nonzero(smooth >= max(support, min_count))[0]
     if good.size == 0:
         return None
-    i = int(good[0] if low else good[-1])
-    # The band's own position: the mean of the samples in the bin and its neighbours.
-    a, b = edges[max(i - 1, 0)], edges[min(i + 2, n)]
-    inside = values[(values >= a) & (values < b)]
-    if inside.size == 0:
-        return None
-    return float(np.median(inside))
+    # From the outermost band inward: the first that is wide enough along the wall
+    for i in (good if low else good[::-1]):
+        i = int(i)
+        # The band's own position: the mean of the samples in the bin and its neighbours.
+        a, b = edges[max(i - 1, 0)], edges[min(i + 2, n)]
+        sel = (values >= a) & (values < b)
+        if not sel.any():
+            continue
+        if lateral is not None and float(lateral[sel].max() - lateral[sel].min()) < min_lateral:
+            continue
+        return float(np.median(values[sel]))
+    return None
 
 
 def label_blobs(mask):
@@ -335,10 +341,11 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geom
 
     # ---- the walls the photo shows: the outermost dense band of wall-facing points on each side of the camera
     side = {}
-    for key, coord, normal_axis, lowside in (("left", X, NX, True), ("right", X, NX, False), ("back", Z, NZ, False), ("front", Z, NZ, True)):
+    for key, coord, along, normal_axis, lowside in (("left", X, Z, NX, True), ("right", X, Z, NX, False), ("back", Z, X, NZ, False), ("front", Z, X, NZ, True)):
         on_axis = vertical & (np.abs(normal_axis) > 0.8)
         part = on_axis & ((coord < -0.2) if lowside else (coord > 0.2))
-        side[key] = dense_extreme(coord[part], support, lowside)
+        # a wall is wide: a doorway or a narrow recess further out than the wall beside it is not the room's end
+        side[key] = dense_extreme(coord[part], support, lowside, lateral=along[part], min_lateral=1.2)
 
     extent_x = PR[vertical, 0] if vertical.any() else PR[OK, 0]
     extent_z = PR[vertical, 2] if vertical.any() else PR[OK, 2]

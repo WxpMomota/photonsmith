@@ -175,20 +175,24 @@ def cut_out(image, mask, margin=0.06):
     return Image.fromarray(rgba, "RGBA")
 
 
-def add_furniture(image, geometry, result, out_folder, count, device_choice, base_percent=62, top_percent=98):
-    """Finds furniture in the photo, makes a mesh of each piece and puts them in `result` ("objects", and what could not be done in "notes")."""
+def find_things(image, device_choice, result, base_percent=56):
+    """What the segmentation model names in the photo: the segments, or None when it cannot run (a note says why)."""
+    progress(base_percent, "Looking for furniture (the first time this downloads about 170 MB)")
+    try:
+        return segment_objects(image, device_choice)
+    except ImportError as e:
+        result["notes"].append("Furniture was skipped: a Python package is missing (%s); run the photo helper's setup script." % e)
+        return None
+
+
+def add_furniture(image, geometry, result, out_folder, segments, count, device_choice, base_percent=62, top_percent=98):
+    """Makes a mesh (or measured boxes) of the furniture among `segments` and puts them in `result` ("objects", and what could not be done in "notes")."""
     import room_objects
     from PIL import Image
 
     def band(lo, hi):   # progress inside [lo, hi] for a step that reports 0..100
         return lambda percent, message: progress(int(lo + (hi - lo) * percent / 100.0), message)
 
-    progress(base_percent, "Looking for furniture (the first time this downloads about 170 MB)")
-    try:
-        segments = segment_objects(image, device_choice)
-    except ImportError as e:
-        result["notes"].append("Furniture was skipped: a Python package is missing (%s); run the photo helper's setup script." % e)
-        return
     chosen = room_objects.choose_objects(segments, max_count=count)
     if not chosen:
         result["notes"].append("No furniture was recognised in the photo.")
@@ -205,6 +209,15 @@ def add_furniture(image, geometry, result, out_folder, count, device_choice, bas
     for seg in chosen:
         label = seg["label"]
         place = room_objects.place_object(geometry, seg["mask"], label=label)
+        if label == "stairs":   # (a staircase is measured, never guessed: the 3D model cannot make steps)
+            stairs = room_objects.stairs_piece(geometry, seg["mask"], title_of(label)) if place is not None else None
+            if stairs:
+                stairs.update({"label": label, "score": round(seg["score"], 3)})
+                result["objects"].append(stairs)
+            else:
+                names[label] = names.get(label, 1) - 1
+                result["notes"].append("A staircase was seen but could not be measured, so it is left out.")
+            continue
         parts = None
         if place is not None and (label in room_objects.TABLES or label in room_objects.BLOCKS):
             title = title_of(label)
@@ -368,9 +381,14 @@ def main():
         result, geometry = room_fit.fit_room(depth, np.asarray(image), hfov, camera_height=args.camera_height, return_geometry=True, allow_outline=not args.box)
     except ValueError as e:
         fail("could not find a room in this photo (%s). A photo taken inside a room, showing a floor and at least one wall, works best." % e)
+    segments = find_things(image, args.device, result) if args.furniture > 0 else None
+    if segments:
+        import room_objects
+        # what stands in the room is left out of the walls' and floor's pictures (it is modelled, or at least not part of the surface)
+        geometry["textures"]["exclude"] = room_objects.object_mask(segments)
     add_textures(result, geometry, args.out)
-    if args.furniture > 0:
-        add_furniture(image, geometry, result, args.out, args.furniture, args.device)
+    if segments:
+        add_furniture(image, geometry, result, args.out, segments, args.furniture, args.device)
     result["photo"] = {"width": image.width, "height": image.height, "hfov": round(hfov, 3), "fov_source": fov_source,
                        "brightness": round(room_fit.picture_brightness(np.asarray(image)), 4)}   # (the Scene Builder renders a draft and sets the lights to match this)
     result["model"] = MODEL

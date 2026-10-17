@@ -133,6 +133,14 @@ class OutlineTests(unittest.TestCase):
         self.assertNotIn("outline", result["room"])
         self.assertEqual([s["name"] for s in result["surfaces"]], ["Floor", "Ceiling", "Left wall", "Right wall", "Back wall", "Front wall"])
 
+    def test_a_doorway_to_a_far_corridor_is_not_the_back_wall(self):
+        # a room x -2..2, z -0.5..4 with a 1 m wide doorway in its back wall opening on a corridor that runs on to z = 5.5 (before the width rule the room ran out to 5.5)
+        rects = [(-2.0, 2.0, -0.5, 4.0), (-0.5, 0.5, 4.0, 5.5)]
+        walls = [(0, -2.0, -0.5, 4.0), (2, 4.0, -2.0, -0.5), (0, -0.5, 4.0, 5.5), (2, 5.5, -0.5, 0.5), (0, 0.5, 4.0, 5.5), (2, 4.0, 0.5, 2.0), (0, 2.0, -0.5, 4.0), (2, -0.5, -2.0, 2.0)]
+        depth, rgb = photograph_outline(rects, walls)
+        box = room_fit.fit_room(depth, rgb, 70.0, allow_outline=False)
+        self.assertAlmostEqual(box["room"]["max"][2], 4.0, delta=0.35, msg="the room ends at its back wall, not at the end of the corridor behind the door")
+
     def test_every_wall_slab_faces_into_the_room_and_closes_it(self):
         result, _ = fit(L_RECTS, L_WALLS)
         walls = [s for s in result["surfaces"] if s["name"].startswith("Wall")]

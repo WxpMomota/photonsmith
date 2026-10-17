@@ -17,17 +17,18 @@ import numpy as np
 # What counts as furniture or a room's decoration: the names the segmentation model (DETR panoptic, COCO's classes) gives them. People and animals are left out on purpose.
 FURNITURE = {
     "chair", "couch", "bed", "dining table", "table-merged", "toilet", "tv", "laptop", "potted plant", "vase", "clock", "refrigerator", "oven", "microwave", "sink", "bench",
-    "cabinet-merged", "shelf", "counter", "pillow", "teddy bear", "suitcase", "book", "bottle", "cup", "wine glass", "bowl", "toaster", "hair drier", "umbrella",
+    "cabinet-merged", "shelf", "counter", "pillow", "teddy bear", "suitcase", "book", "bottle", "cup", "wine glass", "bowl", "toaster", "hair drier", "umbrella", "stairs",
 }
 # Things that stand on the floor: their lowest visible point is no guide (a table's thin legs and a chair's feet vanish in a depth map and the lowest point read is the seat or the
 # tabletop), so they are taken to stand on it. Plants, vases, cups and the like are not here: they are as often on a table.
-FLOOR_STANDING = {"chair", "couch", "bed", "dining table", "table-merged", "toilet", "refrigerator", "oven", "bench", "cabinet-merged", "counter", "shelf", "sink", "suitcase"}
+FLOOR_STANDING = {"chair", "couch", "bed", "dining table", "table-merged", "toilet", "refrigerator", "oven", "bench", "cabinet-merged", "counter", "shelf", "sink", "suitcase", "stairs"}
 FLOOR_PRIOR_BELOW = 0.7      # ... when the lowest point read is below this height (above it, the piece really is on something)
 # Furniture that is a slab and four legs or a plain block is built from measured boxes instead of being guessed by the 3D model, which turns thin legs into lumps: the table, and
 # the blocks with the depth to give one when the photo only shows the front (metres).
 TABLES = {"dining table", "table-merged"}
 BLOCKS = {"refrigerator": 0.7, "oven": 0.6, "cabinet-merged": 0.55, "counter": 0.6, "shelf": 0.35, "bed": 2.0}
-MIN_AREA = 0.012       # an object must cover at least this fraction of the picture (smaller ones come out as blobs)
+MIN_STAIR_WIDTH = 0.9   # metres
+MIN_AREA = 0.005       # an object must cover at least this fraction of the picture (smaller ones come out as blobs; a chair across a room is under 1%)
 MAX_OBJECTS = 6
 MIN_SCORE = 0.5
 SNAP_DEGREES = 20.0    # a facing direction this close to a wall's direction is lined up with the wall
@@ -42,6 +43,34 @@ def relight_texture(rgb8, exposure):
     lin = lin * np.minimum(1.0, 0.9 / np.maximum(top, 1e-9))
     out = np.where(lin <= 0.0031308, lin * 12.92, 1.055 * np.power(np.maximum(lin, 0.0), 1 / 2.4) - 0.055)
     return (np.clip(out, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
+
+
+# What is in a room but is not its walls and floor: it is left out of their pictures (a staircase, a chair or a bag in front of a wall must not be painted on it too). The furniture
+# classes above, and the other things the segmentation model names.
+OBJECT_LABELS = set(FURNITURE) | {"stairs", "person", "handbag", "backpack", "teddy bear", "laptop", "keyboard", "mouse", "remote", "cell phone", "tv", "book", "clock", "scissors", "bird",
+                                  "cat", "dog", "umbrella", "tie", "bottle", "cup", "wine glass", "bowl", "banana", "apple", "orange", "toothbrush", "vase", "potted plant", "bench"}
+
+
+def dilate(mask, radius):
+    """The mask grown by `radius` pixels in every direction (a square window)."""
+    out = np.asarray(mask, dtype=bool).copy()
+    for _ in range(radius):
+        grown = out.copy()
+        grown[1:] |= out[:-1]
+        grown[:-1] |= out[1:]
+        grown[:, 1:] |= out[:, :-1]
+        grown[:, :-1] |= out[:, 1:]
+        out = grown
+    return out
+
+
+def object_mask(segments, radius=3):
+    """Everything in the photo that is a thing in the room (see OBJECT_LABELS), grown a little (an object's edge pixels blend with what is behind it): (h, w) bool, or None."""
+    union = None
+    for s in segments:
+        if s["label"] in OBJECT_LABELS:
+            union = np.asarray(s["mask"], dtype=bool) if union is None else (union | np.asarray(s["mask"], dtype=bool))
+    return dilate(union, radius) if union is not None else None
 
 
 def mask_overlap(a, b):
@@ -72,8 +101,9 @@ def choose_objects(segments, max_count=MAX_OBJECTS, min_area=MIN_AREA, min_score
     return chosen
 
 
-def masked_points(geometry, mask, min_points=20):
-    """The 3D points (and the photo's colours there, as display RGB 0..1) of an object's mask, without depth outliers; (None, None) when there are too few."""
+def masked_points(geometry, mask, min_points=20, require_ok=True):
+    """The 3D points (and the photo's colours there, as display RGB 0..1) of an object's mask, without depth outliers; (None, None, mask) when there are too few. require_ok=False takes
+    every pixel of the mask, not only those on a smooth surface (a staircase's treads are seen at a grazing angle and the depth map drops them)."""
     points, ok, step = geometry["points"], geometry["ok"], geometry["step"]
     h, w = ok.shape
     m = np.asarray(mask, dtype=bool)[::step, ::step]
@@ -81,14 +111,14 @@ def masked_points(geometry, mask, min_points=20):
         fixed = np.zeros(ok.shape, dtype=bool)
         fixed[:min(h, m.shape[0]), :min(w, m.shape[1])] = m[:h, :w]
         m = fixed
-    sel = m & ok
+    sel = (m & ok) if require_ok else m.copy()
     inner = m.copy()   # one pixel in from the border: a border pixel's blurred depth lands in mid-air between the object and what is behind it
     inner[1:] &= m[:-1]
     inner[:-1] &= m[1:]
     inner[:, 1:] &= m[:, :-1]
     inner[:, :-1] &= m[:, 1:]
-    if int((inner & ok).sum()) >= max(2 * min_points, 0.4 * int(sel.sum())):
-        sel = inner & ok
+    if int((inner & (ok if require_ok else True)).sum()) >= max(2 * min_points, 0.4 * int(sel.sum())):
+        sel = inner & ok if require_ok else inner
     p = points[sel]
     if len(p) < min_points:
         return None, None, m
@@ -188,6 +218,49 @@ def wall_behind(geometry, axis, sign, near_edge, lateral_lo, lateral_hi):
         if best is None or beyond < best[0]:
             best = (beyond, wl["value"])
     return best[1] if best else None
+
+
+def stairs_piece(geometry, mask, name="Stairs"):
+    """A staircase from its mask: a Scene Builder stairs object as {"kind": "stairs", "name", "min", "max" (the box it fills, in the Scene Builder's frame), "ascend" (the horizontal
+    direction it climbs, a unit axis vector there), "steps", "color"}, or None when what the mask shows is not a believable staircase. The run is whichever way the points spread further,
+    the ascent is the way they rise, the rise comes from their height (the base is taken to be on the floor), and a step is about 18 cm."""
+    p, colours, m = masked_points(geometry, mask, min_points=40, require_ok=False)
+    if p is None:
+        return None
+    ranges = [float(np.percentile(p[:, a], 95) - np.percentile(p[:, a], 5)) for a in (0, 2)]
+    axis = 0 if ranges[0] > ranges[1] else 2            # the run axis: x or z of the photo's frame
+    across = 2 if axis == 0 else 0
+    run_lo, run_hi = float(np.percentile(p[:, axis], 3)), float(np.percentile(p[:, axis], 97))
+    wid_lo, wid_hi = float(np.percentile(p[:, across], 3)), float(np.percentile(p[:, across], 97))
+    corr = float(np.corrcoef(p[:, axis], p[:, 1])[0, 1]) if p[:, axis].std() > 1e-6 and p[:, 1].std() > 1e-6 else 0.0
+    if abs(corr) < 0.3:
+        return None                                      # it does not rise along a line: not a staircase
+    sign = 1.0 if corr > 0 else -1.0
+    bottom = 0.0
+    top = float(np.percentile(p[:, 1], 98))
+    rise, run, width = top - bottom, run_hi - run_lo, wid_hi - wid_lo
+    if width < MIN_STAIR_WIDTH:   # the side away from the camera is hidden behind the steps themselves: a flight is never much narrower than this
+        if 0.5 * (wid_lo + wid_hi) >= 0.0:
+            wid_hi = wid_lo + MIN_STAIR_WIDTH
+        else:
+            wid_lo = wid_hi - MIN_STAIR_WIDTH
+        width = MIN_STAIR_WIDTH
+    if rise < 0.5 or rise > 6.0 or width > 3.0 or run < 0.5:
+        return None
+    slope = rise / run                                    # (a stair is about 0.6 to 0.8: only a part of it is seen, but it must climb like one)
+    if not (0.3 <= slope <= 1.4):
+        run = rise / 0.7                                  # what is seen does not give the run: take a usual stair
+        if sign > 0:
+            run_hi = run_lo + run
+        else:
+            run_lo = run_hi - run
+    lo, hi = [0.0, bottom, 0.0], [0.0, top, 0.0]
+    lo[axis], hi[axis] = run_lo, run_hi
+    lo[across], hi[across] = wid_lo, wid_hi
+    a, b = mirror_box(lo, hi)
+    ascend = [0.0, 0.0]
+    ascend[0 if axis == 0 else 1] = sign * (-1.0 if axis == 0 else 1.0)   # (x is mirrored for the Scene Builder; z is not)
+    return {"kind": "stairs", "name": name, "min": a, "max": b, "ascend": ascend, "steps": int(min(30, max(3, round(rise / 0.18)))), "color": reflectance(colours, geometry.get("exposure", 1.0))}
 
 
 def block_parts(geometry, mask, label, place, name="Block"):

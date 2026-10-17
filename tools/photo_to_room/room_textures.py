@@ -99,6 +99,9 @@ def sample(model, u, v, zc, tolerance=0.12, check_depth=True):
     fx, fy = (uu - x0)[:, None], (vv - y0)[:, None]
     img = model["image"]
     colour = (img[y0, x0] * (1 - fx) * (1 - fy) + img[y0, x0 + 1] * fx * (1 - fy) + img[y0 + 1, x0] * (1 - fx) * fy + img[y0 + 1, x0 + 1] * fx * fy)
+    exclude = model.get("exclude")   # (a picture's pixels that show an object in the room: not a wall's or a floor's own look)
+    if exclude is not None:
+        ok &= ~exclude[np.clip(np.rint(vv).astype(int), 0, h - 1), np.clip(np.rint(uu).astype(int), 0, w - 1)]
     d = model["depth_near"]
     measured = np.minimum.reduce([d[y0, x0], d[y0, x0 + 1], d[y0 + 1, x0], d[y0 + 1, x0 + 1]])   # (the nearest thing around the pixel: an occluder's edge counts)
     if check_depth:

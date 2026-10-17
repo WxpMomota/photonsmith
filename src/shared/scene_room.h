@@ -161,6 +161,32 @@ inline bool fromJson(const std::string& text, Import& out, std::string& err, con
 		namespace fs = std::filesystem;
 		const auto resolve = [&](const std::string& rel) { return baseFolder.empty() ? rel : (fs::path(baseFolder) / rel).string(); };
 		for (const Json& o : objects->a) {
+			// A staircase: the box it fills, the way it climbs and how many steps; the Builder's own stairs shape (it climbs along its local +z, and stands centred on its box)
+			std::string kind;
+			if (o.type == Json::Type::Obj && scene_doc::detail::readStr(o, "kind", kind) && kind == "stairs") {
+				std::string name = "Stairs", why;
+				scene_doc::detail::readStr(o, "name", name);
+				scene_doc::Float3 lo, hi;
+				scene_doc::Rgb colour{0.55, 0.4, 0.25};
+				int steps = 10;
+				const Json* ascend = o.find("ascend");
+				const bool good = detail::readBox(o, lo, hi, why, name) && readRgb(o, "color", colour) && scene_doc::detail::readInt(o, "steps", steps) && ascend && ascend->type == Json::Type::Arr &&
+				                  ascend->a.size() == 2 && ascend->a[0].type == Json::Type::Num && ascend->a[1].type == Json::Type::Num;
+				if (!good) {
+					out.notes.push_back("A staircase in the room file (" + name + ") could not be used and was left out.");
+					continue;
+				}
+				const double ax = ascend->a[0].n, az = ascend->a[1].n;
+				scene_doc::Object s = scene_doc::makeObject(scene_doc::ShapeKind::Stairs, name);
+				s.position = {(lo.x + hi.x) / 2.0, (lo.y + hi.y) / 2.0, (lo.z + hi.z) / 2.0};
+				const bool alongZ = std::fabs(az) >= std::fabs(ax);
+				s.size = {alongZ ? hi.x - lo.x : hi.z - lo.z, hi.y - lo.y, alongZ ? hi.z - lo.z : hi.x - lo.x};   // width, rise, run
+				s.rotation = {0.0, alongZ ? (az > 0 ? 0.0 : 180.0) : (ax > 0 ? 90.0 : -90.0), 0.0};
+				s.steps = std::clamp(steps, 1, 40);
+				s.material.color = {std::clamp(colour.r, 0.0, 1.0), std::clamp(colour.g, 0.0, 1.0), std::clamp(colour.b, 0.0, 1.0)};
+				out.furniture.push_back(s);
+				continue;
+			}
 			// A piece made of measured boxes (a table: a top and four legs; a cabinet: one block): each part is a Box, all of them one group so the piece is picked and moved as one
 			if (const Json* parts = o.type == Json::Type::Obj ? o.find("parts") : nullptr) {
 				std::string name = "Furniture";

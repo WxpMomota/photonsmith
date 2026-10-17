@@ -176,6 +176,54 @@ class MeasuredFurnitureTests(unittest.TestCase):
         self.assertAlmostEqual(b["max"][2] - b["min"][2], 0.55, delta=0.15)   # (the kind's typical depth; the top is seen a little)
 
 
+def staircase(x0, x1, z_start, steps, tread=0.25, riser=0.18, ascend_z=True, along_x=False):
+    """A staircase of boxes as the analytic room's obstacles: climbing along +z (or back towards the camera when ascend_z is False), or, with along_x, climbing along +x with its
+    steps spread between x0 and x0 + steps * tread at depth z_start..z_start + (x1 - x0)."""
+    boxes = []
+    for i in range(steps):
+        if along_x:
+            boxes.append(((x0 + i * tread, 0.0, z_start), (x0 + (i + 1) * tread, (i + 1) * riser, z_start + (x1 - x0))))
+            continue
+        z = z_start + i * tread if ascend_z else z_start + (steps - 1 - i) * tread
+        boxes.append(((x0, 0.0, z), (x1, (i + 1) * riser, z + tread)))
+    return boxes
+
+
+@unittest.skipUnless(HAVE_NUMPY, "numpy is not installed")
+class StairsTests(unittest.TestCase):
+    def piece(self, steps=8, **kw):
+        _, geometry, mask = fit_with_object(obstacle=staircase(-0.6, 0.4, 2.0, steps, **kw))
+        return room_objects.stairs_piece(geometry, mask, "Stairs 1")
+
+    def test_a_staircase_climbing_away_is_measured(self):
+        s = self.piece()
+        self.assertIsNotNone(s)
+        self.assertEqual(s["kind"], "stairs")
+        self.assertEqual(s["ascend"], [0.0, 1.0], "climbing along +z, which the mirror leaves alone")
+        self.assertAlmostEqual(s["max"][1], 8 * 0.18, delta=0.25)                    # the rise: 1.44 m
+        self.assertEqual(s["min"][1], 0.0)
+        self.assertAlmostEqual(s["max"][0] - s["min"][0], 1.0, delta=0.3)            # the width
+        self.assertAlmostEqual(s["max"][2] - s["min"][2], 2.0, delta=0.5)            # the run
+        self.assertAlmostEqual(s["steps"], 8, delta=2)
+
+    def test_a_staircase_climbing_to_the_photos_right_climbs_towards_minus_x_in_the_builder(self):
+        _, geometry, mask = fit_with_object(obstacle=staircase(-1.0, 0.0, 2.5, 8, along_x=True))   # its steps spread along x, 1 m deep
+        s = room_objects.stairs_piece(geometry, mask, "Stairs 1")
+        self.assertIsNotNone(s)
+        self.assertEqual(s["ascend"], [-1.0, 0.0], "to the photo's right is -x in the Scene Builder's mirrored frame")
+        self.assertAlmostEqual(s["max"][0] - s["min"][0], 2.0, delta=0.5, msg="its run is along x")
+        self.assertAlmostEqual(s["max"][2] - s["min"][2], 1.0, delta=0.15, msg="its width along z: the far side is hidden, so the usual 0.9 m is taken")
+        self.assertGreater(s["max"][2], s["min"][2] + 0.89)
+
+    def test_something_that_does_not_climb_is_not_stairs(self):
+        _, geometry, mask = fit_with_object(obstacle=((-0.5, 0.0, 2.0), (0.5, 0.9, 3.0)))   # a plain block
+        self.assertIsNone(room_objects.stairs_piece(geometry, mask))
+
+    def test_stairs_are_furniture_that_stands_on_the_floor(self):
+        self.assertIn("stairs", room_objects.FURNITURE)
+        self.assertIn("stairs", room_objects.FLOOR_STANDING)
+
+
 @unittest.skipUnless(HAVE_NUMPY, "numpy is not installed")
 class RelightTextureTests(unittest.TestCase):
     @staticmethod
@@ -203,6 +251,28 @@ class RelightTextureTests(unittest.TestCase):
     def test_an_exposure_of_one_changes_nothing(self):
         tex = np.random.default_rng(3).integers(0, 200, size=(4, 4, 3)).astype(np.uint8)   # (below the 0.9 cap, which also applies at an exposure of one)
         self.assertTrue(np.all(np.abs(room_objects.relight_texture(tex, 1.0).astype(int) - tex.astype(int)) <= 1))
+
+
+@unittest.skipUnless(HAVE_NUMPY, "numpy is not installed")
+class ObjectMaskTests(unittest.TestCase):
+    def test_things_in_the_room_are_masked_and_grown_and_the_walls_are_not(self):
+        wall = np.ones((20, 20), bool)
+        chair = np.zeros((20, 20), bool)
+        chair[8:12, 8:12] = True
+        bag = np.zeros((20, 20), bool)
+        bag[2:4, 15:17] = True
+        mask = room_objects.object_mask([{"label": "wall-other-merged", "score": 1, "mask": wall}, {"label": "chair", "score": 1, "mask": chair}, {"label": "handbag", "score": 1, "mask": bag}], radius=2)
+        self.assertTrue(mask[10, 10] and mask[3, 16], "the chair and the bag are in it, small as the bag is")
+        self.assertTrue(mask[6, 10] and not mask[5, 10], "grown by two pixels")
+        self.assertFalse(mask[18, 2], "the wall is not")
+        self.assertIsNone(room_objects.object_mask([{"label": "wall-other-merged", "score": 1, "mask": wall}]))
+
+    def test_dilate_grows_by_the_radius(self):
+        m = np.zeros((9, 9), bool)
+        m[4, 4] = True
+        self.assertEqual(int(room_objects.dilate(m, 1).sum()), 5)
+        self.assertEqual(int(room_objects.dilate(m, 0).sum()), 1)
+        self.assertTrue(room_objects.dilate(m, 4)[0, 4])
 
 
 @unittest.skipUnless(HAVE_NUMPY, "numpy is not installed")

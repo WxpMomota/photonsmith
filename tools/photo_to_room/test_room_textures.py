@@ -95,6 +95,24 @@ class RoomTexturesTests(unittest.TestCase):
         close_to_brown = np.all(np.abs(image - brown) < 0.05, axis=-1)
         self.assertLess(float(close_to_brown[behind].mean()), 0.05, "the cabinet is not on the wall")
 
+    def test_an_object_flush_against_the_wall_is_left_out_when_its_mask_is_given(self):
+        # a thin object on the back wall (2 cm in front: the depth test cannot tell it from the wall) is painted on the wall's picture unless its mask says what it is
+        obstacle = ((-0.5, 0.5, 4.48), (0.4, 1.4, 4.5))
+        depth, rgb, mask = photograph(window=False, pattern=True, yaw=0.0, pitch=0.0, obstacle=obstacle, want_mask=True)
+        result, geometry = room_fit.fit_room(depth, rgb, 70.0, return_geometry=True)
+        s = surface(result, "Back wall")
+        spec = room_textures.FACES["Back wall"]
+        brown = np.array([150, 130, 100]) / 255.0
+
+        def brown_share(exclude):
+            geometry["textures"]["exclude"] = exclude
+            image, _ = room_textures.surface_texture(geometry["textures"], s["min"], s["max"], spec, texels_per_metre=100)
+            return float(np.all(np.abs(image - brown) < 0.05, axis=-1).mean())
+
+        self.assertGreater(brown_share(None), 0.02, "without the mask the object is on the wall's picture")
+        import room_objects
+        self.assertLess(brown_share(room_objects.dilate(mask, 2)), 0.003, "with it, it is not")
+
     def test_a_surface_the_photo_does_not_show_gets_no_picture(self):
         result, geometry = fit(yaw=0.0, pitch=0.0)
         s = surface(result, "Front wall")   # behind the camera
