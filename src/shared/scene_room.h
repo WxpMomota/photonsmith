@@ -202,6 +202,14 @@ inline bool fromJson(const std::string& text, Import& out, std::string& err, con
 					if (!detail::readBox(part, lo, hi, why, partName) || !readRgb(part, "color", colour)) { all = false; break; }
 					scene_doc::Object box = detail::boxObject(partName, lo, hi);
 					box.material.color = {std::clamp(colour.r, 0.0, 1.0), std::clamp(colour.g, 0.0, 1.0), std::clamp(colour.b, 0.0, 1.0)};
+					// A table's top can carry the photo's own look (its wood, its cloth): a picture named relative to the room file's folder; the flat colour stays when it is missing
+					std::string picture;
+					if (scene_doc::detail::readStr(part, "texture", picture) && !picture.empty()) {
+						std::error_code ec;
+						const std::string path = baseFolder.empty() ? picture : (std::filesystem::path(baseFolder) / picture).string();
+						if (std::filesystem::exists(path, ec)) box.material.imageFile = path;
+						else out.notes.push_back("The picture of the " + partName + " was not found, so it keeps its flat colour.");
+					}
 					if (parts->a.size() > 1) box.group = name;
 					made.push_back(box);
 				}

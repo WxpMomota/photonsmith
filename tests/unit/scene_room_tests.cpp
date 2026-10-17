@@ -464,6 +464,32 @@ TEST(SceneRoomTest, FurnitureMadeOfMeasuredBoxesBecomesGroupedBoxes) {
 	EXPECT_FALSE(hasErrors(validate(d)));
 }
 
+TEST(SceneRoomTest, ATablesTopCanCarryThePhotosPictureAndAMissingOneKeepsTheFlatColour) {
+	const std::string folder = "scene_room_test_tabletop";
+	std::error_code ec;
+	std::filesystem::create_directories(folder, ec);
+	{
+		std::ofstream tex(folder + "/top.bmp", std::ios::binary);
+		tex << bmpFile(1, 1, {10, 20, 30});
+	}
+	const std::string table = R"json(, "objects": [
+	  {"name": "Table 1", "label": "dining table", "kind": "boxes", "parts": [
+	    {"name": "Table 1 top", "min": [-0.6, 0.70, 2.2], "max": [0.6, 0.75, 3.0], "color": [0.3, 0.2, 0.1], "texture": "top.bmp"},
+	    {"name": "Table 1 leg 1", "min": [-0.58, 0.0, 2.22], "max": [-0.52, 0.70, 2.28], "color": [0.3, 0.2, 0.1], "texture": "nowhere.png"}]}])json";
+	scene_room::Import room;
+	std::string err;
+	ASSERT_TRUE(scene_room::fromJson(roomJson(table), room, err, folder)) << err;
+	ASSERT_EQ(room.furniture.size(), 2u);
+	EXPECT_NE(room.furniture[0].material.imageFile.find("top.bmp"), std::string::npos);
+	EXPECT_TRUE(room.furniture[1].material.imageFile.empty());
+	EXPECT_NEAR(room.furniture[1].material.color.r, 0.3, 1e-9) << "the flat colour stays";
+	EXPECT_TRUE(std::any_of(room.notes.begin(), room.notes.end(), [](const std::string& n) { return n.find("Table 1 leg 1") != std::string::npos; }));
+	Document d = makeStarterScene();
+	scene_room::applyTo(room, d, "Room");
+	EXPECT_FALSE(hasErrors(validate(d)));
+	std::filesystem::remove_all(folder, ec);
+}
+
 TEST(SceneRoomTest, AStaircaseBecomesTheBuildersStairsAndClimbsTheWayItIsToldTo) {
 	const std::string launcher = findLauncher();
 	scene_room::Import room;

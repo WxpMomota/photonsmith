@@ -223,6 +223,8 @@ def add_furniture(image, geometry, result, out_folder, segments, count, device_c
             title = title_of(label)
             if label in room_objects.TABLES:
                 parts = room_objects.table_parts(geometry, seg["mask"], title)
+                if parts:
+                    add_table_top_picture(geometry, seg["mask"], parts, out_folder, title)
             else:
                 parts = room_objects.block_parts(geometry, seg["mask"], label, place, title)
             if parts:
@@ -271,6 +273,27 @@ def add_furniture(image, geometry, result, out_folder, segments, count, device_c
     if result["objects"]:
         result["notes"].append("%d piece(s) of furniture were made from the photo (%s). Tables and blocks are measured boxes, the rest guesses with an invented back: move, resize or delete them." %
                                (len(result["objects"]), ", ".join(o["name"] for o in result["objects"])))
+
+
+def add_table_top_picture(geometry, mask, parts, out_folder, title):
+    """Gives a table's top (parts[0]) the photo's own look (its wood, its cloth): a picture in textures/ and "texture" in the part. Only what the photo shows as the table counts (a table
+    is not square: the corners of its box are the floor, a cup on it is not its look), the rest is filled in smoothly. Returns whether a picture was made."""
+    import numpy as np
+    from PIL import Image
+    import room_objects, room_textures
+
+    top = parts[0]
+    seen_as_table = room_objects.dilate(mask, 2)
+    model = dict(geometry["textures"], exclude=~seen_as_table)
+    image, _ = room_textures.surface_texture(model, top["min"], top["max"], room_textures.face_spec(1, +1), texels_per_metre=200, max_size=512, min_seen=0.3)
+    if image is None:
+        return False
+    folder = os.path.join(out_folder, "textures")
+    os.makedirs(folder, exist_ok=True)
+    slug = "top_" + title.lower().replace(" ", "_")
+    Image.fromarray(room_textures.to_reflectance_png(image, geometry["exposure"])).save(os.path.join(folder, slug + ".png"))
+    top["texture"] = "textures/%s.png" % slug
+    return True
 
 
 def add_textures(result, geometry, out_folder):

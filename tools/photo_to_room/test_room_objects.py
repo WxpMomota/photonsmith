@@ -147,6 +147,25 @@ class MeasuredFurnitureTests(unittest.TestCase):
             self.assertTrue(all(a < b for a, b in zip(part["min"], part["max"])))
             self.assertTrue(all(0.03 <= c <= 0.9 for c in part["color"]))
 
+    def test_a_tables_top_gets_the_photos_own_picture_of_it(self):
+        import tempfile
+        import photo_to_room
+        from PIL import Image
+        _, geometry, mask = fit_with_object(obstacle=TABLE)
+        parts = room_objects.table_parts(geometry, mask, "Table 1")
+        with tempfile.TemporaryDirectory() as folder:
+            self.assertTrue(photo_to_room.add_table_top_picture(geometry, mask, parts, folder, "Table 1"))
+            self.assertEqual(parts[0]["texture"], "textures/top_table_1.png")
+            self.assertNotIn("texture", parts[1], "only the top has a picture")
+            with Image.open(os.path.join(folder, parts[0]["texture"])) as picture:
+                self.assertEqual(picture.mode, "RGB")
+                self.assertGreater(picture.width, 100)
+            tiny = np.zeros_like(mask)
+            tiny[0, 0] = True   # nothing of the table is in the photo there: no picture, and no file
+            plain = room_objects.table_parts(geometry, mask, "Table 2")
+            self.assertFalse(photo_to_room.add_table_top_picture(geometry, tiny, plain, folder, "Table 2"))
+            self.assertNotIn("texture", plain[0])
+
     def test_a_table_the_photo_barely_shows_is_left_to_the_3d_model(self):
         _, geometry, mask = fit_with_object(obstacle=TABLE)
         tiny = np.zeros_like(mask)
