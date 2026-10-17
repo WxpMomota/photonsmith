@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  Makes every narrow-string Windows call of the program (argv, fopen, std::ifstream, ...) read and write UTF-8 instead of the system's ANSI code page. The program keeps its paths as UTF-8
+  (Qt's toStdString, the pbrt files it writes), so without this a folder or user name with an accented or non-Latin letter ("C:\Users\José\...") is a different, missing folder to the
+  renderer: scenes, meshes and pictures there are not found. Needs Windows 10 version 1903 or later; earlier versions ignore it (and keep the old behaviour).
+-->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+    </windowsSettings>
+  </application>
+</assembly>

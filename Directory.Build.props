@@ -29,4 +29,14 @@
       <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
   </ItemDefinitionGroup>
+
+  <!--
+    Every program (ray_tracer.exe and the test programs) reads narrow-string paths as UTF-8, which is how the Scene Builder and the pbrt files it writes spell them: a user or folder name
+    with an accented or non-Latin letter then works. The manifest only matters to a program, not to a library (a DLL or static library takes the setting of the program that loads it).
+  -->
+  <ItemDefinitionGroup Condition="'$(ConfigurationType)' == 'Application'">
+    <Manifest>
+      <AdditionalManifestFiles>$(MSBuildThisFileDirectory)resources\utf8.manifest %(AdditionalManifestFiles)</AdditionalManifestFiles>
+    </Manifest>
+  </ItemDefinitionGroup>
 </Project>

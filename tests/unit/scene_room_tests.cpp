@@ -153,6 +153,32 @@ TEST(SceneRoomTest, ARoomFileCannotMakeTheBuilderReadAFileOutsideItsFolder) {
 	fs::remove_all(base, ec);
 }
 
+TEST(SceneRoomTest, AFolderWithAccentedAndNonLatinLettersIsReadAsItIsSpelled) {
+#ifdef _WIN32
+	// The program's narrow-string paths are UTF-8 (resources/utf8.manifest makes Windows read them so): a picture in a folder named with an accented letter and Chinese characters is found, and a file written through such a path lands in the
+	// folder of that exact name (checked through the wide-character API, which does not depend on the setting).
+	namespace fs = std::filesystem;
+	const std::string folder = "scene_room_test_Jos\xC3\xA9 \xE7\x94\xA8\xE6\x88\xB7";
+	std::error_code ec;
+	fs::remove_all(fs::u8path(folder), ec);
+	fs::create_directories(fs::u8path(folder), ec);
+	{
+		std::ofstream tex(folder + "/floor.bmp", std::ios::binary);
+		tex << bmpFile(1, 1, {10, 20, 30});
+	}
+	EXPECT_TRUE(fs::exists(fs::u8path(folder + "/floor.bmp"), ec)) << "the file was written under the name it was given, not an ANSI mangling of it";
+	std::string text = roomJson();
+	text.replace(text.find("\"name\": \"Floor\","), 16, "\"name\": \"Floor\", \"texture\": \"floor.bmp\",");
+	scene_room::Import room;
+	std::string err;
+	ASSERT_TRUE(scene_room::fromJson(text, room, err, folder)) << err;
+	EXPECT_FALSE(room.surfaces[0].material.imageFile.empty()) << "the picture in the folder with the letters is found";
+	fs::remove_all(fs::u8path(folder), ec);
+#else
+	GTEST_SKIP() << "Windows only: other systems read paths as UTF-8 already";
+#endif
+}
+
 TEST(SceneRoomTest, ARoomFileWithAbsurdlyManyPartsIsRefused) {
 	scene_room::Import room;
 	std::string err;
