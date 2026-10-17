@@ -329,9 +329,15 @@ void MainWindow::runSkySelfTest(const std::function<void(const QString &)> &log,
 		const double dx = std::cos(el) * std::sin(az), dy = std::sin(el), dz = std::cos(el) * std::cos(az);
 		const double yc = dy * std::cos(tilt) - dz * std::sin(tilt), zc = dy * std::sin(tilt) + dz * std::cos(tilt);
 		const double su = cx + focal * dx / zc, sv = cy - focal * yc / zc;
+		// the sun: a white disc with the glow every real one has (the glare falls off the same way all round it)
 		for (int y = 0; y < h; ++y)
-			for (int x = 0; x < w; ++x)
-				if ((x - su) * (x - su) + (y - sv) * (y - sv) < 25.0) photo.setPixel(x, y, qRgb(255, 255, 255));
+			for (int x = 0; x < w; ++x) {
+				const double d = std::sqrt((x - su) * (x - su) + (y - sv) * (y - sv));
+				if (d < 5.0) { photo.setPixel(x, y, qRgb(255, 255, 255)); continue; }
+				const double glow = 0.85 * std::exp(-(d - 5.0) / 14.0);
+				const QRgb base = photo.pixel(x, y);
+				if (y < horizon) photo.setPixel(x, y, qRgb(static_cast<int>(qRed(base) + (255 - qRed(base)) * glow), static_cast<int>(qGreen(base) + (255 - qGreen(base)) * glow), static_cast<int>(qBlue(base) + (255 - qBlue(base)) * glow)));
+			}
 		const QString path = QDir::tempPath() + "/rt_selftest_sky.png";
 		photo.save(path);
 

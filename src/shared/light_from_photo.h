@@ -90,7 +90,8 @@ inline bool skyLike(const float* c) {
 	return (blue || white) && lum > 0.08;
 }
 
-inline bool clipped(const float* c) { return std::min({c[0], c[1], c[2]}) >= 0.97f; }
+// Clipped to (nearly) white: a sun is often warm, so one channel may stop short of full.
+inline bool clipped(const float* c) { return std::min({c[0], c[1], c[2]}) >= 0.85f && luminance(c) >= 0.95; }
 
 }  // namespace detail
 
@@ -105,12 +106,23 @@ inline Estimate estimate(const unsigned char* rgb8, int w, int h, const Options&
 	const double focal = (pic.w / 2.0) / std::tan(std::min(160.0, std::max(10.0, options.hfovDegrees)) * kPi / 360.0);   // pixels
 	const double cx = pic.w / 2.0, cy = pic.h / 2.0;
 
-	// ---- the sky: down each column from the top while the pixels look like sky
+	// ---- the sky: down each column from the top while the pixels look like sky, and stop where the brightness drops well below what the sky has been (a blue sea is darker than the sky
+	// above it; a sky gets brighter towards the horizon, it does not fall off)
 	std::vector<int> end(static_cast<size_t>(pic.w), 0);
 	size_t skyPixels = 0;
 	for (int x = 0; x < pic.w; ++x) {
-		int y = 0;
-		while (y < pic.h && detail::skyLike(pic.at(x, y))) ++y;
+		int y = 0, sinceClipped = 1000;
+		while (y < pic.h && detail::skyLike(pic.at(x, y))) {
+			const double lum = detail::luminance(pic.at(x, y));
+			// the brightest the sky was in the last 20 rows (not the whole column: the glare round a sun is far brighter than the sky just past it), leaving out clipped pixels and the
+			// rows just after them
+			double recent = 0.0;
+			for (int k = std::max(0, y - 20); k < y; ++k)
+				if (!detail::clipped(pic.at(x, k))) recent = std::max(recent, detail::luminance(pic.at(x, k)));
+			if (y >= 3 && sinceClipped > 20 && lum < 0.6 * recent) break;
+			sinceClipped = detail::clipped(pic.at(x, y)) ? 0 : sinceClipped + 1;
+			++y;
+		}
 		end[static_cast<size_t>(x)] = y < 3 ? 0 : y;
 		skyPixels += static_cast<size_t>(end[static_cast<size_t>(x)]);
 	}
@@ -152,10 +164,14 @@ inline Estimate estimate(const unsigned char* rgb8, int w, int h, const Options&
 		d[2] = zz / n;
 	};
 
-	// ---- the sun itself: a small clipped spot in the sky
+	// ---- the sun itself: one small clipped spot in the sky (white cloud tops give several, and are not it)
+	struct Blob {
+		size_t area;
+		double u, v;
+		bool touches;   // reaches the edge of the picture or the end of the sky (the glow at a horizon, a cloud's edge): a sun floats inside the sky
+	};
+	std::vector<Blob> blobs;
 	std::vector<char> seen(static_cast<size_t>(pic.w) * pic.h, 0);
-	double sunDir[3] = {0, 0, 0};
-	size_t bestArea = 0;
 	for (int y0 = 0; y0 < pic.h; ++y0)
 		for (int x0 = 0; x0 < pic.w; ++x0) {
 			const size_t i0 = static_cast<size_t>(y0) * pic.w + x0;
@@ -164,6 +180,7 @@ inline Estimate estimate(const unsigned char* rgb8, int w, int h, const Options&
 			seen[i0] = 1;
 			size_t area = 0;
 			double su = 0, sv = 0;
+			bool touches = false;
 			while (!stack.empty()) {
 				const auto [x, y] = stack.back();
 				stack.pop_back();
@@ -172,19 +189,48 @@ inline Estimate estimate(const unsigned char* rgb8, int w, int h, const Options&
 				sv += y + 0.5;
 				const int nx[4] = {x - 1, x + 1, x, x}, ny[4] = {y, y, y - 1, y + 1};
 				for (int k = 0; k < 4; ++k) {
-					if (nx[k] < 0 || ny[k] < 0 || nx[k] >= pic.w || ny[k] >= pic.h) continue;
+					if (nx[k] < 0 || ny[k] < 0 || nx[k] >= pic.w || ny[k] >= pic.h || ny[k] >= end[static_cast<size_t>(nx[k])]) { touches = true; continue; }
 					const size_t j = static_cast<size_t>(ny[k]) * pic.w + nx[k];
-					if (seen[j] || ny[k] >= end[static_cast<size_t>(nx[k])] || !detail::clipped(pic.at(nx[k], ny[k]))) continue;
+					if (seen[j] || !detail::clipped(pic.at(nx[k], ny[k]))) continue;
 					seen[j] = 1;
 					stack.push_back({nx[k], ny[k]});
 				}
 			}
-			if (area > bestArea && area <= 0.03 * pic.w * pic.h) {
-				bestArea = area;
-				direction(su / area, sv / area, sunDir);
-			}
+			if (area >= 2) blobs.push_back({area, su / area, sv / area, touches});   // (single pixels are noise and glints)
 		}
-	out.sunSeen = bestArea >= 1;
+	std::sort(blobs.begin(), blobs.end(), [](const Blob& a, const Blob& b) { return a.area > b.area; });
+	double sunDir[3] = {0, 0, 0};
+	if (!blobs.empty() && !blobs[0].touches && blobs[0].area <= 0.06 * pic.w * pic.h && (blobs.size() == 1 || blobs[1].area * 4 <= blobs[0].area)) {
+		const Blob& b = blobs[0];
+		// the glow of a sun is the same all round it: the brightness on rings round the spot is even (a clipped cloud is lumpy) and falls off outwards
+		const double radius = std::max(1.5, std::sqrt(b.area / kPi));
+		double ringMean[2] = {0, 0};
+		bool glow = true;
+		for (int ring = 0; ring < 2 && glow; ++ring) {
+			const double r = (ring == 0 ? 3.0 : 5.0) * radius;
+			double sum = 0.0, sq = 0.0;
+			int n = 0;
+			for (int k = 0; k < 36; ++k) {
+				const int px = static_cast<int>(b.u + r * std::cos(k * kPi / 18.0)), py = static_cast<int>(b.v + r * std::sin(k * kPi / 18.0));
+				if (px < 0 || py < 0 || px >= pic.w || py >= pic.h || py >= end[static_cast<size_t>(px)]) continue;
+				const double lum = detail::luminance(pic.at(px, py));
+				sum += lum;
+				sq += lum * lum;
+				++n;
+			}
+			if (n < 8) {   // (the ring is mostly outside the picture or the sky: a big glare near an edge; the inner ring has to be there, the outer one need not)
+				if (ring == 0) glow = false;
+				break;
+			}
+			ringMean[ring] = sum / n;
+			const double variance = std::max(0.0, sq / n - ringMean[ring] * ringMean[ring]);
+			if (std::sqrt(variance) > 0.45 * std::max(ringMean[ring], 1e-3)) glow = false;
+		}
+		if (glow && (ringMean[1] == 0.0 || ringMean[0] >= ringMean[1])) {
+			direction(b.u, b.v, sunDir);
+			out.sunSeen = true;
+		}
+	}
 
 	// ---- the samples the sky is fitted to: sky pixels above the horizon, not clipped, not at the sky's ragged lower edge
 	struct Sample {
@@ -273,14 +319,17 @@ inline Estimate estimate(const unsigned char* rgb8, int w, int h, const Options&
 	out.sunAzimuth = bestAzimuth;
 	out.turbidity = bestTurbidity;
 	out.confidence = var0 > 1e-9 ? std::min(1.0, std::max(0.0, 1.0 - bestError / var0)) : 0.0;
-	if (var0 < 0.015) {   // a sky with almost no gradient: overcast
+	if (var0 < 0.015 && out.skyFraction >= 0.15) {   // a sky with almost no gradient: overcast (a thin strip of sky says nothing of the kind)
 		out.flatSky = true;
 		out.sunElevation = 45.0;
 		out.sunAzimuth = 0.0;
 		out.turbidity = 10.0;
 		out.confidence = 0.0;
 		out.why = "The sky is even (overcast): the sun's direction cannot be told, so it is set high and the haze to its most.";
-	} else if (out.confidence < 0.3 && !out.sunSeen) {
+	} else if (out.skyFraction < 0.15 && !out.sunSeen) {
+		out.confidence = std::min(out.confidence, 0.3);
+		out.why = "Only a small part of the picture is sky, so the fit rests on little: check the result by eye (a warm sunset or sunrise sky is not found as sky at all).";
+	} else if (out.confidence < 0.35 && !out.sunSeen) {
 		out.why = "The fitted sky explains little of the photo's sky (confidence " + std::to_string(static_cast<int>(out.confidence * 100)) + "%): check the result by eye.";
 	}
 	out.ok = true;

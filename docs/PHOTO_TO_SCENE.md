@@ -73,10 +73,13 @@ the horizon" it is read off where the sky ends). It then sets the sun's **height
 
 How it reads the photo:
 
-- **The sky** is the blue or white region that hangs from the top of the picture, column by column, down to where something else (trees, a building, the ground) begins.
+- **The sky** is the blue or white region that hangs from the top of the picture, column by column, down to where something else (trees, a building, the ground) begins, or where it gets much
+  darker (a blue sea below the horizon is not sky).
 - **The tilt of the camera** comes from the lower edge of the sky, taken to be the horizon. If the horizon is not in the photo, or hidden by buildings or trees, the camera is taken to look
   level and the tilt can be given.
-- **The sun**, if it is in the picture (a small clipped white spot in the sky), is read straight off it: height and direction to within a few degrees.
+- **The sun**, if it is in the picture (one clearly dominant, nearly white spot that floats inside the sky, touching neither the picture's edge nor the skyline, with a glow of the same
+  brightness all round it), is read straight off it: height and direction to within a few degrees. White cloud tops are bright too, but there are several, they run into the sky's edge or are
+  lumpy, so they are not taken for the sun; a very large glare near the edge is left to the fit, which reads it just as well.
 - **If the sun is out of the picture**, the Hosek-Wilkie sky (the model the Builder renders its sky with) is fitted to how bright the sky is in each direction: for every sun height, direction
   and haze it predicts the sky's brightness everywhere, and the sky that follows the photo's brightness best wins (up to one overall gain, since the photo's exposure is not known). A sky is
   brighter towards the sun and near the horizon, and that is what is fitted. The result says how much of the sky's variation the fit explains.
@@ -92,8 +95,11 @@ degrees in height and in direction, with the sun in the picture or outside it. T
 - **The brightness** stays as it was: the photo's exposure is not known. Use the light's strength.
 - **The ground's brightness** is not read (a snow field and a dark ground look alike here).
 - **A photo with little sky**, or none, is refused; one with clouds and clear blue mixed may give a rougher fit (not tried).
-- It was checked on made-up skies, so a real photo's own tone curve, lens vignetting and clouds may cost some accuracy. Check the result by eye and change **Sun height** and **Sun direction** if
-  it is off.
+- **Real photos** (nine free-licence photos from the web, no ground truth for any of them, so judged by eye): a desert with the sun in view and a low sun behind a roof gave the sun's height and
+  direction as they look in the picture; a beach and a canyon rim with the sun out of the picture gave plausible, front-lit suns (the scenes look front-lit); a stormy sky, a cloudy meadow
+  and an overcast sky with big clouds gave a low confidence and say so; a hazy sunrise (a warm sky) was found as only a sliver of sky and says so; a beach with a thin strip of sky was not
+  claimed to be well fitted. Trying them found three faults, now fixed and tested: a blue sea counted as sky, bright cloud tops taken for the sun, and a near-perfect confidence from a thin
+  strip of sky. A real photo's own tone curve, lens vignetting and clouds still cost accuracy: check the result by eye and change **Sun height** and **Sun direction** if it is off.
 
 ## Object from a photo
 

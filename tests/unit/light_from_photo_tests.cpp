@@ -28,6 +28,8 @@ struct SkyShot {
 	double tilt = 8.0;          // the camera looks up by this much
 	double hfov = 70.0;
 	bool building = true;       // a dark block hides the sky at the left
+	double ground[3] = {0.30, 0.42, 0.24};   // below the horizon (grass; a blue sea is {0.05, 0.18, 0.40})
+	bool clouds = false;        // bright white cloud tops, clipped, at several places in the sky
 };
 
 double encode(double linear) {
@@ -70,7 +72,14 @@ std::vector<unsigned char> photograph(const SkyShot& s, int w = 320, int h = 240
 			double c[3];
 			if (p.sunSpot) c[0] = c[1] = c[2] = 1.0;
 			else if (p.sky) for (int k = 0; k < 3; ++k) c[k] = encode(std::max(0.0, p.lum[k]) * scale);
-			else { c[0] = 0.30; c[1] = 0.42; c[2] = 0.24; }   // grass: not sky-like
+			else { c[0] = s.ground[0]; c[1] = s.ground[1]; c[2] = s.ground[2]; }
+			if (s.clouds && p.sky) {   // four lumpy clipped tops, none of them the sun
+				const double lumps[4][3] = {{0.18, 0.12, 0.05}, {0.45, 0.06, 0.07}, {0.62, 0.20, 0.06}, {0.85, 0.10, 0.04}};
+				for (const auto& l : lumps) {
+					const double ex = (x / static_cast<double>(w) - l[0]) / l[2], ey = (y / static_cast<double>(h) - l[1]) / (l[2] * 0.7);
+					if (ex * ex + ey * ey + 0.15 * std::sin(9.0 * x + 5.0 * y) < 1.0) c[0] = c[1] = c[2] = 1.0;
+				}
+			}
 			if (s.building && x >= static_cast<int>(0.10 * w) && x < static_cast<int>(0.25 * w) && y < static_cast<int>(0.6 * h)) c[0] = c[1] = c[2] = 0.05;
 			for (int k = 0; k < 3; ++k) out[(static_cast<size_t>(y) * w + x) * 3 + k] = static_cast<unsigned char>(std::clamp(c[k], 0.0, 1.0) * 255.0 + 0.5);
 		}
@@ -179,4 +188,48 @@ TEST(LightFromPhotoTest, ASkyThatFillsThePictureHasNoHorizonAndSaysSo) {
 	EXPECT_FALSE(e.horizonFound);
 	EXPECT_DOUBLE_EQ(e.tiltDegrees, 0.0);
 	EXPECT_NE(e.why.find("horizon"), std::string::npos) << "it says the camera was taken to look level: " << e.why;
+}
+
+TEST(LightFromPhotoTest, ABlueSeaBelowTheHorizonIsNotTakenForSky) {
+	// found on a real beach photo: the blue sea is blue like the sky, and was counted as sky (its darkness was the clue: a sky does not fall off towards the horizon)
+	SkyShot shot;
+	shot.azimuth = -48.0;
+	shot.building = false;
+	shot.ground[0] = 0.05;
+	shot.ground[1] = 0.18;
+	shot.ground[2] = 0.40;
+	const std::vector<unsigned char> px = photograph(shot);
+	const Estimate e = light_from_photo::estimate(px.data(), 320, 240);
+	ASSERT_TRUE(e.ok) << e.why;
+	EXPECT_TRUE(e.horizonFound);
+	EXPECT_NEAR(e.tiltDegrees, shot.tilt, 3.0) << "the horizon is where the sky ends, not where the sea does";
+	EXPECT_LT(e.skyFraction, 0.75) << "the sea below the horizon is not sky";
+	EXPECT_NEAR(e.sunAzimuth, shot.azimuth, 30.0);
+}
+
+TEST(LightFromPhotoTest, BrightWhiteCloudTopsAreNotTheSun) {
+	// found on real photos: clipped cloud tops were read as the sun. A sun is one spot; clouds give several.
+	SkyShot shot;
+	shot.elevation = 25.0;
+	shot.azimuth = -48.0;   // the sun is outside the picture
+	shot.building = false;
+	shot.clouds = true;
+	const std::vector<unsigned char> px = photograph(shot);
+	const Estimate e = light_from_photo::estimate(px.data(), 320, 240);
+	ASSERT_TRUE(e.ok) << e.why;
+	EXPECT_FALSE(e.sunSeen) << "several bright spots in the sky are clouds";
+}
+
+TEST(LightFromPhotoTest, ASkyThatIsOnlyAThinStripIsNotClaimedToBeWellFitted) {
+	// found on a real photo of a beach and a hazy sunrise: the fit rested on very little sky and reported near-perfect confidence
+	SkyShot shot;
+	shot.tilt = -24.0;   // looking well down: the sky is a thin strip at the top
+	shot.azimuth = -30.0;
+	shot.building = false;
+	const std::vector<unsigned char> px = photograph(shot);
+	const Estimate e = light_from_photo::estimate(px.data(), 320, 240);
+	ASSERT_TRUE(e.ok) << e.why;
+	EXPECT_LT(e.skyFraction, 0.15);
+	EXPECT_LE(e.confidence, 0.3) << "little sky: little confidence";
+	EXPECT_NE(e.why.find("small part"), std::string::npos) << e.why;
 }
