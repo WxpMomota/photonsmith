@@ -51,6 +51,24 @@ inline bool readBox(const Json& j, scene_doc::Float3& lo, scene_doc::Float3& hi,
 	return true;
 }
 
+// A file the room file names (a picture, a mesh), inside the room file's folder: `path` is the folder joined with the name. False for a name that is absolute or climbs out of the folder
+// (a room file is data: it must not make the Builder read any file on the disk), and for a name that is not there. With no folder the name is used as it is.
+inline bool findFile(const std::string& baseFolder, const std::string& name, std::string& path) {
+	namespace fs = std::filesystem;
+	if (name.empty()) return false;
+	std::error_code ec;
+	if (baseFolder.empty()) {
+		path = name;
+		return fs::exists(path, ec);
+	}
+	const fs::path rel(name);
+	if (rel.is_absolute() || rel.has_root_name() || rel.has_root_directory()) return false;
+	for (const fs::path& part : rel)
+		if (part == "..") return false;
+	path = (fs::path(baseFolder) / rel).string();
+	return fs::exists(path, ec);
+}
+
 inline scene_doc::Object boxObject(const std::string& name, const scene_doc::Float3& lo, const scene_doc::Float3& hi) {
 	scene_doc::Object o = scene_doc::makeObject(scene_doc::ShapeKind::Box, name);
 	o.position = {(lo.x + hi.x) / 2.0, (lo.y + hi.y) / 2.0, (lo.z + hi.z) / 2.0};
@@ -81,6 +99,17 @@ inline bool fromJson(const std::string& text, Import& out, std::string& err, con
 		return false;
 	}
 	if (!(vfov > 5.0 && vfov < 150.0)) { err = "the camera's field of view is not believable"; return false; }
+	{
+		const scene_doc::Float3 &p = out.camera.position, &t = out.camera.target, &u = out.camera.up;
+		const double dx = t.x - p.x, dy = t.y - p.y, dz = t.z - p.z;
+		const double view = std::sqrt(dx * dx + dy * dy + dz * dz), upLength = std::sqrt(u.x * u.x + u.y * u.y + u.z * u.z);
+		const double along = view > 0.0 && upLength > 0.0 ? std::fabs(dx * u.x + dy * u.y + dz * u.z) / (view * upLength) : 1.0;
+		if (!detail::finite3(p.x, p.y, p.z) || !detail::finite3(t.x, t.y, t.z) || !detail::finite3(u.x, u.y, u.z) || std::fabs(p.x) > 1e4 || std::fabs(p.y) > 1e4 || std::fabs(p.z) > 1e4 ||
+		    !(view > 1e-6) || !(upLength > 1e-6) || along > 0.999) {
+			err = "the camera in the room file does not look anywhere believable";
+			return false;
+		}
+	}
 	out.camera.fov = vfov;
 	out.camera.lensRadius = 0.0;
 
@@ -106,6 +135,7 @@ inline bool fromJson(const std::string& text, Import& out, std::string& err, con
 	// ---- surfaces
 	const Json* surfaces = root.find("surfaces");
 	if (!surfaces || surfaces->type != Json::Type::Arr || surfaces->a.empty()) { err = "the room file has no surfaces"; return false; }
+	if (surfaces->a.size() > 200) { err = "the room file has more than 200 surfaces"; return false; }
 	for (const Json& s : surfaces->a) {
 		scene_doc::Float3 lo, hi;
 		std::string name = "Surface";
@@ -117,11 +147,9 @@ inline bool fromJson(const std::string& text, Import& out, std::string& err, con
 		o.material.color = {std::clamp(c.r, 0.0, 1.0), std::clamp(c.g, 0.0, 1.0), std::clamp(c.b, 0.0, 1.0)};
 		o.locked = true;   // a wall is not dragged by accident; it can still be picked in the list
 		// The photo's own look on the surface: a picture named relative to the room.json's folder (the flat colour stays under it, and is what shows when the picture is missing)
-		std::string picture;
+		std::string picture, path;
 		if (scene_doc::detail::readStr(s, "texture", picture) && !picture.empty()) {
-			std::error_code ec;
-			const std::string path = baseFolder.empty() ? picture : (std::filesystem::path(baseFolder) / picture).string();
-			if (std::filesystem::exists(path, ec)) o.material.imageFile = path;
+			if (detail::findFile(baseFolder, picture, path)) o.material.imageFile = path;
 			else out.notes.push_back("The picture of the " + name + " was not found, so it keeps its flat colour.");
 		}
 		out.surfaces.push_back(o);
@@ -130,6 +158,7 @@ inline bool fromJson(const std::string& text, Import& out, std::string& err, con
 	// ---- lights
 	if (const Json* lights = root.find("lights")) {
 		if (lights->type != Json::Type::Arr) { err = "the lights in the room file are not a list"; return false; }
+		if (lights->a.size() > 100) { err = "the room file has more than 100 lights"; return false; }
 		for (const Json& l : lights->a) {
 			scene_doc::Float3 lo, hi;
 			std::string name = "Light";
@@ -142,11 +171,9 @@ inline bool fromJson(const std::string& text, Import& out, std::string& err, con
 			o.emissive = true;
 			o.emission = {std::clamp(c.r, 0.0, 1.0), std::clamp(c.g, 0.0, 1.0), std::clamp(c.b, 0.0, 1.0)};
 			// A window's view: the picture the helper cut out of the photo, which the light then takes its colours from (the colour above is what shows without it)
-			std::string view;
+			std::string view, path;
 			if (scene_doc::detail::readStr(l, "picture", view) && !view.empty()) {
-				std::error_code ec;
-				const std::string path = baseFolder.empty() ? view : (std::filesystem::path(baseFolder) / view).string();
-				if (std::filesystem::exists(path, ec)) o.emissionImage = path;
+				if (detail::findFile(baseFolder, view, path)) o.emissionImage = path;
 				else out.notes.push_back("The picture of the light \"" + name + "\" was not found, so it is a plain light.");
 			}
 			o.emissionStrength = std::clamp(strength, 0.0, 1000.0);
@@ -158,8 +185,7 @@ inline bool fromJson(const std::string& text, Import& out, std::string& err, con
 	// ---- furniture: a mesh and a texture each, placed and turned
 	if (const Json* objects = root.find("objects")) {
 		if (objects->type != Json::Type::Arr) { err = "the furniture in the room file is not a list"; return false; }
-		namespace fs = std::filesystem;
-		const auto resolve = [&](const std::string& rel) { return baseFolder.empty() ? rel : (fs::path(baseFolder) / rel).string(); };
+		if (objects->a.size() > 100) { err = "the room file has more than 100 pieces of furniture"; return false; }
 		for (const Json& o : objects->a) {
 			// A staircase: the box it fills, the way it climbs and how many steps; the Builder's own stairs shape (it climbs along its local +z, and stands centred on its box)
 			std::string kind;
@@ -203,11 +229,9 @@ inline bool fromJson(const std::string& text, Import& out, std::string& err, con
 					scene_doc::Object box = detail::boxObject(partName, lo, hi);
 					box.material.color = {std::clamp(colour.r, 0.0, 1.0), std::clamp(colour.g, 0.0, 1.0), std::clamp(colour.b, 0.0, 1.0)};
 					// A table's top can carry the photo's own look (its wood, its cloth): a picture named relative to the room file's folder; the flat colour stays when it is missing
-					std::string picture;
+					std::string picture, path;
 					if (scene_doc::detail::readStr(part, "texture", picture) && !picture.empty()) {
-						std::error_code ec;
-						const std::string path = baseFolder.empty() ? picture : (std::filesystem::path(baseFolder) / picture).string();
-						if (std::filesystem::exists(path, ec)) box.material.imageFile = path;
+						if (detail::findFile(baseFolder, picture, path)) box.material.imageFile = path;
 						else out.notes.push_back("The picture of the " + partName + " was not found, so it keeps its flat colour.");
 					}
 					if (parts->a.size() > 1) box.group = name;
@@ -227,14 +251,14 @@ inline bool fromJson(const std::string& text, Import& out, std::string& err, con
 			                      scene_doc::detail::readStr(o, "texture", texture) && readVec(o, "position", pos) && readNum(o, "yaw", yaw) && readNum(o, "scale", scale);
 			const bool believable = readable && !mesh.empty() && detail::finite3(pos.x, pos.y, pos.z) && std::fabs(pos.x) < 500 && std::fabs(pos.y) < 500 && std::fabs(pos.z) < 500 &&
 			                        std::isfinite(yaw) && scale > 0.001 && scale < 100.0;
-			std::error_code ec;
-			if (!believable || !fs::exists(resolve(mesh), ec) || (!texture.empty() && !fs::exists(resolve(texture), ec))) {
+			std::string meshPath, texturePath;
+			if (!believable || !detail::findFile(baseFolder, mesh, meshPath) || (!texture.empty() && !detail::findFile(baseFolder, texture, texturePath))) {
 				out.notes.push_back("A piece of furniture in the room file (" + name + ") could not be used and was left out.");
 				continue;
 			}
 			scene_doc::Object m = scene_doc::makeObject(scene_doc::ShapeKind::Mesh, name);
-			m.meshFile = resolve(mesh);
-			m.material.imageFile = texture.empty() ? std::string() : resolve(texture);
+			m.meshFile = meshPath;
+			m.material.imageFile = texturePath;
 			m.meshScale = scale;
 			m.position = pos;
 			m.rotation = {0.0, yaw, 0.0};

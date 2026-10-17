@@ -335,14 +335,14 @@ double SceneBuilderWidget::calibrateRoomLight(scene_room::Import &room, const QS
 	busy.setWindowTitle(tr("Making a room from the photo"));
 	busy.setWindowModality(Qt::WindowModal);
 	busy.setMinimumDuration(0);
-	busy.setCancelButton(nullptr);
-	busy.show();
+	busy.show();   // (its Cancel button gives up the light level: the lights stay as the helper set them)
 
 	const int w = 192;
 	const int h = std::clamp(static_cast<int>(std::lround(w * static_cast<double>(room.height) / std::max(room.width, 1))), 64, 400);
 	const QString sceneFile = folder + "/calibrate.pbrt", base = folder + "/calibrate";
 	const auto measure = [&](double factor) -> double {
 		QCoreApplication::processEvents();
+		if (busy.wasCanceled()) return -1.0;
 		scene_room::Import trial = room;
 		scene_room::scaleLights(trial, factor);
 		trial.furniture.clear();   // (the draft is the bare room: the furniture would only slow every render down)
@@ -359,10 +359,17 @@ double SceneBuilderWidget::calibrateRoomLight(scene_room::Import &room, const QS
 		process.setProcessChannelMode(QProcess::MergedChannels);
 		process.setWorkingDirectory(QCoreApplication::applicationDirPath());
 		process.start(launcherPath(), {"--cpu", "--output", base + ".ppm", "--height", QString::number(h), QString::number(w), "24", "6", sceneFile});
-		if (!process.waitForFinished(60000) || process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+		// (waited for in slices, so the window keeps repainting and its Cancel button works; a render that takes over a minute is given up)
+		for (int waited = 0; process.state() != QProcess::NotRunning && waited < 60000 && !busy.wasCanceled(); waited += 50) {
+			process.waitForFinished(50);
+			QCoreApplication::processEvents();
+		}
+		if (process.state() != QProcess::NotRunning) {
 			process.kill();
+			process.waitForFinished(3000);
 			return -1.0;
 		}
+		if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) return -1.0;
 		QImage image(base + ".png");
 		if (image.isNull()) return -1.0;
 		image = image.convertToFormat(QImage::Format_RGB888);

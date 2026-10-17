@@ -110,6 +110,63 @@ TEST(SceneRoomTest, AFileTheBuilderCannotUseIsRefusedWithAReason) {
 	EXPECT_FALSE(scene_room::fromJson(badFov, room, err));
 }
 
+TEST(SceneRoomTest, ACameraThatLooksNowhereBelievableIsRefused) {
+	scene_room::Import room;
+	std::string err;
+	const std::string good = "\"target\": [0, 1.4, 1], \"up\": [0, 1, 0]";
+	const auto with = [&](const std::string& replacement) {
+		std::string text = roomJson();
+		text.replace(text.find(good), good.size(), replacement);
+		return text;
+	};
+	EXPECT_FALSE(scene_room::fromJson(with("\"target\": [0, 1.4, 0], \"up\": [0, 1, 0]"), room, err)) << "looking at itself";
+	EXPECT_NE(err.find("camera"), std::string::npos) << err;
+	EXPECT_FALSE(scene_room::fromJson(with("\"target\": [0, 1.4, 1], \"up\": [0, 0, 0]"), room, err)) << "no up";
+	EXPECT_FALSE(scene_room::fromJson(with("\"target\": [0, 5, 0], \"up\": [0, 1, 0]"), room, err)) << "up along the view: the camera has no side";
+	EXPECT_FALSE(scene_room::fromJson(with("\"target\": [0, 1.4, 1e999], \"up\": [0, 1, 0]"), room, err)) << "not finite";
+	EXPECT_TRUE(scene_room::fromJson(with("\"target\": [0.3, 1.2, 1], \"up\": [0.01, 1, 0.05]"), room, err)) << err << " (a slightly turned camera is fine)";
+}
+
+TEST(SceneRoomTest, ARoomFileCannotMakeTheBuilderReadAFileOutsideItsFolder) {
+	namespace fs = std::filesystem;
+	const std::string base = "scene_room_test_escape";
+	std::error_code ec;
+	fs::create_directories(base + "/inner", ec);
+	for (const char* name : {"/outside.bmp", "/inner/inside.bmp"}) {
+		std::ofstream tex(base + name, std::ios::binary);
+		tex << bmpFile(1, 1, {10, 20, 30});
+	}
+	const std::string inner = base + "/inner";
+	const std::string absolute = fs::absolute(base + "/outside.bmp").generic_string();
+	const auto floorImage = [&](const std::string& texture) {
+		std::string text = roomJson();
+		text.replace(text.find("\"name\": \"Floor\","), 16, "\"name\": \"Floor\", \"texture\": \"" + texture + "\",");
+		scene_room::Import room;
+		std::string err;
+		EXPECT_TRUE(scene_room::fromJson(text, room, err, inner)) << err;
+		return room.surfaces.empty() ? std::string("?") : room.surfaces[0].material.imageFile;
+	};
+	EXPECT_FALSE(floorImage("inside.bmp").empty()) << "a file in the folder is read";
+	EXPECT_TRUE(floorImage("../outside.bmp").empty()) << "a file the name climbs out to is not";
+	EXPECT_TRUE(floorImage("sub/../../outside.bmp").empty());
+	EXPECT_TRUE(floorImage(absolute).empty()) << "nor is an absolute path";
+	fs::remove_all(base, ec);
+}
+
+TEST(SceneRoomTest, ARoomFileWithAbsurdlyManyPartsIsRefused) {
+	scene_room::Import room;
+	std::string err;
+	std::string lights;
+	for (int i = 0; i < 101; ++i) lights += std::string(i ? "," : "") + R"({"name": "L", "min": [0, 0, 0], "max": [1, 1, 1], "color": [1, 1, 1], "strength": 1})";
+	std::string text = roomJson();
+	const size_t at = text.find("\"lights\": [");
+	const size_t end = text.find(" \"notes\"", at);
+	ASSERT_NE(end, std::string::npos);
+	text.replace(at, end - at, "\"lights\": [" + lights + "],\n");
+	EXPECT_FALSE(scene_room::fromJson(text, room, err));
+	EXPECT_NE(err.find("100 lights"), std::string::npos) << err;
+}
+
 TEST(SceneRoomTest, TheRoomReplacesTheSceneAndIsAValidDocumentThatSurvivesTheFile) {
 	scene_room::Import room;
 	std::string err;

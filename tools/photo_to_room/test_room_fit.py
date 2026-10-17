@@ -144,6 +144,38 @@ class RoomFitTests(unittest.TestCase):
         roll = math.degrees(math.atan2(up[0], up[1]))
         self.assertAlmostEqual(abs(roll), 8.0, delta=3.0)
 
+    def test_the_cameras_up_stays_square_to_the_view_in_a_turned_room(self):
+        # the corner shots the guide asks for: the room is turned 20 to 45 degrees against the camera and the camera is pitched; up must still be perpendicular to the view, or pbrt's LookAt rolls the picture
+        for yaw, pitch in ((20.0, 10.0), (40.0, 10.0), (40.0, 15.0), (25.0, 20.0)):
+            depth, rgb = photograph(yaw=yaw, pitch=pitch, roll=0.0)
+            r = room_fit.fit_room(depth, rgb, 70.0)
+            f = np.array(r["camera"]["target"]) - np.array(r["camera"]["position"])
+            up = np.array(r["camera"]["up"])
+            self.assertLess(abs(float(f @ up)) / (np.linalg.norm(f) * np.linalg.norm(up)), 0.03, "yaw %s pitch %s" % (yaw, pitch))
+            # and it is upright: the roll about the view direction is nothing
+            side = np.cross(f, up)
+            self.assertAlmostEqual(float(side[1]) / np.linalg.norm(side), 0.0, delta=0.05, msg="yaw %s pitch %s" % (yaw, pitch))
+
+    def test_a_ceiling_is_never_at_or_below_the_camera(self):
+        depth, rgb = photograph(yaw=0.0, pitch=0.0)
+        r = room_fit.fit_room(depth, rgb, 70.0, camera_height=6.0)
+        self.assertGreaterEqual(r["room"]["max"][1], r["camera"]["position"][1] + 0.29)
+
+    def test_a_camera_looking_up_with_no_floor_still_keeps_the_points_and_the_camera_together(self):
+        depth, rgb = photograph(yaw=0.0, pitch=-35.0)
+        r = room_fit.fit_room(depth, rgb, 70.0)
+        # whatever the notes say about the floor, the room is not thrown 10 cm out from under the camera: the camera is inside it, between floor and ceiling
+        self.assertGreater(r["camera"]["position"][1], 0.2)
+        self.assertLess(r["camera"]["position"][1] + 0.29, r["room"]["max"][1])
+        self.assertFalse(any("ceiling is not in the photo" in n for n in r["notes"]), r["notes"])
+
+    def test_a_very_dark_8_bit_picture_reads_as_dark(self):
+        dark = np.zeros((8, 8, 3), np.uint8)
+        dark[0, 0] = 1
+        self.assertLess(room_fit.picture_brightness(dark), 0.01)
+        self.assertAlmostEqual(room_fit.picture_brightness(np.full((4, 4, 3), 0.5)), 0.5, places=6)
+        self.assertAlmostEqual(room_fit.picture_brightness(np.full((4, 4, 3), 128, np.uint8)), 128 / 255.0, places=6)
+
     def test_noisy_depth_still_finds_the_room(self):
         depth, rgb = photograph(yaw=15.0, pitch=8.0, noise=0.01)
         r = room_fit.fit_room(depth, rgb, 70.0)

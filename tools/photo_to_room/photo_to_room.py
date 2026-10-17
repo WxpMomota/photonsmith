@@ -183,6 +183,9 @@ def find_things(image, device_choice, result, base_percent=56):
     except ImportError as e:
         result["notes"].append("Furniture was skipped: a Python package is missing (%s); run the photo helper's setup script." % e)
         return None
+    except Exception as e:   # (offline with the model not downloaded yet, out of graphics memory...: the room is still worth having)
+        result["notes"].append("Furniture was skipped: the model that finds it could not run (%s)." % (str(e).splitlines()[0][:160] if str(e) else type(e).__name__))
+        return None
 
 
 def add_furniture(image, geometry, result, out_folder, segments, count, device_choice, base_percent=62, top_percent=98):
@@ -215,7 +218,8 @@ def add_furniture(image, geometry, result, out_folder, segments, count, device_c
                 stairs.update({"label": label, "score": round(seg["score"], 3)})
                 result["objects"].append(stairs)
             else:
-                names[label] = names.get(label, 1) - 1
+                if place is not None:
+                    names[label] = names.get(label, 1) - 1   # (the title was taken above: give it back)
                 result["notes"].append("A staircase was seen but could not be measured, so it is left out.")
             continue
         parts = None
@@ -240,6 +244,9 @@ def add_furniture(image, geometry, result, out_folder, segments, count, device_c
         except photo_to_mesh.ObjectError as e:
             result["notes"].append("Some furniture was skipped: %s" % e)
             remaining = []
+        except Exception as e:   # (the 3D model could not be downloaded or loaded: the measured boxes and the room are kept)
+            result["notes"].append("Some furniture was skipped: the 3D model could not be loaded (%s)." % (str(e).splitlines()[0][:160] if str(e) else type(e).__name__))
+            remaining = []
     span = (top_percent - base_percent - 8) / float(max(len(remaining), 1))
     for k, (seg, place) in enumerate(remaining):
         label = seg["label"]
@@ -259,13 +266,17 @@ def add_furniture(image, geometry, result, out_folder, segments, count, device_c
         except Exception as e:   # (a model failure on one piece must not lose the room)
             result["notes"].append("The %s could not be made into a 3D object (%s)." % (label, str(e).splitlines()[0][:120] if str(e) else type(e).__name__))
             continue
-        exposure = float(result.get("info", {}).get("exposure", 1.0))
-        if abs(exposure - 1.0) > 0.02:   # the same correction the room's surfaces got: a lit photo is not a reflectance
-            import numpy as np
-            texture_path = os.path.join(folder, "texture.png")
-            pixels = np.asarray(Image.open(texture_path).convert("RGB"))
-            Image.fromarray(room_objects.relight_texture(pixels, exposure)).save(texture_path)
-        final = room_objects.finalize_object(place, info["size"], geometry["box"], label, info.get("foot", 0.0))
+        try:
+            exposure = float(result.get("info", {}).get("exposure", 1.0))
+            if abs(exposure - 1.0) > 0.02:   # the same correction the room's surfaces got: a lit photo is not a reflectance
+                import numpy as np
+                texture_path = os.path.join(folder, "texture.png")
+                pixels = np.asarray(Image.open(texture_path).convert("RGB"))
+                Image.fromarray(room_objects.relight_texture(pixels, exposure)).save(texture_path)
+            final = room_objects.finalize_object(place, info["size"], geometry["box"], label, info.get("foot", 0.0))
+        except Exception as e:
+            result["notes"].append("The %s could not be finished (%s)." % (label, str(e).splitlines()[0][:120] if str(e) else type(e).__name__))
+            continue
         if final is None:
             continue
         result["objects"].append({"name": title_of(label), "label": label, "score": round(seg["score"], 3),
@@ -389,6 +400,9 @@ def main():
     hfov, fov_source = photo_fov(original, image.width, image.height, args.fov)
     if not (20.0 <= hfov <= 140.0):
         fail("the field of view %.1f degrees is not believable; give --fov (the photo's horizontal angle of view)" % hfov)
+    vfov = 2.0 * math.degrees(math.atan(math.tan(math.radians(hfov) / 2.0) * image.height / float(image.width)))
+    if not (6.0 <= vfov <= 149.0):   # (the Scene Builder's own limits for a camera: better to say so now than after the furniture)
+        fail("a field of view of %.1f degrees across a picture this shape is %.1f degrees up and down, which is not believable; give --fov (the photo's horizontal angle of view)" % (hfov, vfov))
     print("NOTE field of view %.1f degrees, %s" % (hfov, fov_source), flush=True)
 
     try:

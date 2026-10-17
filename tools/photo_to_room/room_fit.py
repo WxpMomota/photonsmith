@@ -39,8 +39,9 @@ LIGHT_CALIBRATION = 0.56
 def picture_brightness(img):
     """How bright a picture looks, for matching the room's light to the photo's: the mean of every channel value (0..1, as displayed) with anything above 0.9 held at 0.9, so a window
     clipped to white does not count for more than a bright wall. scene_room.h's pictureBrightness is the same number for the draft render."""
-    a = np.asarray(img, dtype=np.float64)
-    if a.max() > 1.5:
+    raw = np.asarray(img)
+    a = raw.astype(np.float64)
+    if raw.dtype.kind in "iu":   # (by type, not by value: a nearly black 8-bit picture has no value above 1)
         a = a / 255.0
     return float(np.minimum(a, 0.9).mean())
 
@@ -311,7 +312,9 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geom
         notes.append("No floor could be found; the lowest point seen is taken as the floor.")
     P[:, 1] -= floor_y
     cam_h = -floor_y
-    if cam_h < 0.2:
+    given = camera_height is not None and camera_height > 0
+    if cam_h < (0.02 if given else 0.2):
+        P[:, 1] += 1.5 - cam_h   # (the points and the camera must agree: the lowest point seen is taken to be 1.5 m below the lens)
         cam_h = 1.5
         notes.append("The camera height could not be told; 1.5 m is assumed.")
     scale = 1.0
@@ -333,6 +336,8 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geom
     NX, NZ = turn_xz(N[:, 0], N[:, 2], theta)
     fx, fz = turn_xz(forward[0], forward[2], theta)
     forward_room = np.array([fx, forward[1], fz])
+    ux, uz = turn_xz(cam_up[0], cam_up[2], theta)   # (the camera's up turns with the room too, or a corner shot that is pitched comes out rolled)
+    cam_up = np.array([float(ux), cam_up[1], float(uz)])
     PR = np.stack([X, P[:, 1], Z], axis=-1)
     PRimg = PR.reshape(h, w, 3)
 
@@ -374,7 +379,7 @@ def fit_room(depth, rgb, hfov_deg, camera_height=None, max_side=160, return_geom
     if ceiling_y is None or ceiling_y < max(top_walls, 1.8):
         ceiling_y = max(DEFAULT_CEILING, top_walls + 0.05)
         notes.append("The ceiling is not in the photo; it is assumed %.1f m high." % ceiling_y)
-    ceiling_y = float(min(max(ceiling_y, cam_h + 0.3), 6.0))
+    ceiling_y = float(max(min(ceiling_y, 6.0), cam_h + 0.3))   # (a ceiling is never at or below the camera, even when the camera is as high as the cap)
 
     # ---- the walls: the box's four, or (when the photo's walls do not sit on the box) the outline's
     t = WALL_THICKNESS
