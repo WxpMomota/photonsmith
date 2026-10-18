@@ -15,6 +15,7 @@
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QElapsedTimer>
 #include <QDir>
 #include <QAbstractSpinBox>
 #include <QDoubleSpinBox>
@@ -117,11 +118,19 @@ bool SceneBuilderWidget::loadAutosave() {
 	m_dirty = true;
 	m_history.clear();
 	m_lastEditKey.clear();
+	QElapsedTimer step;   // (what the restore spends its time on, for the startup profile)
+	step.start();
+	auto took = [&step](const char *what) { AppLog::debug(QStringLiteral("startup"), QStringLiteral("restoring the unsaved scene: %1 took %2 ms").arg(QLatin1String(what)).arg(step.restart())); };
 	rebuildList();
+	took("the list");
 	setSelection({SelKind::None, 0});
+	took("the selection");
 	frameViews();
+	took("framing the views");
 	refreshProblems();
+	took("checking the scene");
 	updateTitle();
 	updateActions();
+	took("title and buttons");
 	return true;
 }

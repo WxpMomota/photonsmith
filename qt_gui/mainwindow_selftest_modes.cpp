@@ -12,6 +12,7 @@
 
 #include <QApplication>
 #include <QElapsedTimer>
+#include <QTemporaryDir>
 #include <QThread>
 #include <QAbstractSpinBox>
 #include <QLineEdit>
@@ -1153,6 +1154,25 @@ void MainWindow::runUiSelfTest(const std::function<void(const QString &)> &log, 
 	const bool arrived = logTail.join('\n').contains(QStringLiteral("[selftest] a line written to stderr"));
 	log(QString("stderr: %1").arg(redirected ? (arrived ? "written to the log" : "FAIL (redirected, but the line is not in the log)") : "left where it was (a terminal)"));
 	if (redirected && !arrived) { QApplication::exit(1); return; }
+	// The list of recent renders is built at start-up from the renders found in the default folders. Every file found used to get an entry (each asks the scene list about its scene, tens of
+	// milliseconds), so a folder that had collected a few hundred renders (the command line writes there too) made the program take half a minute to start. Now only the newest few get one.
+	{
+		QTemporaryDir folder;
+		bool ok = folder.isValid();
+		for (int i = 0; ok && i < 400; ++i) {
+			QFile f(folder.filePath(QStringLiteral("render_A1_20260101_%1.png").arg(i, 6, 10, QLatin1Char('0'))));
+			ok = f.open(QIODevice::WriteOnly);
+		}
+		qputenv("RAY_TRACER_RECENT_SCAN_DIR", folder.path().toLocal8Bit());
+		QElapsedTimer clock;
+		clock.start();
+		const int listed = ok ? static_cast<int>(loadRecentRenders().size()) : -1;
+		const qint64 ms = clock.elapsed();
+		qunsetenv("RAY_TRACER_RECENT_SCAN_DIR");
+		const bool fast = ok && listed >= 1 && listed <= 20 && ms < 3000;
+		log(QString("recent renders: %1 listed from 400 files in %2 ms: %3").arg(listed).arg(ms).arg(fast ? "ok" : "FAIL (too many, or too slow: start-up reads this list)"));
+		if (!fast) { QApplication::exit(1); return; }
+	}
 	QTimer::singleShot(600, this, [shot]() { shot("ui"); QApplication::exit(0); });
 	return;
 }

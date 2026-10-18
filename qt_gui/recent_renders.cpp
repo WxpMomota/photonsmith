@@ -1,10 +1,12 @@
 #include "mainwindow.h"
+#include "app_log.h"
 #include "scene_metadata_client.h"
 #include "settings_keys.h"
 
 #include <QAbstractItemView>
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QElapsedTimer>
 #include <QDir>
 #include <QFileInfo>
 #include <QListWidget>
@@ -213,6 +215,8 @@ RecentRenderEntry readEntry(QSettings &settings) {
 } // namespace
 
 QList<RecentRenderEntry> MainWindow::loadRecentRenders() const {
+	QElapsedTimer profile;   // (what the list costs at start-up: the profile lines below)
+	profile.start();
 	QSettings settings(settings_keys::kOrg, settings_keys::kApp);
 	QList<RecentRenderEntry> entries;
 	const int count = settings.beginReadArray(settings_keys::kRecentRendersGroup);
@@ -223,6 +227,7 @@ QList<RecentRenderEntry> MainWindow::loadRecentRenders() const {
 	}
 	settings.endArray();
 
+	AppLog::debug(QStringLiteral("startup"), QStringLiteral("recent renders: %1 saved entries read in %2 ms").arg(entries.size()).arg(profile.restart()));
 	// A file may have been moved or deleted since it was recorded (in a
 	// different session, possibly by something outside this app entirely) -
 	// filtering here, not at save time, is what keeps the list honest
@@ -263,20 +268,35 @@ QList<RecentRenderEntry> MainWindow::loadRecentRenders() const {
 		QDir(QCoreApplication::applicationDirPath() + QStringLiteral("/output")),
 		QDir(QDir::homePath() + QStringLiteral("/Desktop")),
 	};
-	QList<RecentRenderEntry> scanned;
+	// RAY_TRACER_RECENT_SCAN_DIR (for the self-test) scans only that folder.
+	if (const QString only = qEnvironmentVariable("RAY_TRACER_RECENT_SCAN_DIR"); !only.isEmpty()) scanDirs = {QDir(only)};
+	AppLog::debug(QStringLiteral("startup"), QStringLiteral("recent renders: %1 of them still exist, checked in %2 ms").arg(existing.size()).arg(profile.restart()));
+	// Only the newest kMaxRecentRenders can ever show, so the files are listed and sorted by their date first and an entry is made for just those: making one asks the scene list about the file's
+	// scene, which costs tens of milliseconds, and a folder that has collected hundreds of renders (the command line writes into <exe_dir>/output too) made the program wait half a minute to start
+	// before this, only to throw all but twenty of them away.
+	struct Candidate {
+		QFileInfo info;
+		bool video;
+		qint64 when;
+	};
+	QList<Candidate> candidates;
 	for (const QDir &dir : scanDirs) {
-		for (const QFileInfo &fileInfo : dir.entryInfoList(QStringList() << QStringLiteral("render_*.png"), QDir::Files)) {
-			if (knownPaths.contains(fileInfo.absoluteFilePath())) continue;
-			knownPaths.insert(fileInfo.absoluteFilePath());
-			scanned.append(buildScannedEntry(fileInfo, /*isVideo=*/false));
-		}
-		for (const QFileInfo &fileInfo : dir.entryInfoList(QStringList() << QStringLiteral("*_video.mp4"), QDir::Files)) {
-			if (knownPaths.contains(fileInfo.absoluteFilePath())) continue;
-			knownPaths.insert(fileInfo.absoluteFilePath());
-			scanned.append(buildScannedEntry(fileInfo, /*isVideo=*/true));
+		for (const bool video : {false, true}) {
+			const QString pattern = video ? QStringLiteral("*_video.mp4") : QStringLiteral("render_*.png");
+			for (const QFileInfo &fileInfo : dir.entryInfoList(QStringList() << pattern, QDir::Files)) {
+				if (knownPaths.contains(fileInfo.absoluteFilePath())) continue;
+				knownPaths.insert(fileInfo.absoluteFilePath());
+				const QDateTime birth = fileInfo.birthTime();
+				candidates.append({fileInfo, video, (birth.isValid() ? birth : fileInfo.lastModified()).toSecsSinceEpoch()});   // (the date buildScannedEntry gives the entry)
+			}
 		}
 	}
+	std::sort(candidates.begin(), candidates.end(), [](const Candidate &x, const Candidate &y) { return x.when > y.when; });
+	QList<RecentRenderEntry> scanned;
+	const int found = static_cast<int>(candidates.size());
+	for (int i = 0; i < found && i < kMaxRecentRenders; ++i) scanned.append(buildScannedEntry(candidates[i].info, candidates[i].video));
 
+	AppLog::debug(QStringLiteral("startup"), QStringLiteral("recent renders: %1 files found in the default folders, %2 entries made, in %3 ms").arg(found).arg(scanned.size()).arg(profile.restart()));
 	QList<RecentRenderEntry> merged = existing + scanned;
 	std::sort(merged.begin(), merged.end(), [](const RecentRenderEntry &a, const RecentRenderEntry &b) {
 		return a.timestampEpochSecs > b.timestampEpochSecs;
@@ -369,7 +389,10 @@ QString MainWindow::describeRecentRenderEntry(const RecentRenderEntry &entry) co
 // same as the initial build did.
 void MainWindow::refreshRecentRendersList() {
 	if (!m_previewSubTabs) return;
+	QElapsedTimer profile;
+	profile.start();
 	const QList<RecentRenderEntry> recents = loadRecentRenders();
+	AppLog::debug(QStringLiteral("startup"), QStringLiteral("recent renders: list loaded in %1 ms").arg(profile.elapsed()));
 
 	if (recents.isEmpty()) {
 		if (m_recentRendersList) m_recentRendersList->clear();
