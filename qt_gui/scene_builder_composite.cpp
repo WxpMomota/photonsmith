@@ -42,6 +42,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <memory>
 
 namespace {
 
@@ -101,7 +102,8 @@ std::vector<photo_composite::Role> SceneBuilderWidget::compositeRoles() const {
 }
 
 bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::vector<photo_composite::Role> &rolesGiven, double exposureStops, int samples, int maxWidth, bool matchToPhoto, QString *error, QStringList *notes) {
-	if (m_process || m_compositeRunning) {   // (a Preview, final picture or video is running: two renders at once would fight for the GPU, and the window would take clicks meant for the first)
+	const scene_doc::Document &doc = m_compositeSource ? *m_compositeSource : m_doc;   // (a day cycle into the photo renders its own moment of the scene)
+	if (m_process || (m_compositeRunning && !m_compositeNested)) {   // (a Preview, final picture or video is running: two renders at once would fight for the GPU, and the window would take clicks meant for the first)
 		if (error) *error = tr("A render is already running.");
 		return false;
 	}
@@ -113,7 +115,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 		if (error) *error = tr("The renderer (%1) was not found next to the program.").arg(launcherPath());
 		return false;
 	}
-	if (scene_doc::hasErrors(scene_doc::validate(m_doc))) {
+	if (scene_doc::hasErrors(scene_doc::validate(doc))) {
 		if (error) *error = tr("Fix the problems listed under the properties first.");
 		return false;
 	}
@@ -125,7 +127,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 	for (int y = 0; y < h; ++y) std::copy(photo.constScanLine(y), photo.constScanLine(y) + w * 3, photoPixels.begin() + static_cast<std::ptrdiff_t>(y) * w * 3);
 
 	std::vector<photo_composite::Role> roles = rolesGiven;
-	roles.resize(m_doc.objects.size(), photo_composite::Role::Inserted);
+	roles.resize(doc.objects.size(), photo_composite::Role::Inserted);
 	int inserted = 0, grounds = 0;
 	for (const photo_composite::Role r : roles) {
 		inserted += r == photo_composite::Role::Inserted ? 1 : 0;
@@ -134,21 +136,21 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 	if (inserted == 0) {
 		QStringList what;
 		for (size_t i = 0; i < roles.size(); ++i)
-			what << QStringLiteral("%1: %2").arg(QString::fromStdString(m_doc.objects[i].name), roles[i] == photo_composite::Role::Ground ? tr("ground") : tr("light"));
+			what << QStringLiteral("%1: %2").arg(QString::fromStdString(doc.objects[i].name), roles[i] == photo_composite::Role::Ground ? tr("ground") : tr("light"));
 		if (error) *error = tr("Every object is marked as the ground or a light, so there is nothing to put into the photo (%1). Set one to \"Put into the photo\" in Camera and image > Render into the photo...").arg(what.join(QStringLiteral(", ")));
 		return false;
 	}
 	// The camera was made for the photo's shape (its field of view is across the short side of the picture). If the Image size has been changed since, the render would be cropped or stretched
 	// against the photo, so the three scenes take the photo's shape.
-	scene_doc::Document base = m_doc;
-	const double docAspect = scene_doc::aspectOf(m_doc.render), photoAspect = static_cast<double>(w) / h;
+	scene_doc::Document base = doc;
+	const double docAspect = scene_doc::aspectOf(doc.render), photoAspect = static_cast<double>(w) / h;
 	const bool reshaped = std::fabs(docAspect / photoAspect - 1.0) > 0.02;
 	base.render.width = w;
 	base.render.height = h;
 	const photo_composite::Passes passes = photo_composite::makePasses(base, roles);
 
 	struct Pass { const char *name; const scene_doc::Document *doc; int samples, depth; };
-	const Pass list[3] = {{"full", &base, samples, m_doc.render.maxDepth}, {"ground", &passes.ground, samples, m_doc.render.maxDepth}, {"mask", &passes.mask, 16, 2}};
+	const Pass list[3] = {{"full", &base, samples, doc.render.maxDepth}, {"ground", &passes.ground, samples, doc.render.maxDepth}, {"mask", &passes.mask, 16, 2}};
 	const QString dir = workFolder() + "/composite";
 	QDir().mkpath(dir);
 	// Like a Preview: the status line under the picture says how far it is, the Preview button reads Cancel, and the window stays usable (the other render buttons are off). A scope guard puts it all
@@ -168,7 +170,9 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 			w->m_previewButton->setText(SceneBuilderWidget::tr("Preview"));
 			w->updateActions();
 		}
-	} running(this, tr("Rendering the scene for the photo..."));
+	};
+	std::unique_ptr<Running> running;   // (a day cycle into the photo holds the running state itself, across its frames)
+	if (!m_compositeNested) running = std::make_unique<Running>(this, tr("Rendering the scene for the photo..."));
 	std::vector<float> rgb[3];
 	QElapsedTimer clock;
 	clock.start();
@@ -181,7 +185,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 	logLine(cat, QStringLiteral("render into the photo: %1 x %2, %3 samples, %4 inserted object(s), %5 ground object(s), %6; three renders (as it is, without the inserted objects, mask of them)%7")
 	                 .arg(w).arg(h).arg(samples).arg(inserted).arg(grounds).arg(m_gpuCheck && m_gpuCheck->isChecked() ? QStringLiteral("GPU") : QStringLiteral("CPU"), denoise ? QStringLiteral(", denoised") : QString()));
 	for (int p = 0; p < 3; ++p) {
-		m_previewStatus->setText(tr("Rendering the scene for the photo: %1 of 3...").arg(p + 1));
+		m_previewStatus->setText(m_compositeStatusPrefix + tr("Rendering the scene for the photo: %1 of 3...").arg(p + 1));
 		QCoreApplication::processEvents();
 		const QString scene = dir + "/" + list[p].name + ".pbrt", exr = dir + "/" + list[p].name + ".exr";
 		const QByteArray sceneText = QByteArray::fromStdString(scene_doc::toPbrt(*list[p].doc));
@@ -228,7 +232,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 				if (line.startsWith(QLatin1String("Scanlines remaining:"))) {
 					const int left = line.mid(20).trimmed().toInt();
 					const int percent = std::min(100, std::max(0, 100 * (h - left) / h));
-					m_previewStatus->setText(tr("Rendering the scene for the photo: %1 of 3, %2%...").arg(p + 1).arg(percent));
+					m_previewStatus->setText(m_compositeStatusPrefix + tr("Rendering the scene for the photo: %1 of 3, %2%...").arg(p + 1).arg(percent));
 					if (percent / 25 != lastQuarter) {
 						lastQuarter = percent / 25;
 						logLine(cat, QStringLiteral("    render %1 of 3: %2%").arg(p + 1).arg(percent));
@@ -282,7 +286,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 	QString matchNote;
 	bool matched = false;
 	if (matchToPhoto) {
-		if (!hasMatchableSky(m_doc)) {
+		if (!hasMatchableSky(doc)) {
 			matchNote = tr("The objects' exposure was not matched to the photo: that reads the photo's sky, and the scene has no Sun & sky (set it from the same photo with Light from a photo).");
 		} else {
 			const photo_composite::Match match = photo_composite::matchToPhoto(photoPixels.data(), rgb[0].data(), mask.data(), w, h);

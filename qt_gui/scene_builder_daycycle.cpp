@@ -87,6 +87,11 @@ void SceneBuilderWidget::showDayCycleDialog() {
 	form->addRow(tr("Speed:"), fps);
 	form->addRow(tr("Quality:"), quality);
 	form->addRow(tr("Sun height at noon:"), noon);
+	auto *intoPhoto = new QCheckBox(tr("Put the scene into the photo"), &dialog);
+	intoPhoto->setEnabled(!m_cameraPhoto.isNull());
+	intoPhoto->setToolTip(m_cameraPhoto.isNull() ? tr("Needs the camera matched to a photo (Camera and image: Match to a photo...)")
+	                                             : tr("Every frame is the scene put into the photo, with its shadows: they sweep across the photo as the sun goes over. Three renders a frame, so it takes about three times as long."));
+	form->addRow(QString(), intoPhoto);
 	root->addWidget(summary);
 	const auto refresh = [=]() { summary->setText(tr("%1 frames.").arg(seconds->value() * fps->currentData().toInt())); };
 	connect(seconds, QOverload<int>::of(&QSpinBox::valueChanged), &dialog, refresh);
@@ -106,11 +111,11 @@ void SceneBuilderWidget::showDayCycleDialog() {
 	const DayQuality q = kDayQualities[std::clamp(quality->currentIndex(), 0, 3)];
 	QString message;
 	const bool ok = renderDayCycle(mp4, seconds->value() * fps->currentData().toInt(), fps->currentData().toInt(), q.width > 0 ? q.width : m_doc.render.width, q.samples > 0 ? q.samples : m_doc.render.samples,
-	                               noon->value(), &message);
+	                               noon->value(), &message, nullptr, intoPhoto->isChecked());
 	if (!ok && !message.isEmpty()) QMessageBox::warning(this, tr("The day cycle failed"), message);
 }
 
-bool SceneBuilderWidget::renderDayCycle(const QString &outMp4, int frames, int fps, int width, int samples, double noonElevation, QString *message, std::vector<QImage> *framesOut) {
+bool SceneBuilderWidget::renderDayCycle(const QString &outMp4, int frames, int fps, int width, int samples, double noonElevation, QString *message, std::vector<QImage> *framesOut, bool intoPhoto) {
 	const QString cat = QStringLiteral("builder-render");
 	const auto fail = [&](const QString &msg, log_format::Level level = log_format::Level::Warn) {
 		logLine(cat, QStringLiteral("day cycle: %1").arg(msg), level);
@@ -170,6 +175,40 @@ bool SceneBuilderWidget::renderDayCycle(const QString &outMp4, int frames, int f
 		sky.sky.sunAzimuth = sun.azimuth;
 		std::string skyError;
 		if (!scene_doc::sky::applySunAndSky(frameDoc.lights, static_cast<size_t>(skyIndex), dir.toStdString(), skyError)) return fail(tr("The sky for frame %1 could not be made: %2").arg(i + 1).arg(QString::fromStdString(skyError)));
+		if (intoPhoto) {   // the scene put into the photo at this moment: Render into the photo's own three renders, the objects' exposure matched to the photo's sky
+			struct Nested {   // (however this ends)
+				SceneBuilderWidget *w;
+				explicit Nested(SceneBuilderWidget *widget, const scene_doc::Document *source, const QString &prefix) : w(widget) {
+					w->m_compositeSource = source;
+					w->m_compositeNested = true;
+					w->m_compositeLive = true;   // (quiet: no first look and no log line for each of the hundreds of renders)
+					w->m_compositeStatusPrefix = prefix;
+				}
+				~Nested() {
+					w->m_compositeSource = nullptr;
+					w->m_compositeNested = false;
+					w->m_compositeLive = false;
+					w->m_compositeStatusPrefix.clear();
+				}
+			};
+			QImage picture;
+			QString frameError;
+			bool made = false;
+			{
+				const Nested nested(this, &frameDoc, tr("Day cycle: frame %1 of %2 - ").arg(i + 1).arg(frames));
+				made = renderIntoPhotoRoles(&picture, compositeRoles(), m_compositeExposure, samples, width, true, &frameError);
+			}
+			if (!made) return m_compositeCancel ? fail(tr("The video was cancelled."), log_format::Level::Info) : fail(tr("Frame %1 could not be put into the photo: %2").arg(i + 1).arg(frameError), log_format::Level::Error);
+			picture = picture.copy(0, 0, picture.width() & ~1, picture.height() & ~1);   // (the video's encoder wants an even width and height)
+			if (!picture.save(QStringLiteral("%1/enc_%2.png").arg(dir).arg(i, 4, 10, QLatin1Char('0')))) return fail(tr("Frame %1 could not be saved in %2.").arg(i + 1).arg(dir), log_format::Level::Error);
+			if (framesOut) framesOut->push_back(picture);
+			if (i == frames / 2) {
+				m_previewPixmap = QPixmap::fromImage(picture);
+				updatePreviewPixmap();
+			}
+			logLine(cat, QStringLiteral("  frame %1 of %2 (into the photo): sun %3 degrees high, compass %4").arg(i + 1).arg(frames).arg(sun.elevation, 0, 'f', 1).arg(sun.azimuth, 0, 'f', 0));
+			continue;
+		}
 		const QString scene = dir + "/scene.pbrt", ppm = dir + "/frame.ppm";
 		QString writeError;
 		if (!writeSceneFile(scene, &writeError, &frameDoc)) return fail(writeError);
@@ -196,6 +235,7 @@ bool SceneBuilderWidget::renderDayCycle(const QString &outMp4, int frames, int f
 		QImage picture(ppm);
 		if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0 || picture.isNull())
 			return fail(tr("The renderer could not make frame %1 (exit code %2). Its output:\n%3").arg(i + 1).arg(process.exitCode()).arg(tail.trimmed().right(400)), log_format::Level::Error);
+		picture = picture.copy(0, 0, picture.width() & ~1, picture.height() & ~1);   // (the video's encoder wants an even width and height)
 		if (!picture.save(QStringLiteral("%1/enc_%2.png").arg(dir).arg(i, 4, 10, QLatin1Char('0')))) return fail(tr("Frame %1 could not be saved in %2.").arg(i + 1).arg(dir), log_format::Level::Error);
 		if (framesOut) framesOut->push_back(picture);
 		if (i == frames / 2) {   // the middle of the day, as a first look in the preview pane

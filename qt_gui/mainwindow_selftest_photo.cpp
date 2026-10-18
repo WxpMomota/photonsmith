@@ -964,6 +964,29 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 				check(frames[0] != frames[2], "and sunrise and sunset are different pictures (the sun is on the other side)");
 			}
 			if (dayOk) check(QFileInfo(mp4).size() > 1000, "the video is a file");
+			// the same into the beach photo: every frame is the scene put into the photo, so the sky is the photo's in all of them and the shadows (and the lighting on the objects) change
+			QString photoError;
+			sb->newScene();
+			const bool matched = sb->applyCameraPhoto(sample_photos::all().first().resource, 0.0, 1.6, false, 0.0, false, 0.0, true, &photoError);
+			std::vector<QImage> photoFrames;
+			QString photoMessage;
+			const QString photoMp4 = QDir::tempPath() + "/rt_selftest_daycycle_photo.mp4";
+			QFile::remove(photoMp4);
+			const bool photoDay = matched && sb->renderDayCycle(photoMp4, 3, 24, 400, 4, 60.0, &photoMessage, &photoFrames, true);
+			const bool photoNoFfmpeg = matched && !photoDay && photoMessage.contains("ffmpeg");
+			check(matched && photoFrames.size() == 3 && (photoDay || photoNoFfmpeg), "a day cycle into the photo makes its three frames: " + photoError + photoMessage.left(160));
+			if (photoFrames.size() == 3) {
+				const QImage first = photoFrames[0].convertToFormat(QImage::Format_RGB32), last = photoFrames[2].convertToFormat(QImage::Format_RGB32);
+				const QImage original = QImage(sample_photos::all().first().resource).convertToFormat(QImage::Format_RGB32).scaled(first.size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+				int skyDiffers = 0, wholeDiffers = 0;
+				for (int y = 0; y < first.height(); ++y)
+					for (int x = 0; x < first.width(); ++x) {
+						if (first.pixel(x, y) != last.pixel(x, y)) ++wholeDiffers;
+						if (y < first.height() / 10 && (std::abs(qRed(first.pixel(x, y)) - qRed(original.pixel(x, y))) > 8 || std::abs(qGreen(first.pixel(x, y)) - qGreen(original.pixel(x, y))) > 8 || std::abs(qBlue(first.pixel(x, y)) - qBlue(original.pixel(x, y))) > 8)) ++skyDiffers;
+					}
+				check(first.width() == 400 && wholeDiffers > 200, QString("the frames differ as the sun moves (%1 pixels differ between sunrise and sunset)").arg(wholeDiffers));
+				check(skyDiffers < first.width() * first.height() / 10 / 20, QString("and the sky stays the photo's (%1 of the top tenth differs)").arg(skyDiffers));
+			}
 		}
 		// Export glTF: the starter scene as a .glb by the renderer: a file that starts with glTF's magic and says what it holds
 		{

@@ -298,9 +298,10 @@ public:
 	bool exportGltf(const QString &outGlb, QString *message);
 	// A video of a day (scene_builder_daycycle.cpp, src/shared/day_cycle.h): the sun of the scene's Sun & sky goes from sunrise to sunset (crossing where it is now at noon, `noonElevation` degrees high)
 	// over `frames` frames while the camera stays; every frame is a render, and the renderer puts them together at `fps` (--assemble-video). Copies the MP4 to `outMp4`; false with `message` set when it
-	// cannot. `framesOut`, when given, gets the pictures (a test looks at them). The Preview button reads Cancel while it runs.
+	// cannot. `framesOut`, when given, gets the pictures (a test looks at them). With `intoPhoto` (the camera matched to a photo) every frame is the scene put into the photo, with its shadows
+	// (Render into the photo, with the objects' exposure matched to the photo's sky each time): the shadows sweep across the photo as the sun goes over. The Preview button reads Cancel while it runs.
 	void showDayCycleDialog();
-	bool renderDayCycle(const QString &outMp4, int frames, int fps, int width, int samples, double noonElevation, QString *message, std::vector<QImage> *framesOut = nullptr);
+	bool renderDayCycle(const QString &outMp4, int frames, int fps, int width, int samples, double noonElevation, QString *message, std::vector<QImage> *framesOut = nullptr, bool intoPhoto = false);
 	// Starts a preview render (no file dialog) and calls `done` when the picture is loaded or it failed.
 	void startPreview(const std::function<void(bool ok, const QString &message)> &done = nullptr);
 	QString previewImagePath() const { return m_previewPng; }
@@ -593,6 +594,9 @@ private:
 	bool m_cancelRequested = false;
 	bool m_compositeRunning = false;   // Render into the photo / Preview in the photo is rendering (its three renders run from renderIntoPhotoRoles, with the window still usable)
 	bool m_compositeCancel = false;    // the Preview button (Cancel while it runs) was pressed
+	const scene_doc::Document *m_compositeSource = nullptr;   // a day cycle into the photo: renderIntoPhotoRoles renders this moment of the scene instead of the document
+	bool m_compositeNested = false;                            // ... and the day cycle holds the running state (the Cancel button, the disabled buttons) across its frames
+	QString m_compositeStatusPrefix;                           // ... and says which frame in the status line
 	bool m_compositeLive = false;      // the running composite is a Live refresh: quiet (no log lines, no first look, no scrolling to the picture)
 	QCheckBox *m_liveCheck = nullptr;  // "Live": the picture in the photo follows the scene
 	QTimer *m_liveTimer = nullptr;
