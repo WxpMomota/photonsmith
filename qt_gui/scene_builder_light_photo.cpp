@@ -134,7 +134,7 @@ void SceneBuilderWidget::lightFromPhoto(int lightIndex) {
 	layout->addWidget(buttons);
 	const std::size_t baseline = undoDepth();   // (every apply takes back the last one first, so the window leaves one apply behind, not one for every click)
 	photo_dialog::run(
-	    dialog, page, buttons, intro + QStringLiteral("\n\n") + tr("Click a photo to use it: the sky is set from it at once, and again whenever you change a setting."),
+	    dialog, page, buttons, intro + QStringLiteral("\n\n") + tr("Click a photo to use it: the sky is set from it at once, and again whenever you change a setting (or press Apply)."),
 	    [&](const std::function<void()> &schedule) {
 		    connect(picker, &sample_photos::Picker::photoPicked, &dialog, schedule);
 		    for (QDoubleSpinBox *spin : {fov, tilt}) connect(spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dialog, schedule);

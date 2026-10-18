@@ -9431,8 +9431,12 @@ La forme est une estimation : l&apos;arrière est inventé et les détails fins 
     </message>
     <message>
         <location filename="../scene_builder_light_photo.cpp" line="137"/>
+        <source>Click a photo to use it: the sky is set from it at once, and again whenever you change a setting (or press Apply).</source>
+        <translation>Cliquez sur une photo pour l&apos;utiliser : le ciel est réglé d&apos;après elle aussitôt, et de nouveau à chaque changement d&apos;un réglage (ou en appuyant sur Appliquer).</translation>
+    </message>
+    <message>
         <source>Click a photo to use it: the sky is set from it at once, and again whenever you change a setting.</source>
-        <translation>Cliquez sur une photo pour l&apos;utiliser : le ciel est réglé d&apos;après elle aussitôt, et de nouveau à chaque changement d&apos;un réglage.</translation>
+        <translation type="vanished">Cliquez sur une photo pour l&apos;utiliser : le ciel est réglé d&apos;après elle aussitôt, et de nouveau à chaque changement d&apos;un réglage.</translation>
     </message>
     <message>
         <location filename="../scene_builder_light_photo.cpp" line="150"/>
@@ -9589,8 +9593,12 @@ La forme est une estimation : l&apos;arrière est inventé et les détails fins 
     </message>
     <message>
         <location filename="../scene_builder_camera_photo.cpp" line="183"/>
+        <source>Click a photo to use it: the camera is set from it at once, and again whenever you change a setting (or press Apply).</source>
+        <translation>Cliquez sur une photo pour l&apos;utiliser : la caméra est réglée d&apos;après elle aussitôt, et de nouveau à chaque changement d&apos;un réglage (ou en appuyant sur Appliquer).</translation>
+    </message>
+    <message>
         <source>Click a photo to use it: the camera is set from it at once, and again whenever you change a setting.</source>
-        <translation>Cliquez sur une photo pour l&apos;utiliser : la caméra est réglée d&apos;après elle aussitôt, et de nouveau à chaque changement d&apos;un réglage.</translation>
+        <translation type="vanished">Cliquez sur une photo pour l&apos;utiliser : la caméra est réglée d&apos;après elle aussitôt, et de nouveau à chaque changement d&apos;un réglage.</translation>
     </message>
     <message>
         <location filename="../scene_builder_camera_photo.cpp" line="196"/>
@@ -10482,6 +10490,16 @@ Vérifiez que vous avez l&apos;autorisation d&apos;y écrire et que le disque n&
     <message>
         <source>Close</source>
         <translation type="vanished">Fermer</translation>
+    </message>
+    <message>
+        <location filename="../photo_dialog.h" line="66"/>
+        <source>Apply</source>
+        <translation>Appliquer</translation>
+    </message>
+    <message>
+        <location filename="../photo_dialog.h" line="68"/>
+        <source>Apply the photo and the settings now (this happens by itself after a click or a change).</source>
+        <translation>Applique la photo et les réglages maintenant (cela se fait tout seul après un clic ou un changement).</translation>
     </message>
 </context>
 <context>

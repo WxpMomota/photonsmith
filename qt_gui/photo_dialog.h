@@ -1,6 +1,7 @@
 #pragma once
 // photo_dialog.h -- the shape of the photo features' dialogs (Match to a photo for the camera and for the Sun & sky): the photo and the settings above, the result under them, in one window, and
-// no Ok button: whatever is clicked or changed is applied at once (after a short pause, so typing a number is one apply), and the result is the panel's text.
+// whatever is clicked or changed is applied at once (after a short pause, so typing a number is one apply), and the result is the panel's text. An Apply button is there too (and Enter): it applies now, for
+// anyone who wants to be sure; Close keeps what has been applied.
 #include <QCoreApplication>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -54,12 +55,18 @@ inline void run(QDialog &dialog, QWidget *page, QDialogButtonBox *buttons, const
 	auto *pause = new QTimer(&dialog);
 	pause->setSingleShot(true);
 	pause->setInterval(delayMs);
-	QObject::connect(pause, &QTimer::timeout, &dialog, [text, apply]() {
+	const auto applyNow = [pause, text, apply]() {
+		pause->stop();
 		QString result;
 		apply(&result);
 		text->setText(result);
-	});
+	};
+	QObject::connect(pause, &QTimer::timeout, &dialog, applyNow);
 	wire([pause]() { pause->start(); });
+	QPushButton *applyButton = buttons->addButton(QCoreApplication::translate("photo_dialog", "Apply"), QDialogButtonBox::ActionRole);   // (not AcceptRole: it must not close the window)
+	applyButton->setDefault(true);
+	applyButton->setToolTip(QCoreApplication::translate("photo_dialog", "Apply the photo and the settings now (this happens by itself after a click or a change)."));
+	QObject::connect(applyButton, &QPushButton::clicked, &dialog, applyNow);
 
 	layout->activate();
 	QSize want = dialog.sizeHint().expandedTo(dialog.size());

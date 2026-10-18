@@ -9327,8 +9327,12 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
     </message>
     <message>
         <location filename="../scene_builder_light_photo.cpp" line="137"/>
+        <source>Click a photo to use it: the sky is set from it at once, and again whenever you change a setting (or press Apply).</source>
+        <translation>写真をクリックすると使われます。空はすぐにその写真から設定され、設定を変えるたびに (または「適用」を押すと) もう一度設定されます。</translation>
+    </message>
+    <message>
         <source>Click a photo to use it: the sky is set from it at once, and again whenever you change a setting.</source>
-        <translation>写真をクリックすると使われます。空はすぐにその写真から設定され、設定を変えるたびにもう一度設定されます。</translation>
+        <translation type="vanished">写真をクリックすると使われます。空はすぐにその写真から設定され、設定を変えるたびにもう一度設定されます。</translation>
     </message>
     <message>
         <location filename="../scene_builder_light_photo.cpp" line="150"/>
@@ -9485,8 +9489,12 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
     </message>
     <message>
         <location filename="../scene_builder_camera_photo.cpp" line="183"/>
+        <source>Click a photo to use it: the camera is set from it at once, and again whenever you change a setting (or press Apply).</source>
+        <translation>写真をクリックすると使われます。カメラはすぐにその写真から設定され、設定を変えるたびに (または「適用」を押すと) もう一度設定されます。</translation>
+    </message>
+    <message>
         <source>Click a photo to use it: the camera is set from it at once, and again whenever you change a setting.</source>
-        <translation>写真をクリックすると使われます。カメラはすぐにその写真から設定され、設定を変えるたびにもう一度設定されます。</translation>
+        <translation type="vanished">写真をクリックすると使われます。カメラはすぐにその写真から設定され、設定を変えるたびにもう一度設定されます。</translation>
     </message>
     <message>
         <location filename="../scene_builder_camera_photo.cpp" line="196"/>
@@ -10378,6 +10386,16 @@ Check that you have permission to write there and that the disk is not full.</so
     <message>
         <source>Close</source>
         <translation type="vanished">閉じる</translation>
+    </message>
+    <message>
+        <location filename="../photo_dialog.h" line="66"/>
+        <source>Apply</source>
+        <translation>適用</translation>
+    </message>
+    <message>
+        <location filename="../photo_dialog.h" line="68"/>
+        <source>Apply the photo and the settings now (this happens by itself after a click or a change).</source>
+        <translation>写真と設定を今すぐ適用します (クリックや変更の後は自動で行われます)。</translation>
     </message>
 </context>
 <context>

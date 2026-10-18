@@ -9333,8 +9333,12 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
     </message>
     <message>
         <location filename="../scene_builder_light_photo.cpp" line="137"/>
+        <source>Click a photo to use it: the sky is set from it at once, and again whenever you change a setting (or press Apply).</source>
+        <translation>点击一张照片即可使用：天空会立即根据它设置，之后每次更改设置（或按“应用”）时会再次设置。</translation>
+    </message>
+    <message>
         <source>Click a photo to use it: the sky is set from it at once, and again whenever you change a setting.</source>
-        <translation>点击一张照片即可使用：天空会立即根据它设置，之后每次更改设置时会再次设置。</translation>
+        <translation type="vanished">点击一张照片即可使用：天空会立即根据它设置，之后每次更改设置时会再次设置。</translation>
     </message>
     <message>
         <location filename="../scene_builder_light_photo.cpp" line="150"/>
@@ -9491,8 +9495,12 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
     </message>
     <message>
         <location filename="../scene_builder_camera_photo.cpp" line="183"/>
+        <source>Click a photo to use it: the camera is set from it at once, and again whenever you change a setting (or press Apply).</source>
+        <translation>点击一张照片即可使用：相机会立即根据它设置，之后每次更改设置（或按“应用”）时会再次设置。</translation>
+    </message>
+    <message>
         <source>Click a photo to use it: the camera is set from it at once, and again whenever you change a setting.</source>
-        <translation>点击一张照片即可使用：相机会立即根据它设置，之后每次更改设置时会再次设置。</translation>
+        <translation type="vanished">点击一张照片即可使用：相机会立即根据它设置，之后每次更改设置时会再次设置。</translation>
     </message>
     <message>
         <location filename="../scene_builder_camera_photo.cpp" line="196"/>
@@ -10384,6 +10392,16 @@ Check that you have permission to write there and that the disk is not full.</so
     <message>
         <source>Close</source>
         <translation type="vanished">关闭</translation>
+    </message>
+    <message>
+        <location filename="../photo_dialog.h" line="66"/>
+        <source>Apply</source>
+        <translation>应用</translation>
+    </message>
+    <message>
+        <location filename="../photo_dialog.h" line="68"/>
+        <source>Apply the photo and the settings now (this happens by itself after a click or a change).</source>
+        <translation>立即应用照片和设置（点击或更改后会自动进行）。</translation>
     </message>
 </context>
 <context>

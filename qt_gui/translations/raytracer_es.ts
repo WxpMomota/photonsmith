@@ -9379,8 +9379,12 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
     </message>
     <message>
         <location filename="../scene_builder_light_photo.cpp" line="137"/>
+        <source>Click a photo to use it: the sky is set from it at once, and again whenever you change a setting (or press Apply).</source>
+        <translation>Haz clic en una foto para usarla: el cielo se ajusta a ella al instante, y de nuevo cada vez que cambies un ajuste (o pulses Aplicar).</translation>
+    </message>
+    <message>
         <source>Click a photo to use it: the sky is set from it at once, and again whenever you change a setting.</source>
-        <translation>Haz clic en una foto para usarla: el cielo se ajusta a ella al instante, y de nuevo cada vez que cambies un ajuste.</translation>
+        <translation type="vanished">Haz clic en una foto para usarla: el cielo se ajusta a ella al instante, y de nuevo cada vez que cambies un ajuste.</translation>
     </message>
     <message>
         <location filename="../scene_builder_light_photo.cpp" line="150"/>
@@ -9537,8 +9541,12 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
     </message>
     <message>
         <location filename="../scene_builder_camera_photo.cpp" line="183"/>
+        <source>Click a photo to use it: the camera is set from it at once, and again whenever you change a setting (or press Apply).</source>
+        <translation>Haz clic en una foto para usarla: la cámara se ajusta a ella al instante, y de nuevo cada vez que cambies un ajuste (o pulses Aplicar).</translation>
+    </message>
+    <message>
         <source>Click a photo to use it: the camera is set from it at once, and again whenever you change a setting.</source>
-        <translation>Haz clic en una foto para usarla: la cámara se ajusta a ella al instante, y de nuevo cada vez que cambies un ajuste.</translation>
+        <translation type="vanished">Haz clic en una foto para usarla: la cámara se ajusta a ella al instante, y de nuevo cada vez que cambies un ajuste.</translation>
     </message>
     <message>
         <location filename="../scene_builder_camera_photo.cpp" line="196"/>
@@ -10430,6 +10438,16 @@ Comprueba que tienes permiso para escribir allí y que el disco no está lleno.<
     <message>
         <source>Close</source>
         <translation type="vanished">Cerrar</translation>
+    </message>
+    <message>
+        <location filename="../photo_dialog.h" line="66"/>
+        <source>Apply</source>
+        <translation>Aplicar</translation>
+    </message>
+    <message>
+        <location filename="../photo_dialog.h" line="68"/>
+        <source>Apply the photo and the settings now (this happens by itself after a click or a change).</source>
+        <translation>Aplica ahora la foto y los ajustes (esto ocurre solo tras un clic o un cambio).</translation>
     </message>
 </context>
 <context>
