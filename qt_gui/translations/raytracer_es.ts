@@ -6950,8 +6950,8 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation>Relación de aspecto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="94"/>
-        <location filename="../scene_builder_composite.cpp" line="259"/>
+        <location filename="../scene_builder_composite.cpp" line="95"/>
+        <location filename="../scene_builder_composite.cpp" line="271"/>
         <source>Match the camera to a photo first (Camera section: Match to a photo...): the scene is put into that photo.</source>
         <translation>Ajusta primero la cámara a una foto (sección Cámara: Ajustar a una foto...): la escena se pone en esa foto.</translation>
     </message>
@@ -6960,86 +6960,86 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation type="vanished">Todos los objetos están marcados como suelo o como luz, así que no hay nada que poner en la foto.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="132"/>
+        <location filename="../scene_builder_composite.cpp" line="133"/>
         <source>Rendering the scene for the photo...</source>
         <translation>Renderizando la escena para la foto...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="133"/>
-        <location filename="../scene_builder_composite.cpp" line="259"/>
-        <location filename="../scene_builder_composite.cpp" line="264"/>
+        <location filename="../scene_builder_composite.cpp" line="134"/>
+        <location filename="../scene_builder_composite.cpp" line="271"/>
+        <location filename="../scene_builder_composite.cpp" line="276"/>
         <source>Render into the photo</source>
         <translation>Renderizar en la foto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="145"/>
+        <location filename="../scene_builder_composite.cpp" line="151"/>
         <source>Rendering the scene for the photo: %1 of 3...</source>
         <translation>Renderizando la escena para la foto: %1 de 3...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="178"/>
+        <location filename="../scene_builder_composite.cpp" line="187"/>
         <source>Rendering the scene for the photo: %1 of 3, %2%...</source>
         <translation>Renderizando la escena para la foto: %1 de 3, %2%...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="197"/>
+        <location filename="../scene_builder_composite.cpp" line="206"/>
         <source>A render took too long and was stopped.</source>
         <translation>Un renderizado tardó demasiado y se detuvo.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="203"/>
+        <location filename="../scene_builder_composite.cpp" line="212"/>
         <source>The renderer could not make the %1 picture. Its output:
 %2</source>
         <translation>El renderizador no pudo hacer la imagen «%1». Su salida:
 %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="209"/>
+        <location filename="../scene_builder_composite.cpp" line="219"/>
         <source>The renderer made a picture of %1 x %2, not the %3 x %4 asked for.</source>
         <translation>El renderizador hizo una imagen de %1 x %2, no de los %3 x %4 pedidos.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="224"/>
+        <location filename="../scene_builder_composite.cpp" line="234"/>
         <source>The objects&apos; exposure was not matched to the photo: that reads the photo&apos;s sky, and the scene has no Sun &amp; sky (set it from the same photo with Light from a photo).</source>
         <translation>La exposición de los objetos no se ajustó a la foto: eso lee el cielo de la foto, y la escena no tiene Sol y cielo (ponlo a partir de la misma foto con Luz a partir de una foto).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="231"/>
+        <location filename="../scene_builder_composite.cpp" line="241"/>
         <source>The objects&apos; exposure (%1 stops) and colour were matched to the photo&apos;s sky.</source>
         <translation>La exposición de los objetos (%1 pasos) y su color se ajustaron al cielo de la foto.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="234"/>
+        <location filename="../scene_builder_composite.cpp" line="244"/>
         <source>The objects&apos; exposure was not matched to the photo: %1</source>
         <translation>La exposición de los objetos no se ajustó a la foto: %1</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="240"/>
+        <location filename="../scene_builder_composite.cpp" line="250"/>
         <source>The picture could not be put together.</source>
         <translation>No se pudo componer la imagen.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="66"/>
+        <location filename="../scene_builder_composite.cpp" line="67"/>
         <source>The picture could not be saved as %1.</source>
         <translation>No se pudo guardar la imagen como %1.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="122"/>
+        <location filename="../scene_builder_composite.cpp" line="123"/>
         <source>ground</source>
         <translation>suelo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="122"/>
+        <location filename="../scene_builder_composite.cpp" line="123"/>
         <source>light</source>
         <translation>luz</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="123"/>
+        <location filename="../scene_builder_composite.cpp" line="124"/>
         <source>Every object is marked as the ground or a light, so there is nothing to put into the photo (%1). Set one to &quot;Put into the photo&quot; in Camera and image &gt; Render into the photo...</source>
         <translation>Todos los objetos están marcados como suelo o como luz, así que no hay nada que poner en la foto (%1). Pon uno en «Poner en la foto» en Cámara e imagen &gt; Renderizar en la foto...</translation>
     </message>
     <message numerus="yes">
-        <location filename="../scene_builder_composite.cpp" line="249"/>
+        <location filename="../scene_builder_composite.cpp" line="259"/>
         <source>%n object(s) were put into the photo; the ground they stand on is not drawn (only the shadows and reflections they cause are).</source>
         <translation>
             <numerusform>Se puso %n objeto en la foto; el suelo en que se apoya no se dibuja (solo las sombras y los reflejos que provoca).</numerusform>
@@ -7047,17 +7047,32 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         </translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="251"/>
+        <location filename="../scene_builder_composite.cpp" line="260"/>
+        <source>The renders were denoised before the objects were put in.</source>
+        <translation>Los renders se limpiaron de ruido antes de poner los objetos.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_composite.cpp" line="261"/>
+        <source>The renders could not be denoised (%1), so the objects are as grainy as the samples leave them.</source>
+        <translation>No se pudo quitar el ruido de los renders (%1), así que los objetos quedan tan granulosos como los deja el número de muestras.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_composite.cpp" line="261"/>
+        <source>the renderer did not say why</source>
+        <translation>el renderizador no dijo por qué</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_composite.cpp" line="263"/>
         <source>The objects are shown at the exposure the Builder gives them%1; the photo&apos;s own exposure is not known, so use Exposure if they look too bright or too dark.</source>
         <translation>Los objetos se muestran con la exposición que les da el Constructor%1; la exposición de la foto no se conoce, así que usa Exposición si se ven demasiado claros u oscuros.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="251"/>
+        <location filename="../scene_builder_composite.cpp" line="263"/>
         <source> (%1 stops)</source>
         <translation> (%1 pasos)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="252"/>
+        <location filename="../scene_builder_composite.cpp" line="264"/>
         <source>No object is marked as the ground, so there are no shadows on the photo: tick the floor the objects stand on.</source>
         <translation>Ningún objeto está marcado como suelo, así que la foto no tiene sombras: marca el suelo sobre el que están los objetos.</translation>
     </message>
@@ -7070,108 +7085,118 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation type="vanished">Marcado: el suelo que la foto ya tiene (se usan sus sombras, no se dibuja). Sin marcar: se pone en la foto.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="266"/>
+        <location filename="../scene_builder_composite.cpp" line="278"/>
         <source>The scene, seen through the camera matched to the photo, is rendered and put into the photo, with the shadows and reflections it casts on the ground. Say what each object is: the ground the photo already has (not drawn: only the shadows it catches count), a light (lights the scene, not shown), or an object to put into the photo. The scene is rendered three times, so it takes about three times as long as one picture.</source>
         <translation>La escena, vista a través de la cámara ajustada a la foto, se renderiza y se pone en la foto, con las sombras y los reflejos que proyecta sobre el suelo. Indica qué es cada objeto: el suelo que la foto ya tiene (no se dibuja: solo cuentan las sombras que recibe), una luz (ilumina la escena, no se muestra) o un objeto que se pone en la foto. La escena se renderiza tres veces, así que tarda unas tres veces más que una imagen.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="273"/>
+        <location filename="../scene_builder_composite.cpp" line="285"/>
         <source>Is</source>
         <translation>Es</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="282"/>
+        <location filename="../scene_builder_composite.cpp" line="294"/>
         <source>Put into the photo</source>
         <translation>Poner en la foto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="283"/>
+        <location filename="../scene_builder_composite.cpp" line="295"/>
         <source>Ground (the photo has it)</source>
         <translation>Suelo (la foto lo tiene)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="284"/>
+        <location filename="../scene_builder_composite.cpp" line="296"/>
         <source>Light (lights the scene, not shown)</source>
         <translation>Luz (ilumina la escena, no se muestra)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="293"/>
+        <location filename="../scene_builder_composite.cpp" line="305"/>
         <source>Ground: the floor the photo already has (its shadows are used, it is not drawn). Light: a lamp, which lights the scene and is not shown. Put into the photo: everything you want to see in it.</source>
         <translation>Suelo: el suelo que la foto ya tiene (se usan sus sombras, no se dibuja). Luz: una lámpara, que ilumina la escena y no se muestra. Poner en la foto: todo lo que quieras ver en ella.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="298"/>
+        <location filename="../scene_builder_composite.cpp" line="310"/>
         <source>Match the objects&apos; exposure and colour to the photo&apos;s sky</source>
         <translation>Ajustar la exposición y el color de los objetos al cielo de la foto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="300"/>
+        <location filename="../scene_builder_composite.cpp" line="312"/>
         <source>Reads how bright and how warm or cool the photo&apos;s sky is, and gives the objects the same exposure and colour cast. Needs the Sun &amp; sky set from the same photo (Light from a photo). The setting below is added to it.</source>
         <translation>Lee lo claro y lo cálido o frío que es el cielo de la foto, y da a los objetos la misma exposición y dominante de color. Necesita el Sol y cielo ajustado a partir de la misma foto (Luz a partir de una foto). El ajuste de abajo se suma a este.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="306"/>
+        <location filename="../scene_builder_composite.cpp" line="314"/>
+        <source>Denoise the renders (cleans the grain)</source>
+        <translation>Reducir el ruido de los renders (limpia el grano)</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_composite.cpp" line="316"/>
+        <source>Runs the AI denoiser on the renders before the objects are put into the photo, so a low sample count looks clean. The same as the Denoise tick next to Preview. The first time on the CPU it offers to download the denoiser.</source>
+        <translation>Pasa el eliminador de ruido de IA por los renders antes de poner los objetos en la foto, para que un número bajo de muestras se vea limpio. Es lo mismo que la casilla Reducir ruido junto a Vista previa. La primera vez en la CPU ofrece descargar el eliminador de ruido.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_composite.cpp" line="322"/>
         <source> stops</source>
         <translation> pasos</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="308"/>
+        <location filename="../scene_builder_composite.cpp" line="324"/>
         <source>How much brighter (+) or darker (-) the objects are made, to match the photo&apos;s exposure. Each stop doubles or halves their light.</source>
         <translation>Cuánto más claros (+) o más oscuros (-) se hacen los objetos para igualar la exposición de la foto. Cada paso duplica o reduce a la mitad su luz.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="309"/>
+        <location filename="../scene_builder_composite.cpp" line="325"/>
         <source>Exposure of the objects</source>
         <translation>Exposición de los objetos</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="313"/>
+        <location filename="../scene_builder_composite.cpp" line="329"/>
         <source>Samples per pixel: more makes the shadows smoother and takes longer.</source>
         <translation>Muestras por píxel: más hacen las sombras más suaves y tardan más.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="314"/>
+        <location filename="../scene_builder_composite.cpp" line="330"/>
         <location filename="../scene_builder_inspector.cpp" line="441"/>
         <source>Samples per pixel</source>
         <translation>Muestras por píxel</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="343"/>
+        <location filename="../scene_builder_composite.cpp" line="360"/>
         <source>Put into the photo in %1 s (%2 x %3). %4</source>
         <translation>Puesto en la foto en %1 s (%2 x %3). %4</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="349"/>
+        <location filename="../scene_builder_composite.cpp" line="366"/>
         <source>Match the camera to a photo first (Camera and image: Match to a photo...): the scene is put into that photo.</source>
         <translation>Ajusta primero la cámara a una foto (Cámara e imagen: Ajustar a una foto...): la escena se pone en esa foto.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="359"/>
+        <location filename="../scene_builder_composite.cpp" line="376"/>
         <source>Putting the scene into the photo...</source>
         <translation>Poniendo la escena en la foto...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="370"/>
+        <location filename="../scene_builder_composite.cpp" line="387"/>
         <source>Put into the photo in %1 s (%2 x %3, %4 samples). %5</source>
         <translation>Puesto en la foto en %1 s (%2 x %3, %4 muestras). %5</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="379"/>
+        <location filename="../scene_builder_composite.cpp" line="403"/>
         <source>The picture is in the preview pane.</source>
         <translation>La imagen está en el panel de vista previa.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="385"/>
+        <location filename="../scene_builder_composite.cpp" line="409"/>
         <source>Save the picture as</source>
         <translation>Guardar la imagen como</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="385"/>
+        <location filename="../scene_builder_composite.cpp" line="409"/>
         <source>PNG pictures (*.png)</source>
         <translation>Imágenes PNG (*.png)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="339"/>
+        <location filename="../scene_builder_composite.cpp" line="356"/>
         <source>Could not render into the photo</source>
         <translation>No se pudo renderizar en la foto</translation>
     </message>
@@ -7299,7 +7324,7 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation>Deja pasar</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="273"/>
+        <location filename="../scene_builder_composite.cpp" line="285"/>
         <location filename="../scene_builder_inspector.cpp" line="691"/>
         <source>Object</source>
         <translation>Objeto</translation>
@@ -9014,7 +9039,7 @@ Procedencia: %3</translation>
         <translation>No se puede guardar</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="151"/>
+        <location filename="../scene_builder_composite.cpp" line="157"/>
         <location filename="../scene_builder_files.cpp" line="170"/>
         <location filename="../scene_builder_files.cpp" line="180"/>
         <location filename="../scene_builder_files.cpp" line="246"/>
@@ -9182,14 +9207,14 @@ Ya está en la lista de escenas (pestaña Configuración, Mis escenas).</transla
         <translation>Ya hay un renderizado en curso.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="102"/>
+        <location filename="../scene_builder_composite.cpp" line="103"/>
         <location filename="../scene_builder_render.cpp" line="152"/>
         <location filename="../scene_builder_turntable.cpp" line="170"/>
         <source>Fix the problems listed under the properties first.</source>
         <translation>Corrige primero los problemas indicados en las propiedades.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="98"/>
+        <location filename="../scene_builder_composite.cpp" line="99"/>
         <location filename="../scene_builder_render.cpp" line="153"/>
         <location filename="../scene_builder_turntable.cpp" line="171"/>
         <source>The renderer (%1) was not found next to the program.</source>
@@ -9662,7 +9687,7 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <translation>Se creó un material a partir de %1. %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="132"/>
+        <location filename="../scene_builder_composite.cpp" line="133"/>
         <location filename="../scene_builder_photo.cpp" line="98"/>
         <location filename="../scene_builder_photo.cpp" line="262"/>
         <location filename="../scene_builder_photo.cpp" line="334"/>
@@ -9800,7 +9825,7 @@ Esto reemplaza la escena actual (Deshacer la recupera).</translation>
         <translation>Renderizando %1 x %2, %3 muestras...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="367"/>
+        <location filename="../scene_builder_composite.cpp" line="384"/>
         <location filename="../scene_builder_render.cpp" line="221"/>
         <source>The render was cancelled.</source>
         <translation>Se canceló el renderizado.</translation>
@@ -9829,13 +9854,13 @@ Esto reemplaza la escena actual (Deshacer la recupera).</translation>
         <translation>Terminado en %1 s (%2 x %3).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="389"/>
+        <location filename="../scene_builder_composite.cpp" line="413"/>
         <location filename="../scene_builder_render.cpp" line="232"/>
         <source>Saved %1.</source>
         <translation>Se guardó %1.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="392"/>
+        <location filename="../scene_builder_composite.cpp" line="416"/>
         <location filename="../scene_builder_render.cpp" line="233"/>
         <source>Could not save to %1.</source>
         <translation>No se pudo guardar en %1.</translation>

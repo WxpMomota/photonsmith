@@ -27,6 +27,7 @@
 #include <QProcess>
 #include <QRegularExpression>
 #include <QProgressDialog>
+#include <QSignalBlocker>
 #include <QHeaderView>
 #include <QTableWidget>
 #include <QPushButton>
@@ -138,8 +139,13 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 	QElapsedTimer clock;
 	clock.start();
 	const QString cat = QStringLiteral("photo");
-	logLine(cat, QStringLiteral("render into the photo: %1 x %2, %3 samples, %4 inserted object(s), %5 ground object(s), %6; three renders (as it is, without the inserted objects, mask of them)")
-	                 .arg(w).arg(h).arg(samples).arg(inserted).arg(grounds).arg(m_gpuCheck && m_gpuCheck->isChecked() ? QStringLiteral("GPU") : QStringLiteral("CPU")));
+	// The Denoise tick of the preview bar: the "as it is" and "without the objects" renders are denoised (OpenImageDenoise on the CPU, OptiX's denoiser on the GPU) before they are put together; the
+	// mask is not (it is nearly noiseless, and a denoiser would soften its edge). Both denoised renders carry the same kind of smoothing, so the ratio that makes the shadows is not disturbed by it.
+	const bool denoise = m_denoiseCheck && m_denoiseCheck->isChecked();
+	QString denoiseProblem;
+	int denoisedPasses = 0;
+	logLine(cat, QStringLiteral("render into the photo: %1 x %2, %3 samples, %4 inserted object(s), %5 ground object(s), %6; three renders (as it is, without the inserted objects, mask of them)%7")
+	                 .arg(w).arg(h).arg(samples).arg(inserted).arg(grounds).arg(m_gpuCheck && m_gpuCheck->isChecked() ? QStringLiteral("GPU") : QStringLiteral("CPU"), denoise ? QStringLiteral(", denoised") : QString()));
 	for (int p = 0; p < 3; ++p) {
 		busy.setValue(p);
 		busy.setLabelText(tr("Rendering the scene for the photo: %1 of 3...").arg(p + 1));
@@ -156,11 +162,13 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 		QProcess process;
 		process.setProcessChannelMode(QProcess::MergedChannels);
 		process.setWorkingDirectory(QCoreApplication::applicationDirPath());
-		const QStringList launch = {m_gpuCheck && m_gpuCheck->isChecked() ? "--gpu" : "--cpu", "--output", exr, "--height", QString::number(h), QString::number(w), QString::number(list[p].samples), QString::number(list[p].depth), scene};
+		QStringList launch = {m_gpuCheck && m_gpuCheck->isChecked() ? "--gpu" : "--cpu"};
+		if (denoise && p < 2) launch << "--denoise";
+		launch << "--output" << exr << "--height" << QString::number(h) << QString::number(w) << QString::number(list[p].samples) << QString::number(list[p].depth) << scene;
 		logLine(cat, QStringLiteral("  render %1 of 3 (%2, %3 samples): %4 %5").arg(p + 1).arg(QString::fromLatin1(list[p].name)).arg(list[p].samples).arg(launcherPath(), launch.join(QLatin1Char(' '))));
 		QElapsedTimer passClock;
 		passClock.start();
-		process.start(launcherPath(), {m_gpuCheck && m_gpuCheck->isChecked() ? "--gpu" : "--cpu", "--output", exr, "--height", QString::number(h), QString::number(w), QString::number(list[p].samples), QString::number(list[p].depth), scene});
+		process.start(launcherPath(), launch);
 		// what the renderer says: its progress goes to the progress window and (a line in four) the log, the rest straight to the log
 		QString partial, outputTail;   // (outputTail: the last of what it said, for an error message)
 		int lastQuarter = -1, kept = 0;
@@ -172,6 +180,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 				const QString line = parts[k].trimmed();
 				if (line.isEmpty()) continue;
 				outputTail = (outputTail + line + QChar(10)).right(1200);
+				if (line.contains(QLatin1String("--denoise:"))) denoiseProblem = line;   // ("Warning: --denoise: <why> - rendering without it.")
 				if (line.startsWith(QLatin1String("Scanlines remaining:"))) {
 					const int left = line.mid(20).trimmed().toInt();
 					const int percent = std::min(100, std::max(0, 100 * (h - left) / h));
@@ -204,6 +213,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 			logLine(cat, QStringLiteral("  render %1 of 3 failed (exit code %2): %3").arg(p + 1).arg(process.exitCode()).arg(outputTail.right(400).simplified()), log_format::Level::Error);
 			return false;
 		}
+		if (denoise && p < 2 && denoiseProblem.isEmpty()) ++denoisedPasses;
 		logLine(cat, QStringLiteral("  render %1 of 3 done in %2 s (%3 x %4)").arg(p + 1).arg(passClock.elapsed() / 1000.0, 0, 'f', 1).arg(rw).arg(rh));
 		if (rw != w || rh != h) {
 			if (error) *error = tr("The renderer made a picture of %1 x %2, not the %3 x %4 asked for.").arg(rw).arg(rh).arg(w).arg(h);
@@ -247,6 +257,8 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 	if (!matchNote.isEmpty()) logLine(cat, QStringLiteral("  %1").arg(matchNote), matched ? log_format::Level::Info : log_format::Level::Warn);
 	if (notes) {
 		*notes << tr("%n object(s) were put into the photo; the ground they stand on is not drawn (only the shadows and reflections they cause are).", "", inserted);
+		if (denoise) *notes << (denoisedPasses == 2 ? tr("The renders were denoised before the objects were put in.")
+		                                              : tr("The renders could not be denoised (%1), so the objects are as grainy as the samples leave them.").arg(denoiseProblem.isEmpty() ? tr("the renderer did not say why") : denoiseProblem.simplified().left(160)));
 		if (!matchNote.isEmpty()) *notes << matchNote;
 		if (!matched) *notes << tr("The objects are shown at the exposure the Builder gives them%1; the photo's own exposure is not known, so use Exposure if they look too bright or too dark.").arg(exposureStops != 0.0 ? tr(" (%1 stops)").arg(exposureStops, 0, 'f', 2) : QString());
 		if (grounds == 0) *notes << tr("No object is marked as the ground, so there are no shadows on the photo: tick the floor the objects stand on.");
@@ -299,6 +311,10 @@ void SceneBuilderWidget::renderIntoPhotoDialog() {
 	match->setChecked(physicalSky);
 	match->setToolTip(tr("Reads how bright and how warm or cool the photo's sky is, and gives the objects the same exposure and colour cast. Needs the Sun & sky set from the same photo (Light from a photo). The setting below is added to it."));
 	layout->addWidget(match);
+	auto *denoiseBox = new QCheckBox(tr("Denoise the renders (cleans the grain)"), &dialog);
+	denoiseBox->setChecked(m_denoiseCheck && m_denoiseCheck->isChecked());
+	denoiseBox->setToolTip(tr("Runs the AI denoiser on the renders before the objects are put into the photo, so a low sample count looks clean. The same as the Denoise tick next to Preview. The first time on the CPU it offers to download the denoiser."));
+	layout->addWidget(denoiseBox);
 	auto *exposure = new QDoubleSpinBox(&dialog);
 	exposure->setRange(-4.0, 4.0);
 	exposure->setSingleStep(0.25);
@@ -327,6 +343,7 @@ void SceneBuilderWidget::renderIntoPhotoDialog() {
 		m_compositeRoles.push_back({m_doc.objects[i].name, static_cast<int>(chosen[i])});
 	}
 	m_compositeExposure = exposure->value();
+	if (m_denoiseCheck && m_denoiseCheck->isChecked() != denoiseBox->isChecked()) m_denoiseCheck->setChecked(denoiseBox->isChecked());   // (the one Denoise setting: ticking it may offer the download)
 
 	QImage picture;
 	QString error;
@@ -368,6 +385,13 @@ void SceneBuilderWidget::previewIntoPhoto() {
 		return;
 	}
 	showInPreview(QPixmap::fromImage(picture), tr("Put into the photo in %1 s (%2 x %3, %4 samples). %5").arg(clock.elapsed() / 1000.0, 0, 'f', 1).arg(picture.width()).arg(picture.height()).arg(spps[q]).arg(notes.join(QLatin1Char(' '))));
+}
+
+bool SceneBuilderWidget::denoiseTickedForTest() const { return m_denoiseCheck && m_denoiseCheck->isChecked(); }
+void SceneBuilderWidget::setDenoiseForTest(bool on) {
+	if (!m_denoiseCheck) return;
+	const QSignalBlocker blocker(m_denoiseCheck);   // (ticking it for real may ask to download the denoiser: a test has nobody to answer)
+	m_denoiseCheck->setChecked(on);
 }
 
 void SceneBuilderWidget::showInPreview(const QPixmap &picture, const QString &status) {

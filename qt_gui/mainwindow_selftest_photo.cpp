@@ -464,7 +464,7 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 		ok = ok && cond;
 	};
 	if (sb) {
-		sb->setUseGpu(false);
+		sb->setUseGpu(!qEnvironmentVariable("RT_GUI_SELFTEST_COMPOSITE_GPU").isEmpty());   // (the CPU, unless asked: a machine with an NVIDIA GPU can run the GPU path of it, denoiser included)
 		const QString out = QDir::tempPath() + "/rt_selftest_composite_out.png";
 		QFile::remove(out);
 		QString noPhotoError;
@@ -537,6 +537,38 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 		QString nothing;
 		const bool nothingOk = sb->renderIntoPhoto(out, all, 0.0, 16, false, &nothing);
 		check(!nothingOk && nothing.contains("Floor: ground") && nothing.contains("Put into the photo"), "with everything marked as the ground there is nothing to put in, and it says which object is what: " + nothing.left(220));
+		// Denoise: the renders are denoised before the objects go in. Where a denoiser is there (Open Image Denoise installed, or the GPU's) the grain on the objects falls and the notes say so; where there
+		// is none the picture is made all the same and the notes say why it is not denoised.
+		{
+			const bool wasDenoising = sb->denoiseTickedForTest();
+			auto grain = [](const QImage &img) {   // the mean difference between neighbouring pixels in the lower half, where the objects and their shadows are (the photo itself is the same in both)
+				double sum = 0.0;
+				long count = 0;
+				for (int y = img.height() / 2; y < img.height(); ++y)
+					for (int x = 0; x + 1 < img.width(); ++x) {
+						sum += std::abs(qGreen(img.pixel(x, y)) - qGreen(img.pixel(x + 1, y)));
+						++count;
+					}
+				return count ? sum / count : 0.0;
+			};
+			QImage plain, cleaned;
+			QString plainError, cleanError;
+			QStringList plainNotes, cleanNotes;
+			sb->setDenoiseForTest(false);
+			const bool plainOk = sb->renderIntoPhotoImage(&plain, {0}, 0.0, 8, 480, false, &plainError, &plainNotes);
+			sb->setDenoiseForTest(true);
+			const bool cleanOk = sb->renderIntoPhotoImage(&cleaned, {0}, 0.0, 8, 480, false, &cleanError, &cleanNotes);
+			sb->setDenoiseForTest(wasDenoising);
+			check(plainOk && cleanOk, "the picture is made with and without the denoiser " + plainError + cleanError);
+			if (plainOk && cleanOk) {
+				plain.save(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_plain.png");   // (kept next to the log, to look at)
+				cleaned.save(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_cleaned.png");
+				const bool denoised = cleanNotes.join(" ").contains("were denoised");
+				if (denoised) check(grain(cleaned) < 0.8 * grain(plain), QString("the denoiser took the grain off the objects (%1 down from %2)").arg(grain(cleaned), 0, 'f', 2).arg(grain(plain), 0, 'f', 2));
+				else check(cleanNotes.join(" ").contains("could not be denoised"), "no denoiser here, and the notes say so: " + cleanNotes.join(" / ").right(200));
+				check(!plainNotes.join(" ").contains("denoised"), "and without the tick nothing is said about denoising");
+			}
+		}
 		// "Preview in the photo": no questions, and the picture appears in the preview pane (at the Preview's Draft size) with Save picture... ready
 		sb->previewIntoPhoto();
 		check(sb->previewHasPictureForTest() && sb->previewPictureSizeForTest() == QSize(480, 360), QString("Preview in the photo shows its picture in the preview pane (%1 x %2)").arg(sb->previewPictureSizeForTest().width()).arg(sb->previewPictureSizeForTest().height()));

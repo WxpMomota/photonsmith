@@ -215,6 +215,8 @@ public:
 	void showInPreview(const QPixmap &picture, const QString &status);   // the preview pane shows this picture (and "Save picture..." can save it)
 	void onSavePictureClicked();                                           // "Save picture...": the picture in the preview pane, as a PNG
 	bool previewHasPictureForTest() const { return !m_previewPixmap.isNull(); }
+	bool denoiseTickedForTest() const;
+	void setDenoiseForTest(bool on);   // the Denoise tick next to Preview, which Render into the photo and Preview in the photo follow
 	QSize previewPictureSizeForTest() const { return m_previewPixmap.size(); }
 	void updateCameraPhotoOverlay();                         // shows (or takes away) the photo over the camera view
 	// Place on the photo's ground (scene_builder_camera_photo.cpp): placeByClicking looks through the camera and waits for clicks on the ground in the picture; each click stands the picked items
