@@ -10453,72 +10453,72 @@ Comprueba que tienes permiso para escribir allí y que el disco no está lleno.<
 <context>
     <name>sample_photos</name>
     <message>
-        <location filename="../sample_photos.cpp" line="24"/>
+        <location filename="../sample_photos.cpp" line="25"/>
         <source>Beach, blue sky</source>
         <translation>Playa, cielo azul</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="25"/>
+        <location filename="../sample_photos.cpp" line="26"/>
         <source>A clean horizon and a clear sky: the camera, the sun and the exposure all read well from it. The best one to start with.</source>
         <translation>Un horizonte limpio y un cielo despejado: la cámara, el sol y la exposición se leen bien de ella. La mejor para empezar.</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="27"/>
+        <location filename="../sample_photos.cpp" line="28"/>
         <source>North Sea beach</source>
         <translation>Playa del mar del Norte</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="28"/>
+        <location filename="../sample_photos.cpp" line="29"/>
         <source>A beach under a blue sky with the sea behind it: a straight horizon.</source>
         <translation>Una playa bajo un cielo azul con el mar detrás: un horizonte recto.</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="30"/>
+        <location filename="../sample_photos.cpp" line="31"/>
         <source>Heath under clouds</source>
         <translation>Brezal bajo las nubes</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="31"/>
+        <location filename="../sample_photos.cpp" line="32"/>
         <source>Open ground under a cloudy sky: the sky is mostly cloud, so the objects&apos; exposure is left for you to set.</source>
         <translation>Terreno abierto bajo un cielo nublado: el cielo es sobre todo nubes, así que la exposición de los objetos queda para que la fijes tú.</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="33"/>
+        <location filename="../sample_photos.cpp" line="34"/>
         <source>Meadow, partly cloudy</source>
         <translation>Prado, parcialmente nublado</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="34"/>
+        <location filename="../sample_photos.cpp" line="35"/>
         <source>A meadow with hills on the horizon: the sky&apos;s lower edge is not a clean line, so check the camera&apos;s tilt by eye.</source>
         <translation>Un prado con colinas en el horizonte: el borde inferior del cielo no es una línea limpia, así que revisa a ojo la inclinación de la cámara.</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="36"/>
+        <location filename="../sample_photos.cpp" line="37"/>
         <source>Overcast hills</source>
         <translation>Colinas nubladas</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="37"/>
+        <location filename="../sample_photos.cpp" line="38"/>
         <source>A grey sky with no sun: the light comes out as an overcast sky.</source>
         <translation>Un cielo gris sin sol: la luz sale como la de un cielo cubierto.</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="45"/>
+        <location filename="../sample_photos.cpp" line="46"/>
         <source>Try a sample photo, or use one of your own.</source>
         <translation>Prueba una foto de ejemplo o usa una tuya.</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="101"/>
+        <location filename="../sample_photos.cpp" line="125"/>
         <source>Photo: %1</source>
         <translation>Foto: %1</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="102"/>
+        <location filename="../sample_photos.cpp" line="126"/>
         <source>Your photo: %1</source>
         <translation>Tu foto: %1</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="121"/>
+        <location filename="../sample_photos.cpp" line="145"/>
         <source>My photo</source>
         <translation>Mi foto</translation>
     </message>
@@ -10527,12 +10527,12 @@ Comprueba que tienes permiso para escribir allí y que el disco no está lleno.<
         <translation type="vanished">Usar esta foto</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="77"/>
+        <location filename="../sample_photos.cpp" line="82"/>
         <source>Choose my own photo...</source>
         <translation>Elegir una foto propia...</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="91"/>
+        <location filename="../sample_photos.cpp" line="96"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.tga)</source>
         <translation>Imágenes (*.png *.jpg *.jpeg *.bmp *.tga)</translation>
     </message>

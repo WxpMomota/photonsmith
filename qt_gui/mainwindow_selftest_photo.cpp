@@ -689,7 +689,7 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			const QString out = qEnvironmentVariable("RT_GUI_SELFTEST_OUT");
 			QString seen;
 			int samplesListed = 0;
-			bool fillsScreen = false, hasApply = false;
+			bool fillsScreen = false, hasApply = false, bigThumbnails = false;
 			std::size_t depthAtStart = sb->undoDepth(), depthAfterTwo = 0;
 			auto panelHas = [](QWidget *w, const QString &what) {
 				for (QLabel *label : w->findChildren<QLabel *>()) if (label->isVisible() && label->text().contains(what)) return true;
@@ -700,6 +700,7 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 				if (QWidget *w = QApplication::activeModalWidget()) {
 					seen += panelHas(w, "Click a photo to use it") ? "hint " : "";
 					for (QPushButton *b : w->findChildren<QPushButton *>()) hasApply = hasApply || b->text() == "Apply";
+					if (auto *picker = w->findChild<sample_photos::Picker *>()) bigThumbnails = picker->thumbnailSizeForTest().width() >= 96;   // (the pictures grow with the window: at least 96 wide)
 					if (const QScreen *screen = QGuiApplication::primaryScreen()) fillsScreen = w->width() >= screen->availableGeometry().width() * 6 / 10 && w->height() >= screen->availableGeometry().height() * 85 / 100;   // (it opens tall: most of the screen's height)
 					samplesListed = firstList(w)->count();
 					w->grab().save(out + "_camera_settings.png");
@@ -729,8 +730,8 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 				}
 			});
 			sb->cameraFromPhoto();
-			check(seen == "hint north-sea beach own " && samplesListed == static_cast<int>(samples.size()) && depthAfterTwo - depthAtStart <= 2 && fillsScreen && hasApply,
-			      QString("Match to a photo for the camera is one window that applies on click (%1; %2 samples listed; two applies left %3 undo steps; fills the screen %4, has an Apply button %5)").arg(seen).arg(samplesListed).arg(depthAfterTwo - depthAtStart).arg(fillsScreen).arg(hasApply));
+			check(seen == "hint north-sea beach own " && samplesListed == static_cast<int>(samples.size()) && depthAfterTwo - depthAtStart <= 2 && fillsScreen && hasApply && bigThumbnails,
+			      QString("Match to a photo for the camera is one window that applies on click (%1; %2 samples listed; two applies left %3 undo steps; fills the screen %4, has an Apply button %5, thumbnails %6)").arg(seen).arg(samplesListed).arg(depthAfterTwo - depthAtStart).arg(fillsScreen).arg(hasApply).arg(bigThumbnails));
 		}
 	}
 	QTimer::singleShot(600, this, [this, shot, log, ok]() {

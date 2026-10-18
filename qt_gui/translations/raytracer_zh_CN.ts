@@ -10407,72 +10407,72 @@ Check that you have permission to write there and that the disk is not full.</so
 <context>
     <name>sample_photos</name>
     <message>
-        <location filename="../sample_photos.cpp" line="24"/>
+        <location filename="../sample_photos.cpp" line="25"/>
         <source>Beach, blue sky</source>
         <translation>海滩，蓝天</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="25"/>
+        <location filename="../sample_photos.cpp" line="26"/>
         <source>A clean horizon and a clear sky: the camera, the sun and the exposure all read well from it. The best one to start with.</source>
         <translation>清晰的地平线和晴朗的天空：相机、太阳和曝光都能很好地读出。最适合作为起点。</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="27"/>
+        <location filename="../sample_photos.cpp" line="28"/>
         <source>North Sea beach</source>
         <translation>北海海滩</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="28"/>
+        <location filename="../sample_photos.cpp" line="29"/>
         <source>A beach under a blue sky with the sea behind it: a straight horizon.</source>
         <translation>蓝天下的海滩，身后是大海：一条笔直的地平线。</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="30"/>
+        <location filename="../sample_photos.cpp" line="31"/>
         <source>Heath under clouds</source>
         <translation>云下的荒原</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="31"/>
+        <location filename="../sample_photos.cpp" line="32"/>
         <source>Open ground under a cloudy sky: the sky is mostly cloud, so the objects&apos; exposure is left for you to set.</source>
         <translation>多云天空下的开阔地：天空大多是云，因此物体的曝光需要你自己设置。</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="33"/>
+        <location filename="../sample_photos.cpp" line="34"/>
         <source>Meadow, partly cloudy</source>
         <translation>草地，局部多云</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="34"/>
+        <location filename="../sample_photos.cpp" line="35"/>
         <source>A meadow with hills on the horizon: the sky&apos;s lower edge is not a clean line, so check the camera&apos;s tilt by eye.</source>
         <translation>地平线上有山丘的草地：天空的下边缘不是一条干净的线，因此请目视检查相机的倾斜。</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="36"/>
+        <location filename="../sample_photos.cpp" line="37"/>
         <source>Overcast hills</source>
         <translation>阴天的山丘</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="37"/>
+        <location filename="../sample_photos.cpp" line="38"/>
         <source>A grey sky with no sun: the light comes out as an overcast sky.</source>
         <translation>没有太阳的灰色天空：光照会设为阴天。</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="45"/>
+        <location filename="../sample_photos.cpp" line="46"/>
         <source>Try a sample photo, or use one of your own.</source>
         <translation>试试示例照片，或使用你自己的照片。</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="101"/>
+        <location filename="../sample_photos.cpp" line="125"/>
         <source>Photo: %1</source>
         <translation>照片：%1</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="102"/>
+        <location filename="../sample_photos.cpp" line="126"/>
         <source>Your photo: %1</source>
         <translation>你的照片：%1</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="121"/>
+        <location filename="../sample_photos.cpp" line="145"/>
         <source>My photo</source>
         <translation>我的照片</translation>
     </message>
@@ -10481,12 +10481,12 @@ Check that you have permission to write there and that the disk is not full.</so
         <translation type="vanished">使用这张照片</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="77"/>
+        <location filename="../sample_photos.cpp" line="82"/>
         <source>Choose my own photo...</source>
         <translation>选择我自己的照片...</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="91"/>
+        <location filename="../sample_photos.cpp" line="96"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.tga)</source>
         <translation>图像 (*.png *.jpg *.jpeg *.bmp *.tga)</translation>
     </message>

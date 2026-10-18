@@ -2,6 +2,7 @@
 #include "sample_photos.h"
 
 #include <QCoreApplication>
+#include <algorithm>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -52,13 +53,17 @@ Picker::Picker(const QString &ownPhotoTitle, QWidget *parent) : QWidget(parent),
 	m_list->setWrapping(true);
 	m_list->setMovement(QListView::Static);
 	m_list->setResizeMode(QListView::Adjust);
-	m_list->setIconSize(QSize(88, 54));
-	m_list->setGridSize(QSize(102, 108));
 	m_list->setSpacing(2);
-	m_list->setFixedHeight(130);
 	m_list->setWordWrap(true);   // (a title that does not fit goes on a second line)
+	m_list->setTextElideMode(Qt::ElideNone);
+	{
+		QFont titleFont = m_list->font();
+		titleFont.setPointSizeF(titleFont.pointSizeF() + 1.0);
+		m_list->setFont(titleFont);
+	}
+	fitThumbnails();
 	for (const Sample &s : m_samples) {
-		auto *item = new QListWidgetItem(QIcon(QPixmap(s.resource).scaled(m_list->iconSize(), Qt::KeepAspectRatio, Qt::SmoothTransformation)), s.title, m_list);
+		auto *item = new QListWidgetItem(QIcon(QPixmap(s.resource).scaledToWidth(360, Qt::SmoothTransformation)), s.title, m_list);   // (a big copy: the row's size changes with the window)
 		item->setData(Qt::UserRole, s.resource);
 		item->setToolTip(s.title);
 		item->setTextAlignment(Qt::AlignHCenter);
@@ -94,6 +99,25 @@ Picker::Picker(const QString &ownPhotoTitle, QWidget *parent) : QWidget(parent),
 	showCredit();
 }
 
+QSize Picker::thumbnailSizeForTest() const { return m_list->iconSize(); }
+
+void Picker::resizeEvent(QResizeEvent *e) {
+	QWidget::resizeEvent(e);
+	fitThumbnails();
+}
+
+// Six pictures across whatever width there is (the five samples and one's own), 96 to 280 pixels wide, in one row when they fit and two when they do not.
+void Picker::fitThumbnails() {
+	const int avail = std::max(300, m_list ? m_list->width() - 24 : this->width());   // (24: the frame and a scroll bar)
+	const int cell = std::clamp(avail / 6, 116, 300);
+	const int pictureWidth = cell - 20, pictureHeight = pictureWidth * 62 / 100;
+	m_list->setIconSize(QSize(pictureWidth, pictureHeight));
+	m_list->setGridSize(QSize(cell, pictureHeight + 56));
+	const int perRow = std::max(1, avail / cell);
+	const int rows = std::max(1, (m_list->count() + perRow - 1) / perRow);   // (as many rows as the pictures there are need: one's own photo is a sixth)
+	m_list->setFixedHeight(rows * (pictureHeight + 56) + 14);
+}
+
 QString Picker::photo() const { return m_list && m_list->currentItem() ? m_list->currentItem()->data(Qt::UserRole).toString() : QString(); }
 
 void Picker::showCredit() {
@@ -110,7 +134,7 @@ void Picker::useOwnPhoto(const QString &file) {
 	const QSize size = reader.size();
 	QPixmap picture;
 	if (size.isValid()) {
-		reader.setScaledSize(size.scaled(m_list->iconSize(), Qt::KeepAspectRatio));
+		reader.setScaledSize(size.scaled(QSize(360, 360), Qt::KeepAspectRatio));
 		picture = QPixmap::fromImage(reader.read());
 	}
 	if (!m_own) {
@@ -122,6 +146,7 @@ void Picker::useOwnPhoto(const QString &file) {
 	m_own->setData(Qt::UserRole, file);
 	m_own->setToolTip(file);
 	const bool wasSelected = m_list->currentItem() == m_own;
+	fitThumbnails();                 // (one more picture: maybe one more row)
 	m_list->setCurrentItem(m_own);   // (currentRowChanged shows its credit and says the photo changed)
 	if (wasSelected) {               // (the same row, a different file: no row change to tell it)
 		showCredit();

@@ -10401,72 +10401,72 @@ Check that you have permission to write there and that the disk is not full.</so
 <context>
     <name>sample_photos</name>
     <message>
-        <location filename="../sample_photos.cpp" line="24"/>
+        <location filename="../sample_photos.cpp" line="25"/>
         <source>Beach, blue sky</source>
         <translation>ビーチ、青空</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="25"/>
+        <location filename="../sample_photos.cpp" line="26"/>
         <source>A clean horizon and a clear sky: the camera, the sun and the exposure all read well from it. The best one to start with.</source>
         <translation>くっきりした地平線と晴れた空: カメラ、太陽、露出のどれもよく読み取れます。最初に試すのに最適です。</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="27"/>
+        <location filename="../sample_photos.cpp" line="28"/>
         <source>North Sea beach</source>
         <translation>北海のビーチ</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="28"/>
+        <location filename="../sample_photos.cpp" line="29"/>
         <source>A beach under a blue sky with the sea behind it: a straight horizon.</source>
         <translation>青空の下の砂浜と背後の海: まっすぐな地平線です。</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="30"/>
+        <location filename="../sample_photos.cpp" line="31"/>
         <source>Heath under clouds</source>
         <translation>雲の下のヒース</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="31"/>
+        <location filename="../sample_photos.cpp" line="32"/>
         <source>Open ground under a cloudy sky: the sky is mostly cloud, so the objects&apos; exposure is left for you to set.</source>
         <translation>曇り空の下の開けた土地: 空はほとんど雲なので、オブジェクトの露出はあなたが設定します。</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="33"/>
+        <location filename="../sample_photos.cpp" line="34"/>
         <source>Meadow, partly cloudy</source>
         <translation>牧草地、ところどころ曇り</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="34"/>
+        <location filename="../sample_photos.cpp" line="35"/>
         <source>A meadow with hills on the horizon: the sky&apos;s lower edge is not a clean line, so check the camera&apos;s tilt by eye.</source>
         <translation>地平線に丘のある牧草地: 空の下端がきれいな線ではないため、カメラの傾きは目で確認してください。</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="36"/>
+        <location filename="../sample_photos.cpp" line="37"/>
         <source>Overcast hills</source>
         <translation>曇りの丘</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="37"/>
+        <location filename="../sample_photos.cpp" line="38"/>
         <source>A grey sky with no sun: the light comes out as an overcast sky.</source>
         <translation>太陽のない灰色の空: ライトは曇り空として設定されます。</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="45"/>
+        <location filename="../sample_photos.cpp" line="46"/>
         <source>Try a sample photo, or use one of your own.</source>
         <translation>サンプル写真を試すか、ご自身の写真を使ってください。</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="101"/>
+        <location filename="../sample_photos.cpp" line="125"/>
         <source>Photo: %1</source>
         <translation>写真: %1</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="102"/>
+        <location filename="../sample_photos.cpp" line="126"/>
         <source>Your photo: %1</source>
         <translation>あなたの写真: %1</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="121"/>
+        <location filename="../sample_photos.cpp" line="145"/>
         <source>My photo</source>
         <translation>自分の写真</translation>
     </message>
@@ -10475,12 +10475,12 @@ Check that you have permission to write there and that the disk is not full.</so
         <translation type="vanished">この写真を使う</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="77"/>
+        <location filename="../sample_photos.cpp" line="82"/>
         <source>Choose my own photo...</source>
         <translation>自分の写真を選ぶ...</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="91"/>
+        <location filename="../sample_photos.cpp" line="96"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.tga)</source>
         <translation>画像 (*.png *.jpg *.jpeg *.bmp *.tga)</translation>
     </message>

@@ -31,12 +31,17 @@ public:
 	explicit Picker(const QString &ownPhotoTitle, QWidget *parent = nullptr);   // `ownPhotoTitle` heads the file dialog
 	QString photo() const;
 	void chooseOwnPhotoForTest(const QString &file) { useOwnPhoto(file); }
+	QSize thumbnailSizeForTest() const;   // the size of the pictures in the row now
 
 signals:
 	void photoChanged(const QString &photo);   // the selected photo is another one (also set from code)
 	void photoPicked(const QString &photo);    // the user chose a photo: a click (the selected one again too), a key, or one's own file
 
+protected:
+	void resizeEvent(QResizeEvent *e) override;
+
 private:
+	void fitThumbnails();   // the pictures are as big as the width allows: six across, between 96 and 280 pixels wide
 	void showCredit();
 	void useOwnPhoto(const QString &file);
 
