@@ -44,6 +44,8 @@
 #include "../src/shared/exr_writer.h"
 #include "../src/shared/pbrt_asset_check.h"
 #include "../src/shared/scene_size.h"
+#include "../src/shared/gltf_export.h"
+#include "../src/shared/pbrt_load.h"
 #include "../src/shared/light_sampler_resolution.h"
 #include <iostream>
 #include <fstream>
@@ -1125,6 +1127,37 @@ extern "C" double cpu_scene_measure_size(const char* scene_id_or_path) {
 	const double size = scene_size::ofFile(path, &error);
 	if (size < 0.0) std::cerr << "cannot measure " << path << ": " << error << "\n";
 	return size;
+}
+
+extern "C" int cpu_export_gltf(const char* scene_id_or_path, const char* out_path) {
+	if (!scene_id_or_path || !scene_id_or_path[0] || !out_path || !out_path[0]) return 1;
+	std::string path = scene_id_or_path;
+	if (!std::filesystem::exists(path)) {
+		const char* known = cpu_scene_pbrt_path_by_id(scene_id_or_path);
+		if (!known || !known[0]) {
+			std::cerr << "cannot export " << scene_id_or_path << ": not a file, and not a scene backed by one\n";
+			return 2;
+		}
+		path = known;
+	}
+	const pbrt_load::LoadResult loaded = pbrt_load::loadFile(path);
+	if (!loaded.ok) {
+		std::cerr << "cannot export " << path << ": " << loaded.error << "\n";
+		return 3;
+	}
+	const gltf_export::Result r = gltf_export::fromFlatScene(loaded.scene);
+	if (!r.ok) {
+		std::cerr << "cannot export " << path << ": " << r.error << "\n";
+		return 4;
+	}
+	std::ofstream out(out_path, std::ios::binary);
+	if (!out || !out.write(r.glb.data(), static_cast<std::streamsize>(r.glb.size()))) {
+		std::cerr << "cannot write " << out_path << "\n";
+		return 5;
+	}
+	std::cout << "Exported " << r.triangles << " triangles, " << r.materials << " materials and " << r.lights << " lights to " << out_path << "\n";
+	for (const std::string& n : r.notes) std::cout << "Note: " << n << "\n";
+	return 0;
 }
 
 extern "C" int cpu_scene_requires_files_by_id(const char* scene_id) {

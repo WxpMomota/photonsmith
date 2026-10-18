@@ -1526,6 +1526,15 @@ int main(int argc, char** argv) {
 		}
 		return assembleVideoFile(std::filesystem::path(argv[2]), count, fps, std::filesystem::path(argv[5]));
 	}
+	// `ray_tracer --export-gltf <scene id, name or .pbrt path> <out.glb>`: the scene as a binary glTF (src/shared/gltf_export.h), for Blender, a viewer or an engine. Notes on what was
+	// approximated or left out go to standard output. Exit 0 on success.
+	if (argc >= 2 && std::string(argv[1]) == "--export-gltf") {
+		if (argc < 4) {
+			std::cerr << "usage: " << argv[0] << " --export-gltf <scene id, name or .pbrt path> <out.glb>\n";
+			return EXIT_FAILURE;
+		}
+		return cpu_export_gltf(argv[2], argv[3]) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+	}
 	// `ray_tracer --print-scene-size <scene id, name or .pbrt path>`: prints the scene's size (the largest side of its bounding box, in its own units) and
 	// nothing else, for scripts/stamp_scene_sizes.py and for people who want the "# @rt-size" line for a scene of their own. Handled before the banner and the
 	// argument parser: it is a measurement, not a render. Exit 0 and a number on success (0 means a scene with nothing to measure), exit 1 if it cannot be loaded.

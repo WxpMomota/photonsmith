@@ -293,6 +293,9 @@ public:
 	// starts and ends it gently. Needs two or more views. The lens is the first view's.
 	void showFlythroughDialog();
 	void startFlythrough(int frames, int fps, int width, int samples, const QString &outMp4, bool ease, bool returnToStart, const std::function<void(bool ok, const QString &message)> &done = nullptr);
+	// The scene as a binary glTF (.glb) for Blender, a viewer or an engine (src/shared/gltf_export.h, run by the renderer: `ray_tracer --export-gltf`). `message` gets what the renderer said (the counts,
+	// and what was approximated or left out: pictures on surfaces, the environment) or why it failed.
+	bool exportGltf(const QString &outGlb, QString *message);
 	// A video of a day (scene_builder_daycycle.cpp, src/shared/day_cycle.h): the sun of the scene's Sun & sky goes from sunrise to sunset (crossing where it is now at noon, `noonElevation` degrees high)
 	// over `frames` frames while the camera stays; every frame is a render, and the renderer puts them together at `fps` (--assemble-video). Copies the MP4 to `outMp4`; false with `message` set when it
 	// cannot. `framesOut`, when given, gets the pictures (a test looks at them). The Preview button reads Cancel while it runs.
@@ -349,6 +352,7 @@ private slots:
 	void onSaveClicked();
 	void onSaveAsClicked();
 	void onSaveToSceneListClicked();
+	void onExportGltfClicked();
 	void onPreviewLiveClicked();
 	// Saves the scene, titled "<name> (live preview)", as <name>-live-preview.pbrt in the scene-list folder (replaced each time: one preview copy per scene name), so
 	// Live Preview can open it by a scene id without touching the scene's own listing or file. Returns the path, or "" with `error` set.

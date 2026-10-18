@@ -176,6 +176,7 @@ add_executable(unit_tests
     # pbrt_gpu_*_tests.cpp comment below explains staying out of this
     # portable, SDK-independent target for.
     unit/pbrt_flatten_tests.cpp
+    unit/gltf_export_tests.cpp
     unit/pbrt_flatten_camera_tests.cpp
     unit/pbrt_flatten_lights_tests.cpp
     unit/pbrt_flatten_materials_tests.cpp

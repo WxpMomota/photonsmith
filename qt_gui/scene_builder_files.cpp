@@ -307,6 +307,49 @@ bool SceneBuilderWidget::openForEditing(const QString &path) {
 	return true;
 }
 
+bool SceneBuilderWidget::exportGltf(const QString &outGlb, QString *message) {
+	flushEditLog();
+	const auto fail = [&](const QString &why) {
+		logLine(QStringLiteral("builder"), QStringLiteral("export glTF: %1").arg(why), log_format::Level::Warn);
+		if (message) *message = why;
+		return false;
+	};
+	if (!QFileInfo::exists(launcherPath())) return fail(tr("The renderer (%1) was not found next to the program.").arg(launcherPath()));
+	const QString dir = workFolder() + "/gltf";
+	QDir().mkpath(dir);
+	const QString scene = dir + "/scene.pbrt";
+	QString error;
+	if (!writeSceneFile(scene, &error)) return fail(error);
+	QFile::remove(outGlb);
+	QProcess process;
+	process.setProcessChannelMode(QProcess::MergedChannels);
+	process.setWorkingDirectory(QCoreApplication::applicationDirPath());
+	process.start(launcherPath(), {QStringLiteral("--export-gltf"), scene, outGlb});
+	if (!process.waitForFinished(120000)) {
+		process.kill();
+		return fail(tr("The export took too long and was stopped."));
+	}
+	const QString output = QString::fromLocal8Bit(process.readAll()).trimmed();
+	if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0 || QFileInfo(outGlb).size() == 0) return fail(tr("The scene could not be exported: %1").arg(output.right(400)));
+	logLine(QStringLiteral("builder"), QStringLiteral("export glTF: %1 -> %2").arg(output.simplified(), outGlb));
+	if (message) *message = output;
+	return true;
+}
+
+void SceneBuilderWidget::onExportGltfClicked() {
+	const QString start = (m_path.isEmpty() ? QDir::homePath() + "/scene" : QFileInfo(m_path).absolutePath() + "/" + QFileInfo(m_path).completeBaseName()) + ".glb";
+	QString glb = QFileDialog::getSaveFileName(this, tr("Export the scene as glTF"), start, tr("glTF binary (*.glb)"));
+	if (glb.isEmpty()) return;
+	if (!glb.endsWith(".glb", Qt::CaseInsensitive)) glb += ".glb";
+	QString message;
+	if (!exportGltf(glb, &message)) {
+		QMessageBox::warning(this, tr("Cannot export"), message);
+		return;
+	}
+	emit statusMessage(tr("Exported %1.").arg(glb));
+	QMessageBox::information(this, tr("Exported as glTF"), tr("Saved %1.\n\n%2").arg(glb, message));
+}
+
 void SceneBuilderWidget::onSaveToSceneListClicked() {
 	const QString folder = sceneListFolder();
 	if (folder.isEmpty()) {

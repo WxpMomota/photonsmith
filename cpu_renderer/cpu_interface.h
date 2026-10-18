@@ -568,6 +568,10 @@ double cpu_scene_size_by_id(const char* scene_id);
 /// Measures a scene by loading it: `scene_id_or_path` is a scene id or name, or a .pbrt path. The largest side of the bounding box, 0 for a scene with nothing
 /// to measure, negative if it cannot be loaded. This is what `ray_tracer --print-scene-size` prints and scripts/stamp_scene_sizes.py writes into the headers.
 double cpu_scene_measure_size(const char* scene_id_or_path);
+/// Loads a scene (`scene_id_or_path`: a scene id or name, or a .pbrt path) and writes it as a binary glTF (src/shared/gltf_export.h): the triangles, the materials as glTF's
+/// metallic-roughness and the point, spot and distant lights. What was approximated or left out is printed to standard output. 0 on success, nonzero (with a message on standard error)
+/// when the scene cannot be loaded or has nothing to export. This is what `ray_tracer --export-gltf` and the Scene Builder's Export glTF... run.
+int cpu_export_gltf(const char* scene_id_or_path, const char* out_path);
 /// For a scene flagged requires_files that is backed by a .pbrt file: checks whether the files that
 /// scene refers to are actually on disk. "" when nothing is missing (or the scene is not pbrt-backed,
 /// so there is nothing to check); otherwise five tab-separated fields - the directory the missing

@@ -965,6 +965,16 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			}
 			if (dayOk) check(QFileInfo(mp4).size() > 1000, "the video is a file");
 		}
+		// Export glTF: the starter scene as a .glb by the renderer: a file that starts with glTF's magic and says what it holds
+		{
+			sb->newScene();
+			const QString glb = QDir::tempPath() + "/rt_selftest_export.glb";
+			QString exportMessage;
+			const bool exported = sb->exportGltf(glb, &exportMessage);
+			QFile file(glb);
+			const QByteArray head = file.open(QIODevice::ReadOnly) ? file.read(12) : QByteArray();
+			check(exported && QFileInfo(glb).size() > 2000 && head.left(4) == "glTF" && exportMessage.contains("triangles"), "the scene exports as a glTF file: " + exportMessage.left(160));
+		}
 		// The photo belongs to the scene: a scene matched to a photo, saved, then a new scene (no photo), then the saved one opened again has its photo, its overlay, its Render into the photo state and
 		// the camera back; a photo that has gone is said so, not a crash; Remove the photo takes it out; and one undo of the match takes it away too.
 		{
