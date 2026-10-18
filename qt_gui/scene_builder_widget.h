@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "../src/shared/log_format.h"
+#include "../src/shared/photo_composite.h"
 #include "../src/shared/scene_document.h"
 #include "../src/shared/snapshot_history.h"
 #include "../src/shared/scene_props.h"
@@ -208,6 +209,8 @@ public:
 	// The same, giving the picture itself (at most `maxWidth` pixels across) instead of a file: the Builder shows it in its preview pane (showInPreview).
 	bool renderIntoPhotoImage(QImage *result, const std::vector<int> &groundObjects, double exposureStops, int samples, int maxWidth, bool matchToPhoto, QString *error, QStringList *notes = nullptr);
 	// "Preview in the photo": the same at the Quality setting of the Preview, with the ground, exposure and matching last used (the first time: the floor is the ground, the sky matches when there is one).
+	bool renderIntoPhotoRoles(QImage *result, const std::vector<photo_composite::Role> &roles, double exposureStops, int samples, int maxWidth, bool matchToPhoto, QString *error, QStringList *notes = nullptr);
+	std::vector<photo_composite::Role> compositeRoles() const;   // what each object is for the picture: as last said in the dialog, else guessed
 	void previewIntoPhoto();
 	void showInPreview(const QPixmap &picture, const QString &status);   // the preview pane shows this picture (and "Save picture..." can save it)
 	void onSavePictureClicked();                                           // "Save picture...": the picture in the preview pane, as a PNG
@@ -516,8 +519,7 @@ private:
 	QPushButton *m_previewButton = nullptr;
 	QPushButton *m_inPhotoButton = nullptr;   // "Preview in the photo"
 	QPushButton *m_saveButton = nullptr;      // "Save picture..." (the picture in the preview pane)
-	std::vector<std::string> m_compositeGround;   // the names of the objects last ticked as the ground in Render into the photo
-	bool m_compositeGroundSet = false;
+	std::vector<std::pair<std::string, int>> m_compositeRoles;   // what each object (by name) was last said to be in Render into the photo: a photo_composite::Role
 	double m_compositeExposure = 0.0;            // the exposure last given there
 	QPushButton *m_finalButton = nullptr;
 	QPushButton *m_turntableButton = nullptr;

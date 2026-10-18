@@ -243,13 +243,21 @@ inline Passes makePasses(const scene_doc::Document& scene, const std::vector<Rol
 	return p;
 }
 
-// A reasonable first guess at what each object is: an emissive one is a light; one called Floor or Ground, or a big flat quad lying at the bottom of the scene, is the ground; the rest is inserted.
+// A reasonable first guess at what each object is: an emissive one is a light; one called Floor or Ground (alone, or with a number: "Floor 2"), or a big flat quad lying at the bottom of the scene, is
+// the ground; the rest is inserted. (Not any name that merely begins with "floor": an object made from a photo takes its file's name, and "floor_lamp" is not the floor.)
 inline std::vector<Role> guessRoles(const scene_doc::Document& scene) {
 	std::vector<Role> roles;
 	for (const scene_doc::Object& o : scene.objects) {
 		std::string name = o.name;
 		std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-		const bool named = name.rfind("floor", 0) == 0 || name.rfind("ground", 0) == 0;
+		const auto isWord = [&name](const char* word) {
+			const size_t n = std::char_traits<char>::length(word);
+			if (name.compare(0, n, word) != 0) return false;
+			for (size_t k = n; k < name.size(); ++k)
+				if (!(name[k] == ' ' || std::isdigit(static_cast<unsigned char>(name[k])))) return false;   // (only spaces and digits may follow)
+			return true;
+		};
+		const bool named = isWord("floor") || isWord("ground");
 		const bool bigFlatQuad = o.shape == scene_doc::ShapeKind::Quad && o.position.y < 0.05 && std::max(o.size.x, o.size.z) >= 5.0 && std::fabs(o.rotation.x) < 1e-6 && std::fabs(o.rotation.z) < 1e-6;
 		roles.push_back(o.emissive ? Role::Light : (named || bigFlatQuad) ? Role::Ground : Role::Inserted);
 	}

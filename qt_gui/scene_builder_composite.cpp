@@ -27,6 +27,8 @@
 #include <QProcess>
 #include <QRegularExpression>
 #include <QProgressDialog>
+#include <QHeaderView>
+#include <QTableWidget>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSpinBox>
@@ -70,6 +72,24 @@ bool SceneBuilderWidget::renderIntoPhoto(const QString &outPng, const std::vecto
 }
 
 bool SceneBuilderWidget::renderIntoPhotoImage(QImage *resultImage, const std::vector<int> &groundObjects, double exposureStops, int samples, int maxWidth, bool matchToPhoto, QString *error, QStringList *notes) {
+	std::vector<photo_composite::Role> roles = photo_composite::guessRoles(m_doc);
+	for (size_t i = 0; i < roles.size(); ++i) {
+		if (roles[i] == photo_composite::Role::Light) continue;
+		roles[i] = std::find(groundObjects.begin(), groundObjects.end(), static_cast<int>(i)) != groundObjects.end() ? photo_composite::Role::Ground : photo_composite::Role::Inserted;
+	}
+	return renderIntoPhotoRoles(resultImage, roles, exposureStops, samples, maxWidth, matchToPhoto, error, notes);
+}
+
+// What each object is for the picture, as last chosen in the Render into the photo dialog (by name, so it survives edits), else guessed.
+std::vector<photo_composite::Role> SceneBuilderWidget::compositeRoles() const {
+	std::vector<photo_composite::Role> roles = photo_composite::guessRoles(m_doc);
+	for (size_t i = 0; i < roles.size() && i < m_doc.objects.size(); ++i)
+		for (const auto &chosen : m_compositeRoles)
+			if (chosen.first == m_doc.objects[i].name) { roles[i] = static_cast<photo_composite::Role>(chosen.second); break; }
+	return roles;
+}
+
+bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::vector<photo_composite::Role> &rolesGiven, double exposureStops, int samples, int maxWidth, bool matchToPhoto, QString *error, QStringList *notes) {
 	if (m_cameraPhoto.isNull()) {
 		if (error) *error = tr("Match the camera to a photo first (Camera section: Match to a photo...): the scene is put into that photo.");
 		return false;
@@ -89,18 +109,18 @@ bool SceneBuilderWidget::renderIntoPhotoImage(QImage *resultImage, const std::ve
 	std::vector<unsigned char> photoPixels(static_cast<size_t>(w) * h * 3);
 	for (int y = 0; y < h; ++y) std::copy(photo.constScanLine(y), photo.constScanLine(y) + w * 3, photoPixels.begin() + static_cast<std::ptrdiff_t>(y) * w * 3);
 
-	std::vector<photo_composite::Role> roles = photo_composite::guessRoles(m_doc);
-	for (size_t i = 0; i < roles.size(); ++i) {
-		if (roles[i] == photo_composite::Role::Light) continue;
-		roles[i] = std::find(groundObjects.begin(), groundObjects.end(), static_cast<int>(i)) != groundObjects.end() ? photo_composite::Role::Ground : photo_composite::Role::Inserted;
-	}
+	std::vector<photo_composite::Role> roles = rolesGiven;
+	roles.resize(m_doc.objects.size(), photo_composite::Role::Inserted);
 	int inserted = 0, grounds = 0;
 	for (const photo_composite::Role r : roles) {
 		inserted += r == photo_composite::Role::Inserted ? 1 : 0;
 		grounds += r == photo_composite::Role::Ground ? 1 : 0;
 	}
 	if (inserted == 0) {
-		if (error) *error = tr("Every object is marked as the ground or a light, so there is nothing to put into the photo.");
+		QStringList what;
+		for (size_t i = 0; i < roles.size(); ++i)
+			what << QStringLiteral("%1: %2").arg(QString::fromStdString(m_doc.objects[i].name), roles[i] == photo_composite::Role::Ground ? tr("ground") : tr("light"));
+		if (error) *error = tr("Every object is marked as the ground or a light, so there is nothing to put into the photo (%1). Set one to \"Put into the photo\" in Camera and image > Render into the photo...").arg(what.join(QStringLiteral(", ")));
 		return false;
 	}
 	const photo_composite::Passes passes = photo_composite::makePasses(m_doc, roles);
@@ -239,27 +259,38 @@ void SceneBuilderWidget::renderIntoPhotoDialog() {
 		QMessageBox::information(this, tr("Render into the photo"), tr("Match the camera to a photo first (Camera section: Match to a photo...): the scene is put into that photo."));
 		return;
 	}
-	const std::vector<photo_composite::Role> guessed = photo_composite::guessRoles(m_doc);
+	const std::vector<photo_composite::Role> roles = compositeRoles();
 	QDialog dialog(this);
 	dialog.setWindowTitle(tr("Render into the photo"));
 	auto *layout = new QVBoxLayout(&dialog);
-	auto *intro = new QLabel(tr("The scene, seen through the camera matched to the photo, is rendered and put into the photo, with the shadows and reflections it casts on the ground. Tick the objects that are the "
-	                            "ground: the photo already has it, so it is not drawn, and only the shadows it catches count. Everything else (except lights) is put into the photo. The scene is rendered three times, "
-	                            "so it takes about three times as long as one picture."),
+	auto *intro = new QLabel(tr("The scene, seen through the camera matched to the photo, is rendered and put into the photo, with the shadows and reflections it casts on the ground. Say what each object is: "
+	                            "the ground the photo already has (not drawn: only the shadows it catches count), a light (lights the scene, not shown), or an object to put into the photo. "
+	                            "The scene is rendered three times, so it takes about three times as long as one picture."),
 	                         &dialog);
 	intro->setWordWrap(true);
 	layout->addWidget(intro);
-	auto *objects = new QListWidget(&dialog);
-	std::vector<int> indices;
+	auto *objects = new QTableWidget(static_cast<int>(m_doc.objects.size()), 2, &dialog);
+	objects->setHorizontalHeaderLabels({tr("Object"), tr("Is")});
+	objects->horizontalHeader()->setStretchLastSection(true);
+	objects->verticalHeader()->hide();
+	objects->setEditTriggers(QAbstractItemView::NoEditTriggers);
+	objects->setSelectionMode(QAbstractItemView::NoSelection);
+	std::vector<QComboBox *> roleBoxes;
 	for (size_t i = 0; i < m_doc.objects.size(); ++i) {
-		if (guessed[i] == photo_composite::Role::Light) continue;   // (a lamp lights the scene and is not put into the photo)
-		auto *item = new QListWidgetItem(QString::fromStdString(m_doc.objects[i].name), objects);
-		item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
-		const bool ground = m_compositeGroundSet ? std::find(m_compositeGround.begin(), m_compositeGround.end(), m_doc.objects[i].name) != m_compositeGround.end() : guessed[i] == photo_composite::Role::Ground;
-		item->setCheckState(ground ? Qt::Checked : Qt::Unchecked);
-		indices.push_back(static_cast<int>(i));
+		objects->setItem(static_cast<int>(i), 0, new QTableWidgetItem(QString::fromStdString(m_doc.objects[i].name)));
+		auto *box = new QComboBox;
+		box->addItem(tr("Put into the photo"), static_cast<int>(photo_composite::Role::Inserted));
+		box->addItem(tr("Ground (the photo has it)"), static_cast<int>(photo_composite::Role::Ground));
+		box->addItem(tr("Light (lights the scene, not shown)"), static_cast<int>(photo_composite::Role::Light));
+		box->setCurrentIndex(box->findData(static_cast<int>(roles[i])));
+		objects->setCellWidget(static_cast<int>(i), 1, box);
+		roleBoxes.push_back(box);
 	}
-	objects->setToolTip(tr("Ticked: the ground the photo already has (its shadows are used, it is not drawn). Unticked: put into the photo."));
+	objects->verticalHeader()->setDefaultSectionSize(36);
+	objects->resizeColumnsToContents();
+	objects->setMinimumHeight(40 + 36 * static_cast<int>(std::min<size_t>(m_doc.objects.size(), 8)));
+	dialog.setMinimumWidth(620);
+	objects->setToolTip(tr("Ground: the floor the photo already has (its shadows are used, it is not drawn). Light: a lamp, which lights the scene and is not shown. Put into the photo: everything you want to see in it."));
 	layout->addWidget(objects);
 	auto *form = new QFormLayout();
 	bool physicalSky = false;
@@ -286,15 +317,15 @@ void SceneBuilderWidget::renderIntoPhotoDialog() {
 	connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
 	connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
 	layout->addWidget(buttons);
+	layout->activate();
+	dialog.resize(dialog.sizeHint().expandedTo(QSize(620, 0)));   // (sized for the wrapped text and the whole table before it is shown)
 	if (dialog.exec() != QDialog::Accepted) return;
-	m_compositeGround.clear();
-	m_compositeGroundSet = true;
-	std::vector<int> ground;
-	for (int row = 0; row < objects->count(); ++row)
-		if (objects->item(row)->checkState() == Qt::Checked) {
-			ground.push_back(indices[static_cast<size_t>(row)]);
-			m_compositeGround.push_back(m_doc.objects[static_cast<size_t>(indices[static_cast<size_t>(row)])].name);
-		}
+	m_compositeRoles.clear();
+	std::vector<photo_composite::Role> chosen(m_doc.objects.size(), photo_composite::Role::Inserted);
+	for (size_t i = 0; i < m_doc.objects.size(); ++i) {
+		chosen[i] = static_cast<photo_composite::Role>(roleBoxes[i]->currentData().toInt());
+		m_compositeRoles.push_back({m_doc.objects[i].name, static_cast<int>(chosen[i])});
+	}
 	m_compositeExposure = exposure->value();
 
 	QImage picture;
@@ -302,7 +333,7 @@ void SceneBuilderWidget::renderIntoPhotoDialog() {
 	QStringList notes;
 	QElapsedTimer clock;
 	clock.start();
-	if (!renderIntoPhotoImage(&picture, ground, exposure->value(), quality->value(), 1000, match->isChecked(), &error, &notes)) {
+	if (!renderIntoPhotoRoles(&picture, chosen, exposure->value(), quality->value(), 1000, match->isChecked(), &error, &notes)) {
 		if (!error.isEmpty()) {
 			logLine(QStringLiteral("photo"), QStringLiteral("render into the photo failed: %1").arg(error), log_format::Level::Warn);
 			QMessageBox::warning(this, tr("Could not render into the photo"), error);
@@ -322,12 +353,7 @@ void SceneBuilderWidget::previewIntoPhoto() {
 	static const int widths[3] = {480, 720, 960};
 	static const int spps[3] = {16, 64, 256};
 	const int q = std::clamp(m_qualityCombo->currentData().toInt(), 0, 2);
-	const std::vector<photo_composite::Role> guessed = photo_composite::guessRoles(m_doc);
-	std::vector<int> ground;
-	for (size_t i = 0; i < m_doc.objects.size(); ++i) {
-		const bool isGround = m_compositeGroundSet ? std::find(m_compositeGround.begin(), m_compositeGround.end(), m_doc.objects[i].name) != m_compositeGround.end() : guessed[i] == photo_composite::Role::Ground;
-		if (isGround && guessed[i] != photo_composite::Role::Light) ground.push_back(static_cast<int>(i));
-	}
+	const std::vector<photo_composite::Role> roles = compositeRoles();
 	bool physicalSky = false;
 	for (const scene_doc::Light &l : m_doc.lights) physicalSky = physicalSky || (l.kind == scene_doc::LightKind::Infinite && l.physicalSky);
 	m_previewStatus->setText(tr("Putting the scene into the photo..."));
@@ -336,7 +362,7 @@ void SceneBuilderWidget::previewIntoPhoto() {
 	QStringList notes;
 	QElapsedTimer clock;
 	clock.start();
-	if (!renderIntoPhotoImage(&picture, ground, m_compositeExposure, spps[q], widths[q], physicalSky, &error, &notes)) {
+	if (!renderIntoPhotoRoles(&picture, roles, m_compositeExposure, spps[q], widths[q], physicalSky, &error, &notes)) {
 		logLine(QStringLiteral("photo"), QStringLiteral("preview in the photo failed: %1").arg(error), log_format::Level::Warn);
 		m_previewStatus->setText(error.isEmpty() ? tr("The render was cancelled.") : error);
 		return;

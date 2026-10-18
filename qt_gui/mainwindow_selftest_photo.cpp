@@ -22,6 +22,7 @@
 #include "../src/shared/scene_arrange.h"
 
 #include <QApplication>
+#include <QComboBox>
 #include <QDialog>
 #include <QDir>
 #include <QElapsedTimer>
@@ -519,12 +520,23 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			}
 			check(!notes.isEmpty(), "the user is told what was done: " + notes.join(" / ").left(120));
 		}
+		// the dialog: it opens with a role to choose for every object (a picture of it is saved), and a cancel changes nothing
+		int roleBoxes = 0;
+		QTimer::singleShot(1200, [&roleBoxes]() {
+			if (QWidget *w = QApplication::activeModalWidget()) {
+				w->grab().save(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_dialog.png");
+				roleBoxes = w->findChildren<QComboBox *>().size();
+				if (QDialog *d = qobject_cast<QDialog *>(w)) d->reject();
+			}
+		});
+		sb->renderIntoPhotoDialog();
+		check(roleBoxes == static_cast<int>(sb->document().objects.size()), QString("the Render into the photo dialog has a role to choose for each of the %1 objects (%2 choices)").arg(sb->document().objects.size()).arg(roleBoxes));
 		// every object marked as the ground (and the lamp is a light): nothing to put into the photo
 		std::vector<int> all;
 		for (size_t i = 0; i < sb->document().objects.size(); ++i) all.push_back(static_cast<int>(i));
 		QString nothing;
 		const bool nothingOk = sb->renderIntoPhoto(out, all, 0.0, 16, false, &nothing);
-		check(!nothingOk && !nothing.isEmpty(), "with everything marked as the ground there is nothing to put in, and it says so: " + nothing.left(100));
+		check(!nothingOk && nothing.contains("Floor: ground") && nothing.contains("Put into the photo"), "with everything marked as the ground there is nothing to put in, and it says which object is what: " + nothing.left(220));
 		// "Preview in the photo": no questions, and the picture appears in the preview pane (at the Preview's Draft size) with Save picture... ready
 		sb->previewIntoPhoto();
 		check(sb->previewHasPictureForTest() && sb->previewPictureSizeForTest() == QSize(480, 360), QString("Preview in the photo shows its picture in the preview pane (%1 x %2)").arg(sb->previewPictureSizeForTest().width()).arg(sb->previewPictureSizeForTest().height()));

@@ -332,3 +332,21 @@ TEST(PhotoCompositeMatchTest, TheColourCastOfTheMatchTintsTheObjectsAndNothingEl
 	EXPECT_LT(b[1], a[1] - 20) << "the green of the object is halved";
 	for (size_t i = n / 2 * 3; i < n * 3; ++i) EXPECT_EQ(a[i], b[i]) << "the photo's own pixels do not change";
 }
+
+TEST(PhotoCompositeTest, OnlyAFloorOrGroundNamedObjectIsGuessedToBeTheGroundNotAnythingThatBeginsLikeOne) {
+	Document d = makeStarterScene();
+	const struct { const char* name; Role want; } cases[] = {
+	    {"Floor", Role::Ground},       {"floor 2", Role::Ground},        {"Ground", Role::Ground},        {"GROUND3", Role::Ground},
+	    {"floor_lamp", Role::Inserted}, {"Floor lamp", Role::Inserted},  {"Ground floor", Role::Inserted}, {"Groundhog", Role::Inserted},
+	    {"floorplan", Role::Inserted},  {"Photo object", Role::Inserted}, {"", Role::Inserted},
+	};
+	for (const auto& c : cases) {
+		Object o = makeObject(ShapeKind::Mesh, c.name);   // (a mesh made from a photo is named after its file)
+		d.objects.assign(1, o);
+		EXPECT_EQ(photo_composite::guessRoles(d)[0], c.want) << "\"" << c.name << "\"";
+	}
+	Object glowing = makeObject(ShapeKind::Sphere, "Glow");
+	glowing.emissive = true;
+	d.objects.assign(1, glowing);
+	EXPECT_EQ(photo_composite::guessRoles(d)[0], Role::Light);
+}

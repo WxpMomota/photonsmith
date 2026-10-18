@@ -72,7 +72,7 @@ void SceneBuilderWidget::setUseGpu(bool on) { m_gpuCheck->setChecked(on); }
 
 void SceneBuilderWidget::logLine(const QString &category, const QString &text, log_format::Level level) {
 	if (isSignalConnected(QMetaMethod::fromSignal(&SceneBuilderWidget::logMessage))) {
-		const QString tag = level == log_format::Level::Error ? QStringLiteral("[ERROR] ") : level == log_format::Level::Warn ? QStringLiteral("[WARN] ") : QString();
+		const QString tag = level == log_format::Level::Error ? QStringLiteral("Error: ") : level == log_format::Level::Warn ? QStringLiteral("Warning: ") : QString();   // (the pane sorts a line by such words and labels it itself)
 		emit logMessage(QStringLiteral("[Scene Builder] ") + tag + text);   // (the pane writes the log file too)
 	} else {
 		AppLog::write(level, category, text);
