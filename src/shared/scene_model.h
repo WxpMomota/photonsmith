@@ -229,6 +229,16 @@ struct RenderSettings {
 	int maxDepth = 8;
 };
 
+// The photo the scene's camera was matched to (Match to a photo), kept with the scene so that opening it again brings the photo, the overlay and Render into the photo back, with what was said about
+// the objects. Nothing in a renderer reads it; it is the Scene Builder's own.
+struct PhotoBackdrop {
+	std::string file;                 // the photo: a file's path, or ":/sample_photos/beach.jpg" for one built into the program; empty: the camera was not matched to a photo
+	bool shown = false;               // laid over the camera view
+	double opacity = 0.5;             // ... how strongly (0.1 to 1)
+	double exposureStops = 0.0;       // Render into the photo: the objects' exposure
+	std::vector<std::pair<std::string, int>> roles;   // Render into the photo: what each object (by name) is for: 0 the ground the photo has, 1 a light, 2 put into the photo
+};
+
 struct Document {
 	std::string title = "Untitled scene";
 	Camera camera;
@@ -236,6 +246,7 @@ struct Document {
 	std::vector<Object> objects;
 	std::vector<Light> lights;
 	std::vector<CameraView> cameraViews;   // saved cameras, in the order they were saved
+	PhotoBackdrop photo;                   // the photo the camera was matched to, if any
 };
 
 struct Problem {

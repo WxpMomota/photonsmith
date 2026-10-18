@@ -114,6 +114,7 @@ bool SceneBuilderWidget::loadAutosave() {
 	AppLog::info(QStringLiteral("builder"), QStringLiteral("restored the unsaved scene from %1: \"%2\", %3 objects, %4 lights")
 	                                            .arg(f.fileName(), QString::fromStdString(d.title)).arg(d.objects.size()).arg(d.lights.size()));
 	m_doc = std::move(d);
+	syncCameraPhoto();
 	m_path.clear();
 	m_dirty = true;
 	m_history.clear();

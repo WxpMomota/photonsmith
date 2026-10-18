@@ -361,6 +361,18 @@ inline std::string toJson(const Document& d) {
 		root.set("cameraViews", std::move(views));
 	}
 
+	if (!d.photo.file.empty()) {
+		Json ph = Json::object();
+		ph.set("file", Json::string(d.photo.file)).set("shown", Json::boolean(d.photo.shown)).set("opacity", Json::number(d.photo.opacity));
+		if (d.photo.exposureStops != 0.0) ph.set("exposureStops", Json::number(d.photo.exposureStops));
+		if (!d.photo.roles.empty()) {
+			Json roles = Json::array();
+			for (const auto& r : d.photo.roles) roles.push(Json::object().set("name", Json::string(r.first)).set("role", Json::number(r.second)));
+			ph.set("roles", std::move(roles));
+		}
+		root.set("photo", std::move(ph));
+	}
+
 	Json rs = Json::object();
 	rs.set("width", Json::number(d.render.width)).set("height", Json::number(d.render.height));
 	rs.set("samples", Json::number(d.render.samples)).set("maxDepth", Json::number(d.render.maxDepth));
@@ -464,6 +476,25 @@ inline bool fromJson(const std::string& text, Document& out, std::string& err) {
 			if (!(v.hold >= 0.0 && v.hold <= 3600.0)) v.hold = 0.0;
 			if (!ok) break;
 			d.cameraViews.push_back(v);
+		}
+	}
+	if (const Json* ph = root.find("photo")) {
+		if (ph->type != Json::Type::Obj) ok = false;
+		else {
+			ok = ok && detail::readStr(*ph, "file", d.photo.file);
+			detail::readBool(*ph, "shown", d.photo.shown);
+			detail::readNum(*ph, "opacity", d.photo.opacity);
+			detail::readNum(*ph, "exposureStops", d.photo.exposureStops);
+			if (!(d.photo.opacity >= 0.1 && d.photo.opacity <= 1.0)) d.photo.opacity = 0.5;
+			if (!(d.photo.exposureStops >= -8.0 && d.photo.exposureStops <= 8.0)) d.photo.exposureStops = 0.0;
+			if (const Json* roles = ph->find("roles")) {
+				if (roles->type != Json::Type::Arr) ok = false;
+				else for (const Json& j : roles->a) {
+					std::string name;
+					int role = 2;
+					if (detail::readStr(j, "name", name) && detail::readInt(j, "role", role) && role >= 0 && role <= 2) d.photo.roles.emplace_back(name, role);
+				}
+			}
 		}
 	}
 	if (const Json* rs = root.find("render")) {

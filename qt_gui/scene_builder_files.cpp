@@ -66,6 +66,7 @@ void SceneBuilderWidget::newScene() {
 	m_logPending = false;
 	AppLog::info(QStringLiteral("builder"), QStringLiteral("new scene (the starter scene)"));
 	m_doc = scene_doc::makeStarterScene();
+	syncCameraPhoto();
 	m_path.clear();
 	m_listedPath.clear();
 	m_dirty = false;
@@ -100,6 +101,7 @@ bool SceneBuilderWidget::openFile(const QString &path, QString *error) {
 	AppLog::info(QStringLiteral("builder"), QStringLiteral("open %1: \"%2\", %3 objects, %4 lights").arg(path, QString::fromStdString(d.title)).arg(d.objects.size()).arg(d.lights.size()));
 	m_logPending = false;
 	m_doc = std::move(d);
+	syncCameraPhoto();   // (the photo the scene was matched to comes back)
 	m_path = path;
 	// A file opened from the scene-list folder is a listed scene: adding it again offers to update it.
 	m_listedPath = QFileInfo(path).absolutePath() == QFileInfo(sceneListFolder() + "/x").absolutePath() ? path : QString();

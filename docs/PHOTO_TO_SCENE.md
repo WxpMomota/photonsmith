@@ -133,6 +133,13 @@ How good it is:
   roof line, so check the tilt and roll by eye against the photo laid over the view.
 - The renderers draw the scene on its own (the photo is laid over the view in the Builder, to line things up); **Render into the photo...** (below) puts the scene into the photo with its shadows. Light from a photo sets the light to match.
 
+## The photo is saved with the scene
+
+Matching the camera to a photo puts the photo into the scene (its file, whether it is laid over the camera view, how strongly, and what Render into the photo was told: the exposure and what each object is). **Save**
+the scene and open it again, and the photo, the overlay, the Place tools and Render into the photo are back, with the camera as it was matched. A sample photo is saved by its name inside the program, so it comes back
+on any computer; a photo of your own is saved by its path, and if the file has gone the scene still opens, with a note under Camera and image that the photo was not found (**Remove the photo** takes the note away;
+the camera stays as it was matched). One undo of the match takes the photo away with the camera. Showing the photo and its opacity are saved but are not undo steps.
+
 ## Sample photos
 
 Camera from a photo and Light from a photo are **one window**: at the top the photo to use, with **five sample photos built into the program** (a picture of each, what it is good for, and its credit) so you can try them without a photo of your own, and **Choose my own photo...** (which adds your photo to the row, selected); below it the settings; and clicking a photo applies it at once (**Apply**, or Enter, applies now **and closes the window** when it worked, and says why in the panel, keeping the window open, when it did not; **Close** keeps what has been applied and closes), and changing a setting applies again (after a short pause, so typing a number is one apply); the result appears **under the settings** in that same window (which opens large, most of the screen's height). Each apply takes the last one of the window back first, so the window leaves one apply behind (one undo step for the camera, one for the sky), however many photos you tried. A short screen scrolls the settings instead of cutting them off. Close ends it. Start with *Beach, blue sky*: a clean horizon and a clear sky, from which the camera, the sun and the exposure of Render into the photo all read well.

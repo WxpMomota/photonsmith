@@ -760,6 +760,43 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			check(seen == "hint north-sea beach own " && samplesListed == static_cast<int>(samples.size()) && depthAfterTwo - depthAtStart <= 2 && fillsScreen && hasApply && bigThumbnails && !*stayedOpen,
 			      QString("Match to a photo for the camera is one window that applies on click (%1; %2 samples listed; two applies left %3 undo steps; fills the screen %4, has an Apply button %5, thumbnails %6)").arg(seen).arg(samplesListed).arg(depthAfterTwo - depthAtStart).arg(fillsScreen).arg(hasApply).arg(bigThumbnails));
 		}
+		// The photo belongs to the scene: a scene matched to a photo, saved, then a new scene (no photo), then the saved one opened again has its photo, its overlay, its Render into the photo state and
+		// the camera back; a photo that has gone is said so, not a crash; Remove the photo takes it out; and one undo of the match takes it away too.
+		{
+			const QString file = QDir::tempPath() + "/rt_selftest_composite.png";
+			const QString scenePath = QDir::tempPath() + "/rt_selftest_photo_scene.pbrt";
+			QString err;
+			const bool matched = sb->applyCameraPhoto(file, 65.0, 1.6, false, 0.0, false, 0.0, false, &err);
+			sb->setPhotoExposureForTest(0.75);   // (what the Render into the photo dialog keeps in the document)
+			const double cameraY = sb->document().camera.position.y;
+			const bool kept = sb->document().photo.file == file.toStdString() && sb->cameraPhotoShownForTest();
+			check(matched && kept, "a scene matched to a photo keeps the photo's file in its document and shows it");
+			check(sb->saveFile(scenePath), "the scene is saved");
+			sb->newScene();
+			check(sb->document().photo.file.empty() && !sb->cameraPhotoShownForTest(), "a new scene has no photo and no overlay");
+			QString openError;
+			const bool opened = sb->openFile(scenePath, &openError);
+			check(opened && sb->document().photo.file == file.toStdString() && sb->cameraPhotoShownForTest() && std::fabs(sb->document().camera.position.y - cameraY) < 1e-9,
+			      "the saved scene opened again has its photo, the overlay and the camera back " + openError);
+			check(sb->document().photo.exposureStops == 0.75 && sb->document().photo.roles.size() == 1, "and what Render into the photo was told (the exposure, the roles) is back too");
+			// a photo that has gone: the scene opens, the overlay is not there, and the file name stays so the photo can be put back
+			QString movedAway = file + ".moved";
+			QFile::remove(movedAway);
+			QFile::rename(file, movedAway);
+			sb->newScene();
+			const bool openedWithoutPhoto = sb->openFile(scenePath, &openError);
+			check(openedWithoutPhoto && sb->document().photo.file == file.toStdString() && !sb->cameraPhotoShownForTest(), "a scene whose photo has gone still opens, without the overlay");
+			QFile::rename(movedAway, file);
+			// Remove the photo
+			sb->newScene();
+			sb->openFile(scenePath, &openError);
+			sb->removePhotoForTest();
+			check(sb->document().photo.file.empty() && !sb->cameraPhotoShownForTest(), "Remove the photo takes the photo out of the scene");
+			// one undo of the match takes the photo away with the camera
+			sb->newScene();
+			sb->applyCameraPhoto(file, 65.0, 1.6, false, 0.0, false, 0.0, false, &err);
+			check(sb->cameraPhotoShownForTest() && sb->undo() && sb->document().photo.file.empty() && !sb->cameraPhotoShownForTest(), "one undo of the match takes the photo away with the camera");
+		}
 	}
 	QTimer::singleShot(600, this, [this, shot, log, ok]() {
 		shot("composite_edit");

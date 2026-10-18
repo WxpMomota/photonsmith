@@ -540,6 +540,7 @@ void SceneBuilderWidget::syncSunAndSky() {
 }
 
 void SceneBuilderWidget::documentChanged() {
+	syncCameraPhoto();
 	m_skySignature = skySignature();
 	m_dirty = true;
 	refreshViewCombo();

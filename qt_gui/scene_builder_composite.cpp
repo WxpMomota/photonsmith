@@ -376,6 +376,9 @@ void SceneBuilderWidget::renderIntoPhotoDialog() {
 		m_compositeRoles.push_back({m_doc.objects[i].name, static_cast<int>(chosen[i])});
 	}
 	m_compositeExposure = exposure->value();
+	m_doc.photo.roles = m_compositeRoles;   // (kept with the scene: opening it again remembers what each object was said to be, and the exposure)
+	m_doc.photo.exposureStops = m_compositeExposure;
+	documentChanged();
 	if (m_denoiseCheck && m_denoiseCheck->isChecked() != denoiseBox->isChecked()) m_denoiseCheck->setChecked(denoiseBox->isChecked());   // (the one Denoise setting: ticking it may offer the download)
 
 	QImage picture;

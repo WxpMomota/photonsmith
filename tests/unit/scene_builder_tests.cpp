@@ -8,6 +8,7 @@
 
 #include <gtest/gtest.h>
 #include "scene_builder_test_helpers.h"
+#include "../../src/shared/scene_doc_diff.h"
 
 namespace {
 
@@ -981,4 +982,44 @@ TEST(SceneArrayDocumentTest, WritesADemoSceneWhenAsked) {
 	for (const Object& o : scene_doc::makeRing(chair, rp, d.objects)) d.objects.push_back(o);
 	d.camera.position = {4.0, 7.0, 14.0}; d.camera.target = {0.0, 0.5, -2.0};
 	std::ofstream(out, std::ios::binary) << toPbrt(d);
+}
+
+TEST(SceneBuilderJsonTest, ThePhotoTheCameraWasMatchedToIsSavedWithTheScene) {
+	Document d = makeStarterScene();
+	EXPECT_TRUE(d.photo.file.empty()) << "a new scene has no photo";
+	d.photo.file = ":/sample_photos/beach.jpg";
+	d.photo.shown = true;
+	d.photo.opacity = 0.7;
+	d.photo.exposureStops = -0.5;
+	d.photo.roles = {{"Floor", 0}, {"Ceiling light", 1}, {"Red \"box\"", 2}};
+	const std::string text = toJson(d);
+	Document back;
+	std::string err;
+	ASSERT_TRUE(fromJson(text, back, err)) << err;
+	EXPECT_EQ(back.photo.file, d.photo.file);
+	EXPECT_TRUE(back.photo.shown);
+	EXPECT_DOUBLE_EQ(back.photo.opacity, 0.7);
+	EXPECT_DOUBLE_EQ(back.photo.exposureStops, -0.5);
+	EXPECT_EQ(back.photo.roles, d.photo.roles);
+	EXPECT_EQ(toJson(back), text) << "and writes back the same";
+	// a scene with no photo writes nothing about one, and an old scene (no "photo") reads as none
+	Document none = makeStarterScene();
+	EXPECT_EQ(toJson(none).find("\"photo\""), std::string::npos);
+	Document old;
+	ASSERT_TRUE(fromJson("{\"objects\":[]}", old, err)) << err;
+	EXPECT_TRUE(old.photo.file.empty());
+	// bad values are made sane, not refused: an opacity outside 0.1..1, an exposure far outside, a role that is none of the three
+	Document odd;
+	ASSERT_TRUE(fromJson("{\"photo\":{\"file\":\"x.jpg\",\"opacity\":9,\"exposureStops\":99,\"roles\":[{\"name\":\"A\",\"role\":7},{\"name\":\"B\",\"role\":1}]}}", odd, err)) << err;
+	EXPECT_DOUBLE_EQ(odd.photo.opacity, 0.5);
+	EXPECT_DOUBLE_EQ(odd.photo.exposureStops, 0.0);
+	ASSERT_EQ(odd.photo.roles.size(), 1u);
+	EXPECT_EQ(odd.photo.roles[0].first, "B");
+	Document wrong;
+	EXPECT_FALSE(fromJson("{\"photo\":5}", wrong, err));
+	// the edit log names a change of photo
+	Document with = makeStarterScene();
+	with.photo.file = "a.jpg";
+	EXPECT_NE(describeChange(none, with).find("photo"), std::string::npos);
+	EXPECT_NE(describeChange(with, none).find("photo removed"), std::string::npos);
 }

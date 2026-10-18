@@ -346,24 +346,29 @@ void SceneBuilderWidget::inspectCamera(QFormLayout *f) {
 	composite->setToolTip(tr("Render the scene through this camera and put it into the photo, with the shadows it casts on the ground. Tick the floor as the ground: the photo already has it."));
 	connect(composite, &QPushButton::clicked, this, [this]() { renderIntoPhotoDialog(); });
 	f->addRow(composite);
-	if (!m_cameraPhoto.isNull()) {
-		auto *show = new QCheckBox(tr("Show the photo over the camera view"));
-		show->setChecked(m_cameraPhotoShown);
-		connect(show, &QCheckBox::toggled, this, [this](bool on) { m_cameraPhotoShown = on; updateCameraPhotoOverlay(); });
-		f->addRow(show);
-		auto *opacity = new QDoubleSpinBox;
-		opacity->setRange(0.1, 1.0);
-		opacity->setSingleStep(0.1);
-		opacity->setDecimals(1);
-		opacity->setValue(m_cameraPhotoOpacity);
-		connect(opacity, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double v) { m_cameraPhotoOpacity = v; updateCameraPhotoOverlay(); });
-		f->addRow(tr("Photo opacity"), opacity);
+	if (!m_doc.photo.file.empty()) {
+		if (m_cameraPhoto.isNull()) {   // the scene was matched to a photo that is not there now
+			auto *missing = new QLabel(tr("The photo %1 that this scene was matched to could not be found.").arg(QString::fromStdString(m_doc.photo.file)));
+			missing->setWordWrap(true);
+			f->addRow(missing);
+		} else {
+			auto *show = new QCheckBox(tr("Show the photo over the camera view"));
+			show->setChecked(m_cameraPhotoShown);
+			connect(show, &QCheckBox::toggled, this, [this](bool on) { m_doc.photo.shown = on; documentChanged(); });   // (a view setting: saved with the scene, not an undo step)
+			f->addRow(show);
+			auto *opacity = new QDoubleSpinBox;
+			opacity->setRange(0.1, 1.0);
+			opacity->setSingleStep(0.1);
+			opacity->setDecimals(1);
+			opacity->setValue(m_cameraPhotoOpacity);
+			connect(opacity, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double v) { m_doc.photo.opacity = v; documentChanged(); });
+			f->addRow(tr("Photo opacity"), opacity);
+		}
 		auto *remove = new QPushButton(tr("Remove the photo"));
 		remove->setAutoDefault(false);
 		connect(remove, &QPushButton::clicked, this, [this]() {
-			m_cameraPhoto = QImage();
-			m_cameraPhotoShown = false;
-			updateCameraPhotoOverlay();
+			m_doc.photo = scene_doc::PhotoBackdrop();   // (the camera stays as it was matched; only the photo goes)
+			documentChanged();
 			QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
 		});
 		f->addRow(remove);

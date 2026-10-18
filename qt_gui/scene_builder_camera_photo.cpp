@@ -71,14 +71,16 @@ bool SceneBuilderWidget::applyCameraPhoto(const QString &photo, double hfov, dou
 		return false;
 	}
 	const scene_doc::Camera camera = camera_from_photo::makeCamera(m_doc.camera, hfov, w, h, found.tiltDegrees, found.rollDegrees, heightMetres);
+	// the photo, kept for the camera view (at most 1600 pixels across: the view only needs it to line the scene up) and, by its file, in the document: the edit below makes syncCameraPhoto
+	// find the picture already loaded
+	m_cameraPhoto = std::max(w, h) > 1600 ? image.scaled(1600, 1600, Qt::KeepAspectRatio, Qt::SmoothTransformation) : image;
+	m_cameraPhotoFile = photo;
 	edit(QString(), [&]() {
 		m_doc.camera = camera;
 		m_doc.render.height = std::max(1, static_cast<int>(std::lround(m_doc.render.width * static_cast<double>(h) / w)));   // (the picture takes the photo's shape)
+		m_doc.photo.file = photo.toStdString();
+		m_doc.photo.shown = true;
 	});
-	// the photo, kept for the camera view (at most 1600 pixels across: the view only needs it to line the scene up)
-	m_cameraPhoto = std::max(w, h) > 1600 ? image.scaled(1600, 1600, Qt::KeepAspectRatio, Qt::SmoothTransformation) : image;
-	m_cameraPhotoShown = true;
-	updateCameraPhotoOverlay();
 	show3dView(true);   // (the overlay is drawn by the 3D view, looking through the camera)
 	lookThroughCamera(true);
 	QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
@@ -115,6 +117,38 @@ bool SceneBuilderWidget::view3dShownForTest() const { return m_viewStack && m_vi
 
 void SceneBuilderWidget::updateCameraPhotoOverlay() {
 	if (m_view3d) m_view3d->setPhotoOverlay(m_cameraPhotoShown ? m_cameraPhoto : QImage(), m_cameraPhotoOpacity);
+}
+
+QImage SceneBuilderWidget::loadCameraPhotoImage(const QString &file) {
+	QImageReader reader(file);
+	reader.setAutoTransform(true);   // a phone photo stores its turn as a flag
+	QImage image = reader.read();
+	if (image.isNull()) return QImage();
+	image = image.convertToFormat(QImage::Format_RGB888);
+	return std::max(image.width(), image.height()) > 1600 ? image.scaled(1600, 1600, Qt::KeepAspectRatio, Qt::SmoothTransformation) : image;
+}
+
+// Brings the window's photo (the picture, whether it is over the view, how strongly, and what Render into the photo was last told) in line with the document's.
+void SceneBuilderWidget::syncCameraPhoto() {
+	const scene_doc::PhotoBackdrop &want = m_doc.photo;
+	const QString file = QString::fromStdString(want.file);
+	bool changed = false;
+	if (file != m_cameraPhotoFile) {   // another photo, or none: load it
+		m_cameraPhotoFile = file;
+		m_cameraPhoto = file.isEmpty() ? QImage() : loadCameraPhotoImage(file);
+		if (!file.isEmpty() && m_cameraPhoto.isNull()) {
+			logLine(QStringLiteral("photo"), QStringLiteral("the photo %1 that this scene was matched to could not be read").arg(file), log_format::Level::Warn);
+			emit statusMessage(tr("The photo %1 that this scene was matched to could not be found.").arg(file));
+		}
+		changed = true;
+	}
+	const bool shown = want.shown && !m_cameraPhoto.isNull();
+	if (shown != m_cameraPhotoShown || want.opacity != m_cameraPhotoOpacity) changed = true;
+	m_cameraPhotoShown = shown;
+	m_cameraPhotoOpacity = want.opacity;
+	m_compositeExposure = want.exposureStops;
+	m_compositeRoles = want.roles;
+	if (changed) updateCameraPhotoOverlay();
 }
 
 void SceneBuilderWidget::cameraFromPhoto() {

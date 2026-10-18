@@ -217,12 +217,18 @@ public:
 	bool previewHasPictureForTest() const { return !m_previewPixmap.isNull(); }
 	bool denoiseTickedForTest() const;
 	bool compositeRunningForTest() const { return m_compositeRunning; }
+	void setPhotoExposureForTest(double v) { m_doc.photo.exposureStops = v; m_doc.photo.roles = {{"Floor", 0}}; documentChanged(); }   // what the Render into the photo dialog keeps in the document
+	void removePhotoForTest() { m_doc.photo = scene_doc::PhotoBackdrop(); documentChanged(); }   // what the Remove the photo button does
 	QString previewButtonTextForTest() const;
 	QString previewStatusForTest() const;
 	void pressPreviewForTest();   // the Preview button, which reads Cancel while a render runs
 	void setDenoiseForTest(bool on);   // the Denoise tick next to Preview, which Render into the photo and Preview in the photo follow
 	QSize previewPictureSizeForTest() const { return m_previewPixmap.size(); }
 	void updateCameraPhotoOverlay();                         // shows (or takes away) the photo over the camera view
+	// The photo belongs to the scene (Document::photo: its file, whether it is shown, how strongly, and what Render into the photo was told), so saving and opening a scene keeps it. The members below
+	// are what the window works from, brought in line with the document whenever it changes (documentChanged, an open, a new scene, an undo): this loads the photo when its file is another one.
+	void syncCameraPhoto();
+	static QImage loadCameraPhotoImage(const QString &file);   // the photo as the camera view needs it: turned upright, RGB, at most 1600 pixels across; null when it cannot be read
 	// Place on the photo's ground (scene_builder_camera_photo.cpp): placeByClicking looks through the camera and waits for clicks on the ground in the picture; each click stands the picked items
 	// there (placePickedAt, one undo step), on the ground y = 0 (the camera is `height` above it). setPickedHeight makes the picked items `metres` tall about the middle of their base.
 	void placeByClicking();
@@ -488,6 +494,7 @@ private:
 	QListWidget *m_list = nullptr;
 	SceneLayoutView *m_view = nullptr;
 	Scene3DView *m_view3d = nullptr;
+	QString m_cameraPhotoFile;             // the file m_cameraPhoto was loaded from (Document::photo.file)
 	QImage m_cameraPhoto;                  // the photo the camera was matched to, laid over the camera view while m_cameraPhotoShown
 	bool m_cameraPhotoShown = false;
 	double m_cameraPhotoOpacity = 0.5;
