@@ -30,6 +30,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 * **Scene Builder: the result of Match to a photo is shown in the same window** (the camera's and the Sun & sky's): pressing Ok no longer closes the settings and opens a second pop-up with what was read; the settings page gives way, in the same window, to the result (scrolling when long) and a single Close button, and a photo that cannot be read leaves the settings to be changed. One shared helper (`qt_gui/photo_dialog.h`). The `composite` self-test drives the whole of it with real clicks: the picker, the settings, Ok, the result, Close.
 
+* **Scene Builder: Match to a photo is one window from start to finish** (the camera's and the Sun & sky's): the photo to use (the five samples as a row of pictures, or one's own, which joins the row), the settings and then the result are all in the same window, where the photo chooser used to be a window of its own ahead of the settings (`sample_photos::Picker`, built into the dialogs; changing the photo updates the field of view that its lens data gives). The `composite` self-test drives the window: the samples listed, one's own photo chosen (twice), Ok, the result, Close.
+
 ## 0.1.5 (2026-10-16)
 
 * **The first Metal render after an install waits about two minutes, not four**: Metal turns the path tracer into machine code once per Mac, for two shader variants (the second is for alpha masks and subsurface), and the app built them one after the other (108 s then 121 s on an M2). They are now built side by side (about 125 s in all: `ray_tracer --prepare-gpu` 231 s -> 136 s, measured with a cold cache). A Live Preview that starts during the warm-up still waits for the build of its own variant instead of compiling it twice.

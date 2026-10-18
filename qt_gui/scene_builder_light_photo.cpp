@@ -90,16 +90,17 @@ bool SceneBuilderWidget::applyLightPhoto(int lightIndex, const QString &photo, d
 
 void SceneBuilderWidget::lightFromPhoto(int lightIndex) {
 	if (lightIndex < 0 || lightIndex >= static_cast<int>(m_doc.lights.size())) return;
-	const QString photo = sample_photos::choose(this, tr("Choose a photo with the sky in it"));
-	if (photo.isEmpty()) return;
-
+	// One window for the whole thing: the photo to use (a sample or one's own), the settings, and then (photo_dialog::run) the result.
 	QDialog dialog(this);
 	dialog.setWindowTitle(tr("Light from a photo"));
+	dialog.setMinimumWidth(720);
 	auto *layout = new QVBoxLayout(&dialog);
-	auto *page = new QWidget(&dialog);   // (the settings: photo_dialog::run swaps it for the result in this same window)
+	auto *page = new QWidget(&dialog);
 	auto *pageLayout = new QVBoxLayout(page);
 	pageLayout->setContentsMargins(0, 0, 0, 0);
 	layout->addWidget(page);
+	auto *picker = new sample_photos::Picker(tr("Choose a photo with the sky in it"), &dialog);
+	pageLayout->addWidget(picker);
 	auto *intro = new QLabel(tr("The sun's height and direction and the haze are read from the sky in the photo (a blue or white sky that reaches the top of the picture), and the Sun && sky "
 	                            "settings are set to match. The photo should show some sky and, for the height, the horizon. Both settings below are optional."),
 	                         &dialog);
@@ -109,11 +110,16 @@ void SceneBuilderWidget::lightFromPhoto(int lightIndex) {
 	auto *fov = new QDoubleSpinBox(&dialog);
 	fov->setRange(20.0, 140.0);
 	fov->setDecimals(0);
-	QImageReader shape(photo);
-	shape.setAutoTransform(true);
-	const QSize shown = shape.size();
-	const double fromExif = exifHorizontalFov(photo);   // (the photo's own lens data, when it has it)
-	fov->setValue(fromExif > 0.0 ? std::clamp(std::round(fromExif), 20.0, 140.0) : shown.isValid() && shown.height() > shown.width() ? 51.0 : 65.0);   // (else 65 degrees, along a phone photo's long side: across a portrait one it is about 51)
+	// the field of view starts at the photo's own lens data when it has it, else a phone's (65 degrees along the long side of a phone photo, about 51 across a portrait one); each photo chosen sets it again
+	const auto lensOfPhoto = [fov](const QString &chosen) {
+		QImageReader shape(chosen);
+		shape.setAutoTransform(true);
+		const QSize shown = shape.size();
+		const double fromExif = exifHorizontalFov(chosen);
+		fov->setValue(fromExif > 0.0 ? std::clamp(std::round(fromExif), 20.0, 140.0) : shown.isValid() && shown.height() > shown.width() ? 51.0 : 65.0);
+	};
+	lensOfPhoto(picker->photo());
+	connect(picker, &sample_photos::Picker::photoChanged, &dialog, lensOfPhoto);
 	fov->setSuffix(tr(" degrees"));
 	fov->setToolTip(tr("How wide the photo sees, left to right. A phone's main camera is about 65 to 70 degrees; a wide-angle one 100 or more."));
 	form->addRow(tr("Photo's field of view (horizontal)"), fov);
@@ -129,6 +135,7 @@ void SceneBuilderWidget::lightFromPhoto(int lightIndex) {
 	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
 	layout->addWidget(buttons);
 	photo_dialog::run(dialog, page, buttons, [&](QString *result) {
+		const QString photo = picker->photo();
 		QString error;
 		QStringList notes;
 		const bool tiltGiven = tilt->value() > tilt->minimum();
@@ -137,7 +144,7 @@ void SceneBuilderWidget::lightFromPhoto(int lightIndex) {
 			QMessageBox::warning(&dialog, tr("Could not read the light"), error);
 			return false;
 		}
-	for (const QString &note : notes) logLine(QStringLiteral("photo"), QStringLiteral("  %1").arg(note));
+		for (const QString &note : notes) logLine(QStringLiteral("photo"), QStringLiteral("  %1").arg(note));
 		*result = tr("The sky was set from %1:\n\n- %2").arg(QFileInfo(photo).fileName(), notes.join("\n- "));
 		return true;
 	});

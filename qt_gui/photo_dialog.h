@@ -43,6 +43,8 @@ inline void run(QDialog &dialog, QWidget *page, QDialogButtonBox *buttons, const
 		dialog.setMinimumWidth(std::max(dialog.width(), 520));
 		dialog.adjustSize();
 	});
+	layout->activate();
+	dialog.resize(dialog.sizeHint().expandedTo(dialog.size()));   // (sized for the wrapped texts before it is shown, or the rows overlap)
 	dialog.exec();
 }
 

@@ -651,17 +651,6 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			QString sampleError;
 			check(sb->applyCameraPhoto(s.resource, 0.0, 1.6, false, 0.0, false, 0.0, true, &sampleError), QString("the camera and sky are set from %1 %2").arg(s.resource, sampleError));
 		}
-		// the picker: it opens (a picture of it is saved), lists every sample, and a cancel gives nothing
-		QString pickerSeen;
-		QTimer::singleShot(400, [&pickerSeen]() {
-			if (QWidget *w = QApplication::activeModalWidget()) {
-				w->grab().save(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_picker.png");
-				for (QListWidget *list : w->findChildren<QListWidget *>()) pickerSeen = QString::number(list->count());
-				if (QDialog *d = qobject_cast<QDialog *>(w)) d->reject();
-			}
-		});
-		const QString picked = sample_photos::choose(this, "Choose a photo");
-		check(picked.isEmpty() && pickerSeen == QString::number(samples.size()), QString("the picker listed %1 samples and a cancel chose nothing").arg(pickerSeen));
 		QStringList beachNotes;
 		QString beachError;
 		const bool beachOk = sb->applyCameraPhoto(samples[0].resource, 0.0, 1.6, false, 0.0, false, 0.0, true, &beachError) && sb->renderIntoPhoto(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_sample.png", {0}, 0.0, 24, true, &beachError, &beachNotes);
@@ -676,7 +665,7 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			check(madeReal, "the real photo " + real + " was put into: " + realError);
 			for (const QString &n : realNotes) log("note: " + n);
 		}
-		// The whole of Match to a photo for the camera, through its real windows: the picker (the first sample is used), the settings, Ok, and the result in that same settings window, then Close.
+		// The whole of Match to a photo for the camera is one window: the photos to choose from (a picture of each, the first selected), the settings, Ok, and then the result in that same window and Close.
 		{
 			const QString out = qEnvironmentVariable("RT_GUI_SELFTEST_OUT");
 			auto click = [](QWidget *w, const QString &text) {
@@ -685,15 +674,25 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 				return false;
 			};
 			QString seen;
-			QTimer::singleShot(500, [&]() { if (QWidget *w = QApplication::activeModalWidget()) { seen += "picker "; click(w, "Use this photo"); } });
-			QTimer::singleShot(1500, [&]() {
+			int samplesListed = 0;
+			bool ownPhotoUsed = false;
+			QTimer::singleShot(900, [&]() {
 				if (QWidget *w = QApplication::activeModalWidget()) {
-					seen += "settings ";
+					seen += "window ";
+					for (QListWidget *list : w->findChildren<QListWidget *>()) samplesListed = list->count();
 					w->grab().save(out + "_camera_settings.png");
+					// one's own photo goes into the row too, and is the one used
+					if (auto *picker = w->findChild<sample_photos::Picker *>()) {
+						picker->chooseOwnPhotoForTest(QDir::tempPath() + "/rt_selftest_composite.png");
+						ownPhotoUsed = picker->photo().endsWith("rt_selftest_composite.png");
+						for (QListWidget *list : w->findChildren<QListWidget *>()) samplesListed = std::max(samplesListed, list->count()) - 1;   // (the row of one's own is not a sample)
+						picker->chooseOwnPhotoForTest(QDir::tempPath() + "/rt_selftest_composite.png");   // (the same row again: still fine)
+						w->findChildren<QListWidget *>().first()->setCurrentRow(0);                       // and back to the first sample
+					}
 					click(w, "OK");
 				}
 			});
-			QTimer::singleShot(3500, [&]() {
+			QTimer::singleShot(4000, [&]() {
 				if (QWidget *w = QApplication::activeModalWidget()) {
 					seen += w->findChildren<QLabel *>().size() ? "result " : "";
 					w->grab().save(out + "_camera_result.png");
@@ -701,7 +700,8 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 				}
 			});
 			sb->cameraFromPhoto();
-			check(seen == "picker settings result ", "Match to a photo for the camera ran through its picker, its settings and its result: " + seen);
+			check(seen == "window result " && samplesListed == static_cast<int>(samples.size()) && ownPhotoUsed,
+			      QString("Match to a photo for the camera is one window (%1; %2 samples listed; one's own photo used %3)").arg(seen).arg(samplesListed).arg(ownPhotoUsed));
 		}
 	}
 	QTimer::singleShot(600, this, [this, shot, log, ok]() {

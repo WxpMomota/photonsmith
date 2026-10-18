@@ -1,12 +1,15 @@
-// sample_photos.cpp -- the sample photos and the picker (sample_photos.h).
+// sample_photos.cpp -- the sample photos and the photo chooser (sample_photos.h).
 #include "sample_photos.h"
 
 #include <QCoreApplication>
-#include <QDialog>
-#include <QDialogButtonBox>
+#include <QDir>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QFont>
+#include <QHBoxLayout>
 #include <QIcon>
+#include <QImage>
+#include <QImageReader>
 #include <QLabel>
 #include <QListWidget>
 #include <QPixmap>
@@ -36,60 +39,91 @@ QList<Sample> all() {
 	};
 }
 
-QString choose(QWidget *parent, const QString &title) {
-	QDialog dialog(parent);
-	dialog.setWindowTitle(title);
-	auto *layout = new QVBoxLayout(&dialog);
-	auto *intro = new QLabel(QCoreApplication::translate("sample_photos", "Try a sample photo, or use one of your own."), &dialog);
-	intro->setWordWrap(true);
-	layout->addWidget(intro);
-	auto *list = new QListWidget(&dialog);
-	list->setIconSize(QSize(160, 96));
-	list->setMinimumSize(520, 330);
-	const QList<Sample> samples = all();
-	for (const Sample &s : samples) {
-		auto *item = new QListWidgetItem(QIcon(QPixmap(s.resource).scaled(list->iconSize(), Qt::KeepAspectRatio, Qt::SmoothTransformation)), s.title, list);
+Picker::Picker(const QString &ownPhotoTitle, QWidget *parent) : QWidget(parent), m_ownTitle(ownPhotoTitle), m_samples(all()) {
+	auto *layout = new QVBoxLayout(this);
+	layout->setContentsMargins(0, 0, 0, 0);
+	auto *heading = new QLabel(QCoreApplication::translate("sample_photos", "Try a sample photo, or use one of your own."), this);
+	heading->setWordWrap(true);
+	layout->addWidget(heading);
+
+	m_list = new QListWidget(this);
+	m_list->setViewMode(QListView::IconMode);
+	m_list->setFlow(QListView::LeftToRight);
+	m_list->setWrapping(true);
+	m_list->setMovement(QListView::Static);
+	m_list->setResizeMode(QListView::Adjust);
+	m_list->setIconSize(QSize(104, 64));
+	m_list->setGridSize(QSize(124, 116));
+	m_list->setSpacing(2);
+	m_list->setFixedHeight(156);
+	m_list->setWordWrap(true);   // (a title that does not fit goes on a second line)
+	for (const Sample &s : m_samples) {
+		auto *item = new QListWidgetItem(QIcon(QPixmap(s.resource).scaled(m_list->iconSize(), Qt::KeepAspectRatio, Qt::SmoothTransformation)), s.title, m_list);
 		item->setData(Qt::UserRole, s.resource);
-		item->setSizeHint(QSize(480, 108));
-		QFont big = list->font();
-		big.setPointSize(big.pointSize() + 2);
-		item->setFont(big);
+		item->setToolTip(s.title);
+		item->setTextAlignment(Qt::AlignHCenter);
 	}
-	list->setCurrentRow(0);
-	layout->addWidget(list);
-	auto *credit = new QLabel(&dialog);
-	credit->setWordWrap(true);
-	credit->setTextInteractionFlags(Qt::TextSelectableByMouse);
-	credit->setMinimumHeight(120);
-	credit->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-	layout->addWidget(credit);
-	auto showCredit = [&]() {
-		const int row = list->currentRow();
-		credit->setText(row >= 0 && row < samples.size() ? samples[row].note + QStringLiteral("\n\n") + QCoreApplication::translate("sample_photos", "Photo: %1").arg(samples[row].credit) : QString());
-	};
-	QObject::connect(list, &QListWidget::currentRowChanged, &dialog, showCredit);
+	m_list->setCurrentRow(0);
+	layout->addWidget(m_list);
+
+	m_credit = new QLabel(this);
+	m_credit->setWordWrap(true);
+	m_credit->setTextInteractionFlags(Qt::TextSelectableByMouse);
+	m_credit->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+	m_credit->setMinimumHeight(120);
+	layout->addWidget(m_credit);
+
+	auto *own = new QPushButton(QCoreApplication::translate("sample_photos", "Choose my own photo..."), this);
+	own->setAutoDefault(false);
+	auto *row = new QHBoxLayout();
+	row->addWidget(own);
+	row->addStretch(1);
+	layout->addLayout(row);
+
+	connect(m_list, &QListWidget::currentRowChanged, this, [this](int) {
+		showCredit();
+		emit photoChanged(photo());
+	});
+	connect(own, &QPushButton::clicked, this, [this]() {
+		const QString file = QFileDialog::getOpenFileName(this, m_ownTitle, QString(), QCoreApplication::translate("sample_photos", "Images (*.png *.jpg *.jpeg *.bmp *.tga)"));
+		if (!file.isEmpty()) useOwnPhoto(file);
+	});
 	showCredit();
-	auto *buttons = new QDialogButtonBox(&dialog);
-	auto *use = buttons->addButton(QCoreApplication::translate("sample_photos", "Use this photo"), QDialogButtonBox::AcceptRole);
-	auto *own = buttons->addButton(QCoreApplication::translate("sample_photos", "Choose my own photo..."), QDialogButtonBox::ActionRole);
-	buttons->addButton(QDialogButtonBox::Cancel);
-	use->setDefault(true);
-	layout->addWidget(buttons);
-	QString result;
-	QObject::connect(use, &QPushButton::clicked, &dialog, [&]() {
-		if (list->currentItem()) result = list->currentItem()->data(Qt::UserRole).toString();
-		dialog.accept();
-	});
-	QObject::connect(list, &QListWidget::itemDoubleClicked, use, &QPushButton::click);
-	QObject::connect(own, &QPushButton::clicked, &dialog, [&]() {
-		const QString file = QFileDialog::getOpenFileName(&dialog, title, QString(), QCoreApplication::translate("sample_photos", "Images (*.png *.jpg *.jpeg *.bmp *.tga)"));
-		if (file.isEmpty()) return;
-		result = file;
-		dialog.accept();
-	});
-	QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-	dialog.exec();
-	return result;
+}
+
+QString Picker::photo() const { return m_list && m_list->currentItem() ? m_list->currentItem()->data(Qt::UserRole).toString() : QString(); }
+
+void Picker::showCredit() {
+	const int row = m_list->currentRow();
+	if (row >= 0 && row < m_samples.size()) m_credit->setText(m_samples[row].note + QStringLiteral("\n\n") + QCoreApplication::translate("sample_photos", "Photo: %1").arg(m_samples[row].credit));
+	else if (m_list->currentItem() == m_own && m_own) m_credit->setText(QCoreApplication::translate("sample_photos", "Your photo: %1").arg(QDir::toNativeSeparators(m_own->data(Qt::UserRole).toString())));
+	else m_credit->clear();
+}
+
+// A photo of the user's own goes in the row after the samples (one place, replaced by the next one chosen) and is selected.
+void Picker::useOwnPhoto(const QString &file) {
+	QImageReader reader(file);
+	reader.setAutoTransform(true);
+	const QSize size = reader.size();
+	QPixmap picture;
+	if (size.isValid()) {
+		reader.setScaledSize(size.scaled(m_list->iconSize(), Qt::KeepAspectRatio));
+		picture = QPixmap::fromImage(reader.read());
+	}
+	if (!m_own) {
+		m_own = new QListWidgetItem(m_list);
+		m_own->setTextAlignment(Qt::AlignHCenter);
+	}
+	m_own->setIcon(QIcon(picture));
+	m_own->setText(QCoreApplication::translate("sample_photos", "My photo"));
+	m_own->setData(Qt::UserRole, file);
+	m_own->setToolTip(file);
+	const bool wasSelected = m_list->currentItem() == m_own;
+	m_list->setCurrentItem(m_own);   // (currentRowChanged shows its credit and says the photo changed)
+	if (wasSelected) {               // (the same row, a different file: no row change to tell it)
+		showCredit();
+		emit photoChanged(file);
+	}
 }
 
 }  // namespace sample_photos

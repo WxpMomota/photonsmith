@@ -118,20 +118,17 @@ void SceneBuilderWidget::updateCameraPhotoOverlay() {
 }
 
 void SceneBuilderWidget::cameraFromPhoto() {
-	const QString photo = sample_photos::choose(this, tr("Choose the photo to match the camera to"));
-	if (photo.isEmpty()) return;
-	QImageReader shape(photo);
-	shape.setAutoTransform(true);
-	const QSize shown = shape.size();
-	const double exif = exifHorizontalFov(photo);
-
+	// One window for the whole thing: the photo to use (a sample or one's own), the settings, and then (photo_dialog::run) the result.
 	QDialog dialog(this);
 	dialog.setWindowTitle(tr("Camera from a photo"));
+	dialog.setMinimumWidth(720);
 	auto *layout = new QVBoxLayout(&dialog);
-	auto *page = new QWidget(&dialog);   // (the settings: photo_dialog::run swaps it for the result in this same window)
+	auto *page = new QWidget(&dialog);
 	auto *pageLayout = new QVBoxLayout(page);
 	pageLayout->setContentsMargins(0, 0, 0, 0);
 	layout->addWidget(page);
+	auto *picker = new sample_photos::Picker(tr("Choose the photo to match the camera to"), &dialog);
+	pageLayout->addWidget(picker);
 	auto *intro = new QLabel(tr("The camera takes the photo's lens (from the photo's own data when it has it), tilt and roll (read off the horizon: the lower edge of a blue or white sky), and the picture "
 	                            "takes the photo's shape. The photo can then be laid over the camera view. All the settings below are optional."),
 	                         &dialog);
@@ -142,16 +139,22 @@ void SceneBuilderWidget::cameraFromPhoto() {
 	fov->setRange(0.0, 140.0);
 	fov->setDecimals(0);
 	fov->setSuffix(tr(" degrees"));
-	fov->setSpecialValueText(exif > 0.0 ? tr("from the photo (%1)").arg(exif, 0, 'f', 0) : tr("from the photo (not in it: a phone's)"));
 	fov->setValue(0.0);
 	fov->setToolTip(tr("How wide the photo sees, left to right. Left at the lowest setting it is read from the photo's own data when it has it, else a phone's is assumed."));
+	// what the lowest setting means depends on the photo chosen (its own lens data, or a phone's)
+	const auto lensOfPhoto = [this, fov](const QString &chosen) {
+		const double exif = exifHorizontalFov(chosen);
+		fov->setSpecialValueText(exif > 0.0 ? tr("from the photo (%1)").arg(exif, 0, 'f', 0) : tr("from the photo (not in it: a phone's)"));
+	};
+	lensOfPhoto(picker->photo());
+	connect(picker, &sample_photos::Picker::photoChanged, &dialog, lensOfPhoto);
 	form->addRow(tr("Photo's field of view (horizontal)"), fov);
 	auto *height = new QDoubleSpinBox(&dialog);
 	height->setRange(0.1, 100.0);
 	height->setDecimals(2);
 	height->setSingleStep(0.1);
 	height->setSuffix(tr(" m"));
-	height->setValue(shown.isValid() && std::fabs(m_doc.camera.position.y) > 0.1 ? std::clamp(m_doc.camera.position.y, 0.1, 100.0) : 1.6);
+	height->setValue(std::fabs(m_doc.camera.position.y) > 0.1 ? std::clamp(m_doc.camera.position.y, 0.1, 100.0) : 1.6);
 	height->setToolTip(tr("How high the camera was above the ground. Standing at eye level is about 1.6 m."));
 	form->addRow(tr("Camera height above the ground"), height);
 	auto *tilt = new QDoubleSpinBox(&dialog);
@@ -178,6 +181,7 @@ void SceneBuilderWidget::cameraFromPhoto() {
 	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
 	layout->addWidget(buttons);
 	photo_dialog::run(dialog, page, buttons, [&](QString *result) {
+		const QString photo = picker->photo();
 		QString error;
 		QStringList notes;
 		if (!applyCameraPhoto(photo, fov->value(), height->value(), tilt->value() > tilt->minimum(), tilt->value(), rollSpin->value() > rollSpin->minimum(), rollSpin->value(), sun->isChecked(), &error, &notes)) {
@@ -185,8 +189,8 @@ void SceneBuilderWidget::cameraFromPhoto() {
 			QMessageBox::warning(&dialog, tr("Could not read the camera"), error);
 			return false;
 		}
-	for (const QString &note : notes) logLine(QStringLiteral("photo"), QStringLiteral("  %1").arg(note));
-	if (photo.startsWith(QLatin1String(":/"))) notes << tr("Next: pick an object in the list, press Place the picked object by clicking... in its properties, click the ground in the picture, then press Render into the photo... on Camera and image.");
+		for (const QString &note : notes) logLine(QStringLiteral("photo"), QStringLiteral("  %1").arg(note));
+		if (photo.startsWith(QLatin1String(":/"))) notes << tr("Next: pick an object in the list, press Place the picked object by clicking... in its properties, click the ground in the picture, then press Render into the photo... on Camera and image.");
 		*result = tr("The camera was set from %1:\n\n- %2").arg(QFileInfo(photo).fileName(), notes.join("\n- "));
 		return true;
 	});
