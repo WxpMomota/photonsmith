@@ -37,7 +37,7 @@ inline void run(QDialog &dialog, QWidget *page, QDialogButtonBox *buttons, const
 	auto *panel = new QScrollArea(&dialog);
 	panel->setWidgetResizable(true);
 	panel->setFrameShape(QFrame::NoFrame);
-	panel->setMinimumHeight(170);
+	panel->setMinimumHeight(90);
 	panel->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	auto *text = new QLabel(hint, panel);
 	text->setTextFormat(Qt::PlainText);   // (a photo's file name is in the result: text, never markup)
@@ -47,19 +47,26 @@ inline void run(QDialog &dialog, QWidget *page, QDialogButtonBox *buttons, const
 	text->setContentsMargins(10, 4, 4, 4);
 	panel->setWidget(text);
 	auto *row = new QVBoxLayout();
-	row->addWidget(settings, 3);
-	row->addWidget(panel, 2);   // (the result gets two fifths of whatever height the window has)
+	row->addWidget(settings, 1);
+	row->addWidget(panel);   // (the result is only as tall as its text, up to two fifths of the window: see fitPanel)
 	layout->insertLayout(slot, row, 1);
 
 	QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
 	auto *pause = new QTimer(&dialog);
 	pause->setSingleShot(true);
 	pause->setInterval(delayMs);
-	const auto applyNow = [pause, text, apply]() {
+	// the result panel is as tall as its text needs, so the settings above it get the rest of the window
+	const auto fitPanel = [&dialog, panel, text]() {
+		const int width = std::max(200, panel->viewport()->width() - 4);
+		const int wanted = text->heightForWidth(width) + 14;
+		panel->setFixedHeight(std::clamp(wanted, 90, std::max(90, dialog.height() * 40 / 100)));
+	};
+	const auto applyNow = [pause, text, apply, fitPanel]() {
 		pause->stop();
 		QString result;
 		apply(&result);
 		text->setText(result);
+		fitPanel();
 	};
 	QObject::connect(pause, &QTimer::timeout, &dialog, applyNow);
 	wire([pause]() { pause->start(); });
@@ -79,6 +86,7 @@ inline void run(QDialog &dialog, QWidget *page, QDialogButtonBox *buttons, const
 		dialog.resize(want);
 	}
 	dialog.setSizeGripEnabled(true);
+	QTimer::singleShot(0, &dialog, fitPanel);   // (once the window has its size: the hint fits too)
 	dialog.exec();
 }
 

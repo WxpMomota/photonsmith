@@ -44,6 +44,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 * **Scene Builder: the photo row in Match to a photo is as big as the window allows**: the pictures scale with the width (six across, 116 to 300 pixels wide cells instead of a fixed 100), with bigger titles, and take as many rows as the pictures there are need (one's own photo is a sixth). The `composite` self-test checks the pictures are at least 96 pixels wide.
 
+* **Scene Builder: the result area of Match to a photo is only as tall as its text** (up to two fifths of the window), so the photo row and settings above it get the rest, instead of a fixed share that left a large empty block on a wide window.
+
 ## 0.1.5 (2026-10-16)
 
 * **The first Metal render after an install waits about two minutes, not four**: Metal turns the path tracer into machine code once per Mac, for two shader variants (the second is for alpha masks and subsurface), and the app built them one after the other (108 s then 121 s on an M2). They are now built side by side (about 125 s in all: `ray_tracer --prepare-gpu` 231 s -> 136 s, measured with a cold cache). A Live Preview that starts during the warm-up still waits for the build of its own variant instead of compiling it twice.
