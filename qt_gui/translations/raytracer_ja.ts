@@ -9315,12 +9315,12 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>太陽の方向は、写真が向いている方向に対する関係と同じ関係で、Builder のカメラが今向いている方向に対して設定されます。写真の露出はわからないため、空の「明るさ」はそのままです。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="139"/>
+        <location filename="../scene_builder_light_photo.cpp" line="137"/>
         <source>Click a photo to use it: the sky is set from it at once, and again whenever you change a setting.</source>
         <translation>写真をクリックすると使われます。空はすぐにその写真から設定され、設定を変えるたびにもう一度設定されます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="152"/>
+        <location filename="../scene_builder_light_photo.cpp" line="150"/>
         <source>The sky could not be set from this photo: %1</source>
         <translation>この写真から空を設定できませんでした: %1</translation>
     </message>
@@ -9345,13 +9345,13 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>写真の空 (画像の上端まで届く青または白の空) から太陽の高さと方向ともやを読み取り、「太陽と空」の設定をそれに合わせます。写真には空が写っている必要があり、高さを読むには地平線も必要です。以下の 2 つの設定は省略できます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="141"/>
-        <location filename="../scene_builder_light_photo.cpp" line="123"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="139"/>
+        <location filename="../scene_builder_light_photo.cpp" line="121"/>
         <source> degrees</source>
         <translation> 度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="124"/>
+        <location filename="../scene_builder_light_photo.cpp" line="122"/>
         <source>How wide the photo sees, left to right. A phone&apos;s main camera is about 65 to 70 degrees; a wide-angle one 100 or more.</source>
         <translation>写真が左右にどれだけの範囲を捉えているか。スマートフォンのメインカメラは約 65〜70 度、広角では 100 度以上です。</translation>
     </message>
@@ -9410,75 +9410,75 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>カメラは写真のレンズ (写真自体のデータがあればそれから)、傾き、ロール (地平線から読み取り: 青または白の空の下端) を引き継ぎ、画像は写真の形になります。その後、写真をカメラビューに重ねられます。以下の設定はすべて省略できます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="147"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="145"/>
         <source>from the photo (%1)</source>
         <translation>写真から (%1)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="147"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="145"/>
         <source>from the photo (not in it: a phone&apos;s)</source>
         <translation>写真から (記載なし: スマートフォンの値)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="143"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="141"/>
         <source>How wide the photo sees, left to right. Left at the lowest setting it is read from the photo&apos;s own data when it has it, else a phone&apos;s is assumed.</source>
         <translation>写真が左右にどれだけの範囲を捉えているか。最小の設定のままにすると、写真自体のデータがあればそれから読み取り、なければスマートフォンの値を仮定します。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="151"/>
-        <location filename="../scene_builder_light_photo.cpp" line="125"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="149"/>
+        <location filename="../scene_builder_light_photo.cpp" line="123"/>
         <source>Photo&apos;s field of view (horizontal)</source>
         <translation>写真の視野角 (水平)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="156"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="154"/>
         <source> m</source>
         <translation> m</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="158"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="156"/>
         <source>How high the camera was above the ground. Standing at eye level is about 1.6 m.</source>
         <translation>カメラが地面からどれくらいの高さにあったか。立って目の高さで撮ると約 1.6 m です。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="159"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="157"/>
         <source>Camera height above the ground</source>
         <translation>カメラの地面からの高さ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="163"/>
-        <location filename="../scene_builder_camera_photo.cpp" line="170"/>
-        <location filename="../scene_builder_light_photo.cpp" line="129"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="161"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="168"/>
+        <location filename="../scene_builder_light_photo.cpp" line="127"/>
         <source>from the horizon</source>
         <translation>地平線から</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="165"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="163"/>
         <source>How far the camera looked up (+) or down (-). Left at the lowest setting it is read off the horizon.</source>
         <translation>カメラが上 (+) または下 (-) にどれだけ向いていたか。最小の設定のままにすると地平線から読み取ります。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="172"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="170"/>
         <source>How far the camera was rolled (+ counter-clockwise seen from behind it: the horizon then runs down to the right). Left at the lowest setting it is read off the horizon.</source>
         <translation>カメラがどれだけ回転 (ロール) していたか (+ は後ろから見て反時計回り: 地平線は右下がりになります)。最小の設定のままにすると地平線から読み取ります。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="173"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="171"/>
         <source>Camera roll</source>
         <translation>カメラのロール</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="176"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="174"/>
         <source>Also set the sun and sky from the photo</source>
         <translation>太陽と空も写真から設定する</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="185"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="183"/>
         <source>Click a photo to use it: the camera is set from it at once, and again whenever you change a setting.</source>
         <translation>写真をクリックすると使われます。カメラはすぐにその写真から設定され、設定を変えるたびにもう一度設定されます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="198"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="196"/>
         <source>The camera could not be set from this photo: %1</source>
         <translation>この写真からカメラを設定できませんでした: %1</translation>
     </message>
@@ -9487,12 +9487,12 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation type="vanished">カメラを読み取れませんでした</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="202"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="200"/>
         <source>Next: pick an object in the list, press Place the picked object by clicking... in its properties, click the ground in the picture, then press Render into the photo... on Camera and image.</source>
         <translation>次の手順: リストでオブジェクトを選び、そのプロパティの「選択したオブジェクトをクリックで配置...」を押して画像の地面をクリックし、「カメラと画像」で「写真にレンダリング...」を押します。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="203"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="201"/>
         <source>The camera was set from %1:
 
 - %2</source>
@@ -9501,49 +9501,49 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
 - %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="212"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="210"/>
         <source>Pick an object first (click it in the list or the view), then Place by clicking.</source>
         <translation>先にオブジェクトを選択してください (リストまたはビューでクリック)。そのあと「クリックで配置」を使います。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="218"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="216"/>
         <source>Click the ground in the picture to stand the picked object there. Click again to move it; Esc stops.</source>
         <translation>画像の地面をクリックすると、選択したオブジェクトがそこに置かれます。もう一度クリックすると移動します。Esc で終了します。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="229"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="227"/>
         <source>Placed on the ground. It is %1 m tall; the camera is %2 m above the ground. Click again to move it, Esc stops, or set its real height.</source>
         <translation>地面に置きました。高さは %1 m、カメラは地面から %2 m です。もう一度クリックすると移動し、Esc で終了します。実際の高さも設定できます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="247"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="245"/>
         <source>Pick an object first: its height is made what you say, about the middle of its base.</source>
         <translation>先にオブジェクトを選択してください。高さは指定した値になり、底面の中心を基準にします。</translation>
     </message>
     <message>
+        <location filename="../scene_builder_camera_photo.cpp" line="249"/>
         <location filename="../scene_builder_camera_photo.cpp" line="251"/>
-        <location filename="../scene_builder_camera_photo.cpp" line="253"/>
         <source>Real height</source>
         <translation>実際の高さ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="251"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="249"/>
         <source>How tall is it in the photo (metres)? The picked object is scaled about the middle of its base.</source>
         <translation>写真の中での高さは何メートルですか？ 選択したオブジェクトは底面の中心を基準に拡大縮小されます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="253"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="251"/>
         <source>It cannot be made that tall (the size may change by up to 100 times).</source>
         <translation>その高さにはできません (大きさは最大100倍まで変えられます)。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="131"/>
+        <location filename="../scene_builder_light_photo.cpp" line="129"/>
         <source>How far the camera looked up (+) or down (-). Left at the lowest setting it is read off where the sky ends, which works when the horizon is in the photo and not hidden by buildings or trees.</source>
         <translation>カメラが上 (+) または下 (-) にどれだけ向いていたか。最小の設定のままにすると、空が途切れる位置から読み取ります。地平線が写っていて、建物や木で隠れていない場合に有効です。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="166"/>
-        <location filename="../scene_builder_light_photo.cpp" line="133"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="164"/>
+        <location filename="../scene_builder_light_photo.cpp" line="131"/>
         <source>Camera tilt</source>
         <translation>カメラの傾き</translation>
     </message>
@@ -9552,7 +9552,7 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation type="vanished">ライトを読み取れませんでした</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="156"/>
+        <location filename="../scene_builder_light_photo.cpp" line="154"/>
         <source>The sky was set from %1:
 
 - %2</source>

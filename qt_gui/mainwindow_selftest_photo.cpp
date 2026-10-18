@@ -685,7 +685,7 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			QTimer::singleShot(900, [&]() {
 				if (QWidget *w = QApplication::activeModalWidget()) {
 					seen += panelHas(w, "Click a photo to use it") ? "hint " : "";
-					if (const QScreen *screen = QGuiApplication::primaryScreen()) fillsScreen = w->width() >= screen->availableGeometry().width() * 9 / 10 - 2 && w->height() >= screen->availableGeometry().height() * 85 / 100;   // (it opens large: most of the screen)
+					if (const QScreen *screen = QGuiApplication::primaryScreen()) fillsScreen = w->width() >= screen->availableGeometry().width() * 6 / 10 && w->height() >= screen->availableGeometry().height() * 85 / 100;   // (it opens tall: most of the screen's height)
 					samplesListed = firstList(w)->count();
 					w->grab().save(out + "_camera_settings.png");
 					firstList(w)->setCurrentRow(1);   // the second sample is clicked (a click makes it the current one, then says it was clicked)
