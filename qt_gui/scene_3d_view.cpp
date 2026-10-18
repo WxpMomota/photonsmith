@@ -45,6 +45,11 @@ void Scene3DView::beginPickFocus() {
 	setFocus();
 }
 
+void Scene3DView::hideEvent(QHideEvent *e) {
+	endPickPlace();
+	QWidget::hideEvent(e);
+}
+
 void Scene3DView::beginPickPlace() {
 	m_pickPlace = true;
 	setCursor(Qt::CrossCursor);
@@ -182,6 +187,7 @@ void Scene3DView::setFlythroughPreview(const scene_doc::Camera &camera, double p
 // Out of the camera's view, staying where it is: the orbit carries on from the camera's place (at the usual field of view).
 void Scene3DView::leaveCameraView() {
 	if (!m_throughCamera) return;
+	endPickPlace();   // (Place works on the camera's picture: it is over once that is left)
 	m_cam = cameraPose();
 	m_cam.fovDeg = scene_view::OrbitCamera{}.fovDeg;
 	m_throughCamera = false;
@@ -642,7 +648,7 @@ void Scene3DView::drawCameraFrame(QPainter &p) const {
 	p.setPen(QPen(palette().color(QPalette::Highlight), 1.5));
 	p.drawRect(QRectF(f.x, f.y, f.w, f.h));
 	p.setPen(palette().color(QPalette::Text));
-	p.drawText(QPointF(f.x + 8, f.y + 18), m_previewing ? tr("Flythrough preview, %1% (%2 x %3). Orbit, pan or zoom to leave.").arg(qRound(m_previewProgress * 100.0)).arg(m_doc->render.width).arg(m_doc->render.height)
+	p.drawText(QPointF(f.x + 8, f.y + 18), m_pickPlace ? tr("Placing: click the ground to stand the picked object there. Esc stops.") : m_previewing ? tr("Flythrough preview, %1% (%2 x %3). Orbit, pan or zoom to leave.").arg(qRound(m_previewProgress * 100.0)).arg(m_doc->render.width).arg(m_doc->render.height)
 	                                                     : tr("Through the camera (%1 x %2). Orbit, pan or zoom to leave.").arg(m_doc->render.width).arg(m_doc->render.height));
 }
 

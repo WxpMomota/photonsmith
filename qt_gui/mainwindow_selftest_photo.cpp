@@ -645,6 +645,15 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			check(view->pickingPlace(), "and the view goes on waiting for the next click");
 			view->endPickPlace();
 			check(!view->pickingPlace(), "and stops when asked to");
+			// Place is over once the camera's picture is left (it would go on taking every click in a view that is no longer the photo's) or the view is hidden
+			view->beginPickPlace();
+			view->orbitForTest(20.0, 30.0);
+			check(!view->pickingPlace(), "Place ends when the camera's view is left");
+			sb->lookThroughCamera(true);
+			view->beginPickPlace();
+			view->hide();
+			check(!view->pickingPlace(), "and when the view is hidden");
+			view->show();
 		}
 		// the sample photos built into the program: each one is there, is a 1280-pixel picture, and sets a camera and a sky; the beach is put into with the exposure matched
 		const QList<sample_photos::Sample> samples = sample_photos::all();

@@ -176,3 +176,31 @@ TEST(SceneArrangeTest, SettingTheHeightScalesAboutTheMiddleOfTheBaseSoItStaysWhe
 	EXPECT_FALSE(setHeightOfItems(d, makeItemSet(d, {0}), 1000.0)) << "more than 100 times: refused";
 	EXPECT_NEAR(heightOfItems(d, ItemSet{}), 0.0, 1e-12);
 }
+
+TEST(SceneArrangeTest, AMeshStandsOnItsOriginSoPlacingAndSettingItsHeightKeepItOnTheGround) {
+	Object mesh = makeObject(ShapeKind::Mesh, "Photo object");   // what the photo-to-object helper makes: the base on y = 0, 2 tall, the Scale is the size
+	mesh.meshFile = "x.obj";
+	mesh.meshScale = 1.0;
+	mesh.position = {3.0, 0.0, 4.0};
+	Document d = sceneOf({mesh});
+	EXPECT_NEAR(heightOfItems(d, makeItemSet(d, {0})), 2.0, 1e-9);
+	ASSERT_TRUE(placeOnGround(d, makeItemSet(d, {0}), Float3{10.0, 0.0, 10.0}));
+	EXPECT_NEAR(d.objects[0].position.x, 10.0, 1e-9);
+	EXPECT_NEAR(d.objects[0].position.z, 10.0, 1e-9);
+	EXPECT_NEAR(d.objects[0].position.y, 0.0, 1e-9) << "its base (the origin) is on the ground, not the bottom of its bounding sphere";
+	ASSERT_TRUE(setHeightOfItems(d, makeItemSet(d, {0}), 1.0));
+	EXPECT_NEAR(d.objects[0].meshScale, 0.5, 1e-9);
+	EXPECT_NEAR(d.objects[0].position.y, 0.0, 1e-9) << "scaling a mesh keeps it standing where it is: it neither lifts nor sinks";
+	ASSERT_TRUE(setHeightOfItems(d, makeItemSet(d, {0}), 3.4));
+	EXPECT_NEAR(d.objects[0].meshScale, 1.7, 1e-9);
+	EXPECT_NEAR(d.objects[0].position.y, 0.0, 1e-9);
+	// a lamp picked with an object does not decide where the pick stands or how tall it is
+	Object lamp = makeObject(ShapeKind::Sphere, "Lamp");
+	Document withLamp = sceneOf({ballAt(0, 1.0, 0, 1.0)});
+	Light light;
+	light.name = "Bulb";
+	light.position = {0.0, 5.0, 0.0};
+	withLamp.lights.push_back(light);
+	EXPECT_NEAR(heightOfItems(withLamp, makeItemSet(withLamp, {0}, {0})), 2.0, 1e-9);
+	(void)lamp;
+}

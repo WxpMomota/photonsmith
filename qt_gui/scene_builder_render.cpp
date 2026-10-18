@@ -190,6 +190,7 @@ void SceneBuilderWidget::runRender(int width, int height, int samples, bool toFi
 	m_previewButton->setText(tr("Cancel"));
 	m_previewButton->setEnabled(true);
 	m_finalButton->setEnabled(false);
+	m_inPhotoButton->setEnabled(false);
 	m_previewStatus->setText(tr("Rendering %1 x %2, %3 samples...").arg(width).arg(height).arg(samples));
 	m_process->start(launcherPath(), args);
 }

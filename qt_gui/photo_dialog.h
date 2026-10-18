@@ -39,6 +39,7 @@ inline void run(QDialog &dialog, QWidget *page, QDialogButtonBox *buttons, const
 	panel->setMinimumHeight(170);
 	panel->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	auto *text = new QLabel(hint, panel);
+	text->setTextFormat(Qt::PlainText);   // (a photo's file name is in the result: text, never markup)
 	text->setWordWrap(true);
 	text->setTextInteractionFlags(Qt::TextSelectableByMouse);
 	text->setAlignment(Qt::AlignTop | Qt::AlignLeft);
@@ -62,7 +63,7 @@ inline void run(QDialog &dialog, QWidget *page, QDialogButtonBox *buttons, const
 
 	layout->activate();
 	QSize want = dialog.sizeHint().expandedTo(dialog.size());
-	if (const QScreen *screen = QGuiApplication::primaryScreen()) {   // (a window taller than the screen cannot be used: the settings scroll instead)
+	if (const QScreen *screen = dialog.screen() ? dialog.screen() : QGuiApplication::primaryScreen()) {   // (the screen the window is on)   // (a window taller than the screen cannot be used: the settings scroll instead)
 		const QRect free = screen->availableGeometry();
 		want = want.expandedTo(QSize(free.width() * 66 / 100, free.height() * 92 / 100)).boundedTo(QSize(free.width() * 96 / 100, free.height() * 94 / 100));   // (tall: most of the screen's height)
 		dialog.resize(want);

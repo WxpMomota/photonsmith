@@ -91,6 +91,10 @@ std::vector<photo_composite::Role> SceneBuilderWidget::compositeRoles() const {
 }
 
 bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::vector<photo_composite::Role> &rolesGiven, double exposureStops, int samples, int maxWidth, bool matchToPhoto, QString *error, QStringList *notes) {
+	if (m_process) {   // (a Preview, final picture or video is running: two renders at once would fight for the GPU, and the window would take clicks meant for the first)
+		if (error) *error = tr("A render is already running.");
+		return false;
+	}
 	if (m_cameraPhoto.isNull()) {
 		if (error) *error = tr("Match the camera to a photo first (Camera section: Match to a photo...): the scene is put into that photo.");
 		return false;
@@ -124,10 +128,17 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 		if (error) *error = tr("Every object is marked as the ground or a light, so there is nothing to put into the photo (%1). Set one to \"Put into the photo\" in Camera and image > Render into the photo...").arg(what.join(QStringLiteral(", ")));
 		return false;
 	}
-	const photo_composite::Passes passes = photo_composite::makePasses(m_doc, roles);
+	// The camera was made for the photo's shape (its field of view is across the short side of the picture). If the Image size has been changed since, the render would be cropped or stretched
+	// against the photo, so the three scenes take the photo's shape.
+	scene_doc::Document base = m_doc;
+	const double docAspect = scene_doc::aspectOf(m_doc.render), photoAspect = static_cast<double>(w) / h;
+	const bool reshaped = std::fabs(docAspect / photoAspect - 1.0) > 0.02;
+	base.render.width = w;
+	base.render.height = h;
+	const photo_composite::Passes passes = photo_composite::makePasses(base, roles);
 
 	struct Pass { const char *name; const scene_doc::Document *doc; int samples, depth; };
-	const Pass list[3] = {{"full", &m_doc, samples, m_doc.render.maxDepth}, {"ground", &passes.ground, samples, m_doc.render.maxDepth}, {"mask", &passes.mask, 16, 2}};
+	const Pass list[3] = {{"full", &base, samples, m_doc.render.maxDepth}, {"ground", &passes.ground, samples, m_doc.render.maxDepth}, {"mask", &passes.mask, 16, 2}};
 	const QString dir = workFolder() + "/composite";
 	QDir().mkpath(dir);
 	QProgressDialog busy(tr("Rendering the scene for the photo..."), tr("Cancel"), 0, 3, this);
@@ -261,6 +272,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 		                                              : tr("The renders could not be denoised (%1), so the objects are as grainy as the samples leave them.").arg(denoiseProblem.isEmpty() ? tr("the renderer did not say why") : denoiseProblem.simplified().left(160)));
 		if (!matchNote.isEmpty()) *notes << matchNote;
 		if (!matched) *notes << tr("The objects are shown at the exposure the Builder gives them%1; the photo's own exposure is not known, so use Exposure if they look too bright or too dark.").arg(exposureStops != 0.0 ? tr(" (%1 stops)").arg(exposureStops, 0, 'f', 2) : QString());
+		if (reshaped) *notes << tr("The scene's Image size has a different shape from the photo's, so it was rendered in the photo's shape (the camera was set for it).");
 		if (grounds == 0) *notes << tr("No object is marked as the ground, so there are no shadows on the photo: tick the floor the objects stand on.");
 	}
 	return true;

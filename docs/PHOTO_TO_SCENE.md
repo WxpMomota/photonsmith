@@ -155,7 +155,7 @@ Arrange menu as *Place on the ground by clicking...*). The 3D view looks through
 its base is under the click and its lowest point is on the ground (the plane y = 0, which the camera is 1.6 m above unless you gave another height). Click again to move it; Esc stops. Several picked objects are
 placed together, keeping their places relative to each other. A click above the horizon finds no ground and does nothing.
 
-The scene's units mean nothing in a photo, so **Set the picked object's real height...** says how tall the object is in the photo (metres): it is scaled to that, uniformly, about the middle of its base, so it keeps
+A mesh (such as an Object from a photo) is taken to stand on its origin and to be 2 units tall times its Scale, which is what the photo-to-object helper makes; for another mesh file those are guesses, since the size of a mesh file is not in the scene. The scene's units mean nothing in a photo, so **Set the picked object's real height...** says how tall the object is in the photo (metres): it is scaled to that, uniformly, about the middle of its base, so it keeps
 standing where it is. The camera's height gives the scale of everything else: a person in the photo is about 1.7 m, a door 2 m.
 
 Checked by unit tests (the base lands on the ground, a pick of two keeps its arrangement, a scaled object stays on the ground) and by the headless GUI test, which sends a real mouse click to the view.

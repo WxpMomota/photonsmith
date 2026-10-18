@@ -141,6 +141,7 @@ signals:
 protected:
 	void paintEvent(QPaintEvent *) override;
 	void resizeEvent(QResizeEvent *e) override;
+	void hideEvent(QHideEvent *e) override;   // (Place ends: a hidden view would go on taking the clicks)
 	void mousePressEvent(QMouseEvent *e) override;
 	void mouseMoveEvent(QMouseEvent *e) override;
 	void mouseReleaseEvent(QMouseEvent *e) override;

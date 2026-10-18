@@ -108,29 +108,51 @@ inline bool boundsOf(const Document& d, const ItemSet& wanted, Float3& lo, Float
 	return any;
 }
 
+namespace arrange_detail {
+
+// The box a standing thing occupies, for placing and for its height. A shape that has a box is that box. A mesh file's size is not in the document, so a mesh counts as standing on its origin and 2 scale
+// units tall and wide (what the photo-to-object helper makes: it puts the base on y = 0 and the height at 2, then the Scale is the size): the bottom of its bounding sphere would be below the base and
+// scaling about it would lift or sink the mesh. A light counts as a point.
+inline bool standingBounds(const Document& d, const ItemSet& wanted, Float3& lo, Float3& hi) {
+	const ItemSet s = makeItemSet(d, wanted.objects, wanted.lights);
+	bool any = false;
+	const auto grow = [&](const Float3& p) {
+		if (!any) { lo = hi = p; any = true; return; }
+		lo = {std::min(lo.x, p.x), std::min(lo.y, p.y), std::min(lo.z, p.z)};
+		hi = {std::max(hi.x, p.x), std::max(hi.y, p.y), std::max(hi.z, p.z)};
+	};
+	for (int i : s.objects) {
+		const Object& o = d.objects[i];
+		if (o.shape == ShapeKind::Mesh) {
+			const double r = std::fabs(o.meshScale);
+			grow({o.position.x - r, o.position.y, o.position.z - r});
+			grow({o.position.x + r, o.position.y + 2.0 * r, o.position.z + r});
+			continue;
+		}
+		const Aabb box = aabbOf(o);
+		if (box.valid) { grow(box.lo); grow(box.hi); }
+	}
+	if (!any)   // (a pick of lights alone: where they are; with objects in it the objects say where and how tall the pick stands, not a lamp above them)
+		for (int i : s.lights) grow(d.lights[i].position);
+	return any;
+}
+
+}  // namespace arrange_detail
+
 // Stands the picked items on the ground at `point` (a click on a photo's ground in the camera view): moves them all, together, so that the middle of the box round them (sideways) is at
-// the point and the lowest point of the lowest object is at the point's height. A pick of meshes and lights alone has nothing to measure from below, so it is moved sideways only.
-// Returns false for an empty pick.
+// the point and the lowest point of the lowest one is at the point's height (a mesh stands on its origin: see arrange_detail::standingBounds). Returns false for an empty pick.
 inline bool placeOnGround(Document& d, const ItemSet& wanted, const Float3& point) {
 	const ItemSet s = makeItemSet(d, wanted.objects, wanted.lights);
 	Float3 lo, hi;
-	if (!boundsOf(d, s, lo, hi)) return false;
-	translateItems(d, s, Float3{point.x - 0.5 * (lo.x + hi.x), 0.0, point.z - 0.5 * (lo.z + hi.z)});
-	double lowest = std::numeric_limits<double>::infinity();
-	for (int i : s.objects) {
-		const Object& o = d.objects[i];
-		if (o.shape == ShapeKind::Mesh) continue;
-		const Aabb box = aabbOf(o);
-		if (box.valid) lowest = std::min(lowest, box.low(1));
-	}
-	if (std::isfinite(lowest)) translateItems(d, s, Float3{0.0, point.y - lowest, 0.0});
+	if (!arrange_detail::standingBounds(d, s, lo, hi)) return false;
+	translateItems(d, s, Float3{point.x - 0.5 * (lo.x + hi.x), point.y - lo.y, point.z - 0.5 * (lo.z + hi.z)});
 	return true;
 }
 
-// How tall the picked items are together (the box round them), in scene units; 0 for an empty pick.
+// How tall the picked items are together (the box they stand in), in scene units; 0 for an empty pick.
 inline double heightOfItems(const Document& d, const ItemSet& wanted) {
 	Float3 lo, hi;
-	return boundsOf(d, wanted, lo, hi) ? hi.y - lo.y : 0.0;
+	return arrange_detail::standingBounds(d, wanted, lo, hi) ? hi.y - lo.y : 0.0;
 }
 
 // Makes the picked items `metres` tall together, by scaling them uniformly about the middle of their base (so they stay where they stand). False for an empty or flat pick or a size
@@ -138,7 +160,7 @@ inline double heightOfItems(const Document& d, const ItemSet& wanted) {
 inline bool setHeightOfItems(Document& d, const ItemSet& wanted, double metres) {
 	const ItemSet s = makeItemSet(d, wanted.objects, wanted.lights);
 	Float3 lo, hi;
-	if (!boundsOf(d, s, lo, hi) || !(metres > 0.0) || !(hi.y - lo.y > 1e-9)) return false;
+	if (!arrange_detail::standingBounds(d, s, lo, hi) || !(metres > 0.0) || !(hi.y - lo.y > 1e-9)) return false;
 	return scaleItems(d, s, metres / (hi.y - lo.y), Float3{0.5 * (lo.x + hi.x), lo.y, 0.5 * (lo.z + hi.z)});
 }
 

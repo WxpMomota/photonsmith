@@ -227,6 +227,7 @@ void SceneBuilderWidget::startCameraVideo(int frames, int fps, int width, int sa
 	m_previewButton->setText(tr("Cancel"));
 	m_previewButton->setEnabled(true);
 	m_finalButton->setEnabled(false);
+	m_inPhotoButton->setEnabled(false);
 	if (m_turntableButton) m_turntableButton->setEnabled(false);
 	if (m_flythroughButton) m_flythroughButton->setEnabled(false);
 	m_previewStatus->setText(tr("Video: starting (%1 frames, %2 x %3, %4 samples)...").arg(frames).arg(width).arg(height).arg(samples));

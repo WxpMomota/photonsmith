@@ -52,3 +52,21 @@ TEST(SnapshotHistoryTest, ClearEmptiesBoth) {
 	EXPECT_FALSE(h.canUndo());
 	EXPECT_FALSE(h.canRedo());
 }
+
+TEST(SnapshotHistoryTest, TheSerialKeepsCountingWhenTheSizeLimitDropsOldSteps) {
+	SnapshotHistory h(/*maxSteps=*/3);
+	for (int i = 0; i < 6; ++i) h.record("step " + std::to_string(i));
+	EXPECT_EQ(h.undoSize(), 3u) << "the list is full: the oldest steps are gone";
+	EXPECT_EQ(h.serial(), 6u) << "but the serial is how many changes were made, so a caller can remember it and undo back to it";
+	const std::size_t remembered = h.serial();
+	h.record("one more");
+	h.record("and another");
+	EXPECT_EQ(h.undoSize(), 3u);
+	EXPECT_EQ(h.serial(), remembered + 2);
+	while (h.serial() > remembered && h.canUndo()) h.undone("now");   // what SceneBuilderWidget::undoTo does
+	EXPECT_EQ(h.serial(), remembered) << "two undos take it back to where it was remembered, though the list had been full the whole time";
+	h.redone("again");
+	EXPECT_EQ(h.serial(), remembered + 1);
+	h.clear();
+	EXPECT_EQ(h.serial(), 0u);
+}

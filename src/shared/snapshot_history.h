@@ -18,12 +18,16 @@ public:
 	bool canRedo() const { return !m_redo.empty(); }
 	std::size_t undoSize() const { return m_undo.size(); }
 	std::size_t redoSize() const { return m_redo.size(); }
+	// How many steps the document is away from where it started, counting the ones the size limit has dropped from the front of the undo list: record() and redone() add one, undone() takes one
+	// off. Unlike undoSize() it does not stop growing when the list is full, so a caller can remember it and later undo back to it.
+	std::size_t serial() const { return m_serial; }
 	const std::string& undoTop() const { return m_undo.back(); }
 	const std::string& redoTop() const { return m_redo.back(); }
 
 	// A new change is about to be made: `before` becomes the newest undo step, and redo is forgotten.
 	void record(std::string before) {
 		push(m_undo, m_undoBytes, std::move(before));
+		++m_serial;
 		m_redo.clear();
 		m_redoBytes = 0;
 		while (m_undo.size() > 1 && (m_undo.size() > m_maxSteps || m_undoBytes > m_maxBytes)) {
@@ -35,15 +39,18 @@ public:
 	void undone(std::string current) {
 		pop(m_undo, m_undoBytes);
 		push(m_redo, m_redoBytes, std::move(current));
+		if (m_serial > 0) --m_serial;
 	}
 	void redone(std::string current) {
 		pop(m_redo, m_redoBytes);
 		push(m_undo, m_undoBytes, std::move(current));
+		++m_serial;
 	}
 	void clear() {
 		m_undo.clear();
 		m_redo.clear();
 		m_undoBytes = m_redoBytes = 0;
+		m_serial = 0;
 	}
 
 private:
@@ -57,6 +64,6 @@ private:
 	}
 
 	std::deque<std::string> m_undo, m_redo;
-	std::size_t m_undoBytes = 0, m_redoBytes = 0;
+	std::size_t m_undoBytes = 0, m_redoBytes = 0, m_serial = 0;
 	std::size_t m_maxSteps, m_maxBytes;
 };

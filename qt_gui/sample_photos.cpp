@@ -67,6 +67,7 @@ Picker::Picker(const QString &ownPhotoTitle, QWidget *parent) : QWidget(parent),
 	layout->addWidget(m_list);
 
 	m_credit = new QLabel(this);
+	m_credit->setTextFormat(Qt::PlainText);   // (the path of one's own photo is shown in it)
 	m_credit->setWordWrap(true);
 	m_credit->setTextInteractionFlags(Qt::TextSelectableByMouse);
 	m_credit->setAlignment(Qt::AlignTop | Qt::AlignLeft);
