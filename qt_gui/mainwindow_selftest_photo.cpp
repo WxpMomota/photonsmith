@@ -18,23 +18,28 @@
 #include "scene_3d_view.h"
 
 #include "../src/shared/camera_from_photo.h"
+#include "../src/shared/environment_from_photo.h"
+#include "../src/external/tinyexr.h"
 #include "../src/shared/light_from_photo.h"
 #include "../src/shared/material_from_photo.h"
 #include "../src/shared/scene_arrange.h"
 
 #include <QApplication>
+#include <QCoreApplication>
 #include <QComboBox>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QFileInfo>
 #include <QImage>
 #include <QLabel>
 #include <QListWidget>
 #include <QMouseEvent>
 #include <QGuiApplication>
 #include <QPointer>
+#include <QProcess>
 #include <QPushButton>
 #include <QScreen>
 #include <QTimer>
@@ -699,6 +704,13 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 		const bool beachOk = sb->applyCameraPhoto(samples[0].resource, 0.0, 1.6, false, 0.0, false, 0.0, true, &beachError) && sb->renderIntoPhoto(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_sample.png", {0}, 0.0, 24, true, &beachError, &beachNotes);
 		check(beachOk, "the beach sample was put into " + beachError);
 		check(beachNotes.join(" ").contains("matched to the photo's sky"), "and its sky gave the objects' exposure: " + beachNotes.join(" / ").right(160));
+		// the same, with the photo as the environment (the result is saved next to the log for a look at the reflections)
+		{
+			QStringList envNotes;
+			QString envError;
+			const bool envOk = sb->applyEnvironmentPhoto(&envError) && sb->renderIntoPhoto(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_sample_env.png", {0}, 0.0, 24, true, &envError, &envNotes);
+			check(envOk && envNotes.join(" ").contains("matched to the photo's sky"), "the beach sample with the photo as the environment was put into: " + envError + envNotes.join(" / ").right(120));
+		}
 		// a real photo, when one is given: the camera, the sky and the picture from it (the result is saved next to the log for a look)
 		const QString real = qEnvironmentVariable("RT_GUI_SELFTEST_COMPOSITE_PHOTO");
 		if (!real.isEmpty()) {
@@ -759,7 +771,7 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 				if (QWidget *w = QApplication::activeModalWidget()) { *stayedOpen = true; if (auto *d = qobject_cast<QDialog *>(w)) d->reject(); }   // (only if it did not close)
 			});
 			sb->cameraFromPhoto();
-			check(seen == "hint north-sea beach own " && samplesListed == static_cast<int>(samples.size()) && depthAfterTwo - depthAtStart <= 2 && fillsScreen && hasApply && bigThumbnails && !*stayedOpen,
+			check(seen == "hint north-sea beach own " && samplesListed == static_cast<int>(samples.size()) && depthAfterTwo - depthAtStart <= 3 && fillsScreen && hasApply && bigThumbnails && !*stayedOpen,
 			      QString("Match to a photo for the camera is one window that applies on click (%1; %2 samples listed; two applies left %3 undo steps; fills the screen %4, has an Apply button %5, thumbnails %6)").arg(seen).arg(samplesListed).arg(depthAfterTwo - depthAtStart).arg(fillsScreen).arg(hasApply).arg(bigThumbnails));
 		}
 		// Live: with the tick on the picture in the photo follows the scene. Ticking it makes one (small, quick) picture; a change of the scene makes another when it has been still for a moment; and the
@@ -862,6 +874,71 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			sb->newScene();
 			const bool opened = sb->openFile(scenePath, &openError);
 			check(saved && opened && sb->occluderPresentForTest(), "what is in front is saved with the scene and comes back when it is opened " + openError);
+		}
+		// The photo as the environment: four colours in the four quarters of a photo, the scene's sky light given the photo, and the scene (no objects) rendered: the camera sees the four colours where the
+		// photo had them (so the picture is the right way round and the right way up), and the light is a photo environment that Render into the photo can read its exposure off.
+		{
+			QImage quarters(320, 240, QImage::Format_RGB32);
+			for (int y = 0; y < quarters.height(); ++y)
+				for (int x = 0; x < quarters.width(); ++x) quarters.setPixel(x, y, y < 120 ? (x < 160 ? qRgb(230, 30, 30) : qRgb(30, 200, 30)) : (x < 160 ? qRgb(30, 30, 230) : qRgb(230, 220, 30)));
+			const QString quartersFile = QDir::tempPath() + "/rt_selftest_quarters.png";
+			quarters.save(quartersFile);
+			QString err, envError;
+			sb->newScene();
+			const bool matched = sb->applyCameraPhoto(quartersFile, 65.0, 1.6, true, 0.0, true, 0.0, true, &err);
+			QStringList envNotes;
+			const auto distantBefore = std::count_if(sb->document().lights.begin(), sb->document().lights.end(), [](const scene_doc::Light &l) { return l.kind == scene_doc::LightKind::Distant; });
+			const bool made = matched && sb->applyEnvironmentPhoto(&envError, &envNotes);
+			const scene_doc::Document &doc = sb->document();
+			const scene_doc::Light *sky = nullptr;
+			for (const scene_doc::Light &l : doc.lights)
+				if (l.kind == scene_doc::LightKind::Infinite) sky = &l;
+			check(matched && made && sky && !sky->physicalSky && environment_from_photo::isEnvironmentFile(sky->imageFile) && QFileInfo(QString::fromStdString(sky->imageFile)).size() > 1000,
+			      "the photo is the sky light's picture: " + err + envError);
+			check(!envNotes.isEmpty() && std::count_if(doc.lights.begin(), doc.lights.end(), [](const scene_doc::Light &l) { return l.kind == scene_doc::LightKind::Distant; }) == distantBefore, "and the Sun light is as it was");
+			if (made && sky) {
+				scene_doc::Document bare = doc;
+				scene_doc::Object speck;   // (the renderer wants an object: a tiny one far below, which the camera does not see)
+				speck.radius = 0.05;
+				speck.position = {0.0, -500.0, 0.0};
+				bare.objects.assign(1, speck);
+				bare.render.width = 160;
+				bare.render.height = 120;
+				const QString scenePath = QDir::tempPath() + "/rt_selftest_env.pbrt", exrPath = QDir::tempPath() + "/rt_selftest_env.exr";
+				QFile::remove(exrPath);
+				QFile scene(scenePath);
+				const bool wrote = scene.open(QIODevice::WriteOnly) && scene.write(QByteArray::fromStdString(scene_doc::toPbrt(bare))) > 0;
+				scene.close();
+				QProcess renderer;
+				renderer.setProcessChannelMode(QProcess::MergedChannels);
+				renderer.setWorkingDirectory(QCoreApplication::applicationDirPath());
+				renderer.start(sb->launcherPathForTest(), {"--cpu", "--output", exrPath, "--height", "120", "160", "4", "2", scenePath});
+				const bool finished = wrote && renderer.waitForFinished(120000);
+				int rw = 0, rh = 0;
+				float *rgba = nullptr;
+				const char *loadError = nullptr;
+				const bool loaded = finished && renderer.exitCode() == 0 && LoadEXR(&rgba, &rw, &rh, QFile::encodeName(exrPath).constData(), &loadError) == TINYEXR_SUCCESS;
+				if (loadError) FreeEXRErrorMessage(loadError);
+				check(loaded && rw == 160 && rh == 120, "the scene with the photo environment renders " + QString::fromLocal8Bit(renderer.readAll()).right(120));
+				if (loaded && rw == 160 && rh == 120) {
+					auto at = [&](int x, int y, int c) { return rgba[4 * (y * rw + x) + c]; };
+					const int lx = 40, rx = 120, ty = 30, by = 90;   // the middle of each quarter of the picture
+					check(at(lx, ty, 0) > 2.0f * at(lx, ty, 1) && at(lx, ty, 0) > 2.0f * at(lx, ty, 2), "top left of the picture is the photo's red");
+					check(at(rx, ty, 1) > 2.0f * at(rx, ty, 0) && at(rx, ty, 1) > 2.0f * at(rx, ty, 2), "top right is its green");
+					check(at(lx, by, 2) > 2.0f * at(lx, by, 0) && at(lx, by, 2) > 2.0f * at(lx, by, 1), "bottom left is its blue");
+					check(at(rx, by, 0) > 2.0f * at(rx, by, 2) && at(rx, by, 1) > 2.0f * at(rx, by, 2), "bottom right is its yellow");
+					check(at(lx, ty, 0) > 0.01f && at(lx, ty, 0) < 50.0f, QString("and the brightness is that of a sky, not of a lamp (%1)").arg(at(lx, ty, 0)));
+				}
+				std::free(rgba);
+			}
+			// the exposure match reads the photo environment like a generated sky
+			sb->newScene();
+			QString matchError;
+			QStringList matchNotes;
+			const bool skyOnly = sb->applyCameraPhoto(QDir::tempPath() + "/rt_selftest_composite.png", 65.0, 1.6, false, 0.0, false, 0.0, true, &matchError) && sb->applyEnvironmentPhoto(&matchError);
+			QString renderError;
+			const bool rendered = skyOnly && sb->renderIntoPhoto(QDir::tempPath() + "/rt_selftest_env_match.png", {0}, 0.0, 8, true, &renderError, &matchNotes);
+			check(rendered && matchNotes.join(" ").contains("were matched to the photo's sky"), "Render into the photo matches the exposure off the photo environment: " + renderError + matchNotes.join(" / ").left(200));
 		}
 		// The photo belongs to the scene: a scene matched to a photo, saved, then a new scene (no photo), then the saved one opened again has its photo, its overlay, its Render into the photo state and
 		// the camera back; a photo that has gone is said so, not a crash; Remove the photo takes it out; and one undo of the match takes it away too.

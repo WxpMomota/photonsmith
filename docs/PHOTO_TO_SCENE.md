@@ -175,6 +175,17 @@ in a large window to paint on: **Paint** and **Erase** use a brush (the wheel ch
 reopened with it), its edge is feathered a little, and every render into the photo (Live, Preview in the photo, Render into the photo) leaves the photo's own pixels there: the object is hidden, and so is its
 shadow, where the mask is. The mask is yours to paint: nothing guesses what is in front, so a thing in front that you do not paint is still covered.
 
+## The photo as the environment
+
+A glass or metal object reflects what is around it, and a made-up sky is not what is around *your* photo. In **Camera from a photo** the tick **Use the photo as the environment** (on when the scene has a sky light) gives
+the sky light the photo itself as its picture: the photo is placed in the sky's equirectangular picture where the matched camera looks (its direction, tilt, roll and field of view), and everything the photo did not
+see (above, below, behind) is continued from the photo's own colours (the picture is shrunk by averaging, the holes are filled from the coarser levels, then it is built back up: a smooth continuation, nothing
+invented). The scene is then lit by the real ground and sky and glass and metal show them. The picture is scaled to be as bright above the horizon as the generated sky it replaces, so the Sun light, which stays,
+keeps its proportion to it; **Render into the photo** reads the objects' exposure off it like off a generated sky. The generated sky is replaced: tick *Sun & sky* in the light's properties to bring it back.
+
+It is a continuation, not a measurement: the photo's pixels are 0 to 1 (a bright sun is clipped), and what is behind the camera is a guess made of what is in front of it. The picture is written next to the generated
+skies, named for what it is made from, so the same photo from the same camera is made once.
+
 ## Live: the picture in the photo follows the scene
 
 With the camera matched to a photo, the **Live** tick next to *Preview in the photo* keeps the picture in the preview pane up to date while you work: ticking it makes one small picture (360 pixels

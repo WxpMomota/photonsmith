@@ -221,6 +221,7 @@
     <ClCompile Include="unit\camera_from_photo_tests.cpp" />
     <ClCompile Include="unit\photo_composite_tests.cpp" />
     <ClCompile Include="unit\occluder_mask_tests.cpp" />
+    <ClCompile Include="unit\environment_from_photo_tests.cpp" />
     <ClCompile Include="unit\scene_view_math_tests.cpp" />
     <ClCompile Include="unit\mesh_preview_tests.cpp" />
     <ClCompile Include="unit\log_format_tests.cpp" />

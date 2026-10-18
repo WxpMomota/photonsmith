@@ -9,9 +9,15 @@
 #include "sample_photos.h"
 #include "scene_3d_view.h"
 #include "../src/shared/camera_from_photo.h"
+#include "../src/shared/environment_from_photo.h"
 #include "../src/shared/scene_arrange.h"
+#include "../src/shared/scene_sky.h"
 
+#include <QByteArrayView>
 #include <QCheckBox>
+#include <QCryptographicHash>
+#include <QDir>
+#include <QSaveFile>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
@@ -109,6 +115,71 @@ bool SceneBuilderWidget::applyCameraPhoto(const QString &photo, double hfov, dou
 		} else if (notes) {
 			*notes << (sky < 0 ? tr("There is no sky light, so the sun was not set from the photo.") : tr("The sun was not set from the photo: %1").arg(skyError));
 		}
+	}
+	return true;
+}
+
+bool SceneBuilderWidget::applyEnvironmentPhoto(QString *error, QStringList *notes) {
+	if (m_cameraPhoto.isNull()) {
+		if (error) *error = tr("Match the camera to a photo first: the photo becomes the environment as seen from that camera.");
+		return false;
+	}
+	int skyIndex = -1;
+	for (size_t i = 0; i < m_doc.lights.size() && skyIndex < 0; ++i)
+		if (m_doc.lights[i].kind == scene_doc::LightKind::Infinite) skyIndex = static_cast<int>(i);
+	if (skyIndex < 0) {
+		if (error) *error = tr("There is no sky light to give the photo to (add a Sun & sky or an Infinite light).");
+		return false;
+	}
+	const QImage image = m_cameraPhoto.convertToFormat(QImage::Format_RGB888);
+	const int w = image.width(), h = image.height();
+	std::vector<unsigned char> rgb(static_cast<size_t>(w) * h * 3);
+	for (int y = 0; y < h; ++y) std::copy(image.constScanLine(y), image.constScanLine(y) + w * 3, rgb.begin() + static_cast<std::ptrdiff_t>(y) * w * 3);
+	const scene_doc::Camera &cam = m_doc.camera;
+	const double position[3] = {cam.position.x, cam.position.y, cam.position.z}, target[3] = {cam.target.x, cam.target.y, cam.target.z}, up[3] = {cam.up.x, cam.up.y, cam.up.z};
+	const environment_from_photo::Frame frame = environment_from_photo::frameOf(position, target, up, cam.fov, static_cast<double>(w) / h);
+	// as bright above the horizon as the generated sky it replaces, so the Sun that goes with it keeps its proportion to it
+	const scene_doc::Light &light = m_doc.lights[static_cast<size_t>(skyIndex)];
+	const int skyW = 128, skyH = 64;
+	const std::vector<float> generated = scene_doc::sky::renderSkyImage(light.sky, skyW, skyH);
+	double upper = 0.0;
+	for (size_t i = 0; i < static_cast<size_t>(skyW) * (skyH / 2); ++i) upper += 0.2126 * generated[i * 3] + 0.7152 * generated[i * 3 + 1] + 0.0722 * generated[i * 3 + 2];
+	upper /= static_cast<double>(skyW) * (skyH / 2);
+	const int envW = 1024, envH = 512;
+	const std::vector<float> env = environment_from_photo::make(rgb.data(), w, h, frame, envW, envH, upper);
+	if (env.empty()) {
+		if (error) *error = tr("The photo could not be made into an environment.");
+		return false;
+	}
+	// named by what it is made from, so the same photo seen from the same camera is made once
+	QCryptographicHash hash(QCryptographicHash::Sha1);
+	hash.addData(QByteArrayView(reinterpret_cast<const char *>(rgb.data()), static_cast<qsizetype>(rgb.size())));
+	hash.addData(QByteArrayView(reinterpret_cast<const char *>(&frame), static_cast<qsizetype>(sizeof frame)));
+	hash.addData(QByteArrayView(reinterpret_cast<const char *>(&upper), static_cast<qsizetype>(sizeof upper)));
+	const QString folder = skyImageFolder();
+	const QString path = folder + QLatin1Char('/') + QString::fromStdString(environment_from_photo::fileNamePrefix()) + QString::fromLatin1(hash.result().toHex().left(12)) + QStringLiteral(".hdr");
+	if (!QFileInfo::exists(path) || QFileInfo(path).size() == 0) {
+		const std::string data = scene_doc::sky::encodeHdr(env, envW, envH);
+		QDir().mkpath(folder);
+		QSaveFile file(path);
+		if (!file.open(QIODevice::WriteOnly) || file.write(data.data(), static_cast<qint64>(data.size())) != static_cast<qint64>(data.size()) || !file.commit()) {
+			if (error) *error = tr("The environment picture could not be written as %1.").arg(path);
+			return false;
+		}
+	}
+	const bool wasGenerated = light.physicalSky;
+	edit(QString(), [&]() {
+		scene_doc::Light &l = m_doc.lights[static_cast<size_t>(skyIndex)];
+		if (!l.physicalSky && l.imageFile.empty()) l.intensity = 1.0;   // (a plain-colour light had its own strength; the photo is in real proportions, as the generated sky is)
+		l.imageFile = path.toStdString();
+		l.physicalSky = false;   // (a picture of its own, not the generated sky: the Sun light stays where it is)
+		l.skySpin = 0.0;         // (the picture is already turned to where the camera looks)
+	});
+	QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
+	logLine(QStringLiteral("photo"), QStringLiteral("environment from a photo: %1 x %2 picture %3").arg(envW).arg(envH).arg(path));
+	if (notes) {
+		*notes << tr("The photo is the environment now: what it shows lights the scene and shows in glass and metal, where the camera looks; above, below and behind are continued from the photo's own colours.");
+		if (wasGenerated) *notes << tr("The generated sky is replaced; tick Sun && sky in the light's properties to bring it back.").replace(QStringLiteral("&&"), QStringLiteral("&"));
 	}
 	return true;
 }
@@ -214,6 +285,11 @@ void SceneBuilderWidget::cameraFromPhoto() {
 	sun->setChecked(hasSky);
 	sun->setEnabled(hasSky);
 	form->addRow(QString(), sun);
+	auto *environment = new QCheckBox(tr("Use the photo as the environment"), &dialog);
+	environment->setChecked(hasSky);
+	environment->setEnabled(hasSky);
+	environment->setToolTip(tr("The photo becomes the picture the sky light shines with, as seen from the camera, so glass and metal reflect what is really around the scene. Above, below and behind the photo are continued from its own colours."));
+	form->addRow(QString(), environment);
 	pageLayout->addLayout(form);
 	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
 	layout->addWidget(buttons);
@@ -224,6 +300,7 @@ void SceneBuilderWidget::cameraFromPhoto() {
 		    connect(picker, &sample_photos::Picker::photoPicked, &dialog, schedule);
 		    for (QDoubleSpinBox *spin : {fov, height, tilt, rollSpin}) connect(spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dialog, schedule);
 		    connect(sun, &QCheckBox::toggled, &dialog, schedule);
+		    connect(environment, &QCheckBox::toggled, &dialog, schedule);
 	    },
 	    [&](QString *result) {
 		    undoTo(baseline);
@@ -234,6 +311,10 @@ void SceneBuilderWidget::cameraFromPhoto() {
 			    logLine(QStringLiteral("photo"), QStringLiteral("camera from a photo failed: %1").arg(error), log_format::Level::Warn);
 			    *result = tr("The camera could not be set from this photo: %1").arg(error);
 			    return false;
+		    }
+		    if (environment->isChecked()) {
+			    QString envError;
+			    if (!applyEnvironmentPhoto(&envError, &notes)) notes << tr("The photo was not made the environment: %1").arg(envError);
 		    }
 		    for (const QString &note : notes) logLine(QStringLiteral("photo"), QStringLiteral("  %1").arg(note));
 		    if (photo.startsWith(QLatin1String(":/"))) notes << tr("Next: pick an object in the list, press Place the picked object by clicking... in its properties, click the ground in the picture, then press Render into the photo... on Camera and image.");

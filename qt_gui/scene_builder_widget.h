@@ -199,6 +199,9 @@ public:
 	// and with `alsoSky` the Sun & sky are set from the photo too. One undo step for the camera. False with `error` set when the photo cannot be read; `notes` gets what the user should know.
 	void cameraFromPhoto();
 	bool applyCameraPhoto(const QString &photo, double hfov, double heightMetres, bool tiltGiven, double tilt, bool rollGiven, double roll, bool alsoSky, QString *error, QStringList *notes = nullptr);
+	// The photo as the environment (src/shared/environment_from_photo.h): the scene's first Infinite light gets, as its picture, the photo placed where the camera looks (the camera must be matched
+	// to a photo, and is where the photo was taken from) with the rest of the sphere continued from the photo's own colours. The Sun light stays. One undo step. False with `error` set when it cannot.
+	bool applyEnvironmentPhoto(QString *error, QStringList *notes = nullptr);
 	static double exifHorizontalFov(const QString &photo);   // the photo's horizontal field of view from its EXIF lens data, 0 when it has none
 	// Render into the photo (scene_builder_composite.cpp, src/shared/photo_composite.h): needs the photo the camera was matched to. The scene is rendered three times (as it is, without the
 	// inserted objects, and as a mask of them) and put into the photo with its shadows. `groundObjects` are the indices of the objects that are the ground the photo already has (not drawn,
@@ -225,6 +228,7 @@ public:
 	int compositeCacheHitsForTest() const { return m_compositeCacheHits; }
 	void setPhotoExposureForTest(double v) { m_doc.photo.exposureStops = v; m_doc.photo.roles = {{"Floor", 0}}; documentChanged(); }   // what the Render into the photo dialog keeps in the document
 	void removePhotoForTest() { m_doc.photo = scene_doc::PhotoBackdrop(); documentChanged(); }   // what the Remove the photo button does
+	QString launcherPathForTest() const { return launcherPath(); }
 	QString previewButtonTextForTest() const;
 	QString previewStatusForTest() const;
 	void pressPreviewForTest();   // the Preview button, which reads Cancel while a render runs

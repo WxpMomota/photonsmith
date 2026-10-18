@@ -4,6 +4,7 @@
 // The method and its arithmetic are src/shared/photo_composite.h; this file runs the three renders with the renderer, reads them back as linear radiance, calls the compositor and saves the picture.
 #include "scene_builder_widget.h"
 #include "app_log.h"
+#include "../src/shared/environment_from_photo.h"
 #include "../src/shared/photo_composite.h"
 #include "../src/external/tinyexr.h"
 
@@ -43,6 +44,13 @@
 #include <cstdlib>
 
 namespace {
+
+// Whether the scene has a sky the objects' exposure can be read off: the generated Sun & sky, or the photo itself as the environment.
+bool hasMatchableSky(const scene_doc::Document &doc) {
+	for (const scene_doc::Light &l : doc.lights)
+		if (l.kind == scene_doc::LightKind::Infinite && (l.physicalSky || environment_from_photo::isEnvironmentFile(l.imageFile))) return true;
+	return false;
+}
 
 // A linear EXR as w x h x 3 floats (what the renderer wrote with --output x.exr); false when it cannot be read.
 bool readLinear(const QString &path, int *w, int *h, std::vector<float> *rgb) {
@@ -274,9 +282,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 	QString matchNote;
 	bool matched = false;
 	if (matchToPhoto) {
-		bool physicalSky = false;
-		for (const scene_doc::Light &l : m_doc.lights) physicalSky = physicalSky || (l.kind == scene_doc::LightKind::Infinite && l.physicalSky);
-		if (!physicalSky) {
+		if (!hasMatchableSky(m_doc)) {
 			matchNote = tr("The objects' exposure was not matched to the photo: that reads the photo's sky, and the scene has no Sun & sky (set it from the same photo with Light from a photo).");
 		} else {
 			const photo_composite::Match match = photo_composite::matchToPhoto(photoPixels.data(), rgb[0].data(), mask.data(), w, h);
@@ -353,10 +359,8 @@ void SceneBuilderWidget::renderIntoPhotoDialog() {
 	objects->setToolTip(tr("Ground: the floor the photo already has (its shadows are used, it is not drawn). Light: a lamp, which lights the scene and is not shown. Put into the photo: everything you want to see in it."));
 	layout->addWidget(objects);
 	auto *form = new QFormLayout();
-	bool physicalSky = false;
-	for (const scene_doc::Light &l : m_doc.lights) physicalSky = physicalSky || (l.kind == scene_doc::LightKind::Infinite && l.physicalSky);
 	auto *match = new QCheckBox(tr("Match the objects' exposure and colour to the photo's sky"), &dialog);
-	match->setChecked(physicalSky);
+	match->setChecked(hasMatchableSky(m_doc));
 	match->setToolTip(tr("Reads how bright and how warm or cool the photo's sky is, and gives the objects the same exposure and colour cast. Needs the Sun & sky set from the same photo (Light from a photo). The setting below is added to it."));
 	layout->addWidget(match);
 	auto *denoiseBox = new QCheckBox(tr("Denoise the renders (cleans the grain)"), &dialog);
@@ -427,8 +431,7 @@ void SceneBuilderWidget::previewIntoPhotoWith(int maxWidth, int samples, bool li
 	}
 	flushEditLog();
 	const std::vector<photo_composite::Role> roles = compositeRoles();
-	bool physicalSky = false;
-	for (const scene_doc::Light &l : m_doc.lights) physicalSky = physicalSky || (l.kind == scene_doc::LightKind::Infinite && l.physicalSky);
+	const bool physicalSky = hasMatchableSky(m_doc);
 	if (!live) m_previewStatus->setText(tr("Putting the scene into the photo..."));
 	m_compositeLive = live;
 	struct LiveFlag {   // (however this function ends)
