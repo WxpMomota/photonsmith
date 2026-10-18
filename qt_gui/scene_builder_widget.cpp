@@ -340,6 +340,9 @@ void SceneBuilderWidget::buildUi() {
 	m_flythroughButton = new QPushButton(tr("Flythrough..."), previewBox);
 	m_flythroughButton->setAutoDefault(false);
 	m_flythroughButton->setToolTip(tr("Make a video of the scene from a camera that flies through your saved camera views (needs two or more)"));
+	m_dayCycleButton = new QPushButton(tr("Day cycle..."), previewBox);
+	m_dayCycleButton->setAutoDefault(false);
+	m_dayCycleButton->setToolTip(tr("Make a video of a day on the scene: the sun goes from sunrise to sunset (needs a Sun & sky light)"));
 	m_previewStatus = new QLabel(previewBox);
 	renderRow->addWidget(new QLabel(tr("Quality:"), renderBar));
 	renderRow->addWidget(m_qualityCombo);
@@ -358,6 +361,8 @@ void SceneBuilderWidget::buildUi() {
 	renderRow->addWidget(m_turntableButton);
 	scene_builder_ui::compactStyle(m_flythroughButton);
 	renderRow->addWidget(m_flythroughButton);
+	scene_builder_ui::compactStyle(m_dayCycleButton);
+	renderRow->addWidget(m_dayCycleButton);
 	m_previewStatus->setWordWrap(true);
 	previewLayout->addWidget(renderBar);
 	m_previewLabel = new QLabel(previewBox);
@@ -395,6 +400,7 @@ void SceneBuilderWidget::buildUi() {
 	connect(m_saveButton, &QPushButton::clicked, this, &SceneBuilderWidget::onSavePictureClicked);
 	connect(m_turntableButton, &QPushButton::clicked, this, &SceneBuilderWidget::showTurntableDialog);
 	connect(m_flythroughButton, &QPushButton::clicked, this, &SceneBuilderWidget::showFlythroughDialog);
+	connect(m_dayCycleButton, &QPushButton::clicked, this, &SceneBuilderWidget::showDayCycleDialog);
 
 	// ---- right: inspector
 	auto *right = new QWidget(split);
@@ -900,6 +906,9 @@ void SceneBuilderWidget::updateActions() {
 	m_liveCheck->setEnabled(ok && !m_cameraPhoto.isNull());
 	m_turntableButton->setEnabled(ok && !rendering);
 	m_flythroughButton->setEnabled(ok && !rendering && m_doc.cameraViews.size() >= 2);
+	bool generatedSky = false;
+	for (const Light &l : m_doc.lights) generatedSky = generatedSky || (l.kind == LightKind::Infinite && l.physicalSky);
+	m_dayCycleButton->setEnabled(ok && !rendering && generatedSky);
 }
 
 void SceneBuilderWidget::updateTitle() {

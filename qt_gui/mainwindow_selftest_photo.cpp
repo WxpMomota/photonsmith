@@ -940,6 +940,31 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			const bool rendered = skyOnly && sb->renderIntoPhoto(QDir::tempPath() + "/rt_selftest_env_match.png", {0}, 0.0, 8, true, &renderError, &matchNotes);
 			check(rendered && matchNotes.join(" ").contains("were matched to the photo's sky"), "Render into the photo matches the exposure off the photo environment: " + renderError + matchNotes.join(" / ").left(200));
 		}
+		// A day cycle: three frames of the starter scene under a Sun & sky whose sun goes from sunrise over noon to sunset; the middle frame is brighter than the first (the sun is higher), the first and the
+		// last differ (it is on the other side), and the renderer puts them together as an MP4 (when ffmpeg is there).
+		{
+			sb->newScene();
+			sb->runActionForTest("lighting sunny");
+			const QString mp4 = QDir::tempPath() + "/rt_selftest_daycycle.mp4";
+			QFile::remove(mp4);
+			std::vector<QImage> frames;
+			QString dayMessage;
+			const bool dayOk = sb->renderDayCycle(mp4, 3, 24, 160, 2, 60.0, &dayMessage, &frames);
+			const bool noFfmpeg = !dayOk && dayMessage.contains("ffmpeg");
+			check(frames.size() == 3 && (dayOk || noFfmpeg), "a day cycle renders its three frames and puts them together: " + dayMessage.left(160));
+			if (frames.size() == 3) {
+				auto mean = [](const QImage &img) {
+					const QImage rgb = img.convertToFormat(QImage::Format_RGB32);
+					double sum = 0.0;
+					for (int y = 0; y < rgb.height(); ++y)
+						for (int x = 0; x < rgb.width(); ++x) sum += qGray(rgb.pixel(x, y));
+					return sum / (static_cast<double>(rgb.width()) * rgb.height());
+				};
+				check(mean(frames[1]) > mean(frames[0]) * 1.15, QString("the sun is higher at noon, so the picture is brighter (%1 against %2 at sunrise)").arg(mean(frames[1]), 0, 'f', 1).arg(mean(frames[0]), 0, 'f', 1));
+				check(frames[0] != frames[2], "and sunrise and sunset are different pictures (the sun is on the other side)");
+			}
+			if (dayOk) check(QFileInfo(mp4).size() > 1000, "the video is a file");
+		}
 		// The photo belongs to the scene: a scene matched to a photo, saved, then a new scene (no photo), then the saved one opened again has its photo, its overlay, its Render into the photo state and
 		// the camera back; a photo that has gone is said so, not a crash; Remove the photo takes it out; and one undo of the match takes it away too.
 		{

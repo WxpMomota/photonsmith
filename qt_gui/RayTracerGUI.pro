@@ -103,6 +103,7 @@ SOURCES += \
 	scene_builder_light_photo.cpp \
 	scene_builder_camera_photo.cpp \
 	scene_builder_composite.cpp \
+	scene_builder_daycycle.cpp \
 	scene_builder_occluder.cpp \
 	sample_photos.cpp \
 	scene_builder_photo.cpp \

@@ -7176,7 +7176,7 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
     </message>
     <message>
         <location filename="../scene_builder_composite.cpp" line="429"/>
-        <location filename="../scene_builder_widget.cpp" line="389"/>
+        <location filename="../scene_builder_widget.cpp" line="394"/>
         <source>Match the camera to a photo first (Camera and image: Match to a photo...): the scene is put into that photo.</source>
         <translation>Ajusta primero la cámara a una foto (Cámara e imagen: Ajustar a una foto...): la escena se pone en esa foto.</translation>
     </message>
@@ -7844,7 +7844,7 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="818"/>
-        <location filename="../scene_builder_widget.cpp" line="763"/>
+        <location filename="../scene_builder_widget.cpp" line="769"/>
         <source>Meshes (*.ply *.obj)</source>
         <translation>Mallas (*.ply *.obj)</translation>
     </message>
@@ -8117,6 +8117,16 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <location filename="../scene_builder_widget.cpp" line="333"/>
         <source>Save the picture shown below as a PNG</source>
         <translation>Guarda como PNG la imagen que se muestra abajo</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="343"/>
+        <source>Day cycle...</source>
+        <translation>Ciclo del día...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="345"/>
+        <source>Make a video of a day on the scene: the sun goes from sunrise to sunset (needs a Sun &amp; sky light)</source>
+        <translation>Crea un vídeo de un día en la escena: el sol va del amanecer al atardecer (necesita una luz de Sol y cielo)</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="73"/>
@@ -8797,8 +8807,9 @@ Procedencia: %3</translation>
     </message>
     <message>
         <location filename="../scene_builder_composite.cpp" line="168"/>
+        <location filename="../scene_builder_daycycle.cpp" line="150"/>
         <location filename="../scene_builder_render.cpp" line="207"/>
-        <location filename="../scene_builder_turntable.cpp" line="245"/>
+        <location filename="../scene_builder_turntable.cpp" line="246"/>
         <location filename="../scene_builder_widget.cpp" line="323"/>
         <source>Preview</source>
         <translation>Vista previa</translation>
@@ -8845,34 +8856,124 @@ Procedencia: %3</translation>
     </message>
     <message>
         <location filename="../scene_builder_camera_views.cpp" line="327"/>
+        <location filename="../scene_builder_daycycle.cpp" line="70"/>
         <location filename="../scene_builder_turntable.cpp" line="76"/>
         <source> s</source>
         <translation> s</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="55"/>
+        <source>A day cycle moves the sun of a Sun &amp; sky light: add one first (Lighting, or a light of kind Sun &amp; sky).</source>
+        <translation>Un ciclo del día mueve el sol de una luz de Sol y cielo: añade una primero (Iluminación, o una luz de tipo Sol y cielo).</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="59"/>
+        <source>Day cycle video</source>
+        <translation>Vídeo del ciclo del día</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="61"/>
+        <source>Makes a video of a day on the scene: the sun goes from sunrise to sunset (crossing where it is now at noon) and the sky and the light change with it, while the camera stays where it is. It renders every frame, so a long or large video takes a while; start with Draft.</source>
+        <translation>Crea un vídeo de un día en la escena: el sol va del amanecer al atardecer (cruzando donde está ahora al mediodía) y el cielo y la luz cambian con él, mientras la cámara se queda donde está. Renderiza cada fotograma, así que un vídeo largo o grande tarda un rato; empieza con Borrador.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="72"/>
         <location filename="../scene_builder_turntable.cpp" line="78"/>
         <source>%1 frames per second</source>
         <translation>%1 fotogramas por segundo</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="74"/>
         <location filename="../scene_builder_turntable.cpp" line="81"/>
         <source>Draft: 480 pixels wide, 16 samples</source>
         <translation>Borrador: 480 píxeles de ancho, 16 muestras</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="75"/>
         <location filename="../scene_builder_turntable.cpp" line="82"/>
         <source>Good: 720 pixels wide, 64 samples</source>
         <translation>Buena: 720 píxeles de ancho, 64 muestras</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="76"/>
         <location filename="../scene_builder_turntable.cpp" line="83"/>
         <source>Best: 960 pixels wide, 256 samples</source>
         <translation>Óptima: 960 píxeles de ancho, 256 muestras</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="77"/>
         <location filename="../scene_builder_turntable.cpp" line="84"/>
         <source>The scene&apos;s own size and samples (%1 x %2, %3)</source>
         <translation>El tamaño y las muestras de la escena (%1 x %2, %3)</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="83"/>
+        <source>How high the sun is at noon: about 65 in the summer in the middle latitudes, 25 in the winter.</source>
+        <translation>Qué altura tiene el sol al mediodía: unos 65 grados en verano en latitudes medias, 25 en invierno.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="103"/>
+        <source>Save the day cycle video</source>
+        <translation>Guardar el vídeo del ciclo del día</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="110"/>
+        <source>The day cycle failed</source>
+        <translation>El ciclo del día falló</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="125"/>
+        <source>A day cycle moves the sun of a Sun &amp; sky light: add one first.</source>
+        <translation>Un ciclo del día mueve el sol de una luz de Sol y cielo: añade una primero.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="161"/>
+        <source>Day cycle: frame %1 of %2...</source>
+        <translation>Ciclo del día: fotograma %1 de %2...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="172"/>
+        <source>The sky for frame %1 could not be made: %2</source>
+        <translation>No se pudo crear el cielo del fotograma %1: %2</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="194"/>
+        <source>A frame took too long and was stopped.</source>
+        <translation>Un fotograma tardó demasiado y se detuvo.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="198"/>
+        <source>The renderer could not make frame %1 (exit code %2). Its output:
+%3</source>
+        <translation>El renderizador no pudo crear el fotograma %1 (código de salida %2). Su salida:
+%3</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="199"/>
+        <source>Frame %1 could not be saved in %2.</source>
+        <translation>No se pudo guardar el fotograma %1 en %2.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="208"/>
+        <source>Day cycle: putting the video together...</source>
+        <translation>Ciclo del día: uniendo el vídeo...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="225"/>
+        <source>Putting the video together took too long and was stopped.</source>
+        <translation>Unir el vídeo tardó demasiado y se detuvo.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="230"/>
+        <source>The frames were rendered but the video could not be put together (exit code %1).
+%2</source>
+        <translation>Los fotogramas se renderizaron pero no se pudo unir el vídeo (código de salida %1).
+%2</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="236"/>
+        <source>Day cycle done in %1 s. Saved %2.</source>
+        <translation>Ciclo del día terminado en %1 s. Guardado %2.</translation>
     </message>
     <message>
         <location filename="../scene_builder_turntable.cpp" line="88"/>
@@ -8885,22 +8986,31 @@ Procedencia: %3</translation>
         <translation>Volver a la primera vista al final</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="86"/>
         <location filename="../scene_builder_turntable.cpp" line="92"/>
         <source>Length:</source>
         <translation>Duración:</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="87"/>
         <location filename="../scene_builder_turntable.cpp" line="93"/>
         <source>Speed:</source>
         <translation>Velocidad:</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="88"/>
         <location filename="../scene_builder_turntable.cpp" line="94"/>
-        <location filename="../scene_builder_widget.cpp" line="344"/>
+        <location filename="../scene_builder_widget.cpp" line="347"/>
         <source>Quality:</source>
         <translation>Calidad:</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="89"/>
+        <source>Sun height at noon:</source>
+        <translation>Altura del sol al mediodía:</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="91"/>
         <location filename="../scene_builder_turntable.cpp" line="106"/>
         <source>%1 frames.</source>
         <translation>%1 fotogramas.</translation>
@@ -8916,6 +9026,7 @@ Procedencia: %3</translation>
         <translation>La cámara hace pausas durante %1 s en total, así que se mueve durante %2 s.</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="96"/>
         <location filename="../scene_builder_turntable.cpp" line="117"/>
         <source>Choose where to save...</source>
         <translation>Elegir dónde guardar...</translation>
@@ -8926,6 +9037,7 @@ Procedencia: %3</translation>
         <translation>Guardar el vídeo de plato giratorio</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="103"/>
         <location filename="../scene_builder_turntable.cpp" line="125"/>
         <source>MP4 videos (*.mp4)</source>
         <translation>Vídeos MP4 (*.mp4)</translation>
@@ -8946,6 +9058,7 @@ Procedencia: %3</translation>
         <translation>El recorrido falló</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="123"/>
         <location filename="../scene_builder_turntable.cpp" line="168"/>
         <source>A video needs at least one frame.</source>
         <translation>Un vídeo necesita al menos un fotograma.</translation>
@@ -8961,22 +9074,25 @@ Procedencia: %3</translation>
         <translation>Vídeo: montando el vídeo...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="233"/>
+        <location filename="../scene_builder_turntable.cpp" line="234"/>
         <source>Video: starting (%1 frames, %2 x %3, %4 samples)...</source>
         <translation>Vídeo: iniciando (%1 fotogramas, %2 x %3, %4 muestras)...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="259"/>
+        <location filename="../scene_builder_turntable.cpp" line="260"/>
         <source>Video done in %1 s. Saved %2.</source>
         <translation>Vídeo terminado en %1 s. Guardado en %2.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="264"/>
+        <location filename="../scene_builder_daycycle.cpp" line="160"/>
+        <location filename="../scene_builder_daycycle.cpp" line="194"/>
+        <location filename="../scene_builder_daycycle.cpp" line="225"/>
+        <location filename="../scene_builder_turntable.cpp" line="265"/>
         <source>The video was cancelled.</source>
         <translation>El vídeo se canceló.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="276"/>
+        <location filename="../scene_builder_turntable.cpp" line="277"/>
         <source>The video failed.</source>
         <translation>El vídeo falló.</translation>
     </message>
@@ -9001,7 +9117,8 @@ Procedencia: %3</translation>
         <translation type="vanished">Plato giratorio terminado en %1 s. Guardado en %2.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="261"/>
+        <location filename="../scene_builder_daycycle.cpp" line="234"/>
+        <location filename="../scene_builder_turntable.cpp" line="262"/>
         <source>The video was made but could not be saved to %1.</source>
         <translation>El vídeo se creó pero no se pudo guardar en %1.</translation>
     </message>
@@ -9010,12 +9127,13 @@ Procedencia: %3</translation>
         <translation type="vanished">El plato giratorio se canceló.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="272"/>
+        <location filename="../scene_builder_daycycle.cpp" line="229"/>
+        <location filename="../scene_builder_turntable.cpp" line="273"/>
         <source>The frames were rendered, but putting them together needs the free program ffmpeg, which was not found. Install it (ffmpeg.org) and try again.</source>
         <translation>Se renderizaron los fotogramas, pero para montarlos hace falta el programa gratuito ffmpeg, que no se encontró. Instálalo (ffmpeg.org) e inténtalo de nuevo.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="273"/>
+        <location filename="../scene_builder_turntable.cpp" line="274"/>
         <source>The renderer did not produce a video (exit code %1).
 %2</source>
         <translation>El renderizador no produjo un vídeo (código de salida %1).
@@ -9026,7 +9144,7 @@ Procedencia: %3</translation>
         <translation type="vanished">El plato giratorio falló.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="367"/>
+        <location filename="../scene_builder_widget.cpp" line="372"/>
         <source>Press Preview to see the scene.</source>
         <translation>Pulsa Vista previa para ver la escena.</translation>
     </message>
@@ -9137,12 +9255,12 @@ It is in the scene list now (Settings tab, My Scenes).</source>
 Ya está en la lista de escenas (pestaña Configuración, Mis escenas).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="912"/>
+        <location filename="../scene_builder_widget.cpp" line="921"/>
         <source>(%1)%2  |  %3 objects, %4 lights</source>
         <translation>(%1)%2  |  %3 objetos, %4 luces</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="763"/>
+        <location filename="../scene_builder_widget.cpp" line="769"/>
         <source>Choose a mesh</source>
         <translation>Elegir una malla</translation>
     </message>
@@ -9182,37 +9300,37 @@ Ya está en la lista de escenas (pestaña Configuración, Mis escenas).</transla
         <translation>Añadida a la lista de escenas</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="581"/>
+        <location filename="../scene_builder_widget.cpp" line="587"/>
         <source>Camera and image</source>
         <translation>Cámara e imagen</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="622"/>
+        <location filename="../scene_builder_widget.cpp" line="628"/>
         <source>, light</source>
         <translation>, luz</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="810"/>
+        <location filename="../scene_builder_widget.cpp" line="816"/>
         <source>Lighting: %1. %2</source>
         <translation>Iluminación: %1. %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="906"/>
+        <location filename="../scene_builder_widget.cpp" line="915"/>
         <source>not saved yet</source>
         <translation>sin guardar todavía</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="940"/>
+        <location filename="../scene_builder_widget.cpp" line="949"/>
         <source>No problems found.</source>
         <translation>No se encontraron problemas.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="946"/>
+        <location filename="../scene_builder_widget.cpp" line="955"/>
         <source>Fix this:</source>
         <translation>Corrige esto:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="946"/>
+        <location filename="../scene_builder_widget.cpp" line="955"/>
         <source>Note:</source>
         <translation>Nota:</translation>
     </message>
@@ -9233,6 +9351,7 @@ Ya está en la lista de escenas (pestaña Configuración, Mis escenas).</transla
     </message>
     <message>
         <location filename="../scene_builder_composite.cpp" line="105"/>
+        <location filename="../scene_builder_daycycle.cpp" line="122"/>
         <location filename="../scene_builder_render.cpp" line="151"/>
         <location filename="../scene_builder_turntable.cpp" line="167"/>
         <source>A render is already running.</source>
@@ -9240,6 +9359,7 @@ Ya está en la lista de escenas (pestaña Configuración, Mis escenas).</transla
     </message>
     <message>
         <location filename="../scene_builder_composite.cpp" line="117"/>
+        <location filename="../scene_builder_daycycle.cpp" line="126"/>
         <location filename="../scene_builder_render.cpp" line="153"/>
         <location filename="../scene_builder_turntable.cpp" line="170"/>
         <source>Fix the problems listed under the properties first.</source>
@@ -9247,6 +9367,7 @@ Ya está en la lista de escenas (pestaña Configuración, Mis escenas).</transla
     </message>
     <message>
         <location filename="../scene_builder_composite.cpp" line="113"/>
+        <location filename="../scene_builder_daycycle.cpp" line="127"/>
         <location filename="../scene_builder_render.cpp" line="154"/>
         <location filename="../scene_builder_turntable.cpp" line="171"/>
         <source>The renderer (%1) was not found next to the program.</source>
@@ -9434,6 +9555,7 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
     </message>
     <message>
         <location filename="../scene_builder_camera_photo.cpp" line="249"/>
+        <location filename="../scene_builder_daycycle.cpp" line="81"/>
         <location filename="../scene_builder_light_photo.cpp" line="121"/>
         <source> degrees</source>
         <translation> grados</translation>
@@ -9795,6 +9917,7 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
     </message>
     <message>
         <location filename="../scene_builder_composite.cpp" line="161"/>
+        <location filename="../scene_builder_daycycle.cpp" line="144"/>
         <location filename="../scene_builder_photo.cpp" line="98"/>
         <location filename="../scene_builder_photo.cpp" line="262"/>
         <location filename="../scene_builder_photo.cpp" line="334"/>
@@ -9939,7 +10062,7 @@ Esto reemplaza la escena actual (Deshacer la recupera).</translation>
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="223"/>
-        <location filename="../scene_builder_turntable.cpp" line="271"/>
+        <location filename="../scene_builder_turntable.cpp" line="272"/>
         <source>The renderer stopped unexpectedly.</source>
         <translation>El renderizador se detuvo inesperadamente.</translation>
     </message>
@@ -9974,13 +10097,13 @@ Esto reemplaza la escena actual (Deshacer la recupera).</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="463"/>
-        <location filename="../scene_builder_widget.cpp" line="606"/>
+        <location filename="../scene_builder_widget.cpp" line="612"/>
         <source>, locked</source>
         <translation>, bloqueado</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="477"/>
-        <location filename="../scene_builder_widget.cpp" line="605"/>
+        <location filename="../scene_builder_widget.cpp" line="611"/>
         <source>, hidden</source>
         <translation>, oculto</translation>
     </message>

@@ -7124,7 +7124,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_composite.cpp" line="429"/>
-        <location filename="../scene_builder_widget.cpp" line="389"/>
+        <location filename="../scene_builder_widget.cpp" line="394"/>
         <source>Match the camera to a photo first (Camera and image: Match to a photo...): the scene is put into that photo.</source>
         <translation>先にカメラを写真に合わせてください (カメラと画像: 写真に合わせる...)。シーンはその写真の中に合成されます。</translation>
     </message>
@@ -7792,7 +7792,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="818"/>
-        <location filename="../scene_builder_widget.cpp" line="763"/>
+        <location filename="../scene_builder_widget.cpp" line="769"/>
         <source>Meshes (*.ply *.obj)</source>
         <translation>メッシュ (*.ply *.obj)</translation>
     </message>
@@ -8065,6 +8065,16 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <location filename="../scene_builder_widget.cpp" line="333"/>
         <source>Save the picture shown below as a PNG</source>
         <translation>下に表示されている画像を PNG として保存します</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="343"/>
+        <source>Day cycle...</source>
+        <translation>一日の移り変わり...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="345"/>
+        <source>Make a video of a day on the scene: the sun goes from sunrise to sunset (needs a Sun &amp; sky light)</source>
+        <translation>シーンの一日を動画にします。太陽が日の出から日没まで動きます (「太陽と空」のライトが必要です)</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="73"/>
@@ -8745,8 +8755,9 @@ From: %3</source>
     </message>
     <message>
         <location filename="../scene_builder_composite.cpp" line="168"/>
+        <location filename="../scene_builder_daycycle.cpp" line="150"/>
         <location filename="../scene_builder_render.cpp" line="207"/>
-        <location filename="../scene_builder_turntable.cpp" line="245"/>
+        <location filename="../scene_builder_turntable.cpp" line="246"/>
         <location filename="../scene_builder_widget.cpp" line="323"/>
         <source>Preview</source>
         <translation>プレビュー</translation>
@@ -8793,34 +8804,124 @@ From: %3</source>
     </message>
     <message>
         <location filename="../scene_builder_camera_views.cpp" line="327"/>
+        <location filename="../scene_builder_daycycle.cpp" line="70"/>
         <location filename="../scene_builder_turntable.cpp" line="76"/>
         <source> s</source>
         <translation> 秒</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="55"/>
+        <source>A day cycle moves the sun of a Sun &amp; sky light: add one first (Lighting, or a light of kind Sun &amp; sky).</source>
+        <translation>一日の移り変わりは「太陽と空」のライトの太陽を動かします。先に追加してください (ライティング、または種類が「太陽と空」のライト)。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="59"/>
+        <source>Day cycle video</source>
+        <translation>一日の移り変わりの動画</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="61"/>
+        <source>Makes a video of a day on the scene: the sun goes from sunrise to sunset (crossing where it is now at noon) and the sky and the light change with it, while the camera stays where it is. It renders every frame, so a long or large video takes a while; start with Draft.</source>
+        <translation>シーンの一日を動画にします。太陽は日の出から日没まで動き (正午には今ある位置を通ります)、空と光もそれに合わせて変わります。カメラは今の位置のままです。すべてのフレームをレンダリングするので、長い動画や大きい動画には時間がかかります。まずは下書きで試してください。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="72"/>
         <location filename="../scene_builder_turntable.cpp" line="78"/>
         <source>%1 frames per second</source>
         <translation>毎秒 %1 フレーム</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="74"/>
         <location filename="../scene_builder_turntable.cpp" line="81"/>
         <source>Draft: 480 pixels wide, 16 samples</source>
         <translation>ドラフト: 幅 480 ピクセル、16 サンプル</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="75"/>
         <location filename="../scene_builder_turntable.cpp" line="82"/>
         <source>Good: 720 pixels wide, 64 samples</source>
         <translation>標準: 幅 720 ピクセル、64 サンプル</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="76"/>
         <location filename="../scene_builder_turntable.cpp" line="83"/>
         <source>Best: 960 pixels wide, 256 samples</source>
         <translation>最高: 幅 960 ピクセル、256 サンプル</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="77"/>
         <location filename="../scene_builder_turntable.cpp" line="84"/>
         <source>The scene&apos;s own size and samples (%1 x %2, %3)</source>
         <translation>シーンのサイズとサンプル数 (%1 x %2、%3)</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="83"/>
+        <source>How high the sun is at noon: about 65 in the summer in the middle latitudes, 25 in the winter.</source>
+        <translation>正午の太陽の高さ: 中緯度では夏に約65度、冬に約25度です。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="103"/>
+        <source>Save the day cycle video</source>
+        <translation>一日の移り変わりの動画を保存</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="110"/>
+        <source>The day cycle failed</source>
+        <translation>一日の移り変わりに失敗しました</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="125"/>
+        <source>A day cycle moves the sun of a Sun &amp; sky light: add one first.</source>
+        <translation>一日の移り変わりは「太陽と空」のライトの太陽を動かします。先に追加してください。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="161"/>
+        <source>Day cycle: frame %1 of %2...</source>
+        <translation>一日の移り変わり: フレーム %1 / %2...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="172"/>
+        <source>The sky for frame %1 could not be made: %2</source>
+        <translation>フレーム %1 の空を作れませんでした: %2</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="194"/>
+        <source>A frame took too long and was stopped.</source>
+        <translation>フレームに時間がかかりすぎたため停止しました。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="198"/>
+        <source>The renderer could not make frame %1 (exit code %2). Its output:
+%3</source>
+        <translation>レンダラーはフレーム %1 を作れませんでした (終了コード %2)。出力:
+%3</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="199"/>
+        <source>Frame %1 could not be saved in %2.</source>
+        <translation>フレーム %1 を %2 に保存できませんでした。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="208"/>
+        <source>Day cycle: putting the video together...</source>
+        <translation>一日の移り変わり: 動画をまとめています...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="225"/>
+        <source>Putting the video together took too long and was stopped.</source>
+        <translation>動画をまとめるのに時間がかかりすぎたため停止しました。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="230"/>
+        <source>The frames were rendered but the video could not be put together (exit code %1).
+%2</source>
+        <translation>フレームはレンダリングされましたが、動画をまとめられませんでした (終了コード %1)。
+%2</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="236"/>
+        <source>Day cycle done in %1 s. Saved %2.</source>
+        <translation>一日の移り変わりが %1 秒で完了しました。保存先: %2。</translation>
     </message>
     <message>
         <location filename="../scene_builder_turntable.cpp" line="88"/>
@@ -8833,22 +8934,31 @@ From: %3</source>
         <translation>最後に最初のビューへ戻る</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="86"/>
         <location filename="../scene_builder_turntable.cpp" line="92"/>
         <source>Length:</source>
         <translation>長さ:</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="87"/>
         <location filename="../scene_builder_turntable.cpp" line="93"/>
         <source>Speed:</source>
         <translation>速さ:</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="88"/>
         <location filename="../scene_builder_turntable.cpp" line="94"/>
-        <location filename="../scene_builder_widget.cpp" line="344"/>
+        <location filename="../scene_builder_widget.cpp" line="347"/>
         <source>Quality:</source>
         <translation>品質:</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="89"/>
+        <source>Sun height at noon:</source>
+        <translation>正午の太陽の高さ:</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_daycycle.cpp" line="91"/>
         <location filename="../scene_builder_turntable.cpp" line="106"/>
         <source>%1 frames.</source>
         <translation>%1 フレーム。</translation>
@@ -8864,6 +8974,7 @@ From: %3</source>
         <translation>カメラは合計 %1 秒停止するため、移動する時間は %2 秒です。</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="96"/>
         <location filename="../scene_builder_turntable.cpp" line="117"/>
         <source>Choose where to save...</source>
         <translation>保存先を選ぶ...</translation>
@@ -8874,6 +8985,7 @@ From: %3</source>
         <translation>ターンテーブル動画を保存</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="103"/>
         <location filename="../scene_builder_turntable.cpp" line="125"/>
         <source>MP4 videos (*.mp4)</source>
         <translation>MP4 動画 (*.mp4)</translation>
@@ -8894,6 +9006,7 @@ From: %3</source>
         <translation>フライスルーに失敗しました</translation>
     </message>
     <message>
+        <location filename="../scene_builder_daycycle.cpp" line="123"/>
         <location filename="../scene_builder_turntable.cpp" line="168"/>
         <source>A video needs at least one frame.</source>
         <translation>動画には少なくとも 1 フレームが必要です。</translation>
@@ -8909,22 +9022,25 @@ From: %3</source>
         <translation>動画: 動画を組み立てています...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="233"/>
+        <location filename="../scene_builder_turntable.cpp" line="234"/>
         <source>Video: starting (%1 frames, %2 x %3, %4 samples)...</source>
         <translation>動画: 開始 (%1 フレーム、%2 x %3、%4 サンプル)...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="259"/>
+        <location filename="../scene_builder_turntable.cpp" line="260"/>
         <source>Video done in %1 s. Saved %2.</source>
         <translation>動画が %1 秒で完成しました。%2 に保存しました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="264"/>
+        <location filename="../scene_builder_daycycle.cpp" line="160"/>
+        <location filename="../scene_builder_daycycle.cpp" line="194"/>
+        <location filename="../scene_builder_daycycle.cpp" line="225"/>
+        <location filename="../scene_builder_turntable.cpp" line="265"/>
         <source>The video was cancelled.</source>
         <translation>動画はキャンセルされました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="276"/>
+        <location filename="../scene_builder_turntable.cpp" line="277"/>
         <source>The video failed.</source>
         <translation>動画の作成に失敗しました。</translation>
     </message>
@@ -8949,7 +9065,8 @@ From: %3</source>
         <translation type="vanished">ターンテーブルが %1 秒で完了しました。%2 に保存しました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="261"/>
+        <location filename="../scene_builder_daycycle.cpp" line="234"/>
+        <location filename="../scene_builder_turntable.cpp" line="262"/>
         <source>The video was made but could not be saved to %1.</source>
         <translation>動画は作成されましたが、%1 に保存できませんでした。</translation>
     </message>
@@ -8958,12 +9075,13 @@ From: %3</source>
         <translation type="vanished">ターンテーブルはキャンセルされました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="272"/>
+        <location filename="../scene_builder_daycycle.cpp" line="229"/>
+        <location filename="../scene_builder_turntable.cpp" line="273"/>
         <source>The frames were rendered, but putting them together needs the free program ffmpeg, which was not found. Install it (ffmpeg.org) and try again.</source>
         <translation>フレームはレンダリングされましたが、動画にまとめるには無料のプログラム ffmpeg が必要で、見つかりませんでした。インストール (ffmpeg.org) してからもう一度お試しください。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_turntable.cpp" line="273"/>
+        <location filename="../scene_builder_turntable.cpp" line="274"/>
         <source>The renderer did not produce a video (exit code %1).
 %2</source>
         <translation>レンダラーは動画を作成しませんでした (終了コード %1)。
@@ -8974,7 +9092,7 @@ From: %3</source>
         <translation type="vanished">ターンテーブルに失敗しました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="367"/>
+        <location filename="../scene_builder_widget.cpp" line="372"/>
         <source>Press Preview to see the scene.</source>
         <translation>「プレビュー」を押すとシーンが表示されます。</translation>
     </message>
@@ -9085,12 +9203,12 @@ It is in the scene list now (Settings tab, My Scenes).</source>
 シーンリスト（設定タブの「マイシーン」）に追加されました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="912"/>
+        <location filename="../scene_builder_widget.cpp" line="921"/>
         <source>(%1)%2  |  %3 objects, %4 lights</source>
         <translation>(%1)%2  |  オブジェクト %3 個、ライト %4 個</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="763"/>
+        <location filename="../scene_builder_widget.cpp" line="769"/>
         <source>Choose a mesh</source>
         <translation>メッシュを選択</translation>
     </message>
@@ -9130,37 +9248,37 @@ It is in the scene list now (Settings tab, My Scenes).</source>
         <translation>シーンリストに追加しました</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="581"/>
+        <location filename="../scene_builder_widget.cpp" line="587"/>
         <source>Camera and image</source>
         <translation>カメラと画像</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="622"/>
+        <location filename="../scene_builder_widget.cpp" line="628"/>
         <source>, light</source>
         <translation>、ライト</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="810"/>
+        <location filename="../scene_builder_widget.cpp" line="816"/>
         <source>Lighting: %1. %2</source>
         <translation>ライティング: %1。%2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="906"/>
+        <location filename="../scene_builder_widget.cpp" line="915"/>
         <source>not saved yet</source>
         <translation>未保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="940"/>
+        <location filename="../scene_builder_widget.cpp" line="949"/>
         <source>No problems found.</source>
         <translation>問題は見つかりませんでした。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="946"/>
+        <location filename="../scene_builder_widget.cpp" line="955"/>
         <source>Fix this:</source>
         <translation>修正してください:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="946"/>
+        <location filename="../scene_builder_widget.cpp" line="955"/>
         <source>Note:</source>
         <translation>注意:</translation>
     </message>
@@ -9181,6 +9299,7 @@ It is in the scene list now (Settings tab, My Scenes).</source>
     </message>
     <message>
         <location filename="../scene_builder_composite.cpp" line="105"/>
+        <location filename="../scene_builder_daycycle.cpp" line="122"/>
         <location filename="../scene_builder_render.cpp" line="151"/>
         <location filename="../scene_builder_turntable.cpp" line="167"/>
         <source>A render is already running.</source>
@@ -9188,6 +9307,7 @@ It is in the scene list now (Settings tab, My Scenes).</source>
     </message>
     <message>
         <location filename="../scene_builder_composite.cpp" line="117"/>
+        <location filename="../scene_builder_daycycle.cpp" line="126"/>
         <location filename="../scene_builder_render.cpp" line="153"/>
         <location filename="../scene_builder_turntable.cpp" line="170"/>
         <source>Fix the problems listed under the properties first.</source>
@@ -9195,6 +9315,7 @@ It is in the scene list now (Settings tab, My Scenes).</source>
     </message>
     <message>
         <location filename="../scene_builder_composite.cpp" line="113"/>
+        <location filename="../scene_builder_daycycle.cpp" line="127"/>
         <location filename="../scene_builder_render.cpp" line="154"/>
         <location filename="../scene_builder_turntable.cpp" line="171"/>
         <source>The renderer (%1) was not found next to the program.</source>
@@ -9382,6 +9503,7 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
     </message>
     <message>
         <location filename="../scene_builder_camera_photo.cpp" line="249"/>
+        <location filename="../scene_builder_daycycle.cpp" line="81"/>
         <location filename="../scene_builder_light_photo.cpp" line="121"/>
         <source> degrees</source>
         <translation> 度</translation>
@@ -9743,6 +9865,7 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
     </message>
     <message>
         <location filename="../scene_builder_composite.cpp" line="161"/>
+        <location filename="../scene_builder_daycycle.cpp" line="144"/>
         <location filename="../scene_builder_photo.cpp" line="98"/>
         <location filename="../scene_builder_photo.cpp" line="262"/>
         <location filename="../scene_builder_photo.cpp" line="334"/>
@@ -9887,7 +10010,7 @@ This replaces the scene you have now (Undo brings it back).</source>
     </message>
     <message>
         <location filename="../scene_builder_render.cpp" line="223"/>
-        <location filename="../scene_builder_turntable.cpp" line="271"/>
+        <location filename="../scene_builder_turntable.cpp" line="272"/>
         <source>The renderer stopped unexpectedly.</source>
         <translation>レンダラーが予期せず停止しました。</translation>
     </message>
@@ -9922,13 +10045,13 @@ This replaces the scene you have now (Undo brings it back).</source>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="463"/>
-        <location filename="../scene_builder_widget.cpp" line="606"/>
+        <location filename="../scene_builder_widget.cpp" line="612"/>
         <source>, locked</source>
         <translation>、ロック中</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="477"/>
-        <location filename="../scene_builder_widget.cpp" line="605"/>
+        <location filename="../scene_builder_widget.cpp" line="611"/>
         <source>, hidden</source>
         <translation>、非表示</translation>
     </message>

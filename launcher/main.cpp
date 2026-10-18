@@ -1516,6 +1516,16 @@ int main(int argc, char** argv) {
 		std::cerr << (ok ? "The GPU renderer is ready.\n" : "The GPU renderer could not be prepared.\n");
 		return ok ? 0 : 1;
 	}
+	// `ray_tracer --assemble-video <frames folder> <frame count> <frames per second> <out.mp4>`: puts a sequence of pictures (enc_0000.png, enc_0001.png, ... in that folder) together as an MP4, the way --video
+	// does at its end (AVFoundation on a Mac, ffmpeg elsewhere). For a program that rendered the frames itself (the Scene Builder's Day cycle video, where the sun moves, not the camera). Exit 0 on success.
+	if (argc >= 6 && std::string(argv[1]) == "--assemble-video") {
+		const int count = std::atoi(argv[3]), fps = std::atoi(argv[4]);
+		if (count < 1 || fps < 1) {
+			std::cerr << "usage: " << argv[0] << " --assemble-video <frames folder> <frame count (>= 1)> <frames per second (>= 1)> <out.mp4>\n";
+			return EXIT_FAILURE;
+		}
+		return assembleVideoFile(std::filesystem::path(argv[2]), count, fps, std::filesystem::path(argv[5]));
+	}
 	// `ray_tracer --print-scene-size <scene id, name or .pbrt path>`: prints the scene's size (the largest side of its bounding box, in its own units) and
 	// nothing else, for scripts/stamp_scene_sizes.py and for people who want the "# @rt-size" line for a scene of their own. Handled before the banner and the
 	// argument parser: it is a measurement, not a render. Exit 0 and a number on success (0 means a scene with nothing to measure), exit 1 if it cannot be loaded.

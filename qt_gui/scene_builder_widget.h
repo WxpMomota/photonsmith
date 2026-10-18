@@ -293,6 +293,11 @@ public:
 	// starts and ends it gently. Needs two or more views. The lens is the first view's.
 	void showFlythroughDialog();
 	void startFlythrough(int frames, int fps, int width, int samples, const QString &outMp4, bool ease, bool returnToStart, const std::function<void(bool ok, const QString &message)> &done = nullptr);
+	// A video of a day (scene_builder_daycycle.cpp, src/shared/day_cycle.h): the sun of the scene's Sun & sky goes from sunrise to sunset (crossing where it is now at noon, `noonElevation` degrees high)
+	// over `frames` frames while the camera stays; every frame is a render, and the renderer puts them together at `fps` (--assemble-video). Copies the MP4 to `outMp4`; false with `message` set when it
+	// cannot. `framesOut`, when given, gets the pictures (a test looks at them). The Preview button reads Cancel while it runs.
+	void showDayCycleDialog();
+	bool renderDayCycle(const QString &outMp4, int frames, int fps, int width, int samples, double noonElevation, QString *message, std::vector<QImage> *framesOut = nullptr);
 	// Starts a preview render (no file dialog) and calls `done` when the picture is loaded or it failed.
 	void startPreview(const std::function<void(bool ok, const QString &message)> &done = nullptr);
 	QString previewImagePath() const { return m_previewPng; }
@@ -558,6 +563,7 @@ private:
 	QPushButton *m_finalButton = nullptr;
 	QPushButton *m_turntableButton = nullptr;
 	QPushButton *m_flythroughButton = nullptr;
+	QPushButton *m_dayCycleButton = nullptr;
 	QString m_turntableOut;
 	int m_turntableFrames = 0;
 	QPushButton *m_deleteButton = nullptr;
