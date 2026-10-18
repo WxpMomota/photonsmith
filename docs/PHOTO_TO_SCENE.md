@@ -135,7 +135,7 @@ How good it is:
 
 ## Sample photos
 
-Camera from a photo and Light from a photo are **one window**: at the top the photo to use, with **five sample photos built into the program** (a picture of each, what it is good for, and its credit) so you can try them without a photo of your own, and **Choose my own photo...** (which adds your photo to the row, selected); below it the settings; and when you press Ok the result appears in that same window (with a Close button). Start with *Beach, blue sky*: a clean horizon and a clear sky, from which the camera, the sun and the exposure of Render into the photo all read well.
+Camera from a photo and Light from a photo are **one window**: at the top the photo to use, with **five sample photos built into the program** (a picture of each, what it is good for, and its credit) so you can try them without a photo of your own, and **Choose my own photo...** (which adds your photo to the row, selected); below it the settings; and when you press Ok the result appears **beside the settings** in that same window, so they are still there to change: Ok then reads **Apply again**, and Cancel reads Close. A short screen scrolls the settings instead of cutting them off. Start with *Beach, blue sky*: a clean horizon and a clear sky, from which the camera, the sun and the exposure of Render into the photo all read well.
 
 | sample | good for | credit |
 |---|---|---|

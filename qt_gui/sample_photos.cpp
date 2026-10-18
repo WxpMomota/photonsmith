@@ -52,8 +52,8 @@ Picker::Picker(const QString &ownPhotoTitle, QWidget *parent) : QWidget(parent),
 	m_list->setWrapping(true);
 	m_list->setMovement(QListView::Static);
 	m_list->setResizeMode(QListView::Adjust);
-	m_list->setIconSize(QSize(104, 64));
-	m_list->setGridSize(QSize(124, 116));
+	m_list->setIconSize(QSize(96, 60));
+	m_list->setGridSize(QSize(110, 116));
 	m_list->setSpacing(2);
 	m_list->setFixedHeight(156);
 	m_list->setWordWrap(true);   // (a title that does not fit goes on a second line)

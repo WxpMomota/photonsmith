@@ -524,7 +524,8 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			}
 			check(!notes.isEmpty(), "the user is told what was done: " + notes.join(" / ").left(120));
 		}
-		// The photo dialogs show their result in the same window: Ok does the work (a failure leaves the settings to be changed), and the settings page gives way to the result and one Close button.
+		// The photo dialogs show their result beside the settings, in the same window: Ok does the work (a failure leaves things as they were), the result appears while the settings stay, and Ok
+		// (now "Apply again") works once more; Cancel (now "Close") closes.
 		{
 			QDialog probe(this);
 			auto *probeLayout = new QVBoxLayout(&probe);
@@ -535,21 +536,29 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			auto *probeButtons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &probe);
 			probeLayout->addWidget(probeButtons);
 			int tries = 0;
-			bool pageHiddenAfter = false, resultShown = false, onlyClose = false;
-			QTimer::singleShot(300, [&]() { probeButtons->button(QDialogButtonBox::Ok)->click(); });   // the first Ok fails: the settings stay
-			QTimer::singleShot(600, [&]() { if (page->isVisible()) probeButtons->button(QDialogButtonBox::Ok)->click(); });   // the second works
+			bool noResultYet = false, pageStays = false, resultShown = false, relabelled = false, updated = false;
+			QTimer::singleShot(300, [&]() { probeButtons->button(QDialogButtonBox::Ok)->click(); });   // the first Ok fails
+			QTimer::singleShot(600, [&]() {
+				for (QLabel *label : probe.findChildren<QLabel *>()) noResultYet = noResultYet || label->text().startsWith("done");
+				noResultYet = !noResultYet;
+				probeButtons->button(QDialogButtonBox::Ok)->click();   // the second works
+			});
 			QTimer::singleShot(1000, [&]() {
-				pageHiddenAfter = !page->isVisible();
-				for (QLabel *label : probe.findChildren<QLabel *>()) resultShown = resultShown || (label->text() == "done: the result" && label->isVisible());
-				onlyClose = probeButtons->buttons().size() == 1 && probeButtons->button(QDialogButtonBox::Close) != nullptr;
-				probe.reject();
+				pageStays = page->isVisible();
+				for (QLabel *label : probe.findChildren<QLabel *>()) resultShown = resultShown || (label->text() == "done 2" && label->isVisible());
+				relabelled = probeButtons->button(QDialogButtonBox::Ok)->text() == "Apply again" && probeButtons->button(QDialogButtonBox::Cancel)->text() == "Close";
+				probeButtons->button(QDialogButtonBox::Ok)->click();   // and again
+			});
+			QTimer::singleShot(1400, [&]() {
+				for (QLabel *label : probe.findChildren<QLabel *>()) updated = updated || (label->text() == "done 3" && label->isVisible());
+				probeButtons->button(QDialogButtonBox::Cancel)->click();
 			});
 			photo_dialog::run(probe, page, probeButtons, [&tries](QString *result) {
 				if (++tries == 1) return false;
-				*result = "done: the result";
+				*result = QString("done %1").arg(tries);
 				return true;
 			});
-			check(tries == 2 && pageHiddenAfter && resultShown && onlyClose, QString("the photo dialogs show their result in the same window (apply ran %1 times, settings hidden %2, result shown %3, one Close button %4)").arg(tries).arg(pageHiddenAfter).arg(resultShown).arg(onlyClose));
+			check(tries == 3 && noResultYet && pageStays && resultShown && relabelled && updated, QString("the photo dialogs show their result beside the settings (apply ran %1 times, no result after a failure %2, settings stay %3, result shown %4, buttons relabelled %5, second result replaced it %6)").arg(tries).arg(noResultYet).arg(pageStays).arg(resultShown).arg(relabelled).arg(updated));
 		}
 		// the dialog: it opens with a role to choose for every object (a picture of it is saved), and a cancel changes nothing
 		int roleBoxes = 0;

@@ -10341,6 +10341,19 @@ Check that you have permission to write there and that the disk is not full.</so
     </message>
 </context>
 <context>
+    <name>photo_dialog</name>
+    <message>
+        <location filename="../photo_dialog.h" line="57"/>
+        <source>Apply again</source>
+        <translation>もう一度適用</translation>
+    </message>
+    <message>
+        <location filename="../photo_dialog.h" line="58"/>
+        <source>Close</source>
+        <translation>閉じる</translation>
+    </message>
+</context>
+<context>
     <name>sample_photos</name>
     <message>
         <location filename="../sample_photos.cpp" line="24"/>

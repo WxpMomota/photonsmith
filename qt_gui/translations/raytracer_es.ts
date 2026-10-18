@@ -10393,6 +10393,19 @@ Comprueba que tienes permiso para escribir allí y que el disco no está lleno.<
     </message>
 </context>
 <context>
+    <name>photo_dialog</name>
+    <message>
+        <location filename="../photo_dialog.h" line="57"/>
+        <source>Apply again</source>
+        <translation>Aplicar de nuevo</translation>
+    </message>
+    <message>
+        <location filename="../photo_dialog.h" line="58"/>
+        <source>Close</source>
+        <translation>Cerrar</translation>
+    </message>
+</context>
+<context>
     <name>sample_photos</name>
     <message>
         <location filename="../sample_photos.cpp" line="24"/>
