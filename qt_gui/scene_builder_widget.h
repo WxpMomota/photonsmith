@@ -216,6 +216,10 @@ public:
 	void onSavePictureClicked();                                           // "Save picture...": the picture in the preview pane, as a PNG
 	bool previewHasPictureForTest() const { return !m_previewPixmap.isNull(); }
 	bool denoiseTickedForTest() const;
+	bool compositeRunningForTest() const { return m_compositeRunning; }
+	QString previewButtonTextForTest() const;
+	QString previewStatusForTest() const;
+	void pressPreviewForTest();   // the Preview button, which reads Cancel while a render runs
 	void setDenoiseForTest(bool on);   // the Denoise tick next to Preview, which Render into the photo and Preview in the photo follow
 	QSize previewPictureSizeForTest() const { return m_previewPixmap.size(); }
 	void updateCameraPhotoOverlay();                         // shows (or takes away) the photo over the camera view
@@ -551,6 +555,8 @@ private:
 	std::function<void(bool, const QString &)> m_pendingDone;
 	QString m_renderLog;
 	bool m_cancelRequested = false;
+	bool m_compositeRunning = false;   // Render into the photo / Preview in the photo is rendering (its three renders run from renderIntoPhotoRoles, with the window still usable)
+	bool m_compositeCancel = false;    // the Preview button (Cancel while it runs) was pressed
 	QPixmap m_previewPixmap;
 	std::vector<std::function<void()>> m_refreshers;  // re-read each inspector field from the document (after a drag moves something)
 };

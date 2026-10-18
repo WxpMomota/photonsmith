@@ -366,6 +366,10 @@ void SceneBuilderWidget::buildUi() {
 	previewLayout->addWidget(m_previewLabel, 1);
 	previewLayout->addWidget(m_previewStatus);
 	connect(m_previewButton, &QPushButton::clicked, this, [this]() {
+		if (m_compositeRunning) {   // Render into the photo is rendering: the button reads Cancel
+			m_compositeCancel = true;
+			return;
+		}
 		if (m_process) {
 			m_cancelRequested = true;
 			m_process->kill();  // the button reads Cancel while a render runs
@@ -874,11 +878,12 @@ void SceneBuilderWidget::updateActions() {
 	m_undoButton->setEnabled(m_history.canUndo());
 	m_redoButton->setEnabled(m_history.canRedo());
 	const bool ok = !scene_doc::hasErrors(m_problems);   // from the last refreshProblems(): the document has not changed since
-	m_previewButton->setEnabled(ok || m_process);
-	m_finalButton->setEnabled(ok && !m_process);
-	m_inPhotoButton->setEnabled(ok && !m_process);
-	m_turntableButton->setEnabled(ok && !m_process);
-	m_flythroughButton->setEnabled(ok && !m_process && m_doc.cameraViews.size() >= 2);
+	const bool rendering = m_process || m_compositeRunning;
+	m_previewButton->setEnabled(ok || rendering);
+	m_finalButton->setEnabled(ok && !rendering);
+	m_inPhotoButton->setEnabled(ok && !rendering);
+	m_turntableButton->setEnabled(ok && !rendering);
+	m_flythroughButton->setEnabled(ok && !rendering && m_doc.cameraViews.size() >= 2);
 }
 
 void SceneBuilderWidget::updateTitle() {

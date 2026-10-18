@@ -48,6 +48,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 * **Scene Builder: Apply in Match to a photo closes the window** (when the apply worked; when it did not, the window stays open and the panel says why), and the status line says what was done once it is gone. Clicking a photo and changing a setting still apply by themselves while the window is open; Close keeps what was applied. The self-test checks Apply closes it and a failing Apply keeps it open.
 
+* **Scene Builder: Render into the photo and Preview in the photo run like a normal render**: no pop-up progress window; the status line under the picture says "Rendering the scene for the photo: 2 of 3, 40%...", the Preview button reads **Cancel** while it runs (pressing it stops the renderer and puts the buttons back), the other render buttons are off, the window stays usable, and after the first of the three renders the preview pane shows the scene as it is (tone mapped) as a first look until the picture in the photo replaces it. The `composite` self-test checks the Cancel button, the status line, that no pop-up is in the way and that Cancel works.
+
 ## 0.1.5 (2026-10-16)
 
 * **The first Metal render after an install waits about two minutes, not four**: Metal turns the path tracer into machine code once per Mac, for two shader variants (the second is for alpha masks and subsurface), and the app built them one after the other (108 s then 121 s on an M2). They are now built side by side (about 125 s in all: `ray_tracer --prepare-gpu` 231 s -> 136 s, measured with a cold cache). A Live Preview that starts during the warm-up still waits for the build of its own variant instead of compiling it twice.

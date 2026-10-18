@@ -616,6 +616,22 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 				check(!plainNotes.join(" ").contains("denoised"), "and without the tick nothing is said about denoising");
 			}
 		}
+		// It renders like a normal render: while it runs the Preview button reads Cancel, the status line says which render of the three it is on, no pop-up stands in the way, and pressing the button
+		// (Cancel) stops it, leaving the buttons as they were.
+		{
+			bool runningSeen = false, cancelText = false, statusText = false, noPopup = false;
+			QTimer::singleShot(250, [&]() {
+				runningSeen = sb->compositeRunningForTest();
+				cancelText = sb->previewButtonTextForTest() == "Cancel";
+				statusText = sb->previewStatusForTest().contains("Rendering the scene for the photo");
+				noPopup = QApplication::activeModalWidget() == nullptr;
+				sb->pressPreviewForTest();   // Cancel
+			});
+			sb->previewIntoPhoto();
+			check(runningSeen && cancelText && statusText && noPopup, QString("Preview in the photo shows its progress like a render: running %1, the button reads Cancel %2, the status line says which render %3, no pop-up %4").arg(runningSeen).arg(cancelText).arg(statusText).arg(noPopup));
+			check(!sb->compositeRunningForTest() && sb->previewButtonTextForTest() == "Preview" && sb->previewStatusForTest().contains("cancelled"),
+			      QString("and Cancel stops it and puts the buttons back (the status line says: %1)").arg(sb->previewStatusForTest().left(80)));
+		}
 		// "Preview in the photo": no questions, and the picture appears in the preview pane (at the Preview's Draft size) with Save picture... ready
 		sb->previewIntoPhoto();
 		check(sb->previewHasPictureForTest() && sb->previewPictureSizeForTest() == QSize(480, 360), QString("Preview in the photo shows its picture in the preview pane (%1 x %2)").arg(sb->previewPictureSizeForTest().width()).arg(sb->previewPictureSizeForTest().height()));

@@ -91,7 +91,7 @@ std::vector<photo_composite::Role> SceneBuilderWidget::compositeRoles() const {
 }
 
 bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::vector<photo_composite::Role> &rolesGiven, double exposureStops, int samples, int maxWidth, bool matchToPhoto, QString *error, QStringList *notes) {
-	if (m_process) {   // (a Preview, final picture or video is running: two renders at once would fight for the GPU, and the window would take clicks meant for the first)
+	if (m_process || m_compositeRunning) {   // (a Preview, final picture or video is running: two renders at once would fight for the GPU, and the window would take clicks meant for the first)
 		if (error) *error = tr("A render is already running.");
 		return false;
 	}
@@ -141,11 +141,24 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 	const Pass list[3] = {{"full", &base, samples, m_doc.render.maxDepth}, {"ground", &passes.ground, samples, m_doc.render.maxDepth}, {"mask", &passes.mask, 16, 2}};
 	const QString dir = workFolder() + "/composite";
 	QDir().mkpath(dir);
-	QProgressDialog busy(tr("Rendering the scene for the photo..."), tr("Cancel"), 0, 3, this);
-	busy.setWindowTitle(tr("Render into the photo"));
-	busy.setWindowModality(Qt::WindowModal);
-	busy.setMinimumDuration(0);
-	busy.show();
+	// Like a Preview: the status line under the picture says how far it is, the Preview button reads Cancel, and the window stays usable (the other render buttons are off). A scope guard puts it all
+	// back however this function ends.
+	struct Running {
+		SceneBuilderWidget *w;
+		explicit Running(SceneBuilderWidget *widget, const QString &first) : w(widget) {
+			w->m_compositeRunning = true;
+			w->m_compositeCancel = false;
+			w->m_previewButton->setText(SceneBuilderWidget::tr("Cancel"));
+			w->m_previewStatus->setText(first);
+			w->updateActions();
+			w->m_previewButton->setEnabled(true);
+		}
+		~Running() {
+			w->m_compositeRunning = false;
+			w->m_previewButton->setText(SceneBuilderWidget::tr("Preview"));
+			w->updateActions();
+		}
+	} running(this, tr("Rendering the scene for the photo..."));
 	std::vector<float> rgb[3];
 	QElapsedTimer clock;
 	clock.start();
@@ -158,8 +171,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 	logLine(cat, QStringLiteral("render into the photo: %1 x %2, %3 samples, %4 inserted object(s), %5 ground object(s), %6; three renders (as it is, without the inserted objects, mask of them)%7")
 	                 .arg(w).arg(h).arg(samples).arg(inserted).arg(grounds).arg(m_gpuCheck && m_gpuCheck->isChecked() ? QStringLiteral("GPU") : QStringLiteral("CPU"), denoise ? QStringLiteral(", denoised") : QString()));
 	for (int p = 0; p < 3; ++p) {
-		busy.setValue(p);
-		busy.setLabelText(tr("Rendering the scene for the photo: %1 of 3...").arg(p + 1));
+		m_previewStatus->setText(tr("Rendering the scene for the photo: %1 of 3...").arg(p + 1));
 		QCoreApplication::processEvents();
 		const QString scene = dir + "/" + list[p].name + ".pbrt", exr = dir + "/" + list[p].name + ".exr";
 		QFile::remove(exr);
@@ -195,7 +207,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 				if (line.startsWith(QLatin1String("Scanlines remaining:"))) {
 					const int left = line.mid(20).trimmed().toInt();
 					const int percent = std::min(100, std::max(0, 100 * (h - left) / h));
-					busy.setLabelText(tr("Rendering the scene for the photo: %1 of 3, %2%...").arg(p + 1).arg(percent));
+					m_previewStatus->setText(tr("Rendering the scene for the photo: %1 of 3, %2%...").arg(p + 1).arg(percent));
 					if (percent / 25 != lastQuarter) {
 						lastQuarter = percent / 25;
 						logLine(cat, QStringLiteral("    render %1 of 3: %2%").arg(p + 1).arg(percent));
@@ -205,7 +217,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 				}
 			}
 		};
-		for (int waited = 0; process.state() != QProcess::NotRunning && waited < 20 * 60 * 1000 && !busy.wasCanceled(); waited += 50) {
+		for (int waited = 0; process.state() != QProcess::NotRunning && waited < 20 * 60 * 1000 && !m_compositeCancel; waited += 50) {
 			process.waitForFinished(50);
 			drain();
 			QCoreApplication::processEvents();
@@ -214,8 +226,8 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 		if (process.state() != QProcess::NotRunning) {
 			process.kill();
 			process.waitForFinished(3000);
-			if (error && !busy.wasCanceled()) *error = tr("A render took too long and was stopped.");
-			logLine(cat, busy.wasCanceled() ? QStringLiteral("  cancelled by the user") : QStringLiteral("  a render took too long and was stopped"), log_format::Level::Warn);
+			if (error && !m_compositeCancel) *error = tr("A render took too long and was stopped.");
+			logLine(cat, m_compositeCancel ? QStringLiteral("  cancelled by the user") : QStringLiteral("  a render took too long and was stopped"), log_format::Level::Warn);
 			return false;
 		}
 		int rw = 0, rh = 0;
@@ -225,13 +237,22 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 			return false;
 		}
 		if (denoise && p < 2 && denoiseProblem.isEmpty()) ++denoisedPasses;
+		if (p == 0) {   // the scene as it is, on its own: a first look in the preview pane while the other two renders run
+			QImage first(w, h, QImage::Format_RGB888);
+			for (int y = 0; y < h; ++y) {
+				unsigned char *row = first.scanLine(y);
+				for (int x = 0; x < w; ++x)
+					for (int c = 0; c < 3; ++c) row[3 * x + c] = static_cast<unsigned char>(photo_composite::detail::encode(photo_composite::detail::aces(rgb[0][3 * (static_cast<size_t>(y) * w + x) + c])) * 255.0 + 0.5);
+			}
+			m_previewPixmap = QPixmap::fromImage(first);
+			updatePreviewPixmap();
+		}
 		logLine(cat, QStringLiteral("  render %1 of 3 done in %2 s (%3 x %4)").arg(p + 1).arg(passClock.elapsed() / 1000.0, 0, 'f', 1).arg(rw).arg(rh));
 		if (rw != w || rh != h) {
 			if (error) *error = tr("The renderer made a picture of %1 x %2, not the %3 x %4 asked for.").arg(rw).arg(rh).arg(w).arg(h);
 			return false;
 		}
 	}
-	busy.setValue(3);
 	std::vector<float> mask(static_cast<size_t>(w) * h);
 	for (size_t i = 0; i < mask.size(); ++i) mask[i] = std::min(1.0f, std::max(0.0f, (rgb[2][3 * i] + rgb[2][3 * i + 1] + rgb[2][3 * i + 2]) / 3.0f));
 	photo_composite::Options options;
@@ -405,6 +426,10 @@ void SceneBuilderWidget::setDenoiseForTest(bool on) {
 	const QSignalBlocker blocker(m_denoiseCheck);   // (ticking it for real may ask to download the denoiser: a test has nobody to answer)
 	m_denoiseCheck->setChecked(on);
 }
+
+QString SceneBuilderWidget::previewButtonTextForTest() const { return m_previewButton ? m_previewButton->text() : QString(); }
+QString SceneBuilderWidget::previewStatusForTest() const { return m_previewStatus ? m_previewStatus->text() : QString(); }
+void SceneBuilderWidget::pressPreviewForTest() { if (m_previewButton) m_previewButton->click(); }
 
 void SceneBuilderWidget::showInPreview(const QPixmap &picture, const QString &status) {
 	m_previewPixmap = picture;
