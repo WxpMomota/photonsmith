@@ -7,6 +7,8 @@ usage: python3 scripts/bundled_scene_compare.py [--exe build_macos/ray_tracer] [
 Scenes that need files that are not in the checkout are reported as "did not render".
 """
 import argparse
+import shutil
+import atexit
 import os
 import subprocess
 import sys
@@ -39,6 +41,7 @@ def main():
     only = [w for w in args.only.split(",") if w]
     scenes = sorted(f for f in os.listdir(os.path.join(REPO, "pbrt_scenes")) if f.endswith(".pbrt") and (not only or any(w in f for w in only)))
     work = tempfile.mkdtemp(prefix="bundled_compare.")
+    atexit.register(shutil.rmtree, work, ignore_errors=True)   # (it used to leave one folder of pictures behind per run)
     bad = 0
     skipped = []
     for name in scenes:

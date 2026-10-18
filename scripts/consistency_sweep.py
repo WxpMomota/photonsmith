@@ -20,6 +20,7 @@ the EXR reader is in this file.
 Exit code 1 when a pair is off by more than the tolerance. See docs/CONSISTENCY_SWEEP.md.
 """
 import argparse
+import atexit
 import math
 import os
 import shutil
@@ -396,6 +397,8 @@ class Sweep:
 
 def run(args):
     workdir = tempfile.mkdtemp(prefix="consistency_sweep.")
+    if not args.keep:
+        atexit.register(shutil.rmtree, workdir, ignore_errors=True)   # also when a run fails half way or is interrupted (they piled up in the temp folder)
     sw = Sweep(args.exe, args.backends, workdir, args.verbose)
     only = set(args.only.split(",")) if args.only else None
     tol = args.tolerance
