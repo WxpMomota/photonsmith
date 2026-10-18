@@ -1,6 +1,6 @@
 #pragma once
-// photo_dialog.h -- the shape of the photo features' dialogs (Match to a photo for the camera and for the Sun & sky): the settings on the left and, when Ok has done its work, the result beside them in
-// the same window, so the settings are still there to change and apply again. No second pop-up to close on top of the first.
+// photo_dialog.h -- the shape of the photo features' dialogs (Match to a photo for the camera and for the Sun & sky): the photo and the settings on the left, the result on the right, in one window, and
+// no Ok button: whatever is clicked or changed is applied at once (after a short pause, so typing a number is one apply), and the result is the panel's text.
 #include <QCoreApplication>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -10,6 +10,7 @@
 #include <QPushButton>
 #include <QScreen>
 #include <QScrollArea>
+#include <QTimer>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -17,13 +18,13 @@
 
 namespace photo_dialog {
 
-// `dialog` has a vertical layout with `page` (the settings) above `buttons` (Ok and Cancel). The settings go into a scroll area (so a short screen can still reach all of them) and the window is
-// sized to the screen. Ok calls `apply`; when that returns true the text it gave in `result` appears in a panel beside the settings, Ok now reads "Apply again" (the settings are still there to
-// change) and Cancel reads "Close"; when it returns false (it has already said why) nothing else changes. Cancel and Close close the window.
-inline void run(QDialog &dialog, QWidget *page, QDialogButtonBox *buttons, const std::function<bool(QString *result)> &apply) {
+// `dialog` has a vertical layout with `page` (the photo chooser and the settings) above `buttons` (a Close button). The settings go into a scroll area (so a short screen can still reach all of them), the
+// result panel stands beside it and the window is sized to the screen. `wire(schedule)` connects every widget whose change should apply (the photo row, each setting) to `schedule`; a pause of
+// `delayMs` after the last call to it, `apply` runs and the text it gives in `result` (the result, or why it could not be done) is shown in the panel. Nothing is applied before the first call.
+inline void run(QDialog &dialog, QWidget *page, QDialogButtonBox *buttons, const QString &hint, const std::function<void(const std::function<void()> &schedule)> &wire,
+                const std::function<bool(QString *result)> &apply, int delayMs = 350) {
 	auto *layout = qobject_cast<QVBoxLayout *>(dialog.layout());
 	if (!layout) return;
-	// the settings in a scroll area, the result panel beside it (hidden until there is a result)
 	const int slot = layout->indexOf(page);
 	layout->removeWidget(page);
 	auto *settings = new QScrollArea(&dialog);
@@ -35,8 +36,7 @@ inline void run(QDialog &dialog, QWidget *page, QDialogButtonBox *buttons, const
 	panel->setWidgetResizable(true);
 	panel->setFrameShape(QFrame::NoFrame);
 	panel->setFixedWidth(420);
-	panel->hide();
-	auto *text = new QLabel(panel);
+	auto *text = new QLabel(hint, panel);
 	text->setWordWrap(true);
 	text->setTextInteractionFlags(Qt::TextSelectableByMouse);
 	text->setAlignment(Qt::AlignTop | Qt::AlignLeft);
@@ -48,16 +48,15 @@ inline void run(QDialog &dialog, QWidget *page, QDialogButtonBox *buttons, const
 	layout->insertLayout(slot, row, 1);
 
 	QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-	QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, [&dialog, buttons, panel, text, apply]() {
+	auto *pause = new QTimer(&dialog);
+	pause->setSingleShot(true);
+	pause->setInterval(delayMs);
+	QObject::connect(pause, &QTimer::timeout, &dialog, [text, apply]() {
 		QString result;
-		if (!apply(&result)) return;   // (it said why: the settings stay, to be changed)
+		apply(&result);
 		text->setText(result);
-		const bool first = !panel->isVisible();
-		panel->show();
-		if (QPushButton *ok = buttons->button(QDialogButtonBox::Ok)) ok->setText(QCoreApplication::translate("photo_dialog", "Apply again"));
-		if (QPushButton *close = buttons->button(QDialogButtonBox::Cancel)) close->setText(QCoreApplication::translate("photo_dialog", "Close"));
-		if (first) dialog.resize(dialog.width() + panel->width() + 12, dialog.height());   // (the panel appears beside the settings, which keep their size)
 	});
+	wire([pause]() { pause->start(); });
 
 	layout->activate();
 	QSize want = dialog.sizeHint().expandedTo(dialog.size());

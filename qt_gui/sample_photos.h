@@ -33,7 +33,8 @@ public:
 	void chooseOwnPhotoForTest(const QString &file) { useOwnPhoto(file); }
 
 signals:
-	void photoChanged(const QString &photo);
+	void photoChanged(const QString &photo);   // the selected photo is another one (also set from code)
+	void photoPicked(const QString &photo);    // the user chose a photo: a click (the selected one again too), a key, or one's own file
 
 private:
 	void showCredit();

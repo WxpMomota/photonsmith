@@ -524,41 +524,34 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			}
 			check(!notes.isEmpty(), "the user is told what was done: " + notes.join(" / ").left(120));
 		}
-		// The photo dialogs show their result beside the settings, in the same window: Ok does the work (a failure leaves things as they were), the result appears while the settings stay, and Ok
-		// (now "Apply again") works once more; Cancel (now "Close") closes.
+		// The photo dialogs apply what is clicked or changed at once and show the result beside the settings: nothing is applied before the first click, two quick changes are one apply, a failure is shown
+		// in the panel (not a pop-up) and the next change tries again.
 		{
 			QDialog probe(this);
 			auto *probeLayout = new QVBoxLayout(&probe);
 			auto *page = new QWidget(&probe);
 			auto *pageLayout = new QVBoxLayout(page);
-			pageLayout->addWidget(new QLabel("settings", page));
+			auto *trigger = new QPushButton("change", page);
+			pageLayout->addWidget(trigger);
 			probeLayout->addWidget(page);
-			auto *probeButtons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &probe);
+			auto *probeButtons = new QDialogButtonBox(QDialogButtonBox::Close, &probe);
 			probeLayout->addWidget(probeButtons);
 			int tries = 0;
-			bool noResultYet = false, pageStays = false, resultShown = false, relabelled = false, updated = false;
-			QTimer::singleShot(300, [&]() { probeButtons->button(QDialogButtonBox::Ok)->click(); });   // the first Ok fails
-			QTimer::singleShot(600, [&]() {
-				for (QLabel *label : probe.findChildren<QLabel *>()) noResultYet = noResultYet || label->text().startsWith("done");
-				noResultYet = !noResultYet;
-				probeButtons->button(QDialogButtonBox::Ok)->click();   // the second works
-			});
-			QTimer::singleShot(1000, [&]() {
-				pageStays = page->isVisible();
-				for (QLabel *label : probe.findChildren<QLabel *>()) resultShown = resultShown || (label->text() == "done 2" && label->isVisible());
-				relabelled = probeButtons->button(QDialogButtonBox::Ok)->text() == "Apply again" && probeButtons->button(QDialogButtonBox::Cancel)->text() == "Close";
-				probeButtons->button(QDialogButtonBox::Ok)->click();   // and again
-			});
-			QTimer::singleShot(1400, [&]() {
-				for (QLabel *label : probe.findChildren<QLabel *>()) updated = updated || (label->text() == "done 3" && label->isVisible());
-				probeButtons->button(QDialogButtonBox::Cancel)->click();
-			});
-			photo_dialog::run(probe, page, probeButtons, [&tries](QString *result) {
-				if (++tries == 1) return false;
-				*result = QString("done %1").arg(tries);
-				return true;
-			});
-			check(tries == 3 && noResultYet && pageStays && resultShown && relabelled && updated, QString("the photo dialogs show their result beside the settings (apply ran %1 times, no result after a failure %2, settings stay %3, result shown %4, buttons relabelled %5, second result replaced it %6)").arg(tries).arg(noResultYet).arg(pageStays).arg(resultShown).arg(relabelled).arg(updated));
+			bool hintFirst = false, failureShown = false, oneApplyForTwo = false, resultShown = false;
+			auto panelText = [&probe](const QString &starts) {
+				for (QLabel *label : probe.findChildren<QLabel *>()) if (label->text().startsWith(starts) && label->isVisible()) return true;
+				return false;
+			};
+			QTimer::singleShot(300, [&]() { hintFirst = tries == 0 && panelText("the hint"); trigger->click(); });
+			QTimer::singleShot(900, [&]() { failureShown = tries == 1 && panelText("failed"); trigger->click(); trigger->click(); });   // two quick changes
+			QTimer::singleShot(1500, [&]() { oneApplyForTwo = tries == 2; resultShown = panelText("done 2"); probeButtons->button(QDialogButtonBox::Close)->click(); });
+			photo_dialog::run(probe, page, probeButtons, "the hint", [&](const std::function<void()> &schedule) { QObject::connect(trigger, &QPushButton::clicked, &probe, schedule); },
+			                  [&tries](QString *result) {
+				                  ++tries;
+				                  *result = tries == 1 ? QString("failed") : QString("done %1").arg(tries);
+				                  return tries != 1;
+			                  }, 100);
+			check(hintFirst && failureShown && oneApplyForTwo && resultShown && tries == 2, QString("the photo windows apply at once: hint first %1, a failure is shown in the panel %2, two quick changes are one apply %3, the result is shown %4 (%5 applies)").arg(hintFirst).arg(failureShown).arg(oneApplyForTwo).arg(resultShown).arg(tries));
 		}
 		// the dialog: it opens with a role to choose for every object (a picture of it is saved), and a cancel changes nothing
 		int roleBoxes = 0;
@@ -674,43 +667,51 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			check(madeReal, "the real photo " + real + " was put into: " + realError);
 			for (const QString &n : realNotes) log("note: " + n);
 		}
-		// The whole of Match to a photo for the camera is one window: the photos to choose from (a picture of each, the first selected), the settings, Ok, and then the result in that same window and Close.
+		// Match to a photo for the camera is one window with no Ok: a click on a sample applies it at once and the result is beside the settings; another click applies that one (taking the first back, so the
+		// undo list grows by one apply, not two); one's own photo joins the row and applies too.
 		{
 			const QString out = qEnvironmentVariable("RT_GUI_SELFTEST_OUT");
-			auto click = [](QWidget *w, const QString &text) {
-				for (QPushButton *b : w->findChildren<QPushButton *>())
-					if (b->text().remove(QLatin1Char('&')) == text) { b->click(); return true; }
-				return false;
-			};
 			QString seen;
 			int samplesListed = 0;
-			bool ownPhotoUsed = false;
+			std::size_t depthAtStart = sb->undoDepth(), depthAfterTwo = 0;
+			auto panelHas = [](QWidget *w, const QString &what) {
+				for (QLabel *label : w->findChildren<QLabel *>()) if (label->isVisible() && label->text().contains(what)) return true;
+				return false;
+			};
+			auto firstList = [](QWidget *w) { return w->findChildren<QListWidget *>().first(); };
 			QTimer::singleShot(900, [&]() {
 				if (QWidget *w = QApplication::activeModalWidget()) {
-					seen += "window ";
-					for (QListWidget *list : w->findChildren<QListWidget *>()) samplesListed = list->count();
+					seen += panelHas(w, "Click a photo to use it") ? "hint " : "";
+					samplesListed = firstList(w)->count();
 					w->grab().save(out + "_camera_settings.png");
-					// one's own photo goes into the row too, and is the one used
-					if (auto *picker = w->findChild<sample_photos::Picker *>()) {
-						picker->chooseOwnPhotoForTest(QDir::tempPath() + "/rt_selftest_composite.png");
-						ownPhotoUsed = picker->photo().endsWith("rt_selftest_composite.png");
-						for (QListWidget *list : w->findChildren<QListWidget *>()) samplesListed = std::max(samplesListed, list->count()) - 1;   // (the row of one's own is not a sample)
-						picker->chooseOwnPhotoForTest(QDir::tempPath() + "/rt_selftest_composite.png");   // (the same row again: still fine)
-						w->findChildren<QListWidget *>().first()->setCurrentRow(0);                       // and back to the first sample
-					}
-					click(w, "OK");
+					firstList(w)->setCurrentRow(1);   // the second sample is clicked (a click makes it the current one, then says it was clicked)
+					emit firstList(w)->itemClicked(firstList(w)->item(1));
 				}
 			});
-			QTimer::singleShot(4000, [&]() {
+			QTimer::singleShot(3500, [&]() {
 				if (QWidget *w = QApplication::activeModalWidget()) {
-					seen += w->findChildren<QLabel *>().size() ? "result " : "";
+					seen += panelHas(w, "north-sea.jpg") ? "north-sea " : "";
 					w->grab().save(out + "_camera_result.png");
-					click(w, "Close");
+					firstList(w)->setCurrentRow(0);   // and then the first, as an arrow key would
+				}
+			});
+			QTimer::singleShot(6000, [&]() {
+				if (QWidget *w = QApplication::activeModalWidget()) {
+					seen += panelHas(w, "beach.jpg") ? "beach " : "";
+					depthAfterTwo = sb->undoDepth();
+					if (auto *picker = w->findChild<sample_photos::Picker *>()) picker->chooseOwnPhotoForTest(QDir::tempPath() + "/rt_selftest_composite.png");
+				}
+			});
+			QTimer::singleShot(8500, [&]() {
+				if (QWidget *w = QApplication::activeModalWidget()) {
+					seen += panelHas(w, "rt_selftest_composite.png") ? "own " : "";
+					for (QPushButton *b : w->findChildren<QPushButton *>())
+						if (b->text().remove(QLatin1Char('&')) == "Close") { b->click(); break; }
 				}
 			});
 			sb->cameraFromPhoto();
-			check(seen == "window result " && samplesListed == static_cast<int>(samples.size()) && ownPhotoUsed,
-			      QString("Match to a photo for the camera is one window (%1; %2 samples listed; one's own photo used %3)").arg(seen).arg(samplesListed).arg(ownPhotoUsed));
+			check(seen == "hint north-sea beach own " && samplesListed == static_cast<int>(samples.size()) && depthAfterTwo - depthAtStart <= 2,
+			      QString("Match to a photo for the camera is one window that applies on click (%1; %2 samples listed; two applies left %3 undo steps)").arg(seen).arg(samplesListed).arg(depthAfterTwo - depthAtStart));
 		}
 	}
 	QTimer::singleShot(600, this, [this, shot, log, ok]() {

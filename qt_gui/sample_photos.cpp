@@ -83,7 +83,9 @@ Picker::Picker(const QString &ownPhotoTitle, QWidget *parent) : QWidget(parent),
 	connect(m_list, &QListWidget::currentRowChanged, this, [this](int) {
 		showCredit();
 		emit photoChanged(photo());
+		emit photoPicked(photo());
 	});
+	connect(m_list, &QListWidget::itemClicked, this, [this](QListWidgetItem *) { emit photoPicked(photo()); });   // (a click on the one already selected too)
 	connect(own, &QPushButton::clicked, this, [this]() {
 		const QString file = QFileDialog::getOpenFileName(this, m_ownTitle, QString(), QCoreApplication::translate("sample_photos", "Images (*.png *.jpg *.jpeg *.bmp *.tga)"));
 		if (!file.isEmpty()) useOwnPhoto(file);
@@ -123,6 +125,7 @@ void Picker::useOwnPhoto(const QString &file) {
 	if (wasSelected) {               // (the same row, a different file: no row change to tell it)
 		showCredit();
 		emit photoChanged(file);
+		emit photoPicked(file);
 	}
 }
 

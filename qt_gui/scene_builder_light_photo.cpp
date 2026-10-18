@@ -132,20 +132,28 @@ void SceneBuilderWidget::lightFromPhoto(int lightIndex) {
 	                    "not hidden by buildings or trees."));
 	form->addRow(tr("Camera tilt"), tilt);
 	pageLayout->addLayout(form);
-	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
 	layout->addWidget(buttons);
-	photo_dialog::run(dialog, page, buttons, [&](QString *result) {
-		const QString photo = picker->photo();
-		QString error;
-		QStringList notes;
-		const bool tiltGiven = tilt->value() > tilt->minimum();
-		if (!applyLightPhoto(lightIndex, photo, fov->value(), tiltGiven, tilt->value(), &error, &notes)) {
-			logLine(QStringLiteral("photo"), QStringLiteral("light from a photo failed: %1").arg(error), log_format::Level::Warn);
-			QMessageBox::warning(&dialog, tr("Could not read the light"), error);
-			return false;
-		}
-		for (const QString &note : notes) logLine(QStringLiteral("photo"), QStringLiteral("  %1").arg(note));
-		*result = tr("The sky was set from %1:\n\n- %2").arg(QFileInfo(photo).fileName(), notes.join("\n- "));
-		return true;
-	});
+	const std::size_t baseline = undoDepth();   // (every apply takes back the last one first, so the window leaves one apply behind, not one for every click)
+	photo_dialog::run(
+	    dialog, page, buttons, tr("Click a photo to use it: the sky is set from it at once, and again whenever you change a setting."),
+	    [&](const std::function<void()> &schedule) {
+		    connect(picker, &sample_photos::Picker::photoPicked, &dialog, schedule);
+		    for (QDoubleSpinBox *spin : {fov, tilt}) connect(spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dialog, schedule);
+	    },
+	    [&](QString *result) {
+		    undoTo(baseline);
+		    const QString photo = picker->photo();
+		    QString error;
+		    QStringList notes;
+		    const bool tiltGiven = tilt->value() > tilt->minimum();
+		    if (!applyLightPhoto(lightIndex, photo, fov->value(), tiltGiven, tilt->value(), &error, &notes)) {
+			    logLine(QStringLiteral("photo"), QStringLiteral("light from a photo failed: %1").arg(error), log_format::Level::Warn);
+			    *result = tr("The sky could not be set from this photo: %1").arg(error);
+			    return false;
+		    }
+		    for (const QString &note : notes) logLine(QStringLiteral("photo"), QStringLiteral("  %1").arg(note));
+		    *result = tr("The sky was set from %1:\n\n- %2").arg(QFileInfo(photo).fileName(), notes.join("\n- "));
+		    return true;
+	    });
 }

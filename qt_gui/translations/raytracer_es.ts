@@ -9367,6 +9367,16 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <translation>La dirección del sol se fija respecto a hacia dónde mira ahora la cámara del Builder, como estaba respecto a hacia dónde mira la foto. La exposición de la foto no se conoce, así que el Brillo del cielo se queda como estaba.</translation>
     </message>
     <message>
+        <location filename="../scene_builder_light_photo.cpp" line="139"/>
+        <source>Click a photo to use it: the sky is set from it at once, and again whenever you change a setting.</source>
+        <translation>Haz clic en una foto para usarla: el cielo se ajusta a ella al instante, y de nuevo cada vez que cambies un ajuste.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="152"/>
+        <source>The sky could not be set from this photo: %1</source>
+        <translation>No se pudo ajustar el cielo a partir de esta foto: %1</translation>
+    </message>
+    <message>
         <location filename="../scene_builder_material_photo.cpp" line="149"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.tga)</source>
         <translation>Imágenes (*.png *.jpg *.jpeg *.bmp *.tga)</translation>
@@ -9515,17 +9525,26 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <translation>Ajustar también el sol y el cielo a partir de la foto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="189"/>
-        <source>Could not read the camera</source>
-        <translation>No se pudo leer la cámara</translation>
+        <location filename="../scene_builder_camera_photo.cpp" line="185"/>
+        <source>Click a photo to use it: the camera is set from it at once, and again whenever you change a setting.</source>
+        <translation>Haz clic en una foto para usarla: la cámara se ajusta a ella al instante, y de nuevo cada vez que cambies un ajuste.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="193"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="198"/>
+        <source>The camera could not be set from this photo: %1</source>
+        <translation>No se pudo ajustar la cámara a partir de esta foto: %1</translation>
+    </message>
+    <message>
+        <source>Could not read the camera</source>
+        <translation type="vanished">No se pudo leer la cámara</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_photo.cpp" line="202"/>
         <source>Next: pick an object in the list, press Place the picked object by clicking... in its properties, click the ground in the picture, then press Render into the photo... on Camera and image.</source>
         <translation>Siguiente: elige un objeto en la lista, pulsa Colocar el objeto elegido con un clic... en sus propiedades, haz clic en el suelo de la imagen y luego pulsa Renderizar en la foto... en Cámara e imagen.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="194"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="203"/>
         <source>The camera was set from %1:
 
 - %2</source>
@@ -9534,38 +9553,38 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
 - %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="203"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="212"/>
         <source>Pick an object first (click it in the list or the view), then Place by clicking.</source>
         <translation>Elige primero un objeto (haz clic en él en la lista o en la vista) y luego Colocar con un clic.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="209"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="218"/>
         <source>Click the ground in the picture to stand the picked object there. Click again to move it; Esc stops.</source>
         <translation>Haz clic en el suelo de la imagen para colocar allí el objeto elegido. Haz clic otra vez para moverlo; Esc termina.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="220"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="229"/>
         <source>Placed on the ground. It is %1 m tall; the camera is %2 m above the ground. Click again to move it, Esc stops, or set its real height.</source>
         <translation>Colocado en el suelo. Mide %1 m de alto; la cámara está a %2 m del suelo. Haz clic otra vez para moverlo, Esc termina, o fija su altura real.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="238"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="247"/>
         <source>Pick an object first: its height is made what you say, about the middle of its base.</source>
         <translation>Elige primero un objeto: su altura se hace la que indiques, respecto al centro de su base.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="242"/>
-        <location filename="../scene_builder_camera_photo.cpp" line="244"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="251"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="253"/>
         <source>Real height</source>
         <translation>Altura real</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="242"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="251"/>
         <source>How tall is it in the photo (metres)? The picked object is scaled about the middle of its base.</source>
         <translation>¿Qué altura tiene en la foto (metros)? El objeto elegido se escala respecto al centro de su base.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="244"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="253"/>
         <source>It cannot be made that tall (the size may change by up to 100 times).</source>
         <translation>No se puede hacer tan alto (el tamaño puede cambiar hasta 100 veces).</translation>
     </message>
@@ -9581,12 +9600,11 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <translation>Inclinación de la cámara</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="144"/>
         <source>Could not read the light</source>
-        <translation>No se pudo leer la luz</translation>
+        <translation type="vanished">No se pudo leer la luz</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="148"/>
+        <location filename="../scene_builder_light_photo.cpp" line="156"/>
         <source>The sky was set from %1:
 
 - %2</source>
@@ -10395,14 +10413,12 @@ Comprueba que tienes permiso para escribir allí y que el disco no está lleno.<
 <context>
     <name>photo_dialog</name>
     <message>
-        <location filename="../photo_dialog.h" line="57"/>
         <source>Apply again</source>
-        <translation>Aplicar de nuevo</translation>
+        <translation type="vanished">Aplicar de nuevo</translation>
     </message>
     <message>
-        <location filename="../photo_dialog.h" line="58"/>
         <source>Close</source>
-        <translation>Cerrar</translation>
+        <translation type="vanished">Cerrar</translation>
     </message>
 </context>
 <context>
@@ -10463,17 +10479,17 @@ Comprueba que tienes permiso para escribir allí y que el disco no está lleno.<
         <translation>Prueba una foto de ejemplo o usa una tuya.</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="98"/>
+        <location filename="../sample_photos.cpp" line="100"/>
         <source>Photo: %1</source>
         <translation>Foto: %1</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="99"/>
+        <location filename="../sample_photos.cpp" line="101"/>
         <source>Your photo: %1</source>
         <translation>Tu foto: %1</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="118"/>
+        <location filename="../sample_photos.cpp" line="120"/>
         <source>My photo</source>
         <translation>Mi foto</translation>
     </message>
@@ -10487,7 +10503,7 @@ Comprueba que tienes permiso para escribir allí y que el disco no está lleno.<
         <translation>Elegir una foto propia...</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="88"/>
+        <location filename="../sample_photos.cpp" line="90"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.tga)</source>
         <translation>Imágenes (*.png *.jpg *.jpeg *.bmp *.tga)</translation>
     </message>

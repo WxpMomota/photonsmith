@@ -254,6 +254,8 @@ public:
 	bool runActionForTest(const QString &words);   // runs the best match for the words, as if picked in the box
 	void deleteSelected();
 	bool undo();
+	std::size_t undoDepth() const { return m_history.undoSize(); }
+	void undoTo(std::size_t depth) { while (m_history.undoSize() > depth && undo()) {} }   // (the photo windows take back their own last apply before the next, so they leave one apply behind)
 	bool redo();
 	// A video of the scene from a camera that goes once round the point the camera looks at (scene_builder_turntable.cpp). The window asks for the length, speed and
 	// quality and where to save the MP4; startTurntable() renders `frames` pictures `width` pixels wide (the height follows the scene's picture shape) and puts them together

@@ -9321,6 +9321,16 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>太阳的方向是相对于 Builder 相机当前朝向来设置的，就像它相对于照片朝向那样。照片的曝光未知，所以天空的“亮度”保持不变。</translation>
     </message>
     <message>
+        <location filename="../scene_builder_light_photo.cpp" line="139"/>
+        <source>Click a photo to use it: the sky is set from it at once, and again whenever you change a setting.</source>
+        <translation>点击一张照片即可使用：天空会立即根据它设置，之后每次更改设置时会再次设置。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_light_photo.cpp" line="152"/>
+        <source>The sky could not be set from this photo: %1</source>
+        <translation>无法根据这张照片设置天空：%1</translation>
+    </message>
+    <message>
         <location filename="../scene_builder_material_photo.cpp" line="149"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.tga)</source>
         <translation>图像 (*.png *.jpg *.jpeg *.bmp *.tga)</translation>
@@ -9469,17 +9479,26 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>同时根据照片设置太阳和天空</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="189"/>
-        <source>Could not read the camera</source>
-        <translation>无法读出相机</translation>
+        <location filename="../scene_builder_camera_photo.cpp" line="185"/>
+        <source>Click a photo to use it: the camera is set from it at once, and again whenever you change a setting.</source>
+        <translation>点击一张照片即可使用：相机会立即根据它设置，之后每次更改设置时会再次设置。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="193"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="198"/>
+        <source>The camera could not be set from this photo: %1</source>
+        <translation>无法根据这张照片设置相机：%1</translation>
+    </message>
+    <message>
+        <source>Could not read the camera</source>
+        <translation type="vanished">无法读出相机</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_camera_photo.cpp" line="202"/>
         <source>Next: pick an object in the list, press Place the picked object by clicking... in its properties, click the ground in the picture, then press Render into the photo... on Camera and image.</source>
         <translation>下一步：在列表中选择一个物体，在它的属性中点击“点击放置所选物体...”，再点击画面中的地面，然后在“相机与图像”上点击“渲染到照片中...”。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="194"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="203"/>
         <source>The camera was set from %1:
 
 - %2</source>
@@ -9488,38 +9507,38 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
 - %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="203"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="212"/>
         <source>Pick an object first (click it in the list or the view), then Place by clicking.</source>
         <translation>请先选择一个物体（在列表或视图中点击它），然后使用“点击放置”。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="209"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="218"/>
         <source>Click the ground in the picture to stand the picked object there. Click again to move it; Esc stops.</source>
         <translation>点击画面中的地面，把所选物体放在那里。再次点击可移动它；按 Esc 结束。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="220"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="229"/>
         <source>Placed on the ground. It is %1 m tall; the camera is %2 m above the ground. Click again to move it, Esc stops, or set its real height.</source>
         <translation>已放在地面上。它高 %1 米；相机离地 %2 米。再次点击可移动它，按 Esc 结束，也可以设置它的实际高度。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="238"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="247"/>
         <source>Pick an object first: its height is made what you say, about the middle of its base.</source>
         <translation>请先选择一个物体：它的高度会变为你给出的值，以底面中心为基准。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="242"/>
-        <location filename="../scene_builder_camera_photo.cpp" line="244"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="251"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="253"/>
         <source>Real height</source>
         <translation>实际高度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="242"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="251"/>
         <source>How tall is it in the photo (metres)? The picked object is scaled about the middle of its base.</source>
         <translation>它在照片中有多高（米）？所选物体会以底面中心为基准缩放。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="244"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="253"/>
         <source>It cannot be made that tall (the size may change by up to 100 times).</source>
         <translation>无法调到这个高度（尺寸最多可变化 100 倍）。</translation>
     </message>
@@ -9535,12 +9554,11 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>相机倾斜</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="144"/>
         <source>Could not read the light</source>
-        <translation>无法读出光照</translation>
+        <translation type="vanished">无法读出光照</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="148"/>
+        <location filename="../scene_builder_light_photo.cpp" line="156"/>
         <source>The sky was set from %1:
 
 - %2</source>
@@ -10349,14 +10367,12 @@ Check that you have permission to write there and that the disk is not full.</so
 <context>
     <name>photo_dialog</name>
     <message>
-        <location filename="../photo_dialog.h" line="57"/>
         <source>Apply again</source>
-        <translation>再次应用</translation>
+        <translation type="vanished">再次应用</translation>
     </message>
     <message>
-        <location filename="../photo_dialog.h" line="58"/>
         <source>Close</source>
-        <translation>关闭</translation>
+        <translation type="vanished">关闭</translation>
     </message>
 </context>
 <context>
@@ -10417,17 +10433,17 @@ Check that you have permission to write there and that the disk is not full.</so
         <translation>试试示例照片，或使用你自己的照片。</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="98"/>
+        <location filename="../sample_photos.cpp" line="100"/>
         <source>Photo: %1</source>
         <translation>照片：%1</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="99"/>
+        <location filename="../sample_photos.cpp" line="101"/>
         <source>Your photo: %1</source>
         <translation>你的照片：%1</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="118"/>
+        <location filename="../sample_photos.cpp" line="120"/>
         <source>My photo</source>
         <translation>我的照片</translation>
     </message>
@@ -10441,7 +10457,7 @@ Check that you have permission to write there and that the disk is not full.</so
         <translation>选择我自己的照片...</translation>
     </message>
     <message>
-        <location filename="../sample_photos.cpp" line="88"/>
+        <location filename="../sample_photos.cpp" line="90"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.tga)</source>
         <translation>图像 (*.png *.jpg *.jpeg *.bmp *.tga)</translation>
     </message>
