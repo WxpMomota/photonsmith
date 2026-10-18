@@ -3598,7 +3598,7 @@ SVGF Denoiser: an alternative, experimental noise-reduction filter. Instead of b
         <translation>提亮较暗的场景，避免画面几乎全黑：把被照亮像素的平均亮度向中灰提升，最多 64 倍，并平滑地跟随画面变化。它绝不会让任何东西变暗，曝光正常或较亮的场景与关闭时完全一样。它会与上方的曝光值相乘，曝光值仍可作为手动修正。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="94"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="95"/>
         <location filename="../mainwindow_tabs_render_live.cpp" line="742"/>
         <source>AI denoise</source>
         <translation>AI 降噪</translation>
@@ -5112,38 +5112,38 @@ CPU only. Only works with lights that have a physical size or shape.</source>
         <translation>&lt;br&gt;&lt;br&gt;&lt;b&gt;使用的设置&lt;/b&gt;&lt;br&gt;%1</translation>
     </message>
     <message>
-        <location filename="../recent_renders.cpp" line="334"/>
+        <location filename="../recent_renders.cpp" line="354"/>
         <source>just now</source>
         <translation>just now</translation>
     </message>
     <message>
-        <location filename="../recent_renders.cpp" line="335"/>
+        <location filename="../recent_renders.cpp" line="355"/>
         <source>%1 min ago</source>
         <translation>%1 分钟前</translation>
     </message>
     <message>
-        <location filename="../recent_renders.cpp" line="336"/>
+        <location filename="../recent_renders.cpp" line="356"/>
         <source>%1 hr ago</source>
         <translation>%1 小时前</translation>
     </message>
     <message>
-        <location filename="../recent_renders.cpp" line="337"/>
+        <location filename="../recent_renders.cpp" line="357"/>
         <source>%1 days ago</source>
         <translation>%1 天前</translation>
     </message>
     <message>
-        <location filename="../recent_renders.cpp" line="344"/>
+        <location filename="../recent_renders.cpp" line="364"/>
         <source>%1%2 — %3</source>
         <translation>%1%2 — %3</translation>
     </message>
     <message>
-        <location filename="../recent_renders.cpp" line="346"/>
-        <location filename="../recent_renders.cpp" line="351"/>
+        <location filename="../recent_renders.cpp" line="366"/>
+        <location filename="../recent_renders.cpp" line="371"/>
         <source> · Video</source>
         <translation> · 视频</translation>
     </message>
     <message>
-        <location filename="../recent_renders.cpp" line="354"/>
+        <location filename="../recent_renders.cpp" line="374"/>
         <source>%1 — %2×%3 · %4spp · %5%6%7 — %8</source>
         <translation>%1 — %2×%3 · %4spp · %5%6%7 — %8</translation>
     </message>
@@ -8613,8 +8613,8 @@ From: %3</source>
         <translation>底</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="516"/>
-        <location filename="../mainwindow_selftest_modes.cpp" line="564"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="517"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="565"/>
         <location filename="../scene_builder_actions.cpp" line="88"/>
         <location filename="../scene_builder_views.cpp" line="85"/>
         <location filename="../scene_builder_views.cpp" line="121"/>
@@ -8622,7 +8622,7 @@ From: %3</source>
         <translation>顶视</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="518"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="519"/>
         <location filename="../scene_builder_actions.cpp" line="86"/>
         <location filename="../scene_builder_views.cpp" line="83"/>
         <location filename="../scene_builder_views.cpp" line="121"/>
@@ -8630,7 +8630,7 @@ From: %3</source>
         <translation>前视</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="520"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="521"/>
         <location filename="../scene_builder_actions.cpp" line="87"/>
         <location filename="../scene_builder_inspector.cpp" line="788"/>
         <location filename="../scene_builder_views.cpp" line="84"/>
@@ -9285,38 +9285,38 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>选择表面的照片</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="29"/>
+        <location filename="../scene_builder_light_photo.cpp" line="30"/>
         <source>There is no sky light to set.</source>
         <translation>没有可设置的天空光源。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="48"/>
-        <location filename="../scene_builder_light_photo.cpp" line="36"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="49"/>
+        <location filename="../scene_builder_light_photo.cpp" line="37"/>
         <source>The photo %1 could not be read: %2</source>
         <translation>无法读取照片 %1：%2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="80"/>
+        <location filename="../scene_builder_light_photo.cpp" line="81"/>
         <source>The sky is even (overcast), so the sun&apos;s direction cannot be told: it is set high and the haze to its most. Change Sun height and Sun direction by hand if you know them.</source>
         <translation>天空是均匀的（阴天），无法判断太阳的方向：太阳被设得较高，雾霾设为最大。如果你知道，请手动修改“太阳高度”和“太阳方向”。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="81"/>
+        <location filename="../scene_builder_light_photo.cpp" line="82"/>
         <source>The sun is in the photo: its height and direction are read straight off it.</source>
         <translation>太阳就在照片中：其高度和方向直接从照片中读出。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="82"/>
+        <location filename="../scene_builder_light_photo.cpp" line="83"/>
         <source>The sun is not in the photo: its height and direction are fitted to how the sky&apos;s brightness varies (confidence %1%).</source>
         <translation>太阳不在照片中：其高度和方向根据天空亮度的变化拟合得出（置信度 %1%）。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="83"/>
+        <location filename="../scene_builder_light_photo.cpp" line="84"/>
         <source>The camera was tilted %1 degrees (read off the horizon).</source>
         <translation>相机倾斜了 %1 度（由地平线读出）。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="85"/>
+        <location filename="../scene_builder_light_photo.cpp" line="86"/>
         <source>The sun&apos;s direction is set relative to where the Builder&apos;s camera looks now, as it was relative to where the photo looks. The photo&apos;s exposure is not known, so the sky&apos;s Brightness stays as it was.</source>
         <translation>太阳的方向是相对于 Builder 相机当前朝向来设置的，就像它相对于照片朝向那样。照片的曝光未知，所以天空的“亮度”保持不变。</translation>
     </message>
@@ -9326,49 +9326,48 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation>图像 (*.png *.jpg *.jpeg *.bmp *.tga)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="92"/>
+        <location filename="../scene_builder_light_photo.cpp" line="93"/>
         <source>Choose a photo with the sky in it</source>
         <translation>选择一张能看到天空的照片</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="96"/>
-        <location filename="../scene_builder_light_photo.cpp" line="139"/>
+        <location filename="../scene_builder_light_photo.cpp" line="97"/>
         <source>Light from a photo</source>
         <translation>由照片生成光照</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="98"/>
+        <location filename="../scene_builder_light_photo.cpp" line="103"/>
         <source>The sun&apos;s height and direction and the haze are read from the sky in the photo (a blue or white sky that reaches the top of the picture), and the Sun &amp;&amp; sky settings are set to match. The photo should show some sky and, for the height, the horizon. Both settings below are optional.</source>
         <translation>从照片的天空（延伸到图像顶部的蓝色或白色天空）中读出太阳的高度和方向以及雾霾，并设置“太阳与天空”使之匹配。照片中应有一些天空，要读出高度还需要有地平线。下面两项设置都是可选的。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="139"/>
-        <location filename="../scene_builder_light_photo.cpp" line="112"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="144"/>
+        <location filename="../scene_builder_light_photo.cpp" line="117"/>
         <source> degrees</source>
         <translation> 度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="113"/>
+        <location filename="../scene_builder_light_photo.cpp" line="118"/>
         <source>How wide the photo sees, left to right. A phone&apos;s main camera is about 65 to 70 degrees; a wide-angle one 100 or more.</source>
         <translation>照片从左到右的视野宽度。手机主摄大约是 65 到 70 度；广角镜头为 100 度或更多。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="92"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="93"/>
         <source>The lens was read from the photo&apos;s own data: %1 degrees across.</source>
         <translation>镜头信息从照片自带的数据中读出：横向 %1 度。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="93"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="94"/>
         <source>The photo does not say what lens took it, so a phone&apos;s field of view was assumed (%1 degrees across); set it if you know it.</source>
         <translation>照片没有说明用的是什么镜头，因此假设为手机的视野（横向 %1 度）；如果你知道，请自行设置。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="94"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="95"/>
         <source>The horizon in the photo gave the camera&apos;s tilt (%1 degrees up) and roll (%2 degrees).</source>
         <translation>照片中的地平线给出了相机的倾斜（向上 %1 度）和翻滚（%2 度）。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="96"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="97"/>
         <source>The camera keeps the direction it looked in, is %1 m above the ground, and the picture has the photo&apos;s shape. The photo is laid over the camera view (Camera section: Show the photo) to line your scene up against it.</source>
         <translation>相机保持原来的朝向，位于地面上方 %1 米，画面采用照片的形状。照片会叠加在相机视图上（相机部分：显示照片），用来对齐你的场景。</translation>
     </message>
@@ -9377,111 +9376,110 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
         <translation type="vanished">“太阳与天空”也已根据照片设置：%1</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="105"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="106"/>
         <source>The Sun &amp; sky were set from the photo too: %1</source>
         <translation>“太阳与天空”也已根据照片设置：%1</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="107"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="108"/>
         <source>There is no sky light, so the sun was not set from the photo.</source>
         <translation>没有天空光源，因此没有根据照片设置太阳。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="107"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="108"/>
         <source>The sun was not set from the photo: %1</source>
         <translation>没有根据照片设置太阳：%1</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="120"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="121"/>
         <source>Choose the photo to match the camera to</source>
         <translation>选择要与相机匹配的照片</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="128"/>
-        <location filename="../scene_builder_camera_photo.cpp" line="188"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="129"/>
         <source>Camera from a photo</source>
         <translation>由照片设置相机</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="130"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="135"/>
         <source>The camera takes the photo&apos;s lens (from the photo&apos;s own data when it has it), tilt and roll (read off the horizon: the lower edge of a blue or white sky), and the picture takes the photo&apos;s shape. The photo can then be laid over the camera view. All the settings below are optional.</source>
         <translation>相机会采用照片的镜头（照片自带数据时取自其中）、倾斜和翻滚（由地平线读出：蓝色或白色天空的下边缘），画面采用照片的形状。之后可以把照片叠加在相机视图上。下面所有设置都是可选的。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="140"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="145"/>
         <source>from the photo (%1)</source>
         <translation>取自照片 (%1)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="140"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="145"/>
         <source>from the photo (not in it: a phone&apos;s)</source>
         <translation>取自照片（其中没有：按手机的）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="142"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="147"/>
         <source>How wide the photo sees, left to right. Left at the lowest setting it is read from the photo&apos;s own data when it has it, else a phone&apos;s is assumed.</source>
         <translation>照片从左到右的视野宽度。保持最低设置时，若照片自带数据则从中读出，否则假设为手机的值。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="143"/>
-        <location filename="../scene_builder_light_photo.cpp" line="114"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="148"/>
+        <location filename="../scene_builder_light_photo.cpp" line="119"/>
         <source>Photo&apos;s field of view (horizontal)</source>
         <translation>照片的视野（水平）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="148"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="153"/>
         <source> m</source>
         <translation> m</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="150"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="155"/>
         <source>How high the camera was above the ground. Standing at eye level is about 1.6 m.</source>
         <translation>拍摄时相机离地面的高度。站着以视线高度拍摄大约是 1.6 米。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="151"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="156"/>
         <source>Camera height above the ground</source>
         <translation>相机离地高度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="155"/>
-        <location filename="../scene_builder_camera_photo.cpp" line="162"/>
-        <location filename="../scene_builder_light_photo.cpp" line="118"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="160"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="167"/>
+        <location filename="../scene_builder_light_photo.cpp" line="123"/>
         <source>from the horizon</source>
         <translation>由地平线得出</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="157"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="162"/>
         <source>How far the camera looked up (+) or down (-). Left at the lowest setting it is read off the horizon.</source>
         <translation>相机向上 (+) 或向下 (-) 看了多少。保持最低设置时由地平线读出。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="164"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="169"/>
         <source>How far the camera was rolled (+ counter-clockwise seen from behind it: the horizon then runs down to the right). Left at the lowest setting it is read off the horizon.</source>
         <translation>相机翻滚了多少（+ 表示从相机后方看为逆时针：此时地平线向右下方倾斜）。保持最低设置时由地平线读出。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="165"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="170"/>
         <source>Camera roll</source>
         <translation>相机翻滚</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="168"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="173"/>
         <source>Also set the sun and sky from the photo</source>
         <translation>同时根据照片设置太阳和天空</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="183"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="185"/>
         <source>Could not read the camera</source>
         <translation>无法读出相机</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="187"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="189"/>
         <source>Next: pick an object in the list, press Place the picked object by clicking... in its properties, click the ground in the picture, then press Render into the photo... on Camera and image.</source>
         <translation>下一步：在列表中选择一个物体，在它的属性中点击“点击放置所选物体...”，再点击画面中的地面，然后在“相机与图像”上点击“渲染到照片中...”。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="188"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="190"/>
         <source>The camera was set from %1:
 
 - %2</source>
@@ -9490,59 +9488,59 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
 - %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="195"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="199"/>
         <source>Pick an object first (click it in the list or the view), then Place by clicking.</source>
         <translation>请先选择一个物体（在列表或视图中点击它），然后使用“点击放置”。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="201"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="205"/>
         <source>Click the ground in the picture to stand the picked object there. Click again to move it; Esc stops.</source>
         <translation>点击画面中的地面，把所选物体放在那里。再次点击可移动它；按 Esc 结束。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="212"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="216"/>
         <source>Placed on the ground. It is %1 m tall; the camera is %2 m above the ground. Click again to move it, Esc stops, or set its real height.</source>
         <translation>已放在地面上。它高 %1 米；相机离地 %2 米。再次点击可移动它，按 Esc 结束，也可以设置它的实际高度。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="230"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="234"/>
         <source>Pick an object first: its height is made what you say, about the middle of its base.</source>
         <translation>请先选择一个物体：它的高度会变为你给出的值，以底面中心为基准。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="234"/>
-        <location filename="../scene_builder_camera_photo.cpp" line="236"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="238"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="240"/>
         <source>Real height</source>
         <translation>实际高度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="234"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="238"/>
         <source>How tall is it in the photo (metres)? The picked object is scaled about the middle of its base.</source>
         <translation>它在照片中有多高（米）？所选物体会以底面中心为基准缩放。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="236"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="240"/>
         <source>It cannot be made that tall (the size may change by up to 100 times).</source>
         <translation>无法调到这个高度（尺寸最多可变化 100 倍）。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="120"/>
+        <location filename="../scene_builder_light_photo.cpp" line="125"/>
         <source>How far the camera looked up (+) or down (-). Left at the lowest setting it is read off where the sky ends, which works when the horizon is in the photo and not hidden by buildings or trees.</source>
         <translation>相机向上 (+) 或向下 (-) 看了多少。保持最低设置时，会根据天空结束的位置读出，这在照片中有地平线且未被建筑或树木遮挡时有效。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="158"/>
-        <location filename="../scene_builder_light_photo.cpp" line="122"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="163"/>
+        <location filename="../scene_builder_light_photo.cpp" line="127"/>
         <source>Camera tilt</source>
         <translation>相机倾斜</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="135"/>
+        <location filename="../scene_builder_light_photo.cpp" line="137"/>
         <source>Could not read the light</source>
         <translation>无法读出光照</translation>
     </message>
     <message>
-        <location filename="../scene_builder_light_photo.cpp" line="139"/>
+        <location filename="../scene_builder_light_photo.cpp" line="141"/>
         <source>The sky was set from %1:
 
 - %2</source>
@@ -9820,13 +9818,13 @@ This replaces the scene you have now (Undo brings it back).</source>
         <translation>无法保存到 %1。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="462"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="463"/>
         <location filename="../scene_builder_widget.cpp" line="587"/>
         <source>, locked</source>
         <translation>，已锁定</translation>
     </message>
     <message>
-        <location filename="../mainwindow_selftest_modes.cpp" line="476"/>
+        <location filename="../mainwindow_selftest_modes.cpp" line="477"/>
         <location filename="../scene_builder_widget.cpp" line="586"/>
         <source>, hidden</source>
         <translation>，已隐藏</translation>
