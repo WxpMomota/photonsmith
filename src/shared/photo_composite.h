@@ -53,7 +53,7 @@ inline double luminance(const float* c) { return 0.2126 * c[0] + 0.7152 * c[1] +
 
 // The photo (`photo`: w x h x 3, 8-bit sRGB) with the render put in. `with` and `ground` are w x h x 3 linear radiance (the FULL and GROUND renders), `mask` w x h coverage 0..1. Returns w x h x 3
 // 8-bit sRGB, empty for a null input or a size below 1.
-inline std::vector<unsigned char> composite(const unsigned char* photo, const float* with, const float* ground, const float* mask, int w, int h, const Options& options = Options()) {
+inline std::vector<unsigned char> composite(const unsigned char* photo, const float* with, const float* ground, const float* mask, int w, int h, const Options& options = Options(), const unsigned char* occluder = nullptr) {
 	if (!photo || !with || !ground || !mask || w < 1 || h < 1) return {};
 	const size_t n = static_cast<size_t>(w) * static_cast<size_t>(h);
 	// the log of what the objects do to the ground's light, where the objects are not (under them the ratio means nothing)
@@ -98,6 +98,10 @@ inline std::vector<unsigned char> composite(const unsigned char* photo, const fl
 				const double toned = detail::aces(std::isfinite(objectLinear) ? objectLinear : 0.0) * options.channelGain[c];
 				const double object = detail::encode(toned);
 				value = m * object + (1.0 - m) * background;
+			}
+			if (occluder && occluder[i] != 0) {   // what is in front of the objects in the photo (a railing, a branch) stays: the photo's own pixel, shadows and all
+				const double o = occluder[i] / 255.0;
+				value = value * (1.0 - o) + (photo[i * 3 + static_cast<size_t>(c)] / 255.0) * o;
 			}
 			out[i * 3 + static_cast<size_t>(c)] = static_cast<unsigned char>(std::min(1.0, std::max(0.0, value)) * 255.0 + 0.5);
 		}

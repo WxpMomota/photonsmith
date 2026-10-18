@@ -291,7 +291,8 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 			}
 		}
 	}
-	const std::vector<unsigned char> out = photo_composite::composite(photoPixels.data(), rgb[0].data(), rgb[1].data(), mask.data(), w, h, options);
+	const std::vector<unsigned char> occluder = occluderBytes(w, h);   // (what is in front of the objects in the photo: the photo stays there)
+	const std::vector<unsigned char> out = photo_composite::composite(photoPixels.data(), rgb[0].data(), rgb[1].data(), mask.data(), w, h, options, occluder.empty() ? nullptr : occluder.data());
 	if (out.empty()) {
 		if (error) *error = tr("The picture could not be put together.");
 		return false;

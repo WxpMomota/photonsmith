@@ -236,6 +236,7 @@ struct PhotoBackdrop {
 	bool shown = false;               // laid over the camera view
 	double opacity = 0.5;             // ... how strongly (0.1 to 1)
 	double exposureStops = 0.0;       // Render into the photo: the objects' exposure
+	std::string occluder;             // what is in front of the objects in the photo (Paint what is in front): a grayscale PNG the size of the photo as kept, base64; empty: nothing
 	std::vector<std::pair<std::string, int>> roles;   // Render into the photo: what each object (by name) is for: 0 the ground the photo has, 1 a light, 2 put into the photo
 };
 

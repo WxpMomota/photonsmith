@@ -146,6 +146,11 @@ void SceneBuilderWidget::syncCameraPhoto() {
 	if (shown != m_cameraPhotoShown || want.opacity != m_cameraPhotoOpacity) changed = true;
 	m_cameraPhotoShown = shown;
 	m_cameraPhotoOpacity = want.opacity;
+	const QString occluderText = QString::fromStdString(want.occluder);
+	if (occluderText != m_occluderText) {   // what is in front of the objects: another mask
+		m_occluderText = occluderText;
+		m_occluder = occluderFromText(occluderText);
+	}
 	m_compositeExposure = want.exposureStops;
 	m_compositeRoles = want.roles;
 	if (changed) updateCameraPhotoOverlay();

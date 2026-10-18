@@ -167,6 +167,14 @@ standing where it is. The camera's height gives the scale of everything else: a 
 
 Checked by unit tests (the base lands on the ground, a pick of two keeps its arrangement, a scaled object stays on the ground) and by the headless GUI test, which sends a real mouse click to the view.
 
+## Paint what is in front
+
+A railing, a branch or a post that stands between the camera and an object put into the photo must hide it. **Paint what is in front...** (Camera and image, with the camera matched to a photo) opens the photo
+in a large window to paint on: **Paint** and **Erase** use a brush (the wheel changes its size), **Select region** takes the joined region of similar colour under a click (a branch is a few similar greens; the
+**Tolerance** says how similar) and **Unselect region** takes one out; **Undo stroke** and **Clear all**. What is painted shows red. When you press Ok the mask is kept **in the scene** (one undo step, saved and
+reopened with it), its edge is feathered a little, and every render into the photo (Live, Preview in the photo, Render into the photo) leaves the photo's own pixels there: the object is hidden, and so is its
+shadow, where the mask is. The mask is yours to paint: nothing guesses what is in front, so a thing in front that you do not paint is still covered.
+
 ## Live: the picture in the photo follows the scene
 
 With the camera matched to a photo, the **Live** tick next to *Preview in the photo* keeps the picture in the preview pane up to date while you work: ticking it makes one small picture (360 pixels

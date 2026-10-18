@@ -992,6 +992,7 @@ TEST(SceneBuilderJsonTest, ThePhotoTheCameraWasMatchedToIsSavedWithTheScene) {
 	d.photo.opacity = 0.7;
 	d.photo.exposureStops = -0.5;
 	d.photo.roles = {{"Floor", 0}, {"Ceiling light", 1}, {"Red \"box\"", 2}};
+	d.photo.occluder = "iVBORw0KGgoAAAANSUhEUg==";   // (what is in front: a PNG as text)
 	const std::string text = toJson(d);
 	Document back;
 	std::string err;
@@ -1001,6 +1002,7 @@ TEST(SceneBuilderJsonTest, ThePhotoTheCameraWasMatchedToIsSavedWithTheScene) {
 	EXPECT_DOUBLE_EQ(back.photo.opacity, 0.7);
 	EXPECT_DOUBLE_EQ(back.photo.exposureStops, -0.5);
 	EXPECT_EQ(back.photo.roles, d.photo.roles);
+	EXPECT_EQ(back.photo.occluder, d.photo.occluder);
 	EXPECT_EQ(toJson(back), text) << "and writes back the same";
 	// a scene with no photo writes nothing about one, and an old scene (no "photo") reads as none
 	Document none = makeStarterScene();

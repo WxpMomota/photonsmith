@@ -365,6 +365,7 @@ inline std::string toJson(const Document& d) {
 		Json ph = Json::object();
 		ph.set("file", Json::string(d.photo.file)).set("shown", Json::boolean(d.photo.shown)).set("opacity", Json::number(d.photo.opacity));
 		if (d.photo.exposureStops != 0.0) ph.set("exposureStops", Json::number(d.photo.exposureStops));
+		if (!d.photo.occluder.empty()) ph.set("occluder", Json::string(d.photo.occluder));
 		if (!d.photo.roles.empty()) {
 			Json roles = Json::array();
 			for (const auto& r : d.photo.roles) roles.push(Json::object().set("name", Json::string(r.first)).set("role", Json::number(r.second)));
@@ -481,7 +482,7 @@ inline bool fromJson(const std::string& text, Document& out, std::string& err) {
 	if (const Json* ph = root.find("photo")) {
 		if (ph->type != Json::Type::Obj) ok = false;
 		else {
-			ok = ok && detail::readStr(*ph, "file", d.photo.file);
+			ok = ok && detail::readStr(*ph, "file", d.photo.file) && detail::readStr(*ph, "occluder", d.photo.occluder);
 			detail::readBool(*ph, "shown", d.photo.shown);
 			detail::readNum(*ph, "opacity", d.photo.opacity);
 			detail::readNum(*ph, "exposureStops", d.photo.exposureStops);

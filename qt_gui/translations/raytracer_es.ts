@@ -6896,31 +6896,31 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation>Cámara</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="376"/>
-        <location filename="../scene_builder_inspector.cpp" line="672"/>
-        <location filename="../scene_builder_inspector.cpp" line="709"/>
-        <location filename="../scene_builder_inspector.cpp" line="851"/>
+        <location filename="../scene_builder_inspector.cpp" line="381"/>
+        <location filename="../scene_builder_inspector.cpp" line="677"/>
+        <location filename="../scene_builder_inspector.cpp" line="714"/>
+        <location filename="../scene_builder_inspector.cpp" line="856"/>
         <source>Position</source>
         <translation>Posición</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="377"/>
+        <location filename="../scene_builder_inspector.cpp" line="382"/>
         <source>Looks at</source>
         <translation>Mira a</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="378"/>
-        <location filename="../scene_builder_inspector.cpp" line="859"/>
+        <location filename="../scene_builder_inspector.cpp" line="383"/>
+        <location filename="../scene_builder_inspector.cpp" line="864"/>
         <source>Field of view</source>
         <translation>Campo de visión</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="422"/>
+        <location filename="../scene_builder_inspector.cpp" line="427"/>
         <source>Lens radius</source>
         <translation>Radio de la lente</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="423"/>
+        <location filename="../scene_builder_inspector.cpp" line="428"/>
         <source>Focus distance</source>
         <translation>Distancia de enfoque</translation>
     </message>
@@ -6929,34 +6929,34 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation type="vanished">Un radio de lente mayor que 0 desenfoca lo que no está a la distancia de enfoque (profundidad de campo).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="432"/>
-        <location filename="../scene_builder_inspector.cpp" line="488"/>
+        <location filename="../scene_builder_inspector.cpp" line="437"/>
+        <location filename="../scene_builder_inspector.cpp" line="493"/>
         <source>Picture</source>
         <translation>Imagen</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="433"/>
+        <location filename="../scene_builder_inspector.cpp" line="438"/>
         <source>Width (pixels)</source>
         <translation>Ancho (píxeles)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="434"/>
+        <location filename="../scene_builder_inspector.cpp" line="439"/>
         <source>Height (pixels)</source>
         <translation>Alto (píxeles)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="436"/>
+        <location filename="../scene_builder_inspector.cpp" line="441"/>
         <source>Set height from width...</source>
         <translation>Fijar el alto a partir del ancho...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="445"/>
+        <location filename="../scene_builder_inspector.cpp" line="450"/>
         <source>Aspect ratio</source>
         <translation>Relación de aspecto</translation>
     </message>
     <message>
         <location filename="../scene_builder_composite.cpp" line="101"/>
-        <location filename="../scene_builder_composite.cpp" line="318"/>
+        <location filename="../scene_builder_composite.cpp" line="319"/>
         <source>Match the camera to a photo first (Camera section: Match to a photo...): the scene is put into that photo.</source>
         <translation>Ajusta primero la cámara a una foto (sección Cámara: Ajustar a una foto...): la escena se pone en esa foto.</translation>
     </message>
@@ -6970,8 +6970,8 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation>Renderizando la escena para la foto...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="318"/>
-        <location filename="../scene_builder_composite.cpp" line="323"/>
+        <location filename="../scene_builder_composite.cpp" line="319"/>
+        <location filename="../scene_builder_composite.cpp" line="324"/>
         <source>Render into the photo</source>
         <translation>Renderizar en la foto</translation>
     </message>
@@ -7018,7 +7018,7 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation>La exposición de los objetos no se ajustó a la foto: %1</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="296"/>
+        <location filename="../scene_builder_composite.cpp" line="297"/>
         <source>The picture could not be put together.</source>
         <translation>No se pudo componer la imagen.</translation>
     </message>
@@ -7043,7 +7043,7 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation>Todos los objetos están marcados como suelo o como luz, así que no hay nada que poner en la foto (%1). Pon uno en «Poner en la foto» en Cámara e imagen &gt; Renderizar en la foto...</translation>
     </message>
     <message numerus="yes">
-        <location filename="../scene_builder_composite.cpp" line="305"/>
+        <location filename="../scene_builder_composite.cpp" line="306"/>
         <source>%n object(s) were put into the photo; the ground they stand on is not drawn (only the shadows and reflections they cause are).</source>
         <translation>
             <numerusform>Se puso %n objeto en la foto; el suelo en que se apoya no se dibuja (solo las sombras y los reflejos que provoca).</numerusform>
@@ -7051,32 +7051,32 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         </translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="306"/>
+        <location filename="../scene_builder_composite.cpp" line="307"/>
         <source>The renders were denoised before the objects were put in.</source>
         <translation>Los renders se limpiaron de ruido antes de poner los objetos.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="307"/>
+        <location filename="../scene_builder_composite.cpp" line="308"/>
         <source>The renders could not be denoised (%1), so the objects are as grainy as the samples leave them.</source>
         <translation>No se pudo quitar el ruido de los renders (%1), así que los objetos quedan tan granulosos como los deja el número de muestras.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="307"/>
+        <location filename="../scene_builder_composite.cpp" line="308"/>
         <source>the renderer did not say why</source>
         <translation>el renderizador no dijo por qué</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="309"/>
+        <location filename="../scene_builder_composite.cpp" line="310"/>
         <source>The objects are shown at the exposure the Builder gives them%1; the photo&apos;s own exposure is not known, so use Exposure if they look too bright or too dark.</source>
         <translation>Los objetos se muestran con la exposición que les da el Constructor%1; la exposición de la foto no se conoce, así que usa Exposición si se ven demasiado claros u oscuros.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="309"/>
+        <location filename="../scene_builder_composite.cpp" line="310"/>
         <source> (%1 stops)</source>
         <translation> (%1 pasos)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="311"/>
+        <location filename="../scene_builder_composite.cpp" line="312"/>
         <source>No object is marked as the ground, so there are no shadows on the photo: tick the floor the objects stand on.</source>
         <translation>Ningún objeto está marcado como suelo, así que la foto no tiene sombras: marca el suelo sobre el que están los objetos.</translation>
     </message>
@@ -7089,124 +7089,124 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation type="vanished">Marcado: el suelo que la foto ya tiene (se usan sus sombras, no se dibuja). Sin marcar: se pone en la foto.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="310"/>
+        <location filename="../scene_builder_composite.cpp" line="311"/>
         <source>The scene&apos;s Image size has a different shape from the photo&apos;s, so it was rendered in the photo&apos;s shape (the camera was set for it).</source>
         <translation>El tamaño de imagen de la escena tiene una forma distinta de la de la foto, así que se renderizó con la forma de la foto (la cámara se ajustó a ella).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="325"/>
+        <location filename="../scene_builder_composite.cpp" line="326"/>
         <source>The scene, seen through the camera matched to the photo, is rendered and put into the photo, with the shadows and reflections it casts on the ground. Say what each object is: the ground the photo already has (not drawn: only the shadows it catches count), a light (lights the scene, not shown), or an object to put into the photo. The scene is rendered three times, so it takes about three times as long as one picture.</source>
         <translation>La escena, vista a través de la cámara ajustada a la foto, se renderiza y se pone en la foto, con las sombras y los reflejos que proyecta sobre el suelo. Indica qué es cada objeto: el suelo que la foto ya tiene (no se dibuja: solo cuentan las sombras que recibe), una luz (ilumina la escena, no se muestra) o un objeto que se pone en la foto. La escena se renderiza tres veces, así que tarda unas tres veces más que una imagen.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="332"/>
+        <location filename="../scene_builder_composite.cpp" line="333"/>
         <source>Is</source>
         <translation>Es</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="341"/>
+        <location filename="../scene_builder_composite.cpp" line="342"/>
         <source>Put into the photo</source>
         <translation>Poner en la foto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="342"/>
+        <location filename="../scene_builder_composite.cpp" line="343"/>
         <source>Ground (the photo has it)</source>
         <translation>Suelo (la foto lo tiene)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="343"/>
+        <location filename="../scene_builder_composite.cpp" line="344"/>
         <source>Light (lights the scene, not shown)</source>
         <translation>Luz (ilumina la escena, no se muestra)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="352"/>
+        <location filename="../scene_builder_composite.cpp" line="353"/>
         <source>Ground: the floor the photo already has (its shadows are used, it is not drawn). Light: a lamp, which lights the scene and is not shown. Put into the photo: everything you want to see in it.</source>
         <translation>Suelo: el suelo que la foto ya tiene (se usan sus sombras, no se dibuja). Luz: una lámpara, que ilumina la escena y no se muestra. Poner en la foto: todo lo que quieras ver en ella.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="357"/>
+        <location filename="../scene_builder_composite.cpp" line="358"/>
         <source>Match the objects&apos; exposure and colour to the photo&apos;s sky</source>
         <translation>Ajustar la exposición y el color de los objetos al cielo de la foto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="359"/>
+        <location filename="../scene_builder_composite.cpp" line="360"/>
         <source>Reads how bright and how warm or cool the photo&apos;s sky is, and gives the objects the same exposure and colour cast. Needs the Sun &amp; sky set from the same photo (Light from a photo). The setting below is added to it.</source>
         <translation>Lee lo claro y lo cálido o frío que es el cielo de la foto, y da a los objetos la misma exposición y dominante de color. Necesita el Sol y cielo ajustado a partir de la misma foto (Luz a partir de una foto). El ajuste de abajo se suma a este.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="361"/>
+        <location filename="../scene_builder_composite.cpp" line="362"/>
         <source>Denoise the renders (cleans the grain)</source>
         <translation>Reducir el ruido de los renders (limpia el grano)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="363"/>
+        <location filename="../scene_builder_composite.cpp" line="364"/>
         <source>Runs the AI denoiser on the renders before the objects are put into the photo, so a low sample count looks clean. The same as the Denoise tick next to Preview. The first time on the CPU it offers to download the denoiser.</source>
         <translation>Pasa el eliminador de ruido de IA por los renders antes de poner los objetos en la foto, para que un número bajo de muestras se vea limpio. Es lo mismo que la casilla Reducir ruido junto a Vista previa. La primera vez en la CPU ofrece descargar el eliminador de ruido.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="369"/>
+        <location filename="../scene_builder_composite.cpp" line="370"/>
         <source> stops</source>
         <translation> pasos</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="371"/>
+        <location filename="../scene_builder_composite.cpp" line="372"/>
         <source>How much brighter (+) or darker (-) the objects are made, to match the photo&apos;s exposure. Each stop doubles or halves their light.</source>
         <translation>Cuánto más claros (+) o más oscuros (-) se hacen los objetos para igualar la exposición de la foto. Cada paso duplica o reduce a la mitad su luz.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="372"/>
+        <location filename="../scene_builder_composite.cpp" line="373"/>
         <source>Exposure of the objects</source>
         <translation>Exposición de los objetos</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="376"/>
+        <location filename="../scene_builder_composite.cpp" line="377"/>
         <source>Samples per pixel: more makes the shadows smoother and takes longer.</source>
         <translation>Muestras por píxel: más hacen las sombras más suaves y tardan más.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="377"/>
-        <location filename="../scene_builder_inspector.cpp" line="446"/>
+        <location filename="../scene_builder_composite.cpp" line="378"/>
+        <location filename="../scene_builder_inspector.cpp" line="451"/>
         <source>Samples per pixel</source>
         <translation>Muestras por píxel</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="410"/>
+        <location filename="../scene_builder_composite.cpp" line="411"/>
         <source>Put into the photo in %1 s (%2 x %3). %4</source>
         <translation>Puesto en la foto en %1 s (%2 x %3). %4</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="424"/>
+        <location filename="../scene_builder_composite.cpp" line="425"/>
         <location filename="../scene_builder_widget.cpp" line="389"/>
         <source>Match the camera to a photo first (Camera and image: Match to a photo...): the scene is put into that photo.</source>
         <translation>Ajusta primero la cámara a una foto (Cámara e imagen: Ajustar a una foto...): la escena se pone en esa foto.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="431"/>
+        <location filename="../scene_builder_composite.cpp" line="432"/>
         <source>Putting the scene into the photo...</source>
         <translation>Poniendo la escena en la foto...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="448"/>
+        <location filename="../scene_builder_composite.cpp" line="449"/>
         <source>Put into the photo in %1 s (%2 x %3, %4 samples). %5</source>
         <translation>Puesto en la foto en %1 s (%2 x %3, %4 muestras). %5</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="496"/>
+        <location filename="../scene_builder_composite.cpp" line="497"/>
         <source>The picture is in the preview pane.</source>
         <translation>La imagen está en el panel de vista previa.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="503"/>
+        <location filename="../scene_builder_composite.cpp" line="504"/>
         <source>Save the picture as</source>
         <translation>Guardar la imagen como</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="503"/>
+        <location filename="../scene_builder_composite.cpp" line="504"/>
         <source>PNG pictures (*.png)</source>
         <translation>Imágenes PNG (*.png)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="406"/>
+        <location filename="../scene_builder_composite.cpp" line="407"/>
         <source>Could not render into the photo</source>
         <translation>No se pudo renderizar en la foto</translation>
     </message>
@@ -7219,53 +7219,53 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
 - %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="447"/>
+        <location filename="../scene_builder_inspector.cpp" line="452"/>
         <source>Light bounces (max depth)</source>
         <translation>Rebotes de luz (profundidad máxima)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="452"/>
+        <location filename="../scene_builder_inspector.cpp" line="457"/>
         <source>Material</source>
         <translation>Material</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="455"/>
+        <location filename="../scene_builder_inspector.cpp" line="460"/>
         <source>Choose a ready-made material...</source>
         <translation>Elige un material predefinido...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="466"/>
-        <location filename="../scene_builder_inspector.cpp" line="897"/>
+        <location filename="../scene_builder_inspector.cpp" line="471"/>
+        <location filename="../scene_builder_inspector.cpp" line="902"/>
         <source>Preset</source>
         <translation>Preajuste</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="483"/>
-        <location filename="../scene_builder_inspector.cpp" line="658"/>
-        <location filename="../scene_builder_inspector.cpp" line="849"/>
+        <location filename="../scene_builder_inspector.cpp" line="488"/>
+        <location filename="../scene_builder_inspector.cpp" line="663"/>
+        <location filename="../scene_builder_inspector.cpp" line="854"/>
         <location filename="../scene_builder_mix.cpp" line="84"/>
         <source>Type</source>
         <translation>Tipo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="488"/>
-        <location filename="../scene_builder_inspector.cpp" line="530"/>
-        <location filename="../scene_builder_inspector.cpp" line="825"/>
-        <location filename="../scene_builder_inspector.cpp" line="860"/>
+        <location filename="../scene_builder_inspector.cpp" line="493"/>
+        <location filename="../scene_builder_inspector.cpp" line="535"/>
+        <location filename="../scene_builder_inspector.cpp" line="830"/>
+        <location filename="../scene_builder_inspector.cpp" line="865"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.tga *.exr *.hdr)</source>
         <translation>Imágenes (*.png *.jpg *.jpeg *.bmp *.tga *.exr *.hdr)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="569"/>
+        <location filename="../scene_builder_inspector.cpp" line="574"/>
         <source>Colour A</source>
         <translation>Color A</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="569"/>
-        <location filename="../scene_builder_inspector.cpp" line="577"/>
-        <location filename="../scene_builder_inspector.cpp" line="609"/>
-        <location filename="../scene_builder_inspector.cpp" line="677"/>
-        <location filename="../scene_builder_inspector.cpp" line="928"/>
+        <location filename="../scene_builder_inspector.cpp" line="574"/>
+        <location filename="../scene_builder_inspector.cpp" line="582"/>
+        <location filename="../scene_builder_inspector.cpp" line="614"/>
+        <location filename="../scene_builder_inspector.cpp" line="682"/>
+        <location filename="../scene_builder_inspector.cpp" line="933"/>
         <location filename="../scene_builder_mix.cpp" line="89"/>
         <location filename="../scene_builder_mix.cpp" line="92"/>
         <location filename="../scene_builder_mix.cpp" line="109"/>
@@ -7277,72 +7277,72 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation type="vanished">Patrón de cuadros</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="571"/>
+        <location filename="../scene_builder_inspector.cpp" line="576"/>
         <source>Colour B</source>
         <translation>Color B</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="572"/>
+        <location filename="../scene_builder_inspector.cpp" line="577"/>
         <source>Checks across</source>
         <translation>Cuadros a lo ancho</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="578"/>
-        <location filename="../scene_builder_inspector.cpp" line="582"/>
-        <location filename="../scene_builder_inspector.cpp" line="774"/>
+        <location filename="../scene_builder_inspector.cpp" line="583"/>
+        <location filename="../scene_builder_inspector.cpp" line="587"/>
+        <location filename="../scene_builder_inspector.cpp" line="779"/>
         <location filename="../scene_builder_mix.cpp" line="93"/>
         <location filename="../scene_builder_mix.cpp" line="97"/>
         <source>Roughness</source>
         <translation>Rugosidad</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="581"/>
-        <location filename="../scene_builder_inspector.cpp" line="613"/>
+        <location filename="../scene_builder_inspector.cpp" line="586"/>
+        <location filename="../scene_builder_inspector.cpp" line="618"/>
         <location filename="../scene_builder_mix.cpp" line="96"/>
         <location filename="../scene_builder_mix.cpp" line="113"/>
         <source>Index of refraction</source>
         <translation>Índice de refracción</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="598"/>
+        <location filename="../scene_builder_inspector.cpp" line="603"/>
         <location filename="../scene_builder_mix.cpp" line="100"/>
         <source>Paint colour</source>
         <translation>Color de la pintura</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="601"/>
+        <location filename="../scene_builder_inspector.cpp" line="606"/>
         <location filename="../scene_builder_mix.cpp" line="101"/>
         <source>Coat index of refraction</source>
         <translation>Índice de refracción de la capa</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="602"/>
+        <location filename="../scene_builder_inspector.cpp" line="607"/>
         <location filename="../scene_builder_mix.cpp" line="102"/>
         <source>Coat roughness</source>
         <translation>Rugosidad de la capa</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="605"/>
+        <location filename="../scene_builder_inspector.cpp" line="610"/>
         <location filename="../scene_builder_mix.cpp" line="105"/>
         <source>Reflects</source>
         <translation>Refleja</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="606"/>
+        <location filename="../scene_builder_inspector.cpp" line="611"/>
         <location filename="../scene_builder_mix.cpp" line="106"/>
         <source>Lets through</source>
         <translation>Deja pasar</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="332"/>
-        <location filename="../scene_builder_inspector.cpp" line="696"/>
+        <location filename="../scene_builder_composite.cpp" line="333"/>
+        <location filename="../scene_builder_inspector.cpp" line="701"/>
         <source>Object</source>
         <translation>Objeto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="643"/>
-        <location filename="../scene_builder_inspector.cpp" line="697"/>
-        <location filename="../scene_builder_inspector.cpp" line="838"/>
+        <location filename="../scene_builder_inspector.cpp" line="648"/>
+        <location filename="../scene_builder_inspector.cpp" line="702"/>
+        <location filename="../scene_builder_inspector.cpp" line="843"/>
         <source>Name</source>
         <translation>Nombre</translation>
     </message>
@@ -7352,7 +7352,7 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation>Elige una foto: la cámara toma su objetivo, inclinación y giro, y la imagen toma su forma. Después se puede superponer la foto a la vista de la cámara para alinear tu escena con ella.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="355"/>
+        <location filename="../scene_builder_inspector.cpp" line="360"/>
         <source>Show the photo over the camera view</source>
         <translation>Mostrar la foto sobre la vista de la cámara</translation>
     </message>
@@ -7367,213 +7367,223 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation>Renderiza la escena a través de esta cámara y la pone en la foto, con las sombras que proyecta sobre el suelo. Marca el suelo como suelo: la foto ya lo tiene.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="365"/>
+        <location filename="../scene_builder_inspector.cpp" line="349"/>
+        <source>Paint what is in front...</source>
+        <translation>Pintar lo que está delante...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="351"/>
+        <source>Paint over what is in front of the objects in the photo (a railing, a branch): Render into the photo leaves it in front of them. Needs the camera matched to a photo.</source>
+        <translation>Pinta lo que está delante de los objetos en la foto (una barandilla, una rama): Renderizar en la foto lo deja delante de ellos. Necesita la cámara ajustada a una foto.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="370"/>
         <source>Photo opacity</source>
         <translation>Opacidad de la foto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="367"/>
+        <location filename="../scene_builder_inspector.cpp" line="372"/>
         <source>Remove the photo</source>
         <translation>Quitar la foto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="381"/>
+        <location filename="../scene_builder_inspector.cpp" line="386"/>
         <source>Focal length</source>
         <translation>Distancia focal</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="382"/>
-        <location filename="../scene_builder_inspector.cpp" line="413"/>
+        <location filename="../scene_builder_inspector.cpp" line="387"/>
+        <location filename="../scene_builder_inspector.cpp" line="418"/>
         <source> mm</source>
         <translation> mm</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="384"/>
+        <location filename="../scene_builder_inspector.cpp" line="389"/>
         <source>Choose a lens...</source>
         <translation>Elige un objetivo...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="393"/>
+        <location filename="../scene_builder_inspector.cpp" line="398"/>
         <source>Lens</source>
         <translation>Objetivo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="396"/>
+        <location filename="../scene_builder_inspector.cpp" line="401"/>
         <source>Other</source>
         <translation>Otro</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="412"/>
+        <location filename="../scene_builder_inspector.cpp" line="417"/>
         <source>Sensor</source>
         <translation>Sensor</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="413"/>
+        <location filename="../scene_builder_inspector.cpp" line="418"/>
         <source>Sensor width</source>
         <translation>Ancho del sensor</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="414"/>
+        <location filename="../scene_builder_inspector.cpp" line="419"/>
         <source>Aperture (f-number)</source>
         <translation>Apertura (número f)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="421"/>
+        <location filename="../scene_builder_inspector.cpp" line="426"/>
         <source>Pinhole (everything sharp)</source>
         <translation>Estenopeico (todo nítido)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="424"/>
+        <location filename="../scene_builder_inspector.cpp" line="429"/>
         <source>Pick focus in the 3D view</source>
         <translation>Elegir el enfoque en la vista 3D</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="426"/>
+        <location filename="../scene_builder_inspector.cpp" line="431"/>
         <source>Then click what should be sharp: the focus distance becomes how far that is from the camera along the way it looks</source>
         <translation>Después haz clic en lo que debe quedar nítido: la distancia de enfoque pasa a ser lo lejos que está de la cámara en la dirección en que mira</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="429"/>
+        <location filename="../scene_builder_inspector.cpp" line="434"/>
         <source>The focal length and the sensor tell the field of view the way a photographer&apos;s lens does (50 mm on a 36 mm sensor is about 40 degrees across), and the picture&apos;s shape crops the sensor, as in a real camera. The aperture sets the lens radius for a scene where one unit is a metre (50 mm at f/1.8 is 0.014): a lens radius above 0 blurs what is not at the focus distance (depth of field), the more the wider the opening and the longer the lens.</source>
         <translation>La distancia focal y el sensor determinan el campo de visión como lo hace el objetivo de un fotógrafo (50 mm en un sensor de 36 mm son unos 40 grados de ancho), y la forma de la imagen recorta el sensor, como en una cámara real. La apertura fija el radio de la lente para una escena en la que una unidad es un metro (50 mm a f/1,8 son 0,014): un radio de lente mayor que 0 desenfoca lo que no está a la distancia de enfoque (profundidad de campo), más cuanto más abierta es la apertura y más largo el objetivo.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="499"/>
+        <location filename="../scene_builder_inspector.cpp" line="504"/>
         <source>Make from a photo...</source>
         <translation>Crear a partir de una foto...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="501"/>
+        <location filename="../scene_builder_inspector.cpp" line="506"/>
         <source>Choose a photo of a surface (wood, tile, fabric, a wall): it becomes this material&apos;s picture, repeated with no joins, with a bump map guessed from it.</source>
         <translation>Elige una foto de una superficie (madera, baldosa, tela, una pared): se convierte en la imagen de este material, repetida sin juntas, con un mapa de relieve deducido de ella.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="509"/>
+        <location filename="../scene_builder_inspector.cpp" line="514"/>
         <source>Plain colour</source>
         <translation>Color liso</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="510"/>
+        <location filename="../scene_builder_inspector.cpp" line="515"/>
         <source>Checker</source>
         <translation>Damero</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="512"/>
+        <location filename="../scene_builder_inspector.cpp" line="517"/>
         <source>Noise (soft clouds)</source>
         <translation>Ruido (nubes suaves)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="513"/>
-        <location filename="../scene_builder_inspector.cpp" line="564"/>
-        <location filename="../scene_builder_inspector.cpp" line="594"/>
+        <location filename="../scene_builder_inspector.cpp" line="518"/>
+        <location filename="../scene_builder_inspector.cpp" line="569"/>
+        <location filename="../scene_builder_inspector.cpp" line="599"/>
         <source>Dots</source>
         <translation>Puntos</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="526"/>
+        <location filename="../scene_builder_inspector.cpp" line="531"/>
         <source>Pattern</source>
         <translation>Patrón</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="530"/>
+        <location filename="../scene_builder_inspector.cpp" line="535"/>
         <source>Bump or normal map</source>
         <translation>Mapa de relieve o de normales</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="534"/>
+        <location filename="../scene_builder_inspector.cpp" line="539"/>
         <source>Height map (grayscale: light is high)</source>
         <translation>Mapa de alturas (grises: lo claro es alto)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="535"/>
+        <location filename="../scene_builder_inspector.cpp" line="540"/>
         <source>Normal map (colour)</source>
         <translation>Mapa de normales (color)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="542"/>
+        <location filename="../scene_builder_inspector.cpp" line="547"/>
         <source>Picture is a</source>
         <translation>La imagen es un</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="543"/>
+        <location filename="../scene_builder_inspector.cpp" line="548"/>
         <source>The renderer tells the two apart by the picture itself: a grayscale picture is a height map and a colour one a normal map, whichever is chosen here.</source>
         <translation>El renderizador distingue ambos por la propia imagen: una imagen en escala de grises es un mapa de altura y una en color es un mapa de normales, sea cual sea la opción elegida aquí.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="547"/>
+        <location filename="../scene_builder_inspector.cpp" line="552"/>
         <source>Bump height</source>
         <translation>Altura del relieve</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="558"/>
-        <location filename="../scene_builder_inspector.cpp" line="591"/>
+        <location filename="../scene_builder_inspector.cpp" line="563"/>
+        <location filename="../scene_builder_inspector.cpp" line="596"/>
         <source>Veins</source>
         <translation>Vetas</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="559"/>
-        <location filename="../scene_builder_inspector.cpp" line="592"/>
+        <location filename="../scene_builder_inspector.cpp" line="564"/>
+        <location filename="../scene_builder_inspector.cpp" line="597"/>
         <source>Wander</source>
         <translation>Ondulación</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="565"/>
-        <location filename="../scene_builder_inspector.cpp" line="595"/>
+        <location filename="../scene_builder_inspector.cpp" line="570"/>
+        <location filename="../scene_builder_inspector.cpp" line="600"/>
         <source>Ground</source>
         <translation>Fondo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="566"/>
-        <location filename="../scene_builder_inspector.cpp" line="596"/>
+        <location filename="../scene_builder_inspector.cpp" line="571"/>
+        <location filename="../scene_builder_inspector.cpp" line="601"/>
         <source>Dots across</source>
         <translation>Puntos a lo ancho</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="610"/>
+        <location filename="../scene_builder_inspector.cpp" line="615"/>
         <location filename="../scene_builder_mix.cpp" line="110"/>
         <source>Travels under the surface: red</source>
         <translation>Recorrido bajo la superficie: rojo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="611"/>
+        <location filename="../scene_builder_inspector.cpp" line="616"/>
         <location filename="../scene_builder_mix.cpp" line="111"/>
         <source>Travels under the surface: green</source>
         <translation>Recorrido bajo la superficie: verde</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="612"/>
+        <location filename="../scene_builder_inspector.cpp" line="617"/>
         <location filename="../scene_builder_mix.cpp" line="112"/>
         <source>Travels under the surface: blue</source>
         <translation>Recorrido bajo la superficie: azul</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="614"/>
+        <location filename="../scene_builder_inspector.cpp" line="619"/>
         <location filename="../scene_builder_mix.cpp" line="114"/>
         <source>Surface roughness</source>
         <translation>Rugosidad de la superficie</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="615"/>
+        <location filename="../scene_builder_inspector.cpp" line="620"/>
         <source>Light goes into the surface, wanders about and comes out somewhere else, which softens the shading the way skin, wax, milk and marble are soft. The distances are how far each colour travels before it scatters, in the scene&apos;s units: a tenth to a half of the object&apos;s size looks translucent, much more looks like fog inside glass. A colour that travels further glows further from where the light went in (skin&apos;s red does).</source>
         <translation>La luz entra en la superficie, se desplaza por el interior y sale por otro sitio, lo que suaviza el sombreado como en la piel, la cera, la leche y el mármol. Las distancias indican hasta dónde llega cada color antes de dispersarse, en las unidades de la escena: entre una décima y la mitad del tamaño del objeto se ve translúcido; mucho más parece niebla dentro de cristal. Un color que recorre más distancia brilla más lejos de donde entró la luz (el rojo de la piel lo hace).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="624"/>
+        <location filename="../scene_builder_inspector.cpp" line="629"/>
         <source>Texture repeats across</source>
         <translation>La textura se repite a lo ancho</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="625"/>
+        <location filename="../scene_builder_inspector.cpp" line="630"/>
         <source>Texture repeats up</source>
         <translation>La textura se repite a lo alto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="626"/>
+        <location filename="../scene_builder_inspector.cpp" line="631"/>
         <source>Texture shift across</source>
         <translation>Desplazamiento de la textura a lo ancho</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="627"/>
+        <location filename="../scene_builder_inspector.cpp" line="632"/>
         <source>Texture shift up</source>
         <translation>Desplazamiento de la textura a lo alto</translation>
     </message>
@@ -7582,435 +7592,435 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation type="vanished">Las repeticiones y el desplazamiento se aplican a una caja, un plano y las formas predefinidas; esta forma conserva las coordenadas de textura del renderizador, así que aquí no tienen efecto.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="634"/>
+        <location filename="../scene_builder_inspector.cpp" line="639"/>
         <source>Hidden in the views</source>
         <translation>Oculto en las vistas</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="635"/>
+        <location filename="../scene_builder_inspector.cpp" line="640"/>
         <source>Locked</source>
         <translation>Bloqueado</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="642"/>
+        <location filename="../scene_builder_inspector.cpp" line="647"/>
         <source>Volume</source>
         <translation>Volumen</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="670"/>
-        <location filename="../scene_builder_inspector.cpp" line="708"/>
+        <location filename="../scene_builder_inspector.cpp" line="675"/>
+        <location filename="../scene_builder_inspector.cpp" line="713"/>
         <source>Shape</source>
         <translation>Forma</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="673"/>
-        <location filename="../scene_builder_inspector.cpp" line="710"/>
+        <location filename="../scene_builder_inspector.cpp" line="678"/>
+        <location filename="../scene_builder_inspector.cpp" line="715"/>
         <source>Rotation (degrees)</source>
         <translation>Rotación (grados)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="674"/>
-        <location filename="../scene_builder_inspector.cpp" line="726"/>
-        <location filename="../scene_builder_inspector.cpp" line="730"/>
-        <location filename="../scene_builder_inspector.cpp" line="734"/>
-        <location filename="../scene_builder_inspector.cpp" line="737"/>
+        <location filename="../scene_builder_inspector.cpp" line="679"/>
+        <location filename="../scene_builder_inspector.cpp" line="731"/>
+        <location filename="../scene_builder_inspector.cpp" line="735"/>
+        <location filename="../scene_builder_inspector.cpp" line="739"/>
+        <location filename="../scene_builder_inspector.cpp" line="742"/>
         <source>Radius</source>
         <translation>Radio</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="675"/>
-        <location filename="../scene_builder_inspector.cpp" line="731"/>
-        <location filename="../scene_builder_inspector.cpp" line="747"/>
+        <location filename="../scene_builder_inspector.cpp" line="680"/>
+        <location filename="../scene_builder_inspector.cpp" line="736"/>
         <location filename="../scene_builder_inspector.cpp" line="752"/>
+        <location filename="../scene_builder_inspector.cpp" line="757"/>
         <source>Height</source>
         <translation>Altura</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="676"/>
+        <location filename="../scene_builder_inspector.cpp" line="681"/>
         <source>Density</source>
         <translation>Densidad</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="678"/>
+        <location filename="../scene_builder_inspector.cpp" line="683"/>
         <source>Forward scattering</source>
         <translation>Dispersión hacia delante</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="680"/>
+        <location filename="../scene_builder_inspector.cpp" line="685"/>
         <source>Wispiness</source>
         <translation>Deshilachado</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="681"/>
+        <location filename="../scene_builder_inspector.cpp" line="686"/>
         <source>Detail (lumps across)</source>
         <translation>Detalle (grumos a lo ancho)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="684"/>
+        <location filename="../scene_builder_inspector.cpp" line="689"/>
         <source>A cloud scatters light and never absorbs it. Density is how thick it is: about 6 is a solid white cloud, 1 is a thin haze. Forward scattering above 0 gives the bright silver edge against the sun.</source>
         <translation>Una nube dispersa la luz y nunca la absorbe. La densidad indica lo espesa que es: alrededor de 6 es una nube blanca y sólida, 1 es una bruma fina. Una dispersión hacia delante superior a 0 da el borde plateado brillante frente al sol.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="686"/>
+        <location filename="../scene_builder_inspector.cpp" line="691"/>
         <source>Density is how quickly the light is scattered or absorbed per unit of distance: 0.3 is a light mist in a sphere a few units across, 2 is thick. The colour is what is scattered: white fog only scatters, so it glows; a dark colour absorbs the rest and looks like smoke.</source>
         <translation>La densidad indica con qué rapidez se dispersa o se absorbe la luz por unidad de distancia: 0,3 es una bruma ligera en una esfera de pocas unidades de ancho, 2 es espesa. El color es lo que se dispersa: la niebla blanca solo dispersa, así que brilla; un color oscuro absorbe el resto y parece humo.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="711"/>
+        <location filename="../scene_builder_inspector.cpp" line="716"/>
         <source>Place the picked object by clicking...</source>
         <translation>Colocar el objeto elegido con un clic...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="713"/>
+        <location filename="../scene_builder_inspector.cpp" line="718"/>
         <source>Look through the camera and click the ground in the picture: the picked object stands there. With a photo laid over the view, that is where it stands in the photo.</source>
         <translation>Mira a través de la cámara y haz clic en el suelo de la imagen: el objeto elegido se coloca allí. Con una foto superpuesta a la vista, ahí es donde queda en la foto.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="716"/>
+        <location filename="../scene_builder_inspector.cpp" line="721"/>
         <source>Set the picked object&apos;s real height...</source>
         <translation>Fijar la altura real del objeto elegido...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="718"/>
+        <location filename="../scene_builder_inspector.cpp" line="723"/>
         <source>Say how tall the picked object is in the photo, in metres: it is scaled to that about the middle of its base, so it keeps standing where it is.</source>
         <translation>Indica la altura del objeto elegido en la foto, en metros: se escala a ella respecto al centro de su base, así que sigue en su sitio.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="738"/>
+        <location filename="../scene_builder_inspector.cpp" line="743"/>
         <source>Height (with the rounded ends)</source>
         <translation>Altura (con los extremos redondeados)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="741"/>
+        <location filename="../scene_builder_inspector.cpp" line="746"/>
         <source>Ring radius</source>
         <translation>Radio del anillo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="742"/>
+        <location filename="../scene_builder_inspector.cpp" line="747"/>
         <source>Tube radius</source>
         <translation>Radio del tubo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="745"/>
+        <location filename="../scene_builder_inspector.cpp" line="750"/>
         <source>Outer radius</source>
         <translation>Radio exterior</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="746"/>
+        <location filename="../scene_builder_inspector.cpp" line="751"/>
         <source>Hole radius</source>
         <translation>Radio del agujero</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="750"/>
+        <location filename="../scene_builder_inspector.cpp" line="755"/>
         <source>Base width (X)</source>
         <translation>Ancho de la base (X)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="751"/>
+        <location filename="../scene_builder_inspector.cpp" line="756"/>
         <source>Base depth (Z)</source>
         <translation>Profundidad de la base (Z)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="755"/>
         <location filename="../scene_builder_inspector.cpp" line="760"/>
-        <location filename="../scene_builder_inspector.cpp" line="763"/>
+        <location filename="../scene_builder_inspector.cpp" line="765"/>
+        <location filename="../scene_builder_inspector.cpp" line="768"/>
         <source>Size</source>
         <translation>Tamaño</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="756"/>
+        <location filename="../scene_builder_inspector.cpp" line="761"/>
         <source>Steps</source>
         <translation>Peldaños</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="764"/>
+        <location filename="../scene_builder_inspector.cpp" line="769"/>
         <source>Roundness of the edges</source>
         <translation>Redondez de los bordes</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="767"/>
+        <location filename="../scene_builder_inspector.cpp" line="772"/>
         <source>Size (width, height, depth)</source>
         <translation>Tamaño (ancho, alto, profundidad)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="768"/>
+        <location filename="../scene_builder_inspector.cpp" line="773"/>
         <source>Radius of the curve</source>
         <translation>Radio de la curva</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="771"/>
+        <location filename="../scene_builder_inspector.cpp" line="776"/>
         <source>Size (width, hill height, depth)</source>
         <translation>Tamaño (ancho, altura de las colinas, profundidad)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="772"/>
+        <location filename="../scene_builder_inspector.cpp" line="777"/>
         <source>Detail (grid cells across)</source>
         <translation>Detalle (celdas de la cuadrícula a lo ancho)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="773"/>
+        <location filename="../scene_builder_inspector.cpp" line="778"/>
         <source>Hills across</source>
         <translation>Colinas a lo ancho</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="775"/>
+        <location filename="../scene_builder_inspector.cpp" line="780"/>
         <source>Seed (which ground)</source>
         <translation>Semilla (qué terreno)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="778"/>
+        <location filename="../scene_builder_inspector.cpp" line="783"/>
         <source>Text</source>
         <translation>Texto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="780"/>
+        <location filename="../scene_builder_inspector.cpp" line="785"/>
         <source>Default font</source>
         <translation>Fuente predeterminada</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="783"/>
+        <location filename="../scene_builder_inspector.cpp" line="788"/>
         <source>%1 (not on this computer)</source>
         <translation>%1 (no está en este equipo)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="789"/>
+        <location filename="../scene_builder_inspector.cpp" line="794"/>
         <source>Font</source>
         <translation>Fuente</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="790"/>
+        <location filename="../scene_builder_inspector.cpp" line="795"/>
         <source>Bold</source>
         <translation>Negrita</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="791"/>
+        <location filename="../scene_builder_inspector.cpp" line="796"/>
         <source>Italic</source>
         <translation>Cursiva</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="794"/>
+        <location filename="../scene_builder_inspector.cpp" line="799"/>
         <source>Centre</source>
         <translation>Centro</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="801"/>
+        <location filename="../scene_builder_inspector.cpp" line="806"/>
         <source>Lines line up</source>
         <translation>Alineación de las líneas</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="802"/>
+        <location filename="../scene_builder_inspector.cpp" line="807"/>
         <source>Height of a capital letter</source>
         <translation>Altura de una mayúscula</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="803"/>
+        <location filename="../scene_builder_inspector.cpp" line="808"/>
         <source>Thickness</source>
         <translation>Grosor</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="804"/>
+        <location filename="../scene_builder_inspector.cpp" line="809"/>
         <source>Stretch sideways</source>
         <translation>Estirar a lo ancho</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="805"/>
+        <location filename="../scene_builder_inspector.cpp" line="810"/>
         <source>The letters are made from the chosen font and written into the scene as a mesh, so the scene file shows the same words on any computer. A new line starts a new row of letters.</source>
         <translation>Las letras se hacen con la fuente elegida y se escriben en la escena como una malla, así que el archivo de la escena muestra las mismas palabras en cualquier equipo. Una línea nueva empieza una nueva fila de letras.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="809"/>
+        <location filename="../scene_builder_inspector.cpp" line="814"/>
         <source>Width (X)</source>
         <translation>Ancho (X)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="810"/>
+        <location filename="../scene_builder_inspector.cpp" line="815"/>
         <source>Depth (Z)</source>
         <translation>Profundidad (Z)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="813"/>
+        <location filename="../scene_builder_inspector.cpp" line="818"/>
         <source>Mesh file</source>
         <translation>Archivo de malla</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="813"/>
+        <location filename="../scene_builder_inspector.cpp" line="818"/>
         <location filename="../scene_builder_widget.cpp" line="763"/>
         <source>Meshes (*.ply *.obj)</source>
         <translation>Mallas (*.ply *.obj)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="814"/>
+        <location filename="../scene_builder_inspector.cpp" line="819"/>
         <location filename="../scene_builder_multi.cpp" line="317"/>
         <location filename="../scene_builder_views.cpp" line="53"/>
         <source>Scale</source>
         <translation>Escala</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="820"/>
-        <location filename="../scene_builder_inspector.cpp" line="837"/>
+        <location filename="../scene_builder_inspector.cpp" line="825"/>
+        <location filename="../scene_builder_inspector.cpp" line="842"/>
         <source>Light</source>
         <translation>Luz</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="821"/>
+        <location filename="../scene_builder_inspector.cpp" line="826"/>
         <source>Gives off light</source>
         <translation>Emite luz</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="823"/>
+        <location filename="../scene_builder_inspector.cpp" line="828"/>
         <source>Light colour</source>
         <translation>Color de la luz</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="824"/>
-        <location filename="../scene_builder_inspector.cpp" line="929"/>
+        <location filename="../scene_builder_inspector.cpp" line="829"/>
+        <location filename="../scene_builder_inspector.cpp" line="934"/>
         <source>Strength</source>
         <translation>Intensidad</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="825"/>
+        <location filename="../scene_builder_inspector.cpp" line="830"/>
         <source>Light picture</source>
         <translation>Imagen de la luz</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="826"/>
+        <location filename="../scene_builder_inspector.cpp" line="831"/>
         <source>Both sides</source>
         <translation>Ambas caras</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="828"/>
+        <location filename="../scene_builder_inspector.cpp" line="833"/>
         <source>A quad or disk lights the side that faces up. Rotate it 180 degrees about X to make a ceiling light.</source>
         <translation>Un cuadrilátero o un disco ilumina la cara que mira hacia arriba. Gíralo 180 grados sobre X para hacer una luz de techo.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="853"/>
         <location filename="../scene_builder_inspector.cpp" line="858"/>
+        <location filename="../scene_builder_inspector.cpp" line="863"/>
         <source>Aims at</source>
         <translation>Apunta a</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="854"/>
+        <location filename="../scene_builder_inspector.cpp" line="859"/>
         <source>Cone angle</source>
         <translation>Ángulo del cono</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="855"/>
+        <location filename="../scene_builder_inspector.cpp" line="860"/>
         <source>Soft edge</source>
         <translation>Borde suave</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="860"/>
+        <location filename="../scene_builder_inspector.cpp" line="865"/>
         <source>Slide picture</source>
         <translation>Imagen de la diapositiva</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="861"/>
+        <location filename="../scene_builder_inspector.cpp" line="866"/>
         <source>A slide projector: the picture shines out through a frustum, onto whatever it falls on, with the colours of the picture. The field of view is the angle across the picture&apos;s shorter side. Strength is the brightness of the whitest part of the picture; a surface facing the projector from distance d is lit with Strength / d squared. The top of the picture points up as far as the aim allows.</source>
         <translation>Un proyector de diapositivas: la imagen sale por un tronco de pirámide y cae sobre lo que encuentra, con los colores de la imagen. El campo de visión es el ángulo del lado más corto de la imagen. La intensidad es el brillo de la parte más blanca de la imagen; una superficie de cara al proyector a una distancia d recibe Intensidad / d al cuadrado. La parte superior de la imagen apunta hacia arriba en la medida en que lo permite la orientación.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="866"/>
+        <location filename="../scene_builder_inspector.cpp" line="871"/>
         <source>Shines from</source>
         <translation>Brilla desde</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="867"/>
+        <location filename="../scene_builder_inspector.cpp" line="872"/>
         <source>Towards</source>
         <translation>Hacia</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="871"/>
+        <location filename="../scene_builder_inspector.cpp" line="876"/>
         <source>Sun &amp;&amp; sky (a clear sky for a time of day)</source>
         <translation>Sol y cielo (un cielo despejado según la hora del día)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="887"/>
+        <location filename="../scene_builder_inspector.cpp" line="892"/>
         <source>Time of day...</source>
         <translation>Hora del día...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="888"/>
+        <location filename="../scene_builder_inspector.cpp" line="893"/>
         <source>Sunrise</source>
         <translation>Amanecer</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="888"/>
+        <location filename="../scene_builder_inspector.cpp" line="893"/>
         <source>Morning</source>
         <translation>Mañana</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="888"/>
+        <location filename="../scene_builder_inspector.cpp" line="893"/>
         <source>Noon</source>
         <translation>Mediodía</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="889"/>
+        <location filename="../scene_builder_inspector.cpp" line="894"/>
         <source>Afternoon</source>
         <translation>Tarde</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="889"/>
+        <location filename="../scene_builder_inspector.cpp" line="894"/>
         <source>Sunset</source>
         <translation>Atardecer</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="899"/>
+        <location filename="../scene_builder_inspector.cpp" line="904"/>
         <source>Sky gallery...</source>
         <translation>Galería de cielos...</translation>
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="339"/>
-        <location filename="../scene_builder_inspector.cpp" line="909"/>
+        <location filename="../scene_builder_inspector.cpp" line="914"/>
         <source>Match to a photo...</source>
         <translation>Ajustar a una foto...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="910"/>
+        <location filename="../scene_builder_inspector.cpp" line="915"/>
         <source>Choose a photo of an outdoor scene with the sky in it: the sun&apos;s height and direction and the haze are read from the sky and set here.</source>
         <translation>Elige una foto de un paisaje al aire libre con el cielo visible: la altura y la dirección del sol y la calima se leen del cielo y se fijan aquí.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="913"/>
+        <location filename="../scene_builder_inspector.cpp" line="918"/>
         <source>Sun height</source>
         <translation>Altura del sol</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="914"/>
+        <location filename="../scene_builder_inspector.cpp" line="919"/>
         <source>Sun direction</source>
         <translation>Dirección del sol</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="915"/>
+        <location filename="../scene_builder_inspector.cpp" line="920"/>
         <source>Haze</source>
         <translation>Calima</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="916"/>
+        <location filename="../scene_builder_inspector.cpp" line="921"/>
         <source>Ground brightness</source>
         <translation>Brillo del suelo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="917"/>
+        <location filename="../scene_builder_inspector.cpp" line="922"/>
         <source>The sky picture and the Sun light are made from these settings; change the sun here rather than moving the Sun light. Direction 0 is towards +X, 90 away from the starting camera, 180 towards -X, 270 behind it. Brightness 1 is a daylight scene.</source>
         <translation>La imagen del cielo y la luz del Sol se generan con estos ajustes; cambia el sol aquí en lugar de mover la luz del Sol. La dirección 0 es hacia +X, 90 alejándose de la cámara inicial, 180 hacia -X y 270 detrás de ella. Un brillo de 1 es una escena de pleno día.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="920"/>
+        <location filename="../scene_builder_inspector.cpp" line="925"/>
         <source>Sky image</source>
         <translation>Imagen del cielo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="920"/>
+        <location filename="../scene_builder_inspector.cpp" line="925"/>
         <source>Images (*.exr *.hdr *.png *.jpg *.jpeg)</source>
         <translation>Imágenes (*.exr *.hdr *.png *.jpg *.jpeg)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="922"/>
+        <location filename="../scene_builder_inspector.cpp" line="927"/>
         <source>Rotate sky</source>
         <translation>Girar el cielo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="923"/>
+        <location filename="../scene_builder_inspector.cpp" line="928"/>
         <source>Leave the image empty for a plain colour sky. An image is an equirectangular (lat-long) panorama; Rotate sky turns it about the vertical axis (counter-clockwise seen from above), to put the bright part of the picture where you want the light to come from.</source>
         <translation>Deja la imagen vacía para un cielo de color liso. Una imagen es un panorama equirrectangular (lat-long); Girar el cielo lo gira sobre el eje vertical (en sentido antihorario visto desde arriba), para poner la parte brillante de la imagen por donde quieres que llegue la luz.</translation>
     </message>
@@ -8019,7 +8029,7 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation type="vanished">Deja la imagen vacía para un cielo de color liso. Una imagen es un panorama equirrectangular (latitud-longitud).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="929"/>
+        <location filename="../scene_builder_inspector.cpp" line="934"/>
         <source>Brightness</source>
         <translation>Brillo</translation>
     </message>
@@ -8667,7 +8677,7 @@ Procedencia: %3</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="87"/>
-        <location filename="../scene_builder_inspector.cpp" line="795"/>
+        <location filename="../scene_builder_inspector.cpp" line="800"/>
         <location filename="../scene_builder_views.cpp" line="84"/>
         <source>Right</source>
         <translation>Derecha</translation>
@@ -8698,7 +8708,7 @@ Procedencia: %3</translation>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="521"/>
         <location filename="../scene_builder_actions.cpp" line="87"/>
-        <location filename="../scene_builder_inspector.cpp" line="793"/>
+        <location filename="../scene_builder_inspector.cpp" line="798"/>
         <location filename="../scene_builder_views.cpp" line="84"/>
         <source>Left</source>
         <translation>Izquierda</translation>
@@ -8728,7 +8738,7 @@ Procedencia: %3</translation>
         <translation>Acercar ambas vistas a lo seleccionado (F)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="511"/>
+        <location filename="../scene_builder_inspector.cpp" line="516"/>
         <source>Marble</source>
         <translation>Mármol</translation>
     </message>
@@ -9423,7 +9433,7 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <translation>La altura y la dirección del sol y la calima se leen del cielo de la foto (un cielo azul o blanco que llega a la parte de arriba de la imagen), y los ajustes de Sol y cielo se fijan para que coincidan. La foto debe mostrar algo de cielo y, para la altura, el horizonte. Los dos ajustes de abajo son opcionales.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="173"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="178"/>
         <location filename="../scene_builder_light_photo.cpp" line="121"/>
         <source> degrees</source>
         <translation> grados</translation>
@@ -9473,91 +9483,91 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <translation>El sol no se ajustó a partir de la foto: %1</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="164"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="169"/>
         <source>Choose the photo to match the camera to</source>
         <translation>Elige la foto con la que ajustar la cámara</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="157"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="162"/>
         <source>Camera from a photo</source>
         <translation>Cámara a partir de una foto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="166"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="171"/>
         <source>The camera takes the photo&apos;s lens (from the photo&apos;s own data when it has it), tilt and roll (read off the horizon: the lower edge of a blue or white sky), and the picture takes the photo&apos;s shape. The photo can then be laid over the camera view. All the settings below are optional.</source>
         <translation>La cámara toma el objetivo de la foto (de los datos de la propia foto cuando los tiene), su inclinación y su giro (leídos del horizonte: el borde inferior de un cielo azul o blanco), y la imagen toma la forma de la foto. Después se puede superponer la foto a la vista de la cámara. Todos los ajustes de abajo son opcionales.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="179"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="184"/>
         <source>from the photo (%1)</source>
         <translation>de la foto (%1)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="179"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="184"/>
         <source>from the photo (not in it: a phone&apos;s)</source>
         <translation>de la foto (no figura: el de un móvil)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="175"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="180"/>
         <source>How wide the photo sees, left to right. Left at the lowest setting it is read from the photo&apos;s own data when it has it, else a phone&apos;s is assumed.</source>
         <translation>Cuánto abarca la foto, de izquierda a derecha. En el valor más bajo se lee de los datos de la propia foto cuando los tiene; si no, se supone el de un móvil.</translation>
     </message>
     <message>
         <location filename="../scene_builder_camera_photo.cpp" line="141"/>
-        <location filename="../scene_builder_inspector.cpp" line="351"/>
+        <location filename="../scene_builder_inspector.cpp" line="356"/>
         <source>The photo %1 that this scene was matched to could not be found.</source>
         <translation>No se encontró la foto %1 a la que se ajustó esta escena.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="183"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="188"/>
         <location filename="../scene_builder_light_photo.cpp" line="123"/>
         <source>Photo&apos;s field of view (horizontal)</source>
         <translation>Campo de visión de la foto (horizontal)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="188"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="193"/>
         <source> m</source>
         <translation> m</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="190"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="195"/>
         <source>How high the camera was above the ground. Standing at eye level is about 1.6 m.</source>
         <translation>A qué altura estaba la cámara sobre el suelo. A la altura de los ojos, de pie, son unos 1,6 m.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="191"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="196"/>
         <source>Camera height above the ground</source>
         <translation>Altura de la cámara sobre el suelo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="195"/>
-        <location filename="../scene_builder_camera_photo.cpp" line="202"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="200"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="207"/>
         <location filename="../scene_builder_light_photo.cpp" line="127"/>
         <source>from the horizon</source>
         <translation>a partir del horizonte</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="197"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="202"/>
         <source>How far the camera looked up (+) or down (-). Left at the lowest setting it is read off the horizon.</source>
         <translation>Cuánto miraba la cámara hacia arriba (+) o hacia abajo (-). En el valor más bajo se lee del horizonte.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="204"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="209"/>
         <source>How far the camera was rolled (+ counter-clockwise seen from behind it: the horizon then runs down to the right). Left at the lowest setting it is read off the horizon.</source>
         <translation>Cuánto estaba girada la cámara (+ en sentido antihorario visto desde atrás: el horizonte baja entonces hacia la derecha). En el valor más bajo se lee del horizonte.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="205"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="210"/>
         <source>Camera roll</source>
         <translation>Giro de la cámara</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="208"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="213"/>
         <source>Also set the sun and sky from the photo</source>
         <translation>Ajustar también el sol y el cielo a partir de la foto</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="217"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="222"/>
         <source>Click a photo to use it: the camera is set from it at once, and again whenever you change a setting (or press Apply).</source>
         <translation>Haz clic en una foto para usarla: la cámara se ajusta a ella al instante, y de nuevo cada vez que cambies un ajuste (o pulses Aplicar).</translation>
     </message>
@@ -9566,7 +9576,7 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <translation type="vanished">Haz clic en una foto para usarla: la cámara se ajusta a ella al instante, y de nuevo cada vez que cambies un ajuste.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="230"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="235"/>
         <source>The camera could not be set from this photo: %1</source>
         <translation>No se pudo ajustar la cámara a partir de esta foto: %1</translation>
     </message>
@@ -9575,12 +9585,12 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <translation type="vanished">No se pudo leer la cámara</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="234"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="239"/>
         <source>Next: pick an object in the list, press Place the picked object by clicking... in its properties, click the ground in the picture, then press Render into the photo... on Camera and image.</source>
         <translation>Siguiente: elige un objeto en la lista, pulsa Colocar el objeto elegido con un clic... en sus propiedades, haz clic en el suelo de la imagen y luego pulsa Renderizar en la foto... en Cámara e imagen.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="235"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="240"/>
         <source>The camera was set from %1:
 
 - %2</source>
@@ -9589,38 +9599,38 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
 - %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="245"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="250"/>
         <source>Pick an object first (click it in the list or the view), then Place by clicking.</source>
         <translation>Elige primero un objeto (haz clic en él en la lista o en la vista) y luego Colocar con un clic.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="251"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="256"/>
         <source>Click the ground in the picture to stand the picked object there. Click again to move it; Esc stops.</source>
         <translation>Haz clic en el suelo de la imagen para colocar allí el objeto elegido. Haz clic otra vez para moverlo; Esc termina.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="262"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="267"/>
         <source>Placed on the ground. It is %1 m tall; the camera is %2 m above the ground. Click again to move it, Esc stops, or set its real height.</source>
         <translation>Colocado en el suelo. Mide %1 m de alto; la cámara está a %2 m del suelo. Haz clic otra vez para moverlo, Esc termina, o fija su altura real.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="280"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="285"/>
         <source>Pick an object first: its height is made what you say, about the middle of its base.</source>
         <translation>Elige primero un objeto: su altura se hace la que indiques, respecto al centro de su base.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="284"/>
-        <location filename="../scene_builder_camera_photo.cpp" line="286"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="289"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="291"/>
         <source>Real height</source>
         <translation>Altura real</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="284"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="289"/>
         <source>How tall is it in the photo (metres)? The picked object is scaled about the middle of its base.</source>
         <translation>¿Qué altura tiene en la foto (metros)? El objeto elegido se escala respecto al centro de su base.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="286"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="291"/>
         <source>It cannot be made that tall (the size may change by up to 100 times).</source>
         <translation>No se puede hacer tan alto (el tamaño puede cambiar hasta 100 veces).</translation>
     </message>
@@ -9630,7 +9640,7 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
         <translation>Cuánto miraba la cámara hacia arriba (+) o hacia abajo (-). En el valor más bajo se lee de dónde termina el cielo, lo cual funciona cuando el horizonte está en la foto y no lo tapan edificios o árboles.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="198"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="203"/>
         <location filename="../scene_builder_light_photo.cpp" line="131"/>
         <source>Camera tilt</source>
         <translation>Inclinación de la cámara</translation>
@@ -9877,7 +9887,7 @@ Esto reemplaza la escena actual (Deshacer la recupera).</translation>
         <translation>Renderizando %1 x %2, %3 muestras...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="444"/>
+        <location filename="../scene_builder_composite.cpp" line="445"/>
         <location filename="../scene_builder_render.cpp" line="223"/>
         <source>The render was cancelled.</source>
         <translation>Se canceló el renderizado.</translation>
@@ -9906,13 +9916,13 @@ Esto reemplaza la escena actual (Deshacer la recupera).</translation>
         <translation>Terminado en %1 s (%2 x %3).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="507"/>
+        <location filename="../scene_builder_composite.cpp" line="508"/>
         <location filename="../scene_builder_render.cpp" line="234"/>
         <source>Saved %1.</source>
         <translation>Se guardó %1.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="510"/>
+        <location filename="../scene_builder_composite.cpp" line="511"/>
         <location filename="../scene_builder_render.cpp" line="235"/>
         <source>Could not save to %1.</source>
         <translation>No se pudo guardar en %1.</translation>
@@ -10148,6 +10158,72 @@ Esto reemplaza la escena actual (Deshacer la recupera).</translation>
         <location filename="../scene_builder_render.cpp" line="91"/>
         <source>Clean the grain out of the Preview picture with an AI denoiser. A Draft picture has only 16 samples per pixel, so it is grainy without it. Uses Intel Open Image Denoise on the CPU (downloaded once, with your permission) and NVIDIA&apos;s denoiser with the GPU. The final picture (Render picture...) is not denoised.</source>
         <translation>Limpia el grano de la vista previa con un reductor de ruido con IA. Una imagen en Borrador tiene solo 16 muestras por píxel, así que sin él sale granulada. Usa Intel Open Image Denoise en la CPU (se descarga una vez, con tu permiso) y el reductor de ruido de NVIDIA con la GPU. La imagen final (Renderizar imagen...) no se limpia.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_occluder.cpp" line="177"/>
+        <location filename="../scene_builder_occluder.cpp" line="187"/>
+        <source>Paint what is in front</source>
+        <translation>Pintar lo que está delante</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_occluder.cpp" line="177"/>
+        <source>Match the camera to a photo first (Camera and image: Match to a photo...): the mask is painted on that photo.</source>
+        <translation>Ajusta primero la cámara a una foto (Cámara e imagen: Ajustar a una foto...): la máscara se pinta sobre esa foto.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_occluder.cpp" line="189"/>
+        <source>Paint over what is in front of the objects in the photo (a railing, a branch, a post): where it is painted red, the photo stays in front of the objects. Paint and Erase use the brush (the wheel changes its size); Select region takes the joined region of similar colour under a click, and Unselect region takes one out; the tolerance says how similar.</source>
+        <translation>Pinta sobre lo que está delante de los objetos en la foto (una barandilla, una rama, un poste): donde esté pintado de rojo, la foto queda delante de los objetos. Pintar y Borrar usan el pincel (la rueda cambia su tamaño); Seleccionar región toma la región contigua de color parecido bajo un clic, y Deseleccionar región quita una; la tolerancia dice cuánto de parecido.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_occluder.cpp" line="197"/>
+        <source>Paint</source>
+        <translation>Pintar</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_occluder.cpp" line="198"/>
+        <source>Erase</source>
+        <translation>Borrar</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_occluder.cpp" line="199"/>
+        <source>Select region</source>
+        <translation>Seleccionar región</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_occluder.cpp" line="200"/>
+        <source>Unselect region</source>
+        <translation>Deseleccionar región</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_occluder.cpp" line="203"/>
+        <source>Brush</source>
+        <translation>Pincel</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_occluder.cpp" line="211"/>
+        <source>Tolerance</source>
+        <translation>Tolerancia</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_occluder.cpp" line="219"/>
+        <source>Undo stroke</source>
+        <translation>Deshacer trazo</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_occluder.cpp" line="223"/>
+        <source>Clear all</source>
+        <translation>Borrar todo</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_occluder.cpp" line="244"/>
+        <source>Nothing is in front of the objects any more.</source>
+        <translation>Ya no hay nada delante de los objetos.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_occluder.cpp" line="244"/>
+        <source>What is in front of the objects is saved with the scene; Render into the photo leaves it in front.</source>
+        <translation>Lo que está delante de los objetos se guarda con la escena; Renderizar en la foto lo deja delante.</translation>
     </message>
 </context>
 <context>

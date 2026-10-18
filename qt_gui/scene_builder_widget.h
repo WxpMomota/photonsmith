@@ -234,6 +234,13 @@ public:
 	// The photo belongs to the scene (Document::photo: its file, whether it is shown, how strongly, and what Render into the photo was told), so saving and opening a scene keeps it. The members below
 	// are what the window works from, brought in line with the document whenever it changes (documentChanged, an open, a new scene, an undo): this loads the photo when its file is another one.
 	void syncCameraPhoto();
+	// What is in front of the objects in the photo (Paint what is in front...): a mask painted on the photo, kept in the document (photo.occluder) and used by the composite so that the photo stays in front
+	// of the objects there. occluderBytes is the mask at a picture's size (one byte a pixel; empty when there is none).
+	void paintOccluderDialog();
+	static QImage occluderFromText(const QString &text);
+	std::vector<unsigned char> occluderBytes(int w, int h) const;
+	bool occluderPresentForTest() const { return !m_occluder.isNull(); }
+	void setOccluderForTest(const QImage &mask);   // a mask in the document, as the painting window would leave it
 	static QImage loadCameraPhotoImage(const QString &file);   // the photo as the camera view needs it: turned upright, RGB, at most 1600 pixels across; null when it cannot be read
 	// Place on the photo's ground (scene_builder_camera_photo.cpp): placeByClicking looks through the camera and waits for clicks on the ground in the picture; each click stands the picked items
 	// there (placePickedAt, one undo step), on the ground y = 0 (the camera is `height` above it). setPickedHeight makes the picked items `metres` tall about the middle of their base.
@@ -500,6 +507,8 @@ private:
 	QListWidget *m_list = nullptr;
 	SceneLayoutView *m_view = nullptr;
 	Scene3DView *m_view3d = nullptr;
+	QImage m_occluder;                     // photo.occluder as a picture (grayscale, the photo's size); null when there is none
+	QString m_occluderText;                // the text it was decoded from
 	QString m_cameraPhotoFile;             // the file m_cameraPhoto was loaded from (Document::photo.file)
 	QImage m_cameraPhoto;                  // the photo the camera was matched to, laid over the camera view while m_cameraPhotoShown
 	bool m_cameraPhotoShown = false;

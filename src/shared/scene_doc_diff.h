@@ -108,6 +108,7 @@ inline std::string describeChange(const Document& a, const Document& b) {
 	listChanges(parts, "object", a.objects, b.objects);
 	listChanges(parts, "light", a.lights, b.lights);
 	listChanges(parts, "camera view", a.cameraViews, b.cameraViews);
+	if (a.photo.occluder != b.photo.occluder) parts.push_back(b.photo.occluder.empty() ? std::string("what is in front cleared") : std::string("what is in front painted"));
 	if (a.photo.file != b.photo.file) parts.push_back(b.photo.file.empty() ? std::string("photo removed") : "photo '" + b.photo.file + "'");
 	std::string out;
 	for (std::size_t i = 0; i < parts.size() && i < 6; ++i) out += (out.empty() ? "" : "; ") + parts[i];

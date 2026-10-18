@@ -346,6 +346,11 @@ void SceneBuilderWidget::inspectCamera(QFormLayout *f) {
 	composite->setToolTip(tr("Render the scene through this camera and put it into the photo, with the shadows it casts on the ground. Tick the floor as the ground: the photo already has it."));
 	connect(composite, &QPushButton::clicked, this, [this]() { renderIntoPhotoDialog(); });
 	f->addRow(composite);
+	auto *inFront = new QPushButton(tr("Paint what is in front..."));
+	inFront->setAutoDefault(false);
+	inFront->setToolTip(tr("Paint over what is in front of the objects in the photo (a railing, a branch): Render into the photo leaves it in front of them. Needs the camera matched to a photo."));
+	connect(inFront, &QPushButton::clicked, this, [this]() { paintOccluderDialog(); });
+	f->addRow(inFront);
 	if (!m_doc.photo.file.empty()) {
 		if (m_cameraPhoto.isNull()) {   // the scene was matched to a photo that is not there now
 			auto *missing = new QLabel(tr("The photo %1 that this scene was matched to could not be found.").arg(QString::fromStdString(m_doc.photo.file)));

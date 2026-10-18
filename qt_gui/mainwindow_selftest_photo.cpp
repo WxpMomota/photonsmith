@@ -802,6 +802,67 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			while (quiet.elapsed() < 1500) { QCoreApplication::processEvents(QEventLoop::AllEvents, 100); QThread::msleep(20); }
 			check(sb->liveRefreshesForTest() == stopped && !sb->compositeRunningForTest(), "with the tick off nothing is made when the scene changes");
 		}
+		// What is in front of the objects: a mask on the photo (painted in its own window, kept in the scene) leaves the photo's own pixels there in a render into the photo, and nothing of the objects.
+		{
+			const QString file = QDir::tempPath() + "/rt_selftest_composite.png";
+			QString err;
+			sb->newScene();
+			sb->applyCameraPhoto(file, 65.0, 1.6, false, 0.0, false, 0.0, false, &err);
+			const QImage photoImage(file);
+			QString renderError;
+			const QString plainPath = QDir::tempPath() + "/rt_selftest_front_plain.png", maskedPath = QDir::tempPath() + "/rt_selftest_front_masked.png";
+			const bool plainOk = sb->renderIntoPhoto(plainPath, {0}, 0.0, 8, false, &renderError);
+			QImage mask(photoImage.size(), QImage::Format_Grayscale8);
+			mask.fill(0);
+			for (int y = 0; y < mask.height(); ++y)
+				for (int x = mask.width() / 2; x < mask.width(); ++x) mask.scanLine(y)[x] = 255;   // the right half is in front
+			sb->setOccluderForTest(mask);
+			const bool maskedOk = sb->renderIntoPhoto(maskedPath, {0}, 0.0, 8, false, &renderError);
+			const QImage plain = QImage(plainPath).convertToFormat(QImage::Format_RGB32), masked = QImage(maskedPath).convertToFormat(QImage::Format_RGB32), original = photoImage.scaled(plain.size()).convertToFormat(QImage::Format_RGB32);
+			long inFrontDiffers = 0, plainObjectPixels = 0, leftSame = 0, leftPixels = 0;
+			for (int y = 0; y < masked.height() && plainOk && maskedOk; ++y)
+				for (int x = 0; x < masked.width(); ++x) {
+					const bool changedByObjects = qRed(plain.pixel(x, y)) != qRed(original.pixel(x, y)) || qGreen(plain.pixel(x, y)) != qGreen(original.pixel(x, y)) || qBlue(plain.pixel(x, y)) != qBlue(original.pixel(x, y));
+					if (x > masked.width() / 2 + 3) {
+						plainObjectPixels += changedByObjects ? 1 : 0;
+						inFrontDiffers += (changedByObjects && masked.pixel(x, y) != original.pixel(x, y)) ? 1 : 0;   // an object pixel in front of which something is: it must be the photo's own
+					} else if (x < masked.width() / 2 - 3 && !changedByObjects) {   // (the render's noise differs between two renders: where the objects did nothing the two must agree)
+						++leftPixels;
+						leftSame += masked.pixel(x, y) == plain.pixel(x, y) ? 1 : 0;
+					}
+				}
+			check(plainOk && maskedOk && sb->occluderPresentForTest(), "a render into the photo with and without what is in front " + renderError);
+			check(plainObjectPixels > 200 && inFrontDiffers == 0, QString("where the mask is, the photo's own pixels stay (%1 object pixels there without the mask, %2 still differ with it)").arg(plainObjectPixels).arg(inFrontDiffers));
+			check(leftPixels > 0 && leftSame * 100 > leftPixels * 97, QString("and where it is not, what the objects did not touch is as it was (%1 of %2 pixels the same)").arg(leftSame).arg(leftPixels));
+			// the painting window, with real mouse events: a stroke across the middle, then Ok
+			QTimer::singleShot(700, [&]() {
+				if (QWidget *w = QApplication::activeModalWidget()) {
+					if (QWidget *canvas = w->findChild<QWidget *>("occluderCanvas")) {
+						const QPoint a(canvas->width() / 2 - 30, canvas->height() / 2), b(canvas->width() / 2 + 30, canvas->height() / 2);
+						QMouseEvent press(QEvent::MouseButtonPress, QPointF(a), canvas->mapToGlobal(QPointF(a)), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+						QApplication::sendEvent(canvas, &press);
+						QMouseEvent move(QEvent::MouseMove, QPointF(b), canvas->mapToGlobal(QPointF(b)), Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+						QApplication::sendEvent(canvas, &move);
+						QMouseEvent release(QEvent::MouseButtonRelease, QPointF(b), canvas->mapToGlobal(QPointF(b)), Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+						QApplication::sendEvent(canvas, &release);
+						w->grab().save(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_occluder.png");
+					}
+					for (QPushButton *b : w->findChildren<QPushButton *>())
+						if (b->text().remove(QLatin1Char('&')) == "OK") { b->click(); break; }
+				}
+			});
+			sb->setOccluderForTest(QImage());   // (nothing in front: the window starts from an empty mask)
+			const bool noneBefore = !sb->occluderPresentForTest();
+			sb->paintOccluderDialog();
+			check(noneBefore && sb->occluderPresentForTest() && !sb->document().photo.occluder.empty(), "the painting window: a stroke with the mouse and Ok leaves a mask in the scene");
+			// it is kept with the scene, and one undo takes it away
+			const QString scenePath = QDir::tempPath() + "/rt_selftest_front_scene.pbrt";
+			QString openError;
+			const bool saved = sb->saveFile(scenePath);
+			sb->newScene();
+			const bool opened = sb->openFile(scenePath, &openError);
+			check(saved && opened && sb->occluderPresentForTest(), "what is in front is saved with the scene and comes back when it is opened " + openError);
+		}
 		// The photo belongs to the scene: a scene matched to a photo, saved, then a new scene (no photo), then the saved one opened again has its photo, its overlay, its Render into the photo state and
 		// the camera back; a photo that has gone is said so, not a crash; Remove the photo takes it out; and one undo of the match takes it away too.
 		{
