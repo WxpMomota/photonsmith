@@ -152,6 +152,7 @@ void SceneBuilderWidget::lightFromPhoto(int lightIndex) {
 		    }
 		    for (const QString &note : notes) logLine(QStringLiteral("photo"), QStringLiteral("  %1").arg(note));
 		    *result = tr("The sky was set from %1:\n\n- %2").arg(QFileInfo(photo).fileName(), notes.join("\n- "));
+		    emit statusMessage(result->left(result->indexOf(QLatin1Char(':'))) + QLatin1Char('.'));
 		    return true;
 	    });
 }

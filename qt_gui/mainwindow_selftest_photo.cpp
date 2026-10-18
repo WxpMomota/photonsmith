@@ -34,6 +34,7 @@
 #include <QListWidget>
 #include <QMouseEvent>
 #include <QGuiApplication>
+#include <QPointer>
 #include <QPushButton>
 #include <QScreen>
 #include <QTimer>
@@ -539,7 +540,7 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			auto *probeButtons = new QDialogButtonBox(QDialogButtonBox::Close, &probe);
 			probeLayout->addWidget(probeButtons);
 			int tries = 0;
-			bool hintFirst = false, failureShown = false, oneApplyForTwo = false, resultShown = false, appliedByButton = false;
+			bool hintFirst = false, failureShown = false, oneApplyForTwo = false, resultShown = false, appliedByButton = false, failedApplyStays = false;
 			auto panelText = [&probe](const QString &starts) {
 				for (QLabel *label : probe.findChildren<QLabel *>()) if (label->text().startsWith(starts) && label->isVisible()) return true;
 				return false;
@@ -547,18 +548,24 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			QTimer::singleShot(300, [&]() { hintFirst = tries == 0 && panelText("the hint"); trigger->click(); });
 			QTimer::singleShot(900, [&]() { failureShown = tries == 1 && panelText("failed"); trigger->click(); trigger->click(); });   // two quick changes
 			QTimer::singleShot(1500, [&]() { oneApplyForTwo = tries == 2; resultShown = panelText("done 2"); });
-			QTimer::singleShot(1700, [&]() {   // the Apply button applies now, without the pause
+			QTimer::singleShot(1700, [&]() {   // the Apply button applies now, without the pause, and closes the window when it worked
+				tries = 0;   // (the next apply fails again: the window must stay open)
 				for (QPushButton *b : probe.findChildren<QPushButton *>()) if (b->text() == "Apply") { b->click(); break; }
-				appliedByButton = tries == 3 && panelText("done 3");
-				probeButtons->button(QDialogButtonBox::Close)->click();
+				failedApplyStays = probe.isVisible() && panelText("failed");
 			});
+			QTimer::singleShot(2200, [&]() {
+				for (QPushButton *b : probe.findChildren<QPushButton *>()) if (b->text() == "Apply") { b->click(); break; }   // this one works: the window closes by itself
+				appliedByButton = tries == 2;   // (the window closes by itself at once: its panel is no longer there to read)
+			});
+			QPointer<QDialog> guard(&probe);
+			QTimer::singleShot(5000, [guard]() { if (guard) guard->reject(); });   // (only if it did not close; the probe is gone by then if it did)
 			photo_dialog::run(probe, page, probeButtons, "the hint", [&](const std::function<void()> &schedule) { QObject::connect(trigger, &QPushButton::clicked, &probe, schedule); },
 			                  [&tries](QString *result) {
 				                  ++tries;
 				                  *result = tries == 1 ? QString("failed") : QString("done %1").arg(tries);
 				                  return tries != 1;
 			                  }, 100);
-			check(hintFirst && failureShown && oneApplyForTwo && resultShown && appliedByButton && tries == 3, QString("the photo windows apply at once: hint first %1, a failure is shown in the panel %2, two quick changes are one apply %3, the result is shown %4, the Apply button applies now %6 (%5 applies)").arg(hintFirst).arg(failureShown).arg(oneApplyForTwo).arg(resultShown).arg(tries).arg(appliedByButton));
+			check(hintFirst && failureShown && oneApplyForTwo && resultShown && appliedByButton && failedApplyStays && probe.result() == QDialog::Accepted, QString("the photo windows apply at once: hint first %1, a failure is shown in the panel %2, two quick changes are one apply %3, the result is shown %4, the Apply button applies now and closes the window %6, a failed Apply keeps it open %7 (%5 applies)").arg(hintFirst).arg(failureShown).arg(oneApplyForTwo).arg(resultShown).arg(tries).arg(appliedByButton).arg(failedApplyStays));
 		}
 		// the dialog: it opens with a role to choose for every object (a picture of it is saved), and a cancel changes nothing
 		int roleBoxes = 0;
@@ -726,11 +733,15 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 				if (QWidget *w = QApplication::activeModalWidget()) {
 					seen += panelHas(w, "rt_selftest_composite.png") ? "own " : "";
 					for (QPushButton *b : w->findChildren<QPushButton *>())
-						if (b->text().remove(QLatin1Char('&')) == "Close") { b->click(); break; }
+						if (b->text() == "Apply") { b->click(); break; }   // Apply applies and closes the window
 				}
 			});
+			auto stayedOpen = std::make_shared<bool>(false);
+			QTimer::singleShot(12000, [stayedOpen]() {
+				if (QWidget *w = QApplication::activeModalWidget()) { *stayedOpen = true; if (auto *d = qobject_cast<QDialog *>(w)) d->reject(); }   // (only if it did not close)
+			});
 			sb->cameraFromPhoto();
-			check(seen == "hint north-sea beach own " && samplesListed == static_cast<int>(samples.size()) && depthAfterTwo - depthAtStart <= 2 && fillsScreen && hasApply && bigThumbnails,
+			check(seen == "hint north-sea beach own " && samplesListed == static_cast<int>(samples.size()) && depthAfterTwo - depthAtStart <= 2 && fillsScreen && hasApply && bigThumbnails && !*stayedOpen,
 			      QString("Match to a photo for the camera is one window that applies on click (%1; %2 samples listed; two applies left %3 undo steps; fills the screen %4, has an Apply button %5, thumbnails %6)").arg(seen).arg(samplesListed).arg(depthAfterTwo - depthAtStart).arg(fillsScreen).arg(hasApply).arg(bigThumbnails));
 		}
 	}

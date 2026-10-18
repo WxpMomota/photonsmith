@@ -46,6 +46,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 * **Scene Builder: the result area of Match to a photo is only as tall as its text** (up to two fifths of the window), so the photo row and settings above it get the rest, instead of a fixed share that left a large empty block on a wide window.
 
+* **Scene Builder: Apply in Match to a photo closes the window** (when the apply worked; when it did not, the window stays open and the panel says why), and the status line says what was done once it is gone. Clicking a photo and changing a setting still apply by themselves while the window is open; Close keeps what was applied. The self-test checks Apply closes it and a failing Apply keeps it open.
+
 ## 0.1.5 (2026-10-16)
 
 * **The first Metal render after an install waits about two minutes, not four**: Metal turns the path tracer into machine code once per Mac, for two shader variants (the second is for alpha masks and subsurface), and the app built them one after the other (108 s then 121 s on an M2). They are now built side by side (about 125 s in all: `ray_tracer --prepare-gpu` 231 s -> 136 s, measured with a cold cache). A Live Preview that starts during the warm-up still waits for the build of its own variant instead of compiling it twice.

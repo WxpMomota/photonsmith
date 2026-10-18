@@ -1,7 +1,7 @@
 #pragma once
 // photo_dialog.h -- the shape of the photo features' dialogs (Match to a photo for the camera and for the Sun & sky): the photo and the settings above, the result under them, in one window, and
-// whatever is clicked or changed is applied at once (after a short pause, so typing a number is one apply), and the result is the panel's text. An Apply button is there too (and Enter): it applies now, for
-// anyone who wants to be sure; Close keeps what has been applied.
+// whatever is clicked or changed is applied at once (after a short pause, so typing a number is one apply), and the result is the panel's text. An Apply button is there too (and Enter): it applies now and closes the
+// window (when it worked; when it did not, the window stays and the panel says why); Close keeps what has been applied and closes.
 #include <QCoreApplication>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -64,16 +64,19 @@ inline void run(QDialog &dialog, QWidget *page, QDialogButtonBox *buttons, const
 	const auto applyNow = [pause, text, apply, fitPanel]() {
 		pause->stop();
 		QString result;
-		apply(&result);
+		const bool ok = apply(&result);
 		text->setText(result);
 		fitPanel();
+		return ok;
 	};
-	QObject::connect(pause, &QTimer::timeout, &dialog, applyNow);
+	QObject::connect(pause, &QTimer::timeout, &dialog, [applyNow]() { applyNow(); });
 	wire([pause]() { pause->start(); });
-	QPushButton *applyButton = buttons->addButton(QCoreApplication::translate("photo_dialog", "Apply"), QDialogButtonBox::ActionRole);   // (not AcceptRole: it must not close the window)
+	QPushButton *applyButton = buttons->addButton(QCoreApplication::translate("photo_dialog", "Apply"), QDialogButtonBox::ActionRole);   // (not AcceptRole: it closes the window only when the apply worked)
 	applyButton->setDefault(true);
-	applyButton->setToolTip(QCoreApplication::translate("photo_dialog", "Apply the photo and the settings now (this happens by itself after a click or a change)."));
-	QObject::connect(applyButton, &QPushButton::clicked, &dialog, applyNow);
+	applyButton->setToolTip(QCoreApplication::translate("photo_dialog", "Apply the photo and the settings now and close this window (clicking a photo or changing a setting has already applied it)."));
+	QObject::connect(applyButton, &QPushButton::clicked, &dialog, [&dialog, applyNow]() {
+		if (applyNow()) dialog.accept();
+	});
 
 	layout->activate();
 	QSize want = dialog.sizeHint().expandedTo(dialog.size());

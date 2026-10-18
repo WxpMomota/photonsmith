@@ -9572,38 +9572,38 @@ La forma es una suposición: la parte trasera es inventada y los detalles finos 
 - %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="210"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="211"/>
         <source>Pick an object first (click it in the list or the view), then Place by clicking.</source>
         <translation>Elige primero un objeto (haz clic en él en la lista o en la vista) y luego Colocar con un clic.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="216"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="217"/>
         <source>Click the ground in the picture to stand the picked object there. Click again to move it; Esc stops.</source>
         <translation>Haz clic en el suelo de la imagen para colocar allí el objeto elegido. Haz clic otra vez para moverlo; Esc termina.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="227"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="228"/>
         <source>Placed on the ground. It is %1 m tall; the camera is %2 m above the ground. Click again to move it, Esc stops, or set its real height.</source>
         <translation>Colocado en el suelo. Mide %1 m de alto; la cámara está a %2 m del suelo. Haz clic otra vez para moverlo, Esc termina, o fija su altura real.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="245"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="246"/>
         <source>Pick an object first: its height is made what you say, about the middle of its base.</source>
         <translation>Elige primero un objeto: su altura se hace la que indiques, respecto al centro de su base.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="249"/>
-        <location filename="../scene_builder_camera_photo.cpp" line="251"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="250"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="252"/>
         <source>Real height</source>
         <translation>Altura real</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="249"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="250"/>
         <source>How tall is it in the photo (metres)? The picked object is scaled about the middle of its base.</source>
         <translation>¿Qué altura tiene en la foto (metros)? El objeto elegido se escala respecto al centro de su base.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="251"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="252"/>
         <source>It cannot be made that tall (the size may change by up to 100 times).</source>
         <translation>No se puede hacer tan alto (el tamaño puede cambiar hasta 100 veces).</translation>
     </message>
@@ -10440,14 +10440,18 @@ Comprueba que tienes permiso para escribir allí y que el disco no está lleno.<
         <translation type="vanished">Cerrar</translation>
     </message>
     <message>
-        <location filename="../photo_dialog.h" line="66"/>
+        <location filename="../photo_dialog.h" line="74"/>
         <source>Apply</source>
         <translation>Aplicar</translation>
     </message>
     <message>
-        <location filename="../photo_dialog.h" line="68"/>
+        <location filename="../photo_dialog.h" line="76"/>
+        <source>Apply the photo and the settings now and close this window (clicking a photo or changing a setting has already applied it).</source>
+        <translation>Aplica ahora la foto y los ajustes y cierra esta ventana (hacer clic en una foto o cambiar un ajuste ya los ha aplicado).</translation>
+    </message>
+    <message>
         <source>Apply the photo and the settings now (this happens by itself after a click or a change).</source>
-        <translation>Aplica ahora la foto y los ajustes (esto ocurre solo tras un clic o un cambio).</translation>
+        <translation type="vanished">Aplica ahora la foto y los ajustes (esto ocurre solo tras un clic o un cambio).</translation>
     </message>
 </context>
 <context>

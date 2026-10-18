@@ -199,6 +199,7 @@ void SceneBuilderWidget::cameraFromPhoto() {
 		    for (const QString &note : notes) logLine(QStringLiteral("photo"), QStringLiteral("  %1").arg(note));
 		    if (photo.startsWith(QLatin1String(":/"))) notes << tr("Next: pick an object in the list, press Place the picked object by clicking... in its properties, click the ground in the picture, then press Render into the photo... on Camera and image.");
 		    *result = tr("The camera was set from %1:\n\n- %2").arg(QFileInfo(photo).fileName(), notes.join("\n- "));
+		    emit statusMessage(result->left(result->indexOf(QLatin1Char(':'))) + QLatin1Char('.'));   // ("The camera was set from beach.jpg.": what was done, once the window is closed)
 		    return true;
 	    });
 }

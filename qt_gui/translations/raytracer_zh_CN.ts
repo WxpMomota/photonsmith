@@ -9526,38 +9526,38 @@ The shape is a guess: the back is invented and fine detail is soft. It works bes
 - %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="210"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="211"/>
         <source>Pick an object first (click it in the list or the view), then Place by clicking.</source>
         <translation>请先选择一个物体（在列表或视图中点击它），然后使用“点击放置”。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="216"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="217"/>
         <source>Click the ground in the picture to stand the picked object there. Click again to move it; Esc stops.</source>
         <translation>点击画面中的地面，把所选物体放在那里。再次点击可移动它；按 Esc 结束。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="227"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="228"/>
         <source>Placed on the ground. It is %1 m tall; the camera is %2 m above the ground. Click again to move it, Esc stops, or set its real height.</source>
         <translation>已放在地面上。它高 %1 米；相机离地 %2 米。再次点击可移动它，按 Esc 结束，也可以设置它的实际高度。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="245"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="246"/>
         <source>Pick an object first: its height is made what you say, about the middle of its base.</source>
         <translation>请先选择一个物体：它的高度会变为你给出的值，以底面中心为基准。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="249"/>
-        <location filename="../scene_builder_camera_photo.cpp" line="251"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="250"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="252"/>
         <source>Real height</source>
         <translation>实际高度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="249"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="250"/>
         <source>How tall is it in the photo (metres)? The picked object is scaled about the middle of its base.</source>
         <translation>它在照片中有多高（米）？所选物体会以底面中心为基准缩放。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_camera_photo.cpp" line="251"/>
+        <location filename="../scene_builder_camera_photo.cpp" line="252"/>
         <source>It cannot be made that tall (the size may change by up to 100 times).</source>
         <translation>无法调到这个高度（尺寸最多可变化 100 倍）。</translation>
     </message>
@@ -10394,14 +10394,18 @@ Check that you have permission to write there and that the disk is not full.</so
         <translation type="vanished">关闭</translation>
     </message>
     <message>
-        <location filename="../photo_dialog.h" line="66"/>
+        <location filename="../photo_dialog.h" line="74"/>
         <source>Apply</source>
         <translation>应用</translation>
     </message>
     <message>
-        <location filename="../photo_dialog.h" line="68"/>
+        <location filename="../photo_dialog.h" line="76"/>
+        <source>Apply the photo and the settings now and close this window (clicking a photo or changing a setting has already applied it).</source>
+        <translation>立即应用照片和设置并关闭此窗口（点击照片或更改设置时已经应用过了）。</translation>
+    </message>
+    <message>
         <source>Apply the photo and the settings now (this happens by itself after a click or a change).</source>
-        <translation>立即应用照片和设置（点击或更改后会自动进行）。</translation>
+        <translation type="vanished">立即应用照片和设置（点击或更改后会自动进行）。</translation>
     </message>
 </context>
 <context>
