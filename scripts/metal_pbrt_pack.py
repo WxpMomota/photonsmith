@@ -16,6 +16,8 @@ The baseline gate fails (exit 1) when
 A scene with a small visible lamp is noisy at the pack's 64 samples (killeroo-simple reads 8.7% low on one seed and 4% high on another): --spp-factor 4 or more settles those.
 """
 import argparse, os, subprocess, sys, tempfile
+import shutil
+import atexit
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from consistency_sweep import read_exr_means
 
@@ -52,6 +54,7 @@ def main():
     written, drifted = {}, []
     only = [x for x in args.only.split(",") if x]
     work = tempfile.mkdtemp(prefix="metal_pbrt_pack_")
+    atexit.register(shutil.rmtree, work, ignore_errors=True)   # (it used to leave one folder of pictures behind per run)
     bad = []
     n = 0
     for line in open(os.path.join(REPO, "tests", "data", "pbrt_reference_means.txt")):
