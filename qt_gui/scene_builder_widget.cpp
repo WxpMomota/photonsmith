@@ -344,7 +344,7 @@ void SceneBuilderWidget::buildUi() {
 	m_flythroughButton->setToolTip(tr("Make a video of the scene from a camera that flies through your saved camera views (needs two or more)"));
 	m_dayCycleButton = new QPushButton(tr("Day cycle..."), previewBox);
 	m_dayCycleButton->setAutoDefault(false);
-	m_dayCycleButton->setToolTip(tr("Make a video of a day on the scene: the sun goes from sunrise to sunset (needs a Sun & sky light)"));
+	m_dayCycleButton->setToolTip(tr("Make a video of a day on the scene: the sun goes from sunrise to sunset (needs a Sun & sky light)"));   // (or a sky that is the photo)
 	m_previewStatus = new QLabel(previewBox);
 	renderRow->addWidget(new QLabel(tr("Quality:"), renderBar));
 	renderRow->addWidget(m_qualityCombo);
@@ -908,9 +908,7 @@ void SceneBuilderWidget::updateActions() {
 	m_liveCheck->setEnabled(ok && !m_cameraPhoto.isNull());
 	m_turntableButton->setEnabled(ok && !rendering);
 	m_flythroughButton->setEnabled(ok && !rendering && m_doc.cameraViews.size() >= 2);
-	bool generatedSky = false;
-	for (const Light &l : m_doc.lights) generatedSky = generatedSky || (l.kind == LightKind::Infinite && l.physicalSky);
-	m_dayCycleButton->setEnabled(ok && !rendering && generatedSky);
+	m_dayCycleButton->setEnabled(ok && !rendering && daySkyIndex(m_doc) >= 0);
 }
 
 void SceneBuilderWidget::updateTitle() {

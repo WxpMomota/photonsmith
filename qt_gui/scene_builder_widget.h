@@ -212,7 +212,14 @@ public:
 	// The same, giving the picture itself (at most `maxWidth` pixels across) instead of a file: the Builder shows it in its preview pane (showInPreview).
 	bool renderIntoPhotoImage(QImage *result, const std::vector<int> &groundObjects, double exposureStops, int samples, int maxWidth, bool matchToPhoto, QString *error, QStringList *notes = nullptr);
 	// "Preview in the photo": the same at the Quality setting of the Preview, with the ground, exposure and matching last used (the first time: the floor is the ground, the sky matches when there is one).
-	bool renderIntoPhotoRoles(QImage *result, const std::vector<photo_composite::Role> &roles, double exposureStops, int samples, int maxWidth, bool matchToPhoto, QString *error, QStringList *notes = nullptr);
+	// What a longer job that renders many pictures into the photo (the Day cycle) tells renderIntoPhotoRoles about the render it asks for.
+	struct CompositeJob {
+		const scene_doc::Document *source = nullptr;   // render this moment of the scene instead of the document
+		bool nested = false;                            // the caller already holds the running state (the Cancel button, the disabled buttons) across its renders
+		bool quiet = false;                             // no first look and no log line for this render, as for a Live refresh
+		QString statusPrefix;                           // in front of the status line's text ("Day cycle: frame 3 of 90 - ")
+	};
+	bool renderIntoPhotoRoles(QImage *result, const std::vector<photo_composite::Role> &roles, double exposureStops, int samples, int maxWidth, bool matchToPhoto, QString *error, QStringList *notes = nullptr, const CompositeJob *job = nullptr);
 	std::vector<photo_composite::Role> compositeRoles() const;   // what each object is for the picture: as last said in the dialog, else guessed
 	void previewIntoPhoto();
 	void previewIntoPhotoWith(int maxWidth, int samples, bool live);   // previewIntoPhoto at a chosen size; `live`: the quiet, small refresh of the Live tick
@@ -229,6 +236,8 @@ public:
 	void setPhotoExposureForTest(double v) { m_doc.photo.exposureStops = v; m_doc.photo.roles = {{"Floor", 0}}; documentChanged(); }   // what the Render into the photo dialog keeps in the document
 	void removePhotoForTest() { m_doc.photo = scene_doc::PhotoBackdrop(); documentChanged(); }   // what the Remove the photo button does
 	QString launcherPathForTest() const { return launcherPath(); }
+	QString workFolderForTest() const { return workFolder(); }
+	int daySkyIndexForTest() const { return daySkyIndex(m_doc); }
 	QString previewButtonTextForTest() const;
 	QString previewStatusForTest() const;
 	void pressPreviewForTest();   // the Preview button, which reads Cancel while a render runs
@@ -301,6 +310,7 @@ public:
 	// cannot. `framesOut`, when given, gets the pictures (a test looks at them). With `intoPhoto` (the camera matched to a photo) every frame is the scene put into the photo, with its shadows
 	// (Render into the photo, with the objects' exposure matched to the photo's sky each time): the shadows sweep across the photo as the sun goes over. The Preview button reads Cancel while it runs.
 	void showDayCycleDialog();
+	static int daySkyIndex(const scene_doc::Document &doc);   // the sky light whose sun a day cycle moves (a generated Sun & sky, or the photo as the environment), or -1
 	bool renderDayCycle(const QString &outMp4, int frames, int fps, int width, int samples, double noonElevation, QString *message, std::vector<QImage> *framesOut = nullptr, bool intoPhoto = false);
 	// Starts a preview render (no file dialog) and calls `done` when the picture is loaded or it failed.
 	void startPreview(const std::function<void(bool ok, const QString &message)> &done = nullptr);
@@ -594,9 +604,8 @@ private:
 	bool m_cancelRequested = false;
 	bool m_compositeRunning = false;   // Render into the photo / Preview in the photo is rendering (its three renders run from renderIntoPhotoRoles, with the window still usable)
 	bool m_compositeCancel = false;    // the Preview button (Cancel while it runs) was pressed
-	const scene_doc::Document *m_compositeSource = nullptr;   // a day cycle into the photo: renderIntoPhotoRoles renders this moment of the scene instead of the document
-	bool m_compositeNested = false;                            // ... and the day cycle holds the running state (the Cancel button, the disabled buttons) across its frames
-	QString m_compositeStatusPrefix;                           // ... and says which frame in the status line
+	bool m_exporting = false;          // an Export glTF is running (the window handles events meanwhile)
+	bool m_dayCycleRunning = false;    // a Day cycle video is rendering: an edit does not cancel it
 	bool m_compositeLive = false;      // the running composite is a Live refresh: quiet (no log lines, no first look, no scrolling to the picture)
 	QCheckBox *m_liveCheck = nullptr;  // "Live": the picture in the photo follows the scene
 	QTimer *m_liveTimer = nullptr;

@@ -203,8 +203,32 @@ inline bool ensureSkyFile(const std::string& dir, const SkyParams& p, std::strin
 	return true;
 }
 
-// Turns lights[skyIndex] (an Infinite light) into the sky of its own SkyParams: its picture is the generated sky (written into `imageDir`), and the scene's
-// first Distant light, or a new one named "Sun", is aimed along the sun with the sun's colour and strength. Both are multiplied by the sky light's `intensity`.
+// Aims the scene's first Distant light, or a new one named "Sun", along the sun of lights[skyIndex].sky (an Infinite light's SkyParams), with the sun's colour and strength, both multiplied by the sky
+// light's `intensity`. The sky light's picture is not touched: the Sun of a sky that is a photo (environment_from_photo.h) moves this way too (the Scene Builder's Day cycle).
+inline bool applySunLight(std::vector<Light>& lights, size_t skyIndex, std::string& error) {
+	if (skyIndex >= lights.size() || lights[skyIndex].kind != LightKind::Infinite) { error = "not a sky light"; return false; }
+	lights[skyIndex].sky = clamped(lights[skyIndex].sky);
+	const SunLight sun = sunLight(lights[skyIndex].sky);
+	const double skyIntensity = lights[skyIndex].intensity;
+	size_t sunIndex = lights.size();
+	for (size_t i = 0; i < lights.size(); ++i)
+		if (lights[i].kind == LightKind::Distant) { sunIndex = i; break; }
+	if (sunIndex == lights.size()) {
+		lights.emplace_back();
+		lights[sunIndex].name = "Sun";
+		lights[sunIndex].kind = LightKind::Distant;
+		lights[sunIndex].target = {0.0, 0.0, 0.0};
+	}
+	Light& s = lights[sunIndex];
+	const double distance = 10.0;
+	s.position = {s.target.x + sun.towardSun.x * distance, s.target.y + sun.towardSun.y * distance, s.target.z + sun.towardSun.z * distance};
+	s.color = sun.colour;
+	s.intensity = sun.irradiance * skyIntensity;
+	return true;
+}
+
+// Turns lights[skyIndex] (an Infinite light) into the sky of its own SkyParams: its picture is the generated sky (written into `imageDir`), and the Sun light is aimed along the sun
+// (applySunLight).
 inline bool applySunAndSky(std::vector<Light>& lights, size_t skyIndex, const std::string& imageDir, std::string& error) {
 	if (skyIndex >= lights.size() || lights[skyIndex].kind != LightKind::Infinite) { error = "not a sky light"; return false; }
 	Light& sky = lights[skyIndex];
@@ -213,23 +237,7 @@ inline bool applySunAndSky(std::vector<Light>& lights, size_t skyIndex, const st
 	if (!ensureSkyFile(imageDir, sky.sky, path, error)) return false;
 	sky.physicalSky = true;
 	sky.imageFile = path;
-	const SunLight sun = sunLight(sky.sky);
-	Light* sunLightPtr = nullptr;
-	for (Light& l : lights)
-		if (l.kind == LightKind::Distant) { sunLightPtr = &l; break; }
-	if (!sunLightPtr) {
-		lights.emplace_back();
-		sunLightPtr = &lights.back();
-		sunLightPtr->name = "Sun";
-		sunLightPtr->kind = LightKind::Distant;
-		sunLightPtr->target = {0.0, 0.0, 0.0};
-	}
-	Light& s = *sunLightPtr;
-	const double distance = 10.0;
-	s.position = {s.target.x + sun.towardSun.x * distance, s.target.y + sun.towardSun.y * distance, s.target.z + sun.towardSun.z * distance};
-	s.color = sun.colour;
-	s.intensity = sun.irradiance * lights[skyIndex].intensity;
-	return true;
+	return applySunLight(lights, skyIndex, error);
 }
 
 // ---- The sky gallery: ready-made skies for the Sun & sky light (the Builder's "Sky gallery..." window) ----------------------------------------------------------------

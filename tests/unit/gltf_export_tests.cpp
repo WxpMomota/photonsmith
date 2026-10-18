@@ -188,3 +188,10 @@ TEST(GltfExportTest, ASceneBuilderSceneKeepsItsHandedness) {
 	EXPECT_NEAR(cy / 30, 1.0, 1.0);
 	EXPECT_LT(cz / 30, -1.0) << "-Z stays -Z";
 }
+
+TEST(GltfExportTest, AFileThatDoesNotFitIn32BitLengthsIsRefused) {
+	EXPECT_TRUE(gltf_export::detail::fitsInGlb(1000, 1000000));
+	EXPECT_TRUE(gltf_export::detail::fitsInGlb(1000, 0xFFFFFFFFull - 12 - 8 - 1000 - 8));
+	EXPECT_FALSE(gltf_export::detail::fitsInGlb(1000, 0xFFFFFFFFull - 12 - 8 - 1000 - 8 + 1));
+	EXPECT_FALSE(gltf_export::detail::fitsInGlb(10, 5000000000ull));
+}

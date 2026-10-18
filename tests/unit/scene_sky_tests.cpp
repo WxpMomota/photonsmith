@@ -478,3 +478,28 @@ TEST(SceneSkyGalleryTest, ContactSheetForLooking) {
 	f << "P6\n" << cols * tw << " " << rows * th << "\n255\n";
 	f.write(reinterpret_cast<const char*>(sheet.data()), static_cast<std::streamsize>(sheet.size()));
 }
+
+TEST(SceneSkyTest, TheSunAloneCanBeMovedWithoutTouchingTheSkyPicture) {
+	// a sky that is a picture of its own (a photo environment): the Day cycle moves only the Sun
+	std::vector<Light> lights;
+	Light skyLight;
+	skyLight.kind = LightKind::Infinite;
+	skyLight.imageFile = "photo_env_abc.hdr";
+	skyLight.physicalSky = false;
+	skyLight.sky.sunElevation = 30.0;
+	skyLight.sky.sunAzimuth = 45.0;
+	skyLight.intensity = 2.0;
+	lights.push_back(skyLight);
+	std::string error;
+	ASSERT_TRUE(sky::applySunLight(lights, 0, error)) << error;
+	ASSERT_EQ(lights.size(), 2u) << "a Sun was added";
+	EXPECT_EQ(lights[0].imageFile, "photo_env_abc.hdr");
+	EXPECT_FALSE(lights[0].physicalSky);
+	EXPECT_NEAR(lights[1].intensity, sky::sunLight(lights[0].sky).irradiance * 2.0, 1e-9) << "multiplied by the sky light's brightness";
+	lights[0].sky.sunElevation = 70.0;
+	ASSERT_TRUE(sky::applySunLight(lights, 0, error)) << error;
+	EXPECT_EQ(lights.size(), 2u) << "the same Sun is moved";
+	const Float3 toSun = {lights[1].position.x - lights[1].target.x, lights[1].position.y - lights[1].target.y, lights[1].position.z - lights[1].target.z};
+	EXPECT_GT(toSun.y / std::sqrt(toSun.x * toSun.x + toSun.y * toSun.y + toSun.z * toSun.z), std::sin(60.0 * 3.14159265358979 / 180.0));
+	EXPECT_FALSE(sky::applySunLight(lights, 1, error)) << "a Distant light is not a sky";
+}

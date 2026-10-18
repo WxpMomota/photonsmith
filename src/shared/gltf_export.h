@@ -149,6 +149,9 @@ inline void appendBytes(std::vector<unsigned char>& bin, const void* data, size_
 	bin.insert(bin.end(), p, p + size);
 }
 
+// A .glb stores its own length and its chunks' as 32-bit numbers: whether a file with these two chunks fits.
+inline bool fitsInGlb(uint64_t jsonBytes, uint64_t binBytes) { return 12ull + 8 + jsonBytes + 8 + binBytes <= 0xFFFFFFFFull; }
+
 inline void put32(std::string& s, uint32_t v) {
 	for (int i = 0; i < 4; ++i) s.push_back(static_cast<char>((v >> (8 * i)) & 255));
 }
@@ -318,6 +321,10 @@ inline Result fromFlatScene(pbrt_flatten::FlatScene scene) {
 	if (needsLights) json += ",\"extensions\":{\"KHR_lights_punctual\":{\"lights\":[" + lightDefs + "]}}";
 	json += "}";
 	while (json.size() % 4) json.push_back(' ');
+	if (!fitsInGlb(json.size(), bin.size())) {
+		result.error = "The scene is too large for one .glb file (4 GB): export a smaller part of it.";
+		return result;
+	}
 	std::string glb;
 	put32(glb, 0x46546C67);   // "glTF"
 	put32(glb, 2);

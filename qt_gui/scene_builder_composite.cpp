@@ -101,9 +101,17 @@ std::vector<photo_composite::Role> SceneBuilderWidget::compositeRoles() const {
 	return roles;
 }
 
-bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::vector<photo_composite::Role> &rolesGiven, double exposureStops, int samples, int maxWidth, bool matchToPhoto, QString *error, QStringList *notes) {
-	const scene_doc::Document &doc = m_compositeSource ? *m_compositeSource : m_doc;   // (a day cycle into the photo renders its own moment of the scene)
-	if (m_process || (m_compositeRunning && !m_compositeNested)) {   // (a Preview, final picture or video is running: two renders at once would fight for the GPU, and the window would take clicks meant for the first)
+bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::vector<photo_composite::Role> &rolesGiven, double exposureStops, int samples, int maxWidth, bool matchToPhoto, QString *error, QStringList *notes, const CompositeJob *job) {
+	const scene_doc::Document &doc = job && job->source ? *job->source : m_doc;   // (a day cycle into the photo renders its own moment of the scene)
+	const bool nested = job && job->nested;
+	const QString statusPrefix = job ? job->statusPrefix : QString();
+	struct Quiet {   // (a quiet render is as a Live refresh: the flag is put back however this function ends)
+		bool &flag;
+		const bool before;
+		Quiet(bool &f, bool on) : flag(f), before(f) { if (on) flag = true; }
+		~Quiet() { flag = before; }
+	} quiet(m_compositeLive, job && job->quiet);
+	if (m_process || (m_compositeRunning && !nested)) {   // (a Preview, final picture or video is running: two renders at once would fight for the GPU, and the window would take clicks meant for the first)
 		if (error) *error = tr("A render is already running.");
 		return false;
 	}
@@ -172,7 +180,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 		}
 	};
 	std::unique_ptr<Running> running;   // (a day cycle into the photo holds the running state itself, across its frames)
-	if (!m_compositeNested) running = std::make_unique<Running>(this, tr("Rendering the scene for the photo..."));
+	if (!nested) running = std::make_unique<Running>(this, tr("Rendering the scene for the photo..."));
 	std::vector<float> rgb[3];
 	QElapsedTimer clock;
 	clock.start();
@@ -185,7 +193,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 	logLine(cat, QStringLiteral("render into the photo: %1 x %2, %3 samples, %4 inserted object(s), %5 ground object(s), %6; three renders (as it is, without the inserted objects, mask of them)%7")
 	                 .arg(w).arg(h).arg(samples).arg(inserted).arg(grounds).arg(m_gpuCheck && m_gpuCheck->isChecked() ? QStringLiteral("GPU") : QStringLiteral("CPU"), denoise ? QStringLiteral(", denoised") : QString()));
 	for (int p = 0; p < 3; ++p) {
-		m_previewStatus->setText(m_compositeStatusPrefix + tr("Rendering the scene for the photo: %1 of 3...").arg(p + 1));
+		m_previewStatus->setText(statusPrefix + tr("Rendering the scene for the photo: %1 of 3...").arg(p + 1));
 		QCoreApplication::processEvents();
 		const QString scene = dir + "/" + list[p].name + ".pbrt", exr = dir + "/" + list[p].name + ".exr";
 		const QByteArray sceneText = QByteArray::fromStdString(scene_doc::toPbrt(*list[p].doc));
@@ -232,7 +240,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 				if (line.startsWith(QLatin1String("Scanlines remaining:"))) {
 					const int left = line.mid(20).trimmed().toInt();
 					const int percent = std::min(100, std::max(0, 100 * (h - left) / h));
-					m_previewStatus->setText(m_compositeStatusPrefix + tr("Rendering the scene for the photo: %1 of 3, %2%...").arg(p + 1).arg(percent));
+					m_previewStatus->setText(statusPrefix + tr("Rendering the scene for the photo: %1 of 3, %2%...").arg(p + 1).arg(percent));
 					if (percent / 25 != lastQuarter) {
 						lastQuarter = percent / 25;
 						logLine(cat, QStringLiteral("    render %1 of 3: %2%").arg(p + 1).arg(percent));
@@ -467,7 +475,7 @@ void SceneBuilderWidget::scheduleLiveComposite() {
 		m_liveTimer->setInterval(400);
 		connect(m_liveTimer, &QTimer::timeout, this, &SceneBuilderWidget::runLiveComposite);
 	}
-	if (m_compositeRunning) m_compositeCancel = true;
+	if (m_compositeRunning && !m_dayCycleRunning) m_compositeCancel = true;   // (a render of an older scene is stopped; a day cycle renders its own copy of the scene and is not)
 	m_liveTimer->start();
 }
 

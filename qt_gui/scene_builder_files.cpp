@@ -314,6 +314,7 @@ bool SceneBuilderWidget::exportGltf(const QString &outGlb, QString *message) {
 		if (message) *message = why;
 		return false;
 	};
+	if (m_exporting) return fail(tr("An export is already running."));
 	if (!QFileInfo::exists(launcherPath())) return fail(tr("The renderer (%1) was not found next to the program.").arg(launcherPath()));
 	const QString dir = workFolder() + "/gltf";
 	QDir().mkpath(dir);
@@ -325,11 +326,25 @@ bool SceneBuilderWidget::exportGltf(const QString &outGlb, QString *message) {
 	process.setProcessChannelMode(QProcess::MergedChannels);
 	process.setWorkingDirectory(QCoreApplication::applicationDirPath());
 	process.start(launcherPath(), {QStringLiteral("--export-gltf"), scene, outGlb});
-	if (!process.waitForFinished(120000)) {
+	// The window stays usable while a big scene is loaded and written (the renderer takes tens of seconds for the biggest bundled ones): events are handled between short waits.
+	m_exporting = true;
+	struct Exporting {
+		bool &flag;
+		~Exporting() { flag = false; }
+	} exporting{m_exporting};
+	m_previewStatus->setText(tr("Exporting the scene as glTF..."));
+	QString output;
+	for (int waited = 0; process.state() != QProcess::NotRunning && waited < 30 * 60 * 1000; waited += 50) {
+		process.waitForFinished(50);
+		output += QString::fromLocal8Bit(process.readAll());
+		QCoreApplication::processEvents();
+	}
+	if (process.state() != QProcess::NotRunning) {
 		process.kill();
+		process.waitForFinished(3000);
 		return fail(tr("The export took too long and was stopped."));
 	}
-	const QString output = QString::fromLocal8Bit(process.readAll()).trimmed();
+	output = (output + QString::fromLocal8Bit(process.readAll())).trimmed();
 	if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0 || QFileInfo(outGlb).size() == 0) return fail(tr("The scene could not be exported: %1").arg(output.right(400)));
 	logLine(QStringLiteral("builder"), QStringLiteral("export glTF: %1 -> %2").arg(output.simplified(), outGlb));
 	if (message) *message = output;

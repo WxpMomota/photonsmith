@@ -6,6 +6,7 @@
 #include "app_log.h"
 #include "scene_builder_common.h"
 #include "../src/shared/day_cycle.h"
+#include "../src/shared/environment_from_photo.h"
 #include "../src/shared/scene_sky.h"
 
 #include <QCheckBox>
@@ -40,17 +41,17 @@ struct DayQuality {
 };
 const DayQuality kDayQualities[4] = {{480, 16}, {720, 64}, {960, 256}, {0, 0}};
 
-// The first sky that is the generated Sun & sky (the only one whose sun can be moved): its index, or -1.
-int generatedSkyIndex(const scene_doc::Document &doc) {
+}  // namespace
+
+// The first sky whose sun can be moved: the generated Sun & sky, or a sky that is the photo (the Sun light moves, the photo stays). Its index, or -1.
+int SceneBuilderWidget::daySkyIndex(const scene_doc::Document &doc) {
 	for (size_t i = 0; i < doc.lights.size(); ++i)
-		if (doc.lights[i].kind == scene_doc::LightKind::Infinite && doc.lights[i].physicalSky) return static_cast<int>(i);
+		if (doc.lights[i].kind == scene_doc::LightKind::Infinite && (doc.lights[i].physicalSky || environment_from_photo::isEnvironmentFile(doc.lights[i].imageFile))) return static_cast<int>(i);
 	return -1;
 }
 
-}  // namespace
-
 void SceneBuilderWidget::showDayCycleDialog() {
-	const int skyIndex = generatedSkyIndex(m_doc);
+	const int skyIndex = daySkyIndex(m_doc);
 	if (skyIndex < 0) {
 		emit statusMessage(tr("A day cycle moves the sun of a Sun & sky light: add one first (Lighting, or a light of kind Sun & sky)."));
 		return;
@@ -126,17 +127,27 @@ bool SceneBuilderWidget::renderDayCycle(const QString &outMp4, int frames, int f
 	flushEditLog();
 	if (m_process || m_compositeRunning) return fail(tr("A render is already running."));
 	if (frames < 1 || fps < 1 || width < 1) return fail(tr("A video needs at least one frame."));
-	const int skyIndex = generatedSkyIndex(m_doc);
+	// The scene as it is now: every frame is made from this copy (and these roles), so an edit made while the video renders (the window stays usable) does not reach the later frames or move the sky's index.
+	const scene_doc::Document base = m_doc;
+	const int skyIndex = daySkyIndex(base);
 	if (skyIndex < 0) return fail(tr("A day cycle moves the sun of a Sun & sky light: add one first."));
-	if (scene_doc::hasErrors(scene_doc::validate(m_doc))) return fail(tr("Fix the problems listed under the properties first."));
+	if (scene_doc::hasErrors(scene_doc::validate(base))) return fail(tr("Fix the problems listed under the properties first."));
 	if (!QFileInfo::exists(launcherPath())) return fail(tr("The renderer (%1) was not found next to the program.").arg(launcherPath()));
+	const std::vector<photo_composite::Role> roles = compositeRoles();
+	const double exposure = m_compositeExposure;
 
 	const QString dir = workFolder() + "/daycycle";
 	QDir(dir).removeRecursively();
 	QDir().mkpath(dir);
-	const double aspect = m_doc.render.width > 0 ? static_cast<double>(m_doc.render.height) / m_doc.render.width : 0.75;
+	struct Folder {   // the frames and the sky pictures are large: they go however this function ends
+		QString path;
+		~Folder() { QDir(path).removeRecursively(); }
+	} folder{dir};
+	const double aspect = base.render.width > 0 ? static_cast<double>(base.render.height) / base.render.width : 0.75;
 	const int height = std::max(1, static_cast<int>(std::lround(width * aspect)));
-	const double noonAzimuth = m_doc.lights[static_cast<size_t>(skyIndex)].sky.sunAzimuth;
+	const scene_doc::Light &skyOfBase = base.lights[static_cast<size_t>(skyIndex)];
+	const double noonAzimuth = skyOfBase.sky.sunAzimuth;
+	const bool generatedSky = skyOfBase.physicalSky;   // (else the sky is the photo: only the Sun moves)
 	const bool gpu = m_gpuCheck && m_gpuCheck->isChecked();
 	const bool denoise = m_denoiseCheck && m_denoiseCheck->isChecked();
 
@@ -145,6 +156,7 @@ bool SceneBuilderWidget::renderDayCycle(const QString &outMp4, int frames, int f
 		SceneBuilderWidget *w;
 		explicit Running(SceneBuilderWidget *widget) : w(widget) {
 			w->m_compositeRunning = true;
+			w->m_dayCycleRunning = true;
 			w->m_compositeCancel = false;
 			w->m_previewButton->setText(SceneBuilderWidget::tr("Cancel"));
 			w->updateActions();
@@ -152,6 +164,7 @@ bool SceneBuilderWidget::renderDayCycle(const QString &outMp4, int frames, int f
 		}
 		~Running() {
 			w->m_compositeRunning = false;
+			w->m_dayCycleRunning = false;
 			w->m_previewButton->setText(SceneBuilderWidget::tr("Preview"));
 			w->updateActions();
 		}
@@ -161,12 +174,24 @@ bool SceneBuilderWidget::renderDayCycle(const QString &outMp4, int frames, int f
 	QElapsedTimer clock;
 	clock.start();
 	if (framesOut) framesOut->clear();
+	// A finished frame: made an even size (the video's encoder wants it), saved for the assembly, kept for a test, shown in the preview pane from the middle of the day, and logged. The error text, or "".
+	const auto keepFrame = [&](QImage picture, int i, const day_cycle::Sun &sun) {
+		picture = picture.copy(0, 0, picture.width() & ~1, picture.height() & ~1);
+		if (!picture.save(QStringLiteral("%1/enc_%2.png").arg(dir).arg(i, 4, 10, QLatin1Char('0')))) return tr("Frame %1 could not be saved in %2.").arg(i + 1).arg(dir);
+		if (framesOut) framesOut->push_back(picture);
+		if (i == frames / 2) {   // the middle of the day, as a first look
+			m_previewPixmap = QPixmap::fromImage(picture);
+			updatePreviewPixmap();
+		}
+		logLine(cat, QStringLiteral("  frame %1 of %2%3: sun %4 degrees high, compass %5").arg(i + 1).arg(frames).arg(intoPhoto ? QStringLiteral(" (into the photo)") : QString()).arg(sun.elevation, 0, 'f', 1).arg(sun.azimuth, 0, 'f', 0));
+		return QString();
+	};
 	for (int i = 0; i < frames; ++i) {
 		if (m_compositeCancel) return fail(tr("The video was cancelled."), log_format::Level::Info);
 		m_previewStatus->setText(tr("Day cycle: frame %1 of %2...").arg(i + 1).arg(frames));
 		QCoreApplication::processEvents();
-		// the scene at this moment: the sun of the Sun & sky moved, its sky picture and the Sun light made for it (into this video's own folder, which goes with it)
-		scene_doc::Document frameDoc = m_doc;
+		// the scene at this moment: the sun moved; for the generated sky its picture and the Sun light are made for it (into this video's own folder), for the photo's sky only the Sun light is
+		scene_doc::Document frameDoc = base;
 		frameDoc.render.width = width;
 		frameDoc.render.height = height;
 		const day_cycle::Sun sun = day_cycle::sunOfFrame(i, frames, noonElevation, noonAzimuth);
@@ -174,75 +199,49 @@ bool SceneBuilderWidget::renderDayCycle(const QString &outMp4, int frames, int f
 		sky.sky.sunElevation = sun.elevation;
 		sky.sky.sunAzimuth = sun.azimuth;
 		std::string skyError;
-		if (!scene_doc::sky::applySunAndSky(frameDoc.lights, static_cast<size_t>(skyIndex), dir.toStdString(), skyError)) return fail(tr("The sky for frame %1 could not be made: %2").arg(i + 1).arg(QString::fromStdString(skyError)));
+		const bool skyMade = generatedSky ? scene_doc::sky::applySunAndSky(frameDoc.lights, static_cast<size_t>(skyIndex), dir.toStdString(), skyError)
+		                                  : scene_doc::sky::applySunLight(frameDoc.lights, static_cast<size_t>(skyIndex), skyError);
+		if (!skyMade) return fail(tr("The sky for frame %1 could not be made: %2").arg(i + 1).arg(QString::fromStdString(skyError)));
+		QImage picture;
 		if (intoPhoto) {   // the scene put into the photo at this moment: Render into the photo's own three renders, the objects' exposure matched to the photo's sky
-			struct Nested {   // (however this ends)
-				SceneBuilderWidget *w;
-				explicit Nested(SceneBuilderWidget *widget, const scene_doc::Document *source, const QString &prefix) : w(widget) {
-					w->m_compositeSource = source;
-					w->m_compositeNested = true;
-					w->m_compositeLive = true;   // (quiet: no first look and no log line for each of the hundreds of renders)
-					w->m_compositeStatusPrefix = prefix;
-				}
-				~Nested() {
-					w->m_compositeSource = nullptr;
-					w->m_compositeNested = false;
-					w->m_compositeLive = false;
-					w->m_compositeStatusPrefix.clear();
-				}
-			};
-			QImage picture;
+			CompositeJob job;
+			job.source = &frameDoc;
+			job.nested = true;   // (this function holds the Cancel button and the disabled buttons across the frames)
+			job.quiet = true;    // (no first look and no log line for each of the hundreds of renders)
+			job.statusPrefix = tr("Day cycle: frame %1 of %2 - ").arg(i + 1).arg(frames);
 			QString frameError;
-			bool made = false;
-			{
-				const Nested nested(this, &frameDoc, tr("Day cycle: frame %1 of %2 - ").arg(i + 1).arg(frames));
-				made = renderIntoPhotoRoles(&picture, compositeRoles(), m_compositeExposure, samples, width, true, &frameError);
+			if (!renderIntoPhotoRoles(&picture, roles, exposure, samples, width, true, &frameError, nullptr, &job))
+				return m_compositeCancel ? fail(tr("The video was cancelled."), log_format::Level::Info) : fail(tr("Frame %1 could not be put into the photo: %2").arg(i + 1).arg(frameError), log_format::Level::Error);
+		} else {
+			const QString scene = dir + "/scene.pbrt", ppm = dir + "/frame.ppm";
+			QString writeError;
+			if (!writeSceneFile(scene, &writeError, &frameDoc)) return fail(writeError);
+			QFile::remove(ppm);
+			QStringList args = {gpu ? "--gpu" : "--cpu"};
+			if (denoise) args << "--denoise";
+			args << "--output" << ppm << "--height" << QString::number(height) << QString::number(width) << QString::number(samples) << QString::number(base.render.maxDepth) << scene;
+			QProcess process;
+			process.setProcessChannelMode(QProcess::MergedChannels);
+			process.setWorkingDirectory(QCoreApplication::applicationDirPath());
+			process.start(launcherPath(), args);
+			QString tail;
+			for (int waited = 0; process.state() != QProcess::NotRunning && waited < 20 * 60 * 1000 && !m_compositeCancel; waited += 50) {
+				process.waitForFinished(50);
+				tail = (tail + QString::fromLocal8Bit(process.readAll())).right(600);
+				QCoreApplication::processEvents();
 			}
-			if (!made) return m_compositeCancel ? fail(tr("The video was cancelled."), log_format::Level::Info) : fail(tr("Frame %1 could not be put into the photo: %2").arg(i + 1).arg(frameError), log_format::Level::Error);
-			picture = picture.copy(0, 0, picture.width() & ~1, picture.height() & ~1);   // (the video's encoder wants an even width and height)
-			if (!picture.save(QStringLiteral("%1/enc_%2.png").arg(dir).arg(i, 4, 10, QLatin1Char('0')))) return fail(tr("Frame %1 could not be saved in %2.").arg(i + 1).arg(dir), log_format::Level::Error);
-			if (framesOut) framesOut->push_back(picture);
-			if (i == frames / 2) {
-				m_previewPixmap = QPixmap::fromImage(picture);
-				updatePreviewPixmap();
-			}
-			logLine(cat, QStringLiteral("  frame %1 of %2 (into the photo): sun %3 degrees high, compass %4").arg(i + 1).arg(frames).arg(sun.elevation, 0, 'f', 1).arg(sun.azimuth, 0, 'f', 0));
-			continue;
-		}
-		const QString scene = dir + "/scene.pbrt", ppm = dir + "/frame.ppm";
-		QString writeError;
-		if (!writeSceneFile(scene, &writeError, &frameDoc)) return fail(writeError);
-		QFile::remove(ppm);
-		QStringList args = {gpu ? "--gpu" : "--cpu"};
-		if (denoise) args << "--denoise";
-		args << "--output" << ppm << "--height" << QString::number(height) << QString::number(width) << QString::number(samples) << QString::number(m_doc.render.maxDepth) << scene;
-		QProcess process;
-		process.setProcessChannelMode(QProcess::MergedChannels);
-		process.setWorkingDirectory(QCoreApplication::applicationDirPath());
-		process.start(launcherPath(), args);
-		QString tail;
-		for (int waited = 0; process.state() != QProcess::NotRunning && waited < 20 * 60 * 1000 && !m_compositeCancel; waited += 50) {
-			process.waitForFinished(50);
 			tail = (tail + QString::fromLocal8Bit(process.readAll())).right(600);
-			QCoreApplication::processEvents();
+			if (process.state() != QProcess::NotRunning) {
+				process.kill();
+				process.waitForFinished(3000);
+				return m_compositeCancel ? fail(tr("The video was cancelled."), log_format::Level::Info) : fail(tr("A frame took too long and was stopped."));
+			}
+			picture = QImage(ppm);
+			if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0 || picture.isNull())
+				return fail(tr("The renderer could not make frame %1 (exit code %2). Its output:\n%3").arg(i + 1).arg(process.exitCode()).arg(tail.trimmed().right(400)), log_format::Level::Error);
 		}
-		tail = (tail + QString::fromLocal8Bit(process.readAll())).right(600);
-		if (process.state() != QProcess::NotRunning) {
-			process.kill();
-			process.waitForFinished(3000);
-			return m_compositeCancel ? fail(tr("The video was cancelled."), log_format::Level::Info) : fail(tr("A frame took too long and was stopped."));
-		}
-		QImage picture(ppm);
-		if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0 || picture.isNull())
-			return fail(tr("The renderer could not make frame %1 (exit code %2). Its output:\n%3").arg(i + 1).arg(process.exitCode()).arg(tail.trimmed().right(400)), log_format::Level::Error);
-		picture = picture.copy(0, 0, picture.width() & ~1, picture.height() & ~1);   // (the video's encoder wants an even width and height)
-		if (!picture.save(QStringLiteral("%1/enc_%2.png").arg(dir).arg(i, 4, 10, QLatin1Char('0')))) return fail(tr("Frame %1 could not be saved in %2.").arg(i + 1).arg(dir), log_format::Level::Error);
-		if (framesOut) framesOut->push_back(picture);
-		if (i == frames / 2) {   // the middle of the day, as a first look in the preview pane
-			m_previewPixmap = QPixmap::fromImage(picture);
-			updatePreviewPixmap();
-		}
-		logLine(cat, QStringLiteral("  frame %1 of %2: sun %3 degrees high, compass %4").arg(i + 1).arg(frames).arg(sun.elevation, 0, 'f', 1).arg(sun.azimuth, 0, 'f', 0));
+		const QString keepError = keepFrame(picture, i, sun);
+		if (!keepError.isEmpty()) return fail(keepError, log_format::Level::Error);
 	}
 	// the frames, put together by the renderer
 	m_previewStatus->setText(tr("Day cycle: putting the video together..."));
@@ -272,7 +271,6 @@ bool SceneBuilderWidget::renderDayCycle(const QString &outMp4, int frames, int f
 	}
 	QFile::remove(outMp4);
 	if (!QFile::copy(made, outMp4)) return fail(tr("The video was made but could not be saved to %1.").arg(outMp4), log_format::Level::Error);
-	QDir(dir).removeRecursively();   // the frames are large; the video has been copied out
 	const QString done = tr("Day cycle done in %1 s. Saved %2.").arg(clock.elapsed() / 1000.0, 0, 'f', 1).arg(outMp4);
 	logLine(cat, QStringLiteral("day cycle: %1").arg(done));
 	m_previewStatus->setText(done);

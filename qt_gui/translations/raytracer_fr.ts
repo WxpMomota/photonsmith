@@ -7007,8 +7007,8 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
         <translation>Rapport d&apos;aspect</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="111"/>
-        <location filename="../scene_builder_composite.cpp" line="329"/>
+        <location filename="../scene_builder_composite.cpp" line="119"/>
+        <location filename="../scene_builder_composite.cpp" line="337"/>
         <source>Match the camera to a photo first (Camera section: Match to a photo...): the scene is put into that photo.</source>
         <translation>Accordez d&apos;abord la caméra à une photo (section Caméra : Accorder à une photo...) : la scène est placée dans cette photo.</translation>
     </message>
@@ -7017,60 +7017,60 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
         <translation type="vanished">Tous les objets sont marqués comme sol ou comme lumière : il n&apos;y a donc rien à placer dans la photo.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="175"/>
+        <location filename="../scene_builder_composite.cpp" line="183"/>
         <source>Rendering the scene for the photo...</source>
         <translation>Rendu de la scène pour la photo...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="329"/>
-        <location filename="../scene_builder_composite.cpp" line="334"/>
+        <location filename="../scene_builder_composite.cpp" line="337"/>
+        <location filename="../scene_builder_composite.cpp" line="342"/>
         <source>Render into the photo</source>
         <translation>Rendre dans la photo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="188"/>
+        <location filename="../scene_builder_composite.cpp" line="196"/>
         <source>Rendering the scene for the photo: %1 of 3...</source>
         <translation>Rendu de la scène pour la photo : %1 sur 3...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="235"/>
+        <location filename="../scene_builder_composite.cpp" line="243"/>
         <source>Rendering the scene for the photo: %1 of 3, %2%...</source>
         <translation>Rendu de la scène pour la photo : %1 sur 3, %2 %...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="254"/>
+        <location filename="../scene_builder_composite.cpp" line="262"/>
         <source>A render took too long and was stopped.</source>
         <translation>Un rendu a pris trop de temps et a été arrêté.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="260"/>
+        <location filename="../scene_builder_composite.cpp" line="268"/>
         <source>The renderer could not make the %1 picture. Its output:
 %2</source>
         <translation>Le moteur de rendu n&apos;a pas pu produire l&apos;image « %1 ». Sa sortie :
 %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="278"/>
+        <location filename="../scene_builder_composite.cpp" line="286"/>
         <source>The renderer made a picture of %1 x %2, not the %3 x %4 asked for.</source>
         <translation>Le moteur de rendu a produit une image de %1 x %2 et non de %3 x %4 comme demandé.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="290"/>
+        <location filename="../scene_builder_composite.cpp" line="298"/>
         <source>The objects&apos; exposure was not matched to the photo: that reads the photo&apos;s sky, and the scene has no Sun &amp; sky (set it from the same photo with Light from a photo).</source>
         <translation>L&apos;exposition des objets n&apos;a pas été accordée à la photo : cela lit le ciel de la photo, et la scène n&apos;a pas de Soleil et ciel (réglez-le d&apos;après la même photo avec Lumière à partir d&apos;une photo).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="297"/>
+        <location filename="../scene_builder_composite.cpp" line="305"/>
         <source>The objects&apos; exposure (%1 stops) and colour were matched to the photo&apos;s sky.</source>
         <translation>L&apos;exposition des objets (%1 IL) et leur couleur ont été accordées au ciel de la photo.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="300"/>
+        <location filename="../scene_builder_composite.cpp" line="308"/>
         <source>The objects&apos; exposure was not matched to the photo: %1</source>
         <translation>L&apos;exposition des objets n&apos;a pas été accordée à la photo : %1</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="307"/>
+        <location filename="../scene_builder_composite.cpp" line="315"/>
         <source>The picture could not be put together.</source>
         <translation>L&apos;image n&apos;a pas pu être composée.</translation>
     </message>
@@ -7080,22 +7080,22 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
         <translation>L&apos;image n&apos;a pas pu être enregistrée sous %1.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="139"/>
+        <location filename="../scene_builder_composite.cpp" line="147"/>
         <source>ground</source>
         <translation>sol</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="139"/>
+        <location filename="../scene_builder_composite.cpp" line="147"/>
         <source>light</source>
         <translation>lumière</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="140"/>
+        <location filename="../scene_builder_composite.cpp" line="148"/>
         <source>Every object is marked as the ground or a light, so there is nothing to put into the photo (%1). Set one to &quot;Put into the photo&quot; in Camera and image &gt; Render into the photo...</source>
         <translation>Tous les objets sont marqués comme sol ou comme lumière : il n&apos;y a donc rien à placer dans la photo (%1). Réglez-en un sur « Placer dans la photo » dans Caméra et image &gt; Rendre dans la photo...</translation>
     </message>
     <message numerus="yes">
-        <location filename="../scene_builder_composite.cpp" line="316"/>
+        <location filename="../scene_builder_composite.cpp" line="324"/>
         <source>%n object(s) were put into the photo; the ground they stand on is not drawn (only the shadows and reflections they cause are).</source>
         <translation>
             <numerusform>%n objet a été placé dans la photo ; le sol sur lequel il repose n&apos;est pas dessiné (seuls les ombres et reflets qu&apos;il provoque le sont).</numerusform>
@@ -7103,32 +7103,32 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
         </translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="317"/>
+        <location filename="../scene_builder_composite.cpp" line="325"/>
         <source>The renders were denoised before the objects were put in.</source>
         <translation>Les rendus ont été débruités avant le placement des objets.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="318"/>
+        <location filename="../scene_builder_composite.cpp" line="326"/>
         <source>The renders could not be denoised (%1), so the objects are as grainy as the samples leave them.</source>
         <translation>Les rendus n&apos;ont pas pu être débruités (%1) : les objets sont donc aussi granuleux que les échantillons le laissent.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="318"/>
+        <location filename="../scene_builder_composite.cpp" line="326"/>
         <source>the renderer did not say why</source>
         <translation>le moteur de rendu n&apos;a pas dit pourquoi</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="320"/>
+        <location filename="../scene_builder_composite.cpp" line="328"/>
         <source>The objects are shown at the exposure the Builder gives them%1; the photo&apos;s own exposure is not known, so use Exposure if they look too bright or too dark.</source>
         <translation>Les objets sont montrés avec l&apos;exposition que leur donne le Constructeur%1 ; celle de la photo n&apos;est pas connue : utilisez Exposition s&apos;ils paraissent trop clairs ou trop sombres.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="320"/>
+        <location filename="../scene_builder_composite.cpp" line="328"/>
         <source> (%1 stops)</source>
         <translation> (%1 IL)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="322"/>
+        <location filename="../scene_builder_composite.cpp" line="330"/>
         <source>No object is marked as the ground, so there are no shadows on the photo: tick the floor the objects stand on.</source>
         <translation>Aucun objet n&apos;est marqué comme sol, il n&apos;y a donc pas d&apos;ombres sur la photo : cochez le sol sur lequel reposent les objets.</translation>
     </message>
@@ -7141,124 +7141,124 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
         <translation type="vanished">Coché : le sol que la photo a déjà (ses ombres sont utilisées, il n&apos;est pas dessiné). Décoché : placé dans la photo.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="321"/>
+        <location filename="../scene_builder_composite.cpp" line="329"/>
         <source>The scene&apos;s Image size has a different shape from the photo&apos;s, so it was rendered in the photo&apos;s shape (the camera was set for it).</source>
         <translation>La taille d&apos;image de la scène n&apos;a pas la même forme que la photo : le rendu a donc été fait à la forme de la photo (la caméra a été réglée pour elle).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="336"/>
+        <location filename="../scene_builder_composite.cpp" line="344"/>
         <source>The scene, seen through the camera matched to the photo, is rendered and put into the photo, with the shadows and reflections it casts on the ground. Say what each object is: the ground the photo already has (not drawn: only the shadows it catches count), a light (lights the scene, not shown), or an object to put into the photo. The scene is rendered three times, so it takes about three times as long as one picture.</source>
         <translation>La scène, vue par la caméra accordée à la photo, est rendue et placée dans la photo, avec les ombres et les reflets qu&apos;elle projette sur le sol. Indiquez ce qu&apos;est chaque objet : le sol que la photo a déjà (il n&apos;est pas dessiné : seules les ombres qu&apos;il reçoit comptent), une lumière (elle éclaire la scène, elle n&apos;est pas montrée) ou un objet à placer dans la photo. La scène est rendue trois fois, ce qui prend environ trois fois plus de temps qu&apos;une image.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="343"/>
+        <location filename="../scene_builder_composite.cpp" line="351"/>
         <source>Is</source>
         <translation>Est</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="352"/>
+        <location filename="../scene_builder_composite.cpp" line="360"/>
         <source>Put into the photo</source>
         <translation>Placer dans la photo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="353"/>
+        <location filename="../scene_builder_composite.cpp" line="361"/>
         <source>Ground (the photo has it)</source>
         <translation>Sol (la photo l&apos;a)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="354"/>
+        <location filename="../scene_builder_composite.cpp" line="362"/>
         <source>Light (lights the scene, not shown)</source>
         <translation>Lumière (éclaire la scène, non montrée)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="363"/>
+        <location filename="../scene_builder_composite.cpp" line="371"/>
         <source>Ground: the floor the photo already has (its shadows are used, it is not drawn). Light: a lamp, which lights the scene and is not shown. Put into the photo: everything you want to see in it.</source>
         <translation>Sol : le sol que la photo a déjà (ses ombres sont utilisées, il n&apos;est pas dessiné). Lumière : une lampe, qui éclaire la scène et n&apos;est pas montrée. Placer dans la photo : tout ce que vous voulez y voir.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="366"/>
+        <location filename="../scene_builder_composite.cpp" line="374"/>
         <source>Match the objects&apos; exposure and colour to the photo&apos;s sky</source>
         <translation>Accorder l&apos;exposition et la couleur des objets au ciel de la photo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="368"/>
+        <location filename="../scene_builder_composite.cpp" line="376"/>
         <source>Reads how bright and how warm or cool the photo&apos;s sky is, and gives the objects the same exposure and colour cast. Needs the Sun &amp; sky set from the same photo (Light from a photo). The setting below is added to it.</source>
         <translation>Lit la luminosité et la chaleur ou la fraîcheur du ciel de la photo, et donne aux objets la même exposition et la même dominante de couleur. Nécessite le Soleil et ciel réglé d&apos;après la même photo (Lumière à partir d&apos;une photo). Le réglage ci-dessous s&apos;y ajoute.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="370"/>
+        <location filename="../scene_builder_composite.cpp" line="378"/>
         <source>Denoise the renders (cleans the grain)</source>
         <translation>Débruiter les rendus (nettoie le grain)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="372"/>
+        <location filename="../scene_builder_composite.cpp" line="380"/>
         <source>Runs the AI denoiser on the renders before the objects are put into the photo, so a low sample count looks clean. The same as the Denoise tick next to Preview. The first time on the CPU it offers to download the denoiser.</source>
         <translation>Applique le débruiteur IA aux rendus avant de placer les objets dans la photo, pour qu&apos;un faible nombre d&apos;échantillons paraisse propre. C&apos;est la même case que Débruiter à côté d&apos;Aperçu. La première fois sur le CPU, il propose de télécharger le débruiteur.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="378"/>
+        <location filename="../scene_builder_composite.cpp" line="386"/>
         <source> stops</source>
         <translation> IL</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="380"/>
+        <location filename="../scene_builder_composite.cpp" line="388"/>
         <source>How much brighter (+) or darker (-) the objects are made, to match the photo&apos;s exposure. Each stop doubles or halves their light.</source>
         <translation>De combien les objets sont éclaircis (+) ou assombris (-) pour égaler l&apos;exposition de la photo. Chaque IL double ou divise par deux leur lumière.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="381"/>
+        <location filename="../scene_builder_composite.cpp" line="389"/>
         <source>Exposure of the objects</source>
         <translation>Exposition des objets</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="385"/>
+        <location filename="../scene_builder_composite.cpp" line="393"/>
         <source>Samples per pixel: more makes the shadows smoother and takes longer.</source>
         <translation>Échantillons par pixel : plus d&apos;échantillons adoucissent les ombres mais prennent plus de temps.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="386"/>
+        <location filename="../scene_builder_composite.cpp" line="394"/>
         <location filename="../scene_builder_inspector.cpp" line="451"/>
         <source>Samples per pixel</source>
         <translation>Échantillons par pixel</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="419"/>
+        <location filename="../scene_builder_composite.cpp" line="427"/>
         <source>Put into the photo in %1 s (%2 x %3). %4</source>
         <translation>Placé dans la photo en %1 s (%2 x %3). %4</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="433"/>
+        <location filename="../scene_builder_composite.cpp" line="441"/>
         <location filename="../scene_builder_widget.cpp" line="396"/>
         <source>Match the camera to a photo first (Camera and image: Match to a photo...): the scene is put into that photo.</source>
         <translation>Accordez d&apos;abord la caméra à une photo (Caméra et image : Accorder à une photo...) : la scène est placée dans cette photo.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="439"/>
+        <location filename="../scene_builder_composite.cpp" line="447"/>
         <source>Putting the scene into the photo...</source>
         <translation>Placement de la scène dans la photo...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="456"/>
+        <location filename="../scene_builder_composite.cpp" line="464"/>
         <source>Put into the photo in %1 s (%2 x %3, %4 samples). %5</source>
         <translation>Placé dans la photo en %1 s (%2 x %3, %4 échantillons). %5</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="504"/>
+        <location filename="../scene_builder_composite.cpp" line="512"/>
         <source>The picture is in the preview pane.</source>
         <translation>L&apos;image est dans le volet d&apos;aperçu.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="511"/>
+        <location filename="../scene_builder_composite.cpp" line="519"/>
         <source>Save the picture as</source>
         <translation>Enregistrer l&apos;image sous</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="511"/>
+        <location filename="../scene_builder_composite.cpp" line="519"/>
         <source>PNG pictures (*.png)</source>
         <translation>Images PNG (*.png)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="415"/>
+        <location filename="../scene_builder_composite.cpp" line="423"/>
         <source>Could not render into the photo</source>
         <translation>Impossible de rendre dans la photo</translation>
     </message>
@@ -7386,7 +7386,7 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
         <translation>Laisse passer</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="343"/>
+        <location filename="../scene_builder_composite.cpp" line="351"/>
         <location filename="../scene_builder_inspector.cpp" line="701"/>
         <source>Object</source>
         <translation>Objet</translation>
@@ -8868,8 +8868,8 @@ Origine : %3</translation>
         <translation>Effectuer le rendu sur la carte graphique (NVIDIA OptiX sous Windows, Metal sur Mac). Beaucoup plus rapide pour les grandes images ; nécessite un GPU pris en charge.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="170"/>
-        <location filename="../scene_builder_daycycle.cpp" line="155"/>
+        <location filename="../scene_builder_composite.cpp" line="178"/>
+        <location filename="../scene_builder_daycycle.cpp" line="168"/>
         <location filename="../scene_builder_render.cpp" line="207"/>
         <location filename="../scene_builder_turntable.cpp" line="246"/>
         <location filename="../scene_builder_widget.cpp" line="325"/>
@@ -8918,148 +8918,147 @@ Origine : %3</translation>
     </message>
     <message>
         <location filename="../scene_builder_camera_views.cpp" line="327"/>
-        <location filename="../scene_builder_daycycle.cpp" line="70"/>
+        <location filename="../scene_builder_daycycle.cpp" line="71"/>
         <location filename="../scene_builder_turntable.cpp" line="76"/>
         <source> s</source>
         <translation> s</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="55"/>
+        <location filename="../scene_builder_daycycle.cpp" line="56"/>
         <source>A day cycle moves the sun of a Sun &amp; sky light: add one first (Lighting, or a light of kind Sun &amp; sky).</source>
         <translation>Un cycle du jour déplace le soleil d&apos;une lumière Soleil et ciel : ajoutez-en une d&apos;abord (Éclairage, ou une lumière de type Soleil et ciel).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="59"/>
+        <location filename="../scene_builder_daycycle.cpp" line="60"/>
         <source>Day cycle video</source>
         <translation>Vidéo du cycle du jour</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="61"/>
+        <location filename="../scene_builder_daycycle.cpp" line="62"/>
         <source>Makes a video of a day on the scene: the sun goes from sunrise to sunset (crossing where it is now at noon) and the sky and the light change with it, while the camera stays where it is. It renders every frame, so a long or large video takes a while; start with Draft.</source>
         <translation>Crée une vidéo d&apos;une journée sur la scène : le soleil va du lever au coucher (en passant à midi là où il est maintenant) et le ciel et la lumière changent avec lui, tandis que la caméra reste où elle est. Chaque image est rendue, donc une vidéo longue ou grande prend un moment ; commencez par Brouillon.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="72"/>
+        <location filename="../scene_builder_daycycle.cpp" line="73"/>
         <location filename="../scene_builder_turntable.cpp" line="78"/>
         <source>%1 frames per second</source>
         <translation>%1 images par seconde</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="74"/>
+        <location filename="../scene_builder_daycycle.cpp" line="75"/>
         <location filename="../scene_builder_turntable.cpp" line="81"/>
         <source>Draft: 480 pixels wide, 16 samples</source>
         <translation>Brouillon : 480 pixels de large, 16 échantillons</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="75"/>
+        <location filename="../scene_builder_daycycle.cpp" line="76"/>
         <location filename="../scene_builder_turntable.cpp" line="82"/>
         <source>Good: 720 pixels wide, 64 samples</source>
         <translation>Bonne : 720 pixels de large, 64 échantillons</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="76"/>
+        <location filename="../scene_builder_daycycle.cpp" line="77"/>
         <location filename="../scene_builder_turntable.cpp" line="83"/>
         <source>Best: 960 pixels wide, 256 samples</source>
         <translation>Optimale : 960 pixels de large, 256 échantillons</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="77"/>
+        <location filename="../scene_builder_daycycle.cpp" line="78"/>
         <location filename="../scene_builder_turntable.cpp" line="84"/>
         <source>The scene&apos;s own size and samples (%1 x %2, %3)</source>
         <translation>La taille et les échantillons de la scène (%1 x %2, %3)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="83"/>
+        <location filename="../scene_builder_daycycle.cpp" line="84"/>
         <source>How high the sun is at noon: about 65 in the summer in the middle latitudes, 25 in the winter.</source>
         <translation>La hauteur du soleil à midi : environ 65 en été aux latitudes moyennes, 25 en hiver.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="90"/>
+        <location filename="../scene_builder_daycycle.cpp" line="91"/>
         <source>Put the scene into the photo</source>
         <translation>Mettre la scène dans la photo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="92"/>
+        <location filename="../scene_builder_daycycle.cpp" line="93"/>
         <source>Needs the camera matched to a photo (Camera and image: Match to a photo...)</source>
         <translation>Nécessite la caméra accordée à une photo (Caméra et image : Accorder à une photo...)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="93"/>
+        <location filename="../scene_builder_daycycle.cpp" line="94"/>
         <source>Every frame is the scene put into the photo, with its shadows: they sweep across the photo as the sun goes over. Three renders a frame, so it takes about three times as long.</source>
         <translation>Chaque image est la scène mise dans la photo, avec ses ombres : elles balaient la photo pendant que le soleil passe. Trois rendus par image, donc environ trois fois plus long.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="108"/>
+        <location filename="../scene_builder_daycycle.cpp" line="109"/>
         <source>Save the day cycle video</source>
         <translation>Enregistrer la vidéo du cycle du jour</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="115"/>
+        <location filename="../scene_builder_daycycle.cpp" line="116"/>
         <source>The day cycle failed</source>
         <translation>Le cycle du jour a échoué</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="130"/>
+        <location filename="../scene_builder_daycycle.cpp" line="133"/>
         <source>A day cycle moves the sun of a Sun &amp; sky light: add one first.</source>
         <translation>Un cycle du jour déplace le soleil d&apos;une lumière Soleil et ciel : ajoutez-en une d&apos;abord.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="166"/>
+        <location filename="../scene_builder_daycycle.cpp" line="191"/>
         <source>Day cycle: frame %1 of %2...</source>
         <translation>Cycle du jour : image %1 sur %2...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="177"/>
+        <location filename="../scene_builder_daycycle.cpp" line="204"/>
         <source>The sky for frame %1 could not be made: %2</source>
         <translation>Le ciel de l&apos;image %1 n&apos;a pas pu être créé : %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="198"/>
+        <location filename="../scene_builder_daycycle.cpp" line="211"/>
         <source>Day cycle: frame %1 of %2 - </source>
         <translation>Cycle du jour : image %1 sur %2 - </translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="201"/>
+        <location filename="../scene_builder_daycycle.cpp" line="214"/>
         <source>Frame %1 could not be put into the photo: %2</source>
         <translation>L&apos;image %1 n&apos;a pas pu être mise dans la photo : %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="233"/>
+        <location filename="../scene_builder_daycycle.cpp" line="237"/>
         <source>A frame took too long and was stopped.</source>
         <translation>Une image a pris trop de temps et a été arrêtée.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="237"/>
+        <location filename="../scene_builder_daycycle.cpp" line="241"/>
         <source>The renderer could not make frame %1 (exit code %2). Its output:
 %3</source>
         <translation>Le moteur de rendu n&apos;a pas pu créer l&apos;image %1 (code de sortie %2). Sa sortie :
 %3</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="203"/>
-        <location filename="../scene_builder_daycycle.cpp" line="239"/>
+        <location filename="../scene_builder_daycycle.cpp" line="180"/>
         <source>Frame %1 could not be saved in %2.</source>
         <translation>L&apos;image %1 n&apos;a pas pu être enregistrée dans %2.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="248"/>
+        <location filename="../scene_builder_daycycle.cpp" line="247"/>
         <source>Day cycle: putting the video together...</source>
         <translation>Cycle du jour : assemblage de la vidéo...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="265"/>
+        <location filename="../scene_builder_daycycle.cpp" line="264"/>
         <source>Putting the video together took too long and was stopped.</source>
         <translation>L&apos;assemblage de la vidéo a pris trop de temps et a été arrêté.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="270"/>
+        <location filename="../scene_builder_daycycle.cpp" line="269"/>
         <source>The frames were rendered but the video could not be put together (exit code %1).
 %2</source>
         <translation>Les images ont été rendues mais la vidéo n&apos;a pas pu être assemblée (code de sortie %1).
 %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="276"/>
+        <location filename="../scene_builder_daycycle.cpp" line="274"/>
         <source>Day cycle done in %1 s. Saved %2.</source>
         <translation>Cycle du jour terminé en %1 s. Enregistré : %2.</translation>
     </message>
@@ -9074,31 +9073,31 @@ Origine : %3</translation>
         <translation>Revenir à la première vue à la fin</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="86"/>
+        <location filename="../scene_builder_daycycle.cpp" line="87"/>
         <location filename="../scene_builder_turntable.cpp" line="92"/>
         <source>Length:</source>
         <translation>Durée :</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="87"/>
+        <location filename="../scene_builder_daycycle.cpp" line="88"/>
         <location filename="../scene_builder_turntable.cpp" line="93"/>
         <source>Speed:</source>
         <translation>Vitesse :</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="88"/>
+        <location filename="../scene_builder_daycycle.cpp" line="89"/>
         <location filename="../scene_builder_turntable.cpp" line="94"/>
         <location filename="../scene_builder_widget.cpp" line="349"/>
         <source>Quality:</source>
         <translation>Qualité :</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="89"/>
+        <location filename="../scene_builder_daycycle.cpp" line="90"/>
         <source>Sun height at noon:</source>
         <translation>Hauteur du soleil à midi :</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="96"/>
+        <location filename="../scene_builder_daycycle.cpp" line="97"/>
         <location filename="../scene_builder_turntable.cpp" line="106"/>
         <source>%1 frames.</source>
         <translation>%1 images.</translation>
@@ -9114,7 +9113,7 @@ Origine : %3</translation>
         <translation>La caméra fait des pauses pendant %1 s au total, elle se déplace donc pendant %2 s.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="101"/>
+        <location filename="../scene_builder_daycycle.cpp" line="102"/>
         <location filename="../scene_builder_turntable.cpp" line="117"/>
         <source>Choose where to save...</source>
         <translation>Choisir où enregistrer...</translation>
@@ -9125,7 +9124,7 @@ Origine : %3</translation>
         <translation>Enregistrer la vidéo sur plateau tournant</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="108"/>
+        <location filename="../scene_builder_daycycle.cpp" line="109"/>
         <location filename="../scene_builder_turntable.cpp" line="125"/>
         <source>MP4 videos (*.mp4)</source>
         <translation>Vidéos MP4 (*.mp4)</translation>
@@ -9146,7 +9145,7 @@ Origine : %3</translation>
         <translation>Le survol a échoué</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="128"/>
+        <location filename="../scene_builder_daycycle.cpp" line="129"/>
         <location filename="../scene_builder_turntable.cpp" line="168"/>
         <source>A video needs at least one frame.</source>
         <translation>Une vidéo a besoin d&apos;au moins une image.</translation>
@@ -9172,10 +9171,10 @@ Origine : %3</translation>
         <translation>Vidéo terminée en %1 s. Enregistrée : %2.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="165"/>
-        <location filename="../scene_builder_daycycle.cpp" line="201"/>
-        <location filename="../scene_builder_daycycle.cpp" line="233"/>
-        <location filename="../scene_builder_daycycle.cpp" line="265"/>
+        <location filename="../scene_builder_daycycle.cpp" line="190"/>
+        <location filename="../scene_builder_daycycle.cpp" line="214"/>
+        <location filename="../scene_builder_daycycle.cpp" line="237"/>
+        <location filename="../scene_builder_daycycle.cpp" line="264"/>
         <location filename="../scene_builder_turntable.cpp" line="265"/>
         <source>The video was cancelled.</source>
         <translation>La vidéo a été annulée.</translation>
@@ -9206,7 +9205,7 @@ Origine : %3</translation>
         <translation type="vanished">Plateau tournant terminé en %1 s. Enregistré : %2.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="274"/>
+        <location filename="../scene_builder_daycycle.cpp" line="273"/>
         <location filename="../scene_builder_turntable.cpp" line="262"/>
         <source>The video was made but could not be saved to %1.</source>
         <translation>La vidéo a été créée mais n&apos;a pas pu être enregistrée dans %1.</translation>
@@ -9216,7 +9215,7 @@ Origine : %3</translation>
         <translation type="vanished">Le plateau tournant a été annulé.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_daycycle.cpp" line="269"/>
+        <location filename="../scene_builder_daycycle.cpp" line="268"/>
         <location filename="../scene_builder_turntable.cpp" line="273"/>
         <source>The frames were rendered, but putting them together needs the free program ffmpeg, which was not found. Install it (ffmpeg.org) and try again.</source>
         <translation>Les images ont été calculées, mais leur assemblage nécessite le programme gratuit ffmpeg, introuvable. Installez-le (ffmpeg.org) puis réessayez.</translation>
@@ -9272,12 +9271,12 @@ Origine : %3</translation>
     <message>
         <location filename="../scene_builder_files.cpp" line="172"/>
         <location filename="../scene_builder_files.cpp" line="182"/>
-        <location filename="../scene_builder_files.cpp" line="378"/>
+        <location filename="../scene_builder_files.cpp" line="393"/>
         <source>Cannot save</source>
         <translation>Enregistrement impossible</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="208"/>
+        <location filename="../scene_builder_composite.cpp" line="216"/>
         <location filename="../scene_builder_files.cpp" line="172"/>
         <location filename="../scene_builder_files.cpp" line="182"/>
         <location filename="../scene_builder_files.cpp" line="248"/>
@@ -9310,42 +9309,52 @@ Origine : %3</translation>
         <translation>Aperçu impossible</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="330"/>
+        <location filename="../scene_builder_files.cpp" line="317"/>
+        <source>An export is already running.</source>
+        <translation>Une exportation est déjà en cours.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_files.cpp" line="335"/>
+        <source>Exporting the scene as glTF...</source>
+        <translation>Exportation de la scène en glTF...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_files.cpp" line="345"/>
         <source>The export took too long and was stopped.</source>
         <translation>L&apos;exportation a pris trop de temps et a été arrêtée.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="333"/>
+        <location filename="../scene_builder_files.cpp" line="348"/>
         <source>The scene could not be exported: %1</source>
         <translation>La scène n&apos;a pas pu être exportée : %1</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="341"/>
+        <location filename="../scene_builder_files.cpp" line="356"/>
         <source>Export the scene as glTF</source>
         <translation>Exporter la scène en glTF</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="341"/>
+        <location filename="../scene_builder_files.cpp" line="356"/>
         <source>glTF binary (*.glb)</source>
         <translation>glTF binaire (*.glb)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="346"/>
+        <location filename="../scene_builder_files.cpp" line="361"/>
         <source>Cannot export</source>
         <translation>Exportation impossible</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="349"/>
+        <location filename="../scene_builder_files.cpp" line="364"/>
         <source>Exported %1.</source>
         <translation>%1 a été exporté.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="350"/>
+        <location filename="../scene_builder_files.cpp" line="365"/>
         <source>Exported as glTF</source>
         <translation>Exporté en glTF</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="350"/>
+        <location filename="../scene_builder_files.cpp" line="365"/>
         <source>Saved %1.
 
 %2</source>
@@ -9354,32 +9363,32 @@ Origine : %3</translation>
 %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="358"/>
+        <location filename="../scene_builder_files.cpp" line="373"/>
         <source>No scenes folder</source>
         <translation>Pas de dossier de scènes</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="365"/>
+        <location filename="../scene_builder_files.cpp" line="380"/>
         <source>Add to the scene list</source>
         <translation>Ajouter à la liste des scènes</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="366"/>
+        <location filename="../scene_builder_files.cpp" line="381"/>
         <source>This scene is already in the list as &quot;%1&quot;.</source>
         <translation>Cette scène figure déjà dans la liste sous le nom « %1 ».</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="367"/>
+        <location filename="../scene_builder_files.cpp" line="382"/>
         <source>Add as a new scene</source>
         <translation>Ajouter comme nouvelle scène</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="368"/>
+        <location filename="../scene_builder_files.cpp" line="383"/>
         <source>Update the existing one</source>
         <translation>Mettre à jour la scène existante</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="383"/>
+        <location filename="../scene_builder_files.cpp" line="398"/>
         <source>Saved a copy as %1.
 
 It is in the scene list now (Settings tab, My Scenes).</source>
@@ -9388,7 +9397,7 @@ It is in the scene list now (Settings tab, My Scenes).</source>
 Elle figure maintenant dans la liste des scènes (onglet Paramètres, Mes scènes).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="923"/>
+        <location filename="../scene_builder_widget.cpp" line="921"/>
         <source>(%1)%2  |  %3 objects, %4 lights</source>
         <translation>(%1)%2  |  %3 objets, %4 lumières</translation>
     </message>
@@ -9428,7 +9437,7 @@ Elle figure maintenant dans la liste des scènes (onglet Paramètres, Mes scène
         <translation>Brouillon : 480 pixels de large, 16 échantillons. Bonne : 720 de large, 64 échantillons. Optimale : 960 de large, 256 échantillons.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_files.cpp" line="382"/>
+        <location filename="../scene_builder_files.cpp" line="397"/>
         <source>Added to the scene list</source>
         <translation>Ajoutée à la liste des scènes</translation>
     </message>
@@ -9448,22 +9457,22 @@ Elle figure maintenant dans la liste des scènes (onglet Paramètres, Mes scène
         <translation>Éclairage : %1. %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="917"/>
+        <location filename="../scene_builder_widget.cpp" line="915"/>
         <source>not saved yet</source>
         <translation>pas encore enregistrée</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="951"/>
+        <location filename="../scene_builder_widget.cpp" line="949"/>
         <source>No problems found.</source>
         <translation>Aucun problème détecté.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="957"/>
+        <location filename="../scene_builder_widget.cpp" line="955"/>
         <source>Fix this:</source>
         <translation>À corriger :</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="957"/>
+        <location filename="../scene_builder_widget.cpp" line="955"/>
         <source>Note:</source>
         <translation>Remarque :</translation>
     </message>
@@ -9483,25 +9492,25 @@ Elle figure maintenant dans la liste des scènes (onglet Paramètres, Mes scène
         <translation>Échec du rendu</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="107"/>
-        <location filename="../scene_builder_daycycle.cpp" line="127"/>
+        <location filename="../scene_builder_composite.cpp" line="115"/>
+        <location filename="../scene_builder_daycycle.cpp" line="128"/>
         <location filename="../scene_builder_render.cpp" line="151"/>
         <location filename="../scene_builder_turntable.cpp" line="167"/>
         <source>A render is already running.</source>
         <translation>Un rendu est déjà en cours.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="119"/>
-        <location filename="../scene_builder_daycycle.cpp" line="131"/>
+        <location filename="../scene_builder_composite.cpp" line="127"/>
+        <location filename="../scene_builder_daycycle.cpp" line="134"/>
         <location filename="../scene_builder_render.cpp" line="153"/>
         <location filename="../scene_builder_turntable.cpp" line="170"/>
         <source>Fix the problems listed under the properties first.</source>
         <translation>Corrigez d&apos;abord les problèmes indiqués dans les propriétés.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="115"/>
-        <location filename="../scene_builder_daycycle.cpp" line="132"/>
-        <location filename="../scene_builder_files.cpp" line="317"/>
+        <location filename="../scene_builder_composite.cpp" line="123"/>
+        <location filename="../scene_builder_daycycle.cpp" line="135"/>
+        <location filename="../scene_builder_files.cpp" line="318"/>
         <location filename="../scene_builder_render.cpp" line="154"/>
         <location filename="../scene_builder_turntable.cpp" line="171"/>
         <source>The renderer (%1) was not found next to the program.</source>
@@ -9689,7 +9698,7 @@ La forme est une estimation : l&apos;arrière est inventé et les détails fins 
     </message>
     <message>
         <location filename="../scene_builder_camera_photo.cpp" line="249"/>
-        <location filename="../scene_builder_daycycle.cpp" line="81"/>
+        <location filename="../scene_builder_daycycle.cpp" line="82"/>
         <location filename="../scene_builder_light_photo.cpp" line="121"/>
         <source> degrees</source>
         <translation> degrés</translation>
@@ -10050,8 +10059,8 @@ La forme est une estimation : l&apos;arrière est inventé et les détails fins 
         <translation>Un matériau a été créé à partir de %1. %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="163"/>
-        <location filename="../scene_builder_daycycle.cpp" line="149"/>
+        <location filename="../scene_builder_composite.cpp" line="171"/>
+        <location filename="../scene_builder_daycycle.cpp" line="161"/>
         <location filename="../scene_builder_photo.cpp" line="98"/>
         <location filename="../scene_builder_photo.cpp" line="262"/>
         <location filename="../scene_builder_photo.cpp" line="334"/>
@@ -10189,7 +10198,7 @@ Cela remplace la scène actuelle (Annuler la rétablit).</translation>
         <translation>Rendu de %1 x %2, %3 échantillons...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="452"/>
+        <location filename="../scene_builder_composite.cpp" line="460"/>
         <location filename="../scene_builder_render.cpp" line="223"/>
         <source>The render was cancelled.</source>
         <translation>Le rendu a été annulé.</translation>
@@ -10218,13 +10227,13 @@ Cela remplace la scène actuelle (Annuler la rétablit).</translation>
         <translation>Terminé en %1 s (%2 x %3).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="515"/>
+        <location filename="../scene_builder_composite.cpp" line="523"/>
         <location filename="../scene_builder_render.cpp" line="234"/>
         <source>Saved %1.</source>
         <translation>%1 enregistré.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_composite.cpp" line="518"/>
+        <location filename="../scene_builder_composite.cpp" line="526"/>
         <location filename="../scene_builder_render.cpp" line="235"/>
         <source>Could not save to %1.</source>
         <translation>Impossible d&apos;enregistrer dans %1.</translation>

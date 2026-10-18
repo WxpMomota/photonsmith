@@ -987,6 +987,28 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 				check(first.width() == 400 && wholeDiffers > 200, QString("the frames differ as the sun moves (%1 pixels differ between sunrise and sunset)").arg(wholeDiffers));
 				check(skyDiffers < first.width() * first.height() / 10 / 20, QString("and the sky stays the photo's (%1 of the top tenth differs)").arg(skyDiffers));
 			}
+			// With the photo as the environment (the default of Camera from a photo) the Day cycle moves only the Sun; an edit made while it renders (with Live on, which used to cancel it) does not reach it
+			sb->newScene();
+			QString envError;
+			const bool envMatched = sb->applyCameraPhoto(sample_photos::all().first().resource, 0.0, 1.6, false, 0.0, false, 0.0, true, &envError) && sb->applyEnvironmentPhoto(&envError);
+			check(envMatched && sb->daySkyIndexForTest() >= 0, "a scene whose sky is the photo can have a day cycle: " + envError);
+			if (envMatched) {
+				std::vector<QImage> envFrames;
+				QString envMessage;
+				const QString envMp4 = QDir::tempPath() + "/rt_selftest_daycycle_env.mp4";
+				QFile::remove(envMp4);
+				sb->setLiveForTest(true);
+				QTimer::singleShot(1500, sb, [sb]() { sb->setPhotoExposureForTest(0.0); });   // (an edit in the middle of the video: documentChanged, which asks Live for a refresh)
+				const bool envDay = sb->renderDayCycle(envMp4, 3, 24, 400, 4, 60.0, &envMessage, &envFrames, true);
+				sb->setLiveForTest(false);
+				const bool envNoFfmpeg = !envDay && envMessage.contains("ffmpeg");
+				check(envFrames.size() == 3 && (envDay || envNoFfmpeg), "and an edit during it does not cancel it: " + envMessage.left(160));
+				if (envFrames.size() == 3) check(envFrames[0] != envFrames[2], "the Sun moved between sunrise and sunset");
+				// a failure leaves no frames behind: the video cannot be saved into a folder that is not there
+				QString failMessage;
+				const bool failed = !sb->renderDayCycle(QDir::tempPath() + "/rt_no_such_folder_for_the_selftest/x.mp4", 2, 24, 160, 2, 60.0, &failMessage, nullptr, false);
+				check(failed && !QDir(sb->workFolderForTest() + "/daycycle").exists(), "a day cycle that fails leaves its frames behind nowhere: " + failMessage.left(100));
+			}
 		}
 		// Export glTF: the starter scene as a .glb by the renderer: a file that starts with glTF's magic and says what it holds
 		{

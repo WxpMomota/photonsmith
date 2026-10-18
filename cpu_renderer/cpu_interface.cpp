@@ -1132,7 +1132,8 @@ extern "C" double cpu_scene_measure_size(const char* scene_id_or_path) {
 extern "C" int cpu_export_gltf(const char* scene_id_or_path, const char* out_path) {
 	if (!scene_id_or_path || !scene_id_or_path[0] || !out_path || !out_path[0]) return 1;
 	std::string path = scene_id_or_path;
-	if (!std::filesystem::exists(path)) {
+	std::error_code existsError;   // (the throwing overload would abort on a path the OS rejects)
+	if (!std::filesystem::exists(path, existsError)) {
 		const char* known = cpu_scene_pbrt_path_by_id(scene_id_or_path);
 		if (!known || !known[0]) {
 			std::cerr << "cannot export " << scene_id_or_path << ": not a file, and not a scene backed by one\n";
@@ -1140,12 +1141,12 @@ extern "C" int cpu_export_gltf(const char* scene_id_or_path, const char* out_pat
 		}
 		path = known;
 	}
-	const pbrt_load::LoadResult loaded = pbrt_load::loadFile(path);
+	pbrt_load::LoadResult loaded = pbrt_load::loadFile(path);
 	if (!loaded.ok) {
 		std::cerr << "cannot export " << path << ": " << loaded.error << "\n";
 		return 3;
 	}
-	const gltf_export::Result r = gltf_export::fromFlatScene(loaded.scene);
+	const gltf_export::Result r = gltf_export::fromFlatScene(std::move(loaded.scene));   // (moved: a big scene is not held twice)
 	if (!r.ok) {
 		std::cerr << "cannot export " << path << ": " << r.error << "\n";
 		return 4;
