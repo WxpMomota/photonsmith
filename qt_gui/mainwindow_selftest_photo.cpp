@@ -33,7 +33,9 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QMouseEvent>
+#include <QGuiApplication>
 #include <QPushButton>
+#include <QScreen>
 #include <QTimer>
 #include <QVBoxLayout>
 
@@ -673,6 +675,7 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			const QString out = qEnvironmentVariable("RT_GUI_SELFTEST_OUT");
 			QString seen;
 			int samplesListed = 0;
+			bool fillsScreen = false;
 			std::size_t depthAtStart = sb->undoDepth(), depthAfterTwo = 0;
 			auto panelHas = [](QWidget *w, const QString &what) {
 				for (QLabel *label : w->findChildren<QLabel *>()) if (label->isVisible() && label->text().contains(what)) return true;
@@ -682,6 +685,7 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			QTimer::singleShot(900, [&]() {
 				if (QWidget *w = QApplication::activeModalWidget()) {
 					seen += panelHas(w, "Click a photo to use it") ? "hint " : "";
+					if (const QScreen *screen = QGuiApplication::primaryScreen()) fillsScreen = w->width() >= screen->availableGeometry().width() * 9 / 10 - 2 && w->height() >= screen->availableGeometry().height() * 85 / 100;   // (it opens large: most of the screen)
 					samplesListed = firstList(w)->count();
 					w->grab().save(out + "_camera_settings.png");
 					firstList(w)->setCurrentRow(1);   // the second sample is clicked (a click makes it the current one, then says it was clicked)
@@ -710,8 +714,8 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 				}
 			});
 			sb->cameraFromPhoto();
-			check(seen == "hint north-sea beach own " && samplesListed == static_cast<int>(samples.size()) && depthAfterTwo - depthAtStart <= 2,
-			      QString("Match to a photo for the camera is one window that applies on click (%1; %2 samples listed; two applies left %3 undo steps)").arg(seen).arg(samplesListed).arg(depthAfterTwo - depthAtStart));
+			check(seen == "hint north-sea beach own " && samplesListed == static_cast<int>(samples.size()) && depthAfterTwo - depthAtStart <= 2 && fillsScreen,
+			      QString("Match to a photo for the camera is one window that applies on click (%1; %2 samples listed; two applies left %3 undo steps; fills the screen %4)").arg(seen).arg(samplesListed).arg(depthAfterTwo - depthAtStart).arg(fillsScreen));
 		}
 	}
 	QTimer::singleShot(600, this, [this, shot, log, ok]() {

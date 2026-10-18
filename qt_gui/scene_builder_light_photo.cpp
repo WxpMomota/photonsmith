@@ -101,12 +101,10 @@ void SceneBuilderWidget::lightFromPhoto(int lightIndex) {
 	layout->addWidget(page);
 	auto *picker = new sample_photos::Picker(tr("Choose a photo with the sky in it"), &dialog);
 	pageLayout->addWidget(picker);
-	auto *intro = new QLabel(tr("The sun's height and direction and the haze are read from the sky in the photo (a blue or white sky that reaches the top of the picture), and the Sun && sky "
-	                            "settings are set to match. The photo should show some sky and, for the height, the horizon. Both settings below are optional."),
-	                         &dialog);
-	intro->setWordWrap(true);
-	pageLayout->addWidget(intro);
+	const QString intro = tr("The sun's height and direction and the haze are read from the sky in the photo (a blue or white sky that reaches the top of the picture), and the Sun && sky "
+	                            "settings are set to match. The photo should show some sky and, for the height, the horizon. Both settings below are optional.").replace(QStringLiteral("&&"), QStringLiteral("&"));   // (shown in the result panel until there is a result: the settings get the room)
 	auto *form = new QFormLayout();
+	form->setRowWrapPolicy(QFormLayout::WrapLongRows);
 	auto *fov = new QDoubleSpinBox(&dialog);
 	fov->setRange(20.0, 140.0);
 	fov->setDecimals(0);
@@ -136,7 +134,7 @@ void SceneBuilderWidget::lightFromPhoto(int lightIndex) {
 	layout->addWidget(buttons);
 	const std::size_t baseline = undoDepth();   // (every apply takes back the last one first, so the window leaves one apply behind, not one for every click)
 	photo_dialog::run(
-	    dialog, page, buttons, tr("Click a photo to use it: the sky is set from it at once, and again whenever you change a setting."),
+	    dialog, page, buttons, intro + QStringLiteral("\n\n") + tr("Click a photo to use it: the sky is set from it at once, and again whenever you change a setting."),
 	    [&](const std::function<void()> &schedule) {
 		    connect(picker, &sample_photos::Picker::photoPicked, &dialog, schedule);
 		    for (QDoubleSpinBox *spin : {fov, tilt}) connect(spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dialog, schedule);

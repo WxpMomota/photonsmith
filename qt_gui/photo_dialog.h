@@ -30,12 +30,14 @@ inline void run(QDialog &dialog, QWidget *page, QDialogButtonBox *buttons, const
 	auto *settings = new QScrollArea(&dialog);
 	settings->setWidgetResizable(true);
 	settings->setFrameShape(QFrame::NoFrame);
+	settings->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);   // (the settings wrap to the width they have)
 	settings->setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContents);   // (as big as the settings are, up to the screen: see below)
 	settings->setWidget(page);
 	auto *panel = new QScrollArea(&dialog);
 	panel->setWidgetResizable(true);
 	panel->setFrameShape(QFrame::NoFrame);
-	panel->setFixedWidth(420);
+	panel->setMinimumWidth(380);
+	panel->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	auto *text = new QLabel(hint, panel);
 	text->setWordWrap(true);
 	text->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -43,8 +45,8 @@ inline void run(QDialog &dialog, QWidget *page, QDialogButtonBox *buttons, const
 	text->setContentsMargins(10, 4, 4, 4);
 	panel->setWidget(text);
 	auto *row = new QHBoxLayout();
-	row->addWidget(settings, 1);
-	row->addWidget(panel);
+	row->addWidget(settings, 3);
+	row->addWidget(panel, 2);   // (the result gets two fifths of whatever width the window has)
 	layout->insertLayout(slot, row, 1);
 
 	QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
@@ -62,9 +64,13 @@ inline void run(QDialog &dialog, QWidget *page, QDialogButtonBox *buttons, const
 	QSize want = dialog.sizeHint().expandedTo(dialog.size());
 	if (const QScreen *screen = QGuiApplication::primaryScreen()) {   // (a window taller than the screen cannot be used: the settings scroll instead)
 		const QRect free = screen->availableGeometry();
-		want = want.boundedTo(QSize(free.width() * 95 / 100, free.height() * 90 / 100));
+		want = want.expandedTo(QSize(free.width() * 92 / 100, free.height() * 90 / 100)).boundedTo(QSize(free.width() * 96 / 100, free.height() * 94 / 100));   // (large: most of the screen)
+		dialog.resize(want);
+		dialog.move(free.center() - QPoint(want.width() / 2, want.height() / 2));
+	} else {
+		dialog.resize(want);
 	}
-	dialog.resize(want);
+	dialog.setSizeGripEnabled(true);
 	dialog.exec();
 }
 

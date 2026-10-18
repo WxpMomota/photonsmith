@@ -52,10 +52,10 @@ Picker::Picker(const QString &ownPhotoTitle, QWidget *parent) : QWidget(parent),
 	m_list->setWrapping(true);
 	m_list->setMovement(QListView::Static);
 	m_list->setResizeMode(QListView::Adjust);
-	m_list->setIconSize(QSize(96, 60));
-	m_list->setGridSize(QSize(110, 116));
+	m_list->setIconSize(QSize(88, 54));
+	m_list->setGridSize(QSize(102, 108));
 	m_list->setSpacing(2);
-	m_list->setFixedHeight(156);
+	m_list->setFixedHeight(130);
 	m_list->setWordWrap(true);   // (a title that does not fit goes on a second line)
 	for (const Sample &s : m_samples) {
 		auto *item = new QListWidgetItem(QIcon(QPixmap(s.resource).scaled(m_list->iconSize(), Qt::KeepAspectRatio, Qt::SmoothTransformation)), s.title, m_list);
@@ -70,7 +70,7 @@ Picker::Picker(const QString &ownPhotoTitle, QWidget *parent) : QWidget(parent),
 	m_credit->setWordWrap(true);
 	m_credit->setTextInteractionFlags(Qt::TextSelectableByMouse);
 	m_credit->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-	m_credit->setMinimumHeight(120);
+	m_credit->setMinimumHeight(84);
 	layout->addWidget(m_credit);
 
 	auto *own = new QPushButton(QCoreApplication::translate("sample_photos", "Choose my own photo..."), this);
