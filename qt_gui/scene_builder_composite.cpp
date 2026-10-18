@@ -13,6 +13,7 @@
 #include <QDateTime>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QDoubleSpinBox>
 #include <QElapsedTimer>
@@ -28,6 +29,7 @@
 #include <QRegularExpression>
 #include <QProgressDialog>
 #include <QSignalBlocker>
+#include <QTimer>
 #include <QHeaderView>
 #include <QTableWidget>
 #include <QPushButton>
@@ -174,20 +176,31 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 		m_previewStatus->setText(tr("Rendering the scene for the photo: %1 of 3...").arg(p + 1));
 		QCoreApplication::processEvents();
 		const QString scene = dir + "/" + list[p].name + ".pbrt", exr = dir + "/" + list[p].name + ".exr";
+		const QByteArray sceneText = QByteArray::fromStdString(scene_doc::toPbrt(*list[p].doc));
+		QStringList launch = {m_gpuCheck && m_gpuCheck->isChecked() ? "--gpu" : "--cpu"};
+		if (denoise && p < 2) launch << "--denoise";
+		launch << "--output" << exr << "--height" << QString::number(h) << QString::number(w) << QString::number(list[p].samples) << QString::number(list[p].depth) << scene;
+		// what this pass is: the scene it renders and how (not where it writes). The same as last time: the picture of last time is the picture of this time.
+		const QByteArray key = QCryptographicHash::hash(sceneText + launch.join(QLatin1Char(' ')).toUtf8(), QCryptographicHash::Sha1);
+		CompositePass &cached = m_compositeCache[p];
+		if (!cached.key.isEmpty() && cached.key == key && cached.w == w && cached.h == h && !cached.rgb.empty()) {
+			rgb[p] = cached.rgb;
+			++m_compositeCacheHits;
+			logLine(cat, QStringLiteral("  render %1 of 3 (%2): nothing it depends on changed, the last picture is used").arg(p + 1).arg(QString::fromLatin1(list[p].name)));
+			if (denoise && p < 2) ++denoisedPasses;
+			continue;
+		}
 		QFile::remove(exr);
 		QFile file(scene);
 		if (!file.open(QIODevice::WriteOnly)) {
 			if (error) *error = tr("Could not write %1.").arg(scene);
 			return false;
 		}
-		file.write(QByteArray::fromStdString(scene_doc::toPbrt(*list[p].doc)));
+		file.write(sceneText);
 		file.close();
 		QProcess process;
 		process.setProcessChannelMode(QProcess::MergedChannels);
 		process.setWorkingDirectory(QCoreApplication::applicationDirPath());
-		QStringList launch = {m_gpuCheck && m_gpuCheck->isChecked() ? "--gpu" : "--cpu"};
-		if (denoise && p < 2) launch << "--denoise";
-		launch << "--output" << exr << "--height" << QString::number(h) << QString::number(w) << QString::number(list[p].samples) << QString::number(list[p].depth) << scene;
 		logLine(cat, QStringLiteral("  render %1 of 3 (%2, %3 samples): %4 %5").arg(p + 1).arg(QString::fromLatin1(list[p].name)).arg(list[p].samples).arg(launcherPath(), launch.join(QLatin1Char(' '))));
 		QElapsedTimer passClock;
 		passClock.start();
@@ -237,7 +250,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 			return false;
 		}
 		if (denoise && p < 2 && denoiseProblem.isEmpty()) ++denoisedPasses;
-		if (p == 0) {   // the scene as it is, on its own: a first look in the preview pane while the other two renders run
+		if (p == 0 && !m_compositeLive) {   // the scene as it is, on its own: a first look in the preview pane while the other two renders run (not for a Live refresh: the picture changes under the eye)
 			QImage first(w, h, QImage::Format_RGB888);
 			for (int y = 0; y < h; ++y) {
 				unsigned char *row = first.scanLine(y);
@@ -247,6 +260,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 			m_previewPixmap = QPixmap::fromImage(first);
 			updatePreviewPixmap();
 		}
+		if (!m_compositeCancel && !(denoise && p < 2 && !denoiseProblem.isEmpty())) { cached.key = key; cached.rgb = rgb[p]; cached.w = rw; cached.h = rh; }   // (a pass that could not be denoised as asked is not kept as if it had been)
 		logLine(cat, QStringLiteral("  render %1 of 3 done in %2 s (%3 x %4)").arg(p + 1).arg(passClock.elapsed() / 1000.0, 0, 'f', 1).arg(rw).arg(rh));
 		if (rw != w || rh != h) {
 			if (error) *error = tr("The renderer made a picture of %1 x %2, not the %3 x %4 asked for.").arg(rw).arg(rh).arg(w).arg(h);
@@ -398,30 +412,68 @@ void SceneBuilderWidget::renderIntoPhotoDialog() {
 
 // "Preview in the photo": no questions, the Preview's Quality, what was last given in the dialog (the first time: the floor is the ground and the sky's exposure is matched when there is a Sun & sky).
 void SceneBuilderWidget::previewIntoPhoto() {
+	static const int widths[3] = {480, 720, 960};
+	static const int spps[3] = {16, 64, 256};
+	const int q = std::clamp(m_qualityCombo->currentData().toInt(), 0, 2);
+	previewIntoPhotoWith(widths[q], spps[q], false);
+}
+
+// "Preview in the photo" at a size: no questions, what was last given in the dialog (the first time: the floor is the ground and the sky's exposure is matched when there is a Sun & sky).
+void SceneBuilderWidget::previewIntoPhotoWith(int maxWidth, int samples, bool live) {
 	if (m_cameraPhoto.isNull()) {
 		m_previewStatus->setText(tr("Match the camera to a photo first (Camera and image: Match to a photo...): the scene is put into that photo."));
 		return;
 	}
 	flushEditLog();
-	static const int widths[3] = {480, 720, 960};
-	static const int spps[3] = {16, 64, 256};
-	const int q = std::clamp(m_qualityCombo->currentData().toInt(), 0, 2);
 	const std::vector<photo_composite::Role> roles = compositeRoles();
 	bool physicalSky = false;
 	for (const scene_doc::Light &l : m_doc.lights) physicalSky = physicalSky || (l.kind == scene_doc::LightKind::Infinite && l.physicalSky);
-	m_previewStatus->setText(tr("Putting the scene into the photo..."));
+	if (!live) m_previewStatus->setText(tr("Putting the scene into the photo..."));
+	m_compositeLive = live;
+	struct LiveFlag {   // (however this function ends)
+		SceneBuilderWidget *w;
+		~LiveFlag() { w->m_compositeLive = false; }
+	} liveFlag{this};
 	QImage picture;
 	QString error;
 	QStringList notes;
 	QElapsedTimer clock;
 	clock.start();
-	if (!renderIntoPhotoRoles(&picture, roles, m_compositeExposure, spps[q], widths[q], physicalSky, &error, &notes)) {
-		logLine(QStringLiteral("photo"), QStringLiteral("preview in the photo failed: %1").arg(error), log_format::Level::Warn);
-		m_previewStatus->setText(error.isEmpty() ? tr("The render was cancelled.") : error);
+	if (!renderIntoPhotoRoles(&picture, roles, m_compositeExposure, samples, maxWidth, physicalSky, &error, &notes)) {
+		if (!error.isEmpty()) logLine(QStringLiteral("photo"), QStringLiteral("preview in the photo failed: %1").arg(error), log_format::Level::Warn);
+		if (!live || !error.isEmpty()) m_previewStatus->setText(error.isEmpty() ? tr("The render was cancelled.") : error);   // (a Live refresh stopped because the scene changed again says nothing: the next one is on its way)
 		return;
 	}
-	showInPreview(QPixmap::fromImage(picture), tr("Put into the photo in %1 s (%2 x %3, %4 samples). %5").arg(clock.elapsed() / 1000.0, 0, 'f', 1).arg(picture.width()).arg(picture.height()).arg(spps[q]).arg(notes.join(QLatin1Char(' '))));
+	if (live) ++m_liveRefreshes;
+	showInPreview(QPixmap::fromImage(picture), tr("Put into the photo in %1 s (%2 x %3, %4 samples). %5").arg(clock.elapsed() / 1000.0, 0, 'f', 1).arg(picture.width()).arg(picture.height()).arg(samples).arg(notes.join(QLatin1Char(' '))));
 }
+
+// ---- Live: the picture in the photo follows the scene -----------------------------------------------------------------------------------------------------------------------------------------
+
+// The scene changed. With Live on, once it has been still for a moment a small, quick picture in the photo is made; a render in progress is out of date, so it is stopped (the timer starts the new one).
+void SceneBuilderWidget::scheduleLiveComposite() {
+	if (!m_liveCheck || !m_liveCheck->isChecked() || m_cameraPhoto.isNull() || m_process) return;
+	if (!m_liveTimer) {
+		m_liveTimer = new QTimer(this);
+		m_liveTimer->setSingleShot(true);
+		m_liveTimer->setInterval(400);
+		connect(m_liveTimer, &QTimer::timeout, this, &SceneBuilderWidget::runLiveComposite);
+	}
+	if (m_compositeRunning) m_compositeCancel = true;
+	m_liveTimer->start();
+}
+
+void SceneBuilderWidget::runLiveComposite() {
+	if (!m_liveCheck || !m_liveCheck->isChecked() || m_cameraPhoto.isNull() || m_process) return;
+	if (m_compositeRunning) {   // (still stopping the last one)
+		m_liveTimer->start();
+		return;
+	}
+	if (scene_doc::hasErrors(scene_doc::validate(m_doc))) return;   // (a scene with a problem cannot be rendered: wait for the next change)
+	previewIntoPhotoWith(360, 8, true);
+}
+
+void SceneBuilderWidget::setLiveForTest(bool on) { if (m_liveCheck) m_liveCheck->setChecked(on); }
 
 bool SceneBuilderWidget::denoiseTickedForTest() const { return m_denoiseCheck && m_denoiseCheck->isChecked(); }
 void SceneBuilderWidget::setDenoiseForTest(bool on) {
@@ -439,8 +491,10 @@ void SceneBuilderWidget::showInPreview(const QPixmap &picture, const QString &st
 	updatePreviewPixmap();
 	m_previewStatus->setText(status);
 	if (m_saveButton) m_saveButton->setEnabled(!picture.isNull());
-	if (m_centreScroll) m_centreScroll->ensureWidgetVisible(m_previewLabel, 0, 40);   // (the preview pane is below the fold in a short window: scroll to the picture)
-	emit statusMessage(tr("The picture is in the preview pane."));
+	if (!m_compositeLive) {   // (a Live refresh does not scroll the window or speak in the status bar every time)
+		if (m_centreScroll) m_centreScroll->ensureWidgetVisible(m_previewLabel, 0, 40);   // (the preview pane is below the fold in a short window: scroll to the picture)
+		emit statusMessage(tr("The picture is in the preview pane."));
+	}
 }
 
 void SceneBuilderWidget::onSavePictureClicked() {

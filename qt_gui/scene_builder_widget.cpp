@@ -325,6 +325,8 @@ void SceneBuilderWidget::buildUi() {
 	m_inPhotoButton = new QPushButton(tr("Preview in the photo"), previewBox);
 	m_inPhotoButton->setAutoDefault(false);
 	m_inPhotoButton->setToolTip(tr("Render the scene through the camera that was matched to a photo and show it here, put into the photo with its shadows. Same Quality as Preview. (Camera and image > Render into the photo... asks for more.)"));
+	m_liveCheck = new QCheckBox(tr("Live"), previewBox);
+	m_liveCheck->setToolTip(tr("Keep the picture in the photo up to date while you change the scene: a small, quick one is made when the scene has been still for a moment. Needs the camera matched to a photo."));
 	m_saveButton = new QPushButton(tr("Save picture..."), previewBox);
 	m_saveButton->setAutoDefault(false);
 	m_saveButton->setEnabled(false);
@@ -350,6 +352,7 @@ void SceneBuilderWidget::buildUi() {
 	scene_builder_ui::compactStyle(m_inPhotoButton);
 	scene_builder_ui::compactStyle(m_saveButton);
 	renderRow->addWidget(m_inPhotoButton);
+	renderRow->addWidget(m_liveCheck);
 	renderRow->addWidget(m_saveButton);
 	scene_builder_ui::compactStyle(m_turntableButton);
 	renderRow->addWidget(m_turntableButton);
@@ -379,6 +382,16 @@ void SceneBuilderWidget::buildUi() {
 	});
 	connect(m_finalButton, &QPushButton::clicked, this, &SceneBuilderWidget::onRenderFinalClicked);
 	connect(m_inPhotoButton, &QPushButton::clicked, this, &SceneBuilderWidget::previewIntoPhoto);
+	connect(m_liveCheck, &QCheckBox::toggled, this, [this](bool on) {
+		if (on && m_cameraPhoto.isNull()) {   // (nothing to put the scene into)
+			const QSignalBlocker blocker(m_liveCheck);
+			m_liveCheck->setChecked(false);
+			m_previewStatus->setText(tr("Match the camera to a photo first (Camera and image: Match to a photo...): the scene is put into that photo."));
+			return;
+		}
+		if (on) scheduleLiveComposite();
+		else if (m_liveTimer) m_liveTimer->stop();
+	});
 	connect(m_saveButton, &QPushButton::clicked, this, &SceneBuilderWidget::onSavePictureClicked);
 	connect(m_turntableButton, &QPushButton::clicked, this, &SceneBuilderWidget::showTurntableDialog);
 	connect(m_flythroughButton, &QPushButton::clicked, this, &SceneBuilderWidget::showFlythroughDialog);
@@ -552,6 +565,7 @@ void SceneBuilderWidget::documentChanged() {
 	scheduleAutosave();
 	if (m_sel.kind == SelKind::Camera && !m_loading) refreshInspectorValues();   // (the camera's lens rows are worked out from one another)
 	m_viewportDocChanged = true;   // (the rendered viewport works out whether the picture changed at its next tick)
+	scheduleLiveComposite();       // (with Live on, the picture in the photo follows)
 }
 
 // ---- list, selection ------------------------------------------------------------------------------------------------------------
@@ -883,6 +897,7 @@ void SceneBuilderWidget::updateActions() {
 	m_previewButton->setEnabled(ok || rendering);
 	m_finalButton->setEnabled(ok && !rendering);
 	m_inPhotoButton->setEnabled(ok && !rendering);
+	m_liveCheck->setEnabled(ok && !m_cameraPhoto.isNull());
 	m_turntableButton->setEnabled(ok && !rendering);
 	m_flythroughButton->setEnabled(ok && !rendering && m_doc.cameraViews.size() >= 2);
 }

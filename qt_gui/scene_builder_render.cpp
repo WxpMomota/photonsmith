@@ -71,6 +71,7 @@ using namespace scene_builder_ui;
 void SceneBuilderWidget::setUseGpu(bool on) { m_gpuCheck->setChecked(on); }
 
 void SceneBuilderWidget::logLine(const QString &category, const QString &text, log_format::Level level) {
+	if (m_compositeLive && level == log_format::Level::Info && category == QLatin1String("photo")) return;   // (a Live refresh makes dozens of lines a minute: warnings and errors only)
 	if (isSignalConnected(QMetaMethod::fromSignal(&SceneBuilderWidget::logMessage))) {
 		const QString tag = level == log_format::Level::Error ? QStringLiteral("Error: ") : level == log_format::Level::Warn ? QStringLiteral("Warning: ") : QString();   // (the pane sorts a line by such words and labels it itself)
 		emit logMessage(QStringLiteral("[Scene Builder] ") + tag + text);   // (the pane writes the log file too)

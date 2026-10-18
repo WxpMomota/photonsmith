@@ -212,11 +212,17 @@ public:
 	bool renderIntoPhotoRoles(QImage *result, const std::vector<photo_composite::Role> &roles, double exposureStops, int samples, int maxWidth, bool matchToPhoto, QString *error, QStringList *notes = nullptr);
 	std::vector<photo_composite::Role> compositeRoles() const;   // what each object is for the picture: as last said in the dialog, else guessed
 	void previewIntoPhoto();
+	void previewIntoPhotoWith(int maxWidth, int samples, bool live);   // previewIntoPhoto at a chosen size; `live`: the quiet, small refresh of the Live tick
+	void scheduleLiveComposite();   // the scene changed: with Live on, a picture in the photo is made when it has been still for a moment (and one in progress is stopped: it is out of date)
+	void runLiveComposite();
 	void showInPreview(const QPixmap &picture, const QString &status);   // the preview pane shows this picture (and "Save picture..." can save it)
 	void onSavePictureClicked();                                           // "Save picture...": the picture in the preview pane, as a PNG
 	bool previewHasPictureForTest() const { return !m_previewPixmap.isNull(); }
 	bool denoiseTickedForTest() const;
 	bool compositeRunningForTest() const { return m_compositeRunning; }
+	void setLiveForTest(bool on);
+	int liveRefreshesForTest() const { return m_liveRefreshes; }
+	int compositeCacheHitsForTest() const { return m_compositeCacheHits; }
 	void setPhotoExposureForTest(double v) { m_doc.photo.exposureStops = v; m_doc.photo.roles = {{"Floor", 0}}; documentChanged(); }   // what the Render into the photo dialog keeps in the document
 	void removePhotoForTest() { m_doc.photo = scene_doc::PhotoBackdrop(); documentChanged(); }   // what the Remove the photo button does
 	QString previewButtonTextForTest() const;
@@ -564,6 +570,17 @@ private:
 	bool m_cancelRequested = false;
 	bool m_compositeRunning = false;   // Render into the photo / Preview in the photo is rendering (its three renders run from renderIntoPhotoRoles, with the window still usable)
 	bool m_compositeCancel = false;    // the Preview button (Cancel while it runs) was pressed
+	bool m_compositeLive = false;      // the running composite is a Live refresh: quiet (no log lines, no first look, no scrolling to the picture)
+	QCheckBox *m_liveCheck = nullptr;  // "Live": the picture in the photo follows the scene
+	QTimer *m_liveTimer = nullptr;
+	int m_liveRefreshes = 0, m_compositeCacheHits = 0;
+	// The last render of each of the three passes (as it is, without the inserted objects, mask), kept with what made it (the scene text and the renderer's arguments): when nothing that a pass
+	// depends on has changed (moving an inserted object leaves the ground pass as it was) the pass is not rendered again.
+	struct CompositePass {
+		QByteArray key;
+		std::vector<float> rgb;
+		int w = 0, h = 0;
+	} m_compositeCache[3];
 	QPixmap m_previewPixmap;
 	std::vector<std::function<void()>> m_refreshers;  // re-read each inspector field from the document (after a drag moves something)
 };

@@ -38,6 +38,8 @@
 #include <QPushButton>
 #include <QScreen>
 #include <QTimer>
+#include <QEventLoop>
+#include <QThread>
 #include <QVBoxLayout>
 
 #include <cmath>
@@ -759,6 +761,46 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			sb->cameraFromPhoto();
 			check(seen == "hint north-sea beach own " && samplesListed == static_cast<int>(samples.size()) && depthAfterTwo - depthAtStart <= 2 && fillsScreen && hasApply && bigThumbnails && !*stayedOpen,
 			      QString("Match to a photo for the camera is one window that applies on click (%1; %2 samples listed; two applies left %3 undo steps; fills the screen %4, has an Apply button %5, thumbnails %6)").arg(seen).arg(samplesListed).arg(depthAfterTwo - depthAtStart).arg(fillsScreen).arg(hasApply).arg(bigThumbnails));
+		}
+		// Live: with the tick on the picture in the photo follows the scene. Ticking it makes one (small, quick) picture; a change of the scene makes another when it has been still for a moment; and the
+		// render that the change did not touch (the scene without the inserted objects) is not made again.
+		{
+			QString liveError;
+			sb->applyCameraPhoto(QDir::tempPath() + "/rt_selftest_composite.png", 65.0, 1.6, false, 0.0, false, 0.0, false, &liveError);
+			auto waitFor = [&](int refreshes) {
+				QElapsedTimer waited;
+				waited.start();
+				while (waited.elapsed() < 30000 && sb->liveRefreshesForTest() < refreshes) {
+					QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+					QThread::msleep(20);
+				}
+				return sb->liveRefreshesForTest() >= refreshes;
+			};
+			const int before = sb->liveRefreshesForTest();
+			sb->setLiveForTest(true);
+			const bool first = waitFor(before + 1);
+			check(first && sb->previewHasPictureForTest() && sb->previewPictureSizeForTest().width() == 360, QString("ticking Live makes a small picture in the photo (%1 x %2)").arg(sb->previewPictureSizeForTest().width()).arg(sb->previewPictureSizeForTest().height()));
+			const int hitsBefore = sb->compositeCacheHitsForTest();
+			sb->selectObject(3);
+			sb->setPickedHeight(1.0);   // the scene changes: an inserted object
+			const bool second = waitFor(before + 2);
+			check(second && sb->compositeCacheHitsForTest() > hitsBefore, QString("a change of the scene makes another, and the render it did not touch was used again (%1 reuses)").arg(sb->compositeCacheHitsForTest() - hitsBefore));
+			// two quick changes are one refresh (and a render in progress is stopped for the newer scene)
+			const int refreshesBefore = sb->liveRefreshesForTest();
+			sb->setPickedHeight(1.2);
+			sb->setPickedHeight(1.4);
+			const bool third = waitFor(refreshesBefore + 1);
+			QElapsedTimer settle;
+			settle.start();
+			while (settle.elapsed() < 1500) { QCoreApplication::processEvents(QEventLoop::AllEvents, 100); QThread::msleep(20); }
+			check(third && sb->liveRefreshesForTest() == refreshesBefore + 1, QString("two quick changes are one refresh (%1 made)").arg(sb->liveRefreshesForTest() - refreshesBefore));
+			sb->setLiveForTest(false);
+			const int stopped = sb->liveRefreshesForTest();
+			sb->setPickedHeight(1.0);
+			QElapsedTimer quiet;
+			quiet.start();
+			while (quiet.elapsed() < 1500) { QCoreApplication::processEvents(QEventLoop::AllEvents, 100); QThread::msleep(20); }
+			check(sb->liveRefreshesForTest() == stopped && !sb->compositeRunningForTest(), "with the tick off nothing is made when the scene changes");
 		}
 		// The photo belongs to the scene: a scene matched to a photo, saved, then a new scene (no photo), then the saved one opened again has its photo, its overlay, its Render into the photo state and
 		// the camera back; a photo that has gone is said so, not a crash; Remove the photo takes it out; and one undo of the match takes it away too.

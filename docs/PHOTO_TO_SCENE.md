@@ -167,6 +167,15 @@ standing where it is. The camera's height gives the scale of everything else: a 
 
 Checked by unit tests (the base lands on the ground, a pick of two keeps its arrangement, a scaled object stays on the ground) and by the headless GUI test, which sends a real mouse click to the view.
 
+## Live: the picture in the photo follows the scene
+
+With the camera matched to a photo, the **Live** tick next to *Preview in the photo* keeps the picture in the preview pane up to date while you work: ticking it makes one small picture (360 pixels
+across, 8 samples, denoised when the Denoise tick is on), and each change of the scene (a drag, a number typed, a height set) makes another once the scene has been still for 0.4 s. A render that is
+running when the scene changes is out of date, so it is stopped and the new one starts. The three renders of a composite depend on different parts of the scene: **a pass whose scene and settings are the
+same as last time is not rendered again** (moving or scaling an inserted object leaves the ground pass as it was, so two renders are made instead of three), which also speeds up Preview in the photo.
+A Live refresh is quiet: it does not fill the Log Output tab, scroll the window, or show a first look. Untick Live to stop; the Preview button cancels the refresh that is running. Use Render into the photo
+for the final picture.
+
 ## Render into the photo
 
 **Render into the photo...** (in the Camera section, under *Match to a photo...*; it needs the camera to have been matched to a photo first, see Camera from a photo, and says so if not) puts the scene into that
