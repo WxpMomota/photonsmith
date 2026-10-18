@@ -5,6 +5,7 @@
 // camera and the picture's shape, keeps the photo for the camera view and (if asked) sets the Sun & sky from the same photo.
 #include "scene_builder_widget.h"
 #include "app_log.h"
+#include "photo_dialog.h"
 #include "sample_photos.h"
 #include "scene_3d_view.h"
 #include "../src/shared/camera_from_photo.h"
@@ -127,11 +128,15 @@ void SceneBuilderWidget::cameraFromPhoto() {
 	QDialog dialog(this);
 	dialog.setWindowTitle(tr("Camera from a photo"));
 	auto *layout = new QVBoxLayout(&dialog);
+	auto *page = new QWidget(&dialog);   // (the settings: photo_dialog::run swaps it for the result in this same window)
+	auto *pageLayout = new QVBoxLayout(page);
+	pageLayout->setContentsMargins(0, 0, 0, 0);
+	layout->addWidget(page);
 	auto *intro = new QLabel(tr("The camera takes the photo's lens (from the photo's own data when it has it), tilt and roll (read off the horizon: the lower edge of a blue or white sky), and the picture "
 	                            "takes the photo's shape. The photo can then be laid over the camera view. All the settings below are optional."),
 	                         &dialog);
 	intro->setWordWrap(true);
-	layout->addWidget(intro);
+	pageLayout->addWidget(intro);
 	auto *form = new QFormLayout();
 	auto *fov = new QDoubleSpinBox(&dialog);
 	fov->setRange(0.0, 140.0);
@@ -169,23 +174,22 @@ void SceneBuilderWidget::cameraFromPhoto() {
 	sun->setChecked(hasSky);
 	sun->setEnabled(hasSky);
 	form->addRow(QString(), sun);
-	layout->addLayout(form);
+	pageLayout->addLayout(form);
 	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-	connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-	connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
 	layout->addWidget(buttons);
-	if (dialog.exec() != QDialog::Accepted) return;
-
-	QString error;
-	QStringList notes;
-	if (!applyCameraPhoto(photo, fov->value(), height->value(), tilt->value() > tilt->minimum(), tilt->value(), rollSpin->value() > rollSpin->minimum(), rollSpin->value(), sun->isChecked(), &error, &notes)) {
-		logLine(QStringLiteral("photo"), QStringLiteral("camera from a photo failed: %1").arg(error), log_format::Level::Warn);
-		QMessageBox::warning(this, tr("Could not read the camera"), error);
-		return;
-	}
+	photo_dialog::run(dialog, page, buttons, [&](QString *result) {
+		QString error;
+		QStringList notes;
+		if (!applyCameraPhoto(photo, fov->value(), height->value(), tilt->value() > tilt->minimum(), tilt->value(), rollSpin->value() > rollSpin->minimum(), rollSpin->value(), sun->isChecked(), &error, &notes)) {
+			logLine(QStringLiteral("photo"), QStringLiteral("camera from a photo failed: %1").arg(error), log_format::Level::Warn);
+			QMessageBox::warning(&dialog, tr("Could not read the camera"), error);
+			return false;
+		}
 	for (const QString &note : notes) logLine(QStringLiteral("photo"), QStringLiteral("  %1").arg(note));
 	if (photo.startsWith(QLatin1String(":/"))) notes << tr("Next: pick an object in the list, press Place the picked object by clicking... in its properties, click the ground in the picture, then press Render into the photo... on Camera and image.");
-	QMessageBox::information(this, tr("Camera from a photo"), tr("The camera was set from %1:\n\n- %2").arg(QFileInfo(photo).fileName(), notes.join("\n- ")));
+		*result = tr("The camera was set from %1:\n\n- %2").arg(QFileInfo(photo).fileName(), notes.join("\n- "));
+		return true;
+	});
 }
 
 // ---- Place on the photo's ground ---------------------------------------------------------------------------------------------------------------------------------------------------------

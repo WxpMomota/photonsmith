@@ -5,6 +5,7 @@
 // where the Builder camera looks) and sets the light.
 #include "scene_builder_widget.h"
 #include "app_log.h"
+#include "photo_dialog.h"
 #include "sample_photos.h"
 #include "../src/shared/light_from_photo.h"
 
@@ -95,11 +96,15 @@ void SceneBuilderWidget::lightFromPhoto(int lightIndex) {
 	QDialog dialog(this);
 	dialog.setWindowTitle(tr("Light from a photo"));
 	auto *layout = new QVBoxLayout(&dialog);
+	auto *page = new QWidget(&dialog);   // (the settings: photo_dialog::run swaps it for the result in this same window)
+	auto *pageLayout = new QVBoxLayout(page);
+	pageLayout->setContentsMargins(0, 0, 0, 0);
+	layout->addWidget(page);
 	auto *intro = new QLabel(tr("The sun's height and direction and the haze are read from the sky in the photo (a blue or white sky that reaches the top of the picture), and the Sun && sky "
 	                            "settings are set to match. The photo should show some sky and, for the height, the horizon. Both settings below are optional."),
 	                         &dialog);
 	intro->setWordWrap(true);
-	layout->addWidget(intro);
+	pageLayout->addWidget(intro);
 	auto *form = new QFormLayout();
 	auto *fov = new QDoubleSpinBox(&dialog);
 	fov->setRange(20.0, 140.0);
@@ -120,21 +125,20 @@ void SceneBuilderWidget::lightFromPhoto(int lightIndex) {
 	tilt->setToolTip(tr("How far the camera looked up (+) or down (-). Left at the lowest setting it is read off where the sky ends, which works when the horizon is in the photo and "
 	                    "not hidden by buildings or trees."));
 	form->addRow(tr("Camera tilt"), tilt);
-	layout->addLayout(form);
+	pageLayout->addLayout(form);
 	auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-	connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-	connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
 	layout->addWidget(buttons);
-	if (dialog.exec() != QDialog::Accepted) return;
-
-	QString error;
-	QStringList notes;
-	const bool tiltGiven = tilt->value() > tilt->minimum();
-	if (!applyLightPhoto(lightIndex, photo, fov->value(), tiltGiven, tilt->value(), &error, &notes)) {
-		logLine(QStringLiteral("photo"), QStringLiteral("light from a photo failed: %1").arg(error), log_format::Level::Warn);
-		QMessageBox::warning(this, tr("Could not read the light"), error);
-		return;
-	}
+	photo_dialog::run(dialog, page, buttons, [&](QString *result) {
+		QString error;
+		QStringList notes;
+		const bool tiltGiven = tilt->value() > tilt->minimum();
+		if (!applyLightPhoto(lightIndex, photo, fov->value(), tiltGiven, tilt->value(), &error, &notes)) {
+			logLine(QStringLiteral("photo"), QStringLiteral("light from a photo failed: %1").arg(error), log_format::Level::Warn);
+			QMessageBox::warning(&dialog, tr("Could not read the light"), error);
+			return false;
+		}
 	for (const QString &note : notes) logLine(QStringLiteral("photo"), QStringLiteral("  %1").arg(note));
-	QMessageBox::information(this, tr("Light from a photo"), tr("The sky was set from %1:\n\n- %2").arg(QFileInfo(photo).fileName(), notes.join("\n- ")));
+		*result = tr("The sky was set from %1:\n\n- %2").arg(QFileInfo(photo).fileName(), notes.join("\n- "));
+		return true;
+	});
 }

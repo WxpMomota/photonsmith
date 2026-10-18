@@ -159,6 +159,7 @@ HEADERS += \
 	win_taskbar.h \
 	scene_builder_widget.h \
 	sample_photos.h \
+	photo_dialog.h \
 	scene_builder_array_dialog.h \
 	scene_builder_common.h \
 	photo_import.h \

@@ -12,6 +12,7 @@
 #endif
 
 #include "photo_import.h"
+#include "photo_dialog.h"
 #include "scene_builder_widget.h"
 #include "sample_photos.h"
 #include "scene_3d_view.h"
@@ -24,14 +25,17 @@
 #include <QApplication>
 #include <QComboBox>
 #include <QDialog>
+#include <QDialogButtonBox>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QImage>
+#include <QLabel>
 #include <QListWidget>
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QTimer>
+#include <QVBoxLayout>
 
 #include <cmath>
 
@@ -520,6 +524,33 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			}
 			check(!notes.isEmpty(), "the user is told what was done: " + notes.join(" / ").left(120));
 		}
+		// The photo dialogs show their result in the same window: Ok does the work (a failure leaves the settings to be changed), and the settings page gives way to the result and one Close button.
+		{
+			QDialog probe(this);
+			auto *probeLayout = new QVBoxLayout(&probe);
+			auto *page = new QWidget(&probe);
+			auto *pageLayout = new QVBoxLayout(page);
+			pageLayout->addWidget(new QLabel("settings", page));
+			probeLayout->addWidget(page);
+			auto *probeButtons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &probe);
+			probeLayout->addWidget(probeButtons);
+			int tries = 0;
+			bool pageHiddenAfter = false, resultShown = false, onlyClose = false;
+			QTimer::singleShot(300, [&]() { probeButtons->button(QDialogButtonBox::Ok)->click(); });   // the first Ok fails: the settings stay
+			QTimer::singleShot(600, [&]() { if (page->isVisible()) probeButtons->button(QDialogButtonBox::Ok)->click(); });   // the second works
+			QTimer::singleShot(1000, [&]() {
+				pageHiddenAfter = !page->isVisible();
+				for (QLabel *label : probe.findChildren<QLabel *>()) resultShown = resultShown || (label->text() == "done: the result" && label->isVisible());
+				onlyClose = probeButtons->buttons().size() == 1 && probeButtons->button(QDialogButtonBox::Close) != nullptr;
+				probe.reject();
+			});
+			photo_dialog::run(probe, page, probeButtons, [&tries](QString *result) {
+				if (++tries == 1) return false;
+				*result = "done: the result";
+				return true;
+			});
+			check(tries == 2 && pageHiddenAfter && resultShown && onlyClose, QString("the photo dialogs show their result in the same window (apply ran %1 times, settings hidden %2, result shown %3, one Close button %4)").arg(tries).arg(pageHiddenAfter).arg(resultShown).arg(onlyClose));
+		}
 		// the dialog: it opens with a role to choose for every object (a picture of it is saved), and a cancel changes nothing
 		int roleBoxes = 0;
 		QTimer::singleShot(1200, [&roleBoxes]() {
@@ -644,6 +675,33 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 			const bool madeReal = sb->applyCameraPhoto(real, 0.0, 1.6, false, 0.0, false, 0.0, true, &realError, &realNotes) && sb->renderIntoPhoto(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_real.png", {0}, 0.0, 48, true, &realError, &realNotes);
 			check(madeReal, "the real photo " + real + " was put into: " + realError);
 			for (const QString &n : realNotes) log("note: " + n);
+		}
+		// The whole of Match to a photo for the camera, through its real windows: the picker (the first sample is used), the settings, Ok, and the result in that same settings window, then Close.
+		{
+			const QString out = qEnvironmentVariable("RT_GUI_SELFTEST_OUT");
+			auto click = [](QWidget *w, const QString &text) {
+				for (QPushButton *b : w->findChildren<QPushButton *>())
+					if (b->text().remove(QLatin1Char('&')) == text) { b->click(); return true; }
+				return false;
+			};
+			QString seen;
+			QTimer::singleShot(500, [&]() { if (QWidget *w = QApplication::activeModalWidget()) { seen += "picker "; click(w, "Use this photo"); } });
+			QTimer::singleShot(1500, [&]() {
+				if (QWidget *w = QApplication::activeModalWidget()) {
+					seen += "settings ";
+					w->grab().save(out + "_camera_settings.png");
+					click(w, "OK");
+				}
+			});
+			QTimer::singleShot(3500, [&]() {
+				if (QWidget *w = QApplication::activeModalWidget()) {
+					seen += w->findChildren<QLabel *>().size() ? "result " : "";
+					w->grab().save(out + "_camera_result.png");
+					click(w, "Close");
+				}
+			});
+			sb->cameraFromPhoto();
+			check(seen == "picker settings result ", "Match to a photo for the camera ran through its picker, its settings and its result: " + seen);
 		}
 	}
 	QTimer::singleShot(600, this, [this, shot, log, ok]() {
