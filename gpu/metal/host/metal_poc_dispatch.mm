@@ -1,0 +1,1346 @@
+// metal_poc_dispatch.mm
+// Stage 4: MetalPocApp::compileShaderAndDispatch() (plus its own
+// checkGpuResource() helper) - concatenates+compiles the runtime Metal
+// shader source (see metal_poc_shader_files.h's own comment), binds every
+// GPU-resident buffer/texture buildGPUResources() built, dispatches the
+// compute kernel, and reads the rendered HDR buffer back into `pixels` -
+// split out of metal_poc.mm once its own Stage 3/4 pair grew past ~1200
+// combined lines (a pure code-motion refactor, no behaviour change - same
+// precedent as metal_poc_scenes_a.mm's own split, and metal_poc_pbrt_
+// loader.mm's own follow-up). Stage 3 (GPU buffer/AS upload) is the
+// sibling split, metal_poc_gpu_resources.mm - kept separate from this one
+// since "upload the data" and "compile+dispatch+read back" are two
+// genuinely different concerns that happen to run back to back, not one
+// oversized stage that was arbitrarily cut in half.
+//
+// compileShaderAndDispatch() is now a short driver over named stages (dsLoadShaderLibrary, dsBuildPipeline, dsCreateRenderTargets,
+// dsUploadTextures, dsUploadSamplingTables, dsFillUniforms, dsCheckResources, dsMakeRenderFrame): it had grown back to one ~1,080-line
+// function. The stage bodies are the original code, moved unchanged; what they hand to each other lives in DispatchState below, and each
+// stage reads it through references of the same names. Renders are byte-identical to before the split.
+#import <Metal/Metal.h>
+#import <Foundation/Foundation.h>
+#include <algorithm>
+#include <atomic>
+#include <memory>
+#include <mutex>
+#include <thread>
+#include "metal_poc_app.h"
+#include "../metal_interface.h"   // metal_prepare_renderer()
+#include "../shaders/metal_poc_shader_files.h"
+#include "metal_poc_tuning.h"   // the environment switches, parsed once
+#include "metal_poc_families.h"   // which rarely used material families a pipeline is built with
+// PixelFilterDispatch/FilterSampler<float,32> - see Uniforms::filterKind's
+// own comment (metal_poc_gpu_types.h) for why this table is built here,
+// host-side, from the SAME shared headers CPU/OptiX already use.
+#include "../../../src/shared/filter.h"
+#include "../../../src/shared/filter_sampler.h"
+#include "../../../src/shared/camera_footprint.h"   // pbrt's Approximate_dp_dxy: the camera's smallest pixel differentials
+
+// Every buffer/texture the compute encoder below binds can be nil if its
+// own newBufferWith.../newTextureWithDescriptor call failed - OOM, or a
+// requested length exceeding device.maxBufferLength (a real, finite,
+// GPU-dependent ceiling a sufficiently large baked pbrt scene could
+// plausibly hit, e.g. many ObjectInstance placements each duplicating
+// full geometry rather than sharing one buffer - see section 86).
+// Metal's own setBuffer:/setTexture: silently UNBIND that slot on a nil
+// argument instead of erroring, so an unchecked failure here would let
+// the shader read back zeroed/garbage data at that one binding and
+// render a WRONG image with NO error anywhere - the hardest kind of bug
+// to diagnose (found via a logging/debugging-focused review, not a
+// symptom - see section 107). Deliberately does NOT re-check the
+// acceleration-structure-only scratch/geometry buffers built earlier in
+// this same stage (primScratch/sphereScratch/suzanneScratch/instScratch,
+// boundingBoxBuffer/diskBoundingBoxBuffer/instanceBuffer) - those are
+// never bound to THIS encoder, and a nil one there already fails loud
+// via that build's own existing `buildCmd.status ==
+// MTLCommandBufferStatusError` check just above it.
+static void checkGpuResource(id resource, const char* name, id<MTLDevice> device, bool* anyFailed) {
+    if (!resource) {
+        fprintf(stderr, "GPU resource allocation FAILED: '%s' is nil (likely out of memory, "
+                        "or this scene is too large for this GPU's max buffer length of %llu "
+                        "bytes) - aborting before the render would silently produce a wrong "
+                        "image instead of a visible error.\n",
+                name, (unsigned long long)device.maxBufferLength);
+        *anyFailed = true;
+    }
+}
+
+
+// Everything the stages below hand to each other. compileShaderAndDispatch() used to be one ~1,080-line function whose locals these were;
+// each stage now reads the ones it needs through references of the same name (so the stage bodies are the original code, unchanged) and
+// leaves the ones it creates here. The frame lambda built by the last stage copies what it needs, as it always did.
+struct MetalPocApp::DispatchState {
+    NSError* error = nil;   // stage A
+    id<MTLLibrary> library;   // stage A
+    id<MTLComputePipelineState> pipeline;   // stage B
+    id<MTLIntersectionFunctionTable> functionTable;   // stage B
+    id<MTLTexture> outTexture;   // stage C
+    bool censusOn = false;   // stage C
+    id<MTLTexture> censusTexture;   // stage C
+    id<MTLTexture> worldPosTexture;   // stage C
+    id<MTLTexture> earthTexture;   // stage D
+    id<MTLTexture> pbrtEnvTexture;   // stage D
+    id<MTLTexture> pbrtGoniometricTexture;   // stage D
+    id<MTLTexture> pbrtProjectionTexture;   // stage D
+    id<MTLTexture> pbrtAreaLightTexture;   // stage D
+    id<MTLTexture> pbrtDiffuseTexture;   // stage D
+    id<MTLTexture> pbrtTransmitTexture;   // stage D
+    EnvDistribution2D envDist;   // stage D
+    uint32_t envMapWidth = 0;   // stage D2
+    uint32_t envMapHeight = 0;   // stage D2
+    id<MTLBuffer> envMarginalCDFBuffer;   // stage D2
+    id<MTLBuffer> envConditionalCDFBuffer;   // stage D2
+    uint32_t pbrtEnvMapWidth = 0;   // stage D2
+    uint32_t pbrtEnvMapHeight = 0;   // stage D2
+    id<MTLBuffer> pbrtEnvMarginalCDFBuffer;   // stage D2
+    id<MTLBuffer> pbrtEnvConditionalCDFBuffer;   // stage D2
+    GGXEnergyTable ggxEnergyTable;   // stage D2
+    id<MTLBuffer> ggxEnergyTableBuffer;   // stage D2
+    id<MTLBuffer> uniformBuffer;   // stage E
+};
+
+// Compiles the shader library (every metal_poc_*.metal fragment, concatenated) for one variant: the scene needs the any-hit triangle test (an alpha mask, a subsurface material) or not.
+// A render gets it through dsLoadShaderLibrary(); metal_prepare_renderer() builds both variants ahead of time. Compiling the source takes about a second; the expensive step is building
+// the compute pipeline from it (createKernelPipeline below), which Metal then caches for this Mac.
+static id<MTLLibrary> compileShaderLibrary(id<MTLDevice> dev, bool triangleAnyHit) {
+    // --- Compile the shader library from source at runtime ---------
+    NSError* error = nil;
+    // Three DIRECTORY candidates, tried in priority order (unchanged from
+    // before the shader source was split into several files - see
+    // metal_poc_shader_files.h's own comment for why every file below is
+    // read from this SAME directory rather than resolved independently):
+    // 1. Right next to the CURRENTLY RUNNING executable
+    //    (_NSGetExecutablePath(), not NSBundle - resolves correctly for
+    //    a plain (non-app-bundle) CLI binary too, which is exactly how
+    //    a shipped .app's own Contents/MacOS/ray_tracer runs when the
+    //    Qt GUI spawns it as a subprocess). This is the only candidate
+    //    that works once the binary has been copied/installed anywhere
+    //    other than the machine that built it - a real, previously-
+    //    undiscovered bug found by actually testing a packaged release
+    //    (section 110): RT_METAL_SHADER_DIR below is a compile-time
+    //    absolute path into the BUILD MACHINE's own source tree, so a
+    //    distributed .dmg's own bundled ray_tracer would report Metal
+    //    available (metal_get_diagnostics() never touches this shader
+    //    path at all) yet fail every actual GPU render once it got
+    //    here, silently, on every machine except the one that built it.
+    //    build_and_deploy_macos.sh now also copies every metal_poc_*.metal
+    //    file next to the bundled ray_tracer specifically so this
+    //    candidate finds them.
+    // 2. RT_METAL_SHADER_DIR (set by CMakeLists.txt's metal_poc target,
+    //    RT_BUILD_METAL=ON path) - gpu/metal/'s absolute SOURCE
+    //    directory, correct only on the machine that built this binary
+    //    (a plain `cmake --build` dev loop, never distributed).
+    // 3. A __FILE__-relative lookup, for the ad-hoc `clang++
+    //    metal_poc.mm ...` invocation this POC started as
+    //    (docs/history/METAL_GPU_FEASIBILITY.md section 7/8/9).
+    NSString* shaderDir = nil;
+    {
+        char exePathBuf[4096];
+        uint32_t exePathSize = sizeof(exePathBuf);
+        if (_NSGetExecutablePath(exePathBuf, &exePathSize) == 0) {
+            NSString* exeDir = [@(exePathBuf) stringByDeletingLastPathComponent];
+            int firstCount = 0;
+            NSString* candidate = [exeDir stringByAppendingPathComponent:
+                @(metalShaderFileNames(&firstCount)[0])];
+            if ([[NSFileManager defaultManager] fileExistsAtPath:candidate]) shaderDir = exeDir;
+        }
+    }
+    if (!shaderDir) {
+#ifdef RT_METAL_SHADER_DIR
+        shaderDir = @(RT_METAL_SHADER_DIR);
+#else
+        shaderDir = [[@(__FILE__) stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"../shaders"];
+#endif
+    }
+    // Concatenate every shader fragment, in metal_poc_shader_files.h's own
+    // declared order, into ONE source string - Metal compiles from a
+    // single in-memory string (newLibraryWithSource: below), so the split
+    // into several files on disk is a source-organization change only,
+    // not a real separate-translation-unit split the way the `.mm`
+    // side's own per-category files are; every later file's own function
+    // still needs every earlier file's own struct/function already
+    // defined in the SAME string it's handed.
+    NSMutableString* shaderSource = [NSMutableString string];
+    int shaderFileCount = 0;
+    const char* const* shaderFileNames = metalShaderFileNames(&shaderFileCount);
+    for (int i = 0; i < shaderFileCount; ++i) {
+        NSString* fragPath = [shaderDir stringByAppendingPathComponent:@(shaderFileNames[i])];
+        NSString* fragSource = [NSString stringWithContentsOfFile:fragPath encoding:NSUTF8StringEncoding error:&error];
+        if (!fragSource) {
+            fprintf(stderr, "Failed to read shader source at %s: %s\n",
+                fragPath.UTF8String, error.localizedDescription.UTF8String);
+            return nil;
+        }
+        [shaderSource appendString:fragSource];
+    }
+    MTLCompileOptions* compileOpts = [MTLCompileOptions new];
+    if (triangleAnyHit) compileOpts.preprocessorMacros = @{@"METAL_TRIANGLE_ANY_HIT": @1};
+    id<MTLLibrary> library = [dev newLibraryWithSource:shaderSource options:compileOpts error:&error];
+    if (!library) {
+        fprintf(stderr, "Shader compile failed: %s\n", error.localizedDescription.UTF8String);
+        return nil;
+    }
+    return library;
+}
+
+// Stage A: Compiles the shader library for this scene's variant.
+bool MetalPocApp::dsLoadShaderLibrary(DispatchState& s) {
+    id<MTLLibrary> library = compileShaderLibrary(device, havePbrtTriangleAnyHit);
+    if (!library) return false;
+    s.error = nil;
+    s.library = library;
+    return true;
+}
+
+// The kernel and the four intersection functions it links.
+struct KernelFunctions {
+    id<MTLFunction> kernel, sphere, disk, cylinder, triangleAnyHit;
+};
+
+// Looks up the kernel and the intersection functions in `library`, links them and builds the compute pipeline. This is the slow step of a Mac's first run: the compiler turns the
+// whole path tracer (every material and medium in one kernel) into machine code for this GPU, about 90 seconds on an M2, and Metal keeps the result in a cache for this app, so
+// every later run takes no time at all. A render and metal_prepare_renderer() both come through here, so they share that cache. A message says so after three seconds, because
+// nothing else on screen does.
+static id<MTLComputePipelineState> createKernelPipeline(id<MTLDevice> dev, id<MTLLibrary> library, bool anyHitVariant, const FamilySet& families, KernelFunctions& f, NSError** error) {
+    // The material families this pipeline contains (function constants 0 to 4 of primaryRayKernel): one pipeline, and one entry in Metal's cache, for each distinct set.
+    MTLFunctionConstantValues* constants = [MTLFunctionConstantValues new];
+    const bool familyValues[5] = {families.layered, families.measured, families.subsurface, families.hair, families.extras};
+    for (int i = 0; i < 5; ++i) [constants setConstantValue:&familyValues[i] type:MTLDataTypeBool atIndex:(NSUInteger)i];
+    NSError* functionError = nil;
+    f.kernel = [library newFunctionWithName:@"primaryRayKernel" constantValues:constants error:&functionError];
+    if (!f.kernel && functionError) fprintf(stderr, "Shader function primaryRayKernel could not be specialized: %s\n", functionError.localizedDescription.UTF8String);
+    f.sphere = [library newFunctionWithName:@"sphereIntersectionFunction"];
+    f.disk = [library newFunctionWithName:@"diskIntersectionFunction"];
+    f.cylinder = [library newFunctionWithName:@"cylinderIntersectionFunction"];
+    f.triangleAnyHit = [library newFunctionWithName:@"triangleAnyHitFunction"];
+    // newFunctionWithName: returns nil (it doesn't throw) for a name that isn't in the compiled library - and a nil inside the @[...] literal below would then raise an uncaught
+    // NSInvalidArgumentException instead of this function's normal print-and-return-nil failure path.
+    if (!f.kernel || !f.sphere || !f.disk || !f.cylinder || !f.triangleAnyHit) {
+        fprintf(stderr, "Shader function lookup failed (nil): primaryRayKernel=%s "
+                        "sphereIntersectionFunction=%s diskIntersectionFunction=%s "
+                        "cylinderIntersectionFunction=%s - a function was renamed/removed "
+                        "in the .metal sources without updating this lookup.\n",
+                f.kernel ? "ok" : "MISSING", f.sphere ? "ok" : "MISSING",
+                f.disk ? "ok" : "MISSING", f.cylinder ? "ok" : "MISSING");
+        return nil;
+    }
+    // The intersection functions have to be LINKED into the compute pipeline (MTLLinkedFunctions) before an MTLIntersectionFunctionTable naming them can be built - a plain
+    // newComputePipelineStateWithFunction: has nowhere to put that linkage, hence the descriptor-based creation call here.
+    MTLComputePipelineDescriptor* pipelineDesc = [MTLComputePipelineDescriptor new];
+    pipelineDesc.computeFunction = f.kernel;
+    MTLLinkedFunctions* linkedFns = [MTLLinkedFunctions new];
+    linkedFns.functions = @[f.sphere, f.disk, f.cylinder, f.triangleAnyHit];
+    pipelineDesc.linkedFunctions = linkedFns;
+    // One build of each VARIANT at a time in this process: a Live Preview that starts while the GUI's background warm-up is still compiling the same variant waits for it and then finds the result
+    // in Metal's cache, instead of compiling the same pipeline a second time beside it. The two variants do not wait for each other: Metal compiles them side by side in about the time of one
+    // (measured on an M2, 2026-10-15: 122 s and 124 s together, against 108 s then 121 s one after the other), which halves a new install's first-run wait.
+    static std::mutex buildMutex[2];
+    std::lock_guard<std::mutex> lock(buildMutex[anyHitVariant ? 1 : 0]);
+    auto finished = std::make_shared<std::atomic<bool>>(false);
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC), dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        // (said once: the two variants are built side by side and both would say it)
+        static std::atomic<bool> said{false};
+        if (!finished->load() && !said.exchange(true))
+            fprintf(stderr, "Metal: preparing the GPU renderer for this Mac. This happens once (about a minute or two); the next runs start at once.\n");
+    });
+    const double start = CFAbsoluteTimeGetCurrent();
+    id<MTLComputePipelineState> pipeline = [dev newComputePipelineStateWithDescriptor:pipelineDesc options:MTLPipelineOptionNone reflection:nil error:error];
+    finished->store(true);
+    const double seconds = CFAbsoluteTimeGetCurrent() - start;
+    if (seconds > 3.0) fprintf(stderr, "Metal: the GPU renderer is ready (prepared in %.0f s).\n", seconds);
+    return pipeline;
+}
+
+// Stage B: Builds the compute pipeline that links the intersection functions, and fills the intersection function table.
+bool MetalPocApp::dsBuildPipeline(DispatchState& s) {
+    auto& error = s.error;
+    auto& library = s.library;
+    KernelFunctions fns;
+    // The families this scene needs. A Live Preview session can change any material later, so it gets all of them; METAL_FULL_KERNEL forces that for a render too.
+    FamilySet families = FamilySet::none();
+    if (liveSession || MetalTuning::fromEnvironment().fullKernel) families = FamilySet::all();
+    else { families.addAll(materials); families.addAll(sphereMaterials); families.addAll(diskMaterials); families.addAll(cylinderMaterials); families.addAll(suzanneMaterials); }
+    id<MTLComputePipelineState> pipeline = createKernelPipeline(device, library, havePbrtTriangleAnyHit, families, fns, &error);
+    if (!pipeline) {
+        if (fns.kernel) fprintf(stderr, "Pipeline creation failed: %s\n", error.localizedDescription.UTF8String);
+        return false;
+    }
+    id<MTLFunction> kernelFn = fns.kernel, sphereIntersectFn = fns.sphere, diskIntersectFn = fns.disk, cylinderIntersectFn = fns.cylinder, triangleAnyHitFn = fns.triangleAnyHit;
+    (void)kernelFn;
+
+    // --- Intersection function table: two slots now, matching --------
+    // bboxGeomDesc's own intersectionFunctionTableOffset (0) and
+    // diskGeomDesc's (1) above - this POC's first real "one slot per
+    // distinct intersection function" table, not just one slot
+    // reused by every custom primitive. `setBuffer:atIndex:N` here
+    // sets buffer N in the table's OWN shared argument namespace
+    // (every function in ONE table draws from the same set of bound
+    // buffers/textures) - sphereIntersectionFunction and
+    // diskIntersectionFunction each declare a DIFFERENT `[[buffer(N)]]`
+    // in their own MSL signature (0 and 1 respectively) specifically
+    // so binding sphereBuffer at atIndex:0 and diskBuffer at
+    // atIndex:1 here reaches the right function's own data, not a
+    // shared/overwritten slot.
+    MTLIntersectionFunctionTableDescriptor* fnTableDesc = [MTLIntersectionFunctionTableDescriptor new];
+    fnTableDesc.functionCount = 4;
+    id<MTLIntersectionFunctionTable> functionTable = [pipeline newIntersectionFunctionTableWithDescriptor:fnTableDesc];
+    // Not part of the checkGpuResource() sweep further down (that runs
+    // after this table has already been configured and bound) - and a nil
+    // table would make every setFunction:/setBuffer: below, and the later
+    // setIntersectionFunctionTable:, silently do nothing, leaving every
+    // sphere/disk/cylinder with undefined intersection behavior.
+    if (!functionTable) {
+        fprintf(stderr, "GPU resource allocation FAILED: 'functionTable' (intersection function "
+                        "table) is nil - aborting before the render would silently produce a "
+                        "wrong image instead of a visible error.\n");
+        return false;
+    }
+    id<MTLFunctionHandle> sphereHandle = [pipeline functionHandleWithFunction:sphereIntersectFn];
+    id<MTLFunctionHandle> diskHandle = [pipeline functionHandleWithFunction:diskIntersectFn];
+    id<MTLFunctionHandle> cylinderHandle = [pipeline functionHandleWithFunction:cylinderIntersectFn];
+    [functionTable setFunction:sphereHandle atIndex:0];
+    [functionTable setFunction:diskHandle atIndex:1];
+    [functionTable setFunction:cylinderHandle atIndex:2];
+    // Slot 3: the alpha-cutout test for the main triangles (see buildTriangleAS). Used only when the scene has an alpha mask; it reads the
+    // triangle materials, UVs and the shared float buffer (the masks) through this table's own buffers 5, 6 and 7.
+    id<MTLFunctionHandle> triangleAnyHitHandle = [pipeline functionHandleWithFunction:triangleAnyHitFn];
+    [functionTable setFunction:triangleAnyHitHandle atIndex:3];
+    [functionTable setBuffer:materialBuffer offset:0 atIndex:5];
+    [functionTable setBuffer:uvBuffer offset:0 atIndex:6];
+    [functionTable setBuffer:rgbGridDataBuffer offset:0 atIndex:7];
+    [functionTable setBuffer:instanceTransformBuffer offset:0 atIndex:8];   // an instanced group's triangles are found at the instance's triBase
+    // sphereIntersectionFunction/diskIntersectionFunction/
+    // cylinderIntersectionFunction each read their own geometry buffer
+    // (metal_poc.metal buffer(0)/buffer(1)/buffer(2) respectively - a
+    // SEPARATE argument table from the calling kernel's own
+    // buffer(0..27), see that file's own comment) - bound here, on the
+    // function table, not on the compute encoder.
+    [functionTable setBuffer:sphereBuffer offset:0 atIndex:0];
+    [functionTable setBuffer:diskBuffer offset:0 atIndex:1];
+    [functionTable setBuffer:cylinderBuffer offset:0 atIndex:2];
+    // A8/section 176: sphereIntersectionFunction's own SpherePayload::
+    // isShadowRay check needs sphereMaterials too, to tell a real
+    // medium sphere (materialType 28) apart from an ordinary one - the
+    // SAME sphereMaterialBuffer the calling kernel already binds at its
+    // own buffer(4), bound a SECOND time here since this table has its
+    // own independent argument namespace (diskGeomDesc's own comment).
+    [functionTable setBuffer:sphereMaterialBuffer offset:0 atIndex:3];
+    // cylinderIntersectionFunction likewise needs cylinderMaterials to recognise a medium-bounding tube for shadow rays.
+    [functionTable setBuffer:cylinderMaterialBuffer offset:0 atIndex:4];
+
+    s.pipeline = pipeline;
+    s.functionTable = functionTable;
+    return true;
+}
+
+// Stage C: The output texture, plus the optional census and live-preview world-position textures.
+bool MetalPocApp::dsCreateRenderTargets(DispatchState& s) {
+    // --- Output texture + uniforms ----------------------------------
+    MTLTextureDescriptor* texDesc = [MTLTextureDescriptor
+        texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA32Float
+        width:width height:height mipmapped:NO];
+    texDesc.usage = MTLTextureUsageShaderWrite | MTLTextureUsageShaderRead;
+    texDesc.storageMode = MTLStorageModeShared;
+    id<MTLTexture> outTexture = [device newTextureWithDescriptor:texDesc];
+    // Divergence census (METAL_CENSUS=1): a per-pixel record of the materials sample 0 hit; a 1x1 dummy otherwise.
+    const bool censusOn = MetalTuning::fromEnvironment().census;
+    MTLTextureDescriptor* censusDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA32Uint
+        width:(censusOn ? width : 1) height:(censusOn ? height : 1) mipmapped:NO];
+    censusDesc.usage = MTLTextureUsageShaderWrite | MTLTextureUsageShaderRead;
+    censusDesc.storageMode = MTLStorageModeShared;
+    id<MTLTexture> censusTexture = [device newTextureWithDescriptor:censusDesc];
+    // Live Preview: where each pixel's primary ray first hit (xyz, w = 1) or missed (all zero); a 1x1 dummy otherwise.
+    MTLTextureDescriptor* worldPosDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA32Float
+        width:(liveSession ? width : 1) height:(liveSession ? height : 1) mipmapped:NO];
+    worldPosDesc.usage = MTLTextureUsageShaderWrite | MTLTextureUsageShaderRead;
+    worldPosDesc.storageMode = MTLStorageModeShared;
+    id<MTLTexture> worldPosTexture = [device newTextureWithDescriptor:worldPosDesc];
+
+    s.outTexture = outTexture;
+    s.censusOn = censusOn;
+    s.censusTexture = censusTexture;
+    s.worldPosTexture = worldPosTexture;
+    return true;
+}
+
+// A decoded linear float RGB image (3 floats per pixel) as an RGBA32Float texture: no sRGB decode, alpha 1. With no image it is a 1x1 black
+// texture, because Metal needs SOME texture at every slot the shader binds; the scene's own use-flag decides whether the shader reads it.
+static id<MTLTexture> rgbFloatTexture(id<MTLDevice> device, bool haveImage, int width, int height, const std::vector<float>& rgb) {
+    const uint32_t w = haveImage ? (uint32_t)width : 1u;
+    const uint32_t h = haveImage ? (uint32_t)height : 1u;
+    MTLTextureDescriptor* desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA32Float width:w height:h mipmapped:NO];
+    desc.usage = MTLTextureUsageShaderRead;
+    desc.storageMode = MTLStorageModeShared;
+    id<MTLTexture> texture = [device newTextureWithDescriptor:desc];
+    std::vector<float> rgba((size_t)w * h * 4, 0.0f);
+    if (haveImage) {
+        for (size_t i = 0; i < (size_t)w * h; ++i) {
+            rgba[i * 4 + 0] = rgb[i * 3 + 0];
+            rgba[i * 4 + 1] = rgb[i * 3 + 1];
+            rgba[i * 4 + 2] = rgb[i * 3 + 2];
+            rgba[i * 4 + 3] = 1.0f;
+        }
+    }
+    [texture replaceRegion:MTLRegionMake2D(0, 0, w, h) mipmapLevel:0 withBytes:rgba.data() bytesPerRow:(NSUInteger)w * 4 * sizeof(float)];
+    return texture;
+}
+
+// Stage D: Textures: the earth image (and the environment distribution built from it) and the pbrt environment, goniometric, projection, area-light, diffuse and transmit images.
+bool MetalPocApp::dsUploadTextures(DispatchState& s) {
+    // --- Earth texture (the back wall's materialType=3 source) -----
+    // stb_image decodes straight to interleaved 8-bit RGBA regardless
+    // of the source JPEG's channel count (the 4th `desiredChannels`
+    // arg below), which is exactly MTLPixelFormatRGBA8Unorm_sRGB's own
+    // BYTE layout - no repacking needed between stbi_load's buffer and
+    // replaceRegion:. The `_sRGB` pixel format (not plain
+    // `RGBA8Unorm`, this POC's own format up through PR #37) matters
+    // for more than naming: an ordinary 8-bit JPEG/PNG's own stored
+    // bytes are sRGB-gamma-ENCODED (perceptually, not linearly,
+    // spaced) - every earlier render sampled those bytes directly as
+    // if they were already linear radiance, silently darkening every
+    // midtone the earth texture (and, via GI, everything it bounces
+    // light onto) ever produced. `_sRGB` makes the texture SAMPLE
+    // instruction itself convert sRGB to linear before the shader
+    // ever sees a value - the standard, hardware-accelerated way to
+    // do this, rather than a manual `pow(c, 2.2)` after sampling in
+    // the shader.
+    NSString* imagesDir = nil;
+    {
+        NSString* exeDir = executableDir();
+        NSString* candidate = [exeDir stringByAppendingPathComponent:@"images"];
+        if (exeDir && [[NSFileManager defaultManager] fileExistsAtPath:
+                [candidate stringByAppendingPathComponent:@"earthmap.jpg"]]) {
+            imagesDir = candidate;
+        }
+    }
+    if (!imagesDir) {
+#ifdef RT_MODELS_DIR
+        imagesDir = [[@(RT_MODELS_DIR) stringByDeletingLastPathComponent]
+            stringByAppendingPathComponent:@"images"];
+#else
+        imagesDir = [[@(__FILE__) stringByDeletingLastPathComponent]
+            stringByAppendingPathComponent:@"../../../images"];
+#endif
+    }
+    NSString* earthPath = [imagesDir stringByAppendingPathComponent:@"earthmap.jpg"];
+    int earthW = 0, earthH = 0, earthChannels = 0;
+    // The earth map only feeds the demo room (back wall, demo sky/projection light, its env importance sampling);
+    // useEnvironmentMap is forced to 0 for a pbrt scene, so skip the ~30 ms JPEG decode + ~70 ms CDF build for it
+    // and fall through to the 1x1 white placeholder below.
+    unsigned char* earthPixels = skipDemoRoom ? nullptr : stbi_load(earthPath.UTF8String, &earthW, &earthH, &earthChannels, 4);
+    id<MTLTexture> earthTexture = nil;
+    // Environment-map importance sampling (phase 2 - see section 69 for
+    // phase 1's own host-side EnvDistribution2D, built and independently
+    // verified there but not yet wired to anything). Built from the SAME
+    // decoded `earthPixels` bytes right before they're freed below - the
+    // shader-side NEE counterpart to `earthTexture`'s own miss-path
+    // lookup (equirectangularUV()), which previously had no importance-
+    // sampling strategy at all. Left default-constructed (empty arrays)
+    // in the fallback/missing-JPEG case below; `envMapWidth`/
+    // `envMapHeight` stay 0 in that case too, which the shader's own
+    // Uniforms comment documents as "skip this NEE strategy entirely."
+    EnvDistribution2D envDist;
+    if (earthPixels) {
+        MTLTextureDescriptor* earthDesc = [MTLTextureDescriptor
+            texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm_sRGB
+            width:(NSUInteger)earthW height:(NSUInteger)earthH mipmapped:NO];
+        earthDesc.usage = MTLTextureUsageShaderRead;
+        earthDesc.storageMode = MTLStorageModeShared;
+        earthTexture = [device newTextureWithDescriptor:earthDesc];
+        MTLRegion earthRegion = MTLRegionMake2D(0, 0, (NSUInteger)earthW, (NSUInteger)earthH);
+        [earthTexture replaceRegion:earthRegion mipmapLevel:0 withBytes:earthPixels
+            bytesPerRow:(NSUInteger)earthW * 4];
+        buildEnvDistribution2D(earthPixels, earthW, earthH, envDist);
+        stbi_image_free(earthPixels);
+        fprintf(stderr, "Loaded %s: %dx%d, %d channels\n", earthPath.UTF8String, earthW, earthH, earthChannels);
+    } else {
+        if (!skipDemoRoom)
+            fprintf(stderr, "Could not load %s - back wall will read black/undefined texture data.\n",
+                earthPath.UTF8String);
+        // A 1x1 white fallback keeps the shader's unconditional
+        // texture bind valid (Metal requires SOME texture at the
+        // bound slot) even if the JPEG is missing. `_sRGB` for
+        // consistency with the real texture above, though pure white
+        // (255,255,255) round-trips through the sRGB<->linear
+        // conversion unchanged either way.
+        MTLTextureDescriptor* fallbackDesc = [MTLTextureDescriptor
+            texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm_sRGB width:1 height:1 mipmapped:NO];
+        fallbackDesc.usage = MTLTextureUsageShaderRead;
+        fallbackDesc.storageMode = MTLStorageModeShared;
+        earthTexture = [device newTextureWithDescriptor:fallbackDesc];
+        uint8_t white4[4] = {255, 255, 255, 255};
+        [earthTexture replaceRegion:MTLRegionMake2D(0, 0, 1, 1) mipmapLevel:0 withBytes:white4 bytesPerRow:4];
+    }
+
+    // A pbrt-loaded scene's own image-based infinite light - a
+    // genuinely SEPARATE texture from earthTexture above (see
+    // loadPbrtScene()'s own comment on why). pbrtEnvImagePixels is
+    // already decoded, linear float RGB (3 floats/pixel) - stored
+    // straight into an RGBA32Float texture (padding alpha=1, no sRGB
+    // format/decode needed at all: unlike earthTexture's own 8-bit JPEG
+    // source, there's no gamma curve to reverse here). Falls back to a
+    // 1x1 black texture (Metal requires SOME texture bound at every
+    // used slot) when the scene has no image-based infinite light -
+    // harmless, since pbrtHasImageEnvLight gates whether the shader
+    // ever actually samples it.
+    id<MTLTexture> pbrtEnvTexture = rgbFloatTexture(device, havePbrtImageEnvLight, pbrtEnvImageWidth, pbrtEnvImageHeight, pbrtEnvImagePixels);
+
+    // A pbrt-loaded scene's own real per-light goniometric/projection
+    // profile images (section 98) - same upload pattern as pbrtEnvTexture
+    // above (already-decoded linear float RGB -> RGBA32Float, 1x1 black
+    // fallback when there's no such light, harmless since usePbrtTexture
+    // gates whether any light actually reads it).
+    id<MTLTexture> pbrtGoniometricTexture = rgbFloatTexture(device, havePbrtGoniometricImage, pbrtGoniometricImageWidth, pbrtGoniometricImageHeight, pbrtGoniometricImagePixels);
+
+    id<MTLTexture> pbrtProjectionTexture = rgbFloatTexture(device, havePbrtProjectionImage, pbrtProjectionImageWidth, pbrtProjectionImageHeight, pbrtProjectionImagePixels);
+
+    // A pbrt-loaded scene's own image-based AreaLightSource (section
+    // 105) - same upload pattern as pbrtGoniometricTexture/
+    // pbrtProjectionTexture above.
+    id<MTLTexture> pbrtAreaLightTexture = rgbFloatTexture(device, havePbrtAreaLightImage, pbrtAreaLightImageWidth, pbrtAreaLightImageHeight, pbrtAreaLightImagePixels);
+
+    // A pbrt-loaded Diffuse/CoatedDiffuse material's own real imagemap-
+    // bound "texture reflectance" (F5/F9, section 166) - same upload
+    // pattern as pbrtAreaLightTexture/pbrtGoniometricTexture above.
+    id<MTLTexture> pbrtDiffuseTexture = rgbFloatTexture(device, havePbrtDiffuseImage, pbrtDiffuseImageWidth, pbrtDiffuseImageHeight, pbrtDiffuseImagePixels);
+
+    // Second image slot (see MetalPocApp::havePbrtTransmitImage): a DiffuseTransmission material's transmittance image.
+    id<MTLTexture> pbrtTransmitTexture = rgbFloatTexture(device, havePbrtTransmitImage, pbrtTransmitImageWidth, pbrtTransmitImageHeight, pbrtTransmitImagePixels);
+    s.earthTexture = earthTexture;
+    s.pbrtEnvTexture = pbrtEnvTexture;
+    s.pbrtGoniometricTexture = pbrtGoniometricTexture;
+    s.pbrtProjectionTexture = pbrtProjectionTexture;
+    s.pbrtAreaLightTexture = pbrtAreaLightTexture;
+    s.pbrtDiffuseTexture = pbrtDiffuseTexture;
+    s.pbrtTransmitTexture = pbrtTransmitTexture;
+    s.envDist = envDist;
+    return true;
+}
+
+// Stage D2: The sampling tables the shader reads: environment CDFs (plain and pbrt, incl. the portal light) and the GGX energy table.
+bool MetalPocApp::dsUploadSamplingTables(DispatchState& s) {
+    auto& envDist = s.envDist;
+    // envMarginalCDF/envConditionalCDF buffers - a real (non-empty)
+    // envDist above uploads its own arrays directly; the fallback case
+    // (missing JPEG) still needs SOME buffer bound at these indices
+    // (Metal requires a real resource at every declared buffer slot,
+    // the same reason earthTexture's own fallback path exists above),
+    // hence the single-float dummy - `envMapWidth`/`envMapHeight`
+    // staying 0 is what actually keeps the shader from ever reading
+    // past it.
+    uint32_t envMapWidth = 0, envMapHeight = 0;
+    id<MTLBuffer> envMarginalCDFBuffer;
+    id<MTLBuffer> envConditionalCDFBuffer;
+    if (!envDist.marginalCDF.empty()) {
+        envMarginalCDFBuffer = [device newBufferWithBytes:envDist.marginalCDF.data()
+            length:envDist.marginalCDF.size() * sizeof(float) options:MTLResourceStorageModeShared];
+        envConditionalCDFBuffer = [device newBufferWithBytes:envDist.conditionalCDF.data()
+            length:envDist.conditionalCDF.size() * sizeof(float) options:MTLResourceStorageModeShared];
+        envMapWidth = (uint32_t)envDist.width;
+        envMapHeight = (uint32_t)envDist.height;
+    } else {
+        float dummy = 0.0f;
+        envMarginalCDFBuffer = [device newBufferWithBytes:&dummy length:sizeof(float) options:MTLResourceStorageModeShared];
+        envConditionalCDFBuffer = [device newBufferWithBytes:&dummy length:sizeof(float) options:MTLResourceStorageModeShared];
+    }
+
+    // pbrtEnvMarginalCDF/pbrtEnvConditionalCDF buffers (section 96) - the
+    // NEE-importance-sampling counterpart to pbrtEnvTexture above, same
+    // idea as envMarginalCDF/envConditionalCDF just above but for a
+    // SEPARATE image (a pbrt-loaded scene's own image-based infinite
+    // light, not earthTexture). Uses the float-RGB buildEnvDistribution2D()
+    // overload directly on pbrtEnvImagePixels (already linear, already
+    // decoded - no srgbByteToLinear() round-trip needed the way
+    // earthPixels' own RGBA8 bytes require). Empty/dummy fallback when
+    // there's no image-based infinite light, same "0 disables it" pattern
+    // as envMapWidth's own fallback.
+    EnvDistribution2D pbrtEnvDist;
+    if (havePbrtImageEnvLight) {
+        buildEnvDistribution2D(pbrtEnvImagePixels.data(), pbrtEnvImageWidth, pbrtEnvImageHeight, pbrtEnvDist);
+    }
+    uint32_t pbrtEnvMapWidth = 0, pbrtEnvMapHeight = 0;
+    id<MTLBuffer> pbrtEnvMarginalCDFBuffer;
+    id<MTLBuffer> pbrtEnvConditionalCDFBuffer;
+    if (havePbrtPortalLight) {
+        // Portal light (see metal_poc_environment.metal, portalSampleLi): the distribution's cell values then its summed-area table in the "marginal"
+        // slot, the rectified RGB image in the "conditional" slot. The shader's plain-environment sites read these buffers through
+        // pbrtEnvSampleDirection()/pbrtEnvLeAt()/pbrtEnvPdfAt(), which switch on Uniforms::pbrtHasPortalLight.
+        std::vector<float> distAndSat(pbrtPortalDistFunc);
+        distAndSat.insert(distAndSat.end(), pbrtPortalSatSum.begin(), pbrtPortalSatSum.end());
+        pbrtEnvMarginalCDFBuffer = [device newBufferWithBytes:distAndSat.data() length:distAndSat.size() * sizeof(float) options:MTLResourceStorageModeShared];
+        pbrtEnvConditionalCDFBuffer = [device newBufferWithBytes:pbrtPortalRectified.data() length:pbrtPortalRectified.size() * sizeof(float) options:MTLResourceStorageModeShared];
+        pbrtEnvMapWidth = (uint32_t)pbrtPortalWidth;
+        pbrtEnvMapHeight = (uint32_t)pbrtPortalHeight;
+    } else if (!pbrtEnvDist.marginalCDF.empty()) {
+        pbrtEnvMarginalCDFBuffer = [device newBufferWithBytes:pbrtEnvDist.marginalCDF.data()
+            length:pbrtEnvDist.marginalCDF.size() * sizeof(float) options:MTLResourceStorageModeShared];
+        pbrtEnvConditionalCDFBuffer = [device newBufferWithBytes:pbrtEnvDist.conditionalCDF.data()
+            length:pbrtEnvDist.conditionalCDF.size() * sizeof(float) options:MTLResourceStorageModeShared];
+        pbrtEnvMapWidth = (uint32_t)pbrtEnvDist.width;
+        pbrtEnvMapHeight = (uint32_t)pbrtEnvDist.height;
+    } else {
+        float pbrtEnvDummy = 0.0f;
+        pbrtEnvMarginalCDFBuffer = [device newBufferWithBytes:&pbrtEnvDummy length:sizeof(float) options:MTLResourceStorageModeShared];
+        pbrtEnvConditionalCDFBuffer = [device newBufferWithBytes:&pbrtEnvDummy length:sizeof(float) options:MTLResourceStorageModeShared];
+    }
+
+    // GGX multi-scatter energy-compensation table (phase 2 - see phase
+    // 1's own header comment in metal_poc_host_math.h for the full
+    // "why," found by spot-checking this POC's GGX conductor material
+    // against Blender Cycles as a second reference). Built ONCE here at
+    // startup (a real-time Monte Carlo precompute, not Cycles' own
+    // offline 8-64-million-sample tool) and uploaded as a single GPU
+    // buffer - only `E` is needed on the device side; `Eavg` only feeds
+    // the "multi-bounce Fresnel darkening" refinement this phase
+    // deliberately doesn't attempt (see that same header comment).
+    // std::mt19937 (not this POC's own device-side randFloat()) is fine
+    // here - this is a host-only precompute of a smooth, low-frequency
+    // table, not a per-pixel render decision that needs to match the
+    // shader's own RNG stream bit-for-bit.
+    // Built on a background thread started at the top of buildScene() (see startGgxEnergyTableBuild()) so its ~80 ms
+    // overlaps scene/AS building; the values are identical (same seed, same sequence).
+    GGXEnergyTable ggxEnergyTable = takeGgxEnergyTable();
+    id<MTLBuffer> ggxEnergyTableBuffer = [device newBufferWithBytes:ggxEnergyTable.E.data()
+        length:ggxEnergyTable.E.size() * sizeof(float) options:MTLResourceStorageModeShared];
+    s.envMapWidth = envMapWidth;
+    s.envMapHeight = envMapHeight;
+    s.envMarginalCDFBuffer = envMarginalCDFBuffer;
+    s.envConditionalCDFBuffer = envConditionalCDFBuffer;
+    s.pbrtEnvMapWidth = pbrtEnvMapWidth;
+    s.pbrtEnvMapHeight = pbrtEnvMapHeight;
+    s.pbrtEnvMarginalCDFBuffer = pbrtEnvMarginalCDFBuffer;
+    s.pbrtEnvConditionalCDFBuffer = pbrtEnvConditionalCDFBuffer;
+    s.ggxEnergyTable = ggxEnergyTable;
+    s.ggxEnergyTableBuffer = ggxEnergyTableBuffer;
+    return true;
+}
+
+// A loaded pbrt scene's camera: placement, lens, orbit motion blur, realistic lens, shutter velocity, and the glass medium the camera may sit inside.
+void MetalPocApp::applyPbrtCameraUniforms(Uniforms& uniforms) {
+    uniforms.cameraPos = PackedFloat3{pbrtCameraPos.x, pbrtCameraPos.y, pbrtCameraPos.z};
+    // A glass sphere bounding a medium that CONTAINS the camera (A9's radius-5000 world haze): paths start inside its medium. The outermost
+    // such sphere wins (a smaller one nested inside is entered and left by refraction as usual).
+    uniforms.cameraGlassPrim = 0;   // 1 + the sphere index, 0 = none
+    {
+        float bestRadius = 0.0f;
+        for (size_t si = 0; si < spheres.size() && si < sphereMaterials.size(); ++si) {
+            const TriangleMaterial& sm = sphereMaterials[si];
+            const bool glassMedium = (sm.materialType == METAL_MAT_DIELECTRIC || sm.materialType == METAL_MAT_ROUGH_DIELECTRIC || sm.materialType == METAL_MAT_THIN_DIELECTRIC) && matparams::glassHasMedium(sm);
+            if (!glassMedium) continue;
+            const float dx = pbrtCameraPos.x - spheres[si].center.x, dy = pbrtCameraPos.y - spheres[si].center.y, dz = pbrtCameraPos.z - spheres[si].center.z;
+            if (dx * dx + dy * dy + dz * dz < spheres[si].radius * spheres[si].radius && spheres[si].radius > bestRadius) {
+                bestRadius = spheres[si].radius;
+                uniforms.cameraGlassPrim = (int32_t)si + 1;
+            }
+        }
+    }
+    uniforms.cameraForward = PackedFloat3{pbrtCameraForward.x, pbrtCameraForward.y, pbrtCameraForward.z};
+    uniforms.cameraRight = PackedFloat3{pbrtCameraRight.x, pbrtCameraRight.y, pbrtCameraRight.z};
+    uniforms.cameraUp = PackedFloat3{pbrtCameraUp.x, pbrtCameraUp.y, pbrtCameraUp.z};
+    uniforms.tanHalfFov = pbrtTanHalfFov;
+    // D13 (section 174): real orbit-style camera motion blur, gated
+    // on the scene's own sceneCameraVelocity actually being nonzero
+    // (every other scene leaves it at its own {0,0,0} default, so
+    // this is 0/false for all of them - a provable no-op). Always
+    // copies pbrtCameraLookAtWorld/pbrtCameraUpRaw regardless -
+    // both already exist for applyCameraOverride()'s own sake, and
+    // are simply unread by the shader whenever hasCameraOrbitBlur
+    // is 0.
+    uniforms.cameraLookAtBlur = PackedFloat3{pbrtCameraLookAtWorld.x, pbrtCameraLookAtWorld.y, pbrtCameraLookAtWorld.z};
+    uniforms.cameraUpRawBlur = PackedFloat3{pbrtCameraUpRaw.x, pbrtCameraUpRaw.y, pbrtCameraUpRaw.z};
+    uniforms.hasCameraOrbitBlur = (sceneCameraVelocity.x != 0.0f || sceneCameraVelocity.y != 0.0f ||
+                                    sceneCameraVelocity.z != 0.0f) ? 1u : 0u;
+    // pbrt v1 still doesn't read a pbrt FILE's own "float lensradius"/
+    // "float focaldistance" Camera parameters (a genuinely separate,
+    // still-open gap) - but a hand-authored scene (D5, section 137)
+    // has no pbrt file to parse from at all, so its own
+    // pbrtLensRadius/pbrtFocusDistance (defaulting to 0/1, "no DOF" -
+    // every scene before D5) are read directly here instead.
+    // focusDistance is unread by the shader whenever lensRadius == 0.
+    uniforms.lensRadius = pbrtLensRadius;
+    uniforms.focusDistance = pbrtFocusDistance;
+    // See MetalPocApp::havePbrtOrthographic's own comment - reuses
+    // pbrtTanHalfFov (already copied to uniforms.tanHalfFov above)
+    // as the orthographic screen window's own half-extent.
+    uniforms.cameraOrthographic = havePbrtOrthographic ? 1u : 0u;
+    // See MetalPocApp::havePbrtSpherical's own comment.
+    uniforms.cameraSpherical = havePbrtSpherical ? 1u : 0u;
+    // See MetalPocApp::havePbrtSphericalEqualArea's own comment.
+    uniforms.sphericalMappingEqualArea = havePbrtSphericalEqualArea ? 1u : 0u;
+    // See MetalPocApp::havePbrtRealisticCamera's own comment.
+    uniforms.cameraRealistic = havePbrtRealisticCamera ? 1u : 0u;
+    uniforms.numLensElements = (uint32_t)realisticLensElements.size();
+    uniforms.numExitPupilBounds = (uint32_t)realisticExitPupilBounds.size();
+    uniforms.filmHalfX = realisticFilmHalfX;
+    uniforms.filmHalfY = realisticFilmHalfY;
+    uniforms.lensRearZ = realisticLensRearZ;
+    // Adaptive sampling (enabled by default just above,
+    // uniforms.adaptiveSampling=1) OFF for a real multi-element-lens
+    // camera - a real, found-by-rendering bug, not a style choice.
+    // Its convergence test (metal_poc.metal's own shading-loop
+    // comment) checks standardError/mean against a fixed threshold,
+    // which assumes a roughly UNIMODAL per-sample radiance
+    // distribution (true for every earlier camera mode's own noise,
+    // which is why the heuristic was tuned/validated against those).
+    // A real lens's own per-sample radiance is instead strongly
+    // BIMODAL: most exit-pupil samples land outside the true
+    // (non-rectangular) aperture and get vignetted to EXACTLY 0
+    // (sampleRealisticCameraRay's own comment), while the rest carry
+    // the entire `cameraWeight`-scaled contribution. Many exact
+    // zeros pull the running mean/variance down together, so the
+    // ratio can cross the threshold after just a handful of samples
+    // even though the NONZERO tail is still wildly undersampled -
+    // confirmed empirically: with adaptive sampling on, a 3000spp
+    // D4 render finished in ~4s (barely slower than 100spp) and was
+    // JUST as speckled; forcing every sample through to the full
+    // requested budget (this override) made that same 3000spp
+    // render converge to a clean, smooth image. The visible
+    // "speckle" itself is this per-pixel undersampling residual,
+    // amplified into colour fringing by postProcessAndWrite()'s own
+    // always-on chromatic aberration (a small, fixed per-channel
+    // pixel-space shift - invisible on an already-smooth image, but
+    // it visibly decorrelates R/G/B on a noisy one).
+    if (havePbrtRealisticCamera) uniforms.adaptiveSampling = 0u;
+    // D13 (section 174): reads the scene's own sceneCameraVelocity
+    // instead of unconditionally zeroing this out - see that
+    // member's own comment. {0,0,0} (every scene but D13) is an
+    // exact no-op, identical to this line's own previous literal.
+    uniforms.cameraVelocity = sceneCameraVelocity;
+}
+
+// The scene's participating medium around the camera (fog), and whether any medium sphere or tube is chromatic.
+void MetalPocApp::applyPbrtMediumUniforms(Uniforms& uniforms) {
+    // bit 1 (value 2): some medium sphere or tube has a different extinction per colour channel, so every path fixes its hero channel at the camera (see fogChromatic)
+    uint32_t chromaticShapeMedium = 0u;
+    for (const TriangleMaterial& sm : sphereMaterials)
+        if (sm.materialType == METAL_MAT_MEDIUM_HOMOGENEOUS && matparams::mediumIsChromatic(sm)) chromaticShapeMedium = 2u;
+    for (const TriangleMaterial& cm : cylinderMaterials)
+        if (cm.materialType == METAL_MAT_MEDIUM_HOMOGENEOUS && matparams::mediumIsChromatic(cm)) chromaticShapeMedium = 2u;
+    uniforms.fogChromatic = chromaticShapeMedium;
+    if (havePbrtMedium) {
+        uniforms.fogSigmaT = pbrtFogSigmaT;
+        uniforms.fogSigmaT3 = PackedFloat3{pbrtFogSigmaT3.x, pbrtFogSigmaT3.y, pbrtFogSigmaT3.z};
+        uniforms.fogChromatic = chromaticShapeMedium | (pbrtFogChromatic ? 1u : 0u);
+        uniforms.fogAlbedo = PackedFloat3{pbrtFogAlbedo.x, pbrtFogAlbedo.y, pbrtFogAlbedo.z};
+        uniforms.fogAsymmetryG = pbrtFogAsymmetryG;
+    } else {
+        uniforms.fogSigmaT = 0.0f;                      // no participating medium in this scene
+    }
+}
+
+// The miss-ray background: none (black), a constant light, an image light or a portal light.
+void MetalPocApp::applyPbrtSkyUniforms(Uniforms& uniforms) {
+    uniforms.useEnvironmentMap = 0u;                    // this scene's own sky, if any, replaces the hardcoded room's earthTexture-based one below
+    // See Uniforms::isPbrtScene's own comment (metal_poc_types.metal)
+    // - a real pbrt scene with no infinite light gets a BLACK
+    // miss-path background, not the hardcoded room's own sky
+    // gradient. Deliberately `!pbrtScenePath.empty()`, NOT the
+    // broader `havePbrtCamera` this whole block is already gated
+    // on - havePbrtCamera is true for every HAND-AUTHORED scene's
+    // own camera setup too (buildCornellBoxA1() and nearly every
+    // other builder set it), not just a genuinely loaded pbrt FILE.
+    // A first version of this fix used havePbrtCamera directly and
+    // made A1/G1/every other hand-authored scene's own background
+    // incorrectly black too (caught by this PR's own before/after
+    // hash sweep across EVERY scene, not just the pbrt-file ones
+    // this fix was meant for - exactly the discipline that check
+    // exists to catch).
+    uniforms.isPbrtScene = pbrtScenePath.empty() ? 0u : 1u;
+    if (havePbrtConstantEnvLight) {
+        uniforms.pbrtHasConstantEnvLight = 1u;
+        uniforms.pbrtEnvColor = PackedFloat3{pbrtEnvColor.x, pbrtEnvColor.y, pbrtEnvColor.z};
+    } else if (havePbrtImageEnvLight) {
+        uniforms.pbrtHasImageEnvLight = 1u;
+    } else if (havePbrtPortalLight) {
+        // The miss path and every environment-NEE site are gated on pbrtHasImageEnvLight / pbrtEnvMapWidth; the portal switch is below them.
+        uniforms.pbrtHasImageEnvLight = 1u;
+        uniforms.pbrtHasPortalLight = 1u;
+        uniforms.pbrtPortalWidth = (uint32_t)pbrtPortalWidth;
+        uniforms.pbrtPortalHeight = (uint32_t)pbrtPortalHeight;
+        uniforms.pbrtPortalScale = pbrtPortalScale;
+        uniforms.portalFrameX = PackedFloat3{pbrtPortalFrameX.x, pbrtPortalFrameX.y, pbrtPortalFrameX.z};
+        uniforms.portalFrameY = PackedFloat3{pbrtPortalFrameY.x, pbrtPortalFrameY.y, pbrtPortalFrameY.z};
+        uniforms.portalFrameZ = PackedFloat3{pbrtPortalFrameZ.x, pbrtPortalFrameZ.y, pbrtPortalFrameZ.z};
+        uniforms.portalP0 = PackedFloat3{pbrtPortalP0.x, pbrtPortalP0.y, pbrtPortalP0.z};
+        uniforms.portalP2 = PackedFloat3{pbrtPortalP2.x, pbrtPortalP2.y, pbrtPortalP2.z};
+    }
+}
+
+// The film's own pixel filter.
+void MetalPocApp::applyPbrtFilterUniforms(Uniforms& uniforms) {
+    // Film's own PixelFilter - see MetalPocApp::pbrtFilterKind's own
+    // comment. Same int mapping gpu/optix/scene_builder.cpp uses for
+    // its own identical GpuCameraParams::filterKind wiring.
+    uniforms.filterKind = (pbrtFilterKind == "box") ? 1u
+        : (pbrtFilterKind == "triangle") ? 2u
+        : (pbrtFilterKind == "mitchell") ? 3u
+        : (pbrtFilterKind == "sinc") ? 4u
+        : 0u;  // "gaussian", or any unrecognized kind (pbrt_flatten's own parser already rejects those at load time)
+    uniforms.filterB = pbrtFilterB;
+    uniforms.filterC = pbrtFilterC;
+    uniforms.filterSigma = pbrtFilterSigma;
+    uniforms.filterTau = pbrtFilterTau;
+    uniforms.filterRadius = pbrtFilterRadius;
+}
+
+// The pixel filter's sampling table (a FilterSampler<float, 32>), copied into the Uniforms.
+void MetalPocApp::fillFilterSamplerTable(Uniforms& uniforms) {
+    // uniforms.filterKind/B/C/sigma/tau/radius are now final (either the
+    // pbrt override just above, or this struct's own in-class defaults -
+    // gaussian, radius 1.5 - for a HAND-AUTHORED scene, which never
+    // enters the havePbrtCamera block above at all). Build this scene's
+    // own FilterSampler<float,32> table and copy it into the Uniforms
+    // struct itself - see that struct's own filterConditionalCDF comment
+    // for why a separate kernel buffer isn't used here. A fresh build
+    // every render (not cached across Live-Preview-style repeated calls,
+    // unlike gpu/optix/optix_renderer_render.cpp's own cached version) -
+    // this POC's own compileShaderAndDispatch() already runs once per
+    // process invocation, never in a tight per-frame loop, so there is
+    // no repeated-rebuild cost to amortize here.
+    {
+        static const char* const kFilterKindNames[] = { "gaussian", "box", "triangle", "mitchell", "sinc" };
+        const uint32_t kind = (uniforms.filterKind <= 4u) ? uniforms.filterKind : 0u;
+        const PixelFilterDispatch dispatch(kFilterKindNames[kind], uniforms.filterRadius,
+                                            uniforms.filterB, uniforms.filterC,
+                                            uniforms.filterSigma, uniforms.filterTau);
+        const FilterSampler<float, 32> sampler(dispatch);
+        uniforms.filterIntegral = sampler.integral();
+        memcpy(uniforms.filterConditionalCDF, &sampler.conditionalCDF(), sizeof(uniforms.filterConditionalCDF));
+        memcpy(uniforms.filterMarginalCDF, &sampler.marginalCDF(), sizeof(uniforms.filterMarginalCDF));
+    }
+}
+
+// pbrt's Approximate_dp_dxy for a bounced hit (bumpFootprintApprox() in metal_poc_bump.metal): the camera's smallest pixel differentials, found once here the way
+// pbrt's CameraBase::FindMinimumDifferentials does. Only a plain perspective camera has them (the others' primary rays carry no differentials either).
+void MetalPocApp::fillFootprintCameraUniforms(Uniforms& uniforms) {
+    uniforms.footprintValid = 0;
+    if (uniforms.cameraOrthographic != 0u || uniforms.cameraSpherical != 0u || uniforms.cameraRealistic != 0u || uniforms.hasCameraOrbitBlur != 0u) return;
+    if (uniforms.width == 0 || uniforms.height == 0) return;
+    using namespace camera_footprint;
+    const auto v = [](const PackedFloat3& a) { return make(a.x, a.y, a.z); };
+    const double halfH = uniforms.tanHalfFov, halfW = uniforms.tanHalfFov * uniforms.aspect;   // the viewport at distance 1 along forward
+    const V3 origin = v(uniforms.cameraPos), right = unit(v(uniforms.cameraRight)), up = unit(v(uniforms.cameraUp)), fwd = unit(v(uniforms.cameraForward));
+    const V3 du = right * (2.0 * halfW / uniforms.width), dv = up * (-2.0 * halfH / uniforms.height);
+    const V3 pixel00 = origin + fwd + up * halfH - right * halfW + du * 0.5 + dv * 0.5;
+    const Camera cam = makeCamera(origin, pixel00, du, dv, (int)uniforms.width, (int)uniforms.height, 1);
+    if (!cam.valid) return;
+    uniforms.footprintMinDirX = PackedFloat3{(float)cam.minDirX.x, (float)cam.minDirX.y, (float)cam.minDirX.z};
+    uniforms.footprintMinDirY = PackedFloat3{(float)cam.minDirY.x, (float)cam.minDirY.y, (float)cam.minDirY.z};
+    uniforms.footprintValid = 1;
+}
+
+// Stage E: Fills the Uniforms (camera, lights, media, filter, options) and uploads them.
+bool MetalPocApp::dsFillUniforms(DispatchState& s, int argc, const char** argv) {
+    auto& censusOn = s.censusOn;
+    auto& envMapWidth = s.envMapWidth;
+    auto& envMapHeight = s.envMapHeight;
+    auto& pbrtEnvMapWidth = s.pbrtEnvMapWidth;
+    auto& pbrtEnvMapHeight = s.pbrtEnvMapHeight;
+    auto& ggxEnergyTable = s.ggxEnergyTable;
+    const uint32_t samplesPerPixel = (argc > 4) ? (uint32_t)atoi(argv[4]) : 64;
+    const uint32_t maxDepth = (argc > 5) ? (uint32_t)atoi(argv[5]) : 8;
+    fprintf(stderr, "Samples/pixel: %u, max depth: %u\n", samplesPerPixel, maxDepth);
+
+    Uniforms uniforms{};
+    uniforms.cameraPos = PackedFloat3{0.0f, 0.0f, 3.2f};
+    float3 forward = simd::normalize(float3{0, 0, -1});
+    uniforms.cameraForward = PackedFloat3{forward.x, forward.y, forward.z};
+    uniforms.cameraRight = PackedFloat3{1, 0, 0};
+    uniforms.cameraUp = PackedFloat3{0, 1, 0};
+    uniforms.tanHalfFov = tanf(0.5f * 40.0f * (float)M_PI / 180.0f);
+    uniforms.aspect = (float)width / (float)height;
+    uniforms.width = width;
+    uniforms.height = height;
+    uniforms.samplesPerPixel = samplesPerPixel;
+    uniforms.maxDepth = maxDepth;
+    uniforms.frameSeed = frameSeedValue;
+    uniforms.lightCount = (uint32_t)lights.size();
+    // Thin-lens depth of field: focused on the gold conductor sphere
+    // (the nearest object to the camera), so it renders pixel-sharp
+    // while the dielectric sphere just behind it and the back
+    // wall/Suzanne further back show progressively more defocus blur -
+    // the falloff is what actually demonstrates this is a real lens
+    // model, not just a uniform blur filter over the whole frame.
+    uniforms.lensRadius = 0.05f;
+    uniforms.focusDistance = uniforms.cameraPos.z - spheres[1].center.z; // gold sphere's own z
+    // A hexagonal (6-blade) aperture rather than a perfectly circular
+    // one - see Uniforms' own apertureBlades comment. The classic
+    // photographic blade count; out-of-focus highlights (area/point/
+    // spot light reflections on the defocused back-wall geometry)
+    // should now read as hexagons, not perfect circles.
+    uniforms.apertureBlades = 6;
+    // Shutter motion blur: a small horizontal dolly over the frame's
+    // simulated exposure - chosen (over, say, an object moving) since
+    // it needs no acceleration-structure/intersection-function
+    // changes at all, purely a primary-ray-generation addition (see
+    // metal_poc.metal's own comment on why: a moving CUSTOM primitive
+    // would need per-sample time threaded into
+    // sphereIntersectionFunction's own, separate argument table, real
+    // additional Metal API surface this increment intentionally
+    // doesn't take on).
+    uniforms.cameraVelocity = PackedFloat3{0.015f, 0.0f, 0.0f};
+    // Homogeneous fog filling the whole room - subtle (transmittance
+    // ~0.7 over the ~4-unit camera-to-back-wall sightline: exp(-0.08*4)
+    // ~ 0.73), meant to read as a light atmospheric haze visible in
+    // the light shafts/depth falloff, not an opaque room-filling mist
+    // that would fight every other material's own visibility.
+    uniforms.fogSigmaT = 0.05f;
+    uniforms.fogAlbedo = PackedFloat3{0.85f, 0.88f, 0.95f}; // mostly-scattering, faint cool tint
+    // On: a miss ray samples earthTexture by direction (equirectangular)
+    // instead of the flat two-colour gradient - the room's open front
+    // means most miss rays are secondary/GI bounces (a mirror/glass
+    // surface reflecting/refracting outward), not primary camera rays,
+    // so this mostly shows up subtly rather than as an obvious visible
+    // backdrop - see docs/history/METAL_GPU_FEASIBILITY.md's own note on
+    // verifying this with a dedicated wide-FOV test render.
+    uniforms.useEnvironmentMap = 1u;
+    // Moderate forward scattering (real fog/haze skews strongly
+    // forward in reality - Mie scattering off water droplets often
+    // has g around 0.7-0.9 - 0.4 is deliberately more modest, so the
+    // difference from isotropic reads as a stylistic tint on the fog
+    // rather than a dramatic visible change).
+    uniforms.fogAsymmetryG = 0.4f;
+    uniforms.pointLightCount = (uint32_t)pointLights.size();
+    uniforms.directionalLightCount = (uint32_t)directionalLights.size();
+    uniforms.projectionLightCount = (uint32_t)projectionLights.size();
+    uniforms.goniometricLightCount = (uint32_t)goniometricLights.size();
+    // Single-pass adaptive sampling (see metal_poc.metal's own
+    // shading-loop comment) - enabled by default for this scene:
+    // converged pixels (most of the flat-coloured walls/ceiling)
+    // stop well short of the full samplesPerPixel budget, spending
+    // it instead on the noisier fog/specular/caustic regions this
+    // scene already has plenty of - a real render-TIME win at
+    // (ideally) no visible quality cost, verified via a dedicated
+    // A/B render, not assumed.
+    uniforms.adaptiveSampling = adaptiveSamplingRequested ? 1u : 0u;
+    uniforms.adaptiveThreshold = adaptiveThresholdValue;
+    uniforms.pbrtEnvMapWidth = pbrtEnvMapWidth;
+    uniforms.pbrtEnvMapHeight = pbrtEnvMapHeight;
+    uniforms.envMapWidth = envMapWidth;
+    uniforms.envMapHeight = envMapHeight;
+    uniforms.ggxEnergyRoughRes = (uint32_t)ggxEnergyTable.roughRes;
+    uniforms.ggxEnergyMuRes = (uint32_t)ggxEnergyTable.muRes;
+    uniforms.fireflyClamp = maxComponentValueOverride > 0.0f ? maxComponentValueOverride : pbrtMaxComponentValue;
+    uniforms.debugCensus = censusOn ? 1u : 0u;
+    uniforms.liveWorldPos = liveSession ? 1u : 0u;
+    // Path regeneration pays off on simple scenes (Cornell-style: -9..-23%) but costs 2-15% on mesh-heavy ones, where lanes
+    // at different bounce depths trace incoherent rays through a big BVH (measured over ~40 scenes: break-even near 1-2k
+    // triangles). The picture is identical either way.
+    const size_t sceneTriangles = verts.size() / 3;
+    uniforms.pathRegen = (sceneTriangles < 1500) ? 1u : 0u;
+    if (MetalTuning::fromEnvironment().pathRegen >= 0) uniforms.pathRegen = (uint32_t)MetalTuning::fromEnvironment().pathRegen;   // tuning/diagnostics
+
+    if (havePbrtCamera) {
+        applyPbrtCameraUniforms(uniforms);
+        applyPbrtMediumUniforms(uniforms);
+        applyPbrtSkyUniforms(uniforms);
+        applyPbrtFilterUniforms(uniforms);
+    }
+    fillFootprintCameraUniforms(uniforms);
+    fillFilterSamplerTable(uniforms);
+
+    uniforms.pbrtInstanceFirst = pbrtInstanceFirstId;
+    id<MTLBuffer> uniformBuffer = [device newBufferWithBytes:&uniforms length:sizeof(Uniforms) options:MTLResourceStorageModeShared];
+    s.uniformBuffer = uniformBuffer;
+    return true;
+}
+
+// Stage F: Fails loudly if any buffer or texture the encoder binds could not be allocated.
+bool MetalPocApp::dsCheckResources(DispatchState& s) {
+    auto& outTexture = s.outTexture;
+    auto& earthTexture = s.earthTexture;
+    auto& pbrtEnvTexture = s.pbrtEnvTexture;
+    auto& pbrtGoniometricTexture = s.pbrtGoniometricTexture;
+    auto& pbrtProjectionTexture = s.pbrtProjectionTexture;
+    auto& pbrtAreaLightTexture = s.pbrtAreaLightTexture;
+    auto& pbrtDiffuseTexture = s.pbrtDiffuseTexture;
+    auto& pbrtTransmitTexture = s.pbrtTransmitTexture;
+    auto& envMarginalCDFBuffer = s.envMarginalCDFBuffer;
+    auto& envConditionalCDFBuffer = s.envConditionalCDFBuffer;
+    auto& pbrtEnvMarginalCDFBuffer = s.pbrtEnvMarginalCDFBuffer;
+    auto& pbrtEnvConditionalCDFBuffer = s.pbrtEnvConditionalCDFBuffer;
+    auto& ggxEnergyTableBuffer = s.ggxEnergyTableBuffer;
+    auto& uniformBuffer = s.uniformBuffer;
+    // Checked once, here, right before they're all bound below - see
+    // checkGpuResource()'s own comment for why this one spot (not each
+    // allocation call site above) and why the AS-only scratch/geometry
+    // buffers aren't included.
+    bool anyResourceFailed = false;
+    checkGpuResource(uniformBuffer, "uniformBuffer", device, &anyResourceFailed);
+    checkGpuResource(materialBuffer, "materialBuffer", device, &anyResourceFailed);
+    checkGpuResource(vertexBuffer, "vertexBuffer", device, &anyResourceFailed);
+    checkGpuResource(sphereMaterialBuffer, "sphereMaterialBuffer", device, &anyResourceFailed);
+    checkGpuResource(cloudMediumBuffer, "cloudMediumBuffer", device, &anyResourceFailed);
+    checkGpuResource(rgbGridMediumBuffer, "rgbGridMediumBuffer", device, &anyResourceFailed);
+    checkGpuResource(rgbGridDataBuffer, "rgbGridDataBuffer", device, &anyResourceFailed);
+    checkGpuResource(sphereBuffer, "sphereBuffer", device, &anyResourceFailed);
+    checkGpuResource(normalBuffer, "normalBuffer", device, &anyResourceFailed);
+    checkGpuResource(uvBuffer, "uvBuffer", device, &anyResourceFailed);
+    checkGpuResource(lightBuffer, "lightBuffer", device, &anyResourceFailed);
+    checkGpuResource(suzanneNormalBuffer, "suzanneNormalBuffer", device, &anyResourceFailed);
+    checkGpuResource(suzanneMaterialBuffer, "suzanneMaterialBuffer", device, &anyResourceFailed);
+    checkGpuResource(instanceTransformBuffer, "instanceTransformBuffer", device, &anyResourceFailed);
+    checkGpuResource(diskBuffer, "diskBuffer", device, &anyResourceFailed);
+    checkGpuResource(diskMaterialBuffer, "diskMaterialBuffer", device, &anyResourceFailed);
+    checkGpuResource(cylinderBuffer, "cylinderBuffer", device, &anyResourceFailed);
+    checkGpuResource(cylinderMaterialBuffer, "cylinderMaterialBuffer", device, &anyResourceFailed);
+    checkGpuResource(pointLightBuffer, "pointLightBuffer", device, &anyResourceFailed);
+    checkGpuResource(directionalLightBuffer, "directionalLightBuffer", device, &anyResourceFailed);
+    checkGpuResource(projectionLightBuffer, "projectionLightBuffer", device, &anyResourceFailed);
+    checkGpuResource(goniometricLightBuffer, "goniometricLightBuffer", device, &anyResourceFailed);
+    checkGpuResource(lensElementBuffer, "lensElementBuffer", device, &anyResourceFailed);
+    checkGpuResource(exitPupilBoundsBuffer, "exitPupilBoundsBuffer", device, &anyResourceFailed);
+    checkGpuResource(envMarginalCDFBuffer, "envMarginalCDFBuffer", device, &anyResourceFailed);
+    checkGpuResource(envConditionalCDFBuffer, "envConditionalCDFBuffer", device, &anyResourceFailed);
+    checkGpuResource(ggxEnergyTableBuffer, "ggxEnergyTableBuffer", device, &anyResourceFailed);
+    checkGpuResource(pbrtEnvMarginalCDFBuffer, "pbrtEnvMarginalCDFBuffer", device, &anyResourceFailed);
+    checkGpuResource(pbrtEnvConditionalCDFBuffer, "pbrtEnvConditionalCDFBuffer", device, &anyResourceFailed);
+    checkGpuResource(outTexture, "outTexture", device, &anyResourceFailed);
+    checkGpuResource(earthTexture, "earthTexture", device, &anyResourceFailed);
+    checkGpuResource(goniometricTexture, "goniometricTexture", device, &anyResourceFailed);
+    checkGpuResource(pbrtEnvTexture, "pbrtEnvTexture", device, &anyResourceFailed);
+    checkGpuResource(pbrtGoniometricTexture, "pbrtGoniometricTexture", device, &anyResourceFailed);
+    checkGpuResource(pbrtProjectionTexture, "pbrtProjectionTexture", device, &anyResourceFailed);
+    checkGpuResource(pbrtAreaLightTexture, "pbrtAreaLightTexture", device, &anyResourceFailed);
+    checkGpuResource(pbrtDiffuseTexture, "pbrtDiffuseTexture", device, &anyResourceFailed);
+    checkGpuResource(pbrtTransmitTexture, "pbrtTransmitTexture", device, &anyResourceFailed);
+    if (anyResourceFailed) return false;
+    return true;
+}
+
+// The divergence census a --census render asks for, printed to stderr: per 8x4 tile (the dispatch's SIMD group) and bounce, how many serial passes
+// the megakernel pays (one per distinct material among the active lanes) against what sorted / compacted wavefront queues would pay.
+static void printDivergenceCensus(id<MTLTexture> censusTexture, uint32_t width, uint32_t height) {
+    std::vector<uint32_t> cen((size_t)width * height * 4);
+    [censusTexture getBytes:cen.data() bytesPerRow:width * 16 fromRegion:MTLRegionMake2D(0, 0, width, height) mipmapLevel:0];
+    double sumDistinct = 0, sumAnyActive = 0, sumActive = 0, lanesTotal = 0, pathLenSum = 0, pathCount = 0;
+    double shDistinct = 0, shGroups = 0, shActive = 0;   // shading only: lanes that hit a material or a medium (not a miss)
+    long codeCount[256] = {0};
+    for (uint32_t ty = 0; ty < height; ty += 4) {
+        for (uint32_t tx = 0; tx < width; tx += 8) {
+            int len[32], lanes = 0; uint8_t codes[32][8];
+            for (uint32_t y = ty; y < std::min(height, ty + 4); ++y)
+                for (uint32_t x = tx; x < std::min(width, tx + 8); ++x) {
+                    const uint32_t* p = &cen[((size_t)y * width + x) * 4];
+                    len[lanes] = (int)std::min<uint32_t>(p[2], 8u);
+                    for (int k = 0; k < 8; ++k) codes[lanes][k] = (uint8_t)((k < 4 ? p[0] >> (8 * k) : p[1] >> (8 * (k - 4))) & 0xFFu);
+                    pathLenSum += len[lanes]; pathCount += 1;
+                    for (int k = 0; k < len[lanes]; ++k) codeCount[codes[lanes][k]]++;
+                    ++lanes;
+                }
+            lanesTotal += lanes;
+            for (int k = 0; k < 8; ++k) {
+                bool seen[256] = {false}; int active = 0, distinct = 0, shAct = 0, shDist = 0; bool shSeen[256] = {false};
+                for (int l = 0; l < lanes; ++l)
+                    if (len[l] > k) {
+                        ++active; if (!seen[codes[l][k]]) { seen[codes[l][k]] = true; ++distinct; }
+                        if (codes[l][k] != 255) { ++shAct; if (!shSeen[codes[l][k]]) { shSeen[codes[l][k]] = true; ++shDist; } }
+                    }
+                if (shAct > 0) { shDistinct += shDist; shGroups += 1; shActive += shAct; }
+                if (active == 0) continue;
+                sumDistinct += distinct; sumAnyActive += 1; sumActive += active;
+            }
+        }
+    }
+    const double idealPasses = sumActive / 32.0, idealShade = shActive / 32.0;
+    fprintf(stderr, "[census] %ux%u  mean recorded bounces/path %.2f  lane utilisation per group-bounce %.1f%%  "
+                    "distinct materials per active group-bounce %.2f\n", width, height, pathLenSum / std::max(1.0, pathCount),
+            100.0 * sumActive / std::max(1.0, 32.0 * sumAnyActive), sumDistinct / std::max(1.0, sumAnyActive));
+    fprintf(stderr, "[census] SHADING only (misses excluded): lane utilisation %.1f%%, distinct materials per group-bounce %.2f, passes %.2fx fewer if sorted+compacted\n",
+            100.0 * shActive / std::max(1.0, 32.0 * shGroups), shDistinct / std::max(1.0, shGroups), shDistinct / std::max(1e-9, idealShade));
+    fprintf(stderr, "[census] upper bound: all-event passes %.2fx fewer with sorted queues, traversal passes %.2fx fewer with compaction\n",
+            sumDistinct / std::max(1e-9, idealPasses), sumAnyActive / std::max(1e-9, idealPasses));
+    fprintf(stderr, "[census] event mix:");
+    for (int c = 0; c < 256; ++c) if (codeCount[c] > 0) fprintf(stderr, " %s%d=%.1f%%", c == 255 ? "miss" : (c == 100 ? "medium" : "mat"), c == 255 || c == 100 ? 0 : c, 100.0 * codeCount[c] / std::max(1.0, pathLenSum));
+    fprintf(stderr, "\n");
+}
+
+// Stage G: Builds the re-runnable per-frame dispatch (row bands, read-back, crop). It owns copies of every GPU resource it needs.
+std::function<bool(const std::function<void(Uniforms&)>&)> MetalPocApp::dsMakeRenderFrame(DispatchState& s) {
+    auto& error = s.error;
+    auto& pipeline = s.pipeline;
+    auto& functionTable = s.functionTable;
+    auto& outTexture = s.outTexture;
+    auto& censusOn = s.censusOn;
+    auto& censusTexture = s.censusTexture;
+    auto& worldPosTexture = s.worldPosTexture;
+    auto& earthTexture = s.earthTexture;
+    auto& pbrtEnvTexture = s.pbrtEnvTexture;
+    auto& pbrtGoniometricTexture = s.pbrtGoniometricTexture;
+    auto& pbrtProjectionTexture = s.pbrtProjectionTexture;
+    auto& pbrtAreaLightTexture = s.pbrtAreaLightTexture;
+    auto& pbrtDiffuseTexture = s.pbrtDiffuseTexture;
+    auto& pbrtTransmitTexture = s.pbrtTransmitTexture;
+    auto& envMarginalCDFBuffer = s.envMarginalCDFBuffer;
+    auto& envConditionalCDFBuffer = s.envConditionalCDFBuffer;
+    auto& pbrtEnvMarginalCDFBuffer = s.pbrtEnvMarginalCDFBuffer;
+    auto& pbrtEnvConditionalCDFBuffer = s.pbrtEnvConditionalCDFBuffer;
+    auto& ggxEnergyTableBuffer = s.ggxEnergyTableBuffer;
+    auto& uniformBuffer = s.uniformBuffer;
+    // --- Dispatch, one horizontal row-band at a time ------------------
+    // A single dispatchThreads: covering the whole image (this loop's
+    // own precedent, before row bands existed at all) gives the host
+    // NO visibility into progress until the entire render finishes -
+    // exactly the "one monolithic launch, no host-visible checkpoint"
+    // problem OptiX's own recursive GPU backend already has, per
+    // gpu/optix/wavefront_path_tracer.cpp's own comment (which solves
+    // it differently, via a real per-sample host sync its own ray-
+    // queue architecture already needs anyway). Splitting into row
+    // bands instead of sample batches deliberately touches NOTHING
+    // about per-pixel sampling/accumulation/adaptive-convergence state
+    // (metal_poc_kernel.metal's own primaryRayKernel is untouched
+    // except for the one-line `tid` offset at its own top) - each pixel
+    // is still computed in exactly ONE dispatch, with the EXACT SAME
+    // per-pixel RNG seed it would get from a single whole-image
+    // dispatch (seeded from the real `tid`, not a band-relative one),
+    // so a banded render is provably byte-identical to an unbanded one,
+    // not just visually similar - verified via the same 81-scene hash
+    // sweep this project's own every other change uses.
+    //
+    // Band count: capped at 20 (a real, if modest, per-dispatch/per-
+    // sync cost exists - encoder setup, a real GPU pipeline drain at
+    // each waitUntilCompleted - so more bands isn't free even though
+    // each one is cheap), but never more bands than there are rows.
+    // Mirrors wavefront_path_tracer.cpp's own progressPrintInterval
+    // philosophy (throttle to a fixed cadence, not one sync per unit of
+    // work) rather than reinventing a different tuning approach.
+    // Crop window (--crop, section 205): only the window's ROWS [cropY0,cropY1)
+    // are dispatched (the saving crop buys), at full width; the columns
+    // outside [cropX0,cropX1) are computed like any other pixel in those rows
+    // and then zeroed with everything else outside the window, after readback
+    // below. Deliberately NOT a column-restricted dispatch: that needs a
+    // colOffset added to tid in primaryRayKernel, and that one extra kernel
+    // line was measured (section 205) to turn previously bit-stable scenes
+    // (B14, D1, D3) nondeterministic - the project's known code-shape
+    // sensitivity, hit for real - so the kernel is left untouched and
+    // no-crop renders stay exactly as they were. cropX1 < 0 = no crop
+    // requested, the whole image: every expression below then reduces to what
+    // this loop computed before crop existed (cy0 = 0, cropRows = height).
+    // Everything from here to the readback is ONE frame of work: pulled into a lambda that owns copies of the GPU
+    // resources set up above, so a Live Preview session can run it again and again without rebuilding anything.
+    auto renderFrame = [=](const std::function<void(Uniforms&)>& tweak) mutable -> bool {
+    if (tweak) tweak(*(Uniforms*)uniformBuffer.contents);
+    const uint32_t cx0 = (cropX1 >= 0) ? (uint32_t)cropX0 : 0;
+    const uint32_t cx1 = (cropX1 >= 0) ? (uint32_t)cropX1 : width;
+    const uint32_t cy0 = (cropX1 >= 0) ? (uint32_t)cropY0 : 0;
+    const uint32_t cy1 = (cropX1 >= 0) ? (uint32_t)cropY1 : height;
+    const uint32_t cropRows = cy1 - cy0;
+    // Band sizing. Every band is its own command buffer that must fully drain before the next starts, and that
+    // tail costs ~16 ms: a fixed 20 bands made a 1.7 s render ~17% slower than one band (measured on an M2). But
+    // bands also give the GUI progress ticks and keep each GPU submission short (watchdog). So: one small
+    // calibration band, then bands sized to ~kTargetBandSeconds of GPU time from the measured rows/second - a few
+    // percent overhead, and finer progress than before on long renders. METAL_BANDS=N forces N equal bands.
+    constexpr double kTargetBandSeconds = 0.3;
+    const bool fixedBands = MetalTuning::fromEnvironment().forcedBands > 0;
+    const uint32_t forcedBands =
+        fixedBands ? std::min<uint32_t>((uint32_t)MetalTuning::fromEnvironment().forcedBands, std::max<uint32_t>(1, cropRows)) : 0;
+    uint32_t bandHeight = fixedBands ? (cropRows + forcedBands - 1) / forcedBands : std::max<uint32_t>(1, cropRows / 40);
+    if (liveSession && !fixedBands && liveBandHint > bandHeight) bandHeight = std::min(liveBandHint, cropRows);
+    Uniforms* uniformsShared = (Uniforms*)uniformBuffer.contents;
+    for (uint32_t bandStart = 0; bandStart < cropRows;) {
+        const uint32_t thisBandHeight = std::min(bandHeight, cropRows - bandStart);
+        // uniformBuffer is MTLResourceStorageModeShared (Apple Silicon
+        // unified memory) - writing directly into its own backing
+        // memory between dispatches is the same convenience this
+        // project's own host-shared buffers already rely on elsewhere,
+        // not a new pattern. No other Uniforms field changes band to
+        // band, so nothing else needs re-uploading.
+        uniformsShared->rowOffset = cy0 + bandStart;
+
+        id<MTLCommandBuffer> renderCmd = [queue commandBuffer];
+        id<MTLComputeCommandEncoder> enc = [renderCmd computeCommandEncoder];
+        [enc setComputePipelineState:pipeline];
+        [enc setTexture:outTexture atIndex:0];
+        [enc setTexture:earthTexture atIndex:1];
+        [enc setTexture:goniometricTexture atIndex:2];
+        [enc setTexture:pbrtEnvTexture atIndex:3];
+        [enc setTexture:pbrtGoniometricTexture atIndex:4];
+        [enc setTexture:pbrtProjectionTexture atIndex:5];
+        [enc setTexture:pbrtAreaLightTexture atIndex:6];
+        [enc setTexture:pbrtDiffuseTexture atIndex:7];
+        [enc setTexture:pbrtTransmitTexture atIndex:8];
+        [enc setTexture:censusTexture atIndex:9];
+        [enc setTexture:worldPosTexture atIndex:10];
+        [enc setAccelerationStructure:instAS atBufferIndex:0];
+        [enc setBuffer:uniformBuffer offset:0 atIndex:1];
+        [enc setBuffer:materialBuffer offset:0 atIndex:2];
+        [enc setBuffer:vertexBuffer offset:0 atIndex:3];
+        [enc setBuffer:sphereMaterialBuffer offset:0 atIndex:4];
+        [enc setBuffer:sphereBuffer offset:0 atIndex:5];
+        [enc setIntersectionFunctionTable:functionTable atBufferIndex:6];
+        [enc setBuffer:normalBuffer offset:0 atIndex:7];
+        [enc setBuffer:uvBuffer offset:0 atIndex:8];
+        [enc setBuffer:lightBuffer offset:0 atIndex:9];
+        [enc setBuffer:suzanneNormalBuffer offset:0 atIndex:10];
+        [enc setBuffer:suzanneMaterialBuffer offset:0 atIndex:11];
+        [enc setBuffer:instanceTransformBuffer offset:0 atIndex:12];
+        [enc setBuffer:diskBuffer offset:0 atIndex:13];
+        [enc setBuffer:diskMaterialBuffer offset:0 atIndex:14];
+        [enc setBuffer:pointLightBuffer offset:0 atIndex:15];
+        [enc setBuffer:directionalLightBuffer offset:0 atIndex:16];
+        [enc setBuffer:projectionLightBuffer offset:0 atIndex:17];
+        [enc setBuffer:goniometricLightBuffer offset:0 atIndex:18];
+        [enc setBuffer:envMarginalCDFBuffer offset:0 atIndex:19];
+        [enc setBuffer:envConditionalCDFBuffer offset:0 atIndex:20];
+        [enc setBuffer:ggxEnergyTableBuffer offset:0 atIndex:21];
+        [enc setBuffer:pbrtEnvMarginalCDFBuffer offset:0 atIndex:22];
+        [enc setBuffer:pbrtEnvConditionalCDFBuffer offset:0 atIndex:23];
+        [enc setBuffer:lensElementBuffer offset:0 atIndex:24];
+        [enc setBuffer:exitPupilBoundsBuffer offset:0 atIndex:25];
+        [enc setBuffer:cylinderBuffer offset:0 atIndex:26];
+        [enc setBuffer:cylinderMaterialBuffer offset:0 atIndex:27];
+        [enc setBuffer:cloudMediumBuffer offset:0 atIndex:28];
+        [enc setBuffer:rgbGridMediumBuffer offset:0 atIndex:29];
+        [enc setBuffer:rgbGridDataBuffer offset:0 atIndex:30];
+        // Mark the AS + its dependent primitive ASes as used so Metal
+        // knows about the indirection - required for instance
+        // acceleration structures referencing primitive ones (now three:
+        // the room+Spot triangle mesh, the sphere's bounding-box
+        // geometry, and Suzanne's own - referenced by TWO instances, but
+        // only needs marking used once here, not once per instance).
+        [enc useResource:primAS usage:MTLResourceUsageRead];
+        [enc useResource:sphereAS usage:MTLResourceUsageRead];
+        [enc useResource:suzanneAS usage:MTLResourceUsageRead];
+
+        MTLSize gridSize = MTLSizeMake(width, thisBandHeight, 1);
+        // Threadgroup shape: ONE SIMD group per threadgroup, as a square-ish tile (8 x execWidth/8 = 8x4 on Apple
+        // GPUs), instead of the pipeline's maximum (32x12 = 384 threads). Measured on an M2: every SIMD-sized shape
+        // (8x4, 4x4, 16x2, 32x1, ...) is equally fast and 10-22% faster than 32x12 (A1 3.9s -> 3.5s, G1 2.7s ->
+        // 2.1s), because big threadgroups tie a whole 384-thread group to its slowest path. The image is
+        // unchanged (per-pixel RNG streams). METAL_TG_W/METAL_TG_H override it for tuning.
+        NSUInteger w = 8;
+        NSUInteger h = std::max<NSUInteger>(1, pipeline.threadExecutionWidth / w);
+        const MetalTuning& tuning = MetalTuning::fromEnvironment();
+        if (tuning.threadgroupWidth > 0) w = (NSUInteger)tuning.threadgroupWidth;
+        if (tuning.threadgroupHeight > 0) h = (NSUInteger)tuning.threadgroupHeight;
+        if (w * h > pipeline.maxTotalThreadsPerThreadgroup) {   // (a shape the pipeline cannot run would fail the dispatch)
+            static bool said = false;   // (once, not once per band)
+            if (!said) fprintf(stderr, "Metal: a threadgroup of %lu x %lu is more than this pipeline's %lu threads; using the default shape\n", (unsigned long)w, (unsigned long)h, (unsigned long)pipeline.maxTotalThreadsPerThreadgroup);
+            said = true;
+            w = 8;
+            h = std::max<NSUInteger>(1, pipeline.threadExecutionWidth / w);
+        }
+        if (tuning.printThreadgroup) fprintf(stderr, "[perf] execWidth=%lu maxThreads=%lu staticTG=%lu -> tg %lux%lu\n", (unsigned long)pipeline.threadExecutionWidth, (unsigned long)pipeline.maxTotalThreadsPerThreadgroup, (unsigned long)pipeline.staticThreadgroupMemoryLength, (unsigned long)w, (unsigned long)h);
+        MTLSize threadgroupSize = MTLSizeMake(w, h, 1);
+        [enc dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
+        [enc endEncoding];
+        [renderCmd commit];
+        [renderCmd waitUntilCompleted];
+        if (renderCmd.status == MTLCommandBufferStatusError) {
+            fprintf(stderr, "Render dispatch failed: %s\n", renderCmd.error.localizedDescription.UTF8String);
+            return false;
+        }
+
+        // Same "Scanlines remaining: N" shape/terminator the CPU
+        // backend (src/TheRestOfYourLife/camera.h) and OptiX's own
+        // wavefront backend already print - qt_gui/render_output_
+        // parser.h's parseScanlineProgress() picks this up with zero
+        // parser/GUI changes at all. `\r` (not `\n`) is load-bearing:
+        // splitOutputLines()'s own comment explains why.
+        const uint32_t rowsDone = bandStart + thisBandHeight;
+        fprintf(stderr, "Scanlines remaining: %u\r", cropRows - rowsDone);
+        fflush(stderr);
+
+        // Re-size the next band from this one's measured GPU time (rows/second), growing by at most 4x per step.
+        if (!fixedBands) {
+            const double secs = renderCmd.GPUEndTime - renderCmd.GPUStartTime;
+            if (secs > 0.0) {
+                const double target = (double)thisBandHeight / secs * kTargetBandSeconds;
+                bandHeight = (uint32_t)std::max(1.0, std::min({target, (double)thisBandHeight * 4.0, (double)cropRows}));
+            }
+        }
+        bandStart += thisBandHeight;
+    }
+    if (liveSession && !fixedBands) liveBandHint = bandHeight;
+
+    if (censusOn) printDivergenceCensus(censusTexture, width, height);
+
+    // --- Read back into `pixels` (post-processed and written to disk
+    // by postProcessAndWrite(), below) --------------------------------
+    pixels.resize(width * height * 4);
+    MTLRegion region = MTLRegionMake2D(0, 0, width, height);
+    [outTexture getBytes:pixels.data() bytesPerRow:width * 4 * sizeof(float) fromRegion:region mipmapLevel:0];
+    if (liveSession) {
+        liveWorldPos.resize((size_t)width * height * 4);
+        [worldPosTexture getBytes:liveWorldPos.data() bytesPerRow:width * 4 * sizeof(float) fromRegion:region mipmapLevel:0];
+    }
+    // Crop window: only the dispatched rectangle was ever written; the rest of
+    // outTexture's contents are undefined (Metal does not guarantee a fresh
+    // texture is zeroed), so make "outside the window is black" - the same
+    // contract CPU/OptiX crop has - explicit rather than relying on it.
+    if (cropX1 >= 0) {
+        for (uint32_t y = 0; y < height; ++y) {
+            for (uint32_t x = 0; x < width; ++x) {
+                if (x >= cx0 && x < cx1 && y >= cy0 && y < cy1) continue;
+                float* p = &pixels[((size_t)y * width + x) * 4];
+                p[0] = p[1] = p[2] = 0.0f;
+                p[3] = 1.0f;
+            }
+        }
+    }
+        return true;
+    };
+    return renderFrame;
+}
+
+// --- Stage 4: compile the shader, dispatch the render, read back -------
+bool MetalPocApp::compileShaderAndDispatch(int argc, const char** argv) {
+    DispatchState s;
+    if (!dsLoadShaderLibrary(s)) return false;
+    if (!dsBuildPipeline(s)) return false;
+    if (!dsCreateRenderTargets(s)) return false;
+    if (!dsUploadTextures(s)) return false;
+    if (!dsUploadSamplingTables(s)) return false;
+    if (!dsFillUniforms(s, argc, argv)) return false;
+    if (!dsCheckResources(s)) return false;
+    auto renderFrame = dsMakeRenderFrame(s);
+    // Live Preview session: keep the re-runnable dispatch (it owns every GPU resource it needs) for later frames; the
+    // caller updates the camera/seed/sample-count uniforms through `tweak` before each one.
+    if (liveSession) liveRender = renderFrame;
+    return renderFrame(nullptr);
+}
+
+// Builds the shader library and the compute pipeline for both variants (a scene with an any-hit triangle test, one without) and throws them away: the point is Metal's cache, which
+// the next real render then hits. Called in the background at the GUI's start (the library has the same entry for Live Preview, which runs in the GUI's own process, where the cache
+// is its own) and by `ray_tracer --prepare-gpu` (the renders the GUI starts run in that program). False when the GPU or a compile fails.
+// Builds both variants of the pipeline for one family set, side by side; false when the GPU or a compile fails.
+static bool prepareFamilySet(id<MTLDevice> dev, const FamilySet& families) {
+    auto build = [dev, &families](bool anyHit) -> bool {
+        @autoreleasepool {
+            id<MTLLibrary> library = compileShaderLibrary(dev, anyHit);
+            if (!library) return false;
+            KernelFunctions fns;
+            NSError* error = nil;
+            if (!createKernelPipeline(dev, library, anyHit, families, fns, &error)) {
+                if (error) fprintf(stderr, "Pipeline creation failed: %s\n", error.localizedDescription.UTF8String);
+                return false;
+            }
+            return true;
+        }
+    };
+    bool anyHitOk = false;
+    std::thread anyHitThread([&] { anyHitOk = build(true); });
+    const bool defaultOk = build(false);
+    anyHitThread.join();
+    return defaultOk && anyHitOk;
+}
+
+bool metal_prepare_renderer() {
+    @autoreleasepool {
+        id<MTLDevice> dev = MTLCreateSystemDefaultDevice();
+        if (!dev) return false;
+        return prepareFamilySet(dev, FamilySet::all());   // what Live Preview builds
+    }
+}
+
+// What the renders the GUI starts build: first the pipeline for a scene that uses none of the rarely used material families (about a sixth of the full compile, so the first render of an
+// ordinary scene is ready in well under half a minute), then the full one (any scene that uses a rare family, and Live Preview, which runs in another process but finds its own cache).
+bool metal_prepare_renderer_for_renders() {
+    @autoreleasepool {
+        id<MTLDevice> dev = MTLCreateSystemDefaultDevice();
+        if (!dev) return false;
+        const bool lite = prepareFamilySet(dev, FamilySet::none());
+        const bool full = prepareFamilySet(dev, FamilySet::all());
+        return lite && full;
+    }
+}

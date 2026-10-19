@@ -1,0 +1,1277 @@
+// metal_poc.metal
+// Metal ray tracing proof-of-concept, step 2 - see
+// docs/history/METAL_GPU_FEASIBILITY.md section 8. Step 1 (committed in PR #2) was
+// a single-bounce raycast preview with no shadow rays. This step turns it
+// into an actual minimal Monte Carlo path tracer: shadow-ray occlusion, a
+// real multi-bounce GI loop with Russian roulette, a second material
+// (mirror) to prove per-primitive material-type branching works (not just
+// per-primitive colour), and multi-sample antialiasing. Still deliberately
+// minimal otherwise - one directional light, two material types, no
+// textures, no area lights, no spectral/BSSRDF/volumetric anything. The
+// goal remains proving the pipeline shape, now one level deeper (a real
+// path integrator, not just primary-ray shading) rather than feature
+// coverage.
+
+#include <metal_stdlib>
+#include <metal_raytracing>
+using namespace metal;
+using namespace raytracing;
+
+// AreaLight, PointLight, DirectionalLight, ProjectionLight, GoniometricLight, LensElement, ExitPupilBounds, SphereData, DiskData, CylinderData, InstanceTransform, GpuCloudMedium and
+// GpuRgbGridMedium are defined once, for host and shader, in metal_poc_shared_types.h (the file before this one in the concatenated source).
+
+// Every member here is either already 4-byte-scalar or packed_float3
+// (size 12, align 4, no implicit padding) - deliberately avoiding plain
+// `float3` (size 12 but ALIGN 16 inside a struct) anywhere two of these
+// structs are shared byte-for-byte between the C++ host struct and this
+// MSL one. A float3-vs-packed_float3 layout mismatch between host and
+// device is a classic, silent GPU bug (wrong bytes land in the wrong
+// field, still "compiles and runs," just renders garbage) - packed_float3
+// on both sides everywhere a struct crosses the host/device boundary
+// avoids the whole class of bug rather than reasoning through MSL's
+// packing rules per-field.
+struct Uniforms {
+    packed_float3 cameraPos;
+    packed_float3 cameraForward;
+    packed_float3 cameraRight;
+    packed_float3 cameraUp;
+    float tanHalfFov;
+    float aspect;
+    uint width;
+    uint height;
+    uint samplesPerPixel;
+    uint maxDepth;
+    uint frameSeed;
+    uint lightCount;
+    // Thin-lens depth of field: lensRadius == 0 reduces to the original
+    // pinhole camera exactly (no lens-sample branch taken below), so
+    // every earlier PR's own screenshots stay reproducible bit-for-bit
+    // reasoning-wise by just leaving this at 0 - DOF is purely additive,
+    // not a replacement for the pinhole path.
+    float lensRadius;
+    float focusDistance;
+    // Aperture SHAPE for the lens sample above - 0/1/2 (every scene
+    // before this one) means "circular" (sampleUnitDisk()); 3 or more is
+    // a regular polygon with this many sides/blades (samplePolygonAperture()),
+    // the real reason out-of-focus highlights in an actual photo read as
+    // hexagons/pentagons rather than perfect circles. Purely additive,
+    // same "0 reproduces the exact prior behaviour" shape lensRadius == 0
+    // itself already has - never affects anything when lensRadius == 0.
+    uint apertureBlades;
+    // Camera (shutter) motion blur: the camera translates by
+    // `cameraVelocity` (world-space, full displacement) over the frame's
+    // simulated [0,1] shutter interval - each primary-ray SAMPLE draws
+    // its own uniform-random shutter time and offsets the camera origin
+    // by that fraction of the velocity before casting, so different
+    // samples for the same pixel see the camera at different points along
+    // its path, and averaging them (the same multi-sample loop every
+    // other feature in this POC already reuses) is what produces the
+    // blur - no separate accumulation pass needed. `cameraVelocity ==
+    // (0,0,0)` (every earlier PR's own scenes) makes every sample use the
+    // exact same origin regardless of its sampled time, i.e. the original
+    // static camera exactly - purely additive, like lensRadius == 0 above.
+    packed_float3 cameraVelocity;
+    // Homogeneous participating medium (fog) filling the WHOLE scene
+    // volume - not attached to any one object's geometry, the simplest
+    // possible "is this ray inside the medium" answer (always yes,
+    // camera to first surface hit), avoiding needing boundary tracking
+    // (entering/exiting a fog volume's own geometry) this POC doesn't
+    // have any other reason to build yet. fogSigmaT == 0 (every earlier
+    // PR's own scenes) skips the medium-interaction branch entirely -
+    // purely additive, same pattern as lensRadius/cameraVelocity above.
+    float fogSigmaT; // extinction coefficient (scalar - shared across
+                      // RGB channels for distance sampling, not spectral)
+    packed_float3 fogAlbedo; // single-scattering albedo (sigma_s/sigma_t), per channel
+    // useEnvironmentMap == 0 (every earlier PR's own scenes) keeps the
+    // original flat two-colour sky gradient exactly; != 0 replaces it
+    // with an equirectangular sample of `earthTexture` by ray DIRECTION
+    // instead of by surface UV - reusing the same texture already loaded
+    // for materialType 3, sampled a completely different way. Purely
+    // additive/toggleable, same pattern as every other uniform above.
+    uint useEnvironmentMap;
+    // Henyey-Greenstein phase-function asymmetry, [-1,1]. 0 (isotropic)
+    // reproduces the same uniform-over-sphere DISTRIBUTION step 17's own
+    // isotropic phase function used (HG's own g==0 case reduces to
+    // uniform-over-sphere sampling, just relative to a local frame
+    // instead of absolute world axes - a rotationally-invariant
+    // distribution is identical either way) -
+    // not a separate toggle, this field alone controls both the isotropic
+    // and directional cases. Positive g = forward scattering (favours
+    // continuing roughly the same direction light was already travelling
+    // - fog/haze/water droplets in reality skew strongly forward, g
+    // around 0.7-0.9 in Mie scattering terms), negative = backward.
+    float fogAsymmetryG;
+    // How many entries in the SEPARATE `pointLights` buffer are live -
+    // not part of `lightCount`/`lights[]` above (see PointLight's own
+    // comment on why delta lights aren't folded into the area-light
+    // picking scheme). 0 (every earlier scene) skips the point-light NEE
+    // loop entirely in every material branch - purely additive.
+    uint pointLightCount;
+    // Same idea as pointLightCount, for the separate `directionalLights`
+    // buffer (see DirectionalLight's own comment). 0 (every earlier
+    // scene) skips that loop entirely - purely additive.
+    uint directionalLightCount;
+    // Same idea again, for the separate `projectionLights` buffer (see
+    // ProjectionLight's own comment) - a fourth delta-light type, summed
+    // unconditionally like the other three, never picked. 0 (every
+    // earlier scene) skips that loop entirely - purely additive.
+    uint projectionLightCount;
+    // Same idea again, for the separate `goniometricLights` buffer (see
+    // GoniometricLight's own comment) - a fifth delta-light type, summed
+    // unconditionally like the other four, never picked. 0 (every
+    // earlier scene) skips that loop entirely - purely additive.
+    uint goniometricLightCount;
+    // Single-pass adaptive sampling toggle - see the shading loop's own
+    // comment on `convergedCount`/`kAdaptiveThreshold` for the full
+    // "why" and the CPU integrator this was ported from. 0 (every scene
+    // before this one) skips the convergence check entirely, an exact
+    // no-op.
+    uint adaptiveSampling;
+    // Environment-map importance sampling (section 69's own
+    // EnvDistribution2D, uploaded as the `envMarginalCDF`/
+    // `envConditionalCDF` buffers below) - the image dimensions its own
+    // CDF arrays were built at, needed by the device-side binary search/
+    // evaluation functions to index them correctly. 0 (every scene before
+    // this one, or `useEnvironmentMap == 0`) skips the environment
+    // light's own NEE sampling entirely in every material's own shading
+    // function - purely additive, same "0 reproduces prior behaviour
+    // exactly" pattern every other optional feature here already uses.
+    uint envMapWidth;
+    uint envMapHeight;
+    // GGX multi-scatter energy-compensation table (section 72/73) - the
+    // grid dimensions its own directional-albedo table (`ggxEnergyTable`
+    // buffer below) was built at, needed to index it correctly. Applies
+    // unconditionally to materialType 4/9's own GGX conductor (there is
+    // no "0 disables this" case the way env-map/adaptive-sampling have -
+    // the table is always built and always physically correct to apply,
+    // unlike those genuinely optional features).
+    uint ggxEnergyRoughRes;
+    uint ggxEnergyMuRes;
+    // A pbrt-loaded scene's own LightSource "infinite" with no image
+    // (constant colour only) - see the miss-path code below and
+    // metal_poc.mm's own loadPbrtScene() comment. Deliberately NO NEE/
+    // MIS strategy the way useEnvironmentMap's earthTexture-based one
+    // has (section 71) - every material's own shading function would
+    // need its own new sampling+MIS block to add that, real work this
+    // POC's own docs (METAL_GPU_FEASIBILITY.md) explicitly scope out for
+    // now. A pure miss-path contribution is still a correct, unbiased
+    // Monte Carlo estimator (just higher-variance than an NEE-augmented
+    // one) - the exact same tradeoff this file's own env-map support
+    // already had for a long time before section 71 added NEE on top of
+    // it, and the same one envMapWidth==0 still falls back to today.
+    uint pbrtHasConstantEnvLight;
+    packed_float3 pbrtEnvColor;
+    // A pbrt-loaded scene's own image-based LightSource "infinite" (an
+    // actual named image file, as opposed to pbrtHasConstantEnvLight's
+    // colour-only case just above) - mutually exclusive with that flag
+    // (an infinite light is either constant-colour or image-based, never
+    // both - see metal_poc.mm's own loadPbrtScene()). Reads pbrtEnvTexture
+    // (see the kernel's own texture argument comment) via a plain
+    // equirectangular lookup.
+    uint pbrtHasImageEnvLight;
+    // Importance-sampling dimensions for pbrtEnvTexture's own SEPARATE
+    // EnvDistribution2D (section 96) - same idea as envMapWidth/
+    // envMapHeight above, built from a DIFFERENT image (pbrtEnvTexture,
+    // not earthTexture) via metal_poc_host_math.h's float-RGB
+    // buildEnvDistribution2D() overload (pbrt's own infinite-light image
+    // is already decoded linear float, unlike earthTexture's 8-bit JPEG
+    // source). 0 (every scene without a pbrt-loaded image-based infinite
+    // light) skips this NEE strategy entirely in every material's own
+    // shading function, same "0 disables it" pattern as envMapWidth.
+    uint pbrtEnvMapWidth;
+    uint pbrtEnvMapHeight;
+    // Whether a REAL pbrt FILE was loaded (metal_poc.mm's own
+    // `!pbrtScenePath.empty()`, section 163 - deliberately narrower than
+    // `havePbrtCamera`, which every HAND-AUTHORED scene's own camera
+    // setup also sets, pbrt file or not) - decides what the FINAL
+    // miss-path fallback below does once useEnvironmentMap/
+    // pbrtHasImageEnvLight/pbrtHasConstantEnvLight have ALL already been
+    // checked and found false (i.e. this scene has no environment/sky
+    // light of any kind). 0 (every hand-authored scene, which was always
+    // authored expecting SOME background - either the earthTexture env
+    // map or an explicit sky colour) keeps the existing procedural
+    // sky-gradient fallback exactly as before. != 0 means a REAL pbrt
+    // file was loaded and genuinely has no `LightSource "infinite"`
+    // directive at all - real pbrt-v4's own behaviour there is a plain
+    // BLACK background (no ambient sky exists unless a scene explicitly
+    // asks for one), which is what CPU/OptiX already render; this
+    // loader's own sky-gradient fallback was firing unconditionally
+    // regardless, a real, previously undiscovered bug found by directly
+    // comparing several category-C pbrt-example scenes against `--cpu`
+    // (most of pbrt_scenes/*.pbrt's own "Lights" examples deliberately
+    // have NO infinite light, so their own dark/moody framing - and
+    // often a scene-specific feature's own visibility, e.g. C9/C11/C13/
+    // C14's own otherwise-dim emissive geometry - was getting washed out
+    // by this loader's own unrelated bright sky-blue gradient bleeding
+    // through every miss ray, section 163).
+    uint isPbrtScene;
+    // Orthographic (parallel-projection) camera - pbrt-v4's own
+    // OrthographicCamera, D2/D6's own real port (section 150). 0 (every
+    // earlier scene) keeps the existing pinhole/thin-lens PERSPECTIVE
+    // fan exactly as before - purely additive, same "0 reproduces prior
+    // behaviour" shape every other camera-feature flag above already
+    // has. != 0 switches the primary ray generation from a fanned
+    // direction (`cameraForward + screen.x*cameraRight + screen.y*
+    // cameraUp`) to a CONSTANT direction (`cameraForward`) with the
+    // SAME `screen.x/screen.y` instead offsetting the ray's ORIGIN -
+    // `tanHalfFov` is reused unchanged as the orthographic screen
+    // window's own half-extent (not a tangent at all here, just a
+    // world-space distance) since the aspect-ratio scaling already
+    // applied to `screen` above is IDENTICAL to pbrt-v4's own
+    // `compute_screen_window()` shape (`xmax`, `ymax` in [-1,1] or
+    // aspect-scaled), just missing that formula's own final `*320`
+    // (or whatever literal) multiplier - which is exactly what setting
+    // `tanHalfFov` to that literal (pre-scaled by `sceneScale`, the
+    // same world-space-distance convention `pbrtLensRadius` already
+    // uses) supplies.
+    uint cameraOrthographic;
+    // Spherical (360-degree equirectangular panorama) camera - pbrt-v4's
+    // own SphericalCamera, D7/D8's own real port (section 152). 0
+    // (every earlier scene) keeps the existing ray generation exactly
+    // as before - purely additive, same shape as `cameraOrthographic`
+    // immediately above (mutually exclusive with it in practice, never
+    // both nonzero for the same scene). != 0 replaces the ENTIRE
+    // perspective/orthographic direction computation with pbrt-v4's own
+    // SphericalCamera::GenerateRay() formula (EquiRectangular mapping):
+    // `theta = pi*v, phi = 2*pi*u` (`u`/`v` the SAME `pixelNDC.x/y`
+    // already computed for every other mode, BEFORE the `screen.y =
+    // -screen.y` flip that only the perspective/orthographic modes
+    // need), `rayDir = -sin(theta)*cos(phi)*cameraRight +
+    // cos(theta)*cameraUp + sin(theta)*sin(phi)*cameraForward` - the
+    // leading MINUS on the `cameraRight` term is the SAME right-vector
+    // sign correction `cameraOrthographic`'s own comment explains (CPU's
+    // `cameras.h::make_look_at()` alt-camera path's `right` is the
+    // negation of this loader's own `cameraRight`, which always matches
+    // CPU's PRIMARY perspective camera instead). `cameraPos` is used
+    // directly as the ray origin (no lens/DOF, no screen-window offset -
+    // every pixel shares one origin, only the DIRECTION varies, the
+    // defining trait of a panoramic camera).
+    uint cameraSpherical;
+    // Which mapping `cameraSpherical`'s own ray generation uses - 0
+    // (every scene before D11, and D7/D8's own hand-authored ports)
+    // means EquiRectangular (this field's own default, matching
+    // cameraSpherical's own comment above exactly, unread when
+    // cameraSpherical==0). Nonzero means EqualArea instead - pbrt-v4
+    // Camera "spherical" "string mapping" ["equalarea"], real pbrt
+    // FILE scenes only (D11, section 159) - no hand-authored scene
+    // requests it. See equalAreaSquareToSphere()'s own comment
+    // (metal_poc_types.metal) for the mapping itself.
+    uint sphericalMappingEqualArea;
+    // Realistic (multi-element-lens) camera - pbrt-v4's own
+    // RealisticCamera, D4/D8's own real port (section 157). 0 (every
+    // earlier scene) keeps the existing ray generation exactly as
+    // before - mutually exclusive with cameraOrthographic/cameraSpherical
+    // in practice. != 0 replaces the ENTIRE primary ray generation with
+    // sampleRealisticCameraRay()'s own real per-element Snell's-law
+    // lens trace, reading the `lensElements`/`exitPupilBounds` buffers
+    // below - see metal_poc.mm's own Uniforms::cameraRealistic mirrored
+    // comment for the full host-side precompute mechanism.
+    uint cameraRealistic;
+    uint numLensElements;
+    uint numExitPupilBounds;
+    float filmHalfX;
+    float filmHalfY;
+    float lensRearZ;
+    // Real (not translate-only-approximated) camera shutter motion blur
+    // for a scene whose camera keeps a FIXED lookAt point while its own
+    // origin moves (D13, section 174) - `cameraVelocity` above only
+    // offsets the ORIGIN, leaving `cameraForward`/`cameraRight`/
+    // `cameraUp` fixed for the whole exposure, which is wrong whenever
+    // the real camera path is actually an orbit/truck around a fixed
+    // subject rather than a pure translation: pointing at the SAME
+    // world point from a shifted origin needs a slightly different
+    // forward direction too, and a uniform-across-the-frame blur (what
+    // the origin-only version produces) looks visibly different from a
+    // real pivot's own "least blur near the lookAt point, more at the
+    // periphery" character - confirmed by directly comparing an
+    // origin-only render against CPU's own real AnimatedTransform
+    // result, not assumed close enough. `hasCameraOrbitBlur != 0`
+    // recomputes the WHOLE forward/right/up basis fresh, once per
+    // SAMPLE, from `mix(cameraPos, cameraPos+cameraVelocity, shutterT)`
+    // toward `cameraLookAtBlur` (fixed) using `cameraUpRawBlur` (fixed) -
+    // exactly reproducing "translate the origin, keep pointing at the
+    // same target," the same conceptual camera model pbrt-v4's own
+    // AnimatedTransform decomposition targets for this exact keyframe
+    // shape (a translate with the rotation fully determined by it, not
+    // an independent rotation needing its own interpolation/slerp).
+    // 0 (every scene but D13) leaves the existing cameraVelocity-only
+    // path completely unchanged - a provable no-op.
+    packed_float3 cameraLookAtBlur;
+    packed_float3 cameraUpRawBlur;
+    uint hasCameraOrbitBlur;
+    // Row-band progress reporting - see metal_poc_gpu_types.h's own
+    // mirrored comment for the full "why". Appended at the very end,
+    // same reasoning as that comment.
+    uint rowOffset;
+
+    // Pixel reconstruction filter importance-sampling table - see
+    // metal_poc_gpu_types.h's own mirrored comment for the full "why".
+    // Appended at the very end, same reasoning as rowOffset's own
+    // comment just above. Consumed by primaryRayKernel's own
+    // sampleFilterPosition() call (metal_poc_sampling.metal).
+    uint filterKind;
+    float filterB;
+    float filterC;
+    float filterSigma;
+    float filterTau;
+    float filterRadius;
+    float filterIntegral;
+    float filterConditionalCDF[32][32];
+    float filterMarginalCDF[32];
+    // See metal_poc_gpu_types.h. <= 0 means unbounded.
+    float fireflyClamp;
+    // Divergence census (METAL_CENSUS=1): record per pixel which material/event each bounce of sample 0 hits.
+    uint debugCensus;
+    // 1 = path regeneration (a lane starts its next sample as soon as its path ends); 0 = lockstep (all lanes of a
+    // SIMD group start their next sample together, as before). Same image either way; see the kernel's loop.
+    uint pathRegen;
+    // 1 when the camera medium has different extinction per colour channel: the kernel then follows ONE channel per path
+    // (chosen uniformly, weight x3 on it, as for a chromatic glass medium) and uses that channel of fogSigmaT3 for free
+    // flight and shadow-ray attenuation. 0: grey medium, the scalar fogSigmaT is used. Bit 1 (value 2): a medium sphere or tube is chromatic, so every
+    // path fixes its hero channel at the camera (a shadow ray from a surface that crosses the medium before the path ever enters it needs one too).
+    uint fogChromatic;
+    packed_float3 fogSigmaT3;
+    // 1 during a Live Preview session: the kernel records each pixel's first hit position in worldPosTexture.
+    uint liveWorldPos;
+    // Adaptive sampling's relative-error threshold (RenderOptions::adaptive_threshold); only read when adaptiveSampling != 0.
+    float adaptiveThreshold;
+    // 1 + the primitive index of the OUTERMOST glass sphere that bounds a medium and contains the camera (a "world haze" shell), or 0 for none (so zero-initialised Uniforms mean none). A path then
+    // starts inside that medium instead of entering it by refraction, and returns to it on leaving a nested glass-medium sphere.
+    int cameraGlassPrim;
+    // pbrt-v4 portal (windowed) infinite light (see portalSampleLi() in metal_poc_environment.metal). 1 = the pbrt scene's image infinite light has a portal[4] window; its
+    // data then rides in the pbrtEnv buffers instead of the plain environment distribution. Frame = the portal quad's orthonormal frame, P0/P2 its diagonal corners.
+    uint pbrtHasPortalLight;
+    uint pbrtPortalWidth;
+    uint pbrtPortalHeight;
+    float pbrtPortalScale;
+    packed_float3 portalFrameX;
+    packed_float3 portalFrameY;
+    packed_float3 portalFrameZ;
+    packed_float3 portalP0;
+    packed_float3 portalP2;
+    // Metal instance id of the first pbrt ObjectInstance placement, 0xFFFFFFFF = none (see the host copy in metal_poc_gpu_types.h).
+    uint pbrtInstanceFirst;
+    // pbrt's Approximate_dp_dxy (the footprint of a bounced hit, bumpFootprintApprox() in metal_poc_bump.metal): the camera's smallest pixel differentials in the frame round a ray, found on
+    // the host (src/shared/camera_footprint.h makeCamera); footprintValid is 0 for every camera but a plain perspective one.
+    packed_float3 footprintMinDirX;
+    packed_float3 footprintMinDirY;
+    uint footprintValid;
+};
+
+// Blinn/pbrt-v4's own smooth cone falloff: 0 outside the outer cone, 1
+// inside the inner cone, smoothstep-interpolated in between - `wiFromLight`
+// points FROM the light TOWARD the shading point (the direction the
+// spot's own light actually travels), compared against the spot's own
+// aim `direction`.
+inline float spotLightFalloff(float3 wiFromLight, float3 direction, float cosOuterAngle, float cosInnerAngle) {
+    if (cosOuterAngle <= -1.0) {
+        return 1.0; // omnidirectional - every point light before this one
+    }
+    float cosAngle = dot(normalize(wiFromLight), normalize(direction));
+    if (cosAngle < cosOuterAngle) return 0.0;
+    if (cosAngle > cosInnerAngle) return 1.0;
+    float t = (cosAngle - cosOuterAngle) / max(cosInnerAngle - cosOuterAngle, 1e-6);
+    return t * t * (3.0 - 2.0 * t); // smoothstep
+}
+
+// Evaluates a ProjectionLight's own emitted intensity toward a shading
+// point, given `wiFromLight` (the direction the light itself travels,
+// FROM the light TOWARD the shading point - the same convention
+// spotLightFalloff() already uses for its own `wiFromLight`). Mirrors
+// pbrt-v4 ProjectionLight::I(): reject anything behind the projector
+// (`lz <= hither`, a small positive epsilon rather than exactly 0, same
+// reasoning pbrt-v4's own default hither has - avoids a degenerate
+// divide right at the projector's own image plane), perspective-project
+// into normalized screen space, reject anything outside the frustum's
+// own screen bounds, then sample the image at the resulting UV. No
+// separate falloff curve the way spotLightFalloff() has - the image
+// itself (all zero outside the visible frustum, real pixel values
+// inside it) already IS the full directional intensity function.
+inline float3 projectionLightRadiance(float3 wiFromLight, packed_float3 lightForward,
+                                       packed_float3 lightRight, packed_float3 lightUp,
+                                       float tanHalfFovX, float tanHalfFovY, float scale,
+                                       texture2d<float, access::sample> image, sampler s) {
+    float3 wi = normalize(wiFromLight);
+    float lz = dot(wi, float3(lightForward));
+    const float kHither = 0.001;
+    if (lz <= kHither) {
+        return float3(0.0); // Behind (or exactly at) the projector's own image plane.
+    }
+    float lx = dot(wi, float3(lightRight)) / lz;
+    float ly = dot(wi, float3(lightUp)) / lz;
+    float sx = lx / tanHalfFovX;
+    float sy = ly / tanHalfFovY;
+    if (abs(sx) > 1.0 || abs(sy) > 1.0) {
+        return float3(0.0); // Outside the projector's own frustum.
+    }
+    // Screen space [-1,1]^2 -> image UV [0,1]^2, matching pbrt-v4
+    // (screenBounds.Offset(), no Y flip) and the CPU port in
+    // src/shared/projection_light.h so the slide lands identically on
+    // every backend. Two details differ from a naive "up is up" mapping:
+    //  - V is NOT flipped: pbrt feeds screen +Y straight into the image's
+    //    row index, so the image's row 0 sits at screen -Y.
+    //  - U runs against `lightRight`: pbrt's LookAt derives its right axis
+    //    as cross(up, dir), while the loader builds `lightRight` as
+    //    cross(forward, up) (the convention the goniometric light uses),
+    //    i.e. the opposite sign.
+    float2 uv = float2(0.5 - sx * 0.5, sy * 0.5 + 0.5);
+    // Nearest-neighbour, clamped: pbrt-v4 and src/shared/projection_light.h
+    // (image_lookup_rgb) both fetch the single texel under uv rather than
+    // filtering. Bilinear (the caller's `s`) smears a low-resolution slide
+    // (e.g. an 8x4 checker) into pastel blobs instead of crisp cells.
+    constexpr sampler nearestSampler(coord::normalized, address::clamp_to_edge, filter::nearest);
+    return image.sample(nearestSampler, uv).rgb * scale;
+}
+
+// pbrt-v4's own equal-area octahedral sphere<->square mapping
+// (src/shared/sampling_extra.h's EqualAreaSphereToSquare(), itself
+// mirroring pbrt-v4 util/math.cpp) - a direct, faithful port (Clarberg
+// 2008's minimax polynomial approximation of atan, not a re-derivation).
+// Unlike equirectangularUV()'s own longitude/latitude mapping (which
+// distorts area heavily near the poles - equal SOLID ANGLE regions map
+// to very UNEQUAL image-space area there), this maps the WHOLE sphere to
+// a single [0,1]^2 square with equal-AREA fidelity everywhere, the
+// standard choice for a goniometric (IES-profile) light's own stored
+// image: pbrt-v4 requires it specifically so a uniformly-sampled image
+// pixel corresponds to a uniformly-likely direction, not a pole-biased
+// one - this POC only ever uses the forward (direction-to-UV) half
+// below (a goniometric light's own `eval_I` is a pure lookup, never an
+// image-guided direction SAMPLE), so only EqualAreaSphereToSquare
+// itself is ported, not its own inverse or WrapEqualAreaSquare.
+inline float2 equalAreaSphereToSquare(float3 w) {
+    float x = abs(w.x), y = abs(w.y), z = abs(w.z);
+    float r = sqrt(max(0.0, 1.0 - z));
+    float a = max(x, y);
+    float b = min(x, y);
+    b = (a == 0.0) ? 0.0 : b / a;
+
+    const float t1 = 0.406758566246788489601959989e-5;
+    const float t2 = 0.636226545274016134946890922156;
+    const float t3 = 0.61572017898280213493197203466e-2;
+    const float t4 = -0.247333733281268944196501420480;
+    const float t5 = 0.881770664775316294736387951347e-1;
+    const float t6 = 0.419038818029165735901852432784e-1;
+    const float t7 = -0.251390972343483509333252996350e-1;
+    float phi = t1 + b * (t2 + b * (t3 + b * (t4 + b * (t5 + b * (t6 + b * t7)))));
+    if (x < y) phi = 1.0 - phi;
+
+    float vv = phi * r;
+    float uu = r - vv;
+    if (w.z < 0.0) {
+        float tmp = uu;
+        uu = 1.0 - vv;
+        vv = 1.0 - tmp;
+    }
+    uu = copysign(uu, w.x);
+    vv = copysign(vv, w.y);
+    return float2(0.5 * (uu + 1.0), 0.5 * (vv + 1.0));
+}
+
+// The inverse of equalAreaSphereToSquare() just above: (u,v) in [0,1]^2
+// -> unit sphere direction, equal-area - needed once a caller SAMPLES a
+// direction from (u,v) rather than only looking one up (the reason this
+// inverse wasn't ported alongside the forward mapping originally - see
+// that function's own comment). The spherical camera's own EqualArea
+// mapping option (D11, pbrt-v4 Camera "spherical" "string mapping"
+// ["equalarea"], section 159) is the first caller. Direct port of
+// src/shared/sampling_sphere.h's EqualAreaSquareToSphere / gpu/optix/
+// optix_device_helpers_lighting.h's own already-shipped CUDA mirror
+// (dev_equal_area_square_to_sphere) - same algorithm, this file's own
+// established `float` (not CUDA's `double`) precision, matching
+// equalAreaSphereToSquare() immediately above.
+inline float3 equalAreaSquareToSphere(float u, float v) {
+    float uu = 2.0 * u - 1.0, vv = 2.0 * v - 1.0;
+    float up = abs(uu), vp = abs(vv);
+    float signedDist = 1.0 - (up + vp);
+    float d = abs(signedDist);
+    float r = 1.0 - d;
+    float phi = (r == 0.0 ? 1.0 : (vp - up) / r + 1.0) * (M_PI_F / 4.0);
+    float wz = copysign(1.0 - r * r, signedDist);
+    float cosPhi = cos(phi);
+    float sinPhi = sin(phi);
+    float xyR = r * sqrt(max(0.0, 2.0 - r * r));
+    float wx = copysign(cosPhi * xyR, uu);
+    float wy = copysign(sinPhi * xyR, vv);
+    return float3(wx, wy, wz);
+}
+
+// Mirrors an (u,v) outside [0,1]^2 back onto the equal-area square -
+// needed wherever the caller's own (u,v) can legitimately land slightly
+// outside that range (equalAreaSquareToSphere()'s own caller draws a
+// per-sample jittered pixel coordinate, not an image index a plain
+// clamp would already handle correctly). Direct port of
+// src/shared/sampling_sphere.h's WrapEqualAreaSquare / gpu/optix/
+// optix_device_helpers_lighting.h's own dev_wrap_equal_area_square.
+inline void wrapEqualAreaSquare(thread float& u, thread float& v) {
+    if (u < 0.0) { u = -u; v = 1.0 - v; }
+    else if (u > 1.0) { u = 2.0 - u; v = 1.0 - v; }
+    if (v < 0.0) { u = 1.0 - u; v = -v; }
+    else if (v > 1.0) { u = 1.0 - u; v = 2.0 - v; }
+}
+
+inline float3 goniometricLightRadiance(float3 wiFromLight, packed_float3 lightForward,
+                                        packed_float3 lightRight, packed_float3 lightUp,
+                                        packed_float3 emission, float scale,
+                                        texture2d<float, access::sample> image, sampler s) {
+    float3 wi = normalize(wiFromLight);
+    float3 local = float3(dot(wi, float3(lightRight)), dot(wi, float3(lightUp)), dot(wi, float3(lightForward)));
+    float2 uv = equalAreaSphereToSquare(local);
+    // pbrt's GoniometricLight::I reads the profile with LookupNearest (the CPU's image_lookup is a nearest texel as well): a linear lookup blurs the profile's edges, which a
+    // light aimed at a dark part of the profile shows (a floor under a light whose pole points sideways read 0.0004 where the CPU and pbrt read about 0).
+    constexpr sampler nearestSampler(coord::normalized, address::clamp_to_edge, filter::nearest);
+    float intensity = image.sample(nearestSampler, uv).r;
+    return float3(emission) * intensity * scale;
+}
+
+// A shadow ray toward a directional light has no real target distance
+// (the light is at infinity) - this is just "farther than anything in
+// this room's own [-1,1]^3 extent could be," so an unoccluded shadow ray
+// reads as having genuinely exited the scene rather than being clipped
+// short of a real occluder.
+constant float kDirectionalLightMaxDistance = 10.0f;
+
+// Per-sample firefly clamp: the kernel caps each sample's max(r,g,b) at
+// Uniforms::fireflyClamp, which the pbrt loader sets from the scene's Film
+// "maxcomponentvalue" (default unbounded, exactly like the CPU path). This used
+// to be a fixed constant of 20 tuned for the old hand-authored room; a pbrt scene
+// can legitimately exceed it (the ceiling right above a point light reads
+// 100-260), so Metal rendered those scenes ~35% too dark.
+
+// Adaptive sampling's own convergence parameters, ported directly from
+// this project's own CPU integrator (src/shared/adaptive_sampling.h) -
+// same values, not re-tuned for this scene, since they're already a
+// real, working default (Cycles' own adaptive_threshold) rather than an
+// arbitrary starting guess. `kAdaptiveThreshold`: a pixel is "converged"
+// once its own running mean's standard error, relative to that mean,
+// drops below this. `kAdaptiveBlackFloor`: a near-black pixel (mean
+// below this) is converged unconditionally rather than divided into a
+// permanently-large relative error by a near-zero mean - matches
+// Cycles' own behaviour of not endlessly re-sampling background/shadow
+// pixels correctly converging toward zero. `kAdaptiveMinSamples`: never
+// even CHECK convergence before this many samples - the CPU version's
+// own `min(2 * sqrt_spp, 32)` doesn't translate directly (this POC's
+// own sample loop isn't the CPU's stratified sqrt_spp x sqrt_spp grid),
+// so a flat, comparably-sized minimum is used instead.
+constant float kAdaptiveThreshold = 0.01f;
+constant float kAdaptiveBlackFloor = 1e-4f;
+constant uint kAdaptiveMinSamples = 16u;
+
+// This scene's own room bounds (see metal_poc.mm's own floor/ceiling/
+// wall addQuad() calls) - an explicit, documented scene-specific
+// constant, the same category as this file's own hardcoded Suzanne
+// instance_id threshold, not a general-purpose scene-bounds mechanism.
+constant float3 kRoomBoundsMin = float3(-1.0, -1.0, -1.0);
+constant float3 kRoomBoundsMax = float3(1.0, 1.0, 1.0);
+
+// Distance from `origin` (assumed INSIDE the box) to where a ray leaves
+// the axis-aligned box `[boxMin, boxMax]` - the standard "far" slab-test
+// distance (the near one is behind the ray, since origin is inside).
+// Used to give the directional light's own fog attenuation a REAL path
+// length instead of skipping it (see DirectionalLight's own comment):
+// valid specifically because it's only ever called on an UNOCCLUDED
+// shadow ray, which therefore can only have exited through this room's
+// one actual gap, not through a solid wall this box-only test doesn't
+// know about.
+//
+// Every call site guards this behind `uniforms.fogSigmaT > 0.0` (a
+// real, previously-latent bug found by section 143/B23): `origin`
+// genuinely IS always inside `[kRoomBoundsMin, kRoomBoundsMax]` for
+// every Cornell-family/hardcoded-room-scaled scene, but a much larger,
+// far-offset bespoke scene (B23's own prism, sitting around x=8, not
+// [-1,1]) violates that precondition outright. Combined with a light
+// direction that has an EXACTLY-zero component on some axis (common
+// for an axis-ish-aligned directional light), `1.0/dir` divides by
+// zero into +-Infinity, and `boxMin/Max - origin` being the SAME sign
+// on that axis (since origin sits entirely outside the box) makes both
+// slab planes agree on that sign too - the overall min() then returns
+// +-Infinity, not a finite number. Multiplying an unconditionally-
+// computed `fogSigmaT * exitDist` by a `fogSigmaT` of EXACTLY 0.0 does
+// NOT save this (`0 * Infinity` is NaN, not 0 - the finite-times-zero
+// intuition doesn't apply), silently poisoning `radiance` for the rest
+// of that shading call. Skipping the call entirely whenever there's no
+// fog to attenuate (the common case for most scenes) is both the fix
+// and a free perf win, cheaper than trying to make this function safe
+// to call outside its own documented precondition.
+inline float rayBoxExitDistance(float3 origin, float3 dir, float3 boxMin, float3 boxMax) {
+    float3 invDir = 1.0 / dir;
+    float3 tPlane1 = (boxMin - origin) * invDir;
+    float3 tPlane2 = (boxMax - origin) * invDir;
+    float3 tFar = max(tPlane1, tPlane2);
+    return min(min(tFar.x, tFar.y), tFar.z);
+}
+
+// The camera medium's transmittance over `dist` as a per-channel colour: a chromatic fog (uniforms.fogChromatic) attenuates each channel by its own sigma_t. The path's
+// throughput is masked to the hero channel, so this vector only ever reaches that channel; the scalar mean used before was the wrong sigma_t for it.
+inline float3 fogTransmittance(constant Uniforms& u, float dist) {
+    if (!(u.fogSigmaT > 0.0)) return float3(1.0);
+    return (u.fogChromatic & 1u) != 0u ? exp(-float3(u.fogSigmaT3) * dist) : float3(exp(-u.fogSigmaT * dist));
+}
+
+// materialType: 0 = Lambertian diffuse, 1 = mirror (perfect specular),
+// 2 = dielectric (glass), 3 = textured Lambertian (same BSDF/NEE code path
+// as 0, just samples `earthTexture` at the hit's interpolated UV for
+// albedo instead of reading `color` - see the shading loop below), 4 =
+// rough conductor (GGX microfacet metal - `color` is the conductor's
+// normal-incidence reflectance F0, not a diffuse albedo), 5 = rough
+// (frosted) dielectric - materialType 2's own reflect/refract math,
+// VNDF-perturbed - see that branch's own comment for exactly what's and
+// isn't modeled. `color` means something different again for {2,5}: a
+// per-unit-distance Beer-Lambert ABSORPTION coefficient, not a
+// reflectance/tint - see applyBeerLambertAbsorption()'s own comment.
+// 6 = procedural checkerboard Lambertian (same BSDF/NEE code path as 0/3
+// again - `color` is tile A, tile B is a fixed fraction of it, computed
+// analytically from UV with no texture/sampler involved at all, unlike
+// materialType 3's image lookup - see checkerColor()'s own comment).
+// 7 = procedurally bump-mapped Lambertian (same BSDF/NEE code path as
+// 0/3/6 yet again - the ONLY difference is which NORMAL that shared code
+// shades with: `facingNormal` is perturbed in tangent space by
+// proceduralBumpNormal() before any of it runs, rather than albedo
+// changing the way it does for 3/6). Only ever assigned to a primary-
+// triangle-buffer primitive (never a sphere/disk/Suzanne instance) since
+// tangentFor() needs that buffer's own flat vertex/uv indexing.
+// 8 = clearcoat (glossy plastic/car-paint): a stochastic Fresnel-
+// weighted MIX of a smooth dielectric clear coat (fixed IOR 1.5, F0 =
+// 0.04, always colourless/non-metal - unlike materialType 1's own
+// tinted mirror) over a Lambertian diffuse base (`color`, the same
+// meaning it has for materialType 0). At each hit, a single random draw
+// against the coat's own Fresnel reflectance decides which LOBE this
+// bounce samples - the specular coat (probability == its own
+// reflectance, so no NEE, same delta-lobe reasoning materialType 1
+// already uses) or the diffuse base (probability == 1 - that
+// reflectance, full NEE + cosine-sampling, same code shape as
+// materialType 0's own branch) - never a blend of both in one bounce.
+// This is the standard way to stochastically combine two BRDF lobes
+// without bias: sampling each lobe with probability exactly equal to
+// its own weight makes that weight cancel out of the estimator
+// entirely, so NEITHER branch needs an extra scaling factor at the
+// point of the random decision - see the shading loop's own comment on
+// this material for why duplicating the diffuse NEE code here (instead
+// of falling through to materialType 0's shared branch) is necessary,
+// not just convenient.
+// 9 = procedurally roughness-mapped GGX conductor - the SAME NEE/BSDF
+// shape materialType 4 already uses, but `alphaX`/`alphaY` are computed
+// from an analytic UV-space checker pattern (reusing checkerColor(),
+// picking between two roughness values instead of two colours) rather
+// than being one constant per primitive - patches of near-mirror-smooth
+// and rough microfacet regions on the SAME surface, a "worn/scratched
+// metal" look. Genuinely different from materialType 4's own anisotropy
+// (varies BY DIRECTION at a single point) - this varies BY LOCATION
+// (isotropic at any single point, but which isotropic alpha changes
+// across the surface). Only ever assigned to a SPHERE in this scene:
+// `equirectangularUV()` on the hit's own object-space normal gives a
+// texture-space coordinate for free (the same technique the environment
+// map already uses for direction-based sampling), rather than needing
+// materialType 7's own tangentFor()/real mesh UVs.
+// 10 = patterned emissive AreaLight surface - otherwise materialType
+// 0's own Lambertian (the SAME light-quad-doubles-as-diffuse-reflector
+// behaviour every earlier AreaLight already has for indirect bounces
+// landing on it), except the "did a ray land directly on the light"
+// check earlier in this loop evaluates a checkerboard pattern
+// (checkerColor(), `roughness` as the tile-B fraction) at the hit's own
+// UV instead of using `emission` as a flat constant - see AreaLight's
+// own `patternTileB`/`patternScale` comment for the NEE-side half of
+// this (a DIFFERENT point on the same light, so a different UV, hence
+// two separate places evaluating the same pattern rather than one).
+// 11 = thin dielectric (pbrt-v4's own ThinDielectricBxDF) - a zero-
+// thickness slab (soap film, single window pane), genuinely different
+// from materialType 2/5's own SOLID glass: transmission passes straight
+// through with no bending at all, and reflectance uses a closed-form
+// multi-bounce geometric series instead of a single-interface Fresnel
+// term - see the shading loop's own comment on this materialType for
+// the full formula. `ior` is meaningful here too (same slot, same
+// meaning as materialType 2/5's own refraction index), `roughness` is
+// unused (a thin dielectric has no rough/frosted variant modeled here).
+// `ior` is meaningful for materialType == 2 and 5 (refraction index) and
+// reused, differently, for materialType == 4 (perceptual roughness in
+// [0,1], squared into the GGX alpha parameter below) - materialType 4
+// and {2,5} never coexist on one primitive, so sharing the slot there
+// avoids a second otherwise-almost-always-zero field; materialType 5
+// needs both ior AND roughness at once though, hence `roughness` getting
+// its own field instead of also trying to overload `ior`. materialType 9
+// reuses BOTH the same way materialType 5 does - `ior` the smooth
+// patch's own perceptual roughness, `roughness` the rough patch's - two
+// roughness values instead of one, picked between by location rather
+// than both applying at once the way 5's ior/roughness do. Both fields
+// carried on every material anyway (rather than a separate per-type
+// struct) since this POC values "one flat array, index by primitive_id"
+// simplicity over saving a few bytes on entries that don't use every
+// field. `emission` is nonzero only for a light quad's own triangles
+// (see the AreaLight struct below) - same "just carry it, don't special-
+// case a rare field" reasoning. Checking it unconditionally on every hit
+// (regardless of material type) is what makes a light source visible at
+// all when a camera/GI ray lands on it directly, on top of the light-
+// SAMPLING code below which handles every other surface's direct
+// illumination FROM it.
+struct TriangleMaterial {
+    packed_float3 color;
+    uint materialType;
+    // Real refraction index for materialType == 2/5/11 (see each
+    // branch's own comment); reused again, differently, by materialType
+    // == 4/9 (anisotropic/patchy conductor's own alphaX) and now
+    // materialType == 14 (velvet's own `sigma` spread parameter, see
+    // shadeVelvet's own comment) - the same "one scalar slot, per-
+    // materialType meaning" pattern `roughness` already uses below.
+    float ior;
+    packed_float3 emission;
+    // Index into the `lights` buffer for a hit ON one of a light's own
+    // emissive triangles - -1 for every non-emissive material. Lets the
+    // direct-hit MIS weight (see the emission check in the shading loop)
+    // look up exactly which AreaLight's area/normal to weight against,
+    // instead of a single global light's constants.
+    int lightId;
+    // Perceptual roughness for materialType == 5 (rough/frosted
+    // dielectric) - unlike materialType == 4's reuse of the `ior` slot
+    // for roughness, a rough dielectric genuinely needs both `ior` (real
+    // refraction index) and a roughness value at once, so this gets its
+    // own field rather than overloading an existing one. ALSO reused,
+    // differently again, by materialType == 4 as its own alphaY
+    // (anisotropic Y-axis roughness, alongside `ior`'s own alphaX) -
+    // `roughness == 0.0` there falls back to the isotropic case (alphaY
+    // == alphaX), so this stays a safe no-op for every scene that never
+    // sets it. ALSO reused a further time by materialType == 13 (Oren-
+    // Nayar rough diffuse) as its own sigma parameter - `roughness ==
+    // 0.0` there reduces EXACTLY to plain Lambertian, the same "0 is a
+    // safe no-op" contract every other reuse of this field already
+    // follows. 0 for every other material type.
+    float roughness;
+    // Complex IOR (eta + i*k) per RGB channel, materialType == 4/9 only -
+    // the real physically-based conductor Fresnel (frComplexRGB(), see
+    // its own comment) these two materials now use in place of the flat-
+    // tint Schlick approximation fresnelSchlickConductor() still is for
+    // materialType == 1's mirror. 0 for every other material type (unread
+    // there).
+    packed_float3 conductorEta;
+    packed_float3 conductorK;
+    // Diffuse TRANSMITTANCE tint, materialType == 12 only (`color` is
+    // this material's own diffuse REFLECTANCE tint, same convention as
+    // materialType 0/3/6/7) - a two-sided translucent diffuser (paper, a
+    // leaf, a thin frosted panel), pbrt-v4's own DiffuseTransmissionBxDF
+    // (src/shared/bxdfs_layered.h). 0 for every other material type.
+    packed_float3 transmitColor;
+    // pbrt-v4's own "bool twosided" AreaLightSource parameter (section
+    // 104), mirrored from AreaLight::twoSided above so the direct-hit
+    // emissive check can read it without a lights[] lookup - needed
+    // for a non-quad/disk emissive shape (sections 100/101), which has
+    // no AreaLight entry (lightId < 0) to look up in the first place.
+    // 0 for every non-emissive material.
+    uint twoSided;
+    // Image bump map: see metal_poc_gpu_types.h. bumpWidth == 0 means none.
+    int bumpOffset;
+    int bumpWidth;
+    int bumpHeight;
+    float bumpScale;
+    int bumpIsNormalMap;   // 1: RGB tangent-space normal map (3 floats per texel), 0: height map (1 float per texel)
+    // Alpha cutout: see metal_poc_gpu_types.h. alphaWidth == 0 means none.
+    int alphaOffset;
+    int alphaWidth;
+    int alphaHeight;
+    // UV mapping of the reflectance picture and of the bump / normal-map picture: see metal_poc_gpu_types.h. (1, 1, 0, 0) = identity.
+    float uvScaleU, uvScaleV, uvDeltaU, uvDeltaV;
+    float bumpUvScaleU, bumpUvScaleV, bumpUvDeltaU, bumpUvDeltaV;
+    // The reflectance picture's "string wrap": 0 clamp, 1 repeat, 2 black (see metal_poc_gpu_types.h).
+    int textureWrap;
+    // The geometric normal of the hit on the ray's side, for spawnSide() (see metal_poc_gpu_types.h); zero = not set.
+    packed_float3 spawnNormal;
+    // The path's colour channel through a chromatic medium (-1: none) and the time of its camera sample, for traceShadowAnyM() (see metal_poc_gpu_types.h).
+    int shadowChannel;
+    float rayTime;
+};
+
+// ---- What the spare slots of TriangleMaterial mean, per material family ----------------------------------------------------------------------------------------------
+// `conductorEta`, `conductorK` (two float3) and `transmitColor` began as a conductor's complex IOR and a diffuse transmittance, and were then reused as the parameter
+// block of every later family (the loader writes them, the shader reads them). The storage is unchanged, but nothing outside this block reads those slots by their
+// conductor names for a non-conductor any more: each family has one named view here, and metal_poc_material_params.h has the matching setters for the host. A new
+// family adds its views here and its setters there, and the table in docs/METAL_BACKEND.md.
+//   conductor (4, 9, 20)   eta = conductorEta, k = conductorK            (read directly: that IS a conductor's IOR)
+//   hair (31)              betaN, alphaDeg = conductorEta.x/.y; fibre tangent = conductorK (zero: none)
+//   principled (24)        metallic, clearcoat, clearcoatRoughness = conductorEta.x/.y/.z
+//   dispersive (22, 23)    Cauchy A, B = conductorEta.x/.y
+//   measured (32)          table index = conductorEta.x
+//   subsurface (34)        BSSRDF table offset, entry-interface alpha = conductorEta.x/.y
+//   coat over a picture (27)  coat alpha = conductorEta.x
+//   medium (28, glass with a medium)  sigma_t per channel = conductorEta; g, has-medium, chromatic = conductorK.x/.y/.z
+//   cloud / RGB grid (29, 30)  index into the medium buffer = conductorEta.x
+//   texture family (25), diffuse transmission with a picture (12), thin-film etc.: the mode is conductorK.y and the rest depends on it (kernel_surface.metal)
+// Overloaded for a material in thread memory (a local copy) and one read in place from a device buffer.
+#define MAT_VIEW(RET, NAME, EXPR) \
+    inline RET NAME(thread const TriangleMaterial& m) { return EXPR; } \
+    inline RET NAME(device const TriangleMaterial& m) { return EXPR; }
+MAT_VIEW(float, matHairBetaN, m.conductorEta.x)
+MAT_VIEW(float, matHairAlphaDeg, m.conductorEta.y)
+MAT_VIEW(float3, matHairTangent, float3(m.conductorK))
+MAT_VIEW(float, matPrincipledMetallic, m.conductorEta.x)
+MAT_VIEW(float, matPrincipledClearcoat, m.conductorEta.y)
+MAT_VIEW(float, matPrincipledClearcoatRoughness, m.conductorEta.z)
+MAT_VIEW(float, matCauchyA, m.conductorEta.x)
+MAT_VIEW(float, matCauchyB, m.conductorEta.y)
+MAT_VIEW(int, matMeasuredTable, int(m.conductorEta.x))
+MAT_VIEW(float, matSubsurfaceTableOffset, m.conductorEta.x)
+MAT_VIEW(float, matSubsurfaceEntryAlpha, m.conductorEta.y)
+MAT_VIEW(float, matCoatAlpha, m.conductorEta.x)
+MAT_VIEW(float3, matMediumSigmaT, float3(m.conductorEta))
+MAT_VIEW(float, matMediumG, m.conductorK.x)
+MAT_VIEW(bool, matMediumInGlass, m.conductorK.y > 0.5)
+MAT_VIEW(bool, matMediumChromatic, m.conductorK.z > 0.5)
+MAT_VIEW(uint, matMediumBufferIndex, uint(m.conductorEta.x))
+
+// Per-ray side-channel for sphereIntersectionFunction below - Metal's
+// analogue of OptiX's optixGetRayTime(), which has no built-in
+// equivalent for a bounding-box/custom-primitive intersection function.
+// Only `shutterT` (metal_poc_kernel.metal's own per-SAMPLE shutter-time
+// draw, already used unconditionally for camera motion blur, section 22)
+// needs to reach the sphere intersection function so a moving sphere's
+// centre can be interpolated at the SAME simulated instant the camera
+// itself was sampled at, both a primary ray and any shadow ray cast
+// within that same sample.
+struct SpherePayload {
+    float shutterT;
+    // A8/section 176: a real bounded medium sphere is a semi-transparent
+    // volume, not an opaque surface. For a pure occlusion (shadow-ray)
+    // test a homogeneous one (materialType 28) is blocked only
+    // stochastically, with probability 1 - exp(-sigma_t * chord) - see
+    // sphereIntersectionFunction() - so visibility through it is
+    // attenuated correctly in expectation. The heterogeneous kinds
+    // (29/30) are still ignored entirely for shadow rays (they slightly
+    // OVER-light what's behind them).
+    // A shadow ray must set this TRUE. Do NOT rely on the default: the
+    // 3-argument `intersect(ray, accel, table)` overload does NOT apply this
+    // struct's default member initialisers to the payload it hands the
+    // intersection function, so every shadow-ray call site goes through
+    // traceShadowAny()/traceShadowAnyP() (metal_poc_sampling.metal), which
+    // construct the payload explicitly. (An implicit payload made a sphere's
+    // shadow extend well past its true extent - C4, point-light Cornell box.)
+    // The primary/continuation ray that must actually ENTER a medium sphere
+    // passes isShadowRay=false explicitly (F11, section 167).
+    bool isShadowRay = true;
+    // B14/section 184: which sphere primitive (if any) a shadow ray must
+    // treat as invisible/non-occluding, REGARDLESS of isShadowRay/
+    // materialType - -1 means "ignore nothing". Exists specifically for a sphere-shaped area
+    // light's own NEE shadow ray: unlike a quad light (a flat triangle a
+    // `max_distance` epsilon-short-stop reliably clears), a curved
+    // sphere's own surface is close enough to a shadow ray's intended
+    // target point that even a generous distance epsilon isn't reliably
+    // enough margin (found via direct debugging, not assumed - see
+    // shadeLambertian()'s own comment) - excluding the light's own
+    // primitive_id outright is the robust fix, independent of epsilon
+    // tuning.
+    int shadowIgnorePrimId = -1;
+    // Colour channel (0/1/2) whose sigma_t a glass-with-medium sphere should use for this shadow ray, or -1 for the
+    // channel mean. Set by the free-flight block while the path follows one channel inside a chromatic glass medium.
+    int shadowChannel = -1;
+};
+
+// Bounding-box intersection functions report their result through
+// attribute-tagged fields exactly like this, not a plain return value -
+// [[accept_intersection]] tells the intersector whether to keep searching
+// past this candidate, [[distance]] is what intersection_result::distance
+// reads back on the calling side if accepted.
+struct SphereIntersectionResult {
+    bool accept [[accept_intersection]];
+    float distance [[distance]];
+};
+
+// Applies only the 3x3 LINEAR part (columns 0-2; column 3 is translation,
+// meaningless for a direction) of an instance's own transform to an
+// object-space normal, producing the correct world-space one - needed
+// for any instance whose transform isn't the identity (translation alone
+// leaves a normal's direction unchanged, but Suzanne's second instance
+// below also rotates, which does not). Assumes a RIGID transform
+// (rotation + translation, no non-uniform scale) - the correct general
+// case would need the inverse-transpose of the linear part instead of
+// the linear part itself, but every instance transform this POC's own
+// scene ever constructs is rigid, so that distinction is deliberately
+// not implemented here (documented, not silently assumed away, same
+// spirit as this POC's other explicitly-scoped simplifications).
+// Inverse of a 3x3 matrix (the instance's normal matrix back to its linear part); the identity for a singular one.
+inline float3x3 inverse3x3(float3x3 m) {
+    const float3 c0 = m[0], c1 = m[1], c2 = m[2];
+    const float3 r0 = cross(c1, c2), r1 = cross(c2, c0), r2 = cross(c0, c1);
+    const float det = dot(c0, r0);
+    if (abs(det) < 1e-20f) return float3x3(1.0f);
+    return transpose(float3x3(r0, r1, r2)) * (1.0f / det);
+}
+
+inline float3 transformNormalByInstance(float3 objectNormal, InstanceTransform xf) {
+    float3x3 linear = float3x3(float3(xf.col0), float3(xf.col1), float3(xf.col2));
+    return normalize(linear * objectNormal);
+}
+
+// The tag list here (triangle_data, instancing) has to match the calling
+// intersector<instancing, triangle_data>/intersection_function_table<...>'s
+// own tags exactly, not just declare bounding_box - a mismatched tag set
+// compiles fine but the function silently never gets dispatched at trace
+// time (found by bisection: an unconditional-accept version of this
+// function still produced zero sphere hits until the tags matched).
+// Otherwise: this is callable FROM an intersector, not a kernel entry
+// point itself, so no [[buffer(N)]] index collision with primaryRayKernel's
+// own bindings to worry about - intersection functions have their own
+// independent argument table, bound via MTLIntersectionFunctionTable on
+// the host side, not shared with the calling kernel's buffer(0..N)
+// bindings at all.
+[[intersection(bounding_box, triangle_data, instancing)]]
+SphereIntersectionResult sphereIntersectionFunction(
+    float3 origin [[origin]],
+    float3 direction [[direction]],
+    float minDistance [[min_distance]],
+    float maxDistance [[max_distance]],
+    uint primitiveIndex [[primitive_id]],
+    device const SphereData* spheres [[buffer(0)]],
+    ray_data SpherePayload& payload [[payload]],
+    // A8/section 176: only read for SpherePayload::isShadowRay's own
+    // "make a medium sphere invisible to a pure occlusion test" check
+    // just below - a SEPARATE buffer(3) binding of the SAME
+    // sphereMaterialBuffer the calling kernel already binds at its own
+    // buffer(4), matching every other custom-primitive geometry's own
+    // "intersection functions have their own independent argument
+    // table" convention (this struct's own comment above).
+    device const TriangleMaterial* sphereMaterials [[buffer(3)]])
+{
+    SphereIntersectionResult result;
+    result.accept = false;
+
+    // Medium spheres (materialType 28, homogeneous; materialType 29, E2's
+    // own heterogeneous CloudMedium; materialType 30, E4's own
+    // heterogeneous RgbGridMedium) are semi-transparent volumes, not
+    // opaque surfaces - a pure occlusion test (SpherePayload::
+    // isShadowRay's own comment) must not treat one as a blocker at all,
+    // so it's rejected here before any real geometric test runs. The
+    // PRIMARY/continuation ray that actually needs to detect ENTERING
+    // one of these spheres sets isShadowRay=false explicitly
+    // (metal_poc_kernel.metal's own primary-ray payload construction),
+    // so it's unaffected by this check.
+    {
+        uint mt = sphereMaterials[primitiveIndex].materialType;
+        if (payload.isShadowRay && (mt == 29u || mt == 30u)) return result;   // (a shadow ray passes through a medium trigger sphere; a subsurface surface blocks it, as in pbrt)
+        // A glass sphere that bounds a medium is NOT in this list: like every pbrt-v4 surface with a material it is opaque to NEE
+        // shadow rays (VolPathIntegrator::SampleLd), so a scatter vertex inside it cannot see a light through its own shell and the fog is
+        // lit only along specular chains - the same rule the CPU and both OptiX backends follow (commit 2f8dc3d). A boundary that should
+        // not block is Material "interface", which is materialType 28 here.
+        if (payload.isShadowRay && mt == 28u) {
+            // Homogeneous medium sphere vs a shadow ray: not an opaque
+            // blocker, but it does attenuate. Visibility through it is
+            // exp(-sigma_t * chord), and a binary occlusion test can
+            // reproduce that in expectation: block with probability
+            // 1 - exp(-sigma_t * chord). Done here (not at the ~70 NEE
+            // call sites) because every one of them already treats "no
+            // hit" as "light visible". The random number is a hash of the
+            // ray itself - each NEE ray differs, so the decisions are
+            // independent across samples - and of the primitive, so two
+            // overlapping medium spheres decide independently.
+            SphereData ms = spheres[primitiveIndex];
+            float3 msCenter = float3(ms.center) + payload.shutterT * float3(ms.centerDelta1);
+            float3 msOc = origin - msCenter;
+            float msA = dot(direction, direction);
+            float msB = dot(msOc, direction);
+            float msDisc = msB * msB - msA * (dot(msOc, msOc) - ms.radius * ms.radius);
+            if (msDisc <= 0.0) return result;
+            float msSqrt = sqrt(msDisc);
+            float t0 = max((-msB - msSqrt) / msA, minDistance);
+            float t1 = min((-msB + msSqrt) / msA, maxDistance);
+            if (t1 <= t0) return result;
+            float chord = (t1 - t0) * sqrt(msA);
+            float sigmaForShadow;
+            if (mt == 28u && sphereMaterials[primitiveIndex].ior > 0.0 && matMediumChromatic(sphereMaterials[primitiveIndex]) && payload.shadowChannel >= 0) {
+                sigmaForShadow = matMediumSigmaT(sphereMaterials[primitiveIndex])[payload.shadowChannel];   // a chromatic medium: the path's hero channel
+            } else if (mt == 28u && sphereMaterials[primitiveIndex].ior > 0.0) {
+                sigmaForShadow = sphereMaterials[primitiveIndex].ior;
+            } else {   // glass-with-medium, or a pure absorber (sigma_t 0, per-channel sigma_a in conductorEta)
+                const float3 gEta = matMediumSigmaT(sphereMaterials[primitiveIndex]);
+                sigmaForShadow = (payload.shadowChannel >= 0) ? gEta[payload.shadowChannel] : (gEta.x + gEta.y + gEta.z) * (1.0 / 3.0);
+            }
+            float transmittance = exp(-sigmaForShadow * chord);
+            uint h = as_type<uint>(origin.x) * 73856093u ^ as_type<uint>(origin.y) * 19349663u
+                   ^ as_type<uint>(origin.z) * 83492791u ^ as_type<uint>(direction.x) * 2654435761u
+                   ^ as_type<uint>(direction.y) * 40503u ^ as_type<uint>(direction.z) * 668265263u
+                   ^ primitiveIndex * 374761393u;
+            h ^= h >> 16; h *= 0x7feb352du; h ^= h >> 15; h *= 0x846ca68bu; h ^= h >> 16;
+            float xi = float(h >> 8) * (1.0 / 16777216.0);
+            if (xi < transmittance) return result;   // passed through: not blocked
+            result.accept = true;                    // absorbed/scattered away: blocked
+            result.distance = t0;
+            return result;
+        }
+    }
+    // A sphere light's own NEE shadow ray excludes ITS OWN primitive
+    // outright (SpherePayload::shadowIgnorePrimId's own comment) rather
+    // than relying purely on a distance-epsilon margin, which a curved
+    // surface makes unreliable.
+    if (payload.isShadowRay && int(primitiveIndex) == payload.shadowIgnorePrimId) return result;
+
+    SphereData sphere = spheres[primitiveIndex];
+    // lerp(center, center+0, anything) == center exactly, so this is a
+    // provable no-op for every sphere whose centerDelta1 is (0,0,0) - see
+    // SphereData::centerDelta1's own comment. Matches this project's own
+    // CPU src/TheRestOfYourLife/sphere.h's `current_center =
+    // center.at(r.time())` linear interpolation, and
+    // gpu/optix/optix_intersection_sphere.h's identical
+    // center/ray_time-based interpolation, in spirit.
+    float3 center = float3(sphere.center) + payload.shutterT * float3(sphere.centerDelta1);
+    float3 oc = origin - center;
+    float a = dot(direction, direction);
+    float bHalf = dot(oc, direction);
+    float c = dot(oc, oc) - sphere.radius * sphere.radius;
+    float discriminant = bHalf * bHalf - a * c;
+    if (discriminant < 0.0) return result;
+
+    float sqrtDisc = sqrt(discriminant);
+    float t = (-bHalf - sqrtDisc) / a;
+    if (t < minDistance || t > maxDistance) {
+        t = (-bHalf + sqrtDisc) / a;
+        if (t < minDistance || t > maxDistance) return result;
+    }
+
+    result.accept = true;
+    result.distance = t;
+    return result;
+}
+
+struct DiskIntersectionResult {
+    bool accept [[accept_intersection]];
+    float distance [[distance]];
+};
+
+// Plain ray-plane intersection (t = dot(center - origin, normal) /
+// dot(direction, normal)) followed by a radius check on the in-plane
+// distance from the disk's own centre - the textbook disk-primitive test,
+// same shape this project's own CPU disk.h shape uses in spirit (plane
+// test + radial bound), not an approximation of it. Declares its OWN
+// `[[buffer(1)]]` (not buffer(0), which the sphere intersection function
+// above already claims) - within ONE shared MTLIntersectionFunctionTable,
+// every function's buffer/texture bindings share a single argument
+// namespace, so two DIFFERENT functions needing different data must use
+// DIFFERENT buffer indices, bound on the host side via two separate
+// `setBuffer:atIndex:` calls on the same table (see metal_poc.mm's own
+// comment on this at the function-table setup site) - discovered by
+// reasoning through what "shared argument table" actually implies here,
+// not by trial and error.
+[[intersection(bounding_box, triangle_data, instancing)]]
+DiskIntersectionResult diskIntersectionFunction(
+    float3 origin [[origin]],
+    float3 direction [[direction]],
+    float minDistance [[min_distance]],
+    float maxDistance [[max_distance]],
+    uint primitiveIndex [[primitive_id]],
+    device const DiskData* disks [[buffer(1)]])
+{
+    DiskIntersectionResult result;
+    result.accept = false;
+
+    DiskData disk = disks[primitiveIndex];
+    float3 center = float3(disk.center);
+    float3 normal = float3(disk.normal);
+    float denom = dot(direction, normal);
+    if (fabs(denom) < 1e-6) return result; // ray parallel to the disk's plane
+
+    float t = dot(center - origin, normal) / denom;
+    // A disk lying exactly on a triangle (a Scene Builder disk on the floor, which is where it usually is) ties with it to the last bit, and the tie went to the floor
+    // every time: the disk was not drawn at all (the CPU showed a speckle of the two, and now draws the disk too). The disk is reported a hair in front, 2e-5 of its
+    // distance, so it wins; the hit point is that much in front of the plane, far inside what the rays' offsets already allow. (It must also get past the closest hit
+    // so far when that is the tying triangle, hence the comparison with the reported distance.)
+    const float reported = max(t * (1.0 - 2e-5), minDistance);
+    if (t < minDistance || reported > maxDistance) return result;
+
+    float3 hitPoint = origin + direction * t;
+    float distSq = length_squared(hitPoint - center);
+    if (distSq > disk.radius * disk.radius) return result;
+
+    result.accept = true;
+    result.distance = reported;
+    return result;
+}
+
+struct CylinderIntersectionResult {
+    bool accept [[accept_intersection]];
+    float distance [[distance]];
+};
+
+// The ray's extent inside the SOLID tube (the infinite tube's roots intersected with the end-plane slab), unclamped - may start
+// behind the origin. This is the region of a homogeneous medium bounded by a cylinder: a ray may enter or leave through the open
+// ends as well as the wall, exactly like the CPU's cylinder volume_bounds() and OptiX's dc_solve_tube_quadratic. False when the
+// ray misses the solid.
+inline bool cylinderSolidInterval(float3 origin, float3 direction, CylinderData cyl, thread float& s0, thread float& s1) {
+    const float3 axis = float3(cyl.axis);
+    const float3 oc = origin - float3(cyl.base);
+    const float3 dPerp = direction - dot(direction, axis) * axis;
+    const float3 ocPerp = oc - dot(oc, axis) * axis;
+    const float a = dot(dPerp, dPerp);
+    float tubeT0 = -INFINITY, tubeT1 = INFINITY;
+    if (a < 1e-12) {
+        if (dot(ocPerp, ocPerp) > cyl.radius * cyl.radius) return false;
+    } else {
+        const float b = 2.0 * dot(ocPerp, dPerp);
+        const float c = dot(ocPerp, ocPerp) - cyl.radius * cyl.radius;
+        const float disc = b * b - 4.0 * a * c;
+        if (disc < 0.0) return false;
+        const float sq = sqrt(disc);
+        tubeT0 = (-b - sq) / (2.0 * a);
+        tubeT1 = (-b + sq) / (2.0 * a);
+    }
+    float slabT0 = -INFINITY, slabT1 = INFINITY;
+    const float h0 = dot(oc, axis), hd = dot(direction, axis);
+    if (fabs(hd) < 1e-12) {
+        if (h0 < 0.0 || h0 > cyl.height) return false;
+    } else {
+        const float za = -h0 / hd, zb = (cyl.height - h0) / hd;
+        slabT0 = min(za, zb);
+        slabT1 = max(za, zb);
+    }
+    s0 = max(tubeT0, slabT0);
+    s1 = min(tubeT1, slabT1);
+    return s0 < s1;
+}
+
+// Ray-vs-finite-cylinder in world space: solve the infinite-tube
+// quadratic using only the components of the ray PERPENDICULAR to the
+// cylinder's own axis (the standard "project out the axis" reduction -
+// a ray parallel to the axis has a zero perpendicular direction, `a`
+// below underflows to ~0, and is rejected explicitly rather than
+// dividing by it, matching gpu/optix/optix_disk_cylinder_helpers.h's
+// own dc_solve_tube_quadratic() to the same edge case for the same
+// reason: a ray running parallel to the tube's own surface has no
+// discrete crossing to report). Declares its own `[[buffer(2)]]` -
+// buffer(0)/buffer(1) are sphereIntersectionFunction's/
+// diskIntersectionFunction's own, this table's shared argument
+// namespace (see diskIntersectionFunction's own comment on why each
+// function needs a distinct index here).
+[[intersection(bounding_box, triangle_data, instancing)]]
+CylinderIntersectionResult cylinderIntersectionFunction(
+    float3 origin [[origin]],
+    float3 direction [[direction]],
+    float minDistance [[min_distance]],
+    float maxDistance [[max_distance]],
+    uint primitiveIndex [[primitive_id]],
+    device const CylinderData* cylinders [[buffer(2)]],
+    ray_data SpherePayload& payload [[payload]],
+    // Only read to tell a homogeneous-medium tube (materialType 28) from an ordinary cylinder - see the shadow-ray block below.
+    device const TriangleMaterial* cylinderMaterials [[buffer(4)]])
+{
+    CylinderIntersectionResult result;
+    result.accept = false;
+
+    CylinderData cyl = cylinders[primitiveIndex];
+
+    // A homogeneous-medium tube (Material "interface" + MediumInterface, loaded as materialType 28) is a semi-transparent volume
+    // bounding the SOLID cylinder, not an opaque surface. A primary/continuation ray hits the solid's entry (or, from inside, its
+    // exit). A shadow ray is blocked with probability 1 - exp(-sigma_t * chord), the same stochastic attenuation
+    // sphereIntersectionFunction applies to a medium sphere.
+    if (cylinderMaterials[primitiveIndex].materialType == METAL_MAT_MEDIUM_HOMOGENEOUS) {
+        float s0, s1;
+        if (!cylinderSolidInterval(origin, direction, cyl, s0, s1) || s1 <= minDistance) return result;
+        if (!payload.isShadowRay) {
+            const float tHit = (s0 >= minDistance) ? s0 : s1;
+            if (tHit > maxDistance) return result;
+            result.accept = true;
+            result.distance = tHit;
+            return result;
+        }
+        const float chordT0 = max(s0, minDistance);
+        const float chordT1 = min(s1, maxDistance);
+        if (chordT1 <= chordT0) return result;
+        const float chord = (chordT1 - chordT0) * length(direction);
+        const float3 absorbSigma = matMediumSigmaT(cylinderMaterials[primitiveIndex]);
+        const float sigmaForShadow = (cylinderMaterials[primitiveIndex].ior > 0.0 && matMediumChromatic(cylinderMaterials[primitiveIndex]) && payload.shadowChannel >= 0)
+            ? absorbSigma[payload.shadowChannel]   // a chromatic medium: the path's hero channel (per-channel sigma_t in conductorEta)
+            : cylinderMaterials[primitiveIndex].ior > 0.0 ? cylinderMaterials[primitiveIndex].ior
+            : (payload.shadowChannel >= 0 ? absorbSigma[payload.shadowChannel] : (absorbSigma.x + absorbSigma.y + absorbSigma.z) * (1.0 / 3.0));
+        uint h = as_type<uint>(origin.x) * 73856093u ^ as_type<uint>(origin.y) * 19349663u
+               ^ as_type<uint>(origin.z) * 83492791u ^ as_type<uint>(direction.x) * 2654435761u
+               ^ as_type<uint>(direction.y) * 40503u ^ as_type<uint>(direction.z) * 668265263u
+               ^ primitiveIndex * 374761393u ^ 0x5bd1e995u;
+        h ^= h >> 16; h *= 0x7feb352du; h ^= h >> 15; h *= 0x846ca68bu; h ^= h >> 16;
+        if (float(h >> 8) * (1.0 / 16777216.0) < exp(-sigmaForShadow * chord)) return result;   // passed through
+        result.accept = true;
+        result.distance = chordT0;
+        return result;
+    }
+    float3 axis = float3(cyl.axis);
+    float3 base = float3(cyl.base);
+    float3 oc = origin - base;
+    float3 dPerp = direction - dot(direction, axis) * axis;
+    float3 ocPerp = oc - dot(oc, axis) * axis;
+
+    float a = dot(dPerp, dPerp);
+    if (a < 1e-12) return result; // ray parallel to the axis - no discrete crossing
+
+    float b = 2.0 * dot(ocPerp, dPerp);
+    float c = dot(ocPerp, ocPerp) - cyl.radius * cyl.radius;
+    float discriminant = b * b - 4.0 * a * c;
+    if (discriminant < 0.0) return result;
+
+    float sqrtDisc = sqrt(discriminant);
+    float t0 = (-b - sqrtDisc) / (2.0 * a);
+    float t1 = (-b + sqrtDisc) / (2.0 * a);
+
+    // t0 <= t1 always (sqrtDisc >= 0) - try the nearer root first, fall
+    // back to the farther one exactly like sphereIntersectionFunction's
+    // own two-root try-nearest-then-farthest shape just above.
+    float t = t0;
+    bool valid = (t >= minDistance && t <= maxDistance);
+    if (valid) {
+        float h = dot(origin + t * direction - base, axis);
+        valid = (h >= 0.0 && h <= cyl.height);
+    }
+    if (!valid) {
+        t = t1;
+        valid = (t >= minDistance && t <= maxDistance);
+        if (valid) {
+            float h = dot(origin + t * direction - base, axis);
+            valid = (h >= 0.0 && h <= cyl.height);
+        }
+    }
+    if (!valid) return result;
+
+    result.accept = true;
+    result.distance = t;
+    return result;
+}
+
+// ---------------------------------------------------------------------------
+// PCG32-ish hash-based PRNG, stateless per call (no persistent generator
+// object needed across bounces - each call is reseeded from a running
+// state uint carried by the caller). Standard "hash the state, use the
+// hash, advance the state" shape; not cryptographic, just decorrelated
+// enough for path tracing. Mirrors this project's CPU rng.h in spirit
+// (a seedable, bounce-advanced generator) without sharing implementation -
+// the CPU renderer's actual PCG32/Sobol samplers are C++ classes with
+// their own state layout that doesn't translate directly into an MSL
+// per-thread scalar.
+// ---------------------------------------------------------------------------
+inline uint pcgHash(thread uint& state) {
+    state = state * 747796405u + 2891336453u;
+    uint word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+inline float randFloat(thread uint& state) {
+    return float(pcgHash(state)) / float(0xFFFFFFFFu);
+}
+
+// Real multi-element-lens camera ray generation (pbrt-v4 RealisticCamera,
+// src/shared/realistic_camera.h) - a direct MSL port of
+// gpu/optix/optix_device_helpers.h's own already-shipped CUDA
+// `sample_realistic_camera_ray()`, itself mirroring
+// RealisticCamera<T>::generate_ray()/trace_lenses_from_film()/
+// sample_exit_pupil() exactly (same variable names, same algorithm
+// structure - a direct translation, not a re-derivation). `u`/`v` are
+// the SAME raw `pixelNDC.x/y` (in [0,1]^2, row-major raster order,
+// v=0 at the TOP row) every other camera mode derives `screen` from,
+// used BEFORE any of their own `*2-1`/y-flip/aspect/tanHalfFov
+// transforms - this mode has no screen window or FOV at all, only a
+// real film-plane size (`uniforms.filmHalfX/Y`). `su`/`sv`/`sw`/
+// `originWorld` are this loader's own usual `cameraRight`/`cameraUp`/
+// `cameraForward`/`cameraPos` (computed the SAME `cross(forward,up)`
+// way every other scene's camera already is) - NOT
+// RealisticCamera<T>::world_right()/etc's own basis (which would
+// inherit CPU's ALT-camera path's own differently-signed `right`,
+// section 150's own D6 finding) - the host side deliberately builds
+// its RealisticCamera<float> with an IDENTITY camera-to-world (see
+// metal_poc_scenes_d.mm) and reads ONLY the lens/exit-pupil/film
+// accessors from it, exactly mirroring gpu/optix/scene_builder.cpp's
+// own "ctw doesn't matter for these fields" comment.
+// Returns false (weight left at 0) if the ray is fully vignetted - a
+// real, unbiased Monte Carlo outcome (this exact film position/exit-
+// pupil sample genuinely can't reach the scene through this lens
+// system), not an error; the caller folds the returned weight straight
+// into that sample's own initial `throughput`, so a vignetted sample's
+// own zero throughput naturally contributes nothing without any
+// separate early-exit needed.

@@ -197,14 +197,17 @@ done
 # adding the copy, not assumed safe.
 #
 # The shader source is now split across several metal_poc_*.metal files
-# (gpu/metal/metal_poc_shader_files.h's own comment - the former single
+# (gpu/metal/shaders/metal_poc_shader_files.h's own comment - the former single
 # metal_poc.metal no longer exists) - every one of them has to be copied,
 # not just one, since metal_poc.mm's own runtime loader concatenates them
 # all from this SAME directory. Globbed rather than hardcoded file-by-file
 # so a future file added to that list doesn't also need a matching edit
 # here to actually ship.
 if [[ -f "$BUILD_DIR/CMakeCache.txt" ]] && grep -q "RT_BUILD_METAL:BOOL=ON" "$BUILD_DIR/CMakeCache.txt"; then
-	cp "$REPO_ROOT"/gpu/metal/metal_poc_*.metal "$APP_BUNDLE/Contents/MacOS/"
+	for shader in "$REPO_ROOT"/gpu/metal/shaders/metal_poc_*.metal "$REPO_ROOT"/gpu/metal/shaders/metal_poc_shared_types.h; do
+		[[ "$(basename "$shader")" == "metal_poc_test_kernels.metal" ]] && continue   # the shader unit tests' kernels: not part of what a user compiles
+		cp "$shader" "$APP_BUNDLE/Contents/MacOS/"
+	done
 fi
 
 # The hardcoded-room demo scene's own small, ALWAYS-needed assets (unlike

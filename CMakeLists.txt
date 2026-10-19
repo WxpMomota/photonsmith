@@ -385,22 +385,22 @@ if(RT_BUILD_METAL)
     # (ray_tracer ...) block further down in this same if() for exactly
     # where that wiring happens).
     add_library(metal_renderer STATIC
-        gpu/metal/metal_poc.mm
+        gpu/metal/host/metal_poc.mm
         # loadPbrtScene() and its 9 phase methods (real pbrt scene
         # loading) - split out of metal_poc.mm once that one file's own
         # "Stage 2.5" block grew past a third of it, same pure-code-motion
         # precedent as the other metal_poc_*.mm splits.
-        gpu/metal/metal_poc_pbrt_loader.mm
-        gpu/metal/metal_poc_pbrt_loader_punctual.mm   # point / spot / distant / goniometric / projection lights
-        gpu/metal/metal_poc_pbrt_materials.mm
-        gpu/metal/metal_poc_pbrt_nanovdb.mm   # "nanovdb" media: read on the host, drawn by the RGB grid medium
+        gpu/metal/host/metal_poc_pbrt_loader.mm
+        gpu/metal/host/metal_poc_pbrt_loader_punctual.mm   # point / spot / distant / goniometric / projection lights
+        gpu/metal/host/metal_poc_pbrt_materials.mm
+        gpu/metal/host/metal_poc_pbrt_nanovdb.mm   # "nanovdb" media: read on the host, drawn by the RGB grid medium
         # Stage 3 (GPU buffer/acceleration-structure upload) and Stage 4
         # (shader compile + dispatch + readback) - split out of
         # metal_poc.mm once that pair grew past ~1200 combined lines,
         # same pure-code-motion precedent as the two splits just above.
-        gpu/metal/metal_poc_gpu_resources.mm
-        gpu/metal/metal_poc_dispatch.mm
-        gpu/metal/metal_live_preview.mm
+        gpu/metal/host/metal_poc_gpu_resources.mm
+        gpu/metal/host/metal_poc_dispatch.mm
+        gpu/metal/host/metal_live_preview.mm
         # tinyexr's own zip/pxr24 codecs need miniz's real mz_compress/
         # mz_uncompress symbols (see the target_include_directories
         # comment below on why metal_renderer now needs tinyexr's real
@@ -415,7 +415,7 @@ if(RT_BUILD_METAL)
     # guaranteed to stay a path anyone can navigate back to gpu/metal/ or
     # models/ from an arbitrary build dir.
     target_compile_definitions(metal_renderer PUBLIC
-        RT_METAL_SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/gpu/metal"
+        RT_METAL_SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/gpu/metal/shaders"
         RT_MODELS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/models")
     # Needed once metal_poc.mm started including src/shared/pbrt_load.h
     # (real pbrt scene loading, not just the relative-path #includes this
@@ -460,7 +460,7 @@ if(RT_BUILD_METAL)
     # metal_renderer would just move the duplicate-symbol conflict rather
     # than fix it. One copy per final executable, none shared, keeps each
     # link with exactly one definition.
-    add_executable(metal_poc gpu/metal/metal_poc_main.mm src/external/image_writer.cpp)
+    add_executable(metal_poc gpu/metal/host/metal_poc_main.mm src/external/image_writer.cpp)
     target_link_libraries(metal_poc PRIVATE metal_renderer)
     set_target_properties(metal_poc PROPERTIES
         XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC YES)
@@ -492,13 +492,13 @@ if(RT_BUILD_METAL)
     # scoped inside this RT_BUILD_METAL block only - `ctest` still finds
     # nothing here unless RT_BUILD_METAL=ON, same additive posture as
     # every other choice in this block.
-    # Live Preview API driver: orbiting camera, frame timings, a few PNGs (see gpu/metal/metal_live_preview.h).
-    add_executable(metal_live_bench gpu/metal/metal_live_bench.cpp src/external/image_writer.cpp)
+    # Live Preview API driver: orbiting camera, frame timings, a few PNGs (see gpu/metal/host/metal_live_preview.h).
+    add_executable(metal_live_bench gpu/metal/tests/metal_live_bench.cpp src/external/image_writer.cpp)
     target_include_directories(metal_live_bench PRIVATE ${CMAKE_SOURCE_DIR})
     target_link_libraries(metal_live_bench PRIVATE metal_renderer cpu_renderer)
 
     # Live Preview object editing (pick, move, reset) through the same API: see the file's header for what it checks.
-    add_executable(metal_live_edit_check gpu/metal/metal_live_edit_check.cpp src/external/image_writer.cpp)
+    add_executable(metal_live_edit_check gpu/metal/tests/metal_live_edit_check.cpp src/external/image_writer.cpp)
     target_include_directories(metal_live_edit_check PRIVATE ${CMAKE_SOURCE_DIR})
     target_link_libraries(metal_live_edit_check PRIVATE metal_renderer cpu_renderer)
     add_test(NAME metal_live_edit COMMAND metal_live_edit_check)
@@ -514,7 +514,7 @@ if(RT_BUILD_METAL)
     target_link_libraries(realtime_renderer PRIVATE metal_renderer cpu_renderer)
 
     # Calls realtime_renderer.dylib through the GUI's own function pointer type (see the file's header).
-    add_executable(metal_realtime_dylib_check gpu/metal/metal_realtime_dylib_check.cpp)
+    add_executable(metal_realtime_dylib_check gpu/metal/tests/metal_realtime_dylib_check.cpp)
     add_dependencies(metal_realtime_dylib_check realtime_renderer)
     add_test(NAME metal_realtime_dylib COMMAND metal_realtime_dylib_check $<TARGET_FILE:realtime_renderer>)
     # Same check from a directory that has NO pbrt_scenes (a Finder-launched GUI runs from "/"): the library must find the scene
@@ -528,10 +528,10 @@ if(RT_BUILD_METAL)
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
         PASS_REGULAR_EXPRESSION "REALTIME_DYLIB_OK|SKIP: no usable Metal device")
 
-    add_executable(metal_poc_validate gpu/metal/metal_poc_validate.cpp)
+    add_executable(metal_poc_validate gpu/metal/tests/metal_poc_validate.cpp)
 
     # --- Real regression coverage, not just a smoke test - see
-    # gpu/metal/metal_poc_host_math.h and gpu/metal/metal_poc_math_tests.cpp's
+    # gpu/metal/host/metal_poc_host_math.h and gpu/metal/tests/metal_poc_math_tests.cpp's
     # own comments for the full "why" (closing the gap the smoke test
     # above deliberately doesn't: every material/light/tonemap correctness
     # fix documented in docs/history/METAL_GPU_FEASIBILITY.md - Fresnel, the
@@ -541,10 +541,18 @@ if(RT_BUILD_METAL)
     # (every function under test is plain, GPU-independent host C++), so
     # this doesn't need an actual device or acceleration structure to run
     # - just plain math, checked against known-correct reference values.
-    add_executable(metal_poc_math_tests gpu/metal/metal_poc_math_tests.cpp)
+    add_executable(metal_poc_math_tests gpu/metal/tests/metal_poc_math_tests.cpp)
+
+    # The pbrt scene loader (PbrtSceneLoader, metal_poc_scene_data.h) with no GPU: loads bundled scenes and checks the host arrays. Links metal_renderer for the loader's
+    # code (the Metal frameworks are linked but no device is ever created).
+    add_executable(metal_poc_loader_tests gpu/metal/tests/metal_poc_loader_tests.mm src/external/image_writer.cpp)
+    target_link_libraries(metal_poc_loader_tests PRIVATE metal_renderer)
+    target_compile_options(metal_poc_loader_tests PRIVATE -fobjc-arc)
+    target_compile_definitions(metal_poc_loader_tests PRIVATE RT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_include_directories(metal_poc_loader_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/TheRestOfYourLife ${CMAKE_SOURCE_DIR}/src/shared ${CMAKE_SOURCE_DIR}/src/external)
 
     # --- The device-side half of that same regression coverage - see
-    # gpu/metal/metal_poc_shader_tests.mm's own comment. Dispatches small,
+    # gpu/metal/tests/metal_poc_shader_tests.mm's own comment. Dispatches small,
     # purpose-built test kernels (metal_poc.metal's own "Device-side
     # unit-test kernels" section) against frDielectric(), the GGX
     # microfacet math, checkerColor(), spotLightFalloff(),
@@ -563,16 +571,16 @@ if(RT_BUILD_METAL)
     # lines, same pure-code-motion precedent as metal_poc_scenes_*.mm's
     # own split (metal_renderer, above).
     add_executable(metal_poc_shader_tests
-        gpu/metal/metal_poc_shader_tests.mm
-        gpu/metal/metal_poc_shader_tests_materials.mm
-        gpu/metal/metal_poc_shader_tests_media.mm
-        gpu/metal/metal_poc_shader_tests_lights.mm
-        gpu/metal/metal_poc_shader_tests_hair.mm
-        gpu/metal/metal_poc_shader_tests_geometry.mm
-        gpu/metal/metal_poc_shader_tests_mipmap_ref.cpp
-        gpu/metal/metal_poc_shader_tests_layout.mm)
+        gpu/metal/tests/metal_poc_shader_tests.mm
+        gpu/metal/tests/metal_poc_shader_tests_materials.mm
+        gpu/metal/tests/metal_poc_shader_tests_media.mm
+        gpu/metal/tests/metal_poc_shader_tests_lights.mm
+        gpu/metal/tests/metal_poc_shader_tests_hair.mm
+        gpu/metal/tests/metal_poc_shader_tests_geometry.mm
+        gpu/metal/tests/metal_poc_shader_tests_mipmap_ref.cpp
+        gpu/metal/tests/metal_poc_shader_tests_layout.mm)
     target_compile_definitions(metal_poc_shader_tests PRIVATE
-        RT_METAL_SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/gpu/metal")
+        RT_METAL_SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/gpu/metal/shaders")
     target_link_libraries(metal_poc_shader_tests PRIVATE
         "-framework Metal" "-framework Foundation")
     set_target_properties(metal_poc_shader_tests PROPERTIES
@@ -581,6 +589,7 @@ if(RT_BUILD_METAL)
 
     enable_testing()
     add_test(NAME metal_poc_math_tests COMMAND metal_poc_math_tests)
+    add_test(NAME metal_poc_loader_tests COMMAND metal_poc_loader_tests)
     add_test(NAME metal_poc_shader_tests COMMAND metal_poc_shader_tests)
     set(METAL_POC_SMOKE_OUTPUT "${CMAKE_BINARY_DIR}/metal_poc_smoke_test.png")
     add_test(NAME metal_poc_smoke_render
@@ -655,9 +664,9 @@ if(RT_BUILD_METAL)
     # --crop under Metal (section 205): metal_poc_crop_check.cpp is a host-only
     # image comparer (no Metal, no device) driven by metal_poc_crop_test.sh, which
     # renders A1 whole and cropped through the real ray_tracer --gpu path.
-    add_executable(metal_poc_crop_check gpu/metal/metal_poc_crop_check.cpp)
+    add_executable(metal_poc_crop_check gpu/metal/tests/metal_poc_crop_check.cpp)
     add_test(NAME metal_poc_crop_window
-        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/metal_poc_crop_test.sh"
+        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_crop_test.sh"
             $<TARGET_FILE:ray_tracer> $<TARGET_FILE:metal_poc_crop_check> "${CMAKE_BINARY_DIR}")
     set_tests_properties(metal_poc_crop_window PROPERTIES
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
@@ -665,9 +674,9 @@ if(RT_BUILD_METAL)
 
     # A pbrt Shape's "texture alpha" cutout mask under Metal: metal_poc_alpha_check.cpp is a host-only pixel prober driven by
     # metal_poc_alpha_test.sh, which renders pbrt_scenes/alpha-cutout.pbrt through the real ray_tracer --gpu path.
-    add_executable(metal_poc_alpha_check gpu/metal/metal_poc_alpha_check.cpp)
+    add_executable(metal_poc_alpha_check gpu/metal/tests/metal_poc_alpha_check.cpp)
     add_test(NAME metal_poc_alpha_cutout
-        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/metal_poc_alpha_test.sh"
+        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_alpha_test.sh"
             $<TARGET_FILE:ray_tracer> $<TARGET_FILE:metal_poc_alpha_check> "${CMAKE_BINARY_DIR}")
     set_tests_properties(metal_poc_alpha_cutout PROPERTIES
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
@@ -675,9 +684,9 @@ if(RT_BUILD_METAL)
 
     # Energy conservation of the cloud medium under Metal: a non-absorbing cloud under a uniform sky must be invisible
     # (pbrt_scenes/cloud-furnace.pbrt; metal_poc_furnace_check.cpp is a host-only window-mean comparer).
-    add_executable(metal_poc_furnace_check gpu/metal/metal_poc_furnace_check.cpp)
+    add_executable(metal_poc_furnace_check gpu/metal/tests/metal_poc_furnace_check.cpp)
     add_test(NAME metal_poc_cloud_furnace
-        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/metal_poc_furnace_test.sh"
+        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_furnace_test.sh"
             $<TARGET_FILE:ray_tracer> $<TARGET_FILE:metal_poc_furnace_check> "${CMAKE_BINARY_DIR}")
     set_tests_properties(metal_poc_cloud_furnace PROPERTIES
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
@@ -685,43 +694,43 @@ if(RT_BUILD_METAL)
 
     # pbrt's SubsurfaceMaterial (a tabulated BSSRDF) under Metal: metal_poc_subsurface_check.cpp compares four window means of a render of
     # pbrt_scenes/subsurface-ball.pbrt with what the CPU renderer produces (metal_poc_subsurface_test.sh drives it).
-    add_executable(metal_poc_subsurface_check gpu/metal/metal_poc_subsurface_check.cpp)
+    add_executable(metal_poc_subsurface_check gpu/metal/tests/metal_poc_subsurface_check.cpp)
     add_test(NAME metal_poc_subsurface
-        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/metal_poc_subsurface_test.sh"
+        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_subsurface_test.sh"
             $<TARGET_FILE:ray_tracer> $<TARGET_FILE:metal_poc_subsurface_check> "${CMAKE_BINARY_DIR}")
     set_tests_properties(metal_poc_subsurface PROPERTIES
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
         PASS_REGULAR_EXPRESSION "SUBSURFACE_TEST_OK")
 
     # pbrt "nanovdb" media under Metal: the furnace and the thin-slab closed form the CPU and OptiX renderers pass (metal_poc_nanovdb_test.sh drives it).
-    add_executable(metal_poc_nanovdb_check gpu/metal/metal_poc_nanovdb_check.cpp)
+    add_executable(metal_poc_nanovdb_check gpu/metal/tests/metal_poc_nanovdb_check.cpp)
     target_include_directories(metal_poc_nanovdb_check PRIVATE ${CMAKE_SOURCE_DIR})
     target_link_libraries(metal_poc_nanovdb_check PRIVATE cpu_renderer)   # tinyexr's implementation
     add_test(NAME metal_poc_nanovdb
-        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/metal_poc_nanovdb_test.sh"
+        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_nanovdb_test.sh"
             $<TARGET_FILE:ray_tracer> $<TARGET_FILE:metal_poc_nanovdb_check> "${CMAKE_BINARY_DIR}")
     set_tests_properties(metal_poc_nanovdb PROPERTIES
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
         PASS_REGULAR_EXPRESSION "NANOVDB_TEST_OK")
 
     # Light sampling inside media: a homogeneous medium and a cloud lit by one distant light and by one point light must match the CPU's picture
-    # (metal_poc_media_lights_test.sh drives it; the scenes are gpu/metal/test_scenes/media-*.pbrt, not in the scene list).
-    add_executable(metal_poc_media_lights_check gpu/metal/metal_poc_media_lights_check.cpp)
+    # (metal_poc_media_lights_test.sh drives it; the scenes are gpu/metal/tests/test_scenes/media-*.pbrt, not in the scene list).
+    add_executable(metal_poc_media_lights_check gpu/metal/tests/metal_poc_media_lights_check.cpp)
     target_include_directories(metal_poc_media_lights_check PRIVATE ${CMAKE_SOURCE_DIR})
     target_link_libraries(metal_poc_media_lights_check PRIVATE cpu_renderer)   # tinyexr's implementation
     add_test(NAME metal_poc_media_lights
-        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/metal_poc_media_lights_test.sh"
+        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_media_lights_test.sh"
             $<TARGET_FILE:ray_tracer> $<TARGET_FILE:metal_poc_media_lights_check> "${CMAKE_BINARY_DIR}")
     set_tests_properties(metal_poc_media_lights PROPERTIES
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
         PASS_REGULAR_EXPRESSION "MEDIA_LIGHTS_TEST_OK")
 
     # A cloud whose box sticks out of its interface sphere, in a white furnace: invisible everywhere, not only on average (metal_poc_clipped_medium_test.sh).
-    add_executable(metal_poc_furnace_blocks_check gpu/metal/metal_poc_furnace_blocks_check.cpp)
+    add_executable(metal_poc_furnace_blocks_check gpu/metal/tests/metal_poc_furnace_blocks_check.cpp)
     target_include_directories(metal_poc_furnace_blocks_check PRIVATE ${CMAKE_SOURCE_DIR})
     target_link_libraries(metal_poc_furnace_blocks_check PRIVATE cpu_renderer)   # tinyexr's implementation
     add_test(NAME metal_poc_clipped_medium
-        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/metal_poc_clipped_medium_test.sh"
+        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_clipped_medium_test.sh"
             $<TARGET_FILE:ray_tracer> $<TARGET_FILE:metal_poc_furnace_blocks_check> "${CMAKE_BINARY_DIR}")
     set_tests_properties(metal_poc_clipped_medium PROPERTIES
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
@@ -729,7 +738,7 @@ if(RT_BUILD_METAL)
 
     # A subsurface ball under a uniform sky (a constant and a white picture): Metal matches the CPU and its own two skies agree (metal_poc_subsurface_sky_test.sh).
     add_test(NAME metal_poc_subsurface_sky
-        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/metal_poc_subsurface_sky_test.sh"
+        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_subsurface_sky_test.sh"
             $<TARGET_FILE:ray_tracer> $<TARGET_FILE:metal_poc_media_lights_check> "${CMAKE_BINARY_DIR}")
     set_tests_properties(metal_poc_subsurface_sky PROPERTIES
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
@@ -749,12 +758,12 @@ if(RT_BUILD_METAL)
                 --exe $<TARGET_FILE:ray_tracer> --only fog,dots,wrap,spawn,instbump,oddmap,motion,lightpic,subsurface --tolerance 4)
         set_tests_properties(metal_poc_cpu_gpu_sweep PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" TIMEOUT 1800)
         # Metal against real pbrt-v4's means (tests/data/pbrt_reference_means.txt), every scene of the table: the only check against ground truth rather than against the CPU. It compares with
-        # the ratios of gpu/metal/pbrt_pack_baseline.txt (a render is deterministic per seed, and code motion moved no scene by 0.5%, so the gate is 1%) and fails when a scene moves by more
+        # the ratios of gpu/metal/tests/pbrt_pack_baseline.txt (a render is deterministic per seed, and code motion moved no scene by 0.5%, so the gate is 1%) and fails when a scene moves by more
         # than that, when a scene of the table is not in the baseline (a new row must be looked at and added), or when a scene is off pbrt by more than 3% and its baseline row has no
         # "# known: <why>" note. About 7 minutes; rewrite the baseline only after a change you understand.
         add_test(NAME metal_poc_pbrt_pack
             COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/metal_pbrt_pack.py"
-                --exe $<TARGET_FILE:ray_tracer> --spp-factor 4 --baseline "${CMAKE_SOURCE_DIR}/gpu/metal/pbrt_pack_baseline.txt" --drift 0.01 --max-off 0.03)
+                --exe $<TARGET_FILE:ray_tracer> --spp-factor 4 --baseline "${CMAKE_SOURCE_DIR}/gpu/metal/tests/pbrt_pack_baseline.txt" --drift 0.01 --max-off 0.03)
         set_tests_properties(metal_poc_pbrt_pack PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" TIMEOUT 3600)
         add_test(NAME metal_poc_consistency
             COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/consistency_sweep.py"
@@ -768,14 +777,14 @@ if(RT_BUILD_METAL)
     set_tests_properties(metal_poc_prepare_gpu PROPERTIES PASS_REGULAR_EXPRESSION "The GPU renderer is ready" TIMEOUT 900)
 
     add_test(NAME metal_poc_seed_reproducible
-        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/metal_poc_seed_test.sh"
+        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_seed_test.sh"
             $<TARGET_FILE:ray_tracer> "${CMAKE_BINARY_DIR}")
     set_tests_properties(metal_poc_seed_reproducible PROPERTIES
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
         PASS_REGULAR_EXPRESSION "SEED_TEST_OK")
 
     add_test(NAME metal_poc_sppm_gpu_falls_back
-        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/metal_poc_sppm_fallback_test.sh"
+        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_sppm_fallback_test.sh"
             $<TARGET_FILE:ray_tracer> "${CMAKE_BINARY_DIR}")
     set_tests_properties(metal_poc_sppm_gpu_falls_back PROPERTIES
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
@@ -795,7 +804,7 @@ if(RT_BUILD_METAL)
     # other pbrt-scene-loading Metal test here (cpu_scene_pbrt_path_by_id()
     # resolves pbrt_scenes/ paths relative to the process's own CWD).
     add_executable(metal_cpu_gpu_parity_check
-        gpu/metal/metal_cpu_gpu_parity_check.cpp
+        gpu/metal/tests/metal_cpu_gpu_parity_check.cpp
         src/external/image_writer.cpp)
     target_include_directories(metal_cpu_gpu_parity_check PRIVATE ${CMAKE_SOURCE_DIR})
     # metal_renderer BEFORE cpu_renderer - order matters here, confirmed
@@ -824,7 +833,7 @@ if(RT_BUILD_METAL)
     target_link_libraries(metal_cpu_gpu_parity_check PRIVATE metal_renderer cpu_renderer)
     # The committed Metal snapshot the sweep also checks against (see "Golden snapshot" in the harness).
     target_compile_definitions(metal_cpu_gpu_parity_check PRIVATE
-        RT_PARITY_GOLDEN_PATH="${CMAKE_SOURCE_DIR}/gpu/metal/parity_golden.txt")
+        RT_PARITY_GOLDEN_PATH="${CMAKE_SOURCE_DIR}/gpu/metal/tests/parity_golden.txt")
     # A real gate: METAL_PARITY_STRICT=1 (set below) makes the sweep exit non-zero and print "FAIL: ..." when a scene that is
     # NOT a documented known gap exceeds tolerance, or drifts from the golden snapshot. ctest does NOT fail on that exit status: with a
     # PASS_REGULAR_EXPRESSION it looks at the output only, and the sweep runs as two processes (a worker takes half the scenes) whose

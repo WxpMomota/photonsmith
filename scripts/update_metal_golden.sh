@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Regenerate gpu/metal/parity_golden.txt, the committed snapshot of Metal's own output that the parity sweep checks
-# every scene against (see "Golden snapshot" in gpu/metal/metal_cpu_gpu_parity_check.cpp).
+# Regenerate gpu/metal/tests/parity_golden.txt, the committed snapshot of Metal's own output that the parity sweep checks
+# every scene against (see "Golden snapshot" in gpu/metal/tests/metal_cpu_gpu_parity_check.cpp).
 #
 # Run it ONLY when a change to the rendered pictures is intended (a new feature, a deliberate accuracy fix), then
-# review `git diff gpu/metal/parity_golden.txt` - every scene whose numbers moved should be a scene you meant to
+# review `git diff gpu/metal/tests/parity_golden.txt` - every scene whose numbers moved should be a scene you meant to
 # change. A drift you did not expect is a bug, not a reason to re-snapshot.
 #
 # Usage: scripts/update_metal_golden.sh [path/to/metal_cpu_gpu_parity_check]   (default: build_macos/...)
@@ -14,7 +14,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN="${1:-$REPO_ROOT/build_macos/metal_cpu_gpu_parity_check}"
 [[ -x "$BIN" ]] || { echo "ERROR: $BIN not found - build with -DRT_BUILD_METAL=ON first" >&2; exit 1; }
-GOLDEN="$REPO_ROOT/gpu/metal/parity_golden.txt"
+GOLDEN="$REPO_ROOT/gpu/metal/tests/parity_golden.txt"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 

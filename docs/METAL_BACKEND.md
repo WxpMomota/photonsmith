@@ -17,6 +17,11 @@ around it. The shader source is **compiled at run time** from the `.metal` files
 
 ## Files
 
+`gpu/metal/` has three folders and one header: `metal_interface.h` (the C API the launcher calls), `host/` (the Objective-C++ renderer: `MetalPocApp`, the pbrt loader,
+buffer upload, dispatch, Live Preview), `shaders/` (the `.metal` sources, the two headers valid in both languages, and the list of files to concatenate) and `tests/`
+(shader unit tests, math and loader tests, the checks and their `.sh` drivers, `test_scenes/`, the parity golden and the pbrt-pack baseline). The tables below name
+files without the folder. The `metal_poc_` prefix is history (the backend began as a proof of concept); it is on every file and has no other meaning.
+
 | file | role |
 |---|---|
 | `metal_poc_main.mm`, `metal_poc.mm` | the `metal_poc` CLI and `MetalPocApp`: argument parsing, the hand-built demo room (`buildScene`), post-processing and writing the image |
@@ -24,9 +29,11 @@ around it. The shader source is **compiled at run time** from the `.metal` files
 | `metal_poc_pbrt_materials.mm` | pbrt material -> the shader's `TriangleMaterial` (`mapPbrtMaterial`, `mapPbrtDiffuseMaterial`), measured-BRDF tables |
 | `metal_poc_gpu_resources.mm` | uploads buffers and builds the acceleration structures |
 | `metal_poc_dispatch.mm` | `compileShaderAndDispatch()`: eight named stages (library, pipeline, targets, textures, sampling tables, uniforms, resource check, per-frame dispatch) over a `DispatchState` |
-| `metal_poc_app.h`, `metal_poc_gpu_types.h`, `metal_poc_host_math.h`, `metal_poc_scene_helpers.h` | the host-side class, the host copies of the shader structs, math, scene-building helpers |
+| `metal_poc_scene_data.h`, `metal_poc_loader_tests.mm` | `PbrtSceneLoader`: the host-side scene arrays and the `loadPbrt*` / `mapPbrt*` methods (`metal_poc_pbrt_*.mm`), which need no GPU device; `MetalPocApp` derives from it. The tests load bundled scenes and check the arrays |
+| `metal_poc_app.h`, `metal_poc_gpu_types.h`, `metal_poc_host_math.h`, `metal_poc_scene_helpers.h` | `MetalPocApp` (the device, buffers, acceleration structures, shader and output), the host copies of the shader structs, math, scene-building helpers |
 | `metal_poc_material_ids.metal` | the `METAL_MAT_*` names of every `materialType` (included by host and shader) |
-| `metal_poc_types.metal` | the shader copies of the structs (`Uniforms`, `TriangleMaterial`, lights, media), intersection functions |
+| `metal_poc_shared_types.h` | the light, shape, lens and medium structs: one definition for host and shader |
+| `metal_poc_types.metal` | the shader copies of `Uniforms` and `TriangleMaterial`, intersection functions |
 | `metal_poc_sampling.metal` | camera and pixel-filter sampling, hemisphere sampling, shading normals, texture lookups, shadow-ray tracing (`traceShadowAny*`) |
 | `metal_poc_environment.metal`, `_procedural.metal`, `_bsdf_math.metal`, `_media_math.metal`, `_area_lights.metal` | environment/portal lights; checker, noise and marble; Fresnel, Beer-Lambert and GGX; Henyey-Greenstein, cloud and RGB-grid density; `sampleAreaLight()` and sphere-light cone sampling (all split out of `metal_poc_sampling.metal`) |
 | `metal_poc_bump.metal`, `metal_poc_layered_bxdf.metal` | image bump and normal maps; layered BxDF code |
@@ -91,7 +98,9 @@ textures selected by `conductorK.y`, and glass bounding a medium carries its sig
 
 ## The host/shader contracts
 
-Two copies of every shared struct exist, by hand: `metal_poc_gpu_types.h` (C++) and `metal_poc_types.metal` (MSL).
+The plain-data structs (the lights, spheres, disks, cylinders, instance transforms, lens elements, cloud and grid media) are written ONCE, in
+`metal_poc_shared_types.h`, which is valid C++ and Metal Shading Language and is the second file of the shader source (the host `#include`s it). A new field
+goes there, with its default. `Uniforms` and `TriangleMaterial` are still two hand-kept copies, `metal_poc_gpu_types.h` (C++) and `metal_poc_types.metal` (MSL).
 
 * **Add fields at the END** of `Uniforms` and of any other mirrored struct, on both sides, with a safe zero-initialised default. Zero-initialised `Uniforms`
   (the shader tests) must mean "feature off".
@@ -100,6 +109,13 @@ Two copies of every shared struct exist, by hand: `metal_poc_gpu_types.h` (C++) 
   (`metal_poc_test_kernels.metal`, `metal_poc_shader_tests_layout.mm`).
 * `materialType` values are the `METAL_MAT_*` macros in `metal_poc_material_ids.metal`. Never reuse a number. Metal's numbering is its own; OptiX has a
   separate enum.
+* **A material's parameters beyond colour, ior and roughness** live in the spare slots of `TriangleMaterial` (`conductorEta`, `conductorK`, `transmitColor`),
+  which began as a conductor's IOR. Nothing outside a conductor reads or writes them by those names: the loader uses the setters in
+  `metal_poc_material_params.h` (`matparams::setHair`, `setPrincipled`, `setCauchy`, `setMeasuredTable`, `setSubsurface`, `setCoatAlpha`, `setChromaticMedium`,
+  `setGlassMedium`, `setMediumBufferIndex`), the shader the views `matHairBetaN()`, `matCauchyA()`, `matMediumSigmaT()` ... after the struct in
+  `metal_poc_types.metal`, which also has the table of what each family keeps in which slot. The storage and the picture are unchanged; a new family adds its
+  setter and its views. (The procedural-texture family, `materialType` 25, still reads `conductorK.y` as its mode and the rest per mode: see `shadeSurfaceAlbedo`
+  in `metal_poc_kernel_surface.metal`.)
 * `Uniforms` is read as a `constant` buffer; the loader and `dsFillUniforms` fill it. `liveRender` writes only camera/seed/sample fields per frame.
 
 ## Recipes
@@ -147,7 +163,23 @@ a low-priority thread for the library Live Preview uses, which runs in the GUI's
 a cache of its own), and a run that is still building after three seconds prints a line saying so. The status bar says "Preparing the GPU renderer for this Mac (first run only...)" while it
 works. `RT_NO_GPU_WARMUP=1` turns the background build off; the GUI self-test never starts it, so `scripts/gui_selftest_macos.sh` now runs the bundle's `ray_tracer --prepare-gpu` first (measured once, 2026-10-15: after a real shader change the first self-test run then passed, where before the Scene Builder's Rendered viewport failed with "0 frames" until a second run); `gui_selftest.py` on its own still waits the full time on a new build.
 
+**Where the cold-compile time goes (measured 2026-10-19, M2, both variants built in parallel, `--prepare-gpu`):** the full shader takes 127.5 s. With the `else if (mat.materialType == ...)` branches
+of 12 rarely used families made `false &&` in `scatterAtSurface` (so the compiler drops the code, which is what a Metal function constant set to false would do), the same kernel takes **17.6 s**. Turning off one
+group at a time: the four layered ones (coated diffuse, coated conductor, image clearcoat, normalized Fresnel) 69.7 s; measured, subsurface and hair 88.8 s; principled, Oren-Nayar, velvet, diffuse transmission and
+clearcoat 85.0 s. The savings overlap (they do not add up), so no single family is to blame: the cost is the whole megakernel with everything inlined into it.
+
+**What was done with that (2026-10-19): the pipeline is built for the families the scene uses.** `primaryRayKernel` has five function constants (`kFcLayered`, `kFcMeasured`, `kFcSubsurface`, `kFcHair`, `kFcExtras`,
+`metal_poc_kernel_bounce.metal`; a constant the host does not set counts as true, so the shader unit tests and the offline compile see the full kernel). `dsBuildPipeline()` collects the families from the scene's
+material arrays (`FamilySet`, `host/metal_poc_families.h`: a Mix material, which hides the two it mixes, takes everything) and `createKernelPipeline()` builds the kernel with exactly those; Metal caches
+each distinct set separately. A scene of ordinary materials (diffuse, conductors, glass, textures, media, lights) compiles in about 16 s the first time instead of about 127 s; a scene with hair, say, builds
+only the hair family on top. `ray_tracer --prepare-gpu` (what the GUI's warm-up runs for renders) builds that small renderer first for both variants, then the full one, so the first render of an ordinary
+scene is ready in well under half a minute. **Live Preview always builds the full kernel** (`liveSession`, and `metal_prepare_renderer()` for its warm-up): a material can be changed to any family while it
+runs, and rebuilding the pipeline mid-session would be a pause of up to two minutes. `METAL_FULL_KERNEL=1` forces the full kernel for a render (to compare a picture with and without the specialization).
+The cost, as expected: someone who opens many different scenes compiles one pipeline per distinct set of families they meet (each at most as long as the full one, and cached from then on).
+
 ## Environment switches
+
+The production switches below are parsed once, in `gpu/metal/host/metal_poc_tuning.h` (`MetalTuning`): a value that is not a whole number in range is ignored with a message (it used to go through `atoi`, so `METAL_TG_W=abc` was a threadgroup of width 0), and a run prints the switches it had when any differs from the default.
 
 | variable | effect |
 |---|---|
@@ -155,6 +187,7 @@ works. `RT_NO_GPU_WARMUP=1` turns the background build off; the GUI self-test ne
 | `METAL_REGEN=0\|1` | force path regeneration off/on (the host picks per scene: on below ~1500 triangles) |
 | `METAL_CENSUS=1` | print per-scene lane utilisation and distinct materials per group-bounce |
 | `METAL_TG_W`, `METAL_TG_H`, `METAL_TG_PRINT` | threadgroup shape override / print |
+| `METAL_FULL_KERNEL=1` | build the pipeline with every material family, not only the ones the scene uses (to compare a picture with and without the specialization; the first run of a scene then compiles for about two minutes) |
 | `METAL_PARITY_*` | the sweep: `STRICT`, `ALL`, `MODELS`, `ONLY_SCENE_ID`, `SEED`, `SPP`, `DEPTH`, `ADAPTIVE`, `GOLDEN`, `DUMP`, `KEEP`, `TIMING`, `WORKERS`, `SHARD` (see the parity doc) |
 | `RT_METAL_POST_EFFECTS=list` | the PNG's optional finishing effects, from `vignette,aberration,denoise` (or `all` / `none`). Unset = just `denoise` (a bilateral blur that hides some noise: the Mac has no AI denoiser). The vignette (corners 18% darker) and the red/blue colour shift used to be applied to every Metal PNG although the CPU and OptiX renderers add neither, so the same scene looked different on a Mac; they are opt-in now. `.exr` output never gets any of them |
 | `RAY_TRACER_USER_ASSETS` | the per-user folder the loader also searches for downloaded scene files |

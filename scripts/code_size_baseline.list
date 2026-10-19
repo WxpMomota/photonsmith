@@ -1,8 +1,8 @@
 # Written by scripts/check_code_size.py --update. Functions over 300 lines and files over 2000 lines that exist today;
 # CI fails when one grows or a new one appears. Lower or delete a line after splitting something. Format: <key> <lines>
 func cpu_renderer/cpu_interface.cpp::cpu_render_main 404
-func gpu/metal/metal_poc_materials_specular.metal::shadeConductor 329
-func gpu/metal/metal_poc_pbrt_materials.mm::MetalPocApp::mapPbrtMaterial 336
+func gpu/metal/shaders/metal_poc_materials_specular.metal::shadeConductor 329
+func gpu/metal/host/metal_poc_pbrt_materials.mm::PbrtSceneLoader::mapPbrtMaterial 336
 func gpu/optix/optix_interface.cpp::optix_render_main 340
 func gpu/optix/optix_interface.cpp::rt_realtime_render_frame 302
 func gpu/optix/optix_intersection_disk_cylinder.h::__closesthit__cylinder 435

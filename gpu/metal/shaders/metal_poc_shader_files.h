@@ -1,0 +1,66 @@
+// metal_poc_shader_files.h
+//
+// The single source of truth for how the Metal shader source is split
+// across files on disk, and the ORDER they must be concatenated in to
+// reproduce the original single-file `metal_poc.metal` exactly (structs/
+// functions defined in an earlier file are used by later ones - MSL, like
+// C++, needs a prior declaration in the same translation unit).
+//
+// Originally one 6,495-line file (the shader-side analogue of the
+// `metal_poc.mm`/`MetalPocApp` "one giant translation unit" problem
+// PR #156 already fixed on the host side - see that PR's own doc section)
+// mixing shared types/light functions, sampling/BSDF math utilities, 18
+// per-material `shadeXxx()` functions (over half the file on its own),
+// the main kernel, and the device-side test kernels. Split the same way:
+// by logical section, at exact function boundaries, nothing rewritten.
+//
+// Unlike the `.mm` split, Metal shader source is compiled at RUNTIME from
+// a single string (`newLibraryWithSource:` - see metal_poc.mm's/
+// metal_poc_shader_tests.mm's own compile-time-vs-runtime comment), not
+// as separate translation units the linker joins later. So this split
+// does NOT give each piece its own real compilation unit the way the
+// `.mm` split did - every caller must still read all the files and
+// concatenate them into ONE string, in this exact order, before handing
+// it to Metal. This header exists so that "read this list of files, in
+// this order" is written down ONCE, not duplicated (and potentially
+// drifted) between metal_poc.mm's own loader and
+// metal_poc_shader_tests.mm's own separate, simpler one.
+//
+// Plain C++, no Objective-C/Foundation dependency, so it can be included
+// from either .mm file's loader without pulling in more than needed.
+
+inline const char* const* metalShaderFileNames(int* outCount) {
+    static const char* const kFiles[] = {
+        "metal_poc_material_ids.metal",   // materialType names (METAL_MAT_*), shared with the host: must come first
+        "metal_poc_shared_types.h",        // the light/shape/medium structs, one definition for host and shader (valid C++ and MSL): must come second
+        "metal_poc_types.metal",
+        "metal_poc_sampling.metal",        // camera / filter / hemisphere sampling, shading normals, texture lookups, shadow-ray tracing
+        "metal_poc_environment.metal",     // environment-map and portal infinite lights (split out of sampling for the code-size limit)
+        "metal_poc_procedural.metal",      // procedural textures: checker, noise, marble
+        "metal_poc_bsdf_math.metal",       // Fresnel, Beer-Lambert, GGX (D, G, VNDF), orthonormal bases
+        "metal_poc_media_math.metal",      // Henyey-Greenstein, procedural cloud density, RGB density grids
+        "metal_poc_area_lights.metal",     // LightSample, textured disk / cylinder lights, sphere cone sampling, sampleAreaLight()
+        "metal_poc_bump.metal",            // image bump and normal maps (split out of sampling for the code-size limit)
+        "metal_poc_layered_bxdf.metal",
+        "metal_poc_materials_specular.metal",
+        "metal_poc_materials_diffuse.metal",
+        "metal_poc_materials_layered.metal",
+        "metal_poc_materials_extra.metal",
+        "metal_poc_materials_medium.metal",
+        "metal_poc_materials_hair.metal",
+        "metal_poc_bssrdf.metal",          // the tabulated BSSRDF profile: Sr, its pdf, and sampling a radius
+        "metal_poc_kernel_state.metal",    // primaryRayKernel's bundles (resources, path state, bounce state) and their alias macros
+        "metal_poc_kernel_camera.metal",   // camera ray + fresh path state
+        "metal_poc_kernel_media.metal",    // bounded media and the global camera / glass medium
+        "metal_poc_kernel_surface.metal",  // escape, hit resolution, normal perturbation, albedo, emission
+        "metal_poc_kernel_subsurface.metal", // the BSSRDF probe walk and the subsurface material (uses resolveHit and shadeNormalizedFresnel)
+        "metal_poc_kernel_bounce.metal",   // scattering by material, glass-medium bookkeeping, traceBounce()
+        "metal_poc_kernel.metal",          // primaryRayKernel itself
+    };
+    *outCount = (int)(sizeof(kFiles) / sizeof(kFiles[0]));
+    return kFiles;
+}
+
+// The device-side test kernels (the shader unit tests dispatch them directly): concatenated AFTER the files above by the test program only, so a user's run-time compile does not carry them
+// and the app does not ship them (scripts/build_and_deploy_macos.sh skips this one file).
+inline const char* metalTestShaderFileName() { return "metal_poc_test_kernels.metal"; }

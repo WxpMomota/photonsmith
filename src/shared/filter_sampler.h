@@ -127,7 +127,7 @@ public:
 	CPU_GPU T integral() const { return integral_; }
 
 	// Read-only access to the two CDF tables sample() itself inverts -
-	// added for a caller (gpu/metal/metal_poc_dispatch.mm) that needs to
+	// added for a caller (gpu/metal/host/metal_poc_dispatch.mm) that needs to
 	// COPY this table to a separate device, rather than running sample()
 	// on this same object directly (OptiX/CUDA's shared-compilation-unit
 	// model lets device code call sample() on this class verbatim; Metal
