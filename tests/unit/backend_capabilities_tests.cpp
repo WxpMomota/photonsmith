@@ -18,7 +18,7 @@ TEST(BackendCapabilitiesTest, OnlyTheCpuPathTracerReadsTheCpuSamplingOptions) {
 }
 
 TEST(BackendCapabilitiesTest, MetalReadsAdaptiveSamplingAndOptixDoesNot) {
-	// gpu/metal/metal_poc.mm reads options.adaptive_sampling and adaptive_threshold; the OptiX one-shot renderers do not.
+	// gpu/metal/host/metal_poc.mm reads options.adaptive_sampling and adaptive_threshold; the OptiX one-shot renderers do not.
 	EXPECT_TRUE(supports(Renderer::GpuMetal, Option::AdaptiveSampling));
 	EXPECT_TRUE(supports(Renderer::CpuDefault, Option::AdaptiveSampling));
 	EXPECT_FALSE(supports(Renderer::GpuOptix, Option::AdaptiveSampling));

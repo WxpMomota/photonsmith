@@ -4,8 +4,8 @@ pack was made with, and prints each scene's mean per channel as a ratio of pbrt'
 The pack's own cpu_ratio column says how far the CPU is, so a scene where Metal is off and the CPU is not is Metal's to fix.
 
   python3 scripts/metal_pbrt_pack.py [--exe build_macos/ray_tracer] [--tolerance 3] [--only name,name] [--cpu] [--spp-factor 4]
-  python3 scripts/metal_pbrt_pack.py --spp-factor 4 --write-baseline gpu/metal/pbrt_pack_baseline.txt     # remember where Metal stands against pbrt (after a change you understand)
-  python3 scripts/metal_pbrt_pack.py --spp-factor 4 --baseline gpu/metal/pbrt_pack_baseline.txt [--drift 0.01] [--max-off 0.03]   # ctest metal_poc_pbrt_pack
+  python3 scripts/metal_pbrt_pack.py --spp-factor 4 --write-baseline gpu/metal/tests/pbrt_pack_baseline.txt     # remember where Metal stands against pbrt (after a change you understand)
+  python3 scripts/metal_pbrt_pack.py --spp-factor 4 --baseline gpu/metal/tests/pbrt_pack_baseline.txt [--drift 0.01] [--max-off 0.03]   # ctest metal_poc_pbrt_pack
 The baseline gate fails (exit 1) when
   * a scene moved by more than --drift since the baseline was written,
   * a scene renders that is not in the baseline at all (a new row of the table would otherwise never be gated: write it with --write-baseline, after looking at its ratios),

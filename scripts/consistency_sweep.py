@@ -706,7 +706,7 @@ def run(args):
     if "cpu" in args.backends and "gpu" in args.backends and (not only or "backends" in only or "refraction" in only or "bundled" in only):
         print("[cpu vs gpu, light and camera inside glass, a goniometric light]")
         # (goniometric-projection: pbrt's profile frame has the light's up as its pole and its lookup is nearest; 38% off on Metal before it did both)
-        for scene_name in ("lamp-inside-glass", "lamp-inside-rough-glass", "camera-inside-glass", "rough-glass-from-inside", "goniometric-projection", "gpu/metal/test_scenes/subsurface-rough-skin"):
+        for scene_name in ("lamp-inside-glass", "lamp-inside-rough-glass", "camera-inside-glass", "rough-glass-from-inside", "goniometric-projection", "gpu/metal/tests/test_scenes/subsurface-rough-skin"):
             total += 1
             means = {}
             try:

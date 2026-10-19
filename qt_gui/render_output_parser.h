@@ -222,7 +222,7 @@ inline LogCategory classifyLogLine(const std::string &line) {
 		containsNoCase(line, "GPU mode") || contains(line, "NVIDIA") ||
 		contains(line, "RTX") || containsNoCase(line, "Launching renderer (GPU") ||
 		// Metal's own equivalent lines (metal_render_main()'s own stderr/
-		// stdout, gpu/metal/metal_poc.mm/metal_poc_dispatch.mm) - this rule
+		// stdout, gpu/metal/host/metal_poc.mm/metal_poc_dispatch.mm) - this rule
 		// was OptiX/NVIDIA-keyword-only, so a real macOS GPU render's own
 		// non-error log lines fell through to plain Info instead of the
 		// GPU-tagged/colored severity every OptiX line already gets.

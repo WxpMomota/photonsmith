@@ -9,7 +9,7 @@ the camera and watch the image sharpen. On Windows it is backed by OptiX; on mac
   `realtime_render_frame(...)`, from `realtime_renderer.dll` / **`realtime_renderer.dylib`**, and accumulates the frames itself
   (running mean per pixel, reset when the camera moves).
 * `realtime_renderer/realtime_renderer_mac.cpp` exports that exact C ABI (34 arguments, hand-duplicated by the GUI) and forwards to
-  `gpu/metal/metal_live_preview.h`.
+  `gpu/metal/host/metal_live_preview.h`.
 * `metal_live_preview.mm` keeps ONE persistent session per (scene, size): the pbrt scene, acceleration structures and shader
   pipeline are built on the first frame (~0.25 s, ~15 s the very first time ever while macOS compiles the shaders); every later
   frame only updates the camera, frame seed and sample count and dispatches. This works because

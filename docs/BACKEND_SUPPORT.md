@@ -51,7 +51,7 @@ The same method on every GPU backend: render each scene small, with the same see
 | Backend | Command | Known gaps |
 |---|---|---|
 | OptiX recursive and wavefront (Windows) | `python scripts/backend_parity.py` (103 scenes x 2 backends, about 6 minutes) | `scripts/backend_parity_known_gaps.txt` |
-| Metal (Mac) | `ctest` runs `gpu/metal/metal_cpu_gpu_parity_check.cpp`, plus a committed snapshot of Metal's own earlier output | `kKnownGapScenes` (empty) |
+| Metal (Mac) | `ctest` runs `gpu/metal/tests/metal_cpu_gpu_parity_check.cpp`, plus a committed snapshot of Metal's own earlier output | `kKnownGapScenes` (empty) |
 
 To see whether a change moved a picture at all (not whether the picture is right), `python scripts/render_baseline.py capture <name>` before the change and `compare <name>` after: seeded renders are deterministic, so a pure refactor must come out bit-identical.
 

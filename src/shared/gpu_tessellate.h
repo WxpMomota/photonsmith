@@ -5,7 +5,7 @@
 // cylinders, OptiX adds bilinear patches (and dices curves into patches itself) but has no cone or paraboloid. This is the step that rewrites those shapes as ordinary
 // triangles appended to the scene, so area lights, materials, instancing and the scene bounds all see them like any other mesh. Which shapes are rewritten is the
 // backend's TessellationCaps: Metal asks for all four kinds, OptiX only for cones and paraboloids (its native patches and curve dicing stay). Moved here from
-// gpu/metal/metal_poc_pbrt_loader.mm (tessellateUnsupportedShapes) with the numbers unchanged, so a seeded Metal render is byte-identical.
+// gpu/metal/host/metal_poc_pbrt_loader.mm (tessellateUnsupportedShapes) with the numbers unchanged, so a seeded Metal render is byte-identical.
 //
 // The tessellation is a close approximation, not exact geometry: smooth analytic vertex normals for the quadrics and patches, flat-shaded 8-sided tubes for curves
 // (the same dicing density as src/shared/curve_tessellate.h gives OptiX). A shape with Material "interface" only bounds a medium and is skipped (transparent).

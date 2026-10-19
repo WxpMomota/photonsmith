@@ -34,7 +34,7 @@ render() {  # tag, extra ray_tracer args, scene id, environment assignments
 }
 
 specs() {   # tag | extra args | scene id | environment assignments (a '|' separator: empty fields must survive `read`)
-	for id in $(grep -v '^#' gpu/metal/parity_golden.txt | cut -d' ' -f1); do printf '%s||%s|\n' "$id" "$id"; done
+	for id in $(grep -v '^#' gpu/metal/tests/parity_golden.txt | cut -d' ' -f1); do printf '%s||%s|\n' "$id" "$id"; done
 	for id in A1 B1 C1; do
 		printf '%s|%s|%s|%s\n' "$id.adaptive" "--adaptive" "$id" ""
 		printf '%s|%s|%s|%s\n' "$id.clamp" "--maxcomponentvalue 2" "$id" ""

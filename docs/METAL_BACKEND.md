@@ -17,6 +17,11 @@ around it. The shader source is **compiled at run time** from the `.metal` files
 
 ## Files
 
+`gpu/metal/` has three folders and one header: `metal_interface.h` (the C API the launcher calls), `host/` (the Objective-C++ renderer: `MetalPocApp`, the pbrt loader,
+buffer upload, dispatch, Live Preview), `shaders/` (the `.metal` sources, the two headers valid in both languages, and the list of files to concatenate) and `tests/`
+(shader unit tests, math and loader tests, the checks and their `.sh` drivers, `test_scenes/`, the parity golden and the pbrt-pack baseline). The tables below name
+files without the folder. The `metal_poc_` prefix is history (the backend began as a proof of concept); it is on every file and has no other meaning.
+
 | file | role |
 |---|---|
 | `metal_poc_main.mm`, `metal_poc.mm` | the `metal_poc` CLI and `MetalPocApp`: argument parsing, the hand-built demo room (`buildScene`), post-processing and writing the image |
@@ -160,7 +165,7 @@ works. `RT_NO_GPU_WARMUP=1` turns the background build off; the GUI self-test ne
 
 ## Environment switches
 
-The production switches below are parsed once, in `gpu/metal/metal_poc_tuning.h` (`MetalTuning`): a value that is not a whole number in range is ignored with a message (it used to go through `atoi`, so `METAL_TG_W=abc` was a threadgroup of width 0), and a run prints the switches it had when any differs from the default.
+The production switches below are parsed once, in `gpu/metal/host/metal_poc_tuning.h` (`MetalTuning`): a value that is not a whole number in range is ignored with a message (it used to go through `atoi`, so `METAL_TG_W=abc` was a threadgroup of width 0), and a run prints the switches it had when any differs from the default.
 
 | variable | effect |
 |---|---|

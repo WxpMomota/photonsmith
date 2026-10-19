@@ -5,7 +5,7 @@
 // box spans about 555 units). So the Metal loader rescales the whole scene once, so that its largest dimension is 2, recentres it on its bounding box, and moves it well clear
 // of the hardcoded room (+60 in X). Everything the loader places (triangles, spheres, lights, media, the camera) goes through the same transform, and Live Preview converts the
 // GUI's camera and first-hit positions with it - which is why the rule returns all three numbers, not only the scale. Moved here from MetalPocApp::loadPbrtScene()
-// (gpu/metal/metal_poc_pbrt_loader.mm) with the arithmetic unchanged (single precision, same order), so a seeded Metal render is byte-identical.
+// (gpu/metal/host/metal_poc_pbrt_loader.mm) with the arithmetic unchanged (single precision, same order), so a seeded Metal render is byte-identical.
 //
 // The bounding box covers the triangles and the spheres. A huge ground-plane-as-a-sphere (the `Translate 0 -1000 0` + radius 1000 idiom) would set the extent to about 2000
 // and shrink every real object to the size of the shaders' fixed epsilons, so a sphere whose diameter is at least 60% of the full extent is left out of the box when that

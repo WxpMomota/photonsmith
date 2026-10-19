@@ -6,7 +6,7 @@ history) and `docs/PBRT_SUPPORT.md` (which pbrt features each backend supports).
 
 ## How it is measured
 
-`gpu/metal/metal_cpu_gpu_parity_check.cpp` renders every pbrt-backed scene with both backends at
+`gpu/metal/tests/metal_cpu_gpu_parity_check.cpp` renders every pbrt-backed scene with both backends at
 a small size and compares linear HDR (`.exr`) output:
 
 * **whole-image brightness** and **per-channel means** within 30%;
@@ -47,7 +47,7 @@ finds gross errors, and it cannot see a regression that CPU and Metal share. Mea
 +15% bias on all diffuse direct lighting and removing the Russian-roulette compensation both PASSED it; +35% and a 40% Fresnel
 error only just failed. Metal is deterministic and low-noise (a different seed moves a scene's channel means by <= 2.2% and its
 4x4 block means by <= 11%, over 95 scenes x 3 seeds), so the sweep also compares every scene's Metal image with a committed
-snapshot of Metal's own earlier output, `gpu/metal/parity_golden.txt` (R/G/B means + 4x4 block means, averaged over 3 seeds):
+snapshot of Metal's own earlier output, `gpu/metal/tests/parity_golden.txt` (R/G/B means + 4x4 block means, averaged over 3 seeds):
 channel means may move by 6%, blocks (above a small brightness floor) by 20%. With the snapshot: **0** drifts on two unseen
 seeds, and the same bugs are caught: +15% diffuse -> 40 scenes flagged, +8% -> 16, no RR compensation -> 2. Under
 `METAL_PARITY_STRICT=1` (ctest) a drift fails the test.
@@ -67,7 +67,7 @@ The standard sweep (what CI/ctest runs): 56 scenes, all pass. All 24 Models
 scenes with assets present match CPU (23 pass, 1 marginal). CI skips the test, non-fatally, on a runner
 whose Metal device cannot do hardware ray tracing, so the gate really protects a developer Mac.
 
-**Host/shader contracts.** Two things that used to be held together only by comments are now checked. (1) `materialType` values have names, `METAL_MAT_*`, in `gpu/metal/metal_poc_material_ids.metal` - one file that the host #includes and that is also the first file of the concatenated shader source, so the loader and the kernel cannot disagree about what "25" means (the numbering is Metal's own; OptiX has a separate enum). (2) `metal_poc_shader_tests` asks the shader for its `sizeof`/`alignof` of every struct the host mirrors by hand (`Uniforms`, `TriangleMaterial`, the media, light, lens structs) and the byte offset of the last 17 `Uniforms` fields, and compares them with the host's (`test_structLayouts`, `metal_poc_shader_tests_layout.mm`): adding a field on one side only, or in a different place, fails that test instead of shifting every later field. Keep the probe lists in step when you add a mirrored struct.
+**Host/shader contracts.** Two things that used to be held together only by comments are now checked. (1) `materialType` values have names, `METAL_MAT_*`, in `gpu/metal/shaders/metal_poc_material_ids.metal` - one file that the host #includes and that is also the first file of the concatenated shader source, so the loader and the kernel cannot disagree about what "25" means (the numbering is Metal's own; OptiX has a separate enum). (2) `metal_poc_shader_tests` asks the shader for its `sizeof`/`alignof` of every struct the host mirrors by hand (`Uniforms`, `TriangleMaterial`, the media, light, lens structs) and the byte offset of the last 17 `Uniforms` fields, and compares them with the host's (`test_structLayouts`, `metal_poc_shader_tests_layout.mm`): adding a field on one side only, or in a different place, fails that test instead of shifting every later field. Keep the probe lists in step when you add a mirrored struct.
 
 ## What the Metal loader supports
 
@@ -201,7 +201,7 @@ Still different from the CPU on Metal (none in a bundled scene except the first)
 | `metal_poc_shader_tests` (device-side unit tests of shader functions against host references, e.g. `bumpHeightFiltered` against the CPU `mipmap`, the sphere-light cone sampling, `spawnSide`, BSDFs, noise, media) | A wrong index, level, pdf or sign inside one function, before it becomes a few percent of a picture | Any Mac with a Metal device (not the hosted runners: they have none) |
 | `metal_poc_cpu_gpu_sweep` (`scripts/consistency_sweep.py --only fog,dots,wrap,spawn,instbump,oddmap,subsurface`) | Metal against the CPU on the cases this project found wrong before: coloured fog, lamps, a clamped small lamp, an imagemap's wrap, a dots mapping, bump on an instance and of odd size, a far tilted normal map, subsurface | Any Mac |
 | `metal_poc_cpu_gpu_parity` (golden snapshot, `scripts/update_metal_golden.sh`), `metal_poc_consistency`, `metal_poc_subsurface*`, the media, alpha, cloud, nanovdb tests | The older scene-level checks | Any Mac |
-| `metal_poc_pbrt_pack` (`scripts/metal_pbrt_pack.py --baseline gpu/metal/pbrt_pack_baseline.txt`: Metal's mean against real pbrt-v4's on every scene of the table, compared with the stored ratios: a move of more than 1% fails, a scene of the table missing from the baseline fails, and a row more than 3% off pbrt without a `# known: <why>` note fails; the only check against ground truth instead of the CPU) | Anything that moves a whole scene toward or away from pbrt, in a scene no sweep pair targets | Any Mac, about 7 minutes; rewrite the baseline (`--write-baseline`) only after a change you understand |
+| `metal_poc_pbrt_pack` (`scripts/metal_pbrt_pack.py --baseline gpu/metal/tests/pbrt_pack_baseline.txt`: Metal's mean against real pbrt-v4's on every scene of the table, compared with the stored ratios: a move of more than 1% fails, a scene of the table missing from the baseline fails, and a row more than 3% off pbrt without a `# known: <why>` note fails; the only check against ground truth instead of the CPU) | Anything that moves a whole scene toward or away from pbrt, in a scene no sweep pair targets | Any Mac, about 7 minutes; rewrite the baseline (`--write-baseline`) only after a change you understand |
 | `scripts/bundled_scene_compare.py` (every bundled scene, CPU against Metal), `scripts/combo_sweep.py` (the Builder's 400-odd shape x material scenes), the full `scripts/consistency_sweep.py` | Everything else | By hand, before a release; not in ctest |
 | `scripts/gui_selftest_macos.sh` | The GUI, Live Preview and the render queue with a fresh app | By hand, before a release |
 

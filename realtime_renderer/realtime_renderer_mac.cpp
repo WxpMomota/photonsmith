@@ -1,5 +1,5 @@
 // realtime_renderer_mac.cpp - the macOS realtime_renderer.dylib: the same C ABI as realtime_renderer_dll.cpp (what the Qt GUI's
-// Live Preview loads, qt_gui/realtime_preview_session.cpp), backed by the Metal live session (gpu/metal/metal_live_preview.h)
+// Live Preview loads, qt_gui/realtime_preview_session.cpp), backed by the Metal live session (gpu/metal/host/metal_live_preview.h)
 // instead of OptiX.
 //
 // realtime_render_frame() is declared once, in src/shared/realtime_api.h, which the GUI and the OptiX library include too, so this definition cannot drift from
@@ -9,7 +9,7 @@
 #include <atomic>
 
 #include "../gpu/metal/metal_interface.h"   // metal_prepare_renderer()
-#include "../gpu/metal/metal_live_preview.h"
+#include "../gpu/metal/host/metal_live_preview.h"
 #include "../src/shared/realtime_api.h"
 
 RT_REALTIME_API bool realtime_render_frame(

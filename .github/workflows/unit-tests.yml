@@ -23,7 +23,7 @@ name: Unit tests
 # Whether it can also RUN the raytracing-dependent tests depends on
 # whether the runner's own (paravirtualized, on a hosted VM) GPU passes
 # this project's own supportsRaytracing check in parseArgsAndCreateDevice()
-# (gpu/metal/metal_poc.mm) - genuinely unverified as of this workflow's
+# (gpu/metal/host/metal_poc.mm) - genuinely unverified as of this workflow's
 # own introduction, since GitHub's hosted macOS runners historically
 # returned no usable Metal device at all and only recently started
 # exposing a paravirtual one, with unconfirmed feature-family support.
@@ -197,7 +197,7 @@ jobs:
       - name: Run host-only math tests
         # metal_poc_math_tests needs no Metal device at all (plain,
         # GPU-independent host C++ checked against known-correct
-        # reference values - see gpu/metal/metal_poc_math_tests.cpp's
+        # reference values - see gpu/metal/tests/metal_poc_math_tests.cpp's
         # own comment) - always safe to run unconditionally, unlike the
         # device-dependent step below.
         working-directory: build

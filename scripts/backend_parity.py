@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CPU-versus-GPU parity sweep for the OptiX renderers - the same method the Mac's Metal sweep uses (gpu/metal/metal_cpu_gpu_parity_check.cpp,
+"""CPU-versus-GPU parity sweep for the OptiX renderers - the same method the Mac's Metal sweep uses (gpu/metal/tests/metal_cpu_gpu_parity_check.cpp,
 docs/METAL_PARITY_STATUS.md), so every GPU backend is judged the same way.
 
 Every scene is rendered at a small size on the CPU and on the GPU backend with the same --seed and compared in linear HDR (.exr):
