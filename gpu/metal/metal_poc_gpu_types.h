@@ -232,33 +232,6 @@ struct Uniforms {
     uint32_t footprintValid = 0;
 };
 
-// Mirrors metal_poc.metal's own LensElement byte-for-byte - a single
-// pbrt-v4 RealisticCamera lens surface, already in the FOCUS-ADJUSTED,
-// metres-converted form `RealisticCamera<float>::lens_curvature_radius(i)`/
-// etc. return (see Uniforms::cameraRealistic's own comment). A
-// `curvatureRadius == 0` entry is the aperture STOP, not a refractive
-// surface (matches `RealisticCamera<T>::LensElement`'s own `eta == 0`-
-// means-stop convention exactly, just keyed on the OTHER field - see
-// that struct's own comment, src/shared/realistic_camera.h, for why
-// both conventions coexist there).
-struct GpuLensElementData {
-    float curvatureRadius;
-    float thickness;
-    float eta;
-    float apertureRadius;
-};
-
-// Mirrors metal_poc.metal's own ExitPupilBounds byte-for-byte - one
-// annulus slab's own precomputed 2D bounding box on the rear exit
-// pupil (`RealisticCamera<float>::bound_exit_pupil()`'s own output,
-// read back via its `exit_pupil_xmin/xmax/ymin/ymax/degenerate(i)`
-// accessors) - `degenerate` true means NO valid ray leaves the lens
-// system from this film radius at all (fully vignetted).
-struct GpuExitPupilBoundsData {
-    float xMin, xMax, yMin, yMax;
-    uint32_t degenerate;
-};
-
 // AreaLightData/buildPowerLightSampler now live in metal_poc_host_math.h
 // (included above) - see that header's own comment.
 
@@ -270,43 +243,6 @@ struct GpuExitPupilBoundsData {
 inline void logPowerLightSamplerLine(int i, double power, double pmf, double uniformPmf) {
     fprintf(stderr, "Light %d: power=%.4f pmf=%.4f (uniform would be %.4f)\n", i, power, pmf, uniformPmf);
 }
-
-// Mirrors metal_poc.metal's PointLight byte-for-byte.
-struct PointLightData {
-    PackedFloat3 position;
-    PackedFloat3 emission;
-    // Defaults make every point light omnidirectional (see
-    // metal_poc.metal's own PointLight/spotLightFalloff() comments) unless
-    // explicitly overridden - the existing point light's own literal
-    // doesn't need to change at all for this to stay backward compatible.
-    PackedFloat3 direction = PackedFloat3{0.0f, -1.0f, 0.0f};
-    float cosOuterAngle = -1.0f;
-    float cosInnerAngle = -1.0f;
-};
-
-// Mirrors metal_poc.metal's DirectionalLight byte-for-byte.
-struct DirectionalLightData {
-    PackedFloat3 direction;
-    PackedFloat3 emission;
-};
-
-// Mirrors metal_poc.metal's ProjectionLight byte-for-byte.
-struct ProjectionLightData {
-    PackedFloat3 position;
-    PackedFloat3 forward;
-    PackedFloat3 right;
-    PackedFloat3 up;
-    float tanHalfFovX;
-    float tanHalfFovY;
-    float scale;
-    // True for a pbrt-loaded light with its own real slide image (section
-    // 98) - selects pbrtProjectionTexture instead of the room's own
-    // shared earthTexture at the shading call site. False (every light
-    // before this one, including every hardcoded-room light and every
-    // pbrt-loaded Approx-fallback light) keeps reading earthTexture
-    // exactly as before - purely additive.
-    uint32_t usePbrtTexture = 0;
-};
 
 // Builds a ProjectionLightData aimed from `position` at `target`, with a
 // world-space `worldUp` hint (the usual "look-at" convention every other
@@ -335,20 +271,6 @@ inline ProjectionLightData makeProjectionLight(float3 position, float3 target, f
         tanHalfFovY,
         scale};
 }
-
-// Mirrors metal_poc.metal's GoniometricLight byte-for-byte.
-struct GoniometricLightData {
-    PackedFloat3 position;
-    PackedFloat3 forward;
-    PackedFloat3 right;
-    PackedFloat3 up;
-    PackedFloat3 emission;
-    float scale;
-    // Same idea as ProjectionLightData::usePbrtTexture above - selects
-    // pbrtGoniometricTexture instead of the room's own shared
-    // goniometricTexture. False by default, purely additive.
-    uint32_t usePbrtTexture = 0;
-};
 
 // Builds a GoniometricLightData the same look-at way makeProjectionLight()
 // above builds a ProjectionLightData - see that function's own comment.
@@ -500,81 +422,3 @@ struct TriangleMaterial {
     float rayTime = 0.0f;
 };
 
-// Mirrors metal_poc_types.metal's GpuCloudMedium byte-for-byte (E2,
-// section 178) - see that struct's own comment.
-struct GpuCloudMedium {
-    float boundsMin[3];
-    float boundsMax[3];
-    float worldToMediumMat[9];
-    float worldToMediumTranslate[3];
-    float sigmaA;
-    float sigmaS;
-    float density;
-    float wispiness;
-    float frequency;
-};
-
-// Mirrors metal_poc_types.metal's GpuRgbGridMedium byte-for-byte (E4,
-// section 179) - see that struct's own comment.
-struct GpuRgbGridMedium {
-    float boundsMin[3];
-    float boundsMax[3];
-    float worldToMediumMat[9];
-    float worldToMediumTranslate[3];
-    int nx, ny, nz;
-    int dataOffset;
-    float sigmaScale;
-    float sigmaMaj;
-    float phaseG;
-    float sigmaAConst;  // see metal_poc_types.metal
-    int saDataOffset;   // see metal_poc_types.metal
-    int leDataOffset;   // see metal_poc_types.metal
-    float leScale;
-};
-
-// Mirrors metal_poc.metal's SphereData byte-for-byte. centerDelta1
-// (F11, section 167) defaults to {0,0,0} - see that struct's own
-// comment for why every existing 2-field `SphereData{center, radius}`
-// construction site (every scene but F11) stays correct unmodified.
-struct SphereData {
-    PackedFloat3 center;
-    float radius;
-    PackedFloat3 centerDelta1{0, 0, 0};
-    // pbrt's sphere texture coordinates are taken about the sphere's OWN z axis: these three rows (pbrt_flatten::Sphere::uvRot, row-major) carry a world direction into the frame
-    // the project's older (u, v) are defined in (get_sphere_uv, what equirectangularUV(float3(n.x, n.y, -n.z)) computes). The identity keeps a hardcoded sphere's old mapping.
-    PackedFloat3 uvRot0{1, 0, 0};
-    PackedFloat3 uvRot1{0, 1, 0};
-    PackedFloat3 uvRot2{0, 0, 1};
-};
-
-// Mirrors metal_poc.metal's InstanceTransform byte-for-byte (4 packed
-// columns, same layout MTLPackedFloat4x3 itself uses - see that file's
-// own comment on why this side-channel buffer exists at all).
-struct InstanceTransform {
-    PackedFloat3 col0;
-    PackedFloat3 col1;
-    PackedFloat3 col2;
-    PackedFloat3 col3;
-    // pbrt ObjectInstance placements (see Uniforms::pbrtInstanceFirst): the index of this instance's group's first triangle in the shared
-    // vertex/normal/uv/material arrays. For such an instance col0..2 hold the NORMAL matrix (inverse transpose of the linear part), not the
-    // linear part itself - transformNormalByInstance() multiplies by them either way. 0 for every other instance.
-    uint32_t triBase = 0;
-};
-
-// Mirrors metal_poc.metal's DiskData byte-for-byte.
-struct DiskData {
-    PackedFloat3 center;
-    PackedFloat3 normal;
-    float radius;
-};
-
-// Mirrors metal_poc.metal's CylinderData byte-for-byte (section 171) -
-// see that struct's own comment for why this is baked world-space
-// base/axis/radius/height rather than an object-space shape plus a
-// per-primitive transform.
-struct CylinderData {
-    PackedFloat3 base;
-    PackedFloat3 axis;
-    float radius;
-    float height;
-};

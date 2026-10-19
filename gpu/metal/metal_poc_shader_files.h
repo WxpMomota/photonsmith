@@ -32,6 +32,7 @@
 inline const char* const* metalShaderFileNames(int* outCount) {
     static const char* const kFiles[] = {
         "metal_poc_material_ids.metal",   // materialType names (METAL_MAT_*), shared with the host: must come first
+        "metal_poc_shared_types.h",        // the light/shape/medium structs, one definition for host and shader (valid C++ and MSL): must come second
         "metal_poc_types.metal",
         "metal_poc_sampling.metal",        // camera / filter / hemisphere sampling, shading normals, texture lookups, shadow-ray tracing
         "metal_poc_environment.metal",     // environment-map and portal infinite lights (split out of sampling for the code-size limit)
