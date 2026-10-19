@@ -89,7 +89,7 @@ static void uniformGridsAsRgbGrids(pbrt_flatten::FlatScene& scene) {
     }
 }
 
-void MetalPocApp::loadPbrtScene() {
+void PbrtSceneLoader::loadPbrtScene() {
     pbrt_load::LoadResult result = pbrt_load::loadFile(pbrtScenePath);
     if (!result.ok) {
         fprintf(stderr, "loadPbrtScene: %s\n", result.error.c_str());
@@ -230,7 +230,7 @@ static PackedFloat3 pbrtFlatLightEmission(const std::string& pbrtScenePath, cons
 // Every picture an AreaLightSource names goes into ONE atlas texture (the shader has one slot for them): each file decoded once, the pictures stacked top to bottom, and each given its place in
 // the atlas - (scale u, scale v, offset u, offset v), where the picture's own (u, v) in [0, 1] is read. A scene with one picture has it alone at (1, 1, 0, 0), as before. A picture that cannot be
 // read or decoded, or that would make the atlas larger than Metal's 16384 pixels, is left out and its lights keep their flat colour.
-void MetalPocApp::buildAreaLightAtlas(const pbrt_flatten::FlatScene& scene) {
+void PbrtSceneLoader::buildAreaLightAtlas(const pbrt_flatten::FlatScene& scene) {
     struct Picture { std::string name; std::vector<float> rgb; int w = 0, h = 0; };
     std::vector<Picture> pictures;
     std::set<std::string> seen;
@@ -269,7 +269,7 @@ void MetalPocApp::buildAreaLightAtlas(const pbrt_flatten::FlatScene& scene) {
     }
 }
 
-bool MetalPocApp::claimAreaLightImage(const pbrt_flatten::Emission& em, std::array<float, 4>& place) const {
+bool PbrtSceneLoader::claimAreaLightImage(const pbrt_flatten::Emission& em, std::array<float, 4>& place) const {
     if (em.filename.empty()) return false;
     const auto it = pbrtAreaLightImagePlaces.find(em.filename);
     if (it == pbrtAreaLightImagePlaces.end()) return false;
@@ -283,7 +283,7 @@ static AreaLightData withImagePlace(AreaLightData light, const std::array<float,
     return light;
 }
 
-void MetalPocApp::loadPbrtAreaLights(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
+void PbrtSceneLoader::loadPbrtAreaLights(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
     const PbrtMaterialForFn& materialFor, std::vector<bool>& triangleHandled,
     std::unordered_map<int, std::pair<float3, bool>>& unhandledLightEmission) {
     auto vertexAt = [toWorld](const double* v, int i) {
@@ -433,7 +433,7 @@ void MetalPocApp::loadPbrtAreaLights(const pbrt_flatten::FlatScene& scene, const
 // Alpha cutout masks (a pbrt Shape's "alpha" / "texture alpha"): each distinct file is decoded once (gpu_scene_textures::decodeAlphaMask, the decode OptiX and the CPU
 // use) into the shared float buffer, one float per texel. pbrtAlphaMasks: filename -> {offset, width, height}; width 0 = unusable. Used for the scene's own triangles and
 // for the triangles of an instanced group.
-void MetalPocApp::applyPbrtAlphaMask(TriangleMaterial& mat, const pbrt_flatten::Material& m) {
+void PbrtSceneLoader::applyPbrtAlphaMask(TriangleMaterial& mat, const pbrt_flatten::Material& m) {
     if (m.alphaTextureFilename.empty() || mat.lightId >= 0) return;
     auto it = pbrtAlphaMasks.find(m.alphaTextureFilename);
     if (it == pbrtAlphaMasks.end()) {
@@ -461,7 +461,7 @@ void MetalPocApp::applyPbrtAlphaMask(TriangleMaterial& mat, const pbrt_flatten::
 // filename -> {element offset, width, height, 1 if a normal map}; width 0 = could not be used (missing/undecodable).
 // A grayscale image is a height map (1 float per texel, sRGB-decoded); anything else is read as a tangent-space RGB normal map
 // (3 floats per texel, LINEAR - a normal map holds vectors, not colours), as the CPU classifies and reads them.
-void MetalPocApp::applyPbrtImageBump(TriangleMaterial& mat, const pbrt_flatten::Material& m) {
+void PbrtSceneLoader::applyPbrtImageBump(TriangleMaterial& mat, const pbrt_flatten::Material& m) {
     if (m.displacementTextureFilename.empty() || mat.lightId >= 0 || mat.twoSided != 0u) return;
     auto it = pbrtBumpImages.find(m.displacementTextureFilename);
     if (it == pbrtBumpImages.end()) {
@@ -517,7 +517,7 @@ void MetalPocApp::applyPbrtImageBump(TriangleMaterial& mat, const pbrt_flatten::
 // light's own quad - ordinary geometry, or an unhandled (non-quad)
 // light's own triangles (emissive via `unhandledLightEmission`, not
 // NEE-registered).
-void MetalPocApp::loadPbrtRemainingTriangles(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
+void PbrtSceneLoader::loadPbrtRemainingTriangles(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
     const PbrtMaterialForFn& materialFor, const std::vector<bool>& triangleHandled,
     const std::unordered_map<int, std::pair<float3, bool>>& unhandledLightEmission) {
     auto vertexAt = [toWorld](const double* v, int i) {
@@ -612,7 +612,7 @@ static TriangleMaterial homogeneousMediumMaterial(const pbrt_flatten::Medium& m,
 }
 
 // A `Material "interface"` sphere bounding a pbrt "rgbgrid" medium: its TriangleMaterial (materialType 30) and the grid it points at.
-void MetalPocApp::rgbGridSphereMaterial(const pbrt_flatten::Medium& gm, const PbrtToWorldFn& toWorld, float sceneScale, TriangleMaterial& mat) {
+void PbrtSceneLoader::rgbGridSphereMaterial(const pbrt_flatten::Medium& gm, const PbrtToWorldFn& toWorld, float sceneScale, TriangleMaterial& mat) {
     // pbrt "rgbgrid" medium (E7): a per-voxel RGB scattering grid inside the interface sphere, rendered by
     // shadeRgbGridMediumSphere (materialType 30; this sphere is its trigger volume, the grid's own AABB
     // clips the actual medium). Distances are rescaled by sceneScale, so every sigma is divided by it.
@@ -686,7 +686,7 @@ void MetalPocApp::rgbGridSphereMaterial(const pbrt_flatten::Medium& gm, const Pb
 }
 
 // The same for a pbrt "cloud" medium (materialType 29).
-void MetalPocApp::cloudSphereMaterial(const pbrt_flatten::Medium& cm, const PbrtToWorldFn& toWorld, float sceneScale, TriangleMaterial& mat) {
+void PbrtSceneLoader::cloudSphereMaterial(const pbrt_flatten::Medium& cm, const PbrtToWorldFn& toWorld, float sceneScale, TriangleMaterial& mat) {
     // pbrt "cloud" medium (E5): procedural Perlin-noise density inside the interface sphere, rendered by
     // shadeCloudMediumSphere (materialType 29; the sphere is its trigger volume, the cloud's own medium-space box
     // [p0,p1] clips the actual medium). Same field mapping as OptiX's pbrt_gpu_builder.h: pure scattering with the
@@ -717,7 +717,7 @@ void MetalPocApp::cloudSphereMaterial(const pbrt_flatten::Medium& cm, const Pbrt
 }
 
 // What a sphere is drawn with: its pbrt material, or, for a `Material "interface"` sphere, the medium it bounds; a glass sphere that also bounds a medium carries the medium in its spare fields.
-TriangleMaterial MetalPocApp::sphereMaterial(const pbrt_flatten::FlatScene& scene, const pbrt_flatten::Sphere& s, const PbrtToWorldFn& toWorld, const PbrtMaterialForFn& materialFor, float sceneScale) {
+TriangleMaterial PbrtSceneLoader::sphereMaterial(const pbrt_flatten::FlatScene& scene, const pbrt_flatten::Sphere& s, const PbrtToWorldFn& toWorld, const PbrtMaterialForFn& materialFor, float sceneScale) {
     TriangleMaterial mat = materialFor(s.material);
     // A `Material "interface"` sphere bounding a homogeneous medium
     // (MediumInterface "fog" "") has no BSDF of its own: it is only the
@@ -796,7 +796,7 @@ TriangleMaterial MetalPocApp::sphereMaterial(const pbrt_flatten::FlatScene& scen
 }
 
 // An emissive sphere: its radiance, and its registration as a sphere light for next-event estimation.
-void MetalPocApp::emitSphereLight(const pbrt_flatten::FlatScene& scene, const pbrt_flatten::Sphere& s, const SphereData& sd, const float3& center, TriangleMaterial& mat) {
+void PbrtSceneLoader::emitSphereLight(const pbrt_flatten::FlatScene& scene, const pbrt_flatten::Sphere& s, const SphereData& sd, const float3& center, TriangleMaterial& mat) {
     if (s.areaLight >= 0 && s.areaLight < (int)scene.areaLights.size()) {
         // Emissive hit handled here; NEE registration (a real sphere light
         // in `lights[]`) follows below. (Originally this tier was "visible
@@ -849,7 +849,7 @@ void MetalPocApp::emitSphereLight(const pbrt_flatten::FlatScene& scene, const pb
     }
 }
 
-void MetalPocApp::loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, const std::vector<pbrt_flatten::Sphere>& sphereList, const PbrtToWorldFn& toWorld,
+void PbrtSceneLoader::loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, const std::vector<pbrt_flatten::Sphere>& sphereList, const PbrtToWorldFn& toWorld,
     const PbrtMaterialForFn& materialFor, float sceneScale) {
     for (const pbrt_flatten::Sphere& s : sphereList) {
         const float3 center = toWorld(float3{(float)s.center[0], (float)s.center[1], (float)s.center[2]});
@@ -923,7 +923,7 @@ static void warnShapeMotionIgnored(const char* kind) {
     // disk skips for the same "don't render something visibly wrong"
     // reason a partial disk does, mirroring skippedInstancedSpheres'
     // own non-uniform-scale precedent for instanced spheres.
-void MetalPocApp::loadPbrtDisks(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
+void PbrtSceneLoader::loadPbrtDisks(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
     const PbrtMaterialForFn& materialFor, float sceneScale) {
     size_t skippedDisks = 0;
     auto isInterfaceMaterial = [&scene](int idx) {
@@ -1022,7 +1022,7 @@ void MetalPocApp::loadPbrtDisks(const pbrt_flatten::FlatScene& scene, const Pbrt
 // "frozen at its start pose" tier disk-cylinder-motion-blur.pbrt's own
 // registry description already gives every GPU backend for this shape,
 // not a new gap this loader introduces.
-void MetalPocApp::loadPbrtCylinders(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
+void PbrtSceneLoader::loadPbrtCylinders(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
     const PbrtMaterialForFn& materialFor, float sceneScale) {
     size_t skippedCylinders = 0;
     auto isInterfaceMaterial = [&scene](int idx) {
@@ -1118,7 +1118,7 @@ void MetalPocApp::loadPbrtCylinders(const pbrt_flatten::FlatScene& scene, const 
 // buildInstanceAS in metal_poc_gpu_resources.mm). A scene that instances a tree mesh 600 times used to bake 600 copies of its triangles (Barcelona
 // Pavilion: 97 million, more than the GPU can hold); now it stores the tree once. The kernel finds an instance's triangles at
 // InstanceTransform::triBase + the group-local primitive id and transforms the shading normal by the instance's normal matrix.
-void MetalPocApp::loadPbrtObjectInstances(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
+void PbrtSceneLoader::loadPbrtObjectInstances(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
     const PbrtMaterialForFn& materialFor, float sceneScale) {
     pbrtInstGroups.clear();
     pbrtInstPlacements.clear();
@@ -1247,7 +1247,7 @@ void MetalPocApp::loadPbrtObjectInstances(const pbrt_flatten::FlatScene& scene, 
 // at all when the scene has no conflicting real per-shape medium -
 // see that field's own comment) - a direct, safe read, no further
 // checking needed here.
-void MetalPocApp::loadPbrtMedium(const pbrt_flatten::FlatScene& scene, float sceneScale) {
+void PbrtSceneLoader::loadPbrtMedium(const pbrt_flatten::FlatScene& scene, float sceneScale) {
     if (scene.cameraMediumIndex >= 0 &&
         (size_t)scene.cameraMediumIndex < scene.media.size()) {
         const pbrt_flatten::Medium& m = scene.media[(size_t)scene.cameraMediumIndex];
@@ -1336,7 +1336,7 @@ void MetalPocApp::loadPbrtMedium(const pbrt_flatten::FlatScene& scene, float sce
 // cosine-weighted (or the material's own specular/GGX) BSDF sampling is
 // already optimal for a constant-radiance background, which is exactly why
 // no material function has a "pbrtEnvColor NEE" block anywhere.
-void MetalPocApp::loadPbrtInfiniteLight(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld) {
+void PbrtSceneLoader::loadPbrtInfiniteLight(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld) {
     if (scene.infiniteLight.present) {
         if (scene.infiniteLight.hasPortal) {
             // pbrt-v4 portal (windowed) infinite light. Same host recipe as the OptiX builder (gpu/optix/pbrt_gpu_builder.h): a real
@@ -1408,7 +1408,7 @@ void MetalPocApp::loadPbrtInfiniteLight(const pbrt_flatten::FlatScene& scene, co
 }
 
 // --- Camera ------------------------------------------------------------
-void MetalPocApp::loadPbrtCamera(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
+void PbrtSceneLoader::loadPbrtCamera(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld,
     float3 bboxCenter, float sceneScale, float3 sceneOffset) {
     const pbrt_flatten::Camera& cam = scene.camera;
     // lookfrom/lookat are positions, scaled the same as every vertex

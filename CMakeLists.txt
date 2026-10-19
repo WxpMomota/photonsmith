@@ -543,6 +543,14 @@ if(RT_BUILD_METAL)
     # - just plain math, checked against known-correct reference values.
     add_executable(metal_poc_math_tests gpu/metal/metal_poc_math_tests.cpp)
 
+    # The pbrt scene loader (PbrtSceneLoader, metal_poc_scene_data.h) with no GPU: loads bundled scenes and checks the host arrays. Links metal_renderer for the loader's
+    # code (the Metal frameworks are linked but no device is ever created).
+    add_executable(metal_poc_loader_tests gpu/metal/metal_poc_loader_tests.mm src/external/image_writer.cpp)
+    target_link_libraries(metal_poc_loader_tests PRIVATE metal_renderer)
+    target_compile_options(metal_poc_loader_tests PRIVATE -fobjc-arc)
+    target_compile_definitions(metal_poc_loader_tests PRIVATE RT_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_include_directories(metal_poc_loader_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/TheRestOfYourLife ${CMAKE_SOURCE_DIR}/src/shared ${CMAKE_SOURCE_DIR}/src/external)
+
     # --- The device-side half of that same regression coverage - see
     # gpu/metal/metal_poc_shader_tests.mm's own comment. Dispatches small,
     # purpose-built test kernels (metal_poc.metal's own "Device-side
@@ -581,6 +589,7 @@ if(RT_BUILD_METAL)
 
     enable_testing()
     add_test(NAME metal_poc_math_tests COMMAND metal_poc_math_tests)
+    add_test(NAME metal_poc_loader_tests COMMAND metal_poc_loader_tests)
     add_test(NAME metal_poc_shader_tests COMMAND metal_poc_shader_tests)
     set(METAL_POC_SMOKE_OUTPUT "${CMAKE_BINARY_DIR}/metal_poc_smoke_test.png")
     add_test(NAME metal_poc_smoke_render

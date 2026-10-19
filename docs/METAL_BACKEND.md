@@ -24,7 +24,8 @@ around it. The shader source is **compiled at run time** from the `.metal` files
 | `metal_poc_pbrt_materials.mm` | pbrt material -> the shader's `TriangleMaterial` (`mapPbrtMaterial`, `mapPbrtDiffuseMaterial`), measured-BRDF tables |
 | `metal_poc_gpu_resources.mm` | uploads buffers and builds the acceleration structures |
 | `metal_poc_dispatch.mm` | `compileShaderAndDispatch()`: eight named stages (library, pipeline, targets, textures, sampling tables, uniforms, resource check, per-frame dispatch) over a `DispatchState` |
-| `metal_poc_app.h`, `metal_poc_gpu_types.h`, `metal_poc_host_math.h`, `metal_poc_scene_helpers.h` | the host-side class, the host copies of the shader structs, math, scene-building helpers |
+| `metal_poc_scene_data.h`, `metal_poc_loader_tests.mm` | `PbrtSceneLoader`: the host-side scene arrays and the `loadPbrt*` / `mapPbrt*` methods (`metal_poc_pbrt_*.mm`), which need no GPU device; `MetalPocApp` derives from it. The tests load bundled scenes and check the arrays |
+| `metal_poc_app.h`, `metal_poc_gpu_types.h`, `metal_poc_host_math.h`, `metal_poc_scene_helpers.h` | `MetalPocApp` (the device, buffers, acceleration structures, shader and output), the host copies of the shader structs, math, scene-building helpers |
 | `metal_poc_material_ids.metal` | the `METAL_MAT_*` names of every `materialType` (included by host and shader) |
 | `metal_poc_shared_types.h` | the light, shape, lens and medium structs: one definition for host and shader |
 | `metal_poc_types.metal` | the shader copies of `Uniforms` and `TriangleMaterial`, intersection functions |
