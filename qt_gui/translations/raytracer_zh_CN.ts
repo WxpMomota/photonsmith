@@ -217,6 +217,44 @@
     </message>
 </context>
 <context>
+    <name>EnvironmentLibrary</name>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="30"/>
+        <source>Sunrise and sunset</source>
+        <translation>日出与日落</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="30"/>
+        <source>Day</source>
+        <translation>白天</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="30"/>
+        <source>Overcast</source>
+        <translation>阴天</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="31"/>
+        <source>City</source>
+        <translation>城市</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="31"/>
+        <source>Night</source>
+        <translation>夜晚</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="31"/>
+        <source>Studio</source>
+        <translation>摄影棚</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="32"/>
+        <source>Interior</source>
+        <translation>室内</translation>
+    </message>
+</context>
+<context>
     <name>ErrorHandler</name>
     <message>
         <location filename="../error_handler.h" line="95"/>
@@ -1325,8 +1363,8 @@
     </message>
     <message>
         <location filename="../mainwindow_scene_info.cpp" line="165"/>
-        <source>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; Requires external files&lt;/b&gt;</source>
-        <translation>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; 需要外部文件&lt;/b&gt;</translation>
+        <source>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#10003; External files found&lt;/b&gt;</source>
+        <translation>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#10003; 已找到外部文件&lt;/b&gt;</translation>
     </message>
     <message>
         <location filename="../mainwindow_scene_info.cpp" line="170"/>
@@ -5845,181 +5883,186 @@ The scenes in the other categories are not touched. You can get them back from %
     </message>
     <message>
         <location filename="../scene_technique_notes.h" line="157"/>
+        <source>A small photo studio with a different material on each object: a red car-paint box worn through to copper (a mix of two materials), mossy stone (a ready-made mix), a candle-wax ball (light scatters inside it, subsurface scattering), a glass ball and a gold ball. Three spot lights (key, fill, rim) and a projector that throws a window pattern light the set, so each surface shows how it answers soft shadows, highlights and reflections.</source>
+        <translation>一个小型摄影棚,每个物体都用了不同的材质:磨损到露出铜色的红色车漆盒子(两种材质的混合)、长满青苔的石块(现成的混合材质)、蜡烛蜡球(光在内部散射,即次表面散射)、玻璃球和金球。三盏聚光灯(主光、补光、轮廓光)和一个投射窗格图案的投影灯照亮场景,每个表面如何应对柔和阴影、高光和反射一目了然。</translation>
+    </message>
+    <message>
+        <location filename="../scene_technique_notes.h" line="158"/>
         <source>A cloud-like volume built from real per-cell density data on a 3D grid, with red, green, and blue given independently varying patterns so the color drifts and shifts through the cloud instead of reading as one flat, uniform tint.</source>
         <translation>一团云状体积，由三维网格上每个格子的真实密度数据构建而成，红、绿、蓝三个通道各自使用独立变化的图案，使颜色在云朵内部不断漂移、变幻，而不是呈现为单一、均匀的色调。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="162"/>
+        <location filename="../scene_technique_notes.h" line="163"/>
         <source>A cloud loaded from an external scene file, its shape driven by the same kind of naturally-varied noise pattern real cloud rendering uses to avoid looking like a flat, obviously fake block of fog.</source>
         <translation>一朵从外部场景文件加载的云，它的形状由与真实云渲染相同的那种自然变化的噪声图案驱动，避免看起来像一整块明显假的平淡雾块。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="163"/>
+        <location filename="../scene_technique_notes.h" line="164"/>
         <source>A simple, uniform fog wrapped around a cylinder shape - this exact pairing used to silently render as a plain, fog-free cylinder on the GPU, so this scene exists to make sure the haze actually shows up there too.</source>
         <translation>一层简单均匀的雾气包裹在一个圆柱形状外面——这种具体的组合过去在 GPU 上会被悄悄渲染成一个没有雾气的普通圆柱，所以这个场景的存在就是为了确保雾气效果在 GPU 上也能正确显示出来。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="164"/>
+        <location filename="../scene_technique_notes.h" line="165"/>
         <source>A ball of coloured fog is wrapped in a zero-thickness pane of glass (a &quot;thin&quot; dielectric) instead of a solid glass shell. Light crosses it in a straight line without bending, so the fog inside stays clearly visible, while the surface still shows a faint glassy glint that strengthens toward grazing angles, the way a car windscreen turns reflective at a shallow angle but seems to vanish head-on.</source>
         <translation>一团彩色的雾球被一层零厚度的玻璃（“薄”电介质）包裹，而不是实心玻璃壳。光线沿直线穿过而不发生折射，因此里面的雾清晰可见，表面仍有一抹淡淡的玻璃反光，且在掠射角处更强，就像汽车挡风玻璃在斜视时反光明显，正对着看却几乎消失。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="165"/>
+        <location filename="../scene_technique_notes.h" line="166"/>
         <source>A frosted, sandblasted-looking glass ball wraps a jade-green fog. The roughness blurs the highlights and softens the fog&apos;s silhouette instead of bending the view sharply the way clear glass does. Compare it with the smooth jade sphere of Subsurface Slab, which has the same fog inside, to see what the frosting alone changes.</source>
         <translation>一个磨砂、像喷砂处理过的玻璃球包裹着翠绿色的雾。粗糙度使高光变得模糊，雾的轮廓也更柔和，而不像透明玻璃那样让视线发生明显折射。可以与内部同样充满雾的光滑翡翠球（Subsurface Slab）对比，看看仅磨砂一项带来了什么变化。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="166"/>
+        <location filename="../scene_technique_notes.h" line="167"/>
         <source>A voxel-based volume where each little cell carries its own color, not just a density value - rendering as a soft, colorful, nebula-like cloud rather than a single uniformly tinted fog.</source>
         <translation>一个基于体素的体积，其中每个小格子都携带自己的颜色，而不只是一个密度数值——渲染出的效果是一团柔和、色彩斑斓、如星云般的云朵，而不是一片单一均匀色调的雾气。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="167"/>
+        <location filename="../scene_technique_notes.h" line="168"/>
         <source>A voxel-based volume with just a single density value per cell and no per-cell color - rendering as a simpler, softly glowing fog blob, the plainer sibling of the colorful grid-cloud scene.</source>
         <translation>一个基于体素的体积，每个格子只有一个密度数值，没有各自的颜色——渲染出的效果是一团更简单、柔和发光的雾状团块，是色彩斑斓的网格云场景更朴素的姊妹版本。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="168"/>
+        <location filename="../scene_technique_notes.h" line="169"/>
         <source>A real sparse cloud-data file, the same format used by professional visual-effects software, loaded in and rendered as a soft fog sphere. Sparse data like this needs a very different lookup approach than an ordinary evenly-spaced grid, making it one of the trickier formats to support well. Works fully on the CPU; on the GPU it currently falls back to a plain, evenly-thick fog instead, as a known simplification rather than a bug.</source>
         <translation>一个真实的稀疏云数据文件，采用专业视觉特效软件所使用的同一种格式，被加载并渲染成一个柔和的雾状球体。像这样的稀疏数据需要一套与普通等间距网格完全不同的查找方式，因此它是较难良好支持的格式之一。在 CPU 上能够完整工作；在 GPU 上目前会回退为一层普通的、厚度均匀的雾气，这是一个已知的简化处理，而不是 bug。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="169"/>
+        <location filename="../scene_technique_notes.h" line="170"/>
         <source>The camera itself sits inside a haze with no surrounding shape at all, as if the lens were fogged over - a genuinely different setup from every other fog scene here, which all put the viewer looking at a foggy object from the outside. Works on the CPU and one of the two GPU rendering paths; the other GPU path doesn&apos;t support it yet and just renders without any fog at all.</source>
         <translation>相机本身就置身于一片没有任何包围形状的雾气之中，仿佛镜头本身蒙上了雾——这与这里其他所有雾气场景的设置真正不同，那些场景都是让观察者从外部看着一个带雾的物体。这个效果在 CPU 和两条 GPU 渲染路径中的一条上能正常工作；另一条 GPU 路径目前还不支持它，只会渲染出完全没有雾气的画面。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="174"/>
+        <location filename="../scene_technique_notes.h" line="175"/>
         <source>Two curved surfaces - a saddle shape and a smooth ramp - built directly from just their four corner points rather than approximated with flat triangles. A softly blurred metal finish is used deliberately, so the shading gradient reveals the surface&apos;s true curve; a perfect mirror finish would just show one sharp highlight and hide the fact that the surface isn&apos;t flat at all.</source>
         <translation>两个弯曲的表面——一个马鞍形和一个平滑的斜坡——直接由各自的四个角点构建而成，而不是用平面三角形来近似。这里特意使用了柔和模糊的金属质感，让明暗渐变揭示出表面真实的弯曲程度；如果用完美的镜面效果，就只会显示一个锐利的高光，掩盖了这个表面根本不是平的这一事实。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="175"/>
+        <location filename="../scene_technique_notes.h" line="176"/>
         <source>A hand-built 20-sided die shape (an icosahedron), assembled as a real triangle mesh. Each flat triangular face shows its own distinct shading rather than blending smoothly into its neighbors, giving it a faceted, low-poly look instead of a smooth, rounded one.</source>
         <translation>一个手工搭建的 20 面骰子形状（二十面体），由真正的三角形网格拼装而成。每个平坦的三角面都呈现出各自独立的明暗效果，而不是与相邻面平滑融合，因此呈现出多面、低多边形的外观，而不是光滑圆润的效果。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="176"/>
+        <location filename="../scene_technique_notes.h" line="177"/>
         <source>The same small object (a few spheres and flat panels) is placed several times without being copied: each placement is a transformed reference to one shared definition, which is what keeps scenes with thousands of repeats cheap. One placement is stretched unevenly, which turns its spheres into ellipsoids. That is only possible because rays are carried into the object&apos;s own space instead of the spheres being baked into the world, and it is the visible difference between true instancing and simply copying.</source>
         <translation>同一个小物体（几个球体和平面板）被多次放置而没有复制：每次放置都是对同一个共享定义的变换引用，这正是包含成千上万次重复的场景依然开销很小的原因。其中一次放置被不均匀地拉伸，使其中的球体变成椭球。这之所以可行，是因为光线被带入物体自身的空间，而不是把球体直接烘焙进世界，这也是真正的实例化与简单复制之间肉眼可见的差别。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="177"/>
+        <location filename="../scene_technique_notes.h" line="178"/>
         <source>Real curved, tapering strands - thick at the root and thinning toward the tip - scattered across a surface, built from genuinely curved geometry rather than the flat &quot;sphere shaded to look like hair&quot; trick used in the separate Hair Fibers scene.</source>
         <translation>真正弯曲、逐渐变细的发丝——根部粗、尖端细——散布在一个表面上，由真实弯曲的几何体构建而成，而不是另一个“毛发纤维”场景中使用的、用平面球体着色伪装成毛发的手法。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="182"/>
+        <location filename="../scene_technique_notes.h" line="183"/>
         <source>An externally loaded 3D model with real texture-coordinate data baked in, so an image can wrap correctly around its surface. This exact scene used to render solid black on one of the GPU rendering paths, because that texture data was being silently dropped.</source>
         <translation>一个从外部加载的三维模型，内置了真实的纹理坐标数据，使图像能够正确地贴合在它的表面上。这个具体的场景过去在其中一条 GPU 渲染路径上会渲染成一片纯黑，因为那份纹理坐标数据被悄悄丢弃了。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="183"/>
+        <location filename="../scene_technique_notes.h" line="184"/>
         <source>A real external 3D model file loaded start to finish, including a face in the original file that wasn&apos;t already made of triangles - the loader has to split it into triangles itself rather than assuming the file already did that work.</source>
         <translation>一个从头到尾完整加载的真实外部三维模型文件，其中原始文件里有一个面并不是由三角形构成的——加载器必须自己把它拆分成三角形，而不能假设文件里已经做好了这件事。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="184"/>
+        <location filename="../scene_technique_notes.h" line="185"/>
         <source>True curved fiber strands, smoothly rounded rather than built from flat triangles, shown side by side with this project&apos;s own native hair-strand demo built the same way - a direct comparison of the two approaches to the same visual effect.</source>
         <translation>真正弯曲的纤维发丝，表面平滑圆润，而不是由平面三角形构成，与本项目自带的、以同样方式构建的发丝演示场景并排展示——直接对比两种方法实现同一视觉效果的差异。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="185"/>
+        <location filename="../scene_technique_notes.h" line="186"/>
         <source>Real curved fiber strands paired with a proper hair-like material for the first time - together, they exposed a bug where the shine along each strand was computed as if the strand were a flat surface instead of a curved fiber, which is exactly what gives a strand of hair its characteristic streak of highlight running along its length rather than a dull, matte look.</source>
         <translation>真正弯曲的纤维发丝首次搭配上恰当的毛发质感材质——两者结合，暴露出一个 bug：每根发丝上的光泽被当作平面来计算，而不是当作弯曲的纤维，而正是这一点，才让一根真实的头发呈现出沿其长度延伸的那道特征性高光条纹，而不是暗淡的哑光效果。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="186"/>
+        <location filename="../scene_technique_notes.h" line="187"/>
         <source>A triangle-based 3D shape with explicit texture coordinates set on each corner, so images can be applied to it correctly. One of the two GPU rendering paths used to render this exact scene solid black before that texture-coordinate support existed.</source>
         <translation>一个基于三角形的三维形状，每个角点都明确设置了纹理坐标，使图像能够正确贴合到它上面。在具备这项纹理坐标支持之前，两条 GPU 渲染路径中的一条曾经把这个具体场景渲染成一片纯黑。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="187"/>
+        <location filename="../scene_technique_notes.h" line="188"/>
         <source>This scene deliberately uses a simpler, blockier way of turning many samples into a final pixel color, giving edges and silhouettes a slightly harder, more jagged look than the smoother default. Compare it against any other scene&apos;s usual soft-edged rendering to see the difference.</source>
         <translation>这个场景特意使用一种更简单、更块状的方式，把大量采样合成为最终的像素颜色，使边缘和轮廓比默认的平滑效果略显生硬、锯齿感更明显。可以拿它和其他场景通常那种柔和边缘的渲染效果做对比，观察其中的差异。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="188"/>
+        <location filename="../scene_technique_notes.h" line="189"/>
         <source>A single sphere is given two different positions at the start and end of the simulated camera shutter, so it should render as a soft directional streak between the two - true motion blur - rather than a sharp still sphere or an oddly doubled copy. A stationary reference sphere sits alongside it for comparison. This works correctly on every rendering backend the project supports.</source>
         <translation>一个球体在模拟相机快门开启的起点和终点被赋予了两个不同的位置，因此它应该渲染成两点之间一道柔和的方向性拖影——真正的运动模糊——而不是一个清晰的静止球体，或者一个奇怪的重影副本。旁边放置了一个静止的参照球体用于对比。这个效果在本项目支持的每一种渲染后端上都能正确工作。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="189"/>
+        <location filename="../scene_technique_notes.h" line="190"/>
         <source>The same start-and-end-position motion-blur trick as the sphere motion-blur scene, but applied to a disk and a cylinder instead - shapes that store their movement a bit differently under the hood. This one only works when rendering on the CPU; both GPU rendering paths currently just show these shapes frozen in their starting pose instead of blurred.</source>
         <translation>与“球体运动模糊”场景相同的起点/终点运动模糊手法，这次应用在圆盘和圆柱上——这两种形状底层存储运动信息的方式略有不同。这个效果目前只在 CPU 上渲染时才能生效；两条 GPU 渲染路径目前都只会把这些形状显示为静止在起始姿态，而不会产生模糊。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="190"/>
+        <location filename="../scene_technique_notes.h" line="191"/>
         <source>Two identical flat panels are built from the exact same geometry, which by default would make both of them face away from the camera and stay dark as light sources. Flipping just the second one&apos;s facing direction makes it light up while the first stays dark - a clean visual check that a shape&apos;s facing direction is being respected correctly, since a mistake here would show either both panels dark or both lit.</source>
         <translation>两块完全相同的平板由同一份几何数据构建而成，按默认设置，两者都会背对相机、作为光源时保持昏暗。只把第二块的朝向翻转过来，就能让它发光，而第一块依然保持昏暗——这是一次直观的检验，用来确认物体的朝向被正确地考虑在内，因为如果这里出了错，就会表现为两块面板要么都暗、要么都亮。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="191"/>
+        <location filename="../scene_technique_notes.h" line="192"/>
         <source>Four shapes built from an older cone- and dish-shaped (paraboloid) primitive kept around for compatibility with older scene files: a plain cone, a plain dish shape, a cone used as a glowing light source instead of an ordinary surface, and a dish shape used as a fog boundary with its open end facing the camera, so rays can drift into the fog through the opening rather than punching through solid material. Only rendered on the CPU - both GPU paths skip cone and dish shapes entirely.</source>
         <translation>四个形状由一种较旧的锥形/碟形（抛物面）图元构建而成，这种图元是为了兼容旧版场景文件而保留下来的：一个普通圆锥、一个普通碟形、一个用作发光光源而非普通表面的圆锥，以及一个开口朝向相机的碟形，用作雾气的边界，使光线能够通过开口漂入雾气内部，而不是硬生生穿透实心材质。仅在 CPU 上渲染——两条 GPU 路径都会完全跳过圆锥和碟形。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="196"/>
+        <location filename="../scene_technique_notes.h" line="197"/>
         <source>A classic, detailed statue model, arriving as a complete self-contained scene file - geometry, materials, lighting, and camera all defined in the file itself - exactly the same loading path a user&apos;s own custom scene files would go through.</source>
         <translation>一个经典、精细的雕像模型，以一个完整自包含的场景文件形式呈现——几何体、材质、灯光和相机都在文件内部定义——走的是和用户自己的自定义场景文件完全相同的加载路径。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="201"/>
+        <location filename="../scene_technique_notes.h" line="202"/>
         <source>The same Cornell box as the very first demo scene, deliberately rendered with far fewer samples than usual so it stays noticeably grainy instead of converging cleanly. Try switching the Sampler option on the Render Options tab through its different choices (Sobol, Z-Sobol, Padded Sobol, Stratified, PMJ02BN, Halton) and re-render - each one spreads those samples across the pixel and toward the light in a different pattern, so the graininess along the soft shadow&apos;s edge looks a little different for each, even though nothing else about the scene changes. This only affects the CPU&apos;s default renderer - the Sampler option has no effect when rendering on the GPU.</source>
         <translation>与最开始的第一个演示场景相同的康奈尔盒，这次故意用远少于平常的采样数渲染，使画面明显保持带噪点的状态，而不是干净地收敛。可以尝试在“渲染选项”标签页切换“采样器”的不同选项（Sobol、Z-Sobol、Padded Sobol、Stratified、PMJ02BN、Halton）并重新渲染——每一种都会以不同的方式把采样分布到像素内以及朝向光源，因此柔和阴影边缘的噪点效果在每种选项下都会略有不同，尽管场景的其他部分完全没有变化。这只影响 CPU 的默认渲染器——在 GPU 上渲染时，“采样器”选项没有任何效果。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="202"/>
+        <location filename="../scene_technique_notes.h" line="203"/>
         <source>The same glass prism as the Spectral Dispersion scene, built specifically to show off the Spectral rendering checkbox on the Render Options tab. With it off, the renderer only tracks red, green, and blue, so every color of light bends by the same amount passing through the glass. Switched on, the renderer tracks individual wavelengths of light, so the glass bends each one very slightly differently - fanning white light out into a visible rainbow, the same way a real glass prism does. CPU only.</source>
         <translation>与“光谱色散”场景相同的玻璃棱镜，专门用来展示“渲染选项”标签页上的“光谱渲染”选框。关闭它时，渲染器只追踪红、绿、蓝三色，因此每种颜色的光穿过玻璃时弯折程度都一样。开启后，渲染器会追踪单独的光波长，因此玻璃对每个波长的弯折都会有极其细微的差异——把白光分散成一道清晰可见的彩虹，就像真实的玻璃棱镜一样。仅限 CPU。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="203"/>
+        <location filename="../scene_technique_notes.h" line="204"/>
         <source>The same bright sky-and-shadow scene as the HDRI Sky demo, whose true brightness spans a much wider range than any screen can show at once. Two Render Options tab controls handle that range differently: Exposure is a simple brightness multiplier applied first, evenly brightening everything, sky and sphere alike. Tone mapping is a curve applied afterward that squeezes that wide range down into something a screen can display - ACES gently rolls off the brightest parts of the sky, Reinhard compresses more aggressively, and None just clips the brightest areas to flat white. Try a few different Tone mapping choices at a couple of different Exposure levels to see how the two controls act independently. Works on both CPU and GPU.</source>
         <translation>与“HDRI 天空”演示相同的明亮天空与阴影场景，其真实亮度范围远远超出任何屏幕能一次性显示的范围。“渲染选项”标签页上的两个控件以不同方式处理这个范围：“曝光”是最先施加的一个简单亮度乘数，会均匀地把一切（天空和球体）都调亮或调暗。“色调映射”则是之后施加的一条曲线，把这个巨大的亮度范围压缩到屏幕能够显示的范围内——ACES 会柔和地压低天空最亮的部分，Reinhard 压缩得更激进，“无”则直接把最亮的区域截断为纯白。可以尝试几种不同的“色调映射”选项，配合几档不同的“曝光”数值，观察这两个控件是如何各自独立发挥作用的。CPU 和 GPU 均可使用。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="204"/>
+        <location filename="../scene_technique_notes.h" line="205"/>
         <source>The same first Cornell box demo, rendered with a very low number of samples so it looks genuinely grainy - render it once with the OptiX AI denoiser (Render Options tab) turned off, then once with it on. The denoiser is a machine-learning model that recognizes that speckled noise pattern and smooths it away without tracing a single extra ray, trading a small amount of fine detail for a much cleaner-looking image at no extra rendering cost. Requires the OptiX GPU backend (Windows) - it has no Metal equivalent, so this demo isn&apos;t available on macOS. The nearby OptiX validation mode checkbox is worth knowing about too, but it&apos;s different - it only turns on extra internal safety checks with a performance cost, and never changes what the image looks like, so there&apos;s nothing to visually compare there.</source>
         <translation>同样是第一个康奈尔盒演示，但只用很少的采样来渲染，让它真正显得颗粒感十足：先关闭 OptiX AI 降噪器（渲染选项选项卡）渲染一次，再开启后渲染一次。降噪器是一个机器学习模型，能识别这种斑驳的噪点图案，并在不追踪任何额外光线的情况下将其抹平，以少量细节为代价，换来干净得多的图像，且无需额外的渲染开销。需要 OptiX GPU 后端（Windows）；Metal 没有对应功能，因此该演示在 macOS 上不可用。旁边的 OptiX 验证模式复选框同样值得了解，但它不一样：它只是启用有性能开销的内部安全检查，绝不会改变图像的外观，所以没有什么可以直观对比的。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="205"/>
+        <location filename="../scene_technique_notes.h" line="206"/>
         <source>The same frosted-glass Cornell box as the Cornell Rough Glass scene, built to show off the SPPM option in the Integrator dropdown. Render it once with the default Path Tracer and once with SPPM (Render Options tab) at the same sample count - the bright, focused patch of light under the rough glass sphere (a caustic) is exactly the kind of tricky lighting that ordinary path tracing struggles to clean up quickly. SPPM traces light from the light source first, records where it lands, then gathers that up from the camera&apos;s side - an approach built specifically for lighting like this, so the caustic should visibly sharpen up much faster.</source>
         <translation>与“康奈尔粗糙玻璃”场景相同的磨砂玻璃康奈尔盒，专门用来展示“渲染方式”下拉菜单中的 SPPM 选项。用相同的采样数，先用默认的路径追踪器渲染一次，再用 SPPM（渲染选项标签页）渲染一次——粗糙玻璃球下方那块明亮聚焦的光斑（一种焦散效果），正是普通路径追踪很难快速清理干净的那类棘手光照。SPPM 会先从光源追踪光线并记录它们落在哪里，再从相机一侧把这些信息收集起来——这是专门针对这类光照设计的方法，因此焦散效果应该会明显更快变得清晰锐利。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="206"/>
+        <location filename="../scene_technique_notes.h" line="207"/>
         <source>The same first Cornell box demo, built to show off the Integrator dropdown&apos;s BDPT and MLT options. Try either one (Render Options tab) instead of the default Path Tracer: both trace light paths starting from the camera and from the light source at the same time, then connect them partway - a fundamentally different strategy from the default renderer or SPPM, which only trace from the camera. On a scene like this, with meaningful bounced lighting, that different strategy can converge differently, sometimes better, sometimes just with a different noise character.</source>
         <translation>与最开始的第一个康奈尔盒演示相同的场景，专门用来展示“渲染方式”下拉菜单中的 BDPT 和 MLT 选项。可以在“渲染选项”标签页尝试其中任意一个来代替默认的路径追踪器：两者都会同时从相机和光源出发追踪光路，再在中途把它们连接起来——这与默认渲染器或 SPPM（只从相机端追踪）在策略上有根本性的不同。在这种带有明显反弹光照的场景中，这种不同的策略会带来不同的收敛效果，有时更好，有时只是噪点的表现方式不一样。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="207"/>
+        <location filename="../scene_technique_notes.h" line="208"/>
         <source>The same first Cornell box demo, used as a tour through the Integrator dropdown&apos;s reference and debug modes. RandomWalk just bounces each ray off in a random direction with no attempt to aim at the lights and no smart blending of strategies - the simplest, slowest-converging, but most &quot;honest&quot; baseline. SimplePath adds two independent checkboxes for exactly those two ingredients: with only &quot;sample lights&quot; on, direct lighting comes in cheaply, but a bounce that happens to point toward a bright light off to the side is just luck; with only &quot;sample BSDF&quot; on, it&apos;s the other way around; with both on, the two strategies get combined for a cleaner result - which is also what the default Path Tracer already does behind the scenes. Render each at the same low sample count to see how differently they converge on the exact same room.</source>
         <translation>与最开始的第一个康奈尔盒演示相同的场景，用来带你逐一了解“渲染方式”下拉菜单中的参考和调试模式。RandomWalk 只是让每条光线朝随机方向反弹，完全不尝试瞄准光源，也不做任何策略上的智能混合——是最简单、变干净最慢，但也最“老实”的基准方式。SimplePath 恰好为这两个要素分别提供了两个独立的选框：只开启“采样光源”时，直接光照能便宜地获得，但反弹恰好指向旁边一个明亮光源就纯属运气；只开启“采样材质反射”时则正好相反；两者都开启时，两种策略会结合起来得到更干净的结果——这其实也正是默认路径追踪器在背后一直在做的事情。用相同的低采样数分别渲染，观察它们在同一个房间里收敛效果的差异有多大。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="208"/>
+        <location filename="../scene_technique_notes.h" line="209"/>
         <source>A Cornell box built specifically for this demo, with five ceiling lights instead of the usual one, and deliberately very uneven brightness between them (roughly 1:2:6:15:80). The Uniform light sampler (Render Options tab) spends an equal fifth of its light-aiming effort on each of the five lights regardless of how much each one actually matters - so it wastes most of its effort on four lights that barely contribute, leaving the one genuinely bright light noisier than it needs to be. Power and BVH both instead weight their effort toward that dominant light (BVH also factors in distance and direction, Power only in total brightness) - render all three at the same low sample count and compare how much faster the noise around the bright corner light settles down.</source>
         <translation>专门为这个演示搭建的康奈尔盒，天花板上有五盏灯而不是通常的一盏，而且各自的亮度被特意设置得极不均匀（大致比例为 1:2:6:15:80）。“均匀”光源采样器（渲染选项标签页）会把瞄准光源的努力平均分成五份，分别用在这五盏灯上，而不考虑它们各自实际的重要程度——因此它把大部分精力浪费在四盏几乎没什么贡献的灯上，导致真正明亮的那盏灯的噪点比本该有的更多。而“按功率”和 BVH 都会把精力更多地倾向那盏主导光源（BVH 还会考虑距离和方向，“按功率”只考虑总亮度）——用相同的低采样数分别渲染这三种方式，比较明亮角落那盏灯周围的噪点消退速度有多大差别。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="209"/>
+        <location filename="../scene_technique_notes.h" line="210"/>
         <source>The same first Cornell box demo, used to show off the Integrator dropdown&apos;s Ambient Occlusion mode. AO isn&apos;t a normal lit render at all - switch to it (Render Options tab) and every surface&apos;s actual color and every real light in the scene get ignored completely, replaced with a simple grayscale measure of how enclosed each point is by nearby geometry. All that&apos;s left is the box&apos;s own contact shadows and the corners where walls meet, which is exactly what makes AO a fast way to preview a scene&apos;s shape and geometric complexity without worrying about its lighting at all.</source>
         <translation>与最开始的第一个康奈尔盒演示相同的场景，用来展示“渲染方式”下拉菜单中的“环境光遮蔽”模式。AO 根本不是一种正常的带光照渲染——切换到它（渲染选项标签页）之后，场景中每个表面的实际颜色以及每一个真实光源都会被完全忽略，取而代之的是一个简单的灰度值，衡量每个点被周围几何体包围的程度。剩下的只有盒子本身的接触阴影和墙角相接处的暗部，这正是 AO 能够快速预览场景形状和几何复杂度、而完全不用操心光照的原因所在。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="210"/>
+        <location filename="../scene_technique_notes.h" line="211"/>
         <source>The same frosted-glass Cornell box as the Cornell Rough Glass and SPPM demo scenes - the bright focused patch of light under the rough glass sphere is a classic source of stray, isolated overly-bright pixels (&quot;fireflies&quot;) under ordinary path tracing. Regularize and Firefly clamp (both on the Render Options tab) fix that two different ways: Regularize gently blurs the glass&apos;s own roughness after the first bounce, making that tricky lighting easier to sample cleanly in the first place; the Firefly clamp instead lets the bright pixel happen, then caps how bright any single sample is allowed to get, trading a tiny bit of accuracy for a guaranteed ceiling on stray bright spots. Render the scene plain, then with each option on its own, at the same sample count, to compare.</source>
         <translation>与“康奈尔粗糙玻璃”和 SPPM 演示场景相同的磨砂玻璃康奈尔盒——粗糙玻璃球下方那块明亮聚焦的光斑，正是普通路径追踪下杂散、孤立的过亮像素（“萤火虫噪点”）的典型来源。“正则化”和“萤火虫钳制”（都在“渲染选项”标签页）用两种不同的方式解决这个问题：“正则化”会在第一次反弹之后，柔和地增加玻璃自身的粗糙度，让这类棘手的光照从一开始就更容易被干净地采样到；“萤火虫钳制”则任由过亮的像素先出现，再限制单个采样所能达到的最大亮度，用一点点精度换取对杂散亮点的确定性上限。分别用相同的采样数渲染原始场景，以及单独开启每一个选项的版本，进行对比。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="231"/>
+        <location filename="../scene_technique_notes.h" line="232"/>
         <source>Select a scene to see the rendering technique it demonstrates.</source>
         <translation>选择一个场景以查看它所演示的渲染技术。</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="236"/>
+        <location filename="../scene_technique_notes.h" line="237"/>
         <source>No rendering-technique note is written for this scene yet - these are only authored for the self-contained scene set (the &quot;Self-Contained&quot; tab above) so far.</source>
         <translation>目前尚未为该场景编写渲染技术说明——这些说明目前仅为“自包含”场景集(即上方的“自包含”标签页)编写。</translation>
     </message>
@@ -10522,29 +10565,29 @@ This replaces the scene you have now (Undo brings it back).</source>
         <translation>模型中发光的部分三角形太多，无法作为光源，所以不发光。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_environment.cpp" line="78"/>
+        <location filename="../scene_builder_environment.cpp" line="84"/>
         <source>Environment: %1. It is the sky light&apos;s picture now: the sun, clouds and lamps in it light the scene. Rotate sky turns it; Brightness changes its strength.</source>
         <translation>环境：%1。它现在是天空光的图片：其中的太阳、云和灯光会照亮场景。“旋转天空”可转动它，“亮度”可改变强度。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_environment.cpp" line="85"/>
-        <location filename="../scene_builder_environment.cpp" line="89"/>
-        <location filename="../scene_builder_environment.cpp" line="136"/>
+        <location filename="../scene_builder_environment.cpp" line="91"/>
+        <location filename="../scene_builder_environment.cpp" line="95"/>
+        <location filename="../scene_builder_environment.cpp" line="142"/>
         <source>Environment library</source>
         <translation>环境库</translation>
     </message>
     <message>
-        <location filename="../scene_builder_environment.cpp" line="85"/>
+        <location filename="../scene_builder_environment.cpp" line="91"/>
         <source>No environment pictures were found next to the app (an environments folder).</source>
         <translation>在应用旁边没有找到环境图片（environments 文件夹）。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_environment.cpp" line="93"/>
+        <location filename="../scene_builder_environment.cpp" line="99"/>
         <source>All kinds</source>
         <translation>全部类型</translation>
     </message>
     <message>
-        <location filename="../scene_builder_environment.cpp" line="114"/>
+        <location filename="../scene_builder_environment.cpp" line="120"/>
         <source>%1
 %2
 From: %3</source>
@@ -10553,17 +10596,17 @@ From: %3</source>
 来源：%3</translation>
     </message>
     <message>
-        <location filename="../scene_builder_environment.cpp" line="117"/>
+        <location filename="../scene_builder_environment.cpp" line="123"/>
         <source>%1 photographic skies and rooms (Poly Haven, CC0). One becomes the sky light&apos;s picture: the sun, clouds, lamps and windows in it light the scene and show behind it. The Sun light made by the generated sky is removed, because the picture has its own.</source>
         <translation>%1 个实景天空和房间（Poly Haven，CC0）。选择其中一个会成为天空光的图片：其中的太阳、云、灯和窗会照亮场景并显示在背景中。生成天空所做的太阳光会被移除，因为图片本身已有太阳。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_environment.cpp" line="122"/>
+        <location filename="../scene_builder_environment.cpp" line="128"/>
         <source>Use this sky</source>
         <translation>使用此天空</translation>
     </message>
     <message>
-        <location filename="../scene_builder_environment.cpp" line="136"/>
+        <location filename="../scene_builder_environment.cpp" line="142"/>
         <source>That picture could not be used.</source>
         <translation>无法使用该图片。</translation>
     </message>

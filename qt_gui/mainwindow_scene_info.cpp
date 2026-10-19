@@ -162,8 +162,8 @@ void MainWindow::refreshSceneInfoLabel(const SceneMetadataClient::SceneMetadata*
 				.arg(missing.missing).arg(missing.referenced)
 				.arg(missing.example.toHtmlEscaped(), folder);
 		} else {
-			infoText += tr("<br><b style='color: %1;'>&#9888; Requires external files</b>")
-				.arg(m_activeTheme.logWarning.name());
+			infoText += tr("<br><b style='color: %1;'>&#10003; External files found</b>")
+				.arg(m_activeTheme.logSuccess.name());
 		}
 	}
 	if (!gpuSupported)

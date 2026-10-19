@@ -25,6 +25,13 @@
 
 namespace {
 
+// The gallery looks each category up by its English text (QCoreApplication::translate below, a non-literal, which lupdate cannot see): these are here so lupdate lists them.
+[[maybe_unused]] const char *const kCategoryTexts[] = {
+	QT_TRANSLATE_NOOP("EnvironmentLibrary", "Sunrise and sunset"), QT_TRANSLATE_NOOP("EnvironmentLibrary", "Day"), QT_TRANSLATE_NOOP("EnvironmentLibrary", "Overcast"),
+	QT_TRANSLATE_NOOP("EnvironmentLibrary", "City"), QT_TRANSLATE_NOOP("EnvironmentLibrary", "Night"), QT_TRANSLATE_NOOP("EnvironmentLibrary", "Studio"),
+	QT_TRANSLATE_NOOP("EnvironmentLibrary", "Interior"),
+};
+
 // The folder the pictures are in: next to the installed app, or the source tree's environments/ folder when running from a build inside it (the one with the most of the library's files).
 QString environmentsFolder() {
 	const QString app = QCoreApplication::applicationDirPath();

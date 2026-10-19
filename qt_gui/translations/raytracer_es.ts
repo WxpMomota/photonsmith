@@ -217,6 +217,44 @@
     </message>
 </context>
 <context>
+    <name>EnvironmentLibrary</name>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="30"/>
+        <source>Sunrise and sunset</source>
+        <translation>Amanecer y atardecer</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="30"/>
+        <source>Day</source>
+        <translation>Día</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="30"/>
+        <source>Overcast</source>
+        <translation>Nublado</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="31"/>
+        <source>City</source>
+        <translation>Ciudad</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="31"/>
+        <source>Night</source>
+        <translation>Noche</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="31"/>
+        <source>Studio</source>
+        <translation>Estudio</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="32"/>
+        <source>Interior</source>
+        <translation>Interior</translation>
+    </message>
+</context>
+<context>
     <name>ErrorHandler</name>
     <message>
         <location filename="../error_handler.h" line="95"/>
@@ -1327,8 +1365,8 @@
     </message>
     <message>
         <location filename="../mainwindow_scene_info.cpp" line="165"/>
-        <source>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; Requires external files&lt;/b&gt;</source>
-        <translation>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; Requiere archivos externos&lt;/b&gt;</translation>
+        <source>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#10003; External files found&lt;/b&gt;</source>
+        <translation>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#10003; Archivos externos encontrados&lt;/b&gt;</translation>
     </message>
     <message>
         <location filename="../mainwindow_scene_info.cpp" line="170"/>
@@ -5890,181 +5928,186 @@ Las escenas de las demás categorías no se tocan. Puedes recuperarlas desde %1.
     </message>
     <message>
         <location filename="../scene_technique_notes.h" line="157"/>
+        <source>A small photo studio with a different material on each object: a red car-paint box worn through to copper (a mix of two materials), mossy stone (a ready-made mix), a candle-wax ball (light scatters inside it, subsurface scattering), a glass ball and a gold ball. Three spot lights (key, fill, rim) and a projector that throws a window pattern light the set, so each surface shows how it answers soft shadows, highlights and reflections.</source>
+        <translation>Un pequeño estudio fotográfico con un material distinto en cada objeto: una caja de pintura roja de coche desgastada hasta dejar ver el cobre (una mezcla de dos materiales), piedra con musgo (una mezcla ya preparada), una bola de cera de vela (la luz se dispersa en su interior: dispersión subsuperficial), una bola de cristal y una bola de oro. Tres focos (principal, de relleno y de contraluz) y un proyector que lanza un patrón de ventana iluminan el escenario, y así cada superficie muestra cómo responde a las sombras suaves, los brillos y los reflejos.</translation>
+    </message>
+    <message>
+        <location filename="../scene_technique_notes.h" line="158"/>
         <source>A cloud-like volume built from real per-cell density data on a 3D grid, with red, green, and blue given independently varying patterns so the color drifts and shifts through the cloud instead of reading as one flat, uniform tint.</source>
         <translation>Un volumen con aspecto de nube construido a partir de datos reales de densidad por celda en una cuadrícula 3D, con patrones de variación independiente para el rojo, el verde y el azul, de modo que el color se desplaza y cambia a través de la nube en lugar de leerse como un tinte plano y uniforme.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="162"/>
+        <location filename="../scene_technique_notes.h" line="163"/>
         <source>A cloud loaded from an external scene file, its shape driven by the same kind of naturally-varied noise pattern real cloud rendering uses to avoid looking like a flat, obviously fake block of fog.</source>
         <translation>Una nube cargada desde un archivo de escena externo, con su forma guiada por el mismo tipo de patrón de ruido con variación natural que se usa en el renderizado real de nubes para evitar que parezcan un bloque de niebla plano y claramente falso.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="163"/>
+        <location filename="../scene_technique_notes.h" line="164"/>
         <source>A simple, uniform fog wrapped around a cylinder shape - this exact pairing used to silently render as a plain, fog-free cylinder on the GPU, so this scene exists to make sure the haze actually shows up there too.</source>
         <translation>Una niebla simple y uniforme envuelve un cilindro; esta combinación exacta solía renderizarse en silencio como un cilindro liso y sin niebla en la GPU, así que esta escena existe para asegurarse de que la bruma también aparezca correctamente ahí.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="164"/>
+        <location filename="../scene_technique_notes.h" line="165"/>
         <source>A ball of coloured fog is wrapped in a zero-thickness pane of glass (a &quot;thin&quot; dielectric) instead of a solid glass shell. Light crosses it in a straight line without bending, so the fog inside stays clearly visible, while the surface still shows a faint glassy glint that strengthens toward grazing angles, the way a car windscreen turns reflective at a shallow angle but seems to vanish head-on.</source>
         <translation>Una bola de niebla de color está envuelta en un cristal de grosor cero (un dieléctrico «fino») en lugar de una cáscara de vidrio sólido. La luz lo atraviesa en línea recta sin desviarse, así que la niebla del interior se ve con claridad, mientras que la superficie conserva un leve destello vítreo que se intensifica en los ángulos rasantes, igual que el parabrisas de un coche se vuelve reflectante con un ángulo bajo pero parece desaparecer de frente.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="165"/>
+        <location filename="../scene_technique_notes.h" line="166"/>
         <source>A frosted, sandblasted-looking glass ball wraps a jade-green fog. The roughness blurs the highlights and softens the fog&apos;s silhouette instead of bending the view sharply the way clear glass does. Compare it with the smooth jade sphere of Subsurface Slab, which has the same fog inside, to see what the frosting alone changes.</source>
         <translation>Una bola de vidrio esmerilado, como arenado, envuelve una niebla verde jade. La rugosidad difumina los reflejos y suaviza la silueta de la niebla en lugar de desviar bruscamente la vista como lo hace el vidrio transparente. Compárala con la esfera de jade lisa de Subsurface Slab, que tiene la misma niebla en el interior, para ver qué cambia solo con el esmerilado.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="166"/>
+        <location filename="../scene_technique_notes.h" line="167"/>
         <source>A voxel-based volume where each little cell carries its own color, not just a density value - rendering as a soft, colorful, nebula-like cloud rather than a single uniformly tinted fog.</source>
         <translation>Un volumen basado en vóxeles en el que cada pequeña celda lleva su propio color, no solo un valor de densidad, se renderiza como una nube suave, colorida y con aspecto de nebulosa, en lugar de una niebla con un único tinte uniforme.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="167"/>
+        <location filename="../scene_technique_notes.h" line="168"/>
         <source>A voxel-based volume with just a single density value per cell and no per-cell color - rendering as a simpler, softly glowing fog blob, the plainer sibling of the colorful grid-cloud scene.</source>
         <translation>Un volumen basado en vóxeles con un único valor de densidad por celda y sin color propio por celda, se renderiza como una nube de niebla más simple y con un resplandor suave, la versión más sencilla de la nube colorida en cuadrícula.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="168"/>
+        <location filename="../scene_technique_notes.h" line="169"/>
         <source>A real sparse cloud-data file, the same format used by professional visual-effects software, loaded in and rendered as a soft fog sphere. Sparse data like this needs a very different lookup approach than an ordinary evenly-spaced grid, making it one of the trickier formats to support well. Works fully on the CPU; on the GPU it currently falls back to a plain, evenly-thick fog instead, as a known simplification rather than a bug.</source>
         <translation>Un archivo real de datos de nube dispersos, del mismo formato que usa el software profesional de efectos visuales, cargado y renderizado como una esfera de niebla suave. Unos datos dispersos como estos necesitan una forma de búsqueda muy distinta a la de una cuadrícula uniforme normal, lo que lo convierte en uno de los formatos más difíciles de admitir bien. Funciona completamente en la CPU; en la GPU, por ahora recurre a una niebla plana y de grosor uniforme, una simplificación conocida y no un error.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="169"/>
+        <location filename="../scene_technique_notes.h" line="170"/>
         <source>The camera itself sits inside a haze with no surrounding shape at all, as if the lens were fogged over - a genuinely different setup from every other fog scene here, which all put the viewer looking at a foggy object from the outside. Works on the CPU and one of the two GPU rendering paths; the other GPU path doesn&apos;t support it yet and just renders without any fog at all.</source>
         <translation>La propia cámara está sumergida en una bruma sin ninguna forma que la rodee, como si el objetivo estuviera empañado, una configuración genuinamente distinta a la de cualquier otra escena de niebla de aquí, en las que el espectador siempre mira un objeto brumoso desde fuera. Funciona en la CPU y en una de las dos rutas de renderizado de GPU; la otra ruta de GPU todavía no lo admite y simplemente renderiza sin ninguna niebla.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="174"/>
+        <location filename="../scene_technique_notes.h" line="175"/>
         <source>Two curved surfaces - a saddle shape and a smooth ramp - built directly from just their four corner points rather than approximated with flat triangles. A softly blurred metal finish is used deliberately, so the shading gradient reveals the surface&apos;s true curve; a perfect mirror finish would just show one sharp highlight and hide the fact that the surface isn&apos;t flat at all.</source>
         <translation>Dos superficies curvas, una forma de silla de montar y una rampa suave, construidas directamente a partir de solo sus cuatro puntos de esquina, en lugar de aproximarse con triángulos planos. Se usa deliberadamente un acabado metálico suavemente difuminado, para que el degradado del sombreado revele la verdadera curva de la superficie; un acabado de espejo perfecto solo mostraría un reflejo nítido y ocultaría el hecho de que la superficie no es plana en absoluto.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="175"/>
+        <location filename="../scene_technique_notes.h" line="176"/>
         <source>A hand-built 20-sided die shape (an icosahedron), assembled as a real triangle mesh. Each flat triangular face shows its own distinct shading rather than blending smoothly into its neighbors, giving it a faceted, low-poly look instead of a smooth, rounded one.</source>
         <translation>Un dado de 20 caras (un icosaedro) construido a mano, ensamblado como una malla real de triángulos. Cada cara triangular plana muestra su propio sombreado diferenciado en lugar de mezclarse suavemente con sus vecinas, lo que le da un aspecto facetado y de baja poligonización en vez de uno suave y redondeado.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="176"/>
+        <location filename="../scene_technique_notes.h" line="177"/>
         <source>The same small object (a few spheres and flat panels) is placed several times without being copied: each placement is a transformed reference to one shared definition, which is what keeps scenes with thousands of repeats cheap. One placement is stretched unevenly, which turns its spheres into ellipsoids. That is only possible because rays are carried into the object&apos;s own space instead of the spheres being baked into the world, and it is the visible difference between true instancing and simply copying.</source>
         <translation>El mismo objeto pequeño (unas esferas y paneles planos) se coloca varias veces sin copiarse: cada colocación es una referencia transformada a una única definición compartida, que es lo que mantiene baratas las escenas con miles de repeticiones. Una de las colocaciones está estirada de forma desigual, lo que convierte sus esferas en elipsoides. Eso solo es posible porque los rayos se llevan al espacio propio del objeto en lugar de fijar las esferas en el mundo, y es la diferencia visible entre la instanciación real y la simple copia.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="177"/>
+        <location filename="../scene_technique_notes.h" line="178"/>
         <source>Real curved, tapering strands - thick at the root and thinning toward the tip - scattered across a surface, built from genuinely curved geometry rather than the flat &quot;sphere shaded to look like hair&quot; trick used in the separate Hair Fibers scene.</source>
         <translation>Mechones curvos y afilados de verdad, gruesos en la raíz y cada vez más finos hacia la punta, repartidos sobre una superficie, construidos con geometría realmente curva en lugar del truco de &quot;esfera sombreada para parecer pelo&quot; que se usa en la escena aparte de Fibras de Pelo.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="182"/>
+        <location filename="../scene_technique_notes.h" line="183"/>
         <source>An externally loaded 3D model with real texture-coordinate data baked in, so an image can wrap correctly around its surface. This exact scene used to render solid black on one of the GPU rendering paths, because that texture data was being silently dropped.</source>
         <translation>Un modelo 3D cargado desde fuera con datos reales de coordenadas de textura incorporados, para que una imagen pueda envolver correctamente su superficie. Esta escena exacta solía renderizarse completamente negra en una de las rutas de renderizado de GPU, porque esos datos de textura se descartaban en silencio.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="183"/>
+        <location filename="../scene_technique_notes.h" line="184"/>
         <source>A real external 3D model file loaded start to finish, including a face in the original file that wasn&apos;t already made of triangles - the loader has to split it into triangles itself rather than assuming the file already did that work.</source>
         <translation>Un archivo real de modelo 3D externo cargado de principio a fin, incluida una cara del archivo original que no estaba ya formada por triángulos: el cargador tiene que dividirla en triángulos por su cuenta, en lugar de suponer que el archivo ya lo había hecho.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="184"/>
+        <location filename="../scene_technique_notes.h" line="185"/>
         <source>True curved fiber strands, smoothly rounded rather than built from flat triangles, shown side by side with this project&apos;s own native hair-strand demo built the same way - a direct comparison of the two approaches to the same visual effect.</source>
         <translation>Mechones de fibra curvos de verdad, con un redondeo suave en lugar de estar construidos con triángulos planos, mostrados junto a la propia demostración nativa de mechones de pelo de este proyecto, construida de la misma manera: una comparación directa de los dos enfoques para el mismo efecto visual.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="185"/>
+        <location filename="../scene_technique_notes.h" line="186"/>
         <source>Real curved fiber strands paired with a proper hair-like material for the first time - together, they exposed a bug where the shine along each strand was computed as if the strand were a flat surface instead of a curved fiber, which is exactly what gives a strand of hair its characteristic streak of highlight running along its length rather than a dull, matte look.</source>
         <translation>Mechones de fibra curvos de verdad emparejados por primera vez con un material propiamente parecido al pelo. Juntos, dejaron al descubierto un error por el que el brillo a lo largo de cada mechón se calculaba como si el mechón fuera una superficie plana en lugar de una fibra curva, que es precisamente lo que le da a un mechón de pelo su característico reflejo alargado a lo largo de su longitud, en lugar de un aspecto apagado y mate.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="186"/>
+        <location filename="../scene_technique_notes.h" line="187"/>
         <source>A triangle-based 3D shape with explicit texture coordinates set on each corner, so images can be applied to it correctly. One of the two GPU rendering paths used to render this exact scene solid black before that texture-coordinate support existed.</source>
         <translation>Una forma 3D basada en triángulos con coordenadas de textura explícitas en cada esquina, para que las imágenes se puedan aplicar correctamente. Una de las dos rutas de renderizado de GPU solía renderizar esta escena exacta completamente negra antes de que existiera esa compatibilidad con coordenadas de textura.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="187"/>
+        <location filename="../scene_technique_notes.h" line="188"/>
         <source>This scene deliberately uses a simpler, blockier way of turning many samples into a final pixel color, giving edges and silhouettes a slightly harder, more jagged look than the smoother default. Compare it against any other scene&apos;s usual soft-edged rendering to see the difference.</source>
         <translation>Esta escena usa deliberadamente una forma más simple y tosca de convertir muchas muestras en el color final de un píxel, lo que da a los bordes y las siluetas un aspecto ligeramente más duro y dentado que el habitual, más suave. Compárala con el renderizado normal de bordes suaves de cualquier otra escena para ver la diferencia.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="188"/>
+        <location filename="../scene_technique_notes.h" line="189"/>
         <source>A single sphere is given two different positions at the start and end of the simulated camera shutter, so it should render as a soft directional streak between the two - true motion blur - rather than a sharp still sphere or an oddly doubled copy. A stationary reference sphere sits alongside it for comparison. This works correctly on every rendering backend the project supports.</source>
         <translation>Una única esfera recibe dos posiciones distintas al principio y al final del obturador de cámara simulado, así que debería renderizarse como una estela direccional y suave entre ambas, desenfoque de movimiento real, en lugar de una esfera fija y nítida o una copia duplicada de forma extraña. Junto a ella hay una esfera de referencia fija para comparar. Esto funciona correctamente en todos los backends de renderizado que admite el proyecto.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="189"/>
+        <location filename="../scene_technique_notes.h" line="190"/>
         <source>The same start-and-end-position motion-blur trick as the sphere motion-blur scene, but applied to a disk and a cylinder instead - shapes that store their movement a bit differently under the hood. This one only works when rendering on the CPU; both GPU rendering paths currently just show these shapes frozen in their starting pose instead of blurred.</source>
         <translation>El mismo truco de desenfoque de movimiento por posición inicial y final que la escena de esfera con desenfoque de movimiento, pero aplicado esta vez a un disco y a un cilindro, formas que guardan su movimiento de una manera algo distinta por dentro. Esto solo funciona al renderizar en la CPU; las dos rutas de renderizado de GPU actualmente muestran estas formas congeladas en su posición inicial en lugar de desenfocadas.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="190"/>
+        <location filename="../scene_technique_notes.h" line="191"/>
         <source>Two identical flat panels are built from the exact same geometry, which by default would make both of them face away from the camera and stay dark as light sources. Flipping just the second one&apos;s facing direction makes it light up while the first stays dark - a clean visual check that a shape&apos;s facing direction is being respected correctly, since a mistake here would show either both panels dark or both lit.</source>
         <translation>Dos paneles planos idénticos se construyen a partir de exactamente la misma geometría, lo que por defecto haría que ambos miraran en dirección contraria a la cámara y quedaran apagados como fuentes de luz. Invertir solo la orientación del segundo hace que se encienda mientras el primero sigue apagado, una comprobación visual clara de que la orientación de una forma se respeta correctamente, ya que un error aquí haría que ambos paneles se vieran apagados o ambos encendidos.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="191"/>
+        <location filename="../scene_technique_notes.h" line="192"/>
         <source>Four shapes built from an older cone- and dish-shaped (paraboloid) primitive kept around for compatibility with older scene files: a plain cone, a plain dish shape, a cone used as a glowing light source instead of an ordinary surface, and a dish shape used as a fog boundary with its open end facing the camera, so rays can drift into the fog through the opening rather than punching through solid material. Only rendered on the CPU - both GPU paths skip cone and dish shapes entirely.</source>
         <translation>Cuatro formas construidas a partir de una primitiva antigua con forma de cono y de plato (paraboloide) que se mantiene por compatibilidad con archivos de escena antiguos: un cono simple, una forma de plato simple, un cono usado como fuente de luz luminosa en lugar de como superficie normal, y una forma de plato usada como límite de una niebla con su extremo abierto orientado hacia la cámara, de modo que los rayos puedan entrar en la niebla por esa abertura en lugar de atravesar material sólido. Solo se renderiza en la CPU: las dos rutas de GPU omiten por completo las formas de cono y de plato.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="196"/>
+        <location filename="../scene_technique_notes.h" line="197"/>
         <source>A classic, detailed statue model, arriving as a complete self-contained scene file - geometry, materials, lighting, and camera all defined in the file itself - exactly the same loading path a user&apos;s own custom scene files would go through.</source>
         <translation>Un modelo de estatua clásico y muy detallado, que llega como un archivo de escena completo y autónomo, geometría, materiales, iluminación y cámara, todo definido en el propio archivo, exactamente la misma ruta de carga por la que pasarían los archivos de escena personalizados de cualquier usuario.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="201"/>
+        <location filename="../scene_technique_notes.h" line="202"/>
         <source>The same Cornell box as the very first demo scene, deliberately rendered with far fewer samples than usual so it stays noticeably grainy instead of converging cleanly. Try switching the Sampler option on the Render Options tab through its different choices (Sobol, Z-Sobol, Padded Sobol, Stratified, PMJ02BN, Halton) and re-render - each one spreads those samples across the pixel and toward the light in a different pattern, so the graininess along the soft shadow&apos;s edge looks a little different for each, even though nothing else about the scene changes. This only affects the CPU&apos;s default renderer - the Sampler option has no effect when rendering on the GPU.</source>
         <translation>La misma Cornell box que la primera escena de demostración, renderizada deliberadamente con muchas menos muestras de lo habitual para que se note con ruido en lugar de converger de forma limpia. Prueba a cambiar la opción Muestreador en la pestaña Opciones de renderizado entre sus distintas alternativas (Sobol, Z-Sobol, Padded Sobol, Stratified, PMJ02BN, Halton) y vuelve a renderizar: cada una reparte esas muestras por el píxel y hacia la luz con un patrón distinto, así que el ruido en el borde de la sombra suave se ve un poco diferente en cada caso, aunque nada más en la escena cambie. Esto solo afecta al renderizador por defecto de la CPU: la opción Muestreador no tiene ningún efecto al renderizar en la GPU.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="202"/>
+        <location filename="../scene_technique_notes.h" line="203"/>
         <source>The same glass prism as the Spectral Dispersion scene, built specifically to show off the Spectral rendering checkbox on the Render Options tab. With it off, the renderer only tracks red, green, and blue, so every color of light bends by the same amount passing through the glass. Switched on, the renderer tracks individual wavelengths of light, so the glass bends each one very slightly differently - fanning white light out into a visible rainbow, the same way a real glass prism does. CPU only.</source>
         <translation>El mismo prisma de vidrio que la escena de Dispersión Espectral, creado específicamente para mostrar la casilla de renderizado Espectral de la pestaña Opciones de renderizado. Con ella desactivada, el renderizador solo sigue el rojo, el verde y el azul, así que todos los colores de luz se desvían la misma cantidad al pasar por el vidrio. Activada, el renderizador sigue longitudes de onda individuales de la luz, así que el vidrio desvía cada una de forma ligeramente distinta, abriendo la luz blanca en un arcoíris visible, igual que hace un prisma de vidrio real. Solo CPU.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="203"/>
+        <location filename="../scene_technique_notes.h" line="204"/>
         <source>The same bright sky-and-shadow scene as the HDRI Sky demo, whose true brightness spans a much wider range than any screen can show at once. Two Render Options tab controls handle that range differently: Exposure is a simple brightness multiplier applied first, evenly brightening everything, sky and sphere alike. Tone mapping is a curve applied afterward that squeezes that wide range down into something a screen can display - ACES gently rolls off the brightest parts of the sky, Reinhard compresses more aggressively, and None just clips the brightest areas to flat white. Try a few different Tone mapping choices at a couple of different Exposure levels to see how the two controls act independently. Works on both CPU and GPU.</source>
         <translation>La misma escena de cielo brillante y sombras que la demostración de Cielo HDRI, cuyo brillo real abarca un rango mucho más amplio del que puede mostrar una pantalla a la vez. Dos controles de la pestaña Opciones de renderizado manejan ese rango de forma distinta: Exposición es un simple multiplicador de brillo que se aplica primero, aclarando todo por igual, tanto el cielo como la esfera. Mapeo tonal es una curva que se aplica después y comprime ese amplio rango a algo que una pantalla pueda mostrar: ACES suaviza con delicadeza las zonas más brillantes del cielo, Reinhard comprime de forma más agresiva, y Ninguno simplemente recorta las zonas más brillantes a blanco plano. Prueba varias opciones de Mapeo tonal con distintos niveles de Exposición para ver cómo actúan los dos controles de forma independiente. Funciona tanto en CPU como en GPU.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="204"/>
+        <location filename="../scene_technique_notes.h" line="205"/>
         <source>The same first Cornell box demo, rendered with a very low number of samples so it looks genuinely grainy - render it once with the OptiX AI denoiser (Render Options tab) turned off, then once with it on. The denoiser is a machine-learning model that recognizes that speckled noise pattern and smooths it away without tracing a single extra ray, trading a small amount of fine detail for a much cleaner-looking image at no extra rendering cost. Requires the OptiX GPU backend (Windows) - it has no Metal equivalent, so this demo isn&apos;t available on macOS. The nearby OptiX validation mode checkbox is worth knowing about too, but it&apos;s different - it only turns on extra internal safety checks with a performance cost, and never changes what the image looks like, so there&apos;s nothing to visually compare there.</source>
         <translation>La misma primera demostración de la Cornell box, renderizada con muy pocas muestras para que se vea realmente granulada: renderízala una vez con el eliminador de ruido con IA de OptiX (pestaña Opciones de renderizado) desactivado y otra con él activado. El eliminador de ruido es un modelo de aprendizaje automático que reconoce ese patrón de ruido moteado y lo suaviza sin trazar ni un solo rayo adicional, a cambio de perder un poco de detalle fino, con una imagen mucho más limpia y sin coste de renderizado extra. Requiere el motor de GPU OptiX (Windows); no tiene equivalente en Metal, así que esta demostración no está disponible en macOS. La casilla cercana del modo de validación de OptiX también merece conocerse, pero es distinta: solo activa comprobaciones internas de seguridad con un coste de rendimiento y nunca cambia el aspecto de la imagen, así que no hay nada que comparar visualmente.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="205"/>
+        <location filename="../scene_technique_notes.h" line="206"/>
         <source>The same frosted-glass Cornell box as the Cornell Rough Glass scene, built to show off the SPPM option in the Integrator dropdown. Render it once with the default Path Tracer and once with SPPM (Render Options tab) at the same sample count - the bright, focused patch of light under the rough glass sphere (a caustic) is exactly the kind of tricky lighting that ordinary path tracing struggles to clean up quickly. SPPM traces light from the light source first, records where it lands, then gathers that up from the camera&apos;s side - an approach built specifically for lighting like this, so the caustic should visibly sharpen up much faster.</source>
         <translation>La misma Cornell box con vidrio esmerilado que la escena de Vidrio Rugoso Cornell, creada para mostrar la opción SPPM del menú desplegable Integrador. Renderízala una vez con el Trazador de rayos por defecto y otra con SPPM (pestaña Opciones de renderizado) con el mismo número de muestras: el parche de luz brillante y concentrado bajo la esfera de vidrio rugoso (una cáustica) es exactamente el tipo de iluminación difícil que le cuesta limpiar rápido al trazado de rayos normal. SPPM traza primero la luz desde la fuente, registra dónde cae y luego la recoge desde el lado de la cámara: un método pensado específicamente para este tipo de iluminación, así que la cáustica debería afinarse visiblemente mucho más rápido.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="206"/>
+        <location filename="../scene_technique_notes.h" line="207"/>
         <source>The same first Cornell box demo, built to show off the Integrator dropdown&apos;s BDPT and MLT options. Try either one (Render Options tab) instead of the default Path Tracer: both trace light paths starting from the camera and from the light source at the same time, then connect them partway - a fundamentally different strategy from the default renderer or SPPM, which only trace from the camera. On a scene like this, with meaningful bounced lighting, that different strategy can converge differently, sometimes better, sometimes just with a different noise character.</source>
         <translation>La misma primera demostración de Cornell box, creada para mostrar las opciones BDPT y MLT del menú desplegable Integrador. Prueba cualquiera de las dos (pestaña Opciones de renderizado) en lugar del Trazador de rayos por defecto: ambas trazan trayectorias de luz que empiezan a la vez desde la cámara y desde la fuente de luz, y luego las conectan a medio camino, una estrategia completamente distinta a la del renderizador por defecto o SPPM, que solo trazan desde la cámara. En una escena como esta, con una iluminación rebotada considerable, esa estrategia distinta puede converger de otra manera, a veces mejor, a veces solo con un carácter de ruido diferente.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="207"/>
+        <location filename="../scene_technique_notes.h" line="208"/>
         <source>The same first Cornell box demo, used as a tour through the Integrator dropdown&apos;s reference and debug modes. RandomWalk just bounces each ray off in a random direction with no attempt to aim at the lights and no smart blending of strategies - the simplest, slowest-converging, but most &quot;honest&quot; baseline. SimplePath adds two independent checkboxes for exactly those two ingredients: with only &quot;sample lights&quot; on, direct lighting comes in cheaply, but a bounce that happens to point toward a bright light off to the side is just luck; with only &quot;sample BSDF&quot; on, it&apos;s the other way around; with both on, the two strategies get combined for a cleaner result - which is also what the default Path Tracer already does behind the scenes. Render each at the same low sample count to see how differently they converge on the exact same room.</source>
         <translation>La misma primera demostración de Cornell box, usada como recorrido por los modos de referencia y depuración del menú desplegable Integrador. RandomWalk simplemente hace rebotar cada rayo en una dirección aleatoria, sin intentar apuntar a las luces ni combinar estrategias de forma inteligente: la base más simple, la que converge más despacio, pero también la más &quot;honesta&quot;. SimplePath añade dos casillas independientes para justamente esos dos ingredientes: con solo &quot;muestrear luces&quot; activado, la iluminación directa llega de forma barata, pero un rebote que por casualidad apunte hacia una luz brillante a un lado es pura suerte; con solo &quot;muestrear BSDF&quot; activado, ocurre lo contrario; con las dos activadas, ambas estrategias se combinan para un resultado más limpio, que es justo lo que ya hace por detrás el Trazador de rayos por defecto. Renderiza cada uno con el mismo número bajo de muestras para ver cuánto difieren al converger en la misma habitación exacta.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="208"/>
+        <location filename="../scene_technique_notes.h" line="209"/>
         <source>A Cornell box built specifically for this demo, with five ceiling lights instead of the usual one, and deliberately very uneven brightness between them (roughly 1:2:6:15:80). The Uniform light sampler (Render Options tab) spends an equal fifth of its light-aiming effort on each of the five lights regardless of how much each one actually matters - so it wastes most of its effort on four lights that barely contribute, leaving the one genuinely bright light noisier than it needs to be. Power and BVH both instead weight their effort toward that dominant light (BVH also factors in distance and direction, Power only in total brightness) - render all three at the same low sample count and compare how much faster the noise around the bright corner light settles down.</source>
         <translation>Una Cornell box creada específicamente para esta demostración, con cinco luces en el techo en lugar de la habitual una, y con un brillo deliberadamente muy desigual entre ellas (aproximadamente 1:2:6:15:80). El Muestreador de luces Uniforme (pestaña Opciones de renderizado) dedica una quinta parte igual de su esfuerzo de apuntado a cada una de las cinco luces, sin importar cuánto contribuya realmente cada una, así que desperdicia la mayor parte de su esfuerzo en cuatro luces que apenas aportan nada, dejando con más ruido del necesario a la única luz realmente brillante. Potencia y BVH, en cambio, dirigen su esfuerzo hacia esa luz dominante (BVH también tiene en cuenta la distancia y la dirección, Potencia solo el brillo total): renderiza los tres con el mismo número bajo de muestras y compara cuánto más rápido se asienta el ruido alrededor de la luz brillante de la esquina.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="209"/>
+        <location filename="../scene_technique_notes.h" line="210"/>
         <source>The same first Cornell box demo, used to show off the Integrator dropdown&apos;s Ambient Occlusion mode. AO isn&apos;t a normal lit render at all - switch to it (Render Options tab) and every surface&apos;s actual color and every real light in the scene get ignored completely, replaced with a simple grayscale measure of how enclosed each point is by nearby geometry. All that&apos;s left is the box&apos;s own contact shadows and the corners where walls meet, which is exactly what makes AO a fast way to preview a scene&apos;s shape and geometric complexity without worrying about its lighting at all.</source>
         <translation>La misma primera demostración de Cornell box, usada para mostrar el modo de Ambient Occlusion del menú desplegable Integrador. AO no es en absoluto un renderizado con iluminación normal: cambia a él (pestaña Opciones de renderizado) y el color real de cada superficie y cada luz real de la escena se ignoran por completo, sustituidos por una simple medida en escala de grises de cuánto está encerrado cada punto por la geometría cercana. Lo único que queda son las sombras de contacto propias de la caja y las esquinas donde se unen las paredes, que es precisamente lo que convierte a AO en una forma rápida de previsualizar la forma y la complejidad geométrica de una escena sin preocuparse en absoluto de su iluminación.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="210"/>
+        <location filename="../scene_technique_notes.h" line="211"/>
         <source>The same frosted-glass Cornell box as the Cornell Rough Glass and SPPM demo scenes - the bright focused patch of light under the rough glass sphere is a classic source of stray, isolated overly-bright pixels (&quot;fireflies&quot;) under ordinary path tracing. Regularize and Firefly clamp (both on the Render Options tab) fix that two different ways: Regularize gently blurs the glass&apos;s own roughness after the first bounce, making that tricky lighting easier to sample cleanly in the first place; the Firefly clamp instead lets the bright pixel happen, then caps how bright any single sample is allowed to get, trading a tiny bit of accuracy for a guaranteed ceiling on stray bright spots. Render the scene plain, then with each option on its own, at the same sample count, to compare.</source>
         <translation>La misma Cornell box con vidrio esmerilado que las escenas de demostración de Vidrio Rugoso Cornell y SPPM: el parche de luz brillante y concentrado bajo la esfera de vidrio rugoso es una fuente clásica de píxeles sueltos, aislados y demasiado brillantes (&quot;destellos&quot;) con el trazado de rayos normal. Regularize y Firefly clamp (ambos en la pestaña Opciones de renderizado) solucionan eso de dos formas distintas: Regularize difumina suavemente la propia rugosidad del vidrio después del primer rebote, haciendo que esa iluminación difícil sea más fácil de muestrear limpiamente desde el principio; el Firefly clamp, en cambio, deja que ocurra el píxel brillante y luego limita lo brillante que puede llegar a ser una sola muestra, a cambio de un poco de precisión se obtiene un techo garantizado para los puntos brillantes sueltos. Renderiza la escena tal cual, y luego con cada opción activada por separado, con el mismo número de muestras, para comparar.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="231"/>
+        <location filename="../scene_technique_notes.h" line="232"/>
         <source>Select a scene to see the rendering technique it demonstrates.</source>
         <translation>Selecciona una escena para ver la técnica de renderizado que demuestra.</translation>
     </message>
     <message>
-        <location filename="../scene_technique_notes.h" line="236"/>
+        <location filename="../scene_technique_notes.h" line="237"/>
         <source>No rendering-technique note is written for this scene yet - these are only authored for the self-contained scene set (the &quot;Self-Contained&quot; tab above) so far.</source>
         <translation>Todavía no se ha escrito una nota de técnica de renderizado para esta escena - por ahora estas solo se redactan para el conjunto de escenas autocontenidas (la pestaña &quot;Autocontenidas&quot; de arriba).</translation>
     </message>
@@ -10568,29 +10611,29 @@ Esto reemplaza la escena actual (Deshacer la recupera).</translation>
         <translation>Una parte brillante del modelo tiene demasiados triángulos para ser una luz, así que no brilla.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_environment.cpp" line="78"/>
+        <location filename="../scene_builder_environment.cpp" line="84"/>
         <source>Environment: %1. It is the sky light&apos;s picture now: the sun, clouds and lamps in it light the scene. Rotate sky turns it; Brightness changes its strength.</source>
         <translation>Entorno: %1. Ahora es la imagen de la luz del cielo: el sol, las nubes y las lámparas que hay en ella iluminan la escena. Girar cielo lo gira; Brillo cambia su intensidad.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_environment.cpp" line="85"/>
-        <location filename="../scene_builder_environment.cpp" line="89"/>
-        <location filename="../scene_builder_environment.cpp" line="136"/>
+        <location filename="../scene_builder_environment.cpp" line="91"/>
+        <location filename="../scene_builder_environment.cpp" line="95"/>
+        <location filename="../scene_builder_environment.cpp" line="142"/>
         <source>Environment library</source>
         <translation>Biblioteca de entornos</translation>
     </message>
     <message>
-        <location filename="../scene_builder_environment.cpp" line="85"/>
+        <location filename="../scene_builder_environment.cpp" line="91"/>
         <source>No environment pictures were found next to the app (an environments folder).</source>
         <translation>No se encontraron imágenes de entorno junto a la aplicación (una carpeta environments).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_environment.cpp" line="93"/>
+        <location filename="../scene_builder_environment.cpp" line="99"/>
         <source>All kinds</source>
         <translation>Todos los tipos</translation>
     </message>
     <message>
-        <location filename="../scene_builder_environment.cpp" line="114"/>
+        <location filename="../scene_builder_environment.cpp" line="120"/>
         <source>%1
 %2
 From: %3</source>
@@ -10599,17 +10642,17 @@ From: %3</source>
 Origen: %3</translation>
     </message>
     <message>
-        <location filename="../scene_builder_environment.cpp" line="117"/>
+        <location filename="../scene_builder_environment.cpp" line="123"/>
         <source>%1 photographic skies and rooms (Poly Haven, CC0). One becomes the sky light&apos;s picture: the sun, clouds, lamps and windows in it light the scene and show behind it. The Sun light made by the generated sky is removed, because the picture has its own.</source>
         <translation>%1 cielos y salas fotográficos (Poly Haven, CC0). Uno pasa a ser la imagen de la luz del cielo: el sol, las nubes, las lámparas y las ventanas que hay en él iluminan la escena y se ven detrás. La luz del Sol que hacía el cielo generado se quita, porque la imagen ya tiene la suya.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_environment.cpp" line="122"/>
+        <location filename="../scene_builder_environment.cpp" line="128"/>
         <source>Use this sky</source>
         <translation>Usar este cielo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_environment.cpp" line="136"/>
+        <location filename="../scene_builder_environment.cpp" line="142"/>
         <source>That picture could not be used.</source>
         <translation>No se pudo usar esa imagen.</translation>
     </message>

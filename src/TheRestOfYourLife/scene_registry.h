@@ -723,7 +723,7 @@ namespace pbrt_scene_registry {
     inline SceneDescriptor build_curated_external_pbrt_scene_descriptor(
             const char* id, int legacy_id, const char* name, const char* category,
             const char* description, const char* performance, const char* filename,
-            double recommended_exposure = 1.0) {
+            double recommended_exposure = 1.0, int recommended_spp_if_missing = 0) {
         std::string path;
         for (const std::string& dir : pbrt_discover::defaultSearchPaths()) {
             std::filesystem::path candidate = std::filesystem::path(dir) / filename;
@@ -740,7 +740,8 @@ namespace pbrt_scene_registry {
                 if (std::filesystem::exists(candidate, ec)) path = candidate.string();
             }
         }
-        if (path.empty()) path = std::string("pbrt_scenes/") + filename;  // not downloaded - fails gracefully below
+        const bool onDisk = !path.empty();
+        if (!onDisk) path = std::string("pbrt_scenes/") + filename;  // not downloaded - fails gracefully below
 
         const pbrt_discover::Discovered d = pbrt_discover::describeFile(path);
 
@@ -760,6 +761,9 @@ namespace pbrt_scene_registry {
         // recommended_spp/max_depth/integrator/sampler/light_sampler fields
         // it derives from `d`) so a caller's curated override always wins.
         s.recommended_exposure = recommended_exposure;
+        // A scene that is not downloaded yet has no file to read its sample count from: the caller says what the file asks for, so the info panel does not
+        // show the default before the download and the file's number after it.
+        if (!onDisk && recommended_spp_if_missing > 0) s.recommended_spp = recommended_spp_if_missing;
 
         paths()[id] = path;
         return s;

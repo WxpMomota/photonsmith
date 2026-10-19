@@ -1153,6 +1153,10 @@ TEST(FindSceneTest, EveryDownloadableBitterliSceneHasAPackThatWritesItsFile) {
 		++checked;
 		const std::string wanted = "member|pbrt_scenes/" + generic.substr(at) + "|";
 		EXPECT_NE(catalogue.find(wanted), std::string::npos) << entry.first << " reads " << generic << " but no pack in scene_packs.txt writes it";
+		// every Bitterli file asks for 64 samples: the registry says so whether the scene is downloaded or not, so the info panel does not change its mind after the download
+		const SceneDescriptor* scene = find_scene(entry.first);
+		ASSERT_NE(scene, nullptr) << entry.first;
+		EXPECT_EQ(scene->recommended_spp, 64) << entry.first;
 	}
 	EXPECT_EQ(checked, 17);
 }
