@@ -103,6 +103,13 @@ goes there, with its default. `Uniforms` and `TriangleMaterial` are still two ha
   (`metal_poc_test_kernels.metal`, `metal_poc_shader_tests_layout.mm`).
 * `materialType` values are the `METAL_MAT_*` macros in `metal_poc_material_ids.metal`. Never reuse a number. Metal's numbering is its own; OptiX has a
   separate enum.
+* **A material's parameters beyond colour, ior and roughness** live in the spare slots of `TriangleMaterial` (`conductorEta`, `conductorK`, `transmitColor`),
+  which began as a conductor's IOR. Nothing outside a conductor reads or writes them by those names: the loader uses the setters in
+  `metal_poc_material_params.h` (`matparams::setHair`, `setPrincipled`, `setCauchy`, `setMeasuredTable`, `setSubsurface`, `setCoatAlpha`, `setChromaticMedium`,
+  `setGlassMedium`, `setMediumBufferIndex`), the shader the views `matHairBetaN()`, `matCauchyA()`, `matMediumSigmaT()` ... after the struct in
+  `metal_poc_types.metal`, which also has the table of what each family keeps in which slot. The storage and the picture are unchanged; a new family adds its
+  setter and its views. (The procedural-texture family, `materialType` 25, still reads `conductorK.y` as its mode and the rest per mode: see `shadeSurfaceAlbedo`
+  in `metal_poc_kernel_surface.metal`.)
 * `Uniforms` is read as a `constant` buffer; the loader and `dsFillUniforms` fill it. `liveRender` writes only camera/seed/sample fields per frame.
 
 ## Recipes

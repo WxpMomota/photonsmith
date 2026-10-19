@@ -614,7 +614,7 @@ void MetalPocApp::applyPbrtCameraUniforms(Uniforms& uniforms) {
         float bestRadius = 0.0f;
         for (size_t si = 0; si < spheres.size() && si < sphereMaterials.size(); ++si) {
             const TriangleMaterial& sm = sphereMaterials[si];
-            const bool glassMedium = (sm.materialType == METAL_MAT_DIELECTRIC || sm.materialType == METAL_MAT_ROUGH_DIELECTRIC || sm.materialType == METAL_MAT_THIN_DIELECTRIC) && sm.conductorK.y > 0.5f;
+            const bool glassMedium = (sm.materialType == METAL_MAT_DIELECTRIC || sm.materialType == METAL_MAT_ROUGH_DIELECTRIC || sm.materialType == METAL_MAT_THIN_DIELECTRIC) && matparams::glassHasMedium(sm);
             if (!glassMedium) continue;
             const float dx = pbrtCameraPos.x - spheres[si].center.x, dy = pbrtCameraPos.y - spheres[si].center.y, dz = pbrtCameraPos.z - spheres[si].center.z;
             if (dx * dx + dy * dy + dz * dz < spheres[si].radius * spheres[si].radius && spheres[si].radius > bestRadius) {
@@ -702,9 +702,9 @@ void MetalPocApp::applyPbrtMediumUniforms(Uniforms& uniforms) {
     // bit 1 (value 2): some medium sphere or tube has a different extinction per colour channel, so every path fixes its hero channel at the camera (see fogChromatic)
     uint32_t chromaticShapeMedium = 0u;
     for (const TriangleMaterial& sm : sphereMaterials)
-        if (sm.materialType == METAL_MAT_MEDIUM_HOMOGENEOUS && sm.conductorK.z > 0.5f) chromaticShapeMedium = 2u;
+        if (sm.materialType == METAL_MAT_MEDIUM_HOMOGENEOUS && matparams::mediumIsChromatic(sm)) chromaticShapeMedium = 2u;
     for (const TriangleMaterial& cm : cylinderMaterials)
-        if (cm.materialType == METAL_MAT_MEDIUM_HOMOGENEOUS && cm.conductorK.z > 0.5f) chromaticShapeMedium = 2u;
+        if (cm.materialType == METAL_MAT_MEDIUM_HOMOGENEOUS && matparams::mediumIsChromatic(cm)) chromaticShapeMedium = 2u;
     uniforms.fogChromatic = chromaticShapeMedium;
     if (havePbrtMedium) {
         uniforms.fogSigmaT = pbrtFogSigmaT;

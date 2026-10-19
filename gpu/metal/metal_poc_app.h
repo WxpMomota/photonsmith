@@ -46,6 +46,7 @@
 #include "../../src/shared/realistic_camera.h"
 
 #include "metal_poc_gpu_types.h"
+#include "metal_poc_material_params.h"   // the per-family setters of TriangleMaterial's parameter slots
 #include "metal_poc_scene_helpers.h"
 
 // main()'s own body used to be one ~1020-line function carrying roughly

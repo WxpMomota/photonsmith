@@ -509,8 +509,8 @@ inline bool shadeHair(TriangleMaterial mat, float3 hitPoint, float3 facingNormal
     float sigmaMax = max(sigma_a.x, max(sigma_a.y, sigma_a.z));
     float betaFloor = sigmaMax > 0.3 ? 0.6 : 0.0;
     float beta_m = max(mat.roughness, betaFloor);
-    float beta_n = max(mat.conductorEta.x, betaFloor);
-    float alpha_deg = mat.conductorEta.y;
+    float beta_n = max(matHairBetaN(mat), betaFloor);
+    float alpha_deg = matHairAlphaDeg(mat);
     HairBxDFParams hp = hairMakeParams(h, mat.ior, sigma_a.x, sigma_a.y, sigma_a.z,
                                         beta_m, beta_n, alpha_deg);
 
@@ -523,7 +523,7 @@ inline bool shadeHair(TriangleMaterial mat, float3 hitPoint, float3 facingNormal
     // conductorK), else CPU's default proxy - the shading normal.
     float3 fiberT = facingNormal;
     {
-        float3 ck = float3(mat.conductorK);
+        float3 ck = matHairTangent(mat);
         float cl = length(ck);
         if (cl > 0.5) fiberT = ck / cl;
     }

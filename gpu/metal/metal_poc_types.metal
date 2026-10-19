@@ -777,6 +777,43 @@ struct TriangleMaterial {
     float rayTime;
 };
 
+// ---- What the spare slots of TriangleMaterial mean, per material family ----------------------------------------------------------------------------------------------
+// `conductorEta`, `conductorK` (two float3) and `transmitColor` began as a conductor's complex IOR and a diffuse transmittance, and were then reused as the parameter
+// block of every later family (the loader writes them, the shader reads them). The storage is unchanged, but nothing outside this block reads those slots by their
+// conductor names for a non-conductor any more: each family has one named view here, and metal_poc_material_params.h has the matching setters for the host. A new
+// family adds its views here and its setters there, and the table in docs/METAL_BACKEND.md.
+//   conductor (4, 9, 20)   eta = conductorEta, k = conductorK            (read directly: that IS a conductor's IOR)
+//   hair (31)              betaN, alphaDeg = conductorEta.x/.y; fibre tangent = conductorK (zero: none)
+//   principled (24)        metallic, clearcoat, clearcoatRoughness = conductorEta.x/.y/.z
+//   dispersive (22, 23)    Cauchy A, B = conductorEta.x/.y
+//   measured (32)          table index = conductorEta.x
+//   subsurface (34)        BSSRDF table offset, entry-interface alpha = conductorEta.x/.y
+//   coat over a picture (27)  coat alpha = conductorEta.x
+//   medium (28, glass with a medium)  sigma_t per channel = conductorEta; g, has-medium, chromatic = conductorK.x/.y/.z
+//   cloud / RGB grid (29, 30)  index into the medium buffer = conductorEta.x
+//   texture family (25), diffuse transmission with a picture (12), thin-film etc.: the mode is conductorK.y and the rest depends on it (kernel_surface.metal)
+// Overloaded for a material in thread memory (a local copy) and one read in place from a device buffer.
+#define MAT_VIEW(RET, NAME, EXPR) \
+    inline RET NAME(thread const TriangleMaterial& m) { return EXPR; } \
+    inline RET NAME(device const TriangleMaterial& m) { return EXPR; }
+MAT_VIEW(float, matHairBetaN, m.conductorEta.x)
+MAT_VIEW(float, matHairAlphaDeg, m.conductorEta.y)
+MAT_VIEW(float3, matHairTangent, float3(m.conductorK))
+MAT_VIEW(float, matPrincipledMetallic, m.conductorEta.x)
+MAT_VIEW(float, matPrincipledClearcoat, m.conductorEta.y)
+MAT_VIEW(float, matPrincipledClearcoatRoughness, m.conductorEta.z)
+MAT_VIEW(float, matCauchyA, m.conductorEta.x)
+MAT_VIEW(float, matCauchyB, m.conductorEta.y)
+MAT_VIEW(int, matMeasuredTable, int(m.conductorEta.x))
+MAT_VIEW(float, matSubsurfaceTableOffset, m.conductorEta.x)
+MAT_VIEW(float, matSubsurfaceEntryAlpha, m.conductorEta.y)
+MAT_VIEW(float, matCoatAlpha, m.conductorEta.x)
+MAT_VIEW(float3, matMediumSigmaT, float3(m.conductorEta))
+MAT_VIEW(float, matMediumG, m.conductorK.x)
+MAT_VIEW(bool, matMediumInGlass, m.conductorK.y > 0.5)
+MAT_VIEW(bool, matMediumChromatic, m.conductorK.z > 0.5)
+MAT_VIEW(uint, matMediumBufferIndex, uint(m.conductorEta.x))
+
 // Per-ray side-channel for sphereIntersectionFunction below - Metal's
 // analogue of OptiX's optixGetRayTime(), which has no built-in
 // equivalent for a bounding-box/custom-primitive intersection function.
@@ -933,12 +970,12 @@ SphereIntersectionResult sphereIntersectionFunction(
             if (t1 <= t0) return result;
             float chord = (t1 - t0) * sqrt(msA);
             float sigmaForShadow;
-            if (mt == 28u && sphereMaterials[primitiveIndex].ior > 0.0 && sphereMaterials[primitiveIndex].conductorK.z > 0.5 && payload.shadowChannel >= 0) {
-                sigmaForShadow = float3(sphereMaterials[primitiveIndex].conductorEta)[payload.shadowChannel];   // a chromatic medium: the path's hero channel
+            if (mt == 28u && sphereMaterials[primitiveIndex].ior > 0.0 && matMediumChromatic(sphereMaterials[primitiveIndex]) && payload.shadowChannel >= 0) {
+                sigmaForShadow = matMediumSigmaT(sphereMaterials[primitiveIndex])[payload.shadowChannel];   // a chromatic medium: the path's hero channel
             } else if (mt == 28u && sphereMaterials[primitiveIndex].ior > 0.0) {
                 sigmaForShadow = sphereMaterials[primitiveIndex].ior;
             } else {   // glass-with-medium, or a pure absorber (sigma_t 0, per-channel sigma_a in conductorEta)
-                const float3 gEta = float3(sphereMaterials[primitiveIndex].conductorEta);
+                const float3 gEta = matMediumSigmaT(sphereMaterials[primitiveIndex]);
                 sigmaForShadow = (payload.shadowChannel >= 0) ? gEta[payload.shadowChannel] : (gEta.x + gEta.y + gEta.z) * (1.0 / 3.0);
             }
             float transmittance = exp(-sigmaForShadow * chord);
@@ -1131,8 +1168,8 @@ CylinderIntersectionResult cylinderIntersectionFunction(
         const float chordT1 = min(s1, maxDistance);
         if (chordT1 <= chordT0) return result;
         const float chord = (chordT1 - chordT0) * length(direction);
-        const float3 absorbSigma = float3(cylinderMaterials[primitiveIndex].conductorEta);
-        const float sigmaForShadow = (cylinderMaterials[primitiveIndex].ior > 0.0 && cylinderMaterials[primitiveIndex].conductorK.z > 0.5 && payload.shadowChannel >= 0)
+        const float3 absorbSigma = matMediumSigmaT(cylinderMaterials[primitiveIndex]);
+        const float sigmaForShadow = (cylinderMaterials[primitiveIndex].ior > 0.0 && matMediumChromatic(cylinderMaterials[primitiveIndex]) && payload.shadowChannel >= 0)
             ? absorbSigma[payload.shadowChannel]   // a chromatic medium: the path's hero channel (per-channel sigma_t in conductorEta)
             : cylinderMaterials[primitiveIndex].ior > 0.0 ? cylinderMaterials[primitiveIndex].ior
             : (payload.shadowChannel >= 0 ? absorbSigma[payload.shadowChannel] : (absorbSigma.x + absorbSigma.y + absorbSigma.z) * (1.0 / 3.0));

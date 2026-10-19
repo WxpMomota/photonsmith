@@ -296,9 +296,8 @@ TriangleMaterial MetalPocApp::mapPbrtSubsurfaceMaterial(PbrtMaterialMapState& st
                          PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/nfC};
     mat.transmitColor = PackedFloat3{(float)m.sigma_s[0] * invScale, (float)m.sigma_s[1] * invScale, (float)m.sigma_s[2] * invScale};
     const int tableOffset = bssrdfTableOffset(st, m.g, m.ior);
-    mat.conductorEta.x = (float)tableOffset;   // exact below 2^24 floats; an int's bits would be a denormal, which the GPU may flush to zero
-    // pbrt's "roughness" roughens the entry interface (a GGX dielectric): conductorEta.y = its alpha, remapped from the perceptual roughness as pbrt does; 0 keeps the smooth interface.
-    mat.conductorEta.y = (float)(m.remapRoughness ? std::sqrt(std::max(m.roughness_u, 0.0)) : m.roughness_u);
+    // pbrt's "roughness" roughens the entry interface (a GGX dielectric): its alpha, remapped from the perceptual roughness as pbrt does; 0 keeps the smooth interface.
+    matparams::setSubsurface(mat, tableOffset, (float)(m.remapRoughness ? std::sqrt(std::max(m.roughness_u, 0.0)) : m.roughness_u));
     return mat;
 }
 
@@ -439,7 +438,7 @@ TriangleMaterial MetalPocApp::mapPbrtMaterial(PbrtMaterialMapState& st, const pb
             // clearcoat roughness).
             TriangleMaterial mat{color, /*materialType=*/METAL_MAT_PRINCIPLED, /*ior=*/(float)m.ior,
                                  PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/(float)m.roughness};
-            mat.conductorEta = PackedFloat3{(float)m.metallic, (float)m.clearcoat, (float)m.clearcoatRoughness};
+            matparams::setPrincipled(mat, (float)m.metallic, (float)m.clearcoat, (float)m.clearcoatRoughness);
             return mat;
         }
         case pbrt_flatten::MaterialKind::Measured: {
@@ -466,7 +465,7 @@ TriangleMaterial MetalPocApp::mapPbrtMaterial(PbrtMaterialMapState& st, const pb
             if (tableIndex >= 0) {
                 TriangleMaterial mat{PackedFloat3{1, 1, 1}, /*materialType=*/METAL_MAT_MEASURED, /*ior=*/1.0f,
                                      PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/0.0f};
-                mat.conductorEta = PackedFloat3{(float)tableIndex, 0.0f, 0.0f};
+                matparams::setMeasuredTable(mat, tableIndex);
                 return mat;
             }
             return TriangleMaterial{PackedFloat3{0.5f, 0.5f, 0.5f}, 0u, 1.0f, PackedFloat3{0, 0, 0}, -1, 0.0f};
@@ -481,7 +480,7 @@ TriangleMaterial MetalPocApp::mapPbrtMaterial(PbrtMaterialMapState& st, const pb
             TriangleMaterial mat{PackedFloat3{(float)m.sigma_a[0], (float)m.sigma_a[1], (float)m.sigma_a[2]},
                                  /*materialType=*/METAL_MAT_HAIR, /*ior=*/(float)m.ior,
                                  PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/(float)m.betaM};
-            mat.conductorEta = PackedFloat3{(float)m.betaN, (float)m.alphaDeg, 0.0f};
+            matparams::setHair(mat, (float)m.betaN, (float)m.alphaDeg);
             return mat;
         }
         case pbrt_flatten::MaterialKind::Dielectric:
@@ -505,7 +504,7 @@ TriangleMaterial MetalPocApp::mapPbrtMaterial(PbrtMaterialMapState& st, const pb
                 }
                 TriangleMaterial mat{PackedFloat3{0, 0, 0}, /*materialType=*/frosted ? METAL_MAT_DISPERSIVE_ROUGH_DIELECTRIC : METAL_MAT_DISPERSIVE_DIELECTRIC,
                                      /*ior=*/(float)m.ior, PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/roughnessSqrtAlpha};
-                mat.conductorEta = PackedFloat3{(float)cauchyA, (float)cauchyB, 0.0f};
+                matparams::setCauchy(mat, (float)cauchyA, (float)cauchyB);
                 return mat;
             }
             if (m.roughness_u > 0.0 || m.roughness_v > 0.0) {
@@ -622,7 +621,7 @@ TriangleMaterial MetalPocApp::mapPbrtMaterial(PbrtMaterialMapState& st, const pb
                     const float coatAlpha = (float)(m.remapRoughness ? std::sqrt(coatRough) : coatRough);
                     TriangleMaterial imageMat{color, /*materialType=*/METAL_MAT_IMAGE_CLEARCOAT, /*ior=*/(float)m.ior,
                                               PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/(float)m.textureScale};
-                    imageMat.conductorEta = PackedFloat3{coatAlpha, 0.0f, 0.0f};
+                    matparams::setCoatAlpha(imageMat, coatAlpha);
                     applyReflectanceMapping(imageMat, m);
                     return imageMat;
                 }

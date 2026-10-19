@@ -151,7 +151,7 @@ inline bool shadeDispersiveDielectric(TriangleMaterial mat, float3 hitPoint, flo
         rgbChannel = newChannel;
     }
     float dielectricIor = cauchyEta(kRgbChannelWavelengthNm[rgbChannel],
-                                     mat.conductorEta.x, mat.conductorEta.y);
+                                     matCauchyA(mat), matCauchyB(mat));
 
     float refractionRatio = frontFace ? (1.0 / dielectricIor) : dielectricIor;
     float3 unitDir = normalize(rayDir);
@@ -347,7 +347,7 @@ inline bool shadeDispersiveRoughDielectric(TriangleMaterial mat, float3 hitPoint
         rgbChannel = newChannel;
     }
     float dispersiveIor = cauchyEta(kRgbChannelWavelengthNm[rgbChannel],
-                                     mat.conductorEta.x, mat.conductorEta.y);
+                                     matCauchyA(mat), matCauchyB(mat));
 
     float alpha = max(mat.roughness * mat.roughness, 0.0009);
     float3 tangent, bitangent;

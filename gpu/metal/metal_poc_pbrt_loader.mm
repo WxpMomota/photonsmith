@@ -566,7 +566,7 @@ void MetalPocApp::loadPbrtRemainingTriangles(const pbrt_flatten::FlatScene& scen
         if (t.material >= 0 && t.material < (int)scene.materials.size()) { applyImageBump(mat, scene.materials[t.material]); applyAlphaMask(mat, scene.materials[t.material]); }
         if (mat.materialType == METAL_MAT_HAIR) {
             auto tanIt = pbrtTriangleFiberTangent.find(i);
-            if (tanIt != pbrtTriangleFiberTangent.end()) mat.conductorK = PackedFloat3{tanIt->second[0], tanIt->second[1], tanIt->second[2]};   // real fibre tangent (curves)
+            if (tanIt != pbrtTriangleFiberTangent.end()) matparams::setHairTangent(mat, tanIt->second[0], tanIt->second[1], tanIt->second[2]);   // real fibre tangent (curves)
         }
         auto unhandledIt = unhandledLightEmission.find(i);
         if (unhandledIt != unhandledLightEmission.end()) {
@@ -601,14 +601,12 @@ static TriangleMaterial homogeneousMediumMaterial(const pbrt_flatten::Medium& m,
         for (int c = 1; c < 3; ++c) { lo = std::min(lo, sigmaT[c]); hi = std::max(hi, sigmaT[c]); }
         if (hi > 0.0 && (hi - lo) > kChromaticFogSpread * hi) {
             // chromatic extinction: per-channel sigma_t in conductorEta, flagged in conductorK.z, for the shader's hero-channel path (the mean in `ior` stays for shadow tests of a grey fallback)
-            mat.conductorEta = PackedFloat3{(float)(sigmaT[0] / sceneScale), (float)(sigmaT[1] / sceneScale), (float)(sigmaT[2] / sceneScale)};
-            mat.conductorK = PackedFloat3{0.0f, 0.0f, 1.0f};
+            matparams::setChromaticMedium(mat, (float)(sigmaT[0] / sceneScale), (float)(sigmaT[1] / sceneScale), (float)(sigmaT[2] / sceneScale));
         }
     }
     if (m.sigma_s[0] == 0.0 && m.sigma_s[1] == 0.0 && m.sigma_s[2] == 0.0 && meanSigmaT > 0.0) {
         mat.ior = 0.0f;   // (conductorK.z keeps the chromatic flag: a path follows one colour channel through a coloured absorber too, so its shadow rays use that channel)
-        mat.conductorEta = PackedFloat3{(float)(m.sigma_a[0] / sceneScale), (float)(m.sigma_a[1] / sceneScale),
-                                        (float)(m.sigma_a[2] / sceneScale)};
+        matparams::setMediumAbsorption(mat, (float)(m.sigma_a[0] / sceneScale), (float)(m.sigma_a[1] / sceneScale), (float)(m.sigma_a[2] / sceneScale));
     }
     return mat;
 }
@@ -684,7 +682,7 @@ void MetalPocApp::rgbGridSphereMaterial(const pbrt_flatten::Medium& gm, const Pb
     mat = TriangleMaterial{};
     mat.materialType = METAL_MAT_MEDIUM_RGB_GRID;
     mat.lightId = -1;
-    mat.conductorEta = PackedFloat3{(float)gridIdx, 0.0f, 0.0f};
+    matparams::setMediumBufferIndex(mat, (int)gridIdx);
 }
 
 // The same for a pbrt "cloud" medium (materialType 29).
@@ -715,7 +713,7 @@ void MetalPocApp::cloudSphereMaterial(const pbrt_flatten::Medium& cm, const Pbrt
     mat.materialType = METAL_MAT_MEDIUM_HETEROGENEOUS;
     mat.lightId = -1;
     mat.roughness = (float)cm.g;
-    mat.conductorEta = PackedFloat3{(float)cloudIdx, 0.0f, 0.0f};
+    matparams::setMediumBufferIndex(mat, (int)cloudIdx);
 }
 
 // What a sphere is drawn with: its pbrt material, or, for a `Material "interface"` sphere, the medium it bounds; a glass sphere that also bounds a medium carries the medium in its spare fields.
@@ -791,8 +789,7 @@ TriangleMaterial MetalPocApp::sphereMaterial(const pbrt_flatten::FlatScene& scen
         const double gMaxSig = std::max(gSigmaT[0], std::max(gSigmaT[1], gSigmaT[2]));
         const double gMinSig = std::min(gSigmaT[0], std::min(gSigmaT[1], gSigmaT[2]));
         const bool chromatic = (gMaxSig - gMinSig) > kChromaticGlassMediumSpread * std::max(gMaxSig, 1e-12);
-        mat.conductorEta = PackedFloat3{(float)(gSigmaT[0] / sceneScale), (float)(gSigmaT[1] / sceneScale), (float)(gSigmaT[2] / sceneScale)};
-        mat.conductorK = PackedFloat3{(float)gm.g, 1.0f, chromatic ? 1.0f : 0.0f};
+        matparams::setGlassMedium(mat, (float)(gSigmaT[0] / sceneScale), (float)(gSigmaT[1] / sceneScale), (float)(gSigmaT[2] / sceneScale), (float)gm.g, chromatic);
         (void)gMeanSigmaT;
     }
     return mat;

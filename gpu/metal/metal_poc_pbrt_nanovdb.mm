@@ -71,6 +71,6 @@ bool MetalPocApp::mapNanovdbMedium(const pbrt_flatten::Medium& nm, float sceneSc
     mat = TriangleMaterial{};
     mat.materialType = METAL_MAT_MEDIUM_RGB_GRID;
     mat.lightId = -1;
-    mat.conductorEta = PackedFloat3{(float)gridIdx, 0.0f, 0.0f};
+    matparams::setMediumBufferIndex(mat, (int)gridIdx);
     return true;
 }
