@@ -47,6 +47,24 @@ static std::string uploadKeyFor(const char* scene_id) {
 	return key;
 }
 
+// build_scene() fails for a scene id that was never ported AND for a scene read from a pbrt file that is not on disk (a downloadable scene, such as one of the
+// Bitterli scenes, before "Download missing files"). The second is not "use CPU mode": the CPU cannot render it either. Says which it is and returns the code.
+static int reportBuildFailure(const char* scene_id, bool print) {
+	const char* report = scene_id ? cpu_scene_missing_assets_by_id(scene_id) : nullptr;
+	if (report && *report) {
+		// folder TAB missing count TAB referenced count TAB first missing file TAB every missing path
+		std::vector<std::string> fields;
+		std::stringstream parts{std::string(report)};
+		for (std::string field; std::getline(parts, field, '\t');) fields.push_back(field);
+		if (print)
+			std::cerr << "[OptiX] Scene files not found: " << (fields.size() > 3 ? fields[3] : std::string("?"))
+			          << ". Use \"Download missing files\" for the scene in the Settings tab, or put the files in " << (fields.empty() ? std::string("?") : fields[0]) << ".\n";
+		return ERR_FILE_NOT_FOUND;
+	}
+	if (print) std::cerr << "[OptiX] Scene not supported on GPU\n";
+	return ERR_GPU_UNSUPPORTED_SCENE;
+}
+
 // Detail for the most recent rt_realtime_render_frame() failure on THIS
 // thread - see rt_realtime_get_last_error()'s own comment. thread_local
 // (not a plain static) since Live Preview always calls both functions from
@@ -181,16 +199,16 @@ static bool prepareSceneAndCamera(
 
 	if (!builtOk) {
 		if (!verbose) g_lastRealtimeError = reasonFrom(buildDiagnostics, "this scene has no GPU implementation");
-		// build_scene() only ever returns false for an unrecognized/
-		// unimplemented scene_id (its default: case) - the other
-		// return-false path (a null camera_params buffer) is unreachable in
-		// practice, since every caller here passes a valid on-stack array.
+		// build_scene() returns false for an unrecognized/unimplemented
+		// scene_id (its default: case) and for a pbrt file that is not on disk
+		// (reportBuildFailure() tells them apart); the other return-false
+		// path (a null camera_params buffer) is unreachable in practice,
+		// since every caller here passes a valid on-stack array.
 		// ERR_GPU_UNSUPPORTED_SCENE gives the user the actionable "switch to
 		// CPU mode" message (error_handler.h); the old ERR_GPU_SCENE_BUILD_FAILED
 		// here was misleading - it reads as a genuine build/geometry failure,
 		// not "this scene was never ported to GPU."
-		if (verbose) std::cerr << "[OptiX] Scene not supported on GPU\n";
-		errorCode = ERR_GPU_UNSUPPORTED_SCENE;
+		errorCode = reportBuildFailure(scene_id, verbose);
 		return false;
 	}
 
@@ -1250,8 +1268,7 @@ extern "C" int optix_render_main_sppm(
 		GpuCameraParams cameraExtra{};
 
 		if (!build_scene(scene_id, image_width, image_height, scene, camera_params, cam_x, cam_y, cam_z, &cameraExtra, force_camera_override != 0)) {
-			std::cerr << "[OptiX] Scene not supported on GPU\n";
-			return ERR_GPU_UNSUPPORTED_SCENE;
+			return reportBuildFailure(scene_id, true);
 		}
 
 		// Film "cropwindow"/"pixelbounds" - build_scene() (for a pbrt-loaded
