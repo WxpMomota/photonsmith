@@ -36,6 +36,7 @@
 
 #include "../host/metal_poc_host_math.h"
 #include "../host/metal_poc_tuning.h"
+#include "../host/metal_poc_families.h"
 #include <map>
 
 #include <cmath>
@@ -617,9 +618,34 @@ static void testMetalTuning() {
     expectTrue("a threadgroup side is taken up to 1024 and ignored beyond it", wide.threadgroupWidth == 1024 && wide.threadgroupHeight == 0 && wide.problems.size() == 1);
 }
 
+static FamilySet familiesOf(std::initializer_list<uint32_t> types) { FamilySet s; for (uint32_t m : types) s.add(m); return s; }
+static void testFamilySet() {
+    expectTrue("a scene of common materials needs no rare family", familiesOf({METAL_MAT_LAMBERTIAN, METAL_MAT_MIRROR, METAL_MAT_DIELECTRIC, METAL_MAT_ROUGH_CONDUCTOR, METAL_MAT_ROUGH_DIELECTRIC,
+        METAL_MAT_THIN_DIELECTRIC, METAL_MAT_IMAGE_LAMBERTIAN, METAL_MAT_TEXTURE_FAMILY, METAL_MAT_MEDIUM_HOMOGENEOUS, METAL_MAT_MEDIUM_HETEROGENEOUS, METAL_MAT_MEDIUM_RGB_GRID,
+        METAL_MAT_PATTERNED_EMISSIVE, METAL_MAT_IMAGE_EMISSIVE, METAL_MAT_DISPERSIVE_DIELECTRIC, METAL_MAT_DISPERSIVE_ROUGH_DIELECTRIC}).isNone());
+    for (uint32_t m : {METAL_MAT_COATED_DIFFUSE, METAL_MAT_COATED_CONDUCTOR, METAL_MAT_IMAGE_CLEARCOAT, METAL_MAT_NORMALIZED_FRESNEL}) {
+        const FamilySet s = familiesOf({m});
+        expectTrue("a layered material needs the layered family and nothing else", s.layered && !s.measured && !s.subsurface && !s.hair && !s.extras);
+    }
+    for (uint32_t m : {METAL_MAT_PRINCIPLED, METAL_MAT_OREN_NAYAR, METAL_MAT_VELVET, METAL_MAT_DIFFUSE_TRANSMISSION, METAL_MAT_CLEARCOAT}) {
+        const FamilySet s = familiesOf({m});
+        expectTrue("an extra material needs the extras family and nothing else", s.extras && !s.layered && !s.measured && !s.subsurface && !s.hair);
+    }
+    expectTrue("measured, subsurface and hair each have their own", familiesOf({METAL_MAT_MEASURED}).measured && familiesOf({METAL_MAT_SUBSURFACE}).subsurface && familiesOf({METAL_MAT_HAIR}).hair);
+    expectTrue("a Mix material takes everything (its two materials are stored apart)", familiesOf({METAL_MAT_MIX}).isAll());
+    expectTrue("sets add up", familiesOf({METAL_MAT_HAIR, METAL_MAT_MEASURED}) == [] { FamilySet s; s.hair = s.measured = true; return s; }());
+    struct M { uint32_t materialType; };
+    std::vector<M> mats(2);
+    mats[0].materialType = METAL_MAT_LAMBERTIAN; mats[1].materialType = METAL_MAT_HAIR;
+    FamilySet fromVector; fromVector.addAll(mats);
+    expectTrue("addAll reads a vector of materials", fromVector.hair && !fromVector.layered);
+    expectTrue("METAL_FULL_KERNEL is read", tuningFrom({{"METAL_FULL_KERNEL", "1"}}).fullKernel && !tuningFrom({}).fullKernel);
+}
+
 int main() {
     testParsePostEffects();
     testMetalTuning();
+    testFamilySet();
     testLinearToSRGB();
     testChromaticAberrationZeroShiftAtCentre();
     testToneMapModesDiverge();

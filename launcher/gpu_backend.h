@@ -31,7 +31,7 @@ inline bool available() {
 	MetalDiagnostics d{};
 	return metal_get_diagnostics(&d);
 }
-inline bool prepare() { return metal_prepare_renderer(); }   // build and cache the GPU renderer (see metal_interface.h): `--prepare-gpu`
+inline bool prepare() { return metal_prepare_renderer_for_renders(); }   // build and cache the GPU renderer (see metal_interface.h): `--prepare-gpu`
 inline int render(int width, int height, int samples, int maxDepth, const char* outputPath, const char* sceneId, double camX, double camY, double camZ,
                   int forceCameraOverride, const RenderOptions& options) {
 	return metal_render_main(width, height, samples, maxDepth, outputPath, sceneId, camX, camY, camZ, forceCameraOverride, options);

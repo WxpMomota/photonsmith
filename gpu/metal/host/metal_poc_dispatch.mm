@@ -28,6 +28,7 @@
 #include "../metal_interface.h"   // metal_prepare_renderer()
 #include "../shaders/metal_poc_shader_files.h"
 #include "metal_poc_tuning.h"   // the environment switches, parsed once
+#include "metal_poc_families.h"   // which rarely used material families a pipeline is built with
 // PixelFilterDispatch/FilterSampler<float,32> - see Uniforms::filterKind's
 // own comment (metal_poc_gpu_types.h) for why this table is built here,
 // host-side, from the SAME shared headers CPU/OptiX already use.
@@ -200,8 +201,14 @@ struct KernelFunctions {
 // whole path tracer (every material and medium in one kernel) into machine code for this GPU, about 90 seconds on an M2, and Metal keeps the result in a cache for this app, so
 // every later run takes no time at all. A render and metal_prepare_renderer() both come through here, so they share that cache. A message says so after three seconds, because
 // nothing else on screen does.
-static id<MTLComputePipelineState> createKernelPipeline(id<MTLDevice> dev, id<MTLLibrary> library, bool anyHitVariant, KernelFunctions& f, NSError** error) {
-    f.kernel = [library newFunctionWithName:@"primaryRayKernel"];
+static id<MTLComputePipelineState> createKernelPipeline(id<MTLDevice> dev, id<MTLLibrary> library, bool anyHitVariant, const FamilySet& families, KernelFunctions& f, NSError** error) {
+    // The material families this pipeline contains (function constants 0 to 4 of primaryRayKernel): one pipeline, and one entry in Metal's cache, for each distinct set.
+    MTLFunctionConstantValues* constants = [MTLFunctionConstantValues new];
+    const bool familyValues[5] = {families.layered, families.measured, families.subsurface, families.hair, families.extras};
+    for (int i = 0; i < 5; ++i) [constants setConstantValue:&familyValues[i] type:MTLDataTypeBool atIndex:(NSUInteger)i];
+    NSError* functionError = nil;
+    f.kernel = [library newFunctionWithName:@"primaryRayKernel" constantValues:constants error:&functionError];
+    if (!f.kernel && functionError) fprintf(stderr, "Shader function primaryRayKernel could not be specialized: %s\n", functionError.localizedDescription.UTF8String);
     f.sphere = [library newFunctionWithName:@"sphereIntersectionFunction"];
     f.disk = [library newFunctionWithName:@"diskIntersectionFunction"];
     f.cylinder = [library newFunctionWithName:@"cylinderIntersectionFunction"];
@@ -249,7 +256,11 @@ bool MetalPocApp::dsBuildPipeline(DispatchState& s) {
     auto& error = s.error;
     auto& library = s.library;
     KernelFunctions fns;
-    id<MTLComputePipelineState> pipeline = createKernelPipeline(device, library, havePbrtTriangleAnyHit, fns, &error);
+    // The families this scene needs. A Live Preview session can change any material later, so it gets all of them; METAL_FULL_KERNEL forces that for a render too.
+    FamilySet families = FamilySet::none();
+    if (liveSession || MetalTuning::fromEnvironment().fullKernel) families = FamilySet::all();
+    else { families.addAll(materials); families.addAll(sphereMaterials); families.addAll(diskMaterials); families.addAll(cylinderMaterials); families.addAll(suzanneMaterials); }
+    id<MTLComputePipelineState> pipeline = createKernelPipeline(device, library, havePbrtTriangleAnyHit, families, fns, &error);
     if (!pipeline) {
         if (fns.kernel) fprintf(stderr, "Pipeline creation failed: %s\n", error.localizedDescription.UTF8String);
         return false;
@@ -1292,28 +1303,44 @@ bool MetalPocApp::compileShaderAndDispatch(int argc, const char** argv) {
 // Builds the shader library and the compute pipeline for both variants (a scene with an any-hit triangle test, one without) and throws them away: the point is Metal's cache, which
 // the next real render then hits. Called in the background at the GUI's start (the library has the same entry for Live Preview, which runs in the GUI's own process, where the cache
 // is its own) and by `ray_tracer --prepare-gpu` (the renders the GUI starts run in that program). False when the GPU or a compile fails.
+// Builds both variants of the pipeline for one family set, side by side; false when the GPU or a compile fails.
+static bool prepareFamilySet(id<MTLDevice> dev, const FamilySet& families) {
+    auto build = [dev, &families](bool anyHit) -> bool {
+        @autoreleasepool {
+            id<MTLLibrary> library = compileShaderLibrary(dev, anyHit);
+            if (!library) return false;
+            KernelFunctions fns;
+            NSError* error = nil;
+            if (!createKernelPipeline(dev, library, anyHit, families, fns, &error)) {
+                if (error) fprintf(stderr, "Pipeline creation failed: %s\n", error.localizedDescription.UTF8String);
+                return false;
+            }
+            return true;
+        }
+    };
+    bool anyHitOk = false;
+    std::thread anyHitThread([&] { anyHitOk = build(true); });
+    const bool defaultOk = build(false);
+    anyHitThread.join();
+    return defaultOk && anyHitOk;
+}
+
 bool metal_prepare_renderer() {
     @autoreleasepool {
         id<MTLDevice> dev = MTLCreateSystemDefaultDevice();
         if (!dev) return false;
-        // Both variants at once (see createKernelPipeline): the wait is the longer of the two, not their sum.
-        auto build = [dev](bool anyHit) -> bool {
-            @autoreleasepool {
-                id<MTLLibrary> library = compileShaderLibrary(dev, anyHit);
-                if (!library) return false;
-                KernelFunctions fns;
-                NSError* error = nil;
-                if (!createKernelPipeline(dev, library, anyHit, fns, &error)) {
-                    if (error) fprintf(stderr, "Pipeline creation failed: %s\n", error.localizedDescription.UTF8String);
-                    return false;
-                }
-                return true;
-            }
-        };
-        bool anyHitOk = false;
-        std::thread anyHitThread([&] { anyHitOk = build(true); });
-        const bool defaultOk = build(false);
-        anyHitThread.join();
-        return defaultOk && anyHitOk;
+        return prepareFamilySet(dev, FamilySet::all());   // what Live Preview builds
+    }
+}
+
+// What the renders the GUI starts build: first the pipeline for a scene that uses none of the rarely used material families (about a sixth of the full compile, so the first render of an
+// ordinary scene is ready in well under half a minute), then the full one (any scene that uses a rare family, and Live Preview, which runs in another process but finds its own cache).
+bool metal_prepare_renderer_for_renders() {
+    @autoreleasepool {
+        id<MTLDevice> dev = MTLCreateSystemDefaultDevice();
+        if (!dev) return false;
+        const bool lite = prepareFamilySet(dev, FamilySet::none());
+        const bool full = prepareFamilySet(dev, FamilySet::all());
+        return lite && full;
     }
 }

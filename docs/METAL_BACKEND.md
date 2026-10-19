@@ -168,12 +168,14 @@ of 12 rarely used families made `false &&` in `scatterAtSurface` (so the compile
 group at a time: the four layered ones (coated diffuse, coated conductor, image clearcoat, normalized Fresnel) 69.7 s; measured, subsurface and hair 88.8 s; principled, Oren-Nayar, velvet, diffuse transmission and
 clearcoat 85.0 s. The savings overlap (they do not add up), so no single family is to blame: the cost is the whole megakernel with everything inlined into it.
 
-That makes specialization by function constants a real option, not a guess: a scene that uses only diffuse, conductor and glass would compile in about 20 s instead of 127 s, and the kernel would probably run
-a little faster (fewer registers). What it would cost, so that it is decided with eyes open: (1) every distinct set of families is its own pipeline and its own cache entry, so someone who opens many different
-scenes compiles more in total than with one full build; (2) Live Preview and the Scene Builder can change a material to a family the pipeline was built without, which needs a rebuild (up to 2 minutes of
-waiting) or a fallback to the full kernel built in the background; (3) the scene's family set must be computed before the pipeline is made (the loader already knows it) and the same set used by the
-warm-up. A cheaper variant of the same idea: build the "common" specialization first (about 20 s) so the first render can start, and the full one in the background as now; a scene that needs a rare family waits
-for the full build, everything else does not. Not done: it changes `createKernelPipeline()`, the warm-up and Live Preview, and wants a decision on (2).
+**What was done with that (2026-10-19): the pipeline is built for the families the scene uses.** `primaryRayKernel` has five function constants (`kFcLayered`, `kFcMeasured`, `kFcSubsurface`, `kFcHair`, `kFcExtras`,
+`metal_poc_kernel_bounce.metal`; a constant the host does not set counts as true, so the shader unit tests and the offline compile see the full kernel). `dsBuildPipeline()` collects the families from the scene's
+material arrays (`FamilySet`, `host/metal_poc_families.h`: a Mix material, which hides the two it mixes, takes everything) and `createKernelPipeline()` builds the kernel with exactly those; Metal caches
+each distinct set separately. A scene of ordinary materials (diffuse, conductors, glass, textures, media, lights) compiles in about 16 s the first time instead of about 127 s; a scene with hair, say, builds
+only the hair family on top. `ray_tracer --prepare-gpu` (what the GUI's warm-up runs for renders) builds that small renderer first for both variants, then the full one, so the first render of an ordinary
+scene is ready in well under half a minute. **Live Preview always builds the full kernel** (`liveSession`, and `metal_prepare_renderer()` for its warm-up): a material can be changed to any family while it
+runs, and rebuilding the pipeline mid-session would be a pause of up to two minutes. `METAL_FULL_KERNEL=1` forces the full kernel for a render (to compare a picture with and without the specialization).
+The cost, as expected: someone who opens many different scenes compiles one pipeline per distinct set of families they meet (each at most as long as the full one, and cached from then on).
 
 ## Environment switches
 
@@ -185,6 +187,7 @@ The production switches below are parsed once, in `gpu/metal/host/metal_poc_tuni
 | `METAL_REGEN=0\|1` | force path regeneration off/on (the host picks per scene: on below ~1500 triangles) |
 | `METAL_CENSUS=1` | print per-scene lane utilisation and distinct materials per group-bounce |
 | `METAL_TG_W`, `METAL_TG_H`, `METAL_TG_PRINT` | threadgroup shape override / print |
+| `METAL_FULL_KERNEL=1` | build the pipeline with every material family, not only the ones the scene uses (to compare a picture with and without the specialization; the first run of a scene then compiles for about two minutes) |
 | `METAL_PARITY_*` | the sweep: `STRICT`, `ALL`, `MODELS`, `ONLY_SCENE_ID`, `SEED`, `SPP`, `DEPTH`, `ADAPTIVE`, `GOLDEN`, `DUMP`, `KEEP`, `TIMING`, `WORKERS`, `SHARD` (see the parity doc) |
 | `RT_METAL_POST_EFFECTS=list` | the PNG's optional finishing effects, from `vignette,aberration,denoise` (or `all` / `none`). Unset = just `denoise` (a bilateral blur that hides some noise: the Mac has no AI denoiser). The vignette (corners 18% darker) and the red/blue colour shift used to be applied to every Metal PNG although the CPU and OptiX renderers add neither, so the same scene looked different on a Mac; they are opt-in now. `.exr` output never gets any of them |
 | `RAY_TRACER_USER_ASSETS` | the per-user folder the loader also searches for downloaded scene files |

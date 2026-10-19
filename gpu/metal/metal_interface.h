@@ -55,6 +55,11 @@ bool metal_get_diagnostics(MetalDiagnostics* out);
 // seconds if it is slow. False when there is no GPU or a compile fails. launcher/main.cpp runs it for `--prepare-gpu`; realtime_renderer_mac.cpp's realtime_warm_up() calls it.
 bool metal_prepare_renderer();
 
+// The same for the renders a program starts (`ray_tracer --prepare-gpu`): first the small renderer for a scene with none of the rarely used material families (about a sixth of the compile
+// time), then the full one. A render builds its pipeline for the families its own scene uses, so an ordinary scene finds the small one in Metal's cache. Live Preview uses the full one
+// (metal_prepare_renderer() above), because a material can be changed to any family while it runs.
+bool metal_prepare_renderer_for_renders();
+
 // scene_id must resolve to a pbrt-file-backed scene (cpu_scene_pbrt_path_
 // by_id() returns non-empty) - this backend's own scene loader
 // (loadPbrtScene(), metal_poc.mm) doesn't yet reproduce this project's
