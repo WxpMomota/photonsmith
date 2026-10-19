@@ -12,7 +12,7 @@
 
 // "The same material" for the probe walk: pbrt compares the material objects; here, the parameters that define it.
 inline bool sameSubsurfaceMaterial(TriangleMaterial a, TriangleMaterial b) {
-    return b.materialType == METAL_MAT_SUBSURFACE && a.conductorEta.x == b.conductorEta.x &&
+    return b.materialType == METAL_MAT_SUBSURFACE && matSubsurfaceTableOffset(a) == matSubsurfaceTableOffset(b) &&
            a.ior == b.ior && all(float3(a.color) == float3(b.color)) && all(float3(a.transmitColor) == float3(b.transmitColor));
 }
 
@@ -25,7 +25,7 @@ inline bool subsurfaceProbeWalk(thread const KernelRes& R, thread PathState& P, 
     KERNEL_RES_ALIASES(R)
     constexpr int kMaxProbeSteps = 100;
     const TriangleMaterial surface = B.mat;
-    const BssrdfTableView tab = bssrdfTableAt(rgbGridData + int(surface.conductorEta.x));
+    const BssrdfTableView tab = bssrdfTableAt(rgbGridData + int(matSubsurfaceTableOffset(surface)));
     const float3 sigmaA = float3(surface.color), sigmaS = float3(surface.transmitColor);
     const float3 sigmaT = sigmaA + sigmaS;
     float3 rho = float3(0.0);
@@ -166,9 +166,9 @@ inline bool shadeSubsurface(thread const KernelRes& R, thread PathState& P, thre
     // The interface is a plain DielectricBxDF(eta): no absorption (the medium's is in the BSSRDF).
     TriangleMaterial entryMat = mat;
     entryMat.color = float3(0.0);
-    if (mat.conductorEta.y >= 1e-3) {   // a rough interface (pbrt's EffectivelySmooth: alpha below 1e-3)
+    if (matSubsurfaceEntryAlpha(mat) >= 1e-3) {   // a rough interface (pbrt's EffectivelySmooth: alpha below 1e-3)
         bool refracted = false;
-        if (!subsurfaceRoughEntry(mat.conductorEta.y, mat.ior, hitPoint, normal, facingNormal, frontFace, rayDir, rayOrigin, throughput, rngState, refracted)) return false;
+        if (!subsurfaceRoughEntry(matSubsurfaceEntryAlpha(mat), mat.ior, hitPoint, normal, facingNormal, frontFace, rayDir, rayOrigin, throughput, rngState, refracted)) return false;
         if (!refracted) { specularBounce = true; return true; }   // reflected off the interface: a bounce (no direct-light sample at the rough entry, as on the CPU)
     } else {
         if (!shadeDielectric(entryMat, hitPoint, normal, facingNormal, frontFace, result.distance, rayDir, rayOrigin, throughput, specularBounce, rngState)) return false;

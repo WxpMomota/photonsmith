@@ -252,12 +252,12 @@ inline void initPathState(thread const KernelRes& R, thread PathState& P, float 
     if (uniforms.cameraGlassPrim > 0) {
         const TriangleMaterial camGlass = sphereMaterials[uniforms.cameraGlassPrim - 1];
         inGlass = true;
-        glassSigmaT3 = float3(camGlass.conductorEta);
-        glassG = camGlass.conductorK.x;
+        glassSigmaT3 = matMediumSigmaT(camGlass);
+        glassG = matMediumG(camGlass);
         glassAlbedo = float3(camGlass.transmitColor);
         if (fogChan >= 0) {
             glassChan = fogChan;
-        } else if (camGlass.conductorK.z > 0.5) {
+        } else if (matMediumChromatic(camGlass)) {
             glassChan = min(int(randFloat(rngState) * 3.0), 2);
             throughput *= float3(glassChan == 0 ? 3.0 : 0.0, glassChan == 1 ? 3.0 : 0.0, glassChan == 2 ? 3.0 : 0.0);
             mediumChan = glassChan;

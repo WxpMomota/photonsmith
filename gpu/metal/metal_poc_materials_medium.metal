@@ -115,13 +115,13 @@ inline void shadeHomogeneousMediumSpan(
     // A chromatic medium (per-channel sigma_t in conductorEta, flag in conductorK.z): this path follows ONE colour channel (the same hero channel the camera fog and glass
     // interiors use, weight x3 on it), so free flight, the albedo and the shadow rays' transmittance all use that channel's own sigma_t. One scalar (the mean) for every
     // channel mis-weighted each channel's transmittance when absorption and scattering differ across colours.
-    const bool chromatic = mediumMat.conductorK.z > 0.5 && sigmaT > 0.0;
+    const bool chromatic = matMediumChromatic(mediumMat) && sigmaT > 0.0;
     if (chromatic) {
         if (mediumChan < 0) {
             mediumChan = min(int(randFloat(rngState) * 3.0), 2);
             throughput *= float3(mediumChan == 0 ? 3.0 : 0.0, mediumChan == 1 ? 3.0 : 0.0, mediumChan == 2 ? 3.0 : 0.0);
         }
-        sigmaT = float3(mediumMat.conductorEta)[mediumChan];
+        sigmaT = matMediumSigmaT(mediumMat)[mediumChan];
         shadowSpherePayload.shadowChannel = mediumChan;
         if (!(sigmaT > 1e-9)) {   // this channel sees no medium at all
             rayOrigin = rayOrigin + rayDir * exitT;
@@ -131,7 +131,7 @@ inline void shadeHomogeneousMediumSpan(
     }
     // A pure absorber (no scattering; sigma_t == 0 here and the per-channel absorption in conductorEta): colour-dependent
     // absorption cannot be expressed as one scalar free-flight distance, so apply exp(-sigma_a * chord) per channel instead.
-    const float3 absorbSigma = float3(mediumMat.conductorEta);
+    const float3 absorbSigma = matMediumSigmaT(mediumMat);
     if (sigmaT <= 0.0 && (absorbSigma.x + absorbSigma.y + absorbSigma.z) > 0.0) {
         throughput *= exp(-absorbSigma * (exitT - entryT));
         rayOrigin = rayOrigin + rayDir * exitT;
@@ -447,7 +447,7 @@ inline void shadeCloudMediumSphere(
     // gpu/optix/optix_intersection_sphere.h's own
     // MaterialType::CloudMedium closest-hit code - see
     // that block's own comment for the algorithm.
-    GpuCloudMedium cloud = cloudMediums[uint(mediumMat.conductorEta.x)];
+    GpuCloudMedium cloud = cloudMediums[matMediumBufferIndex(mediumMat)];
     float3 mo = worldToMediumPoint(cloud, rayOrigin);
     // Direction transforms by the matrix only (no
     // translation) - CloudMedium<T>::sample_ray()'s own
@@ -761,7 +761,7 @@ inline void shadeRgbGridMediumSphere(
     thread float3& throughput, thread float3& radiance,
     thread float& bsdfPdf, thread bool& specularBounce, thread uint& rngState,
     thread bool& scatteredInMedium, thread bool& passedThroughMediumSphere) {
-    GpuRgbGridMedium grid = rgbGridMediums[uint(mediumMat.conductorEta.x)];
+    GpuRgbGridMedium grid = rgbGridMediums[matMediumBufferIndex(mediumMat)];
     float3 mo = rgbGridWorldToMediumPoint(grid, rayOrigin);
     float3 md = float3(
         grid.worldToMediumMat[0]*rayDir.x + grid.worldToMediumMat[1]*rayDir.y + grid.worldToMediumMat[2]*rayDir.z,

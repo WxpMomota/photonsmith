@@ -42,7 +42,7 @@ inline bool scatterAtSurface(thread const KernelRes& R, thread PathState& P, thr
         // (`albedo`, computed above); the coat's IOR is `ior` and its alpha `conductorEta.x` (`roughness` is the picture's scale).
         TriangleMaterial coated = mat;
         coated.color = packed_float3(albedo);
-        coated.roughness = mat.conductorEta.x;
+        coated.roughness = matCoatAlpha(mat);
         if (!shadeCoatedDiffuse(coated, hitPoint, facingNormal, uniforms,
                           lights, pointLights, directionalLights, projectionLights, goniometricLights,
                           envMarginalCDF, envConditionalCDF, uniforms.envMapWidth, uniforms.envMapHeight,
@@ -146,7 +146,7 @@ inline void updateMediumStateAfterBounce(thread const KernelRes& R, thread PathS
         // the sphere iff its new direction points against the outward normal (true for refraction in,
         // reflection inside, and a thin dielectric passing straight through). `normal` is the sphere's
         // outward normal here.
-        if (isSphere && mat.conductorK.y > 0.5 &&
+        if (isSphere && matMediumInGlass(mat) &&
             (mat.materialType == METAL_MAT_DIELECTRIC || mat.materialType == METAL_MAT_ROUGH_DIELECTRIC || mat.materialType == METAL_MAT_THIN_DIELECTRIC)) {
             const bool wasInGlass = inGlass;
             inGlass = dot(rayDir, normal) < 0.0;
@@ -155,12 +155,12 @@ inline void updateMediumStateAfterBounce(thread const KernelRes& R, thread PathS
             if (backInCameraGlass) {
                 const TriangleMaterial camGlass = sphereMaterials[uniforms.cameraGlassPrim - 1];
                 inGlass = true;
-                glassSigmaT3 = float3(camGlass.conductorEta);
-                glassG = camGlass.conductorK.x;
+                glassSigmaT3 = matMediumSigmaT(camGlass);
+                glassG = matMediumG(camGlass);
                 glassAlbedo = float3(camGlass.transmitColor);
             } else if (inGlass) {
-                glassSigmaT3 = float3(mat.conductorEta);
-                glassG = mat.conductorK.x;
+                glassSigmaT3 = matMediumSigmaT(mat);
+                glassG = matMediumG(mat);
                 glassAlbedo = float3(mat.transmitColor);
                 // Entering from outside, or from the camera's world-haze shell into a nested sphere (a front-face hit on a sphere other than the shell).
                 const bool enteringNested = wasInGlass && uniforms.cameraGlassPrim > 0 && frontFace && primId != uint(uniforms.cameraGlassPrim - 1);
@@ -173,9 +173,9 @@ inline void updateMediumStateAfterBounce(thread const KernelRes& R, thread PathS
                         glassChan = fogChan;   // the camera medium already fixed this path's colour channel
                     } else if (enteringNested && glassChan >= 0) {
                         // the shell already fixed this path's hero channel; keep it
-                    } else if (mat.conductorK.z > 0.5 && mediumChan >= 0) {
+                    } else if (matMediumChromatic(mat) && mediumChan >= 0) {
                         glassChan = mediumChan;   // an earlier chromatic medium on this path already fixed the hero channel
-                    } else if (mat.conductorK.z > 0.5) {
+                    } else if (matMediumChromatic(mat)) {
                         glassChan = min(int(randFloat(rngState) * 3.0), 2);
                         mediumChan = glassChan;
                         float3 chanMask = float3(glassChan == 0 ? 3.0 : 0.0, glassChan == 1 ? 3.0 : 0.0, glassChan == 2 ? 3.0 : 0.0);

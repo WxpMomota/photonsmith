@@ -658,9 +658,9 @@ inline float principledCombinedPdf(float pDiff, float pSpec, float pCoat, float 
 inline bool shadePrincipled(TriangleMaterial mat, float3 hitPoint, float3 facingNormal,
                             thread float3& rayDir, thread float3& rayOrigin,
                             thread float3& throughput, thread bool& specularBounce, thread uint& rngState) {
-    float metallic = mat.conductorEta.x;
-    float clearcoat = mat.conductorEta.y;
-    float clearcoatRoughness = mat.conductorEta.z;
+    float metallic = matPrincipledMetallic(mat);
+    float clearcoat = matPrincipledClearcoat(mat);
+    float clearcoatRoughness = matPrincipledClearcoatRoughness(mat);
     // TrowbridgeReitz::RoughnessToAlpha(r) = sqrt(r) - the REAL pbrt-v4
     // formula, not materialType 4/9's own "square it in the shader"
     // convention (this is a brand-new shading function with no old
@@ -1111,7 +1111,7 @@ inline bool shadeMeasured(TriangleMaterial mat, float3 hitPoint, float3 facingNo
     // (area, punctual, environment) with MIS against that density, using the BxDF's own f() and pdf() - the same structure as the
     // OptiX backends (optix_device_helpers.h, MaterialType::Measured). A rejected sample (grazing wo, zero pdf, a reflection below the
     // horizon) still gets its direct-light samples, then ends the path.
-    const MeasuredTables tab = measuredReadTables(rgbGridData, int(mat.conductorEta.x));
+    const MeasuredTables tab = measuredReadTables(rgbGridData, matMeasuredTable(mat));
     float3 tangent, bitangent;
     buildAnisotropicOnb(facingNormal, tangent, bitangent);
     const float3 woWorld = -rayDir;
