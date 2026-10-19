@@ -35,6 +35,8 @@
 //     every rendered pixel's own final brightness.
 
 #include "metal_poc_host_math.h"
+#include "metal_poc_tuning.h"
+#include <map>
 
 #include <cmath>
 #include <cstdio>
@@ -587,8 +589,37 @@ static void testParsePostEffects() {
     expectTrue("an empty value means no effects", !empty.vignette && !empty.aberration && !empty.denoise);
 }
 
+
+// The environment switches (metal_poc_tuning.h): parsed from a table here, not the real environment. A value that is not a whole number in range used to be taken with atoi (METAL_TG_W=abc was
+// a threadgroup of width 0, which fails the dispatch); it is ignored with a message now.
+static MetalTuning tuningFrom(const std::map<std::string, std::string>& env) {
+    return MetalTuning::parse([&env](const char* name) -> const char* {
+        const auto it = env.find(name);
+        return it == env.end() ? nullptr : it->second.c_str();
+    });
+}
+static void testMetalTuning() {
+    const MetalTuning none = tuningFrom({});
+    expectTrue("no switch set: every default, nothing custom, nothing to say", !none.anyCustom() && none.problems.empty() && none.pathRegen == -1 && none.forcedBands == 0 && none.describe().empty());
+    const MetalTuning all = tuningFrom({{"METAL_CENSUS", "1"}, {"METAL_REGEN", "0"}, {"METAL_BANDS", "16"}, {"METAL_TG_W", "8"}, {"METAL_TG_H", "4"}, {"METAL_TG_PRINT", ""}});
+    expectTrue("every switch set: read as given", all.census && all.pathRegen == 0 && all.forcedBands == 16 && all.threadgroupWidth == 8 && all.threadgroupHeight == 4 && all.printThreadgroup && all.problems.empty());
+    expectTrue("and described", all.describe() == "METAL_CENSUS METAL_REGEN=0 METAL_BANDS=16 METAL_TG_W=8 METAL_TG_H=4 METAL_TG_PRINT");
+    expectTrue("METAL_REGEN=1 forces regeneration on", tuningFrom({{"METAL_REGEN", "1"}}).pathRegen == 1);
+    for (const char* bad : {"abc", "0", "-3", "", "4x", "99999999999999999999", "4097"}) {
+        const MetalTuning t = tuningFrom({{"METAL_BANDS", bad}});
+        expectTrue((std::string("METAL_BANDS=") + bad + " is ignored with one message").c_str(), t.forcedBands == 0 && t.problems.size() == 1 && !t.anyCustom());
+    }
+    for (const char* bad : {"abc", "2", "-1", "01", ""}) {   // (0 and 1 are the two valid values)
+        const MetalTuning t = tuningFrom({{"METAL_REGEN", bad}});
+        expectTrue((std::string("METAL_REGEN=") + bad + " is ignored with one message").c_str(), t.pathRegen == -1 && t.problems.size() == 1);
+    }
+    const MetalTuning wide = tuningFrom({{"METAL_TG_W", "1024"}, {"METAL_TG_H", "1025"}});
+    expectTrue("a threadgroup side is taken up to 1024 and ignored beyond it", wide.threadgroupWidth == 1024 && wide.threadgroupHeight == 0 && wide.problems.size() == 1);
+}
+
 int main() {
     testParsePostEffects();
+    testMetalTuning();
     testLinearToSRGB();
     testChromaticAberrationZeroShiftAtCentre();
     testToneMapModesDiverge();

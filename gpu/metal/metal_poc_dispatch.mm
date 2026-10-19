@@ -27,6 +27,7 @@
 #include "metal_poc_app.h"
 #include "metal_interface.h"   // metal_prepare_renderer()
 #include "metal_poc_shader_files.h"
+#include "metal_poc_tuning.h"   // the environment switches, parsed once
 // PixelFilterDispatch/FilterSampler<float,32> - see Uniforms::filterKind's
 // own comment (metal_poc_gpu_types.h) for why this table is built here,
 // host-side, from the SAME shared headers CPU/OptiX already use.
@@ -331,7 +332,7 @@ bool MetalPocApp::dsCreateRenderTargets(DispatchState& s) {
     texDesc.storageMode = MTLStorageModeShared;
     id<MTLTexture> outTexture = [device newTextureWithDescriptor:texDesc];
     // Divergence census (METAL_CENSUS=1): a per-pixel record of the materials sample 0 hit; a 1x1 dummy otherwise.
-    const bool censusOn = getenv("METAL_CENSUS") != nullptr;
+    const bool censusOn = MetalTuning::fromEnvironment().census;
     MTLTextureDescriptor* censusDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA32Uint
         width:(censusOn ? width : 1) height:(censusOn ? height : 1) mipmapped:NO];
     censusDesc.usage = MTLTextureUsageShaderWrite | MTLTextureUsageShaderRead;
@@ -916,7 +917,7 @@ bool MetalPocApp::dsFillUniforms(DispatchState& s, int argc, const char** argv) 
     // triangles). The picture is identical either way.
     const size_t sceneTriangles = verts.size() / 3;
     uniforms.pathRegen = (sceneTriangles < 1500) ? 1u : 0u;
-    if (const char* regenEnv = getenv("METAL_REGEN")) uniforms.pathRegen = atoi(regenEnv) ? 1u : 0u;   // tuning/diagnostics
+    if (MetalTuning::fromEnvironment().pathRegen >= 0) uniforms.pathRegen = (uint32_t)MetalTuning::fromEnvironment().pathRegen;   // tuning/diagnostics
 
     if (havePbrtCamera) {
         applyPbrtCameraUniforms(uniforms);
@@ -1119,10 +1120,9 @@ std::function<bool(const std::function<void(Uniforms&)>&)> MetalPocApp::dsMakeRe
     // calibration band, then bands sized to ~kTargetBandSeconds of GPU time from the measured rows/second - a few
     // percent overhead, and finer progress than before on long renders. METAL_BANDS=N forces N equal bands.
     constexpr double kTargetBandSeconds = 0.3;
-    const char* bandsEnv = getenv("METAL_BANDS");
-    const bool fixedBands = bandsEnv != nullptr;
+    const bool fixedBands = MetalTuning::fromEnvironment().forcedBands > 0;
     const uint32_t forcedBands =
-        fixedBands ? std::min<uint32_t>((uint32_t)std::max(1, atoi(bandsEnv)), std::max<uint32_t>(1, cropRows)) : 0;
+        fixedBands ? std::min<uint32_t>((uint32_t)MetalTuning::fromEnvironment().forcedBands, std::max<uint32_t>(1, cropRows)) : 0;
     uint32_t bandHeight = fixedBands ? (cropRows + forcedBands - 1) / forcedBands : std::max<uint32_t>(1, cropRows / 40);
     if (liveSession && !fixedBands && liveBandHint > bandHeight) bandHeight = std::min(liveBandHint, cropRows);
     Uniforms* uniformsShared = (Uniforms*)uniformBuffer.contents;
@@ -1199,9 +1199,17 @@ std::function<bool(const std::function<void(Uniforms&)>&)> MetalPocApp::dsMakeRe
         // unchanged (per-pixel RNG streams). METAL_TG_W/METAL_TG_H override it for tuning.
         NSUInteger w = 8;
         NSUInteger h = std::max<NSUInteger>(1, pipeline.threadExecutionWidth / w);
-        if (const char* tgw = getenv("METAL_TG_W")) w = (NSUInteger)atoi(tgw);
-        if (const char* tgh = getenv("METAL_TG_H")) h = (NSUInteger)atoi(tgh);
-        if (getenv("METAL_TG_PRINT")) fprintf(stderr, "[perf] execWidth=%lu maxThreads=%lu staticTG=%lu -> tg %lux%lu\n", (unsigned long)pipeline.threadExecutionWidth, (unsigned long)pipeline.maxTotalThreadsPerThreadgroup, (unsigned long)pipeline.staticThreadgroupMemoryLength, (unsigned long)w, (unsigned long)h);
+        const MetalTuning& tuning = MetalTuning::fromEnvironment();
+        if (tuning.threadgroupWidth > 0) w = (NSUInteger)tuning.threadgroupWidth;
+        if (tuning.threadgroupHeight > 0) h = (NSUInteger)tuning.threadgroupHeight;
+        if (w * h > pipeline.maxTotalThreadsPerThreadgroup) {   // (a shape the pipeline cannot run would fail the dispatch)
+            static bool said = false;   // (once, not once per band)
+            if (!said) fprintf(stderr, "Metal: a threadgroup of %lu x %lu is more than this pipeline's %lu threads; using the default shape\n", (unsigned long)w, (unsigned long)h, (unsigned long)pipeline.maxTotalThreadsPerThreadgroup);
+            said = true;
+            w = 8;
+            h = std::max<NSUInteger>(1, pipeline.threadExecutionWidth / w);
+        }
+        if (tuning.printThreadgroup) fprintf(stderr, "[perf] execWidth=%lu maxThreads=%lu staticTG=%lu -> tg %lux%lu\n", (unsigned long)pipeline.threadExecutionWidth, (unsigned long)pipeline.maxTotalThreadsPerThreadgroup, (unsigned long)pipeline.staticThreadgroupMemoryLength, (unsigned long)w, (unsigned long)h);
         MTLSize threadgroupSize = MTLSizeMake(w, h, 1);
         [enc dispatchThreads:gridSize threadsPerThreadgroup:threadgroupSize];
         [enc endEncoding];
