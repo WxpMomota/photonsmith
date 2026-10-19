@@ -66,11 +66,10 @@ bool SceneBuilderWidget::applyEnvironment(int lightIndex, const QString &stem) {
 		light.imageFile = QDir::toNativeSeparators(path).toStdString();
 		light.intensity = 1.0;
 		light.skySpin = 0.0;
-		// the picture has its own sun: the Sun light the generated sky made would light everything twice
-		const scene_doc::Light kept = light;
-		m_doc.lights.erase(std::remove_if(m_doc.lights.begin(), m_doc.lights.end(), [](const scene_doc::Light &l) { return l.kind == scene_doc::LightKind::Distant && l.name == "Sun"; }), m_doc.lights.end());
-		for (size_t i = 0; i < m_doc.lights.size(); ++i)
-			if (m_doc.lights[i].kind == scene_doc::LightKind::Infinite && m_doc.lights[i].imageFile == kept.imageFile) sky = static_cast<int>(i);
+		// the picture has its own sun: the Sun light the generated sky made would light everything twice. The sky light's place moves down by the Suns that were in front of it.
+		const auto isSun = [](const scene_doc::Light &l) { return l.kind == scene_doc::LightKind::Distant && l.name == "Sun"; };
+		sky -= static_cast<int>(std::count_if(m_doc.lights.begin(), m_doc.lights.begin() + sky, isSun));
+		m_doc.lights.erase(std::remove_if(m_doc.lights.begin(), m_doc.lights.end(), isSun), m_doc.lights.end());
 		m_sel = {SelKind::Light, sky};
 	});
 	rebuildList();

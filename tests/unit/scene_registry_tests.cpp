@@ -13,6 +13,8 @@
 
 #include <gtest/gtest.h>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <string>
 #include <map>
 #include <regex>
@@ -1135,4 +1137,22 @@ TEST(SceneHeaderTagsTest, ASceneCanSayItIsCpuOnly) {
 	if (!cone || !disk) GTEST_SKIP() << "pbrt_scenes/ was not discovered - run from the repository root";
 	EXPECT_FALSE(cone->gpu_compatible);
 	EXPECT_TRUE(disk->gpu_compatible);
+}
+
+// A scene that is downloaded on request (Benedikt Bitterli's) is found at the path its registry entry names, so the scene pack that fetches it must
+// write exactly that file: a pack whose member lands anywhere else downloads fine and the scene still says its files are missing.
+TEST(FindSceneTest, EveryDownloadableBitterliSceneHasAPackThatWritesItsFile) {
+	std::ifstream in("qt_gui/scene_packs.txt");
+	if (!in) GTEST_SKIP() << "qt_gui/scene_packs.txt is not next to the working directory";
+	const std::string catalogue((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+	int checked = 0;
+	for (const auto& entry : pbrt_scene_registry::paths()) {
+		const std::string generic = std::filesystem::path(entry.second).generic_string();
+		const std::size_t at = generic.find("bitterli/");
+		if (at == std::string::npos) continue;
+		++checked;
+		const std::string wanted = "member|pbrt_scenes/" + generic.substr(at) + "|";
+		EXPECT_NE(catalogue.find(wanted), std::string::npos) << entry.first << " reads " << generic << " but no pack in scene_packs.txt writes it";
+	}
+	EXPECT_EQ(checked, 17);
 }

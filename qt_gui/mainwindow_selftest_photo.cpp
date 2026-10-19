@@ -828,7 +828,6 @@ static void compositeTestDayCycle(const CompositeTestContext &c) {
 	}
 }
 
-// Export glTF: the starter scene as a .glb by the renderer: a file that starts with glTF's magic and says what it holds
 // The environment library: a photographic sky becomes the sky light's picture and the generated sky's Sun light goes; rendered, the scene is lit by it (the picture is kept next to the log for a look).
 static void compositeTestEnvironment(const CompositeTestContext &c) {
 	SceneBuilderWidget *sb = c.sb;
@@ -862,6 +861,7 @@ static void compositeTestEnvironment(const CompositeTestContext &c) {
 	check(finished && lit > picture.width() * picture.height() / 3, QString("the scene renders lit by it (%1 lit pixels)").arg(lit));
 }
 
+// Export glTF: the starter scene as a .glb by the renderer: a file that starts with glTF's magic and says what it holds
 static void compositeTestExportGltf(const CompositeTestContext &c) {
 	SceneBuilderWidget *sb = c.sb;
 	[[maybe_unused]] QWidget *window = c.window;
