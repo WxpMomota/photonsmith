@@ -27,7 +27,7 @@ def main():
         print("check_metal_shaders: xcrun has no Metal compiler on this machine, skipped:", (probe.stderr or "").strip()[:200])
         return 0
     header = open(os.path.join(args.shader_dir, "metal_poc_shader_files.h")).read()
-    files = re.findall(r'"(metal_poc_[a-z_0-9]+\.metal)"', header)   # the list the renderer concatenates, in its order
+    files = re.findall(r'"(metal_poc_[a-z_0-9]+\.(?:metal|h))"', header)   # the list the renderer concatenates, in its order
     if not files:
         print("check_metal_shaders: found no shader file names in metal_poc_shader_files.h")
         return 1
@@ -36,7 +36,7 @@ def main():
         print("check_metal_shaders: listed but missing:", ", ".join(missing))
         return 1
     # a shader file that is on disk but not in the list is never compiled (the app packaging copies metal_poc_*.metal, so it would ship unused)
-    on_disk = sorted(f for f in os.listdir(args.shader_dir) if re.fullmatch(r"metal_poc_[a-z_0-9]+\.metal", f))
+    on_disk = sorted(f for f in os.listdir(args.shader_dir) if re.fullmatch(r"metal_poc_[a-z_0-9]+\.metal", f) or f == "metal_poc_shared_types.h")
     unlisted = [f for f in on_disk if f not in files]
     if unlisted:
         print("check_metal_shaders: on disk but not in metal_poc_shader_files.h (never compiled):", ", ".join(unlisted))

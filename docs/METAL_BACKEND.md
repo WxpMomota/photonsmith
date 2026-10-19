@@ -26,7 +26,8 @@ around it. The shader source is **compiled at run time** from the `.metal` files
 | `metal_poc_dispatch.mm` | `compileShaderAndDispatch()`: eight named stages (library, pipeline, targets, textures, sampling tables, uniforms, resource check, per-frame dispatch) over a `DispatchState` |
 | `metal_poc_app.h`, `metal_poc_gpu_types.h`, `metal_poc_host_math.h`, `metal_poc_scene_helpers.h` | the host-side class, the host copies of the shader structs, math, scene-building helpers |
 | `metal_poc_material_ids.metal` | the `METAL_MAT_*` names of every `materialType` (included by host and shader) |
-| `metal_poc_types.metal` | the shader copies of the structs (`Uniforms`, `TriangleMaterial`, lights, media), intersection functions |
+| `metal_poc_shared_types.h` | the light, shape, lens and medium structs: one definition for host and shader |
+| `metal_poc_types.metal` | the shader copies of `Uniforms` and `TriangleMaterial`, intersection functions |
 | `metal_poc_sampling.metal` | camera and pixel-filter sampling, hemisphere sampling, shading normals, texture lookups, shadow-ray tracing (`traceShadowAny*`) |
 | `metal_poc_environment.metal`, `_procedural.metal`, `_bsdf_math.metal`, `_media_math.metal`, `_area_lights.metal` | environment/portal lights; checker, noise and marble; Fresnel, Beer-Lambert and GGX; Henyey-Greenstein, cloud and RGB-grid density; `sampleAreaLight()` and sphere-light cone sampling (all split out of `metal_poc_sampling.metal`) |
 | `metal_poc_bump.metal`, `metal_poc_layered_bxdf.metal` | image bump and normal maps; layered BxDF code |
@@ -91,7 +92,9 @@ textures selected by `conductorK.y`, and glass bounding a medium carries its sig
 
 ## The host/shader contracts
 
-Two copies of every shared struct exist, by hand: `metal_poc_gpu_types.h` (C++) and `metal_poc_types.metal` (MSL).
+The plain-data structs (the lights, spheres, disks, cylinders, instance transforms, lens elements, cloud and grid media) are written ONCE, in
+`metal_poc_shared_types.h`, which is valid C++ and Metal Shading Language and is the second file of the shader source (the host `#include`s it). A new field
+goes there, with its default. `Uniforms` and `TriangleMaterial` are still two hand-kept copies, `metal_poc_gpu_types.h` (C++) and `metal_poc_types.metal` (MSL).
 
 * **Add fields at the END** of `Uniforms` and of any other mirrored struct, on both sides, with a safe zero-initialised default. Zero-initialised `Uniforms`
   (the shader tests) must mean "feature off".

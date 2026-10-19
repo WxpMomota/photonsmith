@@ -204,7 +204,7 @@ done
 # so a future file added to that list doesn't also need a matching edit
 # here to actually ship.
 if [[ -f "$BUILD_DIR/CMakeCache.txt" ]] && grep -q "RT_BUILD_METAL:BOOL=ON" "$BUILD_DIR/CMakeCache.txt"; then
-	for shader in "$REPO_ROOT"/gpu/metal/metal_poc_*.metal; do
+	for shader in "$REPO_ROOT"/gpu/metal/metal_poc_*.metal "$REPO_ROOT"/gpu/metal/metal_poc_shared_types.h; do
 		[[ "$(basename "$shader")" == "metal_poc_test_kernels.metal" ]] && continue   # the shader unit tests' kernels: not part of what a user compiles
 		cp "$shader" "$APP_BUNDLE/Contents/MacOS/"
 	done

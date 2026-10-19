@@ -33,13 +33,9 @@
 
 using simd::float3;
 
-// A plain, tightly-packed 12-byte vertex type - MTLAccelerationStructure
-// TriangleGeometryDescriptor reads raw bytes at vertexStride, and simd's
-// own float3 is 16-byte-aligned/padded, not 12, so a hand-rolled struct
-// (no simd padding) is what actually matches a tight vertexStride.
-struct PackedFloat3 {
-    float x, y, z;
-};
+// PackedFloat3 (a tightly-packed 12-byte vector: simd's own float3 is 16-byte-aligned/padded, and MTLAccelerationStructureTriangleGeometryDescriptor reads raw bytes at vertexStride)
+// and the plain-data light/shape/medium structs the shader also reads are defined once, in the header shared with the shader source.
+#include "metal_poc_shared_types.h"
 
 // Mirrors metal_poc.metal's UV buffer element type - simd::float2 has no
 // padding-inside-a-struct issue the way float3 does (2 floats is already
@@ -48,54 +44,6 @@ struct PackedFloat3 {
 // with it" clarity PackedFloat3 gives the position/normal buffers.
 struct PackedFloat2 {
     float u, v;
-};
-
-// Mirrors metal_poc.metal's AreaLight byte-for-byte.
-struct AreaLightData {
-    PackedFloat3 center;
-    PackedFloat3 edgeU;
-    PackedFloat3 edgeV;
-    PackedFloat3 normal;
-    float area;
-    PackedFloat3 emission;
-    // Defaults keep every light before this one exactly flat (no
-    // pattern) - see metal_poc.metal's own AreaLight comment.
-    float patternTileB = 0.0f;
-    float patternScale = 0.0f;
-    // pbrt-v4's own "bool twosided" AreaLightSource parameter (section
-    // 104) - 0.0 (every light before this one) keeps the original
-    // one-sided-only behaviour exactly. See metal_poc.metal's own
-    // AreaLight::twoSided comment.
-    float twoSided = 0.0f;
-    // A pbrt-loaded scene's own image-based AreaLightSource (section
-    // 105) - 0.0 (every light before this one) keeps `emission` a flat
-    // direct radiance value. See metal_poc.metal's own
-    // AreaLight::useTexture comment.
-    float useTexture = 0.0f;
-    // Power-proportional light-picking data (Vose alias table, built
-    // host-side by buildPowerLightSampler() below, mirroring
-    // src/shared/power_light_sampler_scaffold.h's own PowerLightSampler)
-    // - see metal_poc.metal's AreaLight/sampleAreaLight() for how these
-    // three get used. Defaults reproduce exact uniform 1/N picking (every
-    // light before this one) if this ever got skipped: pmf = 0 would be
-    // wrong, so buildPowerLightSampler() always runs, never left at these
-    // raw defaults for an actual render.
-    float pmf = 0.0f;
-    float aliasProb = 1.0f;
-    uint32_t aliasIndex = 0;
-    // 0.0 = planar quad (every light before this one). 1.0 = a sphere
-    // light (B14, section 184) - see metal_poc.metal's own AreaLight::kind
-    // comment for the full field-reuse layout (edgeU.x = radius).
-    // 2 = disk, 3 = cylinder (lateral), 4 = triangle - see metal_poc_types.metal's AreaLight::kind.
-    float kind = 0.0f;
-    // A sphere light's own index into `spheres[]` (-1 for a quad light) -
-    // see metal_poc.metal's own AreaLight::spherePrimId comment.
-    int32_t spherePrimId = -1;
-    // The light's picture (an AreaLightSource "filename"): where it sits in the shared picture atlas, (scale u, scale v, offset u, offset v) - the picture's own (u, v) in [0, 1]
-    // is read at (offset + scale * (u, v)) - and, for a triangle light (kind 4), the texture coordinates of its three vertices (a point of the triangle takes the picture where
-    // the mesh's own uv put it). The defaults read a whole texture and a quad's own (u, v). See metal_poc_area_lights.metal, areaLightPicture().
-    float imageScaleU = 1.0f, imageScaleV = 1.0f, imageOffsetU = 0.0f, imageOffsetV = 0.0f;
-    float triU0 = 0.0f, triV0 = 0.0f, triU1 = 1.0f, triV1 = 0.0f, triU2 = 1.0f, triV2 = 1.0f;
 };
 
 // Power-proportional light picking - a direct port of the Vose alias-

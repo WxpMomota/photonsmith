@@ -104,70 +104,12 @@ inline void expectTrue(const char* label, bool condition) {
 // here, just no longer duplicated now that a real dependency on that
 // header exists anyway.
 
-// Mirrors metal_poc.metal's ProjectionLight byte-for-byte (see that
-// struct's own comment) - needed to build the constant-buffer argument
-// test_projectionLightRadiance expects.
-// Mirrors metal_poc_types.metal's GpuCloudMedium byte-for-byte - needed
-// to build the constant-buffer argument test_gpuCloudDensity expects.
-// Only `.density`/`.frequency` are actually read by gpuCloudDensity()
-// itself; every other field is zero-initialized and unused by this test.
-struct GpuCloudMediumGPU {
-    float boundsMin[3]{};
-    float boundsMax[3]{};
-    float worldToMediumMat[9]{};
-    float worldToMediumTranslate[3]{};
-    float sigmaA = 0.0f;
-    float sigmaS = 0.0f;
-    float density = 1.0f;
-    float wispiness = 0.0f;
-    float frequency = 1.0f;
-};
-
-struct ProjectionLightGPU {
-    PackedFloat3 position;
-    PackedFloat3 forward;
-    PackedFloat3 right;
-    PackedFloat3 up;
-    float tanHalfFovX;
-    float tanHalfFovY;
-    float scale;
-    uint32_t usePbrtTexture = 0;
-};
-
-// Mirrors metal_poc.metal's GoniometricLight byte-for-byte - needed to
-// build the constant-buffer argument test_goniometricLightRadiance
-// expects.
-struct GoniometricLightGPU {
-    PackedFloat3 position;
-    PackedFloat3 forward;
-    PackedFloat3 right;
-    PackedFloat3 up;
-    PackedFloat3 emission;
-    float scale;
-    uint32_t usePbrtTexture = 0;
-};
-
-// Mirrors metal_poc.metal's AreaLight byte-for-byte - needed to build the
-// light list test_sampleAreaLight_pmf dispatches against.
-struct AreaLightGPU {
-    PackedFloat3 center;
-    PackedFloat3 edgeU;
-    PackedFloat3 edgeV;
-    PackedFloat3 normal;
-    float area;
-    PackedFloat3 emission;
-    float patternTileB;
-    float patternScale;
-    float twoSided = 0.0f;
-    float useTexture = 0.0f;
-    float pmf;
-    float aliasProb;
-    uint32_t aliasIndex;
-    float kind = 0.0f;  // 0=quad, 1=sphere - see AreaLight::kind's own comment
-    int32_t spherePrimId = -1;
-    float imageScaleU = 1.0f, imageScaleV = 1.0f, imageOffsetU = 0.0f, imageOffsetV = 0.0f;   // the light's picture in the atlas (AreaLightData, metal_poc_host_math.h)
-    float triU0 = 0.0f, triV0 = 0.0f, triU1 = 1.0f, triV1 = 0.0f, triU2 = 1.0f, triV2 = 1.0f;
-};
+// The structs the tests hand to the shader are the production ones (metal_poc_shared_types.h, the same text the shader compiles): the tests used to keep a private copy of each
+// "byte-for-byte", and the copy of the light struct fell behind when fields were added. These names stay so the tests read as before.
+using GpuCloudMediumGPU = GpuCloudMedium;
+using ProjectionLightGPU = ProjectionLightData;
+using GoniometricLightGPU = GoniometricLightData;
+using AreaLightGPU = AreaLightData;
 
 // Mirrors metal_poc_test_kernels.metal's own DielectricTestInput/
 // DielectricTestOutput byte-for-byte - needed to build the buffers
