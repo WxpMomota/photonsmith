@@ -119,7 +119,7 @@ def installphoto_env(fake_home):
             "RT_GUI_SELFTEST_SETUP_FAIL": fail_path, **extra}
 
 
-def run_mode(exe, mode, wait_s, out, plugins, fake_home, gpu=False):
+def run_mode(exe, mode, wait_s, out, plugins, fake_home, gpu=False, retried=False):
     prefix = os.path.join(out, mode)
     for ext in (".txt", ".stdout"):
         if os.path.exists(prefix + ext):
@@ -153,6 +153,13 @@ def run_mode(exe, mode, wait_s, out, plugins, fake_home, gpu=False):
             proc.wait()
             print("FAIL [%s]: still running after %ds (hung)" % (mode, wait_s))
             return False
+    if rc == -11 and mode == "quitwarm" and IS_MAC and not retried:
+        # MallocScribble (set above) makes freed memory 0x55...: when macOS's own memory-pressure handler (libdispatch -> malloc_memory_event_handler -> malloc_zone_pressure_relief) walks
+        # the free lists at that moment, it crashes INSIDE libsystem_malloc on 0x5555555555555555, whatever the app does (seen 2026-10-18 on a 16 GB Mac with many pageouts, from a run
+        # of builds and shader compiles; the crash report's faulting thread was com.apple.libdispatch-manager). The bug this mode guards crashes on EVERY run under scribble (that is why
+        # it is set), so one crash is run again and only two in a row fail.
+        print("note [%s]: crashed once (SIGSEGV); running it again, a real quit crash would crash again" % mode)
+        return run_mode(exe, mode, wait_s, out, plugins, fake_home, gpu, retried=True)
     if rc != 0:
         print("FAIL [%s]: exit code %d" % (mode, rc))
         if os.path.exists(prefix + ".txt"):
