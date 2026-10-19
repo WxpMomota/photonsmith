@@ -3,6 +3,22 @@
 // the material's scattering, glass-medium bookkeeping, Russian roulette). Pure code motion out of the old kernel body; see
 // metal_poc_kernel_state.metal.
 
+// Which of the rarely used material families this pipeline contains. The compiler turns the whole path tracer into one kernel, and the twelve families below are most of what it costs:
+// the same kernel without them compiles in 17.6 s instead of 127 s (docs/METAL_BACKEND.md, "first run"). The host builds a pipeline for the families a scene actually has
+// (MTLFunctionConstantValues in createKernelPipeline, from the scene's materials); a family set to false is not compiled, so a hit on a material of that family would be shaded as a plain
+// Lambertian: the host must never leave out a family the scene uses. A function constant the host does not set (the shader unit tests, the offline compile) counts as true, i.e. the full kernel.
+constant bool kFcLayered [[function_constant(0)]];       // coated diffuse (19), coated conductor (20), image clearcoat (27), normalized Fresnel (18)
+constant bool kFcMeasured [[function_constant(1)]];      // measured BSDF (32)
+constant bool kFcSubsurface [[function_constant(2)]];    // subsurface (34)
+constant bool kFcHair [[function_constant(3)]];          // hair (31)
+constant bool kFcExtras [[function_constant(4)]];        // principled (24), Oren-Nayar (13), velvet (14), diffuse transmission (12), clearcoat (8)
+constant bool kHasLayered = is_function_constant_defined(kFcLayered) ? kFcLayered : true;
+constant bool kHasMeasured = is_function_constant_defined(kFcMeasured) ? kFcMeasured : true;
+constant bool kHasSubsurface = is_function_constant_defined(kFcSubsurface) ? kFcSubsurface : true;
+constant bool kHasHair = is_function_constant_defined(kFcHair) ? kFcHair : true;
+constant bool kHasExtras = is_function_constant_defined(kFcExtras) ? kFcExtras : true;
+constant bool kHasNormalizedFresnel = kHasLayered || kHasSubsurface;   // a subsurface material's exit lobe is a normalized Fresnel one
+
 // Scatters at the hit surface by its material (each shadeXxx() samples the next direction and adds the direct light). Returns false when the
 // path ends (an absorbing or terminal event).
 inline bool scatterAtSurface(thread const KernelRes& R, thread PathState& P, thread BounceState& B) {
@@ -37,7 +53,7 @@ inline bool scatterAtSurface(thread const KernelRes& R, thread PathState& P, thr
     } else if (mat.materialType == METAL_MAT_THIN_DIELECTRIC) {
         if (!shadeThinDielectric(mat, hitPoint, normal, facingNormal,
                                   rayDir, rayOrigin, throughput, specularBounce, rngState)) return false;
-    } else if (mat.materialType == METAL_MAT_IMAGE_CLEARCOAT) {
+    } else if (kHasLayered && mat.materialType == METAL_MAT_IMAGE_CLEARCOAT) {
         // materialType 27: a pbrt CoatedDiffuse whose reflectance is a picture: the layered coat of materialType 19 over a base whose colour is the sampled picture
         // (`albedo`, computed above); the coat's IOR is `ior` and its alpha `conductorEta.x` (`roughness` is the picture's scale).
         TriangleMaterial coated = mat;
@@ -50,7 +66,7 @@ inline bool scatterAtSurface(thread const KernelRes& R, thread PathState& P, thr
                           earthTexture, pbrtEnvTexture, goniometricTexture, pbrtGoniometricTexture, pbrtProjectionTexture, pbrtAreaLightTexture, textureSampler,
                           isect, accelStructure, functionTable,
                           rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState)) return false;
-    } else if (mat.materialType == METAL_MAT_CLEARCOAT) {
+    } else if (kHasExtras && mat.materialType == METAL_MAT_CLEARCOAT) {
         if (!shadeClearcoat(mat, albedo, hitPoint, facingNormal, uniforms,
                              lights, pointLights, directionalLights, projectionLights, goniometricLights,
                              envMarginalCDF, envConditionalCDF, uniforms.envMapWidth, uniforms.envMapHeight,
@@ -58,7 +74,7 @@ inline bool scatterAtSurface(thread const KernelRes& R, thread PathState& P, thr
                              earthTexture, pbrtEnvTexture, goniometricTexture, pbrtGoniometricTexture, pbrtProjectionTexture, pbrtAreaLightTexture, textureSampler,
                              isect, accelStructure, functionTable,
                              rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState)) return false;
-    } else if (mat.materialType == METAL_MAT_DIFFUSE_TRANSMISSION) {
+    } else if (kHasExtras && mat.materialType == METAL_MAT_DIFFUSE_TRANSMISSION) {
         if (!shadeDiffuseTransmission(mat, albedo, hitPoint, facingNormal, uniforms,
                                        lights, pointLights, directionalLights, projectionLights, goniometricLights,
                                        envMarginalCDF, envConditionalCDF, uniforms.envMapWidth, uniforms.envMapHeight,
@@ -66,7 +82,7 @@ inline bool scatterAtSurface(thread const KernelRes& R, thread PathState& P, thr
                                        earthTexture, pbrtEnvTexture, goniometricTexture, pbrtGoniometricTexture, pbrtProjectionTexture, pbrtAreaLightTexture, textureSampler,
                                        isect, accelStructure, functionTable,
                                        rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState)) return false;
-    } else if (mat.materialType == METAL_MAT_OREN_NAYAR) {
+    } else if (kHasExtras && mat.materialType == METAL_MAT_OREN_NAYAR) {
         if (!shadeOrenNayar(mat, albedo, hitPoint, facingNormal, uniforms,
                              lights, pointLights, directionalLights, projectionLights, goniometricLights,
                              envMarginalCDF, envConditionalCDF, uniforms.envMapWidth, uniforms.envMapHeight,
@@ -74,7 +90,7 @@ inline bool scatterAtSurface(thread const KernelRes& R, thread PathState& P, thr
                              earthTexture, pbrtEnvTexture, goniometricTexture, pbrtGoniometricTexture, pbrtProjectionTexture, pbrtAreaLightTexture, textureSampler,
                              isect, accelStructure, functionTable,
                              rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState)) return false;
-    } else if (mat.materialType == METAL_MAT_VELVET) {
+    } else if (kHasExtras && mat.materialType == METAL_MAT_VELVET) {
         if (!shadeVelvet(mat, albedo, hitPoint, facingNormal, uniforms,
                           lights, pointLights, directionalLights, projectionLights, goniometricLights,
                           envMarginalCDF, envConditionalCDF, uniforms.envMapWidth, uniforms.envMapHeight,
@@ -82,10 +98,10 @@ inline bool scatterAtSurface(thread const KernelRes& R, thread PathState& P, thr
                           earthTexture, pbrtEnvTexture, goniometricTexture, pbrtGoniometricTexture, pbrtProjectionTexture, pbrtAreaLightTexture, textureSampler,
                           isect, accelStructure, functionTable,
                           rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState)) return false;
-    } else if (mat.materialType == METAL_MAT_PRINCIPLED) {
+    } else if (kHasExtras && mat.materialType == METAL_MAT_PRINCIPLED) {
         if (!shadePrincipled(mat, hitPoint, facingNormal,
                           rayDir, rayOrigin, throughput, specularBounce, rngState)) return false;
-    } else if (mat.materialType == METAL_MAT_MEASURED) {
+    } else if (kHasMeasured && mat.materialType == METAL_MAT_MEASURED) {
         if (!shadeMeasured(mat, hitPoint, facingNormal, uniforms, rgbGridData,
                           lights, pointLights, directionalLights, projectionLights, goniometricLights,
                           envMarginalCDF, envConditionalCDF, uniforms.envMapWidth, uniforms.envMapHeight,
@@ -93,13 +109,13 @@ inline bool scatterAtSurface(thread const KernelRes& R, thread PathState& P, thr
                           earthTexture, pbrtEnvTexture, goniometricTexture, pbrtGoniometricTexture, pbrtProjectionTexture, pbrtAreaLightTexture, textureSampler,
                           isect, accelStructure, functionTable,
                           rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState)) return false;
-    } else if (mat.materialType == METAL_MAT_SUBSURFACE) {
+    } else if (kHasSubsurface && mat.materialType == METAL_MAT_SUBSURFACE) {
         if (!shadeSubsurface(R, P, B)) return false;
-    } else if (mat.materialType == METAL_MAT_HAIR) {
+    } else if (kHasHair && mat.materialType == METAL_MAT_HAIR) {
         pathTouchedHair = true;
         if (!shadeHair(mat, hitPoint, facingNormal,
                           rayDir, rayOrigin, throughput, specularBounce, rngState)) return false;
-    } else if (mat.materialType == METAL_MAT_NORMALIZED_FRESNEL) {
+    } else if (kHasNormalizedFresnel && mat.materialType == METAL_MAT_NORMALIZED_FRESNEL) {
         if (!shadeNormalizedFresnel(mat, hitPoint, facingNormal, uniforms,
                           lights, pointLights, directionalLights, projectionLights, goniometricLights,
                           envMarginalCDF, envConditionalCDF, uniforms.envMapWidth, uniforms.envMapHeight,
@@ -107,7 +123,7 @@ inline bool scatterAtSurface(thread const KernelRes& R, thread PathState& P, thr
                           earthTexture, pbrtEnvTexture, goniometricTexture, pbrtGoniometricTexture, pbrtProjectionTexture, pbrtAreaLightTexture, textureSampler,
                           isect, accelStructure, functionTable,
                           rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState)) return false;
-    } else if (mat.materialType == METAL_MAT_COATED_DIFFUSE) {
+    } else if (kHasLayered && mat.materialType == METAL_MAT_COATED_DIFFUSE) {
         if (!shadeCoatedDiffuse(mat, hitPoint, facingNormal, uniforms,
                           lights, pointLights, directionalLights, projectionLights, goniometricLights,
                           envMarginalCDF, envConditionalCDF, uniforms.envMapWidth, uniforms.envMapHeight,
@@ -115,7 +131,7 @@ inline bool scatterAtSurface(thread const KernelRes& R, thread PathState& P, thr
                           earthTexture, pbrtEnvTexture, goniometricTexture, pbrtGoniometricTexture, pbrtProjectionTexture, pbrtAreaLightTexture, textureSampler,
                           isect, accelStructure, functionTable,
                           rayDir, rayOrigin, throughput, radiance, bsdfPdf, specularBounce, rngState)) return false;
-    } else if (mat.materialType == METAL_MAT_COATED_CONDUCTOR) {
+    } else if (kHasLayered && mat.materialType == METAL_MAT_COATED_CONDUCTOR) {
         if (!shadeCoatedConductor(mat, hitPoint, facingNormal, uniforms,
                           lights, pointLights, directionalLights, projectionLights, goniometricLights,
                           envMarginalCDF, envConditionalCDF, uniforms.envMapWidth, uniforms.envMapHeight,
