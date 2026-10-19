@@ -465,6 +465,427 @@ void MainWindow::runCameraSelfTest(const std::function<void(const QString &)> &l
 	});
 }
 
+namespace {
+// What each part of the composite self-test needs: the Scene Builder, the window (the parent of dialogs and the owner of timers), the check that prints ok or FAIL and fails the run, and the log and
+// screenshot writers.
+struct CompositeTestContext {
+	SceneBuilderWidget *sb;
+	QWidget *window;
+	std::function<void(bool, const QString &)> check;
+	std::function<void(const QString &)> log, shot;
+};
+}  // namespace
+
+// the same, with the photo as the environment (the result is saved next to the log for a look at the reflections)
+static void compositeTestEnvironmentSample(const CompositeTestContext &c) {
+	SceneBuilderWidget *sb = c.sb;
+	[[maybe_unused]] QWidget *window = c.window;
+	const auto &check = c.check;
+	[[maybe_unused]] const auto &log = c.log;
+	[[maybe_unused]] const auto &shot = c.shot;
+	QStringList envNotes;
+	QString envError;
+	const bool envOk = sb->applyEnvironmentPhoto(&envError) && sb->renderIntoPhoto(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_sample_env.png", {0}, 0.0, 24, true, &envError, &envNotes);
+	check(envOk && envNotes.join(" ").contains("matched to the photo's sky"), "the beach sample with the photo as the environment was put into: " + envError + envNotes.join(" / ").right(120));
+}
+
+// a real photo, when one is given: the camera, the sky and the picture from it (the result is saved next to the log for a look)
+static void compositeTestRealPhoto(const CompositeTestContext &c) {
+	SceneBuilderWidget *sb = c.sb;
+	[[maybe_unused]] QWidget *window = c.window;
+	const auto &check = c.check;
+	[[maybe_unused]] const auto &log = c.log;
+	[[maybe_unused]] const auto &shot = c.shot;
+	const QString real = qEnvironmentVariable("RT_GUI_SELFTEST_COMPOSITE_PHOTO");
+	if (!real.isEmpty()) {
+		QString realError;
+		QStringList realNotes;
+		const bool madeReal = sb->applyCameraPhoto(real, 0.0, 1.6, false, 0.0, false, 0.0, true, &realError, &realNotes) && sb->renderIntoPhoto(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_real.png", {0}, 0.0, 48, true, &realError, &realNotes);
+		check(madeReal, "the real photo " + real + " was put into: " + realError);
+		for (const QString &n : realNotes) log("note: " + n);
+	}
+}
+
+// Match to a photo for the camera is one window with no Ok: a click on a sample applies it at once and the result is beside the settings; another click applies that one (taking the first back, so the
+// undo list grows by one apply, not two); one's own photo joins the row and applies too.
+static void compositeTestCameraWindow(const CompositeTestContext &c) {
+	SceneBuilderWidget *sb = c.sb;
+	[[maybe_unused]] QWidget *window = c.window;
+	const auto &check = c.check;
+	[[maybe_unused]] const auto &log = c.log;
+	[[maybe_unused]] const auto &shot = c.shot;
+	const QList<sample_photos::Sample> samples = sample_photos::all();
+	const QString out = qEnvironmentVariable("RT_GUI_SELFTEST_OUT");
+	QString seen;
+	int samplesListed = 0;
+	bool fillsScreen = false, hasApply = false, bigThumbnails = false;
+	std::size_t depthAtStart = sb->undoDepth(), depthAfterTwo = 0;
+	auto panelHas = [](QWidget *w, const QString &what) {
+		for (QLabel *label : w->findChildren<QLabel *>()) if (label->isVisible() && label->text().contains(what)) return true;
+		return false;
+	};
+	auto firstList = [](QWidget *w) { return w->findChildren<QListWidget *>().first(); };
+	QTimer::singleShot(900, [&]() {
+		if (QWidget *w = QApplication::activeModalWidget()) {
+			seen += panelHas(w, "Click a photo to use it") ? "hint " : "";
+			for (QPushButton *b : w->findChildren<QPushButton *>()) hasApply = hasApply || b->text() == "Apply";
+			if (auto *picker = w->findChild<sample_photos::Picker *>()) bigThumbnails = picker->thumbnailSizeForTest().width() >= 96;   // (the pictures grow with the window: at least 96 wide)
+			if (const QScreen *screen = QGuiApplication::primaryScreen()) fillsScreen = w->width() >= screen->availableGeometry().width() * 6 / 10 && w->height() >= screen->availableGeometry().height() * 85 / 100;   // (it opens tall: most of the screen's height)
+			samplesListed = firstList(w)->count();
+			w->grab().save(out + "_camera_settings.png");
+			firstList(w)->setCurrentRow(1);   // the second sample is clicked (a click makes it the current one, then says it was clicked)
+			emit firstList(w)->itemClicked(firstList(w)->item(1));
+		}
+	});
+	QTimer::singleShot(3500, [&]() {
+		if (QWidget *w = QApplication::activeModalWidget()) {
+			seen += panelHas(w, "north-sea.jpg") ? "north-sea " : "";
+			w->grab().save(out + "_camera_result.png");
+			firstList(w)->setCurrentRow(0);   // and then the first, as an arrow key would
+		}
+	});
+	QTimer::singleShot(6000, [&]() {
+		if (QWidget *w = QApplication::activeModalWidget()) {
+			seen += panelHas(w, "beach.jpg") ? "beach " : "";
+			depthAfterTwo = sb->undoDepth();
+			if (auto *picker = w->findChild<sample_photos::Picker *>()) picker->chooseOwnPhotoForTest(QDir::tempPath() + "/rt_selftest_composite.png");
+		}
+	});
+	QTimer::singleShot(8500, [&]() {
+		if (QWidget *w = QApplication::activeModalWidget()) {
+			seen += panelHas(w, "rt_selftest_composite.png") ? "own " : "";
+			for (QPushButton *b : w->findChildren<QPushButton *>())
+				if (b->text() == "Apply") { b->click(); break; }   // Apply applies and closes the window
+		}
+	});
+	auto stayedOpen = std::make_shared<bool>(false);
+	QTimer::singleShot(12000, [stayedOpen]() {
+		if (QWidget *w = QApplication::activeModalWidget()) { *stayedOpen = true; if (auto *d = qobject_cast<QDialog *>(w)) d->reject(); }   // (only if it did not close)
+	});
+	sb->cameraFromPhoto();
+	check(seen == "hint north-sea beach own " && samplesListed == static_cast<int>(samples.size()) && depthAfterTwo - depthAtStart <= 3 && fillsScreen && hasApply && bigThumbnails && !*stayedOpen,
+	      QString("Match to a photo for the camera is one window that applies on click (%1; %2 samples listed; two applies left %3 undo steps; fills the screen %4, has an Apply button %5, thumbnails %6)").arg(seen).arg(samplesListed).arg(depthAfterTwo - depthAtStart).arg(fillsScreen).arg(hasApply).arg(bigThumbnails));
+}
+
+// Live: with the tick on the picture in the photo follows the scene. Ticking it makes one (small, quick) picture; a change of the scene makes another when it has been still for a moment; and the
+// render that the change did not touch (the scene without the inserted objects) is not made again.
+static void compositeTestLive(const CompositeTestContext &c) {
+	SceneBuilderWidget *sb = c.sb;
+	[[maybe_unused]] QWidget *window = c.window;
+	const auto &check = c.check;
+	[[maybe_unused]] const auto &log = c.log;
+	[[maybe_unused]] const auto &shot = c.shot;
+	QString liveError;
+	sb->applyCameraPhoto(QDir::tempPath() + "/rt_selftest_composite.png", 65.0, 1.6, false, 0.0, false, 0.0, false, &liveError);
+	auto waitFor = [&](int refreshes) {
+		QElapsedTimer waited;
+		waited.start();
+		while (waited.elapsed() < 30000 && sb->liveRefreshesForTest() < refreshes) {
+			QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
+			QThread::msleep(20);
+		}
+		return sb->liveRefreshesForTest() >= refreshes;
+	};
+	const int before = sb->liveRefreshesForTest();
+	sb->setLiveForTest(true);
+	const bool first = waitFor(before + 1);
+	check(first && sb->previewHasPictureForTest() && sb->previewPictureSizeForTest().width() == 360, QString("ticking Live makes a small picture in the photo (%1 x %2)").arg(sb->previewPictureSizeForTest().width()).arg(sb->previewPictureSizeForTest().height()));
+	const int hitsBefore = sb->compositeCacheHitsForTest();
+	sb->selectObject(3);
+	sb->setPickedHeight(1.0);   // the scene changes: an inserted object
+	const bool second = waitFor(before + 2);
+	check(second && sb->compositeCacheHitsForTest() > hitsBefore, QString("a change of the scene makes another, and the render it did not touch was used again (%1 reuses)").arg(sb->compositeCacheHitsForTest() - hitsBefore));
+	// two quick changes are one refresh (and a render in progress is stopped for the newer scene)
+	const int refreshesBefore = sb->liveRefreshesForTest();
+	sb->setPickedHeight(1.2);
+	sb->setPickedHeight(1.4);
+	const bool third = waitFor(refreshesBefore + 1);
+	QElapsedTimer settle;
+	settle.start();
+	while (settle.elapsed() < 1500) { QCoreApplication::processEvents(QEventLoop::AllEvents, 100); QThread::msleep(20); }
+	check(third && sb->liveRefreshesForTest() == refreshesBefore + 1, QString("two quick changes are one refresh (%1 made)").arg(sb->liveRefreshesForTest() - refreshesBefore));
+	sb->setLiveForTest(false);
+	const int stopped = sb->liveRefreshesForTest();
+	sb->setPickedHeight(1.0);
+	QElapsedTimer quiet;
+	quiet.start();
+	while (quiet.elapsed() < 1500) { QCoreApplication::processEvents(QEventLoop::AllEvents, 100); QThread::msleep(20); }
+	check(sb->liveRefreshesForTest() == stopped && !sb->compositeRunningForTest(), "with the tick off nothing is made when the scene changes");
+}
+
+// What is in front of the objects: a mask on the photo (painted in its own window, kept in the scene) leaves the photo's own pixels there in a render into the photo, and nothing of the objects.
+static void compositeTestInFront(const CompositeTestContext &c) {
+	SceneBuilderWidget *sb = c.sb;
+	[[maybe_unused]] QWidget *window = c.window;
+	const auto &check = c.check;
+	[[maybe_unused]] const auto &log = c.log;
+	[[maybe_unused]] const auto &shot = c.shot;
+	const QString file = QDir::tempPath() + "/rt_selftest_composite.png";
+	QString err;
+	sb->newScene();
+	sb->applyCameraPhoto(file, 65.0, 1.6, false, 0.0, false, 0.0, false, &err);
+	const QImage photoImage(file);
+	QString renderError;
+	const QString plainPath = QDir::tempPath() + "/rt_selftest_front_plain.png", maskedPath = QDir::tempPath() + "/rt_selftest_front_masked.png";
+	const bool plainOk = sb->renderIntoPhoto(plainPath, {0}, 0.0, 8, false, &renderError);
+	QImage mask(photoImage.size(), QImage::Format_Grayscale8);
+	mask.fill(0);
+	for (int y = 0; y < mask.height(); ++y)
+		for (int x = mask.width() / 2; x < mask.width(); ++x) mask.scanLine(y)[x] = 255;   // the right half is in front
+	sb->setOccluderForTest(mask);
+	const bool maskedOk = sb->renderIntoPhoto(maskedPath, {0}, 0.0, 8, false, &renderError);
+	const QImage plain = QImage(plainPath).convertToFormat(QImage::Format_RGB32), masked = QImage(maskedPath).convertToFormat(QImage::Format_RGB32), original = photoImage.scaled(plain.size()).convertToFormat(QImage::Format_RGB32);
+	long inFrontDiffers = 0, plainObjectPixels = 0, leftSame = 0, leftPixels = 0;
+	for (int y = 0; y < masked.height() && plainOk && maskedOk; ++y)
+		for (int x = 0; x < masked.width(); ++x) {
+			const bool changedByObjects = qRed(plain.pixel(x, y)) != qRed(original.pixel(x, y)) || qGreen(plain.pixel(x, y)) != qGreen(original.pixel(x, y)) || qBlue(plain.pixel(x, y)) != qBlue(original.pixel(x, y));
+			if (x > masked.width() / 2 + 3) {
+				plainObjectPixels += changedByObjects ? 1 : 0;
+				inFrontDiffers += (changedByObjects && masked.pixel(x, y) != original.pixel(x, y)) ? 1 : 0;   // an object pixel in front of which something is: it must be the photo's own
+			} else if (x < masked.width() / 2 - 3 && !changedByObjects) {   // (the render's noise differs between two renders: where the objects did nothing the two must agree)
+				++leftPixels;
+				leftSame += masked.pixel(x, y) == plain.pixel(x, y) ? 1 : 0;
+			}
+		}
+	check(plainOk && maskedOk && sb->occluderPresentForTest(), "a render into the photo with and without what is in front " + renderError);
+	check(plainObjectPixels > 200 && inFrontDiffers == 0, QString("where the mask is, the photo's own pixels stay (%1 object pixels there without the mask, %2 still differ with it)").arg(plainObjectPixels).arg(inFrontDiffers));
+	check(leftPixels > 0 && leftSame * 100 > leftPixels * 97, QString("and where it is not, what the objects did not touch is as it was (%1 of %2 pixels the same)").arg(leftSame).arg(leftPixels));
+	// the painting window, with real mouse events: a stroke across the middle, then Ok
+	QTimer::singleShot(700, [&]() {
+		if (QWidget *w = QApplication::activeModalWidget()) {
+			if (QWidget *canvas = w->findChild<QWidget *>("occluderCanvas")) {
+				const QPoint a(canvas->width() / 2 - 30, canvas->height() / 2), b(canvas->width() / 2 + 30, canvas->height() / 2);
+				QMouseEvent press(QEvent::MouseButtonPress, QPointF(a), canvas->mapToGlobal(QPointF(a)), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+				QApplication::sendEvent(canvas, &press);
+				QMouseEvent move(QEvent::MouseMove, QPointF(b), canvas->mapToGlobal(QPointF(b)), Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+				QApplication::sendEvent(canvas, &move);
+				QMouseEvent release(QEvent::MouseButtonRelease, QPointF(b), canvas->mapToGlobal(QPointF(b)), Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+				QApplication::sendEvent(canvas, &release);
+				w->grab().save(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_occluder.png");
+			}
+			for (QPushButton *b : w->findChildren<QPushButton *>())
+				if (b->text().remove(QLatin1Char('&')) == "OK") { b->click(); break; }
+		}
+	});
+	sb->setOccluderForTest(QImage());   // (nothing in front: the window starts from an empty mask)
+	const bool noneBefore = !sb->occluderPresentForTest();
+	sb->paintOccluderDialog();
+	check(noneBefore && sb->occluderPresentForTest() && !sb->document().photo.occluder.empty(), "the painting window: a stroke with the mouse and Ok leaves a mask in the scene");
+	// it is kept with the scene, and one undo takes it away
+	const QString scenePath = QDir::tempPath() + "/rt_selftest_front_scene.pbrt";
+	QString openError;
+	const bool saved = sb->saveFile(scenePath);
+	sb->newScene();
+	const bool opened = sb->openFile(scenePath, &openError);
+	check(saved && opened && sb->occluderPresentForTest(), "what is in front is saved with the scene and comes back when it is opened " + openError);
+}
+
+// The photo as the environment: four colours in the four quarters of a photo, the scene's sky light given the photo, and the scene (no objects) rendered: the camera sees the four colours where the
+// photo had them (so the picture is the right way round and the right way up), and the light is a photo environment that Render into the photo can read its exposure off.
+static void compositeTestPhotoEnvironment(const CompositeTestContext &c) {
+	SceneBuilderWidget *sb = c.sb;
+	[[maybe_unused]] QWidget *window = c.window;
+	const auto &check = c.check;
+	[[maybe_unused]] const auto &log = c.log;
+	[[maybe_unused]] const auto &shot = c.shot;
+	QImage quarters(320, 240, QImage::Format_RGB32);
+	for (int y = 0; y < quarters.height(); ++y)
+		for (int x = 0; x < quarters.width(); ++x) quarters.setPixel(x, y, y < 120 ? (x < 160 ? qRgb(230, 30, 30) : qRgb(30, 200, 30)) : (x < 160 ? qRgb(30, 30, 230) : qRgb(230, 220, 30)));
+	const QString quartersFile = QDir::tempPath() + "/rt_selftest_quarters.png";
+	quarters.save(quartersFile);
+	QString err, envError;
+	sb->newScene();
+	const bool matched = sb->applyCameraPhoto(quartersFile, 65.0, 1.6, true, 0.0, true, 0.0, true, &err);
+	QStringList envNotes;
+	const auto distantBefore = std::count_if(sb->document().lights.begin(), sb->document().lights.end(), [](const scene_doc::Light &l) { return l.kind == scene_doc::LightKind::Distant; });
+	const bool made = matched && sb->applyEnvironmentPhoto(&envError, &envNotes);
+	const scene_doc::Document &doc = sb->document();
+	const scene_doc::Light *sky = nullptr;
+	for (const scene_doc::Light &l : doc.lights)
+		if (l.kind == scene_doc::LightKind::Infinite) sky = &l;
+	check(matched && made && sky && !sky->physicalSky && environment_from_photo::isEnvironmentFile(sky->imageFile) && QFileInfo(QString::fromStdString(sky->imageFile)).size() > 1000,
+	      "the photo is the sky light's picture: " + err + envError);
+	check(!envNotes.isEmpty() && std::count_if(doc.lights.begin(), doc.lights.end(), [](const scene_doc::Light &l) { return l.kind == scene_doc::LightKind::Distant; }) == distantBefore, "and the Sun light is as it was");
+	if (made && sky) {
+		scene_doc::Document bare = doc;
+		scene_doc::Object speck;   // (the renderer wants an object: a tiny one far below, which the camera does not see)
+		speck.radius = 0.05;
+		speck.position = {0.0, -500.0, 0.0};
+		bare.objects.assign(1, speck);
+		bare.render.width = 160;
+		bare.render.height = 120;
+		const QString scenePath = QDir::tempPath() + "/rt_selftest_env.pbrt", exrPath = QDir::tempPath() + "/rt_selftest_env.exr";
+		QFile::remove(exrPath);
+		QFile scene(scenePath);
+		const bool wrote = scene.open(QIODevice::WriteOnly) && scene.write(QByteArray::fromStdString(scene_doc::toPbrt(bare))) > 0;
+		scene.close();
+		QProcess renderer;
+		renderer.setProcessChannelMode(QProcess::MergedChannels);
+		renderer.setWorkingDirectory(QCoreApplication::applicationDirPath());
+		renderer.start(sb->launcherPathForTest(), {"--cpu", "--output", exrPath, "--height", "120", "160", "4", "2", scenePath});
+		const bool finished = wrote && renderer.waitForFinished(120000);
+		int rw = 0, rh = 0;
+		float *rgba = nullptr;
+		const char *loadError = nullptr;
+		const bool loaded = finished && renderer.exitCode() == 0 && LoadEXR(&rgba, &rw, &rh, QFile::encodeName(exrPath).constData(), &loadError) == TINYEXR_SUCCESS;
+		if (loadError) FreeEXRErrorMessage(loadError);
+		check(loaded && rw == 160 && rh == 120, "the scene with the photo environment renders " + QString::fromLocal8Bit(renderer.readAll()).right(120));
+		if (loaded && rw == 160 && rh == 120) {
+			auto at = [&](int x, int y, int c) { return rgba[4 * (y * rw + x) + c]; };
+			const int lx = 40, rx = 120, ty = 30, by = 90;   // the middle of each quarter of the picture
+			check(at(lx, ty, 0) > 2.0f * at(lx, ty, 1) && at(lx, ty, 0) > 2.0f * at(lx, ty, 2), "top left of the picture is the photo's red");
+			check(at(rx, ty, 1) > 2.0f * at(rx, ty, 0) && at(rx, ty, 1) > 2.0f * at(rx, ty, 2), "top right is its green");
+			check(at(lx, by, 2) > 2.0f * at(lx, by, 0) && at(lx, by, 2) > 2.0f * at(lx, by, 1), "bottom left is its blue");
+			check(at(rx, by, 0) > 2.0f * at(rx, by, 2) && at(rx, by, 1) > 2.0f * at(rx, by, 2), "bottom right is its yellow");
+			check(at(lx, ty, 0) > 0.01f && at(lx, ty, 0) < 50.0f, QString("and the brightness is that of a sky, not of a lamp (%1)").arg(at(lx, ty, 0)));
+		}
+		std::free(rgba);
+	}
+	// the exposure match reads the photo environment like a generated sky
+	sb->newScene();
+	QString matchError;
+	QStringList matchNotes;
+	const bool skyOnly = sb->applyCameraPhoto(QDir::tempPath() + "/rt_selftest_composite.png", 65.0, 1.6, false, 0.0, false, 0.0, true, &matchError) && sb->applyEnvironmentPhoto(&matchError);
+	QString renderError;
+	const bool rendered = skyOnly && sb->renderIntoPhoto(QDir::tempPath() + "/rt_selftest_env_match.png", {0}, 0.0, 8, true, &renderError, &matchNotes);
+	check(rendered && matchNotes.join(" ").contains("were matched to the photo's sky"), "Render into the photo matches the exposure off the photo environment: " + renderError + matchNotes.join(" / ").left(200));
+}
+
+// A day cycle: three frames of the starter scene under a Sun & sky whose sun goes from sunrise over noon to sunset; the middle frame is brighter than the first (the sun is higher), the first and the
+// last differ (it is on the other side), and the renderer puts them together as an MP4 (when ffmpeg is there).
+static void compositeTestDayCycle(const CompositeTestContext &c) {
+	SceneBuilderWidget *sb = c.sb;
+	[[maybe_unused]] QWidget *window = c.window;
+	const auto &check = c.check;
+	[[maybe_unused]] const auto &log = c.log;
+	[[maybe_unused]] const auto &shot = c.shot;
+	sb->newScene();
+	sb->runActionForTest("lighting sunny");
+	const QString mp4 = QDir::tempPath() + "/rt_selftest_daycycle.mp4";
+	QFile::remove(mp4);
+	std::vector<QImage> frames;
+	QString dayMessage;
+	const bool dayOk = sb->renderDayCycle(mp4, 3, 24, 160, 2, 60.0, &dayMessage, &frames);
+	const bool noFfmpeg = !dayOk && dayMessage.contains("ffmpeg");
+	check(frames.size() == 3 && (dayOk || noFfmpeg), "a day cycle renders its three frames and puts them together: " + dayMessage.left(160));
+	if (frames.size() == 3) {
+		auto mean = [](const QImage &img) {
+			const QImage rgb = img.convertToFormat(QImage::Format_RGB32);
+			double sum = 0.0;
+			for (int y = 0; y < rgb.height(); ++y)
+				for (int x = 0; x < rgb.width(); ++x) sum += qGray(rgb.pixel(x, y));
+			return sum / (static_cast<double>(rgb.width()) * rgb.height());
+		};
+		check(mean(frames[1]) > mean(frames[0]) * 1.15, QString("the sun is higher at noon, so the picture is brighter (%1 against %2 at sunrise)").arg(mean(frames[1]), 0, 'f', 1).arg(mean(frames[0]), 0, 'f', 1));
+		check(frames[0] != frames[2], "and sunrise and sunset are different pictures (the sun is on the other side)");
+	}
+	if (dayOk) check(QFileInfo(mp4).size() > 1000, "the video is a file");
+	// the same into the beach photo: every frame is the scene put into the photo, so the sky is the photo's in all of them and the shadows (and the lighting on the objects) change
+	QString photoError;
+	sb->newScene();
+	const bool matched = sb->applyCameraPhoto(sample_photos::all().first().resource, 0.0, 1.6, false, 0.0, false, 0.0, true, &photoError);
+	std::vector<QImage> photoFrames;
+	QString photoMessage;
+	const QString photoMp4 = QDir::tempPath() + "/rt_selftest_daycycle_photo.mp4";
+	QFile::remove(photoMp4);
+	const bool photoDay = matched && sb->renderDayCycle(photoMp4, 3, 24, 400, 4, 60.0, &photoMessage, &photoFrames, true);
+	const bool photoNoFfmpeg = matched && !photoDay && photoMessage.contains("ffmpeg");
+	check(matched && photoFrames.size() == 3 && (photoDay || photoNoFfmpeg), "a day cycle into the photo makes its three frames: " + photoError + photoMessage.left(160));
+	if (photoFrames.size() == 3) {
+		const QImage first = photoFrames[0].convertToFormat(QImage::Format_RGB32), last = photoFrames[2].convertToFormat(QImage::Format_RGB32);
+		const QImage original = QImage(sample_photos::all().first().resource).convertToFormat(QImage::Format_RGB32).scaled(first.size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+		int skyDiffers = 0, wholeDiffers = 0;
+		for (int y = 0; y < first.height(); ++y)
+			for (int x = 0; x < first.width(); ++x) {
+				if (first.pixel(x, y) != last.pixel(x, y)) ++wholeDiffers;
+				if (y < first.height() / 10 && (std::abs(qRed(first.pixel(x, y)) - qRed(original.pixel(x, y))) > 8 || std::abs(qGreen(first.pixel(x, y)) - qGreen(original.pixel(x, y))) > 8 || std::abs(qBlue(first.pixel(x, y)) - qBlue(original.pixel(x, y))) > 8)) ++skyDiffers;
+			}
+		check(first.width() == 400 && wholeDiffers > 200, QString("the frames differ as the sun moves (%1 pixels differ between sunrise and sunset)").arg(wholeDiffers));
+		check(skyDiffers < first.width() * first.height() / 10 / 20, QString("and the sky stays the photo's (%1 of the top tenth differs)").arg(skyDiffers));
+	}
+	// With the photo as the environment (the default of Camera from a photo) the Day cycle moves only the Sun; an edit made while it renders (with Live on, which used to cancel it) does not reach it
+	sb->newScene();
+	QString envError;
+	const bool envMatched = sb->applyCameraPhoto(sample_photos::all().first().resource, 0.0, 1.6, false, 0.0, false, 0.0, true, &envError) && sb->applyEnvironmentPhoto(&envError);
+	check(envMatched && sb->daySkyIndexForTest() >= 0, "a scene whose sky is the photo can have a day cycle: " + envError);
+	if (envMatched) {
+		std::vector<QImage> envFrames;
+		QString envMessage;
+		const QString envMp4 = QDir::tempPath() + "/rt_selftest_daycycle_env.mp4";
+		QFile::remove(envMp4);
+		sb->setLiveForTest(true);
+		QTimer::singleShot(1500, sb, [sb]() { sb->setPhotoExposureForTest(0.0); });   // (an edit in the middle of the video: documentChanged, which asks Live for a refresh)
+		const bool envDay = sb->renderDayCycle(envMp4, 3, 24, 400, 4, 60.0, &envMessage, &envFrames, true);
+		sb->setLiveForTest(false);
+		const bool envNoFfmpeg = !envDay && envMessage.contains("ffmpeg");
+		check(envFrames.size() == 3 && (envDay || envNoFfmpeg), "and an edit during it does not cancel it: " + envMessage.left(160));
+		if (envFrames.size() == 3) check(envFrames[0] != envFrames[2], "the Sun moved between sunrise and sunset");
+		// a failure leaves no frames behind: the video cannot be saved into a folder that is not there
+		QString failMessage;
+		const bool failed = !sb->renderDayCycle(QDir::tempPath() + "/rt_no_such_folder_for_the_selftest/x.mp4", 2, 24, 160, 2, 60.0, &failMessage, nullptr, false);
+		check(failed && !QDir(sb->workFolderForTest() + "/daycycle").exists(), "a day cycle that fails leaves its frames behind nowhere: " + failMessage.left(100));
+	}
+}
+
+// Export glTF: the starter scene as a .glb by the renderer: a file that starts with glTF's magic and says what it holds
+static void compositeTestExportGltf(const CompositeTestContext &c) {
+	SceneBuilderWidget *sb = c.sb;
+	[[maybe_unused]] QWidget *window = c.window;
+	const auto &check = c.check;
+	[[maybe_unused]] const auto &log = c.log;
+	[[maybe_unused]] const auto &shot = c.shot;
+	sb->newScene();
+	const QString glb = QDir::tempPath() + "/rt_selftest_export.glb";
+	QString exportMessage;
+	const bool exported = sb->exportGltf(glb, &exportMessage);
+	QFile file(glb);
+	const QByteArray head = file.open(QIODevice::ReadOnly) ? file.read(12) : QByteArray();
+	check(exported && QFileInfo(glb).size() > 2000 && head.left(4) == "glTF" && exportMessage.contains("triangles"), "the scene exports as a glTF file: " + exportMessage.left(160));
+}
+
+// The photo belongs to the scene: a scene matched to a photo, saved, then a new scene (no photo), then the saved one opened again has its photo, its overlay, its Render into the photo state and
+// the camera back; a photo that has gone is said so, not a crash; Remove the photo takes it out; and one undo of the match takes it away too.
+static void compositeTestSavedWithScene(const CompositeTestContext &c) {
+	SceneBuilderWidget *sb = c.sb;
+	[[maybe_unused]] QWidget *window = c.window;
+	const auto &check = c.check;
+	[[maybe_unused]] const auto &log = c.log;
+	[[maybe_unused]] const auto &shot = c.shot;
+	const QString file = QDir::tempPath() + "/rt_selftest_composite.png";
+	const QString scenePath = QDir::tempPath() + "/rt_selftest_photo_scene.pbrt";
+	QString err;
+	const bool matched = sb->applyCameraPhoto(file, 65.0, 1.6, false, 0.0, false, 0.0, false, &err);
+	sb->setPhotoExposureForTest(0.75);   // (what the Render into the photo dialog keeps in the document)
+	const double cameraY = sb->document().camera.position.y;
+	const bool kept = sb->document().photo.file == file.toStdString() && sb->cameraPhotoShownForTest();
+	check(matched && kept, "a scene matched to a photo keeps the photo's file in its document and shows it");
+	check(sb->saveFile(scenePath), "the scene is saved");
+	sb->newScene();
+	check(sb->document().photo.file.empty() && !sb->cameraPhotoShownForTest(), "a new scene has no photo and no overlay");
+	QString openError;
+	const bool opened = sb->openFile(scenePath, &openError);
+	check(opened && sb->document().photo.file == file.toStdString() && sb->cameraPhotoShownForTest() && std::fabs(sb->document().camera.position.y - cameraY) < 1e-9,
+	      "the saved scene opened again has its photo, the overlay and the camera back " + openError);
+	check(sb->document().photo.exposureStops == 0.75 && sb->document().photo.roles.size() == 1, "and what Render into the photo was told (the exposure, the roles) is back too");
+	// a photo that has gone: the scene opens, the overlay is not there, and the file name stays so the photo can be put back
+	QString movedAway = file + ".moved";
+	QFile::remove(movedAway);
+	QFile::rename(file, movedAway);
+	sb->newScene();
+	const bool openedWithoutPhoto = sb->openFile(scenePath, &openError);
+	check(openedWithoutPhoto && sb->document().photo.file == file.toStdString() && !sb->cameraPhotoShownForTest(), "a scene whose photo has gone still opens, without the overlay");
+	QFile::rename(movedAway, file);
+	// Remove the photo
+	sb->newScene();
+	sb->openFile(scenePath, &openError);
+	sb->removePhotoForTest();
+	check(sb->document().photo.file.empty() && !sb->cameraPhotoShownForTest(), "Remove the photo takes the photo out of the scene");
+	// one undo of the match takes the photo away with the camera
+	sb->newScene();
+	sb->applyCameraPhoto(file, 65.0, 1.6, false, 0.0, false, 0.0, false, &err);
+	check(sb->cameraPhotoShownForTest() && sb->undo() && sb->document().photo.file.empty() && !sb->cameraPhotoShownForTest(), "one undo of the match takes the photo away with the camera");
+}
+
 // RT_GUI_SELFTEST=composite RT_GUI_SELFTEST_OUT=<prefix>: the Scene Builder's "Render into the photo..." without its dialogs. Matches the starter scene's camera to a made-up photo (a pale sky over a flat
 // green ground, the camera 1.6 m up and tilted 6 degrees), renders the scene into it with the floor as the ground, and checks the picture that was saved: the photo's shape, the sky and the far
 // ground exactly the photo's, the objects put in (many pixels changed), the shadows (some ground pixels darker), and that a scene with only ground and lights, or no photo, fails with a message.
@@ -477,6 +898,7 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 		log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what));
 		ok = ok && cond;
 	};
+	const CompositeTestContext context{sb, this, check, log, shot};
 	if (sb) {
 		sb->setUseGpu(!qEnvironmentVariable("RT_GUI_SELFTEST_COMPOSITE_GPU").isEmpty());   // (the CPU, unless asked: a machine with an NVIDIA GPU can run the GPU path of it, denoiser included)
 		const QString out = QDir::tempPath() + "/rt_selftest_composite_out.png";
@@ -486,7 +908,7 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 		check(!noPhotoOk && !noPhotoError.isEmpty(), "with no photo it fails with a message: " + noPhotoError.left(100));
 
 		const int w = 640, h = 480;
-		const double focal = (w / 2.0) / std::tan(65.0 * camera_from_photo::kPi / 360.0), cx = w / 2.0, cy = h / 2.0;
+		const double focal = (w / 2.0) / std::tan(65.0 * camera_from_photo::kPi / 360.0), cy = h / 2.0;
 		const double t = 6.0 * camera_from_photo::kPi / 180.0;
 		QImage photo(w, h, QImage::Format_RGB32);
 		for (int y = 0; y < h; ++y)
@@ -704,359 +1126,15 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 		const bool beachOk = sb->applyCameraPhoto(samples[0].resource, 0.0, 1.6, false, 0.0, false, 0.0, true, &beachError) && sb->renderIntoPhoto(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_sample.png", {0}, 0.0, 24, true, &beachError, &beachNotes);
 		check(beachOk, "the beach sample was put into " + beachError);
 		check(beachNotes.join(" ").contains("matched to the photo's sky"), "and its sky gave the objects' exposure: " + beachNotes.join(" / ").right(160));
-		// the same, with the photo as the environment (the result is saved next to the log for a look at the reflections)
-		{
-			QStringList envNotes;
-			QString envError;
-			const bool envOk = sb->applyEnvironmentPhoto(&envError) && sb->renderIntoPhoto(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_sample_env.png", {0}, 0.0, 24, true, &envError, &envNotes);
-			check(envOk && envNotes.join(" ").contains("matched to the photo's sky"), "the beach sample with the photo as the environment was put into: " + envError + envNotes.join(" / ").right(120));
-		}
-		// a real photo, when one is given: the camera, the sky and the picture from it (the result is saved next to the log for a look)
-		const QString real = qEnvironmentVariable("RT_GUI_SELFTEST_COMPOSITE_PHOTO");
-		if (!real.isEmpty()) {
-			QString realError;
-			QStringList realNotes;
-			const bool madeReal = sb->applyCameraPhoto(real, 0.0, 1.6, false, 0.0, false, 0.0, true, &realError, &realNotes) && sb->renderIntoPhoto(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_real.png", {0}, 0.0, 48, true, &realError, &realNotes);
-			check(madeReal, "the real photo " + real + " was put into: " + realError);
-			for (const QString &n : realNotes) log("note: " + n);
-		}
-		// Match to a photo for the camera is one window with no Ok: a click on a sample applies it at once and the result is beside the settings; another click applies that one (taking the first back, so the
-		// undo list grows by one apply, not two); one's own photo joins the row and applies too.
-		{
-			const QString out = qEnvironmentVariable("RT_GUI_SELFTEST_OUT");
-			QString seen;
-			int samplesListed = 0;
-			bool fillsScreen = false, hasApply = false, bigThumbnails = false;
-			std::size_t depthAtStart = sb->undoDepth(), depthAfterTwo = 0;
-			auto panelHas = [](QWidget *w, const QString &what) {
-				for (QLabel *label : w->findChildren<QLabel *>()) if (label->isVisible() && label->text().contains(what)) return true;
-				return false;
-			};
-			auto firstList = [](QWidget *w) { return w->findChildren<QListWidget *>().first(); };
-			QTimer::singleShot(900, [&]() {
-				if (QWidget *w = QApplication::activeModalWidget()) {
-					seen += panelHas(w, "Click a photo to use it") ? "hint " : "";
-					for (QPushButton *b : w->findChildren<QPushButton *>()) hasApply = hasApply || b->text() == "Apply";
-					if (auto *picker = w->findChild<sample_photos::Picker *>()) bigThumbnails = picker->thumbnailSizeForTest().width() >= 96;   // (the pictures grow with the window: at least 96 wide)
-					if (const QScreen *screen = QGuiApplication::primaryScreen()) fillsScreen = w->width() >= screen->availableGeometry().width() * 6 / 10 && w->height() >= screen->availableGeometry().height() * 85 / 100;   // (it opens tall: most of the screen's height)
-					samplesListed = firstList(w)->count();
-					w->grab().save(out + "_camera_settings.png");
-					firstList(w)->setCurrentRow(1);   // the second sample is clicked (a click makes it the current one, then says it was clicked)
-					emit firstList(w)->itemClicked(firstList(w)->item(1));
-				}
-			});
-			QTimer::singleShot(3500, [&]() {
-				if (QWidget *w = QApplication::activeModalWidget()) {
-					seen += panelHas(w, "north-sea.jpg") ? "north-sea " : "";
-					w->grab().save(out + "_camera_result.png");
-					firstList(w)->setCurrentRow(0);   // and then the first, as an arrow key would
-				}
-			});
-			QTimer::singleShot(6000, [&]() {
-				if (QWidget *w = QApplication::activeModalWidget()) {
-					seen += panelHas(w, "beach.jpg") ? "beach " : "";
-					depthAfterTwo = sb->undoDepth();
-					if (auto *picker = w->findChild<sample_photos::Picker *>()) picker->chooseOwnPhotoForTest(QDir::tempPath() + "/rt_selftest_composite.png");
-				}
-			});
-			QTimer::singleShot(8500, [&]() {
-				if (QWidget *w = QApplication::activeModalWidget()) {
-					seen += panelHas(w, "rt_selftest_composite.png") ? "own " : "";
-					for (QPushButton *b : w->findChildren<QPushButton *>())
-						if (b->text() == "Apply") { b->click(); break; }   // Apply applies and closes the window
-				}
-			});
-			auto stayedOpen = std::make_shared<bool>(false);
-			QTimer::singleShot(12000, [stayedOpen]() {
-				if (QWidget *w = QApplication::activeModalWidget()) { *stayedOpen = true; if (auto *d = qobject_cast<QDialog *>(w)) d->reject(); }   // (only if it did not close)
-			});
-			sb->cameraFromPhoto();
-			check(seen == "hint north-sea beach own " && samplesListed == static_cast<int>(samples.size()) && depthAfterTwo - depthAtStart <= 3 && fillsScreen && hasApply && bigThumbnails && !*stayedOpen,
-			      QString("Match to a photo for the camera is one window that applies on click (%1; %2 samples listed; two applies left %3 undo steps; fills the screen %4, has an Apply button %5, thumbnails %6)").arg(seen).arg(samplesListed).arg(depthAfterTwo - depthAtStart).arg(fillsScreen).arg(hasApply).arg(bigThumbnails));
-		}
-		// Live: with the tick on the picture in the photo follows the scene. Ticking it makes one (small, quick) picture; a change of the scene makes another when it has been still for a moment; and the
-		// render that the change did not touch (the scene without the inserted objects) is not made again.
-		{
-			QString liveError;
-			sb->applyCameraPhoto(QDir::tempPath() + "/rt_selftest_composite.png", 65.0, 1.6, false, 0.0, false, 0.0, false, &liveError);
-			auto waitFor = [&](int refreshes) {
-				QElapsedTimer waited;
-				waited.start();
-				while (waited.elapsed() < 30000 && sb->liveRefreshesForTest() < refreshes) {
-					QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
-					QThread::msleep(20);
-				}
-				return sb->liveRefreshesForTest() >= refreshes;
-			};
-			const int before = sb->liveRefreshesForTest();
-			sb->setLiveForTest(true);
-			const bool first = waitFor(before + 1);
-			check(first && sb->previewHasPictureForTest() && sb->previewPictureSizeForTest().width() == 360, QString("ticking Live makes a small picture in the photo (%1 x %2)").arg(sb->previewPictureSizeForTest().width()).arg(sb->previewPictureSizeForTest().height()));
-			const int hitsBefore = sb->compositeCacheHitsForTest();
-			sb->selectObject(3);
-			sb->setPickedHeight(1.0);   // the scene changes: an inserted object
-			const bool second = waitFor(before + 2);
-			check(second && sb->compositeCacheHitsForTest() > hitsBefore, QString("a change of the scene makes another, and the render it did not touch was used again (%1 reuses)").arg(sb->compositeCacheHitsForTest() - hitsBefore));
-			// two quick changes are one refresh (and a render in progress is stopped for the newer scene)
-			const int refreshesBefore = sb->liveRefreshesForTest();
-			sb->setPickedHeight(1.2);
-			sb->setPickedHeight(1.4);
-			const bool third = waitFor(refreshesBefore + 1);
-			QElapsedTimer settle;
-			settle.start();
-			while (settle.elapsed() < 1500) { QCoreApplication::processEvents(QEventLoop::AllEvents, 100); QThread::msleep(20); }
-			check(third && sb->liveRefreshesForTest() == refreshesBefore + 1, QString("two quick changes are one refresh (%1 made)").arg(sb->liveRefreshesForTest() - refreshesBefore));
-			sb->setLiveForTest(false);
-			const int stopped = sb->liveRefreshesForTest();
-			sb->setPickedHeight(1.0);
-			QElapsedTimer quiet;
-			quiet.start();
-			while (quiet.elapsed() < 1500) { QCoreApplication::processEvents(QEventLoop::AllEvents, 100); QThread::msleep(20); }
-			check(sb->liveRefreshesForTest() == stopped && !sb->compositeRunningForTest(), "with the tick off nothing is made when the scene changes");
-		}
-		// What is in front of the objects: a mask on the photo (painted in its own window, kept in the scene) leaves the photo's own pixels there in a render into the photo, and nothing of the objects.
-		{
-			const QString file = QDir::tempPath() + "/rt_selftest_composite.png";
-			QString err;
-			sb->newScene();
-			sb->applyCameraPhoto(file, 65.0, 1.6, false, 0.0, false, 0.0, false, &err);
-			const QImage photoImage(file);
-			QString renderError;
-			const QString plainPath = QDir::tempPath() + "/rt_selftest_front_plain.png", maskedPath = QDir::tempPath() + "/rt_selftest_front_masked.png";
-			const bool plainOk = sb->renderIntoPhoto(plainPath, {0}, 0.0, 8, false, &renderError);
-			QImage mask(photoImage.size(), QImage::Format_Grayscale8);
-			mask.fill(0);
-			for (int y = 0; y < mask.height(); ++y)
-				for (int x = mask.width() / 2; x < mask.width(); ++x) mask.scanLine(y)[x] = 255;   // the right half is in front
-			sb->setOccluderForTest(mask);
-			const bool maskedOk = sb->renderIntoPhoto(maskedPath, {0}, 0.0, 8, false, &renderError);
-			const QImage plain = QImage(plainPath).convertToFormat(QImage::Format_RGB32), masked = QImage(maskedPath).convertToFormat(QImage::Format_RGB32), original = photoImage.scaled(plain.size()).convertToFormat(QImage::Format_RGB32);
-			long inFrontDiffers = 0, plainObjectPixels = 0, leftSame = 0, leftPixels = 0;
-			for (int y = 0; y < masked.height() && plainOk && maskedOk; ++y)
-				for (int x = 0; x < masked.width(); ++x) {
-					const bool changedByObjects = qRed(plain.pixel(x, y)) != qRed(original.pixel(x, y)) || qGreen(plain.pixel(x, y)) != qGreen(original.pixel(x, y)) || qBlue(plain.pixel(x, y)) != qBlue(original.pixel(x, y));
-					if (x > masked.width() / 2 + 3) {
-						plainObjectPixels += changedByObjects ? 1 : 0;
-						inFrontDiffers += (changedByObjects && masked.pixel(x, y) != original.pixel(x, y)) ? 1 : 0;   // an object pixel in front of which something is: it must be the photo's own
-					} else if (x < masked.width() / 2 - 3 && !changedByObjects) {   // (the render's noise differs between two renders: where the objects did nothing the two must agree)
-						++leftPixels;
-						leftSame += masked.pixel(x, y) == plain.pixel(x, y) ? 1 : 0;
-					}
-				}
-			check(plainOk && maskedOk && sb->occluderPresentForTest(), "a render into the photo with and without what is in front " + renderError);
-			check(plainObjectPixels > 200 && inFrontDiffers == 0, QString("where the mask is, the photo's own pixels stay (%1 object pixels there without the mask, %2 still differ with it)").arg(plainObjectPixels).arg(inFrontDiffers));
-			check(leftPixels > 0 && leftSame * 100 > leftPixels * 97, QString("and where it is not, what the objects did not touch is as it was (%1 of %2 pixels the same)").arg(leftSame).arg(leftPixels));
-			// the painting window, with real mouse events: a stroke across the middle, then Ok
-			QTimer::singleShot(700, [&]() {
-				if (QWidget *w = QApplication::activeModalWidget()) {
-					if (QWidget *canvas = w->findChild<QWidget *>("occluderCanvas")) {
-						const QPoint a(canvas->width() / 2 - 30, canvas->height() / 2), b(canvas->width() / 2 + 30, canvas->height() / 2);
-						QMouseEvent press(QEvent::MouseButtonPress, QPointF(a), canvas->mapToGlobal(QPointF(a)), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
-						QApplication::sendEvent(canvas, &press);
-						QMouseEvent move(QEvent::MouseMove, QPointF(b), canvas->mapToGlobal(QPointF(b)), Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
-						QApplication::sendEvent(canvas, &move);
-						QMouseEvent release(QEvent::MouseButtonRelease, QPointF(b), canvas->mapToGlobal(QPointF(b)), Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
-						QApplication::sendEvent(canvas, &release);
-						w->grab().save(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_occluder.png");
-					}
-					for (QPushButton *b : w->findChildren<QPushButton *>())
-						if (b->text().remove(QLatin1Char('&')) == "OK") { b->click(); break; }
-				}
-			});
-			sb->setOccluderForTest(QImage());   // (nothing in front: the window starts from an empty mask)
-			const bool noneBefore = !sb->occluderPresentForTest();
-			sb->paintOccluderDialog();
-			check(noneBefore && sb->occluderPresentForTest() && !sb->document().photo.occluder.empty(), "the painting window: a stroke with the mouse and Ok leaves a mask in the scene");
-			// it is kept with the scene, and one undo takes it away
-			const QString scenePath = QDir::tempPath() + "/rt_selftest_front_scene.pbrt";
-			QString openError;
-			const bool saved = sb->saveFile(scenePath);
-			sb->newScene();
-			const bool opened = sb->openFile(scenePath, &openError);
-			check(saved && opened && sb->occluderPresentForTest(), "what is in front is saved with the scene and comes back when it is opened " + openError);
-		}
-		// The photo as the environment: four colours in the four quarters of a photo, the scene's sky light given the photo, and the scene (no objects) rendered: the camera sees the four colours where the
-		// photo had them (so the picture is the right way round and the right way up), and the light is a photo environment that Render into the photo can read its exposure off.
-		{
-			QImage quarters(320, 240, QImage::Format_RGB32);
-			for (int y = 0; y < quarters.height(); ++y)
-				for (int x = 0; x < quarters.width(); ++x) quarters.setPixel(x, y, y < 120 ? (x < 160 ? qRgb(230, 30, 30) : qRgb(30, 200, 30)) : (x < 160 ? qRgb(30, 30, 230) : qRgb(230, 220, 30)));
-			const QString quartersFile = QDir::tempPath() + "/rt_selftest_quarters.png";
-			quarters.save(quartersFile);
-			QString err, envError;
-			sb->newScene();
-			const bool matched = sb->applyCameraPhoto(quartersFile, 65.0, 1.6, true, 0.0, true, 0.0, true, &err);
-			QStringList envNotes;
-			const auto distantBefore = std::count_if(sb->document().lights.begin(), sb->document().lights.end(), [](const scene_doc::Light &l) { return l.kind == scene_doc::LightKind::Distant; });
-			const bool made = matched && sb->applyEnvironmentPhoto(&envError, &envNotes);
-			const scene_doc::Document &doc = sb->document();
-			const scene_doc::Light *sky = nullptr;
-			for (const scene_doc::Light &l : doc.lights)
-				if (l.kind == scene_doc::LightKind::Infinite) sky = &l;
-			check(matched && made && sky && !sky->physicalSky && environment_from_photo::isEnvironmentFile(sky->imageFile) && QFileInfo(QString::fromStdString(sky->imageFile)).size() > 1000,
-			      "the photo is the sky light's picture: " + err + envError);
-			check(!envNotes.isEmpty() && std::count_if(doc.lights.begin(), doc.lights.end(), [](const scene_doc::Light &l) { return l.kind == scene_doc::LightKind::Distant; }) == distantBefore, "and the Sun light is as it was");
-			if (made && sky) {
-				scene_doc::Document bare = doc;
-				scene_doc::Object speck;   // (the renderer wants an object: a tiny one far below, which the camera does not see)
-				speck.radius = 0.05;
-				speck.position = {0.0, -500.0, 0.0};
-				bare.objects.assign(1, speck);
-				bare.render.width = 160;
-				bare.render.height = 120;
-				const QString scenePath = QDir::tempPath() + "/rt_selftest_env.pbrt", exrPath = QDir::tempPath() + "/rt_selftest_env.exr";
-				QFile::remove(exrPath);
-				QFile scene(scenePath);
-				const bool wrote = scene.open(QIODevice::WriteOnly) && scene.write(QByteArray::fromStdString(scene_doc::toPbrt(bare))) > 0;
-				scene.close();
-				QProcess renderer;
-				renderer.setProcessChannelMode(QProcess::MergedChannels);
-				renderer.setWorkingDirectory(QCoreApplication::applicationDirPath());
-				renderer.start(sb->launcherPathForTest(), {"--cpu", "--output", exrPath, "--height", "120", "160", "4", "2", scenePath});
-				const bool finished = wrote && renderer.waitForFinished(120000);
-				int rw = 0, rh = 0;
-				float *rgba = nullptr;
-				const char *loadError = nullptr;
-				const bool loaded = finished && renderer.exitCode() == 0 && LoadEXR(&rgba, &rw, &rh, QFile::encodeName(exrPath).constData(), &loadError) == TINYEXR_SUCCESS;
-				if (loadError) FreeEXRErrorMessage(loadError);
-				check(loaded && rw == 160 && rh == 120, "the scene with the photo environment renders " + QString::fromLocal8Bit(renderer.readAll()).right(120));
-				if (loaded && rw == 160 && rh == 120) {
-					auto at = [&](int x, int y, int c) { return rgba[4 * (y * rw + x) + c]; };
-					const int lx = 40, rx = 120, ty = 30, by = 90;   // the middle of each quarter of the picture
-					check(at(lx, ty, 0) > 2.0f * at(lx, ty, 1) && at(lx, ty, 0) > 2.0f * at(lx, ty, 2), "top left of the picture is the photo's red");
-					check(at(rx, ty, 1) > 2.0f * at(rx, ty, 0) && at(rx, ty, 1) > 2.0f * at(rx, ty, 2), "top right is its green");
-					check(at(lx, by, 2) > 2.0f * at(lx, by, 0) && at(lx, by, 2) > 2.0f * at(lx, by, 1), "bottom left is its blue");
-					check(at(rx, by, 0) > 2.0f * at(rx, by, 2) && at(rx, by, 1) > 2.0f * at(rx, by, 2), "bottom right is its yellow");
-					check(at(lx, ty, 0) > 0.01f && at(lx, ty, 0) < 50.0f, QString("and the brightness is that of a sky, not of a lamp (%1)").arg(at(lx, ty, 0)));
-				}
-				std::free(rgba);
-			}
-			// the exposure match reads the photo environment like a generated sky
-			sb->newScene();
-			QString matchError;
-			QStringList matchNotes;
-			const bool skyOnly = sb->applyCameraPhoto(QDir::tempPath() + "/rt_selftest_composite.png", 65.0, 1.6, false, 0.0, false, 0.0, true, &matchError) && sb->applyEnvironmentPhoto(&matchError);
-			QString renderError;
-			const bool rendered = skyOnly && sb->renderIntoPhoto(QDir::tempPath() + "/rt_selftest_env_match.png", {0}, 0.0, 8, true, &renderError, &matchNotes);
-			check(rendered && matchNotes.join(" ").contains("were matched to the photo's sky"), "Render into the photo matches the exposure off the photo environment: " + renderError + matchNotes.join(" / ").left(200));
-		}
-		// A day cycle: three frames of the starter scene under a Sun & sky whose sun goes from sunrise over noon to sunset; the middle frame is brighter than the first (the sun is higher), the first and the
-		// last differ (it is on the other side), and the renderer puts them together as an MP4 (when ffmpeg is there).
-		{
-			sb->newScene();
-			sb->runActionForTest("lighting sunny");
-			const QString mp4 = QDir::tempPath() + "/rt_selftest_daycycle.mp4";
-			QFile::remove(mp4);
-			std::vector<QImage> frames;
-			QString dayMessage;
-			const bool dayOk = sb->renderDayCycle(mp4, 3, 24, 160, 2, 60.0, &dayMessage, &frames);
-			const bool noFfmpeg = !dayOk && dayMessage.contains("ffmpeg");
-			check(frames.size() == 3 && (dayOk || noFfmpeg), "a day cycle renders its three frames and puts them together: " + dayMessage.left(160));
-			if (frames.size() == 3) {
-				auto mean = [](const QImage &img) {
-					const QImage rgb = img.convertToFormat(QImage::Format_RGB32);
-					double sum = 0.0;
-					for (int y = 0; y < rgb.height(); ++y)
-						for (int x = 0; x < rgb.width(); ++x) sum += qGray(rgb.pixel(x, y));
-					return sum / (static_cast<double>(rgb.width()) * rgb.height());
-				};
-				check(mean(frames[1]) > mean(frames[0]) * 1.15, QString("the sun is higher at noon, so the picture is brighter (%1 against %2 at sunrise)").arg(mean(frames[1]), 0, 'f', 1).arg(mean(frames[0]), 0, 'f', 1));
-				check(frames[0] != frames[2], "and sunrise and sunset are different pictures (the sun is on the other side)");
-			}
-			if (dayOk) check(QFileInfo(mp4).size() > 1000, "the video is a file");
-			// the same into the beach photo: every frame is the scene put into the photo, so the sky is the photo's in all of them and the shadows (and the lighting on the objects) change
-			QString photoError;
-			sb->newScene();
-			const bool matched = sb->applyCameraPhoto(sample_photos::all().first().resource, 0.0, 1.6, false, 0.0, false, 0.0, true, &photoError);
-			std::vector<QImage> photoFrames;
-			QString photoMessage;
-			const QString photoMp4 = QDir::tempPath() + "/rt_selftest_daycycle_photo.mp4";
-			QFile::remove(photoMp4);
-			const bool photoDay = matched && sb->renderDayCycle(photoMp4, 3, 24, 400, 4, 60.0, &photoMessage, &photoFrames, true);
-			const bool photoNoFfmpeg = matched && !photoDay && photoMessage.contains("ffmpeg");
-			check(matched && photoFrames.size() == 3 && (photoDay || photoNoFfmpeg), "a day cycle into the photo makes its three frames: " + photoError + photoMessage.left(160));
-			if (photoFrames.size() == 3) {
-				const QImage first = photoFrames[0].convertToFormat(QImage::Format_RGB32), last = photoFrames[2].convertToFormat(QImage::Format_RGB32);
-				const QImage original = QImage(sample_photos::all().first().resource).convertToFormat(QImage::Format_RGB32).scaled(first.size(), Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
-				int skyDiffers = 0, wholeDiffers = 0;
-				for (int y = 0; y < first.height(); ++y)
-					for (int x = 0; x < first.width(); ++x) {
-						if (first.pixel(x, y) != last.pixel(x, y)) ++wholeDiffers;
-						if (y < first.height() / 10 && (std::abs(qRed(first.pixel(x, y)) - qRed(original.pixel(x, y))) > 8 || std::abs(qGreen(first.pixel(x, y)) - qGreen(original.pixel(x, y))) > 8 || std::abs(qBlue(first.pixel(x, y)) - qBlue(original.pixel(x, y))) > 8)) ++skyDiffers;
-					}
-				check(first.width() == 400 && wholeDiffers > 200, QString("the frames differ as the sun moves (%1 pixels differ between sunrise and sunset)").arg(wholeDiffers));
-				check(skyDiffers < first.width() * first.height() / 10 / 20, QString("and the sky stays the photo's (%1 of the top tenth differs)").arg(skyDiffers));
-			}
-			// With the photo as the environment (the default of Camera from a photo) the Day cycle moves only the Sun; an edit made while it renders (with Live on, which used to cancel it) does not reach it
-			sb->newScene();
-			QString envError;
-			const bool envMatched = sb->applyCameraPhoto(sample_photos::all().first().resource, 0.0, 1.6, false, 0.0, false, 0.0, true, &envError) && sb->applyEnvironmentPhoto(&envError);
-			check(envMatched && sb->daySkyIndexForTest() >= 0, "a scene whose sky is the photo can have a day cycle: " + envError);
-			if (envMatched) {
-				std::vector<QImage> envFrames;
-				QString envMessage;
-				const QString envMp4 = QDir::tempPath() + "/rt_selftest_daycycle_env.mp4";
-				QFile::remove(envMp4);
-				sb->setLiveForTest(true);
-				QTimer::singleShot(1500, sb, [sb]() { sb->setPhotoExposureForTest(0.0); });   // (an edit in the middle of the video: documentChanged, which asks Live for a refresh)
-				const bool envDay = sb->renderDayCycle(envMp4, 3, 24, 400, 4, 60.0, &envMessage, &envFrames, true);
-				sb->setLiveForTest(false);
-				const bool envNoFfmpeg = !envDay && envMessage.contains("ffmpeg");
-				check(envFrames.size() == 3 && (envDay || envNoFfmpeg), "and an edit during it does not cancel it: " + envMessage.left(160));
-				if (envFrames.size() == 3) check(envFrames[0] != envFrames[2], "the Sun moved between sunrise and sunset");
-				// a failure leaves no frames behind: the video cannot be saved into a folder that is not there
-				QString failMessage;
-				const bool failed = !sb->renderDayCycle(QDir::tempPath() + "/rt_no_such_folder_for_the_selftest/x.mp4", 2, 24, 160, 2, 60.0, &failMessage, nullptr, false);
-				check(failed && !QDir(sb->workFolderForTest() + "/daycycle").exists(), "a day cycle that fails leaves its frames behind nowhere: " + failMessage.left(100));
-			}
-		}
-		// Export glTF: the starter scene as a .glb by the renderer: a file that starts with glTF's magic and says what it holds
-		{
-			sb->newScene();
-			const QString glb = QDir::tempPath() + "/rt_selftest_export.glb";
-			QString exportMessage;
-			const bool exported = sb->exportGltf(glb, &exportMessage);
-			QFile file(glb);
-			const QByteArray head = file.open(QIODevice::ReadOnly) ? file.read(12) : QByteArray();
-			check(exported && QFileInfo(glb).size() > 2000 && head.left(4) == "glTF" && exportMessage.contains("triangles"), "the scene exports as a glTF file: " + exportMessage.left(160));
-		}
-		// The photo belongs to the scene: a scene matched to a photo, saved, then a new scene (no photo), then the saved one opened again has its photo, its overlay, its Render into the photo state and
-		// the camera back; a photo that has gone is said so, not a crash; Remove the photo takes it out; and one undo of the match takes it away too.
-		{
-			const QString file = QDir::tempPath() + "/rt_selftest_composite.png";
-			const QString scenePath = QDir::tempPath() + "/rt_selftest_photo_scene.pbrt";
-			QString err;
-			const bool matched = sb->applyCameraPhoto(file, 65.0, 1.6, false, 0.0, false, 0.0, false, &err);
-			sb->setPhotoExposureForTest(0.75);   // (what the Render into the photo dialog keeps in the document)
-			const double cameraY = sb->document().camera.position.y;
-			const bool kept = sb->document().photo.file == file.toStdString() && sb->cameraPhotoShownForTest();
-			check(matched && kept, "a scene matched to a photo keeps the photo's file in its document and shows it");
-			check(sb->saveFile(scenePath), "the scene is saved");
-			sb->newScene();
-			check(sb->document().photo.file.empty() && !sb->cameraPhotoShownForTest(), "a new scene has no photo and no overlay");
-			QString openError;
-			const bool opened = sb->openFile(scenePath, &openError);
-			check(opened && sb->document().photo.file == file.toStdString() && sb->cameraPhotoShownForTest() && std::fabs(sb->document().camera.position.y - cameraY) < 1e-9,
-			      "the saved scene opened again has its photo, the overlay and the camera back " + openError);
-			check(sb->document().photo.exposureStops == 0.75 && sb->document().photo.roles.size() == 1, "and what Render into the photo was told (the exposure, the roles) is back too");
-			// a photo that has gone: the scene opens, the overlay is not there, and the file name stays so the photo can be put back
-			QString movedAway = file + ".moved";
-			QFile::remove(movedAway);
-			QFile::rename(file, movedAway);
-			sb->newScene();
-			const bool openedWithoutPhoto = sb->openFile(scenePath, &openError);
-			check(openedWithoutPhoto && sb->document().photo.file == file.toStdString() && !sb->cameraPhotoShownForTest(), "a scene whose photo has gone still opens, without the overlay");
-			QFile::rename(movedAway, file);
-			// Remove the photo
-			sb->newScene();
-			sb->openFile(scenePath, &openError);
-			sb->removePhotoForTest();
-			check(sb->document().photo.file.empty() && !sb->cameraPhotoShownForTest(), "Remove the photo takes the photo out of the scene");
-			// one undo of the match takes the photo away with the camera
-			sb->newScene();
-			sb->applyCameraPhoto(file, 65.0, 1.6, false, 0.0, false, 0.0, false, &err);
-			check(sb->cameraPhotoShownForTest() && sb->undo() && sb->document().photo.file.empty() && !sb->cameraPhotoShownForTest(), "one undo of the match takes the photo away with the camera");
-		}
+		compositeTestEnvironmentSample(context);
+		compositeTestRealPhoto(context);
+		compositeTestCameraWindow(context);
+		compositeTestLive(context);
+		compositeTestInFront(context);
+		compositeTestPhotoEnvironment(context);
+		compositeTestDayCycle(context);
+		compositeTestExportGltf(context);
+		compositeTestSavedWithScene(context);
 	}
 	QTimer::singleShot(600, this, [this, shot, log, ok]() {
 		shot("composite_edit");

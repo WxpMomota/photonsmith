@@ -121,9 +121,8 @@ QString SceneBuilderWidget::launcherPath() const {
 #endif
 }
 
-void SceneBuilderWidget::buildUi() {
-	auto *root = new QVBoxLayout(this);
-
+// The top bar: one row of buttons and the scene's name (a flow layout, so it wraps when the window is narrow), added to `root`.
+void SceneBuilderWidget::buildTopBar(QVBoxLayout *root) {
 	// ---- top bar: one row of buttons and the scene's name, wrapping to more rows when the window is narrow
 	auto button = [this](const QString &text, const QString &tip) {
 		auto *b = new QPushButton(text, this);
@@ -183,6 +182,112 @@ void SceneBuilderWidget::buildUi() {
 	connect(m_liveButton, &QPushButton::clicked, this, &SceneBuilderWidget::onPreviewLiveClicked);
 	connect(m_undoButton, &QPushButton::clicked, this, [this]() { undo(); });
 	connect(m_redoButton, &QPushButton::clicked, this, [this]() { redo(); });
+}
+
+// The preview pane under the views: the quality, Use the GPU, Denoise, Preview / Preview in the photo / Live / Save picture / Render picture / Turntable / Flythrough / Day cycle row, the picture and its status line.
+QWidget *SceneBuilderWidget::buildPreviewBox() {
+	auto *previewBox = new QWidget;
+	auto *previewLayout = new QVBoxLayout(previewBox);
+	previewLayout->setContentsMargins(0, 0, 0, 0);
+	auto *renderBar = new QWidget(previewBox);
+	auto *renderRow = new FlowLayout(renderBar, 0, 6, 6);
+	m_qualityCombo = new QComboBox(previewBox);
+	m_qualityCombo->addItem(tr("Draft"), 0);
+	m_qualityCombo->addItem(tr("Good"), 1);
+	m_qualityCombo->addItem(tr("Best"), 2);
+	m_qualityCombo->setCurrentIndex(0);
+	m_qualityCombo->setToolTip(tr("Draft: 480 pixels wide, 16 samples. Good: 720 wide, 64 samples. Best: 960 wide, 256 samples."));
+	m_gpuCheck = new QCheckBox(tr("Use the GPU"), previewBox);
+	m_gpuCheck->setToolTip(tr("Render on the graphics card (NVIDIA OptiX on Windows, Metal on a Mac). Much faster for large pictures; needs a supported GPU."));
+	createDenoiseCheck(previewBox);   // the Preview's Denoise tick (scene_builder_render.cpp)
+	m_previewButton = new QPushButton(tr("Preview"), previewBox);
+	m_previewButton->setAutoDefault(false);
+	m_inPhotoButton = new QPushButton(tr("Preview in the photo"), previewBox);
+	m_inPhotoButton->setAutoDefault(false);
+	m_inPhotoButton->setToolTip(tr("Render the scene through the camera that was matched to a photo and show it here, put into the photo with its shadows. Same Quality as Preview. (Camera and image > Render into the photo... asks for more.)"));
+	m_liveCheck = new QCheckBox(tr("Live"), previewBox);
+	m_liveCheck->setToolTip(tr("Keep the picture in the photo up to date while you change the scene: a small, quick one is made when the scene has been still for a moment. Needs the camera matched to a photo."));
+	m_saveButton = new QPushButton(tr("Save picture..."), previewBox);
+	m_saveButton->setAutoDefault(false);
+	m_saveButton->setEnabled(false);
+	m_saveButton->setToolTip(tr("Save the picture shown below as a PNG"));
+	m_finalButton = new QPushButton(tr("Render picture..."), previewBox);
+	m_finalButton->setAutoDefault(false);
+	m_finalButton->setToolTip(tr("Render at the image size and sample count set under Camera, and save the picture as a PNG"));
+	m_turntableButton = new QPushButton(tr("Turntable..."), previewBox);
+	m_turntableButton->setAutoDefault(false);
+	m_turntableButton->setToolTip(tr("Make a video of the scene from a camera that goes once round it"));
+	m_flythroughButton = new QPushButton(tr("Flythrough..."), previewBox);
+	m_flythroughButton->setAutoDefault(false);
+	m_flythroughButton->setToolTip(tr("Make a video of the scene from a camera that flies through your saved camera views (needs two or more)"));
+	m_dayCycleButton = new QPushButton(tr("Day cycle..."), previewBox);
+	m_dayCycleButton->setAutoDefault(false);
+	m_dayCycleButton->setToolTip(tr("Make a video of a day on the scene: the sun goes from sunrise to sunset (needs a Sun & sky light)"));   // (or a sky that is the photo)
+	m_previewStatus = new QLabel(previewBox);
+	renderRow->addWidget(new QLabel(tr("Quality:"), renderBar));
+	renderRow->addWidget(m_qualityCombo);
+	renderRow->addWidget(m_gpuCheck);
+	renderRow->addWidget(m_denoiseCheck);
+	scene_builder_ui::compactStyle(m_previewButton);
+	scene_builder_ui::compactStyle(m_finalButton);
+	renderRow->addWidget(m_previewButton);
+	renderRow->addWidget(m_finalButton);
+	scene_builder_ui::compactStyle(m_inPhotoButton);
+	scene_builder_ui::compactStyle(m_saveButton);
+	renderRow->addWidget(m_inPhotoButton);
+	renderRow->addWidget(m_liveCheck);
+	renderRow->addWidget(m_saveButton);
+	scene_builder_ui::compactStyle(m_turntableButton);
+	renderRow->addWidget(m_turntableButton);
+	scene_builder_ui::compactStyle(m_flythroughButton);
+	renderRow->addWidget(m_flythroughButton);
+	scene_builder_ui::compactStyle(m_dayCycleButton);
+	renderRow->addWidget(m_dayCycleButton);
+	m_previewStatus->setWordWrap(true);
+	previewLayout->addWidget(renderBar);
+	m_previewLabel = new QLabel(previewBox);
+	m_previewLabel->setAlignment(Qt::AlignCenter);
+	m_previewLabel->setMinimumHeight(120);
+	m_previewLabel->installEventFilter(this);  // rescale the picture when the pane is resized
+	m_previewLabel->setText(tr("Press Preview to see the scene."));
+	m_previewLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+	previewLayout->addWidget(m_previewLabel, 1);
+	previewLayout->addWidget(m_previewStatus);
+	connect(m_previewButton, &QPushButton::clicked, this, [this]() {
+		if (m_compositeRunning) {   // Render into the photo is rendering: the button reads Cancel
+			m_compositeCancel = true;
+			return;
+		}
+		if (m_process) {
+			m_cancelRequested = true;
+			m_process->kill();  // the button reads Cancel while a render runs
+			return;
+		}
+		startPreview();
+	});
+	connect(m_finalButton, &QPushButton::clicked, this, &SceneBuilderWidget::onRenderFinalClicked);
+	connect(m_inPhotoButton, &QPushButton::clicked, this, &SceneBuilderWidget::previewIntoPhoto);
+	connect(m_liveCheck, &QCheckBox::toggled, this, [this](bool on) {
+		if (on && m_cameraPhoto.isNull()) {   // (nothing to put the scene into)
+			const QSignalBlocker blocker(m_liveCheck);
+			m_liveCheck->setChecked(false);
+			m_previewStatus->setText(tr("Match the camera to a photo first (Camera and image: Match to a photo...): the scene is put into that photo."));
+			return;
+		}
+		if (on) scheduleLiveComposite();
+		else if (m_liveTimer) m_liveTimer->stop();
+	});
+	connect(m_saveButton, &QPushButton::clicked, this, &SceneBuilderWidget::onSavePictureClicked);
+	connect(m_turntableButton, &QPushButton::clicked, this, &SceneBuilderWidget::showTurntableDialog);
+	connect(m_flythroughButton, &QPushButton::clicked, this, &SceneBuilderWidget::showFlythroughDialog);
+	connect(m_dayCycleButton, &QPushButton::clicked, this, &SceneBuilderWidget::showDayCycleDialog);
+	return previewBox;
+}
+
+void SceneBuilderWidget::buildUi() {
+	auto *root = new QVBoxLayout(this);
+
+	buildTopBar(root);
 
 	auto *split = new QSplitter(Qt::Horizontal, this);
 	root->addWidget(split, 1);
@@ -308,101 +413,7 @@ void SceneBuilderWidget::buildUi() {
 	layoutLayout->setContentsMargins(0, 0, 0, 0);
 	createViews(layoutBox, layoutLayout);  // scene_builder_views.cpp: the Top / Front / Side / 3D views and what they share
 
-	auto *previewBox = new QWidget;
-	auto *previewLayout = new QVBoxLayout(previewBox);
-	previewLayout->setContentsMargins(0, 0, 0, 0);
-	auto *renderBar = new QWidget(previewBox);
-	auto *renderRow = new FlowLayout(renderBar, 0, 6, 6);
-	m_qualityCombo = new QComboBox(previewBox);
-	m_qualityCombo->addItem(tr("Draft"), 0);
-	m_qualityCombo->addItem(tr("Good"), 1);
-	m_qualityCombo->addItem(tr("Best"), 2);
-	m_qualityCombo->setCurrentIndex(0);
-	m_qualityCombo->setToolTip(tr("Draft: 480 pixels wide, 16 samples. Good: 720 wide, 64 samples. Best: 960 wide, 256 samples."));
-	m_gpuCheck = new QCheckBox(tr("Use the GPU"), previewBox);
-	m_gpuCheck->setToolTip(tr("Render on the graphics card (NVIDIA OptiX on Windows, Metal on a Mac). Much faster for large pictures; needs a supported GPU."));
-	createDenoiseCheck(previewBox);   // the Preview's Denoise tick (scene_builder_render.cpp)
-	m_previewButton = new QPushButton(tr("Preview"), previewBox);
-	m_previewButton->setAutoDefault(false);
-	m_inPhotoButton = new QPushButton(tr("Preview in the photo"), previewBox);
-	m_inPhotoButton->setAutoDefault(false);
-	m_inPhotoButton->setToolTip(tr("Render the scene through the camera that was matched to a photo and show it here, put into the photo with its shadows. Same Quality as Preview. (Camera and image > Render into the photo... asks for more.)"));
-	m_liveCheck = new QCheckBox(tr("Live"), previewBox);
-	m_liveCheck->setToolTip(tr("Keep the picture in the photo up to date while you change the scene: a small, quick one is made when the scene has been still for a moment. Needs the camera matched to a photo."));
-	m_saveButton = new QPushButton(tr("Save picture..."), previewBox);
-	m_saveButton->setAutoDefault(false);
-	m_saveButton->setEnabled(false);
-	m_saveButton->setToolTip(tr("Save the picture shown below as a PNG"));
-	m_finalButton = new QPushButton(tr("Render picture..."), previewBox);
-	m_finalButton->setAutoDefault(false);
-	m_finalButton->setToolTip(tr("Render at the image size and sample count set under Camera, and save the picture as a PNG"));
-	m_turntableButton = new QPushButton(tr("Turntable..."), previewBox);
-	m_turntableButton->setAutoDefault(false);
-	m_turntableButton->setToolTip(tr("Make a video of the scene from a camera that goes once round it"));
-	m_flythroughButton = new QPushButton(tr("Flythrough..."), previewBox);
-	m_flythroughButton->setAutoDefault(false);
-	m_flythroughButton->setToolTip(tr("Make a video of the scene from a camera that flies through your saved camera views (needs two or more)"));
-	m_dayCycleButton = new QPushButton(tr("Day cycle..."), previewBox);
-	m_dayCycleButton->setAutoDefault(false);
-	m_dayCycleButton->setToolTip(tr("Make a video of a day on the scene: the sun goes from sunrise to sunset (needs a Sun & sky light)"));   // (or a sky that is the photo)
-	m_previewStatus = new QLabel(previewBox);
-	renderRow->addWidget(new QLabel(tr("Quality:"), renderBar));
-	renderRow->addWidget(m_qualityCombo);
-	renderRow->addWidget(m_gpuCheck);
-	renderRow->addWidget(m_denoiseCheck);
-	scene_builder_ui::compactStyle(m_previewButton);
-	scene_builder_ui::compactStyle(m_finalButton);
-	renderRow->addWidget(m_previewButton);
-	renderRow->addWidget(m_finalButton);
-	scene_builder_ui::compactStyle(m_inPhotoButton);
-	scene_builder_ui::compactStyle(m_saveButton);
-	renderRow->addWidget(m_inPhotoButton);
-	renderRow->addWidget(m_liveCheck);
-	renderRow->addWidget(m_saveButton);
-	scene_builder_ui::compactStyle(m_turntableButton);
-	renderRow->addWidget(m_turntableButton);
-	scene_builder_ui::compactStyle(m_flythroughButton);
-	renderRow->addWidget(m_flythroughButton);
-	scene_builder_ui::compactStyle(m_dayCycleButton);
-	renderRow->addWidget(m_dayCycleButton);
-	m_previewStatus->setWordWrap(true);
-	previewLayout->addWidget(renderBar);
-	m_previewLabel = new QLabel(previewBox);
-	m_previewLabel->setAlignment(Qt::AlignCenter);
-	m_previewLabel->setMinimumHeight(120);
-	m_previewLabel->installEventFilter(this);  // rescale the picture when the pane is resized
-	m_previewLabel->setText(tr("Press Preview to see the scene."));
-	m_previewLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
-	previewLayout->addWidget(m_previewLabel, 1);
-	previewLayout->addWidget(m_previewStatus);
-	connect(m_previewButton, &QPushButton::clicked, this, [this]() {
-		if (m_compositeRunning) {   // Render into the photo is rendering: the button reads Cancel
-			m_compositeCancel = true;
-			return;
-		}
-		if (m_process) {
-			m_cancelRequested = true;
-			m_process->kill();  // the button reads Cancel while a render runs
-			return;
-		}
-		startPreview();
-	});
-	connect(m_finalButton, &QPushButton::clicked, this, &SceneBuilderWidget::onRenderFinalClicked);
-	connect(m_inPhotoButton, &QPushButton::clicked, this, &SceneBuilderWidget::previewIntoPhoto);
-	connect(m_liveCheck, &QCheckBox::toggled, this, [this](bool on) {
-		if (on && m_cameraPhoto.isNull()) {   // (nothing to put the scene into)
-			const QSignalBlocker blocker(m_liveCheck);
-			m_liveCheck->setChecked(false);
-			m_previewStatus->setText(tr("Match the camera to a photo first (Camera and image: Match to a photo...): the scene is put into that photo."));
-			return;
-		}
-		if (on) scheduleLiveComposite();
-		else if (m_liveTimer) m_liveTimer->stop();
-	});
-	connect(m_saveButton, &QPushButton::clicked, this, &SceneBuilderWidget::onSavePictureClicked);
-	connect(m_turntableButton, &QPushButton::clicked, this, &SceneBuilderWidget::showTurntableDialog);
-	connect(m_flythroughButton, &QPushButton::clicked, this, &SceneBuilderWidget::showFlythroughDialog);
-	connect(m_dayCycleButton, &QPushButton::clicked, this, &SceneBuilderWidget::showDayCycleDialog);
+	QWidget *previewBox = buildPreviewBox();   // (put under the views below)
 
 	// ---- right: inspector
 	auto *right = new QWidget(split);

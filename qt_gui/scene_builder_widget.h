@@ -376,6 +376,8 @@ private:
 	using SelKind = BuilderSelection::Kind;
 
 	void buildUi();
+	void buildTopBar(QVBoxLayout *root);   // the buttons and the scene's name (scene_builder_widget.cpp)
+	QWidget *buildPreviewBox();            // the preview pane: the render bar, the picture and its status line
 	void rebuildList();
 	void refreshListLabels();
 	void rebuildInspector();
