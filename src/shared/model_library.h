@@ -99,6 +99,10 @@ inline const std::vector<Entry>& catalog() {
 		{"toaster", "Toaster", "Kenney Furniture Kit, CC0", 1, false, "gltf/toaster.glb"},
 		{"trashcan", "Trash can", "Kenney Furniture Kit, CC0", 1, false, "gltf/trashcan.glb"},
 		{"tv-vintage", "Vintage television", "Kenney Furniture Kit, CC0", 1, false, "gltf/tv-vintage.glb"},
+		{"car-concept", "Car concept (scene)", "Khronos glTF Sample Assets, CC BY 4.0 (Eric Chadwick)", 1, false, "gltf/car-concept.glb"},
+		{"broken-window", "Broken window (scene)", "Khronos glTF Sample Assets, CC BY 4.0 (Eric Chadwick)", 1, false, "gltf/broken-window.glb"},
+		{"vase-with-flowers", "Glass vase with flowers (scene)", "Khronos glTF Sample Assets, CC0", 1, false, "gltf/vase-with-flowers.glb"},
+		{"dish-with-olives", "Iridescent dish with olives (scene)", "Khronos glTF Sample Assets, CC BY 4.0 (Eric Chadwick)", 1, false, "gltf/dish-with-olives.glb"},
 	};
 	return all;
 }

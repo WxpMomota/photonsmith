@@ -120,3 +120,9 @@ The pbrt-v4 scene collection lives at
 <https://github.com/mmp/pbrt-v4-scenes>. Individual scenes there carry their
 own licences — several are non-commercial or no-derivatives, so check before
 redistributing anything you download.
+
+**Benedikt Bitterli's rendering resources** (<https://benedikt-bitterli.me/resources/>) are a set of well-known, beautiful scenes (living rooms, a kitchen, a bedroom, staircases, a glass of water, cars,
+a lamp, a spaceship, a Japanese classroom...), each released under CC0 or CC BY 3.0 (the author's credit travels in the scene's own `LICENSE.txt`). They are in the scene list as *Large Scenes*
+(Grey and White Room, Bedroom Interior, Country Kitchen, Modern Hall, ...) and are not stored here: select one and press **Download missing files**, and its pbrt-v4 version is fetched from
+benedikt-bitterli.me into `pbrt_scenes/bitterli/<scene>/` (5 to 50 MB each; only what the scene uses, every file checked). Restart the app once after the first download so the scene is read with its
+own camera. They are the scenes' original files, unchanged: `scene-v4.pbrt`, `models/`, `textures/`.

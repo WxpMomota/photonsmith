@@ -229,6 +229,23 @@ constexpr Entry kBuiltin[] = {
         {"H19", "crown"},   // Crown
         {"H20", "villa"},   // Villa
         {"H21", "transparent-machines"},   // Transparent Machines
+        {"H22", "grey-white-room"},   // Grey and White Room
+        {"H23", "bedroom-interior"},   // Bedroom Interior
+        {"H24", "country-kitchen"},   // Country Kitchen
+        {"H25", "modern-hall"},   // Modern Hall
+        {"H26", "wooden-staircase"},   // Wooden Staircase
+        {"H27", "white-room"},   // White Room
+        {"H28", "modern-living-room"},   // Modern Living Room
+        {"H29", "glass-of-water"},   // Glass of Water
+        {"H30", "pontiac-gto"},   // Pontiac GTO
+        {"H31", "vintage-car"},   // Vintage Car
+        {"H32", "coffee-maker"},   // Coffee Maker
+        {"H33", "little-lamp"},   // Little Lamp
+        {"H34", "victorian-house"},   // Victorian House
+        {"H35", "spaceship"},   // Spaceship
+        {"H36", "japanese-classroom"},   // Japanese Classroom
+        {"H37", "dragon-statue"},   // Dragon Statue
+        {"H38", "material-test-ball"},   // Material Test Ball
         {"I1", "sampler-comparison"},   // Sampler Comparison (Low Sample Count)
         {"I2", "spectral-prism-dispersion"},   // Spectral Rendering: Prism Dispersion
         {"I3", "exposure-tone-mapping"},   // Exposure & Tone Mapping (HDR Sky)

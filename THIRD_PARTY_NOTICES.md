@@ -46,16 +46,20 @@ These are data, not code, and the MIT licence **does not apply to them**.
   installers carry only Spot, Suzanne and the Utah teapot.
   The larger scenes (Power Plant and others) are deliberately not bundled in the
   installers for this reason.
-* **`models/gltf/`** holds 52 free glTF models: from the Khronos glTF Sample Assets (CC0 or CC BY 4.0, each model its own), Poly Haven (CC0) and Kenney's Furniture Kit (CC0). All were changed to keep the
+* **`models/gltf/`** holds 56 free glTF models: from the Khronos glTF Sample Assets (CC0 or CC BY 4.0, each model its own), Poly Haven (CC0) and Kenney's Furniture Kit (CC0). All were changed to keep the
   repository small (pictures made smaller, pictures this program does not read left out); `models/gltf/CREDITS.md` names the source, licence and credit of each one. The CC BY 4.0 models need the credit:
   Velvet sofa: Eric Chadwick, Wayfair, LLC (2021), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/GlamVelvetSofa;
   Sunglasses: Eric Chadwick, Darmstadt Graphics Group GmbH (2024), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/SunglassesKhronos;
   Glass candle holder: Eric Chadwick, Wayfair, LLC (2021), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/GlassHurricaneCandleHolder;
   Shoe: Shopify, Shopify (2021), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MaterialsVariantsShoe;
   Silk pouf: Eric Chadwick, Copyright 2023 Wayfair, LLC (2023), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/SpecularSilkPouf;
-  Traffic cone: hinndia, hinndia (2024), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/TrafficCone. Licence: https://creativecommons.org/licenses/by/4.0/ . The installers do not carry them.
+  Traffic cone: hinndia, hinndia (2024), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/TrafficCone;
+  Car concept: Eric Chadwick, Darmstadt Graphics Group GmbH (2024), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CarConcept;
+  Broken window: Eric Chadwick, Wayfair (2023), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/GlassBrokenWindow;
+  Iridescent dish with olives: Eric Chadwick, Wayfair, LLC (2020), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/IridescentDishWithOlives. Licence: https://creativecommons.org/licenses/by/4.0/ . The installers do not carry them.
 * **`environments/`** holds 30 high-dynamic-range sky and room panoramas (1k) from Poly Haven (polyhaven.com), published under CC0 1.0 (public domain dedication): unchanged copies of Poly Haven's `.hdr` files and its preview
   pictures. No credit is required; `environments/CREDITS.md` names each one's author and source page. The installers do not carry them.
+* **Benedikt Bitterli's rendering-resources scenes** (17 scenes, H22 to H38): **not in the repository or the installers**. The Scene Builder's "Download missing files" fetches them from https://benedikt-bitterli.me/resources/ on request (their pbrt-v4 versions), and they are kept out of git. Each scene keeps its own licence, CC0 or CC BY 3.0, and its `LICENSE.txt` is downloaded with it; the CC BY 3.0 ones need the credit: The Grey & White Room, The Wooden Staircase and The Modern Living Room by Wig42; Country Kitchen and The White Room by Jay-Artist; Modern Hall by NewSee2l035; Coffee Maker by cekuhnen; Japanese Classroom by NovaZeeke; Dragon by Delatronic. Licence: https://creativecommons.org/licenses/by/3.0/ . The CC0 ones are Bedroom (SlykDrako), Glass of Water (aXel), Pontiac GTO 67 and 4060.b Spaceship (thecali), Old vintage car (piopis), Little Lamp (UP3D), Victorian Style House (MrChimp2313) and the Material Test Ball (Benedikt Bitterli).
 * **`images/`**: `earthmap.jpg` is NASA's Blue Marble in equirectangular projection
   (from Wikimedia Commons, public domain: created solely by NASA). `bump-marble.png`
   and `normal-checker.png` are small textures generated for this project's tests.

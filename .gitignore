@@ -388,6 +388,8 @@ pbrt_scenes/zero-day/
 pbrt_scenes/crown/
 pbrt_scenes/villa/
 pbrt_scenes/transparent-machines/
+# Benedikt Bitterli's rendering-resources scenes (benedikt-bitterli.me/resources): fetched on request by the GUI, pbrt_scenes/bitterli/<scene>/ each
+pbrt_scenes/bitterli/
 # Companion tree assets for barcelona-pavilion (referenced as ../landscape/
 # from its .pbrt files) - only the ~46 files it actually needs, not the
 # full ~1.3GB landscape/ folder from the same upstream repo.

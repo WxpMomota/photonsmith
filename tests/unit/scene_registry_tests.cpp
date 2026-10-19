@@ -132,7 +132,7 @@ TEST(SceneRegistryTest, RegistryHasExpectedCount) {
 	// with MediumInterface now reaches a real GGX microfacet DielectricMedium
 	// surface with real glossy NEE, see mediumMaterialIndex()'s own comment
 	// and rough_dielectric_scatter_and_nee() (optix_device_helpers.h).
-	EXPECT_EQ(builtin_scene_count(), 151);
+	EXPECT_EQ(builtin_scene_count(), 168);
 }
 
 TEST(SceneRegistryTest, LoadedScenesAppendAfterTheBuiltInsWithoutDisturbingThem) {
@@ -856,7 +856,7 @@ TEST(SceneBuilderTest, CornellBoxBuildsDetAndRepeatably) {
 // double-checking the GUI/error-hint text that mentions specific scene
 // counts or ID ranges by hand.
 TEST(SceneRegistryGuiConsistencyTest, GuiSceneCountMatchesRegistry) {
-	constexpr int kGuiSceneCount = 151;
+	constexpr int kGuiSceneCount = 168;
 	EXPECT_EQ(builtin_scene_count(), kGuiSceneCount)
 		<< "Registry size changed -- update kGuiSceneCount here to match.";
 }

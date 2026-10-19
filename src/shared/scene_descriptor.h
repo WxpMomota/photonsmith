@@ -139,6 +139,23 @@ namespace SceneNames {
     constexpr const char* CrownPbrtExample                  = "Crown";
     constexpr const char* VillaPbrtExample                  = "Villa";
     constexpr const char* TransparentMachinesPbrtExample    = "Transparent Machines";
+    constexpr const char* GreyWhiteRoomPbrtExample           = "Grey and White Room";
+    constexpr const char* BedroomInteriorPbrtExample         = "Bedroom Interior";
+    constexpr const char* CountryKitchenPbrtExample          = "Country Kitchen";
+    constexpr const char* ModernHallPbrtExample              = "Modern Hall";
+    constexpr const char* WoodenStaircasePbrtExample         = "Wooden Staircase";
+    constexpr const char* WhiteRoomPbrtExample               = "White Room";
+    constexpr const char* ModernLivingRoomPbrtExample        = "Modern Living Room";
+    constexpr const char* GlassOfWaterPbrtExample            = "Glass of Water";
+    constexpr const char* PontiacGtoPbrtExample              = "Pontiac GTO";
+    constexpr const char* VintageCarPbrtExample              = "Vintage Car";
+    constexpr const char* CoffeeMakerPbrtExample             = "Coffee Maker";
+    constexpr const char* LittleLampPbrtExample              = "Little Lamp";
+    constexpr const char* VictorianHousePbrtExample          = "Victorian House";
+    constexpr const char* SpaceshipPbrtExample               = "Spaceship";
+    constexpr const char* JapaneseClassroomPbrtExample       = "Japanese Classroom";
+    constexpr const char* DragonStatuePbrtExample            = "Dragon Statue";
+    constexpr const char* MaterialTestBallPbrtExample        = "Material Test Ball";
 
     // Curated entries for self-contained pbrt_scenes/*.pbrt example files (see
     // scene_registry.h's pbrt_scene_registry::build_curated_pbrt_scene_

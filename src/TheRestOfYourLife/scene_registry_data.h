@@ -497,6 +497,74 @@ inline std::vector<SceneDescriptor> builtin_scenes_part4() {
             "H21", 167, SceneNames::TransparentMachinesPbrtExample, SceneCategories::LargeScene,
             "A real pbrt-v4-scenes bundle (not bundled with this repo - see pbrt_scenes/README.md): detailed mechanical objects (gears, casings) rendered in transparent glass-like materials, shot as an animated camera fly-through. Five frames ship in the bundle (frame542/675/812/888/1266.pbrt); this entry renders a representative middle one (frame812).",
             "Medium", "transparent-machines/frame812.pbrt"),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H22", 206, SceneNames::GreyWhiteRoomPbrtExample, SceneCategories::LargeScene,
+            "A calm grey-and-white living room with tall arched windows, a round table and soft daylight (\"The Grey & White Room\" by Wig42, CC BY 3.0), one of Benedikt Bitterli's rendering-resources scenes, run as its pbrt-v4 file. Not bundled with this repo: the GUI downloads it from benedikt-bitterli.me on request (see pbrt_scenes/README.md).",
+            "Slow", "bitterli/living-room/scene-v4.pbrt", 3.0),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H23", 207, SceneNames::BedroomInteriorPbrtExample, SceneCategories::LargeScene,
+            "A furnished bedroom with a wardrobe, a made bed and light falling through a large window (\"Bedroom\" by SlykDrako, CC0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Slow", "bitterli/bedroom/scene-v4.pbrt"),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H24", 208, SceneNames::CountryKitchenPbrtExample, SceneCategories::LargeScene,
+            "A country kitchen with a range, copper lamps and a table by a sash window (\"Country Kitchen\" by Jay-Artist, CC BY 3.0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Slow", "bitterli/kitchen/scene-v4.pbrt"),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H25", 209, SceneNames::ModernHallPbrtExample, SceneCategories::LargeScene,
+            "A bright modern hall with a floating wooden staircase, a glass balustrade and polished stone tiles (\"Modern Hall\" by NewSee2l035, CC BY 3.0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Slow", "bitterli/staircase2/scene-v4.pbrt"),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H26", 210, SceneNames::WoodenStaircasePbrtExample, SceneCategories::LargeScene,
+            "A warm wooden staircase seen through an archway, with panelled walls and a polished floor (\"The Wooden Staircase\" by Wig42, CC BY 3.0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Slow", "bitterli/staircase/scene-v4.pbrt", 1.5),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H27", 211, SceneNames::WhiteRoomPbrtExample, SceneCategories::LargeScene,
+            "A white living room with sofas and a paper lantern, lit by tall windows (\"The White Room\" by Jay-Artist, CC BY 3.0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Slow", "bitterli/living-room-2/scene-v4.pbrt"),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H28", 212, SceneNames::ModernLivingRoomPbrtExample, SceneCategories::LargeScene,
+            "A modern living room with a white sofa, pink cushions, a red rug and shelves (\"The Modern Living Room\" by Wig42, CC BY 3.0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Slow", "bitterli/living-room-3/scene-v4.pbrt"),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H29", 213, SceneNames::GlassOfWaterPbrtExample, SceneCategories::LargeScene,
+            "A glass of water with ice cubes and a stream of water pouring in, in cool studio light (\"Glass of Water\" by aXel, CC0): refraction, caustics and rough dielectric surfaces, from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Medium", "bitterli/glass-of-water/scene-v4.pbrt", 0.5),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H30", 214, SceneNames::PontiacGtoPbrtExample, SceneCategories::LargeScene,
+            "A 1967 Pontiac GTO in dark green paint on a studio floor (\"Pontiac GTO 67\" by thecali, CC0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Medium", "bitterli/car2/scene-v4.pbrt"),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H31", 215, SceneNames::VintageCarPbrtExample, SceneCategories::LargeScene,
+            "An old vintage car in blue paint with chrome trim, in a grey studio (\"Old vintage car\" by piopis, CC0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Medium", "bitterli/car/scene-v4.pbrt", 0.6),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H32", 216, SceneNames::CoffeeMakerPbrtExample, SceneCategories::LargeScene,
+            "A retro orange coffee maker with a glass jug, in a dark studio (\"Coffee Maker\" by cekuhnen, CC BY 3.0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Medium", "bitterli/coffee/scene-v4.pbrt"),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H33", 217, SceneNames::LittleLampPbrtExample, SceneCategories::LargeScene,
+            "An articulated desk lamp with its bulb on, casting striped shadows over the floor (\"Little Lamp\" by UP3D, CC0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md). A heavy render: glass around a small bright light converges slowly.",
+            "Very Slow", "bitterli/lamp/scene-v4.pbrt"),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H34", 218, SceneNames::VictorianHousePbrtExample, SceneCategories::LargeScene,
+            "A white Victorian-style house with a bay window and a wraparound porch, lit by an open sky (\"Victorian Style House\" by MrChimp2313, CC0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Slow", "bitterli/house/scene-v4.pbrt"),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H35", 219, SceneNames::SpaceshipPbrtExample, SceneCategories::LargeScene,
+            "A detailed little spaceship with rocket engines and a glass canopy on a dark studio floor (\"4060.b Spaceship\" by thecali, CC0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Medium", "bitterli/spaceship/scene-v4.pbrt", 0.7),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H36", 220, SceneNames::JapaneseClassroomPbrtExample, SceneCategories::LargeScene,
+            "A Japanese classroom with rows of wooden desks and chairs facing a blackboard, in daylight (\"Japanese Classroom\" by NovaZeeke, CC BY 3.0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Slow", "bitterli/classroom/scene-v4.pbrt"),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H37", 221, SceneNames::DragonStatuePbrtExample, SceneCategories::LargeScene,
+            "A dragon with spread wings on a round base, in white (\"Dragon\" by Delatronic, CC BY 3.0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Medium", "bitterli/dragon/scene-v4.pbrt"),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H38", 222, SceneNames::MaterialTestBallPbrtExample, SceneCategories::LargeScene,
+            "A rough copper-coloured material ball with a T-shaped notch on a pedestal, on a checkered floor (CC0, Benedikt Bitterli's rendering-resources scenes): the classic scene for judging a material. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Medium", "bitterli/material-testball/scene-v4.pbrt"),
 
     };
 }
@@ -965,4 +1033,4 @@ inline const std::vector<SceneDescriptor>& get_builtin_scene_registry() {
         return all;
     }();
     return registry;
-}
+}

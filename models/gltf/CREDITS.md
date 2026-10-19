@@ -60,3 +60,7 @@ trademarks that appear in some of the sources' own pages are not part of the lic
 | water-bottle.glb | Water bottle | [Khronos glTF Sample Assets: WaterBottle](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/WaterBottle) | CC0 1.0 | Microsoft |
 | wine-bottles.glb | Wine bottles | [Poly Haven: wine_bottles_01](https://polyhaven.com/a/wine_bottles_01) | CC0 1.0 | Rico Cilliers, Jurita Burger / Poly Haven |
 | wooden-table.glb | Wooden table | [Poly Haven: wooden_table_02](https://polyhaven.com/a/wooden_table_02) | CC0 1.0 | Serhii Khromov / Poly Haven |
+| car-concept.glb | Car concept (scene) | [Khronos glTF Sample Assets: CarConcept](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CarConcept) | CC BY 4.0 | Eric Chadwick / Darmstadt Graphics Group GmbH |
+| broken-window.glb | Broken window (scene) | [Khronos glTF Sample Assets: GlassBrokenWindow](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/GlassBrokenWindow) | CC BY 4.0 | Eric Chadwick / Wayfair |
+| vase-with-flowers.glb | Glass vase with flowers (scene) | [Khronos glTF Sample Assets: GlassVaseFlowers](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/GlassVaseFlowers) | CC0 1.0 | Eric Chadwick, Rico Cilliers / Public |
+| dish-with-olives.glb | Iridescent dish with olives (scene) | [Khronos glTF Sample Assets: IridescentDishWithOlives](https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/IridescentDishWithOlives) | CC BY 4.0 | Eric Chadwick / Wayfair, LLC |

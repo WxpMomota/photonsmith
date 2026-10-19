@@ -127,6 +127,49 @@ PBRT_V4 = {
 }
 
 
+# --- Benedikt Bitterli's rendering resources ---------------------------------------------------------------------------------------
+# slug -> (title, author, the scene's page, licence). Each pbrt-v4 zip holds the scene (scene-v4.pbrt, models/, textures/, LICENSE.txt); every member except the Tungsten reference render is
+# fetched into pbrt_scenes/bitterli/<slug>/, where the scene runs as it is.
+BITTERLI = {
+    "living-room": ("The Grey & White Room", "Wig42", "http://www.blendswap.com/blends/view/75795", "CC BY 3.0"),
+    "bedroom": ("Bedroom", "SlykDrako", "http://www.blendswap.com/blends/view/17385", "CC0"),
+    "kitchen": ("Country Kitchen", "Jay-Artist", "http://www.blendswap.com/blends/view/42851", "CC BY 3.0"),
+    "staircase2": ("Modern Hall", "NewSee2l035", "http://www.blendswap.com/blends/view/51997", "CC BY 3.0"),
+    "staircase": ("The Wooden Staircase", "Wig42", "http://www.blendswap.com/blends/view/77668", "CC BY 3.0"),
+    "living-room-2": ("The White Room", "Jay-Artist", "http://www.blendswap.com/blends/view/41683", "CC BY 3.0"),
+    "living-room-3": ("The Modern Living Room", "Wig42", "http://www.blendswap.com/blends/view/75692", "CC BY 3.0"),
+    "glass-of-water": ("Glass of Water", "aXel", "http://www.blendswap.com/blends/view/21697", "CC0"),
+    "car2": ("Pontiac GTO 67", "thecali", "http://www.blendswap.com/blends/view/75850", "CC0"),
+    "car": ("Old vintage car", "piopis", "http://www.blendswap.com/blends/view/77134", "CC0"),
+    "coffee": ("Coffee Maker", "cekuhnen", "http://www.blendswap.com/blends/view/81696", "CC BY 3.0"),
+    "lamp": ("Little Lamp", "UP3D", "http://www.blendswap.com/blends/view/57000", "CC0"),
+    "house": ("Victorian Style House", "MrChimp2313", "http://www.blendswap.com/blends/view/74114", "CC0"),
+    "spaceship": ("4060.b Spaceship", "thecali", "http://www.blendswap.com/blends/view/75686", "CC0"),
+    "classroom": ("Japanese Classroom", "NovaZeeke", "http://www.blendswap.com/blends/view/75940", "CC BY 3.0"),
+    "dragon": ("Dragon", "Delatronic", "http://www.blendswap.com/blends/view/80766", "CC BY 3.0"),
+    "material-testball": ("Material Test Ball", "Benedikt Bitterli", "https://benedikt-bitterli.me/resources", "CC0"),
+}
+
+
+def bitterli_pack(slug, problems):
+    title, author, page, licence = BITTERLI[slug]
+    url = "https://benedikt-bitterli.me/resources/pbrt-v4/%s.zip" % slug
+    credit = "'%s' by %s, %s%s. From Benedikt Bitterli's Rendering Resources (benedikt-bitterli.me/resources)." % (
+        title, author, licence, " (credit the author and link https://creativecommons.org/licenses/by/3.0/)" if licence == "CC BY 3.0" else " (public domain)")
+    zf_file = HttpFile(url)
+    zf = zipfile.ZipFile(zf_file)
+    lines = ["pack|bitterli-%s|%s|%s|%s" % (slug, title, credit, page), "archive|%s|%d" % (url, zf_file.size)]
+    total_dl = total_disk = count = 0
+    for i in zf.infolist():
+        name = i.filename
+        if i.is_dir() or ".." in name or name.startswith("/") or not name.startswith(slug + "/") or "TungstenRender" in name: continue
+        lines.append("member|pbrt_scenes/bitterli/%s|%s|%d|%d|%08x|%d|%d|%d|%d" % (name, name, i.compress_size, i.file_size, i.CRC, i.header_offset, i.compress_type, len(i.orig_filename.encode("utf-8")), len(i.extra)))
+        total_dl += i.compress_size; total_disk += i.file_size; count += 1
+    if not any("scene-v4.pbrt" in l for l in lines): problems.append("bitterli %s has no scene-v4.pbrt" % slug)
+    print("bitterli-%-18s %4d files, download %7.1f MB, on disk %7.1f MB" % (slug, count, total_dl / 1e6, total_disk / 1e6))
+    return lines
+
+
 def quote_path(p):
     return "/".join(urllib.parse.quote(seg) for seg in p.split("/"))
 
@@ -242,6 +285,8 @@ def main():
     for spec in MCGUIRE:
         out += mcguire_pack(spec, problems)
     out += pbrt_v4_packs(problems)
+    for slug in BITTERLI:
+        out += bitterli_pack(slug, problems)
     if problems:
         print("\nPROBLEMS:", *problems, sep="\n  ")
         sys.exit(1)

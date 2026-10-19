@@ -7,7 +7,7 @@ file...** (or Add > Mesh), and then keeps its own size, so a big scan may need a
 What is in the folder depends on where the app comes from:
 
 * **The installers** (macOS dmg, Windows package) carry three small models whose terms are clear: Spot, Suzanne and the Utah teapot.
-* **A source checkout** has all 22 meshes in `models/` (about 66 MB) and the 52 glTF models in `models/gltf/` (about 27 MB), and the library shows every one it finds.
+* **A source checkout** has all 22 meshes in `models/` (about 66 MB) and the 56 glTF models in `models/gltf/` (about 38 MB), and the library shows every one it finds.
 
 To add your own to the library's folder, put the `.obj` there; only the models named in `src/shared/model_library.h` appear in the library, so add a line to its catalog (and a
 picture `models/thumbnails/<name>.png`, made by `scripts/make_model_thumbnails.sh`) to list a new one. Anything else is still available through Choose another file.
@@ -35,6 +35,8 @@ thing to do before publishing pictures or scenes made with a model, or shipping 
 | Silk pouf | Khronos glTF Sample Assets | CC BY 4.0: credit **Eric Chadwick (Copyright 2023 Wayfair, LLC)**, link the licence, say it was changed | no |
 | Sunglasses | Khronos glTF Sample Assets | CC BY 4.0: credit **Eric Chadwick (Darmstadt Graphics Group GmbH)**, link the licence, say it was changed | no |
 | Traffic cone | Khronos glTF Sample Assets | CC BY 4.0: credit **hinndia**, link the licence, say it was changed | no |
+| Car concept (scene), Broken window (scene), Iridescent dish with olives (scene) | Khronos glTF Sample Assets | CC BY 4.0: credit **Eric Chadwick** (Darmstadt Graphics Group GmbH, Wayfair), link the licence, say it was changed | no |
+| Glass vase with flowers (scene) | Khronos glTF Sample Assets | CC0 (public domain dedication) | no |
 | Alarm clock | Poly Haven | CC0 (public domain dedication) | no |
 | Apple | Poly Haven | CC0 (public domain dedication) | no |
 | Barrel | Poly Haven | CC0 (public domain dedication) | no |
@@ -53,8 +55,8 @@ thing to do before publishing pictures or scenes made with a model, or shipping 
 
 ## The glTF models
 
-`models/gltf/` holds 52 everyday objects and pieces of furniture as `.glb` files, from three free sources: **the Khronos glTF Sample Assets** (github.com/KhronosGroup/glTF-Sample-Assets, which gives each model
-its own licence: the ones here are CC0 or CC BY 4.0), **Poly Haven** (polyhaven.com: all CC0) and **Kenney's Furniture Kit** (kenney.nl: CC0). 46 are CC0 and need nothing; 6 are **CC BY 4.0**, which needs a
+`models/gltf/` holds 56 everyday objects, pieces of furniture and four small scenes (a car concept, a broken window, a glass vase with flowers, an iridescent dish with olives: their names say "(scene)") as `.glb` files, from three free sources: **the Khronos glTF Sample Assets** (github.com/KhronosGroup/glTF-Sample-Assets, which gives each model
+its own licence: the ones here are CC0 or CC BY 4.0), **Poly Haven** (polyhaven.com: all CC0) and **Kenney's Furniture Kit** (kenney.nl: CC0). 47 are CC0 and need nothing; 9 are **CC BY 4.0**, which needs a
 credit, a link to the licence and a note that the model was changed: `models/gltf/CREDITS.md` has the credit and the source page of every model, and travels with the files. They are added with the glTF importer (see
 SCENE_BUILDER.md), at their real size (an avocado is 10 cm, a sofa 2 m), with their colours and materials; a model in the library is a starting point for a scene, so it is worth setting its real height when it is placed in a photo.
 
