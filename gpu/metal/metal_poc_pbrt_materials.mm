@@ -46,7 +46,7 @@ static void applyReflectanceMapping(TriangleMaterial& mat, const pbrt_flatten::M
 
 // pbrt Diffuse: flat colour, or one of the textured variants (checkerboard, procedural noise, image) that the shader implements as modes of
 // materialType 25/26 (see the comments below). Split out of mapPbrtMaterial(), where this one case was 215 of its ~530 lines.
-TriangleMaterial MetalPocApp::mapPbrtDiffuseMaterial(const pbrt_flatten::Material& m, float sceneScale, float3 bboxCenter, float3 sceneOffset) {
+TriangleMaterial PbrtSceneLoader::mapPbrtDiffuseMaterial(const pbrt_flatten::Material& m, float sceneScale, float3 bboxCenter, float3 sceneOffset) {
     PackedFloat3 color{(float)m.color[0], (float)m.color[1], (float)m.color[2]};
     // A "reflectance" bound to a "checkerboard" Texture (B22,
     // section 162) - materialType 25, pbrt-v4's real UV-space
@@ -286,7 +286,7 @@ TriangleMaterial MetalPocApp::mapPbrtDiffuseMaterial(const pbrt_flatten::Materia
 // transmitColor = sigma_s per channel, both divided by the scene scale (a coefficient is per unit length, and the scene was rescaled); ior = eta;
 // roughness = the NormalizedFresnel constant c of the exit BSDF (as for materialType 18); conductorEta.x = the BSSRDF table's offset in the shared
 // float buffer, stored as a float.
-TriangleMaterial MetalPocApp::mapPbrtSubsurfaceMaterial(PbrtMaterialMapState& st, const pbrt_flatten::Material& m) {
+TriangleMaterial PbrtSceneLoader::mapPbrtSubsurfaceMaterial(PbrtMaterialMapState& st, const pbrt_flatten::Material& m) {
     const float eta = (float)m.ior;
     float nfC = 1.0f - 2.0f * fresnelMoment1(1.0f / eta);
     if (nfC <= 0.0f) nfC = 1e-6f;
@@ -303,7 +303,7 @@ TriangleMaterial MetalPocApp::mapPbrtSubsurfaceMaterial(PbrtMaterialMapState& st
 
 // The tabulated BSSRDF for a (g, eta) pair, computed once (the same CPU ComputeBeamDiffusionBSSRDF that OptiX and the CPU use) and stored in the shared
 // float buffer in the layout metal_poc_bssrdf.metal reads: n_rho, n_radius, rho samples, radius samples, profile, profile CDF. Returns its element offset.
-int MetalPocApp::bssrdfTableOffset(PbrtMaterialMapState& st, double g, double eta) {
+int PbrtSceneLoader::bssrdfTableOffset(PbrtMaterialMapState& st, double g, double eta) {
     const auto key = std::make_pair(g, eta);
     auto it = st.bssrdfTableCache.find(key);
     if (it != st.bssrdfTableCache.end()) return it->second;
@@ -324,7 +324,7 @@ int MetalPocApp::bssrdfTableOffset(PbrtMaterialMapState& st, double g, double et
 // buffer, and resolveHit() picks one at each hit, the second with probability `amount`, as pbrt-v4's MixMaterial does (and OptiX and the CPU).
 // `amount` <= 0 or >= 1 is just one material, left to the caller. Returns false (leaving `out` alone) for a nested Mix or a medium-bounding
 // sub-material, which keep the older load-time pick.
-bool MetalPocApp::mapPbrtPerHitMix(PbrtMaterialMapState& st, const pbrt_flatten::Material& m, int depth, TriangleMaterial& out) {
+bool PbrtSceneLoader::mapPbrtPerHitMix(PbrtMaterialMapState& st, const pbrt_flatten::Material& m, int depth, TriangleMaterial& out) {
     const pbrt_flatten::FlatScene& scene = st.scene;
     constexpr int kMaxMixDepth = 8;
     auto validIdx = [&](int i) { return i >= 0 && i < (int)scene.materials.size(); };
@@ -352,7 +352,7 @@ bool MetalPocApp::mapPbrtPerHitMix(PbrtMaterialMapState& st, const pbrt_flatten:
     return true;
 }
 
-TriangleMaterial MetalPocApp::mapPbrtMaterial(PbrtMaterialMapState& st, const pbrt_flatten::Material& m, int depth) {
+TriangleMaterial PbrtSceneLoader::mapPbrtMaterial(PbrtMaterialMapState& st, const pbrt_flatten::Material& m, int depth) {
     const pbrt_flatten::FlatScene& scene = st.scene;
     const float sceneScale = st.sceneScale;
     const float3 bboxCenter = st.bboxCenter;

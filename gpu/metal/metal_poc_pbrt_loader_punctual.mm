@@ -10,7 +10,7 @@
 #include <functional>
 
 // A goniometric light with a profile image: the first such light of a scene gets the one dedicated texture slot; false if this one cannot (an image that does not read or decode), and the caller draws it as a point light.
-bool MetalPocApp::addGoniometricImageLight(const pbrt_flatten::PunctualLight& pl, const PbrtToWorldFn& toWorld, const float3& emission) {
+bool PbrtSceneLoader::addGoniometricImageLight(const pbrt_flatten::PunctualLight& pl, const PbrtToWorldFn& toWorld, const float3& emission) {
         std::string bytes;
         if (pbrt_load::loadFileNear(pbrtScenePath, pl.filename, bytes) &&
             pbrt_load::detail::decodeInfiniteLightImage(pl.filename, bytes,
@@ -60,7 +60,7 @@ bool MetalPocApp::addGoniometricImageLight(const pbrt_flatten::PunctualLight& pl
 }
 
 // A projection light with a slide image (same rules as the goniometric one); false falls back to the uniform beam.
-bool MetalPocApp::addProjectionImageLight(const pbrt_flatten::PunctualLight& pl, const PbrtToWorldFn& toWorld, float intensityScale) {
+bool PbrtSceneLoader::addProjectionImageLight(const pbrt_flatten::PunctualLight& pl, const PbrtToWorldFn& toWorld, float intensityScale) {
         std::string bytes;
         if (pbrt_load::loadFileNear(pbrtScenePath, pl.filename, bytes) &&
             pbrt_load::detail::decodeInfiniteLightImage(pl.filename, bytes,
@@ -125,7 +125,7 @@ bool MetalPocApp::addProjectionImageLight(const pbrt_flatten::PunctualLight& pl,
 }
 
 // --- Punctual lights (point/spot/distant) ---------------------------
-void MetalPocApp::loadPbrtPunctualLights(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld, float sceneScale) {
+void PbrtSceneLoader::loadPbrtPunctualLights(const pbrt_flatten::FlatScene& scene, const PbrtToWorldFn& toWorld, float sceneScale) {
     // Point and spot both reuse PointLightData - the SAME GPU buffer/
     // shading path the hardcoded room's own point+spot lights already use
     // (see that struct's own comment: direction/cosOuterAngle/

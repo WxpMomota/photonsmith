@@ -29,7 +29,7 @@ constexpr size_t kMaxVoxels = 64u * 1024u * 1024u;
 
 // `cOff` is bboxCenter - sceneOffset / sceneScale (the same offset the rgbgrid branch derives), so the world->medium map composes with the Metal scene's rescale and recentre.
 // Fills `mat` and returns true when the grid was usable; otherwise leaves `mat` alone and returns false.
-bool MetalPocApp::mapNanovdbMedium(const pbrt_flatten::Medium& nm, float sceneScale, float cOffX, float cOffY, float cOffZ, TriangleMaterial& mat) {
+bool PbrtSceneLoader::mapNanovdbMedium(const pbrt_flatten::Medium& nm, float sceneScale, float cOffX, float cOffY, float cOffZ, TriangleMaterial& mat) {
     const std::shared_ptr<const nanovdb_dense::Grid> grid = cachedGrid(nm.nanovdbFilename, nm.nanovdbGridName);
     nanovdb_dense::Placement placement;
     if (!grid || !grid->ok() || !nanovdb_dense::placeInWorld(*grid, nm.nanovdbXform, placement)) return false;
