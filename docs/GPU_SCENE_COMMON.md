@@ -447,3 +447,23 @@ The Scene Builder's **Add > Room from a photo...** (`docs/PHOTO_TO_SCENE.md`, "R
 * **The light level was solved on the CPU/OptiX.** The Builder renders a draft of the room and scales the lights until its mean brightness matches the photo's (`calibrateRoomLight` in `scene_builder_photo.cpp`); on a Mac that draft goes through whatever renderer the Builder's own preview uses, so check that the number it settles on is about the same as the CPU's (a room that comes out twice as dark or bright would show it).
 
 Not Metal-specific and already covered: the room file reader (`src/shared/scene_room.h`, 18 `SceneRoomTest` cases) and the Python helper (60 tests in `tools/photo_to_room`, numpy only).
+
+## Where the staged plan stands, and what to do with the rest (Mac session, 2026-10-19; for the Windows session to answer)
+
+**Done, both halves:** stage 0 (`gpu_tessellate.h`, `gpu_scene_frame.h`), stage 1 (image and alpha-mask decoding, `gpu_scene_textures.h`, `srgb_decode.h`), stage 2 (the material decisions that really are common, `gpu_scene_materials.h`). Measured today: the two translators are about 4,600 lines on OptiX (`pbrt_gpu_builder.h` 1,880, `pbrt_gpu_builder_materials.h` 1,204, `scene_builder.cpp` 1,520) and 2,600 on Metal (`metal_poc_pbrt_loader.mm` 1,556, `_punctual` 272, `_materials` 699, `_nanovdb` 76), against 540 lines in the `gpu_scene_*` / `gpu_tessellate` headers. Stages 3 (a neutral material and texture table) and 4 (shapes and lights) are not started.
+
+**A change on the Mac side that matters here:** Metal's loader is now `PbrtSceneLoader` (`gpu/metal/metal_poc_scene_data.h`), a class with no GPU in it, and `metal_poc_loader_tests` loads bundled scenes and checks the arrays (#479). Before this, the only way to look at what Metal's loader produced was to render. So the Metal output can now be compared with something by a unit test, on a machine with no GPU.
+
+**Recommendation: do not build the full neutral IR (stage 3 as written). Share an inventory and test against it.**
+
+* The IR would be a third representation of the scene between `FlatScene` and each backend's arrays, and both backends would still have to pack from it into things that do not look alike: Metal rides per-material parameters in spare `TriangleMaterial` slots and has nine texture slots with a first-match policy; OptiX picks a mix material per hit and keeps native spheres, disks and cylinders. The decisions that were truly common are already shared (stages 0 to 2). What is left in the "decided independently" list of the proposal is mostly decisions about *which things exist*: which emitters are samplable, how many triangles a shape tessellates into, which shapes a backend keeps native, what a medium reduces to.
+* Those are countable. A pure function `inventory(const FlatScene&, const TessellationCaps&)` in `src/shared` (a new `gpu_scene_inventory.h`) would return: triangles after tessellation (and instanced ones), spheres, disks, cylinders, samplable area lights, punctual lights by kind, media by kind, whether a camera medium exists. Each backend then has a CPU-side test asserting that the arrays its builder produced equal the inventory for a list of bundled scenes. Where they disagree, that is the next thing to look at, and the test fails the day someone adds a shape on one side.
+* On the Mac this is one more block in `metal_poc_loader_tests.mm`. On OptiX it needs the builder to run without a GPU; I could not tell from here whether `pbrt_gpu_builder.h` allocates device memory while it builds (`SceneData` is host arrays first, as far as I read), so that is the question below.
+
+**Questions for the Windows session**
+
+1. Can `PbrtGpuBuilder` (or whatever the class is called now) build a `SceneData` in a unit test with no CUDA context? If it can, the inventory test costs about a day on each side. If not, a thin "host arrays only" step would have to come out of it first, which is worth doing for the same reason as on the Mac.
+2. Do you agree to stop at the inventory and not do stage 3? If you want the material and texture table anyway, say what the OptiX side would gain from it that stages 1 and 2 did not already give; the Mac side will review it against Metal's slot limits.
+3. Stage 4 (shapes and lights) only after the inventory test has shown where the two really differ. The proposal's own warning stands: that is where they diverge most, and a merged shape walk would have to keep Metal's visit order (area-light triangles first).
+
+The Mac will write `gpu_scene_inventory.h` and the Metal half of the test once the Windows session has answered 1 and 2, so that the header is shaped by both builders and not by one.
