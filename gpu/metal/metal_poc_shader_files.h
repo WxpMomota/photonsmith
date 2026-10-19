@@ -55,8 +55,11 @@ inline const char* const* metalShaderFileNames(int* outCount) {
         "metal_poc_kernel_subsurface.metal", // the BSSRDF probe walk and the subsurface material (uses resolveHit and shadeNormalizedFresnel)
         "metal_poc_kernel_bounce.metal",   // scattering by material, glass-medium bookkeeping, traceBounce()
         "metal_poc_kernel.metal",          // primaryRayKernel itself
-        "metal_poc_test_kernels.metal",
     };
     *outCount = (int)(sizeof(kFiles) / sizeof(kFiles[0]));
     return kFiles;
 }
+
+// The device-side test kernels (the shader unit tests dispatch them directly): concatenated AFTER the files above by the test program only, so a user's run-time compile does not carry them
+// and the app does not ship them (scripts/build_and_deploy_macos.sh skips this one file).
+inline const char* metalTestShaderFileName() { return "metal_poc_test_kernels.metal"; }

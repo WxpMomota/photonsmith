@@ -39,8 +39,10 @@ int main() {
         NSMutableString* shaderSource = [NSMutableString string];
         int shaderFileCount = 0;
         const char* const* shaderFileNames = metalShaderFileNames(&shaderFileCount);
-        for (int i = 0; i < shaderFileCount; ++i) {
-            NSString* fragPath = [shaderDir stringByAppendingPathComponent:@(shaderFileNames[i])];
+        std::vector<const char*> shaderFiles(shaderFileNames, shaderFileNames + shaderFileCount);
+        shaderFiles.push_back(metalTestShaderFileName());   // (the test kernels are not in the production list)
+        for (const char* shaderFile : shaderFiles) {
+            NSString* fragPath = [shaderDir stringByAppendingPathComponent:@(shaderFile)];
             NSString* fragSource = [NSString stringWithContentsOfFile:fragPath encoding:NSUTF8StringEncoding error:&error];
             if (!fragSource) {
                 fprintf(stderr, "FAIL: could not read shader source at %s: %s\n",
