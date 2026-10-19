@@ -39,3 +39,10 @@
 # miss). Other pre-existing binary types under pbrt_scenes/ (*.exr, *.ply,
 # *.bmp, etc.) have this same latent exposure but are out of scope here.
 *.bsdf -text
+
+# Every text file is stored with LF line endings, whatever a contributor's core.autocrlf says (a checkout on Windows still gets CRLF with autocrlf=true). Before this
+# line two files were stored with CRLF (scene_registry_data.h, camera_path.h), so an edit that kept the file's endings was a diff of every line, and an edit that did
+# not was a diff of every line the other way. Batch files must keep CRLF to run under cmd.exe.
+* text=auto
+*.bat text eol=crlf
+*.cmd text eol=crlf
