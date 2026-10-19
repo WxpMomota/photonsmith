@@ -81,7 +81,8 @@ def functions(path):
             parent = stack[-1] if stack else "top"
             if parent in ("top", "ns", "type"):
                 h = head.strip()
-                if re.search(r"\b(namespace)\b", h) or re.search(r'extern\s*"', h) or h.endswith('""'):
+                # (extern "C" { ... } holds functions; extern "C" __global__ void f() { ... } is one)
+                if re.search(r"\b(namespace)\b", h) or (re.search(r'extern\s*"', h) and "(" not in h) or h.endswith('""'):
                     kind = "ns"
                 elif re.match(r"^(template\s*<[^>]*>\s*)?(typedef\s+)?(struct|class|union|enum)\b", h) and "(" not in h:
                     kind = "type"
