@@ -879,6 +879,14 @@ static void compositeTestExportGltf(const CompositeTestContext &c) {
 	}
 	QString bad;
 	check(!sb->importGltf(QDir::tempPath() + "/rt_selftest_composite.png", &bad) && !bad.isEmpty(), "a file that is not a model is refused with a message: " + bad.left(80));
+	// the model library's glTF models: one is added from the library (the source checkout's models folder is next to the package), in colour, at its real size
+	sb->newScene();
+	const size_t before = sb->document().objects.size();
+	const bool added = sb->addLibraryModel(QStringLiteral("avocado"));
+	const scene_doc::Document &after = sb->document();
+	const scene_doc::Object *fruit = after.objects.size() > before ? &after.objects.back() : nullptr;
+	check(added && fruit && fruit->shape == scene_doc::ShapeKind::Mesh && fruit->meshScale > 0.03 && fruit->meshScale < 0.2 && !fruit->material.imageFile.empty(),
+	      QString("a glTF model from the library is added at its real size and with its picture (scale %1; the model file %2 there)").arg(fruit ? fruit->meshScale : -1.0).arg(QFileInfo::exists(QCoreApplication::applicationDirPath() + "/../models/gltf/avocado.glb") ? "is" : "is not"));
 }
 
 // The photo belongs to the scene: a scene matched to a photo, saved, then a new scene (no photo), then the saved one opened again has its photo, its overlay, its Render into the photo state and

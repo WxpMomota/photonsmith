@@ -8255,23 +8255,23 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
         <translation>Crée une vidéo de la scène depuis une caméra qui survole vos vues de caméra enregistrées (deux ou plus nécessaires)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="67"/>
+        <location filename="../scene_builder_models.cpp" line="76"/>
         <source>Added %1 (%2 triangles). It stands on the floor, about 1.6 units across; use Scale to resize it.</source>
         <translation>%1 ajouté (%2 triangles). Il est posé sur le sol et mesure environ 1,6 unité ; utilisez Échelle pour le redimensionner.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="75"/>
-        <location filename="../scene_builder_models.cpp" line="133"/>
+        <location filename="../scene_builder_models.cpp" line="84"/>
+        <location filename="../scene_builder_models.cpp" line="142"/>
         <source>Model library</source>
         <translation>Bibliothèque de modèles</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="80"/>
+        <location filename="../scene_builder_models.cpp" line="89"/>
         <source>Search by name</source>
         <translation>Rechercher par nom</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="103"/>
+        <location filename="../scene_builder_models.cpp" line="112"/>
         <source>%1
 About %2 thousand triangles
 From: %3</source>
@@ -8280,29 +8280,33 @@ Environ %2 milliers de triangles
 Origine : %3</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="111"/>
+        <location filename="../scene_builder_models.cpp" line="120"/>
         <source>No models were found next to the app (a models folder). Use &quot;Choose another file...&quot; to add any .obj or .ply file.</source>
         <translation>Aucun modèle n&apos;a été trouvé à côté de l&apos;application (un dossier models). Utilisez « Choisir un autre fichier... » pour ajouter n&apos;importe quel fichier .obj ou .ply.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="113"/>
+        <location filename="../scene_builder_models.cpp" line="122"/>
+        <source>%1 models. A scan is added standing on the floor, about 1.6 units across; an everyday object or piece of furniture keeps its real size (in metres, as a glTF model does); use Scale to resize either. Each model keeps the licence of its source (docs/MODELS.md): check it before you publish pictures or scenes made with one.</source>
+        <translation>%1 modèles. Un scan est ajouté debout sur le sol, sur environ 1,6 unité de large ; un objet du quotidien ou un meuble garde sa taille réelle (en mètres, comme un modèle glTF) ; utilisez Échelle pour redimensionner l&apos;un ou l&apos;autre. Chaque modèle garde la licence de sa source (docs/MODELS.md) : vérifiez-la avant de publier des images ou des scènes faites avec l&apos;un d&apos;eux.</translation>
+    </message>
+    <message>
         <source>%1 models. A model is added standing on the floor, about 1.6 units across; use Scale to resize it. Each model keeps the licence of its source (docs/MODELS.md): check it before you publish pictures or scenes made with one.</source>
-        <translation>%1 modèles. Un modèle est ajouté posé sur le sol, d&apos;environ 1,6 unité ; utilisez Échelle pour le redimensionner. Chaque modèle conserve la licence de sa source (docs/MODELS.md) : vérifiez-la avant de publier des images ou des scènes faites avec l&apos;un d&apos;eux.</translation>
+        <translation type="vanished">%1 modèles. Un modèle est ajouté posé sur le sol, d&apos;environ 1,6 unité ; utilisez Échelle pour le redimensionner. Chaque modèle conserve la licence de sa source (docs/MODELS.md) : vérifiez-la avant de publier des images ou des scènes faites avec l&apos;un d&apos;eux.</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
-        <location filename="../scene_builder_models.cpp" line="118"/>
+        <location filename="../scene_builder_models.cpp" line="127"/>
         <location filename="../scene_builder_widget.cpp" line="299"/>
         <source>Add</source>
         <translation>Ajouter</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="119"/>
+        <location filename="../scene_builder_models.cpp" line="128"/>
         <source>Choose another file...</source>
         <translation>Choisir un autre fichier...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="133"/>
+        <location filename="../scene_builder_models.cpp" line="142"/>
         <source>That model could not be read.</source>
         <translation>Ce modèle n&apos;a pas pu être lu.</translation>
     </message>
@@ -10551,44 +10555,49 @@ Cela remplace la scène actuelle (Annuler la rétablit).</translation>
         <translation>Ce qui est devant les objets est enregistré avec la scène ; Rendre dans la photo le laisse devant.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="71"/>
+        <location filename="../scene_builder_gltf.cpp" line="72"/>
         <source>The file could not be opened.</source>
         <translation>Le fichier n&apos;a pas pu être ouvert.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="72"/>
+        <location filename="../scene_builder_gltf.cpp" line="73"/>
         <source>The file is too large to import (over 600 MB).</source>
         <translation>Le fichier est trop volumineux pour être importé (plus de 600 Mo).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="94"/>
+        <location filename="../scene_builder_gltf.cpp" line="95"/>
         <source>The model has no size.</source>
         <translation>Le modèle n&apos;a pas de taille.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="101"/>
+        <location filename="../scene_builder_gltf.cpp" line="102"/>
         <source>Model</source>
         <translation>Modèle</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="126"/>
+        <location filename="../scene_builder_gltf.cpp" line="132"/>
         <source>A part of the model is too large to import.</source>
         <translation>Une partie du modèle est trop volumineuse pour être importée.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="129"/>
+        <location filename="../scene_builder_gltf.cpp" line="135"/>
         <source>The model could not be written to %1.</source>
         <translation>Le modèle n&apos;a pas pu être écrit dans %1.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="147"/>
+        <location filename="../scene_builder_gltf.cpp" line="168"/>
         <source>Added %1: %2 part(s), %3 triangles, %4 m tall%5.</source>
         <translation>%1 ajouté : %2 partie(s), %3 triangles, %4 m de haut%5.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="148"/>
+        <location filename="../scene_builder_gltf.cpp" line="169"/>
         <source> in the file, shown 1.6 units tall</source>
         <translation> dans le fichier, affiché sur 1,6 unité de haut</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_gltf.cpp" line="170"/>
+        <source>A glowing part of the model has too many triangles to be a light, so it does not glow.</source>
+        <translation>Une partie lumineuse du modèle a trop de triangles pour être une lumière : elle ne brille donc pas.</translation>
     </message>
 </context>
 <context>

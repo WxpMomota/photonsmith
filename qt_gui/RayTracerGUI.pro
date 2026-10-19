@@ -58,6 +58,7 @@ SOURCES += \
 	mainwindow_selftest_modes.cpp \
 	mainwindow_selftest_live.cpp \
 	mainwindow_selftest_photo.cpp \
+	mainwindow_selftest_models.cpp \
 	mainwindow_photo_install.cpp \
 	mainwindow_my_scenes.cpp \
 	mainwindow_denoiser.cpp \

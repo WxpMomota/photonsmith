@@ -260,3 +260,17 @@ TEST(GltfImportTest, EveryFileOfAFolderReads) {
 	}
 	EXPECT_GT(files, 0);
 }
+
+TEST(GltfImportTest, AnEmissivePictureMeansTheFactorIsNotTheSurfacesGlow) {
+	// emissiveFactor [1,1,1] with an emissive texture: the factor multiplies the picture (mostly black), so read alone it would make the whole model a lamp
+	const std::string extra = ",\"materials\":[{\"emissiveFactor\":[1,1,1],\"emissiveTexture\":{\"index\":0}}],\"textures\":[{\"source\":0}],\"images\":[{\"uri\":\"data:image/png;base64,AAAA\"}]";
+	const gltf_import::Result r = gltf_import::parse(triangleGltf("{\"mesh\":0}", extra, ",\"material\":0"));
+	ASSERT_TRUE(r.ok) << r.error;
+	EXPECT_EQ(r.model.materials[0].emissive[0], 0.0);
+	bool said = false;
+	for (const std::string& n : r.model.notes) said = said || n.find("Emissive pictures") != std::string::npos;
+	EXPECT_TRUE(said);
+	const gltf_import::Result plain = gltf_import::parse(triangleGltf("{\"mesh\":0}", ",\"materials\":[{\"emissiveFactor\":[1,0.5,0]}]", ",\"material\":0"));
+	ASSERT_TRUE(plain.ok);
+	EXPECT_EQ(plain.model.materials[0].emissive[0], 1.0) << "a plain emissive factor still glows";
+}

@@ -8157,23 +8157,23 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>制作一段视频：相机依次飞过你保存的相机视图（需要两个或更多）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="67"/>
+        <location filename="../scene_builder_models.cpp" line="76"/>
         <source>Added %1 (%2 triangles). It stands on the floor, about 1.6 units across; use Scale to resize it.</source>
         <translation>已添加 %1（%2 个三角形）。它立在地面上，宽约 1.6 个单位；可用“缩放”调整大小。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="75"/>
-        <location filename="../scene_builder_models.cpp" line="133"/>
+        <location filename="../scene_builder_models.cpp" line="84"/>
+        <location filename="../scene_builder_models.cpp" line="142"/>
         <source>Model library</source>
         <translation>模型库</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="80"/>
+        <location filename="../scene_builder_models.cpp" line="89"/>
         <source>Search by name</source>
         <translation>按名称搜索</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="103"/>
+        <location filename="../scene_builder_models.cpp" line="112"/>
         <source>%1
 About %2 thousand triangles
 From: %3</source>
@@ -8182,29 +8182,33 @@ From: %3</source>
 来源：%3</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="111"/>
+        <location filename="../scene_builder_models.cpp" line="120"/>
         <source>No models were found next to the app (a models folder). Use &quot;Choose another file...&quot; to add any .obj or .ply file.</source>
         <translation>在应用旁边没有找到模型（models 文件夹）。可用“选择其他文件...”添加任意 .obj 或 .ply 文件。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="113"/>
+        <location filename="../scene_builder_models.cpp" line="122"/>
+        <source>%1 models. A scan is added standing on the floor, about 1.6 units across; an everyday object or piece of furniture keeps its real size (in metres, as a glTF model does); use Scale to resize either. Each model keeps the licence of its source (docs/MODELS.md): check it before you publish pictures or scenes made with one.</source>
+        <translation>%1 个模型。扫描模型会立在地面上，宽约 1.6 个单位；日常物品和家具保持真实尺寸（和 glTF 模型一样以米为单位）；两者都可用“缩放”调整大小。每个模型都沿用其来源的许可协议（docs/MODELS.md）：发布用它们制作的图片或场景之前请先查看。</translation>
+    </message>
+    <message>
         <source>%1 models. A model is added standing on the floor, about 1.6 units across; use Scale to resize it. Each model keeps the licence of its source (docs/MODELS.md): check it before you publish pictures or scenes made with one.</source>
-        <translation>%1 个模型。模型会立在地面上添加，宽约 1.6 个单位；可用“缩放”调整大小。每个模型沿用其来源的许可（docs/MODELS.md）：用它制作的图片或场景在发布前请先查看。</translation>
+        <translation type="vanished">%1 个模型。模型会立在地面上添加，宽约 1.6 个单位；可用“缩放”调整大小。每个模型沿用其来源的许可（docs/MODELS.md）：用它制作的图片或场景在发布前请先查看。</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
-        <location filename="../scene_builder_models.cpp" line="118"/>
+        <location filename="../scene_builder_models.cpp" line="127"/>
         <location filename="../scene_builder_widget.cpp" line="299"/>
         <source>Add</source>
         <translation>添加</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="119"/>
+        <location filename="../scene_builder_models.cpp" line="128"/>
         <source>Choose another file...</source>
         <translation>选择其他文件...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="133"/>
+        <location filename="../scene_builder_models.cpp" line="142"/>
         <source>That model could not be read.</source>
         <translation>无法读取该模型。</translation>
     </message>
@@ -10453,44 +10457,49 @@ This replaces the scene you have now (Undo brings it back).</source>
         <translation>物体前面的内容会随场景保存；“渲染到照片中”会让它保持在前面。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="71"/>
+        <location filename="../scene_builder_gltf.cpp" line="72"/>
         <source>The file could not be opened.</source>
         <translation>无法打开文件。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="72"/>
+        <location filename="../scene_builder_gltf.cpp" line="73"/>
         <source>The file is too large to import (over 600 MB).</source>
         <translation>文件太大，无法导入（超过 600 MB）。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="94"/>
+        <location filename="../scene_builder_gltf.cpp" line="95"/>
         <source>The model has no size.</source>
         <translation>模型没有大小。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="101"/>
+        <location filename="../scene_builder_gltf.cpp" line="102"/>
         <source>Model</source>
         <translation>模型</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="126"/>
+        <location filename="../scene_builder_gltf.cpp" line="132"/>
         <source>A part of the model is too large to import.</source>
         <translation>模型的某一部分太大，无法导入。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="129"/>
+        <location filename="../scene_builder_gltf.cpp" line="135"/>
         <source>The model could not be written to %1.</source>
         <translation>无法把模型写入 %1。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="147"/>
+        <location filename="../scene_builder_gltf.cpp" line="168"/>
         <source>Added %1: %2 part(s), %3 triangles, %4 m tall%5.</source>
         <translation>已添加 %1：%2 个部分，%3 个三角形，高 %4 米%5。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="148"/>
+        <location filename="../scene_builder_gltf.cpp" line="169"/>
         <source> in the file, shown 1.6 units tall</source>
         <translation>（文件中的尺寸，按 1.6 单位高显示）</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_gltf.cpp" line="170"/>
+        <source>A glowing part of the model has too many triangles to be a light, so it does not glow.</source>
+        <translation>模型中发光的部分三角形太多，无法作为光源，所以不发光。</translation>
     </message>
 </context>
 <context>

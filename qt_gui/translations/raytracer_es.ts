@@ -8203,23 +8203,23 @@ Añade formas y luces con el botón Añadir. Arrástralas en la vista de disposi
         <translation>Crea un vídeo de la escena desde una cámara que vuela por tus vistas de cámara guardadas (hacen falta dos o más)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="67"/>
+        <location filename="../scene_builder_models.cpp" line="76"/>
         <source>Added %1 (%2 triangles). It stands on the floor, about 1.6 units across; use Scale to resize it.</source>
         <translation>Se añadió %1 (%2 triángulos). Está sobre el suelo y mide unas 1,6 unidades; usa Escala para cambiar su tamaño.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="75"/>
-        <location filename="../scene_builder_models.cpp" line="133"/>
+        <location filename="../scene_builder_models.cpp" line="84"/>
+        <location filename="../scene_builder_models.cpp" line="142"/>
         <source>Model library</source>
         <translation>Biblioteca de modelos</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="80"/>
+        <location filename="../scene_builder_models.cpp" line="89"/>
         <source>Search by name</source>
         <translation>Buscar por nombre</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="103"/>
+        <location filename="../scene_builder_models.cpp" line="112"/>
         <source>%1
 About %2 thousand triangles
 From: %3</source>
@@ -8228,29 +8228,33 @@ Unos %2 mil triángulos
 Procedencia: %3</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="111"/>
+        <location filename="../scene_builder_models.cpp" line="120"/>
         <source>No models were found next to the app (a models folder). Use &quot;Choose another file...&quot; to add any .obj or .ply file.</source>
         <translation>No se encontraron modelos junto a la aplicación (una carpeta models). Usa «Elegir otro archivo...» para añadir cualquier archivo .obj o .ply.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="113"/>
+        <location filename="../scene_builder_models.cpp" line="122"/>
+        <source>%1 models. A scan is added standing on the floor, about 1.6 units across; an everyday object or piece of furniture keeps its real size (in metres, as a glTF model does); use Scale to resize either. Each model keeps the licence of its source (docs/MODELS.md): check it before you publish pictures or scenes made with one.</source>
+        <translation>%1 modelos. Un escaneo se añade de pie sobre el suelo, de unas 1,6 unidades de ancho; un objeto cotidiano o un mueble conserva su tamaño real (en metros, como un modelo glTF); usa Escala para cambiar el tamaño de cualquiera de ellos. Cada modelo conserva la licencia de su fuente (docs/MODELS.md): compruébala antes de publicar imágenes o escenas hechas con uno.</translation>
+    </message>
+    <message>
         <source>%1 models. A model is added standing on the floor, about 1.6 units across; use Scale to resize it. Each model keeps the licence of its source (docs/MODELS.md): check it before you publish pictures or scenes made with one.</source>
-        <translation>%1 modelos. Un modelo se añade sobre el suelo y mide unas 1,6 unidades; usa Escala para cambiar su tamaño. Cada modelo conserva la licencia de su origen (docs/MODELS.md): consúltala antes de publicar imágenes o escenas hechas con uno.</translation>
+        <translation type="vanished">%1 modelos. Un modelo se añade sobre el suelo y mide unas 1,6 unidades; usa Escala para cambiar su tamaño. Cada modelo conserva la licencia de su origen (docs/MODELS.md): consúltala antes de publicar imágenes o escenas hechas con uno.</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
-        <location filename="../scene_builder_models.cpp" line="118"/>
+        <location filename="../scene_builder_models.cpp" line="127"/>
         <location filename="../scene_builder_widget.cpp" line="299"/>
         <source>Add</source>
         <translation>Añadir</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="119"/>
+        <location filename="../scene_builder_models.cpp" line="128"/>
         <source>Choose another file...</source>
         <translation>Elegir otro archivo...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="133"/>
+        <location filename="../scene_builder_models.cpp" line="142"/>
         <source>That model could not be read.</source>
         <translation>No se pudo leer ese modelo.</translation>
     </message>
@@ -10499,44 +10503,49 @@ Esto reemplaza la escena actual (Deshacer la recupera).</translation>
         <translation>Lo que está delante de los objetos se guarda con la escena; Renderizar en la foto lo deja delante.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="71"/>
+        <location filename="../scene_builder_gltf.cpp" line="72"/>
         <source>The file could not be opened.</source>
         <translation>No se pudo abrir el archivo.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="72"/>
+        <location filename="../scene_builder_gltf.cpp" line="73"/>
         <source>The file is too large to import (over 600 MB).</source>
         <translation>El archivo es demasiado grande para importarlo (más de 600 MB).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="94"/>
+        <location filename="../scene_builder_gltf.cpp" line="95"/>
         <source>The model has no size.</source>
         <translation>El modelo no tiene tamaño.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="101"/>
+        <location filename="../scene_builder_gltf.cpp" line="102"/>
         <source>Model</source>
         <translation>Modelo</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="126"/>
+        <location filename="../scene_builder_gltf.cpp" line="132"/>
         <source>A part of the model is too large to import.</source>
         <translation>Una parte del modelo es demasiado grande para importarla.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="129"/>
+        <location filename="../scene_builder_gltf.cpp" line="135"/>
         <source>The model could not be written to %1.</source>
         <translation>No se pudo escribir el modelo en %1.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="147"/>
+        <location filename="../scene_builder_gltf.cpp" line="168"/>
         <source>Added %1: %2 part(s), %3 triangles, %4 m tall%5.</source>
         <translation>Se añadió %1: %2 parte(s), %3 triángulos, %4 m de alto%5.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="148"/>
+        <location filename="../scene_builder_gltf.cpp" line="169"/>
         <source> in the file, shown 1.6 units tall</source>
         <translation> en el archivo, mostrado de 1,6 unidades de alto</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_gltf.cpp" line="170"/>
+        <source>A glowing part of the model has too many triangles to be a light, so it does not glow.</source>
+        <translation>Una parte brillante del modelo tiene demasiados triángulos para ser una luz, así que no brilla.</translation>
     </message>
 </context>
 <context>

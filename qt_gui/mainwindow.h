@@ -170,6 +170,7 @@ public:
 	void runMaterialSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_photo.cpp
 	void runSkySelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_photo.cpp
 	void runCameraSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_photo.cpp
+	void runModelThumbsSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_models.cpp
 	void runCompositeSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_photo.cpp
 
 	// Called from main.cpp, before any MainWindow exists, to decide which

@@ -239,6 +239,8 @@ public:
 	void removePhotoForTest() { m_doc.photo = scene_doc::PhotoBackdrop(); documentChanged(); }   // what the Remove the photo button does
 	QString launcherPathForTest() const { return launcherPath(); }
 	QString workFolderForTest() const { return workFolder(); }
+	void clearObjectsForTest() { m_doc.objects.clear(); m_sel = {SelKind::None, 0}; documentChanged(); rebuildList(); }   // an empty scene (the lights stay)
+	void setThumbnailViewForTest(const scene_doc::Float3 &eye, const scene_doc::Float3 &target) { m_doc.camera.position = eye; m_doc.camera.target = target; m_doc.camera.up = {0.0, 1.0, 0.0}; m_doc.camera.fov = 35.0; m_doc.camera.lensRadius = 0.0; m_doc.render.width = 160; m_doc.render.height = 160; documentChanged(); }
 	int daySkyIndexForTest() const { return daySkyIndex(m_doc); }
 	QString previewButtonTextForTest() const;
 	QString previewStatusForTest() const;

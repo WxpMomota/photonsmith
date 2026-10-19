@@ -40,6 +40,7 @@ struct Material {
 	double clearcoat = 0.0;
 	double emissive[3] = {0, 0, 0};   // already multiplied by the emissive strength
 	int baseColorImage = -1;          // index into Model::images, -1: none
+	int metalRoughImage = -1;         // the metal (blue) and roughness (green) picture, which multiplies the two factors: a caller that can decode pictures averages it, else the factors stand
 	bool doubleSided = false;
 };
 
@@ -370,10 +371,15 @@ inline Result parse(const std::string& bytes, const FileFetcher& fetch = FileFet
 				if (texture) mat.baseColorImage = importImage(intOr(get(*texture, "source"), -1));
 				if (get(*tex, "texCoord") && intOr(get(*tex, "texCoord"), 0) != 0) d.note("A picture uses a second set of texture coordinates, which is not read.");
 			}
-			if (get(*pbr, "metallicRoughnessTexture")) d.note("Metal and roughness pictures are not read: those surfaces use their plain values.");
+			if (const Json* tex = get(*pbr, "metallicRoughnessTexture")) {
+				const Json* texture = at(textures, intOr(get(*tex, "index"), -1));
+				if (texture) mat.metalRoughImage = importImage(intOr(get(*texture, "source"), -1));
+				d.note("Metal and roughness pictures are replaced by their average over the surface.");
+			}
 		}
 		if (get(m, "normalTexture")) d.note("Normal maps are not read.");
-		if (get(m, "emissiveTexture")) d.note("Emissive pictures are not read.");
+		const bool emissivePicture = get(m, "emissiveTexture") != nullptr;   // (the factor multiplies the picture, which is mostly black: read alone it would make the whole surface glow)
+		if (emissivePicture) d.note("Emissive pictures are not read: those surfaces do not glow.");
 		if (get(m, "alphaMode") && strOr(get(m, "alphaMode")) != "OPAQUE") d.note("Transparent and cut-out surfaces (alpha) are drawn opaque.");
 		mat.doubleSided = get(m, "doubleSided") && get(m, "doubleSided")->type == Json::Type::Bool && get(m, "doubleSided")->b;
 		double strength = 1.0;
@@ -386,7 +392,7 @@ inline Result parse(const std::string& bytes, const FileFetcher& fetch = FileFet
 			if (get(*extensions, "KHR_materials_pbrSpecularGlossiness")) d.note("The specular-glossiness material is not read: its surfaces use plain colours.");
 		}
 		if (const Json* e = get(m, "emissiveFactor"))
-			if (e->type == Json::Type::Arr && e->a.size() == 3)
+			if (!emissivePicture && e->type == Json::Type::Arr && e->a.size() == 3)
 				for (size_t k = 0; k < 3; ++k) mat.emissive[k] = std::max(0.0, numOr(&e->a[k], 0.0)) * strength;
 		model.materials.push_back(std::move(mat));
 	}

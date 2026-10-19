@@ -30,6 +30,7 @@ namespace {
 
 constexpr qint64 kMaxModelBytes = 600ll * 1000 * 1000;
 constexpr qint64 kMaxPartFileBytes = 200ll * 1000 * 1000;
+constexpr size_t kMaxLightTriangles = 5000;   // a glowing part with more triangles than this is not made a light
 
 // The Builder's material for a glTF one: glass when it transmits, a metal when it is metallic, a coated surface when it has a clearcoat, else a plain diffuse one; the base-colour picture (a file) goes
 // on a diffuse or coated surface. glTF's roughness r gives the microfacet width r * r, which the renderer's roughness (remapped by a square root) says as r to the fourth.
@@ -103,7 +104,11 @@ bool SceneBuilderWidget::importGltf(const QString &file, QString *message) {
 	const QString folder = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/imported_models/") + stem + QLatin1Char('-') + id;
 	QDir().mkpath(folder);
 	std::vector<QString> pictureOf(model.images.size());
+	std::vector<bool> colourPicture(model.images.size(), false);   // (only the pictures that colour a surface are kept as files)
+	for (const gltf_import::Material &m : model.materials)
+		if (m.baseColorImage >= 0) colourPicture[static_cast<size_t>(m.baseColorImage)] = true;
 	for (size_t i = 0; i < model.images.size(); ++i) {
+		if (!colourPicture[i]) continue;
 		const gltf_import::Image &image = model.images[i];
 		QImage decoded;
 		if (!decoded.loadFromData(image.bytes.data(), static_cast<uint>(image.bytes.size()))) continue;   // (a picture format Qt cannot read, such as WebP without its plugin: that surface keeps its plain colour)
@@ -120,6 +125,7 @@ bool SceneBuilderWidget::importGltf(const QString &file, QString *message) {
 		pictureOf[i] = QDir::toNativeSeparators(path);
 	}
 	std::vector<Object> objects;
+	bool glowDropped = false;
 	for (size_t i = 0; i < model.parts.size(); ++i) {
 		const gltf_import::Part &part = model.parts[i];
 		const std::string ply = gltf_import::toPly(part, offset, 2.0 / norm);
@@ -128,7 +134,20 @@ bool SceneBuilderWidget::importGltf(const QString &file, QString *message) {
 		QFile out(path);
 		if (!out.open(QIODevice::WriteOnly) || out.write(ply.data(), static_cast<qint64>(ply.size())) != static_cast<qint64>(ply.size())) return fail(tr("The model could not be written to %1.").arg(path));
 		out.close();
-		const gltf_import::Material &material = model.materials[static_cast<size_t>(part.material)];
+		gltf_import::Material material = model.materials[static_cast<size_t>(part.material)];
+		if (material.metalRoughImage >= 0) {   // the picture multiplies the factors: its average over the surface does
+			const gltf_import::Image &mr = model.images[static_cast<size_t>(material.metalRoughImage)];
+			QImage picture;
+			if (picture.loadFromData(mr.bytes.data(), static_cast<uint>(mr.bytes.size()))) {
+				const QImage small = picture.scaled(32, 32, Qt::IgnoreAspectRatio, Qt::SmoothTransformation).convertToFormat(QImage::Format_RGB32);
+				double green = 0.0, blue = 0.0;
+				for (int y = 0; y < small.height(); ++y)
+					for (int x = 0; x < small.width(); ++x) { green += qGreen(small.pixel(x, y)); blue += qBlue(small.pixel(x, y)); }
+				const double n = 255.0 * small.width() * small.height();
+				material.roughness *= green / n;
+				material.metallic *= blue / n;
+			}
+		}
 		const QString materialName = cleanName(QString::fromStdString(material.name), QString::number(i + 1));
 		Object o = scene_doc::makeObject(ShapeKind::Mesh, (model.parts.size() > 1 ? stem + QLatin1Char(' ') + materialName : stem).toStdString());
 		o.meshFile = QDir::toNativeSeparators(path).toStdString();
@@ -136,7 +155,9 @@ bool SceneBuilderWidget::importGltf(const QString &file, QString *message) {
 		o.position = {0.0, 0.0, 0.0};
 		o.material = materialOf(material, material.baseColorImage >= 0 ? pictureOf[static_cast<size_t>(material.baseColorImage)] : QString());
 		const double peak = std::max({material.emissive[0], material.emissive[1], material.emissive[2]});
-		if (peak > 0.0) {
+		if (peak > 0.0 && part.indices.size() / 3 > kMaxLightTriangles) {   // (every triangle of a light is sampled: a big mesh that glows is a slow scene, and rarely meant as a lamp)
+			glowDropped = true;
+		} else if (peak > 0.0) {
 			o.emissive = true;
 			o.emission = {material.emissive[0] / peak, material.emissive[1] / peak, material.emissive[2] / peak};
 			o.emissionStrength = peak;
@@ -146,6 +167,7 @@ bool SceneBuilderWidget::importGltf(const QString &file, QString *message) {
 	addParts(std::move(objects), stem);
 	QString text = tr("Added %1: %2 part(s), %3 triangles, %4 m tall%5.")
 	                   .arg(stem, QString::number(model.parts.size()), QString::number(static_cast<qulonglong>(model.triangles)), QString::number(norm, 'f', norm < 10 ? 2 : 1), realSize ? QString() : tr(" in the file, shown 1.6 units tall"));
+	if (glowDropped) text += QStringLiteral("\n") + tr("A glowing part of the model has too many triangles to be a light, so it does not glow.");
 	for (const std::string &n : model.notes) text += QStringLiteral("\n") + QString::fromStdString(n);
 	logLine(QStringLiteral("builder"), QStringLiteral("import glTF %1: %2").arg(file, text.simplified()));
 	if (message) *message = text;

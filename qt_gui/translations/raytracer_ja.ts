@@ -8151,23 +8151,23 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>保存したカメラビューを順にたどって飛ぶカメラの動画を作ります (2 つ以上必要)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="67"/>
+        <location filename="../scene_builder_models.cpp" line="76"/>
         <source>Added %1 (%2 triangles). It stands on the floor, about 1.6 units across; use Scale to resize it.</source>
         <translation>%1 を追加しました (%2 三角形)。床の上に置かれ、幅は約 1.6 単位です。大きさは「拡大縮小」で変えられます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="75"/>
-        <location filename="../scene_builder_models.cpp" line="133"/>
+        <location filename="../scene_builder_models.cpp" line="84"/>
+        <location filename="../scene_builder_models.cpp" line="142"/>
         <source>Model library</source>
         <translation>モデルライブラリ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="80"/>
+        <location filename="../scene_builder_models.cpp" line="89"/>
         <source>Search by name</source>
         <translation>名前で検索</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="103"/>
+        <location filename="../scene_builder_models.cpp" line="112"/>
         <source>%1
 About %2 thousand triangles
 From: %3</source>
@@ -8176,29 +8176,33 @@ From: %3</source>
 出典: %3</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="111"/>
+        <location filename="../scene_builder_models.cpp" line="120"/>
         <source>No models were found next to the app (a models folder). Use &quot;Choose another file...&quot; to add any .obj or .ply file.</source>
         <translation>アプリの隣にモデルが見つかりませんでした (models フォルダー)。「別のファイルを選ぶ...」で任意の .obj または .ply ファイルを追加できます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="113"/>
+        <location filename="../scene_builder_models.cpp" line="122"/>
+        <source>%1 models. A scan is added standing on the floor, about 1.6 units across; an everyday object or piece of furniture keeps its real size (in metres, as a glTF model does); use Scale to resize either. Each model keeps the licence of its source (docs/MODELS.md): check it before you publish pictures or scenes made with one.</source>
+        <translation>%1 個のモデル。スキャンは床の上に立てて、幅約 1.6 単位で追加されます。日用品や家具は実際の大きさ (glTF モデルと同じくメートル単位) のままです。どちらも「スケール」で大きさを変えられます。各モデルはそれぞれの出典のライセンスに従います (docs/MODELS.md)。モデルを使った画像やシーンを公開する前に確認してください。</translation>
+    </message>
+    <message>
         <source>%1 models. A model is added standing on the floor, about 1.6 units across; use Scale to resize it. Each model keeps the licence of its source (docs/MODELS.md): check it before you publish pictures or scenes made with one.</source>
-        <translation>%1 個のモデル。モデルは床の上に置かれ、幅は約 1.6 単位で追加されます。大きさは「拡大縮小」で変えられます。各モデルは出典元のライセンスに従います (docs/MODELS.md)。モデルを使った画像やシーンを公開する前に確認してください。</translation>
+        <translation type="vanished">%1 個のモデル。モデルは床の上に置かれ、幅は約 1.6 単位で追加されます。大きさは「拡大縮小」で変えられます。各モデルは出典元のライセンスに従います (docs/MODELS.md)。モデルを使った画像やシーンを公開する前に確認してください。</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
-        <location filename="../scene_builder_models.cpp" line="118"/>
+        <location filename="../scene_builder_models.cpp" line="127"/>
         <location filename="../scene_builder_widget.cpp" line="299"/>
         <source>Add</source>
         <translation>追加</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="119"/>
+        <location filename="../scene_builder_models.cpp" line="128"/>
         <source>Choose another file...</source>
         <translation>別のファイルを選ぶ...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="133"/>
+        <location filename="../scene_builder_models.cpp" line="142"/>
         <source>That model could not be read.</source>
         <translation>そのモデルを読み込めませんでした。</translation>
     </message>
@@ -10447,44 +10451,49 @@ This replaces the scene you have now (Undo brings it back).</source>
         <translation>オブジェクトの手前にあるものはシーンと一緒に保存され、「写真にレンダリング」でも手前に残ります。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="71"/>
+        <location filename="../scene_builder_gltf.cpp" line="72"/>
         <source>The file could not be opened.</source>
         <translation>ファイルを開けませんでした。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="72"/>
+        <location filename="../scene_builder_gltf.cpp" line="73"/>
         <source>The file is too large to import (over 600 MB).</source>
         <translation>ファイルが大きすぎて読み込めません (600 MB 超)。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="94"/>
+        <location filename="../scene_builder_gltf.cpp" line="95"/>
         <source>The model has no size.</source>
         <translation>モデルにサイズがありません。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="101"/>
+        <location filename="../scene_builder_gltf.cpp" line="102"/>
         <source>Model</source>
         <translation>モデル</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="126"/>
+        <location filename="../scene_builder_gltf.cpp" line="132"/>
         <source>A part of the model is too large to import.</source>
         <translation>モデルの一部が大きすぎて読み込めません。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="129"/>
+        <location filename="../scene_builder_gltf.cpp" line="135"/>
         <source>The model could not be written to %1.</source>
         <translation>モデルを %1 に書き込めませんでした。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="147"/>
+        <location filename="../scene_builder_gltf.cpp" line="168"/>
         <source>Added %1: %2 part(s), %3 triangles, %4 m tall%5.</source>
         <translation>%1 を追加しました: %2 パーツ、三角形 %3 個、高さ %4 m%5。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="148"/>
+        <location filename="../scene_builder_gltf.cpp" line="169"/>
         <source> in the file, shown 1.6 units tall</source>
         <translation> (ファイル上の値。高さ 1.6 単位で表示)</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_gltf.cpp" line="170"/>
+        <source>A glowing part of the model has too many triangles to be a light, so it does not glow.</source>
+        <translation>モデルの発光する部分は三角形が多すぎてライトにできないため、光りません。</translation>
     </message>
 </context>
 <context>

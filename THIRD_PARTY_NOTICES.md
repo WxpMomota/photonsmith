@@ -46,6 +46,14 @@ These are data, not code, and the MIT licence **does not apply to them**.
   installers carry only Spot, Suzanne and the Utah teapot.
   The larger scenes (Power Plant and others) are deliberately not bundled in the
   installers for this reason.
+* **`models/gltf/`** holds 52 free glTF models: from the Khronos glTF Sample Assets (CC0 or CC BY 4.0, each model its own), Poly Haven (CC0) and Kenney's Furniture Kit (CC0). All were changed to keep the
+  repository small (pictures made smaller, pictures this program does not read left out); `models/gltf/CREDITS.md` names the source, licence and credit of each one. The CC BY 4.0 models need the credit:
+  Velvet sofa: Eric Chadwick, Wayfair, LLC (2021), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/GlamVelvetSofa;
+  Sunglasses: Eric Chadwick, Darmstadt Graphics Group GmbH (2024), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/SunglassesKhronos;
+  Glass candle holder: Eric Chadwick, Wayfair, LLC (2021), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/GlassHurricaneCandleHolder;
+  Shoe: Shopify, Shopify (2021), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MaterialsVariantsShoe;
+  Silk pouf: Eric Chadwick, Copyright 2023 Wayfair, LLC (2023), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/SpecularSilkPouf;
+  Traffic cone: hinndia, hinndia (2024), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/TrafficCone. Licence: https://creativecommons.org/licenses/by/4.0/ . The installers do not carry them.
 * **`images/`**: `earthmap.jpg` is NASA's Blue Marble in equirectangular projection
   (from Wikimedia Commons, public domain: created solely by NASA). `bump-marble.png`
   and `normal-checker.png` are small textures generated for this project's tests.

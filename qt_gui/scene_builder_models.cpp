@@ -31,20 +31,33 @@ using namespace scene_builder_ui;
 static QString modelsFolder() {
 	const QString app = QCoreApplication::applicationDirPath();
 	const QStringList candidates = {app + "/models", app + "/../models", app + "/../../models", QDir::currentPath() + "/models", QDir::currentPath() + "/../models"};
-	for (const QString &c : candidates)
-		if (QFileInfo(c + "/spot.obj").exists()) return QDir(c).absolutePath();
-	for (const QString &c : candidates)
+	// the folder with the most of the library's files: a package carries three models in its own models/ folder, and a source checkout beside it has them all
+	QString best;
+	int bestCount = 0;
+	for (const QString &c : candidates) {
+		int count = 0;
 		for (const model_library::Entry &e : model_library::catalog())
-			if (QFileInfo(c + "/" + e.stem + ".obj").exists()) return QDir(c).absolutePath();
-	return QString();
+			if (QFileInfo(c + "/" + QString::fromStdString(model_library::fileOf(e))).exists()) ++count;
+		if (count > bestCount) { bestCount = count; best = QDir(c).absolutePath(); }
+	}
+	return best;
 }
 
 bool SceneBuilderWidget::addLibraryModel(const QString &stem) {
 	const model_library::Entry *entry = model_library::findEntry(stem.toUtf8().constData());
 	const QString folder = modelsFolder();
 	if (!entry || folder.isEmpty()) return false;
-	const QString path = folder + "/" + stem + ".obj";
+	const QString path = folder + "/" + QString::fromStdString(model_library::fileOf(*entry));
 	if (!QFileInfo(path).exists()) return false;
+	if (model_library::isGltf(*entry)) {   // a glTF model: its parts, at its real size, with its colours (scene_builder_gltf.cpp)
+		QString message;
+		if (!importGltf(path, &message)) {
+			AppLog::write(log_format::Level::Warn, QStringLiteral("models"), QStringLiteral("%1: %2").arg(path, message));
+			return false;
+		}
+		emit statusMessage(message.section(QLatin1Char('\n'), 0, 0));
+		return true;
+	}
 	const mesh_preview::MeshPreview preview = mesh_preview::load(path.toStdString(), 1);
 	if (!preview.ok) {
 		AppLog::write(log_format::Level::Warn, QStringLiteral("models"), QStringLiteral("%1: %2").arg(path, QString::fromStdString(preview.error)));
@@ -95,7 +108,7 @@ void SceneBuilderWidget::showModelLibrary() {
 	int available = 0;
 	if (!folder.isEmpty()) {
 		for (const model_library::Entry &e : model_library::catalog()) {
-			if (!QFileInfo(folder + "/" + e.stem + ".obj").exists()) continue;
+			if (!QFileInfo(folder + "/" + QString::fromStdString(model_library::fileOf(e))).exists()) continue;
 			auto *item = new QListWidgetItem(QString::fromUtf8(e.name), list);
 			const QString thumb = folder + "/thumbnails/" + e.stem + ".png";
 			if (QFileInfo(thumb).exists()) item->setIcon(QIcon(thumb));
@@ -110,8 +123,8 @@ void SceneBuilderWidget::showModelLibrary() {
 	if (available == 0)
 		note->setText(tr("No models were found next to the app (a models folder). Use \"Choose another file...\" to add any .obj or .ply file."));
 	else
-		note->setText(tr("%1 models. A model is added standing on the floor, about 1.6 units across; use Scale to resize it. Each model keeps the licence of its source "
-		                 "(docs/MODELS.md): check it before you publish pictures or scenes made with one.").arg(available));
+		note->setText(tr("%1 models. A scan is added standing on the floor, about 1.6 units across; an everyday object or piece of furniture keeps its real size (in metres, as a "
+		                 "glTF model does); use Scale to resize either. Each model keeps the licence of its source (docs/MODELS.md): check it before you publish pictures or scenes made with one.").arg(available));
 	layout->addWidget(note);
 
 	auto *buttons = new QDialogButtonBox(&dialog);

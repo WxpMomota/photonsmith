@@ -16,6 +16,9 @@ TEST(ModelLibraryTest, TheCatalogHasUniqueStemsAndNames) {
 		EXPECT_GT(e.kiloTriangles, 0) << e.stem;
 	}
 	EXPECT_GE(stems.size(), 20u);
+	int gltf = 0;
+	for (const model_library::Entry& e : model_library::catalog()) gltf += model_library::isGltf(e) ? 1 : 0;
+	EXPECT_GE(gltf, 40) << "the everyday objects and furniture are glTF models";
 	EXPECT_NE(model_library::findEntry("spot"), nullptr);
 	EXPECT_EQ(model_library::findEntry("no-such-model"), nullptr);
 }
@@ -24,7 +27,7 @@ TEST(ModelLibraryTest, EveryModelThatIsInTheFolderHasAThumbnailAndTheBundledOnes
 	// The tests run from the repository root (ctest sets the working directory); skip quietly when run elsewhere.
 	if (!std::filesystem::exists("models/spot.obj")) GTEST_SKIP() << "models/ is not next to the working directory";
 	for (const model_library::Entry& e : model_library::catalog()) {
-		const bool present = std::filesystem::exists(std::string("models/") + e.stem + ".obj");
+		const bool present = std::filesystem::exists("models/" + model_library::fileOf(e));
 		if (e.bundled) EXPECT_TRUE(present) << e.stem << " is flagged as bundled but its file is missing";
 		if (present) EXPECT_TRUE(std::filesystem::exists(std::string("models/thumbnails/") + e.stem + ".png")) << e.stem << " has no thumbnail";
 	}
