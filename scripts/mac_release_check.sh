@@ -22,6 +22,8 @@ OUT=""
 SKIP=","
 DMG=""
 COMBO_PY="${COMBO_PY:-}"
+# a stray python3 earlier on PATH (an old framework install) can be killed on start: use the system one first, as gui_selftest_macos.sh does
+PY=python3; [[ -x /usr/bin/python3 ]] && PY=/usr/bin/python3
 ALL_STEPS="preconditions tests bundled sweep combos dmg verify selftest"
 
 while [[ $# -gt 0 ]]; do
@@ -78,6 +80,7 @@ step_preconditions() {
 		red="$(gh run list --commit "$(git rev-parse HEAD)" --json workflowName,conclusion -q '.[] | select(.conclusion == "failure") | .workflowName' 2>/dev/null | tr '\n' ' ')"
 		[[ -z "$red" ]] || { echo "CI is red for this commit: $red"; return 1; }
 	fi
+	"$PY" -c "pass" 2>/dev/null || { echo "$PY does not run (a Python that starts is needed for the comparison scripts)"; return 1; }
 	echo "on main at $COMMIT, clean, equal to origin/main, CI not red"
 }
 
@@ -88,17 +91,17 @@ step_tests() {
 
 step_bundled() {
 	local line differ
-	line="$(python3 scripts/bundled_scene_compare.py --size 96 --spp 64 2>&1 | tee /dev/stderr | grep -E '^[0-9]+ scenes,' | tail -n 1)"
+	line="$("$PY" scripts/bundled_scene_compare.py --size 96 --spp 64 2>&1 | tee /dev/stderr | grep -E '^[0-9]+ scenes,' | tail -n 1)"
 	differ="$(echo "$line" | sed -E 's/^[0-9]+ scenes, ([0-9]+) differ.*/\1/')"
-	echo "$line"
+	echo "${line:-no result line printed (the script did not finish)}"
 	[[ "$differ" =~ ^[0-9]+$ ]] && [[ "$differ" -eq 0 ]]
 }
 
 step_sweep() {
 	local line off
-	line="$(python3 scripts/consistency_sweep.py 2>&1 | tee /dev/stderr | grep -E '^[0-9]+ pairs,' | tail -n 1)"
+	line="$("$PY" scripts/consistency_sweep.py 2>&1 | tee /dev/stderr | grep -E '^[0-9]+ pairs,' | tail -n 1)"
 	off="$(echo "$line" | sed -E 's/^[0-9]+ pairs, ([0-9]+) off.*/\1/')"
-	echo "$line"
+	echo "${line:-no result line printed (the script did not finish)}"
 	[[ "$off" =~ ^[0-9]+$ ]] && [[ "$off" -eq 0 ]]
 }
 
@@ -151,6 +154,10 @@ step_verify() {
 step_selftest() {
 	local app="$OUT/app/RayTracerGUI.app"
 	[[ -d "$app" ]] || { echo "no extracted app (the verify step did not run)"; return 1; }
+	# The installer carries three models and no environments (docs/MODELS.md), but the composite self-test adds a glTF model and a photographic sky from the libraries, which a source checkout has in
+	# full. The self-test starts the app from "/", so the libraries are copied into this scratch copy of the app (after the dmg was verified, so its seal does not matter any more).
+	mkdir -p "$app/Contents/MacOS/models"
+	cp -R models/gltf "$app/Contents/MacOS/models/" && cp -R models/thumbnails "$app/Contents/MacOS/models/" && cp -R environments "$app/Contents/MacOS/" || { echo "could not copy the model and environment libraries into the extracted app"; return 1; }
 	scripts/gui_selftest_macos.sh "$app" "$OUT/selftest" 2>&1 | tee /dev/stderr | grep -E '^(PASS|FAIL)' > "$OUT/selftest.summary"
 	grep -q '^FAIL' "$OUT/selftest.summary" && { grep '^FAIL' "$OUT/selftest.summary" | head -n 1; return 1; }
 	echo "$(grep -c '^PASS' "$OUT/selftest.summary") self-test modes passed on the extracted app"
