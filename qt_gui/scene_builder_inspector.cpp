@@ -887,6 +887,10 @@ void SceneBuilderWidget::inspectLight(QFormLayout *f, int i) {
 			QTimer::singleShot(0, this, [this]() { rebuildInspector(); });
 		});
 		f->addRow(physical);
+		auto *environments = new QPushButton(tr("Photographic sky (HDRI)..."));
+		environments->setToolTip(tr("Choose a photographic sky or room: sunsets, forests, studios, night skies. Its picture is the sky light, sun and all."));
+		connect(environments, &QPushButton::clicked, this, [this, i]() { if (!m_loading) showEnvironmentLibrary(i); });
+		f->addRow(QString(), environments);
 		if (l.physicalSky) {
 			auto *time = new QComboBox;
 			time->addItem(tr("Time of day..."), -1.0);

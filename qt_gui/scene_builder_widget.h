@@ -171,6 +171,10 @@ public:
 	void addRoomFromPhoto();    // scene_builder_photo.cpp: a photo of a room becomes a room (the same helper environment, plus a depth model)
 	// A glTF model (.glb or .gltf) as mesh objects, one for each material, grouped (scene_builder_gltf.cpp, src/shared/gltf_import.h). `message` says what was added and what was not read, or why it failed.
 	bool importGltf(const QString &file, QString *message);
+	// The environment library (scene_builder_environment.cpp, src/shared/environment_library.h): a photographic sky or room becomes the sky light's picture, and the Sun light of the generated sky goes. `lightIndex`
+	// is the sky light to change (-1: the first, or a new one). False when the picture is not there.
+	void showEnvironmentLibrary(int lightIndex = -1);
+	bool applyEnvironment(int lightIndex, const QString &stem);
 	void showModelLibrary();    // scene_builder_models.cpp: the dialog behind Add > Model library...
 	// Adds one library model (the stem of models/<stem>.obj) at a handy size, standing on the floor under the drop point, as one undo step. False when it is not found.
 	bool addLibraryModel(const QString &stem);

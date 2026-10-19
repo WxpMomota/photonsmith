@@ -7287,7 +7287,7 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="471"/>
-        <location filename="../scene_builder_inspector.cpp" line="902"/>
+        <location filename="../scene_builder_inspector.cpp" line="906"/>
         <source>Preset</source>
         <translation>Préréglage</translation>
     </message>
@@ -7317,7 +7317,7 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
         <location filename="../scene_builder_inspector.cpp" line="582"/>
         <location filename="../scene_builder_inspector.cpp" line="614"/>
         <location filename="../scene_builder_inspector.cpp" line="682"/>
-        <location filename="../scene_builder_inspector.cpp" line="933"/>
+        <location filename="../scene_builder_inspector.cpp" line="937"/>
         <location filename="../scene_builder_mix.cpp" line="89"/>
         <location filename="../scene_builder_mix.cpp" line="92"/>
         <location filename="../scene_builder_mix.cpp" line="109"/>
@@ -7924,7 +7924,7 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="829"/>
-        <location filename="../scene_builder_inspector.cpp" line="934"/>
+        <location filename="../scene_builder_inspector.cpp" line="938"/>
         <source>Strength</source>
         <translation>Intensité</translation>
     </message>
@@ -7985,93 +7985,103 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
         <translation>Soleil et ciel (un ciel dégagé selon l&apos;heure de la journée)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="892"/>
+        <location filename="../scene_builder_inspector.cpp" line="890"/>
+        <source>Photographic sky (HDRI)...</source>
+        <translation>Ciel photographique (HDRI)...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="891"/>
+        <source>Choose a photographic sky or room: sunsets, forests, studios, night skies. Its picture is the sky light, sun and all.</source>
+        <translation>Choisissez un ciel ou une pièce photographiques : couchers de soleil, forêts, studios, ciels nocturnes. Son image est la lumière du ciel, soleil compris.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="896"/>
         <source>Time of day...</source>
         <translation>Heure de la journée...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="893"/>
+        <location filename="../scene_builder_inspector.cpp" line="897"/>
         <source>Sunrise</source>
         <translation>Lever du soleil</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="893"/>
+        <location filename="../scene_builder_inspector.cpp" line="897"/>
         <source>Morning</source>
         <translation>Matin</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="893"/>
+        <location filename="../scene_builder_inspector.cpp" line="897"/>
         <source>Noon</source>
         <translation>Midi</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="894"/>
+        <location filename="../scene_builder_inspector.cpp" line="898"/>
         <source>Afternoon</source>
         <translation>Après-midi</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="894"/>
+        <location filename="../scene_builder_inspector.cpp" line="898"/>
         <source>Sunset</source>
         <translation>Coucher du soleil</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="904"/>
+        <location filename="../scene_builder_inspector.cpp" line="908"/>
         <source>Sky gallery...</source>
         <translation>Galerie de ciels...</translation>
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="339"/>
-        <location filename="../scene_builder_inspector.cpp" line="914"/>
+        <location filename="../scene_builder_inspector.cpp" line="918"/>
         <source>Match to a photo...</source>
         <translation>Accorder à une photo...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="915"/>
+        <location filename="../scene_builder_inspector.cpp" line="919"/>
         <source>Choose a photo of an outdoor scene with the sky in it: the sun&apos;s height and direction and the haze are read from the sky and set here.</source>
         <translation>Choisissez la photo d&apos;un paysage en extérieur où l&apos;on voit le ciel : la hauteur et la direction du soleil et la brume sont lues dans le ciel et réglées ici.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="918"/>
+        <location filename="../scene_builder_inspector.cpp" line="922"/>
         <source>Sun height</source>
         <translation>Hauteur du soleil</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="919"/>
+        <location filename="../scene_builder_inspector.cpp" line="923"/>
         <source>Sun direction</source>
         <translation>Direction du soleil</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="920"/>
+        <location filename="../scene_builder_inspector.cpp" line="924"/>
         <source>Haze</source>
         <translation>Brume</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="921"/>
+        <location filename="../scene_builder_inspector.cpp" line="925"/>
         <source>Ground brightness</source>
         <translation>Luminosité du sol</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="922"/>
+        <location filename="../scene_builder_inspector.cpp" line="926"/>
         <source>The sky picture and the Sun light are made from these settings; change the sun here rather than moving the Sun light. Direction 0 is towards +X, 90 away from the starting camera, 180 towards -X, 270 behind it. Brightness 1 is a daylight scene.</source>
         <translation>L&apos;image du ciel et la lumière du Soleil sont générées à partir de ces réglages ; changez le soleil ici plutôt que de déplacer la lumière du Soleil. La direction 0 va vers +X, 90 s&apos;éloigne de la caméra de départ, 180 va vers -X et 270 est derrière elle. Une luminosité de 1 correspond à une scène en plein jour.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="925"/>
+        <location filename="../scene_builder_inspector.cpp" line="929"/>
         <source>Sky image</source>
         <translation>Image du ciel</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="925"/>
+        <location filename="../scene_builder_inspector.cpp" line="929"/>
         <source>Images (*.exr *.hdr *.png *.jpg *.jpeg)</source>
         <translation>Images (*.exr *.hdr *.png *.jpg *.jpeg)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="927"/>
+        <location filename="../scene_builder_inspector.cpp" line="931"/>
         <source>Rotate sky</source>
         <translation>Tourner le ciel</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="928"/>
+        <location filename="../scene_builder_inspector.cpp" line="932"/>
         <source>Leave the image empty for a plain colour sky. An image is an equirectangular (lat-long) panorama; Rotate sky turns it about the vertical axis (counter-clockwise seen from above), to put the bright part of the picture where you want the light to come from.</source>
         <translation>Laissez l&apos;image vide pour un ciel de couleur unie. Une image est un panorama équirectangulaire (lat-long) ; Tourner le ciel le fait pivoter autour de l&apos;axe vertical (dans le sens antihoraire vu de dessus), pour placer la partie lumineuse de l&apos;image là d&apos;où vous voulez que la lumière vienne.</translation>
     </message>
@@ -8080,7 +8090,7 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
         <translation type="vanished">Laissez l&apos;image vide pour un ciel de couleur unie. Une image est un panorama équirectangulaire (latitude-longitude).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="934"/>
+        <location filename="../scene_builder_inspector.cpp" line="938"/>
         <source>Brightness</source>
         <translation>Luminosité</translation>
     </message>
@@ -8223,12 +8233,12 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
-        <location filename="../scene_builder_widget.cpp" line="347"/>
+        <location filename="../scene_builder_widget.cpp" line="348"/>
         <source>Arrange</source>
         <translation>Organiser</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="348"/>
+        <location filename="../scene_builder_widget.cpp" line="349"/>
         <source>Rename, put on the floor, frame, hide and lock what is picked (also on a right-click in the list)</source>
         <translation>Renommer, poser au sol, cadrer, masquer et verrouiller la sélection (aussi par clic droit dans la liste)</translation>
     </message>
@@ -8255,23 +8265,23 @@ Ajoutez des formes et des lumières avec le bouton Ajouter. Faites-les glisser d
         <translation>Crée une vidéo de la scène depuis une caméra qui survole vos vues de caméra enregistrées (deux ou plus nécessaires)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="76"/>
+        <location filename="../scene_builder_models.cpp" line="80"/>
         <source>Added %1 (%2 triangles). It stands on the floor, about 1.6 units across; use Scale to resize it.</source>
         <translation>%1 ajouté (%2 triangles). Il est posé sur le sol et mesure environ 1,6 unité ; utilisez Échelle pour le redimensionner.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="84"/>
-        <location filename="../scene_builder_models.cpp" line="142"/>
+        <location filename="../scene_builder_models.cpp" line="88"/>
+        <location filename="../scene_builder_models.cpp" line="146"/>
         <source>Model library</source>
         <translation>Bibliothèque de modèles</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="89"/>
+        <location filename="../scene_builder_models.cpp" line="93"/>
         <source>Search by name</source>
         <translation>Rechercher par nom</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="112"/>
+        <location filename="../scene_builder_models.cpp" line="116"/>
         <source>%1
 About %2 thousand triangles
 From: %3</source>
@@ -8280,12 +8290,12 @@ Environ %2 milliers de triangles
 Origine : %3</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="120"/>
+        <location filename="../scene_builder_models.cpp" line="124"/>
         <source>No models were found next to the app (a models folder). Use &quot;Choose another file...&quot; to add any .obj or .ply file.</source>
         <translation>Aucun modèle n&apos;a été trouvé à côté de l&apos;application (un dossier models). Utilisez « Choisir un autre fichier... » pour ajouter n&apos;importe quel fichier .obj ou .ply.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="122"/>
+        <location filename="../scene_builder_models.cpp" line="126"/>
         <source>%1 models. A scan is added standing on the floor, about 1.6 units across; an everyday object or piece of furniture keeps its real size (in metres, as a glTF model does); use Scale to resize either. Each model keeps the licence of its source (docs/MODELS.md): check it before you publish pictures or scenes made with one.</source>
         <translation>%1 modèles. Un scan est ajouté debout sur le sol, sur environ 1,6 unité de large ; un objet du quotidien ou un meuble garde sa taille réelle (en mètres, comme un modèle glTF) ; utilisez Échelle pour redimensionner l&apos;un ou l&apos;autre. Chaque modèle garde la licence de sa source (docs/MODELS.md) : vérifiez-la avant de publier des images ou des scènes faites avec l&apos;un d&apos;eux.</translation>
     </message>
@@ -8295,18 +8305,18 @@ Origine : %3</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
-        <location filename="../scene_builder_models.cpp" line="127"/>
+        <location filename="../scene_builder_models.cpp" line="131"/>
         <location filename="../scene_builder_widget.cpp" line="299"/>
         <source>Add</source>
         <translation>Ajouter</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="128"/>
+        <location filename="../scene_builder_models.cpp" line="132"/>
         <source>Choose another file...</source>
         <translation>Choisir un autre fichier...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="142"/>
+        <location filename="../scene_builder_models.cpp" line="146"/>
         <source>That model could not be read.</source>
         <translation>Ce modèle n&apos;a pas pu être lu.</translation>
     </message>
@@ -8353,39 +8363,39 @@ Origine : %3</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="62"/>
-        <location filename="../scene_builder_widget.cpp" line="320"/>
+        <location filename="../scene_builder_widget.cpp" line="321"/>
         <source>Object from a photo...</source>
         <translation>Objet à partir d&apos;une photo...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="322"/>
+        <location filename="../scene_builder_widget.cpp" line="323"/>
         <source>Light panel (emitting quad)</source>
         <translation>Panneau lumineux (quadrilatère émissif)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="331"/>
+        <location filename="../scene_builder_widget.cpp" line="332"/>
         <source>Lights</source>
         <translation>Lumières</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="67"/>
-        <location filename="../scene_builder_widget.cpp" line="342"/>
+        <location filename="../scene_builder_widget.cpp" line="343"/>
         <source>Duplicate</source>
         <translation>Dupliquer</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="343"/>
+        <location filename="../scene_builder_widget.cpp" line="344"/>
         <source>Make a copy of the selected item beside it (%1)</source>
         <translation>Crée une copie de l&apos;élément sélectionné à côté de lui (%1)</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="68"/>
-        <location filename="../scene_builder_widget.cpp" line="344"/>
+        <location filename="../scene_builder_widget.cpp" line="345"/>
         <source>Array...</source>
         <translation>Réseau...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="345"/>
+        <location filename="../scene_builder_widget.cpp" line="346"/>
         <source>Make many copies of the selected object: a grid, a ring round a point, or a random scatter</source>
         <translation>Crée de nombreuses copies de l&apos;objet sélectionné : une grille, un anneau autour d&apos;un point ou une dispersion aléatoire</translation>
     </message>
@@ -8549,7 +8559,7 @@ Origine : %3</translation>
     <message>
         <location filename="../scene_builder_actions.cpp" line="69"/>
         <location filename="../scene_builder_camera_views.cpp" line="335"/>
-        <location filename="../scene_builder_widget.cpp" line="346"/>
+        <location filename="../scene_builder_widget.cpp" line="347"/>
         <source>Delete</source>
         <translation>Supprimer</translation>
     </message>
@@ -9400,12 +9410,12 @@ It is in the scene list now (Settings tab, My Scenes).</source>
 Elle figure maintenant dans la liste des scènes (onglet Paramètres, Mes scènes).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="942"/>
+        <location filename="../scene_builder_widget.cpp" line="943"/>
         <source>(%1)%2  |  %3 objects, %4 lights</source>
         <translation>(%1)%2  |  %3 objets, %4 lumières</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="782"/>
+        <location filename="../scene_builder_widget.cpp" line="783"/>
         <source>Choose a mesh</source>
         <translation>Choisir un maillage</translation>
     </message>
@@ -9430,7 +9440,12 @@ Elle figure maintenant dans la liste des scènes (onglet Paramètres, Mes scène
         <translation>Rétablir (%1)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="335"/>
+        <location filename="../scene_builder_widget.cpp" line="320"/>
+        <source>Environment library...</source>
+        <translation>Bibliothèque d&apos;environnements...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="336"/>
         <source>Lighting (replaces the lights)</source>
         <translation>Éclairage (remplace les lumières)</translation>
     </message>
@@ -9445,52 +9460,52 @@ Elle figure maintenant dans la liste des scènes (onglet Paramètres, Mes scène
         <translation>Ajoutée à la liste des scènes</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="600"/>
+        <location filename="../scene_builder_widget.cpp" line="601"/>
         <source>Camera and image</source>
         <translation>Caméra et image</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="641"/>
+        <location filename="../scene_builder_widget.cpp" line="642"/>
         <source>, light</source>
         <translation>, lumière</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="782"/>
+        <location filename="../scene_builder_widget.cpp" line="783"/>
         <source>Meshes and models (*.ply *.obj *.glb *.gltf)</source>
         <translation>Maillages et modèles (*.ply *.obj *.glb *.gltf)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="787"/>
+        <location filename="../scene_builder_widget.cpp" line="788"/>
         <source>Cannot import the model</source>
         <translation>Impossible d&apos;importer le modèle</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="791"/>
+        <location filename="../scene_builder_widget.cpp" line="792"/>
         <source>Model imported</source>
         <translation>Modèle importé</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="839"/>
+        <location filename="../scene_builder_widget.cpp" line="840"/>
         <source>Lighting: %1. %2</source>
         <translation>Éclairage : %1. %2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="936"/>
+        <location filename="../scene_builder_widget.cpp" line="937"/>
         <source>not saved yet</source>
         <translation>pas encore enregistrée</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="970"/>
+        <location filename="../scene_builder_widget.cpp" line="971"/>
         <source>No problems found.</source>
         <translation>Aucun problème détecté.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="976"/>
+        <location filename="../scene_builder_widget.cpp" line="977"/>
         <source>Fix this:</source>
         <translation>À corriger :</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="976"/>
+        <location filename="../scene_builder_widget.cpp" line="977"/>
         <source>Note:</source>
         <translation>Remarque :</translation>
     </message>
@@ -10258,13 +10273,13 @@ Cela remplace la scène actuelle (Annuler la rétablit).</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="463"/>
-        <location filename="../scene_builder_widget.cpp" line="625"/>
+        <location filename="../scene_builder_widget.cpp" line="626"/>
         <source>, locked</source>
         <translation>, verrouillé</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="477"/>
-        <location filename="../scene_builder_widget.cpp" line="624"/>
+        <location filename="../scene_builder_widget.cpp" line="625"/>
         <source>, hidden</source>
         <translation>, masqué</translation>
     </message>
@@ -10360,7 +10375,7 @@ Cela remplace la scène actuelle (Annuler la rétablit).</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="63"/>
-        <location filename="../scene_builder_widget.cpp" line="321"/>
+        <location filename="../scene_builder_widget.cpp" line="322"/>
         <source>Room from a photo...</source>
         <translation>Pièce à partir d&apos;une photo...</translation>
     </message>
@@ -10565,39 +10580,90 @@ Cela remplace la scène actuelle (Annuler la rétablit).</translation>
         <translation>Le fichier est trop volumineux pour être importé (plus de 600 Mo).</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="95"/>
+        <location filename="../scene_builder_gltf.cpp" line="75"/>
+        <source>The file could not be read.</source>
+        <translation>Le fichier n&apos;a pas pu être lu.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_gltf.cpp" line="96"/>
         <source>The model has no size.</source>
         <translation>Le modèle n&apos;a pas de taille.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="102"/>
+        <location filename="../scene_builder_gltf.cpp" line="103"/>
         <source>Model</source>
         <translation>Modèle</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="132"/>
+        <location filename="../scene_builder_gltf.cpp" line="131"/>
         <source>A part of the model is too large to import.</source>
         <translation>Une partie du modèle est trop volumineuse pour être importée.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="135"/>
+        <location filename="../scene_builder_gltf.cpp" line="134"/>
         <source>The model could not be written to %1.</source>
         <translation>Le modèle n&apos;a pas pu être écrit dans %1.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="168"/>
+        <location filename="../scene_builder_gltf.cpp" line="167"/>
         <source>Added %1: %2 part(s), %3 triangles, %4 m tall%5.</source>
         <translation>%1 ajouté : %2 partie(s), %3 triangles, %4 m de haut%5.</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="169"/>
+        <location filename="../scene_builder_gltf.cpp" line="168"/>
         <source> in the file, shown 1.6 units tall</source>
         <translation> dans le fichier, affiché sur 1,6 unité de haut</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="170"/>
+        <location filename="../scene_builder_gltf.cpp" line="169"/>
         <source>A glowing part of the model has too many triangles to be a light, so it does not glow.</source>
         <translation>Une partie lumineuse du modèle a trop de triangles pour être une lumière : elle ne brille donc pas.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="78"/>
+        <source>Environment: %1. It is the sky light&apos;s picture now: the sun, clouds and lamps in it light the scene. Rotate sky turns it; Brightness changes its strength.</source>
+        <translation>Environnement : %1. C&apos;est maintenant l&apos;image de la lumière du ciel : le soleil, les nuages et les lampes qu&apos;elle contient éclairent la scène. Tourner le ciel la fait pivoter ; Luminosité change son intensité.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="85"/>
+        <location filename="../scene_builder_environment.cpp" line="89"/>
+        <location filename="../scene_builder_environment.cpp" line="136"/>
+        <source>Environment library</source>
+        <translation>Bibliothèque d&apos;environnements</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="85"/>
+        <source>No environment pictures were found next to the app (an environments folder).</source>
+        <translation>Aucune image d&apos;environnement n&apos;a été trouvée à côté de l&apos;application (un dossier environments).</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="93"/>
+        <source>All kinds</source>
+        <translation>Tous les types</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="114"/>
+        <source>%1
+%2
+From: %3</source>
+        <translation>%1
+%2
+Source : %3</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="117"/>
+        <source>%1 photographic skies and rooms (Poly Haven, CC0). One becomes the sky light&apos;s picture: the sun, clouds, lamps and windows in it light the scene and show behind it. The Sun light made by the generated sky is removed, because the picture has its own.</source>
+        <translation>%1 ciels et pièces photographiques (Poly Haven, CC0). L&apos;un devient l&apos;image de la lumière du ciel : le soleil, les nuages, les lampes et les fenêtres qu&apos;il contient éclairent la scène et se voient derrière. La lumière Soleil créée par le ciel généré est retirée, car l&apos;image a la sienne.</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="122"/>
+        <source>Use this sky</source>
+        <translation>Utiliser ce ciel</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="136"/>
+        <source>That picture could not be used.</source>
+        <translation>Cette image n&apos;a pas pu être utilisée.</translation>
     </message>
 </context>
 <context>

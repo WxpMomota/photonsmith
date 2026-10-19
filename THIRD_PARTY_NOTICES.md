@@ -54,6 +54,8 @@ These are data, not code, and the MIT licence **does not apply to them**.
   Shoe: Shopify, Shopify (2021), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/MaterialsVariantsShoe;
   Silk pouf: Eric Chadwick, Copyright 2023 Wayfair, LLC (2023), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/SpecularSilkPouf;
   Traffic cone: hinndia, hinndia (2024), https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/TrafficCone. Licence: https://creativecommons.org/licenses/by/4.0/ . The installers do not carry them.
+* **`environments/`** holds 30 high-dynamic-range sky and room panoramas (1k) from Poly Haven (polyhaven.com), published under CC0 1.0 (public domain dedication): unchanged copies of Poly Haven's `.hdr` files and its preview
+  pictures. No credit is required; `environments/CREDITS.md` names each one's author and source page. The installers do not carry them.
 * **`images/`**: `earthmap.jpg` is NASA's Blue Marble in equirectangular projection
   (from Wikimedia Commons, public domain: created solely by NASA). `bump-marble.png`
   and `normal-checker.png` are small textures generated for this project's tests.

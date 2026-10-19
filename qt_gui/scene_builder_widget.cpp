@@ -317,6 +317,7 @@ void SceneBuilderWidget::buildUi() {
 		volumeMenu->addAction(volumeLabel(k), this, [this, k]() { addVolume(k); });
 	addMenu->addSection(tr("More"));
 	addMenu->addAction(tr("Model library..."), this, [this]() { showModelLibrary(); });
+	addMenu->addAction(tr("Environment library..."), this, [this]() { showEnvironmentLibrary(); });
 	addMenu->addAction(tr("Object from a photo..."), this, [this]() { addObjectFromPhoto(); });
 	addMenu->addAction(tr("Room from a photo..."), this, [this]() { addRoomFromPhoto(); });
 	addMenu->addAction(tr("Light panel (emitting quad)"), this, [this]() {

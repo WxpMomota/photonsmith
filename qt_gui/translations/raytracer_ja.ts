@@ -7183,7 +7183,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="471"/>
-        <location filename="../scene_builder_inspector.cpp" line="902"/>
+        <location filename="../scene_builder_inspector.cpp" line="906"/>
         <source>Preset</source>
         <translation>プリセット</translation>
     </message>
@@ -7213,7 +7213,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <location filename="../scene_builder_inspector.cpp" line="582"/>
         <location filename="../scene_builder_inspector.cpp" line="614"/>
         <location filename="../scene_builder_inspector.cpp" line="682"/>
-        <location filename="../scene_builder_inspector.cpp" line="933"/>
+        <location filename="../scene_builder_inspector.cpp" line="937"/>
         <location filename="../scene_builder_mix.cpp" line="89"/>
         <location filename="../scene_builder_mix.cpp" line="92"/>
         <location filename="../scene_builder_mix.cpp" line="109"/>
@@ -7820,7 +7820,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="829"/>
-        <location filename="../scene_builder_inspector.cpp" line="934"/>
+        <location filename="../scene_builder_inspector.cpp" line="938"/>
         <source>Strength</source>
         <translation>強さ</translation>
     </message>
@@ -7881,93 +7881,103 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>太陽と空 (時刻に合わせた晴天の空)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="892"/>
+        <location filename="../scene_builder_inspector.cpp" line="890"/>
+        <source>Photographic sky (HDRI)...</source>
+        <translation>写真の空 (HDRI)...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="891"/>
+        <source>Choose a photographic sky or room: sunsets, forests, studios, night skies. Its picture is the sky light, sun and all.</source>
+        <translation>写真の空や部屋を選びます: 夕焼け、森、スタジオ、夜空など。その画像が、太陽も含めて空のライトになります。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="896"/>
         <source>Time of day...</source>
         <translation>時刻...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="893"/>
+        <location filename="../scene_builder_inspector.cpp" line="897"/>
         <source>Sunrise</source>
         <translation>日の出</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="893"/>
+        <location filename="../scene_builder_inspector.cpp" line="897"/>
         <source>Morning</source>
         <translation>朝</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="893"/>
+        <location filename="../scene_builder_inspector.cpp" line="897"/>
         <source>Noon</source>
         <translation>正午</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="894"/>
+        <location filename="../scene_builder_inspector.cpp" line="898"/>
         <source>Afternoon</source>
         <translation>午後</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="894"/>
+        <location filename="../scene_builder_inspector.cpp" line="898"/>
         <source>Sunset</source>
         <translation>日没</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="904"/>
+        <location filename="../scene_builder_inspector.cpp" line="908"/>
         <source>Sky gallery...</source>
         <translation>空のギャラリー...</translation>
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="339"/>
-        <location filename="../scene_builder_inspector.cpp" line="914"/>
+        <location filename="../scene_builder_inspector.cpp" line="918"/>
         <source>Match to a photo...</source>
         <translation>写真に合わせる...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="915"/>
+        <location filename="../scene_builder_inspector.cpp" line="919"/>
         <source>Choose a photo of an outdoor scene with the sky in it: the sun&apos;s height and direction and the haze are read from the sky and set here.</source>
         <translation>空が写っている屋外の写真を選ぶと、空から太陽の高さと方向ともやを読み取って、ここに設定します。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="918"/>
+        <location filename="../scene_builder_inspector.cpp" line="922"/>
         <source>Sun height</source>
         <translation>太陽の高さ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="919"/>
+        <location filename="../scene_builder_inspector.cpp" line="923"/>
         <source>Sun direction</source>
         <translation>太陽の方向</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="920"/>
+        <location filename="../scene_builder_inspector.cpp" line="924"/>
         <source>Haze</source>
         <translation>もや</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="921"/>
+        <location filename="../scene_builder_inspector.cpp" line="925"/>
         <source>Ground brightness</source>
         <translation>地面の明るさ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="922"/>
+        <location filename="../scene_builder_inspector.cpp" line="926"/>
         <source>The sky picture and the Sun light are made from these settings; change the sun here rather than moving the Sun light. Direction 0 is towards +X, 90 away from the starting camera, 180 towards -X, 270 behind it. Brightness 1 is a daylight scene.</source>
         <translation>空の画像と太陽の光はこれらの設定から作られます。太陽の光を動かすのではなく、ここで太陽を変更してください。方向 0 は +X、90 は開始カメラから遠ざかる向き、180 は -X、270 はカメラの後ろです。明るさ 1 は昼間のシーンです。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="925"/>
+        <location filename="../scene_builder_inspector.cpp" line="929"/>
         <source>Sky image</source>
         <translation>空の画像</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="925"/>
+        <location filename="../scene_builder_inspector.cpp" line="929"/>
         <source>Images (*.exr *.hdr *.png *.jpg *.jpeg)</source>
         <translation>画像 (*.exr *.hdr *.png *.jpg *.jpeg)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="927"/>
+        <location filename="../scene_builder_inspector.cpp" line="931"/>
         <source>Rotate sky</source>
         <translation>空を回転</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="928"/>
+        <location filename="../scene_builder_inspector.cpp" line="932"/>
         <source>Leave the image empty for a plain colour sky. An image is an equirectangular (lat-long) panorama; Rotate sky turns it about the vertical axis (counter-clockwise seen from above), to put the bright part of the picture where you want the light to come from.</source>
         <translation>画像を空にすると単色の空になります。画像は正距円筒図法 (緯度経度) のパノラマです。「空を回転」は垂直軸まわりに (上から見て反時計回りに) 回し、画像の明るい部分を光を来させたい方向に合わせます。</translation>
     </message>
@@ -7976,7 +7986,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation type="vanished">画像を空にすると単色の空になります。画像は正距円筒図法（緯度経度）のパノラマです。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="934"/>
+        <location filename="../scene_builder_inspector.cpp" line="938"/>
         <source>Brightness</source>
         <translation>明るさ</translation>
     </message>
@@ -8119,12 +8129,12 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
-        <location filename="../scene_builder_widget.cpp" line="347"/>
+        <location filename="../scene_builder_widget.cpp" line="348"/>
         <source>Arrange</source>
         <translation>整理</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="348"/>
+        <location filename="../scene_builder_widget.cpp" line="349"/>
         <source>Rename, put on the floor, frame, hide and lock what is picked (also on a right-click in the list)</source>
         <translation>選択中のものの名前変更、床に置く、フレーミング、非表示、ロック (リストの右クリックでも使えます)</translation>
     </message>
@@ -8151,23 +8161,23 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>保存したカメラビューを順にたどって飛ぶカメラの動画を作ります (2 つ以上必要)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="76"/>
+        <location filename="../scene_builder_models.cpp" line="80"/>
         <source>Added %1 (%2 triangles). It stands on the floor, about 1.6 units across; use Scale to resize it.</source>
         <translation>%1 を追加しました (%2 三角形)。床の上に置かれ、幅は約 1.6 単位です。大きさは「拡大縮小」で変えられます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="84"/>
-        <location filename="../scene_builder_models.cpp" line="142"/>
+        <location filename="../scene_builder_models.cpp" line="88"/>
+        <location filename="../scene_builder_models.cpp" line="146"/>
         <source>Model library</source>
         <translation>モデルライブラリ</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="89"/>
+        <location filename="../scene_builder_models.cpp" line="93"/>
         <source>Search by name</source>
         <translation>名前で検索</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="112"/>
+        <location filename="../scene_builder_models.cpp" line="116"/>
         <source>%1
 About %2 thousand triangles
 From: %3</source>
@@ -8176,12 +8186,12 @@ From: %3</source>
 出典: %3</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="120"/>
+        <location filename="../scene_builder_models.cpp" line="124"/>
         <source>No models were found next to the app (a models folder). Use &quot;Choose another file...&quot; to add any .obj or .ply file.</source>
         <translation>アプリの隣にモデルが見つかりませんでした (models フォルダー)。「別のファイルを選ぶ...」で任意の .obj または .ply ファイルを追加できます。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="122"/>
+        <location filename="../scene_builder_models.cpp" line="126"/>
         <source>%1 models. A scan is added standing on the floor, about 1.6 units across; an everyday object or piece of furniture keeps its real size (in metres, as a glTF model does); use Scale to resize either. Each model keeps the licence of its source (docs/MODELS.md): check it before you publish pictures or scenes made with one.</source>
         <translation>%1 個のモデル。スキャンは床の上に立てて、幅約 1.6 単位で追加されます。日用品や家具は実際の大きさ (glTF モデルと同じくメートル単位) のままです。どちらも「スケール」で大きさを変えられます。各モデルはそれぞれの出典のライセンスに従います (docs/MODELS.md)。モデルを使った画像やシーンを公開する前に確認してください。</translation>
     </message>
@@ -8191,18 +8201,18 @@ From: %3</source>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
-        <location filename="../scene_builder_models.cpp" line="127"/>
+        <location filename="../scene_builder_models.cpp" line="131"/>
         <location filename="../scene_builder_widget.cpp" line="299"/>
         <source>Add</source>
         <translation>追加</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="128"/>
+        <location filename="../scene_builder_models.cpp" line="132"/>
         <source>Choose another file...</source>
         <translation>別のファイルを選ぶ...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="142"/>
+        <location filename="../scene_builder_models.cpp" line="146"/>
         <source>That model could not be read.</source>
         <translation>そのモデルを読み込めませんでした。</translation>
     </message>
@@ -8249,39 +8259,39 @@ From: %3</source>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="62"/>
-        <location filename="../scene_builder_widget.cpp" line="320"/>
+        <location filename="../scene_builder_widget.cpp" line="321"/>
         <source>Object from a photo...</source>
         <translation>写真からオブジェクトを作成...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="322"/>
+        <location filename="../scene_builder_widget.cpp" line="323"/>
         <source>Light panel (emitting quad)</source>
         <translation>ライトパネル (発光する四角形)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="331"/>
+        <location filename="../scene_builder_widget.cpp" line="332"/>
         <source>Lights</source>
         <translation>ライト</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="67"/>
-        <location filename="../scene_builder_widget.cpp" line="342"/>
+        <location filename="../scene_builder_widget.cpp" line="343"/>
         <source>Duplicate</source>
         <translation>複製</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="343"/>
+        <location filename="../scene_builder_widget.cpp" line="344"/>
         <source>Make a copy of the selected item beside it (%1)</source>
         <translation>選択した項目のコピーをその横に作ります (%1)</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="68"/>
-        <location filename="../scene_builder_widget.cpp" line="344"/>
+        <location filename="../scene_builder_widget.cpp" line="345"/>
         <source>Array...</source>
         <translation>配列...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="345"/>
+        <location filename="../scene_builder_widget.cpp" line="346"/>
         <source>Make many copies of the selected object: a grid, a ring round a point, or a random scatter</source>
         <translation>選択したオブジェクトのコピーをたくさん作ります。グリッド、点のまわりのリング、またはランダムな散布</translation>
     </message>
@@ -8445,7 +8455,7 @@ From: %3</source>
     <message>
         <location filename="../scene_builder_actions.cpp" line="69"/>
         <location filename="../scene_builder_camera_views.cpp" line="335"/>
-        <location filename="../scene_builder_widget.cpp" line="346"/>
+        <location filename="../scene_builder_widget.cpp" line="347"/>
         <source>Delete</source>
         <translation>削除</translation>
     </message>
@@ -9296,12 +9306,12 @@ It is in the scene list now (Settings tab, My Scenes).</source>
 シーンリスト（設定タブの「マイシーン」）に追加されました。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="942"/>
+        <location filename="../scene_builder_widget.cpp" line="943"/>
         <source>(%1)%2  |  %3 objects, %4 lights</source>
         <translation>(%1)%2  |  オブジェクト %3 個、ライト %4 個</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="782"/>
+        <location filename="../scene_builder_widget.cpp" line="783"/>
         <source>Choose a mesh</source>
         <translation>メッシュを選択</translation>
     </message>
@@ -9326,7 +9336,12 @@ It is in the scene list now (Settings tab, My Scenes).</source>
         <translation>やり直し (%1)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="335"/>
+        <location filename="../scene_builder_widget.cpp" line="320"/>
+        <source>Environment library...</source>
+        <translation>環境ライブラリ...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="336"/>
         <source>Lighting (replaces the lights)</source>
         <translation>ライティング (ライトを置き換え)</translation>
     </message>
@@ -9341,52 +9356,52 @@ It is in the scene list now (Settings tab, My Scenes).</source>
         <translation>シーンリストに追加しました</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="600"/>
+        <location filename="../scene_builder_widget.cpp" line="601"/>
         <source>Camera and image</source>
         <translation>カメラと画像</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="641"/>
+        <location filename="../scene_builder_widget.cpp" line="642"/>
         <source>, light</source>
         <translation>、ライト</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="782"/>
+        <location filename="../scene_builder_widget.cpp" line="783"/>
         <source>Meshes and models (*.ply *.obj *.glb *.gltf)</source>
         <translation>メッシュとモデル (*.ply *.obj *.glb *.gltf)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="787"/>
+        <location filename="../scene_builder_widget.cpp" line="788"/>
         <source>Cannot import the model</source>
         <translation>モデルを読み込めません</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="791"/>
+        <location filename="../scene_builder_widget.cpp" line="792"/>
         <source>Model imported</source>
         <translation>モデルを読み込みました</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="839"/>
+        <location filename="../scene_builder_widget.cpp" line="840"/>
         <source>Lighting: %1. %2</source>
         <translation>ライティング: %1。%2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="936"/>
+        <location filename="../scene_builder_widget.cpp" line="937"/>
         <source>not saved yet</source>
         <translation>未保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="970"/>
+        <location filename="../scene_builder_widget.cpp" line="971"/>
         <source>No problems found.</source>
         <translation>問題は見つかりませんでした。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="976"/>
+        <location filename="../scene_builder_widget.cpp" line="977"/>
         <source>Fix this:</source>
         <translation>修正してください:</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="976"/>
+        <location filename="../scene_builder_widget.cpp" line="977"/>
         <source>Note:</source>
         <translation>注意:</translation>
     </message>
@@ -10154,13 +10169,13 @@ This replaces the scene you have now (Undo brings it back).</source>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="463"/>
-        <location filename="../scene_builder_widget.cpp" line="625"/>
+        <location filename="../scene_builder_widget.cpp" line="626"/>
         <source>, locked</source>
         <translation>、ロック中</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="477"/>
-        <location filename="../scene_builder_widget.cpp" line="624"/>
+        <location filename="../scene_builder_widget.cpp" line="625"/>
         <source>, hidden</source>
         <translation>、非表示</translation>
     </message>
@@ -10256,7 +10271,7 @@ This replaces the scene you have now (Undo brings it back).</source>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="63"/>
-        <location filename="../scene_builder_widget.cpp" line="321"/>
+        <location filename="../scene_builder_widget.cpp" line="322"/>
         <source>Room from a photo...</source>
         <translation>写真から部屋を作成...</translation>
     </message>
@@ -10461,39 +10476,90 @@ This replaces the scene you have now (Undo brings it back).</source>
         <translation>ファイルが大きすぎて読み込めません (600 MB 超)。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="95"/>
+        <location filename="../scene_builder_gltf.cpp" line="75"/>
+        <source>The file could not be read.</source>
+        <translation>ファイルを読み込めませんでした。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_gltf.cpp" line="96"/>
         <source>The model has no size.</source>
         <translation>モデルにサイズがありません。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="102"/>
+        <location filename="../scene_builder_gltf.cpp" line="103"/>
         <source>Model</source>
         <translation>モデル</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="132"/>
+        <location filename="../scene_builder_gltf.cpp" line="131"/>
         <source>A part of the model is too large to import.</source>
         <translation>モデルの一部が大きすぎて読み込めません。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="135"/>
+        <location filename="../scene_builder_gltf.cpp" line="134"/>
         <source>The model could not be written to %1.</source>
         <translation>モデルを %1 に書き込めませんでした。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="168"/>
+        <location filename="../scene_builder_gltf.cpp" line="167"/>
         <source>Added %1: %2 part(s), %3 triangles, %4 m tall%5.</source>
         <translation>%1 を追加しました: %2 パーツ、三角形 %3 個、高さ %4 m%5。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="169"/>
+        <location filename="../scene_builder_gltf.cpp" line="168"/>
         <source> in the file, shown 1.6 units tall</source>
         <translation> (ファイル上の値。高さ 1.6 単位で表示)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="170"/>
+        <location filename="../scene_builder_gltf.cpp" line="169"/>
         <source>A glowing part of the model has too many triangles to be a light, so it does not glow.</source>
         <translation>モデルの発光する部分は三角形が多すぎてライトにできないため、光りません。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="78"/>
+        <source>Environment: %1. It is the sky light&apos;s picture now: the sun, clouds and lamps in it light the scene. Rotate sky turns it; Brightness changes its strength.</source>
+        <translation>環境: %1。空のライトの画像になりました。画像の中の太陽、雲、ランプがシーンを照らします。「空を回転」で向きを、「明るさ」で強さを変えられます。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="85"/>
+        <location filename="../scene_builder_environment.cpp" line="89"/>
+        <location filename="../scene_builder_environment.cpp" line="136"/>
+        <source>Environment library</source>
+        <translation>環境ライブラリ</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="85"/>
+        <source>No environment pictures were found next to the app (an environments folder).</source>
+        <translation>アプリの隣に環境画像が見つかりませんでした (environments フォルダ)。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="93"/>
+        <source>All kinds</source>
+        <translation>すべての種類</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="114"/>
+        <source>%1
+%2
+From: %3</source>
+        <translation>%1
+%2
+出典: %3</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="117"/>
+        <source>%1 photographic skies and rooms (Poly Haven, CC0). One becomes the sky light&apos;s picture: the sun, clouds, lamps and windows in it light the scene and show behind it. The Sun light made by the generated sky is removed, because the picture has its own.</source>
+        <translation>%1 個の写真の空と部屋 (Poly Haven、CC0)。1つを選ぶと空のライトの画像になり、その中の太陽、雲、ランプ、窓がシーンを照らし、背景にも映ります。生成された空が作った太陽ライトは、画像自体に太陽があるため取り除かれます。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="122"/>
+        <source>Use this sky</source>
+        <translation>この空を使う</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="136"/>
+        <source>That picture could not be used.</source>
+        <translation>その画像は使えませんでした。</translation>
     </message>
 </context>
 <context>

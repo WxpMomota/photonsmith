@@ -829,6 +829,39 @@ static void compositeTestDayCycle(const CompositeTestContext &c) {
 }
 
 // Export glTF: the starter scene as a .glb by the renderer: a file that starts with glTF's magic and says what it holds
+// The environment library: a photographic sky becomes the sky light's picture and the generated sky's Sun light goes; rendered, the scene is lit by it (the picture is kept next to the log for a look).
+static void compositeTestEnvironment(const CompositeTestContext &c) {
+	SceneBuilderWidget *sb = c.sb;
+	const auto &check = c.check;
+	sb->newScene();
+	sb->runActionForTest("lighting sunny");   // (a Sun & sky and its Sun light)
+	const bool applied = sb->applyEnvironment(-1, QStringLiteral("venice_sunset"));
+	const scene_doc::Document &doc = sb->document();
+	const scene_doc::Light *sky = nullptr;
+	int suns = 0;
+	for (const scene_doc::Light &l : doc.lights) {
+		if (l.kind == scene_doc::LightKind::Infinite) sky = &l;
+		if (l.kind == scene_doc::LightKind::Distant && l.name == "Sun") ++suns;
+	}
+	check(applied && sky && !sky->physicalSky && sky->imageFile.find("venice_sunset.hdr") != std::string::npos && suns == 0 && sky->intensity == 1.0, "an environment becomes the sky light's picture and the generated Sun goes");
+	check(!sb->applyEnvironment(-1, QStringLiteral("no-such-sky")), "an environment that is not in the library is refused");
+	const QString scenePath = QDir::tempPath() + "/rt_selftest_env_library.pbrt", ppm = QDir::tempPath() + "/rt_selftest_env_library.ppm";
+	QFile text(scenePath);
+	const bool wrote = text.open(QIODevice::WriteOnly) && text.write(sb->pbrtTextForTest().toUtf8()) > 0;
+	text.close();
+	QProcess renderer;
+	renderer.setProcessChannelMode(QProcess::MergedChannels);
+	renderer.setWorkingDirectory(QCoreApplication::applicationDirPath());
+	renderer.start(sb->launcherPathForTest(), {"--cpu", "--output", ppm, "--height", "270", "480", "24", "6", scenePath});
+	const bool finished = wrote && renderer.waitForFinished(180000) && renderer.exitCode() == 0;
+	const QImage picture(ppm);
+	long lit = 0;
+	for (int y = 0; y < picture.height() && finished; ++y)
+		for (int x = 0; x < picture.width(); ++x) lit += qGray(picture.pixel(x, y)) > 40 ? 1 : 0;
+	if (!picture.isNull()) picture.save(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_environment.png");
+	check(finished && lit > picture.width() * picture.height() / 3, QString("the scene renders lit by it (%1 lit pixels)").arg(lit));
+}
+
 static void compositeTestExportGltf(const CompositeTestContext &c) {
 	SceneBuilderWidget *sb = c.sb;
 	[[maybe_unused]] QWidget *window = c.window;
@@ -1180,6 +1213,7 @@ void MainWindow::runCompositeSelfTest(const std::function<void(const QString &)>
 		compositeTestPhotoEnvironment(context);
 		compositeTestDayCycle(context);
 		compositeTestExportGltf(context);
+		compositeTestEnvironment(context);
 		compositeTestSavedWithScene(context);
 	}
 	QTimer::singleShot(600, this, [this, shot, log, ok]() {

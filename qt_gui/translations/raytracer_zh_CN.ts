@@ -7189,7 +7189,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="471"/>
-        <location filename="../scene_builder_inspector.cpp" line="902"/>
+        <location filename="../scene_builder_inspector.cpp" line="906"/>
         <source>Preset</source>
         <translation>预设</translation>
     </message>
@@ -7219,7 +7219,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <location filename="../scene_builder_inspector.cpp" line="582"/>
         <location filename="../scene_builder_inspector.cpp" line="614"/>
         <location filename="../scene_builder_inspector.cpp" line="682"/>
-        <location filename="../scene_builder_inspector.cpp" line="933"/>
+        <location filename="../scene_builder_inspector.cpp" line="937"/>
         <location filename="../scene_builder_mix.cpp" line="89"/>
         <location filename="../scene_builder_mix.cpp" line="92"/>
         <location filename="../scene_builder_mix.cpp" line="109"/>
@@ -7826,7 +7826,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="829"/>
-        <location filename="../scene_builder_inspector.cpp" line="934"/>
+        <location filename="../scene_builder_inspector.cpp" line="938"/>
         <source>Strength</source>
         <translation>强度</translation>
     </message>
@@ -7887,93 +7887,103 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>太阳与天空（随时间变化的晴朗天空）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="892"/>
+        <location filename="../scene_builder_inspector.cpp" line="890"/>
+        <source>Photographic sky (HDRI)...</source>
+        <translation>实景天空 (HDRI)...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="891"/>
+        <source>Choose a photographic sky or room: sunsets, forests, studios, night skies. Its picture is the sky light, sun and all.</source>
+        <translation>选择实景天空或房间：日落、森林、摄影棚、夜空等。它的图片就是天空光，包括太阳。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_inspector.cpp" line="896"/>
         <source>Time of day...</source>
         <translation>时间...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="893"/>
+        <location filename="../scene_builder_inspector.cpp" line="897"/>
         <source>Sunrise</source>
         <translation>日出</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="893"/>
+        <location filename="../scene_builder_inspector.cpp" line="897"/>
         <source>Morning</source>
         <translation>上午</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="893"/>
+        <location filename="../scene_builder_inspector.cpp" line="897"/>
         <source>Noon</source>
         <translation>正午</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="894"/>
+        <location filename="../scene_builder_inspector.cpp" line="898"/>
         <source>Afternoon</source>
         <translation>下午</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="894"/>
+        <location filename="../scene_builder_inspector.cpp" line="898"/>
         <source>Sunset</source>
         <translation>日落</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="904"/>
+        <location filename="../scene_builder_inspector.cpp" line="908"/>
         <source>Sky gallery...</source>
         <translation>天空图库...</translation>
     </message>
     <message>
         <location filename="../scene_builder_inspector.cpp" line="339"/>
-        <location filename="../scene_builder_inspector.cpp" line="914"/>
+        <location filename="../scene_builder_inspector.cpp" line="918"/>
         <source>Match to a photo...</source>
         <translation>匹配照片...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="915"/>
+        <location filename="../scene_builder_inspector.cpp" line="919"/>
         <source>Choose a photo of an outdoor scene with the sky in it: the sun&apos;s height and direction and the haze are read from the sky and set here.</source>
         <translation>选择一张能看到天空的户外照片：太阳的高度和方向以及雾霾会从天空中读出并在此设置。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="918"/>
+        <location filename="../scene_builder_inspector.cpp" line="922"/>
         <source>Sun height</source>
         <translation>太阳高度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="919"/>
+        <location filename="../scene_builder_inspector.cpp" line="923"/>
         <source>Sun direction</source>
         <translation>太阳方向</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="920"/>
+        <location filename="../scene_builder_inspector.cpp" line="924"/>
         <source>Haze</source>
         <translation>雾霾</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="921"/>
+        <location filename="../scene_builder_inspector.cpp" line="925"/>
         <source>Ground brightness</source>
         <translation>地面亮度</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="922"/>
+        <location filename="../scene_builder_inspector.cpp" line="926"/>
         <source>The sky picture and the Sun light are made from these settings; change the sun here rather than moving the Sun light. Direction 0 is towards +X, 90 away from the starting camera, 180 towards -X, 270 behind it. Brightness 1 is a daylight scene.</source>
         <translation>天空图像和太阳光由这些设置生成；请在这里调整太阳，而不是移动太阳光。方向 0 朝向 +X，90 远离初始相机，180 朝向 -X，270 在相机后方。亮度 1 为白天场景。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="925"/>
+        <location filename="../scene_builder_inspector.cpp" line="929"/>
         <source>Sky image</source>
         <translation>天空图像</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="925"/>
+        <location filename="../scene_builder_inspector.cpp" line="929"/>
         <source>Images (*.exr *.hdr *.png *.jpg *.jpeg)</source>
         <translation>图像 (*.exr *.hdr *.png *.jpg *.jpeg)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="927"/>
+        <location filename="../scene_builder_inspector.cpp" line="931"/>
         <source>Rotate sky</source>
         <translation>旋转天空</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="928"/>
+        <location filename="../scene_builder_inspector.cpp" line="932"/>
         <source>Leave the image empty for a plain colour sky. An image is an equirectangular (lat-long) panorama; Rotate sky turns it about the vertical axis (counter-clockwise seen from above), to put the bright part of the picture where you want the light to come from.</source>
         <translation>图像留空则为纯色天空。图像是等距柱状（经纬度）全景图；“旋转天空”会绕竖直轴旋转（从上方看为逆时针），使图像中最亮的部分对准你希望光线来自的方向。</translation>
     </message>
@@ -7982,7 +7992,7 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation type="vanished">图像留空则使用纯色天空。图像应为等距柱状（经纬度）全景图。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_inspector.cpp" line="934"/>
+        <location filename="../scene_builder_inspector.cpp" line="938"/>
         <source>Brightness</source>
         <translation>亮度</translation>
     </message>
@@ -8125,12 +8135,12 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
-        <location filename="../scene_builder_widget.cpp" line="347"/>
+        <location filename="../scene_builder_widget.cpp" line="348"/>
         <source>Arrange</source>
         <translation>整理</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="348"/>
+        <location filename="../scene_builder_widget.cpp" line="349"/>
         <source>Rename, put on the floor, frame, hide and lock what is picked (also on a right-click in the list)</source>
         <translation>对所选项重命名、放到地面、取景、隐藏和锁定（在列表中右键点击也可使用）</translation>
     </message>
@@ -8157,23 +8167,23 @@ Add shapes and lights with the Add button. Drag them in the layout view, then pr
         <translation>制作一段视频：相机依次飞过你保存的相机视图（需要两个或更多）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="76"/>
+        <location filename="../scene_builder_models.cpp" line="80"/>
         <source>Added %1 (%2 triangles). It stands on the floor, about 1.6 units across; use Scale to resize it.</source>
         <translation>已添加 %1（%2 个三角形）。它立在地面上，宽约 1.6 个单位；可用“缩放”调整大小。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="84"/>
-        <location filename="../scene_builder_models.cpp" line="142"/>
+        <location filename="../scene_builder_models.cpp" line="88"/>
+        <location filename="../scene_builder_models.cpp" line="146"/>
         <source>Model library</source>
         <translation>模型库</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="89"/>
+        <location filename="../scene_builder_models.cpp" line="93"/>
         <source>Search by name</source>
         <translation>按名称搜索</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="112"/>
+        <location filename="../scene_builder_models.cpp" line="116"/>
         <source>%1
 About %2 thousand triangles
 From: %3</source>
@@ -8182,12 +8192,12 @@ From: %3</source>
 来源：%3</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="120"/>
+        <location filename="../scene_builder_models.cpp" line="124"/>
         <source>No models were found next to the app (a models folder). Use &quot;Choose another file...&quot; to add any .obj or .ply file.</source>
         <translation>在应用旁边没有找到模型（models 文件夹）。可用“选择其他文件...”添加任意 .obj 或 .ply 文件。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="122"/>
+        <location filename="../scene_builder_models.cpp" line="126"/>
         <source>%1 models. A scan is added standing on the floor, about 1.6 units across; an everyday object or piece of furniture keeps its real size (in metres, as a glTF model does); use Scale to resize either. Each model keeps the licence of its source (docs/MODELS.md): check it before you publish pictures or scenes made with one.</source>
         <translation>%1 个模型。扫描模型会立在地面上，宽约 1.6 个单位；日常物品和家具保持真实尺寸（和 glTF 模型一样以米为单位）；两者都可用“缩放”调整大小。每个模型都沿用其来源的许可协议（docs/MODELS.md）：发布用它们制作的图片或场景之前请先查看。</translation>
     </message>
@@ -8197,18 +8207,18 @@ From: %3</source>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="53"/>
-        <location filename="../scene_builder_models.cpp" line="127"/>
+        <location filename="../scene_builder_models.cpp" line="131"/>
         <location filename="../scene_builder_widget.cpp" line="299"/>
         <source>Add</source>
         <translation>添加</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="128"/>
+        <location filename="../scene_builder_models.cpp" line="132"/>
         <source>Choose another file...</source>
         <translation>选择其他文件...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_models.cpp" line="142"/>
+        <location filename="../scene_builder_models.cpp" line="146"/>
         <source>That model could not be read.</source>
         <translation>无法读取该模型。</translation>
     </message>
@@ -8255,39 +8265,39 @@ From: %3</source>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="62"/>
-        <location filename="../scene_builder_widget.cpp" line="320"/>
+        <location filename="../scene_builder_widget.cpp" line="321"/>
         <source>Object from a photo...</source>
         <translation>由照片生成物体...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="322"/>
+        <location filename="../scene_builder_widget.cpp" line="323"/>
         <source>Light panel (emitting quad)</source>
         <translation>灯板（发光四边形）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="331"/>
+        <location filename="../scene_builder_widget.cpp" line="332"/>
         <source>Lights</source>
         <translation>光源</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="67"/>
-        <location filename="../scene_builder_widget.cpp" line="342"/>
+        <location filename="../scene_builder_widget.cpp" line="343"/>
         <source>Duplicate</source>
         <translation>复制</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="343"/>
+        <location filename="../scene_builder_widget.cpp" line="344"/>
         <source>Make a copy of the selected item beside it (%1)</source>
         <translation>在所选项旁边制作一个副本（%1）</translation>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="68"/>
-        <location filename="../scene_builder_widget.cpp" line="344"/>
+        <location filename="../scene_builder_widget.cpp" line="345"/>
         <source>Array...</source>
         <translation>阵列...</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="345"/>
+        <location filename="../scene_builder_widget.cpp" line="346"/>
         <source>Make many copies of the selected object: a grid, a ring round a point, or a random scatter</source>
         <translation>为所选对象制作许多副本：网格、绕一点的环形，或随机散布</translation>
     </message>
@@ -8451,7 +8461,7 @@ From: %3</source>
     <message>
         <location filename="../scene_builder_actions.cpp" line="69"/>
         <location filename="../scene_builder_camera_views.cpp" line="335"/>
-        <location filename="../scene_builder_widget.cpp" line="346"/>
+        <location filename="../scene_builder_widget.cpp" line="347"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
@@ -9302,12 +9312,12 @@ It is in the scene list now (Settings tab, My Scenes).</source>
 它现在已在场景列表中（“设置”标签页，我的场景）。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="942"/>
+        <location filename="../scene_builder_widget.cpp" line="943"/>
         <source>(%1)%2  |  %3 objects, %4 lights</source>
         <translation>(%1)%2  |  %3 个物体，%4 个光源</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="782"/>
+        <location filename="../scene_builder_widget.cpp" line="783"/>
         <source>Choose a mesh</source>
         <translation>选择网格</translation>
     </message>
@@ -9332,7 +9342,12 @@ It is in the scene list now (Settings tab, My Scenes).</source>
         <translation>重做 (%1)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="335"/>
+        <location filename="../scene_builder_widget.cpp" line="320"/>
+        <source>Environment library...</source>
+        <translation>环境库...</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_widget.cpp" line="336"/>
         <source>Lighting (replaces the lights)</source>
         <translation>灯光方案（替换现有灯光）</translation>
     </message>
@@ -9347,52 +9362,52 @@ It is in the scene list now (Settings tab, My Scenes).</source>
         <translation>已添加到场景列表</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="600"/>
+        <location filename="../scene_builder_widget.cpp" line="601"/>
         <source>Camera and image</source>
         <translation>相机与画面</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="641"/>
+        <location filename="../scene_builder_widget.cpp" line="642"/>
         <source>, light</source>
         <translation>，光源</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="782"/>
+        <location filename="../scene_builder_widget.cpp" line="783"/>
         <source>Meshes and models (*.ply *.obj *.glb *.gltf)</source>
         <translation>网格和模型 (*.ply *.obj *.glb *.gltf)</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="787"/>
+        <location filename="../scene_builder_widget.cpp" line="788"/>
         <source>Cannot import the model</source>
         <translation>无法导入模型</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="791"/>
+        <location filename="../scene_builder_widget.cpp" line="792"/>
         <source>Model imported</source>
         <translation>模型已导入</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="839"/>
+        <location filename="../scene_builder_widget.cpp" line="840"/>
         <source>Lighting: %1. %2</source>
         <translation>灯光：%1。%2</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="936"/>
+        <location filename="../scene_builder_widget.cpp" line="937"/>
         <source>not saved yet</source>
         <translation>尚未保存</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="970"/>
+        <location filename="../scene_builder_widget.cpp" line="971"/>
         <source>No problems found.</source>
         <translation>未发现问题。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="976"/>
+        <location filename="../scene_builder_widget.cpp" line="977"/>
         <source>Fix this:</source>
         <translation>请修复：</translation>
     </message>
     <message>
-        <location filename="../scene_builder_widget.cpp" line="976"/>
+        <location filename="../scene_builder_widget.cpp" line="977"/>
         <source>Note:</source>
         <translation>注意：</translation>
     </message>
@@ -10160,13 +10175,13 @@ This replaces the scene you have now (Undo brings it back).</source>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="463"/>
-        <location filename="../scene_builder_widget.cpp" line="625"/>
+        <location filename="../scene_builder_widget.cpp" line="626"/>
         <source>, locked</source>
         <translation>，已锁定</translation>
     </message>
     <message>
         <location filename="../mainwindow_selftest_modes.cpp" line="477"/>
-        <location filename="../scene_builder_widget.cpp" line="624"/>
+        <location filename="../scene_builder_widget.cpp" line="625"/>
         <source>, hidden</source>
         <translation>，已隐藏</translation>
     </message>
@@ -10262,7 +10277,7 @@ This replaces the scene you have now (Undo brings it back).</source>
     </message>
     <message>
         <location filename="../scene_builder_actions.cpp" line="63"/>
-        <location filename="../scene_builder_widget.cpp" line="321"/>
+        <location filename="../scene_builder_widget.cpp" line="322"/>
         <source>Room from a photo...</source>
         <translation>由照片生成房间...</translation>
     </message>
@@ -10467,39 +10482,90 @@ This replaces the scene you have now (Undo brings it back).</source>
         <translation>文件太大，无法导入（超过 600 MB）。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="95"/>
+        <location filename="../scene_builder_gltf.cpp" line="75"/>
+        <source>The file could not be read.</source>
+        <translation>无法读取文件。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_gltf.cpp" line="96"/>
         <source>The model has no size.</source>
         <translation>模型没有大小。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="102"/>
+        <location filename="../scene_builder_gltf.cpp" line="103"/>
         <source>Model</source>
         <translation>模型</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="132"/>
+        <location filename="../scene_builder_gltf.cpp" line="131"/>
         <source>A part of the model is too large to import.</source>
         <translation>模型的某一部分太大，无法导入。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="135"/>
+        <location filename="../scene_builder_gltf.cpp" line="134"/>
         <source>The model could not be written to %1.</source>
         <translation>无法把模型写入 %1。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="168"/>
+        <location filename="../scene_builder_gltf.cpp" line="167"/>
         <source>Added %1: %2 part(s), %3 triangles, %4 m tall%5.</source>
         <translation>已添加 %1：%2 个部分，%3 个三角形，高 %4 米%5。</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="169"/>
+        <location filename="../scene_builder_gltf.cpp" line="168"/>
         <source> in the file, shown 1.6 units tall</source>
         <translation>（文件中的尺寸，按 1.6 单位高显示）</translation>
     </message>
     <message>
-        <location filename="../scene_builder_gltf.cpp" line="170"/>
+        <location filename="../scene_builder_gltf.cpp" line="169"/>
         <source>A glowing part of the model has too many triangles to be a light, so it does not glow.</source>
         <translation>模型中发光的部分三角形太多，无法作为光源，所以不发光。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="78"/>
+        <source>Environment: %1. It is the sky light&apos;s picture now: the sun, clouds and lamps in it light the scene. Rotate sky turns it; Brightness changes its strength.</source>
+        <translation>环境：%1。它现在是天空光的图片：其中的太阳、云和灯光会照亮场景。“旋转天空”可转动它，“亮度”可改变强度。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="85"/>
+        <location filename="../scene_builder_environment.cpp" line="89"/>
+        <location filename="../scene_builder_environment.cpp" line="136"/>
+        <source>Environment library</source>
+        <translation>环境库</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="85"/>
+        <source>No environment pictures were found next to the app (an environments folder).</source>
+        <translation>在应用旁边没有找到环境图片（environments 文件夹）。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="93"/>
+        <source>All kinds</source>
+        <translation>全部类型</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="114"/>
+        <source>%1
+%2
+From: %3</source>
+        <translation>%1
+%2
+来源：%3</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="117"/>
+        <source>%1 photographic skies and rooms (Poly Haven, CC0). One becomes the sky light&apos;s picture: the sun, clouds, lamps and windows in it light the scene and show behind it. The Sun light made by the generated sky is removed, because the picture has its own.</source>
+        <translation>%1 个实景天空和房间（Poly Haven，CC0）。选择其中一个会成为天空光的图片：其中的太阳、云、灯和窗会照亮场景并显示在背景中。生成天空所做的太阳光会被移除，因为图片本身已有太阳。</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="122"/>
+        <source>Use this sky</source>
+        <translation>使用此天空</translation>
+    </message>
+    <message>
+        <location filename="../scene_builder_environment.cpp" line="136"/>
+        <source>That picture could not be used.</source>
+        <translation>无法使用该图片。</translation>
     </message>
 </context>
 <context>
