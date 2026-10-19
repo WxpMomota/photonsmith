@@ -1337,72 +1337,72 @@
         <translation>レンダリングを停止中...</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="102"/>
+        <location filename="../mainwindow_scene_info.cpp" line="103"/>
         <source>&lt;b&gt;Description:&lt;/b&gt; %1&lt;br&gt;</source>
         <translation>&lt;b&gt;説明:&lt;/b&gt; %1&lt;br&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="111"/>
+        <location filename="../mainwindow_scene_info.cpp" line="112"/>
         <source>&lt;b&gt;Recommended SPP:&lt;/b&gt; %1&lt;br&gt;</source>
         <translation>&lt;b&gt;推奨SPP:&lt;/b&gt; %1&lt;br&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="112"/>
+        <location filename="../mainwindow_scene_info.cpp" line="113"/>
         <source>&lt;b&gt;GPU Support:&lt;/b&gt; %1&lt;br&gt;</source>
         <translation>&lt;b&gt;GPU対応:&lt;/b&gt; %1&lt;br&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="112"/>
+        <location filename="../mainwindow_scene_info.cpp" line="113"/>
         <source>Yes</source>
         <translation>はい</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="112"/>
+        <location filename="../mainwindow_scene_info.cpp" line="113"/>
         <source>CPU only</source>
         <translation>CPUのみ</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="165"/>
+        <location filename="../mainwindow_scene_info.cpp" line="166"/>
         <source>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#10003; External files found&lt;/b&gt;</source>
         <translation>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#10003; 外部ファイルが見つかりました&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="170"/>
+        <location filename="../mainwindow_scene_info.cpp" line="171"/>
         <source>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; CPU renderer only&lt;/b&gt;</source>
         <translation>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; CPUレンダラーのみ対応&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="207"/>
+        <location filename="../mainwindow_scene_info.cpp" line="208"/>
         <source>Integrator &quot;%1&quot;</source>
         <translation>インテグレータ「%1」</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="212"/>
+        <location filename="../mainwindow_scene_info.cpp" line="213"/>
         <source>Sampler &quot;%1&quot;</source>
         <translation>サンプラー「%1」</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="217"/>
+        <location filename="../mainwindow_scene_info.cpp" line="218"/>
         <source>Light Sampler &quot;%1&quot;</source>
         <translation>光源サンプラー「%1」</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="227"/>
+        <location filename="../mainwindow_scene_info.cpp" line="228"/>
         <source>Tip: this scene was set up with %1. Your Render Options use the defaults instead, which is fine for a first render; click Apply to match the scene&apos;s own settings.</source>
         <translation>ヒント: このシーンは %1 で設定されています。レンダリングオプションは既定値のままですが、最初のレンダリングには問題ありません。シーン本来の設定に合わせるには「適用」をクリックしてください。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="230"/>
+        <location filename="../mainwindow_scene_info.cpp" line="231"/>
         <source>, </source>
         <translation>、</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="317"/>
+        <location filename="../mainwindow_scene_info.cpp" line="318"/>
         <source>No scenes in this category.</source>
         <translation>このカテゴリにはシーンがありません。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="318"/>
+        <location filename="../mainwindow_scene_info.cpp" line="319"/>
         <source>No scenes match &quot;%1&quot; in this category.</source>
         <translation>このカテゴリには「%1」に一致するシーンがありません。</translation>
     </message>
@@ -1624,54 +1624,54 @@ Use the pause/stop controls if a category turns out to take too long.</source>
         <translation>⏸ 一時停止中</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="105"/>
+        <location filename="../mainwindow_scene_info.cpp" line="106"/>
         <source>under 10 s</source>
         <translation>10 秒未満</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="106"/>
+        <location filename="../mainwindow_scene_info.cpp" line="107"/>
         <source>10 to 30 s</source>
         <translation>10〜30 秒</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="107"/>
+        <location filename="../mainwindow_scene_info.cpp" line="108"/>
         <source>30 s to 2 min</source>
         <translation>30 秒〜2 分</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="108"/>
+        <location filename="../mainwindow_scene_info.cpp" line="109"/>
         <source>over 2 min</source>
         <translation>2 分以上</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="109"/>
+        <location filename="../mainwindow_scene_info.cpp" line="110"/>
         <source>not measured</source>
         <translation>未計測</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="110"/>
+        <location filename="../mainwindow_scene_info.cpp" line="111"/>
         <source>&lt;b&gt;Performance:&lt;/b&gt; %1 (%2)&lt;br&gt;</source>
         <translation>&lt;b&gt;パフォーマンス:&lt;/b&gt; %1 (%2)&lt;br&gt;</translation>
     </message>
     <message numerus="yes">
-        <location filename="../mainwindow_scene_info.cpp" line="138"/>
+        <location filename="../mainwindow_scene_info.cpp" line="139"/>
         <source>Download %n missing file(s) (%1)</source>
         <translation>
             <numerusform>不足している %n 個のファイルをダウンロード (%1)</numerusform>
         </translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="148"/>
+        <location filename="../mainwindow_scene_info.cpp" line="149"/>
         <source>Download &quot;%1&quot; (%2)</source>
         <translation>「%1」をダウンロード (%2)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="155"/>
+        <location filename="../mainwindow_scene_info.cpp" line="156"/>
         <source>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; This scene&apos;s file was not found: %2&lt;/b&gt;&lt;br&gt;Expected in: %3&lt;br&gt;Rendering this scene will fail until it is installed.</source>
         <translation>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; このシーンのファイルが見つかりません: %2&lt;/b&gt;&lt;br&gt;配置先: %3&lt;br&gt;インストールするまで、このシーンはレンダリングできません。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="159"/>
+        <location filename="../mainwindow_scene_info.cpp" line="160"/>
         <source>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; Missing external files: %2 of %3 not found (first: %4)&lt;/b&gt;&lt;br&gt;Put them in: %5&lt;br&gt;Rendering this scene will fail until they are installed.</source>
         <translation>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; 外部ファイルが不足しています: %3 個中 %2 個が見つかりません（最初のファイル: %4）&lt;/b&gt;&lt;br&gt;配置先: %5&lt;br&gt;インストールするまで、このシーンはレンダリングできません。</translation>
     </message>
@@ -1855,7 +1855,6 @@ The render may have failed to create output.</source>
         <location filename="../mainwindow_downloads.cpp" line="155"/>
         <location filename="../mainwindow_downloads.cpp" line="163"/>
         <location filename="../mainwindow_downloads.cpp" line="195"/>
-        <location filename="../mainwindow_downloads.cpp" line="201"/>
         <source>Download missing files</source>
         <translation>不足しているファイルをダウンロード</translation>
     </message>
@@ -2112,16 +2111,15 @@ This is a large download and may take a while.</source>
 ダウンロードサイズが大きいため、時間がかかる場合があります。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_downloads.cpp" line="202"/>
         <source>The scene was downloaded. It appears with its own camera and settings after the app restarts. Restart now?
 
 (A render in progress or queued jobs would be lost.)</source>
-        <translation>シーンをダウンロードしました。アプリを再起動すると、シーン独自のカメラと設定で表示されます。今すぐ再起動しますか？
+        <translation type="vanished">シーンをダウンロードしました。アプリを再起動すると、シーン独自のカメラと設定で表示されます。今すぐ再起動しますか？
 
 （実行中のレンダリングやキュー内のジョブは失われます。）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_downloads.cpp" line="208"/>
+        <location filename="../mainwindow_downloads.cpp" line="206"/>
         <source>Downloading &quot;%1&quot; (%2)…</source>
         <translation>「%1」をダウンロード中 (%2)…</translation>
     </message>
@@ -11016,19 +11014,19 @@ Check that you have permission to write there and that the disk is not full.</so
 <context>
     <name>scene_packs::PackDownloader</name>
     <message numerus="yes">
-        <location filename="../scene_packs.cpp" line="149"/>
+        <location filename="../scene_packs.cpp" line="151"/>
         <source>The download stalled: no data was received for %n second(s).</source>
         <translation>
             <numerusform>ダウンロードが停止しました: %n 秒間データを受信していません。</numerusform>
         </translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="205"/>
+        <location filename="../scene_packs.cpp" line="207"/>
         <source>Download cancelled.</source>
         <translation>ダウンロードをキャンセルしました。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="223"/>
+        <location filename="../scene_packs.cpp" line="225"/>
         <source>Cannot write to %1: %2
 
 Check that you have permission to write there and that the disk is not full.</source>
@@ -11037,52 +11035,52 @@ Check that you have permission to write there and that the disk is not full.</so
 書き込み権限があること、およびディスクがいっぱいでないことを確認してください。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="254"/>
+        <location filename="../scene_packs.cpp" line="256"/>
         <source>Could not write %1: %2</source>
         <translation>%1 を書き込めませんでした: %2</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="269"/>
+        <location filename="../scene_packs.cpp" line="271"/>
         <source>%1: the archive&apos;s layout is not what was recorded (it has probably changed upstream).</source>
         <translation>%1: アーカイブの構成が記録されたものと異なります（配布元で変更された可能性があります）。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="294"/>
+        <location filename="../scene_packs.cpp" line="296"/>
         <source>%1 could not be decompressed (corrupt download).</source>
         <translation>%1 を展開できませんでした（ダウンロードが破損しています）。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="314"/>
+        <location filename="../scene_packs.cpp" line="316"/>
         <source>%1 has changed upstream since this app&apos;s list of downloads was made, so it can no longer be fetched safely.</source>
         <translation>このアプリのダウンロード一覧が作成された後に %1 が配布元で変更されたため、安全に取得できなくなりました。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="328"/>
+        <location filename="../scene_packs.cpp" line="330"/>
         <source>%1 is larger than expected and was discarded.</source>
         <translation>%1 が想定より大きいため、破棄しました。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="344"/>
+        <location filename="../scene_packs.cpp" line="346"/>
         <source>Could not download %1: %2</source>
         <translation>%1 をダウンロードできませんでした: %2</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="356"/>
+        <location filename="../scene_packs.cpp" line="358"/>
         <source>%1 downloaded incompletely and was discarded.</source>
         <translation>%1 のダウンロードが不完全だったため、破棄しました。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="358"/>
+        <location filename="../scene_packs.cpp" line="360"/>
         <source>%1 failed its checksum (CRC-32) and was discarded.</source>
         <translation>%1 がチェックサム（CRC-32）の検証に失敗したため、破棄しました。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="361"/>
+        <location filename="../scene_packs.cpp" line="363"/>
         <source>%1 failed its checksum and was discarded.</source>
         <translation>%1 がチェックサムの検証に失敗したため、破棄しました。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="365"/>
+        <location filename="../scene_packs.cpp" line="367"/>
         <source>Could not move the downloaded file into place at %1.</source>
         <translation>ダウンロードしたファイルを %1 に移動できませんでした。</translation>
     </message>

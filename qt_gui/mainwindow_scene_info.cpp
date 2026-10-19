@@ -33,6 +33,7 @@
 #include <QThread>
 #include <QHash>
 #include <array>
+#include <algorithm>
 #include <cmath>
 #include <optional>
 
@@ -447,6 +448,18 @@ void MainWindow::onSceneChanged(int index) {
 		double dz = meta.camLookfromZ - meta.camLookatZ;
 		double dist = std::sqrt(dx * dx + dy * dy + dz * dz);
 		m_currentSceneCamDistance = (dist > 1e-6) ? dist : 1078.0;
+		// The boxes show the camera to four significant digits of the scene's own size, so a scene a metre across is not rounded to the centimetre (the
+		// preview starts from these numbers while the image render uses the file's camera: a rounded camera framed the picture a little differently), and a
+		// scene thousands of units wide is not stopped at +-2000 (a clamped camera is another place than the file's).
+		{
+			const int decimals = std::clamp(4 - static_cast<int>(std::floor(std::log10(m_currentSceneCamDistance))), 2, 8);
+			for (QDoubleSpinBox *box : {m_cameraPosX, m_cameraPosY, m_cameraPosZ, m_cameraDistance}) {
+				const QSignalBlocker blocker(box);
+				box->setDecimals(decimals);
+				if (box == m_cameraDistance) box->setRange(std::pow(10.0, -decimals), 1.0e7);
+				else box->setRange(-1.0e7, 1.0e7);
+			}
+		}
 		m_cameraPosX->setValue(meta.camLookfromX);
 		m_cameraPosY->setValue(meta.camLookfromY);
 		m_cameraPosZ->setValue(meta.camLookfromZ);

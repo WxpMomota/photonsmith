@@ -1160,3 +1160,53 @@ TEST(FindSceneTest, EveryDownloadableBitterliSceneHasAPackThatWritesItsFile) {
 	}
 	EXPECT_EQ(checked, 17);
 }
+
+// A downloadable scene whose file was missing when the registry was built has a missing file's camera; once the file is there, a refresh (the GUI's, after "Download
+// missing files") builds the descriptor again from it, with no restart: the camera boxes and the Live Preview then start where the file's camera is.
+TEST(FindSceneTest, ADownloadedSceneReadsItsOwnCameraAtOnce) {
+	const auto pending = [] {
+		for (const auto& p : pbrt_scene_registry::pendingDownloads())
+			if (p.id == "H32") return true;
+		return false;
+	};
+	(void)get_scene_registry();
+	if (!pending()) GTEST_SKIP() << "the Coffee Maker is on disk here, so it was never missing";
+	const SceneDescriptor* scene = find_scene("H32");
+	ASSERT_NE(scene, nullptr);
+	EXPECT_EQ(scene->camera.lookfrom_x, 0.0);   // (a missing file: the camera at the origin)
+
+	namespace fs = std::filesystem;
+	const fs::path root = fs::temp_directory_path() / "rt_downloaded_scene_test";
+	const fs::path dir = root / "pbrt_scenes" / "bitterli" / "coffee";
+	std::error_code ec;
+	fs::create_directories(dir, ec);
+	{
+		std::ofstream out(dir / "scene-v4.pbrt");
+		out << "LookAt 1 2 3  4 5 6  0 1 0\n"
+		       "Sampler \"sobol\" \"integer pixelsamples\" [ 64 ]\n"
+		       "Camera \"perspective\" \"float fov\" [ 30 ]\n"
+		       "Film \"rgb\" \"integer xresolution\" [ 40 ] \"integer yresolution\" [ 30 ] \"string filename\" [ \"x.png\" ]\n"
+		       "WorldBegin\n"
+		       "Shape \"sphere\" \"float radius\" [ 1 ]\n";
+	}
+#ifdef _WIN32
+	_putenv_s("RAY_TRACER_USER_ASSETS", root.string().c_str());
+#else
+	setenv("RAY_TRACER_USER_ASSETS", root.string().c_str(), 1);
+#endif
+	cpu_refresh_user_scenes();
+#ifdef _WIN32
+	_putenv_s("RAY_TRACER_USER_ASSETS", "");
+#else
+	unsetenv("RAY_TRACER_USER_ASSETS");
+#endif
+	const SceneDescriptor* now = find_scene("H32");
+	ASSERT_NE(now, nullptr);
+	EXPECT_NEAR(now->camera.lookfrom_x, 1.0, 1e-6);
+	EXPECT_NEAR(now->camera.lookfrom_y, 2.0, 1e-6);
+	EXPECT_NEAR(now->camera.lookat_z, 6.0, 1e-6);
+	EXPECT_NEAR(now->camera.vfov, 30.0, 1e-6);
+	EXPECT_EQ(now->slug, "coffee-maker") << "the refreshed entry keeps its name";
+	EXPECT_FALSE(pending()) << "and is not refreshed again";
+	fs::remove_all(root, ec);
+}

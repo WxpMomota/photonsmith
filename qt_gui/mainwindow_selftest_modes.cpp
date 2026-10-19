@@ -1115,9 +1115,13 @@ void MainWindow::runDownloadSelfTest(const std::function<void(const QString &)> 
 		QTimer::singleShot(1800000, this, [log]() { log("RESULT: FAIL (timed out)"); QApplication::exit(1); });
 		startPackDownload(*pack, false, [this, log](bool ok, const QString &error) {
 			const bool stillMissing = SceneMetadataClient::missingAssets(m_sceneCombo->currentData().toString()).any;
-			log(QString("download ok=%1 error=\"%2\" scene-still-reports-missing=%3").arg(ok).arg(error).arg(stillMissing));
-			log(ok && !stillMissing ? "RESULT: OK" : "RESULT: FAIL");
-			QApplication::exit(ok && !stillMissing ? 0 : 1);
+			// A scene the registry listed while its file was missing has the camera of a missing file (the origin) until the download is read again: the camera boxes the Live
+			// Preview starts from must now be the file's camera.
+			const bool cameraRead = m_cameraPosX->value() != 0.0 || m_cameraPosY->value() != 0.0 || m_cameraPosZ->value() != 0.0;
+			log(QString("download ok=%1 error=\"%2\" scene-still-reports-missing=%3 camera boxes (%4, %5, %6) read from the file=%7").arg(ok).arg(error).arg(stillMissing)
+				.arg(m_cameraPosX->value()).arg(m_cameraPosY->value()).arg(m_cameraPosZ->value()).arg(cameraRead));
+			log(ok && !stillMissing && cameraRead ? "RESULT: OK" : "RESULT: FAIL");
+			QApplication::exit(ok && !stillMissing && cameraRead ? 0 : 1);
 		});
 		return;
 	}

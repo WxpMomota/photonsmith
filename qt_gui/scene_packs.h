@@ -59,7 +59,7 @@ struct Pack {
 	qint64 downloadBytes() const;   // what crosses the network
 	qint64 diskBytes() const;       // what ends up on disk
 	int fileCount() const;
-	bool providesSceneFiles() const;   // contains .pbrt scenes (a new scene appears only after a restart)
+	bool providesSceneFiles() const;   // contains .pbrt scenes (the registry reads them again after the download)
 };
 
 struct Catalogue {

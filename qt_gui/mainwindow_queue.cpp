@@ -252,7 +252,7 @@ RenderJob MainWindow::captureRenderJob() {
 		// camera ever needs more precision than 2 decimals would silently
 		// never compare equal, permanently forcing camExplicit=true (still
 		// harmless, just pointlessly defeats this check for that scene).
-		constexpr double kEpsilon = 0.005;
+		const double kEpsilon = 0.5 * std::pow(10.0, -m_cameraPosX->decimals());   // (half the last digit the boxes show: they follow the scene's size)
 		job.camExplicit = std::abs(job.camX - jobMeta.camLookfromX) > kEpsilon
 			|| std::abs(job.camY - jobMeta.camLookfromY) > kEpsilon
 			|| std::abs(job.camZ - jobMeta.camLookfromZ) > kEpsilon;

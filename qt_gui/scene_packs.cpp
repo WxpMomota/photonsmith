@@ -56,6 +56,8 @@ int Pack::fileCount() const {
 
 bool Pack::providesSceneFiles() const {
 	for (const RemoteFile &f : files) if (f.dest.endsWith(QLatin1String(".pbrt"), Qt::CaseInsensitive)) return true;
+	for (const Archive &a : archives)   // (a scene inside a zip, such as the Bitterli scenes' scene-v4.pbrt)
+		for (const Member &m : a.members) if (m.dest.endsWith(QLatin1String(".pbrt"), Qt::CaseInsensitive)) return true;
 	return false;
 }
 

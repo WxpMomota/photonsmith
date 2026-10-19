@@ -1337,72 +1337,72 @@
         <translation>正在停止渲染…</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="102"/>
+        <location filename="../mainwindow_scene_info.cpp" line="103"/>
         <source>&lt;b&gt;Description:&lt;/b&gt; %1&lt;br&gt;</source>
         <translation>&lt;b&gt;描述：&lt;/b&gt;%1&lt;br&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="111"/>
+        <location filename="../mainwindow_scene_info.cpp" line="112"/>
         <source>&lt;b&gt;Recommended SPP:&lt;/b&gt; %1&lt;br&gt;</source>
         <translation>&lt;b&gt;建议 SPP：&lt;/b&gt;%1&lt;br&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="112"/>
+        <location filename="../mainwindow_scene_info.cpp" line="113"/>
         <source>&lt;b&gt;GPU Support:&lt;/b&gt; %1&lt;br&gt;</source>
         <translation>&lt;b&gt;GPU 支持：&lt;/b&gt;%1&lt;br&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="112"/>
+        <location filename="../mainwindow_scene_info.cpp" line="113"/>
         <source>Yes</source>
         <translation>是</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="112"/>
+        <location filename="../mainwindow_scene_info.cpp" line="113"/>
         <source>CPU only</source>
         <translation>仅限 CPU</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="165"/>
+        <location filename="../mainwindow_scene_info.cpp" line="166"/>
         <source>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#10003; External files found&lt;/b&gt;</source>
         <translation>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#10003; 已找到外部文件&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="170"/>
+        <location filename="../mainwindow_scene_info.cpp" line="171"/>
         <source>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; CPU renderer only&lt;/b&gt;</source>
         <translation>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; 仅支持 CPU 渲染&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="207"/>
+        <location filename="../mainwindow_scene_info.cpp" line="208"/>
         <source>Integrator &quot;%1&quot;</source>
         <translation>积分器 &quot;%1&quot;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="212"/>
+        <location filename="../mainwindow_scene_info.cpp" line="213"/>
         <source>Sampler &quot;%1&quot;</source>
         <translation>采样器 &quot;%1&quot;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="217"/>
+        <location filename="../mainwindow_scene_info.cpp" line="218"/>
         <source>Light Sampler &quot;%1&quot;</source>
         <translation>光源采样器 &quot;%1&quot;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="227"/>
+        <location filename="../mainwindow_scene_info.cpp" line="228"/>
         <source>Tip: this scene was set up with %1. Your Render Options use the defaults instead, which is fine for a first render; click Apply to match the scene&apos;s own settings.</source>
         <translation>提示：此场景使用 %1 设置。你的渲染选项使用的是默认值，用于首次渲染没有问题；点击“应用”可与场景自身的设置保持一致。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="230"/>
+        <location filename="../mainwindow_scene_info.cpp" line="231"/>
         <source>, </source>
         <translation>、</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="317"/>
+        <location filename="../mainwindow_scene_info.cpp" line="318"/>
         <source>No scenes in this category.</source>
         <translation>此分类下没有场景。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="318"/>
+        <location filename="../mainwindow_scene_info.cpp" line="319"/>
         <source>No scenes match &quot;%1&quot; in this category.</source>
         <translation>此分类下没有与 &quot;%1&quot; 匹配的场景。</translation>
     </message>
@@ -1623,54 +1623,54 @@ Use the pause/stop controls if a category turns out to take too long.</source>
         <translation>⏸ 已暂停</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="105"/>
+        <location filename="../mainwindow_scene_info.cpp" line="106"/>
         <source>under 10 s</source>
         <translation>不到 10 秒</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="106"/>
+        <location filename="../mainwindow_scene_info.cpp" line="107"/>
         <source>10 to 30 s</source>
         <translation>10 到 30 秒</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="107"/>
+        <location filename="../mainwindow_scene_info.cpp" line="108"/>
         <source>30 s to 2 min</source>
         <translation>30 秒到 2 分钟</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="108"/>
+        <location filename="../mainwindow_scene_info.cpp" line="109"/>
         <source>over 2 min</source>
         <translation>超过 2 分钟</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="109"/>
+        <location filename="../mainwindow_scene_info.cpp" line="110"/>
         <source>not measured</source>
         <translation>未测量</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="110"/>
+        <location filename="../mainwindow_scene_info.cpp" line="111"/>
         <source>&lt;b&gt;Performance:&lt;/b&gt; %1 (%2)&lt;br&gt;</source>
         <translation>&lt;b&gt;性能：&lt;/b&gt;%1 (%2)&lt;br&gt;</translation>
     </message>
     <message numerus="yes">
-        <location filename="../mainwindow_scene_info.cpp" line="138"/>
+        <location filename="../mainwindow_scene_info.cpp" line="139"/>
         <source>Download %n missing file(s) (%1)</source>
         <translation>
             <numerusform>下载 %n 个缺失的文件（%1）</numerusform>
         </translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="148"/>
+        <location filename="../mainwindow_scene_info.cpp" line="149"/>
         <source>Download &quot;%1&quot; (%2)</source>
         <translation>下载“%1”（%2）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="155"/>
+        <location filename="../mainwindow_scene_info.cpp" line="156"/>
         <source>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; This scene&apos;s file was not found: %2&lt;/b&gt;&lt;br&gt;Expected in: %3&lt;br&gt;Rendering this scene will fail until it is installed.</source>
         <translation>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; 找不到此场景的文件：%2&lt;/b&gt;&lt;br&gt;应放在：%3&lt;br&gt;在安装之前，此场景无法渲染。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="159"/>
+        <location filename="../mainwindow_scene_info.cpp" line="160"/>
         <source>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; Missing external files: %2 of %3 not found (first: %4)&lt;/b&gt;&lt;br&gt;Put them in: %5&lt;br&gt;Rendering this scene will fail until they are installed.</source>
         <translation>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; 缺少外部文件：%3 个中有 %2 个找不到（第一个：%4）&lt;/b&gt;&lt;br&gt;请放到：%5&lt;br&gt;在安装之前，此场景无法渲染。</translation>
     </message>
@@ -1854,7 +1854,6 @@ The render may have failed to create output.</source>
         <location filename="../mainwindow_downloads.cpp" line="155"/>
         <location filename="../mainwindow_downloads.cpp" line="163"/>
         <location filename="../mainwindow_downloads.cpp" line="195"/>
-        <location filename="../mainwindow_downloads.cpp" line="201"/>
         <source>Download missing files</source>
         <translation>下载缺失的文件</translation>
     </message>
@@ -2111,16 +2110,15 @@ This is a large download and may take a while.</source>
 这是一个较大的下载，可能需要一些时间。</translation>
     </message>
     <message>
-        <location filename="../mainwindow_downloads.cpp" line="202"/>
         <source>The scene was downloaded. It appears with its own camera and settings after the app restarts. Restart now?
 
 (A render in progress or queued jobs would be lost.)</source>
-        <translation>场景已下载。应用重启后，它将以自己的相机和设置显示。现在重启吗？
+        <translation type="vanished">场景已下载。应用重启后，它将以自己的相机和设置显示。现在重启吗？
 
 （正在进行的渲染或排队的任务将会丢失。）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_downloads.cpp" line="208"/>
+        <location filename="../mainwindow_downloads.cpp" line="206"/>
         <source>Downloading &quot;%1&quot; (%2)…</source>
         <translation>正在下载“%1”（%2）…</translation>
     </message>
@@ -11022,19 +11020,19 @@ Check that you have permission to write there and that the disk is not full.</so
 <context>
     <name>scene_packs::PackDownloader</name>
     <message numerus="yes">
-        <location filename="../scene_packs.cpp" line="149"/>
+        <location filename="../scene_packs.cpp" line="151"/>
         <source>The download stalled: no data was received for %n second(s).</source>
         <translation>
             <numerusform>下载已停滞：%n 秒内未收到任何数据。</numerusform>
         </translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="205"/>
+        <location filename="../scene_packs.cpp" line="207"/>
         <source>Download cancelled.</source>
         <translation>下载已取消。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="223"/>
+        <location filename="../scene_packs.cpp" line="225"/>
         <source>Cannot write to %1: %2
 
 Check that you have permission to write there and that the disk is not full.</source>
@@ -11043,52 +11041,52 @@ Check that you have permission to write there and that the disk is not full.</so
 请检查你是否有写入该位置的权限，以及磁盘是否已满。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="254"/>
+        <location filename="../scene_packs.cpp" line="256"/>
         <source>Could not write %1: %2</source>
         <translation>无法写入 %1：%2</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="269"/>
+        <location filename="../scene_packs.cpp" line="271"/>
         <source>%1: the archive&apos;s layout is not what was recorded (it has probably changed upstream).</source>
         <translation>%1：压缩包的结构与记录的不一致（可能已在上游发生变化）。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="294"/>
+        <location filename="../scene_packs.cpp" line="296"/>
         <source>%1 could not be decompressed (corrupt download).</source>
         <translation>无法解压 %1（下载已损坏）。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="314"/>
+        <location filename="../scene_packs.cpp" line="316"/>
         <source>%1 has changed upstream since this app&apos;s list of downloads was made, so it can no longer be fetched safely.</source>
         <translation>自此应用的下载列表生成以来，%1 已在上游发生变化，因此无法再安全地获取。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="328"/>
+        <location filename="../scene_packs.cpp" line="330"/>
         <source>%1 is larger than expected and was discarded.</source>
         <translation>%1 比预期的大，已被丢弃。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="344"/>
+        <location filename="../scene_packs.cpp" line="346"/>
         <source>Could not download %1: %2</source>
         <translation>无法下载 %1：%2</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="356"/>
+        <location filename="../scene_packs.cpp" line="358"/>
         <source>%1 downloaded incompletely and was discarded.</source>
         <translation>%1 下载不完整，已被丢弃。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="358"/>
+        <location filename="../scene_packs.cpp" line="360"/>
         <source>%1 failed its checksum (CRC-32) and was discarded.</source>
         <translation>%1 未通过校验和（CRC-32）检查，已被丢弃。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="361"/>
+        <location filename="../scene_packs.cpp" line="363"/>
         <source>%1 failed its checksum and was discarded.</source>
         <translation>%1 未通过校验和检查，已被丢弃。</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="365"/>
+        <location filename="../scene_packs.cpp" line="367"/>
         <source>Could not move the downloaded file into place at %1.</source>
         <translation>无法将已下载的文件移动到 %1。</translation>
     </message>

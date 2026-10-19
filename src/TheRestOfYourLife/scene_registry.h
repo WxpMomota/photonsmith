@@ -720,26 +720,40 @@ namespace pbrt_scene_registry {
     // file isn't a crash either way - wire_pbrt_backed_scene()'s own
     // ensure() lambda renders an empty world and prints why, the same
     // graceful failure every pbrt-backed scene already has.
+    // Where a downloadable scene's file is: next to the app (the search paths), else under the per-user asset folder (pbrt_asset_check.h), where the GUI's
+    // "Download missing files" puts it (used by its ABSOLUTE path, so describeFile() reads it and every file it names, relative to the scene, resolves beside it).
+    // "" when it is not on disk.
+    inline std::string locateExternalPbrtFile(const char* filename) {
+        for (const std::string& dir : pbrt_discover::defaultSearchPaths()) {
+            std::filesystem::path candidate = std::filesystem::path(dir) / filename;
+            std::error_code ec;
+            if (std::filesystem::exists(candidate, ec)) return candidate.string();
+        }
+        const std::string userRoot = pbrt_asset_check::userAssetRoot();
+        if (!userRoot.empty()) {
+            std::error_code ec;
+            const std::filesystem::path candidate = std::filesystem::path(userRoot) / "pbrt_scenes" / filename;
+            if (std::filesystem::exists(candidate, ec)) return candidate.string();
+        }
+        return std::string();
+    }
+
+    // A downloadable scene whose file was not on disk when its descriptor was built: how to build it again (see refresh_downloaded_scenes_locked()).
+    struct PendingDownload {
+        std::string id;
+        std::string filename;
+        std::function<SceneDescriptor()> rebuild;
+    };
+    inline std::vector<PendingDownload>& pendingDownloads() {
+        static std::vector<PendingDownload> pending;
+        return pending;
+    }
+
     inline SceneDescriptor build_curated_external_pbrt_scene_descriptor(
             const char* id, int legacy_id, const char* name, const char* category,
             const char* description, const char* performance, const char* filename,
             double recommended_exposure = 1.0, int recommended_spp_if_missing = 0) {
-        std::string path;
-        for (const std::string& dir : pbrt_discover::defaultSearchPaths()) {
-            std::filesystem::path candidate = std::filesystem::path(dir) / filename;
-            std::error_code ec;
-            if (std::filesystem::exists(candidate, ec)) { path = candidate.string(); break; }
-        }
-        // Not next to the app: a scene the GUI downloaded earlier lives under the per-user asset folder (pbrt_asset_check.h). Used by its ABSOLUTE
-        // path, so describeFile() reads it and every file it names (relative to the scene) resolves beside it.
-        if (path.empty()) {
-            const std::string userRoot = pbrt_asset_check::userAssetRoot();
-            if (!userRoot.empty()) {
-                std::error_code ec;
-                const std::filesystem::path candidate = std::filesystem::path(userRoot) / "pbrt_scenes" / filename;
-                if (std::filesystem::exists(candidate, ec)) path = candidate.string();
-            }
-        }
+        std::string path = locateExternalPbrtFile(filename);
         const bool onDisk = !path.empty();
         if (!onDisk) path = std::string("pbrt_scenes/") + filename;  // not downloaded - fails gracefully below
 
@@ -766,6 +780,13 @@ namespace pbrt_scene_registry {
         if (!onDisk && recommended_spp_if_missing > 0) s.recommended_spp = recommended_spp_if_missing;
 
         paths()[id] = path;
+        if (!onDisk) {
+            // The arguments are the string literals of the registry table, so they outlive this call.
+            pendingDownloads().push_back({id, filename, [=]() {
+                return build_curated_external_pbrt_scene_descriptor(id, legacy_id, name, category, description, performance, filename,
+                                                                    recommended_exposure, recommended_spp_if_missing);
+            }});
+        }
         return s;
     }
 } // namespace pbrt_scene_registry
@@ -1117,6 +1138,29 @@ inline std::mutex& registry_refresh_mutex() {
     return m;
 }
 
+// A downloadable scene (build_curated_external_pbrt_scene_descriptor()) whose file was not on disk when the registry was built holds what a missing file gives: a
+// camera at the origin, the default sample count. Once "Download missing files" has fetched it, this builds the descriptor again from the real file and puts it
+// where the old one was (the same index, so the pointers find_scene() handed out stay valid): the scene has its own camera and settings at once, not after a
+// restart. Returns how many it refreshed. The caller holds the refresh mutex.
+inline int refresh_downloaded_scenes_locked(std::vector<SceneDescriptor>& registry) {
+    std::vector<pbrt_scene_registry::PendingDownload>& pending = pbrt_scene_registry::pendingDownloads();
+    int refreshed = 0;
+    for (std::size_t i = 0; i < pending.size();) {
+        if (pbrt_scene_registry::locateExternalPbrtFile(pending[i].filename.c_str()).empty()) { ++i; continue; }
+        const pbrt_scene_registry::PendingDownload done = std::move(pending[i]);
+        pending.erase(pending.begin() + static_cast<std::ptrdiff_t>(i));   // (the file is on disk now, so the rebuild below does not register it again)
+        SceneDescriptor fresh = done.rebuild();
+        for (SceneDescriptor& s : registry) {
+            if (s.id != done.id) continue;
+            fresh.slug = s.slug;
+            s = std::move(fresh);
+            ++refreshed;
+            break;
+        }
+    }
+    return refreshed;
+}
+
 // Removes the registry entries (and their paths()) of scenes in the per-user folder whose file no longer exists. Returns how many. The caller holds the
 // refresh mutex.
 inline int prune_missing_user_scenes_locked(std::vector<SceneDescriptor>& registry, const std::string& dir) {
@@ -1136,9 +1180,10 @@ inline int prune_missing_user_scenes_locked(std::vector<SceneDescriptor>& regist
 
 inline int refresh_user_scenes(bool prune = false) {
     std::vector<SceneDescriptor>& registry = scene_registry_storage();
+    std::lock_guard<std::mutex> lock(registry_refresh_mutex());
+    refresh_downloaded_scenes_locked(registry);   // (not counted in the result: the list of scenes does not change)
     const std::string dir = pbrt_discover::userSceneDir();
     if (dir.empty()) return 0;
-    std::lock_guard<std::mutex> lock(registry_refresh_mutex());
     if (prune) prune_missing_user_scenes_locked(registry, dir);
     int legacy_id = 0;
     for (const SceneDescriptor& s : registry) legacy_id = std::max(legacy_id, s.legacy_id + 1);

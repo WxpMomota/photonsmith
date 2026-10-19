@@ -1339,72 +1339,72 @@
         <translation>Arrêt du rendu...</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="102"/>
+        <location filename="../mainwindow_scene_info.cpp" line="103"/>
         <source>&lt;b&gt;Description:&lt;/b&gt; %1&lt;br&gt;</source>
         <translation>&lt;b&gt;Description :&lt;/b&gt; %1&lt;br&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="111"/>
+        <location filename="../mainwindow_scene_info.cpp" line="112"/>
         <source>&lt;b&gt;Recommended SPP:&lt;/b&gt; %1&lt;br&gt;</source>
         <translation>&lt;b&gt;SPP recommandé :&lt;/b&gt; %1&lt;br&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="112"/>
+        <location filename="../mainwindow_scene_info.cpp" line="113"/>
         <source>&lt;b&gt;GPU Support:&lt;/b&gt; %1&lt;br&gt;</source>
         <translation>&lt;b&gt;Prise en charge GPU :&lt;/b&gt; %1&lt;br&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="112"/>
+        <location filename="../mainwindow_scene_info.cpp" line="113"/>
         <source>Yes</source>
         <translation>Oui</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="112"/>
+        <location filename="../mainwindow_scene_info.cpp" line="113"/>
         <source>CPU only</source>
         <translation>CPU uniquement</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="165"/>
+        <location filename="../mainwindow_scene_info.cpp" line="166"/>
         <source>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#10003; External files found&lt;/b&gt;</source>
         <translation>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#10003; Fichiers externes trouvés&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="170"/>
+        <location filename="../mainwindow_scene_info.cpp" line="171"/>
         <source>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; CPU renderer only&lt;/b&gt;</source>
         <translation>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;⚠ Moteur CPU uniquement&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="207"/>
+        <location filename="../mainwindow_scene_info.cpp" line="208"/>
         <source>Integrator &quot;%1&quot;</source>
         <translation>Intégrateur &quot;%1&quot;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="212"/>
+        <location filename="../mainwindow_scene_info.cpp" line="213"/>
         <source>Sampler &quot;%1&quot;</source>
         <translation>Échantillonneur &quot;%1&quot;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="217"/>
+        <location filename="../mainwindow_scene_info.cpp" line="218"/>
         <source>Light Sampler &quot;%1&quot;</source>
         <translation>Échantillonneur de lumière &quot;%1&quot;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="227"/>
+        <location filename="../mainwindow_scene_info.cpp" line="228"/>
         <source>Tip: this scene was set up with %1. Your Render Options use the defaults instead, which is fine for a first render; click Apply to match the scene&apos;s own settings.</source>
         <translation>Astuce : cette scène a été conçue avec %1. Vos Options de rendu utilisent les valeurs par défaut, ce qui convient pour un premier rendu ; cliquez sur Appliquer pour reprendre les réglages propres à la scène.</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="230"/>
+        <location filename="../mainwindow_scene_info.cpp" line="231"/>
         <source>, </source>
         <translation>, </translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="317"/>
+        <location filename="../mainwindow_scene_info.cpp" line="318"/>
         <source>No scenes in this category.</source>
         <translation>Aucune scène dans cette catégorie.</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="318"/>
+        <location filename="../mainwindow_scene_info.cpp" line="319"/>
         <source>No scenes match &quot;%1&quot; in this category.</source>
         <translation>Aucune scène ne correspond à &quot;%1&quot; dans cette catégorie.</translation>
     </message>
@@ -1627,37 +1627,37 @@ Utilisez les commandes pause/arrêt si une catégorie s&apos;avère trop longue.
         <translation>⏸ En pause</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="105"/>
+        <location filename="../mainwindow_scene_info.cpp" line="106"/>
         <source>under 10 s</source>
         <translation>moins de 10 s</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="106"/>
+        <location filename="../mainwindow_scene_info.cpp" line="107"/>
         <source>10 to 30 s</source>
         <translation>10 à 30 s</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="107"/>
+        <location filename="../mainwindow_scene_info.cpp" line="108"/>
         <source>30 s to 2 min</source>
         <translation>30 s à 2 min</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="108"/>
+        <location filename="../mainwindow_scene_info.cpp" line="109"/>
         <source>over 2 min</source>
         <translation>plus de 2 min</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="109"/>
+        <location filename="../mainwindow_scene_info.cpp" line="110"/>
         <source>not measured</source>
         <translation>non mesuré</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="110"/>
+        <location filename="../mainwindow_scene_info.cpp" line="111"/>
         <source>&lt;b&gt;Performance:&lt;/b&gt; %1 (%2)&lt;br&gt;</source>
         <translation>&lt;b&gt;Performances :&lt;/b&gt; %1 (%2)&lt;br&gt;</translation>
     </message>
     <message numerus="yes">
-        <location filename="../mainwindow_scene_info.cpp" line="138"/>
+        <location filename="../mainwindow_scene_info.cpp" line="139"/>
         <source>Download %n missing file(s) (%1)</source>
         <translation>
             <numerusform>Télécharger %n fichier manquant (%1)</numerusform>
@@ -1665,17 +1665,17 @@ Utilisez les commandes pause/arrêt si une catégorie s&apos;avère trop longue.
         </translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="148"/>
+        <location filename="../mainwindow_scene_info.cpp" line="149"/>
         <source>Download &quot;%1&quot; (%2)</source>
         <translation>Télécharger « %1 » (%2)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="155"/>
+        <location filename="../mainwindow_scene_info.cpp" line="156"/>
         <source>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; This scene&apos;s file was not found: %2&lt;/b&gt;&lt;br&gt;Expected in: %3&lt;br&gt;Rendering this scene will fail until it is installed.</source>
         <translation>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; Le fichier de cette scène est introuvable : %2&lt;/b&gt;&lt;br&gt;Attendu dans : %3&lt;br&gt;Cette scène ne pourra pas être rendue tant qu&apos;il n&apos;est pas installé.</translation>
     </message>
     <message>
-        <location filename="../mainwindow_scene_info.cpp" line="159"/>
+        <location filename="../mainwindow_scene_info.cpp" line="160"/>
         <source>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; Missing external files: %2 of %3 not found (first: %4)&lt;/b&gt;&lt;br&gt;Put them in: %5&lt;br&gt;Rendering this scene will fail until they are installed.</source>
         <translation>&lt;br&gt;&lt;b style=&apos;color: %1;&apos;&gt;&amp;#9888; Fichiers externes manquants : %2 sur %3 introuvables (le premier : %4)&lt;/b&gt;&lt;br&gt;Placez-les dans : %5&lt;br&gt;Cette scène ne pourra pas être rendue tant qu&apos;ils ne sont pas installés.</translation>
     </message>
@@ -1860,7 +1860,6 @@ Le rendu n&apos;a peut-être pas réussi à créer de résultat.</translation>
         <location filename="../mainwindow_downloads.cpp" line="155"/>
         <location filename="../mainwindow_downloads.cpp" line="163"/>
         <location filename="../mainwindow_downloads.cpp" line="195"/>
-        <location filename="../mainwindow_downloads.cpp" line="201"/>
         <source>Download missing files</source>
         <translation>Télécharger les fichiers manquants</translation>
     </message>
@@ -2134,16 +2133,15 @@ This is a large download and may take a while.</source>
 Il s&apos;agit d&apos;un téléchargement volumineux qui peut prendre du temps.</translation>
     </message>
     <message>
-        <location filename="../mainwindow_downloads.cpp" line="202"/>
         <source>The scene was downloaded. It appears with its own camera and settings after the app restarts. Restart now?
 
 (A render in progress or queued jobs would be lost.)</source>
-        <translation>La scène a été téléchargée. Elle apparaîtra avec sa propre caméra et ses propres réglages après le redémarrage de l&apos;application. Redémarrer maintenant ?
+        <translation type="vanished">La scène a été téléchargée. Elle apparaîtra avec sa propre caméra et ses propres réglages après le redémarrage de l&apos;application. Redémarrer maintenant ?
 
 (Un rendu en cours ou des tâches en file d&apos;attente seraient perdus.)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_downloads.cpp" line="208"/>
+        <location filename="../mainwindow_downloads.cpp" line="206"/>
         <source>Downloading &quot;%1&quot; (%2)…</source>
         <translation>Téléchargement de « %1 » (%2)…</translation>
     </message>
@@ -5981,7 +5979,7 @@ Les scènes des autres catégories ne sont pas touchées. Vous pouvez les récup
     <message>
         <location filename="../scene_technique_notes.h" line="157"/>
         <source>A small photo studio with a different material on each object: a red car-paint box worn through to copper (a mix of two materials), mossy stone (a ready-made mix), a candle-wax ball (light scatters inside it, subsurface scattering), a glass ball and a gold ball. Three spot lights (key, fill, rim) and a projector that throws a window pattern light the set, so each surface shows how it answers soft shadows, highlights and reflections.</source>
-        <translation>Un petit studio photo avec un matériau différent sur chaque objet : une boîte en peinture de carrosserie rouge usée jusqu'au cuivre (un mélange de deux matériaux), une pierre moussue (un mélange prêt à l'emploi), une boule de cire de bougie (la lumière se diffuse à l'intérieur : diffusion sous la surface), une boule de verre et une boule d'or. Trois spots (principal, d'appoint, à contre-jour) et un projecteur qui envoie un motif de fenêtre éclairent le décor, si bien que chaque surface montre comment elle réagit aux ombres douces, aux reflets brillants et aux réflexions.</translation>
+        <translation>Un petit studio photo avec un matériau différent sur chaque objet : une boîte en peinture de carrosserie rouge usée jusqu&apos;au cuivre (un mélange de deux matériaux), une pierre moussue (un mélange prêt à l&apos;emploi), une boule de cire de bougie (la lumière se diffuse à l&apos;intérieur : diffusion sous la surface), une boule de verre et une boule d&apos;or. Trois spots (principal, d&apos;appoint, à contre-jour) et un projecteur qui envoie un motif de fenêtre éclairent le décor, si bien que chaque surface montre comment elle réagit aux ombres douces, aux reflets brillants et aux réflexions.</translation>
     </message>
     <message>
         <location filename="../scene_technique_notes.h" line="158"/>
@@ -11120,7 +11118,7 @@ Vérifiez que vous avez l&apos;autorisation d&apos;y écrire et que le disque n&
 <context>
     <name>scene_packs::PackDownloader</name>
     <message numerus="yes">
-        <location filename="../scene_packs.cpp" line="149"/>
+        <location filename="../scene_packs.cpp" line="151"/>
         <source>The download stalled: no data was received for %n second(s).</source>
         <translation>
             <numerusform>Le téléchargement est bloqué : aucune donnée reçue depuis %n seconde.</numerusform>
@@ -11128,12 +11126,12 @@ Vérifiez que vous avez l&apos;autorisation d&apos;y écrire et que le disque n&
         </translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="205"/>
+        <location filename="../scene_packs.cpp" line="207"/>
         <source>Download cancelled.</source>
         <translation>Téléchargement annulé.</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="223"/>
+        <location filename="../scene_packs.cpp" line="225"/>
         <source>Cannot write to %1: %2
 
 Check that you have permission to write there and that the disk is not full.</source>
@@ -11142,52 +11140,52 @@ Check that you have permission to write there and that the disk is not full.</so
 Vérifiez que vous avez l&apos;autorisation d&apos;y écrire et que le disque n&apos;est pas plein.</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="254"/>
+        <location filename="../scene_packs.cpp" line="256"/>
         <source>Could not write %1: %2</source>
         <translation>Impossible d&apos;écrire %1 : %2</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="269"/>
+        <location filename="../scene_packs.cpp" line="271"/>
         <source>%1: the archive&apos;s layout is not what was recorded (it has probably changed upstream).</source>
         <translation>%1 : la structure de l&apos;archive ne correspond pas à celle enregistrée (elle a probablement changé en amont).</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="294"/>
+        <location filename="../scene_packs.cpp" line="296"/>
         <source>%1 could not be decompressed (corrupt download).</source>
         <translation>Impossible de décompresser %1 (téléchargement corrompu).</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="314"/>
+        <location filename="../scene_packs.cpp" line="316"/>
         <source>%1 has changed upstream since this app&apos;s list of downloads was made, so it can no longer be fetched safely.</source>
         <translation>%1 a changé en amont depuis la création de la liste de téléchargements de cette application ; il ne peut donc plus être récupéré en toute sécurité.</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="328"/>
+        <location filename="../scene_packs.cpp" line="330"/>
         <source>%1 is larger than expected and was discarded.</source>
         <translation>%1 est plus volumineux que prévu et a été supprimé.</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="344"/>
+        <location filename="../scene_packs.cpp" line="346"/>
         <source>Could not download %1: %2</source>
         <translation>Impossible de télécharger %1 : %2</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="356"/>
+        <location filename="../scene_packs.cpp" line="358"/>
         <source>%1 downloaded incompletely and was discarded.</source>
         <translation>%1 n&apos;a été téléchargé que partiellement et a été supprimé.</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="358"/>
+        <location filename="../scene_packs.cpp" line="360"/>
         <source>%1 failed its checksum (CRC-32) and was discarded.</source>
         <translation>%1 a échoué à la vérification de la somme de contrôle (CRC-32) et a été supprimé.</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="361"/>
+        <location filename="../scene_packs.cpp" line="363"/>
         <source>%1 failed its checksum and was discarded.</source>
         <translation>%1 a échoué à la vérification de la somme de contrôle et a été supprimé.</translation>
     </message>
     <message>
-        <location filename="../scene_packs.cpp" line="365"/>
+        <location filename="../scene_packs.cpp" line="367"/>
         <source>Could not move the downloaded file into place at %1.</source>
         <translation>Impossible de placer le fichier téléchargé dans %1.</translation>
     </message>

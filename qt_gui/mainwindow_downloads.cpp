@@ -117,8 +117,8 @@ void MainWindow::startAssetDownload(const QList<asset_downloader::Job> &jobs, bo
 // ---------------------------------------------------------------------------
 // Catalogue packs (scene_packs.h): the large third-party scenes, fetched from their ORIGINAL sites on request. Differs from the statue-model
 // download above in what the confirmation must say (whose work this is and under what licence, where it comes from, how big), a disk-space
-// check before anything starts (a pack can be over a gigabyte once unpacked), and a restart offer when the pack adds a scene file the
-// registry only reads at startup.
+// check before anything starts (a pack can be over a gigabyte once unpacked), and and the registry re-read of a scene file the pack adds
+// (the scene has its real camera and settings at once).
 // ---------------------------------------------------------------------------
 
 void MainWindow::startPackDownload(const scene_packs::Pack &pack, bool confirm, std::function<void(bool, const QString &)> onDone) {
@@ -193,16 +193,14 @@ void MainWindow::startPackDownload(const scene_packs::Pack &pack, bool confirm, 
 				onLogMessage(tr("Download failed: %1").arg(error));
 				if (dialog) QMessageBox::warning(this, tr("Download missing files"), error);
 			}
+			// The registry listed a scene whose file was missing with a missing file's camera and settings: read the real ones now, without a restart. The scene is the
+			// one selected (the download button belongs to it), so its camera boxes, sample count and notes are set again as if it had just been chosen.
+			if (ok && addsScene) {
+				SceneMetadataClient::refreshUserScenes();
+				if (m_sceneCombo && m_sceneCombo->currentIndex() >= 0) onSceneChanged(m_sceneCombo->currentIndex());
+			}
 			refreshSceneInfoLabel();
 			if (onDone) onDone(ok, error);
-			// A scene file the registry only reads at startup: its camera and settings come from that scan, so it needs a fresh start to appear right.
-			if (ok && addsScene && dialog) {
-				const auto answer = QMessageBox::question(this, tr("Download missing files"),
-					tr("The scene was downloaded. It appears with its own camera and settings after the app restarts. Restart now?\n\n(A render in progress or queued jobs would be lost.)"),
-					QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-				if (answer == QMessageBox::Yes && QProcess::startDetached(QCoreApplication::applicationFilePath(), QCoreApplication::arguments().mid(1)))
-					qApp->quit();
-			}
 		});
 	onLogMessage(tr("Downloading \"%1\" (%2)…").arg(pack.title, QLocale().formattedDataSize(downloadBytes, 1)));
 	m_packDownloader->start(pack, root);
