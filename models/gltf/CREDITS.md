@@ -3,7 +3,7 @@
 Each file is a model from the source named here, under the licence named here. **CC0** models have no terms; **CC BY 4.0** models need the credit below and a link to
 https://creativecommons.org/licenses/by/4.0/ and a note that they were changed. Every file was changed in the same way, to keep the repository small: the pictures were made at most 1024 pixels
 across (JPEG, or PNG where a picture is see-through), the pictures this program does not read (normal, metal-roughness, occlusion and emissive pictures) were left out, with the average metal and
-roughness of the metal-roughness picture put into the material's two numbers, and the whole model was put into one `.glb` file. Nothing else was changed; the sources have the originals. The logos and
+roughness of the metal-roughness picture put into the material's two numbers, and the whole model was put into one `.glb` file. Nothing else was changed; the sources have the originals, and `scripts/pack_glb.py` does the repacking. The logos and
 trademarks that appear in some of the sources' own pages are not part of the licence and are not here.
 
 | File | Model | Source | Licence | Credit |

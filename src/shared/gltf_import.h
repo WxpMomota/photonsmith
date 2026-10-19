@@ -28,7 +28,8 @@
 
 namespace gltf_import {
 
-constexpr size_t kMaxVertices = 60u * 1000u * 1000u;   // a model with more is refused: it would not fit in memory as doubles and could not be placed
+constexpr size_t kMaxVertices = 20u * 1000u * 1000u;   // a model with more is refused: as doubles (positions, normals, texture coordinates) it would need about a gigabyte and a half
+constexpr size_t kMaxZeroAccessor = 4u * 1000u * 1000u;   // an accessor with no data of its own (all zeros) is not made bigger than this
 
 struct Material {
 	std::string name;
@@ -194,10 +195,13 @@ inline bool readAccessor(Doc& d, long index, std::vector<double>& out, int& comp
 	const double countValue = numOr(get(*accessor, "count"), -1.0);
 	if (components == 0 || csize == 0 || !(countValue >= 0.0) || countValue > static_cast<double>(kMaxVertices) * 3.0) { err = "an accessor is not valid"; return false; }
 	count = static_cast<size_t>(countValue);
-	out.assign(count * static_cast<size_t>(components), 0.0);
 	if (get(*accessor, "sparse")) d.note("Sparse accessors are not read: the model may have morph targets or deltas missing.");
 	const long viewIndex = intOr(get(*accessor, "bufferView"), -1);
-	if (viewIndex < 0) return true;   // (no bufferView: all zeros, as the spec says)
+	if (viewIndex < 0) {   // (no bufferView: all zeros, as the spec says)
+		if (count > kMaxZeroAccessor) { err = "an accessor with no data is too large"; return false; }
+		out.assign(count * static_cast<size_t>(components), 0.0);
+		return true;
+	}
 	const Json* view = at(get(d.root, "bufferViews"), viewIndex);
 	if (!view) { err = "a buffer view is missing"; return false; }
 	const long bufferIndex = intOr(get(*view, "buffer"), -1);
@@ -213,6 +217,7 @@ inline bool readAccessor(Doc& d, long index, std::vector<double>& out, int& comp
 		const double last = accessorOffset + static_cast<double>(count - 1) * static_cast<double>(stride) + static_cast<double>(elementBytes);
 		if (last > viewLength) { err = "an accessor reads past its buffer view"; return false; }
 	}
+	out.assign(count * static_cast<size_t>(components), 0.0);   // (only now: the buffer really holds what the count says)
 	const bool normalized = get(*accessor, "normalized") && get(*accessor, "normalized")->type == Json::Type::Bool && get(*accessor, "normalized")->b;
 	const unsigned char* base = buffer.data() + static_cast<size_t>(viewOffset) + static_cast<size_t>(accessorOffset);
 	for (size_t e = 0; e < count; ++e) {
@@ -269,75 +274,96 @@ inline std::string mimeOfName(const std::string& name) {
 	return ext.empty() ? std::string() : "image/" + ext;
 }
 
-}  // namespace detail
+// What one parse works through, step by step (parse() below runs them in order). Every step that can fail says why in result_.error and returns false.
+class Reader {
+  public:
+	Reader(const FileFetcher& fetch, Result& result) : fetch_(fetch), result_(result), model_(result.model) {}
 
-// The model in `bytes` (a .glb, or the JSON text of a .gltf, whose buffers and pictures `fetch` supplies).
-inline Result parse(const std::string& bytes, const FileFetcher& fetch = FileFetcher()) {
-	using namespace detail;
-	Result result;
-	Doc d;
-	std::string jsonText;
-	std::vector<unsigned char> glbBin;
-	bool haveGlbBin = false;
-	if (bytes.size() >= 12 && std::memcmp(bytes.data(), "glTF", 4) == 0) {
+	bool run(const std::string& bytes) {
+		std::string jsonText;
+		std::vector<unsigned char> glbBin;
+		bool haveGlbBin = false;
+		return container(bytes, jsonText, glbBin, haveGlbBin) && openJson(jsonText) && checkExtensions() && loadBuffers(glbBin, haveGlbBin) && readMaterials() && walkNodes() && finish();
+	}
+
+  private:
+	const FileFetcher& fetch_;
+	Result& result_;
+	Model& model_;
+	Doc d_;
+	std::map<long, int> imageOfSource_;   // glTF image index -> Model::images index
+	std::map<int, size_t> partOfMaterial_;
+	size_t declaredMaterials_ = 0;
+	int defaultMaterial_ = -1;            // made when a primitive names none
+	size_t vertices_ = 0;
+
+	bool fail(const std::string& why) { result_.error = why; return false; }
+
+	// A .glb's chunks (the JSON and the binary part), or the text of a .gltf.
+	bool container(const std::string& bytes, std::string& jsonText, std::vector<unsigned char>& glbBin, bool& haveGlbBin) {
+		if (!(bytes.size() >= 12 && std::memcmp(bytes.data(), "glTF", 4) == 0)) { jsonText = bytes; return true; }
 		const auto read32 = [&](size_t at) { uint32_t v = 0; for (int i = 0; i < 4; ++i) v |= static_cast<uint32_t>(static_cast<unsigned char>(bytes[at + static_cast<size_t>(i)])) << (8 * i); return v; };
-		if (read32(4) != 2) { result.error = "This is not a glTF 2.0 file."; return result; }
+		if (read32(4) != 2) return fail("This is not a glTF 2.0 file.");
 		size_t pos = 12;
 		bool haveJson = false;
 		while (pos + 8 <= bytes.size()) {
 			const uint32_t length = read32(pos), type = read32(pos + 4);
 			pos += 8;
-			if (length > bytes.size() - pos) { result.error = "The file is cut short (a chunk is longer than the file)."; return result; }
+			if (length > bytes.size() - pos) return fail("The file is cut short (a chunk is longer than the file).");
 			if (type == 0x4E4F534A && !haveJson) { jsonText.assign(bytes, pos, length); haveJson = true; }
 			else if (type == 0x004E4942 && !haveGlbBin) { glbBin.assign(bytes.begin() + static_cast<std::ptrdiff_t>(pos), bytes.begin() + static_cast<std::ptrdiff_t>(pos + length)); haveGlbBin = true; }
 			pos += (static_cast<size_t>(length) + 3) & ~static_cast<size_t>(3);
 		}
-		if (!haveJson) { result.error = "The file has no JSON chunk."; return result; }
-	} else {
-		jsonText = bytes;
+		return haveJson || fail("The file has no JSON chunk.");
 	}
-	std::string jsonError;
-	scene_doc::detail::JsonParser parser(jsonText);
-	if (!parser.parse(d.root, jsonError) || d.root.type != Json::Type::Obj) { result.error = "This is not a glTF file: " + (jsonError.empty() ? std::string("it is not a JSON object") : jsonError); return result; }
-	const Json* asset = get(d.root, "asset");
-	if (!asset || strOr(get(*asset, "version")).compare(0, 2, "2.") != 0) { result.error = "This is not a glTF 2.0 file."; return result; }
-	if (const Json* required = get(d.root, "extensionsRequired"))
+
+	bool openJson(const std::string& jsonText) {
+		std::string jsonError;
+		scene_doc::detail::JsonParser parser(jsonText);
+		if (!parser.parse(d_.root, jsonError) || d_.root.type != Json::Type::Obj) return fail("This is not a glTF file: " + (jsonError.empty() ? std::string("it is not a JSON object") : jsonError));
+		const Json* asset = get(d_.root, "asset");
+		if (!asset || strOr(get(*asset, "version")).compare(0, 2, "2.") != 0) return fail("This is not a glTF 2.0 file.");
+		return true;
+	}
+
+	// What the file requires: compressed geometry is refused (it needs a decoder), an extension nothing here reads is said.
+	bool checkExtensions() {
+		const Json* required = get(d_.root, "extensionsRequired");
+		if (!required) return true;
 		for (const Json& e : required->a) {
 			const std::string name = strOr(&e);
-			if (name == "KHR_draco_mesh_compression") { result.error = "This model uses Draco compression, which needs a decoder this program does not have. Export it again without compression (in Blender: tick off 'Compression')."; return result; }
-			if (name == "EXT_meshopt_compression") { result.error = "This model uses meshopt compression, which needs a decoder this program does not have. Export it again without compression."; return result; }
+			if (name == "KHR_draco_mesh_compression") return fail("This model uses Draco compression, which needs a decoder this program does not have. Export it again without compression (in Blender: tick off 'Compression').");
+			if (name == "EXT_meshopt_compression") return fail("This model uses meshopt compression, which needs a decoder this program does not have. Export it again without compression.");
 			if (name != "KHR_materials_transmission" && name != "KHR_materials_ior" && name != "KHR_materials_clearcoat" && name != "KHR_materials_emissive_strength" && name != "KHR_texture_transform" &&
 			    name != "KHR_mesh_quantization" && name != "KHR_materials_unlit" && name != "KHR_lights_punctual")
-				d.note("The model requires the extension " + name + ", which is not read: it may look different.");
+				d_.note("The model requires the extension " + name + ", which is not read: it may look different.");
 		}
-
-	// the buffers
-	const Json* buffers = get(d.root, "buffers");
-	const size_t bufferCount = buffers && buffers->type == Json::Type::Arr ? buffers->a.size() : 0;
-	d.buffers.resize(bufferCount);
-	d.bufferOk.assign(bufferCount, false);
-	for (size_t i = 0; i < bufferCount; ++i) {
-		const std::string uri = strOr(get(buffers->a[i], "uri"));
-		if (uri.empty()) {
-			if (i == 0 && haveGlbBin) { d.buffers[i] = glbBin; d.bufferOk[i] = true; }
-		} else {
-			d.bufferOk[i] = readUri(uri, fetch, d.buffers[i]);
-		}
-		if (!d.bufferOk[i]) { result.error = "A data file the model needs could not be read (" + (uri.empty() ? std::string("its binary part") : uri) + ")."; return result; }
+		return true;
 	}
 
-	// the materials (a glTF triangle with no material gets one more, plain, at the end)
-	Model& model = result.model;
-	const Json* materials = get(d.root, "materials");
-	const size_t declared = materials && materials->type == Json::Type::Arr ? materials->a.size() : 0;
-	const Json* textures = get(d.root, "textures");
-	const Json* images = get(d.root, "images");
-	std::map<long, int> imageOfSource;   // glTF image index -> Model::images index
-	const auto importImage = [&](long source) -> int {
+	bool loadBuffers(std::vector<unsigned char>& glbBin, bool haveGlbBin) {
+		const Json* buffers = get(d_.root, "buffers");
+		const size_t count = buffers && buffers->type == Json::Type::Arr ? buffers->a.size() : 0;
+		d_.buffers.resize(count);
+		d_.bufferOk.assign(count, false);
+		for (size_t i = 0; i < count; ++i) {
+			const std::string uri = strOr(get(buffers->a[i], "uri"));
+			if (uri.empty()) {
+				if (i == 0 && haveGlbBin) { d_.buffers[i] = std::move(glbBin); d_.bufferOk[i] = true; }
+			} else {
+				d_.bufferOk[i] = readUri(uri, fetch_, d_.buffers[i]);
+			}
+			if (!d_.bufferOk[i]) return fail("A data file the model needs could not be read (" + (uri.empty() ? std::string("its binary part") : uri) + ").");
+		}
+		return true;
+	}
+
+	// A glTF image as Model::images' index (the picture is read once), or -1 when it cannot be had.
+	int importImage(long source) {
 		if (source < 0) return -1;
-		const auto found = imageOfSource.find(source);
-		if (found != imageOfSource.end()) return found->second;
-		const Json* image = at(images, source);
+		const auto found = imageOfSource_.find(source);
+		if (found != imageOfSource_.end()) return found->second;
+		const Json* image = at(get(d_.root, "images"), source);
 		if (!image) return -1;
 		Image out;
 		out.name = strOr(get(*image, "name"));
@@ -346,20 +372,26 @@ inline Result parse(const std::string& bytes, const FileFetcher& fetch = FileFet
 		bool ok = false;
 		if (!uri.empty()) {
 			std::string uriMime;
-			ok = readUri(uri, fetch, out.bytes, &uriMime);
+			ok = readUri(uri, fetch_, out.bytes, &uriMime);
 			if (out.mime.empty()) out.mime = !uriMime.empty() ? uriMime : mimeOfName(uri);
 		} else {
-			ok = readView(d, intOr(get(*image, "bufferView"), -1), out.bytes);
+			ok = readView(d_, intOr(get(*image, "bufferView"), -1), out.bytes);
 		}
-		if (!ok || out.bytes.empty()) { d.note("A picture on the model could not be read: its surface has its plain colour."); imageOfSource[source] = -1; return -1; }
-		model.images.push_back(std::move(out));
-		imageOfSource[source] = static_cast<int>(model.images.size()) - 1;
-		return imageOfSource[source];
-	};
-	for (size_t i = 0; i < declared; ++i) {
-		const Json& m = materials->a[i];
+		if (!ok || out.bytes.empty()) { d_.note("A picture on the model could not be read: its surface has its plain colour."); imageOfSource_[source] = -1; return -1; }
+		model_.images.push_back(std::move(out));
+		imageOfSource_[source] = static_cast<int>(model_.images.size()) - 1;
+		return imageOfSource_[source];
+	}
+
+	// The picture a texture reference names, as an image index.
+	int pictureOf(const Json& reference) {
+		const Json* texture = at(get(d_.root, "textures"), intOr(get(reference, "index"), -1));
+		return texture ? importImage(intOr(get(*texture, "source"), -1)) : -1;
+	}
+
+	Material readMaterial(const Json& m, size_t index) {
 		Material mat;
-		mat.name = strOr(get(m, "name"), "material " + std::to_string(i));
+		mat.name = strOr(get(m, "name"), "material " + std::to_string(index));
 		if (const Json* pbr = get(m, "pbrMetallicRoughness")) {
 			if (const Json* c = get(*pbr, "baseColorFactor"))
 				if (c->type == Json::Type::Arr && c->a.size() == 4)
@@ -367,92 +399,87 @@ inline Result parse(const std::string& bytes, const FileFetcher& fetch = FileFet
 			mat.metallic = std::min(1.0, std::max(0.0, numOr(get(*pbr, "metallicFactor"), 1.0)));
 			mat.roughness = std::min(1.0, std::max(0.0, numOr(get(*pbr, "roughnessFactor"), 1.0)));
 			if (const Json* tex = get(*pbr, "baseColorTexture")) {
-				const Json* texture = at(textures, intOr(get(*tex, "index"), -1));
-				if (texture) mat.baseColorImage = importImage(intOr(get(*texture, "source"), -1));
-				if (get(*tex, "texCoord") && intOr(get(*tex, "texCoord"), 0) != 0) d.note("A picture uses a second set of texture coordinates, which is not read.");
+				mat.baseColorImage = pictureOf(*tex);
+				if (get(*tex, "texCoord") && intOr(get(*tex, "texCoord"), 0) != 0) d_.note("A picture uses a second set of texture coordinates, which is not read.");
 			}
 			if (const Json* tex = get(*pbr, "metallicRoughnessTexture")) {
-				const Json* texture = at(textures, intOr(get(*tex, "index"), -1));
-				if (texture) mat.metalRoughImage = importImage(intOr(get(*texture, "source"), -1));
-				d.note("Metal and roughness pictures are replaced by their average over the surface.");
+				mat.metalRoughImage = pictureOf(*tex);
+				d_.note("Metal and roughness pictures are replaced by their average over the surface.");
 			}
 		}
-		if (get(m, "normalTexture")) d.note("Normal maps are not read.");
+		if (get(m, "normalTexture")) d_.note("Normal maps are not read.");
 		const bool emissivePicture = get(m, "emissiveTexture") != nullptr;   // (the factor multiplies the picture, which is mostly black: read alone it would make the whole surface glow)
-		if (emissivePicture) d.note("Emissive pictures are not read: those surfaces do not glow.");
-		if (get(m, "alphaMode") && strOr(get(m, "alphaMode")) != "OPAQUE") d.note("Transparent and cut-out surfaces (alpha) are drawn opaque.");
+		if (emissivePicture) d_.note("Emissive pictures are not read: those surfaces do not glow.");
+		if (get(m, "alphaMode") && strOr(get(m, "alphaMode")) != "OPAQUE") d_.note("Transparent and cut-out surfaces (alpha) are drawn opaque.");
 		mat.doubleSided = get(m, "doubleSided") && get(m, "doubleSided")->type == Json::Type::Bool && get(m, "doubleSided")->b;
 		double strength = 1.0;
-		const Json* extensions = get(m, "extensions");
-		if (extensions) {
+		if (const Json* extensions = get(m, "extensions")) {
 			if (const Json* t = get(*extensions, "KHR_materials_transmission")) mat.transmission = std::min(1.0, std::max(0.0, numOr(get(*t, "transmissionFactor"), 0.0)));
 			if (const Json* o = get(*extensions, "KHR_materials_ior")) mat.ior = std::min(3.0, std::max(1.0, numOr(get(*o, "ior"), 1.5)));
 			if (const Json* c = get(*extensions, "KHR_materials_clearcoat")) mat.clearcoat = std::min(1.0, std::max(0.0, numOr(get(*c, "clearcoatFactor"), 0.0)));
 			if (const Json* s = get(*extensions, "KHR_materials_emissive_strength")) strength = std::max(0.0, numOr(get(*s, "emissiveStrength"), 1.0));
-			if (get(*extensions, "KHR_materials_pbrSpecularGlossiness")) d.note("The specular-glossiness material is not read: its surfaces use plain colours.");
+			if (get(*extensions, "KHR_materials_pbrSpecularGlossiness")) d_.note("The specular-glossiness material is not read: its surfaces use plain colours.");
 		}
 		if (const Json* e = get(m, "emissiveFactor"))
 			if (!emissivePicture && e->type == Json::Type::Arr && e->a.size() == 3)
 				for (size_t k = 0; k < 3; ++k) mat.emissive[k] = std::max(0.0, numOr(&e->a[k], 0.0)) * strength;
-		model.materials.push_back(std::move(mat));
+		return mat;
 	}
-	int defaultMaterial = -1;   // made when a primitive names none
-	std::map<int, size_t> partOfMaterial;
 
-	// the meshes, through the node hierarchy
-	const Json* nodes = get(d.root, "nodes");
-	const Json* meshes = get(d.root, "meshes");
-	const size_t nodeCount = nodes && nodes->type == Json::Type::Arr ? nodes->a.size() : 0;
-	std::vector<long> roots;
-	if (const Json* scenes = get(d.root, "scenes")) {
-		const Json* scene = at(scenes, intOr(get(d.root, "scene"), 0));
-		if (scene)
-			if (const Json* list = get(*scene, "nodes"))
-				for (const Json& n : list->a) roots.push_back(intOr(&n, -1));
+	// The materials as declared (a triangle that names none gets one more, plain, at the end: partFor()).
+	bool readMaterials() {
+		const Json* materials = get(d_.root, "materials");
+		declaredMaterials_ = materials && materials->type == Json::Type::Arr ? materials->a.size() : 0;
+		for (size_t i = 0; i < declaredMaterials_; ++i) model_.materials.push_back(readMaterial(materials->a[i], i));
+		return true;
 	}
-	if (roots.empty()) {   // (no scene named: every node nothing is a child of, or the meshes themselves)
-		std::vector<bool> isChild(nodeCount, false);
-		for (size_t i = 0; i < nodeCount; ++i)
+
+	// The nodes the traversal starts from: the scene's, else every node that is nobody's child.
+	std::vector<long> rootNodes() const {
+		std::vector<long> roots;
+		if (const Json* scenes = get(d_.root, "scenes"))
+			if (const Json* scene = at(scenes, intOr(get(d_.root, "scene"), 0)))
+				if (const Json* list = get(*scene, "nodes"))
+					for (const Json& n : list->a) roots.push_back(intOr(&n, -1));
+		if (!roots.empty()) return roots;
+		const Json* nodes = get(d_.root, "nodes");
+		const size_t count = nodes && nodes->type == Json::Type::Arr ? nodes->a.size() : 0;
+		std::vector<bool> isChild(count, false);
+		for (size_t i = 0; i < count; ++i)
 			if (const Json* c = get(nodes->a[i], "children"))
-				for (const Json& k : c->a) { const long child = intOr(&k, -1); if (child >= 0 && static_cast<size_t>(child) < nodeCount) isChild[static_cast<size_t>(child)] = true; }
-		for (size_t i = 0; i < nodeCount; ++i)
+				for (const Json& k : c->a) { const long child = intOr(&k, -1); if (child >= 0 && static_cast<size_t>(child) < count) isChild[static_cast<size_t>(child)] = true; }
+		for (size_t i = 0; i < count; ++i)
 			if (!isChild[i]) roots.push_back(static_cast<long>(i));
+		return roots;
 	}
-	struct Visit { long node; Mat parent; int depth; };
-	std::vector<Visit> stack;
-	for (auto it = roots.rbegin(); it != roots.rend(); ++it) stack.push_back({*it, identity(), 0});
-	size_t visited = 0;
-	size_t vertices = 0;
-	const auto addPrimitive = [&](const Json& primitive, const Mat& world) -> bool {
-		const Json* attributes = get(primitive, "attributes");
-		if (!attributes || !get(*attributes, "POSITION")) return true;
-		const long mode = intOr(get(primitive, "mode"), 4);
-		if (mode != 4 && mode != 5 && mode != 6) { d.note("Points and lines in the model are not read: only triangles."); return true; }
-		std::vector<double> pos, nrm, uv, idx;
-		int pc = 0, nc = 0, uc = 0, ic = 0;
-		size_t pn = 0, nn = 0, un = 0, in = 0;
-		std::string err;
-		if (!readAccessor(d, intOr(get(*attributes, "POSITION"), -1), pos, pc, pn, err) || pc != 3) { result.error = "A mesh's positions could not be read: " + (err.empty() ? std::string("they are not 3-vectors") : err) + "."; return false; }
-		if (vertices + pn > kMaxVertices) { result.error = "The model has too many vertices to place."; return false; }
-		const bool hasNormals = get(*attributes, "NORMAL") && readAccessor(d, intOr(get(*attributes, "NORMAL"), -1), nrm, nc, nn, err) && nc == 3 && nn == pn;
-		const bool hasUv = get(*attributes, "TEXCOORD_0") && readAccessor(d, intOr(get(*attributes, "TEXCOORD_0"), -1), uv, uc, un, err) && uc == 2 && un == pn;
-		if (get(*attributes, "COLOR_0")) d.note("Vertex colours are not read.");
-		if (get(*attributes, "JOINTS_0")) d.note("The model has a skeleton: it is placed in its bind pose, not animated.");
-		if (get(primitive, "targets")) d.note("Morph targets are not read.");
-		if (get(*attributes, "TEXCOORD_1")) d.note("A second set of texture coordinates is not read.");
-		std::vector<uint32_t> list;
-		if (get(primitive, "indices")) {
-			if (!readAccessor(d, intOr(get(primitive, "indices"), -1), idx, ic, in, err) || ic != 1) { result.error = "A mesh's indices could not be read: " + (err.empty() ? std::string("they are not scalars") : err) + "."; return false; }
-			list.resize(in);
-			for (size_t i = 0; i < in; ++i) {
-				if (!(idx[i] >= 0.0) || idx[i] >= static_cast<double>(pn)) { result.error = "A mesh's indices point outside its vertices."; return false; }
-				list[i] = static_cast<uint32_t>(idx[i]);
-			}
-		} else {
-			list.resize(pn);
-			for (size_t i = 0; i < pn; ++i) list[i] = static_cast<uint32_t>(i);
+
+	// The part of a material (made when there is none yet; a material the file does not declare is the plain default one).
+	Part& partFor(int material) {
+		if (material < 0 || static_cast<size_t>(material) >= declaredMaterials_) {
+			if (defaultMaterial_ < 0) { Material plain; plain.name = "default"; plain.metallic = 0.0; plain.roughness = 1.0; model_.materials.push_back(plain); defaultMaterial_ = static_cast<int>(model_.materials.size()) - 1; }
+			material = defaultMaterial_;
 		}
-		// strips and fans as triangles
+		auto found = partOfMaterial_.find(material);
+		if (found == partOfMaterial_.end()) {
+			Part p;
+			p.material = material;
+			model_.parts.push_back(std::move(p));
+			found = partOfMaterial_.emplace(material, model_.parts.size() - 1).first;
+		}
+		return model_.parts[found->second];
+	}
+
+	// One primitive's data as the file has it, before the node's matrix.
+	struct Primitive {
+		std::vector<double> positions, normals, uvs;
+		size_t count = 0;
+		bool hasNormals = false, hasUvs = false;
+		std::vector<uint32_t> triangles;   // 3 per triangle, as indices into the vertices
+		int material = -1;
+	};
+
+	// Triangle lists from an index list read as a triangle list (mode 4), a strip (5) or a fan (6).
+	static std::vector<uint32_t> trianglesOf(const std::vector<uint32_t>& list, long mode) {
 		std::vector<uint32_t> tri;
 		if (mode == 4) {
 			tri.assign(list.begin(), list.begin() + static_cast<std::ptrdiff_t>(list.size() / 3 * 3));
@@ -464,109 +491,173 @@ inline Result parse(const std::string& bytes, const FileFetcher& fetch = FileFet
 		} else {
 			for (size_t i = 2; i < list.size(); ++i) { tri.push_back(list[0]); tri.push_back(list[i - 1]); tri.push_back(list[i]); }
 		}
-		if (tri.empty()) return true;
-		// the part of this primitive's material
-		int material = static_cast<int>(intOr(get(primitive, "material"), -1));
-		if (material < 0 || static_cast<size_t>(material) >= declared) {
-			if (defaultMaterial < 0) { Material plain; plain.name = "default"; plain.metallic = 0.0; plain.roughness = 1.0; model.materials.push_back(plain); defaultMaterial = static_cast<int>(model.materials.size()) - 1; }
-			material = defaultMaterial;
+		return tri;
+	}
+
+	// Reads a primitive; `skip` is set for one that holds no triangles (points, lines, no positions). False with the error set when the file is wrong.
+	bool readPrimitive(const Json& primitive, Primitive& out, bool& skip) {
+		skip = true;
+		const Json* attributes = get(primitive, "attributes");
+		if (!attributes || !get(*attributes, "POSITION")) return true;
+		const long mode = intOr(get(primitive, "mode"), 4);
+		if (mode != 4 && mode != 5 && mode != 6) { d_.note("Points and lines in the model are not read: only triangles."); return true; }
+		int pc = 0, nc = 0, uc = 0, ic = 0;
+		size_t nn = 0, un = 0, in = 0;
+		std::string err;
+		if (!readAccessor(d_, intOr(get(*attributes, "POSITION"), -1), out.positions, pc, out.count, err) || pc != 3) return fail("A mesh's positions could not be read: " + (err.empty() ? std::string("they are not 3-vectors") : err) + ".");
+		if (vertices_ + out.count > kMaxVertices) return fail("The model has too many vertices to place.");
+		out.hasNormals = get(*attributes, "NORMAL") && readAccessor(d_, intOr(get(*attributes, "NORMAL"), -1), out.normals, nc, nn, err) && nc == 3 && nn == out.count;
+		out.hasUvs = get(*attributes, "TEXCOORD_0") && readAccessor(d_, intOr(get(*attributes, "TEXCOORD_0"), -1), out.uvs, uc, un, err) && uc == 2 && un == out.count;
+		if (get(*attributes, "COLOR_0")) d_.note("Vertex colours are not read.");
+		if (get(*attributes, "JOINTS_0")) d_.note("The model has a skeleton: it is placed in its bind pose, not animated.");
+		if (get(primitive, "targets")) d_.note("Morph targets are not read.");
+		if (get(*attributes, "TEXCOORD_1")) d_.note("A second set of texture coordinates is not read.");
+		std::vector<uint32_t> list;
+		if (get(primitive, "indices")) {
+			std::vector<double> idx;
+			if (!readAccessor(d_, intOr(get(primitive, "indices"), -1), idx, ic, in, err) || ic != 1) return fail("A mesh's indices could not be read: " + (err.empty() ? std::string("they are not scalars") : err) + ".");
+			list.resize(in);
+			for (size_t i = 0; i < in; ++i) {
+				if (!(idx[i] >= 0.0) || idx[i] >= static_cast<double>(out.count)) return fail("A mesh's indices point outside its vertices.");
+				list[i] = static_cast<uint32_t>(idx[i]);
+			}
+		} else {
+			list.resize(out.count);
+			for (size_t i = 0; i < out.count; ++i) list[i] = static_cast<uint32_t>(i);
 		}
-		auto found = partOfMaterial.find(material);
-		if (found == partOfMaterial.end()) {
-			Part p;
-			p.material = material;
-			model.parts.push_back(std::move(p));
-			found = partOfMaterial.emplace(material, model.parts.size() - 1).first;
+		out.triangles = trianglesOf(list, mode);
+		out.material = static_cast<int>(intOr(get(primitive, "material"), -1));
+		skip = out.triangles.empty();
+		return true;
+	}
+
+	// The file's normals, turned like the surface: by the inverse transpose of the node's upper 3 x 3 (cofactors over the determinant).
+	static void appendFileNormals(Part& part, const Primitive& p, const Mat& world) {
+		const double det = determinant3(world);
+		double inv[9];
+		if (std::fabs(det) > 1e-18) {
+			inv[0] = (world[5] * world[10] - world[9] * world[6]) / det; inv[1] = (world[9] * world[2] - world[1] * world[10]) / det; inv[2] = (world[1] * world[6] - world[5] * world[2]) / det;
+			inv[3] = (world[8] * world[6] - world[4] * world[10]) / det; inv[4] = (world[0] * world[10] - world[8] * world[2]) / det; inv[5] = (world[4] * world[2] - world[0] * world[6]) / det;
+			inv[6] = (world[4] * world[9] - world[8] * world[5]) / det;  inv[7] = (world[8] * world[1] - world[0] * world[9]) / det;  inv[8] = (world[0] * world[5] - world[4] * world[1]) / det;
+		} else {
+			for (int k = 0; k < 9; ++k) inv[k] = k % 4 == 0 ? 1.0 : 0.0;
 		}
-		Part& part = model.parts[found->second];
+		for (size_t i = 0; i < p.count; ++i) {
+			const double x = p.normals[i * 3], y = p.normals[i * 3 + 1], z = p.normals[i * 3 + 2];
+			// `inv` holds the rows of the inverse transpose, which is what turns a normal
+			double n[3] = {inv[0] * x + inv[1] * y + inv[2] * z, inv[3] * x + inv[4] * y + inv[5] * z, inv[6] * x + inv[7] * y + inv[8] * z};
+			const double l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+			if (l > 1e-12) { n[0] /= l; n[1] /= l; n[2] /= l; } else { n[0] = 0; n[1] = 1; n[2] = 0; }
+			part.normals.insert(part.normals.end(), n, n + 3);
+		}
+	}
+
+	// Smooth normals from the triangles just added (`firstTri` is where they start in part.indices): each vertex the area-weighted sum of its faces'.
+	static void appendSmoothNormals(Part& part, size_t count, uint32_t base, size_t firstTri) {
+		std::vector<double> sum(count * 3, 0.0);
+		for (size_t t = firstTri; t + 2 < part.indices.size(); t += 3) {
+			const size_t a = part.indices[t] - base, b = part.indices[t + 1] - base, c = part.indices[t + 2] - base;
+			const double* A = &part.positions[(base + a) * 3]; const double* B = &part.positions[(base + b) * 3]; const double* C = &part.positions[(base + c) * 3];
+			const double e1[3] = {B[0] - A[0], B[1] - A[1], B[2] - A[2]}, e2[3] = {C[0] - A[0], C[1] - A[1], C[2] - A[2]};
+			const double n[3] = {e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]};   // (its length is twice the area: area weighting)
+			for (const size_t v : {a, b, c})
+				for (int k = 0; k < 3; ++k) sum[v * 3 + static_cast<size_t>(k)] += n[k];
+		}
+		for (size_t i = 0; i < count; ++i) {
+			double* n = &sum[i * 3];
+			const double l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+			if (l > 1e-18) { n[0] /= l; n[1] /= l; n[2] /= l; } else { n[0] = 0; n[1] = 1; n[2] = 0; }
+			part.normals.insert(part.normals.end(), n, n + 3);
+		}
+	}
+
+	// Adds a primitive to its material's part: vertices through the node's matrix, triangles (turned over for a mirrored node), normals and texture coordinates.
+	void appendPrimitive(Part& part, const Primitive& p, const Mat& world) {
 		const uint32_t base = static_cast<uint32_t>(part.positions.size() / 3);
-		for (size_t i = 0; i < pn; ++i) {
-			const double x = pos[i * 3], y = pos[i * 3 + 1], z = pos[i * 3 + 2];
+		for (size_t i = 0; i < p.count; ++i) {
+			const double x = p.positions[i * 3], y = p.positions[i * 3 + 1], z = p.positions[i * 3 + 2];
 			part.positions.push_back(world[0] * x + world[4] * y + world[8] * z + world[12]);
 			part.positions.push_back(world[1] * x + world[5] * y + world[9] * z + world[13]);
 			part.positions.push_back(world[2] * x + world[6] * y + world[10] * z + world[14]);
 		}
 		const bool flip = determinant3(world) < 0.0;   // (a mirrored node turns the triangles inside out)
 		const size_t firstTri = part.indices.size();
-		for (size_t i = 0; i + 2 < tri.size(); i += 3) {
-			part.indices.push_back(base + tri[i]);
-			part.indices.push_back(base + (flip ? tri[i + 2] : tri[i + 1]));
-			part.indices.push_back(base + (flip ? tri[i + 1] : tri[i + 2]));
+		for (size_t i = 0; i + 2 < p.triangles.size(); i += 3) {
+			part.indices.push_back(base + p.triangles[i]);
+			part.indices.push_back(base + (flip ? p.triangles[i + 2] : p.triangles[i + 1]));
+			part.indices.push_back(base + (flip ? p.triangles[i + 1] : p.triangles[i + 2]));
 		}
-		// normals: the file's (turned like the surface), or smooth ones from the faces
-		if (hasNormals) {
-			// the inverse transpose of the upper 3 x 3 (cofactors over the determinant)
-			const double det = determinant3(world);
-			double inv[9];
-			if (std::fabs(det) > 1e-18) {
-				inv[0] = (world[5] * world[10] - world[9] * world[6]) / det; inv[1] = (world[9] * world[2] - world[1] * world[10]) / det; inv[2] = (world[1] * world[6] - world[5] * world[2]) / det;
-				inv[3] = (world[8] * world[6] - world[4] * world[10]) / det; inv[4] = (world[0] * world[10] - world[8] * world[2]) / det; inv[5] = (world[4] * world[2] - world[0] * world[6]) / det;
-				inv[6] = (world[4] * world[9] - world[8] * world[5]) / det;  inv[7] = (world[8] * world[1] - world[0] * world[9]) / det;  inv[8] = (world[0] * world[5] - world[4] * world[1]) / det;
-			} else {
-				for (int k = 0; k < 9; ++k) inv[k] = k % 4 == 0 ? 1.0 : 0.0;
-			}
-			for (size_t i = 0; i < pn; ++i) {
-				const double x = nrm[i * 3], y = nrm[i * 3 + 1], z = nrm[i * 3 + 2];
-				// `inv` holds the rows of the inverse transpose, which is what turns a normal
-				double n[3] = {inv[0] * x + inv[1] * y + inv[2] * z, inv[3] * x + inv[4] * y + inv[5] * z, inv[6] * x + inv[7] * y + inv[8] * z};
-				const double l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
-				if (l > 1e-12) { n[0] /= l; n[1] /= l; n[2] /= l; } else { n[0] = 0; n[1] = 1; n[2] = 0; }
-				part.normals.insert(part.normals.end(), n, n + 3);
-			}
-		} else {
-			std::vector<double> sum(pn * 3, 0.0);
-			for (size_t t = firstTri; t + 2 < part.indices.size(); t += 3) {
-				const size_t a = part.indices[t] - base, b = part.indices[t + 1] - base, c = part.indices[t + 2] - base;
-				const double* A = &part.positions[(base + a) * 3]; const double* B = &part.positions[(base + b) * 3]; const double* C = &part.positions[(base + c) * 3];
-				const double e1[3] = {B[0] - A[0], B[1] - A[1], B[2] - A[2]}, e2[3] = {C[0] - A[0], C[1] - A[1], C[2] - A[2]};
-				const double n[3] = {e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]};   // (its length is twice the area: area weighting)
-				for (const size_t v : {a, b, c})
-					for (int k = 0; k < 3; ++k) sum[v * 3 + static_cast<size_t>(k)] += n[k];
-			}
-			for (size_t i = 0; i < pn; ++i) {
-				double* n = &sum[i * 3];
-				const double l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
-				if (l > 1e-18) { n[0] /= l; n[1] /= l; n[2] /= l; } else { n[0] = 0; n[1] = 1; n[2] = 0; }
-				part.normals.insert(part.normals.end(), n, n + 3);
-			}
+		if (p.hasNormals) appendFileNormals(part, p, world);
+		else appendSmoothNormals(part, p.count, base, firstTri);
+		if (p.hasUvs) { part.uvs.insert(part.uvs.end(), p.uvs.begin(), p.uvs.end()); part.hasUvs = true; }
+		else part.uvs.insert(part.uvs.end(), p.count * 2, 0.0);
+		vertices_ += p.count;
+	}
+
+	bool addMesh(const Json& node, const Mat& world) {
+		const long meshIndex = intOr(get(node, "mesh"), -1);
+		if (meshIndex < 0) return true;
+		const Json* mesh = at(get(d_.root, "meshes"), meshIndex);
+		const Json* primitives = mesh ? get(*mesh, "primitives") : nullptr;
+		if (!primitives || primitives->type != Json::Type::Arr) return true;
+		for (const Json& primitive : primitives->a) {
+			Primitive p;
+			bool skip = false;
+			if (!readPrimitive(primitive, p, skip)) return false;
+			if (!skip) appendPrimitive(partFor(p.material), p, world);
 		}
-		if (hasUv) { part.uvs.insert(part.uvs.end(), uv.begin(), uv.end()); part.hasUvs = true; }
-		else part.uvs.insert(part.uvs.end(), pn * 2, 0.0);
-		vertices += pn;
 		return true;
-	};
-	while (!stack.empty()) {
-		const Visit v = stack.back();
-		stack.pop_back();
-		const Json* node = at(nodes, v.node);
-		if (!node || v.depth > 64 || ++visited > 200000) continue;   // (a node that is missing, a hierarchy too deep or a loop: skipped)
-		const Mat world = multiply(v.parent, nodeMatrix(*node));
-		const long meshIndex = intOr(get(*node, "mesh"), -1);
-		if (meshIndex >= 0) {
-			const Json* mesh = at(meshes, meshIndex);
-			const Json* primitives = mesh ? get(*mesh, "primitives") : nullptr;
-			if (primitives && primitives->type == Json::Type::Arr)
-				for (const Json& primitive : primitives->a)
-					if (!addPrimitive(primitive, world)) return result;
+	}
+
+	// Every mesh of the node hierarchy, in world space.
+	bool walkNodes() {
+		struct Visit { long node; Mat parent; int depth; };
+		std::vector<Visit> stack;
+		const std::vector<long> roots = rootNodes();
+		for (auto it = roots.rbegin(); it != roots.rend(); ++it) stack.push_back({*it, identity(), 0});
+		const Json* nodes = get(d_.root, "nodes");
+		size_t visited = 0;
+		while (!stack.empty()) {
+			const Visit v = stack.back();
+			stack.pop_back();
+			const Json* node = at(nodes, v.node);
+			if (!node || v.depth > 64) continue;   // (a node that is missing or a hierarchy too deep, such as a loop)
+			if (++visited > 200000) { d_.note("The model has more than 200000 nodes: the rest are left out."); break; }
+			const Mat world = multiply(v.parent, nodeMatrix(*node));
+			if (!addMesh(*node, world)) return false;
+			if (const Json* children = get(*node, "children"))
+				for (auto it = children->a.rbegin(); it != children->a.rend(); ++it) stack.push_back({intOr(&*it, -1), world, v.depth + 1});
 		}
-		if (const Json* children = get(*node, "children"))
-			for (auto it = children->a.rbegin(); it != children->a.rend(); ++it) stack.push_back({intOr(&*it, -1), world, v.depth + 1});
+		return true;
 	}
-	if (model.parts.empty()) { result.error = "The model has no triangles."; return result; }
-	bool first = true;
-	for (const Part& p : model.parts) {
-		model.triangles += p.indices.size() / 3;
-		for (size_t i = 0; i + 2 < p.positions.size(); i += 3)
-			for (size_t a = 0; a < 3; ++a) {
-				const double x = p.positions[i + a];
-				if (first) model.lo[a] = model.hi[a] = x;
-				model.lo[a] = std::min(model.lo[a], x);
-				model.hi[a] = std::max(model.hi[a], x);
-				if (a == 2) first = false;
-			}
+
+	// The totals and the bounding box.
+	bool finish() {
+		if (model_.parts.empty()) return fail("The model has no triangles.");
+		bool first = true;
+		for (const Part& p : model_.parts) {
+			model_.triangles += p.indices.size() / 3;
+			for (size_t i = 0; i + 2 < p.positions.size(); i += 3)
+				for (size_t a = 0; a < 3; ++a) {
+					const double x = p.positions[i + a];
+					if (first) model_.lo[a] = model_.hi[a] = x;
+					model_.lo[a] = std::min(model_.lo[a], x);
+					model_.hi[a] = std::max(model_.hi[a], x);
+					if (a == 2) first = false;
+				}
+		}
+		model_.notes = d_.notes;
+		return true;
 	}
-	model.notes = d.notes;
-	result.ok = true;
+};
+
+}  // namespace detail
+
+// The model in `bytes` (a .glb, or the JSON text of a .gltf, whose buffers and pictures `fetch` supplies).
+inline Result parse(const std::string& bytes, const FileFetcher& fetch = FileFetcher()) {
+	Result result;
+	detail::Reader reader(fetch, result);
+	result.ok = reader.run(bytes);
 	return result;
 }
 

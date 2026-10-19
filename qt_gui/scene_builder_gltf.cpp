@@ -71,7 +71,8 @@ bool SceneBuilderWidget::importGltf(const QString &file, QString *message) {
 	QFile source(file);
 	if (!source.open(QIODevice::ReadOnly)) return fail(tr("The file could not be opened."));
 	if (source.size() > kMaxModelBytes) return fail(tr("The file is too large to import (over 600 MB)."));
-	const QByteArray content = source.readAll();
+	std::string content(static_cast<size_t>(source.size()), '\0');   // (read straight into the string the parser takes: a big model is not held twice)
+	if (source.read(content.data(), static_cast<qint64>(content.size())) != static_cast<qint64>(content.size())) return fail(tr("The file could not be read."));
 	source.close();
 	const QDir folderOfModel = QFileInfo(file).absoluteDir();
 	// A .gltf names its buffers and pictures by relative path: only files inside the model's own folder are read (a file from the internet must not be able to name another place on the disk).
@@ -84,7 +85,7 @@ bool SceneBuilderWidget::importGltf(const QString &file, QString *message) {
 		bytes.assign(reinterpret_cast<const unsigned char *>(data.constData()), reinterpret_cast<const unsigned char *>(data.constData()) + data.size());
 		return true;
 	};
-	const gltf_import::Result parsed = gltf_import::parse(std::string(content.constData(), static_cast<size_t>(content.size())), fetch);
+	const gltf_import::Result parsed = gltf_import::parse(content, fetch);
 	if (!parsed.ok) return fail(QString::fromStdString(parsed.error));
 	const gltf_import::Model &model = parsed.model;
 
@@ -100,7 +101,7 @@ bool SceneBuilderWidget::importGltf(const QString &file, QString *message) {
 
 	// the files: a folder named for the model and for the file's own bytes (the same model is written once)
 	const QString stem = cleanName(QFileInfo(file).completeBaseName(), tr("Model"));
-	const QString id = QString::fromLatin1(QCryptographicHash::hash(content, QCryptographicHash::Sha1).toHex().left(8));
+	const QString id = QString::fromLatin1(QCryptographicHash::hash(QByteArrayView(content.data(), static_cast<qsizetype>(content.size())), QCryptographicHash::Sha1).toHex().left(8));
 	const QString folder = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/imported_models/") + stem + QLatin1Char('-') + id;
 	QDir().mkpath(folder);
 	std::vector<QString> pictureOf(model.images.size());
@@ -114,13 +115,11 @@ bool SceneBuilderWidget::importGltf(const QString &file, QString *message) {
 		if (!decoded.loadFromData(image.bytes.data(), static_cast<uint>(image.bytes.size()))) continue;   // (a picture format Qt cannot read, such as WebP without its plugin: that surface keeps its plain colour)
 		const bool jpeg = image.mime == "image/jpeg";
 		const QString path = QStringLiteral("%1/picture_%2.%3").arg(folder).arg(i).arg(jpeg ? QStringLiteral("jpg") : QStringLiteral("png"));
-		if (!QFileInfo::exists(path) || QFileInfo(path).size() == 0) {
-			if (jpeg) {
-				QFile out(path);
-				if (!out.open(QIODevice::WriteOnly) || out.write(reinterpret_cast<const char *>(image.bytes.data()), static_cast<qint64>(image.bytes.size())) != static_cast<qint64>(image.bytes.size())) continue;
-			} else if (!decoded.save(path, "PNG")) {
-				continue;
-			}
+		if (jpeg) {   // (written every time: a .gltf with the same text can have other pictures beside it)
+			QFile out(path);
+			if (!out.open(QIODevice::WriteOnly) || out.write(reinterpret_cast<const char *>(image.bytes.data()), static_cast<qint64>(image.bytes.size())) != static_cast<qint64>(image.bytes.size())) continue;
+		} else if (!decoded.save(path, "PNG")) {
+			continue;
 		}
 		pictureOf[i] = QDir::toNativeSeparators(path);
 	}

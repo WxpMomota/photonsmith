@@ -274,3 +274,20 @@ TEST(GltfImportTest, AnEmissivePictureMeansTheFactorIsNotTheSurfacesGlow) {
 	ASSERT_TRUE(plain.ok);
 	EXPECT_EQ(plain.model.materials[0].emissive[0], 1.0) << "a plain emissive factor still glows";
 }
+
+TEST(GltfImportTest, ABigCountInASmallFileIsRefusedBeforeAnythingIsAllocated) {
+	// 100 million vertices claimed over a 36-byte buffer view: the check against the buffer comes before the allocation (the file is untrusted)
+	const std::string good = triangleGltf("{\"mesh\":0}");
+	const gltf_import::Result r = gltf_import::parse(replaceFirst(good, "\"count\":3,\"type\":\"VEC3\"}", "\"count\":100000000,\"type\":\"VEC3\"}"));
+	EXPECT_FALSE(r.ok);
+	// an accessor with no data of its own (all zeros) is not made as big as the count says either
+	const std::string noView = "{\"asset\":{\"version\":\"2.0\"},\"accessors\":[{\"componentType\":5126,\"count\":50000000,\"type\":\"VEC3\"}],\"meshes\":[{\"primitives\":[{\"attributes\":{\"POSITION\":0}}]}],\"nodes\":[{\"mesh\":0}]}";
+	EXPECT_FALSE(gltf_import::parse(noView).ok);
+}
+
+TEST(GltfImportTest, AHierarchyDeeperThanTheLimitStillGivesTheMeshesAboveIt) {
+	std::string nodes = "{\"mesh\":0,\"children\":[1]}";
+	for (int i = 1; i < 100; ++i) nodes += ",{\"children\":[" + std::to_string(i + 1) + "]}";
+	const gltf_import::Result r = gltf_import::parse(triangleGltf(nodes));
+	EXPECT_TRUE(r.ok) << "the mesh is on the first node";
+}
