@@ -163,6 +163,18 @@ a low-priority thread for the library Live Preview uses, which runs in the GUI's
 a cache of its own), and a run that is still building after three seconds prints a line saying so. The status bar says "Preparing the GPU renderer for this Mac (first run only...)" while it
 works. `RT_NO_GPU_WARMUP=1` turns the background build off; the GUI self-test never starts it, so `scripts/gui_selftest_macos.sh` now runs the bundle's `ray_tracer --prepare-gpu` first (measured once, 2026-10-15: after a real shader change the first self-test run then passed, where before the Scene Builder's Rendered viewport failed with "0 frames" until a second run); `gui_selftest.py` on its own still waits the full time on a new build.
 
+**Where the cold-compile time goes (measured 2026-10-19, M2, both variants built in parallel, `--prepare-gpu`):** the full shader takes 127.5 s. With the `else if (mat.materialType == ...)` branches
+of 12 rarely used families made `false &&` in `scatterAtSurface` (so the compiler drops the code, which is what a Metal function constant set to false would do), the same kernel takes **17.6 s**. Turning off one
+group at a time: the four layered ones (coated diffuse, coated conductor, image clearcoat, normalized Fresnel) 69.7 s; measured, subsurface and hair 88.8 s; principled, Oren-Nayar, velvet, diffuse transmission and
+clearcoat 85.0 s. The savings overlap (they do not add up), so no single family is to blame: the cost is the whole megakernel with everything inlined into it.
+
+That makes specialization by function constants a real option, not a guess: a scene that uses only diffuse, conductor and glass would compile in about 20 s instead of 127 s, and the kernel would probably run
+a little faster (fewer registers). What it would cost, so that it is decided with eyes open: (1) every distinct set of families is its own pipeline and its own cache entry, so someone who opens many different
+scenes compiles more in total than with one full build; (2) Live Preview and the Scene Builder can change a material to a family the pipeline was built without, which needs a rebuild (up to 2 minutes of
+waiting) or a fallback to the full kernel built in the background; (3) the scene's family set must be computed before the pipeline is made (the loader already knows it) and the same set used by the
+warm-up. A cheaper variant of the same idea: build the "common" specialization first (about 20 s) so the first render can start, and the full one in the background as now; a scene that needs a rare family waits
+for the full build, everything else does not. Not done: it changes `createKernelPipeline()`, the warm-up and Live Preview, and wants a decision on (2).
+
 ## Environment switches
 
 The production switches below are parsed once, in `gpu/metal/host/metal_poc_tuning.h` (`MetalTuning`): a value that is not a whole number in range is ignored with a message (it used to go through `atoi`, so `METAL_TG_W=abc` was a threadgroup of width 0), and a run prints the switches it had when any differs from the default.
