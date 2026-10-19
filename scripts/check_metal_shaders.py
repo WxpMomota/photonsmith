@@ -5,7 +5,7 @@ The renderer builds its shaders from source on the machine that runs it (MTLDevi
 Metal device that renders something; the hosted CI runners have none, and a broken shader used to stay green there. `xcrun metal` needs neither a device nor the Metal toolchain
 download, and takes about a second for all of it. Both variants the renderer compiles are checked (METAL_TRIANGLE_ANY_HIT on and off).
 
-  python3 scripts/check_metal_shaders.py [--shader-dir gpu/metal] [--warnings]
+  python3 scripts/check_metal_shaders.py [--shader-dir gpu/metal/shaders] [--warnings]
 
 Exit code 0: both variants compile. Anything else prints the compiler's errors. Skips (exit 0, says so) where `xcrun metal` does not exist (Linux, Windows).
 """
@@ -16,7 +16,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--shader-dir", default=os.path.join(REPO, "gpu", "metal"))
+    ap.add_argument("--shader-dir", default=os.path.join(REPO, "gpu", "metal", "shaders"))
     ap.add_argument("--warnings", action="store_true", help="show the compiler's warnings too (they are hidden by default: the run-time compile ignores them)")
     args = ap.parse_args()
     if shutil.which("xcrun") is None:

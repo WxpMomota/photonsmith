@@ -389,7 +389,7 @@ way) twelve regression tests: host-side math, real on-device shader
 kernels, and a CPU-vs-Metal parity harness that renders every scene on
 both and compares them
 (`METAL_PARITY_STRICT=1 ctest`; `scripts/update_metal_golden.sh` refreshes the
-golden snapshot in `gpu/metal/parity_golden.txt` after an intentional
+golden snapshot in `gpu/metal/tests/parity_golden.txt` after an intentional
 change). Metal renders the great majority of scenes to within noise of the
 CPU renderer; `docs/METAL_PARITY_STATUS.md` lists exactly which scenes and
 features still differ, and `docs/history/METAL_GPU_FEASIBILITY.md` has the full

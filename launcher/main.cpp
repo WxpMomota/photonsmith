@@ -1265,7 +1265,7 @@ static bool runIntegrator(const LaunchArgs &args, const RenderSetup &s, double c
         if (!report_render_result(render_result, "cpu_render_main_sppm", "SPPM", "SPPM", out_path))
             return false;
     } else if (use_gpu) {
-        // The GPU renderer this build has: Metal on a Mac (gpu/metal/metal_poc.mm renders a pbrt-file-backed scene_id and, for any other, prints a clear
+        // The GPU renderer this build has: Metal on a Mac (gpu/metal/host/metal_poc.mm renders a pbrt-file-backed scene_id and, for any other, prints a clear
         // message and returns non-zero), OptiX on Windows. Both are called through launcher/gpu_backend.h.
         if (!gpu_backend::available()) {
             std::cerr << "ERROR: " << gpu_backend::name() << " is not available!" << std::endl;

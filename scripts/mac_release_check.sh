@@ -144,7 +144,7 @@ step_verify() {
 	done
 	# the shader files the app carries: exactly the production list (metal_poc_shader_files.h), and none of the test kernels
 	local want have
-	want="$(grep -cE '^[[:space:]]+"metal_poc_[a-z_0-9]+\.metal",' gpu/metal/metal_poc_shader_files.h)"
+	want="$(grep -cE '^[[:space:]]+"metal_poc_[a-z_0-9]+\.metal",' gpu/metal/shaders/metal_poc_shader_files.h)"
 	have="$(ls "$app/Contents/MacOS" | grep -cE '^metal_poc_.*\.metal$')"
 	[[ "$want" == "$have" ]] || { echo "the app carries $have shader files, the production list has $want"; return 1; }
 	[[ ! -e "$app/Contents/MacOS/metal_poc_test_kernels.metal" ]] || { echo "the app carries the test kernels"; return 1; }
