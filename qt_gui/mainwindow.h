@@ -160,6 +160,7 @@ public:
 	void runDenoiserSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot); void runTourSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);
 	void runBuilderUiSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // (mainwindow_selftest_builderui.cpp)
 	void runQueueSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_builder3d.cpp
+	void runRenderFailSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_builder3d.cpp
 	void selfTestRenderQueue(const std::function<void(bool, const QString &)> &check); void selfTestCrashRecovery(const std::function<void(bool, const QString &)> &check);
 	void selfTestWindowGeometry(const std::function<void(bool, const QString &)> &check); void selfTestWheelGuard(const std::function<void(bool, const QString &)> &check);
 	void selfTestLog(SceneBuilderWidget *sb, const std::function<void(bool, const QString &)> &check);

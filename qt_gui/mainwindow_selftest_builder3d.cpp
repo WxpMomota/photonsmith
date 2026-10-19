@@ -1090,6 +1090,44 @@ void MainWindow::selfTestRenderQueue(const std::function<void(bool, const QStrin
 	refreshQueuePanel();
 }
 
+// RT_GUI_SELFTEST=renderfail [RT_GUI_SELFTEST_SCENE=<a downloadable scene that is not downloaded, default H35>]: a real render through the Render button that
+// cannot work because the scene's files are not on disk. The renderer says why in an event (src/shared/render_events.h); the failure shown must be in the
+// words of that reason ("Scene files are not downloaded"), not the generic text of the exit code, and the raw event line must not be in the log.
+void MainWindow::runRenderFailSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {
+	if (m_progressTabIndex >= 0) m_tabWidget->setCurrentIndex(m_progressTabIndex);
+	resize(1100, 800);
+	const QString scene = qEnvironmentVariable("RT_GUI_SELFTEST_SCENE", "H35");
+	selectSceneById(scene);
+	for (int i = 0; i < m_renderModeCombo->count(); ++i)
+		if (!m_renderModeCombo->itemData(i).toBool()) m_renderModeCombo->setCurrentIndex(i);   // the CPU
+	m_qualityPresetCombo->setCurrentIndex(6);
+	m_widthSpinBox->setValue(64);
+	m_heightSpinBox->setValue(48);
+	m_samplesSpinBox->setValue(1);
+	m_maxDepthSpinBox->setValue(2);
+	onRenderClicked();
+	auto *poll = new QTimer(this);
+	auto *waited = new int(0);
+	connect(poll, &QTimer::timeout, this, [this, poll, waited, log, shot, scene]() {
+		if (++*waited > 200) { poll->stop(); log("FAIL: the render did not end in 60 s"); log("RESULT: FAIL"); QApplication::exit(1); return; }
+		if (m_queueModel->finishedCount() < 1) return;
+		poll->stop();
+		bool ok = true;
+		auto check = [&ok, log](bool cond, const QString &what) { log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what)); ok = ok && cond; };
+		const QString text = m_logTextEdit ? m_logTextEdit->toPlainText() : QString();
+		check(m_queueModel->stateAt(0) == job_queue::State::Failed, QString("the render of %1 failed").arg(scene));
+		check(text.contains("Error: The scene's files are not on this computer"), "the log has the event's own sentence");
+		check(text.contains("Scene files are not downloaded"), "the error is worded by the reason: Scene files are not downloaded");
+		check(text.contains("Download button"), "and says what to do about it");
+		check(!text.contains("@rt {"), "the raw event line is not shown");
+		check(!text.contains("Scene contains no objects"), "the CPU no longer calls a missing file an empty scene");
+		shot("renderfail");
+		log(ok ? "RESULT: OK" : "RESULT: FAIL");
+		QApplication::exit(ok ? 0 : 1);
+	});
+	poll->start(300);
+}
+
 // RT_GUI_SELFTEST=queue: two real tiny CPU renders through the Render button. The second is queued behind the first; both rows must end Done with a time, stay
 // in the table as a record, and Clear Finished must then empty it. Needs ray_tracer next to the GUI.
 void MainWindow::runQueueSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {

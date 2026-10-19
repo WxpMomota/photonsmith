@@ -10,6 +10,7 @@
 // The canonical code list and its baseline text. Header-only and Qt-free
 // (<string>/<map>), so the GUI can share it rather than restate it.
 #include "../src/TheRestOfYourLife/error_codes.h"
+#include "../src/shared/render_events.h"
 
 // ============================================================================
 // Qt GUI Error Handler
@@ -221,6 +222,32 @@ inline QString getErrorMessage(int errorCode, bool useMetal = false) {
 // translated, a literal comparison would silently stop matching.
 inline QString genericHint() {
 	return QCoreApplication::translate("ErrorHandler", "Check the Log Output tab for detailed error information.");
+}
+
+// The words for a renderer error event (render_events.h): its `reason` says more than the exit code does (a scene file that was not downloaded and a scene that
+// was never ported are different problems with one code between them). False for a reason this GUI has no text for: the caller keeps the code's text.
+struct ReasonText {
+	QString title, message, hint;
+};
+inline bool textForReason(const render_events::Event &event, ReasonText &out) {
+	const QString reason = QString::fromStdString(event.get("reason"));
+	const auto field = [&event](const char *key) { return QString::fromStdString(event.get(key)); };
+	if (reason == QLatin1String("scene-file-missing")) {
+		const int count = field("missing").toInt();
+		out.title = QCoreApplication::translate("ErrorHandler", "Scene files are not downloaded");
+		out.message = count > 1
+			? QCoreApplication::translate("ErrorHandler", "%1 files of this scene are not on this computer yet. The first is: %2").arg(count).arg(field("file"))
+			: QCoreApplication::translate("ErrorHandler", "A file of this scene is not on this computer yet: %1").arg(field("file"));
+		out.hint = QCoreApplication::translate("ErrorHandler", "Select the scene in the Settings tab and click the Download button under its description, then render again.\nThe files go in: %1").arg(field("folder"));
+		return true;
+	}
+	if (reason == QLatin1String("scene-load-failed")) {
+		out.title = QCoreApplication::translate("ErrorHandler", "The scene file could not be loaded");
+		out.message = QCoreApplication::translate("ErrorHandler", "The scene file could not be loaded: %1").arg(field("detail"));
+		out.hint = QCoreApplication::translate("ErrorHandler", "If the scene came from a download, download it again; if it is your own file, check it for mistakes (the Log Output tab has the loader's own line).");
+		return true;
+	}
+	return false;
 }
 
 // Get troubleshooting hint. useMetal: which GPU backend the failed render

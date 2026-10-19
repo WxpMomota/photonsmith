@@ -8,6 +8,7 @@
 #include "../../cpu_renderer/cpu_interface.h"   // cpu_scene_pbrt_path_by_id
 #include "../../src/TheRestOfYourLife/error_codes.h"
 #include "../../src/shared/tone_map.h"
+#include "../../src/shared/render_events.h"
 #include "../../src/shared/exr_writer.h"
 #include <iostream>
 #include <fstream>
@@ -47,21 +48,26 @@ static std::string uploadKeyFor(const char* scene_id) {
 	return key;
 }
 
-// build_scene() fails for a scene id that was never ported AND for a scene read from a pbrt file that is not on disk (a downloadable scene, such as one of the
-// Bitterli scenes, before "Download missing files"). The second is not "use CPU mode": the CPU cannot render it either. Says which it is and returns the code.
-static int reportBuildFailure(const char* scene_id, bool print) {
-	const char* report = scene_id ? cpu_scene_missing_assets_by_id(scene_id) : nullptr;
-	if (report && *report) {
-		// folder TAB missing count TAB referenced count TAB first missing file TAB every missing path
-		std::vector<std::string> fields;
-		std::stringstream parts{std::string(report)};
-		for (std::string field; std::getline(parts, field, '\t');) fields.push_back(field);
+// build_scene() fails for several unrelated reasons (SceneData::failure says which): a scene id that was never ported, a pbrt scene whose file is not on disk
+// (a downloadable scene before "Download missing files"), a file that is there but cannot be loaded. Only the first is "use CPU mode": the CPU cannot render the
+// others either. Returns the error code that fits and, when `print`, tells the GUI exactly what happened (render_events.h) so it can say so in its own words.
+static int reportBuildFailure(const char* scene_id, const SceneBuildFailure& failure, bool print) {
+	const std::string id = scene_id ? scene_id : "";
+	if (failure.kind == SceneBuildFailureKind::FileMissing || failure.kind == SceneBuildFailureKind::LoadFailed) {
+		// A loader failure over a file the scene names that is not there (a mesh, a picture) is a missing download too.
+		if (!pbrt_asset_check::check(failure.file).missing.empty()) {
+			if (print) render_events::emitSceneFilesMissing(ERR_FILE_NOT_FOUND, id, failure.file);
+			return ERR_FILE_NOT_FOUND;
+		}
 		if (print)
-			std::cerr << "[OptiX] Scene files not found: " << (fields.size() > 3 ? fields[3] : std::string("?"))
-			          << ". Use \"Download missing files\" for the scene in the Settings tab, or put the files in " << (fields.empty() ? std::string("?") : fields[0]) << ".\n";
-		return ERR_FILE_NOT_FOUND;
+			render_events::emitError(ERR_FILE_READ_FAILED, "scene-load-failed", "The scene file could not be loaded: " + failure.detail,
+			                         {{"scene", id}, {"file", failure.file}, {"detail", failure.detail}});
+		return ERR_FILE_READ_FAILED;
 	}
-	if (print) std::cerr << "[OptiX] Scene not supported on GPU\n";
+	if (print) {
+		std::cerr << "[OptiX] Scene not supported on GPU\n";
+		render_events::emitError(ERR_GPU_UNSUPPORTED_SCENE, "scene-not-supported-on-gpu", "This scene has no GPU implementation. Use CPU mode for it.", {{"scene", id}});
+	}
 	return ERR_GPU_UNSUPPORTED_SCENE;
 }
 
@@ -208,7 +214,7 @@ static bool prepareSceneAndCamera(
 		// CPU mode" message (error_handler.h); the old ERR_GPU_SCENE_BUILD_FAILED
 		// here was misleading - it reads as a genuine build/geometry failure,
 		// not "this scene was never ported to GPU."
-		errorCode = reportBuildFailure(scene_id, verbose);
+		errorCode = reportBuildFailure(scene_id, scene.failure, verbose);
 		return false;
 	}
 
@@ -1268,7 +1274,7 @@ extern "C" int optix_render_main_sppm(
 		GpuCameraParams cameraExtra{};
 
 		if (!build_scene(scene_id, image_width, image_height, scene, camera_params, cam_x, cam_y, cam_z, &cameraExtra, force_camera_override != 0)) {
-			return reportBuildFailure(scene_id, true);
+			return reportBuildFailure(scene_id, scene.failure, true);
 		}
 
 		// Film "cropwindow"/"pixelbounds" - build_scene() (for a pbrt-loaded

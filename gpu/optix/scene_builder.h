@@ -6,6 +6,20 @@
 #include "optix_types.h"
 #include <vector>
 
+// Why build_scene() returned false (SceneData::failure): several unrelated causes used to look the same to the caller, which told the user "Scene not
+// supported on GPU (use CPU mode)" for a scene file that was simply not downloaded.
+enum class SceneBuildFailureKind {
+	None,
+	UnknownScene,   // the id names no scene this backend can build
+	FileMissing,    // a pbrt scene whose file is not on disk
+	LoadFailed,     // the file is there but could not be loaded or built (`detail` says why)
+};
+struct SceneBuildFailure {
+	SceneBuildFailureKind kind = SceneBuildFailureKind::None;
+	std::string file;     // the scene file, for FileMissing and LoadFailed
+	std::string detail;   // the loader's sentence, for LoadFailed
+};
+
 // Scene container
 struct SceneData {
 	// Lamps (area-light shapes) whose own material the CPU reflects but this builder cannot: anything but a flat diffuse reflectance (a textured diffuse, coated,
@@ -159,6 +173,9 @@ struct SceneData {
 	// enforced contract build_scene() itself checks - simply left false
 	// (default) is always correct, just potentially slower.
 	bool skipExpensiveGeometryLoad = false;
+
+	// Set by build_scene() when it returns false (see SceneBuildFailure); None otherwise.
+	SceneBuildFailure failure;
 };
 
 // Build a scene and return geometry + camera

@@ -199,17 +199,17 @@
 <context>
     <name>DiagnosticsRunner</name>
     <message>
-        <location filename="../mainwindow.cpp" line="740"/>
+        <location filename="../mainwindow.cpp" line="764"/>
         <source>Failed to start ray_tracer.exe: %1</source>
         <translation>ray_tracer.exe を起動できませんでした: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="750"/>
+        <location filename="../mainwindow.cpp" line="774"/>
         <source>Diagnostics process crashed (exit code %1)</source>
         <translation>診断プロセスがクラッシュしました（終了コード %1）</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="752"/>
+        <location filename="../mainwindow.cpp" line="776"/>
         <source>Diagnostics process exited with code %1:
 %2</source>
         <translation>診断プロセスがコード %1 で終了しました:
@@ -257,366 +257,403 @@
 <context>
     <name>ErrorHandler</name>
     <message>
-        <location filename="../error_handler.h" line="95"/>
-        <location filename="../error_handler.h" line="321"/>
+        <location filename="../error_handler.h" line="96"/>
+        <location filename="../error_handler.h" line="348"/>
         <source>Success</source>
         <translation>成功</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="98"/>
+        <location filename="../error_handler.h" line="99"/>
         <source>Unknown Error</source>
         <translation>不明なエラー</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="99"/>
+        <location filename="../error_handler.h" line="100"/>
         <source>Invalid Arguments</source>
         <translation>無効な引数</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="100"/>
+        <location filename="../error_handler.h" line="101"/>
         <source>File Not Found</source>
         <translation>ファイルが見つかりません</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="101"/>
+        <location filename="../error_handler.h" line="102"/>
         <source>File Read Failed</source>
         <translation>ファイルの読み込みに失敗しました</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="102"/>
+        <location filename="../error_handler.h" line="103"/>
         <source>File Write Failed</source>
         <translation>ファイルの書き込みに失敗しました</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="110"/>
+        <location filename="../error_handler.h" line="111"/>
         <source>File Copy Failed</source>
         <translation>ファイルのコピーに失敗しました</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="111"/>
+        <location filename="../error_handler.h" line="112"/>
         <source>Directory Creation Failed</source>
         <translation>ディレクトリの作成に失敗しました</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="112"/>
+        <location filename="../error_handler.h" line="113"/>
         <source>Invalid Image Dimensions</source>
         <translation>無効な画像サイズ</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="113"/>
+        <location filename="../error_handler.h" line="114"/>
         <source>Invalid Sample Count</source>
         <translation>無効なサンプル数</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="114"/>
+        <location filename="../error_handler.h" line="115"/>
         <source>Invalid Ray Depth</source>
         <translation>無効なレイの深さ</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="115"/>
+        <location filename="../error_handler.h" line="116"/>
         <source>Invalid Scene ID</source>
         <translation>無効なシーン ID</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="116"/>
+        <location filename="../error_handler.h" line="117"/>
         <source>Invalid Camera Position</source>
         <translation>無効なカメラ位置</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="117"/>
+        <location filename="../error_handler.h" line="118"/>
         <source>Invalid Output Path</source>
         <translation>無効な出力パス</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="118"/>
+        <location filename="../error_handler.h" line="119"/>
         <source>Video Assembly Failed</source>
         <translation>動画の結合に失敗しました</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="121"/>
+        <location filename="../error_handler.h" line="122"/>
         <source>Scene Build Failed (CPU)</source>
         <translation>シーンの構築に失敗しました（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="122"/>
+        <location filename="../error_handler.h" line="123"/>
         <source>Scene is Empty (CPU)</source>
         <translation>シーンが空です（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="123"/>
+        <location filename="../error_handler.h" line="124"/>
         <source>Camera Initialization Failed (CPU)</source>
         <translation>カメラの初期化に失敗しました（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="124"/>
+        <location filename="../error_handler.h" line="125"/>
         <source>Rendering Failed (CPU)</source>
         <translation>レンダリングに失敗しました（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="125"/>
+        <location filename="../error_handler.h" line="126"/>
         <source>Thread Error (CPU)</source>
         <translation>スレッドエラー（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="126"/>
+        <location filename="../error_handler.h" line="127"/>
         <source>Out of Memory (CPU)</source>
         <translation>メモリ不足（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="127"/>
+        <location filename="../error_handler.h" line="128"/>
         <source>BVH Build Failed (CPU)</source>
         <translation>BVH の構築に失敗しました（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="128"/>
+        <location filename="../error_handler.h" line="129"/>
         <source>Texture Load Failed (CPU)</source>
         <translation>テクスチャの読み込みに失敗しました（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="129"/>
+        <location filename="../error_handler.h" line="130"/>
         <source>No Lights in Scene (CPU)</source>
         <translation>シーンにライトがありません（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="130"/>
+        <location filename="../error_handler.h" line="131"/>
         <source>Invalid Material (CPU)</source>
         <translation>無効なマテリアル（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="133"/>
+        <location filename="../error_handler.h" line="134"/>
         <source>No GPU Found</source>
         <translation>GPU が見つかりません</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="134"/>
+        <location filename="../error_handler.h" line="135"/>
         <source>GPU Initialization Failed</source>
         <translation>GPU の初期化に失敗しました</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="135"/>
-        <location filename="../error_handler.h" line="141"/>
+        <location filename="../error_handler.h" line="136"/>
+        <location filename="../error_handler.h" line="142"/>
         <source>GPU Out of Memory</source>
         <translation>GPU メモリ不足</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="136"/>
+        <location filename="../error_handler.h" line="137"/>
         <source>GPU Memory Copy Failed</source>
         <translation>GPU メモリのコピーに失敗しました</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="137"/>
+        <location filename="../error_handler.h" line="138"/>
         <source>GPU Kernel Launch Failed</source>
         <translation>GPU カーネルの起動に失敗しました</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="138"/>
+        <location filename="../error_handler.h" line="139"/>
         <source>GPU Kernel Execution Failed</source>
         <translation>GPU カーネルの実行に失敗しました</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="139"/>
+        <location filename="../error_handler.h" line="140"/>
         <source>GPU Scene Serialization Failed</source>
         <translation>GPU 用のシーンのシリアライズに失敗しました</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="140"/>
+        <location filename="../error_handler.h" line="141"/>
         <source>GPU Synchronization Failed</source>
         <translation>GPU の同期に失敗しました</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="142"/>
+        <location filename="../error_handler.h" line="143"/>
         <source>Invalid GPU Configuration</source>
         <translation>無効な GPU 設定</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="143"/>
+        <location filename="../error_handler.h" line="144"/>
         <source>GPU Texture Binding Failed</source>
         <translation>GPU でのテクスチャのバインドに失敗しました</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="144"/>
+        <location filename="../error_handler.h" line="145"/>
         <source>Scene Not Supported on GPU</source>
         <translation>このシーンは GPU に対応していません</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="145"/>
+        <location filename="../error_handler.h" line="146"/>
         <source>Scene Build Failed (GPU)</source>
         <translation>シーンの構築に失敗しました（GPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="146"/>
+        <location filename="../error_handler.h" line="147"/>
         <source>Rendering Failed (GPU)</source>
         <translation>レンダリングに失敗しました（GPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="147"/>
+        <location filename="../error_handler.h" line="148"/>
         <source>Exception During Rendering (GPU)</source>
         <translation>レンダリング中に例外が発生しました（GPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="148"/>
+        <location filename="../error_handler.h" line="149"/>
         <source>Unknown Error (GPU)</source>
         <translation>不明なエラー（GPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="151"/>
+        <location filename="../error_handler.h" line="152"/>
         <source>Cancelled by User</source>
         <translation>ユーザーによりキャンセルされました</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="157"/>
+        <location filename="../error_handler.h" line="158"/>
         <source>Error Code %1</source>
         <translation>エラーコード %1</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="169"/>
+        <location filename="../error_handler.h" line="170"/>
         <source>Scene ID must be a valid scene identifier (e.g. &quot;A1&quot;). Check the scene selector.</source>
         <translation>シーン ID は有効なシーン識別子（例: &quot;A1&quot;）である必要があります。シーン選択を確認してください。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="171"/>
+        <location filename="../error_handler.h" line="172"/>
         <source>No usable Metal GPU was found on this Mac.</source>
         <translation>この Mac で使用できる Metal GPU が見つかりませんでした。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="172"/>
+        <location filename="../error_handler.h" line="173"/>
         <source>No CUDA-capable GPU was detected.</source>
         <translation>CUDA 対応の GPU が検出されませんでした。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="176"/>
+        <location filename="../error_handler.h" line="177"/>
         <source>Render completed successfully.</source>
         <translation>レンダリングが正常に完了しました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="177"/>
+        <location filename="../error_handler.h" line="178"/>
         <source>An unknown error occurred during rendering.</source>
         <translation>レンダリング中に不明なエラーが発生しました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="178"/>
+        <location filename="../error_handler.h" line="179"/>
         <source>Invalid command-line arguments were provided to the renderer.</source>
         <translation>レンダラーに無効なコマンドライン引数が渡されました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="179"/>
+        <location filename="../error_handler.h" line="180"/>
         <source>A required file could not be found.</source>
         <translation>必要なファイルが見つかりませんでした。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="180"/>
+        <location filename="../error_handler.h" line="181"/>
         <source>Failed to write the output image file.</source>
         <translation>出力画像ファイルの書き込みに失敗しました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="181"/>
+        <location filename="../error_handler.h" line="182"/>
         <source>Image dimensions must be positive integers (recommended: 400-1920).</source>
         <translation>画像サイズは正の整数である必要があります（推奨: 400〜1920）。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="182"/>
+        <location filename="../error_handler.h" line="183"/>
         <source>Samples per pixel must be greater than 0 (recommended: 10-500).</source>
         <translation>ピクセルあたりのサンプル数は 0 より大きい必要があります（推奨: 10〜500）。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="183"/>
+        <location filename="../error_handler.h" line="184"/>
         <source>Maximum ray depth must be greater than 0 (recommended: 10-100).</source>
         <translation>最大レイ深度は 0 より大きい必要があります（推奨: 10〜100）。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="184"/>
+        <location filename="../error_handler.h" line="185"/>
         <source>Frames rendered successfully, but assembling them into a video with ffmpeg failed.</source>
         <translation>フレームのレンダリングは成功しましたが、ffmpeg で動画に結合する処理に失敗しました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="185"/>
+        <location filename="../error_handler.h" line="186"/>
         <source>Failed to construct the scene geometry.</source>
         <translation>シーンのジオメトリの構築に失敗しました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="186"/>
+        <location filename="../error_handler.h" line="187"/>
         <source>The scene contains no objects to render.</source>
         <translation>レンダリングするオブジェクトがシーンにありません。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="187"/>
+        <location filename="../error_handler.h" line="188"/>
         <source>An error occurred while rendering the image.</source>
         <translation>画像のレンダリング中にエラーが発生しました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="188"/>
+        <location filename="../error_handler.h" line="189"/>
         <source>The system ran out of memory during rendering.</source>
         <translation>レンダリング中にシステムのメモリが不足しました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="189"/>
+        <location filename="../error_handler.h" line="190"/>
         <source>Failed to load texture file (e.g., earthmap.jpg for Earth scene).</source>
         <translation>テクスチャファイルの読み込みに失敗しました（例: 地球シーンの earthmap.jpg）。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="193"/>
+        <location filename="../error_handler.h" line="194"/>
         <source>The GPU ran out of memory.</source>
         <translation>GPU のメモリが不足しました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="194"/>
+        <location filename="../error_handler.h" line="195"/>
         <source>Failed to launch GPU rendering kernel.</source>
         <translation>GPU レンダリングカーネルの起動に失敗しました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="195"/>
+        <location filename="../error_handler.h" line="196"/>
         <source>GPU memory allocation failed.</source>
         <translation>GPU メモリの確保に失敗しました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="196"/>
+        <location filename="../error_handler.h" line="197"/>
         <source>This scene is not supported on GPU. Please use CPU mode.</source>
         <translation>このシーンは GPU に対応していません。CPU モードを使用してください。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="197"/>
+        <location filename="../error_handler.h" line="198"/>
         <source>Failed to construct the scene geometry on GPU.</source>
         <translation>GPU でのシーンのジオメトリの構築に失敗しました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="198"/>
+        <location filename="../error_handler.h" line="199"/>
         <source>An error occurred while rendering the image on GPU.</source>
         <translation>GPU での画像のレンダリング中にエラーが発生しました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="199"/>
+        <location filename="../error_handler.h" line="200"/>
         <source>An exception was thrown while rendering on GPU.</source>
         <translation>GPU でのレンダリング中に例外がスローされました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="200"/>
+        <location filename="../error_handler.h" line="201"/>
         <source>An unknown error occurred while rendering on GPU.</source>
         <translation>GPU でのレンダリング中に不明なエラーが発生しました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="201"/>
+        <location filename="../error_handler.h" line="202"/>
         <source>The render was cancelled by the user.</source>
         <translation>レンダリングはユーザーによってキャンセルされました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="215"/>
+        <location filename="../error_handler.h" line="216"/>
         <source>An error occurred with code %1.</source>
         <translation>コード %1 のエラーが発生しました。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="223"/>
+        <location filename="../error_handler.h" line="224"/>
         <source>Check the Log Output tab for detailed error information.</source>
         <translation>エラーの詳細はログ出力タブを確認してください。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="236"/>
+        <location filename="../error_handler.h" line="237"/>
+        <source>Scene files are not downloaded</source>
+        <translation>シーンのファイルがダウンロードされていません</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="239"/>
+        <source>%1 files of this scene are not on this computer yet. The first is: %2</source>
+        <translation>このシーンのファイル %1 個がまだこのコンピューターにありません。最初のファイル: %2</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="240"/>
+        <source>A file of this scene is not on this computer yet: %1</source>
+        <translation>このシーンのファイルがまだこのコンピューターにありません: %1</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="241"/>
+        <source>Select the scene in the Settings tab and click the Download button under its description, then render again.
+The files go in: %1</source>
+        <translation>設定タブでシーンを選び、説明の下のダウンロードボタンを押してから、もう一度レンダリングしてください。
+ファイルの保存先: %1</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="245"/>
+        <source>The scene file could not be loaded</source>
+        <translation>シーンファイルを読み込めませんでした</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="246"/>
+        <source>The scene file could not be loaded: %1</source>
+        <translation>シーンファイルを読み込めませんでした: %1</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="247"/>
+        <source>If the scene came from a download, download it again; if it is your own file, check it for mistakes (the Log Output tab has the loader&apos;s own line).</source>
+        <translation>ダウンロードしたシーンなら、もう一度ダウンロードしてください。自作のファイルなら、間違いがないか確認してください(ログタブにローダーの出力行があります)。</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="263"/>
         <source>• Check the Scene dropdown in the Settings tab for a valid scene id
 • Use CPU renderer for scenes that are not GPU-supported</source>
         <translation>• 設定タブのシーンのドロップダウンで有効なシーン ID が選ばれているか確認してください
 • GPU が対応していないシーンには CPU レンダラーを使用してください</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="240"/>
+        <location filename="../error_handler.h" line="267"/>
         <source>• GPU supports scenes: %1
 • Switch to CPU mode for all other scenes
 • CPU mode supports all %2 scenes</source>
@@ -625,7 +662,7 @@
 • CPU モードは %2 個のシーンすべてに対応しています</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="247"/>
+        <location filename="../error_handler.h" line="274"/>
         <source>• No usable Metal GPU found on this Mac
 • Switch to CPU mode in the renderer settings
 • CPU mode works on all systems</source>
@@ -634,7 +671,7 @@
 • CPU モードはすべてのシステムで動作します</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="250"/>
+        <location filename="../error_handler.h" line="277"/>
         <source>• No CUDA-capable GPU found
 • Switch to CPU mode in the renderer settings
 • CPU mode works on all systems</source>
@@ -643,7 +680,7 @@
 • CPU モードはすべてのシステムで動作します</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="256"/>
+        <location filename="../error_handler.h" line="283"/>
         <source>• Check that the output directory exists and is writable
 • Make sure you have enough disk space
 • Try closing any programs that might be using the output file</source>
@@ -652,14 +689,14 @@
 • 出力ファイルを使用している可能性のあるプログラムを閉じてみてください</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="264"/>
+        <location filename="../error_handler.h" line="291"/>
         <source>
 • Windows Security&apos;s &quot;Controlled folder access&quot; blocks apps it doesn&apos;t recognize from writing to protected folders (Pictures, Documents, Desktop). Either choose a different Output Path, or allow RayTracerGUI.exe and ray_tracer.exe under Virus &amp; threat protection &gt; Ransomware protection &gt; Controlled folder access &gt; Allow an app through</source>
         <translation>
 • Windows セキュリティの「コントロールされたフォルダーアクセス」は、認識されないアプリが保護されたフォルダー（ピクチャ、ドキュメント、デスクトップ）に書き込むのをブロックします。別の出力パスを選ぶか、ウイルスと脅威の防止 &gt; ランサムウェアの防止 &gt; コントロールされたフォルダーアクセス &gt; アプリによるコントロールされたフォルダーアクセスの許可 で RayTracerGUI.exe と ray_tracer.exe を許可してください</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="274"/>
+        <location filename="../error_handler.h" line="301"/>
         <source>• Install ffmpeg from https://ffmpeg.org/download.html and add it to your PATH
 • Check the render log above for the exact ffmpeg command and error output
 • Rendered frames are kept in output/frames/ - you can assemble the video manually</source>
@@ -668,14 +705,14 @@
 • レンダリング済みのフレームは output/frames/ に残っているので、動画は手動で結合できます</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="278"/>
+        <location filename="../error_handler.h" line="305"/>
         <source>• Try common resolutions: 800×800, 1920×1080
 • Width and height must be positive numbers</source>
         <translation>• 一般的な解像度を試してください: 800×800、1920×1080
 • 幅と高さは正の数にする必要があります</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="281"/>
+        <location filename="../error_handler.h" line="308"/>
         <source>• For quick previews, use 10-50 samples
 • For final renders, use 100-500 samples
 • More samples = better quality but slower</source>
@@ -684,14 +721,14 @@
 • サンプル数が多いほど高品質になりますが、遅くなります</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="285"/>
+        <location filename="../error_handler.h" line="312"/>
         <source>• Some scenes require texture files (e.g., earthmap.jpg)
 • Make sure all required files are in the correct location</source>
         <translation>• 一部のシーンにはテクスチャファイルが必要です（例: earthmap.jpg）
 • 必要なファイルがすべて正しい場所にあることを確認してください</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="288"/>
+        <location filename="../error_handler.h" line="315"/>
         <source>• Try reducing image resolution (e.g., 800×800 instead of 1920×1080)
 • Try reducing samples per pixel (e.g., 50 instead of 500)
 • Close other memory-intensive applications</source>
@@ -700,14 +737,14 @@
 • メモリを多く使う他のアプリケーションを閉じてください</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="292"/>
+        <location filename="../error_handler.h" line="319"/>
         <source>• For the Earth scene, make sure earthmap.jpg is in the correct folder
 • Check that texture files are not corrupted</source>
         <translation>• 地球シーンでは、earthmap.jpg が正しいフォルダーにあることを確認してください
 • テクスチャファイルが破損していないか確認してください</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="299"/>
+        <location filename="../error_handler.h" line="326"/>
         <source>• Try reducing image resolution
 • Try reducing samples per pixel
 • Switch to CPU mode if GPU memory is limited</source>
@@ -716,7 +753,7 @@
 • GPU メモリが限られている場合は CPU モードに切り替えてください</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="303"/>
+        <location filename="../error_handler.h" line="330"/>
         <source>• GPU ran out of memory
 • Try smaller resolution (e.g., 800×800)
 • Try fewer samples (e.g., 50)
@@ -727,27 +764,27 @@
 • 大きなシーンでは CPU モードに切り替えてください</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="322"/>
+        <location filename="../error_handler.h" line="349"/>
         <source>General</source>
         <translation>一般</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="323"/>
+        <location filename="../error_handler.h" line="350"/>
         <source>CPU Renderer</source>
         <translation>CPU レンダラー</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="324"/>
+        <location filename="../error_handler.h" line="351"/>
         <source>GPU Renderer</source>
         <translation>GPU レンダラー</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="325"/>
+        <location filename="../error_handler.h" line="352"/>
         <source>User Action</source>
         <translation>ユーザー操作</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="326"/>
+        <location filename="../error_handler.h" line="353"/>
         <source>Unknown</source>
         <translation>不明</translation>
     </message>
@@ -938,60 +975,60 @@
         <translation>言語(&amp;L)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="930"/>
+        <location filename="../mainwindow.cpp" line="954"/>
         <source>Ray Tracer - Path Tracing Renderer</source>
         <translation>Ray Tracer - パストレーシングレンダラー</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1037"/>
+        <location filename="../mainwindow.cpp" line="1061"/>
         <source>Ray Tracer</source>
         <translation>Ray Tracer</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1298"/>
+        <location filename="../mainwindow.cpp" line="1322"/>
         <location filename="../mainwindow_slots.cpp" line="342"/>
         <source>START &amp;RENDER</source>
         <translation>レンダリング開始(&amp;R)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1307"/>
+        <location filename="../mainwindow.cpp" line="1331"/>
         <source>Render the selected scene with the current settings
 (queues behind it instead if a render is already running)</source>
         <translation>現在の設定で選択したシーンをレンダリングします
 (すでにレンダリング中の場合はキューに追加されます)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1318"/>
+        <location filename="../mainwindow.cpp" line="1342"/>
         <source>S&amp;TOP RENDER</source>
         <translation>レンダリング停止(&amp;T)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1324"/>
+        <location filename="../mainwindow.cpp" line="1348"/>
         <location filename="../mainwindow_actions.cpp" line="71"/>
         <source>Stop the running render and discard its output</source>
         <translation>実行中のレンダリングを停止し、出力を破棄します</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1337"/>
+        <location filename="../mainwindow.cpp" line="1361"/>
         <location filename="../mainwindow_queue.cpp" line="348"/>
         <location filename="../mainwindow_slots.cpp" line="120"/>
         <source>&amp;PAUSE RENDER</source>
         <translation>レンダリングを一時停止(&amp;P)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1342"/>
+        <location filename="../mainwindow.cpp" line="1366"/>
         <location filename="../mainwindow_actions.cpp" line="80"/>
         <location filename="../mainwindow_slots.cpp" line="122"/>
         <source>Pause the running render in place - Resume continues from the exact same pixels</source>
         <translation>実行中のレンダリングをその場で一時停止します - 「再開」は全く同じピクセルから続行します</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1351"/>
+        <location filename="../mainwindow.cpp" line="1375"/>
         <source>ABANDON &amp;&amp; &amp;NEXT</source>
         <translation>破棄して次へ進む(&amp;N)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1357"/>
+        <location filename="../mainwindow.cpp" line="1381"/>
         <location filename="../mainwindow_actions.cpp" line="85"/>
         <source>Discard the running render&apos;s output and immediately start the next queued job</source>
         <translation>実行中のレンダリングの出力を破棄し、キュー内の次のジョブをただちに開始します</translation>
@@ -5244,17 +5281,17 @@ The scenes in the other categories are not touched. You can get them back from %
         </translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1014"/>
+        <location filename="../mainwindow.cpp" line="1038"/>
         <source>Preparing the GPU renderer for this Mac (first run only, about a minute or two)...</source>
         <translation>このMac用にGPUレンダラーを準備しています(初回のみ、1〜2分ほどかかります)...</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1016"/>
+        <location filename="../mainwindow.cpp" line="1040"/>
         <source>The GPU renderer is ready.</source>
         <translation>GPUレンダラーの準備ができました。</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1016"/>
+        <location filename="../mainwindow.cpp" line="1040"/>
         <source>The GPU renderer could not be prepared ahead of time; the first GPU render will build it.</source>
         <translation>GPUレンダラーを事前に準備できませんでした。最初のGPUレンダリングで準備されます。</translation>
     </message>
@@ -6655,27 +6692,27 @@ If the program keeps stopping at start, choose Start fresh: it resets the window
 <context>
     <name>RenderController</name>
     <message>
-        <location filename="../mainwindow.cpp" line="557"/>
+        <location filename="../mainwindow.cpp" line="572"/>
         <source>Failed to start renderer: %1</source>
         <translation>レンダラーを起動できませんでした: %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="638"/>
+        <location filename="../mainwindow.cpp" line="653"/>
         <source>Render completed successfully!</source>
         <translation>レンダリングが正常に完了しました！</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="675"/>
+        <location filename="../mainwindow.cpp" line="699"/>
         <source>&lt;br&gt;&lt;br&gt;&lt;b&gt;Troubleshooting:&lt;/b&gt;&lt;br&gt;%1</source>
         <translation>&lt;br&gt;&lt;br&gt;&lt;b&gt;トラブルシューティング:&lt;/b&gt;&lt;br&gt;%1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="677"/>
+        <location filename="../mainwindow.cpp" line="701"/>
         <source>&lt;br&gt;&lt;br&gt;&lt;small&gt;Error Code: %1 | Category: %2&lt;/small&gt;</source>
         <translation>&lt;br&gt;&lt;br&gt;&lt;small&gt;エラーコード: %1 | カテゴリ: %2&lt;/small&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="679"/>
+        <location filename="../mainwindow.cpp" line="703"/>
         <source>
 
 Output:

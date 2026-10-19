@@ -17,6 +17,7 @@
 // than trimming to each class's exact minimum - over-including a Qt
 // header is harmless, and this avoids re-deriving per-class minimums by
 // hand only to get one wrong.
+#include "../src/shared/render_events.h"
 #include <QMainWindow>
 #include <QTabWidget>
 #include <QComboBox>
@@ -293,6 +294,9 @@ private:
 	// each as a log message and feeding it to parseProgressLine().
 	void handleOutputChunk(const QString &chunk);
 	void parseProgressLine(const QString &line);
+	// An "@rt {...}" line (render_events.h) is read, not shown: an error event is kept for onProcessFinished(), which words the failure by its reason, and
+	// its English message goes to the log. True when `line` was an event.
+	bool handleEventLine(const QString &line);
 	void finish(bool success, const QString &message, const QString &outputPath);
 
 	// Render configuration
@@ -357,6 +361,8 @@ private:
 
 	QElapsedTimer m_elapsed;   // Wall-clock timer for the render
 	QString m_lineBuffer;      // Incomplete trailing line awaiting the rest of its chunk
+	render_events::Event m_errorEvent;   // the renderer's own account of why it failed, when it gave one
+	bool m_hasErrorEvent = false;
 	int m_lastProgress = 0;    // Last emitted percentage (progress only moves forward)
 
 	// Video generation parameters

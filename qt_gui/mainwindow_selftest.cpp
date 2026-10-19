@@ -135,6 +135,7 @@ void MainWindow::runSelfTest(const QString &mode, const QString &outPrefix) {
 	if (mode == "tour") { runTourSelfTest(log, shot); return; }
 	if (mode == "builderui") { runBuilderUiSelfTest(log, shot); return; }
 	if (mode == "queue") { runQueueSelfTest(log, shot); return; }
+	if (mode == "renderfail") { runRenderFailSelfTest(log, shot); return; }
 	if (mode == "installphoto") { runInstallPhotoSelfTest(log, shot); return; }
 
 	if (mode == "diagnostics") { runDiagnosticsSelfTest(log, shot); return; }

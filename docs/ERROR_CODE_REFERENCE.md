@@ -379,6 +379,24 @@ scene-specific exception, not a general GPU limitation (see
 
 ---
 
+## Error events (`@rt` lines)
+
+An exit code says *that* a render failed, not always *why*: several causes can share one code. So the renderer also prints, just before it gives up, one machine-readable line on stdout:
+
+```
+@rt {"type":"error","code":"3","reason":"scene-file-missing","message":"The scene's files are not on this computer: pbrt_scenes/bitterli/spaceship/scene-v4.pbrt. Use \"Download missing files\" ...","scene":"H35","file":"pbrt_scenes/bitterli/spaceship/scene-v4.pbrt","folder":"C:\...\pbrt_scenes\bitterli\spaceship"}
+```
+
+The line is `@rt ` and a flat JSON object whose values are all strings (`src/shared/render_events.h` writes and reads it; `tests/unit/render_events_tests.cpp`). `type` says what the event is, `message` is always an English sentence (a program that does not know the event, or a person reading the log, uses it as it is), and the rest are the parameters of `reason`. The GUI keeps the event, words the failure by its `reason` in the user's language (`ErrorHandler::textForReason`), and does not show the raw line. Older renderers print no events and older GUIs show the line like any other, so the two sides can be updated in any order.
+
+| `reason` | Code | Parameters | Meaning |
+|----------|------|------------|---------|
+| `scene-file-missing` | 3 | `scene`, `file`, `folder`, `missing` (how many) | A scene that needs a download (or an asset it names) is not on disk |
+| `scene-load-failed` | 3 or 4 | `scene`, `file`, `detail` | The file is there but cannot be loaded; `detail` is the loader's sentence |
+| `scene-not-supported-on-gpu` | 211 | `scene` | The scene was never ported to this GPU backend: use CPU mode |
+
+Before this, a missing scene file ended as 211 on the GPU ("use CPU mode", which could not render it either) and as 101 on the CPU ("scene contains no objects"). To add a reason: print it with `render_events::emitError`, give it a case in `ErrorHandler::textForReason` (and its translations), and add a row here.
+
 ## User Action (999)
 
 ### 999 - ERR_USER_CANCELLED

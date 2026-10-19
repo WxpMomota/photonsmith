@@ -22,6 +22,7 @@
 #include "pbrt_cpu_builder.h"
 #include "../shared/pbrt_discover.h"
 #include "../shared/pbrt_load.h"
+#include "../shared/render_events.h"
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -295,7 +296,7 @@ namespace pbrt_scene_registry {
                     pbrt_load::loadFile(path, accelerator_override::state());
                 if (!r.ok) {
                     std::cerr << "error: " << r.error << "\n";
-                    if (!r.missingFiles.empty()) state->missingAssetsError = r.error;
+                    if (!r.missingFiles.empty() || pbrt_load::detail::locateFile(path).empty()) state->missingAssetsError = r.error;   // (the scene file itself missing counts: a download not made yet)
                 } else {
                     for (const pbrt_scene::Warning& w : r.scene.warnings)
                         std::cerr << "warning: " << path << ": " << w.message << "\n";
@@ -1251,8 +1252,17 @@ inline const SceneDescriptor* find_scene_by_file_stem(const std::string& stem) {
 // unreadable, returns ERR_FILE_NOT_FOUND so the render stops with a failure
 // instead of producing an empty image and reporting success; otherwise returns SUCCESS. The
 // explanation itself was already printed by the load (see below).
+// Tells the GUI why a scene's files stopped the render (render_events.h): which file is not on disk, or what the loader said when they are all there.
+inline void report_scene_files_error(const SceneDescriptor& scene, const std::string& detail) {
+    const auto found = pbrt_scene_registry::paths().find(scene.id);
+    if (found != pbrt_scene_registry::paths().end() && render_events::emitSceneFilesMissing(ERR_FILE_NOT_FOUND, scene.id, found->second)) return;
+    render_events::emitError(ERR_FILE_NOT_FOUND, "scene-load-failed", detail.empty() ? std::string("The scene's files could not be read.") : detail,
+                             {{"scene", scene.id}, {"detail", detail}});
+}
+
 inline int check_scene_assets(const SceneDescriptor& scene) {
     if (scene.missing_assets_error && !scene.missing_assets_error().empty()) {
+        report_scene_files_error(scene, scene.missing_assets_error());
         // No message printed here: the load itself already reported it (the registry prints "error: ..."
         // when the loader fails), and a second copy only clutters the log.
         return ERR_FILE_NOT_FOUND;
@@ -1262,6 +1272,7 @@ inline int check_scene_assets(const SceneDescriptor& scene) {
         const std::string msg = scene.missing_meshes_error();
         if (!msg.empty()) {
             std::cerr << "error: " << msg << std::endl;
+            report_scene_files_error(scene, msg);
             return ERR_FILE_NOT_FOUND;
         }
     }

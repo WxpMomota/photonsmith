@@ -199,17 +199,17 @@
 <context>
     <name>DiagnosticsRunner</name>
     <message>
-        <location filename="../mainwindow.cpp" line="740"/>
+        <location filename="../mainwindow.cpp" line="764"/>
         <source>Failed to start ray_tracer.exe: %1</source>
         <translation>Impossible de démarrer ray_tracer.exe : %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="750"/>
+        <location filename="../mainwindow.cpp" line="774"/>
         <source>Diagnostics process crashed (exit code %1)</source>
         <translation>Le processus de diagnostic a planté (code de sortie %1)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="752"/>
+        <location filename="../mainwindow.cpp" line="776"/>
         <source>Diagnostics process exited with code %1:
 %2</source>
         <translation>Le processus de diagnostic s&apos;est terminé avec le code %1 :
@@ -257,366 +257,403 @@
 <context>
     <name>ErrorHandler</name>
     <message>
-        <location filename="../error_handler.h" line="95"/>
-        <location filename="../error_handler.h" line="321"/>
+        <location filename="../error_handler.h" line="96"/>
+        <location filename="../error_handler.h" line="348"/>
         <source>Success</source>
         <translation>Succès</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="98"/>
+        <location filename="../error_handler.h" line="99"/>
         <source>Unknown Error</source>
         <translation>Erreur inconnue</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="99"/>
+        <location filename="../error_handler.h" line="100"/>
         <source>Invalid Arguments</source>
         <translation>Arguments non valides</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="100"/>
+        <location filename="../error_handler.h" line="101"/>
         <source>File Not Found</source>
         <translation>Fichier introuvable</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="101"/>
+        <location filename="../error_handler.h" line="102"/>
         <source>File Read Failed</source>
         <translation>Échec de la lecture du fichier</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="102"/>
+        <location filename="../error_handler.h" line="103"/>
         <source>File Write Failed</source>
         <translation>Échec de l&apos;écriture du fichier</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="110"/>
+        <location filename="../error_handler.h" line="111"/>
         <source>File Copy Failed</source>
         <translation>Échec de la copie du fichier</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="111"/>
+        <location filename="../error_handler.h" line="112"/>
         <source>Directory Creation Failed</source>
         <translation>Échec de la création du dossier</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="112"/>
+        <location filename="../error_handler.h" line="113"/>
         <source>Invalid Image Dimensions</source>
         <translation>Dimensions d&apos;image non valides</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="113"/>
+        <location filename="../error_handler.h" line="114"/>
         <source>Invalid Sample Count</source>
         <translation>Nombre d&apos;échantillons non valide</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="114"/>
+        <location filename="../error_handler.h" line="115"/>
         <source>Invalid Ray Depth</source>
         <translation>Profondeur de rayon non valide</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="115"/>
+        <location filename="../error_handler.h" line="116"/>
         <source>Invalid Scene ID</source>
         <translation>ID de scène non valide</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="116"/>
+        <location filename="../error_handler.h" line="117"/>
         <source>Invalid Camera Position</source>
         <translation>Position de caméra non valide</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="117"/>
+        <location filename="../error_handler.h" line="118"/>
         <source>Invalid Output Path</source>
         <translation>Chemin de sortie non valide</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="118"/>
+        <location filename="../error_handler.h" line="119"/>
         <source>Video Assembly Failed</source>
         <translation>Échec de l&apos;assemblage de la vidéo</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="121"/>
+        <location filename="../error_handler.h" line="122"/>
         <source>Scene Build Failed (CPU)</source>
         <translation>Échec de la construction de la scène (CPU)</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="122"/>
+        <location filename="../error_handler.h" line="123"/>
         <source>Scene is Empty (CPU)</source>
         <translation>La scène est vide (CPU)</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="123"/>
+        <location filename="../error_handler.h" line="124"/>
         <source>Camera Initialization Failed (CPU)</source>
         <translation>Échec de l&apos;initialisation de la caméra (CPU)</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="124"/>
+        <location filename="../error_handler.h" line="125"/>
         <source>Rendering Failed (CPU)</source>
         <translation>Échec du rendu (CPU)</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="125"/>
+        <location filename="../error_handler.h" line="126"/>
         <source>Thread Error (CPU)</source>
         <translation>Erreur de thread (CPU)</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="126"/>
+        <location filename="../error_handler.h" line="127"/>
         <source>Out of Memory (CPU)</source>
         <translation>Mémoire insuffisante (CPU)</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="127"/>
+        <location filename="../error_handler.h" line="128"/>
         <source>BVH Build Failed (CPU)</source>
         <translation>Échec de la construction du BVH (CPU)</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="128"/>
+        <location filename="../error_handler.h" line="129"/>
         <source>Texture Load Failed (CPU)</source>
         <translation>Échec du chargement de la texture (CPU)</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="129"/>
+        <location filename="../error_handler.h" line="130"/>
         <source>No Lights in Scene (CPU)</source>
         <translation>Aucune lumière dans la scène (CPU)</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="130"/>
+        <location filename="../error_handler.h" line="131"/>
         <source>Invalid Material (CPU)</source>
         <translation>Matériau non valide (CPU)</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="133"/>
+        <location filename="../error_handler.h" line="134"/>
         <source>No GPU Found</source>
         <translation>Aucun GPU trouvé</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="134"/>
+        <location filename="../error_handler.h" line="135"/>
         <source>GPU Initialization Failed</source>
         <translation>Échec de l&apos;initialisation du GPU</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="135"/>
-        <location filename="../error_handler.h" line="141"/>
+        <location filename="../error_handler.h" line="136"/>
+        <location filename="../error_handler.h" line="142"/>
         <source>GPU Out of Memory</source>
         <translation>Mémoire GPU insuffisante</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="136"/>
+        <location filename="../error_handler.h" line="137"/>
         <source>GPU Memory Copy Failed</source>
         <translation>Échec de la copie de mémoire GPU</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="137"/>
+        <location filename="../error_handler.h" line="138"/>
         <source>GPU Kernel Launch Failed</source>
         <translation>Échec du lancement du kernel GPU</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="138"/>
+        <location filename="../error_handler.h" line="139"/>
         <source>GPU Kernel Execution Failed</source>
         <translation>Échec de l&apos;exécution du kernel GPU</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="139"/>
+        <location filename="../error_handler.h" line="140"/>
         <source>GPU Scene Serialization Failed</source>
         <translation>Échec de la sérialisation de la scène pour le GPU</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="140"/>
+        <location filename="../error_handler.h" line="141"/>
         <source>GPU Synchronization Failed</source>
         <translation>Échec de la synchronisation du GPU</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="142"/>
+        <location filename="../error_handler.h" line="143"/>
         <source>Invalid GPU Configuration</source>
         <translation>Configuration GPU non valide</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="143"/>
+        <location filename="../error_handler.h" line="144"/>
         <source>GPU Texture Binding Failed</source>
         <translation>Échec de la liaison de texture sur le GPU</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="144"/>
+        <location filename="../error_handler.h" line="145"/>
         <source>Scene Not Supported on GPU</source>
         <translation>Scène non prise en charge par le GPU</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="145"/>
+        <location filename="../error_handler.h" line="146"/>
         <source>Scene Build Failed (GPU)</source>
         <translation>Échec de la construction de la scène (GPU)</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="146"/>
+        <location filename="../error_handler.h" line="147"/>
         <source>Rendering Failed (GPU)</source>
         <translation>Échec du rendu (GPU)</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="147"/>
+        <location filename="../error_handler.h" line="148"/>
         <source>Exception During Rendering (GPU)</source>
         <translation>Exception pendant le rendu (GPU)</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="148"/>
+        <location filename="../error_handler.h" line="149"/>
         <source>Unknown Error (GPU)</source>
         <translation>Erreur inconnue (GPU)</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="151"/>
+        <location filename="../error_handler.h" line="152"/>
         <source>Cancelled by User</source>
         <translation>Annulé par l&apos;utilisateur</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="157"/>
+        <location filename="../error_handler.h" line="158"/>
         <source>Error Code %1</source>
         <translation>Code d&apos;erreur %1</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="169"/>
+        <location filename="../error_handler.h" line="170"/>
         <source>Scene ID must be a valid scene identifier (e.g. &quot;A1&quot;). Check the scene selector.</source>
         <translation>L&apos;ID de scène doit être un identifiant de scène valide (p. ex. « A1 »). Vérifiez le sélecteur de scène.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="171"/>
+        <location filename="../error_handler.h" line="172"/>
         <source>No usable Metal GPU was found on this Mac.</source>
         <translation>Aucun GPU Metal utilisable n&apos;a été trouvé sur ce Mac.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="172"/>
+        <location filename="../error_handler.h" line="173"/>
         <source>No CUDA-capable GPU was detected.</source>
         <translation>Aucun GPU compatible CUDA n&apos;a été détecté.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="176"/>
+        <location filename="../error_handler.h" line="177"/>
         <source>Render completed successfully.</source>
         <translation>Rendu terminé avec succès.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="177"/>
+        <location filename="../error_handler.h" line="178"/>
         <source>An unknown error occurred during rendering.</source>
         <translation>Une erreur inconnue s&apos;est produite pendant le rendu.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="178"/>
+        <location filename="../error_handler.h" line="179"/>
         <source>Invalid command-line arguments were provided to the renderer.</source>
         <translation>Des arguments de ligne de commande non valides ont été transmis au moteur de rendu.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="179"/>
+        <location filename="../error_handler.h" line="180"/>
         <source>A required file could not be found.</source>
         <translation>Un fichier requis est introuvable.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="180"/>
+        <location filename="../error_handler.h" line="181"/>
         <source>Failed to write the output image file.</source>
         <translation>Impossible d&apos;écrire le fichier image de sortie.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="181"/>
+        <location filename="../error_handler.h" line="182"/>
         <source>Image dimensions must be positive integers (recommended: 400-1920).</source>
         <translation>Les dimensions de l&apos;image doivent être des entiers positifs (recommandé : 400-1920).</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="182"/>
+        <location filename="../error_handler.h" line="183"/>
         <source>Samples per pixel must be greater than 0 (recommended: 10-500).</source>
         <translation>Le nombre d&apos;échantillons par pixel doit être supérieur à 0 (recommandé : 10-500).</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="183"/>
+        <location filename="../error_handler.h" line="184"/>
         <source>Maximum ray depth must be greater than 0 (recommended: 10-100).</source>
         <translation>La profondeur maximale des rayons doit être supérieure à 0 (recommandé : 10-100).</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="184"/>
+        <location filename="../error_handler.h" line="185"/>
         <source>Frames rendered successfully, but assembling them into a video with ffmpeg failed.</source>
         <translation>Les images ont été rendues avec succès, mais leur assemblage en vidéo avec ffmpeg a échoué.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="185"/>
+        <location filename="../error_handler.h" line="186"/>
         <source>Failed to construct the scene geometry.</source>
         <translation>Impossible de construire la géométrie de la scène.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="186"/>
+        <location filename="../error_handler.h" line="187"/>
         <source>The scene contains no objects to render.</source>
         <translation>La scène ne contient aucun objet à rendre.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="187"/>
+        <location filename="../error_handler.h" line="188"/>
         <source>An error occurred while rendering the image.</source>
         <translation>Une erreur s&apos;est produite pendant le rendu de l&apos;image.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="188"/>
+        <location filename="../error_handler.h" line="189"/>
         <source>The system ran out of memory during rendering.</source>
         <translation>Le système a manqué de mémoire pendant le rendu.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="189"/>
+        <location filename="../error_handler.h" line="190"/>
         <source>Failed to load texture file (e.g., earthmap.jpg for Earth scene).</source>
         <translation>Impossible de charger le fichier de texture (p. ex. earthmap.jpg pour la scène de la Terre).</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="193"/>
+        <location filename="../error_handler.h" line="194"/>
         <source>The GPU ran out of memory.</source>
         <translation>Le GPU a manqué de mémoire.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="194"/>
+        <location filename="../error_handler.h" line="195"/>
         <source>Failed to launch GPU rendering kernel.</source>
         <translation>Impossible de lancer le kernel de rendu GPU.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="195"/>
+        <location filename="../error_handler.h" line="196"/>
         <source>GPU memory allocation failed.</source>
         <translation>L&apos;allocation de mémoire GPU a échoué.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="196"/>
+        <location filename="../error_handler.h" line="197"/>
         <source>This scene is not supported on GPU. Please use CPU mode.</source>
         <translation>Cette scène n&apos;est pas prise en charge sur GPU. Utilisez le mode CPU.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="197"/>
+        <location filename="../error_handler.h" line="198"/>
         <source>Failed to construct the scene geometry on GPU.</source>
         <translation>Impossible de construire la géométrie de la scène sur le GPU.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="198"/>
+        <location filename="../error_handler.h" line="199"/>
         <source>An error occurred while rendering the image on GPU.</source>
         <translation>Une erreur s&apos;est produite pendant le rendu de l&apos;image sur le GPU.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="199"/>
+        <location filename="../error_handler.h" line="200"/>
         <source>An exception was thrown while rendering on GPU.</source>
         <translation>Une exception a été levée pendant le rendu sur le GPU.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="200"/>
+        <location filename="../error_handler.h" line="201"/>
         <source>An unknown error occurred while rendering on GPU.</source>
         <translation>Une erreur inconnue s&apos;est produite pendant le rendu sur le GPU.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="201"/>
+        <location filename="../error_handler.h" line="202"/>
         <source>The render was cancelled by the user.</source>
         <translation>Le rendu a été annulé par l&apos;utilisateur.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="215"/>
+        <location filename="../error_handler.h" line="216"/>
         <source>An error occurred with code %1.</source>
         <translation>Une erreur s&apos;est produite avec le code %1.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="223"/>
+        <location filename="../error_handler.h" line="224"/>
         <source>Check the Log Output tab for detailed error information.</source>
         <translation>Consultez l&apos;onglet Sortie du journal pour obtenir des informations détaillées sur l&apos;erreur.</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="236"/>
+        <location filename="../error_handler.h" line="237"/>
+        <source>Scene files are not downloaded</source>
+        <translation>Les fichiers de la scène ne sont pas téléchargés</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="239"/>
+        <source>%1 files of this scene are not on this computer yet. The first is: %2</source>
+        <translation>%1 fichiers de cette scène ne sont pas encore sur cet ordinateur. Le premier est : %2</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="240"/>
+        <source>A file of this scene is not on this computer yet: %1</source>
+        <translation>Un fichier de cette scène n&apos;est pas encore sur cet ordinateur : %1</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="241"/>
+        <source>Select the scene in the Settings tab and click the Download button under its description, then render again.
+The files go in: %1</source>
+        <translation>Sélectionnez la scène dans l&apos;onglet Réglages et cliquez sur le bouton de téléchargement sous sa description, puis relancez le rendu.
+Les fichiers vont dans : %1</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="245"/>
+        <source>The scene file could not be loaded</source>
+        <translation>Le fichier de la scène n&apos;a pas pu être chargé</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="246"/>
+        <source>The scene file could not be loaded: %1</source>
+        <translation>Le fichier de la scène n&apos;a pas pu être chargé : %1</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="247"/>
+        <source>If the scene came from a download, download it again; if it is your own file, check it for mistakes (the Log Output tab has the loader&apos;s own line).</source>
+        <translation>Si la scène vient d&apos;un téléchargement, téléchargez-la de nouveau ; s&apos;il s&apos;agit de votre propre fichier, cherchez-y des erreurs (l&apos;onglet Journal contient la ligne du chargeur).</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="263"/>
         <source>• Check the Scene dropdown in the Settings tab for a valid scene id
 • Use CPU renderer for scenes that are not GPU-supported</source>
         <translation>• Vérifiez dans la liste Scène de l&apos;onglet Paramètres qu&apos;un ID de scène valide est choisi
 • Utilisez le moteur CPU pour les scènes que le GPU ne prend pas en charge</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="240"/>
+        <location filename="../error_handler.h" line="267"/>
         <source>• GPU supports scenes: %1
 • Switch to CPU mode for all other scenes
 • CPU mode supports all %2 scenes</source>
@@ -625,7 +662,7 @@
 • Le mode CPU prend en charge les %2 scènes</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="247"/>
+        <location filename="../error_handler.h" line="274"/>
         <source>• No usable Metal GPU found on this Mac
 • Switch to CPU mode in the renderer settings
 • CPU mode works on all systems</source>
@@ -634,7 +671,7 @@
 • Le mode CPU fonctionne sur tous les systèmes</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="250"/>
+        <location filename="../error_handler.h" line="277"/>
         <source>• No CUDA-capable GPU found
 • Switch to CPU mode in the renderer settings
 • CPU mode works on all systems</source>
@@ -643,7 +680,7 @@
 • Le mode CPU fonctionne sur tous les systèmes</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="256"/>
+        <location filename="../error_handler.h" line="283"/>
         <source>• Check that the output directory exists and is writable
 • Make sure you have enough disk space
 • Try closing any programs that might be using the output file</source>
@@ -652,14 +689,14 @@
 • Essayez de fermer les programmes susceptibles d&apos;utiliser le fichier de sortie</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="264"/>
+        <location filename="../error_handler.h" line="291"/>
         <source>
 • Windows Security&apos;s &quot;Controlled folder access&quot; blocks apps it doesn&apos;t recognize from writing to protected folders (Pictures, Documents, Desktop). Either choose a different Output Path, or allow RayTracerGUI.exe and ray_tracer.exe under Virus &amp; threat protection &gt; Ransomware protection &gt; Controlled folder access &gt; Allow an app through</source>
         <translation>
 • L&apos;« Accès contrôlé aux dossiers » de Sécurité Windows empêche les applications qu&apos;il ne reconnaît pas d&apos;écrire dans les dossiers protégés (Images, Documents, Bureau). Choisissez un autre Chemin de sortie, ou autorisez RayTracerGUI.exe et ray_tracer.exe dans Protection contre les virus et menaces &gt; Protection contre les rançongiciels &gt; Accès contrôlé aux dossiers &gt; Autoriser une application</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="274"/>
+        <location filename="../error_handler.h" line="301"/>
         <source>• Install ffmpeg from https://ffmpeg.org/download.html and add it to your PATH
 • Check the render log above for the exact ffmpeg command and error output
 • Rendered frames are kept in output/frames/ - you can assemble the video manually</source>
@@ -668,14 +705,14 @@
 • Les images rendues sont conservées dans output/frames/ : vous pouvez assembler la vidéo manuellement</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="278"/>
+        <location filename="../error_handler.h" line="305"/>
         <source>• Try common resolutions: 800×800, 1920×1080
 • Width and height must be positive numbers</source>
         <translation>• Essayez des résolutions courantes : 800×800, 1920×1080
 • La largeur et la hauteur doivent être des nombres positifs</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="281"/>
+        <location filename="../error_handler.h" line="308"/>
         <source>• For quick previews, use 10-50 samples
 • For final renders, use 100-500 samples
 • More samples = better quality but slower</source>
@@ -684,14 +721,14 @@
 • Plus d&apos;échantillons = meilleure qualité, mais plus lent</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="285"/>
+        <location filename="../error_handler.h" line="312"/>
         <source>• Some scenes require texture files (e.g., earthmap.jpg)
 • Make sure all required files are in the correct location</source>
         <translation>• Certaines scènes nécessitent des fichiers de texture (p. ex. earthmap.jpg)
 • Vérifiez que tous les fichiers requis se trouvent au bon endroit</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="288"/>
+        <location filename="../error_handler.h" line="315"/>
         <source>• Try reducing image resolution (e.g., 800×800 instead of 1920×1080)
 • Try reducing samples per pixel (e.g., 50 instead of 500)
 • Close other memory-intensive applications</source>
@@ -700,14 +737,14 @@
 • Fermez les autres applications gourmandes en mémoire</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="292"/>
+        <location filename="../error_handler.h" line="319"/>
         <source>• For the Earth scene, make sure earthmap.jpg is in the correct folder
 • Check that texture files are not corrupted</source>
         <translation>• Pour la scène de la Terre, vérifiez que earthmap.jpg se trouve dans le bon dossier
 • Vérifiez que les fichiers de texture ne sont pas corrompus</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="299"/>
+        <location filename="../error_handler.h" line="326"/>
         <source>• Try reducing image resolution
 • Try reducing samples per pixel
 • Switch to CPU mode if GPU memory is limited</source>
@@ -716,7 +753,7 @@
 • Passez en mode CPU si la mémoire GPU est limitée</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="303"/>
+        <location filename="../error_handler.h" line="330"/>
         <source>• GPU ran out of memory
 • Try smaller resolution (e.g., 800×800)
 • Try fewer samples (e.g., 50)
@@ -727,27 +764,27 @@
 • Passez en mode CPU pour les grandes scènes</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="322"/>
+        <location filename="../error_handler.h" line="349"/>
         <source>General</source>
         <translation>Général</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="323"/>
+        <location filename="../error_handler.h" line="350"/>
         <source>CPU Renderer</source>
         <translation>Moteur de rendu CPU</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="324"/>
+        <location filename="../error_handler.h" line="351"/>
         <source>GPU Renderer</source>
         <translation>Moteur de rendu GPU</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="325"/>
+        <location filename="../error_handler.h" line="352"/>
         <source>User Action</source>
         <translation>Action de l&apos;utilisateur</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="326"/>
+        <location filename="../error_handler.h" line="353"/>
         <source>Unknown</source>
         <translation>Inconnu</translation>
     </message>
@@ -939,60 +976,60 @@
         <translation>&amp;Langue</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="930"/>
+        <location filename="../mainwindow.cpp" line="954"/>
         <source>Ray Tracer - Path Tracing Renderer</source>
         <translation>Ray Tracer - Moteur de rendu par path tracing</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1037"/>
+        <location filename="../mainwindow.cpp" line="1061"/>
         <source>Ray Tracer</source>
         <translation>Ray Tracer</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1298"/>
+        <location filename="../mainwindow.cpp" line="1322"/>
         <location filename="../mainwindow_slots.cpp" line="342"/>
         <source>START &amp;RENDER</source>
         <translation>DÉMARRER LE &amp;RENDU</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1307"/>
+        <location filename="../mainwindow.cpp" line="1331"/>
         <source>Render the selected scene with the current settings
 (queues behind it instead if a render is already running)</source>
         <translation>Rend la scène sélectionnée avec les paramètres actuels
 (la met en file d&apos;attente si un rendu est déjà en cours)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1318"/>
+        <location filename="../mainwindow.cpp" line="1342"/>
         <source>S&amp;TOP RENDER</source>
         <translation>ARRÊ&amp;TER LE RENDU</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1324"/>
+        <location filename="../mainwindow.cpp" line="1348"/>
         <location filename="../mainwindow_actions.cpp" line="71"/>
         <source>Stop the running render and discard its output</source>
         <translation>Arrête le rendu en cours et abandonne son résultat</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1337"/>
+        <location filename="../mainwindow.cpp" line="1361"/>
         <location filename="../mainwindow_queue.cpp" line="348"/>
         <location filename="../mainwindow_slots.cpp" line="120"/>
         <source>&amp;PAUSE RENDER</source>
         <translation>&amp;METTRE LE RENDU EN PAUSE</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1342"/>
+        <location filename="../mainwindow.cpp" line="1366"/>
         <location filename="../mainwindow_actions.cpp" line="80"/>
         <location filename="../mainwindow_slots.cpp" line="122"/>
         <source>Pause the running render in place - Resume continues from the exact same pixels</source>
         <translation>Met en pause le rendu en cours, tel quel - Reprendre continue exactement à partir des mêmes pixels</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1351"/>
+        <location filename="../mainwindow.cpp" line="1375"/>
         <source>ABANDON &amp;&amp; &amp;NEXT</source>
         <translation>ABANDONNER ET S&amp;UIVANT</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1357"/>
+        <location filename="../mainwindow.cpp" line="1381"/>
         <location filename="../mainwindow_actions.cpp" line="85"/>
         <source>Discard the running render&apos;s output and immediately start the next queued job</source>
         <translation>Abandonne la sortie du rendu en cours et démarre immédiatement le prochain travail en file d&apos;attente</translation>
@@ -5347,17 +5384,17 @@ Les scènes des autres catégories ne sont pas touchées. Vous pouvez les récup
         </translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1014"/>
+        <location filename="../mainwindow.cpp" line="1038"/>
         <source>Preparing the GPU renderer for this Mac (first run only, about a minute or two)...</source>
         <translation>Préparation du moteur de rendu GPU pour ce Mac (la première fois seulement, environ une à deux minutes)...</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1016"/>
+        <location filename="../mainwindow.cpp" line="1040"/>
         <source>The GPU renderer is ready.</source>
         <translation>Le moteur de rendu GPU est prêt.</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1016"/>
+        <location filename="../mainwindow.cpp" line="1040"/>
         <source>The GPU renderer could not be prepared ahead of time; the first GPU render will build it.</source>
         <translation>Le moteur de rendu GPU n&apos;a pas pu être préparé à l&apos;avance ; le premier rendu GPU le préparera.</translation>
     </message>
@@ -6758,27 +6795,27 @@ Si le programme s&apos;arrête sans cesse au démarrage, choisissez Repartir de 
 <context>
     <name>RenderController</name>
     <message>
-        <location filename="../mainwindow.cpp" line="557"/>
+        <location filename="../mainwindow.cpp" line="572"/>
         <source>Failed to start renderer: %1</source>
         <translation>Impossible de démarrer le moteur de rendu : %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="638"/>
+        <location filename="../mainwindow.cpp" line="653"/>
         <source>Render completed successfully!</source>
         <translation>Rendu terminé avec succès !</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="675"/>
+        <location filename="../mainwindow.cpp" line="699"/>
         <source>&lt;br&gt;&lt;br&gt;&lt;b&gt;Troubleshooting:&lt;/b&gt;&lt;br&gt;%1</source>
         <translation>&lt;br&gt;&lt;br&gt;&lt;b&gt;Dépannage :&lt;/b&gt;&lt;br&gt;%1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="677"/>
+        <location filename="../mainwindow.cpp" line="701"/>
         <source>&lt;br&gt;&lt;br&gt;&lt;small&gt;Error Code: %1 | Category: %2&lt;/small&gt;</source>
         <translation>&lt;br&gt;&lt;br&gt;&lt;small&gt;Code d&apos;erreur : %1 | Catégorie : %2&lt;/small&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="679"/>
+        <location filename="../mainwindow.cpp" line="703"/>
         <source>
 
 Output:

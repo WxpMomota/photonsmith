@@ -199,17 +199,17 @@
 <context>
     <name>DiagnosticsRunner</name>
     <message>
-        <location filename="../mainwindow.cpp" line="740"/>
+        <location filename="../mainwindow.cpp" line="764"/>
         <source>Failed to start ray_tracer.exe: %1</source>
         <translation>无法启动 ray_tracer.exe：%1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="750"/>
+        <location filename="../mainwindow.cpp" line="774"/>
         <source>Diagnostics process crashed (exit code %1)</source>
         <translation>诊断进程崩溃（退出代码 %1）</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="752"/>
+        <location filename="../mainwindow.cpp" line="776"/>
         <source>Diagnostics process exited with code %1:
 %2</source>
         <translation>诊断进程以代码 %1 退出：
@@ -257,366 +257,403 @@
 <context>
     <name>ErrorHandler</name>
     <message>
-        <location filename="../error_handler.h" line="95"/>
-        <location filename="../error_handler.h" line="321"/>
+        <location filename="../error_handler.h" line="96"/>
+        <location filename="../error_handler.h" line="348"/>
         <source>Success</source>
         <translation>成功</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="98"/>
+        <location filename="../error_handler.h" line="99"/>
         <source>Unknown Error</source>
         <translation>未知错误</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="99"/>
+        <location filename="../error_handler.h" line="100"/>
         <source>Invalid Arguments</source>
         <translation>参数无效</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="100"/>
+        <location filename="../error_handler.h" line="101"/>
         <source>File Not Found</source>
         <translation>找不到文件</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="101"/>
+        <location filename="../error_handler.h" line="102"/>
         <source>File Read Failed</source>
         <translation>读取文件失败</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="102"/>
+        <location filename="../error_handler.h" line="103"/>
         <source>File Write Failed</source>
         <translation>写入文件失败</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="110"/>
+        <location filename="../error_handler.h" line="111"/>
         <source>File Copy Failed</source>
         <translation>复制文件失败</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="111"/>
+        <location filename="../error_handler.h" line="112"/>
         <source>Directory Creation Failed</source>
         <translation>创建目录失败</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="112"/>
+        <location filename="../error_handler.h" line="113"/>
         <source>Invalid Image Dimensions</source>
         <translation>图像尺寸无效</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="113"/>
+        <location filename="../error_handler.h" line="114"/>
         <source>Invalid Sample Count</source>
         <translation>采样数无效</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="114"/>
+        <location filename="../error_handler.h" line="115"/>
         <source>Invalid Ray Depth</source>
         <translation>光线深度无效</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="115"/>
+        <location filename="../error_handler.h" line="116"/>
         <source>Invalid Scene ID</source>
         <translation>场景 ID 无效</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="116"/>
+        <location filename="../error_handler.h" line="117"/>
         <source>Invalid Camera Position</source>
         <translation>相机位置无效</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="117"/>
+        <location filename="../error_handler.h" line="118"/>
         <source>Invalid Output Path</source>
         <translation>输出路径无效</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="118"/>
+        <location filename="../error_handler.h" line="119"/>
         <source>Video Assembly Failed</source>
         <translation>视频合成失败</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="121"/>
+        <location filename="../error_handler.h" line="122"/>
         <source>Scene Build Failed (CPU)</source>
         <translation>场景构建失败（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="122"/>
+        <location filename="../error_handler.h" line="123"/>
         <source>Scene is Empty (CPU)</source>
         <translation>场景为空（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="123"/>
+        <location filename="../error_handler.h" line="124"/>
         <source>Camera Initialization Failed (CPU)</source>
         <translation>相机初始化失败（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="124"/>
+        <location filename="../error_handler.h" line="125"/>
         <source>Rendering Failed (CPU)</source>
         <translation>渲染失败（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="125"/>
+        <location filename="../error_handler.h" line="126"/>
         <source>Thread Error (CPU)</source>
         <translation>线程错误（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="126"/>
+        <location filename="../error_handler.h" line="127"/>
         <source>Out of Memory (CPU)</source>
         <translation>内存不足（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="127"/>
+        <location filename="../error_handler.h" line="128"/>
         <source>BVH Build Failed (CPU)</source>
         <translation>BVH 构建失败（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="128"/>
+        <location filename="../error_handler.h" line="129"/>
         <source>Texture Load Failed (CPU)</source>
         <translation>纹理加载失败（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="129"/>
+        <location filename="../error_handler.h" line="130"/>
         <source>No Lights in Scene (CPU)</source>
         <translation>场景中没有灯光（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="130"/>
+        <location filename="../error_handler.h" line="131"/>
         <source>Invalid Material (CPU)</source>
         <translation>材质无效（CPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="133"/>
+        <location filename="../error_handler.h" line="134"/>
         <source>No GPU Found</source>
         <translation>未找到 GPU</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="134"/>
+        <location filename="../error_handler.h" line="135"/>
         <source>GPU Initialization Failed</source>
         <translation>GPU 初始化失败</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="135"/>
-        <location filename="../error_handler.h" line="141"/>
+        <location filename="../error_handler.h" line="136"/>
+        <location filename="../error_handler.h" line="142"/>
         <source>GPU Out of Memory</source>
         <translation>GPU 内存不足</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="136"/>
+        <location filename="../error_handler.h" line="137"/>
         <source>GPU Memory Copy Failed</source>
         <translation>GPU 内存复制失败</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="137"/>
+        <location filename="../error_handler.h" line="138"/>
         <source>GPU Kernel Launch Failed</source>
         <translation>GPU 内核启动失败</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="138"/>
+        <location filename="../error_handler.h" line="139"/>
         <source>GPU Kernel Execution Failed</source>
         <translation>GPU 内核执行失败</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="139"/>
+        <location filename="../error_handler.h" line="140"/>
         <source>GPU Scene Serialization Failed</source>
         <translation>GPU 场景序列化失败</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="140"/>
+        <location filename="../error_handler.h" line="141"/>
         <source>GPU Synchronization Failed</source>
         <translation>GPU 同步失败</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="142"/>
+        <location filename="../error_handler.h" line="143"/>
         <source>Invalid GPU Configuration</source>
         <translation>GPU 配置无效</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="143"/>
+        <location filename="../error_handler.h" line="144"/>
         <source>GPU Texture Binding Failed</source>
         <translation>GPU 纹理绑定失败</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="144"/>
+        <location filename="../error_handler.h" line="145"/>
         <source>Scene Not Supported on GPU</source>
         <translation>GPU 不支持此场景</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="145"/>
+        <location filename="../error_handler.h" line="146"/>
         <source>Scene Build Failed (GPU)</source>
         <translation>场景构建失败（GPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="146"/>
+        <location filename="../error_handler.h" line="147"/>
         <source>Rendering Failed (GPU)</source>
         <translation>渲染失败（GPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="147"/>
+        <location filename="../error_handler.h" line="148"/>
         <source>Exception During Rendering (GPU)</source>
         <translation>渲染时出现异常（GPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="148"/>
+        <location filename="../error_handler.h" line="149"/>
         <source>Unknown Error (GPU)</source>
         <translation>未知错误（GPU）</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="151"/>
+        <location filename="../error_handler.h" line="152"/>
         <source>Cancelled by User</source>
         <translation>已被用户取消</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="157"/>
+        <location filename="../error_handler.h" line="158"/>
         <source>Error Code %1</source>
         <translation>错误代码 %1</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="169"/>
+        <location filename="../error_handler.h" line="170"/>
         <source>Scene ID must be a valid scene identifier (e.g. &quot;A1&quot;). Check the scene selector.</source>
         <translation>场景 ID 必须是有效的场景标识符（例如 &quot;A1&quot;）。请检查场景选择器。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="171"/>
+        <location filename="../error_handler.h" line="172"/>
         <source>No usable Metal GPU was found on this Mac.</source>
         <translation>在这台 Mac 上未找到可用的 Metal GPU。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="172"/>
+        <location filename="../error_handler.h" line="173"/>
         <source>No CUDA-capable GPU was detected.</source>
         <translation>未检测到支持 CUDA 的 GPU。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="176"/>
+        <location filename="../error_handler.h" line="177"/>
         <source>Render completed successfully.</source>
         <translation>渲染已成功完成。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="177"/>
+        <location filename="../error_handler.h" line="178"/>
         <source>An unknown error occurred during rendering.</source>
         <translation>渲染过程中发生未知错误。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="178"/>
+        <location filename="../error_handler.h" line="179"/>
         <source>Invalid command-line arguments were provided to the renderer.</source>
         <translation>传给渲染器的命令行参数无效。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="179"/>
+        <location filename="../error_handler.h" line="180"/>
         <source>A required file could not be found.</source>
         <translation>找不到所需的文件。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="180"/>
+        <location filename="../error_handler.h" line="181"/>
         <source>Failed to write the output image file.</source>
         <translation>写入输出图像文件失败。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="181"/>
+        <location filename="../error_handler.h" line="182"/>
         <source>Image dimensions must be positive integers (recommended: 400-1920).</source>
         <translation>图像尺寸必须是正整数（建议：400-1920）。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="182"/>
+        <location filename="../error_handler.h" line="183"/>
         <source>Samples per pixel must be greater than 0 (recommended: 10-500).</source>
         <translation>每像素采样数必须大于 0（建议：10-500）。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="183"/>
+        <location filename="../error_handler.h" line="184"/>
         <source>Maximum ray depth must be greater than 0 (recommended: 10-100).</source>
         <translation>最大光线深度必须大于 0（建议：10-100）。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="184"/>
+        <location filename="../error_handler.h" line="185"/>
         <source>Frames rendered successfully, but assembling them into a video with ffmpeg failed.</source>
         <translation>各帧已成功渲染，但用 ffmpeg 将它们合成视频时失败。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="185"/>
+        <location filename="../error_handler.h" line="186"/>
         <source>Failed to construct the scene geometry.</source>
         <translation>构建场景几何体失败。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="186"/>
+        <location filename="../error_handler.h" line="187"/>
         <source>The scene contains no objects to render.</source>
         <translation>场景中没有可渲染的对象。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="187"/>
+        <location filename="../error_handler.h" line="188"/>
         <source>An error occurred while rendering the image.</source>
         <translation>渲染图像时发生错误。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="188"/>
+        <location filename="../error_handler.h" line="189"/>
         <source>The system ran out of memory during rendering.</source>
         <translation>渲染期间系统内存不足。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="189"/>
+        <location filename="../error_handler.h" line="190"/>
         <source>Failed to load texture file (e.g., earthmap.jpg for Earth scene).</source>
         <translation>加载纹理文件失败（例如地球场景的 earthmap.jpg）。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="193"/>
+        <location filename="../error_handler.h" line="194"/>
         <source>The GPU ran out of memory.</source>
         <translation>GPU 内存不足。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="194"/>
+        <location filename="../error_handler.h" line="195"/>
         <source>Failed to launch GPU rendering kernel.</source>
         <translation>启动 GPU 渲染内核失败。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="195"/>
+        <location filename="../error_handler.h" line="196"/>
         <source>GPU memory allocation failed.</source>
         <translation>GPU 内存分配失败。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="196"/>
+        <location filename="../error_handler.h" line="197"/>
         <source>This scene is not supported on GPU. Please use CPU mode.</source>
         <translation>GPU 不支持此场景。请使用 CPU 模式。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="197"/>
+        <location filename="../error_handler.h" line="198"/>
         <source>Failed to construct the scene geometry on GPU.</source>
         <translation>在 GPU 上构建场景几何体失败。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="198"/>
+        <location filename="../error_handler.h" line="199"/>
         <source>An error occurred while rendering the image on GPU.</source>
         <translation>在 GPU 上渲染图像时发生错误。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="199"/>
+        <location filename="../error_handler.h" line="200"/>
         <source>An exception was thrown while rendering on GPU.</source>
         <translation>在 GPU 上渲染时抛出了异常。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="200"/>
+        <location filename="../error_handler.h" line="201"/>
         <source>An unknown error occurred while rendering on GPU.</source>
         <translation>在 GPU 上渲染时发生未知错误。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="201"/>
+        <location filename="../error_handler.h" line="202"/>
         <source>The render was cancelled by the user.</source>
         <translation>渲染已被用户取消。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="215"/>
+        <location filename="../error_handler.h" line="216"/>
         <source>An error occurred with code %1.</source>
         <translation>发生了代码为 %1 的错误。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="223"/>
+        <location filename="../error_handler.h" line="224"/>
         <source>Check the Log Output tab for detailed error information.</source>
         <translation>请查看“日志输出”选项卡以获取详细的错误信息。</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="236"/>
+        <location filename="../error_handler.h" line="237"/>
+        <source>Scene files are not downloaded</source>
+        <translation>场景文件尚未下载</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="239"/>
+        <source>%1 files of this scene are not on this computer yet. The first is: %2</source>
+        <translation>此场景的 %1 个文件尚未在这台电脑上。第一个是:%2</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="240"/>
+        <source>A file of this scene is not on this computer yet: %1</source>
+        <translation>此场景的一个文件尚未在这台电脑上:%1</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="241"/>
+        <source>Select the scene in the Settings tab and click the Download button under its description, then render again.
+The files go in: %1</source>
+        <translation>在“设置”选项卡中选择该场景,点击其说明下方的下载按钮,然后重新渲染。
+文件存放位置:%1</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="245"/>
+        <source>The scene file could not be loaded</source>
+        <translation>无法加载场景文件</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="246"/>
+        <source>The scene file could not be loaded: %1</source>
+        <translation>无法加载场景文件:%1</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="247"/>
+        <source>If the scene came from a download, download it again; if it is your own file, check it for mistakes (the Log Output tab has the loader&apos;s own line).</source>
+        <translation>如果场景来自下载,请重新下载;如果是你自己的文件,请检查其中是否有错误(“日志输出”选项卡里有加载器自己的那一行)。</translation>
+    </message>
+    <message>
+        <location filename="../error_handler.h" line="263"/>
         <source>• Check the Scene dropdown in the Settings tab for a valid scene id
 • Use CPU renderer for scenes that are not GPU-supported</source>
         <translation>• 请在设置选项卡的场景下拉列表中检查是否选择了有效的场景 ID
 • 对 GPU 不支持的场景请使用 CPU 渲染器</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="240"/>
+        <location filename="../error_handler.h" line="267"/>
         <source>• GPU supports scenes: %1
 • Switch to CPU mode for all other scenes
 • CPU mode supports all %2 scenes</source>
@@ -625,7 +662,7 @@
 • CPU 模式支持全部 %2 个场景</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="247"/>
+        <location filename="../error_handler.h" line="274"/>
         <source>• No usable Metal GPU found on this Mac
 • Switch to CPU mode in the renderer settings
 • CPU mode works on all systems</source>
@@ -634,7 +671,7 @@
 • CPU 模式适用于所有系统</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="250"/>
+        <location filename="../error_handler.h" line="277"/>
         <source>• No CUDA-capable GPU found
 • Switch to CPU mode in the renderer settings
 • CPU mode works on all systems</source>
@@ -643,7 +680,7 @@
 • CPU 模式适用于所有系统</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="256"/>
+        <location filename="../error_handler.h" line="283"/>
         <source>• Check that the output directory exists and is writable
 • Make sure you have enough disk space
 • Try closing any programs that might be using the output file</source>
@@ -652,14 +689,14 @@
 • 请尝试关闭可能正在使用输出文件的程序</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="264"/>
+        <location filename="../error_handler.h" line="291"/>
         <source>
 • Windows Security&apos;s &quot;Controlled folder access&quot; blocks apps it doesn&apos;t recognize from writing to protected folders (Pictures, Documents, Desktop). Either choose a different Output Path, or allow RayTracerGUI.exe and ray_tracer.exe under Virus &amp; threat protection &gt; Ransomware protection &gt; Controlled folder access &gt; Allow an app through</source>
         <translation>
 • Windows 安全中心的“受控文件夹访问”会阻止它不认识的应用写入受保护的文件夹（图片、文档、桌面）。请选择其他输出路径，或在 病毒和威胁防护 &gt; 勒索软件防护 &gt; 受控文件夹访问 &gt; 允许应用通过受控文件夹访问 中允许 RayTracerGUI.exe 和 ray_tracer.exe</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="274"/>
+        <location filename="../error_handler.h" line="301"/>
         <source>• Install ffmpeg from https://ffmpeg.org/download.html and add it to your PATH
 • Check the render log above for the exact ffmpeg command and error output
 • Rendered frames are kept in output/frames/ - you can assemble the video manually</source>
@@ -668,14 +705,14 @@
 • 已渲染的帧保存在 output/frames/ 中，你可以手动合成视频</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="278"/>
+        <location filename="../error_handler.h" line="305"/>
         <source>• Try common resolutions: 800×800, 1920×1080
 • Width and height must be positive numbers</source>
         <translation>• 请尝试常用分辨率：800×800、1920×1080
 • 宽度和高度必须是正数</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="281"/>
+        <location filename="../error_handler.h" line="308"/>
         <source>• For quick previews, use 10-50 samples
 • For final renders, use 100-500 samples
 • More samples = better quality but slower</source>
@@ -684,14 +721,14 @@
 • 采样越多质量越好，但速度越慢</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="285"/>
+        <location filename="../error_handler.h" line="312"/>
         <source>• Some scenes require texture files (e.g., earthmap.jpg)
 • Make sure all required files are in the correct location</source>
         <translation>• 有些场景需要纹理文件（例如 earthmap.jpg）
 • 请确保所有所需文件都在正确的位置</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="288"/>
+        <location filename="../error_handler.h" line="315"/>
         <source>• Try reducing image resolution (e.g., 800×800 instead of 1920×1080)
 • Try reducing samples per pixel (e.g., 50 instead of 500)
 • Close other memory-intensive applications</source>
@@ -700,14 +737,14 @@
 • 请关闭其他占用大量内存的应用程序</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="292"/>
+        <location filename="../error_handler.h" line="319"/>
         <source>• For the Earth scene, make sure earthmap.jpg is in the correct folder
 • Check that texture files are not corrupted</source>
         <translation>• 对于地球场景，请确保 earthmap.jpg 位于正确的文件夹中
 • 请检查纹理文件是否已损坏</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="299"/>
+        <location filename="../error_handler.h" line="326"/>
         <source>• Try reducing image resolution
 • Try reducing samples per pixel
 • Switch to CPU mode if GPU memory is limited</source>
@@ -716,7 +753,7 @@
 • 如果 GPU 内存有限，请切换到 CPU 模式</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="303"/>
+        <location filename="../error_handler.h" line="330"/>
         <source>• GPU ran out of memory
 • Try smaller resolution (e.g., 800×800)
 • Try fewer samples (e.g., 50)
@@ -727,27 +764,27 @@
 • 大型场景请切换到 CPU 模式</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="322"/>
+        <location filename="../error_handler.h" line="349"/>
         <source>General</source>
         <translation>常规</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="323"/>
+        <location filename="../error_handler.h" line="350"/>
         <source>CPU Renderer</source>
         <translation>CPU 渲染器</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="324"/>
+        <location filename="../error_handler.h" line="351"/>
         <source>GPU Renderer</source>
         <translation>GPU 渲染器</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="325"/>
+        <location filename="../error_handler.h" line="352"/>
         <source>User Action</source>
         <translation>用户操作</translation>
     </message>
     <message>
-        <location filename="../error_handler.h" line="326"/>
+        <location filename="../error_handler.h" line="353"/>
         <source>Unknown</source>
         <translation>未知</translation>
     </message>
@@ -938,60 +975,60 @@
         <translation>语言(&amp;L)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="930"/>
+        <location filename="../mainwindow.cpp" line="954"/>
         <source>Ray Tracer - Path Tracing Renderer</source>
         <translation>光线追踪渲染器 - 路径追踪渲染器</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1037"/>
+        <location filename="../mainwindow.cpp" line="1061"/>
         <source>Ray Tracer</source>
         <translation>光线追踪渲染器</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1298"/>
+        <location filename="../mainwindow.cpp" line="1322"/>
         <location filename="../mainwindow_slots.cpp" line="342"/>
         <source>START &amp;RENDER</source>
         <translation>开始渲染(&amp;R)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1307"/>
+        <location filename="../mainwindow.cpp" line="1331"/>
         <source>Render the selected scene with the current settings
 (queues behind it instead if a render is already running)</source>
         <translation>使用当前设置渲染所选场景
 （如果已有渲染正在进行，则改为加入队列排在其后）</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1318"/>
+        <location filename="../mainwindow.cpp" line="1342"/>
         <source>S&amp;TOP RENDER</source>
         <translation>停止渲染(&amp;T)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1324"/>
+        <location filename="../mainwindow.cpp" line="1348"/>
         <location filename="../mainwindow_actions.cpp" line="71"/>
         <source>Stop the running render and discard its output</source>
         <translation>停止正在运行的渲染并丢弃其输出</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1337"/>
+        <location filename="../mainwindow.cpp" line="1361"/>
         <location filename="../mainwindow_queue.cpp" line="348"/>
         <location filename="../mainwindow_slots.cpp" line="120"/>
         <source>&amp;PAUSE RENDER</source>
         <translation>暂停渲染(&amp;P)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1342"/>
+        <location filename="../mainwindow.cpp" line="1366"/>
         <location filename="../mainwindow_actions.cpp" line="80"/>
         <location filename="../mainwindow_slots.cpp" line="122"/>
         <source>Pause the running render in place - Resume continues from the exact same pixels</source>
         <translation>就地暂停正在运行的渲染 - “继续”会从完全相同的像素处接着渲染</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1351"/>
+        <location filename="../mainwindow.cpp" line="1375"/>
         <source>ABANDON &amp;&amp; &amp;NEXT</source>
         <translation>放弃并继续下一个(&amp;N)</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1357"/>
+        <location filename="../mainwindow.cpp" line="1381"/>
         <location filename="../mainwindow_actions.cpp" line="85"/>
         <source>Discard the running render&apos;s output and immediately start the next queued job</source>
         <translation>丢弃正在运行的渲染的输出，并立即开始下一个排队的任务</translation>
@@ -5250,17 +5287,17 @@ The scenes in the other categories are not touched. You can get them back from %
         </translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1014"/>
+        <location filename="../mainwindow.cpp" line="1038"/>
         <source>Preparing the GPU renderer for this Mac (first run only, about a minute or two)...</source>
         <translation>正在为这台 Mac 准备 GPU 渲染器(仅首次运行,大约一到两分钟)...</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1016"/>
+        <location filename="../mainwindow.cpp" line="1040"/>
         <source>The GPU renderer is ready.</source>
         <translation>GPU 渲染器已就绪。</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="1016"/>
+        <location filename="../mainwindow.cpp" line="1040"/>
         <source>The GPU renderer could not be prepared ahead of time; the first GPU render will build it.</source>
         <translation>无法提前准备 GPU 渲染器;第一次 GPU 渲染时会进行准备。</translation>
     </message>
@@ -6661,27 +6698,27 @@ If the program keeps stopping at start, choose Start fresh: it resets the window
 <context>
     <name>RenderController</name>
     <message>
-        <location filename="../mainwindow.cpp" line="557"/>
+        <location filename="../mainwindow.cpp" line="572"/>
         <source>Failed to start renderer: %1</source>
         <translation>无法启动渲染器：%1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="638"/>
+        <location filename="../mainwindow.cpp" line="653"/>
         <source>Render completed successfully!</source>
         <translation>渲染已成功完成！</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="675"/>
+        <location filename="../mainwindow.cpp" line="699"/>
         <source>&lt;br&gt;&lt;br&gt;&lt;b&gt;Troubleshooting:&lt;/b&gt;&lt;br&gt;%1</source>
         <translation>&lt;br&gt;&lt;br&gt;&lt;b&gt;故障排除：&lt;/b&gt;&lt;br&gt;%1</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="677"/>
+        <location filename="../mainwindow.cpp" line="701"/>
         <source>&lt;br&gt;&lt;br&gt;&lt;small&gt;Error Code: %1 | Category: %2&lt;/small&gt;</source>
         <translation>&lt;br&gt;&lt;br&gt;&lt;small&gt;错误代码：%1 | 类别：%2&lt;/small&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow.cpp" line="679"/>
+        <location filename="../mainwindow.cpp" line="703"/>
         <source>
 
 Output:

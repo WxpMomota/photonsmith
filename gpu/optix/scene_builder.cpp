@@ -1235,18 +1235,29 @@ static bool build_loaded_pbrt_scene(
 	// rare.
 	static SharedLruCache<pbrt_load::LoadResult> s_pbrtLoadCache(2);   // bounded: see SharedLruCache
 	const std::string stamp = optix_live_edit::writeStamp(path);
+	std::string loadError;
 	const std::shared_ptr<const pbrt_load::LoadResult> loadedPtr = s_pbrtLoadCache.get_or_build(std::string(path) + stamp,
 		[&](pbrt_load::LoadResult& out) -> bool {
 			out = pbrt_load::loadFile(path);
 			if (!out.ok) {
 				std::cerr << "[OptiX] " << out.error << "\n";
+				loadError = out.error;
 				return false;
 			}
 			for (const pbrt_scene::Warning& w : out.scene.warnings)
 				std::cerr << "[OptiX] warning: " << path << ": " << w.message << "\n";
 			return true;
 		});
-	if (!loadedPtr) return false;
+	if (!loadedPtr) {
+		scene.failure.file = path;
+		if (pbrt_load::detail::locateFile(path).empty()) {
+			scene.failure.kind = SceneBuildFailureKind::FileMissing;
+		} else {
+			scene.failure.kind = SceneBuildFailureKind::LoadFailed;
+			scene.failure.detail = loadError;
+		}
+		return false;
+	}
 	const pbrt_load::LoadResult& loaded = *loadedPtr;
 
 	// pbrt_gpu::build() itself is the SOLE populator of `scene` in this
@@ -1303,7 +1314,12 @@ static bool build_loaded_pbrt_scene(
 			out.stats = pbrt_gpu::build(*source, out.sceneData);
 			return true;
 		});
-	if (!built) return false;
+	if (!built) {
+		scene.failure.kind = SceneBuildFailureKind::LoadFailed;
+		scene.failure.file = path;
+		scene.failure.detail = "the scene could not be built for the GPU";
+		return false;
+	}
 	// What a click needs, for the scene as it is drawn now (a build cached by a batch render of the same file has no pick information: made from the scene itself).
 	if (livePreview) optix_live_edit::Edits::get().note(path, built->edit ? built->edit : optix_live_edit::makeBuiltFrom(loaded.scene, offsets, builtKey));
 	if (scene.skipExpensiveGeometryLoad) {
@@ -1515,6 +1531,7 @@ bool build_scene(
 	} else {
 		std::cerr << "[OptiX] Unknown scene id=" << scene_id << ".\n";
 	}
+	scene.failure.kind = SceneBuildFailureKind::UnknownScene;
 	return false;
 }
 

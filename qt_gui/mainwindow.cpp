@@ -471,6 +471,8 @@ void RenderController::start() {
 	m_finished = false;
 	m_lastProgress = 0;
 	m_lineBuffer.clear();
+	m_hasErrorEvent = false;
+	m_errorEvent = render_events::Event();
 	m_elapsed.start();
 
 	m_renderProcess = new QProcess(this);
@@ -514,9 +516,22 @@ void RenderController::handleOutputChunk(const QString &chunk) {
 	for (const QString &part : parts) {
 		QString line = part.trimmed();
 		if (line.isEmpty()) continue;
+		if (handleEventLine(line)) continue;
 		emit logMessage(line);
 		parseProgressLine(line);
 	}
+}
+
+bool RenderController::handleEventLine(const QString &line) {
+	if (!line.startsWith(QLatin1String("@rt "))) return false;
+	render_events::Event event;
+	if (!render_events::parseLine(line.toStdString(), event)) return false;   // (not well formed: shown like any line)
+	if (event.type == "error") {
+		m_errorEvent = event;
+		m_hasErrorEvent = true;
+		emit logMessage(QString("Error: %1").arg(QString::fromStdString(event.get("message"))));
+	}
+	return true;   // (an event type this GUI does not know is ignored: newer renderers may print more)
 }
 
 void RenderController::parseProgressLine(const QString &line) {
@@ -660,6 +675,15 @@ void RenderController::onProcessFinished(int exitCode, QProcess::ExitStatus exit
 		QString errorMessage = ErrorHandler::getErrorMessage(exitCode, useMetal);
 		QString hint = ErrorHandler::getTroubleshootingHint(exitCode, useMetal);
 		QString category = ErrorHandler::getCategoryName(exitCode);
+		// The renderer said why, in a form that needs no guessing (render_events.h): its reason has words of its own, better than the code's.
+		if (m_hasErrorEvent) {
+			ErrorHandler::ReasonText reasonText;
+			if (ErrorHandler::textForReason(m_errorEvent, reasonText)) {
+				errorTitle = reasonText.title;
+				errorMessage = reasonText.message;
+				hint = reasonText.hint;
+			}
+		}
 
 		emit logMessage(QString("=== ERROR DETAILS ==="));
 		emit logMessage(QString("Category: %1").arg(category));

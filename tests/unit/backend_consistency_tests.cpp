@@ -166,7 +166,7 @@ TEST(BackendConsistency, SourceTreeIsReachableFromTestFile) {
     // ever fails, the checks below would pass vacuously - fail loudly instead.
     ASSERT_TRUE(fs::exists(repoRoot() / "CMakeLists.txt"))
         << "expected the repo root at " << repoRoot().string();
-    ASSERT_TRUE(fs::exists(repoRoot() / "gpu" / "metal" / "metal_poc.mm"));
+    ASSERT_TRUE(fs::exists(repoRoot() / "gpu" / "metal" / "host" / "metal_poc.mm"));
 }
 
 TEST(BackendConsistency, CpuSideSourceFilesMatchAcrossBuildSystems) {
