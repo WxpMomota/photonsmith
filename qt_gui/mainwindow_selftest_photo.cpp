@@ -19,6 +19,7 @@
 
 #include "../src/shared/camera_from_photo.h"
 #include "../src/shared/environment_from_photo.h"
+#include "../src/shared/ply_mesh.h"
 #include "../src/external/tinyexr.h"
 #include "../src/shared/light_from_photo.h"
 #include "../src/shared/material_from_photo.h"
@@ -841,6 +842,43 @@ static void compositeTestExportGltf(const CompositeTestContext &c) {
 	QFile file(glb);
 	const QByteArray head = file.open(QIODevice::ReadOnly) ? file.read(12) : QByteArray();
 	check(exported && QFileInfo(glb).size() > 2000 && head.left(4) == "glTF" && exportMessage.contains("triangles"), "the scene exports as a glTF file: " + exportMessage.left(160));
+	// and the file comes back: into a new scene as mesh objects (one for each material), grouped, standing on the floor, each a PLY file that reads
+	sb->newScene();
+	QString importMessage;
+	const bool imported = sb->importGltf(glb, &importMessage);
+	const scene_doc::Document &doc = sb->document();
+	size_t meshes = 0, readable = 0;
+	for (const scene_doc::Object &o : doc.objects) {
+		if (o.shape != scene_doc::ShapeKind::Mesh) continue;
+		++meshes;
+		readable += ply_mesh::loadFile(o.meshFile).ok ? 1 : 0;
+	}
+	check(imported && meshes >= 2 && readable == meshes, QString("the file imports as mesh objects, one for each material (%1 meshes, %2 readable): %3").arg(meshes).arg(readable).arg(importMessage.left(120)));
+	const scene_doc::Object *lastObject = doc.objects.empty() ? nullptr : &doc.objects.back();   // (the starter scene's own objects come first: the model is added after them)
+	bool grouped = lastObject && !lastObject->group.empty();
+	size_t inGroup = 0;
+	for (const scene_doc::Object &o : doc.objects) inGroup += lastObject && o.group == lastObject->group ? 1 : 0;
+	check(grouped && inGroup == meshes && !scene_doc::hasErrors(scene_doc::validate(doc)), QString("the parts are one group (%1 of %2) and the scene has no errors").arg(inGroup).arg(meshes));
+	{   // rendered, to see that the imported parts are where and as they should be (the picture is kept next to the log for a look)
+		const QString scenePath = QDir::tempPath() + "/rt_selftest_imported.pbrt", ppm = QDir::tempPath() + "/rt_selftest_imported.ppm";
+		QFile text(scenePath);
+		const bool wrote = text.open(QIODevice::WriteOnly) && text.write(sb->pbrtTextForTest().toUtf8()) > 0;
+		text.close();
+		QProcess renderer;
+		renderer.setProcessChannelMode(QProcess::MergedChannels);
+		renderer.setWorkingDirectory(QCoreApplication::applicationDirPath());
+		renderer.start(sb->launcherPathForTest(), {"--cpu", "--output", ppm, "--height", "270", "480", "16", "6", scenePath});
+		const bool finished = wrote && renderer.waitForFinished(120000) && renderer.exitCode() == 0;
+		const QString output = QString::fromLocal8Bit(renderer.readAll());
+		const QImage picture(ppm);
+		long lit = 0;
+		for (int y = 0; y < picture.height() && finished; ++y)
+			for (int x = 0; x < picture.width(); ++x) lit += qGray(picture.pixel(x, y)) > 60 ? 1 : 0;
+		if (!picture.isNull()) picture.save(qEnvironmentVariable("RT_GUI_SELFTEST_OUT") + "_imported.png");
+		check(finished && lit > picture.width() * picture.height() / 4 && !output.contains("could not be read"), QString("the imported model renders (%1 lit pixels): %2").arg(lit).arg(output.right(100).simplified()));
+	}
+	QString bad;
+	check(!sb->importGltf(QDir::tempPath() + "/rt_selftest_composite.png", &bad) && !bad.isEmpty(), "a file that is not a model is refused with a message: " + bad.left(80));
 }
 
 // The photo belongs to the scene: a scene matched to a photo, saved, then a new scene (no photo), then the saved one opened again has its photo, its overlay, its Render into the photo state and

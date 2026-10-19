@@ -169,6 +169,8 @@ public:
 	void applyLightingPreset(scene_doc::lighting::Preset preset);   // the lights become a ready-made lighting (one undo step)
 	void addObjectFromPhoto();  // scene_builder_photo.cpp: needs the optional photo helper
 	void addRoomFromPhoto();    // scene_builder_photo.cpp: a photo of a room becomes a room (the same helper environment, plus a depth model)
+	// A glTF model (.glb or .gltf) as mesh objects, one for each material, grouped (scene_builder_gltf.cpp, src/shared/gltf_import.h). `message` says what was added and what was not read, or why it failed.
+	bool importGltf(const QString &file, QString *message);
 	void showModelLibrary();    // scene_builder_models.cpp: the dialog behind Add > Model library...
 	// Adds one library model (the stem of models/<stem>.obj) at a handy size, standing on the floor under the drop point, as one undo step. False when it is not found.
 	bool addLibraryModel(const QString &stem);

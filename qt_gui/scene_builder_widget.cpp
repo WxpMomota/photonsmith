@@ -779,8 +779,18 @@ void SceneBuilderWidget::addParts(std::vector<Object> parts, const QString &grou
 void SceneBuilderWidget::addObject(ShapeKind shape) {
 	std::string fileName;
 	if (shape == ShapeKind::Mesh) {
-		const QString f = QFileDialog::getOpenFileName(this, tr("Choose a mesh"), QString(), tr("Meshes (*.ply *.obj)"));
+		const QString f = QFileDialog::getOpenFileName(this, tr("Choose a mesh"), QString(), tr("Meshes and models (*.ply *.obj *.glb *.gltf)"));
 		if (f.isEmpty()) return;
+		if (f.endsWith(QStringLiteral(".glb"), Qt::CaseInsensitive) || f.endsWith(QStringLiteral(".gltf"), Qt::CaseInsensitive)) {   // a model with several parts and materials
+			QString message;
+			if (!importGltf(f, &message)) {
+				QMessageBox::warning(this, tr("Cannot import the model"), message);
+				return;
+			}
+			emit statusMessage(message.section(QLatin1Char('\n'), 0, 0));
+			if (message.contains(QLatin1Char('\n'))) QMessageBox::information(this, tr("Model imported"), message);   // (there is something the file had that was not read)
+			return;
+		}
 		fileName = f.toStdString();
 	}
 	edit(QString(), [&]() {

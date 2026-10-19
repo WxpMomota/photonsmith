@@ -94,6 +94,7 @@ SOURCES += \
 	win_taskbar.cpp \
 	scene_builder_widget.cpp \
 	scene_builder_files.cpp \
+	scene_builder_gltf.cpp \
 	scene_builder_sky_gallery.cpp \
 	scene_builder_text.cpp \
 	scene_builder_autosave.cpp \

@@ -191,6 +191,7 @@
     <ClCompile Include="unit\ply_mesh_tests.cpp" />
     <ClCompile Include="unit\pbrt_flatten_tests.cpp" />
     <ClCompile Include="unit\gltf_export_tests.cpp" />
+    <ClCompile Include="unit\gltf_import_tests.cpp" />
     <ClCompile Include="unit\pbrt_flatten_camera_tests.cpp" />
     <ClCompile Include="unit\pbrt_flatten_lights_tests.cpp" />
     <ClCompile Include="unit\pbrt_flatten_materials_tests.cpp" />
