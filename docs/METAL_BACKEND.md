@@ -149,6 +149,8 @@ works. `RT_NO_GPU_WARMUP=1` turns the background build off; the GUI self-test ne
 
 ## Environment switches
 
+The production switches below are parsed once, in `gpu/metal/metal_poc_tuning.h` (`MetalTuning`): a value that is not a whole number in range is ignored with a message (it used to go through `atoi`, so `METAL_TG_W=abc` was a threadgroup of width 0), and a run prints the switches it had when any differs from the default.
+
 | variable | effect |
 |---|---|
 | `METAL_BANDS=N` | force N equal row bands instead of time-targeted ones |
