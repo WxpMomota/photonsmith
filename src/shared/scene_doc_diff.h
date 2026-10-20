@@ -49,7 +49,7 @@ inline Fields fieldsOf(const Light& l) {
 	        {"intensity", v(l.intensity)}, {"coneAngle", v(l.coneAngle)}, {"coneDelta", v(l.coneDelta)}, {"image", l.imageFile}, {"skySpin", v(l.skySpin)}, {"sunElevation", v(l.sky.sunElevation)}, {"sunAzimuth", v(l.sky.sunAzimuth)}, {"haze", v(l.sky.turbidity)}, {"groundAlbedo", v(l.sky.groundAlbedo)}, {"fov", v(l.fov)}, {"hidden", l.hidden ? "1" : "0"}, {"locked", l.locked ? "1" : "0"}};
 }
 inline Fields fieldsOf(const Camera& c) {
-	return {{"position", v(c.position)}, {"target", v(c.target)}, {"up", v(c.up)}, {"fov", v(c.fov)}, {"lensRadius", v(c.lensRadius)}, {"focusDistance", v(c.focusDistance)}, {"sensorWidth", v(c.sensorWidthMm)}};
+	return {{"position", v(c.position)}, {"target", v(c.target)}, {"up", v(c.up)}, {"fov", v(c.fov)}, {"lensRadius", v(c.lensRadius)}, {"focusDistance", v(c.focusDistance)}, {"sensorWidth", v(c.sensorWidthMm)}, {"iso", v(c.iso)}, {"shutter", v(c.shutter)}};
 }
 inline Fields fieldsOf(const CameraView& v) {
 	Fields f = fieldsOf(v.camera);

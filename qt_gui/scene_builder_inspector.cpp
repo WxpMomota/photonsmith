@@ -425,6 +425,10 @@ void SceneBuilderWidget::inspectCamera(QFormLayout *f) {
 	              },
 	              0, 64, 0.2, 1, QString(), tr("Pinhole (everything sharp)"));
 	addNum(f, tr("Lens radius"), [this]() { return &m_doc.camera.lensRadius; }, 0, 10, 0.01, 3);
+	// The film's exposure, as pbrt has it: the picture is scaled by shutter * ISO / 100, so ISO 100 at 1 s (the default) leaves the lights as they are and ISO 400 at 1/4 s is the same picture.
+	// The aperture above changes the blur only, as in pbrt.
+	addNum(f, tr("ISO"), [this]() { return &m_doc.camera.iso; }, 6, 25600, 25, 0);
+	addNum(f, tr("Shutter time"), [this]() { return &m_doc.camera.shutter; }, 0.0001, 60, 0.05, 4, tr(" s"));
 	addNum(f, tr("Focus distance"), [this]() { return &m_doc.camera.focusDistance; }, 0.01, 10000, 0.5, 2);
 	auto *pick = new QPushButton(tr("Pick focus in the 3D view"));
 	pick->setAutoDefault(false);

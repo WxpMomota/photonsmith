@@ -52,6 +52,8 @@ inline std::vector<Problem> validate(const Document& d) {
 	if (!(d.camera.fov >= 1.0 && d.camera.fov <= 170.0)) err("The field of view must be between 1 and 170 degrees.");
 	if (d.camera.lensRadius < 0.0) err("The lens radius cannot be negative.");
 	if (!(d.camera.sensorWidthMm > 0.0 && d.camera.sensorWidthMm <= 1000.0)) err("The sensor width must be above 0 and at most 1000 millimetres.");
+	if (!(d.camera.iso > 0.0 && d.camera.iso <= 1.0e6)) err("The ISO must be above 0 and at most 1000000.");
+	if (!(d.camera.shutter > 0.0 && d.camera.shutter <= 3600.0)) err("The shutter time must be above 0 and at most 3600 seconds.");
 	if (d.camera.lensRadius > 0.0 && !(d.camera.focusDistance > 0.0)) err("A camera with depth of field needs a focus distance above zero.");
 	if (d.render.width < 1 || d.render.height < 1 || d.render.width > 16384 || d.render.height > 16384) err("The image size must be between 1 and 16384 pixels each way.");
 	if (d.render.samples < 1) err("At least one sample per pixel is needed.");

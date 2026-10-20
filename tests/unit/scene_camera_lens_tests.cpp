@@ -166,3 +166,44 @@ TEST(SceneCameraWriterTest, ASavedViewKeepsItsSensorWidthThroughTheJsonWhateverT
 	ASSERT_EQ(back.cameraViews.size(), 1u);
 	EXPECT_EQ(back.cameraViews[0].camera.sensorWidthMm, 36.0) << "a view saved at 36 mm is still 36 mm";
 }
+
+// The film's exposure: pbrt scales the picture by shutter * iso / 100, and the Builder's camera now has both.
+TEST(SceneCameraExposureTest, TheDefaultExposureWritesNothingAndANonDefaultOneSurvivesTheFile) {
+	Document d = makeStarterScene();
+	EXPECT_EQ(toJson(d).find("\"iso\""), std::string::npos) << "older scenes write what they always did";
+	EXPECT_EQ(toPbrt(d).find("float iso"), std::string::npos);
+	EXPECT_EQ(toPbrt(d).find("shutterclose"), std::string::npos);
+	d.camera.iso = 400.0;
+	d.camera.shutter = 0.25;
+	d.cameraViews.push_back(CameraView{"Dim", d.camera, 0.0});
+	Document back;
+	std::string error;
+	ASSERT_TRUE(fromJson(toJson(d), back, error)) << error;
+	EXPECT_DOUBLE_EQ(back.camera.iso, 400.0);
+	EXPECT_DOUBLE_EQ(back.camera.shutter, 0.25);
+	EXPECT_DOUBLE_EQ(back.cameraViews[0].camera.iso, 400.0);
+	EXPECT_EQ(toJson(back), toJson(d));
+}
+
+TEST(SceneCameraExposureTest, TheWrittenFileGivesTheRendererTheSameFilmRatio) {
+	Document d = makeStarterScene();
+	d.camera.iso = 400.0;
+	d.camera.shutter = 0.5;
+	const std::string pbrt = toPbrt(d);
+	EXPECT_NE(pbrt.find("\"float iso\" [ 400 ]"), std::string::npos);
+	const pbrt_scene::ParseResult parsed = pbrt_scene::parse(pbrt);
+	ASSERT_TRUE(parsed.ok) << parsed.error;
+	const pbrt_flatten::FlatScene flat = pbrt_flatten::flatten(parsed.scene);
+	EXPECT_DOUBLE_EQ(flat.filmImagingRatio, 2.0);   // 0.5 s at ISO 400
+}
+
+TEST(SceneCameraExposureTest, ANonsenseExposureIsAnError) {
+	Document d = makeStarterScene();
+	d.camera.iso = 0.0;
+	EXPECT_TRUE(hasErrors(validate(d)));
+	d.camera.iso = 100.0;
+	d.camera.shutter = -1.0;
+	EXPECT_TRUE(hasErrors(validate(d)));
+	d.camera.shutter = 1.0;
+	EXPECT_FALSE(hasErrors(validate(d)));
+}

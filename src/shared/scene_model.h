@@ -213,6 +213,10 @@ struct Camera {
 	double lensRadius = 0.0;           // 0 = a pinhole; > 0 blurs what is not at focusDistance
 	double focusDistance = 8.0;
 	double sensorWidthMm = 36.0;       // the film's width in millimetres, for talking about the lens as a focal length (scene_camera_lens.h); the renderer reads only `fov`
+	// The film's exposure, as pbrt has it: the picture is scaled by shutter * iso / 100 (the defaults, 1 s at ISO 100, are a factor of 1: the lights are drawn as they are). ISO 400 at 1/4 s is
+	// the same picture; the aperture (lensRadius) changes the blur, not the brightness, as in pbrt.
+	double iso = 100.0;
+	double shutter = 1.0;              // exposure time, seconds
 };
 
 // A camera the user saved under a name, to come back to (scene_camera_views.h).

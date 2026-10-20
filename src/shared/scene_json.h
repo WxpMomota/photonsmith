@@ -307,6 +307,8 @@ inline Json cameraToJson(const Camera& c) {
 	Json cam = Json::object();
 	cam.set("position", toJson(c.position)).set("target", toJson(c.target)).set("up", toJson(c.up));
 	cam.set("fov", Json::number(c.fov)).set("lensRadius", Json::number(c.lensRadius)).set("focusDistance", Json::number(c.focusDistance));
+	if (c.iso != 100.0) cam.set("iso", Json::number(c.iso));   // (the exposure only when it is not pbrt's neutral 1 s at ISO 100: older scenes write what they always did)
+	if (c.shutter != 1.0) cam.set("shutter", Json::number(c.shutter));
 	if (c.sensorWidthMm != 36.0) cam.set("sensorWidthMm", Json::number(c.sensorWidthMm));   // (only when it is not the full-frame default: older scenes write what they always did)
 	return cam;
 }
@@ -314,7 +316,8 @@ inline Json cameraToJson(const Camera& c) {
 inline bool readCamera(const Json& cam, Camera& c) {
 	if (cam.type != Json::Type::Obj) return false;
 	return readVec(cam, "position", c.position) && readVec(cam, "target", c.target) && readVec(cam, "up", c.up) && readNum(cam, "fov", c.fov) &&
-	       readNum(cam, "lensRadius", c.lensRadius) && readNum(cam, "focusDistance", c.focusDistance) && readNum(cam, "sensorWidthMm", c.sensorWidthMm);
+	       readNum(cam, "lensRadius", c.lensRadius) && readNum(cam, "focusDistance", c.focusDistance) && readNum(cam, "sensorWidthMm", c.sensorWidthMm) &&
+	       readNum(cam, "iso", c.iso) && readNum(cam, "shutter", c.shutter) && c.iso > 0.0 && c.shutter > 0.0;
 }
 
 }  // namespace detail
@@ -473,6 +476,8 @@ inline bool fromJson(const std::string& text, Document& out, std::string& err) {
 			CameraView v;
 			v.camera = d.camera;   // a field a view does not carry is the scene camera's
 			ok = ok && detail::readCamera(j, v.camera) && detail::readStr(j, "name", v.name) && detail::readNum(j, "hold", v.hold);
+			if (!j.find("iso")) v.camera.iso = 100.0;   // (written only when not the default, like the sensor width just below)
+			if (!j.find("shutter")) v.camera.shutter = 1.0;
 			if (!j.find("sensorWidthMm")) v.camera.sensorWidthMm = 36.0;   // (the width is written only when it is not 36, so a view without it was saved at 36, whatever the scene camera has now)
 			if (!(v.hold >= 0.0 && v.hold <= 3600.0)) v.hold = 0.0;
 			if (!ok) break;

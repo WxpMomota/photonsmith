@@ -398,8 +398,11 @@ inline std::string toPbrt(const Document& d, bool instancing = true, const std::
 		writtenFov = 2.0 * std::atan(std::tan(c.fov * 3.14159265358979323846 / 360.0) * static_cast<double>(d.render.width) / d.render.height) * 180.0 / 3.14159265358979323846;
 	os << "Camera \"perspective\" \"float fov\" [ " << detail::num(writtenFov) << " ]";
 	if (c.lensRadius > 0.0) os << " \"float lensradius\" [ " << detail::num(c.lensRadius) << " ] \"float focaldistance\" [ " << detail::num(c.focusDistance) << " ]";
+	if (c.shutter != 1.0) os << " \"float shutteropen\" [ 0 ] \"float shutterclose\" [ " << detail::num(c.shutter) << " ]";   // (pbrt's exposure time is close - open)
 	os << "\n";
-	os << "Film \"rgb\" \"integer xresolution\" [ " << d.render.width << " ] \"integer yresolution\" [ " << d.render.height << " ]\n";
+	os << "Film \"rgb\" \"integer xresolution\" [ " << d.render.width << " ] \"integer yresolution\" [ " << d.render.height << " ]";
+	if (c.iso != 100.0) os << " \"float iso\" [ " << detail::num(c.iso) << " ]";
+	os << "\n";
 	os << "Sampler \"sobol\" \"integer pixelsamples\" [ " << d.render.samples << " ]\n";
 	os << "Integrator \"volpath\" \"integer maxdepth\" [ " << d.render.maxDepth << " ]\n\n";
 	os << "WorldBegin\n\n";
