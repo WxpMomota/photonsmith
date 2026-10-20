@@ -229,6 +229,7 @@
     <ClCompile Include="unit\environment_library_tests.cpp" />
     <ClCompile Include="unit\render_events_tests.cpp" />
     <ClCompile Include="unit\output_crop_tests.cpp" />
+    <ClCompile Include="unit\scene_report_tests.cpp" />
     <ClCompile Include="unit\scene_registry_snapshot_tests.cpp" />
     <ClCompile Include="unit\scene_view_math_tests.cpp" />
     <ClCompile Include="unit\mesh_preview_tests.cpp" />

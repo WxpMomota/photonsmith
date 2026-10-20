@@ -44,11 +44,13 @@
 #include "../src/shared/exr_writer.h"
 #include "../src/shared/pbrt_asset_check.h"
 #include "../src/shared/scene_size.h"
+#include "../src/shared/scene_report.h"
 #include "../src/shared/gltf_export.h"
 #include "../src/shared/pbrt_load.h"
 #include "../src/shared/light_sampler_resolution.h"
 #include <iostream>
 #include <fstream>
+#include <iterator>
 #include <memory>
 #include <filesystem>
 #include <cmath>
@@ -1139,6 +1141,33 @@ extern "C" double cpu_scene_measure_size(const char* scene_id_or_path) {
 	const double size = scene_size::ofFile(path, &error);
 	if (size < 0.0) std::cerr << "cannot measure " << path << ": " << error << "\n";
 	return size;
+}
+
+extern "C" int cpu_scene_report(const char* scene_id_or_path) {
+	if (!scene_id_or_path || !scene_id_or_path[0]) return 1;
+	std::string path = scene_id_or_path;
+	std::error_code existsError;
+	if (!std::filesystem::exists(path, existsError)) {
+		const char* known = cpu_scene_pbrt_path_by_id(scene_id_or_path);
+		if (!known || !known[0]) {
+			std::cerr << "cannot report on " << scene_id_or_path << ": not a file, and not a scene backed by one\n";
+			return 2;
+		}
+		path = known;
+	}
+	const pbrt_load::LoadResult loaded = pbrt_load::loadFile(path);
+	if (!loaded.ok) {
+		std::cerr << "cannot load " << path << ": " << loaded.error << "\n";
+		return 3;
+	}
+	// The reference pack's table, when it is at hand (a checkout: tests/data/ next to the program or up to four folders above the current one).
+	std::string table;
+	for (std::filesystem::path dir = std::filesystem::current_path(existsError), prev; table.empty() && !dir.empty() && dir != prev; prev = dir, dir = dir.parent_path()) {
+		std::ifstream in(dir / "tests" / "data" / "pbrt_reference_means.txt", std::ios::binary);
+		if (in) table.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+	}
+	std::cout << scene_report::format(path, loaded.scene, table);
+	return 0;
 }
 
 extern "C" int cpu_export_gltf(const char* scene_id_or_path, const char* out_path) {
