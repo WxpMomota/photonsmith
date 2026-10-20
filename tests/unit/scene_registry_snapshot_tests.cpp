@@ -51,7 +51,7 @@ std::vector<std::string> currentSnapshot() {
 	for (const SceneDescriptor& s : get_builtin_scene_registry()) {
 		const SceneDescriptor* listed = find_scene(s.id);   // (the full registry gives the slug; the built-in one is before it is set)
 		std::ostringstream line;
-		line << s.id << '|' << s.legacy_id << '|' << (listed ? listed->slug : s.slug) << '|' << s.category << '|' << s.name << '|' << s.performance << '|'
+		line << s.id << '|' << s.legacy_id << '|' << (listed ? listed->slug : s.slug) << '|' << s.category << '|' << s.subcategory << '|' << s.name << '|' << s.performance << '|'
 		     << (s.requires_files ? "files" : "self") << (s.gpu_compatible ? ",gpu" : ",cpu-only") << '|' << fileOf(s.id) << '|' << fingerprint(s.description);
 		lines.push_back(line.str());
 	}
@@ -59,7 +59,7 @@ std::vector<std::string> currentSnapshot() {
 }
 
 std::string header() {
-	return "# The built-in scenes, one per line: id|legacy id|slug|category|name|performance|flags|file|description fingerprint.\n"
+	return "# The built-in scenes, one per line: id|legacy id|slug|category|subcategory|name|performance|flags|file|description fingerprint.\n"
 	       "# Regenerate with RT_UPDATE_SNAPSHOT=1 (see tests/unit/scene_registry_snapshot_tests.cpp) and review the diff.\n";
 }
 

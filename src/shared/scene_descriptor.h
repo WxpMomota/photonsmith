@@ -127,4 +127,24 @@ namespace SceneCategories {
     }
 } // namespace SceneCategories
 
+// -----------------------------------------------------------------------
+// Subcategories: a second level inside a category that has grown too big to browse as one list (Large Scenes: 42 and counting). A scene's subcategory is an
+// argument of its registry row (in_subcategory() in scene_registry.h); it never changes the scene's id (the letter is the CATEGORY's), so adding or moving a
+// scene between subcategories moves no id. The GUI shows a row of subcategory tabs under the category tabs when a category has two or more. A category with
+// no subcategories (every other one today) simply has none; a scene with an empty subcategory under a category that has some is listed under "All" only.
+// Use these constants in the registry, never raw string literals; the order here is the order of the tabs.
+// -----------------------------------------------------------------------
+namespace SceneSubcategories {
+    // Large Scenes
+    constexpr const char* Interiors   = "Interiors";           // rooms, halls, kitchens: lit by windows and lamps
+    constexpr const char* Buildings   = "Buildings & Streets"; // atrium, cathedral, pavilion, houses, streets, a power plant
+    constexpr const char* VoxelWorlds = "Voxel Worlds";        // Minecraft-style towns and islands
+    constexpr const char* Nature      = "Nature";              // outdoor scenes of plants and land
+    constexpr const char* Vehicles    = "Vehicles";            // cars and a spaceship
+    constexpr const char* Objects     = "Objects";             // statues, product shots and material studies
+    constexpr const char* LightAndArt = "Light & Art";         // light-transport test scenes and artists' pieces
+    constexpr const char* kLargeScenes[] = {Interiors, Buildings, VoxelWorlds, Nature, Vehicles, Objects, LightAndArt};
+    constexpr std::size_t kLargeScenesCount = sizeof(kLargeScenes) / sizeof(kLargeScenes[0]);
+} // namespace SceneSubcategories
+
 #endif // __cplusplus

@@ -1030,6 +1030,11 @@ extern "C" const char* cpu_scene_category_by_id(const char* scene_id) {
 	return s ? s->category : "";
 }
 
+extern "C" const char* cpu_scene_subcategory_by_id(const char* scene_id) {
+	const SceneDescriptor* s = find_scene(scene_id);
+	return s ? s->subcategory : "";
+}
+
 extern "C" const char* cpu_scene_pbrt_path_by_id(const char* scene_id) {
 	// get_scene_registry() must run at least once before pbrt_scene_
 	// registry::paths() has anything in it - that map is populated as a

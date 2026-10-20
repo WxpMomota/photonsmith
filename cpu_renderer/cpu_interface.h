@@ -543,6 +543,8 @@ const char* cpu_scene_name_by_id(const char* scene_id);
 /// SceneCategories:: constants in src/shared/scene_descriptor.h. The Qt GUI
 /// groups its scene list by this.
 const char* cpu_scene_category_by_id(const char* scene_id);
+/// The scene's subcategory (one of the SceneSubcategories:: constants in src/shared/scene_descriptor.h), "" when its category has none. The GUI's second row of tabs.
+const char* cpu_scene_subcategory_by_id(const char* scene_id);
 const char* cpu_scene_description_by_id(const char* scene_id);
 /// For a scene loaded from a .pbrt file, the path it was loaded from; "" for
 /// every built-in scene. This exists so the GPU scene builder can find the

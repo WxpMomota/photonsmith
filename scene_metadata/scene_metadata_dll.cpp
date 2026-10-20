@@ -165,6 +165,15 @@ SCENE_METADATA_API const char* scene_metadata_category(const char* scene_id) {
 	}
 }
 
+// The scene's subcategory ("" when its category has none): the GUI's second row of tabs.
+SCENE_METADATA_API const char* scene_metadata_subcategory(const char* scene_id) {
+	try {
+		return cpu_scene_subcategory_by_id(scene_id);
+	} catch (...) {
+		return "";
+	}
+}
+
 SCENE_METADATA_API const char* scene_metadata_description(const char* scene_id) {
 	try {
 		return cpu_scene_description_by_id(scene_id);

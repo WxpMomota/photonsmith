@@ -24,6 +24,8 @@ struct DllHandle {
 	IdAtIndexFn idAtIndexFn = nullptr;
 	StringByIdFn nameFn = nullptr;
 	StringByIdFn categoryFn = nullptr;
+	// Optional: a scene's subcategory. Absent in an older library: no scene has one.
+	StringByIdFn subcategoryFn = nullptr;
 	StringByIdFn descriptionFn = nullptr;
 	IntByIdFn requiresFilesFn = nullptr;
 	// Optional (absent in a library built before this export existed): the GUI just shows no
@@ -91,6 +93,8 @@ DllHandle& handle() {
 			cross_abi_library::lookupSymbol(h.module, "scene_metadata_name"));
 		h.categoryFn = reinterpret_cast<StringByIdFn>(
 			cross_abi_library::lookupSymbol(h.module, "scene_metadata_category"));
+		h.subcategoryFn = reinterpret_cast<StringByIdFn>(
+			cross_abi_library::lookupSymbol(h.module, "scene_metadata_subcategory"));
 		h.descriptionFn = reinterpret_cast<StringByIdFn>(
 			cross_abi_library::lookupSymbol(h.module, "scene_metadata_description"));
 		h.requiresFilesFn = reinterpret_cast<IntByIdFn>(
@@ -198,6 +202,27 @@ QString sceneIdForKey(const QString& key) {
 QString sceneCategory(const QString& scene_id) {
 	if (!ensureLoaded()) return QString();
 	return QString::fromUtf8(handle().categoryFn(scene_id.toUtf8().constData()));
+}
+
+QString sceneSubcategory(const QString& scene_id) {
+	if (!ensureLoaded() || !handle().subcategoryFn) return QString();
+	return QString::fromUtf8(handle().subcategoryFn(scene_id.toUtf8().constData()));
+}
+
+QString displaySubcategory(const QString& subcategory) {
+	// The literals below exist for lupdate; the lookup passes the canonical name through translate().
+	static const char *const kNames[] = {
+		QT_TRANSLATE_NOOP("SceneSubcategory", "Interiors"),
+		QT_TRANSLATE_NOOP("SceneSubcategory", "Buildings & Streets"),
+		QT_TRANSLATE_NOOP("SceneSubcategory", "Voxel Worlds"),
+		QT_TRANSLATE_NOOP("SceneSubcategory", "Nature"),
+		QT_TRANSLATE_NOOP("SceneSubcategory", "Vehicles"),
+		QT_TRANSLATE_NOOP("SceneSubcategory", "Objects"),
+		QT_TRANSLATE_NOOP("SceneSubcategory", "Light & Art"),
+	};
+	for (const char *name : kNames)
+		if (subcategory == QLatin1String(name)) return QCoreApplication::translate("SceneSubcategory", name);
+	return subcategory;
 }
 
 QString displayCategory(const QString& category) {

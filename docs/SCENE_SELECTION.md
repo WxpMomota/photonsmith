@@ -24,12 +24,14 @@ The category letters, in GUI tab order:
 | E | Volumes | Participating media |
 | F | Geometry | Shape primitives |
 | G | Models | Single imported meshes |
-| H | Large Scenes | Full textured environments |
+| H | Large Scenes | Full textured environments, in subcategories (below) |
 | I | Education | Curated demos of specific Render Options controls (Sampler, Spectral rendering, Exposure, Tone mapping, Integrator) |
 | J | Textures | Texture-system demos (encoding, wrap, invert, procedural texture classes, nested textures) |
 | K | Custom Scenes | Your scenes and downloaded collections: `.pbrt` files found on disk that do not name another category |
 | L | Test Scenes | The bundled fixtures: furnaces with exact answers, light-transport probes, one-feature regression scenes. Worth browsing (each isolates one thing) but not demos |
 | M | My Scenes | Scenes you made: the ones saved from the Scene Builder with **Add to scene list** (they go to your own folder, so they survive reinstalling the program), and any scene file carrying a Scene Builder title. Shown right after Textures in the GUI, though its id letter is the last one so no existing id changed |
+
+**Subcategories.** A category that grows too big to browse as one list has a second level, shown as a row of tabs under the category tabs ("All (42)", "Interiors (14)", ...). Today only Large Scenes has them: **Interiors** (rooms, halls, kitchens), **Buildings & Streets** (atrium, cathedral, pavilion, houses, streets, a power plant), **Voxel Worlds** (Minecraft-style towns), **Nature**, **Vehicles** (cars and a spaceship), **Objects** (statues, product shots, material studies) and **Light & Art** (light-transport test scenes, artists' pieces). A subcategory is part of the scene's registry row (`in_subcategory(SceneSubcategories::Vehicles, ...)`, names in `src/shared/scene_descriptor.h`); it never changes the scene's id, which is the category's letter and a number, so moving a scene between subcategories moves no id. The row shows only when the selected category's scenes have two or more subcategories.
 
 A name in a scene's list is what the scene shows ("Cornell Rough Glass"). A scene found on disk is listed under the title the Scene Builder saved in it, or its file name made readable (`bdpt-box-room` is "BDPT Box Room"). A "(pbrt file)" qualifier appears on six names only, where a compiled-in scene already has the plain name.
 
@@ -94,7 +96,7 @@ Any `.pbrt` file placed in `pbrt_scenes/` (or in the folder named by the `RAY_TR
 ## Adding a built-in scene
 
 1. Put the scene's `.pbrt` file in `pbrt_scenes/` (a scene that needs a download is a pack in `qt_gui/scene_packs.txt`, made by `scripts/gen_scene_packs.py`).
-2. Add **one** row in `src/TheRestOfYourLife/scene_registry_data.h` (`build_curated_pbrt_scene_descriptor(...)`, or the `_external_` one for a download): id, legacy id (the next number nobody uses), name (what the scene shows, not how it is stored), slug (the durable name: it never changes when the name does), category, description, performance, file. The name and slug used to be two more tables; they are arguments of the row now.
+2. Add **one** row in `src/TheRestOfYourLife/scene_registry_data.h` (a Large Scene wraps it in `pbrt_scene_registry::in_subcategory(SceneSubcategories::..., ...)`: the tests fail for a Large Scene with none) (`build_curated_pbrt_scene_descriptor(...)`, or the `_external_` one for a download): id, legacy id (the next number nobody uses), name (what the scene shows, not how it is stored), slug (the durable name: it never changes when the name does), category, description, performance, file. The name and slug used to be two more tables; they are arguments of the row now.
 3. Add its technique note to `qt_gui/scene_technique_notes.h`, keyed by the slug, for a scene that needs no download. The notes are translated GUI text, so they stay in the GUI rather than in the (Qt-free) registry; `RT_GUI_SELFTEST=scenekeys` (see `qt_gui/mainwindow_selftest.cpp`) fails when a self-contained scene has no note or a note belongs to no scene.
 4. Run `RT_UPDATE_SNAPSHOT=1 ray_tracer_tests --gtest_filter=SceneRegistrySnapshot*` from the repository root and review the diff of `tests/data/scene_registry_snapshot.txt` (one line per scene: that is where a count, a rename or a retuned row shows up). The same test names the documents that quote the number of scenes (README, this guide, `.github/copilot-instructions.md`) when they are out of date.
 

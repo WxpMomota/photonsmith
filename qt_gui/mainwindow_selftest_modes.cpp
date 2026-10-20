@@ -1057,6 +1057,55 @@ void MainWindow::runDiagnosticsSelfTest(const std::function<void(const QString &
 	return;
 }
 
+	// RT_GUI_SELFTEST=subcategories: the third row of scene tabs. Choosing a car (a Large Scene) shows the Vehicles tab selected and only vehicles in the list;
+	// "All" lists every Large Scene; another subcategory drops the car; a category without subcategories hides the row. Exit 0 if every check held.
+void MainWindow::runSubcategoriesSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {
+	bool ok = true;
+	auto check = [&ok, log](bool cond, const QString &what) {
+		log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what));
+		ok = ok && cond;
+	};
+	resize(1100, 900);
+	selectSceneById("H17");   // the Sports Car
+	QApplication::processEvents();
+	check(m_sceneSubcategoryTabs && m_sceneSubcategoryTabs->count() > 2, QString("the subcategory row has tabs (%1)").arg(m_sceneSubcategoryTabs ? m_sceneSubcategoryTabs->count() : -1));
+	const QString current = m_sceneSubcategoryTabs ? m_sceneSubcategoryTabs->tabData(m_sceneSubcategoryTabs->currentIndex()).toString() : QString();
+	check(current == "Vehicles", "choosing a car selects the Vehicles tab (" + current + ")");
+	bool onlyVehicles = m_sceneCombo->count() > 1, hasCar = false;
+	for (int i = 0; i < m_sceneCombo->count(); ++i) {
+		const QString id = m_sceneCombo->itemData(i).toString();
+		onlyVehicles = onlyVehicles && SceneMetadataClient::sceneSubcategory(id) == "Vehicles";
+		hasCar = hasCar || id == "H17";
+	}
+	check(onlyVehicles && hasCar, QString("the list holds %1 vehicles, the car among them").arg(m_sceneCombo->count()));
+	shot("subcategories");
+	m_sceneSubcategoryTabs->setCurrentIndex(0);   // All
+	QApplication::processEvents();
+	int largeScenes = 0;
+	for (int i = 0, n = SceneMetadataClient::sceneCount(); i < n; ++i) {
+		const QString id = SceneMetadataClient::sceneIdAtIndex(i);
+		if (SceneMetadataClient::sceneCategory(id) == "Large Scenes" && SceneMetadataClient::sceneRequiresFiles(id)) ++largeScenes;
+	}
+	check(m_sceneCombo->count() == largeScenes && largeScenes > 30, QString("All lists every Large Scene (%1 of %2)").arg(m_sceneCombo->count()).arg(largeScenes));
+	for (int i = 0; i < m_sceneSubcategoryTabs->count(); ++i)
+		if (m_sceneSubcategoryTabs->tabData(i).toString() == "Interiors") m_sceneSubcategoryTabs->setCurrentIndex(i);
+	QApplication::processEvents();
+	bool carGone = true, anyInterior = m_sceneCombo->count() > 5;
+	for (int i = 0; i < m_sceneCombo->count(); ++i) {
+		carGone = carGone && m_sceneCombo->itemData(i).toString() != "H17";
+		anyInterior = anyInterior && SceneMetadataClient::sceneSubcategory(m_sceneCombo->itemData(i).toString()) == "Interiors";
+	}
+	check(carGone && anyInterior, QString("Interiors lists %1 rooms and not the car").arg(m_sceneCombo->count()));
+	selectSceneById("A1");   // a category with no subcategories
+	QApplication::processEvents();
+	check(m_sceneSubcategoryTabs->count() == 0 && !m_sceneSubcategoryTabs->isVisible(), "a category without subcategories shows no subcategory row");
+	selectSceneById("H41");   // and back: Veach, Ajar is in Light & Art
+	QApplication::processEvents();
+	check(m_sceneSubcategoryTabs->tabData(m_sceneSubcategoryTabs->currentIndex()).toString() == "Light & Art", "choosing Veach, Ajar selects Light & Art");
+	log(ok ? "RESULT: OK" : "RESULT: FAIL");
+	QApplication::exit(ok ? 0 : 1);
+}
+
 	// RT_GUI_SELFTEST=scenekeys: the scene keys the GUI saves and looks up by (slugs, with ids still accepted) round-trip through the metadata library, the
 	// technique notes are found by either, and the thumbnail cache is keyed by slug. Exit 0 if every check held.
 void MainWindow::runSceneKeysSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {

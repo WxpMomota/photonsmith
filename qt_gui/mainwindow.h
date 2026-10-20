@@ -139,6 +139,7 @@ public:
 	void runBuilderSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot, const QString &outPrefix);
 	void runDiagnosticsSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);
 	void runSceneKeysSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);
+	void runSubcategoriesSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runDownloadSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);
 	void runUiSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);
 #ifdef RT_GUI_HAVE_LIVE_PREVIEW
@@ -1441,6 +1442,9 @@ private:
 	// category with zero scenes at all.
 	QTabBar *m_sceneAvailabilityTabs = nullptr;  // "Self-Contained" / "Requires External Files"
 	QTabBar *m_sceneCategoryTabs = nullptr;  // Category filter above the scene dropdown
+	// A third row, under the category tabs: the subcategories of the selected category (Large Scenes: Interiors, Vehicles, ...), with "All" first. It has no tabs
+	// (and is hidden) when the category's scenes have fewer than two subcategories, which is every category but Large Scenes today.
+	QTabBar *m_sceneSubcategoryTabs = nullptr;
 	// Narrows the current category's own combo list further by name/id/
 	// description substring - independent of, and applied on top of, the
 	// availability/category tab filters above. Scenes went from 78 to 154
@@ -1507,6 +1511,9 @@ private:
 	// all. Does not touch m_sceneCombo; callers follow up with
 	// populateSceneCombo() for whichever category tab ends up selected.
 	void rebuildCategoryTabs(bool requiresFiles);
+	// Rebuilds m_sceneSubcategoryTabs for `category` and the current availability tab ("All (n)" and one tab for each subcategory present, in
+	// SceneSubcategories order); `select` is the subcategory to show ("" = All). Does not touch the combo: callers follow it with populateSceneViews().
+	void rebuildSubcategoryTabs(const QString &category, const QString &select = QString());
 
 	// The scene ids matching `category` and m_sceneAvailabilityTabs' current
 	// selection, further narrowed by m_sceneSearchBox's text if any (name/id/

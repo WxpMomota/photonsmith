@@ -344,54 +344,66 @@ inline std::vector<SceneDescriptor> builtin_scenes_part3() {
             "G24", 61, "Rocker Arm", "rocker-arm", SceneCategories::Models,
             "A mechanical engine part (a rocker arm) in gunmetal, from an external .obj file (needs models/rocker-arm.obj). The flat tops of its two bosses catch a strong mirror-like highlight from the overhead light, as a flat low-roughness surface should.",
             "Fast", "mesh-rocker-arm.pbrt", CameraMode::Fixed, /*requires_files=*/true),
-        pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Buildings,
+            pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
             "H1", 62, "Crytek Sponza", "crytek-sponza", SceneCategories::LargeScene,
             "Crytek Sponza (262K triangles) - the classic architectural global-illumination benchmark scene, with real per-face .mtl materials and image textures (curtains, columns, floor) loaded from models/sponza_textures/, lit by an open sky, loaded from an external .obj file (requires models/sponza.obj). First 'whole environment' mesh scene here rather than a single statue -- see build_sponza()'s own comment for the full design rationale.",
-            "Medium", "environment-sponza.pbrt", CameraMode::Fixed, /*requires_files=*/true),
-        pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
+            "Medium", "environment-sponza.pbrt", CameraMode::Fixed, /*requires_files=*/true)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Buildings,
+            pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
             "H2", 63, "Amazon Lumberyard Bistro", "amazon-lumberyard-bistro", SceneCategories::LargeScene,
             "Amazon Lumberyard Bistro, exterior (2.84M triangles): a full outdoor street block with several buildings and a plaza, per-face materials and image textures (windows, doors, foliage) from models/bistro_textures/, lit by an open sky. From an external .obj file (needs models/bistro_exterior.obj).",
-            "Slow", "environment-bistro-exterior.pbrt", CameraMode::Fixed, /*requires_files=*/true),
-        pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
+            "Slow", "environment-bistro-exterior.pbrt", CameraMode::Fixed, /*requires_files=*/true)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::VoxelWorlds,
+            pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
             "H3", 64, "Rungholt", "rungholt", SceneCategories::LargeScene,
             "Rungholt (6.7M triangles): a giant blocky Minecraft-style town with per-face material colours and no image textures, from an external .obj file (needs models/rungholt.obj).",
-            "Slow", "environment-rungholt.pbrt", CameraMode::Fixed, /*requires_files=*/true),
-        pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
+            "Slow", "environment-rungholt.pbrt", CameraMode::Fixed, /*requires_files=*/true)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
+            pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
             "H4", 73, "Fireplace Room", "fireplace-room", SceneCategories::LargeScene,
             "Fireplace Room: a small furnished living room (fireplace, wood floor, framed pictures, a potted plant) with materials and image textures from models/fireplace_room_textures/, lit by an open sky through its windows. From an external .obj file (needs models/fireplace_room.obj).",
-            "Medium", "environment-fireplace-room.pbrt", CameraMode::Fixed, /*requires_files=*/true),
-        pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
+            "Medium", "environment-fireplace-room.pbrt", CameraMode::Fixed, /*requires_files=*/true)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Buildings,
+            pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
             "H5", 74, "San Miguel", "san-miguel", SceneCategories::LargeScene,
             "San Miguel (9.9M triangles): a dense Mexican hacienda courtyard, the classic benchmark scene, with tile, wood, fabric and foliage textures from models/san_miguel_textures/, lit by an open sky. From an external .obj file (needs models/san_miguel.obj).",
-            "Very Slow", "environment-san-miguel.pbrt", CameraMode::Fixed, /*requires_files=*/true),
-        pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
+            "Very Slow", "environment-san-miguel.pbrt", CameraMode::Fixed, /*requires_files=*/true)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Buildings,
+            pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
             "H6", 75, "Sibenik Cathedral", "sibenik-cathedral", SceneCategories::LargeScene,
             "Sibenik Cathedral: a Gothic cathedral interior (vaulted nave, stone columns, a rose window, coloured stained glass) with image textures and bump maps from models/sibenik_cathedral_textures/, lit through its doorway and arches. From an external .obj file (needs models/sibenik_cathedral.obj).",
-            "Slow", "environment-sibenik-cathedral.pbrt", CameraMode::Fixed, /*requires_files=*/true),
-        pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
+            "Slow", "environment-sibenik-cathedral.pbrt", CameraMode::Fixed, /*requires_files=*/true)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
+            pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
             "H7", 76, "Breakfast Room", "breakfast-room", SceneCategories::LargeScene,
             "Breakfast Room: a cosy dining interior with glassware, table settings and marble and tile textures from models/breakfast_room_textures/, lit by an open sky through its windows. From an external .obj file (needs models/breakfast_room.obj).",
-            "Slow", "environment-breakfast-room.pbrt", CameraMode::Fixed, /*requires_files=*/true),
-        pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
+            "Slow", "environment-breakfast-room.pbrt", CameraMode::Fixed, /*requires_files=*/true)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
+            pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
             "H8", 77, "Salle de Bain", "salle-de-bain", SceneCategories::LargeScene,
             "Salle de Bain: a tiled bathroom with a mirror, a tub and a real ceiling light fixture that emits light, with image textures from models/salle_de_bain_textures/. From an external .obj file (needs models/salle_de_bain.obj).",
-            "Medium", "environment-salle-de-bain.pbrt", CameraMode::Fixed, /*requires_files=*/true),
-        pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
+            "Medium", "environment-salle-de-bain.pbrt", CameraMode::Fixed, /*requires_files=*/true)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
+            pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
             "H9", 78, "Gallery", "gallery", SceneCategories::LargeScene,
             "Gallery: the Hallwyl Museum picture gallery in Stockholm, an ornate room of framed paintings, chandeliers and a parquet floor, with a texture from models/gallery_textures/, lit by an open sky. From an external .obj file (needs models/gallery.obj).",
-            "Medium", "environment-gallery.pbrt", CameraMode::Fixed, /*requires_files=*/true),
-        pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
+            "Medium", "environment-gallery.pbrt", CameraMode::Fixed, /*requires_files=*/true)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::VoxelWorlds,
+            pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
             "H10", 79, "Lost Empire", "lost-empire", SceneCategories::LargeScene,
             "Lost Empire - a large half-buried ancient city exported from a Minecraft world, with temple platforms, staircases, and a lava chamber, with real per-face .mtl materials and an image texture loaded from models/lost_empire_textures/, lit by an open sky, loaded from an external .obj file (requires models/lost_empire.obj). Tenth 'whole environment' mesh scene, and the first at a scale (165 units deep) that suits a long video flythrough -- see build_lost_empire()'s own comment.",
-            "Very Slow", "environment-lost-empire.pbrt", CameraMode::Fixed, /*requires_files=*/true),
-        pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
+            "Very Slow", "environment-lost-empire.pbrt", CameraMode::Fixed, /*requires_files=*/true)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::VoxelWorlds,
+            pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
             "H11", 80, "Vokselia Spawn", "vokselia-spawn", SceneCategories::LargeScene,
             "Vokselia Spawn - a small floating voxel island, exported from the same Minecraft world as Lost Empire from its spawn point, with a real per-face .mtl material and an image texture loaded from models/vokselia_spawn_textures/, lit by an open sky, loaded from an external .obj file (requires models/vokselia_spawn.obj). Eleventh 'whole environment' mesh scene -- see build_vokselia_spawn()'s own comment.",
-            "Fast", "environment-vokselia-spawn.pbrt", CameraMode::Fixed, /*requires_files=*/true),
-        pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
+            "Fast", "environment-vokselia-spawn.pbrt", CameraMode::Fixed, /*requires_files=*/true)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Buildings,
+            pbrt_scene_registry::build_curated_pbrt_scene_descriptor(
             "H12", 81, "Power Plant", "power-plant", SceneCategories::LargeScene,
             "Power Plant - a complete model of an actual coal-fired power plant (12.76M triangles, 5.98M vertices), the largest scene in this collection by triangle count, with flat per-face .mtl colors (no image textures), lit by an open sky, loaded from an external .obj file (requires models/powerplant.obj). Twelfth 'whole environment' mesh scene, and the first needing a real coordinate rescale rather than raw OBJ units -- see build_power_plant()'s own comment.",
-            "Slow", "environment-power-plant.pbrt", CameraMode::Fixed, /*requires_files=*/true),
+            "Slow", "environment-power-plant.pbrt", CameraMode::Fixed, /*requires_files=*/true)),
     };
 }
 
@@ -419,14 +431,16 @@ inline std::vector<SceneDescriptor> builtin_scenes_part4() {
         // exposure=1.0 they rendered as a near-black silhouette rather
         // than the furnished/architectural scene the geometry actually
         // contains.
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H13", 159, "Contemporary Bathroom", "contemporary-bathroom", SceneCategories::LargeScene,
             "A furnished bathroom interior from the pbrt-v4-scenes collection (not bundled with this repo; see pbrt_scenes/README.md): tile, wood, chrome, glass and fabric, with a blackbody-temperature light fixture.",
-            "Very Slow", "contemporary-bathroom/contemporary-bathroom.pbrt", 15.0),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Very Slow", "contemporary-bathroom/contemporary-bathroom.pbrt", 15.0)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Buildings,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H14", 160, "Barcelona Pavilion", "barcelona-pavilion", SceneCategories::LargeScene,
             "Mies van der Rohe's Barcelona Pavilion from the pbrt-v4-scenes collection (not bundled with this repo; see pbrt_scenes/README.md): glass and marble architecture among dense foliage, in its daytime lighting.",
-            "Slow", "barcelona-pavilion/pavilion-day.pbrt", 15.0),
+            "Slow", "barcelona-pavilion/pavilion-day.pbrt", 15.0)),
         // H15-H17: three more real pbrt-v4-scenes bundles, same
         // build_curated_external_pbrt_scene_descriptor() mechanism as H13/H14
         // above - already sitting locally as parser-verification fixtures,
@@ -434,18 +448,21 @@ inline std::vector<SceneDescriptor> builtin_scenes_part4() {
         // pbrt_scenes/sssdragon/, pbrt_scenes/ganesha/, pbrt_scenes/sportscar/
         // respectively (pbrt_scenes/README.md's "Getting scenes" section) for
         // these to render.
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Objects,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H15", 161, "Subsurface Dragon", "subsurface-dragon", SceneCategories::LargeScene,
             "A real pbrt-v4-scenes bundle (not bundled with this repo - see pbrt_scenes/README.md): a dragon statue rendered as translucent skin-like subsurface scattering material lit by an HDR environment map. Three density variants ship in the same directory (dragon_10/50/250.pbrt, differing only in the subsurface scale parameter, 10 being the most translucent); this entry renders the middle one.",
-            "Very Slow", "sssdragon/dragon_50.pbrt"),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Very Slow", "sssdragon/dragon_50.pbrt")),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Objects,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H16", 162, "Ganesha", "ganesha", SceneCategories::LargeScene,
             "A detailed statue of Ganesha in a marble-like subsurface scattering material, lit by an HDR environment map, from the pbrt-v4-scenes collection (not bundled with this repo; see pbrt_scenes/README.md). A second subsurface showcase beside the Subsurface Dragon.",
-            "Slow", "ganesha/ganesha.pbrt"),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Slow", "ganesha/ganesha.pbrt")),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Vehicles,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H17", 163, "Sports Car", "sports-car", SceneCategories::LargeScene,
             "A real pbrt-v4-scenes bundle (not bundled with this repo - see pbrt_scenes/README.md): a studio-lit sports car with real-world car-paint (layered coated conductor), glass, chrome, and rubber materials under an HDR sky. Renders the daytime sky-lit variant (sportscar-sky.pbrt); a separate area-lit studio variant also ships in the same directory.",
-            "Slow", "sportscar/sportscar-sky.pbrt"),
+            "Slow", "sportscar/sportscar-sky.pbrt")),
         // H18: a genuinely NEW download (not a pre-existing local fixture
         // like H13-H17 were) - github.com/mmp/pbrt-v4-scenes' "zero-day"
         // scene, a detailed game-level-style interior (~422MB). It's an
@@ -469,10 +486,11 @@ inline std::vector<SceneDescriptor> builtin_scenes_part4() {
         // make a full render impractically slow - said so explicitly here
         // rather than silently reusing the same "Very Slow" wording H13-H17
         // use for renders that actually finish quickly.
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::LightAndArt,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H18", 164, "Zero Day", "zero-day", SceneCategories::LargeScene,
             "A real pbrt-v4-scenes bundle (not bundled with this repo - see pbrt_scenes/README.md): a highly detailed, game-level-style interior scene (an office/atrium space) shot as an animated camera fly-through. This entry renders one representative frame (frame180) of the 9 that ship in the bundle. Note: this is markedly heavier than this project's other Large Scenes - per-scanline shading cost at this camera position is high (heavy instancing, many layered materials), so treat the file's own recommended sample count as a starting point to scale down from, not a target.",
-            "Very Slow", "zero-day/frame180.pbrt"),
+            "Very Slow", "zero-day/frame180.pbrt")),
         // H19-H21: three more genuinely NEW downloads (same
         // build_curated_external_pbrt_scene_descriptor() mechanism, same
         // "download into pbrt_scenes/<name>/" convention as H18). All
@@ -485,102 +503,126 @@ inline std::vector<SceneDescriptor> builtin_scenes_part4() {
         // worth checking the render for a plausible look, since a real
         // medium under the wrong integrator can still look reasonable
         // without necessarily matching pbrt-v4's own reference render.
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Objects,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H19", 165, "Crown", "crown", SceneCategories::LargeScene,
             "A jewelled crown rendered with glass and gem dispersion and refraction, from the pbrt-v4-scenes collection (not bundled with this repo; see pbrt_scenes/README.md): a classic pbrt showcase scene.",
-            "Slow", "crown/crown.pbrt", 30.0),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Slow", "crown/crown.pbrt", 30.0)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H20", 166, "Villa", "villa", SceneCategories::LargeScene,
             "A furnished villa, inside and out, from the pbrt-v4-scenes collection (not bundled with this repo; see pbrt_scenes/README.md), in its daylight lighting (villa-daylight.pbrt). A lights-on night variant ships in the same folder.",
-            "Very Slow", "villa/villa-daylight.pbrt", 15.0),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Very Slow", "villa/villa-daylight.pbrt", 15.0)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::LightAndArt,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H21", 167, "Transparent Machines", "transparent-machines", SceneCategories::LargeScene,
             "A real pbrt-v4-scenes bundle (not bundled with this repo - see pbrt_scenes/README.md): detailed mechanical objects (gears, casings) rendered in transparent glass-like materials, shot as an animated camera fly-through. Five frames ship in the bundle (frame542/675/812/888/1266.pbrt); this entry renders a representative middle one (frame812).",
-            "Medium", "transparent-machines/frame812.pbrt"),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Medium", "transparent-machines/frame812.pbrt")),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H22", 206, "Grey and White Room", "grey-white-room", SceneCategories::LargeScene,
             "A calm grey-and-white living room with tall arched windows, a round table and soft daylight (\"The Grey & White Room\" by Wig42, CC BY 3.0), one of Benedikt Bitterli's rendering-resources scenes, run as its pbrt-v4 file. Not bundled with this repo: the GUI downloads it from benedikt-bitterli.me on request (see pbrt_scenes/README.md).",
-            "Fast", "bitterli/living-room/scene-v4.pbrt", 3.0, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Fast", "bitterli/living-room/scene-v4.pbrt", 3.0, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H23", 207, "Bedroom Interior", "bedroom-interior", SceneCategories::LargeScene,
             "A furnished bedroom with a wardrobe, a made bed and light falling through a large window (\"Bedroom\" by SlykDrako, CC0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
-            "Medium", "bitterli/bedroom/scene-v4.pbrt", 1.0, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Medium", "bitterli/bedroom/scene-v4.pbrt", 1.0, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H24", 208, "Country Kitchen", "country-kitchen", SceneCategories::LargeScene,
             "A country kitchen with a range, copper lamps and a table by a sash window (\"Country Kitchen\" by Jay-Artist, CC BY 3.0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
-            "Medium", "bitterli/kitchen/scene-v4.pbrt", 1.0, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Medium", "bitterli/kitchen/scene-v4.pbrt", 1.0, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H25", 209, "Modern Hall", "modern-hall", SceneCategories::LargeScene,
             "A bright modern hall with a floating wooden staircase, a glass balustrade and polished stone tiles (\"Modern Hall\" by NewSee2l035, CC BY 3.0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
-            "Medium", "bitterli/staircase2/scene-v4.pbrt", 1.0, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Medium", "bitterli/staircase2/scene-v4.pbrt", 1.0, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H26", 210, "Wooden Staircase", "wooden-staircase", SceneCategories::LargeScene,
             "A warm wooden staircase seen through an archway, with panelled walls and a polished floor (\"The Wooden Staircase\" by Wig42, CC BY 3.0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
-            "Medium", "bitterli/staircase/scene-v4.pbrt", 1.5, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Medium", "bitterli/staircase/scene-v4.pbrt", 1.5, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H27", 211, "White Room", "white-room", SceneCategories::LargeScene,
             "A white living room with sofas and a paper lantern, lit by tall windows (\"The White Room\" by Jay-Artist, CC BY 3.0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
-            "Medium", "bitterli/living-room-2/scene-v4.pbrt", 1.0, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Medium", "bitterli/living-room-2/scene-v4.pbrt", 1.0, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H28", 212, "Modern Living Room", "modern-living-room", SceneCategories::LargeScene,
             "A modern living room with a white sofa, pink cushions, a red rug and shelves (\"The Modern Living Room\" by Wig42, CC BY 3.0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
-            "Medium", "bitterli/living-room-3/scene-v4.pbrt", 1.0, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Medium", "bitterli/living-room-3/scene-v4.pbrt", 1.0, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Objects,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H29", 213, "Glass of Water", "glass-of-water", SceneCategories::LargeScene,
             "A glass of water with ice cubes and a stream of water pouring in, in cool studio light (\"Glass of Water\" by aXel, CC0): refraction, caustics and rough dielectric surfaces, from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
-            "Medium", "bitterli/glass-of-water/scene-v4.pbrt", 0.5, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Medium", "bitterli/glass-of-water/scene-v4.pbrt", 0.5, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Vehicles,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H30", 214, "Pontiac GTO", "pontiac-gto", SceneCategories::LargeScene,
             "A 1967 Pontiac GTO in dark green paint on a studio floor (\"Pontiac GTO 67\" by thecali, CC0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
-            "Fast", "bitterli/car2/scene-v4.pbrt", 1.0, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Fast", "bitterli/car2/scene-v4.pbrt", 1.0, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Vehicles,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H31", 215, "Vintage Car", "vintage-car", SceneCategories::LargeScene,
             "An old vintage car in blue paint with chrome trim, in a grey studio (\"Old vintage car\" by piopis, CC0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
-            "Fast", "bitterli/car/scene-v4.pbrt", 0.6, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Fast", "bitterli/car/scene-v4.pbrt", 0.6, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Objects,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H32", 216, "Coffee Maker", "coffee-maker", SceneCategories::LargeScene,
             "A retro orange coffee maker with a glass jug, in a dark studio (\"Coffee Maker\" by cekuhnen, CC BY 3.0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
-            "Fast", "bitterli/coffee/scene-v4.pbrt", 1.0, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Fast", "bitterli/coffee/scene-v4.pbrt", 1.0, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Objects,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H33", 217, "Little Lamp", "little-lamp", SceneCategories::LargeScene,
             "An articulated desk lamp with its bulb on, casting striped shadows over the floor (\"Little Lamp\" by UP3D, CC0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md). A heavy render: glass around a small bright light converges slowly.",
-            "Very Slow", "bitterli/lamp/scene-v4.pbrt", 1.0, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Very Slow", "bitterli/lamp/scene-v4.pbrt", 1.0, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Buildings,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H34", 218, "Victorian House", "victorian-house", SceneCategories::LargeScene,
             "A white Victorian-style house with a bay window and a wraparound porch, lit by an open sky (\"Victorian Style House\" by MrChimp2313, CC0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
-            "Medium", "bitterli/house/scene-v4.pbrt", 1.0, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Medium", "bitterli/house/scene-v4.pbrt", 1.0, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Vehicles,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H35", 219, "Spaceship", "spaceship", SceneCategories::LargeScene,
             "A detailed little spaceship with rocket engines and a glass canopy on a dark studio floor (\"4060.b Spaceship\" by thecali, CC0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md). A heavy render: about 15 minutes on the CPU at 400 pixels and 64 samples (the GPU is far faster).",
-            "Very Slow", "bitterli/spaceship/scene-v4.pbrt", 0.7, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Very Slow", "bitterli/spaceship/scene-v4.pbrt", 0.7, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H36", 220, "Japanese Classroom", "japanese-classroom", SceneCategories::LargeScene,
             "A Japanese classroom with rows of wooden desks and chairs facing a blackboard, in daylight (\"Japanese Classroom\" by NovaZeeke, CC BY 3.0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
-            "Medium", "bitterli/classroom/scene-v4.pbrt", 1.0, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Medium", "bitterli/classroom/scene-v4.pbrt", 1.0, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Objects,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H37", 221, "Dragon Statue", "dragon-statue", SceneCategories::LargeScene,
             "A dragon with spread wings on a round base, in white (\"Dragon\" by Delatronic, CC BY 3.0), from Benedikt Bitterli's rendering-resources scenes. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
-            "Fast", "bitterli/dragon/scene-v4.pbrt", 1.0, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Fast", "bitterli/dragon/scene-v4.pbrt", 1.0, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Objects,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H38", 222, "Material Test Ball", "material-test-ball", SceneCategories::LargeScene,
             "A rough copper-coloured material ball with a T-shaped notch on a pedestal, on a checkered floor (CC0, Benedikt Bitterli's rendering-resources scenes): the classic scene for judging a material. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
-            "Fast", "bitterli/material-testball/scene-v4.pbrt", 1.0, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Fast", "bitterli/material-testball/scene-v4.pbrt", 1.0, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Nature,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H39", 223, "Landscape (Laubwerk)", "laubwerk-landscape", SceneCategories::LargeScene,
             "A meadow with birch trees, wildflowers and a footpath, built from 23,241 plant models (3.1 billion triangles through instancing, 24 million stored): 'Landscape' by Jan-Walter Schliep, Burak Kahraman and Timm Dapper of Laubwerk (CC BY 4.0), the cover picture of the third edition of Physically Based Rendering, from the pbrt-v4-scenes collection. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md). The heaviest scene here: a download of 1.4 GB, and over a minute just to load.",
-            "Very Slow", "landscape/view-0.pbrt", 0.6, 512),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Very Slow", "landscape/view-0.pbrt", 0.6, 512)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Vehicles,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H40", 224, "BMW M6", "bmw-m6", SceneCategories::LargeScene,
             "A white BMW M6 coupe on a dark glossy floor (model by tyrant monkey on Blend Swap, CC0), from the pbrt-v4-scenes collection: car paint, glass and chrome under an environment light. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md). A download of 72 MB.",
-            "Slow", "bmw-m6/bmw-m6.pbrt", 0.8, 1024),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Slow", "bmw-m6/bmw-m6.pbrt", 0.8, 1024)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::LightAndArt,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H41", 225, "Veach, Ajar", "veach-ajar", SceneCategories::LargeScene,
             "Eric Veach's classic 'Ajar' test in Benedikt Bitterli's version (CC0): a room lit only by the light that falls through a door left ajar, a hard case for a path tracer, with a picture on the wall and glass and metal on the table. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
-            "Fast", "bitterli/veach-ajar/scene-v4.pbrt", 0.8, 64),
-        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "Fast", "bitterli/veach-ajar/scene-v4.pbrt", 0.8, 64)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::LightAndArt,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H42", 226, "Water Caustic", "water-caustic", SceneCategories::LargeScene,
             "Light through a rippling water surface drawing caustics on the walls and floor of a small room (Benedikt Bitterli, CC0). The scene's file asks for photon mapping: choose the SPPM integrator (Render Options, or Apply recommended settings in the scene panel); a path tracer draws these caustics as dark noise, and SPPM has no triangle meshes on the GPU, so it runs on the CPU. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
-            "Medium", "bitterli/water-caustic/scene-v4.pbrt", 0.4, 200),
+            "Medium", "bitterli/water-caustic/scene-v4.pbrt", 0.4, 200)),
 
     };
 }

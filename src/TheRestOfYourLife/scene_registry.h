@@ -95,6 +95,8 @@ struct SceneDescriptor {
     // scene under no tab at all, which is silent (see the category tests in
     // tests/unit/scene_registry_tests.cpp, which pin exactly that).
     const char* category;
+    // The second level inside the category (a SceneSubcategories:: constant), "" for a scene that has none. See scene_descriptor.h.
+    const char* subcategory = "";
     const char* description;
     const char* performance;   // "Fast" | "Medium" | "Slow" | "Very Slow"
     // recommended_spp, recommended_exposure (further below) and `camera`
@@ -793,6 +795,12 @@ namespace pbrt_scene_registry {
                                                                     recommended_exposure, recommended_spp_if_missing);
             }});
         }
+        return s;
+    }
+    // A row's subcategory: `in_subcategory(SceneSubcategories::Interiors, build_curated_...(...))`. Wraps the row rather than adding a positional argument to every
+    // builder, so a category without subcategories needs nothing.
+    inline SceneDescriptor in_subcategory(const char* subcategory, SceneDescriptor s) {
+        s.subcategory = subcategory;
         return s;
     }
 } // namespace pbrt_scene_registry

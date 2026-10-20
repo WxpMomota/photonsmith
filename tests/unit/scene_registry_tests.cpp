@@ -905,6 +905,23 @@ TEST(SceneSlugTest, EveryBuiltInSceneHasAWellFormedUniqueSlug) {
 	}
 }
 
+// Large Scenes grew past what one list can browse, so each is under a subcategory (a second row of tabs in the GUI). A subcategory is a SceneSubcategories:: constant, never a literal
+// (a typo would make a tab of one scene), the other categories have none, and every subcategory in use has a scene.
+TEST(SceneSubcategoryTest, EveryLargeSceneIsInAKnownSubcategoryAndNoOtherCategoryHasOne) {
+	std::map<std::string, int> used;
+	for (const SceneDescriptor& s : get_builtin_scene_registry()) {
+		if (std::string(s.category) != SceneCategories::LargeScene) {
+			EXPECT_STREQ(s.subcategory, "") << s.id << " (" << s.name << ") is not a Large Scene and has a subcategory";
+			continue;
+		}
+		bool known = false;
+		for (const char* name : SceneSubcategories::kLargeScenes) known = known || std::string(name) == s.subcategory;
+		EXPECT_TRUE(known) << s.id << " (" << s.name << ") has subcategory '" << s.subcategory << "'";
+		++used[s.subcategory];
+	}
+	for (const char* name : SceneSubcategories::kLargeScenes) EXPECT_GE(used[name], 1) << "no Large Scene is in '" << name << "'";
+}
+
 TEST(SceneSlugTest, EveryCompiledInSceneCarriesItsOwnSlug) {
 	// The slug is an argument of the scene's row (there is no separate table to forget a scene in): the full registry hands out what the row says.
 	std::set<std::string> ids;

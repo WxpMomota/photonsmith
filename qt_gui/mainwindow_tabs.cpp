@@ -82,11 +82,16 @@ QStringList MainWindow::filteredSceneIds(const QString &category) const {
 	// replacement for them - see m_sceneSearchBox's own comment.
 	const QString searchTerm = m_sceneSearchBox ? m_sceneSearchBox->text().trimmed() : QString();
 
+	// The subcategory tab, when the category has them (the bar has no tabs otherwise) and it is not "All".
+	const QString wantSubcategory = (m_sceneSubcategoryTabs && m_sceneSubcategoryTabs->count() > 1)
+		? m_sceneSubcategoryTabs->tabData(m_sceneSubcategoryTabs->currentIndex()).toString() : QString();
+
 	const int count = SceneMetadataClient::sceneCount();
 	for (int i = 0; i < count; ++i) {
 		const QString id = SceneMetadataClient::sceneIdAtIndex(i);
 		if (SceneMetadataClient::sceneCategory(id) != category) continue;
 		if (SceneMetadataClient::sceneRequiresFiles(id) != wantRequiresFiles) continue;
+		if (!wantSubcategory.isEmpty() && SceneMetadataClient::sceneSubcategory(id) != wantSubcategory) continue;
 		const QString name = SceneMetadataClient::sceneName(id);
 		if (!searchTerm.isEmpty() &&
 			!name.contains(searchTerm, Qt::CaseInsensitive) &&
@@ -221,6 +226,7 @@ void MainWindow::selectSceneById(const QString &key) {
 		}
 	}
 
+	rebuildSubcategoryTabs(category, SceneMetadataClient::sceneSubcategory(id));   // (so the scene is in the list the next line fills)
 	populateSceneViews(category);
 	// Both setCurrentIndex() calls above ran signal-blocked, so neither tab
 	// bar's own currentChanged handler (mainwindow_tabs.cpp's
@@ -276,6 +282,46 @@ void MainWindow::rebuildCategoryTabs(bool requiresFiles) {
 
 	if (m_sceneCategoryTabs->count() > 0)
 		m_sceneCategoryTabs->setCurrentIndex(restoredTab >= 0 ? restoredTab : 0);
+}
+
+void MainWindow::rebuildSubcategoryTabs(const QString &category, const QString &select) {
+	if (!m_sceneSubcategoryTabs) return;
+	const bool wantRequiresFiles = m_sceneAvailabilityTabs && m_sceneAvailabilityTabs->currentIndex() == 1;
+	const QSignalBlocker blocker(m_sceneSubcategoryTabs);
+	while (m_sceneSubcategoryTabs->count() > 0) m_sceneSubcategoryTabs->removeTab(0);
+
+	QMap<QString, int> counts;
+	int total = 0;
+	for (int i = 0, n = SceneMetadataClient::sceneCount(); i < n; ++i) {
+		const QString id = SceneMetadataClient::sceneIdAtIndex(i);
+		if (SceneMetadataClient::sceneCategory(id) != category || SceneMetadataClient::sceneRequiresFiles(id) != wantRequiresFiles) continue;
+		++total;
+		const QString sub = SceneMetadataClient::sceneSubcategory(id);
+		if (!sub.isEmpty()) ++counts[sub];
+	}
+	// The canonical order first (SceneSubcategories::kLargeScenes), then any other name in alphabetical order.
+	QStringList names;
+	for (const char *canonical : SceneSubcategories::kLargeScenes)
+		if (counts.contains(QString::fromUtf8(canonical))) names << QString::fromUtf8(canonical);
+	for (auto it = counts.constBegin(); it != counts.constEnd(); ++it)
+		if (!names.contains(it.key())) names << it.key();
+	if (names.size() < 2) {
+		m_sceneSubcategoryTabs->setVisible(false);
+		return;
+	}
+
+	const int all = m_sceneSubcategoryTabs->addTab(tr("All (%1)").arg(total));
+	m_sceneSubcategoryTabs->setTabData(all, QString());
+	int chosen = all;
+	for (const QString &name : names) {
+		QString label = SceneMetadataClient::displaySubcategory(name);
+		label.replace(QLatin1Char('&'), QLatin1String("&&"));   // (a tab's text reads one '&' as a keyboard shortcut mark: "Buildings & Streets" lost its ampersand)
+		const int tab = m_sceneSubcategoryTabs->addTab(QString("%1 (%2)").arg(label).arg(counts.value(name)));
+		m_sceneSubcategoryTabs->setTabData(tab, name);
+		if (name == select) chosen = tab;
+	}
+	m_sceneSubcategoryTabs->setCurrentIndex(chosen);
+	m_sceneSubcategoryTabs->setVisible(true);
 }
 
 void MainWindow::createSettingsTab() {

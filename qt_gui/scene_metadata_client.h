@@ -100,6 +100,8 @@ QString sceneSlug(const QString& scene_id);
 QString sceneIdForKey(const QString& key);
 
 QString sceneCategory(const QString& scene_id);
+// scene_id's subcategory ("Interiors", "Vehicles", ...: the second level inside a category), or "" when its category has none or the library is older than the export.
+QString sceneSubcategory(const QString& scene_id);
 
 // The text to SHOW for a category / performance hint. sceneCategory() and
 // ScenePerformance values are canonical English identifiers (they are compared,
@@ -107,6 +109,8 @@ QString sceneCategory(const QString& scene_id);
 // point of display. A value with no entry - a category added to the registry
 // later - is shown as is.
 QString displayCategory(const QString& category);
+// The text to show for a subcategory, translated like displayCategory().
+QString displaySubcategory(const QString& subcategory);
 QString displayPerformance(const QString& performance);
 
 // What a scene flagged requires_files is missing on disk, found by scanning its .pbrt for the

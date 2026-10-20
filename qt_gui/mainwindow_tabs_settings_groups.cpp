@@ -197,6 +197,15 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	rebuildCategoryTabs(/*requiresFiles=*/false);
 	sceneGroupLayout->addWidget(m_sceneCategoryTabs);
 
+	// The subcategory row (Large Scenes: Interiors, Vehicles, ...): hidden unless the selected category has two or more.
+	m_sceneSubcategoryTabs = new QTabBar(basicTab);
+	m_sceneSubcategoryTabs->setObjectName("sceneCategoryTabs");
+	m_sceneSubcategoryTabs->setDrawBase(false);
+	m_sceneSubcategoryTabs->setExpanding(false);
+	m_sceneSubcategoryTabs->setUsesScrollButtons(true);
+	m_sceneSubcategoryTabs->setVisible(false);
+	sceneGroupLayout->addWidget(m_sceneSubcategoryTabs);
+
 	// Narrows the combo/grid below by substring, on top of (not instead of)
 	// the availability/category tabs above - see m_sceneSearchBox's own
 	// comment in mainwindow.h for why. setClearButtonEnabled gives it Qt's
@@ -333,8 +342,10 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	});
 
 	// Fill the dropdown/grid for whichever category the bar opened on.
-	if (m_sceneCategoryTabs->count() > 0)
+	if (m_sceneCategoryTabs->count() > 0) {
+		rebuildSubcategoryTabs(m_sceneCategoryTabs->tabData(0).toString());
 		populateSceneViews(m_sceneCategoryTabs->tabData(0).toString());
+	}
 	updateGenerateThumbnailsButtonState();
 
 	connect(m_sceneAvailabilityTabs, &QTabBar::currentChanged, this, [this](int tab) {
@@ -348,9 +359,11 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 		// back to a bucket that happens to restore the same tab index by
 		// coincidence) - so this always refills explicitly rather than
 		// relying on that signal firing.
-		if (m_sceneCategoryTabs->count() > 0)
+		if (m_sceneCategoryTabs->count() > 0) {
+			rebuildSubcategoryTabs(m_sceneCategoryTabs->tabData(m_sceneCategoryTabs->currentIndex()).toString());
 			populateSceneViews(m_sceneCategoryTabs->tabData(m_sceneCategoryTabs->currentIndex()).toString());
-		else {
+		} else {
+			if (m_sceneSubcategoryTabs) m_sceneSubcategoryTabs->setVisible(false);
 			m_sceneCombo->clear();
 			if (m_sceneGrid) m_sceneGrid->clear();
 		}
@@ -362,8 +375,16 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 		updateGenerateThumbnailsButtonState();
 	});
 
+	connect(m_sceneSubcategoryTabs, &QTabBar::currentChanged, this, [this](int tab) {
+		if (tab < 0 || m_sceneCategoryTabs->count() == 0) return;
+		populateSceneViews(m_sceneCategoryTabs->tabData(m_sceneCategoryTabs->currentIndex()).toString());
+		onSceneChanged(m_sceneCombo->currentIndex());
+		updateGenerateThumbnailsButtonState();
+	});
+
 	connect(m_sceneCategoryTabs, &QTabBar::currentChanged, this, [this](int tab) {
 		if (tab < 0) return;
+		rebuildSubcategoryTabs(m_sceneCategoryTabs->tabData(tab).toString());
 		populateSceneViews(m_sceneCategoryTabs->tabData(tab).toString());
 		// populateSceneViews() deliberately stays silent, so the one update for
 		// the newly selected scene is issued here - otherwise switching category

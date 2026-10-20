@@ -141,6 +141,7 @@ void MainWindow::runSelfTest(const QString &mode, const QString &outPrefix) {
 	if (mode == "diagnostics") { runDiagnosticsSelfTest(log, shot); return; }
 
 	if (mode == "scenekeys") { runSceneKeysSelfTest(log, shot); return; }
+	if (mode == "subcategories") { runSubcategoriesSelfTest(log, shot); return; }
 
 	if (mode == "download") { runDownloadSelfTest(log, shot); return; }
 
