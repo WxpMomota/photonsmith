@@ -521,6 +521,18 @@ inline LoadResult loadFile(const std::string &path,
 		}
 	}
 
+	// A portal light with a constant colour and no picture (the pbrt-v4-scenes Kroken: "blackbody L" 6500 with a "portal"): pbrt turns the colour into a picture of that
+	// colour ("Converting non-RGB L parameter to RGB so that a portal light can be used"), so the light is the window's patch of a uniform sky. The same here: a small
+	// constant picture, which both backends then treat like any portal picture. Without it the light had no image and failed closed to NO light at all, so a room lit only
+	// through its window rendered nearly black.
+	if (sky.present && sky.hasPortal && sky.imageFile.empty() && sky.imageWidth == 0) {
+		constexpr int kSize = 16;
+		sky.imageWidth = sky.imageHeight = kSize;
+		sky.imagePixels.resize(static_cast<std::size_t>(kSize) * kSize * 3);
+		for (int i = 0; i < kSize * kSize; ++i)
+			for (int c = 0; c < 3; ++c) sky.imagePixels[static_cast<std::size_t>(i) * 3 + c] = static_cast<float>(sky.L[c]);
+	}
+
 	// Measured materials' .bsdf tensor files. Same scene-directory-then-as-
 	// given resolution as everything else here, but resolved to a PATH
 	// (resolveExistingPath) rather than read into a string - the tensor
