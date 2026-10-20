@@ -387,6 +387,10 @@ struct MaterialData {
 	float roughTexScale = 1.0f;
 	int   condRoughTexIdx = -1;
 	float condRoughTexScale = 1.0f;
+	// Mix only: an image bound to the material's "amount" (index into LaunchParams::textures, -1 = none) and its scale: the probability of sub-material B at a hit is scale * the image's
+	// value there (resolve_mix_material / wf_resolve_mix_material, the overloads that take the hit's uv). mix_extra.mixWeight holds the image's mean, used wherever the uv is not at hand.
+	int   mixAmountTexIdx = -1;
+	float mixAmountTexScale = 1.0f;
 
 	// Medium / DielectricMedium only: the PER-CHANNEL coefficients of a homogeneous medium whose extinction differs between colour
 	// channels (sigma_t = chromaSigmaA + chromaSigmaS). All zero (the default) for a grey medium, which keeps using the scalar

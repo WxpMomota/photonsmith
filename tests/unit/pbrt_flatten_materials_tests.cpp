@@ -1440,3 +1440,22 @@ TEST(FlattenMaterialTest, ACoatedConductorsTwoRoughnessImagesGoToTheirOwnSlots) 
 	EXPECT_EQ(m.condRoughnessTextureFilename, "base.png");
 	EXPECT_DOUBLE_EQ(m.condRoughnessTextureScale, 2.0) << "a constant scale texture around the image";
 }
+
+// A Mix material's amount bound to an image is kept to be read per hit; its mean stays in mixWeight (pbrt_load) as the fallback.
+TEST(FlattenMaterialTest, AMixAmountImageIsKeptForPerHitReading) {
+	const FlatScene s = flattenSource(
+		"Texture \"amt\" \"float\" \"imagemap\" \"string filename\" [ \"amount.png\" ] \"float scale\" [ 0.75 ]\n"
+		"MakeNamedMaterial \"a\" \"string type\" [ \"diffuse\" ]\n"
+		"MakeNamedMaterial \"b\" \"string type\" [ \"diffuse\" ]\n"
+		"Material \"mix\" \"string materials\" [ \"a\" \"b\" ] \"texture amount\" [ \"amt\" ]\n"
+		+ std::string(kQuadMesh));
+	const Material *mix = nullptr;
+	for (const Material &m : s.materials)
+		if (m.kind == MaterialKind::Mix) mix = &m;
+	ASSERT_NE(mix, nullptr);
+	EXPECT_EQ(mix->mixWeightTextureFilename, "amount.png");
+	EXPECT_DOUBLE_EQ(mix->mixWeightTextureScale, 0.75);
+	ASSERT_EQ(mix->textureAverages.size(), 1u);
+	EXPECT_EQ(mix->textureAverages[0].param, "amount");
+	EXPECT_FALSE(warnedAbout(s, "not supported"));
+}

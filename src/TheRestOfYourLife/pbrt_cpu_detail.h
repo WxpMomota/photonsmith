@@ -536,6 +536,13 @@ inline std::shared_ptr<material> makeMaterialBase(const pbrt_flatten::Material &
 								 nullptr, allMaterials, depth + 1, forCurve);
 		auto matB = makeMaterial(allMaterials[static_cast<std::size_t>(m.mixMaterialB)],
 								 nullptr, allMaterials, depth + 1, forCurve);
+		if (!m.mixWeightTextureFilename.empty()) {   // the amount is an image: read per hit (mix_material's own weight texture)
+			shared_ptr<texture> weight = sharedMipmapTexture(m.mixWeightTextureFilename.c_str(), toMipMapOptions(m.mixWeightTextureOptions));
+			const pbrt_flatten::UvMapping &map = m.mixWeightTextureMapping;
+			if (!map.identity()) weight = std::make_shared<uv_mapped_texture>(weight, map.su, map.sv, map.du, map.dv);
+			if (m.mixWeightTextureScale != 1.0) weight = std::make_shared<scaled_texture>(weight, m.mixWeightTextureScale);
+			return std::make_shared<mix_material>(matA, matB, weight);
+		}
 		return std::make_shared<mix_material>(matA, matB, m.mixWeight);
 	}
 	case pbrt_flatten::MaterialKind::Diffuse:

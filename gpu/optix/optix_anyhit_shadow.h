@@ -484,7 +484,8 @@ extern "C" __global__ void __anyhit__shadow_triangle() {
 	const float shadow_t = optixGetRayTmax();
 	const float3 shadow_hit_point = optixGetWorldRayOrigin() + shadow_t * optixGetWorldRayDirection();
 	int matIdx = tri.materialIdx;
-	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, shadow_hit_point, matIdx);
+	const float2 mixUv = triangle_hit_uv(tri, optixGetTriangleBarycentrics());
+	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, shadow_hit_point, mixUv.x, mixUv.y, matIdx);
 
 	// Alpha-cutout: a transparent pixel of a leaf/foliage material casts no
 	// shadow there, same as any other "not actually here" any-hit case

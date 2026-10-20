@@ -1182,6 +1182,11 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 			d.mix_extra.mixMaterialAIdx = static_cast<float>(idxA);
 			d.mix_extra.mixMaterialBIdx = static_cast<float>(idxB);
 			d.mix_extra.mixWeight = static_cast<float>(m.mixWeight);
+			if (!m.mixWeightTextureFilename.empty()) {   // the amount is an image: read per hit (see MaterialData::mixAmountTexIdx)
+				const int idx = getOrBuildPbrtImageTexture(m.mixWeightTextureFilename, out, imageTextureCache, static_cast<float>(m.mixWeightTextureOptions.gamma),
+														   static_cast<GpuWrapMode>(m.mixWeightTextureOptions.wrapIndex), m.mixWeightTextureOptions.invert, m.mixWeightTextureMapping);
+				if (idx >= 0) { d.mixAmountTexIdx = idx; d.mixAmountTexScale = static_cast<float>(m.mixWeightTextureScale); }
+			}
 		} else {
 			// Falls back to the same flat-colour-average resolveMixColor()
 			// already computes - passing `m` itself (not its sub-materials)

@@ -536,6 +536,21 @@ inline bool resolveRoughnessImage(const pbrt_scene::Scene &scene, const std::str
 	return true;
 }
 
+// A Mix material's "amount" bound to an image (an imagemap, or a constant scale around one): kept to be read per hit; the mean stays in mixWeight (applyTextureAverages) as the fallback.
+inline bool bindMixAmountTexture(const pbrt_scene::Scene &scene, FlatScene &out, Material &m, const pbrt_scene::Param &p) {
+	if (m.kind != MaterialKind::Mix || p.name != "amount" || p.strings.empty()) return false;
+	RoughnessImage img;
+	if (!resolveRoughnessImage(scene, p.strings[0], materialWarner(out), img)) return false;
+	m.mixWeightTextureFilename = img.file;
+	m.mixWeightTextureOptions = img.options;
+	m.mixWeightTextureScale = img.scale;
+	m.mixWeightTextureMapping = img.mapping;
+	TextureAverage avg;
+	avg.param = p.name;
+	if (buildTextureMean(scene, p.strings[0], avg.nodes) >= 0) m.textureAverages.push_back(std::move(avg));
+	return true;
+}
+
 inline bool bindRoughnessTexture(const pbrt_scene::Scene &scene, FlatScene &out, Material &m, const pbrt_scene::Param &p) {
 	const auto warn = materialWarner(out);
 	// Conductor, CoatedDiffuse and CoatedConductor: the image is evaluated per hit (CPU roughness_mapped_material, both OptiX backends' patched material), and its mean stays in the
@@ -738,6 +753,7 @@ inline void readMaterialBindings(const pbrt_scene::Scene &scene, FlatScene &out,
 		if (bindReflectanceTexture(scene, out, m, p)) continue;
 		if (bindTransmittanceTexture(scene, out, m, p)) continue;
 		if (bindRoughnessTexture(scene, out, m, p)) continue;
+		if (bindMixAmountTexture(scene, out, m, p)) continue;
 		if (bindDisplacementTexture(scene, out, m, p)) continue;
 		const pbrt_scene::TextureDecl *bound = p.strings.empty() ? nullptr : findTexture(scene, p.strings[0]);
 		// A mean the loader can still use: the parameter takes the texture's average value instead of its default (a mirror, for a roughness map).

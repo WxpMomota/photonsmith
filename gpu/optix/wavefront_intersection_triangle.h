@@ -112,7 +112,10 @@ extern "C" __global__ void __anyhit__wf_triangle() {
 	const float wf_t = optixGetRayTmax();
 	const float3 wf_hit_point = optixGetWorldRayOrigin() + wf_t * optixGetWorldRayDirection();
 	int matIdx = tri.materialIdx;
-	const MaterialData mat = wf_resolve_mix_material(wf_params.materials[matIdx], matIdx, wf_hit_point, matIdx);
+	const float mixB1 = __int_as_float(optixGetAttribute_0()), mixB2 = __int_as_float(optixGetAttribute_1()), mixB0 = 1.0f - mixB1 - mixB2;
+	const float mixU = tri.hasUVs ? mixB0 * tri.uv0.x + mixB1 * tri.uv1.x + mixB2 * tri.uv2.x : mixB1;
+	const float mixV = tri.hasUVs ? mixB0 * tri.uv0.y + mixB1 * tri.uv1.y + mixB2 * tri.uv2.y : mixB2;
+	const MaterialData mat = wf_resolve_mix_material(wf_params.materials[matIdx], matIdx, wf_hit_point, mixU, mixV, matIdx);
 	if (mat.alphaMaskTexIdx < 0) return;
 
 	// Real UV when authored, else the same barycentric fallback CPU's own

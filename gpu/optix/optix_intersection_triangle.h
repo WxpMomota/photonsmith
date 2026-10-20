@@ -65,7 +65,8 @@ extern "C" __global__ void __anyhit__triangle() {
 	// Mix must resolve before alphaMaskTexIdx is read - see MaterialType::
 	// Mix's own comment (optix_types.h).
 	int matIdx = tri.materialIdx;
-	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, hit_point, matIdx);
+	const float2 mixUv = triangle_hit_uv(tri, optixGetTriangleBarycentrics());
+	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, hit_point, mixUv.x, mixUv.y, matIdx);
 	if (mat.alphaMaskTexIdx < 0) return;
 
 	// Real UV when authored, else the same barycentric fallback CPU's own
@@ -113,7 +114,8 @@ extern "C" __global__ void __closesthit__triangle() {
 	// Resolved to a real, non-Mix material before any mat.type branch below -
 	// see MaterialType::Mix's own comment (optix_types.h).
 	int matIdx = tri.materialIdx;
-	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, hit_point, matIdx);
+	const float2 mixUv = triangle_hit_uv(tri, optixGetTriangleBarycentrics());
+	const MaterialData mat = resolve_mix_material(params.materials[matIdx], matIdx, hit_point, mixUv.x, mixUv.y, matIdx);
 
 	float3 shading_normal;
 	// Real UV when authored, else the same barycentric fallback CPU's own

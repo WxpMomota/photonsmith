@@ -798,6 +798,19 @@ inline LoadResult loadFile(const std::string &path,
 
 		m.roughnessTextureFilename = resolved;
 	}
+	// A Mix material's "amount" image (Material::mixWeightTextureFilename), resolved the same way.
+	for (pbrt_flatten::Material &m : r.scene.materials) {
+		if (m.mixWeightTextureFilename.empty()) continue;
+		const std::string resolved = resolveExistingPath(sceneDir, m.mixWeightTextureFilename);
+		if (resolved.empty()) {
+			r.scene.warnings.push_back(
+				{0, path, "mix material's amount texture image '" + m.mixWeightTextureFilename +
+					"' could not be found; falling back to a constant amount instead"});
+			m.mixWeightTextureFilename.clear();
+			continue;
+		}
+		m.mixWeightTextureFilename = resolved;
+	}
 	// The CoatedConductor's base conductor roughness image (Material::condRoughnessTextureFilename), resolved the same way.
 	for (pbrt_flatten::Material &m : r.scene.materials) {
 		if (m.condRoughnessTextureFilename.empty()) continue;

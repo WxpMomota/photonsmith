@@ -390,6 +390,14 @@ struct Material {
 	double condRoughnessTextureScale = 1.0;
 	UvMapping condRoughnessTextureMapping;
 
+	// A Mix MATERIAL's "amount" bound to an image (pbrt's "texture amount"): the probability of material B at a hit is scale * the image's value there, read per hit (CPU mix_material's
+	// weight texture; both OptiX backends on triangles for the recursive one and on every shape for the radiance hit of the wavefront one: see MaterialData::mixAmountTexIdx).
+	// mixWeight (above) holds the image's MEAN for a path that cannot read it.
+	std::string mixWeightTextureFilename;
+	TextureDecodeOptions mixWeightTextureOptions;
+	double mixWeightTextureScale = 1.0;
+	UvMapping mixWeightTextureMapping;
+
 	// A Diffuse material's "reflectance" bound to a "checkerboard" Texture
 	// instead of an "imagemap" one (e.g. named-material-and-texture.pbrt's
 	// "floor-check": Texture "floor-check" "spectrum" "checkerboard"

@@ -144,7 +144,7 @@ extern "C" __global__ void __raygen__wf_intersect() {
 		// Mix's own comment (optix_types.h).
 		{
 			int resolvedIdx = h.materialIdx;
-			wf_resolve_mix_material(wf_params.materials[h.materialIdx], h.materialIdx, h.hitPoint, resolvedIdx);
+			wf_resolve_mix_material(wf_params.materials[h.materialIdx], h.materialIdx, h.hitPoint, h.uv_u, h.uv_v, resolvedIdx);
 			h.materialIdx = resolvedIdx;
 		}
 		// Route cheap materials (no texture/layered-BxDF work) into their

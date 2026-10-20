@@ -484,6 +484,10 @@ All in the shared loader, so Metal gets them without a change, but check the por
 
 The launcher (`launcher/main.cpp`, `cutToScenePicture()`) cuts a finished PPM or EXR to the scene's Film crop window when `SceneDescriptor::crop_is_picture` (the Head, H45; `cpu_scene_crop_picture_by_id()`). Metal writes a PNG directly at the output path, which `output_crop.h` does not read, so on a Mac the Head comes out as the black-surrounded window until Metal's frame writer cuts to the same window (`output_crop::pixelBounds(frac, w, h)` gives the pixel rectangle; the fractions are `film_crop` of the descriptor). The launcher prints a note when it could not cut.
 
+## Windows to Mac, 2026-10-20: a mix material's amount image
+
+`Material::mixWeightTextureFilename` (+ `...Scale`, `...Mapping`, `...Options`) holds a Mix material's `amount` image, and `mixWeight` its MEAN (so Metal keeps drawing what it drew). On OptiX it is `MaterialData::mixAmountTexIdx` / `mixAmountTexScale`: the Mix is resolved to sub-material A or B per hit by a hash of the hit point against `scale * image(uv)` instead of the flat weight (`resolve_mix_material` / `wf_resolve_mix_material`, the overloads that take uv). Check: the `texture-mix-amount` row of the reference pack (1.00).
+
 ## Windows to Mac, 2026-10-20: roughness images, per pixel
 
 `Material::roughnessTextureFilename` / `condRoughnessTextureFilename` (+ `...Scale`, `...Mapping`, `...Options`) now also hold a roughness image on a `conductor`, `coateddiffuse` and `coatedconductor` (coat, and the base conductor), and the flat `roughness_u/v` / `conductorRoughness_u/v` hold its MEAN (so Metal, which has no image roughness, keeps drawing what it drew). On OptiX they are `MaterialData::roughTexIdx/roughTexScale/condRoughTexIdx/condRoughTexScale`, read per hit into a copy of the material before the shading switch. To port: sample the image at the hit's uv (it is placed by the texture's uv mapping, which the builder bakes into the `TextureData`), roughness = scale * the value, isotropic, then the usual remap. Check: the `texture-params` row of the reference pack (1.00) and, per 8 x 8 block of the picture, against a pbrt render.

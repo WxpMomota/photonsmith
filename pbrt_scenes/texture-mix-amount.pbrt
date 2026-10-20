@@ -1,0 +1,34 @@
+# @rt-category Test Scenes
+# @rt-description A mix material whose amount is a picture, per pixel: a floor and a back wall of triangles that blend a pale and a dark diffuse material by a checker of 0, 1/2 and 1, as pbrt draws them.
+# @rt-performance Fast
+# @rt-size 10
+# texture-mix-amount.pbrt -- a Mix material's "amount" bound to an image: at each hit pbrt chooses material B with the probability the image gives there. The average (0.5) would draw an even
+# grey-brown; per pixel, the floor and the wall show the checker. Triangle meshes with uv (the recursive OptiX backend reads the image on triangles). Original, no licence constraints.
+
+LookAt 0 3.5 9   0 1 0   0 1 0
+Camera "perspective" "float fov" [ 50 ]
+
+Film "rgb" "integer xresolution" [ 64 ] "integer yresolution" [ 64 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+Integrator "volpath" "integer maxdepth" [ 8 ]
+
+WorldBegin
+
+LightSource "infinite" "rgb L" [ 0.3 0.35 0.45 ]
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 10 10 10 ]
+  Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+    "point3 P" [ -2 4.5 -1   2 4.5 -1   2 4.5 3   -2 4.5 3 ]
+AttributeEnd
+
+Texture "amount" "float" "imagemap" "string filename" [ "texture-params-amount.png" ] "string encoding" [ "linear" ]
+MakeNamedMaterial "pale" "string type" [ "diffuse" ] "rgb reflectance" [ 0.85 0.8 0.7 ]
+MakeNamedMaterial "dark" "string type" [ "diffuse" ] "rgb reflectance" [ 0.08 0.12 0.2 ]
+Material "mix" "string materials" [ "pale" "dark" ] "texture amount" [ "amount" ]
+
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -6 0 -5   6 0 -5   6 0 6   -6 0 6 ]
+  "point2 uv" [ 0 0   2 0   2 2   0 2 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -6 0 -5   6 0 -5   6 6 -5   -6 6 -5 ]
+  "point2 uv" [ 0 0   2 0   2 1   0 1 ]

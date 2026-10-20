@@ -69,6 +69,30 @@ __device__ __forceinline__ MaterialData resolve_mix_material(MaterialData mat, i
 	return mat;
 }
 
+// The same, for a hit whose uv is at hand: a Mix whose "amount" is an image (MaterialData::mixAmountTexIdx) reads it at (uv_u, uv_v). Triangles use this (their uv is known before the
+// material is); the other shapes resolve with the image's mean (mix_extra.mixWeight), above.
+__device__ __forceinline__ MaterialData resolve_mix_material(MaterialData mat, int matIdx, const float3& hit_point, float uv_u, float uv_v, int& outMatIdx) {
+	constexpr int kMaxMixDepth = 8;
+	for (int depth = 0; mat.type == MaterialType::Mix && depth < kMaxMixDepth; ++depth) {
+		float w = mat.mix_extra.mixWeight;
+		if (mat.mixAmountTexIdx >= 0) w = fminf(1.0f, fmaxf(0.0f, mat.mixAmountTexScale * sample_texture(mat.mixAmountTexIdx, uv_u, uv_v, hit_point).x));
+		const float h = mix_branch_hash01(hit_point);
+		const int subIdx = (h >= w) ? static_cast<int>(mat.mix_extra.mixMaterialAIdx)
+									 : static_cast<int>(mat.mix_extra.mixMaterialBIdx);
+		matIdx = subIdx;
+		mat = params.materials[subIdx];
+	}
+	outMatIdx = matIdx;
+	return mat;
+}
+
+// A triangle's (u, v) at a hit with barycentrics `bary`: its own uv when authored, else the barycentric fallback (as the closest-hit program does).
+__device__ __forceinline__ float2 triangle_hit_uv(const TriangleData& tri, const float2& bary) {
+	const float b1 = bary.x, b2 = bary.y, b0 = 1.0f - b1 - b2;
+	if (!tri.hasUVs) return make_float2(b1, b2);
+	return make_float2(b0 * tri.uv0.x + b1 * tri.uv1.x + b2 * tri.uv2.x, b0 * tri.uv0.y + b1 * tri.uv1.y + b2 * tri.uv2.y);
+}
+
 __device__ __forceinline__ bool material_requires_sphere_only_handling(MaterialType type) {
 	switch (type) {
 		case MaterialType::Medium:

@@ -383,3 +383,21 @@ struct WfShadowPayload {
 // above, so this include has to stay below them. See wavefront_probe.h's
 // own header comment for the full design.
 #include "wavefront_probe.h"
+
+// wf_resolve_mix_material() for a hit whose uv is at hand: a Mix whose "amount" is an image (MaterialData::mixAmountTexIdx) reads it at (uv_u, uv_v). The radiance hit (wavefront_raygen.h:
+// any shape) and the triangle shadow/alpha any-hit programs use it; the other shapes' shadow any-hit programs resolve with the image's mean (mix_extra.mixWeight), above.
+__device__ __forceinline__ MaterialData wf_resolve_mix_material(MaterialData mat, int matIdx, const float3& hit_point, float uv_u, float uv_v, int& outMatIdx) {
+	constexpr int kMaxMixDepth = 8;
+	for (int depth = 0; mat.type == MaterialType::Mix && depth < kMaxMixDepth; ++depth) {
+		float w = mat.mix_extra.mixWeight;
+		if (mat.mixAmountTexIdx >= 0)
+			w = fminf(1.0f, fmaxf(0.0f, mat.mixAmountTexScale * wf_sample_texture(wf_params.textures, wf_params.texturePixels, mat.mixAmountTexIdx, uv_u, uv_v, hit_point).x));
+		const float h = wf_mix_branch_hash01(hit_point);
+		const int subIdx = (h >= w) ? static_cast<int>(mat.mix_extra.mixMaterialAIdx)
+									 : static_cast<int>(mat.mix_extra.mixMaterialBIdx);
+		matIdx = subIdx;
+		mat = wf_params.materials[subIdx];
+	}
+	outMatIdx = matIdx;
+	return mat;
+}
