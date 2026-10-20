@@ -203,6 +203,12 @@ struct SceneDescriptor {
     // flag that doesn't apply to every scene (see render_options.h's
     // top-of-file comment).
     bool is_pbrt_backed = false;
+
+    // The file's own Film "cropwindow"/"pixelbounds" as NDC fractions {x0, x1, y0, y1} ({0, 1, 0, 1} when it has none), set for a pbrt-backed scene. Renderers draw only
+    // that window (the rest of the frame is black). crop_is_picture says the file's crop is the PICTURE its author meant (the pbrt-v4-scenes Head: a 1920 x 1080 film, a
+    // crop of its face): the launcher then cuts the finished image to the window, as pbrt writes it (cpu_scene_crop_picture_by_id()).
+    double film_crop[4] = {0.0, 1.0, 0.0, 1.0};
+    bool crop_is_picture = false;
 };
 
 // The note a non-default integrator prints for a scene with a participating medium whose extinction differs between colour channels, or "" when
@@ -753,6 +759,7 @@ namespace pbrt_scene_registry {
         s.gpu_compatible = true;
 
         wire_pbrt_backed_scene(s, d, path);
+        s.film_crop[0] = d.cropX0; s.film_crop[1] = d.cropX1; s.film_crop[2] = d.cropY0; s.film_crop[3] = d.cropY1;
 
         // Set after wire_pbrt_backed_scene() (which only touches the
         // recommended_spp/max_depth/integrator/sampler/light_sampler fields
@@ -780,6 +787,11 @@ namespace pbrt_scene_registry {
     // builder, so a category without subcategories needs nothing.
     inline SceneDescriptor in_subcategory(const char* subcategory, SceneDescriptor s) {
         s.subcategory = subcategory;
+        return s;
+    }
+    // A row whose file's crop window is its picture (see SceneDescriptor::crop_is_picture): `crop_is_the_picture(build_curated_...(...))`.
+    inline SceneDescriptor crop_is_the_picture(SceneDescriptor s) {
+        s.crop_is_picture = true;
         return s;
     }
 } // namespace pbrt_scene_registry
@@ -1146,6 +1158,8 @@ inline int refresh_downloaded_scenes_locked(std::vector<SceneDescriptor>& regist
         for (SceneDescriptor& s : registry) {
             if (s.id != done.id) continue;
             fresh.slug = s.slug;
+            fresh.subcategory = s.subcategory;   // (the rebuild is the bare builder: what the row's wrappers set is kept)
+            fresh.crop_is_picture = s.crop_is_picture;
             s = std::move(fresh);
             ++refreshed;
             break;

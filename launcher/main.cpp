@@ -68,6 +68,7 @@ extern char** environ;
 #include "src/TheRestOfYourLife/thread_count.h"
 #include "src/shared/accelerator_override.h"
 #include "src/shared/exr_writer.h"
+#include "src/shared/output_crop.h"
 #include "src/shared/render_stats.h"
 #include "launcher/camera_path.h"
 #include "src/shared/camera_keyframes.h"
@@ -1380,6 +1381,17 @@ static void printCpuStats(const LaunchArgs &args, const RenderSetup &s, double s
     }
 }
 
+// A scene whose file's crop window is its picture (the pbrt-v4-scenes Head, SceneDescriptor::crop_is_picture): the renderers drew only the window, into a full-size frame with black
+// around it; the finished image is cut to the window here, whichever renderer drew it, as pbrt writes it. An explicit --crop means the black-surrounded window and is left alone, and
+// so is a render with extra passes (they would be left the wrong size) and a PNG written directly (Metal).
+static void cutToScenePicture(const LaunchArgs &args, const std::string &scene_id, const std::string &out_path) {
+    if (args.crop_x0 != 0.0 || args.crop_y0 != 0.0 || args.crop_x1 != 1.0 || args.crop_y1 != 1.0) return;
+    double crop[4];
+    if (!cpu_scene_crop_picture_by_id(scene_id.c_str(), crop)) return;
+    const bool done = is_exr_output_path(out_path) ? output_crop::cropExrFile(out_path, crop) : output_crop::cropPpmFile(out_path, crop);
+    if (!done) std::cerr << "Note: the scene's crop window is its picture, but '" << out_path << "' could not be cut to it; the full frame is kept." << std::endl;
+}
+
 // After a successful render: PPM to PNG (Metal and EXR output are already final) and the list of files to open.
 static void announceRenderedFile(const std::string &out_path, bool use_gpu) {
     (void)use_gpu;  // (read only by the Metal branch)
@@ -1501,6 +1513,7 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
 
     printCpuStats(args, s, seconds);
 
+    if (render_result == 0 && !args.aovs) cutToScenePicture(args, scene_id, out_path);
     if (render_result == 0) announceRenderedFile(out_path, use_gpu);
 
     if (render_result == 0 && args.aovs) write_aov_passes(out_path, image_width, image_height, samples_per_pixel, scene_id, cam_x, cam_y, cam_z);

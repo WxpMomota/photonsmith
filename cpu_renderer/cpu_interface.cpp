@@ -1035,6 +1035,13 @@ extern "C" const char* cpu_scene_subcategory_by_id(const char* scene_id) {
 	return s ? s->subcategory : "";
 }
 
+extern "C" int cpu_scene_crop_picture_by_id(const char* scene_id, double out[4]) {
+	const SceneDescriptor* s = find_scene(scene_id);
+	if (!s || !s->crop_is_picture) return 0;
+	for (int i = 0; i < 4; ++i) out[i] = s->film_crop[i];
+	return 1;
+}
+
 extern "C" const char* cpu_scene_pbrt_path_by_id(const char* scene_id) {
 	// get_scene_registry() must run at least once before pbrt_scene_
 	// registry::paths() has anything in it - that map is populated as a

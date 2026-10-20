@@ -1224,3 +1224,14 @@ TEST(FindSceneTest, ADownloadedSceneReadsItsOwnCameraAtOnce) {
 	EXPECT_FALSE(pending()) << "and is not refreshed again";
 	fs::remove_all(root, ec);
 }
+
+// A scene whose file's crop window is its picture (the Head) says so through the C API the launcher reads; no other scene does.
+TEST(SceneRegistryCropPictureTest, OnlyTheHeadHasItsCropAsItsPicture) {
+	double crop[4] = {-1, -1, -1, -1};
+	EXPECT_EQ(cpu_scene_crop_picture_by_id("H45", crop), 1);
+	EXPECT_EQ(cpu_scene_crop_picture_by_id("A1", crop), 0);
+	EXPECT_EQ(cpu_scene_crop_picture_by_id("NotARealId", crop), 0);
+	int count = 0;
+	for (const SceneDescriptor &s : get_scene_registry()) count += s.crop_is_picture ? 1 : 0;
+	EXPECT_EQ(count, 1);
+}

@@ -545,6 +545,9 @@ const char* cpu_scene_name_by_id(const char* scene_id);
 const char* cpu_scene_category_by_id(const char* scene_id);
 /// The scene's subcategory (one of the SceneSubcategories:: constants in src/shared/scene_descriptor.h), "" when its category has none. The GUI's second row of tabs.
 const char* cpu_scene_subcategory_by_id(const char* scene_id);
+/// 1 and `out[4]` = the scene's Film crop window as NDC fractions {x0, x1, y0, y1} when the scene's crop IS its picture (SceneDescriptor::crop_is_picture: the launcher cuts the
+/// finished image to it), 0 (out untouched) for every other scene.
+int cpu_scene_crop_picture_by_id(const char* scene_id, double out[4]);
 const char* cpu_scene_description_by_id(const char* scene_id);
 /// For a scene loaded from a .pbrt file, the path it was loaded from; "" for
 /// every built-in scene. This exists so the GPU scene builder can find the

@@ -116,6 +116,7 @@ H41|225|veach-ajar|Large Scenes|Light & Art|Veach, Ajar|Fast|files,gpu|bitterli/
 H42|226|water-caustic|Large Scenes|Light & Art|Water Caustic|Medium|files,gpu|bitterli/water-caustic/scene-v4.pbrt|3a9a08d11f0653bc
 H43|227|kroken|Large Scenes|Interiors|Kroken|Very Slow|files,gpu|kroken/camera-1.pbrt|f62855ec939c80da
 H44|228|watercolor|Large Scenes|Interiors|Watercolor|Very Slow|files,gpu|watercolor/camera-1.pbrt|8d523cbf79582230
+H45|229|head|Large Scenes|Objects|Head|Medium|files,gpu|head/head.pbrt|de4b3025d3de1bc8
 I1|132|sampler-comparison|Education||Sampler Comparison (Low Sample Count)|Fast|self,cpu-only|cornell-box-native.pbrt|a1c87cfe9f5f96c7
 I2|133|spectral-prism-dispersion|Education||Spectral Rendering: Prism Dispersion|Fast|self,cpu-only|prism-dispersion.pbrt|a47c8bfd77a3e064
 I3|204|exposure-tone-mapping|Education||Exposure & Tone Mapping (HDR Sky)|Fast|self,gpu|hdri-sky-gradient.pbrt|1d00a46f945f2b86

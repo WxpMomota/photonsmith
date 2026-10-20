@@ -343,6 +343,7 @@ add_executable(cpu_integrator_tests
     unit/day_cycle_tests.cpp
     unit/environment_library_tests.cpp
     unit/render_events_tests.cpp
+    unit/output_crop_tests.cpp
     unit/scene_registry_snapshot_tests.cpp
     unit/scene_mix_tests.cpp
     unit/pbrt_handedness_tests.cpp
