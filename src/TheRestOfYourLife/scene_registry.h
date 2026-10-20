@@ -3,9 +3,8 @@
 // the sole source of truth for scene metadata (see SceneDescriptor's
 // gpu_compatible field comment below for why there's only one table).
 //
-// Scene names are defined as constants in src/shared/scene_descriptor.h
-// (SceneNames::). Always use SceneNames:: constants here -- never raw
-// string literals -- so a name can never drift between call sites.
+// A scene's name and slug are arguments of its own row in scene_registry_data.h (they used to be two more tables, SceneNames and scene_slugs::kBuiltin:
+// three lists to keep in step for one scene). tests/data/scene_registry_snapshot.txt pins every row, so a change to any of them is a diff in review.
 //
 // To add a new scene: see the list at the top of src/shared/scene_descriptor.h and docs/SCENE_SELECTION.md. cpu_interface.cpp's C API and
 // scene_metadata.dll (and through it, the GUI) pick a row up automatically; GPU support is gpu_compatible plus gpu/optix/pbrt_gpu_builder.h.
@@ -657,7 +656,7 @@ namespace pbrt_scene_registry {
     // SceneDescriptor this call replaced had set (see FindSceneTest.
     // EarthSceneRequiresFiles, which this migration briefly regressed).
     inline SceneDescriptor build_curated_pbrt_scene_descriptor(
-            const char* id, int legacy_id, const char* name, const char* category,
+            const char* id, int legacy_id, const char* name, const char* slug, const char* category,
             const char* description, const char* performance, const char* filename,
             // See wire_pbrt_backed_scene()'s own `mode` parameter comment.
             // Fixed (the default) preserves every pre-existing call site's
@@ -687,6 +686,7 @@ namespace pbrt_scene_registry {
         s.id = id;
         s.legacy_id = legacy_id;
         s.name = name;
+        s.slug = slug;
         s.category = category;
         s.description = description;
         s.performance = performance;
@@ -751,7 +751,7 @@ namespace pbrt_scene_registry {
     }
 
     inline SceneDescriptor build_curated_external_pbrt_scene_descriptor(
-            const char* id, int legacy_id, const char* name, const char* category,
+            const char* id, int legacy_id, const char* name, const char* slug, const char* category,
             const char* description, const char* performance, const char* filename,
             double recommended_exposure = 1.0, int recommended_spp_if_missing = 0) {
         std::string path = locateExternalPbrtFile(filename);
@@ -764,6 +764,7 @@ namespace pbrt_scene_registry {
         s.id = id;
         s.legacy_id = legacy_id;
         s.name = name;
+        s.slug = slug;
         s.category = category;
         s.description = description;
         s.performance = performance;
@@ -784,7 +785,7 @@ namespace pbrt_scene_registry {
         if (!onDisk) {
             // The arguments are the string literals of the registry table, so they outlive this call.
             pendingDownloads().push_back({id, filename, [=]() {
-                return build_curated_external_pbrt_scene_descriptor(id, legacy_id, name, category, description, performance, filename,
+                return build_curated_external_pbrt_scene_descriptor(id, legacy_id, name, slug, category, description, performance, filename,
                                                                     recommended_exposure, recommended_spp_if_missing);
             }});
         }
@@ -835,7 +836,8 @@ inline SceneDescriptor build_instanced_spheres_descriptor() {
     SceneDescriptor s;
     s.id = "F3";
     s.legacy_id = 71;
-    s.name = SceneNames::InstancedSpheres;
+    s.name = "Instanced Spheres";
+    s.slug = "instanced-spheres";
     s.category = SceneCategories::Geometry;
     s.description =
         "Object instancing with spheres: one 'cairn' (slab + metal ball + "
@@ -1113,7 +1115,6 @@ inline std::vector<SceneDescriptor>& scene_registry_storage() {
     static std::vector<SceneDescriptor> registry = []() {
         scene_registry_built() = true;
         std::vector<SceneDescriptor> all = get_builtin_scene_registry();
-        for (SceneDescriptor& s : all) s.slug = scene_slugs::builtinSlugForId(s.id);
         pbrt_scene_registry::append(all);
         all.reserve(all.size() + kRuntimeSceneCapacity);
         return all;

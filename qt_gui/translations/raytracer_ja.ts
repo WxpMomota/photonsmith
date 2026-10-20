@@ -913,17 +913,17 @@ The files go in: %1</source>
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="195"/>
+        <location filename="../mainwindow_actions.cpp" line="196"/>
         <source>Increase Log Font Size</source>
         <translation>ログのフォントサイズを拡大</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="199"/>
+        <location filename="../mainwindow_actions.cpp" line="200"/>
         <source>Decrease Log Font Size</source>
         <translation>ログのフォントサイズを縮小</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="203"/>
+        <location filename="../mainwindow_actions.cpp" line="204"/>
         <source>Reset Log Font Size</source>
         <translation>ログのフォントサイズをリセット</translation>
     </message>
@@ -1004,7 +1004,7 @@ The files go in: %1</source>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="1348"/>
-        <location filename="../mainwindow_actions.cpp" line="71"/>
+        <location filename="../mainwindow_actions.cpp" line="72"/>
         <source>Stop the running render and discard its output</source>
         <translation>実行中のレンダリングを停止し、出力を破棄します</translation>
     </message>
@@ -1017,7 +1017,7 @@ The files go in: %1</source>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="1366"/>
-        <location filename="../mainwindow_actions.cpp" line="80"/>
+        <location filename="../mainwindow_actions.cpp" line="81"/>
         <location filename="../mainwindow_slots.cpp" line="122"/>
         <source>Pause the running render in place - Resume continues from the exact same pixels</source>
         <translation>実行中のレンダリングをその場で一時停止します - 「再開」は全く同じピクセルから続行します</translation>
@@ -1029,236 +1029,236 @@ The files go in: %1</source>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="1381"/>
-        <location filename="../mainwindow_actions.cpp" line="85"/>
+        <location filename="../mainwindow_actions.cpp" line="86"/>
         <source>Discard the running render&apos;s output and immediately start the next queued job</source>
         <translation>実行中のレンダリングの出力を破棄し、キュー内の次のジョブをただちに開始します</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="49"/>
+        <location filename="../mainwindow_actions.cpp" line="50"/>
         <source>&amp;Render Image</source>
         <translation>画像をレンダリング(&amp;R)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="52"/>
+        <location filename="../mainwindow_actions.cpp" line="53"/>
         <source>Render the selected scene with the current settings</source>
         <translation>現在の設定で選択したシーンをレンダリングします</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="58"/>
+        <location filename="../mainwindow_actions.cpp" line="59"/>
         <source>Render &amp;Video</source>
         <translation>動画をレンダリング(&amp;V)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="61"/>
+        <location filename="../mainwindow_actions.cpp" line="62"/>
         <source>Render the camera path frame by frame and assemble a video</source>
         <translation>カメラパスをフレームごとにレンダリングし、動画として合成します</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="67"/>
+        <location filename="../mainwindow_actions.cpp" line="68"/>
         <source>&amp;Stop Render</source>
         <translation>レンダリングを停止(&amp;S)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="78"/>
+        <location filename="../mainwindow_actions.cpp" line="79"/>
         <location filename="../mainwindow_queue.cpp" line="351"/>
         <location filename="../mainwindow_slots.cpp" line="124"/>
         <source>&amp;Pause Render</source>
         <translation>レンダリングを一時停止(&amp;P)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="83"/>
+        <location filename="../mainwindow_actions.cpp" line="84"/>
         <source>&amp;Abandon &amp;&amp; Start Next</source>
         <translation>破棄して次を開始(&amp;A)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="88"/>
+        <location filename="../mainwindow_actions.cpp" line="89"/>
         <location filename="../mainwindow_tabs_render.cpp" line="353"/>
         <source>Open Output &amp;Folder</source>
         <translation>出力フォルダーを開く(&amp;F)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="91"/>
+        <location filename="../mainwindow_actions.cpp" line="92"/>
         <source>Show the folder containing the active Preview tab&apos;s render</source>
         <translation>アクティブなプレビュータブのレンダリング結果があるフォルダーを表示します</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="98"/>
+        <location filename="../mainwindow_actions.cpp" line="99"/>
         <location filename="../mainwindow_tabs_render.cpp" line="365"/>
         <source>Open in Default &amp;Viewer</source>
         <translation>既定のビューアーで開く(&amp;V)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="100"/>
+        <location filename="../mainwindow_actions.cpp" line="101"/>
         <source>Open the active Preview tab&apos;s render in the system viewer</source>
         <translation>アクティブなプレビュータブのレンダリング結果をシステムのビューアーで開きます</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="107"/>
+        <location filename="../mainwindow_actions.cpp" line="108"/>
         <source>&amp;Copy Log</source>
         <translation>ログをコピー(&amp;C)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="110"/>
+        <location filename="../mainwindow_actions.cpp" line="111"/>
         <source>Copy the entire log to the clipboard</source>
         <translation>ログ全体をクリップボードにコピーします</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="113"/>
+        <location filename="../mainwindow_actions.cpp" line="114"/>
         <location filename="../mainwindow_tabs_output.cpp" line="264"/>
         <source>&amp;Save Log…</source>
         <translation>ログを保存(&amp;S)…</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="121"/>
+        <location filename="../mainwindow_actions.cpp" line="122"/>
         <source>Write the log to a text file</source>
         <translation>ログをテキストファイルに書き出します</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="124"/>
+        <location filename="../mainwindow_actions.cpp" line="125"/>
         <location filename="../mainwindow_tabs_output.cpp" line="269"/>
         <source>C&amp;lear Log</source>
         <translation>ログをクリア(&amp;L)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="127"/>
+        <location filename="../mainwindow_actions.cpp" line="128"/>
         <source>Clear the log pane</source>
         <translation>ログペインをクリアします</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="130"/>
+        <location filename="../mainwindow_actions.cpp" line="131"/>
         <source>&amp;About Ray Tracer</source>
         <translation>Ray Tracerについて(&amp;A)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="132"/>
+        <location filename="../mainwindow_actions.cpp" line="133"/>
         <source>Version and project information</source>
         <translation>バージョンおよびプロジェクト情報</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="136"/>
+        <location filename="../mainwindow_actions.cpp" line="137"/>
         <source>Show &amp;Log Folder</source>
         <translation>ログフォルダーを表示(&amp;L)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="137"/>
+        <location filename="../mainwindow_actions.cpp" line="138"/>
         <location filename="../mainwindow_tabs_output.cpp" line="278"/>
         <source>Open the folder holding the program&apos;s log file (send it with a bug report)</source>
         <translation>プログラムのログファイルがあるフォルダーを開きます (不具合の報告に添付してください)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="145"/>
+        <location filename="../mainwindow_actions.cpp" line="146"/>
         <source>About &amp;Qt</source>
         <translation>Qtについて(&amp;Q)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="148"/>
+        <location filename="../mainwindow_actions.cpp" line="149"/>
         <source>&amp;Quit</source>
         <translation>終了(&amp;Q)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="150"/>
+        <location filename="../mainwindow_actions.cpp" line="151"/>
         <source>Exit the application</source>
         <translation>アプリケーションを終了します</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="157"/>
+        <location filename="../mainwindow_actions.cpp" line="158"/>
         <source>&amp;File</source>
         <translation>ファイル(&amp;F)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="165"/>
+        <location filename="../mainwindow_actions.cpp" line="166"/>
         <source>&amp;Render</source>
         <translation>レンダリング(&amp;R)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="173"/>
+        <location filename="../mainwindow_actions.cpp" line="174"/>
         <source>&amp;View</source>
         <translation>表示(&amp;V)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="184"/>
+        <location filename="../mainwindow_actions.cpp" line="185"/>
         <source>Reset Window Layout</source>
         <translation>ウィンドウのレイアウトをリセット</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="185"/>
+        <location filename="../mainwindow_actions.cpp" line="186"/>
         <source>Put the window back at its default size and place</source>
         <translation>ウィンドウを既定のサイズと位置に戻します</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="215"/>
+        <location filename="../mainwindow_actions.cpp" line="216"/>
         <source>&amp;Help</source>
         <translation>ヘルプ(&amp;H)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="369"/>
-        <source>&lt;h3&gt;Ray Tracer&lt;/h3&gt;&lt;p&gt;A physically-based path tracer with parallel CPU and GPU backends, built up from the &lt;i&gt;Ray Tracing in One Weekend&lt;/i&gt; series into a pbrt-v4-style feature set.&lt;/p&gt;&lt;p&gt;168 built-in scenes and 58 test scenes, a wide BxDF library, multiple light and camera types, triangle-mesh and texture support, BVH acceleration, volumetrics, and a choice of integrators alongside standard path tracing - SPPM photon mapping, bidirectional path tracing (BDPT), Metropolis Light Transport, and several reference/debug integrators (RandomWalk, Ambient Occlusion, SimplePath, SimpleVolPath, LightPath).&lt;/p&gt;&lt;p&gt;This window drives &lt;code&gt;%1&lt;/code&gt; as a subprocess.&lt;/p&gt;</source>
-        <translation>&lt;h3&gt;Ray Tracer&lt;/h3&gt;&lt;p&gt;CPU と GPU の並列バックエンドを備えた物理ベースのパストレーサーです。&lt;i&gt;Ray Tracing in One Weekend&lt;/i&gt; シリーズを出発点に、pbrt-v4 スタイルの機能セットへと発展させました。&lt;/p&gt;&lt;p&gt;組み込みシーン 168 個とテストシーン 58 個、豊富な BxDF ライブラリ、複数のライトとカメラの種類、三角形メッシュとテクスチャのサポート、BVH による高速化、ボリューム表現、標準のパストレーシングに加えて選べる各種インテグレーター（SPPM フォトンマッピング、双方向パストレーシング (BDPT)、Metropolis Light Transport、参照用・デバッグ用の RandomWalk、Ambient Occlusion、SimplePath、SimpleVolPath、LightPath）を備えています。&lt;/p&gt;&lt;p&gt;このウィンドウは &lt;code&gt;%1&lt;/code&gt; をサブプロセスとして実行します。&lt;/p&gt;</translation>
+        <location filename="../mainwindow_actions.cpp" line="377"/>
+        <source>&lt;h3&gt;Ray Tracer&lt;/h3&gt;&lt;p&gt;A physically-based path tracer with parallel CPU and GPU backends, built up from the &lt;i&gt;Ray Tracing in One Weekend&lt;/i&gt; series into a pbrt-v4-style feature set.&lt;/p&gt;&lt;p&gt;%2 built-in scenes and %3 test scenes, a wide BxDF library, multiple light and camera types, triangle-mesh and texture support, BVH acceleration, volumetrics, and a choice of integrators alongside standard path tracing - SPPM photon mapping, bidirectional path tracing (BDPT), Metropolis Light Transport, and several reference/debug integrators (RandomWalk, Ambient Occlusion, SimplePath, SimpleVolPath, LightPath).&lt;/p&gt;&lt;p&gt;This window drives &lt;code&gt;%1&lt;/code&gt; as a subprocess.&lt;/p&gt;</source>
+        <translation>&lt;h3&gt;Ray Tracer&lt;/h3&gt;&lt;p&gt;CPU と GPU の並列バックエンドを備えた物理ベースのパストレーサーです。&lt;i&gt;Ray Tracing in One Weekend&lt;/i&gt; シリーズを出発点に、pbrt-v4 スタイルの機能セットへと発展させました。&lt;/p&gt;&lt;p&gt;組み込みシーン %2 個とテストシーン %3 個、豊富な BxDF ライブラリ、複数のライトとカメラの種類、三角形メッシュとテクスチャのサポート、BVH による高速化、ボリューム表現、標準のパストレーシングに加えて選べる各種インテグレーター（SPPM フォトンマッピング、双方向パストレーシング (BDPT)、Metropolis Light Transport、参照用・デバッグ用の RandomWalk、Ambient Occlusion、SimplePath、SimpleVolPath、LightPath）を備えています。&lt;/p&gt;&lt;p&gt;このウィンドウは &lt;code&gt;%1&lt;/code&gt; をサブプロセスとして実行します。&lt;/p&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="252"/>
+        <location filename="../mainwindow_actions.cpp" line="253"/>
         <source>GPU (OptiX)</source>
         <translation>GPU (OptiX)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="255"/>
+        <location filename="../mainwindow_actions.cpp" line="256"/>
         <location filename="../mainwindow_queue.cpp" line="413"/>
         <source>CPU</source>
         <translation>CPU</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="252"/>
+        <location filename="../mainwindow_actions.cpp" line="253"/>
         <source>GPU (OptiX, Wavefront)</source>
         <translation>GPU（OptiX、Wavefront）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="253"/>
+        <location filename="../mainwindow_actions.cpp" line="254"/>
         <source>GPU (Metal)</source>
         <translation>GPU (Metal)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="268"/>
+        <location filename="../mainwindow_actions.cpp" line="269"/>
         <source>%1x%2  ·  %3 spp</source>
         <translation>%1x%2  ·  %3 spp</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="309"/>
+        <location filename="../mainwindow_actions.cpp" line="310"/>
         <source>Save Log</source>
         <translation>ログを保存</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="311"/>
-        <location filename="../mainwindow_actions.cpp" line="351"/>
+        <location filename="../mainwindow_actions.cpp" line="312"/>
+        <location filename="../mainwindow_actions.cpp" line="352"/>
         <source>Text Files (*.txt);;All Files (*.*)</source>
         <translation>テキストファイル (*.txt);;すべてのファイル (*.*)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="318"/>
+        <location filename="../mainwindow_actions.cpp" line="319"/>
         <source>[ERROR] Could not write log to %1: %2</source>
         <translation>[ERROR] ログを%1に書き込めませんでした: %2</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="322"/>
+        <location filename="../mainwindow_actions.cpp" line="323"/>
         <source>[INFO] Log saved to %1</source>
         <translation>[INFO] ログを%1に保存しました</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="349"/>
+        <location filename="../mainwindow_actions.cpp" line="350"/>
         <source>Save Diagnostics Report</source>
         <translation>診断レポートを保存</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="356"/>
+        <location filename="../mainwindow_actions.cpp" line="357"/>
         <source>Save Failed</source>
         <translation>保存に失敗しました</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="357"/>
+        <location filename="../mainwindow_actions.cpp" line="358"/>
         <source>Could not write diagnostics report to %1: %2</source>
         <translation>診断レポートを%1に書き込めませんでした: %2</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="368"/>
+        <location filename="../mainwindow_actions.cpp" line="376"/>
         <source>About Ray Tracer</source>
         <translation>Ray Tracerについて</translation>
     </message>

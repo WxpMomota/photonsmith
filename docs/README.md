@@ -38,6 +38,7 @@ A guide to this folder and the other documents. The repository's front page is t
 |---|---|
 | [BUILD.md](../BUILD.md) | Building on Windows and macOS, the fast incremental loop, troubleshooting |
 | [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) | Where things are in the repository |
+| [ENVIRONMENT.md](ENVIRONMENT.md) | Every environment variable the program reads: settings, plumbing, test hooks |
 | [CONTRIBUTING.md](../CONTRIBUTING.md), [CODING_STANDARDS.md](../CODING_STANDARDS.md) | How to contribute, and the code style |
 | [tests/TESTING_GUIDE.md](../tests/TESTING_GUIDE.md) | Running and adding tests |
 | [scripts/README.md](../scripts/README.md), [releases/README.md](../releases/README.md) | The scripts, and making a release package |

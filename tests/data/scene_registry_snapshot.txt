@@ -1,0 +1,170 @@
+# The built-in scenes, one per line: id|legacy id|slug|category|name|performance|flags|file|description fingerprint.
+# Regenerate with RT_UPDATE_SNAPSHOT=1 (see tests/unit/scene_registry_snapshot_tests.cpp) and review the diff.
+A1|169|cornell-box|Basics|Cornell Box|Fast|self,gpu|cornell-box-native.pbrt|1d56211f44ff7178
+A2|1|bouncing-spheres|Basics|Bouncing Spheres|Fast|self,gpu|bouncing-spheres.pbrt|50547cfbe3819271
+A3|185|checkered-spheres|Basics|Checkered Spheres|Fast|self,gpu|checkered-spheres.pbrt|51e35703c8b74a22
+A4|190|earth|Basics|Earth|Fast|files,gpu|earth-globe.pbrt|c37f81568e2dc30f
+A5|4|perlin-spheres|Basics|Perlin Spheres|Fast|self,gpu|perlin-spheres.pbrt|3bf47ed7ddcc82ef
+A6|168|colored-quads|Basics|Colored Quads|Fast|self,gpu|colored-quads.pbrt|d79c48134f7139b2
+A7|6|simple-light|Basics|Simple Light|Fast|self,gpu|simple-light.pbrt|91e9e6b5da8c33a2
+A8|191|cornell-smoke|Basics|Cornell Smoke|Medium|self,gpu|cornell-smoke.pbrt|095ce6f003c01295
+A9|8|final-scene|Basics|Final Scene|Slow|self,gpu|final-scene.pbrt|e1a7fd0ddeefb243
+B1|9|rough-metal-spheres|Materials|Rough Metal Spheres|Fast|self,gpu|rough-metal-spheres.pbrt|4efd9fab6fafedbc
+B2|10|cornell-rough-metal|Materials|Cornell Rough Metal|Medium|self,gpu|cornell-rough-metal.pbrt|fbd36a4e324ac46e
+B3|171|cornell-rough-glass|Materials|Cornell Rough Glass|Fast|self,gpu|cornell-rough-glass.pbrt|0e434b80774511f0
+B4|170|cornell-conductor|Materials|Cornell Conductor|Fast|self,gpu|cornell-conductor.pbrt|229ec2378649d518
+B5|172|cornell-coated-diffuse|Materials|Cornell Coated Diffuse|Fast|self,gpu|cornell-coated-diffuse.pbrt|6fd1ef08458cad37
+B6|173|cornell-thin-glass|Materials|Cornell Thin Glass|Fast|self,gpu|cornell-thin-glass.pbrt|1dd3c3dc3c099c9b
+B7|174|cornell-coated-conductor|Materials|Cornell Coated Conductor|Medium|self,gpu|cornell-coated-conductor.pbrt|23bc05918d32696a
+B8|175|cornell-wax-slab|Materials|Cornell Wax Slab|Fast|self,gpu|cornell-wax-slab.pbrt|fc30679b6134a6b5
+B9|17|cornell-crystal|Materials|Cornell Crystal|Fast|self,gpu|cornell-crystal.pbrt|fa4c694adc6c5435
+B10|18|principled-showcase|Materials|Principled Showcase|Fast|self,gpu|principled-showcase.pbrt|3e5d3037013781db
+B11|192|hair-fibers|Materials|Hair Fibers|Fast|self,gpu|hair-fibers-scene.pbrt|e4296b706f335150
+B12|20|normal-mapped-cornell|Materials|Normal Mapped Cornell|Fast|self,gpu|normal-mapped-cornell.pbrt|02c4e6876aaf9cd2
+B13|193|subsurface-slab|Materials|Subsurface Slab|Medium|self,gpu|subsurface-slab.pbrt|2d8c72a5d12020d1
+D1|22|depth-of-field|Cameras|Depth of Field|Fast|self,gpu|depth-of-field-spheres.pbrt|15cd37ce120b499a
+F1|200|bilinear-patch|Geometry|Bilinear Patch|Fast|self,gpu|bilinear-patch-scene.pbrt|30b39f94c6f755eb
+C1|203|hdri-sky|Lights|HDRI Sky|Fast|self,gpu|hdri-sky-gradient.pbrt|44312bbc2ff2ee00
+C2|176|spotlight-cornell|Lights|Spotlight Cornell|Fast|self,gpu|cornell-spotlight.pbrt|68e752d73be525c0
+C3|177|distant-light-cornell|Lights|Distant Light Cornell|Fast|self,gpu|cornell-distant-light.pbrt|7eb130a60e89f14b
+C4|178|point-light-cornell|Lights|Point Light Cornell|Fast|self,gpu|cornell-point-light.pbrt|0c88ae3772395d08
+C5|179|goniometric-light|Lights|Goniometric Light|Fast|self,gpu|cornell-goniometric.pbrt|e39d7ae3663642f0
+C6|180|projection-light|Lights|Projection Light|Fast|self,gpu|cornell-projection.pbrt|823fc81fed7c0c79
+E1|197|homogeneous-medium|Volumes|Homogeneous Medium|Slow|self,gpu|homogeneous-medium.pbrt|5a8b1d277dee3f4c
+E2|198|cloud-medium|Volumes|Cloud Medium|Medium|self,gpu|cloud-medium-scene.pbrt|01613cf0d1ef0d51
+E3|199|dielectric-medium-showcase|Volumes|Dielectric Medium Showcase|Fast|self,gpu|dielectric-medium-showcase.pbrt|7f0451091b78af02
+E4|70|rgb-grid-medium|Volumes|RGB Grid Medium|Fast|self,gpu|rgb-grid-nebula.pbrt|7bd4a1d888a8be55
+D2|186|orthographic-camera|Cameras|Orthographic Camera|Fast|self,gpu|ortho-camera-scene.pbrt|aab8caba87771443
+D3|195|spherical-camera|Cameras|Spherical Camera|Fast|self,gpu|spherical-camera-scene.pbrt|64de7206a9bd0767
+B14|205|measured-brdf|Materials|Measured BRDF|Fast|self,gpu|measured-brdf-showroom.pbrt|a1063615ce497989
+B23|131|glass-prism-dispersion|Materials|Glass Prism Dispersion|Fast|self,gpu|prism-dispersion.pbrt|8e6e2f4214bd0404
+B24|136|frosted-prism-dispersion|Materials|Frosted Prism Dispersion|Fast|self,gpu|frosted-prism-dispersion.pbrt|6405b3f9c502c792
+C7|194|portal-infinite-light|Lights|Portal Infinite Light|Fast|self,gpu|portal-window-room.pbrt|6b8327b903ad403e
+D4|187|realistic-camera|Cameras|Realistic Camera|Fast|self,gpu|realistic-camera-scene.pbrt|f03ff2c7594e3711
+D5|181|depth-of-field-cornell-box|Cameras|Depth of Field (Cornell Box)|Fast|self,gpu|cornell-dof.pbrt|1dd534ecca4bc1af
+D6|182|orthographic-camera-cornell-box|Cameras|Orthographic Camera (Cornell Box)|Fast|self,gpu|cornell-orthographic.pbrt|e5c71837adc2b14d
+D7|183|spherical-camera-cornell-box|Cameras|Spherical Camera (Cornell Box)|Fast|self,gpu|cornell-spherical.pbrt|0637d4a958f1b171
+D8|184|realistic-camera-cornell-box|Cameras|Realistic Camera (Cornell Box)|Fast|self,gpu|cornell-realistic.pbrt|3b42b0a15a4e50bd
+D13|196|camera-motion-blur-cornell-box|Cameras|Camera Motion Blur (Cornell Box)|Fast|self,gpu|cornell-camera-motion-blur.pbrt|ac26c1966b084a43
+F2|188|triangle-mesh|Geometry|Triangle Mesh|Fast|self,gpu|triangle-mesh-scene.pbrt|c32217fc6df9563b
+F3|71|instanced-spheres|Geometry|Instanced Spheres|Fast|self,gpu|instanced-spheres.pbrt|519ab0cf1a490226
+F4|189|curve-fibers|Geometry|Curve Fibers|Fast|self,gpu|curve-fibers-scene.pbrt|6b29f48999190692
+G1|38|stanford-bunny|Models|Stanford Bunny|Fast|files,gpu|mesh-stanford-bunny.pbrt|40619825ffe3f912
+G2|39|stanford-armadillo|Models|Stanford Armadillo|Fast|files,gpu|mesh-stanford-armadillo.pbrt|b57437fd81a648e0
+G3|40|stanford-happy-buddha|Models|Stanford Happy Buddha|Fast|files,gpu|mesh-stanford-happy-buddha.pbrt|6dce718b5d85d6fe
+G4|41|stanford-lucy|Models|Stanford Lucy|Fast|files,gpu|mesh-stanford-lucy.pbrt|c67db637538edd78
+G5|42|stanford-xyzrgb-dragon|Models|Stanford XYZRGB Dragon|Fast|files,gpu|mesh-stanford-dragon.pbrt|424b49e1abf84e74
+G6|43|utah-teapot|Models|Utah Teapot|Fast|files,gpu|mesh-utah-teapot.pbrt|240f4fea0b9a7fdc
+G7|44|spot-the-cow|Models|Spot the Cow|Fast|files,gpu|mesh-spot-cow.pbrt|8ca604c3445faeef
+G8|45|suzanne|Models|Suzanne|Fast|files,gpu|mesh-suzanne.pbrt|fe1228bbe1d5682a
+G9|46|nefertiti-bust|Models|Nefertiti Bust|Fast|files,gpu|mesh-nefertiti-bust.pbrt|98c4b7fa923cdee1
+G10|47|horse|Models|Horse|Fast|files,gpu|mesh-horse.pbrt|3d44199ab08e1986
+G11|48|cheburashka|Models|Cheburashka|Fast|files,gpu|mesh-cheburashka.pbrt|52ccd516f278f4d4
+G12|49|trophy-room|Models|Trophy Room|Fast|files,gpu|mesh-trophy-room.pbrt|f662f3bca5d8dd06
+G13|50|glass-dragon|Models|Glass Dragon|Fast|files,gpu|mesh-glass-dragon.pbrt|1d2570be8c161775
+G14|51|beast|Models|Beast|Fast|files,gpu|mesh-beast.pbrt|61d8dfe8eb4d490d
+G15|52|vw-beetle|Models|VW Beetle|Fast|files,gpu|mesh-vw-beetle.pbrt|c5b0a1f8b45c1a55
+G17|54|bimba|Models|Bimba|Fast|files,gpu|mesh-bimba.pbrt|4814887a35a952a7
+G18|55|cow|Models|Cow|Fast|files,gpu|mesh-cow.pbrt|92485f914578a43c
+G19|56|fandisk|Models|Fandisk|Fast|files,gpu|mesh-fandisk.pbrt|83c84811c7e6e6df
+G20|57|homer|Models|Homer|Fast|files,gpu|mesh-homer.pbrt|d244190010c8ae7c
+G21|58|igea|Models|Igea|Fast|files,gpu|mesh-igea.pbrt|563e493c5d57c158
+G22|59|max-planck|Models|Max Planck|Fast|files,gpu|mesh-max-planck.pbrt|7e7378bd83fbb712
+G23|60|ogre|Models|Ogre|Fast|files,gpu|mesh-ogre.pbrt|f43b33ae611d2739
+G24|61|rocker-arm|Models|Rocker Arm|Fast|files,gpu|mesh-rocker-arm.pbrt|fd6ac561a7d83ab0
+H1|62|crytek-sponza|Large Scenes|Crytek Sponza|Medium|files,gpu|environment-sponza.pbrt|fc6e873316e5fbd8
+H2|63|amazon-lumberyard-bistro|Large Scenes|Amazon Lumberyard Bistro|Slow|files,gpu|environment-bistro-exterior.pbrt|58e0f7afd088971f
+H3|64|rungholt|Large Scenes|Rungholt|Slow|files,gpu|environment-rungholt.pbrt|09867651fd315e35
+H4|73|fireplace-room|Large Scenes|Fireplace Room|Medium|files,gpu|environment-fireplace-room.pbrt|41e1374e825cd428
+H5|74|san-miguel|Large Scenes|San Miguel|Very Slow|files,gpu|environment-san-miguel.pbrt|b3f1d62c8c5ce504
+H6|75|sibenik-cathedral|Large Scenes|Sibenik Cathedral|Slow|files,gpu|environment-sibenik-cathedral.pbrt|e048b3aa1a68d517
+H7|76|breakfast-room|Large Scenes|Breakfast Room|Slow|files,gpu|environment-breakfast-room.pbrt|cbe65f5349b8430c
+H8|77|salle-de-bain|Large Scenes|Salle de Bain|Medium|files,gpu|environment-salle-de-bain.pbrt|381ca3ab9f8c8d00
+H9|78|gallery|Large Scenes|Gallery|Medium|files,gpu|environment-gallery.pbrt|e7974ee0c0f177be
+H10|79|lost-empire|Large Scenes|Lost Empire|Very Slow|files,gpu|environment-lost-empire.pbrt|c65eccf2b052a1c9
+H11|80|vokselia-spawn|Large Scenes|Vokselia Spawn|Fast|files,gpu|environment-vokselia-spawn.pbrt|1d1a7dc9aef77a29
+H12|81|power-plant|Large Scenes|Power Plant|Slow|files,gpu|environment-power-plant.pbrt|7a60dee1fb6051a8
+H13|159|contemporary-bathroom|Large Scenes|Contemporary Bathroom|Very Slow|files,gpu|contemporary-bathroom/contemporary-bathroom.pbrt|b8cdac2e28b71b23
+H14|160|barcelona-pavilion|Large Scenes|Barcelona Pavilion|Slow|files,gpu|barcelona-pavilion/pavilion-day.pbrt|a45383a6682a26b9
+H15|161|subsurface-dragon|Large Scenes|Subsurface Dragon|Very Slow|files,gpu|sssdragon/dragon_50.pbrt|bba9c137bc0e3f4e
+H16|162|ganesha|Large Scenes|Ganesha|Slow|files,gpu|ganesha/ganesha.pbrt|d91d67efb8e415a3
+H17|163|sports-car|Large Scenes|Sports Car|Slow|files,gpu|sportscar/sportscar-sky.pbrt|ca7e42fe15105825
+H18|164|zero-day|Large Scenes|Zero Day|Very Slow|files,gpu|zero-day/frame180.pbrt|1dc2d0a45ba2d9cd
+H19|165|crown|Large Scenes|Crown|Slow|files,gpu|crown/crown.pbrt|ba8b372b21c888b0
+H20|166|villa|Large Scenes|Villa|Very Slow|files,gpu|villa/villa-daylight.pbrt|aecaaeda9b64fb76
+H21|167|transparent-machines|Large Scenes|Transparent Machines|Medium|files,gpu|transparent-machines/frame812.pbrt|92c10b610ba63cf0
+H22|206|grey-white-room|Large Scenes|Grey and White Room|Fast|files,gpu|bitterli/living-room/scene-v4.pbrt|a8993319c9256398
+H23|207|bedroom-interior|Large Scenes|Bedroom Interior|Medium|files,gpu|bitterli/bedroom/scene-v4.pbrt|6a7e909919e84e98
+H24|208|country-kitchen|Large Scenes|Country Kitchen|Medium|files,gpu|bitterli/kitchen/scene-v4.pbrt|e47beb43335b4ef0
+H25|209|modern-hall|Large Scenes|Modern Hall|Medium|files,gpu|bitterli/staircase2/scene-v4.pbrt|16c9190d0367b7a1
+H26|210|wooden-staircase|Large Scenes|Wooden Staircase|Medium|files,gpu|bitterli/staircase/scene-v4.pbrt|2d34f2c9c270c0d8
+H27|211|white-room|Large Scenes|White Room|Medium|files,gpu|bitterli/living-room-2/scene-v4.pbrt|eeb23aba94e35b93
+H28|212|modern-living-room|Large Scenes|Modern Living Room|Medium|files,gpu|bitterli/living-room-3/scene-v4.pbrt|7be6cbd0b99cc6f1
+H29|213|glass-of-water|Large Scenes|Glass of Water|Medium|files,gpu|bitterli/glass-of-water/scene-v4.pbrt|494abc77afc5fe83
+H30|214|pontiac-gto|Large Scenes|Pontiac GTO|Fast|files,gpu|bitterli/car2/scene-v4.pbrt|ed7e67a492571ca9
+H31|215|vintage-car|Large Scenes|Vintage Car|Fast|files,gpu|bitterli/car/scene-v4.pbrt|2d4e342452c17b21
+H32|216|coffee-maker|Large Scenes|Coffee Maker|Fast|files,gpu|bitterli/coffee/scene-v4.pbrt|dd237c3200b6aea9
+H33|217|little-lamp|Large Scenes|Little Lamp|Very Slow|files,gpu|bitterli/lamp/scene-v4.pbrt|82052bb52ad77c6d
+H34|218|victorian-house|Large Scenes|Victorian House|Medium|files,gpu|bitterli/house/scene-v4.pbrt|cc6d6d0bf0be1dae
+H35|219|spaceship|Large Scenes|Spaceship|Very Slow|files,gpu|bitterli/spaceship/scene-v4.pbrt|e8497ddc5c08790a
+H36|220|japanese-classroom|Large Scenes|Japanese Classroom|Medium|files,gpu|bitterli/classroom/scene-v4.pbrt|bd5c7770f7bfb6a1
+H37|221|dragon-statue|Large Scenes|Dragon Statue|Fast|files,gpu|bitterli/dragon/scene-v4.pbrt|64ac5d04d6412028
+H38|222|material-test-ball|Large Scenes|Material Test Ball|Fast|files,gpu|bitterli/material-testball/scene-v4.pbrt|1f2d8f1a8388a835
+I1|132|sampler-comparison|Education|Sampler Comparison (Low Sample Count)|Fast|self,cpu-only|cornell-box-native.pbrt|a1c87cfe9f5f96c7
+I2|133|spectral-prism-dispersion|Education|Spectral Rendering: Prism Dispersion|Fast|self,cpu-only|prism-dispersion.pbrt|a47c8bfd77a3e064
+I3|204|exposure-tone-mapping|Education|Exposure & Tone Mapping (HDR Sky)|Fast|self,gpu|hdri-sky-gradient.pbrt|1d00a46f945f2b86
+I4|135|gpu-denoiser-demo|Education|GPU Denoiser: Before & After|Fast|self,gpu|cornell-box-native.pbrt|af5b6f32bc9181df
+I5|139|sppm-rough-glass-caustic|Education|SPPM: Rough Glass Caustic|Fast|self,gpu|cornell-rough-glass.pbrt|bf165f1271c22cf2
+I6|140|bdpt-mlt-demo|Education|BDPT / MLT: Bidirectional Light Transport|Fast|self,gpu|cornell-box-native.pbrt|9bebdf240743f7c0
+I7|155|light-transport-strategies|Education|Light Transport Strategies (NEE / BSDF / MIS)|Fast|self,cpu-only|cornell-box-native.pbrt|5b028598a09581b1
+I8|156|light-sampler-comparison|Education|Light Sampler Strategy (Uniform / Power / BVH)|Fast|self,cpu-only|cornell-light-sampler-comparison.pbrt|423b5d1b25334c3b
+I9|157|ambient-occlusion-demo|Education|Ambient Occlusion (Debug Integrator)|Fast|self,cpu-only|cornell-box-native.pbrt|2838185cb5c60421
+I10|158|firefly-suppression|Education|Firefly Suppression (Regularize / Clamp)|Fast|self,gpu|cornell-rough-glass.pbrt|abd7888784ea0f88
+B15|100|mix-material|Materials|Mix Material|Fast|self,gpu|mix-material.pbrt|a61a05e4c1c803a6
+B16|101|layered-materials|Materials|Layered Materials|Fast|self,gpu|layered-materials.pbrt|7ad5a4c1c5dfa2b6
+B18|103|conductor-rgb-eta-k|Materials|Conductor RGB Eta/K|Fast|self,gpu|conductor-rgb-eta-k.pbrt|438fa4f746453832
+B20|105|hair-material|Materials|Hair Material|Fast|self,gpu|hair-material.pbrt|46fe5d0187d8d0df
+B22|107|named-material-and-texture|Materials|Named Material & Texture|Fast|self,gpu|named-material-and-texture.pbrt|11d4ab05925d8e47
+B25|146|glass-presets|Materials|Glass Presets|Fast|self,gpu|glass-presets.pbrt|1cf8f18a4075a532
+J1|102|coateddiffuse-texture|Textures|CoatedDiffuse Texture|Fast|self,gpu|coateddiffuse-texture.pbrt|2cf0421d0ecc955a
+J2|104|diffusetransmission-texture|Textures|DiffuseTransmission Texture|Fast|self,gpu|diffusetransmission-texture.pbrt|3416ae7c9e8c3473
+J3|106|nested-checker-texture|Textures|Nested Checker Texture|Fast|self,gpu|nested-checker-texture.pbrt|3b1a8955dd0fc2f4
+J4|147|texture-encoding-and-wrap|Textures|Texture Encoding & Wrap|Fast|self,gpu|texture-encoding-wrap-invert.pbrt|b3ae030b71353fbb
+J5|148|procedural-texture-gallery|Textures|Procedural Texture Gallery|Fast|self,gpu|procedural-textures-windy-wrinkled-dots-bilerp.pbrt|0c50246e935ddb98
+J6|149|nested-texture-2-levels|Textures|Nested Texture: 2 Levels|Fast|self,gpu|nested-texture-2level.pbrt|0dca5ecd7a45a3eb
+C8|108|punctual-lights|Lights|Punctual Lights|Fast|self,gpu|punctual-lights.pbrt|a670daee9b9a27af
+C9|109|goniometric-and-projection-lights|Lights|Goniometric & Projection Lights|Fast|self,gpu|goniometric-projection.pbrt|ae38de97860b846b
+C10|110|blackbody-light|Lights|Blackbody Light|Fast|self,gpu|blackbody-light.pbrt|40224cc9f4171ef9
+C11|111|textured-two-sided-lights|Lights|Textured Two-Sided Lights|Fast|self,gpu|textured-twosided-lights.pbrt|2e61725a60490179
+C12|112|infinite-light|Lights|Infinite Light|Fast|self,gpu|infinite-light.pbrt|da9038622917970d
+C13|113|disk-and-cylinder-lights|Lights|Disk & Cylinder Lights|Fast|self,gpu|disk-cylinder-light.pbrt|22ac7f5ccae44913
+C14|114|two-sphere-lights|Lights|Two Sphere Lights|Fast|self,gpu|two-sphere-lights.pbrt|6ca2951e6a448602
+C15|115|triangle-fan-light|Lights|Triangle Fan Light|Fast|self,gpu|triangle-fan-light.pbrt|5f33f938929f2209
+C16|137|colorspace-blackbody-light|Lights|ColorSpace + Blackbody Light|Fast|self,gpu|colorspace-blackbody.pbrt|f9b0c52d9d2ea68b
+C17|142|portal-light|Lights|Portal Light|Fast|self,gpu|portal-light.pbrt|b841fc6d9f6105be
+C18|143|light-power-parameter|Lights|Light Power Parameter|Fast|self,gpu|light-power-parameter.pbrt|1e45eb5b7b742b3e
+C19|144|projection-light-non-square|Lights|Projection Light: Non-Square|Fast|self,gpu|projection-light-nonsquare.pbrt|f91c1ed685620ac0
+C20|145|spectral-gamut-saturation|Lights|Spectral Gamut Saturation|Fast|self,gpu|spectral-gamut-saturation.pbrt|f74c8fb634c25006
+D9|116|depth-of-field-pbrt-file|Cameras|Depth of Field (pbrt file)|Fast|self,gpu|depth-of-field.pbrt|906069a4a5f32dd8
+D10|117|orthographic-camera-pbrt-file|Cameras|Orthographic Camera (pbrt file)|Fast|self,gpu|orthographic-camera.pbrt|db4a413a2665bf23
+D11|118|spherical-camera-pbrt-file|Cameras|Spherical Camera (pbrt file)|Fast|self,gpu|spherical-camera.pbrt|072f04167a1a6ac2
+D12|119|realistic-camera-pbrt-file|Cameras|Realistic Camera (pbrt file)|Fast|self,gpu|realistic-camera.pbrt|5dcb24767e6d1d82
+E5|120|cloud-medium-pbrt-file|Volumes|Cloud Medium (pbrt file)|Fast|self,gpu|cloud-medium.pbrt|e91d1a37abf27b96
+E6|121|cylinder-medium|Volumes|Cylinder Medium|Fast|self,gpu|cylinder-medium.pbrt|736ba5571ec108af
+E11|201|thin-dielectric-medium|Volumes|Thin Dielectric Medium|Fast|self,gpu|thin-dielectric-medium.pbrt|7ed23e232a48a34f
+E12|202|rough-dielectric-medium|Volumes|Rough Dielectric Medium|Fast|self,gpu|rough-dielectric-medium.pbrt|a6ce8d73da9e498f
+E7|122|rgb-grid-medium-pbrt-file|Volumes|RGB Grid Medium (pbrt file)|Fast|self,gpu|rgbgrid-medium.pbrt|67aef1acf96d9aaf
+E8|123|uniform-grid-medium|Volumes|Uniform Grid Medium|Fast|self,gpu|uniformgrid-medium.pbrt|5bd1fc4e90b4ec83
+E9|141|nanovdb-medium|Volumes|NanoVDB Medium|Fast|self,gpu|nanovdb-medium.pbrt|edf384617ed45eba
+E10|154|camera-medium|Volumes|Camera Medium|Fast|self,gpu|camera-medium.pbrt|066707ec6d5602c4
+F5|124|ply-mesh-uv|Geometry|PLY Mesh UV|Fast|self,gpu|plymesh-uv.pbrt|267182c947a8148f
+F6|125|ply-mesh-geometry|Geometry|PLY Mesh Geometry|Fast|self,gpu|plymesh-geometry.pbrt|e9c990408e8f4820
+F7|126|curve-tuft|Geometry|Curve Tuft|Fast|self,gpu|curve-tuft.pbrt|983245a432062274
+F8|127|curve-hair-tuft|Geometry|Curve + Hair Tuft|Fast|self,gpu|curve-hair-tuft.pbrt|e3ecdb4e7819250d
+F9|128|triangle-mesh-uv|Geometry|Triangle Mesh UV|Fast|self,gpu|trianglemesh-uv.pbrt|5ab570a75b02abb5
+F10|129|pixel-filter-box|Geometry|Pixel Filter: Box|Fast|self,gpu|pixel-filter-box.pbrt|65df8c29c029041d
+F11|150|object-motion-blur|Geometry|Object Motion Blur|Fast|self,gpu|object-motion-blur.pbrt|03dd282b81bad01f
+F12|151|disk-and-cylinder-motion-blur|Geometry|Disk & Cylinder Motion Blur|Fast|self,gpu|disk-cylinder-motion-blur.pbrt|50df6047b88636a4
+F13|152|reverseorientation|Geometry|ReverseOrientation|Fast|self,gpu|reverseorientation.pbrt|e7286e2103ecb3f6
+F14|153|cone-and-paraboloid-gallery|Geometry|Cone & Paraboloid Gallery|Fast|self,gpu|cone-paraboloid-gallery.pbrt|552ab0108926757f
+G25|130|killeroo|Models|Killeroo|Fast|self,gpu|killeroo-simple.pbrt|d7ffcc753f2d5e07

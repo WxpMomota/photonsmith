@@ -93,12 +93,10 @@ Any `.pbrt` file placed in `pbrt_scenes/` (or in the folder named by the `RAY_TR
 
 ## Adding a built-in scene
 
-1. Put the scene's `.pbrt` file in `pbrt_scenes/`.
-2. Add a `SceneNames::` constant in `src/shared/scene_descriptor.h` (the name says what the scene shows, not how it is stored).
-3. Add its row to `src/shared/scene_slugs.h` (`kBuiltin`): the name that will not change.
-4. Add a `build_curated_pbrt_scene_descriptor(...)` row in `src/TheRestOfYourLife/scene_registry_data.h`: id, name, category, description, performance, file.
-5. Add its technique note to `qt_gui/scene_technique_notes.h`, keyed by the name. The notes are translated GUI text, so they stay in the GUI rather than in the (Qt-free) registry; `RT_GUI_SELFTEST=scenekeys` (see `qt_gui/mainwindow_selftest.cpp`) fails when a self-contained scene has no note or a note belongs to no scene.
-6. Update the pinned counts in `tests/unit/scene_registry_tests.cpp`; the slug-table and name tests fail until steps 3 and 2 are done.
+1. Put the scene's `.pbrt` file in `pbrt_scenes/` (a scene that needs a download is a pack in `qt_gui/scene_packs.txt`, made by `scripts/gen_scene_packs.py`).
+2. Add **one** row in `src/TheRestOfYourLife/scene_registry_data.h` (`build_curated_pbrt_scene_descriptor(...)`, or the `_external_` one for a download): id, legacy id (the next number nobody uses), name (what the scene shows, not how it is stored), slug (the durable name: it never changes when the name does), category, description, performance, file. The name and slug used to be two more tables; they are arguments of the row now.
+3. Add its technique note to `qt_gui/scene_technique_notes.h`, keyed by the slug, for a scene that needs no download. The notes are translated GUI text, so they stay in the GUI rather than in the (Qt-free) registry; `RT_GUI_SELFTEST=scenekeys` (see `qt_gui/mainwindow_selftest.cpp`) fails when a self-contained scene has no note or a note belongs to no scene.
+4. Run `RT_UPDATE_SNAPSHOT=1 ray_tracer_tests --gtest_filter=SceneRegistrySnapshot*` from the repository root and review the diff of `tests/data/scene_registry_snapshot.txt` (one line per scene: that is where a count, a rename or a retuned row shows up). The same test names the documents that quote the number of scenes (README, this guide, `.github/copilot-instructions.md`) when they are out of date.
 
 A test fixture needs none of this: give the file the tags above and it is listed.
 

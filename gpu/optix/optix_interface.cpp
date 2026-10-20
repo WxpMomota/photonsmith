@@ -174,6 +174,9 @@ static bool prepareSceneAndCamera(
 	// build_scene()'s own mesh-loading helpers can skip their expensive work
 	// entirely. A single shared local also means the two checks can't
 	// silently drift apart if either is ever extended independently.
+	// A scene downloaded since this library built its own scene list (every library has one) has the camera and settings of a missing file until the list reads the
+	// file again; a scene that is about to be uploaded is the moment to do it (nothing happens when nothing is pending).
+	if (uploadKeyFor(scene_id) != g_uploaded_scene_id) cpu_refresh_user_scenes();
 	const bool sceneAlreadyUploaded = (uploadKeyFor(scene_id) == g_uploaded_scene_id);
 	scene.skipExpensiveGeometryLoad = sceneAlreadyUploaded;
 	float camera_params[12];  // origin(3) + lower_left(3) + horizontal(3) + vertical(3)

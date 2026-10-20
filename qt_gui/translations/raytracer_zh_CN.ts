@@ -913,17 +913,17 @@ The files go in: %1</source>
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="195"/>
+        <location filename="../mainwindow_actions.cpp" line="196"/>
         <source>Increase Log Font Size</source>
         <translation>增大日志字号</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="199"/>
+        <location filename="../mainwindow_actions.cpp" line="200"/>
         <source>Decrease Log Font Size</source>
         <translation>减小日志字号</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="203"/>
+        <location filename="../mainwindow_actions.cpp" line="204"/>
         <source>Reset Log Font Size</source>
         <translation>重置日志字号</translation>
     </message>
@@ -1004,7 +1004,7 @@ The files go in: %1</source>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="1348"/>
-        <location filename="../mainwindow_actions.cpp" line="71"/>
+        <location filename="../mainwindow_actions.cpp" line="72"/>
         <source>Stop the running render and discard its output</source>
         <translation>停止正在运行的渲染并丢弃其输出</translation>
     </message>
@@ -1017,7 +1017,7 @@ The files go in: %1</source>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="1366"/>
-        <location filename="../mainwindow_actions.cpp" line="80"/>
+        <location filename="../mainwindow_actions.cpp" line="81"/>
         <location filename="../mainwindow_slots.cpp" line="122"/>
         <source>Pause the running render in place - Resume continues from the exact same pixels</source>
         <translation>就地暂停正在运行的渲染 - “继续”会从完全相同的像素处接着渲染</translation>
@@ -1029,236 +1029,236 @@ The files go in: %1</source>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="1381"/>
-        <location filename="../mainwindow_actions.cpp" line="85"/>
+        <location filename="../mainwindow_actions.cpp" line="86"/>
         <source>Discard the running render&apos;s output and immediately start the next queued job</source>
         <translation>丢弃正在运行的渲染的输出，并立即开始下一个排队的任务</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="49"/>
+        <location filename="../mainwindow_actions.cpp" line="50"/>
         <source>&amp;Render Image</source>
         <translation>渲染图像(&amp;R)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="52"/>
+        <location filename="../mainwindow_actions.cpp" line="53"/>
         <source>Render the selected scene with the current settings</source>
         <translation>使用当前设置渲染所选场景</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="58"/>
+        <location filename="../mainwindow_actions.cpp" line="59"/>
         <source>Render &amp;Video</source>
         <translation>渲染视频(&amp;V)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="61"/>
+        <location filename="../mainwindow_actions.cpp" line="62"/>
         <source>Render the camera path frame by frame and assemble a video</source>
         <translation>逐帧渲染相机路径并合成为视频</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="67"/>
+        <location filename="../mainwindow_actions.cpp" line="68"/>
         <source>&amp;Stop Render</source>
         <translation>停止渲染(&amp;S)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="78"/>
+        <location filename="../mainwindow_actions.cpp" line="79"/>
         <location filename="../mainwindow_queue.cpp" line="351"/>
         <location filename="../mainwindow_slots.cpp" line="124"/>
         <source>&amp;Pause Render</source>
         <translation>暂停渲染(&amp;P)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="83"/>
+        <location filename="../mainwindow_actions.cpp" line="84"/>
         <source>&amp;Abandon &amp;&amp; Start Next</source>
         <translation>放弃并开始下一个(&amp;A)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="88"/>
+        <location filename="../mainwindow_actions.cpp" line="89"/>
         <location filename="../mainwindow_tabs_render.cpp" line="353"/>
         <source>Open Output &amp;Folder</source>
         <translation>打开输出文件夹(&amp;F)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="91"/>
+        <location filename="../mainwindow_actions.cpp" line="92"/>
         <source>Show the folder containing the active Preview tab&apos;s render</source>
         <translation>显示当前预览标签页所渲染结果所在的文件夹</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="98"/>
+        <location filename="../mainwindow_actions.cpp" line="99"/>
         <location filename="../mainwindow_tabs_render.cpp" line="365"/>
         <source>Open in Default &amp;Viewer</source>
         <translation>用默认查看器打开(&amp;V)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="100"/>
+        <location filename="../mainwindow_actions.cpp" line="101"/>
         <source>Open the active Preview tab&apos;s render in the system viewer</source>
         <translation>使用系统查看器打开当前预览标签页的渲染结果</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="107"/>
+        <location filename="../mainwindow_actions.cpp" line="108"/>
         <source>&amp;Copy Log</source>
         <translation>复制日志(&amp;C)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="110"/>
+        <location filename="../mainwindow_actions.cpp" line="111"/>
         <source>Copy the entire log to the clipboard</source>
         <translation>将完整日志复制到剪贴板</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="113"/>
+        <location filename="../mainwindow_actions.cpp" line="114"/>
         <location filename="../mainwindow_tabs_output.cpp" line="264"/>
         <source>&amp;Save Log…</source>
         <translation>保存日志(&amp;S)…</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="121"/>
+        <location filename="../mainwindow_actions.cpp" line="122"/>
         <source>Write the log to a text file</source>
         <translation>将日志写入文本文件</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="124"/>
+        <location filename="../mainwindow_actions.cpp" line="125"/>
         <location filename="../mainwindow_tabs_output.cpp" line="269"/>
         <source>C&amp;lear Log</source>
         <translation>清空日志(&amp;L)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="127"/>
+        <location filename="../mainwindow_actions.cpp" line="128"/>
         <source>Clear the log pane</source>
         <translation>清空日志面板</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="130"/>
+        <location filename="../mainwindow_actions.cpp" line="131"/>
         <source>&amp;About Ray Tracer</source>
         <translation>关于光线追踪渲染器(&amp;A)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="132"/>
+        <location filename="../mainwindow_actions.cpp" line="133"/>
         <source>Version and project information</source>
         <translation>版本与项目信息</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="136"/>
+        <location filename="../mainwindow_actions.cpp" line="137"/>
         <source>Show &amp;Log Folder</source>
         <translation>显示日志文件夹(&amp;L)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="137"/>
+        <location filename="../mainwindow_actions.cpp" line="138"/>
         <location filename="../mainwindow_tabs_output.cpp" line="278"/>
         <source>Open the folder holding the program&apos;s log file (send it with a bug report)</source>
         <translation>打开程序日志文件所在的文件夹（报告问题时请一并发送）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="145"/>
+        <location filename="../mainwindow_actions.cpp" line="146"/>
         <source>About &amp;Qt</source>
         <translation>关于 Qt(&amp;Q)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="148"/>
+        <location filename="../mainwindow_actions.cpp" line="149"/>
         <source>&amp;Quit</source>
         <translation>退出(&amp;Q)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="150"/>
+        <location filename="../mainwindow_actions.cpp" line="151"/>
         <source>Exit the application</source>
         <translation>退出应用程序</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="157"/>
+        <location filename="../mainwindow_actions.cpp" line="158"/>
         <source>&amp;File</source>
         <translation>文件(&amp;F)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="165"/>
+        <location filename="../mainwindow_actions.cpp" line="166"/>
         <source>&amp;Render</source>
         <translation>渲染(&amp;R)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="173"/>
+        <location filename="../mainwindow_actions.cpp" line="174"/>
         <source>&amp;View</source>
         <translation>视图(&amp;V)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="184"/>
+        <location filename="../mainwindow_actions.cpp" line="185"/>
         <source>Reset Window Layout</source>
         <translation>重置窗口布局</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="185"/>
+        <location filename="../mainwindow_actions.cpp" line="186"/>
         <source>Put the window back at its default size and place</source>
         <translation>将窗口恢复为默认大小和位置</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="215"/>
+        <location filename="../mainwindow_actions.cpp" line="216"/>
         <source>&amp;Help</source>
         <translation>帮助(&amp;H)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="369"/>
-        <source>&lt;h3&gt;Ray Tracer&lt;/h3&gt;&lt;p&gt;A physically-based path tracer with parallel CPU and GPU backends, built up from the &lt;i&gt;Ray Tracing in One Weekend&lt;/i&gt; series into a pbrt-v4-style feature set.&lt;/p&gt;&lt;p&gt;168 built-in scenes and 58 test scenes, a wide BxDF library, multiple light and camera types, triangle-mesh and texture support, BVH acceleration, volumetrics, and a choice of integrators alongside standard path tracing - SPPM photon mapping, bidirectional path tracing (BDPT), Metropolis Light Transport, and several reference/debug integrators (RandomWalk, Ambient Occlusion, SimplePath, SimpleVolPath, LightPath).&lt;/p&gt;&lt;p&gt;This window drives &lt;code&gt;%1&lt;/code&gt; as a subprocess.&lt;/p&gt;</source>
-        <translation>&lt;h3&gt;Ray Tracer&lt;/h3&gt;&lt;p&gt;一款基于物理的路径追踪器，带有并行的 CPU 和 GPU 后端，从 &lt;i&gt;Ray Tracing in One Weekend&lt;/i&gt; 系列一路发展为 pbrt-v4 风格的功能集。&lt;/p&gt;&lt;p&gt;内置 168 个场景和 58 个测试场景，拥有丰富的 BxDF 库，支持多种光源和相机类型、三角网格与纹理、BVH 加速、体积渲染，并且除标准路径追踪外还提供多种积分器：SPPM 光子映射、双向路径追踪 (BDPT)、Metropolis 光传输，以及若干参考和调试用积分器（RandomWalk、Ambient Occlusion、SimplePath、SimpleVolPath、LightPath）。&lt;/p&gt;&lt;p&gt;此窗口以子进程方式运行 &lt;code&gt;%1&lt;/code&gt;。&lt;/p&gt;</translation>
+        <location filename="../mainwindow_actions.cpp" line="377"/>
+        <source>&lt;h3&gt;Ray Tracer&lt;/h3&gt;&lt;p&gt;A physically-based path tracer with parallel CPU and GPU backends, built up from the &lt;i&gt;Ray Tracing in One Weekend&lt;/i&gt; series into a pbrt-v4-style feature set.&lt;/p&gt;&lt;p&gt;%2 built-in scenes and %3 test scenes, a wide BxDF library, multiple light and camera types, triangle-mesh and texture support, BVH acceleration, volumetrics, and a choice of integrators alongside standard path tracing - SPPM photon mapping, bidirectional path tracing (BDPT), Metropolis Light Transport, and several reference/debug integrators (RandomWalk, Ambient Occlusion, SimplePath, SimpleVolPath, LightPath).&lt;/p&gt;&lt;p&gt;This window drives &lt;code&gt;%1&lt;/code&gt; as a subprocess.&lt;/p&gt;</source>
+        <translation>&lt;h3&gt;Ray Tracer&lt;/h3&gt;&lt;p&gt;一款基于物理的路径追踪器，带有并行的 CPU 和 GPU 后端，从 &lt;i&gt;Ray Tracing in One Weekend&lt;/i&gt; 系列一路发展为 pbrt-v4 风格的功能集。&lt;/p&gt;&lt;p&gt;内置 %2 个场景和 %3 个测试场景，拥有丰富的 BxDF 库，支持多种光源和相机类型、三角网格与纹理、BVH 加速、体积渲染，并且除标准路径追踪外还提供多种积分器：SPPM 光子映射、双向路径追踪 (BDPT)、Metropolis 光传输，以及若干参考和调试用积分器（RandomWalk、Ambient Occlusion、SimplePath、SimpleVolPath、LightPath）。&lt;/p&gt;&lt;p&gt;此窗口以子进程方式运行 &lt;code&gt;%1&lt;/code&gt;。&lt;/p&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="252"/>
+        <location filename="../mainwindow_actions.cpp" line="253"/>
         <source>GPU (OptiX)</source>
         <translation>GPU（OptiX）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="255"/>
+        <location filename="../mainwindow_actions.cpp" line="256"/>
         <location filename="../mainwindow_queue.cpp" line="413"/>
         <source>CPU</source>
         <translation>CPU</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="252"/>
+        <location filename="../mainwindow_actions.cpp" line="253"/>
         <source>GPU (OptiX, Wavefront)</source>
         <translation>GPU（OptiX，Wavefront）</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="253"/>
+        <location filename="../mainwindow_actions.cpp" line="254"/>
         <source>GPU (Metal)</source>
         <translation>GPU (Metal)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="268"/>
+        <location filename="../mainwindow_actions.cpp" line="269"/>
         <source>%1x%2  ·  %3 spp</source>
         <translation>%1x%2  ·  %3 spp</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="309"/>
+        <location filename="../mainwindow_actions.cpp" line="310"/>
         <source>Save Log</source>
         <translation>保存日志</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="311"/>
-        <location filename="../mainwindow_actions.cpp" line="351"/>
+        <location filename="../mainwindow_actions.cpp" line="312"/>
+        <location filename="../mainwindow_actions.cpp" line="352"/>
         <source>Text Files (*.txt);;All Files (*.*)</source>
         <translation>文本文件 (*.txt);;所有文件 (*.*)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="318"/>
+        <location filename="../mainwindow_actions.cpp" line="319"/>
         <source>[ERROR] Could not write log to %1: %2</source>
         <translation>[错误] 无法将日志写入 %1：%2</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="322"/>
+        <location filename="../mainwindow_actions.cpp" line="323"/>
         <source>[INFO] Log saved to %1</source>
         <translation>[信息] 日志已保存至 %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="349"/>
+        <location filename="../mainwindow_actions.cpp" line="350"/>
         <source>Save Diagnostics Report</source>
         <translation>保存诊断报告</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="356"/>
+        <location filename="../mainwindow_actions.cpp" line="357"/>
         <source>Save Failed</source>
         <translation>保存失败</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="357"/>
+        <location filename="../mainwindow_actions.cpp" line="358"/>
         <source>Could not write diagnostics report to %1: %2</source>
         <translation>无法将诊断报告写入 %1：%2</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="368"/>
+        <location filename="../mainwindow_actions.cpp" line="376"/>
         <source>About Ray Tracer</source>
         <translation>关于光线追踪渲染器</translation>
     </message>

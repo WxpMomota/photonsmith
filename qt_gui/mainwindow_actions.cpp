@@ -1,5 +1,7 @@
 #include "mainwindow.h"
 #include "icon_tint.h"
+#include "../src/shared/scene_descriptor.h"
+#include "scene_metadata_client.h"
 
 #include <QApplication>
 #include <QDesktopServices>
@@ -360,6 +362,13 @@ void MainWindow::saveDiagReportToFile() {
 }
 
 void MainWindow::showAboutDialog() {
+	// The scenes that come with the program (every category but the ones made from files: Custom Scenes, My Scenes) and the bundled test fixtures.
+	int builtInScenes = 0, testScenes = 0;
+	for (int i = 0, n = SceneMetadataClient::sceneCount(); i < n; ++i) {
+		const QString category = SceneMetadataClient::sceneCategory(SceneMetadataClient::sceneIdAtIndex(i));
+		if (category == QLatin1String(SceneCategories::Tests)) ++testScenes;
+		else if (category != QLatin1String(SceneCategories::CustomScenes) && category != QLatin1String(SceneCategories::MyScenes)) ++builtInScenes;
+	}
 #ifdef Q_OS_WIN
 	const char* rendererBinaryName = "ray_tracer.exe";
 #else
@@ -375,19 +384,13 @@ void MainWindow::showAboutDialog() {
 		"<p>A physically-based path tracer with parallel CPU and GPU "
 		"backends, built up from the <i>Ray Tracing in One Weekend</i> series "
 		"into a pbrt-v4-style feature set.</p>"
-		// Scene count is free-form text, not derived from
-		// builtin_scene_count() (src/TheRestOfYourLife/scene_registry.h) -
-		// the Qt GUI shells out to the CLI rather than linking
-		// cpu_renderer.lib directly, so there's no live count to read here.
-		// Keep this in sync by hand whenever scene_registry_tests.cpp's own
-		// builtin_scene_count()/kGuiSceneCount assertions change, or a file
-		// is added to or removed from pbrt_scenes/.
-		"<p>168 built-in scenes and 58 test scenes, a wide "
+		// The scene counts (%2, %3) are the registry's own, counted below through scene_metadata.dll: they used to be typed here and went stale.
+		"<p>%2 built-in scenes and %3 test scenes, a wide "
 		"BxDF library, multiple light and camera types, "
 		"triangle-mesh and texture support, BVH acceleration, volumetrics, and "
 		"a choice of integrators alongside standard path tracing - SPPM photon "
 		"mapping, bidirectional path tracing (BDPT), Metropolis Light Transport, "
 		"and several reference/debug integrators (RandomWalk, Ambient Occlusion, "
 		"SimplePath, SimpleVolPath, LightPath).</p>"
-		"<p>This window drives <code>%1</code> as a subprocess.</p>").arg(rendererBinaryName));
+		"<p>This window drives <code>%1</code> as a subprocess.</p>").arg(rendererBinaryName).arg(builtInScenes).arg(testScenes));
 }

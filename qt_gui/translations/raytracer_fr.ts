@@ -913,17 +913,17 @@ Les fichiers vont dans : %1</translation>
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="195"/>
+        <location filename="../mainwindow_actions.cpp" line="196"/>
         <source>Increase Log Font Size</source>
         <translation>Augmenter la taille de police du journal</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="199"/>
+        <location filename="../mainwindow_actions.cpp" line="200"/>
         <source>Decrease Log Font Size</source>
         <translation>Réduire la taille de police du journal</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="203"/>
+        <location filename="../mainwindow_actions.cpp" line="204"/>
         <source>Reset Log Font Size</source>
         <translation>Réinitialiser la taille de police du journal</translation>
     </message>
@@ -1005,7 +1005,7 @@ Les fichiers vont dans : %1</translation>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="1348"/>
-        <location filename="../mainwindow_actions.cpp" line="71"/>
+        <location filename="../mainwindow_actions.cpp" line="72"/>
         <source>Stop the running render and discard its output</source>
         <translation>Arrête le rendu en cours et abandonne son résultat</translation>
     </message>
@@ -1018,7 +1018,7 @@ Les fichiers vont dans : %1</translation>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="1366"/>
-        <location filename="../mainwindow_actions.cpp" line="80"/>
+        <location filename="../mainwindow_actions.cpp" line="81"/>
         <location filename="../mainwindow_slots.cpp" line="122"/>
         <source>Pause the running render in place - Resume continues from the exact same pixels</source>
         <translation>Met en pause le rendu en cours, tel quel - Reprendre continue exactement à partir des mêmes pixels</translation>
@@ -1030,236 +1030,236 @@ Les fichiers vont dans : %1</translation>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="1381"/>
-        <location filename="../mainwindow_actions.cpp" line="85"/>
+        <location filename="../mainwindow_actions.cpp" line="86"/>
         <source>Discard the running render&apos;s output and immediately start the next queued job</source>
         <translation>Abandonne la sortie du rendu en cours et démarre immédiatement le prochain travail en file d&apos;attente</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="49"/>
+        <location filename="../mainwindow_actions.cpp" line="50"/>
         <source>&amp;Render Image</source>
         <translation>&amp;Rendre l&apos;image</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="52"/>
+        <location filename="../mainwindow_actions.cpp" line="53"/>
         <source>Render the selected scene with the current settings</source>
         <translation>Rend la scène sélectionnée avec les paramètres actuels</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="58"/>
+        <location filename="../mainwindow_actions.cpp" line="59"/>
         <source>Render &amp;Video</source>
         <translation>Rendre la &amp;vidéo</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="61"/>
+        <location filename="../mainwindow_actions.cpp" line="62"/>
         <source>Render the camera path frame by frame and assemble a video</source>
         <translation>Rend la trajectoire de la caméra image par image et assemble une vidéo</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="67"/>
+        <location filename="../mainwindow_actions.cpp" line="68"/>
         <source>&amp;Stop Render</source>
         <translation>&amp;Arrêter le rendu</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="78"/>
+        <location filename="../mainwindow_actions.cpp" line="79"/>
         <location filename="../mainwindow_queue.cpp" line="351"/>
         <location filename="../mainwindow_slots.cpp" line="124"/>
         <source>&amp;Pause Render</source>
         <translation>&amp;Mettre le rendu en pause</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="83"/>
+        <location filename="../mainwindow_actions.cpp" line="84"/>
         <source>&amp;Abandon &amp;&amp; Start Next</source>
         <translation>&amp;Abandonner et passer au suivant</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="88"/>
+        <location filename="../mainwindow_actions.cpp" line="89"/>
         <location filename="../mainwindow_tabs_render.cpp" line="353"/>
         <source>Open Output &amp;Folder</source>
         <translation>Ouvrir le &amp;dossier de sortie</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="91"/>
+        <location filename="../mainwindow_actions.cpp" line="92"/>
         <source>Show the folder containing the active Preview tab&apos;s render</source>
         <translation>Affiche le dossier contenant le rendu de l&apos;onglet Aperçu actif</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="98"/>
+        <location filename="../mainwindow_actions.cpp" line="99"/>
         <location filename="../mainwindow_tabs_render.cpp" line="365"/>
         <source>Open in Default &amp;Viewer</source>
         <translation>Ouvrir dans la &amp;visionneuse par défaut</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="100"/>
+        <location filename="../mainwindow_actions.cpp" line="101"/>
         <source>Open the active Preview tab&apos;s render in the system viewer</source>
         <translation>Ouvre le rendu de l&apos;onglet Aperçu actif dans la visionneuse du système</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="107"/>
+        <location filename="../mainwindow_actions.cpp" line="108"/>
         <source>&amp;Copy Log</source>
         <translation>&amp;Copier le journal</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="110"/>
+        <location filename="../mainwindow_actions.cpp" line="111"/>
         <source>Copy the entire log to the clipboard</source>
         <translation>Copie l&apos;intégralité du journal dans le presse-papiers</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="113"/>
+        <location filename="../mainwindow_actions.cpp" line="114"/>
         <location filename="../mainwindow_tabs_output.cpp" line="264"/>
         <source>&amp;Save Log…</source>
         <translation>&amp;Enregistrer le journal…</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="121"/>
+        <location filename="../mainwindow_actions.cpp" line="122"/>
         <source>Write the log to a text file</source>
         <translation>Écrit le journal dans un fichier texte</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="124"/>
+        <location filename="../mainwindow_actions.cpp" line="125"/>
         <location filename="../mainwindow_tabs_output.cpp" line="269"/>
         <source>C&amp;lear Log</source>
         <translation>&amp;Vider le journal</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="127"/>
+        <location filename="../mainwindow_actions.cpp" line="128"/>
         <source>Clear the log pane</source>
         <translation>Vide le panneau de journal</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="130"/>
+        <location filename="../mainwindow_actions.cpp" line="131"/>
         <source>&amp;About Ray Tracer</source>
         <translation>À &amp;propos de Ray Tracer</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="132"/>
+        <location filename="../mainwindow_actions.cpp" line="133"/>
         <source>Version and project information</source>
         <translation>Informations de version et du projet</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="136"/>
+        <location filename="../mainwindow_actions.cpp" line="137"/>
         <source>Show &amp;Log Folder</source>
         <translation>Afficher le dossier des &amp;journaux</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="137"/>
+        <location filename="../mainwindow_actions.cpp" line="138"/>
         <location filename="../mainwindow_tabs_output.cpp" line="278"/>
         <source>Open the folder holding the program&apos;s log file (send it with a bug report)</source>
         <translation>Ouvre le dossier contenant le fichier journal du programme (à joindre à un rapport de bogue)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="145"/>
+        <location filename="../mainwindow_actions.cpp" line="146"/>
         <source>About &amp;Qt</source>
         <translation>À propos de &amp;Qt</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="148"/>
+        <location filename="../mainwindow_actions.cpp" line="149"/>
         <source>&amp;Quit</source>
         <translation>&amp;Quitter</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="150"/>
+        <location filename="../mainwindow_actions.cpp" line="151"/>
         <source>Exit the application</source>
         <translation>Quitte l&apos;application</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="157"/>
+        <location filename="../mainwindow_actions.cpp" line="158"/>
         <source>&amp;File</source>
         <translation>&amp;Fichier</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="165"/>
+        <location filename="../mainwindow_actions.cpp" line="166"/>
         <source>&amp;Render</source>
         <translation>&amp;Rendu</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="173"/>
+        <location filename="../mainwindow_actions.cpp" line="174"/>
         <source>&amp;View</source>
         <translation>&amp;Affichage</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="184"/>
+        <location filename="../mainwindow_actions.cpp" line="185"/>
         <source>Reset Window Layout</source>
         <translation>Réinitialiser la disposition de la fenêtre</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="185"/>
+        <location filename="../mainwindow_actions.cpp" line="186"/>
         <source>Put the window back at its default size and place</source>
         <translation>Remet la fenêtre à sa taille et à sa position par défaut</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="215"/>
+        <location filename="../mainwindow_actions.cpp" line="216"/>
         <source>&amp;Help</source>
         <translation>&amp;Aide</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="369"/>
-        <source>&lt;h3&gt;Ray Tracer&lt;/h3&gt;&lt;p&gt;A physically-based path tracer with parallel CPU and GPU backends, built up from the &lt;i&gt;Ray Tracing in One Weekend&lt;/i&gt; series into a pbrt-v4-style feature set.&lt;/p&gt;&lt;p&gt;168 built-in scenes and 58 test scenes, a wide BxDF library, multiple light and camera types, triangle-mesh and texture support, BVH acceleration, volumetrics, and a choice of integrators alongside standard path tracing - SPPM photon mapping, bidirectional path tracing (BDPT), Metropolis Light Transport, and several reference/debug integrators (RandomWalk, Ambient Occlusion, SimplePath, SimpleVolPath, LightPath).&lt;/p&gt;&lt;p&gt;This window drives &lt;code&gt;%1&lt;/code&gt; as a subprocess.&lt;/p&gt;</source>
-        <translation>&lt;h3&gt;Ray Tracer&lt;/h3&gt;&lt;p&gt;Un path tracer physiquement réaliste avec des moteurs CPU et GPU parallèles, construit à partir de la série &lt;i&gt;Ray Tracing in One Weekend&lt;/i&gt; jusqu&apos;à un ensemble de fonctionnalités de type pbrt-v4.&lt;/p&gt;&lt;p&gt;168 scènes intégrées et 58 scènes de test, une vaste bibliothèque de BxDF, plusieurs types de lumières et de caméras, la prise en charge des maillages de triangles et des textures, l&apos;accélération par BVH, les volumes, et un choix d&apos;intégrateurs en plus du path tracing standard : photon mapping SPPM, path tracing bidirectionnel (BDPT), Metropolis Light Transport et plusieurs intégrateurs de référence et de débogage (RandomWalk, Ambient Occlusion, SimplePath, SimpleVolPath, LightPath).&lt;/p&gt;&lt;p&gt;Cette fenêtre pilote &lt;code&gt;%1&lt;/code&gt; comme sous-processus.&lt;/p&gt;</translation>
+        <location filename="../mainwindow_actions.cpp" line="377"/>
+        <source>&lt;h3&gt;Ray Tracer&lt;/h3&gt;&lt;p&gt;A physically-based path tracer with parallel CPU and GPU backends, built up from the &lt;i&gt;Ray Tracing in One Weekend&lt;/i&gt; series into a pbrt-v4-style feature set.&lt;/p&gt;&lt;p&gt;%2 built-in scenes and %3 test scenes, a wide BxDF library, multiple light and camera types, triangle-mesh and texture support, BVH acceleration, volumetrics, and a choice of integrators alongside standard path tracing - SPPM photon mapping, bidirectional path tracing (BDPT), Metropolis Light Transport, and several reference/debug integrators (RandomWalk, Ambient Occlusion, SimplePath, SimpleVolPath, LightPath).&lt;/p&gt;&lt;p&gt;This window drives &lt;code&gt;%1&lt;/code&gt; as a subprocess.&lt;/p&gt;</source>
+        <translation>&lt;h3&gt;Ray Tracer&lt;/h3&gt;&lt;p&gt;Un path tracer physiquement réaliste avec des moteurs CPU et GPU parallèles, construit à partir de la série &lt;i&gt;Ray Tracing in One Weekend&lt;/i&gt; jusqu&apos;à un ensemble de fonctionnalités de type pbrt-v4.&lt;/p&gt;&lt;p&gt;%2 scènes intégrées et %3 scènes de test, une vaste bibliothèque de BxDF, plusieurs types de lumières et de caméras, la prise en charge des maillages de triangles et des textures, l&apos;accélération par BVH, les volumes, et un choix d&apos;intégrateurs en plus du path tracing standard : photon mapping SPPM, path tracing bidirectionnel (BDPT), Metropolis Light Transport et plusieurs intégrateurs de référence et de débogage (RandomWalk, Ambient Occlusion, SimplePath, SimpleVolPath, LightPath).&lt;/p&gt;&lt;p&gt;Cette fenêtre pilote &lt;code&gt;%1&lt;/code&gt; comme sous-processus.&lt;/p&gt;</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="252"/>
+        <location filename="../mainwindow_actions.cpp" line="253"/>
         <source>GPU (OptiX)</source>
         <translation>GPU (OptiX)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="255"/>
+        <location filename="../mainwindow_actions.cpp" line="256"/>
         <location filename="../mainwindow_queue.cpp" line="413"/>
         <source>CPU</source>
         <translation>CPU</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="252"/>
+        <location filename="../mainwindow_actions.cpp" line="253"/>
         <source>GPU (OptiX, Wavefront)</source>
         <translation>GPU (OptiX, Wavefront)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="253"/>
+        <location filename="../mainwindow_actions.cpp" line="254"/>
         <source>GPU (Metal)</source>
         <translation>GPU (Metal)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="268"/>
+        <location filename="../mainwindow_actions.cpp" line="269"/>
         <source>%1x%2  ·  %3 spp</source>
         <translation>%1x%2  ·  %3 spp</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="309"/>
+        <location filename="../mainwindow_actions.cpp" line="310"/>
         <source>Save Log</source>
         <translation>Enregistrer le journal</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="311"/>
-        <location filename="../mainwindow_actions.cpp" line="351"/>
+        <location filename="../mainwindow_actions.cpp" line="312"/>
+        <location filename="../mainwindow_actions.cpp" line="352"/>
         <source>Text Files (*.txt);;All Files (*.*)</source>
         <translation>Fichiers texte (*.txt);;Tous les fichiers (*.*)</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="318"/>
+        <location filename="../mainwindow_actions.cpp" line="319"/>
         <source>[ERROR] Could not write log to %1: %2</source>
         <translation>[ERREUR] Impossible d&apos;écrire le journal dans %1 : %2</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="322"/>
+        <location filename="../mainwindow_actions.cpp" line="323"/>
         <source>[INFO] Log saved to %1</source>
         <translation>[INFO] Journal enregistré dans %1</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="349"/>
+        <location filename="../mainwindow_actions.cpp" line="350"/>
         <source>Save Diagnostics Report</source>
         <translation>Enregistrer le rapport de diagnostic</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="356"/>
+        <location filename="../mainwindow_actions.cpp" line="357"/>
         <source>Save Failed</source>
         <translation>Échec de l&apos;enregistrement</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="357"/>
+        <location filename="../mainwindow_actions.cpp" line="358"/>
         <source>Could not write diagnostics report to %1: %2</source>
         <translation>Impossible d&apos;écrire le rapport de diagnostic dans %1 : %2</translation>
     </message>
     <message>
-        <location filename="../mainwindow_actions.cpp" line="368"/>
+        <location filename="../mainwindow_actions.cpp" line="376"/>
         <source>About Ray Tracer</source>
         <translation>À propos de Ray Tracer</translation>
     </message>

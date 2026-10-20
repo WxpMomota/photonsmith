@@ -48,8 +48,8 @@ TEST(SceneRegistryTest, RegistryHasExpectedCount) {
 	// registry's existing precedent of stable, non-contiguous ids; H4/H5
 	// added Fireplace Room and San Miguel to the LargeScene category; H6-H9
 	// added Sibenik Cathedral, Breakfast Room, Salle de Bain, and Gallery).
-	// This test will fail if a scene is accidentally added or removed -
-	// update this count (and kGuiSceneCount below) when that's intentional.
+	// This is only a sanity floor now: a scene accidentally added or removed fails
+	// SceneRegistrySnapshot (tests/data/scene_registry_snapshot.txt, one row per scene).
 	//
 	// Deliberately the BUILT-IN count, not scene_count(). The full registry
 	// also contains whatever .pbrt files happen to be on the machine running
@@ -134,7 +134,8 @@ TEST(SceneRegistryTest, RegistryHasExpectedCount) {
 	// with MediumInterface now reaches a real GGX microfacet DielectricMedium
 	// surface with real glossy NEE, see mediumMaterialIndex()'s own comment
 	// and rough_dielectric_scatter_and_nee() (optix_device_helpers.h).
-	EXPECT_EQ(builtin_scene_count(), 168);
+	// (The number itself is pinned by tests/data/scene_registry_snapshot.txt, one row per scene; scene_registry_snapshot_tests.cpp.)
+	EXPECT_GE(builtin_scene_count(), 100);
 }
 
 TEST(SceneRegistryTest, LoadedScenesAppendAfterTheBuiltInsWithoutDisturbingThem) {
@@ -845,24 +846,6 @@ TEST(SceneBuilderTest, CornellBoxBuildsDetAndRepeatably) {
 	EXPECT_EQ(w1.objects.size(), w2.objects.size());
 }
 
-// ===========================================================================
-// GUI mirror count guard
-// ===========================================================================
-
-// The Qt GUI builds its scene dropdown dynamically from
-// SceneMetadataClient::sceneCount()/sceneName() (qt_gui/mainwindow_tabs.cpp
-// createSettingsTab()), which query scene_metadata.dll -> this registry live,
-// not a hardcoded array, so it can't drift out of sync with the registry
-// on its own. This constant exists as a tripwire: if it stops matching
-// scene_count(), something changed the registry size and it's worth
-// double-checking the GUI/error-hint text that mentions specific scene
-// counts or ID ranges by hand.
-TEST(SceneRegistryGuiConsistencyTest, GuiSceneCountMatchesRegistry) {
-	constexpr int kGuiSceneCount = 168;
-	EXPECT_EQ(builtin_scene_count(), kGuiSceneCount)
-		<< "Registry size changed -- update kGuiSceneCount here to match.";
-}
-
 // A Cornell-box-style enclosed room has opaque walls that are unlit from outside, so an orbit-family camera path (orbit,
 // spiral, figure8), which circles OUTSIDE the box, rendered most of the default video solid black (5 of 8 frames of A1's,
 // on CPU and Metal alike, ~40 scenes). These scenes use "tour", which sways in front of the open face. Found by rendering
@@ -922,12 +905,17 @@ TEST(SceneSlugTest, EveryBuiltInSceneHasAWellFormedUniqueSlug) {
 	}
 }
 
-TEST(SceneSlugTest, TheSlugTableMatchesTheCompiledInScenes) {
+TEST(SceneSlugTest, EveryCompiledInSceneCarriesItsOwnSlug) {
+	// The slug is an argument of the scene's row (there is no separate table to forget a scene in): the full registry hands out what the row says.
 	std::set<std::string> ids;
-	for (const auto& s : get_builtin_scene_registry()) ids.insert(s.id);
-	for (const auto& e : scene_slugs::kBuiltin) EXPECT_TRUE(ids.count(e.id)) << "slug table row for unknown scene " << e.id;
-	for (const auto& s : get_builtin_scene_registry()) EXPECT_FALSE(scene_slugs::builtinSlugForId(s.id).empty()) << s.id << " is missing from kBuiltin";
-	EXPECT_EQ(scene_slugs::kBuiltinCount, ids.size());
+	for (const auto& s : get_builtin_scene_registry()) {
+		ids.insert(s.id);
+		EXPECT_FALSE(s.slug.empty()) << s.id << " (" << s.name << ") has no slug in its row";
+		const SceneDescriptor* listed = find_scene(s.id);
+		ASSERT_NE(listed, nullptr) << s.id;
+		EXPECT_EQ(listed->slug, s.slug) << s.id;
+	}
+	EXPECT_EQ(ids.size(), get_builtin_scene_registry().size()) << "two rows share an id";
 }
 
 TEST(SceneSlugTest, FindSceneAcceptsASlugOrAnId) {

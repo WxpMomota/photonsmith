@@ -1,237 +1,24 @@
-// scene_descriptor.h -- Canonical scene NAME constants only.
+// scene_descriptor.h -- the scene CATEGORY names (SceneCategories) and nothing else.
 //
-// All scene METADATA (description, performance hint, recommended SPP,
-// requires_files, gpu_compatible, camera) lives solely in
-// src/TheRestOfYourLife/scene_registry.h's SceneDescriptor table, queried
-// live by the Qt GUI via scene_metadata.dll / qt_gui/scene_metadata_client.h
-// - there is exactly one place that can drift from actual renderer
-// behavior, not two. This header used to also carry its own duplicate
-// presentational table (SceneDesc/kAllScenes/get_all_scenes/
-// find_scene_desc) so the GUI - which can't link scene_registry.h's full
-// CPU hittable/material class hierarchy - could read it without the DLL
-// bridge; that duplication drifted out of sync once already (scene 1 got
-// gpu_compatible=true in the registry without its mirror row here being
-// updated, so the GUI kept showing "CPU only" until fixed separately) and
-// was removed once scene_metadata.dll grew accessors for every field, not
-// just camera/gpu_compatible.
-//
-// SceneNames stays here (rather than moving into scene_registry.h itself)
-// because it's a lightweight, dependency-free header both scene_registry.h
-// (CPU) and gpu/optix/scene_builder.cpp (GPU) #include just for these
-// string constants, without pulling in anything heavier.
+// All scene METADATA (name, slug, description, performance hint, recommended SPP, requires_files, gpu_compatible, camera) lives in one place: the row of
+// src/TheRestOfYourLife/scene_registry_data.h, queried live by the Qt GUI via scene_metadata.dll / qt_gui/scene_metadata_client.h. A scene's name and its
+// durable slug used to be two more tables (SceneNames here, kBuiltin in scene_slugs.h); each was used once, by that row, and adding a scene meant keeping
+// three lists in step. They are the row's own arguments now. The category names stay here because the GUI and the GPU backends use them too.
 //
 // To add a scene (docs/SCENE_SELECTION.md has the full list):
 //   1. Put its .pbrt file in pbrt_scenes/
-//   2. Add a name constant in SceneNames below (what the scene shows, not how it is stored)
-//   3. Add its durable name to src/shared/scene_slugs.h (kBuiltin)
-//   4. Add its row to src/TheRestOfYourLife/scene_registry_data.h (build_curated_pbrt_scene_descriptor), using the SceneNames constant
-//   5. Add its technique note to qt_gui/scene_technique_notes.h, keyed by the slug
-// scene_metadata.dll serves every field of the row to the GUI live. A test fixture or a scene of your own needs none of this: a .pbrt file in
-// pbrt_scenes/ is listed on its own (see "# @rt-category" in pbrt_discover.h).
+//   2. Add its row to src/TheRestOfYourLife/scene_registry_data.h (build_curated_pbrt_scene_descriptor): id, legacy id, name (what the scene shows, not how it is
+//      stored), slug (the durable name: it never changes when the name does), category, description, performance, file
+//   3. Add its technique note to qt_gui/scene_technique_notes.h, keyed by the slug (a scene that needs no download)
+//   4. Run RT_UPDATE_SNAPSHOT=1 ray_tracer_tests --gtest_filter=SceneRegistrySnapshot* and review the diff of tests/data/scene_registry_snapshot.txt; the same test
+//      says which documents quote the number of scenes and are out of date
+// A test fixture or a scene of your own needs none of this: a .pbrt file in pbrt_scenes/ is listed on its own (see "# @rt-category" in pbrt_discover.h).
 
 #pragma once
 
 #ifdef __cplusplus
 #include <cstddef>
 #include <cstring>
-
-// -----------------------------------------------------------------------
-// Canonical scene name constants
-// Use these everywhere (registry, GPU builder, tests) rather than raw
-// string literals, so a scene's name can never drift between call sites.
-// -----------------------------------------------------------------------
-namespace SceneNames {
-    constexpr const char* CornellBox          = "Cornell Box";
-    constexpr const char* BouncingSpheres     = "Bouncing Spheres";
-    constexpr const char* CheckeredSpheres    = "Checkered Spheres";
-    constexpr const char* Earth               = "Earth";
-    constexpr const char* PerlinSpheres       = "Perlin Spheres";
-    constexpr const char* ColoredQuads        = "Colored Quads";
-    constexpr const char* SimpleLight         = "Simple Light";
-    constexpr const char* CornellSmoke        = "Cornell Smoke";
-    constexpr const char* FinalScene          = "Final Scene";
-    constexpr const char* RoughMetalSpheres   = "Rough Metal Spheres";
-    constexpr const char* CornellRoughMetal   = "Cornell Rough Metal";
-    constexpr const char* CornellRoughGlass   = "Cornell Rough Glass";
-    constexpr const char* CornellConductor    = "Cornell Conductor";
-    constexpr const char* CornellCoatedDiffuse   = "Cornell Coated Diffuse";
-    constexpr const char* CornellThinGlass    = "Cornell Thin Glass";
-    constexpr const char* CornellCoatedConductor = "Cornell Coated Conductor";
-    constexpr const char* CornellWaxSlab      = "Cornell Wax Slab";
-    constexpr const char* CornellCrystal      = "Cornell Crystal";
-    constexpr const char* GlassPrismDispersion = "Glass Prism Dispersion";
-    constexpr const char* FrostedPrismDispersion = "Frosted Prism Dispersion";
-    constexpr const char* PrincipledShowcase   = "Principled Showcase";
-    constexpr const char* HairFibers           = "Hair Fibers";
-    constexpr const char* NormalMappedCornell  = "Normal Mapped Cornell";
-    constexpr const char* SubsurfaceSlab       = "Subsurface Slab";
-    constexpr const char* DepthOfField         = "Depth of Field";
-    constexpr const char* BilinearPatchScene   = "Bilinear Patch";
-    // pbrt-v4 light / camera / medium showcase scenes
-    constexpr const char* HdriSky              = "HDRI Sky";
-    constexpr const char* SpotlightCornell     = "Spotlight Cornell";
-    constexpr const char* DistantLightCornell  = "Distant Light Cornell";
-    constexpr const char* PointLightCornell    = "Point Light Cornell";
-    constexpr const char* GoniometricLight     = "Goniometric Light";
-    constexpr const char* ProjectionLight      = "Projection Light";
-    constexpr const char* HomogeneousMedium    = "Homogeneous Medium";
-    constexpr const char* CloudMedium          = "Cloud Medium";
-    constexpr const char* DielectricMediumShowcase = "Dielectric Medium Showcase";
-    constexpr const char* RgbGridMedium        = "RGB Grid Medium";
-    constexpr const char* OrthographicCamera   = "Orthographic Camera";
-    constexpr const char* SphericalCamera      = "Spherical Camera";
-    constexpr const char* MeasuredBrdf         = "Measured BRDF";
-    constexpr const char* PortalInfiniteLight  = "Portal Infinite Light";
-    constexpr const char* RealisticCamera      = "Realistic Camera";
-    // Same classic Cornell box as A1 (CornellBox), rendered with each of the
-    // other four camera models - a fixed reference scene makes the actual
-    // camera differences (blur, projection, distortion) easier to compare
-    // than each D1-D4 scene's own bespoke geometry does.
-    constexpr const char* DepthOfFieldCornellBox      = "Depth of Field (Cornell Box)";
-    constexpr const char* OrthographicCameraCornellBox = "Orthographic Camera (Cornell Box)";
-    constexpr const char* SphericalCameraCornellBox    = "Spherical Camera (Cornell Box)";
-    constexpr const char* RealisticCameraCornellBox    = "Realistic Camera (Cornell Box)";
-    constexpr const char* CameraMotionBlur             = "Camera Motion Blur (Cornell Box)";
-    constexpr const char* TriangleMesh         = "Triangle Mesh";
-    constexpr const char* InstancedSpheres     = "Instanced Spheres";
-    constexpr const char* CurveFibers          = "Curve Fibers";
-    constexpr const char* StanfordBunny        = "Stanford Bunny";
-    constexpr const char* StanfordArmadillo    = "Stanford Armadillo";
-    constexpr const char* StanfordHappyBuddha  = "Stanford Happy Buddha";
-    constexpr const char* StanfordLucy         = "Stanford Lucy";
-    constexpr const char* StanfordDragon       = "Stanford XYZRGB Dragon";
-    constexpr const char* UtahTeapot           = "Utah Teapot";
-    constexpr const char* SpotCow              = "Spot the Cow";
-    constexpr const char* Suzanne              = "Suzanne";
-    constexpr const char* NefertitiBust        = "Nefertiti Bust";
-    constexpr const char* Horse                = "Horse";
-    constexpr const char* Cheburashka          = "Cheburashka";
-    constexpr const char* TrophyRoom           = "Trophy Room";
-    constexpr const char* GlassDragon          = "Glass Dragon";
-    constexpr const char* Beast                = "Beast";
-    constexpr const char* VWBeetle             = "VW Beetle";
-    constexpr const char* Bimba                = "Bimba";
-    constexpr const char* Cow                  = "Cow";
-    constexpr const char* Fandisk              = "Fandisk";
-    constexpr const char* Homer                = "Homer";
-    constexpr const char* Igea                 = "Igea";
-    constexpr const char* MaxPlanck            = "Max Planck";
-    constexpr const char* Ogre                 = "Ogre";
-    constexpr const char* RockerArm            = "Rocker Arm";
-    constexpr const char* CrytekSponza         = "Crytek Sponza";
-    constexpr const char* AmazonBistro         = "Amazon Lumberyard Bistro";
-    constexpr const char* Rungholt             = "Rungholt";
-    constexpr const char* FireplaceRoom        = "Fireplace Room";
-    constexpr const char* SanMiguel            = "San Miguel";
-    constexpr const char* SibenikCathedral     = "Sibenik Cathedral";
-    constexpr const char* BreakfastRoom        = "Breakfast Room";
-    constexpr const char* SalleDeBain          = "Salle de Bain";
-    constexpr const char* Gallery              = "Gallery";
-    constexpr const char* LostEmpire           = "Lost Empire";
-    constexpr const char* VokseliaSpawn        = "Vokselia Spawn";
-    constexpr const char* PowerPlant           = "Power Plant";
-    constexpr const char* ContemporaryBathroomPbrtExample = "Contemporary Bathroom";
-    constexpr const char* BarcelonaPavilionPbrtExample     = "Barcelona Pavilion";
-    constexpr const char* SssDragonPbrtExample             = "Subsurface Dragon";
-    constexpr const char* GaneshaPbrtExample               = "Ganesha";
-    constexpr const char* SportsCarPbrtExample             = "Sports Car";
-    constexpr const char* ZeroDayPbrtExample                = "Zero Day";
-    constexpr const char* CrownPbrtExample                  = "Crown";
-    constexpr const char* VillaPbrtExample                  = "Villa";
-    constexpr const char* TransparentMachinesPbrtExample    = "Transparent Machines";
-    constexpr const char* GreyWhiteRoomPbrtExample           = "Grey and White Room";
-    constexpr const char* BedroomInteriorPbrtExample         = "Bedroom Interior";
-    constexpr const char* CountryKitchenPbrtExample          = "Country Kitchen";
-    constexpr const char* ModernHallPbrtExample              = "Modern Hall";
-    constexpr const char* WoodenStaircasePbrtExample         = "Wooden Staircase";
-    constexpr const char* WhiteRoomPbrtExample               = "White Room";
-    constexpr const char* ModernLivingRoomPbrtExample        = "Modern Living Room";
-    constexpr const char* GlassOfWaterPbrtExample            = "Glass of Water";
-    constexpr const char* PontiacGtoPbrtExample              = "Pontiac GTO";
-    constexpr const char* VintageCarPbrtExample              = "Vintage Car";
-    constexpr const char* CoffeeMakerPbrtExample             = "Coffee Maker";
-    constexpr const char* LittleLampPbrtExample              = "Little Lamp";
-    constexpr const char* VictorianHousePbrtExample          = "Victorian House";
-    constexpr const char* SpaceshipPbrtExample               = "Spaceship";
-    constexpr const char* JapaneseClassroomPbrtExample       = "Japanese Classroom";
-    constexpr const char* DragonStatuePbrtExample            = "Dragon Statue";
-    constexpr const char* MaterialTestBallPbrtExample        = "Material Test Ball";
-
-    // Curated entries for self-contained pbrt_scenes/*.pbrt example files (see
-    // scene_registry.h's pbrt_scene_registry::build_curated_pbrt_scene_
-    // descriptor() and its call sites), shown under their real topic tab. A
-    // name says what the scene shows, not how it is stored; the one exception
-    // is "(pbrt file)", added only where a compiled-in scene already has the
-    // plain name (Depth of Field, Cloud Medium, ...) so the two can be told
-    // apart. The constant names keep their old "PbrtExample" suffix.
-    constexpr const char* MixMaterialPbrtExample              = "Mix Material";
-    constexpr const char* LayeredMaterialsPbrtExample         = "Layered Materials";
-    constexpr const char* CoatedDiffuseTexturePbrtExample     = "CoatedDiffuse Texture";
-    constexpr const char* ConductorRgbEtaKPbrtExample         = "Conductor RGB Eta/K";
-    constexpr const char* DiffuseTransmissionTexturePbrtExample = "DiffuseTransmission Texture";
-    constexpr const char* HairMaterialPbrtExample             = "Hair Material";
-    constexpr const char* NestedCheckerTexturePbrtExample     = "Nested Checker Texture";
-    constexpr const char* NamedMaterialAndTexturePbrtExample  = "Named Material & Texture";
-    constexpr const char* GlassPresetsPbrtExample              = "Glass Presets";
-    constexpr const char* TextureEncodingWrapInvertPbrtExample = "Texture Encoding & Wrap";
-    constexpr const char* ProceduralTextureGalleryPbrtExample  = "Procedural Texture Gallery";
-    constexpr const char* NestedTexture2LevelPbrtExample       = "Nested Texture: 2 Levels";
-
-    constexpr const char* PunctualLightsPbrtExample           = "Punctual Lights";
-    constexpr const char* GoniometricProjectionPbrtExample    = "Goniometric & Projection Lights";
-    constexpr const char* BlackbodyLightPbrtExample           = "Blackbody Light";
-    constexpr const char* ColorSpaceBlackbodyPbrtExample       = "ColorSpace + Blackbody Light";
-    constexpr const char* TexturedTwoSidedLightsPbrtExample   = "Textured Two-Sided Lights";
-    constexpr const char* InfiniteLightPbrtExample            = "Infinite Light";
-    constexpr const char* DiskCylinderLightPbrtExample        = "Disk & Cylinder Lights";
-    constexpr const char* TwoSphereLightsPbrtExample          = "Two Sphere Lights";
-    constexpr const char* TriangleFanLightPbrtExample         = "Triangle Fan Light";
-    constexpr const char* PortalLightPbrtExample               = "Portal Light";
-    constexpr const char* LightPowerParameterPbrtExample       = "Light Power Parameter";
-    constexpr const char* ProjectionLightNonSquarePbrtExample  = "Projection Light: Non-Square";
-    constexpr const char* SpectralGamutSaturationPbrtExample   = "Spectral Gamut Saturation";
-
-    constexpr const char* DepthOfFieldPbrtExample             = "Depth of Field (pbrt file)";
-    constexpr const char* OrthographicCameraPbrtExample       = "Orthographic Camera (pbrt file)";
-    constexpr const char* SphericalCameraPbrtExample          = "Spherical Camera (pbrt file)";
-    constexpr const char* RealisticCameraPbrtExample          = "Realistic Camera (pbrt file)";
-
-    constexpr const char* CloudMediumPbrtExample              = "Cloud Medium (pbrt file)";
-    constexpr const char* CylinderMediumPbrtExample           = "Cylinder Medium";
-    constexpr const char* RgbGridMediumPbrtExample            = "RGB Grid Medium (pbrt file)";
-    constexpr const char* UniformGridMediumPbrtExample        = "Uniform Grid Medium";
-    constexpr const char* NanoVdbMediumPbrtExample             = "NanoVDB Medium";
-    constexpr const char* CameraMediumPbrtExample              = "Camera Medium";
-    constexpr const char* ThinDielectricMediumPbrtExample      = "Thin Dielectric Medium";
-    constexpr const char* RoughDielectricMediumPbrtExample     = "Rough Dielectric Medium";
-
-    constexpr const char* PlymeshUvPbrtExample                = "PLY Mesh UV";
-    constexpr const char* PlymeshGeometryPbrtExample          = "PLY Mesh Geometry";
-    constexpr const char* CurveTuftPbrtExample                = "Curve Tuft";
-    constexpr const char* CurveHairTuftPbrtExample            = "Curve + Hair Tuft";
-    constexpr const char* TrianglemeshUvPbrtExample           = "Triangle Mesh UV";
-    constexpr const char* PixelFilterBoxPbrtExample           = "Pixel Filter: Box";
-    constexpr const char* ObjectMotionBlurPbrtExample         = "Object Motion Blur";
-    constexpr const char* DiskCylinderMotionBlurPbrtExample   = "Disk & Cylinder Motion Blur";
-    constexpr const char* ReverseOrientationPbrtExample       = "ReverseOrientation";
-    constexpr const char* ConeParaboloidGalleryPbrtExample    = "Cone & Paraboloid Gallery";
-
-    constexpr const char* KillerooSimplePbrtExample           = "Killeroo";
-
-    // Education category - each reuses an existing scene's geometry (see
-    // that entry's own comment in scene_registry.h), so the name says what
-    // Render Options control it demonstrates rather than what's in frame.
-    constexpr const char* SamplerComparison    = "Sampler Comparison (Low Sample Count)";
-    constexpr const char* SpectralDispersionEducation = "Spectral Rendering: Prism Dispersion";
-    constexpr const char* ExposureToneMapping  = "Exposure & Tone Mapping (HDR Sky)";
-    constexpr const char* DenoiserComparison   = "GPU Denoiser: Before & After";
-    constexpr const char* SppmCausticsEducation = "SPPM: Rough Glass Caustic";
-    constexpr const char* BdptMltEducation      = "BDPT / MLT: Bidirectional Light Transport";
-    constexpr const char* LightTransportStrategies = "Light Transport Strategies (NEE / BSDF / MIS)";
-    constexpr const char* LightSamplerComparison    = "Light Sampler Strategy (Uniform / Power / BVH)";
-    constexpr const char* AmbientOcclusionEducation = "Ambient Occlusion (Debug Integrator)";
-    constexpr const char* FireflySuppression        = "Firefly Suppression (Regularize / Clamp)";
-} // namespace SceneNames
 
 // -----------------------------------------------------------------------
 // Canonical scene category constants
@@ -241,7 +28,7 @@ namespace SceneNames {
 // source file they came from. The Qt GUI turns these into a filter tab bar
 // above the scene list (see qt_gui/mainwindow_tabs.cpp).
 //
-// Same rule as SceneNames: use these constants in the registry, never raw
+// Use these constants in the registry, never raw
 // string literals, so a category can't drift between call sites. kAll is the
 // display order for the tabs and is what tests/unit/scene_registry_tests.cpp
 // validates every scene's category against - a typo'd category would
