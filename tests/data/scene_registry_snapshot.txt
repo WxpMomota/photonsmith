@@ -110,6 +110,10 @@ H35|219|spaceship|Large Scenes|Spaceship|Very Slow|files,gpu|bitterli/spaceship/
 H36|220|japanese-classroom|Large Scenes|Japanese Classroom|Medium|files,gpu|bitterli/classroom/scene-v4.pbrt|bd5c7770f7bfb6a1
 H37|221|dragon-statue|Large Scenes|Dragon Statue|Fast|files,gpu|bitterli/dragon/scene-v4.pbrt|64ac5d04d6412028
 H38|222|material-test-ball|Large Scenes|Material Test Ball|Fast|files,gpu|bitterli/material-testball/scene-v4.pbrt|1f2d8f1a8388a835
+H39|223|laubwerk-landscape|Large Scenes|Landscape (Laubwerk)|Very Slow|files,gpu|landscape/view-0.pbrt|fd0e76a2fbdbd91f
+H40|224|bmw-m6|Large Scenes|BMW M6|Slow|files,gpu|bmw-m6/bmw-m6.pbrt|9963498d911c0e28
+H41|225|veach-ajar|Large Scenes|Veach, Ajar|Fast|files,gpu|bitterli/veach-ajar/scene-v4.pbrt|4eef90a2b5ffea8c
+H42|226|water-caustic|Large Scenes|Water Caustic|Medium|files,gpu|bitterli/water-caustic/scene-v4.pbrt|3a9a08d11f0653bc
 I1|132|sampler-comparison|Education|Sampler Comparison (Low Sample Count)|Fast|self,cpu-only|cornell-box-native.pbrt|a1c87cfe9f5f96c7
 I2|133|spectral-prism-dispersion|Education|Spectral Rendering: Prism Dispersion|Fast|self,cpu-only|prism-dispersion.pbrt|a47c8bfd77a3e064
 I3|204|exposure-tone-mapping|Education|Exposure & Tone Mapping (HDR Sky)|Fast|self,gpu|hdri-sky-gradient.pbrt|1d00a46f945f2b86

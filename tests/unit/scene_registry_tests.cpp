@@ -1141,12 +1141,21 @@ TEST(FindSceneTest, EveryDownloadableBitterliSceneHasAPackThatWritesItsFile) {
 		++checked;
 		const std::string wanted = "member|pbrt_scenes/" + generic.substr(at) + "|";
 		EXPECT_NE(catalogue.find(wanted), std::string::npos) << entry.first << " reads " << generic << " but no pack in scene_packs.txt writes it";
-		// every Bitterli file asks for 64 samples: the registry says so whether the scene is downloaded or not, so the info panel does not change its mind after the download
+		// the registry gives a count whether the scene is downloaded or not (the file's own, 64 for most of Bitterli's), so the info panel does not change its mind after the download
 		const SceneDescriptor* scene = find_scene(entry.first);
 		ASSERT_NE(scene, nullptr) << entry.first;
-		EXPECT_EQ(scene->recommended_spp, 64) << entry.first;
+		EXPECT_GT(scene->recommended_spp, 0) << entry.first;
 	}
-	EXPECT_EQ(checked, 17);
+	EXPECT_EQ(checked, 19);
+	// the pbrt-v4-scenes ones are single files of a repository folder ("file|<url>|<dest>|...")
+	for (const char* id : {"H39", "H40"}) {
+		const auto found = pbrt_scene_registry::paths().find(id);
+		ASSERT_NE(found, pbrt_scene_registry::paths().end()) << id;
+		const std::string generic = std::filesystem::path(found->second).generic_string();
+		const std::size_t at = generic.rfind("pbrt_scenes/");
+		const std::string dest = at == std::string::npos ? generic : generic.substr(at);
+		EXPECT_NE(catalogue.find("|" + dest + "|"), std::string::npos) << id << " reads " << dest << " but no pack in scene_packs.txt writes it";
+	}
 }
 
 // A downloadable scene whose file was missing when the registry was built has a missing file's camera; once the file is there, a refresh (the GUI's, after "Download

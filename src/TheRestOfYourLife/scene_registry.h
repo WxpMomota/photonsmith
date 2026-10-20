@@ -777,6 +777,10 @@ namespace pbrt_scene_registry {
         // recommended_spp/max_depth/integrator/sampler/light_sampler fields
         // it derives from `d`) so a caller's curated override always wins.
         s.recommended_exposure = recommended_exposure;
+        // A reference scene can ask for a count no one renders interactively (the BMW M6 file says 65536); the GUI puts the recommendation in its Samples box, so it
+        // is capped at what a long render uses (the scenes that ask for 1024 are unchanged).
+        constexpr int kMostRecommendedSamples = 1024;
+        if (s.recommended_spp > kMostRecommendedSamples) s.recommended_spp = kMostRecommendedSamples;
         // A scene that is not downloaded yet has no file to read its sample count from: the caller says what the file asks for, so the info panel does not
         // show the default before the download and the file's number after it.
         if (!onDisk && recommended_spp_if_missing > 0) s.recommended_spp = recommended_spp_if_missing;

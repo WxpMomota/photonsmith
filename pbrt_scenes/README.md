@@ -126,3 +126,7 @@ a lamp, a spaceship, a Japanese classroom...), each released under CC0 or CC BY 
 (Grey and White Room, Bedroom Interior, Country Kitchen, Modern Hall, ...) and are not stored here: select one and press **Download missing files**, and its pbrt-v4 version is fetched from
 benedikt-bitterli.me into `pbrt_scenes/bitterli/<scene>/` (5 to 50 MB each; only what the scene uses, every file checked). Restart the app once after the first download so the scene is read with its
 own camera. They are the scenes' original files, unchanged: `scene-v4.pbrt`, `models/`, `textures/`.
+
+**pbrt-v4-scenes not added, and why** (checked 2026-10-19 against the renderers):
+- **Kroken** and **Watercolor** (interiors licensed from Angelo Ferretti, CC BY-ND) use pbrt's `"rgb:textures/file"` shorthand for image textures, a texture-bound `mix` "amount" and several textured material parameters, which the loader warns about and replaces with constants, so they draw dull and dark; Kroken's daylight is a portal infinite light with a constant colour (now supported), but its glass panes and pictures are not right yet. Watercolor also has two portal lights and only the last infinite light of a file is used.
+- **Head** (a subsurface head, CC BY 2.0) works since the textured-reflectance subsurface fix, but its file sets a crop window, so the rest of the picture is black.

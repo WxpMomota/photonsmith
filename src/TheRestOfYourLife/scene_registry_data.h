@@ -565,6 +565,22 @@ inline std::vector<SceneDescriptor> builtin_scenes_part4() {
             "H38", 222, "Material Test Ball", "material-test-ball", SceneCategories::LargeScene,
             "A rough copper-coloured material ball with a T-shaped notch on a pedestal, on a checkered floor (CC0, Benedikt Bitterli's rendering-resources scenes): the classic scene for judging a material. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
             "Fast", "bitterli/material-testball/scene-v4.pbrt", 1.0, 64),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H39", 223, "Landscape (Laubwerk)", "laubwerk-landscape", SceneCategories::LargeScene,
+            "A meadow with birch trees, wildflowers and a footpath, built from 23,241 plant models (3.1 billion triangles through instancing, 24 million stored): 'Landscape' by Jan-Walter Schliep, Burak Kahraman and Timm Dapper of Laubwerk (CC BY 4.0), the cover picture of the third edition of Physically Based Rendering, from the pbrt-v4-scenes collection. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md). The heaviest scene here: a download of 1.4 GB, and over a minute just to load.",
+            "Very Slow", "landscape/view-0.pbrt", 0.6, 512),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H40", 224, "BMW M6", "bmw-m6", SceneCategories::LargeScene,
+            "A white BMW M6 coupe on a dark glossy floor (model by tyrant monkey on Blend Swap, CC0), from the pbrt-v4-scenes collection: car paint, glass and chrome under an environment light. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md). A download of 72 MB.",
+            "Slow", "bmw-m6/bmw-m6.pbrt", 0.8, 1024),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H41", 225, "Veach, Ajar", "veach-ajar", SceneCategories::LargeScene,
+            "Eric Veach's classic 'Ajar' test in Benedikt Bitterli's version (CC0): a room lit only by the light that falls through a door left ajar, a hard case for a path tracer, with a picture on the wall and glass and metal on the table. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Fast", "bitterli/veach-ajar/scene-v4.pbrt", 0.8, 64),
+        pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H42", 226, "Water Caustic", "water-caustic", SceneCategories::LargeScene,
+            "Light through a rippling water surface drawing caustics on the walls and floor of a small room (Benedikt Bitterli, CC0). The scene's file asks for photon mapping: choose the SPPM integrator (Render Options, or Apply recommended settings in the scene panel); a path tracer draws these caustics as dark noise, and SPPM has no triangle meshes on the GPU, so it runs on the CPU. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
+            "Medium", "bitterli/water-caustic/scene-v4.pbrt", 0.4, 200),
 
     };
 }

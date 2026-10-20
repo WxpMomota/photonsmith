@@ -40,6 +40,7 @@ OUT = os.path.join(REPO, "qt_gui", "scene_packs.txt")
 UA = {"User-Agent": "RayTracerGUI"}   # the McGuire archive's server answers 406 to a default python User-Agent
 G3D = "https://casual-effects.com/g3d/data10/"
 PBRT_REPO = "mmp/pbrt-v4-scenes"
+PBRT_V4_COMMIT = "30cf4a0346ae5a80a2d7a530a3ef7d0fa4f70572"
 
 
 class HttpFile(io.RawIOBase):
@@ -123,6 +124,8 @@ PBRT_V4 = {
     "zero-day": ("Zero Day", "Frames converted from Beeple's Zero-Day; see http://beeple-crap.com/resources.php for his licence. From mmp/pbrt-v4-scenes."),
     "crown": ("Crown", "Model by Martin Lubich (http://www.loramel.net/). From mmp/pbrt-v4-scenes."),
     "villa": ("Villa", "Scene by Florent Boyer. From mmp/pbrt-v4-scenes."),
+    "landscape": ("Landscape", "A landscape of 23,241 plant models (3.1 billion triangles, 24 million stored) by Jan-Walter Schliep, Burak Kahraman and Timm Dapper of Laubwerk (https://www.laubwerk.com), CC BY 4.0 (credit the authors and link https://creativecommons.org/licenses/by/4.0/). From mmp/pbrt-v4-scenes."),
+    "bmw-m6": ("BMW M6", "Model by tyrant monkey via Blend Swap, CC0 (public domain). From mmp/pbrt-v4-scenes."),
     "transparent-machines": ("Transparent Machines", "Models from frames of Beeple's Transparent Machines; see http://beeple-crap.com/resources.php for his licence. From mmp/pbrt-v4-scenes."),
 }
 
@@ -147,6 +150,8 @@ BITTERLI = {
     "spaceship": ("4060.b Spaceship", "thecali", "http://www.blendswap.com/blends/view/75686", "CC0"),
     "classroom": ("Japanese Classroom", "NovaZeeke", "http://www.blendswap.com/blends/view/75940", "CC BY 3.0"),
     "dragon": ("Dragon", "Delatronic", "http://www.blendswap.com/blends/view/80766", "CC BY 3.0"),
+    "veach-ajar": ("Veach, Ajar", "Benedikt Bitterli", "https://benedikt-bitterli.me/resources", "CC0"),
+    "water-caustic": ("Water Caustic", "Benedikt Bitterli", "https://benedikt-bitterli.me/resources", "CC0"),
     "material-testball": ("Material Test Ball", "Benedikt Bitterli", "https://benedikt-bitterli.me/resources", "CC0"),
 }
 
@@ -256,8 +261,7 @@ def outside_references(folder, tree, commit, blobs, by_path):
 
 def pbrt_v4_packs(problems):
     base = "https://api.github.com/repos/%s" % PBRT_REPO
-    with urllib.request.urlopen(urllib.request.Request(base + "/commits/master", headers=UA), timeout=60) as f:
-        commit = json.load(f)["sha"]
+    commit = PBRT_V4_COMMIT   # (pinned: a new upstream commit changes nothing here until someone moves this on purpose and regenerates)
     with urllib.request.urlopen(urllib.request.Request(base + "/git/trees/%s?recursive=1" % commit, headers=UA), timeout=120) as f:
         tree = json.load(f)
     if tree.get("truncated"): problems.append("pbrt-v4-scenes tree listing was truncated")
