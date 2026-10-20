@@ -816,6 +816,42 @@ inline void flattenSettings(const pbrt_scene::Scene &scene, FlatScene &out) {
 	}
 }
 
+// pbrt's film imaging ratio (exposure time * iso / 100, film.cpp PixelSensor::Create) multiplies every radiance its sensor records. The renderers here have no sensor
+// stage that every integrator shares (the exposure knob is the default path tracer's alone), so the ratio is applied where all of them read it: to the light the scene
+// emits. Radiance is linear in the emitters, so the picture is the same one pbrt's sensor makes, on the CPU, both OptiX backends, Metal, BDPT, MLT, SPPM and Live Preview.
+// Runs AFTER resolveAfterShapes(): an area light's "power" is resolved into its scale there, and the ratio multiplies the result.
+inline void applyFilmImagingRatio(const pbrt_scene::Scene &scene, FlatScene &out) {
+	const auto warn = [&out](const std::string &msg) {
+		out.warnings.push_back({0, std::string(), msg});
+	};
+	const double shutter = scene.cameraParams.getFloat("shutterclose", 1.0) - scene.cameraParams.getFloat("shutteropen", 0.0);
+	if (shutter <= 0.0) {
+		warn("the camera's shutterclose is not after its shutteropen: pbrt rejects this file; the film's exposure time is taken as 1");
+	}
+	const double exposureTime = shutter > 0.0 ? shutter : 1.0;
+	if (!(scene.filmIso > 0.0)) {
+		warn("Film \"iso\" must be positive; 100 is used");
+	}
+	const double iso = scene.filmIso > 0.0 ? scene.filmIso : 100.0;
+	if (scene.filmSensor != "cie1931") {
+		warn("Film \"sensor\" \"" + scene.filmSensor + "\" (a camera's measured response) is not modelled; the cie1931 sensor is used, with the file's iso and shutter time");
+	}
+	const double ratio = exposureTime * iso / 100.0;
+	out.filmImagingRatio = ratio;
+	if (ratio == 1.0) return;
+
+	for (Emission &e : out.areaLights) e.scale *= ratio;
+	if (out.infiniteLight.present) out.infiniteLight.scale *= ratio;
+	for (PunctualLight &p : out.punctualLights) p.scale *= ratio;
+	for (Medium &m : out.media) {
+		for (double &c : m.Le) c *= ratio;
+		m.Le_scale *= ratio;
+		m.nanovdbLeScale *= ratio;
+	}
+	// The film clamps each sample AFTER the sensor scale; the renderers clamp before it, so the same limit is the scene's limit divided by the ratio.
+	if (out.maxComponentValue < 1e8) out.maxComponentValue /= ratio;
+}
+
 } // namespace flatten_detail
 
 // A Scene Builder file written before the Builder wrote pbrt's mirror (`Scale -1 1 1` before LookAt, scene_pbrt_writer.h) is a right-handed scene whose picture has always been the
@@ -839,6 +875,7 @@ inline FlatScene flatten(const pbrt_scene::Scene &scene,
 	flattenShapes(scene, out, meshes);
 	resolveAfterShapes(scene, out);
 	flattenSettings(scene, out);
+	applyFilmImagingRatio(scene, out);
 	return out;
 }
 

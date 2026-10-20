@@ -448,6 +448,11 @@ struct Scene {
 	// same 1e9f) - this field is what actually threads a scene-authored
 	// value through to it, via pbrt_flatten.h/FlatScene::maxComponentValue.
 	double maxComponentValue = 1e9;
+	// Film "float iso" (pbrt-v4's default 100, which makes the film's imaging ratio exactly 1) and "string sensor" ("cie1931" is the default and the only sensor this
+	// renderer models). pbrt's imaging ratio = exposure time (the camera's shutterclose - shutteropen) * iso / 100 scales every radiance the film records; flatten()
+	// turns it into FlatScene::filmImagingRatio.
+	double filmIso = 100.0;
+	std::string filmSensor = "cie1931";
 	std::string integrator = "volpath";
 	// Sampler directive's type name (e.g. "sobol", "zsobol", "halton") -
 	// like `integrator` above, purely informational: nothing in this parser
@@ -1182,6 +1187,8 @@ private:
 				}
 			}
 			s_.maxComponentValue = p.getFloat("maxcomponentvalue", s_.maxComponentValue);
+			s_.filmIso = p.getFloat("iso", s_.filmIso);
+			s_.filmSensor = p.getString("sensor", s_.filmSensor);
 			return true;
 		}
 		if (d == "Sampler") {

@@ -325,6 +325,52 @@ TEST(FlattenTest, MaxComponentValueIsCarriedThroughFromTheFilmDirective) {
 	EXPECT_DOUBLE_EQ(s.maxComponentValue, 25.0);
 }
 
+// Film "iso" and the camera's shutter: pbrt's sensor multiplies every radiance by exposure time * iso / 100. flatten() applies it to the scene's emitters.
+TEST(FlattenTest, FilmImagingRatioIsOneWithoutIsoOrShutter) {
+	const FlatScene s = flattenSource(
+		"Camera \"perspective\"\nWorldBegin\n"
+		"LightSource \"point\" \"rgb I\" [ 2 2 2 ]\n" + std::string(kQuadMesh));
+	EXPECT_DOUBLE_EQ(s.filmImagingRatio, 1.0);
+	ASSERT_EQ(s.punctualLights.size(), 1u);
+	EXPECT_DOUBLE_EQ(s.punctualLights[0].scale, 1.0);
+}
+
+TEST(FlattenTest, FilmIsoScalesEveryEmitter) {
+	const FlatScene s = flattenSource(
+		"Film \"rgb\" \"float iso\" [ 400 ] \"float maxcomponentvalue\" [ 40 ]\n"
+		"Camera \"perspective\"\nWorldBegin\n"
+		"LightSource \"point\" \"rgb I\" [ 2 2 2 ] \"float scale\" [ 3 ]\n"
+		"LightSource \"infinite\" \"rgb L\" [ 1 1 1 ]\n"
+		"AttributeBegin\nAreaLightSource \"diffuse\" \"rgb L\" [ 1 1 1 ] \"float scale\" [ 5 ]\n" + std::string(kQuadMesh) + "AttributeEnd\n");
+	EXPECT_DOUBLE_EQ(s.filmImagingRatio, 4.0);
+	ASSERT_EQ(s.punctualLights.size(), 1u);
+	EXPECT_DOUBLE_EQ(s.punctualLights[0].scale, 12.0);
+	EXPECT_DOUBLE_EQ(s.infiniteLight.scale, 4.0);
+	ASSERT_EQ(s.areaLights.size(), 1u);
+	EXPECT_DOUBLE_EQ(s.areaLights[0].scale, 20.0);
+	EXPECT_DOUBLE_EQ(s.maxComponentValue, 10.0);   // the film clamps after the sensor scale
+}
+
+TEST(FlattenTest, ShutterTimeScalesTheFilmLikeIsoDoes) {
+	const FlatScene s = flattenSource(
+		"Film \"rgb\" \"float iso\" [ 50 ]\n"
+		"Camera \"perspective\" \"float shutteropen\" [ 0.25 ] \"float shutterclose\" [ 2.25 ]\n"
+		"WorldBegin\n"
+		"LightSource \"point\" \"rgb I\" [ 1 1 1 ]\n" + std::string(kQuadMesh));
+	EXPECT_DOUBLE_EQ(s.filmImagingRatio, 1.0);   // 2 s at iso 50
+	ASSERT_EQ(s.punctualLights.size(), 1u);
+	EXPECT_DOUBLE_EQ(s.punctualLights[0].scale, 1.0);
+}
+
+TEST(FlattenTest, AMeasuredSensorIsWarnedAboutNotSilentlyIgnored) {
+	const FlatScene s = flattenSource(
+		"Film \"rgb\" \"string sensor\" [ \"canon_eos_100d\" ]\n"
+		"Camera \"perspective\"\nWorldBegin\n" + std::string(kQuadMesh));
+	bool warned = false;
+	for (const auto &w : s.warnings) warned = warned || w.message.find("sensor") != std::string::npos;
+	EXPECT_TRUE(warned);
+}
+
 TEST(FlattenTest, CropWindowDefaultsToFullFrame) {
 	const FlatScene s = flattenSource(
 		"Camera \"perspective\"\nWorldBegin\n" + std::string(kQuadMesh));

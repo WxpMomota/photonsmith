@@ -424,23 +424,21 @@ inline std::vector<SceneDescriptor> builtin_scenes_part4() {
         // camera/lights/materials all come from the file itself, not a
         // hand-transcribed struct.
         //
-        // Both (and H19/H20 further below) pass a trailing curated
-        // recommended_exposure argument - see SceneDescriptor::
-        // recommended_exposure's own comment (scene_registry.h) for why
-        // these four specifically needed one: at this engine's neutral
-        // exposure=1.0 they rendered as a near-black silhouette rather
-        // than the furnished/architectural scene the geometry actually
-        // contains.
+        // They (and H19/H20 further below) used to pass a curated
+        // recommended_exposure of 15-30x, because their Film "iso" (600, 500,
+        // 150, 200) was ignored and they rendered near-black. The loader now
+        // applies the film's imaging ratio (pbrt_flatten.h,
+        // applyFilmImagingRatio) and they match pbrt-v4 at the neutral exposure 1.
         pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
             pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H13", 159, "Contemporary Bathroom", "contemporary-bathroom", SceneCategories::LargeScene,
             "A furnished bathroom interior from the pbrt-v4-scenes collection (not bundled with this repo; see pbrt_scenes/README.md): tile, wood, chrome, glass and fabric, with a blackbody-temperature light fixture.",
-            "Very Slow", "contemporary-bathroom/contemporary-bathroom.pbrt", 15.0)),
+            "Very Slow", "contemporary-bathroom/contemporary-bathroom.pbrt")),
         pbrt_scene_registry::in_subcategory(SceneSubcategories::Buildings,
             pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H14", 160, "Barcelona Pavilion", "barcelona-pavilion", SceneCategories::LargeScene,
             "Mies van der Rohe's Barcelona Pavilion from the pbrt-v4-scenes collection (not bundled with this repo; see pbrt_scenes/README.md): glass and marble architecture among dense foliage, in its daytime lighting.",
-            "Slow", "barcelona-pavilion/pavilion-day.pbrt", 15.0)),
+            "Slow", "barcelona-pavilion/pavilion-day.pbrt")),
         // H15-H17: three more real pbrt-v4-scenes bundles, same
         // build_curated_external_pbrt_scene_descriptor() mechanism as H13/H14
         // above - already sitting locally as parser-verification fixtures,
@@ -507,12 +505,12 @@ inline std::vector<SceneDescriptor> builtin_scenes_part4() {
             pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H19", 165, "Crown", "crown", SceneCategories::LargeScene,
             "A jewelled crown rendered with glass and gem dispersion and refraction, from the pbrt-v4-scenes collection (not bundled with this repo; see pbrt_scenes/README.md): a classic pbrt showcase scene.",
-            "Slow", "crown/crown.pbrt", 30.0)),
+            "Slow", "crown/crown.pbrt")),
         pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
             pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H20", 166, "Villa", "villa", SceneCategories::LargeScene,
             "A furnished villa, inside and out, from the pbrt-v4-scenes collection (not bundled with this repo; see pbrt_scenes/README.md), in its daylight lighting (villa-daylight.pbrt). A lights-on night variant ships in the same folder.",
-            "Very Slow", "villa/villa-daylight.pbrt", 15.0)),
+            "Very Slow", "villa/villa-daylight.pbrt")),
         pbrt_scene_registry::in_subcategory(SceneSubcategories::LightAndArt,
             pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H21", 167, "Transparent Machines", "transparent-machines", SceneCategories::LargeScene,
@@ -607,7 +605,7 @@ inline std::vector<SceneDescriptor> builtin_scenes_part4() {
             pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H39", 223, "Landscape (Laubwerk)", "laubwerk-landscape", SceneCategories::LargeScene,
             "A meadow with birch trees, wildflowers and a footpath, built from 23,241 plant models (3.1 billion triangles through instancing, 24 million stored): 'Landscape' by Jan-Walter Schliep, Burak Kahraman and Timm Dapper of Laubwerk (CC BY 4.0), the cover picture of the third edition of Physically Based Rendering, from the pbrt-v4-scenes collection. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md). The heaviest scene here: a download of 1.4 GB, and over a minute just to load.",
-            "Very Slow", "landscape/view-0.pbrt", 0.6, 512)),
+            "Very Slow", "landscape/view-0.pbrt", 0.4, 512)),
         pbrt_scene_registry::in_subcategory(SceneSubcategories::Vehicles,
             pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H40", 224, "BMW M6", "bmw-m6", SceneCategories::LargeScene,

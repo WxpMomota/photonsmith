@@ -1,0 +1,38 @@
+# @rt-size 6
+# film-iso-shutter.pbrt -- a film that is not at pbrt's passthrough exposure. The sensor multiplies every radiance by exposure time * iso / 100 (film.cpp):
+# here (0.75 - 0.25) s * 300 / 100 = 1.5, so the picture is 1.5 times as bright as the same file with the default film. Area light, point light and a sky all light
+# the room, so each kind of emitter has to carry the factor. Original, so it carries no licence constraints.
+
+LookAt 0 1.2 6   0 0.8 0   0 1 0
+Camera "perspective" "float fov" [ 45 ] "float shutteropen" [ 0.25 ] "float shutterclose" [ 0.75 ]
+
+Film "rgb" "integer xresolution" [ 64 ] "integer yresolution" [ 64 ] "float iso" [ 300 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+Integrator "volpath" "integer maxdepth" [ 8 ]
+
+WorldBegin
+
+LightSource "infinite" "rgb L" [ 0.25 0.3 0.4 ]
+LightSource "point" "point3 from" [ -2 3 2 ] "rgb I" [ 6 5 4 ]
+
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 3 3 3 ]
+  Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+    "point3 P" [ -0.6 2.8 -0.6   0.6 2.8 -0.6   0.6 2.8 0.6   -0.6 2.8 0.6 ]
+AttributeEnd
+
+Material "diffuse" "rgb reflectance" [ 0.6 0.6 0.55 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -6 0 -6   6 0 -6   6 0 6   -6 0 6 ]
+
+AttributeBegin
+  Translate -0.9 0.8 0
+  Material "diffuse" "rgb reflectance" [ 0.8 0.3 0.2 ]
+  Shape "sphere" "float radius" [ 0.8 ]
+AttributeEnd
+
+AttributeBegin
+  Translate 1.1 0.6 0.6
+  Material "conductor" "spectrum eta" "metal-Cu-eta" "spectrum k" "metal-Cu-k" "float roughness" [ 0.2 ]
+  Shape "sphere" "float radius" [ 0.6 ]
+AttributeEnd

@@ -184,33 +184,12 @@ struct SceneDescriptor {
     // True when any shape of the scene carries a participating medium, grey or not (BuildResult::hasShapeMedia). LAST, like the fields above.
     std::function<bool()> build_has_shape_media;
 
-    // A CURATED (not derived from the .pbrt file - see the comment below on
-    // why not) flat multiplier auto-applied to the Render Options tab's
-    // Exposure control when this scene is selected, the same way
-    // recommended_spp is auto-applied to the Samples field (mainwindow_
-    // slots.cpp's onSceneChanged()). Defaults to 1.0 (no-op) for every
-    // hand-built scene and the vast majority of pbrt-backed ones.
+    // A CURATED flat multiplier auto-applied to the Render Options tab's Exposure control when this scene is selected, the same way recommended_spp is auto-applied
+    // to the Samples field (mainwindow_slots.cpp's onSceneChanged()). 1.0 (no-op) for every hand-built scene and nearly every pbrt-backed one.
     //
-    // pbrt-v4 files that DO specify exposure-relevant metadata (Film's
-    // "float iso", occasionally paired with a camera shutter time) encode
-    // it for pbrt-v4's own PixelSensor model - a real, but partial, physical
-    // camera response pipeline this project's tone-mapping does not
-    // reproduce. Computing pbrt's own imagingRatio = exposureTime * ISO/100
-    // from those fields was tried and rejected: for H19 (Crown, iso 150) it
-    // works out to 1.5x, but the render needs roughly 30x to look like
-    // anything other than a near-black silhouette - the gap is dominated by
-    // something else entirely (most likely this renderer's blackbody-arealight
-    // radiance scale not matching pbrt-v4's own convention, though that
-    // wasn't tracked down further - out of scope for a scene-registry
-    // addition). A formula-derived value here would therefore be
-    // confidently wrong; an empirically-found one that actually produces a
-    // viewable image is more honest, even though it can't be traced back to
-    // a specific line in the source file the way recommended_spp can.
-    // Set only for H13/H14/H19/H20 so far (the four curated pbrt-v4-scenes
-    // bundles found to render unusably dark at the engine's neutral
-    // exposure=1.0) - see their own build_curated_external_pbrt_scene_
-    // descriptor() call sites in scene_registry_data.h for the values and
-    // how each was determined.
+    // It is NOT how a pbrt file's own exposure is honoured. A pbrt file's Film "iso" and the camera's shutter time (imaging ratio = shutter * iso / 100) are applied by the
+    // loader to the scene's light (pbrt_flatten.h, applyFilmImagingRatio), so a file that renders as pbrt does needs no entry here. What is left for this value is a scene
+    // that is still too dark or too bright at that point for another reason (this renderer's tone mapping against pbrt's, or a Tungsten scene's own units).
     double recommended_exposure = 1.0;
 
     // Whether this scene is backed by a loaded .pbrt file (true for every

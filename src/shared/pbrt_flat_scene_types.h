@@ -507,6 +507,11 @@ struct FlatScene {
 	// unconditionally, same "genuine scene-authored behavior" shape as
 	// cropX0 above, not maxDepth/samplerType's CLI-overridable one.
 	double maxComponentValue = 1e9;
+	// pbrt's film imaging ratio, exposure time (camera shutterclose - shutteropen) * Film "iso" / 100: the factor its sensor multiplies every recorded radiance by (film.cpp,
+	// PixelSensor::Create). 1 for a file that says neither (pbrt's "passthrough" default). flatten() has ALREADY applied it, to every emitter in this struct (area lights, the
+	// infinite light, the punctual lights, medium emission) and divided maxComponentValue by it: the renderers see a scene that is as bright as pbrt's picture, so
+	// nothing downstream (CPU, OptiX, Metal, BDPT, MLT, SPPM, Live Preview) needs to know. Kept here for the scene info and the tests.
+	double filmImagingRatio = 1.0;
 	std::vector<pbrt_scene::Warning> warnings;
 	// Mesh files (plymesh / .obj) a Shape named but the resolver could not read.
 	// Those shapes are skipped with a warning; this list is what lets the loader
