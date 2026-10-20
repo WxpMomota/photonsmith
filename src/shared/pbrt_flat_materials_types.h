@@ -598,6 +598,13 @@ struct Material {
 	double conductorRoughness_u = -1.0;
 	double conductorRoughness_v = -1.0;
 	double coatThickness = 0.01;
+	// The layered materials' (coateddiffuse, coatedconductor) walk inside the layer, pbrt's "thickness" (above, coatThickness), "g" (the layer medium's Henyey-Greenstein asymmetry),
+	// "albedo" (the medium's single-scattering albedo: 0 = a clear layer, pbrt's default; a spectrum in pbrt, its mean here), "maxdepth" (interactions per walk, default 10) and
+	// "nsamples" (walks per estimate, default 1).
+	double layerG = 0.0;
+	double layerMediumAlbedo = 0.0;
+	int layerMaxDepth = 10;
+	int layerNSamples = 1;
 
 	// Texture-bound parameters that fall back to their mean (see TextureAverage). pbrt_load resolves them into the fields above; empty for a material that has none.
 	std::vector<TextureAverage> textureAverages;

@@ -903,6 +903,11 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 		// (already assigned generically above) - same degrade-to-flat-
 		// colour every other texture-bound material kind gets.
 		d.type = MaterialType::CoatedDiffuse;
+		d.layerThickness = static_cast<float>(m.coatThickness);
+		d.layerG = static_cast<float>(m.layerG);
+		d.layerAlbedo = static_cast<float>(m.layerMediumAlbedo);
+		d.layerMaxDepth = m.layerMaxDepth;
+		d.layerNSamples = m.layerNSamples;
 		if (!m.textureFilename.empty()) {
 			d.textureIdx = getOrBuildPbrtImageTexture(m.textureFilename, out, imageTextureCache,
 				static_cast<float>(m.textureGamma), static_cast<GpuWrapMode>(m.textureWrapIndex), m.textureInvert, m.textureMapping);
@@ -987,6 +992,10 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 		d.condRoughness  = static_cast<float>(m.conductorRoughness_u);
 		d.condRoughnessV = static_cast<float>(m.conductorRoughness_v);
 		d.layerThickness = static_cast<float>(m.coatThickness);
+		d.layerG = static_cast<float>(m.layerG);
+		d.layerAlbedo = static_cast<float>(m.layerMediumAlbedo);
+		d.layerMaxDepth = m.layerMaxDepth;
+		d.layerNSamples = m.layerNSamples;
 		break;
 	case pbrt_flatten::MaterialKind::Subsurface:
 		// Real tabulated BSSRDF, on BOTH GPU backends (see optix_types.h's

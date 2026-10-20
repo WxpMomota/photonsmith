@@ -829,7 +829,13 @@ class coated_diffuse : public material {
 
     BxDF get_bxdf(const MaterialContext<double>& ctx) const {
         color albedo = tex->value(ctx.u, ctx.v, point3(ctx.px, ctx.py, ctx.pz));
-        return BxDF{ albedo.x(), albedo.y(), albedo.z(), ior, alpha_x, alpha_y };
+        return with_layer(BxDF{ albedo.x(), albedo.y(), albedo.z(), ior, alpha_x, alpha_y });
+    }
+
+    // The layer's thickness, its medium (HG asymmetry g, single-scattering albedo) and the random walk's controls (pbrt's thickness, g, albedo, maxdepth, nsamples). The defaults
+    // (0.01, a clear layer, 10 interactions, 1 sample) are pbrt's own.
+    void set_layer_walk(double thickness, double g, double medium_albedo, int max_depth, int n_samples) {
+        layer_thickness = thickness; layer_g = g; layer_albedo = medium_albedo; layer_max_depth = max_depth; layer_n_samples = n_samples;
     }
 
     bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec,
@@ -877,12 +883,19 @@ class coated_diffuse : public material {
     BxDF make_bxdf(const color& albedo, bool do_regularize) const {
         const double ex = do_regularize ? regularize_alpha(alpha_x) : alpha_x;
         const double ey = do_regularize ? regularize_alpha(alpha_y) : alpha_y;
-        return BxDF{ albedo.x(), albedo.y(), albedo.z(), ior, ex, ey };
+        return with_layer(BxDF{ albedo.x(), albedo.y(), albedo.z(), ior, ex, ey });
+    }
+    BxDF with_layer(BxDF bx) const {
+        bx.thickness = layer_thickness; bx.g = layer_g; bx.medium_albedo = layer_albedo;
+        bx.maxDepth = layer_max_depth; bx.nSamples = layer_n_samples;
+        return bx;
     }
 
     shared_ptr<texture> tex;
     double ior;
     double alpha_x, alpha_y;
+    double layer_thickness = 0.01, layer_g = 0.0, layer_albedo = 0.0;
+    int layer_max_depth = 10, layer_n_samples = 1;
 };
 
 
@@ -1011,6 +1024,11 @@ class coated_conductor : public material {
 
     BxDF get_bxdf(const MaterialContext<double>& /*ctx*/) const { return make_bxdf(false); }
 
+    // The layer's medium (HG asymmetry g, single-scattering albedo) and the random walk's controls (pbrt's g, albedo, maxdepth, nsamples); the thickness is a constructor argument.
+    void set_layer_walk(double thickness_, double g, double medium_albedo, int max_depth, int n_samples) {
+        thickness = thickness_; layer_g = g; layer_albedo = medium_albedo; layer_max_depth = max_depth; layer_n_samples = n_samples;
+    }
+
     bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec,
                  bool do_regularize = false) const override {
         auto ctx = MaterialContext<double>::from_hit(rec, r_in);
@@ -1062,6 +1080,7 @@ class coated_conductor : public material {
             bx.cond_alpha_x = do_regularize ? regularize_alpha(cond_alpha_x) : cond_alpha_x;
             bx.cond_alpha_y = do_regularize ? regularize_alpha(cond_alpha_y) : cond_alpha_y;
         }
+        bx.g = layer_g; bx.medium_albedo = layer_albedo; bx.maxDepth = layer_max_depth; bx.nSamples = layer_n_samples;
         return bx;
     }
 
@@ -1071,6 +1090,8 @@ class coated_conductor : public material {
     double alpha_x, alpha_y;
     double cond_alpha_x = -1.0, cond_alpha_y = -1.0;   // negative: use the coat's
     double thickness = 0.01;
+    double layer_g = 0.0, layer_albedo = 0.0;
+    int layer_max_depth = 10, layer_n_samples = 1;
 };
 
 // ---------------------------------------------------------------------------

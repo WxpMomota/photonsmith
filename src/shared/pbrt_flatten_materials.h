@@ -736,20 +736,22 @@ inline void readRoughnessAndLayers(FlatScene &out, pbrt_scene::MaterialDecl &md,
 			m.conductorRoughness_u = md.params.getFloat("conductor.uroughness", md.params.getFloat("conductor.roughness", 0.0));
 			m.conductorRoughness_v = md.params.getFloat("conductor.vroughness", md.params.getFloat("conductor.roughness", 0.0));
 		}
-		m.coatThickness = md.params.getFloat("thickness", 0.01);
 	}
-	// The layered materials' medium (albedo, g) and walk controls (maxdepth, nsamples) are not wired through to the
-	// renderers - the defaults (a clear layer, 10 interactions, 1 sample) are what every bundled scene uses.
+	// The layered materials' thickness, medium (albedo, g) and walk controls (maxdepth, nsamples).
 	if (m.kind == MaterialKind::CoatedConductor || m.kind == MaterialKind::CoatedDiffuse) {
+		m.coatThickness = md.params.getFloat("thickness", 0.01);
+		m.layerG = md.params.getFloat("g", 0.0);
+		m.layerMaxDepth = std::max(1, md.params.getInt("maxdepth", 10));
+		m.layerNSamples = std::max(1, md.params.getInt("nsamples", 1));
 		const pbrt_scene::Param *albedoP = md.params.find("albedo");
-		const bool hasMediumAlbedo = albedoP && albedoP->type != "texture" &&
-			(albedoP->numbers.size() < 3 || albedoP->numbers[0] != 0.0 || albedoP->numbers[1] != 0.0 || albedoP->numbers[2] != 0.0);
-		if (hasMediumAlbedo || md.params.getFloat("g", 0.0) != 0.0 ||
-			md.params.getInt("maxdepth", 10) != 10 || md.params.getInt("nsamples", 1) != 1)
-			materialWarn(out, "material '" + md.type + "' sets \"albedo\"/\"g\"/\"maxdepth\"/\"nsamples\", which are not supported; "
-				 "a clear layer, 10 interactions and 1 sample are used");
-		if (m.kind == MaterialKind::CoatedDiffuse && md.params.getFloat("thickness", 0.01) != 0.01)
-			materialWarn(out, "material 'coateddiffuse' sets \"thickness\", which is not supported; 0.01 is used");
+		if (albedoP && albedoP->type != "texture" && !albedoP->numbers.empty()) {
+			const double r = albedoP->numbers[0], g = albedoP->numbers.size() > 1 ? albedoP->numbers[1] : r, b = albedoP->numbers.size() > 2 ? albedoP->numbers[2] : r;
+			m.layerMediumAlbedo = (r + g + b) / 3.0;
+			if (std::fabs(r - g) > 0.05 * std::max(1e-6, m.layerMediumAlbedo) || std::fabs(g - b) > 0.05 * std::max(1e-6, m.layerMediumAlbedo))
+				materialWarn(out, "material '" + md.type + "' has a coloured layer \"albedo\"; the renderers use one value (its mean) for the layer medium");
+		} else if (albedoP && albedoP->type == "texture") {
+			materialWarn(out, "material '" + md.type + "' binds its layer \"albedo\" to a texture, which is not supported; a clear layer is used");
+		}
 	}
 }
 

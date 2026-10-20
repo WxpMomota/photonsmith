@@ -776,7 +776,7 @@ extern "C" __global__ void evaluate_materials(
 		float cd_alpha_y = wf_glossy_alpha_v(mat, do_regularize);
 		glossyAlphaForNEE = cd_alpha_x;
 		glossyAlphaVForNEE = cd_alpha_y;
-		CoatedDiffuseBxDF<float> cd_bxdf{ cd_albedo.x, cd_albedo.y, cd_albedo.z, mat.ior, cd_alpha_x, cd_alpha_y };
+		CoatedDiffuseBxDF<float> cd_bxdf{ cd_albedo.x, cd_albedo.y, cd_albedo.z, mat.ior, cd_alpha_x, cd_alpha_y, mat.layerThickness, mat.layerG, mat.layerAlbedo, mat.layerMaxDepth, mat.layerNSamples };
 		const WfLayeredScatter cd_ls = wf_layered_scatter(cd_bxdf, normal, h.rayDir, h.objDpdu, seed);
 		if (!cd_ls.scattered) { scattered = false; break; }
 		scattered_dir = cd_ls.dir;
@@ -834,7 +834,7 @@ extern "C" __global__ void evaluate_materials(
 		const float cc_inv_ior = 1.0f / mat.ior;
 		CoatedConductorBxDF<float> cc_bxdf{ mat.eta_c.x * cc_inv_ior, mat.eta_c.y * cc_inv_ior, mat.eta_c.z * cc_inv_ior,
 		                                    mat.k_c.x * cc_inv_ior, mat.k_c.y * cc_inv_ior, mat.k_c.z * cc_inv_ior,
-		                                    mat.ior, cc_alpha_x, cc_alpha_y, mat.layerThickness, 0.0f, 0.0f, 10, 1,
+		                                    mat.ior, cc_alpha_x, cc_alpha_y, mat.layerThickness, mat.layerG, mat.layerAlbedo, mat.layerMaxDepth, mat.layerNSamples,
 		                                    cc_cond_x, cc_cond_y };
 		const WfLayeredScatter cc_ls = wf_layered_scatter(cc_bxdf, normal, h.rayDir, h.objDpdu, seed);
 		if (!cc_ls.scattered) { scattered = false; break; }

@@ -224,6 +224,13 @@ inline std::shared_ptr<material> makeMaterial(const pbrt_flatten::Material &m,
 											  const pbrt_flatten::Emission *emission,
 											  const std::vector<pbrt_flatten::Material> &allMaterials = {},
 											  int depth = 0,
+											  bool forCurve = false);
+
+// makeMaterial() below, before the layered materials' walk settings (makeMaterial applies those on top).
+inline std::shared_ptr<material> makeMaterialBase(const pbrt_flatten::Material &m,
+											  const pbrt_flatten::Emission *emission,
+											  const std::vector<pbrt_flatten::Material> &allMaterials = {},
+											  int depth = 0,
 											  bool forCurve = false) {
 	// Emission wins: in pbrt an AreaLightSource attaches to the shape, and its
 	// material describes what the surface does with light arriving at it. Our
@@ -617,6 +624,24 @@ inline std::shared_ptr<material> makeMaterial(const pbrt_flatten::Material &m,
 		break;
 	}
 	return std::make_shared<lambertian>(albedo);
+}
+
+inline std::shared_ptr<material> makeMaterial(const pbrt_flatten::Material &m,
+											  const pbrt_flatten::Emission *emission,
+											  const std::vector<pbrt_flatten::Material> &allMaterials,
+											  int depth,
+											  bool forCurve) {
+	std::shared_ptr<material> made = makeMaterialBase(m, emission, allMaterials, depth, forCurve);
+	if (emission) return made;
+	// The layered materials' thickness, medium and random-walk controls (pbrt's thickness, g, albedo, maxdepth, nsamples), on whichever constructor built it.
+	if (m.kind == pbrt_flatten::MaterialKind::CoatedDiffuse) {
+		if (auto cd = std::dynamic_pointer_cast<coated_diffuse>(made))
+			cd->set_layer_walk(m.coatThickness, m.layerG, m.layerMediumAlbedo, m.layerMaxDepth, m.layerNSamples);
+	} else if (m.kind == pbrt_flatten::MaterialKind::CoatedConductor) {
+		if (auto cc = std::dynamic_pointer_cast<coated_conductor>(made))
+			cc->set_layer_walk(m.coatThickness, m.layerG, m.layerMediumAlbedo, m.layerMaxDepth, m.layerNSamples);
+	}
+	return made;
 }
 
 // Key for restoring vertex sharing. FlatScene stores each triangle's three

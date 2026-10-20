@@ -820,7 +820,7 @@ __device__ __forceinline__ void shade_coated_conductor(ShadeState& s) {
 	const float cc_inv_ior = 1.0f / mat.ior;
 	CoatedConductorBxDF<float> cc_bxdf{ mat.eta_c.x * cc_inv_ior, mat.eta_c.y * cc_inv_ior, mat.eta_c.z * cc_inv_ior,
 	                                    mat.k_c.x * cc_inv_ior, mat.k_c.y * cc_inv_ior, mat.k_c.z * cc_inv_ior,
-	                                    mat.ior, cc_alpha_x, cc_alpha_y, mat.layerThickness, 0.0f, 0.0f, 10, 1,
+	                                    mat.ior, cc_alpha_x, cc_alpha_y, mat.layerThickness, mat.layerG, mat.layerAlbedo, mat.layerMaxDepth, mat.layerNSamples,
 	                                    cc_cond_x, cc_cond_y };
 	if (!layered_scatter_and_nee(cc_bxdf, normal, ray_dir, hit_point, dpdu, seed,
 	                             attenuation, scattered_dir, is_specular, brdf_pdf_override, emission)) {
@@ -1026,7 +1026,7 @@ __device__ __forceinline__ void shade_material_surface(
 				cd_alpha_x = RegularizeAlpha(cd_alpha_x);
 				cd_alpha_y = RegularizeAlpha(cd_alpha_y);
 			}
-			CoatedDiffuseBxDF<float> cd_bxdf{ cd_albedo.x, cd_albedo.y, cd_albedo.z, mat.ior, cd_alpha_x, cd_alpha_y };
+			CoatedDiffuseBxDF<float> cd_bxdf{ cd_albedo.x, cd_albedo.y, cd_albedo.z, mat.ior, cd_alpha_x, cd_alpha_y, mat.layerThickness, mat.layerG, mat.layerAlbedo, mat.layerMaxDepth, mat.layerNSamples };
 			if (!layered_scatter_and_nee(cd_bxdf, normal, ray_dir, hit_point, dpdu, seed,
 			                             attenuation, scattered_dir, is_specular, brdf_pdf_override, emission)) {
 				scattered = false;

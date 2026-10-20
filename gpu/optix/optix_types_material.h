@@ -374,6 +374,12 @@ struct MaterialData {
 	float condRoughnessV = -1.0f;
 	// CoatedConductor only: pbrt's layer "thickness" (Beer-Lambert attenuation through the coat, unit extinction).
 	float layerThickness = 0.01f;
+	// CoatedDiffuse and CoatedConductor: the layer's medium and the random walk's controls (pbrt's thickness - layerThickness above, for both kinds now - g, albedo, maxdepth, nsamples).
+	// pbrt's own defaults (a clear layer, 10 interactions, 1 sample) when the scene says nothing.
+	float layerG = 0.0f;
+	float layerAlbedo = 0.0f;
+	int   layerMaxDepth = 10;
+	int   layerNSamples = 1;
 
 	// Medium / DielectricMedium only: the PER-CHANNEL coefficients of a homogeneous medium whose extinction differs between colour
 	// channels (sigma_t = chromaSigmaA + chromaSigmaS). All zero (the default) for a grey medium, which keeps using the scalar

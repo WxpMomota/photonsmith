@@ -543,7 +543,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 			const float3 coatedAlbedo = (fm.textureIdx >= 0)
 				? wf_sample_texture(textures, texturePixels, fm.textureIdx, uv_u, uv_v, hit_point) * fm.emissionScale
 				: fm.albedo;
-			CoatedDiffuseBxDF<float> bx{ coatedAlbedo.x, coatedAlbedo.y, coatedAlbedo.z, fm.ior, glossy_alpha, glossy_alpha_v };
+			CoatedDiffuseBxDF<float> bx{ coatedAlbedo.x, coatedAlbedo.y, coatedAlbedo.z, fm.ior, glossy_alpha, glossy_alpha_v, fm.layerThickness, fm.layerG, fm.layerAlbedo, fm.layerMaxDepth, fm.layerNSamples };
 			uint64_t s0, s1; wf_random_seed64_pair(seed, s0, s1);
 			bx.f(glossy_wi_x, glossy_wi_y, glossy_wi_z, wo_x, wo_y, wo_z, s0, s1, fr, fg, fb);
 			// pbrt's LayeredBxDF::PDF(): the same density the scatter step reports for the sampled continuation
@@ -569,7 +569,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 			const float inv_ior = 1.0f / fm.ior;
 			CoatedConductorBxDF<float> bx{ fm.eta_c.x * inv_ior, fm.eta_c.y * inv_ior, fm.eta_c.z * inv_ior,
 			                               fm.k_c.x * inv_ior, fm.k_c.y * inv_ior, fm.k_c.z * inv_ior,
-			                               fm.ior, glossy_alpha, glossy_alpha_v, fm.layerThickness, 0.0f, 0.0f, 10, 1,
+			                               fm.ior, glossy_alpha, glossy_alpha_v, fm.layerThickness, fm.layerG, fm.layerAlbedo, fm.layerMaxDepth, fm.layerNSamples,
 			                               cond_ax, cond_ay };
 			uint64_t s0, s1; wf_random_seed64_pair(seed, s0, s1);
 			bx.f(glossy_wi_x, glossy_wi_y, glossy_wi_z, wo_x, wo_y, wo_z, s0, s1, fr, fg, fb);

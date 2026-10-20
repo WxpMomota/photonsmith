@@ -1384,3 +1384,30 @@ TEST(FlattenMaterialTest, ATextureClassWithNoRecipeStillWarnsAndKeepsTheConstant
 	EXPECT_TRUE(s.materials[0].textureAverages.empty());
 	EXPECT_TRUE(warnedAbout(s, "a constant colour is used instead"));
 }
+
+// pbrt's layered materials: the coat's thickness, its medium (g, albedo) and the walk's controls reach the flat material.
+TEST(FlattenMaterialTest, ALayeredMaterialsMediumAndWalkControlsAreRead) {
+	const FlatScene s = flattenSource(
+		"Material \"coateddiffuse\" \"rgb reflectance\" [ .5 .5 .5 ] \"rgb albedo\" [ .6 .6 .6 ] \"float g\" [ .4 ] \"float thickness\" [ .2 ]\n"
+		"  \"integer maxdepth\" [ 20 ] \"integer nsamples\" [ 3 ]\n"
+		+ std::string(kQuadMesh));
+	ASSERT_EQ(s.materials.size(), 1u);
+	const Material &m = s.materials[0];
+	EXPECT_DOUBLE_EQ(m.coatThickness, 0.2);
+	EXPECT_DOUBLE_EQ(m.layerG, 0.4);
+	EXPECT_NEAR(m.layerMediumAlbedo, 0.6, 1e-12);
+	EXPECT_EQ(m.layerMaxDepth, 20);
+	EXPECT_EQ(m.layerNSamples, 3);
+	EXPECT_FALSE(warnedAbout(s, "not supported"));
+}
+
+TEST(FlattenMaterialTest, ALayeredMaterialWithNothingSetKeepsPbrtsDefaults) {
+	const FlatScene s = flattenSource("Material \"coatedconductor\"\n" + std::string(kQuadMesh));
+	ASSERT_EQ(s.materials.size(), 1u);
+	const Material &m = s.materials[0];
+	EXPECT_DOUBLE_EQ(m.coatThickness, 0.01);
+	EXPECT_DOUBLE_EQ(m.layerG, 0.0);
+	EXPECT_DOUBLE_EQ(m.layerMediumAlbedo, 0.0);
+	EXPECT_EQ(m.layerMaxDepth, 10);
+	EXPECT_EQ(m.layerNSamples, 1);
+}
