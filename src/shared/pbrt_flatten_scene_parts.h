@@ -372,38 +372,49 @@ inline void flattenLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 	// else genuinely unknown still gets the warn-and-drop this whole block
 	// used to give every non-infinite kind.
 	//
-	// Only the LAST "infinite" LightSource in the scene wins if there is more
-	// than one - real pbrt scenes have at most one (this codebase has never
-	// seen otherwise among the scenes it loads), and picking the last one
-	// matches how pbrt's own graphics-state model would apply them (each
-	// later directive's effect is visible, not merged). Punctual lights have
-	// no such restriction - a scene can genuinely want three spotlights - so
-	// every one of those is kept, not just the last.
+	// A file can declare several "infinite" lights (the pbrt-v4-scenes Watercolor has two portal lights, one per window), and pbrt sums them. The renderers here have ONE
+	// environment slot (and one portal), so one is kept and the rest are dropped with a warning: when two or more have a portal the one with the largest window (it lights
+	// the most of the room), otherwise the last. Watercolor's second window is 4% of its light. Punctual lights have no such limit: every one is kept.
+	int infiniteLightsSeen = 0;
 	for (const pbrt_scene::LightDecl &ld : scene.lights) {
 		if (ld.type == "infinite") {
-			out.infiniteLight.present = true;
+			InfiniteLight cand;
+			cand.present = true;
 			const pbrt_scene::Vec3 L = resolveEmissionColor(ld.params, "L", pbrt_scene::Vec3{1, 1, 1}, RGBColorSpaceFromName(ld.colorSpaceName));
-			out.infiniteLight.L[0] = L.x; out.infiniteLight.L[1] = L.y; out.infiniteLight.L[2] = L.z;
-			out.infiniteLight.scale = ld.params.getFloat("scale", 1.0);
-			out.infiniteLight.imageFile = ld.params.getString("filename", "");
-			out.infiniteLight.xform = ld.xform;
-			// "point3 portal[4]" (pbrt-v4's windowed infinite light) - 4
-			// corner points, 12 numbers total. Transformed into world/
-			// render space here (matching every other point-valued light
-			// param in this loop) since PortalImageInfiniteLightData itself
-			// applies no further transform - see InfiniteLight::portal's
-			// own comment. Reset unconditionally first, like every other field above -
-			out.infiniteLight.hasPortal = false;
+			cand.L[0] = L.x; cand.L[1] = L.y; cand.L[2] = L.z;
+			cand.scale = ld.params.getFloat("scale", 1.0);
+			cand.imageFile = ld.params.getString("filename", "");
+			cand.xform = ld.xform;
+			// "point3 portal[4]" (pbrt-v4's windowed infinite light) - 4 corner points, 12 numbers total. They are WORLD-space points as written: pbrt maps them with the
+			// camera transform alone (`cameraTransform.RenderFromWorld(p)`, lights.cpp) and never through the light's CTM, which only turns the environment picture
+			// (pbrt_load.h resamples it). The pbrt-v4-scenes Kroken has `Rotate 340 0 1 0` / `Rotate -90 1 0 0` before its portal light, whose corners are the window's own
+			// coordinates: carrying them through that rotation put the window somewhere else and the room got no sky at all. Reset unconditionally first, like every other field above.
+			cand.hasPortal = false;
 			if (const pbrt_scene::Param *portal = ld.params.find("portal")) {
 				if (portal->numbers.size() >= 12) {
-					out.infiniteLight.hasPortal = true;
-					for (int i = 0; i < 4; ++i) {
-						transformPoint(ld.xform,
-							portal->numbers[i*3+0], portal->numbers[i*3+1], portal->numbers[i*3+2],
-							&out.infiniteLight.portal[i*3]);
-					}
+					cand.hasPortal = true;
+					for (int i = 0; i < 12; ++i) cand.portal[i] = portal->numbers[static_cast<std::size_t>(i)];
 				}
 			}
+			// A portal light with a colour and no picture: pbrt makes a 1 x 1 picture of the colour's XYZ -> sRGB (SpectrumToXYZ), NOT normalised to a luminance of 1 the way a
+			// uniform infinite light's L is (it divides `scale` by the sRGB illuminant's photometric value alone). For an RGB L that is the RGB; for "blackbody L" it is the
+			// peak-normalised blackbody seen through the sensor: a 6500 K body is (0.92, 0.87, 0.92), Y 0.89, where blackbodyKelvinToRGB() above gave Y 1.
+			if (cand.hasPortal && cand.imageFile.empty()) {
+				if (const pbrt_scene::Param *lp = ld.params.find("L"); lp && lp->type == "blackbody" && !lp->numbers.empty()) {
+					const pbrt_scene::Vec3 c = blackbodyPeakNormalizedRGB(static_cast<float>(lp->numbers[0]), RGBColorSpace::sRGB());
+					for (int k = 0; k < 3; ++k) cand.L[k] = (k == 0 ? c.x : k == 1 ? c.y : c.z) / kCIE_Y_integral;
+				}
+			}
+			++infiniteLightsSeen;
+			const auto windowArea = [](const InfiniteLight &l) {   // the portal's area: |p01 x p03|
+				if (!l.hasPortal) return 0.0;
+				const double ax = l.portal[3] - l.portal[0], ay = l.portal[4] - l.portal[1], az = l.portal[5] - l.portal[2];
+				const double bx = l.portal[9] - l.portal[0], by = l.portal[10] - l.portal[1], bz = l.portal[11] - l.portal[2];
+				const double cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+				return std::sqrt(cx * cx + cy * cy + cz * cz);
+			};
+			const bool keepNew = !out.infiniteLight.present || !(out.infiniteLight.hasPortal && cand.hasPortal) || windowArea(cand) > windowArea(out.infiniteLight);
+			if (keepNew) out.infiniteLight = cand;
 			continue;
 		}
 
@@ -603,6 +614,10 @@ inline void flattenLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 
 		warn("light source '" + ld.type + "' is not supported and was dropped; "
 			 "the scene will be darker than intended");
+	}
+	if (infiniteLightsSeen > 1) {
+		warn("the scene has " + std::to_string(infiniteLightsSeen) + " \"infinite\" lights, which pbrt sums; this renderer has one environment slot, so only one is used (the one "
+			 "with the largest portal window, else the last) and the other " + std::to_string(infiniteLightsSeen - 1) + " were dropped");
 	}
 }
 

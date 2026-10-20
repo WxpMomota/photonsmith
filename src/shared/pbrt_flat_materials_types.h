@@ -103,6 +103,26 @@ inline double nestedProceduralAverageScalar(const NestedProceduralTexture &n) {
 	return (c[0] + c[1] + c[2]) / 3.0;
 }
 
+// A Texture bound to a material parameter this renderer cannot evaluate per hit (a roughness map, a mix amount, a conductor's colour image, a scale of two textures ...),
+// reduced to a recipe for its MEAN value: the material uses that mean where it would otherwise use the parameter's default (a mirror, for a roughness). pbrt_flatten
+// builds the recipe, which needs no file; pbrt_load reads the images and resolves it (applyTextureAverages). The means of a product and of a blend are taken as the product
+// and the blend of the means, which is exact for textures that are not correlated.
+struct TexMeanNode {
+	enum class Kind { Const, Image, Product, Blend };
+	Kind kind = Kind::Const;
+	double c[3] = {0.0, 0.0, 0.0};   // Const: the value (a float texture has the same value in each channel)
+	std::string file;                // Image: the picture, as the scene names it
+	double scale = 1.0;              // Image: the imagemap's "scale"
+	double gamma = 2.2;              // Image: the encoding of an 8-bit picture (1 = linear)
+	bool invert = false;             // Image: pbrt's "invert"
+	int a = -1, b = -1, t = -1;      // Product: a * b. Blend: (1 - t) * a + t * b. Indices into TextureAverage::nodes
+};
+
+struct TextureAverage {
+	std::string param;                  // the material parameter, as pbrt names it ("roughness", "reflectance", "amount", "interface.roughness" ...)
+	std::vector<TexMeanNode> nodes;     // the recipe; the root is the last node
+};
+
 struct Material {
 	MaterialKind kind = MaterialKind::Diffuse;
 	std::string pbrtType;              // as written, for diagnostics
@@ -578,6 +598,9 @@ struct Material {
 	double conductorRoughness_u = -1.0;
 	double conductorRoughness_v = -1.0;
 	double coatThickness = 0.01;
+
+	// Texture-bound parameters that fall back to their mean (see TextureAverage). pbrt_load resolves them into the fields above; empty for a material that has none.
+	std::vector<TextureAverage> textureAverages;
 };
 
 // Extracts "Ag" from pbrt-v4's "metal-Ag-eta"/"metal-Ag-k" named-spectrum

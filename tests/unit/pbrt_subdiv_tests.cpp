@@ -168,7 +168,8 @@ TEST(PbrtDroppedTest, ATextureBoundToAMaterialIsReportedWithItsParameterName) {
 		"  \"point3 P\" [ 0 0 0  1 0 0  0 1 0 ]\n");
 	EXPECT_TRUE(warned(s, "reflectance"))
 		<< "a textured material renders flat and says nothing about it";
-	EXPECT_TRUE(warned(s, "constant colour"));
+	EXPECT_TRUE(warned(s, "average value is used"))
+		<< "a conductor's colour image is not per pixel: the warning says its mean is used (pbrt_load resolves it)";
 }
 
 TEST(PbrtDroppedTest, CoatedDiffuseReflectanceImagemapIsResolvedNotWarned) {

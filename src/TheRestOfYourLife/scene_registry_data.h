@@ -621,6 +621,16 @@ inline std::vector<SceneDescriptor> builtin_scenes_part4() {
             "H42", 226, "Water Caustic", "water-caustic", SceneCategories::LargeScene,
             "Light through a rippling water surface drawing caustics on the walls and floor of a small room (Benedikt Bitterli, CC0). The scene's file asks for photon mapping: choose the SPPM integrator (Render Options, or Apply recommended settings in the scene panel); a path tracer draws these caustics as dark noise, and SPPM has no triangle meshes on the GPU, so it runs on the CPU. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md).",
             "Medium", "bitterli/water-caustic/scene-v4.pbrt", 0.4, 200)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H43", 227, "Kroken", "kroken", SceneCategories::LargeScene,
+            "A complex modern interior: a lounge chair, shelves of books and objects, framed pictures and a window wall, lit by daylight through the windows (licensed from Angelo Ferretti, CC BY-ND 2.0), from the pbrt-v4-scenes collection, its first camera. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md), a download of 3.1 GB. Its daylight is a portal infinite light, drawn through the windows. A few of its textures (roughness maps, dirt overlays, some book covers) are drawn as their average colour, not per pixel.",
+            "Very Slow", "kroken/camera-1.pbrt", 1.0, 128)),
+        pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
+            pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
+            "H44", 228, "Watercolor", "watercolor", SceneCategories::LargeScene,
+            "A painter's attic studio under skylights: an easel and canvases, a drawing table with brushes and jars, flat files and a leather chair (licensed from Angelo Ferretti, CC BY-ND 2.0), from the pbrt-v4-scenes collection, its first camera. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md), a download of 3.0 GB. Its daylight comes through two window portals, of which this renderer keeps the larger (the other is 4% of the light). A few of its textures (roughness maps, paint overlays) are drawn as their average colour, not per pixel.",
+            "Very Slow", "watercolor/camera-1.pbrt", 1.0, 128)),
 
     };
 }

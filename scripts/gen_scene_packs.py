@@ -126,6 +126,8 @@ PBRT_V4 = {
     "villa": ("Villa", "Scene by Florent Boyer. From mmp/pbrt-v4-scenes."),
     "landscape": ("Landscape", "A landscape of 23,241 plant models (3.1 billion triangles, 24 million stored) by Jan-Walter Schliep, Burak Kahraman and Timm Dapper of Laubwerk (https://www.laubwerk.com), CC BY 4.0 (credit the authors and link https://creativecommons.org/licenses/by/4.0/). From mmp/pbrt-v4-scenes."),
     "bmw-m6": ("BMW M6", "Model by tyrant monkey via Blend Swap, CC0 (public domain). From mmp/pbrt-v4-scenes."),
+    "kroken": ("Kroken", "A modern interior licensed from Angelo Ferretti (https://www.lucydreams.it) and available in pbrt's scene format under CC BY-ND 2.0 (https://creativecommons.org/licenses/by-nd/2.0/): the files are fetched unchanged. From mmp/pbrt-v4-scenes."),
+    "watercolor": ("Watercolor", "A modern interior licensed from Angelo Ferretti (https://www.lucydreams.it) and available in pbrt's scene format under CC BY-ND 2.0 (https://creativecommons.org/licenses/by-nd/2.0/): the files are fetched unchanged. From mmp/pbrt-v4-scenes."),
     "transparent-machines": ("Transparent Machines", "Models from frames of Beeple's Transparent Machines; see http://beeple-crap.com/resources.php for his licence. From mmp/pbrt-v4-scenes."),
 }
 

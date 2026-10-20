@@ -1335,3 +1335,52 @@ TEST(FlattenMaterialTest, SubsurfaceReflectanceGivenAsAnImageIsKeptForTheHit) {
 	EXPECT_FALSE(p.materials[0].subsurfaceTexturedReflectance);
 	EXPECT_TRUE(warnedAbout(p, "reflectance"));
 }
+
+// A texture bound to a parameter the renderers cannot evaluate per hit becomes a recipe for its mean (pbrt_load resolves it), not a silent constant.
+TEST(FlattenMaterialTest, ARoughnessMapOnAConductorLeavesAMeanRecipe) {
+	const FlatScene s = flattenSource(
+		"Texture \"r\" \"float\" \"imagemap\" \"string filename\" [ \"rough.png\" ] \"float scale\" [ 0.5 ]\n"
+		"Material \"conductor\" \"texture roughness\" [ \"r\" ]\n"
+		+ std::string(kQuadMesh));
+	ASSERT_EQ(s.materials.size(), 1u);
+	ASSERT_EQ(s.materials[0].textureAverages.size(), 1u);
+	const TextureAverage &avg = s.materials[0].textureAverages[0];
+	EXPECT_EQ(avg.param, "roughness");
+	ASSERT_EQ(avg.nodes.size(), 1u);
+	EXPECT_EQ(avg.nodes[0].kind, TexMeanNode::Kind::Image);
+	EXPECT_EQ(avg.nodes[0].file, "rough.png");
+	EXPECT_DOUBLE_EQ(avg.nodes[0].scale, 0.5);
+	EXPECT_TRUE(warnedAbout(s, "average"));
+}
+
+TEST(FlattenMaterialTest, AScaleOfAMixOfTextureIsBuiltIntoOneRecipe) {
+	// scale(mix(imagemap, constant 0.6, 0.25), float imagemap): a product of a blend and an image.
+	const FlatScene s = flattenSource(
+		"Texture \"img\" \"spectrum\" \"imagemap\" \"string filename\" [ \"a.png\" ]\n"
+		"Texture \"dirt\" \"float\" \"imagemap\" \"string filename\" [ \"dirt.png\" ]\n"
+		"Texture \"m\" \"spectrum\" \"mix\" \"texture tex1\" [ \"img\" ] \"rgb tex2\" [ .6 .6 .6 ] \"float amount\" [ .25 ]\n"
+		"Texture \"s\" \"spectrum\" \"scale\" \"texture tex\" [ \"m\" ] \"texture scale\" [ \"dirt\" ]\n"
+		"Material \"conductor\" \"texture reflectance\" [ \"s\" ]\n"
+		+ std::string(kQuadMesh));
+	ASSERT_EQ(s.materials.size(), 1u);
+	ASSERT_EQ(s.materials[0].textureAverages.size(), 1u);
+	const TextureAverage &avg = s.materials[0].textureAverages[0];
+	EXPECT_EQ(avg.nodes.back().kind, TexMeanNode::Kind::Product);
+	int images = 0, blends = 0;
+	for (const TexMeanNode &n : avg.nodes) {
+		images += n.kind == TexMeanNode::Kind::Image;
+		blends += n.kind == TexMeanNode::Kind::Blend;
+	}
+	EXPECT_EQ(images, 2);
+	EXPECT_EQ(blends, 1);
+}
+
+TEST(FlattenMaterialTest, ATextureClassWithNoRecipeStillWarnsAndKeepsTheConstant) {
+	const FlatScene s = flattenSource(
+		"Texture \"w\" \"spectrum\" \"wrinkled\"\n"
+		"Material \"conductor\" \"texture reflectance\" [ \"w\" ]\n"
+		+ std::string(kQuadMesh));
+	ASSERT_EQ(s.materials.size(), 1u);
+	EXPECT_TRUE(s.materials[0].textureAverages.empty());
+	EXPECT_TRUE(warnedAbout(s, "a constant colour is used instead"));
+}

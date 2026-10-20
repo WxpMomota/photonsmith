@@ -1,0 +1,39 @@
+# @rt-category Test Scenes
+# @rt-description portal-light.pbrt with the light turned a quarter and a bit about z: pbrt turns a portal light's picture by the light's transform, so the sun the window shows moves.
+# @rt-performance Fast
+# @rt-size 9
+# portal-light-turned.pbrt -- portal-light.pbrt with `Rotate 70 0 0 1` before its LightSource. The window (world-space corners) stays; the equal-area sky behind it turns.
+# Uses portal-light-sky.exr like portal-light.pbrt. Geometry is original, no licence constraints.
+
+LookAt  0 1.5 6    0 1.5 0    0 1 0
+Camera "perspective" "float fov" [ 50 ]
+
+Film "rgb" "integer xresolution" [ 640 ] "integer yresolution" [ 400 ]
+Sampler "halton" "integer pixelsamples" [ 96 ]
+
+WorldBegin
+
+AttributeBegin
+  Rotate 70 0 0 1
+  LightSource "infinite" "point3 portal" [ -1.5 0.2 -3   1.5 0.2 -3   1.5 2.8 -3   -1.5 2.8 -3 ]
+    "string filename" [ "portal-light-sky.exr" ]
+AttributeEnd
+
+Material "diffuse" "rgb reflectance" [ 0.55 0.5 0.45 ]
+
+# Back wall with a rectangular hole where the portal window sits.
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -4 0 -3   -1.5 0 -3   -1.5 3.5 -3   -4 3.5 -3 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ 1.5 0 -3   4 0 -3   4 3.5 -3   1.5 3.5 -3 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -4 0 -3   4 0 -3   4 0.2 -3   -4 0.2 -3 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -4 2.8 -3   4 2.8 -3   4 3.5 -3   -4 3.5 -3 ]
+
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -4 0 -3   4 0 -3   4 0 6   -4 0 6 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -4 0 -3   -4 3.5 -3   -4 3.5 6   -4 0 6 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ 4 0 6   4 3.5 6   4 3.5 -3   4 0 -3 ]

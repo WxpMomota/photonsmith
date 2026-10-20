@@ -796,3 +796,88 @@ TEST_F(TempTree, NamedMaterialNeverMadeStillFails) {
 	EXPECT_FALSE(r.ok);
 	EXPECT_NE(r.error.find("nowhere"), std::string::npos) << r.error;
 }
+
+// ---------------------------------------------------------------------------
+// A texture bound to a parameter the renderers cannot evaluate per hit takes the texture's MEAN: a roughness map is not a mirror, a mix amount is not 0.5.
+// (The pbrt-v4-scenes Kroken and Watercolor bind dozens of them.)
+// ---------------------------------------------------------------------------
+
+TEST_F(TempTree, ARoughnessMapOnAConductorTakesTheMapsMean) {
+	// A 2 x 1 gray picture, 0 and 255: its mean is 0.5 whatever the encoding.
+	write("textures/rough.pgm", std::string("P5\n2 1\n255\n") + std::string("\x00\xff", 2));
+	write("scene.pbrt",
+		  "Texture \"r\" \"float\" \"imagemap\" \"string filename\" [ \"textures/rough.pgm\" ] \"float scale\" [ 0.5 ]\n"
+		  "Material \"conductor\" \"texture roughness\" [ \"r\" ]\n"
+		  "Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 ] \"point3 P\" [ 0 0 0  1 0 0  0 1 0 ]\n");
+	const pbrt_load::LoadResult r = pbrt_load::loadFile(path("scene.pbrt"));
+	ASSERT_TRUE(r.ok) << r.error;
+	ASSERT_EQ(r.scene.materials.size(), 1u);
+	EXPECT_NEAR(r.scene.materials[0].roughness, 0.25, 0.01);   // 0.5 * the picture's mean of 0.5
+	EXPECT_NEAR(r.scene.materials[0].roughness_u, 0.25, 0.01);
+	EXPECT_NEAR(r.scene.materials[0].roughness_v, 0.25, 0.01);
+}
+
+TEST_F(TempTree, AMixAmountMapAndAScaleOfTwoMapsTakeTheirMeans) {
+	write("textures/half.pgm", std::string("P5\n2 1\n255\n") + std::string("\x00\xff", 2));
+	write("scene.pbrt",
+		  "Texture \"amt\" \"float\" \"imagemap\" \"string filename\" [ \"textures/half.pgm\" ]\n"
+		  "Texture \"a\" \"spectrum\" \"imagemap\" \"string filename\" [ \"textures/half.pgm\" ]\n"
+		  "Texture \"prod\" \"spectrum\" \"scale\" \"texture tex\" [ \"a\" ] \"texture scale\" [ \"amt\" ]\n"
+		  "MakeNamedMaterial \"m1\" \"string type\" [ \"diffuse\" ] \"rgb reflectance\" [ 1 1 1 ]\n"
+		  "MakeNamedMaterial \"m2\" \"string type\" [ \"diffuse\" ] \"rgb reflectance\" [ 0 0 0 ]\n"
+		  "Material \"mix\" \"string materials\" [ \"m1\" \"m2\" ] \"texture amount\" [ \"amt\" ]\n"
+		  "Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 ] \"point3 P\" [ 0 0 0  1 0 0  0 1 0 ]\n"
+		  "Material \"diffuse\" \"texture reflectance\" [ \"prod\" ]\n"
+		  "Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 ] \"point3 P\" [ 0 0 0  1 0 0  0 1 0 ]\n");
+	const pbrt_load::LoadResult r = pbrt_load::loadFile(path("scene.pbrt"));
+	ASSERT_TRUE(r.ok) << r.error;
+	const pbrt_flatten::Material *mix = nullptr, *diffuse = nullptr;
+	for (const pbrt_flatten::Material &m : r.scene.materials) {
+		if (m.kind == pbrt_flatten::MaterialKind::Mix) mix = &m;
+		if (m.kind == pbrt_flatten::MaterialKind::Diffuse && !m.textureAverages.empty()) diffuse = &m;
+	}
+	ASSERT_NE(mix, nullptr);
+	EXPECT_NEAR(mix->mixWeight, 0.5, 0.01);
+	ASSERT_NE(diffuse, nullptr);
+	EXPECT_NE(diffuse->textureFilename.find("half.pgm"), std::string::npos);   // the picture stays per pixel ...
+	EXPECT_NEAR(diffuse->textureScale, 0.5, 0.01);                // ... times the mean of the texture that scales it
+}
+
+TEST_F(TempTree, ATextureWhosePictureIsMissingKeepsTheParametersDefaultAndSaysSo) {
+	write("scene.pbrt",
+		  "Texture \"r\" \"float\" \"imagemap\" \"string filename\" [ \"textures/gone.pgm\" ]\n"
+		  "Material \"conductor\" \"texture roughness\" [ \"r\" ]\n"
+		  "Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 ] \"point3 P\" [ 0 0 0  1 0 0  0 1 0 ]\n");
+	const pbrt_load::LoadResult r = pbrt_load::loadFile(path("scene.pbrt"));
+	ASSERT_TRUE(r.ok) << r.error;
+	ASSERT_EQ(r.scene.materials.size(), 1u);
+	EXPECT_DOUBLE_EQ(r.scene.materials[0].roughness, 0.0);
+	bool said = false;
+	for (const auto &w : r.scene.warnings) said = said || w.message.find("could not be read") != std::string::npos;
+	EXPECT_TRUE(said);
+}
+
+TEST(PbrtLoadPortalTest, APortalPicturesRotationFollowsTheLightsTransform) {
+	// pbrt turns a portal light's equal-area picture by the light's CTM. A 4 x 4 picture whose left half is red and right half blue, turned a half circle about z, swaps.
+	const int n = 4;
+	std::vector<float> px(static_cast<std::size_t>(n) * n * 3);
+	for (int y = 0; y < n; ++y)
+		for (int x = 0; x < n; ++x) {
+			float *p = &px[(static_cast<std::size_t>(y) * n + x) * 3];
+			p[0] = x < n / 2 ? 1.0f : 0.0f; p[1] = 0.0f; p[2] = x < n / 2 ? 0.0f : 1.0f;
+		}
+	std::vector<float> same = px;
+	pbrt_scene::Matrix4 id;
+	pbrt_load::detail::rotateEqualAreaPortalImage(id, same, n, n);
+	EXPECT_EQ(same, px) << "an identity transform leaves the picture alone";
+	pbrt_scene::Matrix4 turn;   // 180 degrees about z: (x, y, z) -> (-x, -y, z)
+	turn.m[0] = -1.0; turn.m[5] = -1.0;
+	std::vector<float> turned = px;
+	pbrt_load::detail::rotateEqualAreaPortalImage(turn, turned, n, n);
+	double redBefore = 0, redAfter = 0;
+	for (int y = 0; y < n; ++y) {
+		redBefore += px[(static_cast<std::size_t>(y) * n + 0) * 3 + 0];
+		redAfter += turned[(static_cast<std::size_t>(y) * n + 0) * 3 + 0];
+	}
+	EXPECT_GT(redBefore, redAfter) << "the red left column is no longer on the left";
+}

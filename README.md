@@ -6,7 +6,7 @@
 
 [**Download**](https://github.com/XinpeiWang/photonsmith/releases) | [**Website and gallery**](https://xinpeiwang.github.io/photonsmith/) | [**What is supported**](docs/BACKEND_SUPPORT.md) | [**How the renders are checked**](docs/CLOSED_FORMS_FOUND_THE_BUGS.md)
 
-A physically-based renderer with parallel **CPU**, **GPU (OptiX)** (Windows + NVIDIA) and **GPU (Metal)** (macOS) implementations, built up from the "Ray Tracing in One Weekend" book series into a much broader pbrt-v4-style feature set: 172 built-in scenes and 66 test scenes, a wide material library, multiple light types, real triangle-mesh/texture support, BVH acceleration, volumetrics, and an experimental SPPM (photon-mapping) integrator alongside standard path tracing.
+A physically-based renderer with parallel **CPU**, **GPU (OptiX)** (Windows + NVIDIA) and **GPU (Metal)** (macOS) implementations, built up from the "Ray Tracing in One Weekend" book series into a much broader pbrt-v4-style feature set: 174 built-in scenes and 66 test scenes, a wide material library, multiple light types, real triangle-mesh/texture support, BVH acceleration, volumetrics, and an experimental SPPM (photon-mapping) integrator alongside standard path tracing.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-lightgrey.svg)
@@ -103,7 +103,7 @@ Both in full, with the output locations, the macOS Metal and universal-binary op
 ### Core Rendering
 - ✅ **Path tracing** with next-event estimation and multiple importance sampling (power heuristic)
 - ✅ **BVH acceleration** on both CPU and GPU (SAH-based CPU BVH; OptiX's native BVH/GAS on GPU) — not a linear scan
-- ✅ **172 built-in scenes and 66 test scenes** (each has a stable name such as `cornell-box`, and a short id such as `A1`) spanning the "Ray Tracing" book series, a pbrt-v4-style material/light/camera showcase, dozens of real-world statue/object meshes, and several "movie-level" environment scenes (Sponza, Amazon Lumberyard Bistro, Rungholt, Fireplace Room, San Miguel, Sibenik Cathedral, Breakfast Room, Salle de Bain, Gallery) — see [Scenes](#-scenes) below
+- ✅ **174 built-in scenes and 66 test scenes** (each has a stable name such as `cornell-box`, and a short id such as `A1`) spanning the "Ray Tracing" book series, a pbrt-v4-style material/light/camera showcase, dozens of real-world statue/object meshes, and several "movie-level" environment scenes (Sponza, Amazon Lumberyard Bistro, Rungholt, Fireplace Room, San Miguel, Sibenik Cathedral, Breakfast Room, Salle de Bain, Gallery) — see [Scenes](#-scenes) below
 - ✅ **Real triangle meshes**: OBJ loading with BVH, per-face `.mtl` materials, and real `map_Kd` image-texture sampling (not just flat colors) on both CPU and GPU
 - ✅ **Stochastic Progressive Photon Mapping (SPPM)**, an alternative integrator for hard caustic/glass scenes a standard path tracer struggles to converge — on the CPU, and on the GPU for sphere/quad scenes (see [Known Limitations](#-known-limitations))
 - ✅ **Bidirectional Path Tracing (BDPT) and Metropolis Light Transport (MLT)**, additional alternative integrators (CPU-only, `--bdpt`/`--mlt`) for scenes with difficult light transport
@@ -176,7 +176,7 @@ Video: see [docs/VIDEO_GENERATION.md](docs/VIDEO_GENERATION.md). On macOS the co
 
 ## 🖼️ Scenes
 
-172 built-in scenes and 66 test scenes, each with a stable name (`cornell-box`) and a
+174 built-in scenes and 66 test scenes, each with a stable name (`cornell-box`) and a
 short id (a category letter plus a number: `A1`, `B10`, `G25`), selected via the
 CLI's scene argument (either works, or the path of a `.pbrt` file) or the GUI's
 scene dropdown. Categories: **A** Basics (the book progression), **B** Materials,

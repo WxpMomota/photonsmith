@@ -21,7 +21,9 @@
 // neighbours by bare filename.
 
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <cmath>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -265,6 +267,57 @@ inline bool convertEqualAreaInfiniteLight(const pbrt_scene::Matrix4 &xform, std:
 	return true;
 }
 
+// A portal light's equal-area picture, turned by the LightSource directive's CTM the way pbrt does while it builds the portal's rectified picture: each pixel of the result is the
+// source picture read at the direction the CTM's inverse takes its own direction to (`renderFromLight.ApplyInverse(w)`, lights.cpp). The portal's corners are world space and take
+// no part (pbrt_flatten_scene_parts.h). Bilinear with the octahedral wrap like pbrt's BilerpChannel; untouched for an identity CTM (no blur for nothing) or a singular one.
+inline void rotateEqualAreaPortalImage(const pbrt_scene::Matrix4 &xform, std::vector<float> &pixels, int w, int h) {
+	if (w <= 0 || w != h || pixels.size() < static_cast<std::size_t>(w) * h * 3) return;
+	pbrt_scene::Matrix4 inv;
+	if (!xform.inverseAffine(inv)) return;
+	bool identity = true;
+	for (int r = 0; r < 3 && identity; ++r)
+		for (int c = 0; c < 3; ++c)
+			if (std::fabs(inv.m[r * 4 + c] - (r == c ? 1.0 : 0.0)) > 1e-9) { identity = false; break; }
+	if (identity) return;
+	const int n = w;
+	const auto wrap = [n](int &x, int &y) {   // pbrt's WrapMode::OctahedralSphere
+		if (x < 0) { x = -x; y = n - 1 - y; } else if (x >= n) { x = 2 * n - 1 - x; y = n - 1 - y; }
+		if (y < 0) { x = n - 1 - x; y = -y; } else if (y >= n) { x = n - 1 - x; y = 2 * n - 1 - y; }
+		x = std::min(std::max(x, 0), n - 1);
+		y = std::min(std::max(y, 0), n - 1);
+	};
+	std::vector<float> out(pixels.size());
+	for (int y = 0; y < n; ++y) {
+		for (int x = 0; x < n; ++x) {
+			double dx, dy, dz;
+			EqualAreaSquareToSphere((x + 0.5) / n, (y + 0.5) / n, dx, dy, dz);
+			double lx = inv.m[0]*dx + inv.m[1]*dy + inv.m[2]*dz;
+			double ly = inv.m[4]*dx + inv.m[5]*dy + inv.m[6]*dz;
+			double lz = inv.m[8]*dx + inv.m[9]*dy + inv.m[10]*dz;
+			const double len = std::sqrt(lx*lx + ly*ly + lz*lz);
+			float *dst = &out[(static_cast<std::size_t>(y) * n + x) * 3];
+			if (len < 1e-12) { dst[0] = dst[1] = dst[2] = 0.0f; continue; }
+			double u, v;
+			EqualAreaSphereToSquare(lx / len, ly / len, lz / len, u, v);
+			const double fx = u * n - 0.5, fy = v * n - 0.5;
+			const int x0 = static_cast<int>(std::floor(fx)), y0 = static_cast<int>(std::floor(fy));
+			const double tx = fx - x0, ty = fy - y0;
+			double acc[3] = {0, 0, 0};
+			for (int j = 0; j < 2; ++j) {
+				for (int i = 0; i < 2; ++i) {
+					int sx = x0 + i, sy = y0 + j;
+					wrap(sx, sy);
+					const double wgt = (i ? tx : 1.0 - tx) * (j ? ty : 1.0 - ty);
+					const float *src = &pixels[(static_cast<std::size_t>(sy) * n + sx) * 3];
+					for (int c = 0; c < 3; ++c) acc[c] += wgt * src[c];
+				}
+			}
+			for (int c = 0; c < 3; ++c) dst[c] = static_cast<float>(acc[c]);
+		}
+	}
+	pixels.swap(out);
+}
+
 // Decodes an infinite light's environment-map bytes into row-major RGB float
 // pixels (3 floats/pixel, linear) - the format sky_light's raw-buffer
 // constructor (sky_light.h) accepts. Dispatches purely on `filename`'s
@@ -313,6 +366,119 @@ inline bool decodeInfiniteLightImage(const std::string &filename, const std::str
 	stbi_image_free(pixels);
 	outW = w; outH = h;
 	return true;
+}
+
+// The mean value (per channel, linear) of a picture a texture recipe names, before the imagemap's own scale. 8-bit pictures are decoded with `gamma` (1 = linear), like the
+// renderers do; an EXR or HDR picture is already linear. A large picture is sampled on a grid of about a million pixels (a mean needs no more). False when the file cannot
+// be found or read.
+inline bool meanOfTextureImage(const std::string &sceneDir, const std::string &file, double gamma, double out[3]) {
+	std::string bytes;
+	if (!readFile(join(sceneDir, file), bytes) && !readFile(file, bytes)) return false;
+	if (endsWithCaseInsensitive(file, ".exr") || endsWithCaseInsensitive(file, ".hdr")) {
+		std::vector<float> pixels;
+		int w = 0, h = 0;
+		if (!decodeInfiniteLightImage(file, bytes, pixels, w, h)) return false;
+		const std::size_t count = static_cast<std::size_t>(w) * h;
+		const std::size_t step = std::max<std::size_t>(1, count / 1000000);
+		double sum[3] = {0, 0, 0};
+		std::size_t used = 0;
+		for (std::size_t i = 0; i < count; i += step, ++used)
+			for (int c = 0; c < 3; ++c) sum[c] += pixels[i * 3 + c];
+		for (int c = 0; c < 3; ++c) out[c] = used ? sum[c] / used : 0.0;
+		return true;
+	}
+	int w = 0, h = 0, channels = 0;
+	unsigned char *pixels = stbi_load_from_memory(reinterpret_cast<const unsigned char *>(bytes.data()), static_cast<int>(bytes.size()), &w, &h, &channels, 0);
+	if (!pixels || w <= 0 || h <= 0) {
+		if (pixels) stbi_image_free(pixels);
+		return false;
+	}
+	const int rgbChannels = channels >= 3 ? 3 : 1;   // gray (with or without alpha) is one channel
+	double lut[256];
+	for (int i = 0; i < 256; ++i) lut[i] = std::pow(i / 255.0, gamma);
+	const std::size_t count = static_cast<std::size_t>(w) * h;
+	const std::size_t step = std::max<std::size_t>(1, count / 1000000);
+	double sum[3] = {0, 0, 0};
+	std::size_t used = 0;
+	for (std::size_t i = 0; i < count; i += step, ++used)
+		for (int c = 0; c < rgbChannels; ++c) sum[c] += lut[pixels[i * channels + c]];
+	stbi_image_free(pixels);
+	for (int c = 0; c < 3; ++c) out[c] = used ? sum[rgbChannels == 3 ? c : 0] / used : 0.0;
+	return true;
+}
+
+// The mean of one node of a texture recipe (pbrt_flat_materials_types.h's TexMeanNode), per channel. False if a picture it needs cannot be read.
+inline bool evaluateTextureMean(const std::string &sceneDir, const std::vector<pbrt_flatten::TexMeanNode> &nodes, int index, std::unordered_map<std::string, std::array<double, 3>> &cache, double out[3]) {
+	using Kind = pbrt_flatten::TexMeanNode::Kind;
+	if (index < 0 || index >= static_cast<int>(nodes.size())) return false;
+	const pbrt_flatten::TexMeanNode &n = nodes[static_cast<std::size_t>(index)];
+	switch (n.kind) {
+		case Kind::Const:
+			for (int c = 0; c < 3; ++c) out[c] = n.c[c];
+			return true;
+		case Kind::Image: {
+			const std::string key = n.file + "|" + std::to_string(n.gamma);
+			auto it = cache.find(key);
+			if (it == cache.end()) {
+				double m[3];
+				if (!meanOfTextureImage(sceneDir, n.file, n.gamma, m)) return false;
+				it = cache.emplace(key, std::array<double, 3>{m[0], m[1], m[2]}).first;
+			}
+			for (int c = 0; c < 3; ++c) {
+				const double v = n.scale * it->second[static_cast<std::size_t>(c)];
+				out[c] = n.invert ? std::max(0.0, 1.0 - v) : v;   // pbrt: scale, then invert, then clamp at zero
+			}
+			return true;
+		}
+		case Kind::Product: {
+			double a[3], b[3];
+			if (!evaluateTextureMean(sceneDir, nodes, n.a, cache, a) || !evaluateTextureMean(sceneDir, nodes, n.b, cache, b)) return false;
+			for (int c = 0; c < 3; ++c) out[c] = a[c] * b[c];
+			return true;
+		}
+		case Kind::Blend: {
+			double a[3], b[3], t[3];
+			if (!evaluateTextureMean(sceneDir, nodes, n.a, cache, a) || !evaluateTextureMean(sceneDir, nodes, n.b, cache, b) || !evaluateTextureMean(sceneDir, nodes, n.t, cache, t)) return false;
+			const double amount = std::min(1.0, std::max(0.0, (t[0] + t[1] + t[2]) / 3.0));
+			for (int c = 0; c < 3; ++c) out[c] = (1.0 - amount) * a[c] + amount * b[c];
+			return true;
+		}
+	}
+	return false;
+}
+
+// Puts each texture-bound parameter's mean (Material::textureAverages) where the parameter's own value would go: the materials' roughness, a layered material's thickness, a
+// conductor's or diffuse material's colour, a mix material's weight. A picture that cannot be read leaves the parameter at its default, with a warning.
+inline void applyTextureAverages(const std::string &sceneDir, const std::string &scenePath, pbrt_flatten::FlatScene &scene) {
+	std::unordered_map<std::string, std::array<double, 3>> cache;
+	for (pbrt_flatten::Material &m : scene.materials) {
+		for (const pbrt_flatten::TextureAverage &avg : m.textureAverages) {
+			double v[3];
+			if (!evaluateTextureMean(sceneDir, avg.nodes, static_cast<int>(avg.nodes.size()) - 1, cache, v)) {
+				scene.warnings.push_back({0, scenePath, "material '" + m.pbrtType + "': a picture of the texture bound to its '" + avg.param + "' could not be read; the parameter's default is used"});
+				continue;
+			}
+			const double gray = (v[0] + v[1] + v[2]) / 3.0;
+			const std::string &name = avg.param;
+			if (name == "scale") {   // a picture's own "scale" that is a texture: the picture is multiplied by its mean
+				m.textureScale *= gray;
+			} else if (name == "reflectance") {
+				for (int c = 0; c < 3; ++c) m.color[c] = std::min(1.0, std::max(0.0, v[c]));
+			} else if (name == "amount") {
+				m.mixWeight = std::min(1.0, std::max(0.0, gray));
+			} else if (name == "thickness") {
+				m.coatThickness = std::max(0.0, gray);
+			} else if (name == "conductor.roughness" || name == "conductor.uroughness" || name == "conductor.vroughness") {
+				if (name != "conductor.vroughness") m.conductorRoughness_u = gray;
+				if (name != "conductor.uroughness") m.conductorRoughness_v = gray;
+			} else {   // roughness: a plain one, or a layered material's coat ("interface.")
+				const bool u = name.find("vroughness") == std::string::npos, w = name.find("uroughness") == std::string::npos;
+				if (u) m.roughness_u = gray;
+				if (w) m.roughness_v = gray;
+				m.roughness = 0.5 * (m.roughness_u + m.roughness_v);
+			}
+		}
+	}
 }
 
 // The error for a scene whose every mesh was unreadable (see loadFile). Names the
@@ -502,17 +668,12 @@ inline LoadResult loadFile(const std::string &path,
 				// sky_light/InfiniteLight use - a portal light's image is a
 				// DIFFERENT format (equal-area octahedral, see
 				// PortalImageInfiniteLightData's own comment), which this
-				// would corrupt if applied, so portal images skip it
-				// entirely. Known, pre-existing limitation this inherits
-				// (not introduced here): the portal's geometry (its 4
-				// corners) IS correctly transformed by this same CTM at
-				// parse time (pbrt_flatten.h), but the environment image's
-				// own orientation is not - a rotated portal light's image
-				// renders as if that rotation were identity. Fixing that
-				// would need PortalImageInfiniteLightData itself to accept
-				// a transform, which it currently does not (see its own
-				// constructor comment).
+				// would corrupt if applied: a portal light's picture is turned
+				// by rotateEqualAreaPortalImage() below instead.
 				applyInfiniteLightOrientation(sky.xform, sky.imagePixels, sky.imageWidth, sky.imageHeight);
+			} else {
+				// A portal light's picture is turned by the CTM, as pbrt does when it builds the portal's rectified picture; the corners are world space and are not.
+				rotateEqualAreaPortalImage(sky.xform, sky.imagePixels, sky.imageWidth, sky.imageHeight);
 			}
 		} else {
 			r.scene.warnings.push_back(
@@ -532,6 +693,9 @@ inline LoadResult loadFile(const std::string &path,
 		for (int i = 0; i < kSize * kSize; ++i)
 			for (int c = 0; c < 3; ++c) sky.imagePixels[static_cast<std::size_t>(i) * 3 + c] = static_cast<float>(sky.L[c]);
 	}
+
+	// Texture-bound parameters the renderers cannot evaluate per hit take the texture's mean (Material::textureAverages).
+	applyTextureAverages(sceneDir, path, r.scene);
 
 	// Measured materials' .bsdf tensor files. Same scene-directory-then-as-
 	// given resolution as everything else here, but resolved to a PATH

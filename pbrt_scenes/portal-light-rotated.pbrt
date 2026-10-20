@@ -1,0 +1,41 @@
+# @rt-category Test Scenes
+# @rt-description A room with one wall opening, lit through a portal infinite light written the way the pbrt-v4-scenes Kroken writes it: rotations before the LightSource, the portal's corners in world coordinates, and "blackbody L" with no picture.
+# @rt-performance Fast
+# @rt-size 9
+# portal-light-rotated.pbrt -- portal-light-constant.pbrt with the light's rotations in front of it. pbrt maps a portal's corners with the camera transform alone (lights.cpp), so the window
+# stays where its corners say whatever the CTM is; and the picture it makes of a "blackbody L" is the peak-normalised blackbody seen through the sensor, not one scaled to a luminance of 1.
+# The loader used to carry the corners through the rotation (the window ended up somewhere else, and the room got no sky). Geometry is portal-light.pbrt's own: original, no licence constraints.
+
+LookAt  0 1.5 6    0 1.5 0    0 1 0
+Camera "perspective" "float fov" [ 50 ]
+
+Film "rgb" "integer xresolution" [ 640 ] "integer yresolution" [ 400 ]
+Sampler "halton" "integer pixelsamples" [ 96 ]
+
+WorldBegin
+
+AttributeBegin
+  Rotate 40 0 1 0
+  Rotate -90 1 0 0
+  LightSource "infinite" "point3 portal" [ -1.5 0.2 -3   1.5 0.2 -3   1.5 2.8 -3   -1.5 2.8 -3 ]
+    "blackbody L" 4500 "float scale" 3
+AttributeEnd
+
+Material "diffuse" "rgb reflectance" [ 0.55 0.5 0.45 ]
+
+# Back wall with a rectangular hole where the portal window sits.
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -4 0 -3   -1.5 0 -3   -1.5 3.5 -3   -4 3.5 -3 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ 1.5 0 -3   4 0 -3   4 3.5 -3   1.5 3.5 -3 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -4 0 -3   4 0 -3   4 0.2 -3   -4 0.2 -3 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -4 2.8 -3   4 2.8 -3   4 3.5 -3   -4 3.5 -3 ]
+
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -4 0 -3   4 0 -3   4 0 6   -4 0 6 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -4 0 -3   -4 3.5 -3   -4 3.5 6   -4 0 6 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ 4 0 6   4 3.5 6   4 3.5 -3   4 0 -3 ]

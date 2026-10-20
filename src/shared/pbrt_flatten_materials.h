@@ -147,6 +147,9 @@ inline NestedProceduralTexture resolveNestedProcedural(const pbrt_scene::Scene &
 	return out2;
 }
 
+// (defined below, with the mean recipes)
+inline int buildTextureMean(const pbrt_scene::Scene &scene, const std::string &name, std::vector<TexMeanNode> &nodes, int depth = 0);
+
 // "reflectance" bound to an "imagemap" (optionally wrapped in a "scale" texture). True when resolved to an image.
 inline bool bindReflectanceImagemap(const pbrt_scene::Scene &scene, FlatScene &out, Material &m, const pbrt_scene::TextureDecl *tex) {
 	const auto warn = materialWarner(out);
@@ -177,7 +180,10 @@ inline bool bindReflectanceImagemap(const pbrt_scene::Scene &scene, FlatScene &o
 	// bare checkerboard instead.
 	const pbrt_scene::TextureDecl *imgTex = tex;
 	double texScale = 1.0;
+	std::string scaleTexture;   // a scale that is itself a Texture (Kroken's dirt maps): its mean multiplies the picture, resolved by pbrt_load
 	if (imgTex && imgTex->cls == "scale") {
+		const pbrt_scene::Param *scaleP = imgTex->params.find("scale");
+		if (scaleP && scaleP->type == "texture" && !scaleP->strings.empty()) scaleTexture = scaleP->strings[0];
 		texScale = imgTex->params.getFloat("scale", 1.0);
 		const pbrt_scene::Param *inner = imgTex->params.find("tex");
 		imgTex = (inner && inner->type == "texture" && !inner->strings.empty())
@@ -189,6 +195,12 @@ inline bool bindReflectanceImagemap(const pbrt_scene::Scene &scene, FlatScene &o
 			m.textureFilename = filename;
 			m.textureMapping = uvMappingOf(*imgTex);
 			m.textureScale = texScale;
+			if (!scaleTexture.empty()) {
+				TextureAverage avg;
+				avg.param = "scale";
+				if (buildTextureMean(scene, scaleTexture, avg.nodes) >= 0) m.textureAverages.push_back(std::move(avg));
+				else warn("a 'scale' texture's own scale is a texture this loader cannot average; 1 is used");
+			}
 			// imageMapOptionsFor() (pbrt_cpu_builder.h) and GPU's
 			// own call sites read these 3 loose fields by name
 			// (kept as-is rather than switched to a
@@ -544,6 +556,78 @@ inline bool bindDisplacementTexture(const pbrt_scene::Scene &scene, FlatScene &o
 	return false;
 }
 
+// The mean recipe (TexMeanNode) of the texture named `name`, for a parameter this renderer cannot evaluate per hit: "constant", "imagemap", "scale" (a product), "mix" and
+// "directionmix" and "checkerboard" (a blend: the last two at one half). Returns the node's index in `nodes`, or -1 for a texture class with no recipe.
+
+// A texture class's own parameter: a Texture it names, or the literal it carries, or `def` when absent.
+inline int buildTextureMeanOfParam(const pbrt_scene::Scene &scene, const pbrt_scene::TextureDecl &tex, const char *param, double def, std::vector<TexMeanNode> &nodes, int depth) {
+	const pbrt_scene::Param *p = tex.params.find(param);
+	if (p && p->type == "texture" && !p->strings.empty()) return buildTextureMean(scene, p->strings[0], nodes, depth + 1);
+	TexMeanNode n;
+	n.kind = TexMeanNode::Kind::Const;
+	if (p && p->numbers.size() >= 3) { n.c[0] = p->numbers[0]; n.c[1] = p->numbers[1]; n.c[2] = p->numbers[2]; }
+	else if (p && !p->numbers.empty()) { n.c[0] = n.c[1] = n.c[2] = p->numbers[0]; }
+	else { n.c[0] = n.c[1] = n.c[2] = def; }
+	nodes.push_back(n);
+	return static_cast<int>(nodes.size()) - 1;
+}
+
+inline int buildTextureMean(const pbrt_scene::Scene &scene, const std::string &name, std::vector<TexMeanNode> &nodes, int depth) {
+	if (depth > 8) return -1;
+	const pbrt_scene::TextureDecl *tex = findTexture(scene, name);
+	if (!tex) return -1;
+	const auto constant = [&nodes](double v) {
+		TexMeanNode n;
+		n.c[0] = n.c[1] = n.c[2] = v;
+		nodes.push_back(n);
+		return static_cast<int>(nodes.size()) - 1;
+	};
+	if (tex->cls == "constant") return buildTextureMeanOfParam(scene, *tex, "value", 1.0, nodes, depth);
+	if (tex->cls == "imagemap") {
+		const std::string file = tex->params.getString("filename", "");
+		if (file.empty()) return -1;
+		TexMeanNode n;
+		n.kind = TexMeanNode::Kind::Image;
+		n.file = file;
+		n.scale = tex->params.getFloat("scale", 1.0);
+		n.gamma = resolveTextureGamma(*tex, [](const std::string &) {});
+		n.invert = tex->params.getBool("invert", false);
+		nodes.push_back(n);
+		return static_cast<int>(nodes.size()) - 1;
+	}
+	if (tex->cls == "scale") {
+		const int a = buildTextureMeanOfParam(scene, *tex, "tex", 1.0, nodes, depth);
+		const int b = buildTextureMeanOfParam(scene, *tex, "scale", 1.0, nodes, depth);
+		if (a < 0 || b < 0) return -1;
+		TexMeanNode n;
+		n.kind = TexMeanNode::Kind::Product;
+		n.a = a; n.b = b;
+		nodes.push_back(n);
+		return static_cast<int>(nodes.size()) - 1;
+	}
+	if (tex->cls == "mix" || tex->cls == "directionmix" || tex->cls == "checkerboard") {
+		const bool checker = tex->cls == "checkerboard";
+		const int a = buildTextureMeanOfParam(scene, *tex, "tex1", checker ? 1.0 : 0.0, nodes, depth);
+		const int b = buildTextureMeanOfParam(scene, *tex, "tex2", checker ? 0.0 : 1.0, nodes, depth);
+		const int amt = tex->cls == "mix" ? buildTextureMeanOfParam(scene, *tex, "amount", 0.5, nodes, depth) : constant(0.5);
+		if (a < 0 || b < 0 || amt < 0) return -1;
+		TexMeanNode n;
+		n.kind = TexMeanNode::Kind::Blend;
+		n.a = a; n.b = b; n.t = amt;
+		nodes.push_back(n);
+		return static_cast<int>(nodes.size()) - 1;
+	}
+	return -1;
+}
+
+// The material parameters pbrt_load's applyTextureAverages() can put a mean into.
+inline bool hasTextureAverageTarget(const std::string &param) {
+	return param == "roughness" || param == "uroughness" || param == "vroughness" ||
+		   param == "interface.roughness" || param == "interface.uroughness" || param == "interface.vroughness" ||
+		   param == "conductor.roughness" || param == "conductor.uroughness" || param == "conductor.vroughness" ||
+		   param == "thickness" || param == "reflectance" || param == "amount";
+}
+
 // Material type, base colour and every texture binding (reflectance, roughness, transmittance, alpha, displacement,
 // checker/mix/scale wrappers, ...).
 inline void readMaterialBindings(const pbrt_scene::Scene &scene, FlatScene &out,
@@ -600,9 +684,16 @@ inline void readMaterialBindings(const pbrt_scene::Scene &scene, FlatScene &out,
 		if (bindTransmittanceTexture(scene, out, m, p)) continue;
 		if (bindRoughnessTexture(scene, out, m, p)) continue;
 		if (bindDisplacementTexture(scene, out, m, p)) continue;
-		warn("material '" + md.type + "' binds its '" + p.name +
-			 "' to a texture, which is not supported; a constant colour is "
-			 "used instead");
+		const pbrt_scene::TextureDecl *bound = p.strings.empty() ? nullptr : findTexture(scene, p.strings[0]);
+		// A mean the loader can still use: the parameter takes the texture's average value instead of its default (a mirror, for a roughness map).
+		TextureAverage avg;
+		avg.param = p.name;
+		const bool hasMean = bound && hasTextureAverageTarget(p.name) && buildTextureMean(scene, p.strings[0], avg.nodes) >= 0 && !avg.nodes.empty();
+		if (hasMean) m.textureAverages.push_back(std::move(avg));
+		warn("material '" + md.type + "' binds its '" + p.name + "' to a texture" +
+			 (bound ? " ('" + bound->name + "', a '" + bound->cls + "' texture)" : std::string()) +
+			 (hasMean ? ", which is not supported; the texture's average value is used instead"
+					  : ", which is not supported; a constant colour is used instead"));
 	}
 }
 

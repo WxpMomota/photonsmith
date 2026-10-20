@@ -70,6 +70,26 @@ TEST(FlattenInfiniteLightTest, OnlyTheLastInfiniteLightWins) {
 	EXPECT_DOUBLE_EQ(s.infiniteLight.L[2], 7.0);
 }
 
+TEST(FlattenInfiniteLightTest, SeveralInfiniteLightsAreWarnedAbout) {
+	const FlatScene s = flattenSource(
+		"LightSource \"infinite\" \"rgb L\" [ 1 1 1 ]\n"
+		"LightSource \"infinite\" \"rgb L\" [ 9 8 7 ]\n");
+	bool warned = false;
+	for (const auto &w : s.warnings) warned = warned || w.message.find("\"infinite\" lights") != std::string::npos;
+	EXPECT_TRUE(warned);
+}
+
+TEST(FlattenInfiniteLightTest, OfSeveralPortalLightsTheLargestWindowIsKept) {
+	// The pbrt-v4-scenes Watercolor has two portal lights, one per window, the later one the smaller: pbrt sums them, this renderer keeps the one that lights the most.
+	const FlatScene s = flattenSource(
+		"LightSource \"infinite\" \"rgb L\" [ 1 1 1 ] \"point3 portal\" [ 0 0 0   4 0 0   4 3 0   0 3 0 ]\n"
+		"LightSource \"infinite\" \"rgb L\" [ 2 2 2 ] \"point3 portal\" [ 0 0 0   1 0 0   1 1 0   0 1 0 ]\n");
+	ASSERT_TRUE(s.infiniteLight.present);
+	ASSERT_TRUE(s.infiniteLight.hasPortal);
+	EXPECT_DOUBLE_EQ(s.infiniteLight.L[0], 1.0);
+	EXPECT_DOUBLE_EQ(s.infiniteLight.portal[3], 4.0);
+}
+
 TEST(FlattenInfiniteLightTest, NoPortalParamLeavesHasPortalFalse) {
 	// The overwhelmingly common case - a plain (non-windowed) infinite
 	// light - must not be misread as having a portal.
@@ -93,24 +113,31 @@ TEST(FlattenInfiniteLightTest, PortalParamPopulatesHasPortalAndCorners) {
 		EXPECT_DOUBLE_EQ(s.infiniteLight.portal[i], expected[i]) << "component " << i;
 }
 
-TEST(FlattenInfiniteLightTest, PortalCornersAreTransformedByTheCTM) {
-	// PortalImageInfiniteLightData itself applies no further transform (see
-	// its own constructor comment) - the loader must bring the corners into
-	// world/render space at parse time, the same way it already does for
-	// point/spot/distant "from"/"to" (see FlattenPunctualLightTest below).
+TEST(FlattenInfiniteLightTest, PortalCornersAreWorldSpaceWhateverTheCTM) {
+	// pbrt maps a portal's corners with the camera transform alone (`cameraTransform.RenderFromWorld(p)`, lights.cpp), never through the light's CTM: the CTM only turns the
+	// environment picture. The pbrt-v4-scenes Kroken rotates before its portal light and writes the window's own world coordinates.
 	const FlatScene s = flattenSource(
 		"Translate 5 0 0\n"
+		"Rotate 90 0 1 0\n"
 		"LightSource \"infinite\" \"string filename\" [ \"env.exr\" ] "
 		"\"point3 portal\" [ -1 -1 0   1 -1 0   1 1 0   -1 1 0 ]\n");
 	ASSERT_TRUE(s.infiniteLight.present);
 	ASSERT_TRUE(s.infiniteLight.hasPortal);
-	// Every corner's own x shifts by +5; y/z pass through unchanged.
-	const double expectedX[4] = { 4.0, 6.0, 6.0, 4.0 };
-	for (int i = 0; i < 4; ++i) {
-		EXPECT_DOUBLE_EQ(s.infiniteLight.portal[i*3+0], expectedX[i]) << "corner " << i;
-		EXPECT_DOUBLE_EQ(s.infiniteLight.portal[i*3+1], (i==0||i==1) ? -1.0 : 1.0) << "corner " << i;
-		EXPECT_DOUBLE_EQ(s.infiniteLight.portal[i*3+2], 0.0) << "corner " << i;
-	}
+	const double expected[12] = { -1,-1,0,  1,-1,0,  1,1,0,  -1,1,0 };
+	for (int i = 0; i < 12; ++i)
+		EXPECT_DOUBLE_EQ(s.infiniteLight.portal[i], expected[i]) << "component " << i;
+}
+
+TEST(FlattenInfiniteLightTest, APortalLightsColourIsNotNormalisedToALuminanceOfOne) {
+	// pbrt's 1 x 1 picture for "L" with a portal is the colour's XYZ -> sRGB as it is; for a blackbody that is the peak-normalised body (a 6500 K one has Y ~ 0.89), where the
+	// light's ordinary L is scaled to a luminance of 1.
+	const FlatScene portal = flattenSource(
+		"LightSource \"infinite\" \"blackbody L\" [ 6500 ] \"point3 portal\" [ -1 -1 0   1 -1 0   1 1 0   -1 1 0 ]\n");
+	const FlatScene plain = flattenSource("LightSource \"infinite\" \"blackbody L\" [ 6500 ]\n");
+	const double yPortal = 0.2126 * portal.infiniteLight.L[0] + 0.7152 * portal.infiniteLight.L[1] + 0.0722 * portal.infiniteLight.L[2];
+	const double yPlain = 0.2126 * plain.infiniteLight.L[0] + 0.7152 * plain.infiniteLight.L[1] + 0.0722 * plain.infiniteLight.L[2];
+	EXPECT_NEAR(yPlain, 1.0, 0.01);
+	EXPECT_NEAR(yPortal, 0.886, 0.02);
 }
 
 TEST(FlattenInfiniteLightTest, PortalParamWithFewerThanTwelveNumbersIsIgnored) {
