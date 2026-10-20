@@ -193,6 +193,10 @@ struct GpuPortalLight {
 	const float*  rectifiedImage;  // width*height*3 floats, row-major RGB
 	const float*  distFunc;        // width*height floats, raw per-cell distribution values
 	const double* satSum;          // width*height doubles, summed-area-table prefix sums
+	// The file's OTHER portal lights (pbrt sums them: the pbrt-v4-scenes Watercolor has one per window). `extra` is a device array of `extraCount` complete GpuPortalLights (their own
+	// extraCount is 0); 0 / null for every scene with one portal light. The set functions of gpu_portal_light_shared.h (gpu_portal_set_*) take this light as the first of the set.
+	int extraCount;
+	const GpuPortalLight* extra;
 };
 
 // GPU camera parameters. `origin`/`lower_left_corner`/`horizontal`/`vertical`

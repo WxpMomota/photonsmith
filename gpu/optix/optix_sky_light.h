@@ -33,7 +33,7 @@ __device__ __forceinline__ void sample_sky_nee(unsigned int& seed, const float3&
 	const GpuPortalLight& p = params.camera.portalLight;
 	if (p.height > 0 && p.width > 0) {
 		const float ru = random_float(seed), rv = random_float(seed);
-		if (gpu_portal_sample_Li(p, shadingPoint, ru, rv, dir_out, pdf_out, Le_out)) {
+		if (gpu_portal_set_sample_Li(p, shadingPoint, ru, rv, dir_out, pdf_out, Le_out)) {
 			return;
 		}
 		// Portal window subtends zero area from here (e.g. shading point
@@ -66,7 +66,7 @@ __device__ __forceinline__ void sample_sky_nee(unsigned int& seed, const float3&
 // existing behavior exactly.
 __device__ __forceinline__ float sky_pdf_for_mis(const float3& dir, const float3& shadingPoint) {
 	const GpuPortalLight& p = params.camera.portalLight;
-	if (p.height > 0 && p.width > 0) return gpu_portal_pdf_Li(p, shadingPoint, dir);
+	if (p.height > 0 && p.width > 0) return gpu_portal_set_pdf_Li(p, shadingPoint, dir);
 	const GpuSkyDistribution& d = params.camera.skyDist;
 	if (d.height > 0 && d.width > 0) return gpu_sky_pdf_Li(d, dir);
 	const float kPi = 3.14159265358979323846f;
@@ -78,7 +78,7 @@ __device__ __forceinline__ float sky_pdf_for_mis(const float3& dir, const float3
 // the flat `flatColor`.
 __device__ __forceinline__ float3 sky_radiance(const float3& dir, const float3& flatColor, const float3& shadingPoint) {
 	const GpuPortalLight& p = params.camera.portalLight;
-	if (p.height > 0 && p.width > 0) return gpu_portal_Le(p, shadingPoint, dir);
+	if (p.height > 0 && p.width > 0) return gpu_portal_set_Le(p, shadingPoint, dir);
 	const GpuSkyDistribution& d = params.camera.skyDist;
 	if (d.height > 0 && d.width > 0) return gpu_sky_Le(d, dir);
 	return flatColor;

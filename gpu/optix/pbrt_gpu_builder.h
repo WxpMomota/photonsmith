@@ -1556,6 +1556,30 @@ inline void addInfiniteLight(BuildCtx &c) {
 				out.portalFrameX = nx; out.portalFrameY = ny; out.portalFrameZ = nz;
 				out.portalP0 = p0f; out.portalP2 = p2f;
 
+				// The file's other portal lights (pbrt sums them), each built the same way from its own corners and picture.
+				for (const auto &extraSky : scene.extraPortalLights) {
+					if (!(extraSky.hasPortal && extraSky.imageWidth > 0 && extraSky.imageHeight > 0 && !extraSky.imagePixels.empty())) continue;
+					std::array<pil_detail::Vec3<double>, 4> xc;
+					for (int i = 0; i < 4; ++i) xc[i] = pil_detail::Vec3<double>(extraSky.portal[i*3+0], extraSky.portal[i*3+1], extraSky.portal[i*3+2]);
+					PortalImageInfiniteLightData<double> xData(extraSky.imagePixels.data(), extraSky.imageWidth, extraSky.imageHeight, extraSky.scale, xc);
+					ExtraPortalLightHost x;
+					x.rectifiedImage = xData.rectified();
+					x.distFunc = xData.distribution().func().data();
+					x.satSum = xData.distribution().sat().sum().data();
+					x.width = xData.width();
+					x.height = xData.height();
+					x.scale = static_cast<float>(xData.scale());
+					const auto xf3 = [&](int i) {
+						return make_float3(static_cast<float>(extraSky.portal[i*3+0]), static_cast<float>(extraSky.portal[i*3+1]), static_cast<float>(extraSky.portal[i*3+2]));
+					};
+					const float3 q0 = xf3(0), q1 = xf3(1), q2 = xf3(2), q3 = xf3(3);
+					const float3 xnx = normalize(normalize(q3 - q0));
+					const float3 xnz = normalize(cross(xnx, normalize(q1 - q0)));
+					x.frameX = xnx; x.frameY = cross(xnz, xnx); x.frameZ = xnz;
+					x.p0 = q0; x.p2 = q2;
+					out.extraPortals.push_back(std::move(x));
+				}
+
 				stats.backgroundColor = meanPixelColor();
 			}
 		} else if (hasImage) {

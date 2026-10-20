@@ -163,7 +163,7 @@ struct SceneDescriptor {
     // nullptr unless the loaded scene declared a real portal[4] (see
     // pbrt_cpu_builder.h's BuildResult::portal comment); empty
     // (std::function = nullptr) otherwise.
-    std::function<std::shared_ptr<PortalImageInfiniteLightData<double>>()> build_portal;
+    std::function<std::shared_ptr<PortalLightSet<double>>()> build_portal;
 
     // Integrator "string lightsampler" - same "empty for every hand-built
     // scene; not auto-applied; cpu_interface.cpp warns rather than
@@ -410,7 +410,7 @@ namespace pbrt_scene_registry {
         // real "point3 portal[4]" - see pbrt_cpu_builder.h's build() for
         // how b.portal gets populated (mutually exclusive with b.sky - see
         // that field's own comment).
-        s.build_portal = [ensure]() -> std::shared_ptr<PortalImageInfiniteLightData<double>> {
+        s.build_portal = [ensure]() -> std::shared_ptr<PortalLightSet<double>> {
             pbrt_cpu::BuildResult& b = ensure();
             return b.portal;
         };

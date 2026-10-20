@@ -275,3 +275,54 @@ __device__ __forceinline__ bool gpu_portal_sample_Li(const GpuPortalLight& d, co
 	Le_out = d.scale * make_float3(px[0], px[1], px[2]);
 	return true;
 }
+
+// ---------------------------------------------------------------------------
+// A SET of portal lights (GpuPortalLight::extra): `d` is the first light, d.extra[0..extraCount) the others. Mirrors PortalLightSet (src/shared/portal_light_set.h): Le is the sum
+// of every light's Le, a sample picks one light uniformly (the first random number rescaled) and reports the MIXTURE density at the direction it chose, and the pdf of a direction
+// is the mean of the lights' pdfs. With no extras these are exactly the single-light functions above.
+// ---------------------------------------------------------------------------
+// pdf_Li, but 0 for a direction outside the light's window at p (see PortalImageInfiniteLightData::pdf_li_in_window): a mixture counts only the lights that can produce the direction.
+__device__ __forceinline__ float gpu_portal_pdf_Li_in_window(const GpuPortalLight& d, const float3& p, const float3& dir) {
+	float u, v;
+	if (!gpu_portal_image_from_render(d, normalize(dir), u, v)) return 0.0f;
+	float bMinU, bMinV, bMaxU, bMaxV;
+	if (!gpu_portal_image_bounds(d, p, bMinU, bMinV, bMaxU, bMaxV)) return 0.0f;
+	if (u < bMinU || u > bMaxU || v < bMinV || v > bMaxV) return 0.0f;
+	return gpu_portal_pdf_Li(d, p, dir);
+}
+
+__device__ __forceinline__ float3 gpu_portal_set_Le(const GpuPortalLight& d, const float3& origin, const float3& dir) {
+	float3 sum = gpu_portal_Le(d, origin, dir);
+	for (int i = 0; i < d.extraCount; ++i) sum = sum + gpu_portal_Le(d.extra[i], origin, dir);
+	return sum;
+}
+
+__device__ __forceinline__ float gpu_portal_set_pdf_Li(const GpuPortalLight& d, const float3& p, const float3& dir) {
+	if (d.extraCount == 0) return gpu_portal_pdf_Li(d, p, dir);
+	float sum = gpu_portal_pdf_Li_in_window(d, p, dir);
+	for (int i = 0; i < d.extraCount; ++i) sum += gpu_portal_pdf_Li_in_window(d.extra[i], p, dir);
+	return sum / (float)(1 + d.extraCount);
+}
+
+__device__ __forceinline__ bool gpu_portal_set_sample_Li(const GpuPortalLight& d, const float3& p, float ru, float rv,
+														   float3& dir_out, float& pdf_out, float3& Le_out) {
+	if (d.extraCount == 0) return gpu_portal_sample_Li(d, p, ru, rv, dir_out, pdf_out, Le_out);
+	const int n = 1 + d.extraCount;
+	const float scaled = ru * (float)n;
+	const int index = min(n - 1, (int)scaled);
+	const float reused = fminf(0.99999994f, scaled - (float)index);
+	float chosenPdf;
+	float3 chosenLe;
+	// (explicit branches, not a reference chosen by `?:`: the first light can live in __constant__ memory and the others in global memory)
+	const bool sampled = (index == 0) ? gpu_portal_sample_Li(d, p, reused, rv, dir_out, chosenPdf, chosenLe)
+										 : gpu_portal_sample_Li(d.extra[index - 1], p, reused, rv, dir_out, chosenPdf, chosenLe);
+	if (!sampled) return false;
+	float sum = chosenPdf;   // the mixture's density at the direction taken: the chosen light's own sampled density, plus what each other light gives that direction
+	for (int i = 0; i < n; ++i) {
+		if (i == index) continue;
+		sum += (i == 0) ? gpu_portal_pdf_Li_in_window(d, p, dir_out) : gpu_portal_pdf_Li_in_window(d.extra[i - 1], p, dir_out);
+	}
+	pdf_out = sum / (float)n;
+	Le_out = gpu_portal_set_Le(d, p, dir_out);
+	return pdf_out > 0.0f;
+}

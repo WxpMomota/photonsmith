@@ -648,51 +648,55 @@ inline LoadResult loadFile(const std::string &path,
 	// (loadFileNear() below is this exact lookup, factored out for a
 	// caller that only has the flattened result to work from - inlined
 	// here instead since sceneDir/readFile are already in scope).
-	pbrt_flatten::InfiniteLight &sky = r.scene.infiniteLight;
-	if (sky.present && !sky.imageFile.empty()) {
-		std::string bytes;
-		if (readFile(join(sceneDir, sky.imageFile), bytes) || readFile(sky.imageFile, bytes)) {
-			if (!decodeInfiniteLightImage(sky.imageFile, bytes,
-										  sky.imagePixels, sky.imageWidth, sky.imageHeight)) {
+	// The environment light's picture (or, for a portal light given only a colour, the picture pbrt makes of it), for the main infinite light and for every extra portal light.
+	const auto resolveEnvironmentLight = [&](pbrt_flatten::InfiniteLight &sky) {
+		if (sky.present && !sky.imageFile.empty()) {
+			std::string bytes;
+			if (readFile(join(sceneDir, sky.imageFile), bytes) || readFile(sky.imageFile, bytes)) {
+				if (!decodeInfiniteLightImage(sky.imageFile, bytes,
+											  sky.imagePixels, sky.imageWidth, sky.imageHeight)) {
+					r.scene.warnings.push_back(
+						{0, path, "infinite light image '" + sky.imageFile +
+							"' could not be decoded; using its constant colour instead"});
+				} else if (!sky.hasPortal && sky.imageWidth == sky.imageHeight && convertEqualAreaInfiniteLight(sky.xform, sky.imagePixels, sky.imageWidth, sky.imageHeight)) {
+					// A square image is pbrt's equal-area form (see convertEqualAreaInfiniteLight()): now a lat-long image with the CTM baked in.
+				} else if (!sky.hasPortal) {
+					// Bakes the LightSource "infinite" directive's own CTM into
+					// the pixels themselves - see applyInfiniteLightOrientation()'s
+					// own comment for why this is done once here instead of in
+					// either backend's sampling code. Its resample math is
+					// hardcoded for the equirectangular dir_to_uv mapping plain
+					// sky_light/InfiniteLight use - a portal light's image is a
+					// DIFFERENT format (equal-area octahedral, see
+					// PortalImageInfiniteLightData's own comment), which this
+					// would corrupt if applied: a portal light's picture is turned
+					// by rotateEqualAreaPortalImage() below instead.
+					applyInfiniteLightOrientation(sky.xform, sky.imagePixels, sky.imageWidth, sky.imageHeight);
+				} else {
+					// A portal light's picture is turned by the CTM, as pbrt does when it builds the portal's rectified picture; the corners are world space and are not.
+					rotateEqualAreaPortalImage(sky.xform, sky.imagePixels, sky.imageWidth, sky.imageHeight);
+				}
+			} else {
 				r.scene.warnings.push_back(
 					{0, path, "infinite light image '" + sky.imageFile +
-						"' could not be decoded; using its constant colour instead"});
-			} else if (!sky.hasPortal && sky.imageWidth == sky.imageHeight && convertEqualAreaInfiniteLight(sky.xform, sky.imagePixels, sky.imageWidth, sky.imageHeight)) {
-				// A square image is pbrt's equal-area form (see convertEqualAreaInfiniteLight()): now a lat-long image with the CTM baked in.
-			} else if (!sky.hasPortal) {
-				// Bakes the LightSource "infinite" directive's own CTM into
-				// the pixels themselves - see applyInfiniteLightOrientation()'s
-				// own comment for why this is done once here instead of in
-				// either backend's sampling code. Its resample math is
-				// hardcoded for the equirectangular dir_to_uv mapping plain
-				// sky_light/InfiniteLight use - a portal light's image is a
-				// DIFFERENT format (equal-area octahedral, see
-				// PortalImageInfiniteLightData's own comment), which this
-				// would corrupt if applied: a portal light's picture is turned
-				// by rotateEqualAreaPortalImage() below instead.
-				applyInfiniteLightOrientation(sky.xform, sky.imagePixels, sky.imageWidth, sky.imageHeight);
-			} else {
-				// A portal light's picture is turned by the CTM, as pbrt does when it builds the portal's rectified picture; the corners are world space and are not.
-				rotateEqualAreaPortalImage(sky.xform, sky.imagePixels, sky.imageWidth, sky.imageHeight);
+						"' could not be read; using its constant colour instead"});
 			}
-		} else {
-			r.scene.warnings.push_back(
-				{0, path, "infinite light image '" + sky.imageFile +
-					"' could not be read; using its constant colour instead"});
 		}
-	}
 
-	// A portal light with a constant colour and no picture (the pbrt-v4-scenes Kroken: "blackbody L" 6500 with a "portal"): pbrt turns the colour into a picture of that
-	// colour ("Converting non-RGB L parameter to RGB so that a portal light can be used"), so the light is the window's patch of a uniform sky. The same here: a small
-	// constant picture, which both backends then treat like any portal picture. Without it the light had no image and failed closed to NO light at all, so a room lit only
-	// through its window rendered nearly black.
-	if (sky.present && sky.hasPortal && sky.imageFile.empty() && sky.imageWidth == 0) {
-		constexpr int kSize = 16;
-		sky.imageWidth = sky.imageHeight = kSize;
-		sky.imagePixels.resize(static_cast<std::size_t>(kSize) * kSize * 3);
-		for (int i = 0; i < kSize * kSize; ++i)
-			for (int c = 0; c < 3; ++c) sky.imagePixels[static_cast<std::size_t>(i) * 3 + c] = static_cast<float>(sky.L[c]);
-	}
+		// A portal light with a constant colour and no picture (the pbrt-v4-scenes Kroken: "blackbody L" 6500 with a "portal"): pbrt turns the colour into a picture of that
+		// colour ("Converting non-RGB L parameter to RGB so that a portal light can be used"), so the light is the window's patch of a uniform sky. The same here: a small
+		// constant picture, which both backends then treat like any portal picture. Without it the light had no image and failed closed to NO light at all, so a room lit only
+		// through its window rendered nearly black.
+		if (sky.present && sky.hasPortal && sky.imageFile.empty() && sky.imageWidth == 0) {
+			constexpr int kSize = 16;
+			sky.imageWidth = sky.imageHeight = kSize;
+			sky.imagePixels.resize(static_cast<std::size_t>(kSize) * kSize * 3);
+			for (int i = 0; i < kSize * kSize; ++i)
+				for (int c = 0; c < 3; ++c) sky.imagePixels[static_cast<std::size_t>(i) * 3 + c] = static_cast<float>(sky.L[c]);
+		}
+	};
+	resolveEnvironmentLight(r.scene.infiniteLight);
+	for (pbrt_flatten::InfiniteLight &extra : r.scene.extraPortalLights) resolveEnvironmentLight(extra);
 
 	// Texture-bound parameters the renderers cannot evaluate per hit take the texture's mean (Material::textureAverages).
 	applyTextureAverages(sceneDir, path, r.scene);

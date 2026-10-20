@@ -568,6 +568,34 @@ void OptiXRenderer::uploadPortalLight(const std::vector<float>& portalRectifiedI
 			<< ", " << portalRectifiedImage.size() << " rectified-image floats) to GPU\n";
 }
 
+void OptiXRenderer::uploadExtraPortalLights(const std::vector<ExtraPortalLightHost>& extras) {
+	for (CUdeviceptr p : d_extraPortalBuffers_) if (p) cudaFree(reinterpret_cast<void*>(p));
+	d_extraPortalBuffers_.clear();
+	if (d_extraPortals_) { cudaFree(reinterpret_cast<void*>(d_extraPortals_)); d_extraPortals_ = 0; }
+	extraPortalCount_ = 0;
+	std::vector<GpuPortalLight> lights;
+	for (const ExtraPortalLightHost& e : extras) {
+		if (e.height <= 0 || e.width <= 0) continue;
+		CUdeviceptr image = 0, dist = 0, sat = 0;
+		wf_upload_gpu_buf(e.rectifiedImage, image);
+		wf_upload_gpu_buf(e.distFunc, dist);
+		wf_upload_gpu_buf(e.satSum, sat);
+		d_extraPortalBuffers_.push_back(image); d_extraPortalBuffers_.push_back(dist); d_extraPortalBuffers_.push_back(sat);
+		GpuPortalLight g;
+		std::memset(&g, 0, sizeof(g));
+		g.width = e.width; g.height = e.height; g.scale = e.scale;
+		g.frameX = e.frameX; g.frameY = e.frameY; g.frameZ = e.frameZ;
+		g.p0 = e.p0; g.p2 = e.p2;
+		g.rectifiedImage = reinterpret_cast<const float*>(image);
+		g.distFunc = reinterpret_cast<const float*>(dist);
+		g.satSum = reinterpret_cast<const double*>(sat);
+		lights.push_back(g);
+	}
+	extraPortalCount_ = static_cast<int>(lights.size());
+	wf_upload_gpu_buf(lights, d_extraPortals_);
+	if (extraPortalCount_ > 0) std::cout << "[OptiX] Uploaded " << extraPortalCount_ << " more portal infinite light(s) to GPU\n";
+}
+
 void OptiXRenderer::uploadPunctualLights(const std::vector<PunctualLightGPU>& punctualLights) {
 	// Separate from the area-light arrays uploaded elsewhere - punctual
 	// lights are evaluated deterministically every hit rather than selected

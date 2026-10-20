@@ -842,6 +842,7 @@ inline void applyFilmImagingRatio(const pbrt_scene::Scene &scene, FlatScene &out
 
 	for (Emission &e : out.areaLights) e.scale *= ratio;
 	if (out.infiniteLight.present) out.infiniteLight.scale *= ratio;
+	for (InfiniteLight &l : out.extraPortalLights) l.scale *= ratio;
 	for (PunctualLight &p : out.punctualLights) p.scale *= ratio;
 	for (Medium &m : out.media) {
 		for (double &c : m.Le) c *= ratio;

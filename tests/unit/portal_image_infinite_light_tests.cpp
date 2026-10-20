@@ -199,3 +199,101 @@ TEST(PortalImageInfiniteLight, MultiSample_AllDirectionsThroughPortal) {
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// PortalLightSet (portal_light_set.h): several portal lights as one (pbrt sums every light of a file)
+// ---------------------------------------------------------------------------
+#include "../../src/shared/portal_light_set.h"
+
+namespace {
+// A portal facing +Z at z, and one facing +X at x = -z (a second window on another wall); shading points near the origin see both.
+std::array<Vec3d,4> make_x_portal(double x = -10.0, double hw = 1.0) {
+	return {{
+		{x, -hw, -hw},   // portal[0]
+		{x,  hw, -hw},   // portal[1]  p01 = up    = (0,1,0)
+		{x,  hw,  hw},   // portal[2]  diagonal
+		{x, -hw,  hw}    // portal[3]  p03 = right = (0,0,1): Cross((0,0,1),(0,1,0)) = (-1,0,0), outward
+	}};
+}
+
+struct TwoPortals {
+	std::vector<float> imgA = make_uniform_image(8, 8, 1.f, 0.f, 0.f);
+	std::vector<float> imgB = make_uniform_image(8, 8, 0.f, 0.f, 1.f);
+	std::shared_ptr<PortalImageInfiniteLightData<double>> a, b;
+	PortalLightSet<double> set;
+	TwoPortals() : a(std::make_shared<PortalImageInfiniteLightData<double>>(imgA.data(), 8, 8, 1.0, make_z_portal(10.0, 1.0))),
+				   b(std::make_shared<PortalImageInfiniteLightData<double>>(imgB.data(), 8, 8, 2.0, make_x_portal(-10.0, 1.0))),
+				   set(std::vector<std::shared_ptr<PortalImageInfiniteLightData<double>>>{a, b}) {}
+};
+}  // namespace
+
+TEST(PortalLightSet, ASetOfOneIsThatLight) {
+	auto img = make_uniform_image(8, 8, 1.f, 1.f, 1.f);
+	auto one = std::make_shared<PortalImageInfiniteLightData<double>>(img.data(), 8, 8, 1.0, make_z_portal(10.0, 1.0));
+	PortalLightSet<double> set({one});
+	double sr, sg, sb, lr, lg, lb;
+	set.eval_Le_rgb(0, 0, 0, 0, 0, 1, sr, sg, sb);
+	one->eval_Le_rgb(0, 0, 0, 0, 0, 1, lr, lg, lb);
+	EXPECT_DOUBLE_EQ(sr, lr);
+	EXPECT_DOUBLE_EQ(sb, lb);
+	EXPECT_DOUBLE_EQ(set.pdf_li(0, 0, 0, 0, 0, 1), one->pdf_li(0, 0, 0, 0, 0, 1));
+}
+
+TEST(PortalLightSet, LeIsTheSumAndEachWindowShowsItsOwnLight) {
+	TwoPortals t;
+	double r, g, b;
+	t.set.eval_Le_rgb(0, 0, 0, 0, 0, 1, r, g, b);   // through the +Z window: only A (red)
+	EXPECT_GT(r, 0.0);
+	EXPECT_DOUBLE_EQ(b, 0.0);
+	t.set.eval_Le_rgb(0, 0, 0, -1, 0, 0, r, g, b);  // through the -X window: only B (blue, scale 2)
+	EXPECT_DOUBLE_EQ(r, 0.0);
+	EXPECT_GT(b, 0.0);
+	t.set.eval_Le_rgb(0, 0, 0, 0, 1, 0, r, g, b);   // through neither
+	EXPECT_DOUBLE_EQ(r + g + b, 0.0);
+}
+
+TEST(PortalLightSet, TheMixtureDensityCountsOnlyTheLightsThatCanProduceTheDirection) {
+	TwoPortals t;
+	// Towards window A: B's table has a value there but B does not shine from that direction, so the mixture is half of A's density.
+	const double pdfA = t.a->pdf_li(0, 0, 0, 0, 0, 1);
+	EXPECT_GT(pdfA, 0.0);
+	EXPECT_NEAR(t.set.pdf_li(0, 0, 0, 0, 0, 1), 0.5 * pdfA, 1e-9);
+	const double pdfB = t.b->pdf_li(0, 0, 0, -1, 0, 0);
+	EXPECT_NEAR(t.set.pdf_li(0, 0, 0, -1, 0, 0), 0.5 * pdfB, 1e-9);
+	EXPECT_DOUBLE_EQ(t.set.pdf_li(0, 0, 0, 0, 1, 0), 0.0);
+}
+
+TEST(PortalLightSet, ASampleReportsTheMixtureDensityAndPicksEachLightHalfTheTime) {
+	TwoPortals t;
+	int viaA = 0, viaB = 0, edge = 0;
+	const int n = 2000;
+	for (int i = 0; i < n; ++i) {
+		const double ru = (i + 0.5) / n, rv = std::fmod(i * 0.6180339887, 1.0);
+		double wx, wy, wz, pdf;
+		ASSERT_TRUE(t.set.sample_li(ru, rv, 0, 0, 0, wx, wy, wz, pdf));
+		// (a sample on the very edge of its window can read as just outside it when the direction is rounded: the sample's own density is what counts then)
+		const double again = t.set.pdf_li(0, 0, 0, wx, wy, wz);
+		if (again > 0.0) EXPECT_NEAR(pdf, again, 1e-6 * std::max(1.0, pdf)) << "sample " << i;
+		else ++edge;
+		(wz > std::fabs(wx) ? viaA : viaB)++;   // A shines from +Z, B from -X
+	}
+	EXPECT_NEAR(static_cast<double>(viaA) / n, 0.5, 0.01);
+	EXPECT_EQ(viaA + viaB, n);
+	EXPECT_LE(edge, 5);
+}
+
+TEST(PortalLightSet, TheSetIntegratesToOneOverTheSphere) {
+	TwoPortals t;
+	// Sum of pdf * solid angle over the directions, midpoint rule on a (cos theta, phi) grid: a density integrates to 1 (the portals' windows are all inside the sphere).
+	const int nt = 400, np = 800;
+	double total = 0.0;
+	for (int i = 0; i < nt; ++i) {
+		const double z = 1.0 - 2.0 * (i + 0.5) / nt, s = std::sqrt(1.0 - z * z);
+		for (int j = 0; j < np; ++j) {
+			const double phi = 2.0 * PI * (j + 0.5) / np;
+			total += t.set.pdf_li(0, 0, 0, s * std::cos(phi), s * std::sin(phi), z);
+		}
+	}
+	total *= 4.0 * PI / (static_cast<double>(nt) * np);
+	EXPECT_NEAR(total, 1.0, 0.03);
+}

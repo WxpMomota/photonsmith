@@ -434,6 +434,10 @@ struct FlatScene {
 	// CPU and the GPU-wavefront backend still don't consume this field.
 	int cameraMediumIndex = -1;
 	InfiniteLight infiniteLight;        // present=false if the scene has none
+	// The scene's OTHER portal infinite lights (pbrt sums every light; the pbrt-v4-scenes Watercolor has one per window). `infiniteLight` is the one with the largest window; each of
+	// these is a complete portal light of its own (picture, scale, corners). Empty for every scene with at most one infinite light. The renderers add them to the main portal
+	// (a set of portals: Le is the sum, the light is sampled by picking one uniformly). Only portal lights are kept here: see flattenLights() for what happens to the others.
+	std::vector<InfiniteLight> extraPortalLights;
 	std::vector<PunctualLight> punctualLights;   // LightSource point/spot/distant/goniometric/projection
 
 	// Instanced geometry. `groups` hold object-space shapes; `instances` place

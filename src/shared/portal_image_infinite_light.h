@@ -241,6 +241,19 @@ struct PortalImageInfiniteLightData {
 		return T(mapPDF) / duv_dw;
 	}
 
+	// pdf_li_in_window: pdf_li, but 0 for a direction the light does not shine from at this point (outside the window's image bounds), where pbrt's PDF_Li (and pdf_li above) still
+	// return the table's value there. That is harmless for one light (its Le is 0 there too) and wrong for a MIXTURE of lights (portal_light_set.h), whose density at a direction must
+	// count only the lights that can produce it.
+	CPU_GPU T pdf_li_in_window(T px, T py, T pz, T dx, T dy, T dz) const {
+		Vec3T wRender = pil_detail::normalize(Vec3T{dx,dy,dz});
+		T u, v;
+		if (!ImageFromRender(wRender, &u, &v)) return T(0);
+		T bMinU, bMinV, bMaxU, bMaxV;
+		if (!ImageBounds(px, py, pz, bMinU, bMinV, bMaxU, bMaxV)) return T(0);
+		if (u < bMinU || u > bMaxU || v < bMinV || v > bMaxV) return T(0);
+		return pdf_li(px, py, pz, dx, dy, dz);
+	}
+
 	// power: approximate total power. Mirrors pbrt-v4 Phi.
 	// pbrt-v4 uses luminance (via RGBIlluminantSpectrum) divided by duv_dw,
 	// then scales by scale * Area / (nx * ny).

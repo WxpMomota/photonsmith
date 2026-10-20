@@ -21,6 +21,17 @@ struct SceneBuildFailure {
 };
 
 // Scene container
+// One of a scene's OTHER portal lights (GpuPortalLight::extra), as the scene builder hands it to the renderer: the same flat buffers and scalars the first portal light has
+// (SceneData::portal*), built from a real PortalImageInfiniteLightData<double> the same way.
+struct ExtraPortalLightHost {
+	std::vector<float> rectifiedImage;   // width*height*3
+	std::vector<float> distFunc;         // width*height
+	std::vector<double> satSum;          // width*height
+	int width = 0, height = 0;
+	float scale = 1.0f;
+	float3 frameX = {}, frameY = {}, frameZ = {}, p0 = {}, p2 = {};
+};
+
 struct SceneData {
 	// Lamps (area-light shapes) whose own material the CPU reflects but this builder cannot: anything but a flat diffuse reflectance (a textured diffuse, coated,
 	// conductor, dielectric...). They are pure emitters on both OptiX backends; scene_builder.cpp warns with the count.
@@ -95,6 +106,8 @@ struct SceneData {
 	float portalScale = 1.0f;
 	float3 portalFrameX = {}, portalFrameY = {}, portalFrameZ = {};
 	float3 portalP0 = {}, portalP2 = {};
+	// The scene's other portal lights (FlatScene::extraPortalLights): the renderers sum them with the one above. Empty for a scene with at most one infinite light.
+	std::vector<ExtraPortalLightHost> extraPortals;
 
 	// ---- object instancing ------------------------------------------------
 	// Geometry that exists once and is placed many times. Kept in a SEPARATE

@@ -70,6 +70,14 @@ TEST(FlattenInfiniteLightTest, OnlyTheLastInfiniteLightWins) {
 	EXPECT_DOUBLE_EQ(s.infiniteLight.L[2], 7.0);
 }
 
+namespace {
+bool warnedAboutInfinite(const FlatScene &s) {
+	for (const auto &w : s.warnings)
+		if (w.message.find("\"infinite\" lights") != std::string::npos) return true;
+	return false;
+}
+}  // namespace
+
 TEST(FlattenInfiniteLightTest, SeveralInfiniteLightsAreWarnedAbout) {
 	const FlatScene s = flattenSource(
 		"LightSource \"infinite\" \"rgb L\" [ 1 1 1 ]\n"
@@ -79,8 +87,8 @@ TEST(FlattenInfiniteLightTest, SeveralInfiniteLightsAreWarnedAbout) {
 	EXPECT_TRUE(warned);
 }
 
-TEST(FlattenInfiniteLightTest, OfSeveralPortalLightsTheLargestWindowIsKept) {
-	// The pbrt-v4-scenes Watercolor has two portal lights, one per window, the later one the smaller: pbrt sums them, this renderer keeps the one that lights the most.
+TEST(FlattenInfiniteLightTest, OfSeveralPortalLightsTheLargestWindowIsTheMainOneAndTheRestAreKept) {
+	// The pbrt-v4-scenes Watercolor has two portal lights, one per window, the later one the smaller: pbrt sums them. The larger is `infiniteLight`, the other an extra.
 	const FlatScene s = flattenSource(
 		"LightSource \"infinite\" \"rgb L\" [ 1 1 1 ] \"point3 portal\" [ 0 0 0   4 0 0   4 3 0   0 3 0 ]\n"
 		"LightSource \"infinite\" \"rgb L\" [ 2 2 2 ] \"point3 portal\" [ 0 0 0   1 0 0   1 1 0   0 1 0 ]\n");
@@ -88,6 +96,18 @@ TEST(FlattenInfiniteLightTest, OfSeveralPortalLightsTheLargestWindowIsKept) {
 	ASSERT_TRUE(s.infiniteLight.hasPortal);
 	EXPECT_DOUBLE_EQ(s.infiniteLight.L[0], 1.0);
 	EXPECT_DOUBLE_EQ(s.infiniteLight.portal[3], 4.0);
+	ASSERT_EQ(s.extraPortalLights.size(), 1u);
+	EXPECT_DOUBLE_EQ(s.extraPortalLights[0].L[0], 2.0);
+	EXPECT_FALSE(warnedAboutInfinite(s)) << "nothing was dropped";
+}
+
+TEST(FlattenInfiniteLightTest, APlainSkyNextToPortalsIsDroppedWithAWarning) {
+	const FlatScene s = flattenSource(
+		"LightSource \"infinite\" \"rgb L\" [ 5 5 5 ]\n"
+		"LightSource \"infinite\" \"rgb L\" [ 1 1 1 ] \"point3 portal\" [ 0 0 0   1 0 0   1 1 0   0 1 0 ]\n");
+	ASSERT_TRUE(s.infiniteLight.hasPortal);
+	EXPECT_TRUE(s.extraPortalLights.empty());
+	EXPECT_TRUE(warnedAboutInfinite(s));
 }
 
 TEST(FlattenInfiniteLightTest, NoPortalParamLeavesHasPortalFalse) {

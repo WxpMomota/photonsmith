@@ -651,6 +651,8 @@ private:
 	/// Geometry stored once and placed many times. Call before buildScene();
 	/// passing empty vectors (or not calling it) disables instancing for the
 	/// next scene built.
+	/// @brief Uploads the scene's other portal lights (pbrt sums every light; see GpuPortalLight::extra). Called with the scene's list, empty for none, on every scene upload.
+	void uploadExtraPortalLights(const std::vector<ExtraPortalLightHost>& extras);
 	void setInstanceData(const std::vector<TriangleData>& triangles,
 						 const std::vector<SphereData>& spheres,
 						 const std::vector<SceneData::InstanceGroupGPU>& groups,
@@ -729,6 +731,10 @@ private:
 	CUdeviceptr d_portalRectifiedImage_ = 0;
 	CUdeviceptr d_portalDistFunc_ = 0;
 	CUdeviceptr d_portalSatSum_ = 0;
+	// The scene's other portal lights (GpuPortalLight::extra): their buffers (three per light), and the device array of GpuPortalLights that points at them.
+	std::vector<CUdeviceptr> d_extraPortalBuffers_;
+	CUdeviceptr d_extraPortals_ = 0;
+	int extraPortalCount_ = 0;
 	int portalWidth_ = 0, portalHeight_ = 0;
 	float portalScale_ = 1.0f;
 	float3 portalFrameX_ = {}, portalFrameY_ = {}, portalFrameZ_ = {};

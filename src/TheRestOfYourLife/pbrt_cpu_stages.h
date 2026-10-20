@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "../shared/pbrt_flatten.h"
+#include "../shared/portal_light_set.h"
 #include "../shared/portal_image_infinite_light.h"   // PortalImageInfiniteLightData<double> - LightSource "infinite" "point3 portal[4]"
 #include "../external/tinyexr.h"   // LoadEXR() - see decodePunctualLightImageFile()
 #include "../external/nanovdb/NanoVDB.h"   // MakeNamedMedium "nanovdb" - see addMediumIfPresent()'s own nanovdb branch
@@ -60,7 +61,7 @@ struct BuildResult {
 	// already return zero/false outside the window on their own - callers
 	// (camera.h) branch on `portal` first, falling through to `sky` only
 	// when this is null.
-	std::shared_ptr<PortalImageInfiniteLightData<double>> portal;
+	std::shared_ptr<PortalLightSet<double>> portal;   // the portal light, or every portal light of the file (FlatScene::extraPortalLights)
 	// LightSource point/spot/distant/goniometric/projection - null if the
 	// scene has none (matches camera_t::punct_lights' own "nullptr = none"
 	// convention, which this feeds directly - see scene_registry.h's
@@ -313,15 +314,19 @@ inline void buildSkyOrPortal(const pbrt_flatten::FlatScene &scene, BuildResult &
 			// global Vec3<T> template) - NOT this codebase's own `vec3` class
 			// (a different, unrelated type; see that header's own comment on
 			// why it's kept separate from this project's vec3/point3/color).
-			std::array<Vec3<double>, 4> corners;
-			for (int i = 0; i < 4; ++i)
-				corners[i] = Vec3<double>(scene.infiniteLight.portal[i*3+0],
-				                          scene.infiniteLight.portal[i*3+1],
-				                          scene.infiniteLight.portal[i*3+2]);
-			out.portal = std::make_shared<PortalImageInfiniteLightData<double>>(
-				scene.infiniteLight.imagePixels.data(),
-				scene.infiniteLight.imageWidth, scene.infiniteLight.imageHeight,
-				scene.infiniteLight.scale, corners);
+			// The main portal light and every extra one of the file (pbrt sums them), as one set (portal_light_set.h).
+			std::vector<std::shared_ptr<PortalImageInfiniteLightData<double>>> portals;
+			const auto addPortal = [&portals](const pbrt_flatten::InfiniteLight &l) {
+				if (!(l.hasPortal && l.imageWidth > 0 && l.imageHeight > 0)) return;   // (an extra whose picture failed to load is skipped, as the main one is)
+				std::array<Vec3<double>, 4> corners;
+				for (int i = 0; i < 4; ++i)
+					corners[i] = Vec3<double>(l.portal[i*3+0], l.portal[i*3+1], l.portal[i*3+2]);
+				portals.push_back(std::make_shared<PortalImageInfiniteLightData<double>>(
+					l.imagePixels.data(), l.imageWidth, l.imageHeight, l.scale, corners));
+			};
+			addPortal(scene.infiniteLight);
+			for (const pbrt_flatten::InfiniteLight &extra : scene.extraPortalLights) addPortal(extra);
+			out.portal = std::make_shared<PortalLightSet<double>>(std::move(portals));
 		}
 		// else: a portal window was declared but its image never named, or
 		// named-and-failed to decode (pbrt_load.h already recorded a

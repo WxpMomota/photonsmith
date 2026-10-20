@@ -121,6 +121,8 @@ GpuCameraParams OptiXRenderer::makeRenderCamera(const GpuCameraParams& camera) {
 		gpuCam.portalLight.rectifiedImage = reinterpret_cast<const float*>(d_portalRectifiedImage_);
 		gpuCam.portalLight.distFunc = reinterpret_cast<const float*>(d_portalDistFunc_);
 		gpuCam.portalLight.satSum = reinterpret_cast<const double*>(d_portalSatSum_);
+		gpuCam.portalLight.extraCount = extraPortalCount_;
+		gpuCam.portalLight.extra = reinterpret_cast<const GpuPortalLight*>(d_extraPortals_);
 	}
 	return gpuCam;
 }
@@ -577,6 +579,9 @@ void OptiXRenderer::cleanup() noexcept {
 	if (d_probeGrid_) cudaFree(reinterpret_cast<void*>(d_probeGrid_));
 	if (d_guidingHistograms_) cudaFree(reinterpret_cast<void*>(d_guidingHistograms_));
 	if (d_punctualLights_) cudaFree(reinterpret_cast<void*>(d_punctualLights_));
+	for (CUdeviceptr p : d_extraPortalBuffers_) if (p) cudaFree(reinterpret_cast<void*>(p));
+	d_extraPortalBuffers_.clear();
+	if (d_extraPortals_) cudaFree(reinterpret_cast<void*>(d_extraPortals_));
 
 	// Free launch params
 	if (d_launchParams_) cudaFree(reinterpret_cast<void*>(d_launchParams_));

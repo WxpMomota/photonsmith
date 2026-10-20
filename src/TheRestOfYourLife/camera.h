@@ -22,6 +22,7 @@
 #include "../shared/film.h"     // clamp_sensor_rgb - camera::max_component_value's own comment
 #include "sky_light.h"
 #include "../shared/portal_image_infinite_light.h"   // PortalImageInfiniteLightData<double>
+#include "../shared/portal_light_set.h"             // PortalLightSet<double>: one or several portal lights
 #include "punctual_light_objects.h"
 #include "shadow_ray.h"
 #include "constant_medium.h"   // ambient_medium - see camera::camera_medium's own comment
@@ -270,7 +271,7 @@ class camera {
     // BuildResult::portal comment) - every ray_color()/ray_color_spectral()
     // call site below checks `portal` first, falling through to `sky` only
     // when this is null.
-    shared_ptr<PortalImageInfiniteLightData<double>> portal;
+    shared_ptr<PortalLightSet<double>> portal;   // one portal light, or the several of a file (pbrt sums them)
     shared_ptr<punctual_light_list> punct_lights; // pbrt-v4 PointLight/SpotLight/DistantLight (delta); nullptr = none
     // pbrt-v4's own "camera medium" (FlatScene::cameraMediumIndex's own
     // comment, pbrt_flatten.h) - an unbounded homogeneous medium the camera

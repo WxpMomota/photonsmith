@@ -372,10 +372,11 @@ inline void flattenLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 	// else genuinely unknown still gets the warn-and-drop this whole block
 	// used to give every non-infinite kind.
 	//
-	// A file can declare several "infinite" lights (the pbrt-v4-scenes Watercolor has two portal lights, one per window), and pbrt sums them. The renderers here have ONE
-	// environment slot (and one portal), so one is kept and the rest are dropped with a warning: when two or more have a portal the one with the largest window (it lights
-	// the most of the room), otherwise the last. Watercolor's second window is 4% of its light. Punctual lights have no such limit: every one is kept.
-	int infiniteLightsSeen = 0;
+	// A file can declare several "infinite" lights (the pbrt-v4-scenes Watercolor has two portal lights, one per window), and pbrt sums them. Every PORTAL light is kept: the one
+	// with the largest window is `infiniteLight`, the rest are `extraPortalLights`, and the renderers sum them. Anything else beyond one (a second plain sky, or a plain sky
+	// next to portals) has no home in the renderers' single environment slot: with portals the plain ones are dropped, without any the last plain one is kept, and a warning says so.
+	// Punctual lights have no such limit: every one is kept.
+	std::vector<InfiniteLight> infiniteCandidates;
 	for (const pbrt_scene::LightDecl &ld : scene.lights) {
 		if (ld.type == "infinite") {
 			InfiniteLight cand;
@@ -405,16 +406,7 @@ inline void flattenLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 					for (int k = 0; k < 3; ++k) cand.L[k] = (k == 0 ? c.x : k == 1 ? c.y : c.z) / kCIE_Y_integral;
 				}
 			}
-			++infiniteLightsSeen;
-			const auto windowArea = [](const InfiniteLight &l) {   // the portal's area: |p01 x p03|
-				if (!l.hasPortal) return 0.0;
-				const double ax = l.portal[3] - l.portal[0], ay = l.portal[4] - l.portal[1], az = l.portal[5] - l.portal[2];
-				const double bx = l.portal[9] - l.portal[0], by = l.portal[10] - l.portal[1], bz = l.portal[11] - l.portal[2];
-				const double cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
-				return std::sqrt(cx * cx + cy * cy + cz * cz);
-			};
-			const bool keepNew = !out.infiniteLight.present || !(out.infiniteLight.hasPortal && cand.hasPortal) || windowArea(cand) > windowArea(out.infiniteLight);
-			if (keepNew) out.infiniteLight = cand;
+			infiniteCandidates.push_back(cand);
 			continue;
 		}
 
@@ -615,9 +607,31 @@ inline void flattenLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 		warn("light source '" + ld.type + "' is not supported and was dropped; "
 			 "the scene will be darker than intended");
 	}
-	if (infiniteLightsSeen > 1) {
-		warn("the scene has " + std::to_string(infiniteLightsSeen) + " \"infinite\" lights, which pbrt sums; this renderer has one environment slot, so only one is used (the one "
-			 "with the largest portal window, else the last) and the other " + std::to_string(infiniteLightsSeen - 1) + " were dropped");
+	if (!infiniteCandidates.empty()) {
+		const auto windowArea = [](const InfiniteLight &l) {   // the portal's area: |p01 x p03|
+			if (!l.hasPortal) return 0.0;
+			const double ax = l.portal[3] - l.portal[0], ay = l.portal[4] - l.portal[1], az = l.portal[5] - l.portal[2];
+			const double bx = l.portal[9] - l.portal[0], by = l.portal[10] - l.portal[1], bz = l.portal[11] - l.portal[2];
+			const double cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+			return std::sqrt(cx * cx + cy * cy + cz * cz);
+		};
+		std::vector<InfiniteLight> portals;
+		for (const InfiniteLight &c : infiniteCandidates)
+			if (c.hasPortal) portals.push_back(c);
+		int dropped = 0;
+		if (!portals.empty()) {
+			std::stable_sort(portals.begin(), portals.end(), [&](const InfiniteLight &x, const InfiniteLight &y) { return windowArea(x) > windowArea(y); });
+			out.infiniteLight = portals.front();
+			out.extraPortalLights.assign(portals.begin() + 1, portals.end());
+			dropped = static_cast<int>(infiniteCandidates.size() - portals.size());
+		} else {
+			out.infiniteLight = infiniteCandidates.back();
+			dropped = static_cast<int>(infiniteCandidates.size()) - 1;
+		}
+		if (dropped > 0) {
+			warn("the scene has " + std::to_string(infiniteCandidates.size()) + " \"infinite\" lights, which pbrt sums; this renderer has one environment slot, so " + std::to_string(dropped) +
+				 " plain (non-portal) one" + (dropped > 1 ? "s were" : " was") + " dropped (portal lights are all kept: " + std::to_string(portals.size()) + ")");
+		}
 	}
 }
 

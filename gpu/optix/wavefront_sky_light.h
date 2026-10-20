@@ -30,7 +30,7 @@ __device__ __forceinline__ void wf_sample_sky_nee(const GpuSkyDistribution& sky,
 													 float3& dir_out, float& pdf_out, float3& Le_out) {
 	if (portal.height > 0 && portal.width > 0) {
 		const float ru = wf_rand(seed), rv = wf_rand(seed);
-		if (gpu_portal_sample_Li(portal, shadingPoint, ru, rv, dir_out, pdf_out, Le_out)) {
+		if (gpu_portal_set_sample_Li(portal, shadingPoint, ru, rv, dir_out, pdf_out, Le_out)) {
 			return;
 		}
 		// Portal window subtends zero area from here - see optix_sky_light.h's
@@ -55,7 +55,7 @@ __device__ __forceinline__ void wf_sample_sky_nee(const GpuSkyDistribution& sky,
 
 __device__ __forceinline__ float wf_sky_pdf_for_mis(const GpuSkyDistribution& sky, const GpuPortalLight& portal,
 													  const float3& dir, const float3& shadingPoint) {
-	if (portal.height > 0 && portal.width > 0) return gpu_portal_pdf_Li(portal, shadingPoint, dir);
+	if (portal.height > 0 && portal.width > 0) return gpu_portal_set_pdf_Li(portal, shadingPoint, dir);
 	if (sky.height > 0 && sky.width > 0) return gpu_sky_pdf_Li(sky, dir);
 	return 1.0f / (4.0f * 3.14159265f);
 }
@@ -63,7 +63,7 @@ __device__ __forceinline__ float wf_sky_pdf_for_mis(const GpuSkyDistribution& sk
 __device__ __forceinline__ float3 wf_sky_radiance(const GpuSkyDistribution& sky, const GpuPortalLight& portal,
 													 const float3& dir, const float3& flatColor,
 													 const float3& shadingPoint) {
-	if (portal.height > 0 && portal.width > 0) return gpu_portal_Le(portal, shadingPoint, dir);
+	if (portal.height > 0 && portal.width > 0) return gpu_portal_set_Le(portal, shadingPoint, dir);
 	if (sky.height > 0 && sky.width > 0) return gpu_sky_Le(sky, dir);
 	return flatColor;
 }

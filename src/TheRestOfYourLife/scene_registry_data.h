@@ -629,7 +629,7 @@ inline std::vector<SceneDescriptor> builtin_scenes_part4() {
         pbrt_scene_registry::in_subcategory(SceneSubcategories::Interiors,
             pbrt_scene_registry::build_curated_external_pbrt_scene_descriptor(
             "H44", 228, "Watercolor", "watercolor", SceneCategories::LargeScene,
-            "A painter's attic studio under skylights: an easel and canvases, a drawing table with brushes and jars, flat files and a leather chair (licensed from Angelo Ferretti, CC BY-ND 2.0), from the pbrt-v4-scenes collection, its first camera. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md), a download of 3.0 GB. Its daylight comes through two window portals, of which this renderer keeps the larger (the other is 4% of the light). A few of its textures (roughness maps, paint overlays) are drawn as their average colour, not per pixel.",
+            "A painter's attic studio under skylights: an easel and canvases, a drawing table with brushes and jars, flat files and a leather chair (licensed from Angelo Ferretti, CC BY-ND 2.0), from the pbrt-v4-scenes collection, its first camera. Not bundled with this repo: the GUI downloads it on request (see pbrt_scenes/README.md), a download of 3.0 GB. Its daylight comes through two window portals, two portal infinite lights that are added together. A few of its textures (roughness maps, paint overlays) are drawn as their average colour, not per pixel.",
             "Very Slow", "watercolor/camera-1.pbrt", 1.0, 128)),
         pbrt_scene_registry::in_subcategory(SceneSubcategories::Objects,
             pbrt_scene_registry::crop_is_the_picture(
