@@ -2,6 +2,11 @@
 #include "material_base.h"
 #include "../shared/bssrdf.h"
 #include "../shared/measured_bxdf_loader.h"
+#include <functional>
+#include <vector>
+#include <memory>
+#include <mutex>
+#include <atomic>
 #include <cstring>
 
 // coated_seed_from_dir -- deterministic 64-bit hash of a direction vector,
@@ -1441,6 +1446,83 @@ class mix_material : public material {
     shared_ptr<material> mat_a;
     shared_ptr<material> mat_b;
     shared_ptr<texture>  weight_tex;
+};
+
+
+// ---------------------------------------------------------------------------
+// roughness_mapped_material -- a Conductor, CoatedDiffuse or CoatedConductor whose roughness is an IMAGE (pbrt's "texture roughness"): rebuilt at each hit with that hit's roughness.
+//
+// The concrete materials hold their GGX alphas as constants, in a dozen members' worth of code; rather than thread a per-hit alpha through each of them, this builds the concrete
+// material for the roughness at the hit (a handful of doubles: cheap beside a path-tracing step) and forwards the call to it. Every call at one hit sees the same texel and so the
+// same material, which is what keeps scatter(), scattering_pdf() and scattering_attenuation() consistent. `make(coat, conductor)` takes the AUTHORED roughness (before remapping) of
+// the coat (the only one for a Conductor or CoatedDiffuse) and of a CoatedConductor's base; a slot with no image passes its flat value.
+// ---------------------------------------------------------------------------
+class roughness_mapped_material : public material {
+  public:
+    using Factory = std::function<shared_ptr<material>(double coat_roughness, double conductor_roughness)>;
+
+    // The roughness is rounded to 1/kLevels steps (a roughness image varies slowly: 1/128 is far below what an alpha step shows) so each distinct concrete material is built once
+    // and kept, not rebuilt at every hit: a path tracer makes millions of hits.
+    static constexpr int kLevels = 128;
+
+    roughness_mapped_material(Factory make,
+                              shared_ptr<texture> coat_tex, double coat_scale, double coat_flat,
+                              shared_ptr<texture> conductor_tex, double conductor_scale, double conductor_flat)
+        : make_(std::move(make)), coat_tex_(std::move(coat_tex)), coat_scale_(coat_scale), coat_flat_(coat_flat),
+          conductor_tex_(std::move(conductor_tex)), conductor_scale_(conductor_scale), conductor_flat_(conductor_flat),
+          coat_levels_(coat_tex_ ? kLevels + 1 : 1), conductor_levels_(conductor_tex_ ? kLevels + 1 : 1),
+          cache_(new std::atomic<const material*>[static_cast<std::size_t>(coat_levels_) * conductor_levels_]) {
+        for (std::size_t i = 0, n = static_cast<std::size_t>(coat_levels_) * conductor_levels_; i < n; ++i) cache_[i].store(nullptr);
+    }
+
+    // The concrete material at this hit.
+    const material* at(const hit_record& rec) const {
+        int ci = 0, ki = 0;
+        if (coat_tex_) ci = level(coat_scale_ * coat_tex_->value(rec.u, rec.v, rec.p).x());
+        if (conductor_tex_) ki = level(conductor_scale_ * conductor_tex_->value(rec.u, rec.v, rec.p).x());
+        std::atomic<const material*>& slot = cache_[static_cast<std::size_t>(ci) * conductor_levels_ + ki];
+        if (const material* m = slot.load(std::memory_order_acquire)) return m;
+        std::lock_guard<std::mutex> lock(build_mutex_);
+        if (const material* m = slot.load(std::memory_order_acquire)) return m;
+        shared_ptr<material> made = make_(coat_tex_ ? static_cast<double>(ci) / kLevels : coat_flat_, conductor_tex_ ? static_cast<double>(ki) / kLevels : conductor_flat_);
+        owned_.push_back(made);
+        slot.store(made.get(), std::memory_order_release);
+        return made.get();
+    }
+
+    bool scatter(const ray& r_in, const hit_record& rec, scatter_record& srec, bool do_regularize = false) const override {
+        return at(rec)->scatter(r_in, rec, srec, do_regularize);
+    }
+    double scattering_pdf(const ray& r_in, const hit_record& rec, const ray& scattered) const override {
+        return at(rec)->scattering_pdf(r_in, rec, scattered);
+    }
+    color scattering_attenuation(const hit_record& rec, const ray& scattered, const color& srec_attenuation) const override {
+        return at(rec)->scattering_attenuation(rec, scattered, srec_attenuation);
+    }
+    color scattering_attenuation(const ray& r_in, const hit_record& rec, const ray& scattered, const color& srec_attenuation) const override {
+        return at(rec)->scattering_attenuation(r_in, rec, scattered, srec_attenuation);
+    }
+    bool is_delta_bsdf() const override { return false; }
+    bool is_delta_bsdf(const hit_record& rec) const override { return at(rec)->is_delta_bsdf(rec); }
+    bool is_shadow_transmissive(const hit_record& rec) const override { return at(rec)->is_shadow_transmissive(rec); }
+
+  private:
+    static int level(double roughness) {
+        const double r = roughness < 0.0 ? 0.0 : (roughness > 1.0 ? 1.0 : roughness);
+        return static_cast<int>(r * kLevels + 0.5);
+    }
+
+    Factory make_;
+    shared_ptr<texture> coat_tex_;
+    double coat_scale_;
+    double coat_flat_;
+    shared_ptr<texture> conductor_tex_;
+    double conductor_scale_;
+    double conductor_flat_;
+    int coat_levels_, conductor_levels_;
+    std::unique_ptr<std::atomic<const material*>[]> cache_;
+    mutable std::mutex build_mutex_;
+    mutable std::vector<shared_ptr<material>> owned_;
 };
 
 

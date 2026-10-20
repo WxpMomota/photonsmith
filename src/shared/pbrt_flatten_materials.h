@@ -508,8 +508,63 @@ inline bool bindTransmittanceTexture(const pbrt_scene::Scene &scene, FlatScene &
 // Material::roughnessTextureFilename's own comment); no
 // "scale"-wrap or procedural (checkerboard/fbm/marble/mix)
 // support, same scope narrowing as transmittance above.
+// A float Texture bound to a roughness slot, resolved to what the renderers evaluate per hit: an "imagemap" (with its own "float scale"), or a "scale" texture with a CONSTANT scale
+// wrapped around one. False for anything else (a procedural pattern, a texture-valued scale), which the caller then averages.
+struct RoughnessImage {
+	std::string file;
+	TextureDecodeOptions options;
+	double scale = 1.0;
+	UvMapping mapping;
+};
+inline bool resolveRoughnessImage(const pbrt_scene::Scene &scene, const std::string &name, const std::function<void(const std::string &)> &warn, RoughnessImage &out) {
+	const pbrt_scene::TextureDecl *tex = findTexture(scene, name);
+	double outerScale = 1.0;
+	if (tex && tex->cls == "scale") {
+		const pbrt_scene::Param *s = tex->params.find("scale");
+		if (s && s->type == "texture") return false;
+		outerScale = tex->params.getFloat("scale", 1.0);
+		const pbrt_scene::Param *inner = tex->params.find("tex");
+		tex = (inner && inner->type == "texture" && !inner->strings.empty()) ? findTexture(scene, inner->strings[0]) : nullptr;
+	}
+	if (!tex || tex->cls != "imagemap") return false;
+	const std::string file = tex->params.getString("filename", "");
+	if (file.empty()) return false;
+	out.file = file;
+	out.options = resolveTextureDecodeOptions(*tex, warn);
+	out.scale = outerScale * tex->params.getFloat("scale", 1.0);
+	out.mapping = uvMappingOf(*tex);
+	return true;
+}
+
 inline bool bindRoughnessTexture(const pbrt_scene::Scene &scene, FlatScene &out, Material &m, const pbrt_scene::Param &p) {
 	const auto warn = materialWarner(out);
+	// Conductor, CoatedDiffuse and CoatedConductor: the image is evaluated per hit (CPU roughness_mapped_material, both OptiX backends' patched material), and its mean stays in the
+	// flat roughness as the fallback for a backend that cannot (GPU SPPM, Metal).
+	const bool coatedConductor = m.kind == MaterialKind::CoatedConductor;
+	const bool primary = (p.name == "roughness" && (m.kind == MaterialKind::Conductor || m.kind == MaterialKind::CoatedDiffuse || coatedConductor)) ||
+						 (p.name == "interface.roughness" && coatedConductor);
+	const bool conductorSlot = p.name == "conductor.roughness" && coatedConductor;
+	if ((primary || conductorSlot) && !p.strings.empty()) {
+		RoughnessImage img;
+		if (resolveRoughnessImage(scene, p.strings[0], warn, img)) {
+			if (primary) {
+				m.roughnessTextureFilename = img.file;
+				m.roughnessTextureOptions = img.options;
+				m.roughnessTextureScale = img.scale;
+				m.roughnessTextureMapping = img.mapping;
+			} else {
+				m.condRoughnessTextureFilename = img.file;
+				m.condRoughnessTextureOptions = img.options;
+				m.condRoughnessTextureScale = img.scale;
+				m.condRoughnessTextureMapping = img.mapping;
+			}
+			TextureAverage avg;
+			avg.param = p.name;
+			if (buildTextureMean(scene, p.strings[0], avg.nodes) >= 0) m.textureAverages.push_back(std::move(avg));
+			return true;
+		}
+		return false;   // (not an image: the caller averages it)
+	}
 	if (m.kind == MaterialKind::Dielectric &&
 		p.name == "roughness" && !p.strings.empty()) {
 		const pbrt_scene::TextureDecl *tex = findTexture(scene, p.strings[0]);

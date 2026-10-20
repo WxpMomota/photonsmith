@@ -1337,15 +1337,15 @@ TEST(FlattenMaterialTest, SubsurfaceReflectanceGivenAsAnImageIsKeptForTheHit) {
 }
 
 // A texture bound to a parameter the renderers cannot evaluate per hit becomes a recipe for its mean (pbrt_load resolves it), not a silent constant.
-TEST(FlattenMaterialTest, ARoughnessMapOnAConductorLeavesAMeanRecipe) {
+TEST(FlattenMaterialTest, AColourImageOnAConductorLeavesAMeanRecipe) {
 	const FlatScene s = flattenSource(
-		"Texture \"r\" \"float\" \"imagemap\" \"string filename\" [ \"rough.png\" ] \"float scale\" [ 0.5 ]\n"
-		"Material \"conductor\" \"texture roughness\" [ \"r\" ]\n"
+		"Texture \"r\" \"spectrum\" \"imagemap\" \"string filename\" [ \"rough.png\" ] \"float scale\" [ 0.5 ]\n"
+		"Material \"conductor\" \"texture reflectance\" [ \"r\" ]\n"
 		+ std::string(kQuadMesh));
 	ASSERT_EQ(s.materials.size(), 1u);
 	ASSERT_EQ(s.materials[0].textureAverages.size(), 1u);
 	const TextureAverage &avg = s.materials[0].textureAverages[0];
-	EXPECT_EQ(avg.param, "roughness");
+	EXPECT_EQ(avg.param, "reflectance");
 	ASSERT_EQ(avg.nodes.size(), 1u);
 	EXPECT_EQ(avg.nodes[0].kind, TexMeanNode::Kind::Image);
 	EXPECT_EQ(avg.nodes[0].file, "rough.png");
@@ -1410,4 +1410,33 @@ TEST(FlattenMaterialTest, ALayeredMaterialWithNothingSetKeepsPbrtsDefaults) {
 	EXPECT_DOUBLE_EQ(m.layerMediumAlbedo, 0.0);
 	EXPECT_EQ(m.layerMaxDepth, 10);
 	EXPECT_EQ(m.layerNSamples, 1);
+}
+
+// A roughness image on a Conductor, a CoatedDiffuse or a CoatedConductor is kept to be read per hit (with its scale), and its mean stays as the flat fallback.
+TEST(FlattenMaterialTest, ARoughnessImageOnAConductorIsKeptForPerHitReadingWithItsScale) {
+	const FlatScene s = flattenSource(
+		"Texture \"r\" \"float\" \"imagemap\" \"string filename\" [ \"rough.png\" ] \"float scale\" [ 0.5 ]\n"
+		"Material \"conductor\" \"texture roughness\" [ \"r\" ]\n"
+		+ std::string(kQuadMesh));
+	ASSERT_EQ(s.materials.size(), 1u);
+	const Material &m = s.materials[0];
+	EXPECT_EQ(m.roughnessTextureFilename, "rough.png");
+	EXPECT_DOUBLE_EQ(m.roughnessTextureScale, 0.5);
+	ASSERT_EQ(m.textureAverages.size(), 1u) << "the mean is the fallback for a path that cannot read the image";
+	EXPECT_EQ(m.textureAverages[0].param, "roughness");
+	EXPECT_FALSE(warnedAbout(s, "not supported"));
+}
+
+TEST(FlattenMaterialTest, ACoatedConductorsTwoRoughnessImagesGoToTheirOwnSlots) {
+	const FlatScene s = flattenSource(
+		"Texture \"coat\" \"float\" \"imagemap\" \"string filename\" [ \"coat.png\" ]\n"
+		"Texture \"base\" \"float\" \"scale\" \"texture tex\" [ \"baseimg\" ] \"float scale\" [ 2 ]\n"
+		"Texture \"baseimg\" \"float\" \"imagemap\" \"string filename\" [ \"base.png\" ]\n"
+		"Material \"coatedconductor\" \"texture interface.roughness\" [ \"coat\" ] \"texture conductor.roughness\" [ \"base\" ]\n"
+		+ std::string(kQuadMesh));
+	ASSERT_EQ(s.materials.size(), 1u);
+	const Material &m = s.materials[0];
+	EXPECT_EQ(m.roughnessTextureFilename, "coat.png");
+	EXPECT_EQ(m.condRoughnessTextureFilename, "base.png");
+	EXPECT_DOUBLE_EQ(m.condRoughnessTextureScale, 2.0) << "a constant scale texture around the image";
 }

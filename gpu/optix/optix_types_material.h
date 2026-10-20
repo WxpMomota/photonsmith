@@ -380,6 +380,13 @@ struct MaterialData {
 	float layerAlbedo = 0.0f;
 	int   layerMaxDepth = 10;
 	int   layerNSamples = 1;
+	// Conductor, CoatedDiffuse and CoatedConductor: a roughness IMAGE (index into LaunchParams::textures, -1 = none) and its scale, read at each hit by patch_roughness_textures() /
+	// wf_patch_roughness_textures(), which overwrite the flat roughness for that hit. roughTex is the coat's (the only roughness of a Conductor or CoatedDiffuse), condRoughTex the
+	// CoatedConductor's base conductor. The flat roughness fields hold the image's mean, for a path that does not read the image (GPU SPPM).
+	int   roughTexIdx = -1;
+	float roughTexScale = 1.0f;
+	int   condRoughTexIdx = -1;
+	float condRoughTexScale = 1.0f;
 
 	// Medium / DielectricMedium only: the PER-CHANNEL coefficients of a homogeneous medium whose extinction differs between colour
 	// channels (sigma_t = chromaSigmaA + chromaSigmaS). All zero (the default) for a grey medium, which keeps using the scalar

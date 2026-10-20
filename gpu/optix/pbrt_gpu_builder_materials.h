@@ -467,6 +467,22 @@ inline float3 resolveMixColor(const pbrt_flatten::Material &m,
 					   ca.z * (1.0f - w) + cb.z * w);
 }
 
+// A roughness IMAGE on a Conductor, CoatedDiffuse or CoatedConductor (Material::roughnessTextureFilename / condRoughnessTextureFilename): the texture and its scale go into the
+// MaterialData, and the device reads the image at each hit (patch_roughness_textures(), optix_device_textures.h / wf_patch_roughness_textures(), wavefront_device_common.h).
+// The flat roughness the caller stored stays as the fallback (the image's mean, from pbrt_load) for a path that does not read it (GPU SPPM).
+inline void setRoughnessTextures(const pbrt_flatten::Material &m, MaterialData &d, SceneData &out, std::map<std::string, int> &imageTextureCache) {
+	if (!m.roughnessTextureFilename.empty()) {
+		const int idx = getOrBuildPbrtImageTexture(m.roughnessTextureFilename, out, imageTextureCache, static_cast<float>(m.roughnessTextureOptions.gamma),
+												   static_cast<GpuWrapMode>(m.roughnessTextureOptions.wrapIndex), m.roughnessTextureOptions.invert, m.roughnessTextureMapping);
+		if (idx >= 0) { d.roughTexIdx = idx; d.roughTexScale = static_cast<float>(m.roughnessTextureScale); }
+	}
+	if (!m.condRoughnessTextureFilename.empty()) {
+		const int idx = getOrBuildPbrtImageTexture(m.condRoughnessTextureFilename, out, imageTextureCache, static_cast<float>(m.condRoughnessTextureOptions.gamma),
+												   static_cast<GpuWrapMode>(m.condRoughnessTextureOptions.wrapIndex), m.condRoughnessTextureOptions.invert, m.condRoughnessTextureMapping);
+		if (idx >= 0) { d.condRoughTexIdx = idx; d.condRoughTexScale = static_cast<float>(m.condRoughnessTextureScale); }
+	}
+}
+
 // Resolves whichever procedural (non-file) reflectance texture kind `m` has
 // set - checkerboard/FBm/marble/mix/windy/wrinkled/dots/bilerp, in the same
 // priority order as makeMaterial()'s own imagemap-then-procedural chain -
@@ -796,6 +812,7 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 		// colliding with the isotropic sentinel.
 		d.roughness  = static_cast<float>(m.roughness_u);
 		d.roughnessV = static_cast<float>(m.roughness_v);
+		setRoughnessTextures(m, d, out, imageTextureCache);
 		break;
 	// Pass-through "interface" material (pbrt-v4's Material "none"/"" -
 	// see MaterialKind::Interface's own comment). flatten() already forced
@@ -930,6 +947,7 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 		// identical-shape override above for the full rationale.
 		d.roughness  = static_cast<float>(m.roughness_u);
 		d.roughnessV = static_cast<float>(m.roughness_v);
+		setRoughnessTextures(m, d, out, imageTextureCache);
 		break;
 	case pbrt_flatten::MaterialKind::DiffuseTransmission:
 		d.type = MaterialType::DiffuseTransmission;
@@ -989,6 +1007,7 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 		// identical-shape override above for the full rationale.
 		d.roughness  = static_cast<float>(m.roughness_u);
 		d.roughnessV = static_cast<float>(m.roughness_v);
+		setRoughnessTextures(m, d, out, imageTextureCache);
 		d.condRoughness  = static_cast<float>(m.conductorRoughness_u);
 		d.condRoughnessV = static_cast<float>(m.conductorRoughness_v);
 		d.layerThickness = static_cast<float>(m.coatThickness);

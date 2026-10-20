@@ -631,6 +631,31 @@ inline std::shared_ptr<material> makeMaterial(const pbrt_flatten::Material &m,
 											  const std::vector<pbrt_flatten::Material> &allMaterials,
 											  int depth,
 											  bool forCurve) {
+	// A roughness IMAGE on a Conductor, CoatedDiffuse or CoatedConductor (Material::roughnessTextureFilename / condRoughnessTextureFilename): a material rebuilt at each hit with that
+	// hit's roughness (roughness_mapped_material). The factory remakes the material from a copy of the flat one with the image slots cleared and the roughness set.
+	if (!emission && (m.kind == pbrt_flatten::MaterialKind::Conductor || m.kind == pbrt_flatten::MaterialKind::CoatedDiffuse || m.kind == pbrt_flatten::MaterialKind::CoatedConductor) &&
+		(!m.roughnessTextureFilename.empty() || !m.condRoughnessTextureFilename.empty())) {
+		const auto roughnessImage = [](const std::string &file, const pbrt_flatten::TextureDecodeOptions &options, const pbrt_flatten::UvMapping &map) -> shared_ptr<texture> {
+			if (file.empty()) return nullptr;
+			shared_ptr<texture> tex = sharedMipmapTexture(file.c_str(), toMipMapOptions(options));
+			if (!map.identity()) tex = std::make_shared<uv_mapped_texture>(tex, map.su, map.sv, map.du, map.dv);
+			return tex;
+		};
+		const shared_ptr<texture> coatTex = roughnessImage(m.roughnessTextureFilename, m.roughnessTextureOptions, m.roughnessTextureMapping);
+		const shared_ptr<texture> condTex = roughnessImage(m.condRoughnessTextureFilename, m.condRoughnessTextureOptions, m.condRoughnessTextureMapping);
+		auto flat = std::make_shared<const pbrt_flatten::Material>(m);
+		const double coatFlat = m.roughness_u, condFlat = m.conductorRoughness_u >= 0.0 ? m.conductorRoughness_u : m.roughness_u;
+		const bool hadCoat = coatTex != nullptr, hadCond = condTex != nullptr;
+		roughness_mapped_material::Factory factory = [flat, hadCoat, hadCond, forCurve](double coat, double cond) -> shared_ptr<material> {
+			pbrt_flatten::Material mm = *flat;
+			mm.roughnessTextureFilename.clear();
+			mm.condRoughnessTextureFilename.clear();
+			if (hadCoat) { mm.roughness = mm.roughness_u = mm.roughness_v = coat; }
+			if (hadCond) { mm.conductorRoughness_u = mm.conductorRoughness_v = cond; }
+			return makeMaterial(mm, nullptr, {}, 0, forCurve);
+		};
+		return std::make_shared<roughness_mapped_material>(std::move(factory), coatTex, m.roughnessTextureScale, coatFlat, condTex, m.condRoughnessTextureScale, condFlat);
+	}
 	std::shared_ptr<material> made = makeMaterialBase(m, emission, allMaterials, depth, forCurve);
 	if (emission) return made;
 	// The layered materials' thickness, medium and random-walk controls (pbrt's thickness, g, albedo, maxdepth, nsamples), on whichever constructor built it.

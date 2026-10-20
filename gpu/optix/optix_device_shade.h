@@ -1105,6 +1105,19 @@ __device__ __forceinline__ void shade_material_surface(
 
 // A lamp that also reflects (lamp_reflects(), optix_types_material.h) shades as a diffuse surface: the caller's `emission` is reset to just the light that surface collects, and
 // the lamp's OWN light, weighted against the light sampling like any emitter hit, is added by the hit program (lamp_own_emission()) since only it knows the shape's light pdf.
+// A roughness image on a Conductor, CoatedDiffuse or CoatedConductor (MaterialData::roughTexIdx / condRoughTexIdx): this hit's roughness, in a per-hit copy of the material.
+__device__ __forceinline__ void patch_roughness_textures(MaterialData& view, float uv_u, float uv_v, const float3& hit_point) {
+	if (view.roughTexIdx >= 0) {
+		view.roughness = fmaxf(0.0f, view.roughTexScale * sample_texture(view.roughTexIdx, uv_u, uv_v, hit_point).x);
+		view.roughnessV = -1.0f;   // (isotropic: the image is one roughness)
+	}
+	if (view.condRoughTexIdx >= 0) {
+		const float c = fmaxf(0.0f, view.condRoughTexScale * sample_texture(view.condRoughTexIdx, uv_u, uv_v, hit_point).x);
+		view.condRoughness = c;
+		view.condRoughnessV = c;
+	}
+}
+
 __device__ __forceinline__ void shade_material(
 	const MaterialData& mat,
 	int matIdx,
@@ -1133,6 +1146,14 @@ __device__ __forceinline__ void shade_material(
 		view.type = MaterialType::Lambertian;
 		view.textureIdx = -1;   // (the texture of a lamp is its emission, not its reflectance)
 		emission = make_float3(0.0f, 0.0f, 0.0f);
+		shade_material_surface(view, matIdx, normal, ray_dir, hit_point, front_face, uv_u, uv_v, dpdu, do_regularize, seed,
+			out_attenuation, out_scattered_dir, out_scattered, out_is_specular, out_is_medium_boundary, out_brdf_pdf_override, emission,
+			out_bssrdf_exit, out_bssrdf_exit_pos, out_eta, inout_rgb_channel);
+		return;
+	}
+	if (mat.roughTexIdx >= 0 || mat.condRoughTexIdx >= 0) {
+		MaterialData view = mat;   // (a copy for this hit only, with this hit's roughness)
+		patch_roughness_textures(view, uv_u, uv_v, hit_point);
 		shade_material_surface(view, matIdx, normal, ray_dir, hit_point, front_face, uv_u, uv_v, dpdu, do_regularize, seed,
 			out_attenuation, out_scattered_dir, out_scattered, out_is_specular, out_is_medium_boundary, out_brdf_pdf_override, emission,
 			out_bssrdf_exit, out_bssrdf_exit_pos, out_eta, inout_rgb_channel);

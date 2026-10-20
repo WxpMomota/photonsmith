@@ -1,0 +1,47 @@
+# @rt-category Test Scenes
+# @rt-description Roughness read from a picture, per pixel: a conductor sphere, a coated diffuse sphere and a coated conductor sphere (coat and base) whose roughness is a checker of smooth and rough squares, as pbrt draws them.
+# @rt-performance Fast
+# @rt-size 8
+# texture-params.pbrt -- a parameter bound to a texture is evaluated per hit, not as the texture's average: here the roughness of a conductor, of a coated diffuse's coat and of a coated conductor's coat and base is a
+# 64 x 64 checker (0.05 and 0.6) read through the spheres' own uv. The average (0.325) would draw all three evenly glossy; per pixel, half the sphere is a mirror and half is rough. Original, no licence constraints.
+
+LookAt 0 2.2 10   0 0.9 0   0 1 0
+Camera "perspective" "float fov" [ 40 ]
+
+Film "rgb" "integer xresolution" [ 64 ] "integer yresolution" [ 64 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+Integrator "volpath" "integer maxdepth" [ 8 ]
+
+WorldBegin
+
+LightSource "infinite" "rgb L" [ 0.25 0.3 0.4 ]
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 12 12 12 ]
+  Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+    "point3 P" [ -2 3.5 -2   2 3.5 -2   2 3.5 2   -2 3.5 2 ]
+AttributeEnd
+
+Texture "checker" "float" "imagemap" "string filename" [ "texture-params-rough.png" ] "string encoding" [ "linear" ]
+
+Material "diffuse" "rgb reflectance" [ 0.5 0.5 0.45 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -7 0 -6   7 0 -6   7 0 6   -7 0 6 ]
+
+AttributeBegin
+  Translate -2.2 0.9 0
+  Material "conductor" "spectrum eta" "metal-Cu-eta" "spectrum k" "metal-Cu-k" "texture roughness" [ "checker" ]
+  Shape "sphere" "float radius" 0.9
+AttributeEnd
+
+AttributeBegin
+  Translate 0 0.9 0
+  Material "coateddiffuse" "rgb reflectance" [ 0.7 0.2 0.15 ] "texture roughness" [ "checker" ]
+  Shape "sphere" "float radius" 0.9
+AttributeEnd
+
+AttributeBegin
+  Translate 2.2 0.9 0
+  Material "coatedconductor" "spectrum conductor.eta" "metal-Au-eta" "spectrum conductor.k" "metal-Au-k"
+    "texture interface.roughness" [ "checker" ] "texture conductor.roughness" [ "checker" ]
+  Shape "sphere" "float radius" 0.9
+AttributeEnd

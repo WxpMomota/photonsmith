@@ -379,6 +379,17 @@ struct Material {
 	// transmittanceTextureOptions' own comment just above.
 	TextureDecodeOptions roughnessTextureOptions;
 
+	// A roughness image on a Conductor, CoatedDiffuse or CoatedConductor (the coat's roughness: "roughness" / "interface.roughness"), evaluated per hit like the Dielectric's above, and
+	// the CoatedConductor's base conductor ("conductor.roughness") in the cond* fields. Roughness at a hit = scale * the image's value (the imagemap's own "float scale", or a
+	// constant "scale" texture wrapped around it), placed by the imagemap's uv mapping, then remapped like a flat roughness (remaproughness). The flat roughness fields hold the
+	// image's MEAN when pbrt_load has read it (TextureAverage), for a backend that cannot read the image per hit (GPU SPPM, Metal).
+	double roughnessTextureScale = 1.0;
+	UvMapping roughnessTextureMapping;
+	std::string condRoughnessTextureFilename;
+	TextureDecodeOptions condRoughnessTextureOptions;
+	double condRoughnessTextureScale = 1.0;
+	UvMapping condRoughnessTextureMapping;
+
 	// A Diffuse material's "reflectance" bound to a "checkerboard" Texture
 	// instead of an "imagemap" one (e.g. named-material-and-texture.pbrt's
 	// "floor-check": Texture "floor-check" "spectrum" "checkerboard"

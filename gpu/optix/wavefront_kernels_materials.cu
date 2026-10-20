@@ -169,7 +169,24 @@ extern "C" __global__ void evaluate_materials(
 	if (idx >= numHits) return;
 
 	const HitWorkItem& h = hitQueue.items[idx];
-	const MaterialData& mat = materials[h.materialIdx];
+	// A roughness image on a Conductor, CoatedDiffuse or CoatedConductor (MaterialData::roughTexIdx / condRoughTexIdx): this hit shades with a copy of the material that carries
+	// this hit's roughness, so nothing below needs to know (the NEE reads the alpha this switch stores per hit). Every other material is used in place.
+	MaterialData matView;
+	const MaterialData* matPtr = &materials[h.materialIdx];
+	if (matPtr->roughTexIdx >= 0 || matPtr->condRoughTexIdx >= 0) {
+		matView = *matPtr;
+		if (matView.roughTexIdx >= 0) {
+			matView.roughness = fmaxf(0.0f, matView.roughTexScale * wf_sample_texture(textures, texturePixels, matView.roughTexIdx, h.uv_u, h.uv_v, h.hitPoint).x);
+			matView.roughnessV = -1.0f;   // (isotropic: the image is one roughness)
+		}
+		if (matView.condRoughTexIdx >= 0) {
+			const float c = fmaxf(0.0f, matView.condRoughTexScale * wf_sample_texture(textures, texturePixels, matView.condRoughTexIdx, h.uv_u, h.uv_v, h.hitPoint).x);
+			matView.condRoughness = c;
+			matView.condRoughnessV = c;
+		}
+		matPtr = &matView;
+	}
+	const MaterialData& mat = *matPtr;
 
 	// Denoiser guide-layer AOV - primary-ray hits only (depth==0). See
 	// wf_accumulate_aov()'s own comment (above gpu_in_crop()) for why.

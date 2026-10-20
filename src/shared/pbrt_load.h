@@ -798,6 +798,19 @@ inline LoadResult loadFile(const std::string &path,
 
 		m.roughnessTextureFilename = resolved;
 	}
+	// The CoatedConductor's base conductor roughness image (Material::condRoughnessTextureFilename), resolved the same way.
+	for (pbrt_flatten::Material &m : r.scene.materials) {
+		if (m.condRoughnessTextureFilename.empty()) continue;
+		const std::string resolved = resolveExistingPath(sceneDir, m.condRoughnessTextureFilename);
+		if (resolved.empty()) {
+			r.scene.warnings.push_back(
+				{0, path, "material's conductor roughness texture image '" + m.condRoughnessTextureFilename +
+					"' could not be found; falling back to a constant roughness instead"});
+			m.condRoughnessTextureFilename.clear();
+			continue;
+		}
+		m.condRoughnessTextureFilename = resolved;
+	}
 
 	// Shape "alpha" cutout masks (Material::alphaTextureFilename - see that
 	// field's own comment). Same resolution convention as textureFilename
