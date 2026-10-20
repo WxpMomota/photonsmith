@@ -506,6 +506,9 @@ struct BssrdfProbeWorkItem {
 	// matIdx parameter) and is looked up again to read
 	// bssrdf_sigma_a/bssrdf_sigma_s/ior/textureIdx (-> bssrdfTables).
 	int    matIdx;
+	// The entry hit's texture coordinates: a Subsurface material whose reflectance is an image (MaterialData::transmittanceTextureIdx >= 0) gets its scattering
+	// coefficients from the image's value here (wf_bssrdf_probe_walk()).
+	float  uv_u, uv_v;
 	unsigned int seed;
 	float  throughput[kWFNWavelengths];
 	float  radiance[kWFNWavelengths];

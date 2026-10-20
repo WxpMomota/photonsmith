@@ -393,7 +393,9 @@ __device__ __forceinline__ void shade_subsurface(ShadeState& s) {
 	// camera.h's `if (!sample_bssrdf_exit(...)) break;`.
 	float3 exit_pos, exit_normal, Sp;
 	float pdf, sample_prob;
-	if (!bssrdf_probe_walk(mat, matIdx, hit_point, normal, seed,
+	float ss_sigma_a[3], ss_sigma_s[3];
+	bssrdf_hit_coefficients(mat, hit_point, s.uv_u, s.uv_v, ss_sigma_a, ss_sigma_s);   // (an image reflectance gives each hit its own)
+	if (!bssrdf_probe_walk(mat, matIdx, hit_point, normal, ss_sigma_a, ss_sigma_s, seed,
 							exit_pos, exit_normal, Sp, pdf, sample_prob)) {
 		scattered = false;
 		return;

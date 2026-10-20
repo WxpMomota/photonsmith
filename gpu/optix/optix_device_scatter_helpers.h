@@ -128,9 +128,28 @@ __device__ __forceinline__ void shade_normalized_fresnel(
 // __raygen__randomHit's own 100-iteration cap) so a pathological segment
 // (e.g. many thin, closely-stacked same-material faces) cannot turn into an
 // unbounded device loop.
+// The scattering coefficients of a Subsurface material at an entry hit: its own (sigma_a/sigma_s, resolved when the scene was built), or, for a reflectance given
+// by an image (transmittanceTextureIdx >= 0, the field reused as that image's index; the mean free path is bssrdf_sigma_a), the beam-diffusion table inverted for
+// the image's value at this hit (pbrt-v4 SubsurfaceMaterial::GetBSSRDF; src/shared/bssrdf.h's SubsurfaceFromDiffuse on the CPU).
+__device__ __forceinline__ void bssrdf_hit_coefficients(const MaterialData& mat, const float3& hit_point, float u, float v, float sigma_a[3], float sigma_s[3]) {
+	if (mat.transmittanceTextureIdx < 0) {
+		sigma_a[0] = mat.bssrdf_sigma_a.x; sigma_a[1] = mat.bssrdf_sigma_a.y; sigma_a[2] = mat.bssrdf_sigma_a.z;
+		sigma_s[0] = mat.bssrdf_sigma_s.x; sigma_s[1] = mat.bssrdf_sigma_s.y; sigma_s[2] = mat.bssrdf_sigma_s.z;
+		return;
+	}
+	const GpuBssrdfTable& table = params.bssrdfTables[mat.textureIdx];
+	const float3 texel = sample_texture(mat.transmittanceTextureIdx, u, v, hit_point) * mat.transmittanceScale;
+	const float reflectance[3] = { texel.x, texel.y, texel.z };
+	const float mfp[3] = { mat.bssrdf_sigma_a.x, mat.bssrdf_sigma_a.y, mat.bssrdf_sigma_a.z };
+	for (int c = 0; c < 3; ++c)
+		gpu_bssrdf_sigma_from_diffuse(params.bssrdfRhoSamples + table.rho_offset, params.bssrdfProfileCdf + table.profile_offset, table.n_rho, table.n_radius,
+		                              reflectance[c], mfp[c], sigma_a[c], sigma_s[c]);
+}
+
 __device__ __forceinline__ bool bssrdf_probe_walk(
 	const MaterialData& mat, int matIdx,
 	const float3& p0, const float3& axis0,
+	const float sigma_a[3], const float sigma_s[3],
 	unsigned int& seed,
 	float3& out_exit_pos, float3& out_exit_normal,
 	float3& out_Sp, float& out_pdf, float& out_sample_prob)
@@ -139,8 +158,6 @@ __device__ __forceinline__ bool bssrdf_probe_walk(
 	const float kPi = 3.14159265358979323846f;
 
 	const GpuBssrdfTable& table = params.bssrdfTables[mat.textureIdx];
-	const float sigma_a[3] = { mat.bssrdf_sigma_a.x, mat.bssrdf_sigma_a.y, mat.bssrdf_sigma_a.z };
-	const float sigma_s[3] = { mat.bssrdf_sigma_s.x, mat.bssrdf_sigma_s.y, mat.bssrdf_sigma_s.z };
 	float sigma_t[3], rho[3];
 	for (int c = 0; c < 3; ++c) {
 		sigma_t[c] = sigma_a[c] + sigma_s[c];

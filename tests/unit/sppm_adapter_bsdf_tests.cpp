@@ -725,3 +725,32 @@ TEST(SubsurfaceRoughEntry, SamplesAWeightedGlossyDielectricAndFlagsRefractions) 
 	EXPECT_GT(transmitted, 0.9 * n);   // Fresnel reflectance is a few percent here
 	EXPECT_LT(transmitted, n);
 }
+
+// A subsurface material whose reflectance is an image: the profile of a hit is the one a constant reflectance of the image's value there would give
+// (pbrt-v4 SubsurfaceMaterial::GetBSSRDF inverts the diffusion table at every intersection).
+TEST(SubsurfaceTexturedReflectanceTest, TheProfileOfAHitIsTheOneOfThatReflectance) {
+	const double eta = 1.33, g = 0.0;
+	const double mfp[3] = {0.4, 0.2, 0.1};
+	const color albedo(0.8, 0.5, 0.2);
+	subsurface textured(eta, std::make_shared<solid_color>(albedo), mfp, g);
+	ASSERT_TRUE(textured.has_textured_reflectance());
+
+	BSSRDFTable table(100, 64);
+	ComputeBeamDiffusionBSSRDF(g, eta, &table);
+	double sa[3], ss[3];
+	const double refl[3] = {albedo.x(), albedo.y(), albedo.z()};
+	for (int c = 0; c < 3; ++c) SubsurfaceFromDiffuse(table, refl[c], mfp[c], sa[c], ss[c]);
+	const TabulatedBSSRDF expected(sa, ss, &table, 3);
+
+	hit_record rec;
+	rec.u = 0.3; rec.v = 0.6;
+	const TabulatedBSSRDF got = textured.bssrdf_at(rec);
+	for (int c = 0; c < 3; ++c)
+		for (double r : {0.02, 0.1, 0.3, 0.8})
+			EXPECT_NEAR(got.sr(c, r), expected.sr(c, r), 1e-9 * std::max(1.0, expected.sr(c, r))) << "channel " << c << " radius " << r;
+
+	// A brighter albedo scatters further for the same mean free path: the profile differs between two reflectances, which a fixed profile cannot do.
+	subsurface bright(eta, std::make_shared<solid_color>(color(0.95, 0.95, 0.95)), mfp, g);
+	subsurface dark(eta, std::make_shared<solid_color>(color(0.2, 0.2, 0.2)), mfp, g);
+	EXPECT_GT(bright.bssrdf_at(rec).sr(0, 0.5), 1.01 * dark.bssrdf_at(rec).sr(0, 0.5) + 1e-12);
+}

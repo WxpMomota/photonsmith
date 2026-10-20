@@ -23,7 +23,9 @@ inline bool camera::sample_bssrdf_exit(hit_record& rec, scatter_record& srec,
                              : cross(vec3(1, 0, 0), axis));
     vec3 t2 = cross(axis, t1);
 
-    const TabulatedBSSRDF& bssrdf = ss->get_bssrdf();
+    // The profile of THIS entry hit (an image reflectance gives a different one at every point; the rec is overwritten by the exit point below, so it is taken now).
+    const TabulatedBSSRDF hitProfile = ss->has_textured_reflectance() ? ss->bssrdf_at(rec) : TabulatedBSSRDF();
+    const TabulatedBSSRDF& bssrdf = ss->has_textured_reflectance() ? hitProfile : ss->get_bssrdf();
 
     const int channel = std::min(2, static_cast<int>(random_double() * 3.0));
     const double r = bssrdf.sample_sr(channel, random_double());

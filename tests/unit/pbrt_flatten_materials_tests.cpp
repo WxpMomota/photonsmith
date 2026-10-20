@@ -1307,3 +1307,31 @@ TEST(PbrtFocusTest, ADegenerateCameraStillYieldsAUsableDistance) {
 	for (int i = 0; i < 3; ++i) { c.lookfrom[i] = 5; c.lookat[i] = 5; }
 	EXPECT_GT(pbrt_flatten::focusDistanceFor(c), 0.0);
 }
+
+TEST(FlattenMaterialTest, SubsurfaceReflectanceGivenAsAnImageIsKeptForTheHit) {
+	// pbrt-v4-scenes' head: "texture reflectance" bound to an imagemap, with "rgb mfp". The reflectance is looked up and inverted at every hit
+	// (SubsurfaceMaterial::GetBSSRDF), so flatten() keeps the image and the mean free path (times "scale") and does not warn.
+	const FlatScene s = flattenSource(
+		"Texture \"albedo\" \"spectrum\" \"imagemap\" \"string filename\" [ \"head_albedomap.png\" ]\n"
+		"Material \"subsurface\" \"texture reflectance\" [ \"albedo\" ] \"rgb mfp\" [ 0.5 0.25 0.125 ] \"float scale\" 2\n" +
+		std::string(kQuadMesh));
+	ASSERT_EQ(s.materials.size(), 1u);
+	EXPECT_EQ(s.materials[0].kind, MaterialKind::Subsurface);
+	EXPECT_TRUE(s.materials[0].subsurfaceTexturedReflectance);
+	EXPECT_EQ(s.materials[0].textureFilename, "head_albedomap.png");
+	EXPECT_NEAR(s.materials[0].subsurfaceMfp[0], 1.0, 1e-12);
+	EXPECT_NEAR(s.materials[0].subsurfaceMfp[1], 0.5, 1e-12);
+	EXPECT_NEAR(s.materials[0].subsurfaceMfp[2], 0.25, 1e-12);
+	EXPECT_FALSE(warnedAbout(s, "reflectance"));
+
+	// a constant reflectance is still resolved once
+	const FlatScene c = flattenSource("Material \"subsurface\" \"rgb reflectance\" [ 0.8 0.8 0.8 ] \"rgb mfp\" [ 0.4 0.4 0.4 ]\n" + std::string(kQuadMesh));
+	EXPECT_FALSE(c.materials[0].subsurfaceTexturedReflectance);
+
+	// a pattern texture is not an image: still warned about, and the default coefficients stand
+	const FlatScene p = flattenSource(
+		"Texture \"chk\" \"spectrum\" \"checkerboard\"\n"
+		"Material \"subsurface\" \"texture reflectance\" [ \"chk\" ]\n" + std::string(kQuadMesh));
+	EXPECT_FALSE(p.materials[0].subsurfaceTexturedReflectance);
+	EXPECT_TRUE(warnedAbout(p, "reflectance"));
+}

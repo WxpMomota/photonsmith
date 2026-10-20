@@ -64,6 +64,9 @@ __device__ __forceinline__ float wf_rand(unsigned int& seed) {
 // bssrdfProfileCdf instead of params.*.
 // ---------------------------------------------------------------------------
 
+#include "gpu_bssrdf_invert.h"          // SubsurfaceFromDiffuse, for a Subsurface material whose reflectance is an image
+#include "wavefront_texture_sample.h"   // wf_sample_texture: that image's value at the entry hit
+
 __device__ __forceinline__ int wf_gpu_find_interval_le(const float* arr, int n, float x) {
 	int size = n - 2, first = 1;
 	while (size > 0) {
@@ -522,6 +525,7 @@ __device__ __forceinline__ WfProbePayload wf_trace_probe_ray(
 __device__ __forceinline__ bool wf_bssrdf_probe_walk(
 	int matIdx,
 	const float3& p0, const float3& axis0,
+	float uv_u, float uv_v,
 	unsigned int& seed,
 	float3& out_exit_pos, float3& out_exit_normal,
 	float3& out_Sp, float& out_pdf, float& out_sample_prob,
@@ -532,8 +536,18 @@ __device__ __forceinline__ bool wf_bssrdf_probe_walk(
 
 	const MaterialData& mat = wf_params.materials[matIdx];
 	const GpuBssrdfTable& table = wf_params.bssrdfTables[mat.textureIdx];
-	const float sigma_a[3] = { mat.bssrdf_sigma_a.x, mat.bssrdf_sigma_a.y, mat.bssrdf_sigma_a.z };
-	const float sigma_s[3] = { mat.bssrdf_sigma_s.x, mat.bssrdf_sigma_s.y, mat.bssrdf_sigma_s.z };
+	// The material's own coefficients, or - a reflectance given by an image (transmittanceTextureIdx >= 0; the mean free path is bssrdf_sigma_a) - the table inverted
+	// for the image's value at the entry hit (the recursive backend's bssrdf_hit_coefficients(): same maths, optix_device_scatter_helpers.h).
+	float sigma_a[3] = { mat.bssrdf_sigma_a.x, mat.bssrdf_sigma_a.y, mat.bssrdf_sigma_a.z };
+	float sigma_s[3] = { mat.bssrdf_sigma_s.x, mat.bssrdf_sigma_s.y, mat.bssrdf_sigma_s.z };
+	if (mat.transmittanceTextureIdx >= 0) {
+		const float3 texel = wf_sample_texture(wf_params.textures, wf_params.texturePixels, mat.transmittanceTextureIdx, uv_u, uv_v, p0) * mat.transmittanceScale;
+		const float reflectance[3] = { texel.x, texel.y, texel.z };
+		const float mfp[3] = { mat.bssrdf_sigma_a.x, mat.bssrdf_sigma_a.y, mat.bssrdf_sigma_a.z };
+		for (int c = 0; c < 3; ++c)
+			gpu_bssrdf_sigma_from_diffuse(wf_params.bssrdfRhoSamples + table.rho_offset, wf_params.bssrdfProfileCdf + table.profile_offset, table.n_rho, table.n_radius,
+			                              reflectance[c], mfp[c], sigma_a[c], sigma_s[c]);
+	}
 	float sigma_t[3], rho[3];
 	for (int c = 0; c < 3; ++c) {
 		sigma_t[c] = sigma_a[c] + sigma_s[c];
@@ -671,7 +685,7 @@ extern "C" __global__ void __raygen__wf_probe() {
 
 	float3 exitPos, exitNormal, Sp;
 	float pdf, sampleProb;
-	bool found = wf_bssrdf_probe_walk(item.matIdx, item.p0, item.axis0, seed,
+	bool found = wf_bssrdf_probe_walk(item.matIdx, item.p0, item.axis0, item.uv_u, item.uv_v, seed,
 									   exitPos, exitNormal, Sp, pdf, sampleProb, item.time);
 	exitItem.seed = seed;
 	if (found) {

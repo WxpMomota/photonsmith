@@ -1010,6 +1010,15 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 		// same field NormalizedFresnel(ior=eta) reads at the found exit
 		// point (shade_material()'s probe-walk success path).
 		d.textureIdx = getOrBuildBssrdfTable(m.g, m.ior, out, bssrdfTableCache);
+		// A reflectance given by an image (the pbrt-v4-scenes head): the table is inverted for the image's value at each hit on the device (bssrdf_hit_coefficients() /
+		// wf_bssrdf_probe_walk()), so the image goes in transmittanceTextureIdx (this kind has no transmittance: the field is free) with its "scale" in transmittanceScale,
+		// and bssrdf_sigma_a, which a fixed material uses for sigma_a, holds the mean free path instead (already times "scale").
+		if (m.subsurfaceTexturedReflectance && !m.textureFilename.empty()) {
+			d.transmittanceTextureIdx = getOrBuildPbrtImageTexture(m.textureFilename, out, imageTextureCache,
+				static_cast<float>(m.textureGamma), static_cast<GpuWrapMode>(m.textureWrapIndex), m.textureInvert, m.textureMapping);
+			d.transmittanceScale = static_cast<float>(m.textureScale);
+			d.bssrdf_sigma_a = make_float3(static_cast<float>(m.subsurfaceMfp[0]), static_cast<float>(m.subsurfaceMfp[1]), static_cast<float>(m.subsurfaceMfp[2]));
+		}
 		// The entry interface's roughness (pbrt's "roughness"; 0 = the smooth dielectric): u and v axes, remapped on the device like RoughDielectric's.
 		d.roughness  = static_cast<float>(m.roughness_u);
 		d.roughnessV = static_cast<float>(m.roughness_v);

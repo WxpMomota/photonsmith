@@ -201,6 +201,11 @@ struct Material {
 	double sigma_a[3] = {0.0011, 0.0024, 0.014};
 	double sigma_s[3] = {2.55, 3.21, 3.77};
 	double g = 0.0;   // Henyey-Greenstein asymmetry (subsurface only)
+	// Subsurface whose "reflectance" is an image (the pbrt-v4-scenes head: "texture reflectance" "albedomap" with "rgb mfp"): the image is textureFilename (and its
+	// options, like a Diffuse material's), and sigma_a/sigma_s come from inverting the diffusion table at EACH HIT, for that point's reflectance and this mean free
+	// path (pbrt-v4 SubsurfaceMaterial::GetBSSRDF), so sigma_a/sigma_s above are not used. False for a constant reflectance (resolved once in flatten()).
+	bool subsurfaceTexturedReflectance = false;
+	double subsurfaceMfp[3] = {1.0, 1.0, 1.0};   // the mean free path (already times "scale"), for subsurfaceTexturedReflectance
 
 	// Hair only - longitudinal/azimuthal roughness and cuticle scale-tilt
 	// angle (degrees). Defaults match pbrt-v4's own HairMaterial::Create

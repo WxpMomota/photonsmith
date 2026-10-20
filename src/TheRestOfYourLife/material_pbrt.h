@@ -1476,6 +1476,25 @@ class subsurface : public material {
         exit_bsdf_ = std::make_shared<normalized_fresnel>(eta);
     }
 
+    // A reflectance given by an image, and a mean free path (already times "scale"): pbrt-v4's SubsurfaceMaterial with "texture reflectance". There are no fixed
+    // sigma_a/sigma_s: bssrdf_at() looks the image up at the entry hit and inverts the diffusion table for that reflectance (SubsurfaceFromDiffuse), as
+    // SubsurfaceMaterial::GetBSSRDF does at every intersection.
+    subsurface(double eta, shared_ptr<texture> reflectance, const double mfp[3], double g,
+               double roughness_u = 0.0, double roughness_v = 0.0, bool remap_roughness = true)
+        : eta_(eta),
+          alpha_x_(layered_alpha(roughness_u, remap_roughness)),
+          alpha_y_(layered_alpha(roughness_v, remap_roughness)),
+          table_(100, 64),
+          reflectance_(std::move(reflectance)) {
+        ComputeBeamDiffusionBSSRDF(g, eta, &table_);
+        for (int c = 0; c < 3; ++c) {
+            mfp_[c] = mfp[c];
+            sigma_a_[c] = sigma_s_[c] = 0.0;
+        }
+        bssrdf_ = TabulatedBSSRDF(sigma_a_, sigma_s_, &table_, 3);   // (unused: bssrdf_at() builds the profile of each hit)
+        exit_bsdf_ = std::make_shared<normalized_fresnel>(eta);
+    }
+
     // table_ owns the profile grid and bssrdf_ points INTO it (see
     // TabulatedBSSRDF's own non-owning-pointer design in bssrdf.h) - copying
     // or moving a `subsurface` would leave bssrdf_ pointing at the source
@@ -1508,6 +1527,18 @@ class subsurface : public material {
 
     double get_ior() const { return eta_; }
     const TabulatedBSSRDF& get_bssrdf() const { return bssrdf_; }
+    bool has_textured_reflectance() const { return reflectance_ != nullptr; }
+    // The profile at this entry hit: the fixed one, or, for an image reflectance, the one whose effective albedo is the image's value here (pbrt-v4
+    // SubsurfaceMaterial::GetBSSRDF: reflectance clamped to [0, 1], mean free path from the material, SubsurfaceFromDiffuse per channel). Points into this
+    // material's table, so it lives as long as the material does.
+    TabulatedBSSRDF bssrdf_at(const hit_record& rec) const {
+        if (!reflectance_) return bssrdf_;
+        const color r = reflectance_->value_diff(rec.u, rec.v, rec.p, rec.dudx, rec.dvdx, rec.dudy, rec.dvdy);
+        const double refl[3] = {std::min(std::max(r.x(), 0.0), 1.0), std::min(std::max(r.y(), 0.0), 1.0), std::min(std::max(r.z(), 0.0), 1.0)};
+        double sig_a[3], sig_s[3];
+        for (int c = 0; c < 3; ++c) SubsurfaceFromDiffuse(table_, refl[c], std::max(mfp_[c], 1e-9), sig_a[c], sig_s[c]);
+        return TabulatedBSSRDF(sig_a, sig_s, &table_, 3);
+    }
     const shared_ptr<material>& get_exit_bsdf() const { return exit_bsdf_; }
 
   private:
@@ -1541,6 +1572,8 @@ class subsurface : public material {
     double sigma_s_[3];
     BSSRDFTable table_;              // owns the profile grid; bssrdf_ points into it
     TabulatedBSSRDF bssrdf_;
+    shared_ptr<texture> reflectance_;   // non-null: an image reflectance (second constructor), looked up and inverted at each entry hit
+    double mfp_[3] = {1.0, 1.0, 1.0};   // its mean free path
     shared_ptr<material> exit_bsdf_; // cached normalized_fresnel(eta_) -- Sw
 };
 

@@ -1,0 +1,22 @@
+# @rt-category Test Scenes
+# @rt-description A subsurface ball whose reflectance is an image, under a white sky: the scattering coefficients are worked out from the image's value at every hit (pbrt-v4's SubsurfaceMaterial with "texture reflectance", as in the pbrt-v4-scenes head), so the ball's mean is the one number pbrt-v4 and the renderers must agree on.
+# @rt-performance Fast
+# @rt-size 2
+# subsurface-textured-sky-ball.pbrt -- the ball of subsurface-sky-ball.pbrt with a checker picture for its reflectance instead of a constant.
+#
+# A reflectance given as a texture used to be ignored (the default coefficients were used and the loader warned): the pbrt-v4-scenes head came out as speckled blue-grey noise where
+# pbrt draws skin. The reflectance is clamped to [0, 1] and inverted through the beam-diffusion table at each hit, so the picture's mean is NOT the mean of one inverted value:
+# a loader that inverted the image's average would be off here. Original, so it carries no licence constraints (the picture is pbrt_scenes/uv-checker.bmp).
+
+LookAt 0 0 5   0 0 0   0 1 0
+Camera "perspective" "float fov" [ 10 ]
+Film "rgb" "integer xresolution" [ 48 ] "integer yresolution" [ 48 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+Integrator "volpath" "integer maxdepth" [ 30 ]
+WorldBegin
+LightSource "infinite" "rgb L" [ 1 1 1 ]
+Texture "albedo" "spectrum" "imagemap" "string filename" [ "uv-checker.bmp" ]
+AttributeBegin
+  Material "subsurface" "rgb mfp" [ 0.4 0.4 0.4 ] "texture reflectance" [ "albedo" ] "float eta" [ 1.33 ] "float roughness" [ 0 ]
+  Shape "sphere" "float radius" [ 1 ]
+AttributeEnd

@@ -430,6 +430,26 @@ TEST(PbrtMaterialTest, ReferencingAnUndeclaredMaterialIsFatal) {
 	EXPECT_NE(r.error.find("nope"), std::string::npos) << r.error;
 }
 
+TEST(PbrtMaterialTest, AnUndeclaredMaterialNoShapeDrawsWithIsNotAnError) {
+	// pbrt-v4 looks a named material up when the shape is made, so a NamedMaterial nothing draws with is harmless. The pbrt-v4-scenes Watercolor has one:
+	// "BG", for a background mesh whose Shape and MakeNamedMaterial are both commented out.
+	const ParseResult r = parse(
+		"AttributeBegin\n"
+		"  NamedMaterial \"BG\"\n"
+		"AttributeEnd\n"
+		"MakeNamedMaterial \"other\" \"string type\" \"diffuse\"\n"
+		"NamedMaterial \"other\"\n"
+		"Shape \"sphere\"\n");
+	EXPECT_TRUE(r.ok) << r.error;
+	// ... but one an object's shape uses is still fatal
+	const ParseResult o = parse(
+		"ObjectBegin \"o\"\n"
+		"  NamedMaterial \"nope\"\n"
+		"  Shape \"sphere\"\n"
+		"ObjectEnd\n");
+	EXPECT_FALSE(o.ok);
+}
+
 TEST(PbrtLightTest, LightSourceAndAreaLightSourceAreKeptApart) {
 	const Scene s = parseOk(
 		"LightSource \"infinite\" \"string filename\" \"sky.exr\"\n"

@@ -551,6 +551,8 @@ extern "C" __global__ void evaluate_materials(
 			probeItem.p0     = hit_point;
 			probeItem.axis0  = normal;
 			probeItem.matIdx = h.materialIdx;
+			probeItem.uv_u   = h.uv_u;
+			probeItem.uv_v   = h.uv_v;
 			probeItem.seed   = seed;
 			// pbrt-v4 etaScale, entry interface only - front_face is
 			// hardcoded true here (see this case's own comment), so

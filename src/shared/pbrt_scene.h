@@ -778,8 +778,20 @@ public:
 			}
 			if (!dispatch()) return result_;
 		}
-		for (const MaterialDecl &mat : s_.materials)
-			if (mat.forwardRef) return fail(mat.forwardLine, "NamedMaterial '" + mat.name + "' was never declared");
+		// A NamedMaterial that never got its MakeNamedMaterial is an error only when a shape draws with it (pbrt-v4 looks the name up when the shape is made):
+		// the pbrt-v4-scenes Watercolor names "BG" for a background mesh whose Shape and MakeNamedMaterial are both commented out.
+		const auto usedByAShape = [this](int index) {
+			for (const ShapeDecl &s : s_.shapes)
+				if (s.materialIndex == index) return true;
+			for (const ObjectDecl &o : s_.objects)
+				for (const ShapeDecl &s : o.shapes)
+					if (s.materialIndex == index) return true;
+			return false;
+		};
+		for (std::size_t i = 0; i < s_.materials.size(); ++i) {
+			const MaterialDecl &mat = s_.materials[i];
+			if (mat.forwardRef && usedByAShape(static_cast<int>(i))) return fail(mat.forwardLine, "NamedMaterial '" + mat.name + "' was never declared");
+		}
 		result_.ok = true;
 		result_.scene = s_;
 		return result_;

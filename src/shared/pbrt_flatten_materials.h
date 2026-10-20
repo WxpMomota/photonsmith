@@ -444,10 +444,12 @@ inline bool bindOtherProceduralReflectance(const pbrt_scene::Scene &scene, Mater
 // "reflectance" bound to a Texture on a diffuse-like material: an image, or one of the procedural patterns. True when it was resolved (so no "not supported" warning).
 inline bool bindReflectanceTexture(const pbrt_scene::Scene &scene, FlatScene &out, Material &m, const pbrt_scene::Param &p) {
 	if (!((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse ||
-		   m.kind == MaterialKind::DiffuseTransmission) &&
+		   m.kind == MaterialKind::DiffuseTransmission || m.kind == MaterialKind::Subsurface) &&
 		  p.name == "reflectance" && !p.strings.empty())) return false;
 	const pbrt_scene::TextureDecl *tex = findTexture(scene, p.strings[0]);
 	if (bindReflectanceImagemap(scene, out, m, tex)) return true;
+	// A subsurface material takes an image and nothing else for its reflectance (the pattern textures below have no meaning to its per-hit inversion here).
+	if (m.kind == MaterialKind::Subsurface) return false;
 	if (bindCheckerReflectance(scene, m, tex)) return true;
 	if (bindFbmOrMarbleReflectance(m, tex)) return true;
 	if (bindMixReflectance(scene, m, tex)) return true;
@@ -927,8 +929,13 @@ inline void readSubsurfaceParams(FlatScene &out, pbrt_scene::MaterialDecl &md, M
 				 "both are required together, so the default coefficients are used instead");
 		} else if (const pbrt_scene::Param *reflP = md.params.find("reflectance")) {
 			if (reflP->type == "texture") {
-				materialWarn(out, "material 'subsurface' binds \"reflectance\" to a texture; this loader inverts a constant "
-					 "reflectance+mfp into scattering coefficients, so the default coefficients are used instead");
+				// An image (bound just above, with the other texture parameters): the reflectance is looked up at every hit and inverted there, so only the mean free
+				// path is read here. Any other kind of texture was warned about by the binding and leaves the default coefficients.
+				if (!m.textureFilename.empty()) {
+					m.subsurfaceTexturedReflectance = true;
+					const pbrt_scene::Vec3 f = md.params.getVec3("mfp", pbrt_scene::Vec3{1.0, 1.0, 1.0});   // pbrt's default mean free path is 1
+					m.subsurfaceMfp[0] = f.x * scale; m.subsurfaceMfp[1] = f.y * scale; m.subsurfaceMfp[2] = f.z * scale;
+				}
 			} else {
 				reflectanceMode = true;
 				const pbrt_scene::Vec3 r = md.params.getVec3("reflectance", pbrt_scene::Vec3{1.0, 1.0, 1.0});

@@ -19,6 +19,8 @@
 // `params`; see that struct's own comment for why rho_eff is derived from
 // bssrdfProfileCdf's last column rather than uploaded separately.
 
+#include "gpu_bssrdf_invert.h"   // pbrt's SubsurfaceFromDiffuse, for a Subsurface material whose reflectance is an image
+
 // ---------------------------------------------------------------------------
 // gpu_find_interval_le -- binary search for the largest i in [0, n-2] such
 // that arr[i] <= x. Mirrors src/shared/sampling_2d.h's
