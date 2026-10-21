@@ -1422,6 +1422,21 @@ void PbrtSceneLoader::loadPbrtInfiniteLight(const pbrt_flatten::FlatScene& scene
                 pbrtPortalP0 = toWorld(float3{(float)corners[0].x, (float)corners[0].y, (float)corners[0].z});
                 pbrtPortalP2 = toWorld(float3{(float)corners[2].x, (float)corners[2].y, (float)corners[2].z});
                 fprintf(stderr, "loadPbrtScene: portal infinite light found (%dx%d, scale=%.3g)\n", pbrtPortalWidth, pbrtPortalHeight, pbrtPortalScale);
+                // A plain sky beside the portals: pbrt sums every infinite light (FlatScene::skyBesidePortals; a constant colour is exact, a picture is drawn as its mean colour).
+                havePbrtSkyBesidePortals = false;
+                if (scene.skyBesidePortals.present) {
+                    const pbrt_flatten::InfiniteLight& sky = scene.skyBesidePortals;
+                    double rgb[3] = {sky.L[0], sky.L[1], sky.L[2]};
+                    if (sky.imageWidth > 0 && sky.imageHeight > 0 && !sky.imagePixels.empty()) {
+                        double sum[3] = {0, 0, 0};
+                        const size_t count = (size_t)sky.imageWidth * (size_t)sky.imageHeight;
+                        for (size_t i = 0; i < count; ++i) for (int c = 0; c < 3; ++c) sum[c] += sky.imagePixels[i * 3 + c];
+                        for (int c = 0; c < 3; ++c) rgb[c] = sum[c] / (double)count;
+                        fprintf(stderr, "loadPbrtScene: the plain sky beside the portal light has a picture; Metal draws it as its mean colour\n");
+                    }
+                    havePbrtSkyBesidePortals = true;
+                    pbrtSkyBesidePortalsColor = float3{(float)(rgb[0] * sky.scale), (float)(rgb[1] * sky.scale), (float)(rgb[2] * sky.scale)};
+                }
                 // Further portals (src/shared/portal_light_set.h draws their sum): the same recipe for each, kept in pbrtExtraPortals.
                 pbrtExtraPortals.clear();
                 for (const pbrt_flatten::InfiniteLight& extra : scene.extraPortalLights) {
