@@ -231,6 +231,14 @@ struct PbrtSceneLoader {
     float pbrtPortalScale = 1.0f;
     float3 pbrtPortalFrameX{1, 0, 0}, pbrtPortalFrameY{0, 1, 0}, pbrtPortalFrameZ{0, 0, 1};
     float3 pbrtPortalP0{0, 0, 0}, pbrtPortalP2{0, 0, 0};
+    // Every portal infinite light after the main one (a pbrt file may have several; FlatScene::extraPortalLights): the same data as the main one's members above, one entry each.
+    struct PbrtExtraPortal {
+        std::vector<float> rectified, distFunc, satSum;
+        int width = 0, height = 0;
+        float scale = 1.0f;
+        float3 frameX{1, 0, 0}, frameY{0, 1, 0}, frameZ{0, 0, 1}, p0{0, 0, 0}, p2{0, 0, 0};
+    };
+    std::vector<PbrtExtraPortal> pbrtExtraPortals;
 
     // Set by loadPbrtScene() for the FIRST pbrt-loaded goniometric/
     // projection light that names a real profile/slide image and

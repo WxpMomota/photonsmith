@@ -567,8 +567,30 @@ bool MetalPocApp::dsUploadSamplingTables(DispatchState& s) {
         // pbrtEnvSampleDirection()/pbrtEnvLeAt()/pbrtEnvPdfAt(), which switch on Uniforms::pbrtHasPortalLight.
         std::vector<float> distAndSat(pbrtPortalDistFunc);
         distAndSat.insert(distAndSat.end(), pbrtPortalSatSum.begin(), pbrtPortalSatSum.end());
+        std::vector<float> rect(pbrtPortalRectified);
+        // Further portals: a 24-float header each right after the first picture (frame, corners, size, scale, and where its picture and its distribution start), then their data.
+        // Uniforms::pbrtPortalExtraBase / Count say where the headers are (applyPbrtSkyUniforms()).
+        const size_t headerBase = rect.size();
+        rect.resize(headerBase + 24 * pbrtExtraPortals.size());
+        for (size_t k = 0; k < pbrtExtraPortals.size(); ++k) {
+            const PbrtExtraPortal& e = pbrtExtraPortals[k];
+            float* h = &rect[headerBase + 24 * k];
+            const float3 axes[5] = {e.frameX, e.frameY, e.frameZ, e.p0, e.p2};
+            for (int a = 0; a < 5; ++a) { h[3 * a] = axes[a].x; h[3 * a + 1] = axes[a].y; h[3 * a + 2] = axes[a].z; }
+            h[15] = (float)e.width; h[16] = (float)e.height; h[17] = e.scale;
+            h[18] = (float)rect.size();   // (set after the headers are all in place: see below)
+        }
+        for (size_t k = 0; k < pbrtExtraPortals.size(); ++k) {
+            const PbrtExtraPortal& e = pbrtExtraPortals[k];
+            const size_t rectOffset = rect.size(), distOffset = distAndSat.size();
+            rect.insert(rect.end(), e.rectified.begin(), e.rectified.end());
+            distAndSat.insert(distAndSat.end(), e.distFunc.begin(), e.distFunc.end());
+            distAndSat.insert(distAndSat.end(), e.satSum.begin(), e.satSum.end());
+            float* h = &rect[headerBase + 24 * k];
+            h[18] = (float)rectOffset; h[19] = (float)distOffset;
+        }
         pbrtEnvMarginalCDFBuffer = [device newBufferWithBytes:distAndSat.data() length:distAndSat.size() * sizeof(float) options:MTLResourceStorageModeShared];
-        pbrtEnvConditionalCDFBuffer = [device newBufferWithBytes:pbrtPortalRectified.data() length:pbrtPortalRectified.size() * sizeof(float) options:MTLResourceStorageModeShared];
+        pbrtEnvConditionalCDFBuffer = [device newBufferWithBytes:rect.data() length:rect.size() * sizeof(float) options:MTLResourceStorageModeShared];
         pbrtEnvMapWidth = (uint32_t)pbrtPortalWidth;
         pbrtEnvMapHeight = (uint32_t)pbrtPortalHeight;
     } else if (!pbrtEnvDist.marginalCDF.empty()) {
@@ -763,6 +785,8 @@ void MetalPocApp::applyPbrtSkyUniforms(Uniforms& uniforms) {
         uniforms.portalFrameZ = PackedFloat3{pbrtPortalFrameZ.x, pbrtPortalFrameZ.y, pbrtPortalFrameZ.z};
         uniforms.portalP0 = PackedFloat3{pbrtPortalP0.x, pbrtPortalP0.y, pbrtPortalP0.z};
         uniforms.portalP2 = PackedFloat3{pbrtPortalP2.x, pbrtPortalP2.y, pbrtPortalP2.z};
+        uniforms.pbrtPortalExtraCount = (uint32_t)pbrtExtraPortals.size();
+        uniforms.pbrtPortalExtraBase = (uint32_t)pbrtPortalRectified.size();   // the headers follow the first portal's picture in the "conditional" buffer
     }
 }
 

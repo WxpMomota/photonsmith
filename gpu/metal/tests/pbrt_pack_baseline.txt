@@ -121,7 +121,7 @@ portal-light 0.9994 0.9993 0.9989
 portal-light-constant 1.0001 0.9999 1.0003
 portal-light-rotated 1.0010 1.0002 1.0010
 portal-light-turned 0.9995 0.9998 0.9996
-portal-light-two 0.9593 0.9413 0.9000  # known: Metal has the main portal light only; a second portal window's light is lost (Windows handoff 2026-10-20, 'several portal lights'); the CPU reads 1.001
+portal-light-two 1.0000 1.0000 1.0000
 portal-window-room 0.9971 0.9983 0.9995
 projection-light-nonsquare 1.0003 1.0033 0.9933
 reverseorientation 1.0013 1.0013 1.0012

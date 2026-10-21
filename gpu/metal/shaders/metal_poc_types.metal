@@ -356,6 +356,9 @@ struct Uniforms {
     packed_float3 footprintMinDirX;
     packed_float3 footprintMinDirY;
     uint footprintValid;
+    // Further portal infinite lights (pbrt allows several): how many, and where their 24-float headers start in the pbrtEnv "conditional" buffer (see portalFromHeader() in metal_poc_environment.metal).
+    uint pbrtPortalExtraCount;
+    uint pbrtPortalExtraBase;
 };
 
 // Blinn/pbrt-v4's own smooth cone falloff: 0 outside the outer cone, 1
