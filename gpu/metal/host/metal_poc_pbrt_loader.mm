@@ -1371,6 +1371,32 @@ void PbrtSceneLoader::loadPbrtInfiniteLight(const pbrt_flatten::FlatScene& scene
                 pbrtPortalP0 = toWorld(float3{(float)corners[0].x, (float)corners[0].y, (float)corners[0].z});
                 pbrtPortalP2 = toWorld(float3{(float)corners[2].x, (float)corners[2].y, (float)corners[2].z});
                 fprintf(stderr, "loadPbrtScene: portal infinite light found (%dx%d, scale=%.3g)\n", pbrtPortalWidth, pbrtPortalHeight, pbrtPortalScale);
+                // Further portals (src/shared/portal_light_set.h draws their sum): the same recipe for each, kept in pbrtExtraPortals.
+                pbrtExtraPortals.clear();
+                for (const pbrt_flatten::InfiniteLight& extra : scene.extraPortalLights) {
+                    if (!extra.hasPortal || extra.imageWidth <= 0 || extra.imageHeight <= 0 || extra.imagePixels.empty()) continue;
+                    std::array<Vec3<double>, 4> xc;
+                    for (int i = 0; i < 4; ++i) xc[i] = Vec3<double>(extra.portal[i*3+0], extra.portal[i*3+1], extra.portal[i*3+2]);
+                    PortalImageInfiniteLightData<double> xp(extra.imagePixels.data(), extra.imageWidth, extra.imageHeight, extra.scale, xc);
+                    PbrtExtraPortal e;
+                    e.width = xp.width(); e.height = xp.height(); e.scale = (float)xp.scale();
+                    e.rectified = xp.rectified();
+                    const Array2D<float>& xfunc = xp.distribution().func();
+                    e.distFunc.assign(xfunc.data().begin(), xfunc.data().end());
+                    const std::vector<double>& xsat = xp.distribution().sat().sum().data();
+                    e.satSum.assign(xsat.begin(), xsat.end());
+                    const auto xp01 = pil_detail::normalize(pil_detail::sub(xc[1], xc[0]));
+                    const auto xnx = pil_detail::normalize(pil_detail::sub(xc[3], xc[0]));
+                    const auto xnz = pil_detail::normalize(pil_detail::cross(xnx, xp01));
+                    const auto xny = pil_detail::cross(xnz, xnx);
+                    e.frameX = float3{(float)xnx.x, (float)xnx.y, (float)xnx.z};
+                    e.frameY = float3{(float)xny.x, (float)xny.y, (float)xny.z};
+                    e.frameZ = float3{(float)xnz.x, (float)xnz.y, (float)xnz.z};
+                    e.p0 = toWorld(float3{(float)xc[0].x, (float)xc[0].y, (float)xc[0].z});
+                    e.p2 = toWorld(float3{(float)xc[2].x, (float)xc[2].y, (float)xc[2].z});
+                    fprintf(stderr, "loadPbrtScene: extra portal infinite light found (%dx%d, scale=%.3g)\n", e.width, e.height, e.scale);
+                    pbrtExtraPortals.push_back(std::move(e));
+                }
             } else {
                 fprintf(stderr, "loadPbrtScene: portal infinite light has no usable image; no environment light is added (the CPU does the same)\n");
             }
