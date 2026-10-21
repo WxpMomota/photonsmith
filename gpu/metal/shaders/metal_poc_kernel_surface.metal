@@ -566,6 +566,12 @@ inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread
     } else {
         albedo = float3(mat.color);
     }
+    // A reflectance that is a graph of textures: its value here is the reflectance. A coated diffuse reads `color` itself, a Lambertian the albedo, so both are set.
+    if (mat.graphRef != 0) {
+        const float2 uvG = hitUV(primId, result.triangle_barycentric_coord, uvs, spheres, normal, isSphere, isTriangleHit);
+        albedo = evalTextureGraph(rgbGridData, mat.graphRef, uvG, hitPoint);
+        mat.color = packed_float3(albedo);
+    }
 }
 
 // Emission at the hit: an emissive surface adds its light to the radiance, weighted by MIS against light sampling unless the previous bounce

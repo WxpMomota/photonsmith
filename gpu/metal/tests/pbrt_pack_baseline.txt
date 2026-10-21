@@ -145,7 +145,7 @@ subsurface-sky-ball 1.0114 1.0115 1.0110
 subsurface-slab 0.9990 0.9940 0.9903
 subsurface-textured-sky-ball 1.0580 1.0170 1.0300  # known: a subsurface material whose reflectance is an image is drawn (the table is inverted per hit, as pbrt does), 1.81/2.06/1.18 before; the remaining 5.8% in red is not explained (the CPU reads 0.995; the same table with a flat reflectance is within 1.2% on the subsurface-sky rows)
 texture-encoding-wrap-invert 0.9960 0.9804 0.9958
-texture-graph 0.9929 0.9802 0.9904
+texture-graph 1.0042 1.0056 1.0035
 texture-mappings 1.0030 1.0040 0.9990
 texture-means 0.9966 0.9992 0.9983
 texture-mix-amount 0.9993 0.9994 0.9994
