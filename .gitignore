@@ -516,3 +516,8 @@ mcparity_*.exr
 # Python bytecode (the photo helpers' tests)
 __pycache__/
 *.pyc
+
+# animation toolkit output (frames and videos)
+scripts/anim/out/
+scripts/anim/__pycache__/
+!scripts/anim/*.py
