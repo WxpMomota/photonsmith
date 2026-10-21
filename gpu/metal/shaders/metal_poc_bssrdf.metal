@@ -29,6 +29,36 @@ inline BssrdfTableView bssrdfTableAt(device const float* t) {
     return v;
 }
 
+// The effective albedo of row i of the table is the last column of that row's profile CDF.
+inline float bssrdfRhoEffAt(BssrdfTableView tab, int row) { return tab.profileCdf[row * tab.nRadius + (tab.nRadius - 1)]; }
+
+// pbrt-v4's SubsurfaceFromDiffuse for one channel: the single-scattering albedo whose effective albedo through this table is `target` (src/shared/bssrdf.h invert_catmull_rom, in float;
+// gpu/optix/gpu_bssrdf_invert.h is the model). The ends clamp.
+inline float bssrdfInvertRhoEff(BssrdfTableView tab, float target) {
+    const int n = tab.nRho;
+    if (!(target > bssrdfRhoEffAt(tab, 0))) return tab.rhoSamples[0];
+    if (!(target < bssrdfRhoEffAt(tab, n - 1))) return tab.rhoSamples[n - 1];
+    int lo = 0, hi = n - 1;
+    while (hi - lo > 1) {
+        const int mid = (lo + hi) / 2;
+        if (bssrdfRhoEffAt(tab, mid) <= target) lo = mid; else hi = mid;
+    }
+    const int i = lo;
+    const float x0 = tab.rhoSamples[i], x1 = tab.rhoSamples[i + 1];
+    const float f0 = bssrdfRhoEffAt(tab, i), f1 = bssrdfRhoEffAt(tab, i + 1);
+    const float width = x1 - x0;
+    const float d0 = (i > 0) ? width * (f1 - bssrdfRhoEffAt(tab, i - 1)) / (x1 - tab.rhoSamples[i - 1]) : (f1 - f0);
+    const float d1 = (i + 2 < n) ? width * (bssrdfRhoEffAt(tab, i + 2) - f0) / (tab.rhoSamples[i + 2] - x0) : (f1 - f0);
+    float tLo = 0.0, tHi = 1.0;
+    for (int it = 0; it < 30; ++it) {
+        const float tm = 0.5 * (tLo + tHi);
+        const float t2 = tm * tm, t3 = t2 * tm;
+        const float F = (2.0 * t3 - 3.0 * t2 + 1.0) * f0 + (-2.0 * t3 + 3.0 * t2) * f1 + (t3 - 2.0 * t2 + tm) * d0 + (t3 - t2) * d1;
+        if (F < target) tLo = tm; else tHi = tm;
+    }
+    return x0 + 0.5 * (tLo + tHi) * width;
+}
+
 // pbrt-v4's FindInterval over a sorted node array: the largest index i in [0, n - 2] with arr[i] <= x.
 inline int bssrdfFindIntervalLe(device const float* arr, int n, float x) {
     int size = n - 2, first = 1;

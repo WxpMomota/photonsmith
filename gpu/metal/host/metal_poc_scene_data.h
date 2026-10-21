@@ -44,6 +44,9 @@ struct PbrtSceneLoader {
     // Position-based texture mappings already put in rgbGridData (21 floats each), by content, so a mapping shared by many materials is stored once.
     std::map<std::vector<float>, int> pbrtPositionMappings;
     // The offset in rgbGridData of `mapping`'s data (stored on first use); the texture-from-world matrix is carried into Metal's rescaled world.
+    // The scene's one shared reflectance picture (the "diffuse image" slot): loads `m.textureFilename` into it when it is free or already that file; false when the slot holds another picture
+    // or the file cannot be read (the material then keeps its flat colour).
+    bool claimDiffuseImage(const pbrt_flatten::Material& m);
     int claimPositionMapping(const pbrt_flatten::UvMapping& mapping, float sceneScale, float3 bboxCenter, float3 sceneOffset);
     // Optional 7th positional CLI arg - a real .pbrt scene file to load
     // via src/shared/pbrt_load.h INSTEAD of buildScene()'s own hardcoded

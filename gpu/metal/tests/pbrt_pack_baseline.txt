@@ -143,7 +143,7 @@ studio-showcase 0.9916 0.9959 0.9951
 subsurface-ball 0.9954 0.9993 0.9989
 subsurface-sky-ball 1.0114 1.0115 1.0110
 subsurface-slab 0.9990 0.9940 0.9903
-subsurface-textured-sky-ball 1.8105 2.0639 1.1798  # known: a subsurface material whose reflectance is an image is drawn with the default coefficients (Windows handoff 2026-10-19); the CPU reads 0.995
+subsurface-textured-sky-ball 1.0580 1.0170 1.0300  # known: a subsurface material whose reflectance is an image is drawn (the table is inverted per hit, as pbrt does), 1.81/2.06/1.18 before; the remaining 5.8% in red is not explained (the CPU reads 0.995; the same table with a flat reflectance is within 1.2% on the subsurface-sky rows)
 texture-encoding-wrap-invert 0.9960 0.9804 0.9958
 texture-graph 0.9929 0.9802 0.9904
 texture-mappings 1.0030 1.0040 0.9990
