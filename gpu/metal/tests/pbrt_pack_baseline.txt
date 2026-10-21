@@ -144,6 +144,7 @@ studio-showcase 0.9916 0.9959 0.9951
 subsurface-ball 0.9954 0.9993 0.9989
 subsurface-sky-ball 0.9996 0.9997 0.9992
 subsurface-slab 0.9990 0.9940 0.9903
+subsurface-small-ball 0.9998 0.9999 0.9998
 subsurface-textured-sky-ball 1.0142 0.9738 0.9906
 texture-encoding-wrap-invert 0.9960 0.9804 0.9958
 texture-graph 1.0042 1.0056 1.0035
