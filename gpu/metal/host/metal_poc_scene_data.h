@@ -38,6 +38,9 @@ struct PbrtSceneLoader {
     // the image size: the loader needs the aspect ratio (the camera's field of view is the pbrt file's, along its shorter side)
     uint32_t width = 400;
     uint32_t height = 400;
+    // The file's own Film "cropwindow"/"pixelbounds" as NDC fractions {x0, x1, y0, y1} (FlatScene::cropX0...; {0, 1, 0, 1} = none). metal_render_main() turns it into the pixel window
+    // (cropX0... in MetalPocApp) unless --crop was given, so Metal draws only the window like the CPU and OptiX do.
+    double pbrtFilmCrop[4] = {0.0, 1.0, 0.0, 1.0};
     // Optional 7th positional CLI arg - a real .pbrt scene file to load
     // via src/shared/pbrt_load.h INSTEAD of buildScene()'s own hardcoded
     // room (see loadPbrtScene()'s own comment for exactly what subset of

@@ -640,6 +640,7 @@ static void testFamilySet() {
     FamilySet fromVector; fromVector.addAll(mats);
     expectTrue("addAll reads a vector of materials", fromVector.hair && !fromVector.layered);
     expectTrue("METAL_FULL_KERNEL is read", tuningFrom({{"METAL_FULL_KERNEL", "1"}}).fullKernel && !tuningFrom({}).fullKernel);
+    expectTrue("METAL_CUT_TO_CROP is read", tuningFrom({{"METAL_CUT_TO_CROP", "1"}}).cutToCrop && !tuningFrom({}).cutToCrop);
 }
 
 int main() {
