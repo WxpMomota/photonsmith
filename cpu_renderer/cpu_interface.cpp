@@ -1245,5 +1245,6 @@ extern "C" int cpu_scene_metadata_snapshot(const char* scene_id, SceneMetadataSn
 	out->cam_left_handed = cc.left_handed ? 1 : 0;
 	out->recommended_camera_path = recommended_camera_path_for(s->id);
 	out->scene_size = cpu_scene_size_by_id(s->id.c_str());
+	out->film_key = s->film_key.c_str();
 	return 1;
 }

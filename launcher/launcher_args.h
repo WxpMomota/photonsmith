@@ -866,7 +866,7 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 				out.camera_path = argv[i + 1];
 			} else {
 				std::cerr << "Unknown cartoon \"" << argv[i + 1] << "\" - valid cartoons:";
-				for (const cartoon::Film &f : cartoon::kFilms) std::cerr << " " << cartoon::kCameraPathPrefix << f.key;
+				for (const cartoon::Film &f : cartoon::kFilms) std::cerr << " " << cartoon::cameraPathOf(f);
 				std::cerr << "\n";
 				return FlagResult::Error;
 			}

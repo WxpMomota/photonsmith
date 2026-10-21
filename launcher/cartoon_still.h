@@ -46,7 +46,7 @@ struct SceneFile {
 		std::error_code ec;
 		dir = root / (std::string(kFolderPrefix) + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 		if (!std::filesystem::create_directories(dir, ec)) return false;
-		path = dir / (std::string("cartoon-") + still.film->key + "-frame.pbrt");
+		path = dir / (cartoon::stillSlugOf(*still.film) + "-frame.pbrt");
 		std::ofstream out(path, std::ios::binary);
 		out << "# @rt-name " << still.film->name << " at " << still.t << " s\n" << still.film->sceneAt(still.t);
 		return static_cast<bool>(out);

@@ -357,11 +357,12 @@ TEST(CartoonStills, EveryFilmGetsASceneFileTheSceneListFindsUnderCartoons) {
 	for (const cartoon::Film &film : cartoon::kFilms) {
 		bool listed = false;
 		for (const pbrt_discover::Discovered &d : found) {
-			if (d.name != "cartoon-" + std::string(film.key)) continue;
+			if (d.name != cartoon::stillSlugOf(film)) continue;
 			listed = true;
 			EXPECT_TRUE(d.ok) << d.error;
 			EXPECT_EQ(d.category, "Cartoons");
 			EXPECT_EQ(d.tagName, film.name);
+			EXPECT_EQ(d.cartoonKey, film.key);
 			EXPECT_NE(d.description.find(film.description), std::string::npos);
 			EXPECT_TRUE(d.declaresCamera);
 		}
@@ -370,14 +371,14 @@ TEST(CartoonStills, EveryFilmGetsASceneFileTheSceneListFindsUnderCartoons) {
 	std::filesystem::remove_all(dir);
 }
 
-TEST(CartoonStills, ASceneNameFindsItsFilm) {
+TEST(CartoonStills, EveryStillNamesItsFilmByKeyAndTheNamesAgree) {
 	for (const cartoon::Film &film : cartoon::kFilms) {
-		const cartoon::Film *found = cartoon_stills::filmForName(film.name);
-		ASSERT_NE(found, nullptr) << film.key;
-		EXPECT_STREQ(found->key, film.key);
+		EXPECT_EQ(cartoon::cameraPathOf(film), std::string("cartoon:") + film.key);
+		EXPECT_EQ(cartoon::stillSlugOf(film), std::string("cartoon-") + film.key);
+		EXPECT_EQ(cartoon_stills::fileName(film), cartoon::stillSlugOf(film) + ".pbrt");
+		EXPECT_EQ(cartoon::forCameraPath(cartoon::cameraPathOf(film).c_str()), &film) << "a camera path finds its film again";
+		EXPECT_NE(cartoon_stills::text(film).find(std::string("# @rt-cartoon ") + film.key + "\n"), std::string::npos) << "the tag that links a listed still to its film";
 	}
-	EXPECT_EQ(cartoon_stills::filmForName("Cornell Box"), nullptr);
-	EXPECT_EQ(cartoon_stills::filmForName(""), nullptr);
 }
 
 TEST(CartoonStills, AStillIsTheFilmsFrameAtItsStillTime) {

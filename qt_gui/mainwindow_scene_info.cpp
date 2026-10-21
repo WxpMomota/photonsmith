@@ -310,15 +310,15 @@ void MainWindow::applyRecommendedSettings() {
 // first selected, so a length the user typed in survives a tab switch, a search or the start-up restore. Selecting any other scene forgets the film.
 void MainWindow::syncCartoonVideoSettings(const QString &sceneId) {
 	const cartoon::Film *film = nullptr;
-	if (!sceneId.isEmpty() && SceneMetadataClient::sceneCategory(sceneId) == QLatin1String(SceneCategories::Cartoons))
-		film = cartoon_stills::filmForName(SceneMetadataClient::sceneName(sceneId).toStdString());
+	SceneMetadataClient::SceneMetadata meta;
+	if (!sceneId.isEmpty() && SceneMetadataClient::sceneMetadata(sceneId, meta) && !meta.filmKey.isEmpty()) film = cartoon::find(meta.filmKey.toUtf8().constData());   // the still's own @rt-cartoon tag
 	if (!film) {
 		m_cartoonSettingsFor.clear();
 		return;
 	}
 	if (!isVideoMode()) return;   // applied when the mode changes to video (onModeChanged)
 	if (m_cameraPathCombo) {
-		const int filmPath = m_cameraPathCombo->findData(QString::fromUtf8(cartoon::kCameraPathPrefix) + QString::fromUtf8(film->key));
+		const int filmPath = m_cameraPathCombo->findData(QString::fromStdString(cartoon::cameraPathOf(*film)));
 		if (filmPath >= 0) m_cameraPathCombo->setCurrentIndex(filmPath);
 	}
 	const QString key = QString::fromUtf8(film->key);

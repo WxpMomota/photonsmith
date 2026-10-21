@@ -170,6 +170,10 @@ struct SceneDescriptor {
     // switches samplers" shape as recommended_sampler above.
     std::string recommended_light_sampler;
 
+    // The cartoon film (src/shared/cartoon/cartoons.h, Film::key) this scene is a still of, "" for every other scene: the link from a listed scene to its film, from the
+    // file's "# @rt-cartoon" tag. The GUI sets a film's video settings from it. A std::string, so it sits with the other strings that were added after the first fields.
+    std::string film_key;
+
     // pbrt-v4's own "camera medium" (see pbrt_flatten::FlatScene::
     // cameraMediumIndex's own comment for what this requests, and
     // camera_t::camera_medium's own comment, camera.h, for what consumes
@@ -1008,6 +1012,7 @@ inline bool appendOne(std::vector<SceneDescriptor>& registry, const pbrt_discove
     // pbrt_discover::Discovered::nested's comment for how that
     // distinction is made.
     s.requires_files = d.nested;
+    s.film_key = d.cartoonKey;
     // gpu/optix/pbrt_gpu_builder.h consumes the same FlatScene this does,
     // so both backends render the same file, and they now agree on what
     // they can sample: sphere, parallelogram AND individual-triangle area

@@ -122,7 +122,7 @@ inline const std::vector<VideoPreset>& all() {
             p.name = t.keep(std::string(f.name) + " (cartoon)");
             p.description = f.description;
             p.scene_id = "A1";   // a placeholder: a cartoon renders its own scenes
-            p.camera_path = t.keep(std::string(cartoon::kCameraPathPrefix) + f.key);
+            p.camera_path = t.keep(cartoon::cameraPathOf(f));
             p.frames = static_cast<int>(std::lround(f.duration * f.fps));
             p.fps = f.fps;
             p.speed = 1.0;

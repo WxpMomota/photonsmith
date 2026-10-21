@@ -75,6 +75,8 @@ struct SceneMetadataSnapshot {
 	// 0 = the scene does not say. The Live Preview's keyboard step is a fraction of it, so one key press is a sensible distance in a 6-unit room and in the
 	// 555-unit Cornell box alike.
 	double scene_size;
+	// The cartoon film this scene is a still of (cartoons.h, Film::key), "" for any other scene. LAST, like the fields added after the first ones.
+	const char* film_key;
 };
 
 #ifdef __cplusplus

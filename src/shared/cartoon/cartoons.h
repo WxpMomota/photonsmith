@@ -16,6 +16,7 @@
 namespace cartoon {
 
 constexpr const char *kCameraPathPrefix = "cartoon:";
+constexpr const char *kStillSlugPrefix = "cartoon-";   // the scene a film's still is listed as: "cartoon-fireflies" (and its file, cartoon-fireflies.pbrt)
 
 inline const Film kFilms[] = {
 	{"lamp-and-ball", "Lamp and Ball",
@@ -40,6 +41,15 @@ inline const Film *find(const char *key) {
 	return nullptr;
 }
 
+// The names one film goes by, written once. Everything that needs one of them calls these (the video presets, the launcher, the stills, the GUI) rather than joining strings itself.
+//   key           "fireflies"            Film::key: how the table and the command line name it
+//   camera path   "cartoon:fireflies"    --camera-path, the GUI's Camera Path entry, the video preset's path
+//   still scene   "cartoon-fireflies"    the slug of its still in the scene list (the scene list may add a suffix when a scene of the user's has the name; the still's own
+//                                        `# @rt-cartoon <key>` tag, not this, is what links a listed scene back to its film)
+//   preset id     "V10"                  video_preset::all(): numbered in kFilms order after the camera presets
+inline std::string cameraPathOf(const Film &film) { return std::string(kCameraPathPrefix) + film.key; }
+inline std::string stillSlugOf(const Film &film) { return std::string(kStillSlugPrefix) + film.key; }
+
 // The film a camera-path name asks for ("cartoon:lamp-and-ball"), or null when the name is an ordinary camera path.
 inline const Film *forCameraPath(const char *cameraPath) {
 	const std::size_t n = std::strlen(kCameraPathPrefix);
@@ -63,7 +73,7 @@ inline bool parseStill(const std::string &spec, Still &out, std::string &error) 
 	const Film *film = find(key.c_str());
 	if (!film) {
 		error = "Unknown cartoon \"" + key + "\" - valid cartoons:";
-		for (const Film &f : kFilms) error += std::string(" ") + kCameraPathPrefix + f.key;
+		for (const Film &f : kFilms) error += " " + cameraPathOf(f);
 		return false;
 	}
 	double t = film->stillTime;

@@ -116,6 +116,8 @@ struct Discovered {
 	std::string title;
 	// "# @rt-name Fireflies": the name to list the scene under, for a file whose name does not read well (the Scene Builder's title wins when there is one).
 	std::string tagName;
+	// "# @rt-cartoon fireflies": the cartoon film (src/shared/cartoon/cartoons.h) this file is a still of; empty for any other scene. It is what links a listed scene to its film.
+	std::string cartoonKey;
 	// True for a file the user named explicitly (ray_tracer.exe ... path/to/scene.pbrt, the GUI's Scene Builder) rather than one found by scanning a
 	// scene directory. Such a scene is numbered after every scanned one, so naming a file never shifts the id of a scene that scanning finds.
 	bool userFile = false;
@@ -153,7 +155,7 @@ inline std::string headerOf(const std::string &text) {
 // wherever it is copied. Only comment lines before WorldBegin are read; a description given on several lines is joined with spaces; the Scene
 // Builder's own "# @rt-builder-doc" line is not one of these. Unknown keys are ignored.
 struct HeaderTags {
-	std::string category, description, performance, name;
+	std::string category, description, performance, name, cartoon;
 	bool gpuCompatible = true;   // "# @rt-gpu no": the scene uses something the GPU backends do not support, so it renders on the CPU only
 	// "# @rt-size 555": how big the scene is, as the largest side of its bounding box in the scene's own units (scene_size.h). The interactive camera controls
 	// scale their step by it. 0 = the file does not say.
@@ -176,6 +178,7 @@ inline HeaderTags readHeaderTags(const std::string &text) {
 		if (key == "category") tags.category = value;
 		else if (key == "performance") tags.performance = value;
 		else if (key == "name") tags.name = value;
+		else if (key == "cartoon") tags.cartoon = value;
 		else if (key == "gpu") tags.gpuCompatible = value != "no";
 		else if (key == "size") {
 			char *end = nullptr;
@@ -289,6 +292,7 @@ inline Discovered describe(const std::string &path, const std::string &text) {
 		d.description = tags.description;
 		d.performance = tags.performance;
 		d.tagName = tags.name;
+		d.cartoonKey = tags.cartoon;
 		d.gpuCompatible = tags.gpuCompatible;
 	}
 	{

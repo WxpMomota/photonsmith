@@ -200,6 +200,8 @@ struct SceneMetadata {
 	// The scene's size in its own world units (the largest side of its bounding box, from the "# @rt-size" line of its header); 0 when the scene does not say.
 	// The Live Preview's keyboard step is a fraction of it.
 	double sceneSize = 0.0;
+	// The cartoon film this scene is a still of (Film::key in src/shared/cartoon/cartoons.h); empty for every other scene.
+	QString filmKey;
 };
 
 // Fills `out` with everything SceneMetadata holds for scene_id in one DLL

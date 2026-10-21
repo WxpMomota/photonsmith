@@ -23,17 +23,7 @@
 namespace cartoon_stills {
 
 constexpr const char *kHashTag = "# @rt-cartoon-hash ";
-constexpr const char *kFilePrefix = "cartoon-";
-
-inline std::string fileName(const cartoon::Film &film) { return std::string(kFilePrefix) + film.key + ".pbrt"; }
-
-// The film a still's displayed name ("Fireflies": the @rt-name tag of its file) belongs to, or null. The link is the name rather than the scene's slug, which the
-// scene list changes ("cartoon-fireflies-2") when a scene of the user's has the same file name.
-inline const cartoon::Film *filmForName(const std::string &name) {
-	for (const cartoon::Film &film : cartoon::kFilms)
-		if (name == film.name) return &film;
-	return nullptr;
-}
+inline std::string fileName(const cartoon::Film &film) { return cartoon::stillSlugOf(film) + ".pbrt"; }
 
 // 64-bit FNV-1a of `text`, as 16 hex digits.
 inline std::string hashOf(const std::string &text) {
@@ -53,6 +43,7 @@ inline std::string body(const cartoon::Film &film) {
 	std::snprintf(at, sizeof(at), "%g", film.stillTime);
 	std::string out = std::string("# @rt-name ") + film.name + "\n";
 	out += "# @rt-category Cartoons\n";
+	out += std::string("# @rt-cartoon ") + film.key + "\n";
 	out += std::string("# @rt-description ") + film.description + " This picture is the frame at " + at + " seconds; the whole film is a video preset (Video Settings, \"Cartoon: " +
 		   film.name + "\").\n";
 	out += film.sceneAt(film.stillTime);
@@ -81,7 +72,7 @@ inline void pruneUnknown(const std::string &dir) {
 	for (const auto &entry : std::filesystem::directory_iterator(dir, ec)) {
 		if (ec) break;
 		const std::string name = entry.path().filename().string();
-		if (name.compare(0, std::string(kFilePrefix).size(), kFilePrefix) != 0 || entry.path().extension() != ".pbrt") continue;
+		if (name.compare(0, std::string(cartoon::kStillSlugPrefix).size(), cartoon::kStillSlugPrefix) != 0 || entry.path().extension() != ".pbrt") continue;
 		bool known = false;
 		for (const cartoon::Film &film : cartoon::kFilms) known = known || name == fileName(film);
 		if (!known) std::filesystem::remove(entry.path(), ec);
