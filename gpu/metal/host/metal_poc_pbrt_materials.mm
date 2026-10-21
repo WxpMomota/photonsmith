@@ -48,6 +48,23 @@ static void applyReflectanceMapping(TriangleMaterial& mat, const pbrt_flatten::M
 
 // pbrt Diffuse: flat colour, or one of the textured variants (checkerboard, procedural noise, image) that the shader implements as modes of
 // materialType 25/26 (see the comments below). Split out of mapPbrtMaterial(), where this one case was 215 of its ~530 lines.
+bool PbrtSceneLoader::claimDiffuseImage(const pbrt_flatten::Material& m) {
+    if (m.textureFilename.empty() || (havePbrtDiffuseImage && m.textureFilename != pbrtDiffuseImageFilename)) return false;
+    if (!havePbrtDiffuseImage) {
+        std::string bytes;
+        if (pbrt_load::loadFileNear(pbrtScenePath, m.textureFilename, bytes) &&
+            pbrt_load::detail::decodeInfiniteLightImage(m.textureFilename, bytes, pbrtDiffuseImagePixels, pbrtDiffuseImageWidth, pbrtDiffuseImageHeight)) {
+            gpu_scene_textures::applyImagemapEncoding(pbrtDiffuseImagePixels, m.textureFilename, m.textureGamma, m.textureInvert);
+            havePbrtDiffuseImage = true;
+            pbrtDiffuseImageFilename = m.textureFilename;
+        } else {
+            fprintf(stderr, "loadPbrtScene: the material's own texture '%s' could not be read/decoded; falling back to its flat colour\n", m.textureFilename.c_str());
+            return false;
+        }
+    }
+    return true;
+}
+
 // A position-based mapping (pbrt spherical, cylindrical, planar) for the shader: 21 floats in rgbGridData. The scene's texture-from-world matrix is for pbrt's world; Metal draws a rescaled and
 // recentred copy (position = (p - bboxCenter) * sceneScale + sceneOffset), so the matrix is composed with the inverse of that, and the shader feeds it the Metal-world hit point.
 int PbrtSceneLoader::claimPositionMapping(const pbrt_flatten::UvMapping& mapping, float sceneScale, float3 bboxCenter, float3 sceneOffset) {
@@ -323,6 +340,14 @@ TriangleMaterial PbrtSceneLoader::mapPbrtSubsurfaceMaterial(PbrtMaterialMapState
     const int tableOffset = bssrdfTableOffset(st, m.g, m.ior);
     // pbrt's "roughness" roughens the entry interface (a GGX dielectric): its alpha, remapped from the perceptual roughness as pbrt does; 0 keeps the smooth interface.
     matparams::setSubsurface(mat, tableOffset, (float)(m.remapRoughness ? std::sqrt(std::max(m.roughness_u, 0.0)) : m.roughness_u));
+    // A reflectance that is an image (the pbrt-v4-scenes head): the shader looks the picture up at the entry hit and inverts the table for it. color then holds the mean free path
+    // (a length, so times the scene scale where a coefficient is divided by it), transmitColor.x the picture's scale and conductorEta.z the flag; sigma_a / sigma_s of the flat material are not meaningful.
+    if (m.subsurfaceTexturedReflectance && claimDiffuseImage(m)) {
+        mat.color = PackedFloat3{(float)m.subsurfaceMfp[0] * st.sceneScale, (float)m.subsurfaceMfp[1] * st.sceneScale, (float)m.subsurfaceMfp[2] * st.sceneScale};   // a LENGTH: times the scene's rescale
+        mat.transmitColor = PackedFloat3{(float)m.textureScale, 0.0f, 0.0f};
+        mat.conductorEta.z = 1.0f;
+        applyReflectanceMapping(mat, m, *this, st.sceneScale, st.bboxCenter, st.sceneOffset);
+    }
     return mat;
 }
 

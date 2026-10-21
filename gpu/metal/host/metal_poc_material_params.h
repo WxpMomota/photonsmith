@@ -21,6 +21,7 @@ inline void setCauchy(TriangleMaterial& m, float a, float b) { m.conductorEta = 
 inline void setMeasuredTable(TriangleMaterial& m, int index) { m.conductorEta = PackedFloat3{(float)index, 0.0f, 0.0f}; }
 // subsurface (34): the BSSRDF table's offset in the shared float buffer (an integer-valued float: a bit-cast int would be a denormal, which the GPU may flush to zero;
 // exact below 2^24 floats) and the GGX alpha of a rough entry interface (0 keeps it smooth)
+// (a subsurface material whose reflectance is an image sets conductorEta.z = 1, color = the mean free path and transmitColor.x = the picture scale: see PbrtSceneLoader::mapPbrtSubsurfaceMaterial)
 inline void setSubsurface(TriangleMaterial& m, int tableOffset, float entryAlpha) { m.conductorEta.x = (float)tableOffset; m.conductorEta.y = entryAlpha; }
 // a layered coat over a picture (27): the coat's alpha
 inline void setCoatAlpha(TriangleMaterial& m, float alpha) { m.conductorEta = PackedFloat3{alpha, 0.0f, 0.0f}; }

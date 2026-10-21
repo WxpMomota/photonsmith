@@ -26,7 +26,16 @@ inline bool subsurfaceProbeWalk(thread const KernelRes& R, thread PathState& P, 
     constexpr int kMaxProbeSteps = 100;
     const TriangleMaterial surface = B.mat;
     const BssrdfTableView tab = bssrdfTableAt(rgbGridData + int(matSubsurfaceTableOffset(surface)));
-    const float3 sigmaA = float3(surface.color), sigmaS = float3(surface.transmitColor);
+    float3 sigmaA = float3(surface.color), sigmaS = float3(surface.transmitColor);
+    if (surface.conductorEta.z > 0.5) {
+        // a reflectance that is an image: color is the mean free path and B.albedo the picture's value at the entry hit (computeAlbedo); invert the table for each channel
+        for (int c = 0; c < 3; ++c) {
+            const float rhoC = bssrdfInvertRhoEff(tab, clamp(B.albedo[c], 0.0f, 1.0f));
+            const float length = max(float(surface.color[c]), 1e-9f);
+            sigmaS[c] = rhoC / length;
+            sigmaA[c] = (1.0 - rhoC) / length;
+        }
+    }
     const float3 sigmaT = sigmaA + sigmaS;
     float3 rho = float3(0.0);
     for (int c = 0; c < 3; ++c) rho[c] = (sigmaT[c] > 0.0) ? (sigmaS[c] / sigmaT[c]) : 0.0;

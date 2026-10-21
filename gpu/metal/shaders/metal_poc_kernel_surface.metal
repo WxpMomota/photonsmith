@@ -556,6 +556,11 @@ inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread
                               : texCoordFor(primId, result.triangle_barycentric_coord, uvs);
         const float2 muv = pictureLookup(mat, rgbGridData, hitPoint, uv);   // pbrt imagemap uscale/vscale/udelta/vdelta, or a position-based mapping
         albedo = samplePictureWrapped(pbrtDiffuseTexture, textureSampler, muv, mat.textureWrap).rgb * mat.roughness;
+    } else if (mat.materialType == METAL_MAT_SUBSURFACE && mat.conductorEta.z > 0.5) {
+        // a subsurface material whose reflectance is an image: the picture's value here (times its scale) is what the BSSRDF's table is inverted for (subsurfaceProbeWalk)
+        float2 uvS = isSphere ? sphereUV(spheres[primId].uvRot0, spheres[primId].uvRot1, spheres[primId].uvRot2, normal)
+                              : texCoordFor(primId, result.triangle_barycentric_coord, uvs);
+        albedo = samplePictureWrapped(pbrtDiffuseTexture, textureSampler, pictureLookup(mat, rgbGridData, hitPoint, uvS), mat.textureWrap).rgb * float(mat.transmitColor.x);
     } else if (mat.materialType == METAL_MAT_DIFFUSE_TRANSMISSION && mat.conductorK.y > 8.5) {
         // DiffuseTransmission with image-textured reflectance (diffuse slot) and/or transmittance
         // (second slot) - J2. conductorK.x = 1 when reflectance is an image, conductorK.z = 1 when
