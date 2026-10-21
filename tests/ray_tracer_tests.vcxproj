@@ -143,6 +143,7 @@
     <ClCompile Include="unit\hair_bxdf_tests.cpp" />
     <ClCompile Include="unit\halton_sampler_tests.cpp" />
     <ClCompile Include="unit\loop_subdivide_tests.cpp" />
+    <ClCompile Include="unit\cartoon_tests.cpp" />
     <ClCompile Include="unit\texture_mapping_tests.cpp" />
     <ClCompile Include="unit\transform_instance_tests.cpp" />
     <ClCompile Include="unit\color_encoding_tests.cpp" />

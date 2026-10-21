@@ -274,6 +274,7 @@ add_executable(unit_tests
     unit/summed_area_table_tests.cpp
     unit/surface_interaction_tests.cpp
     unit/texture_differentials_tests.cpp
+    unit/cartoon_tests.cpp
     unit/texture_mapping_tests.cpp
     unit/tone_map_tests.cpp
     unit/triangle_tests.cpp

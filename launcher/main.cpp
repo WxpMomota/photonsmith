@@ -75,6 +75,7 @@ extern char** environ;
 #include "src/shared/backend_capabilities.h"   // which options each renderer reads
 #include "launcher/gpu_backend.h"      // the GPU renderer this build has (Metal or OptiX), behind one call
 #include "launcher/launcher_args.h"   // Argument parsing
+#include "launcher/cartoon_render.h"  // cartoon video presets: one child run per frame
 #include "launcher/diagnostics.h"     // --diagnose
 #ifdef RT_HAVE_AVFOUNDATION_ENCODER
 #include "launcher/video_encoder_mac.h"   // Video -> MP4 via AVFoundation, no ffmpeg needed
@@ -343,6 +344,7 @@ struct RenderSetup {
 	bool use_randomwalk = false, use_ao = false, use_simplepath = false, use_simplevolpath = false, use_lightpath = false;
 	bool use_debug_integrator = false;   // any one of the five debug integrators
 	std::string out_path;
+	std::string exe_path;   // this program, for a cartoon video's per-frame child runs
 };
 
 // Rejects combinations of render modes that cannot work together (returns an error code) and warns about flags a mode ignores (returns SUCCESS).
@@ -783,6 +785,8 @@ static int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
     // that block's own comment for why a per-frame seed is needed).
     // See src/shared/render_options.h's own field comments.
     RenderOptions render_opts = render_options_from_args(args);
+    // A cartoon preset (--camera-path cartoon:<key>): each frame is a scene of its own, rendered by a child run (launcher/cartoon_render.h).
+    const cartoon::Film *cartoon_film = cartoon::forCameraPath(camera_path.c_str());
 
     // Render each frame with animated camera position
     for (int frame = 0; frame < render_frame_count; ++frame) {
@@ -842,12 +846,13 @@ static int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
         std::filesystem::path frame_path = frames_dir / frame_filename;
 
         // Progress indicator
-        std::cout << "\n[" << (frame + 1) << "/" << render_frame_count << "] Rendering "
-                  << frame_filename << " (camera: "
-                  << std::fixed << std::setprecision(1)
-                  << cam_pos.lookfrom_x << ", " 
-                  << cam_pos.lookfrom_y << ", " 
-                  << cam_pos.lookfrom_z << ")..." << std::flush;
+        std::cout << "\n[" << (frame + 1) << "/" << render_frame_count << "] Rendering " << frame_filename << " (";
+        if (cartoon_film) {
+            std::cout << cartoon_film->name << " at " << std::fixed << std::setprecision(2) << cartoon_film->duration * frame / std::max(1, render_frame_count) << " s";
+        } else {
+            std::cout << "camera: " << std::fixed << std::setprecision(1) << cam_pos.lookfrom_x << ", " << cam_pos.lookfrom_y << ", " << cam_pos.lookfrom_z;
+        }
+        std::cout << ")..." << std::flush;
 
         auto frame_start = std::chrono::high_resolution_clock::now();
         int render_result = -1;
@@ -881,7 +886,11 @@ static int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
         // always use their own fixed single-image lookfrom - a video
         // must honor its per-frame animated camera regardless, or it
         // would render the same static frame video_frames times.
-        if (use_gpu) {
+        if (cartoon_film) {
+            const double film_time = cartoon_film->duration * frame / std::max(1, render_frame_count);
+            render_result = cartoon_render::renderFrame(*cartoon_film, film_time, frames_dir / ("cartoon_" + std::to_string(frame) + ".pbrt"), s.exe_path, args,
+                                                        image_width, image_height, samples_per_pixel, max_ray_depth, frame_path.string());
+        } else if (use_gpu) {
             if (gpu_backend::available()) {   // Metal on a Mac, OptiX on Windows: launcher/gpu_backend.h
                 render_result = gpu_backend::render(
                     image_width,
@@ -1045,7 +1054,7 @@ static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
     pinThreadsForVideo(s.use_gpu);
     VideoPaths paths;
     if (int rc = prepareVideoDirectories(s.out_path, render_frame_count, paths); rc != SUCCESS) return rc;
-    const VideoCameraStart start = videoCameraStart(args, s);
+    const VideoCameraStart start = cartoon::isCartoonPath(s.camera_path.c_str()) ? VideoCameraStart{0, 0, 0, 0, 0, 0} : videoCameraStart(args, s);
 
     int converted = 0;
     if (int rc = renderVideoFrames(args, s, paths, render_frame_count, keyframes, use_keyframes, start, converted); rc != SUCCESS) return rc;
@@ -1625,6 +1634,12 @@ int main(int argc, char** argv) {
 	int  samples_per_pixel  = args.samples_per_pixel;
 	int  max_ray_depth      = args.max_ray_depth;
 	std::string scene_id    = args.scene_id;
+	// A cartoon video renders its own scene at every frame (launcher/cartoon_render.h); the scene named here is only a placeholder that keeps the checks below content.
+	const bool cartoon_video = args.video_mode && args.camera_path_explicit && cartoon::isCartoonPath(args.camera_path.c_str());
+	if (cartoon_video) {
+		scene_id = "A1";
+		args.scene_file.clear();
+	}
 	if (!args.scene_file.empty()) {
 		// A .pbrt file named instead of a scene id: give it an id, before anything below touches the scene registry.
 		std::error_code exists_ec;  // the throwing overload would abort on a path the OS rejects
@@ -1769,6 +1784,7 @@ int main(int argc, char** argv) {
 
 	const std::string out_path = prepare_output_path(args, argv[0]);
 	setup.out_path = out_path;
+	setup.exe_path = std::filesystem::absolute(argv[0]).string();
 
     // Print configuration summary before rendering
     std::cout << "Using command-line settings: width=" << image_width << " height=" << image_height << " spp=" << samples_per_pixel << " max_depth=" << max_ray_depth 

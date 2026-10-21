@@ -37,7 +37,8 @@ struct VideoPreset {
     const char* name;         // "Cornell Box Orbit" - shown in the GUI combo
     const char* description;  // one line, shown as a tooltip
     const char* scene_id;     // SceneDescriptor::id, e.g. "A1"
-    const char* camera_path;  // one of camera_path.h's named types
+    const char* camera_path;  // one of camera_path.h's named types, or "cartoon:<key>" (src/shared/cartoon/cartoons.h): the video then renders that film's own scene at
+                               // every frame instead of moving a camera round a fixed scene (scene_id is then only a placeholder: "A1")
     int frames;
     int fps;
     double speed;
@@ -84,6 +85,17 @@ inline const VideoPreset kAll[] = {
         "A flythrough of Crytek Sponza, the rendering community's canonical "
         "global-illumination showcase scene.",
         "H1", "linear", 120, 24, 0.5
+    },
+    {
+        "V7", "lamp-and-ball", "Lamp and Ball (cartoon)",
+        "A 20 second cartoon: a small desk lamp wakes up in the dark, notices a red ball, hops over, nudges it, watches it bounce off the books and roll home, and tucks its "
+        "shade over it.",
+        "A1", "cartoon:lamp-and-ball", 480, 24, 1.0
+    },
+    {
+        "V8", "ball-parade", "Ball Parade (cartoon)",
+        "A 12 second cartoon of squash and stretch: seven glossy balls drop in one after another, bounce in a travelling wave on a checker floor and settle one by one into a row.",
+        "A1", "cartoon:ball-parade", 288, 24, 1.0
     },
 };
 inline constexpr int kAllCount = sizeof(kAll) / sizeof(kAll[0]);

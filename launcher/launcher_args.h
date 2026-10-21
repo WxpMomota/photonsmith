@@ -14,6 +14,7 @@
 #include <functional>
 
 #include "../src/shared/video_preset.h"
+#include "../src/shared/cartoon/cartoons.h"   // --camera-path cartoon:<key>
 #include "../src/shared/render_flag_names.h"
 #include "../src/shared/scene_slugs.h"
 
@@ -352,6 +353,9 @@ struct LaunchArgs {
 	// the first frame is the first place and the last frame the last. Empty when not given.
 	std::string camera_keyframes_file;
 	std::string custom_output_path;
+	// Every command-line token the parser consumed (flags and their values, in order, positional arguments left out): what a cartoon video repeats on each frame's own run
+	// (launcher/cartoon_render.h).
+	std::vector<std::string> consumed_tokens;
 
 	int    image_width       = kDefaultWidth;
 	int    image_height      = kDefaultHeight;
@@ -835,8 +839,20 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 		// do, catches a typo'd/stale preset id at parse time instead.
 		static const std::set<std::string> kValidCameraPaths = {
 			"orbit", "linear", "figure8", "spiral", "tour", "showcase"};
-		parseEnumFlag(argv[i + 1], kValidCameraPaths, out.camera_path, "--camera-path",
-					  "using default (orbit). Valid: orbit, linear, figure8, spiral, tour, showcase");
+		if (cartoon::isCartoonPath(argv[i + 1])) {
+			// A cartoon (src/shared/cartoon/cartoons.h): the video renders that film's own scene at every frame.
+			if (cartoon::forCameraPath(argv[i + 1])) {
+				out.camera_path = argv[i + 1];
+			} else {
+				std::cerr << "Unknown cartoon \"" << argv[i + 1] << "\" - valid cartoons:";
+				for (const cartoon::Film &f : cartoon::kFilms) std::cerr << " " << cartoon::kCameraPathPrefix << f.key;
+				std::cerr << "\n";
+				return FlagResult::Error;
+			}
+		} else {
+			parseEnumFlag(argv[i + 1], kValidCameraPaths, out.camera_path, "--camera-path",
+						  "using default (orbit). Valid: orbit, linear, figure8, spiral, tour, showcase, or a cartoon: cartoon:lamp-and-ball");
+		}
 		out.camera_path_explicit = true;
 		consumed_args.insert(i);
 		consumed_args.insert(i + 1);
@@ -1161,6 +1177,9 @@ inline bool parse_launch_args(int argc, char** argv, LaunchArgs& out,
 			consumed_args.insert(i);
 		}
 	}
+
+	for (int i = 1; i < argc; ++i)
+		if (consumed_args.count(i) > 0) out.consumed_tokens.push_back(argv[i]);
 
 	// Parse positional arguments: width spp depth scene_id cam_x cam_y cam_z
 	// Kept as raw strings rather than blindly std::stod-ing every token like

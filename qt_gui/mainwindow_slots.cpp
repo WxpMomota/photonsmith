@@ -7,6 +7,7 @@
 #include "app_log.h"
 #include "camera_math.h"
 #include "../src/shared/video_preset.h"
+#include "../src/shared/cartoon/cartoons.h"
 #include "../src/shared/scene_descriptor.h"
 #include <QApplication>
 #include <QFileDialog>
@@ -210,7 +211,8 @@ void MainWindow::onVideoPresetChanged(int index) {
 	// touches status-adjacent labels.
 	selectOutputMode(OutputMode::Video);
 
-	selectSceneById(QString::fromUtf8(preset->scene_id));
+	// A cartoon preset renders its own scene at every frame: the scene picker keeps what it had.
+	if (!cartoon::isCartoonPath(preset->camera_path)) selectSceneById(QString::fromUtf8(preset->scene_id));
 
 	const int pathIndex = m_cameraPathCombo ? m_cameraPathCombo->findData(QString::fromUtf8(preset->camera_path)) : -1;
 	if (pathIndex >= 0) m_cameraPathCombo->setCurrentIndex(pathIndex);

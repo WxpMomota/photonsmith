@@ -5,6 +5,9 @@ A short film in Photonsmith is a Python function of time. `build(t)` returns the
 
 The renderer itself needs nothing new: each frame is an ordinary `.pbrt` file, so every material, light and shape the renderer supports can be animated.
 
+This Python toolkit is for writing a film quickly. The cartoon video presets that ship with the program are the same films in C++ (`src/shared/cartoon/`, a twin of
+`anim_lib.py`), so the GUI and `--video-preset` can render them without Python; `docs/VIDEO_GENERATION.md` has the user's side.
+
 ## "Lamp and Ball"
 
 `lamp_and_ball.py` is a 20 second cartoon built with it: a desk lamp wakes up, notices a ball, hops over, nudges it, watches it bounce off a stack of books and roll home, and tucks its

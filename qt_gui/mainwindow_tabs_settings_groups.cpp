@@ -8,6 +8,7 @@
 
 #include "../src/shared/scene_descriptor.h"
 #include "../src/shared/video_preset.h"
+#include "../src/shared/cartoon/cartoons.h"
 
 #include <QTabBar>
 #include "scene_metadata_client.h"
@@ -903,6 +904,9 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	m_cameraPathCombo->addItem(tr("Spiral (Zoom-in)"), "spiral");
 	m_cameraPathCombo->addItem(tr("Tour (Room walkthrough)"), "tour");
 	m_cameraPathCombo->addItem(tr("Showcase (Product reveal)"), "showcase");
+	// A cartoon is a camera path of its own kind: the video renders that film's scene at every frame (src/shared/cartoon/cartoons.h), whatever scene is selected above.
+	for (const cartoon::Film &film : cartoon::kFilms)
+		m_cameraPathCombo->addItem(tr("Cartoon: %1").arg(QString::fromUtf8(film.name)), QString::fromUtf8(cartoon::kCameraPathPrefix) + QString::fromUtf8(film.key));
 	m_cameraPathCombo->setToolTip(
 		tr("How the camera moves over the frame sequence:\n"
 		"  Orbit     — full circle around the scene, always looking at its centre\n"

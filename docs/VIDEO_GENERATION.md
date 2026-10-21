@@ -201,6 +201,8 @@ short id or the descriptive key:
 | V4 | next-week-finale | A9 (Final Scene) | figure8 | 120 | 30 | 0.6 |
 | V5 | glass-dragon-caustics | G13 (dragon) | spiral | 120 | 30 | 0.5 |
 | V6 | sponza-flythrough | H1 (Sponza) | linear | 120 | 24 | 0.5 |
+| V7 | lamp-and-ball | (its own scenes) | cartoon:lamp-and-ball | 480 | 24 | 1.0 |
+| V8 | ball-parade | (its own scenes) | cartoon:ball-parade | 288 | 24 | 1.0 |
 
 ```powershell
 # By id
@@ -209,6 +211,31 @@ short id or the descriptive key:
 # Or by key, with an override (fps wins over the preset's own default)
 .\ray_tracer.exe --video-preset cornell-orbit --fps 60
 ```
+
+## Cartoon presets
+
+A cartoon preset is a short animated film instead of a camera moving round a fixed scene: the scene itself changes from frame to frame (a lamp hops, a ball bounces). It is chosen
+as a camera path of its own kind, `cartoon:<key>`, either by `--video-preset <key>` (or id) or by hand:
+
+```powershell
+.\ray_tracer.exe --gpu --denoise --video-preset lamp-and-ball 960 128 8                  # 480 frames at 24 fps: 20 seconds
+.\ray_tracer.exe --gpu --video --camera-path cartoon:lamp-and-ball --frames 48 960 64 8    # a quick 2 second look (the film is squeezed into the frames you ask for)
+```
+
+The GUI lists them in the Video Settings tab, both in the Preset combo and as "Cartoon: ..." in the Camera Path combo; the scene picker is ignored for a cartoon.
+
+How it renders: each frame is written as a `.pbrt` scene (`src/shared/cartoon/`: the film's `sceneAt(t)`) and rendered by a child run of the launcher with the flags you gave (backend,
+denoiser, seed, exposure, tone mapping ...; the video flags and the output path are replaced), then joined by the usual video assembly. Each frame is therefore an ordinary
+single-image render of a pbrt file: every renderer feature works, and a frame costs a process start (a second or two) on top of its render. `--frames` / `--fps` change how the film is
+sampled and played back, not its story.
+
+| Key | Name | Length | What happens |
+|-----|------|--------|--------------|
+| lamp-and-ball | Lamp and Ball | 20 s | A small desk lamp wakes up in the dark, notices a red ball rolling in, hops over, nudges it, watches it bounce off a stack of books and roll home, and tucks its shade over it. |
+| ball-parade | Ball Parade | 12 s | Seven glossy balls drop in one after another, bounce in a travelling wave on a glossy checker floor with squash and stretch, and settle one by one into a row. |
+
+Making a film of your own: `scripts/anim/` (Python, quicker to change; `README.md` there) is the same toolkit for authoring, and `src/shared/cartoon/cartoon_lib.h` is its C++ twin;
+a finished film is a function `std::string sceneAt(double t)` listed in `src/shared/cartoon/cartoons.h`, plus a row in `src/shared/video_preset.h`.
 
 ## Examples
 
