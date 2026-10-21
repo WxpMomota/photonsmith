@@ -78,15 +78,8 @@
 #include "metal_poc_host_math.h"
 #include "../../../src/shared/oidn_runtime.h"
 
-// pbrt_load.h -> pbrt_flatten.h's InfiniteLight image decode path needs
-// tinyexr's real implementation linked in somewhere - cpu_renderer gets
-// it from its own separate src/external/tinyexr_impl.cpp translation
-// unit, but metal_poc is a standalone binary that doesn't link against
-// that library at all, so it needs its own copy, same "define, include,
-// undef" scoping as stb_image.h above and for the same reason.
-#define TINYEXR_IMPLEMENTATION
-#include "../../../src/external/tinyexr.h"
-#undef TINYEXR_IMPLEMENTATION
+// (tinyexr's implementation is cpu_renderer's, src/external/tinyexr_impl.cpp: metal_renderer links it PUBLIC. metal_poc.mm used to define
+// TINYEXR_IMPLEMENTATION itself, which put a second copy in the ray_tracer link as soon as the launcher referenced EXR code.)
 #include "../../../src/shared/pbrt_load.h"
 // resolve_crop_pixel_bounds() - the shared NDC-fraction -> pixel-rectangle
 // resolver OptiX already uses for --crop, so Metal rounds/clamps identically.
@@ -96,8 +89,7 @@
 #include "../../../src/TheRestOfYourLife/error_codes.h"
 // is_exr_output_path()/write_exr_image() - the same shared helpers the CPU
 // and OptiX backends use to honor a ".exr" output path (postProcessAndWrite()
-// below). Its own tinyexr.h include is a no-op here: that header's include
-// guard is already set by the TINYEXR_IMPLEMENTATION include above.
+// below).
 #include "../../../src/shared/exr_writer.h"
 #include "../../../src/shared/cornell_box_data.h"
 // kConductorAu/kConductorCu - real (eta,k) presets for B7's own lacquered-

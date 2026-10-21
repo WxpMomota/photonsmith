@@ -401,12 +401,8 @@ if(RT_BUILD_METAL)
         gpu/metal/host/metal_poc_gpu_resources.mm
         gpu/metal/host/metal_poc_dispatch.mm
         gpu/metal/host/metal_live_preview.mm
-        # tinyexr's own zip/pxr24 codecs need miniz's real mz_compress/
-        # mz_uncompress symbols (see the target_include_directories
-        # comment below on why metal_renderer now needs tinyexr's real
-        # implementation at all) - cpu_renderer gets this from the SAME
-        # source file, listed separately above.
-        src/external/miniz.c
+        # (tinyexr's implementation and miniz come from cpu_renderer, which metal_renderer links PUBLIC: a second copy here
+        # was pulled in beside it as soon as the launcher itself referenced EXR code, and the link failed with 42 duplicate symbols)
     )
     # RT_METAL_SHADER_DIR/RT_MODELS_DIR (not __FILE__-relative lookups) so
     # both the shader source and models/suzanne.obj resolve correctly
