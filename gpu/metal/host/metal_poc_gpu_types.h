@@ -232,6 +232,8 @@ struct Uniforms {
     uint32_t footprintValid = 0;
     uint32_t pbrtPortalExtraCount = 0;   // see the shader's copy
     uint32_t pbrtPortalExtraBase = 0;
+    uint32_t pbrtSkyBesidePortals = 0;   // see the shader's copy
+    PackedFloat3 pbrtSkyColor{0, 0, 0};
 };
 
 // AreaLightData/buildPowerLightSampler now live in metal_poc_host_math.h

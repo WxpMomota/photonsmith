@@ -268,37 +268,67 @@ inline bool portalSampleLi(PortalLight u, device const float* distAndSat, float3
 
 // The three entry points every environment-NEE site and the miss path use for a pbrt scene's own image infinite light. They dispatch
 // on Uniforms::pbrtHasPortalLight, so a site only changes which function it calls; the plain-image behaviour is exactly as before.
+// The portals' density at `dir` from `origin`, zero where a portal does not shine from there: the mean over the portals of their in-window densities (the mixture src/shared/portal_light_set.h
+// uses when it samples one of them uniformly).
+inline float portalMixturePdfInWindow(constant Uniforms& u, device const float* marginalOrDist, device const float* conditionalOrRect, float3 origin, float3 dir) {
+    float sum = portalPdfLiInWindow(portalFromUniforms(u), marginalOrDist, origin, dir);
+    for (uint i = 0; i < u.pbrtPortalExtraCount; ++i) {
+        device const float* h = conditionalOrRect + (u.pbrtPortalExtraBase + i * 24u);
+        sum += portalPdfLiInWindow(portalFromHeader(h), marginalOrDist + uint(h[19] + 0.5), origin, dir);
+    }
+    return sum / float(1u + u.pbrtPortalExtraCount);
+}
+
+// Samples the portals alone: one of them uniformly (the first random number rescaled and reused), and returns the density of the portal MIXTURE at the direction taken.
+inline bool portalMixtureSample(constant Uniforms& u, device const float* marginalOrDist, device const float* conditionalOrRect, float3 hitPoint, float u1, float u2,
+                                thread float3& dir, thread float& pdfSolidAngle) {
+    const int n = 1 + int(u.pbrtPortalExtraCount);
+    if (n == 1) return portalSampleLi(portalFromUniforms(u), marginalOrDist, hitPoint, u1, u2, dir, pdfSolidAngle);
+    const float scaled = u1 * float(n);
+    const int index = min(n - 1, int(scaled));
+    const float reused = min(0.9999999f, scaled - float(index));
+    float chosenPdf;
+    PortalLight chosen = portalFromUniforms(u);
+    device const float* chosenDist = marginalOrDist;
+    if (index > 0) {
+        device const float* h = conditionalOrRect + (u.pbrtPortalExtraBase + uint(index - 1) * 24u);
+        chosen = portalFromHeader(h);
+        chosenDist = marginalOrDist + uint(h[19] + 0.5);
+    }
+    if (!portalSampleLi(chosen, chosenDist, hitPoint, reused, u2, dir, chosenPdf)) return false;
+    float sum = chosenPdf;
+    for (int i = 0; i < n; ++i) {
+        if (i == index) continue;
+        if (i == 0) { sum += portalPdfLiInWindow(portalFromUniforms(u), marginalOrDist, hitPoint, dir); continue; }
+        device const float* h = conditionalOrRect + (u.pbrtPortalExtraBase + uint(i - 1) * 24u);
+        sum += portalPdfLiInWindow(portalFromHeader(h), marginalOrDist + uint(h[19] + 0.5), hitPoint, dir);
+    }
+    pdfSolidAngle = sum / float(n);
+    return true;
+}
+
 inline float3 pbrtEnvSampleDirection(constant Uniforms& u, device const float* marginalOrDist, device const float* conditionalOrRect,
                                       uint width, uint height, float3 hitPoint, float u1, float u2, thread float& pdfSolidAngle) {
     if (u.pbrtHasPortalLight != 0u) {
         float3 dir;
-        const int n = 1 + int(u.pbrtPortalExtraCount);
-        if (n == 1) {
-            if (!portalSampleLi(portalFromUniforms(u), marginalOrDist, hitPoint, u1, u2, dir, pdfSolidAngle)) { pdfSolidAngle = 0.0; return float3(0.0, 1.0, 0.0); }
+        if (u.pbrtSkyBesidePortals == 0u) {
+            if (!portalMixtureSample(u, marginalOrDist, conditionalOrRect, hitPoint, u1, u2, dir, pdfSolidAngle)) { pdfSolidAngle = 0.0; return float3(0.0, 1.0, 0.0); }
             return dir;
         }
-        // Several portals (src/shared/portal_light_set.h): pick one uniformly with the first random number (rescaled and reused), sample it, and report the density of the MIXTURE at the
-        // direction taken: the chosen portal's own sampled density plus what each other portal gives that direction (zero outside its window), over n.
-        const float scaled = u1 * float(n);
-        const int index = min(n - 1, int(scaled));
-        const float reused = min(0.9999999f, scaled - float(index));
-        float chosenPdf;
-        PortalLight chosen = portalFromUniforms(u);
-        device const float* chosenDist = marginalOrDist;
-        if (index > 0) {
-            device const float* h = conditionalOrRect + (u.pbrtPortalExtraBase + uint(index - 1) * 24u);
-            chosen = portalFromHeader(h);
-            chosenDist = marginalOrDist + uint(h[19] + 0.5);
+        // The portals and a plain sky together (wf_sample_sky_nee, gpu/optix/wavefront_sky_light.h): one of the two with probability 1/2 each, the first random number rescaled and reused, and the
+        // density of the mixture at the direction taken: half the portals' density (zero outside their windows) plus half the sky's (uniform over the sphere).
+        const float invFourPi = 1.0 / (4.0 * M_PI_F);
+        if (u1 < 0.5) {
+            float portalPdf;
+            if (!portalMixtureSample(u, marginalOrDist, conditionalOrRect, hitPoint, 2.0 * u1, u2, dir, portalPdf)) { pdfSolidAngle = 0.0; return float3(0.0, 1.0, 0.0); }
+            pdfSolidAngle = 0.5 * (portalPdf + invFourPi);
+            return dir;
         }
-        if (!portalSampleLi(chosen, chosenDist, hitPoint, reused, u2, dir, chosenPdf)) { pdfSolidAngle = 0.0; return float3(0.0, 1.0, 0.0); }
-        float sum = chosenPdf;
-        for (int i = 0; i < n; ++i) {
-            if (i == index) continue;
-            if (i == 0) { sum += portalPdfLiInWindow(portalFromUniforms(u), marginalOrDist, hitPoint, dir); continue; }
-            device const float* h = conditionalOrRect + (u.pbrtPortalExtraBase + uint(i - 1) * 24u);
-            sum += portalPdfLiInWindow(portalFromHeader(h), marginalOrDist + uint(h[19] + 0.5), hitPoint, dir);
-        }
-        pdfSolidAngle = sum / float(n);
+        const float z = 1.0 - 2.0 * min(0.9999999f, 2.0 * (u1 - 0.5));
+        const float r = sqrt(max(0.0f, 1.0f - z * z));
+        const float phi = 2.0 * M_PI_F * u2;
+        dir = float3(r * cos(phi), r * sin(phi), z);
+        pdfSolidAngle = 0.5 * (portalMixturePdfInWindow(u, marginalOrDist, conditionalOrRect, hitPoint, dir) + invFourPi);
         return dir;
     }
     return sampleEnvironmentDirection(marginalOrDist, conditionalOrRect, int(width), int(height), u1, u2, pdfSolidAngle);
@@ -307,12 +337,13 @@ inline float3 pbrtEnvSampleDirection(constant Uniforms& u, device const float* m
 inline float3 pbrtEnvLeAt(constant Uniforms& u, device const float* conditionalOrRect, texture2d<float, access::sample> envTexture,
                            sampler s, float3 origin, float3 dir) {
     if (u.pbrtHasPortalLight != 0u) {
-        // the sum of every portal's sky: an escaped ray sees each window
+        // the sum of every portal's sky (and the plain sky beside them): an escaped ray sees each window
         float3 le = portalLe(portalFromUniforms(u), conditionalOrRect, origin, dir);
         for (uint i = 0; i < u.pbrtPortalExtraCount; ++i) {
             device const float* h = conditionalOrRect + (u.pbrtPortalExtraBase + i * 24u);
             le += portalLe(portalFromHeader(h), conditionalOrRect + uint(h[18] + 0.5), origin, dir);
         }
+        if (u.pbrtSkyBesidePortals != 0u) le += float3(u.pbrtSkyColor);
         return le;
     }
     return envTexture.sample(s, envMapUV(dir)).rgb;
@@ -321,14 +352,11 @@ inline float3 pbrtEnvLeAt(constant Uniforms& u, device const float* conditionalO
 inline float pbrtEnvPdfAt(constant Uniforms& u, device const float* marginalOrDist, device const float* conditionalOrRect,
                            uint width, uint height, float3 origin, float3 dir) {
     if (u.pbrtHasPortalLight != 0u) {
+        if (u.pbrtSkyBesidePortals != 0u)   // (the mixture: half the portals' density where they shine, half the uniform sphere's)
+            return 0.5 * (portalMixturePdfInWindow(u, marginalOrDist, conditionalOrRect, origin, dir) + 1.0 / (4.0 * M_PI_F));
         if (u.pbrtPortalExtraCount == 0u) return portalPdfLi(portalFromUniforms(u), marginalOrDist, origin, dir);
         // the mixture's density: the mean of every portal's pdf for directions it shines from (what a BSDF-sampled escape needs for its MIS weight)
-        float sum = portalPdfLiInWindow(portalFromUniforms(u), marginalOrDist, origin, dir);
-        for (uint i = 0; i < u.pbrtPortalExtraCount; ++i) {
-            device const float* h = conditionalOrRect + (u.pbrtPortalExtraBase + i * 24u);
-            sum += portalPdfLiInWindow(portalFromHeader(h), marginalOrDist + uint(h[19] + 0.5), origin, dir);
-        }
-        return sum / float(1u + u.pbrtPortalExtraCount);
+        return portalMixturePdfInWindow(u, marginalOrDist, conditionalOrRect, origin, dir);
     }
     return pdfEnvironmentDirection(marginalOrDist, conditionalOrRect, int(width), int(height), dir);
 }
