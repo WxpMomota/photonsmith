@@ -24,6 +24,11 @@ inline void setMeasuredTable(TriangleMaterial& m, int index) { m.conductorEta = 
 inline void setSubsurface(TriangleMaterial& m, int tableOffset, float entryAlpha) { m.conductorEta.x = (float)tableOffset; m.conductorEta.y = entryAlpha; }
 // a layered coat over a picture (27): the coat's alpha
 inline void setCoatAlpha(TriangleMaterial& m, float alpha) { m.conductorEta = PackedFloat3{alpha, 0.0f, 0.0f}; }
+// a coated material's layer (coateddiffuse 19, coatedconductor 20, image clearcoat 27): pbrt's thickness, the layer medium's mean albedo and g, the walk's maximum depth and the samples
+// per estimate. These have fields of their own (TriangleMaterial::layer*), not the conductor slots.
+inline void setLayerMedium(TriangleMaterial& m, double thickness, double albedo, double g, int maxDepth, int nSamples) {
+    m.layerThickness = (float)thickness; m.layerAlbedo = (float)albedo; m.layerG = (float)g; m.layerMaxDepth = maxDepth; m.layerNSamples = nSamples;
+}
 // a cloud (29) or RGB grid (30) medium: the index into cloudMediums / rgbGridMediums
 inline void setMediumBufferIndex(TriangleMaterial& m, int index) { m.conductorEta = PackedFloat3{(float)index, 0.0f, 0.0f}; }
 // a homogeneous medium (28) with per-channel extinction: the hero-channel path (chromatic flag in conductorK.z)

@@ -420,5 +420,12 @@ struct TriangleMaterial {
     // sphere is where it is at that time). Set per hit by resolveHit(); read by traceShadowAnyM().
     int32_t shadowChannel = -1;
     float rayTime = 0.0f;
+    // The layer of a coated material (coateddiffuse, coatedconductor): pbrt's thickness, the layer medium's single-scattering albedo and Henyey-Greenstein g, the walk's maximum depth and
+    // the samples per estimate. All zero (a material that never sets them) means pbrt's defaults: 0.01, no medium, g 0, 10, 1.
+    float layerThickness = 0.0f;
+    float layerAlbedo = 0.0f;
+    float layerG = 0.0f;
+    int32_t layerMaxDepth = 0;
+    int32_t layerNSamples = 0;
 };
 

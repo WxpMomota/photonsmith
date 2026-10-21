@@ -114,7 +114,7 @@ goes there, with its default. `Uniforms` and `TriangleMaterial` are still two ha
   `metal_poc_material_params.h` (`matparams::setHair`, `setPrincipled`, `setCauchy`, `setMeasuredTable`, `setSubsurface`, `setCoatAlpha`, `setChromaticMedium`,
   `setGlassMedium`, `setMediumBufferIndex`), the shader the views `matHairBetaN()`, `matCauchyA()`, `matMediumSigmaT()` ... after the struct in
   `metal_poc_types.metal`, which also has the table of what each family keeps in which slot. The storage and the picture are unchanged; a new family adds its
-  setter and its views. (The procedural-texture family, `materialType` 25, still reads `conductorK.y` as its mode and the rest per mode: see `shadeSurfaceAlbedo`
+  setter and its views. A coated material's layer (thickness, medium albedo and g, maximum depth, samples) has fields of its own (`TriangleMaterial::layer*`, set by `matparams::setLayerMedium`, read by `layerMediumOf()`). (The procedural-texture family, `materialType` 25, still reads `conductorK.y` as its mode and the rest per mode: see `shadeSurfaceAlbedo`
   in `metal_poc_kernel_surface.metal`.)
 * `Uniforms` is read as a `constant` buffer; the loader and `dsFillUniforms` fill it. `liveRender` writes only camera/seed/sample fields per frame.
 

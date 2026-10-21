@@ -526,22 +526,22 @@ inline bool shadeNormalizedFresnel(TriangleMaterial mat, float3 hitPoint, float3
 // (host-side `RoughnessToAlpha`, not squared in-shader - see buildCornellCoatedDiffuse()'s own comment, metal_poc.mm).
 
 inline float3 layeredCoatedDiffuseF(float3 wiLocal, float3 woLocal, float eta, float alpha,
-                                     float3 albedo, thread uint& rngState) {
+                                     float3 albedo, thread uint& rngState, LayerMedium med = LayerMedium()) {
     LayerTop top; LayerBottom bottom;
     layeredCoatedDiffuseParts(eta, alpha, albedo, top, bottom);
-    return layeredF(top, bottom, kLayerThickness, woLocal, wiLocal, rngState);
+    return layeredF(top, bottom, med, woLocal, wiLocal, rngState);
 }
 
-inline float layeredCoatedDiffusePdf(float3 woLocal, float3 wiLocal, float eta, float alpha, float3 albedo) {
+inline float layeredCoatedDiffusePdf(float3 woLocal, float3 wiLocal, float eta, float alpha, float3 albedo, LayerMedium med = LayerMedium()) {
     LayerTop top; LayerBottom bottom;
     layeredCoatedDiffuseParts(eta, alpha, albedo, top, bottom);
-    return layeredPdf(top, bottom, woLocal, wiLocal);
+    return layeredPdf(top, bottom, med, woLocal, wiLocal);
 }
 
-inline LayerSample layeredCoatedDiffuseSample(float3 woLocal, float eta, float alpha, float3 albedo, thread uint& rngState) {
+inline LayerSample layeredCoatedDiffuseSample(float3 woLocal, float eta, float alpha, float3 albedo, thread uint& rngState, LayerMedium med = LayerMedium()) {
     LayerTop top; LayerBottom bottom;
     layeredCoatedDiffuseParts(eta, alpha, albedo, top, bottom);
-    return layeredSample(top, bottom, kLayerThickness, woLocal, rngState);
+    return layeredSample(top, bottom, med, woLocal, rngState);
 }
 
 // GGX VNDF reflection pdf of the coat's own top surface - the MIS proxy the shaders used before the pbrt port. No longer used
@@ -583,6 +583,7 @@ inline bool shadeCoatedDiffuse(TriangleMaterial mat, float3 hitPoint, float3 fac
                             thread float3& throughput, thread float3& radiance,
                             thread float& bsdfPdf, thread bool& specularBounce, thread uint& rngState) {
     float alpha = max(mat.roughness, 0.0);
+    const LayerMedium coatMed = layerMediumOf(mat, kLayerThickness);
 
     float3 tangent, bitangent;
     buildAnisotropicOnb(facingNormal, tangent, bitangent);
@@ -610,9 +611,9 @@ inline bool shadeCoatedDiffuse(TriangleMaterial mat, float3 hitPoint, float3 fac
                 traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat);
             if (shadowResult.type == intersection_type::none) {
                 float3 wiLocal = float3(dot(wi, tangent), dot(wi, bitangent), dot(wi, facingNormal));
-                float3 f = layeredCoatedDiffuseF(wiLocal, woLocal, mat.ior, alpha, float3(mat.color), rngState);
+                float3 f = layeredCoatedDiffuseF(wiLocal, woLocal, mat.ior, alpha, float3(mat.color), rngState, coatMed);
                 float pdfSolidAngle = (distSq / (ls.area * abs(cosLight))) * ls.pmf;
-                float pdfBsdf = layeredCoatedDiffusePdf(woLocal, wiLocal, mat.ior, alpha, float3(mat.color));
+                float pdfBsdf = layeredCoatedDiffusePdf(woLocal, wiLocal, mat.ior, alpha, float3(mat.color), coatMed);
                 float weight = (pdfSolidAngle * pdfSolidAngle)
                     / (pdfSolidAngle * pdfSolidAngle + pdfBsdf * pdfBsdf);
                 float3 transmittance = fogTransmittance(uniforms, dist);
@@ -638,7 +639,7 @@ inline bool shadeCoatedDiffuse(TriangleMaterial mat, float3 hitPoint, float3 fac
                     traceShadowAnyM(isect, plShadowRay, accelStructure, functionTable, mat);
                 if (plShadowResult.type == intersection_type::none) {
                     float3 plWiLocal = float3(dot(plWi, tangent), dot(plWi, bitangent), dot(plWi, facingNormal));
-                    float3 plF = layeredCoatedDiffuseF(plWiLocal, woLocal, mat.ior, alpha, float3(mat.color), rngState);
+                    float3 plF = layeredCoatedDiffuseF(plWiLocal, woLocal, mat.ior, alpha, float3(mat.color), rngState, coatMed);
                     float3 plTransmittance = fogTransmittance(uniforms, plDist);
                     float plSpot = spotLightFalloff(-plWi, float3(pl.direction), pl.cosOuterAngle, pl.cosInnerAngle);
                     radiance += throughput * plF * float3(pl.emission) * plCosSurface * plSpot * plTransmittance / plDistSq;
@@ -660,7 +661,7 @@ inline bool shadeCoatedDiffuse(TriangleMaterial mat, float3 hitPoint, float3 fac
                     traceShadowAnyM(isect, dlShadowRay, accelStructure, functionTable, mat);
                 if (dlShadowResult.type == intersection_type::none) {
                     float3 dlWiLocal = float3(dot(dlWi, tangent), dot(dlWi, bitangent), dot(dlWi, facingNormal));
-                    float3 dlF = layeredCoatedDiffuseF(dlWiLocal, woLocal, mat.ior, alpha, float3(mat.color), rngState);
+                    float3 dlF = layeredCoatedDiffuseF(dlWiLocal, woLocal, mat.ior, alpha, float3(mat.color), rngState, coatMed);
                     // Skip when there is no fog - rayBoxExitDistance()
                     // is only valid for an origin INSIDE the hardcoded
                     // room bounds (see that function.s own comment for
@@ -695,7 +696,7 @@ inline bool shadeCoatedDiffuse(TriangleMaterial mat, float3 hitPoint, float3 fac
                         traceShadowAnyM(isect, pjShadowRay, accelStructure, functionTable, mat);
                     if (pjShadowResult.type == intersection_type::none) {
                         float3 pjWiLocal = float3(dot(pjWi, tangent), dot(pjWi, bitangent), dot(pjWi, facingNormal));
-                        float3 pjF = layeredCoatedDiffuseF(pjWiLocal, woLocal, mat.ior, alpha, float3(mat.color), rngState);
+                        float3 pjF = layeredCoatedDiffuseF(pjWiLocal, woLocal, mat.ior, alpha, float3(mat.color), rngState, coatMed);
                         float3 pjTransmittance = fogTransmittance(uniforms, pjDist);
                         radiance += throughput * pjF * pjRadiance * pjCosSurface * pjTransmittance / pjDistSq;
                     }
@@ -725,7 +726,7 @@ inline bool shadeCoatedDiffuse(TriangleMaterial mat, float3 hitPoint, float3 fac
                         traceShadowAnyM(isect, glShadowRay, accelStructure, functionTable, mat);
                     if (glShadowResult.type == intersection_type::none) {
                         float3 glWiLocal = float3(dot(glWi, tangent), dot(glWi, bitangent), dot(glWi, facingNormal));
-                        float3 glF = layeredCoatedDiffuseF(glWiLocal, woLocal, mat.ior, alpha, float3(mat.color), rngState);
+                        float3 glF = layeredCoatedDiffuseF(glWiLocal, woLocal, mat.ior, alpha, float3(mat.color), rngState, coatMed);
                         float3 glTransmittance = fogTransmittance(uniforms, glDist);
                         radiance += throughput * glF * glRadiance * glCosSurface * glTransmittance / glDistSq;
                     }
@@ -753,8 +754,8 @@ inline bool shadeCoatedDiffuse(TriangleMaterial mat, float3 hitPoint, float3 fac
                     traceShadowAnyM(isect, envShadowRay, accelStructure, functionTable, mat);
                 if (envShadowResult.type == intersection_type::none) {
                     float3 envWiLocal = float3(dot(envWi, tangent), dot(envWi, bitangent), dot(envWi, facingNormal));
-                    float3 envF = layeredCoatedDiffuseF(envWiLocal, woLocal, mat.ior, alpha, float3(mat.color), rngState);
-                    float envPdfBsdf = layeredCoatedDiffusePdf(woLocal, envWiLocal, mat.ior, alpha, float3(mat.color));
+                    float3 envF = layeredCoatedDiffuseF(envWiLocal, woLocal, mat.ior, alpha, float3(mat.color), rngState, coatMed);
+                    float envPdfBsdf = layeredCoatedDiffusePdf(woLocal, envWiLocal, mat.ior, alpha, float3(mat.color), coatMed);
                     float envWeight = (envPdfSolidAngle * envPdfSolidAngle) / (envPdfSolidAngle * envPdfSolidAngle + envPdfBsdf * envPdfBsdf);
                     float3 envRadiance = earthTexture.sample(textureSampler, envMapUV(envWi)).rgb;
                     radiance += throughput * envF * envRadiance * envCosSurface / envPdfSolidAngle * envWeight;
@@ -776,8 +777,8 @@ inline bool shadeCoatedDiffuse(TriangleMaterial mat, float3 hitPoint, float3 fac
                     traceShadowAnyM(isect, pbrtEnvShadowRay, accelStructure, functionTable, mat);
                 if (pbrtEnvShadowResult.type == intersection_type::none) {
                     float3 pbrtEnvWiLocal = float3(dot(pbrtEnvWi, tangent), dot(pbrtEnvWi, bitangent), dot(pbrtEnvWi, facingNormal));
-                    float3 pbrtEnvF = layeredCoatedDiffuseF(pbrtEnvWiLocal, woLocal, mat.ior, alpha, float3(mat.color), rngState);
-                    float pbrtEnvPdfBsdf = layeredCoatedDiffusePdf(woLocal, pbrtEnvWiLocal, mat.ior, alpha, float3(mat.color));
+                    float3 pbrtEnvF = layeredCoatedDiffuseF(pbrtEnvWiLocal, woLocal, mat.ior, alpha, float3(mat.color), rngState, coatMed);
+                    float pbrtEnvPdfBsdf = layeredCoatedDiffusePdf(woLocal, pbrtEnvWiLocal, mat.ior, alpha, float3(mat.color), coatMed);
                     float pbrtEnvWeight = (pbrtEnvPdfSolidAngle * pbrtEnvPdfSolidAngle) / (pbrtEnvPdfSolidAngle * pbrtEnvPdfSolidAngle + pbrtEnvPdfBsdf * pbrtEnvPdfBsdf);
                     float3 pbrtEnvRadianceSample = pbrtEnvLeAt(uniforms, pbrtEnvConditionalCDF, pbrtEnvTexture, textureSampler, hitPoint, pbrtEnvWi);
                     radiance += throughput * pbrtEnvF * pbrtEnvRadianceSample * pbrtEnvCosSurface / pbrtEnvPdfSolidAngle * pbrtEnvWeight;
@@ -788,7 +789,7 @@ inline bool shadeCoatedDiffuse(TriangleMaterial mat, float3 hitPoint, float3 fac
 
     // Continuation ray: pbrt's LayeredBxDF::Sample_f random walk (see this file's header comment). A failed walk
     // (Russian roulette, total internal reflection, ...) ends the path here - the light samples above were already taken.
-    LayerSample smp = layeredCoatedDiffuseSample(woLocal, mat.ior, alpha, float3(mat.color), rngState);
+    LayerSample smp = layeredCoatedDiffuseSample(woLocal, mat.ior, alpha, float3(mat.color), rngState, coatMed);
     if (!smp.valid) return false;
     float3 beta = smp.f * (abs(smp.wi.z) / smp.pdf);
     float3 newDirLocal = smp.wi;
@@ -800,7 +801,7 @@ inline bool shadeCoatedDiffuse(TriangleMaterial mat, float3 hitPoint, float3 fac
         // A smooth coat's mirror reflection: nothing the light samples could have produced, so no MIS (pbrt specularBounce).
         specularBounce = true;
     } else {
-        bsdfPdf = layeredCoatedDiffusePdf(woLocal, newDirLocal, mat.ior, alpha, float3(mat.color));
+        bsdfPdf = layeredCoatedDiffusePdf(woLocal, newDirLocal, mat.ior, alpha, float3(mat.color), coatMed);
         specularBounce = false;
     }
     return true;

@@ -775,6 +775,12 @@ struct TriangleMaterial {
     // The path's colour channel through a chromatic medium (-1: none) and the time of its camera sample, for traceShadowAnyM() (see metal_poc_gpu_types.h).
     int shadowChannel;
     float rayTime;
+    // The layer of a coated material (see metal_poc_gpu_types.h); zero = pbrt's defaults.
+    float layerThickness;
+    float layerAlbedo;
+    float layerG;
+    int layerMaxDepth;
+    int layerNSamples;
 };
 
 // ---- What the spare slots of TriangleMaterial mean, per material family ----------------------------------------------------------------------------------------------
