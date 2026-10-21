@@ -58,3 +58,4 @@ unit/wavefront_restir_tests.cpp
 unit/wavefront_restir_volume_tests.cpp
 unit/wavefront_svgf_math_tests.cpp
 unit/wavefront_upscale_math_tests.cpp
+unit/pbrt_gpu_subsurface_texture_tests.cpp

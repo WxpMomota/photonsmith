@@ -521,3 +521,6 @@ __pycache__/
 scripts/anim/out/
 scripts/anim/__pycache__/
 !scripts/anim/*.py
+
+# The environment thumbnails the GUI shows (30 small pictures, 1.2 MB): tracked, unlike every other picture
+!environments/thumbnails/*.png

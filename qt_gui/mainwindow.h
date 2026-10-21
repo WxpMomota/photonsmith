@@ -265,6 +265,7 @@ private:
 	void createSettingsTab();
 	// The Settings tab is built one group box at a time (each adds itself to `layout`).
 	void buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout);
+	QWidget *buildSceneGridPage(QWidget *basicTab);   // the thumbnail-grid page of buildSceneGroup()'s view stack
 	void buildSceneInfoRows(QWidget *basicTab, QVBoxLayout *sceneGroupLayout);
 	void buildRenderSettingsGroup(QWidget *basicTab, QVBoxLayout *layout);
 	void buildQualityRows(QWidget *basicTab, QFormLayout *renderLayout);

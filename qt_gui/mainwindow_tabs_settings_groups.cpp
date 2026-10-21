@@ -98,6 +98,51 @@ QString defaultRenderOutputDir() {
 }
 } // namespace
 
+// The Scene group's thumbnail-grid page (the other page of m_sceneViewStack is the combo box): the grid, the Generate Thumbnails button and its progress and Pause / Stop row.
+QWidget *MainWindow::buildSceneGridPage(QWidget *basicTab) {
+	QWidget *gridPage = new QWidget(m_sceneViewStack);
+	QVBoxLayout *gridPageLayout = new QVBoxLayout(gridPage);
+	gridPageLayout->setContentsMargins(0, 0, 0, 0);
+	m_sceneGrid = new QListWidget(basicTab);
+	m_sceneGrid->setViewMode(QListView::IconMode);
+	m_sceneGrid->setResizeMode(QListView::Adjust);
+	m_sceneGrid->setMovement(QListView::Static);
+	m_sceneGrid->setSelectionMode(QAbstractItemView::SingleSelection);
+	m_sceneGrid->setIconSize(QSize(96, 96));
+	m_sceneGrid->setGridSize(QSize(120, 132));
+	m_sceneGrid->setUniformItemSizes(true);
+	m_sceneGrid->setWordWrap(true);
+	m_sceneGrid->setMinimumHeight(260);
+	gridPageLayout->addWidget(m_sceneGrid, 1);
+	// Enabled state/tooltip both set for real by updateGenerateThumbnailsButtonState()
+	// once the category tabs exist below - this constructs enabled with a
+	// placeholder tooltip only because there's no category to check against yet.
+	m_generateThumbnailsButton = new QPushButton(tr("Generate Thumbnails"), gridPage);
+	gridPageLayout->addWidget(m_generateThumbnailsButton);
+	// Hidden until generation actually starts (onGenerateThumbnailsClicked())
+	// and hidden again once it finishes (onThumbnailsAllDone()) - see
+	// m_thumbnailProgressBar's own comment (mainwindow.h).
+	m_thumbnailProgressBar = new QProgressBar(gridPage);
+	m_thumbnailProgressBar->setTextVisible(true);
+	m_thumbnailProgressBar->setVisible(false);
+	gridPageLayout->addWidget(m_thumbnailProgressBar);
+	// Same show/hide lifecycle as m_thumbnailProgressBar just above - visible
+	// only while a batch is actually running, right below its own progress
+	// bar rather than reusing the real render's Stop/Pause row (which drives
+	// m_renderController/m_renderQueue, a completely separate job).
+	QHBoxLayout *thumbnailControlsRow = new QHBoxLayout();
+	m_thumbnailPauseButton = new QPushButton(tr("Pause"), gridPage);
+	m_thumbnailPauseButton->setVisible(false);
+	thumbnailControlsRow->addWidget(m_thumbnailPauseButton);
+	m_thumbnailStopButton = new QPushButton(tr("Stop"), gridPage);
+	m_thumbnailStopButton->setVisible(false);
+	thumbnailControlsRow->addWidget(m_thumbnailStopButton);
+	gridPageLayout->addLayout(thumbnailControlsRow);
+	connect(m_thumbnailPauseButton, &QPushButton::clicked, this, &MainWindow::onThumbnailPauseClicked);
+	connect(m_thumbnailStopButton, &QPushButton::clicked, this, &MainWindow::onThumbnailStopClicked);
+	return gridPage;
+}
+
 void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	// --- Scene selection ---
 	InfoGroupBox *sceneGroup = new InfoGroupBox(tr("Scene"), basicTab);
@@ -254,46 +299,7 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	sceneRow->addWidget(m_sceneCombo, 1);
 	m_sceneViewStack->addWidget(comboPage);
 
-	QWidget *gridPage = new QWidget(m_sceneViewStack);
-	QVBoxLayout *gridPageLayout = new QVBoxLayout(gridPage);
-	gridPageLayout->setContentsMargins(0, 0, 0, 0);
-	m_sceneGrid = new QListWidget(basicTab);
-	m_sceneGrid->setViewMode(QListView::IconMode);
-	m_sceneGrid->setResizeMode(QListView::Adjust);
-	m_sceneGrid->setMovement(QListView::Static);
-	m_sceneGrid->setSelectionMode(QAbstractItemView::SingleSelection);
-	m_sceneGrid->setIconSize(QSize(96, 96));
-	m_sceneGrid->setGridSize(QSize(120, 132));
-	m_sceneGrid->setUniformItemSizes(true);
-	m_sceneGrid->setWordWrap(true);
-	m_sceneGrid->setMinimumHeight(260);
-	gridPageLayout->addWidget(m_sceneGrid, 1);
-	// Enabled state/tooltip both set for real by updateGenerateThumbnailsButtonState()
-	// once the category tabs exist below - this constructs enabled with a
-	// placeholder tooltip only because there's no category to check against yet.
-	m_generateThumbnailsButton = new QPushButton(tr("Generate Thumbnails"), gridPage);
-	gridPageLayout->addWidget(m_generateThumbnailsButton);
-	// Hidden until generation actually starts (onGenerateThumbnailsClicked())
-	// and hidden again once it finishes (onThumbnailsAllDone()) - see
-	// m_thumbnailProgressBar's own comment (mainwindow.h).
-	m_thumbnailProgressBar = new QProgressBar(gridPage);
-	m_thumbnailProgressBar->setTextVisible(true);
-	m_thumbnailProgressBar->setVisible(false);
-	gridPageLayout->addWidget(m_thumbnailProgressBar);
-	// Same show/hide lifecycle as m_thumbnailProgressBar just above - visible
-	// only while a batch is actually running, right below its own progress
-	// bar rather than reusing the real render's Stop/Pause row (which drives
-	// m_renderController/m_renderQueue, a completely separate job).
-	QHBoxLayout *thumbnailControlsRow = new QHBoxLayout();
-	m_thumbnailPauseButton = new QPushButton(tr("Pause"), gridPage);
-	m_thumbnailPauseButton->setVisible(false);
-	thumbnailControlsRow->addWidget(m_thumbnailPauseButton);
-	m_thumbnailStopButton = new QPushButton(tr("Stop"), gridPage);
-	m_thumbnailStopButton->setVisible(false);
-	thumbnailControlsRow->addWidget(m_thumbnailStopButton);
-	gridPageLayout->addLayout(thumbnailControlsRow);
-	connect(m_thumbnailPauseButton, &QPushButton::clicked, this, &MainWindow::onThumbnailPauseClicked);
-	connect(m_thumbnailStopButton, &QPushButton::clicked, this, &MainWindow::onThumbnailStopClicked);
+	QWidget *gridPage = buildSceneGridPage(basicTab);
 	m_sceneViewStack->addWidget(gridPage);
 
 	sceneGroupLayout->addWidget(m_sceneViewStack);
