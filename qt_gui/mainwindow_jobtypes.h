@@ -223,6 +223,8 @@ public:
 	// own "use the scene's recommended camera" fallback (main.cpp, driven by
 	// LaunchArgs::cam_explicit) stays a real code path for untouched renders
 	// instead of being permanently short-circuited by this GUI.
+	// One moment of a film ("cartoon:fireflies@13.5") in place of the scene id; call after setParameters().
+	void setSceneArgument(const QString &argument) { m_sceneArgument = argument; }
 	void setParameters(bool useGPU, int width, int height, int samples, int maxDepth,
 					   const QString &sceneId, double camX, double camY, double camZ, bool camExplicit,
 					   const QString &outputPath = QString(), bool useWavefront = false);
@@ -307,6 +309,7 @@ private:
 	int m_samples;          // Samples per pixel (anti-aliasing quality)
 	int m_maxDepth;         // Max ray bounce depth (lighting quality)
 	QString m_sceneId;      // Scene selector ID (category letter + number, e.g. "A1")
+	QString m_sceneArgument; // replaces m_sceneId on the command line when set (see RenderJob::sceneArgument)
 
 	// Camera position (lookfrom) - always looking at center (278, 278, 278)
 	double m_camX;          // Camera X coordinate
@@ -516,6 +519,7 @@ struct RenderJob {
 	int samples = 0;
 	int maxDepth = 0;
 	QString sceneId;
+	QString sceneArgument;   // what the launcher is given for the scene when that is not sceneId: one moment of a film (cartoon:<key>@<seconds>); empty otherwise
 	QString outputPath;
 	double camX = 0.0;
 	double camY = 0.0;

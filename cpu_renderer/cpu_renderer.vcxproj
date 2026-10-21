@@ -82,6 +82,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="cpu_interface.cpp" />
+    <!-- the cartoon films' stills as scenes of the scene list (pbrt_discover.h listGenerated); the film code lives only here -->
+    <ClCompile Include="..\src\shared\cartoon\cartoon_scenes.cpp" />
     <!-- BDPT/MLT CLI entry points - see cpu_interface_bdpt.cpp's own file
          comment. Kept as its own translation unit organizationally (keeps
          the BDPT/MLT-specific includes/logic out of cpu_interface.cpp) but

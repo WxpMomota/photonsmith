@@ -1,41 +1,40 @@
-# Animation toolkit
+# Looking at a cartoon film
 
-A short film in Photonsmith is a Python function of time. `build(t)` returns the complete pbrt-v4 scene for the instant `t` (seconds); `anim_lib.py` renders every frame with `ray_tracer.exe`
-(GPU, path traced, denoised) and joins the frames into an MP4 with ffmpeg. Plain Python 3, no packages (Pillow is used only for the optional contact sheet). ffmpeg must be on `PATH`.
+The cartoon films (Lamp and Ball, Ball Parade, The Little Robot, Fireflies) are C++: `src/shared/cartoon/cartoon_lib.h` is the toolkit, there is one header per film, and `cartoons.h`
+lists them. A film is a function `std::string sceneAt(double t)` that returns the complete pbrt-v4 scene for the instant `t` (seconds), so every material, light and shape the renderer
+supports can be animated. There is one implementation of the toolkit; the GUI, `--video-preset` and this script all render the same thing.
 
-The renderer itself needs nothing new: each frame is an ordinary `.pbrt` file, so every material, light and shape the renderer supports can be animated.
-
-This Python toolkit is for writing a film quickly. The cartoon video presets that ship with the program are the same films in C++ (`src/shared/cartoon/`, a twin of
-`anim_lib.py`), so the GUI and `--video-preset` can render them without Python; `docs/VIDEO_GENERATION.md` has the user's side.
-
-## "Lamp and Ball"
-
-`lamp_and_ball.py` is a 20 second cartoon built with it: a desk lamp wakes up, notices a ball, hops over, nudges it, watches it bounce off a stack of books and roll home, and tucks its
-shade over it.
+`film.py` is plain Python 3 and only drives `ray_tracer` (the GPU, denoised, unless you pass `--cpu`):
 
 ```
-python scripts/anim/lamp_and_ball.py --still 7.2                 # one frame, to look at
-python scripts/anim/lamp_and_ball.py --preview --sheet 2,6,9,12  # stills of those times tiled into one picture
-python scripts/anim/lamp_and_ball.py --preview                   # the whole film at 480 x 270 (a few minutes)
-python scripts/anim/lamp_and_ball.py --final                     # 1280 x 720, 384 samples (about an hour)
+python scripts/anim/film.py list                            # the films and their lengths
+python scripts/anim/film.py still fireflies@13.5            # one frame, to look at (no @: the film's own best still)
+python scripts/anim/film.py sheet fireflies --count 16      # the whole film as a contact sheet: stills tiled with their times (needs Pillow)
+python scripts/anim/film.py sheet little-robot --times 2,8,20,30
+python scripts/anim/film.py video fireflies                 # the finished video
 ```
 
-Frames go to `scripts/anim/out/<name>_<preview|draft|final>/frame_#####.png` and the video next to them. Rendering resumes: frames that already exist are skipped (`--redo` renders them again).
+A frame is also an ordinary scene: `ray_tracer --gpu --denoise 1280 256 8 cartoon:fireflies@13.5`, and the GUI's Cartoons tab lists a still of each film.
 
-## What `anim_lib.py` gives a film
+## Writing a film
+
+Add `src/shared/cartoon/<name>.h` with a `headerAt(t)` and a `sceneAt(t)` in the style of the others, and list it at the end of `kFilms` in `cartoons.h` (append, never reorder: a film's
+preset id is its place in the list). Rebuild, then `film.py sheet <key>` to look at it. `docs/VIDEO_GENERATION.md` has the user's side.
+
+## What the toolkit gives a film
 
 | | |
 |---|---|
-| `Track(keys, ease)` | keyframes `(time, value[, ease])`, numbers or vectors; eases: `linear`, `smooth`, `in`, `out`, `back` (overshoot), `elastic` |
-| matrices | `translate`, `scale`, `rotate(axis, degrees)`, `frame_matrix`, `mat_mul(a, b, ...)`, `invert_affine` |
-| `Mesh` | `lathe(profile)` (anything round), `uv_sphere`, `box`, `rounded_box`; `mesh.to_pbrt(matrix)` writes a `trianglemesh` with normals and uv; squash and stretch (non-uniform scale) keeps correct shading |
-| `attr`, `coated`, `diffuse` | small pbrt text helpers |
-| `film_cli(build, duration, fps, name)` | the command line above |
+| `Track` / `Track3` | keyframes `{time, value, ease}`; eases: linear, smooth, in, out, back (overshoot), elastic |
+| matrices | `translate`, `scale`, `rotate(axis, degrees)`, `mul(a, b, ...)`, `invertAffine` |
+| `Mesh` | `lathe(profile)` (anything round), `uvSphere`, `box`, `roundedBox`, `torus`, `capsule`; `appendPbrt` writes a `trianglemesh` with normals and uv; squash and stretch (non-uniform scale) keeps correct shading |
+| `limbIk` | two-link inverse kinematics, so a hand can be put exactly where the story needs it |
+| `Shot`, `cameraAt` | cuts and camera moves: each shot has its own eye, target, fov and lens, and `cameraAt(shots, t)` picks the one that is on |
+| `attr`, `coated`, `diffuseMaterial` | small pbrt text helpers |
 
-## Notes on the cartoon's craft
+## Notes on the craft
 
-* Squash and stretch: the lamp crouches before a hop, stretches in the air and squashes on landing; the ball stretches along its velocity while it flies.
-* Anticipation and follow-through: the head winds back before the nudge; waking up uses an overshooting ease.
-* The arms are solved by two-link inverse kinematics, so the head can be put exactly where the story needs it (over the ball, on the ball, looking at it).
-* The ball's motion is a small physics pass; the books' bounce is bisected so that the ball comes to rest exactly where the lamp's shade comes down.
-* pbrt is left-handed: the story is written with +x to the right of the picture and `W` mirrors it on the way out.
+* Squash and stretch: a character crouches before a hop, stretches in the air and squashes on landing.
+* Anticipation and follow-through: the head winds back before a nudge; waking up uses an overshooting ease.
+* Light the film from the film: the fireflies are small emitters, so they light the grass round them; the moon is a large cool emitter.
+* The story space is +x to the right of the picture, +y up, +z towards the camera; every emitted x is negated because pbrt is left-handed.

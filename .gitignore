@@ -512,6 +512,7 @@ mcparity_*.exr
 # The frozen pbrt-v4 reference means the pbrt reference pack tests read (scripts/pbrt_reference_pack.py writes it) - a data file, not a stray log.
 !tests/data/pbrt_reference_means.txt
 !tests/data/scene_registry_snapshot.txt
+!tests/data/cartoon_films_snapshot.txt
 
 # Python bytecode (the photo helpers' tests)
 __pycache__/

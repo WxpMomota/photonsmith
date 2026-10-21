@@ -212,9 +212,9 @@ void MainWindow::selectSceneById(const QString &key) {
 	// scene, so nothing is lost by silencing them here.
 	if (m_sceneAvailabilityTabs) {
 		const QSignalBlocker blocker(m_sceneAvailabilityTabs);
-		m_sceneAvailabilityTabs->setCurrentIndex(scene_bucket::of(category == QLatin1String(SceneCategories::Cartoons), requiresFiles));
+		m_sceneAvailabilityTabs->setCurrentIndex(scene_bucket::of(SceneCategories::isFilmCategory(category.toUtf8().constData()), requiresFiles));
 	}
-	rebuildCategoryTabs(scene_bucket::of(category == QLatin1String(SceneCategories::Cartoons), requiresFiles));
+	rebuildCategoryTabs(scene_bucket::of(SceneCategories::isFilmCategory(category.toUtf8().constData()), requiresFiles));
 	if (!m_sceneCategoryTabs) return;
 	{
 		const QSignalBlocker blocker(m_sceneCategoryTabs);
@@ -266,7 +266,7 @@ void MainWindow::rebuildCategoryTabs(int bucket) {
 	int restoredTab = -1;
 	for (const char *categoryName : SceneCategories::kDisplayOrder) {
 		const QString category = QString::fromUtf8(categoryName);
-		if ((category == QLatin1String(SceneCategories::Cartoons)) != cartoons) continue;   // the cartoon buckets show only that category, the others never do
+		if (SceneCategories::isFilmCategory(categoryName) != cartoons) continue;   // the film buckets show only the film categories, the others never do
 		int inCategory = 0;
 		for (int j = 0; j < sceneCount; ++j) {
 			const QString id = SceneMetadataClient::sceneIdAtIndex(j);

@@ -114,6 +114,7 @@ add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 add_library(cpu_renderer STATIC
     cpu_renderer/cpu_interface.cpp
     cpu_renderer/cpu_interface_bdpt.cpp
+    src/shared/cartoon/cartoon_scenes.cpp
     src/external/stb_image_impl.cpp
     src/external/tinyexr_impl.cpp
     src/external/miniz.c

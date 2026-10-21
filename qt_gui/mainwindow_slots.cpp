@@ -289,7 +289,7 @@ void MainWindow::onModeChanged(int index) {
 	// pick a preset from in the first place). Same convention for Live
 	// Preview's own warning label(s).
 	if (m_videoModeWarningLabel) m_videoModeWarningLabel->setVisible(!isVideoMode());
-	if (isVideoMode() && m_sceneCombo && m_sceneCombo->currentIndex() >= 0) syncCartoonVideoSettings(m_sceneCombo->currentData().toString());   // a cartoon scene chosen in another mode
+	if (m_sceneCombo && m_sceneCombo->currentIndex() >= 0) syncCartoonVideoSettings(m_sceneCombo->currentData().toString());   // a cartoon scene chosen in another mode: its video settings, or its film time
 	// Dims (never disables - see setGroupDimmed()'s own comment) the two
 	// groups whose fields the banners above are talking about, so
 	// irrelevance also reads at a glance instead of only via the text.

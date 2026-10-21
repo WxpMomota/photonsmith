@@ -432,7 +432,7 @@ void RenderController::start() {
 	// Scene ID applies in both modes - dropping it in video mode used to
 	// silently fall back to the launcher's default (scene 0/Cornell Box)
 	// regardless of what the user picked in the Scene dropdown.
-	args << m_sceneId;
+	args << (m_sceneArgument.isEmpty() ? m_sceneId : m_sceneArgument);
 
 	// Camera position is only sent when it's explicit (see setParameters()'s
 	// comment) - when the user hasn't touched it, omitting it lets

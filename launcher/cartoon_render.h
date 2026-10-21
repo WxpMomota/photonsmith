@@ -16,6 +16,42 @@
 
 namespace cartoon_render {
 
+// Sets an environment variable for the life of the object and puts the old value back after it.
+class ScopedEnv {
+public:
+	ScopedEnv(const char *name, const std::string &value) : name_(name) {
+		if (const char *old = std::getenv(name)) {
+			had_ = true;
+			old_ = old;
+		}
+		set(value.c_str());
+	}
+	~ScopedEnv() {
+		if (had_) set(old_.c_str());
+		else unset();
+	}
+	ScopedEnv(const ScopedEnv &) = delete;
+	ScopedEnv &operator=(const ScopedEnv &) = delete;
+
+private:
+	void set(const char *value) {
+#ifdef _WIN32
+		_putenv_s(name_.c_str(), value);
+#else
+		setenv(name_.c_str(), value, 1);
+#endif
+	}
+	void unset() {
+#ifdef _WIN32
+		_putenv_s(name_.c_str(), "");
+#else
+		unsetenv(name_.c_str());
+#endif
+	}
+	std::string name_, old_;
+	bool had_ = false;
+};
+
 inline std::string quote(const std::string &s) {
 	std::string q = "\"";
 	for (char c : s) {
@@ -66,6 +102,9 @@ inline int renderFrame(const cartoon::Film &film, double t, const std::filesyste
 		f << film.sceneAt(t);
 	}
 	const std::string cmd = frameCommand(exe, forwardedFlags(args), width, height, spp, depth, framePath, scenePath.string());
+	// The child only renders this one file, so its scene list need not read the 200-odd scene files of pbrt_scenes/ (about half a second of every frame): pointing the scene folder
+	// at the folder of this frame leaves it the frame and the film stills.
+	const ScopedEnv onlyThisFrame("RAY_TRACER_PBRT_DIR", scenePath.parent_path().string());
 	const int rc = std::system(cmd.c_str());
 	std::error_code ec;
 	std::filesystem::remove(scenePath, ec);

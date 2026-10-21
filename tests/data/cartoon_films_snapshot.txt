@@ -1,0 +1,18 @@
+# The cartoon films, one instant per line: key|time (s)|triangles|area lights.
+# Regenerate with RT_UPDATE_SNAPSHOT=1 (see tests/unit/cartoon_snapshot_tests.cpp) and review the diff.
+lamp-and-ball|0|21846|2
+lamp-and-ball|9.1|22806|3
+lamp-and-ball|10|22806|3
+lamp-and-ball|19.98|22806|3
+ball-parade|0|15504|2
+ball-parade|4.6|15504|2
+ball-parade|6|15504|2
+ball-parade|11.99|15504|2
+little-robot|0|28492|1
+little-robot|25.5|30628|4
+little-robot|16|29548|4
+little-robot|31.97|33148|5
+fireflies|0|32604|3
+fireflies|13|33292|4
+fireflies|13|33292|4
+fireflies|25.97|71820|60

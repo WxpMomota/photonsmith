@@ -127,6 +127,11 @@ struct Discovered {
 	int userSceneNumber = 0;
 };
 
+// Scenes the program writes itself rather than reads from a folder of the user's: the stills of the cartoon films (src/shared/cartoon/cartoon_scenes.cpp). Each is described from a header
+// alone, and its file is written the first time something loads it. Defined in cartoon_scenes.cpp, which carries the film code, so the many files that include this header do not.
+void listGenerated(std::vector<Discovered> &out);   // appends one Discovered for each generated scene (its path is where its file will be)
+void materializeGenerated(const std::string &path);   // writes `path` when it is a generated scene's file that is missing or out of date; any other path is left alone
+
 namespace detail {
 
 // pbrt requires WorldBegin to separate scene-wide options from geometry, so
@@ -318,18 +323,6 @@ inline Discovered describeFile(const std::string &path) {
 	return describe(path, ss.str());
 }
 
-// Like describeFile() for a file that is large but says everything about itself near its start (the generated cartoon stills: a couple of MB of geometry after the header): only
-// the first 64 KB is read, which is enough when it holds the WorldBegin the header scan stops at. Falls back to the whole file otherwise.
-inline Discovered describeFileHead(const std::string &path) {
-	std::ifstream in(path, std::ios::binary);
-	if (!in) return describeFile(path);
-	std::string head(65536, '\0');
-	in.read(&head[0], static_cast<std::streamsize>(head.size()));
-	head.resize(static_cast<std::size_t>(in.gcount()));
-	if (head.find("WorldBegin") == std::string::npos) return describeFile(path);
-	return describe(path, head);
-}
-
 namespace detail {
 
 inline void collectPbrtFiles(const std::filesystem::path &from, std::vector<std::string> &out) {
@@ -430,21 +423,6 @@ inline std::vector<Discovered> scanDirectory(const std::string &dir) {
 	return found;
 }
 
-// The scenes in the cartoon stills folder: every .pbrt directly in it, read by header only (describeFileHead). Not scanDirectory(): the files are ours (no sibling Includes, no
-// subfolders to descend into), and every process that builds the scene list does this, among them each per-frame child run of a cartoon video.
-inline std::vector<Discovered> scanCartoonStills(const std::string &dir) {
-	std::vector<Discovered> found;
-	std::vector<std::string> paths;
-	detail::collectPbrtFiles(dir, paths);
-	std::sort(paths.begin(), paths.end());
-	for (const std::string &p : paths) {
-		Discovered d = describeFileHead(p);
-		if (d.ok && !d.declaresCamera) continue;
-		found.push_back(std::move(d));
-	}
-	return found;
-}
-
 // Where to look, in order, for a directory of user scenes.
 //
 // RAY_TRACER_PBRT_DIR wins so a user can point at a scene collection living
@@ -511,6 +489,8 @@ inline std::vector<Discovered> scanDefaultPaths() {
 		found = scanDirectory(dir);
 		if (!found.empty()) break;
 	}
+	// Scenes the program writes itself (the stills of the cartoon films): described from a header alone here, written when first loaded.
+	listGenerated(found);
 	// Scenes saved in the per-user folder follow the scanned ones, numbered like any file the user named (so adding one never shifts a bundled scene's id).
 	if (const std::string userDir = userSceneDir(); !userDir.empty()) {
 		for (Discovered &d : scanDirectory(userDir)) {
@@ -524,11 +504,6 @@ inline std::vector<Discovered> scanDefaultPaths() {
 			d.userSceneNumber = userSceneNumber(userDir, std::filesystem::path(d.path).filename().string());
 			found.push_back(std::move(d));
 		}
-	}
-	// The stills of the cartoon films, listed under Cartoons. The GUI writes them (cartoon_stills.h, at start-up); this only reads what is there, so the renderer
-	// libraries do not carry the film code.
-	if (const std::string cartoonDir = pbrt_asset_check::cartoonStillDir(); !cartoonDir.empty()) {
-		for (Discovered &d : scanCartoonStills(cartoonDir)) found.push_back(std::move(d));
 	}
 	for (const std::string &path : extraSceneFiles()) {
 		// A file the scan already found (the user named a scene from pbrt_scenes/) keeps its scanned entry.

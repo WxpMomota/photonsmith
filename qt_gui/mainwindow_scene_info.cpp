@@ -312,6 +312,16 @@ void MainWindow::syncCartoonVideoSettings(const QString &sceneId) {
 	const cartoon::Film *film = nullptr;
 	SceneMetadataClient::SceneMetadata meta;
 	if (!sceneId.isEmpty() && SceneMetadataClient::sceneMetadata(sceneId, meta) && !meta.filmKey.isEmpty()) film = cartoon::find(meta.filmKey.toUtf8().constData());   // the still's own @rt-cartoon tag
+	// The film time (a still picture's moment) is for image mode; its range and first value are the film's, set when the film is first selected.
+	if (m_filmTimeRow && m_filmTimeSpin) {
+		m_filmTimeRow->setVisible(film && !isVideoMode());
+		if (film && QString::fromUtf8(film->key) != m_filmTimeFor) {
+			m_filmTimeFor = QString::fromUtf8(film->key);
+			m_filmTimeSpin->setRange(0.0, film->duration);
+			m_filmTimeSpin->setValue(film->stillTime);
+		}
+		if (!film) m_filmTimeFor.clear();
+	}
 	if (!film) {
 		m_cartoonSettingsFor.clear();
 		return;

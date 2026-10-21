@@ -2,7 +2,7 @@
 // cartoon_lib.h -- the toolkit behind the cartoon video presets (src/shared/video_preset.h): a short film is a function of time that returns the complete pbrt-v4 scene for that
 // instant. This header supplies what such a function needs: keyframe tracks with easing, 3 x 3 / 4 x 4 transforms, triangle meshes (surfaces of revolution, spheres, boxes) written as
 // pbrt `trianglemesh` text, and the small text helpers around them. Header-only, plain C++17, no renderer dependency (the launcher writes each frame's text to a file and renders it
-// like any other .pbrt scene). scripts/anim/anim_lib.py is the same toolkit in Python, for authoring a film quickly before porting it.
+// like any other .pbrt scene). This is the only implementation of the toolkit: scripts/anim/film.py drives ray_tracer to look at a film's stills, contact sheet and video.
 
 #include <array>
 #include <cmath>
@@ -410,6 +410,16 @@ inline std::string cameraText(const CameraView &v) {
 				  fmt3({-v.eye.x, v.eye.y, v.eye.z}).c_str(), fmt3({-v.target.x, v.target.y, v.target.z}).c_str(), v.fov, v.lensRadius, length(v.eye - v.target));
 	return buf;
 }
+
+// A film's scene up to and including WorldBegin: `camera` (cameraText of the view at t), the picture's size, the sampler and the integrator. Every film starts this way.
+inline std::string sceneHeader(const std::string &camera) {
+	std::string out = camera;
+	out += "Film \"rgb\" \"integer xresolution\" [ 1280 ] \"integer yresolution\" [ 720 ]\n";
+	out += "Sampler \"halton\" \"integer pixelsamples\" [ 128 ]\n";
+	out += "Integrator \"volpath\" \"integer maxdepth\" [ 8 ]\n";
+	out += "WorldBegin\n";
+	return out;
+}
 inline double smoothstep(double a, double b, double x) {
 	const double u = clamp01((x - a) / (b - a));
 	return u * u * (3.0 - 2.0 * u);
@@ -424,6 +434,7 @@ struct Film {
 	double duration;           // seconds
 	int fps;
 	std::string (*sceneAt)(double t);
+	std::string (*headerAt)(double t);   // sceneAt's first part (up to WorldBegin) on its own
 	double stillTime;          // a time that makes a good still picture (a thumbnail, a gallery image)
 };
 

@@ -209,6 +209,9 @@ RenderJob MainWindow::captureRenderJob() {
 	if (job.displayTitle.isEmpty())
 		job.displayTitle = job.sceneId.isEmpty() ? QStringLiteral("Render") : job.sceneId;
 	job.sceneDescription = jobMeta.description;
+	// A film's still picture can be taken at any moment of the film: the launcher is given that frame (cartoon:<key>@<seconds>) instead of the still's own scene.
+	if (jobMetaFound && !jobMeta.filmKey.isEmpty() && !isVideoMode() && m_filmTimeSpin && m_filmTimeRow && m_filmTimeRow->isVisibleTo(m_filmTimeRow->parentWidget()))
+		job.sceneArgument = QString("cartoon:%1@%2").arg(jobMeta.filmKey).arg(m_filmTimeSpin->value(), 0, 'f', 1);
 
 	// Output file path - the field's own placeholder text promises a
 	// timestamp "to avoid overwriting", but that timestamp was only ever
@@ -299,6 +302,7 @@ void MainWindow::startRenderJob(const RenderJob &job) {
 	m_renderController->setParameters(job.useGPU, job.width, job.height, job.samples, job.maxDepth,
 	                                   job.sceneId, job.camX, job.camY, job.camZ, job.camExplicit,
 	                                   job.outputPath, job.useWavefront);
+	m_renderController->setSceneArgument(job.sceneArgument);
 	m_renderController->setAdvancedFlags(job.advancedFlags);
 	m_renderController->setIntegratorOptions(job.integratorOptions);
 

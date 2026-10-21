@@ -205,7 +205,7 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 		for (int i = 0; i < sceneCount; ++i) {
 			const QString id = SceneMetadataClient::sceneIdAtIndex(i);
 			const bool requires = SceneMetadataClient::sceneRequiresFiles(id);
-			if (SceneMetadataClient::sceneCategory(id) == QLatin1String(SceneCategories::Cartoons)) ++(requires ? cartoonFilesCount : cartoonCount);
+			if (SceneCategories::isFilmCategory(SceneMetadataClient::sceneCategory(id).toUtf8().constData())) ++(requires ? cartoonFilesCount : cartoonCount);
 			else if (requires) ++requiresFilesCount;
 			else selfContainedIds << id;
 		}
@@ -222,6 +222,9 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 		// A tab's index is its bucket (scene_bucket.h): the order above is the enum's.
 		Q_ASSERT(selfTab == scene_bucket::SelfContained && filesTab == scene_bucket::ExternalFiles && cartoonTab == scene_bucket::Cartoons && cartoonFilesTab == scene_bucket::CartoonsExternal);
 		Q_UNUSED(selfTab) Q_UNUSED(filesTab) Q_UNUSED(cartoonTab) Q_UNUSED(cartoonFilesTab)
+		// A bucket nothing is in is not offered: no film needs files from outside the program today, so that tab would only ever be empty.
+		m_sceneAvailabilityTabs->setTabVisible(scene_bucket::CartoonsExternal, cartoonFilesCount > 0);
+		m_sceneAvailabilityTabs->setTabVisible(scene_bucket::Cartoons, cartoonCount > 0);
 
 #ifndef QT_NO_DEBUG
 		// One-time drift guard against scene_technique_notes.h - see that
@@ -432,6 +435,22 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 }
 
 void MainWindow::buildSceneInfoRows(QWidget *basicTab, QVBoxLayout *sceneGroupLayout) {
+	// The moment of a film a still shows: only for the stills of the cartoon films, whose scene is a frame of a film (syncCartoonVideoSettings shows and sets it).
+	m_filmTimeRow = new QWidget(basicTab);
+	QHBoxLayout *filmTimeLayout = new QHBoxLayout(m_filmTimeRow);
+	filmTimeLayout->setContentsMargins(0, 0, 0, 0);
+	QLabel *filmTimeLabel = new QLabel(tr("Film time:"), m_filmTimeRow);
+	m_filmTimeSpin = new QDoubleSpinBox(m_filmTimeRow);
+	m_filmTimeSpin->setDecimals(1);
+	m_filmTimeSpin->setSingleStep(0.5);
+	m_filmTimeSpin->setSuffix(tr(" s"));
+	m_filmTimeSpin->setToolTip(tr("Which moment of the film this picture shows, in seconds from its start. The scene's own picture is the film's best still; the whole film is a video (Generate Video)."));
+	filmTimeLayout->addWidget(filmTimeLabel);
+	filmTimeLayout->addWidget(m_filmTimeSpin);
+	filmTimeLayout->addStretch(1);
+	m_filmTimeRow->setVisible(false);
+	sceneGroupLayout->addWidget(m_filmTimeRow);
+
 	m_sceneInfoLabel = new QLabel(basicTab);
 	m_sceneInfoLabel->setWordWrap(true);
 	// Appearance lives in the global stylesheet under this name, so it follows

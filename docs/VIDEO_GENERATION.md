@@ -243,9 +243,9 @@ sampled and played back, not its story.
 | fireflies | Fireflies | 26 s | A night meadow lit almost only by fireflies: a lone one wanders through the grass, a second arrives, their flashes drift into step, they circle and spiral up towards the moon as fifty more wake in the grass and a crane shot lifts away. Four shots. |
 
 A frame of a film is also a scene: `ray_tracer --gpu 1280 256 8 cartoon:fireflies@13.5` renders that moment as one picture (`cartoon:<key>` alone is the film's own best still), which is the quickest
-way to look at a change to a film. The GUI's scene list has a Cartoons tab (beside Self-Contained and Requires External Files) with one still per film; it is written from the films when the GUI starts, so a new film appears there by itself.
+way to look at a change to a film. The GUI's scene list has a Cartoons tab (beside Self-Contained and Requires External Files) with one still per film; it is listed from the films themselves (a still's file is written the first time it is rendered), so a new film appears there by itself, and its Film time box renders any other moment of the film as a picture.
 
-Making a film of your own: `scripts/anim/` (Python, quicker to change; `README.md` there) is the same toolkit for authoring, and `src/shared/cartoon/cartoon_lib.h` is its C++ twin;
+Making a film of your own: the toolkit is `src/shared/cartoon/cartoon_lib.h` (the only implementation: keyframes, transforms, meshes, hop squash and stretch, inverse-kinematics arms, shots with camera moves), and `python scripts/anim/film.py` shows a film's stills, a contact sheet or the video without the GUI;
 a finished film is a function `std::string sceneAt(double t)` listed in `src/shared/cartoon/cartoons.h`; that listing alone makes it a video preset (`video_preset::all()` builds the
 preset from it), and it appears as a scene on the GUI's Cartoons tab, in the GUI's Camera Path combo, and in `--list-video-presets`. Append new films, do not reorder them: a cartoon's preset id (V7 ...) is its
 place in the list.

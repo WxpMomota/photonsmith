@@ -96,12 +96,12 @@ inline std::string cameraText(double t) {
 	return buf;
 }
 
+// Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator. Cheap, and all the scene list
+// needs to describe the film's still.
+inline std::string headerAt(double t) { return sceneHeader(cameraText(t)); }
+
 inline std::string sceneAt(double t) {
-	std::string out = cameraText(t);
-	out += "Film \"rgb\" \"integer xresolution\" [ 1280 ] \"integer yresolution\" [ 720 ]\n";
-	out += "Sampler \"halton\" \"integer pixelsamples\" [ 128 ]\n";
-	out += "Integrator \"volpath\" \"integer maxdepth\" [ 8 ]\n";
-	out += "WorldBegin\n";
+	std::string out = headerAt(t);
 	out += "LightSource \"infinite\" \"rgb L\" [ 0.06 0.075 0.12 ]\n";
 	// two soft boxes up out of the picture: a big warm one in front, a cooler one behind to light the balls rims
 	const Vec3 key = {7.0, 6.2, 5.2}, rim = {2.0, 3.0, 5.5};

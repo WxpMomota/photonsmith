@@ -1453,6 +1453,9 @@ private:
 	// (category Cartoons) split the same way. A category appears in exactly one pair.
 	QTabBar *m_sceneAvailabilityTabs = nullptr;
 	int currentSceneBucket() const { return m_sceneAvailabilityTabs ? std::max(0, m_sceneAvailabilityTabs->currentIndex()) : 0; }
+	QWidget *m_filmTimeRow = nullptr;        // "Film time": which moment of a film a still render shows; visible for a film's still in image mode
+	QDoubleSpinBox *m_filmTimeSpin = nullptr;
+	QString m_filmTimeFor;                   // key of the film the spin box's range and value were last set for
 	QString m_cartoonSettingsFor;   // key of the film whose frames/fps/speed were last set from a cartoon scene; empty when the scene is not a cartoon
 	QTabBar *m_sceneCategoryTabs = nullptr;  // Category filter above the scene dropdown
 	// A third row, under the category tabs: the subcategories of the selected category (Large Scenes: Interiors, Vehicles, ...), with "All" first. It has no tabs

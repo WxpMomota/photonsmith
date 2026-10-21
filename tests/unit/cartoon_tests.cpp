@@ -14,6 +14,8 @@
 #include <vector>
 
 #include "pbrt_flatten_test_helpers.h"
+#include "scene_registry.h"
+#include "cpu_interface.h"
 #include "../../launcher/cartoon_render.h"
 #include "../../launcher/cartoon_still.h"
 #include "../../launcher/launcher_args.h"
@@ -349,11 +351,10 @@ std::filesystem::path scratchDir(const char *name) {
 }
 }  // namespace
 
-TEST(CartoonStills, EveryFilmGetsASceneFileTheSceneListFindsUnderCartoons) {
-	const std::filesystem::path dir = scratchDir("stills");
-	cartoon_stills::ensure(dir.string());
-	const std::vector<pbrt_discover::Discovered> found = pbrt_discover::scanDirectory(dir.string());
-	EXPECT_EQ(found.size(), static_cast<std::size_t>(cartoon::kFilmCount));
+TEST(CartoonScenes, EveryFilmIsListedFromItsHeaderAloneUnderCartoons) {
+	std::vector<pbrt_discover::Discovered> found;
+	pbrt_discover::listGenerated(found);
+	ASSERT_EQ(found.size(), static_cast<std::size_t>(cartoon::kFilmCount));
 	for (const cartoon::Film &film : cartoon::kFilms) {
 		bool listed = false;
 		for (const pbrt_discover::Discovered &d : found) {
@@ -365,10 +366,49 @@ TEST(CartoonStills, EveryFilmGetsASceneFileTheSceneListFindsUnderCartoons) {
 			EXPECT_EQ(d.cartoonKey, film.key);
 			EXPECT_NE(d.description.find(film.description), std::string::npos);
 			EXPECT_TRUE(d.declaresCamera);
+			EXPECT_EQ(d.xResolution, 1280) << "the film's own Film line, from the header";
+			EXPECT_FALSE(d.nested);
+			EXPECT_FALSE(d.userFile);
 		}
 		EXPECT_TRUE(listed) << film.key;
 	}
-	std::filesystem::remove_all(dir);
+}
+
+TEST(CartoonScenes, TheFileIsWrittenWhenAskedForAndMatchesWhatWasListed) {
+	std::vector<pbrt_discover::Discovered> found;
+	pbrt_discover::listGenerated(found);
+	ASSERT_FALSE(found.empty());
+	const pbrt_discover::Discovered listed = found[0];
+	pbrt_discover::materializeGenerated("some/other/file.pbrt");   // not a generated scene's file: nothing happens
+	EXPECT_FALSE(std::filesystem::exists("some/other/file.pbrt"));
+	pbrt_discover::materializeGenerated(listed.path);
+	ASSERT_TRUE(std::filesystem::exists(listed.path)) << listed.path;
+	const pbrt_discover::Discovered written = pbrt_discover::describeFile(listed.path);
+	EXPECT_TRUE(written.ok) << written.error;
+	EXPECT_EQ(written.tagName, listed.tagName);
+	EXPECT_EQ(written.cartoonKey, listed.cartoonKey);
+	EXPECT_EQ(written.description, listed.description);
+	EXPECT_EQ(written.xResolution, listed.xResolution);
+	EXPECT_EQ(written.samplesPerPixel, listed.samplesPerPixel);
+	EXPECT_DOUBLE_EQ(written.camera.vfov, listed.camera.vfov);
+	EXPECT_DOUBLE_EQ(written.camera.lookfrom[0], listed.camera.lookfrom[0]);
+}
+
+TEST(CartoonScenes, TheRegistryListsEveryFilmAndLoadsAStillThroughIt) {
+	for (const cartoon::Film &film : cartoon::kFilms) {
+		const SceneDescriptor *s = find_scene(cartoon::stillSlugOf(film));
+		ASSERT_NE(s, nullptr) << film.key;
+		EXPECT_STREQ(s->category, "Cartoons");
+		EXPECT_EQ(s->film_key, film.key);
+		EXPECT_STREQ(s->name, film.name);
+		EXPECT_FALSE(s->requires_files);
+	}
+	const SceneDescriptor *s = find_scene(cartoon::stillSlugOf(cartoon::kFilms[1]));   // Ball Parade: the lightest
+	ASSERT_NE(s, nullptr);
+	const hittable_list world = s->build_world();   // writes the file, loads it
+	EXPECT_FALSE(world.objects.empty()) << "the loaded still has geometry";
+	const char *path = cpu_scene_pbrt_path_by_id(s->id.c_str());
+	EXPECT_TRUE(std::filesystem::exists(path)) << path;
 }
 
 TEST(CartoonStills, EveryStillNamesItsFilmByKeyAndTheNamesAgree) {
@@ -431,25 +471,24 @@ TEST(CartoonStills, TheStillOfAFilmThatIsGoneIsRemovedAndOtherFilesAreKept) {
 	std::filesystem::remove_all(dir);
 }
 
-TEST(CartoonStills, TheSceneListReadsOnlyTheHeadOfAStill) {
-	const std::filesystem::path dir = scratchDir("stills_head");
-	cartoon_stills::ensure(dir.string());
-	const std::vector<pbrt_discover::Discovered> found = pbrt_discover::scanCartoonStills(dir.string());
-	ASSERT_EQ(found.size(), static_cast<std::size_t>(cartoon::kFilmCount));
-	const cartoon::Film &film = cartoon::kFilms[0];
-	for (const pbrt_discover::Discovered &d : found) {
-		EXPECT_TRUE(d.ok) << d.error;
-		EXPECT_EQ(d.category, "Cartoons");
-		if (d.tagName == film.name) EXPECT_EQ(d.xResolution, 1280) << "the film's own Film line, read from the head";
+TEST(CartoonRender, TheChildSeesOnlyItsFramesFolderAndTheEnvironmentComesBack) {
+	const char *name = "RT_TEST_CARTOON_ENV";
+#ifdef _WIN32
+	_putenv_s(name, "before");
+#else
+	setenv(name, "before", 1);
+#endif
+	{
+		cartoon_render::ScopedEnv inner(name, "during");
+		EXPECT_STREQ(std::getenv(name), "during");
 	}
-	// the head is enough: describing the 64 KB head gives what describing the whole file does
-	const std::string path = (dir / cartoon_stills::fileName(film)).string();
-	const pbrt_discover::Discovered whole = pbrt_discover::describeFile(path), head = pbrt_discover::describeFileHead(path);
-	EXPECT_EQ(head.xResolution, whole.xResolution);
-	EXPECT_EQ(head.samplesPerPixel, whole.samplesPerPixel);
-	EXPECT_EQ(head.description, whole.description);
-	EXPECT_EQ(head.tagName, whole.tagName);
-	std::filesystem::remove_all(dir);
+	ASSERT_NE(std::getenv(name), nullptr);
+	EXPECT_STREQ(std::getenv(name), "before") << "the old value is put back";
+	{
+		cartoon_render::ScopedEnv fresh("RT_TEST_CARTOON_ENV_UNSET", "x");
+		EXPECT_STREQ(std::getenv("RT_TEST_CARTOON_ENV_UNSET"), "x");
+	}
+	EXPECT_EQ(std::getenv("RT_TEST_CARTOON_ENV_UNSET"), nullptr) << "a variable that was not there is not left behind";
 }
 
 // ---- a frame as a temporary scene file (launcher/cartoon_still.h) ----------------------------------------------------------------------------------------------

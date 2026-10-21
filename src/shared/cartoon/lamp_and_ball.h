@@ -1,6 +1,6 @@
 #pragma once
 // lamp_and_ball.h -- "Lamp and Ball", a 20 second cartoon: a small yellow desk lamp wakes up on a dark desk, notices a red ball rolling in, hops over, nudges it, watches it bounce off
-// a stack of books and roll home, and puts its shade over it like a blanket. A C++ port of scripts/anim/lamp_and_ball.py (which is the quicker place to change the story).
+// a stack of books and roll home, and puts its shade over it like a blanket. (It began as a Python script; the C++ is the film now.)
 //
 // The story is written in "story space": +x to the right of the picture, +y up, +z towards the camera. pbrt is left-handed, so every emitted x is negated (kMirror) and triangle windings
 // are flipped; nothing else in this file has to think about it.
@@ -368,14 +368,14 @@ inline std::string cameraText(double t) {
 	return buf;
 }
 
+// Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator. Cheap, and all the scene list
+// needs to describe the film's still.
+inline std::string headerAt(double t) { return sceneHeader(cameraText(t)); }
+
 inline std::string sceneAt(double t) {
 	std::string spot;
 	const std::string lamp = buildLamp(t, spot);
-	std::string out = cameraText(t);
-	out += "Film \"rgb\" \"integer xresolution\" [ 1280 ] \"integer yresolution\" [ 720 ]\n";
-	out += "Sampler \"halton\" \"integer pixelsamples\" [ 128 ]\n";
-	out += "Integrator \"volpath\" \"integer maxdepth\" [ 8 ]\n";
-	out += "WorldBegin\n";
+	std::string out = headerAt(t);
 	out += "LightSource \"infinite\" \"rgb L\" [ 0.05 0.065 0.11 ]\n";
 	out += "AttributeBegin\n  AreaLightSource \"diffuse\" \"rgb L\" [ 0.9 0.95 1.35 ]\n  Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 0 2 3 ] \"point3 P\" [ -9 9 -3  9 9 -3  9 9 5  -9 9 5 ]\nAttributeEnd\n";
 	out += spot + buildSet() + lamp + buildBall(t);

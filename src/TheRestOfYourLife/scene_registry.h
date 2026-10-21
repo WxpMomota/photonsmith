@@ -282,6 +282,7 @@ namespace pbrt_scene_registry {
                 // of what was actually requested.
                 assert(accelerator_override::was_set() &&
                        "a pbrt-backed scene was built before accelerator_override::set() ran");
+                pbrt_discover::materializeGenerated(path);   // a scene the program writes itself (the cartoon stills) gets its file now
                 const pbrt_load::LoadResult r =
                     pbrt_load::loadFile(path, accelerator_override::state());
                 if (!r.ok) {

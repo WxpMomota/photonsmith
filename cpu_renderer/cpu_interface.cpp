@@ -1052,7 +1052,9 @@ extern "C" const char* cpu_scene_pbrt_path_by_id(const char* scene_id) {
 	// paths() is keyed by id; scene_id may be a slug.
 	const SceneDescriptor* s = find_scene(scene_id);
 	const auto it = byId.find(s ? s->id : std::string(scene_id));
-	return (it == byId.end()) ? "" : it->second.c_str();
+	if (it == byId.end()) return "";
+	pbrt_discover::materializeGenerated(it->second);   // the GPU backends load the file themselves: a generated scene (the cartoon stills) has to exist by now
+	return it->second.c_str();
 }
 
 // Resolves a scene key - an id ("B10") or a slug ("rough-glass") - to the scene's id; returns 0 (and writes an empty string) for an unknown key.

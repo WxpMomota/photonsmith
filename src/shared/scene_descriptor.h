@@ -85,6 +85,10 @@ namespace SceneCategories {
     // the same reason My Scenes was, shown after Textures in the GUI.
     constexpr const char* Cartoons = "Cartoons";
 
+    // True for a category whose scenes are stills of films (cartoons): scenes with a SceneDescriptor::film_key, whose video is the film. The scene picker keeps these apart from the
+    // scene categories without knowing which film category it is.
+    inline bool isFilmCategory(const char* category) { return category && std::strcmp(category, Cartoons) == 0; }
+
     // Display order for the GUI's category tabs. Education and Textures sit
     // after the other compiled-in categories and before CustomScenes, which
     // comes next so the built-in tabs never shift position when a scene

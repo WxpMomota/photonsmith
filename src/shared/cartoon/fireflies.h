@@ -184,13 +184,13 @@ inline const std::vector<Shot> &shots() {
 	return s;
 }
 
+// Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator. Cheap, and all the scene list
+// needs to describe the film's still.
+inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t))); }
+
 inline std::string sceneAt(double t) {
 	const double f = fade(t);
-	std::string out = cameraText(cameraAt(shots(), t));
-	out += "Film \"rgb\" \"integer xresolution\" [ 1280 ] \"integer yresolution\" [ 720 ]\n";
-	out += "Sampler \"halton\" \"integer pixelsamples\" [ 128 ]\n";
-	out += "Integrator \"volpath\" \"integer maxdepth\" [ 8 ]\n";
-	out += "WorldBegin\n";
+	std::string out = headerAt(t);
 	char buf[200];
 	std::snprintf(buf, sizeof(buf), "LightSource \"infinite\" \"rgb L\" [ %.4f %.4f %.4f ]\n", f * 0.006, f * 0.011, f * 0.034);
 	out += buf;
