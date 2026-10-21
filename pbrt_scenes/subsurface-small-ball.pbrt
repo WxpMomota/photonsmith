@@ -1,0 +1,19 @@
+# @rt-category Test Scenes
+# @rt-description A small subsurface ball (radius 0.5, mean free path 0.4, reflectance 0.95) under a white sky: the case that exposed a BSSRDF probe-walk bias on Metal, kept to guard the OptiX backends.
+# @rt-performance Fast
+# @rt-size 1
+# subsurface-small-ball.pbrt -- the same lone ball as subsurface-sky-ball.pbrt, but small and very bright: a high albedo makes the BSSRDF's probe segment long, and a small object puts the
+# surface far from the probe's start, so a probe that restarts its ray with a fixed small step can find the surface it just left and count it twice (Metal read +13.8% before its fix).
+# Every renderer should agree with pbrt-v4 here. Original, no licence constraints.
+
+LookAt 0 0 5   0 0 0   0 1 0
+Camera "perspective" "float fov" [ 12 ]
+Film "rgb" "integer xresolution" [ 48 ] "integer yresolution" [ 48 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+Integrator "volpath" "integer maxdepth" [ 30 ]
+WorldBegin
+LightSource "infinite" "rgb L" [ 1 1 1 ]
+AttributeBegin
+  Material "subsurface" "rgb mfp" [ 0.4 0.4 0.4 ] "rgb reflectance" [ 0.95 0.95 0.95 ] "float eta" [ 1.33 ] "float roughness" [ 0 ]
+  Shape "sphere" "float radius" [ 0.5 ]
+AttributeEnd
