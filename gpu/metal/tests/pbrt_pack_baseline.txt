@@ -148,8 +148,8 @@ texture-encoding-wrap-invert 0.9960 0.9804 0.9958
 texture-graph 0.9929 0.9802 0.9904
 texture-mappings 1.0030 1.0040 0.9990
 texture-means 0.9966 0.9992 0.9983
-texture-mix-amount 0.9939 0.9945 0.9957
-texture-params 0.9862 0.9914 0.9970
+texture-mix-amount 0.9993 0.9994 0.9994
+texture-params 1.0027 1.0011 1.0018
 textured-twosided-lights 0.9867 0.9912 0.9931
 thin-dielectric-medium 0.9993 1.0001 0.9848
 triangle-fan-light 0.9996 0.9999 1.0013

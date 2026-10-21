@@ -432,5 +432,11 @@ struct TriangleMaterial {
     // A position-based texture mapping (spherical, cylindrical, planar) for the reflectance picture: 1 + the offset, in rgbGridData, of 21 floats
     // (kind, texture-from-Metal-world 3x4 row-major, v1, v2, udelta, vdelta); 0 = the surface's own uv (uvScale/uvDelta).
     int32_t posMapIndex = 0;
+    // Per-pixel parameters from pictures (each 1 + the offset of a 12-float picture reference in rgbGridData, see PbrtSceneLoader::claimImageRef; 0 = none): a Mix material's amount, a
+    // roughness (a conductor's, a coated diffuse's, a coated conductor's coat), a coated conductor's base roughness, a reflectance that is a graph of textures.
+    int32_t mixAmountRef = 0;
+    int32_t roughRef = 0;
+    int32_t condRoughRef = 0;
+    int32_t graphRef = 0;
 };
 

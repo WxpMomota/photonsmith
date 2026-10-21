@@ -402,7 +402,56 @@ bool PbrtSceneLoader::mapPbrtPerHitMix(PbrtMaterialMapState& st, const pbrt_flat
     return true;
 }
 
+int PbrtSceneLoader::claimImageRef(const std::string& filename, const pbrt_flatten::TextureDecodeOptions& options, const pbrt_flatten::UvMapping& mapping, double scale,
+                                   float sceneScale, float3 bboxCenter, float3 sceneOffset, bool remapRoughness) {
+    if (filename.empty()) return 0;
+    char key[64];
+    std::snprintf(key, sizeof(key), "|%.6g|%d", options.gamma, options.invert ? 1 : 0);
+    const std::string pixelKey = filename + key;
+    auto found = pbrtImageRefPixels.find(pixelKey);
+    if (found == pbrtImageRefPixels.end()) {
+        std::string bytes;
+        std::vector<float> pixels;
+        int w = 0, h = 0;
+        if (!pbrt_load::loadFileNear(pbrtScenePath, filename, bytes) || !pbrt_load::detail::decodeInfiniteLightImage(filename, bytes, pixels, w, h) || w <= 0 || h <= 0) {
+            fprintf(stderr, "loadPbrtScene: the texture '%s' could not be read/decoded; its material keeps the flat value\n", filename.c_str());
+            return 0;
+        }
+        gpu_scene_textures::applyImagemapEncoding(pixels, filename, options.gamma, options.invert);
+        const int offset = (int)rgbGridData.size();
+        rgbGridData.insert(rgbGridData.end(), pixels.begin(), pixels.end());
+        found = pbrtImageRefPixels.emplace(pixelKey, std::array<int, 3>{offset, w, h}).first;
+    }
+    std::vector<float> ref(12, 0.0f);
+    ref[0] = (float)found->second[0]; ref[1] = (float)found->second[1]; ref[2] = (float)found->second[2];
+    ref[3] = (float)options.wrapIndex;
+    ref[4] = (float)scale;
+    ref[10] = remapRoughness ? 1.0f : 0.0f;
+    ref[5] = (float)mapping.su; ref[6] = (float)mapping.sv; ref[7] = (float)mapping.du; ref[8] = (float)mapping.dv;
+    if (mapping.kind != pbrt_flatten::UvMapping::Kind::Uv) ref[9] = (float)(claimPositionMapping(mapping, sceneScale, bboxCenter, sceneOffset) + 1);
+    const auto it = pbrtImageRefs.find(ref);
+    if (it != pbrtImageRefs.end()) return it->second + 1;
+    const int offset = (int)rgbGridData.size();
+    rgbGridData.insert(rgbGridData.end(), ref.begin(), ref.end());
+    pbrtImageRefs[ref] = offset;
+    return offset + 1;
+}
+
 TriangleMaterial PbrtSceneLoader::mapPbrtMaterial(PbrtMaterialMapState& st, const pbrt_flatten::Material& m, int depth) {
+    TriangleMaterial mat = mapPbrtMaterialBase(st, m, depth);
+    // A roughness picture on a conductor, a coated diffuse or a coated conductor (and its base roughness): read per pixel by the shader (patchPerPixelMaterial); the flat value the base
+    // function stored (the picture's mean) stays as the fallback.
+    const bool roughType = mat.materialType == METAL_MAT_ROUGH_CONDUCTOR || mat.materialType == METAL_MAT_COATED_DIFFUSE || mat.materialType == METAL_MAT_COATED_CONDUCTOR;
+    if (roughType && !m.roughnessTextureFilename.empty())
+        mat.roughRef = claimImageRef(m.roughnessTextureFilename, m.roughnessTextureOptions, m.roughnessTextureMapping, m.roughnessTextureScale, st.sceneScale, st.bboxCenter, st.sceneOffset, m.remapRoughness);
+    if (mat.materialType == METAL_MAT_COATED_CONDUCTOR && !m.condRoughnessTextureFilename.empty())
+        mat.condRoughRef = claimImageRef(m.condRoughnessTextureFilename, m.condRoughnessTextureOptions, m.condRoughnessTextureMapping, m.condRoughnessTextureScale, st.sceneScale, st.bboxCenter, st.sceneOffset, m.remapRoughness);
+    if (mat.materialType == METAL_MAT_MIX && !m.mixWeightTextureFilename.empty())
+        mat.mixAmountRef = claimImageRef(m.mixWeightTextureFilename, m.mixWeightTextureOptions, m.mixWeightTextureMapping, m.mixWeightTextureScale, st.sceneScale, st.bboxCenter, st.sceneOffset);
+    return mat;
+}
+
+TriangleMaterial PbrtSceneLoader::mapPbrtMaterialBase(PbrtMaterialMapState& st, const pbrt_flatten::Material& m, int depth) {
     const pbrt_flatten::FlatScene& scene = st.scene;
     const float sceneScale = st.sceneScale;
     const float3 bboxCenter = st.bboxCenter;

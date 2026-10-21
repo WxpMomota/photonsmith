@@ -191,11 +191,14 @@ inline void resolveHit(thread const KernelRes& R, thread PathState& P, thread Bo
     // and sidedness of the mix itself carry over (a Mix has none of its own).
     if (mat.materialType == METAL_MAT_MIX) {
         device const TriangleMaterial* pair = (device const TriangleMaterial*)(rgbGridData + mat.bumpOffset);
-        const bool pickSecond = randFloat(rngState) < mat.roughness;
+        float amount = mat.roughness;
+        if (mat.mixAmountRef != 0) amount = clamp(sampleImageRef(rgbGridData, mat.mixAmountRef, hitUV(primId, result.triangle_barycentric_coord, uvs, spheres, normal, isSphere, isTriangleHit), hitPoint).x, 0.0f, 1.0f);   // an image amount
+        const bool pickSecond = randFloat(rngState) < amount;
         const int mixLightId = mat.lightId;
         mat = pickSecond ? pair[1] : pair[0];
         mat.lightId = mixLightId;
     }
+    patchPerPixelMaterial(mat, rgbGridData, primId, result.triangle_barycentric_coord, uvs, spheres, normal, hitPoint, isSphere, isTriangleHit);
     // Raw (outward, unflipped) normal kept separately from here -
     // dielectric handling below needs to know which side of the
     // surface the ray is entering from (front vs back face) to
@@ -326,20 +329,7 @@ inline void perturbShadingNormal(thread const KernelRes& R, thread PathState& P,
 // (posMapIndex != 0), the hit point carried into the texture's own space (src/shared/texture_position_mapping.h, positionToSt, in Metal's rescaled world: the host composed the matrix).
 inline float2 pictureLookup(TriangleMaterial mat, device const float* grid, float3 hitPoint, float2 uv) {
     if (mat.posMapIndex <= 0) return float2(mat.uvScaleU * uv.x + mat.uvDeltaU, mat.uvScaleV * uv.y + mat.uvDeltaV);
-    device const float* d = grid + (mat.posMapIndex - 1);
-    const int kind = int(d[0] + 0.5);
-    const float x = d[1] * hitPoint.x + d[2] * hitPoint.y + d[3] * hitPoint.z + d[4];
-    const float y = d[5] * hitPoint.x + d[6] * hitPoint.y + d[7] * hitPoint.z + d[8];
-    const float z = d[9] * hitPoint.x + d[10] * hitPoint.y + d[11] * hitPoint.z + d[12];
-    if (kind == 1) {   // spherical
-        const float len = sqrt(x * x + y * y + z * z);
-        const float cosTheta = len > 0.0 ? clamp(z / len, -1.0f, 1.0f) : 1.0f;
-        float phi = atan2(y, x);
-        if (phi < 0.0) phi += 2.0 * M_PI_F;
-        return float2(acos(cosTheta) / M_PI_F, phi / (2.0 * M_PI_F));
-    }
-    if (kind == 2) return float2((M_PI_F + atan2(y, x)) / (2.0 * M_PI_F), z);   // cylindrical
-    return float2(d[19] + (x * d[13] + y * d[14] + z * d[15]), d[20] + (x * d[16] + y * d[17] + z * d[18]));   // planar
+    return positionMappedSt(grid + (mat.posMapIndex - 1), hitPoint);
 }
 
 inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread BounceState& B) {
