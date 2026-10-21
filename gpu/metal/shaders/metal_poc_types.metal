@@ -356,6 +356,9 @@ struct Uniforms {
     packed_float3 footprintMinDirX;
     packed_float3 footprintMinDirY;
     uint footprintValid;
+    // Further portal infinite lights (pbrt allows several): how many, and where their 24-float headers start in the pbrtEnv "conditional" buffer (see portalFromHeader() in metal_poc_environment.metal).
+    uint pbrtPortalExtraCount;
+    uint pbrtPortalExtraBase;
 };
 
 // Blinn/pbrt-v4's own smooth cone falloff: 0 outside the outer cone, 1
@@ -775,6 +778,19 @@ struct TriangleMaterial {
     // The path's colour channel through a chromatic medium (-1: none) and the time of its camera sample, for traceShadowAnyM() (see metal_poc_gpu_types.h).
     int shadowChannel;
     float rayTime;
+    // The layer of a coated material (see metal_poc_gpu_types.h); zero = pbrt's defaults.
+    float layerThickness;
+    float layerAlbedo;
+    float layerG;
+    int layerMaxDepth;
+    int layerNSamples;
+    // A position-based texture mapping for the reflectance picture (see metal_poc_gpu_types.h); 0 = the surface's own uv.
+    int posMapIndex;
+    // Per-pixel parameters from pictures (see metal_poc_gpu_types.h); 0 = none.
+    int mixAmountRef;
+    int roughRef;
+    int condRoughRef;
+    int graphRef;
 };
 
 // ---- What the spare slots of TriangleMaterial mean, per material family ----------------------------------------------------------------------------------------------

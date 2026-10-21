@@ -497,6 +497,49 @@ inline float3 tangentFor(uint primId, device const packed_float3* verts, device 
 
 // A look-up in a picture at pbrt texture coordinates (s, t) (t up, before the image's top-down row order), honouring the texture's "string wrap": clamp reads the edge texel
 // beyond the picture, black reads black beyond it, repeat (the sampler's own mode) tiles it. 0 clamp, 1 repeat, 2 black (MipWrapMode).
+// pbrt's spherical, cylindrical and planar texture mappings of a hit point: `d` is the 21-float block the host stores (PbrtSceneLoader::claimPositionMapping): the kind, the
+// texture-from-Metal-world 3x4 matrix, v1, v2, udelta, vdelta (src/shared/texture_position_mapping.h, positionToSt).
+inline float2 positionMappedSt(device const float* d, float3 hitPoint) {
+    const int kind = int(d[0] + 0.5);
+    const float x = d[1] * hitPoint.x + d[2] * hitPoint.y + d[3] * hitPoint.z + d[4];
+    const float y = d[5] * hitPoint.x + d[6] * hitPoint.y + d[7] * hitPoint.z + d[8];
+    const float z = d[9] * hitPoint.x + d[10] * hitPoint.y + d[11] * hitPoint.z + d[12];
+    if (kind == 1) {   // spherical
+        const float len = sqrt(x * x + y * y + z * z);
+        const float cosTheta = len > 0.0 ? clamp(z / len, -1.0f, 1.0f) : 1.0f;
+        float phi = atan2(y, x);
+        if (phi < 0.0) phi += 2.0 * M_PI_F;
+        return float2(acos(cosTheta) / M_PI_F, phi / (2.0 * M_PI_F));
+    }
+    if (kind == 2) return float2((M_PI_F + atan2(y, x)) / (2.0 * M_PI_F), z);   // cylindrical
+    return float2(d[19] + (x * d[13] + y * d[14] + z * d[15]), d[20] + (x * d[16] + y * d[17] + z * d[18]));   // planar
+}
+
+// A picture reference (1 + the offset of 12 floats in the shared float buffer, PbrtSceneLoader::claimImageRef): the picture's value at a hit, bilinear with texel centres and pbrt's
+// (s, 1 - t) orientation, wrapped as the texture says (0 clamp, 1 repeat, 2 black), times the reference's scale. `uv` is the surface's own; a position-based mapping uses the hit point.
+inline float3 sampleImageRef(device const float* grid, int ref1, float2 uv, float3 hitPoint) {
+    device const float* r = grid + (ref1 - 1);
+    const int offset = int(r[0] + 0.5), w = int(r[1] + 0.5), h = int(r[2] + 0.5), wrap = int(r[3] + 0.5);
+    const int posMap = int(r[9] + 0.5);
+    const float2 st = posMap > 0 ? positionMappedSt(grid + (posMap - 1), hitPoint) : float2(r[5] * uv.x + r[7], r[6] * uv.y + r[8]);
+    const float fx = st.x * float(w) - 0.5, fy = (1.0 - st.y) * float(h) - 0.5;
+    const int x0 = int(floor(fx)), y0 = int(floor(fy));
+    const float ax = fx - float(x0), ay = fy - float(y0);
+    float3 acc = float3(0.0);
+    for (int j = 0; j < 2; ++j) {
+        for (int i = 0; i < 2; ++i) {
+            int ix = x0 + i, iy = y0 + j;
+            const float wgt = (i == 0 ? 1.0 - ax : ax) * (j == 0 ? 1.0 - ay : ay);
+            if (wrap == 1) { ix = ((ix % w) + w) % w; iy = ((iy % h) + h) % h; }
+            else if (wrap == 2) { if (ix < 0 || ix >= w || iy < 0 || iy >= h) continue; }
+            else { ix = clamp(ix, 0, w - 1); iy = clamp(iy, 0, h - 1); }
+            device const float* px = grid + offset + (iy * w + ix) * 3;
+            acc += wgt * float3(px[0], px[1], px[2]);
+        }
+    }
+    return acc * r[4];
+}
+
 inline float4 samplePictureWrapped(texture2d<float, access::sample> picture, sampler pictureSampler, float2 st, int wrapMode) {
     if (wrapMode == 2 && (st.x < 0.0 || st.x > 1.0 || st.y < 0.0 || st.y > 1.0)) return float4(0.0);
     if (wrapMode == 0) {
@@ -574,6 +617,61 @@ inline float2 equirectangularUV(float3 dir) {
 inline float2 sphereUV(packed_float3 row0, packed_float3 row1, packed_float3 row2, float3 n) {
     const float3 d = float3(dot(float3(row0), n), dot(float3(row1), n), dot(float3(row2), n));
     return equirectangularUV(float3(d.x, d.y, -d.z));
+}
+
+// The surface's own (u, v) at a hit: a sphere's by its normal, a triangle's by its barycentrics, zero for a disk or a cylinder (they have none).
+inline float2 hitUV(uint primId, float2 barycentric, device const packed_float2* uvs, device const SphereData* spheres, float3 normal, bool isSphere, bool isTriangleHit) {
+    if (isSphere) return sphereUV(spheres[primId].uvRot0, spheres[primId].uvRot1, spheres[primId].uvRot2, normal);
+    if (isTriangleHit) return texCoordFor(primId, barycentric, uvs);
+    return float2(0.0);
+}
+
+// A reflectance that is a graph of textures (a picture times a picture, a blend of products; Material::reflectanceGraph): the host stores 1 + count + 8 floats per node in the shared float
+// buffer, [kind (0 constant, 1 picture, 2 product, 3 blend), a, b, t, x, y, z, 0], children being earlier nodes and the last node the answer; a picture node's x is a picture reference
+// (sampleImageRef, scale included), a constant's x, y, z the value. Blend is (1 - t) * a + t * b with t the first channel of node t, clamped to [0, 1]: the OptiX device code's
+// (gpu/optix/optix_device_textures.h) rule.
+inline float3 evalTextureGraph(device const float* grid, int ref1, float2 uv, float3 hitPoint) {
+    device const float* g = grid + (ref1 - 1);
+    const int count = min(int(g[0] + 0.5), 16);
+    float3 vals[16];
+    for (int i = 0; i < count; ++i) {
+        device const float* n = g + 1 + i * 8;
+        const int kind = int(n[0] + 0.5);
+        float3 r;
+        if (kind == 0) r = float3(n[4], n[5], n[6]);
+        else if (kind == 1) r = sampleImageRef(grid, int(n[4] + 0.5), uv, hitPoint);
+        else if (kind == 2) r = vals[int(n[1] + 0.5)] * vals[int(n[2] + 0.5)];
+        else {
+            const float amt = clamp(vals[int(n[3] + 0.5)].x, 0.0f, 1.0f);
+            r = (1.0 - amt) * vals[int(n[1] + 0.5)] + amt * vals[int(n[2] + 0.5)];
+        }
+        vals[i] = r;
+    }
+    return count > 0 ? vals[count - 1] : float3(0.0);
+}
+
+// A material's per-pixel parameters from pictures (TriangleMaterial::roughRef / condRoughRef, PbrtSceneLoader::mapPbrtMaterial): this hit's roughness, in the hit's own copy of the
+// material, as OptiX does (patch_roughness_textures: roughness = scale * the picture's value, isotropic). The host stored the flat value (the picture's mean) as the fallback. A reference's
+// slot 10 says the value is a perceptual roughness to remap to the GGX alpha (sqrt), as the host does for a flat one.
+inline void patchPerPixelMaterial(thread TriangleMaterial& mat, device const float* grid, uint primId, float2 barycentric, device const packed_float2* uvs,
+                                  device const SphereData* spheres, float3 normal, float3 hitPoint, bool isSphere, bool isTriangleHit) {
+    if (mat.roughRef == 0 && mat.condRoughRef == 0) return;
+    const float2 uv = hitUV(primId, barycentric, uvs, spheres, normal, isSphere, isTriangleHit);
+    if (mat.roughRef != 0) {
+        const float v = max(0.0f, sampleImageRef(grid, mat.roughRef, uv, hitPoint).x);
+        const float alpha = (grid[mat.roughRef - 1 + 10] > 0.5) ? sqrt(v) : v;
+        if (mat.materialType == METAL_MAT_ROUGH_CONDUCTOR) {
+            // shadeConductor() squares the roughness-style value it is given into alpha, so a conductor holds sqrt(alpha) in both slots (alphaX = ior, alphaY = roughness; isotropic)
+            mat.ior = sqrt(alpha);
+            mat.roughness = mat.ior;
+        } else {
+            mat.roughness = alpha;
+        }
+    }
+    if (mat.condRoughRef != 0 && mat.materialType == METAL_MAT_COATED_CONDUCTOR) {
+        const float v = max(0.0f, sampleImageRef(grid, mat.condRoughRef, uv, hitPoint).x);
+        mat.transmitColor = packed_float3((grid[mat.condRoughRef - 1 + 10] > 0.5) ? sqrt(v) : v, mat.transmitColor.y, mat.transmitColor.z);
+    }
 }
 
 // The environment-map (sky image) mapping, the one the CPU's sky_light and the OptiX backends use: row 0 of the image is straight up

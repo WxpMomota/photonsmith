@@ -183,7 +183,7 @@ class Scene:
     """A scene description with the knobs the sweep turns: offset, scale, mirror, turn about the vertical axis, sky form, lamp form, ball form, floor form, size, samples."""
 
     def __init__(self, material="diffuse", sky="constant", lamp="area", offset=(0, 0, 0), scale=1.0, mirror=False, rot=0.0, size=48, spp=64, fill=False, depth=8, sky_png=None,
-                 sky_scale=1.0, ball="sphere", floor="tri", material_text=None, prelude="", camera="perspective", shape="sphere", lamp_png=None, sampler="halton", integrator="volpath", film_extra=""):
+                 sky_scale=1.0, ball="sphere", floor="tri", material_text=None, prelude="", camera="perspective", shape="sphere", lamp_png=None, sampler="halton", integrator="volpath", film_extra="", shutter=0.0):
         self.__dict__.update(locals())
         del self.__dict__["self"]
 
@@ -305,6 +305,8 @@ class Scene:
                 camera_line = 'Camera "perspective" "float fov" [ %g ]' % (2 * math.degrees(math.atan(half / (200.0 * self.scale))))
             else:
                 camera_line = 'Camera "orthographic" "float screenwindow" [ %g %g %g %g ]' % (-half, half, -half, half)
+        if self.shutter > 0.0:   # pbrt's exposure time is the CAMERA's shutterclose - shutteropen (a Film "exposuretime" is not a pbrt parameter)
+            camera_line += ' "float shutteropen" [ 0 ] "float shutterclose" [ %g ]' % self.shutter
         up = self.p(0, 1, 0)
         up = tuple(a - b for a, b in zip(up, self.p(0, 0, 0)))   # the turned, scaled up vector's direction
         out = ["LookAt %s  %s  %s" % (f(eye), f(look), f(tuple(c / self.scale for c in up))), camera_line,
@@ -526,8 +528,8 @@ def run(args):
             for sampler in ("independent", "sobol", "zsobol", "pmj02bn", "stratified", "paddedsobol"):
                 check("sampler", "%s sampler vs halton, %s" % (sampler, name), backend, Scene(material=name), Scene(material=name, sampler=sampler), tolerance=max(tol, 6.0))
             check("integrator", "path vs volpath, %s" % name, backend, Scene(material=name), Scene(material=name, integrator="path"), tolerance=max(tol, 6.0))
-        check("film", "iso 200 for 1 s vs iso 100 for 2 s", backend, Scene(material="diffuse", film_extra='"float iso" [ 200 ] "float exposuretime" [ 1 ]'),
-              Scene(material="diffuse", film_extra='"float iso" [ 100 ] "float exposuretime" [ 2 ]'), tolerance=tol)
+        check("film", "iso 200 for 1 s vs iso 100 for 2 s", backend, Scene(material="diffuse", film_extra='"float iso" [ 200 ]', shutter=1.0),
+              Scene(material="diffuse", film_extra='"float iso" [ 100 ]', shutter=2.0), tolerance=tol)
         # a camera that sees every direction, the scene moved, scaled, turned and mirrored. Without the lamp: it would show in a few pixels at a radiance of 318, and where
         # those pixels land differs between samplers by up to 4% of the picture's mean (the Windows session's wavefront backend and Metal both hit this).
         sph = dict(material="diffuse", camera="spherical", lamp="none")

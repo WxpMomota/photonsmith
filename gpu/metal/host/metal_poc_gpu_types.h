@@ -230,6 +230,8 @@ struct Uniforms {
     PackedFloat3 footprintMinDirX{};
     PackedFloat3 footprintMinDirY{};
     uint32_t footprintValid = 0;
+    uint32_t pbrtPortalExtraCount = 0;   // see the shader's copy
+    uint32_t pbrtPortalExtraBase = 0;
 };
 
 // AreaLightData/buildPowerLightSampler now live in metal_poc_host_math.h
@@ -420,5 +422,21 @@ struct TriangleMaterial {
     // sphere is where it is at that time). Set per hit by resolveHit(); read by traceShadowAnyM().
     int32_t shadowChannel = -1;
     float rayTime = 0.0f;
+    // The layer of a coated material (coateddiffuse, coatedconductor): pbrt's thickness, the layer medium's single-scattering albedo and Henyey-Greenstein g, the walk's maximum depth and
+    // the samples per estimate. All zero (a material that never sets them) means pbrt's defaults: 0.01, no medium, g 0, 10, 1.
+    float layerThickness = 0.0f;
+    float layerAlbedo = 0.0f;
+    float layerG = 0.0f;
+    int32_t layerMaxDepth = 0;
+    int32_t layerNSamples = 0;
+    // A position-based texture mapping (spherical, cylindrical, planar) for the reflectance picture: 1 + the offset, in rgbGridData, of 21 floats
+    // (kind, texture-from-Metal-world 3x4 row-major, v1, v2, udelta, vdelta); 0 = the surface's own uv (uvScale/uvDelta).
+    int32_t posMapIndex = 0;
+    // Per-pixel parameters from pictures (each 1 + the offset of a 12-float picture reference in rgbGridData, see PbrtSceneLoader::claimImageRef; 0 = none): a Mix material's amount, a
+    // roughness (a conductor's, a coated diffuse's, a coated conductor's coat), a coated conductor's base roughness, a reflectance that is a graph of textures.
+    int32_t mixAmountRef = 0;
+    int32_t roughRef = 0;
+    int32_t condRoughRef = 0;
+    int32_t graphRef = 0;
 };
 

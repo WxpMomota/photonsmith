@@ -19,6 +19,7 @@ struct MetalTuning {
 	int threadgroupWidth = 0;       // METAL_TG_W, METAL_TG_H: the threadgroup shape; 0 = the default (8 wide, one SIMD group)
 	int threadgroupHeight = 0;
 	bool printThreadgroup = false;  // METAL_TG_PRINT: print the shape each dispatch uses
+	bool cutToCrop = false;         // METAL_CUT_TO_CROP: write only the crop window (a --crop or the file's cropwindow), as a scene whose crop is its picture does (the test uses it)
 	bool fullKernel = false;        // METAL_FULL_KERNEL: build the pipeline with every material family, not only the ones the scene uses (metal_poc_families.h)
 
 	static constexpr int kMaxBands = 4096;
@@ -34,6 +35,7 @@ struct MetalTuning {
 		t.census = get("METAL_CENSUS") != nullptr;
 		t.printThreadgroup = get("METAL_TG_PRINT") != nullptr;
 		t.fullKernel = get("METAL_FULL_KERNEL") != nullptr;
+		t.cutToCrop = get("METAL_CUT_TO_CROP") != nullptr;
 		if (const char* v = get("METAL_REGEN")) {
 			if (v[0] == '0' && v[1] == 0) t.pathRegen = 0;
 			else if (v[0] == '1' && v[1] == 0) t.pathRegen = 1;
@@ -56,7 +58,7 @@ struct MetalTuning {
 		return tuning;
 	}
 
-	bool anyCustom() const { return census || pathRegen >= 0 || forcedBands > 0 || threadgroupWidth > 0 || threadgroupHeight > 0 || printThreadgroup || fullKernel; }
+	bool anyCustom() const { return census || pathRegen >= 0 || forcedBands > 0 || threadgroupWidth > 0 || threadgroupHeight > 0 || printThreadgroup || fullKernel || cutToCrop; }
 
 	std::string describe() const {
 		std::string s;
@@ -68,6 +70,7 @@ struct MetalTuning {
 		if (threadgroupHeight > 0) add("METAL_TG_H=" + std::to_string(threadgroupHeight));
 		if (printThreadgroup) add("METAL_TG_PRINT");
 		if (fullKernel) add("METAL_FULL_KERNEL");
+		if (cutToCrop) add("METAL_CUT_TO_CROP");
 		return s;
 	}
 

@@ -191,11 +191,14 @@ inline void resolveHit(thread const KernelRes& R, thread PathState& P, thread Bo
     // and sidedness of the mix itself carry over (a Mix has none of its own).
     if (mat.materialType == METAL_MAT_MIX) {
         device const TriangleMaterial* pair = (device const TriangleMaterial*)(rgbGridData + mat.bumpOffset);
-        const bool pickSecond = randFloat(rngState) < mat.roughness;
+        float amount = mat.roughness;
+        if (mat.mixAmountRef != 0) amount = clamp(sampleImageRef(rgbGridData, mat.mixAmountRef, hitUV(primId, result.triangle_barycentric_coord, uvs, spheres, normal, isSphere, isTriangleHit), hitPoint).x, 0.0f, 1.0f);   // an image amount
+        const bool pickSecond = randFloat(rngState) < amount;
         const int mixLightId = mat.lightId;
         mat = pickSecond ? pair[1] : pair[0];
         mat.lightId = mixLightId;
     }
+    patchPerPixelMaterial(mat, rgbGridData, primId, result.triangle_barycentric_coord, uvs, spheres, normal, hitPoint, isSphere, isTriangleHit);
     // Raw (outward, unflipped) normal kept separately from here -
     // dielectric handling below needs to know which side of the
     // surface the ray is entering from (front vs back face) to
@@ -322,6 +325,13 @@ inline void perturbShadingNormal(thread const KernelRes& R, thread PathState& P,
 
 // The surface colour at the hit (B.albedo): flat colour, image, checker, noise and marble textures, the texture family. May also replace the
 // material's transmit colour from its image.
+// Where the reflectance picture is looked up: pbrt's imagemap uscale/vscale/udelta/vdelta of the surface's uv, or, for a "spherical", "cylindrical" or "planar" mapping
+// (posMapIndex != 0), the hit point carried into the texture's own space (src/shared/texture_position_mapping.h, positionToSt, in Metal's rescaled world: the host composed the matrix).
+inline float2 pictureLookup(TriangleMaterial mat, device const float* grid, float3 hitPoint, float2 uv) {
+    if (mat.posMapIndex <= 0) return float2(mat.uvScaleU * uv.x + mat.uvDeltaU, mat.uvScaleV * uv.y + mat.uvDeltaV);
+    return positionMappedSt(grid + (mat.posMapIndex - 1), hitPoint);
+}
+
 inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread BounceState& B) {
     KERNEL_RES_ALIASES(R)
     PATH_STATE_ALIASES(P)
@@ -534,15 +544,20 @@ inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread
         // own texture had no wrapping "scale").
         float2 uv = isSphere ? sphereUV(spheres[primId].uvRot0, spheres[primId].uvRot1, spheres[primId].uvRot2, normal)
                               : texCoordFor(primId, result.triangle_barycentric_coord, uvs);
-        const float2 muv = float2(mat.uvScaleU * uv.x + mat.uvDeltaU, mat.uvScaleV * uv.y + mat.uvDeltaV);   // pbrt imagemap uscale/vscale/udelta/vdelta
+        const float2 muv = pictureLookup(mat, rgbGridData, hitPoint, uv);   // pbrt imagemap uscale/vscale/udelta/vdelta, or a position-based mapping
         albedo = samplePictureWrapped(pbrtDiffuseTexture, textureSampler, muv, mat.textureWrap).rgb * mat.roughness;
+    } else if (mat.materialType == METAL_MAT_SUBSURFACE && mat.conductorEta.z > 0.5) {
+        // a subsurface material whose reflectance is an image: the picture's value here (times its scale) is what the BSSRDF's table is inverted for (subsurfaceProbeWalk)
+        float2 uvS = isSphere ? sphereUV(spheres[primId].uvRot0, spheres[primId].uvRot1, spheres[primId].uvRot2, normal)
+                              : texCoordFor(primId, result.triangle_barycentric_coord, uvs);
+        albedo = samplePictureWrapped(pbrtDiffuseTexture, textureSampler, pictureLookup(mat, rgbGridData, hitPoint, uvS), mat.textureWrap).rgb * float(mat.transmitColor.x);
     } else if (mat.materialType == METAL_MAT_DIFFUSE_TRANSMISSION && mat.conductorK.y > 8.5) {
         // DiffuseTransmission with image-textured reflectance (diffuse slot) and/or transmittance
         // (second slot) - J2. conductorK.x = 1 when reflectance is an image, conductorK.z = 1 when
         // transmittance is; otherwise the flat colour in color / transmitColor is used. The shade
         // function reads mat.transmitColor, so the sampled transmittance is written back into it.
         float2 uv9 = texCoordFor(primId, result.triangle_barycentric_coord, uvs);
-        const float2 muv9 = float2(mat.uvScaleU * uv9.x + mat.uvDeltaU, mat.uvScaleV * uv9.y + mat.uvDeltaV);   // the reflectance picture's mapping
+        const float2 muv9 = pictureLookup(mat, rgbGridData, hitPoint, uv9);   // the reflectance picture's mapping
         albedo = (mat.conductorK.x > 0.5)
             ? samplePictureWrapped(pbrtDiffuseTexture, textureSampler, muv9, mat.textureWrap).rgb
             : float3(mat.color);
@@ -550,6 +565,12 @@ inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread
             mat.transmitColor = packed_float3(pbrtTransmitTexture.sample(textureSampler, float2(uv9.x, 1.0 - uv9.y)).rgb);
     } else {
         albedo = float3(mat.color);
+    }
+    // A reflectance that is a graph of textures: its value here is the reflectance. A coated diffuse reads `color` itself, a Lambertian the albedo, so both are set.
+    if (mat.graphRef != 0) {
+        const float2 uvG = hitUV(primId, result.triangle_barycentric_coord, uvs, spheres, normal, isSphere, isTriangleHit);
+        albedo = evalTextureGraph(rgbGridData, mat.graphRef, uvG, hitPoint);
+        mat.color = packed_float3(albedo);
     }
 }
 

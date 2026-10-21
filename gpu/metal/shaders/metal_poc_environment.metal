@@ -90,16 +90,40 @@ inline float pdfEnvironmentDirection(device const float* marginalCDF, device con
 // The summed-area table is float here (the CPU and OptiX use double). A window integral is a difference of nearby prefix sums, so
 // its relative error is ~1e-7 * (total / window): fine for windows that are a sizeable part of the image, coarser for a tiny one.
 
-inline float3 portalToLocal(constant Uniforms& u, float3 v) {
-    return float3(dot(v, float3(u.portalFrameX)), dot(v, float3(u.portalFrameY)), dot(v, float3(u.portalFrameZ)));
+// One portal window: its frame, its diagonal corners, the size and scale of its picture. The first portal's come from Uniforms, the others' from a 24-float header in the pbrtEnv "conditional" buffer, after the first portal's picture (at Uniforms::pbrtPortalExtraBase):
+//   [frameX(3) frameY(3) frameZ(3) p0(3) p2(3) width height scale rectOffset distOffset 0 0 0 0]  (rectOffset into the "conditional" buffer, distOffset into the "marginal" one).
+struct PortalLight {
+    float3 frameX, frameY, frameZ, p0, p2;
+    int width, height;
+    float scale;
+};
+
+inline PortalLight portalFromUniforms(constant Uniforms& u) {
+    PortalLight p;
+    p.frameX = float3(u.portalFrameX); p.frameY = float3(u.portalFrameY); p.frameZ = float3(u.portalFrameZ);
+    p.p0 = float3(u.portalP0); p.p2 = float3(u.portalP2);
+    p.width = int(u.pbrtPortalWidth); p.height = int(u.pbrtPortalHeight); p.scale = u.pbrtPortalScale;
+    return p;
 }
 
-inline float3 portalFromLocal(constant Uniforms& u, float3 v) {
-    return float3(u.portalFrameX) * v.x + float3(u.portalFrameY) * v.y + float3(u.portalFrameZ) * v.z;
+inline PortalLight portalFromHeader(device const float* h) {
+    PortalLight p;
+    p.frameX = float3(h[0], h[1], h[2]); p.frameY = float3(h[3], h[4], h[5]); p.frameZ = float3(h[6], h[7], h[8]);
+    p.p0 = float3(h[9], h[10], h[11]); p.p2 = float3(h[12], h[13], h[14]);
+    p.width = int(h[15] + 0.5); p.height = int(h[16] + 0.5); p.scale = h[17];
+    return p;
+}
+
+inline float3 portalToLocal(PortalLight u, float3 v) {
+    return float3(dot(v, u.frameX), dot(v, u.frameY), dot(v, u.frameZ));
+}
+
+inline float3 portalFromLocal(PortalLight u, float3 v) {
+    return u.frameX * v.x + u.frameY * v.y + u.frameZ * v.z;
 }
 
 // Render-space direction -> image uv in [0,1]^2 and the Jacobian d(uv)/dw. False when the direction is behind the portal.
-inline bool portalImageFromRender(constant Uniforms& u, float3 wRender, thread float& uOut, thread float& vOut, thread float& duvDw) {
+inline bool portalImageFromRender(PortalLight u, float3 wRender, thread float& uOut, thread float& vOut, thread float& duvDw) {
     const float3 w = portalToLocal(u, wRender);
     if (w.z <= 0.0) return false;
     duvDw = M_PI_F * M_PI_F * (1.0 - w.x * w.x) * (1.0 - w.y * w.y) / w.z;
@@ -110,7 +134,7 @@ inline bool portalImageFromRender(constant Uniforms& u, float3 wRender, thread f
     return true;
 }
 
-inline float3 portalRenderFromImage(constant Uniforms& u, float uu, float vv, thread float& duvDw) {
+inline float3 portalRenderFromImage(PortalLight u, float uu, float vv, thread float& duvDw) {
     const float alpha = -0.5 * M_PI_F + uu * M_PI_F;
     const float beta = -0.5 * M_PI_F + vv * M_PI_F;
     const float3 w = normalize(float3(tan(alpha), tan(beta), 1.0));
@@ -119,9 +143,9 @@ inline float3 portalRenderFromImage(constant Uniforms& u, float uu, float vv, th
 }
 
 // [uMin,uMax] x [vMin,vMax] of the portal quad as seen from p (its diagonal corners p0 and p2).
-inline bool portalImageBounds(constant Uniforms& u, float3 p, thread float& uMin, thread float& vMin, thread float& uMax, thread float& vMax) {
-    const float3 d0 = normalize(float3(u.portalP0) - p);
-    const float3 d2 = normalize(float3(u.portalP2) - p);
+inline bool portalImageBounds(PortalLight u, float3 p, thread float& uMin, thread float& vMin, thread float& uMax, thread float& vMax) {
+    const float3 d0 = normalize(u.p0 - p);
+    const float3 d2 = normalize(u.p2 - p);
     float u0, v0, u2, v2, jac;
     if (!portalImageFromRender(u, d0, u0, v0, jac)) return false;
     if (!portalImageFromRender(u, d2, u2, v2, jac)) return false;
@@ -160,21 +184,21 @@ inline void portalUvToCell(int w, int h, float uu, float vv, thread int& ix, thr
 }
 
 // Radiance reaching `origin` along `dir`: zero unless dir lies in the window the portal subtends from origin (eval_Le_rgb()).
-inline float3 portalLe(constant Uniforms& u, device const float* rectified, float3 origin, float3 dir) {
+inline float3 portalLe(PortalLight u, device const float* rectified, float3 origin, float3 dir) {
     float uu, vv, jac;
     if (!portalImageFromRender(u, normalize(dir), uu, vv, jac)) return float3(0.0);
     float bMinU, bMinV, bMaxU, bMaxV;
     if (!portalImageBounds(u, origin, bMinU, bMinV, bMaxU, bMaxV)) return float3(0.0);
     if (uu < bMinU || uu > bMaxU || vv < bMinV || vv > bMaxV) return float3(0.0);
     int ix, iy;
-    portalUvToCell(int(u.pbrtPortalWidth), int(u.pbrtPortalHeight), uu, vv, ix, iy);
-    device const float* px = rectified + (iy * int(u.pbrtPortalWidth) + ix) * 3;
-    return u.pbrtPortalScale * float3(px[0], px[1], px[2]);
+    portalUvToCell(u.width, u.height, uu, vv, ix, iy);
+    device const float* px = rectified + (iy * u.width + ix) * 3;
+    return u.scale * float3(px[0], px[1], px[2]);
 }
 
 // Solid-angle pdf of sampling `dir` from p (pdf_li()).
-inline float portalPdfLi(constant Uniforms& u, device const float* distAndSat, float3 p, float3 dir) {
-    const int w = int(u.pbrtPortalWidth), h = int(u.pbrtPortalHeight);
+inline float portalPdfLi(PortalLight u, device const float* distAndSat, float3 p, float3 dir) {
+    const int w = u.width, h = u.height;
     float uu, vv, duvDw;
     if (!portalImageFromRender(u, normalize(dir), uu, vv, duvDw)) return 0.0;
     if (duvDw == 0.0) return 0.0;
@@ -185,6 +209,17 @@ inline float portalPdfLi(constant Uniforms& u, device const float* distAndSat, f
     int ix, iy;
     portalUvToCell(w, h, uu, vv, ix, iy);
     return (distAndSat[iy * w + ix] / funcInt) / duvDw;
+}
+
+// portalPdfLi(), but zero for a direction the portal does not shine from at this point: pbrt's PDF_Li returns the table's value there, harmless for one light (its Le is 0 there too) and wrong
+// for a MIXTURE of lights, whose density at a direction counts only the lights that can produce it (src/shared/portal_image_infinite_light.h, pdf_li_in_window()).
+inline float portalPdfLiInWindow(PortalLight u, device const float* distAndSat, float3 p, float3 dir) {
+    float uu, vv, jac;
+    if (!portalImageFromRender(u, normalize(dir), uu, vv, jac)) return 0.0;
+    float bMinU, bMinV, bMaxU, bMaxV;
+    if (!portalImageBounds(u, p, bMinU, bMinV, bMaxU, bMaxV)) return 0.0;
+    if (uu < bMinU || uu > bMaxU || vv < bMinV || vv > bMaxV) return 0.0;
+    return portalPdfLi(u, distAndSat, p, dir);
 }
 
 // Bisection against the CDF given by the window integral (WindowedPiecewiseConstant2D::SampleBisection()). mode 0 is the marginal in x over the
@@ -206,9 +241,9 @@ inline float portalBisect(device const float* sat, int w, int h, int mode, float
 }
 
 // Importance-samples a direction toward the portal from p (sample_li()). False when the window is empty from p.
-inline bool portalSampleLi(constant Uniforms& u, device const float* distAndSat, float3 p, float ru, float rv,
+inline bool portalSampleLi(PortalLight u, device const float* distAndSat, float3 p, float ru, float rv,
                            thread float3& dirOut, thread float& pdfOut) {
-    const int w = int(u.pbrtPortalWidth), h = int(u.pbrtPortalHeight);
+    const int w = u.width, h = u.height;
     device const float* sat = distAndSat + w * h;
     float bMinU, bMinV, bMaxU, bMaxV;
     if (!portalImageBounds(u, p, bMinU, bMinV, bMaxU, bMaxV)) return false;
@@ -237,7 +272,33 @@ inline float3 pbrtEnvSampleDirection(constant Uniforms& u, device const float* m
                                       uint width, uint height, float3 hitPoint, float u1, float u2, thread float& pdfSolidAngle) {
     if (u.pbrtHasPortalLight != 0u) {
         float3 dir;
-        if (!portalSampleLi(u, marginalOrDist, hitPoint, u1, u2, dir, pdfSolidAngle)) { pdfSolidAngle = 0.0; return float3(0.0, 1.0, 0.0); }
+        const int n = 1 + int(u.pbrtPortalExtraCount);
+        if (n == 1) {
+            if (!portalSampleLi(portalFromUniforms(u), marginalOrDist, hitPoint, u1, u2, dir, pdfSolidAngle)) { pdfSolidAngle = 0.0; return float3(0.0, 1.0, 0.0); }
+            return dir;
+        }
+        // Several portals (src/shared/portal_light_set.h): pick one uniformly with the first random number (rescaled and reused), sample it, and report the density of the MIXTURE at the
+        // direction taken: the chosen portal's own sampled density plus what each other portal gives that direction (zero outside its window), over n.
+        const float scaled = u1 * float(n);
+        const int index = min(n - 1, int(scaled));
+        const float reused = min(0.9999999f, scaled - float(index));
+        float chosenPdf;
+        PortalLight chosen = portalFromUniforms(u);
+        device const float* chosenDist = marginalOrDist;
+        if (index > 0) {
+            device const float* h = conditionalOrRect + (u.pbrtPortalExtraBase + uint(index - 1) * 24u);
+            chosen = portalFromHeader(h);
+            chosenDist = marginalOrDist + uint(h[19] + 0.5);
+        }
+        if (!portalSampleLi(chosen, chosenDist, hitPoint, reused, u2, dir, chosenPdf)) { pdfSolidAngle = 0.0; return float3(0.0, 1.0, 0.0); }
+        float sum = chosenPdf;
+        for (int i = 0; i < n; ++i) {
+            if (i == index) continue;
+            if (i == 0) { sum += portalPdfLiInWindow(portalFromUniforms(u), marginalOrDist, hitPoint, dir); continue; }
+            device const float* h = conditionalOrRect + (u.pbrtPortalExtraBase + uint(i - 1) * 24u);
+            sum += portalPdfLiInWindow(portalFromHeader(h), marginalOrDist + uint(h[19] + 0.5), hitPoint, dir);
+        }
+        pdfSolidAngle = sum / float(n);
         return dir;
     }
     return sampleEnvironmentDirection(marginalOrDist, conditionalOrRect, int(width), int(height), u1, u2, pdfSolidAngle);
@@ -245,12 +306,29 @@ inline float3 pbrtEnvSampleDirection(constant Uniforms& u, device const float* m
 
 inline float3 pbrtEnvLeAt(constant Uniforms& u, device const float* conditionalOrRect, texture2d<float, access::sample> envTexture,
                            sampler s, float3 origin, float3 dir) {
-    if (u.pbrtHasPortalLight != 0u) return portalLe(u, conditionalOrRect, origin, dir);
+    if (u.pbrtHasPortalLight != 0u) {
+        // the sum of every portal's sky: an escaped ray sees each window
+        float3 le = portalLe(portalFromUniforms(u), conditionalOrRect, origin, dir);
+        for (uint i = 0; i < u.pbrtPortalExtraCount; ++i) {
+            device const float* h = conditionalOrRect + (u.pbrtPortalExtraBase + i * 24u);
+            le += portalLe(portalFromHeader(h), conditionalOrRect + uint(h[18] + 0.5), origin, dir);
+        }
+        return le;
+    }
     return envTexture.sample(s, envMapUV(dir)).rgb;
 }
 
 inline float pbrtEnvPdfAt(constant Uniforms& u, device const float* marginalOrDist, device const float* conditionalOrRect,
                            uint width, uint height, float3 origin, float3 dir) {
-    if (u.pbrtHasPortalLight != 0u) return portalPdfLi(u, marginalOrDist, origin, dir);
+    if (u.pbrtHasPortalLight != 0u) {
+        if (u.pbrtPortalExtraCount == 0u) return portalPdfLi(portalFromUniforms(u), marginalOrDist, origin, dir);
+        // the mixture's density: the mean of every portal's pdf for directions it shines from (what a BSDF-sampled escape needs for its MIS weight)
+        float sum = portalPdfLiInWindow(portalFromUniforms(u), marginalOrDist, origin, dir);
+        for (uint i = 0; i < u.pbrtPortalExtraCount; ++i) {
+            device const float* h = conditionalOrRect + (u.pbrtPortalExtraBase + i * 24u);
+            sum += portalPdfLiInWindow(portalFromHeader(h), marginalOrDist + uint(h[19] + 0.5), origin, dir);
+        }
+        return sum / float(1u + u.pbrtPortalExtraCount);
+    }
     return pdfEnvironmentDirection(marginalOrDist, conditionalOrRect, int(width), int(height), dir);
 }

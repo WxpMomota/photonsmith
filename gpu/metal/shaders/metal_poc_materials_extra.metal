@@ -7,25 +7,25 @@
 // interfaces and the thickness is kLayerThickness.
 inline float3 layeredCoatedConductorF(float3 wiLocal, float3 woLocal, float eta, float alpha,
                                        float3 conductorEta, float3 conductorK, thread uint& rngState,
-                                       float baseAlpha = -1.0, float thickness = kLayerThickness) {
+                                       float baseAlpha = -1.0, LayerMedium med = LayerMedium()) {
     LayerTop top; LayerBottom bottom;
     layeredCoatedConductorParts(eta, alpha, conductorEta, conductorK, top, bottom, baseAlpha);
-    return layeredF(top, bottom, thickness, woLocal, wiLocal, rngState);
+    return layeredF(top, bottom, med, woLocal, wiLocal, rngState);
 }
 
 inline float layeredCoatedConductorPdf(float3 woLocal, float3 wiLocal, float eta, float alpha,
-                                        float3 conductorEta, float3 conductorK, float baseAlpha = -1.0) {
+                                        float3 conductorEta, float3 conductorK, float baseAlpha = -1.0, LayerMedium med = LayerMedium()) {
     LayerTop top; LayerBottom bottom;
     layeredCoatedConductorParts(eta, alpha, conductorEta, conductorK, top, bottom, baseAlpha);
-    return layeredPdf(top, bottom, woLocal, wiLocal);
+    return layeredPdf(top, bottom, med, woLocal, wiLocal);
 }
 
 inline LayerSample layeredCoatedConductorSample(float3 woLocal, float eta, float alpha,
                                                  float3 conductorEta, float3 conductorK, thread uint& rngState,
-                                                 float baseAlpha = -1.0, float thickness = kLayerThickness) {
+                                                 float baseAlpha = -1.0, LayerMedium med = LayerMedium()) {
     LayerTop top; LayerBottom bottom;
     layeredCoatedConductorParts(eta, alpha, conductorEta, conductorK, top, bottom, baseAlpha);
-    return layeredSample(top, bottom, thickness, woLocal, rngState);
+    return layeredSample(top, bottom, med, woLocal, rngState);
 }
 
 inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 facingNormal,
@@ -65,13 +65,13 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
     float3 conductorK = float3(mat.conductorK);
     const bool hasBase = mat.transmitColor.y > 0.0;
     const float baseAlpha = hasBase ? max(float(mat.transmitColor.x), 0.0f) : -1.0f;
-    const float coatThickness = hasBase ? float(mat.transmitColor.y) : kLayerThickness;
+    const LayerMedium coatMed = layerMediumOf(mat, hasBase ? float(mat.transmitColor.y) : kLayerThickness);
 
     // pbrt's Flags(): a smooth coat over a smooth conductor is a delta lobe (no light samples, no MIS); any roughness at all, on the
     // coat or the conductor, gets light samples. Here the one alpha serves both interfaces.
     LayerTop deltaTop; LayerBottom deltaBottom;
     layeredCoatedConductorParts(mat.ior, alpha, conductorEta, conductorK, deltaTop, deltaBottom, baseAlpha);
-    const bool takesLightSamples = !layerIsDelta(deltaTop, deltaBottom);
+    const bool takesLightSamples = !layerIsDelta(deltaTop, deltaBottom, coatMed);
 
     if (takesLightSamples) {
         LightSample ls = sampleAreaLight(lights, uniforms.lightCount, rngState, pbrtAreaLightTexture, textureSampler, hitPoint);
@@ -92,9 +92,9 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                 traceShadowAnyM(isect, shadowRay, accelStructure, functionTable, mat);
             if (shadowResult.type == intersection_type::none) {
                 float3 wiLocal = float3(dot(wi, tangent), dot(wi, bitangent), dot(wi, facingNormal));
-                float3 f = layeredCoatedConductorF(wiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatThickness);
+                float3 f = layeredCoatedConductorF(wiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatMed);
                 float pdfSolidAngle = (distSq / (ls.area * abs(cosLight))) * ls.pmf;
-                float pdfBsdf = layeredCoatedConductorPdf(woLocal, wiLocal, mat.ior, alpha, conductorEta, conductorK, baseAlpha);
+                float pdfBsdf = layeredCoatedConductorPdf(woLocal, wiLocal, mat.ior, alpha, conductorEta, conductorK, baseAlpha, coatMed);
                 float weight = (pdfSolidAngle * pdfSolidAngle)
                     / (pdfSolidAngle * pdfSolidAngle + pdfBsdf * pdfBsdf);
                 float3 transmittance = fogTransmittance(uniforms, dist);
@@ -120,7 +120,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                     traceShadowAnyM(isect, plShadowRay, accelStructure, functionTable, mat);
                 if (plShadowResult.type == intersection_type::none) {
                     float3 plWiLocal = float3(dot(plWi, tangent), dot(plWi, bitangent), dot(plWi, facingNormal));
-                    float3 plF = layeredCoatedConductorF(plWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatThickness);
+                    float3 plF = layeredCoatedConductorF(plWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatMed);
                     float3 plTransmittance = fogTransmittance(uniforms, plDist);
                     float plSpot = spotLightFalloff(-plWi, float3(pl.direction), pl.cosOuterAngle, pl.cosInnerAngle);
                     radiance += throughput * plF * float3(pl.emission) * plCosSurface * plSpot * plTransmittance / plDistSq;
@@ -142,7 +142,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                     traceShadowAnyM(isect, dlShadowRay, accelStructure, functionTable, mat);
                 if (dlShadowResult.type == intersection_type::none) {
                     float3 dlWiLocal = float3(dot(dlWi, tangent), dot(dlWi, bitangent), dot(dlWi, facingNormal));
-                    float3 dlF = layeredCoatedConductorF(dlWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatThickness);
+                    float3 dlF = layeredCoatedConductorF(dlWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatMed);
                     // Skip when there is no fog - rayBoxExitDistance()
                     // is only valid for an origin INSIDE the hardcoded
                     // room bounds (see that function.s own comment for
@@ -177,7 +177,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                         traceShadowAnyM(isect, pjShadowRay, accelStructure, functionTable, mat);
                     if (pjShadowResult.type == intersection_type::none) {
                         float3 pjWiLocal = float3(dot(pjWi, tangent), dot(pjWi, bitangent), dot(pjWi, facingNormal));
-                        float3 pjF = layeredCoatedConductorF(pjWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatThickness);
+                        float3 pjF = layeredCoatedConductorF(pjWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatMed);
                         float3 pjTransmittance = fogTransmittance(uniforms, pjDist);
                         radiance += throughput * pjF * pjRadiance * pjCosSurface * pjTransmittance / pjDistSq;
                     }
@@ -207,7 +207,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                         traceShadowAnyM(isect, glShadowRay, accelStructure, functionTable, mat);
                     if (glShadowResult.type == intersection_type::none) {
                         float3 glWiLocal = float3(dot(glWi, tangent), dot(glWi, bitangent), dot(glWi, facingNormal));
-                        float3 glF = layeredCoatedConductorF(glWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatThickness);
+                        float3 glF = layeredCoatedConductorF(glWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatMed);
                         float3 glTransmittance = fogTransmittance(uniforms, glDist);
                         radiance += throughput * glF * glRadiance * glCosSurface * glTransmittance;
                     }
@@ -235,8 +235,8 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                     traceShadowAnyM(isect, envShadowRay, accelStructure, functionTable, mat);
                 if (envShadowResult.type == intersection_type::none) {
                     float3 envWiLocal = float3(dot(envWi, tangent), dot(envWi, bitangent), dot(envWi, facingNormal));
-                    float3 envF = layeredCoatedConductorF(envWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatThickness);
-                    float envPdfBsdf = layeredCoatedConductorPdf(woLocal, envWiLocal, mat.ior, alpha, conductorEta, conductorK, baseAlpha);
+                    float3 envF = layeredCoatedConductorF(envWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatMed);
+                    float envPdfBsdf = layeredCoatedConductorPdf(woLocal, envWiLocal, mat.ior, alpha, conductorEta, conductorK, baseAlpha, coatMed);
                     float envWeight = (envPdfSolidAngle * envPdfSolidAngle) / (envPdfSolidAngle * envPdfSolidAngle + envPdfBsdf * envPdfBsdf);
                     float3 envRadiance = earthTexture.sample(textureSampler, envMapUV(envWi)).rgb;
                     radiance += throughput * envF * envRadiance * envCosSurface / envPdfSolidAngle * envWeight;
@@ -258,8 +258,8 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
                     traceShadowAnyM(isect, pbrtEnvShadowRay, accelStructure, functionTable, mat);
                 if (pbrtEnvShadowResult.type == intersection_type::none) {
                     float3 pbrtEnvWiLocal = float3(dot(pbrtEnvWi, tangent), dot(pbrtEnvWi, bitangent), dot(pbrtEnvWi, facingNormal));
-                    float3 pbrtEnvF = layeredCoatedConductorF(pbrtEnvWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatThickness);
-                    float pbrtEnvPdfBsdf = layeredCoatedConductorPdf(woLocal, pbrtEnvWiLocal, mat.ior, alpha, conductorEta, conductorK, baseAlpha);
+                    float3 pbrtEnvF = layeredCoatedConductorF(pbrtEnvWiLocal, woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatMed);
+                    float pbrtEnvPdfBsdf = layeredCoatedConductorPdf(woLocal, pbrtEnvWiLocal, mat.ior, alpha, conductorEta, conductorK, baseAlpha, coatMed);
                     float pbrtEnvWeight = (pbrtEnvPdfSolidAngle * pbrtEnvPdfSolidAngle) / (pbrtEnvPdfSolidAngle * pbrtEnvPdfSolidAngle + pbrtEnvPdfBsdf * pbrtEnvPdfBsdf);
                     float3 pbrtEnvRadianceSample = pbrtEnvLeAt(uniforms, pbrtEnvConditionalCDF, pbrtEnvTexture, textureSampler, hitPoint, pbrtEnvWi);
                     radiance += throughput * pbrtEnvF * pbrtEnvRadianceSample * pbrtEnvCosSurface / pbrtEnvPdfSolidAngle * pbrtEnvWeight;
@@ -270,7 +270,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
 
     // Continuation ray: pbrt's LayeredBxDF::Sample_f random walk. A failed walk ends the path here (the light samples above were
     // already taken); a smooth coat's mirror reflection - or the whole chain of a delta lobe - is a specular sample (no MIS).
-    LayerSample smp = layeredCoatedConductorSample(woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatThickness);
+    LayerSample smp = layeredCoatedConductorSample(woLocal, mat.ior, alpha, conductorEta, conductorK, rngState, baseAlpha, coatMed);
     if (!smp.valid) return false;
     float3 beta = smp.f * (abs(smp.wi.z) / smp.pdf);
     float3 newDirLocal = smp.wi;
@@ -281,7 +281,7 @@ inline bool shadeCoatedConductor(TriangleMaterial mat, float3 hitPoint, float3 f
     if (smp.specular) {
         specularBounce = true;
     } else {
-        bsdfPdf = layeredCoatedConductorPdf(woLocal, newDirLocal, mat.ior, alpha, conductorEta, conductorK, baseAlpha);
+        bsdfPdf = layeredCoatedConductorPdf(woLocal, newDirLocal, mat.ior, alpha, conductorEta, conductorK, baseAlpha, coatMed);
         specularBounce = false;
     }
     return true;

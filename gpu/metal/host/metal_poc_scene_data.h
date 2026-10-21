@@ -38,6 +38,26 @@ struct PbrtSceneLoader {
     // the image size: the loader needs the aspect ratio (the camera's field of view is the pbrt file's, along its shorter side)
     uint32_t width = 400;
     uint32_t height = 400;
+    // The file's own Film "cropwindow"/"pixelbounds" as NDC fractions {x0, x1, y0, y1} (FlatScene::cropX0...; {0, 1, 0, 1} = none). metal_render_main() turns it into the pixel window
+    // (cropX0... in MetalPocApp) unless --crop was given, so Metal draws only the window like the CPU and OptiX do.
+    double pbrtFilmCrop[4] = {0.0, 1.0, 0.0, 1.0};
+    // Position-based texture mappings already put in rgbGridData (21 floats each), by content, so a mapping shared by many materials is stored once.
+    std::map<std::vector<float>, int> pbrtPositionMappings;
+    // The offset in rgbGridData of `mapping`'s data (stored on first use); the texture-from-world matrix is carried into Metal's rescaled world.
+    // The scene's one shared reflectance picture (the "diffuse image" slot): loads `m.textureFilename` into it when it is free or already that file; false when the slot holds another picture
+    // or the file cannot be read (the material then keeps its flat colour).
+    bool claimDiffuseImage(const pbrt_flatten::Material& m);
+    // A picture for a per-pixel material parameter (a roughness, a mix amount, a node of a texture graph), kept in rgbGridData: its pixels (decoded and encoded like any imagemap, shared by
+    // every reference to the same file and options) and a 12-float reference [pixels offset, width, height, wrap, scale, su, sv, du, dv, 1 + position-mapping offset (0 = uv), 1 = a perceptual roughness (remap to alpha), 0].
+    // Returns 1 + the reference's offset, or 0 when the file cannot be read.
+    int claimImageRef(const std::string& filename, const pbrt_flatten::TextureDecodeOptions& options, const pbrt_flatten::UvMapping& mapping, double scale,
+                      float sceneScale, float3 bboxCenter, float3 sceneOffset, bool remapRoughness = false);
+    // A reflectance that is a graph of textures (Material::reflectanceGraph) as a block in rgbGridData (see evalTextureGraph() in metal_poc_sampling.metal); 1 + its offset, 0 when a
+    // picture in it cannot be read (the flat colour, the graph's mean, stands).
+    int claimTextureGraph(const std::vector<pbrt_flatten::TexMeanNode>& nodes, float sceneScale, float3 bboxCenter, float3 sceneOffset);
+    std::map<std::string, std::array<int, 3>> pbrtImageRefPixels;   // "file|gamma|invert" -> {pixels offset, width, height} in rgbGridData
+    std::map<std::vector<float>, int> pbrtImageRefs;                  // a reference's content -> its offset
+    int claimPositionMapping(const pbrt_flatten::UvMapping& mapping, float sceneScale, float3 bboxCenter, float3 sceneOffset);
     // Optional 7th positional CLI arg - a real .pbrt scene file to load
     // via src/shared/pbrt_load.h INSTEAD of buildScene()'s own hardcoded
     // room (see loadPbrtScene()'s own comment for exactly what subset of
@@ -48,6 +68,9 @@ struct PbrtSceneLoader {
     // nothing else to draw (pbrt_load::LoadResult::missingFiles). metal_render_main() turns it
     // into ERR_FILE_NOT_FOUND instead of rendering the empty room and reporting success.
     std::string pbrtMissingAssetsError;
+    // The loader's own sentence when the scene file could not be loaded for a reason other than missing files (a parse error, an unreadable file); empty when it loaded. metal_render_main()
+    // turns it into the renderer's "scene-load-failed" event (render_events.h).
+    std::string pbrtLoadError;
     // True for a scene flagged requires_files (set from the registry by the caller): any unreadable mesh is then fatal,
     // not just "every mesh". See SceneDescriptor::missing_meshes_error.
     bool pbrtRequireAllMeshes = false;
@@ -224,6 +247,14 @@ struct PbrtSceneLoader {
     float pbrtPortalScale = 1.0f;
     float3 pbrtPortalFrameX{1, 0, 0}, pbrtPortalFrameY{0, 1, 0}, pbrtPortalFrameZ{0, 0, 1};
     float3 pbrtPortalP0{0, 0, 0}, pbrtPortalP2{0, 0, 0};
+    // Every portal infinite light after the main one (a pbrt file may have several; FlatScene::extraPortalLights): the same data as the main one's members above, one entry each.
+    struct PbrtExtraPortal {
+        std::vector<float> rectified, distFunc, satSum;
+        int width = 0, height = 0;
+        float scale = 1.0f;
+        float3 frameX{1, 0, 0}, frameY{0, 1, 0}, frameZ{0, 0, 1}, p0{0, 0, 0}, p2{0, 0, 0};
+    };
+    std::vector<PbrtExtraPortal> pbrtExtraPortals;
 
     // Set by loadPbrtScene() for the FIRST pbrt-loaded goniometric/
     // projection light that names a real profile/slide image and
@@ -391,6 +422,8 @@ struct PbrtSceneLoader {
         std::unordered_map<const void*, TriangleMaterial> mixCache;   // a Mix material (by address) -> its mapped METAL_MAT_MIX entry, so each is stored once
     };
     TriangleMaterial mapPbrtMaterial(PbrtMaterialMapState& st, const pbrt_flatten::Material& m, int depth);
+    // mapPbrtMaterial() = mapPbrtMaterialBase() (the material as the shader has drawn it, a flat mean for every per-pixel texture) plus the per-pixel pictures it can now read.
+    TriangleMaterial mapPbrtMaterialBase(PbrtMaterialMapState& st, const pbrt_flatten::Material& m, int depth);
     bool mapPbrtPerHitMix(PbrtMaterialMapState& st, const pbrt_flatten::Material& m, int depth, TriangleMaterial& out);
     int bssrdfTableOffset(PbrtMaterialMapState& st, double g, double eta);
     TriangleMaterial mapPbrtSubsurfaceMaterial(PbrtMaterialMapState& st, const pbrt_flatten::Material& m);

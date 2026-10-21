@@ -401,12 +401,8 @@ if(RT_BUILD_METAL)
         gpu/metal/host/metal_poc_gpu_resources.mm
         gpu/metal/host/metal_poc_dispatch.mm
         gpu/metal/host/metal_live_preview.mm
-        # tinyexr's own zip/pxr24 codecs need miniz's real mz_compress/
-        # mz_uncompress symbols (see the target_include_directories
-        # comment below on why metal_renderer now needs tinyexr's real
-        # implementation at all) - cpu_renderer gets this from the SAME
-        # source file, listed separately above.
-        src/external/miniz.c
+        # (tinyexr's implementation and miniz come from cpu_renderer, which metal_renderer links PUBLIC: a second copy here
+        # was pulled in beside it as soon as the launcher itself referenced EXR code, and the link failed with 42 duplicate symbols)
     )
     # RT_METAL_SHADER_DIR/RT_MODELS_DIR (not __FILE__-relative lookups) so
     # both the shader source and models/suzanne.obj resolve correctly
@@ -543,6 +539,10 @@ if(RT_BUILD_METAL)
     # - just plain math, checked against known-correct reference values.
     add_executable(metal_poc_math_tests gpu/metal/tests/metal_poc_math_tests.cpp)
 
+    # Two linear EXRs of one scene compared block by block (a picture that is wrong in its detail has the right mean): a development tool and a test helper, host only.
+    add_executable(metal_poc_block_check gpu/metal/tests/metal_poc_block_check.cpp)
+    target_link_libraries(metal_poc_block_check PRIVATE cpu_renderer)
+
     # The pbrt scene loader (PbrtSceneLoader, metal_poc_scene_data.h) with no GPU: loads bundled scenes and checks the host arrays. Links metal_renderer for the loader's
     # code (the Metal frameworks are linked but no device is ever created).
     add_executable(metal_poc_loader_tests gpu/metal/tests/metal_poc_loader_tests.mm src/external/image_writer.cpp)
@@ -665,6 +665,15 @@ if(RT_BUILD_METAL)
     # image comparer (no Metal, no device) driven by metal_poc_crop_test.sh, which
     # renders A1 whole and cropped through the real ray_tracer --gpu path.
     add_executable(metal_poc_crop_check gpu/metal/tests/metal_poc_crop_check.cpp)
+    # A per-pixel parameter (a roughness picture, a mix amount, a texture graph) drawn as its mean has the right mean: metal_poc_blocks_test.sh compares Metal with the CPU in 8 x 8 blocks.
+    add_test(NAME metal_poc_texture_blocks
+        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_blocks_test.sh"
+            $<TARGET_FILE:ray_tracer> $<TARGET_FILE:metal_poc_block_check> "${CMAKE_BINARY_DIR}")
+    set_tests_properties(metal_poc_texture_blocks PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" PASS_REGULAR_EXPRESSION "BLOCKS_TEST_OK" TIMEOUT 600)
+    # A scene whose files are not downloaded must end as the CPU and OptiX end it: exit code 3 and an @rt scene-file-missing event the GUI can word (render_events.h).
+    add_test(NAME metal_poc_error_event
+        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_events_test.sh" $<TARGET_FILE:ray_tracer> "${CMAKE_BINARY_DIR}")
+    set_tests_properties(metal_poc_error_event PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" PASS_REGULAR_EXPRESSION "EVENT_TEST_OK" SKIP_REGULAR_EXPRESSION "EVENT_TEST_SKIPPED" TIMEOUT 120)
     add_test(NAME metal_poc_crop_window
         COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_crop_test.sh"
             $<TARGET_FILE:ray_tracer> $<TARGET_FILE:metal_poc_crop_check> "${CMAKE_BINARY_DIR}")

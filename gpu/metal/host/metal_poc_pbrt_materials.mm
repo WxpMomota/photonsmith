@@ -28,7 +28,9 @@
 
 // pbrt imagemap uscale/vscale/udelta/vdelta of the reflectance picture, resolved by the flattener into Material::textureMapping; the shader looks
 // the picture up at (su*u + du, sv*v + dv). The identity (the default) leaves the TriangleMaterial's own defaults alone.
-static void applyReflectanceMapping(TriangleMaterial& mat, const pbrt_flatten::Material& m) {
+static void applyReflectanceMapping(TriangleMaterial& mat, const pbrt_flatten::Material& m, PbrtSceneLoader& loader, float sceneScale, float3 bboxCenter, float3 sceneOffset) {
+    if (m.textureMapping.kind != pbrt_flatten::UvMapping::Kind::Uv)
+        matparams::setPositionMapping(mat, loader.claimPositionMapping(m.textureMapping, sceneScale, bboxCenter, sceneOffset));
     mat.uvScaleU = (float)m.textureMapping.su;
     mat.uvScaleV = (float)m.textureMapping.sv;
     mat.uvDeltaU = (float)m.textureMapping.du;
@@ -46,6 +48,46 @@ static void applyReflectanceMapping(TriangleMaterial& mat, const pbrt_flatten::M
 
 // pbrt Diffuse: flat colour, or one of the textured variants (checkerboard, procedural noise, image) that the shader implements as modes of
 // materialType 25/26 (see the comments below). Split out of mapPbrtMaterial(), where this one case was 215 of its ~530 lines.
+bool PbrtSceneLoader::claimDiffuseImage(const pbrt_flatten::Material& m) {
+    if (m.textureFilename.empty() || (havePbrtDiffuseImage && m.textureFilename != pbrtDiffuseImageFilename)) return false;
+    if (!havePbrtDiffuseImage) {
+        std::string bytes;
+        if (pbrt_load::loadFileNear(pbrtScenePath, m.textureFilename, bytes) &&
+            pbrt_load::detail::decodeInfiniteLightImage(m.textureFilename, bytes, pbrtDiffuseImagePixels, pbrtDiffuseImageWidth, pbrtDiffuseImageHeight)) {
+            gpu_scene_textures::applyImagemapEncoding(pbrtDiffuseImagePixels, m.textureFilename, m.textureGamma, m.textureInvert);
+            havePbrtDiffuseImage = true;
+            pbrtDiffuseImageFilename = m.textureFilename;
+        } else {
+            fprintf(stderr, "loadPbrtScene: the material's own texture '%s' could not be read/decoded; falling back to its flat colour\n", m.textureFilename.c_str());
+            return false;
+        }
+    }
+    return true;
+}
+
+// A position-based mapping (pbrt spherical, cylindrical, planar) for the shader: 21 floats in rgbGridData. The scene's texture-from-world matrix is for pbrt's world; Metal draws a rescaled and
+// recentred copy (position = (p - bboxCenter) * sceneScale + sceneOffset), so the matrix is composed with the inverse of that, and the shader feeds it the Metal-world hit point.
+int PbrtSceneLoader::claimPositionMapping(const pbrt_flatten::UvMapping& mapping, float sceneScale, float3 bboxCenter, float3 sceneOffset) {
+    const double* xf = mapping.textureFromWorld;
+    const double inv = 1.0 / sceneScale;
+    const double shift[3] = {bboxCenter.x - sceneOffset.x * inv, bboxCenter.y - sceneOffset.y * inv, bboxCenter.z - sceneOffset.z * inv};
+    std::vector<float> data(21);
+    data[0] = (float)(int)mapping.kind;
+    for (int row = 0; row < 3; ++row) {
+        for (int col = 0; col < 3; ++col) data[1 + row * 4 + col] = (float)(xf[row * 4 + col] * inv);
+        data[1 + row * 4 + 3] = (float)(xf[row * 4 + 3] + xf[row * 4 + 0] * shift[0] + xf[row * 4 + 1] * shift[1] + xf[row * 4 + 2] * shift[2]);
+    }
+    for (int i = 0; i < 3; ++i) { data[13 + i] = (float)mapping.v1[i]; data[16 + i] = (float)mapping.v2[i]; }
+    data[19] = (float)mapping.du;
+    data[20] = (float)mapping.dv;
+    const auto it = pbrtPositionMappings.find(data);
+    if (it != pbrtPositionMappings.end()) return it->second;
+    const int offset = (int)rgbGridData.size();
+    rgbGridData.insert(rgbGridData.end(), data.begin(), data.end());
+    pbrtPositionMappings[data] = offset;
+    return offset;
+}
+
 TriangleMaterial PbrtSceneLoader::mapPbrtDiffuseMaterial(const pbrt_flatten::Material& m, float sceneScale, float3 bboxCenter, float3 sceneOffset) {
     PackedFloat3 color{(float)m.color[0], (float)m.color[1], (float)m.color[2]};
     // A "reflectance" bound to a "checkerboard" Texture (B22,
@@ -264,7 +306,7 @@ TriangleMaterial PbrtSceneLoader::mapPbrtDiffuseMaterial(const pbrt_flatten::Mat
             // no-op for them.
             TriangleMaterial imageMat{color, /*materialType=*/METAL_MAT_IMAGE_LAMBERTIAN, /*ior=*/1.0f,
                                       PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/(float)m.textureScale};
-            applyReflectanceMapping(imageMat, m);
+            applyReflectanceMapping(imageMat, m, *this, sceneScale, bboxCenter, sceneOffset);
             return imageMat;
         }
     }
@@ -298,6 +340,14 @@ TriangleMaterial PbrtSceneLoader::mapPbrtSubsurfaceMaterial(PbrtMaterialMapState
     const int tableOffset = bssrdfTableOffset(st, m.g, m.ior);
     // pbrt's "roughness" roughens the entry interface (a GGX dielectric): its alpha, remapped from the perceptual roughness as pbrt does; 0 keeps the smooth interface.
     matparams::setSubsurface(mat, tableOffset, (float)(m.remapRoughness ? std::sqrt(std::max(m.roughness_u, 0.0)) : m.roughness_u));
+    // A reflectance that is an image (the pbrt-v4-scenes head): the shader looks the picture up at the entry hit and inverts the table for it. color then holds the mean free path
+    // (a length, so times the scene scale where a coefficient is divided by it), transmitColor.x the picture's scale and conductorEta.z the flag; sigma_a / sigma_s of the flat material are not meaningful.
+    if (m.subsurfaceTexturedReflectance && claimDiffuseImage(m)) {
+        mat.color = PackedFloat3{(float)m.subsurfaceMfp[0] * st.sceneScale, (float)m.subsurfaceMfp[1] * st.sceneScale, (float)m.subsurfaceMfp[2] * st.sceneScale};   // a LENGTH: times the scene's rescale
+        mat.transmitColor = PackedFloat3{(float)m.textureScale, 0.0f, 0.0f};
+        mat.conductorEta.z = 1.0f;
+        applyReflectanceMapping(mat, m, *this, st.sceneScale, st.bboxCenter, st.sceneOffset);
+    }
     return mat;
 }
 
@@ -352,7 +402,89 @@ bool PbrtSceneLoader::mapPbrtPerHitMix(PbrtMaterialMapState& st, const pbrt_flat
     return true;
 }
 
+int PbrtSceneLoader::claimImageRef(const std::string& filename, const pbrt_flatten::TextureDecodeOptions& options, const pbrt_flatten::UvMapping& mapping, double scale,
+                                   float sceneScale, float3 bboxCenter, float3 sceneOffset, bool remapRoughness) {
+    if (filename.empty()) return 0;
+    char key[64];
+    std::snprintf(key, sizeof(key), "|%.6g|%d", options.gamma, options.invert ? 1 : 0);
+    const std::string pixelKey = filename + key;
+    auto found = pbrtImageRefPixels.find(pixelKey);
+    if (found == pbrtImageRefPixels.end()) {
+        std::string bytes;
+        std::vector<float> pixels;
+        int w = 0, h = 0;
+        if (!pbrt_load::loadFileNear(pbrtScenePath, filename, bytes) || !pbrt_load::detail::decodeInfiniteLightImage(filename, bytes, pixels, w, h) || w <= 0 || h <= 0) {
+            fprintf(stderr, "loadPbrtScene: the texture '%s' could not be read/decoded; its material keeps the flat value\n", filename.c_str());
+            return 0;
+        }
+        gpu_scene_textures::applyImagemapEncoding(pixels, filename, options.gamma, options.invert);
+        const int offset = (int)rgbGridData.size();
+        rgbGridData.insert(rgbGridData.end(), pixels.begin(), pixels.end());
+        found = pbrtImageRefPixels.emplace(pixelKey, std::array<int, 3>{offset, w, h}).first;
+    }
+    std::vector<float> ref(12, 0.0f);
+    ref[0] = (float)found->second[0]; ref[1] = (float)found->second[1]; ref[2] = (float)found->second[2];
+    ref[3] = (float)options.wrapIndex;
+    ref[4] = (float)scale;
+    ref[10] = remapRoughness ? 1.0f : 0.0f;
+    ref[5] = (float)mapping.su; ref[6] = (float)mapping.sv; ref[7] = (float)mapping.du; ref[8] = (float)mapping.dv;
+    if (mapping.kind != pbrt_flatten::UvMapping::Kind::Uv) ref[9] = (float)(claimPositionMapping(mapping, sceneScale, bboxCenter, sceneOffset) + 1);
+    const auto it = pbrtImageRefs.find(ref);
+    if (it != pbrtImageRefs.end()) return it->second + 1;
+    const int offset = (int)rgbGridData.size();
+    rgbGridData.insert(rgbGridData.end(), ref.begin(), ref.end());
+    pbrtImageRefs[ref] = offset;
+    return offset + 1;
+}
+
+int PbrtSceneLoader::claimTextureGraph(const std::vector<pbrt_flatten::TexMeanNode>& nodes, float sceneScale, float3 bboxCenter, float3 sceneOffset) {
+    using Kind = pbrt_flatten::TexMeanNode::Kind;
+    if (nodes.empty() || (int)nodes.size() > pbrt_flatten::kMaxTextureGraphNodes) return 0;
+    std::vector<float> block(1 + 8 * nodes.size(), 0.0f);
+    block[0] = (float)nodes.size();
+    for (size_t i = 0; i < nodes.size(); ++i) {
+        const pbrt_flatten::TexMeanNode& n = nodes[i];
+        float* d = &block[1 + 8 * i];
+        if (n.kind == Kind::Const) {
+            d[0] = 0; d[4] = (float)n.c[0]; d[5] = (float)n.c[1]; d[6] = (float)n.c[2];
+        } else if (n.kind == Kind::Image) {
+            pbrt_flatten::TextureDecodeOptions options;
+            options.gamma = n.gamma; options.invert = n.invert; options.wrapIndex = n.wrapIndex;
+            const int ref = claimImageRef(n.file, options, n.mapping, n.scale, sceneScale, bboxCenter, sceneOffset);
+            if (ref == 0) return 0;
+            d[0] = 1; d[4] = (float)ref;
+        } else if (n.kind == Kind::Product) {
+            d[0] = 2; d[1] = (float)n.a; d[2] = (float)n.b;
+        } else {
+            d[0] = 3; d[1] = (float)n.a; d[2] = (float)n.b; d[3] = (float)n.t;
+        }
+    }
+    const auto it = pbrtImageRefs.find(block);
+    if (it != pbrtImageRefs.end()) return it->second + 1;
+    const int offset = (int)rgbGridData.size();
+    rgbGridData.insert(rgbGridData.end(), block.begin(), block.end());
+    pbrtImageRefs[block] = offset;
+    return offset + 1;
+}
+
 TriangleMaterial PbrtSceneLoader::mapPbrtMaterial(PbrtMaterialMapState& st, const pbrt_flatten::Material& m, int depth) {
+    TriangleMaterial mat = mapPbrtMaterialBase(st, m, depth);
+    // A roughness picture on a conductor, a coated diffuse or a coated conductor (and its base roughness): read per pixel by the shader (patchPerPixelMaterial); the flat value the base
+    // function stored (the picture's mean) stays as the fallback.
+    const bool roughType = mat.materialType == METAL_MAT_ROUGH_CONDUCTOR || mat.materialType == METAL_MAT_COATED_DIFFUSE || mat.materialType == METAL_MAT_COATED_CONDUCTOR;
+    if (roughType && !m.roughnessTextureFilename.empty())
+        mat.roughRef = claimImageRef(m.roughnessTextureFilename, m.roughnessTextureOptions, m.roughnessTextureMapping, m.roughnessTextureScale, st.sceneScale, st.bboxCenter, st.sceneOffset, m.remapRoughness);
+    if (mat.materialType == METAL_MAT_COATED_CONDUCTOR && !m.condRoughnessTextureFilename.empty())
+        mat.condRoughRef = claimImageRef(m.condRoughnessTextureFilename, m.condRoughnessTextureOptions, m.condRoughnessTextureMapping, m.condRoughnessTextureScale, st.sceneScale, st.bboxCenter, st.sceneOffset, m.remapRoughness);
+    if (!m.reflectanceGraph.empty() && (mat.materialType == METAL_MAT_LAMBERTIAN || mat.materialType == METAL_MAT_IMAGE_LAMBERTIAN || mat.materialType == METAL_MAT_COATED_DIFFUSE ||
+                                        mat.materialType == METAL_MAT_IMAGE_CLEARCOAT))
+        mat.graphRef = claimTextureGraph(m.reflectanceGraph, st.sceneScale, st.bboxCenter, st.sceneOffset);
+    if (mat.materialType == METAL_MAT_MIX && !m.mixWeightTextureFilename.empty())
+        mat.mixAmountRef = claimImageRef(m.mixWeightTextureFilename, m.mixWeightTextureOptions, m.mixWeightTextureMapping, m.mixWeightTextureScale, st.sceneScale, st.bboxCenter, st.sceneOffset);
+    return mat;
+}
+
+TriangleMaterial PbrtSceneLoader::mapPbrtMaterialBase(PbrtMaterialMapState& st, const pbrt_flatten::Material& m, int depth) {
     const pbrt_flatten::FlatScene& scene = st.scene;
     const float sceneScale = st.sceneScale;
     const float3 bboxCenter = st.bboxCenter;
@@ -418,6 +550,7 @@ TriangleMaterial PbrtSceneLoader::mapPbrtMaterial(PbrtMaterialMapState& st, cons
             const double baseRough = m.conductorRoughness_u >= 0.0 ? m.conductorRoughness_u : m.roughness_u;
             mat.transmitColor = PackedFloat3{(float)(m.remapRoughness ? std::sqrt(baseRough) : baseRough), (float)m.coatThickness, 0.0f};
             setConductorOptics(mat, m);
+            matparams::setLayerMedium(mat, m.coatThickness, m.layerMediumAlbedo, m.layerG, m.layerMaxDepth, m.layerNSamples);
             return mat;
         }
         case pbrt_flatten::MaterialKind::Subsurface:
@@ -568,7 +701,7 @@ TriangleMaterial PbrtSceneLoader::mapPbrtMaterial(PbrtMaterialMapState& st, cons
                     transImg = havePbrtTransmitImage;
                 }
                 if (reflImg || transImg) mat.conductorK = PackedFloat3{reflImg ? 1.0f : 0.0f, 9.0f, transImg ? 1.0f : 0.0f};
-                if (reflImg) applyReflectanceMapping(mat, m);
+                if (reflImg) applyReflectanceMapping(mat, m, *this, st.sceneScale, st.bboxCenter, st.sceneOffset);
             }
             return mat;
         }
@@ -622,7 +755,8 @@ TriangleMaterial PbrtSceneLoader::mapPbrtMaterial(PbrtMaterialMapState& st, cons
                     TriangleMaterial imageMat{color, /*materialType=*/METAL_MAT_IMAGE_CLEARCOAT, /*ior=*/(float)m.ior,
                                               PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/(float)m.textureScale};
                     matparams::setCoatAlpha(imageMat, coatAlpha);
-                    applyReflectanceMapping(imageMat, m);
+                    matparams::setLayerMedium(imageMat, m.coatThickness, m.layerMediumAlbedo, m.layerG, m.layerMaxDepth, m.layerNSamples);
+                    applyReflectanceMapping(imageMat, m, *this, st.sceneScale, st.bboxCenter, st.sceneOffset);
                     return imageMat;
                 }
             }
@@ -630,8 +764,10 @@ TriangleMaterial PbrtSceneLoader::mapPbrtMaterial(PbrtMaterialMapState& st, cons
             {
                 const double coatRough = m.roughness_u;
                 const float coatAlpha = (float)(m.remapRoughness ? std::sqrt(coatRough) : coatRough);
-                return TriangleMaterial{color, /*materialType=*/METAL_MAT_COATED_DIFFUSE, /*ior=*/(float)m.ior,
-                                         PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/coatAlpha};
+                TriangleMaterial coated{color, /*materialType=*/METAL_MAT_COATED_DIFFUSE, /*ior=*/(float)m.ior,
+                                        PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/coatAlpha};
+                matparams::setLayerMedium(coated, m.coatThickness, m.layerMediumAlbedo, m.layerG, m.layerMaxDepth, m.layerNSamples);
+                return coated;
             }
         }
         case pbrt_flatten::MaterialKind::Mix: {

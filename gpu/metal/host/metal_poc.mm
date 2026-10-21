@@ -78,15 +78,8 @@
 #include "metal_poc_host_math.h"
 #include "../../../src/shared/oidn_runtime.h"
 
-// pbrt_load.h -> pbrt_flatten.h's InfiniteLight image decode path needs
-// tinyexr's real implementation linked in somewhere - cpu_renderer gets
-// it from its own separate src/external/tinyexr_impl.cpp translation
-// unit, but metal_poc is a standalone binary that doesn't link against
-// that library at all, so it needs its own copy, same "define, include,
-// undef" scoping as stb_image.h above and for the same reason.
-#define TINYEXR_IMPLEMENTATION
-#include "../../../src/external/tinyexr.h"
-#undef TINYEXR_IMPLEMENTATION
+// (tinyexr's implementation is cpu_renderer's, src/external/tinyexr_impl.cpp: metal_renderer links it PUBLIC. metal_poc.mm used to define
+// TINYEXR_IMPLEMENTATION itself, which put a second copy in the ray_tracer link as soon as the launcher referenced EXR code.)
 #include "../../../src/shared/pbrt_load.h"
 // resolve_crop_pixel_bounds() - the shared NDC-fraction -> pixel-rectangle
 // resolver OptiX already uses for --crop, so Metal rounds/clamps identically.
@@ -96,9 +89,11 @@
 #include "../../../src/TheRestOfYourLife/error_codes.h"
 // is_exr_output_path()/write_exr_image() - the same shared helpers the CPU
 // and OptiX backends use to honor a ".exr" output path (postProcessAndWrite()
-// below). Its own tinyexr.h include is a no-op here: that header's include
-// guard is already set by the TINYEXR_IMPLEMENTATION include above.
+// below).
 #include "../../../src/shared/exr_writer.h"
+#include "../../../src/shared/render_events.h"   // the @rt error events the GUI words in its own language
+#include "../../../src/shared/output_crop.h"   // the cut of a scene whose crop window is its picture
+#include "metal_poc_tuning.h"
 #include "../../../src/shared/cornell_box_data.h"
 // kConductorAu/kConductorCu - real (eta,k) presets for B7's own lacquered-
 // gold sphere/lacquered-copper box (buildCornellCoatedConductor()) -
@@ -866,6 +861,16 @@ void MetalPocApp::applyCameraOverride(double cam_x, double cam_y, double cam_z) 
 // (chromatic aberration, then lens vignette, then the selected tonemap
 // operator, then the real sRGB OETF, then bilateral denoise)
 bool MetalPocApp::postProcessAndWrite() {
+    // A scene whose crop window is its picture: keep only the window (every later step, the denoiser, the EXR and the PNG, then sees the smaller image).
+    if (cutToCropWindow && cropX1 >= 0 && cropX1 > cropX0 && cropY1 > cropY0 && (uint32_t)cropX1 <= width && (uint32_t)cropY1 <= height) {
+        output_crop::Bounds window;
+        window.x0 = cropX0; window.x1 = cropX1; window.y0 = cropY0; window.y1 = cropY1;
+        window.full = false;
+        pixels = output_crop::cut(pixels, (int)width, 4, window);
+        width = (uint32_t)(cropX1 - cropX0);
+        height = (uint32_t)(cropY1 - cropY0);
+        cropX0 = 0; cropX1 = -1; cropY0 = 0; cropY1 = -1;
+    }
     // --denoise: Open Image Denoise on the linear HDR image (before the .exr is written or the PNG is tone-mapped). When it ran, the PNG's own bilateral blur
     // is skipped: one denoiser, not two.
     bool oidnDenoised = false;
@@ -1022,7 +1027,8 @@ int metal_render_main(int image_width, int image_height, int samples_per_pixel,
     if (!pbrtPath || !pbrtPath[0]) {
         fprintf(stderr, "metal_render_main: scene '%s' has no pbrt file backing it. Metal renders "
                         "only pbrt-backed scenes now - use CPU or GPU (OptiX) for this scene instead.\n", scene_id);
-        return 1;
+        render_events::emitError(ERR_GPU_UNSUPPORTED_SCENE, "scene-not-supported-on-gpu", "This scene has no GPU implementation. Use CPU mode for it.", {{"scene", scene_id ? scene_id : ""}});
+        return ERR_GPU_UNSUPPORTED_SCENE;
     }
 
     // Builds the SAME positional-argv shape parseArgsAndCreateDevice()/
@@ -1090,7 +1096,32 @@ int metal_render_main(int image_width, int image_height, int samples_per_pixel,
         app.pbrtRequireAllMeshes = cpu_scene_requires_files_by_id(scene_id) != 0;
         app.buildScene();
         // loadPbrtScene() already printed the explanation (naming the missing files).
-        if (!app.pbrtMissingAssetsError.empty()) return ERR_FILE_NOT_FOUND;
+        if (!app.pbrtMissingAssetsError.empty()) {
+            // a scene that needs a download says which file and where it goes; otherwise the loader's own sentence
+            if (!render_events::emitSceneFilesMissing(ERR_FILE_NOT_FOUND, scene_id ? scene_id : "", pbrtPath))
+                render_events::emitError(ERR_FILE_NOT_FOUND, "scene-load-failed", "The scene file could not be loaded: " + app.pbrtMissingAssetsError,
+                                         {{"scene", scene_id ? scene_id : ""}, {"file", pbrtPath}, {"detail", app.pbrtMissingAssetsError}});
+            return ERR_FILE_NOT_FOUND;
+        }
+        if (!app.pbrtLoadError.empty()) {
+            // a scene file that is simply not there (a downloadable scene before "Download missing files") is a missing download, as on the CPU and OptiX
+            if (render_events::emitSceneFilesMissing(ERR_FILE_NOT_FOUND, scene_id ? scene_id : "", pbrtPath)) return ERR_FILE_NOT_FOUND;
+            render_events::emitError(ERR_FILE_READ_FAILED, "scene-load-failed", "The scene file could not be loaded: " + app.pbrtLoadError,
+                                     {{"scene", scene_id ? scene_id : ""}, {"file", pbrtPath}, {"detail", app.pbrtLoadError}});
+            return ERR_FILE_READ_FAILED;
+        }
+        {
+            // The file's own Film cropwindow/pixelbounds: draw only that window (--crop above wins). A scene whose crop IS its picture (the Head) is then written as the window alone.
+            const double* fc = app.pbrtFilmCrop;
+            const bool explicitCrop = app.cropX1 >= 0;
+            if (!explicitCrop && (fc[0] != 0.0 || fc[1] != 1.0 || fc[2] != 0.0 || fc[3] != 1.0)) {
+                const CropPixelBounds b = resolve_crop_pixel_bounds(fc[0], fc[1], fc[2], fc[3], image_width, image_height);
+                if (!b.wasDegenerate) { app.cropX0 = b.x0; app.cropX1 = b.x1; app.cropY0 = b.y0; app.cropY1 = b.y1; }
+            }
+            double pictureCrop[4];
+            app.cutToCropWindow = !explicitCrop && cpu_scene_crop_picture_by_id(scene_id, pictureCrop) != 0;
+            if (MetalTuning::fromEnvironment().cutToCrop) app.cutToCropWindow = true;
+        }
         if (force_camera_override) {
             if (app.havePbrtCamera) {
                 app.applyCameraOverride(cam_x, cam_y, cam_z);
