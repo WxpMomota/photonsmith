@@ -11,7 +11,7 @@
 //   layeredPdf():    pbrt's approximate PDF(), used ONLY for MIS (seeded from the two directions so the light sample and the
 //                    BSDF sample of the same direction see the same number);
 //   layeredF():      the stochastic BSDF value for next-event estimation.
-// Isotropic roughness, no scattering medium inside the layer (albedo = 0), maxDepth 10, nSamples 1 - what every scene here uses.
+// Isotropic roughness. The layer medium (albedo, g), maxDepth and nSamples come in a LayerMedium (pbrt defaults: a clear layer, 10, 1).
 //
 // NOT compiled or run on the machine that wrote it (no Metal toolchain): the algorithm is the C++ one in src/shared, which is
 // covered by unit tests there (closed form for the smooth case, sampler vs f() integral for the rest); this file is a line-by-line
@@ -26,6 +26,27 @@ struct LayerSample {
     bool transmission;
     bool specular;
 };
+
+// The layer between them: pbrt's thickness, the medium inside it (single-scattering albedo, Henyey-Greenstein g; albedo 0 = a clear layer), the walk's maximum depth and the number
+// of samples per f() / PDF() estimate. The defaults are pbrt's (thickness 0.01, no medium, 10, 1).
+struct LayerMedium {
+    float thickness = 0.01;
+    float albedo = 0.0;
+    float g = 0.0;
+    int maxDepth = 10;
+    int nSamples = 1;
+};
+
+// A coated material's layer from its spare fields (TriangleMaterial::layer*): zero fields mean pbrt's defaults, `defaultThickness` being the thickness an older material carried elsewhere.
+inline LayerMedium layerMediumOf(TriangleMaterial m, float defaultThickness) {
+    LayerMedium r;
+    r.thickness = m.layerThickness > 0.0 ? m.layerThickness : defaultThickness;
+    r.albedo = max(m.layerAlbedo, 0.0f);
+    r.g = m.layerG;
+    r.maxDepth = m.layerMaxDepth > 0 ? m.layerMaxDepth : 10;
+    r.nSamples = m.layerNSamples > 0 ? m.layerNSamples : 1;
+    return r;
+}
 
 // The coat (a dielectric interface) and the base (a Lambertian or a conductor).
 struct LayerTop {
@@ -62,7 +83,7 @@ inline bool layerSameHemisphere(float3 a, float3 b) { return a.z * b.z > 0.0; }
 inline bool layerTopSmooth(LayerTop t) { return t.eta == 1.0 || t.alpha < 1.0e-3; }
 inline bool layerBottomSpecular(LayerBottom b) { return b.kind == 1 && b.alpha < 1.0e-3; }
 // pbrt's Flags(): no Diffuse/Glossy bit (so no NEE and no MIS) only for a smooth coat over a smooth conductor.
-inline bool layerIsDelta(LayerTop t, LayerBottom b) { return layerTopSmooth(t) && layerBottomSpecular(b); }
+inline bool layerIsDelta(LayerTop t, LayerBottom b, LayerMedium m = LayerMedium()) { return layerTopSmooth(t) && layerBottomSpecular(b) && m.albedo == 0.0; }
 
 inline float layerMaxComponent(float3 v) { return max(v.x, max(v.y, v.z)); }
 inline bool layerIsZero(float3 v) { return v.x == 0.0 && v.y == 0.0 && v.z == 0.0; }
@@ -265,78 +286,120 @@ inline LayerSample layerBottomSample(LayerBottom b, float3 wo, thread uint& rng,
 }
 
 // ---- LayeredBxDF::f(wo, wi) for wo.z > 0, wi.z > 0 ------------------------------------------------------------------
-inline float3 layeredF(LayerTop top, LayerBottom bottom, float thickness, float3 wo, float3 wi, thread uint& rng) {
+inline float layerSampleExponential(float u, float a) { return -log(1.0 - u) / a; }
+
+inline float3 layeredF(LayerTop top, LayerBottom bottom, LayerMedium med, float3 wo, float3 wi, thread uint& rng) {
     float3 f = float3(0.0);
     if (wo.z <= 0.0 || wi.z <= 0.0) return f;
+    const float thickness = med.thickness;
+    const bool hasMedium = med.albedo > 0.0;
     const bool topSpecular = layerTopSmooth(top);
     const bool bottomSpecular = layerBottomSpecular(bottom);
+    const float exitZ = thickness;
+    const int nSamples = med.nSamples > 0 ? med.nSamples : 1;
 
-    f = layerDielectricF(top, wo, wi, true);
+    f = layerDielectricF(top, wo, wi, true) * float(nSamples);
 
-    float uc = randFloat(rng);
-    LayerSample wos = layerDielectricSample(top, wo, uc, rng, true, kLayerTransmission);
-    if (!wos.valid || layerIsZero(wos.f) || wos.pdf == 0.0 || wos.wi.z == 0.0) return f;
-    uc = randFloat(rng);
-    LayerSample wis = layerDielectricSample(top, wi, uc, rng, false, kLayerTransmission);
-    if (!wis.valid || layerIsZero(wis.f) || wis.pdf == 0.0 || wis.wi.z == 0.0) return f;
+    for (int s = 0; s < nSamples; ++s) {
+        float uc = randFloat(rng);
+        LayerSample wos = layerDielectricSample(top, wo, uc, rng, true, kLayerTransmission);
+        if (!wos.valid || layerIsZero(wos.f) || wos.pdf == 0.0 || wos.wi.z == 0.0) continue;
+        uc = randFloat(rng);
+        LayerSample wis = layerDielectricSample(top, wi, uc, rng, false, kLayerTransmission);
+        if (!wis.valid || layerIsZero(wis.f) || wis.pdf == 0.0 || wis.wi.z == 0.0) continue;
 
-    float3 beta = wos.f * (abs(wos.wi.z) / wos.pdf);
-    float z = thickness;
-    float3 w = wos.wi;
+        float3 beta = wos.f * (abs(wos.wi.z) / wos.pdf);
+        float z = thickness;
+        float3 w = wos.wi;
 
-    for (int depth = 0; depth < kLayerMaxDepth; ++depth) {
-        if (depth > 3 && layerMaxComponent(beta) < 0.25) {
-            float q = max(0.0, 1.0 - layerMaxComponent(beta));
-            if (randFloat(rng) < q) break;
-            beta /= 1.0 - q;
-        }
-
-        z = (z == thickness) ? 0.0 : thickness;
-        beta *= layerTr(thickness, w);
-
-        if (z == thickness) {
-            // reflection at the exit (top) interface
-            float uc2 = randFloat(rng);
-            LayerSample bs = layerDielectricSample(top, -w, uc2, rng, true, kLayerReflection);
-            if (!bs.valid || layerIsZero(bs.f) || bs.pdf == 0.0 || bs.wi.z == 0.0) break;
-            beta *= bs.f * (abs(bs.wi.z) / bs.pdf);
-            w = bs.wi;
-        } else {
-            // scattering at the non-exit (bottom) interface
-            if (!bottomSpecular) {
-                float wt = 1.0;
-                if (!topSpecular) wt = layerPower2(wis.pdf, layerBottomPdf(bottom, -w, -wis.wi, kLayerAllLobes));
-                f += beta * layerBottomF(bottom, -w, -wis.wi) * wis.f * (abs(wis.wi.z) * wt * layerTr(thickness, wis.wi) / wis.pdf);
+        for (int depth = 0; depth < med.maxDepth; ++depth) {
+            if (depth > 3 && layerMaxComponent(beta) < 0.25) {
+                float q = max(0.0, 1.0 - layerMaxComponent(beta));
+                if (randFloat(rng) < q) break;
+                beta /= 1.0 - q;
             }
-            float uc2 = randFloat(rng);
-            LayerSample bs = layerBottomSample(bottom, -w, rng, kLayerReflection);
-            if (!bs.valid || layerIsZero(bs.f) || bs.pdf == 0.0 || bs.wi.z == 0.0) break;
-            beta *= bs.f * (abs(bs.wi.z) / bs.pdf);
-            w = bs.wi;
 
-            if (!topSpecular) {
-                float3 fExit = layerDielectricF(top, -w, wi, true);
-                if (!layerIsZero(fExit)) {
+            if (!hasMedium) {
+                z = (z == thickness) ? 0.0 : thickness;
+                beta *= layerTr(thickness, w);
+            } else {
+                // a scattering layer: sample a distance along w (unit extinction); if it ends inside the layer, scatter there with the HG phase function
+                float dz = layerSampleExponential(randFloat(rng), 1.0 / abs(w.z));
+                float zp = w.z > 0.0 ? (z + dz) : (z - dz);
+                if (z == zp) continue;
+                if (0.0 < zp && zp < thickness) {
                     float wt = 1.0;
-                    if (!bottomSpecular) {
-                        // Verbatim pbrt: exitPDF is the density of generating wi from inside, not the competing strategy's,
-                        // so the two MIS weights do not sum to one (see src/shared/bxdfs_layered.h).
-                        float exitPdf = layerDielectricPdf(top, -w, wi, kLayerTransmission);
-                        wt = layerPower2(bs.pdf, exitPdf);
+                    float phaseExit = henyeyGreensteinPhase(dot(-w, -wis.wi), med.g);
+                    if (!topSpecular) wt = layerPower2(wis.pdf, phaseExit);
+                    f += beta * med.albedo * wis.f * (phaseExit * wt * layerTr(zp - exitZ, wis.wi) / wis.pdf);
+
+                    float3 psw = sampleHenyeyGreenstein(-w, med.g, rng);
+                    float pdfPs = henyeyGreensteinPhase(dot(psw, -w), med.g);
+                    if (pdfPs == 0.0 || psw.z == 0.0) continue;
+                    // p / pdf == 1 for Henyey-Greenstein sampling
+                    beta *= med.albedo;
+                    w = psw;
+                    z = zp;
+
+                    if (((z < exitZ && w.z > 0.0) || (z > exitZ && w.z < 0.0)) && !topSpecular) {
+                        float3 fExit = layerDielectricF(top, -w, wi, true);
+                        if (!layerIsZero(fExit)) {
+                            float exitPdf = layerDielectricPdf(top, -w, wi, kLayerTransmission);
+                            float wt2 = layerPower2(pdfPs, exitPdf);
+                            f += beta * fExit * (layerTr(zp - exitZ, psw) * wt2);
+                        }
                     }
-                    f += beta * fExit * (layerTr(thickness, bs.wi) * wt);
+                    continue;
+                }
+                z = clamp(zp, 0.0, thickness);
+            }
+
+            if (z == exitZ) {
+                // reflection at the exit (top) interface
+                float uc2 = randFloat(rng);
+                LayerSample bs = layerDielectricSample(top, -w, uc2, rng, true, kLayerReflection);
+                if (!bs.valid || layerIsZero(bs.f) || bs.pdf == 0.0 || bs.wi.z == 0.0) break;
+                beta *= bs.f * (abs(bs.wi.z) / bs.pdf);
+                w = bs.wi;
+            } else {
+                // scattering at the non-exit (bottom) interface
+                if (!bottomSpecular) {
+                    float wt = 1.0;
+                    if (!topSpecular) wt = layerPower2(wis.pdf, layerBottomPdf(bottom, -w, -wis.wi, kLayerAllLobes));
+                    f += beta * layerBottomF(bottom, -w, -wis.wi) * wis.f * (abs(wis.wi.z) * wt * layerTr(thickness, wis.wi) / wis.pdf);
+                }
+                float uc2 = randFloat(rng);   // (drawn and unused, as before: it keeps the random stream the clear-layer renders always had)
+                (void)uc2;
+                LayerSample bs = layerBottomSample(bottom, -w, rng, kLayerReflection);
+                if (!bs.valid || layerIsZero(bs.f) || bs.pdf == 0.0 || bs.wi.z == 0.0) break;
+                beta *= bs.f * (abs(bs.wi.z) / bs.pdf);
+                w = bs.wi;
+
+                if (!topSpecular) {
+                    float3 fExit = layerDielectricF(top, -w, wi, true);
+                    if (!layerIsZero(fExit)) {
+                        float wt = 1.0;
+                        if (!bottomSpecular) {
+                            // Verbatim pbrt: exitPDF is the density of generating wi from inside, not the competing strategy's,
+                            // so the two MIS weights do not sum to one (see src/shared/bxdfs_layered.h).
+                            float exitPdf = layerDielectricPdf(top, -w, wi, kLayerTransmission);
+                            wt = layerPower2(bs.pdf, exitPdf);
+                        }
+                        f += beta * fExit * (layerTr(thickness, bs.wi) * wt);
+                    }
                 }
             }
-            (void)uc2;
         }
     }
-    return f;
+    return f / float(nSamples);
 }
 
 // ---- LayeredBxDF::Sample_f(wo) ---------------------------------------------------------------------------------------
-inline LayerSample layeredSample(LayerTop top, LayerBottom bottom, float thickness, float3 wo, thread uint& rng) {
+inline LayerSample layeredSample(LayerTop top, LayerBottom bottom, LayerMedium med, float3 wo, thread uint& rng) {
     LayerSample none = layerNoSample();
     if (wo.z <= 0.0) return none;
+    const float thickness = med.thickness;
+    const bool hasMedium = med.albedo > 0.0;
 
     float uc = randFloat(rng);
     LayerSample bs = layerDielectricSample(top, wo, uc, rng, true, kLayerAllLobes);
@@ -349,7 +412,7 @@ inline LayerSample layeredSample(LayerTop top, LayerBottom bottom, float thickne
     float pdf = bs.pdf;
     float z = thickness;
 
-    for (int depth = 0; depth < kLayerMaxDepth; ++depth) {
+    for (int depth = 0; depth < med.maxDepth; ++depth) {
         float rrBeta = layerMaxComponent(f) / pdf;
         if (depth > 3 && rrBeta < 0.25) {
             float q = max(0.0, 1.0 - rrBeta);
@@ -358,8 +421,26 @@ inline LayerSample layeredSample(LayerTop top, LayerBottom bottom, float thickne
         }
         if (w.z == 0.0) return none;
 
-        z = (z == thickness) ? 0.0 : thickness;
-        f *= layerTr(thickness, w);
+        if (hasMedium) {
+            float dz = layerSampleExponential(randFloat(rng), 1.0 / abs(w.z));
+            float zp = w.z > 0.0 ? (z + dz) : (z - dz);
+            if (zp == z) return none;
+            if (0.0 < zp && zp < thickness) {
+                float3 psw = sampleHenyeyGreenstein(-w, med.g, rng);
+                float pdfPs = henyeyGreensteinPhase(dot(psw, -w), med.g);
+                if (pdfPs == 0.0 || psw.z == 0.0) return none;
+                f *= med.albedo * pdfPs;   // the phase value equals its pdf for Henyey-Greenstein
+                pdf *= pdfPs;
+                specularPath = false;
+                w = psw;
+                z = zp;
+                continue;
+            }
+            z = clamp(zp, 0.0, thickness);
+        } else {
+            z = (z == thickness) ? 0.0 : thickness;
+            f *= layerTr(thickness, w);
+        }
 
         LayerSample is;
         float c0 = randFloat(rng);
@@ -396,41 +477,44 @@ inline uint layerHashDir(float3 d, uint h) {
     return h;
 }
 
-inline float layeredPdf(LayerTop top, LayerBottom bottom, float3 wo, float3 wi) {
+inline float layeredPdf(LayerTop top, LayerBottom bottom, LayerMedium med, float3 wo, float3 wi) {
     if (wo.z <= 0.0 || wi.z <= 0.0) return 0.0;
     uint rng = layerHashDir(wo, layerHashDir(wi, 0x9e3779b9u));
     const bool topSpecular = layerTopSmooth(top);
     const bool bottomSpecular = layerBottomSpecular(bottom);
+    const int nSamples = med.nSamples > 0 ? med.nSamples : 1;
 
-    float pdfSum = layerDielectricPdf(top, wo, wi, kLayerReflection);
+    float pdfSum = float(nSamples) * layerDielectricPdf(top, wo, wi, kLayerReflection);
 
-    float a = randFloat(rng);
-    LayerSample wos = layerDielectricSample(top, wo, a, rng, true, kLayerTransmission);
-    a = randFloat(rng);
-    LayerSample wis = layerDielectricSample(top, wi, a, rng, false, kLayerTransmission);
+    for (int s = 0; s < nSamples; ++s) {
+        float a = randFloat(rng);
+        LayerSample wos = layerDielectricSample(top, wo, a, rng, true, kLayerTransmission);
+        a = randFloat(rng);
+        LayerSample wis = layerDielectricSample(top, wi, a, rng, false, kLayerTransmission);
 
-    if (wos.valid && !layerIsZero(wos.f) && wos.pdf > 0.0 && wis.valid && !layerIsZero(wis.f) && wis.pdf > 0.0) {
-        if (topSpecular) {
-            pdfSum += layerBottomPdf(bottom, -wos.wi, -wis.wi, kLayerAllLobes);
-        } else {
-            LayerSample rs = layerBottomSample(bottom, -wos.wi, rng, kLayerAllLobes);
-            if (rs.valid && !layerIsZero(rs.f) && rs.pdf > 0.0) {
-                if (bottomSpecular) {
-                    pdfSum += layerDielectricPdf(top, -rs.wi, wi, kLayerAllLobes);
-                } else {
-                    float rPdf = layerBottomPdf(bottom, -wos.wi, -wis.wi, kLayerAllLobes);
-                    float wt = layerPower2(wis.pdf, rPdf);
-                    pdfSum += wt * rPdf;
+        if (wos.valid && !layerIsZero(wos.f) && wos.pdf > 0.0 && wis.valid && !layerIsZero(wis.f) && wis.pdf > 0.0) {
+            if (topSpecular) {
+                pdfSum += layerBottomPdf(bottom, -wos.wi, -wis.wi, kLayerAllLobes);
+            } else {
+                LayerSample rs = layerBottomSample(bottom, -wos.wi, rng, kLayerAllLobes);
+                if (rs.valid && !layerIsZero(rs.f) && rs.pdf > 0.0) {
+                    if (bottomSpecular) {
+                        pdfSum += layerDielectricPdf(top, -rs.wi, wi, kLayerAllLobes);
+                    } else {
+                        float rPdf = layerBottomPdf(bottom, -wos.wi, -wis.wi, kLayerAllLobes);
+                        float wt = layerPower2(wis.pdf, rPdf);
+                        pdfSum += wt * rPdf;
 
-                    float tPdf = layerDielectricPdf(top, -rs.wi, wi, kLayerAllLobes);
-                    wt = layerPower2(rs.pdf, tPdf);
-                    pdfSum += wt * tPdf;
+                        float tPdf = layerDielectricPdf(top, -rs.wi, wi, kLayerAllLobes);
+                        wt = layerPower2(rs.pdf, tPdf);
+                        pdfSum += wt * tPdf;
+                    }
                 }
             }
         }
     }
-    // Lerp(0.9, 1/(4 pi), pdfSum)
-    return 0.1 * (1.0 / (4.0 * M_PI_F)) + 0.9 * pdfSum;
+    // Lerp(0.9, 1/(4 pi), pdfSum / nSamples)
+    return 0.1 * (1.0 / (4.0 * M_PI_F)) + 0.9 * (pdfSum / float(nSamples));
 }
 
 // ---- constructors used by the material shaders ------------------------------------------------------------------------

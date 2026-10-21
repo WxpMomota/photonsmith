@@ -418,6 +418,7 @@ TriangleMaterial PbrtSceneLoader::mapPbrtMaterial(PbrtMaterialMapState& st, cons
             const double baseRough = m.conductorRoughness_u >= 0.0 ? m.conductorRoughness_u : m.roughness_u;
             mat.transmitColor = PackedFloat3{(float)(m.remapRoughness ? std::sqrt(baseRough) : baseRough), (float)m.coatThickness, 0.0f};
             setConductorOptics(mat, m);
+            matparams::setLayerMedium(mat, m.coatThickness, m.layerMediumAlbedo, m.layerG, m.layerMaxDepth, m.layerNSamples);
             return mat;
         }
         case pbrt_flatten::MaterialKind::Subsurface:
@@ -622,6 +623,7 @@ TriangleMaterial PbrtSceneLoader::mapPbrtMaterial(PbrtMaterialMapState& st, cons
                     TriangleMaterial imageMat{color, /*materialType=*/METAL_MAT_IMAGE_CLEARCOAT, /*ior=*/(float)m.ior,
                                               PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/(float)m.textureScale};
                     matparams::setCoatAlpha(imageMat, coatAlpha);
+                    matparams::setLayerMedium(imageMat, m.coatThickness, m.layerMediumAlbedo, m.layerG, m.layerMaxDepth, m.layerNSamples);
                     applyReflectanceMapping(imageMat, m);
                     return imageMat;
                 }
@@ -630,8 +632,10 @@ TriangleMaterial PbrtSceneLoader::mapPbrtMaterial(PbrtMaterialMapState& st, cons
             {
                 const double coatRough = m.roughness_u;
                 const float coatAlpha = (float)(m.remapRoughness ? std::sqrt(coatRough) : coatRough);
-                return TriangleMaterial{color, /*materialType=*/METAL_MAT_COATED_DIFFUSE, /*ior=*/(float)m.ior,
-                                         PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/coatAlpha};
+                TriangleMaterial coated{color, /*materialType=*/METAL_MAT_COATED_DIFFUSE, /*ior=*/(float)m.ior,
+                                        PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/coatAlpha};
+                matparams::setLayerMedium(coated, m.coatThickness, m.layerMediumAlbedo, m.layerG, m.layerMaxDepth, m.layerNSamples);
+                return coated;
             }
         }
         case pbrt_flatten::MaterialKind::Mix: {
