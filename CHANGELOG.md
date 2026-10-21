@@ -4,7 +4,7 @@ Release notes for the next tagged release, summarising the large correctness eff
 Before this, see `git log`. Each item has a commit with the measurements behind it, and
 [docs/PBRT_SUPPORT.md](docs/PBRT_SUPPORT.md) has the per-feature, per-backend detail.
 
-## Unreleased (after 0.1.5)
+## 0.1.5 (2026-10-21)
 
 * **"Why is this pixel this colour?"** (`ray_tracer --cpu --probe X Y ...`, or right-click a rendered picture in the GUI's Preview tab): renders one pixel and reports its radiance split by source (emitters hit, sky, next-event estimates toward area lights / sky and portal lights / point lights), by bounce, by area light, and what the camera rays hit first. For finding which term differs when a pixel is the wrong brightness against pbrt or a closed form. CPU default path tracer; see `docs/RENDER_PASSES.md`.
 
@@ -132,7 +132,6 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 * **Environment library: 30 photographic skies and rooms** (`environments/`, 45 MB, from Poly Haven, all CC0, 1k high-dynamic-range panoramas with thumbnails; credits in `environments/CREDITS.md`): sunsets and sunrises, partly cloudy days, meadows and beaches, overcast, city streets, starry and moonlit nights, photo studios, a fireplace room. **Add > Environment library...**, or **Photographic sky (HDRI)...** in a sky light's properties, shows them by kind with thumbnails; one becomes the sky light's picture (the light is made if the scene has none), so the sun, clouds, lamps and windows of a real place light the scene, reflect in glass and metal and show behind it. The Sun light that the generated Sun && sky had made is removed (the picture has its own). `src/shared/environment_library.h` with unit tests; the `composite` self-test applies one and renders the starter scene lit by it.
 
-## 0.1.5 (2026-10-16)
 
 * **The first Metal render after an install waits about two minutes, not four**: Metal turns the path tracer into machine code once per Mac, for two shader variants (the second is for alpha masks and subsurface), and the app built them one after the other (108 s then 121 s on an M2). They are now built side by side (about 125 s in all: `ray_tracer --prepare-gpu` 231 s -> 136 s, measured with a cold cache). A Live Preview that starts during the warm-up still waits for the build of its own variant instead of compiling it twice.
 
@@ -151,7 +150,7 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 * **README and gallery refreshed**: all twelve renders redone with the current build (eleven look the same, the Final scene is brighter and less noisy), a row of three Cornell material scenes and the Studio Showcase added, the social preview carries the Photonsmith name, and the counts (66 test scenes, nearly 6,000 tests) are current.
 * Looked at and left (recorded in `docs/PBRT_SUPPORT.md`): the 2-4% excess of chromatic absorbers in the RGB renderers (pbrt averages over wavelengths; the spectral wavefront backend already agrees) and the flat-shaded OptiX strands.
 
-**Known in 0.1.5 on the Mac (Metal):** nothing new was run on a Mac. Room from a photo (its helper's setup script, the draft-render light level) and Light picture are untested there; on Metal a window's picture in a room made from a photo shows as the picture (see the Unreleased entry; it was one flat colour), and Make from a photo for a material is plain Qt and C++ and works unchanged (the GUI self-test `material` passes on the Mac). `docs/GPU_SCENE_COMMON.md` ("Room from a photo: what the Mac has to check") lists the checks.
+**Known in 0.1.5 on the Mac (Metal):** the Room from a photo helper's own setup (its Python environment and models) and the Denoise tick were not run on this Mac; everything else in this release was: the Metal test suite (30 tests, 160 pbrt reference rows), the 203 bundled scenes CPU against Metal, the packaged app's GUI self-tests. Not drawn on Metal: a bump or normal map with a position-based texture mapping, a roughness picture on a disk or a cylinder, and a clipped sphere that is a light or bounds a medium (it is drawn whole). The first Metal render after installing builds the renderer for the Mac in the background: about 20 seconds for an ordinary scene, up to two minutes when a scene uses hair, measured, subsurface or layered materials. `docs/GPU_SCENE_COMMON.md` has the hand-over notes.
 
 ## 0.1.4 (2026-10-15)
 
