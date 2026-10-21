@@ -25,6 +25,13 @@ constexpr const char *kStampTag = "# @rt-cartoon-stamp ";
 
 inline std::string fileName(const cartoon::Film &film) { return std::string("cartoon-") + film.key + ".pbrt"; }
 
+// The film a still's scene name ("cartoon-fireflies", the slug its file gets) belongs to, or null for any other scene.
+inline const cartoon::Film *filmForSlug(const std::string &slug) {
+	for (const cartoon::Film &film : cartoon::kFilms)
+		if (slug == std::string("cartoon-") + film.key) return &film;
+	return nullptr;
+}
+
 // What the source of this film's still looks like to the compiler: its own file and the toolkit's.
 inline std::string stampOf(const cartoon::Film &film) { return std::string(film.stamp) + " | " + cartoon::kLibStamp; }
 

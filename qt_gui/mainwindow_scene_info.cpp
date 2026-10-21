@@ -10,6 +10,7 @@
 #include "app_log.h"
 #include "camera_math.h"
 #include "../src/shared/video_preset.h"
+#include "../src/shared/cartoon/cartoon_stills.h"
 #include "../src/shared/scene_descriptor.h"
 #include <QApplication>
 #include <QFileDialog>
@@ -392,6 +393,16 @@ void MainWindow::onSceneChanged(int index) {
 	if (m_cameraPathCombo) {
 		const int pathIdx = m_cameraPathCombo->findData(meta.recommendedCameraPath);
 		if (pathIdx >= 0) m_cameraPathCombo->setCurrentIndex(pathIdx);
+	}
+	// A cartoon's still is that film's scene: its video is the film itself, so the video settings follow it the way a preset's do (path, length, fps, speed).
+	if (const cartoon::Film *film = cartoon_stills::filmForSlug(SceneMetadataClient::sceneSlug(scene_id).toStdString())) {
+		if (m_cameraPathCombo) {
+			const int filmPath = m_cameraPathCombo->findData(QString::fromUtf8(cartoon::kCameraPathPrefix) + QString::fromUtf8(film->key));
+			if (filmPath >= 0) m_cameraPathCombo->setCurrentIndex(filmPath);
+		}
+		if (m_videoFramesSpinBox) m_videoFramesSpinBox->setValue(static_cast<int>(std::lround(film->duration * film->fps)));
+		if (m_videoFPSSpinBox) m_videoFPSSpinBox->setValue(film->fps);
+		if (m_videoSpeedSpinBox) m_videoSpeedSpinBox->setValue(1.0);
 	}
 
 	// Auto-switch to CPU when scene doesn't support GPU. Which flag

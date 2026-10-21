@@ -228,7 +228,7 @@ as a camera path of its own kind, `cartoon:<key>`, either by `--video-preset <ke
 .\ray_tracer.exe --gpu --video --camera-path cartoon:lamp-and-ball --frames 48 960 64 8    # a quick 2 second look (the film is squeezed into the frames you ask for)
 ```
 
-The GUI lists them in the Video Settings tab, both in the Preset combo and as "Cartoon: ..." in the Camera Path combo; the scene picker is ignored for a cartoon.
+In the GUI a cartoon is a scene: pick it on the **Cartoons** tab of the scene picker, choose Generate Video, and the video settings (camera path "Cartoon: ...", frames, fps, speed) are already the film's. The **Flythrough Preset** box in Video Settings lists only the camera flythroughs (V1 to V6); `--video-preset` on the command line still takes all of them.
 
 How it renders: each frame is written as a `.pbrt` scene (`src/shared/cartoon/`: the film's `sceneAt(t)`) and rendered by a child run of the launcher with the flags you gave (backend,
 denoiser, seed, exposure, tone mapping ...; the video flags and the output path are replaced), then joined by the usual video assembly. Each frame is therefore an ordinary
@@ -247,7 +247,7 @@ way to look at a change to a film. The GUI's scene list has a Cartoons tab (besi
 
 Making a film of your own: `scripts/anim/` (Python, quicker to change; `README.md` there) is the same toolkit for authoring, and `src/shared/cartoon/cartoon_lib.h` is its C++ twin;
 a finished film is a function `std::string sceneAt(double t)` listed in `src/shared/cartoon/cartoons.h`; that listing alone makes it a video preset (`video_preset::all()` builds the
-preset from it), and it appears in the GUI's Preset combo and Camera Path combo and in `--list-video-presets`. Append new films, do not reorder them: a cartoon's preset id (V7 ...) is its
+preset from it), and it appears as a scene on the GUI's Cartoons tab, in the GUI's Camera Path combo, and in `--list-video-presets`. Append new films, do not reorder them: a cartoon's preset id (V7 ...) is its
 place in the list.
 
 ## Examples

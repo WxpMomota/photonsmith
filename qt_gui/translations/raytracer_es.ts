@@ -3299,6 +3299,11 @@ Cada rebote adicional permite que la luz recorra una superficie más antes de de
         <translation>Preajuste:</translation>
     </message>
     <message>
+        <location filename="../mainwindow_tabs_settings_groups.cpp" line="905"/>
+        <source>Flythrough Preset:</source>
+        <translation>Preajuste de recorrido:</translation>
+    </message>
+    <message>
         <location filename="../mainwindow_tabs_settings_groups.cpp" line="1090"/>
         <source>Live Preview Controls</source>
         <translation>Controles de la vista previa en vivo</translation>

@@ -3299,6 +3299,11 @@ Chaque rebond supplémentaire permet à la lumière de parcourir une surface de 
         <translation>Préréglage :</translation>
     </message>
     <message>
+        <location filename="../mainwindow_tabs_settings_groups.cpp" line="905"/>
+        <source>Flythrough Preset:</source>
+        <translation>Préréglage de parcours :</translation>
+    </message>
+    <message>
         <location filename="../mainwindow_tabs_settings_groups.cpp" line="1090"/>
         <source>Live Preview Controls</source>
         <translation>Commandes de l&apos;aperçu en direct</translation>

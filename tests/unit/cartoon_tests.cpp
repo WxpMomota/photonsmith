@@ -367,6 +367,17 @@ TEST(CartoonStills, EveryFilmGetsASceneFileTheSceneListFindsUnderCartoons) {
 	std::filesystem::remove_all(dir);
 }
 
+TEST(CartoonStills, ASceneNameFindsItsFilm) {
+	for (const cartoon::Film &film : cartoon::kFilms) {
+		const cartoon::Film *found = cartoon_stills::filmForSlug("cartoon-" + std::string(film.key));
+		ASSERT_NE(found, nullptr) << film.key;
+		EXPECT_STREQ(found->key, film.key);
+	}
+	EXPECT_EQ(cartoon_stills::filmForSlug("cartoon-nope"), nullptr);
+	EXPECT_EQ(cartoon_stills::filmForSlug("cornell-box"), nullptr);
+	EXPECT_EQ(cartoon_stills::filmForSlug("cartoon-fireflies-2"), nullptr) << "only the exact name";
+}
+
 TEST(CartoonStills, AStillIsTheFilmsFrameAtItsStillTime) {
 	const cartoon::Film &film = cartoon::kFilms[0];
 	const FlatScene fromFile = flattenSource(cartoon_stills::text(film));

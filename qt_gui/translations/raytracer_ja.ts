@@ -3260,6 +3260,11 @@ Each extra bounce lets light travel one more surface before giving up, which is 
         <translation>プリセット:</translation>
     </message>
     <message>
+        <location filename="../mainwindow_tabs_settings_groups.cpp" line="905"/>
+        <source>Flythrough Preset:</source>
+        <translation>カメラ移動プリセット:</translation>
+    </message>
+    <message>
         <location filename="../mainwindow_tabs_settings_groups.cpp" line="1090"/>
         <source>Live Preview Controls</source>
         <translation>ライブプレビューの操作設定</translation>

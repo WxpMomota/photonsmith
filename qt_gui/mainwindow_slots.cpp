@@ -211,8 +211,7 @@ void MainWindow::onVideoPresetChanged(int index) {
 	// touches status-adjacent labels.
 	selectOutputMode(OutputMode::Video);
 
-	// A cartoon preset renders its own scene at every frame: the scene picker keeps what it had.
-	if (!cartoon::isCartoonPath(preset->camera_path)) selectSceneById(QString::fromUtf8(preset->scene_id));
+	selectSceneById(QString::fromUtf8(preset->scene_id));
 
 	const int pathIndex = m_cameraPathCombo ? m_cameraPathCombo->findData(QString::fromUtf8(preset->camera_path)) : -1;
 	if (pathIndex >= 0) m_cameraPathCombo->setCurrentIndex(pathIndex);

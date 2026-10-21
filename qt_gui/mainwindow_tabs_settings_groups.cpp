@@ -886,10 +886,13 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	// fifth independent setting.
 	m_videoPresetCombo = new QComboBox();
 	m_videoPresetCombo->addItem(tr("(custom - choose settings below)"), QString());
-	for (const video_preset::VideoPreset& p : video_preset::all())
+	// The camera flythroughs only: a cartoon is chosen as a scene (the Cartoons tab above), and selecting one sets its own camera path, frame count and fps.
+	for (const video_preset::VideoPreset& p : video_preset::all()) {
+		if (p.isCartoon()) continue;
 		m_videoPresetCombo->addItem(
 			QString("[%1] %2").arg(QString::fromUtf8(p.id), QString::fromUtf8(p.name)),
 			QString::fromUtf8(p.id));
+	}
 	m_videoPresetCombo->setToolTip(
 		tr("Famous ray-tracing reference scenes and motions, pre-tuned so you don't\n"
 		"have to set the scene, camera path, frame count, fps, and speed by hand.\n"
@@ -899,7 +902,7 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	styleComboBox(m_videoPresetCombo);
 	connect(m_videoPresetCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 			this, &MainWindow::onVideoPresetChanged);
-	videoLayout->addRow(labelWithInfo(tr("Preset:"),
+	videoLayout->addRow(labelWithInfo(tr("Flythrough Preset:"),
 		tr("A ready-made bundle of scene + camera path + frame count + fps "
 		"+ speed, tuned so the resulting video actually looks good "
 		"without hand-picking every setting yourself.\n\n"
