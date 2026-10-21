@@ -115,8 +115,11 @@ inline Mat4 mul(const Mat4 &a, const Mat4 &b) {
 		}
 	return r;
 }
-inline Mat4 mul(const Mat4 &a, const Mat4 &b, const Mat4 &c) { return mul(mul(a, b), c); }
-inline Mat4 mul(const Mat4 &a, const Mat4 &b, const Mat4 &c, const Mat4 &d) { return mul(mul(mul(a, b), c), d); }
+// Any number of matrices: mul(a, b, c, d, ...) = a * b * c * d * ...
+template <typename... Rest>
+inline Mat4 mul(const Mat4 &a, const Mat4 &b, const Mat4 &c, const Rest &...rest) {
+	return mul(mul(a, b), c, rest...);
+}
 inline Mat4 translate(Vec3 v) { return {1, 0, 0, v.x, 0, 1, 0, v.y, 0, 0, 1, v.z, 0, 0, 0, 1}; }
 inline Mat4 translate(double x, double y, double z) { return translate(Vec3{x, y, z}); }
 inline Mat4 scale(double x, double y, double z) { return {x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1}; }
@@ -328,6 +331,88 @@ inline std::string attr(const std::string &material, const std::string &shapes, 
 	if (emission) out += "  AreaLightSource \"diffuse\" \"rgb L\" [ " + fmt3(*emission) + " ]\n";
 	out += "  " + material + "\n" + shapes + "AttributeEnd\n";
 	return out;
+}
+
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+// More shapes, a two-link limb solver and camera shots (what the longer films use)
+// ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// A torus about local +Y: a ring of tube radius `tube` whose centre line has radius `ring`.
+inline Mesh torus(double ring, double tube, int segments = 40, int sides = 14) {
+	std::vector<std::pair<double, double>> profile;
+	for (int i = 0; i <= sides; ++i) {
+		const double a = 2.0 * kPi * i / sides;
+		profile.push_back({ring + tube * std::cos(a), tube * std::sin(a)});
+	}
+	return lathe(profile, segments);
+}
+
+// A capsule along local +Y from y = 0 to y = length: a cylinder of radius r with a round cap at each end.
+inline Mesh capsule(double r, double length, int segments = 20, int capSteps = 6) {
+	std::vector<std::pair<double, double>> profile;
+	profile.push_back({0.0, -r});
+	for (int i = 1; i <= capSteps; ++i) {
+		const double a = -kPi / 2.0 + (kPi / 2.0) * i / capSteps;
+		profile.push_back({r * std::cos(a), r * std::sin(a)});
+	}
+	for (int i = 1; i <= capSteps; ++i) {
+		const double a = (kPi / 2.0) * i / capSteps;
+		profile.push_back({r * std::cos(a), length + r * std::sin(a)});
+	}
+	profile.back() = {0.0, length + r};
+	return lathe(profile, segments);
+}
+
+// A two-link limb (shoulder to elbow to hand) reaching for `target`: the elbow position, bent towards `pole` (a direction the elbow prefers). The hand is where the limb can reach.
+struct Limb {
+	Vec3 elbow, hand;
+};
+inline Limb limbIk(Vec3 shoulder, Vec3 target, double l1, double l2, Vec3 pole) {
+	Vec3 d = target - shoulder;
+	double dist = length(d);
+	const double reach = (l1 + l2) * 0.999;
+	if (dist > reach) {
+		d = d * (reach / dist);
+		dist = reach;
+	}
+	const Vec3 dir = dist > 1e-9 ? d * (1.0 / dist) : Vec3{0.0, -1.0, 0.0};
+	const double a = std::max(-1.0, std::min(1.0, (l1 * l1 + dist * dist - l2 * l2) / (2.0 * l1 * std::max(dist, 1e-9))));
+	const double along = l1 * a, off = l1 * std::sqrt(std::max(0.0, 1.0 - a * a));
+	Vec3 bend = pole - dir * dot(pole, dir);
+	bend = length(bend) > 1e-9 ? normalize(bend) : normalize(cross(dir, Vec3{0.0, 0.0, 1.0}));
+	return {shoulder + dir * along + bend * off, shoulder + d};
+}
+
+// Camera shots: each shot owns a stretch of the film's time and its own camera tracks; `cameraAt` picks the shot of the moment (a hard cut at each shot's start).
+struct Shot {
+	double start;      // seconds
+	Track3 eye, target;
+	Track1 fov;
+	double lensRadius;
+};
+struct CameraView {
+	Vec3 eye, target;
+	double fov, lensRadius;
+	int shot;
+};
+inline CameraView cameraAt(const std::vector<Shot> &shots, double t) {
+	std::size_t k = 0;
+	for (std::size_t i = 0; i < shots.size(); ++i)
+		if (t >= shots[i].start) k = i;
+	const Shot &s = shots[k];
+	return {s.eye(t), s.target(t), s.fov(t), s.lensRadius, static_cast<int>(k)};
+}
+// pbrt's LookAt and Camera lines for a view (x negated: pbrt is left-handed; the films write +x to the right of the picture).
+inline std::string cameraText(const CameraView &v) {
+	char buf[420];
+	std::snprintf(buf, sizeof(buf), "LookAt %s %s 0 1 0\nCamera \"perspective\" \"float fov\" [ %.3f ] \"float lensradius\" [ %.4f ] \"float focaldistance\" [ %.3f ]\n",
+				  fmt3({-v.eye.x, v.eye.y, v.eye.z}).c_str(), fmt3({-v.target.x, v.target.y, v.target.z}).c_str(), v.fov, v.lensRadius, length(v.eye - v.target));
+	return buf;
+}
+inline double smoothstep(double a, double b, double x) {
+	const double u = clamp01((x - a) / (b - a));
+	return u * u * (3.0 - 2.0 * u);
 }
 
 // A film: what a cartoon video preset renders. `sceneAt(t)` is the scene text at time t seconds (0 <= t <= duration); `resolutionHint` is only what its Film line says (the renderer's

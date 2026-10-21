@@ -6,7 +6,9 @@
 #include <cstring>
 
 #include "ball_parade.h"
+#include "fireflies.h"
 #include "lamp_and_ball.h"
+#include "little_robot.h"
 
 namespace cartoon {
 
@@ -19,6 +21,12 @@ inline const Film kFilms[] = {
 	{"ball-parade", "Ball Parade",
 	 "Seven glossy balls drop in one after another, bounce in a travelling wave on a checker floor with squash and stretch, and settle one by one into a row.",
 	 ball_parade::kDuration, ball_parade::kFps, &ball_parade::sceneAt, 4.6},
+	{"little-robot", "The Little Robot",
+	 "A small robot wakes in a junkyard at dusk, finds a seedling dying in a tin can, waters it, and watches it bloom into a glowing flower. Five shots, 32 seconds.",
+	 little_robot::kDuration, little_robot::kFps, &little_robot::sceneAt, 25.5},
+	{"fireflies", "Fireflies",
+	 "A night meadow lit by fireflies: a lone firefly wanders, a second arrives, their flashes drift into step, they circle and spiral up to the moon as the meadow wakes. Four shots, 26 seconds.",
+	 fireflies::kDuration, fireflies::kFps, &fireflies::sceneAt, 13.0},
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 

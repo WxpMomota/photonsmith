@@ -143,6 +143,59 @@ TEST(CartoonBallParade, ABallDoesNotJumpBetweenFrames) {
 	}
 }
 
+TEST(CartoonFilms, EveryFilmFlattensAtSeveralTimesWithoutWarnings) {
+	for (const cartoon::Film &film : cartoon::kFilms) {
+		for (double f : {0.0, 0.1, 0.3, 0.5, 0.7, 0.9, 0.999}) {
+			const double t = f * film.duration;
+			const FlatScene s = flattenSource(film.sceneAt(t));
+			EXPECT_GT(s.triangles.size(), 1000u) << film.key << " t = " << t;
+			EXPECT_FALSE(s.areaLights.empty()) << film.key << " t = " << t;
+			for (const auto &w : s.warnings) ADD_FAILURE() << film.key << " t = " << t << ": " << w.message;
+		}
+	}
+}
+
+TEST(CartoonLittleRobot, TheRobotKneelsAtTheSeedlingAndItBloomsAfterTheWatering) {
+	namespace lr = cartoon::little_robot;
+	const cartoon::Film *film = cartoon::find("little-robot");
+	ASSERT_NE(film, nullptr);
+	EXPECT_DOUBLE_EQ(film->duration, lr::kDuration);
+	// the robot starts left of the seedling and ends beside it
+	EXPECT_LT(lr::robotX(0.5), lr::kSeedling.x - 1.0);
+	EXPECT_NEAR(lr::robotX(lr::kDuration), lr::kStandX, 0.6);
+	// the flower is a good deal more geometry than the bare sprout
+	const size_t sprout = flattenSource(film->sceneAt(20.0)).triangles.size();
+	const size_t flower = flattenSource(film->sceneAt(30.5)).triangles.size();
+	EXPECT_GT(flower, sprout);
+}
+
+TEST(CartoonFireflies, TheSwarmWakesAfterThePairHasMetAndEveryLightIsFaded) {
+	namespace ff = cartoon::fireflies;
+	const cartoon::Film *film = cartoon::find("fireflies");
+	ASSERT_NE(film, nullptr);
+	const size_t early = flattenSource(film->sceneAt(5.0)).areaLights.size();
+	const size_t late = flattenSource(film->sceneAt(23.0)).areaLights.size();
+	EXPECT_GT(late, early + 20) << "dozens more fireflies by the end";
+	EXPECT_EQ(ff::fade(0.0), 0.0) << "the film opens from black";
+	EXPECT_EQ(ff::fade(ff::kDuration), 0.0) << "and closes to black";
+	// the two flashes start out of step and end in step
+	auto offset = [](double t) { return std::abs(ff::glowA(t) - ff::glowB(t)); };
+	double early_gap = 0.0, late_gap = 0.0;
+	for (double t = 6.5; t < 8.0; t += 0.01) early_gap = std::max(early_gap, offset(t));
+	for (double t = 13.0; t < 14.0; t += 0.01) late_gap = std::max(late_gap, offset(t));
+	EXPECT_GT(early_gap, 0.3);
+	EXPECT_LT(late_gap, 1e-6);
+}
+
+TEST(CartoonFireflies, AFireflyDoesNotJumpBetweenFrames) {
+	namespace ff = cartoon::fireflies;
+	const double dt = 1.0 / 24.0;
+	for (double t = 0.0; t < ff::kDuration - dt; t += dt) {
+		EXPECT_LT(cartoon::length(ff::fireflyA(t + dt) - ff::fireflyA(t)), 0.9) << "A jumped at t = " << t;
+		if (t >= 6.0) EXPECT_LT(cartoon::length(ff::fireflyB(t + dt) - ff::fireflyB(t)), 0.9) << "B jumped at t = " << t;
+	}
+}
+
 // ---- the preset and the launcher -------------------------------------------------------------------------------------------------------------------------------
 
 TEST(CartoonPreset, EveryCartoonPresetNamesAFilmAndMatchesItsLength) {
