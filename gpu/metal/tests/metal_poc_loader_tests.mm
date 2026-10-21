@@ -90,8 +90,7 @@ int main() {
             // Where Metal is known to differ from the inventory: scene + what -> what Metal builds. A gap that closes fails here too (take it out of the list), so the list never goes stale.
             struct KnownGap { const char* scene; const char* what; int metalBuilds; const char* why; };
             static const KnownGap knownGaps[] = {
-                {"instanced-spheres.pbrt", "spheres (an instanced sphere is written out per placement)", 4,
-                 "loadPbrtObjectInstances skips an instanced sphere it cannot draw as an analytic sphere (clipped, non-uniformly scaled, emissive or medium-bounded): 5 of the 9 placements here"},
+                {"", "", 0, ""},   // (none now: the instanced clipped and stretched spheres Metal used to skip are drawn in their own object space, SphereData::clipped)
             };
             auto same = [&](const char* what, int expected, int got) {
                 for (const KnownGap& g : knownGaps) {

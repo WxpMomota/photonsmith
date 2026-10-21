@@ -89,7 +89,7 @@ hair-sphere-dim-sky 0.9946 0.9932 0.9930
 homogeneous-medium 0.9902 1.0047 1.0055
 infinite-light 0.9980 1.0003 0.9994
 infinite-light-image 1.0030 1.0189 1.0021
-instanced-spheres 1.0187 1.0200 1.0236
+instanced-spheres 1.0070 1.0100 1.0170
 killeroo-simple 0.9861 0.9862 0.9885
 lamp-inside-glass 1.0018 1.0018 1.0017
 lamp-inside-rough-glass 1.0018 1.0018 1.0021
