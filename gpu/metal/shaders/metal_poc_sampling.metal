@@ -655,11 +655,18 @@ inline float3 evalTextureGraph(device const float* grid, int ref1, float2 uv, fl
 // slot 10 says the value is a perceptual roughness to remap to the GGX alpha (sqrt), as the host does for a flat one.
 inline void patchPerPixelMaterial(thread TriangleMaterial& mat, device const float* grid, uint primId, float2 barycentric, device const packed_float2* uvs,
                                   device const SphereData* spheres, float3 normal, float3 hitPoint, bool isSphere, bool isTriangleHit) {
-    if (mat.roughRef == 0 && mat.condRoughRef == 0) return;
+    if (mat.roughRef == 0 && mat.condRoughRef == 0 && mat.roughGraphRef == 0 && mat.condRoughGraphRef == 0) return;
     const float2 uv = hitUV(primId, barycentric, uvs, spheres, normal, isSphere, isTriangleHit);
-    if (mat.roughRef != 0) {
-        const float v = max(0.0f, sampleImageRef(grid, mat.roughRef, uv, hitPoint).x);
-        const float alpha = (grid[mat.roughRef - 1 + 10] > 0.5) ? sqrt(v) : v;
+    if (mat.roughRef != 0 || mat.roughGraphRef != 0) {
+        float v, remap;
+        if (mat.roughGraphRef != 0) {   // a graph of textures (its own scales; the block's last float says to remap)
+            v = max(0.0f, evalTextureGraph(grid, mat.roughGraphRef, uv, hitPoint).x);
+            remap = grid[mat.roughGraphRef - 1 + 1 + 8 * int(grid[mat.roughGraphRef - 1] + 0.5)];
+        } else {
+            v = max(0.0f, sampleImageRef(grid, mat.roughRef, uv, hitPoint).x);
+            remap = grid[mat.roughRef - 1 + 10];
+        }
+        const float alpha = (remap > 0.5) ? sqrt(v) : v;
         if (mat.materialType == METAL_MAT_ROUGH_CONDUCTOR) {
             // shadeConductor() squares the roughness-style value it is given into alpha, so a conductor holds sqrt(alpha) in both slots (alphaX = ior, alphaY = roughness; isotropic)
             mat.ior = sqrt(alpha);
@@ -668,9 +675,16 @@ inline void patchPerPixelMaterial(thread TriangleMaterial& mat, device const flo
             mat.roughness = alpha;
         }
     }
-    if (mat.condRoughRef != 0 && mat.materialType == METAL_MAT_COATED_CONDUCTOR) {
-        const float v = max(0.0f, sampleImageRef(grid, mat.condRoughRef, uv, hitPoint).x);
-        mat.transmitColor = packed_float3((grid[mat.condRoughRef - 1 + 10] > 0.5) ? sqrt(v) : v, mat.transmitColor.y, mat.transmitColor.z);
+    if ((mat.condRoughRef != 0 || mat.condRoughGraphRef != 0) && mat.materialType == METAL_MAT_COATED_CONDUCTOR) {
+        float v, remap;
+        if (mat.condRoughGraphRef != 0) {
+            v = max(0.0f, evalTextureGraph(grid, mat.condRoughGraphRef, uv, hitPoint).x);
+            remap = grid[mat.condRoughGraphRef - 1 + 1 + 8 * int(grid[mat.condRoughGraphRef - 1] + 0.5)];
+        } else {
+            v = max(0.0f, sampleImageRef(grid, mat.condRoughRef, uv, hitPoint).x);
+            remap = grid[mat.condRoughRef - 1 + 10];
+        }
+        mat.transmitColor = packed_float3((remap > 0.5) ? sqrt(v) : v, mat.transmitColor.y, mat.transmitColor.z);
     }
 }
 

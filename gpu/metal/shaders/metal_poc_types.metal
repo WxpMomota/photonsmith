@@ -794,6 +794,10 @@ struct TriangleMaterial {
     int roughRef;
     int condRoughRef;
     int graphRef;
+    // The same parameters as a graph of textures (see metal_poc_gpu_types.h); 0 = none.
+    int roughGraphRef;
+    int condRoughGraphRef;
+    int mixAmountGraphRef;
 };
 
 // ---- What the spare slots of TriangleMaterial mean, per material family ----------------------------------------------------------------------------------------------

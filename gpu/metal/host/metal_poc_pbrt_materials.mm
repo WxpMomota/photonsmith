@@ -437,11 +437,12 @@ int PbrtSceneLoader::claimImageRef(const std::string& filename, const pbrt_flatt
     return offset + 1;
 }
 
-int PbrtSceneLoader::claimTextureGraph(const std::vector<pbrt_flatten::TexMeanNode>& nodes, float sceneScale, float3 bboxCenter, float3 sceneOffset) {
+int PbrtSceneLoader::claimTextureGraph(const std::vector<pbrt_flatten::TexMeanNode>& nodes, float sceneScale, float3 bboxCenter, float3 sceneOffset, bool remapRoughness) {
     using Kind = pbrt_flatten::TexMeanNode::Kind;
     if (nodes.empty() || (int)nodes.size() > pbrt_flatten::kMaxTextureGraphNodes) return 0;
-    std::vector<float> block(1 + 8 * nodes.size(), 0.0f);
+    std::vector<float> block(1 + 8 * nodes.size() + 1, 0.0f);   // (the last float: 1 = a roughness to remap to alpha)
     block[0] = (float)nodes.size();
+    block.back() = remapRoughness ? 1.0f : 0.0f;
     for (size_t i = 0; i < nodes.size(); ++i) {
         const pbrt_flatten::TexMeanNode& n = nodes[i];
         float* d = &block[1 + 8 * i];
@@ -479,6 +480,13 @@ TriangleMaterial PbrtSceneLoader::mapPbrtMaterial(PbrtMaterialMapState& st, cons
     if (!m.reflectanceGraph.empty() && (mat.materialType == METAL_MAT_LAMBERTIAN || mat.materialType == METAL_MAT_IMAGE_LAMBERTIAN || mat.materialType == METAL_MAT_COATED_DIFFUSE ||
                                         mat.materialType == METAL_MAT_IMAGE_CLEARCOAT))
         mat.graphRef = claimTextureGraph(m.reflectanceGraph, st.sceneScale, st.bboxCenter, st.sceneOffset);
+    // A roughness or a Mix amount that is a graph of several textures rather than one picture (Windows, 2026-10-21): read at the hit, first channel, the graph carrying its own scales.
+    if (roughType && !m.roughnessGraph.empty())
+        mat.roughGraphRef = claimTextureGraph(m.roughnessGraph, st.sceneScale, st.bboxCenter, st.sceneOffset, m.remapRoughness);
+    if (mat.materialType == METAL_MAT_COATED_CONDUCTOR && !m.condRoughnessGraph.empty())
+        mat.condRoughGraphRef = claimTextureGraph(m.condRoughnessGraph, st.sceneScale, st.bboxCenter, st.sceneOffset, m.remapRoughness);
+    if (mat.materialType == METAL_MAT_MIX && !m.mixAmountGraph.empty())
+        mat.mixAmountGraphRef = claimTextureGraph(m.mixAmountGraph, st.sceneScale, st.bboxCenter, st.sceneOffset);
     if (mat.materialType == METAL_MAT_MIX && !m.mixWeightTextureFilename.empty())
         mat.mixAmountRef = claimImageRef(m.mixWeightTextureFilename, m.mixWeightTextureOptions, m.mixWeightTextureMapping, m.mixWeightTextureScale, st.sceneScale, st.bboxCenter, st.sceneOffset);
     return mat;

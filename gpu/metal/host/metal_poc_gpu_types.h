@@ -440,5 +440,10 @@ struct TriangleMaterial {
     int32_t roughRef = 0;
     int32_t condRoughRef = 0;
     int32_t graphRef = 0;
+    // The same three parameters when they are a graph of textures (Material::roughnessGraph, condRoughnessGraph, mixAmountGraph; a block as for graphRef, with a trailing 1 for a
+    // roughness to remap): 1 + the block's offset, 0 = none. They win over the single picture's reference.
+    int32_t roughGraphRef = 0;
+    int32_t condRoughGraphRef = 0;
+    int32_t mixAmountGraphRef = 0;
 };
 
