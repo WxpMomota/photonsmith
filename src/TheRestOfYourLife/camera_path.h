@@ -1,4 +1,7 @@
 #pragma once
+#include <typeinfo>
+
+#include "../shared/path_probe.h"   // `--probe X Y`: where a pixel's light came from (a null-pointer check per call site when no probe runs)
 // camera_path.h -- camera::ray_color(), ray_color_spectral() and sample_bssrdf_exit(): the CPU path tracing integrators, defined out of class here
 // (declarations stay in camera.h). A pure move; included by camera.h after the class.
 
@@ -399,6 +402,9 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
         return camera_medium ? camera_medium->transmittance_over(distance) : color(1, 1, 1);
     };
 
+    const bool probing = path_probe::active();
+    if (probing) path_probe::mark(L.x(), L.y(), L.z());
+
     // Strategy A-1: NEE toward area lights (non-recursive shadow test)
     {
         vec3   light_dir = light_pdf.generate();
@@ -425,12 +431,15 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
                         const double t_light = (light_rec.p - shadow_ray.origin()).length() / dir_len;
                         color med_trans = camera_medium_trans(t_light * dir_len)
                             * shape_media_trans(shadow_ray, t_light);
-                        L += beta * w_l * atten * trans * med_trans * f_pdf * Le_d / pdf_l;
+                        const color nee_area = beta * w_l * atten * trans * med_trans * f_pdf * Le_d / pdf_l;
+                        L += nee_area;
+                        if (probing) path_probe::light(light_rec.mat.get(), typeid(*light_rec.mat).name(), light_rec.p.x(), light_rec.p.y(), light_rec.p.z(), nee_area.x(), nee_area.y(), nee_area.z());
                     }
                 }
             }
         }
     }
+    if (probing) path_probe::cut(path_probe::kNeeArea, L.x(), L.y(), L.z());
 
     // Strategy A-2: NEE toward sky (pbrt-v4 SampleLd for infinite lights)
     // Uses importance-sampled direction when HDR distribution is available,
@@ -490,6 +499,8 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
         }
     }
 
+    if (probing) path_probe::cut(path_probe::kNeeSky, L.x(), L.y(), L.z());
+
     // Strategy A-3: NEE toward punctual (delta) lights
     // pbrt-v4: DeltaPosition/DeltaDirection lights bypass MIS -- PDF=1 (delta),
     // contribution = beta * BSDF * Li (no MIS weight needed since PDF=1).
@@ -512,6 +523,7 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
             }
         });
     }
+    if (probing) path_probe::cut(path_probe::kNeePunctual, L.x(), L.y(), L.z());
 }
 
 } // namespace camera_path_detail
@@ -531,6 +543,8 @@ template <typename Sampler>
     bool   any_nonspecular    = false;  // pbrt-v4: anyNonSpecularBounces
     point3 prev_surface_p     = r.origin(); // pbrt-v4: prevIntrCtx shading point
     int    medium_boundary_crossings = 0;
+    const bool probing = path_probe::active();   // `--probe X Y`: this path's light is booked by source (path_probe.h)
+    if (probing) path_probe::beginSample();
 
     // While this path runs, the chromatic per-shape media are sampled here (below) and hidden from hit() - see
     // constant_medium.h's g_chromatic_media_integrator_managed.
@@ -587,6 +601,7 @@ template <typename Sampler>
         if (render_stats::enabled())
             render_stats::bounce_rays().fetch_add(1, std::memory_order_relaxed);
 
+        if (probing) path_probe::setBounce(depth - bounces_left);
         hit_record rec;
         bool hit_something = world.hit(current_ray, interval(0.001, infinity), rec);
 
@@ -598,7 +613,12 @@ template <typename Sampler>
         // Miss -- query sky (HDR env map) or fall back to flat background.
         // Mirrors pbrt-v4: "Incorporate emission from infinite lights for escaped ray"
         if (!hit_something) {
+            const color L_before_escape = L;
             camera_path_detail::add_escaped_radiance(*this, current_ray, specular_bounce, prev_bsdf_pdf, beta, L);
+            if (probing) {
+                path_probe::add(path_probe::kEscaped, L.x() - L_before_escape.x(), L.y() - L_before_escape.y(), L.z() - L_before_escape.z());
+                if (bounces_left == depth) path_probe::primaryMiss();
+            }
             break;
         }
 
@@ -621,7 +641,20 @@ template <typename Sampler>
 
         // Emission -- full Le on camera/specular hits; MIS-weighted otherwise.
         // Mirrors pbrt-v4 "Compute MIS weight for area light".
-        camera_path_detail::add_hit_emission(lights, current_ray, rec, specular_bounce, prev_bsdf_pdf, prev_surface_p, beta, L);
+        if (probing) {
+            if (bounces_left == depth) {
+                const std::string material_name = typeid(*rec.mat).name();
+                path_probe::firstHit(material_name, rec.p.x(), rec.p.y(), rec.p.z(), rec.normal.x(), rec.normal.y(), rec.normal.z(), rec.u, rec.v, rec.front_face);
+            }
+            const color L_before_emission = L;
+            camera_path_detail::add_hit_emission(lights, current_ray, rec, specular_bounce, prev_bsdf_pdf, prev_surface_p, beta, L);
+            const color emitted = L - L_before_emission;
+            path_probe::add(path_probe::kEmission, emitted.x(), emitted.y(), emitted.z());
+            if (emitted.x() > 0.0 || emitted.y() > 0.0 || emitted.z() > 0.0)
+                path_probe::light(rec.mat.get(), typeid(*rec.mat).name(), rec.p.x(), rec.p.y(), rec.p.z(), emitted.x(), emitted.y(), emitted.z());
+        } else {
+            camera_path_detail::add_hit_emission(lights, current_ray, rec, specular_bounce, prev_bsdf_pdf, prev_surface_p, beta, L);
+        }
 
         // The final, emission-only iteration (see the loop's own comment): the emission above is all this vertex contributes; no light
         // sampling, no scattering.

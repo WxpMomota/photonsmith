@@ -153,6 +153,7 @@ void MainWindow::onRenderComplete(bool success, const QString &message, double t
 							.arg(finishedJob.samples)
 							.arg(rendererLabel(finishedJob.useGPU, finishedJob.useWavefront),
 								 integratorSuffixTag(finishedJob.integratorOptions.mode));
+						setPreviewProbeInfo(finishedJob);
 						addImagePreviewTab(finishedJob.displayTitle, finishedJob.sceneDescription,
 											pixmap, infoText, outputPath, pngPath,
 											{finishedJob.sceneId, renderTechniqueHtml(finishedJob.integratorOptions, finishedJob.advancedFlags)});

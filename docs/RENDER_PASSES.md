@@ -18,4 +18,26 @@ Where a pixel is part surface and part background, the surface channels are aver
 
 **How they are made.** The beauty image comes from whichever renderer you chose (CPU, OptiX or Metal). The passes come from a separate first-hit pass over the camera's rays on the CPU scene, with up to 16 samples per pixel for anti-aliasing, so they cost very little, work the same for every renderer, and never change the picture. `src/TheRestOfYourLife/aov_pass.h` is the pass; `cpu_render_main_aovs()` writes it; `cpu_merge_exr_passes()` merges it into an image's EXR; `src/shared/exr_writer.h` has the multi-channel EXR reader and writer (channels are written sorted by name, as the format requires).
 
+## Why is this pixel this colour? (the pixel probe)
+
+The passes above are for compositing. When a pixel is simply the wrong brightness against another renderer (or against a closed form), the probe says where its light came from:
+
+```
+ray_tracer --cpu --probe 120 45 400 4000 8 kroken --height 300
+```
+
+`--probe X Y` renders ONE pixel (column X, row Y, counted from the top left of the image the other arguments describe) with the CPU path tracer and, instead of a picture, prints:
+
+* the pixel's mean radiance (linear, before exposure and tone mapping);
+* that radiance split by **source**: emitters the paths hit (MIS-weighted), the sky or background a path escapes to, and the next-event estimates toward area lights, toward the sky and portal lights, and toward point / spot / distant lights;
+* the same split by **bounce** (0 is light arriving at the first hit);
+* each **area light** that lit it, with its share and where the paths found it;
+* what the **camera rays hit first**: material class, position, normal, uv, front or back face.
+
+The samples-per-pixel argument is the number of paths averaged (a few thousand is a good number; the report is only as steady as that average). The report is also written to `<--output>.probe.txt` when `--output` is given. It reports on the default path tracer on the CPU: the GPU backends and the other integrators do not book their light by source (a `--probe` with `--sppm`, `--bdpt`, `--mlt` or a debug integrator is refused).
+
+In the GUI, right-click a rendered picture in the Preview tab and choose "Why is this pixel this colour?": it runs the probe on the pixel under the pointer with the settings that image was rendered with (a few seconds for a small scene, longer for a big one: the scene is loaded again) and shows the report. It is only offered for images rendered in the current session.
+
+How it works: `src/shared/path_probe.h` is a sink that `camera_path.h`'s `ray_color()` reports into at the places it adds light to a path (one null-pointer check per call site when no probe runs). The test `PathProbeIntegration` checks the books against a closed form (a diffuse floor of albedo 0.5 under a white sky returns exactly 0.5, all of it the sky's) and that what the probe books is what `ray_color()` returns, sample for sample.
+
 **Not (yet) there:** object / material ids, direct-versus-indirect light splits, a shadow catcher, light groups. The Metal renderer writes no passes of its own, and the denoiser on a Mac sees colour only (the passes could guide it; see DENOISING.md).

@@ -76,6 +76,8 @@ extern char** environ;
 #include "launcher/gpu_backend.h"      // the GPU renderer this build has (Metal or OptiX), behind one call
 #include "launcher/launcher_args.h"   // Argument parsing
 #include "launcher/cartoon_render.h"  // cartoon video presets: one child run per frame
+#include <fstream>
+#include "src/shared/path_probe.h"    // --probe X Y
 #include "launcher/diagnostics.h"     // --diagnose
 #ifdef RT_HAVE_AVFOUNDATION_ENCODER
 #include "launcher/video_encoder_mac.h"   // Video -> MP4 via AVFoundation, no ffmpeg needed
@@ -1070,6 +1072,45 @@ static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
     return SUCCESS;
 }
 
+// --probe X Y: renders ONE pixel with the path tracer reporting into a path_probe::Sink, then prints where that pixel's light came from (src/shared/path_probe.h). The CPU default path
+// tracer only: the pixel is a 1 x 1 crop window of the image the other arguments describe, the samples-per-pixel argument is the number of paths averaged.
+static int run_probe(const LaunchArgs &args, const RenderSetup &s) {
+    if (s.use_gpu) std::cout << "Note: --probe runs on the CPU path tracer (the GPU backends do not report where light comes from)." << std::endl;
+    if (s.use_sppm || s.use_bdpt || s.use_mlt || s.use_debug_integrator) {
+        std::cerr << "ERROR: --probe reports on the default path tracer; it cannot be combined with --sppm, --bdpt, --mlt or the debug integrators." << std::endl;
+        return ERR_INVALID_ARGUMENTS;
+    }
+    if (args.probe_x >= s.image_width || args.probe_y >= s.image_height) {
+        std::cerr << "ERROR: --probe " << args.probe_x << " " << args.probe_y << " is outside the " << s.image_width << " x " << s.image_height << " image." << std::endl;
+        return ERR_INVALID_ARGUMENTS;
+    }
+    RenderOptions opts = render_options_from_args(args);
+    opts.crop_x0 = static_cast<double>(args.probe_x) / s.image_width;
+    opts.crop_x1 = static_cast<double>(args.probe_x + 1) / s.image_width;
+    opts.crop_y0 = static_cast<double>(args.probe_y) / s.image_height;
+    opts.crop_y1 = static_cast<double>(args.probe_y + 1) / s.image_height;
+    const std::filesystem::path scratch = std::filesystem::temp_directory_path() / "photonsmith_probe_pixel.ppm";
+    path_probe::Sink sink;
+    path_probe::install(&sink);
+    const int rc = cpu_render_main(s.image_width, s.image_height, s.samples_per_pixel, s.max_ray_depth, scratch.string().c_str(), s.scene_id.c_str(), s.cam_x, s.cam_y, s.cam_z, 1, opts);
+    path_probe::install(nullptr);
+    std::error_code ec;
+    std::filesystem::remove(scratch, ec);
+    std::filesystem::remove(scratch.string() + ".run_marker.txt", ec);
+    if (rc != SUCCESS) {
+        ErrorInfo err(rc);
+        std::cerr << err.to_string() << std::endl;
+        return rc;
+    }
+    const std::string text = path_probe::report(sink, args.probe_x, args.probe_y, s.image_width, s.image_height);
+    std::cout << "\n========================================\nPIXEL PROBE\n========================================\n" << text << "========================================" << std::endl;
+    if (!args.custom_output_path.empty()) {
+        std::ofstream f(args.custom_output_path + ".probe.txt");
+        f << text;
+    }
+    return SUCCESS;
+}
+
 // What every render entry point does with its return value: logs it, then the output path on success or the failure banner. `failure_note`, when
 // given, replaces the error description in the banner (Metal prints its own explanation). Returns true on success.
 static bool report_render_result(int render_result, const char *entry_point, const char *rendered_with, const char *failed_label,
@@ -1791,5 +1832,6 @@ int main(int argc, char** argv) {
               << " scene_id=" << scene_id << " camera=(" << cam_x << "," << cam_y << "," << cam_z << ")" << std::endl;
     std::cout << "Writing output to: " << out_path << std::endl;
 
+	if (args.probe_x >= 0) return run_probe(args, setup);
 	return video_mode ? run_video_render(args, setup) : render_single_image(args, setup);
 }

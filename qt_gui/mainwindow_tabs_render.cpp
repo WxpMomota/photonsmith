@@ -17,6 +17,12 @@
 
 #include <QTabBar>
 #include <QStatusBar>
+#include <QMenu>
+#include <QRegularExpression>
+#include <QPlainTextEdit>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QFontDatabase>
 #include "scene_builder_widget.h"
 #include "scene_metadata_client.h"
 #ifdef RT_GUI_HAVE_LIVE_PREVIEW
@@ -519,6 +525,24 @@ void MainWindow::addImagePreviewTab(const QString &title, const QString &tooltip
 	// Styled globally by class name - see the ScaledImageLabel rule.
 	layout->addWidget(label);
 
+	// A right click on the picture offers "Why is this pixel this colour?" (probePreviewPixel); the pixel is the one under the pointer, in the image's own pixels.
+	label->setContextMenuPolicy(Qt::CustomContextMenu);
+	connect(label, &QWidget::customContextMenuRequested, page, [this, label, page](const QPoint &pos) {
+		const QRect shown = label->displayedImageRect();
+		if (shown.isEmpty() || !shown.contains(pos)) return;
+		const QSize original = label->originalImageSize();
+		const int x = std::min(original.width() - 1, static_cast<int>((pos.x() - shown.left()) * static_cast<double>(original.width()) / shown.width()));
+		const int y = std::min(original.height() - 1, static_cast<int>((pos.y() - shown.top()) * static_cast<double>(original.height()) / shown.height()));
+		QMenu menu(label);
+		QAction *probe = menu.addAction(tr("Why is this pixel this colour?  (%1, %2)").arg(x).arg(y));
+		probe->setEnabled(page->property("probeWidth").toInt() > 0);
+		if (!probe->isEnabled()) probe->setToolTip(tr("This picture was not rendered in this session, so its settings are not known."));
+		if (menu.exec(label->mapToGlobal(pos)) == probe) probePreviewPixel(page, x, y);
+	});
+
+	for (auto it = m_pendingProbeInfo.constBegin(); it != m_pendingProbeInfo.constEnd(); ++it) page->setProperty(it.key().toUtf8().constData(), it.value());
+	m_pendingProbeInfo.clear();
+
 	page->setProperty("outputPath", outputPath);
 	page->setProperty("previewPath", previewPath);
 	page->setProperty("infoText", infoText);
@@ -526,6 +550,70 @@ void MainWindow::addImagePreviewTab(const QString &title, const QString &tooltip
 	page->setProperty("techniqueHtml", technique.techniqueHtml);
 
 	addPreviewSubTabPage(page, title, tooltip);
+}
+
+// What the newest image tab was rendered with: enough to run ray_tracer --probe on one of its pixels.
+void MainWindow::setPreviewProbeInfo(const RenderJob &job) {
+	m_pendingProbeInfo.clear();
+	m_pendingProbeInfo["probeWidth"] = job.width;
+	m_pendingProbeInfo["probeHeight"] = job.height;
+	m_pendingProbeInfo["probeDepth"] = job.maxDepth;
+	m_pendingProbeInfo["probeScene"] = job.sceneId;
+	m_pendingProbeInfo["probeCamExplicit"] = job.camExplicit;
+	m_pendingProbeInfo["probeCam"] = QVariantList{job.camX, job.camY, job.camZ};
+	m_pendingProbeInfo["probeSeed"] = static_cast<qlonglong>(job.advancedFlags.seed);
+	m_pendingProbeInfo["probeIntegratorIsDefault"] = job.integratorOptions.mode == IntegratorMode::Default;
+}
+
+void MainWindow::probePreviewPixel(QWidget *page, int x, int y) {
+	if (!page) return;
+#ifdef Q_OS_WIN
+	const QString exePath = QCoreApplication::applicationDirPath() + "/ray_tracer.exe";
+#else
+	const QString exePath = QCoreApplication::applicationDirPath() + "/ray_tracer";
+#endif
+	const int width = page->property("probeWidth").toInt(), height = page->property("probeHeight").toInt();
+	QStringList args;
+	args << "--cpu" << "--probe" << QString::number(x) << QString::number(y);
+	if (height != width) args << "--height" << QString::number(height);
+	const qlonglong seed = page->property("probeSeed").toLongLong();
+	if (seed >= 0) args << "--seed" << QString::number(seed);
+	args << QString::number(width) << "2000" << QString::number(page->property("probeDepth").toInt()) << page->property("probeScene").toString();
+	if (page->property("probeCamExplicit").toBool()) {
+		const QVariantList cam = page->property("probeCam").toList();
+		if (cam.size() == 3) args << QString::number(cam[0].toDouble()) << QString::number(cam[1].toDouble()) << QString::number(cam[2].toDouble());
+	}
+	const bool plainTracer = page->property("probeIntegratorIsDefault").toBool();
+	const QString previousStatus = m_statusLabel->text();
+	m_statusLabel->setText(tr("Probing pixel (%1, %2)...").arg(x).arg(y));
+
+	QProcess *process = new QProcess(page);
+	process->setProcessChannelMode(QProcess::MergedChannels);
+	process->setWorkingDirectory(QCoreApplication::applicationDirPath());
+	connect(process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this, process, x, y, plainTracer, previousStatus](int exitCode, QProcess::ExitStatus) {
+		const QString all = QString::fromUtf8(process->readAllStandardOutput());
+		const int start = all.indexOf("PIXEL PROBE");
+		QString text = start >= 0 ? all.mid(all.indexOf('\n', all.indexOf('\n', start) + 1) + 1) : all.right(2000);
+		text.remove(QRegularExpression("\\n=+\\s*$"));
+		if (exitCode != 0 || start < 0) text = tr("The probe did not finish (exit code %1):\n\n%2").arg(exitCode).arg(text);
+		else if (!plainTracer) text = tr("(This picture was rendered with another integrator; the probe reports on the default path tracer.)\n\n") + text;
+		m_statusLabel->setText(previousStatus);
+		QDialog dialog(this);
+		dialog.setWindowTitle(tr("Why is pixel (%1, %2) this colour?").arg(x).arg(y));
+		QVBoxLayout *layout = new QVBoxLayout(&dialog);
+		QPlainTextEdit *view = new QPlainTextEdit(text);
+		view->setReadOnly(true);
+		view->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+		view->setLineWrapMode(QPlainTextEdit::NoWrap);
+		layout->addWidget(view);
+		QDialogButtonBox *buttons = new QDialogButtonBox(QDialogButtonBox::Close);
+		connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+		layout->addWidget(buttons);
+		dialog.resize(920, 560);
+		dialog.exec();
+		process->deleteLater();
+	});
+	process->start(exePath, args);
 }
 
 void MainWindow::addVideoPreviewTab(const QString &title, const QString &tooltip,

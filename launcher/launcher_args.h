@@ -246,6 +246,8 @@ struct LaunchArgs {
 	// Default path tracer only, both backends (crop is real on GPU too,
 	// unlike max_component_value).
 	double crop_x0 = 0.0, crop_y0 = 0.0, crop_x1 = 1.0, crop_y1 = 1.0;
+	// --probe X Y: instead of an image, report where the light of ONE pixel comes from (src/shared/path_probe.h). -1 = not asked for. CPU default path tracer only.
+	int probe_x = -1, probe_y = -1;
 	// An explicit request for reproducible renders. -1 (default) means
 	// "not requested" - see RenderOptions::seed's own comment
 	// (render_options.h) for the full CPU/GPU determinism story this
@@ -614,6 +616,22 @@ inline FlagResult handle_quality_flag(const std::string& arg, int argc, char** a
 			i += 4;
 		} catch (const std::exception&) {
 			std::cerr << "Invalid --crop value, using full frame\n";
+		}
+	} else if (arg == render_flags::kProbe && i + 2 < argc) {
+		try {
+			out.probe_x = std::stoi(argv[i + 1]);
+			out.probe_y = std::stoi(argv[i + 2]);
+			if (out.probe_x < 0 || out.probe_y < 0) {
+				std::cerr << "Invalid --probe " << out.probe_x << " " << out.probe_y << " (the pixel's column and row, counted from the top left, must not be negative)\n";
+				return FlagResult::Error;
+			}
+			consumed_args.insert(i);
+			consumed_args.insert(i + 1);
+			consumed_args.insert(i + 2);
+			i += 2;
+		} catch (const std::exception&) {
+			std::cerr << "Invalid --probe value (expected two whole numbers: the pixel's column and row)\n";
+			return FlagResult::Error;
 		}
 	} else if (arg == render_flags::kSeed && i + 1 < argc) {
 		try {
@@ -1003,6 +1021,14 @@ inline void print_launch_help(const char* program) {
 				  << "               the output file. Only overrides a loaded scene's own\n"
 				  << "               cropwindow/pixelbounds when explicitly passed. Default path\n"
 				  << "               tracer only, both backends.\n"
+				  << "  " << render_flags::kProbe << " X Y: instead of an image, print where ONE pixel's light comes from: its mean\n"
+				  << "               radiance split by source (emitters hit, the sky, next-event estimates\n"
+				  << "               toward area lights / the sky and portal lights / point lights), by\n"
+				  << "               bounce, by area light, and what the camera rays hit first. X is the\n"
+				  << "               column and Y the row, counted from the top left of the image the\n"
+				  << "               other arguments describe; the samples-per-pixel argument is how many\n"
+				  << "               paths are averaged (use a few thousand). CPU default path tracer\n"
+				  << "               only. The report is also written to <--output>.probe.txt.\n"
 				  << "  " << render_flags::kSeed << " N: makes the render reproducible - the same scene, same\n"
 				  << "               settings, and same seed always produce the same pixels. Without\n"
 				  << "               this, CPU renders draw fresh randomness every run (never\n"

@@ -48,6 +48,7 @@ namespace render_flags {
 	constexpr const char* kRegularize    = "--regularize";
 	constexpr const char* kMaxComponentValue = "--maxcomponentvalue";
 	constexpr const char* kCrop          = "--crop";
+	constexpr const char* kProbe         = "--probe";
 	constexpr const char* kSeed          = "--seed";
 	constexpr const char* kAperture      = "--aperture";
 	constexpr const char* kFocusDistance = "--focus-distance";

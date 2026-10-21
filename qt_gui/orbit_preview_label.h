@@ -51,6 +51,9 @@ public:
 		if (m_original.isNull()) setText(text);
 	}
 
+	// The size of the image as loaded (not as scaled to the label); empty without an image.
+	QSize originalImageSize() const { return m_original.size(); }
+
 	// Where the image is drawn inside the label (it is scaled to fit and centred), in the label's own coordinates; an empty rectangle without an image.
 	QRect displayedImageRect() const {
 		if (m_original.isNull()) return QRect();

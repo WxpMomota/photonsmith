@@ -943,6 +943,11 @@ private:
 							 const PreviewTechniqueInfo &technique);
 	void addVideoPreviewTab(const QString &title, const QString &tooltip, const QString &videoPath,
 							 const QString &infoText, const PreviewTechniqueInfo &technique);
+	// "Why is this pixel this colour?" (ray_tracer --probe X Y): remembers what the newest image tab was rendered with, and, from a right click on the picture, runs the probe on the
+	// pixel under the pointer and shows its report.
+	void setPreviewProbeInfo(const RenderJob &job);   // call just BEFORE addImagePreviewTab(): the next image tab takes these settings
+	QVariantMap m_pendingProbeInfo;
+	void probePreviewPixel(QWidget *page, int x, int y);
 	// First use of a title returns it unchanged; each repeat appends " (N)".
 	QString uniquePreviewTabTitle(const QString &baseTitle);
 	// Reads a property (see m_previewSubTabs's comment) off the currently
