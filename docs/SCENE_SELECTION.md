@@ -30,6 +30,7 @@ The category letters, in GUI tab order:
 | K | Custom Scenes | Your scenes and downloaded collections: `.pbrt` files found on disk that do not name another category |
 | L | Test Scenes | The bundled fixtures: furnaces with exact answers, light-transport probes, one-feature regression scenes. Worth browsing (each isolates one thing) but not demos |
 | M | My Scenes | Scenes you made: the ones saved from the Scene Builder with **Add to scene list** (they go to your own folder, so they survive reinstalling the program), and any scene file carrying a Scene Builder title. Shown right after Textures in the GUI, though its id letter is the last one so no existing id changed |
+| N | Cartoons | One still of each cartoon film (the frame at the film's own best moment), written by the GUI into its per-user folder and listed from there; render, preview or open one like any scene. The film itself is a video preset ("Cartoon: ..." in Video Settings). Shown after Textures, with the last id letter so no existing id changed |
 
 **Subcategories.** A category that grows too big to browse as one list has a second level, shown as a row of tabs under the category tabs ("All (45)", "Interiors (16)", ...). Today only Large Scenes has them: **Interiors** (rooms, halls, kitchens), **Buildings & Streets** (atrium, cathedral, pavilion, houses, streets, a power plant), **Voxel Worlds** (Minecraft-style towns), **Nature**, **Vehicles** (cars and a spaceship), **Objects** (statues, product shots, material studies) and **Light & Art** (light-transport test scenes, artists' pieces). A subcategory is part of the scene's registry row (`in_subcategory(SceneSubcategories::Vehicles, ...)`, names in `src/shared/scene_descriptor.h`); it never changes the scene's id, which is the category's letter and a number, so moving a scene between subcategories moves no id. The row shows only when the selected category's scenes have two or more subcategories.
 
@@ -63,7 +64,7 @@ The GUI saves scenes by name: render file names (`render_cornell-box_<time>.png`
 ray_tracer.exe [--cpu|--gpu] [--output PATH] [--height N] width spp max_depth SCENE [cam_x cam_y cam_z]
 ```
 
-`SCENE` is a name (`cornell-box`), an id (`A1`), or the path of a `.pbrt` file. An unknown name says which scenes it might have meant.
+`SCENE` is a name (`cornell-box`), an id (`A1`), the path of a `.pbrt` file, or one frame of a cartoon film: `cartoon:fireflies` (the film's own still) or `cartoon:fireflies@13.5` (that many seconds in; `ray_tracer --list-video-presets` names the films). An unknown name says which scenes it might have meant.
 
 ```bash
 # Cornell Box, GPU

@@ -10827,6 +10827,11 @@ Source : %3</translation>
         <source>My Scenes</source>
         <translation>Mes scènes</translation>
     </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="244"/>
+        <source>Cartoons</source>
+        <translation>Dessins animés</translation>
+    </message>
 </context>
 <context>
     <name>SceneLayoutView</name>

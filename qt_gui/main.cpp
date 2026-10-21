@@ -15,6 +15,8 @@
 #include "wheel_guard.h"
 #include "crash_recovery.h"
 #include "startup_profile.h"
+#include "../src/shared/cartoon/cartoon_stills.h"
+#include "../src/shared/pbrt_asset_check.h"
 
 #include <memory>
 
@@ -66,6 +68,10 @@ int main(int argc, char *argv[]) {
 		qputenv("RAY_TRACER_USER_ASSETS", selfTestAssets.path().toUtf8());
 	if (!qEnvironmentVariableIsSet("RAY_TRACER_USER_ASSETS"))
 		qputenv("RAY_TRACER_USER_ASSETS", (QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/user_assets")).toUtf8());
+
+	// The scene list's Cartoons category: one still of each cartoon film, written as scene files into a per-user folder that scene discovery then reads
+	// (cartoon_stills.h). Not during a self-test, which counts the scenes in the list.
+	if (!qEnvironmentVariableIsSet("RT_GUI_SELFTEST")) cartoon_stills::ensure(pbrt_asset_check::cartoonStillDir());
 
 	// Language selection is restart-to-apply (see language_switch.cpp's own
 	// comment for why) - the translator has to be installed here, before

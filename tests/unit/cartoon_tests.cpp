@@ -4,6 +4,10 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <random>
+#include <sstream>
 #include <set>
 #include <string>
 #include <vector>
@@ -12,6 +16,8 @@
 #include "../../launcher/cartoon_render.h"
 #include "../../launcher/launcher_args.h"
 #include "../../src/shared/cartoon/cartoons.h"
+#include "../../src/shared/cartoon/cartoon_stills.h"
+#include "../../src/shared/pbrt_discover.h"
 #include "../../src/shared/video_preset.h"
 
 namespace {
@@ -290,4 +296,107 @@ TEST(CartoonRender, TheFrameRunRepeatsTheUsersFlagsAndDropsTheVideoOnes) {
 	EXPECT_NE(cmd.find("\"C:/p/ray tracer.exe\""), std::string::npos) << "paths with spaces are quoted";
 	EXPECT_NE(cmd.find("--height 270"), std::string::npos);
 	EXPECT_NE(cmd.find("480 64 8 \"C:/o/frames/cartoon_1.pbrt\""), std::string::npos) << "width, samples, depth and the scene come last";
+}
+
+// ---- one frame of a film as a scene ----------------------------------------------------------------------------------------------------------------------------
+
+TEST(CartoonStill, ANameIsAFilmWithAnOptionalTime) {
+	cartoon::Still s;
+	std::string err;
+	ASSERT_TRUE(cartoon::parseStill("cartoon:fireflies", s, err)) << err;
+	EXPECT_STREQ(s.film->key, "fireflies");
+	EXPECT_DOUBLE_EQ(s.t, s.film->stillTime) << "no time: the film's own still";
+	ASSERT_TRUE(cartoon::parseStill("cartoon:little-robot@3.5", s, err)) << err;
+	EXPECT_STREQ(s.film->key, "little-robot");
+	EXPECT_DOUBLE_EQ(s.t, 3.5);
+	EXPECT_TRUE(cartoon::parseStill("cartoon:ball-parade@0", s, err)) << "the first instant is a frame";
+}
+
+TEST(CartoonStill, ABadNameOrTimeIsAnErrorAndAnythingElseIsNotACartoon) {
+	cartoon::Still s;
+	std::string err;
+	for (const char *bad : {"cartoon:nope", "cartoon:fireflies@", "cartoon:fireflies@abc", "cartoon:fireflies@5x", "cartoon:fireflies@-1", "cartoon:fireflies@26.5"}) {
+		EXPECT_FALSE(cartoon::parseStill(bad, s, err)) << bad;
+		EXPECT_FALSE(err.empty()) << bad << " says why";
+	}
+	for (const char *other : {"cornell-box", "A1", "scene.pbrt", ""}) {
+		EXPECT_FALSE(cartoon::parseStill(other, s, err)) << other;
+		EXPECT_TRUE(err.empty()) << other << " is simply not a cartoon";
+	}
+}
+
+TEST(CartoonLauncherArgs, ACartoonFrameCanBeTheScene) {
+	LaunchArgs args;
+	ASSERT_TRUE(parseArgs({"--cpu", "320", "16", "4", "cartoon:fireflies@13.5"}, args));
+	EXPECT_EQ(args.cartoon_still, "cartoon:fireflies@13.5");
+	EXPECT_TRUE(args.scene_file.empty());
+	LaunchArgs plain;
+	ASSERT_TRUE(parseArgs({"320", "16", "4", "cornell-box"}, plain));
+	EXPECT_TRUE(plain.cartoon_still.empty());
+	LaunchArgs bad;
+	EXPECT_FALSE(parseArgs({"320", "16", "4", "cartoon:nope"}, bad));
+}
+
+namespace {
+// A folder of its own per process: the test shards run at the same time.
+std::filesystem::path scratchDir(const char *name) {
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / (std::string("photonsmith_") + name + "_" + std::to_string(std::random_device{}()));
+	std::filesystem::remove_all(dir);
+	return dir;
+}
+}  // namespace
+
+TEST(CartoonStills, EveryFilmGetsASceneFileTheSceneListFindsUnderCartoons) {
+	const std::filesystem::path dir = scratchDir("stills");
+	cartoon_stills::ensure(dir.string());
+	const std::vector<pbrt_discover::Discovered> found = pbrt_discover::scanDirectory(dir.string());
+	EXPECT_EQ(found.size(), static_cast<std::size_t>(cartoon::kFilmCount));
+	for (const cartoon::Film &film : cartoon::kFilms) {
+		bool listed = false;
+		for (const pbrt_discover::Discovered &d : found) {
+			if (d.name != "cartoon-" + std::string(film.key)) continue;
+			listed = true;
+			EXPECT_TRUE(d.ok) << d.error;
+			EXPECT_EQ(d.category, "Cartoons");
+			EXPECT_EQ(d.tagName, film.name);
+			EXPECT_NE(d.description.find(film.description), std::string::npos);
+			EXPECT_TRUE(d.declaresCamera);
+		}
+		EXPECT_TRUE(listed) << film.key;
+	}
+	std::filesystem::remove_all(dir);
+}
+
+TEST(CartoonStills, AStillIsTheFilmsFrameAtItsStillTime) {
+	const cartoon::Film &film = cartoon::kFilms[0];
+	const FlatScene fromFile = flattenSource(cartoon_stills::text(film));
+	const FlatScene fromFilm = flattenSource(film.sceneAt(film.stillTime));
+	EXPECT_EQ(fromFile.triangles.size(), fromFilm.triangles.size());
+	EXPECT_EQ(fromFile.areaLights.size(), fromFilm.areaLights.size());
+	for (const auto &w : fromFile.warnings) ADD_FAILURE() << w.message;
+}
+
+TEST(CartoonStills, AFileIsWrittenAgainOnlyWhenItsSourceIsNewer) {
+	const std::filesystem::path dir = scratchDir("stills_fresh");
+	cartoon_stills::ensure(dir.string());
+	const std::filesystem::path file = dir / cartoon_stills::fileName(cartoon::kFilms[0]);
+	ASSERT_TRUE(std::filesystem::exists(file));
+	EXPECT_TRUE(cartoon_stills::upToDate(file, cartoon_stills::stampOf(cartoon::kFilms[0])));
+	EXPECT_FALSE(cartoon_stills::upToDate(file, "an older source")) << "another stamp means the file is stale";
+	// current: left alone (a marker appended to the end survives)
+	{ std::ofstream(file, std::ios::binary | std::ios::app) << "# marker\n"; }
+	cartoon_stills::ensure(dir.string());
+	std::ifstream in(file, std::ios::binary);
+	std::stringstream all;
+	all << in.rdbuf();
+	EXPECT_NE(all.str().find("# marker"), std::string::npos);
+	in.close();
+	// stale: replaced
+	{
+		std::ofstream out(file, std::ios::binary | std::ios::trunc);
+		out << "# @rt-cartoon-stamp something else\nWorldBegin\n";
+	}
+	cartoon_stills::ensure(dir.string());
+	EXPECT_TRUE(cartoon_stills::upToDate(file, cartoon_stills::stampOf(cartoon::kFilms[0])));
+	std::filesystem::remove_all(dir);
 }

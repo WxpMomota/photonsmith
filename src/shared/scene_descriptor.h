@@ -80,6 +80,10 @@ namespace SceneCategories {
     // title. Filled from disk like Custom Scenes and legitimately empty until the user makes one. Appended LAST in kAll (so it takes the next free id
     // letter and no earlier category's letter moves - Test Scenes keeps 'L'), but shown right after Textures in the GUI (kDisplayOrder below).
     constexpr const char* MyScenes = "My Scenes";
+    // One still of every cartoon film (src/shared/cartoon/cartoons.h), written as ordinary scene files into the per-user cartoon folder and found like any
+    // scene on disk (pbrt_discover.h). Listed only when that folder exists (the GUI sets it up); the film itself is a video preset. Appended last in kAll for
+    // the same reason My Scenes was, shown after Textures in the GUI.
+    constexpr const char* Cartoons = "Cartoons";
 
     // Display order for the GUI's category tabs. Education and Textures sit
     // after the other compiled-in categories and before CustomScenes, which
@@ -87,7 +91,7 @@ namespace SceneCategories {
     // folder appears; Test Scenes, also filled from disk, is last.
     constexpr const char* kAll[] = {
         Basics, Materials, Lights, Cameras, Volumes, Geometry, Models, LargeScene,
-        Education, Textures, CustomScenes, Tests, MyScenes
+        Education, Textures, CustomScenes, Tests, MyScenes, Cartoons
     };
     constexpr std::size_t kAllCount = sizeof(kAll) / sizeof(kAll[0]);
 
@@ -95,7 +99,7 @@ namespace SceneCategories {
     // the user's own scenes first among the ones read from disk. Same entries as kAll, in a different order (a unit test checks that).
     constexpr const char* kDisplayOrder[] = {
         Basics, Materials, Lights, Cameras, Volumes, Geometry, Models, LargeScene,
-        Education, Textures, MyScenes, CustomScenes, Tests
+        Education, Textures, Cartoons, MyScenes, CustomScenes, Tests
     };
 
     // A category's id letter (used to build scene ids like "B10", the 10th

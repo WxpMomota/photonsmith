@@ -3,7 +3,10 @@
 // (video_preset.h builds one preset per film: name, description, length and fps from here; append, never reorder). A cartoon is
 // chosen with `--camera-path cartoon:<key>` (or `--video-preset <key>`), and the launcher then renders every frame from its own scene instead of moving a camera round a fixed one.
 
+#include <cstdio>
 #include <cstring>
+#include <exception>
+#include <string>
 
 #include "ball_parade.h"
 #include "fireflies.h"
@@ -17,16 +20,16 @@ constexpr const char *kCameraPathPrefix = "cartoon:";
 inline const Film kFilms[] = {
 	{"lamp-and-ball", "Lamp and Ball",
 	 "A small yellow desk lamp wakes up in the dark, notices a red ball, hops over, nudges it, watches it bounce off the books and roll home, and tucks its shade over it.",
-	 lamp_and_ball::kDuration, lamp_and_ball::kFps, &lamp_and_ball::sceneAt, 9.1},
+	 lamp_and_ball::kDuration, lamp_and_ball::kFps, &lamp_and_ball::sceneAt, 9.1, lamp_and_ball::kStamp},
 	{"ball-parade", "Ball Parade",
 	 "Seven glossy balls drop in one after another, bounce in a travelling wave on a checker floor with squash and stretch, and settle one by one into a row.",
-	 ball_parade::kDuration, ball_parade::kFps, &ball_parade::sceneAt, 4.6},
+	 ball_parade::kDuration, ball_parade::kFps, &ball_parade::sceneAt, 4.6, ball_parade::kStamp},
 	{"little-robot", "The Little Robot",
 	 "A small robot wakes in a junkyard at dusk, finds a seedling dying in a tin can, waters it, and watches it bloom into a glowing flower. Five shots, 32 seconds.",
-	 little_robot::kDuration, little_robot::kFps, &little_robot::sceneAt, 25.5},
+	 little_robot::kDuration, little_robot::kFps, &little_robot::sceneAt, 25.5, little_robot::kStamp},
 	{"fireflies", "Fireflies",
 	 "A night meadow lit by fireflies: a lone firefly wanders, a second arrives, their flashes drift into step, they circle and spiral up to the moon as the meadow wakes. Four shots, 26 seconds.",
-	 fireflies::kDuration, fireflies::kFps, &fireflies::sceneAt, 13.0},
+	 fireflies::kDuration, fireflies::kFps, &fireflies::sceneAt, 13.0, fireflies::kStamp},
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 
@@ -44,5 +47,44 @@ inline const Film *forCameraPath(const char *cameraPath) {
 	return find(cameraPath + n);
 }
 inline bool isCartoonPath(const char *cameraPath) { return cameraPath && std::strncmp(cameraPath, kCameraPathPrefix, std::strlen(kCameraPathPrefix)) == 0; }
+
+// One frame of a film as a still scene: "cartoon:<key>" (the film's stillTime) or "cartoon:<key>@<seconds>". Used where a scene is named, `ray_tracer ... cartoon:fireflies@13 `.
+struct Still {
+	const Film *film = nullptr;
+	double t = 0.0;
+};
+// Parses a still's name. Returns false when `spec` is not one (`error` stays empty) or is a bad one (`error` says why).
+inline bool parseStill(const std::string &spec, Still &out, std::string &error) {
+	error.clear();
+	const std::size_t n = std::strlen(kCameraPathPrefix);
+	if (spec.compare(0, n, kCameraPathPrefix) != 0) return false;
+	const std::size_t at = spec.find('@', n);
+	const std::string key = spec.substr(n, at == std::string::npos ? std::string::npos : at - n);
+	const Film *film = find(key.c_str());
+	if (!film) {
+		error = "Unknown cartoon \"" + key + "\" - valid cartoons:";
+		for (const Film &f : kFilms) error += std::string(" ") + kCameraPathPrefix + f.key;
+		return false;
+	}
+	double t = film->stillTime;
+	if (at != std::string::npos) {
+		const std::string text = spec.substr(at + 1);
+		std::size_t used = 0;
+		try {
+			t = std::stod(text, &used);
+		} catch (const std::exception &) {
+			used = 0;
+		}
+		if (used == 0 || used != text.size() || !(t >= 0.0 && t <= film->duration)) {
+			char length[32];
+			std::snprintf(length, sizeof(length), "%g", film->duration);
+			error = "\"" + spec + "\": the time after @ must be a number of seconds from 0 to " + length + " (the length of " + film->name + ")";
+			return false;
+		}
+	}
+	out.film = film;
+	out.t = t;
+	return true;
+}
 
 }  // namespace cartoon

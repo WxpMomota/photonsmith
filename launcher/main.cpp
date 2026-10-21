@@ -1686,6 +1686,31 @@ int main(int argc, char** argv) {
 		scene_id = "A1";
 		args.scene_file.clear();
 	}
+	// One frame of a cartoon (cartoon:<key>[@seconds]) is rendered as the .pbrt file its scene text makes; the file is removed when the run ends.
+	struct TempSceneFile {
+		std::filesystem::path path;
+		~TempSceneFile() {
+			std::error_code ec;
+			if (!path.empty()) std::filesystem::remove(path, ec);
+		}
+	} cartoon_still_file;
+	if (!args.cartoon_still.empty()) {
+		cartoon::Still still;
+		std::string still_error;
+		cartoon::parseStill(args.cartoon_still, still, still_error);   // already checked by the argument parser
+		cartoon_still_file.path = std::filesystem::temp_directory_path() / ("photonsmith_" + std::string(still.film->key) + "_" +
+																			std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".pbrt");
+		{
+			std::ofstream f(cartoon_still_file.path, std::ios::binary);
+			f << still.film->sceneAt(still.t);
+			if (!f) {
+				std::cerr << "Cannot write the scene of " << args.cartoon_still << " to " << cartoon_still_file.path << std::endl;
+				return EXIT_FAILURE;
+			}
+		}
+		std::cout << still.film->name << " at " << std::fixed << std::setprecision(2) << still.t << " s" << std::defaultfloat << std::endl;
+		args.scene_file = cartoon_still_file.path.string();
+	}
 	if (!args.scene_file.empty()) {
 		// A .pbrt file named instead of a scene id: give it an id, before anything below touches the scene registry.
 		std::error_code exists_ec;  // the throwing overload would abort on a path the OS rejects

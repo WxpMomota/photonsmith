@@ -1138,7 +1138,7 @@ void MainWindow::runSceneKeysSelfTest(const std::function<void(const QString &)>
 	for (int i = 0; i < count; ++i) {
 		const QString id = SceneMetadataClient::sceneIdAtIndex(i);
 		const QString category = SceneMetadataClient::sceneCategory(id);
-		if (category == "Custom Scenes" || category == "Test Scenes" || category == "My Scenes" || SceneMetadataClient::sceneRequiresFiles(id)) continue;
+		if (category == "Custom Scenes" || category == "Test Scenes" || category == "My Scenes" || category == "Cartoons" || SceneMetadataClient::sceneRequiresFiles(id)) continue;
 		expected.insert(SceneMetadataClient::sceneSlug(id));
 	}
 	for (const QString &slug : expected)

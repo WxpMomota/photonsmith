@@ -242,6 +242,9 @@ sampled and played back, not its story.
 | little-robot | The Little Robot | 32 s | A small robot wakes in a junkyard at dusk, finds a seedling dying in a tin can, waters it from a watering can, and watches it bloom into a glowing flower. Five shots with a rack-focus close-up. |
 | fireflies | Fireflies | 26 s | A night meadow lit almost only by fireflies: a lone one wanders through the grass, a second arrives, their flashes drift into step, they circle and spiral up towards the moon as fifty more wake in the grass and a crane shot lifts away. Four shots. |
 
+A frame of a film is also a scene: `ray_tracer --gpu 1280 256 8 cartoon:fireflies@13.5` renders that moment as one picture (`cartoon:<key>` alone is the film's own best still), which is the quickest
+way to look at a change to a film. The GUI's scene list has a Cartoons tab with one still per film; it is written from the films when the GUI starts, so a new film appears there by itself.
+
 Making a film of your own: `scripts/anim/` (Python, quicker to change; `README.md` there) is the same toolkit for authoring, and `src/shared/cartoon/cartoon_lib.h` is its C++ twin;
 a finished film is a function `std::string sceneAt(double t)` listed in `src/shared/cartoon/cartoons.h`; that listing alone makes it a video preset (`video_preset::all()` builds the
 preset from it), and it appears in the GUI's Preset combo and Camera Path combo and in `--list-video-presets`. Append new films, do not reorder them: a cartoon's preset id (V7 ...) is its

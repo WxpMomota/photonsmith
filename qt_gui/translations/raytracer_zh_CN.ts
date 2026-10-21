@@ -10729,6 +10729,11 @@ From: %3</source>
         <source>My Scenes</source>
         <translation>我的场景</translation>
     </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="244"/>
+        <source>Cartoons</source>
+        <translation>动画短片</translation>
+    </message>
 </context>
 <context>
     <name>SceneLayoutView</name>

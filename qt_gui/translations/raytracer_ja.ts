@@ -10723,6 +10723,11 @@ From: %3</source>
         <source>My Scenes</source>
         <translation>マイシーン</translation>
     </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="244"/>
+        <source>Cartoons</source>
+        <translation>アニメ</translation>
+    </message>
 </context>
 <context>
     <name>SceneLayoutView</name>

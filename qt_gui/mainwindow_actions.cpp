@@ -367,7 +367,9 @@ void MainWindow::showAboutDialog() {
 	for (int i = 0, n = SceneMetadataClient::sceneCount(); i < n; ++i) {
 		const QString category = SceneMetadataClient::sceneCategory(SceneMetadataClient::sceneIdAtIndex(i));
 		if (category == QLatin1String(SceneCategories::Tests)) ++testScenes;
-		else if (category != QLatin1String(SceneCategories::CustomScenes) && category != QLatin1String(SceneCategories::MyScenes)) ++builtInScenes;
+		else if (category != QLatin1String(SceneCategories::CustomScenes) && category != QLatin1String(SceneCategories::MyScenes) &&
+				 category != QLatin1String(SceneCategories::Cartoons))
+			++builtInScenes;
 	}
 #ifdef Q_OS_WIN
 	const char* rendererBinaryName = "ray_tracer.exe";

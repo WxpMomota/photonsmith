@@ -12,6 +12,8 @@ namespace cartoon {
 namespace fireflies {
 
 constexpr double kDuration = 26.0;
+// When this file was last changed: the cartoon stills (cartoon_stills.h) are written again when it is newer than the file written from it.
+constexpr const char *kStamp = __TIMESTAMP__;
 constexpr int kFps = 24;
 constexpr int kSwarm = 56;
 constexpr int kBlades = 1100;

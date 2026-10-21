@@ -10775,6 +10775,11 @@ Origen: %3</translation>
         <source>My Scenes</source>
         <translation>Mis escenas</translation>
     </message>
+    <message>
+        <location filename="../scene_metadata_client.cpp" line="244"/>
+        <source>Cartoons</source>
+        <translation>Dibujos animados</translation>
+    </message>
 </context>
 <context>
     <name>SceneLayoutView</name>

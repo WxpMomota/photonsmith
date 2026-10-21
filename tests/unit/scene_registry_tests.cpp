@@ -271,7 +271,7 @@ TEST(SceneRegistryTest, EveryCategoryHasAtLeastOneScene) {
 		// including every CI machine. Every other category is compiled in, so
 		// an empty one there really is the bug this test is looking for.
 		if (std::string(SceneCategories::kAll[i]) == SceneCategories::CustomScenes || std::string(SceneCategories::kAll[i]) == SceneCategories::Tests ||
-		    std::string(SceneCategories::kAll[i]) == SceneCategories::MyScenes)
+		    std::string(SceneCategories::kAll[i]) == SceneCategories::MyScenes || std::string(SceneCategories::kAll[i]) == SceneCategories::Cartoons)
 			continue;
 		EXPECT_GT(used.count(SceneCategories::kAll[i]), 0u)
 			<< "Category '" << SceneCategories::kAll[i]

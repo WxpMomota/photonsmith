@@ -900,6 +900,7 @@ std::map<std::string, std::string>& paths();   // defined below, used by append(
 // Room"). A scene in a downloaded collection's own folder is shown as "<Folder>: <Scene>", since "Frame 25" alone says nothing.
 inline std::string displayNameFor(const pbrt_discover::Discovered& d) {
     if (!d.title.empty()) return d.title;
+    if (!d.tagName.empty()) return d.tagName;
     const std::string pretty = scene_slugs::prettyName(d.name);
     if (d.nested) {
         const std::string folder = std::filesystem::path(d.path).parent_path().filename().string();

@@ -114,6 +114,8 @@ struct Discovered {
 	bool gpuCompatible = true;   // false when the file says "# @rt-gpu no"
 	// The title the Scene Builder saved in the file (scene_document.h's "# @rt-builder-doc" line); empty for any other file.
 	std::string title;
+	// "# @rt-name Fireflies": the name to list the scene under, for a file whose name does not read well (the Scene Builder's title wins when there is one).
+	std::string tagName;
 	// True for a file the user named explicitly (ray_tracer.exe ... path/to/scene.pbrt, the GUI's Scene Builder) rather than one found by scanning a
 	// scene directory. Such a scene is numbered after every scanned one, so naming a file never shifts the id of a scene that scanning finds.
 	bool userFile = false;
@@ -151,7 +153,7 @@ inline std::string headerOf(const std::string &text) {
 // wherever it is copied. Only comment lines before WorldBegin are read; a description given on several lines is joined with spaces; the Scene
 // Builder's own "# @rt-builder-doc" line is not one of these. Unknown keys are ignored.
 struct HeaderTags {
-	std::string category, description, performance;
+	std::string category, description, performance, name;
 	bool gpuCompatible = true;   // "# @rt-gpu no": the scene uses something the GPU backends do not support, so it renders on the CPU only
 	// "# @rt-size 555": how big the scene is, as the largest side of its bounding box in the scene's own units (scene_size.h). The interactive camera controls
 	// scale their step by it. 0 = the file does not say.
@@ -173,6 +175,7 @@ inline HeaderTags readHeaderTags(const std::string &text) {
 		if (value.empty()) continue;
 		if (key == "category") tags.category = value;
 		else if (key == "performance") tags.performance = value;
+		else if (key == "name") tags.name = value;
 		else if (key == "gpu") tags.gpuCompatible = value != "no";
 		else if (key == "size") {
 			char *end = nullptr;
@@ -285,6 +288,7 @@ inline Discovered describe(const std::string &path, const std::string &text) {
 		d.category = tags.category;
 		d.description = tags.description;
 		d.performance = tags.performance;
+		d.tagName = tags.name;
 		d.gpuCompatible = tags.gpuCompatible;
 	}
 	{
@@ -489,6 +493,11 @@ inline std::vector<Discovered> scanDefaultPaths() {
 			d.userSceneNumber = userSceneNumber(userDir, std::filesystem::path(d.path).filename().string());
 			found.push_back(std::move(d));
 		}
+	}
+	// The stills of the cartoon films, listed under Cartoons. The GUI writes them (cartoon_stills.h, at start-up); this only reads what is there, so the renderer
+	// libraries do not carry the film code.
+	if (const std::string cartoonDir = pbrt_asset_check::cartoonStillDir(); !cartoonDir.empty()) {
+		for (Discovered &d : scanDirectory(cartoonDir)) found.push_back(std::move(d));
 	}
 	for (const std::string &path : extraSceneFiles()) {
 		// A file the scan already found (the user named a scene from pbrt_scenes/) keeps its scanned entry.

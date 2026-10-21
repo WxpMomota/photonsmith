@@ -367,6 +367,9 @@ struct LaunchArgs {
 	// A .pbrt file named in the scene_id position instead of an id (a scene made in the GUI's Scene Builder, or any pbrt-v4 file). main.cpp registers it
 	// with cpu_register_scene_file() and sets scene_id to the id it gets; empty when the scene was named by id.
 	std::string scene_file;
+	// A cartoon frame named in the scene_id position ("cartoon:fireflies" or "cartoon:fireflies@13.5": src/shared/cartoon/cartoons.h, parseStill). main.cpp writes that frame's scene
+	// to a temporary .pbrt file and renders it as scene_file; empty when the scene was named any other way.
+	std::string cartoon_still;
 	double cam_x             = kDefaultCameraX;
 	double cam_y             = kDefaultCameraY;
 	double cam_z             = kDefaultCameraZ;
@@ -1151,7 +1154,8 @@ inline void print_launch_help(const char* program) {
 				  << "  scene_id   : Scene selector: a scene name (e.g. \"cornell-box\") or an id, category letter +\n"
 				  << "               number (e.g. \"A1\"=Cornell Box; names are stable, ids can shift),\n"
 				  << "               default " << kDefaultSceneId << " - see src/TheRestOfYourLife/scene_registry.h),\n"
-				  << "               or the path of a .pbrt file (e.g. one saved by the GUI's Scene Builder)\n"
+				  << "               or the path of a .pbrt file (e.g. one saved by the GUI's Scene Builder),\n"
+				  << "               or one frame of a cartoon: cartoon:<key> or cartoon:<key>@<seconds>\n"
 				  << "  cam_x/y/z  : Camera position - if omitted, uses the selected scene's own\n"
 				  << "               recommended camera (see src/TheRestOfYourLife/scene_registry.h),\n"
 				  << "               not a single fixed default across every scene\n";
@@ -1237,6 +1241,14 @@ inline bool parse_launch_args(int argc, char** argv, LaunchArgs& out,
 
 	if (positional_args.size() >= 4) {
 		const std::string& id = positional_args[3];
+		cartoon::Still still;
+		std::string still_error;
+		const bool is_still = cartoon::parseStill(id, still, still_error);
+		if (!still_error.empty()) {
+			std::cerr << still_error << "\n";
+			return false;
+		}
+		if (is_still) out.cartoon_still = id;
 		// Category letter + one or more digits (e.g. "A1", "B10").
 		const bool valid = id.size() >= 2 && id[0] >= 'A' && id[0] <= 'Z' &&
 			std::all_of(id.begin() + 1, id.end(),
@@ -1244,7 +1256,9 @@ inline bool parse_launch_args(int argc, char** argv, LaunchArgs& out,
 		// Or the path of a .pbrt file.
 		std::string ext = id.size() >= 5 ? id.substr(id.size() - 5) : std::string();
 		std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-		if (!valid && ext == ".pbrt") {
+		if (is_still) {
+			// a cartoon frame, recorded above
+		} else if (!valid && ext == ".pbrt") {
 			out.scene_file = id;
 		} else if (valid || scene_slugs::looksLikeSlug(id)) {
 			// An id ("A1") or a slug ("cornell-box"); main() resolves either to the scene.
