@@ -437,6 +437,36 @@ int PbrtSceneLoader::claimImageRef(const std::string& filename, const pbrt_flatt
     return offset + 1;
 }
 
+int PbrtSceneLoader::claimTextureGraph(const std::vector<pbrt_flatten::TexMeanNode>& nodes, float sceneScale, float3 bboxCenter, float3 sceneOffset) {
+    using Kind = pbrt_flatten::TexMeanNode::Kind;
+    if (nodes.empty() || (int)nodes.size() > pbrt_flatten::kMaxTextureGraphNodes) return 0;
+    std::vector<float> block(1 + 8 * nodes.size(), 0.0f);
+    block[0] = (float)nodes.size();
+    for (size_t i = 0; i < nodes.size(); ++i) {
+        const pbrt_flatten::TexMeanNode& n = nodes[i];
+        float* d = &block[1 + 8 * i];
+        if (n.kind == Kind::Const) {
+            d[0] = 0; d[4] = (float)n.c[0]; d[5] = (float)n.c[1]; d[6] = (float)n.c[2];
+        } else if (n.kind == Kind::Image) {
+            pbrt_flatten::TextureDecodeOptions options;
+            options.gamma = n.gamma; options.invert = n.invert; options.wrapIndex = n.wrapIndex;
+            const int ref = claimImageRef(n.file, options, n.mapping, n.scale, sceneScale, bboxCenter, sceneOffset);
+            if (ref == 0) return 0;
+            d[0] = 1; d[4] = (float)ref;
+        } else if (n.kind == Kind::Product) {
+            d[0] = 2; d[1] = (float)n.a; d[2] = (float)n.b;
+        } else {
+            d[0] = 3; d[1] = (float)n.a; d[2] = (float)n.b; d[3] = (float)n.t;
+        }
+    }
+    const auto it = pbrtImageRefs.find(block);
+    if (it != pbrtImageRefs.end()) return it->second + 1;
+    const int offset = (int)rgbGridData.size();
+    rgbGridData.insert(rgbGridData.end(), block.begin(), block.end());
+    pbrtImageRefs[block] = offset;
+    return offset + 1;
+}
+
 TriangleMaterial PbrtSceneLoader::mapPbrtMaterial(PbrtMaterialMapState& st, const pbrt_flatten::Material& m, int depth) {
     TriangleMaterial mat = mapPbrtMaterialBase(st, m, depth);
     // A roughness picture on a conductor, a coated diffuse or a coated conductor (and its base roughness): read per pixel by the shader (patchPerPixelMaterial); the flat value the base
@@ -446,6 +476,9 @@ TriangleMaterial PbrtSceneLoader::mapPbrtMaterial(PbrtMaterialMapState& st, cons
         mat.roughRef = claimImageRef(m.roughnessTextureFilename, m.roughnessTextureOptions, m.roughnessTextureMapping, m.roughnessTextureScale, st.sceneScale, st.bboxCenter, st.sceneOffset, m.remapRoughness);
     if (mat.materialType == METAL_MAT_COATED_CONDUCTOR && !m.condRoughnessTextureFilename.empty())
         mat.condRoughRef = claimImageRef(m.condRoughnessTextureFilename, m.condRoughnessTextureOptions, m.condRoughnessTextureMapping, m.condRoughnessTextureScale, st.sceneScale, st.bboxCenter, st.sceneOffset, m.remapRoughness);
+    if (!m.reflectanceGraph.empty() && (mat.materialType == METAL_MAT_LAMBERTIAN || mat.materialType == METAL_MAT_IMAGE_LAMBERTIAN || mat.materialType == METAL_MAT_COATED_DIFFUSE ||
+                                        mat.materialType == METAL_MAT_IMAGE_CLEARCOAT))
+        mat.graphRef = claimTextureGraph(m.reflectanceGraph, st.sceneScale, st.bboxCenter, st.sceneOffset);
     if (mat.materialType == METAL_MAT_MIX && !m.mixWeightTextureFilename.empty())
         mat.mixAmountRef = claimImageRef(m.mixWeightTextureFilename, m.mixWeightTextureOptions, m.mixWeightTextureMapping, m.mixWeightTextureScale, st.sceneScale, st.bboxCenter, st.sceneOffset);
     return mat;

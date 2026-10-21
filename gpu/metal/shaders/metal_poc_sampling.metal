@@ -626,6 +626,30 @@ inline float2 hitUV(uint primId, float2 barycentric, device const packed_float2*
     return float2(0.0);
 }
 
+// A reflectance that is a graph of textures (a picture times a picture, a blend of products; Material::reflectanceGraph): the host stores 1 + count + 8 floats per node in the shared float
+// buffer, [kind (0 constant, 1 picture, 2 product, 3 blend), a, b, t, x, y, z, 0], children being earlier nodes and the last node the answer; a picture node's x is a picture reference
+// (sampleImageRef, scale included), a constant's x, y, z the value. Blend is (1 - t) * a + t * b with t the first channel of node t, clamped to [0, 1]: the OptiX device code's
+// (gpu/optix/optix_device_textures.h) rule.
+inline float3 evalTextureGraph(device const float* grid, int ref1, float2 uv, float3 hitPoint) {
+    device const float* g = grid + (ref1 - 1);
+    const int count = min(int(g[0] + 0.5), 16);
+    float3 vals[16];
+    for (int i = 0; i < count; ++i) {
+        device const float* n = g + 1 + i * 8;
+        const int kind = int(n[0] + 0.5);
+        float3 r;
+        if (kind == 0) r = float3(n[4], n[5], n[6]);
+        else if (kind == 1) r = sampleImageRef(grid, int(n[4] + 0.5), uv, hitPoint);
+        else if (kind == 2) r = vals[int(n[1] + 0.5)] * vals[int(n[2] + 0.5)];
+        else {
+            const float amt = clamp(vals[int(n[3] + 0.5)].x, 0.0f, 1.0f);
+            r = (1.0 - amt) * vals[int(n[1] + 0.5)] + amt * vals[int(n[2] + 0.5)];
+        }
+        vals[i] = r;
+    }
+    return count > 0 ? vals[count - 1] : float3(0.0);
+}
+
 // A material's per-pixel parameters from pictures (TriangleMaterial::roughRef / condRoughRef, PbrtSceneLoader::mapPbrtMaterial): this hit's roughness, in the hit's own copy of the
 // material, as OptiX does (patch_roughness_textures: roughness = scale * the picture's value, isotropic). The host stored the flat value (the picture's mean) as the fallback. A reference's
 // slot 10 says the value is a perceptual roughness to remap to the GGX alpha (sqrt), as the host does for a flat one.
