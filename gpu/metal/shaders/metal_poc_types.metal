@@ -786,6 +786,11 @@ struct TriangleMaterial {
     int layerNSamples;
     // A position-based texture mapping for the reflectance picture (see metal_poc_gpu_types.h); 0 = the surface's own uv.
     int posMapIndex;
+    // Per-pixel parameters from pictures (see metal_poc_gpu_types.h); 0 = none.
+    int mixAmountRef;
+    int roughRef;
+    int condRoughRef;
+    int graphRef;
 };
 
 // ---- What the spare slots of TriangleMaterial mean, per material family ----------------------------------------------------------------------------------------------

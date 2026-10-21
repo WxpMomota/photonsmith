@@ -47,6 +47,13 @@ struct PbrtSceneLoader {
     // The scene's one shared reflectance picture (the "diffuse image" slot): loads `m.textureFilename` into it when it is free or already that file; false when the slot holds another picture
     // or the file cannot be read (the material then keeps its flat colour).
     bool claimDiffuseImage(const pbrt_flatten::Material& m);
+    // A picture for a per-pixel material parameter (a roughness, a mix amount, a node of a texture graph), kept in rgbGridData: its pixels (decoded and encoded like any imagemap, shared by
+    // every reference to the same file and options) and a 12-float reference [pixels offset, width, height, wrap, scale, su, sv, du, dv, 1 + position-mapping offset (0 = uv), 1 = a perceptual roughness (remap to alpha), 0].
+    // Returns 1 + the reference's offset, or 0 when the file cannot be read.
+    int claimImageRef(const std::string& filename, const pbrt_flatten::TextureDecodeOptions& options, const pbrt_flatten::UvMapping& mapping, double scale,
+                      float sceneScale, float3 bboxCenter, float3 sceneOffset, bool remapRoughness = false);
+    std::map<std::string, std::array<int, 3>> pbrtImageRefPixels;   // "file|gamma|invert" -> {pixels offset, width, height} in rgbGridData
+    std::map<std::vector<float>, int> pbrtImageRefs;                  // a reference's content -> its offset
     int claimPositionMapping(const pbrt_flatten::UvMapping& mapping, float sceneScale, float3 bboxCenter, float3 sceneOffset);
     // Optional 7th positional CLI arg - a real .pbrt scene file to load
     // via src/shared/pbrt_load.h INSTEAD of buildScene()'s own hardcoded
@@ -409,6 +416,8 @@ struct PbrtSceneLoader {
         std::unordered_map<const void*, TriangleMaterial> mixCache;   // a Mix material (by address) -> its mapped METAL_MAT_MIX entry, so each is stored once
     };
     TriangleMaterial mapPbrtMaterial(PbrtMaterialMapState& st, const pbrt_flatten::Material& m, int depth);
+    // mapPbrtMaterial() = mapPbrtMaterialBase() (the material as the shader has drawn it, a flat mean for every per-pixel texture) plus the per-pixel pictures it can now read.
+    TriangleMaterial mapPbrtMaterialBase(PbrtMaterialMapState& st, const pbrt_flatten::Material& m, int depth);
     bool mapPbrtPerHitMix(PbrtMaterialMapState& st, const pbrt_flatten::Material& m, int depth, TriangleMaterial& out);
     int bssrdfTableOffset(PbrtMaterialMapState& st, double g, double eta);
     TriangleMaterial mapPbrtSubsurfaceMaterial(PbrtMaterialMapState& st, const pbrt_flatten::Material& m);

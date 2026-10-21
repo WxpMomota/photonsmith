@@ -539,6 +539,10 @@ if(RT_BUILD_METAL)
     # - just plain math, checked against known-correct reference values.
     add_executable(metal_poc_math_tests gpu/metal/tests/metal_poc_math_tests.cpp)
 
+    # Two linear EXRs of one scene compared block by block (a picture that is wrong in its detail has the right mean): a development tool and a test helper, host only.
+    add_executable(metal_poc_block_check gpu/metal/tests/metal_poc_block_check.cpp)
+    target_link_libraries(metal_poc_block_check PRIVATE cpu_renderer)
+
     # The pbrt scene loader (PbrtSceneLoader, metal_poc_scene_data.h) with no GPU: loads bundled scenes and checks the host arrays. Links metal_renderer for the loader's
     # code (the Metal frameworks are linked but no device is ever created).
     add_executable(metal_poc_loader_tests gpu/metal/tests/metal_poc_loader_tests.mm src/external/image_writer.cpp)
@@ -661,6 +665,11 @@ if(RT_BUILD_METAL)
     # image comparer (no Metal, no device) driven by metal_poc_crop_test.sh, which
     # renders A1 whole and cropped through the real ray_tracer --gpu path.
     add_executable(metal_poc_crop_check gpu/metal/tests/metal_poc_crop_check.cpp)
+    # A per-pixel parameter (a roughness picture, a mix amount, a texture graph) drawn as its mean has the right mean: metal_poc_blocks_test.sh compares Metal with the CPU in 8 x 8 blocks.
+    add_test(NAME metal_poc_texture_blocks
+        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_blocks_test.sh"
+            $<TARGET_FILE:ray_tracer> $<TARGET_FILE:metal_poc_block_check> "${CMAKE_BINARY_DIR}")
+    set_tests_properties(metal_poc_texture_blocks PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" PASS_REGULAR_EXPRESSION "BLOCKS_TEST_OK" TIMEOUT 600)
     add_test(NAME metal_poc_crop_window
         COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_crop_test.sh"
             $<TARGET_FILE:ray_tracer> $<TARGET_FILE:metal_poc_crop_check> "${CMAKE_BINARY_DIR}")
