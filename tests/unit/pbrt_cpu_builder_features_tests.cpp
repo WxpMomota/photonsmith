@@ -372,3 +372,21 @@ TEST(PbrtCurveHit, TheRayOriginIsOutsideTheStrand) {
 	const ray leaving(rec.p, unit_vector(vec3(0.5, 0.2, 1.0)));
 	EXPECT_FALSE(b.world->hit(leaving, interval(0.001, infinity), again));
 }
+
+// ---- A reflectance that is a graph of textures ----------------------------------------------------------------------------------------------------------------
+//
+// pbrt_flatten::Material::reflectanceGraph: each recipe node becomes a texture over the nodes before it.
+
+TEST(PbrtReflectanceGraph, ProductsAndBlendsOfConstantsEvaluateLikePbrt) {
+	using Node = pbrt_flatten::TexMeanNode;
+	std::vector<Node> nodes(5);
+	nodes[0].c[0] = 0.8; nodes[0].c[1] = 0.4; nodes[0].c[2] = 0.2;   // a colour
+	nodes[1].c[0] = nodes[1].c[1] = nodes[1].c[2] = 0.5;               // a float
+	nodes[2].kind = Node::Kind::Product; nodes[2].a = 0; nodes[2].b = 1;
+	nodes[3].c[0] = nodes[3].c[1] = nodes[3].c[2] = 0.25;              // the blend's amount
+	nodes[4].kind = Node::Kind::Blend; nodes[4].a = 0; nodes[4].b = 2; nodes[4].t = 3;
+	const color c = pbrt_cpu::detail::reflectanceGraphTexture(nodes)->value(0.3, 0.7, point3(1, 2, 3));
+	EXPECT_NEAR(c.x(), 0.75 * 0.8 + 0.25 * 0.4, 1e-12) << "(1 - t) * a + t * (a * b)";
+	EXPECT_NEAR(c.y(), 0.75 * 0.4 + 0.25 * 0.2, 1e-12);
+	EXPECT_NEAR(c.z(), 0.75 * 0.2 + 0.25 * 0.1, 1e-12);
+}

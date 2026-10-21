@@ -1,0 +1,40 @@
+# @rt-category Test Scenes
+# @rt-description A reflectance that is a graph of textures, per pixel: a floor that is a picture times a checker, and a wall that mixes the picture and that floor by the checker, as pbrt draws them.
+# @rt-performance Fast
+# @rt-size 10
+# texture-graph.pbrt -- a "reflectance" bound to a "scale" texture whose scale is itself a picture (the floor), and to a "mix" of a picture and that product with a picture for its amount
+# (the wall, a coated diffuse). Each is evaluated at every hit; their averages would draw an even tint. Triangle meshes with uv. Original, no licence constraints.
+
+LookAt 0 3.5 9   0 1 0   0 1 0
+Camera "perspective" "float fov" [ 50 ]
+
+Film "rgb" "integer xresolution" [ 64 ] "integer yresolution" [ 64 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+Integrator "volpath" "integer maxdepth" [ 8 ]
+
+WorldBegin
+
+LightSource "infinite" "rgb L" [ 0.3 0.35 0.45 ]
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 10 10 10 ]
+  Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+    "point3 P" [ -2 4.5 -1   2 4.5 -1   2 4.5 3   -2 4.5 3 ]
+AttributeEnd
+
+Texture "pic" "spectrum" "imagemap" "string filename" [ "texture-mappings-pic.png" ]
+Texture "mask" "float" "imagemap" "string filename" [ "texture-params-amount.png" ] "string encoding" [ "linear" ]
+Texture "floor-graph" "spectrum" "scale" "texture tex" [ "pic" ] "texture scale" [ "mask" ]
+Texture "wall-graph" "spectrum" "mix" "texture tex1" [ "pic" ] "texture tex2" [ "floor-graph" ] "texture amount" [ "mask" ]
+
+AttributeBegin
+  Material "diffuse" "texture reflectance" [ "floor-graph" ]
+  Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+    "point3 P" [ -6 0 -5   6 0 -5   6 0 6   -6 0 6 ]
+    "point2 uv" [ 0 0   2 0   2 2   0 2 ]
+AttributeEnd
+AttributeBegin
+  Material "coateddiffuse" "texture reflectance" [ "wall-graph" ] "float roughness" [ 0.1 ]
+  Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+    "point3 P" [ -6 0 -5   6 0 -5   6 6 -5   -6 6 -5 ]
+    "point2 uv" [ 0 0   2 0   2 1   0 1 ]
+AttributeEnd

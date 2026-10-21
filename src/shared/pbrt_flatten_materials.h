@@ -200,6 +200,10 @@ inline bool bindReflectanceImagemap(const pbrt_scene::Scene &scene, FlatScene &o
 				avg.param = "scale";
 				if (buildTextureMean(scene, scaleTexture, avg.nodes) >= 0) m.textureAverages.push_back(std::move(avg));
 				else warn("a 'scale' texture's own scale is a texture this loader cannot average; 1 is used");
+				// A picture times a picture is drawn per hit on Diffuse and CoatedDiffuse (Material::reflectanceGraph); the picture and the mean scale above stay as the fallback.
+				std::vector<TexMeanNode> graph;
+				if ((m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) && buildTextureMean(scene, tex->name, graph) >= 0 && isPerHitTextureGraph(graph))
+					m.reflectanceGraph = std::move(graph);
 			}
 			// imageMapOptionsFor() (pbrt_cpu_builder.h) and GPU's
 			// own call sites read these 3 loose fields by name
@@ -660,8 +664,11 @@ inline int buildTextureMean(const pbrt_scene::Scene &scene, const std::string &n
 		n.kind = TexMeanNode::Kind::Image;
 		n.file = file;
 		n.scale = tex->params.getFloat("scale", 1.0);
-		n.gamma = resolveTextureGamma(*tex, [](const std::string &) {});
-		n.invert = tex->params.getBool("invert", false);
+		const TextureDecodeOptions opts = resolveTextureDecodeOptions(*tex, [](const std::string &) {});
+		n.gamma = opts.gamma;
+		n.invert = opts.invert;
+		n.wrapIndex = opts.wrapIndex;
+		n.mapping = uvMappingOf(*tex);
 		nodes.push_back(n);
 		return static_cast<int>(nodes.size()) - 1;
 	}
@@ -684,6 +691,7 @@ inline int buildTextureMean(const pbrt_scene::Scene &scene, const std::string &n
 		TexMeanNode n;
 		n.kind = TexMeanNode::Kind::Blend;
 		n.a = a; n.b = b; n.t = amt;
+		n.meanOnly = tex->cls != "mix";
 		nodes.push_back(n);
 		return static_cast<int>(nodes.size()) - 1;
 	}
@@ -760,6 +768,12 @@ inline void readMaterialBindings(const pbrt_scene::Scene &scene, FlatScene &out,
 		TextureAverage avg;
 		avg.param = p.name;
 		const bool hasMean = bound && hasTextureAverageTarget(p.name) && buildTextureMean(scene, p.strings[0], avg.nodes) >= 0 && !avg.nodes.empty();
+		// A reflectance that is a graph of pictures and constants is evaluated per hit (Material::reflectanceGraph); its mean stays as the fallback.
+		if (hasMean && p.name == "reflectance" && (m.kind == MaterialKind::Diffuse || m.kind == MaterialKind::CoatedDiffuse) && isPerHitTextureGraph(avg.nodes)) {
+			m.reflectanceGraph = avg.nodes;
+			m.textureAverages.push_back(std::move(avg));
+			continue;
+		}
 		if (hasMean) m.textureAverages.push_back(std::move(avg));
 		warn("material '" + md.type + "' binds its '" + p.name + "' to a texture" +
 			 (bound ? " ('" + bound->name + "', a '" + bound->cls + "' texture)" : std::string()) +

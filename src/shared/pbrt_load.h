@@ -811,6 +811,17 @@ inline LoadResult loadFile(const std::string &path,
 		}
 		m.mixWeightTextureFilename = resolved;
 	}
+	// A reflectance graph's pictures (Material::reflectanceGraph): a picture that cannot be found drops the whole graph (the mean-or-constant colour then stands).
+	for (pbrt_flatten::Material &m : r.scene.materials) {
+		bool allFound = true;
+		for (pbrt_flatten::TexMeanNode &n : m.reflectanceGraph) {
+			if (n.kind != pbrt_flatten::TexMeanNode::Kind::Image) continue;
+			const std::string resolved = resolveExistingPath(sceneDir, n.file);
+			if (resolved.empty()) { allFound = false; break; }
+			n.file = resolved;
+		}
+		if (!allFound) m.reflectanceGraph.clear();
+	}
 	// The CoatedConductor's base conductor roughness image (Material::condRoughnessTextureFilename), resolved the same way.
 	for (pbrt_flatten::Material &m : r.scene.materials) {
 		if (m.condRoughnessTextureFilename.empty()) continue;

@@ -209,6 +209,24 @@ __device__ __forceinline__ float3 wf_sample_texture(
 			: ((tex.tex2ImageIdx >= 0) ? sampleImage(textures[tex.tex2ImageIdx]) : tex.color2);
 	} else if (tex.kind == TextureKind::Bilerp) {
 		return wf_sample_bilerp_texture(tex, u, v);
+	} else if (tex.kind == TextureKind::Graph) {
+		// A reflectance that is a graph of pictures and constants (pbrt_flatten::Material::reflectanceGraph): `octaves` GraphNode entries follow from tex1ImageIdx, each a function
+		// of the nodes before it (children are node numbers, not table indices). The last node is the answer.
+		float3 vals[kMaxTextureGraphNodesDevice];
+		const int count = min(tex.octaves, kMaxTextureGraphNodesDevice);
+		for (int i = 0; i < count; ++i) {
+			const TextureData& g = textures[tex.tex1ImageIdx + i];
+			float3 r;
+			if (g.octaves == 0) r = g.color1;
+			else if (g.octaves == 1) r = sampleImage(g) * g.mixAmount;
+			else if (g.octaves == 2) r = vals[g.tex1ImageIdx] * vals[g.tex2ImageIdx];
+			else {
+				const float amt = fminf(1.0f, fmaxf(0.0f, vals[g.amountImageIdx].x));
+				r = (1.0f - amt) * vals[g.tex1ImageIdx] + amt * vals[g.tex2ImageIdx];
+			}
+			vals[i] = r;
+		}
+		return count > 0 ? vals[count - 1] : make_float3(0.0f, 0.0f, 0.0f);
 	} else if (tex.kind == TextureKind::Mix) {
 		// Matches optix_device_helpers.h's sample_texture() Mix branch (and
 		// mix_texture::value(), texture.h) exactly, including

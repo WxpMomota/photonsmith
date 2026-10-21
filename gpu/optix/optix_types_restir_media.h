@@ -688,8 +688,16 @@ enum class TextureKind : int {
 	// mixAmount below (all unused by Bilerp) rather than adding two more
 	// float3 fields that would grow every TextureData entry - see those
 	// fields' own comments.
-	Bilerp = 10
+	Bilerp = 10,
+	// A reflectance that is a graph of textures (pbrt_flatten::Material::reflectanceGraph): this entry holds the node count in `octaves` and the index of the first node in
+	// tex1ImageIdx; the nodes (GraphNode) follow it in the table. sample_texture evaluates them in order.
+	Graph = 11,
+	// One node of a Graph. `octaves` says which: 0 a constant (color1), 1 a picture (this entry is a copy of an Image entry, so sampleImage reads it; times mixAmount, the imagemap's scale),
+	// 2 a product of nodes tex1ImageIdx and tex2ImageIdx, 3 a blend (1 - t) * tex1 + t * tex2 with t = node amountImageIdx. Children are node numbers within the graph.
+	GraphNode = 12
 };
+// The most nodes a Graph can have (pbrt_flatten::kMaxTextureGraphNodes): the device keeps one colour per node while it evaluates them.
+constexpr int kMaxTextureGraphNodesDevice = 16;
 
 // One entry per texture, indexed by MaterialData::textureIdx. Image
 // textures point into a single shared flat 8-bit RGB pixel buffer

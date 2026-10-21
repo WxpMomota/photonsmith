@@ -209,6 +209,40 @@ inline shared_ptr<texture> reflectanceImageTexture(const pbrt_flatten::Material 
 	return mappedTexture(sharedMipmapTexture(m.textureFilename.c_str(), imageMapOptionsFor(m)), m.textureMapping);
 }
 
+// A reflectance that is a graph of textures (pbrt_flatten::Material::reflectanceGraph): each recipe node becomes a texture object over the nodes before it; the root is the last.
+inline shared_ptr<texture> reflectanceGraphTexture(const std::vector<pbrt_flatten::TexMeanNode> &nodes) {
+	using Kind = pbrt_flatten::TexMeanNode::Kind;
+	std::vector<shared_ptr<texture>> built;
+	built.reserve(nodes.size());
+	for (const pbrt_flatten::TexMeanNode &n : nodes) {
+		shared_ptr<texture> tex;
+		switch (n.kind) {
+			case Kind::Const:
+				tex = std::make_shared<solid_color>(color(n.c[0], n.c[1], n.c[2]));
+				break;
+			case Kind::Image: {
+				pbrt_flatten::TextureDecodeOptions o;
+				o.gamma = n.gamma;
+				o.invert = n.invert;
+				o.wrapIndex = n.wrapIndex;
+				tex = mappedTexture(sharedMipmapTexture(n.file.c_str(), toMipMapOptions(o)), n.mapping);
+				if (n.scale != 1.0) tex = std::make_shared<scaled_texture>(tex, n.scale);
+				break;
+			}
+			case Kind::Product:
+				tex = std::make_shared<product_texture>(built[static_cast<std::size_t>(n.a)], built[static_cast<std::size_t>(n.b)]);
+				break;
+			case Kind::Blend:
+				tex = nodes[static_cast<std::size_t>(n.t)].kind == Kind::Const
+					? std::make_shared<mix_texture>(built[static_cast<std::size_t>(n.a)], built[static_cast<std::size_t>(n.b)], std::min(1.0, std::max(0.0, nodes[static_cast<std::size_t>(n.t)].c[0])))
+					: std::make_shared<mix_texture>(built[static_cast<std::size_t>(n.a)], built[static_cast<std::size_t>(n.b)], built[static_cast<std::size_t>(n.t)]);
+				break;
+		}
+		built.push_back(std::move(tex));
+	}
+	return built.back();
+}
+
 // pbrt's material names already match ours (see pbrt_flatten.h), so this is
 // construction rather than interpretation. An Unsupported material becomes
 // diffuse - flatten() has already warned about it by name, so failing here
@@ -357,6 +391,8 @@ inline std::shared_ptr<material> makeMaterialBase(const pbrt_flatten::Material &
 		// header comment), so a scale-wrapped coateddiffuse texture keeps
 		// real mip-level filtering under minification, not just its
 		// original AreaLightSource caller's point-sampled use.
+		if (!m.reflectanceGraph.empty())   // (a graph first: a picture times a picture also names its first picture in textureFilename, as the fallback)
+			return std::make_shared<coated_diffuse>(reflectanceGraphTexture(m.reflectanceGraph), m.ior, m.roughness_u, m.roughness_v, m.remapRoughness);
 		if (!m.textureFilename.empty()) {
 			shared_ptr<texture> tex = reflectanceImageTexture(m);
 			if (m.textureScale != 1.0)
@@ -563,6 +599,7 @@ inline std::shared_ptr<material> makeMaterialBase(const pbrt_flatten::Material &
 		// multiplier when reflectance was bound to one wrapping an imagemap
 		// (barcelona-pavilion's own dominant pattern, same as CoatedDiffuse's
 		// identical-shape case below).
+		if (!m.reflectanceGraph.empty()) return std::make_shared<lambertian>(reflectanceGraphTexture(m.reflectanceGraph));   // (a graph first, see CoatedDiffuse above)
 		if (!m.textureFilename.empty()) {
 			shared_ptr<texture> tex = reflectanceImageTexture(m);
 			if (m.textureScale != 1.0)

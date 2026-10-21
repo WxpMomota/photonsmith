@@ -605,6 +605,25 @@ class scaled_texture : public texture {
 };
 
 
+// pbrt's "scale" texture when its scale is itself a texture: the product of the two at the point, per channel (a float texture has the same value in each).
+class product_texture : public texture {
+  public:
+    product_texture(shared_ptr<texture> a, shared_ptr<texture> b) : a(std::move(a)), b(std::move(b)) {}
+
+    color value(double u, double v, const point3& p) const override {
+        return a->value(u, v, p) * b->value(u, v, p);
+    }
+
+    color value_diff(double u, double v, const point3& p,
+                      double dudx, double dvdx, double dudy, double dvdy) const override {
+        return a->value_diff(u, v, p, dudx, dvdx, dudy, dvdy) * b->value_diff(u, v, p, dudx, dvdx, dudy, dvdy);
+    }
+
+  private:
+    shared_ptr<texture> a, b;
+};
+
+
 // An image texture looked up through pbrt-v4's UVMapping: (su * u + du, sv * v + dv) instead of (u, v), so a picture repeats `su` times across the surface and can be moved (the texture
 // image's own wrap mode decides what happens outside 0 to 1: Repeat tiles it). The screen-space footprint of the lookup scales by the same factors, so a tiled picture is filtered
 // for the smaller texels it now covers. (pbrt_flatten::UvMapping; the identity is not wrapped at all.)

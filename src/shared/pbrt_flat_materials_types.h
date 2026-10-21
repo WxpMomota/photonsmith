@@ -129,6 +129,9 @@ struct TexMeanNode {
 	double scale = 1.0;              // Image: the imagemap's "scale"
 	double gamma = 2.2;              // Image: the encoding of an 8-bit picture (1 = linear)
 	bool invert = false;             // Image: pbrt's "invert"
+	int wrapIndex = 1;               // Image: the imagemap's "wrap" (TextureDecodeOptions::wrapIndex), read when the recipe is evaluated per hit (Material::reflectanceGraph)
+	UvMapping mapping;               // Image: the imagemap's own mapping (uv scale/offset, or a position-based one), likewise
+	bool meanOnly = false;           // Blend: a half-and-half stand-in for a pattern (checkerboard, directionmix) that is right on average but not at a point
 	int a = -1, b = -1, t = -1;      // Product: a * b. Blend: (1 - t) * a + t * b. Indices into TextureAverage::nodes
 };
 
@@ -136,6 +139,19 @@ struct TextureAverage {
 	std::string param;                  // the material parameter, as pbrt names it ("roughness", "reflectance", "amount", "interface.roughness" ...)
 	std::vector<TexMeanNode> nodes;     // the recipe; the root is the last node
 };
+
+// A recipe the renderers can evaluate at a hit (Material::reflectanceGraph): at least one picture to make it vary, nothing that is only right on average, and few enough nodes for
+// the device's fixed evaluation stack.
+constexpr int kMaxTextureGraphNodes = 16;
+inline bool isPerHitTextureGraph(const std::vector<TexMeanNode> &nodes) {
+	if (nodes.empty() || static_cast<int>(nodes.size()) > kMaxTextureGraphNodes) return false;
+	bool picture = false;
+	for (const TexMeanNode &n : nodes) {
+		if (n.kind == TexMeanNode::Kind::Image) picture = true;
+		if (n.meanOnly) return false;
+	}
+	return picture;
+}
 
 struct Material {
 	MaterialKind kind = MaterialKind::Diffuse;
@@ -392,6 +408,10 @@ struct Material {
 	// This slot's own "encoding"/"wrap"/"invert" - see
 	// transmittanceTextureOptions' own comment just above.
 	TextureDecodeOptions roughnessTextureOptions;
+
+	// Diffuse and CoatedDiffuse: a "reflectance" that is a graph of textures (a "scale" of an image by a float image, a "mix" of images and constants ...), evaluated per hit by the
+	// CPU and both OptiX backends. The recipe's root is the last node (TexMeanNode); the flat `color` holds its mean (TextureAverage), for a backend that cannot (GPU SPPM, Metal).
+	std::vector<TexMeanNode> reflectanceGraph;
 
 	// A roughness image on a Conductor, CoatedDiffuse or CoatedConductor (the coat's roughness: "roughness" / "interface.roughness"), evaluated per hit like the Dielectric's above, and
 	// the CoatedConductor's base conductor ("conductor.roughness") in the cond* fields. Roughness at a hit = scale * the image's value (the imagemap's own "float scale", or a

@@ -1484,3 +1484,37 @@ TEST(FlattenMaterialTest, AnImagemapsPositionMappingsAreRead) {
 	EXPECT_EQ(s.materials[1].textureMapping.kind, pbrt_flatten::UvMapping::Kind::Spherical);
 	EXPECT_TRUE(s.materials[2].textureMapping.identity()) << "no \"mapping\" is pbrt's uv mapping";
 }
+
+TEST(FlattenMaterialTest, AReflectanceThatIsAGraphOfPicturesIsKeptForPerHitEvaluation) {
+	// A "scale" of a picture by a float picture, and a "mix" of that and the picture: not one image, so they used to be averaged.
+	const FlatScene s = flattenSource(
+		"Texture \"pic\" \"spectrum\" \"imagemap\" \"string filename\" [ \"a.png\" ]\n"
+		"Texture \"mask\" \"float\" \"imagemap\" \"string filename\" [ \"m.png\" ]\n"
+		"Texture \"g1\" \"spectrum\" \"scale\" \"texture tex\" [ \"pic\" ] \"texture scale\" [ \"mask\" ]\n"
+		"Texture \"g2\" \"spectrum\" \"mix\" \"texture tex1\" [ \"g1\" ] \"texture tex2\" [ \"pic\" ] \"float amount\" [ 0.3 ]\n"
+		"Material \"diffuse\" \"texture reflectance\" [ \"g1\" ]\n"
+		+ std::string(kQuadMesh) +
+		"Material \"coateddiffuse\" \"texture reflectance\" [ \"g2\" ]\n"
+		+ std::string(kQuadMesh));
+	ASSERT_EQ(s.materials.size(), 2u);
+	ASSERT_FALSE(s.materials[1].reflectanceGraph.empty());
+	const auto &product = s.materials[0].reflectanceGraph;
+	ASSERT_EQ(product.size(), 3u);
+	EXPECT_EQ(product.back().kind, pbrt_flatten::TexMeanNode::Kind::Product);
+	EXPECT_EQ(product[0].file, "a.png");
+	EXPECT_EQ(s.materials[1].reflectanceGraph.back().kind, pbrt_flatten::TexMeanNode::Kind::Blend);
+	EXPECT_FALSE(warnedAbout(s, "not supported")) << "drawn per hit: nothing to apologise for";
+	EXPECT_FALSE(s.materials[0].textureAverages.empty()) << "the mean stays as the fallback for a backend that cannot";
+}
+
+TEST(FlattenMaterialTest, AGraphOfOnlyAPatternStandInIsStillAveraged) {
+	// A checkerboard's half-and-half blend is right on average only: with no way to draw the pattern the graph is not kept.
+	const FlatScene s = flattenSource(
+		"Texture \"pic\" \"spectrum\" \"imagemap\" \"string filename\" [ \"a.png\" ]\n"
+		"Texture \"chk\" \"spectrum\" \"directionmix\" \"texture tex1\" [ \"pic\" ] \"rgb tex2\" [ 0 0 1 ]\n"
+		"Material \"diffuse\" \"texture reflectance\" [ \"chk\" ]\n"
+		+ std::string(kQuadMesh));
+	ASSERT_EQ(s.materials.size(), 1u);
+	EXPECT_TRUE(s.materials[0].reflectanceGraph.empty());
+	EXPECT_TRUE(warnedAbout(s, "average value"));
+}

@@ -507,6 +507,45 @@ inline void setRoughnessTextures(const pbrt_flatten::Material &m, MaterialData &
 // imagemap-filename/flat-color fallback still applies.
 inline bool resolveProceduralReflectanceTexture(const pbrt_flatten::Material &m, MaterialData &d,
 												 SceneData &out, std::map<std::string, int> &imageTextureCache) {
+	if (!m.reflectanceGraph.empty()) {
+		// The pictures first (each may append an image entry), so the graph's own entries below are contiguous.
+		using Kind = pbrt_flatten::TexMeanNode::Kind;
+		static_assert(kMaxTextureGraphNodesDevice == pbrt_flatten::kMaxTextureGraphNodes, "the device's graph stack and the flattener's limit are one number");
+		std::vector<int> imageIdx(m.reflectanceGraph.size(), -1);
+		for (std::size_t i = 0; i < m.reflectanceGraph.size(); ++i) {
+			const pbrt_flatten::TexMeanNode &n = m.reflectanceGraph[i];
+			if (n.kind != Kind::Image) continue;
+			imageIdx[i] = getOrBuildPbrtImageTexture(n.file, out, imageTextureCache, static_cast<float>(n.gamma), static_cast<GpuWrapMode>(n.wrapIndex), n.invert, n.mapping);
+			if (imageIdx[i] < 0) return false;   // an unreadable picture: the flat colour (the graph's mean) stands
+		}
+		TextureData root{};
+		root.kind = TextureKind::Graph;
+		root.octaves = static_cast<int>(m.reflectanceGraph.size());
+		root.tex1ImageIdx = static_cast<int>(out.textures.size()) + 1;
+		d.textureIdx = static_cast<int>(out.textures.size());
+		out.textures.push_back(root);
+		for (std::size_t i = 0; i < m.reflectanceGraph.size(); ++i) {
+			const pbrt_flatten::TexMeanNode &n = m.reflectanceGraph[i];
+			TextureData node{};
+			if (n.kind == Kind::Image) {
+				node = out.textures[static_cast<std::size_t>(imageIdx[i])];
+				node.octaves = 1;
+				node.mixAmount = static_cast<float>(n.scale);
+			} else if (n.kind == Kind::Const) {
+				node.octaves = 0;
+				node.color1 = make_float3(static_cast<float>(n.c[0]), static_cast<float>(n.c[1]), static_cast<float>(n.c[2]));
+			} else if (n.kind == Kind::Product) {
+				node.octaves = 2;
+				node.tex1ImageIdx = n.a; node.tex2ImageIdx = n.b;
+			} else {
+				node.octaves = 3;
+				node.tex1ImageIdx = n.a; node.tex2ImageIdx = n.b; node.amountImageIdx = n.t;
+			}
+			node.kind = TextureKind::GraphNode;
+			out.textures.push_back(node);
+		}
+		return true;
+	}
 	if (m.hasCheckerReflectance) {
 		TextureData tex{};
 		// "integer dimension" [3] (Material::checkerIs3D's own comment) -
@@ -935,7 +974,8 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 		d.layerAlbedo = static_cast<float>(m.layerMediumAlbedo);
 		d.layerMaxDepth = m.layerMaxDepth;
 		d.layerNSamples = m.layerNSamples;
-		if (!m.textureFilename.empty()) {
+		if (!m.reflectanceGraph.empty() && resolveProceduralReflectanceTexture(m, d, out, imageTextureCache)) {   // (a graph first: its first picture is also in textureFilename, as the fallback)
+		} else if (!m.textureFilename.empty()) {
 			d.textureIdx = getOrBuildPbrtImageTexture(m.textureFilename, out, imageTextureCache,
 				static_cast<float>(m.textureGamma), static_cast<GpuWrapMode>(m.textureWrapIndex), m.textureInvert, m.textureMapping);
 			d.emissionScale = static_cast<float>(m.textureScale);
@@ -1119,7 +1159,8 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 		// class wrapper's multiplier (barcelona-pavilion's own dominant
 		// pattern); stays at its 1.0 no-op default for a bare imagemap.
 		d.type = MaterialType::Lambertian;
-		if (!m.textureFilename.empty()) {
+		if (!m.reflectanceGraph.empty() && resolveProceduralReflectanceTexture(m, d, out, imageTextureCache)) {   // (a graph first: its first picture is also in textureFilename, as the fallback)
+		} else if (!m.textureFilename.empty()) {
 			d.textureIdx = getOrBuildPbrtImageTexture(m.textureFilename, out, imageTextureCache,
 				static_cast<float>(m.textureGamma), static_cast<GpuWrapMode>(m.textureWrapIndex), m.textureInvert, m.textureMapping);
 			d.emissionScale = static_cast<float>(m.textureScale);
