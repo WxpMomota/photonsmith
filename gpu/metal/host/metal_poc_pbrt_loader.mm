@@ -851,6 +851,43 @@ void PbrtSceneLoader::emitSphereLight(const pbrt_flatten::FlatScene& scene, cons
     }
 }
 
+// A clipped or stretched sphere for the shader (SphereData::clipped): its object-to-Metal-world 3x4 matrix and the inverse. `xf` is the shape's object -> pbrt-world matrix (row-major 4x4);
+// the scene was rescaled and recentred (toWorld, an affine map, probed at the origin and the three axes), so the matrix is composed with that. center / radius become a bound: the object's
+// origin and the largest half-extent of the object's box (the sphere's own bounding box, which the acceleration structure builds from them).
+static void setSphereObjectTransform(SphereData& sd, const double xf[16], const PbrtSceneLoader::PbrtToWorldFn& toWorld, double radiusLocal, double zMin, double zMax, double phiMaxDeg) {
+    const float3 b0 = toWorld(float3{0, 0, 0});
+    const float3 ex = toWorld(float3{1, 0, 0}), ey = toWorld(float3{0, 1, 0}), ez = toWorld(float3{0, 0, 1});
+    const double A[3][3] = {{ex.x - b0.x, ey.x - b0.x, ez.x - b0.x}, {ex.y - b0.y, ey.y - b0.y, ez.y - b0.y}, {ex.z - b0.z, ey.z - b0.z, ez.z - b0.z}};
+    const double b[3] = {b0.x, b0.y, b0.z};
+    double M[3][4];
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 3; ++c) M[r][c] = A[r][0] * xf[0 * 4 + c] + A[r][1] * xf[1 * 4 + c] + A[r][2] * xf[2 * 4 + c];
+        M[r][3] = A[r][0] * xf[3] + A[r][1] * xf[7] + A[r][2] * xf[11] + b[r];
+    }
+    const double det = M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+    double inv[3][3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+    if (std::fabs(det) > 1e-30) {
+        for (int r = 0; r < 3; ++r)
+            for (int c = 0; c < 3; ++c) {
+                const int r1 = (r + 1) % 3, r2 = (r + 2) % 3, c1 = (c + 1) % 3, c2 = (c + 2) % 3;
+                inv[c][r] = (M[r1][c1] * M[r2][c2] - M[r1][c2] * M[r2][c1]) / det;   // (the cofactor of (r, c) lands at (c, r): the adjugate)
+            }
+    }
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < 3; ++c) { sd.o2w[r * 4 + c] = (float)M[r][c]; sd.w2o[r * 4 + c] = (float)inv[r][c]; }
+        sd.o2w[r * 4 + 3] = (float)M[r][3];
+        sd.w2o[r * 4 + 3] = (float)-(inv[r][0] * M[0][3] + inv[r][1] * M[1][3] + inv[r][2] * M[2][3]);
+    }
+    sd.clipped = 1.0f;
+    sd.radiusLocal = (float)radiusLocal;
+    sd.zMin = (float)zMin; sd.zMax = (float)zMax;
+    sd.phiMax = (float)(phiMaxDeg * 3.14159265358979323846 / 180.0);
+    sd.center = PackedFloat3{(float)M[0][3], (float)M[1][3], (float)M[2][3]};
+    double half = 0.0;
+    for (int r = 0; r < 3; ++r) half = std::max(half, radiusLocal * std::sqrt(M[r][0] * M[r][0] + M[r][1] * M[r][1] + M[r][2] * M[r][2]));
+    sd.radius = (float)half;
+}
+
 void PbrtSceneLoader::loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, const std::vector<pbrt_flatten::Sphere>& sphereList, const PbrtToWorldFn& toWorld,
     const PbrtMaterialForFn& materialFor, float sceneScale) {
     for (const pbrt_flatten::Sphere& s : sphereList) {
@@ -878,6 +915,8 @@ void PbrtSceneLoader::loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, cons
         sd.uvRot0 = PackedFloat3{(float)s.uvRot[0], (float)s.uvRot[1], (float)s.uvRot[2]};
         sd.uvRot1 = PackedFloat3{(float)s.uvRot[3], (float)s.uvRot[4], (float)s.uvRot[5]};
         sd.uvRot2 = PackedFloat3{(float)s.uvRot[6], (float)s.uvRot[7], (float)s.uvRot[8]};
+        // pbrt's zmin / zmax / phimax, and an instanced sphere's stretch, make it a shape of its own in object space (a light or a medium boundary keeps the old whole sphere)
+        if (s.clipped && s.areaLight < 0 && s.medium < 0) setSphereObjectTransform(sd, s.xform, toWorld, s.radiusLocal, s.zMin, s.zMax, s.phiMaxDeg);
         spheres.push_back(sd);
         TriangleMaterial mat = sphereMaterial(scene, s, toWorld, materialFor, sceneScale);
         emitSphereLight(scene, s, sd, center, mat);
@@ -1170,7 +1209,20 @@ void PbrtSceneLoader::loadPbrtObjectInstances(const pbrt_flatten::FlatScene& sce
                                     std::fabs(dots[0]) < 1e-4 * mean * mean && std::fabs(dots[1]) < 1e-4 * mean * mean && std::fabs(dots[2]) < 1e-4 * mean * mean;
             for (const pbrt_flatten::Sphere& gs : grp.spheres) {
                 const bool plainMedium = gs.medium < 0 || (gs.medium < (int)scene.media.size() && scene.media[gs.medium].type == "homogeneous");   // a grid or cloud has its own frame, which the instance would not move
-                if (!similarity || gs.areaLight >= 0 || !plainMedium || gs.clipped) { ++skippedInstancedSpheres; continue; }
+                if (gs.areaLight >= 0 || !plainMedium || gs.medium >= 0) { ++skippedInstancedSpheres; continue; }   // (a light or a medium boundary has to be a whole sphere)
+                if (!similarity || gs.clipped) {
+                    // a stretched or clipped instanced sphere: its own object space, placed by the instance matrix (SphereData::clipped)
+                    double G[16] = {1, 0, 0, 0,  0, 1, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1};   // the sphere's object -> the instance definition's space
+                    if (gs.clipped) { for (int i = 0; i < 16; ++i) G[i] = gs.xform[i]; }
+                    else { G[0] = G[5] = G[10] = gs.radius; G[3] = gs.center[0]; G[7] = gs.center[1]; G[11] = gs.center[2]; }
+                    pbrt_flatten::Sphere placed = gs;
+                    placed.clipped = true;
+                    for (int r = 0; r < 4; ++r)
+                        for (int c = 0; c < 4; ++c) { double v = 0.0; for (int k = 0; k < 4; ++k) v += X[r * 4 + k] * G[k * 4 + c]; placed.xform[r * 4 + c] = v; }
+                    if (!gs.clipped) { placed.radiusLocal = 1.0; placed.zMin = -1.0; placed.zMax = 1.0; placed.phiMaxDeg = 360.0; }
+                    instancedSpheres.push_back(placed);
+                    continue;
+                }
                 pbrt_flatten::Sphere placed = gs;
                 for (int r = 0; r < 3; ++r) {
                     placed.center[r] = X[r * 4 + 0] * gs.center[0] + X[r * 4 + 1] * gs.center[1] + X[r * 4 + 2] * gs.center[2] + X[r * 4 + 3];
@@ -1236,11 +1288,9 @@ void PbrtSceneLoader::loadPbrtObjectInstances(const pbrt_flatten::FlatScene& sce
                         "baking them would take %zu)\n", pbrtInstPlacements.size(), pbrtInstGroups.size(), pbrtInstTriTotal, bakedEquivalent);
     if (skippedDegenerate > 0)
         fprintf(stderr, "loadPbrtScene: %zu ObjectInstance placement(s) with a singular transform skipped\n", skippedDegenerate);
-    // A non-uniformly-scaled sphere is an ellipsoid, which SphereData (a plain centre+radius analytic primitive) can't represent - baking it as
-    // a sphere anyway would silently render the wrong shape, so instanced spheres are skipped (no pbrt scene run so far uses one).
+    // A clipped or stretched instanced sphere is drawn in its own object space (SphereData::clipped); one that is a light or a medium boundary has to be a whole sphere, and is skipped.
     if (skippedInstancedSpheres > 0)
-        fprintf(stderr, "loadPbrtScene: %zu instanced sphere(s) skipped - a non-uniformly-scaled, emissive, medium-bounded or clipped "
-                        "instanced sphere can't be represented by this loader's analytic sphere primitive\n", skippedInstancedSpheres);
+        fprintf(stderr, "loadPbrtScene: %zu instanced sphere(s) skipped - an emissive or medium-bounded instanced sphere can't be represented by this loader's analytic sphere primitive\n", skippedInstancedSpheres);
 }
 
 // --- Homogeneous participating medium (fog) -------------------------
