@@ -252,7 +252,7 @@ static bool prepareSceneAndCamera(
 		// PREVIOUS scene's placements around.
 		g_renderer->setInstanceData(scene.instanceTriangles, scene.instanceSpheres,
 									scene.instanceGroups, scene.instancePlacements);
-		g_renderer->uploadExtraPortalLights(scene.extraPortals);
+		g_renderer->uploadExtraPortalLights(scene.extraPortals, scene.skyBesidePortals);
 		// The GPU upload writes its own errors to std::cerr ("Scene contains no geometry"); kept, when not verbose, to say why this failed.
 		std::unique_ptr<CerrCapture> uploadCapture;
 		if (!verbose) uploadCapture = std::make_unique<CerrCapture>();
@@ -1355,7 +1355,7 @@ extern "C" int optix_render_main_sppm(
 			// keep a PREVIOUS scene's placements around.
 			g_renderer->setInstanceData(scene.instanceTriangles, scene.instanceSpheres,
 										scene.instanceGroups, scene.instancePlacements);
-			g_renderer->uploadExtraPortalLights(scene.extraPortals);
+			g_renderer->uploadExtraPortalLights(scene.extraPortals, scene.skyBesidePortals);
 			if (!g_renderer->buildScene(scene.spheres, scene.quads, scene.materials,
 			                             scene.lightIndices, scene.lightKinds,
 			                             scene.punctualLights, scene.bilinearPatches,

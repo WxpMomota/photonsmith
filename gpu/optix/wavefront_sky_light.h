@@ -24,10 +24,54 @@
 // random_float()/random_unit_vector(). `shadingPoint`: see optix_sky_light.h's
 // own comment - a portal light's visible window depends on it.
 // ---------------------------------------------------------------------------
+// The plain (non-portal) sky on its own: an importance-sampled image, else the uniform sphere with the flat colour (twins of optix_sky_light.h's sample_plain_sky & co).
+__device__ __forceinline__ void wf_sample_plain_sky(const GpuSkyDistribution& sky, unsigned int& seed, const float3& flatColor, float3& dir_out, float& pdf_out, float3& Le_out) {
+	if (sky.height > 0 && sky.width > 0) {
+		const float ru = wf_rand(seed), rv = wf_rand(seed);
+		if (gpu_sky_sample_Li(sky, ru, rv, dir_out, pdf_out)) {
+			Le_out = gpu_sky_Le(sky, dir_out);
+			return;
+		}
+	}
+	dir_out = wf_rand_unit(seed);
+	pdf_out = 1.0f / (4.0f * 3.14159265f);
+	Le_out = flatColor;
+}
+__device__ __forceinline__ float wf_plain_sky_pdf(const GpuSkyDistribution& sky, const float3& dir) {
+	if (sky.height > 0 && sky.width > 0) return gpu_sky_pdf_Li(sky, dir);
+	return 1.0f / (4.0f * 3.14159265f);
+}
+__device__ __forceinline__ float3 wf_plain_sky_radiance(const GpuSkyDistribution& sky, const float3& dir, const float3& flatColor) {
+	if (sky.height > 0 && sky.width > 0) return gpu_sky_Le(sky, dir);
+	return flatColor;
+}
+
 __device__ __forceinline__ void wf_sample_sky_nee(const GpuSkyDistribution& sky, const GpuPortalLight& portal,
 													 unsigned int& seed, const float3& flatColor,
 													 const float3& shadingPoint,
 													 float3& dir_out, float& pdf_out, float3& Le_out) {
+	if (portal.height > 0 && portal.width > 0 && portal.skyBeside) {
+		// A plain sky beside the portal lights: one sample of the 50/50 mixture (see optix_sky_light.h's sample_sky_nee).
+		bool ok;
+		if (wf_rand(seed) < 0.5f) {
+			const float ru = wf_rand(seed), rv = wf_rand(seed);
+			float pdf_unused; float3 le_unused;
+			ok = gpu_portal_set_sample_Li(portal, shadingPoint, ru, rv, dir_out, pdf_unused, le_unused);
+		} else {
+			float3 le_unused;
+			wf_sample_plain_sky(sky, seed, flatColor, dir_out, pdf_out, le_unused);
+			ok = pdf_out > 0.0f;
+		}
+		if (!ok) {
+			pdf_out = 0.0f;
+			Le_out = make_float3(0.0f, 0.0f, 0.0f);
+			dir_out = make_float3(0.0f, 1.0f, 0.0f);
+			return;
+		}
+		pdf_out = 0.5f * (gpu_portal_set_pdf_Li_in_window(portal, shadingPoint, dir_out) + wf_plain_sky_pdf(sky, dir_out));
+		Le_out = gpu_portal_set_Le(portal, shadingPoint, dir_out) + wf_plain_sky_radiance(sky, dir_out, flatColor);
+		return;
+	}
 	if (portal.height > 0 && portal.width > 0) {
 		const float ru = wf_rand(seed), rv = wf_rand(seed);
 		if (gpu_portal_set_sample_Li(portal, shadingPoint, ru, rv, dir_out, pdf_out, Le_out)) {
@@ -41,29 +85,20 @@ __device__ __forceinline__ void wf_sample_sky_nee(const GpuSkyDistribution& sky,
 		dir_out = make_float3(0.0f, 1.0f, 0.0f);
 		return;
 	}
-	if (sky.height > 0 && sky.width > 0) {
-		const float ru = wf_rand(seed), rv = wf_rand(seed);
-		if (gpu_sky_sample_Li(sky, ru, rv, dir_out, pdf_out)) {
-			Le_out = gpu_sky_Le(sky, dir_out);
-			return;
-		}
-	}
-	dir_out = wf_rand_unit(seed);
-	pdf_out = 1.0f / (4.0f * 3.14159265f);
-	Le_out = flatColor;
+	wf_sample_plain_sky(sky, seed, flatColor, dir_out, pdf_out, Le_out);
 }
 
 __device__ __forceinline__ float wf_sky_pdf_for_mis(const GpuSkyDistribution& sky, const GpuPortalLight& portal,
 													  const float3& dir, const float3& shadingPoint) {
+	if (portal.height > 0 && portal.width > 0 && portal.skyBeside) return 0.5f * (gpu_portal_set_pdf_Li_in_window(portal, shadingPoint, dir) + wf_plain_sky_pdf(sky, dir));
 	if (portal.height > 0 && portal.width > 0) return gpu_portal_set_pdf_Li(portal, shadingPoint, dir);
-	if (sky.height > 0 && sky.width > 0) return gpu_sky_pdf_Li(sky, dir);
-	return 1.0f / (4.0f * 3.14159265f);
+	return wf_plain_sky_pdf(sky, dir);
 }
 
 __device__ __forceinline__ float3 wf_sky_radiance(const GpuSkyDistribution& sky, const GpuPortalLight& portal,
 													 const float3& dir, const float3& flatColor,
 													 const float3& shadingPoint) {
+	if (portal.height > 0 && portal.width > 0 && portal.skyBeside) return gpu_portal_set_Le(portal, shadingPoint, dir) + wf_plain_sky_radiance(sky, dir, flatColor);
 	if (portal.height > 0 && portal.width > 0) return gpu_portal_set_Le(portal, shadingPoint, dir);
-	if (sky.height > 0 && sky.width > 0) return gpu_sky_Le(sky, dir);
-	return flatColor;
+	return wf_plain_sky_radiance(sky, dir, flatColor);
 }

@@ -697,6 +697,7 @@ inline LoadResult loadFile(const std::string &path,
 	};
 	resolveEnvironmentLight(r.scene.infiniteLight);
 	for (pbrt_flatten::InfiniteLight &extra : r.scene.extraPortalLights) resolveEnvironmentLight(extra);
+	resolveEnvironmentLight(r.scene.skyBesidePortals);
 
 	// Texture-bound parameters the renderers cannot evaluate per hit take the texture's mean (Material::textureAverages).
 	applyTextureAverages(sceneDir, path, r.scene);

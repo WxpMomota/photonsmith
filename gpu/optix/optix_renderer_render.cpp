@@ -123,6 +123,7 @@ GpuCameraParams OptiXRenderer::makeRenderCamera(const GpuCameraParams& camera) {
 		gpuCam.portalLight.satSum = reinterpret_cast<const double*>(d_portalSatSum_);
 		gpuCam.portalLight.extraCount = extraPortalCount_;
 		gpuCam.portalLight.extra = reinterpret_cast<const GpuPortalLight*>(d_extraPortals_);
+		gpuCam.portalLight.skyBeside = skyBesidePortals_ ? 1 : 0;
 	}
 	return gpuCam;
 }

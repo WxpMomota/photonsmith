@@ -267,10 +267,9 @@ class camera {
     shared_ptr<sky_light> sky;               // HDR env map (pbrt-v4 ImageInfiniteLight); nullptr = flat background
     // pbrt-v4 windowed/portal infinite light ("point3 portal[4]") - visible
     // only through a finite rectangular window, not the whole sphere.
-    // Mutually exclusive with `sky` above (see pbrt_cpu_builder.h's
-    // BuildResult::portal comment) - every ray_color()/ray_color_spectral()
-    // call site below checks `portal` first, falling through to `sky` only
-    // when this is null.
+    // May sit beside `sky` above (pbrt sums every infinite light): every
+    // ray_color()/ray_color_spectral() call site treats the portal and the
+    // sky as two lights, each with its own next-event estimate and MIS weight.
     shared_ptr<PortalLightSet<double>> portal;   // one portal light, or the several of a file (pbrt sums them)
     shared_ptr<punctual_light_list> punct_lights; // pbrt-v4 PointLight/SpotLight/DistantLight (delta); nullptr = none
     // pbrt-v4's own "camera medium" (FlatScene::cameraMediumIndex's own

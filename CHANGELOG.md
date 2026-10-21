@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## Unreleased (after 0.1.5)
 
+* **A plain sky next to portal lights is drawn** (CPU and both OptiX backends): a pbrt file with a portal light and an ordinary `LightSource "infinite"` used to lose the ordinary one with a warning; pbrt adds them, and now so do we (`pbrt_scenes/portal-light-plus-sky.pbrt`, within 0.1% of pbrt on all three backends). BDPT, MLT, SPPM and Metal still do not.
+
 * **A reflectance made of several textures is drawn per pixel** (CPU and both OptiX backends): a picture times a second picture (Kroken's dirt maps), a `mix` whose `amount` is a picture, or a mix of products, on a `diffuse` or `coateddiffuse` used to take the average colour of the whole graph. Each hit now evaluates the graph (up to 16 nodes: pictures, constants, `scale`, `mix`; `pbrt_scenes/texture-graph.pbrt`, checked against real pbrt-v4). A `checkerboard` or `directionmix` inside a graph, and Metal, still use the average.
 
 * **pbrt's spherical, cylindrical and planar texture mappings are drawn** (CPU and both OptiX backends): a picture on a sphere with `"string mapping" [ "spherical" ]` used to take the surface's own uv and ignore the mapping; the hit point now goes through the texture's own transform and pbrt's mapping, so the picture lands where pbrt puts it (`pbrt_scenes/texture-mappings.pbrt`, checked against real pbrt-v4). Metal still uses the surface's uv.

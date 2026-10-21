@@ -290,7 +290,8 @@ inline void add_escaped_radiance(const camera& cam, const ray& current_ray, bool
             double w_b = camera::mis_power_heuristic(prev_bsdf_pdf, p_l);
             L += beta * w_b * Le;
         }
-    } else if (sky) {
+    }
+    if (sky) {   // (a plain sky beside the portal lights is a light of its own: pbrt sums every infinite light)
         color Le = sky->Le(unit_vector(current_ray.direction()));
         if (specular_bounce) {
             // Camera ray or post-specular: full contribution (no MIS needed)
@@ -303,7 +304,8 @@ inline void add_escaped_radiance(const camera& cam, const ray& current_ray, bool
             double w_b = camera::mis_power_heuristic(prev_bsdf_pdf, p_l);
             L += beta * w_b * Le;
         }
-    } else {
+    }
+    if (!portal && !sky) {
         L += beta * background;
     }
 }
@@ -463,7 +465,8 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
                 }
             }
         }
-    } else if (sky) {
+    }
+    if (sky) {   // (a plain sky beside the portal lights is a light of its own: pbrt sums every infinite light)
         SkyLiSample sky_smp = sky->sample_Le();
         vec3   sky_dir  = sky_smp.direction;
         double pdf_sky  = sky_smp.pdf;
@@ -806,7 +809,8 @@ inline void add_escaped_radiance_spectral(const camera& cam, const ray& current_
             double w_b = camera::mis_power_heuristic(prev_bsdf_pdf, p_l);
             L += beta * static_cast<float>(w_b) * Le;
         }
-    } else if (sky) {
+    }
+    if (sky) {   // (a plain sky beside the portal lights is a light of its own: pbrt sums every infinite light)
         SS Le = illuminant(sky->Le(unit_vector(current_ray.direction())));
         if (specular_bounce) {
             L += beta * Le;
@@ -815,7 +819,8 @@ inline void add_escaped_radiance_spectral(const camera& cam, const ray& current_
             double w_b = camera::mis_power_heuristic(prev_bsdf_pdf, p_l);
             L += beta * static_cast<float>(w_b) * Le;
         }
-    } else {
+    }
+    if (!portal && !sky) {
         L += beta * illuminant(background);
     }
 }
@@ -904,7 +909,8 @@ inline void add_direct_lighting_spectral(const camera& cam, const hittable& worl
                 }
             }
         }
-    } else if (sky) {
+    }
+    if (sky) {   // (a plain sky beside the portal lights is a light of its own: pbrt sums every infinite light)
         SkyLiSample sky_smp = sky->sample_Le();
         vec3   sky_dir  = sky_smp.direction;
         double pdf_sky  = sky_smp.pdf;

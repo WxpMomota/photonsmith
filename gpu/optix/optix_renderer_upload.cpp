@@ -568,7 +568,8 @@ void OptiXRenderer::uploadPortalLight(const std::vector<float>& portalRectifiedI
 			<< ", " << portalRectifiedImage.size() << " rectified-image floats) to GPU\n";
 }
 
-void OptiXRenderer::uploadExtraPortalLights(const std::vector<ExtraPortalLightHost>& extras) {
+void OptiXRenderer::uploadExtraPortalLights(const std::vector<ExtraPortalLightHost>& extras, bool skyBeside) {
+	skyBesidePortals_ = skyBeside;
 	for (CUdeviceptr p : d_extraPortalBuffers_) if (p) cudaFree(reinterpret_cast<void*>(p));
 	d_extraPortalBuffers_.clear();
 	if (d_extraPortals_) { cudaFree(reinterpret_cast<void*>(d_extraPortals_)); d_extraPortals_ = 0; }

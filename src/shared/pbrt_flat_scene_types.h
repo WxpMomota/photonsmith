@@ -438,6 +438,10 @@ struct FlatScene {
 	// these is a complete portal light of its own (picture, scale, corners). Empty for every scene with at most one infinite light. The renderers add them to the main portal
 	// (a set of portals: Le is the sum, the light is sampled by picking one uniformly). Only portal lights are kept here: see flattenLights() for what happens to the others.
 	std::vector<InfiniteLight> extraPortalLights;
+	// A plain (non-portal) infinite light in a scene that also has portal lights (pbrt sums them all): the last such light of the file. The portal lights stay in `infiniteLight` /
+	// `extraPortalLights`; the renderers add this sky next to them (an independent estimator per light on the CPU, a two-way mixture on the OptiX backends). present=false
+	// when there is none. A scene with no portal keeps its one plain light in `infiniteLight`, as before.
+	InfiniteLight skyBesidePortals;
 	std::vector<PunctualLight> punctualLights;   // LightSource point/spot/distant/goniometric/projection
 
 	// Instanced geometry. `groups` hold object-space shapes; `instances` place

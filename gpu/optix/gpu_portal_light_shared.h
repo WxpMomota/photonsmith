@@ -304,6 +304,14 @@ __device__ __forceinline__ float gpu_portal_set_pdf_Li(const GpuPortalLight& d, 
 	return sum / (float)(1 + d.extraCount);
 }
 
+// The set's density at a direction counting each portal only inside its own window (a single portal's gpu_portal_pdf_Li does not check the window): what the mixture of the
+// portals and a plain sky beside them needs (GpuPortalLight::skyBeside), where the plain sky samples directions anywhere.
+__device__ __forceinline__ float gpu_portal_set_pdf_Li_in_window(const GpuPortalLight& d, const float3& p, const float3& dir) {
+	float sum = gpu_portal_pdf_Li_in_window(d, p, dir);
+	for (int i = 0; i < d.extraCount; ++i) sum += gpu_portal_pdf_Li_in_window(d.extra[i], p, dir);
+	return sum / (float)(1 + d.extraCount);
+}
+
 __device__ __forceinline__ bool gpu_portal_set_sample_Li(const GpuPortalLight& d, const float3& p, float ru, float rv,
 														   float3& dir_out, float& pdf_out, float3& Le_out) {
 	if (d.extraCount == 0) return gpu_portal_sample_Li(d, p, ru, rv, dir_out, pdf_out, Le_out);

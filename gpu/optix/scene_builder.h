@@ -108,6 +108,8 @@ struct SceneData {
 	float3 portalP0 = {}, portalP2 = {};
 	// The scene's other portal lights (FlatScene::extraPortalLights): the renderers sum them with the one above. Empty for a scene with at most one infinite light.
 	std::vector<ExtraPortalLightHost> extraPortals;
+	// A plain sky was set up (the sky* fields and stats.backgroundColor) next to the portal lights (FlatScene::skyBesidePortals): the device mixes the two (GpuPortalLight::skyBeside).
+	bool skyBesidePortals = false;
 
 	// ---- object instancing ------------------------------------------------
 	// Geometry that exists once and is placed many times. Kept in a SEPARATE

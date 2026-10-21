@@ -374,7 +374,8 @@ inline void flattenLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 	//
 	// A file can declare several "infinite" lights (the pbrt-v4-scenes Watercolor has two portal lights, one per window), and pbrt sums them. Every PORTAL light is kept: the one
 	// with the largest window is `infiniteLight`, the rest are `extraPortalLights`, and the renderers sum them. Anything else beyond one (a second plain sky, or a plain sky
-	// next to portals) has no home in the renderers' single environment slot: with portals the plain ones are dropped, without any the last plain one is kept, and a warning says so.
+	// next to portals) has no home in the renderers' single environment slot: a plain sky beside portals is kept in `skyBesidePortals` (the last one), without portals the last plain
+	// one is `infiniteLight`; the plain lights beyond that are dropped, and a warning says so.
 	// Punctual lights have no such limit: every one is kept.
 	std::vector<InfiniteLight> infiniteCandidates;
 	for (const pbrt_scene::LightDecl &ld : scene.lights) {
@@ -623,14 +624,17 @@ inline void flattenLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 			std::stable_sort(portals.begin(), portals.end(), [&](const InfiniteLight &x, const InfiniteLight &y) { return windowArea(x) > windowArea(y); });
 			out.infiniteLight = portals.front();
 			out.extraPortalLights.assign(portals.begin() + 1, portals.end());
-			dropped = static_cast<int>(infiniteCandidates.size() - portals.size());
+			const int plain = static_cast<int>(infiniteCandidates.size() - portals.size());
+			for (auto it = infiniteCandidates.rbegin(); it != infiniteCandidates.rend(); ++it)
+				if (!it->hasPortal) { out.skyBesidePortals = *it; break; }
+			dropped = plain > 1 ? plain - 1 : 0;
 		} else {
 			out.infiniteLight = infiniteCandidates.back();
 			dropped = static_cast<int>(infiniteCandidates.size()) - 1;
 		}
 		if (dropped > 0) {
 			warn("the scene has " + std::to_string(infiniteCandidates.size()) + " \"infinite\" lights, which pbrt sums; this renderer has one environment slot, so " + std::to_string(dropped) +
-				 " plain (non-portal) one" + (dropped > 1 ? "s were" : " was") + " dropped (portal lights are all kept: " + std::to_string(portals.size()) + ")");
+				 " plain (non-portal) one" + (dropped > 1 ? "s were" : " was") + " dropped (portal lights are all kept: " + std::to_string(portals.size()) + ", and one plain light beside them)");
 		}
 	}
 }

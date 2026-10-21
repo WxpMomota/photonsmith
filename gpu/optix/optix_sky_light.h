@@ -25,12 +25,76 @@
 // parameter existed.
 // ---------------------------------------------------------------------------
 
+// The plain (non-portal) sky on its own: an importance-sampled image, else the uniform sphere with the flat colour.
+__device__ __forceinline__ void sample_plain_sky(unsigned int& seed, const float3& flatColor, float3& dir_out, float& pdf_out, float3& Le_out) {
+	const GpuSkyDistribution& d = params.camera.skyDist;
+	if (d.height > 0 && d.width > 0) {
+		const float ru = random_float(seed), rv = random_float(seed);
+		if (gpu_sky_sample_Li(d, ru, rv, dir_out, pdf_out)) {
+			Le_out = gpu_sky_Le(d, dir_out);
+			return;
+		}
+	}
+	const float kPi = 3.14159265358979323846f;
+	dir_out = random_unit_vector(seed);
+	pdf_out = 1.0f / (4.0f * kPi);
+	Le_out = flatColor;
+}
+__device__ __forceinline__ float plain_sky_pdf(const float3& dir) {
+	const GpuSkyDistribution& d = params.camera.skyDist;
+	if (d.height > 0 && d.width > 0) return gpu_sky_pdf_Li(d, dir);
+	return 1.0f / (4.0f * 3.14159265358979323846f);
+}
+__device__ __forceinline__ float3 plain_sky_radiance(const float3& dir, const float3& flatColor) {
+	const GpuSkyDistribution& d = params.camera.skyDist;
+	if (d.height > 0 && d.width > 0) return gpu_sky_Le(d, dir);
+	return flatColor;
+}
+
+// One sample of the 50/50 mixture of the portal lights and the plain sky beside them (GpuPortalLight::skyBeside): its pdf and its radiance those of the mixture / the sum at the
+// sampled direction (pbrt sums every infinite light; the window test keeps the portal's pdf at zero outside it). Kept out of line: the sky NEE is inlined at a dozen shading sites,
+// and this branch tripled the memory the device compiler needs for them.
+static __device__ __noinline__ void sample_sky_beside_portal(unsigned int& seed, const float3& flatColor, const float3& shadingPoint, float3& dir_out, float& pdf_out, float3& Le_out) {
+	const GpuPortalLight& p = params.camera.portalLight;
+	// (pbrt sums every infinite light; the window test keeps the portal's pdf at zero outside it).
+	bool ok;
+	if (random_float(seed) < 0.5f) {
+		const float ru = random_float(seed), rv = random_float(seed);
+		float pdf_unused; float3 le_unused;
+		ok = gpu_portal_set_sample_Li(p, shadingPoint, ru, rv, dir_out, pdf_unused, le_unused);
+	} else {
+		float3 le_unused;
+		sample_plain_sky(seed, flatColor, dir_out, pdf_out, le_unused);
+		ok = pdf_out > 0.0f;
+	}
+	if (!ok) {
+		pdf_out = 0.0f;
+		Le_out = make_float3(0.0f, 0.0f, 0.0f);
+		dir_out = make_float3(0.0f, 1.0f, 0.0f);
+		return;
+	}
+	pdf_out = 0.5f * (gpu_portal_set_pdf_Li_in_window(p, shadingPoint, dir_out) + plain_sky_pdf(dir_out));
+	Le_out = gpu_portal_set_Le(p, shadingPoint, dir_out) + plain_sky_radiance(dir_out, flatColor);
+	return;
+}
+
+static __device__ __noinline__ float sky_pdf_beside_portal(const float3& dir, const float3& shadingPoint) {
+	return 0.5f * (gpu_portal_set_pdf_Li_in_window(params.camera.portalLight, shadingPoint, dir) + plain_sky_pdf(dir));
+}
+static __device__ __noinline__ float3 sky_radiance_beside_portal(const float3& dir, const float3& flatColor, const float3& shadingPoint) {
+	return gpu_portal_set_Le(params.camera.portalLight, shadingPoint, dir) + plain_sky_radiance(dir, flatColor);
+}
+
 // One sky/portal NEE sample: direction, its solid-angle pdf, and the
 // radiance arriving from it.
 __device__ __forceinline__ void sample_sky_nee(unsigned int& seed, const float3& flatColor,
 												  const float3& shadingPoint,
 												  float3& dir_out, float& pdf_out, float3& Le_out) {
 	const GpuPortalLight& p = params.camera.portalLight;
+	if (p.height > 0 && p.width > 0 && p.skyBeside) {
+		sample_sky_beside_portal(seed, flatColor, shadingPoint, dir_out, pdf_out, Le_out);
+		return;
+	}
 	if (p.height > 0 && p.width > 0) {
 		const float ru = random_float(seed), rv = random_float(seed);
 		if (gpu_portal_set_sample_Li(p, shadingPoint, ru, rv, dir_out, pdf_out, Le_out)) {
@@ -46,18 +110,7 @@ __device__ __forceinline__ void sample_sky_nee(unsigned int& seed, const float3&
 		dir_out = make_float3(0.0f, 1.0f, 0.0f);
 		return;
 	}
-	const GpuSkyDistribution& d = params.camera.skyDist;
-	if (d.height > 0 && d.width > 0) {
-		const float ru = random_float(seed), rv = random_float(seed);
-		if (gpu_sky_sample_Li(d, ru, rv, dir_out, pdf_out)) {
-			Le_out = gpu_sky_Le(d, dir_out);
-			return;
-		}
-	}
-	const float kPi = 3.14159265358979323846f;
-	dir_out = random_unit_vector(seed);
-	pdf_out = 1.0f / (4.0f * kPi);
-	Le_out = flatColor;
+	sample_plain_sky(seed, flatColor, dir_out, pdf_out, Le_out);
 }
 
 // Solid-angle pdf of the sky/portal strategy at a SPECIFIC direction (for
@@ -66,11 +119,9 @@ __device__ __forceinline__ void sample_sky_nee(unsigned int& seed, const float3&
 // existing behavior exactly.
 __device__ __forceinline__ float sky_pdf_for_mis(const float3& dir, const float3& shadingPoint) {
 	const GpuPortalLight& p = params.camera.portalLight;
+	if (p.height > 0 && p.width > 0 && p.skyBeside) return sky_pdf_beside_portal(dir, shadingPoint);
 	if (p.height > 0 && p.width > 0) return gpu_portal_set_pdf_Li(p, shadingPoint, dir);
-	const GpuSkyDistribution& d = params.camera.skyDist;
-	if (d.height > 0 && d.width > 0) return gpu_sky_pdf_Li(d, dir);
-	const float kPi = 3.14159265358979323846f;
-	return 1.0f / (4.0f * kPi);
+	return plain_sky_pdf(dir);
 }
 
 // Radiance arriving from a specific (escaped-ray) direction, as seen from
@@ -78,8 +129,7 @@ __device__ __forceinline__ float sky_pdf_for_mis(const float3& dir, const float3
 // the flat `flatColor`.
 __device__ __forceinline__ float3 sky_radiance(const float3& dir, const float3& flatColor, const float3& shadingPoint) {
 	const GpuPortalLight& p = params.camera.portalLight;
+	if (p.height > 0 && p.width > 0 && p.skyBeside) return sky_radiance_beside_portal(dir, flatColor, shadingPoint);
 	if (p.height > 0 && p.width > 0) return gpu_portal_set_Le(p, shadingPoint, dir);
-	const GpuSkyDistribution& d = params.camera.skyDist;
-	if (d.height > 0 && d.width > 0) return gpu_sky_Le(d, dir);
-	return flatColor;
+	return plain_sky_radiance(dir, flatColor);
 }

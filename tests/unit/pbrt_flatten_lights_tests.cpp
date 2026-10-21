@@ -101,13 +101,32 @@ TEST(FlattenInfiniteLightTest, OfSeveralPortalLightsTheLargestWindowIsTheMainOne
 	EXPECT_FALSE(warnedAboutInfinite(s)) << "nothing was dropped";
 }
 
-TEST(FlattenInfiniteLightTest, APlainSkyNextToPortalsIsDroppedWithAWarning) {
+TEST(FlattenInfiniteLightTest, APlainSkyNextToPortalsIsKeptBesideThem) {
+	// pbrt sums every infinite light: the plain sky is a light of its own beside the portal (FlatScene::skyBesidePortals).
 	const FlatScene s = flattenSource(
 		"LightSource \"infinite\" \"rgb L\" [ 5 5 5 ]\n"
 		"LightSource \"infinite\" \"rgb L\" [ 1 1 1 ] \"point3 portal\" [ 0 0 0   1 0 0   1 1 0   0 1 0 ]\n");
 	ASSERT_TRUE(s.infiniteLight.hasPortal);
 	EXPECT_TRUE(s.extraPortalLights.empty());
-	EXPECT_TRUE(warnedAboutInfinite(s));
+	ASSERT_TRUE(s.skyBesidePortals.present);
+	EXPECT_FALSE(s.skyBesidePortals.hasPortal);
+	EXPECT_DOUBLE_EQ(s.skyBesidePortals.L[0], 5.0);
+	EXPECT_FALSE(warnedAboutInfinite(s)) << "nothing was dropped";
+}
+
+TEST(FlattenInfiniteLightTest, OnlyTheLastOfSeveralPlainSkiesBesidePortalsIsKept) {
+	const FlatScene s = flattenSource(
+		"LightSource \"infinite\" \"rgb L\" [ 5 5 5 ]\n"
+		"LightSource \"infinite\" \"rgb L\" [ 6 6 6 ]\n"
+		"LightSource \"infinite\" \"rgb L\" [ 1 1 1 ] \"point3 portal\" [ 0 0 0   1 0 0   1 1 0   0 1 0 ]\n");
+	ASSERT_TRUE(s.skyBesidePortals.present);
+	EXPECT_DOUBLE_EQ(s.skyBesidePortals.L[0], 6.0);
+	EXPECT_TRUE(warnedAboutInfinite(s)) << "one plain sky was dropped";
+}
+
+TEST(FlattenInfiniteLightTest, WithoutPortalsThereIsNoSkyBesidePortals) {
+	const FlatScene s = flattenSource("LightSource \"infinite\" \"rgb L\" [ 1 1 1 ]\n");
+	EXPECT_FALSE(s.skyBesidePortals.present);
 }
 
 TEST(FlattenInfiniteLightTest, NoPortalParamLeavesHasPortalFalse) {

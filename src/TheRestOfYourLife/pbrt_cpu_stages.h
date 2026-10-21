@@ -300,6 +300,12 @@ inline void buildCurves(const std::vector<pbrt_flatten::Curve> &curveDecls,
 // scene's constant L otherwise - either it never named an image, or naming
 // one failed to resolve/decode (a warning was already recorded for that
 // case).
+inline std::shared_ptr<sky_light> buildPlainSky(const pbrt_flatten::InfiniteLight &l) {
+	if (l.imageWidth > 0 && l.imageHeight > 0)
+		return std::make_shared<sky_light>(l.imageWidth, l.imageHeight, l.imagePixels.data(), l.scale);
+	return std::make_shared<sky_light>(color(l.L[0] * l.scale, l.L[1] * l.scale, l.L[2] * l.scale));
+}
+
 inline void buildSkyOrPortal(const pbrt_flatten::FlatScene &scene, BuildResult &out) {
 	if (scene.infiniteLight.present && scene.infiniteLight.hasPortal) {
 		if (scene.infiniteLight.imageWidth > 0 && scene.infiniteLight.imageHeight > 0) {
@@ -340,17 +346,10 @@ inline void buildSkyOrPortal(const pbrt_flatten::FlatScene &scene, BuildResult &
 		// than fail wrong" convention for unsupported portal combinations
 		// (see the SPPM/BDPT portal-skip comments in cpu_interface.cpp and
 		// cpu_interface_bdpt.cpp).
+		// A plain sky that sits beside the portal lights (pbrt sums every infinite light): an independent light of its own next to out.portal.
+		if (scene.skyBesidePortals.present) out.sky = buildPlainSky(scene.skyBesidePortals);
 	} else if (scene.infiniteLight.present) {
-		if (scene.infiniteLight.imageWidth > 0 && scene.infiniteLight.imageHeight > 0) {
-			out.sky = std::make_shared<sky_light>(
-				scene.infiniteLight.imageWidth, scene.infiniteLight.imageHeight,
-				scene.infiniteLight.imagePixels.data(), scene.infiniteLight.scale);
-		} else {
-			out.sky = std::make_shared<sky_light>(color(
-				scene.infiniteLight.L[0] * scene.infiniteLight.scale,
-				scene.infiniteLight.L[1] * scene.infiniteLight.scale,
-				scene.infiniteLight.L[2] * scene.infiniteLight.scale));
-		}
+		out.sky = buildPlainSky(scene.infiniteLight);
 	}
 }
 

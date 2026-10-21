@@ -197,6 +197,9 @@ struct GpuPortalLight {
 	// extraCount is 0); 0 / null for every scene with one portal light. The set functions of gpu_portal_light_shared.h (gpu_portal_set_*) take this light as the first of the set.
 	int extraCount;
 	const GpuPortalLight* extra;
+	// 1 when a plain sky (GpuSkyDistribution, or the flat colour) is also a light of the scene, beside the portal lights (FlatScene::skyBesidePortals): sample_sky_nee / sky_radiance /
+	// sky_pdf_for_mis (and the wavefront twins) then mix the two. 0 for a portal-only scene, whose flat colour is only a placeholder.
+	int skyBeside;
 };
 
 // GPU camera parameters. `origin`/`lower_left_corner`/`horizontal`/`vertical`

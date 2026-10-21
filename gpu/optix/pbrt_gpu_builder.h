@@ -1459,6 +1459,90 @@ inline void addInstances(BuildCtx &c) {
 	stats.animatedCurveCount = static_cast<int>(scene.animatedCurves.size());
 }
 
+// Mean of every decoded pixel, scaled, floored at a small nonzero epsilon: the "any infinite light present" gate (see addInfiniteLight()) and a plain sky's flat fallback.
+inline float3 meanSkyPixelColor(const pbrt_flatten::InfiniteLight &sky) {
+	double r = 0.0, g = 0.0, b = 0.0;
+	const std::size_t n = static_cast<std::size_t>(sky.imageWidth) * sky.imageHeight;
+	for (std::size_t i = 0; i < n; ++i) {
+		r += sky.imagePixels[i * 3 + 0];
+		g += sky.imagePixels[i * 3 + 1];
+		b += sky.imagePixels[i * 3 + 2];
+	}
+	constexpr float kMinGateBrightness = 1e-4f;
+	return make_float3(
+		std::max(kMinGateBrightness, static_cast<float>(r / n * sky.scale)),
+		std::max(kMinGateBrightness, static_cast<float>(g / n * sky.scale)),
+		std::max(kMinGateBrightness, static_cast<float>(b / n * sky.scale)));
+}
+
+// A plain (non-portal) infinite light: an importance-sampled image sky (GpuSkyDistribution), or a flat colour. Its mean colour is also the "is there a sky at all" gate every
+// NEE/miss call site checks (stats.backgroundColor != 0).
+inline void addPlainSkyLight(BuildCtx &c, const pbrt_flatten::InfiniteLight &sky) {
+	using namespace detail;
+	auto &out = c.out;
+	auto &stats = c.stats;
+	const bool hasImage = sky.imageWidth > 0 && sky.imageHeight > 0 && !sky.imagePixels.empty();
+	const auto meanPixelColor = [&]() -> float3 { return meanSkyPixelColor(sky); };
+	if (hasImage) {
+		stats.backgroundColor = meanPixelColor();
+
+		// Real importance-sampled HDR sky (GpuSkyDistribution - see
+		// optix_types.h's own comment): the SAME PiecewiseConstant2D
+		// construction src/TheRestOfYourLife/sky_light.h's private
+		// constructor builds (Rec.709 luminance * sin(theta) weights,
+		// sin(theta) being the equirectangular solid-angle Jacobian
+		// correction - see that file's own header comment), from the
+		// SAME already-decoded image `stats.backgroundColor` just used
+		// above for its mean-colour fallback. That mean colour stays as
+		// computed either way - it still serves both as the "does this
+		// scene have a sky at all" gate every NEE/miss call site already
+		// checks (backgroundColor != 0) and as the flat-colour fallback
+		// for the rare degenerate case where the distribution itself
+		// ends up empty (e.g. an all-black image).
+		std::vector<double> weights(static_cast<std::size_t>(sky.imageWidth) * sky.imageHeight);
+		constexpr double kPi = 3.14159265358979323846;
+		for (int v = 0; v < sky.imageHeight; ++v) {
+			const double theta = (v + 0.5) / sky.imageHeight * kPi;
+			const double sin_theta = std::sin(theta);
+			for (int u = 0; u < sky.imageWidth; ++u) {
+				const float* px = &sky.imagePixels[(static_cast<std::size_t>(v) * sky.imageWidth + u) * 3];
+				const double lum = 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2];
+				weights[static_cast<std::size_t>(v) * sky.imageWidth + u] = (lum > 0.0 ? lum : 0.0) * sin_theta;
+			}
+		}
+		const PiecewiseConstant2D dist(weights, sky.imageWidth, sky.imageHeight);
+		if (!dist.empty()) {
+			const PiecewiseConstant1D& marg = dist.Marginal();
+			out.skyMarginalFuncInt = static_cast<float>(marg.integral());
+			out.skyMarginalCdf.reserve(marg.Cdf().size());
+			for (double d : marg.Cdf()) out.skyMarginalCdf.push_back(static_cast<float>(d));
+			out.skyMarginalFunc.reserve(marg.Func().size());
+			for (double d : marg.Func()) out.skyMarginalFunc.push_back(static_cast<float>(d));
+
+			const int nv = dist.NV();
+			out.skyConditionalCdf.reserve(static_cast<std::size_t>(nv) * (sky.imageWidth + 1));
+			out.skyConditionalFunc.reserve(static_cast<std::size_t>(nv) * sky.imageWidth);
+			out.skyConditionalFuncInt.reserve(nv);
+			for (int r = 0; r < nv; ++r) {
+				const PiecewiseConstant1D& cond = dist.Conditional(r);
+				for (double d : cond.Cdf()) out.skyConditionalCdf.push_back(static_cast<float>(d));
+				for (double d : cond.Func()) out.skyConditionalFunc.push_back(static_cast<float>(d));
+				out.skyConditionalFuncInt.push_back(static_cast<float>(cond.integral()));
+			}
+
+			out.skyImagePixels = sky.imagePixels; // already row-major float RGB, linear
+			out.skyWidth = sky.imageWidth;
+			out.skyHeight = sky.imageHeight;
+			out.skyScale = static_cast<float>(sky.scale);
+		}
+	} else {
+		stats.backgroundColor = make_float3(
+			static_cast<float>(sky.L[0] * sky.scale),
+			static_cast<float>(sky.L[1] * sky.scale),
+			static_cast<float>(sky.L[2] * sky.scale));
+	}
+}
+
 inline void addInfiniteLight(BuildCtx &c) {
 	using namespace detail;
 	const auto &scene = c.scene;
@@ -1489,20 +1573,7 @@ inline void addInfiniteLight(BuildCtx &c) {
 		// composition - e.g. a mostly-dark photo/exr with one bright window)
 		// must not silently zero out this gate and disable the entire light
 		// with no diagnostic.
-		const auto meanPixelColor = [&]() -> float3 {
-			double r = 0.0, g = 0.0, b = 0.0;
-			const std::size_t n = static_cast<std::size_t>(sky.imageWidth) * sky.imageHeight;
-			for (std::size_t i = 0; i < n; ++i) {
-				r += sky.imagePixels[i * 3 + 0];
-				g += sky.imagePixels[i * 3 + 1];
-				b += sky.imagePixels[i * 3 + 2];
-			}
-			constexpr float kMinGateBrightness = 1e-4f;
-			return make_float3(
-				std::max(kMinGateBrightness, static_cast<float>(r / n * sky.scale)),
-				std::max(kMinGateBrightness, static_cast<float>(g / n * sky.scale)),
-				std::max(kMinGateBrightness, static_cast<float>(b / n * sky.scale)));
-		};
+		const auto meanPixelColor = [&]() -> float3 { return meanSkyPixelColor(sky); };
 
 		if (sky.hasPortal) {
 			// pbrt-v4 "portal" (windowed) infinite light - see GpuPortalLight's
@@ -1582,63 +1653,14 @@ inline void addInfiniteLight(BuildCtx &c) {
 
 				stats.backgroundColor = meanPixelColor();
 			}
-		} else if (hasImage) {
-			stats.backgroundColor = meanPixelColor();
-
-			// Real importance-sampled HDR sky (GpuSkyDistribution - see
-			// optix_types.h's own comment): the SAME PiecewiseConstant2D
-			// construction src/TheRestOfYourLife/sky_light.h's private
-			// constructor builds (Rec.709 luminance * sin(theta) weights,
-			// sin(theta) being the equirectangular solid-angle Jacobian
-			// correction - see that file's own header comment), from the
-			// SAME already-decoded image `stats.backgroundColor` just used
-			// above for its mean-colour fallback. That mean colour stays as
-			// computed either way - it still serves both as the "does this
-			// scene have a sky at all" gate every NEE/miss call site already
-			// checks (backgroundColor != 0) and as the flat-colour fallback
-			// for the rare degenerate case where the distribution itself
-			// ends up empty (e.g. an all-black image).
-			std::vector<double> weights(static_cast<std::size_t>(sky.imageWidth) * sky.imageHeight);
-			constexpr double kPi = 3.14159265358979323846;
-			for (int v = 0; v < sky.imageHeight; ++v) {
-				const double theta = (v + 0.5) / sky.imageHeight * kPi;
-				const double sin_theta = std::sin(theta);
-				for (int u = 0; u < sky.imageWidth; ++u) {
-					const float* px = &sky.imagePixels[(static_cast<std::size_t>(v) * sky.imageWidth + u) * 3];
-					const double lum = 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2];
-					weights[static_cast<std::size_t>(v) * sky.imageWidth + u] = (lum > 0.0 ? lum : 0.0) * sin_theta;
-				}
-			}
-			const PiecewiseConstant2D dist(weights, sky.imageWidth, sky.imageHeight);
-			if (!dist.empty()) {
-				const PiecewiseConstant1D& marg = dist.Marginal();
-				out.skyMarginalFuncInt = static_cast<float>(marg.integral());
-				out.skyMarginalCdf.reserve(marg.Cdf().size());
-				for (double d : marg.Cdf()) out.skyMarginalCdf.push_back(static_cast<float>(d));
-				out.skyMarginalFunc.reserve(marg.Func().size());
-				for (double d : marg.Func()) out.skyMarginalFunc.push_back(static_cast<float>(d));
-
-				const int nv = dist.NV();
-				out.skyConditionalCdf.reserve(static_cast<std::size_t>(nv) * (sky.imageWidth + 1));
-				out.skyConditionalFunc.reserve(static_cast<std::size_t>(nv) * sky.imageWidth);
-				out.skyConditionalFuncInt.reserve(nv);
-				for (int r = 0; r < nv; ++r) {
-					const PiecewiseConstant1D& cond = dist.Conditional(r);
-					for (double d : cond.Cdf()) out.skyConditionalCdf.push_back(static_cast<float>(d));
-					for (double d : cond.Func()) out.skyConditionalFunc.push_back(static_cast<float>(d));
-					out.skyConditionalFuncInt.push_back(static_cast<float>(cond.integral()));
-				}
-
-				out.skyImagePixels = sky.imagePixels; // already row-major float RGB, linear
-				out.skyWidth = sky.imageWidth;
-				out.skyHeight = sky.imageHeight;
-				out.skyScale = static_cast<float>(sky.scale);
-			}
 		} else {
-			stats.backgroundColor = make_float3(
-				static_cast<float>(sky.L[0] * sky.scale),
-				static_cast<float>(sky.L[1] * sky.scale),
-				static_cast<float>(sky.L[2] * sky.scale));
+			addPlainSkyLight(c, sky);
+		}
+		// A plain sky beside the portal lights (pbrt sums every infinite light): the portal block above has set up the portals; this adds the sky next to them (its mean colour
+		// replaces the portal's placeholder as the flat colour, the device mixes the two: GpuPortalLight::skyBeside).
+		if (sky.hasPortal && scene.skyBesidePortals.present) {
+			addPlainSkyLight(c, scene.skyBesidePortals);
+			out.skyBesidePortals = true;
 		}
 	}
 }
