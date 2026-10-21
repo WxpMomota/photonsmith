@@ -31,6 +31,7 @@ int main() {
         PbrtSceneLoader l;
         l.pbrtScenePath = scenePath("no-such-scene.pbrt");
         l.loadPbrtScene();
+        CHECK(!l.pbrtMissingAssetsError.empty() || !l.pbrtLoadError.empty(), "a missing file gave no error message (the renderer's @rt event is made from it)");
         CHECK(l.verts.empty() && l.spheres.empty() && l.lights.empty() && !l.havePbrtCamera, "a missing file left %zu vertices, %zu spheres, %zu lights, camera %d",
               l.verts.size(), l.spheres.size(), l.lights.size(), (int)l.havePbrtCamera);
     }
