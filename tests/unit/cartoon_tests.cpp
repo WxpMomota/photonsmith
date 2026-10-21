@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -146,7 +147,7 @@ TEST(CartoonBallParade, ABallDoesNotJumpBetweenFrames) {
 
 TEST(CartoonPreset, EveryCartoonPresetNamesAFilmAndMatchesItsLength) {
 	int cartoons = 0;
-	for (const video_preset::VideoPreset &p : video_preset::kAll) {
+	for (const video_preset::VideoPreset &p : video_preset::all()) {
 		const cartoon::Film *film = cartoon::forCameraPath(p.camera_path);
 		if (!film) continue;
 		++cartoons;
@@ -156,6 +157,55 @@ TEST(CartoonPreset, EveryCartoonPresetNamesAFilmAndMatchesItsLength) {
 		EXPECT_DOUBLE_EQ(p.speed, 1.0);
 	}
 	EXPECT_GE(cartoons, 1);
+}
+
+TEST(VideoPresets, EveryFilmIsAPresetAndTheCameraPresetsComeFirst) {
+	const auto &all = video_preset::all();
+	int cartoons = 0, cameras = 0;
+	bool sawCartoon = false;
+	for (std::size_t i = 0; i < all.size(); ++i) {
+		const video_preset::VideoPreset &p = all[i];
+		EXPECT_EQ(std::string(p.id), "V" + std::to_string(i + 1)) << "ids are V1, V2 ... in table order";
+		if (p.isCartoon()) {
+			++cartoons;
+			sawCartoon = true;
+		} else {
+			++cameras;
+			EXPECT_FALSE(sawCartoon) << p.id << ": the camera presets come before the cartoons";
+		}
+	}
+	EXPECT_EQ(cartoons, cartoon::kFilmCount) << "one preset per film, nothing more";
+	EXPECT_GE(cameras, 6);
+	for (const cartoon::Film &f : cartoon::kFilms) {
+		const video_preset::VideoPreset *p = video_preset::find(f.key);
+		ASSERT_NE(p, nullptr) << f.key;
+		EXPECT_EQ(std::string(p->name), std::string(f.name) + " (cartoon)");
+		EXPECT_STREQ(p->description, f.description) << "the preset's text is the film's own";
+		EXPECT_EQ(p->film(), &f);
+	}
+}
+
+TEST(VideoPresets, IdsAndKeysAreUniqueAndEitherFindsThePreset) {
+	std::set<std::string> ids, keys;
+	for (const video_preset::VideoPreset &p : video_preset::all()) {
+		EXPECT_TRUE(ids.insert(p.id).second) << "duplicate id " << p.id;
+		EXPECT_TRUE(keys.insert(p.key).second) << "duplicate key " << p.key;
+		EXPECT_EQ(video_preset::find(p.id), &p);
+		EXPECT_EQ(video_preset::find(p.key), &p);
+	}
+	EXPECT_EQ(video_preset::find("nope"), nullptr);
+}
+
+TEST(VideoPresets, TheListTextHasOneLinePerPresetWithItsKind) {
+	const std::string text = video_preset::listText();
+	std::size_t lines = 0;
+	for (char c : text) lines += c == '\n';
+	EXPECT_EQ(lines, video_preset::all().size());
+	EXPECT_NE(text.find("cornell-orbit"), std::string::npos);
+	EXPECT_NE(text.find("camera"), std::string::npos);
+	EXPECT_NE(text.find("lamp-and-ball"), std::string::npos);
+	EXPECT_NE(text.find("cartoon"), std::string::npos);
+	EXPECT_NE(text.find("480 frames at 24 fps (20.0 s)"), std::string::npos) << text;
 }
 
 TEST(CartoonLauncherArgs, ACartoonCameraPathIsAcceptedAndAnUnknownOneIsNot) {

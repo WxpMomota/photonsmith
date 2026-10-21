@@ -1,5 +1,6 @@
 #pragma once
-// cartoons.h -- the cartoon films the video presets (video_preset.h) can render: each is a function of time that returns the pbrt scene for that instant (cartoon_lib.h). A cartoon is
+// cartoons.h -- the cartoon films: each is a function of time that returns the pbrt scene for that instant (cartoon_lib.h). Listing a film in kFilms is all it takes to make it a video preset
+// (video_preset.h builds one preset per film: name, description, length and fps from here; append, never reorder). A cartoon is
 // chosen with `--camera-path cartoon:<key>` (or `--video-preset <key>`), and the launcher then renders every frame from its own scene instead of moving a camera round a fixed one.
 
 #include <cstring>

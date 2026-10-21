@@ -899,7 +899,7 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 			out.video_speed = preset->speed;
 		} else {
 			std::cerr << "Invalid --video-preset \"" << argv[i + 1] << "\" - valid presets:\n";
-			for (const video_preset::VideoPreset& p : video_preset::kAll)
+			for (const video_preset::VideoPreset& p : video_preset::all())
 				std::cerr << "  " << p.id << " / " << p.key << " - " << p.name << "\n";
 			return FlagResult::Error;
 		}
@@ -1136,6 +1136,8 @@ inline void print_launch_help(const char* program) {
 				  << "               instead of a named path. The first frame is the first key and the last frame the last.\n"
 				  << "  --video-preset ID: Sets --video plus scene_id/camera-path/frames/fps/speed\n"
 				  << "               together from one of src/shared/video_preset.h's named bundles.\n"
+				  << "               --list-video-presets (as the only argument) prints them all: the\n"
+				  << "               camera-path flythroughs and the cartoons.\n"
 				  << "               Accepts either short id or descriptive key:\n"
 				  << "               V1/cornell-orbit, V2/teapot-spin, V3/one-weekend-flyby,\n"
 				  << "               V4/next-week-finale, V5/glass-dragon-caustics,\n"

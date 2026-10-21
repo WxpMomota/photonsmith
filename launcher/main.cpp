@@ -1620,6 +1620,11 @@ int main(int argc, char** argv) {
 		std::printf("%.6g\n", size);
 		return EXIT_SUCCESS;
 	}
+	// `ray_tracer --list-video-presets`: every video preset (camera-path flythroughs and cartoons, src/shared/video_preset.h), one per line, and nothing else.
+	if (argc >= 2 && std::string(argv[1]) == "--list-video-presets") {
+		std::cout << video_preset::listText();
+		return EXIT_SUCCESS;
+	}
 	std::cout << "========================================" << std::endl;
 	std::cout << "RAY TRACER LAUNCHER (Unified GPU/CPU)" << std::endl;
 	std::cout << "========================================" << std::endl;

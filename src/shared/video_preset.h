@@ -1,5 +1,12 @@
 #pragma once
+#include <cmath>
+#include <cstdio>
 #include <cstring>
+#include <deque>
+#include <string>
+#include <vector>
+
+#include "cartoon/cartoons.h"
 
 // video_preset.h -- Named bundles of video-mode parameters (scene + camera
 // path + frame count/fps/speed), the video-mode analog of SceneDescriptor
@@ -26,7 +33,7 @@ namespace video_preset {
 struct VideoPreset {
     const char* id;           // short scene-registry-style id, e.g. "V1" - stable
                                // for the lifetime of this table's ordering (see
-                               // kAll's own comment), used by --video-preset and
+                               // all()'s own comment), used by --video-preset and
                                // shown as the GUI combo's "[V1]" prefix, mirroring
                                // how scene_registry.h's SceneDescriptor::id ("A1",
                                // "G6"...) is displayed in the scene combo.
@@ -42,6 +49,10 @@ struct VideoPreset {
     int frames;
     int fps;
     double speed;
+
+    // A cartoon preset renders a film's own scene at every frame instead of moving a camera round a fixed scene; its camera_path is "cartoon:<key>" (cartoon/cartoons.h).
+    bool isCartoon() const { return cartoon::isCartoonPath(camera_path); }
+    const cartoon::Film* film() const { return cartoon::forCameraPath(camera_path); }
 };
 
 // Six presets, each pairing a distinct scene already in the registry with a
@@ -51,7 +62,7 @@ struct VideoPreset {
 // to try. `id` follows that same order (V1..V6) - like scene ids, it is a
 // stable label for a specific preset, not a live rank, so inserting a new
 // preset later should append rather than renumber the ones before it.
-inline const VideoPreset kAll[] = {
+inline const VideoPreset kCameraPresets[] = {
     {
         "V1", "cornell-orbit", "Cornell Box Orbit",
         "A slow 360-degree orbit around ray tracing's most iconic reference scene.",
@@ -86,30 +97,64 @@ inline const VideoPreset kAll[] = {
         "global-illumination showcase scene.",
         "H1", "linear", 120, 24, 0.5
     },
-    {
-        "V7", "lamp-and-ball", "Lamp and Ball (cartoon)",
-        "A 20 second cartoon: a small desk lamp wakes up in the dark, notices a red ball, hops over, nudges it, watches it bounce off the books and roll home, and tucks its "
-        "shade over it.",
-        "A1", "cartoon:lamp-and-ball", 480, 24, 1.0
-    },
-    {
-        "V8", "ball-parade", "Ball Parade (cartoon)",
-        "A 12 second cartoon of squash and stretch: seven glossy balls drop in one after another, bounce in a travelling wave on a checker floor and settle one by one into a row.",
-        "A1", "cartoon:ball-parade", 288, 24, 1.0
-    },
 };
-inline constexpr int kAllCount = sizeof(kAll) / sizeof(kAll[0]);
+
+// Every preset, in id order: the camera-path presets (V1..), then one preset per cartoon film in the film table's order (cartoon/cartoons.h) - so a new film is a new preset by being
+// listed there, with nothing to keep in step here: its name, description, length and fps come from the film. A cartoon's id continues the numbering ("V7" ...) and, like the others,
+// is a stable label: append films, do not reorder them. The strings built for the cartoon presets live as long as the program (the fields are plain const char*, as before).
+inline const std::vector<VideoPreset>& all() {
+    struct Table {
+        std::deque<std::string> strings;
+        std::vector<VideoPreset> presets;
+        const char* keep(std::string s) {
+            strings.push_back(std::move(s));
+            return strings.back().c_str();
+        }
+    };
+    static const Table table = [] {
+        Table t;
+        for (const VideoPreset& p : kCameraPresets) t.presets.push_back(p);
+        int n = static_cast<int>(t.presets.size());
+        for (const cartoon::Film& f : cartoon::kFilms) {
+            VideoPreset p{};
+            p.id = t.keep("V" + std::to_string(++n));
+            p.key = f.key;
+            p.name = t.keep(std::string(f.name) + " (cartoon)");
+            p.description = f.description;
+            p.scene_id = "A1";   // a placeholder: a cartoon renders its own scenes
+            p.camera_path = t.keep(std::string(cartoon::kCameraPathPrefix) + f.key);
+            p.frames = static_cast<int>(std::lround(f.duration * f.fps));
+            p.fps = f.fps;
+            p.speed = 1.0;
+            t.presets.push_back(p);
+        }
+        return t;
+    }();
+    return table.presets;
+}
 
 // Matches against either id ("V1") or key ("cornell-orbit") - the caller
 // (CLI flag parsing, GUI combo lookup) never needs to know which form it
 // was handed.
 inline const VideoPreset* find(const char* id_or_key) {
     if (!id_or_key) return nullptr;
-    for (const VideoPreset& p : kAll) {
+    for (const VideoPreset& p : all()) {
         if (std::strcmp(p.id, id_or_key) == 0 || std::strcmp(p.key, id_or_key) == 0)
             return &p;
     }
     return nullptr;
+}
+
+// The preset list as text, one line each: id, key, kind, length, name. What `ray_tracer --list-video-presets` prints.
+inline std::string listText() {
+    std::string out;
+    char line[320];
+    for (const VideoPreset& p : all()) {
+        std::snprintf(line, sizeof(line), "%-4s %-24s %-8s %3d frames at %2d fps (%.1f s)  %s\n", p.id, p.key, p.isCartoon() ? "cartoon" : "camera", p.frames, p.fps,
+                      p.speed > 0.0 ? p.frames / p.speed / p.fps : 0.0, p.name);
+        out += line;
+    }
+    return out;
 }
 
 } // namespace video_preset

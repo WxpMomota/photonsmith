@@ -204,6 +204,10 @@ short id or the descriptive key:
 | V7 | lamp-and-ball | (its own scenes) | cartoon:lamp-and-ball | 480 | 24 | 1.0 |
 | V8 | ball-parade | (its own scenes) | cartoon:ball-parade | 288 | 24 | 1.0 |
 
+`ray_tracer --list-video-presets` prints the whole list (camera flythroughs and cartoons together: id, key, kind, length, name). The cartoons are presets like the rest: one per film in
+`src/shared/cartoon/cartoons.h`, numbered on from the camera presets (V7, V8 ...), their name, description, frame count and fps taken from the film, so the table below and the film
+table cannot disagree.
+
 ```powershell
 # By id
 .\ray_tracer.exe --video-preset V1
@@ -235,7 +239,9 @@ sampled and played back, not its story.
 | ball-parade | Ball Parade | 12 s | Seven glossy balls drop in one after another, bounce in a travelling wave on a glossy checker floor with squash and stretch, and settle one by one into a row. |
 
 Making a film of your own: `scripts/anim/` (Python, quicker to change; `README.md` there) is the same toolkit for authoring, and `src/shared/cartoon/cartoon_lib.h` is its C++ twin;
-a finished film is a function `std::string sceneAt(double t)` listed in `src/shared/cartoon/cartoons.h`, plus a row in `src/shared/video_preset.h`.
+a finished film is a function `std::string sceneAt(double t)` listed in `src/shared/cartoon/cartoons.h`; that listing alone makes it a video preset (`video_preset::all()` builds the
+preset from it), and it appears in the GUI's Preset combo and Camera Path combo and in `--list-video-presets`. Append new films, do not reorder them: a cartoon's preset id (V7 ...) is its
+place in the list.
 
 ## Examples
 
