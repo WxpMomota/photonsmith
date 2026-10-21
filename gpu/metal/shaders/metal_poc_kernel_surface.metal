@@ -136,6 +136,15 @@ inline void resolveHit(thread const KernelRes& R, thread PathState& P, thread Bo
         // test itself.
         float3 center = float3(sphere.center) + shutterT * float3(sphere.centerDelta1);
         normal = normalize(hitPoint - center);
+        if (sphere.clipped > 0.5) {
+            // a clipped or stretched sphere: the normal of the object-space sphere at the hit, carried back with the inverse transpose of the object-to-world matrix
+            const float3 po = float3(sphere.w2o[0] * hitPoint.x + sphere.w2o[1] * hitPoint.y + sphere.w2o[2] * hitPoint.z + sphere.w2o[3],
+                                     sphere.w2o[4] * hitPoint.x + sphere.w2o[5] * hitPoint.y + sphere.w2o[6] * hitPoint.z + sphere.w2o[7],
+                                     sphere.w2o[8] * hitPoint.x + sphere.w2o[9] * hitPoint.y + sphere.w2o[10] * hitPoint.z + sphere.w2o[11]);
+            normal = normalize(float3(sphere.w2o[0] * po.x + sphere.w2o[4] * po.y + sphere.w2o[8] * po.z,
+                                      sphere.w2o[1] * po.x + sphere.w2o[5] * po.y + sphere.w2o[9] * po.z,
+                                      sphere.w2o[2] * po.x + sphere.w2o[6] * po.y + sphere.w2o[10] * po.z));
+        }
         mat = sphereMaterials[primId];
     } else if (isDisk) {
         // Flat and planar - the disk's own stored normal IS the

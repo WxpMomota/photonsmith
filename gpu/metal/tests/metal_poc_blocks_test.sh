@@ -5,12 +5,13 @@
 # usage: metal_poc_blocks_test.sh <ray_tracer> <metal_poc_block_check> <scratch-dir>
 RT="$1"; CHK="$2"; DIR="$3"
 status=0
-for entry in texture-params:0.05 texture-mix-amount:0.03 texture-means:0.03 texture-graph:0.03; do
+for entry in texture-params:0.05 texture-mix-amount:0.03 texture-means:0.03 texture-graph:0.03 gpu/metal/tests/test_scenes/clipped-spheres:0.05; do
     scene="${entry%%:*}"; tol="${entry##*:}"
-    "$RT" --cpu --seed 3 --output "$DIR/blocks_$scene.cpu.exr" 64 512 12 pbrt_scenes/$scene.pbrt >"$DIR/blocks_$scene.log" 2>&1 || { echo "cpu render of $scene failed"; tail -8 "$DIR/blocks_$scene.log"; exit 1; }
-    "$RT" --gpu --seed 3 --output "$DIR/blocks_$scene.gpu.exr" 64 512 12 pbrt_scenes/$scene.pbrt >"$DIR/blocks_$scene.log" 2>&1 || { echo "metal render of $scene failed"; tail -8 "$DIR/blocks_$scene.log"; exit 1; }
+    case "$scene" in */*) file="$scene.pbrt"; tag="$(basename "$scene")" ;; *) file="pbrt_scenes/$scene.pbrt"; tag="$scene" ;; esac
+    "$RT" --cpu --seed 3 --output "$DIR/blocks_$tag.cpu.exr" 64 512 12 $file >"$DIR/blocks_$tag.log" 2>&1 || { echo "cpu render of $scene failed"; tail -8 "$DIR/blocks_$tag.log"; exit 1; }
+    "$RT" --gpu --seed 3 --output "$DIR/blocks_$tag.gpu.exr" 64 512 12 $file >"$DIR/blocks_$tag.log" 2>&1 || { echo "metal render of $scene failed"; tail -8 "$DIR/blocks_$tag.log"; exit 1; }
     echo "$scene:"
-    "$CHK" "$DIR/blocks_$scene.cpu.exr" "$DIR/blocks_$scene.gpu.exr" 8 "$tol" || status=1
+    "$CHK" "$DIR/blocks_$tag.cpu.exr" "$DIR/blocks_$tag.gpu.exr" 8 "$tol" || status=1
 done
 [ $status = 0 ] && echo BLOCKS_TEST_OK
 exit $status

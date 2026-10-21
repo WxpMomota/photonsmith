@@ -1,0 +1,65 @@
+# clipped-spheres.pbrt -- partial spheres and stretched instanced spheres, which Metal drew as whole spheres (or, instanced, not at all).
+#
+# A dome (zmin = 0, turned so its open side faces down: the floor shows through it from above... and the inside is seen from below), a cap cut by zmin / zmax, a phimax wedge, and
+# an ObjectInstance of a sphere placed three times with a stretch (an ellipsoid) and a clipped one. Compared with the CPU in 8 x 8 blocks by metal_poc_blocks_test.sh.
+#
+# Original, so it carries no licence constraints.
+
+LookAt 0 4 9  0 0.8 0  0 1 0
+Camera "perspective" "float fov" [ 45 ]
+Film "rgb" "integer xresolution" [ 64 ] "integer yresolution" [ 64 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+Integrator "volpath" "integer maxdepth" [ 6 ]
+WorldBegin
+
+LightSource "infinite" "rgb L" [ 0.4 0.45 0.55 ]
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 12 12 12 ]
+  Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ] "point3 P" [ -3 6 -2  3 6 -2  3 6 2  -3 6 2 ]
+AttributeEnd
+
+Material "diffuse" "rgb reflectance" [ 0.7 0.7 0.7 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ] "point3 P" [ -8 0 -8  8 0 -8  8 0 8  -8 0 8 ]
+
+# a dome, open side down
+AttributeBegin
+  Translate -3 0.01 0
+  Rotate -90 1 0 0
+  Material "diffuse" "rgb reflectance" [ 0.8 0.3 0.2 ]
+  Shape "sphere" "float radius" [ 1.2 ] "float zmin" [ 0 ]
+AttributeEnd
+
+# a belt: a slab of the sphere between two z planes, open at both ends
+AttributeBegin
+  Translate 0 1.2 0
+  Rotate -90 1 0 0
+  Material "diffuse" "rgb reflectance" [ 0.2 0.5 0.8 ]
+  Shape "sphere" "float radius" [ 1.1 ] "float zmin" [ -0.5 ] "float zmax" [ 0.6 ]
+AttributeEnd
+
+# a wedge (phimax 220 degrees)
+AttributeBegin
+  Translate 3 1.1 0
+  Rotate -90 1 0 0
+  Material "diffuse" "rgb reflectance" [ 0.3 0.7 0.3 ]
+  Shape "sphere" "float radius" [ 1.0 ] "float phimax" [ 220 ]
+AttributeEnd
+
+# instances of one definition: a ball stretched along x and a dome
+ObjectBegin "pair"
+  AttributeBegin
+    Material "diffuse" "rgb reflectance" [ 0.75 0.65 0.30 ]
+    Shape "sphere" "float radius" [ 0.5 ]
+  AttributeEnd
+ObjectEnd
+
+AttributeBegin
+  Translate -1.5 0.5 3
+  Scale 1.8 0.8 0.8
+  ObjectInstance "pair"
+AttributeEnd
+AttributeBegin
+  Translate 2 0.5 3
+  Scale 0.8 1.4 0.8
+  ObjectInstance "pair"
+AttributeEnd

@@ -924,6 +924,18 @@ inline float3 transformNormalByInstance(float3 objectNormal, InstanceTransform x
 // independent argument table, bound via MTLIntersectionFunctionTable on
 // the host side, not shared with the calling kernel's buffer(0..N)
 // bindings at all.
+// The hit at t along (oro, ord), in the sphere's object space, lies in the part a clipped sphere cut away: pbrt's z range and phi wedge (the hit is first pushed back onto the sphere).
+inline bool clippedSphereRejects(float3 oro, float3 ord, float tt, float r, float zMin, float zMax, float phiMax) {
+    float3 p = oro + tt * ord;
+    const float len = length(p);
+    if (len > 0.0) p *= r / len;
+    if (p.z < zMin || p.z > zMax) return true;
+    if (p.x == 0.0 && p.y == 0.0) p.x = 1e-5 * r;
+    float phi = atan2(p.y, p.x);
+    if (phi < 0.0) phi += 2.0 * M_PI_F;
+    return phi > phiMax;
+}
+
 [[intersection(bounding_box, triangle_data, instancing)]]
 SphereIntersectionResult sphereIntersectionFunction(
     float3 origin [[origin]],
@@ -1014,6 +1026,37 @@ SphereIntersectionResult sphereIntersectionFunction(
     if (payload.isShadowRay && int(primitiveIndex) == payload.shadowIgnorePrimId) return result;
 
     SphereData sphere = spheres[primitiveIndex];
+    if (sphere.clipped > 0.5) {
+        // A clipped or stretched sphere, in its own object space (gpu/optix/optix_intersection_sphere.h's ClippedSphere branch, itself pbrt-v4's SphereShape::intersect with its dual-root
+        // z / phi rejection). t is the same in both spaces: the object-space direction is not renormalised.
+        const float3 oro = float3(sphere.w2o[0] * origin.x + sphere.w2o[1] * origin.y + sphere.w2o[2] * origin.z + sphere.w2o[3],
+                                  sphere.w2o[4] * origin.x + sphere.w2o[5] * origin.y + sphere.w2o[6] * origin.z + sphere.w2o[7],
+                                  sphere.w2o[8] * origin.x + sphere.w2o[9] * origin.y + sphere.w2o[10] * origin.z + sphere.w2o[11]);
+        const float3 ord = float3(sphere.w2o[0] * direction.x + sphere.w2o[1] * direction.y + sphere.w2o[2] * direction.z,
+                                  sphere.w2o[4] * direction.x + sphere.w2o[5] * direction.y + sphere.w2o[6] * direction.z,
+                                  sphere.w2o[8] * direction.x + sphere.w2o[9] * direction.y + sphere.w2o[10] * direction.z);
+        const float r = sphere.radiusLocal;
+        const float qa = dot(ord, ord);
+        const float qb = 2.0 * dot(oro, ord);
+        const float qc = dot(oro, oro) - r * r;
+        const float disc = qb * qb - 4.0 * qa * qc;
+        if (disc < 0.0 || qa == 0.0) return result;
+        const float sqrtDisc = sqrt(disc);
+        const float q = (qb < 0.0) ? -0.5 * (qb - sqrtDisc) : -0.5 * (qb + sqrtDisc);
+        float t0 = q / qa;
+        float t1 = (q != 0.0) ? qc / q : t0;
+        if (t0 > t1) { const float tmp = t0; t0 = t1; t1 = tmp; }
+        if (t0 > maxDistance || t1 < minDistance) return result;
+        float tHit = (t0 >= minDistance) ? t0 : t1;
+        if (tHit > maxDistance) return result;
+        if (clippedSphereRejects(oro, ord, tHit, r, sphere.zMin, sphere.zMax, sphere.phiMax)) {
+            tHit = (tHit == t0) ? t1 : t0;
+            if (tHit < minDistance || tHit > maxDistance || clippedSphereRejects(oro, ord, tHit, r, sphere.zMin, sphere.zMax, sphere.phiMax)) return result;
+        }
+        result.accept = true;
+        result.distance = tHit;
+        return result;
+    }
     // lerp(center, center+0, anything) == center exactly, so this is a
     // provable no-op for every sphere whose centerDelta1 is (0,0,0) - see
     // SphereData::centerDelta1's own comment. Matches this project's own

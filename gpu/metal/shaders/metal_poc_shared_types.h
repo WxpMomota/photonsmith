@@ -312,6 +312,16 @@ struct SphereData {
     PackedFloat3 uvRot0 = PackedFloat3(1, 0, 0);
     PackedFloat3 uvRot1 = PackedFloat3(0, 1, 0);
     PackedFloat3 uvRot2 = PackedFloat3(0, 0, 1);
+    // A sphere that is clipped (pbrt's zmin / zmax / phimax: a cap, a dome, a wedge) or placed with a stretch (an ellipsoid) is not a centre and a radius: 1 here means it is intersected
+    // in its own object space (the matrices below), as the OptiX backends do (SphereData::o2w / w2o). center and radius then only bound it (the object's origin, and the object radius
+    // times the largest stretch), so the acceleration structure's box is still right. zMin / zMax / radiusLocal are object-space, phiMax in radians.
+    float clipped = 0.0f;
+    float radiusLocal = 1.0f;
+    float zMin = -1.0f;
+    float zMax = 1.0f;
+    float phiMax = 6.2831853f;
+    float o2w[12] = {1, 0, 0, 0,  0, 1, 0, 0,  0, 0, 1, 0};   // object -> Metal world, 3x4 row-major
+    float w2o[12] = {1, 0, 0, 0,  0, 1, 0, 0,  0, 0, 1, 0};   // and back
 };
 
 // A second, genuinely DIFFERENT custom-primitive shape - not another
