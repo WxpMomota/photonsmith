@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -14,10 +15,12 @@
 
 #include "pbrt_flatten_test_helpers.h"
 #include "../../launcher/cartoon_render.h"
+#include "../../launcher/cartoon_still.h"
 #include "../../launcher/launcher_args.h"
 #include "../../src/shared/cartoon/cartoons.h"
 #include "../../src/shared/cartoon/cartoon_stills.h"
 #include "../../src/shared/pbrt_discover.h"
+#include "../../qt_gui/scene_bucket.h"
 #include "../../src/shared/video_preset.h"
 
 namespace {
@@ -369,13 +372,12 @@ TEST(CartoonStills, EveryFilmGetsASceneFileTheSceneListFindsUnderCartoons) {
 
 TEST(CartoonStills, ASceneNameFindsItsFilm) {
 	for (const cartoon::Film &film : cartoon::kFilms) {
-		const cartoon::Film *found = cartoon_stills::filmForSlug("cartoon-" + std::string(film.key));
+		const cartoon::Film *found = cartoon_stills::filmForName(film.name);
 		ASSERT_NE(found, nullptr) << film.key;
 		EXPECT_STREQ(found->key, film.key);
 	}
-	EXPECT_EQ(cartoon_stills::filmForSlug("cartoon-nope"), nullptr);
-	EXPECT_EQ(cartoon_stills::filmForSlug("cornell-box"), nullptr);
-	EXPECT_EQ(cartoon_stills::filmForSlug("cartoon-fireflies-2"), nullptr) << "only the exact name";
+	EXPECT_EQ(cartoon_stills::filmForName("Cornell Box"), nullptr);
+	EXPECT_EQ(cartoon_stills::filmForName(""), nullptr);
 }
 
 TEST(CartoonStills, AStillIsTheFilmsFrameAtItsStillTime) {
@@ -387,13 +389,17 @@ TEST(CartoonStills, AStillIsTheFilmsFrameAtItsStillTime) {
 	for (const auto &w : fromFile.warnings) ADD_FAILURE() << w.message;
 }
 
-TEST(CartoonStills, AFileIsWrittenAgainOnlyWhenItsSourceIsNewer) {
+TEST(CartoonStills, AFileIsWrittenAgainOnlyWhenItsTextWouldChange) {
 	const std::filesystem::path dir = scratchDir("stills_fresh");
 	cartoon_stills::ensure(dir.string());
-	const std::filesystem::path file = dir / cartoon_stills::fileName(cartoon::kFilms[0]);
+	const cartoon::Film &film = cartoon::kFilms[0];
+	const std::filesystem::path file = dir / cartoon_stills::fileName(film);
 	ASSERT_TRUE(std::filesystem::exists(file));
-	EXPECT_TRUE(cartoon_stills::upToDate(file, cartoon_stills::stampOf(cartoon::kFilms[0])));
-	EXPECT_FALSE(cartoon_stills::upToDate(file, "an older source")) << "another stamp means the file is stale";
+	const std::string hash = cartoon_stills::hashOf(cartoon_stills::body(film));
+	EXPECT_TRUE(cartoon_stills::upToDate(file, hash));
+	EXPECT_FALSE(cartoon_stills::upToDate(file, "0123456789abcdef")) << "another hash means the file is stale";
+	EXPECT_EQ(cartoon_stills::hashOf("a"), cartoon_stills::hashOf("a"));
+	EXPECT_NE(cartoon_stills::hashOf("a"), cartoon_stills::hashOf("b"));
 	// current: left alone (a marker appended to the end survives)
 	{ std::ofstream(file, std::ios::binary | std::ios::app) << "# marker\n"; }
 	cartoon_stills::ensure(dir.string());
@@ -405,9 +411,101 @@ TEST(CartoonStills, AFileIsWrittenAgainOnlyWhenItsSourceIsNewer) {
 	// stale: replaced
 	{
 		std::ofstream out(file, std::ios::binary | std::ios::trunc);
-		out << "# @rt-cartoon-stamp something else\nWorldBegin\n";
+		out << "# @rt-cartoon-hash something else\nWorldBegin\n";
 	}
 	cartoon_stills::ensure(dir.string());
-	EXPECT_TRUE(cartoon_stills::upToDate(file, cartoon_stills::stampOf(cartoon::kFilms[0])));
+	EXPECT_TRUE(cartoon_stills::upToDate(file, hash));
 	std::filesystem::remove_all(dir);
+}
+
+TEST(CartoonStills, TheStillOfAFilmThatIsGoneIsRemovedAndOtherFilesAreKept) {
+	const std::filesystem::path dir = scratchDir("stills_prune");
+	std::filesystem::create_directories(dir);
+	{ std::ofstream(dir / "cartoon-gone-film.pbrt") << "WorldBegin\n"; }
+	{ std::ofstream(dir / "my-scene.pbrt") << "WorldBegin\n"; }
+	cartoon_stills::ensure(dir.string());
+	EXPECT_FALSE(std::filesystem::exists(dir / "cartoon-gone-film.pbrt"));
+	EXPECT_TRUE(std::filesystem::exists(dir / "my-scene.pbrt")) << "only the generated names are touched";
+	for (const cartoon::Film &film : cartoon::kFilms) EXPECT_TRUE(std::filesystem::exists(dir / cartoon_stills::fileName(film))) << film.key;
+	std::filesystem::remove_all(dir);
+}
+
+TEST(CartoonStills, TheSceneListReadsOnlyTheHeadOfAStill) {
+	const std::filesystem::path dir = scratchDir("stills_head");
+	cartoon_stills::ensure(dir.string());
+	const std::vector<pbrt_discover::Discovered> found = pbrt_discover::scanCartoonStills(dir.string());
+	ASSERT_EQ(found.size(), static_cast<std::size_t>(cartoon::kFilmCount));
+	const cartoon::Film &film = cartoon::kFilms[0];
+	for (const pbrt_discover::Discovered &d : found) {
+		EXPECT_TRUE(d.ok) << d.error;
+		EXPECT_EQ(d.category, "Cartoons");
+		if (d.tagName == film.name) EXPECT_EQ(d.xResolution, 1280) << "the film's own Film line, read from the head";
+	}
+	// the head is enough: describing the 64 KB head gives what describing the whole file does
+	const std::string path = (dir / cartoon_stills::fileName(film)).string();
+	const pbrt_discover::Discovered whole = pbrt_discover::describeFile(path), head = pbrt_discover::describeFileHead(path);
+	EXPECT_EQ(head.xResolution, whole.xResolution);
+	EXPECT_EQ(head.samplesPerPixel, whole.samplesPerPixel);
+	EXPECT_EQ(head.description, whole.description);
+	EXPECT_EQ(head.tagName, whole.tagName);
+	std::filesystem::remove_all(dir);
+}
+
+// ---- a frame as a temporary scene file (launcher/cartoon_still.h) ----------------------------------------------------------------------------------------------
+
+TEST(CartoonStillFile, AFrameIsWrittenReadAsAScenePbrtLoadsAndRemovedAgain) {
+	const std::filesystem::path root = scratchDir("stillfile");
+	std::filesystem::create_directories(root);
+	cartoon::Still still;
+	std::string err;
+	ASSERT_TRUE(cartoon::parseStill("cartoon:fireflies@13", still, err));
+	std::filesystem::path written;
+	{
+		cartoon_still::SceneFile file;
+		ASSERT_TRUE(file.write(still, root));
+		written = file.path;
+		EXPECT_TRUE(std::filesystem::exists(written));
+		EXPECT_EQ(written.filename().string(), "cartoon-fireflies-frame.pbrt");
+		std::ifstream in(written, std::ios::binary);
+		std::stringstream all;
+		all << in.rdbuf();
+		const FlatScene s = flattenSource(all.str());
+		EXPECT_GT(s.triangles.size(), 1000u);
+		for (const auto &w : s.warnings) ADD_FAILURE() << w.message;
+		EXPECT_EQ(pbrt_discover::describeFile(written.string()).tagName, "Fireflies at 13 s");
+	}
+	EXPECT_FALSE(std::filesystem::exists(written)) << "removed with the object";
+	EXPECT_FALSE(std::filesystem::exists(written.parent_path()));
+	std::filesystem::remove_all(root);
+}
+
+TEST(CartoonStillFile, FoldersOfKilledRunsAreSweptOnceOldEnoughAndOnlyThose) {
+	const std::filesystem::path root = scratchDir("stillsweep");
+	std::filesystem::create_directories(root / "photonsmith_cartoon_old");
+	std::filesystem::create_directories(root / "photonsmith_cartoon_new");
+	std::filesystem::create_directories(root / "someone_elses_folder");
+	std::filesystem::last_write_time(root / "photonsmith_cartoon_old", std::filesystem::file_time_type::clock::now() - std::chrono::hours(10));
+	std::filesystem::last_write_time(root / "someone_elses_folder", std::filesystem::file_time_type::clock::now() - std::chrono::hours(10));
+	cartoon_still::sweepStale(root);
+	EXPECT_FALSE(std::filesystem::exists(root / "photonsmith_cartoon_old"));
+	EXPECT_TRUE(std::filesystem::exists(root / "photonsmith_cartoon_new")) << "a run that may still be going keeps its folder";
+	EXPECT_TRUE(std::filesystem::exists(root / "someone_elses_folder")) << "only our own folders";
+	std::filesystem::remove_all(root);
+}
+
+// ---- the GUI's scene buckets (qt_gui/scene_bucket.h) -----------------------------------------------------------------------------------------------------------
+
+TEST(SceneBucket, TheFourBucketsAreTheScenePairAndTheCartoonPair) {
+	using namespace scene_bucket;
+	EXPECT_EQ(of(false, false), SelfContained);
+	EXPECT_EQ(of(false, true), ExternalFiles);
+	EXPECT_EQ(of(true, false), Cartoons);
+	EXPECT_EQ(of(true, true), CartoonsExternal);
+	for (int b = 0; b < kCount; ++b) {
+		EXPECT_EQ(of(isCartoons(b), requiresFiles(b)), b) << "a bucket survives being taken apart and put together";
+	}
+	EXPECT_FALSE(isCartoons(SelfContained) || isCartoons(ExternalFiles));
+	EXPECT_TRUE(isCartoons(Cartoons) && isCartoons(CartoonsExternal));
+	EXPECT_TRUE(requiresFiles(ExternalFiles) && requiresFiles(CartoonsExternal));
+	EXPECT_FALSE(requiresFiles(SelfContained) || requiresFiles(Cartoons));
 }

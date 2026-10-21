@@ -314,6 +314,18 @@ inline Discovered describeFile(const std::string &path) {
 	return describe(path, ss.str());
 }
 
+// Like describeFile() for a file that is large but says everything about itself near its start (the generated cartoon stills: a couple of MB of geometry after the header): only
+// the first 64 KB is read, which is enough when it holds the WorldBegin the header scan stops at. Falls back to the whole file otherwise.
+inline Discovered describeFileHead(const std::string &path) {
+	std::ifstream in(path, std::ios::binary);
+	if (!in) return describeFile(path);
+	std::string head(65536, '\0');
+	in.read(&head[0], static_cast<std::streamsize>(head.size()));
+	head.resize(static_cast<std::size_t>(in.gcount()));
+	if (head.find("WorldBegin") == std::string::npos) return describeFile(path);
+	return describe(path, head);
+}
+
 namespace detail {
 
 inline void collectPbrtFiles(const std::filesystem::path &from, std::vector<std::string> &out) {
@@ -414,6 +426,21 @@ inline std::vector<Discovered> scanDirectory(const std::string &dir) {
 	return found;
 }
 
+// The scenes in the cartoon stills folder: every .pbrt directly in it, read by header only (describeFileHead). Not scanDirectory(): the files are ours (no sibling Includes, no
+// subfolders to descend into), and every process that builds the scene list does this, among them each per-frame child run of a cartoon video.
+inline std::vector<Discovered> scanCartoonStills(const std::string &dir) {
+	std::vector<Discovered> found;
+	std::vector<std::string> paths;
+	detail::collectPbrtFiles(dir, paths);
+	std::sort(paths.begin(), paths.end());
+	for (const std::string &p : paths) {
+		Discovered d = describeFileHead(p);
+		if (d.ok && !d.declaresCamera) continue;
+		found.push_back(std::move(d));
+	}
+	return found;
+}
+
 // Where to look, in order, for a directory of user scenes.
 //
 // RAY_TRACER_PBRT_DIR wins so a user can point at a scene collection living
@@ -497,7 +524,7 @@ inline std::vector<Discovered> scanDefaultPaths() {
 	// The stills of the cartoon films, listed under Cartoons. The GUI writes them (cartoon_stills.h, at start-up); this only reads what is there, so the renderer
 	// libraries do not carry the film code.
 	if (const std::string cartoonDir = pbrt_asset_check::cartoonStillDir(); !cartoonDir.empty()) {
-		for (Discovered &d : scanDirectory(cartoonDir)) found.push_back(std::move(d));
+		for (Discovered &d : scanCartoonStills(cartoonDir)) found.push_back(std::move(d));
 	}
 	for (const std::string &path : extraSceneFiles()) {
 		// A file the scan already found (the user named a scene from pbrt_scenes/) keeps its scanned entry.

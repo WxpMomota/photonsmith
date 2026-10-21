@@ -14,8 +14,6 @@ namespace cartoon {
 namespace ball_parade {
 
 constexpr double kDuration = 12.0;
-// When this file was last changed: the cartoon stills (cartoon_stills.h) are written again when it is newer than the file written from it.
-constexpr const char *kStamp = __TIMESTAMP__;
 constexpr int kFps = 24;
 constexpr int kBalls = 7;
 constexpr double kRadius = 0.60;

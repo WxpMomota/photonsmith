@@ -417,9 +417,6 @@ inline double smoothstep(double a, double b, double x) {
 
 // A film: what a cartoon video preset renders. `sceneAt(t)` is the scene text at time t seconds (0 <= t <= duration); `resolutionHint` is only what its Film line says (the renderer's
 // own --width / --height / --samples settings take over).
-// When this file (the toolkit every film is made with) was last changed, as the compiler saw it; see kStamp in each film.
-constexpr const char *kLibStamp = __TIMESTAMP__;
-
 struct Film {
 	const char *key;           // "lamp-and-ball": the --cartoon argument
 	const char *name;          // "Lamp and Ball"
@@ -428,7 +425,6 @@ struct Film {
 	int fps;
 	std::string (*sceneAt)(double t);
 	double stillTime;          // a time that makes a good still picture (a thumbnail, a gallery image)
-	const char *stamp;         // the film's own kStamp: when its source last changed
 };
 
 }  // namespace cartoon

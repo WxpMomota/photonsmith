@@ -76,7 +76,7 @@ QStringList MainWindow::filteredSceneIds(const QString &category) const {
 	// same tab bar, and defaults to false (self-contained) if the bar
 	// somehow isn't built yet, the safer of the two defaults for a fresh
 	// checkout.
-	const bool wantRequiresFiles = bucketRequiresFiles(currentSceneBucket());
+	const bool wantRequiresFiles = scene_bucket::requiresFiles(currentSceneBucket());
 
 	// A further substring narrowing on top of category/availability, not a
 	// replacement for them - see m_sceneSearchBox's own comment.
@@ -212,9 +212,9 @@ void MainWindow::selectSceneById(const QString &key) {
 	// scene, so nothing is lost by silencing them here.
 	if (m_sceneAvailabilityTabs) {
 		const QSignalBlocker blocker(m_sceneAvailabilityTabs);
-		m_sceneAvailabilityTabs->setCurrentIndex(bucketOf(category == QLatin1String(SceneCategories::Cartoons), requiresFiles));
+		m_sceneAvailabilityTabs->setCurrentIndex(scene_bucket::of(category == QLatin1String(SceneCategories::Cartoons), requiresFiles));
 	}
-	rebuildCategoryTabs(bucketOf(category == QLatin1String(SceneCategories::Cartoons), requiresFiles));
+	rebuildCategoryTabs(scene_bucket::of(category == QLatin1String(SceneCategories::Cartoons), requiresFiles));
 	if (!m_sceneCategoryTabs) return;
 	{
 		const QSignalBlocker blocker(m_sceneCategoryTabs);
@@ -251,8 +251,8 @@ void MainWindow::selectSceneById(const QString &key) {
 // otherwise - mirrors createSettingsTab()'s own initial-fill fallback.
 void MainWindow::rebuildCategoryTabs(int bucket) {
 	if (!m_sceneCategoryTabs) return;
-	const bool requiresFiles = bucketRequiresFiles(bucket);
-	const bool cartoons = bucketIsCartoons(bucket);
+	const bool requiresFiles = scene_bucket::requiresFiles(bucket);
+	const bool cartoons = scene_bucket::isCartoons(bucket);
 
 	const QString previousCategory = m_sceneCategoryTabs->count() > 0
 		? m_sceneCategoryTabs->tabData(m_sceneCategoryTabs->currentIndex()).toString()
@@ -290,7 +290,7 @@ void MainWindow::rebuildCategoryTabs(int bucket) {
 
 void MainWindow::rebuildSubcategoryTabs(const QString &category, const QString &select) {
 	if (!m_sceneSubcategoryTabs) return;
-	const bool wantRequiresFiles = bucketRequiresFiles(currentSceneBucket());
+	const bool wantRequiresFiles = scene_bucket::requiresFiles(currentSceneBucket());
 	const QSignalBlocker blocker(m_sceneSubcategoryTabs);
 	while (m_sceneSubcategoryTabs->count() > 0) m_sceneSubcategoryTabs->removeTab(0);
 
@@ -369,4 +369,4 @@ void MainWindow::createSettingsTab() {
 
 	m_tabWidget->addTab(scrollArea, tr("Settings"));
 }
-
+

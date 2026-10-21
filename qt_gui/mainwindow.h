@@ -1,7 +1,9 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include <algorithm>
 #include <initializer_list>
+#include "scene_bucket.h"
 #include <QMainWindow>
 #include <QTabWidget>
 #include <QComboBox>
@@ -198,6 +200,7 @@ private slots:
 	void onVideoPresetChanged(int index);   // Points scene/camera-path/frames/fps/speed at a named preset
 	void onCameraDistanceChanged(double distance);  // Repositions camera X/Y/Z along its current direction from lookat
 	void onSceneChanged(int index);         // Updates UI when scene selection changes
+	void syncCartoonVideoSettings(const QString &sceneId);   // a cartoon scene sets the video's path / length / fps (mainwindow_scene_info.cpp)
 	void onModeChanged(int index);          // Switches between Image and Video modes
 	void onIntegratorChanged(int index);    // Switches the Integrator Options stack page, auto-corrects GPU/CPU, updates gating
 	void onProgressUpdate(int percentage);
@@ -1446,13 +1449,11 @@ private:
 	// that have at least one scene in whichever availability bucket is
 	// selected (rebuildCategoryTabs()) - mirroring how it already skips any
 	// category with zero scenes at all.
-	// The bar has four buckets: 0 "Self-Contained" and 1 "Requires External Files" hold the scenes; 2 "Cartoons" and 3 "Cartoons: External Files" hold the stills of the cartoon films
+	// The bar has four buckets (scene_bucket.h): Self-Contained and Requires External Files hold the scenes; Cartoons and Cartoons: External Files hold the stills of the cartoon films
 	// (category Cartoons) split the same way. A category appears in exactly one pair.
 	QTabBar *m_sceneAvailabilityTabs = nullptr;
-	static bool bucketIsCartoons(int bucket) { return bucket >= 2; }
-	static bool bucketRequiresFiles(int bucket) { return bucket % 2 == 1; }
-	static int bucketOf(bool cartoons, bool requiresFiles) { return (cartoons ? 2 : 0) + (requiresFiles ? 1 : 0); }
-	int currentSceneBucket() const { return m_sceneAvailabilityTabs && m_sceneAvailabilityTabs->currentIndex() > 0 ? m_sceneAvailabilityTabs->currentIndex() : 0; }
+	int currentSceneBucket() const { return m_sceneAvailabilityTabs ? std::max(0, m_sceneAvailabilityTabs->currentIndex()) : 0; }
+	QString m_cartoonSettingsFor;   // key of the film whose frames/fps/speed were last set from a cartoon scene; empty when the scene is not a cartoon
 	QTabBar *m_sceneCategoryTabs = nullptr;  // Category filter above the scene dropdown
 	// A third row, under the category tabs: the subcategories of the selected category (Large Scenes: Interiors, Vehicles, ...), with "All" first. It has no tabs
 	// (and is hidden) when the category's scenes have fewer than two subcategories, which is every category but Large Scenes today.

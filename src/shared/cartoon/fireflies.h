@@ -12,8 +12,6 @@ namespace cartoon {
 namespace fireflies {
 
 constexpr double kDuration = 26.0;
-// When this file was last changed: the cartoon stills (cartoon_stills.h) are written again when it is newer than the file written from it.
-constexpr const char *kStamp = __TIMESTAMP__;
 constexpr int kFps = 24;
 constexpr int kSwarm = 56;
 constexpr int kBlades = 1100;
@@ -29,20 +27,18 @@ inline double hash01(int i, int salt) {
 }
 
 struct Parts {
-	Mesh blade, body, glow, wing, trunk, capMushroom, stem, moon, star, ground;
+	Mesh blade, body, wing, trunk, capMushroom, stem, moon;
 };
 inline const Parts &parts() {
 	static const Parts p = [] {
 		Parts q;
 		q.blade = lathe({{0.022, 0.0}, {0.016, 0.25}, {0.008, 0.5}, {0.0, 0.62}}, 5);
 		q.body = uvSphere(1.0, 16, 8);
-		q.glow = uvSphere(1.0, 16, 8);
 		q.wing = uvSphere(1.0, 12, 6);
 		q.trunk = lathe({{0.0, 0.0}, {0.5, 0.0}, {0.42, 3.0}, {0.34, 8.0}, {0.0, 8.2}}, 14);
 		q.capMushroom = lathe({{0.0, 0.0}, {0.10, 0.0}, {0.35, 0.02}, {0.40, 0.08}, {0.32, 0.20}, {0.15, 0.30}, {0.0, 0.33}}, 20);
 		q.stem = lathe({{0.0, 0.0}, {0.05, 0.0}, {0.04, 0.15}, {0.0, 0.17}}, 10);
 		q.moon = uvSphere(1.0, 36, 18);
-		q.star = uvSphere(1.0, 6, 3);
 		return q;
 	}();
 	return p;
@@ -106,7 +102,7 @@ inline std::string buildFirefly(const Vec3 &pos, const Vec3 &velocity, double gl
 	out += attr(coated({0.8, 0.85, 0.7}, 0.25), emitMesh(P.wing, mul(frame, translate(0.03, 0.0, 0.012), rotate({0, 1, 0}, 25.0), scale(0.012, 0.075, 0.003))) +
 												 emitMesh(P.wing, mul(frame, translate(-0.03, 0.0, 0.012), rotate({0, 1, 0}, -25.0), scale(0.012, 0.075, 0.003))));
 	const Vec3 L = {f * glow * 16.0, f * glow * 22.0, f * glow * 3.0};
-	out += attr("Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]", emitMesh(P.glow, mul(frame, translate(0.0, -0.06, 0.0), scale(0.022, 0.034, 0.022))), &L);
+	out += attr("Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]", emitMesh(P.body, mul(frame, translate(0.0, -0.06, 0.0), scale(0.022, 0.034, 0.022))), &L);
 	return out;
 }
 

@@ -219,6 +219,9 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 		m_sceneAvailabilityTabs->setTabToolTip(cartoonTab, tr("%n cartoon(s) - a still of each film; the film itself is a video preset", "", cartoonCount));
 		const int cartoonFilesTab = m_sceneAvailabilityTabs->addTab(tr("Cartoons: External Files"));
 		m_sceneAvailabilityTabs->setTabToolTip(cartoonFilesTab, tr("%n cartoon(s) - needs assets not included in a fresh checkout", "", cartoonFilesCount));
+		// A tab's index is its bucket (scene_bucket.h): the order above is the enum's.
+		Q_ASSERT(selfTab == scene_bucket::SelfContained && filesTab == scene_bucket::ExternalFiles && cartoonTab == scene_bucket::Cartoons && cartoonFilesTab == scene_bucket::CartoonsExternal);
+		Q_UNUSED(selfTab) Q_UNUSED(filesTab) Q_UNUSED(cartoonTab) Q_UNUSED(cartoonFilesTab)
 
 #ifndef QT_NO_DEBUG
 		// One-time drift guard against scene_technique_notes.h - see that
@@ -246,7 +249,7 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	// createSettingsTab() already applied for categories with zero scenes at
 	// all (see rebuildCategoryTabs()'s own comment), just re-evaluated
 	// per bucket instead of once.
-	rebuildCategoryTabs(/*bucket=*/0);
+	rebuildCategoryTabs(scene_bucket::SelfContained);
 	sceneGroupLayout->addWidget(m_sceneCategoryTabs);
 
 	// The subcategory row (Large Scenes: Interiors, Vehicles, ...): hidden unless the selected category has two or more.

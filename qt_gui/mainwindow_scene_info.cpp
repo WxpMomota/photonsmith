@@ -305,6 +305,30 @@ void MainWindow::applyRecommendedSettings() {
 	updateSceneRecommendedSettingsHint(sceneId, &meta);
 }
 
+// A cartoon's still is that film's scene, and its video is the film itself, so while Generate Video is the output mode the video settings follow it the way a preset's do.
+// The camera path follows on every scene event (onSceneChanged resets it to the scene's recommended one each time); the frame count, fps and speed only when the film is
+// first selected, so a length the user typed in survives a tab switch, a search or the start-up restore. Selecting any other scene forgets the film.
+void MainWindow::syncCartoonVideoSettings(const QString &sceneId) {
+	const cartoon::Film *film = nullptr;
+	if (!sceneId.isEmpty() && SceneMetadataClient::sceneCategory(sceneId) == QLatin1String(SceneCategories::Cartoons))
+		film = cartoon_stills::filmForName(SceneMetadataClient::sceneName(sceneId).toStdString());
+	if (!film) {
+		m_cartoonSettingsFor.clear();
+		return;
+	}
+	if (!isVideoMode()) return;   // applied when the mode changes to video (onModeChanged)
+	if (m_cameraPathCombo) {
+		const int filmPath = m_cameraPathCombo->findData(QString::fromUtf8(cartoon::kCameraPathPrefix) + QString::fromUtf8(film->key));
+		if (filmPath >= 0) m_cameraPathCombo->setCurrentIndex(filmPath);
+	}
+	const QString key = QString::fromUtf8(film->key);
+	if (key == m_cartoonSettingsFor) return;
+	m_cartoonSettingsFor = key;
+	if (m_videoFramesSpinBox) m_videoFramesSpinBox->setValue(static_cast<int>(std::lround(film->duration * film->fps)));
+	if (m_videoFPSSpinBox) m_videoFPSSpinBox->setValue(film->fps);
+	if (m_videoSpeedSpinBox) m_videoSpeedSpinBox->setValue(1.0);
+}
+
 void MainWindow::onSceneChanged(int index) {
 	if (index < 0) {
 		// The only realistic way to reach this once scenes have loaded is
@@ -394,16 +418,7 @@ void MainWindow::onSceneChanged(int index) {
 		const int pathIdx = m_cameraPathCombo->findData(meta.recommendedCameraPath);
 		if (pathIdx >= 0) m_cameraPathCombo->setCurrentIndex(pathIdx);
 	}
-	// A cartoon's still is that film's scene: its video is the film itself, so the video settings follow it the way a preset's do (path, length, fps, speed).
-	if (const cartoon::Film *film = cartoon_stills::filmForSlug(SceneMetadataClient::sceneSlug(scene_id).toStdString())) {
-		if (m_cameraPathCombo) {
-			const int filmPath = m_cameraPathCombo->findData(QString::fromUtf8(cartoon::kCameraPathPrefix) + QString::fromUtf8(film->key));
-			if (filmPath >= 0) m_cameraPathCombo->setCurrentIndex(filmPath);
-		}
-		if (m_videoFramesSpinBox) m_videoFramesSpinBox->setValue(static_cast<int>(std::lround(film->duration * film->fps)));
-		if (m_videoFPSSpinBox) m_videoFPSSpinBox->setValue(film->fps);
-		if (m_videoSpeedSpinBox) m_videoSpeedSpinBox->setValue(1.0);
-	}
+	syncCartoonVideoSettings(scene_id);
 
 	// Auto-switch to CPU when scene doesn't support GPU. Which flag
 	// actually applies depends on which GPU backend is in play -

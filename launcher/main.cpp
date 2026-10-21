@@ -75,7 +75,8 @@ extern char** environ;
 #include "src/shared/backend_capabilities.h"   // which options each renderer reads
 #include "launcher/gpu_backend.h"      // the GPU renderer this build has (Metal or OptiX), behind one call
 #include "launcher/launcher_args.h"   // Argument parsing
-#include "launcher/cartoon_render.h"  // cartoon video presets: one child run per frame
+#include "launcher/cartoon_render.h"
+#include "launcher/cartoon_still.h"  // one frame of a film as a temporary scene file  // cartoon video presets: one child run per frame
 #include <fstream>
 #include "src/shared/path_probe.h"    // --probe X Y
 #include "launcher/diagnostics.h"     // --diagnose
@@ -1685,28 +1686,17 @@ int main(int argc, char** argv) {
 	if (cartoon_video) {
 		scene_id = "A1";
 		args.scene_file.clear();
+		args.cartoon_still.clear();   // (a cartoon scene named with a cartoon video: the frames bring their own scenes)
 	}
-	// One frame of a cartoon (cartoon:<key>[@seconds]) is rendered as the .pbrt file its scene text makes; the file is removed when the run ends.
-	struct TempSceneFile {
-		std::filesystem::path path;
-		~TempSceneFile() {
-			std::error_code ec;
-			if (!path.empty()) std::filesystem::remove(path, ec);
-		}
-	} cartoon_still_file;
+	// One frame of a cartoon (cartoon:<key>[@seconds]) is rendered as the .pbrt file its scene text makes (launcher/cartoon_still.h); the file is removed when the run ends.
+	cartoon_still::SceneFile cartoon_still_file;
 	if (!args.cartoon_still.empty()) {
 		cartoon::Still still;
 		std::string still_error;
 		cartoon::parseStill(args.cartoon_still, still, still_error);   // already checked by the argument parser
-		cartoon_still_file.path = std::filesystem::temp_directory_path() / ("photonsmith_" + std::string(still.film->key) + "_" +
-																			std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".pbrt");
-		{
-			std::ofstream f(cartoon_still_file.path, std::ios::binary);
-			f << still.film->sceneAt(still.t);
-			if (!f) {
-				std::cerr << "Cannot write the scene of " << args.cartoon_still << " to " << cartoon_still_file.path << std::endl;
-				return EXIT_FAILURE;
-			}
+		if (!cartoon_still_file.write(still, std::filesystem::temp_directory_path())) {
+			std::cerr << "Cannot write the scene of " << args.cartoon_still << " to " << cartoon_still_file.dir << std::endl;
+			return EXIT_FAILURE;
 		}
 		std::cout << still.film->name << " at " << std::fixed << std::setprecision(2) << still.t << " s" << std::defaultfloat << std::endl;
 		args.scene_file = cartoon_still_file.path.string();

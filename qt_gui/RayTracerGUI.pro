@@ -150,6 +150,7 @@ HEADERS += \
 	palette_file.h \
 	render_output_parser.h \
 	scene_metadata_client.h \
+	scene_bucket.h \
 	asset_downloader.h \
 	scene_packs.h \
 	realtime_preview_session.h \
