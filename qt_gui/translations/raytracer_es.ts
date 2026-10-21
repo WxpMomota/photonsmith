@@ -2233,6 +2233,32 @@ Es una descarga grande y puede tardar un rato.</translation>
         </translation>
     </message>
     <message>
+        <location filename="../mainwindow_tabs_settings_groups.cpp" line="220"/>
+        <source>Cartoons</source>
+        <translation>Dibujos animados</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../mainwindow_tabs_settings_groups.cpp" line="220"/>
+        <source>%n cartoon(s) - a still of each film; the film itself is a video preset</source>
+        <translation>
+            <numerusform>%n dibujo animado - una imagen de cada película; la película es un ajuste de vídeo</numerusform>
+            <numerusform>%n dibujos animados - una imagen de cada película; la película es un ajuste de vídeo</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../mainwindow_tabs_settings_groups.cpp" line="220"/>
+        <source>Cartoons: External Files</source>
+        <translation>Dibujos animados: archivos externos</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../mainwindow_tabs_settings_groups.cpp" line="220"/>
+        <source>%n cartoon(s) - needs assets not included in a fresh checkout</source>
+        <translation>
+            <numerusform>%n dibujo animado - necesita recursos no incluidos en una copia nueva</numerusform>
+            <numerusform>%n dibujos animados - necesitan recursos no incluidos en una copia nueva</numerusform>
+        </translation>
+    </message>
+    <message>
         <location filename="../mainwindow_tabs_settings_groups.cpp" line="218"/>
         <source>Search scenes by name or id...</source>
         <translation>Buscar escenas por nombre o id…</translation>

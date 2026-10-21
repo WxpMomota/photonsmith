@@ -2207,6 +2207,30 @@ This is a large download and may take a while.</source>
         </translation>
     </message>
     <message>
+        <location filename="../mainwindow_tabs_settings_groups.cpp" line="220"/>
+        <source>Cartoons</source>
+        <translation>动画短片</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../mainwindow_tabs_settings_groups.cpp" line="220"/>
+        <source>%n cartoon(s) - a still of each film; the film itself is a video preset</source>
+        <translation>
+            <numerusform>%n 部动画短片 - 每部影片的一张静帧；影片本身是视频预设</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../mainwindow_tabs_settings_groups.cpp" line="220"/>
+        <source>Cartoons: External Files</source>
+        <translation>动画短片：外部文件</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../mainwindow_tabs_settings_groups.cpp" line="220"/>
+        <source>%n cartoon(s) - needs assets not included in a fresh checkout</source>
+        <translation>
+            <numerusform>%n 部动画短片 - 需要全新检出中不包含的资源</numerusform>
+        </translation>
+    </message>
+    <message>
         <location filename="../mainwindow_tabs_settings_groups.cpp" line="218"/>
         <source>Search scenes by name or id...</source>
         <translation>按名称或 ID 搜索场景…</translation>

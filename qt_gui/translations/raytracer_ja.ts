@@ -2208,6 +2208,30 @@ This is a large download and may take a while.</source>
         </translation>
     </message>
     <message>
+        <location filename="../mainwindow_tabs_settings_groups.cpp" line="220"/>
+        <source>Cartoons</source>
+        <translation>アニメ</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../mainwindow_tabs_settings_groups.cpp" line="220"/>
+        <source>%n cartoon(s) - a still of each film; the film itself is a video preset</source>
+        <translation>
+            <numerusform>%n 件のアニメ - 各作品の静止画。作品自体は動画プリセットです</numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../mainwindow_tabs_settings_groups.cpp" line="220"/>
+        <source>Cartoons: External Files</source>
+        <translation>アニメ：外部ファイル</translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../mainwindow_tabs_settings_groups.cpp" line="220"/>
+        <source>%n cartoon(s) - needs assets not included in a fresh checkout</source>
+        <translation>
+            <numerusform>%n 件のアニメ - 新規チェックアウトには含まれないアセットが必要</numerusform>
+        </translation>
+    </message>
+    <message>
         <location filename="../mainwindow_tabs_settings_groups.cpp" line="218"/>
         <source>Search scenes by name or id...</source>
         <translation>名前またはIDでシーンを検索...</translation>

@@ -76,7 +76,7 @@ QStringList MainWindow::filteredSceneIds(const QString &category) const {
 	// same tab bar, and defaults to false (self-contained) if the bar
 	// somehow isn't built yet, the safer of the two defaults for a fresh
 	// checkout.
-	const bool wantRequiresFiles = m_sceneAvailabilityTabs && m_sceneAvailabilityTabs->currentIndex() == 1;
+	const bool wantRequiresFiles = bucketRequiresFiles(currentSceneBucket());
 
 	// A further substring narrowing on top of category/availability, not a
 	// replacement for them - see m_sceneSearchBox's own comment.
@@ -212,9 +212,9 @@ void MainWindow::selectSceneById(const QString &key) {
 	// scene, so nothing is lost by silencing them here.
 	if (m_sceneAvailabilityTabs) {
 		const QSignalBlocker blocker(m_sceneAvailabilityTabs);
-		m_sceneAvailabilityTabs->setCurrentIndex(requiresFiles ? 1 : 0);
+		m_sceneAvailabilityTabs->setCurrentIndex(bucketOf(category == QLatin1String(SceneCategories::Cartoons), requiresFiles));
 	}
-	rebuildCategoryTabs(requiresFiles);
+	rebuildCategoryTabs(bucketOf(category == QLatin1String(SceneCategories::Cartoons), requiresFiles));
 	if (!m_sceneCategoryTabs) return;
 	{
 		const QSignalBlocker blocker(m_sceneCategoryTabs);
@@ -249,8 +249,10 @@ void MainWindow::selectSceneById(const QString &key) {
 // (e.g. toggling availability while on "Geometry" should land back on
 // "Geometry" if it still has a qualifying scene), falling back to index 0
 // otherwise - mirrors createSettingsTab()'s own initial-fill fallback.
-void MainWindow::rebuildCategoryTabs(bool requiresFiles) {
+void MainWindow::rebuildCategoryTabs(int bucket) {
 	if (!m_sceneCategoryTabs) return;
+	const bool requiresFiles = bucketRequiresFiles(bucket);
+	const bool cartoons = bucketIsCartoons(bucket);
 
 	const QString previousCategory = m_sceneCategoryTabs->count() > 0
 		? m_sceneCategoryTabs->tabData(m_sceneCategoryTabs->currentIndex()).toString()
@@ -264,6 +266,7 @@ void MainWindow::rebuildCategoryTabs(bool requiresFiles) {
 	int restoredTab = -1;
 	for (const char *categoryName : SceneCategories::kDisplayOrder) {
 		const QString category = QString::fromUtf8(categoryName);
+		if ((category == QLatin1String(SceneCategories::Cartoons)) != cartoons) continue;   // the cartoon buckets show only that category, the others never do
 		int inCategory = 0;
 		for (int j = 0; j < sceneCount; ++j) {
 			const QString id = SceneMetadataClient::sceneIdAtIndex(j);
@@ -282,11 +285,12 @@ void MainWindow::rebuildCategoryTabs(bool requiresFiles) {
 
 	if (m_sceneCategoryTabs->count() > 0)
 		m_sceneCategoryTabs->setCurrentIndex(restoredTab >= 0 ? restoredTab : 0);
+	m_sceneCategoryTabs->setVisible(!cartoons);   // one category: the bucket's own tab already says it
 }
 
 void MainWindow::rebuildSubcategoryTabs(const QString &category, const QString &select) {
 	if (!m_sceneSubcategoryTabs) return;
-	const bool wantRequiresFiles = m_sceneAvailabilityTabs && m_sceneAvailabilityTabs->currentIndex() == 1;
+	const bool wantRequiresFiles = bucketRequiresFiles(currentSceneBucket());
 	const QSignalBlocker blocker(m_sceneSubcategoryTabs);
 	while (m_sceneSubcategoryTabs->count() > 0) m_sceneSubcategoryTabs->removeTab(0);
 

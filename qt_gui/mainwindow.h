@@ -1446,7 +1446,13 @@ private:
 	// that have at least one scene in whichever availability bucket is
 	// selected (rebuildCategoryTabs()) - mirroring how it already skips any
 	// category with zero scenes at all.
-	QTabBar *m_sceneAvailabilityTabs = nullptr;  // "Self-Contained" / "Requires External Files"
+	// The bar has four buckets: 0 "Self-Contained" and 1 "Requires External Files" hold the scenes; 2 "Cartoons" and 3 "Cartoons: External Files" hold the stills of the cartoon films
+	// (category Cartoons) split the same way. A category appears in exactly one pair.
+	QTabBar *m_sceneAvailabilityTabs = nullptr;
+	static bool bucketIsCartoons(int bucket) { return bucket >= 2; }
+	static bool bucketRequiresFiles(int bucket) { return bucket % 2 == 1; }
+	static int bucketOf(bool cartoons, bool requiresFiles) { return (cartoons ? 2 : 0) + (requiresFiles ? 1 : 0); }
+	int currentSceneBucket() const { return m_sceneAvailabilityTabs && m_sceneAvailabilityTabs->currentIndex() > 0 ? m_sceneAvailabilityTabs->currentIndex() : 0; }
 	QTabBar *m_sceneCategoryTabs = nullptr;  // Category filter above the scene dropdown
 	// A third row, under the category tabs: the subcategories of the selected category (Large Scenes: Interiors, Vehicles, ...), with "All" first. It has no tabs
 	// (and is hidden) when the category's scenes have fewer than two subcategories, which is every category but Large Scenes today.
@@ -1516,7 +1522,7 @@ private:
 	// createSettingsTab() already applies for categories with zero scenes at
 	// all. Does not touch m_sceneCombo; callers follow up with
 	// populateSceneCombo() for whichever category tab ends up selected.
-	void rebuildCategoryTabs(bool requiresFiles);
+	void rebuildCategoryTabs(int bucket);
 	// Rebuilds m_sceneSubcategoryTabs for `category` and the current availability tab ("All (n)" and one tab for each subcategory present, in
 	// SceneSubcategories order); `select` is the subcategory to show ("" = All). Does not touch the combo: callers follow it with populateSceneViews().
 	void rebuildSubcategoryTabs(const QString &category, const QString &select = QString());

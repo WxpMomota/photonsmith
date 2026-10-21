@@ -30,7 +30,7 @@ The category letters, in GUI tab order:
 | K | Custom Scenes | Your scenes and downloaded collections: `.pbrt` files found on disk that do not name another category |
 | L | Test Scenes | The bundled fixtures: furnaces with exact answers, light-transport probes, one-feature regression scenes. Worth browsing (each isolates one thing) but not demos |
 | M | My Scenes | Scenes you made: the ones saved from the Scene Builder with **Add to scene list** (they go to your own folder, so they survive reinstalling the program), and any scene file carrying a Scene Builder title. Shown right after Textures in the GUI, though its id letter is the last one so no existing id changed |
-| N | Cartoons | One still of each cartoon film (the frame at the film's own best moment), written by the GUI into its per-user folder and listed from there; render, preview or open one like any scene. The film itself is a video preset ("Cartoon: ..." in Video Settings). Shown after Textures, with the last id letter so no existing id changed |
+| N | Cartoons | One still of each cartoon film (the frame at the film's own best moment), written by the GUI into its per-user folder and listed from there; render, preview or open one like any scene. The film itself is a video preset ("Cartoon: ..." in Video Settings). Has its own pair of tabs in the GUI (Cartoons, Cartoons: External Files), with the last id letter so no existing id changed |
 
 **Subcategories.** A category that grows too big to browse as one list has a second level, shown as a row of tabs under the category tabs ("All (45)", "Interiors (16)", ...). Today only Large Scenes has them: **Interiors** (rooms, halls, kitchens), **Buildings & Streets** (atrium, cathedral, pavilion, houses, streets, a power plant), **Voxel Worlds** (Minecraft-style towns), **Nature**, **Vehicles** (cars and a spaceship), **Objects** (statues, product shots, material studies) and **Light & Art** (light-transport test scenes, artists' pieces). A subcategory is part of the scene's registry row (`in_subcategory(SceneSubcategories::Vehicles, ...)`, names in `src/shared/scene_descriptor.h`); it never changes the scene's id, which is the category's letter and a number, so moving a scene between subcategories moves no id. The row shows only when the selected category's scenes have two or more subcategories.
 
@@ -48,7 +48,7 @@ The full table (id, name, description, performance, recommended samples, GPU com
 
 The scene selector is on the **Settings** tab, in the "Scene" group box:
 
-1. **Availability tabs:** "Self-Contained" and "Requires External Files" (mesh and texture scenes that need assets not guaranteed to be on disk).
+1. **Availability tabs:** "Self-Contained" and "Requires External Files" (mesh and texture scenes that need assets not guaranteed to be on disk) for the scenes, and "Cartoons" and "Cartoons: External Files" for the stills of the cartoon films (the Cartoons category has its own pair, so it does not mix with the scene categories; the external-files one stays empty until a film needs outside files).
 2. **Category tabs:** one per category above.
 3. **Search box:** filters the dropdown by name, id or description.
 4. **Scene dropdown:** the selector.

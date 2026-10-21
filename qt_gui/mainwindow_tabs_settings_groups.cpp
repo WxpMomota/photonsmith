@@ -200,11 +200,13 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	m_sceneAvailabilityTabs->setDrawBase(false);
 	m_sceneAvailabilityTabs->setExpanding(false);
 	{
-		int requiresFilesCount = 0;
+		int requiresFilesCount = 0, cartoonCount = 0, cartoonFilesCount = 0;
 		QStringList selfContainedIds;
 		for (int i = 0; i < sceneCount; ++i) {
 			const QString id = SceneMetadataClient::sceneIdAtIndex(i);
-			if (SceneMetadataClient::sceneRequiresFiles(id)) ++requiresFilesCount;
+			const bool requires = SceneMetadataClient::sceneRequiresFiles(id);
+			if (SceneMetadataClient::sceneCategory(id) == QLatin1String(SceneCategories::Cartoons)) ++(requires ? cartoonFilesCount : cartoonCount);
+			else if (requires) ++requiresFilesCount;
 			else selfContainedIds << id;
 		}
 		const int selfTab = m_sceneAvailabilityTabs->addTab(tr("Self-Contained"));
@@ -213,6 +215,10 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 		const int filesTab = m_sceneAvailabilityTabs->addTab(tr("Requires External Files"));
 		m_sceneAvailabilityTabs->setTabToolTip(filesTab,
 			tr("%n scene(s) - needs assets not included in a fresh checkout", "", requiresFilesCount));
+		const int cartoonTab = m_sceneAvailabilityTabs->addTab(tr("Cartoons"));
+		m_sceneAvailabilityTabs->setTabToolTip(cartoonTab, tr("%n cartoon(s) - a still of each film; the film itself is a video preset", "", cartoonCount));
+		const int cartoonFilesTab = m_sceneAvailabilityTabs->addTab(tr("Cartoons: External Files"));
+		m_sceneAvailabilityTabs->setTabToolTip(cartoonFilesTab, tr("%n cartoon(s) - needs assets not included in a fresh checkout", "", cartoonFilesCount));
 
 #ifndef QT_NO_DEBUG
 		// One-time drift guard against scene_technique_notes.h - see that
@@ -240,7 +246,7 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	// createSettingsTab() already applied for categories with zero scenes at
 	// all (see rebuildCategoryTabs()'s own comment), just re-evaluated
 	// per bucket instead of once.
-	rebuildCategoryTabs(/*requiresFiles=*/false);
+	rebuildCategoryTabs(/*bucket=*/0);
 	sceneGroupLayout->addWidget(m_sceneCategoryTabs);
 
 	// The subcategory row (Large Scenes: Interiors, Vehicles, ...): hidden unless the selected category has two or more.
@@ -357,7 +363,7 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 
 	connect(m_sceneAvailabilityTabs, &QTabBar::currentChanged, this, [this](int tab) {
 		if (tab < 0) return;
-		rebuildCategoryTabs(/*requiresFiles=*/tab == 1);
+		rebuildCategoryTabs(tab);
 		// rebuildCategoryTabs() picks a category tab but (like the category
 		// bar's own currentChanged handler below) does not refill the combo
 		// itself - QTabBar::currentChanged only fires on an actual index
