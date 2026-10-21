@@ -91,6 +91,8 @@
 // and OptiX backends use to honor a ".exr" output path (postProcessAndWrite()
 // below).
 #include "../../../src/shared/exr_writer.h"
+#include "../../../src/shared/output_crop.h"   // the cut of a scene whose crop window is its picture
+#include "metal_poc_tuning.h"
 #include "../../../src/shared/cornell_box_data.h"
 // kConductorAu/kConductorCu - real (eta,k) presets for B7's own lacquered-
 // gold sphere/lacquered-copper box (buildCornellCoatedConductor()) -
@@ -858,6 +860,16 @@ void MetalPocApp::applyCameraOverride(double cam_x, double cam_y, double cam_z) 
 // (chromatic aberration, then lens vignette, then the selected tonemap
 // operator, then the real sRGB OETF, then bilateral denoise)
 bool MetalPocApp::postProcessAndWrite() {
+    // A scene whose crop window is its picture: keep only the window (every later step, the denoiser, the EXR and the PNG, then sees the smaller image).
+    if (cutToCropWindow && cropX1 >= 0 && cropX1 > cropX0 && cropY1 > cropY0 && (uint32_t)cropX1 <= width && (uint32_t)cropY1 <= height) {
+        output_crop::Bounds window;
+        window.x0 = cropX0; window.x1 = cropX1; window.y0 = cropY0; window.y1 = cropY1;
+        window.full = false;
+        pixels = output_crop::cut(pixels, (int)width, 4, window);
+        width = (uint32_t)(cropX1 - cropX0);
+        height = (uint32_t)(cropY1 - cropY0);
+        cropX0 = 0; cropX1 = -1; cropY0 = 0; cropY1 = -1;
+    }
     // --denoise: Open Image Denoise on the linear HDR image (before the .exr is written or the PNG is tone-mapped). When it ran, the PNG's own bilateral blur
     // is skipped: one denoiser, not two.
     bool oidnDenoised = false;
@@ -1083,6 +1095,18 @@ int metal_render_main(int image_width, int image_height, int samples_per_pixel,
         app.buildScene();
         // loadPbrtScene() already printed the explanation (naming the missing files).
         if (!app.pbrtMissingAssetsError.empty()) return ERR_FILE_NOT_FOUND;
+        {
+            // The file's own Film cropwindow/pixelbounds: draw only that window (--crop above wins). A scene whose crop IS its picture (the Head) is then written as the window alone.
+            const double* fc = app.pbrtFilmCrop;
+            const bool explicitCrop = app.cropX1 >= 0;
+            if (!explicitCrop && (fc[0] != 0.0 || fc[1] != 1.0 || fc[2] != 0.0 || fc[3] != 1.0)) {
+                const CropPixelBounds b = resolve_crop_pixel_bounds(fc[0], fc[1], fc[2], fc[3], image_width, image_height);
+                if (!b.wasDegenerate) { app.cropX0 = b.x0; app.cropX1 = b.x1; app.cropY0 = b.y0; app.cropY1 = b.y1; }
+            }
+            double pictureCrop[4];
+            app.cutToCropWindow = !explicitCrop && cpu_scene_crop_picture_by_id(scene_id, pictureCrop) != 0;
+            if (MetalTuning::fromEnvironment().cutToCrop) app.cutToCropWindow = true;
+        }
         if (force_camera_override) {
             if (app.havePbrtCamera) {
                 app.applyCameraOverride(cam_x, cam_y, cam_z);

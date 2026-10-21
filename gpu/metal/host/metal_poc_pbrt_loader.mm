@@ -123,6 +123,7 @@ void PbrtSceneLoader::loadPbrtScene() {
     pbrtFilterSigma = (float)scene.filter.sigma;
     pbrtFilterTau = (float)scene.filter.tau;
     pbrtFilterRadius = (float)scene.filter.radius;
+    pbrtFilmCrop[0] = scene.cropX0; pbrtFilmCrop[1] = scene.cropX1; pbrtFilmCrop[2] = scene.cropY0; pbrtFilmCrop[3] = scene.cropY1;
 
     // Uniform scene-scale normalization: a real pbrt scene is typically
     // authored at a scale of hundreds of units (a classic Cornell box

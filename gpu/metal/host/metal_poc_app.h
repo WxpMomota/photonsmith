@@ -148,6 +148,9 @@ struct MetalPocApp : PbrtSceneLoader {
     // same resolve_crop_pixel_bounds() OptiX uses). cropX1 < 0 = not requested:
     // render the whole image, exactly as before. See compileShaderAndDispatch().
     int cropX0 = 0, cropX1 = -1, cropY0 = 0, cropY1 = -1;
+    // The scene's crop window IS its picture (the pbrt-v4-scenes Head, SceneDescriptor::crop_is_picture): postProcessAndWrite() writes only the window, as pbrt does, where an
+    // ordinary crop leaves the frame its full size with black around the window. Set by metal_render_main().
+    bool cutToCropWindow = false;
     // --- Metal device/queue, set by parseArgsAndCreateDevice() ---------
     id<MTLDevice> device = nil;
     id<MTLCommandQueue> queue = nil;
