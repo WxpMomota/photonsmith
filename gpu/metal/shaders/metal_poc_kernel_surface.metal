@@ -322,6 +322,26 @@ inline void perturbShadingNormal(thread const KernelRes& R, thread PathState& P,
 
 // The surface colour at the hit (B.albedo): flat colour, image, checker, noise and marble textures, the texture family. May also replace the
 // material's transmit colour from its image.
+// Where the reflectance picture is looked up: pbrt's imagemap uscale/vscale/udelta/vdelta of the surface's uv, or, for a "spherical", "cylindrical" or "planar" mapping
+// (posMapIndex != 0), the hit point carried into the texture's own space (src/shared/texture_position_mapping.h, positionToSt, in Metal's rescaled world: the host composed the matrix).
+inline float2 pictureLookup(TriangleMaterial mat, device const float* grid, float3 hitPoint, float2 uv) {
+    if (mat.posMapIndex <= 0) return float2(mat.uvScaleU * uv.x + mat.uvDeltaU, mat.uvScaleV * uv.y + mat.uvDeltaV);
+    device const float* d = grid + (mat.posMapIndex - 1);
+    const int kind = int(d[0] + 0.5);
+    const float x = d[1] * hitPoint.x + d[2] * hitPoint.y + d[3] * hitPoint.z + d[4];
+    const float y = d[5] * hitPoint.x + d[6] * hitPoint.y + d[7] * hitPoint.z + d[8];
+    const float z = d[9] * hitPoint.x + d[10] * hitPoint.y + d[11] * hitPoint.z + d[12];
+    if (kind == 1) {   // spherical
+        const float len = sqrt(x * x + y * y + z * z);
+        const float cosTheta = len > 0.0 ? clamp(z / len, -1.0f, 1.0f) : 1.0f;
+        float phi = atan2(y, x);
+        if (phi < 0.0) phi += 2.0 * M_PI_F;
+        return float2(acos(cosTheta) / M_PI_F, phi / (2.0 * M_PI_F));
+    }
+    if (kind == 2) return float2((M_PI_F + atan2(y, x)) / (2.0 * M_PI_F), z);   // cylindrical
+    return float2(d[19] + (x * d[13] + y * d[14] + z * d[15]), d[20] + (x * d[16] + y * d[17] + z * d[18]));   // planar
+}
+
 inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread BounceState& B) {
     KERNEL_RES_ALIASES(R)
     PATH_STATE_ALIASES(P)
@@ -534,7 +554,7 @@ inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread
         // own texture had no wrapping "scale").
         float2 uv = isSphere ? sphereUV(spheres[primId].uvRot0, spheres[primId].uvRot1, spheres[primId].uvRot2, normal)
                               : texCoordFor(primId, result.triangle_barycentric_coord, uvs);
-        const float2 muv = float2(mat.uvScaleU * uv.x + mat.uvDeltaU, mat.uvScaleV * uv.y + mat.uvDeltaV);   // pbrt imagemap uscale/vscale/udelta/vdelta
+        const float2 muv = pictureLookup(mat, rgbGridData, hitPoint, uv);   // pbrt imagemap uscale/vscale/udelta/vdelta, or a position-based mapping
         albedo = samplePictureWrapped(pbrtDiffuseTexture, textureSampler, muv, mat.textureWrap).rgb * mat.roughness;
     } else if (mat.materialType == METAL_MAT_DIFFUSE_TRANSMISSION && mat.conductorK.y > 8.5) {
         // DiffuseTransmission with image-textured reflectance (diffuse slot) and/or transmittance
@@ -542,7 +562,7 @@ inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread
         // transmittance is; otherwise the flat colour in color / transmitColor is used. The shade
         // function reads mat.transmitColor, so the sampled transmittance is written back into it.
         float2 uv9 = texCoordFor(primId, result.triangle_barycentric_coord, uvs);
-        const float2 muv9 = float2(mat.uvScaleU * uv9.x + mat.uvDeltaU, mat.uvScaleV * uv9.y + mat.uvDeltaV);   // the reflectance picture's mapping
+        const float2 muv9 = pictureLookup(mat, rgbGridData, hitPoint, uv9);   // the reflectance picture's mapping
         albedo = (mat.conductorK.x > 0.5)
             ? samplePictureWrapped(pbrtDiffuseTexture, textureSampler, muv9, mat.textureWrap).rgb
             : float3(mat.color);

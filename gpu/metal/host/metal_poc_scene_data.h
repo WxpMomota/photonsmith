@@ -41,6 +41,10 @@ struct PbrtSceneLoader {
     // The file's own Film "cropwindow"/"pixelbounds" as NDC fractions {x0, x1, y0, y1} (FlatScene::cropX0...; {0, 1, 0, 1} = none). metal_render_main() turns it into the pixel window
     // (cropX0... in MetalPocApp) unless --crop was given, so Metal draws only the window like the CPU and OptiX do.
     double pbrtFilmCrop[4] = {0.0, 1.0, 0.0, 1.0};
+    // Position-based texture mappings already put in rgbGridData (21 floats each), by content, so a mapping shared by many materials is stored once.
+    std::map<std::vector<float>, int> pbrtPositionMappings;
+    // The offset in rgbGridData of `mapping`'s data (stored on first use); the texture-from-world matrix is carried into Metal's rescaled world.
+    int claimPositionMapping(const pbrt_flatten::UvMapping& mapping, float sceneScale, float3 bboxCenter, float3 sceneOffset);
     // Optional 7th positional CLI arg - a real .pbrt scene file to load
     // via src/shared/pbrt_load.h INSTEAD of buildScene()'s own hardcoded
     // room (see loadPbrtScene()'s own comment for exactly what subset of

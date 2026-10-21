@@ -781,6 +781,8 @@ struct TriangleMaterial {
     float layerG;
     int layerMaxDepth;
     int layerNSamples;
+    // A position-based texture mapping for the reflectance picture (see metal_poc_gpu_types.h); 0 = the surface's own uv.
+    int posMapIndex;
 };
 
 // ---- What the spare slots of TriangleMaterial mean, per material family ----------------------------------------------------------------------------------------------
