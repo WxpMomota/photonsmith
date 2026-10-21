@@ -477,16 +477,64 @@ inline float3 resolveMixColor(const pbrt_flatten::Material &m,
 					   ca.z * (1.0f - w) + cb.z * w);
 }
 
+// A graph of textures (pbrt_flatten::TexMeanNode recipe, root last) as a TextureKind::Graph entry followed by its GraphNode entries; returns the root's index in out.textures, or -1
+// when a picture cannot be read (the caller then keeps the flat value, the graph's mean).
+inline int buildTextureGraph(const std::vector<pbrt_flatten::TexMeanNode> &nodes, SceneData &out, std::map<std::string, int> &imageTextureCache) {
+	// The pictures first (each may append an image entry), so the graph's own entries below are contiguous.
+	using Kind = pbrt_flatten::TexMeanNode::Kind;
+	static_assert(kMaxTextureGraphNodesDevice == pbrt_flatten::kMaxTextureGraphNodes, "the device's graph stack and the flattener's limit are one number");
+	std::vector<int> imageIdx(nodes.size(), -1);
+	for (std::size_t i = 0; i < nodes.size(); ++i) {
+		const pbrt_flatten::TexMeanNode &n = nodes[i];
+		if (n.kind != Kind::Image) continue;
+		imageIdx[i] = getOrBuildPbrtImageTexture(n.file, out, imageTextureCache, static_cast<float>(n.gamma), static_cast<GpuWrapMode>(n.wrapIndex), n.invert, n.mapping);
+		if (imageIdx[i] < 0) return -1;
+	}
+	TextureData root{};
+	root.kind = TextureKind::Graph;
+	root.octaves = static_cast<int>(nodes.size());
+	root.tex1ImageIdx = static_cast<int>(out.textures.size()) + 1;
+	const int rootIdx = static_cast<int>(out.textures.size());
+	out.textures.push_back(root);
+	for (std::size_t i = 0; i < nodes.size(); ++i) {
+		const pbrt_flatten::TexMeanNode &n = nodes[i];
+		TextureData node{};
+		if (n.kind == Kind::Image) {
+			node = out.textures[static_cast<std::size_t>(imageIdx[i])];
+			node.octaves = 1;
+			node.mixAmount = static_cast<float>(n.scale);
+		} else if (n.kind == Kind::Const) {
+			node.octaves = 0;
+			node.color1 = make_float3(static_cast<float>(n.c[0]), static_cast<float>(n.c[1]), static_cast<float>(n.c[2]));
+		} else if (n.kind == Kind::Product) {
+			node.octaves = 2;
+			node.tex1ImageIdx = n.a; node.tex2ImageIdx = n.b;
+		} else {
+			node.octaves = 3;
+			node.tex1ImageIdx = n.a; node.tex2ImageIdx = n.b; node.amountImageIdx = n.t;
+		}
+		node.kind = TextureKind::GraphNode;
+		out.textures.push_back(node);
+	}
+	return rootIdx;
+}
+
 // A roughness IMAGE on a Conductor, CoatedDiffuse or CoatedConductor (Material::roughnessTextureFilename / condRoughnessTextureFilename): the texture and its scale go into the
 // MaterialData, and the device reads the image at each hit (patch_roughness_textures(), optix_device_textures.h / wf_patch_roughness_textures(), wavefront_device_common.h).
 // The flat roughness the caller stored stays as the fallback (the image's mean, from pbrt_load) for a path that does not read it (GPU SPPM).
 inline void setRoughnessTextures(const pbrt_flatten::Material &m, MaterialData &d, SceneData &out, std::map<std::string, int> &imageTextureCache) {
-	if (!m.roughnessTextureFilename.empty()) {
+	if (!m.roughnessGraph.empty()) {   // a graph of textures: its scales are inside it
+		const int idx = buildTextureGraph(m.roughnessGraph, out, imageTextureCache);
+		if (idx >= 0) { d.roughTexIdx = idx; d.roughTexScale = 1.0f; }
+	} else if (!m.roughnessTextureFilename.empty()) {
 		const int idx = getOrBuildPbrtImageTexture(m.roughnessTextureFilename, out, imageTextureCache, static_cast<float>(m.roughnessTextureOptions.gamma),
 												   static_cast<GpuWrapMode>(m.roughnessTextureOptions.wrapIndex), m.roughnessTextureOptions.invert, m.roughnessTextureMapping);
 		if (idx >= 0) { d.roughTexIdx = idx; d.roughTexScale = static_cast<float>(m.roughnessTextureScale); }
 	}
-	if (!m.condRoughnessTextureFilename.empty()) {
+	if (!m.condRoughnessGraph.empty()) {
+		const int idx = buildTextureGraph(m.condRoughnessGraph, out, imageTextureCache);
+		if (idx >= 0) { d.condRoughTexIdx = idx; d.condRoughTexScale = 1.0f; }
+	} else if (!m.condRoughnessTextureFilename.empty()) {
 		const int idx = getOrBuildPbrtImageTexture(m.condRoughnessTextureFilename, out, imageTextureCache, static_cast<float>(m.condRoughnessTextureOptions.gamma),
 												   static_cast<GpuWrapMode>(m.condRoughnessTextureOptions.wrapIndex), m.condRoughnessTextureOptions.invert, m.condRoughnessTextureMapping);
 		if (idx >= 0) { d.condRoughTexIdx = idx; d.condRoughTexScale = static_cast<float>(m.condRoughnessTextureScale); }
@@ -508,42 +556,9 @@ inline void setRoughnessTextures(const pbrt_flatten::Material &m, MaterialData &
 inline bool resolveProceduralReflectanceTexture(const pbrt_flatten::Material &m, MaterialData &d,
 												 SceneData &out, std::map<std::string, int> &imageTextureCache) {
 	if (!m.reflectanceGraph.empty()) {
-		// The pictures first (each may append an image entry), so the graph's own entries below are contiguous.
-		using Kind = pbrt_flatten::TexMeanNode::Kind;
-		static_assert(kMaxTextureGraphNodesDevice == pbrt_flatten::kMaxTextureGraphNodes, "the device's graph stack and the flattener's limit are one number");
-		std::vector<int> imageIdx(m.reflectanceGraph.size(), -1);
-		for (std::size_t i = 0; i < m.reflectanceGraph.size(); ++i) {
-			const pbrt_flatten::TexMeanNode &n = m.reflectanceGraph[i];
-			if (n.kind != Kind::Image) continue;
-			imageIdx[i] = getOrBuildPbrtImageTexture(n.file, out, imageTextureCache, static_cast<float>(n.gamma), static_cast<GpuWrapMode>(n.wrapIndex), n.invert, n.mapping);
-			if (imageIdx[i] < 0) return false;   // an unreadable picture: the flat colour (the graph's mean) stands
-		}
-		TextureData root{};
-		root.kind = TextureKind::Graph;
-		root.octaves = static_cast<int>(m.reflectanceGraph.size());
-		root.tex1ImageIdx = static_cast<int>(out.textures.size()) + 1;
-		d.textureIdx = static_cast<int>(out.textures.size());
-		out.textures.push_back(root);
-		for (std::size_t i = 0; i < m.reflectanceGraph.size(); ++i) {
-			const pbrt_flatten::TexMeanNode &n = m.reflectanceGraph[i];
-			TextureData node{};
-			if (n.kind == Kind::Image) {
-				node = out.textures[static_cast<std::size_t>(imageIdx[i])];
-				node.octaves = 1;
-				node.mixAmount = static_cast<float>(n.scale);
-			} else if (n.kind == Kind::Const) {
-				node.octaves = 0;
-				node.color1 = make_float3(static_cast<float>(n.c[0]), static_cast<float>(n.c[1]), static_cast<float>(n.c[2]));
-			} else if (n.kind == Kind::Product) {
-				node.octaves = 2;
-				node.tex1ImageIdx = n.a; node.tex2ImageIdx = n.b;
-			} else {
-				node.octaves = 3;
-				node.tex1ImageIdx = n.a; node.tex2ImageIdx = n.b; node.amountImageIdx = n.t;
-			}
-			node.kind = TextureKind::GraphNode;
-			out.textures.push_back(node);
-		}
+		const int root = buildTextureGraph(m.reflectanceGraph, out, imageTextureCache);
+		if (root < 0) return false;   // an unreadable picture: the flat colour (the graph's mean) stands
+		d.textureIdx = root;
 		return true;
 	}
 	if (m.hasCheckerReflectance) {
@@ -1233,7 +1248,10 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 			d.mix_extra.mixMaterialAIdx = static_cast<float>(idxA);
 			d.mix_extra.mixMaterialBIdx = static_cast<float>(idxB);
 			d.mix_extra.mixWeight = static_cast<float>(m.mixWeight);
-			if (!m.mixWeightTextureFilename.empty()) {   // the amount is an image: read per hit (see MaterialData::mixAmountTexIdx)
+			if (!m.mixAmountGraph.empty()) {   // the amount is a graph of textures: read per hit, its scales inside it
+				const int idx = buildTextureGraph(m.mixAmountGraph, out, imageTextureCache);
+				if (idx >= 0) { d.mixAmountTexIdx = idx; d.mixAmountTexScale = 1.0f; }
+			} else if (!m.mixWeightTextureFilename.empty()) {   // the amount is an image: read per hit (see MaterialData::mixAmountTexIdx)
 				const int idx = getOrBuildPbrtImageTexture(m.mixWeightTextureFilename, out, imageTextureCache, static_cast<float>(m.mixWeightTextureOptions.gamma),
 														   static_cast<GpuWrapMode>(m.mixWeightTextureOptions.wrapIndex), m.mixWeightTextureOptions.invert, m.mixWeightTextureMapping);
 				if (idx >= 0) { d.mixAmountTexIdx = idx; d.mixAmountTexScale = static_cast<float>(m.mixWeightTextureScale); }

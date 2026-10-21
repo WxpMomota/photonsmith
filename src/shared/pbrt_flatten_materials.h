@@ -540,11 +540,23 @@ inline bool resolveRoughnessImage(const pbrt_scene::Scene &scene, const std::str
 	return true;
 }
 
+// A scalar slot bound to a graph of textures that is not one picture (see Material::roughnessGraph): keeps the recipe for per-hit evaluation and the mean as the fallback. False when
+// the texture is not such a graph (the caller then averages it as before).
+inline bool bindScalarGraph(const pbrt_scene::Scene &scene, const pbrt_scene::Param &p, std::vector<TexMeanNode> &slot, Material &m) {
+	if (p.strings.empty()) return false;
+	TextureAverage avg;
+	avg.param = p.name;
+	if (buildTextureMean(scene, p.strings[0], avg.nodes) < 0 || !isPerHitTextureGraph(avg.nodes)) return false;
+	slot = avg.nodes;
+	m.textureAverages.push_back(std::move(avg));
+	return true;
+}
+
 // A Mix material's "amount" bound to an image (an imagemap, or a constant scale around one): kept to be read per hit; the mean stays in mixWeight (applyTextureAverages) as the fallback.
 inline bool bindMixAmountTexture(const pbrt_scene::Scene &scene, FlatScene &out, Material &m, const pbrt_scene::Param &p) {
 	if (m.kind != MaterialKind::Mix || p.name != "amount" || p.strings.empty()) return false;
 	RoughnessImage img;
-	if (!resolveRoughnessImage(scene, p.strings[0], materialWarner(out), img)) return false;
+	if (!resolveRoughnessImage(scene, p.strings[0], materialWarner(out), img)) return bindScalarGraph(scene, p, m.mixAmountGraph, m);
 	m.mixWeightTextureFilename = img.file;
 	m.mixWeightTextureOptions = img.options;
 	m.mixWeightTextureScale = img.scale;
@@ -582,7 +594,7 @@ inline bool bindRoughnessTexture(const pbrt_scene::Scene &scene, FlatScene &out,
 			if (buildTextureMean(scene, p.strings[0], avg.nodes) >= 0) m.textureAverages.push_back(std::move(avg));
 			return true;
 		}
-		return false;   // (not an image: the caller averages it)
+		return bindScalarGraph(scene, p, primary ? m.roughnessGraph : m.condRoughnessGraph, m);   // (not one image: a graph of textures is read per hit, anything else is averaged by the caller)
 	}
 	if (m.kind == MaterialKind::Dielectric &&
 		p.name == "roughness" && !p.strings.empty()) {

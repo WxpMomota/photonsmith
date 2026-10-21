@@ -1518,3 +1518,30 @@ TEST(FlattenMaterialTest, AGraphOfOnlyAPatternStandInIsStillAveraged) {
 	EXPECT_TRUE(s.materials[0].reflectanceGraph.empty());
 	EXPECT_TRUE(warnedAbout(s, "average value"));
 }
+
+TEST(FlattenMaterialTest, ARoughnessAndAMixAmountThatAreGraphsOfPicturesAreKeptForPerHitEvaluation) {
+	// A "scale" of two pictures and a "mix" of a picture and a number: not one image, so they used to be averaged. Each is now a graph, with its mean as the fallback.
+	const FlatScene s = flattenSource(
+		"Texture \"a\" \"float\" \"imagemap\" \"string filename\" [ \"a.png\" ]\n"
+		"Texture \"b\" \"float\" \"imagemap\" \"string filename\" [ \"b.png\" ]\n"
+		"Texture \"prod\" \"float\" \"scale\" \"texture tex\" [ \"a\" ] \"texture scale\" [ \"b\" ]\n"
+		"Texture \"blend\" \"float\" \"mix\" \"texture tex1\" [ \"a\" ] \"float tex2\" [ 0.1 ] \"texture amount\" [ \"b\" ]\n"
+		"Material \"conductor\" \"texture roughness\" [ \"prod\" ]\n"
+		+ std::string(kQuadMesh) +
+		"Material \"coatedconductor\" \"texture interface.roughness\" [ \"prod\" ] \"texture conductor.roughness\" [ \"blend\" ]\n"
+		+ std::string(kQuadMesh) +
+		"MakeNamedMaterial \"p\" \"string type\" [ \"diffuse\" ]\n"
+		"MakeNamedMaterial \"q\" \"string type\" [ \"diffuse\" ]\n"
+		"Material \"mix\" \"string materials\" [ \"p\" \"q\" ] \"texture amount\" [ \"blend\" ]\n"
+		+ std::string(kQuadMesh));
+	ASSERT_EQ(s.materials.size(), 5u);
+	EXPECT_EQ(s.materials[0].roughnessGraph.size(), 3u);
+	EXPECT_EQ(s.materials[0].roughnessGraph.back().kind, pbrt_flatten::TexMeanNode::Kind::Product);
+	EXPECT_FALSE(s.materials[1].roughnessGraph.empty());
+	EXPECT_EQ(s.materials[1].condRoughnessGraph.back().kind, pbrt_flatten::TexMeanNode::Kind::Blend);
+	bool sawMix = false;
+	for (const auto &m : s.materials) sawMix = sawMix || (m.kind == pbrt_flatten::MaterialKind::Mix && !m.mixAmountGraph.empty());
+	EXPECT_TRUE(sawMix);
+	EXPECT_FALSE(warnedAbout(s, "average value")) << "drawn per hit: nothing to apologise for";
+	EXPECT_FALSE(s.materials[0].textureAverages.empty()) << "the mean stays as the fallback";
+}

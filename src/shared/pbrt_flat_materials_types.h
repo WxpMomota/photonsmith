@@ -412,6 +412,10 @@ struct Material {
 	// Diffuse and CoatedDiffuse: a "reflectance" that is a graph of textures (a "scale" of an image by a float image, a "mix" of images and constants ...), evaluated per hit by the
 	// CPU and both OptiX backends. The recipe's root is the last node (TexMeanNode); the flat `color` holds its mean (TextureAverage), for a backend that cannot (GPU SPPM, Metal).
 	std::vector<TexMeanNode> reflectanceGraph;
+	// The same for a scalar slot: a roughness (Conductor, CoatedDiffuse, CoatedConductor's coat), the CoatedConductor's base roughness and a Mix material's amount that is a graph of
+	// textures rather than one picture (a "scale" of two pictures, a "mix" of pictures ...), read from the graph's first channel at each hit. Empty when the slot is one picture (the
+	// *TextureFilename fields above) or a constant; the slot's flat value holds the graph's mean for a backend that cannot evaluate it.
+	std::vector<TexMeanNode> roughnessGraph, condRoughnessGraph, mixAmountGraph;
 
 	// A roughness image on a Conductor, CoatedDiffuse or CoatedConductor (the coat's roughness: "roughness" / "interface.roughness"), evaluated per hit like the Dielectric's above, and
 	// the CoatedConductor's base conductor ("conductor.roughness") in the cond* fields. Roughness at a hit = scale * the image's value (the imagemap's own "float scale", or a

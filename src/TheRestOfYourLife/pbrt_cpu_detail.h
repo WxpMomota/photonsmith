@@ -577,6 +577,8 @@ inline std::shared_ptr<material> makeMaterialBase(const pbrt_flatten::Material &
 								 nullptr, allMaterials, depth + 1, forCurve);
 		auto matB = makeMaterial(allMaterials[static_cast<std::size_t>(m.mixMaterialB)],
 								 nullptr, allMaterials, depth + 1, forCurve);
+		if (!m.mixAmountGraph.empty())   // the amount is a graph of textures: read per hit (its scales are inside the graph)
+			return std::make_shared<mix_material>(matA, matB, reflectanceGraphTexture(m.mixAmountGraph));
 		if (!m.mixWeightTextureFilename.empty()) {   // the amount is an image: read per hit (mix_material's own weight texture)
 			shared_ptr<texture> weight = sharedMipmapTexture(m.mixWeightTextureFilename.c_str(), toMipMapOptions(m.mixWeightTextureOptions));
 			weight = mappedTexture(weight, m.mixWeightTextureMapping);
@@ -682,14 +684,19 @@ inline std::shared_ptr<material> makeMaterial(const pbrt_flatten::Material &m,
 	// A roughness IMAGE on a Conductor, CoatedDiffuse or CoatedConductor (Material::roughnessTextureFilename / condRoughnessTextureFilename): a material rebuilt at each hit with that
 	// hit's roughness (roughness_mapped_material). The factory remakes the material from a copy of the flat one with the image slots cleared and the roughness set.
 	if (!emission && (m.kind == pbrt_flatten::MaterialKind::Conductor || m.kind == pbrt_flatten::MaterialKind::CoatedDiffuse || m.kind == pbrt_flatten::MaterialKind::CoatedConductor) &&
-		(!m.roughnessTextureFilename.empty() || !m.condRoughnessTextureFilename.empty())) {
+		(!m.roughnessTextureFilename.empty() || !m.condRoughnessTextureFilename.empty() || !m.roughnessGraph.empty() || !m.condRoughnessGraph.empty())) {
 		const auto roughnessImage = [](const std::string &file, const pbrt_flatten::TextureDecodeOptions &options, const pbrt_flatten::UvMapping &map) -> shared_ptr<texture> {
 			if (file.empty()) return nullptr;
 			shared_ptr<texture> tex = sharedMipmapTexture(file.c_str(), toMipMapOptions(options));
 			return mappedTexture(tex, map);
 		};
-		const shared_ptr<texture> coatTex = roughnessImage(m.roughnessTextureFilename, m.roughnessTextureOptions, m.roughnessTextureMapping);
-		const shared_ptr<texture> condTex = roughnessImage(m.condRoughnessTextureFilename, m.condRoughnessTextureOptions, m.condRoughnessTextureMapping);
+		// (a graph of textures carries its own scales: the slot's picture scale is then 1)
+		const shared_ptr<texture> coatTex = !m.roughnessGraph.empty() ? reflectanceGraphTexture(m.roughnessGraph)
+			: roughnessImage(m.roughnessTextureFilename, m.roughnessTextureOptions, m.roughnessTextureMapping);
+		const shared_ptr<texture> condTex = !m.condRoughnessGraph.empty() ? reflectanceGraphTexture(m.condRoughnessGraph)
+			: roughnessImage(m.condRoughnessTextureFilename, m.condRoughnessTextureOptions, m.condRoughnessTextureMapping);
+		const double coatScale = m.roughnessGraph.empty() ? m.roughnessTextureScale : 1.0;
+		const double condScale = m.condRoughnessGraph.empty() ? m.condRoughnessTextureScale : 1.0;
 		auto flat = std::make_shared<const pbrt_flatten::Material>(m);
 		const double coatFlat = m.roughness_u, condFlat = m.conductorRoughness_u >= 0.0 ? m.conductorRoughness_u : m.roughness_u;
 		const bool hadCoat = coatTex != nullptr, hadCond = condTex != nullptr;
@@ -697,11 +704,13 @@ inline std::shared_ptr<material> makeMaterial(const pbrt_flatten::Material &m,
 			pbrt_flatten::Material mm = *flat;
 			mm.roughnessTextureFilename.clear();
 			mm.condRoughnessTextureFilename.clear();
+			mm.roughnessGraph.clear();
+			mm.condRoughnessGraph.clear();
 			if (hadCoat) { mm.roughness = mm.roughness_u = mm.roughness_v = coat; }
 			if (hadCond) { mm.conductorRoughness_u = mm.conductorRoughness_v = cond; }
 			return makeMaterial(mm, nullptr, {}, 0, forCurve);
 		};
-		return std::make_shared<roughness_mapped_material>(std::move(factory), coatTex, m.roughnessTextureScale, coatFlat, condTex, m.condRoughnessTextureScale, condFlat);
+		return std::make_shared<roughness_mapped_material>(std::move(factory), coatTex, coatScale, coatFlat, condTex, condScale, condFlat);
 	}
 	std::shared_ptr<material> made = makeMaterialBase(m, emission, allMaterials, depth, forCurve);
 	if (emission) return made;
