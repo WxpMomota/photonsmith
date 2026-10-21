@@ -68,6 +68,9 @@ struct PbrtSceneLoader {
     // nothing else to draw (pbrt_load::LoadResult::missingFiles). metal_render_main() turns it
     // into ERR_FILE_NOT_FOUND instead of rendering the empty room and reporting success.
     std::string pbrtMissingAssetsError;
+    // The loader's own sentence when the scene file could not be loaded for a reason other than missing files (a parse error, an unreadable file); empty when it loaded. metal_render_main()
+    // turns it into the renderer's "scene-load-failed" event (render_events.h).
+    std::string pbrtLoadError;
     // True for a scene flagged requires_files (set from the registry by the caller): any unreadable mesh is then fatal,
     // not just "every mesh". See SceneDescriptor::missing_meshes_error.
     bool pbrtRequireAllMeshes = false;

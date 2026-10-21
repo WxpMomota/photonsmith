@@ -91,6 +91,7 @@
 // and OptiX backends use to honor a ".exr" output path (postProcessAndWrite()
 // below).
 #include "../../../src/shared/exr_writer.h"
+#include "../../../src/shared/render_events.h"   // the @rt error events the GUI words in its own language
 #include "../../../src/shared/output_crop.h"   // the cut of a scene whose crop window is its picture
 #include "metal_poc_tuning.h"
 #include "../../../src/shared/cornell_box_data.h"
@@ -1026,7 +1027,8 @@ int metal_render_main(int image_width, int image_height, int samples_per_pixel,
     if (!pbrtPath || !pbrtPath[0]) {
         fprintf(stderr, "metal_render_main: scene '%s' has no pbrt file backing it. Metal renders "
                         "only pbrt-backed scenes now - use CPU or GPU (OptiX) for this scene instead.\n", scene_id);
-        return 1;
+        render_events::emitError(ERR_GPU_UNSUPPORTED_SCENE, "scene-not-supported-on-gpu", "This scene has no GPU implementation. Use CPU mode for it.", {{"scene", scene_id ? scene_id : ""}});
+        return ERR_GPU_UNSUPPORTED_SCENE;
     }
 
     // Builds the SAME positional-argv shape parseArgsAndCreateDevice()/
@@ -1094,7 +1096,20 @@ int metal_render_main(int image_width, int image_height, int samples_per_pixel,
         app.pbrtRequireAllMeshes = cpu_scene_requires_files_by_id(scene_id) != 0;
         app.buildScene();
         // loadPbrtScene() already printed the explanation (naming the missing files).
-        if (!app.pbrtMissingAssetsError.empty()) return ERR_FILE_NOT_FOUND;
+        if (!app.pbrtMissingAssetsError.empty()) {
+            // a scene that needs a download says which file and where it goes; otherwise the loader's own sentence
+            if (!render_events::emitSceneFilesMissing(ERR_FILE_NOT_FOUND, scene_id ? scene_id : "", pbrtPath))
+                render_events::emitError(ERR_FILE_NOT_FOUND, "scene-load-failed", "The scene file could not be loaded: " + app.pbrtMissingAssetsError,
+                                         {{"scene", scene_id ? scene_id : ""}, {"file", pbrtPath}, {"detail", app.pbrtMissingAssetsError}});
+            return ERR_FILE_NOT_FOUND;
+        }
+        if (!app.pbrtLoadError.empty()) {
+            // a scene file that is simply not there (a downloadable scene before "Download missing files") is a missing download, as on the CPU and OptiX
+            if (render_events::emitSceneFilesMissing(ERR_FILE_NOT_FOUND, scene_id ? scene_id : "", pbrtPath)) return ERR_FILE_NOT_FOUND;
+            render_events::emitError(ERR_FILE_READ_FAILED, "scene-load-failed", "The scene file could not be loaded: " + app.pbrtLoadError,
+                                     {{"scene", scene_id ? scene_id : ""}, {"file", pbrtPath}, {"detail", app.pbrtLoadError}});
+            return ERR_FILE_READ_FAILED;
+        }
         {
             // The file's own Film cropwindow/pixelbounds: draw only that window (--crop above wins). A scene whose crop IS its picture (the Head) is then written as the window alone.
             const double* fc = app.pbrtFilmCrop;

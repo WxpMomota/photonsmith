@@ -94,6 +94,7 @@ void PbrtSceneLoader::loadPbrtScene() {
     if (!result.ok) {
         fprintf(stderr, "loadPbrtScene: %s\n", result.error.c_str());
         if (!result.missingFiles.empty()) pbrtMissingAssetsError = result.error;
+        else pbrtLoadError = result.error;
         return;
     }
     if (pbrtRequireAllMeshes && !result.scene.missingFiles.empty()) {

@@ -670,6 +670,10 @@ if(RT_BUILD_METAL)
         COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_blocks_test.sh"
             $<TARGET_FILE:ray_tracer> $<TARGET_FILE:metal_poc_block_check> "${CMAKE_BINARY_DIR}")
     set_tests_properties(metal_poc_texture_blocks PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" PASS_REGULAR_EXPRESSION "BLOCKS_TEST_OK" TIMEOUT 600)
+    # A scene whose files are not downloaded must end as the CPU and OptiX end it: exit code 3 and an @rt scene-file-missing event the GUI can word (render_events.h).
+    add_test(NAME metal_poc_error_event
+        COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_events_test.sh" $<TARGET_FILE:ray_tracer> "${CMAKE_BINARY_DIR}")
+    set_tests_properties(metal_poc_error_event PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}" PASS_REGULAR_EXPRESSION "EVENT_TEST_OK" SKIP_REGULAR_EXPRESSION "EVENT_TEST_SKIPPED" TIMEOUT 120)
     add_test(NAME metal_poc_crop_window
         COMMAND sh "${CMAKE_SOURCE_DIR}/gpu/metal/tests/metal_poc_crop_test.sh"
             $<TARGET_FILE:ray_tracer> $<TARGET_FILE:metal_poc_crop_check> "${CMAKE_BINARY_DIR}")
