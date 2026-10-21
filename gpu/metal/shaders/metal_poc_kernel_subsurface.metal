@@ -69,21 +69,23 @@ inline bool subsurfaceProbeWalk(thread const KernelRes& R, thread PathState& P, 
 
     float3 chosenPos = float3(0.0), chosenNormal = float3(0.0);
     int candidateCount = 0;
-    float3 base = pStart;
-    float remaining = segLen;
-    for (int iter = 0; iter < kMaxProbeSteps && remaining > 1e-6; ++iter) {
+    // Every probe ray starts at pStart and only its minimum distance moves on: restarting at the last hit (the point a hit moved to, a few thousandths of a unit past the surface) made a
+    // surface found again as a second candidate when the step was smaller than the float spacing at the probe's distance from the object, which a high albedo (a long probe) and a small
+    // ball (a few percent of the surface the probe crosses) turned into +14% of the picture. A hit's own distance repeats exactly, so asking for hits beyond it (and a hair more) cannot find it again.
+    float minT = 0.0;
+    for (int iter = 0; iter < kMaxProbeSteps && minT < segLen; ++iter) {
         ray probeRay;
-        probeRay.origin = base;
+        probeRay.origin = pStart;
         probeRay.direction = segDir;
-        probeRay.min_distance = 0.0f;
-        probeRay.max_distance = remaining;
+        probeRay.min_distance = minT;
+        probeRay.max_distance = segLen;
         SpherePayload probePayload{P.shutterT, false, -1};
         intersection_result<instancing, triangle_data> hit = isect.intersect(probeRay, accelStructure, functionTable, probePayload);
         if (hit.type == intersection_type::none) break;
         // Position, normal and material of the hit, by the same code a path vertex uses.
         PathState probeP = P;
         BounceState probeB;
-        probeP.rayOrigin = base;
+        probeP.rayOrigin = pStart;
         probeP.rayDir = segDir;
         probeB.result = hit;
         resolveHit(R, probeP, probeB);
@@ -94,9 +96,7 @@ inline bool subsurfaceProbeWalk(thread const KernelRes& R, thread PathState& P, 
                 chosenNormal = probeB.normal;   // the surface's OUTWARD normal (see the comment above shadeSubsurface)
             }
         }
-        const float step = hit.distance + 1e-4;
-        base += step * segDir;
-        remaining -= step;
+        minT = hit.distance + 1e-5 + 4e-7 * hit.distance;
     }
     if (candidateCount == 0) return false;
     const float sampleProb = 1.0 / float(candidateCount);

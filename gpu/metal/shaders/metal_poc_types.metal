@@ -359,6 +359,9 @@ struct Uniforms {
     // Further portal infinite lights (pbrt allows several): how many, and where their 24-float headers start in the pbrtEnv "conditional" buffer (see portalFromHeader() in metal_poc_environment.metal).
     uint pbrtPortalExtraCount;
     uint pbrtPortalExtraBase;
+    // A plain (non-portal) infinite light of a file that also has portal lights (pbrt sums every infinite light): 1 and its colour (L * scale; a picture sky is reduced to its mean).
+    uint pbrtSkyBesidePortals;
+    packed_float3 pbrtSkyColor;
 };
 
 // Blinn/pbrt-v4's own smooth cone falloff: 0 outside the outer cone, 1
@@ -791,6 +794,10 @@ struct TriangleMaterial {
     int roughRef;
     int condRoughRef;
     int graphRef;
+    // The same parameters as a graph of textures (see metal_poc_gpu_types.h); 0 = none.
+    int roughGraphRef;
+    int condRoughGraphRef;
+    int mixAmountGraphRef;
 };
 
 // ---- What the spare slots of TriangleMaterial mean, per material family ----------------------------------------------------------------------------------------------

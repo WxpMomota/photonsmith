@@ -201,7 +201,8 @@ inline void resolveHit(thread const KernelRes& R, thread PathState& P, thread Bo
     if (mat.materialType == METAL_MAT_MIX) {
         device const TriangleMaterial* pair = (device const TriangleMaterial*)(rgbGridData + mat.bumpOffset);
         float amount = mat.roughness;
-        if (mat.mixAmountRef != 0) amount = clamp(sampleImageRef(rgbGridData, mat.mixAmountRef, hitUV(primId, result.triangle_barycentric_coord, uvs, spheres, normal, isSphere, isTriangleHit), hitPoint).x, 0.0f, 1.0f);   // an image amount
+        if (mat.mixAmountGraphRef != 0) amount = clamp(evalTextureGraph(rgbGridData, mat.mixAmountGraphRef, hitUV(primId, result.triangle_barycentric_coord, uvs, spheres, normal, isSphere, isTriangleHit), hitPoint).x, 0.0f, 1.0f);   // a graph of textures
+        else if (mat.mixAmountRef != 0) amount = clamp(sampleImageRef(rgbGridData, mat.mixAmountRef, hitUV(primId, result.triangle_barycentric_coord, uvs, spheres, normal, isSphere, isTriangleHit), hitPoint).x, 0.0f, 1.0f);   // an image amount
         const bool pickSecond = randFloat(rngState) < amount;
         const int mixLightId = mat.lightId;
         mat = pickSecond ? pair[1] : pair[0];

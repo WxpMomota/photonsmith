@@ -787,6 +787,10 @@ void MetalPocApp::applyPbrtSkyUniforms(Uniforms& uniforms) {
         uniforms.portalP2 = PackedFloat3{pbrtPortalP2.x, pbrtPortalP2.y, pbrtPortalP2.z};
         uniforms.pbrtPortalExtraCount = (uint32_t)pbrtExtraPortals.size();
         uniforms.pbrtPortalExtraBase = (uint32_t)pbrtPortalRectified.size();   // the headers follow the first portal's picture in the "conditional" buffer
+        if (havePbrtSkyBesidePortals) {
+            uniforms.pbrtSkyBesidePortals = 1u;
+            uniforms.pbrtSkyColor = PackedFloat3{pbrtSkyBesidePortalsColor.x, pbrtSkyBesidePortalsColor.y, pbrtSkyBesidePortalsColor.z};
+        }
     }
 }
 

@@ -119,6 +119,7 @@ plymesh-geometry 0.9990 1.0014 1.0088
 plymesh-uv 1.0000 0.9999 0.9999
 portal-light 0.9994 0.9993 0.9989
 portal-light-constant 1.0001 0.9999 1.0003
+portal-light-plus-sky 0.9990 1.0000 0.9990
 portal-light-rotated 1.0010 1.0002 1.0010
 portal-light-turned 0.9995 0.9998 0.9996
 portal-light-two 1.0000 1.0000 1.0000
@@ -141,11 +142,12 @@ sppm-textured-sky 0.9999 1.0001 0.9999
 sppm-transmissive-furnace 1.0003 1.0004 1.0004
 studio-showcase 0.9916 0.9959 0.9951
 subsurface-ball 0.9954 0.9993 0.9989
-subsurface-sky-ball 1.0114 1.0115 1.0110
+subsurface-sky-ball 0.9996 0.9997 0.9992
 subsurface-slab 0.9990 0.9940 0.9903
-subsurface-textured-sky-ball 1.0580 1.0170 1.0300  # known: a subsurface material whose reflectance is an image is drawn (the table is inverted per hit, as pbrt does), 1.81/2.06/1.18 before; the remaining 5.8% in red is not explained (the CPU reads 0.995; the same table with a flat reflectance is within 1.2% on the subsurface-sky rows)
+subsurface-textured-sky-ball 1.0142 0.9738 0.9906
 texture-encoding-wrap-invert 0.9960 0.9804 0.9958
 texture-graph 1.0042 1.0056 1.0035
+texture-graph-scalars 1.0038 1.0019 1.0028
 texture-mappings 1.0030 1.0040 0.9990
 texture-means 0.9966 0.9992 0.9983
 texture-mix-amount 0.9993 0.9994 0.9994

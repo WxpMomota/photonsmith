@@ -54,7 +54,7 @@ struct PbrtSceneLoader {
                       float sceneScale, float3 bboxCenter, float3 sceneOffset, bool remapRoughness = false);
     // A reflectance that is a graph of textures (Material::reflectanceGraph) as a block in rgbGridData (see evalTextureGraph() in metal_poc_sampling.metal); 1 + its offset, 0 when a
     // picture in it cannot be read (the flat colour, the graph's mean, stands).
-    int claimTextureGraph(const std::vector<pbrt_flatten::TexMeanNode>& nodes, float sceneScale, float3 bboxCenter, float3 sceneOffset);
+    int claimTextureGraph(const std::vector<pbrt_flatten::TexMeanNode>& nodes, float sceneScale, float3 bboxCenter, float3 sceneOffset, bool remapRoughness = false);
     std::map<std::string, std::array<int, 3>> pbrtImageRefPixels;   // "file|gamma|invert" -> {pixels offset, width, height} in rgbGridData
     std::map<std::vector<float>, int> pbrtImageRefs;                  // a reference's content -> its offset
     int claimPositionMapping(const pbrt_flatten::UvMapping& mapping, float sceneScale, float3 bboxCenter, float3 sceneOffset);
@@ -255,6 +255,9 @@ struct PbrtSceneLoader {
         float3 frameX{1, 0, 0}, frameY{0, 1, 0}, frameZ{0, 0, 1}, p0{0, 0, 0}, p2{0, 0, 0};
     };
     std::vector<PbrtExtraPortal> pbrtExtraPortals;
+    // A plain infinite light beside portal lights (FlatScene::skyBesidePortals): drawn as a constant colour, L * scale (a picture sky as its mean colour).
+    bool havePbrtSkyBesidePortals = false;
+    float3 pbrtSkyBesidePortalsColor{0, 0, 0};
 
     // Set by loadPbrtScene() for the FIRST pbrt-loaded goniometric/
     // projection light that names a real profile/slide image and
