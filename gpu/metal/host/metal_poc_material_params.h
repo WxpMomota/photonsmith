@@ -29,6 +29,8 @@ inline void setCoatAlpha(TriangleMaterial& m, float alpha) { m.conductorEta = Pa
 inline void setLayerMedium(TriangleMaterial& m, double thickness, double albedo, double g, int maxDepth, int nSamples) {
     m.layerThickness = (float)thickness; m.layerAlbedo = (float)albedo; m.layerG = (float)g; m.layerMaxDepth = maxDepth; m.layerNSamples = nSamples;
 }
+// the reflectance picture is looked up by a position-based mapping stored at `offset` in rgbGridData (PbrtSceneLoader::claimPositionMapping)
+inline void setPositionMapping(TriangleMaterial& m, int offset) { m.posMapIndex = offset + 1; }
 // a cloud (29) or RGB grid (30) medium: the index into cloudMediums / rgbGridMediums
 inline void setMediumBufferIndex(TriangleMaterial& m, int index) { m.conductorEta = PackedFloat3{(float)index, 0.0f, 0.0f}; }
 // a homogeneous medium (28) with per-channel extinction: the hero-channel path (chromatic flag in conductorK.z)

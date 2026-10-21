@@ -28,7 +28,9 @@
 
 // pbrt imagemap uscale/vscale/udelta/vdelta of the reflectance picture, resolved by the flattener into Material::textureMapping; the shader looks
 // the picture up at (su*u + du, sv*v + dv). The identity (the default) leaves the TriangleMaterial's own defaults alone.
-static void applyReflectanceMapping(TriangleMaterial& mat, const pbrt_flatten::Material& m) {
+static void applyReflectanceMapping(TriangleMaterial& mat, const pbrt_flatten::Material& m, PbrtSceneLoader& loader, float sceneScale, float3 bboxCenter, float3 sceneOffset) {
+    if (m.textureMapping.kind != pbrt_flatten::UvMapping::Kind::Uv)
+        matparams::setPositionMapping(mat, loader.claimPositionMapping(m.textureMapping, sceneScale, bboxCenter, sceneOffset));
     mat.uvScaleU = (float)m.textureMapping.su;
     mat.uvScaleV = (float)m.textureMapping.sv;
     mat.uvDeltaU = (float)m.textureMapping.du;
@@ -46,6 +48,29 @@ static void applyReflectanceMapping(TriangleMaterial& mat, const pbrt_flatten::M
 
 // pbrt Diffuse: flat colour, or one of the textured variants (checkerboard, procedural noise, image) that the shader implements as modes of
 // materialType 25/26 (see the comments below). Split out of mapPbrtMaterial(), where this one case was 215 of its ~530 lines.
+// A position-based mapping (pbrt spherical, cylindrical, planar) for the shader: 21 floats in rgbGridData. The scene's texture-from-world matrix is for pbrt's world; Metal draws a rescaled and
+// recentred copy (position = (p - bboxCenter) * sceneScale + sceneOffset), so the matrix is composed with the inverse of that, and the shader feeds it the Metal-world hit point.
+int PbrtSceneLoader::claimPositionMapping(const pbrt_flatten::UvMapping& mapping, float sceneScale, float3 bboxCenter, float3 sceneOffset) {
+    const double* xf = mapping.textureFromWorld;
+    const double inv = 1.0 / sceneScale;
+    const double shift[3] = {bboxCenter.x - sceneOffset.x * inv, bboxCenter.y - sceneOffset.y * inv, bboxCenter.z - sceneOffset.z * inv};
+    std::vector<float> data(21);
+    data[0] = (float)(int)mapping.kind;
+    for (int row = 0; row < 3; ++row) {
+        for (int col = 0; col < 3; ++col) data[1 + row * 4 + col] = (float)(xf[row * 4 + col] * inv);
+        data[1 + row * 4 + 3] = (float)(xf[row * 4 + 3] + xf[row * 4 + 0] * shift[0] + xf[row * 4 + 1] * shift[1] + xf[row * 4 + 2] * shift[2]);
+    }
+    for (int i = 0; i < 3; ++i) { data[13 + i] = (float)mapping.v1[i]; data[16 + i] = (float)mapping.v2[i]; }
+    data[19] = (float)mapping.du;
+    data[20] = (float)mapping.dv;
+    const auto it = pbrtPositionMappings.find(data);
+    if (it != pbrtPositionMappings.end()) return it->second;
+    const int offset = (int)rgbGridData.size();
+    rgbGridData.insert(rgbGridData.end(), data.begin(), data.end());
+    pbrtPositionMappings[data] = offset;
+    return offset;
+}
+
 TriangleMaterial PbrtSceneLoader::mapPbrtDiffuseMaterial(const pbrt_flatten::Material& m, float sceneScale, float3 bboxCenter, float3 sceneOffset) {
     PackedFloat3 color{(float)m.color[0], (float)m.color[1], (float)m.color[2]};
     // A "reflectance" bound to a "checkerboard" Texture (B22,
@@ -264,7 +289,7 @@ TriangleMaterial PbrtSceneLoader::mapPbrtDiffuseMaterial(const pbrt_flatten::Mat
             // no-op for them.
             TriangleMaterial imageMat{color, /*materialType=*/METAL_MAT_IMAGE_LAMBERTIAN, /*ior=*/1.0f,
                                       PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/(float)m.textureScale};
-            applyReflectanceMapping(imageMat, m);
+            applyReflectanceMapping(imageMat, m, *this, sceneScale, bboxCenter, sceneOffset);
             return imageMat;
         }
     }
@@ -569,7 +594,7 @@ TriangleMaterial PbrtSceneLoader::mapPbrtMaterial(PbrtMaterialMapState& st, cons
                     transImg = havePbrtTransmitImage;
                 }
                 if (reflImg || transImg) mat.conductorK = PackedFloat3{reflImg ? 1.0f : 0.0f, 9.0f, transImg ? 1.0f : 0.0f};
-                if (reflImg) applyReflectanceMapping(mat, m);
+                if (reflImg) applyReflectanceMapping(mat, m, *this, st.sceneScale, st.bboxCenter, st.sceneOffset);
             }
             return mat;
         }
@@ -624,7 +649,7 @@ TriangleMaterial PbrtSceneLoader::mapPbrtMaterial(PbrtMaterialMapState& st, cons
                                               PackedFloat3{0, 0, 0}, /*lightId=*/-1, /*roughness=*/(float)m.textureScale};
                     matparams::setCoatAlpha(imageMat, coatAlpha);
                     matparams::setLayerMedium(imageMat, m.coatThickness, m.layerMediumAlbedo, m.layerG, m.layerMaxDepth, m.layerNSamples);
-                    applyReflectanceMapping(imageMat, m);
+                    applyReflectanceMapping(imageMat, m, *this, st.sceneScale, st.bboxCenter, st.sceneOffset);
                     return imageMat;
                 }
             }
