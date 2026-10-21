@@ -1209,8 +1209,9 @@ void PbrtSceneLoader::loadPbrtObjectInstances(const pbrt_flatten::FlatScene& sce
                                     std::fabs(dots[0]) < 1e-4 * mean * mean && std::fabs(dots[1]) < 1e-4 * mean * mean && std::fabs(dots[2]) < 1e-4 * mean * mean;
             for (const pbrt_flatten::Sphere& gs : grp.spheres) {
                 const bool plainMedium = gs.medium < 0 || (gs.medium < (int)scene.media.size() && scene.media[gs.medium].type == "homogeneous");   // a grid or cloud has its own frame, which the instance would not move
-                if (gs.areaLight >= 0 || !plainMedium || gs.medium >= 0) { ++skippedInstancedSpheres; continue; }   // (a light or a medium boundary has to be a whole sphere)
+                if (gs.areaLight >= 0 || !plainMedium) { ++skippedInstancedSpheres; continue; }   // (a light, or a medium that is not a plain homogeneous one)
                 if (!similarity || gs.clipped) {
+                    if (gs.medium >= 0) { ++skippedInstancedSpheres; continue; }   // a medium boundary has to be a whole sphere: only a similarity placement keeps it
                     // a stretched or clipped instanced sphere: its own object space, placed by the instance matrix (SphereData::clipped)
                     double G[16] = {1, 0, 0, 0,  0, 1, 0, 0,  0, 0, 1, 0,  0, 0, 0, 1};   // the sphere's object -> the instance definition's space
                     if (gs.clipped) { for (int i = 0; i < 16; ++i) G[i] = gs.xform[i]; }
