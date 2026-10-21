@@ -15,6 +15,7 @@
 #include "rtw_stb_image.h"
 #include "../shared/mipmap.h"
 #include "../shared/scalar_math.h"   // Clamp() - see mipmap_texture::wide_clamp()
+#include "../shared/texture_position_mapping.h"
 #include "../shared/procedural_textures.h"   // checkerboard_weight_2d() - see uv_checker_texture::value_diff()
 #include <atomic>
 
@@ -626,6 +627,31 @@ class uv_mapped_texture : public texture {
     double su, sv, du, dv;
 };
 
+
+// An image texture looked up through one of pbrt-v4's position-based mappings (spherical, cylindrical, planar: src/shared/texture_position_mapping.h): (s, t) come from the HIT POINT carried
+// into the texture's own space, not from the surface's uv. The lookup is at full resolution (no footprint: pbrt's differentials are not carried through these mappings here).
+class position_mapped_texture : public texture {
+  public:
+    position_mapped_texture(shared_ptr<texture> inner, int kind, const double (&xf)[12], const double (&v1)[3], const double (&v2)[3], double du, double dv)
+        : inner(std::move(inner)), kind(kind), du(du), dv(dv) {
+        for (int i = 0; i < 12; ++i) this->xf[i] = xf[i];
+        for (int i = 0; i < 3; ++i) { this->v1[i] = v1[i]; this->v2[i] = v2[i]; }
+    }
+
+    color value(double u, double v, const point3& p) const override {
+        (void)u; (void)v;
+        double s, t;
+        texture_position_mapping::positionToSt<double>(kind, xf, v1, v2, du, dv, p.x(), p.y(), p.z(), s, t);
+        return inner->value(s, t, p);
+    }
+
+    color value_diff(double u, double v, const point3& p, double, double, double, double) const override { return value(u, v, p); }
+
+  private:
+    shared_ptr<texture> inner;
+    int kind;
+    double xf[12], v1[3], v2[3], du, dv;
+};
 
 class mix_texture : public texture {
   public:

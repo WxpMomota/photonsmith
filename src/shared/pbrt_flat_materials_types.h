@@ -31,10 +31,24 @@ namespace pbrt_flatten {
 // pbrt-v4's UVMapping of an imagemap Texture ("float uscale"/"vscale"/"udelta"/"vdelta"): the texture is looked up at (su * u + du, sv * v + dv) instead of (u, v), so a picture
 // repeats `su` times across the surface and is moved by `du`. The default is the identity. Resolved for the reflectance image (Material::textureMapping) and the displacement
 // (bump or normal map) image (Material::displacementMapping); every other image slot uses the surface's own coordinates.
+// pbrt's other three 2D mappings are position-based: the hit point is carried into the texture's own space (the inverse of the CTM at the Texture directive: `textureFromWorld`, a 3x4
+// row-major affine matrix) and turned into (s, t): "spherical" (theta / pi, phi / 2 pi about the texture's z axis), "cylindrical" ((pi + atan2(y, x)) / 2 pi, z) and "planar"
+// (du + p . v1, dv + p . v2). `kind` says which; for Planar, du/dv are the udelta/vdelta offsets and v1/v2 the "vector3 v1/v2" (defaults (1,0,0), (0,1,0)); su/sv are unused by the
+// position-based kinds. texture_position_mapping.h evaluates all four.
 struct UvMapping {
+	enum class Kind { Uv = 0, Spherical = 1, Cylindrical = 2, Planar = 3 };
 	double su = 1.0, sv = 1.0, du = 0.0, dv = 0.0;
-	bool identity() const { return su == 1.0 && sv == 1.0 && du == 0.0 && dv == 0.0; }
-	bool operator==(const UvMapping& o) const { return su == o.su && sv == o.sv && du == o.du && dv == o.dv; }
+	Kind kind = Kind::Uv;
+	double textureFromWorld[12] = {1, 0, 0, 0,  0, 1, 0, 0,  0, 0, 1, 0};
+	double v1[3] = {1, 0, 0}, v2[3] = {0, 1, 0};
+	bool identity() const { return kind == Kind::Uv && su == 1.0 && sv == 1.0 && du == 0.0 && dv == 0.0; }
+	bool operator==(const UvMapping& o) const {
+		if (!(su == o.su && sv == o.sv && du == o.du && dv == o.dv && kind == o.kind)) return false;
+		if (kind == Kind::Uv) return true;
+		for (int i = 0; i < 12; ++i) if (textureFromWorld[i] != o.textureFromWorld[i]) return false;
+		for (int i = 0; i < 3; ++i) if (v1[i] != o.v1[i] || v2[i] != o.v2[i]) return false;
+		return true;
+	}
 };
 
 struct TextureDecodeOptions {

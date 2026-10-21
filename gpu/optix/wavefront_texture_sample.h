@@ -6,6 +6,7 @@
 #include "optix_types.h"
 #include "optix_math_helpers.h"
 #include "../../src/shared/noise.h"   // fbm_simple/turbulence_simple/perlin_noise
+#include "../../src/shared/texture_position_mapping.h"   // positionToSt: spherical, cylindrical and planar image mappings
 
 // De Casteljau cubic Bezier evaluation - duplicated from optix_device_
 // helpers.h's marble_cubic_bezier4 (with the wf_ prefix), matching this
@@ -121,8 +122,13 @@ __device__ __forceinline__ float3 wf_sample_texture(
 	// finding) this fixes.
 	auto sampleImage = [&](const TextureData& t) -> float3 {
 		if (t.width <= 0 || t.height <= 0) return make_float3(0.0f, 1.0f, 1.0f);
-		const float um = t.uvScaleU * u + t.uvDeltaU;   // the Texture's own UVMapping, as in optix_device_textures.h
-		const float vm = t.uvScaleV * v + t.uvDeltaV;
+		float um, vm;
+		if (t.mapKind != 0) {   // a position-based mapping (spherical, cylindrical, planar): (s, t) from the hit point
+			texture_position_mapping::positionToSt<float>(t.mapKind, t.mapXf, t.mapV1, t.mapV2, t.uvDeltaU, t.uvDeltaV, p.x, p.y, p.z, um, vm);
+		} else {
+			um = t.uvScaleU * u + t.uvDeltaU;   // the Texture's own UVMapping, as in optix_device_textures.h
+			vm = t.uvScaleV * v + t.uvDeltaV;
+		}
 		const float uw = fminf(fmaxf(um, -1024.0f), 1024.0f);
 		const float vw = fminf(fmaxf(1.0f - vm, -1024.0f), 1024.0f);
 		// double, not float - see optix_device_helpers.h's identical

@@ -223,6 +223,7 @@ RayTracer_Package/tls/
 # Uniform grey pictures for texture-means.pbrt (a texture bound to a roughness / mix amount / scale takes its mean).
 !pbrt_scenes/texture-means-*.png
 !pbrt_scenes/texture-params-*.png
+!pbrt_scenes/texture-mappings-*.png
 # an equal-area environment picture (pbrt_scenes/equal-area-sky.pbrt), same reasoning
 !pbrt_scenes/equal-area-sky.bmp
 

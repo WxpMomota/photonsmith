@@ -1,5 +1,6 @@
 #pragma once
 // optix_device_textures.h -- part 2 of 5 of optix_device_helpers.h (included by it, in order; not meant to be included on its own).
+#include "../../src/shared/texture_position_mapping.h"   // positionToSt: spherical, cylindrical and planar image mappings
 
 // Samples a texture by index (see TextureData in optix_types.h), matching
 // CPU's texture::value(u, v, p) dispatch (src/TheRestOfYourLife/texture.h)
@@ -48,8 +49,13 @@ __device__ __forceinline__ float3 sample_texture(int textureIdx, float u, float 
 	// common one for small/debug textures), which needs no mip chain at all.
 	auto sampleImage = [&](const TextureData& t) -> float3 {
 		if (t.width <= 0 || t.height <= 0) return make_float3(0.0f, 1.0f, 1.0f);
-		const float um = t.uvScaleU * u + t.uvDeltaU;   // the Texture's own UVMapping (identity unless it said uscale/udelta...)
-		const float vm = t.uvScaleV * v + t.uvDeltaV;
+		float um, vm;
+		if (t.mapKind != 0) {   // a position-based mapping (spherical, cylindrical, planar): (s, t) from the hit point
+			texture_position_mapping::positionToSt<float>(t.mapKind, t.mapXf, t.mapV1, t.mapV2, t.uvDeltaU, t.uvDeltaV, p.x, p.y, p.z, um, vm);
+		} else {
+			um = t.uvScaleU * u + t.uvDeltaU;   // the Texture's own UVMapping (identity unless it said uscale/udelta...)
+			vm = t.uvScaleV * v + t.uvDeltaV;
+		}
 		const float uw = fminf(fmaxf(um, -1024.0f), 1024.0f);
 		const float vw = fminf(fmaxf(1.0f - vm, -1024.0f), 1024.0f);
 		// double, not float, for the multiply - matches CPU's own bilerp()

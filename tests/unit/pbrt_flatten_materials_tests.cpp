@@ -1459,3 +1459,28 @@ TEST(FlattenMaterialTest, AMixAmountImageIsKeptForPerHitReading) {
 	EXPECT_EQ(mix->textureAverages[0].param, "amount");
 	EXPECT_FALSE(warnedAbout(s, "not supported"));
 }
+
+TEST(FlattenMaterialTest, AnImagemapsPositionMappingsAreRead) {
+	// pbrt's "spherical", "cylindrical" and "planar" mappings: the kind, the inverse of the CTM at the Texture directive and (planar) the v1/v2 vectors.
+	const FlatScene s = flattenSource(
+		"Translate 1 2 3\n"
+		"Texture \"tplanar\" \"spectrum\" \"imagemap\" \"string filename\" [ \"a.png\" ] \"string mapping\" [ \"planar\" ] \"vector3 v1\" [ 0 0 1 ] \"float udelta\" [ 0.25 ]\n"
+		"Texture \"tsph\" \"spectrum\" \"imagemap\" \"string filename\" [ \"a.png\" ] \"string mapping\" [ \"spherical\" ]\n"
+		"Texture \"tuv\" \"spectrum\" \"imagemap\" \"string filename\" [ \"a.png\" ]\n"
+		"Material \"diffuse\" \"texture reflectance\" [ \"tplanar\" ]\n"
+		+ std::string(kQuadMesh) +
+		"Material \"diffuse\" \"texture reflectance\" [ \"tsph\" ]\n"
+		+ std::string(kQuadMesh) +
+		"Material \"diffuse\" \"texture reflectance\" [ \"tuv\" ]\n"
+		+ std::string(kQuadMesh));
+	ASSERT_EQ(s.materials.size(), 3u);
+	const pbrt_flatten::UvMapping &planar = s.materials[0].textureMapping;
+	EXPECT_EQ(planar.kind, pbrt_flatten::UvMapping::Kind::Planar);
+	EXPECT_DOUBLE_EQ(planar.du, 0.25);
+	EXPECT_DOUBLE_EQ(planar.v1[2], 1.0);
+	EXPECT_DOUBLE_EQ(planar.v2[1], 1.0) << "v2 defaults to (0, 1, 0)";
+	EXPECT_DOUBLE_EQ(planar.textureFromWorld[3], -1.0) << "the inverse of Translate 1 2 3";
+	EXPECT_DOUBLE_EQ(planar.textureFromWorld[11], -3.0);
+	EXPECT_EQ(s.materials[1].textureMapping.kind, pbrt_flatten::UvMapping::Kind::Spherical);
+	EXPECT_TRUE(s.materials[2].textureMapping.identity()) << "no \"mapping\" is pbrt's uv mapping";
+}

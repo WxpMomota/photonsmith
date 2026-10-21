@@ -324,3 +324,45 @@ TEST(TextureMapping3DTest, VariantDispatch) {
 	EXPECT_TRUE(near(tc.p.y, 5.f));
 	EXPECT_TRUE(near(tc.p.z, 6.f));
 }
+
+// ---------------------------------------------------------------------------
+// texture_position_mapping.h: the position-based (s, t) the CPU and both OptiX backends share
+// ---------------------------------------------------------------------------
+#include "../../src/shared/texture_position_mapping.h"
+
+namespace {
+const float kIdentity[12] = {1, 0, 0, 0,  0, 1, 0, 0,  0, 0, 1, 0};
+const float kU[3] = {1, 0, 0}, kV[3] = {0, 1, 0};
+}
+
+TEST(PositionMapping, SphericalPlacesThePoleAndTheEquator) {
+	float s = -1, t = -1;
+	texture_position_mapping::positionToSt<float>(texture_position_mapping::kSpherical, kIdentity, kU, kV, 0, 0, 0, 0, 2, s, t);
+	EXPECT_NEAR(s, 0.0f, kEps) << "+z is theta = 0";
+	texture_position_mapping::positionToSt<float>(texture_position_mapping::kSpherical, kIdentity, kU, kV, 0, 0, 0, -3, 0, s, t);
+	EXPECT_NEAR(s, 0.5f, kEps) << "the equator is theta = pi / 2";
+	EXPECT_NEAR(t, 0.75f, kEps) << "-y is phi = 3 pi / 2";
+}
+
+TEST(PositionMapping, CylindricalTurnsAboutZAndKeepsTheHeight) {
+	float s = -1, t = -1;
+	texture_position_mapping::positionToSt<float>(texture_position_mapping::kCylindrical, kIdentity, kU, kV, 0, 0, 1, 0, 0.25f, s, t);
+	EXPECT_NEAR(s, 0.5f, kEps) << "+x is atan2 = 0, half way round";
+	EXPECT_NEAR(t, 0.25f, kEps);
+}
+
+TEST(PositionMapping, PlanarProjectsOntoItsTwoVectorsAndMovesByTheDeltas) {
+	const float v1[3] = {0, 0, 2}, v2[3] = {0, 1, 0};
+	float s = -1, t = -1;
+	texture_position_mapping::positionToSt<float>(texture_position_mapping::kPlanar, kIdentity, v1, v2, 0.5f, 0.25f, 9, 0.5f, 0.125f, s, t);
+	EXPECT_NEAR(s, 0.5f + 0.25f, kEps);
+	EXPECT_NEAR(t, 0.25f + 0.5f, kEps);
+}
+
+TEST(PositionMapping, ThePointIsCarriedIntoTextureSpaceFirst) {
+	const float shifted[12] = {1, 0, 0, -1,  0, 1, 0, 0,  0, 0, 1, 0};   // the inverse of a Translate 1 0 0
+	float s = -1, t = -1;
+	texture_position_mapping::positionToSt<float>(texture_position_mapping::kPlanar, shifted, kU, kV, 0, 0, 1.5f, 0.25f, 0, s, t);
+	EXPECT_NEAR(s, 0.5f, kEps);
+	EXPECT_NEAR(t, 0.25f, kEps);
+}

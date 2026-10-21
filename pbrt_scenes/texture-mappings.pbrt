@@ -1,0 +1,46 @@
+# @rt-category Test Scenes
+# @rt-description pbrt's position-based texture mappings: a sphere with a spherical mapping, a sphere with a cylindrical one and a floor with a planar one, each in a turned and moved texture space, as pbrt draws them.
+# @rt-performance Fast
+# @rt-size 9
+# texture-mappings.pbrt -- an image texture's "mapping" can be "spherical", "cylindrical" or "planar": its coordinates come from the HIT POINT carried into the texture's own space (the inverse of the CTM at
+# the Texture directive), not from the surface's uv. The pbrt-v4-scenes Kroken's books and cups use cylindrical and planar mappings. Original, no licence constraints.
+
+LookAt 0 2.5 9   0 0.8 0   0 1 0
+Camera "perspective" "float fov" [ 45 ]
+
+Film "rgb" "integer xresolution" [ 64 ] "integer yresolution" [ 64 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+Integrator "volpath" "integer maxdepth" [ 6 ]
+
+WorldBegin
+
+LightSource "infinite" "rgb L" [ 0.7 0.7 0.7 ]
+
+# A floor with a planar mapping in a turned texture space.
+AttributeBegin
+  Rotate 30 0 1 0
+  Texture "planar-pic" "spectrum" "imagemap" "string filename" [ "texture-mappings-pic.png" ] "string mapping" [ "planar" ] "vector3 v1" [ 0.25 0 0 ] "vector3 v2" [ 0 0 0.25 ] "float udelta" [ 0.1 ] "float vdelta" [ 0.3 ]
+AttributeEnd
+Material "diffuse" "texture reflectance" [ "planar-pic" ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -7 0 -5   7 0 -5   7 0 6   -7 0 6 ]
+
+# A sphere with a spherical mapping, its poles turned toward the camera.
+AttributeBegin
+  Translate -2.1 1.1 0
+  Rotate 90 1 0 0
+  Texture "spherical-pic" "spectrum" "imagemap" "string filename" [ "texture-mappings-pic.png" ] "string mapping" [ "spherical" ]
+  Rotate -90 1 0 0
+  Material "diffuse" "texture reflectance" [ "spherical-pic" ]
+  Shape "sphere" "float radius" 1.1
+AttributeEnd
+
+# A sphere with a cylindrical mapping, its axis tilted.
+AttributeBegin
+  Translate 2.1 1.1 0
+  Rotate 40 0 0 1
+  Texture "cylindrical-pic" "spectrum" "imagemap" "string filename" [ "texture-mappings-pic.png" ] "string mapping" [ "cylindrical" ]
+  Rotate -40 0 0 1
+  Material "diffuse" "texture reflectance" [ "cylindrical-pic" ]
+  Shape "sphere" "float radius" 1.1
+AttributeEnd

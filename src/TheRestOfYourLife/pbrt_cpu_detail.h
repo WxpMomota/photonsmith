@@ -188,6 +188,14 @@ inline MipMapOptions toMipMapOptions(const pbrt_flatten::TextureDecodeOptions &o
 	return opts;
 }
 
+// An image texture behind its mapping: the surface's own uv with scale and offset (uv_mapped_texture), or one of pbrt's position-based mappings (position_mapped_texture); the identity
+// is not wrapped at all.
+inline shared_ptr<texture> mappedTexture(shared_ptr<texture> tex, const pbrt_flatten::UvMapping &map) {
+	if (map.identity()) return tex;
+	if (map.kind == pbrt_flatten::UvMapping::Kind::Uv) return std::make_shared<uv_mapped_texture>(tex, map.su, map.sv, map.du, map.dv);
+	return std::make_shared<position_mapped_texture>(tex, static_cast<int>(map.kind), map.textureFromWorld, map.v1, map.v2, map.du, map.dv);
+}
+
 // A "dots" Texture's dots: its cells are counted in the Texture's own (uscale, vscale, udelta, vdelta) coordinates (pbrt_flatten::UvMapping).
 inline shared_ptr<texture> dotsTextureOf(const pbrt_flatten::Material &m, shared_ptr<texture> insideTex, shared_ptr<texture> outsideTex) {
 	shared_ptr<texture> tex = std::make_shared<dots_texture>(insideTex, outsideTex);
@@ -198,10 +206,7 @@ inline shared_ptr<texture> dotsTextureOf(const pbrt_flatten::Material &m, shared
 
 // The image of a material's reflectance slot: the shared mipmap, looked up through the Texture's own uscale/vscale/udelta/vdelta when it has any (pbrt_flatten::UvMapping).
 inline shared_ptr<texture> reflectanceImageTexture(const pbrt_flatten::Material &m) {
-	shared_ptr<texture> tex = sharedMipmapTexture(m.textureFilename.c_str(), imageMapOptionsFor(m));
-	const pbrt_flatten::UvMapping &map = m.textureMapping;
-	if (!map.identity()) tex = std::make_shared<uv_mapped_texture>(tex, map.su, map.sv, map.du, map.dv);
-	return tex;
+	return mappedTexture(sharedMipmapTexture(m.textureFilename.c_str(), imageMapOptionsFor(m)), m.textureMapping);
 }
 
 // pbrt's material names already match ours (see pbrt_flatten.h), so this is
@@ -538,8 +543,7 @@ inline std::shared_ptr<material> makeMaterialBase(const pbrt_flatten::Material &
 								 nullptr, allMaterials, depth + 1, forCurve);
 		if (!m.mixWeightTextureFilename.empty()) {   // the amount is an image: read per hit (mix_material's own weight texture)
 			shared_ptr<texture> weight = sharedMipmapTexture(m.mixWeightTextureFilename.c_str(), toMipMapOptions(m.mixWeightTextureOptions));
-			const pbrt_flatten::UvMapping &map = m.mixWeightTextureMapping;
-			if (!map.identity()) weight = std::make_shared<uv_mapped_texture>(weight, map.su, map.sv, map.du, map.dv);
+			weight = mappedTexture(weight, m.mixWeightTextureMapping);
 			if (m.mixWeightTextureScale != 1.0) weight = std::make_shared<scaled_texture>(weight, m.mixWeightTextureScale);
 			return std::make_shared<mix_material>(matA, matB, weight);
 		}
@@ -645,8 +649,7 @@ inline std::shared_ptr<material> makeMaterial(const pbrt_flatten::Material &m,
 		const auto roughnessImage = [](const std::string &file, const pbrt_flatten::TextureDecodeOptions &options, const pbrt_flatten::UvMapping &map) -> shared_ptr<texture> {
 			if (file.empty()) return nullptr;
 			shared_ptr<texture> tex = sharedMipmapTexture(file.c_str(), toMipMapOptions(options));
-			if (!map.identity()) tex = std::make_shared<uv_mapped_texture>(tex, map.su, map.sv, map.du, map.dv);
-			return tex;
+			return mappedTexture(tex, map);
 		};
 		const shared_ptr<texture> coatTex = roughnessImage(m.roughnessTextureFilename, m.roughnessTextureOptions, m.roughnessTextureMapping);
 		const shared_ptr<texture> condTex = roughnessImage(m.condRoughnessTextureFilename, m.condRoughnessTextureOptions, m.condRoughnessTextureMapping);

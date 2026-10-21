@@ -225,6 +225,11 @@ inline int getOrBuildPbrtImageTexture(const std::string& resolvedPath, SceneData
 		std::uint32_t bits[4];
 		std::memcpy(bits, placed, sizeof bits);
 		cacheKey += "|m" + std::to_string(bits[0]) + "," + std::to_string(bits[1]) + "," + std::to_string(bits[2]) + "," + std::to_string(bits[3]);
+		if (uv.kind != pbrt_flatten::UvMapping::Kind::Uv) {   // (a position-based mapping is part of what makes the entry: its kind and the texture space it reads)
+			cacheKey += "|k" + std::to_string(static_cast<int>(uv.kind));
+			for (int i = 0; i < 12; ++i) { const float f = static_cast<float>(uv.textureFromWorld[i]); std::uint32_t b; std::memcpy(&b, &f, sizeof b); cacheKey += "," + std::to_string(b); }
+			for (int i = 0; i < 3; ++i) { const float f = static_cast<float>(uv.v1[i]), g = static_cast<float>(uv.v2[i]); std::uint32_t b, c; std::memcpy(&b, &f, sizeof b); std::memcpy(&c, &g, sizeof c); cacheKey += "," + std::to_string(b) + "," + std::to_string(c); }
+		}
 	}
 	const auto it = cache.find(cacheKey);
 	if (it != cache.end()) return it->second;
@@ -262,6 +267,11 @@ inline int getOrBuildPbrtImageTexture(const std::string& resolvedPath, SceneData
 	tex.uvScaleV = static_cast<float>(uv.sv);
 	tex.uvDeltaU = static_cast<float>(uv.du);
 	tex.uvDeltaV = static_cast<float>(uv.dv);
+	tex.mapKind = static_cast<int>(uv.kind);
+	if (uv.kind != pbrt_flatten::UvMapping::Kind::Uv) {
+		for (int i = 0; i < 12; ++i) tex.mapXf[i] = static_cast<float>(uv.textureFromWorld[i]);
+		for (int i = 0; i < 3; ++i) { tex.mapV1[i] = static_cast<float>(uv.v1[i]); tex.mapV2[i] = static_cast<float>(uv.v2[i]); }
+	}
 	tex.srgb = decoded->srgb;
 	out.texturePixels.insert(out.texturePixels.end(), decoded->pixels.begin(), decoded->pixels.end());
 

@@ -18,6 +18,12 @@ struct TextureData {
 	// inside the one place that reads an image's texels (sample_texture's sampleImage, its wavefront copy, and gpu_sample_displacement), so every kernel gets it. The identity (1, 1, 0, 0)
 	// is the default; the loader sets these only for the reflectance and the displacement image, every other image slot keeps the surface's own coordinates.
 	float uvScaleU = 1.0f, uvScaleV = 1.0f, uvDeltaU = 0.0f, uvDeltaV = 0.0f;
+	// Image only: pbrt's position-based mappings (texture_mapping.h: 0 = the surface's uv above, 1 spherical, 2 cylindrical, 3 planar). (s, t) then come from the HIT POINT carried into the
+	// Texture's own space by mapXf (the inverse of the CTM at the Texture directive, 3x4 row-major); planar uses mapV1/mapV2 and uvDeltaU/V as its offsets.
+	int   mapKind = 0;
+	float mapXf[12] = {1.0f, 0.0f, 0.0f, 0.0f,  0.0f, 1.0f, 0.0f, 0.0f,  0.0f, 0.0f, 1.0f, 0.0f};
+	float mapV1[3] = {1.0f, 0.0f, 0.0f};
+	float mapV2[3] = {0.0f, 1.0f, 0.0f};
 	// Image only: texturePixels holds the file's own sRGB-encoded bytes, decoded per texel at lookup
 	// (texel_rgb above). False (the zero-init default) for every linear texture: normal maps, alpha
 	// masks, inverted images, HDR-derived data, native scenes.

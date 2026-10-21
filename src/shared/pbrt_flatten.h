@@ -202,14 +202,31 @@ inline void warnIfImagemapOptionsIgnored(const pbrt_scene::TextureDecl &imgTex,
 	}
 }
 
-// The imagemap Texture's own texture-coordinate mapping: pbrt-v4's "uv" mapping with "uscale"/"vscale"/"udelta"/"vdelta" (any other "mapping" - spherical, cylindrical, planar - is not
-// supported and is left as the identity, which is what this loader did before it read these at all).
+// The imagemap Texture's own texture-coordinate mapping: pbrt-v4's "uv" mapping with "uscale"/"vscale"/"udelta"/"vdelta", or its position-based "spherical", "cylindrical" and
+// "planar" mappings (pbrt_flat_materials_types.h's UvMapping), which carry the hit point into the texture's own space through the inverse of the CTM at the Texture directive.
 inline UvMapping uvMappingOf(const pbrt_scene::TextureDecl &imgTex) {
 	UvMapping m;
 	m.su = imgTex.params.getFloat("uscale", 1.0);
 	m.sv = imgTex.params.getFloat("vscale", 1.0);
 	m.du = imgTex.params.getFloat("udelta", 0.0);
 	m.dv = imgTex.params.getFloat("vdelta", 0.0);
+	const std::string type = imgTex.params.getString("mapping", "uv");
+	if (type == "spherical") m.kind = UvMapping::Kind::Spherical;
+	else if (type == "cylindrical") m.kind = UvMapping::Kind::Cylindrical;
+	else if (type == "planar") m.kind = UvMapping::Kind::Planar;
+	if (m.kind != UvMapping::Kind::Uv) {
+		pbrt_scene::Matrix4 inv;
+		if (imgTex.xform.inverseAffine(inv)) {
+			for (int r = 0; r < 3; ++r)
+				for (int c = 0; c < 4; ++c) m.textureFromWorld[r * 4 + c] = inv.m[r * 4 + c];
+		}
+		if (m.kind == UvMapping::Kind::Planar) {
+			const pbrt_scene::Vec3 a = imgTex.params.getVec3("v1", pbrt_scene::Vec3{1, 0, 0});
+			const pbrt_scene::Vec3 b = imgTex.params.getVec3("v2", pbrt_scene::Vec3{0, 1, 0});
+			m.v1[0] = a.x; m.v1[1] = a.y; m.v1[2] = a.z;
+			m.v2[0] = b.x; m.v2[1] = b.y; m.v2[2] = b.z;
+		}
+	}
 	return m;
 }
 
