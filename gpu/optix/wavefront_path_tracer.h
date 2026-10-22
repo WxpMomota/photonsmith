@@ -389,7 +389,7 @@ private:
     void renderSampleLoop(RenderCall &rc);
     void evaluateBounceMaterials(RenderCall &rc, int numHits, int numSimpleHits, int numDielectricHits, int numMiss);
     void runBssrdfProbeStage(RenderCall &rc, WavefrontLaunchParams &lp, int &numProbe, int &numExit);
-    int runShadowStage(RenderCall &rc, WavefrontLaunchParams &lp);
+    int runShadowStage(RenderCall &rc, WavefrontLaunchParams &lp, int numShadow);
     void renderFinish(RenderCall &rc);
     // Resize-on-resolution-change helper for a per-pixel GPU buffer: frees
     // and reallocates only when `capacity` doesn't already match `numPixels`,
@@ -656,6 +656,12 @@ private:
     void launchNormalizeAovBuffers(unsigned int numPixels, float3* d_albedoBuffer,
         float3* d_normalBuffer, unsigned int samplesPerPixel);
     int  readQueueSize(int* d_counter);
+    // The counters of a bounce, all at once, with ONE round trip to the GPU (a copy of the whole counter block and one synchronize): a bounce needed a synchronize for each counter it read,
+    // about fourteen a bounce, and a render is thousands of bounces. The count of counter `c` (d_hitCounter_ ...) is blockCount(block, c); the block is valid until the next call.
+    const int *readCounterBlock();
+    int blockCount(const int *block, CUdeviceptr counter) const { return block[counterSlot(counter) * (kCounterStrideBytes / sizeof(int))]; }
+    // Zeroes the counters a bounce starts with (hit, simple hit, dielectric hit, miss, shadow, probe, exit and the next-ray counter) with two memsets instead of eight kernel launches.
+    void resetBounceCounters();
     void resetQueueCounter(int* d_counter);
 
     // OptiX AI denoiser (--denoise, this backend's own instance) - thin
@@ -763,6 +769,13 @@ private:
     CUdeviceptr d_shadowCounter_    = 0;
     CUdeviceptr d_probeCounter_     = 0;
     CUdeviceptr d_exitCounter_      = 0;
+    // The nine counters above are slots of ONE allocation, a 128-byte line apart (so that threads pushing to different queues do not fight over a line): that is what lets a bounce reset
+    // them with two memsets and read them with one copy (readCounterBlock). Slots 0 to 6 are hit, simple hit, dielectric hit, miss, shadow, probe and exit; 7 and 8 are the two ray counters,
+    // swapped every bounce (d_rayCounter_ and d_nextRayCounter_ are pointers into them).
+    static constexpr int kCounterStrideBytes = 128;
+    static constexpr int kCounterSlots = 9;
+    CUdeviceptr d_counterBlock_ = 0;
+    int counterSlot(CUdeviceptr counter) const { return static_cast<int>((counter - d_counterBlock_) / kCounterStrideBytes); }
 
     // World-space irradiance probe cache (Live Preview only, gpu/optix/
     // probe_grid_types.h) - see setProbeGrid()/launchProbeCacheUpdate()'s own
@@ -929,6 +942,12 @@ private:
     // overlap reasoning as simpleMaterialStream_ above - hitQueue/
     // simpleHitQueue/dielectricHitQueue are mutually disjoint at push time.
     cudaStream_t dielectricMaterialStream_ = nullptr;
+    // Recorded when simpleMaterialStream_'s and dielectricMaterialStream_'s kernels of a bounce are queued, and waited for ON THE GPU by stream_ (cudaStreamWaitEvent): the host no longer
+    // waits for each of the three streams in turn, only once, for the counters it reads next.
+    cudaEvent_t simpleMaterialDone_ = nullptr;
+    cudaEvent_t dielectricMaterialDone_ = nullptr;
+    // Where readQueueSizes() copies the counters to: pinned, so that the copies are really asynchronous.
+    int *h_counterReads_ = nullptr;
     int          queueCapacity_ = 0;
     // Separate, LARGER capacity for d_shadowItems_/d_shadowCounter_ only -
     // see allocateQueues()'s own comment for why a single shadow NEE pass

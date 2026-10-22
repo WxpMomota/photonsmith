@@ -57,6 +57,10 @@ bool WavefrontPathTracer::initialize(OptixDeviceContext context,
 	// Own stream for launchEvaluateMaterialsDielectric()'s kernel - same
 	// reasoning, see its member comment in the header.
 	CUDA_CHECK(cudaStreamCreate(&dielectricMaterialStream_));
+	// The events that join those two streams to stream_ on the GPU, and the pinned place the counters are read into (see their member comments in the header).
+	CUDA_CHECK(cudaEventCreateWithFlags(&simpleMaterialDone_, cudaEventDisableTiming));
+	CUDA_CHECK(cudaEventCreateWithFlags(&dielectricMaterialDone_, cudaEventDisableTiming));
+	CUDA_CHECK(cudaHostAlloc(reinterpret_cast<void **>(&h_counterReads_), static_cast<size_t>(kCounterSlots) * kCounterStrideBytes, cudaHostAllocDefault));
 
 	// Must be true, not false: the traversable this pipeline traces against
 	// is the SAME IAS/GAS OptiXRenderer::buildScene() builds for the

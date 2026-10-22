@@ -844,7 +844,7 @@ void WavefrontPathTracer::runBssrdfProbeStage(RenderCall &rc, WavefrontLaunchPar
 	unsigned int num_cylinders = rc.num_cylinders;
 	float3* d_fbPtr = rc.d_fbPtr;
 
-	numProbe = readQueueSize(reinterpret_cast<int*>(d_probeCounter_));
+	// (numProbe was read with the bounce's other counters, renderSampleLoop below)
 	if (numProbe > 0) {
 		lp.bssrdfProbeQueue.items    = reinterpret_cast<BssrdfProbeWorkItem*>(d_probeItems_);
 		lp.bssrdfProbeQueue.counter  = reinterpret_cast<int*>(d_probeCounter_);
@@ -888,11 +888,11 @@ void WavefrontPathTracer::runBssrdfProbeStage(RenderCall &rc, WavefrontLaunchPar
 }
 
 // The shadow rays this bounce queued: the occlusion launch, then the accumulation of the unoccluded contributions. Returns how many there were.
-int WavefrontPathTracer::runShadowStage(RenderCall &rc, WavefrontLaunchParams &lp) {
+int WavefrontPathTracer::runShadowStage(RenderCall &rc, WavefrontLaunchParams &lp, int numShadow) {
 	const auto &camera = rc.camera;
 	float3* d_fbPtr = rc.d_fbPtr;
 
-	int numShadow = readQueueSize(reinterpret_cast<int*>(d_shadowCounter_));
+	// (numShadow was read with the bounce's other counters, renderSampleLoop below)
 
 	// ------------------------------------------------------------------
 	// Phase 5: OptiX shadow launch (determine occlusion)
@@ -919,16 +919,16 @@ int WavefrontPathTracer::runShadowStage(RenderCall &rc, WavefrontLaunchParams &l
 			&shadowSBT_,
 			(unsigned int)numShadow, 1, 1));
 
-		CUDA_CHECK(cudaStreamSynchronize(stream_));
-
 		// ------------------------------------------------------------------
 		// Phase 6: Accumulate shadow contributions
 		// ------------------------------------------------------------------
+		// (no host wait between the launch and the accumulation, or after it: both are on stream_, so the GPU runs them in this order, and the next thing the host waits for is the next
+		// bounce's intersection)
 		launchAccumulateShadow(numShadow,
 							   reinterpret_cast<const float*>(d_transmittance_),
 							   d_fbPtr, camera.maxComponentValue);
-		CUDA_CHECK(cudaStreamSynchronize(stream_));
 	}
+	return numShadow;
 }
 
 void WavefrontPathTracer::renderSampleLoop(RenderCall &rc) {
@@ -994,7 +994,8 @@ void WavefrontPathTracer::renderSampleLoop(RenderCall &rc) {
 		resetQueueCounter(reinterpret_cast<int*>(d_rayCounter_));
 		launchGenerateCameraRays(width, height, sampleIdx, camera, d_weightPtr, checkerboardActive,
 			reinterpret_cast<const unsigned char*>(d_activePixelMaskPtr));
-		CUDA_CHECK(cudaStreamSynchronize(stream_));
+		// How many rays the next bounce traces: this read waits for the camera rays, and each bounce below brings the count for the one after it with its other counters.
+		int pendingRays = readQueueSize(reinterpret_cast<int*>(d_rayCounter_));
 
 		// -------------------------------------------------------------------------
 		// Inner bounce loop
@@ -1005,20 +1006,13 @@ void WavefrontPathTracer::renderSampleLoop(RenderCall &rc) {
 		// the real budget. The queue empties as rays finish, so the extra iterations cost nothing in a scene without media.
 		for (int depth = 0; depth < max_depth + 1 + kMaxMediumBoundaryCrossings; ++depth) {
 
-			int numRays = readQueueSize(reinterpret_cast<int*>(d_rayCounter_));
+			const int numRays = pendingRays;
 			if (numRays == 0) break;
 			stats.primaryRays += numRays;
 			++stats.bounceIterations;
 
 			// Reset output queue counters
-			resetQueueCounter(reinterpret_cast<int*>(d_hitCounter_));
-			resetQueueCounter(reinterpret_cast<int*>(d_simpleHitCounter_));
-			resetQueueCounter(reinterpret_cast<int*>(d_dielectricHitCounter_));
-			resetQueueCounter(reinterpret_cast<int*>(d_missCounter_));
-			resetQueueCounter(reinterpret_cast<int*>(d_shadowCounter_));
-			resetQueueCounter(reinterpret_cast<int*>(d_nextRayCounter_));
-			resetQueueCounter(reinterpret_cast<int*>(d_probeCounter_));
-			resetQueueCounter(reinterpret_cast<int*>(d_exitCounter_));
+			resetBounceCounters();
 
 			// ------------------------------------------------------------------
 			// Phase 2: OptiX intersect launch
@@ -1052,12 +1046,10 @@ void WavefrontPathTracer::renderSampleLoop(RenderCall &rc) {
 				&intersectSBT_,
 				(unsigned int)numRays, 1, 1));
 
-			CUDA_CHECK(cudaStreamSynchronize(stream_));
-
-			int numHits            = readQueueSize(reinterpret_cast<int*>(d_hitCounter_));
-			int numSimpleHits      = readQueueSize(reinterpret_cast<int*>(d_simpleHitCounter_));
-			int numDielectricHits  = readQueueSize(reinterpret_cast<int*>(d_dielectricHitCounter_));
-			int numMiss            = readQueueSize(reinterpret_cast<int*>(d_missCounter_));
+			// One wait for the intersection and the four queue sizes it made.
+			const int *counts = readCounterBlock();
+			const int numHits = blockCount(counts, d_hitCounter_), numSimpleHits = blockCount(counts, d_simpleHitCounter_);
+			const int numDielectricHits = blockCount(counts, d_dielectricHitCounter_), numMiss = blockCount(counts, d_missCounter_);
 			stats.hits += numHits;
 			stats.simpleHits += numSimpleHits;
 			stats.dielectricHits += numDielectricHits;
@@ -1065,16 +1057,27 @@ void WavefrontPathTracer::renderSampleLoop(RenderCall &rc) {
 
 			evaluateBounceMaterials(rc, numHits, numSimpleHits, numDielectricHits, numMiss);
 
-			CUDA_CHECK(cudaStreamSynchronize(stream_));
-			CUDA_CHECK(cudaStreamSynchronize(simpleMaterialStream_));
-			CUDA_CHECK(cudaStreamSynchronize(dielectricMaterialStream_));
+			// stream_ waits, on the GPU, for the kernels on the other two material streams; the host waits once, for the counters below
+			CUDA_CHECK(cudaEventRecord(simpleMaterialDone_, simpleMaterialStream_));
+			CUDA_CHECK(cudaEventRecord(dielectricMaterialDone_, dielectricMaterialStream_));
+			CUDA_CHECK(cudaStreamWaitEvent(stream_, simpleMaterialDone_, 0));
+			CUDA_CHECK(cudaStreamWaitEvent(stream_, dielectricMaterialDone_, 0));
 
-			int numProbe = 0, numExit = 0;
+			// What the materials queued: BSSRDF probes, shadow rays and the rays of the next bounce
+			counts = readCounterBlock();
+			int numProbe = blockCount(counts, d_probeCounter_), numExit = 0, numShadow = blockCount(counts, d_shadowCounter_);
+			pendingRays = blockCount(counts, d_nextRayCounter_);
 			runBssrdfProbeStage(rc, lp, numProbe, numExit);
+			if (numProbe > 0) {
+				// the exits the probes found queued shadow rays (and may have queued next rays) of their own
+				counts = readCounterBlock();
+				numShadow = blockCount(counts, d_shadowCounter_);
+				pendingRays = blockCount(counts, d_nextRayCounter_);
+			}
 			stats.probeRays += numProbe;
 			stats.probeExits += numExit;
 
-			stats.shadowRays += runShadowStage(rc, lp);
+			stats.shadowRays += runShadowStage(rc, lp, numShadow);
 
 			// ReSTIR GI finalize (see wavefront_kernels_restir.cu's own
 			// restir_gi_finalize header comment) - runs once per SAMPLE,
@@ -1491,6 +1494,9 @@ void WavefrontPathTracer::cleanup() {
 	if (d_wfLaunchParams_)  { cudaFree(reinterpret_cast<void*>(d_wfLaunchParams_)); d_wfLaunchParams_ = 0; }
 	if (simpleMaterialStream_) { cudaStreamDestroy(simpleMaterialStream_); simpleMaterialStream_ = nullptr; }
 	if (dielectricMaterialStream_) { cudaStreamDestroy(dielectricMaterialStream_); dielectricMaterialStream_ = nullptr; }
+	if (simpleMaterialDone_) { cudaEventDestroy(simpleMaterialDone_); simpleMaterialDone_ = nullptr; }
+	if (dielectricMaterialDone_) { cudaEventDestroy(dielectricMaterialDone_); dielectricMaterialDone_ = nullptr; }
+	if (h_counterReads_) { cudaFreeHost(h_counterReads_); h_counterReads_ = nullptr; }
 }
 
 } // namespace optix_renderer

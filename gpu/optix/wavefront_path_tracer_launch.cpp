@@ -94,15 +94,14 @@ bool WavefrontPathTracer::allocateQueues(int numPixels, int numPunctualLights) {
 	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_probeItems_),   probeItemSz));
 	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_exitItems_),    exitItemSz));
 
-	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_rayCounter_),     counterSz));
-	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_nextRayCounter_), counterSz));
-	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_hitCounter_),     counterSz));
-	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_simpleHitCounter_), counterSz));
-	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_dielectricHitCounter_), counterSz));
-	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_missCounter_),    counterSz));
-	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_shadowCounter_),  counterSz));
-	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_probeCounter_),   counterSz));
-	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_exitCounter_),    counterSz));
+	// the nine counters are slots of one allocation (see kCounterStrideBytes in the header)
+	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_counterBlock_), static_cast<size_t>(kCounterSlots) * kCounterStrideBytes));
+	CUDA_CHECK(cudaMemset(reinterpret_cast<void*>(d_counterBlock_), 0, static_cast<size_t>(kCounterSlots) * kCounterStrideBytes));
+	auto slot = [this](int i) { return d_counterBlock_ + static_cast<CUdeviceptr>(i) * kCounterStrideBytes; };
+	d_hitCounter_ = slot(0); d_simpleHitCounter_ = slot(1); d_dielectricHitCounter_ = slot(2); d_missCounter_ = slot(3);
+	d_shadowCounter_ = slot(4); d_probeCounter_ = slot(5); d_exitCounter_ = slot(6);
+	d_rayCounter_ = slot(7); d_nextRayCounter_ = slot(8);
+	(void)counterSz;
 
 	return true;
 }
@@ -117,12 +116,8 @@ void WavefrontPathTracer::freeQueues() {
 	freeDev(d_missItems_);
 	freeDev(d_shadowItems_);   freeDev(d_transmittance_);
 	freeDev(d_probeItems_);    freeDev(d_exitItems_);
-	freeDev(d_rayCounter_);    freeDev(d_nextRayCounter_);
-	freeDev(d_hitCounter_);    freeDev(d_simpleHitCounter_);
-	freeDev(d_dielectricHitCounter_);
-	freeDev(d_missCounter_);
-	freeDev(d_shadowCounter_);
-	freeDev(d_probeCounter_);  freeDev(d_exitCounter_);
+	freeDev(d_counterBlock_);   // (the nine counters are slots of it)
+	d_rayCounter_ = d_nextRayCounter_ = d_hitCounter_ = d_simpleHitCounter_ = d_dielectricHitCounter_ = d_missCounter_ = d_shadowCounter_ = d_probeCounter_ = d_exitCounter_ = 0;
 	queueCapacity_ = 0;
 	shadowQueueCapacity_ = 0;
 }
@@ -136,6 +131,18 @@ int WavefrontPathTracer::readQueueSize(int* d_counter) {
 	CUDA_CHECK(cudaMemcpyAsync(&val, d_counter, sizeof(int), cudaMemcpyDeviceToHost, stream_));
 	CUDA_CHECK(cudaStreamSynchronize(stream_));
 	return val;
+}
+
+const int *WavefrontPathTracer::readCounterBlock() {
+	CUDA_CHECK(cudaMemcpyAsync(h_counterReads_, reinterpret_cast<const void*>(d_counterBlock_), static_cast<size_t>(kCounterSlots) * kCounterStrideBytes, cudaMemcpyDeviceToHost, stream_));
+	CUDA_CHECK(cudaStreamSynchronize(stream_));
+	return h_counterReads_;
+}
+
+void WavefrontPathTracer::resetBounceCounters() {
+	// slots 0 to 6 are contiguous: one memset; the ray counter that is the NEXT bounce's is the other (the current one still says how many rays this bounce has)
+	CUDA_CHECK(cudaMemsetAsync(reinterpret_cast<void*>(d_counterBlock_), 0, static_cast<size_t>(7) * kCounterStrideBytes, stream_));
+	CUDA_CHECK(cudaMemsetAsync(reinterpret_cast<void*>(d_nextRayCounter_), 0, sizeof(int), stream_));
 }
 
 void WavefrontPathTracer::resetQueueCounter(int* d_counter) {
