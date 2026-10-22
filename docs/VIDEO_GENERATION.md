@@ -238,8 +238,13 @@ In the GUI a cartoon is a scene: pick it on the **Cartoons** tab of the scene pi
 
 How it renders: each frame is written as a `.pbrt` scene (`src/shared/cartoon/`: the film's `sceneAt(t)`) and rendered by a child run of the launcher with the flags you gave (backend,
 denoiser, seed, exposure, tone mapping ...; the video flags and the output path are replaced), then joined by the usual video assembly. Each frame is therefore an ordinary
-single-image render of a pbrt file: every renderer feature works, and a frame costs a process start (a second or two) on top of its render. `--frames` / `--fps` change how the film is
-sampled and played back, not its story.
+single-image render of a pbrt file: every renderer feature works, and a frame costs a process start (a second or two) on top of its render. To keep the GPU busy through that, **two frames
+are rendered at once** on a GPU (one on the CPU, which a single render already fills): while one renders the other starts up or writes its picture, which takes a 12-frame Newton's Cradle from 50 s to
+36 s; `--cartoon-jobs 3` (or the environment variable `RAY_TRACER_CARTOON_JOBS`) is faster still, 32 s, at about 3 GB of video memory for each frame in flight. The pictures are put in frame order
+whatever order they finish in. `--frames` / `--fps` change how the film is sampled and played back, not its story.
+
+**Writing a film that renders fast:** a glowing ball must be `emissiveSphere(centre, radius, light)` (pbrt's own sphere, one light), never an emitting `uvSphere` mesh: every triangle of an emitting
+mesh is a light of its own to sample, so a mesh ball is hundreds of lights. The Candle's 70 out-of-focus lights took a frame from 7 s to 19 s as meshes, and cost 7 s again as spheres.
 
 | Key | Name | Length | Shots | Tags | What happens |
 |-----|------|--------|-------|------|--------------|

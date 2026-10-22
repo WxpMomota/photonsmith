@@ -163,7 +163,7 @@ inline std::string buildMeadow(double f) {
 	out += attr(dark, emitMesh(band(7.0, 24.0), identity()), &mid);
 	out += attr(dark, emitMesh(band(24.0, 100.0), identity()), &high);
 	const Vec3 sun = {f * 220.0, f * 96.0, f * 18.0};
-	out += attr(dark, emitMesh(parts().sphere, mul(translate(-24.0, 6.0, -70.0), scale(4.4))), &sun);
+	out += emissiveSphere({-24.0, 6.0, -70.0}, 4.4, sun);
 	return out;
 }
 

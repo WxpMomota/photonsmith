@@ -140,7 +140,7 @@ inline std::string buildOrrery(double t) {
 inline std::string buildSun(double f, double t) {
 	const double glow = 0.92 + 0.08 * std::sin(1.3 * t);
 	const Vec3 L = {f * glow * 46.0, f * glow * 20.0, f * glow * 3.6};
-	return attr("Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]", emitMesh(parts().sphere, mul(translate(0.0, kSunHeight, 0.0), scale(0.52))), &L);
+	return emissiveSphere({0.0, kSunHeight, 0.0}, 0.52, L);
 }
 
 inline std::string sceneAt(double t) {

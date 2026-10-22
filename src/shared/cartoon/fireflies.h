@@ -28,7 +28,7 @@ inline double hash01(int i, int salt) {
 }
 
 struct Parts {
-	Mesh blade, body, wing, trunk, capMushroom, stem, moon;
+	Mesh blade, body, wing, trunk, capMushroom, stem;
 };
 inline const Parts &parts() {
 	static const Parts p = [] {
@@ -39,7 +39,6 @@ inline const Parts &parts() {
 		q.trunk = lathe({{0.0, 0.0}, {0.5, 0.0}, {0.42, 3.0}, {0.34, 8.0}, {0.0, 8.2}}, 14);
 		q.capMushroom = lathe({{0.0, 0.0}, {0.10, 0.0}, {0.35, 0.02}, {0.40, 0.08}, {0.32, 0.20}, {0.15, 0.30}, {0.0, 0.33}}, 20);
 		q.stem = lathe({{0.0, 0.0}, {0.05, 0.0}, {0.04, 0.15}, {0.0, 0.17}}, 10);
-		q.moon = uvSphere(1.0, 36, 18);
 		return q;
 	}();
 	return p;
@@ -157,8 +156,8 @@ inline std::string buildSky(double f) {
 	std::string out;
 	const Vec3 moonL = {f * 2.2, f * 2.5, f * 3.4}, haloL = {f * 0.07, f * 0.10, f * 0.20};
 	const Vec3 moonAt = {-2.0, 8.5, -32.0};
-	out += attr("Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]", emitMesh(P.moon, mul(translate(moonAt.x, moonAt.y, moonAt.z), scale(1.5))), &moonL);
-	out += attr("Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]", emitMesh(P.moon, mul(translate(moonAt.x, moonAt.y, moonAt.z - 8.0), scale(5.0))), &haloL);
+	out += emissiveSphere(moonAt, 1.5, moonL);
+	out += emissiveSphere(moonAt - Vec3{0.0, 0.0, 8.0}, 5.0, haloL);
 	return out;
 }
 

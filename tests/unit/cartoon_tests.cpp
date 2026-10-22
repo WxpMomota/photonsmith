@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <filesystem>
@@ -13,6 +14,7 @@
 #include <sstream>
 #include <set>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "pbrt_flatten_test_helpers.h"
@@ -420,24 +422,63 @@ TEST(CartoonStills, TheStillOfAFilmThatIsGoneIsRemovedAndOtherFilesAreKept) {
 	std::filesystem::remove_all(dir);
 }
 
-TEST(CartoonRender, TheChildSeesOnlyItsFramesFolderAndTheEnvironmentComesBack) {
-	const char *name = "RT_TEST_CARTOON_ENV";
-#ifdef _WIN32
-	_putenv_s(name, "before");
-#else
-	setenv(name, "before", 1);
-#endif
-	{
-		cartoon_render::ScopedEnv inner(name, "during");
-		EXPECT_STREQ(std::getenv(name), "during");
+TEST(CartoonRender, TheChildSeesOnlyItsFramesFolder) {
+	const std::string cmd = cartoon_render::frameCommand("C:/r/ray_tracer.exe", {"--gpu"}, 1280, 720, 128, 8, "C:/o/frames/frame_0003.ppm", "C:/o/frames/work1/cartoon_3.pbrt", "C:/o/frames/work1");
+	EXPECT_NE(cmd.find("RAY_TRACER_PBRT_DIR="), std::string::npos) << "the child's scene folder is set on its own command line: several children run at once, so it cannot be this process's";
+	EXPECT_NE(cmd.find("C:/o/frames/work1"), std::string::npos);
+	EXPECT_LT(cmd.find("RAY_TRACER_PBRT_DIR="), cmd.find("ray_tracer.exe")) << "set before the program starts";
+	EXPECT_EQ(cartoon_render::frameCommand("C:/r/ray_tracer.exe", {}, 64, 64, 1, 1, "o.ppm", "s.pbrt").find("RAY_TRACER_PBRT_DIR"), std::string::npos) << "and left alone when no folder is given";
+}
+
+TEST(CartoonRender, TheNumberOfFramesAtOnceIsTheFlagThenTheEnvironmentThenTwoOnAGpuAndOneOnTheCpu) {
+	LaunchArgs args;
+	EXPECT_EQ(cartoon_render::jobsFor(args, true), 2);
+	EXPECT_EQ(cartoon_render::jobsFor(args, false), 1);
+	args.cartoon_jobs = 3;
+	EXPECT_EQ(cartoon_render::jobsFor(args, true), 3);
+	EXPECT_EQ(cartoon_render::jobsFor(args, false), 3) << "asked for, so asked for";
+	args.cartoon_jobs = 99;
+	EXPECT_EQ(cartoon_render::jobsFor(args, true), 8) << "within reason";
+	LaunchArgs parsed;
+	ASSERT_TRUE(parseArgs({"--video", "--cartoon-jobs", "4", "--camera-path", "cartoon:fireflies"}, parsed));
+	EXPECT_EQ(parsed.cartoon_jobs, 4);
+	const std::vector<std::string> flags = cartoon_render::forwardedFlags(parsed);
+	EXPECT_EQ(std::find(flags.begin(), flags.end(), "--cartoon-jobs"), flags.end()) << "a frame's own run is one frame: the flag is not passed on";
+}
+
+TEST(CartoonRender, FramesRenderedAtOnceAreHandedOnInFrameOrderAndNeverMoreThanTheLimitAtOnce) {
+	for (int jobs : {1, 2, 3, 5}) {
+		const int count = 23;
+		std::atomic<int> running{0}, peak{0};
+		std::vector<int> rendered(count, 0), workerOf(count, -1);
+		std::vector<int> completedOrder, handedOrder;
+		const int ok = cartoon_render::runInParallel(
+			count, jobs,
+			[&](int frame, int worker) {
+				const int now = ++running;
+				int seen = peak.load();
+				while (now > seen && !peak.compare_exchange_weak(seen, now)) {}
+				// a frame takes a different time, so that they finish out of order
+				std::this_thread::sleep_for(std::chrono::milliseconds(frame % 3 == 0 ? 12 : 2));
+				++rendered[static_cast<std::size_t>(frame)];
+				workerOf[static_cast<std::size_t>(frame)] = worker;
+				--running;
+				return frame == 7 ? 1 : 0;   // one frame fails
+			},
+			[&](int frame, int, double) { completedOrder.push_back(frame); }, [&](int frame, int) { handedOrder.push_back(frame); });
+		EXPECT_EQ(ok, count - 1) << "jobs " << jobs << ": the failed frame is not counted";
+		EXPECT_LE(peak.load(), jobs) << "never more than the limit at once";
+		for (int f = 0; f < count; ++f) {
+			EXPECT_EQ(rendered[static_cast<std::size_t>(f)], 1) << "frame " << f << " is rendered once";
+			EXPECT_GE(workerOf[static_cast<std::size_t>(f)], 0);
+			EXPECT_LT(workerOf[static_cast<std::size_t>(f)], jobs) << "a worker number is below the limit, so that it names a folder";
+		}
+		EXPECT_EQ(completedOrder.size(), static_cast<std::size_t>(count));
+		ASSERT_EQ(handedOrder.size(), static_cast<std::size_t>(count)) << "every frame is handed on, the failed one with its result";
+		for (int f = 0; f < count; ++f) EXPECT_EQ(handedOrder[static_cast<std::size_t>(f)], f) << "the video's pictures are in frame order whatever order the frames finished in";
 	}
-	ASSERT_NE(std::getenv(name), nullptr);
-	EXPECT_STREQ(std::getenv(name), "before") << "the old value is put back";
-	{
-		cartoon_render::ScopedEnv fresh("RT_TEST_CARTOON_ENV_UNSET", "x");
-		EXPECT_STREQ(std::getenv("RT_TEST_CARTOON_ENV_UNSET"), "x");
-	}
-	EXPECT_EQ(std::getenv("RT_TEST_CARTOON_ENV_UNSET"), nullptr) << "a variable that was not there is not left behind";
+	// no frames at all is fine
+	EXPECT_EQ(cartoon_render::runInParallel(0, 2, [](int, int) { return 0; }, [](int, int, double) {}, [](int, int) {}), 0);
 }
 
 // ---- a frame as a temporary scene file (launcher/cartoon_still.h) ----------------------------------------------------------------------------------------------

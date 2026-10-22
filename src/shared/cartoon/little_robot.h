@@ -230,7 +230,7 @@ inline std::string buildRobot(double t, double f, const std::string &canText, Ve
 	const double ag = antennaGlow(t);
 	if (ag > 0.02) {
 		const Vec3 L = {1.0 * 14.0 * ag * f, 0.62 * 14.0 * ag * f, 0.2 * 14.0 * ag * f};
-		out += attr("Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]", emitMesh(P.bulb, mul(headFrame, translate(-0.05, 0.50, 0.0), scale(0.055))), &L);
+		out += emissiveSphere(transformPoint(headFrame, {-0.05, 0.50, 0.0}), 0.055, L);
 	} else {
 		out += attr(coated({0.5, 0.35, 0.1}, 0.1), emitMesh(P.bulb, mul(headFrame, translate(-0.05, 0.50, 0.0), scale(0.05))));
 	}
@@ -291,7 +291,7 @@ inline std::string buildSeedling(double t, double f, Vec3 &outFlowerCentre, doub
 		}
 		outFlowerGlow = b;
 		const Vec3 L = {(1.0 * 16.0 * b + 0.2) * f, (0.62 * 16.0 * b + 0.1) * f, (0.28 * 16.0 * b + 0.05) * f};
-		out += attr("Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]", emitMesh(P.bulb, mul(translate(outFlowerCentre + Vec3{0.0, 0.02, 0.0}), scale(0.045 + 0.05 * b))), &L);
+		out += emissiveSphere(outFlowerCentre + Vec3{0.0, 0.02, 0.0}, 0.045 + 0.05 * b, L);
 	}
 	return out;
 }

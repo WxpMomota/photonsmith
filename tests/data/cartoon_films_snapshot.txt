@@ -2,9 +2,9 @@
 # Regenerate with RT_UPDATE_SNAPSHOT=1 (see tests/unit/cartoon_snapshot_tests.cpp) and review the diff.
 meta|lamp-and-ball|V7|20 s|24 fps|1 shots|character,physics,emissive,night|128 spp
 lamp-and-ball|0|21846|2
-lamp-and-ball|9.1|22806|3
-lamp-and-ball|10|22806|3
-lamp-and-ball|19.98|22806|3
+lamp-and-ball|9.1|21846|3
+lamp-and-ball|10|21846|3
+lamp-and-ball|19.98|21846|3
 meta|ball-parade|V8|12 s|24 fps|1 shots|physics,reflections|128 spp
 ball-parade|0|15504|2
 ball-parade|4.6|15504|2
@@ -12,41 +12,41 @@ ball-parade|6|15504|2
 ball-parade|11.99|15504|2
 meta|little-robot|V9|32 s|24 fps|5 shots|character,emissive,dusk,dof|160 spp
 little-robot|0|28492|1
-little-robot|25.5|30628|4
-little-robot|16|29548|4
-little-robot|31.97|33148|5
+little-robot|25.5|30268|4
+little-robot|16|29188|4
+little-robot|31.97|32428|5
 meta|fireflies|V10|26 s|24 fps|4 shots|emissive,particles,night,dof|192 spp
-fireflies|0|32604|3
-fireflies|13|33292|4
-fireflies|13|33292|4
-fireflies|25.97|71820|60
+fireflies|0|30156|3
+fireflies|13|30844|4
+fireflies|13|30844|4
+fireflies|25.97|69372|60
 meta|newtons-cradle|V11|18 s|24 fps|3 shots|metal,reflections,physics,dof|128 spp
 newtons-cradle|0|22092|4
 newtons-cradle|5|22092|4
 newtons-cradle|9|22092|4
 newtons-cradle|17.98|22092|4
 meta|domino-run|V12|24 s|24 fps|4 shots|physics,emissive,dof|160 spp
-domino-run|0|57648|3
-domino-run|9|57648|3
-domino-run|12|57648|3
-domino-run|23.98|57648|3
+domino-run|0|56688|3
+domino-run|9|56688|3
+domino-run|12|56688|3
+domino-run|23.98|56688|3
 meta|paper-boat|V13|24 s|24 fps|3 shots|water,reflections,dusk,backlight|192 spp
-paper-boat|0|20762|5
-paper-boat|10|20912|5
-paper-boat|12|20912|5
-paper-boat|23.98|16262|4
+paper-boat|0|19802|5
+paper-boat|10|19952|5
+paper-boat|12|19952|5
+paper-boat|23.98|15302|4
 meta|orrery|V14|22 s|24 fps|3 shots|metal,reflections,emissive|160 spp
-orrery|0|33872|2
-orrery|6|33872|2
-orrery|11|33872|2
-orrery|21.98|33872|2
+orrery|0|32352|2
+orrery|6|32352|2
+orrery|11|32352|2
+orrery|21.98|32352|2
 meta|dandelion|V15|22 s|24 fps|3 shots|translucent,backlight,particles,dof,dusk|192 spp
-dandelion|0|62540|4
-dandelion|7.5|62540|4
-dandelion|11|62540|4
-dandelion|21.98|62540|4
+dandelion|0|61580|4
+dandelion|7.5|61580|4
+dandelion|11|61580|4
+dandelion|21.98|61580|4
 meta|candle|V16|20 s|24 fps|3 shots|subsurface,emissive,dof,night|192 spp
-candle|0|13780|72
-candle|5|15036|72
-candle|10|16292|72
-candle|19.98|25864|70
+candle|0|1796|72
+candle|5|3052|72
+candle|10|4308|72
+candle|19.98|14104|70

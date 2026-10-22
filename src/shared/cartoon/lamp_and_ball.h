@@ -291,7 +291,7 @@ inline std::string buildLamp(double t, std::string &spot) {
 	const Vec3 bulbC = transformPoint(head, bulbLocal);
 	if (plan.glow > 0.01) {
 		const Vec3 L = {30.0 * plan.glow, 25.0 * plan.glow, 17.0 * plan.glow};
-		out += attr("Material \"diffuse\" \"rgb reflectance\" [ 1 1 1 ]", emitMesh(P.sphere, mul(head, translate(bulbLocal), scale(0.19))), &L);
+		out += emissiveSphere(bulbC, 0.19, L, "Material \"diffuse\" \"rgb reflectance\" [ 1 1 1 ]");
 	}
 	// a spot light from the bulb along the shade's axis does the real lighting; its cone just fills the shade's mouth
 	const Vec3 mouth = transformPoint(head, {0.0, kShadeLen, 0.0});

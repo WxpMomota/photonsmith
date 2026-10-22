@@ -367,6 +367,15 @@ inline std::string attr(const std::string &material, const std::string &shapes, 
 }
 
 
+// An emissive ball as pbrt's own sphere shape: ONE light. A triangle mesh of the same ball is hundreds of them (every triangle of an emitting mesh is a light of its own to sample), and in a
+// scene with many emitters that is most of what a frame costs: the candle's 70 out-of-focus lights took a frame from 7 s to 19 s as meshes. Use this for every ball that glows (sun, moon,
+// bulb, bokeh light). `centre` is in story space (x is negated, as for every mesh).
+inline std::string emissiveSphere(Vec3 centre, double radius, Vec3 emission, const std::string &material = "Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]") {
+	char buf[160];
+	std::snprintf(buf, sizeof(buf), "  Translate %.5f %.5f %.5f\n  Shape \"sphere\" \"float radius\" [ %.5f ]\n", -centre.x, centre.y, centre.z, radius);
+	return attr(material, buf, &emission);
+}
+
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // More shapes, a two-link limb solver and camera shots (what the longer films use)
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------

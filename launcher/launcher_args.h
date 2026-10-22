@@ -370,6 +370,8 @@ struct LaunchArgs {
 	// A cartoon frame named in the scene_id position ("cartoon:fireflies" or "cartoon:fireflies@13.5": src/shared/cartoon/cartoons.h, parseStill). main.cpp writes that frame's scene
 	// to a temporary .pbrt file and renders it as scene_file; empty when the scene was named any other way.
 	std::string cartoon_still;
+	// --cartoon-jobs N: how many frames of a cartoon video are rendered at once; 0 = automatic (launcher/cartoon_render.h, jobsFor).
+	int cartoon_jobs = 0;
 	double cam_x             = kDefaultCameraX;
 	double cam_y             = kDefaultCameraY;
 	double cam_z             = kDefaultCameraZ;
@@ -833,6 +835,15 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 		} catch (const std::exception&) {
 			std::cerr << "Invalid frame count, using default\n";
 		}
+	} else if (arg == "--cartoon-jobs" && i + 1 < argc) {
+		try {
+			out.cartoon_jobs = std::stoi(argv[i + 1]);
+			consumed_args.insert(i);
+			consumed_args.insert(i + 1);
+			++i;
+		} catch (const std::exception&) {
+			std::cerr << "Invalid --cartoon-jobs, using the automatic number\n";
+		}
 	} else if (arg == render_flags::kFps && i + 1 < argc) {
 		try {
 			out.video_fps = std::stoi(argv[i + 1]);
@@ -1142,6 +1153,8 @@ inline void print_launch_help(const char* program) {
 				  << "               --list-video-presets (as the only argument) prints them all: the\n"
 				  << "               camera-path flythroughs and the cartoons; --film-table prints the\n"
 				  << "               cartoon films (length, shots, tags) as the markdown table of the docs.\n"
+				  << "  --cartoon-jobs N: how many frames of a cartoon video are rendered at once (default: 2 on a\n"
+				  << "               GPU, 1 on the CPU; the environment variable RAY_TRACER_CARTOON_JOBS also sets it)\n"
 				  << "               Accepts either short id or descriptive key:\n"
 				  << "               V1/cornell-orbit, V2/teapot-spin, V3/one-weekend-flyby,\n"
 				  << "               V4/next-week-finale, V5/glass-dragon-caustics,\n"

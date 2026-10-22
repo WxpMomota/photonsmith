@@ -104,14 +104,13 @@ inline Vec3 rainbow(double u) {
 // Parts
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 struct Parts {
-	Mesh domino, marble, bulb, stem, base;
+	Mesh domino, marble, stem, base;
 };
 inline const Parts &parts() {
 	static const Parts p = [] {
 		Parts q;
 		q.domino = roundedBox(1.0, 1.0, 1.0, 0.06, 2);
 		q.marble = uvSphere(1.0, 32, 16);
-		q.bulb = uvSphere(1.0, 32, 16);
 		q.stem = lathe({{0.0, 0.0}, {0.30, 0.0}, {0.28, 0.06}, {0.06, 0.16}, {0.05, 0.70}, {0.0, 0.72}}, 24);
 		q.base = lathe({{0.0, 0.0}, {0.42, 0.0}, {0.42, 0.10}, {0.30, 0.16}, {0.0, 0.16}}, 32);
 		return q;
@@ -197,7 +196,7 @@ inline std::string buildLamp(double t, double f) {
 	// the bulb: dark until the last domino reaches the lamp, then it comes up over a second
 	const double on = smoothstep(impactAt(), impactAt() + 1.2, t);
 	const Vec3 glow = {f * on * 2.6, f * on * 1.9, f * on * 0.9};
-	out += attr("Material \"diffuse\" \"rgb reflectance\" [ 0.9 0.9 0.8 ]", emitMesh(P.bulb, mul(translate(0.0, 1.02, 0.0), scale(0.26))), &glow);
+	out += emissiveSphere({0.0, 1.02, 0.0}, 0.26, glow, "Material \"diffuse\" \"rgb reflectance\" [ 0.9 0.9 0.8 ]");
 	// and the light it gives the dominoes round it
 	char lit[160];
 	std::snprintf(lit, sizeof(lit), "LightSource \"point\" \"point3 from\" [ 0 1.02 0 ] \"rgb I\" [ %.4f %.4f %.4f ]\n", f * on * 7.0, f * on * 5.0, f * on * 2.2);

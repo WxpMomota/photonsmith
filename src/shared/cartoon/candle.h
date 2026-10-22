@@ -35,7 +35,7 @@ inline double flicker(double t) { return 1.0 + 0.10 * std::sin(9.1 * t) + 0.07 *
 inline Vec3 lean(double t) { return {0.07 * std::sin(1.9 * t) + 0.04 * std::sin(6.3 * t), 0.0, 0.05 * std::sin(1.3 * t + 1.0)}; }
 
 struct Parts {
-	Mesh flame, root, sphere, bokeh, dish;
+	Mesh flame, sphere, dish;
 };
 inline Mesh candleBody(double h) {
 	// the candle: a round body with a rounded foot, and a dish melted into its top
@@ -46,9 +46,7 @@ inline const Parts &parts() {
 		Parts q;
 		// the flame, a unit teardrop standing on y = 0: widest low down, pointed above
 		q.flame = lathe({{0.0, 0.0}, {0.06, 0.02}, {0.12, 0.12}, {0.14, 0.26}, {0.12, 0.42}, {0.08, 0.60}, {0.04, 0.78}, {0.012, 0.92}, {0.0, 1.0}}, 24);
-		q.root = uvSphere(1.0, 16, 8);
 		q.sphere = uvSphere(1.0, 24, 12);
-		q.bokeh = uvSphere(1.0, 14, 7);   // seen far out of focus: a coarse sphere does
 		q.dish = lathe({{0.0, 0.0}, {1.0, 0.0}, {1.0, 0.04}, {0.0, 0.04}}, 40);
 		return q;
 	}();
@@ -126,7 +124,7 @@ inline std::string buildFlame(double t, double f) {
 	out += lit;
 	// the blue root of the flame, low and small
 	const Vec3 blue = {f * 1.5, f * 5.0, f * 18.0};
-	out += attr("Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]", emitMesh(P.root, mul(translate(0.0, top + 0.17, 0.0), scale(0.05 * b, 0.05 * b, 0.05 * b))), &blue);
+	out += emissiveSphere({0.0, top + 0.17, 0.0}, 0.05 * b, blue);
 	return out;
 }
 
@@ -154,7 +152,7 @@ inline std::string buildBokeh(double f, double t) {
 		const double twinkle = 0.75 + 0.25 * std::sin(1.3 * t + 6.0 * hash01(i, 24));
 		const Vec3 warm = {1.0, 0.62 + 0.25 * hash01(i, 25), 0.25 + 0.3 * hash01(i, 26)};
 		const Vec3 L = warm * (f * twinkle * 9.0);
-		out += attr("Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]", emitMesh(parts().bokeh, mul(translate(x, y, z), scale(0.14 + 0.16 * hash01(i, 27)))), &L);
+		out += emissiveSphere({x, y, z}, 0.14 + 0.16 * hash01(i, 27), L);
 	}
 	return out;
 }

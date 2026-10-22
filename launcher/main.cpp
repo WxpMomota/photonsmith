@@ -27,6 +27,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <iomanip>
+#include <sstream>
 #include <string>
 #include <vector>
 #include <filesystem>
@@ -791,8 +792,40 @@ static int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
     // A cartoon preset (--camera-path cartoon:<key>): each frame is a scene of its own, rendered by a child run (launcher/cartoon_render.h).
     const cartoon::Film *cartoon_film = cartoon::forCameraPath(camera_path.c_str());
 
+    // A cartoon's frames are rendered by child runs, a few at once (launcher/cartoon_render.h); the picture sequence is handed to the converter in frame order whatever order they finish in.
+    if (cartoon_film) {
+        const int jobs = cartoon_render::jobsFor(args, use_gpu);
+        for (int w = 0; w < jobs; ++w) std::filesystem::create_directories(frames_dir / ("work" + std::to_string(w)));
+        const bool frame_is_png = use_gpu && kMetalVideoFrames;
+        auto frame_file = [&](int frame) {
+            char name[64];
+            std::snprintf(name, sizeof(name), frame_is_png ? "frame_%04d.png" : "frame_%04d.ppm", frame);
+            return frames_dir / name;
+        };
+        std::cout << "\nRendering " << render_frame_count << " frames of " << cartoon_film->name << ", " << jobs << " at a time." << std::endl;
+        int reported = 0;
+        successful_frames = cartoon_render::runInParallel(
+            render_frame_count, jobs,
+            [&](int frame, int worker) {
+                const double film_time = cartoon_film->duration * frame / std::max(1, render_frame_count);
+                return cartoon_render::renderFrame(*cartoon_film, film_time, frames_dir / ("work" + std::to_string(worker)) / ("cartoon_" + std::to_string(frame) + ".pbrt"), s.exe_path, args,
+                                                   image_width, image_height, samples_per_pixel, max_ray_depth, frame_file(frame).string());
+            },
+            [&](int frame, int rc, double seconds) {   // as each frame finishes: one line, the count being how many are done
+                std::ostringstream line;
+                line << "\n[" << ++reported << "/" << render_frame_count << "] Rendering " << frame_file(frame).filename().string() << " (" << cartoon_film->name << " at " << std::fixed
+                     << std::setprecision(2) << cartoon_film->duration * frame / std::max(1, render_frame_count) << " s)...";
+                if (rc == 0) line << " \u2713 (" << std::setprecision(1) << seconds << "s)";
+                else line << " \u2717 FAILED (error code: " << rc << ")";
+                (rc == 0 ? std::cout : std::cerr) << line.str() << std::endl;
+            },
+            [&](int frame, int rc) {   // in frame order: the video's picture sequence
+                if (rc == 0) png_converter.push(frame_file(frame).string(), frame_is_png);
+            });
+    }
+
     // Render each frame with animated camera position
-    for (int frame = 0; frame < render_frame_count; ++frame) {
+    for (int frame = 0; frame < (cartoon_film ? 0 : render_frame_count); ++frame) {
         // --time-limit + --video: args.time_limit_seconds is a WHOLE-
         // VIDEO budget, not a per-frame one - re-derive each frame's
         // own render_opts.time_limit_seconds as whatever's LEFT of that
@@ -849,13 +882,8 @@ static int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
         std::filesystem::path frame_path = frames_dir / frame_filename;
 
         // Progress indicator
-        std::cout << "\n[" << (frame + 1) << "/" << render_frame_count << "] Rendering " << frame_filename << " (";
-        if (cartoon_film) {
-            std::cout << cartoon_film->name << " at " << std::fixed << std::setprecision(2) << cartoon_film->duration * frame / std::max(1, render_frame_count) << " s";
-        } else {
-            std::cout << "camera: " << std::fixed << std::setprecision(1) << cam_pos.lookfrom_x << ", " << cam_pos.lookfrom_y << ", " << cam_pos.lookfrom_z;
-        }
-        std::cout << ")..." << std::flush;
+        std::cout << "\n[" << (frame + 1) << "/" << render_frame_count << "] Rendering " << frame_filename << " (camera: " << std::fixed << std::setprecision(1) << cam_pos.lookfrom_x << ", "
+                  << cam_pos.lookfrom_y << ", " << cam_pos.lookfrom_z << ")..." << std::flush;
 
         auto frame_start = std::chrono::high_resolution_clock::now();
         int render_result = -1;
@@ -889,11 +917,7 @@ static int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
         // always use their own fixed single-image lookfrom - a video
         // must honor its per-frame animated camera regardless, or it
         // would render the same static frame video_frames times.
-        if (cartoon_film) {
-            const double film_time = cartoon_film->duration * frame / std::max(1, render_frame_count);
-            render_result = cartoon_render::renderFrame(*cartoon_film, film_time, frames_dir / ("cartoon_" + std::to_string(frame) + ".pbrt"), s.exe_path, args,
-                                                        image_width, image_height, samples_per_pixel, max_ray_depth, frame_path.string());
-        } else if (use_gpu) {
+        if (use_gpu) {
             if (gpu_backend::available()) {   // Metal on a Mac, OptiX on Windows: launcher/gpu_backend.h
                 render_result = gpu_backend::render(
                     image_width,

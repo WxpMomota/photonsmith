@@ -227,7 +227,7 @@ inline std::string buildSky(double f) {
 	out += attr(dark, emitMesh(sky(23.0, 90.0), identity()), &high);
 	// the low sun, left of the picture's centre behind the pond: a bright sphere whose glitter lies on the water
 	const Vec3 sun = {f * 140.0, f * 78.0, f * 26.0};
-	out += attr(diffuseMaterial({0.0, 0.0, 0.0}), emitMesh(uvSphere(1.0, 32, 16), mul(translate(-16.0, 5.2, -60.0), scale(4.2))), &sun);
+	out += emissiveSphere({-16.0, 5.2, -60.0}, 4.2, sun);
 	return out;
 }
 
