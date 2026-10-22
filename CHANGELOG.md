@@ -5,6 +5,9 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 [docs/PBRT_SUPPORT.md](docs/PBRT_SUPPORT.md) has the per-feature, per-backend detail.
 
 ## 0.1.5 (2026-10-21)
+## 0.1.5 (2026-10-21)
+
+* **Background mode: use the computer while a video renders.** A "Keep the PC responsive while rendering" box in the GUI's Settings tab (remembered between runs), `--background` on the command line (or `RAY_TRACER_BACKGROUND=1`): the render and its workers run at a lower CPU, memory and GPU-scheduling priority, a CPU render uses half of the cores, a cartoon uses one worker and one frame at a time, and a video pauses after each frame for as long as the frame took, which is what gives the graphics card back (a lower priority alone does not on Windows). Measured with two Pip renders at once: the one you are using takes 33 s alone, 58 s beside a normal render and 41 s beside a background one. The background render takes about twice as long. See `docs/VIDEO_GENERATION.md`.
 
 * **Cartoon frames come out of the CPU side faster, with the same pictures.** A frame of "Pip and the Moon" at 1280 x 720 spent more time on the CPU (tone-mapping on one thread, writing the picture as 2.7 million numbers of PPM text through iostream, reading it back number by number twice and encoding a PNG that was then deleted) than the GPU spent drawing it. The tone map is now split over the cores, the text is written and read in one block by hand (`src/shared/ppm_text.h`), and a frame run no longer makes a PNG of its own (`--ppm-only`, set by the video). The files are byte for byte what they were: 24 frames at 64 samples take 31 s with one worker (55 s before) and 30 s with two (35 s before). Every other GPU render, a picture or a video, writes its PPM the same faster way.
 

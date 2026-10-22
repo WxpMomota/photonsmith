@@ -24,6 +24,7 @@
 #include "../../launcher/cartoon_worker.h"
 #include "../../launcher/cartoon_still.h"
 #include "../../launcher/launcher_args.h"
+#include "../../launcher/background_mode.h"
 #include "../../src/shared/cartoon/cartoons.h"
 #include "../../src/shared/cartoon/cartoon_stills.h"
 #include "../../src/shared/pbrt_discover.h"
@@ -959,3 +960,54 @@ TEST(PpmText, TheParallelLoopVisitsEveryIndexOnce) {
 		EXPECT_EQ(std::count(seen.begin(), seen.end(), 1), static_cast<std::ptrdiff_t>(n)) << n;
 	}
 }
+
+TEST(CartoonRender, BackgroundModeUsesOneWorkerAndOneFrameAtATimeAndIsPassedOnToTheFrameRuns) {
+	LaunchArgs normal;
+	EXPECT_FALSE(normal.background);
+	EXPECT_EQ(cartoon_render::workersFor(normal, true, false), 2);
+	EXPECT_EQ(cartoon_render::jobsFor(normal, true), 2);
+
+	LaunchArgs quiet;
+	ASSERT_TRUE(parseArgs({"--background", "--video", "--camera-path", "cartoon:fireflies"}, quiet));
+	EXPECT_TRUE(quiet.background);
+	EXPECT_EQ(cartoon_render::workersFor(quiet, true, false), 1) << "one worker keeps a GPU nearly as busy and leaves the rest to the user";
+	EXPECT_EQ(cartoon_render::jobsFor(quiet, true), 1);
+	EXPECT_EQ(cartoon_render::workersFor(quiet, false, false), 0) << "the CPU renderer has no workers either way";
+
+	quiet.cartoon_workers = 3;
+	EXPECT_EQ(cartoon_render::workersFor(quiet, true, false), 3) << "a number the user asked for is kept";
+
+	const cartoon::Film *pip = cartoon::find("pip-and-the-moon");
+	ASSERT_NE(pip, nullptr);
+	const std::vector<std::string> flags = cartoon_render::frameFlags(quiet, *pip, true);
+	EXPECT_NE(std::find(flags.begin(), flags.end(), "--background"), flags.end()) << "the workers and frame runs lower their own priority too";
+}
+
+#ifdef _WIN32
+TEST(BackgroundMode, ItLowersThePriorityOfThisProcessAndHalvesTheCpuThreads) {
+	const DWORD before = GetPriorityClass(GetCurrentProcess());
+	const char *threads = std::getenv("RAY_TRACER_THREADS");
+	const std::string savedThreads = threads ? threads : "";
+	_putenv("RAY_TRACER_THREADS=");   // (removes it: the user did not choose a number)
+
+	const std::string done = background_mode::apply();
+	EXPECT_NE(done.find("CPU priority below normal"), std::string::npos) << done;
+	EXPECT_EQ(GetPriorityClass(GetCurrentProcess()), static_cast<DWORD>(BELOW_NORMAL_PRIORITY_CLASS));
+	const char *now = std::getenv("RAY_TRACER_THREADS");
+	ASSERT_NE(now, nullptr);
+	EXPECT_EQ(std::atoi(now), std::max(1, static_cast<int>(std::thread::hardware_concurrency() / 2)));
+
+	// a number the user chose is kept
+	_putenv("RAY_TRACER_THREADS=3");
+	background_mode::apply();
+	EXPECT_STREQ(std::getenv("RAY_TRACER_THREADS"), "3");
+
+	EXPECT_GT(background_mode::pauseSecondsAfter(2.0), 0.0) << "a frame that took 2 s is followed by a pause";
+	EXPECT_NEAR(background_mode::pauseSecondsAfter(2.0), 2.0, 1e-9) << "a duty of 50%: as long as the work";
+	background_mode::active() = false;
+	EXPECT_EQ(background_mode::pauseSecondsAfter(2.0), 0.0) << "no pause outside background mode";
+	SetPriorityClass(GetCurrentProcess(), before);   // (the rest of the tests run at their usual priority)
+	if (threads) _putenv_s("RAY_TRACER_THREADS", savedThreads.c_str());
+	else _putenv("RAY_TRACER_THREADS=");
+}
+#endif

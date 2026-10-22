@@ -1301,6 +1301,7 @@ private:
 	QDoubleSpinBox *m_exposureSpin;     // --exposure (default path tracer only)
 	QComboBox *m_tonemapCombo;          // --tonemap (default path tracer only)
 	QCheckBox *m_statsCheck;            // --stats (default path tracer only)
+	QCheckBox *m_backgroundCheck = nullptr;   // --background (Settings tab, Output group); remembered between runs
 	QCheckBox *m_aovsCheck = nullptr;   // --aovs (any backend; single images)
 	QCheckBox *m_denoiseCheck;          // --denoise (GPU only, both backends)
 	// --denoise-blend (GPU only, both backends) - spinbox only enabled/

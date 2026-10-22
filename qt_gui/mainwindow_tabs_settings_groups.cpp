@@ -19,6 +19,8 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGroupBox>
+#include <QSettings>
+#include "settings_keys.h"
 #include <QFormLayout>
 #include <QGridLayout>
 #include <QFileDialog>
@@ -1591,6 +1593,25 @@ void MainWindow::buildOutputGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	pathLayout->addWidget(m_outputPathEdit);
 	pathLayout->addWidget(m_browseButton);
 	outputLayout->addLayout(pathLayout);
+
+	// For a long render or video that should not take the computer over: lower CPU and GPU priority, half the CPU cores, one worker and one frame at a time (launcher/background_mode.h).
+	// Remembered between runs; applies to renders and videos, not to Live Preview (which runs inside this program).
+	m_backgroundCheck = new QCheckBox(tr("Keep the PC responsive while rendering"), basicTab);
+	m_backgroundCheck->setToolTip(
+		tr("Renders politely so you can use the computer meanwhile: a lower CPU priority,\n"
+		"half of the CPU cores, and a video pauses after every frame for as long as the\n"
+		"frame took, which leaves the graphics card to your other programs half of the time.\n"
+		"A video takes about twice as long. The pictures are the same."));
+	styleCheckBox(m_backgroundCheck);
+	{
+		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
+		m_backgroundCheck->setChecked(settings.value(settings_keys::kBackgroundModeKey, false).toBool());
+	}
+	connect(m_backgroundCheck, &QCheckBox::toggled, this, [](bool on) {
+		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
+		settings.setValue(settings_keys::kBackgroundModeKey, on);
+	});
+	outputLayout->addWidget(m_backgroundCheck);
 
 	layout->addWidget(outputGroup);
 }

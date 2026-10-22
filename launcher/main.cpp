@@ -83,6 +83,7 @@ extern char** environ;
 #include "launcher/diagnostics.h"     // --diagnose
 #include "launcher/process.h"
 #include "launcher/render_setup.h"
+#include "launcher/background_mode.h"   // --background
 #include "launcher/cartoon_worker.h"
 #include "launcher/video_render.h"   // --video, --assemble-video
 #ifdef RT_HAVE_AVFOUNDATION_ENCODER
@@ -962,6 +963,10 @@ int main(int argc, char** argv) {
 		// render as successful even though no image was ever written.
 		return help_requested ? EXIT_SUCCESS : EXIT_FAILURE;
 	}
+
+	// --background (or RAY_TRACER_BACKGROUND=1): lower priorities for this process, which the programs it starts inherit (launcher/background_mode.h)
+	if (!args.background && background_mode::requestedByEnvironment()) args.background = true;
+	if (args.background) std::cout << "Background mode: " << background_mode::apply() << "." << std::endl;
 
 	// Unpack for readability in the rest of main
 	bool use_gpu            = args.use_gpu;

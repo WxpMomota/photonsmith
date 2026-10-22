@@ -35,6 +35,7 @@ namespace render_flags {
 	constexpr const char* kDenoiseBlend  = "--denoise-blend";
 	constexpr const char* kDenoiseGuides = "--denoise-guides";
 	constexpr const char* kStats         = "--stats";
+	constexpr const char* kBackground    = "--background";   // low priority, one worker: for using the computer meanwhile (launcher/background_mode.h)
 	constexpr const char* kOptixValidate = "--optix-validate";
 	constexpr const char* kExposure      = "--exposure";
 	constexpr const char* kSampler       = "--sampler";

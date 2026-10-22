@@ -395,6 +395,9 @@ struct LaunchArgs {
 	// --ppm-only: write the picture as a PPM and no PNG beside it. A cartoon video's frame runs are started with it (the video turns each PPM into its numbered PNG itself and deletes the
 	// frame run's own PNG, so making one was a second encode of every frame); people have no use for it.
 	bool ppm_only = false;
+	// --background: be a polite guest on the computer (launcher/background_mode.h): lower CPU and GPU priority, half the CPU cores, one worker and one frame at a time. Passed on to every program
+	// a video starts. RAY_TRACER_BACKGROUND=1 does the same.
+	bool background = false;
 	// --cartoon-worker JOBFILE: render the frames the job file lists, one after the other in this one process (launcher/cartoon_worker.h). Started by a cartoon video, not by people.
 	std::string cartoon_worker;
 	// --cartoon-workers N: render a cartoon video's frames with N long-lived worker processes (the default on a GPU) instead of a process per frame; 0 = a process per frame; -1 = automatic.
@@ -900,6 +903,9 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 	} else if (arg == "--ppm-only") {
 		out.ppm_only = true;
 		consumed_args.insert(i);
+	} else if (arg == "--background") {
+		out.background = true;
+		consumed_args.insert(i);
 	} else if (arg == render_flags::kFps && i + 1 < argc) {
 		try {
 			out.video_fps = std::stoi(argv[i + 1]);
@@ -1217,6 +1223,9 @@ inline void print_launch_help(const char* program) {
 				  << "  --cartoon-workers N: render a cartoon video's frames with N long-lived worker processes (the default\n"
 				  << "               on a GPU: 2) instead of starting a process for every frame, which at a draft quality is most\n"
 				  << "               of a frame's time; 0 = a process per frame\n"
+				  << "  --background: use the computer lightly, for when you want to use it meanwhile: lower CPU and GPU\n"
+				  << "               priority, half the CPU cores, one worker and one frame at a time for a cartoon video\n"
+				  << "               (the environment variable RAY_TRACER_BACKGROUND=1 also sets it)\n"
 				  << "  --resume:    continue an interrupted cartoon video from the frames already rendered, when the film and\n"
 				  << "               the settings (size, samples, flags) are the same; otherwise it starts again\n"
 				  << "               Accepts either short id or descriptive key:\n"

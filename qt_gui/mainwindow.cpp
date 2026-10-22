@@ -357,6 +357,7 @@ void RenderController::start() {
 			args << render_flags::kDenoiseBlend << QString::number(m_advancedFlags.denoiseBlend);
 	}
 	if (m_advancedFlags.stats)         args << render_flags::kStats;
+	if (m_advancedFlags.background)    args << render_flags::kBackground;
 	if (m_advancedFlags.aovs)          args << render_flags::kAovs;
 	if (m_advancedFlags.optixValidate) args << render_flags::kOptixValidate;
 	if (m_advancedFlags.exposure != 1.0) args << render_flags::kExposure << QString::number(m_advancedFlags.exposure);

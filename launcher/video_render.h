@@ -28,6 +28,7 @@
 extern char** environ;
 #endif
 #include "cpu_renderer/cpu_interface.h"
+#include "launcher/background_mode.h"
 #ifdef RT_HAVE_AVFOUNDATION_ENCODER
 #include "launcher/video_encoder_mac.h"   // Video -> MP4 via AVFoundation, no ffmpeg needed (used below)
 #endif
@@ -633,6 +634,7 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
 
         auto frame_end = std::chrono::high_resolution_clock::now();
         auto frame_duration = std::chrono::duration_cast<std::chrono::milliseconds>(frame_end - frame_start);
+        background_mode::pauseAfter(std::chrono::duration<double>(frame_end - frame_start).count());   // (--background)
 
         if (render_result == SUCCESS) {
             successful_frames++;

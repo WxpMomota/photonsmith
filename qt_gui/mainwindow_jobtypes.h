@@ -105,6 +105,7 @@ struct AdvancedRenderFlags {
 	// differs from 0.0, and only alongside --denoise itself.
 	double denoiseBlend = 0.0;
 	bool stats = false;
+	bool background = false;   // --background: render as a polite guest (Settings tab: "Keep the PC responsive")
 	bool aovs = false;   // --aovs: also write the render passes (albedo, normal, depth, uv, coverage)
 	bool optixValidate = false;
 	double exposure = 1.0;

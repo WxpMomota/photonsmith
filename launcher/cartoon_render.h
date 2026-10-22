@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "process.h"
+#include "background_mode.h"
 #include "launcher_args.h"
 #include "../src/shared/cartoon/cartoons.h"
 
@@ -95,6 +96,7 @@ inline int renderFrame(const cartoon::Film &film, double t, const std::filesyste
 		return -1;
 	}
 	const std::vector<std::string> childArgs = frameArgs(frameFlags(args, film, gpu), width, height, spp, depth, framePath, scenePath.string(), timeLimitSeconds);
+	const auto frameStart = std::chrono::steady_clock::now();
 	int rc = -1;
 	for (int attempt = 0; attempt < 2; ++attempt) {
 		bool timedOut = false;
@@ -105,6 +107,7 @@ inline int renderFrame(const cartoon::Film &film, double t, const std::filesyste
 	}
 	std::error_code ec;
 	std::filesystem::remove(scenePath, ec);
+	background_mode::pauseAfter(std::chrono::duration<double>(std::chrono::steady_clock::now() - frameStart).count());   // (--background)
 	return rc;
 }
 
@@ -174,7 +177,7 @@ inline int workersFor(const LaunchArgs &args, bool gpu, bool metal) {
 	if (n < 0) {
 		if (const char *env = std::getenv("RAY_TRACER_CARTOON_WORKERS")) n = std::atoi(env);
 	}
-	if (n < 0) n = gpu && !metal ? 2 : 0;
+	if (n < 0) n = gpu && !metal ? (args.background ? 1 : 2) : 0;   // (--background: one worker keeps a GPU nearly as busy and leaves the rest to the computer's user)
 	return std::max(0, std::min(n, 4));
 }
 
@@ -281,7 +284,7 @@ inline int jobsFor(const LaunchArgs &args, bool gpu) {
 	if (n <= 0) {
 		if (const char *env = std::getenv("RAY_TRACER_CARTOON_JOBS")) n = std::atoi(env);
 	}
-	if (n <= 0) n = gpu ? 2 : 1;
+	if (n <= 0) n = gpu && !args.background ? 2 : 1;
 	return std::max(1, std::min(n, 8));
 }
 
