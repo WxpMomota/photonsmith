@@ -16,3 +16,15 @@ fireflies|0|32604|3
 fireflies|13|33292|4
 fireflies|13|33292|4
 fireflies|25.97|71820|60
+newtons-cradle|0|22092|4
+newtons-cradle|5|22092|4
+newtons-cradle|9|22092|4
+newtons-cradle|17.98|22092|4
+domino-run|0|57648|3
+domino-run|9|57648|3
+domino-run|12|57648|3
+domino-run|23.98|57648|3
+paper-boat|0|20762|5
+paper-boat|10|20912|5
+paper-boat|12|20912|5
+paper-boat|23.98|16262|4

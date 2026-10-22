@@ -9,9 +9,12 @@
 #include <string>
 
 #include "ball_parade.h"
+#include "domino_run.h"
 #include "fireflies.h"
 #include "lamp_and_ball.h"
 #include "little_robot.h"
+#include "newtons_cradle.h"
+#include "paper_boat.h"
 
 namespace cartoon {
 
@@ -31,6 +34,15 @@ inline const Film kFilms[] = {
 	{"fireflies", "Fireflies",
 	 "A night meadow lit by fireflies: a lone firefly wanders, a second arrives, their flashes drift into step, they circle and spiral up to the moon as the meadow wakes. Four shots, 26 seconds.",
 	 fireflies::kDuration, fireflies::kFps, &fireflies::sceneAt, &fireflies::headerAt, 13.0},
+	{"newtons-cradle", "Newton's Cradle",
+	 "Five chrome balls on strings: one is lifted and let go, the far ball flies out and back, and the swing passes from side to side and slowly dies, with the room in the chrome. Three shots, 18 seconds.",
+	 newtons_cradle::kDuration, newtons_cradle::kFps, &newtons_cradle::sceneAt, &newtons_cradle::headerAt, 5.0},
+	{"domino-run", "Domino Run",
+	 "A red marble taps the first of 130 rainbow dominoes laid in a spiral; the wave runs inwards, chased by the camera, and the last domino lights a small lamp in the middle. Four shots, 24 seconds.",
+	 domino_run::kDuration, domino_run::kFps, &domino_run::sceneAt, &domino_run::headerAt, 9.0},
+	{"paper-boat", "The Paper Boat",
+	 "A folded paper boat sails across a pond in the rain at dusk: every drop starts rings of ripples that rock the boat and cross one another, the rain eases, and the boat sails on towards the low sun. Three shots, 24 seconds.",
+	 paper_boat::kDuration, paper_boat::kFps, &paper_boat::sceneAt, &paper_boat::headerAt, 10.0},
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 

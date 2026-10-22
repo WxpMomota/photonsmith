@@ -154,6 +154,73 @@ TEST(CartoonBallParade, ABallDoesNotJumpBetweenFrames) {
 	}
 }
 
+TEST(CartoonNewtonsCradle, TheBallsHangTouchingAndTheSwingPassesFromEndToEndWhileLosingEnergy) {
+	namespace nc = cartoon::newtons_cradle;
+	for (int i = 0; i + 1 < nc::kBalls; ++i)
+		EXPECT_NEAR(cartoon::length(nc::ballCentre(i + 1, 0.0) - nc::ballCentre(i, 0.0)), 2.0 * nc::kRadius, 1e-9) << "at rest the balls touch";
+	const nc::Swing lifted = nc::swingAt(nc::kReleaseAt - 0.01);
+	EXPECT_NEAR(lifted.left, -nc::kAmplitude, 0.5) << "the first ball is held at its highest point";
+	EXPECT_EQ(lifted.right, 0.0);
+	// every half period the swing is at the other end, and each time a little lower
+	double last = nc::kAmplitude;
+	for (int k = 0; k < 8; ++k) {
+		const double mid = nc::kReleaseAt + nc::kQuarter + (k + 0.5) * 2.0 * nc::kQuarter;
+		const nc::Swing s = nc::swingAt(mid);
+		const double a = k % 2 == 0 ? s.right : -s.left;
+		EXPECT_GT(a, 0.0) << "swing " << k << " is at the " << (k % 2 == 0 ? "right" : "left") << " end";
+		EXPECT_LT(a, last) << "each swing keeps less of the energy";
+		EXPECT_EQ(k % 2 == 0 ? s.left : s.right, 0.0) << "the other end ball hangs still";
+		last = a;
+	}
+}
+
+TEST(CartoonDominoRun, TheWaveRunsAlongTheWholePathAndTheLampComesOnAtTheEnd) {
+	namespace dr = cartoon::domino_run;
+	const int n = dr::dominoCount();
+	EXPECT_GT(n, 100);
+	for (int i = 1; i < n; ++i) EXPECT_GT(dr::startOf(i), dr::startOf(i - 1)) << "domino " << i << " falls after the one before it";
+	EXPECT_EQ(dr::leanOf(0, dr::kStart - 0.01), 0.0) << "nothing moves before the marble arrives";
+	EXPECT_NEAR(dr::leanOf(n / 2, dr::startOf(n / 2) + dr::kFall + 0.1), dr::kLean, 1e-9) << "a fallen domino rests on its neighbour";
+	EXPECT_GT(dr::leanOf(n - 1, dr::impactAt()), 80.0) << "the last one lies against the lamp";
+	EXPECT_LT(dr::impactAt() + 3.0, dr::kDuration) << "the lamp is lit with time left to enjoy it";
+	// the dominoes are evenly spaced along the path
+	for (int i = 1; i < n; ++i) EXPECT_NEAR(cartoon::length(dr::pointAtArc(dr::arcOf(i)) - dr::pointAtArc(dr::arcOf(i - 1))), dr::kSpacing, 0.01);
+	// the marble starts well before the first domino and has reached it when it is struck
+	EXPECT_GT(cartoon::length(dr::marbleAt(0.0) - dr::marbleAt(dr::kStart)), 3.0);
+	// the lamp is dark first and lit after
+	EXPECT_EQ(cartoon::domino_run::sceneAt(1.0).find("LightSource \"point\""), std::string::npos);
+	EXPECT_NE(cartoon::domino_run::sceneAt(dr::impactAt() + 2.0).find("LightSource \"point\""), std::string::npos);
+}
+
+TEST(CartoonPaperBoat, TheRainEasesTheWaterCalmsAndTheBoatSailsAcrossThePond) {
+	namespace pb = cartoon::paper_boat;
+	EXPECT_NEAR(pb::rainAt(5.0), 1.0, 1e-12);
+	EXPECT_NEAR(pb::rainAt(21.0), 0.0, 1e-12);
+	// the surface: busy in the rain, nearly flat once it has stopped
+	double busy = 0.0, calm = 0.0;
+	for (double x = -6.0; x <= 6.0; x += 0.7) {
+		for (double z = -4.0; z <= 4.0; z += 0.7) {
+			busy = std::max(busy, std::abs(pb::surfaceAt(x, z, 10.0).h));
+			calm = std::max(calm, std::abs(pb::surfaceAt(x, z, 23.5).h));
+		}
+	}
+	EXPECT_GT(busy, 0.02);
+	EXPECT_LT(calm, 0.03) << "only the faint swell is left";
+	EXPECT_LT(pb::boatBase(0.0).x, -7.0);
+	EXPECT_GT(pb::boatBase(pb::kDuration).x, 5.0);
+	for (double t = 0.0; t <= pb::kDuration; t += 0.5) {
+		const pb::BoatPose b = pb::boatAt(t);
+		EXPECT_LT(std::abs(b.pitch), 25.0) << "t = " << t << ": rocked, not capsized";
+		EXPECT_LT(std::abs(b.roll), 25.0) << "t = " << t;
+		EXPECT_LT(std::abs(b.position.y), 0.2) << "t = " << t << ": it floats";
+	}
+	// the water's slope is the slope of its height: a finite difference agrees with the analytic one
+	const double x = 1.3, z = -0.7, e = 1e-4;
+	const pb::Surface s = pb::surfaceAt(x, z, 8.0);
+	EXPECT_NEAR(s.dhdx, (pb::surfaceAt(x + e, z, 8.0).h - pb::surfaceAt(x - e, z, 8.0).h) / (2 * e), 2e-3);
+	EXPECT_NEAR(s.dhdz, (pb::surfaceAt(x, z + e, 8.0).h - pb::surfaceAt(x, z - e, 8.0).h) / (2 * e), 2e-3);
+}
+
 TEST(CartoonFilms, EveryFilmFlattensAtSeveralTimesWithoutWarnings) {
 	for (const cartoon::Film &film : cartoon::kFilms) {
 		for (double f : {0.0, 0.1, 0.3, 0.5, 0.7, 0.9, 0.999}) {

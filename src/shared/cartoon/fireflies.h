@@ -44,12 +44,6 @@ inline const Parts &parts() {
 	return p;
 }
 
-inline std::string emitMesh(const Mesh &mesh, const Mat4 &m) {
-	static const Mat4 mirror = scale(-1.0, 1.0, 1.0);
-	std::string out;
-	mesh.appendPbrt(out, mul(mirror, m), true);
-	return out;
-}
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The two main fireflies

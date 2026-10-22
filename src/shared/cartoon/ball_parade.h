@@ -79,12 +79,6 @@ inline const Mesh &sphere() {
 	return m;
 }
 
-inline std::string emitMesh(const Mesh &mesh, const Mat4 &m) {
-	static const Mat4 mirror = scale(-1.0, 1.0, 1.0);
-	std::string out;
-	mesh.appendPbrt(out, mul(mirror, m), true);
-	return out;
-}
 inline Vec3 worldPoint(Vec3 p) { return {-p.x, p.y, p.z}; }
 
 inline std::string cameraText(double t) {

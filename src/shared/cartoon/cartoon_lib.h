@@ -325,6 +325,18 @@ inline std::string diffuseMaterial(Vec3 color) {
 	return buf;
 }
 
+// Polished metal (a conductor with the given reflectance colour) and clear glass.
+inline std::string metalMaterial(Vec3 reflectance, double roughness = 0.02) {
+	char buf[200];
+	std::snprintf(buf, sizeof(buf), "Material \"conductor\" \"rgb reflectance\" [ %.5f %.5f %.5f ] \"float roughness\" [ %.4f ]", reflectance.x, reflectance.y, reflectance.z, roughness);
+	return buf;
+}
+inline std::string glassMaterial(double eta = 1.5, double roughness = 0.0) {
+	char buf[160];
+	std::snprintf(buf, sizeof(buf), "Material \"dielectric\" \"float eta\" [ %.4f ] \"float roughness\" [ %.4f ]", eta, roughness);
+	return buf;
+}
+
 // An AttributeBegin ... AttributeEnd block: one material and the shapes' text, optionally an area light.
 inline std::string attr(const std::string &material, const std::string &shapes, const Vec3 *emission = nullptr) {
 	std::string out = "AttributeBegin\n";
@@ -362,6 +374,21 @@ inline Mesh capsule(double r, double length, int segments = 20, int capSteps = 6
 	}
 	profile.back() = {0.0, length + r};
 	return lathe(profile, segments);
+}
+
+// A mesh placed by `m`, written as pbrt text in the films' story space (+x to the right of the picture, so x is negated: pbrt is left-handed, with the winding flipped to match).
+inline std::string emitMesh(const Mesh &mesh, const Mat4 &m) {
+	static const Mat4 mirror = scale(-1.0, 1.0, 1.0);
+	std::string out;
+	mesh.appendPbrt(out, mul(mirror, m), true);
+	return out;
+}
+
+// A thin round bar from `a` to `b` (radius `r`, round ends): a rod, a string, a post.
+inline std::string bar(Vec3 a, Vec3 b, double r, int segments = 10) {
+	const double len = length(b - a);
+	if (len < 1e-9) return std::string();
+	return emitMesh(capsule(r, std::max(0.0, len - 2.0 * r), segments, 3), alignY(a + normalize(b - a) * r, b - a));
 }
 
 // A two-link limb (shoulder to elbow to hand) reaching for `target`: the elbow position, bent towards `pole` (a direction the elbow prefers). The hand is where the limb can reach.

@@ -205,9 +205,12 @@ short id or the descriptive key:
 | V8 | ball-parade | (its own scenes) | cartoon:ball-parade | 288 | 24 | 1.0 |
 | V9 | little-robot | (its own scenes) | cartoon:little-robot | 768 | 24 | 1.0 |
 | V10 | fireflies | (its own scenes) | cartoon:fireflies | 624 | 24 | 1.0 |
+| V11 | newtons-cradle | (its own scenes) | cartoon:newtons-cradle | 432 | 24 | 1.0 |
+| V12 | domino-run | (its own scenes) | cartoon:domino-run | 576 | 24 | 1.0 |
+| V13 | paper-boat | (its own scenes) | cartoon:paper-boat | 576 | 24 | 1.0 |
 
 `ray_tracer --list-video-presets` prints the whole list (camera flythroughs and cartoons together: id, key, kind, length, name). The cartoons are presets like the rest: one per film in
-`src/shared/cartoon/cartoons.h`, numbered on from the camera presets (V7 to V10 so far), their name, description, frame count and fps taken from the film, so the table below and the film
+`src/shared/cartoon/cartoons.h`, numbered on from the camera presets (V7 to V13 so far), their name, description, frame count and fps taken from the film, so the table below and the film
 table cannot disagree.
 
 ```powershell
@@ -241,6 +244,9 @@ sampled and played back, not its story.
 | ball-parade | Ball Parade | 12 s | Seven glossy balls drop in one after another, bounce in a travelling wave on a glossy checker floor with squash and stretch, and settle one by one into a row. |
 | little-robot | The Little Robot | 32 s | A small robot wakes in a junkyard at dusk, finds a seedling dying in a tin can, waters it from a watering can, and watches it bloom into a glowing flower. Five shots with a rack-focus close-up. |
 | fireflies | Fireflies | 26 s | A night meadow lit almost only by fireflies: a lone one wanders through the grass, a second arrives, their flashes drift into step, they circle and spiral up towards the moon as fifty more wake in the grass and a crane shot lifts away. Four shots. |
+| newtons-cradle | Newton's Cradle | 18 s | Five chrome balls on strings in a room of coloured lights: one is lifted and let go, the far ball flies out and back, and the swing passes from side to side and slowly dies. Three shots, the middle one a close-up of the strike. |
+| domino-run | Domino Run | 24 s | A red marble taps the first of 130 rainbow dominoes laid in a spiral; the wave runs inwards, chased by the camera, and the last domino lights a small lamp in the middle. Four shots. |
+| paper-boat | The Paper Boat | 24 s | A folded paper boat sails across a pond in the rain at dusk: every drop starts rings of ripples that rock the boat and cross one another (the water is a height field rebuilt for each frame), the rain eases, and the boat sails on towards the low sun. Three shots. |
 
 A frame of a film is also a scene: `ray_tracer --gpu 1280 256 8 cartoon:fireflies@13.5` renders that moment as one picture (`cartoon:<key>` alone is the film's own best still), which is the quickest
 way to look at a change to a film. The GUI's scene list has a Cartoons tab (beside Self-Contained and Requires External Files) with one still per film; it is listed from the films themselves (a still's file is written the first time it is rendered), so a new film appears there by itself, and its Film time box renders any other moment of the film as a picture.
