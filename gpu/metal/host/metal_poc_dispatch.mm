@@ -483,7 +483,9 @@ bool MetalPocApp::dsUploadTextures(DispatchState& s) {
     // used slot) when the scene has no image-based infinite light -
     // harmless, since pbrtHasImageEnvLight gates whether the shader
     // ever actually samples it.
-    id<MTLTexture> pbrtEnvTexture = rgbFloatTexture(device, havePbrtImageEnvLight, pbrtEnvImageWidth, pbrtEnvImageHeight, pbrtEnvImagePixels);
+    id<MTLTexture> pbrtEnvTexture = havePbrtSkyBesidePortals && !pbrtSkyBesidePortalsPixels.empty()   // (a picture sky beside portal lights: the portals do not use the texture)
+        ? rgbFloatTexture(device, true, pbrtSkyBesidePortalsWidth, pbrtSkyBesidePortalsHeight, pbrtSkyBesidePortalsPixels)
+        : rgbFloatTexture(device, havePbrtImageEnvLight, pbrtEnvImageWidth, pbrtEnvImageHeight, pbrtEnvImagePixels);
 
     // A pbrt-loaded scene's own real per-light goniometric/projection
     // profile images (section 98) - same upload pattern as pbrtEnvTexture
@@ -788,7 +790,7 @@ void MetalPocApp::applyPbrtSkyUniforms(Uniforms& uniforms) {
         uniforms.pbrtPortalExtraCount = (uint32_t)pbrtExtraPortals.size();
         uniforms.pbrtPortalExtraBase = (uint32_t)pbrtPortalRectified.size();   // the headers follow the first portal's picture in the "conditional" buffer
         if (havePbrtSkyBesidePortals) {
-            uniforms.pbrtSkyBesidePortals = 1u;
+            uniforms.pbrtSkyBesidePortals = pbrtSkyBesidePortalsPixels.empty() ? 1u : 2u;   // 2: a picture, read from the environment texture
             uniforms.pbrtSkyColor = PackedFloat3{pbrtSkyBesidePortalsColor.x, pbrtSkyBesidePortalsColor.y, pbrtSkyBesidePortalsColor.z};
         }
     }

@@ -255,9 +255,12 @@ struct PbrtSceneLoader {
         float3 frameX{1, 0, 0}, frameY{0, 1, 0}, frameZ{0, 0, 1}, p0{0, 0, 0}, p2{0, 0, 0};
     };
     std::vector<PbrtExtraPortal> pbrtExtraPortals;
-    // A plain infinite light beside portal lights (FlatScene::skyBesidePortals): drawn as a constant colour, L * scale (a picture sky as its mean colour).
+    // A plain infinite light beside portal lights (FlatScene::skyBesidePortals): a constant colour, L * scale, or a picture (scale applied, linear RGB, equirectangular like the plain
+    // image light) that goes into the environment texture and is read by direction.
     bool havePbrtSkyBesidePortals = false;
     float3 pbrtSkyBesidePortalsColor{0, 0, 0};
+    std::vector<float> pbrtSkyBesidePortalsPixels;
+    int pbrtSkyBesidePortalsWidth = 0, pbrtSkyBesidePortalsHeight = 0;
 
     // Set by loadPbrtScene() for the FIRST pbrt-loaded goniometric/
     // projection light that names a real profile/slide image and
