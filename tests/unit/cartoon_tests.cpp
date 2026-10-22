@@ -429,13 +429,15 @@ TEST(CartoonStills, TheStillOfAFilmThatIsGoneIsRemovedAndOtherFilesAreKept) {
 	std::filesystem::remove_all(dir);
 }
 
+#ifdef _WIN32
 TEST(CartoonRender, AnArgumentWithSpacesOrQuotesIsQuotedTheWayTheOperatingSystemReadsIt) {
-	EXPECT_EQ(cartoon_render::windowsQuote("plain"), "plain");
-	EXPECT_EQ(cartoon_render::windowsQuote("C:/p/ray tracer.exe"), "\"C:/p/ray tracer.exe\"");
-	EXPECT_EQ(cartoon_render::windowsQuote("a\"b"), "\"a\\\"b\"");
-	EXPECT_EQ(cartoon_render::windowsQuote("C:\\dir with space\\"), "\"C:\\dir with space\\\\\"") << "a backslash before the closing quote is doubled";
-	EXPECT_EQ(cartoon_render::windowsQuote(""), "\"\"");
+	EXPECT_EQ(win32_quote_arg("plain"), "plain");
+	EXPECT_EQ(win32_quote_arg("C:/p/ray tracer.exe"), "\"C:/p/ray tracer.exe\"");
+	EXPECT_EQ(win32_quote_arg("a\"b"), "\"a\\\"b\"");
+	EXPECT_EQ(win32_quote_arg("C:\\dir with space\\"), "\"C:\\dir with space\\\\\"") << "a backslash before the closing quote is doubled";
+	EXPECT_EQ(win32_quote_arg(""), "\"\"");
 }
+#endif
 
 // a child process that exits with a code that tells what it saw in its environment, and one that outlives any timeout
 #ifdef _WIN32
@@ -454,19 +456,19 @@ static const char *kExitScript = "exit 3";
 
 TEST(CartoonRender, TheChildSeesOnlyItsFramesFolderAndItsExitCodeComesBack) {
 	bool timedOut = true;
-	EXPECT_EQ(cartoon_render::runChild(shellExe(), shellArgs(kExitScript), "", "", 0, &timedOut), 3);
+	EXPECT_EQ(runChild(shellExe(), shellArgs(kExitScript), "", "", 0, &timedOut), 3);
 	EXPECT_FALSE(timedOut);
 	// the variable is set on the child's own environment (several children run at once, so it cannot be this process's) and is not left in this one
-	EXPECT_EQ(cartoon_render::runChild(shellExe(), shellArgs(kEnvScript), "RT_TEST_VAR", "seen", 0), 7);
-	EXPECT_EQ(cartoon_render::runChild(shellExe(), shellArgs(kEnvScript), "", "", 0), 8) << "and left alone when none is asked for";
+	EXPECT_EQ(runChild(shellExe(), shellArgs(kEnvScript), "RT_TEST_VAR", "seen", 0), 7);
+	EXPECT_EQ(runChild(shellExe(), shellArgs(kEnvScript), "", "", 0), 8) << "and left alone when none is asked for";
 	EXPECT_EQ(std::getenv("RT_TEST_VAR"), nullptr);
-	EXPECT_EQ(cartoon_render::runChild("C:/no/such/program.exe", {}, "", "", 0), -1) << "a program that cannot be started";
+	EXPECT_EQ(runChild("C:/no/such/program.exe", {}, "", "", 0), -1) << "a program that cannot be started";
 }
 
 TEST(CartoonRender, AChildThatTakesTooLongIsStoppedAndSaysSo) {
 	bool timedOut = false;
 	const auto start = std::chrono::steady_clock::now();
-	cartoon_render::runChild(shellExe(), shellArgs(kSleepScript), "", "", 1, &timedOut);
+	runChild(shellExe(), shellArgs(kSleepScript), "", "", 1, &timedOut);
 	const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
 	EXPECT_TRUE(timedOut);
 	EXPECT_LT(seconds, 12.0) << "it was stopped, not waited for";

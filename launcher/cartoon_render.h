@@ -25,22 +25,7 @@
 #include <thread>
 #include <vector>
 
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <windows.h>
-#else
-#include <signal.h>
-#include <spawn.h>
-#include <sys/wait.h>
-#include <unistd.h>
-extern char **environ;
-#endif
-
+#include "process.h"
 #include "launcher_args.h"
 #include "../src/shared/cartoon/cartoons.h"
 
@@ -70,99 +55,6 @@ inline std::vector<std::string> frameArgs(const std::vector<std::string> &flags,
 	std::vector<std::string> a = flags;
 	for (const std::string &s : {std::string("--height"), std::to_string(height), std::string("--output"), framePath, std::to_string(width), std::to_string(spp), std::to_string(depth), scenePath}) a.push_back(s);
 	return a;
-}
-
-// A command-line argument as CreateProcess's parser wants it (quotes round anything with a space, backslashes before a quote doubled).
-inline std::string windowsQuote(const std::string &s) {
-	if (!s.empty() && s.find_first_of(" \t\"") == std::string::npos) return s;
-	std::string r = "\"";
-	std::size_t backslashes = 0;
-	for (char c : s) {
-		if (c == '\\') {
-			++backslashes;
-			r += c;
-		} else if (c == '"') {
-			r.append(backslashes + 1, '\\');
-			backslashes = 0;
-			r += '"';
-		} else {
-			backslashes = 0;
-			r += c;
-		}
-	}
-	r.append(backslashes, '\\');
-	return r + "\"";
-}
-
-// Runs `exe args...` with one more environment variable (`envName`=`envValue`, when envName is not empty) and waits for it; when it has not finished after `timeoutSeconds` (0: wait as
-// long as it takes) the process is killed and `*timedOut` set. Returns its exit code, or -1 when it could not be started. The child sees only its own environment: several children run at
-// once, so a variable cannot be set in this process for one of them.
-inline int runChild(const std::string &exe, const std::vector<std::string> &args, const std::string &envName, const std::string &envValue, int timeoutSeconds, bool *timedOut = nullptr) {
-	if (timedOut) *timedOut = false;
-#ifdef _WIN32
-	std::string cmd = windowsQuote(exe);
-	for (const std::string &a : args) cmd += " " + windowsQuote(a);
-	std::string block;
-	for (char **e = _environ; e && *e; ++e) {
-		const std::string entry(*e);
-		const bool same = !envName.empty() && entry.size() > envName.size() && _strnicmp(entry.c_str(), envName.c_str(), envName.size()) == 0 && entry[envName.size()] == '=';
-		if (!same) block.append(entry).push_back('\0');
-	}
-	if (!envName.empty()) block.append(envName + "=" + envValue).push_back('\0');
-	block.push_back('\0');
-	STARTUPINFOA si{};
-	si.cb = sizeof(si);
-	PROCESS_INFORMATION pi{};
-	std::vector<char> mutableCmd(cmd.begin(), cmd.end());
-	mutableCmd.push_back('\0');
-	if (!CreateProcessA(nullptr, mutableCmd.data(), nullptr, nullptr, FALSE, 0, block.data(), nullptr, &si, &pi)) return -1;
-	const DWORD waited = WaitForSingleObject(pi.hProcess, timeoutSeconds > 0 ? static_cast<DWORD>(timeoutSeconds) * 1000u : INFINITE);
-	int rc = 1;
-	if (waited == WAIT_TIMEOUT) {
-		TerminateProcess(pi.hProcess, 1);
-		WaitForSingleObject(pi.hProcess, 10000);
-		if (timedOut) *timedOut = true;
-	} else {
-		DWORD code = 1;
-		GetExitCodeProcess(pi.hProcess, &code);
-		rc = static_cast<int>(code);
-	}
-	CloseHandle(pi.hProcess);
-	CloseHandle(pi.hThread);
-	return rc;
-#else
-	std::vector<std::string> argvStore = {exe};
-	argvStore.insert(argvStore.end(), args.begin(), args.end());
-	std::vector<char *> argv;
-	for (std::string &a : argvStore) argv.push_back(&a[0]);
-	argv.push_back(nullptr);
-	std::vector<std::string> envStore;
-	for (char **e = environ; e && *e; ++e) {
-		const std::string entry(*e);
-		if (envName.empty() || entry.compare(0, envName.size() + 1, envName + "=") != 0) envStore.push_back(entry);
-	}
-	if (!envName.empty()) envStore.push_back(envName + "=" + envValue);
-	std::vector<char *> envp;
-	for (std::string &e : envStore) envp.push_back(&e[0]);
-	envp.push_back(nullptr);
-	pid_t pid = 0;
-	if (posix_spawn(&pid, exe.c_str(), nullptr, nullptr, argv.data(), envp.data()) != 0) return -1;
-	int status = 0;
-	const auto start = std::chrono::steady_clock::now();
-	for (;;) {
-		const pid_t done = waitpid(pid, &status, WNOHANG);
-		if (done == pid) break;
-		if (done < 0) return -1;
-		if (timeoutSeconds > 0 && std::chrono::steady_clock::now() - start > std::chrono::seconds(timeoutSeconds)) {
-			kill(pid, SIGKILL);
-			waitpid(pid, &status, 0);
-			if (timedOut) *timedOut = true;
-			return 1;
-		}
-		std::this_thread::sleep_for(std::chrono::milliseconds(50));
-	}
-	return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
-#endif
 }
 
 // How long one frame may take: --cartoon-timeout S, else the environment variable RAY_TRACER_CARTOON_TIMEOUT, else 15 minutes on a GPU (a frame there takes seconds, so one that has taken
