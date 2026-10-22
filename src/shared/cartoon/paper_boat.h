@@ -186,20 +186,14 @@ inline BoatPose boatAt(double t) {
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Cameras
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
-template <typename F>
-inline Track3 sampled(double t0, double t1, F fn) {
-	std::vector<Track3::Key> keys;
-	for (double t = t0; t < t1 + 1e-9; t += 0.25) keys.push_back({t, fn(t), Ease::Linear});
-	return Track3::withEases(keys);
-}
 inline Vec3 boatPoint(double t, Vec3 off) { return boatBase(t) + off; }
 
 inline const std::vector<Shot> &shots() {
 	static const std::vector<Shot> s = {
 		{0.0, Track3::withEases({{0.0, {-3.4, 0.42, 4.2}, Ease::Smooth}, {7.0, {-1.4, 0.55, 3.4}, Ease::Smooth}}),
-		 sampled(0.0, 7.0, [](double t) { return boatPoint(t, {1.2, 0.45, 0.0}); }), Track1::withEases({{0.0, 36.0, Ease::Smooth}}), 0.035},
-		{7.0, sampled(7.0, 15.0, [](double t) { return boatPoint(t, {2.4, 2.6, 3.0}); }), sampled(7.0, 15.0, [](double t) { return boatPoint(t, {0.2, 0.2, 0.0}); }), Track1::withEases({{7.0, 40.0, Ease::Smooth}}), 0.03},
-		{15.0, Track3::withEases({{15.0, {1.0, 1.4, 7.0}, Ease::Smooth}, {kDuration, {5.0, 3.8, 11.0}, Ease::Smooth}}), sampled(15.0, kDuration, [](double t) { return boatPoint(t, {0.5, 0.5, 0.0}); }),
+		 sampledTrack(0.0, 7.0, [](double t) { return boatPoint(t, {1.2, 0.45, 0.0}); }), Track1::withEases({{0.0, 36.0, Ease::Smooth}}), 0.035},
+		{7.0, sampledTrack(7.0, 15.0, [](double t) { return boatPoint(t, {2.4, 2.6, 3.0}); }), sampledTrack(7.0, 15.0, [](double t) { return boatPoint(t, {0.2, 0.2, 0.0}); }), Track1::withEases({{7.0, 40.0, Ease::Smooth}}), 0.03},
+		{15.0, Track3::withEases({{15.0, {1.0, 1.4, 7.0}, Ease::Smooth}, {kDuration, {5.0, 3.8, 11.0}, Ease::Smooth}}), sampledTrack(15.0, kDuration, [](double t) { return boatPoint(t, {0.5, 0.5, 0.0}); }),
 		 Track1::withEases({{15.0, 38.0, Ease::Smooth}}), 0.02},
 	};
 	return s;

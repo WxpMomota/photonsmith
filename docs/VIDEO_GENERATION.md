@@ -208,9 +208,12 @@ short id or the descriptive key:
 | V11 | newtons-cradle | (its own scenes) | cartoon:newtons-cradle | 432 | 24 | 1.0 |
 | V12 | domino-run | (its own scenes) | cartoon:domino-run | 576 | 24 | 1.0 |
 | V13 | paper-boat | (its own scenes) | cartoon:paper-boat | 576 | 24 | 1.0 |
+| V14 | orrery | (its own scenes) | cartoon:orrery | 528 | 24 | 1.0 |
+| V15 | dandelion | (its own scenes) | cartoon:dandelion | 528 | 24 | 1.0 |
+| V16 | candle | (its own scenes) | cartoon:candle | 480 | 24 | 1.0 |
 
 `ray_tracer --list-video-presets` prints the whole list (camera flythroughs and cartoons together: id, key, kind, length, name). The cartoons are presets like the rest: one per film in
-`src/shared/cartoon/cartoons.h`, numbered on from the camera presets (V7 to V13 so far), their name, description, frame count and fps taken from the film, so the table below and the film
+`src/shared/cartoon/cartoons.h`, numbered on from the camera presets (V7 to V16 so far), their name, description, frame count and fps taken from the film, so the table below and the film
 table cannot disagree.
 
 ```powershell
@@ -247,6 +250,9 @@ sampled and played back, not its story.
 | newtons-cradle | Newton's Cradle | 18 s | Five chrome balls on strings in a room of coloured lights: one is lifted and let go, the far ball flies out and back, and the swing passes from side to side and slowly dies. Three shots, the middle one a close-up of the strike. |
 | domino-run | Domino Run | 24 s | A red marble taps the first of 130 rainbow dominoes laid in a spiral; the wave runs inwards, chased by the camera, and the last domino lights a small lamp in the middle. Four shots. |
 | paper-boat | The Paper Boat | 24 s | A folded paper boat sails across a pond in the rain at dusk: every drop starts rings of ripples that rock the boat and cross one another (the water is a height field rebuilt for each frame), the rain eases, and the boat sails on towards the low sun. Three shots. |
+| orrery | The Orrery | 22 s | A turn round a brass model of a small solar system: a glowing sun, five enamel planets on arms (one with a moon, one with a ring), engraved orbits and a pair of meshing gears, lit by the sun alone. Three shots, the middle one following the third planet and its moon. |
+| dandelion | The Dandelion | 22 s | A gust blows the seeds off a dandelion clock one by one, windward side first, and they drift away on their little parachutes of fluff, glowing where the low sun shines through them. Three shots. |
+| candle | The Candle | 20 s | One candle burns down in front of out-of-focus fairy lights: the flame flickers, light glows through the wax (a subsurface material), drips run down its side, and at the end the flame dies in a thread of smoke. Three shots. |
 
 A frame of a film is also a scene: `ray_tracer --gpu 1280 256 8 cartoon:fireflies@13.5` renders that moment as one picture (`cartoon:<key>` alone is the film's own best still), which is the quickest
 way to look at a change to a film. The GUI's scene list has a Cartoons tab (beside Self-Contained and Requires External Files) with one still per film; it is listed from the films themselves (a still's file is written the first time it is rendered), so a new film appears there by itself, and its Film time box renders any other moment of the film as a picture.

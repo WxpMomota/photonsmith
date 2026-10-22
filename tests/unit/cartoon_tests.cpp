@@ -221,6 +221,62 @@ TEST(CartoonPaperBoat, TheRainEasesTheWaterCalmsAndTheBoatSailsAcrossThePond) {
 	EXPECT_NEAR(s.dhdz, (pb::surfaceAt(x, z + e, 8.0).h - pb::surfaceAt(x, z - e, 8.0).h) / (2 * e), 2e-3);
 }
 
+TEST(CartoonOrrery, ThePlanetsKeepTheirOrbitsTheMoonKeepsItsPlanetAndTheGearsMesh) {
+	namespace orr = cartoon::orrery;
+	for (int k = 0; k < orr::kPlanets; ++k) {
+		for (double t : {0.0, 3.3, 11.0, 21.0}) {
+			const cartoon::Vec3 p = orr::planetAt(k, t);
+			EXPECT_NEAR(std::hypot(p.x, p.z), orr::planet(k).orbit, 1e-9) << "planet " << k;
+			EXPECT_NEAR(p.y, orr::planet(k).height, 1e-9);
+		}
+	}
+	for (int k = 1; k < orr::kPlanets; ++k) EXPECT_GT(orr::planet(k).orbit, orr::planet(k - 1).orbit);
+	for (double t : {0.0, 5.0, 17.0}) EXPECT_NEAR(cartoon::length(orr::moonAt(t) - orr::planetAt(2, t)), 0.55, 0.12) << "the moon stays by its planet";
+	// the gears: the teeth ratio gives the speed ratio, in the other direction, and the small one starts half a tooth out
+	EXPECT_NEAR((orr::smallGearAngle(10.0) - orr::smallGearAngle(0.0)) / (orr::bigGearAngle(10.0) - orr::bigGearAngle(0.0)), -static_cast<double>(orr::kTeethBig) / orr::kTeethSmall, 1e-9);
+	EXPECT_NEAR(cartoon::length(orr::smallGearAt() - orr::bigGearAt()), orr::kBigRadius + orr::kSmallRadius, 1e-9) << "the pitch circles touch";
+}
+
+TEST(CartoonDandelion, TheWindwardSeedsGoFirstAndAReleasedSeedTravelsDownwind) {
+	namespace dd = cartoon::dandelion;
+	double firstToLast = 0.0, earliest = 1e9, latest = 0.0;
+	for (int i = 0; i < dd::kSeeds; ++i) {
+		earliest = std::min(earliest, dd::releaseOf(i));
+		latest = std::max(latest, dd::releaseOf(i));
+	}
+	firstToLast = latest - earliest;
+	EXPECT_GT(firstToLast, 4.0) << "the gust takes seconds to strip the head";
+	EXPECT_GE(earliest, dd::kGust - 1e-9);
+	EXPECT_LT(latest, dd::kDuration - 6.0) << "every seed has gone with time to follow it";
+	// a seed facing the wind lets go before one facing away
+	int toward = 0, away = 0;
+	for (int i = 0; i < dd::kSeeds; ++i) {
+		if (cartoon::dot(dd::seedDirection(i), dd::wind()) > cartoon::dot(dd::seedDirection(toward), dd::wind())) toward = i;
+		if (cartoon::dot(dd::seedDirection(i), dd::wind()) < cartoon::dot(dd::seedDirection(away), dd::wind())) away = i;
+	}
+	EXPECT_LT(dd::releaseOf(toward), dd::releaseOf(away));
+	const cartoon::Vec3 before = dd::seedAt(toward, dd::releaseOf(toward) - 0.1).position, later = dd::seedAt(toward, dd::releaseOf(toward) + 6.0).position;
+	EXPECT_FALSE(dd::seedAt(toward, dd::releaseOf(toward) - 0.1).free);
+	EXPECT_TRUE(dd::seedAt(toward, dd::releaseOf(toward) + 6.0).free);
+	EXPECT_GT(cartoon::dot(later - before, dd::wind()), 5.0) << "it has been blown away";
+	// the seeds are on the head before the gust: all within the seed head's reach
+	for (int i = 0; i < dd::kSeeds; ++i) EXPECT_NEAR(cartoon::length(dd::seedAt(i, 0.0).position - cartoon::Vec3{0.0, dd::kHeadHeight, 0.0}), 0.12 + dd::kStalk, 0.02);
+}
+
+TEST(CartoonCandle, TheCandleBurnsDownAndTheFlameDiesWithSmokeAfterwards) {
+	namespace cd = cartoon::candle;
+	EXPECT_GT(cd::heightAt(0.0), cd::heightAt(cd::kDuration));
+	EXPECT_NEAR(cd::burn(5.0), 1.0, 1e-12);
+	EXPECT_LT(cd::burn(17.5), 1.0);
+	EXPECT_NEAR(cd::burn(cd::kDark), 0.0, 1e-9);
+	const std::string lit = cd::sceneAt(5.0), out = cd::sceneAt(cd::kDark + 0.5);
+	EXPECT_NE(lit.find("rgb L\" [ 15.0"), std::string::npos) << "the flame is an emitter while it burns";
+	EXPECT_EQ(out.find("rgb L\" [ 15.0"), std::string::npos) << "and gone once it has died";
+	// the smoke is only there once the flame has begun to die
+	EXPECT_TRUE(cd::buildSmoke(10.0).empty());
+	EXPECT_FALSE(cd::buildSmoke(cd::kOut + 3.0).empty());
+}
+
 TEST(CartoonFilms, EveryFilmFlattensAtSeveralTimesWithoutWarnings) {
 	for (const cartoon::Film &film : cartoon::kFilms) {
 		for (double f : {0.0, 0.1, 0.3, 0.5, 0.7, 0.9, 0.999}) {

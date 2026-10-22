@@ -28,3 +28,15 @@ paper-boat|0|20762|5
 paper-boat|10|20912|5
 paper-boat|12|20912|5
 paper-boat|23.98|16262|4
+orrery|0|33872|2
+orrery|6|33872|2
+orrery|11|33872|2
+orrery|21.98|33872|2
+dandelion|0|62540|4
+dandelion|7.5|62540|4
+dandelion|11|62540|4
+dandelion|21.98|62540|4
+candle|0|13780|72
+candle|5|15036|72
+candle|10|16292|72
+candle|19.98|25864|70

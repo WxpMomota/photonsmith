@@ -337,6 +337,27 @@ inline std::string glassMaterial(double eta = 1.5, double roughness = 0.0) {
 	return buf;
 }
 
+// Wax, skin, jade: light that goes in under the surface and comes out somewhere else (`mfp` is how far it travels, in scene units, per colour).
+inline std::string subsurfaceMaterial(Vec3 reflectance, Vec3 mfp, double roughness = 0.0) {
+	char buf[240];
+	std::snprintf(buf, sizeof(buf), "Material \"subsurface\" \"rgb mfp\" [ %.4f %.4f %.4f ] \"rgb reflectance\" [ %.4f %.4f %.4f ] \"float eta\" [ 1.33 ] \"float roughness\" [ %.4f ]", mfp.x, mfp.y, mfp.z, reflectance.x, reflectance.y,
+				  reflectance.z, roughness);
+	return buf;
+}
+// A thin sheet that lets light through (a petal, a seed's fluff, a paper shade).
+inline std::string translucentMaterial(Vec3 reflectance, Vec3 transmittance) {
+	char buf[240];
+	std::snprintf(buf, sizeof(buf), "Material \"diffusetransmission\" \"rgb reflectance\" [ %.4f %.4f %.4f ] \"rgb transmittance\" [ %.4f %.4f %.4f ]", reflectance.x, reflectance.y, reflectance.z, transmittance.x, transmittance.y, transmittance.z);
+	return buf;
+}
+// A small deterministic pseudo-random number in [0, 1) from an integer and a salt.
+inline double hash01(int i, int salt) {
+	unsigned x = static_cast<unsigned>(i) * 747796405u + static_cast<unsigned>(salt) * 2891336453u + 12345u;
+	x = ((x >> ((x >> 28u) + 4u)) ^ x) * 277803737u;
+	x = (x >> 22u) ^ x;
+	return (x & 0xFFFFFF) / 16777216.0;
+}
+
 // An AttributeBegin ... AttributeEnd block: one material and the shapes' text, optionally an area light.
 inline std::string attr(const std::string &material, const std::string &shapes, const Vec3 *emission = nullptr) {
 	std::string out = "AttributeBegin\n";
@@ -389,6 +410,15 @@ inline std::string bar(Vec3 a, Vec3 b, double r, int segments = 10) {
 	const double len = length(b - a);
 	if (len < 1e-9) return std::string();
 	return emitMesh(capsule(r, std::max(0.0, len - 2.0 * r), segments, 3), alignY(a + normalize(b - a) * r, b - a));
+}
+
+// A camera track that follows `fn(t)` between t0 and t1, sampled every quarter of a second and joined with straight pieces: for a chase or a follow shot whose path is easier to
+// compute than to key by hand.
+template <typename F>
+inline Track3 sampledTrack(double t0, double t1, F fn) {
+	std::vector<Track3::Key> keys;
+	for (double t = t0; t < t1 + 1e-9; t += 0.25) keys.push_back({t, fn(t), Ease::Linear});
+	return Track3::withEases(keys);
 }
 
 // A two-link limb (shoulder to elbow to hand) reaching for `target`: the elbow position, bent towards `pole` (a direction the elbow prefers). The hand is where the limb can reach.

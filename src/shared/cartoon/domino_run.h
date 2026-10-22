@@ -135,13 +135,6 @@ inline Vec3 marbleAt(double t) {
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Cameras
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
-// A track that follows `fn` sampled every quarter of a second (a smooth function, so the corners of the straight pieces do not show).
-template <typename F>
-inline Track3 sampled(double t0, double t1, F fn) {
-	std::vector<Track3::Key> keys;
-	for (double t = t0; t < t1 + 1e-9; t += 0.25) keys.push_back({t, fn(t), Ease::Linear});
-	return Track3::withEases(keys);
-}
 inline double frontArc(double t) { return kFirst + std::max(0.0, t - kStart) * kSpeed; }
 // The chase: a little behind the wave front, outside the spiral and above it, looking ahead along the path.
 inline Vec3 chaseEye(double t) {
@@ -158,7 +151,7 @@ inline const std::vector<Shot> &shots() {
 		std::vector<Shot> v;
 		v.push_back({0.0, Track3::withEases({{0.0, {0.0, 8.0, 10.5}, Ease::Smooth}, {kStart, {1.8, 7.0, 9.6}, Ease::Smooth}}), Track3::withEases({{0.0, {0.0, 0.2, 0.0}, Ease::Smooth}, {kStart, {0.4, 0.2, 0.0}, Ease::Smooth}}),
 					 Track1::withEases({{0.0, 38.0, Ease::Smooth}}), 0.03});
-		v.push_back({kStart, sampled(kStart, tImpact - 1.4, chaseEye), sampled(kStart, tImpact - 1.4, chaseTarget), Track1::withEases({{kStart, 44.0, Ease::Smooth}}), 0.03});
+		v.push_back({kStart, sampledTrack(kStart, tImpact - 1.4, chaseEye), sampledTrack(kStart, tImpact - 1.4, chaseTarget), Track1::withEases({{kStart, 44.0, Ease::Smooth}}), 0.03});
 		v.push_back({tImpact - 1.4, Track3::withEases({{tImpact - 1.4, {2.6, 0.9, 2.4}, Ease::Smooth}, {tImpact + 2.4, {1.8, 0.8, 2.0}, Ease::Smooth}}), Track3::withEases({{tImpact - 1.4, {0.2, 0.55, 0.1}, Ease::Smooth}, {tImpact + 2.4, {0.1, 0.6, 0.0}, Ease::Smooth}}),
 					 Track1::withEases({{tImpact - 1.4, 34.0, Ease::Smooth}}), 0.04});
 		v.push_back({tImpact + 2.4, Track3::withEases({{tImpact + 2.4, {0.5, 3.0, 7.4}, Ease::Smooth}, {kDuration, {0.0, 10.5, 5.5}, Ease::Smooth}}), Track3::withEases({{tImpact + 2.4, {0.0, 0.4, 0.0}, Ease::Smooth}, {kDuration, {0.0, 0.0, 0.0}, Ease::Smooth}}),

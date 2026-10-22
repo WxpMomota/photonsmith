@@ -9,11 +9,14 @@
 #include <string>
 
 #include "ball_parade.h"
+#include "candle.h"
+#include "dandelion.h"
 #include "domino_run.h"
 #include "fireflies.h"
 #include "lamp_and_ball.h"
 #include "little_robot.h"
 #include "newtons_cradle.h"
+#include "orrery.h"
 #include "paper_boat.h"
 
 namespace cartoon {
@@ -43,6 +46,15 @@ inline const Film kFilms[] = {
 	{"paper-boat", "The Paper Boat",
 	 "A folded paper boat sails across a pond in the rain at dusk: every drop starts rings of ripples that rock the boat and cross one another, the rain eases, and the boat sails on towards the low sun. Three shots, 24 seconds.",
 	 paper_boat::kDuration, paper_boat::kFps, &paper_boat::sceneAt, &paper_boat::headerAt, 10.0},
+	{"orrery", "The Orrery",
+	 "A turn round a brass model of a small solar system: a glowing sun, five enamel planets on arms (one with a moon, one with a ring), engraved orbits and a pair of meshing gears, all lit by the sun alone. Three shots, 22 seconds.",
+	 orrery::kDuration, orrery::kFps, &orrery::sceneAt, &orrery::headerAt, 6.0},
+	{"dandelion", "The Dandelion",
+	 "A gust blows the seeds off a dandelion clock one by one, windward side first, and they drift away on their little parachutes, glowing where the low sun shines through. Three shots, 22 seconds.",
+	 dandelion::kDuration, dandelion::kFps, &dandelion::sceneAt, &dandelion::headerAt, 7.5},
+	{"candle", "The Candle",
+	 "One candle burns down in front of out-of-focus fairy lights: the flame flickers, light glows through the wax, drips run down its side, and at the end the flame dies in a thread of smoke. Three shots, 20 seconds.",
+	 candle::kDuration, candle::kFps, &candle::sceneAt, &candle::headerAt, 5.0},
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 

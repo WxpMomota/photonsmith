@@ -32,6 +32,12 @@ def find_exe(explicit):
     sys.exit("ray_tracer not found next to this repository (RayTracer_Package/); pass --exe PATH")
 
 
+def run_dir():
+    """The program runs from its package folder (it finds the OptiX programs and the scene folders from there), whichever ray_tracer --exe names."""
+    package = os.path.join(REPO, "RayTracer_Package")
+    return package if os.path.isdir(package) else None
+
+
 def renderer_flags(args):
     return ["--cpu"] if args.cpu else ["--gpu", "--denoise"]
 
@@ -40,14 +46,14 @@ def render_still(args, spec, out_png, height, spp):
     """One frame: ray_tracer ... cartoon:<key>[@t], the picture's width following from the film's 16:9."""
     width = round(height * 16 / 9)
     cmd = [find_exe(args.exe)] + renderer_flags(args) + ["--output", out_png, "--height", str(height), str(width), str(spp), "8", "cartoon:" + spec]
-    done = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    done = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=run_dir())
     if done.returncode != 0 or not os.path.exists(out_png):
         sys.exit("render failed (%d):\n%s" % (done.returncode, done.stdout[-1500:]))
 
 
 def film_length(args, key):
     """The film's length in seconds, from --list-video-presets ("V10  fireflies  cartoon  624 frames at 24 fps (26.0 s)  Fireflies (cartoon)")."""
-    out = subprocess.run([find_exe(args.exe), "--list-video-presets"], stdout=subprocess.PIPE, text=True).stdout
+    out = subprocess.run([find_exe(args.exe), "--list-video-presets"], stdout=subprocess.PIPE, text=True, cwd=run_dir()).stdout
     for line in out.splitlines():
         fields = line.split()
         if len(fields) >= 2 and fields[1] == key:
@@ -58,7 +64,7 @@ def film_length(args, key):
 
 
 def cmd_list(args):
-    sys.stdout.write(subprocess.run([find_exe(args.exe), "--list-video-presets"], stdout=subprocess.PIPE, text=True).stdout)
+    sys.stdout.write(subprocess.run([find_exe(args.exe), "--list-video-presets"], stdout=subprocess.PIPE, text=True, cwd=run_dir()).stdout)
 
 
 def cmd_still(args):
@@ -106,7 +112,7 @@ def cmd_video(args):
     cmd = [find_exe(args.exe)] + renderer_flags(args) + ["--video-preset", args.target, "--height", str(height), str(width), str(args.spp or 128), "8"]
     if args.out:
         cmd[1:1] = ["--output", args.out]
-    sys.exit(subprocess.run(cmd).returncode)
+    sys.exit(subprocess.run(cmd, cwd=run_dir()).returncode)
 
 
 def main():
@@ -121,6 +127,10 @@ def main():
     p.add_argument("--count", type=int, help="sheet: how many stills, evenly spaced over the film (default 16)")
     p.add_argument("--times", help="sheet: comma-separated seconds instead of --count")
     args = p.parse_args()
+    if args.out:
+        args.out = os.path.abspath(args.out)   # (the program runs from its package folder)
+    if args.exe:
+        args.exe = os.path.abspath(args.exe)
     if args.command != "list" and not args.target:
         p.error("%s needs a film key" % args.command)
     {"list": cmd_list, "still": cmd_still, "sheet": cmd_sheet, "video": cmd_video}[args.command](args)
