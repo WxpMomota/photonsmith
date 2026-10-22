@@ -25,6 +25,11 @@
 #include <optix_function_table_definition.h>
 #include <optix_stack_size.h>
 #include "optix_module_parallel.h"
+#include <chrono>
+#include <condition_variable>
+#include <iomanip>
+#include <mutex>
+#include <thread>
 #include "optix_program_group.h"
 #include <cuda.h>
 #include <fstream>
@@ -245,25 +250,44 @@ bool OptiXRenderer::initialize() {
 		return false;
 	}
 
-	if (!createModule()) {
-		std::cerr << "Failed to create OptiX module\n";
-		return false;
-	}
-
-	if (!createProgramGroups()) {
-		std::cerr << "Failed to create program groups\n";
-		return false;
-	}
-
-	if (!linkPipeline()) {
-		std::cerr << "Failed to link pipeline\n";
-		return false;
+	// The default renderer's modules are made later, by ensureDefaultRenderer(): all this checks now is that its program files are there.
+	for (const char *file : {"optix_programs.ptx", "optix_programs_sphere.ptx", "optix_programs_quad.ptx", "optix_programs_disk.ptx", "optix_programs_cylinder.ptx", "optix_programs_triangle.ptx"}) {
+		if (!ptxFileExists(file)) {
+			std::cerr << "[OptiX] Could not find PTX file: " << file << "\n";
+			return false;
+		}
 	}
 
 	// Allocate launch params buffer
 	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_launchParams_), sizeof(LaunchParams)));
 
 	std::cout << "[OptiX] Renderer initialized successfully\n";
+	return true;
+}
+
+bool OptiXRenderer::ptxFileExists(const char* filename) const {
+	for (const std::string &path : {std::string("gpu/optix/") + filename, std::string("optix_output/") + filename, std::string("./") + filename}) {
+		std::ifstream file(path.c_str(), std::ios::binary);
+		if (file.good()) return true;
+	}
+	return false;
+}
+
+bool OptiXRenderer::ensureDefaultRenderer() {
+	if (defaultRendererReady_) return true;
+	if (!createModule()) {
+		std::cerr << "Failed to create OptiX module\n";
+		return false;
+	}
+	if (!createProgramGroups()) {
+		std::cerr << "Failed to create program groups\n";
+		return false;
+	}
+	if (!linkPipeline()) {
+		std::cerr << "Failed to link pipeline\n";
+		return false;
+	}
+	defaultRendererReady_ = true;
 	return true;
 }
 
@@ -317,6 +341,14 @@ bool OptiXRenderer::createContext() {
 	}
 
 	OPTIX_CHECK(optixDeviceContextCreate(cudaContext_, &options, &context_));
+
+	// The OptiX cache keeps the compiled shaders between runs (compiling them cold takes 20 minutes). Its default size is too small for more than one build of them at a time, and
+	// an entry that is evicted is a 20-minute recompile at the next start; this leaves room for several builds. OPTIX_CACHE_MAXSIZE, when set, is the user's or a script's own choice.
+#pragma warning(suppress: 4996)
+	if (!std::getenv("OPTIX_CACHE_MAXSIZE")) {
+		const size_t gigabyte = size_t(1) << 30;
+		(void)optixDeviceContextSetCacheDatabaseSizes(context_, 4 * gigabyte, 6 * gigabyte);   // (low water mark, high water mark)
+	}
 
 	return true;
 }
@@ -401,7 +433,35 @@ bool OptiXRenderer::createModule() {
 		logSizes[i] = sizeof(logs[i]);
 		requests.push_back({ptxFiles[i].c_str(), ptxFiles[i].size(), logs[i], &logSizes[i], modules[i].module});
 	}
-	OPTIX_CHECK(optixModulesCreateParallel(context_, &moduleCompileOptions, &pipelineCompileOptions_, requests));
+	// (timed: with a warm OptiX cache this takes a second or two, with a cold one many minutes, and a user who has just installed the program should be told which it is)
+	const auto compileStart = std::chrono::steady_clock::now();
+	{
+		// With a cold OptiX cache (the first run on this computer, or after an update of the shaders) this takes about 20 minutes; a message after five seconds says so, so that nobody
+		// takes it for a hang. (Joined when this block ends, however it ends.)
+		struct SlowCompileNotice {
+			std::mutex mutex;
+			std::condition_variable wake;
+			bool done = false;
+			std::thread thread;
+			SlowCompileNotice() : thread([this] {
+				std::unique_lock<std::mutex> lock(mutex);
+				if (!wake.wait_for(lock, std::chrono::seconds(5), [this] { return done; }))
+					std::cout << "[OptiX] Compiling the default renderer's shaders. This happens once on this computer and again after an update, and takes up to 25 minutes (the wavefront renderer does not need it)." << std::endl;
+			}) {}
+			~SlowCompileNotice() {
+				{ std::lock_guard<std::mutex> lock(mutex); done = true; }
+				wake.notify_all();
+				thread.join();
+			}
+		} notice;
+		OPTIX_CHECK(optixModulesCreateParallel(context_, &moduleCompileOptions, &pipelineCompileOptions_, requests));
+	}
+	{
+		// (formatted here, not with std::fixed on std::cout: that would change how every later message prints its numbers)
+		char took[32];
+		std::snprintf(took, sizeof(took), "%.1f", std::chrono::duration<double>(std::chrono::steady_clock::now() - compileStart).count());
+		std::cout << "[OptiX] The default renderer's " << std::size(modules) << " modules were ready in " << took << " s" << std::endl;
+	}
 	for (size_t i = 0; i < std::size(modules); ++i) {
 		if (logSizes[i] > 1) {
 			std::cout << "[OptiX] Module creation log (" << modules[i].file << "):\n" << logs[i] << "\n";

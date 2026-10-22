@@ -6,6 +6,8 @@
 #endif
 
 #include "wavefront_path_tracer.h"
+#include <chrono>
+#include <iomanip>
 #include "optix_types.h"
 #include "../../src/data/cie_data.h"
 #include "rgb_to_spectrum_table.h"
@@ -241,6 +243,7 @@ bool WavefrontPathTracer::loadModule() {
 	char   log[4096];
 	size_t logSize = sizeof(log);
 
+	const auto compileStart = std::chrono::steady_clock::now();
 	OPTIX_CHECK(optixModuleCreateParallel(
 		context_,
 		&moduleCompileOptions,
@@ -251,6 +254,11 @@ bool WavefrontPathTracer::loadModule() {
 		&logSize,
 		&wfModule_
 	));
+	{
+		char took[32];   // (not std::fixed on std::cout: that would change how every later message prints its numbers)
+		std::snprintf(took, sizeof(took), "%.1f", std::chrono::duration<double>(std::chrono::steady_clock::now() - compileStart).count());
+		std::cout << "[OptiX] The wavefront module was ready in " << took << " s" << std::endl;
+	}
 
 	return true;
 }

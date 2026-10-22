@@ -53,6 +53,15 @@ public:
 	/// @return true if initialization succeeded, false otherwise
 	bool initialize();
 
+	/// The default (recursive) renderer's OptiX modules, program groups and pipeline are made the first time something needs them (a default-renderer render, or a scene upload that is
+	/// for it), not in initialize(): compiling them is 20 minutes on a cold OptiX cache and the wavefront renderer and GPU SPPM do not use them at all. Idempotent.
+	bool ensureDefaultRenderer();
+	/// Whether the next buildScene() should also build the default renderer's shader binding table (and so make the default renderer ready). The wavefront renderer and GPU SPPM say false
+	/// before they upload a scene.
+	void setDefaultRendererWanted(bool wanted) { defaultRendererWanted_ = wanted; }
+	/// True when the scene on the GPU was uploaded without the default renderer's SBT (see setDefaultRendererWanted): a default-renderer render needs it uploaded again.
+	bool defaultRendererSbtMissing() const { return defaultRendererSbtMissing_; }
+
 	/// @brief Build scene acceleration structure from geometry
 	/// @param spheres Vector of sphere geometry data
 	/// @param quads Vector of quad geometry data
@@ -494,6 +503,9 @@ private:
 	// -------------------------------------------------------------------
 	std::unique_ptr<optix_renderer::WavefrontPathTracer> wavefrontTracer_;
 	bool useWavefront_ = false;  ///< If true, render() delegates to wavefrontTracer_
+	bool defaultRendererReady_ = false;        ///< see ensureDefaultRenderer()
+	bool defaultRendererWanted_ = true;        ///< see setDefaultRendererWanted()
+	bool defaultRendererSbtMissing_ = false;   ///< see defaultRendererSbtMissing()
 
 	// -------------------------------------------------------------------
 	// OptiX AI Denoiser (optional post-process, recursive backend)
@@ -999,4 +1011,5 @@ private:
 	/// @param filename Path to PTX file
 	/// @return PTX source code as string
 	std::string loadPTX(const char* filename) const;
+	bool ptxFileExists(const char* filename) const;   ///< whether loadPTX() would find the file (initialize() checks the default renderer's six before they are loaded)
 };

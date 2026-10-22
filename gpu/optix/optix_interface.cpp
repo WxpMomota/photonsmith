@@ -165,6 +165,11 @@ static bool prepareSceneAndCamera(
 		std::cout << "[OptiX] Camera position: (" << cam_x << ", " << cam_y << ", " << cam_z << ")\n";
 	}
 
+	// The default renderer's modules are made when a render needs them; a scene that was uploaded while only the wavefront renderer was wanted has no default-renderer SBT,
+	// so it is uploaded again here when the default renderer is wanted after all.
+	g_renderer->setDefaultRendererWanted(!wavefrontMode);
+	if (!wavefrontMode && g_renderer->defaultRendererSbtMissing()) g_uploaded_scene_id.clear();
+
 	SceneData scene;
 	// Computed once and reused below (both here and at the g_uploaded_scene_id
 	// check just before g_renderer->buildScene()) rather than re-typing the
@@ -1366,6 +1371,7 @@ extern "C" int optix_render_main_sppm(
 			g_renderer->setInstanceData(scene.instanceTriangles, scene.instanceSpheres,
 										scene.instanceGroups, scene.instancePlacements);
 			g_renderer->uploadExtraPortalLights(scene.extraPortals, scene.skyBesidePortals);
+			g_renderer->setDefaultRendererWanted(false);   // (GPU SPPM has its own pipeline and SBT: it needs nothing of the default renderer's)
 			if (!g_renderer->buildScene(scene.spheres, scene.quads, scene.materials,
 			                             scene.lightIndices, scene.lightKinds,
 			                             scene.punctualLights, scene.bilinearPatches,

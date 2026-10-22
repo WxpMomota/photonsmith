@@ -387,6 +387,11 @@ bool OptiXRenderer::render(
 		cudaMemcpyHostToDevice
 	));
 
+	if (!defaultRendererReady_ || defaultRendererSbtMissing_) {
+		std::cerr << "[OptiX] The default renderer was asked to render a scene that was uploaded without its shader binding table\n";
+		return false;
+	}
+
 	// Launch OptiX pipeline
 	OPTIX_CHECK(optixLaunch(
 		pipeline_,

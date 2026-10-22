@@ -1476,10 +1476,18 @@ bool OptiXRenderer::buildScene(
 	// packed record region; instanced geometry gets appended pairs of its own,
 	// which the instTri/instSphere offsets computed above address; disks/
 	// cylinders get their own trailing region the same way (st.diskCylinderSbtOffset).
-	if (!buildSBT(spheres, quads, bilinearPatches, triangles,
-				  st.haveInstancedTriangles, st.haveInstancedSpheres, disks, cylinders)) {
-		std::cerr << "Failed to build SBT\n";
-		return false;
+	// (the default renderer's SBT: only when it is wanted. A scene uploaded for the wavefront renderer or GPU SPPM does without it, which is what lets those start without
+	// compiling the default renderer's modules; setDefaultRendererWanted)
+	if (defaultRendererWanted_) {
+		if (!ensureDefaultRenderer()) return false;
+		if (!buildSBT(spheres, quads, bilinearPatches, triangles,
+					  st.haveInstancedTriangles, st.haveInstancedSpheres, disks, cylinders)) {
+			std::cerr << "Failed to build SBT\n";
+			return false;
+		}
+		defaultRendererSbtMissing_ = false;
+	} else {
+		defaultRendererSbtMissing_ = true;
 	}
 
 
