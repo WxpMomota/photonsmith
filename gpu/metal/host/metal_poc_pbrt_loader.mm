@@ -890,7 +890,12 @@ static void setSphereObjectTransform(SphereData& sd, const double xf[16], const 
 
 void PbrtSceneLoader::loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, const std::vector<pbrt_flatten::Sphere>& sphereList, const PbrtToWorldFn& toWorld,
     const PbrtMaterialForFn& materialFor, float sceneScale) {
-    for (const pbrt_flatten::Sphere& s : sphereList) {
+    for (const pbrt_flatten::Sphere& sphereIn : sphereList) {
+        // An open shell cannot bound a medium: the CPU and OptiX drop it and draw the shell with its own surface material (Sphere::cpuMediumUnsupported), so do the same.
+        pbrt_flatten::Sphere s = sphereIn;
+        if (s.clipped && s.medium >= 0) s.medium = -1;
+        // ...and an `interface` shell (a medium boundary only, no surface of its own) is then nothing at all.
+        if (s.clipped && s.areaLight < 0 && s.material >= 0 && s.material < (int)scene.materials.size() && scene.materials[s.material].kind == pbrt_flatten::MaterialKind::Interface) continue;
         const float3 center = toWorld(float3{(float)s.center[0], (float)s.center[1], (float)s.center[2]});
         SphereData sd{PackedFloat3{center.x, center.y, center.z}, sceneScale * (float)s.radius};
         // Object motion blur (F11, section 167): Sphere::center1 differs
@@ -915,8 +920,8 @@ void PbrtSceneLoader::loadPbrtSpheres(const pbrt_flatten::FlatScene& scene, cons
         sd.uvRot0 = PackedFloat3{(float)s.uvRot[0], (float)s.uvRot[1], (float)s.uvRot[2]};
         sd.uvRot1 = PackedFloat3{(float)s.uvRot[3], (float)s.uvRot[4], (float)s.uvRot[5]};
         sd.uvRot2 = PackedFloat3{(float)s.uvRot[6], (float)s.uvRot[7], (float)s.uvRot[8]};
-        // pbrt's zmin / zmax / phimax, and an instanced sphere's stretch, make it a shape of its own in object space (a light or a medium boundary keeps the old whole sphere)
-        if (s.clipped && s.areaLight < 0 && s.medium < 0) setSphereObjectTransform(sd, s.xform, toWorld, s.radiusLocal, s.zMin, s.zMax, s.phiMaxDeg);
+        // pbrt's zmin / zmax / phimax, and an instanced sphere's stretch, make it a shape of its own in object space (a clipped light is tessellated before it gets here)
+        if (s.clipped && s.areaLight < 0) setSphereObjectTransform(sd, s.xform, toWorld, s.radiusLocal, s.zMin, s.zMax, s.phiMaxDeg);
         spheres.push_back(sd);
         TriangleMaterial mat = sphereMaterial(scene, s, toWorld, materialFor, sceneScale);
         emitSphereLight(scene, s, sd, center, mat);
@@ -1423,20 +1428,23 @@ void PbrtSceneLoader::loadPbrtInfiniteLight(const pbrt_flatten::FlatScene& scene
                 pbrtPortalP0 = toWorld(float3{(float)corners[0].x, (float)corners[0].y, (float)corners[0].z});
                 pbrtPortalP2 = toWorld(float3{(float)corners[2].x, (float)corners[2].y, (float)corners[2].z});
                 fprintf(stderr, "loadPbrtScene: portal infinite light found (%dx%d, scale=%.3g)\n", pbrtPortalWidth, pbrtPortalHeight, pbrtPortalScale);
-                // A plain sky beside the portals: pbrt sums every infinite light (FlatScene::skyBesidePortals; a constant colour is exact, a picture is drawn as its mean colour).
+                // A plain sky beside the portals: pbrt sums every infinite light (FlatScene::skyBesidePortals). A constant colour is a uniform; a picture goes into the environment
+                // texture (the portal's own picture lives in the rectified buffer, so the texture is free) and is read by direction; it is still sampled uniformly over the sphere.
                 havePbrtSkyBesidePortals = false;
+                pbrtSkyBesidePortalsPixels.clear();
+                pbrtSkyBesidePortalsWidth = pbrtSkyBesidePortalsHeight = 0;
                 if (scene.skyBesidePortals.present) {
                     const pbrt_flatten::InfiniteLight& sky = scene.skyBesidePortals;
-                    double rgb[3] = {sky.L[0], sky.L[1], sky.L[2]};
                     if (sky.imageWidth > 0 && sky.imageHeight > 0 && !sky.imagePixels.empty()) {
-                        double sum[3] = {0, 0, 0};
-                        const size_t count = (size_t)sky.imageWidth * (size_t)sky.imageHeight;
-                        for (size_t i = 0; i < count; ++i) for (int c = 0; c < 3; ++c) sum[c] += sky.imagePixels[i * 3 + c];
-                        for (int c = 0; c < 3; ++c) rgb[c] = sum[c] / (double)count;
-                        fprintf(stderr, "loadPbrtScene: the plain sky beside the portal light has a picture; Metal draws it as its mean colour\n");
+                        pbrtSkyBesidePortalsWidth = sky.imageWidth;
+                        pbrtSkyBesidePortalsHeight = sky.imageHeight;
+                        pbrtSkyBesidePortalsPixels = sky.imagePixels;
+                        for (float& v : pbrtSkyBesidePortalsPixels) v *= (float)sky.scale;
+                        fprintf(stderr, "loadPbrtScene: the plain sky beside the portal light has a picture (%dx%d); it is read by direction and sampled uniformly\n", sky.imageWidth, sky.imageHeight);
+                    } else {
+                        pbrtSkyBesidePortalsColor = float3{(float)(sky.L[0] * sky.scale), (float)(sky.L[1] * sky.scale), (float)(sky.L[2] * sky.scale)};
                     }
                     havePbrtSkyBesidePortals = true;
-                    pbrtSkyBesidePortalsColor = float3{(float)(rgb[0] * sky.scale), (float)(rgb[1] * sky.scale), (float)(rgb[2] * sky.scale)};
                 }
                 // Further portals (src/shared/portal_light_set.h draws their sum): the same recipe for each, kept in pbrtExtraPortals.
                 pbrtExtraPortals.clear();

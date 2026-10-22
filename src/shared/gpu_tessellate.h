@@ -44,11 +44,14 @@ using FiberTangents = std::unordered_map<int, std::array<float, 3>>;
 
 namespace tessellate_detail {
 
-// Does the material look something up through the surface's (u, v)? A reflectance picture, a checker or a bump / normal map.
+// Does the material look something up through the surface's (u, v)? A reflectance picture, a checker, a bump / normal map, or a parameter read per pixel (a roughness or a Mix amount
+// that is a picture or a graph of textures).
 inline bool usesSurfaceCoordinates(const pbrt_flatten::FlatScene& scene, int material) {
     if (material < 0 || material >= (int)scene.materials.size()) return false;
     const pbrt_flatten::Material& m = scene.materials[material];
-    return !m.textureFilename.empty() || !m.displacementTextureFilename.empty() || m.hasCheckerReflectance;
+    return !m.textureFilename.empty() || !m.displacementTextureFilename.empty() || m.hasCheckerReflectance ||
+           !m.roughnessTextureFilename.empty() || !m.condRoughnessTextureFilename.empty() || !m.mixWeightTextureFilename.empty() ||
+           !m.reflectanceGraph.empty() || !m.roughnessGraph.empty() || !m.condRoughnessGraph.empty() || !m.mixAmountGraph.empty();
 }
 
 // A disk or cylinder that Metal should draw as triangles: textured, not a light, not in a medium, not moving.
@@ -66,6 +69,12 @@ inline bool tessellateSphereWithMap(const pbrt_flatten::FlatScene& scene, const 
     for (int a = 0; a < 3; ++a) if (sp.center[a] != sp.center1[a]) return false;
     if (sp.material < 0 || sp.material >= (int)scene.materials.size()) return false;
     return !scene.materials[sp.material].displacementTextureFilename.empty();
+}
+
+// A clipped sphere that is an area light, for Metal: not moving (a clipped sphere never is), not instanced (those are separate). Its medium, if any, was never drawn (an open shell
+// cannot bound one: Sphere::cpuMediumUnsupported), so it does not matter here.
+inline bool tessellateClippedSphereLight(const pbrt_flatten::Sphere& sp) {
+    return sp.clipped && sp.areaLight >= 0;
 }
 
 using pbrt_flatten::quadric_tessellate::kPi;
@@ -124,6 +133,7 @@ inline size_t tessellateForBackend(pbrt_flatten::FlatScene& scene, const Tessell
     std::vector<pbrt_flatten::Sphere> keptSpheres;
     if (caps.texturedQuadrics) {
         for (const pbrt_flatten::Sphere& sp : scene.spheres) {
+            if (!isInterface(sp.material) && tessellate_detail::tessellateClippedSphereLight(sp)) { pbrt_flatten::quadric_tessellate::tessellateClippedSphere(sp, out); continue; }
             if (isInterface(sp.material) || !tessellate_detail::tessellateSphereWithMap(scene, sp)) { keptSpheres.push_back(sp); continue; }
             pbrt_flatten::quadric_tessellate::tessellateSphere(sp, out);
         }

@@ -128,4 +128,22 @@ inline void tessellateSphere(const Sphere& sp, std::vector<Triangle>& out) {
     });
 }
 
+// A clipped sphere (pbrt's zmin / zmax / phimax) in its own object space, placed by Sphere::xform: object-space radius `radiusLocal`, z between zMin and zMax (clamped to the sphere),
+// phi from 0 to phiMax round z, outward normals, u = phi / phiMax and v = (theta - thetaZMin) / (thetaZMax - thetaZMin) as pbrt has them. Metal draws a clipped sphere that is an area
+// light this way (an emissive triangle mesh has next-event estimation; the analytic sphere light is a whole sphere).
+inline void tessellateClippedSphere(const Sphere& sp, std::vector<Triangle>& out) {
+    const pbrt_scene::Matrix4 xf = matrixOf(sp.xform);
+    const double r = sp.radiusLocal;
+    const double zLo = std::min(std::max(std::min(sp.zMin, sp.zMax), -r), r), zHi = std::min(std::max(std::max(sp.zMin, sp.zMax), -r), r);
+    const double thetaZMin = std::acos(std::min(1.0, std::max(-1.0, zLo / r))), thetaZMax = std::acos(std::min(1.0, std::max(-1.0, zHi / r)));
+    const double phiMax = std::min(360.0, std::max(0.0, sp.phiMaxDeg)) * kPi / 180.0;
+    tessellateGrid(out, 96, 48, sp.material, sp.areaLight, [&](double u, double v, double* p, double* n) {
+        const double phi = u * phiMax, theta = thetaZMin + v * (thetaZMax - thetaZMin);
+        const double no[3] = {std::sin(theta) * std::cos(phi), std::sin(theta) * std::sin(phi), std::cos(theta)};
+        flatten_detail::transformPoint(xf, r * no[0], r * no[1], r * no[2], p);
+        flatten_detail::transformNormal(xf, no[0], no[1], no[2], n);
+        normalize3(n);
+    });
+}
+
 }  // namespace quadric_tessellate
