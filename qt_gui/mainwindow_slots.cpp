@@ -522,7 +522,7 @@ void MainWindow::assembleVideoAutomatically(const QString &baseOutputPath, const
 		onLogMessage(tr("WARNING: Video file not found at any of the expected locations"));
 
 		// Check if frames exist (fallback diagnostic)
-		QString framesDir = outputDir + "/frames";
+		QString framesDir = outputDir + "/" + FramesStrip::folderNameFor(job.cameraPath);
 		QDir framesDirObj(framesDir);
 
 		if (framesDirObj.exists()) {
@@ -564,7 +564,7 @@ void MainWindow::assembleVideoAutomatically(const QString &baseOutputPath, const
 	// ffmpeg's sequential-input requirement, and those files are never
 	// cleaned up after a successful assembly, so they're still there to
 	// count.
-	QDir framesDirForPreview(outputDir + "/frames");
+	QDir framesDirForPreview(outputDir + "/" + FramesStrip::folderNameFor(job.cameraPath));
 	QStringList frameFiles = framesDirForPreview.entryList(QStringList() << "enc_*.png", QDir::Files, QDir::Name);
 
 	// Named scene+path+frames/fps/speed bundle if one was selected (see

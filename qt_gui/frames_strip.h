@@ -92,6 +92,9 @@ class FramesStrip : public QListWidget {
 		return loaded;
 	}
 
+	// The folder (beside the video's output file) a video's frames are in: `frames`, or for a cartoon `frames-<key>` (launcher/video_render.h), from the video's camera path.
+	static QString folderNameFor(const QString &cameraPath) { return cameraPath.startsWith(QStringLiteral("cartoon:")) ? "frames-" + cameraPath.mid(8) : QStringLiteral("frames"); }
+
 	static QString pathOf(const QListWidgetItem *item) { return item ? item->data(Qt::UserRole + 1).toString() : QString(); }
 
   private:

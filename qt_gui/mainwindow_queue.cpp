@@ -363,7 +363,7 @@ void MainWindow::startRenderJob(const RenderJob &job) {
 	if (m_framesStrip) {
 		if (job.videoMode) {
 			const QString out = job.outputPath.isEmpty() ? QCoreApplication::applicationDirPath() + "/output/video.ppm" : job.outputPath;
-			m_framesStrip->start(QFileInfo(out).absolutePath() + "/frames");
+			m_framesStrip->start(QFileInfo(out).absolutePath() + "/" + FramesStrip::folderNameFor(job.cameraPath));
 			m_framesStripLabel->setText(tr("Frames rendered so far (double-click one to open it):"));
 			m_framesStripLabel->show();
 		} else {

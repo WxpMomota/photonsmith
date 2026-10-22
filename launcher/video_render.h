@@ -269,9 +269,9 @@ struct VideoPaths {
 
 // The temporary frame directory (emptied, unless `signature` says the frames in it are those of an interrupted run of this very video and `resume` asks to continue it) and the output video
 // path. A cartoon's frames come with a signature file (cartoon_render.h, resumeSignature). SUCCESS, or ERR_FILE_WRITE_FAILED.
-inline int prepareVideoDirectories(const std::string &out_path, int render_frame_count, VideoPaths &paths, const std::string &signature = std::string(), bool resume = false) {
+static int prepareVideoDirectories(const std::string &out_path, int render_frame_count, VideoPaths &paths, const std::string &signature = std::string(), bool resume = false, const std::string &frames_folder = "frames") {
     std::filesystem::path out_path_obj(out_path);
-    std::filesystem::path frames_dir = out_path_obj.parent_path() / "frames";
+    std::filesystem::path frames_dir = out_path_obj.parent_path() / frames_folder;
     std::filesystem::path video_path = out_path_obj.parent_path() / (out_path_obj.stem().string() + "_video.mp4");
     paths.frames_dir = frames_dir;
     paths.video_path = video_path;
@@ -304,6 +304,7 @@ inline int prepareVideoDirectories(const std::string &out_path, int render_frame
         }
     } catch (const std::exception& e) {
         std::cerr << "ERROR: Failed to create frames directory: " << e.what() << std::endl;
+        std::cerr << "       Another render may still be using " << frames_dir << " (a render that is still running, or workers it left behind): stop it and try again." << std::endl;
         return ERR_FILE_WRITE_FAILED;
     }
 
@@ -783,7 +784,10 @@ inline int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
     std::string resume_signature;
     if (const cartoon::Film *film = cartoon::forCameraPath(s.camera_path.c_str()))
         resume_signature = cartoon_render::resumeSignature(*film, args, render_frame_count, s.video_fps, image_width, image_height, s.samples_per_pixel, s.max_ray_depth, s.exe_path);
-    if (int rc = prepareVideoDirectories(s.out_path, render_frame_count, paths, resume_signature, args.cartoon_resume); rc != SUCCESS) return rc;
+    // a cartoon's frames are in a folder of the film's own (frames-<key>), so that rendering another film does not wipe the frames of one that was stopped, and two films never share a folder
+    const cartoon::Film *frames_film = cartoon::forCameraPath(s.camera_path.c_str());
+    const std::string frames_folder = frames_film ? std::string("frames-") + frames_film->key : std::string("frames");
+    if (int rc = prepareVideoDirectories(s.out_path, render_frame_count, paths, resume_signature, args.cartoon_resume, frames_folder); rc != SUCCESS) return rc;
     const VideoCameraStart start = cartoon::isCartoonPath(s.camera_path.c_str()) ? VideoCameraStart{0, 0, 0, 0, 0, 0} : videoCameraStart(args, s);
 
     int converted = 0;

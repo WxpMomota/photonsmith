@@ -409,7 +409,10 @@ Create different videos from the same scene (each run clears and re-populates `o
 ## Troubleshooting
 
 ### "No frame_*.ppm files found"
-Check that video rendering completed successfully. Look for `output/frames/` directory.
+Check that video rendering completed successfully. Look for `output/frames/` directory (a cartoon's frames are in `output/frames-<film key>/`, e.g. `frames-pip-and-the-moon`, so rendering one film never clears another's).
+
+### "Failed to create frames directory ... being used by another process"
+Another render is still using that frames folder. The render's workers (`--cartoon-worker`) end with the program that started them, also when the GUI's Stop kills it, so this means a render is really still running (look for `ray_tracer.exe` in Task Manager) or an older version left workers behind: end them and start again. `python scripts/worker_orphan_check.py` checks that workers end with their launcher.
 
 ### Video is too fast/slow
 Adjust FPS during rendering:

@@ -137,6 +137,23 @@ inline int run_subprocess(const std::vector<std::string>& argv) {
 #endif
 }
 
+#ifdef _WIN32
+// Every program this one starts (Child, below) belongs to a job object that kills its processes when the last handle to it closes, and the only handle is this process's own: so when this
+// process ends, however it ends (the GUI's Stop kills it; a crash), the workers and frame runs it started end with it instead of rendering on with nobody to read their pictures.
+inline HANDLE killOnExitJob() {
+	static const HANDLE job = [] {
+		HANDLE h = CreateJobObjectA(nullptr, nullptr);
+		if (h) {
+			JOBOBJECT_EXTENDED_LIMIT_INFORMATION info{};
+			info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+			SetInformationJobObject(h, JobObjectExtendedLimitInformation, &info, sizeof(info));
+		}
+		return h;
+	}();
+	return job;
+}
+#endif
+
 // A program started with one more environment variable (`envName`=`envValue`, when envName is not empty), that can be asked whether it is still running, and stopped. The child sees only
 // its own environment: several children run at once (a cartoon video's frames), so a variable cannot be set in this process for one of them.
 class Child {
@@ -170,6 +187,7 @@ class Child {
 		if (!CreateProcessA(nullptr, mutableCmd.data(), nullptr, nullptr, FALSE, 0, block.data(), nullptr, &si, &pi)) return false;
 		process_ = pi.hProcess;
 		CloseHandle(pi.hThread);
+		if (HANDLE job = killOnExitJob()) AssignProcessToJobObject(job, process_);   // (a failure leaves it as it was: an ordinary child)
 		return true;
 #else
 		std::vector<std::string> argvStore = {exe};
