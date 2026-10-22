@@ -489,6 +489,18 @@ TriangleMaterial PbrtSceneLoader::mapPbrtMaterial(PbrtMaterialMapState& st, cons
         mat.mixAmountGraphRef = claimTextureGraph(m.mixAmountGraph, st.sceneScale, st.bboxCenter, st.sceneOffset);
     if (mat.materialType == METAL_MAT_MIX && !m.mixWeightTextureFilename.empty())
         mat.mixAmountRef = claimImageRef(m.mixWeightTextureFilename, m.mixWeightTextureOptions, m.mixWeightTextureMapping, m.mixWeightTextureScale, st.sceneScale, st.bboxCenter, st.sceneOffset);
+    // A coated diffuse whose reflectance is a procedural texture (a checker, dots, marble ...) came back flat (the colour the texture averages to): the family that draws those is the one a
+    // Diffuse material gets. Take its material and keep the coat beside it, for the shader to put back once the family has computed the base colour at the hit (computeAlbedo).
+    if (m.kind == pbrt_flatten::MaterialKind::CoatedDiffuse && mat.materialType == METAL_MAT_COATED_DIFFUSE) {
+        TriangleMaterial family = mapPbrtDiffuseMaterial(m, st.sceneScale, st.bboxCenter, st.sceneOffset);
+        if (family.materialType == METAL_MAT_TEXTURE_FAMILY) {
+            family.coatIor = mat.ior;
+            family.coatAlpha = mat.roughness;
+            family.layerThickness = mat.layerThickness; family.layerAlbedo = mat.layerAlbedo; family.layerG = mat.layerG;
+            family.layerMaxDepth = mat.layerMaxDepth; family.layerNSamples = mat.layerNSamples;
+            return family;
+        }
+    }
     return mat;
 }
 

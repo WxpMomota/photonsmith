@@ -105,6 +105,7 @@ void PbrtSceneLoader::loadPbrtScene() {
     pbrtTriangleFiberTangent.clear();
     if (const size_t added = gpu_tessellate::tessellateForBackend(result.scene, gpu_tessellate::TessellationCaps::all(), &pbrtTriangleFiberTangent))
         fprintf(stderr, "loadPbrtScene: tessellated bilinear patch/cone/paraboloid/curve shapes into %zu triangle(s)\n", added);
+    gpu_tessellate::windEmissiveTrianglesWithTheirNormals(result.scene);
     uniformGridsAsRgbGrids(result.scene);
     const pbrt_flatten::FlatScene& scene = result.scene;
     for (const pbrt_scene::Warning& w : scene.warnings) {
@@ -151,6 +152,8 @@ void PbrtSceneLoader::loadPbrtScene() {
     if (frame.ignoredGiantSphere)
         fprintf(stderr, "loadPbrtScene: ignoring a huge ground-like sphere when sizing the scene "
                         "(extent %.1f -> %.1f)\n", frame.fullExtent, frame.extent);
+    if (frame.ignoredOutliers)
+        fprintf(stderr, "loadPbrtScene: ignoring a few far-off triangles when sizing the scene (extent %.1f -> %.1f)\n", frame.fullExtent, frame.extent);
     if (pbrtSceneEdit) pbrtSceneEdit(result.scene);   // after the frame: an edit never changes the scale or the centre
     const float maxExtent = frame.extent;
     const float sceneScale = frame.scale;
