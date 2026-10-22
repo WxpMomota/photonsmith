@@ -343,7 +343,8 @@ inline float3 pbrtEnvLeAt(constant Uniforms& u, device const float* conditionalO
             device const float* h = conditionalOrRect + (u.pbrtPortalExtraBase + i * 24u);
             le += portalLe(portalFromHeader(h), conditionalOrRect + uint(h[18] + 0.5), origin, dir);
         }
-        if (u.pbrtSkyBesidePortals != 0u) le += float3(u.pbrtSkyColor);
+        if (u.pbrtSkyBesidePortals == 2u) le += envTexture.sample(s, envMapUV(dir)).rgb;   // a picture sky
+        else if (u.pbrtSkyBesidePortals != 0u) le += float3(u.pbrtSkyColor);
         return le;
     }
     return envTexture.sample(s, envMapUV(dir)).rgb;

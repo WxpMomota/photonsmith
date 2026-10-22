@@ -1,0 +1,35 @@
+# portal-light-plus-picture-sky.pbrt -- the portal-light-plus-sky room with the plain sky beside the portal being a picture (a gradient) instead of a colour, which Metal drew as the
+# picture's mean colour. Compared with the CPU in 8 x 8 blocks by metal_poc_blocks_test.sh. Original, no licence constraints.
+
+LookAt  0 1.5 6    0 1.5 0    0 1 0
+Camera "perspective" "float fov" [ 50 ]
+
+Film "rgb" "integer xresolution" [ 64 ] "integer yresolution" [ 40 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+
+WorldBegin
+
+LightSource "infinite" "point3 portal" [ -1.5 0.2 -3   1.5 0.2 -3   1.5 2.8 -3   -1.5 2.8 -3 ]
+  "string filename" [ "../../../../pbrt_scenes/portal-light-sky.exr" ]
+
+# A PICTURE sky beside the portal: pbrt sums every infinite light, so the room is lit by the portal window AND by this sky (the open roof and front).
+LightSource "infinite" "string filename" [ "../../../../pbrt_scenes/hdri-sky-gradient.exr" ] "float scale" [ 0.5 ]
+
+Material "diffuse" "rgb reflectance" [ 0.55 0.5 0.45 ]
+
+# Back wall with a rectangular hole where the portal window sits.
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -4 0 -3   -1.5 0 -3   -1.5 3.5 -3   -4 3.5 -3 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ 1.5 0 -3   4 0 -3   4 3.5 -3   1.5 3.5 -3 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -4 0 -3   4 0 -3   4 0.2 -3   -4 0.2 -3 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -4 2.8 -3   4 2.8 -3   4 3.5 -3   -4 3.5 -3 ]
+
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -4 0 -3   4 0 -3   4 0 6   -4 0 6 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -4 0 -3   -4 3.5 -3   -4 3.5 6   -4 0 6 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ 4 0 6   4 3.5 6   4 3.5 -3   4 0 -3 ]
