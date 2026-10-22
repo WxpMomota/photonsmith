@@ -274,8 +274,8 @@ add_executable(unit_tests
     unit/summed_area_table_tests.cpp
     unit/surface_interaction_tests.cpp
     unit/texture_differentials_tests.cpp
-    unit/cartoon_tests.cpp
     unit/cartoon_films_tests.cpp
+    ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/cartoon_scenes.cpp   # pbrt_discover::listGenerated / materializeGenerated (pbrt_discover_tests.cpp reaches them)
     unit/cartoon_pip_tests.cpp
     unit/film_file_tests.cpp
     unit/cartoon_snapshot_tests.cpp
@@ -331,6 +331,7 @@ endif()
 # tests/ray_tracer_tests.vcxproj. Run it from the repository root: the tests find pbrt_scenes/ by a relative path.
 add_executable(cpu_integrator_tests
     unit/cpu_integrator_agreement_tests.cpp
+    unit/cartoon_tests.cpp   # calls cpu_scene_pbrt_path_by_id, which cpu_interface.cpp (below) defines
     unit/pbrt_reference_pack_tests.cpp
     unit/bump_footprint_cpu_tests.cpp
     unit/scene_text_tests.cpp
@@ -360,6 +361,7 @@ add_executable(cpu_integrator_tests
     unit/aov_pass_tests.cpp
     ${CMAKE_SOURCE_DIR}/../cpu_renderer/cpu_interface.cpp
     ${CMAKE_SOURCE_DIR}/../cpu_renderer/cpu_interface_bdpt.cpp
+    ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/cartoon_scenes.cpp   # pbrt_discover::listGenerated / materializeGenerated, which cpu_interface.cpp calls (cpu_renderer.vcxproj has it too)
     ${CMAKE_SOURCE_DIR}/../src/data/rgb_spectrum_table_data.cpp
     ${CMAKE_SOURCE_DIR}/../src/external/stb_image_impl.cpp
     ${CMAKE_SOURCE_DIR}/../src/external/image_writer.cpp   # stbi_write_png, which scene_builder_tests.cpp calls (the MSBuild target gets it from mtl_material_tests.cpp)

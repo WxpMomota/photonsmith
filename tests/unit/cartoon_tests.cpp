@@ -567,10 +567,12 @@ struct FakeWorker : cartoon_render::WorkerHandle {
 	std::vector<int> frames;
 	std::size_t next = 0;
 	bool alive = true, killed = false;
+	std::shared_ptr<bool> killedOut;   // set when killed, for a test that outlives the worker (runWorkers destroys a handle after killing it)
 	bool running() override { return alive; }
 	void kill() override {
 		alive = false;
 		killed = true;
+		if (killedOut) *killedOut = true;
 	}
 };
 
@@ -726,11 +728,12 @@ TEST(CartoonWorkers, AWorkerThatEndsWithFramesLeftIsReplacedAndAFrameThatKillsTw
 
 TEST(CartoonWorkers, AWorkerThatStopsMakingProgressIsKilled) {
 	cartoon_render::WorkerHooks hooks;
-	std::vector<FakeWorker *> live;
+	std::vector<std::shared_ptr<bool>> killed;   // (not pointers to the workers: runWorkers destroys a handle once it has killed it)
 	hooks.start = [&](int, const std::vector<int> &frames) -> std::unique_ptr<cartoon_render::WorkerHandle> {
 		auto w = std::make_unique<FakeWorker>();
 		w->frames = frames;
-		live.push_back(w.get());
+		w->killedOut = std::make_shared<bool>(false);
+		killed.push_back(w->killedOut);
 		return w;
 	};
 	hooks.poll = [&](int, int &) { return false; };   // nothing ever finishes
@@ -740,9 +743,9 @@ TEST(CartoonWorkers, AWorkerThatStopsMakingProgressIsKilled) {
 	const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
 	EXPECT_EQ(ok, 0);
 	EXPECT_EQ(failed, std::vector<int>{0});
-	ASSERT_EQ(live.size(), 2u) << "tried once more";
-	EXPECT_TRUE(live[0]->killed);
-	EXPECT_TRUE(live[1]->killed);
+	ASSERT_EQ(killed.size(), 2u) << "tried once more";
+	EXPECT_TRUE(*killed[0]);
+	EXPECT_TRUE(*killed[1]);
 	EXPECT_GT(seconds, 1.9) << "after the stall time, twice";
 	EXPECT_LT(seconds, 8.0);
 }
