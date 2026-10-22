@@ -17,7 +17,7 @@
 namespace cartoon {
 namespace pip_moon {
 
-constexpr int kSamples = 128;   // recommended samples per pixel (the Sampler line of the film's header)
+constexpr int kSamples = 64;   // recommended samples per pixel (the Sampler line of the film's header): the denoiser makes 64 look like 128 at half the time
 
 using actor::Character;
 using actor::Pose;

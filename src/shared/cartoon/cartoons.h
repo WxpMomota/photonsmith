@@ -92,7 +92,7 @@ inline const Film kFilms[] = {
 	{"pip-and-the-moon", "Pip and the Moon",
 	 "Pip finds the moon in a pond, tries to touch it and breaks it, scoops it up in a bucket and dances with it, trips on the way home and loses it, and is shown the real one by a firefly. With music and sounds.",
 	 pip_moon::kDuration, pip_moon::kFps, &pip_moon::sceneAt, &pip_moon::headerAt, &pip_moon::shotStarts, 18.0,
-	 {18, "character,emissive,water,reflections,night", "Moon and reflection|Stroll along the dock|The moon in the water|Sorrow and the idea|Running for the bucket|Scooping the moon|The dance|Carrying it home|The fall|Alone at the water|The firefly|Under the real moon|Pull back over the pond", pip_moon::kSamples, 5.2}, &pip_moon::soundtrack},
+	 {18, "character,emissive,water,reflections,night", "Moon and reflection|Stroll along the dock|The moon in the water|Sorrow and the idea|Running for the bucket|Scooping the moon|The dance|Carrying it home|The fall|Alone at the water|The firefly|Under the real moon|Pull back over the pond", pip_moon::kSamples, 3.0}, &pip_moon::soundtrack},
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 

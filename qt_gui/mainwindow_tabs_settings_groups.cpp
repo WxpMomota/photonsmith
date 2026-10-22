@@ -1085,6 +1085,17 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 				.arg(actualFrames).arg(baseFrames).arg(QString::number(speed, 'f', 2))
 				.arg(capped ? tr(" - capped at 20000") : QString());
 
+		// A film with a soundtrack is made for its own length and frame rate: the video has the sound only when it has them (the launcher says the same when it renders).
+		QString soundNote;
+		if (const QString path = videoCameraPath(); path.startsWith(QStringLiteral("cartoon:"))) {
+			if (const cartoon::Film *film = cartoon::find(path.mid(8).toUtf8().constData()); film && film->soundtrack) {
+				soundNote = (actualFrames == cartoon::frameCountOf(*film) && fps == film->fps)
+					? tr("\nSound: included (the film's own soundtrack)")
+					: tr("\nSound: NOT included - the soundtrack is made for %1 frames at %2 fps; with another frame count, speed or fps the video has no sound")
+						  .arg(cartoon::frameCountOf(*film)).arg(film->fps);
+			}
+		}
+
 		// Plain text, not HTML - createInfoIcon()'s helpText is escaped
 		// before display (see wrapTooltipHtml()'s own comment), so the
 		// <b>/<code> tags the old always-visible label used would show up
@@ -1095,7 +1106,7 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 		// icon's own comment above for why one icon covers both).
 		setRichTooltip(m_videoInfoIcon, tr(
 			"Video Duration: %1 seconds (%2)\n\n"
-			"Camera Path: %3, always completes its full sweep regardless of speed\n\n"
+			"Camera Path: %3, always completes its full sweep regardless of speed%4\n\n"
 			"Output: frames will be saved to output/frames/\n\n"
 			"Requires ffmpeg: turning the rendered frames into a video needs "
 			"a free program called ffmpeg, which must be installed on your "
@@ -1112,7 +1123,7 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 			"(10-50) for quick previews, more (100-500) for production "
 			"quality. Typical render time is 1-5 minutes on GPU, 15-60 minutes "
 			"on CPU."
-		).arg(QString::number(duration, 'f', 1), framesLine, cameraPath));
+		).arg(QString::number(duration, 'f', 1), framesLine, cameraPath, soundNote));
 	};
 
 	m_updateVideoDuration = updateVideoDuration;
@@ -1505,6 +1516,7 @@ void MainWindow::buildCameraGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	// Initialize the spinboxes with the default preset (index 0: "Front View (Outside)")
 	onCameraPresetChanged(0);
 
+	m_cameraGroupBox = cameraGroup;
 	layout->addWidget(cameraGroup);
 }
 

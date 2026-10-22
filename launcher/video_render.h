@@ -405,6 +405,8 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
             if (resumed > 0) std::cout << "\nResuming: " << resumed << " of " << render_frame_count << " frames are already rendered." << std::endl;
         }
         const int timeout = cartoon_render::timeoutFor(args, use_gpu);
+        // --time-limit is the whole video's budget (CPU only, as for any video): each frame gets its share, and `jobs` frames share the clock
+        const double frameTimeLimit = (args.time_limit_seconds > 0.0 && !use_gpu) ? args.time_limit_seconds * jobs / std::max(1, render_frame_count - resumed) : 0.0;
         std::cout << "\nRendering " << (render_frame_count - resumed) << " frames of " << cartoon_film->name << ", " << jobs << " at a time";
         if (timeout > 0) std::cout << " (a frame that takes more than " << timeout << " s is stopped and tried once more)";
         std::cout << "." << std::endl;
@@ -415,7 +417,7 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
                 if (already[static_cast<std::size_t>(frame)]) return 0;
                 const double film_time = cartoon_film->duration * frame / std::max(1, render_frame_count);
                 return cartoon_render::renderFrame(*cartoon_film, film_time, frames_dir / ("work" + std::to_string(worker)) / ("cartoon_" + std::to_string(frame) + ".pbrt"), s.exe_path, args,
-                                                   image_width, image_height, samples_per_pixel, max_ray_depth, frame_file(frame).string(), timeout);
+                                                   image_width, image_height, samples_per_pixel, max_ray_depth, frame_file(frame).string(), timeout, frameTimeLimit);
             },
             [&](int frame, int rc, double seconds) {   // as each frame finishes: one line, the count being how many are done
                 if (already[static_cast<std::size_t>(frame)]) return;

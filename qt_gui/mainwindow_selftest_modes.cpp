@@ -1260,12 +1260,14 @@ void MainWindow::runCartoonUiSelfTest(const std::function<void(const QString &)>
 	selectSceneById(filmScene);
 	QApplication::processEvents();
 	check(!m_cameraPathCombo->isEnabled() && !m_videoPresetCombo->isEnabled(), "a film is the scene: the camera path and the flythrough preset are greyed out");
+	check(m_cameraGroupBox && !m_cameraGroupBox->isEnabled(), "and so is the Camera Position (the film has its own camera)");
 	check(videoCameraPath().startsWith(QStringLiteral("cartoon:")), "and the video's path is the film's own: " + videoCameraPath());
 	check(!m_cameraPathCombo->toolTip().isEmpty() && m_cameraPathCombo->toolTip().contains("cartoon", Qt::CaseInsensitive), "with a tooltip that says why");
 	shot("cartoonui_film");
 	selectSceneById(otherScene);
 	QApplication::processEvents();
 	check(m_cameraPathCombo->isEnabled() && m_videoPresetCombo->isEnabled(), "another scene again: both can be chosen");
+	check(m_cameraGroupBox && m_cameraGroupBox->isEnabled(), "and the Camera Position is back");
 	check(!videoCameraPath().startsWith(QStringLiteral("cartoon:")), "and the video's path is the chosen one again: " + videoCameraPath());
 	log(ok ? "RESULT: OK" : "RESULT: FAIL");
 	QApplication::exit(ok ? 0 : 1);

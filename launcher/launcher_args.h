@@ -115,6 +115,7 @@ inline constexpr VideoFlag kVideoFlags[] = {
 	{"--video", false},          {"--video-preset", true},   {"--frames", true},         {"-f", true},   {"--fps", true},    {"--speed", true},          {"--camera-path", true},
 	{"-p", true},                {"--camera-keyframes", true}, {"--output", true},       {"-o", true},   {"--height", true}, {"--cartoon-jobs", true}, {"--cartoon-timeout", true},
 	{"--resume", false},
+	{"--time-limit", true},   // the video's whole budget: each frame is given its share (cartoon_render.h)
 };
 
 struct LaunchArgs {

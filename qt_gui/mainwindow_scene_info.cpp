@@ -338,6 +338,10 @@ void MainWindow::syncCartoonVideoSettings(const QString &sceneId) {
 		m_cameraPathCombo->setEnabled(!filmVideo);
 		m_cameraPathCombo->setToolTip(filmVideo ? tr("A cartoon film has its own camera (its shots), so the camera path does not apply to it.") : m_cameraPathCombo->property("baseToolTip").toString());
 	}
+	if (m_cameraGroupBox) {
+		m_cameraGroupBox->setEnabled(!filmVideo);
+		m_cameraGroupBox->setToolTip(filmVideo ? tr("A cartoon film has its own camera (its shots), so the camera position does not apply to its video.") : QString());
+	}
 	if (!film) {
 		m_cartoonSettingsFor.clear();
 		return;

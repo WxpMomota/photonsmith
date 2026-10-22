@@ -1671,6 +1671,7 @@ private:
 	// onModeChanged() can dim it when it doesn't apply - see
 	// setGroupDimmed()'s own comment for why dimming, not hiding/disabling.
 	InfoGroupBox *m_videoGroupBox = nullptr;
+	InfoGroupBox *m_cameraGroupBox = nullptr;   // Camera Position: greyed out while a film is the scene of a video (it has its own camera)
 	QComboBox *m_videoPresetCombo;      // Named scene+path+frames/fps/speed bundle - see video_preset.h
 	QComboBox *m_cameraPathCombo;       // Camera animation path selector
 	std::function<void()> m_updateVideoDuration;   // refreshes the video duration tooltip (createSettingsTab)

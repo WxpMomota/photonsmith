@@ -50,8 +50,14 @@ inline std::vector<std::string> forwardedFlags(const LaunchArgs &args) {
 }
 
 // The arguments (after the program) that render `scenePath` to `framePath` at the parent's size and quality: the flags the user gave, then the size, the samples and the scene.
-inline std::vector<std::string> frameArgs(const std::vector<std::string> &flags, int width, int height, int spp, int depth, const std::string &framePath, const std::string &scenePath) {
+// `timeLimitSeconds` > 0 is this frame's own time limit (the CPU renderer's --time-limit).
+inline std::vector<std::string> frameArgs(const std::vector<std::string> &flags, int width, int height, int spp, int depth, const std::string &framePath, const std::string &scenePath,
+										 double timeLimitSeconds = 0.0) {
 	std::vector<std::string> a = flags;
+	if (timeLimitSeconds > 0.0) {
+		a.push_back("--time-limit");
+		a.push_back(std::to_string(timeLimitSeconds));
+	}
 	for (const std::string &s : {std::string("--height"), std::to_string(height), std::string("--output"), framePath, std::to_string(width), std::to_string(spp), std::to_string(depth), scenePath}) a.push_back(s);
 	return a;
 }
@@ -68,7 +74,7 @@ inline int timeoutFor(const LaunchArgs &args, bool gpu) {
 // started or did not finish in `timeoutSeconds` (it is stopped and tried once more first). `scenePath` is in a folder of its own (one per worker): the child's scene list reads that
 // folder and nothing else (RAY_TRACER_PBRT_DIR), so that it does not read the 200-odd scene files of pbrt_scenes/ (about half a second of every frame) to render this one.
 inline int renderFrame(const cartoon::Film &film, double t, const std::filesystem::path &scenePath, const std::string &exe, const LaunchArgs &args, int width, int height, int spp,
-					   int depth, const std::string &framePath, int timeoutSeconds = 0) {
+					   int depth, const std::string &framePath, int timeoutSeconds = 0, double timeLimitSeconds = 0.0) {
 	try {
 		std::ofstream f(scenePath, std::ios::binary);
 		if (!f) return -1;
@@ -76,7 +82,7 @@ inline int renderFrame(const cartoon::Film &film, double t, const std::filesyste
 	} catch (const std::exception &) {   // (a film's code failing on one frame fails that frame, not the whole video)
 		return -1;
 	}
-	const std::vector<std::string> childArgs = frameArgs(forwardedFlags(args), width, height, spp, depth, framePath, scenePath.string());
+	const std::vector<std::string> childArgs = frameArgs(forwardedFlags(args), width, height, spp, depth, framePath, scenePath.string(), timeLimitSeconds);
 	int rc = -1;
 	for (int attempt = 0; attempt < 2; ++attempt) {
 		bool timedOut = false;

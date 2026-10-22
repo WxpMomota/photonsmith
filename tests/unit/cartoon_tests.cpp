@@ -251,6 +251,14 @@ TEST(CartoonRender, TheFrameRunRepeatsTheUsersFlagsAndDropsTheVideoOnes) {
 	const std::vector<std::string> run = cartoon_render::frameArgs(flags, 480, 270, 64, 8, "C:/o/frames/frame_0001.ppm", "C:/o/frames/cartoon_1.pbrt");
 	const std::vector<std::string> expectedRun = {"--gpu", "--denoise", "--denoise-blend", "0.1", "--seed", "7", "--height", "270", "--output", "C:/o/frames/frame_0001.ppm", "480", "64", "8", "C:/o/frames/cartoon_1.pbrt"};
 	EXPECT_EQ(run, expectedRun) << "the user's flags, then the size, the samples, the depth and the scene";
+	// a time limit is the video's: a frame gets its own share, not the whole budget
+	LaunchArgs limited;
+	ASSERT_TRUE(parseArgs({"--cpu", "--time-limit", "60", "--video", "--camera-path", "cartoon:fireflies"}, limited));
+	EXPECT_TRUE(cartoon_render::forwardedFlags(limited).size() == 1) << "only --cpu is repeated";
+	const std::vector<std::string> withLimit = cartoon_render::frameArgs(cartoon_render::forwardedFlags(limited), 64, 36, 4, 2, "o.ppm", "s.pbrt", 2.5);
+	EXPECT_NE(std::find(withLimit.begin(), withLimit.end(), "--time-limit"), withLimit.end());
+	const std::vector<std::string> noLimit = cartoon_render::frameArgs({}, 64, 36, 4, 2, "o.ppm", "s.pbrt");
+	EXPECT_EQ(std::find(noLimit.begin(), noLimit.end(), "--time-limit"), noLimit.end()) << "none when there is no limit";
 	LaunchArgs more;
 	ASSERT_TRUE(parseArgs({"--video", "--resume", "--cartoon-timeout", "30", "--camera-path", "cartoon:fireflies"}, more));
 	EXPECT_TRUE(more.cartoon_resume);
