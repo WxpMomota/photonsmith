@@ -1626,6 +1626,11 @@ int main(int argc, char** argv) {
 		std::cout << video_preset::listText();
 		return EXIT_SUCCESS;
 	}
+	// `ray_tracer --film-table`: the cartoon films as the markdown table of docs/VIDEO_GENERATION.md (key, name, length, shots, tags, story), and nothing else.
+	if (argc >= 2 && std::string(argv[1]) == "--film-table") {
+		std::cout << cartoon::markdownTable();
+		return EXIT_SUCCESS;
+	}
 	std::cout << "========================================" << std::endl;
 	std::cout << "RAY TRACER LAUNCHER (Unified GPU/CPU)" << std::endl;
 	std::cout << "========================================" << std::endl;

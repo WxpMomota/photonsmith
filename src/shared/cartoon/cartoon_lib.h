@@ -469,10 +469,10 @@ inline std::string cameraText(const CameraView &v) {
 }
 
 // A film's scene up to and including WorldBegin: `camera` (cameraText of the view at t), the picture's size, the sampler and the integrator. Every film starts this way.
-inline std::string sceneHeader(const std::string &camera) {
+inline std::string sceneHeader(const std::string &camera, int samples = 128) {
 	std::string out = camera;
 	out += "Film \"rgb\" \"integer xresolution\" [ 1280 ] \"integer yresolution\" [ 720 ]\n";
-	out += "Sampler \"halton\" \"integer pixelsamples\" [ 128 ]\n";
+	out += "Sampler \"halton\" \"integer pixelsamples\" [ " + std::to_string(samples) + " ]\n";
 	out += "Integrator \"volpath\" \"integer maxdepth\" [ 8 ]\n";
 	out += "WorldBegin\n";
 	return out;
@@ -484,6 +484,18 @@ inline double smoothstep(double a, double b, double x) {
 
 // A film: what a cartoon video preset renders. `sceneAt(t)` is the scene text at time t seconds (0 <= t <= duration); `resolutionHint` is only what its Film line says (the renderer's
 // own --width / --height / --samples settings take over).
+// What a film says about itself beyond its story, in one place (the table in cartoons.h). `id` is the number of its video preset, V<id>: fixed once given and never reused, so
+// reordering or removing a film moves no preset. `tags` and `shotNames` are comma- and '|'-separated lists; the tags come from a fixed vocabulary (cartoons.h, kTagVocabulary), and there
+// is one shot name for each of the shots the film's `shotStarts` lists. `samples` is the samples per pixel the film's own Sampler line asks for, and `secondsPerFrame` what one
+// 1280 x 720 frame took at those samples on the GPU with the denoiser (measured by scripts/measure_cartoons.py; the scene list quotes it).
+struct FilmMeta {
+	int id;
+	const char *tags;
+	const char *shotNames;
+	int samples;
+	double secondsPerFrame;
+};
+
 struct Film {
 	const char *key;           // "lamp-and-ball": the --cartoon argument
 	const char *name;          // "Lamp and Ball"
@@ -492,7 +504,9 @@ struct Film {
 	int fps;
 	std::string (*sceneAt)(double t);
 	std::string (*headerAt)(double t);   // sceneAt's first part (up to WorldBegin) on its own
+	std::vector<double> (*shotStarts)();   // when each shot begins, in seconds (the first is 0)
 	double stillTime;          // a time that makes a good still picture (a thumbnail, a gallery image)
+	FilmMeta meta;
 };
 
 }  // namespace cartoon

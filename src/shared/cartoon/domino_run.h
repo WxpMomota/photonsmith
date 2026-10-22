@@ -16,6 +16,7 @@ namespace domino_run {
 
 constexpr double kDuration = 24.0;
 constexpr int kFps = 24;
+constexpr int kSamples = 160;   // recommended samples per pixel (the Sampler line of the film's header)
 constexpr double kHeight = 0.60, kWidth = 0.34, kThick = 0.10;   // one domino
 constexpr double kSpacing = 0.46;                                 // distance between neighbours along the path
 constexpr double kFall = 0.30;                                    // seconds a domino takes to fall onto the next
@@ -162,7 +163,12 @@ inline const std::vector<Shot> &shots() {
 }
 
 // Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator.
-inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t))); }
+inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t)), kSamples); }
+inline std::vector<double> shotStarts() {
+	std::vector<double> v;
+	for (const Shot &s : shots()) v.push_back(s.start);
+	return v;
+}
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The scene

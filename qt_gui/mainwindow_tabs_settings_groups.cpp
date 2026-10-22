@@ -445,8 +445,22 @@ void MainWindow::buildSceneInfoRows(QWidget *basicTab, QVBoxLayout *sceneGroupLa
 	m_filmTimeSpin->setSingleStep(0.5);
 	m_filmTimeSpin->setSuffix(tr(" s"));
 	m_filmTimeSpin->setToolTip(tr("Which moment of the film this picture shows, in seconds from its start. The scene's own picture is the film's best still; the whole film is a video (Generate Video)."));
+	m_filmShotCombo = new QComboBox(m_filmTimeRow);
+	m_filmShotCombo->setMinimumContentsLength(30);   // the longest shot names are about this long
+	m_filmShotCombo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+	m_filmShotCombo->setToolTip(tr("The shots of the film, by name: choosing one sets the film time to a moment inside it."));
+	connect(m_filmShotCombo, QOverload<int>::of(&QComboBox::activated), this, [this](int index) {
+		const cartoon::Film *film = cartoon::find(m_filmTimeFor.toUtf8().constData());
+		if (!film || index < 0) return;
+		const std::vector<double> starts = film->shotStarts();
+		if (index >= static_cast<int>(starts.size())) return;
+		const double end = index + 1 < static_cast<int>(starts.size()) ? starts[static_cast<std::size_t>(index) + 1] : film->duration;
+		m_filmTimeSpin->setValue(starts[static_cast<std::size_t>(index)] + std::min(1.0, 0.25 * (end - starts[static_cast<std::size_t>(index)])));   // a little way into the shot
+	});
 	filmTimeLayout->addWidget(filmTimeLabel);
 	filmTimeLayout->addWidget(m_filmTimeSpin);
+	filmTimeLayout->addWidget(new QLabel(tr("Shot:"), m_filmTimeRow));
+	filmTimeLayout->addWidget(m_filmShotCombo);
 	filmTimeLayout->addStretch(1);
 	m_filmTimeRow->setVisible(false);
 	sceneGroupLayout->addWidget(m_filmTimeRow);

@@ -275,6 +275,7 @@ add_executable(unit_tests
     unit/surface_interaction_tests.cpp
     unit/texture_differentials_tests.cpp
     unit/cartoon_tests.cpp
+    unit/cartoon_films_tests.cpp
     unit/cartoon_snapshot_tests.cpp
     unit/path_probe_tests.cpp
     unit/texture_mapping_tests.cpp

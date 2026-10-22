@@ -16,6 +16,7 @@ namespace dandelion {
 
 constexpr double kDuration = 22.0;
 constexpr int kFps = 24;
+constexpr int kSamples = 192;   // recommended samples per pixel (the Sampler line of the film's header)
 constexpr int kSeeds = 140;
 constexpr double kHeadHeight = 3.2;
 constexpr double kStalk = 0.55;   // a seed's stalk
@@ -96,7 +97,12 @@ inline const std::vector<Shot> &shots() {
 }
 
 // Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator.
-inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t))); }
+inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t)), kSamples); }
+inline std::vector<double> shotStarts() {
+	std::vector<double> v;
+	for (const Shot &s : shots()) v.push_back(s.start);
+	return v;
+}
 
 inline std::string buildSeeds(double t) {
 	const Parts &P = parts();

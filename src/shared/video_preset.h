@@ -99,9 +99,9 @@ inline const VideoPreset kCameraPresets[] = {
     },
 };
 
-// Every preset, in id order: the camera-path presets (V1..), then one preset per cartoon film in the film table's order (cartoon/cartoons.h) - so a new film is a new preset by being
-// listed there, with nothing to keep in step here: its name, description, length and fps come from the film. A cartoon's id continues the numbering ("V7" ...) and, like the others,
-// is a stable label: append films, do not reorder them. The strings built for the cartoon presets live as long as the program (the fields are plain const char*, as before).
+// Every preset: the camera-path presets (V1..V6), then one preset per cartoon film in the film table's order (cartoon/cartoons.h) - so a new film is a new preset by being listed there,
+// with nothing to keep in step here: its name, description, length and fps come from the film, and its id is the film's own number (meta.id), so reordering or removing a film moves
+// no preset. The strings built for the cartoon presets live as long as the program (the fields are plain const char*, as before).
 inline const std::vector<VideoPreset>& all() {
     struct Table {
         std::deque<std::string> strings;
@@ -114,16 +114,15 @@ inline const std::vector<VideoPreset>& all() {
     static const Table table = [] {
         Table t;
         for (const VideoPreset& p : kCameraPresets) t.presets.push_back(p);
-        int n = static_cast<int>(t.presets.size());
         for (const cartoon::Film& f : cartoon::kFilms) {
             VideoPreset p{};
-            p.id = t.keep("V" + std::to_string(++n));
+            p.id = t.keep(cartoon::presetIdOf(f));   // the film's own number (meta.id): stable whatever the order of the film table
             p.key = f.key;
             p.name = t.keep(std::string(f.name) + " (cartoon)");
             p.description = f.description;
             p.scene_id = "A1";   // a placeholder: a cartoon renders its own scenes
             p.camera_path = t.keep(cartoon::cameraPathOf(f));
-            p.frames = static_cast<int>(std::lround(f.duration * f.fps));
+            p.frames = cartoon::frameCountOf(f);
             p.fps = f.fps;
             p.speed = 1.0;
             t.presets.push_back(p);

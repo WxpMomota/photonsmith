@@ -241,26 +241,33 @@ denoiser, seed, exposure, tone mapping ...; the video flags and the output path 
 single-image render of a pbrt file: every renderer feature works, and a frame costs a process start (a second or two) on top of its render. `--frames` / `--fps` change how the film is
 sampled and played back, not its story.
 
-| Key | Name | Length | What happens |
-|-----|------|--------|--------------|
-| lamp-and-ball | Lamp and Ball | 20 s | A small desk lamp wakes up in the dark, notices a red ball rolling in, hops over, nudges it, watches it bounce off a stack of books and roll home, and tucks its shade over it. |
-| ball-parade | Ball Parade | 12 s | Seven glossy balls drop in one after another, bounce in a travelling wave on a glossy checker floor with squash and stretch, and settle one by one into a row. |
-| little-robot | The Little Robot | 32 s | A small robot wakes in a junkyard at dusk, finds a seedling dying in a tin can, waters it from a watering can, and watches it bloom into a glowing flower. Five shots with a rack-focus close-up. |
-| fireflies | Fireflies | 26 s | A night meadow lit almost only by fireflies: a lone one wanders through the grass, a second arrives, their flashes drift into step, they circle and spiral up towards the moon as fifty more wake in the grass and a crane shot lifts away. Four shots. |
-| newtons-cradle | Newton's Cradle | 18 s | Five chrome balls on strings in a room of coloured lights: one is lifted and let go, the far ball flies out and back, and the swing passes from side to side and slowly dies. Three shots, the middle one a close-up of the strike. |
-| domino-run | Domino Run | 24 s | A red marble taps the first of 130 rainbow dominoes laid in a spiral; the wave runs inwards, chased by the camera, and the last domino lights a small lamp in the middle. Four shots. |
-| paper-boat | The Paper Boat | 24 s | A folded paper boat sails across a pond in the rain at dusk: every drop starts rings of ripples that rock the boat and cross one another (the water is a height field rebuilt for each frame), the rain eases, and the boat sails on towards the low sun. Three shots. |
-| orrery | The Orrery | 22 s | A turn round a brass model of a small solar system: a glowing sun, five enamel planets on arms (one with a moon, one with a ring), engraved orbits and a pair of meshing gears, lit by the sun alone. Three shots, the middle one following the third planet and its moon. |
-| dandelion | The Dandelion | 22 s | A gust blows the seeds off a dandelion clock one by one, windward side first, and they drift away on their little parachutes of fluff, glowing where the low sun shines through them. Three shots. |
-| candle | The Candle | 20 s | One candle burns down in front of out-of-focus fairy lights: the flame flickers, light glows through the wax (a subsurface material), drips run down its side, and at the end the flame dies in a thread of smoke. Three shots. |
+| Key | Name | Length | Shots | Tags | What happens |
+|-----|------|--------|-------|------|--------------|
+| lamp-and-ball | Lamp and Ball | 20 s | 1 | character, physics, emissive, night | A small yellow desk lamp wakes up in the dark, notices a red ball, hops over, nudges it, watches it bounce off the books and roll home, and tucks its shade over it. |
+| ball-parade | Ball Parade | 12 s | 1 | physics, reflections | Seven glossy balls drop in one after another, bounce in a travelling wave on a checker floor with squash and stretch, and settle one by one into a row. |
+| little-robot | The Little Robot | 32 s | 5 | character, emissive, dusk, dof | A small robot wakes in a junkyard at dusk, finds a seedling dying in a tin can, waters it, and watches it bloom into a glowing flower. |
+| fireflies | Fireflies | 26 s | 4 | emissive, particles, night, dof | A night meadow lit by fireflies: a lone firefly wanders, a second arrives, their flashes drift into step, they circle and spiral up to the moon as the meadow wakes. |
+| newtons-cradle | Newton's Cradle | 18 s | 3 | metal, reflections, physics, dof | Five chrome balls on strings: one is lifted and let go, the far ball flies out and back, and the swing passes from side to side and slowly dies, with the room in the chrome. |
+| domino-run | Domino Run | 24 s | 4 | physics, emissive, dof | A red marble taps the first of 130 rainbow dominoes laid in a spiral; the wave runs inwards, chased by the camera, and the last domino lights a small lamp in the middle. |
+| paper-boat | The Paper Boat | 24 s | 3 | water, reflections, dusk, backlight | A folded paper boat sails across a pond in the rain at dusk: every drop starts rings of ripples that rock the boat and cross one another, the rain eases, and the boat sails on towards the low sun. |
+| orrery | The Orrery | 22 s | 3 | metal, reflections, emissive | A turn round a brass model of a small solar system: a glowing sun, five enamel planets on arms (one with a moon, one with a ring), engraved orbits and a pair of meshing gears, all lit by the sun alone. |
+| dandelion | The Dandelion | 22 s | 3 | translucent, backlight, particles, dof, dusk | A gust blows the seeds off a dandelion clock one by one, windward side first, and they drift away on their little parachutes, glowing where the low sun shines through. |
+| candle | The Candle | 20 s | 3 | subsurface, emissive, dof, night | One candle burns down in front of out-of-focus fairy lights: the flame flickers, light glows through the wax, drips run down its side, and at the end the flame dies in a thread of smoke. |
 
 A frame of a film is also a scene: `ray_tracer --gpu 1280 256 8 cartoon:fireflies@13.5` renders that moment as one picture (`cartoon:<key>` alone is the film's own best still), which is the quickest
 way to look at a change to a film. The GUI's scene list has a Cartoons tab (beside Self-Contained and Requires External Files) with one still per film; it is listed from the films themselves (a still's file is written the first time it is rendered), so a new film appears there by itself, and its Film time box renders any other moment of the film as a picture.
 
 Making a film of your own: the toolkit is `src/shared/cartoon/cartoon_lib.h` (the only implementation: keyframes, transforms, meshes, hop squash and stretch, inverse-kinematics arms, shots with camera moves), and `python scripts/anim/film.py` shows a film's stills, a contact sheet or the video without the GUI;
-a finished film is a function `std::string sceneAt(double t)` listed in `src/shared/cartoon/cartoons.h`; that listing alone makes it a video preset (`video_preset::all()` builds the
-preset from it), and it appears as a scene on the GUI's Cartoons tab, in the GUI's Camera Path combo, and in `--list-video-presets`. Append new films, do not reorder them: a cartoon's preset id (V7 ...) is its
-place in the list.
+a finished film is a function `std::string sceneAt(double t)` (with `headerAt(t)`, `shotStarts()` and `kSamples` beside it) and a row in the table in `src/shared/cartoon/cartoons.h`; that row alone makes it a video preset
+(`video_preset::all()` builds the preset from it), a scene on the GUI's Cartoons tab, an entry in the GUI's Camera Path combo and a line of `--list-video-presets`.
+
+**What a film says about itself** is its row and nothing else, and nothing is typed twice. The row has the key, the name, a description of the story (one sentence, without the length or the number
+of shots: those are worked out), the length and fps, the still's time, and a `meta` record: `id` (the number of its video preset, V<id>: give a new film the next number and never reuse one, so
+reordering or removing a film moves no preset), `tags` (from the vocabulary `kTagVocabulary`: what the film shows or how it is lit), `shotNames` (one for each shot of its `shotStarts()`),
+`samples` (the samples per pixel its own Sampler line asks for) and `secondsPerFrame` (what a 1280 x 720 frame of it takes on the GPU with the denoiser, written by `python scripts/measure_cartoons.py --write`).
+The scene list shows all of it for the film's still (length, shots by name, tags, cost), and searching the list for a tag finds the films; the GUI's Shot box beside the Film time box jumps to a shot.
+The film table above is the text `ray_tracer --film-table` prints, and a test (`CartoonMeta`) fails when this document, the tags, the shot names, the numbers or a description that restates a length
+are out of step with the table; `tests/data/cartoon_films_snapshot.txt` pins each film's `meta` line and what its scene holds (`RT_UPDATE_SNAPSHOT=1` rewrites it).
 
 ## Examples
 

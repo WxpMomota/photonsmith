@@ -17,6 +17,7 @@ namespace little_robot {
 
 constexpr double kDuration = 32.0;
 constexpr int kFps = 24;
+constexpr int kSamples = 160;   // recommended samples per pixel (the Sampler line of the film's header)
 
 constexpr Vec3 kSeedling = {2.4, 0.0, 0.35};     // the tin can's centre on the ground
 constexpr double kCanTop = 0.42;                  // the soil's height
@@ -376,7 +377,12 @@ inline const std::vector<Shot> &shots() {
 
 // Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator. Cheap, and all the scene list
 // needs to describe the film's still.
-inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t))); }
+inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t)), kSamples); }
+inline std::vector<double> shotStarts() {
+	std::vector<double> v;
+	for (const Shot &s : shots()) v.push_back(s.start);
+	return v;
+}
 
 inline std::string sceneAt(double t) {
 	const double f = fade(t);

@@ -1,0 +1,268 @@
+// cartoon_films_tests.cpp - what each cartoon film says about itself (the table in src/shared/cartoon/cartoons.h) and the story each one tells: its motion, its lights, its timing.
+// (The toolkit, the launcher, the presets and the stills are in cartoon_tests.cpp; this file is separate because the films are code, and a test file that instantiates all of them
+// would be too big for one object file.)
+
+#include <gtest/gtest.h>
+
+#include <algorithm>
+#include <cmath>
+#include <fstream>
+#include <regex>
+#include <set>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include "pbrt_flatten_test_helpers.h"
+#include "../../src/shared/cartoon/cartoons.h"
+#include "../../src/shared/video_preset.h"
+
+// ---- what each film says about itself (the Film table in cartoons.h) -------------------------------------------------------------------------------------------------
+
+TEST(CartoonMeta, EveryFilmHasAStableNumberAndTheVideoPresetUsesIt) {
+	std::set<int> ids;
+	for (const cartoon::Film &film : cartoon::kFilms) {
+		EXPECT_GE(film.meta.id, 7) << film.key << ": V1 to V6 are the camera flythroughs";
+		EXPECT_TRUE(ids.insert(film.meta.id).second) << film.key << ": the number " << film.meta.id << " is used twice";
+		const video_preset::VideoPreset *p = video_preset::find(film.key);
+		ASSERT_NE(p, nullptr) << film.key;
+		EXPECT_STREQ(p->id, cartoon::presetIdOf(film).c_str());
+		EXPECT_EQ(p->frames, cartoon::frameCountOf(film));
+	}
+}
+
+TEST(CartoonMeta, TagsComeFromTheVocabularyAndShotsAreNamedOnceEach) {
+	const std::set<std::string> vocabulary(std::begin(cartoon::kTagVocabulary), std::end(cartoon::kTagVocabulary));
+	for (const cartoon::Film &film : cartoon::kFilms) {
+		const std::vector<std::string> tags = cartoon::tagsOf(film);
+		EXPECT_GE(tags.size(), 2u) << film.key << " says too little about itself";
+		EXPECT_LE(tags.size(), 5u) << film.key << " says too much (a tag that is on every film tells nothing)";
+		std::set<std::string> seen;
+		for (const std::string &tag : tags) {
+			EXPECT_TRUE(vocabulary.count(tag)) << film.key << ": \"" << tag << "\" is not in the tag vocabulary";
+			EXPECT_TRUE(seen.insert(tag).second) << film.key << ": tag " << tag << " twice";
+		}
+		const std::vector<double> starts = film.shotStarts();
+		const std::vector<std::string> names = cartoon::shotNamesOf(film);
+		ASSERT_FALSE(starts.empty()) << film.key;
+		EXPECT_EQ(names.size(), starts.size()) << film.key << ": one name for each shot";
+		EXPECT_EQ(starts.front(), 0.0) << film.key;
+		for (std::size_t i = 1; i < starts.size(); ++i) EXPECT_GT(starts[i], starts[i - 1]) << film.key << ": shot " << i << " begins after the one before it";
+		EXPECT_LT(starts.back(), film.duration - 1.0) << film.key << ": the last shot has time to be seen";
+		EXPECT_GE(film.stillTime, 0.0);
+		EXPECT_LE(film.stillTime, film.duration);
+	}
+}
+
+TEST(CartoonMeta, TheRecommendedSamplesAreTheOnesTheFilmsOwnHeaderAsksFor) {
+	for (const cartoon::Film &film : cartoon::kFilms) {
+		const std::string header = film.headerAt(0.0);
+		const std::string needle = "\"integer pixelsamples\" [ " + std::to_string(film.meta.samples) + " ]";
+		EXPECT_NE(header.find(needle), std::string::npos) << film.key << " says " << film.meta.samples << " samples but its Sampler line says otherwise";
+		EXPECT_GT(film.meta.secondsPerFrame, 0.0) << film.key << " has not been measured: python scripts/measure_cartoons.py --write";
+	}
+}
+
+TEST(CartoonMeta, DescriptionsDoNotRestateWhatIsWorkedOutFromTheData) {
+	// "Three shots, 24 seconds" typed into a description goes stale when the film changes; the length and the shot count are worked out (summaryOf) instead.
+	const std::regex restated(R"((\b(one|two|three|four|five|six|\d+) shots?\b)|(\b\d+ seconds\b))", std::regex::icase);
+	for (const cartoon::Film &film : cartoon::kFilms) {
+		EXPECT_FALSE(std::regex_search(std::string(film.description), restated)) << film.key << ": the description restates the length or the shots";
+		const std::string summary = cartoon::summaryOf(film);
+		EXPECT_NE(summary.find(cartoon::lengthText(film)), std::string::npos) << film.key;
+		EXPECT_NE(summary.find(std::to_string(cartoon::shotCountOf(film)) + (cartoon::shotCountOf(film) == 1 ? " shot" : " shots")), std::string::npos) << film.key;
+		for (const std::string &shot : cartoon::shotNamesOf(film)) EXPECT_NE(summary.find(shot), std::string::npos) << film.key << ": " << shot;
+	}
+}
+
+TEST(CartoonMeta, TheDocumentTablesSayWhatTheTableSays) {
+	std::ifstream in("docs/VIDEO_GENERATION.md", std::ios::binary);
+	if (!in) GTEST_SKIP() << "docs/VIDEO_GENERATION.md is not next to the working directory";
+	std::stringstream all;
+	all << in.rdbuf();
+	std::string doc = all.str();
+	doc.erase(std::remove(doc.begin(), doc.end(), '\r'), doc.end());
+	for (const cartoon::Film &film : cartoon::kFilms) {
+		EXPECT_NE(doc.find(cartoon::markdownRowOf(film) + "\n"), std::string::npos) << film.key << ": the film table of docs/VIDEO_GENERATION.md is out of date; paste the output of `ray_tracer --film-table`";
+		const std::string preset = "| " + cartoon::presetIdOf(film) + " | " + film.key + " | (its own scenes) | " + cartoon::cameraPathOf(film) + " | " + std::to_string(cartoon::frameCountOf(film)) + " | " +
+								   std::to_string(film.fps) + " | 1.0 |\n";
+		EXPECT_NE(doc.find(preset), std::string::npos) << film.key << ": the preset table of docs/VIDEO_GENERATION.md has no row \"" << preset << "\"";
+	}
+}
+
+TEST(CartoonNewtonsCradle, TheBallsHangTouchingAndTheSwingPassesFromEndToEndWhileLosingEnergy) {
+	namespace nc = cartoon::newtons_cradle;
+	for (int i = 0; i + 1 < nc::kBalls; ++i)
+		EXPECT_NEAR(cartoon::length(nc::ballCentre(i + 1, 0.0) - nc::ballCentre(i, 0.0)), 2.0 * nc::kRadius, 1e-9) << "at rest the balls touch";
+	const nc::Swing lifted = nc::swingAt(nc::kReleaseAt - 0.01);
+	EXPECT_NEAR(lifted.left, -nc::kAmplitude, 0.5) << "the first ball is held at its highest point";
+	EXPECT_EQ(lifted.right, 0.0);
+	// every half period the swing is at the other end, and each time a little lower
+	double last = nc::kAmplitude;
+	for (int k = 0; k < 8; ++k) {
+		const double mid = nc::kReleaseAt + nc::kQuarter + (k + 0.5) * 2.0 * nc::kQuarter;
+		const nc::Swing s = nc::swingAt(mid);
+		const double a = k % 2 == 0 ? s.right : -s.left;
+		EXPECT_GT(a, 0.0) << "swing " << k << " is at the " << (k % 2 == 0 ? "right" : "left") << " end";
+		EXPECT_LT(a, last) << "each swing keeps less of the energy";
+		EXPECT_EQ(k % 2 == 0 ? s.left : s.right, 0.0) << "the other end ball hangs still";
+		last = a;
+	}
+}
+
+TEST(CartoonDominoRun, TheWaveRunsAlongTheWholePathAndTheLampComesOnAtTheEnd) {
+	namespace dr = cartoon::domino_run;
+	const int n = dr::dominoCount();
+	EXPECT_GT(n, 100);
+	for (int i = 1; i < n; ++i) EXPECT_GT(dr::startOf(i), dr::startOf(i - 1)) << "domino " << i << " falls after the one before it";
+	EXPECT_EQ(dr::leanOf(0, dr::kStart - 0.01), 0.0) << "nothing moves before the marble arrives";
+	EXPECT_NEAR(dr::leanOf(n / 2, dr::startOf(n / 2) + dr::kFall + 0.1), dr::kLean, 1e-9) << "a fallen domino rests on its neighbour";
+	EXPECT_GT(dr::leanOf(n - 1, dr::impactAt()), 80.0) << "the last one lies against the lamp";
+	EXPECT_LT(dr::impactAt() + 3.0, dr::kDuration) << "the lamp is lit with time left to enjoy it";
+	// the dominoes are evenly spaced along the path
+	for (int i = 1; i < n; ++i) EXPECT_NEAR(cartoon::length(dr::pointAtArc(dr::arcOf(i)) - dr::pointAtArc(dr::arcOf(i - 1))), dr::kSpacing, 0.01);
+	// the marble starts well before the first domino and has reached it when it is struck
+	EXPECT_GT(cartoon::length(dr::marbleAt(0.0) - dr::marbleAt(dr::kStart)), 3.0);
+	// the lamp is dark first and lit after
+	EXPECT_EQ(cartoon::domino_run::sceneAt(1.0).find("LightSource \"point\""), std::string::npos);
+	EXPECT_NE(cartoon::domino_run::sceneAt(dr::impactAt() + 2.0).find("LightSource \"point\""), std::string::npos);
+}
+
+TEST(CartoonPaperBoat, TheRainEasesTheWaterCalmsAndTheBoatSailsAcrossThePond) {
+	namespace pb = cartoon::paper_boat;
+	EXPECT_NEAR(pb::rainAt(5.0), 1.0, 1e-12);
+	EXPECT_NEAR(pb::rainAt(21.0), 0.0, 1e-12);
+	// the surface: busy in the rain, nearly flat once it has stopped
+	double busy = 0.0, calm = 0.0;
+	for (double x = -6.0; x <= 6.0; x += 0.7) {
+		for (double z = -4.0; z <= 4.0; z += 0.7) {
+			busy = std::max(busy, std::abs(pb::surfaceAt(x, z, 10.0).h));
+			calm = std::max(calm, std::abs(pb::surfaceAt(x, z, 23.5).h));
+		}
+	}
+	EXPECT_GT(busy, 0.02);
+	EXPECT_LT(calm, 0.03) << "only the faint swell is left";
+	EXPECT_LT(pb::boatBase(0.0).x, -7.0);
+	EXPECT_GT(pb::boatBase(pb::kDuration).x, 5.0);
+	for (double t = 0.0; t <= pb::kDuration; t += 0.5) {
+		const pb::BoatPose b = pb::boatAt(t);
+		EXPECT_LT(std::abs(b.pitch), 25.0) << "t = " << t << ": rocked, not capsized";
+		EXPECT_LT(std::abs(b.roll), 25.0) << "t = " << t;
+		EXPECT_LT(std::abs(b.position.y), 0.2) << "t = " << t << ": it floats";
+	}
+	// the water's slope is the slope of its height: a finite difference agrees with the analytic one
+	const double x = 1.3, z = -0.7, e = 1e-4;
+	const pb::Surface s = pb::surfaceAt(x, z, 8.0);
+	EXPECT_NEAR(s.dhdx, (pb::surfaceAt(x + e, z, 8.0).h - pb::surfaceAt(x - e, z, 8.0).h) / (2 * e), 2e-3);
+	EXPECT_NEAR(s.dhdz, (pb::surfaceAt(x, z + e, 8.0).h - pb::surfaceAt(x, z - e, 8.0).h) / (2 * e), 2e-3);
+}
+
+TEST(CartoonOrrery, ThePlanetsKeepTheirOrbitsTheMoonKeepsItsPlanetAndTheGearsMesh) {
+	namespace orr = cartoon::orrery;
+	for (int k = 0; k < orr::kPlanets; ++k) {
+		for (double t : {0.0, 3.3, 11.0, 21.0}) {
+			const cartoon::Vec3 p = orr::planetAt(k, t);
+			EXPECT_NEAR(std::hypot(p.x, p.z), orr::planet(k).orbit, 1e-9) << "planet " << k;
+			EXPECT_NEAR(p.y, orr::planet(k).height, 1e-9);
+		}
+	}
+	for (int k = 1; k < orr::kPlanets; ++k) EXPECT_GT(orr::planet(k).orbit, orr::planet(k - 1).orbit);
+	for (double t : {0.0, 5.0, 17.0}) EXPECT_NEAR(cartoon::length(orr::moonAt(t) - orr::planetAt(2, t)), 0.55, 0.12) << "the moon stays by its planet";
+	// the gears: the teeth ratio gives the speed ratio, in the other direction, and the small one starts half a tooth out
+	EXPECT_NEAR((orr::smallGearAngle(10.0) - orr::smallGearAngle(0.0)) / (orr::bigGearAngle(10.0) - orr::bigGearAngle(0.0)), -static_cast<double>(orr::kTeethBig) / orr::kTeethSmall, 1e-9);
+	EXPECT_NEAR(cartoon::length(orr::smallGearAt() - orr::bigGearAt()), orr::kBigRadius + orr::kSmallRadius, 1e-9) << "the pitch circles touch";
+}
+
+TEST(CartoonDandelion, TheWindwardSeedsGoFirstAndAReleasedSeedTravelsDownwind) {
+	namespace dd = cartoon::dandelion;
+	double firstToLast = 0.0, earliest = 1e9, latest = 0.0;
+	for (int i = 0; i < dd::kSeeds; ++i) {
+		earliest = std::min(earliest, dd::releaseOf(i));
+		latest = std::max(latest, dd::releaseOf(i));
+	}
+	firstToLast = latest - earliest;
+	EXPECT_GT(firstToLast, 4.0) << "the gust takes seconds to strip the head";
+	EXPECT_GE(earliest, dd::kGust - 1e-9);
+	EXPECT_LT(latest, dd::kDuration - 6.0) << "every seed has gone with time to follow it";
+	// a seed facing the wind lets go before one facing away
+	int toward = 0, away = 0;
+	for (int i = 0; i < dd::kSeeds; ++i) {
+		if (cartoon::dot(dd::seedDirection(i), dd::wind()) > cartoon::dot(dd::seedDirection(toward), dd::wind())) toward = i;
+		if (cartoon::dot(dd::seedDirection(i), dd::wind()) < cartoon::dot(dd::seedDirection(away), dd::wind())) away = i;
+	}
+	EXPECT_LT(dd::releaseOf(toward), dd::releaseOf(away));
+	const cartoon::Vec3 before = dd::seedAt(toward, dd::releaseOf(toward) - 0.1).position, later = dd::seedAt(toward, dd::releaseOf(toward) + 6.0).position;
+	EXPECT_FALSE(dd::seedAt(toward, dd::releaseOf(toward) - 0.1).free);
+	EXPECT_TRUE(dd::seedAt(toward, dd::releaseOf(toward) + 6.0).free);
+	EXPECT_GT(cartoon::dot(later - before, dd::wind()), 5.0) << "it has been blown away";
+	// the seeds are on the head before the gust: all within the seed head's reach
+	for (int i = 0; i < dd::kSeeds; ++i) EXPECT_NEAR(cartoon::length(dd::seedAt(i, 0.0).position - cartoon::Vec3{0.0, dd::kHeadHeight, 0.0}), 0.12 + dd::kStalk, 0.02);
+}
+
+TEST(CartoonCandle, TheCandleBurnsDownAndTheFlameDiesWithSmokeAfterwards) {
+	namespace cd = cartoon::candle;
+	EXPECT_GT(cd::heightAt(0.0), cd::heightAt(cd::kDuration));
+	EXPECT_NEAR(cd::burn(5.0), 1.0, 1e-12);
+	EXPECT_LT(cd::burn(17.5), 1.0);
+	EXPECT_NEAR(cd::burn(cd::kDark), 0.0, 1e-9);
+	const std::string lit = cd::sceneAt(5.0), out = cd::sceneAt(cd::kDark + 0.5);
+	EXPECT_NE(lit.find("rgb L\" [ 15.0"), std::string::npos) << "the flame is an emitter while it burns";
+	EXPECT_EQ(out.find("rgb L\" [ 15.0"), std::string::npos) << "and gone once it has died";
+	// the smoke is only there once the flame has begun to die
+	EXPECT_TRUE(cd::buildSmoke(10.0).empty());
+	EXPECT_FALSE(cd::buildSmoke(cd::kOut + 3.0).empty());
+}
+
+TEST(CartoonFilms, EveryFilmFlattensAtSeveralTimesWithoutWarnings) {
+	for (const cartoon::Film &film : cartoon::kFilms) {
+		for (double f : {0.0, 0.1, 0.3, 0.5, 0.7, 0.9, 0.999}) {
+			const double t = f * film.duration;
+			const FlatScene s = flattenSource(film.sceneAt(t));
+			EXPECT_GT(s.triangles.size(), 1000u) << film.key << " t = " << t;
+			EXPECT_FALSE(s.areaLights.empty()) << film.key << " t = " << t;
+			for (const auto &w : s.warnings) ADD_FAILURE() << film.key << " t = " << t << ": " << w.message;
+		}
+	}
+}
+
+TEST(CartoonLittleRobot, TheRobotKneelsAtTheSeedlingAndItBloomsAfterTheWatering) {
+	namespace lr = cartoon::little_robot;
+	const cartoon::Film *film = cartoon::find("little-robot");
+	ASSERT_NE(film, nullptr);
+	EXPECT_DOUBLE_EQ(film->duration, lr::kDuration);
+	// the robot starts left of the seedling and ends beside it
+	EXPECT_LT(lr::robotX(0.5), lr::kSeedling.x - 1.0);
+	EXPECT_NEAR(lr::robotX(lr::kDuration), lr::kStandX, 0.6);
+	// the flower is a good deal more geometry than the bare sprout
+	const size_t sprout = flattenSource(film->sceneAt(20.0)).triangles.size();
+	const size_t flower = flattenSource(film->sceneAt(30.5)).triangles.size();
+	EXPECT_GT(flower, sprout);
+}
+
+TEST(CartoonFireflies, TheSwarmWakesAfterThePairHasMetAndEveryLightIsFaded) {
+	namespace ff = cartoon::fireflies;
+	const cartoon::Film *film = cartoon::find("fireflies");
+	ASSERT_NE(film, nullptr);
+	const size_t early = flattenSource(film->sceneAt(5.0)).areaLights.size();
+	const size_t late = flattenSource(film->sceneAt(23.0)).areaLights.size();
+	EXPECT_GT(late, early + 20) << "dozens more fireflies by the end";
+	EXPECT_EQ(ff::fade(0.0), 0.0) << "the film opens from black";
+	EXPECT_EQ(ff::fade(ff::kDuration), 0.0) << "and closes to black";
+	// the two flashes start out of step and end in step
+	auto offset = [](double t) { return std::abs(ff::glowA(t) - ff::glowB(t)); };
+	double early_gap = 0.0, late_gap = 0.0;
+	for (double t = 6.5; t < 8.0; t += 0.01) early_gap = std::max(early_gap, offset(t));
+	for (double t = 13.0; t < 14.0; t += 0.01) late_gap = std::max(late_gap, offset(t));
+	EXPECT_GT(early_gap, 0.3);
+	EXPECT_LT(late_gap, 1e-6);
+}
+
+TEST(CartoonFireflies, AFireflyDoesNotJumpBetweenFrames) {
+	namespace ff = cartoon::fireflies;
+	const double dt = 1.0 / 24.0;
+	for (double t = 0.0; t < ff::kDuration - dt; t += dt) {
+		EXPECT_LT(cartoon::length(ff::fireflyA(t + dt) - ff::fireflyA(t)), 0.9) << "A jumped at t = " << t;
+		if (t >= 6.0) EXPECT_LT(cartoon::length(ff::fireflyB(t + dt) - ff::fireflyB(t)), 0.9) << "B jumped at t = " << t;
+	}
+}
+

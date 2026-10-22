@@ -16,6 +16,7 @@ namespace newtons_cradle {
 
 constexpr double kDuration = 18.0;
 constexpr int kFps = 24;
+constexpr int kSamples = 128;   // recommended samples per pixel (the Sampler line of the film's header)
 constexpr int kBalls = 5;
 constexpr double kRadius = 0.5;
 constexpr double kStringLength = 2.6;
@@ -78,7 +79,12 @@ inline const std::vector<Shot> &shots() {
 }
 
 // Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator.
-inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t))); }
+inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t)), kSamples); }
+inline std::vector<double> shotStarts() {
+	std::vector<double> v;
+	for (const Shot &s : shots()) v.push_back(s.start);
+	return v;
+}
 
 inline std::string buildCradle(double t) {
 	const Parts &P = parts();

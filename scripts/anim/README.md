@@ -18,8 +18,9 @@ A frame is also an ordinary scene: `ray_tracer --gpu --denoise 1280 256 8 cartoo
 
 ## Writing a film
 
-Add `src/shared/cartoon/<name>.h` with a `headerAt(t)` and a `sceneAt(t)` in the style of the others, and list it at the end of `kFilms` in `cartoons.h` (append, never reorder: a film's
-preset id is its place in the list). Rebuild, then `film.py sheet <key>` to look at it. `docs/VIDEO_GENERATION.md` has the user's side.
+Add `src/shared/cartoon/<name>.h` with `headerAt(t)`, `sceneAt(t)`, `shotStarts()` and `kSamples` in the style of the others, and a row at the end of the table in `cartoons.h`: key, name, description,
+length, fps, still time and the `meta` record (the next free preset number, tags from the vocabulary, one name for each shot, samples). Rebuild, `film.py sheet <key>` to look at it, then
+`python scripts/measure_cartoons.py <key> --write` for its cost and `RT_UPDATE_SNAPSHOT=1 ray_tracer_tests --gtest_filter=CartoonFilmSnapshot*`; paste `ray_tracer --film-table` into the docs. `docs/VIDEO_GENERATION.md` has the user's side.
 
 ## What the toolkit gives a film
 

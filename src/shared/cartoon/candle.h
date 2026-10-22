@@ -17,6 +17,7 @@ namespace candle {
 
 constexpr double kDuration = 20.0;
 constexpr int kFps = 24;
+constexpr int kSamples = 192;   // recommended samples per pixel (the Sampler line of the film's header)
 constexpr double kRadius = 0.50;
 constexpr double kOut = 16.6;       // the flame starts to die
 constexpr double kDark = 18.0;      // the flame is gone
@@ -69,7 +70,12 @@ inline const std::vector<Shot> &shots() {
 }
 
 // Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator.
-inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t))); }
+inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t)), kSamples); }
+inline std::vector<double> shotStarts() {
+	std::vector<double> v;
+	for (const Shot &s : shots()) v.push_back(s.start);
+	return v;
+}
 
 inline std::string buildCandle(double t) {
 	const Parts &P = parts();

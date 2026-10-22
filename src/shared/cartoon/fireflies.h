@@ -13,6 +13,7 @@ namespace fireflies {
 
 constexpr double kDuration = 26.0;
 constexpr int kFps = 24;
+constexpr int kSamples = 192;   // recommended samples per pixel (the Sampler line of the film's header)
 constexpr int kSwarm = 56;
 constexpr int kBlades = 1100;
 
@@ -180,7 +181,12 @@ inline const std::vector<Shot> &shots() {
 
 // Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator. Cheap, and all the scene list
 // needs to describe the film's still.
-inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t))); }
+inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t)), kSamples); }
+inline std::vector<double> shotStarts() {
+	std::vector<double> v;
+	for (const Shot &s : shots()) v.push_back(s.start);
+	return v;
+}
 
 inline std::string sceneAt(double t) {
 	const double f = fade(t);

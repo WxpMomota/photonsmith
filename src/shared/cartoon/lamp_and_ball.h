@@ -12,6 +12,7 @@ namespace lamp_and_ball {
 
 constexpr double kDuration = 20.0;
 constexpr int kFps = 24;
+constexpr int kSamples = 128;   // recommended samples per pixel (the Sampler line of the film's header)
 
 constexpr double kBallR = 0.55;
 constexpr double kGravity = 18.0;
@@ -365,7 +366,8 @@ inline std::string cameraText(double t) {
 
 // Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator. Cheap, and all the scene list
 // needs to describe the film's still.
-inline std::string headerAt(double t) { return sceneHeader(cameraText(t)); }
+inline std::string headerAt(double t) { return sceneHeader(cameraText(t), kSamples); }
+inline std::vector<double> shotStarts() { return {0.0}; }   // one continuous shot
 
 inline std::string sceneAt(double t) {
 	std::string spot;

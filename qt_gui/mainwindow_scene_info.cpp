@@ -319,6 +319,11 @@ void MainWindow::syncCartoonVideoSettings(const QString &sceneId) {
 			m_filmTimeFor = QString::fromUtf8(film->key);
 			m_filmTimeSpin->setRange(0.0, film->duration);
 			m_filmTimeSpin->setValue(film->stillTime);
+			if (m_filmShotCombo) {
+				m_filmShotCombo->clear();
+				for (const std::string &shot : cartoon::shotNamesOf(*film)) m_filmShotCombo->addItem(QString::fromStdString(shot));
+				m_filmShotCombo->setCurrentIndex(-1);
+			}
 		}
 		if (!film) m_filmTimeFor.clear();
 	}

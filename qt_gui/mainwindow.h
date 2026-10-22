@@ -1455,6 +1455,7 @@ private:
 	int currentSceneBucket() const { return m_sceneAvailabilityTabs ? std::max(0, m_sceneAvailabilityTabs->currentIndex()) : 0; }
 	QWidget *m_filmTimeRow = nullptr;        // "Film time": which moment of a film a still render shows; visible for a film's still in image mode
 	QDoubleSpinBox *m_filmTimeSpin = nullptr;
+	QComboBox *m_filmShotCombo = nullptr;    // the film's shots by name: choosing one sets the film time to a moment inside it
 	QString m_filmTimeFor;                   // key of the film the spin box's range and value were last set for
 	QString m_cartoonSettingsFor;   // key of the film whose frames/fps/speed were last set from a cartoon scene; empty when the scene is not a cartoon
 	QTabBar *m_sceneCategoryTabs = nullptr;  // Category filter above the scene dropdown

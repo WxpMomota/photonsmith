@@ -1,6 +1,6 @@
 // cartoon_snapshot_tests.cpp - the cartoon films, pinned by what they contain, in tests/data/cartoon_films_snapshot.txt.
 //
-// One line per film and instant: the film's key, the time, and how many triangles and area lights its scene has. A change to a film (a prop added, a swarm made bigger, a shot's
+// One `meta` line per film (its number, length, shots, tags and samples) and one line per film and instant: the film's key, the time, and how many triangles and area lights its scene has. A change to a film (a prop added, a swarm made bigger, a shot's
 // timing moved) shows up as a diff of that file in review, instead of going unnoticed until someone watches the video. Only counts are stored, never the scene text, so the
 // snapshot does not depend on the last digit of a library's sin() and means the same on every platform. When a film is changed ON PURPOSE, regenerate the file and look at the diff:
 //
@@ -23,6 +23,9 @@ namespace {
 std::vector<std::string> currentSnapshot() {
 	std::vector<std::string> lines;
 	for (const cartoon::Film &film : cartoon::kFilms) {
+		// what the film says about itself, then what its scene holds at four instants
+		lines.push_back("meta|" + std::string(film.key) + "|V" + std::to_string(film.meta.id) + "|" + cartoon::lengthText(film) + "|" + std::to_string(film.fps) + " fps|" + std::to_string(cartoon::shotCountOf(film)) + " shots|" +
+						cartoon::join(cartoon::tagsOf(film), ",") + "|" + std::to_string(film.meta.samples) + " spp");
 		// the first instant, the film's own still, the middle and the last
 		for (double t : {0.0, film.stillTime, film.duration * 0.5, film.duration * 0.999}) {
 			const FlatScene s = flattenSource(film.sceneAt(t));

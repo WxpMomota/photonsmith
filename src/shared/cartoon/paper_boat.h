@@ -16,6 +16,7 @@ namespace paper_boat {
 
 constexpr double kDuration = 24.0;
 constexpr int kFps = 24;
+constexpr int kSamples = 192;   // recommended samples per pixel (the Sampler line of the film's header)
 constexpr double kPondX0 = -15.0, kPondX1 = 15.0, kPondZ0 = -11.0, kPondZ1 = 9.0;
 constexpr int kGridX = 96, kGridZ = 64;
 constexpr double kRippleSpeed = 1.7;   // how fast a ring spreads (units per second)
@@ -200,7 +201,12 @@ inline const std::vector<Shot> &shots() {
 }
 
 // Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator.
-inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t))); }
+inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t)), kSamples); }
+inline std::vector<double> shotStarts() {
+	std::vector<double> v;
+	for (const Shot &s : shots()) v.push_back(s.start);
+	return v;
+}
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The scene
