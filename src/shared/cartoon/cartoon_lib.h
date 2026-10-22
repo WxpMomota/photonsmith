@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <functional>
 #include <initializer_list>
 #include <string>
 #include <utility>
@@ -513,12 +514,12 @@ struct Film {
 	const char *description;   // one line
 	double duration;           // seconds
 	int fps;
-	std::string (*sceneAt)(double t);
-	std::string (*headerAt)(double t);   // sceneAt's first part (up to WorldBegin) on its own
-	std::vector<double> (*shotStarts)();   // when each shot begins, in seconds (the first is 0)
+	std::function<std::string(double)> sceneAt;
+	std::function<std::string(double)> headerAt;   // sceneAt's first part (up to WorldBegin) on its own
+	std::function<std::vector<double>()> shotStarts;   // when each shot begins, in seconds (the first is 0)
 	double stillTime;          // a time that makes a good still picture (a thumbnail, a gallery image)
 	FilmMeta meta;
-	void (*soundtrack)(audio::Mix &) = nullptr;   // places the film's music and sounds on a mix of its length (cartoon_audio.h), or null for a silent film
+	std::function<void(audio::Mix &)> soundtrack;   // (empty: a silent film) places the film's music and sounds on a mix of its length (cartoon_audio.h), or null for a silent film
 };
 
 }  // namespace cartoon

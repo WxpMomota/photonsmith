@@ -189,7 +189,7 @@ TEST(VideoPresets, EveryFilmIsAPresetAndTheCameraPresetsComeFirst) {
 			EXPECT_FALSE(sawCartoon) << p.id << ": the camera presets come before the cartoons";
 		}
 	}
-	EXPECT_EQ(cartoons, cartoon::kFilmCount) << "one preset per film, nothing more";
+	EXPECT_EQ(cartoons, static_cast<int>(cartoon::films().size())) << "one preset per film, nothing more";
 	EXPECT_GE(cameras, 6);
 	for (const cartoon::Film &f : cartoon::kFilms) {
 		const video_preset::VideoPreset *p = video_preset::find(f.key);
@@ -312,7 +312,7 @@ std::filesystem::path scratchDir(const char *name) {
 TEST(CartoonScenes, EveryFilmIsListedFromItsHeaderAloneUnderCartoons) {
 	std::vector<pbrt_discover::Discovered> found;
 	pbrt_discover::listGenerated(found);
-	ASSERT_EQ(found.size(), static_cast<std::size_t>(cartoon::kFilmCount));
+	ASSERT_EQ(found.size(), cartoon::films().size());
 	for (const cartoon::Film &film : cartoon::kFilms) {
 		bool listed = false;
 		for (const pbrt_discover::Discovered &d : found) {

@@ -1,0 +1,75 @@
+# windmill.pbrt -- the scene of examples/animated/windmill.film: a small windmill on a green hill at dusk, a ball that rolls by, and a lamp. The parts marked `# @anim NAME` are the ones
+# the film file moves; the rest stands still. Original, not derived from any distributed scene.
+
+LookAt 0 3 14  0 2.5 0  0 1 0
+Camera "perspective" "float fov" [ 38 ]
+Film "rgb" "integer xresolution" [ 1280 ] "integer yresolution" [ 720 ]
+Sampler "halton" "integer pixelsamples" [ 96 ]
+Integrator "volpath" "integer maxdepth" [ 8 ]
+WorldBegin
+
+LightSource "infinite" "rgb L" [ 0.05 0.07 0.14 ]
+LightSource "distant" "point3 from" [ -6 5 8 ] "point3 to" [ 0 0 0 ] "rgb L" [ 2.4 1.7 1.0 ]
+
+# the hill
+AttributeBegin
+  Material "diffuse" "rgb reflectance" [ 0.16 0.34 0.14 ]
+  Translate 0 -6 0
+  Shape "sphere" "float radius" [ 6.4 ]
+AttributeEnd
+
+# the tower
+AttributeBegin
+  Material "diffuse" "rgb reflectance" [ 0.75 0.7 0.62 ]
+  Translate 0 1.6 0
+  Rotate -90 1 0 0
+  Shape "cone" "float radius" [ 0.9 ] "float height" [ 3.0 ]
+AttributeEnd
+
+# the sails: four flat vanes on a hub, turned about the hub's axis (0 3.4 0.9) by the film
+# @anim sails
+AttributeBegin
+  Material "diffuse" "rgb reflectance" [ 0.9 0.85 0.75 ]
+  Translate 0 3.4 0.95
+  Shape "sphere" "float radius" [ 0.22 ]
+  AttributeBegin
+    Shape "trianglemesh" "integer indices" [ 0 1 2 0 2 3 ] "point3 P" [ -0.2 0.2 0  0.2 0.2 0  0.2 2.4 0  -0.2 2.4 0 ]
+  AttributeEnd
+  AttributeBegin
+    Rotate 90 0 0 1
+    Shape "trianglemesh" "integer indices" [ 0 1 2 0 2 3 ] "point3 P" [ -0.2 0.2 0  0.2 0.2 0  0.2 2.4 0  -0.2 2.4 0 ]
+  AttributeEnd
+  AttributeBegin
+    Rotate 180 0 0 1
+    Shape "trianglemesh" "integer indices" [ 0 1 2 0 2 3 ] "point3 P" [ -0.2 0.2 0  0.2 0.2 0  0.2 2.4 0  -0.2 2.4 0 ]
+  AttributeEnd
+  AttributeBegin
+    Rotate 270 0 0 1
+    Shape "trianglemesh" "integer indices" [ 0 1 2 0 2 3 ] "point3 P" [ -0.2 0.2 0  0.2 0.2 0  0.2 2.4 0  -0.2 2.4 0 ]
+  AttributeEnd
+AttributeEnd
+
+# a ball that rolls past
+# @anim ball
+AttributeBegin
+  Material "coateddiffuse" "rgb reflectance" [ 0.8 0.15 0.12 ] "float roughness" [ 0.05 ]
+  Translate -7 0.45 4
+  Shape "sphere" "float radius" [ 0.45 ]
+AttributeEnd
+
+# a lamp on a post that comes on at dusk
+# @anim lamp
+AttributeBegin
+  Translate 3.2 0.9 2.0
+  Material "diffuse" "rgb reflectance" [ 0.2 0.2 0.2 ]
+  AttributeBegin
+    Rotate -90 1 0 0
+    Shape "cylinder" "float radius" [ 0.05 ] "float zmin" [ 0 ] "float zmax" [ 1.1 ]
+  AttributeEnd
+  AttributeBegin
+    Translate 0 1.25 0
+    Material "diffuse" "rgb reflectance" [ 1 1 1 ]
+    AreaLightSource "diffuse" "rgb L" [ 30 22 10 ]
+    Shape "sphere" "float radius" [ 0.16 ]
+  AttributeEnd
+AttributeEnd

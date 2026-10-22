@@ -114,7 +114,8 @@ inline const std::vector<VideoPreset>& all() {
     static const Table table = [] {
         Table t;
         for (const VideoPreset& p : kCameraPresets) t.presets.push_back(p);
-        for (const cartoon::Film& f : cartoon::kFilms) {
+        for (const cartoon::Film* fp : cartoon::films()) {
+            const cartoon::Film& f = *fp;
             VideoPreset p{};
             p.id = t.keep(cartoon::presetIdOf(f));   // the film's own number (meta.id): stable whatever the order of the film table
             p.key = f.key;

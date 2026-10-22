@@ -277,6 +277,7 @@ add_executable(unit_tests
     unit/cartoon_tests.cpp
     unit/cartoon_films_tests.cpp
     unit/cartoon_pip_tests.cpp
+    unit/film_file_tests.cpp
     unit/cartoon_snapshot_tests.cpp
     unit/path_probe_tests.cpp
     unit/texture_mapping_tests.cpp

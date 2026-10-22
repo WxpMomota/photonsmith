@@ -28,7 +28,8 @@ namespace pbrt_discover {
 
 void listGenerated(std::vector<Discovered> &out) {
 	const std::string dir = cacheDir();
-	for (const cartoon::Film &film : cartoon::kFilms) {
+	for (const cartoon::Film *filmPtr : cartoon::films()) {
+		const cartoon::Film &film = *filmPtr;
 		Discovered d = describe(pathOf(dir, film), cartoon_stills::headerText(film));
 		if (d.ok) out.push_back(std::move(d));
 	}
@@ -36,7 +37,8 @@ void listGenerated(std::vector<Discovered> &out) {
 
 void materializeGenerated(const std::string &path) {
 	const std::string dir = cacheDir();
-	for (const cartoon::Film &film : cartoon::kFilms) {
+	for (const cartoon::Film *filmPtr : cartoon::films()) {
+		const cartoon::Film &film = *filmPtr;
 		if (path != pathOf(dir, film)) continue;
 		cartoon_stills::pruneUnknown(dir);
 		cartoon_stills::ensureOne(dir, film);

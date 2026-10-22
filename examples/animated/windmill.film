@@ -1,0 +1,23 @@
+# windmill.film -- a film made from a pbrt scene (src/shared/cartoon/film_file.h): no C++, no rebuild. Copy this file and windmill.pbrt into your pbrt_scenes folder (or the per-user scenes
+# folder) and the film is a scene of the Cartoons tab and a video preset. `ray_tracer --film-check windmill.film` checks it.
+
+film     windmill
+name     The Windmill
+about    The sails turn, a ball rolls past, a lamp comes on as the light goes, and the camera drifts round to the lamp.
+scene    windmill.pbrt
+length   12
+fps      24
+still    6
+tags     emissive,dusk
+
+shot 0 The windmill
+  key  0 3 14    0 2.5 0    38
+  key  -4 3.5 12  0 2.8 0    38
+
+shot 7 The lamp
+  key  -4 3.5 12  0 2.8 0    38
+  key  2 2 9      3.2 1.9 2  34  0.04 8
+
+turn  sails about 0 3.4 0.95 axis 0 0 1   0 0   12 -720
+move  ball  0 0 0 0   12 14 0 0
+light lamp  0 0   4 0   8 1   12 1

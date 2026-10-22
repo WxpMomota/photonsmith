@@ -71,7 +71,7 @@ inline bool upToDate(const std::filesystem::path &path, const std::string &hash)
 	return line == std::string(kHashTag) + hash;
 }
 
-// Removes the generated stills of films that are no longer in kFilms (a renamed or dropped film would otherwise leave its file behind).
+// Removes the generated stills of films that are no longer films (a renamed or dropped film would otherwise leave its file behind).
 inline void pruneUnknown(const std::string &dir) {
 	std::error_code ec;
 	for (const auto &entry : std::filesystem::directory_iterator(dir, ec)) {
@@ -79,7 +79,7 @@ inline void pruneUnknown(const std::string &dir) {
 		const std::string name = entry.path().filename().string();
 		if (name.compare(0, std::string(cartoon::kStillSlugPrefix).size(), cartoon::kStillSlugPrefix) != 0 || entry.path().extension() != ".pbrt") continue;
 		bool known = false;
-		for (const cartoon::Film &film : cartoon::kFilms) known = known || name == fileName(film);
+		for (const cartoon::Film *film : cartoon::films()) known = known || name == fileName(*film);
 		if (!known) std::filesystem::remove(entry.path(), ec);
 	}
 }
@@ -112,7 +112,7 @@ inline void ensure(const std::string &dir) {
 	std::error_code ec;
 	std::filesystem::create_directories(dir, ec);
 	pruneUnknown(dir);
-	for (const cartoon::Film &film : cartoon::kFilms) ensureOne(dir, film);
+	for (const cartoon::Film *film : cartoon::films()) ensureOne(dir, *film);
 }
 
 }  // namespace cartoon_stills

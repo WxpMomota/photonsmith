@@ -9,11 +9,17 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <exception>
+#include <filesystem>
 #include <string>
 #include <vector>
+
+#include "../pbrt_asset_check.h"
 
 #include "ball_parade.h"
 #include "candle.h"
@@ -24,6 +30,7 @@
 #include "little_robot.h"
 #include "meet_pip.h"
 #include "newtons_cradle.h"
+#include "film_file.h"
 #include "orrery.h"
 #include "paper_boat.h"
 #include "pip_and_the_moon.h"
@@ -89,10 +96,114 @@ inline const Film kFilms[] = {
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 
+// ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+// All the films: the ones above, and the ones made from files (film_file.h)
+// ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Where film files (*.film) are looked for: the folders scenes are (RAY_TRACER_PBRT_DIR, pbrt_scenes beside the program or up from it, the per-user scenes folder).
+inline std::vector<std::string> filmFileDirs() {
+	std::vector<std::string> dirs;
+	if (const char *env = std::getenv("RAY_TRACER_PBRT_DIR")) {
+		if (*env) dirs.emplace_back(env);
+	}
+	for (const char *d : {"pbrt_scenes", "../pbrt_scenes", "../../pbrt_scenes"}) dirs.emplace_back(d);
+	if (const std::string user = pbrt_asset_check::userSceneDir(); !user.empty()) dirs.push_back(user);
+	return dirs;
+}
+
+namespace detail {
+
+struct Registry {
+	std::deque<film_file::DataFilm> data;
+	std::deque<Film> made;
+	std::deque<std::string> strings;
+	std::vector<const Film *> all;
+	std::vector<std::string> problems;
+	const char *keep(std::string s) {
+		strings.push_back(std::move(s));
+		return strings.back().c_str();
+	}
+};
+
+// Loads one film file into the registry (or says why not).
+inline void addFilmFile(Registry &r, const std::string &file) {
+	r.data.emplace_back();
+	film_file::DataFilm &d = r.data.back();
+	std::string problem = d.load(file);
+	if (problem.empty()) {
+		for (const Film *f : r.all)
+			if (d.spec.key == f->key) problem = file + ": the key \"" + d.spec.key + "\" is already a film's (" + f->name + ")";
+	}
+	if (!problem.empty()) {
+		r.data.pop_back();
+		r.problems.push_back(problem);
+		return;
+	}
+	// the tags that are in the vocabulary
+	std::string tags;
+	{
+		std::string word;
+		for (std::size_t i = 0; i <= d.spec.tags.size(); ++i) {
+			const char c = i < d.spec.tags.size() ? d.spec.tags[i] : ',';
+			if (c == ',' || c == ' ') {
+				if (!word.empty()) {
+					for (const char *v : kTagVocabulary)
+						if (word == v) tags += (tags.empty() ? "" : ",") + word;
+					word.clear();
+				}
+			} else {
+				word += c;
+			}
+		}
+	}
+	// a stable number from the key (fixed once given, whatever other films there are): 1000 + a hash, moved on past any that is taken
+	std::uint32_t h = 2166136261u;
+	for (char c : d.spec.key) h = (h ^ static_cast<unsigned char>(c)) * 16777619u;
+	int id = 1000 + static_cast<int>(h % 9000u);
+	for (bool taken = true; taken;) {
+		taken = false;
+		for (const Film *f : r.all) taken = taken || f->meta.id == id;
+		if (taken) ++id;
+	}
+	const film_file::DataFilm *p = &d;
+	Film f{r.keep(d.spec.key), r.keep(d.spec.name), r.keep(d.spec.about.empty() ? "A film made from " + std::filesystem::path(d.spec.scene).filename().string() + "." : d.spec.about),
+		   d.spec.length, d.spec.fps, [p](double t) { return p->sceneAt(t); }, [p](double t) { return p->headerAt(t); }, [p]() { return p->shotStarts(); }, d.spec.still,
+		   {id, r.keep(tags), r.keep(d.shotNames()), d.scene.samples, 0.0}};
+	r.made.push_back(std::move(f));
+	r.all.push_back(&r.made.back());
+}
+
+inline Registry &registry() {
+	static Registry *r = [] {
+		Registry *reg = new Registry();   // (lives as long as the program: films hand out pointers into it)
+		for (const Film &f : kFilms) reg->all.push_back(&f);
+		std::vector<std::string> files;
+		for (const std::string &dir : filmFileDirs()) {
+			std::error_code ec;
+			for (const auto &entry : std::filesystem::directory_iterator(dir, ec)) {
+				if (ec) break;
+				if (entry.path().extension() != ".film") continue;
+				const std::string canonical = std::filesystem::weakly_canonical(entry.path(), ec).string();
+				if (std::find(files.begin(), files.end(), canonical) == files.end()) files.push_back(canonical);
+			}
+		}
+		std::sort(files.begin(), files.end());
+		for (const std::string &file : files) addFilmFile(*reg, file);
+		return reg;
+	}();
+	return *r;
+}
+
+}  // namespace detail
+
+// Every film: the built-in ones in the table's order, then those made from film files (in the order of their file names).
+inline const std::vector<const Film *> &films() { return detail::registry().all; }
+// What was wrong with the film files that were left out ("file:line: what"), one entry each.
+inline const std::vector<std::string> &filmFileProblems() { return detail::registry().problems; }
+
 inline const Film *find(const char *key) {
 	if (!key) return nullptr;
-	for (const Film &f : kFilms)
-		if (std::strcmp(f.key, key) == 0) return &f;
+	for (const Film *f : films())
+		if (std::strcmp(f->key, key) == 0) return f;
 	return nullptr;
 }
 
@@ -161,7 +272,8 @@ inline std::string summaryOf(const Film &film) {
 	std::string out = std::string(film.description) + " " + lengthText(film) + " in " + std::to_string(shotCountOf(film)) + (shotCountOf(film) == 1 ? " shot" : " shots");
 	const std::vector<std::string> shots = shotNamesOf(film);
 	if (!shots.empty()) out += " (" + join(shots, ", ") + ")";
-	out += ". Tags: " + join(tagsOf(film), ", ") + ".";
+	out += ".";
+	if (!tagsOf(film).empty()) out += " Tags: " + join(tagsOf(film), ", ") + ".";
 	if (!costText(film).empty()) out += " A frame takes " + costText(film) + " (1280 x 720, " + std::to_string(film.meta.samples) + " samples, GPU, denoised).";
 	return out;
 }
@@ -191,7 +303,7 @@ inline bool parseStill(const std::string &spec, Still &out, std::string &error) 
 	const Film *film = find(key.c_str());
 	if (!film) {
 		error = "Unknown cartoon \"" + key + "\" - valid cartoons:";
-		for (const Film &f : kFilms) error += " " + cameraPathOf(f);
+		for (const Film *f : films()) error += " " + cameraPathOf(*f);
 		return false;
 	}
 	double t = film->stillTime;

@@ -831,6 +831,32 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
     return render_result;
 }
 
+// `ray_tracer --film-check [FILE.film ...]`: checks film files (cartoon/film_file.h): each is loaded with its scene and either described or reported with the file and line of what is wrong. With
+// no file it lists the films found in the scene folders and the files that were left out. Exit status 1 when anything is wrong.
+static int film_check_command(int argc, char** argv) {
+	int bad = 0;
+	for (int i = 2; i < argc; ++i) {
+		cartoon::film_file::DataFilm film;
+		const std::string problem = film.load(argv[i]);
+		if (!problem.empty()) {
+			std::cout << "PROBLEM  " << problem << std::endl;
+			++bad;
+			continue;
+		}
+		std::cout << "OK       " << argv[i] << ": film \"" << film.spec.key << "\", " << film.spec.length << " s at " << film.spec.fps << " fps, " << film.shotStarts().size() << (film.shotStarts().size() == 1 ? " shot" : " shots")
+				  << ", " << film.spec.anims.size() << " animation line" << (film.spec.anims.size() == 1 ? "" : "s") << ", " << film.scene.names.size() << " animated block" << (film.scene.names.size() == 1 ? "" : "s") << std::endl;
+	}
+	if (argc == 2) {
+		for (const cartoon::Film *f : cartoon::films())
+			if (f->meta.id >= 1000) std::cout << "FOUND    " << f->key << " (" << cartoon::presetIdOf(*f) << "): " << f->name << ", " << cartoon::lengthText(*f) << std::endl;
+		for (const std::string &p : cartoon::filmFileProblems()) {
+			std::cout << "PROBLEM  " << p << std::endl;
+			++bad;
+		}
+	}
+return bad == 0 ? EXIT_SUCCESS : 1;
+}
+
 int main(int argc, char** argv) {
 	// `ray_tracer --prepare-gpu`: builds the GPU renderer for this machine and exits (a Mac's first Metal render otherwise waits about a minute and a half for it). The GUI runs
 	// this in the background at its start. Exit code 0 when it is ready or there is nothing to prepare.
@@ -891,6 +917,7 @@ int main(int argc, char** argv) {
 		std::cout << cartoon::markdownTable();
 		return EXIT_SUCCESS;
 	}
+	if (argc >= 2 && std::string(argv[1]) == "--film-check") return film_check_command(argc, argv);
 	std::cout << "========================================" << std::endl;
 	std::cout << "RAY TRACER LAUNCHER (Unified GPU/CPU)" << std::endl;
 	std::cout << "========================================" << std::endl;

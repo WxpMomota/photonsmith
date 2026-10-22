@@ -292,6 +292,53 @@ feet, open its mouth and strike the water, so what you hear is on the beat of wh
 ffmpeg, and the .wav is kept beside the video (`<name>_video.wav`); a video of another length is made without sound, since the sound is made for the film's own timing. On a Mac the built-in
 encoder cannot add sound, so a film's sound needs ffmpeg there (without it the video is silent and the .wav is beside it).
 
+## Films from files: animate a pbrt scene without C++
+
+A film does not have to be C++. A **film file** (`name.film`, plain text) animates an ordinary pbrt scene of your own: a camera that cuts between shots, parts that move, turn, grow, light up
+and appear. Put the `.film` file and its scene in your `pbrt_scenes` folder (or the per-user scenes folder) and the film is a scene of the Cartoons tab and a video preset like the built-in
+ones, with no rebuild. `examples/animated/windmill.film` and `windmill.pbrt` are a complete example (a windmill whose sails turn, a ball that rolls past, a lamp that fades up, two camera shots).
+
+The parts that move are marked in the pbrt file with a comment line right before an `AttributeBegin` ... `AttributeEnd` block:
+
+```
+# @anim sails
+AttributeBegin
+  ...
+AttributeEnd
+```
+
+and the film file says what happens to them (`#` starts a comment; times are seconds; coordinates are the pbrt scene's own):
+
+```
+film     windmill                  # the key: lower-case letters, digits, '-' (default: the file's name)
+name     The Windmill              # what the scene list calls it
+about    The sails turn, a ball rolls past, a lamp comes on.
+scene    windmill.pbrt             # relative to this file (required)
+length   12                        # seconds (required)
+fps      24                        # default 24
+still    6                         # the moment the scene list's picture shows (default: the middle)
+tags     emissive,dusk             # words from the scene list's tags (others are ignored)
+ease     1                         # 1: motions start and stop gently (the default); 0: even pace
+
+shot 0 The windmill                # a camera shot from 0 s; the next shot is a hard cut
+  key  0 3 14   0 2.5 0   38       # where the camera is, what it looks at, [fov [lensRadius focusDistance]], [hold S]
+  key  -4 3.5 12  0 2.8 0  38      #   (the same `key` lines as a --camera-keyframes file: the camera goes through them)
+shot 7 The lamp
+  key  ...
+
+turn  sails about 0 3.4 0.95 axis 0 0 1   0 0   12 -720    # turn NAME about a point, around an axis: pairs of time and degrees
+move  ball  0 0 0 0   12 14 0 0                            # translate NAME: groups of time x y z
+grow  flower about 0 0 0   0 0.1   4 1                     # scale NAME about a point: pairs of time and factor
+light lamp  0 0   4 0   8 1   12 1                         # the power of the lights in NAME times k: pairs of time and factor
+show  ghost 3 5   8 9                                      # NAME is in the scene only between these times
+```
+
+Between two keys a value changes smoothly (evenly with `ease 0`); before the first it holds the first value and after the last the last. A shot with one `key` is a camera that stays; a film with
+no shots keeps the scene's own camera. Meshes and pictures the pbrt file names by a relative path are looked up beside the pbrt file. `ray_tracer --film-check FILE.film` loads a film file and its
+scene and says what it found or what is wrong, with the file and line; with no file it lists the films found in the scene folders and the files that were left out (a film with a problem is left out
+of the scene list, never half-loaded). A film made from a file has a video preset number of its own, `V` and a number from 1000 up worked out from its key, so it never changes when other films
+are added. The sound of a built-in film is C++; a film file has none.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)
