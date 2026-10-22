@@ -62,8 +62,8 @@
 	-Tier Slow this is ignored (with a warning) if also given - pass the
 	full desired pattern directly via -Filter with -Tier All instead.
 .PARAMETER Tier
-	Which slice of the suite to run (default: All, today's original
-	unfiltered behavior - existing invocations are unaffected):
+	Which slice of the suite to run (default: Split, the whole suite the fast way; All when a -Filter is
+	given):
 	  - Fast: excludes every GPU-touching test (matched by the *Gpu*/
 	    *GPU*/*gpu* naming convention this codebase's test suites follow,
 	    plus two suites that don't follow it - WavefrontRenderTest,
@@ -121,8 +121,8 @@ param(
 
 	[string]$Filter = "",
 
-	[ValidateSet("All", "Fast", "Render", "Slow", "Split")]
-	[string]$Tier = "All",
+	[ValidateSet("", "All", "Fast", "Render", "Slow", "Split")]
+	[string]$Tier = "",
 
 	# -Tier Render / Split: how many processes the CPU-render tests are spread over (each gets its share of the cores). Measured on 16 cores (509 tests): 1 process 338 s,
 	# 4 or 8 processes 154 s, 16 processes 187 s.
@@ -138,6 +138,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# No -Tier: the whole suite the fast way (Split, about 6.5 minutes on this machine; -Tier All, one set of shards for everything, is the slowest way to run it and takes 10 to 25),
+# or, when a -Filter is given (which Split cannot take), All with that filter.
+if (-not $Tier) { $Tier = if ($Filter) { "All" } else { "Split" } }
 
 if ($Tier -eq "Split") {
 	if ($Filter) { Write-Host "[FAIL] -Filter cannot be combined with -Tier Split." -ForegroundColor Red; exit 1 }
