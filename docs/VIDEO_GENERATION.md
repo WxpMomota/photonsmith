@@ -88,7 +88,7 @@ two for spiral, the whole start→end traversal for linear) no matter the
 speed, so it always swings all the way around/through the scene. Instead,
 `--speed` scales how many frames that sweep is spread across: `--frames` is
 the "1.0x" baseline frame count, and the actual number of rendered frames is
-`frames / speed` (capped at 5000). `0.5x` renders twice as many frames,
+`frames / speed` (capped at 20000). `0.5x` renders twice as many frames,
 spreading the same journey over more of them - and more real video time at
 the same `--fps` - so it looks slower without ever cutting the path short.
 `2.0x` renders half as many frames, covering the same journey faster (and
@@ -244,6 +244,12 @@ single-image render of a pbrt file: every renderer feature works, and a frame co
 are rendered at once** on a GPU (one on the CPU, which a single render already fills): while one renders the other starts up or writes its picture, which takes a 12-frame Newton's Cradle from 50 s to
 36 s; `--cartoon-jobs 3` (or the environment variable `RAY_TRACER_CARTOON_JOBS`) is faster still, 32 s, at about 3 GB of video memory for each frame in flight. The pictures are put in frame order
 whatever order they finish in. `--frames` / `--fps` change how the film is sampled and played back, not its story.
+
+**A long film is safe to render.** A frame that takes longer than `--cartoon-timeout S` seconds (15 minutes on a GPU by default, never on the CPU; `0` = never; the environment variable
+`RAY_TRACER_CARTOON_TIMEOUT` also sets it) is stopped and tried once more, so one stuck frame does not hold up the rest. A frame that still fails is repeated from the frame before it, so the
+video keeps its length and its sound stays in step (the run says how many). **`--resume` continues an interrupted video**: the frames already rendered are kept (each is a numbered picture in the
+`frames` folder, written whole or not at all), and only the missing ones are rendered; it does this only when the film, the size, the samples and the flags are the same as the interrupted run's
+(a signature file in the folder says so), and otherwise starts again. A rendered frame leaves only its picture in the folder, not the renderer's own files (a film has thousands).
 
 **Writing a film that renders fast:** a glowing ball must be `emissiveSphere(centre, radius, light)` (pbrt's own sphere, one light), never an emitting `uvSphere` mesh: every triangle of an emitting
 mesh is a light of its own to sample, so a mesh ball is hundreds of lights. The Candle's 70 out-of-focus lights took a frame from 7 s to 19 s as meshes, and cost 7 s again as spheres.

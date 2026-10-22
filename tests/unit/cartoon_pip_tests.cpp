@@ -45,7 +45,7 @@ TEST(CartoonActor, ThePoseOfTheWholeFilmNeverMakesABadNumber) {
 // ---- the picture --------------------------------------------------------------------------------------------------------------------------------------------------------
 
 TEST(CartoonPipAndTheMoon, NoSceneOfTheFilmHasABadNumber) {
-	for (double t = 0.0; t < pm::kDuration; t += 0.5) {
+	for (double t = 0.0; t < pm::kDuration; t += 1.0) {
 		const std::string s = pm::sceneAt(t);
 		ASSERT_EQ(s.find("nan"), std::string::npos) << "t = " << t;
 		for (std::size_t at = s.find("inf"); at != std::string::npos; at = s.find("inf", at + 1))

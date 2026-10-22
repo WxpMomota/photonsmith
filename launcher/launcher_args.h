@@ -372,6 +372,10 @@ struct LaunchArgs {
 	std::string cartoon_still;
 	// --cartoon-jobs N: how many frames of a cartoon video are rendered at once; 0 = automatic (launcher/cartoon_render.h, jobsFor).
 	int cartoon_jobs = 0;
+	// --cartoon-timeout S: a frame of a cartoon video that has not finished after S seconds is stopped and tried once more; 0 = never; -1 = automatic (launcher/cartoon_render.h, timeoutFor).
+	int cartoon_timeout = -1;
+	// --resume: continue an interrupted cartoon video from the frames it already rendered (when the settings and the film are the same), instead of starting again.
+	bool cartoon_resume = false;
 	double cam_x             = kDefaultCameraX;
 	double cam_y             = kDefaultCameraY;
 	double cam_z             = kDefaultCameraZ;
@@ -844,6 +848,18 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 		} catch (const std::exception&) {
 			std::cerr << "Invalid --cartoon-jobs, using the automatic number\n";
 		}
+	} else if (arg == "--cartoon-timeout" && i + 1 < argc) {
+		try {
+			out.cartoon_timeout = std::max(0, std::stoi(argv[i + 1]));
+			consumed_args.insert(i);
+			consumed_args.insert(i + 1);
+			++i;
+		} catch (const std::exception&) {
+			std::cerr << "Invalid --cartoon-timeout, using the automatic one\n";
+		}
+	} else if (arg == "--resume") {
+		out.cartoon_resume = true;
+		consumed_args.insert(i);
 	} else if (arg == render_flags::kFps && i + 1 < argc) {
 		try {
 			out.video_fps = std::stoi(argv[i + 1]);
@@ -1155,6 +1171,11 @@ inline void print_launch_help(const char* program) {
 				  << "               cartoon films (length, shots, tags) as the markdown table of the docs.\n"
 				  << "  --cartoon-jobs N: how many frames of a cartoon video are rendered at once (default: 2 on a\n"
 				  << "               GPU, 1 on the CPU; the environment variable RAY_TRACER_CARTOON_JOBS also sets it)\n"
+				  << "  --cartoon-timeout S: a frame of a cartoon video that takes longer than S seconds is stopped and\n"
+				  << "               tried once more (default: 900 on a GPU, never on the CPU; 0 = never; the environment\n"
+				  << "               variable RAY_TRACER_CARTOON_TIMEOUT also sets it)\n"
+				  << "  --resume:    continue an interrupted cartoon video from the frames already rendered, when the film and\n"
+				  << "               the settings (size, samples, flags) are the same; otherwise it starts again\n"
 				  << "               Accepts either short id or descriptive key:\n"
 				  << "               V1/cornell-orbit, V2/teapot-spin, V3/one-weekend-flyby,\n"
 				  << "               V4/next-week-finale, V5/glass-dragon-caustics,\n"

@@ -143,7 +143,9 @@
     <ClCompile Include="unit\hair_bxdf_tests.cpp" />
     <ClCompile Include="unit\halton_sampler_tests.cpp" />
     <ClCompile Include="unit\loop_subdivide_tests.cpp" />
-    <ClCompile Include="unit\cartoon_tests.cpp" />
+    <ClCompile Include="unit\cartoon_tests.cpp">
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="unit\cartoon_films_tests.cpp" />
     <ClCompile Include="unit\cartoon_pip_tests.cpp" />
     <ClCompile Include="unit\cartoon_snapshot_tests.cpp" />

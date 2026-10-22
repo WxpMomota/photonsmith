@@ -269,10 +269,12 @@ public:
     // render loop while the worker thread is running.
     // `already_png`: the frame file is already PNG (a Metal frame), so the
     // worker moves it into the enc_NNNN.png sequence instead of converting.
-    void push(std::string frame_path, bool already_png = false) {
+    // `frame_index` >= 0 names the picture by its frame (a cartoon's, so that a frame that failed leaves a hole that can be filled and an interrupted video can be resumed); the default numbers
+    // the pictures in the order pushed.
+    void push(std::string frame_path, bool already_png = false, int frame_index = -1) {
         {
             std::lock_guard<std::mutex> lock(mtx_);
-            queue_.push({std::move(frame_path), already_png});
+            queue_.push({std::move(frame_path), already_png, frame_index});
         }
         cv_.notify_one();
     }
@@ -303,19 +305,33 @@ private:
             }
 
             char enc_filename[32];
-            std::snprintf(enc_filename, sizeof(enc_filename), "enc_%04d.png", next_index);
-            std::filesystem::path png_path = frames_dir_ / enc_filename;
+            std::snprintf(enc_filename, sizeof(enc_filename), "enc_%04d.png", job.index >= 0 ? job.index : next_index);
+            const std::filesystem::path png_path = frames_dir_ / enc_filename;
+            // written under another name and renamed when whole, so that a render stopped in the middle of a picture leaves no half picture that a resumed render would trust
+            const std::filesystem::path tmp_path = frames_dir_ / (std::string(enc_filename) + ".tmp.png");
             bool ok;
+            std::error_code ec;
             if (job.already_png) {
-                std::error_code ec;
-                std::filesystem::rename(job.path, png_path, ec);
+                std::filesystem::rename(job.path, tmp_path, ec);
                 ok = !ec;
             } else {
-                ok = convert_ppm_to_png(job.path.c_str(), png_path.string().c_str());
+                ok = convert_ppm_to_png(job.path.c_str(), tmp_path.string().c_str());
             }
             if (ok) {
-                ++next_index;
-                converted_ = next_index;
+                std::filesystem::rename(tmp_path, png_path, ec);
+                ok = !ec;
+            }
+            if (ok) {
+                if (job.index < 0) ++next_index;
+                ++converted_;
+                if (job.index >= 0) {
+                    // a cartoon's rendered frame is kept as its picture only: the renderer's own files (a 1280 x 720 .ppm is 2.7 MB; a film has thousands) are not needed again
+                    std::filesystem::remove(job.path, ec);
+                    std::filesystem::path own_png = job.path;
+                    own_png.replace_extension(".png");
+                    std::filesystem::remove(own_png, ec);
+                    std::filesystem::remove(job.path + ".run_marker.txt", ec);
+                }
             } else {
                 std::lock_guard<std::mutex> lock(mtx_);
                 std::cerr << "\nWARNING: PNG conversion failed for " << job.path << std::endl;
@@ -326,7 +342,7 @@ private:
     std::filesystem::path frames_dir_;
     std::mutex mtx_;
     std::condition_variable cv_;
-    struct QueuedFrame { std::string path; bool already_png; };
+    struct QueuedFrame { std::string path; bool already_png; int index; };
     std::queue<QueuedFrame> queue_;
     bool done_ = false;
     int converted_ = 0;
@@ -645,7 +661,7 @@ static int resolveVideoFrameCount(int video_frames, double video_speed, int vide
     // frame count. --frames is the "1.0x" baseline frame count.
     render_frame_count = static_cast<int>(std::llround(video_frames / video_speed));
     if (render_frame_count < 1) render_frame_count = 1;
-    const int kMaxVideoFrames = 5000;
+    const int kMaxVideoFrames = 20000;
     if (render_frame_count > kMaxVideoFrames) {
         std::cout << "WARNING: --speed " << video_speed << " with --frames " << video_frames
                    << " would need " << render_frame_count << " frames; capping at "
@@ -685,8 +701,9 @@ struct VideoPaths {
     std::filesystem::path video_path;
 };
 
-// The temporary frame directory (emptied) and the output video path. SUCCESS, or ERR_FILE_WRITE_FAILED.
-static int prepareVideoDirectories(const std::string &out_path, int render_frame_count, VideoPaths &paths) {
+// The temporary frame directory (emptied, unless `signature` says the frames in it are those of an interrupted run of this very video and `resume` asks to continue it) and the output video
+// path. A cartoon's frames come with a signature file (cartoon_render.h, resumeSignature). SUCCESS, or ERR_FILE_WRITE_FAILED.
+static int prepareVideoDirectories(const std::string &out_path, int render_frame_count, VideoPaths &paths, const std::string &signature = std::string(), bool resume = false) {
     std::filesystem::path out_path_obj(out_path);
     std::filesystem::path frames_dir = out_path_obj.parent_path() / "frames";
     std::filesystem::path video_path = out_path_obj.parent_path() / (out_path_obj.stem().string() + "_video.mp4");
@@ -694,13 +711,31 @@ static int prepareVideoDirectories(const std::string &out_path, int render_frame
     paths.video_path = video_path;
 
     try {
-        // Clear any frames left over from a previous video render - otherwise
-        // stale files can mix with (or mask) this run's sequence, especially
-        // when this run has fewer frames than the last one.
-        if (std::filesystem::exists(frames_dir)) {
-            std::filesystem::remove_all(frames_dir);
+        bool keep = false;
+        if (resume && !signature.empty() && std::filesystem::exists(frames_dir / "resume.txt")) {
+            std::ifstream in(frames_dir / "resume.txt");
+            const std::string saved((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            keep = saved == signature;
+            if (!keep) std::cout << "The frames in " << frames_dir << " are not those of this video (another film, size, quality or flags); starting again." << std::endl;
         }
-        std::filesystem::create_directories(frames_dir);
+        if (keep) {
+            // pictures that were being written when the earlier run stopped, and its working folders, are not frames
+            for (const auto &entry : std::filesystem::directory_iterator(frames_dir)) {
+                const std::string name = entry.path().filename().string();
+                if (name.find(".tmp.png") != std::string::npos || entry.path().extension() == ".ppm") std::filesystem::remove(entry.path());
+                else if (entry.is_directory()) std::filesystem::remove_all(entry.path());
+            }
+        } else {
+            // Clear any frames left over from a previous video render - otherwise
+            // stale files can mix with (or mask) this run's sequence, especially
+            // when this run has fewer frames than the last one.
+            if (std::filesystem::exists(frames_dir)) std::filesystem::remove_all(frames_dir);
+            std::filesystem::create_directories(frames_dir);
+        }
+        if (!signature.empty()) {
+            std::ofstream out(frames_dir / "resume.txt", std::ios::binary);
+            out << signature;
+        }
     } catch (const std::exception& e) {
         std::cerr << "ERROR: Failed to create frames directory: " << e.what() << std::endl;
         return ERR_FILE_WRITE_FAILED;
@@ -802,16 +837,29 @@ static int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
             std::snprintf(name, sizeof(name), frame_is_png ? "frame_%04d.png" : "frame_%04d.ppm", frame);
             return frames_dir / name;
         };
-        std::cout << "\nRendering " << render_frame_count << " frames of " << cartoon_film->name << ", " << jobs << " at a time." << std::endl;
-        int reported = 0;
+        // frames a resumed run finds already rendered (their pictures are in the folder: prepareVideoDirectories kept them because the video is the same)
+        std::vector<char> already(static_cast<std::size_t>(render_frame_count), 0);
+        int resumed = 0;
+        if (args.cartoon_resume) {
+            for (int frame = 0; frame < render_frame_count; ++frame)
+                if (std::filesystem::exists(frames_dir / cartoon_render::encName(frame))) already[static_cast<std::size_t>(frame)] = 1, ++resumed;
+            if (resumed > 0) std::cout << "\nResuming: " << resumed << " of " << render_frame_count << " frames are already rendered." << std::endl;
+        }
+        const int timeout = cartoon_render::timeoutFor(args, use_gpu);
+        std::cout << "\nRendering " << (render_frame_count - resumed) << " frames of " << cartoon_film->name << ", " << jobs << " at a time";
+        if (timeout > 0) std::cout << " (a frame that takes more than " << timeout << " s is stopped and tried once more)";
+        std::cout << "." << std::endl;
+        int reported = resumed;
         successful_frames = cartoon_render::runInParallel(
             render_frame_count, jobs,
             [&](int frame, int worker) {
+                if (already[static_cast<std::size_t>(frame)]) return 0;
                 const double film_time = cartoon_film->duration * frame / std::max(1, render_frame_count);
                 return cartoon_render::renderFrame(*cartoon_film, film_time, frames_dir / ("work" + std::to_string(worker)) / ("cartoon_" + std::to_string(frame) + ".pbrt"), s.exe_path, args,
-                                                   image_width, image_height, samples_per_pixel, max_ray_depth, frame_file(frame).string());
+                                                   image_width, image_height, samples_per_pixel, max_ray_depth, frame_file(frame).string(), timeout);
             },
             [&](int frame, int rc, double seconds) {   // as each frame finishes: one line, the count being how many are done
+                if (already[static_cast<std::size_t>(frame)]) return;
                 std::ostringstream line;
                 line << "\n[" << ++reported << "/" << render_frame_count << "] Rendering " << frame_file(frame).filename().string() << " (" << cartoon_film->name << " at " << std::fixed
                      << std::setprecision(2) << cartoon_film->duration * frame / std::max(1, render_frame_count) << " s)...";
@@ -820,7 +868,7 @@ static int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
                 (rc == 0 ? std::cout : std::cerr) << line.str() << std::endl;
             },
             [&](int frame, int rc) {   // in frame order: the video's picture sequence
-                if (rc == 0) png_converter.push(frame_file(frame).string(), frame_is_png);
+                if (rc == 0 && !already[static_cast<std::size_t>(frame)]) png_converter.push(frame_file(frame).string(), frame_is_png, frame);
             });
     }
 
@@ -989,6 +1037,16 @@ static int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
     // conversion is far faster than a render) and gets the final count.
     std::cout << "Finishing PNG conversion..." << std::endl;
     converted = png_converter.finish();
+    if (cartoon_film) {
+        // every frame that has a picture, however it came (this run, or the run being resumed); a hole is filled with the frame before it so that the video keeps its length
+        converted = cartoon_render::countFrames(frames_dir, render_frame_count);
+        if (converted > 0 && converted < render_frame_count) {
+            const int filled = cartoon_render::fillMissingFrames(frames_dir, render_frame_count);
+            std::cout << "WARNING: " << (render_frame_count - converted) << " frame(s) failed; each is repeated from the frame before it so that the video keeps its length"
+                      << (filled == render_frame_count - converted ? "." : " (some could not be).") << std::endl;
+            converted = cartoon_render::countFrames(frames_dir, render_frame_count);
+        }
+    }
 
     std::cout << "Rendered: " << successful_frames << " frames, converted: " << converted << " PNG files" << std::endl;
 
@@ -1091,7 +1149,10 @@ static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
     if (int rc = resolveVideoFrameCount(s.video_frames, s.video_speed, s.video_fps, render_frame_count); rc != SUCCESS) return rc;
     pinThreadsForVideo(s.use_gpu);
     VideoPaths paths;
-    if (int rc = prepareVideoDirectories(s.out_path, render_frame_count, paths); rc != SUCCESS) return rc;
+    std::string resume_signature;
+    if (const cartoon::Film *film = cartoon::forCameraPath(s.camera_path.c_str()))
+        resume_signature = cartoon_render::resumeSignature(*film, args, render_frame_count, s.video_fps, image_width, image_height, s.samples_per_pixel, s.max_ray_depth);
+    if (int rc = prepareVideoDirectories(s.out_path, render_frame_count, paths, resume_signature, args.cartoon_resume); rc != SUCCESS) return rc;
     const VideoCameraStart start = cartoon::isCartoonPath(s.camera_path.c_str()) ? VideoCameraStart{0, 0, 0, 0, 0, 0} : videoCameraStart(args, s);
 
     int converted = 0;

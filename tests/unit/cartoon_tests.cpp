@@ -248,10 +248,17 @@ TEST(CartoonRender, TheFrameRunRepeatsTheUsersFlagsAndDropsTheVideoOnes) {
 	const std::vector<std::string> flags = cartoon_render::forwardedFlags(args);
 	const std::vector<std::string> expected = {"--gpu", "--denoise", "--denoise-blend", "0.1", "--seed", "7"};
 	EXPECT_EQ(flags, expected);
-	const std::string cmd = cartoon_render::frameCommand("C:/p/ray tracer.exe", flags, 480, 270, 64, 8, "C:/o/frames/frame_0001.ppm", "C:/o/frames/cartoon_1.pbrt");
-	EXPECT_NE(cmd.find("\"C:/p/ray tracer.exe\""), std::string::npos) << "paths with spaces are quoted";
-	EXPECT_NE(cmd.find("--height 270"), std::string::npos);
-	EXPECT_NE(cmd.find("480 64 8 \"C:/o/frames/cartoon_1.pbrt\""), std::string::npos) << "width, samples, depth and the scene come last";
+	const std::vector<std::string> run = cartoon_render::frameArgs(flags, 480, 270, 64, 8, "C:/o/frames/frame_0001.ppm", "C:/o/frames/cartoon_1.pbrt");
+	const std::vector<std::string> expectedRun = {"--gpu", "--denoise", "--denoise-blend", "0.1", "--seed", "7", "--height", "270", "--output", "C:/o/frames/frame_0001.ppm", "480", "64", "8", "C:/o/frames/cartoon_1.pbrt"};
+	EXPECT_EQ(run, expectedRun) << "the user's flags, then the size, the samples, the depth and the scene";
+	LaunchArgs more;
+	ASSERT_TRUE(parseArgs({"--video", "--resume", "--cartoon-timeout", "30", "--camera-path", "cartoon:fireflies"}, more));
+	EXPECT_TRUE(more.cartoon_resume);
+	EXPECT_EQ(more.cartoon_timeout, 30);
+	const std::vector<std::string> kept = cartoon_render::forwardedFlags(more);
+	EXPECT_EQ(std::find(kept.begin(), kept.end(), "--resume"), kept.end()) << "a frame's own run is one frame: neither flag is passed on";
+	EXPECT_EQ(std::find(kept.begin(), kept.end(), "--cartoon-timeout"), kept.end());
+	EXPECT_EQ(std::find(kept.begin(), kept.end(), "30"), kept.end());
 }
 
 // ---- one frame of a film as a scene ----------------------------------------------------------------------------------------------------------------------------
@@ -422,12 +429,97 @@ TEST(CartoonStills, TheStillOfAFilmThatIsGoneIsRemovedAndOtherFilesAreKept) {
 	std::filesystem::remove_all(dir);
 }
 
-TEST(CartoonRender, TheChildSeesOnlyItsFramesFolder) {
-	const std::string cmd = cartoon_render::frameCommand("C:/r/ray_tracer.exe", {"--gpu"}, 1280, 720, 128, 8, "C:/o/frames/frame_0003.ppm", "C:/o/frames/work1/cartoon_3.pbrt", "C:/o/frames/work1");
-	EXPECT_NE(cmd.find("RAY_TRACER_PBRT_DIR="), std::string::npos) << "the child's scene folder is set on its own command line: several children run at once, so it cannot be this process's";
-	EXPECT_NE(cmd.find("C:/o/frames/work1"), std::string::npos);
-	EXPECT_LT(cmd.find("RAY_TRACER_PBRT_DIR="), cmd.find("ray_tracer.exe")) << "set before the program starts";
-	EXPECT_EQ(cartoon_render::frameCommand("C:/r/ray_tracer.exe", {}, 64, 64, 1, 1, "o.ppm", "s.pbrt").find("RAY_TRACER_PBRT_DIR"), std::string::npos) << "and left alone when no folder is given";
+TEST(CartoonRender, AnArgumentWithSpacesOrQuotesIsQuotedTheWayTheOperatingSystemReadsIt) {
+	EXPECT_EQ(cartoon_render::windowsQuote("plain"), "plain");
+	EXPECT_EQ(cartoon_render::windowsQuote("C:/p/ray tracer.exe"), "\"C:/p/ray tracer.exe\"");
+	EXPECT_EQ(cartoon_render::windowsQuote("a\"b"), "\"a\\\"b\"");
+	EXPECT_EQ(cartoon_render::windowsQuote("C:\\dir with space\\"), "\"C:\\dir with space\\\\\"") << "a backslash before the closing quote is doubled";
+	EXPECT_EQ(cartoon_render::windowsQuote(""), "\"\"");
+}
+
+// a child process that exits with a code that tells what it saw in its environment, and one that outlives any timeout
+#ifdef _WIN32
+static std::string shellExe() { return "C:\\Windows\\System32\\cmd.exe"; }
+static std::vector<std::string> shellArgs(const std::string &script) { return {"/c", script}; }
+static const char *kSleepScript = "ping -n 30 127.0.0.1 >nul";
+static const char *kEnvScript = "if \"%RT_TEST_VAR%\"==\"seen\" (exit 7) else (exit 8)";
+static const char *kExitScript = "exit 3";
+#else
+static std::string shellExe() { return "/bin/sh"; }
+static std::vector<std::string> shellArgs(const std::string &script) { return {"-c", script}; }
+static const char *kSleepScript = "sleep 30";
+static const char *kEnvScript = "if [ \"$RT_TEST_VAR\" = seen ]; then exit 7; else exit 8; fi";
+static const char *kExitScript = "exit 3";
+#endif
+
+TEST(CartoonRender, TheChildSeesOnlyItsFramesFolderAndItsExitCodeComesBack) {
+	bool timedOut = true;
+	EXPECT_EQ(cartoon_render::runChild(shellExe(), shellArgs(kExitScript), "", "", 0, &timedOut), 3);
+	EXPECT_FALSE(timedOut);
+	// the variable is set on the child's own environment (several children run at once, so it cannot be this process's) and is not left in this one
+	EXPECT_EQ(cartoon_render::runChild(shellExe(), shellArgs(kEnvScript), "RT_TEST_VAR", "seen", 0), 7);
+	EXPECT_EQ(cartoon_render::runChild(shellExe(), shellArgs(kEnvScript), "", "", 0), 8) << "and left alone when none is asked for";
+	EXPECT_EQ(std::getenv("RT_TEST_VAR"), nullptr);
+	EXPECT_EQ(cartoon_render::runChild("C:/no/such/program.exe", {}, "", "", 0), -1) << "a program that cannot be started";
+}
+
+TEST(CartoonRender, AChildThatTakesTooLongIsStoppedAndSaysSo) {
+	bool timedOut = false;
+	const auto start = std::chrono::steady_clock::now();
+	cartoon_render::runChild(shellExe(), shellArgs(kSleepScript), "", "", 1, &timedOut);
+	const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+	EXPECT_TRUE(timedOut);
+	EXPECT_LT(seconds, 12.0) << "it was stopped, not waited for";
+}
+
+TEST(CartoonRender, TheTimeoutIsTheFlagThenTheEnvironmentThenFifteenMinutesOnAGpuAndNoneOnTheCpu) {
+	LaunchArgs args;
+	EXPECT_EQ(cartoon_render::timeoutFor(args, true), 900);
+	EXPECT_EQ(cartoon_render::timeoutFor(args, false), 0);
+	args.cartoon_timeout = 60;
+	EXPECT_EQ(cartoon_render::timeoutFor(args, true), 60);
+	EXPECT_EQ(cartoon_render::timeoutFor(args, false), 60);
+	args.cartoon_timeout = 0;
+	EXPECT_EQ(cartoon_render::timeoutFor(args, true), 0) << "0 asks for none";
+}
+
+TEST(CartoonRender, AFrameThatFailedIsFilledFromTheOneBeforeSoTheVideoKeepsItsLength) {
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "photonsmith_fill_test";
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	auto write = [&](int i, const std::string &text) { std::ofstream(dir / cartoon_render::encName(i), std::ios::binary) << text; };
+	write(1, "one");
+	write(2, "two");
+	write(5, "five");   // 0, 3, 4 and 6 are missing
+	EXPECT_EQ(cartoon_render::countFrames(dir, 7), 3);
+	EXPECT_EQ(cartoon_render::fillMissingFrames(dir, 7), 4);
+	EXPECT_EQ(cartoon_render::countFrames(dir, 7), 7);
+	auto read = [&](int i) {
+		std::ifstream f(dir / cartoon_render::encName(i), std::ios::binary);
+		return std::string((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+	};
+	EXPECT_EQ(read(0), "one") << "the first takes the next";
+	EXPECT_EQ(read(3), "two");
+	EXPECT_EQ(read(4), "two");
+	EXPECT_EQ(read(6), "five");
+	EXPECT_EQ(read(5), "five") << "the frames there were are not touched";
+	std::filesystem::remove_all(dir);
+	EXPECT_EQ(cartoon_render::fillMissingFrames(dir, 3), 0) << "nothing to fill from";
+}
+
+TEST(CartoonRender, TheFramesOfAnInterruptedVideoAreResumedOnlyForTheSameFilmSizeAndFlags) {
+	const cartoon::Film *film = cartoon::find("lamp-and-ball");
+	ASSERT_NE(film, nullptr);
+	LaunchArgs a, b;
+	ASSERT_TRUE(parseArgs({"--gpu", "--denoise"}, a));
+	ASSERT_TRUE(parseArgs({"--gpu"}, b));
+	const std::string base = cartoon_render::resumeSignature(*film, a, 480, 24, 1280, 720, 128, 8);
+	EXPECT_EQ(base, cartoon_render::resumeSignature(*film, a, 480, 24, 1280, 720, 128, 8)) << "the same video, the same signature";
+	EXPECT_NE(base, cartoon_render::resumeSignature(*film, a, 480, 24, 640, 360, 128, 8)) << "another size";
+	EXPECT_NE(base, cartoon_render::resumeSignature(*film, a, 480, 24, 1280, 720, 64, 8)) << "another quality";
+	EXPECT_NE(base, cartoon_render::resumeSignature(*film, a, 240, 24, 1280, 720, 128, 8)) << "another length";
+	EXPECT_NE(base, cartoon_render::resumeSignature(*film, b, 480, 24, 1280, 720, 128, 8)) << "other flags";
+	EXPECT_NE(base, cartoon_render::resumeSignature(*cartoon::find("fireflies"), a, 480, 24, 1280, 720, 128, 8)) << "another film";
 }
 
 TEST(CartoonRender, TheNumberOfFramesAtOnceIsTheFlagThenTheEnvironmentThenTwoOnAGpuAndOneOnTheCpu) {
