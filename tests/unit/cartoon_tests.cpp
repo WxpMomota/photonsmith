@@ -520,6 +520,14 @@ TEST(CartoonRender, TheFramesOfAnInterruptedVideoAreResumedOnlyForTheSameFilmSiz
 	EXPECT_NE(base, cartoon_render::resumeSignature(*film, a, 240, 24, 1280, 720, 128, 8)) << "another length";
 	EXPECT_NE(base, cartoon_render::resumeSignature(*film, b, 480, 24, 1280, 720, 128, 8)) << "other flags";
 	EXPECT_NE(base, cartoon_render::resumeSignature(*cartoon::find("fireflies"), a, 480, 24, 1280, 720, 128, 8)) << "another film";
+	// a program that has been rebuilt is another program
+	const std::filesystem::path exe = std::filesystem::temp_directory_path() / "photonsmith_signature_test.exe";
+	std::ofstream(exe, std::ios::binary) << "one";
+	const std::string before = cartoon_render::resumeSignature(*film, a, 480, 24, 1280, 720, 128, 8, exe.string());
+	EXPECT_EQ(before, cartoon_render::resumeSignature(*film, a, 480, 24, 1280, 720, 128, 8, exe.string()));
+	std::ofstream(exe, std::ios::binary) << "another program";
+	EXPECT_NE(before, cartoon_render::resumeSignature(*film, a, 480, 24, 1280, 720, 128, 8, exe.string()));
+	std::filesystem::remove(exe);
 }
 
 TEST(CartoonRender, TheNumberOfFramesAtOnceIsTheFlagThenTheEnvironmentThenTwoOnAGpuAndOneOnTheCpu) {

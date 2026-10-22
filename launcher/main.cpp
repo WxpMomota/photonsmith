@@ -1151,7 +1151,7 @@ static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
     VideoPaths paths;
     std::string resume_signature;
     if (const cartoon::Film *film = cartoon::forCameraPath(s.camera_path.c_str()))
-        resume_signature = cartoon_render::resumeSignature(*film, args, render_frame_count, s.video_fps, image_width, image_height, s.samples_per_pixel, s.max_ray_depth);
+        resume_signature = cartoon_render::resumeSignature(*film, args, render_frame_count, s.video_fps, image_width, image_height, s.samples_per_pixel, s.max_ray_depth, s.exe_path);
     if (int rc = prepareVideoDirectories(s.out_path, render_frame_count, paths, resume_signature, args.cartoon_resume); rc != SUCCESS) return rc;
     const VideoCameraStart start = cartoon::isCartoonPath(s.camera_path.c_str()) ? VideoCameraStart{0, 0, 0, 0, 0, 0} : videoCameraStart(args, s);
 

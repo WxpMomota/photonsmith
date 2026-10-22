@@ -201,11 +201,18 @@ inline int renderFrame(const cartoon::Film &film, double t, const std::filesyste
 
 // ---- resuming an interrupted video ----
 // What identifies a cartoon video's frames: the film (its scene text at two instants, so that a change to the film's code is noticed), the size, the samples, the depth, the frame count and
-// every flag given. Written beside the frames; --resume continues from them only when it is the same.
-inline std::string resumeSignature(const cartoon::Film &film, const LaunchArgs &args, int frames, int fps, int width, int height, int spp, int depth) {
+// every flag given, and the program itself (its file's size and time, so that a renderer that has been rebuilt does not continue the frames of the old one). Written beside the frames;
+// --resume continues from them only when it is the same.
+inline std::string resumeSignature(const cartoon::Film &film, const LaunchArgs &args, int frames, int fps, int width, int height, int spp, int depth, const std::string &exePath = std::string()) {
 	std::string s = std::string(film.key) + "|" + std::to_string(frames) + "|" + std::to_string(fps) + "|" + std::to_string(width) + "x" + std::to_string(height) + "|" + std::to_string(spp) + "|" +
 					std::to_string(depth);
 	for (const std::string &f : forwardedFlags(args)) s += "|" + f;
+	if (!exePath.empty()) {
+		std::error_code ec;
+		const auto size = std::filesystem::file_size(exePath, ec);
+		const auto when = std::filesystem::last_write_time(exePath, ec);
+		s += "|" + std::to_string(static_cast<unsigned long long>(size)) + "|" + std::to_string(static_cast<long long>(when.time_since_epoch().count()));
+	}
 	const std::hash<std::string> h;
 	s += "|" + std::to_string(h(film.sceneAt(0.0))) + "|" + std::to_string(h(film.sceneAt(film.duration * 0.5)));
 	return s;
