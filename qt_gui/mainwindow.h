@@ -46,6 +46,7 @@
 #include <QTableView>
 #include "render_queue_model.h"
 #include <QListWidget>
+#include "frames_strip.h"
 #include <QToolButton>
 #include <QScrollArea>
 #include <QDebug>
@@ -139,6 +140,8 @@ public:
 	// One function per mode (mainwindow_selftest_modes.cpp; the Live Preview ones are in mainwindow_selftest_live.cpp).
 	void runOptionsSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);
 	void runCartoonUiSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
+	void runFramesStripSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
+	void runVideoFramesSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runBuilderSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot, const QString &outPrefix);
 	void runDiagnosticsSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);
 	void runSceneKeysSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);
@@ -1007,6 +1010,8 @@ private:
 	QPushButton *m_pauseButton;    // Toggles Pause/Resume - see onPauseClicked()
 	QPushButton *m_abandonButton;  // "Abandon & Next" - see onAbandonClicked()
 	QProgressBar *m_progressBar;
+	FramesStrip *m_framesStrip = nullptr;      // the frames a video has rendered so far, under the progress bar (frames_strip.h)
+	QLabel *m_framesStripLabel = nullptr;
 	// See applyGlow()/startProgressGlow()'s own comments. Both lazily
 	// created on first use, not at construction - the progress bar's
 	// QGraphicsDropShadowEffect only needs to exist once rendering has

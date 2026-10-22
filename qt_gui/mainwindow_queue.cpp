@@ -359,6 +359,18 @@ void MainWindow::startRenderJob(const RenderJob &job) {
 	updateActionStates();
 	refreshStatusBarInfo();
 	m_progressBar->setValue(0);
+	// a video's frames are listed under the bar as they are finished; a single image has none
+	if (m_framesStrip) {
+		if (job.videoMode) {
+			const QString out = job.outputPath.isEmpty() ? QCoreApplication::applicationDirPath() + "/output/video.ppm" : job.outputPath;
+			m_framesStrip->start(QFileInfo(out).absolutePath() + "/frames");
+			m_framesStripLabel->setText(tr("Frames rendered so far (double-click one to open it):"));
+			m_framesStripLabel->show();
+		} else {
+			m_framesStrip->hide();
+			m_framesStripLabel->hide();
+		}
+	}
 	startProgressGlow();
 	QString statusText = job.videoMode ? tr("Rendering video frames...") : tr("Rendering...");
 	if (m_queueModel->hasWaiting()) statusText += tr(" (%1 more queued)").arg(m_queueModel->waitingCount());

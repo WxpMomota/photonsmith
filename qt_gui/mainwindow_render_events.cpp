@@ -75,6 +75,10 @@ void MainWindow::onRenderComplete(bool success, const QString &message, double t
 #endif
 	m_pauseStartedAt = QDateTime();
 	if (m_elapsedTimer) m_elapsedTimer->stop();
+	if (m_framesStrip && m_framesStrip->isVisible()) {   // the rest of the frames, now that they are all there
+		m_framesStrip->refresh(1000);
+		m_framesStripLabel->setText(tr("Frames rendered: %1 (double-click one to open it)").arg(m_framesStrip->pictures()));
+	}
 	updateActionStates();
 	// Cleared unconditionally, before either branch below runs: a warning
 	// left over from a previous job's preview failure must not linger next
@@ -417,4 +421,8 @@ void MainWindow::onElapsedTick() {
 	if (!m_isRendering) return;
 	const qint64 elapsedMs = m_renderStartTime.msecsTo(QDateTime::currentDateTime());
 	m_statusLabel->setText(formatProgressStatus(elapsedMs, m_progressBar->value()));
+	if (m_framesStrip && m_framesStrip->isVisible()) {
+		m_framesStrip->refresh();
+		m_framesStripLabel->setText(tr("Frames rendered so far: %1 (double-click one to open it)").arg(m_framesStrip->pictures()));
+	}
 }

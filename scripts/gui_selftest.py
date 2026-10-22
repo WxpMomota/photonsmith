@@ -187,7 +187,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("app", nargs="?", help="RayTracerGUI.app, RayTracerGUI.exe, or the folder holding it")
     ap.add_argument("--out", help="directory for logs and screenshots (default: a new temp directory)")
-    ap.add_argument("--modes", default="ui,options,builder,queue,diagnostics,quitwarm,material,sky,camera,composite,cartoonui", help="comma-separated self-test modes (default: %(default)s)")
+    ap.add_argument("--modes", default="ui,options,builder,queue,diagnostics,quitwarm,material,sky,camera,composite,cartoonui,framesstrip,videoframes", help="comma-separated self-test modes (default: %(default)s)")
     ap.add_argument("--live-preview", action="store_true", help="also require an enabled Live Preview item and run the livepreview mode (needs a GPU)")
     ap.add_argument("--plugins", help="directory holding Qt's offscreen platform plugin")
     args = ap.parse_args()
@@ -208,7 +208,7 @@ def main():
         modes.append("livepreview_objects")
     if args.live_preview and IS_MAC and "livepreview_arrange" not in modes:
         modes.append("livepreview_arrange")   # Save arrangement of a Scene Builder scene, opened again in the Builder
-    waits = {"quitwarm": 240, "builder": 300, "composite": 180, "modelthumbs": 1800, "livepreview": 240, "livepreview_objects": 150, "livepreview_arrange": 90}
+    waits = {"quitwarm": 240, "builder": 300, "composite": 180, "videoframes": 180, "modelthumbs": 1800, "livepreview": 240, "livepreview_objects": 150, "livepreview_arrange": 90}
     ok = True
     try:
         for mode in modes:

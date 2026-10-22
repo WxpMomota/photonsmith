@@ -151,6 +151,7 @@ HEADERS += \
 	render_output_parser.h \
 	scene_metadata_client.h \
 	scene_bucket.h \
+	frames_strip.h \
 	asset_downloader.h \
 	scene_packs.h \
 	realtime_preview_session.h \

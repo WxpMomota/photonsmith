@@ -89,6 +89,17 @@ void MainWindow::createProgressTab() {
 
 	progressLayout->addWidget(m_currentJobLabel);
 	progressLayout->addWidget(m_progressBar);
+	// While a video renders: the frames that are finished, as they come (it is hidden for a single image)
+	m_framesStripLabel = new QLabel(progressGroup);
+	m_framesStripLabel->setObjectName("statusInfo");
+	m_framesStripLabel->setAlignment(Qt::AlignCenter);
+	m_framesStripLabel->hide();
+	m_framesStrip = new FramesStrip(progressGroup);
+	connect(m_framesStrip, &QListWidget::itemDoubleClicked, this, [](QListWidgetItem *item) {
+		if (const QString path = FramesStrip::pathOf(item); !path.isEmpty()) QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+	});
+	progressLayout->addWidget(m_framesStripLabel);
+	progressLayout->addWidget(m_framesStrip);
 	progressLayout->addWidget(m_statusLabel);
 	progressLayout->addWidget(m_statusWarningLabel);
 	layout->addWidget(progressGroup);

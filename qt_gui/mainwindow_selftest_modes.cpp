@@ -1272,3 +1272,114 @@ void MainWindow::runCartoonUiSelfTest(const std::function<void(const QString &)>
 	log(ok ? "RESULT: OK" : "RESULT: FAIL");
 	QApplication::exit(ok ? 0 : 1);
 }
+
+// RT_GUI_SELFTEST=framesstrip: the strip of finished frames under the progress bar (frames_strip.h) lists a frames folder as it fills: new pictures only, in frame order whatever order they
+// arrive in, nothing that is still being written, only the latest ones when there are too many, and nothing on the Progress tab before a video renders.
+void MainWindow::runFramesStripSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {
+	bool ok = true;
+	auto check = [&ok, log](bool cond, const QString &what) {
+		log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what));
+		ok = ok && cond;
+	};
+	check(m_framesStrip && m_framesStrip->isHidden() && m_framesStripLabel && m_framesStripLabel->isHidden(), "the strip is not shown before a video renders");
+	QTemporaryDir dir;
+	check(dir.isValid(), "a temporary frames folder");
+	auto picture = [&](const QString &name, int shade) {
+		QImage image(160, 90, QImage::Format_RGB32);
+		image.fill(QColor(shade, 255 - shade, 128));
+		image.save(dir.filePath(name));
+	};
+	FramesStrip strip;
+	strip.resize(900, 140);
+	strip.start(dir.path(), 5);
+	check(strip.refresh() == 0 && strip.count() == 0, "an empty folder lists nothing");
+	for (int i = 0; i < 3; ++i) picture(QString("enc_%1.png").arg(i, 4, 10, QChar('0')), 40 * i);
+	check(strip.refresh() == 3 && strip.count() == 3 && strip.pictures() == 3, "three finished frames are listed");
+	check(strip.item(0)->text() == "1" && strip.item(2)->text() == "3", "numbered from 1, in order");
+	check(strip.refresh() == 0, "a second look finds nothing new, and loads nothing twice");
+	picture("enc_0003.png", 200);
+	picture("enc_0004.png.tmp.png", 10);   // a picture still being written
+	QFile(dir.filePath("notes.txt")).open(QIODevice::WriteOnly);
+	check(strip.refresh() == 1 && strip.count() == 4, "only the finished frame is added, not the one being written or a stray file");
+	picture("enc_0009.png", 90);
+	picture("enc_0006.png", 60);
+	check(strip.refresh() == 2 && strip.item(strip.count() - 2)->data(Qt::UserRole).toInt() == 6 && strip.item(strip.count() - 1)->data(Qt::UserRole).toInt() == 9, "frames that arrive out of order are put in their place");
+	check(strip.count() == 5 && strip.item(0)->data(Qt::UserRole).toInt() == 1, "only the latest five are kept (the strip's limit): the oldest went");
+	check(strip.pictures() == 6, "the whole count is still the folder's: 6");
+	// many at once (a resumed video): at most `maxNew` per look, and only the newest ones shown
+	QTemporaryDir many;
+	for (int i = 0; i < 40; ++i) {
+		QImage image(32, 18, QImage::Format_RGB32);
+		image.fill(Qt::gray);
+		image.save(many.filePath(QString("enc_%1.png").arg(i, 4, 10, QChar('0'))));
+	}
+	FramesStrip big;
+	big.start(many.path(), 10);
+	check(big.refresh(4) == 4 && big.count() == 4, "a look loads at most as many as it is told to");
+	while (big.refresh(4) > 0) {}
+	check(big.count() == 10 && big.item(big.count() - 1)->data(Qt::UserRole).toInt() == 39 && big.item(0)->data(Qt::UserRole).toInt() == 30, "40 frames at once: the latest ten are shown");
+	check(big.pictures() == 40, "and all 40 are counted");
+	check(FramesStrip::pathOf(big.item(0)).endsWith("enc_0030.png"), "a picture knows its file (a double-click opens it)");
+	strip.setWindowTitle("framesstrip");
+	strip.show();
+	QApplication::processEvents();
+	shot("framesstrip");
+	log(ok ? "RESULT: OK" : "RESULT: FAIL");
+	QApplication::exit(ok ? 0 : 1);
+}
+
+// RT_GUI_SELFTEST=videoframes: a real video render (12 frames of a cartoon, tiny, on the CPU) with the Progress tab showing: the frames strip fills as the frames come and holds all twelve when
+// the render is over. Takes a picture of the tab part-way through.
+void MainWindow::runVideoFramesSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {
+	if (m_progressTabIndex >= 0) m_tabWidget->setCurrentIndex(m_progressTabIndex);
+	resize(1100, 800);
+	auto fail = [log](const QString &what) {
+		log("FAIL: " + what);
+		log("RESULT: FAIL");
+		QApplication::exit(1);
+	};
+	for (int i = 0; i < m_renderModeCombo->count(); ++i)
+		if (!m_renderModeCombo->itemData(i).toBool()) m_renderModeCombo->setCurrentIndex(i);   // the CPU
+	QString filmScene;
+	for (int i = 0, n = SceneMetadataClient::sceneCount(); i < n && filmScene.isEmpty(); ++i) {
+		const QString id = SceneMetadataClient::sceneIdAtIndex(i);
+		SceneMetadataClient::SceneMetadata meta;
+		if (SceneMetadataClient::sceneMetadata(id, meta) && meta.filmKey == "ball-parade") filmScene = id;
+	}
+	if (filmScene.isEmpty()) { fail("no scene for the ball-parade film"); return; }
+	selectOutputMode(OutputMode::Video);
+	selectSceneById(filmScene);
+	m_videoFramesSpinBox->setValue(12);
+	m_qualityPresetCombo->setCurrentIndex(6);   // Custom: the size below
+	m_widthSpinBox->setValue(96);
+	m_heightSpinBox->setValue(54);
+	m_samplesSpinBox->setValue(2);
+	m_maxDepthSpinBox->setValue(2);
+	onRenderClicked();
+	log("started a 12-frame video render of " + filmScene);
+	auto *poll = new QTimer(this);
+	auto *waited = new int(0);
+	auto *shotTaken = new bool(false);
+	connect(poll, &QTimer::timeout, this, [this, poll, waited, shotTaken, log, shot, fail]() {
+		if (++*waited > 600) { poll->stop(); fail("the video did not finish in 120 s"); return; }
+		if (!*shotTaken && m_framesStrip->count() >= 3 && m_isRendering) {
+			*shotTaken = true;
+			log(QString("part-way: %1 frames in the strip, shown=%2").arg(m_framesStrip->count()).arg(m_framesStrip->isVisible()));
+			shot("videoframes_midway");
+		}
+		if (m_isRendering || m_queueModel->finishedCount() < 1) return;
+		poll->stop();
+		bool ok = true;
+		auto check = [&ok, log](bool cond, const QString &what) { log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what)); ok = ok && cond; };
+		check(m_framesStrip->isVisible() && m_framesStripLabel->isVisible(), "the strip is shown for a video");
+		check(m_framesStrip->pictures() == 12, QString("the folder holds 12 frames (%1)").arg(m_framesStrip->pictures()));
+		check(m_framesStrip->count() == 12, QString("and the strip lists all 12 (%1)").arg(m_framesStrip->count()));
+		check(m_framesStrip->item(0)->text() == "1" && m_framesStrip->item(11)->text() == "12", "in order");
+		check(m_framesStripLabel->text().contains("12"), "the label says how many: " + m_framesStripLabel->text());
+		log(*shotTaken ? "a picture was taken while frames were coming in" : "(the video was too quick for a picture part-way)");
+		shot("videoframes_done");
+		log(ok ? "RESULT: OK" : "RESULT: FAIL");
+		QApplication::exit(ok ? 0 : 1);
+	});
+	poll->start(200);
+}
