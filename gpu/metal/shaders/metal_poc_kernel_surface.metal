@@ -576,6 +576,16 @@ inline void computeAlbedo(thread const KernelRes& R, thread PathState& P, thread
     } else {
         albedo = float3(mat.color);
     }
+    // A coated diffuse over a procedural reflectance (the texture family above computed the base colour): it is a coated diffuse from here on, with that colour as its base.
+    if (mat.materialType == METAL_MAT_TEXTURE_FAMILY && mat.coatIor > 0.0f) {
+        mat.color = packed_float3(albedo);
+        mat.materialType = METAL_MAT_COATED_DIFFUSE;
+        mat.ior = mat.coatIor;
+        mat.roughness = mat.coatAlpha;
+        mat.conductorEta = packed_float3(0.0f);
+        mat.conductorK = packed_float3(0.0f);
+        mat.transmitColor = packed_float3(0.0f);
+    }
     // A reflectance that is a graph of textures: its value here is the reflectance. A coated diffuse reads `color` itself, a Lambertian the albedo, so both are set.
     if (mat.graphRef != 0) {
         const float2 uvG = hitUV(primId, result.triangle_barycentric_coord, uvs, spheres, normal, isSphere, isTriangleHit);

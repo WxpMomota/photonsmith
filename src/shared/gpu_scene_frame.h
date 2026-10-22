@@ -11,12 +11,17 @@
 // and shrink every real object to the size of the shaders' fixed epsilons, so a sphere whose diameter is at least 60% of the full extent is left out of the box when that
 // shrinks the extent more than 4x. The sphere is still loaded; it just does not set the scale.
 //
+// The same goes for a few far-off triangles: a backdrop wall of a dozen triangles 600 units across (the cartoon films have one) behind a stage 34 across and a lamp half a unit tall would
+// make the lamp smaller than the shaders' shadow-ray offsets (a point light inside a bulb lit the whole stage). When the extent of the triangles without the outermost 0.5% on each side
+// (by centroid, per axis; at least 1000 triangles) is less than a quarter of the full one, that trimmed box sets the scale. Those triangles are still loaded.
+//
 // OptiX does not rescale (its epsilons are relative), so it does not use this; the rule lives here, in shared code, so that is a choice a backend makes, not a copy of the code.
 // Standard library only.
 
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include <vector>
 
 #include "pbrt_flatten.h"
 
@@ -29,6 +34,7 @@ struct Frame {
 	float extent = 0.0f;       // the largest dimension of the bounding box that set the scale
 	float fullExtent = 0.0f;   // the same, with every sphere counted
 	bool ignoredGiantSphere = false;   // true when a huge ground-like sphere was left out of the box
+	bool ignoredOutliers = false;      // true when the outermost triangles were left out of the box (see above)
 
 	// A point of the scene in the backend's world: (p - centre) * scale + offset.
 	void toWorld(float x, float y, float z, float out[3]) const {
@@ -97,6 +103,44 @@ inline Frame computeSceneFrame(const pbrt_flatten::FlatScene& scene) {
 				box = core;
 				frame.ignoredGiantSphere = true;
 			}
+		}
+	}
+	if (!frame.ignoredGiantSphere && scene.triangles.size() >= 1000) {
+		// the trimmed box: per axis, the 0.5% and 99.5% quantiles of the triangle centroids, widened by what a triangle at the edge reaches (its own bounding box), plus every sphere
+		const size_t n = scene.triangles.size();
+		float lo[3], hi[3];
+		std::vector<float> c(n);
+		for (int a = 0; a < 3; ++a) {
+			for (size_t i = 0; i < n; ++i) {
+				const pbrt_flatten::Triangle& t = scene.triangles[i];
+				c[i] = (float)((t.v[a] + t.v[3 + a] + t.v[6 + a]) / 3.0);
+			}
+			const size_t k = n / 200;
+			std::nth_element(c.begin(), c.begin() + k, c.end());
+			lo[a] = c[k];
+			std::nth_element(c.begin(), c.begin() + (n - 1 - k), c.end());
+			hi[a] = c[n - 1 - k];
+		}
+		frame_detail::Box trimmed;
+		for (const pbrt_flatten::Triangle& t : scene.triangles) {
+			bool inside = true;
+			for (int a = 0; a < 3; ++a) {
+				const float m = (float)((t.v[a] + t.v[3 + a] + t.v[6 + a]) / 3.0);
+				if (m < lo[a] || m > hi[a]) inside = false;
+			}
+			if (!inside) continue;
+			for (int k = 0; k < 3; ++k) trimmed.grow((float)t.v[k * 3 + 0], (float)t.v[k * 3 + 1], (float)t.v[k * 3 + 2]);
+		}
+		for (const pbrt_flatten::Sphere& s : scene.spheres) {
+			const float r = (float)s.radius;
+			const float cx = (float)s.center[0], cy = (float)s.center[1], cz = (float)s.center[2];
+			trimmed.grow(cx - r, cy - r, cz - r);
+			trimmed.grow(cx + r, cy + r, cz + r);
+		}
+		const float trimmedExtent = trimmed.maxExtent();
+		if (trimmedExtent > 1e-6f && trimmedExtent < 0.25f * frame.fullExtent) {
+			box = trimmed;
+			frame.ignoredOutliers = true;
 		}
 	}
 	frame.extent = box.maxExtent();

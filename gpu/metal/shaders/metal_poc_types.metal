@@ -798,6 +798,9 @@ struct TriangleMaterial {
     int roughGraphRef;
     int condRoughGraphRef;
     int mixAmountGraphRef;
+    // A coat over a procedural reflectance (see metal_poc_gpu_types.h); coatIor = 0: none.
+    float coatIor;
+    float coatAlpha;
 };
 
 // ---- What the spare slots of TriangleMaterial mean, per material family ----------------------------------------------------------------------------------------------

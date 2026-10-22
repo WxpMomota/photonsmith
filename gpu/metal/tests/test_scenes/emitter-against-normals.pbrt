@@ -1,0 +1,18 @@
+# emitter-against-normals.pbrt -- an area-light mesh whose triangles are wound against its vertex normals: pbrt makes the geometric normal face the authored normals, so it emits on the normals' side. Metal took
+# the side from the winding and lit the inside of the mesh (the Orrery film's sun and the Domino Run lamp: 7.5% of the CPU's light). Compared with the CPU in 8 x 8 blocks by metal_poc_blocks_test.sh.
+# Original, so it carries no licence constraints.
+
+LookAt 0 3 8  0 0 0  0 1 0
+Camera "perspective" "float fov" [ 40 ]
+Film "rgb" "integer xresolution" [ 64 ] "integer yresolution" [ 64 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+Integrator "volpath" "integer maxdepth" [ 6 ]
+WorldBegin
+LightSource "infinite" "rgb L" [ 0.02 0.02 0.03 ]
+AttributeBegin
+  AreaLightSource "diffuse" "rgb L" [ 8 8 8 ]
+  Material "diffuse" "rgb reflectance" [ 0 0 0 ]
+  Shape "trianglemesh" "integer indices" [ 0 2 1 0 3 2 ] "point3 P" [ -1.5 3 -1.5  1.5 3 -1.5  1.5 3 1.5  -1.5 3 1.5 ] "normal N" [ 0 -1 0  0 -1 0  0 -1 0  0 -1 0 ]
+AttributeEnd
+Material "diffuse" "rgb reflectance" [ 0.6 0.6 0.6 ]
+Shape "trianglemesh" "integer indices" [ 0 2 1 0 3 2 ] "point3 P" [ -8 0 -8  8 0 -8  8 0 8  -8 0 8 ]
