@@ -212,9 +212,10 @@ short id or the descriptive key:
 | V15 | dandelion | (its own scenes) | cartoon:dandelion | 528 | 24 | 1.0 |
 | V16 | candle | (its own scenes) | cartoon:candle | 480 | 24 | 1.0 |
 | V17 | meet-pip | (its own scenes) | cartoon:meet-pip | 432 | 24 | 1.0 |
+| V18 | pip-and-the-moon | (its own scenes) | cartoon:pip-and-the-moon | 2304 | 24 | 1.0 |
 
 `ray_tracer --list-video-presets` prints the whole list (camera flythroughs and cartoons together: id, key, kind, length, name). The cartoons are presets like the rest: one per film in
-`src/shared/cartoon/cartoons.h`, numbered on from the camera presets (V7 to V17 so far), their name, description, frame count and fps taken from the film, so the table below and the film
+`src/shared/cartoon/cartoons.h`, numbered on from the camera presets (V7 to V18 so far), their name, description, frame count and fps taken from the film, so the table below and the film
 table cannot disagree.
 
 ```powershell
@@ -260,6 +261,7 @@ mesh is a light of its own to sample, so a mesh ball is hundreds of lights. The 
 | dandelion | The Dandelion | 22 s | 3 | translucent, backlight, particles, dof, dusk | A gust blows the seeds off a dandelion clock one by one, windward side first, and they drift away on their little parachutes, glowing where the low sun shines through. |
 | candle | The Candle | 20 s | 3 | subsurface, emissive, dof, night | One candle burns down in front of out-of-focus fairy lights: the flame flickers, light glows through the wax, drips run down its side, and at the end the flame dies in a thread of smoke. |
 | meet-pip | Meet Pip | 18 s | 3 | character, emissive, dof | Pip, a small round blue creature with two antennae, says hello, shows what its face can do (surprise, sadness, a scowl, a hop of joy), follows a glowing orb with its eyes and walks off across the stage. |
+| pip-and-the-moon | Pip and the Moon | 96 s | 13 | character, emissive, water, reflections, night | Pip finds the moon in a pond, tries to touch it and breaks it, scoops it up in a bucket and dances with it, trips on the way home and loses it, and is shown the real one by a firefly. With music and sounds. |
 
 A frame of a film is also a scene: `ray_tracer --gpu 1280 256 8 cartoon:fireflies@13.5` renders that moment as one picture (`cartoon:<key>` alone is the film's own best still), which is the quickest
 way to look at a change to a film. The GUI's scene list has a Cartoons tab (beside Self-Contained and Requires External Files) with one still per film; it is listed from the films themselves (a still's file is written the first time it is rendered), so a new film appears there by itself, and its Film time box renders any other moment of the film as a picture.
@@ -275,6 +277,14 @@ reordering or removing a film moves no preset), `tags` (from the vocabulary `kTa
 The scene list shows all of it for the film's still (length, shots by name, tags, cost), and searching the list for a tag finds the films; the GUI's Shot box beside the Film time box jumps to a shot.
 The film table above is the text `ray_tracer --film-table` prints, and a test (`CartoonMeta`) fails when this document, the tags, the shot names, the numbers or a description that restates a length
 are out of step with the table; `tests/data/cartoon_films_snapshot.txt` pins each film's `meta` line and what its scene holds (`RT_UPDATE_SNAPSHOT=1` rewrites it).
+
+**Sound.** A film can have a soundtrack: a function `void soundtrack(audio::Mix &)` named in its row (`Film::soundtrack`) that places notes and noises on a mix of the film's length.
+`src/shared/cartoon/cartoon_audio.h` is a small synthesiser with no sample files: a few instruments (a marimba-like mallet, a glockenspiel, a plucked string, a pad, a bass), the noises a
+cartoon needs (a splash, a knock on wood, a boing, a slide), a voice that chirps, a reverb and a limiter. Every sound is a pure function of its arguments, so a film sounds the same each time it
+is rendered. The film can share its timeline with the picture: in "Pip and the Moon" the footsteps, Pip's chirps and the splashes come from the same lists (`pip_moon_story.h`) that move its
+feet, open its mouth and strike the water, so what you hear is on the beat of what you see. A video of the film's own length and frame rate (the preset's defaults) gets the sound added by
+ffmpeg, and the .wav is kept beside the video (`<name>_video.wav`); a video of another length is made without sound, since the sound is made for the film's own timing. On a Mac the built-in
+encoder cannot add sound, so a film's sound needs ffmpeg there (without it the video is silent and the .wav is beside it).
 
 ## Examples
 

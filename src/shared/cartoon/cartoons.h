@@ -26,6 +26,7 @@
 #include "newtons_cradle.h"
 #include "orrery.h"
 #include "paper_boat.h"
+#include "pip_and_the_moon.h"
 
 namespace cartoon {
 
@@ -81,6 +82,10 @@ inline const Film kFilms[] = {
 	 "Pip, a small round blue creature with two antennae, says hello, shows what its face can do (surprise, sadness, a scowl, a hop of joy), follows a glowing orb with its eyes and walks off across the stage.",
 	 meet_pip::kDuration, meet_pip::kFps, &meet_pip::sceneAt, &meet_pip::headerAt, &meet_pip::shotStarts, 6.0,
 	 {17, "character,emissive,dof", "Hello and the faces|Following the orb|Side-on walk", meet_pip::kSamples, 2.8}},
+	{"pip-and-the-moon", "Pip and the Moon",
+	 "Pip finds the moon in a pond, tries to touch it and breaks it, scoops it up in a bucket and dances with it, trips on the way home and loses it, and is shown the real one by a firefly. With music and sounds.",
+	 pip_moon::kDuration, pip_moon::kFps, &pip_moon::sceneAt, &pip_moon::headerAt, &pip_moon::shotStarts, 18.0,
+	 {18, "character,emissive,water,reflections,night", "Moon and reflection|Stroll along the dock|The moon in the water|Sorrow and the idea|Running for the bucket|Scooping the moon|The dance|Carrying it home|The fall|Alone at the water|The firefly|Under the real moon|Pull back over the pond", pip_moon::kSamples, 5.2}, &pip_moon::soundtrack},
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 

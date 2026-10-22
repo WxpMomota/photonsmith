@@ -91,6 +91,16 @@ inline int renderFrame(const cartoon::Film &film, double t, const std::filesyste
 	return rc;
 }
 
+// The soundtrack. A film with one (Film::soundtrack, cartoon_audio.h) has it mixed and written as a 16-bit stereo .wav; the video then gets it. It is made for the film's own length and
+// frame rate, so it is only added to a video that has them (a shorter or faster one would not fit it).
+inline bool soundtrackFits(const cartoon::Film &film, int frames, int fps) { return film.soundtrack != nullptr && frames == cartoon::frameCountOf(film) && fps == film.fps; }
+inline bool writeSoundtrack(const cartoon::Film &film, const std::filesystem::path &wavPath) {
+	if (!film.soundtrack) return false;
+	cartoon::audio::Mix mix(film.duration);
+	film.soundtrack(mix);
+	return cartoon::audio::writeWav(wavPath.string(), mix.finish());
+}
+
 // How many frames are rendered at once: --cartoon-jobs N, else the environment variable RAY_TRACER_CARTOON_JOBS, else two on a GPU and one on the CPU (a CPU render already uses every
 // core, so running several only has them compete). Between 1 and 8.
 inline int jobsFor(const LaunchArgs &args, bool gpu) {

@@ -12,6 +12,8 @@
 #include <utility>
 #include <vector>
 
+#include "cartoon_audio.h"
+
 namespace cartoon {
 
 constexpr double kPi = 3.14159265358979323846;
@@ -516,6 +518,7 @@ struct Film {
 	std::vector<double> (*shotStarts)();   // when each shot begins, in seconds (the first is 0)
 	double stillTime;          // a time that makes a good still picture (a thumbnail, a gallery image)
 	FilmMeta meta;
+	void (*soundtrack)(audio::Mix &) = nullptr;   // places the film's music and sounds on a mix of its length (cartoon_audio.h), or null for a silent film
 };
 
 }  // namespace cartoon

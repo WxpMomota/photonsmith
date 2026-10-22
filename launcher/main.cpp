@@ -999,19 +999,67 @@ static int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
     return SUCCESS;
 }
 
-// Assembles the PNG sequence into the MP4: AVFoundation on a Mac, ffmpeg otherwise (and as the fallback). SUCCESS or ERR_VIDEO_ASSEMBLY_FAILED.
-static int assembleVideoFile(const std::filesystem::path &frames_dir, int converted, int video_fps, const std::filesystem::path &video_path) {
+// Assembles the PNG sequence into the MP4: AVFoundation on a Mac, ffmpeg otherwise (and as the fallback). With `audio_path` (a film's soundtrack, a .wav) the sound is added too, which
+// only ffmpeg here can do; when that fails the picture is made without it and the .wav stays beside the video. SUCCESS or ERR_VIDEO_ASSEMBLY_FAILED.
+static int assembleVideoFile(const std::filesystem::path &frames_dir, int converted, int video_fps, const std::filesystem::path &video_path, const std::filesystem::path &audio_path = std::filesystem::path()) {
     // Assemble the PNG sequence into an MP4 with ffmpeg
     std::cout << "\n========================================" << std::endl;
     std::cout << "ASSEMBLING VIDEO WITH FFMPEG" << std::endl;
     std::cout << "========================================" << std::endl;
 
+    // -g (one keyframe per second) and -movflags +faststart: without
+    // them libx264's default ~250-frame GOP can leave a short render
+    // with just its very first frame as a keyframe, and the moov atom
+    // (seek index) lands at the end of the file - together those made
+    // seeking backward in the GUI's embedded QMediaPlayer preview
+    // unreliable (seeking forward mostly worked by chance since it
+    // could just keep decoding ahead to the target).
+    const std::string enc_pattern = (frames_dir / "enc_%04d.png").string();
+    auto runFfmpeg = [&](bool with_audio) {
+        std::vector<std::string> ffmpeg_argv = {"ffmpeg", "-y", "-r", std::to_string(video_fps), "-i", enc_pattern};
+        std::string manual_cmd = "ffmpeg -y -r " + std::to_string(video_fps) + " -i \"" + enc_pattern + "\"";
+        if (with_audio) {
+            ffmpeg_argv.push_back("-i");
+            ffmpeg_argv.push_back(audio_path.string());
+            manual_cmd += " -i \"" + audio_path.string() + "\"";
+        }
+        const std::vector<std::string> codec = {"-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", std::to_string(video_fps)};
+        ffmpeg_argv.insert(ffmpeg_argv.end(), codec.begin(), codec.end());
+        manual_cmd += " -c:v libx264 -pix_fmt yuv420p -g " + std::to_string(video_fps);
+        if (with_audio) {
+            const std::vector<std::string> sound = {"-c:a", "aac", "-b:a", "192k", "-shortest"};
+            ffmpeg_argv.insert(ffmpeg_argv.end(), sound.begin(), sound.end());
+            manual_cmd += " -c:a aac -b:a 192k -shortest";
+        }
+        ffmpeg_argv.push_back("-movflags");
+        ffmpeg_argv.push_back("+faststart");
+        ffmpeg_argv.push_back(video_path.string());
+        manual_cmd += " -movflags +faststart \"" + video_path.string() + "\"";
+        std::cout << "Running: " << manual_cmd << std::endl;
+        const int result = run_subprocess(ffmpeg_argv);
+        if (result == -1) {
+            std::cerr << "ERROR: Could not launch ffmpeg - is it installed and on PATH?" << std::endl;
+            std::cerr << "Install ffmpeg (https://ffmpeg.org/download.html), add it to PATH, then assemble manually:" << std::endl;
+            std::cerr << "  " << manual_cmd << std::endl;
+        } else if (result != 0) {
+            std::cerr << "ERROR: ffmpeg exited with code " << result << std::endl;
+            std::cerr << "Rendered frames are still available in: " << frames_dir << std::endl;
+            std::cerr << "You can retry assembly manually with:" << std::endl;
+            std::cerr << "  " << manual_cmd << std::endl;
+        }
+        return result;
+    };
+
+    bool video_done = false;
+    if (!audio_path.empty()) {
+        if (runFfmpeg(true) == 0) video_done = true;
+        else std::cerr << "WARNING: the sound could not be added; making the video without it (the sound is saved as " << audio_path << ")." << std::endl;
+    }
     // macOS: assemble with AVFoundation (built in, no ffmpeg needed - the GUI's render subprocess does not see a Homebrew
     // ffmpeg anyway). The banner above is kept verbatim: the GUI keys its "Assembling video" status on it. ffmpeg stays as
     // the fallback (and the only path on Windows/Linux).
-    bool video_done = false;
 #ifdef RT_HAVE_AVFOUNDATION_ENCODER
-    {
+    if (!video_done) {
         std::cout << "Encoding with AVFoundation (built into macOS, no ffmpeg needed)..." << std::endl;
         std::string av_error;
         if (encode_png_sequence_to_mp4_avfoundation(frames_dir.string(), converted, video_fps, video_path.string(), av_error)) {
@@ -1020,47 +1068,10 @@ static int assembleVideoFile(const std::filesystem::path &frames_dir, int conver
             std::cerr << "WARNING: the built-in macOS encoder failed (" << av_error << "); trying ffmpeg instead..." << std::endl;
         }
     }
+#else
+    (void)converted;
 #endif
-    if (!video_done) {
-    // -g (one keyframe per second) and -movflags +faststart: without
-    // them libx264's default ~250-frame GOP can leave a short render
-    // with just its very first frame as a keyframe, and the moov atom
-    // (seek index) lands at the end of the file - together those made
-    // seeking backward in the GUI's embedded QMediaPlayer preview
-    // unreliable (seeking forward mostly worked by chance since it
-    // could just keep decoding ahead to the target).
-    std::string enc_pattern = (frames_dir / "enc_%04d.png").string();
-    std::vector<std::string> ffmpeg_argv = {
-        "ffmpeg", "-y",
-        "-r", std::to_string(video_fps),
-        "-i", enc_pattern,
-        "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        "-g", std::to_string(video_fps),
-        "-movflags", "+faststart",
-        video_path.string()
-    };
-    std::string manual_cmd = "ffmpeg -y -r " + std::to_string(video_fps) + " -i \"" + enc_pattern +
-                              "\" -c:v libx264 -pix_fmt yuv420p -g " + std::to_string(video_fps) +
-                              " -movflags +faststart \"" + video_path.string() + "\"";
-
-    std::cout << "Running: " << manual_cmd << std::endl;
-    int ffmpeg_result = run_subprocess(ffmpeg_argv);
-
-    if (ffmpeg_result == -1) {
-        std::cerr << "ERROR: Could not launch ffmpeg - is it installed and on PATH?" << std::endl;
-        std::cerr << "Install ffmpeg (https://ffmpeg.org/download.html), add it to PATH, then assemble manually:" << std::endl;
-        std::cerr << "  " << manual_cmd << std::endl;
-        return ERR_VIDEO_ASSEMBLY_FAILED;
-    }
-    if (ffmpeg_result != 0) {
-        std::cerr << "ERROR: ffmpeg exited with code " << ffmpeg_result << std::endl;
-        std::cerr << "Rendered frames are still available in: " << frames_dir << std::endl;
-        std::cerr << "You can retry assembly manually with:" << std::endl;
-        std::cerr << "  " << manual_cmd << std::endl;
-        return ERR_VIDEO_ASSEMBLY_FAILED;
-    }
-    }   // if (!video_done): the ffmpeg fallback
+    if (!video_done && runFfmpeg(false) != 0) return ERR_VIDEO_ASSEMBLY_FAILED;
     return SUCCESS;
 }
 
@@ -1085,7 +1096,23 @@ static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
 
     int converted = 0;
     if (int rc = renderVideoFrames(args, s, paths, render_frame_count, keyframes, use_keyframes, start, converted); rc != SUCCESS) return rc;
-    if (int rc = assembleVideoFile(paths.frames_dir, converted, s.video_fps, paths.video_path); rc != SUCCESS) return rc;
+    // a film with a soundtrack gets it, when the video is the film's own length (the sound is made for that: a shorter or faster video would not fit it)
+    std::filesystem::path soundtrack_path;
+    if (const cartoon::Film *film = cartoon::forCameraPath(s.camera_path.c_str()); film && film->soundtrack) {
+        if (cartoon_render::soundtrackFits(*film, render_frame_count, s.video_fps)) {
+            soundtrack_path = paths.video_path;
+            soundtrack_path.replace_extension(".wav");
+            std::cout << "\nMaking the soundtrack of " << film->name << "..." << std::endl;
+            if (!cartoon_render::writeSoundtrack(*film, soundtrack_path)) {
+                std::cerr << "WARNING: the soundtrack could not be written to " << soundtrack_path << "; the video will be silent." << std::endl;
+                soundtrack_path.clear();
+            }
+        } else {
+            std::cout << "\nNote: " << film->name << " has a soundtrack, made for " << cartoon::frameCountOf(*film) << " frames at " << film->fps << " frames per second; this video has "
+                      << render_frame_count << " at " << s.video_fps << ", so it is made without sound." << std::endl;
+        }
+    }
+    if (int rc = assembleVideoFile(paths.frames_dir, converted, s.video_fps, paths.video_path, soundtrack_path); rc != SUCCESS) return rc;
 
     std::cout << "\n========================================" << std::endl;
     std::cout << "VIDEO COMPLETE!" << std::endl;

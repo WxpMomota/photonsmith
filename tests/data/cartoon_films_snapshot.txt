@@ -55,3 +55,8 @@ meet-pip|0|18476|3
 meet-pip|6|19092|3
 meet-pip|9|18924|4
 meet-pip|17.98|18924|3
+meta|pip-and-the-moon|V18|96 s|24 fps|13 shots|character,emissive,water,reflections,night|128 spp
+pip-and-the-moon|0|56060|72
+pip-and-the-moon|18|56508|72
+pip-and-the-moon|48|56084|73
+pip-and-the-moon|95.9|56060|72

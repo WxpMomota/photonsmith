@@ -59,7 +59,6 @@ struct Pose {
 constexpr double kHeadR = 0.50;     // the head's radius
 constexpr double kBodyH = 0.58;     // the body's height; the head sits on top of it
 constexpr double kEyeR = 0.145;     // an eye's radius
-constexpr double kHeadCentre = 0.78 + 0.5 * kHeadR;   // height of the head's centre above the feet at rest
 
 struct Parts {
 	Mesh head, body, eye, lid, bar, foot, earTip, hand, mouth;
@@ -101,6 +100,45 @@ inline Vec3 onHead(double yawDeg, double pitchDeg, double out = 0.0, double radi
 	return {r * std::cos(p) * std::cos(y), r * std::sin(p), r * std::cos(p) * std::sin(y)};
 }
 
+// The body's frames for a pose: `stance` (the feet's middle, turned, lifted, leaned) and `neck` (the base of the head, squashed with the body).
+struct Frames {
+	Mat4 root, stance, neck;
+	double S, sxz, sy;
+};
+inline Frames framesOf(const Character &c, const Pose &pose) {
+	Frames f;
+	f.S = c.scale;
+	const double walkBob = 0.035 * pose.stepAmount * std::abs(std::sin(pose.stepPhase));
+	const double walkRoll = 6.0 * pose.stepAmount * std::sin(pose.stepPhase);
+	f.sy = std::max(0.2, pose.squash);
+	f.sxz = 1.0 / std::sqrt(f.sy);
+	f.root = mul(translate(pose.pos), rotate({0, 1, 0}, -pose.yaw), translate(0.0, (pose.lift + walkBob) * f.S, 0.0));
+	// lean and roll act about the feet's middle; squash is applied above it
+	f.stance = mul(f.root, rotate({0, 0, 1}, -pose.lean), rotate({1, 0, 0}, pose.roll + walkRoll));
+	f.neck = mul(f.stance, scale(f.S * f.sxz, f.S * f.sy, f.S * f.sxz), translate(0.0, 0.10 + kBodyH * 0.80, 0.0));
+	return f;
+}
+
+// One arm of a pose: the shoulder, the elbow (bent towards the back and down) and the hand, which is the pose's hand target held within the arm's reach.
+struct Arm {
+	Vec3 shoulder, elbow, hand;
+};
+inline Arm armOf(const Character &c, const Pose &pose, double side /* -1 the actor's left, +1 its right */) {
+	const Frames f = framesOf(c, pose);
+	const double S = f.S;
+	const Vec3 shoulder = transformPoint(f.neck, {0.0, -0.12, side * 0.30});
+	const double w = clamp01(side < 0 ? pose.handWeightL : pose.handWeightR);
+	// at rest the hand hangs a little out from the side
+	const Vec3 rest = transformPoint(f.stance, {0.04 * S, 0.30 * S, side * 0.42 * S});
+	const Vec3 target = lerp(rest, side < 0 ? pose.handL : pose.handR, w);
+	const double reachMax = 0.60 * S;
+	Vec3 handP = target;
+	const Vec3 toT = target - shoulder;
+	if (length(toT) > reachMax) handP = shoulder + normalize(toT) * reachMax;
+	const Limb limb = limbIk(shoulder, handP, 0.31 * S, 0.29 * S, normalize(transformPoint(f.stance, {-0.4, -0.8, side * 0.9}) - transformPoint(f.stance, {0.0, 0.0, 0.0})));
+	return {shoulder, limb.elbow, limb.hand};
+}
+
 inline std::string emitActor(const Character &c, const Pose &pose) {
 	const Parts &P = parts();
 	std::string out;
@@ -109,19 +147,16 @@ inline std::string emitActor(const Character &c, const Pose &pose) {
 	const std::string white = coated({0.97, 0.97, 0.95}, 0.08), pupilMat = coated(c.pupil, 0.04), lidMat = coated(c.skin, 0.30), dark = diffuseMaterial({0.10, 0.03, 0.04}), tongue = diffuseMaterial({0.85, 0.35, 0.40});
 
 	// ---- the body frame: where the feet are, turned, lifted, leaned, squashed ----
-	const double walkBob = 0.035 * pose.stepAmount * std::abs(std::sin(pose.stepPhase));
-	const double walkRoll = 6.0 * pose.stepAmount * std::sin(pose.stepPhase);
-	const double sy = std::max(0.2, pose.squash), sxz = 1.0 / std::sqrt(sy);
-	const Mat4 root = mul(translate(pose.pos), rotate({0, 1, 0}, -pose.yaw), translate(0.0, (pose.lift + walkBob) * S, 0.0));
-	// lean and roll act about the feet's middle; squash is applied above it
-	const Mat4 stance = mul(root, rotate({0, 0, 1}, -pose.lean), rotate({1, 0, 0}, pose.roll + walkRoll));
+	const Frames fr = framesOf(c, pose);
+	const double sy = fr.sy, sxz = fr.sxz;
+	const Mat4 &root = fr.root, &stance = fr.stance;
 	const Mat4 bodyM = mul(stance, scale(S * sxz, S * sy, S * sxz), translate(0.0, 0.10, 0.0));
 	// the body, and a belly patch on its front
 	out += attr(skin, emitMesh(P.body, bodyM));
 	out += attr(belly, emitMesh(P.head, mul(bodyM, translate(0.17, 0.27, 0.0), scale(0.17, 0.20, 0.17))));
 
 	// ---- the head ----
-	const Mat4 neck = mul(stance, scale(S * sxz, S * sy, S * sxz), translate(0.0, 0.10 + kBodyH * 0.80, 0.0));
+	const Mat4 &neck = fr.neck;
 	const Mat4 headM = mul(neck, rotate({1, 0, 0}, pose.headRoll), rotate({0, 1, 0}, -pose.headYaw), rotate({0, 0, 1}, -pose.headPitch), translate(0.0, kHeadR * 0.80, 0.0));
 	out += attr(skin, emitMesh(P.head, mul(headM, scale(kHeadR * 1.06, kHeadR, kHeadR * 1.04))));
 	// cheeks
@@ -132,8 +167,6 @@ inline std::string emitActor(const Character &c, const Pose &pose) {
 	// ---- the eyes ----
 	const double wide = std::max(0.3, pose.eyeWide);
 	std::string whites, pupils, highlights, lids;
-	const Mat4 headWorld = headM;
-	const Vec3 headCentreWorld = transformPoint(headWorld, {0.0, 0.0, 0.0});
 	for (double side : {-1.0, 1.0}) {   // -1 the actor's left eye (-z), +1 the right
 		const Vec3 eyeLocal = onHead(side * 21.0, 6.0, -0.060);
 		const double R = kEyeR * wide;
@@ -229,18 +262,9 @@ inline std::string emitActor(const Character &c, const Pose &pose) {
 	{
 		std::string arms, hands;
 		for (double side : {-1.0, 1.0}) {
-			const Vec3 shoulder = transformPoint(neck, {0.0, -0.12, side * 0.30});
-			const double w = clamp01(side < 0 ? pose.handWeightL : pose.handWeightR);
-			// at rest the hand hangs a little out from the side
-			const Vec3 rest = transformPoint(stance, {0.04 * S, 0.30 * S, side * 0.42 * S});
-			const Vec3 target = lerp(rest, side < 0 ? pose.handL : pose.handR, w);
-			const double reachMax = 0.60 * S;
-			Vec3 handP = target;
-			const Vec3 toT = target - shoulder;
-			if (length(toT) > reachMax) handP = shoulder + normalize(toT) * reachMax;
-			const Limb limb = limbIk(shoulder, handP, 0.31 * S, 0.29 * S, normalize(transformPoint(stance, {-0.4, -0.8, side * 0.9}) - transformPoint(stance, {0.0, 0.0, 0.0})));
-			arms += rod(shoulder, limb.elbow, 0.058 * S) + rod(limb.elbow, limb.hand, 0.052 * S);
-			hands += emitMesh(P.hand, mul(translate(limb.hand), scale(0.088 * S)));
+			const Arm arm = armOf(c, pose, side);
+			arms += rod(arm.shoulder, arm.elbow, 0.058 * S) + rod(arm.elbow, arm.hand, 0.052 * S);
+			hands += emitMesh(P.hand, mul(translate(arm.hand), scale(0.088 * S)));
 		}
 		out += attr(skin, arms + hands);
 	}
@@ -258,7 +282,6 @@ inline std::string emitActor(const Character &c, const Pose &pose) {
 		}
 		out += attr(feetMat, feet);
 	}
-	(void)headCentreWorld;
 	return out;
 }
 

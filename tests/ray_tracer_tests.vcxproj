@@ -145,6 +145,7 @@
     <ClCompile Include="unit\loop_subdivide_tests.cpp" />
     <ClCompile Include="unit\cartoon_tests.cpp" />
     <ClCompile Include="unit\cartoon_films_tests.cpp" />
+    <ClCompile Include="unit\cartoon_pip_tests.cpp" />
     <ClCompile Include="unit\cartoon_snapshot_tests.cpp" />
     <ClCompile Include="unit\path_probe_tests.cpp" />
     <ClCompile Include="unit\texture_mapping_tests.cpp" />
