@@ -10,6 +10,7 @@
 #include "../../src/shared/tone_map.h"
 #include "../../src/shared/render_events.h"
 #include "../../src/shared/exr_writer.h"
+#include "../../src/shared/ppm_text.h"
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -607,7 +608,9 @@ extern "C" int optix_render_main(
 		// as a real, visible color/contrast mismatch between the two
 		// renderers (ACES's filmic S-curve shifts shadow/midtone hue and
 		// softens contrast compared to a flat gamma curve).
-		for (size_t i = 0; i < pixelCount; ++i) {
+		std::vector<unsigned char> bytes(pixelCount * 3);
+		ppm_text::parallel_ranges(pixelCount, [&](size_t begin, size_t end) {
+		for (size_t i = begin; i < end; ++i) {
 			double r = framebuffer[i * 3 + 0];
 			double g = framebuffer[i * 3 + 1];
 			double b = framebuffer[i * 3 + 2];
@@ -639,8 +642,15 @@ extern "C" int optix_render_main(
 			int ig = static_cast<int>(256.0 * std::fmin(std::fmax(g, 0.0), 0.999));
 			int ib = static_cast<int>(256.0 * std::fmin(std::fmax(b, 0.0), 0.999));
 
-			outFile << ir << " " << ig << " " << ib << "\n";
+			bytes[i * 3 + 0] = static_cast<unsigned char>(ir);
+			bytes[i * 3 + 1] = static_cast<unsigned char>(ig);
+			bytes[i * 3 + 2] = static_cast<unsigned char>(ib);
 		}
+		});   // (the pixels are independent: split over the cores, then written as one block of text)
+
+		std::string text;
+		ppm_text::append_p3_pixels(text, bytes.data(), pixelCount);
+		outFile.write(text.data(), static_cast<std::streamsize>(text.size()));
 
 		outFile.close();
 

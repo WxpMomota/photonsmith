@@ -392,6 +392,9 @@ struct LaunchArgs {
 	int cartoon_timeout = -1;
 	// --resume: continue an interrupted cartoon video from the frames it already rendered (when the settings and the film are the same), instead of starting again.
 	bool cartoon_resume = false;
+	// --ppm-only: write the picture as a PPM and no PNG beside it. A cartoon video's frame runs are started with it (the video turns each PPM into its numbered PNG itself and deletes the
+	// frame run's own PNG, so making one was a second encode of every frame); people have no use for it.
+	bool ppm_only = false;
 	// --cartoon-worker JOBFILE: render the frames the job file lists, one after the other in this one process (launcher/cartoon_worker.h). Started by a cartoon video, not by people.
 	std::string cartoon_worker;
 	// --cartoon-workers N: render a cartoon video's frames with N long-lived worker processes (the default on a GPU) instead of a process per frame; 0 = a process per frame; -1 = automatic.
@@ -893,6 +896,9 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 		}
 	} else if (arg == "--resume") {
 		out.cartoon_resume = true;
+		consumed_args.insert(i);
+	} else if (arg == "--ppm-only") {
+		out.ppm_only = true;
 		consumed_args.insert(i);
 	} else if (arg == render_flags::kFps && i + 1 < argc) {
 		try {

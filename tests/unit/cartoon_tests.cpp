@@ -27,6 +27,7 @@
 #include "../../src/shared/cartoon/cartoons.h"
 #include "../../src/shared/cartoon/cartoon_stills.h"
 #include "../../src/shared/pbrt_discover.h"
+#include "../../src/shared/ppm_text.h"
 #include "../../qt_gui/scene_bucket.h"
 #include "../../src/shared/video_preset.h"
 
@@ -901,4 +902,60 @@ TEST(SceneBucket, TheFourBucketsAreTheScenePairAndTheCartoonPair) {
 	EXPECT_TRUE(isCartoons(Cartoons) && isCartoons(CartoonsExternal));
 	EXPECT_TRUE(requiresFiles(ExternalFiles) && requiresFiles(CartoonsExternal));
 	EXPECT_FALSE(requiresFiles(SelfContained) || requiresFiles(Cartoons));
+}
+
+TEST(CartoonRender, AFrameRunWritesThePpmOnlyBecauseTheVideoMakesTheNumberedPng) {
+	LaunchArgs plain;
+	const cartoon::Film *pip = cartoon::find("pip-and-the-moon");
+	ASSERT_NE(pip, nullptr);
+	const std::vector<std::string> flags = cartoon_render::frameFlags(plain, *pip, true);
+	EXPECT_NE(std::find(flags.begin(), flags.end(), "--ppm-only"), flags.end());
+	LaunchArgs parsed;
+	ASSERT_TRUE(parseArgs({"--ppm-only"}, parsed));
+	EXPECT_TRUE(parsed.ppm_only);
+	LaunchArgs normal;
+	ASSERT_TRUE(parseArgs({"--cpu"}, normal));
+	EXPECT_FALSE(normal.ppm_only) << "a picture someone renders still gets its PNG";
+}
+
+TEST(PpmText, TheFastTextIsWhatIostreamWritesAndReadsBack) {
+	const std::size_t pixels = 100003;   // (not a multiple of the thread count)
+	std::vector<unsigned char> rgb(pixels * 3);
+	unsigned seed = 12345;
+	for (unsigned char &c : rgb) {
+		seed = seed * 1664525u + 1013904223u;
+		c = static_cast<unsigned char>(seed >> 24);
+	}
+	rgb[0] = 0;
+	rgb[1] = 9;
+	rgb[2] = 10;
+	rgb[3] = 99;
+	rgb[4] = 100;
+	rgb[5] = 255;
+	std::ostringstream slow;
+	for (std::size_t i = 0; i < pixels; ++i) slow << int(rgb[i * 3]) << " " << int(rgb[i * 3 + 1]) << " " << int(rgb[i * 3 + 2]) << "\n";
+	std::string fast;
+	ppm_text::append_p3_pixels(fast, rgb.data(), pixels);
+	EXPECT_EQ(fast, slow.str());
+
+	std::vector<unsigned char> back(rgb.size());
+	std::size_t failedAt = 0;
+	ASSERT_TRUE(ppm_text::parse_p3_samples(fast.data(), fast.data() + fast.size(), back.data(), back.size(), failedAt));
+	EXPECT_EQ(back, rgb);
+	std::string cut = fast.substr(0, fast.size() / 2);
+	EXPECT_FALSE(ppm_text::parse_p3_samples(cut.data(), cut.data() + cut.size(), back.data(), back.size(), failedAt)) << "a picture cut short is an error";
+	EXPECT_GT(failedAt, 0u);
+	const std::string junk = "1 2 x";
+	EXPECT_FALSE(ppm_text::parse_p3_samples(junk.data(), junk.data() + junk.size(), back.data(), 3, failedAt));
+	EXPECT_EQ(failedAt, 2u);
+}
+
+TEST(PpmText, TheParallelLoopVisitsEveryIndexOnce) {
+	for (std::size_t n : {std::size_t(0), std::size_t(1), std::size_t(16383), std::size_t(16384), std::size_t(1000003)}) {
+		std::vector<int> seen(n, 0);
+		ppm_text::parallel_ranges(n, [&](std::size_t begin, std::size_t end) {
+			for (std::size_t i = begin; i < end; ++i) ++seen[i];
+		});
+		EXPECT_EQ(std::count(seen.begin(), seen.end(), 1), static_cast<std::ptrdiff_t>(n)) << n;
+	}
 }

@@ -4,6 +4,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #include "image_writer.h"
+#include "../shared/ppm_text.h"
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -72,14 +73,17 @@ std::vector<unsigned char> read_ppm(const char* filename, int& width, int& heigh
 	std::vector<unsigned char> pixels(width * height * 3);
 
 	if (magic == "P3") {
-		// ASCII format
-		for (int i = 0; i < width * height * 3; i++) {
-			int val;
-			if (!(file >> val)) {
-				std::cerr << "Failed to read pixel value at index " <<  i << std::endl;
-				return {};
-			}
-			pixels[i] = static_cast<unsigned char>(val);
+		// ASCII format: the rest of the file in one read, parsed by hand (`file >> val` for each of the 2.7 million numbers of a 1280 x 720 picture took longer than drawing it on a GPU)
+		const std::streampos start = file.tellg();
+		file.seekg(0, std::ios::end);
+		const std::streampos finish = file.tellg();
+		file.seekg(start);
+		std::string body(static_cast<size_t>(finish - start), '\0');
+		file.read(&body[0], static_cast<std::streamsize>(body.size()));
+		size_t failedAt = 0;
+		if (!ppm_text::parse_p3_samples(body.data(), body.data() + body.size(), pixels.data(), pixels.size(), failedAt)) {
+			std::cerr << "Failed to read pixel value at index " << failedAt << std::endl;
+			return {};
 		}
 	} else {
 		// Binary format (P6)

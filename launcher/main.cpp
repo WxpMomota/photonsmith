@@ -712,7 +712,7 @@ static void cutToScenePicture(const LaunchArgs &args, const std::string &scene_i
 }
 
 // After a successful render: PPM to PNG (Metal and EXR output are already final) and the list of files to open.
-static void announceRenderedFile(const std::string &out_path, bool use_gpu) {
+static void announceRenderedFile(const std::string &out_path, bool use_gpu, bool ppm_only) {
     (void)use_gpu;  // (read only by the Metal branch)
         std::filesystem::path ppm_path_obj(out_path);
 
@@ -759,6 +759,9 @@ static void announceRenderedFile(const std::string &out_path, bool use_gpu) {
             // compositable format that doesn't need a PNG derivative anyway.
             std::cout << "\nRender complete! You can now open:" << std::endl;
             std::cout << "  - " << ppm_path_obj.filename() << " (EXR - linear HDR, full float precision)" << std::endl;
+        } else if (ppm_only) {
+            std::cout << "\nRender complete! You can now open:" << std::endl;
+            std::cout << "  - " << ppm_path_obj.filename() << " (PPM - raw data)" << std::endl;
         } else {
             std::cout << "\nConverting to PNG format..." << std::endl;
 
@@ -833,7 +836,7 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
     printCpuStats(args, s, seconds);
 
     if (render_result == 0 && !args.aovs) cutToScenePicture(args, scene_id, out_path);
-    if (render_result == 0) announceRenderedFile(out_path, use_gpu);
+    if (render_result == 0) announceRenderedFile(out_path, use_gpu, args.ppm_only);
 
     if (render_result == 0 && args.aovs) write_aov_passes(out_path, image_width, image_height, samples_per_pixel, scene_id, cam_x, cam_y, cam_z);
     return render_result;
