@@ -273,18 +273,37 @@ bool OptiXRenderer::ptxFileExists(const char* filename) const {
 	return false;
 }
 
+void OptiXRenderer::destroyDefaultRendererObjects() {
+	if (pipeline_) { optixPipelineDestroy(pipeline_); pipeline_ = nullptr; }
+	for (OptixProgramGroup *pg : {&raygenPG_, &missPG_, &shadowMissPG_,
+	                              &hitgroupSpherePG_, &hitgroupQuadPG_, &hitgroupBilinearPatchPG_, &hitgroupDiskPG_, &hitgroupCylinderPG_, &hitgroupTrianglePG_,
+	                              &shadowHitgroupSpherePG_, &shadowHitgroupQuadPG_, &shadowHitgroupBilinearPatchPG_, &shadowHitgroupDiskPG_, &shadowHitgroupCylinderPG_, &shadowHitgroupTrianglePG_,
+	                              &probeMissPG_, &probeHitgroupSpherePG_, &probeHitgroupQuadPG_, &probeHitgroupBilinearPatchPG_, &probeHitgroupDiskPG_, &probeHitgroupCylinderPG_,
+	                              &probeHitgroupTrianglePG_}) {
+		if (*pg) { optixProgramGroupDestroy(*pg); *pg = nullptr; }
+	}
+	for (OptixModule *m : {&module_, &moduleSphere_, &moduleQuad_, &moduleDisk_, &moduleCylinder_, &moduleTriangle_}) {
+		if (*m) { optixModuleDestroy(*m); *m = nullptr; }
+	}
+	defaultRendererReady_ = false;
+}
+
 bool OptiXRenderer::ensureDefaultRenderer() {
 	if (defaultRendererReady_) return true;
+	// A step that fails leaves nothing behind, so that the next attempt starts clean instead of making the modules and program groups again over live ones.
 	if (!createModule()) {
 		std::cerr << "Failed to create OptiX module\n";
+		destroyDefaultRendererObjects();
 		return false;
 	}
 	if (!createProgramGroups()) {
 		std::cerr << "Failed to create program groups\n";
+		destroyDefaultRendererObjects();
 		return false;
 	}
 	if (!linkPipeline()) {
 		std::cerr << "Failed to link pipeline\n";
+		destroyDefaultRendererObjects();
 		return false;
 	}
 	defaultRendererReady_ = true;
@@ -344,10 +363,27 @@ bool OptiXRenderer::createContext() {
 
 	// The OptiX cache keeps the compiled shaders between runs (compiling them cold takes 20 minutes). Its default size is too small for more than one build of them at a time, and
 	// an entry that is evicted is a 20-minute recompile at the next start; this leaves room for several builds. OPTIX_CACHE_MAXSIZE, when set, is the user's or a script's own choice.
+	// Only ever raised (never below what OptiX or the user already allows), the result is checked, and the log says when it changed anything. RAY_TRACER_OPTIX_CACHE_GB=n sets the limit
+	// in gigabytes (the low water mark is three quarters of it), 0 leaves OptiX's own.
+	{
+		size_t wantGb = 4;
 #pragma warning(suppress: 4996)
-	if (!std::getenv("OPTIX_CACHE_MAXSIZE")) {
-		const size_t gigabyte = size_t(1) << 30;
-		(void)optixDeviceContextSetCacheDatabaseSizes(context_, 4 * gigabyte, 6 * gigabyte);   // (low water mark, high water mark)
+		if (const char *gb = std::getenv("RAY_TRACER_OPTIX_CACHE_GB")) wantGb = static_cast<size_t>((std::max)(0, std::atoi(gb)));
+#pragma warning(suppress: 4996)
+		const bool userChoseSize = std::getenv("OPTIX_CACHE_MAXSIZE") != nullptr;
+		const size_t megabyte = size_t(1) << 20;
+		size_t low = 0, high = 0;
+		if (wantGb > 0 && !userChoseSize && optixDeviceContextGetCacheDatabaseSizes(context_, &low, &high) == OPTIX_SUCCESS && high < wantGb * 1024 * megabyte) {
+			const size_t newHigh = wantGb * 1024 * megabyte, newLow = newHigh / 4 * 3;
+			if (optixDeviceContextSetCacheDatabaseSizes(context_, newLow, newHigh) == OPTIX_SUCCESS) {
+				// (said on every start, so only when asked for: RAY_TRACER_VERBOSE; a failure is always said)
+#pragma warning(suppress: 4996)
+				if (std::getenv("RAY_TRACER_VERBOSE"))
+					std::cout << "[OptiX] The shader cache may now grow to " << newHigh / megabyte << " MB (it was " << high / megabyte << " MB); RAY_TRACER_OPTIX_CACHE_GB=0 leaves OptiX's own limit" << std::endl;
+			} else {
+				std::cerr << "[OptiX] Could not raise the shader cache limit; a shader build that does not fit may be recompiled (about 20 minutes) at a later start" << std::endl;
+			}
+		}
 	}
 
 	return true;

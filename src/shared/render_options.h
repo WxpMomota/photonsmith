@@ -151,4 +151,7 @@ struct RenderOptions {
 	// launcher/launcher_args.h's LaunchArgs::isolate_pbrt_lighting for the
 	// full "why" (docs/history/METAL_GPU_FEASIBILITY.md section 197's C9 finding).
 	bool isolate_pbrt_lighting = false;
+	// Write the picture as a binary PPM (P6: 3 bytes a pixel) instead of the text one (P3: every sample as a decimal number, about 7 MB at 1280 x 720). For a program's own use: a cartoon
+	// video's frame runs (LaunchArgs::ppm_only), whose pictures the video reads straight back (image_writer's read_ppm reads both). GPU renderers only; the file people ask for stays P3.
+	bool binary_ppm = false;
 };

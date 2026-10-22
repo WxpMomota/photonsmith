@@ -76,11 +76,15 @@ inline std::vector<std::string> frameArgs(const std::vector<std::string> &flags,
 }
 
 // How long one frame may take: --cartoon-timeout S, else the environment variable RAY_TRACER_CARTOON_TIMEOUT, else 15 minutes on a GPU (a frame there takes seconds, so one that has taken
-// fifteen minutes is stuck) and never on the CPU (a CPU frame at a high quality can take that long and more). 0 means never.
+// fifteen minutes is stuck; twice that in --background mode, see below) and never on the CPU (a CPU frame at a high quality can take that long and more). 0 means never.
 inline int timeoutFor(const LaunchArgs &args, bool gpu) {
-	if (args.cartoon_timeout >= 0) return args.cartoon_timeout;
-	if (const char *env = std::getenv("RAY_TRACER_CARTOON_TIMEOUT")) return std::max(0, std::atoi(env));
-	return gpu ? 900 : 0;
+	int seconds = gpu ? 900 : 0;
+	if (args.cartoon_timeout >= 0) seconds = args.cartoon_timeout;
+	else if (const char *env = std::getenv("RAY_TRACER_CARTOON_TIMEOUT")) seconds = std::max(0, std::atoi(env));
+	// --background: a worker pauses after every frame (background_mode.h), and the watchdog measures the time since the worker's last finished frame, so the limit grows by the same
+	// factor (twice at the usual duty of 50%); otherwise a healthy worker with slow frames would be killed in its pause.
+	if (args.background && seconds > 0) seconds = static_cast<int>(std::min<long long>(static_cast<long long>(seconds) * 100 / background_mode::dutyPercent(), 24LL * 3600));
+	return seconds;
 }
 
 // Writes the frame's scene, runs the child, removes the scene file. Returns the child's exit code (0 = SUCCESS), or -1 when the scene file could not be written or the child could not be

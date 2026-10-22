@@ -32,11 +32,13 @@ inline void parallel_ranges(std::size_t count, Fn fn, std::size_t minPerThread =
 	for (std::thread &t : pool) t.join();
 }
 
-// "r g b\n" for each of `pixelCount` pixels of 8-bit RGB, appended to `out`.
-inline void append_p3_pixels(std::string &out, const unsigned char *rgb, std::size_t pixelCount) {
-	std::size_t at = out.size();
-	out.resize(at + pixelCount * 12);   // (at most 3 + 1 + 3 + 1 + 3 + 1 characters a pixel)
-	char *p = &out[at];
+// The most characters a pixel's "r g b\n" takes (3 + 1 + 3 + 1 + 3 + 1): what a destination buffer for format_p3_pixels() needs per pixel.
+constexpr std::size_t kMaxP3BytesPerPixel = 12;
+
+// "r g b\n" for each of `pixelCount` pixels of 8-bit RGB, written to `dst` (which holds at least pixelCount * kMaxP3BytesPerPixel characters and need not be initialised). Returns the number of
+// characters written.
+inline std::size_t format_p3_pixels(char *dst, const unsigned char *rgb, std::size_t pixelCount) {
+	char *p = dst;
 	auto put = [&p](unsigned v) {
 		if (v >= 100) *p++ = char('0' + v / 100), v %= 100, *p++ = char('0' + v / 10), *p++ = char('0' + v % 10);
 		else if (v >= 10) *p++ = char('0' + v / 10), *p++ = char('0' + v % 10);
@@ -50,7 +52,13 @@ inline void append_p3_pixels(std::string &out, const unsigned char *rgb, std::si
 		put(rgb[i * 3 + 2]);
 		*p++ = '\n';
 	}
-	out.resize(static_cast<std::size_t>(p - out.data()));
+	return static_cast<std::size_t>(p - dst);
+}
+
+// The same text appended to a string (for callers that want one; the renderer writes from a buffer instead, to skip the string's zero-fill).
+inline void append_p3_pixels(std::string &out, const unsigned char *rgb, std::size_t pixelCount) {
+	std::vector<char> text(pixelCount * kMaxP3BytesPerPixel);
+	out.append(text.data(), format_p3_pixels(text.data(), rgb, pixelCount));
 }
 
 // Reads `count` whitespace-separated non-negative integers from [p, end) into `out` (each cut to a byte, as `static_cast<unsigned char>(int)` does). False when fewer numbers are there or

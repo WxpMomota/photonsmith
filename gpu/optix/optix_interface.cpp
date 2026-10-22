@@ -167,7 +167,6 @@ static bool prepareSceneAndCamera(
 
 	// The default renderer's modules are made when a render needs them; a scene that was uploaded while only the wavefront renderer was wanted has no default-renderer SBT,
 	// so it is uploaded again here when the default renderer is wanted after all.
-	g_renderer->setDefaultRendererWanted(!wavefrontMode);
 	if (!wavefrontMode && g_renderer->defaultRendererSbtMissing()) g_uploaded_scene_id.clear();
 
 	SceneData scene;
@@ -285,7 +284,7 @@ static bool prepareSceneAndCamera(
 								 scene.portalRectifiedImage, scene.portalDistFunc, scene.portalSatSum,
 								 scene.portalWidth, scene.portalHeight, scene.portalScale,
 								 scene.portalFrameX, scene.portalFrameY, scene.portalFrameZ,
-								 scene.portalP0, scene.portalP2)) {
+								 scene.portalP0, scene.portalP2, /*buildDefaultRendererSbt=*/!wavefrontMode)) {
 			if (verbose) std::cerr << "[OptiX] Failed to upload scene to GPU\n";
 			else g_lastRealtimeError = reasonFrom(uploadCapture->text.str(), "the scene could not be uploaded to the GPU");
 			errorCode = ERR_GPU_MEMORY_COPY_FAILED;
@@ -305,6 +304,13 @@ static bool prepareSceneAndCamera(
 		std::cout << "[OptiX] Wavefront mode enabled (PTX: " << ptxPath << ")\n";
 	}
 	g_renderer->enableWavefront(wavefrontMode, ptxPath);
+
+	// enableWavefront() falls back to the default renderer when the wavefront one cannot start; the scene above was uploaded for the wavefront renderer only (no default-renderer
+	// SBT, no default pipeline), so it is prepared again for the default renderer.
+	if (wavefrontMode && !g_renderer->isWavefrontActive()) {
+		return prepareSceneAndCamera(scene_id, image_width, image_height, cam_x, cam_y, cam_z, force_camera_override, /*wavefrontMode=*/false, ptxPath, verbose, cameraExtra, errorCode,
+									 has_custom_lookat, lookat_x, lookat_y, lookat_z, has_dof_override, aperture_override, focus_distance_override, vfov_override);
+	}
 
 	return true;
 }
@@ -602,8 +608,8 @@ extern "C" int optix_render_main(
 			return ERR_FILE_WRITE_FAILED;
 		}
 
-		// PPM header
-		outFile << "P3\n" << image_width << " " << image_height << "\n255\n";
+		// PPM header (binary P6 for a program's own use, see RenderOptions::binary_ppm; the text P3 otherwise)
+		outFile << (options.binary_ppm ? "P6\n" : "P3\n") << image_width << " " << image_height << "\n255\n";
 
 		// Write pixels with the same ACES filmic tone map + sRGB OETF CPU's
 		// write_color() (src/TheRestOfYourLife/color.h) uses - previously
@@ -653,9 +659,14 @@ extern "C" int optix_render_main(
 		}
 		});   // (the pixels are independent: split over the cores, then written as one block of text)
 
-		std::string text;
-		ppm_text::append_p3_pixels(text, bytes.data(), pixelCount);
-		outFile.write(text.data(), static_cast<std::streamsize>(text.size()));
+		if (options.binary_ppm) {
+			outFile.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+		} else {
+			// (formatted into an uninitialised buffer and written from it: no zero-fill of the text and no second copy)
+			const std::unique_ptr<char[]> text(new char[pixelCount * ppm_text::kMaxP3BytesPerPixel]);
+			const std::size_t length = ppm_text::format_p3_pixels(text.get(), bytes.data(), pixelCount);
+			outFile.write(text.get(), static_cast<std::streamsize>(length));
+		}
 
 		outFile.close();
 
@@ -1371,7 +1382,6 @@ extern "C" int optix_render_main_sppm(
 			g_renderer->setInstanceData(scene.instanceTriangles, scene.instanceSpheres,
 										scene.instanceGroups, scene.instancePlacements);
 			g_renderer->uploadExtraPortalLights(scene.extraPortals, scene.skyBesidePortals);
-			g_renderer->setDefaultRendererWanted(false);   // (GPU SPPM has its own pipeline and SBT: it needs nothing of the default renderer's)
 			if (!g_renderer->buildScene(scene.spheres, scene.quads, scene.materials,
 			                             scene.lightIndices, scene.lightKinds,
 			                             scene.punctualLights, scene.bilinearPatches,
@@ -1395,7 +1405,7 @@ extern "C" int optix_render_main_sppm(
 									 scene.portalRectifiedImage, scene.portalDistFunc, scene.portalSatSum,
 									 scene.portalWidth, scene.portalHeight, scene.portalScale,
 									 scene.portalFrameX, scene.portalFrameY, scene.portalFrameZ,
-									 scene.portalP0, scene.portalP2)) {
+									 scene.portalP0, scene.portalP2, /*buildDefaultRendererSbt=*/false)) {   // (GPU SPPM has its own pipeline and SBT: it needs nothing of the default renderer's)
 				std::cerr << "[OptiX] Failed to upload scene to GPU\n";
 				return ERR_GPU_MEMORY_COPY_FAILED;
 			}

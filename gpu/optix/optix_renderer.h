@@ -56,10 +56,10 @@ public:
 	/// The default (recursive) renderer's OptiX modules, program groups and pipeline are made the first time something needs them (a default-renderer render, or a scene upload that is
 	/// for it), not in initialize(): compiling them is 20 minutes on a cold OptiX cache and the wavefront renderer and GPU SPPM do not use them at all. Idempotent.
 	bool ensureDefaultRenderer();
-	/// Whether the next buildScene() should also build the default renderer's shader binding table (and so make the default renderer ready). The wavefront renderer and GPU SPPM say false
-	/// before they upload a scene.
-	void setDefaultRendererWanted(bool wanted) { defaultRendererWanted_ = wanted; }
-	/// True when the scene on the GPU was uploaded without the default renderer's SBT (see setDefaultRendererWanted): a default-renderer render needs it uploaded again.
+	/// Destroys the default renderer's pipeline, program groups and modules (what ensureDefaultRenderer made); safe when some or none of them exist.
+	void destroyDefaultRendererObjects();
+	/// True when the scene on the GPU was uploaded without the default renderer's SBT (buildScene's `buildDefaultRendererSbt` was false: the wavefront renderer and GPU SPPM do not need
+	/// it): a default-renderer render needs the scene uploaded again.
 	bool defaultRendererSbtMissing() const { return defaultRendererSbtMissing_; }
 
 	/// @brief Build scene acceleration structure from geometry
@@ -141,7 +141,9 @@ public:
 		const std::vector<double>& portalSatSum = {},
 		int portalWidth = 0, int portalHeight = 0, float portalScale = 1.0f,
 		float3 portalFrameX = {}, float3 portalFrameY = {}, float3 portalFrameZ = {},
-		float3 portalP0 = {}, float3 portalP2 = {}
+		float3 portalP0 = {}, float3 portalP2 = {},
+		// false: do not make the default renderer (its modules take 20 minutes to compile cold) or build its shader binding table. For an upload that only the wavefront renderer or GPU SPPM will render.
+		bool buildDefaultRendererSbt = true
 	);
 
 	/// @brief Render a frame using path tracing
@@ -504,7 +506,6 @@ private:
 	std::unique_ptr<optix_renderer::WavefrontPathTracer> wavefrontTracer_;
 	bool useWavefront_ = false;  ///< If true, render() delegates to wavefrontTracer_
 	bool defaultRendererReady_ = false;        ///< see ensureDefaultRenderer()
-	bool defaultRendererWanted_ = true;        ///< see setDefaultRendererWanted()
 	bool defaultRendererSbtMissing_ = false;   ///< see defaultRendererSbtMissing()
 
 	// -------------------------------------------------------------------

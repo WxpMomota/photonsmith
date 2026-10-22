@@ -7,7 +7,8 @@
 //
 // What it changes, in the launcher and in every program the launcher starts (they are given the flag too, and on Windows inherit the priority class):
 //   * CPU priority below normal, and a low memory priority, so the rest of the system is served first when it is busy;
-//   * the GPU scheduling class of the process lowered (Windows: D3DKMTSetProcessSchedulingPriorityClass), so that the desktop, a browser or a game gets the GPU first when it wants it;
+//   * the GPU scheduling class of the process lowered (Windows: D3DKMTSetProcessSchedulingPriorityClass), which favours the desktop's own drawing over this render's work; it does NOT give the
+//     card to another program that is doing compute or heavy graphics (see above: measured, no effect), only the pauses below do that;
 //   * half of the CPU cores for a CPU render (unless RAY_TRACER_THREADS says otherwise);
 //   * one worker and one frame at a time for a cartoon video (cartoon_render.h: workersFor, jobsFor);
 //   * the pause after each frame of a video (pauseAfter below).

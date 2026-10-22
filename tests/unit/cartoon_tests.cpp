@@ -24,10 +24,12 @@
 #include "../../launcher/cartoon_worker.h"
 #include "../../launcher/cartoon_still.h"
 #include "../../launcher/launcher_args.h"
+#include "../../launcher/render_setup.h"
 #include "../../launcher/background_mode.h"
 #include "../../src/shared/cartoon/cartoons.h"
 #include "../../src/shared/cartoon/cartoon_stills.h"
 #include "../../src/shared/pbrt_discover.h"
+#include "../../src/shared/output_crop.h"
 #include "../../src/shared/ppm_text.h"
 #include "../../qt_gui/scene_bucket.h"
 #include "../../src/shared/video_preset.h"
@@ -987,10 +989,23 @@ TEST(CartoonRender, BackgroundModeUsesOneWorkerAndOneFrameAtATimeAndIsPassedOnTo
 }
 
 #ifdef _WIN32
+namespace {
+// Puts back what a test that calls background_mode::apply() changes in the whole test program (the priority class, RAY_TRACER_THREADS and the background flag), however the test ends.
+struct BackgroundModeRestore {
+	DWORD priority = GetPriorityClass(GetCurrentProcess());
+	bool hadThreads = std::getenv("RAY_TRACER_THREADS") != nullptr;
+	std::string threads = hadThreads ? std::getenv("RAY_TRACER_THREADS") : "";
+	~BackgroundModeRestore() {
+		background_mode::active() = false;
+		SetPriorityClass(GetCurrentProcess(), priority);
+		if (hadThreads) _putenv_s("RAY_TRACER_THREADS", threads.c_str());
+		else _putenv("RAY_TRACER_THREADS=");
+	}
+};
+}  // namespace
+
 TEST(BackgroundMode, ItLowersThePriorityOfThisProcessAndHalvesTheCpuThreads) {
-	const DWORD before = GetPriorityClass(GetCurrentProcess());
-	const char *threads = std::getenv("RAY_TRACER_THREADS");
-	const std::string savedThreads = threads ? threads : "";
+	BackgroundModeRestore restore;
 	_putenv("RAY_TRACER_THREADS=");   // (removes it: the user did not choose a number)
 
 	const std::string done = background_mode::apply();
@@ -1009,8 +1024,55 @@ TEST(BackgroundMode, ItLowersThePriorityOfThisProcessAndHalvesTheCpuThreads) {
 	EXPECT_NEAR(background_mode::pauseSecondsAfter(2.0), 2.0, 1e-9) << "a duty of 50%: as long as the work";
 	background_mode::active() = false;
 	EXPECT_EQ(background_mode::pauseSecondsAfter(2.0), 0.0) << "no pause outside background mode";
-	SetPriorityClass(GetCurrentProcess(), before);   // (the rest of the tests run at their usual priority)
-	if (threads) _putenv_s("RAY_TRACER_THREADS", savedThreads.c_str());
-	else _putenv("RAY_TRACER_THREADS=");
 }
 #endif
+
+TEST(CartoonRender, ABackgroundVideoTheWatchdogAllowsForThePausesBetweenFrames) {
+	LaunchArgs normal;
+	EXPECT_EQ(cartoon_render::timeoutFor(normal, true), 900);
+	LaunchArgs quiet;
+	quiet.background = true;
+	EXPECT_EQ(cartoon_render::timeoutFor(quiet, true), 1800) << "a worker that sleeps as long as each frame took needs twice the time between two finished frames";
+	EXPECT_EQ(cartoon_render::timeoutFor(quiet, false), 0) << "never stops being never";
+	quiet.cartoon_timeout = 30;
+	EXPECT_EQ(cartoon_render::timeoutFor(quiet, true), 60) << "also a limit the user chose";
+	quiet.cartoon_timeout = 0;
+	EXPECT_EQ(cartoon_render::timeoutFor(quiet, true), 0);
+}
+
+TEST(CartoonRender, AFrameRunThatIsAskedForAPpmOnlyWritesTheBinaryOneAndTheVideoReadsBothTheSame) {
+	LaunchArgs frame;
+	ASSERT_TRUE(parseArgs({"--ppm-only"}, frame));
+	EXPECT_TRUE(render_options_from_args(frame).binary_ppm);
+	LaunchArgs plain;
+	EXPECT_FALSE(render_options_from_args(plain).binary_ppm) << "the picture someone asks for stays the text PPM";
+
+	// the same 3 x 2 picture as a P3 and as a P6 file must read back the same (the video's PNG conversion, image_writer.cpp's read_ppm, reads both; this checks the header-only reader the crop uses; the PNG itself is checked by hand against a text PPM's)
+	const unsigned char pixels[18] = {0, 9, 10, 99, 100, 255, 1, 2, 3, 250, 128, 7, 33, 44, 55, 200, 201, 202};
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / ("ppm_p6_test_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+	std::filesystem::create_directories(dir);
+	{
+		std::ofstream p3(dir / "a.ppm", std::ios::binary);
+		p3 << "P3\n3 2\n255\n";
+		std::string text;
+		ppm_text::append_p3_pixels(text, pixels, 6);
+		p3 << text;
+		std::ofstream p6(dir / "b.ppm", std::ios::binary);
+		p6 << "P6\n3 2\n255\n";
+		p6.write(reinterpret_cast<const char *>(pixels), sizeof(pixels));
+	}
+	int w3 = 0, h3 = 0, m3 = 0, w6 = 0, h6 = 0, m6 = 0;
+	std::vector<int> a, b;
+	ASSERT_TRUE(output_crop::readPpm((dir / "a.ppm").string(), w3, h3, m3, a));
+	ASSERT_TRUE(output_crop::readPpm((dir / "b.ppm").string(), w6, h6, m6, b));
+	EXPECT_EQ(w3, 3);
+	EXPECT_EQ(h3, 2);
+	EXPECT_EQ(w6, 3);
+	EXPECT_EQ(h6, 2);
+	EXPECT_EQ(m3, 255);
+	EXPECT_EQ(m6, 255);
+	EXPECT_EQ(a, std::vector<int>(pixels, pixels + 18));
+	EXPECT_EQ(b, a);
+	std::error_code ec;
+	std::filesystem::remove_all(dir, ec);
+}

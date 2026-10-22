@@ -592,31 +592,8 @@ void OptiXRenderer::cleanup() noexcept {
 	// Free launch params
 	if (d_launchParams_) cudaFree(reinterpret_cast<void*>(d_launchParams_));
 
-	// Destroy program groups
-	if (raygenPG_) optixProgramGroupDestroy(raygenPG_);
-	if (missPG_) optixProgramGroupDestroy(missPG_);
-	if (hitgroupSpherePG_) optixProgramGroupDestroy(hitgroupSpherePG_);
-	if (hitgroupQuadPG_) optixProgramGroupDestroy(hitgroupQuadPG_);
-	if (hitgroupBilinearPatchPG_) optixProgramGroupDestroy(hitgroupBilinearPatchPG_);
-	if (hitgroupTrianglePG_) optixProgramGroupDestroy(hitgroupTrianglePG_);
-	if (shadowHitgroupSpherePG_) optixProgramGroupDestroy(shadowHitgroupSpherePG_);
-	if (shadowHitgroupQuadPG_) optixProgramGroupDestroy(shadowHitgroupQuadPG_);
-	if (shadowHitgroupBilinearPatchPG_) optixProgramGroupDestroy(shadowHitgroupBilinearPatchPG_);
-	if (shadowHitgroupTrianglePG_) optixProgramGroupDestroy(shadowHitgroupTrianglePG_);
-	if (probeMissPG_) optixProgramGroupDestroy(probeMissPG_);
-	if (probeHitgroupSpherePG_) optixProgramGroupDestroy(probeHitgroupSpherePG_);
-	if (probeHitgroupQuadPG_) optixProgramGroupDestroy(probeHitgroupQuadPG_);
-	if (probeHitgroupBilinearPatchPG_) optixProgramGroupDestroy(probeHitgroupBilinearPatchPG_);
-	if (probeHitgroupTrianglePG_) optixProgramGroupDestroy(probeHitgroupTrianglePG_);
-
-	// Destroy module and pipeline
-	if (module_) optixModuleDestroy(module_);
-	if (moduleSphere_) optixModuleDestroy(moduleSphere_);
-	if (moduleQuad_) optixModuleDestroy(moduleQuad_);
-	if (moduleDisk_) optixModuleDestroy(moduleDisk_);
-	if (moduleCylinder_) optixModuleDestroy(moduleCylinder_);
-	if (moduleTriangle_) optixModuleDestroy(moduleTriangle_);
-	if (pipeline_) optixPipelineDestroy(pipeline_);
+	// Destroy the default renderer's program groups, modules and pipeline
+	destroyDefaultRendererObjects();
 
 	// Destroy context
 	if (context_) optixDeviceContextDestroy(context_);

@@ -1461,7 +1461,8 @@ bool OptiXRenderer::buildScene(
 	const std::vector<double>& portalSatSum,
 	int portalWidth, int portalHeight, float portalScale,
 	float3 portalFrameX, float3 portalFrameY, float3 portalFrameZ,
-	float3 portalP0, float3 portalP2
+	float3 portalP0, float3 portalP2,
+	bool buildDefaultRendererSbt
 ) {
 	const SceneInputs in{spheres, quads, materials, lightIndices, lightKinds, punctualLights, bilinearPatches, triangles, disks, cylinders, lensElements, exitPupilBounds, textures, texturePixels, cloudMediums, rgbGridMediums, rgbGridData, gridMediums, gridData, bssrdfTables, bssrdfRhoSamples, bssrdfRadiusSamples, bssrdfProfile, bssrdfProfileCdf, measuredTables, measuredParamValues, measuredData, measuredMcdf, measuredCcdf, skyImagePixels, skyMarginalCdf, skyMarginalFunc, skyMarginalFuncInt, skyConditionalCdf, skyConditionalFunc, skyConditionalFuncInt, skyWidth, skyHeight, skyScale, portalRectifiedImage, portalDistFunc, portalSatSum, portalWidth, portalHeight, portalScale, portalFrameX, portalFrameY, portalFrameZ, portalP0, portalP2};
 	SceneBuildState st;
@@ -1477,8 +1478,8 @@ bool OptiXRenderer::buildScene(
 	// which the instTri/instSphere offsets computed above address; disks/
 	// cylinders get their own trailing region the same way (st.diskCylinderSbtOffset).
 	// (the default renderer's SBT: only when it is wanted. A scene uploaded for the wavefront renderer or GPU SPPM does without it, which is what lets those start without
-	// compiling the default renderer's modules; setDefaultRendererWanted)
-	if (defaultRendererWanted_) {
+	// compiling the default renderer's modules; buildDefaultRendererSbt)
+	if (buildDefaultRendererSbt) {
 		if (!ensureDefaultRenderer()) return false;
 		if (!buildSBT(spheres, quads, bilinearPatches, triangles,
 					  st.haveInstancedTriangles, st.haveInstancedSpheres, disks, cylinders)) {

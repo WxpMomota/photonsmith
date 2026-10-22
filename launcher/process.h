@@ -3,6 +3,7 @@
 // No shell is involved (so no quoting, percent or glob rules to get wrong), the arguments go to the program as they are.
 
 #include <chrono>
+#include <iostream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -184,10 +185,28 @@ class Child {
 		PROCESS_INFORMATION pi{};
 		std::vector<char> mutableCmd(cmd.begin(), cmd.end());
 		mutableCmd.push_back('\0');
-		if (!CreateProcessA(nullptr, mutableCmd.data(), nullptr, nullptr, FALSE, 0, block.data(), nullptr, &si, &pi)) return false;
+		// Started suspended and put in the kill-on-exit job BEFORE it runs a single instruction, so that nothing it starts can be outside the job.
+		if (!CreateProcessA(nullptr, mutableCmd.data(), nullptr, nullptr, FALSE, CREATE_SUSPENDED, block.data(), nullptr, &si, &pi)) return false;
 		process_ = pi.hProcess;
+		if (HANDLE job = killOnExitJob()) {
+			if (!AssignProcessToJobObject(job, process_)) {
+				// (e.g. this program is itself in a job that does not allow another: the child is then an ordinary one, which a killed launcher leaves running, so say so, once)
+				static bool told = false;
+				if (!told) {
+					told = true;
+					std::cerr << "WARNING: could not put " << exe << " in the group of programs that end with this one (error " << GetLastError()
+							  << "): if this program is stopped, the programs it started may keep running." << std::endl;
+				}
+			}
+		}
+		if (ResumeThread(pi.hThread) == static_cast<DWORD>(-1)) {
+			TerminateProcess(pi.hProcess, 1);
+			CloseHandle(pi.hThread);
+			CloseHandle(process_);
+			process_ = nullptr;
+			return false;
+		}
 		CloseHandle(pi.hThread);
-		if (HANDLE job = killOnExitJob()) AssignProcessToJobObject(job, process_);   // (a failure leaves it as it was: an ordinary child)
 		return true;
 #else
 		std::vector<std::string> argvStore = {exe};

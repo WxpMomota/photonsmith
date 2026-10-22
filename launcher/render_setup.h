@@ -47,6 +47,7 @@ inline RenderOptions render_options_from_args(const LaunchArgs& args) {
     render_opts.denoise_guides = args.denoise_guides;
     render_opts.denoise_blend = static_cast<float>(args.denoise_blend);
     render_opts.isolate_pbrt_lighting = args.isolate_pbrt_lighting;
+    render_opts.binary_ppm = args.ppm_only;
     return render_opts;
 }
 
