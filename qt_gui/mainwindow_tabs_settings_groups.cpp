@@ -602,7 +602,7 @@ void MainWindow::buildRenderSettingsGroup(QWidget *basicTab, QVBoxLayout *layout
 	m_integratorVideoWarningLabelBasic->setObjectName("statusWarning");
 	m_integratorVideoWarningLabelBasic->setWordWrap(true);
 	m_integratorVideoWarningLabelBasic->setVisible(false);
-	renderLayout->addRow(QString(), m_integratorVideoWarningLabelBasic);
+	renderLayout->addRow(m_integratorVideoWarningLabelBasic);   // (the whole row: a banner beside an empty label column is given the height of its narrowest wrapping)
 
 #ifdef RT_GUI_HAVE_LIVE_PREVIEW
 	// Same "banner, don't hide" convention as m_videoModeWarningLabel below -
@@ -618,7 +618,7 @@ void MainWindow::buildRenderSettingsGroup(QWidget *basicTab, QVBoxLayout *layout
 		"output file - Resolution, Samples per Pixel, Max Ray Depth, and Output Path "
 		"don't apply. Scene and Camera Position do."));
 #endif
-	renderLayout->addRow(QString(), m_liveModeWarningLabel);
+	renderLayout->addRow(m_liveModeWarningLabel);
 #endif
 
 	m_modeCombo->setToolTip(

@@ -311,7 +311,6 @@ void MainWindow::createPreviewTab() {
 	m_previewInfoLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
 	m_previewInfoLabel->setWordWrap(true);
 	m_previewInfoLabel->setObjectName("previewInfo");
-	sideLayout->addWidget(m_previewInfoLabel);
 
 	// Selected scene's description - same text/source as the Settings
 	// tab's #sceneInfo box (see onSceneChanged()), kept in sync with the
@@ -321,7 +320,6 @@ void MainWindow::createPreviewTab() {
 	m_previewSceneDescLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
 	m_previewSceneDescLabel->setWordWrap(true);
 	m_previewSceneDescLabel->setObjectName("previewSceneDesc");
-	sideLayout->addWidget(m_previewSceneDescLabel);
 
 	// The active render's own technique note (what the scene demonstrates
 	// and why it looks the way it does, plus the render's own technique/
@@ -337,14 +335,28 @@ void MainWindow::createPreviewTab() {
 	m_previewTechniqueLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
 	m_previewTechniqueLabel->setWordWrap(true);
 	m_previewTechniqueLabel->setObjectName("previewTechniqueNote");
+	m_previewTechniqueLabel->setVisible(false);
+
+	// The three texts are ONE scrolling column that takes all the height the buttons below leave: a cartoon's description alone runs to a dozen lines in this narrow sidebar, and with the
+	// technique note scrolling in whatever was left between it and the buttons it was a box of two lines.
+	QWidget *textColumn = new QWidget();
+	textColumn->setObjectName("previewTextColumn");
+	QVBoxLayout *textLayout = new QVBoxLayout(textColumn);
+	textLayout->setContentsMargins(0, 0, 0, 0);
+	textLayout->setSpacing(10);
+	// (the labels wrap to the column's width whatever their longest word is: a long file name must not make the whole column wider than the sidebar and push its right edge out of view)
+	for (QLabel *label : {m_previewInfoLabel, m_previewSceneDescLabel, m_previewTechniqueLabel}) {
+		label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+		textLayout->addWidget(label);
+	}
+	textLayout->addStretch(1);
 
 	m_previewTechniqueScroll = new QScrollArea(sidebar);
-	m_previewTechniqueScroll->setWidget(m_previewTechniqueLabel);
+	m_previewTechniqueScroll->setWidget(textColumn);
 	m_previewTechniqueScroll->setWidgetResizable(true);
 	m_previewTechniqueScroll->setFrameShape(QFrame::NoFrame);
 	m_previewTechniqueScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	m_previewTechniqueScroll->setObjectName("previewTechniqueScroll");
-	m_previewTechniqueScroll->setVisible(false);
 	sideLayout->addWidget(m_previewTechniqueScroll, /*stretch=*/1);
 
 	// Geometry only - colour and hover/focus states come from the global
@@ -448,7 +460,7 @@ void MainWindow::updatePreviewSidebarForActiveTab() {
 			if (!html.isEmpty()) html += "<br><br>";
 			html += techniqueHtml;
 		}
-		m_previewTechniqueScroll->setVisible(!html.isEmpty());
+		m_previewTechniqueLabel->setVisible(!html.isEmpty());
 		if (!html.isEmpty()) {
 			m_previewTechniqueLabel->setText(html);
 			// QScrollArea only clamps an out-of-range scroll value to the

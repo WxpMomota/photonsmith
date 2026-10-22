@@ -131,7 +131,8 @@ void MainWindow::createProgressTab() {
 	m_queueView->verticalHeader()->setDefaultSectionSize(24);
 	m_queueView->horizontalHeader()->setStretchLastSection(false);
 	m_queueView->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-	m_queueView->horizontalHeader()->setSectionResizeMode(RenderQueueModel::SceneColumn, QHeaderView::Stretch);
+	// (the scene's name is as wide as it is; it used to take every pixel the other columns left, a row of mostly empty space)
+	m_queueView->horizontalHeader()->setMinimumSectionSize(70);
 	// Clicking empty space below the rows otherwise leaves whatever was
 	// selected stuck selected - see ListEmptyAreaDeselectFilter's comment.
 	m_queueView->viewport()->installEventFilter(new ListEmptyAreaDeselectFilter(m_queueView));

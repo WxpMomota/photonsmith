@@ -1378,8 +1378,44 @@ void MainWindow::runVideoFramesSelfTest(const std::function<void(const QString &
 		check(m_framesStripLabel->text().contains("12"), "the label says how many: " + m_framesStripLabel->text());
 		log(*shotTaken ? "a picture was taken while frames were coming in" : "(the video was too quick for a picture part-way)");
 		shot("videoframes_done");
-		log(ok ? "RESULT: OK" : "RESULT: FAIL");
-		QApplication::exit(ok ? 0 : 1);
+		// the Preview tab opens for the finished video a moment later: its sidebar (the render's info, the scene's description and the technique note in one column) is photographed then
+		QTimer::singleShot(3000, this, [this, shot, log, ok]() {
+			if (m_previewTabIndex >= 0) m_tabWidget->setCurrentIndex(m_previewTabIndex);
+			QApplication::processEvents();
+			shot("videoframes_preview");
+			log(ok ? "RESULT: OK" : "RESULT: FAIL");
+			QApplication::exit(ok ? 0 : 1);
+		});
 	});
 	poll->start(200);
+}
+
+// RT_GUI_SELFTEST=banner: the "these controls do not apply in this mode" banners (Live Preview, Generate Video) are as tall as their text needs and no taller: a word-wrapped label in a form
+// layout used to take the height of several lines for one.
+void MainWindow::runBannerSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {
+	resize(1500, 950);
+	if (m_tabWidget) m_tabWidget->setCurrentIndex(0);
+	bool ok = true;
+	auto check = [&ok, log](bool cond, const QString &what) {
+		log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what));
+		ok = ok && cond;
+	};
+	auto measure = [&](QLabel *label, const QString &name) {
+		if (!label) return;
+		label->show();
+		QApplication::processEvents();
+		const int width = label->width();
+		const int needed = label->heightForWidth(width);
+		log(QString("%1: width %2, height %3, its text needs %4").arg(name).arg(width).arg(label->height()).arg(needed));
+		check(label->height() <= needed + 6, name + " is no taller than its text needs");
+	};
+#ifdef RT_GUI_HAVE_LIVE_PREVIEW
+	if (const int live = m_modeCombo->findData(static_cast<int>(OutputMode::LivePreview)); live >= 0) m_modeCombo->setCurrentIndex(live);
+	measure(m_liveModeWarningLabel, "the Live Preview banner");
+#endif
+	if (const int video = m_modeCombo->findData(static_cast<int>(OutputMode::Image)); video >= 0) m_modeCombo->setCurrentIndex(video);
+	measure(m_videoModeWarningLabel, "the Video settings banner");
+	shot("banner");
+	log(ok ? "RESULT: OK" : "RESULT: FAIL");
+	QApplication::exit(ok ? 0 : 1);
 }

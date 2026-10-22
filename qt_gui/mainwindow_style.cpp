@@ -592,6 +592,9 @@ QString themeStylesheetPart3() {  // inputs, text, scroll bars, sliders, splitte
 		   sidebar's plain background shows around previewTechniqueNote's
 		   own boxed look, rather than a second, undecorated rectangle
 		   appearing behind it. */
+		QWidget#previewTextColumn {
+			background: transparent;
+		}
 		QScrollArea#previewTechniqueScroll {
 			background: transparent;
 			border: none;
@@ -923,6 +926,8 @@ QLabel *MainWindow::makeModeWarningBanner(QWidget *parent, const QString &text) 
 	label->setObjectName("videoModeWarning");
 	label->setWordWrap(true);
 	label->setVisible(false);
+	// as tall as its text needs at the width it gets, and no taller (a wrapped label in a form layout otherwise keeps the height of its narrowest wrapping)
+	label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Maximum);
 	return label;
 }
 
