@@ -33,15 +33,14 @@ namespace cartoon_render {
 
 // The flags of the parent run that a frame's run should repeat: everything the parser consumed except the video-only flags and the output path.
 inline std::vector<std::string> forwardedFlags(const LaunchArgs &args) {
-	static const char *const dropWithValue[] = {"--frames", "-f", "--fps", "--speed", "--camera-path", "-p", "--video-preset", "--camera-keyframes", "--output", "-o", "--height", "--cartoon-jobs", "--cartoon-timeout"};
 	std::vector<std::string> out;
 	const std::vector<std::string> &t = args.consumed_tokens;
 	for (std::size_t i = 0; i < t.size(); ++i) {
-		bool drop = t[i] == "--video" || t[i] == "--resume";
-		for (const char *d : dropWithValue) {
-			if (t[i] == d) {
+		bool drop = false;
+		for (const VideoFlag &f : kVideoFlags) {
+			if (t[i] == f.name) {
 				drop = true;
-				++i;   // its value too
+				if (f.takesValue) ++i;   // its value too
 				break;
 			}
 		}

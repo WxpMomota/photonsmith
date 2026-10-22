@@ -249,7 +249,7 @@ whatever order they finish in. `--frames` / `--fps` change how the film is sampl
 `RAY_TRACER_CARTOON_TIMEOUT` also sets it) is stopped and tried once more, so one stuck frame does not hold up the rest. A frame that still fails is repeated from the frame before it, so the
 video keeps its length and its sound stays in step (the run says how many). **`--resume` continues an interrupted video**: the frames already rendered are kept (each is a numbered picture in the
 `frames` folder, written whole or not at all), and only the missing ones are rendered; it does this only when the film, the size, the samples and the flags are the same as the interrupted run's
-(a signature file in the folder says so), and otherwise starts again. A rendered frame leaves only its picture in the folder, not the renderer's own files (a film has thousands).
+(a signature file in the folder says so), and otherwise starts again. The GUI passes it for every cartoon video, so a render that was stopped continues when you start it again with the same settings and output folder. A rendered frame leaves only its picture in the folder, not the renderer's own files (a film has thousands).
 
 **Writing a film that renders fast:** a glowing ball must be `emissiveSphere(centre, radius, light)` (pbrt's own sphere, one light), never an emitting `uvSphere` mesh: every triangle of an emitting
 mesh is a light of its own to sample, so a mesh ball is hundreds of lights. The Candle's 70 out-of-focus lights took a frame from 7 s to 19 s as meshes, and cost 7 s again as spheres.

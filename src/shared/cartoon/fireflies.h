@@ -19,14 +19,6 @@ constexpr int kBlades = 1100;
 
 inline double fade(double t) { return smoothstep(0.0, 1.5, t) * (1.0 - smoothstep(kDuration - 2.0, kDuration, t)); }
 
-// A small deterministic pseudo-random number in [0, 1) from an integer and a salt.
-inline double hash01(int i, int salt) {
-	unsigned x = static_cast<unsigned>(i) * 747796405u + static_cast<unsigned>(salt) * 2891336453u + 12345u;
-	x = ((x >> ((x >> 28u) + 4u)) ^ x) * 277803737u;
-	x = (x >> 22u) ^ x;
-	return (x & 0xFFFFFFu) / 16777216.0;
-}
-
 struct Parts {
 	Mesh blade, body, wing, trunk, capMushroom, stem;
 };

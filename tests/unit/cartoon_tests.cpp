@@ -532,6 +532,21 @@ TEST(CartoonRender, TheFramesOfAnInterruptedVideoAreResumedOnlyForTheSameFilmSiz
 	std::filesystem::remove(exe);
 }
 
+TEST(CartoonRender, EveryVideoFlagTheFramesDoNotRepeatIsAFlagTheParserReallyKnows) {
+	// (a flag renamed in the parser but not in the table would be repeated by every frame's run)
+	for (const VideoFlag &f : kVideoFlags) {
+		std::vector<std::string> words = {f.name};
+		if (f.takesValue) {
+			const std::string name = f.name;
+			words.push_back(name == "--camera-path" || name == "-p" ? "orbit" : name == "--video-preset" ? "V1" : (name == "--output" || name == "-o" || name == "--camera-keyframes") ? "x.ppm" : "7");
+		}
+		LaunchArgs a;
+		ASSERT_TRUE(parseArgs(words, a)) << f.name;
+		EXPECT_EQ(a.consumed_tokens.empty() ? std::string() : a.consumed_tokens.front(), f.name) << f.name << " is not a flag of the parser";
+		EXPECT_TRUE(cartoon_render::forwardedFlags(a).empty()) << f.name << " would be repeated by every frame";
+	}
+}
+
 TEST(CartoonRender, TheNumberOfFramesAtOnceIsTheFlagThenTheEnvironmentThenTwoOnAGpuAndOneOnTheCpu) {
 	LaunchArgs args;
 	EXPECT_EQ(cartoon_render::jobsFor(args, true), 2);

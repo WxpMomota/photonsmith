@@ -395,6 +395,9 @@ void RenderController::start() {
 		args << render_flags::kFps << QString::number(m_videoFPS);
 		args << render_flags::kSpeed << QString::number(m_videoSpeed);
 		args << render_flags::kCameraPath << m_cameraPath;
+		// A cartoon film's frames are kept in <output_dir>/frames, so a render that was stopped (closed window, crash, power) continues from them when started again with the same settings;
+		// the launcher starts afresh when anything differs.
+		if (m_cameraPath.startsWith(QStringLiteral("cartoon:"))) args << QStringLiteral("--resume");
 
 		// Use the same per-render output path image mode does (see
 		// onRenderClicked()'s comment on why it's refreshed with a fresh

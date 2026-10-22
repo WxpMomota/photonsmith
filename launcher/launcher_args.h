@@ -104,6 +104,19 @@ namespace {
 	}
 }
 
+// The flags that belong to a video (or to where its output goes) rather than to one picture: a cartoon video's frame runs (cartoon_render.h) repeat every other flag the user gave, and
+// these are the ones they must not (`--video` and `--video-preset` would make each frame a video of its own, `--output` and `--height` are set for the frame; the rest are read only by the
+// video and harmless in a frame run, listed so that the frame's command line says only what a frame needs). `takesValue`: the next word is the flag's value.
+struct VideoFlag {
+	const char *name;
+	bool takesValue;
+};
+inline constexpr VideoFlag kVideoFlags[] = {
+	{"--video", false},          {"--video-preset", true},   {"--frames", true},         {"-f", true},   {"--fps", true},    {"--speed", true},          {"--camera-path", true},
+	{"-p", true},                {"--camera-keyframes", true}, {"--output", true},       {"-o", true},   {"--height", true}, {"--cartoon-jobs", true}, {"--cartoon-timeout", true},
+	{"--resume", false},
+};
+
 struct LaunchArgs {
 	bool use_gpu            = true;
 	bool force_cpu          = false;

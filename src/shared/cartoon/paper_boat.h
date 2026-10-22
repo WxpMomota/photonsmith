@@ -24,13 +24,6 @@ constexpr int kDrops = 200;            // candidate drops; the rain's strength t
 
 inline double fade(double t) { return smoothstep(0.0, 1.0, t) * (1.0 - smoothstep(kDuration - 1.5, kDuration, t)); }
 
-inline double hash01(int i, int salt) {
-	unsigned x = static_cast<unsigned>(i) * 747796405u + static_cast<unsigned>(salt) * 2891336453u + 12345u;
-	x = ((x >> ((x >> 28u) + 4u)) ^ x) * 277803737u;
-	x = (x >> 22u) ^ x;
-	return (x & 0xFFFFFF) / 16777216.0;
-}
-
 // How hard it rains: heavy for the first twelve seconds, then easing to none by twenty.
 inline double rainAt(double t) { return 1.0 - smoothstep(12.0, 20.0, t); }
 
