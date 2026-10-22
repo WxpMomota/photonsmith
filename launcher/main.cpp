@@ -1099,7 +1099,9 @@ static int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
     // a film with a soundtrack gets it, when the video is the film's own length (the sound is made for that: a shorter or faster video would not fit it)
     std::filesystem::path soundtrack_path;
     if (const cartoon::Film *film = cartoon::forCameraPath(s.camera_path.c_str()); film && film->soundtrack) {
-        if (cartoon_render::soundtrackFits(*film, render_frame_count, s.video_fps)) {
+        if (converted != render_frame_count) {
+            std::cout << "\nNote: " << (render_frame_count - converted) << " frame(s) failed, so the sound (made for every frame) would drift out of step; the video is made without it." << std::endl;
+        } else if (cartoon_render::soundtrackFits(*film, render_frame_count, s.video_fps)) {
             soundtrack_path = paths.video_path;
             soundtrack_path.replace_extension(".wav");
             std::cout << "\nMaking the soundtrack of " << film->name << "..." << std::endl;

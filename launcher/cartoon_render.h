@@ -79,10 +79,12 @@ inline std::string frameCommand(const std::string &exe, const std::vector<std::s
 // folder of its own (one per worker): the child's scene list reads that folder and nothing else.
 inline int renderFrame(const cartoon::Film &film, double t, const std::filesystem::path &scenePath, const std::string &exe, const LaunchArgs &args, int width, int height, int spp,
 					   int depth, const std::string &framePath) {
-	{
+	try {
 		std::ofstream f(scenePath, std::ios::binary);
 		if (!f) return -1;
 		f << film.sceneAt(t);
+	} catch (const std::exception &) {   // (a film's code failing on one frame fails that frame, not the whole video)
+		return -1;
 	}
 	const std::string cmd = frameCommand(exe, forwardedFlags(args), width, height, spp, depth, framePath, scenePath.string(), scenePath.parent_path().string());
 	const int rc = std::system(cmd.c_str());
