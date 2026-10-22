@@ -65,6 +65,7 @@ extern char** environ;
 #include "launcher/diagnostics.h"     // --diagnose
 #include "launcher/process.h"
 #include "launcher/render_setup.h"
+#include "launcher/cartoon_worker.h"
 
 // Converts rendered PPM frames to PNG on a background thread while the main
 // thread renders the next frame, instead of converting everything in a
@@ -287,7 +288,7 @@ inline int prepareVideoDirectories(const std::string &out_path, int render_frame
             // pictures that were being written when the earlier run stopped, and its working folders, are not frames
             for (const auto &entry : std::filesystem::directory_iterator(frames_dir)) {
                 const std::string name = entry.path().filename().string();
-                if (name.find(".tmp.png") != std::string::npos || entry.path().extension() == ".ppm") std::filesystem::remove(entry.path());
+                if (name.find(".tmp.png") != std::string::npos || entry.path().extension() == ".ppm" || entry.path().extension() == ".done") std::filesystem::remove(entry.path());
                 else if (entry.is_directory()) std::filesystem::remove_all(entry.path());
             }
         } else {
@@ -357,6 +358,112 @@ inline VideoCameraStart videoCameraStart(const LaunchArgs &args, const RenderSet
     return {path_lookfrom_x, path_lookfrom_y, path_lookfrom_z, path_lookat_x, path_lookat_y, path_lookat_z};
 }
 
+// A worker as the pool sees it: a process (cartoon_render.h, runWorkers).
+struct WorkerProcess : cartoon_render::WorkerHandle {
+    Child child;
+    bool running() override { return child.running(); }
+    void kill() override { child.kill(); }
+};
+
+// A cartoon video's frames. With workers (the default on an OptiX GPU: cartoon_worker.h) a few long-lived processes each render a list of frames, which spares the second and a half every
+// frame run spends starting up (most of a frame at a draft quality); otherwise one child run renders each frame, a few at once (cartoon_render.h). Either way a frame's picture is
+// handed to `png_converter` in frame order, and a resumed video's finished frames are not rendered again. Returns the number of frames that are rendered.
+inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, const cartoon::Film &film, const std::filesystem::path &frames_dir, int render_frame_count,
+                               BackgroundPngConverter &png_converter) {
+    const bool use_gpu = s.use_gpu;
+    const int image_width = s.image_width, image_height = s.image_height, samples_per_pixel = s.samples_per_pixel, max_ray_depth = s.max_ray_depth;
+    const int workers = cartoon_render::workersFor(args, use_gpu, kMetalVideoFrames);
+    const int jobs = cartoon_render::jobsFor(args, use_gpu);
+    for (int w = 0; w < std::max(jobs, workers); ++w) std::filesystem::create_directories(frames_dir / ("work" + std::to_string(w)));
+    const bool frame_is_png = use_gpu && kMetalVideoFrames;
+    auto frame_file = [&](int frame) {
+        char name[64];
+        std::snprintf(name, sizeof(name), frame_is_png ? "frame_%04d.png" : "frame_%04d.ppm", frame);
+        return frames_dir / name;
+    };
+    // frames a resumed run finds already rendered (their pictures are in the folder: prepareVideoDirectories kept them because the video is the same)
+    std::vector<char> already(static_cast<std::size_t>(render_frame_count), 0);
+    int resumed = 0;
+    if (args.cartoon_resume) {
+        for (int frame = 0; frame < render_frame_count; ++frame)
+            if (std::filesystem::exists(frames_dir / cartoon_render::encName(frame))) already[static_cast<std::size_t>(frame)] = 1, ++resumed;
+        if (resumed > 0) std::cout << "\nResuming: " << resumed << " of " << render_frame_count << " frames are already rendered." << std::endl;
+    }
+    const int timeout = cartoon_render::timeoutFor(args, use_gpu);
+    // --time-limit is the whole video's budget (CPU only, as for any video): each frame gets its share, and `jobs` frames share the clock
+    const double frameTimeLimit = (args.time_limit_seconds > 0.0 && !use_gpu) ? args.time_limit_seconds * jobs / std::max(1, render_frame_count - resumed) : 0.0;
+    std::cout << "\nRendering " << (render_frame_count - resumed) << " frames of " << film.name << ", ";
+    if (workers > 0) std::cout << workers << " workers";
+    else std::cout << jobs << " at a time";
+    if (timeout > 0) std::cout << " (a frame that takes more than " << timeout << " s is stopped and tried once more)";
+    std::cout << "." << std::endl;
+    int reported = resumed;
+    auto completed = [&](int frame, int rc, double seconds) {   // as each frame finishes: one line, the count being how many are done
+        if (already[static_cast<std::size_t>(frame)]) return;
+        std::ostringstream line;
+        line << "\n[" << ++reported << "/" << render_frame_count << "] Rendering " << frame_file(frame).filename().string() << " (" << film.name << " at " << std::fixed << std::setprecision(2)
+             << film.duration * frame / std::max(1, render_frame_count) << " s)...";
+        if (rc == 0) line << " \u2713 (" << std::setprecision(1) << seconds << "s)";
+        else line << " \u2717 FAILED (error code: " << rc << ")";
+        (rc == 0 ? std::cout : std::cerr) << line.str() << std::endl;
+    };
+    auto inOrder = [&](int frame, int rc) {   // in frame order: the video's picture sequence
+        if (rc == 0 && !already[static_cast<std::size_t>(frame)]) png_converter.push(frame_file(frame).string(), frame_is_png, frame);
+    };
+    if (workers > 0) {
+        std::vector<int> todo;
+        for (int frame = 0; frame < render_frame_count; ++frame)
+            if (!already[static_cast<std::size_t>(frame)]) todo.push_back(frame);
+        cartoon_worker::Job job;
+        job.film = film.key;
+        job.frames = render_frame_count;
+        job.out = frames_dir.string();
+        cartoon_render::WorkerHooks hooks;
+        hooks.start = [&](int worker, const std::vector<int> &frames) -> std::unique_ptr<cartoon_render::WorkerHandle> {
+            const std::filesystem::path dir = frames_dir / ("work" + std::to_string(worker));
+            cartoon_worker::Job mine = job;
+            mine.scenes = dir.string();
+            mine.list = frames;
+            std::error_code ec;
+            for (int f : frames) std::filesystem::remove(mine.markerPath(f), ec);   // (a marker left by an earlier worker is not this one's)
+            const std::string file = (dir / "job.txt").string();
+            {
+                std::ofstream out(file, std::ios::trunc);
+                out << mine.text();
+            }
+            std::vector<std::string> childArgs = cartoon_render::forwardedFlags(args);
+            for (const std::string &a : {std::string("--cartoon-worker"), file, std::string("--output"), (dir / "unused.ppm").string(), std::string("--height"), std::to_string(image_height),
+                                          std::to_string(image_width), std::to_string(samples_per_pixel), std::to_string(max_ray_depth)})
+                childArgs.push_back(a);
+            auto process = std::make_unique<WorkerProcess>();
+            if (!process->child.start(s.exe_path, childArgs, "RAY_TRACER_PBRT_DIR", dir.string())) return nullptr;
+            return process;
+        };
+        hooks.poll = [&](int frame, int &result) {
+            const std::string marker = job.markerPath(frame);
+            std::ifstream in(marker);
+            if (!in) return false;
+            int rc = -1;
+            in >> rc;
+            in.close();
+            std::error_code ec;
+            std::filesystem::remove(marker, ec);
+            result = rc;
+            return true;
+        };
+        return cartoon_render::runWorkers(todo, workers, timeout, hooks, completed, inOrder) + resumed;
+    }
+    return cartoon_render::runInParallel(
+        render_frame_count, jobs,
+        [&](int frame, int worker) {
+            if (already[static_cast<std::size_t>(frame)]) return 0;
+            const double film_time = film.duration * frame / std::max(1, render_frame_count);
+            return cartoon_render::renderFrame(film, film_time, frames_dir / ("work" + std::to_string(worker)) / ("cartoon_" + std::to_string(frame) + ".pbrt"), s.exe_path, args, image_width,
+                                               image_height, samples_per_pixel, max_ray_depth, frame_file(frame).string(), timeout, frameTimeLimit);
+        },
+        completed, inOrder);
+}
+
 // Renders every frame (the camera moving along the path), converts them to PNG on a background thread, and reports the counts. SUCCESS, or the error code to exit with;
 // `converted` is the number of PNG frames the assembly will read.
 inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const VideoPaths &paths, int render_frame_count, const camera_keyframes::Path &keyframes,
@@ -392,52 +499,8 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
     // A cartoon preset (--camera-path cartoon:<key>): each frame is a scene of its own, rendered by a child run (launcher/cartoon_render.h).
     const cartoon::Film *cartoon_film = cartoon::forCameraPath(camera_path.c_str());
 
-    // A cartoon's frames are rendered by child runs, a few at once (launcher/cartoon_render.h); the picture sequence is handed to the converter in frame order whatever order they finish in.
-    if (cartoon_film) {
-        const int jobs = cartoon_render::jobsFor(args, use_gpu);
-        for (int w = 0; w < jobs; ++w) std::filesystem::create_directories(frames_dir / ("work" + std::to_string(w)));
-        const bool frame_is_png = use_gpu && kMetalVideoFrames;
-        auto frame_file = [&](int frame) {
-            char name[64];
-            std::snprintf(name, sizeof(name), frame_is_png ? "frame_%04d.png" : "frame_%04d.ppm", frame);
-            return frames_dir / name;
-        };
-        // frames a resumed run finds already rendered (their pictures are in the folder: prepareVideoDirectories kept them because the video is the same)
-        std::vector<char> already(static_cast<std::size_t>(render_frame_count), 0);
-        int resumed = 0;
-        if (args.cartoon_resume) {
-            for (int frame = 0; frame < render_frame_count; ++frame)
-                if (std::filesystem::exists(frames_dir / cartoon_render::encName(frame))) already[static_cast<std::size_t>(frame)] = 1, ++resumed;
-            if (resumed > 0) std::cout << "\nResuming: " << resumed << " of " << render_frame_count << " frames are already rendered." << std::endl;
-        }
-        const int timeout = cartoon_render::timeoutFor(args, use_gpu);
-        // --time-limit is the whole video's budget (CPU only, as for any video): each frame gets its share, and `jobs` frames share the clock
-        const double frameTimeLimit = (args.time_limit_seconds > 0.0 && !use_gpu) ? args.time_limit_seconds * jobs / std::max(1, render_frame_count - resumed) : 0.0;
-        std::cout << "\nRendering " << (render_frame_count - resumed) << " frames of " << cartoon_film->name << ", " << jobs << " at a time";
-        if (timeout > 0) std::cout << " (a frame that takes more than " << timeout << " s is stopped and tried once more)";
-        std::cout << "." << std::endl;
-        int reported = resumed;
-        successful_frames = cartoon_render::runInParallel(
-            render_frame_count, jobs,
-            [&](int frame, int worker) {
-                if (already[static_cast<std::size_t>(frame)]) return 0;
-                const double film_time = cartoon_film->duration * frame / std::max(1, render_frame_count);
-                return cartoon_render::renderFrame(*cartoon_film, film_time, frames_dir / ("work" + std::to_string(worker)) / ("cartoon_" + std::to_string(frame) + ".pbrt"), s.exe_path, args,
-                                                   image_width, image_height, samples_per_pixel, max_ray_depth, frame_file(frame).string(), timeout, frameTimeLimit);
-            },
-            [&](int frame, int rc, double seconds) {   // as each frame finishes: one line, the count being how many are done
-                if (already[static_cast<std::size_t>(frame)]) return;
-                std::ostringstream line;
-                line << "\n[" << ++reported << "/" << render_frame_count << "] Rendering " << frame_file(frame).filename().string() << " (" << cartoon_film->name << " at " << std::fixed
-                     << std::setprecision(2) << cartoon_film->duration * frame / std::max(1, render_frame_count) << " s)...";
-                if (rc == 0) line << " \u2713 (" << std::setprecision(1) << seconds << "s)";
-                else line << " \u2717 FAILED (error code: " << rc << ")";
-                (rc == 0 ? std::cout : std::cerr) << line.str() << std::endl;
-            },
-            [&](int frame, int rc) {   // in frame order: the video's picture sequence
-                if (rc == 0 && !already[static_cast<std::size_t>(frame)]) png_converter.push(frame_file(frame).string(), frame_is_png, frame);
-            });
-    }
+    // A cartoon's frames: by workers or by a child run each (renderCartoonFrames); the picture sequence is handed to the converter in frame order whatever order they finish in.
+    if (cartoon_film) successful_frames = renderCartoonFrames(args, s, *cartoon_film, frames_dir, render_frame_count, png_converter);
 
     // Render each frame with animated camera position
     for (int frame = 0; frame < (cartoon_film ? 0 : render_frame_count); ++frame) {

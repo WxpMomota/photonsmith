@@ -83,6 +83,7 @@ extern char** environ;
 #include "launcher/diagnostics.h"     // --diagnose
 #include "launcher/process.h"
 #include "launcher/render_setup.h"
+#include "launcher/cartoon_worker.h"
 #include "launcher/video_render.h"   // --video, --assemble-video
 #ifdef RT_HAVE_AVFOUNDATION_ENCODER
 #include "launcher/video_encoder_mac.h"   // Video -> MP4 via AVFoundation, no ffmpeg needed
@@ -838,6 +839,24 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
     return render_result;
 }
 
+// A cartoon worker (launcher/cartoon_worker.h) renders a list of frames in this process: the first frame's scene is written now and named as the scene file, as for one frame, and every
+// later frame rewrites that file. False (and says why) when the job cannot be started.
+static bool prepare_cartoon_worker(LaunchArgs &args, cartoon_worker::Job &job) {
+	if (const std::string problem = job.load(args.cartoon_worker); !problem.empty()) {
+		std::cerr << problem << std::endl;
+		return false;
+	}
+	std::error_code dir_ec;
+	std::filesystem::create_directories(job.scenes, dir_ec);
+	double first_eye[3] = {0, 0, 0};
+	if (!job.writeScene(job.list.front(), first_eye)) {
+		std::cerr << "Cannot write the scene of frame " << job.list.front() << " to " << job.scenePath() << std::endl;
+		return false;
+	}
+	args.scene_file = job.scenePath();
+	return true;
+}
+
 // `ray_tracer --film-check [FILE.film ...]`: checks film files (cartoon/film_file.h): each is loaded with its scene and either described or reported with the file and line of what is wrong. With
 // no file it lists the films found in the scene folders and the files that were left out. Exit status 1 when anything is wrong.
 static int film_check_command(int argc, char** argv) {
@@ -1000,6 +1019,8 @@ int main(int argc, char** argv) {
 		std::cout << still.film->name << " at " << std::fixed << std::setprecision(2) << still.t << " s" << std::defaultfloat << std::endl;
 		args.scene_file = cartoon_still_file.path.string();
 	}
+	cartoon_worker::Job worker_job;
+	if (!args.cartoon_worker.empty() && !prepare_cartoon_worker(args, worker_job)) return EXIT_FAILURE;
 	if (!args.scene_file.empty()) {
 		// A .pbrt file named instead of a scene id: give it an id, before anything below touches the scene registry.
 		std::error_code exists_ec;  // the throwing overload would abort on a path the OS rejects
@@ -1152,5 +1173,7 @@ int main(int argc, char** argv) {
     std::cout << "Writing output to: " << out_path << std::endl;
 
 	if (args.probe_x >= 0) return run_probe(args, setup);
+	if (!args.cartoon_worker.empty())
+		return cartoon_worker::run(worker_job, args, setup, [](const LaunchArgs &a, const RenderSetup &s) { return render_single_image(a, s); });
 	return video_mode ? run_video_render(args, setup) : render_single_image(args, setup);
 }

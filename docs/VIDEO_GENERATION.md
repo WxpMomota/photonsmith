@@ -245,6 +245,15 @@ are rendered at once** on a GPU (one on the CPU, which a single render already f
 36 s; `--cartoon-jobs 3` (or the environment variable `RAY_TRACER_CARTOON_JOBS`) is faster still, 32 s, at about 3 GB of video memory for each frame in flight. The pictures are put in frame order
 whatever order they finish in. `--frames` / `--fps` change how the film is sampled and played back, not its story.
 
+**Workers: a draft-quality film renders about four times faster.** A frame run costs about a second and a half before it renders anything (the process starts, OptiX makes its context and builds
+its pipeline), which at a draft quality is most of the frame: 2.4 s for a frame whose rendering takes a fraction of a second. On an OptiX GPU the video therefore starts **two worker processes**
+(`--cartoon-workers N`, or the environment variable `RAY_TRACER_CARTOON_WORKERS`; `0` is the process per frame described above) that each render every other frame in a row: for each frame
+a worker writes the scene to the same file, the renderer sees that it has changed and uploads it, and everything else (the context, the pipeline, the denoiser) is reused. A worker
+leaves a marker file when a frame's picture is whole; the video watches the markers, hands the pictures on in frame order, and **replaces a worker** that ends with frames left or that
+makes no progress for `--cartoon-timeout` seconds (a frame that takes a worker down twice fails and is repeated from the one before). Measured on "Pip and the Moon": 24 frames at 400 x 225
+and 25 samples took 30 s with a process per frame and 8 s with workers (0.34 s a frame); at 1280 x 720 and 64 samples, where rendering is most of the time, 3.3 s a frame became 2.9 s. The
+pictures are the same (a worker's frame differs from a separate run's by noise only: 0.03 of 255 against 6 to 13 between different frames). The CPU and Metal keep a process per frame.
+
 **A long film is safe to render.** A frame that takes longer than `--cartoon-timeout S` seconds (15 minutes on a GPU by default, never on the CPU; `0` = never; the environment variable
 `RAY_TRACER_CARTOON_TIMEOUT` also sets it) is stopped and tried once more, so one stuck frame does not hold up the rest. A frame that still fails is repeated from the frame before it, so the
 video keeps its length and its sound stays in step (the run says how many). **`--resume` continues an interrupted video**: the frames already rendered are kept (each is a numbered picture in the

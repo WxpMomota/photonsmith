@@ -21,6 +21,7 @@
 #include "scene_registry.h"
 #include "cpu_interface.h"
 #include "../../launcher/cartoon_render.h"
+#include "../../launcher/cartoon_worker.h"
 #include "../../launcher/cartoon_still.h"
 #include "../../launcher/launcher_args.h"
 #include "../../src/shared/cartoon/cartoons.h"
@@ -553,6 +554,225 @@ TEST(CartoonRender, EveryVideoFlagTheFramesDoNotRepeatIsAFlagTheParserReallyKnow
 		EXPECT_EQ(a.consumed_tokens.empty() ? std::string() : a.consumed_tokens.front(), f.name) << f.name << " is not a flag of the parser";
 		EXPECT_TRUE(cartoon_render::forwardedFlags(a).empty()) << f.name << " would be repeated by every frame";
 	}
+}
+
+// ---- long-lived workers -----------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace {
+
+// A pretend worker: it finishes one frame of its list each time the pool looks (`work` is called with the frame in hand and says whether it finishes, hangs or ends the worker).
+struct FakeWorker : cartoon_render::WorkerHandle {
+	std::vector<int> frames;
+	std::size_t next = 0;
+	bool alive = true, killed = false;
+	bool running() override { return alive; }
+	void kill() override {
+		alive = false;
+		killed = true;
+	}
+};
+
+}  // namespace
+
+TEST(CartoonWorkers, TheJobFileRoundTripsAndABadOneIsRefusedWithAReason) {
+	cartoon_worker::Job job;
+	job.film = "fireflies";
+	job.frames = 624;
+	job.scenes = "C:/out dir/frames/work0";
+	job.out = "C:/out dir/frames";
+	job.list = {0, 2, 4, 600};
+	const std::filesystem::path file = std::filesystem::temp_directory_path() / "photonsmith_job_test.txt";
+	std::ofstream(file) << job.text();
+	cartoon_worker::Job back;
+	EXPECT_EQ(back.load(file.string()), "");
+	EXPECT_EQ(back.film, "fireflies");
+	EXPECT_EQ(back.frames, 624);
+	EXPECT_EQ(back.scenes, "C:/out dir/frames/work0") << "a folder with a space in its name survives";
+	EXPECT_EQ(back.list, (std::vector<int>{0, 2, 4, 600}));
+	EXPECT_NE(back.filmPtr, nullptr);
+	EXPECT_DOUBLE_EQ(back.timeOf(312), back.filmPtr->duration * 0.5);
+	EXPECT_NE(back.picturePath(7).find("frame_0007.ppm"), std::string::npos);
+	EXPECT_NE(back.markerPath(7).find("frame_0007.done"), std::string::npos);
+	std::ofstream(file) << "film nonesuch\nframes 10\nscenes a\nout b\nlist 1\n";
+	EXPECT_NE(cartoon_worker::Job().load(file.string()).find("nonesuch"), std::string::npos);
+	std::ofstream(file) << "film fireflies\nframes 10\nscenes a\nout b\nlist 1 12\n";
+	EXPECT_NE(cartoon_worker::Job().load(file.string()).find("outside the video"), std::string::npos);
+	std::ofstream(file) << "film fireflies\nframes 10\n";
+	EXPECT_NE(cartoon_worker::Job().load(file.string()).find("incomplete"), std::string::npos);
+	EXPECT_NE(cartoon_worker::Job().load("C:/no/such/job.txt").find("cannot be read"), std::string::npos);
+	std::filesystem::remove(file);
+}
+
+TEST(CartoonWorkers, AWorkerWritesTheSceneOfEachFrameAndAMarkerWithItsResult) {
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "photonsmith_worker_test";
+	std::filesystem::remove_all(dir);
+	cartoon_worker::Job job;
+	job.film = "lamp-and-ball";
+	job.filmPtr = cartoon::find("lamp-and-ball");
+	ASSERT_NE(job.filmPtr, nullptr);
+	job.frames = 480;
+	job.scenes = (dir / "scenes").string();
+	job.out = (dir / "out").string();
+	job.list = {10, 300};
+	std::filesystem::create_directories(job.out);
+	LaunchArgs args;
+	RenderSetup setup;
+	std::vector<std::string> sceneAtRender;
+	std::vector<double> eyes;
+	const int rc = cartoon_worker::run(job, args, setup, [&](const LaunchArgs &a, const RenderSetup &s) {
+		std::ifstream in(job.scenePath());
+		sceneAtRender.push_back(std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()));
+		eyes.push_back(a.cam_x);
+		EXPECT_TRUE(a.cam_explicit) << "the camera is this frame's own, not what the scene list remembers from the first";
+		EXPECT_NE(s.out_path.find(sceneAtRender.size() == 1 ? "frame_0010.ppm" : "frame_0300.ppm"), std::string::npos);
+		return sceneAtRender.size() == 1 ? 0 : 7;   // the second frame fails
+	});
+	EXPECT_EQ(rc, 0) << "a worker goes on after a frame that failed";
+	ASSERT_EQ(sceneAtRender.size(), 2u);
+	EXPECT_EQ(sceneAtRender[0], job.filmPtr->sceneAt(job.timeOf(10))) << "each frame's own scene was in the file when it was rendered";
+	EXPECT_EQ(sceneAtRender[1], job.filmPtr->sceneAt(job.timeOf(300)));
+	EXPECT_NE(sceneAtRender[0], sceneAtRender[1]);
+	auto marker = [&](int f) {
+		std::ifstream in(job.markerPath(f));
+		int v = -99;
+		in >> v;
+		return v;
+	};
+	EXPECT_EQ(marker(10), 0);
+	EXPECT_EQ(marker(300), 7);
+	std::filesystem::remove_all(dir);
+}
+
+TEST(CartoonWorkers, TheFramesAreSharedOutHandedOnInOrderAndAllAccountedFor) {
+	std::vector<std::vector<int>> given;
+	cartoon_render::WorkerHooks hooks;
+	std::set<int> markers;   // frames whose marker is in
+	std::vector<FakeWorker *> made;
+	hooks.start = [&](int worker, const std::vector<int> &frames) -> std::unique_ptr<cartoon_render::WorkerHandle> {
+		if (static_cast<int>(given.size()) <= worker) given.resize(static_cast<std::size_t>(worker) + 1);
+		given[static_cast<std::size_t>(worker)] = frames;
+		auto w = std::make_unique<FakeWorker>();
+		w->frames = frames;
+		made.push_back(w.get());
+		return w;
+	};
+	int calls = 0;
+	hooks.poll = [&](int frame, int &rc) {
+		// the workers finish one frame each time they are looked at, the odd ones in a different order from the pool's
+		++calls;
+		for (FakeWorker *w : made)
+			if (w->alive && w->next < w->frames.size()) {
+				markers.insert(w->frames[w->next++]);
+				if (w->next == w->frames.size()) w->alive = false;
+				break;
+			}
+		if (markers.count(frame) == 0) return false;
+		markers.erase(frame);
+		rc = frame == 5 ? 3 : 0;
+		return true;
+	};
+	std::vector<int> completedOrder, handed;
+	const int ok = cartoon_render::runWorkers({9, 1, 2, 3, 4, 5, 6, 7, 8, 0}, 3, 0, hooks, [&](int f, int, double) { completedOrder.push_back(f); }, [&](int f, int) { handed.push_back(f); }, 1);
+	EXPECT_EQ(ok, 9) << "frame 5 failed";
+	EXPECT_EQ(completedOrder.size(), 10u);
+	EXPECT_EQ(handed, (std::vector<int>{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})) << "in frame order, whatever order they finished in";
+	ASSERT_EQ(given.size(), 3u);
+	EXPECT_EQ(given[0], (std::vector<int>{0, 3, 6, 9})) << "every third frame to each worker";
+	EXPECT_EQ(given[1], (std::vector<int>{1, 4, 7}));
+	EXPECT_EQ(given[2], (std::vector<int>{2, 5, 8}));
+}
+
+TEST(CartoonWorkers, AWorkerThatEndsWithFramesLeftIsReplacedAndAFrameThatKillsTwoIsGivenUp) {
+	int starts = 0;
+	std::vector<std::vector<int>> lists;
+	cartoon_render::WorkerHooks hooks;
+	std::set<int> markers;
+	std::vector<FakeWorker *> live;
+	hooks.start = [&](int, const std::vector<int> &frames) -> std::unique_ptr<cartoon_render::WorkerHandle> {
+		++starts;
+		lists.push_back(frames);
+		auto w = std::make_unique<FakeWorker>();
+		w->frames = frames;
+		live.push_back(w.get());
+		return w;
+	};
+	hooks.poll = [&](int frame, int &rc) {
+		// the worker on frame 1 dies every time it reaches it; the others work
+		for (FakeWorker *w : live)
+			if (w->alive && w->next < w->frames.size()) {
+				if (w->frames[w->next] == 1) {
+					w->alive = false;
+					break;
+				}
+				markers.insert(w->frames[w->next++]);
+				break;
+			}
+		if (markers.count(frame) == 0) return false;
+		markers.erase(frame);
+		rc = 0;
+		return true;
+	};
+	std::vector<std::pair<int, int>> results;
+	const int ok = cartoon_render::runWorkers({0, 1, 2, 3}, 1, 0, hooks, [&](int f, int rc, double) { results.push_back({f, rc}); }, [](int, int) {}, 1);
+	EXPECT_EQ(ok, 3) << "frames 0, 2 and 3";
+	ASSERT_EQ(results.size(), 4u);
+	EXPECT_EQ(results[1], (std::pair<int, int>{1, -1})) << "frame 1 took its worker down twice and failed";
+	EXPECT_EQ(starts, 3) << "the first worker, a second that started at frame 1 and died again, and a third that began after it";
+	EXPECT_EQ(lists[1], (std::vector<int>{1, 2, 3})) << "the replacement starts with the frame that was in hand";
+	EXPECT_EQ(lists[2], (std::vector<int>{2, 3}));
+}
+
+TEST(CartoonWorkers, AWorkerThatStopsMakingProgressIsKilled) {
+	cartoon_render::WorkerHooks hooks;
+	std::vector<FakeWorker *> live;
+	hooks.start = [&](int, const std::vector<int> &frames) -> std::unique_ptr<cartoon_render::WorkerHandle> {
+		auto w = std::make_unique<FakeWorker>();
+		w->frames = frames;
+		live.push_back(w.get());
+		return w;
+	};
+	hooks.poll = [&](int, int &) { return false; };   // nothing ever finishes
+	std::vector<int> failed;
+	const auto start = std::chrono::steady_clock::now();
+	const int ok = cartoon_render::runWorkers({0}, 1, 1, hooks, [&](int f, int rc, double) { if (rc != 0) failed.push_back(f); }, [](int, int) {}, 5);
+	const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+	EXPECT_EQ(ok, 0);
+	EXPECT_EQ(failed, std::vector<int>{0});
+	ASSERT_EQ(live.size(), 2u) << "tried once more";
+	EXPECT_TRUE(live[0]->killed);
+	EXPECT_TRUE(live[1]->killed);
+	EXPECT_GT(seconds, 1.9) << "after the stall time, twice";
+	EXPECT_LT(seconds, 8.0);
+}
+
+TEST(CartoonWorkers, ARealProcessCanBeAskedWhetherItRunsAndStopped) {
+#ifdef _WIN32
+	const std::string exe = "C:\\Windows\\System32\\cmd.exe";
+	const std::vector<std::string> sleep = {"/c", "ping -n 30 127.0.0.1 >nul"}, quick = {"/c", "exit 4"};
+#else
+	const std::string exe = "/bin/sh";
+	const std::vector<std::string> sleep = {"-c", "sleep 30"}, quick = {"-c", "exit 4"};
+#endif
+	Child slow;
+	ASSERT_TRUE(slow.start(exe, sleep, "", ""));
+	EXPECT_TRUE(slow.running());
+	slow.kill();
+	EXPECT_FALSE(slow.running());
+	Child fast;
+	ASSERT_TRUE(fast.start(exe, quick, "", ""));
+	EXPECT_TRUE(fast.wait(10));
+	EXPECT_EQ(fast.exitCode(), 4);
+	Child never;
+	EXPECT_FALSE(never.running()) << "one that was not started does not run";
+	EXPECT_FALSE(never.start("C:/no/such/program.exe", {}, "", ""));
+	EXPECT_EQ(cartoon_render::workersFor(LaunchArgs{}, true, false), 2);
+	EXPECT_EQ(cartoon_render::workersFor(LaunchArgs{}, false, false), 0) << "none on the CPU";
+	EXPECT_EQ(cartoon_render::workersFor(LaunchArgs{}, true, true), 0) << "nor on Metal";
+	LaunchArgs asked;
+	asked.cartoon_workers = 3;
+	EXPECT_EQ(cartoon_render::workersFor(asked, false, true), 3) << "asked for, so asked for";
+	asked.cartoon_workers = 0;
+	EXPECT_EQ(cartoon_render::workersFor(asked, true, false), 0);
 }
 
 TEST(CartoonRender, TheNumberOfFramesAtOnceIsTheFlagThenTheEnvironmentThenTwoOnAGpuAndOneOnTheCpu) {

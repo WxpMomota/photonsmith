@@ -11,6 +11,10 @@
 
 #include <algorithm>
 #include <chrono>
+#include <deque>
+#include <map>
+#include <memory>
+#include <set>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -152,6 +156,114 @@ inline bool writeSoundtrack(const cartoon::Film &film, const std::filesystem::pa
 	cartoon::audio::Mix mix(film.duration);
 	film.soundtrack(mix);
 	return cartoon::audio::writeWav(wavPath.string(), mix.finish());
+}
+
+// ---- long-lived workers (cartoon_worker.h) ----
+// How many worker processes render a cartoon video's frames: --cartoon-workers N, else the environment variable RAY_TRACER_CARTOON_WORKERS, else two on an OptiX GPU and none elsewhere
+// (the CPU renders every frame with all its cores, so a process start is nothing to it; Metal frames are rendered by a process each). 0 means a process per frame.
+inline int workersFor(const LaunchArgs &args, bool gpu, bool metal) {
+	int n = args.cartoon_workers;
+	if (n < 0) {
+		if (const char *env = std::getenv("RAY_TRACER_CARTOON_WORKERS")) n = std::atoi(env);
+	}
+	if (n < 0) n = gpu && !metal ? 2 : 0;
+	return std::max(0, std::min(n, 4));
+}
+
+// What the pool of workers needs from the outside (so that it can be tested without processes): a way to start a worker on a list of frames, to see whether it still runs and to stop it,
+// and to ask whether a frame's marker is in.
+struct WorkerHandle {
+	virtual ~WorkerHandle() = default;
+	virtual bool running() = 0;
+	virtual void kill() = 0;
+};
+struct WorkerHooks {
+	std::function<std::unique_ptr<WorkerHandle>(int worker, const std::vector<int> &frames)> start;   // null: it could not be started
+	std::function<bool(int frame, int &result)> poll;   // true and the frame's result when its marker is in; the marker is used up
+};
+
+// Renders `todo` (frame numbers) with `workers` long-lived workers: worker w is given every workers-th frame and renders its list in order. The pool watches the markers the workers
+// leave; `completed(frame, result, seconds)` is called as each frame is finished (0 is success) and `inOrder(frame, result)` once it and every frame of `todo` before it are, which is what
+// the video's picture sequence needs. A worker that has not finished a frame in `stallSeconds` (0: never) is killed, and one that ends with frames left is replaced: a new worker takes
+// the rest of the list, starting with the frame that was in hand; a frame that has taken a worker down twice fails (result -1) and the new worker starts after it. Returns the number of
+// frames whose result was 0.
+inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, const WorkerHooks &hooks, const std::function<void(int frame, int result, double seconds)> &completed,
+					  const std::function<void(int frame, int result)> &inOrder, int pollMilliseconds = 25) {
+	using Clock = std::chrono::steady_clock;
+	std::sort(todo.begin(), todo.end());
+	if (todo.empty()) return 0;
+	workers = std::max(1, std::min(workers, static_cast<int>(todo.size())));
+	struct Worker {
+		std::deque<int> remaining;
+		std::unique_ptr<WorkerHandle> handle;
+		Clock::time_point last = Clock::now();
+	};
+	std::vector<Worker> ws(static_cast<std::size_t>(workers));
+	for (std::size_t i = 0; i < todo.size(); ++i) ws[i % ws.size()].remaining.push_back(todo[i]);
+	std::map<int, int> result, attempts;
+	std::set<int> finished;
+	std::size_t nextToHand = 0, reported = 0;
+	int succeeded = 0;
+	auto seconds = [](Clock::time_point since) { return std::chrono::duration<double>(Clock::now() - since).count(); };
+	auto report = [&](int frame, int rc, double took) {
+		result[frame] = rc;
+		finished.insert(frame);
+		if (rc == 0) ++succeeded;
+		++reported;
+		completed(frame, rc, took);
+		while (nextToHand < todo.size() && finished.count(todo[nextToHand]) > 0) {
+			inOrder(todo[nextToHand], result[todo[nextToHand]]);
+			++nextToHand;
+		}
+	};
+	while (reported < todo.size()) {
+		for (std::size_t w = 0; w < ws.size(); ++w) {
+			Worker &worker = ws[w];
+			if (worker.remaining.empty()) continue;
+			if (!worker.handle) {
+				worker.last = Clock::now();
+				worker.handle = hooks.start(static_cast<int>(w), std::vector<int>(worker.remaining.begin(), worker.remaining.end()));
+				if (!worker.handle) {   // it could not be started: the frame in hand fails
+					report(worker.remaining.front(), -1, 0.0);
+					worker.remaining.pop_front();
+					continue;
+				}
+			}
+			int rc = 0;
+			while (!worker.remaining.empty() && hooks.poll(worker.remaining.front(), rc)) {
+				report(worker.remaining.front(), rc, seconds(worker.last));
+				worker.remaining.pop_front();
+				worker.last = Clock::now();
+			}
+			if (worker.remaining.empty()) continue;
+			const bool ended = !worker.handle->running();
+			if (ended && hooks.poll(worker.remaining.front(), rc)) {   // (its last marker came just before it ended)
+				report(worker.remaining.front(), rc, seconds(worker.last));
+				worker.remaining.pop_front();
+				worker.last = Clock::now();
+				worker.handle.reset();
+				continue;
+			}
+			const bool stalled = stallSeconds > 0 && seconds(worker.last) > stallSeconds;
+			if (ended || stalled) {
+				if (stalled) worker.handle->kill();
+				worker.handle.reset();
+				const int frame = worker.remaining.front();
+				if (++attempts[frame] >= 2) {
+					std::cerr << "\nWARNING: frame " << frame << " " << (stalled ? "took longer than " + std::to_string(stallSeconds) + " s" : std::string("ended its worker")) << " twice and is given up." << std::endl;
+					report(frame, -1, seconds(worker.last));
+					worker.remaining.pop_front();
+				} else {
+					std::cerr << "\nWARNING: a worker " << (stalled ? "did not finish frame " + std::to_string(frame) + " in " + std::to_string(stallSeconds) + " s" : "ended while rendering frame " + std::to_string(frame)) << "; starting another." << std::endl;
+				}
+				worker.last = Clock::now();
+			}
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(pollMilliseconds));
+	}
+	for (Worker &w : ws)
+		if (w.handle && w.handle->running()) w.handle->kill();   // (none should be left running: all their frames are in)
+	return succeeded;
 }
 
 // How many frames are rendered at once: --cartoon-jobs N, else the environment variable RAY_TRACER_CARTOON_JOBS, else two on a GPU and one on the CPU (a CPU render already uses every

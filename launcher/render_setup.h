@@ -5,8 +5,8 @@
 #include <cstdlib>
 #include <string>
 
-#include "cpu_renderer/cpu_interface.h"
-#include "launcher/launcher_args.h"
+#include "../cpu_renderer/cpu_interface.h"
+#include "launcher_args.h"
 
 // _putenv_s (MSVC CRT) has no POSIX equivalent - setenv() takes the same
 // name/value pair with an added overwrite flag, always 1 here to match

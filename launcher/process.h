@@ -137,73 +137,139 @@ inline int run_subprocess(const std::vector<std::string>& argv) {
 #endif
 }
 
-// Runs `exe args...` with one more environment variable (`envName`=`envValue`, when envName is not empty) and waits for it; when it has not finished after `timeoutSeconds` (0: wait as
-// long as it takes) the process is killed and `*timedOut` set. Returns its exit code, or -1 when it could not be started. The child sees only its own environment: several children run at
-// once (a cartoon video's frames), so a variable cannot be set in this process for one of them.
+// A program started with one more environment variable (`envName`=`envValue`, when envName is not empty), that can be asked whether it is still running, and stopped. The child sees only
+// its own environment: several children run at once (a cartoon video's frames), so a variable cannot be set in this process for one of them.
+class Child {
+  public:
+	Child() = default;
+	Child(const Child &) = delete;
+	Child &operator=(const Child &) = delete;
+	~Child() { release(); }
+
+	// Starts `exe args...`; false when it could not be started.
+	bool start(const std::string &exe, const std::vector<std::string> &args, const std::string &envName, const std::string &envValue) {
+		release();
+		exitCode_ = 1;
+		finished_ = false;
+#ifdef _WIN32
+		std::string cmd = win32_quote_arg(exe);
+		for (const std::string &a : args) cmd += " " + win32_quote_arg(a);
+		std::string block;
+		for (char **e = _environ; e && *e; ++e) {
+			const std::string entry(*e);
+			const bool same = !envName.empty() && entry.size() > envName.size() && _strnicmp(entry.c_str(), envName.c_str(), envName.size()) == 0 && entry[envName.size()] == '=';
+			if (!same) block.append(entry).push_back('\0');
+		}
+		if (!envName.empty()) block.append(envName + "=" + envValue).push_back('\0');
+		block.push_back('\0');
+		STARTUPINFOA si{};
+		si.cb = sizeof(si);
+		PROCESS_INFORMATION pi{};
+		std::vector<char> mutableCmd(cmd.begin(), cmd.end());
+		mutableCmd.push_back('\0');
+		if (!CreateProcessA(nullptr, mutableCmd.data(), nullptr, nullptr, FALSE, 0, block.data(), nullptr, &si, &pi)) return false;
+		process_ = pi.hProcess;
+		CloseHandle(pi.hThread);
+		return true;
+#else
+		std::vector<std::string> argvStore = {exe};
+		argvStore.insert(argvStore.end(), args.begin(), args.end());
+		std::vector<char *> argv;
+		for (std::string &a : argvStore) argv.push_back(&a[0]);
+		argv.push_back(nullptr);
+		std::vector<std::string> envStore;
+		for (char **e = environ; e && *e; ++e) {
+			const std::string entry(*e);
+			if (envName.empty() || entry.compare(0, envName.size() + 1, envName + "=") != 0) envStore.push_back(entry);
+		}
+		if (!envName.empty()) envStore.push_back(envName + "=" + envValue);
+		std::vector<char *> envp;
+		for (std::string &e : envStore) envp.push_back(&e[0]);
+		envp.push_back(nullptr);
+		pid_ = 0;
+		if (posix_spawn(&pid_, exe.c_str(), nullptr, nullptr, argv.data(), envp.data()) != 0) {
+			pid_ = 0;
+			return false;
+		}
+		return true;
+#endif
+	}
+
+	// True while the program has not ended (never started: false). Does not wait.
+	bool running() {
+		if (finished_) return false;
+#ifdef _WIN32
+		if (!process_) return false;
+		if (WaitForSingleObject(process_, 0) == WAIT_TIMEOUT) return true;
+		DWORD code = 1;
+		GetExitCodeProcess(process_, &code);
+		exitCode_ = static_cast<int>(code);
+#else
+		if (pid_ <= 0) return false;
+		int status = 0;
+		const pid_t done = waitpid(pid_, &status, WNOHANG);
+		if (done == 0) return true;
+		exitCode_ = done == pid_ && WIFEXITED(status) ? WEXITSTATUS(status) : 1;
+#endif
+		finished_ = true;
+		return false;
+	}
+
+	// Waits up to `seconds` (0: as long as it takes) for the program to end; true when it has.
+	bool wait(int seconds) {
+		const auto start = std::chrono::steady_clock::now();
+		while (running()) {
+			if (seconds > 0 && std::chrono::steady_clock::now() - start > std::chrono::seconds(seconds)) return false;
+			std::this_thread::sleep_for(std::chrono::milliseconds(20));
+		}
+		return true;
+	}
+
+	// Stops the program (it does not get to clean up) and waits for it to be gone.
+	void kill() {
+		if (!running()) return;
+#ifdef _WIN32
+		TerminateProcess(process_, 1);
+		WaitForSingleObject(process_, 10000);
+#else
+		::kill(pid_, SIGKILL);
+		int status = 0;
+		waitpid(pid_, &status, 0);
+#endif
+		exitCode_ = 1;
+		finished_ = true;
+	}
+
+	int exitCode() const { return exitCode_; }
+
+  private:
+	void release() {
+#ifdef _WIN32
+		if (process_) {
+			CloseHandle(process_);
+			process_ = nullptr;
+		}
+#endif
+	}
+#ifdef _WIN32
+	HANDLE process_ = nullptr;
+#else
+	pid_t pid_ = 0;
+#endif
+	int exitCode_ = 1;
+	bool finished_ = true;
+};
+
+// Runs `exe args...` with the extra environment variable (see Child) and waits for it; when it has not finished after `timeoutSeconds` (0: wait as long as it takes) the process is killed and
+// `*timedOut` set. Returns its exit code, or -1 when it could not be started.
 inline int runChild(const std::string &exe, const std::vector<std::string> &args, const std::string &envName, const std::string &envValue, int timeoutSeconds, bool *timedOut = nullptr) {
 	if (timedOut) *timedOut = false;
-#ifdef _WIN32
-	std::string cmd = win32_quote_arg(exe);
-	for (const std::string &a : args) cmd += " " + win32_quote_arg(a);
-	std::string block;
-	for (char **e = _environ; e && *e; ++e) {
-		const std::string entry(*e);
-		const bool same = !envName.empty() && entry.size() > envName.size() && _strnicmp(entry.c_str(), envName.c_str(), envName.size()) == 0 && entry[envName.size()] == '=';
-		if (!same) block.append(entry).push_back('\0');
-	}
-	if (!envName.empty()) block.append(envName + "=" + envValue).push_back('\0');
-	block.push_back('\0');
-	STARTUPINFOA si{};
-	si.cb = sizeof(si);
-	PROCESS_INFORMATION pi{};
-	std::vector<char> mutableCmd(cmd.begin(), cmd.end());
-	mutableCmd.push_back('\0');
-	if (!CreateProcessA(nullptr, mutableCmd.data(), nullptr, nullptr, FALSE, 0, block.data(), nullptr, &si, &pi)) return -1;
-	const DWORD waited = WaitForSingleObject(pi.hProcess, timeoutSeconds > 0 ? static_cast<DWORD>(timeoutSeconds) * 1000u : INFINITE);
-	int rc = 1;
-	if (waited == WAIT_TIMEOUT) {
-		TerminateProcess(pi.hProcess, 1);
-		WaitForSingleObject(pi.hProcess, 10000);
+	Child child;
+	if (!child.start(exe, args, envName, envValue)) return -1;
+	if (!child.wait(timeoutSeconds)) {
+		child.kill();
 		if (timedOut) *timedOut = true;
-	} else {
-		DWORD code = 1;
-		GetExitCodeProcess(pi.hProcess, &code);
-		rc = static_cast<int>(code);
+		return 1;
 	}
-	CloseHandle(pi.hProcess);
-	CloseHandle(pi.hThread);
-	return rc;
-#else
-	std::vector<std::string> argvStore = {exe};
-	argvStore.insert(argvStore.end(), args.begin(), args.end());
-	std::vector<char *> argv;
-	for (std::string &a : argvStore) argv.push_back(&a[0]);
-	argv.push_back(nullptr);
-	std::vector<std::string> envStore;
-	for (char **e = environ; e && *e; ++e) {
-		const std::string entry(*e);
-		if (envName.empty() || entry.compare(0, envName.size() + 1, envName + "=") != 0) envStore.push_back(entry);
-	}
-	if (!envName.empty()) envStore.push_back(envName + "=" + envValue);
-	std::vector<char *> envp;
-	for (std::string &e : envStore) envp.push_back(&e[0]);
-	envp.push_back(nullptr);
-	pid_t pid = 0;
-	if (posix_spawn(&pid, exe.c_str(), nullptr, nullptr, argv.data(), envp.data()) != 0) return -1;
-	int status = 0;
-	const auto start = std::chrono::steady_clock::now();
-	for (;;) {
-		const pid_t done = waitpid(pid, &status, WNOHANG);
-		if (done == pid) break;
-		if (done < 0) return -1;
-		if (timeoutSeconds > 0 && std::chrono::steady_clock::now() - start > std::chrono::seconds(timeoutSeconds)) {
-			kill(pid, SIGKILL);
-			waitpid(pid, &status, 0);
-			if (timedOut) *timedOut = true;
-			return 1;
-		}
-		std::this_thread::sleep_for(std::chrono::milliseconds(50));
-	}
-	return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
-#endif
+	return child.exitCode();
 }

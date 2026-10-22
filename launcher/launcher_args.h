@@ -115,6 +115,8 @@ inline constexpr VideoFlag kVideoFlags[] = {
 	{"--video", false},          {"--video-preset", true},   {"--frames", true},         {"-f", true},   {"--fps", true},    {"--speed", true},          {"--camera-path", true},
 	{"-p", true},                {"--camera-keyframes", true}, {"--output", true},       {"-o", true},   {"--height", true}, {"--cartoon-jobs", true}, {"--cartoon-timeout", true},
 	{"--resume", false},
+	{"--cartoon-worker", true},   // a worker is started by the video, with a job file of its own
+	{"--cartoon-workers", true},
 	{"--time-limit", true},   // the video's whole budget: each frame is given its share (cartoon_render.h)
 };
 
@@ -390,6 +392,10 @@ struct LaunchArgs {
 	int cartoon_timeout = -1;
 	// --resume: continue an interrupted cartoon video from the frames it already rendered (when the settings and the film are the same), instead of starting again.
 	bool cartoon_resume = false;
+	// --cartoon-worker JOBFILE: render the frames the job file lists, one after the other in this one process (launcher/cartoon_worker.h). Started by a cartoon video, not by people.
+	std::string cartoon_worker;
+	// --cartoon-workers N: render a cartoon video's frames with N long-lived worker processes (the default on a GPU) instead of a process per frame; 0 = a process per frame; -1 = automatic.
+	int cartoon_workers = -1;
 	double cam_x             = kDefaultCameraX;
 	double cam_y             = kDefaultCameraY;
 	double cam_z             = kDefaultCameraZ;
@@ -871,6 +877,20 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 		} catch (const std::exception&) {
 			std::cerr << "Invalid --cartoon-timeout, using the automatic one\n";
 		}
+	} else if (arg == "--cartoon-worker" && i + 1 < argc) {
+		out.cartoon_worker = argv[i + 1];
+		consumed_args.insert(i);
+		consumed_args.insert(i + 1);
+		++i;
+	} else if (arg == "--cartoon-workers" && i + 1 < argc) {
+		try {
+			out.cartoon_workers = std::max(0, std::stoi(argv[i + 1]));
+			consumed_args.insert(i);
+			consumed_args.insert(i + 1);
+			++i;
+		} catch (const std::exception&) {
+			std::cerr << "Invalid --cartoon-workers, using the automatic number\n";
+		}
 	} else if (arg == "--resume") {
 		out.cartoon_resume = true;
 		consumed_args.insert(i);
@@ -1188,6 +1208,9 @@ inline void print_launch_help(const char* program) {
 				  << "  --cartoon-timeout S: a frame of a cartoon video that takes longer than S seconds is stopped and\n"
 				  << "               tried once more (default: 900 on a GPU, never on the CPU; 0 = never; the environment\n"
 				  << "               variable RAY_TRACER_CARTOON_TIMEOUT also sets it)\n"
+				  << "  --cartoon-workers N: render a cartoon video's frames with N long-lived worker processes (the default\n"
+				  << "               on a GPU: 2) instead of starting a process for every frame, which at a draft quality is most\n"
+				  << "               of a frame's time; 0 = a process per frame\n"
 				  << "  --resume:    continue an interrupted cartoon video from the frames already rendered, when the film and\n"
 				  << "               the settings (size, samples, flags) are the same; otherwise it starts again\n"
 				  << "               Accepts either short id or descriptive key:\n"
