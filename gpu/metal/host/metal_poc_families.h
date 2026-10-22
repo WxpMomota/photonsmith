@@ -39,5 +39,12 @@ struct FamilySet {
 
 	// `materials` is any vector of structs with a materialType member (TriangleMaterial).
 	template <class Material>
-	void addAll(const std::vector<Material>& materials) { for (const Material& m : materials) add(m.materialType); }
+	void addAll(const std::vector<Material>& materials) {
+		for (const Material& m : materials) { add(m.materialType); if (coatedOver(m, 0)) layered = true; }
+	}
+
+private:
+	// A procedural reflectance under a coat (TriangleMaterial::coatIor) becomes a coated diffuse at the hit, so the layered family has to be in the kernel; a struct without the member has none.
+	template <class Material> static auto coatedOver(const Material& m, int) -> decltype(m.coatIor > 0.0f) { return m.coatIor > 0.0f; }
+	template <class Material> static bool coatedOver(const Material&, long) { return false; }
 };

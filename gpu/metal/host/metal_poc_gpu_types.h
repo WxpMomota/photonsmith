@@ -445,5 +445,9 @@ struct TriangleMaterial {
     int32_t roughGraphRef = 0;
     int32_t condRoughGraphRef = 0;
     int32_t mixAmountGraphRef = 0;
+    // A coated diffuse whose reflectance is a procedural texture (a checker, dots, marble ...: materialType 25, the texture family): the family computes the base colour at the hit and the
+    // shader then turns the material into a coated diffuse with this coat (computeAlbedo). coatIor = 0: no coat. The layer's medium is in the layer* fields as for any coated material.
+    float coatIor = 0.0f;
+    float coatAlpha = 0.0f;
 };
 

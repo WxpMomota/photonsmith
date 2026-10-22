@@ -28,6 +28,9 @@
 extern char** environ;
 #endif
 #include "cpu_renderer/cpu_interface.h"
+#ifdef RT_HAVE_AVFOUNDATION_ENCODER
+#include "launcher/video_encoder_mac.h"   // Video -> MP4 via AVFoundation, no ffmpeg needed (used below)
+#endif
 #ifdef RT_HAVE_OPTIX
 #include "gpu/optix/optix_interface.h"
 #else

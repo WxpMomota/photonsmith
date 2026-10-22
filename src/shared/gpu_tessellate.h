@@ -83,6 +83,26 @@ using pbrt_flatten::quadric_tessellate::tessellateGrid;
 
 }  // namespace tessellate_detail
 
+// pbrt makes a triangle's geometric normal face the same way as its authored vertex normals (SurfaceInteraction: n = FaceForward(n, shading.n)), whatever the winding, and an emissive mesh
+// emits on that side. The GPU backends take the side from the winding, so an emissive triangle that has vertex normals and is wound against them (a lathe-turned sun, a bulb: the cartoon
+// films have them) would light the inside of its own mesh. Swapping two of its corners puts the winding with the normals. Returns how many triangles were turned.
+inline size_t windEmissiveTrianglesWithTheirNormals(pbrt_flatten::FlatScene& scene) {
+	size_t turned = 0;
+	for (pbrt_flatten::Triangle& t : scene.triangles) {
+		if (t.areaLight < 0 || !t.hasNormals) continue;
+		const double e1[3] = {t.v[3] - t.v[0], t.v[4] - t.v[1], t.v[5] - t.v[2]};
+		const double e2[3] = {t.v[6] - t.v[0], t.v[7] - t.v[1], t.v[8] - t.v[2]};
+		const double g[3] = {e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]};
+		double d = 0.0;
+		for (int a = 0; a < 3; ++a) d += g[a] * (t.n[a] + t.n[3 + a] + t.n[6 + a]);
+		if (d >= 0.0) continue;
+		for (int a = 0; a < 3; ++a) { std::swap(t.v[3 + a], t.v[6 + a]); std::swap(t.n[3 + a], t.n[6 + a]); }
+		std::swap(t.uv[2], t.uv[4]); std::swap(t.uv[3], t.uv[5]);
+		++turned;
+	}
+	return turned;
+}
+
 // Rewrites the shapes `caps` names as triangles appended to scene.triangles (and removes them from the scene). Returns how many triangles were added (0 when the
 // scene has none of those shapes). `fiberTangent`, if given, receives the fibre direction of each curve triangle.
 inline size_t tessellateForBackend(pbrt_flatten::FlatScene& scene, const TessellationCaps& caps, FiberTangents* fiberTangent) {
