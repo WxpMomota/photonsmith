@@ -187,7 +187,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("app", nargs="?", help="RayTracerGUI.app, RayTracerGUI.exe, or the folder holding it")
     ap.add_argument("--out", help="directory for logs and screenshots (default: a new temp directory)")
-    ap.add_argument("--modes", default="ui,options,builder,queue,diagnostics,quitwarm,material,sky,camera,composite", help="comma-separated self-test modes (default: %(default)s)")
+    ap.add_argument("--modes", default="ui,options,builder,queue,diagnostics,quitwarm,material,sky,camera,composite,cartoonui", help="comma-separated self-test modes (default: %(default)s)")
     ap.add_argument("--live-preview", action="store_true", help="also require an enabled Live Preview item and run the livepreview mode (needs a GPU)")
     ap.add_argument("--plugins", help="directory holding Qt's offscreen platform plugin")
     args = ap.parse_args()

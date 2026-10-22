@@ -306,7 +306,7 @@ void MainWindow::applyRecommendedSettings() {
 }
 
 // A cartoon's still is that film's scene, and its video is the film itself, so while Generate Video is the output mode the video settings follow it the way a preset's do.
-// The camera path follows on every scene event (onSceneChanged resets it to the scene's recommended one each time); the frame count, fps and speed only when the film is
+// The camera path is the film's own (videoCameraPath, not a choice in the list); the frame count, fps and speed only when the film is
 // first selected, so a length the user typed in survives a tab switch, a search or the start-up restore. Selecting any other scene forgets the film.
 void MainWindow::syncCartoonVideoSettings(const QString &sceneId) {
 	const cartoon::Film *film = nullptr;
@@ -327,15 +327,23 @@ void MainWindow::syncCartoonVideoSettings(const QString &sceneId) {
 		}
 		if (!film) m_filmTimeFor.clear();
 	}
+	// A film has its own camera (its shots), so a flythrough preset and a camera path do not apply to it: while a film is the scene of a video they are greyed out and say so.
+	const bool filmVideo = film && isVideoMode();
+	if (m_videoPresetCombo) {
+		if (filmVideo && m_videoPresetCombo->currentIndex() != 0) m_videoPresetCombo->setCurrentIndex(0);
+		m_videoPresetCombo->setEnabled(!filmVideo);
+		m_videoPresetCombo->setToolTip(filmVideo ? tr("A cartoon film has its own camera, so a flythrough preset does not apply to it.") : m_videoPresetCombo->property("baseToolTip").toString());
+	}
+	if (m_cameraPathCombo) {
+		m_cameraPathCombo->setEnabled(!filmVideo);
+		m_cameraPathCombo->setToolTip(filmVideo ? tr("A cartoon film has its own camera (its shots), so the camera path does not apply to it.") : m_cameraPathCombo->property("baseToolTip").toString());
+	}
 	if (!film) {
 		m_cartoonSettingsFor.clear();
 		return;
 	}
 	if (!isVideoMode()) return;   // applied when the mode changes to video (onModeChanged)
-	if (m_cameraPathCombo) {
-		const int filmPath = m_cameraPathCombo->findData(QString::fromStdString(cartoon::cameraPathOf(*film)));
-		if (filmPath >= 0) m_cameraPathCombo->setCurrentIndex(filmPath);
-	}
+	if (m_updateVideoDuration) m_updateVideoDuration();   // the film's own camera is the path now
 	const QString key = QString::fromUtf8(film->key);
 	if (key == m_cartoonSettingsFor) return;
 	m_cartoonSettingsFor = key;
@@ -520,3 +528,13 @@ void MainWindow::onSceneChanged(int index) {
 	}
 }
 
+
+// The camera path a video is rendered with: the film's own while a film is the scene (it has its own camera, and the path list does not apply), else the one chosen in the list.
+QString MainWindow::videoCameraPath() const {
+	SceneMetadataClient::SceneMetadata meta;
+	const QString sceneId = m_sceneCombo && m_sceneCombo->currentIndex() >= 0 ? m_sceneCombo->currentData().toString() : QString();
+	if (!sceneId.isEmpty() && SceneMetadataClient::sceneMetadata(sceneId, meta) && !meta.filmKey.isEmpty()) {
+		if (const cartoon::Film *film = cartoon::find(meta.filmKey.toUtf8().constData())) return QString::fromStdString(cartoon::cameraPathOf(*film));
+	}
+	return m_cameraPathCombo ? m_cameraPathCombo->currentData().toString() : QStringLiteral("orbit");
+}

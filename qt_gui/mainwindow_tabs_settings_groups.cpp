@@ -935,6 +935,7 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 		"Selecting one changes the Scene above too. Choosing any of the\n"
 		"other controls on this tab afterward is fine - they simply stop matching\n"
 		"the preset, the same as if you had built the same settings by hand."));
+	m_videoPresetCombo->setProperty("baseToolTip", m_videoPresetCombo->toolTip());
 	styleComboBox(m_videoPresetCombo);
 	connect(m_videoPresetCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 			this, &MainWindow::onVideoPresetChanged);
@@ -955,9 +956,7 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	m_cameraPathCombo->addItem(tr("Spiral (Zoom-in)"), "spiral");
 	m_cameraPathCombo->addItem(tr("Tour (Room walkthrough)"), "tour");
 	m_cameraPathCombo->addItem(tr("Showcase (Product reveal)"), "showcase");
-	// A cartoon is a camera path of its own kind: the video renders that film's scene at every frame (src/shared/cartoon/cartoons.h), whatever scene is selected above.
-	for (const cartoon::Film &film : cartoon::kFilms)
-		m_cameraPathCombo->addItem(tr("Cartoon: %1").arg(QString::fromUtf8(film.name)), QString::fromStdString(cartoon::cameraPathOf(film)));
+	// (A cartoon film is not a path to choose: its scene brings its own camera, and videoCameraPath() answers with it while a film is the scene.)
 	m_cameraPathCombo->setToolTip(
 		tr("How the camera moves over the frame sequence:\n"
 		"  Orbit     — full circle around the scene, always looking at its centre\n"
@@ -968,6 +967,7 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 		"  Showcase  — one smooth turn that pushes in and rises then falls, like a product ad\n"
 		"Every path starts from the camera position set below."));
 	m_cameraPathCombo->setCurrentIndex(0);
+	m_cameraPathCombo->setProperty("baseToolTip", m_cameraPathCombo->toolTip());
 	styleComboBox(m_cameraPathCombo);
 	videoLayout->addRow(labelWithInfo(tr("Camera Path:"),
 		tr("How the camera moves across the sequence of frames.\n\n"
@@ -1068,12 +1068,13 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 		int baseFrames = m_videoFramesSpinBox->value();
 		int fps = m_videoFPSSpinBox->value();
 		double speed = m_videoSpeedSpinBox->value();
-		QString cameraPath = m_cameraPathCombo->currentData().toString();
+		QString cameraPath = videoCameraPath();
+		if (cameraPath.startsWith(QStringLiteral("cartoon:"))) cameraPath = tr("the film's own camera");
 
 		// Mirrors main.cpp's render_frame_count derivation exactly, so this
 		// preview matches what will actually be rendered.
 		int actualFrames = qMax(1, static_cast<int>(std::llround(baseFrames / speed)));
-		const int kMaxVideoFrames = 5000;
+		const int kMaxVideoFrames = 20000;
 		bool capped = actualFrames > kMaxVideoFrames;
 		if (capped) actualFrames = kMaxVideoFrames;
 		double duration = static_cast<double>(actualFrames) / fps;
@@ -1082,7 +1083,7 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 			? tr("%1 frames").arg(actualFrames)
 			: tr("%1 frames (base %2 x 1/%3x speed)%4")
 				.arg(actualFrames).arg(baseFrames).arg(QString::number(speed, 'f', 2))
-				.arg(capped ? tr(" - capped at 5000") : QString());
+				.arg(capped ? tr(" - capped at 20000") : QString());
 
 		// Plain text, not HTML - createInfoIcon()'s helpText is escaped
 		// before display (see wrapTooltipHtml()'s own comment), so the
@@ -1114,6 +1115,7 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 		).arg(QString::number(duration, 'f', 1), framesLine, cameraPath));
 	};
 
+	m_updateVideoDuration = updateVideoDuration;
 	connect(m_videoFramesSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), updateVideoDuration);
 	connect(m_videoFPSSpinBox, QOverload<int>::of(&QSpinBox::valueChanged), updateVideoDuration);
 	connect(m_videoSpeedSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), updateVideoDuration);

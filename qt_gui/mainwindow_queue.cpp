@@ -266,7 +266,7 @@ RenderJob MainWindow::captureRenderJob() {
 		job.videoFrames = m_videoFramesSpinBox->value();
 		job.videoFPS = m_videoFPSSpinBox->value();
 		job.videoSpeed = m_videoSpeedSpinBox->value();
-		job.cameraPath = m_cameraPathCombo->currentData().toString();
+		job.cameraPath = videoCameraPath();
 
 		// Named scene+path+frames/fps/speed bundle, if one is selected - see
 		// video_preset.h. Captured now (rather than re-read by

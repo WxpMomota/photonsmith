@@ -274,7 +274,7 @@ way to look at a change to a film. The GUI's scene list has a Cartoons tab (besi
 
 Making a film of your own: the toolkit is `src/shared/cartoon/cartoon_lib.h` (the only implementation: keyframes, transforms, meshes, hop squash and stretch, inverse-kinematics arms, shots with camera moves), and `python scripts/anim/film.py` shows a film's stills, a contact sheet or the video without the GUI;
 a finished film is a function `std::string sceneAt(double t)` (with `headerAt(t)`, `shotStarts()` and `kSamples` beside it) and a row in the table in `src/shared/cartoon/cartoons.h`; that row alone makes it a video preset
-(`video_preset::all()` builds the preset from it), a scene on the GUI's Cartoons tab, an entry in the GUI's Camera Path combo and a line of `--list-video-presets`.
+(`video_preset::all()` builds the preset from it), a scene on the GUI's Cartoons tab and a line of `--list-video-presets`.
 
 **What a film says about itself** is its row and nothing else, and nothing is typed twice. The row has the key, the name, a description of the story (one sentence, without the length or the number
 of shots: those are worked out), the length and fps, the still's time, and a `meta` record: `id` (the number of its video preset, V<id>: give a new film the next number and never reuse one, so

@@ -1229,3 +1229,44 @@ void MainWindow::runUiSelfTest(const std::function<void(const QString &)> &log, 
 	QTimer::singleShot(600, this, [shot]() { shot("ui"); QApplication::exit(0); });
 	return;
 }
+
+// RT_GUI_SELFTEST=cartoonui: a cartoon film has its own camera, so while a film is the scene of a video the Flythrough Preset and Camera Path drop-downs are greyed out (and the film's path
+// is the one selected), and any other scene gives them back, without the films' own paths among the choices.
+void MainWindow::runCartoonUiSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {
+	resize(1500, 1000);
+	bool ok = true;
+	auto check = [&ok, log](bool cond, const QString &what) {
+		log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what));
+		ok = ok && cond;
+	};
+	QString filmScene, otherScene;
+	for (int i = 0, n = SceneMetadataClient::sceneCount(); i < n && (filmScene.isEmpty() || otherScene.isEmpty()); ++i) {
+		const QString id = SceneMetadataClient::sceneIdAtIndex(i);
+		SceneMetadataClient::SceneMetadata meta;
+		if (!SceneMetadataClient::sceneMetadata(id, meta)) continue;
+		if (!meta.filmKey.isEmpty()) { if (filmScene.isEmpty()) filmScene = id; }
+		else if (otherScene.isEmpty()) otherScene = id;
+	}
+	check(!filmScene.isEmpty() && !otherScene.isEmpty(), "a film scene (" + filmScene + ") and another scene (" + otherScene + ") are in the list");
+	const int video = m_modeCombo->findData(static_cast<int>(OutputMode::Video));
+	check(video >= 0, "there is a Generate Video mode");
+	if (!ok) { log("RESULT: FAIL"); QApplication::exit(1); return; }
+	m_modeCombo->setCurrentIndex(video);
+	selectSceneById(otherScene);
+	check(m_cameraPathCombo->isEnabled() && m_videoPresetCombo->isEnabled(), "an ordinary scene: the camera path and the flythrough preset can be chosen");
+	bool anyCartoon = false;
+	for (int i = 0; i < m_cameraPathCombo->count(); ++i) anyCartoon = anyCartoon || m_cameraPathCombo->itemData(i).toString().startsWith(QStringLiteral("cartoon:"));
+	check(!anyCartoon, "the films' own paths are not among the choices");
+	selectSceneById(filmScene);
+	QApplication::processEvents();
+	check(!m_cameraPathCombo->isEnabled() && !m_videoPresetCombo->isEnabled(), "a film is the scene: the camera path and the flythrough preset are greyed out");
+	check(videoCameraPath().startsWith(QStringLiteral("cartoon:")), "and the video's path is the film's own: " + videoCameraPath());
+	check(!m_cameraPathCombo->toolTip().isEmpty() && m_cameraPathCombo->toolTip().contains("cartoon", Qt::CaseInsensitive), "with a tooltip that says why");
+	shot("cartoonui_film");
+	selectSceneById(otherScene);
+	QApplication::processEvents();
+	check(m_cameraPathCombo->isEnabled() && m_videoPresetCombo->isEnabled(), "another scene again: both can be chosen");
+	check(!videoCameraPath().startsWith(QStringLiteral("cartoon:")), "and the video's path is the chosen one again: " + videoCameraPath());
+	log(ok ? "RESULT: OK" : "RESULT: FAIL");
+	QApplication::exit(ok ? 0 : 1);
+}

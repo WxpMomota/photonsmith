@@ -138,6 +138,7 @@ public:
 	void runSelfTest(const QString &mode, const QString &outPrefix);
 	// One function per mode (mainwindow_selftest_modes.cpp; the Live Preview ones are in mainwindow_selftest_live.cpp).
 	void runOptionsSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);
+	void runCartoonUiSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runBuilderSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot, const QString &outPrefix);
 	void runDiagnosticsSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);
 	void runSceneKeysSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);
@@ -200,6 +201,7 @@ private slots:
 	void onVideoPresetChanged(int index);   // Points scene/camera-path/frames/fps/speed at a named preset
 	void onCameraDistanceChanged(double distance);  // Repositions camera X/Y/Z along its current direction from lookat
 	void onSceneChanged(int index);         // Updates UI when scene selection changes
+	QString videoCameraPath() const;   // the film's own while a film is the scene, else the chosen path (mainwindow_scene_info.cpp)
 	void syncCartoonVideoSettings(const QString &sceneId);   // a cartoon scene sets the video's path / length / fps (mainwindow_scene_info.cpp)
 	void onModeChanged(int index);          // Switches between Image and Video modes
 	void onIntegratorChanged(int index);    // Switches the Integrator Options stack page, auto-corrects GPU/CPU, updates gating
@@ -1671,6 +1673,7 @@ private:
 	InfoGroupBox *m_videoGroupBox = nullptr;
 	QComboBox *m_videoPresetCombo;      // Named scene+path+frames/fps/speed bundle - see video_preset.h
 	QComboBox *m_cameraPathCombo;       // Camera animation path selector
+	std::function<void()> m_updateVideoDuration;   // refreshes the video duration tooltip (createSettingsTab)
 	QSpinBox *m_videoFramesSpinBox;     // Number of frames to render
 	QSpinBox *m_videoFPSSpinBox;        // Target FPS for video
 	QDoubleSpinBox *m_videoSpeedSpinBox; // Camera movement speed multiplier

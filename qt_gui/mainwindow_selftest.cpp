@@ -101,6 +101,7 @@ void MainWindow::runSelfTest(const QString &mode, const QString &outPrefix) {
 	}
 
 	if (mode == "options") { runOptionsSelfTest(log, shot); return; }
+	if (mode == "cartoonui") { runCartoonUiSelfTest(log, shot); return; }   // see mainwindow_selftest_modes.cpp
 
 	// RT_GUI_SELFTEST=quitwarm: wait for the GPU warm-up (a Mac) to finish, then quit. The check is the exit status: the warm-up's thread deletes itself when it is done, and
 	// ~GpuWarmup used to read it afterwards, a crash at every quit that no other mode could see because the warm-up is off in them.
