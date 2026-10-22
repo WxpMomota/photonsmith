@@ -563,8 +563,15 @@ static bool runIntegrator(const LaunchArgs &args, const RenderSetup &s, double c
         render_result = optix_render_main_sppm(image_width, image_height, args.sppm_iterations,
                                                 args.sppm_photons, max_ray_depth, out_path.c_str(),
                                                 scene_id.c_str(), cam_x, cam_y, cam_z, 1);  // force_camera_override
-        if (!report_render_result(render_result, "optix_render_main_sppm", "GPU SPPM", "GPU SPPM", out_path))
+        if (render_result == ERR_GPU_UNSUPPORTED_SCENE) {
+            // GPU SPPM only has hit records for spheres and quads (the reason is printed above): the CPU's SPPM renders every scene, so say so and use it rather than fail
+            std::cerr << "WARNING: GPU SPPM cannot render this scene (see above); rendering it with CPU SPPM instead." << std::endl;
+            render_result = cpu_render_main_sppm(image_width, image_height, args.sppm_iterations, args.sppm_photons, max_ray_depth, out_path.c_str(), scene_id.c_str(), cam_x, cam_y, cam_z, 1);
+            if (!report_render_result(render_result, "cpu_render_main_sppm", "SPPM", "SPPM", out_path))
+                return false;
+        } else if (!report_render_result(render_result, "optix_render_main_sppm", "GPU SPPM", "GPU SPPM", out_path)) {
             return false;
+        }
     } else if (use_sppm) {
         // SPPM Renderer, CPU path (Stochastic Progressive Photon Mapping).
         // Implemented in cpu_renderer/cpu_interface.cpp - takes priority

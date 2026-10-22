@@ -112,9 +112,12 @@ public:
             done_ = true;
         }
         cv_.notify_one();
-        worker_.join();
+        if (worker_.joinable()) worker_.join();
         return converted_;
     }
+
+    // A render that gives up early (every frame failed, say) returns without calling finish(): a running std::thread that is destroyed ends the whole program abnormally.
+    ~BackgroundPngConverter() { finish(); }
 
 private:
     void run() {
@@ -645,9 +648,10 @@ inline int assembleVideoFile(const std::filesystem::path &frames_dir, int conver
             ffmpeg_argv.push_back(audio_path.string());
             manual_cmd += " -i \"" + audio_path.string() + "\"";
         }
-        const std::vector<std::string> codec = {"-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", std::to_string(video_fps)};
+        // yuv420p needs an even width and height; a picture of an odd size (the GUI's size boxes allow one) loses its last row or column rather than the whole video failing
+        const std::vector<std::string> codec = {"-vf", "crop=trunc(iw/2)*2:trunc(ih/2)*2", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-g", std::to_string(video_fps)};
         ffmpeg_argv.insert(ffmpeg_argv.end(), codec.begin(), codec.end());
-        manual_cmd += " -c:v libx264 -pix_fmt yuv420p -g " + std::to_string(video_fps);
+        manual_cmd += " -vf \"crop=trunc(iw/2)*2:trunc(ih/2)*2\" -c:v libx264 -pix_fmt yuv420p -g " + std::to_string(video_fps);
         if (with_audio) {
             const std::vector<std::string> sound = {"-c:a", "aac", "-b:a", "192k", "-shortest"};
             ffmpeg_argv.insert(ffmpeg_argv.end(), sound.begin(), sound.end());
