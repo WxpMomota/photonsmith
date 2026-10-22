@@ -53,6 +53,13 @@ inline std::vector<std::string> forwardedFlags(const LaunchArgs &args) {
 	return out;
 }
 
+// The flags a frame run repeats: the user's, and the film's own renderer when the film names one (cartoons.h, FilmMeta::wavefront) and the user did not choose.
+inline std::vector<std::string> frameFlags(const LaunchArgs &args, const cartoon::Film &film, bool gpu) {
+	std::vector<std::string> flags = forwardedFlags(args);
+	if (gpu && film.meta.wavefront && !args.use_wavefront) flags.push_back("--wavefront");
+	return flags;
+}
+
 // The arguments (after the program) that render `scenePath` to `framePath` at the parent's size and quality: the flags the user gave, then the size, the samples and the scene.
 // `timeLimitSeconds` > 0 is this frame's own time limit (the CPU renderer's --time-limit).
 inline std::vector<std::string> frameArgs(const std::vector<std::string> &flags, int width, int height, int spp, int depth, const std::string &framePath, const std::string &scenePath,
@@ -78,7 +85,7 @@ inline int timeoutFor(const LaunchArgs &args, bool gpu) {
 // started or did not finish in `timeoutSeconds` (it is stopped and tried once more first). `scenePath` is in a folder of its own (one per worker): the child's scene list reads that
 // folder and nothing else (RAY_TRACER_PBRT_DIR), so that it does not read the 200-odd scene files of pbrt_scenes/ (about half a second of every frame) to render this one.
 inline int renderFrame(const cartoon::Film &film, double t, const std::filesystem::path &scenePath, const std::string &exe, const LaunchArgs &args, int width, int height, int spp,
-					   int depth, const std::string &framePath, int timeoutSeconds = 0, double timeLimitSeconds = 0.0) {
+					   int depth, const std::string &framePath, int timeoutSeconds = 0, double timeLimitSeconds = 0.0, bool gpu = false) {
 	try {
 		std::ofstream f(scenePath, std::ios::binary);
 		if (!f) return -1;
@@ -86,7 +93,7 @@ inline int renderFrame(const cartoon::Film &film, double t, const std::filesyste
 	} catch (const std::exception &) {   // (a film's code failing on one frame fails that frame, not the whole video)
 		return -1;
 	}
-	const std::vector<std::string> childArgs = frameArgs(forwardedFlags(args), width, height, spp, depth, framePath, scenePath.string(), timeLimitSeconds);
+	const std::vector<std::string> childArgs = frameArgs(frameFlags(args, film, gpu), width, height, spp, depth, framePath, scenePath.string(), timeLimitSeconds);
 	int rc = -1;
 	for (int attempt = 0; attempt < 2; ++attempt) {
 		bool timedOut = false;

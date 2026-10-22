@@ -775,6 +775,24 @@ TEST(CartoonWorkers, ARealProcessCanBeAskedWhetherItRunsAndStopped) {
 	EXPECT_EQ(cartoon_render::workersFor(asked, true, false), 0);
 }
 
+TEST(CartoonRender, AFilmThatNamesTheWavefrontRendererGetsItOnTheGpuUnlessTheUserChoseAndTheOthersDoNot) {
+	const cartoon::Film *pip = cartoon::find("pip-and-the-moon"), *candle = cartoon::find("candle");
+	ASSERT_NE(pip, nullptr);
+	ASSERT_NE(candle, nullptr);
+	EXPECT_TRUE(pip->meta.wavefront) << "its frames matched the default renderer's (docs/VIDEO_GENERATION.md)";
+	EXPECT_FALSE(candle->meta.wavefront) << "the wavefront renderer draws the candle's wax darker: it keeps the default one";
+	LaunchArgs plain;
+	auto has = [](const std::vector<std::string> &flags) { return std::find(flags.begin(), flags.end(), "--wavefront") != flags.end(); };
+	EXPECT_TRUE(has(cartoon_render::frameFlags(plain, *pip, true)));
+	EXPECT_FALSE(has(cartoon_render::frameFlags(plain, *pip, false))) << "not on the CPU, which has no such renderer";
+	EXPECT_FALSE(has(cartoon_render::frameFlags(plain, *candle, true)));
+	LaunchArgs chosen;
+	ASSERT_TRUE(parseArgs({"--wavefront"}, chosen));
+	const std::vector<std::string> once = cartoon_render::frameFlags(chosen, *pip, true);
+	EXPECT_EQ(std::count(once.begin(), once.end(), "--wavefront"), 1) << "asked for by the user and by the film: once";
+	EXPECT_TRUE(has(cartoon_render::frameFlags(chosen, *candle, true))) << "the user's own choice is kept for any film";
+}
+
 TEST(CartoonRender, TheNumberOfFramesAtOnceIsTheFlagThenTheEnvironmentThenTwoOnAGpuAndOneOnTheCpu) {
 	LaunchArgs args;
 	EXPECT_EQ(cartoon_render::jobsFor(args, true), 2);

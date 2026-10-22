@@ -431,7 +431,7 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
                 std::ofstream out(file, std::ios::trunc);
                 out << mine.text();
             }
-            std::vector<std::string> childArgs = cartoon_render::forwardedFlags(args);
+            std::vector<std::string> childArgs = cartoon_render::frameFlags(args, film, use_gpu);
             for (const std::string &a : {std::string("--cartoon-worker"), file, std::string("--output"), (dir / "unused.ppm").string(), std::string("--height"), std::to_string(image_height),
                                           std::to_string(image_width), std::to_string(samples_per_pixel), std::to_string(max_ray_depth)})
                 childArgs.push_back(a);
@@ -459,7 +459,7 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
             if (already[static_cast<std::size_t>(frame)]) return 0;
             const double film_time = film.duration * frame / std::max(1, render_frame_count);
             return cartoon_render::renderFrame(film, film_time, frames_dir / ("work" + std::to_string(worker)) / ("cartoon_" + std::to_string(frame) + ".pbrt"), s.exe_path, args, image_width,
-                                               image_height, samples_per_pixel, max_ray_depth, frame_file(frame).string(), timeout, frameTimeLimit);
+                                               image_height, samples_per_pixel, max_ray_depth, frame_file(frame).string(), timeout, frameTimeLimit, use_gpu);
         },
         completed, inOrder);
 }

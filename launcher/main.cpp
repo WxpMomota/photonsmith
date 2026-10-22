@@ -1016,6 +1016,7 @@ int main(int argc, char** argv) {
 			std::cerr << "Cannot write the scene of " << args.cartoon_still << " to " << cartoon_still_file.dir << std::endl;
 			return EXIT_FAILURE;
 		}
+		if (use_gpu && still.film->meta.wavefront) args.use_wavefront = true;   // the renderer the film's frames are made with (FilmMeta::wavefront)
 		std::cout << still.film->name << " at " << std::fixed << std::setprecision(2) << still.t << " s" << std::defaultfloat << std::endl;
 		args.scene_file = cartoon_still_file.path.string();
 	}

@@ -506,6 +506,9 @@ struct FilmMeta {
 	const char *shotNames;
 	int samples;
 	double secondsPerFrame;
+	// The film renders on the GPU with the wavefront renderer (about 25% faster than the default one on the same scene). Set only for a film whose frames were compared with the default
+	// renderer's and matched it (the wavefront renderer draws some materials differently: the candle's wax, the dandelion's seeds, chrome), see docs/VIDEO_GENERATION.md.
+	bool wavefront = false;
 };
 
 struct Film {
