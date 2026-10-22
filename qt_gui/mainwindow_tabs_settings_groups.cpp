@@ -997,7 +997,7 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	frameRateGrid->setColumnStretch(3, 1);
 
 	m_videoFramesSpinBox = new QSpinBox();
-	m_videoFramesSpinBox->setRange(10, 1000);
+	m_videoFramesSpinBox->setRange(10, 20000);   // a cartoon movie of two minutes at 24 fps is about 2900 frames
 	m_videoFramesSpinBox->setValue(60);
 	m_videoFramesSpinBox->setSuffix(tr(" frames"));
 	styleSpinBox(m_videoFramesSpinBox);

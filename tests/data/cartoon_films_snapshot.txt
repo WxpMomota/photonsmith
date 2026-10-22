@@ -50,3 +50,8 @@ candle|0|1796|72
 candle|5|3052|72
 candle|10|4308|72
 candle|19.98|14104|70
+meta|meet-pip|V17|18 s|24 fps|3 shots|character,emissive,dof|128 spp
+meet-pip|0|18476|3
+meet-pip|6|19092|3
+meet-pip|9|18924|4
+meet-pip|17.98|18924|3

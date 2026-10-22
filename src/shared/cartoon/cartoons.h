@@ -22,6 +22,7 @@
 #include "fireflies.h"
 #include "lamp_and_ball.h"
 #include "little_robot.h"
+#include "meet_pip.h"
 #include "newtons_cradle.h"
 #include "orrery.h"
 #include "paper_boat.h"
@@ -76,6 +77,10 @@ inline const Film kFilms[] = {
 	 "One candle burns down in front of out-of-focus fairy lights: the flame flickers, light glows through the wax, drips run down its side, and at the end the flame dies in a thread of smoke.",
 	 candle::kDuration, candle::kFps, &candle::sceneAt, &candle::headerAt, &candle::shotStarts, 5.0,
 	 {16, "subsurface,emissive,dof,night", "Portrait of the flame|Macro on the wax and drips|Pull back as it dies", candle::kSamples, 4.7}},
+	{"meet-pip", "Meet Pip",
+	 "Pip, a small round blue creature with two antennae, says hello, shows what its face can do (surprise, sadness, a scowl, a hop of joy), follows a glowing orb with its eyes and walks off across the stage.",
+	 meet_pip::kDuration, meet_pip::kFps, &meet_pip::sceneAt, &meet_pip::headerAt, &meet_pip::shotStarts, 6.0,
+	 {17, "character,emissive,dof", "Hello and the faces|Following the orb|Side-on walk", meet_pip::kSamples, 2.8}},
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 
