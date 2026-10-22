@@ -207,7 +207,7 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 	struct Worker {
 		std::deque<int> remaining;
 		std::unique_ptr<WorkerHandle> handle;
-		Clock::time_point last = Clock::now();
+		std::chrono::steady_clock::time_point last = std::chrono::steady_clock::now();   // (not the function's `Clock` alias: MSVC does not find a function-local alias inside a local struct)
 	};
 	std::vector<Worker> ws(static_cast<std::size_t>(workers));
 	for (std::size_t i = 0; i < todo.size(); ++i) ws[i % ws.size()].remaining.push_back(todo[i]);
