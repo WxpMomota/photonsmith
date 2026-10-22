@@ -26,6 +26,7 @@
 #include "../../launcher/launcher_args.h"
 #include "../../launcher/render_setup.h"
 #include "../../launcher/background_mode.h"
+#include "../../launcher/run_policy.h"
 #include "../../src/shared/cartoon/cartoons.h"
 #include "../../src/shared/cartoon/cartoon_stills.h"
 #include "../../src/shared/pbrt_discover.h"
@@ -988,15 +989,69 @@ TEST(CartoonRender, BackgroundModeUsesOneWorkerAndOneFrameAtATimeAndIsPassedOnTo
 	EXPECT_NE(std::find(flags.begin(), flags.end(), "--background"), flags.end()) << "the workers and frame runs lower their own priority too";
 }
 
+TEST(RunPolicy, ItIsDecidedOnceFromTheArgumentsAndTheEnvironmentAndEveryNumberFollowsFromIt) {
+	LaunchArgs plain;
+	const RunPolicy normal = RunPolicy::from(plain);
+	EXPECT_FALSE(normal.background);
+	EXPECT_EQ(normal.dutyPercent, 100);
+	EXPECT_EQ(normal.defaultWorkers(true, false), 2);
+	EXPECT_EQ(normal.defaultWorkers(false, false), 0) << "the CPU renders every frame with all its cores";
+	EXPECT_EQ(normal.defaultWorkers(true, true), 0) << "a Metal frame is a process of its own";
+	EXPECT_EQ(normal.defaultFrameJobs(true), 2);
+	EXPECT_EQ(normal.defaultFrameJobs(false), 1);
+	EXPECT_EQ(normal.stallSeconds(900), 900);
+	EXPECT_EQ(normal.pauseSecondsAfter(2.0), 0.0);
+	EXPECT_EQ(normal.cpuThreads(16), 0u) << "no limit of its own";
+
+	LaunchArgs quietArgs;
+	quietArgs.background = true;
+	const RunPolicy quiet = RunPolicy::from(quietArgs);
+	EXPECT_TRUE(quiet.background);
+	EXPECT_EQ(quiet.dutyPercent, 50);
+	EXPECT_EQ(quiet.defaultWorkers(true, false), 1);
+	EXPECT_EQ(quiet.defaultFrameJobs(true), 1);
+	EXPECT_EQ(quiet.stallSeconds(900), 1800);
+	EXPECT_EQ(quiet.stallSeconds(0), 0) << "never stays never";
+	EXPECT_NEAR(quiet.pauseSecondsAfter(2.0), 2.0, 1e-9) << "a duty of 50%: as long as the work";
+	EXPECT_EQ(quiet.cpuThreads(16), 8u);
+	EXPECT_EQ(quiet.cpuThreads(2), 1u);
+	EXPECT_EQ(quiet.stallSeconds(2'000'000'000), 24 * 3600) << "capped at a day, not overflowed";
+}
+
+TEST(RunPolicy, TheEnvironmentAloneMakesABackgroundRunAndTheDutyCanBeChosen) {
+	const char *savedBackground = std::getenv("RAY_TRACER_BACKGROUND");
+	const char *savedDuty = std::getenv("RAY_TRACER_BACKGROUND_DUTY");
+	const std::string background = savedBackground ? savedBackground : "", duty = savedDuty ? savedDuty : "";
+	const auto put = [](const char *name, const std::string &value, bool present) {
+#ifdef _WIN32
+		_putenv_s(name, present ? value.c_str() : "");
+#else
+		if (present) setenv(name, value.c_str(), 1); else unsetenv(name);
+#endif
+	};
+	put("RAY_TRACER_BACKGROUND", "1", true);
+	put("RAY_TRACER_BACKGROUND_DUTY", "25", true);
+	LaunchArgs plain;
+	const RunPolicy fromEnvironment = RunPolicy::from(plain);
+	EXPECT_TRUE(fromEnvironment.background);
+	EXPECT_EQ(fromEnvironment.dutyPercent, 25);
+	EXPECT_NEAR(fromEnvironment.pauseSecondsAfter(1.0), 3.0, 1e-9);
+	put("RAY_TRACER_BACKGROUND_DUTY", "1", true);
+	EXPECT_EQ(RunPolicy::from(plain).dutyPercent, 10) << "not below 10%";
+	put("RAY_TRACER_BACKGROUND", "0", true);
+	EXPECT_FALSE(RunPolicy::from(plain).background) << "0 is off";
+	put("RAY_TRACER_BACKGROUND", background, savedBackground != nullptr);
+	put("RAY_TRACER_BACKGROUND_DUTY", duty, savedDuty != nullptr);
+}
+
 #ifdef _WIN32
 namespace {
-// Puts back what a test that calls background_mode::apply() changes in the whole test program (the priority class, RAY_TRACER_THREADS and the background flag), however the test ends.
+// Puts back what a test that calls background_mode::apply() changes in the whole test program (the priority class and RAY_TRACER_THREADS), however the test ends.
 struct BackgroundModeRestore {
 	DWORD priority = GetPriorityClass(GetCurrentProcess());
 	bool hadThreads = std::getenv("RAY_TRACER_THREADS") != nullptr;
 	std::string threads = hadThreads ? std::getenv("RAY_TRACER_THREADS") : "";
 	~BackgroundModeRestore() {
-		background_mode::active() = false;
 		SetPriorityClass(GetCurrentProcess(), priority);
 		if (hadThreads) _putenv_s("RAY_TRACER_THREADS", threads.c_str());
 		else _putenv("RAY_TRACER_THREADS=");
@@ -1007,8 +1062,11 @@ struct BackgroundModeRestore {
 TEST(BackgroundMode, ItLowersThePriorityOfThisProcessAndHalvesTheCpuThreads) {
 	BackgroundModeRestore restore;
 	_putenv("RAY_TRACER_THREADS=");   // (removes it: the user did not choose a number)
+	LaunchArgs quietArgs;
+	quietArgs.background = true;
+	const RunPolicy quiet = RunPolicy::from(quietArgs);
 
-	const std::string done = background_mode::apply();
+	const std::string done = background_mode::apply(quiet);
 	EXPECT_NE(done.find("CPU priority below normal"), std::string::npos) << done;
 	EXPECT_EQ(GetPriorityClass(GetCurrentProcess()), static_cast<DWORD>(BELOW_NORMAL_PRIORITY_CLASS));
 	const char *now = std::getenv("RAY_TRACER_THREADS");
@@ -1017,13 +1075,13 @@ TEST(BackgroundMode, ItLowersThePriorityOfThisProcessAndHalvesTheCpuThreads) {
 
 	// a number the user chose is kept
 	_putenv("RAY_TRACER_THREADS=3");
-	background_mode::apply();
+	background_mode::apply(quiet);
 	EXPECT_STREQ(std::getenv("RAY_TRACER_THREADS"), "3");
 
-	EXPECT_GT(background_mode::pauseSecondsAfter(2.0), 0.0) << "a frame that took 2 s is followed by a pause";
-	EXPECT_NEAR(background_mode::pauseSecondsAfter(2.0), 2.0, 1e-9) << "a duty of 50%: as long as the work";
-	background_mode::active() = false;
-	EXPECT_EQ(background_mode::pauseSecondsAfter(2.0), 0.0) << "no pause outside background mode";
+	// outside background mode nothing at all is changed
+	SetPriorityClass(GetCurrentProcess(), restore.priority);
+	EXPECT_TRUE(background_mode::apply(RunPolicy::from(LaunchArgs())).empty());
+	EXPECT_EQ(GetPriorityClass(GetCurrentProcess()), restore.priority);
 }
 #endif
 

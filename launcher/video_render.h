@@ -484,6 +484,7 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
 
     auto video_start_time = std::chrono::high_resolution_clock::now();
     int successful_frames = 0;
+    const RunPolicy run_policy = RunPolicy::from(args);
 
     // Converts each frame to PNG on a background thread as soon as it's
     // rendered, instead of after the whole video finishes - overlaps
@@ -634,7 +635,7 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
 
         auto frame_end = std::chrono::high_resolution_clock::now();
         auto frame_duration = std::chrono::duration_cast<std::chrono::milliseconds>(frame_end - frame_start);
-        background_mode::pauseAfter(std::chrono::duration<double>(frame_end - frame_start).count());   // (--background)
+        background_mode::pauseAfter(run_policy, std::chrono::duration<double>(frame_end - frame_start).count());   // (--background)
 
         if (render_result == SUCCESS) {
             successful_frames++;

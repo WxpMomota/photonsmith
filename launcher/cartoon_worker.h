@@ -104,6 +104,7 @@ struct Job {
 // Returns 0. A frame that fails leaves its marker with the result and the worker goes on.
 inline int run(const Job &job, const LaunchArgs &args, const RenderSetup &setup, const std::function<int(const LaunchArgs &, const RenderSetup &)> &render) {
 	std::filesystem::create_directories(job.scenes);
+	const RunPolicy policy = RunPolicy::from(args);
 	for (int frame : job.list) {
 		const auto frameStart = std::chrono::steady_clock::now();
 		double eye[3] = {args.cam_x, args.cam_y, args.cam_z};
@@ -127,7 +128,7 @@ inline int run(const Job &job, const LaunchArgs &args, const RenderSetup &setup,
 		std::error_code ec;
 		std::filesystem::rename(temporary, marker, ec);
 		std::cout.flush();
-		background_mode::pauseAfter(std::chrono::duration<double>(std::chrono::steady_clock::now() - frameStart).count());   // (--background: leave the machine to its user for a while)
+		background_mode::pauseAfter(policy, std::chrono::duration<double>(std::chrono::steady_clock::now() - frameStart).count());   // (--background: leave the machine to its user for a while)
 	}
 	return 0;
 }

@@ -81,10 +81,8 @@ inline int timeoutFor(const LaunchArgs &args, bool gpu) {
 	int seconds = gpu ? 900 : 0;
 	if (args.cartoon_timeout >= 0) seconds = args.cartoon_timeout;
 	else if (const char *env = std::getenv("RAY_TRACER_CARTOON_TIMEOUT")) seconds = std::max(0, std::atoi(env));
-	// --background: a worker pauses after every frame (background_mode.h), and the watchdog measures the time since the worker's last finished frame, so the limit grows by the same
-	// factor (twice at the usual duty of 50%); otherwise a healthy worker with slow frames would be killed in its pause.
-	if (args.background && seconds > 0) seconds = static_cast<int>(std::min<long long>(static_cast<long long>(seconds) * 100 / background_mode::dutyPercent(), 24LL * 3600));
-	return seconds;
+	// --background: a worker pauses after every frame, so the limit grows with the pauses (RunPolicy::stallSeconds)
+	return RunPolicy::from(args).stallSeconds(seconds);
 }
 
 // Writes the frame's scene, runs the child, removes the scene file. Returns the child's exit code (0 = SUCCESS), or -1 when the scene file could not be written or the child could not be
@@ -111,7 +109,7 @@ inline int renderFrame(const cartoon::Film &film, double t, const std::filesyste
 	}
 	std::error_code ec;
 	std::filesystem::remove(scenePath, ec);
-	background_mode::pauseAfter(std::chrono::duration<double>(std::chrono::steady_clock::now() - frameStart).count());   // (--background)
+	background_mode::pauseAfter(RunPolicy::from(args), std::chrono::duration<double>(std::chrono::steady_clock::now() - frameStart).count());   // (--background)
 	return rc;
 }
 
@@ -181,7 +179,7 @@ inline int workersFor(const LaunchArgs &args, bool gpu, bool metal) {
 	if (n < 0) {
 		if (const char *env = std::getenv("RAY_TRACER_CARTOON_WORKERS")) n = std::atoi(env);
 	}
-	if (n < 0) n = gpu && !metal ? (args.background ? 1 : 2) : 0;   // (--background: one worker keeps a GPU nearly as busy and leaves the rest to the computer's user)
+	if (n < 0) n = RunPolicy::from(args).defaultWorkers(gpu, metal);
 	return std::max(0, std::min(n, 4));
 }
 
@@ -288,7 +286,7 @@ inline int jobsFor(const LaunchArgs &args, bool gpu) {
 	if (n <= 0) {
 		if (const char *env = std::getenv("RAY_TRACER_CARTOON_JOBS")) n = std::atoi(env);
 	}
-	if (n <= 0) n = gpu && !args.background ? 2 : 1;
+	if (n <= 0) n = RunPolicy::from(args).defaultFrameJobs(gpu);
 	return std::max(1, std::min(n, 8));
 }
 
