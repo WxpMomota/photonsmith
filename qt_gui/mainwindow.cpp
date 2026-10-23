@@ -1046,6 +1046,20 @@ MainWindow::MainWindow(QWidget *parent, const QString &startupLanguageCode)
 		warmup->start();
 	}
 #endif
+#ifdef Q_OS_WIN
+	// OptiX compiles the default renderer's shaders the first time on this computer (and after an update of the shaders): about 20 minutes. Do it now, at a low priority in the background,
+	// and say so; a warm start finishes in a second and says nothing (gpu_warmup.h).
+	{
+		GpuWarmup *warmup = new GpuWarmup(this);
+		connect(warmup, &GpuWarmup::slow, this, [this] {
+			statusBar()->showMessage(tr("Preparing the GPU renderer (first run on this computer, or after an update: up to 25 minutes). You can use the program meanwhile; the wavefront renderer and Live Preview do not wait for it..."), 0);
+		});
+		connect(warmup, &GpuWarmup::done, this, [this](bool ok, bool wasSlow) {
+			if (wasSlow) statusBar()->showMessage(ok ? tr("The GPU renderer is ready.") : tr("The GPU renderer could not be prepared ahead of time; the first render with it will build it."), 8000);
+		});
+		warmup->start();
+	}
+#endif
 	{ startup_profile::Stage s("theme and font"); applyTheme(m_activeTheme); applyFont(m_startupFontId); restyleThemedWidgets(); }
 
 	// Notification-only tray icon: the app has no tray menu and never hides

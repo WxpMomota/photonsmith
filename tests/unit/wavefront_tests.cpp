@@ -11,6 +11,8 @@
  */
 
 #include <gtest/gtest.h>
+#include <sstream>
+#include <iostream>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -383,6 +385,40 @@ TEST_F(WavefrontRenderTest, Scene8FinalSceneIsNotBlack) {
 	EXPECT_LT(bf, 0.95f)
 		<< "More than 95% of pixels are black (black fraction=" << bf
 		<< "). Scene A9's (formerly scene 8) motion-blur/traversable mismatch may have regressed.";
+}
+
+// The wavefront loop waits for the GPU twice per bounce (the intersection's counters and the materials' counters) and not for every counter, stream and stage as it once did (about
+// fourteen): for a small frame that wait is most of the render time (docs/VIDEO_GENERATION.md). A change that adds a synchronize to the bounce shows here. --stats prints the number.
+TEST_F(WavefrontRenderTest, ABounceMakesAboutTwoRoundTripsToTheGpu) {
+	const char *saved = getenv("RAY_TRACER_STATS");
+	const std::string before = saved ? saved : "";
+	std::string name = "wf_test_roundtrips.ppm";
+#ifdef _WIN32
+	_putenv_s("RAY_TRACER_STATS", "1");
+#else
+	setenv("RAY_TRACER_STATS", "1", 1);
+#endif
+	std::ostringstream captured;
+	std::streambuf *oldOut = std::cout.rdbuf(captured.rdbuf());
+	const auto img = renderWF(name.c_str(), 64, 64, 8, 8);
+	std::cout.rdbuf(oldOut);
+#ifdef _WIN32
+	_putenv_s("RAY_TRACER_STATS", saved ? before.c_str() : "");
+#else
+	if (saved) setenv("RAY_TRACER_STATS", before.c_str(), 1); else unsetenv("RAY_TRACER_STATS");
+#endif
+	ASSERT_TRUE(img.valid);
+	const std::string text = captured.str();
+	long long trips = -1, bounces = -1;
+	for (const std::string &line : {std::string("Host round trips   : "), std::string("Bounce iterations  : ")}) {
+		const std::size_t at = text.find(line);
+		ASSERT_NE(at, std::string::npos) << "no \"" << line << "\" in the --stats output:\n" << text;
+		(line[0] == 'H' ? trips : bounces) = std::atoll(text.c_str() + at + line.size());
+	}
+	ASSERT_GT(bounces, 0);
+	const double perBounce = static_cast<double>(trips) / static_cast<double>(bounces);
+	EXPECT_LE(perBounce, 2.5) << trips << " round trips for " << bounces << " bounces";
+	EXPECT_GE(perBounce, 1.0) << "fewer than one a bounce: the counter is not counting";
 }
 
 // Test 2: Correct output dimensions

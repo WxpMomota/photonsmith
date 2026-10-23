@@ -47,6 +47,8 @@ extern "C" {
 
 inline bool optix_is_available() { return false; }
 
+inline bool optix_prepare_renderer() { return true; }   // (nothing to prepare: no OptiX in this build)
+
 inline bool optix_get_diagnostics(OptixDiagnostics* out) {
 	if (!out) return false;
 	*out = OptixDiagnostics{};

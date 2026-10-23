@@ -43,7 +43,7 @@ inline const char* entryPoint() { return "optix_render_main"; }
 inline const char* reportTag() { return "OptiX"; }
 inline const char* failureHint() { return nullptr; }   // nullptr: report_render_result() prints the error code's own text
 inline bool available() { return optix_is_available(); }
-inline bool prepare() { return true; }   // OptiX has nothing to build ahead of time
+inline bool prepare() { return optix_prepare_renderer(); }   // builds the default renderer's modules (20 minutes on a cold OptiX cache): `--prepare-gpu`
 inline int render(int width, int height, int samples, int maxDepth, const char* outputPath, const char* sceneId, double camX, double camY, double camZ,
                   int forceCameraOverride, const RenderOptions& options) {
 	return optix_render_main(width, height, samples, maxDepth, outputPath, sceneId, camX, camY, camZ, forceCameraOverride, options);

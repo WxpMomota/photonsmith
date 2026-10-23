@@ -29,6 +29,7 @@ extern char** environ;
 #endif
 #include "cpu_renderer/cpu_interface.h"
 #include "launcher/background_mode.h"
+#include "src/shared/output_format.h"
 #ifdef RT_HAVE_AVFOUNDATION_ENCODER
 #include "launcher/video_encoder_mac.h"   // Video -> MP4 via AVFoundation, no ffmpeg needed (used below)
 #endif
@@ -141,7 +142,7 @@ private:
             const std::filesystem::path tmp_path = frames_dir_ / (std::string(enc_filename) + ".tmp.png");
             bool ok;
             std::error_code ec;
-            if (job.already_png) {
+            if (job.already_png || file_is_png(job.path)) {   // (already a PNG: the GPU renderer wrote one; a text PPM in a .png file is converted)
                 std::filesystem::rename(job.path, tmp_path, ec);
                 ok = !ec;
             } else {
@@ -365,6 +366,7 @@ struct WorkerProcess : cartoon_render::WorkerHandle {
     Child child;
     bool running() override { return child.running(); }
     void kill() override { child.kill(); }
+    unsigned long long memoryBytes() override { return child.memoryBytes(); }
 };
 
 // A cartoon video's frames. With workers (the default on an OptiX GPU: cartoon_worker.h) a few long-lived processes each render a list of frames, which spares the second and a half every
@@ -377,7 +379,8 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
     const int workers = cartoon_render::workersFor(args, use_gpu, kMetalVideoFrames);
     const int jobs = cartoon_render::jobsFor(args, use_gpu);
     for (int w = 0; w < std::max(jobs, workers); ++w) std::filesystem::create_directories(frames_dir / ("work" + std::to_string(w)));
-    const bool frame_is_png = use_gpu && kMetalVideoFrames;
+    // A GPU frame is written as a PNG by the renderer itself (OutputOptions::write_png; Metal always did), not as a text PPM to convert: the picture of GPU SPPM is the one exception
+    const bool frame_is_png = use_gpu && (kMetalVideoFrames || !args.use_sppm);
     auto frame_file = [&](int frame) {
         char name[64];
         std::snprintf(name, sizeof(name), frame_is_png ? "frame_%04d.png" : "frame_%04d.ppm", frame);
@@ -420,6 +423,7 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
         job.film = film.key;
         job.frames = render_frame_count;
         job.out = frames_dir.string();
+        job.ext = frame_is_png ? "png" : "ppm";   // (the same names the video looks for: frame_file above)
         cartoon_render::WorkerHooks hooks;
         hooks.start = [&](int worker, const std::vector<int> &frames) -> std::unique_ptr<cartoon_render::WorkerHandle> {
             const std::filesystem::path dir = frames_dir / ("work" + std::to_string(worker));
@@ -453,7 +457,7 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
             result = rc;
             return true;
         };
-        return cartoon_render::runWorkers(todo, workers, timeout, hooks, completed, inOrder) + resumed;
+        return cartoon_render::runWorkers(todo, workers, timeout, hooks, completed, inOrder, 25, cartoon_render::workerMemoryLimitBytes()) + resumed;
     }
     return cartoon_render::runInParallel(
         render_frame_count, jobs,
@@ -499,6 +503,7 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
     // that block's own comment for why a per-frame seed is needed).
     // See src/shared/render_options.h's own field comments.
     RenderOptions render_opts = render_options_from_args(args);
+    render_opts.output.write_png = &write_png;   // (a GPU frame asked for a .png file: see frame_is_png)
     // A cartoon preset (--camera-path cartoon:<key>): each frame is a scene of its own, rendered by a child run (launcher/cartoon_render.h).
     const cartoon::Film *cartoon_film = cartoon::forCameraPath(camera_path.c_str());
 
@@ -556,7 +561,8 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
         // Metal's own writer only produces PNG (never PPM), so a Metal
         // frame is written directly as .png and handed to the converter
         // already encoded - see BackgroundPngConverter::push().
-        const bool frame_is_png = use_gpu && kMetalVideoFrames;
+        // A GPU frame is written as a PNG by the renderer itself (OutputOptions::write_png; Metal always did), not as a text PPM to convert: the picture of GPU SPPM is the one exception
+    const bool frame_is_png = use_gpu && (kMetalVideoFrames || !args.use_sppm);
         char frame_filename[256];
         std::snprintf(frame_filename, sizeof(frame_filename),
                       frame_is_png ? "frame_%04d.png" : "frame_%04d.ppm", frame);

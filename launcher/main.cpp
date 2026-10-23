@@ -65,6 +65,7 @@ extern char** environ;
 #include "gpu/metal/metal_interface.h"
 #endif
 #include "src/external/image_writer.h"
+#include "src/shared/output_format.h"
 #include "src/TheRestOfYourLife/error_codes.h"
 #include "src/TheRestOfYourLife/thread_count.h"
 #include "src/shared/accelerator_override.h"
@@ -760,6 +761,10 @@ static void announceRenderedFile(const std::string &out_path, bool use_gpu, bool
             // compositable format that doesn't need a PNG derivative anyway.
             std::cout << "\nRender complete! You can now open:" << std::endl;
             std::cout << "  - " << ppm_path_obj.filename() << " (EXR - linear HDR, full float precision)" << std::endl;
+        } else if (file_is_png(out_path)) {
+            // (the GPU renderer wrote the PNG itself: it was asked for a .png file)
+            std::cout << "\nRender complete! You can now open:" << std::endl;
+            std::cout << "  - " << ppm_path_obj.filename() << " (PNG - lossless, widely supported)" << std::endl;
         } else if (ppm_only) {
             std::cout << "\nRender complete! You can now open:" << std::endl;
             std::cout << "  - " << ppm_path_obj.filename() << " (PPM - raw data)" << std::endl;
@@ -820,6 +825,13 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
     // at all (see the warnings just above). See src/shared/
     // render_options.h's own field comments.
     RenderOptions render_opts = render_options_from_args(args);
+    // A GPU render asked for a .png file writes the PNG itself, straight from the picture (OutputOptions::write_png), with no text PPM for this program to read back and convert, unless
+    // the picture is cut afterwards (a crop window, the scene's own or --crop: cutToScenePicture reads a PPM or an EXR).
+    {
+        const bool cropped = args.crop_x0 != 0.0 || args.crop_y0 != 0.0 || args.crop_x1 != 1.0 || args.crop_y1 != 1.0;
+        double sceneCrop[4];
+        if (!cropped && !cpu_scene_crop_picture_by_id(scene_id.c_str(), sceneCrop)) render_opts.output.write_png = &write_png;
+    }
 
     if (!runIntegrator(args, s, cam_x, cam_y, cam_z, render_opts, render_result)) return render_result;
 
@@ -970,6 +982,9 @@ int main(int argc, char** argv) {
 		args.background = true;   // (so that the programs a video starts are given the flag too)
 		std::cout << "Background mode: " << background_mode::apply(run_policy) << "." << std::endl;
 	}
+
+	// --gpu-device N: the renderer reads RAY_TRACER_GPU_DEVICE (gpu/optix/optix_renderer_init.cpp), and so do the programs a video starts
+	if (args.gpu_device >= 0) set_env_var("RAY_TRACER_GPU_DEVICE", std::to_string(args.gpu_device).c_str());
 
 	// Unpack for readability in the rest of main
 	bool use_gpu            = args.use_gpu;

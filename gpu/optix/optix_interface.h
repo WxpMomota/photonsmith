@@ -30,6 +30,11 @@ extern "C" {
 // Check if GPU/OptiX rendering is available
 bool optix_is_available();
 
+// Builds the default renderer's OptiX modules, program groups and pipeline now (OptiXRenderer::ensureDefaultRenderer) instead of at the first default-renderer render: with a warm OptiX
+// cache that takes a fraction of a second, with a cold one (the first run on a computer, or after an update of the shaders) about 20 minutes. `ray_tracer --prepare-gpu`, which the GUI
+// starts in the background at its start, calls this so that the wait is over before the first render. True when the renderer is ready.
+bool optix_prepare_renderer();
+
 // Full capability probe for --diagnose: device name, driver/CUDA/OptiX
 // versions, VRAM. Runs the same probe sequence as optix_is_available() (see
 // OptiXRenderer::isAvailable()'s comment) but reports what it found instead

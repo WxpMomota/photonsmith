@@ -15,12 +15,17 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <psapi.h>
 #include <stdlib.h>
 #else
+#include <fstream>
 #include <signal.h>
 #include <spawn.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
 extern char **environ;
 #endif
 
@@ -279,6 +284,24 @@ class Child {
 
 	int exitCode() const { return exitCode_; }
 
+	// The memory the program holds right now, in bytes (its private memory on Windows, its resident set on Linux); 0 when it is not running or this system cannot say (macOS).
+	unsigned long long memoryBytes() const {
+#ifdef _WIN32
+		if (!process_ || finished_) return 0;
+		PROCESS_MEMORY_COUNTERS_EX counters{};
+		if (!GetProcessMemoryInfo(process_, reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&counters), sizeof(counters))) return 0;
+		return static_cast<unsigned long long>(counters.PrivateUsage);
+#elif defined(__linux__)
+		if (pid_ <= 0 || finished_) return 0;
+		std::ifstream statm("/proc/" + std::to_string(pid_) + "/statm");
+		unsigned long long sizePages = 0, residentPages = 0;
+		if (!(statm >> sizePages >> residentPages)) return 0;
+		return residentPages * static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
+#else
+		return 0;
+#endif
+	}
+
   private:
 	void release() {
 #ifdef _WIN32
@@ -310,3 +333,33 @@ inline int runChild(const std::string &exe, const std::vector<std::string> &args
 	}
 	return child.exitCode();
 }
+
+// A worker's watch on the program that started it (the launcher). Windows: nothing to do here, the launcher's kill-on-exit job (killOnExitJob above) ends its children with it. POSIX: a
+// worker that outlives a launcher that was killed would go on rendering with nobody to read its pictures, so on Linux the kernel is asked to end it with its parent (prctl
+// PR_SET_PDEATHSIG; it fires when the thread that started the worker ends, which for a launcher's main thread is the whole program), and everywhere on POSIX the worker looks between frames
+// whether it has been given to another parent (a macOS has no prctl: it is the only check there). NOT yet tried on Linux or macOS: the Windows build does not compile this.
+class ParentWatch {
+  public:
+	ParentWatch() {
+#ifndef _WIN32
+		parent_ = getppid();
+#ifdef __linux__
+		prctl(PR_SET_PDEATHSIG, SIGKILL);
+#endif
+#endif
+	}
+	// True when the program that started this one has ended.
+	bool parentGone() const {
+#ifndef _WIN32
+		const pid_t now = getppid();
+		return now != parent_ || now == 1;
+#else
+		return false;
+#endif
+	}
+
+  private:
+#ifndef _WIN32
+	pid_t parent_ = 0;
+#endif
+};

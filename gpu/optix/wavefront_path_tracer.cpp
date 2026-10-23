@@ -74,6 +74,7 @@ struct WavefrontRenderStats {
 	long long probeExits = 0;
 	long long bounceIterations = 0; // total inner-loop iterations across all samples
 	int samplesCompleted = 0;
+	long long hostSyncs = 0;        // round trips to the GPU the sample loop made (a bounce needs two: tests/integration guard it)
 };
 
 struct RenderCall {
@@ -864,6 +865,7 @@ void WavefrontPathTracer::runBssrdfProbeStage(RenderCall &rc, WavefrontLaunchPar
 			(unsigned int)numProbe, 1, 1));
 
 		CUDA_CHECK(cudaStreamSynchronize(stream_));
+		++hostSyncs_;
 
 		numExit = readQueueSize(reinterpret_cast<int*>(d_exitCounter_));
 		launchResolveBssrdfExit(
@@ -884,6 +886,7 @@ void WavefrontPathTracer::runBssrdfProbeStage(RenderCall &rc, WavefrontLaunchPar
 			d_fbPtr, camera.backgroundColor, camera.shadowRayEpsilon, camera.skyDist, camera.portalLight, camera.maxComponentValue);
 
 		CUDA_CHECK(cudaStreamSynchronize(stream_));
+		++hostSyncs_;
 	}
 }
 
@@ -932,6 +935,7 @@ int WavefrontPathTracer::runShadowStage(RenderCall &rc, WavefrontLaunchParams &l
 }
 
 void WavefrontPathTracer::renderSampleLoop(RenderCall &rc) {
+	hostSyncs_ = 0;
 	int width = rc.width;
 	int height = rc.height;
 	int samples_per_pixel = rc.samples_per_pixel;
@@ -1147,6 +1151,7 @@ void WavefrontPathTracer::renderSampleLoop(RenderCall &rc) {
 	rc.d_weightPtr = d_weightPtr;
 	rc.d_activePixelMaskPtr = d_activePixelMaskPtr;
 	rc.lp = lp;
+	stats.hostSyncs = hostSyncs_;
 	rc.stats = stats;
 }
 
@@ -1328,6 +1333,7 @@ void WavefrontPathTracer::renderFinish(RenderCall &rc) {
 		std::cout << "[WF-STATS] Samples completed  : " << stats.samplesCompleted << " / " << samples_per_pixel << "\n";
 		std::cout << "[WF-STATS] Bounce iterations  : " << stats.bounceIterations
 				  << "  (avg " << avgBouncesPerSample << " / sample, max_depth=" << max_depth << ")\n";
+		std::cout << "[WF-STATS] Host round trips   : " << stats.hostSyncs << "  (" << (stats.bounceIterations > 0 ? double(stats.hostSyncs) / double(stats.bounceIterations) : 0.0) << " per bounce)\n";
 		std::cout << "[WF-STATS] Primary+bounce rays: " << stats.primaryRays << "\n";
 		std::cout << "[WF-STATS] Hits (regular/simple/dielectric): "
 				  << stats.hits << " / " << stats.simpleHits << " / " << stats.dielectricHits
@@ -1508,4 +1514,4 @@ void WavefrontPathTracer::cleanup() {
 // for why cpu_renderer.vcxproj itself can't carry this) and
 // tests/CMakeLists.txt's source list - there is no single shared target
 // providing this dependency to every consumer once.
-#include "../../src/data/rgb_spectrum_table_data.cpp"
+#include "../../src/data/rgb_spectrum_table_data.cpp"

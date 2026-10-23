@@ -948,6 +948,8 @@ private:
     cudaEvent_t dielectricMaterialDone_ = nullptr;
     // Where readQueueSizes() copies the counters to: pinned, so that the copies are really asynchronous.
     int *h_counterReads_ = nullptr;
+    // Round trips to the GPU (a stream synchronize with a copy of a counter) that the current render's sample loop has made: printed with --stats and guarded by a test.
+    long long hostSyncs_ = 0;
     int          queueCapacity_ = 0;
     // Separate, LARGER capacity for d_shadowItems_/d_shadowCounter_ only -
     // see allocateQueues()'s own comment for why a single shadow NEE pass

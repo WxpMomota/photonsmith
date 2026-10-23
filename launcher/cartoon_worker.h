@@ -26,6 +26,7 @@
 #include <vector>
 
 #include "background_mode.h"
+#include "process.h"
 #include "launcher_args.h"
 #include "render_setup.h"
 #include "../src/shared/cartoon/cartoons.h"
@@ -34,18 +35,20 @@ namespace cartoon_worker {
 
 struct Job {
 	std::string film, scenes, out;
+	// what the frames' picture files are called: "png" when the renderer writes the PNG itself (a GPU), "ppm" when the video converts a text PPM
+	std::string ext = "ppm";
 	int frames = 0;
 	std::vector<int> list;
 	const cartoon::Film *filmPtr = nullptr;
 
 	std::string scenePath() const { return (std::filesystem::path(scenes) / "frame.pbrt").string(); }
-	std::string picturePath(int frame) const { return pathFor(frame, "ppm"); }
+	std::string picturePath(int frame) const { return pathFor(frame, ext.c_str()); }
 	std::string markerPath(int frame) const { return pathFor(frame, "done"); }
 	double timeOf(int frame) const { return filmPtr->duration * frame / std::max(1, frames); }
 
 	std::string text() const {
 		std::ostringstream o;
-		o << "film " << film << "\nframes " << frames << "\nscenes " << scenes << "\nout " << out << "\nlist";
+		o << "film " << film << "\nframes " << frames << "\nscenes " << scenes << "\nout " << out << "\next " << ext << "\nlist";
 		for (int f : list) o << " " << f;
 		o << "\n";
 		return o.str();
@@ -64,6 +67,7 @@ struct Job {
 			else if (verb == "frames") words >> frames;
 			else if (verb == "scenes") std::getline(words >> std::ws, scenes);
 			else if (verb == "out") std::getline(words >> std::ws, out);
+			else if (verb == "ext") words >> ext;
 			else if (verb == "list")
 				for (int f; words >> f;) list.push_back(f);
 		}
@@ -105,7 +109,12 @@ struct Job {
 inline int run(const Job &job, const LaunchArgs &args, const RenderSetup &setup, const std::function<int(const LaunchArgs &, const RenderSetup &)> &render) {
 	std::filesystem::create_directories(job.scenes);
 	const RunPolicy policy = RunPolicy::from(args);
+	const ParentWatch parent;   // (POSIX: ends this worker with the launcher that started it; process.h)
 	for (int frame : job.list) {
+		if (parent.parentGone()) {
+			std::cerr << "The program that started this worker has ended: stopping." << std::endl;
+			return 0;
+		}
 		const auto frameStart = std::chrono::steady_clock::now();
 		double eye[3] = {args.cam_x, args.cam_y, args.cam_z};
 		int rc = -1;

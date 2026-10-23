@@ -277,6 +277,7 @@ add_executable(unit_tests
     unit/cartoon_films_tests.cpp
     ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/cartoon_scenes.cpp   # pbrt_discover::listGenerated / materializeGenerated (pbrt_discover_tests.cpp reaches them)
     unit/cartoon_pip_tests.cpp
+    unit/uploaded_scene_tests.cpp
     unit/film_file_tests.cpp
     unit/cartoon_snapshot_tests.cpp
     unit/path_probe_tests.cpp

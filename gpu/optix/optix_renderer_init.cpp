@@ -44,8 +44,26 @@
 namespace {
 	/// Constants for OptiX configuration
 	constexpr unsigned int kDefaultLogLevel = 3;  ///< OptiX log level (0=off, 4=verbose)
-	constexpr int kDefaultCudaDevice = 0;         ///< Default CUDA device index
+	constexpr int kDefaultCudaDevice = 0;         ///< The CUDA device used when nothing chooses another (see selectedCudaDevice)
 	constexpr size_t kMaxDeviceNameLength = 256;  ///< Max length for device name buffer
+
+	/// The CUDA device the renderer uses: RAY_TRACER_GPU_DEVICE (`--gpu-device N` sets it), else the first. A number that is not a device of this machine is said once and the first is used.
+	int selectedCudaDevice() {
+#pragma warning(suppress: 4996)
+		const char *env = std::getenv("RAY_TRACER_GPU_DEVICE");
+		if (!env || !*env) return kDefaultCudaDevice;
+		const int wanted = std::atoi(env);
+		int count = 0;
+		if (wanted < 0 || cudaGetDeviceCount(&count) != cudaSuccess || wanted >= count) {
+			static bool told = false;
+			if (!told) {
+				told = true;
+				std::cerr << "[OptiX] GPU device " << env << " (RAY_TRACER_GPU_DEVICE / --gpu-device) is not a device of this computer (" << count << " found); using device " << kDefaultCudaDevice << "\n";
+			}
+			return kDefaultCudaDevice;
+		}
+		return wanted;
+	}
 }
 
 // ============================================================================
@@ -99,8 +117,8 @@ bool OptiXRenderer::isAvailable() noexcept {
 	}
 
 	// Step 2: Set CUDA device
-	if (const cudaError_t setErr = cudaSetDevice(kDefaultCudaDevice); setErr != cudaSuccess) {
-		std::cerr << "[OptiX] cudaSetDevice(" << kDefaultCudaDevice << ") failed: "
+	if (const cudaError_t setErr = cudaSetDevice(selectedCudaDevice()); setErr != cudaSuccess) {
+		std::cerr << "[OptiX] cudaSetDevice(" << selectedCudaDevice() << ") failed: "
 				  << cudaGetErrorString(setErr) << "\n";
 		return false;
 	}
@@ -119,7 +137,7 @@ bool OptiXRenderer::isAvailable() noexcept {
 	}
 
 	CUdevice cuDevice;
-	if (const CUresult devErr = cuDeviceGet(&cuDevice, kDefaultCudaDevice); devErr != CUDA_SUCCESS) {
+	if (const CUresult devErr = cuDeviceGet(&cuDevice, selectedCudaDevice()); devErr != CUDA_SUCCESS) {
 		std::cerr << "[OptiX] cuDeviceGet failed\n";
 		return false;
 	}
@@ -181,7 +199,7 @@ bool OptiXRenderer::getDiagnostics(OptixDiagnostics& out) noexcept {
 											: "No CUDA devices found");
 	}
 
-	if (const cudaError_t setErr = cudaSetDevice(kDefaultCudaDevice); setErr != cudaSuccess) {
+	if (const cudaError_t setErr = cudaSetDevice(selectedCudaDevice()); setErr != cudaSuccess) {
 		return fail(cudaGetErrorString(setErr));
 	}
 
@@ -211,7 +229,7 @@ bool OptiXRenderer::getDiagnostics(OptixDiagnostics& out) noexcept {
 	}
 
 	CUdevice cuDevice;
-	if (const CUresult devErr = cuDeviceGet(&cuDevice, kDefaultCudaDevice); devErr != CUDA_SUCCESS) {
+	if (const CUresult devErr = cuDeviceGet(&cuDevice, selectedCudaDevice()); devErr != CUDA_SUCCESS) {
 		return fail("cuDeviceGet failed");
 	}
 
@@ -318,7 +336,7 @@ bool OptiXRenderer::createContext() {
 
 	// Get CUDA device (stored in cuDevice_ -- cleanup() needs it to release
 	// the primary context correctly, see that member's own comment).
-	CU_CHECK(cuDeviceGet(&cuDevice_, kDefaultCudaDevice));
+	CU_CHECK(cuDeviceGet(&cuDevice_, selectedCudaDevice()));
 
 	// Query and display device name
 	std::array<char, kMaxDeviceNameLength> deviceName{};

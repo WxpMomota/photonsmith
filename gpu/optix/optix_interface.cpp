@@ -5,12 +5,14 @@
 #include "optix_renderer.h"
 #include "scene_builder.h"
 #include "optix_live_edit.h"
+#include "uploaded_scene.h"
 #include "../../cpu_renderer/cpu_interface.h"   // cpu_scene_pbrt_path_by_id
 #include "../../src/TheRestOfYourLife/error_codes.h"
 #include "../../src/shared/tone_map.h"
 #include "../../src/shared/render_events.h"
 #include "../../src/shared/exr_writer.h"
 #include "../../src/shared/ppm_text.h"
+#include "../../src/shared/output_format.h"
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -30,11 +32,11 @@
 struct LeakedAtExit { void operator()(OptiXRenderer*) const noexcept {} };
 static std::unique_ptr<OptiXRenderer, LeakedAtExit> g_renderer;
 
-// Which scene_id is currently uploaded to the GPU (materials/geometry/BVH/SBT
-// all live in g_renderer's device memory, keyed only by scene_id - see the
-// skip-reupload check below). "" = nothing uploaded yet this process (never
-// a valid id - every real id has a category letter and a number).
-static std::string g_uploaded_scene_id;
+// Which scene is currently uploaded to the GPU, and for which renderers (materials/geometry/BVH/SBT all live in g_renderer's device memory; see uploaded_scene.h and the
+// skip-reupload check below). Nothing uploaded yet this process: the empty key (never a valid id - every real id has a category letter and a number).
+using optix_renderer::RendererKind;
+using optix_renderer::UploadedScene;
+static UploadedScene g_uploaded;
 
 // What "the scene already on the GPU" is compared by: the scene id AND, for a scene read from a pbrt file, that file and when it was last written. An id alone is not
 // enough: a file saved over (the Scene Builder does) keeps its id, and would otherwise be drawn from the old upload.
@@ -117,10 +119,24 @@ extern "C" bool optix_get_diagnostics(OptixDiagnostics* out) {
 	return OptiXRenderer::getDiagnostics(*out);
 }
 
+extern "C" bool optix_prepare_renderer() {
+	try {
+		if (!g_renderer) {
+			// Kept only once it has started, as in rt_realtime_render_frame(): a renderer that failed to initialize must not be left as the global one.
+			std::unique_ptr<OptiXRenderer> fresh(new OptiXRenderer());
+			if (!fresh->initialize()) return false;
+			g_renderer.reset(fresh.release());
+		}
+		return g_renderer->ensureDefaultRenderer();
+	} catch (...) {
+		return false;
+	}
+}
+
 // Shared by optix_render_main() and rt_realtime_render_frame(): builds
 // scene_id's CPU-side scene description (build_scene()), computes this
 // call's camera state into cameraExtra, uploads geometry to the GPU only
-// when scene_id differs from the last call (see g_uploaded_scene_id's own
+// when scene_id differs from the last call (see g_uploaded's own
 // comment), and requests wavefrontMode via enableWavefront(). Deliberately
 // does NOT apply --regularize/--seed/--maxcomponentvalue/--crop overrides
 // or call enableDenoise()/setDenoiseBlend() - those are each caller's own
@@ -165,12 +181,8 @@ static bool prepareSceneAndCamera(
 		std::cout << "[OptiX] Camera position: (" << cam_x << ", " << cam_y << ", " << cam_z << ")\n";
 	}
 
-	// The default renderer's modules are made when a render needs them; a scene that was uploaded while only the wavefront renderer was wanted has no default-renderer SBT,
-	// so it is uploaded again here when the default renderer is wanted after all.
-	if (!wavefrontMode && g_renderer->defaultRendererSbtMissing()) g_uploaded_scene_id.clear();
-
 	SceneData scene;
-	// Computed once and reused below (both here and at the g_uploaded_scene_id
+	// Computed once and reused below (both here and at the g_uploaded
 	// check just before g_renderer->buildScene()) rather than re-typing the
 	// same comparison twice - see SceneData::skipExpensiveGeometryLoad's own
 	// comment: this scene's geometry is only ever consumed when scene_id has
@@ -181,8 +193,11 @@ static bool prepareSceneAndCamera(
 	// silently drift apart if either is ever extended independently.
 	// A scene downloaded since this library built its own scene list (every library has one) has the camera and settings of a missing file until the list reads the
 	// file again; a scene that is about to be uploaded is the moment to do it (nothing happens when nothing is pending).
-	if (uploadKeyFor(scene_id) != g_uploaded_scene_id) cpu_refresh_user_scenes();
-	const bool sceneAlreadyUploaded = (uploadKeyFor(scene_id) == g_uploaded_scene_id);
+	const std::string wantedKey = uploadKeyFor(scene_id);
+	if (wantedKey != g_uploaded.key) cpu_refresh_user_scenes();
+	// (a scene uploaded for the wavefront renderer has no default-renderer SBT: it does not serve the default renderer, and is uploaded again for it, which is also what makes the
+	// default renderer's modules compile only when a default-renderer render needs them)
+	const bool sceneAlreadyUploaded = g_uploaded.serves(wantedKey, wavefrontMode ? RendererKind::Wavefront : RendererKind::Default);
 	scene.skipExpensiveGeometryLoad = sceneAlreadyUploaded;
 	float camera_params[12];  // origin(3) + lower_left(3) + horizontal(3) + vertical(3)
 	cameraExtra = GpuCameraParams{};  // zero-init: kind=Perspective, DOF/spherical fields all zero
@@ -290,7 +305,7 @@ static bool prepareSceneAndCamera(
 			errorCode = ERR_GPU_MEMORY_COPY_FAILED;
 			return false;
 		}
-		g_uploaded_scene_id = uploadKeyFor(scene_id);
+		g_uploaded.record(wantedKey, /*builtDefaultRendererSbt=*/!wavefrontMode);
 		// A previous scene's reservoirs/light samples must never be reused
 		// into this new scene's ReSTIR temporal reuse (its light indices/
 		// kinds mean something entirely different now) - see
@@ -363,7 +378,7 @@ extern "C" int optix_render_main(
 		}
 
 		// Enable/disable wavefront mode based on env var RAY_TRACER_WAVEFRONT=1.
-		// g_renderer is a process-lifetime singleton (see g_uploaded_scene_id's
+		// g_renderer is a process-lifetime singleton (see g_uploaded's
 		// own comment above), so OptiXRenderer::useWavefront_ is a member that
 		// persists across calls just like the device buffers scene switches
 		// already have to reset - reading the env var and calling
@@ -445,7 +460,7 @@ extern "C" int optix_render_main(
 		}
 
 		// g_renderer is a process-lifetime singleton (see enableWavefront()'s
-		// call above and g_uploaded_scene_id's own comment) - called
+		// call above and g_uploaded's own comment) - called
 		// unconditionally, same reasoning as enableWavefront(): this render's
 		// own `options.denoise` must be what decides the mode, not whatever
 		// an earlier call in this process happened to request. Now propagates
@@ -601,16 +616,6 @@ extern "C" int optix_render_main(
 			return 0;  // Success
 		}
 
-		// Write to PPM file
-		std::ofstream outFile(output_path, std::ios::binary);
-		if (!outFile) {
-			std::cerr << "[OptiX] Failed to open output file: " << output_path << "\n";
-			return ERR_FILE_WRITE_FAILED;
-		}
-
-		// PPM header (binary P6 for a program's own use, see RenderOptions::binary_ppm; the text P3 otherwise)
-		outFile << (options.binary_ppm ? "P6\n" : "P3\n") << image_width << " " << image_height << "\n255\n";
-
 		// Write pixels with the same ACES filmic tone map + sRGB OETF CPU's
 		// write_color() (src/TheRestOfYourLife/color.h) uses - previously
 		// this was a plain sqrt gamma-2.0 approximation, the exact thing
@@ -659,16 +664,26 @@ extern "C" int optix_render_main(
 		}
 		});   // (the pixels are independent: split over the cores, then written as one block of text)
 
-		if (options.binary_ppm) {
-			outFile.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+		if (options.output.write_png && is_png_output_path(output_path)) {
+			// The file name says PNG (like .exr above): the picture goes straight into the PNG, with no text PPM written for the launcher to read back and convert.
+			if (!options.output.write_png(output_path, image_width, image_height, bytes.data())) {
+				std::cerr << "[OptiX] Failed to write PNG: " << output_path << "\n";
+				return ERR_FILE_WRITE_FAILED;
+			}
 		} else {
+			// A text PPM (P3), as always for any other file name
+			std::ofstream outFile(output_path, std::ios::binary);
+			if (!outFile) {
+				std::cerr << "[OptiX] Failed to open output file: " << output_path << "\n";
+				return ERR_FILE_WRITE_FAILED;
+			}
+			outFile << "P3\n" << image_width << " " << image_height << "\n255\n";
 			// (formatted into an uninitialised buffer and written from it: no zero-fill of the text and no second copy)
 			const std::unique_ptr<char[]> text(new char[pixelCount * ppm_text::kMaxP3BytesPerPixel]);
 			const std::size_t length = ppm_text::format_p3_pixels(text.get(), bytes.data(), pixelCount);
 			outFile.write(text.get(), static_cast<std::streamsize>(length));
+			outFile.close();
 		}
-
-		outFile.close();
 
 		std::cout << "[OptiX] Render complete! Output: " << output_path << "\n";
 		return 0;  // Success
@@ -724,7 +739,7 @@ extern "C" bool rt_realtime_render_frame(
 	// resolution, AND camera are all unchanged from the last call in this
 	// process, skip prepareSceneAndCamera() entirely and reuse the cached
 	// cameraExtra - not just the GPU geometry upload it already skips via
-	// g_uploaded_scene_id. This matters because build_scene() itself does
+	// g_uploaded. This matters because build_scene() itself does
 	// real, synchronous CPU-side work every call regardless of that upload
 	// skip (including real disk I/O + image decode for texture/mesh scenes -
 	// see scene_builder.cpp), and enableWavefront() rebuilds the SBT (~30
@@ -795,7 +810,7 @@ extern "C" bool rt_realtime_render_frame(
 		static GpuCameraParams s_cachedCameraExtra{};
 		static bool s_haveCache = false;
 
-		// Also require scene_id == g_uploaded_scene_id (the actual GPU-resident
+		// Also require the scene to be g_uploaded (the actual GPU-resident
 		// scene, not just this function's own memory of its last call): without
 		// it, a batch/video render for a DIFFERENT scene running between two
 		// otherwise-identical-looking Live Preview calls (same process, e.g. a
@@ -807,13 +822,13 @@ extern "C" bool rt_realtime_render_frame(
 		static std::uint64_t s_cachedEditVersion = 0;
 		if (const std::uint64_t editVersion = optix_live_edit::Edits::get().version(); editVersion != s_cachedEditVersion) {
 			s_cachedEditVersion = editVersion;
-			g_uploaded_scene_id.clear();
+			g_uploaded.clear();
 			s_haveCache = false;
 		}
 
 		const std::string uploadKey = uploadKeyFor(scene_id);
 		const bool cacheHit = s_haveCache && s_cachedSceneId == uploadKey &&
-			uploadKey == g_uploaded_scene_id &&
+			g_uploaded.serves(uploadKey, RendererKind::Wavefront) &&
 			s_cachedWidth == image_width && s_cachedHeight == image_height &&
 			s_cachedCamX == cam_x && s_cachedCamY == cam_y && s_cachedCamZ == cam_z &&
 			s_cachedHasCustomLookAt == has_custom_lookat &&
@@ -1373,7 +1388,7 @@ extern "C" int optix_render_main_sppm(
 			cameraExtra.vertical = make_float3(camera_params[9], camera_params[10], camera_params[11]);
 		}
 
-		if (uploadKeyFor(scene_id) != g_uploaded_scene_id) {
+		if (!g_uploaded.serves(uploadKeyFor(scene_id), RendererKind::Sppm)) {
 			// Instanced geometry travels separately - see setInstanceData().
 			// Called inside this same cache-skip guard as buildScene() itself,
 			// so instance data is part of what "this scene is already
@@ -1409,7 +1424,7 @@ extern "C" int optix_render_main_sppm(
 				std::cerr << "[OptiX] Failed to upload scene to GPU\n";
 				return ERR_GPU_MEMORY_COPY_FAILED;
 			}
-			g_uploaded_scene_id = uploadKeyFor(scene_id);
+			g_uploaded.record(uploadKeyFor(scene_id), /*builtDefaultRendererSbt=*/false);   // (GPU SPPM: no default-renderer SBT)
 		} else {
 			std::cout << "[OptiX] Reusing already-uploaded scene " << scene_id << " (skipping GPU rebuild)\n";
 		}

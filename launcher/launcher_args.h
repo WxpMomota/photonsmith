@@ -104,21 +104,7 @@ namespace {
 	}
 }
 
-// The flags that belong to a video (or to where its output goes) rather than to one picture: a cartoon video's frame runs (cartoon_render.h) repeat every other flag the user gave, and
-// these are the ones they must not (`--video` and `--video-preset` would make each frame a video of its own, `--output` and `--height` are set for the frame; the rest are read only by the
-// video and harmless in a frame run, listed so that the frame's command line says only what a frame needs). `takesValue`: the next word is the flag's value.
-struct VideoFlag {
-	const char *name;
-	bool takesValue;
-};
-inline constexpr VideoFlag kVideoFlags[] = {
-	{"--video", false},          {"--video-preset", true},   {"--frames", true},         {"-f", true},   {"--fps", true},    {"--speed", true},          {"--camera-path", true},
-	{"-p", true},                {"--camera-keyframes", true}, {"--output", true},       {"-o", true},   {"--height", true}, {"--cartoon-jobs", true}, {"--cartoon-timeout", true},
-	{"--resume", false},
-	{"--cartoon-worker", true},   // a worker is started by the video, with a job file of its own
-	{"--cartoon-workers", true},
-	{"--time-limit", true},   // the video's whole budget: each frame is given its share (cartoon_render.h)
-};
+// (which flags a cartoon video's frame runs repeat: launcher/flag_scopes.h)
 
 struct LaunchArgs {
 	bool use_gpu            = true;
@@ -273,6 +259,9 @@ struct LaunchArgs {
 	// seeding) narrows to a 32-bit int, so a value is validated here
 	// rather than silently wrapping (possibly negative) further downstream.
 	long long seed = -1;
+	// --gpu-device N: which GPU an NVIDIA renderer uses (the CUDA device number, 0 = the first; see `nvidia-smi`); -1 = not given (RAY_TRACER_GPU_DEVICE, else 0). Passed to the renderer
+	// as RAY_TRACER_GPU_DEVICE, which the programs a video starts inherit.
+	int gpu_device = -1;
 	// An explicit override for the scene's own camera lens diameter
 	// ("lensradius"*2, world units) / focus distance - see
 	// RenderOptions::aperture_override's own comment (render_options.h)
@@ -667,6 +656,19 @@ inline FlagResult handle_quality_flag(const std::string& arg, int argc, char** a
 		} catch (const std::exception&) {
 			std::cerr << "Invalid --probe value (expected two whole numbers: the pixel's column and row)\n";
 			return FlagResult::Error;
+		}
+	} else if (arg == "--gpu-device" && i + 1 < argc) {
+		try {
+			out.gpu_device = std::stoi(argv[i + 1]);
+			if (out.gpu_device < 0) {
+				std::cerr << "Invalid --gpu-device " << out.gpu_device << " (must be 0 or more), using the first GPU\n";
+				out.gpu_device = -1;
+			}
+			consumed_args.insert(i);
+			consumed_args.insert(i + 1);
+			++i;
+		} catch (const std::exception&) {
+			std::cerr << "Invalid --gpu-device value, using the first GPU\n";
 		}
 	} else if (arg == render_flags::kSeed && i + 1 < argc) {
 		try {
@@ -1105,6 +1107,8 @@ inline void print_launch_help(const char* program) {
 				  << "               other arguments describe; the samples-per-pixel argument is how many\n"
 				  << "               paths are averaged (use a few thousand). CPU default path tracer\n"
 				  << "               only. The report is also written to <--output>.probe.txt.\n"
+				  << "  --gpu-device N: which GPU an NVIDIA renderer uses, as `nvidia-smi` numbers them (default 0, the\n"
+				  << "               first; the environment variable RAY_TRACER_GPU_DEVICE also sets it)\n"
 				  << "  " << render_flags::kSeed << " N: makes the render reproducible - the same scene, same\n"
 				  << "               settings, and same seed always produce the same pixels. Without\n"
 				  << "               this, CPU renders draw fresh randomness every run (never\n"

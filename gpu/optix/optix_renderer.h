@@ -58,9 +58,6 @@ public:
 	bool ensureDefaultRenderer();
 	/// Destroys the default renderer's pipeline, program groups and modules (what ensureDefaultRenderer made); safe when some or none of them exist.
 	void destroyDefaultRendererObjects();
-	/// True when the scene on the GPU was uploaded without the default renderer's SBT (buildScene's `buildDefaultRendererSbt` was false: the wavefront renderer and GPU SPPM do not need
-	/// it): a default-renderer render needs the scene uploaded again.
-	bool defaultRendererSbtMissing() const { return defaultRendererSbtMissing_; }
 
 	/// @brief Build scene acceleration structure from geometry
 	/// @param spheres Vector of sphere geometry data
@@ -506,7 +503,7 @@ private:
 	std::unique_ptr<optix_renderer::WavefrontPathTracer> wavefrontTracer_;
 	bool useWavefront_ = false;  ///< If true, render() delegates to wavefrontTracer_
 	bool defaultRendererReady_ = false;        ///< see ensureDefaultRenderer()
-	bool defaultRendererSbtMissing_ = false;   ///< see defaultRendererSbtMissing()
+	bool defaultRendererSbtMissing_ = false;   ///< the scene on the GPU was uploaded without the default renderer's SBT (buildScene's buildDefaultRendererSbt = false): render() refuses to draw it
 
 	// -------------------------------------------------------------------
 	// OptiX AI Denoiser (optional post-process, recursive backend)

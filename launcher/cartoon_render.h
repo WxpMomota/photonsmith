@@ -31,27 +31,16 @@
 
 #include "process.h"
 #include "background_mode.h"
+#include "flag_scopes.h"
 #include "launcher_args.h"
 #include "../src/shared/cartoon/cartoons.h"
 
 namespace cartoon_render {
 
-// The flags of the parent run that a frame's run should repeat: everything the parser consumed except the video-only flags and the output path.
+// The flags of the parent run that a frame's run should repeat: the ones that say how to render (flag_scopes.h: scope Render), as typed, with their values. Not the video's own flags
+// (`--video` would make every frame a video of its own) nor the output path, and not a flag that the table does not know yet (it says so).
 inline std::vector<std::string> forwardedFlags(const LaunchArgs &args) {
-	std::vector<std::string> out;
-	const std::vector<std::string> &t = args.consumed_tokens;
-	for (std::size_t i = 0; i < t.size(); ++i) {
-		bool drop = false;
-		for (const VideoFlag &f : kVideoFlags) {
-			if (t[i] == f.name) {
-				drop = true;
-				if (f.takesValue) ++i;   // its value too
-				break;
-			}
-		}
-		if (!drop) out.push_back(t[i]);
-	}
-	return out;
+	return renderFlagTokens(args.consumed_tokens);
 }
 
 // The flags a frame run repeats: the user's, and the film's own renderer when the film names one (cartoons.h, FilmMeta::wavefront) and the user did not choose.
@@ -189,7 +178,20 @@ struct WorkerHandle {
 	virtual ~WorkerHandle() = default;
 	virtual bool running() = 0;
 	virtual void kill() = 0;
+	virtual unsigned long long memoryBytes() { return 0; }   // what the worker holds now; 0 when it cannot be said
 };
+
+// How much memory a worker may hold before the pool replaces it (between two frames, not counted as a failed frame): RAY_TRACER_WORKER_MAX_MB megabytes, 8192 when it is not set, 0 = never.
+// A worker's memory is flat in the measurements made (about 440 MB over 120 frames at 640 x 360), so this is protection against a leak that appears in a film or a driver, not a measure of
+// anything that happens today.
+inline unsigned long long workerMemoryLimitBytes() {
+	long long mb = 8192;
+#ifdef _MSC_VER
+#pragma warning(suppress : 4996)
+#endif
+	if (const char *env = std::getenv("RAY_TRACER_WORKER_MAX_MB")) mb = std::atoll(env);
+	return mb > 0 ? static_cast<unsigned long long>(mb) * 1024ull * 1024ull : 0ull;
+}
 struct WorkerHooks {
 	std::function<std::unique_ptr<WorkerHandle>(int worker, const std::vector<int> &frames)> start;   // null: it could not be started
 	std::function<bool(int frame, int &result)> poll;   // true and the frame's result when its marker is in; the marker is used up
@@ -201,7 +203,7 @@ struct WorkerHooks {
 // the rest of the list, starting with the frame that was in hand; a frame that has taken a worker down twice fails (result -1) and the new worker starts after it. Returns the number of
 // frames whose result was 0.
 inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, const WorkerHooks &hooks, const std::function<void(int frame, int result, double seconds)> &completed,
-					  const std::function<void(int frame, int result)> &inOrder, int pollMilliseconds = 25) {
+					  const std::function<void(int frame, int result)> &inOrder, int pollMilliseconds = 25, unsigned long long maxWorkerBytes = 0) {
 	using Clock = std::chrono::steady_clock;
 	std::sort(todo.begin(), todo.end());
 	if (todo.empty()) return 0;
@@ -209,6 +211,7 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 	struct Worker {
 		std::deque<int> remaining;
 		std::unique_ptr<WorkerHandle> handle;
+		int framesSinceStart = 0;   // frames this worker (process) has finished: a worker is only replaced for its size after it has made some progress, so replacing never loops
 		std::chrono::steady_clock::time_point last = std::chrono::steady_clock::now();   // (not the function's `Clock` alias: MSVC does not find a function-local alias inside a local struct)
 	};
 	std::vector<Worker> ws(static_cast<std::size_t>(workers));
@@ -236,6 +239,7 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 			if (!worker.handle) {
 				worker.last = Clock::now();
 				worker.handle = hooks.start(static_cast<int>(w), std::vector<int>(worker.remaining.begin(), worker.remaining.end()));
+				worker.framesSinceStart = 0;
 				if (!worker.handle) {   // it could not be started: the frame in hand fails
 					report(worker.remaining.front(), -1, 0.0);
 					worker.remaining.pop_front();
@@ -247,8 +251,20 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 				report(worker.remaining.front(), rc, seconds(worker.last));
 				worker.remaining.pop_front();
 				worker.last = Clock::now();
+				++worker.framesSinceStart;
 			}
 			if (worker.remaining.empty()) continue;
+			// Too big: replaced now, between two frames (the frame it has started is begun again by the next worker), and not counted against that frame: nothing went wrong with it.
+			if (maxWorkerBytes > 0 && worker.framesSinceStart > 0 && worker.handle->running()) {
+				const unsigned long long held = worker.handle->memoryBytes();
+				if (held > maxWorkerBytes) {
+					std::cerr << "\nNote: a worker has grown to " << held / (1024 * 1024) << " MB (the limit is " << maxWorkerBytes / (1024 * 1024) << " MB, RAY_TRACER_WORKER_MAX_MB); starting another." << std::endl;
+					worker.handle->kill();
+					worker.handle.reset();
+					worker.last = Clock::now();
+					continue;
+				}
+			}
 			const bool ended = !worker.handle->running();
 			if (ended && hooks.poll(worker.remaining.front(), rc)) {   // (its last marker came just before it ended)
 				report(worker.remaining.front(), rc, seconds(worker.last));

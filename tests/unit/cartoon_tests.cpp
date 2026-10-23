@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <map>
+#include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -24,6 +26,7 @@
 #include "../../launcher/cartoon_worker.h"
 #include "../../launcher/cartoon_still.h"
 #include "../../launcher/launcher_args.h"
+#include "../../launcher/flag_scopes.h"
 #include "../../launcher/render_setup.h"
 #include "../../launcher/background_mode.h"
 #include "../../launcher/run_policy.h"
@@ -31,6 +34,7 @@
 #include "../../src/shared/cartoon/cartoon_stills.h"
 #include "../../src/shared/pbrt_discover.h"
 #include "../../src/shared/output_crop.h"
+#include "../../src/shared/output_format.h"
 #include "../../src/shared/ppm_text.h"
 #include "../../qt_gui/scene_bucket.h"
 #include "../../src/shared/video_preset.h"
@@ -546,18 +550,90 @@ TEST(CartoonRender, TheFramesOfAnInterruptedVideoAreResumedOnlyForTheSameFilmSiz
 	std::filesystem::remove(exe);
 }
 
-TEST(CartoonRender, EveryVideoFlagTheFramesDoNotRepeatIsAFlagTheParserReallyKnows) {
-	// (a flag renamed in the parser but not in the table would be repeated by every frame's run)
-	for (const VideoFlag &f : kVideoFlags) {
-		std::vector<std::string> words = {f.name};
-		if (f.takesValue) {
-			const std::string name = f.name;
-			words.push_back(name == "--camera-path" || name == "-p" ? "orbit" : name == "--video-preset" ? "V1" : (name == "--output" || name == "-o" || name == "--camera-keyframes") ? "x.ppm" : "7");
-		}
+TEST(FlagScopes, EveryFlagOfTheVideoIsKnownToTheParserAndIsNotRepeatedByTheFrames) {
+	// the flags of the video and what each takes when typed (a flag renamed in the parser but not in the table would be noticed here)
+	const std::vector<std::vector<std::string>> videoFlags = {
+		{"--video"}, {"--video-preset", "V1"}, {"--frames", "7"}, {"-f", "7"}, {"--fps", "7"}, {"--speed", "7"}, {"--camera-path", "orbit"}, {"-p", "orbit"}, {"--camera-keyframes", "x.ppm"},
+		{"--output", "x.ppm"}, {"-o", "x.ppm"}, {"--height", "7"}, {"--time-limit", "7"}, {"--cartoon-jobs", "2"}, {"--cartoon-timeout", "3"}, {"--cartoon-workers", "2"}, {"--resume"},
+		{"--cartoon-worker", "job.txt"}};
+	for (const std::vector<std::string> &words : videoFlags) {
+		const FlagScopeEntry *entry = findFlagScope(words[0]);
+		ASSERT_NE(entry, nullptr) << words[0] << " is not in launcher/flag_scopes.h";
+		EXPECT_EQ(entry->scope, FlagScope::Video) << words[0];
 		LaunchArgs a;
-		ASSERT_TRUE(parseArgs(words, a)) << f.name;
-		EXPECT_EQ(a.consumed_tokens.empty() ? std::string() : a.consumed_tokens.front(), f.name) << f.name << " is not a flag of the parser";
-		EXPECT_TRUE(cartoon_render::forwardedFlags(a).empty()) << f.name << " would be repeated by every frame";
+		ASSERT_TRUE(parseArgs(words, a)) << words[0];
+		EXPECT_EQ(a.consumed_tokens.empty() ? std::string() : a.consumed_tokens.front(), words[0]) << words[0] << " is not a flag of the parser";
+		EXPECT_TRUE(cartoon_render::forwardedFlags(a).empty()) << words[0] << " would be repeated by every frame";
+	}
+}
+
+TEST(FlagScopes, EveryFlagTheUsageTextDocumentsHasAScope) {
+	// --help prints the usage text; a flag added to it (and to the parser) without a line in the table fails here, instead of being left out of every frame's run
+	std::ostringstream out, err;
+	std::streambuf *oldOut = std::cout.rdbuf(out.rdbuf());
+	std::streambuf *oldErr = std::cerr.rdbuf(err.rdbuf());
+	LaunchArgs a;
+	bool help = false;
+	std::vector<std::string> words = {"ray_tracer", "--help"};
+	std::vector<char *> argv;
+	for (std::string &w : words) argv.push_back(&w[0]);
+	parse_launch_args(static_cast<int>(argv.size()), argv.data(), a, &help);
+	std::cout.rdbuf(oldOut);
+	std::cerr.rdbuf(oldErr);
+	const std::string text = out.str() + err.str();
+	ASSERT_TRUE(help) << "no usage text";
+	std::set<std::string> flags;
+	for (std::size_t i = 0; i + 2 < text.size(); ++i) {
+		if (text[i] == '-' && text[i + 1] == '-' && (i == 0 || !(std::isalnum(static_cast<unsigned char>(text[i - 1])) || text[i - 1] == '-')) && std::islower(static_cast<unsigned char>(text[i + 2]))) {
+			std::size_t j = i + 2;
+			while (j < text.size() && (std::islower(static_cast<unsigned char>(text[j])) || std::isdigit(static_cast<unsigned char>(text[j])) || text[j] == '-')) ++j;
+			std::string flag = text.substr(i, j - i);
+			while (!flag.empty() && flag.back() == '-') flag.pop_back();
+			flags.insert(flag);
+		}
+	}
+	EXPECT_GT(flags.size(), 40u) << "found hardly any flag in the usage text";
+	for (const std::string &flag : flags) EXPECT_NE(findFlagScope(flag), nullptr) << flag << " is documented in the usage text but has no scope in launcher/flag_scopes.h";
+}
+
+TEST(FlagScopes, TheFramesGetTheRenderFlagsWithTheirValuesAndNothingElse) {
+	using cartoon_render::forwardedFlags;
+	LaunchArgs a;
+	ASSERT_TRUE(parseArgs({"--gpu", "--wavefront", "--denoise-blend", "0.5", "--crop", "0", "0", "1", "0.5", "--video", "--frames", "10", "--cartoon-workers", "3", "--seed", "4", "--resume"}, a));
+	EXPECT_EQ(forwardedFlags(a), (std::vector<std::string>{"--gpu", "--wavefront", "--denoise-blend", "0.5", "--crop", "0", "0", "1", "0.5", "--seed", "4"})) << "a value is repeated with its flag";
+	// a negative number is a value, not a flag (a single dash starts a flag only when the table knows it)
+	EXPECT_EQ(renderFlagTokens({"--exposure", "-1.5", "-o", "x.ppm", "--gpu"}), (std::vector<std::string>{"--exposure", "-1.5", "--gpu"}));
+}
+
+TEST(FlagScopes, AFlagThatIsNotInTheTableIsNotRepeatedAndSaysSoOnce) {
+	std::ostringstream err;
+	std::streambuf *oldErr = std::cerr.rdbuf(err.rdbuf());
+	const std::vector<std::string> out = renderFlagTokens({"--gpu", "--brand-new-flag", "5", "--denoise", "--brand-new-flag"});
+	std::cerr.rdbuf(oldErr);
+	EXPECT_EQ(out, (std::vector<std::string>{"--gpu", "--denoise"})) << "the new flag and its value are left out, the others kept";
+	const std::string text = err.str();
+	EXPECT_NE(text.find("--brand-new-flag"), std::string::npos);
+	EXPECT_EQ(text.find("--brand-new-flag"), text.rfind("--brand-new-flag")) << "said once, not for every frame";
+}
+
+TEST(FlagScopes, EveryRenderFlagTheFramesRepeatIsAFlagTheParserKnows) {
+	// the no-value flags of scope Render parse on their own; the ones with values are given sample values
+	const std::map<std::string, std::vector<std::string>> values = {
+		{"--denoise-blend", {"0.5"}}, {"--exposure", {"1.5"}}, {"--sampler", {"halton"}}, {"--adaptive-threshold", {"0.02"}}, {"--lightsampler", {"power"}}, {"--accelerator", {"bvh"}},
+		{"--splitmethod", {"sah"}}, {"--maxcomponentvalue", {"10"}}, {"--crop", {"0", "0", "1", "1"}}, {"--seed", {"3"}}, {"--aperture", {"0.1"}}, {"--focus-distance", {"5"}},
+		{"--tonemap", {"aces"}}, {"--gpu-device", {"0"}}, {"--sppm-iterations", {"3"}}, {"--sppm-photons", {"1000"}}, {"--bdpt-max-depth", {"4"}}, {"--mlt-bootstrap", {"100"}}, {"--mlt-mutations", {"100"}},
+		{"--mlt-max-depth", {"4"}}, {"--ao-max-dist", {"2"}}, {"--ao-illum-scale", {"1"}}, {"--ao-illum-rgb", {"1", "1", "1"}}};
+	for (const FlagScopeEntry &e : kFlagScopes) {
+		if (e.scope != FlagScope::Render) continue;
+		std::vector<std::string> words = {e.name};
+		if (const auto it = values.find(e.name); it != values.end()) words.insert(words.end(), it->second.begin(), it->second.end());
+		LaunchArgs a;
+		std::ostringstream err;
+		std::streambuf *oldErr = std::cerr.rdbuf(err.rdbuf());
+		const bool ok = parseArgs(words, a);
+		std::cerr.rdbuf(oldErr);
+		EXPECT_TRUE(ok) << e.name << " does not parse: " << err.str();
+		EXPECT_EQ(cartoon_render::forwardedFlags(a), words) << e.name;
 	}
 }
 
@@ -571,6 +647,8 @@ struct FakeWorker : cartoon_render::WorkerHandle {
 	std::size_t next = 0;
 	bool alive = true, killed = false;
 	std::shared_ptr<bool> killedOut;   // set when killed, for a test that outlives the worker (runWorkers destroys a handle after killing it)
+	unsigned long long bytes = 0;      // what it holds, for the pool's memory limit
+	unsigned long long memoryBytes() override { return bytes; }
 	bool running() override { return alive; }
 	void kill() override {
 		alive = false;
@@ -687,6 +765,75 @@ TEST(CartoonWorkers, TheFramesAreSharedOutHandedOnInOrderAndAllAccountedFor) {
 	EXPECT_EQ(given[0], (std::vector<int>{0, 3, 6, 9})) << "every third frame to each worker";
 	EXPECT_EQ(given[1], (std::vector<int>{1, 4, 7}));
 	EXPECT_EQ(given[2], (std::vector<int>{2, 5, 8}));
+}
+
+TEST(CartoonWorkers, AWorkerThatHoldsTooMuchMemoryIsReplacedBetweenFramesAndEveryFrameStillComesOut) {
+	int starts = 0;
+	std::vector<std::vector<int>> lists;
+	cartoon_render::WorkerHooks hooks;
+	std::set<int> markers;
+	std::vector<FakeWorker *> live;
+	hooks.start = [&](int, const std::vector<int> &frames) -> std::unique_ptr<cartoon_render::WorkerHandle> {
+		++starts;
+		lists.push_back(frames);
+		auto w = std::make_unique<FakeWorker>();
+		w->frames = frames;
+		live.clear();
+		live.push_back(w.get());
+		return w;
+	};
+	int looks = 0;
+	hooks.poll = [&](int frame, int &rc) {
+		// the worker finishes one frame each time the pool looks (the pool asks twice a look: a real worker's frames come seconds apart, not all within one look) and holds 500 bytes more for each
+		if (++looks % 2 == 0) return false;
+		for (FakeWorker *w : live)
+			if (w->alive && !w->killed && w->next < w->frames.size()) {
+				markers.insert(w->frames[w->next++]);
+				w->bytes += 500;
+				break;
+			}
+		if (markers.count(frame) == 0) return false;
+		markers.erase(frame);
+		rc = 0;
+		return true;
+	};
+	std::vector<int> handed;
+	// a limit of 800 bytes: a worker is replaced after its second frame
+	const int ok = cartoon_render::runWorkers({0, 1, 2, 3, 4, 5, 6, 7}, 1, 0, hooks, [](int, int, double) {}, [&](int f, int) { handed.push_back(f); }, 1, 800);
+	EXPECT_EQ(ok, 8) << "no frame was lost or given up by the replacing";
+	EXPECT_EQ(handed, (std::vector<int>{0, 1, 2, 3, 4, 5, 6, 7}));
+	EXPECT_GE(starts, 3) << "replaced more than once";
+	ASSERT_GE(lists.size(), 2u);
+	EXPECT_EQ(lists[0], (std::vector<int>{0, 1, 2, 3, 4, 5, 6, 7}));
+	EXPECT_EQ(lists[1].front(), 2) << "the next worker takes the rest, from the frame that was in hand";
+
+	// without a limit nothing is replaced
+	starts = 0;
+	markers.clear();
+	live.clear();
+	handed.clear();
+	cartoon_render::runWorkers({0, 1, 2, 3}, 1, 0, hooks, [](int, int, double) {}, [&](int f, int) { handed.push_back(f); }, 1, 0);
+	EXPECT_EQ(starts, 1);
+	EXPECT_EQ(handed.size(), 4u);
+}
+
+TEST(CartoonWorkers, TheMemoryLimitComesFromTheEnvironmentAndDefaultsToEightGigabytes) {
+	const char *saved = std::getenv("RAY_TRACER_WORKER_MAX_MB");
+	const std::string before = saved ? saved : "";
+	const auto put = [](const std::string &value, bool present) {
+#ifdef _WIN32
+		_putenv_s("RAY_TRACER_WORKER_MAX_MB", present ? value.c_str() : "");
+#else
+		if (present) setenv("RAY_TRACER_WORKER_MAX_MB", value.c_str(), 1); else unsetenv("RAY_TRACER_WORKER_MAX_MB");
+#endif
+	};
+	put("", false);
+	EXPECT_EQ(cartoon_render::workerMemoryLimitBytes(), 8192ull * 1024 * 1024);
+	put("2048", true);
+	EXPECT_EQ(cartoon_render::workerMemoryLimitBytes(), 2048ull * 1024 * 1024);
+	put("0", true);
+	EXPECT_EQ(cartoon_render::workerMemoryLimitBytes(), 0ull) << "0 = never";
+	put(before, saved != nullptr);
 }
 
 TEST(CartoonWorkers, AWorkerThatEndsWithFramesLeftIsReplacedAndAFrameThatKillsTwoIsGivenUp) {
@@ -1098,39 +1245,84 @@ TEST(CartoonRender, ABackgroundVideoTheWatchdogAllowsForThePausesBetweenFrames) 
 	EXPECT_EQ(cartoon_render::timeoutFor(quiet, true), 0);
 }
 
-TEST(CartoonRender, AFrameRunThatIsAskedForAPpmOnlyWritesTheBinaryOneAndTheVideoReadsBothTheSame) {
-	LaunchArgs frame;
-	ASSERT_TRUE(parseArgs({"--ppm-only"}, frame));
-	EXPECT_TRUE(render_options_from_args(frame).binary_ppm);
-	LaunchArgs plain;
-	EXPECT_FALSE(render_options_from_args(plain).binary_ppm) << "the picture someone asks for stays the text PPM";
+TEST(OutputFormat, TheFileNameDecidesWhetherAGpuRenderWritesThePngItself) {
+	EXPECT_TRUE(is_png_output_path("C:/o/render.png"));
+	EXPECT_TRUE(is_png_output_path("frame_0001.PNG"));
+	EXPECT_TRUE(is_png_output_path("x.Png"));
+	EXPECT_FALSE(is_png_output_path("x.ppm"));
+	EXPECT_FALSE(is_png_output_path("x.exr"));
+	EXPECT_FALSE(is_png_output_path("png"));
+	EXPECT_FALSE(is_png_output_path("x.png.ppm"));
+	EXPECT_FALSE(is_png_output_path(""));
+}
 
-	// the same 3 x 2 picture as a P3 and as a P6 file must read back the same (the video's PNG conversion, image_writer.cpp's read_ppm, reads both; this checks the header-only reader the crop uses; the PNG itself is checked by hand against a text PPM's)
-	const unsigned char pixels[18] = {0, 9, 10, 99, 100, 255, 1, 2, 3, 250, 128, 7, 33, 44, 55, 200, 201, 202};
-	const std::filesystem::path dir = std::filesystem::temp_directory_path() / ("ppm_p6_test_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+TEST(OutputFormat, AFileIsAPngByItsFirstEightBytesWhateverItIsCalled) {
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / ("output_format_test_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 	std::filesystem::create_directories(dir);
 	{
-		std::ofstream p3(dir / "a.ppm", std::ios::binary);
-		p3 << "P3\n3 2\n255\n";
-		std::string text;
-		ppm_text::append_p3_pixels(text, pixels, 6);
-		p3 << text;
-		std::ofstream p6(dir / "b.ppm", std::ios::binary);
-		p6 << "P6\n3 2\n255\n";
-		p6.write(reinterpret_cast<const char *>(pixels), sizeof(pixels));
+		std::ofstream png(dir / "real.dat", std::ios::binary);
+		const unsigned char signature[8] = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'};
+		png.write(reinterpret_cast<const char *>(signature), 8);
+		png << "rest of the file";
+		std::ofstream text(dir / "fake.png", std::ios::binary);
+		text << "P3\n1 1\n255\n1 2 3\n";   // a renderer that was asked for a .png and wrote a text PPM into it
+		std::ofstream tiny(dir / "tiny.png", std::ios::binary);
+		tiny << "\x89PNG";
 	}
-	int w3 = 0, h3 = 0, m3 = 0, w6 = 0, h6 = 0, m6 = 0;
-	std::vector<int> a, b;
-	ASSERT_TRUE(output_crop::readPpm((dir / "a.ppm").string(), w3, h3, m3, a));
-	ASSERT_TRUE(output_crop::readPpm((dir / "b.ppm").string(), w6, h6, m6, b));
-	EXPECT_EQ(w3, 3);
-	EXPECT_EQ(h3, 2);
-	EXPECT_EQ(w6, 3);
-	EXPECT_EQ(h6, 2);
-	EXPECT_EQ(m3, 255);
-	EXPECT_EQ(m6, 255);
-	EXPECT_EQ(a, std::vector<int>(pixels, pixels + 18));
-	EXPECT_EQ(b, a);
+	EXPECT_TRUE(file_is_png((dir / "real.dat").string())) << "the name does not matter";
+	EXPECT_FALSE(file_is_png((dir / "fake.png").string())) << "nor does a .png name make a text PPM one";
+	EXPECT_FALSE(file_is_png((dir / "tiny.png").string())) << "shorter than the signature";
+	EXPECT_FALSE(file_is_png((dir / "missing.png").string()));
 	std::error_code ec;
 	std::filesystem::remove_all(dir, ec);
+}
+
+TEST(CartoonRender, TheWorkersJobSaysWhatItsPicturesAreCalledAndAFrameRunThatIsAskedForAPpmOnlySkipsThePng) {
+	LaunchArgs frame;
+	ASSERT_TRUE(parseArgs({"--ppm-only"}, frame));
+	EXPECT_TRUE(frame.ppm_only);
+	LaunchArgs plain;
+	ASSERT_TRUE(parseArgs({"--cpu"}, plain));
+	EXPECT_FALSE(plain.ppm_only) << "a picture someone renders still gets its PNG";
+
+	cartoon_worker::Job job;
+	job.film = "fireflies";
+	job.frames = 10;
+	job.scenes = "C:/s";
+	job.out = "C:/o";
+	job.list = {1, 2};
+	EXPECT_NE(job.picturePath(1).find("frame_0001.ppm"), std::string::npos) << "a text PPM to convert unless the job says otherwise";
+	job.ext = "png";
+	const std::filesystem::path file = std::filesystem::temp_directory_path() / "photonsmith_job_ext_test.txt";
+	std::ofstream(file) << job.text();
+	cartoon_worker::Job back;
+	EXPECT_EQ(back.load(file.string()), "");
+	EXPECT_EQ(back.ext, "png") << "a worker is told what to write";
+	EXPECT_NE(back.picturePath(2).find("frame_0002.png"), std::string::npos);
+	std::filesystem::remove(file);
+}
+
+TEST(FlagScopes, TheGpuDeviceIsChosenWithAFlagThatTheFramesOfAVideoRepeat) {
+	LaunchArgs none;
+	EXPECT_EQ(none.gpu_device, -1) << "not given: RAY_TRACER_GPU_DEVICE, else the first";
+	LaunchArgs second;
+	ASSERT_TRUE(parseArgs({"--gpu", "--gpu-device", "1", "--video"}, second));
+	EXPECT_EQ(second.gpu_device, 1);
+	EXPECT_EQ(cartoon_render::forwardedFlags(second), (std::vector<std::string>{"--gpu", "--gpu-device", "1"}));
+
+	std::ostringstream err;
+	std::streambuf *oldErr = std::cerr.rdbuf(err.rdbuf());
+	LaunchArgs bad;
+	EXPECT_TRUE(parseArgs({"--gpu-device", "-3"}, bad));
+	LaunchArgs text;
+	EXPECT_TRUE(parseArgs({"--gpu-device", "two"}, text));
+	std::cerr.rdbuf(oldErr);
+	EXPECT_EQ(bad.gpu_device, -1) << "a negative device number is refused and the first GPU used";
+	EXPECT_EQ(text.gpu_device, -1);
+	EXPECT_NE(err.str().find("--gpu-device"), std::string::npos);
+}
+
+TEST(CartoonWorkers, AWorkerWatchesItsParentAndSeesItAliveWhileItRuns) {
+	const ParentWatch watch;   // (this test program's parent, the test runner, is alive)
+	EXPECT_FALSE(watch.parentGone());
 }

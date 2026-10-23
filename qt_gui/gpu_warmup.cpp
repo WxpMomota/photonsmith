@@ -29,11 +29,12 @@ GpuWarmup::~GpuWarmup() {
 }
 
 void GpuWarmup::start() {
-#ifdef Q_OS_MAC
+#if defined(Q_OS_MAC) || defined(Q_OS_WIN)
 	// (the "quitwarm" self-test is the one that wants it: it quits the window once the warm-up is over, which is when ~GpuWarmup once crashed)
 	if (m_pending > 0 || (qEnvironmentVariableIsSet("RT_GUI_SELFTEST") && qEnvironmentVariable("RT_GUI_SELFTEST") != "quitwarm") || qEnvironmentVariableIsSet("RT_NO_GPU_WARMUP")) return;
 	m_pending = 0;
-	// 1. This process: the library Live Preview calls.
+	// 1. This process: the library Live Preview calls (a Mac: Live Preview on Windows is the wavefront renderer, which has nothing to build ahead).
+#ifdef Q_OS_MAC
 	if (RealtimePreviewSession::isAvailable()) {
 		++m_pending;
 		m_thread = QThread::create([] { RealtimePreviewSession::warmUp(); });
@@ -42,7 +43,9 @@ void GpuWarmup::start() {
 		connect(m_thread, &QThread::finished, this, [this] { oneFinished(true); });
 		m_thread->start(QThread::LowPriority);
 	}
-	// 2. The command line renderer the Render button starts, which has a cache of its own. Niced, so a CPU render started meanwhile loses almost nothing.
+#endif
+	// 2. The command line renderer the Render button starts, which has a cache of its own. At a low priority, so a CPU render started meanwhile loses almost nothing.
+#ifdef Q_OS_MAC
 	const QString exe = QCoreApplication::applicationDirPath() + "/ray_tracer";
 	if (QFile::exists(exe) && QFile::exists("/usr/bin/nice")) {
 		++m_pending;
@@ -54,6 +57,21 @@ void GpuWarmup::start() {
 		});
 		m_process->start("/usr/bin/nice", QStringList() << "-n" << "10" << exe << "--prepare-gpu");
 	}
+#else
+	// Windows: OptiX compiles the default renderer's shaders the first time (about 20 minutes on a cold cache, a fraction of a second on a warm one); `--prepare-gpu` does it now.
+	const QString exe = QCoreApplication::applicationDirPath() + "/ray_tracer.exe";
+	if (QFile::exists(exe)) {
+		++m_pending;
+		m_process = new QProcess(this);
+		m_process->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) { args->flags |= 0x00004000;   /* BELOW_NORMAL_PRIORITY_CLASS (windows.h, whose min/max macros break the headers below) */ });
+		connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
+		        [this](int code, QProcess::ExitStatus status) { oneFinished(status == QProcess::NormalExit && code == 0); });
+		connect(m_process, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) {
+			if (error == QProcess::FailedToStart) oneFinished(false);
+		});
+		m_process->start(exe, QStringList() << "--prepare-gpu");
+	}
+#endif
 	if (m_pending == 0) return;
 	QTimer::singleShot(2500, this, [this] {
 		if (m_pending > 0 && !m_slow) {

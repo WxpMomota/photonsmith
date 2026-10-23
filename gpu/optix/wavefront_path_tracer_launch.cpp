@@ -127,6 +127,7 @@ void WavefrontPathTracer::freeQueues() {
 // ============================================================================
 
 int WavefrontPathTracer::readQueueSize(int* d_counter) {
+	++hostSyncs_;
 	int val = 0;
 	CUDA_CHECK(cudaMemcpyAsync(&val, d_counter, sizeof(int), cudaMemcpyDeviceToHost, stream_));
 	CUDA_CHECK(cudaStreamSynchronize(stream_));
@@ -134,6 +135,7 @@ int WavefrontPathTracer::readQueueSize(int* d_counter) {
 }
 
 const int *WavefrontPathTracer::readCounterBlock() {
+	++hostSyncs_;
 	CUDA_CHECK(cudaMemcpyAsync(h_counterReads_, reinterpret_cast<const void*>(d_counterBlock_), static_cast<size_t>(kCounterSlots) * kCounterStrideBytes, cudaMemcpyDeviceToHost, stream_));
 	CUDA_CHECK(cudaStreamSynchronize(stream_));
 	return h_counterReads_;
