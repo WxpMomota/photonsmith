@@ -202,6 +202,8 @@ struct SceneMetadata {
 	double sceneSize = 0.0;
 	// The cartoon film this scene is a still of (Film::key in src/shared/cartoon/cartoons.h); empty for every other scene.
 	QString filmKey;
+	int filmWidth = 0, filmHeight = 0;   // the picture size the scene file asks for; 0 x 0 for a hand-built scene
+	int recommendedMaxDepth = 0;         // the file's Integrator maxdepth (pbrt's 5 when it does not say); 0 for a hand-built scene
 };
 
 // Fills `out` with everything SceneMetadata holds for scene_id in one DLL

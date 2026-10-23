@@ -8,6 +8,7 @@
 #include "live_ai_denoise.h"
 #include "app_log.h"
 #include "settings_keys.h"
+#include "../src/shared/cartoon/cartoons.h"
 #include <iostream>
 #include "../src/shared/pbrt_asset_check.h"
 
@@ -1565,6 +1566,85 @@ void MainWindow::runDefaultsSelfTest(const std::function<void(const QString &)> 
 		QApplication::processEvents();
 	}
 	shot("defaults");
+	log(ok ? "RESULT: OK" : "RESULT: FAIL");
+	QApplication::exit(ok ? 0 : 1);
+}
+
+// RT_GUI_SELFTEST=recommend: the scene tip lists everything the selected film (or scene file) was made for that the settings differ from - its GPU renderer, max depth,
+// picture size, the denoiser, and in video mode its length and frame rate - and Apply sets them all, after which the tip has nothing left to say. A pbrt scene with a
+// Film line offers its picture size too. A screenshot of the tip.
+void MainWindow::runRecommendSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {
+	resize(1500, 950);
+	if (m_tabWidget) m_tabWidget->setCurrentIndex(0);
+	show();
+	QApplication::processEvents();
+	bool ok = true;
+	auto check = [&ok, log](bool cond, const QString &what) {
+		log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what));
+		ok = ok && cond;
+	};
+	QString turtle, wideScene;
+	for (int i = 0, n = SceneMetadataClient::sceneCount(); i < n; ++i) {
+		const QString id = SceneMetadataClient::sceneIdAtIndex(i);
+		SceneMetadataClient::SceneMetadata meta;
+		if (!SceneMetadataClient::sceneMetadata(id, meta)) continue;
+		if (meta.filmKey == QLatin1String("turtle-escape")) turtle = id;
+		if (meta.filmKey.isEmpty() && wideScene.isEmpty() && meta.filmWidth > 0 && meta.filmWidth != meta.filmHeight && !meta.requiresFiles) wideScene = id;
+	}
+	check(!turtle.isEmpty() && !wideScene.isEmpty(), "the turtle film's scene (" + turtle + ") and a non-square scene file (" + wideScene + ") are listed");
+	const cartoon::Film *film = cartoon::find("turtle-escape");
+	if (turtle.isEmpty() || !film) {
+		log("RESULT: FAIL");
+		QApplication::exit(1);
+		return;
+	}
+	// the turtle film in video mode, with settings it was not made for
+	if (const int video = m_modeCombo->findData(static_cast<int>(OutputMode::Video)); video >= 0) m_modeCombo->setCurrentIndex(video);
+	selectSceneById(turtle);
+	if (const int gpu = m_renderModeCombo->findData(true); gpu >= 0) m_renderModeCombo->setCurrentIndex(gpu);
+	const bool wavefrontOffered = kGpuOptionAvailable && m_gpuBackendCombo->isEnabled();
+	if (wavefrontOffered) m_gpuBackendCombo->setCurrentIndex(m_gpuBackendCombo->findData(false));
+	m_maxDepthSpinBox->setValue(50);
+	m_widthSpinBox->setValue(800);
+	m_heightSpinBox->setValue(800);
+	if (m_denoiseCheck->isEnabled()) m_denoiseCheck->setChecked(false);
+	m_videoFramesSpinBox->setValue(120);
+	m_videoFPSSpinBox->setValue(30);
+	QApplication::processEvents();
+	const QString tip = m_sceneRecommendedSettingsHint->text();
+	log("tip: " + tip);
+	check(m_sceneRecommendedSettingsHint->isVisible() && m_applyRecommendedSettingsButton->isVisible(), "the tip and its Apply button show");
+	check(tip.contains(QStringLiteral("1920 x 1080")) && tip.contains(QStringLiteral("max ray depth 8")) && tip.contains(QStringLiteral("8184 frames at 24 fps")),
+		  "it lists the film's picture size, max depth and length");
+	if (wavefrontOffered) check(tip.contains(QStringLiteral("Wavefront")), "and the GPU renderer it was made for");
+	for (int k = 0; k < 3; ++k) QApplication::processEvents();
+	{
+		QLabel *label = m_sceneRecommendedSettingsHint;
+		const int needed = label->heightForWidth(label->width());
+		log(QString("tip label: width %1, height %2, its text needs %3").arg(label->width()).arg(label->height()).arg(needed));
+		check(label->height() >= needed - 2, "the whole tip shows (no line cut off)");
+	}
+	shot("recommend");
+	applyRecommendedSettings();
+	QApplication::processEvents();
+	check(m_widthSpinBox->value() == film->meta.width && m_heightSpinBox->value() == film->meta.height, QString("Apply: %1 x %2").arg(m_widthSpinBox->value()).arg(m_heightSpinBox->value()));
+	check(m_maxDepthSpinBox->value() == 8 && m_samplesSpinBox->value() == film->meta.samples, QString("max depth %1, %2 samples").arg(m_maxDepthSpinBox->value()).arg(m_samplesSpinBox->value()));
+	check(m_videoFramesSpinBox->value() == cartoon::frameCountOf(*film) && m_videoFPSSpinBox->value() == film->fps, "the film's own length and frame rate");
+	if (wavefrontOffered) check(m_gpuBackendCombo->currentData().toBool() == film->meta.wavefront, "its GPU renderer: " + m_gpuBackendCombo->currentText());
+	if (m_denoiseCheck->isEnabled()) check(m_denoiseCheck->isChecked(), "the denoiser on");
+	check(!m_sceneRecommendedSettingsHint->isVisible() && !m_applyRecommendedSettingsButton->isVisible(), "and the tip has nothing left to say");
+	// a scene file made for a non-square picture offers its size
+	if (!wideScene.isEmpty()) {
+		if (const int image = m_modeCombo->findData(static_cast<int>(OutputMode::Image)); image >= 0) m_modeCombo->setCurrentIndex(image);
+		selectSceneById(wideScene);
+		m_widthSpinBox->setValue(800);
+		m_heightSpinBox->setValue(800);
+		QApplication::processEvents();
+		SceneMetadataClient::SceneMetadata meta;
+		SceneMetadataClient::sceneMetadata(wideScene, meta);
+		check(m_sceneRecommendedSettingsHint->text().contains(QStringLiteral("%1 x %2").arg(meta.filmWidth).arg(meta.filmHeight)),
+			  QString("%1 offers its own %2 x %3").arg(wideScene).arg(meta.filmWidth).arg(meta.filmHeight));
+	}
 	log(ok ? "RESULT: OK" : "RESULT: FAIL");
 	QApplication::exit(ok ? 0 : 1);
 }

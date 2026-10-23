@@ -1249,5 +1249,8 @@ extern "C" int cpu_scene_metadata_snapshot(const char* scene_id, SceneMetadataSn
 	out->recommended_camera_path = recommended_camera_path_for(s->id);
 	out->scene_size = cpu_scene_size_by_id(s->id.c_str());
 	out->film_key = s->film_key.c_str();
+	out->film_width = s->film_width;
+	out->film_height = s->film_height;
+	out->recommended_max_depth = s->recommended_max_depth;
 	return 1;
 }

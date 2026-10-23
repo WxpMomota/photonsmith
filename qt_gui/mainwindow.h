@@ -144,6 +144,7 @@ public:
 	void runBannerSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runResolutionSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	RenderController *makeRenderController(const RenderJob &job);   // set up for the job (mainwindow_queue.cpp)
+	void runRecommendSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runDefaultsSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runVideoFramesSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runBuilderSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot, const QString &outPrefix);
@@ -890,6 +891,12 @@ private:
 	// own comment) - here the user explicitly clicked Apply, so it's a real
 	// action, not an automatic override of an unrelated selection.
 	void applyRecommendedSettings();
+	// One thing the selected scene (or its film) asks for that the settings differ from: what it wants, what is set now, and how to apply it (mainwindow_scene_info.cpp).
+	struct SceneRecommendation {
+		QString wanted, now;
+		std::function<void()> apply;
+	};
+	QList<SceneRecommendation> sceneRecommendations(const QString &sceneId, const SceneMetadataClient::SceneMetadata *preloaded = nullptr);
 	// Plain-text description of `mode` - used by createSettingsTab()'s
 	// per-item combo tooltips (each Integrator dropdown row's own "(i)").
 	QString integratorDescription(IntegratorMode mode);

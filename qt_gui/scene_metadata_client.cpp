@@ -313,6 +313,9 @@ bool sceneMetadata(const QString& scene_id, SceneMetadata& out) {
 	out.recommendedCameraPath = QString::fromUtf8(raw.recommended_camera_path);
 	out.sceneSize = raw.scene_size;
 	out.filmKey = QString::fromUtf8(raw.film_key ? raw.film_key : "");
+	out.filmWidth = raw.film_width;
+	out.filmHeight = raw.film_height;
+	out.recommendedMaxDepth = raw.recommended_max_depth;
 	return true;
 }
 

@@ -518,8 +518,9 @@ void MainWindow::buildSceneInfoRows(QWidget *basicTab, QVBoxLayout *sceneGroupLa
 	recommendedSettingsLayout->addWidget(m_sceneRecommendedSettingsHint, 1);
 	m_applyRecommendedSettingsButton = new QPushButton(tr("Apply"), recommendedSettingsRow);
 	m_applyRecommendedSettingsButton->setToolTip(
-		tr("Sets the rendering method options (Sampler, Integrator, Light Sampler - "
-		"on the Render Options tab) to the values this scene recommends."));
+		tr("Sets everything listed to what this scene (or film) was made for: the rendering method, max depth, "
+		"samples, exposure and picture size, and for a film its GPU renderer, the denoiser and, for a video, its length and "
+		"frame rate."));
 	m_applyRecommendedSettingsButton->setVisible(false);
 	connect(m_applyRecommendedSettingsButton, &QPushButton::clicked,
 			this, &MainWindow::applyRecommendedSettings);

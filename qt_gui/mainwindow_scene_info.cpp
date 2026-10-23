@@ -11,8 +11,10 @@
 #include "camera_math.h"
 #include "../src/shared/video_preset.h"
 #include "../src/shared/cartoon/cartoon_stills.h"
+#include "../src/shared/cartoon/cartoons.h"
 #include "../src/shared/scene_descriptor.h"
 #include <QApplication>
+#include <functional>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QFileInfo>
@@ -174,66 +176,6 @@ void MainWindow::refreshSceneInfoLabel(const SceneMetadataClient::SceneMetadata*
 	m_sceneInfoLabel->setText(infoText);
 }
 
-// Mirrors cpu_render_main()'s own recommended-settings mismatch check
-// (cpu_interface.cpp) - same skip values ("volpath"/"sobol"/"bvh", each
-// integrator/sampler/light-sampler's own real default) and the same "only
-// when the default/no-flag value is actually in effect" scope (a recommendation
-// the user already matched, or already overrode with a DIFFERENT explicit
-// choice, is not a mismatch either way - same as the CLI only warning when
-// no --sampler/--lightsampler was passed at all, and only when running the
-// plain default path tracer for the integrator check), so this never claims
-// a mismatch the CLI itself wouldn't warn about. Purely informational - like
-// the CLI's own warning, this never changes the user's current selection.
-void MainWindow::updateSceneRecommendedSettingsHint(const QString &sceneId,
-		const SceneMetadataClient::SceneMetadata* preloaded) {
-	if (!m_sceneRecommendedSettingsHint) return;
-	if (sceneId.isEmpty() || !m_integratorCombo || !m_samplerCombo || !m_lightSamplerCombo) {
-		m_sceneRecommendedSettingsHint->setVisible(false);
-		if (m_applyRecommendedSettingsButton) m_applyRecommendedSettingsButton->setVisible(false);
-		return;
-	}
-
-	// Not found (or DLL unavailable) leaves `local` at its default-
-	// constructed empty recommendedIntegrator/Sampler/LightSampler - the
-	// same "" every mismatch check below already treats as "no
-	// recommendation, so no mismatch", matching what the old individual
-	// sceneRecommended*() calls did on a failed lookup.
-	SceneMetadataClient::SceneMetadata local;
-	const SceneMetadataClient::SceneMetadata* meta = resolveSceneMeta(preloaded, sceneId, local);
-
-	QStringList mismatches;
-
-	const auto integrator = static_cast<IntegratorMode>(m_integratorCombo->currentData().toInt());
-	if (integrator == IntegratorMode::Default) {
-		if (!meta->recommendedIntegrator.isEmpty() && meta->recommendedIntegrator != QLatin1String("volpath"))
-			mismatches << tr("Integrator \"%1\"").arg(meta->recommendedIntegrator);
-	}
-
-	if (m_samplerCombo->currentData().toString().isEmpty()) {
-		if (!meta->recommendedSampler.isEmpty() && meta->recommendedSampler != QLatin1String("sobol"))
-			mismatches << tr("Sampler \"%1\"").arg(meta->recommendedSampler);
-	}
-
-	if (m_lightSamplerCombo->currentData().toString().isEmpty()) {
-		if (!meta->recommendedLightSampler.isEmpty() && meta->recommendedLightSampler != QLatin1String("bvh"))
-			mismatches << tr("Light Sampler \"%1\"").arg(meta->recommendedLightSampler);
-	}
-
-	if (mismatches.isEmpty()) {
-		m_sceneRecommendedSettingsHint->setVisible(false);
-		if (m_applyRecommendedSettingsButton) m_applyRecommendedSettingsButton->setVisible(false);
-		return;
-	}
-
-	m_sceneRecommendedSettingsHint->setText(
-		tr("Tip: this scene was set up with %1. Your Render Options use the "
-		   "defaults instead, which is fine for a first render; click Apply to "
-		   "match the scene's own settings.")
-			.arg(mismatches.join(tr(", "))));
-	m_sceneRecommendedSettingsHint->setVisible(true);
-	if (m_applyRecommendedSettingsButton) m_applyRecommendedSettingsButton->setVisible(true);
-}
-
 // integratorModeForPbrtName(): the one place this GUI maps a pbrt-v4
 // Integrator directive TYPE STRING (as loaded verbatim from a .pbrt file's
 // own Integrator directive, SceneDescriptor::recommended_integrator) onto
@@ -267,41 +209,113 @@ static bool integratorModeForPbrtName(const QString &name, IntegratorMode &outMo
 	return true;
 }
 
+// Everything the selected scene - or the film it is a still of - asks for that the settings now differ from, each with what applying it does. Shared by the tip
+// under the scene (updateSceneRecommendedSettingsHint) and its Apply button (applyRecommendedSettings), so the two cannot disagree.
+//   the rendering method: Integrator, Sampler, Light Sampler from the scene file - only when the default/no-flag value is in effect and the file asks for something
+//     other than pbrt's own default ("volpath", "sobol", "bvh"), mirroring cpu_render_main()'s console warnings, so a choice the user made is never called a mismatch;
+//   max depth: the file's Integrator maxdepth (not pbrt's default 5), which the renderer otherwise ignores for the GUI's own number (cpu_interface.cpp warns);
+//   samples and exposure: the scene's recommendation (set when the scene is picked; listed again if changed since);
+//   picture size: a film's own (16:9), or the file's Film line - its camera is framed for that shape;
+//   for a film: the GPU renderer it was made for (Recursive or Wavefront: its videos' frames use that one whatever is chosen, cartoon_render::frameFlags), the denoiser
+//     (every film is measured and tuned with it), and in video mode its own length and frame rate (its soundtrack is made for exactly those).
+QList<MainWindow::SceneRecommendation> MainWindow::sceneRecommendations(const QString &sceneId, const SceneMetadataClient::SceneMetadata *preloaded) {
+	QList<SceneRecommendation> out;
+	if (sceneId.isEmpty() || !m_integratorCombo || !m_samplerCombo || !m_lightSamplerCombo || !m_samplesSpinBox || !m_maxDepthSpinBox || !m_widthSpinBox || !m_heightSpinBox)
+		return out;
+	SceneMetadataClient::SceneMetadata local;
+	const SceneMetadataClient::SceneMetadata *meta = resolveSceneMeta(preloaded, sceneId, local);
+	const cartoon::Film *film = meta->filmKey.isEmpty() ? nullptr : cartoon::find(meta->filmKey.toUtf8().constData());
+	const auto add = [&out](const QString &wanted, const QString &now, std::function<void()> apply) { out.append({wanted, now, std::move(apply)}); };
+
+	// the rendering method
+	const auto integrator = static_cast<IntegratorMode>(m_integratorCombo->currentData().toInt());
+	IntegratorMode wantedMode;
+	if (integrator == IntegratorMode::Default && !meta->recommendedIntegrator.isEmpty() && meta->recommendedIntegrator != QLatin1String("volpath") &&
+		integratorModeForPbrtName(meta->recommendedIntegrator, wantedMode)) {
+		const int idx = m_integratorCombo->findData(static_cast<int>(wantedMode));
+		if (idx >= 0) add(tr("Integrator \"%1\"").arg(meta->recommendedIntegrator), m_integratorCombo->currentText(), [this, idx]() { m_integratorCombo->setCurrentIndex(idx); });
+	}
+	if (m_samplerCombo->currentData().toString().isEmpty() && !meta->recommendedSampler.isEmpty() && meta->recommendedSampler != QLatin1String("sobol")) {
+		const int idx = m_samplerCombo->findData(meta->recommendedSampler);
+		if (idx >= 0) add(tr("Sampler \"%1\"").arg(meta->recommendedSampler), m_samplerCombo->currentText(), [this, idx]() { m_samplerCombo->setCurrentIndex(idx); });
+	}
+	if (m_lightSamplerCombo->currentData().toString().isEmpty() && !meta->recommendedLightSampler.isEmpty() && meta->recommendedLightSampler != QLatin1String("bvh")) {
+		const int idx = m_lightSamplerCombo->findData(meta->recommendedLightSampler);
+		if (idx >= 0) add(tr("Light Sampler \"%1\"").arg(meta->recommendedLightSampler), m_lightSamplerCombo->currentText(), [this, idx]() { m_lightSamplerCombo->setCurrentIndex(idx); });
+	}
+
+	// how long a path may bounce, how many samples, how bright
+	const int depth = meta->recommendedMaxDepth;
+	if (depth > 0 && depth != 5 && depth != m_maxDepthSpinBox->value() && depth >= m_maxDepthSpinBox->minimum() && depth <= m_maxDepthSpinBox->maximum())
+		add(tr("max ray depth %1").arg(depth), QString::number(m_maxDepthSpinBox->value()), [this, depth]() { m_maxDepthSpinBox->setValue(depth); });
+	const int spp = film ? film->meta.samples : meta->recommendedSpp;
+	if (spp > 0 && spp != m_samplesSpinBox->value())
+		add(tr("%1 samples per pixel").arg(spp), QString::number(m_samplesSpinBox->value()), [this, spp]() { m_samplesSpinBox->setValue(spp); });
+	if (m_exposureSpin && meta->recommendedExposure > 0.0 && std::abs(meta->recommendedExposure - m_exposureSpin->value()) > 1e-6) {
+		const double exposure = meta->recommendedExposure;
+		add(tr("exposure %1").arg(exposure), QString::number(m_exposureSpin->value()), [this, exposure]() { m_exposureSpin->setValue(exposure); });
+	}
+
+	// the picture's shape
+	const int w = film ? film->meta.width : meta->filmWidth, h = film ? film->meta.height : meta->filmHeight;
+	if (w > 0 && h > 0 && (w != m_widthSpinBox->value() || h != m_heightSpinBox->value()) && w <= m_widthSpinBox->maximum() && h <= m_heightSpinBox->maximum() &&
+		w >= m_widthSpinBox->minimum() && h >= m_heightSpinBox->minimum())
+		add(tr("%1 x %2 pixels").arg(w).arg(h), QStringLiteral("%1 x %2").arg(m_widthSpinBox->value()).arg(m_heightSpinBox->value()), [this, w, h]() {
+			m_widthSpinBox->setValue(w);
+			m_heightSpinBox->setValue(h);
+		});
+
+	if (film) {
+		// the GPU renderer the film was made for, when the GPU renders and both are on offer
+		const bool gpu = m_renderModeCombo && m_renderModeCombo->currentData().toBool();
+		if (gpu && kGpuOptionAvailable && m_gpuBackendCombo && m_gpuBackendCombo->isEnabled()) {
+			const int idx = m_gpuBackendCombo->findData(film->meta.wavefront);
+			if (idx >= 0 && idx != m_gpuBackendCombo->currentIndex())
+				add(film->meta.wavefront ? tr("the Wavefront GPU renderer") : tr("the Recursive GPU renderer"), m_gpuBackendCombo->currentText(),
+					[this, idx]() { m_gpuBackendCombo->setCurrentIndex(idx); });
+		}
+		if (m_denoiseCheck && m_denoiseCheck->isEnabled() && !m_denoiseCheck->isChecked())
+			add(tr("the AI denoiser on"), tr("off"), [this]() { m_denoiseCheck->setChecked(true); });
+		// its own length and frame rate, for a video (its soundtrack is made for them)
+		if (isVideoMode() && m_videoFramesSpinBox && m_videoFPSSpinBox) {
+			const int frames = cartoon::frameCountOf(*film), fps = film->fps;
+			if (frames != m_videoFramesSpinBox->value() || fps != m_videoFPSSpinBox->value())
+				add(tr("%1 frames at %2 fps (the whole film, with its soundtrack)").arg(frames).arg(fps),
+					tr("%1 frames at %2 fps").arg(m_videoFramesSpinBox->value()).arg(m_videoFPSSpinBox->value()), [this, frames, fps]() {
+						m_videoFramesSpinBox->setValue(frames);
+						m_videoFPSSpinBox->setValue(fps);
+					});
+		}
+	}
+	return out;
+}
+
+void MainWindow::updateSceneRecommendedSettingsHint(const QString &sceneId, const SceneMetadataClient::SceneMetadata *preloaded) {
+	if (!m_sceneRecommendedSettingsHint) return;
+	const QList<SceneRecommendation> items = sceneRecommendations(sceneId, preloaded);
+	if (items.isEmpty()) {
+		m_sceneRecommendedSettingsHint->setVisible(false);
+		if (m_applyRecommendedSettingsButton) m_applyRecommendedSettingsButton->setVisible(false);
+		return;
+	}
+	SceneMetadataClient::SceneMetadata local;
+	const SceneMetadataClient::SceneMetadata *meta = resolveSceneMeta(preloaded, sceneId, local);
+	QString text = meta->filmKey.isEmpty() ? tr("Tip: this scene was made for settings that differ from yours:") : tr("Tip: this film was made for settings that differ from yours:");
+	for (const SceneRecommendation &r : items) text += QStringLiteral("<br>&nbsp;&nbsp;&bull; ") + tr("%1 (yours: %2)").arg(r.wanted.toHtmlEscaped(), r.now.toHtmlEscaped());
+	text += QStringLiteral("<br>") + (meta->filmKey.isEmpty() ? tr("Yours render too; click Apply to use the scene's own.") : tr("Yours render too; click Apply to use the film's own."));
+	m_sceneRecommendedSettingsHint->setTextFormat(Qt::RichText);
+	m_sceneRecommendedSettingsHint->setText(text);
+	m_sceneRecommendedSettingsHint->setVisible(true);
+	if (m_applyRecommendedSettingsButton) m_applyRecommendedSettingsButton->setVisible(true);
+}
+
 void MainWindow::applyRecommendedSettings() {
-	if (!m_sceneCombo || !m_integratorCombo || !m_samplerCombo || !m_lightSamplerCombo) return;
+	if (!m_sceneCombo) return;
 	const QString sceneId = m_sceneCombo->currentData().toString();
 	if (sceneId.isEmpty()) return;
-
-	// One fetch for all three recommended-setting lookups below AND the
-	// updateSceneRecommendedSettingsHint() call at the bottom, instead of
-	// four separate scene_metadata.dll round-trips (each its own
-	// find_scene() scan) for the same sceneId.
 	SceneMetadataClient::SceneMetadata meta;
-	SceneMetadataClient::sceneMetadata(sceneId, meta); // failure leaves meta at its empty/neutral defaults, same as each individual accessor's own "not found" fallback
-
-	IntegratorMode mode;
-	if (!meta.recommendedIntegrator.isEmpty() && integratorModeForPbrtName(meta.recommendedIntegrator, mode)) {
-		const int idx = m_integratorCombo->findData(static_cast<int>(mode));
-		if (idx >= 0) m_integratorCombo->setCurrentIndex(idx);
-	}
-
-	if (!meta.recommendedSampler.isEmpty()) {
-		const int idx = m_samplerCombo->findData(meta.recommendedSampler);
-		if (idx >= 0) m_samplerCombo->setCurrentIndex(idx);
-	}
-
-	if (!meta.recommendedLightSampler.isEmpty()) {
-		const int idx = m_lightSamplerCombo->findData(meta.recommendedLightSampler);
-		if (idx >= 0) m_lightSamplerCombo->setCurrentIndex(idx);
-	}
-
-	// Each setCurrentIndex() above already re-ran
-	// updateSceneRecommendedSettingsHint() via its own change handler (the
-	// Integrator combo's onIntegratorChanged(), the Sampler/Light Sampler
-	// combos' own lambdas - mainwindow_tabs_render.cpp), but calling it once
-	// more here is cheap and guarantees the hint reflects the FINAL state
-	// of all three rather than whatever it was after just the first change.
-	// Passes `meta` through rather than letting it self-fetch a 5th time.
+	SceneMetadataClient::sceneMetadata(sceneId, meta);   // (one fetch for the list and the refresh after)
+	for (const SceneRecommendation &r : sceneRecommendations(sceneId, &meta)) r.apply();
 	updateSceneRecommendedSettingsHint(sceneId, &meta);
 }
 

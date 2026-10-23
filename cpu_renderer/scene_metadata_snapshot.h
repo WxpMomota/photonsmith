@@ -77,6 +77,10 @@ struct SceneMetadataSnapshot {
 	double scene_size;
 	// The cartoon film this scene is a still of (cartoons.h, Film::key), "" for any other scene. LAST, like the fields added after the first ones.
 	const char* film_key;
+	// The picture size the scene file asks for (0 x 0 for a hand-built scene) and its Integrator's maxdepth (pbrt's 5 when the file does not say; 0 for a hand-built scene): the
+	// GUI offers both with the scene's other recommended settings. After film_key, like every field added after the first ones.
+	int film_width, film_height;
+	int recommended_max_depth;
 };
 
 #ifdef __cplusplus

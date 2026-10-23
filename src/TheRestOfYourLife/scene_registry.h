@@ -173,6 +173,9 @@ struct SceneDescriptor {
     // The cartoon film (src/shared/cartoon/cartoons.h, Film::key) this scene is a still of, "" for every other scene: the link from a listed scene to its film, from the
     // file's "# @rt-cartoon" tag. The GUI sets a film's video settings from it. A std::string, so it sits with the other strings that were added after the first fields.
     std::string film_key;
+    // The picture size the scene file's own Film line asks for (pbrt's 1280 x 720 when it has none), 0 x 0 for a hand-built scene: the GUI offers it with the scene's other
+    // recommended settings, since the file's camera framing is made for that shape.
+    int film_width = 0, film_height = 0;
 
     // pbrt-v4's own "camera medium" (see pbrt_flatten::FlatScene::
     // cameraMediumIndex's own comment for what this requests, and
@@ -384,6 +387,8 @@ namespace pbrt_scene_registry {
 
         s.recommended_spp = d.samplesPerPixel;
         s.recommended_max_depth = d.maxDepth;
+        s.film_width = d.xResolution;
+        s.film_height = d.yResolution;
         s.recommended_integrator = d.integrator;
         s.recommended_sampler = d.samplerType;
         s.recommended_light_sampler = d.lightSamplerType;

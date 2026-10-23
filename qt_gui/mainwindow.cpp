@@ -1352,6 +1352,19 @@ void MainWindow::setupUI() {
 		refreshStatusBarInfo();
 	});
 	syncResolutionCombo();
+	// the scene's tip lists what differs from what it was made for: kept current as any of those settings change
+	{
+		const auto refreshTip = [this]() {
+			if (m_sceneCombo) updateSceneRecommendedSettingsHint(m_sceneCombo->currentData().toString());
+		};
+		for (QSpinBox *spin : {m_samplesSpinBox, m_maxDepthSpinBox, m_widthSpinBox, m_heightSpinBox, m_videoFramesSpinBox, m_videoFPSSpinBox})
+			if (spin) connect(spin, QOverload<int>::of(&QSpinBox::valueChanged), this, refreshTip);
+		for (QComboBox *combo : {m_gpuBackendCombo, m_renderModeCombo, m_modeCombo})
+			if (combo) connect(combo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, refreshTip);
+		if (m_exposureSpin) connect(m_exposureSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, refreshTip);
+		if (m_denoiseCheck) connect(m_denoiseCheck, &QCheckBox::toggled, this, refreshTip);
+		refreshTip();
+	}
 	connect(m_samplesSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
 			this, [this](int) { refreshStatusBarInfo(); });
 

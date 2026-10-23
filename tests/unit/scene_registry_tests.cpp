@@ -1235,3 +1235,19 @@ TEST(SceneRegistryCropPictureTest, OnlyTheHeadHasItsCropAsItsPicture) {
 	for (const SceneDescriptor &s : get_scene_registry()) count += s.crop_is_picture ? 1 : 0;
 	EXPECT_EQ(count, 1);
 }
+
+// What a scene file asks for beyond its samples reaches the GUI's recommended settings through the snapshot: the picture size of its Film line and its Integrator maxdepth
+// (a film's still: the film's own 1920 x 1080 and 8; a hand-built scene: 0 x 0 and 0).
+TEST(CpuSceneApiTest, TheSnapshotCarriesTheFilesPictureSizeAndMaxDepth) {
+	bool seen = false;
+	for (const auto& s : get_scene_registry()) {
+		if (s.film_key != "turtle-escape") continue;
+		SceneMetadataSnapshot snap{};
+		ASSERT_EQ(cpu_scene_metadata_snapshot(s.id.c_str(), &snap), 1);
+		EXPECT_EQ(snap.film_width, 1920);
+		EXPECT_EQ(snap.film_height, 1080);
+		EXPECT_EQ(snap.recommended_max_depth, 8);
+		seen = true;
+	}
+	EXPECT_TRUE(seen) << "the turtle film's still is listed";
+}
