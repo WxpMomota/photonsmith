@@ -643,6 +643,44 @@ void MainWindow::buildSamplingGroup(QWidget *optionsTab, QVBoxLayout *layout) {
 		"changing any actual light in the scene.")),
 		m_exposureSpin);
 
+	// The camera's look (--bloom/--vignette/--warmth/--saturation, src/shared/lens_look.h). Each box's lowest value reads "Scene's": nothing is passed, so a film or a scene file
+	// keeps the look its own `# @rt-look` line gives it; any other value is passed and wins over the scene's.
+	{
+		const auto lookSpin = [&](double lowest, double highest, double step, const QString &tip) {
+			QDoubleSpinBox *spin = new QDoubleSpinBox(optionsTab);
+			spin->setRange(lowest, highest);
+			spin->setSingleStep(step);
+			spin->setDecimals(2);
+			spin->setSpecialValueText(tr("Scene's"));
+			spin->setValue(lowest);
+			spin->setToolTip(tip);
+			styleSpinBox(spin);
+			return spin;
+		};
+		m_bloomSpin = lookSpin(-0.01, 1.0, 0.05, tr("Bloom, 0-1: the glow bright lights spread, as through a real lens (0.1 subtle, 0.3 dreamy)."));
+		m_vignetteSpin = lookSpin(-0.01, 1.0, 0.05, tr("Vignette, 0-1: how much darker the corners are than the centre."));
+		m_warmthSpin = lookSpin(-1.01, 1.0, 0.05, tr("Warmth, -1 to 1: a white balance towards blue (cool) or amber (warm); brightness stays the same."));
+		m_saturationSpin = lookSpin(-0.01, 3.0, 0.05, tr("Saturation: 0 is grey, 1 as rendered, above 1 more colourful."));
+		// two by two, so the row fits the tab at its narrowest
+		QWidget *lookRow = new QWidget(optionsTab);
+		QGridLayout *lookLayout = new QGridLayout(lookRow);
+		lookLayout->setContentsMargins(0, 0, 0, 0);
+		lookLayout->setHorizontalSpacing(8);
+		const std::pair<QString, QDoubleSpinBox *> parts[] = {{tr("Bloom"), m_bloomSpin}, {tr("Vignette"), m_vignetteSpin}, {tr("Warmth"), m_warmthSpin}, {tr("Saturation"), m_saturationSpin}};
+		for (int k = 0; k < 4; ++k) {
+			lookLayout->addWidget(new QLabel(parts[k].first, lookRow), k / 2, (k % 2) * 2);
+			lookLayout->addWidget(parts[k].second, k / 2, (k % 2) * 2 + 1);
+		}
+		lookLayout->setColumnStretch(1, 1);
+		lookLayout->setColumnStretch(3, 1);
+		samplingLayout->addRow(labelWithInfo(tr("Look:"),
+			tr("What a film camera and its grading add to a picture: a glow round bright lights (bloom), darker corners (vignette), "
+			"a warmer or cooler white balance, and more or less colour. Applied to the finished picture before its brightness is fitted "
+			"to the screen, so a bright lamp glows more than a dim one. An EXR file is left as rendered.\n\n"
+			"\"Scene's\" keeps what the scene asks for: the cartoon films carry their own look. CPU and GPU default path tracer.")),
+			lookRow);
+	}
+
 	m_regularizeCheck = new QCheckBox(tr("Path regularization (--regularize)"), optionsTab);
 	m_regularizeCheck->setToolTip(
 		tr("Slightly softens a rough, reflective, or glassy surface's\n"

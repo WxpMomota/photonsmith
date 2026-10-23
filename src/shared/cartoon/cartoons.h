@@ -27,6 +27,7 @@
 #include "domino_run.h"
 #include "fireflies.h"
 #include "forest_dawn.h"
+#include "forest_dawn_score.h"
 #include "lamp_and_ball.h"
 #include "little_robot.h"
 #include "meet_pip.h"
@@ -97,7 +98,7 @@ inline const Film kFilms[] = {
 	{"forest-dawn", "Forest Dawn",
 	 "A misty forest clearing from the blue before sunrise to the first warm light: the last fireflies go out, the sun comes up behind the hills and shines between the trunks in shafts through the mist, dew catches it on the grass, and leaves fall through the beams.",
 	 forest_dawn::kDuration, forest_dawn::kFps, &forest_dawn::sceneAt, &forest_dawn::headerAt, &forest_dawn::shotStarts, 14.0,
-	 {19, "fog,nature,dawn,translucent,backlight", "Into the blue clearing|Against the rising sun|Dew on the grass|Leaves in the beams|Crane up as the mist thins", forest_dawn::kSamples, 6.0, true}},
+	 {19, "fog,nature,dawn,translucent,backlight", "Into the blue clearing|Against the rising sun|Dew on the grass|Leaves in the beams|Crane up as the mist thins", forest_dawn::kSamples, 6.0, true}, &forest_dawn::soundtrack},
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 

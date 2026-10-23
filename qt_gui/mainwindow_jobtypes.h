@@ -108,6 +108,8 @@ struct AdvancedRenderFlags {
 	bool background = false;   // --background: render as a polite guest (Settings tab: "Keep the PC responsive")
 	int gpuDevice = 0;         // --gpu-device N, passed only when not 0 (the CLI's own default)
 	int workerMaxGb = 8;       // --worker-max-mb N*1024, passed only when not 8 (the CLI's own default); 0 = never replace a video's worker
+	// The camera's look (--bloom/--vignette/--warmth/--saturation); below the range = the scene's own, not passed
+	double lookBloom = -1.0, lookVignette = -1.0, lookWarmth = -2.0, lookSaturation = -1.0;
 	bool aovs = false;   // --aovs: also write the render passes (albedo, normal, depth, uv, coverage)
 	bool optixValidate = false;
 	double exposure = 1.0;

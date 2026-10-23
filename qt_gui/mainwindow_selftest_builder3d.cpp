@@ -1102,6 +1102,14 @@ void MainWindow::selfTestRenderQueue(const std::function<void(bool, const QStrin
 #else
 	check(m_gpuDeviceSpin == nullptr, "a Mac shows no graphics card choice");
 #endif
+	// The look boxes start at "Scene's" (nothing passed, so a film keeps its own look); a value goes into the job.
+	check(captureRenderJob().advancedFlags.lookBloom < 0.0 && m_bloomSpin->text() == tr("Scene's"), "the look starts as the scene's own");
+	m_bloomSpin->setValue(0.25);
+	m_warmthSpin->setValue(-0.5);
+	const RenderJob looked = captureRenderJob();
+	check(std::abs(looked.advancedFlags.lookBloom - 0.25) < 1e-9 && std::abs(looked.advancedFlags.lookWarmth + 0.5) < 1e-9, "a bloom and a warmth go into the queued job");
+	m_bloomSpin->setValue(m_bloomSpin->minimum());
+	m_warmthSpin->setValue(m_warmthSpin->minimum());
 }
 
 // RT_GUI_SELFTEST=renderfail [RT_GUI_SELFTEST_SCENE=<a downloadable scene that is not downloaded, default H35>]: a real render through the Render button that

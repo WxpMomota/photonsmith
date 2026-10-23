@@ -266,3 +266,38 @@ TEST(CartoonFireflies, AFireflyDoesNotJumpBetweenFrames) {
 	}
 }
 
+
+// Forest Dawn: the sun comes up during the film (dark before, in the sky after), every camera is above the rolling ground, the mist holds every camera (the shafts need the camera
+// inside it), and the soundtrack is deterministic and never silent.
+TEST(CartoonForestDawn, TheSunRisesTheCamerasStandAboveTheGroundAndInsideTheMist) {
+	namespace fd = cartoon::forest_dawn;
+	EXPECT_LT(fd::sunUp(2.0), 0.01) << "before dawn the sun is down";
+	EXPECT_GT(fd::sunUp(20.0), 0.99) << "after the second shot it is up";
+	for (double t = 0.0; t <= fd::kDuration; t += 0.25) {
+		const cartoon::CameraView v = cartoon::cameraAt(fd::shots(), t);
+		EXPECT_GT(v.eye.y - fd::ground().height(v.eye.x, v.eye.z), 0.15) << "the camera is below the ground at t = " << t;
+		const fd::Mist m = fd::mistAt(t);
+		EXPECT_LT(cartoon::length(v.eye - m.centre), m.radius - 1.0) << "the camera is outside the mist at t = " << t;
+	}
+}
+
+TEST(CartoonForestDawn, TheSoundtrackIsTheSameEveryTimeInRangeAndNeverSilent) {
+	namespace fd = cartoon::forest_dawn;
+	cartoon::audio::Mix a(fd::kDuration), b(fd::kDuration);
+	fd::soundtrack(a);
+	fd::soundtrack(b);
+	const std::vector<std::int16_t> pa = a.finish(), pb = b.finish();
+	EXPECT_EQ(pa, pb) << "a film sounds the same every time it is rendered";
+	if (const char *keep = std::getenv("RT_SOUNDTRACK_WAV")) cartoon::audio::writeWav(keep, pa);   // (keeps the mix to listen to)
+	auto rms = [&](double t0, double t1) {
+		double e = 0.0;
+		std::size_t n = 0;
+		for (std::size_t i = static_cast<std::size_t>(t0 * cartoon::audio::kRate) * 2; i < static_cast<std::size_t>(t1 * cartoon::audio::kRate) * 2 && i < pa.size(); ++i, ++n) e += static_cast<double>(pa[i]) * pa[i];
+		return std::sqrt(e / static_cast<double>((std::max)(std::size_t(1), n))) / 32768.0;
+	};
+	for (double t = 1.0; t < fd::kDuration - 3.0; t += 3.0) EXPECT_GT(rms(t, t + 3.0), 0.003) << "silence at " << t << " s";
+	EXPECT_GT(rms(35.0, 39.0), rms(0.5, 4.5)) << "the morning is fuller than the night";
+	int peak = 0;
+	for (std::int16_t s : pa) peak = (std::max)(peak, std::abs(static_cast<int>(s)));
+	EXPECT_GT(peak, 6000) << "not too quiet";
+}

@@ -30,8 +30,8 @@ inline const Ground &ground() {
 // The light over time
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-// The sun's height above the horizon in degrees: below it for the first seconds, clearing the hills (1 to 3 degrees) between 6 and 10 s, rising more and more slowly after.
-inline double sunElevation(double t) { return -4.0 + 16.0 * (1.0 - std::exp(-t / 16.0)); }
+// The sun's height above the horizon in degrees: below it for the first seconds, clearing the hills (half a degree to 3 degrees) between 7 and 13 s, rising more and more slowly after.
+inline double sunElevation(double t) { return -4.0 + 15.0 * (1.0 - std::exp(-t / 20.0)); }
 inline Vec3 sunDirection(double t) {
 	const double el = sunElevation(t) * kPi / 180.0, az = -14.0 * kPi / 180.0;
 	return normalize({std::sin(az) * std::cos(el), std::sin(el), -std::cos(az) * std::cos(el)});
@@ -327,7 +327,12 @@ inline std::vector<double> shotStarts() {
 inline std::string headerAt(double t) {
 	char look[160];
 	std::snprintf(look, sizeof(look), "# @rt-look bloom 0.16 vignette 0.32 warmth %.3f saturation 1.06\n", warmthAt(t));
-	return std::string(look) + nature::mistBeforeCamera(mistAt(t)) + sceneHeader(cameraText(cameraAt(shots(), t)), kSamples);
+	// a held camera: a few centimetres of wander, a few millimetres for the macro shot (shot 3)
+	CameraView v = cameraAt(shots(), t);
+	const double hand = v.shot == 2 ? 0.0015 : 0.012;
+	v.eye = v.eye + handheld(t, hand, 1);
+	v.target = v.target + handheld(t, hand * 3.0, 2);
+	return std::string(look) + nature::mistBeforeCamera(mistAt(t)) + sceneHeader(cameraText(v), kSamples);
 }
 
 inline std::string sceneAt(double t) {
@@ -339,7 +344,7 @@ inline std::string sceneAt(double t) {
 	out += buf;
 	// The sun: a glowing ball of radius 4.4 m 400 m away (beyond the mist and the hills): its disc and all of the sunlight.
 	const double up = sunUp(t);
-	if (up > 0.0) out += emissiveSphere(sunDirection(t) * 400.0 + Vec3{0.0, -1.5, -8.0}, 4.4, sunColour(t) * (40000.0 * up));
+	if (up > 0.0) out += emissiveSphere(sunDirection(t) * 400.0 + Vec3{0.0, -1.5, -8.0}, 4.4, sunColour(t) * (28000.0 * up));
 	out += objectDefinitions();
 	std::string branches;
 	for (const Tree &tr : trees()) out += buildTree(tr, t, branches);

@@ -1304,6 +1304,11 @@ private:
 	QCheckBox *m_backgroundCheck = nullptr;   // --background (Settings tab, Output group); remembered between runs
 	QSpinBox *m_gpuDeviceSpin = nullptr;      // --gpu-device (same group; not on a Mac, which has one GPU path); remembered
 	QSpinBox *m_workerMemorySpin = nullptr;   // --worker-max-mb, in GB (same group); remembered
+	// The camera's look (Render Options tab): the lowest value of each is "Scene's" (not passed)
+	QDoubleSpinBox *m_bloomSpin = nullptr;
+	QDoubleSpinBox *m_vignetteSpin = nullptr;
+	QDoubleSpinBox *m_warmthSpin = nullptr;
+	QDoubleSpinBox *m_saturationSpin = nullptr;
 	QCheckBox *m_aovsCheck = nullptr;   // --aovs (any backend; single images)
 	QCheckBox *m_denoiseCheck;          // --denoise (GPU only, both backends)
 	// --denoise-blend (GPU only, both backends) - spinbox only enabled/

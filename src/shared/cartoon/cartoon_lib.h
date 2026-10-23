@@ -472,6 +472,18 @@ inline CameraView cameraAt(const std::vector<Shot> &shots, double t) {
 	const Shot &s = shots[k];
 	return {s.eye(t), s.target(t), s.fov(t), s.lensRadius, static_cast<int>(k)};
 }
+// The small wander of a camera held by hand (or on a slowly breathing crane): a smooth sum of slow sines, up to about `amount` metres, the same every time. Add it to a view's eye
+// (and a larger one to its target) for a shot that should feel filmed rather than computed.
+inline Vec3 handheld(double t, double amount, int salt = 0) {
+	const auto wave = [t, salt](int axis) {
+		double v = 0.0;
+		const double rates[3] = {0.23, 0.51, 1.13}, weights[3] = {0.55, 0.30, 0.15};
+		for (int k = 0; k < 3; ++k) v += weights[k] * std::sin(rates[k] * (1.0 + 0.17 * axis) * 2.0 * kPi * t + 2.1 * axis + 1.7 * k + 0.9 * salt);
+		return v;
+	};
+	return {amount * wave(0), amount * 0.7 * wave(1), amount * wave(2)};
+}
+
 // pbrt's LookAt and Camera lines for a view (x negated: pbrt is left-handed; the films write +x to the right of the picture).
 inline std::string cameraText(const CameraView &v) {
 	char buf[420];
