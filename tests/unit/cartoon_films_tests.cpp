@@ -364,3 +364,46 @@ TEST(CartoonSdfMesh, MeshersPutEveryVertexOnTheSurfaceWithItsNormal) {
 	EXPECT_LE(sdf::smin(0.3, 0.32, 0.1), 0.3);
 	EXPECT_DOUBLE_EQ(sdf::smin(0.3, 0.9, 0.1), 0.3);
 }
+
+// The Crystal Heart: every camera inside the mist (the shafts and glows need it), above the lake and clear of every crystal; the sun up only after the blue hour; the Heart
+// dormant, then ignited; and a score that is the same every time and never silent.
+TEST(CartoonCrystalHeart, CamerasStayInTheMistAboveTheWaterAndClearOfTheCrystals) {
+	namespace ch = cartoon::crystal_heart;
+	EXPECT_LT(ch::sunUp(10.0), 0.01) << "the blue hour has no sun";
+	EXPECT_GT(ch::sunUp(30.0), 0.99);
+	EXPECT_GT(ch::heartGlow(ch::kPeak), 10.0 * ch::heartGlow(10.0)) << "it ignites";
+	ASSERT_GE(ch::spires().size(), 30u);
+	for (double t = 0.0; t < ch::kDuration; t += 0.25) {
+		const cartoon::CameraView v = ch::viewAt(t);
+		const cartoon::nature::Mist m = ch::mistAt(t);
+		EXPECT_LT(cartoon::length(v.eye - m.centre), m.radius - 2.0) << "the camera is outside the mist at t = " << t;
+		EXPECT_GT(v.eye.y, 0.8) << "the camera is at the water at t = " << t;
+		for (const auto &s : ch::spires())
+			for (const auto &c : s.crystals) {
+				const double horizontal = cartoon::length(cartoon::Vec3{v.eye.x - c.base.x, 0.0, v.eye.z - c.base.z});
+				if (v.eye.y < c.base.y + c.height + c.tip) EXPECT_GT(horizontal, c.radius + 1.0) << "the camera is inside a crystal at t = " << t;
+			}
+	}
+}
+
+TEST(CartoonCrystalHeart, TheScoreIsTheSameEveryTimeAndNeverSilent) {
+	namespace ch = cartoon::crystal_heart;
+	cartoon::audio::Mix a(ch::kDuration), b(ch::kDuration);
+	ch::soundtrack(a);
+	ch::soundtrack(b);
+	const std::vector<std::int16_t> pa = a.finish(), pb = b.finish();
+	EXPECT_EQ(pa, pb);
+	if (const char *keep = std::getenv("RT_SOUNDTRACK_WAV")) cartoon::audio::writeWav(keep, pa);
+	auto rms = [&](double t0, double t1) {
+		double e = 0.0;
+		std::size_t n = 0;
+		for (std::size_t i = static_cast<std::size_t>(t0 * cartoon::audio::kRate) * 2; i < static_cast<std::size_t>(t1 * cartoon::audio::kRate) * 2 && i < pa.size(); ++i, ++n) e += static_cast<double>(pa[i]) * pa[i];
+		return std::sqrt(e / static_cast<double>((std::max)(std::size_t(1), n))) / 32768.0;
+	};
+	for (double t = 0.5; t < ch::kDuration - 3.0; t += 3.0) EXPECT_GT(rms(t, t + 3.0), 0.003) << "silence at " << t << " s";
+	EXPECT_GT(rms(ch::kIgnite, ch::kIgnite + 3.0), 2.0 * rms(2.0, 5.0)) << "the ignition is the loudest moment, not the lake";
+	int peak = 0;
+	for (std::int16_t s : pa) peak = (std::max)(peak, std::abs(static_cast<int>(s)));
+	EXPECT_GT(peak, 8000) << "not too quiet";
+	EXPECT_LT(peak, 32767) << "not clipped";
+}

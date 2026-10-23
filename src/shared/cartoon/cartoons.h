@@ -29,6 +29,7 @@
 #include "forest_dawn.h"
 #include "forest_dawn_score.h"
 #include "turtle_escape_score.h"
+#include "crystal_heart_score.h"
 #include "lamp_and_ball.h"
 #include "little_robot.h"
 #include "meet_pip.h"
@@ -108,6 +109,12 @@ inline const Film kFilms[] = {
 	  "The hose|Onto the slate|Hanging|The canyon|Eight inches|The climb|Over the top|Freedom|The slide|The towels|Across the floor|The vacuum wakes|Like a tank|Under the sofa|Beneath|The carpet cliff|The fibres|The far side|Water|"
 	  "The endless crawl|The box|The pool|Looking back|A smile|Splash|Swimming|Home|Something is wrong|The empty slate|The thermometer|The rocks|The hose|The bags|Inside the tank|Behind the tank|Under the table|Behind the sofa|Turtle?|The tub|Black",
 	  turtle_escape::kSamples, 3.0, true, turtle_escape::kWidth, turtle_escape::kHeight}, &turtle_escape::soundtrack},
+	{"crystal-heart", "The Crystal Heart",
+	 "A valley of colossal glowing crystals rising out of a mirror lake, from the deep blue before dawn to sunrise: the sun breaks through the ridge and its light falls between the spires through the mist, and the giant crystal floating over the valley wakes, beats and ignites, its light cutting through the mist in beams. With music.",
+	 crystal_heart::kDuration, crystal_heart::kFps, &crystal_heart::sceneAt, &crystal_heart::headerAt, &crystal_heart::shotStarts, 15.0,
+	 {21, "glass,emissive,fog,water,dawn", "The still lake|Among the spires|First light|The Heart|Ignition|The valley at sunrise", crystal_heart::kSamples, 3.5, false, crystal_heart::kWidth,
+	  crystal_heart::kHeight},
+	 &crystal_heart::soundtrack},
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 

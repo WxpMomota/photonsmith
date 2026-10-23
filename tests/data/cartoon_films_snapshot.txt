@@ -70,3 +70,8 @@ turtle-escape|0|188989|2
 turtle-escape|199|98417|2
 turtle-escape|170.5|96313|2
 turtle-escape|340.7|24|2
+meta|crystal-heart|V21|60 s|24 fps|6 shots|glass,emissive,fog,water,dawn|40 spp
+crystal-heart|0|30832|1097
+crystal-heart|15|30832|1097
+crystal-heart|30|30832|878
+crystal-heart|59.94|30832|878
