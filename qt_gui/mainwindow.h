@@ -1491,6 +1491,7 @@ private:
 	QWidget *m_filmTimeRow = nullptr;        // "Film time": which moment of a film a still render shows; visible for a film's still in image mode
 	QDoubleSpinBox *m_filmTimeSpin = nullptr;
 	QComboBox *m_filmShotCombo = nullptr;    // the film's shots by name: choosing one sets the film time to a moment inside it
+	std::function<void()> m_syncFilmShot;    // shows in m_filmShotCombo the shot the film time is in (buildSceneInfoRows)
 	QString m_filmTimeFor;                   // key of the film the spin box's range and value were last set for
 	QList<InfoGroupBox *> m_resetSections;           // the settings sections with a "Defaults" button
 	QHash<QWidget *, QVariant> m_sectionDefaults;    // each of their controls' default value

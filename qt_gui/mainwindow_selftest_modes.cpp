@@ -1275,6 +1275,38 @@ void MainWindow::runCartoonUiSelfTest(const std::function<void(const QString &)>
 	check(m_cameraPathCombo->isEnabled() && m_videoPresetCombo->isEnabled(), "another scene again: both can be chosen");
 	check(m_cameraGroupBox && m_cameraGroupBox->isEnabled(), "and the Camera Position is back");
 	check(!videoCameraPath().startsWith(QStringLiteral("cartoon:")), "and the video's path is the chosen one again: " + videoCameraPath());
+	// A picture of a film: the moment it shows reads as a moment of the whole film ("15.0 s of 60 s"), and the shot box names the shot that moment is in.
+	if (const int image = m_modeCombo->findData(static_cast<int>(OutputMode::Image)); image >= 0) m_modeCombo->setCurrentIndex(image);
+	const cartoon::Film *film = nullptr;   // one with several shots
+	for (int i = 0, n = SceneMetadataClient::sceneCount(); i < n && !film; ++i) {
+		const QString id = SceneMetadataClient::sceneIdAtIndex(i);
+		SceneMetadataClient::SceneMetadata meta;
+		if (!SceneMetadataClient::sceneMetadata(id, meta) || meta.filmKey.isEmpty()) continue;
+		const cartoon::Film *f = cartoon::find(meta.filmKey.toUtf8().constData());
+		if (f && f->shotStarts().size() >= 3) {
+			film = f;
+			filmScene = id;
+		}
+	}
+	selectSceneById(filmScene);
+	QApplication::processEvents();
+	if (film) {
+		check(m_filmTimeRow->isVisibleTo(this), "a picture of a film shows the moment row");
+		const QString of = QStringLiteral(" of %1 s").arg(film->duration, 0, 'f', 0);
+		check(m_filmTimeSpin->text().endsWith(of), "the moment says which length it is a moment of: " + m_filmTimeSpin->text());
+		const std::vector<double> starts = film->shotStarts();
+		int expected = 0;
+		for (std::size_t i = 0; i < starts.size(); ++i)
+			if (film->stillTime >= starts[i]) expected = static_cast<int>(i);
+		check(m_filmShotCombo->currentIndex() == expected, QString("the shot box names the still's shot: \"%1\"").arg(m_filmShotCombo->currentText()));
+		m_filmTimeSpin->setValue(starts.back() + 0.5);
+		check(m_filmShotCombo->currentIndex() == static_cast<int>(starts.size()) - 1, "a time in the last shot names the last shot: " + m_filmShotCombo->currentText());
+		m_filmShotCombo->setCurrentIndex(0);
+		emit m_filmShotCombo->activated(0);
+		check(m_filmTimeSpin->value() < (starts.size() > 1 ? starts[1] : film->duration), "choosing the first shot moves the moment into it");
+		shot("cartoonui_film_picture");
+	} else
+		check(false, "a film with several shots is in the list");
 	log(ok ? "RESULT: OK" : "RESULT: FAIL");
 	QApplication::exit(ok ? 0 : 1);
 }

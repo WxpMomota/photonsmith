@@ -337,13 +337,14 @@ void MainWindow::syncCartoonVideoSettings(const QString &sceneId) {
 				m_widthSpinBox->setValue(film->meta.width);
 				m_heightSpinBox->setValue(film->meta.height);
 			}
-			m_filmTimeSpin->setRange(0.0, film->duration);
-			m_filmTimeSpin->setValue(film->stillTime);
 			if (m_filmShotCombo) {
 				m_filmShotCombo->clear();
 				for (const std::string &shot : cartoon::shotNamesOf(*film)) m_filmShotCombo->addItem(QString::fromStdString(shot));
-				m_filmShotCombo->setCurrentIndex(-1);
 			}
+			m_filmTimeSpin->setRange(0.0, film->duration);
+			m_filmTimeSpin->setSuffix(tr(" s of %1 s").arg(film->duration, 0, 'f', 0));   // "15.0 s of 60 s": a moment, not a length
+			m_filmTimeSpin->setValue(film->stillTime);
+			if (m_syncFilmShot) m_syncFilmShot();   // (also when the value did not change, so no valueChanged)
 		}
 		if (!film) m_filmTimeFor.clear();
 	}

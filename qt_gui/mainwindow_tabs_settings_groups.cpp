@@ -441,12 +441,16 @@ void MainWindow::buildSceneInfoRows(QWidget *basicTab, QVBoxLayout *sceneGroupLa
 	m_filmTimeRow = new QWidget(basicTab);
 	QHBoxLayout *filmTimeLayout = new QHBoxLayout(m_filmTimeRow);
 	filmTimeLayout->setContentsMargins(0, 0, 0, 0);
-	QLabel *filmTimeLabel = new QLabel(tr("Film time:"), m_filmTimeRow);
+	// "Picture at 15.0 s of 60 s", not "Film time: 15.0 s", which read as the film's length (syncCartoonVideoSettings sets the "of" part)
+	QLabel *filmTimeLabel = new QLabel(tr("Picture at:"), m_filmTimeRow);
 	m_filmTimeSpin = new QDoubleSpinBox(m_filmTimeRow);
 	m_filmTimeSpin->setDecimals(1);
 	m_filmTimeSpin->setSingleStep(0.5);
 	m_filmTimeSpin->setSuffix(tr(" s"));
-	m_filmTimeSpin->setToolTip(tr("Which moment of the film this picture shows, in seconds from its start. The scene's own picture is the film's best still; the whole film is a video (Generate Video)."));
+	const QString filmTimeTip = tr("A picture renders one moment of the film: this many seconds from its start. Choose a shot to jump to it.\n"
+								   "The whole film, with its soundtrack, is a video: choose Generate Video as the Output Mode.");
+	filmTimeLabel->setToolTip(filmTimeTip);
+	m_filmTimeSpin->setToolTip(filmTimeTip);
 	m_filmShotCombo = new QComboBox(m_filmTimeRow);
 	m_filmShotCombo->setMinimumContentsLength(30);   // the longest shot names are about this long
 	m_filmShotCombo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
@@ -459,6 +463,17 @@ void MainWindow::buildSceneInfoRows(QWidget *basicTab, QVBoxLayout *sceneGroupLa
 		const double end = index + 1 < static_cast<int>(starts.size()) ? starts[static_cast<std::size_t>(index) + 1] : film->duration;
 		m_filmTimeSpin->setValue(starts[static_cast<std::size_t>(index)] + std::min(1.0, 0.25 * (end - starts[static_cast<std::size_t>(index)])));   // a little way into the shot
 	});
+	// and the other way round: the shot box names the shot the time is in (it was empty, as if the time were in none)
+	m_syncFilmShot = [this]() {
+		const cartoon::Film *film = cartoon::find(m_filmTimeFor.toUtf8().constData());
+		if (!film) return;
+		const std::vector<double> starts = film->shotStarts();
+		int shot = -1;
+		for (std::size_t i = 0; i < starts.size(); ++i)
+			if (m_filmTimeSpin->value() >= starts[i] - 1e-6) shot = static_cast<int>(i);
+		if (shot < m_filmShotCombo->count()) m_filmShotCombo->setCurrentIndex(shot);
+	};
+	connect(m_filmTimeSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this]() { m_syncFilmShot(); });
 	filmTimeLayout->addWidget(filmTimeLabel);
 	filmTimeLayout->addWidget(m_filmTimeSpin);
 	filmTimeLayout->addWidget(new QLabel(tr("Shot:"), m_filmTimeRow));
