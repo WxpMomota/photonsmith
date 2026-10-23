@@ -29,6 +29,7 @@ extern char** environ;
 #endif
 #include "cpu_renderer/cpu_interface.h"
 #include "launcher/background_mode.h"
+#include "launcher/gpu_memory.h"
 #include "src/shared/output_format.h"
 #ifdef RT_HAVE_AVFOUNDATION_ENCODER
 #include "launcher/video_encoder_mac.h"   // Video -> MP4 via AVFoundation, no ffmpeg needed (used below)
@@ -376,8 +377,13 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
                                BackgroundPngConverter &png_converter) {
     const bool use_gpu = s.use_gpu;
     const int image_width = s.image_width, image_height = s.image_height, samples_per_pixel = s.samples_per_pixel, max_ray_depth = s.max_ray_depth;
-    const int workers = cartoon_render::workersFor(args, use_gpu, kMetalVideoFrames);
-    const int jobs = cartoon_render::jobsFor(args, use_gpu);
+    // how many frames to keep in flight follows the frame's size, its samples and the graphics card's free memory (RunPolicy::framesInFlight), unless the user chose
+    FrameLoad load;
+    load.pixels = static_cast<long long>(image_width) * image_height;
+    load.spp = samples_per_pixel;
+    if (use_gpu && !kMetalVideoFrames) load.freeVramMb = gpu_memory::freeMb(args.gpu_device >= 0 ? args.gpu_device : (std::getenv("RAY_TRACER_GPU_DEVICE") ? std::atoi(std::getenv("RAY_TRACER_GPU_DEVICE")) : 0));
+    const int workers = cartoon_render::workersFor(args, use_gpu, kMetalVideoFrames, load);
+    const int jobs = cartoon_render::jobsFor(args, use_gpu, load);
     for (int w = 0; w < std::max(jobs, workers); ++w) std::filesystem::create_directories(frames_dir / ("work" + std::to_string(w)));
     // A GPU frame is written as a PNG by the renderer itself (OutputOptions::write_png; Metal always did), not as a text PPM to convert: the picture of GPU SPPM is the one exception
     const bool frame_is_png = use_gpu && (kMetalVideoFrames || !args.use_sppm);
@@ -400,6 +406,8 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
     std::cout << "\nRendering " << (render_frame_count - resumed) << " frames of " << film.name << ", ";
     if (workers > 0) std::cout << workers << " workers";
     else std::cout << jobs << " at a time";
+    if (load.freeVramMb > 0 && use_gpu) std::cout << " (for " << image_width << " x " << image_height << " at " << samples_per_pixel << " samples, " << std::fixed << std::setprecision(1)
+                                                  << load.freeVramMb / 1024.0 << " GB of the graphics card free)" << std::defaultfloat;
     if (timeout > 0) std::cout << " (a frame that takes more than " << timeout << " s is stopped and tried once more)";
     std::cout << "." << std::endl;
     int reported = resumed;

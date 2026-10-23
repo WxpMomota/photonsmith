@@ -1152,6 +1152,16 @@ TEST(RunPolicy, ItIsDecidedOnceFromTheArgumentsAndTheEnvironmentAndEveryNumberFo
 	EXPECT_EQ(normal.defaultWorkers(true, true), 0) << "a Metal frame is a process of its own";
 	EXPECT_EQ(normal.defaultFrameJobs(true), 2);
 	EXPECT_EQ(normal.defaultFrameJobs(false), 1);
+	// with the frame's load known: light frames more at once, heavy ones two, never more than the free memory holds (RunPolicy::framesInFlight's measurements)
+	EXPECT_EQ(normal.defaultFrameJobs(true, {214 * 120, 16, 15600}), 4) << "120p at 16 samples";
+	EXPECT_EQ(normal.defaultFrameJobs(true, {854 * 480, 64, 15600}), 4) << "480p at 64 samples";
+	EXPECT_EQ(normal.defaultFrameJobs(true, {1920 * 1080, 16, 15600}), 3) << "1080p at 16 samples";
+	EXPECT_EQ(normal.defaultFrameJobs(true, {1920 * 1080, 256, 15600}), 2) << "1080p at 256 samples keeps the GPU busy by itself";
+	EXPECT_EQ(normal.defaultFrameJobs(true, {1920 * 1080, 16, 6000}), 1) << "only one 1080p frame fits in 6 GB";
+	EXPECT_EQ(normal.defaultFrameJobs(true, {3840 * 2160, 16, 15600}), 1) << "a 4K frame holds most of a 16 GB card";
+	EXPECT_EQ(normal.defaultFrameJobs(true, {214 * 120, 16, 0}), 2) << "memory not known: the old two";
+	EXPECT_EQ(normal.defaultWorkers(true, false, {214 * 120, 16, 15600}), 4) << "workers follow the frames in flight";
+	EXPECT_EQ(normal.defaultFrameJobs(false, {214 * 120, 16, 15600}), 1) << "the CPU renders one frame at a time with all its cores";
 	EXPECT_EQ(normal.stallSeconds(900), 900);
 	EXPECT_EQ(normal.pauseSecondsAfter(2.0), 0.0);
 	EXPECT_EQ(normal.cpuThreads(16), 0u) << "no limit of its own";

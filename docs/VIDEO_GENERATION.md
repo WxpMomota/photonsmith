@@ -244,9 +244,13 @@ How it renders: each frame is written as a `.pbrt` scene (`src/shared/cartoon/`:
 denoiser, seed, exposure, tone mapping ...; the video flags and the output path are replaced), then joined by the usual video assembly. Each frame is therefore an ordinary
 single-image render of a pbrt file: every renderer feature works, and a frame costs a process start (a second or two) on top of its render. To keep the GPU busy through that, **two frames
 are rendered at once** on a GPU (one on the CPU, which a single render already fills): while one renders the other starts up or writes its picture, which takes a 12-frame Newton's Cradle from 50 s to
-36 s; `--cartoon-jobs 3` (or the environment variable `RAY_TRACER_CARTOON_JOBS`) is faster still, 32 s, at about 3 GB of video memory for each frame in flight. For a heavy film at 1920 x 1080 two is the most that pays: 48 frames of The Great Turtle Escape at 64
-samples on an RTX 5080 (16 GB) take 159 s one at a time, 141 s two at a time (10.2 GB of video memory) and 140 s three at a time (13.9 GB); four need more than the card has and slow to a
-crawl as the driver pages video memory out (2026-10-23). The pictures are put in frame order
+36 s; `--cartoon-jobs 3` (or the environment variable `RAY_TRACER_CARTOON_JOBS`) is faster still, 32 s, at about 3 GB of video memory for each frame in flight. How many pays depends on the frame, so by default a GPU video
+chooses (RunPolicy::framesInFlight, launcher/run_policy.h): four for light frames (up to 30 million samples a frame, pixels times samples), three up to 80 million, two above, and never
+more than the card's free memory holds (asked of the NVIDIA driver at the start, launcher/gpu_memory.h; a frame in flight holds about 0.72 GB + 1.75 KB a pixel with the wavefront renderer:
+5 GB at 1080p). Measured on an RTX 5080 (16 GB), 24 frames of The Great Turtle Escape each, two at a time against the best (2026-10-23): 120p at 16 samples 9.3 s, 7.6 s four at a time;
+480p at 16: 11.9 s, 10.3 s four; 480p at 64: 25.4 s, 22.7 s four; 1080p at 16: 24.3 s, 22.7 s three (13.7 GB); 1080p at 256: 274 s, and no better with one (269 s) or three (275 s);
+48 frames at 1080p and 64 samples: 141 s two, 140 s three, and four need more than the card has and crawl as the driver pages video memory out. The workers follow the same number;
+`--cartoon-jobs` / `--cartoon-workers` still decide when given. The pictures are put in frame order
 whatever order they finish in. `--frames` / `--fps` change how the film is sampled and played back, not its story.
 
 **Workers: a draft-quality film renders about four times faster.** A frame run costs about a second and a half before it renders anything (the process starts, OptiX makes its context and builds

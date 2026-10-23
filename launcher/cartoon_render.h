@@ -161,14 +161,15 @@ inline bool writeSoundtrack(const cartoon::Film &film, const std::filesystem::pa
 }
 
 // ---- long-lived workers (cartoon_worker.h) ----
-// How many worker processes render a cartoon video's frames: --cartoon-workers N, else the environment variable RAY_TRACER_CARTOON_WORKERS, else two on an OptiX GPU and none elsewhere
-// (the CPU renders every frame with all its cores, so a process start is nothing to it; Metal frames are rendered by a process each). 0 means a process per frame.
-inline int workersFor(const LaunchArgs &args, bool gpu, bool metal) {
+// How many worker processes render a cartoon video's frames: --cartoon-workers N, else the environment variable RAY_TRACER_CARTOON_WORKERS, else on an OptiX GPU as many as the frame's
+// load calls for (RunPolicy::framesInFlight: 2 to 4 within the free memory; two when it is not given) and none elsewhere (the CPU renders every frame with all its cores, so a process
+// start is nothing to it; Metal frames are rendered by a process each). 0 means a process per frame.
+inline int workersFor(const LaunchArgs &args, bool gpu, bool metal, const FrameLoad &load = {}) {
 	int n = args.cartoon_workers;
 	if (n < 0) {
 		if (const char *env = std::getenv("RAY_TRACER_CARTOON_WORKERS")) n = std::atoi(env);
 	}
-	if (n < 0) n = RunPolicy::from(args).defaultWorkers(gpu, metal);
+	if (n < 0) n = RunPolicy::from(args).defaultWorkers(gpu, metal, load);
 	return std::max(0, std::min(n, 4));
 }
 
@@ -297,14 +298,14 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 	return succeeded;
 }
 
-// How many frames are rendered at once: --cartoon-jobs N, else the environment variable RAY_TRACER_CARTOON_JOBS, else two on a GPU and one on the CPU (a CPU render already uses every
-// core, so running several only has them compete). Between 1 and 8.
-inline int jobsFor(const LaunchArgs &args, bool gpu) {
+// How many frames are rendered at once: --cartoon-jobs N, else the environment variable RAY_TRACER_CARTOON_JOBS, else on a GPU what the frame's load calls for (as workersFor) and one on
+// the CPU (a CPU render already uses every core, so running several only has them compete). Between 1 and 8.
+inline int jobsFor(const LaunchArgs &args, bool gpu, const FrameLoad &load = {}) {
 	int n = args.cartoon_jobs;
 	if (n <= 0) {
 		if (const char *env = std::getenv("RAY_TRACER_CARTOON_JOBS")) n = std::atoi(env);
 	}
-	if (n <= 0) n = RunPolicy::from(args).defaultFrameJobs(gpu);
+	if (n <= 0) n = RunPolicy::from(args).defaultFrameJobs(gpu, load);
 	return std::max(1, std::min(n, 8));
 }
 
