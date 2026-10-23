@@ -279,7 +279,7 @@ private:
 	void buildSceneInfoRows(QWidget *basicTab, QVBoxLayout *sceneGroupLayout);
 	void buildRenderSettingsGroup(QWidget *basicTab, QVBoxLayout *layout);
 	void buildQualityRows(QWidget *basicTab, QFormLayout *renderLayout);
-	void buildMachineRows(QWidget *basicTab, QFormLayout *renderLayout);   // graphics card, video helper memory, keep the PC responsive
+	void buildMachineRows(QWidget *basicTab, QFormLayout *renderLayout);   // power, graphics card, video helper memory
 	void syncResolutionCombo();   // shows the preset that Width x Height is, or "Custom size"
 	void buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout);
 #ifdef RT_GUI_HAVE_LIVE_PREVIEW
@@ -1304,7 +1304,7 @@ private:
 	QDoubleSpinBox *m_exposureSpin;     // --exposure (default path tracer only)
 	QComboBox *m_tonemapCombo;          // --tonemap (default path tracer only)
 	QCheckBox *m_statsCheck;            // --stats (default path tracer only)
-	QCheckBox *m_backgroundCheck = nullptr;   // --background (Settings tab, Render Settings group); remembered between runs
+	QComboBox *m_powerCombo = nullptr;        // Full power (the default) or Keep the PC responsive (--background); Settings tab, Render Settings group; remembered between runs
 	QSpinBox *m_gpuDeviceSpin = nullptr;      // --gpu-device (same group; not on a Mac, which has one GPU path); remembered
 	bool m_syncingResolution = false;         // (Resolution preset <-> Width/Height, without the two setting each other off)
 	QSpinBox *m_workerMemorySpin = nullptr;   // --worker-max-mb, in GB (same group); remembered

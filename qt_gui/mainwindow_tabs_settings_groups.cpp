@@ -896,10 +896,37 @@ void MainWindow::buildQualityRows(QWidget *basicTab, QFormLayout *renderLayout) 
 		m_resolutionCombo);
 }
 
-// The machine side of rendering, at the end of Render Settings: which graphics card renders, when a video's helper process is replaced for holding too much memory,
-// and whether a render keeps the computer responsive (launcher --gpu-device / --worker-max-mb / --background). All remembered between runs; the first two are passed
-// to the renderer only when they differ from its own defaults, so leaving them alone gives the command line this program always gave.
+// The machine side of rendering, at the end of Render Settings: how much of the computer a render takes, which graphics card renders, and when a video's helper process
+// is replaced for holding too much memory (launcher --background / --gpu-device / --worker-max-mb). All remembered between runs and passed to the renderer only when
+// they differ from its own defaults, which are the full power of the computer: no background mode, the first card, no memory limit.
 void MainWindow::buildMachineRows(QWidget *basicTab, QFormLayout *renderLayout) {
+	// Full power, or a render that is a polite guest so the computer stays usable: lower CPU and GPU priority, half the CPU cores, one worker and one frame at a time,
+	// a pause after every video frame (launcher/background_mode.h). Applies to renders and videos, not to Live Preview (which runs inside this program).
+	m_powerCombo = new QComboBox(basicTab);
+	m_powerCombo->addItem(tr("Full power (fastest)"), false);
+	m_powerCombo->addItem(tr("Keep the PC responsive while rendering"), true);
+	styleComboBox(m_powerCombo);
+	m_powerCombo->setToolTip(
+		tr("Full power: the render uses all of the computer - every CPU core, the graphics card\n"
+		"flat out - and finishes as soon as it can.\n\n"
+		"Keep the PC responsive: renders politely so you can use the computer meanwhile - a lower\n"
+		"CPU priority, half of the CPU cores, and a video pauses after every frame for as long as\n"
+		"the frame took. A video takes about twice as long. The pictures are the same."));
+	{
+		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
+		m_powerCombo->setCurrentIndex(settings.value(settings_keys::kBackgroundModeKey, false).toBool() ? 1 : 0);
+	}
+	connect(m_powerCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
+		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
+		settings.setValue(settings_keys::kBackgroundModeKey, m_powerCombo->currentData().toBool());
+	});
+	renderLayout->addRow(labelWithInfo(tr("Power:"),
+		tr("How much of the computer a render or a video takes. Full power, the default, uses "
+		"everything and is the fastest. Keep the PC responsive leaves room for other programs "
+		"(lower priority, half the CPU cores, a pause after every video frame), so a video takes "
+		"about twice as long; the pictures are the same.")),
+		m_powerCombo);
+
 #ifndef Q_OS_MAC
 	m_gpuDeviceSpin = new QSpinBox(basicTab);
 	m_gpuDeviceSpin->setRange(0, 15);
@@ -929,10 +956,10 @@ void MainWindow::buildMachineRows(QWidget *basicTab, QFormLayout *renderLayout) 
 	m_workerMemorySpin->setToolTip(
 		tr("A video renders its frames in helper processes. One that comes to hold more memory\n"
 		"than this is replaced by a fresh one between two frames, so a long video cannot slowly\n"
-		"fill the computer's memory. The pictures are the same. \"No limit\" never replaces one."));
+		"fill the computer's memory. The pictures are the same. \"No limit\" (the default) never replaces one."));
 	{
 		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
-		m_workerMemorySpin->setValue(settings.value(settings_keys::kWorkerMaxGbKey, 8).toInt());
+		m_workerMemorySpin->setValue(settings.value(settings_keys::kWorkerMaxGbKey, 0).toInt());
 	}
 	connect(m_workerMemorySpin, qOverload<int>(&QSpinBox::valueChanged), this, [](int value) {
 		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
@@ -941,27 +968,8 @@ void MainWindow::buildMachineRows(QWidget *basicTab, QFormLayout *renderLayout) 
 	renderLayout->addRow(labelWithInfo(tr("Video Helper Memory:"),
 		tr("A video renders its frames in helper processes. One that comes to hold more memory "
 		"than this is replaced by a fresh one between two frames, so a long video cannot slowly "
-		"fill the computer's memory. The pictures are the same; \"No limit\" never replaces one.")),
+		"fill the computer's memory. The pictures are the same; \"No limit\", the default, never replaces one.")),
 		m_workerMemorySpin);
-
-	// For a long render or video that should not take the computer over: lower CPU and GPU priority, half the CPU cores, one worker and one frame at a time (launcher/background_mode.h).
-	// Applies to renders and videos, not to Live Preview (which runs inside this program).
-	m_backgroundCheck = new QCheckBox(tr("Keep the PC responsive while rendering"), basicTab);
-	m_backgroundCheck->setToolTip(
-		tr("Renders politely so you can use the computer meanwhile: a lower CPU priority,\n"
-		"half of the CPU cores, and a video pauses after every frame for as long as the\n"
-		"frame took, which leaves the graphics card to your other programs half of the time.\n"
-		"A video takes about twice as long. The pictures are the same."));
-	styleCheckBox(m_backgroundCheck);
-	{
-		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
-		m_backgroundCheck->setChecked(settings.value(settings_keys::kBackgroundModeKey, false).toBool());
-	}
-	connect(m_backgroundCheck, &QCheckBox::toggled, this, [](bool on) {
-		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
-		settings.setValue(settings_keys::kBackgroundModeKey, on);
-	});
-	renderLayout->addRow(QString(), m_backgroundCheck);
 }
 
 void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {

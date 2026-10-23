@@ -829,7 +829,7 @@ TEST(CartoonWorkers, TheMemoryLimitIsTheFlagThenTheEnvironmentThenEightGigabytes
 	};
 	LaunchArgs plain;
 	put("", false);
-	EXPECT_EQ(cartoon_render::workerMemoryLimitBytes(plain), 8192ull * 1024 * 1024);
+	EXPECT_EQ(cartoon_render::workerMemoryLimitBytes(plain), 0ull) << "no limit unless one is asked for";
 	put("2048", true);
 	EXPECT_EQ(cartoon_render::workerMemoryLimitBytes(plain), 2048ull * 1024 * 1024);
 	put("0", true);

@@ -359,7 +359,7 @@ void RenderController::start() {
 	if (m_advancedFlags.stats)         args << render_flags::kStats;
 	if (m_advancedFlags.background)    args << render_flags::kBackground;
 	if (m_advancedFlags.gpuDevice != 0) args << render_flags::kGpuDevice << QString::number(m_advancedFlags.gpuDevice);
-	if (m_advancedFlags.workerMaxGb != 8) args << render_flags::kWorkerMaxMb << QString::number(m_advancedFlags.workerMaxGb * 1024);
+	if (m_advancedFlags.workerMaxGb != 0) args << render_flags::kWorkerMaxMb << QString::number(m_advancedFlags.workerMaxGb * 1024);
 	if (m_advancedFlags.lookBloom >= 0.0) args << render_flags::kBloom << QString::number(m_advancedFlags.lookBloom);
 	if (m_advancedFlags.lookVignette >= 0.0) args << render_flags::kVignette << QString::number(m_advancedFlags.lookVignette);
 	if (m_advancedFlags.lookWarmth >= -1.0) args << render_flags::kWarmth << QString::number(m_advancedFlags.lookWarmth);

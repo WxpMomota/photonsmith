@@ -129,9 +129,9 @@ RenderJob MainWindow::captureRenderJob() {
 	job.advancedFlags.denoise = m_denoiseCheck->isEnabled() && m_denoiseCheck->isChecked();
 	job.advancedFlags.denoiseBlend = m_denoiseBlendSpin->isEnabled() ? m_denoiseBlendSpin->value() : 0.0;
 	job.advancedFlags.stats = m_statsCheck->isEnabled() && m_statsCheck->isChecked();
-	job.advancedFlags.background = m_backgroundCheck && m_backgroundCheck->isChecked();
+	job.advancedFlags.background = m_powerCombo && m_powerCombo->currentData().toBool();
 	job.advancedFlags.gpuDevice = m_gpuDeviceSpin ? m_gpuDeviceSpin->value() : 0;
-	job.advancedFlags.workerMaxGb = m_workerMemorySpin ? m_workerMemorySpin->value() : 8;
+	job.advancedFlags.workerMaxGb = m_workerMemorySpin ? m_workerMemorySpin->value() : 0;
 	// (a box at its lowest value says "Scene's": the sentinel, nothing passed)
 	const auto lookValue = [](const QDoubleSpinBox *spin, double unset) { return spin && spin->value() > spin->minimum() ? spin->value() : unset; };
 	job.advancedFlags.lookBloom = lookValue(m_bloomSpin, -1.0);

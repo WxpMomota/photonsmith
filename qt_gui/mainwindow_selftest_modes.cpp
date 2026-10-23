@@ -7,6 +7,7 @@
 #include "denoiser_installer.h"
 #include "live_ai_denoise.h"
 #include "app_log.h"
+#include "settings_keys.h"
 #include <iostream>
 #include "../src/shared/pbrt_asset_check.h"
 
@@ -21,6 +22,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QGroupBox>
+#include <QSettings>
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
@@ -1422,8 +1424,8 @@ void MainWindow::runBannerSelfTest(const std::function<void(const QString &)> &l
 }
 
 // RT_GUI_SELFTEST=resolution: the Resolution box has square and non-square presets; a preset fills in Width and Height, a typed size of any shape shows "Custom
-// size", and the render takes Width x Height whatever the Quality preset; the graphics card, video helper memory and "keep the PC responsive" controls are in the
-// Render Settings group. A screenshot of the group with a widescreen size chosen.
+// size", and the render takes Width x Height whatever the Quality preset; the Power box (Full power first), the graphics card and the video helper memory limit
+// (No limit unless chosen) are in the Render Settings group. A screenshot of the group with a widescreen size chosen.
 void MainWindow::runResolutionSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {
 	resize(1500, 950);
 	if (m_tabWidget) m_tabWidget->setCurrentIndex(0);
@@ -1460,7 +1462,10 @@ void MainWindow::runResolutionSelfTest(const std::function<void(const QString &)
 			if (auto *g = qobject_cast<QGroupBox *>(p)) return g->title() == tr("Render Settings");
 		return false;
 	};
-	check(inRenderSettings(m_backgroundCheck), "\"Keep the PC responsive\" is in Render Settings");
+	check(inRenderSettings(m_powerCombo), "the Power box is in Render Settings");
+	check(m_powerCombo->itemData(0).toBool() == false && m_powerCombo->itemData(1).toBool() == true, "its first choice is Full power, its second Keep the PC responsive");
+	check(m_workerMemorySpin->value() == m_workerMemorySpin->minimum() || QSettings(settings_keys::kOrg, settings_keys::kApp).contains(settings_keys::kWorkerMaxGbKey),
+		  "the video helper memory limit is No limit unless one was chosen: " + m_workerMemorySpin->text());
 	check(inRenderSettings(m_workerMemorySpin), "the video helper memory limit is in Render Settings");
 #ifndef Q_OS_MAC
 	check(inRenderSettings(m_gpuDeviceSpin), "the graphics card is in Render Settings");

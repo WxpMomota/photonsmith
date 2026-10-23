@@ -105,9 +105,9 @@ struct AdvancedRenderFlags {
 	// differs from 0.0, and only alongside --denoise itself.
 	double denoiseBlend = 0.0;
 	bool stats = false;
-	bool background = false;   // --background: render as a polite guest (Settings tab, Render Settings: "Keep the PC responsive")
+	bool background = false;   // --background: render as a polite guest (Settings tab, Render Settings: Power "Keep the PC responsive"; the default is Full power)
 	int gpuDevice = 0;         // --gpu-device N, passed only when not 0 (the CLI's own default)
-	int workerMaxGb = 8;       // --worker-max-mb N*1024, passed only when not 8 (the CLI's own default); 0 = never replace a video's worker
+	int workerMaxGb = 0;       // --worker-max-mb N*1024, passed only when not 0 (the CLI's own default: never replace a video's worker)
 	// The camera's look (--bloom/--vignette/--warmth/--saturation); below the range = the scene's own, not passed
 	double lookBloom = -1.0, lookVignette = -1.0, lookWarmth = -2.0, lookSaturation = -1.0;
 	bool aovs = false;   // --aovs: also write the render passes (albedo, normal, depth, uv, coverage)

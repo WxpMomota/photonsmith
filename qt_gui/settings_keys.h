@@ -28,11 +28,11 @@ constexpr const char *kLanguageKey = "ui/language";
 // Points added to (or, if negative, taken from) the Log/Diagnostics text views'
 // 9pt base size - see MainWindow::changeLogFontSize(). Absent = 0.
 constexpr const char *kLogFontDeltaKey = "ui/logFontDelta";
-// "Keep the PC responsive while rendering" (--background): remembered between runs. Absent = off.
+// The Power box: true = "Keep the PC responsive while rendering" (--background), false = Full power. Remembered between runs. Absent = Full power.
 constexpr const char *kBackgroundModeKey = "render/backgroundMode";
 // The graphics card renders run on (--gpu-device; Windows/Linux only). Absent = 0, the first card.
 constexpr const char *kGpuDeviceKey = "render/gpuDevice";
-// A video's worker that holds more than this many GB is replaced between two frames (--worker-max-mb). Absent = 8; 0 = never.
+// A video's worker that holds more than this many GB is replaced between two frames (--worker-max-mb). Absent = 0 = never (no limit).
 constexpr const char *kWorkerMaxGbKey = "render/workerMaxGb";
 // QSettings array group name (beginWriteArray/beginReadArray) for the
 // Recent Renders list - see recent_renders.cpp. The first list-shaped
