@@ -1,3 +1,4 @@
+#include <new>   // placement new, for shade_material()'s per-hit view of the material
 #pragma once
 // optix_device_shade.h -- part 4 of 5 of optix_device_helpers.h (included by it, in order; not meant to be included on its own).
 
@@ -1141,25 +1142,23 @@ __device__ __forceinline__ void shade_material(
 	float& out_eta,
 	unsigned int& inout_rgb_channel
 ) {
+	// ONE call of shade_material_surface below. It is a large function, and this used to call it from three places (a reflecting lamp's view of the material, one with this hit's roughness image,
+	// the material as it is): three inlined copies of it in every hit program of every geometry module, which is most of the recursive backend's 160 MB of PTX and of its 20 minutes of cold
+	// OptiX compile. The material is changed for this hit only in those two cases, in storage that is constructed only then (a MaterialData is about 300 bytes with 31 member initialisers).
+	alignas(MaterialData) unsigned char viewStorage[sizeof(MaterialData)];
+	const MaterialData *use = &mat;
 	if (lamp_reflects(mat)) {
-		MaterialData view = mat;
-		view.type = MaterialType::Lambertian;
-		view.textureIdx = -1;   // (the texture of a lamp is its emission, not its reflectance)
+		MaterialData *view = ::new (static_cast<void *>(viewStorage)) MaterialData(mat);
+		view->type = MaterialType::Lambertian;
+		view->textureIdx = -1;   // (the texture of a lamp is its emission, not its reflectance)
 		emission = make_float3(0.0f, 0.0f, 0.0f);
-		shade_material_surface(view, matIdx, normal, ray_dir, hit_point, front_face, uv_u, uv_v, dpdu, do_regularize, seed,
-			out_attenuation, out_scattered_dir, out_scattered, out_is_specular, out_is_medium_boundary, out_brdf_pdf_override, emission,
-			out_bssrdf_exit, out_bssrdf_exit_pos, out_eta, inout_rgb_channel);
-		return;
+		use = view;
+	} else if (mat.roughTexIdx >= 0 || mat.condRoughTexIdx >= 0) {
+		MaterialData *view = ::new (static_cast<void *>(viewStorage)) MaterialData(mat);   // (a copy for this hit only, with this hit's roughness)
+		patch_roughness_textures(*view, uv_u, uv_v, hit_point);
+		use = view;
 	}
-	if (mat.roughTexIdx >= 0 || mat.condRoughTexIdx >= 0) {
-		MaterialData view = mat;   // (a copy for this hit only, with this hit's roughness)
-		patch_roughness_textures(view, uv_u, uv_v, hit_point);
-		shade_material_surface(view, matIdx, normal, ray_dir, hit_point, front_face, uv_u, uv_v, dpdu, do_regularize, seed,
-			out_attenuation, out_scattered_dir, out_scattered, out_is_specular, out_is_medium_boundary, out_brdf_pdf_override, emission,
-			out_bssrdf_exit, out_bssrdf_exit_pos, out_eta, inout_rgb_channel);
-		return;
-	}
-	shade_material_surface(mat, matIdx, normal, ray_dir, hit_point, front_face, uv_u, uv_v, dpdu, do_regularize, seed,
+	shade_material_surface(*use, matIdx, normal, ray_dir, hit_point, front_face, uv_u, uv_v, dpdu, do_regularize, seed,
 		out_attenuation, out_scattered_dir, out_scattered, out_is_specular, out_is_medium_boundary, out_brdf_pdf_override, emission,
 		out_bssrdf_exit, out_bssrdf_exit_pos, out_eta, inout_rgb_channel);
 }
