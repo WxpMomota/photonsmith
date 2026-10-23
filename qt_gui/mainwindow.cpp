@@ -1110,6 +1110,10 @@ MainWindow::MainWindow(QWidget *parent, const QString &startupLanguageCode)
 	// The taskbar button only exists once the window has been realised, so
 	// defer the COM setup to the event loop rather than doing it here.
 	QTimer::singleShot(0, this, []() { win_taskbar::init(); });
+	// Every settings section's controls are at their defaults now (the remembered render form below is applied after): that is what each section's
+	// Defaults button goes back to.
+	addSectionResets();
+	captureSectionDefaults();
 	if (!qEnvironmentVariableIsSet("RT_GUI_SELFTEST")) restoreRenderForm();
 }
 

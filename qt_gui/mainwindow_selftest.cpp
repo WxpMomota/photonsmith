@@ -105,6 +105,7 @@ void MainWindow::runSelfTest(const QString &mode, const QString &outPrefix) {
 	if (mode == "framesstrip") { runFramesStripSelfTest(log, shot); return; }   // see mainwindow_selftest_modes.cpp
 	if (mode == "banner") { runBannerSelfTest(log, shot); return; }   // see mainwindow_selftest_modes.cpp
 	if (mode == "resolution") { runResolutionSelfTest(log, shot); return; }   // see mainwindow_selftest_modes.cpp
+	if (mode == "defaults") { runDefaultsSelfTest(log, shot); return; }   // see mainwindow_selftest_modes.cpp
 	if (mode == "videoframes") { runVideoFramesSelfTest(log, shot); return; }   // see mainwindow_selftest_modes.cpp
 
 	// RT_GUI_SELFTEST=quitwarm: wait for the GPU warm-up (a Mac) to finish, then quit. The check is the exit status: the warm-up's thread deletes itself when it is done, and

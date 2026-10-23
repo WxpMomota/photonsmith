@@ -1480,3 +1480,59 @@ void MainWindow::runResolutionSelfTest(const std::function<void(const QString &)
 	log(ok ? "RESULT: OK" : "RESULT: FAIL");
 	QApplication::exit(ok ? 0 : 1);
 }
+
+// RT_GUI_SELFTEST=defaults: every settings section (but Scene) has a Defaults button; pressing one puts that section's controls back to their defaults - and the
+// controls tied to them (Resolution with Width and Height, Quality with Samples and Max Depth) - and leaves every other section as it was. A screenshot of the
+// Settings tab's sections with their buttons.
+void MainWindow::runDefaultsSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {
+	resize(1500, 950);
+	if (m_tabWidget) m_tabWidget->setCurrentIndex(0);
+	show();
+	QApplication::processEvents();
+	bool ok = true;
+	auto check = [&ok, log](bool cond, const QString &what) {
+		log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what));
+		ok = ok && cond;
+	};
+	QStringList titles;
+	for (InfoGroupBox *s : m_resetSections) titles << s->title();
+	log("sections with a Defaults button: " + titles.join(", "));
+	check(m_resetSections.size() >= 10, QString("%1 sections have a Defaults button").arg(m_resetSections.size()));
+	check(!titles.contains(tr("Scene")), "the Scene section has none (choosing a scene is not a setting with a default)");
+	const auto sectionOf = [this](QWidget *w) -> InfoGroupBox * {
+		for (QWidget *p = w ? w->parentWidget() : nullptr; p; p = p->parentWidget())
+			if (auto *g = qobject_cast<InfoGroupBox *>(p); g && m_resetSections.contains(g)) return g;
+		return nullptr;
+	};
+	InfoGroupBox *render = sectionOf(m_powerCombo), *statsSection = sectionOf(m_statsCheck);
+	check(render && statsSection && render != statsSection, "the Power box and the Stats box are in two sections with buttons");
+	if (!render || !statsSection) {
+		log("RESULT: FAIL");
+		QApplication::exit(1);
+		return;
+	}
+	const int samplesBefore = m_samplesSpinBox->value();
+	const bool statsBefore = m_statsCheck->isChecked();
+	m_powerCombo->setCurrentIndex(1);
+	m_resolutionCombo->setCurrentIndex(m_resolutionCombo->findData(QSize(1920, 1080)));
+	m_samplesSpinBox->setValue(777);
+	m_maxDepthSpinBox->setValue(13);
+	m_statsCheck->setChecked(!statsBefore);
+	resetSection(render);
+	check(m_powerCombo->currentIndex() == 0, "Render Settings' Defaults: Power is Full power again");
+	check(m_widthSpinBox->value() == 800 && m_heightSpinBox->value() == 800 && m_resolutionCombo->currentData().toSize() == QSize(800, 800),
+		  QString("the size is 800 x 800 again, Width and Height with it (%1 x %2)").arg(m_widthSpinBox->value()).arg(m_heightSpinBox->value()));
+	check(m_samplesSpinBox->value() == samplesBefore && m_maxDepthSpinBox->value() == 50,
+		  QString("Samples is the scene's own again (%1) and Max Depth the Good preset's (%2)").arg(m_samplesSpinBox->value()).arg(m_maxDepthSpinBox->value()));
+	check(m_statsCheck->isChecked() != statsBefore, "a setting in another section is left as it was");
+	resetSection(statsSection);
+	check(m_statsCheck->isChecked() == statsBefore, "that section's own Defaults puts it back");
+	check(m_powerCombo->currentIndex() == 0 && m_widthSpinBox->value() == 800, "and leaves Render Settings as it was");
+	if (auto *scroll = qobject_cast<QScrollArea *>(m_tabWidget->widget(0))) {
+		scroll->ensureWidgetVisible(m_powerCombo, 50, 400);
+		QApplication::processEvents();
+	}
+	shot("defaults");
+	log(ok ? "RESULT: OK" : "RESULT: FAIL");
+	QApplication::exit(ok ? 0 : 1);
+}

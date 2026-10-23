@@ -915,6 +915,7 @@ void MainWindow::buildMachineRows(QWidget *basicTab, QFormLayout *renderLayout) 
 	{
 		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
 		m_powerCombo->setCurrentIndex(settings.value(settings_keys::kBackgroundModeKey, false).toBool() ? 1 : 0);
+		m_powerCombo->setProperty("rt_default", 0);   // (the section's Defaults button: Full power, whatever was remembered)
 	}
 	connect(m_powerCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
 		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
@@ -938,6 +939,7 @@ void MainWindow::buildMachineRows(QWidget *basicTab, QFormLayout *renderLayout) 
 	{
 		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
 		m_gpuDeviceSpin->setValue(settings.value(settings_keys::kGpuDeviceKey, 0).toInt());
+		m_gpuDeviceSpin->setProperty("rt_default", 0);
 	}
 	connect(m_gpuDeviceSpin, qOverload<int>(&QSpinBox::valueChanged), this, [](int value) {
 		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
@@ -960,6 +962,7 @@ void MainWindow::buildMachineRows(QWidget *basicTab, QFormLayout *renderLayout) 
 	{
 		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
 		m_workerMemorySpin->setValue(settings.value(settings_keys::kWorkerMaxGbKey, 0).toInt());
+		m_workerMemorySpin->setProperty("rt_default", 0);
 	}
 	connect(m_workerMemorySpin, qOverload<int>(&QSpinBox::valueChanged), this, [](int value) {
 		QSettings settings(settings_keys::kOrg, settings_keys::kApp);

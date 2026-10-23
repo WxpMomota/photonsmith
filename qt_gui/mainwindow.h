@@ -143,6 +143,7 @@ public:
 	void runFramesStripSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runBannerSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runResolutionSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
+	void runDefaultsSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runVideoFramesSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runBuilderSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot, const QString &outPrefix);
 	void runDiagnosticsSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);
@@ -202,6 +203,12 @@ private slots:
 	// to RenderController::pauseStateChanged() from startRenderJob().
 	void onControllerPauseStateChanged(bool paused);
 	void onQualityPresetChanged(int index);
+	// Each settings section's "Defaults" button (mainwindow_slots.cpp): the controls of every section as they were when the window was built are its defaults;
+	// a reset puts a section's controls back to them, then applies the current scene's own recommendations again (its samples, exposure, camera, a film's
+	// size) without touching any other section.
+	void addSectionResets();
+	void captureSectionDefaults();
+	void resetSection(InfoGroupBox *section);
 	void onCameraPresetChanged(int index);  // Updates camera spinboxes when preset changes
 	void onVideoPresetChanged(int index);   // Points scene/camera-path/frames/fps/speed at a named preset
 	void onCameraDistanceChanged(double distance);  // Repositions camera X/Y/Z along its current direction from lookat
@@ -1477,6 +1484,8 @@ private:
 	QDoubleSpinBox *m_filmTimeSpin = nullptr;
 	QComboBox *m_filmShotCombo = nullptr;    // the film's shots by name: choosing one sets the film time to a moment inside it
 	QString m_filmTimeFor;                   // key of the film the spin box's range and value were last set for
+	QList<InfoGroupBox *> m_resetSections;           // the settings sections with a "Defaults" button
+	QHash<QWidget *, QVariant> m_sectionDefaults;    // each of their controls' default value
 	QString m_cartoonSettingsFor;   // key of the film whose frames/fps/speed were last set from a cartoon scene; empty when the scene is not a cartoon
 	QTabBar *m_sceneCategoryTabs = nullptr;  // Category filter above the scene dropdown
 	// A third row, under the category tabs: the subcategories of the selected category (Large Scenes: Interiors, Vehicles, ...), with "All" first. It has no tabs

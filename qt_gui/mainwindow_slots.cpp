@@ -28,6 +28,14 @@
 #include <QSignalBlocker>
 #include <QIcon>
 #include <QStyle>
+#include <QToolButton>
+#include <QSpinBox>
+#include <QRadioButton>
+#include <QLineEdit>
+#include <QDoubleSpinBox>
+#include <QComboBox>
+#include <QCheckBox>
+#include <QAbstractSlider>
 #include <QThread>
 #include <QHash>
 #include <array>
@@ -137,6 +145,109 @@ void MainWindow::onQualityPresetChanged(int index) {
 		m_samplesSpinBox->setValue(presetSamples[index]);
 		m_maxDepthSpinBox->setValue(presetDepth[index]);
 	}
+}
+
+// ============================================================================
+// The settings sections' "Defaults" buttons
+// ============================================================================
+namespace {
+// The controls a section's reset covers: combo boxes, spin boxes, check boxes and radio buttons, sliders, and line edits (not the ones inside a spin box or an
+// editable combo box). A control can opt out with the property "rt_no_reset".
+bool isResettable(QWidget *w) {
+	if (!w || w->property("rt_no_reset").toBool()) return false;
+	if (qobject_cast<QComboBox *>(w) || qobject_cast<QAbstractSpinBox *>(w)) return true;
+	if (auto *b = qobject_cast<QAbstractButton *>(w)) return b->isCheckable() && (qobject_cast<QCheckBox *>(w) || qobject_cast<QRadioButton *>(w));
+	if (qobject_cast<QAbstractSlider *>(w)) return !qobject_cast<QScrollBar *>(w);
+	if (qobject_cast<QLineEdit *>(w)) return !qobject_cast<QAbstractSpinBox *>(w->parentWidget()) && !qobject_cast<QComboBox *>(w->parentWidget());
+	return false;
+}
+QList<QWidget *> resettableIn(QWidget *root) {
+	QList<QWidget *> out;
+	for (QWidget *w : root->findChildren<QWidget *>())
+		if (isResettable(w)) out.append(w);
+	return out;
+}
+QVariant valueOf(QWidget *w) {
+	if (auto *c = qobject_cast<QComboBox *>(w)) return c->currentIndex();
+	if (auto *s = qobject_cast<QSpinBox *>(w)) return s->value();
+	if (auto *d = qobject_cast<QDoubleSpinBox *>(w)) return d->value();
+	if (auto *b = qobject_cast<QAbstractButton *>(w)) return b->isChecked();
+	if (auto *l = qobject_cast<QAbstractSlider *>(w)) return l->value();
+	if (auto *e = qobject_cast<QLineEdit *>(w)) return e->text();
+	return {};
+}
+void setValueOf(QWidget *w, const QVariant &v) {
+	if (!v.isValid()) return;
+	if (auto *c = qobject_cast<QComboBox *>(w)) {
+		if (v.toInt() < c->count()) c->setCurrentIndex(v.toInt());
+	} else if (auto *s = qobject_cast<QSpinBox *>(w)) s->setValue(v.toInt());
+	else if (auto *d = qobject_cast<QDoubleSpinBox *>(w)) d->setValue(v.toDouble());
+	else if (auto *b = qobject_cast<QAbstractButton *>(w)) b->setChecked(v.toBool());
+	else if (auto *l = qobject_cast<QAbstractSlider *>(w)) l->setValue(v.toInt());
+	else if (auto *e = qobject_cast<QLineEdit *>(w)) e->setText(v.toString());
+}
+}  // namespace
+
+// The sections of the Settings and Render Options tabs get the button; the Scene section (a choice, not a setting with a default) does not.
+void MainWindow::addSectionResets() {
+	for (int i = 0; m_tabWidget && i < m_tabWidget->count(); ++i) {
+		QWidget *tab = m_tabWidget->widget(i);
+		const QString name = m_tabWidget->tabText(i).remove(QLatin1Char('&'));
+		if (name != tr("Settings") && name != tr("Render Options")) continue;
+		for (InfoGroupBox *section : tab->findChildren<InfoGroupBox *>()) {
+			if (section->title() == tr("Scene") || resettableIn(section).isEmpty()) continue;
+			auto *button = new QToolButton(section);
+			button->setAutoRaise(true);
+			button->setFocusPolicy(Qt::TabFocus);
+			button->setCursor(Qt::PointingHandCursor);
+			button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+			button->setIconSize(QSize(13, 13));
+			button->setText(tr("Defaults"));
+			button->setObjectName(QStringLiteral("sectionResetButton"));
+			icon_tint::apply(button, ":/icons/reset.svg", icon_tint::Role::Body, m_activeTheme.textBody);
+			button->setToolTip(tr("Put every setting in \"%1\" back to its default.\nSettings that follow the scene (its samples, exposure and camera) go back to the scene's own.").arg(section->title().replace(QStringLiteral("&&"), QStringLiteral("&"))));
+			connect(button, &QToolButton::clicked, this, [this, section]() { resetSection(section); });
+			section->setResetButton(button);
+			m_resetSections.append(section);
+		}
+	}
+}
+
+void MainWindow::captureSectionDefaults() {
+	m_sectionDefaults.clear();
+	for (InfoGroupBox *section : m_resetSections)
+		for (QWidget *w : resettableIn(section)) {
+			const QVariant explicitDefault = w->property("rt_default");
+			m_sectionDefaults.insert(w, explicitDefault.isValid() ? explicitDefault : valueOf(w));
+		}
+}
+
+void MainWindow::resetSection(InfoGroupBox *section) {
+	QList<QWidget *> inside = resettableIn(section);
+	// Controls that set each other are reset together, whichever section each is in: the Resolution preset fills in Width and Height, the Quality preset
+	// Samples and Max Depth (left apart, the one kept would switch the other back to Custom).
+	const QList<QList<QWidget *>> linked = {{m_resolutionCombo, m_widthSpinBox, m_heightSpinBox}, {m_qualityPresetCombo, m_samplesSpinBox, m_maxDepthSpinBox}};
+	for (const QList<QWidget *> &group : linked) {
+		bool any = false;
+		for (QWidget *w : group) any = any || inside.contains(w);
+		if (any)
+			for (QWidget *w : group)
+				if (w && !inside.contains(w)) inside.append(w);
+	}
+	// everything outside the section, as it is now (put back after the scene's recommendations are applied again below)
+	QList<QPair<QWidget *, QVariant>> outside;
+	for (QWidget *w : resettableIn(this))
+		if (!inside.contains(w)) outside.append({w, valueOf(w)});
+	for (QWidget *w : inside)
+		if (m_sectionDefaults.contains(w)) setValueOf(w, m_sectionDefaults.value(w));
+	// the scene's own recommendations (samples, exposure, camera, a film's picture size) are the defaults of the settings that follow the scene
+	m_filmTimeFor.clear();
+	if (m_sceneCombo && m_sceneCombo->currentIndex() >= 0) onSceneChanged(m_sceneCombo->currentIndex());
+	for (const auto &kept : outside)
+		if (valueOf(kept.first) != kept.second) setValueOf(kept.first, kept.second);
+	const QString name = section->title().replace(QStringLiteral("&&"), QStringLiteral("&"));   // (a title shows a single & as &&)
+	AppLog::info(QStringLiteral("settings"), QStringLiteral("\"%1\" put back to its defaults").arg(name));
+	if (statusBar()) statusBar()->showMessage(tr("\"%1\" is back to its defaults").arg(name), 4000);
 }
 
 // ============================================================================

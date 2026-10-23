@@ -231,6 +231,15 @@ public:
 	// dynamic content.
 	QToolButton *infoIcon() const { return m_infoIcon; }
 
+	// A button at the right-hand end of the title row (the section's "Defaults" button, MainWindow::addSectionReset()); takes ownership like setInfoIcon().
+	void setResetButton(QToolButton *button) {
+		m_resetButton = button;
+		m_resetButton->setParent(this);
+		m_resetButton->raise();
+		repositionInfoIcon();
+	}
+	QToolButton *resetButton() const { return m_resetButton; }
+
 	// Hides (not overrides - QGroupBox::setTitle() isn't virtual) the base
 	// class setter so a title change also repositions the icon, whose x
 	// depends on the title text's own measured width (repositionInfoIcon()'s
@@ -256,7 +265,7 @@ protected:
 
 private:
 	void repositionInfoIcon() {
-		if (!m_infoIcon) return;
+		if (!m_infoIcon && !m_resetButton) return;
 		// Matches the ::title QSS subcontrol's own box model exactly
 		// (mainwindow_style.cpp) - left offset + left/right padding is
 		// where the title text itself starts.
@@ -268,12 +277,20 @@ private:
 		QFont titleFont = font();
 		titleFont.setBold(true);
 		const QFontMetrics fm(titleFont);
-		const int x = kTitleLeft + kTitlePaddingH + fm.horizontalAdvance(title()) + kGapAfterText;
-		const int y = kTitleTop + kTitlePaddingV + (fm.height() - m_infoIcon->height()) / 2;
-		m_infoIcon->move(x, y);
+		if (m_infoIcon) {
+			const int x = kTitleLeft + kTitlePaddingH + fm.horizontalAdvance(title()) + kGapAfterText;
+			const int y = kTitleTop + kTitlePaddingV + (fm.height() - m_infoIcon->height()) / 2;
+			m_infoIcon->move(x, y);
+		}
+		if (m_resetButton) {
+			m_resetButton->adjustSize();
+			const int y = kTitleTop + kTitlePaddingV + (fm.height() - m_resetButton->height()) / 2;
+			m_resetButton->move(width() - m_resetButton->width() - kTitleLeft, (std::max)(0, y));
+		}
 	}
 
 	QToolButton *m_infoIcon = nullptr;
+	QToolButton *m_resetButton = nullptr;
 };
 
 // ============================================================================
