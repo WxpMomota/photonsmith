@@ -284,6 +284,23 @@ RenderJob MainWindow::captureRenderJob() {
 	return job;
 }
 
+// A RenderController set up for `job` (owned by this window): what startRenderJob() runs, and what a self-test reads the command line of.
+RenderController *MainWindow::makeRenderController(const RenderJob &job) {
+	auto *controller = new RenderController(this);
+	controller->setParameters(job.useGPU, job.width, job.height, job.samples, job.maxDepth,
+	                          job.sceneId, job.camX, job.camY, job.camZ, job.camExplicit,
+	                          job.outputPath, job.useWavefront);
+	controller->setSceneArgument(job.sceneArgument);
+	controller->setAdvancedFlags(job.advancedFlags);
+	controller->setIntegratorOptions(job.integratorOptions);
+	if (job.videoMode) {
+		controller->setVideoParameters(true, job.videoFrames, job.videoFPS, job.cameraPath, job.videoSpeed);
+	} else {
+		controller->setVideoParameters(false, 0, 0, "", 1.0);
+	}
+	return controller;
+}
+
 void MainWindow::startRenderJob(const RenderJob &job) {
 	// Recorded before anything else so onRenderComplete() - which fires
 	// asynchronously, possibly after the user has already changed the scene/
@@ -299,19 +316,7 @@ void MainWindow::startRenderJob(const RenderJob &job) {
 	// parameters and reports its output back via signals (no worker thread -
 	// QProcess is already asynchronous). The executable will call either the
 	// CPU or GPU renderer based on the useGPU flag.
-	m_renderController = new RenderController(this);
-	m_renderController->setParameters(job.useGPU, job.width, job.height, job.samples, job.maxDepth,
-	                                   job.sceneId, job.camX, job.camY, job.camZ, job.camExplicit,
-	                                   job.outputPath, job.useWavefront);
-	m_renderController->setSceneArgument(job.sceneArgument);
-	m_renderController->setAdvancedFlags(job.advancedFlags);
-	m_renderController->setIntegratorOptions(job.integratorOptions);
-
-	if (job.videoMode) {
-		m_renderController->setVideoParameters(true, job.videoFrames, job.videoFPS, job.cameraPath, job.videoSpeed);
-	} else {
-		m_renderController->setVideoParameters(false, 0, 0, "", 1.0);
-	}
+	m_renderController = makeRenderController(job);
 
 	connect(m_renderController, &RenderController::progressUpdate, this, &MainWindow::onProgressUpdate);
 	connect(m_renderController, &RenderController::renderComplete, this, &MainWindow::onRenderComplete);

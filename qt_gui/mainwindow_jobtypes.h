@@ -252,6 +252,7 @@ public:
 	// Builds the command line and launches ray_tracer.exe. Returns immediately;
 	// everything after this point is driven by the process's own signals.
 	void start();
+	QStringList commandArguments() const;   // the ray_tracer command line start() runs (without the program)
 
 	// Kill the render process outright. Safe to call when nothing is
 	// running. The queue does NOT auto-advance after this - see

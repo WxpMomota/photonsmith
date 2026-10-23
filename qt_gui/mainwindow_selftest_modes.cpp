@@ -1457,6 +1457,37 @@ void MainWindow::runResolutionSelfTest(const std::function<void(const QString &)
 	m_heightSpinBox->setValue(1920);
 	check(m_resolutionCombo->currentData().toSize() == QSize(1080, 1920), "typing 1080 x 1920 picks the portrait preset: " + m_resolutionCombo->currentText());
 	m_resolutionCombo->setCurrentIndex(fullHd);
+	// The renderer is told the height: its own default is a square (the height is the width), so a size that only reached the job used to render square.
+	{
+		std::unique_ptr<RenderController> controller(makeRenderController(captureRenderJob()));
+		const QStringList args = controller->commandArguments();
+		const int at = args.indexOf(QStringLiteral("--height"));
+		check(at >= 0 && at + 1 < args.size() && args[at + 1] == QStringLiteral("1080") && args.contains(QStringLiteral("1920")),
+			  "the command line asks for 1920 x 1080: " + args.join(' '));
+	}
+	// And a picture really comes out that shape: a small 320 x 180 render, run the way the GUI runs it.
+	{
+		m_widthSpinBox->setValue(320);
+		m_heightSpinBox->setValue(180);
+		const int samplesWere = m_samplesSpinBox->value();
+		m_samplesSpinBox->setValue(4);
+		RenderJob job = captureRenderJob();
+		const QString out = QFileInfo(m_outputPathEdit->text()).absolutePath() + QStringLiteral("/selftest_wide_render.png");
+		QFile::remove(out);
+		job.outputPath = out;
+		std::unique_ptr<RenderController> controller(makeRenderController(job));
+		QProcess renderer;
+		renderer.setWorkingDirectory(QCoreApplication::applicationDirPath());
+		renderer.start(QCoreApplication::applicationDirPath() + QStringLiteral("/ray_tracer") + (QSysInfo::productType() == "windows" ? ".exe" : ""), controller->commandArguments());
+		const bool ran = renderer.waitForFinished(600000) && renderer.exitCode() == 0;
+		const QImage picture(out);
+		check(ran && picture.width() == 320 && picture.height() == 180,
+			  QString("a 320 x 180 render comes out %1 x %2 (exit %3)").arg(picture.width()).arg(picture.height()).arg(renderer.exitCode()));
+		QFile::remove(out);
+		QFile::remove(out.left(out.size() - 4) + QStringLiteral(".ppm"));
+		m_samplesSpinBox->setValue(samplesWere);
+		m_resolutionCombo->setCurrentIndex(fullHd);
+	}
 	const auto inRenderSettings = [](QWidget *w) {
 		for (QWidget *p = w ? w->parentWidget() : nullptr; p; p = p->parentWidget())
 			if (auto *g = qobject_cast<QGroupBox *>(p)) return g->title() == tr("Render Settings");

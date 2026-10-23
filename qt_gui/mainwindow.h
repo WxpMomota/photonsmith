@@ -143,6 +143,7 @@ public:
 	void runFramesStripSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runBannerSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runResolutionSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
+	RenderController *makeRenderController(const RenderJob &job);   // set up for the job (mainwindow_queue.cpp)
 	void runDefaultsSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runVideoFramesSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runBuilderSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot, const QString &outPrefix);

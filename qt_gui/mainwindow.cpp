@@ -226,55 +226,8 @@ void RenderController::resumeRender() {
 	emit pauseStateChanged(false);
 }
 
-void RenderController::start() {
-	// Every current caller happens to only ever call start() on a fresh
-	// instance or after the previous render finished, so this has never
-	// fired in practice - but start() itself had no guard of its own:
-	// calling it again on a live instance would overwrite m_renderProcess
-	// with a new QProcess while the old one (still connected to this same
-	// object's onReadyRead()/onProcessFinished() slots) kept running
-	// orphaned, and onReadyRead() would then read from the wrong process.
-	if (isRunning()) {
-		emit logMessage("start() called while a render is already running - ignoring.");
-		return;
-	}
-	emit logMessage(QString("Starting render..."));
-
-	// Look up scene name live from scene_metadata.dll
-	QString sceneName = SceneMetadataClient::sceneName(m_sceneId);
-	if (sceneName.isEmpty()) sceneName = QString("Scene %1").arg(m_sceneId);
-
-	// Emit a separator so each render is visually distinct in the log
-	QString sep = QString("─").repeated(60);
-	emit logMessage(sep);
-	emit logMessage(QString("▶ RENDER START  %1")
-		.arg(QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss")));
-	emit logMessage(QString("  Scene: %1 (%2) | %3x%4 | %5 spp | depth %6 | %7")
-		.arg(m_sceneId)
-		.arg(sceneName)
-		.arg(m_width).arg(m_height)
-		.arg(m_samples)
-		.arg(m_maxDepth)
-		.arg(m_useGPU ? (m_useWavefront ? "GPU wavefront" : "GPU") : "CPU"));
-	emit logMessage(sep);
-
-	// ========================================================================
-	// Build Command Line for ray_tracer.exe
-	// ========================================================================
-	// The ray_tracer.exe is the unified launcher that calls CPU or GPU renderer
-	// Command format: ray_tracer.exe [--gpu|--cpu] [--output path] width samples depth cam_x cam_y cam_z
-	//
-	// Camera parameters:
-	//   - cam_x, cam_y, cam_z: Camera position (lookfrom) in world space
-	//   - lookat is always (278, 278, 278) - fixed in renderer code
-	//   - These are passed to both CPU and GPU renderers through their interfaces
-	// ========================================================================
-
-#ifdef Q_OS_WIN
-	QString exePath = QCoreApplication::applicationDirPath() + "/ray_tracer.exe";
-#else
-	QString exePath = QCoreApplication::applicationDirPath() + "/ray_tracer";
-#endif
+// The ray_tracer command line for the render set up in this controller (start() runs it; a self-test reads it).
+QStringList RenderController::commandArguments() const {
 	QStringList args;
 
 	// Render mode flag: --gpu or --cpu
@@ -427,8 +380,12 @@ void RenderController::start() {
 		}
 	}
 
+	// The picture's height, when it is not a square (the CLI's height is the width unless --height says otherwise: without it every
+	// non-square size chosen here used to render square)
+	if (m_height > 0 && m_height != m_width) args << render_flags::kHeight << QString::number(m_height);
+
 	// Numeric positional arguments (order matters!):
-	// 1. width: image width in pixels (height = width for square aspect ratio)
+	// 1. width: image width in pixels (the height is --height above, or the width)
 	// 2. samples: samples per pixel for anti-aliasing and noise reduction
 	// 3. depth: maximum ray bounce depth for recursive ray tracing
 	// 4. scene_id: scene selector (category letter + number, e.g. "A1"=Cornell Box)
@@ -460,6 +417,59 @@ void RenderController::start() {
 		args << QString::number(m_camY);     // Camera position Y
 		args << QString::number(m_camZ);     // Camera position Z
 	}
+	return args;
+}
+
+void RenderController::start() {
+	// Every current caller happens to only ever call start() on a fresh
+	// instance or after the previous render finished, so this has never
+	// fired in practice - but start() itself had no guard of its own:
+	// calling it again on a live instance would overwrite m_renderProcess
+	// with a new QProcess while the old one (still connected to this same
+	// object's onReadyRead()/onProcessFinished() slots) kept running
+	// orphaned, and onReadyRead() would then read from the wrong process.
+	if (isRunning()) {
+		emit logMessage("start() called while a render is already running - ignoring.");
+		return;
+	}
+	emit logMessage(QString("Starting render..."));
+
+	// Look up scene name live from scene_metadata.dll
+	QString sceneName = SceneMetadataClient::sceneName(m_sceneId);
+	if (sceneName.isEmpty()) sceneName = QString("Scene %1").arg(m_sceneId);
+
+	// Emit a separator so each render is visually distinct in the log
+	QString sep = QString("─").repeated(60);
+	emit logMessage(sep);
+	emit logMessage(QString("▶ RENDER START  %1")
+		.arg(QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss")));
+	emit logMessage(QString("  Scene: %1 (%2) | %3x%4 | %5 spp | depth %6 | %7")
+		.arg(m_sceneId)
+		.arg(sceneName)
+		.arg(m_width).arg(m_height)
+		.arg(m_samples)
+		.arg(m_maxDepth)
+		.arg(m_useGPU ? (m_useWavefront ? "GPU wavefront" : "GPU") : "CPU"));
+	emit logMessage(sep);
+
+	// ========================================================================
+	// Build Command Line for ray_tracer.exe
+	// ========================================================================
+	// The ray_tracer.exe is the unified launcher that calls CPU or GPU renderer
+	// Command format: ray_tracer.exe [--gpu|--cpu] [--output path] width samples depth cam_x cam_y cam_z
+	//
+	// Camera parameters:
+	//   - cam_x, cam_y, cam_z: Camera position (lookfrom) in world space
+	//   - lookat is always (278, 278, 278) - fixed in renderer code
+	//   - These are passed to both CPU and GPU renderers through their interfaces
+	// ========================================================================
+
+#ifdef Q_OS_WIN
+	QString exePath = QCoreApplication::applicationDirPath() + "/ray_tracer.exe";
+#else
+	QString exePath = QCoreApplication::applicationDirPath() + "/ray_tracer";
+#endif
+	const QStringList args = commandArguments();
 
 	// Quote any argument containing whitespace for this human-readable log
 	// line only - the actual QProcess::start(exePath, args) call below

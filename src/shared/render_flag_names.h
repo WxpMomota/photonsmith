@@ -25,6 +25,7 @@ namespace render_flags {
 	constexpr const char* kCpu           = "--cpu";
 	constexpr const char* kWavefront     = "--wavefront";
 	constexpr const char* kOutput        = "--output";
+	constexpr const char* kHeight        = "--height";   // the picture's height when it is not the width
 	constexpr const char* kVideo         = "--video";
 	constexpr const char* kFrames        = "--frames";
 	constexpr const char* kFps           = "--fps";
