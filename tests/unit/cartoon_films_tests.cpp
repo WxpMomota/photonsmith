@@ -342,3 +342,25 @@ TEST(CartoonTurtleEscape, TheSoundtrackIsTheSameEveryTimeAndNeverSilent) {
 	EXPECT_GT(peak, 6000) << "not too quiet";
 	EXPECT_LT(peak, 32767) << "not clipped";
 }
+
+// The sculpting toolkit the characters are made with (sdf_mesh.h): both meshers put every vertex on the surface with the surface's own normal, and leave no
+// triangle that the scene text's 10 micrometre rounding would collapse.
+TEST(CartoonSdfMesh, MeshersPutEveryVertexOnTheSurfaceWithItsNormal) {
+	namespace sdf = cartoon::sdf;
+	const auto ball = [](cartoon::Vec3 p) { return sdf::sphere(p, {0.0, 0.0, 0.0}, 0.1); };
+	const cartoon::Mesh nets = sdf::surfaceNets(ball, {-0.12, -0.12, -0.12}, {0.12, 0.12, 0.12}, 0.01);
+	const cartoon::Mesh rays = sdf::radialMesh(ball, {0.0, 0.0, 0.0}, 0.2, 32, 16);
+	for (const cartoon::Mesh *m : {&nets, &rays}) {
+		ASSERT_GT(m->tris.size(), 500u);
+		ASSERT_EQ(m->verts.size(), m->normals.size());
+		for (std::size_t i = 0; i < m->verts.size(); ++i) {
+			EXPECT_NEAR(cartoon::length(m->verts[i]), 0.1, 2e-4) << "vertex " << i;
+			EXPECT_GT(cartoon::dot(m->normals[i], cartoon::normalize(m->verts[i])), 0.99) << "vertex " << i;
+		}
+	}
+	for (const auto &t : nets.tris)
+		for (int k = 0; k < 3; ++k) EXPECT_GT(cartoon::length(nets.verts[static_cast<std::size_t>(t[k])] - nets.verts[static_cast<std::size_t>(t[(k + 1) % 3])]), 1e-5);
+	// a smooth union is never above the plain one, and blends within its width
+	EXPECT_LE(sdf::smin(0.3, 0.32, 0.1), 0.3);
+	EXPECT_DOUBLE_EQ(sdf::smin(0.3, 0.9, 0.1), 0.3);
+}

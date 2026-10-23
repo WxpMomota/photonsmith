@@ -1,26 +1,31 @@
 #pragma once
-// turtle_actor.h -- a turtle for the cartoon films (a red-eared slider, 13 cm long): a domed shell with its scutes, seams and yellow markings, a plastron
-// underneath, a head on a neck that pulls in or stretches out, cartoon eyes that look, blink and narrow, a brow ridge over each that frowns or worries, the
-// red patch behind each eye and the yellow stripes down the neck, a beak that smiles and opens, four clawed legs that walk, paddle or reach for a point
-// in the world (a hose, a rim), and a short tail. A film acts by filling in a `TurtlePose` for each instant and asking for `emitTurtle(pose)`, as for Pip
-// (cartoon_actor.h).
+// turtle_actor.h -- a turtle for the cartoon films, drawn to be adorable (13 cm long): a big round head with a soft muzzle and chubby cheeks, large glossy eyes
+// with two catchlights each, rosy cheeks, a small smile, a domed shell of pillowy hexagonal plates (each with a lighter growth ring) on a cream rim, a cream
+// plastron, chubby legs with three round toes, and a little pointed tail. The head, the legs, the neck and the tail are sculpted (sdf_mesh.h): blended shapes,
+// smooth as clay. The eyes look, blink and narrow, the brows frown or worry, the mouth smiles and opens; the neck pulls in or stretches out; the legs walk,
+// paddle or reach for a point in the world (a hose, a rim). A film acts by filling in a `TurtlePose` for each instant and asking for `emitTurtle(pose)`.
 //
 // Units are metres (the films that use it are built at real size: a living room, a tank). The rig's own frame has +x forward, +y up and +z to the
 // turtle's right; `pose.yaw` turns it about the vertical (0 faces +x, positive turns the front towards +z, as frontOf() in the films).
 
+#include <array>
+
 #include "cartoon_actor.h"
+#include "sdf_mesh.h"
 
 namespace cartoon {
 namespace turtle {
 
 struct Look {
-	Vec3 skin = {0.24, 0.33, 0.13};
-	Vec3 stripe = {0.86, 0.78, 0.30};
-	Vec3 shell = {0.22, 0.30, 0.12};
-	Vec3 seam = {0.07, 0.09, 0.04};
-	Vec3 marking = {0.70, 0.66, 0.26};
-	Vec3 plastron = {0.82, 0.74, 0.36};
-	Vec3 ear = {0.82, 0.14, 0.07};
+	Vec3 skin = {0.40, 0.66, 0.25};
+	Vec3 shell = {0.05, 0.19, 0.09};       // between the plates (the seams)
+	Vec3 plate = {0.15, 0.43, 0.17};
+	Vec3 ring = {0.32, 0.60, 0.24};        // the growth ring in each plate
+	Vec3 rim = {0.90, 0.74, 0.38};
+	Vec3 plastron = {0.93, 0.82, 0.52};
+	Vec3 blush = {0.95, 0.45, 0.50};
+	Vec3 iris = {0.20, 0.11, 0.05};
+	Vec3 brow = {0.13, 0.30, 0.10};
 	double scale = 1.0;
 };
 
@@ -51,46 +56,142 @@ struct TurtlePose {
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 constexpr double kHalfLength = 0.065;   // the shell
 constexpr double kHalfWidth = 0.052;
-constexpr double kDomeHeight = 0.040;
+constexpr double kDomeHeight = 0.042;
 constexpr double kPlastron = 0.011;     // the plastron's thickness; the dome sits on it
+constexpr double kEyeR = 0.0088;        // a big eye: two fifths of the head's width
 
-struct Parts {
-	Mesh dome, rimRing, ball, cap;
-};
-inline const Parts &parts() {
-	static const Parts p = [] {
-		Parts q;
-		// the dome: a quarter ellipse turned about +y, a little flat on top and full at the sides, closed at the bottom
-		std::vector<std::pair<double, double>> prof;
-		for (int i = 0; i <= 14; ++i) {
-			const double a = 0.5 * kPi * i / 14.0;
-			prof.push_back({std::pow(std::cos(a), 0.85), std::pow(std::sin(a), 1.15)});
-		}
-		prof.back().first = 0.0;
-		prof.insert(prof.begin(), {0.0, 0.0});
-		q.dome = lathe(prof, 56);
-		// the marginal scutes: a flat band round the bottom edge, a little wider than the dome
-		q.rimRing = lathe({{0.94, 0.0}, {1.02, 0.04}, {1.035, 0.10}, {1.0, 0.16}, {0.95, 0.12}}, 56);
-		q.ball = uvSphere(1.0, 16, 8);   // (13 cm of turtle: more would not show, and every frame is parsed)
-		q.cap = actor::parts().lid;
-		return q;
-	}();
+// The head, in its own frame (+x forward, +y up, +z right; the origin at the middle of the cranium): a round cranium, a soft muzzle and two chubby cheeks.
+inline double headShape(Vec3 p) {
+	double d = sdf::ellipsoid(p, Vec3{0.0, 0.006, 0.0}, Vec3{0.022, 0.0205, 0.0215});
+	d = sdf::smin(d, sdf::ellipsoid(p, Vec3{0.0155, -0.0045, 0.0}, Vec3{0.0125, 0.0100, 0.0140}), 0.010);
+	for (double side : {-1.0, 1.0}) d = sdf::smin(d, sdf::ellipsoid(p, Vec3{0.0075, -0.0050, side * 0.0122}, Vec3{0.0105, 0.0092, 0.0092}), 0.008);
+	return d;
+}
+inline Vec3 headCentreLocal() { return {0.002, 0.002, 0.0}; }
+// A point on the head's surface (head frame) seen from its middle in direction `dir`, and the surface's normal there.
+inline Vec3 onHeadSurface(Vec3 dir, Vec3 *normal = nullptr) {
+	const Vec3 p = sdf::radialHit(headShape, headCentreLocal(), normalize(dir), 0.06);
+	if (normal) *normal = sdf::normalAt(headShape, p, 2e-4);
 	return p;
 }
+// Each eye's centre in the head frame: sunk a little into the face, on the front of the head, looking forward and a little out (side -1 left, +1 right).
+inline Vec3 eyeCentreLocal(double side) {
+	static const std::array<Vec3, 2> e = [] {
+		std::array<Vec3, 2> r;
+		for (int s = 0; s < 2; ++s) {
+			Vec3 n;
+			const Vec3 p = onHeadSurface({0.80, 0.40, (s == 0 ? -1.0 : 1.0) * 0.46}, &n);
+			r[static_cast<std::size_t>(s)] = p - n * (0.42 * kEyeR);
+		}
+		return r;
+	}();
+	return e[side < 0 ? 0 : 1];
+}
 
+// ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+// The parts that never change shape (built once, in their own frames)
+// ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // A point on the dome's surface over (u, v) (u along the shell from tail -1 to head +1, v across from left -1 to right +1), raised `out` above it, in the
 // shell's frame (the middle of the plastron's bottom at the origin).
 inline Vec3 domePoint(double u, double v, double out = 0.0008) {
 	const double r2 = u * u + v * v;
 	const double s = std::sqrt(std::max(0.0, 1.0 - std::min(1.0, r2)));
-	const double h = kPlastron + kDomeHeight * std::pow(s, 1.0 / 1.15 * 1.0);
+	const double h = kPlastron + kDomeHeight * std::pow(s, 0.80);
 	return {kHalfLength * u, h + out, kHalfWidth * v};
 }
 
-// The dome's seams and markings, as rods along (u, v) polylines.
-inline void addPolyline(std::string &out, const Mat4 &m, const std::vector<std::pair<double, double>> &pts, double r, double outset = 0.0009) {
-	for (std::size_t i = 1; i < pts.size(); ++i)
-		out += bar(transformPoint(m, domePoint(pts[i - 1].first, pts[i - 1].second, outset)), transformPoint(m, domePoint(pts[i].first, pts[i].second, outset)), r, 3);
+// A pillowy hexagonal plate on the dome, centred on (u0, v0) with half sizes (ru, rv) in (u, v), `height` high at its flat middle and rounded down to the dome at
+// its edge.
+inline Mesh plate(double u0, double v0, double ru, double rv, double height, double base) {
+	Mesh m;
+	const int rings = 5, around = 24;
+	const auto hex = [](double a) {
+		const double seg = std::fmod(a + 2.0 * kPi, kPi / 3.0) - kPi / 6.0;
+		return lerp(std::cos(kPi / 6.0) / std::cos(seg), 1.0, 0.35);   // a hexagon with its corners softened
+	};
+	m.verts.push_back(domePoint(u0, v0, base + height));
+	for (int r = 1; r <= rings; ++r) {
+		const double s = static_cast<double>(r) / rings;
+		const double h = height * std::sqrt(std::max(0.0, 1.0 - std::pow(s, 6.0)));
+		for (int a = 0; a < around; ++a) {
+			const double ang = 2.0 * kPi * a / around + kPi / 6.0, k = hex(ang) * s;
+			m.verts.push_back(domePoint(u0 + ru * k * std::cos(ang), v0 + rv * k * std::sin(ang), base + h));
+		}
+	}
+	for (int a = 0; a < around; ++a) m.tris.push_back({0, 1 + (a + 1) % around, 1 + a});
+	for (int r = 1; r < rings; ++r)
+		for (int a = 0; a < around; ++a) {
+			const int i0 = 1 + (r - 1) * around, i1 = 1 + r * around, b = (a + 1) % around;
+			m.tris.push_back({i0 + a, i0 + b, i1 + a});
+			m.tris.push_back({i0 + b, i1 + b, i1 + a});
+		}
+	sdf::computeNormals(m);
+	// (the triangles above wind clockwise seen from outside; the normals must point out of the dome)
+	for (Vec3 &n : m.normals)
+		if (n.y < 0.0) n = n * -1.0;
+	return m;
+}
+inline void append(Mesh &into, const Mesh &m) {
+	const int base = static_cast<int>(into.verts.size());
+	into.verts.insert(into.verts.end(), m.verts.begin(), m.verts.end());
+	into.normals.insert(into.normals.end(), m.normals.begin(), m.normals.end());
+	for (auto t : m.tris) into.tris.push_back({t[0] + base, t[1] + base, t[2] + base});
+}
+
+struct Parts {
+	Mesh dome, rim, plastron, plates, rings, head, blush, nostrils, ball, eyeball, cap, disc, limbal, iris, glow, pupil;
+};
+inline const Parts &parts() {
+	static const Parts p = [] {
+		Parts q;
+		// the dome: a quarter ellipse turned about +y, full and round, closed at the bottom
+		std::vector<std::pair<double, double>> prof;
+		prof.push_back({0.0, 0.0});
+		for (int i = 0; i <= 20; ++i) {
+			const double a = 0.5 * kPi * i / 20.0;
+			prof.push_back({std::cos(a), std::pow(std::sin(a), 0.80)});
+		}
+		prof.back().first = 0.0;
+		q.dome = lathe(prof, 72);
+		// the rim: a soft rounded band round the bottom edge, a little wider than the dome
+		q.rim = lathe({{0.93, -0.02}, {1.03, 0.0}, {1.075, 0.06}, {1.07, 0.15}, {1.02, 0.22}, {0.95, 0.20}}, 72);
+		q.plastron = uvSphere(1.0, 36, 12);
+		// the plates: five down the spine, four on each side
+		const double H = 0.0017;
+		for (double u : {-0.60, -0.30, 0.0, 0.30, 0.60}) {
+			append(q.plates, plate(u, 0.0, 0.148, 0.180, H, 0.0002));
+			append(q.rings, plate(u, 0.0, 0.078, 0.094, 0.0004, 0.0002 + H));
+		}
+		for (double side : {-1.0, 1.0})
+			for (double u : {-0.47, -0.16, 0.15, 0.46}) {
+				append(q.plates, plate(u * 0.98, side * 0.53, 0.148, 0.165, H * 0.9, 0.0002));
+				append(q.rings, plate(u * 0.98, side * 0.53, 0.076, 0.085, 0.0004, 0.0002 + H * 0.9));
+			}
+		q.head = sdf::radialMesh(headShape, headCentreLocal(), 0.06, 72, 48);
+		for (double side : {-1.0, 1.0}) {
+			append(q.blush, sdf::decal(headShape, headCentreLocal(), {0.50, -0.22, side * 0.80}, {1.0, 0.0, 0.0}, 0.0058, 0.0042, 0.00008, 0.06));
+			append(q.nostrils, sdf::decal(headShape, headCentreLocal(), {1.0, 0.02, side * 0.16}, {0.0, 0.0, 1.0}, 0.0009, 0.0006, 0.00008, 0.06, 0.0, 3, 14));
+		}
+		q.ball = uvSphere(1.0, 28, 14);
+		q.cap = actor::parts().lid;
+		q.disc = uvSphere(1.0, 20, 8);
+		q.eyeball = uvSphere(1.0, 48, 24);
+		// the coloured parts of an eye: caps of spheres just outside the eyeball, round +y (a dark ring, the iris, a warm glow low in it, the pupil)
+		const auto cap = [](double degrees, double r) {
+			std::vector<std::pair<double, double>> prof;
+			for (int i = 0; i <= 10; ++i) {
+				const double a = degrees * kPi / 180.0 * (1.0 - i / 10.0);
+				prof.push_back({r * std::sin(a), r * std::cos(a)});
+			}
+			return lathe(prof, 48);
+		};
+		q.limbal = cap(45.0, 1.0015);
+		q.iris = cap(40.0, 1.0030);
+		q.glow = cap(21.0, 1.0045);
+		q.pupil = cap(19.0, 1.0060);
+		return q;
+	}();
+	return p;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -121,8 +222,8 @@ struct LegSite {
 inline LegSite legSite(int k) {
 	const bool front = k < 2;
 	const double side = (k % 2 == 0) ? -1.0 : 1.0;
-	if (front) return {{kHalfLength * 0.52, kPlastron * 0.9, side * kHalfWidth * 0.78}, {kHalfLength * 0.80, -0.012, side * kHalfWidth * 1.12}, side, true};
-	return {{-kHalfLength * 0.58, kPlastron * 0.8, side * kHalfWidth * 0.72}, {-kHalfLength * 0.78, -0.012, side * kHalfWidth * 1.05}, side, false};
+	if (front) return {{kHalfLength * 0.52, kPlastron * 0.9, side * kHalfWidth * 0.74}, {kHalfLength * 0.80, -0.012, side * kHalfWidth * 1.12}, side, true};
+	return {{-kHalfLength * 0.58, kPlastron * 0.8, side * kHalfWidth * 0.70}, {-kHalfLength * 0.78, -0.012, side * kHalfWidth * 1.05}, side, false};
 }
 
 // The foot of leg k for a pose (world): resting, walking, paddling, pulled in, or reaching for its own target.
@@ -155,24 +256,24 @@ struct Neck {
 };
 inline Neck neckOf(const Frames &f, const TurtlePose &p) {
 	const double out = std::max(0.0, p.neck) * (1.0 - 0.8 * clamp01(p.tuck));
-	const Vec3 baseLocal = {kHalfLength * 0.80, kPlastron + 0.012, 0.0};
+	const Vec3 baseLocal = {kHalfLength * 0.78, kPlastron + 0.013, 0.0};
 	// the neck points forward and a little up, bent by part of the head's turn
-	const Mat4 bend = mul(rotate({0, 1, 0}, -0.45 * p.headYaw), rotate({0, 0, 1}, -0.45 * p.headPitch + 12.0));
+	const Mat4 bend = mul(rotate({0, 1, 0}, -0.45 * p.headYaw), rotate({0, 0, 1}, -0.45 * p.headPitch + 14.0));
 	const Vec3 dir = normalize(transformPoint(bend, Vec3{1.0, 0.0, 0.0}));
-	const double length = 0.010 + 0.024 * out;
+	const double length = 0.005 + 0.016 * out;
 	const Vec3 topLocal = baseLocal + dir * length;
 	Neck n;
 	n.base = transformPoint(f.shell, baseLocal);
 	n.top = transformPoint(f.shell, topLocal);
-	n.head = mul(f.shell, translate(topLocal), bend, rotate({0, 1, 0}, -0.55 * p.headYaw), rotate({0, 0, 1}, -0.55 * p.headPitch - 12.0), rotate({1, 0, 0}, p.headRoll),
-				 translate(0.014, 0.004, 0.0));
+	n.head = mul(f.shell, translate(topLocal), bend, rotate({0, 1, 0}, -0.55 * p.headYaw), rotate({0, 0, 1}, -0.55 * p.headPitch - 14.0), rotate({1, 0, 0}, p.headRoll),
+				 translate(0.017, 0.007, 0.0));
 	return n;
 }
 
 // The eyes' centres (world), for a film that wants to aim a close-up at them.
 inline Vec3 eyeOf(const Look &look, const TurtlePose &p, double side) {
 	const Frames f = framesOf(look, p);
-	return transformPoint(neckOf(f, p).head, {0.006, 0.0085, side * 0.0115});
+	return transformPoint(neckOf(f, p).head, eyeCentreLocal(side));
 }
 inline Vec3 headOf(const Look &look, const TurtlePose &p) {
 	const Frames f = framesOf(look, p);
@@ -182,147 +283,124 @@ inline Vec3 headOf(const Look &look, const TurtlePose &p) {
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The turtle
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
-inline std::string emitTurtle(const TurtlePose &p, const Look &look = Look{}) {
-	const Parts &P = parts();
-	const Frames f = framesOf(look, p);
-	std::string out;
-	const std::string skin = coated(look.skin, 0.32), stripe = coated(look.stripe, 0.35), shellMat = coated(look.shell, 0.12), seam = diffuseMaterial(look.seam);
-	const std::string marking = coated(look.marking, 0.3), plastron = coated(look.plastron, 0.3), ear = coated(look.ear, 0.25);
-
-	// ---- the shell ----
-	out += attr(shellMat, emitMesh(P.dome, mul(f.shell, translate(0.0, kPlastron, 0.0), scale(kHalfLength, kDomeHeight, kHalfWidth))));
-	out += attr(coated(lerp(look.shell, look.marking, 0.35), 0.15), emitMesh(P.rimRing, mul(f.shell, translate(0.0, kPlastron * 0.55, 0.0), scale(kHalfLength, 0.040, kHalfWidth))));
-	out += attr(plastron, emitMesh(P.ball, mul(f.shell, translate(0.003, kPlastron * 0.5, 0.0), scale(kHalfLength * 0.92, kPlastron * 0.55, kHalfWidth * 0.86))));
-	// seams: the five scutes down the spine, the four on each side, the edge
-	std::string seams;
-	for (double u : {-0.80, -0.47, -0.14, 0.19, 0.52, 0.82}) addPolyline(seams, f.shell, {{u, -0.30}, {u + 0.03, 0.0}, {u, 0.30}}, 0.0011);
-	for (double side : {-1.0, 1.0}) {
-		std::vector<std::pair<double, double>> spine;
-		for (int k = 0; k <= 12; ++k) {
-			const double u = -0.80 + 1.62 * k / 12.0;
-			spine.push_back({u, side * (0.30 + 0.035 * std::cos(kPi * (u + 0.80) / 0.33))});
-		}
-		addPolyline(seams, f.shell, spine, 0.0011);
-		for (double u : {-0.47, -0.08, 0.32}) addPolyline(seams, f.shell, {{u, side * 0.31}, {u - 0.05, side * 0.62}, {u - 0.10, side * 0.90}}, 0.0010);
-	}
-	std::vector<std::pair<double, double>> edge;
-	for (int k = 0; k <= 40; ++k) {
-		const double a = 2.0 * kPi * k / 40.0;
-		edge.push_back({0.93 * std::cos(a), 0.93 * std::sin(a)});
-	}
-	addPolyline(seams, f.shell, edge, 0.0010, 0.0005);
-	out += attr(seam, seams);
-	// the yellow markings: a curl in each side scute and a thin line down each spine scute
-	std::string marks;
-	for (double side : {-1.0, 1.0})
-		for (double u : {-0.62, -0.27, 0.12, 0.50}) {
-			std::vector<std::pair<double, double>> curl;
-			for (int k = 0; k <= 8; ++k) {
-				const double a = kPi * (0.2 + 1.2 * k / 8.0);
-				curl.push_back({u + 0.07 * std::cos(a), side * (0.58 + 0.10 * std::sin(a))});
-			}
-			addPolyline(marks, f.shell, curl, 0.0007, 0.0012);
-		}
-	for (double u : {-0.63, -0.30, 0.02, 0.35, 0.66}) addPolyline(marks, f.shell, {{u - 0.06, 0.0}, {u + 0.06, 0.0}}, 0.0007, 0.0012);
-	out += attr(marking, marks);
-	// dark blotches on the plastron, seen when it climbs or flips
-	std::string blotches;
-	for (int k = 0; k < 6; ++k)
-		blotches += emitMesh(P.ball, mul(f.shell, translate(-0.035 + 0.014 * k, 0.0005, (k % 2 ? 1.0 : -1.0) * 0.012), scale(0.006, 0.0012, 0.005)));
-	out += attr(diffuseMaterial({0.25, 0.18, 0.08}), blotches);
-
-	// ---- the neck and the head ----
-	const Neck n = neckOf(f, p);
+// The sculpted skin that moves with the pose: the neck, four chubby legs with three round toes each, and the tail (world space).
+inline std::string emitLimbs(const Frames &f, const TurtlePose &p, const Neck &n) {
 	const double S = f.S;
-	std::string skinParts, stripes, claws;
-	skinParts += bar(n.base - (n.top - n.base) * 0.3, n.top, 0.0115 * S, 10);
-	// head: a rounded wedge (a big ball and a smaller snout ball)
-	skinParts += emitMesh(P.ball, mul(n.head, scale(0.019, 0.014, 0.0155)));
-	skinParts += emitMesh(P.ball, mul(n.head, translate(0.011, -0.001, 0.0), scale(0.012, 0.0095, 0.0105)));
-	// the lower jaw, opening downwards about the back of the mouth
-	const double open = clamp01(p.mouthOpen);
-	const Mat4 jaw = mul(n.head, translate(-0.006, -0.006, 0.0), rotate({0, 0, 1}, 28.0 * open), translate(0.006, 0.006, 0.0));
-	skinParts += emitMesh(P.ball, mul(jaw, translate(0.006, -0.0075, 0.0), scale(0.016, 0.0055, 0.0125)));
-	// legs and tail
+	std::string out;
+	const Vec3 shellUp = normalize(transformPoint(f.shell, {0.0, 1.0, 0.0}) - transformPoint(f.shell, {0.0, 0.0, 0.0}));
+	// the neck: from inside the shell to the back of the head
+	{
+		const Vec3 a = n.base - (n.top - n.base) * 0.4, b = transformPoint(n.head, {-0.010, -0.005, 0.0});
+		// (it widens into the back of the head, so that the head grows out of it)
+		const Mat4 flare = invertAffine(mul(n.head, translate(-0.008, -0.008, 0.0)));
+		const auto neck = [&](Vec3 q) { return sdf::smin(sdf::roundCone(q, a, b, 0.0150 * S, 0.0140 * S), sdf::ellipsoid(q, flare, Vec3{0.0095, 0.0085, 0.0115} * S), 0.005 * S); };
+		Vec3 lo, hi;
+		sdf::boundsOf({a, b, transformPoint(n.head, {-0.008, -0.008, 0.0})}, 0.019 * S, lo, hi);
+		out += emitMesh(sdf::surfaceNets(neck, lo, hi, 0.0016 * S), identity());
+	}
 	for (int k = 0; k < 4; ++k) {
 		const LegSite s = legSite(k);
 		const Vec3 hip = transformPoint(f.shell, s.hip), foot = footOf(f, p, k);
 		const Vec3 pole = transformPoint(f.shell, s.hip + Vec3{0.0, 0.02, s.side * 0.03}) - hip;
 		const Limb leg = limbIk(hip, foot, 0.017 * S, 0.017 * S, pole);
-		skinParts += bar(hip, leg.elbow, 0.0078 * S, 8) + bar(leg.elbow, leg.hand, 0.0068 * S, 8);
-		// the foot: a flat paddle along the leg's direction, with four claws
+		// the foot: a soft paddle along the leg's direction, flattened against the ground, three round toes in front
 		const Vec3 along = normalize(leg.hand - leg.elbow);
-		const Vec3 flat = normalize(Vec3{along.x, along.y * 0.3, along.z});
-		const Mat4 footFrame = alignY(leg.hand, flat);
-		skinParts += emitMesh(P.ball, mul(footFrame, translate(0.0, 0.006, 0.0), scale(0.0085, 0.010, 0.0035)));
-		for (int c = 0; c < 4; ++c) {
-			const double off = (c - 1.5) * 0.0032;
-			const Vec3 a = transformPoint(footFrame, {off, 0.014, 0.0}), b = transformPoint(footFrame, {off * 1.25, 0.0185, 0.0});
-			claws += bar(a, b, 0.0009, 4);
-		}
-		// a yellow line down the outside of each leg
-		stripes += bar(lerp(hip, leg.elbow, 0.2) + Vec3{0.0, 0.004, 0.0}, lerp(leg.elbow, leg.hand, 0.7) + Vec3{0.0, 0.003, 0.0}, 0.0016, 5);
+		Vec3 fwd = along - shellUp * dot(along, shellUp);
+		fwd = length(fwd) > 1e-6 ? normalize(fwd) : normalize(transformPoint(f.shell, {1.0, 0.0, 0.0}) - transformPoint(f.shell, {0.0, 0.0, 0.0}));
+		const Vec3 side = normalize(cross(fwd, shellUp));
+		const Mat4 frame = {fwd.x, shellUp.x, side.x, leg.hand.x, fwd.y, shellUp.y, side.y, leg.hand.y, fwd.z, shellUp.z, side.z, leg.hand.z, 0, 0, 0, 1};
+		const Mat4 inv = invertAffine(mul(frame, translate(0.004 * S, -0.0015 * S, 0.0)));
+		Vec3 toes[3];
+		for (int c = 0; c < 3; ++c) toes[c] = transformPoint(frame, Vec3{0.0125, -0.0022, (c - 1) * 0.0047} * S);
+		const auto limb = [&](Vec3 q) {
+			double d = sdf::roundCone(q, hip, leg.elbow, 0.0096 * S, 0.0088 * S);
+			d = sdf::smin(d, sdf::roundCone(q, leg.elbow, leg.hand, 0.0088 * S, 0.0078 * S), 0.004 * S);
+			d = sdf::smin(d, sdf::ellipsoid(q, inv, Vec3{0.0105, 0.0058, 0.0092} * S), 0.005 * S);
+			for (const Vec3 &t : toes) d = sdf::smin(d, sdf::sphere(q, t, 0.0031 * S), 0.0028 * S);
+			return d;
+		};
+		Vec3 lo, hi;
+		sdf::boundsOf({hip, leg.elbow, leg.hand, toes[0], toes[1], toes[2]}, 0.0125 * S, lo, hi);
+		out += emitMesh(sdf::surfaceNets(limb, lo, hi, 0.0017 * S), identity());
 	}
 	{
 		const double tailOut = 1.0 - 0.8 * clamp01(p.tuck);
-		const Vec3 a = transformPoint(f.shell, {-kHalfLength * 0.9, kPlastron * 0.8, 0.0}), b = transformPoint(f.shell, {-kHalfLength * (0.9 + 0.30 * tailOut), kPlastron * 0.3, 0.0});
-		skinParts += bar(a, b, 0.0045 * S, 6);
+		const Vec3 a = transformPoint(f.shell, {-kHalfLength * 0.82, kPlastron * 0.9, 0.0});
+		const Vec3 m = transformPoint(f.shell, {-kHalfLength * (0.92 + 0.18 * tailOut), kPlastron * 0.55, 0.0});
+		const Vec3 b = transformPoint(f.shell, {-kHalfLength * (0.94 + 0.34 * tailOut), kPlastron * 0.45, 0.004});
+		const auto tail = [&](Vec3 q) { return sdf::smin(sdf::roundCone(q, a, m, 0.0058 * S, 0.0036 * S), sdf::roundCone(q, m, b, 0.0036 * S, 0.0013 * S), 0.002 * S); };
+		Vec3 lo, hi;
+		sdf::boundsOf({a, m, b}, 0.008 * S, lo, hi);
+		out += emitMesh(sdf::surfaceNets(tail, lo, hi, 0.0011 * S), identity());
 	}
-	out += attr(skin, skinParts);
-	// yellow stripes down the neck and along the head
-	for (double side : {-1.0, 1.0}) {
-		for (double h : {-0.004, 0.003}) {
-			const Vec3 a = n.base + Vec3{0.0, h, 0.0} + normalize(cross(n.top - n.base, Vec3{0.0, 1.0, 0.0})) * (side * 0.011);
-			const Vec3 b = transformPoint(n.head, {-0.010, h * 0.8, side * 0.0135});
-			stripes += bar(a, b, 0.0012, 5);
-			stripes += bar(b, transformPoint(n.head, {0.012, h * 0.6 - 0.002, side * 0.0095}), 0.0010, 5);
-		}
-	}
-	stripes += bar(transformPoint(n.head, {-0.010, 0.0135, 0.0}), transformPoint(n.head, {0.012, 0.0105, 0.0}), 0.0010, 5);   // down the top of the head
-	out += attr(stripe, stripes);
-	out += attr(coated({0.12, 0.10, 0.06}, 0.3), claws);
-	// the red patch behind each eye
-	std::string ears;
-	for (double side : {-1.0, 1.0}) ears += emitMesh(P.ball, mul(n.head, translate(-0.008, 0.004, side * 0.0145), rotate({0, 1, 0}, side * 10.0), scale(0.0085, 0.0040, 0.0022)));
-	out += attr(ear, ears);
-	// the mouth: the beak's edge, curving up at the corners for a smile, and the dark inside when it opens
+	return out;
+}
+
+inline std::string emitTurtle(const TurtlePose &p, const Look &look = Look{}) {
+	const Parts &P = parts();
+	const Frames f = framesOf(look, p);
+	std::string out;
+	// (matte materials: a glossy coat over a whole character leaves a grain the denoiser cannot take out at the films' sample counts; the eyes get painted catchlights)
+	const std::string skin = diffuseMaterial(look.skin);
+
+	// ---- the shell ----
+	out += attr(diffuseMaterial(look.shell), emitMesh(P.dome, mul(f.shell, translate(0.0, kPlastron, 0.0), scale(kHalfLength, kDomeHeight, kHalfWidth))));
+	out += attr(diffuseMaterial(look.plate), emitMesh(P.plates, f.shell));
+	out += attr(diffuseMaterial(look.ring), emitMesh(P.rings, f.shell));
+	out += attr(diffuseMaterial(look.rim), emitMesh(P.rim, mul(f.shell, translate(0.0, kPlastron * 0.55, 0.0), scale(kHalfLength, 0.040, kHalfWidth))));
+	out += attr(diffuseMaterial(look.plastron), emitMesh(P.plastron, mul(f.shell, translate(0.002, kPlastron * 0.5, 0.0), scale(kHalfLength * 0.93, kPlastron * 0.58, kHalfWidth * 0.88))));
+
+	// ---- the skin: neck, legs, tail and the head ----
+	const Neck n = neckOf(f, p);
+	out += attr(skin, emitLimbs(f, p, n) + emitMesh(P.head, n.head));
+
+	// ---- the face: rosy cheeks, nostrils, the smile and the open mouth, all lying on the skin ----
 	{
-		std::string lip;
-		const double smile = std::max(-1.0, std::min(1.0, p.smile));
-		Vec3 prev{};
-		for (int k = 0; k <= 8; ++k) {
-			const double u = -1.0 + 0.25 * k;   // -1 left corner .. +1 right corner
-			const double x = 0.021 - 0.014 * u * u, y = -0.0045 + 0.0025 * smile * u * u - 0.0012 * smile;
-			const Vec3 q = transformPoint(n.head, {x, y, u * 0.0108});
-			if (k > 0) lip += bar(prev, q, 0.0007, 4);
-			prev = q;
+		out += attr(diffuseMaterial(look.blush), emitMesh(P.blush, n.head));
+		out += attr(diffuseMaterial({0.07, 0.10, 0.04}), emitMesh(P.nostrils, n.head));
+		const double smile = std::max(-1.0, std::min(1.0, p.smile)), open = clamp01(p.mouthOpen);
+		std::vector<Vec3> line;
+		for (int k = 0; k <= 16; ++k) {
+			const double u = -1.0 + 0.125 * k;
+			Vec3 nrm;
+			const Vec3 q = onHeadSurface({1.0, -0.42 + 0.15 * smile * u * u - 0.03 * smile - 0.06 * open * (1.0 - u * u), u * 0.46}, &nrm);
+			line.push_back(q + nrm * 0.0003);
 		}
-		out += attr(diffuseMaterial({0.06, 0.05, 0.03}), lip);
-		if (open > 0.05) out += attr(diffuseMaterial({0.35, 0.10, 0.10}), emitMesh(P.ball, mul(n.head, translate(0.008, -0.0065, 0.0), scale(0.010, 0.003 + 0.004 * open, 0.008))));
-		// the nostrils
-		std::string nose;
-		for (double side : {-1.0, 1.0}) nose += emitMesh(P.ball, mul(n.head, translate(0.0218, 0.0018, side * 0.0022), scale(0.0009)));
-		out += attr(diffuseMaterial({0.03, 0.03, 0.02}), nose);
+		out += attr(diffuseMaterial({0.09, 0.12, 0.05}), emitMesh(sdf::tubeMesh(line, 0.00072, 0.45, 8), n.head));
+		if (open > 0.05) {
+			const Vec3 across = {0.0, 0.0, 1.0};
+			out += attr(diffuseMaterial({0.24, 0.04, 0.06}),
+						emitMesh(sdf::decal(headShape, headCentreLocal(), {1.0, -0.48 - 0.12 * open, 0.0}, across, 0.0042 + 0.0012 * open, 0.0016 + 0.0046 * open, 0.00012, 0.06, 0.55), n.head));
+			out += attr(diffuseMaterial({0.92, 0.42, 0.46}),
+						emitMesh(sdf::decal(headShape, headCentreLocal(), {1.0, -0.52 - 0.14 * open, 0.0}, across, 0.0024 + 0.0004 * open, 0.0008 + 0.0012 * open, 0.00020, 0.06), n.head));
+		}
 	}
+
 	// ---- the eyes ----
 	{
 		const double wide = std::max(0.4, p.eyeWide);
-		std::string whites, pupils, highlights, lids, brows;
+		std::string whites, limbals, irises, glows, pupils, sparks, lids, brows;
 		for (double side : {-1.0, 1.0}) {
-			const Vec3 c = {0.006, 0.0085, side * 0.0115};
-			const double R = 0.0058 * wide;
-			whites += emitMesh(P.ball, mul(n.head, translate(c), scale(R)));
-			Vec3 dir = {0.35, 0.05, side * 0.94};   // turtles look out to the sides
-			dir = normalize(dir);
+			const Vec3 c = eyeCentreLocal(side);
+			const double R = kEyeR * wide;
+			whites += emitMesh(P.eyeball, mul(n.head, translate(c), scale(R)));
+			Vec3 dir = normalize({1.0, 0.04, side * 0.30});   // forward and a little out
 			if (p.lookWeight > 0.0) {
 				const Vec3 t = transformPoint(invertAffine(n.head), p.look);
 				Vec3 d = normalize(t - c);
-				if (d.z * side < 0.15) d.z = side * 0.15;   // the eye cannot see through the head
+				if (d.x < 0.05) d.x = 0.05;   // the eye cannot turn round into the head
 				dir = normalize(lerp(dir, normalize(d), clamp01(p.lookWeight)));
 			}
-			const Vec3 pc = c + dir * (R * 0.60);
-			pupils += emitMesh(P.ball, mul(n.head, translate(pc), scale(R * 0.56)));
-			highlights += emitMesh(P.ball, mul(n.head, translate(pc + normalize(dir + Vec3{0.3, 0.6, 0.0}) * (R * 0.32) + dir * (R * 0.2)), scale(R * 0.15)));
+			// a dark ring, a big iris with a warm glow low in it, the pupil, and two catchlights: a big one up and out, a small one down and in
+			const Mat4 eye = mul(n.head, alignY(c, dir), scale(R));
+			limbals += emitMesh(P.limbal, eye);
+			irises += emitMesh(P.iris, eye);
+			glows += emitMesh(P.glow, mul(n.head, alignY(c, normalize(dir - Vec3{0.0, 0.30, 0.0})), scale(R)));
+			pupils += emitMesh(P.pupil, eye);
+			const Vec3 upv = {0.0, 1.0, 0.0}, outv = {0.0, 0.0, side};
+			const Vec3 s1 = normalize(dir + upv * 0.50 + outv * 0.22), s2 = normalize(dir - upv * 0.42 - outv * 0.28);
+			sparks += emitMesh(P.disc, mul(n.head, alignY(c + s1 * (R * 1.007), s1), scale(R * 0.22, R * 0.012, R * 0.22)));
+			sparks += emitMesh(P.disc, mul(n.head, alignY(c + s2 * (R * 1.007), s2), scale(R * 0.10, R * 0.012, R * 0.10)));
 			// lids: the upper one comes down with a blink or a squint, the lower one comes up with a squint
 			const Vec3 outward = normalize(Vec3{0.25, 0.0, side});
 			const double up = clamp01(std::max(p.blink, 0.62 * p.squint));
@@ -330,24 +408,31 @@ inline std::string emitTurtle(const TurtlePose &p, const Look &look = Look{}) {
 			const auto lid = [&](double amount, double sign) {
 				const double psi = (180.0 - 180.0 * amount) * kPi / 180.0;
 				Vec3 axis = outward * std::cos(psi) + Vec3{0.0, sign, 0.0} * std::sin(psi);
-				// a cross or worried tilt slants the upper lid
-				const double tilt = sign > 0 ? 0.35 * (side < 0 ? p.browL : p.browR) : 0.0;
+				const double tilt = sign > 0 ? 0.35 * (side < 0 ? p.browL : p.browR) : 0.0;   // a cross or worried tilt slants the upper lid
 				axis = normalize(axis + Vec3{tilt * 0.6, 0.0, 0.0});
-				return emitMesh(P.cap, mul(n.head, alignY(c, axis), scale(R * 1.02)));
+				return emitMesh(P.cap, mul(n.head, alignY(c, axis), scale(R * 1.04)));
 			};
 			if (up > 0.02) lids += lid(up, 1.0);
 			if (low > 0.02) lids += lid(low, -1.0);
-			// the brow ridge: a short bar over the eye, its inner end up (worried) or down (cross)
+			// the brow: a short soft arc on the skin over the eye, its inner end up (worried) or down (cross)
 			const double b = side < 0 ? p.browL : p.browR;
-			const double h = R * 1.35 + 0.0016 * p.browRaise;
-			const Vec3 inner = c + Vec3{0.004, h - 0.0018 * b, -side * 0.003}, outer = c + Vec3{-0.003, h + 0.0012 * b, side * 0.0015};
-			brows += bar(transformPoint(n.head, inner), transformPoint(n.head, outer), 0.0011, 5);
+			const double h = R * 1.30 + 0.0018 * p.browRaise;
+			std::vector<Vec3> arc;
+			for (int k = 0; k <= 6; ++k) {
+				const double u = k / 6.0;   // inner .. outer
+				const Vec3 q = c + Vec3{lerp(0.0030, -0.0015, u), h + lerp(-0.0020 * b, 0.0012 * b, u) + 0.0007 * std::sin(kPi * u), side * lerp(-0.0035, 0.0040, u)};
+				arc.push_back(onHeadSurface(q - headCentreLocal()) + normalize(q - headCentreLocal()) * 0.0006);
+			}
+			brows += emitMesh(sdf::tubeMesh(arc, 0.0011, 0.5, 8), n.head);
 		}
-		out += attr(coated({0.93, 0.92, 0.80}, 0.08), whites);
-		out += attr(coated({0.04, 0.04, 0.03}, 0.04), pupils);
-		out += attr(coated({0.98, 0.98, 0.95}, 0.05), highlights);
+		out += attr(diffuseMaterial({0.95, 0.95, 0.93}), whites);
+		out += attr(diffuseMaterial(look.iris * 0.35), limbals);
+		out += attr(diffuseMaterial(look.iris), irises);
+		out += attr(diffuseMaterial(look.iris * 2.6), glows);
+		out += attr(diffuseMaterial({0.015, 0.012, 0.01}), pupils);
+		out += attr(diffuseMaterial({1.0, 1.0, 1.0}), sparks);
 		if (!lids.empty()) out += attr(skin, lids);
-		out += attr(coated(look.skin * 0.55, 0.4), brows);
+		out += attr(diffuseMaterial(look.brow), brows);
 	}
 	return out;
 }
