@@ -10,6 +10,7 @@
  */
 #include <gtest/gtest.h>
 #include <algorithm>
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -34,16 +35,29 @@ TEST_P(PbrtReferencePackCpuTest, TheCpuRenderStaysWhereItWasAgainstPbrt) {
 	const SceneDescriptor* s = find_example_scene(row.name.c_str());
 	if (!s) GTEST_SKIP() << row.name << ".pbrt was not discovered - is pbrt_scenes/ present?";
 	const std::string out = "pbrt_pack_" + pbrtPackTestName(row.name) + "_cpu.exr";
-	ASSERT_EQ(cpu_render_main(row.size, row.size, row.spp, row.depth, out.c_str(), s->id.c_str(), s->camera.lookfrom_x, s->camera.lookfrom_y, s->camera.lookfrom_z), 0);
-	int w = 0, h = 0;
-	std::vector<float> rgb;
-	const bool ok = loadLinearRgbPixels(out, w, h, rgb);
-	std::remove(out.c_str());
-	ASSERT_TRUE(ok) << row.name << ": no readable EXR";
-	double channelMean[3] = {0.0, 0.0, 0.0};
-	for (std::size_t i = 0; i < rgb.size(); ++i) channelMean[i % 3] += rgb[i];
-	for (double& c : channelMean) c /= std::max(1, w * h);
-	const double mean = (channelMean[0] + channelMean[1] + channelMean[2]) / 3.0;
+	// A scene whose estimator has a heavy tail is rendered five times and the render with the median mean is the one compared. Only camera-medium-absorbing is such a scene (its CPU
+	// tolerance is the table's only one of 10% or more): a point light inside a scattering fog gives a scatter point near the light a weight of 1/r^2, which has no bound, so a 64-sample
+	// render now and then holds one sample worth tens of thousands (measured: 6 of 200 renders read more than 10% bright, one 54%, against a median of -1.6%). pbrt-v4's estimator has
+	// the same tail; one render made this test fail at random. Every CPU render draws fresh randomness, so the five are independent; the median of five fails only when three of them do.
+	const int renders = row.tol[0] >= 0.10 ? 5 : 1;
+	std::vector<std::array<double, 4>> results;   // channel means and their mean, per render
+	for (int r = 0; r < renders; ++r) {
+		ASSERT_EQ(cpu_render_main(row.size, row.size, row.spp, row.depth, out.c_str(), s->id.c_str(), s->camera.lookfrom_x, s->camera.lookfrom_y, s->camera.lookfrom_z), 0);
+		int w = 0, h = 0;
+		std::vector<float> rgb;
+		const bool ok = loadLinearRgbPixels(out, w, h, rgb);
+		std::remove(out.c_str());
+		ASSERT_TRUE(ok) << row.name << ": no readable EXR";
+		std::array<double, 4> m = {0.0, 0.0, 0.0, 0.0};
+		for (std::size_t i = 0; i < rgb.size(); ++i) m[i % 3] += rgb[i];
+		for (int c = 0; c < 3; ++c) m[c] /= std::max(1, w * h);
+		m[3] = (m[0] + m[1] + m[2]) / 3.0;
+		results.push_back(m);
+	}
+	std::sort(results.begin(), results.end(), [](const std::array<double, 4>& a, const std::array<double, 4>& b) { return a[3] < b[3]; });
+	const std::array<double, 4>& chosen = results[results.size() / 2];
+	const double channelMean[3] = {chosen[0], chosen[1], chosen[2]};
+	const double mean = chosen[3];
 	const double expected = row.pbrtMean() * row.ratio[0];
 	std::printf("[pack] %-40s cpu %.5f  expected %.5f (pbrt %.5f x %.3f, tolerance %.1f%%): %+.1f%%\n", row.name.c_str(), mean, expected, row.pbrtMean(), row.ratio[0], 100.0 * row.tol[0], 100.0 * (mean / expected - 1.0));
 	EXPECT_GT(mean, (1.0 - row.tol[0]) * expected) << row.name << " reads darker than it did against pbrt-v4";
