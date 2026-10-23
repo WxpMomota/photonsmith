@@ -881,8 +881,8 @@ void MainWindow::buildQualityRows(QWidget *basicTab, QFormLayout *renderLayout) 
 	m_resolutionCombo->insertSeparator(m_resolutionCombo->count());
 	m_resolutionCombo->addItem(tr("Custom size (Width and Height below)"), QSize());
 	m_resolutionCombo->setCurrentIndex(m_resolutionCombo->findData(QSize(800, 800)));   // the default, 800 x 800
-	m_resolutionCombo->setMaxVisibleItems(32);
 	styleComboBox(m_resolutionCombo);
+	m_resolutionCombo->setMaxVisibleItems(16);   // (after styleComboBox, which sets 12)
 	m_resolutionCombo->setToolTip(
 		tr("The picture's size in pixels: squares, widescreen 16:9 (HD, Full HD, 4K),\n"
 		"cinema 21:9, 4:3, 3:2, and portrait sizes for phones. Choosing one fills in\n"

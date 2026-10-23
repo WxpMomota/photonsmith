@@ -40,6 +40,8 @@
 #include <QTimer>
 #include <QPlainTextEdit>
 #include <QRegularExpression>
+#include <QAbstractItemView>
+#include <QScreen>
 #include <QSpinBox>
 #include <functional>
 #include <memory>
@@ -1443,6 +1445,29 @@ void MainWindow::runResolutionSelfTest(const std::function<void(const QString &)
 	}
 	check(wide >= 5 && tall >= 2, QString("the Resolution box offers wide (%1) and tall (%2) sizes, not only squares").arg(wide).arg(tall));
 	check(m_resolutionCombo->findData(QSize(426, 240)) >= 0 && m_resolutionCombo->findData(QSize(214, 120)) >= 0, "240p and 120p are presets");
+	// The list opens against its box, with a choice half-way down it, whether the box is low on the screen (the list opens upwards) or high (downwards). Fusion's own
+	// popup put the chosen item over the box instead, and cut short in height the list hung far above it.
+	{
+		show();
+		m_resolutionCombo->setCurrentIndex(m_resolutionCombo->findData(QSize(214, 120)));
+		const QRect screen = m_resolutionCombo->screen()->availableGeometry();
+		for (const bool low : {true, false}) {
+			QApplication::processEvents();
+			const QPoint at = m_resolutionCombo->mapToGlobal(QPoint(0, 0));
+			move(pos() + QPoint(0, (low ? screen.bottom() - 60 : screen.top() + 60) - at.y()));
+			QApplication::processEvents();
+			const QRect box(m_resolutionCombo->mapToGlobal(QPoint(0, 0)), m_resolutionCombo->size());
+			m_resolutionCombo->showPopup();
+			QApplication::processEvents();
+			const QWidget *popup = m_resolutionCombo->view()->window();
+			const QRect list = popup->geometry();
+			const bool touches = std::abs(list.top() - box.bottom()) <= 6 || std::abs(list.bottom() - box.top()) <= 6;
+			check(popup->isVisible() && touches && list.height() <= screen.height(),
+				  QString("box %1: the list (%2..%3) opens against the box (%4..%5)").arg(low ? "low" : "high").arg(list.top()).arg(list.bottom()).arg(box.top()).arg(box.bottom()));
+			if (low) shot("resolution_popup");
+			m_resolutionCombo->hidePopup();
+		}
+	}
 	const int fullHd = m_resolutionCombo->findData(QSize(1920, 1080));
 	check(fullHd >= 0, "1920 x 1080 is a preset");
 	m_resolutionCombo->setCurrentIndex(fullHd);

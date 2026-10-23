@@ -415,6 +415,12 @@ QString themeStylesheetPart2() {  // the tab pane, scroll areas and lists
 			min-height: 26px;
 			margin: 3px 2px;
 		}
+		/* A plain drop-down list under (or, without room, right above) the box. Fusion's own popup instead puts the CHOSEN item over the box, so with a
+		   long list and a choice half-way down (Resolution's 214 x 120) the whole list moved up, and capped in height it hung far above the box. In
+		   this mode Qt also honours setMaxVisibleItems. */
+		QComboBox {
+			combobox-popup: 0;
+		}
 		/* Same 26px min-height as the combo box/line edit above (no
 		   override here) - now that SpinBoxStepButtons (mainwindow_widgets.h)
 		   draws small real chevron icons instead of the old thick PlusMinus
@@ -951,29 +957,12 @@ void MainWindow::styleComboBox(QComboBox *combo) {
 	QAbstractItemView *view = combo->view();
 
 	// Cap the popup's visible rows so it scrolls instead of growing past
-	// the screen - matters most for m_sceneCombo (81 scenes and counting);
-	// harmless for the shorter dropdowns (mode/quality/resolution/camera
-	// presets), which never reach this count anyway.
-	// setMaxVisibleItems() alone doesn't reliably constrain the popup here
-	// (confirmed live - the popup still grew to fit every item, no
-	// scrollbar) - the Fusion style forced onto the view below, combined
-	// with this QSS's `min-height: 32px` per item, apparently isn't what
-	// Qt's own maxVisibleItems sizing math measures against on this style/
-	// platform combination. A hard pixel cap on the view itself sidesteps
-	// that: QAbstractItemView shows a scrollbar automatically once content
-	// exceeds its viewport height, regardless of how that height was set.
+	// the screen - matters most for m_sceneCombo (81 scenes and counting).
+	// The stylesheet's `combobox-popup: 0` is what makes Qt honour this: in
+	// Fusion's own popup mode it ignored it, and the hard pixel caps that
+	// stood in for it here were applied after Qt had placed the popup, so a
+	// list opening upwards was cut short at the top and hung far above its box.
 	combo->setMaxVisibleItems(12);
-	view->setMaximumHeight(420);
-	// The view alone scrolling correctly wasn't enough - confirmed live,
-	// the popup's own top-level container window (a separate widget
-	// QComboBox lazily creates the first time view() is called, sized from
-	// its own pre-QSS sizeHint estimate) stayed at the full uncapped
-	// height, leaving a large dead/empty area around the now-properly-
-	// clamped-and-scrollable view floating inside it. Cap the container
-	// too, once it exists (immediately, since accessing view() above is
-	// exactly what creates it).
-	if (QWidget *popupContainer = view->parentWidget())
-		popupContainer->setMaximumHeight(420);
 
 	// QComboBox installs a plain QItemDelegate on its popup, and QItemDelegate
 	// paints items itself without consulting the stylesheet - which silently
