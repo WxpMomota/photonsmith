@@ -130,9 +130,12 @@ void MainWindow::createProgressTab() {
 	m_queueView->verticalHeader()->hide();
 	m_queueView->verticalHeader()->setDefaultSectionSize(24);
 	m_queueView->horizontalHeader()->setStretchLastSection(false);
-	m_queueView->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-	// (the scene's name is as wide as it is; it used to take every pixel the other columns left, a row of mostly empty space)
+	// The columns share the table's width evenly. Sized to their contents they sat squeezed together at the left of a wide window; letting only the scene's name take the
+	// rest made a row of mostly empty space. Headings are left-aligned, over their values.
+	m_queueView->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+	m_queueView->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 	m_queueView->horizontalHeader()->setMinimumSectionSize(70);
+	m_queueView->setTextElideMode(Qt::ElideMiddle);   // (a long scene name in a narrow window keeps its start and end)
 	// Clicking empty space below the rows otherwise leaves whatever was
 	// selected stuck selected - see ListEmptyAreaDeselectFilter's comment.
 	m_queueView->viewport()->installEventFilter(new ListEmptyAreaDeselectFilter(m_queueView));

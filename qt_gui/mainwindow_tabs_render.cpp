@@ -390,6 +390,14 @@ void MainWindow::createPreviewTab() {
 		QDesktopServices::openUrl(QUrl::fromLocalFile(path));
 	});
 	sideLayout->addWidget(openViewerButton);
+	// The sidebar is at least as wide as its widest button needs (its label, icon and padding at the chosen font): at a fixed 200-220 px "Open in Default Viewer" lost its last letter.
+	int buttonsWidth = 0;
+	for (QPushButton *b : {openFolderButton, openViewerButton}) {
+		b->ensurePolished();
+		buttonsWidth = (std::max)(buttonsWidth, b->sizeHint().width());
+	}
+	const int sidebarWidth = (std::min)(sidebar->maximumWidth(), (std::max)(sidebar->minimumWidth(), buttonsWidth + sideLayout->contentsMargins().left() + sideLayout->contentsMargins().right() + 4));
+	sidebar->setMinimumWidth(sidebarWidth);
 
 	// No trailing addStretch() here - m_previewTechniqueScroll's own
 	// stretch factor (set above) already absorbs whatever vertical space
@@ -402,7 +410,7 @@ void MainWindow::createPreviewTab() {
 	// width for its buttons/info text, everything else goes to the render.
 	splitter->setStretchFactor(0, 1);
 	splitter->setStretchFactor(1, 0);
-	splitter->setSizes({700, 220});
+	splitter->setSizes({700, (std::max)(220, sidebar->minimumWidth())});
 
 	// Starts hidden - no tabs exist yet at construction time, so there is
 	// nothing for the sidebar to describe. updatePreviewSidebarForActiveTab()
@@ -661,7 +669,14 @@ void MainWindow::addVideoPreviewTab(const QString &title, const QString &tooltip
 	controlsLayout->setSpacing(8);
 
 	QPushButton *playPauseButton = new QPushButton(tr("Pause"));
-	playPauseButton->setFixedWidth(70);
+	// As wide as its longer label needs with the style's padding (a fixed 70 px cut "Pause" off with the app's larger fonts and padding), and the same width for both labels
+	// so the slider beside it does not jump when it changes.
+	{
+		playPauseButton->ensurePolished();   // (the style sheet's font and padding, before measuring)
+		const QFontMetrics fm(playPauseButton->font());
+		const int text = (std::max)(fm.horizontalAdvance(tr("Pause")), fm.horizontalAdvance(tr("Play")));
+		playPauseButton->setFixedWidth((std::max)(playPauseButton->sizeHint().width(), text + 48));
+	}
 	connect(playPauseButton, &QPushButton::clicked, page, [player]() {
 		if (player->playbackState() == QMediaPlayer::PlayingState) player->pause();
 		else player->play();
