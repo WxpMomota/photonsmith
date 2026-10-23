@@ -76,7 +76,7 @@ crystal-heart|15|30832|1097
 crystal-heart|30|30832|878
 crystal-heart|59.94|30832|878
 meta|tengwang|V22|620 s|24 fps|59 shots|character,water,dusk,night,fog|32 spp
-tengwang|0|4|1
+tengwang|0|0|1
 tengwang|219|314|1
 tengwang|310|18|0
 tengwang|619.4|48|0

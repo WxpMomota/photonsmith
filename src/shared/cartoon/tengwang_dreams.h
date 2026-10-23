@@ -15,7 +15,7 @@
 namespace cartoon {
 namespace tengwang {
 
-constexpr int kDreamsVersion = 1;
+constexpr int kDreamsVersion = 2;
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The sea of clouds and the peaks of the opening
@@ -29,7 +29,7 @@ inline double peakHeight(double x, double z) {
 }
 inline Mesh peaksMesh() {
 	Mesh m;
-	const int nx = 520, nz = 520;
+	const int nx = 900, nz = 900;
 	for (int j = 0; j <= nz; ++j)
 		for (int i = 0; i <= nx; ++i) {
 			const double x = lerp(kPeaksX0, kPeaksX1, static_cast<double>(i) / nx), z = lerp(kPeaksZ0, kPeaksZ1, static_cast<double>(j) / nz);
@@ -87,12 +87,89 @@ inline std::string cloudSeaText(double top, double density, double scatter, doub
 	char buf[700];
 	std::snprintf(buf, sizeof buf,
 				  "AttributeBegin\n  Translate %.1f %.1f %.1f\n  Scale %.1f %.1f %.1f\n  MakeNamedMedium \"%s\" \"string type\" [ \"cloud\" ] \"rgb sigma_a\" [ 0 0 0 ] \"rgb sigma_s\" [ %.5f %.5f %.5f ] \"float g\" [ 0.8 ] \"float density\" [ %.3f ] \"float wispiness\" [ 1.2 ] \"float frequency\" [ %.2f ]\nAttributeEnd\n",
-				  -(centre.x + w / 2.0), -250.0, centre.z - w / 2.0, w, depth * 1.6, w, name.c_str(), scatter, scatter, scatter, density, frequency);
+				  -(centre.x + w / 2.0), -250.0, centre.z - w / 2.0, w, depth / 0.9, w, name.c_str(), scatter, scatter, scatter, density, frequency);
+	// (the box's height: the cloud's density falls with height in the box, (1 - y) * 4.5 * density, so a box whose top is a little above the sphere's leaves the cloud thinning
+	// out into billows just under the sphere, rather than cut off flat by it)
 	std::string out = buf;
 	const double R = 40000.0;
 	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.1f %.1f %.1f\n  Material \"interface\"\n  MediumInterface \"%s\" \"\"\n  Shape \"sphere\" \"float radius\" [ %.1f ]\nAttributeEnd\n", -centre.x, top - R,
 				  centre.z, name.c_str(), R);
 	return out + buf;
+}
+
+// The sea of clouds as a surface: the tops of the clouds, billowing (domain-warped noise in rounded heaps), soft and translucent, a kilometre up; seen from above, as the
+// opening sees them, this reads as cloud and costs a fraction of a cloud medium.
+inline double cloudTopHeight(double x, double z) {
+	const double wx = nature::fbm2(x / 2600.0 + 3.0, z / 2600.0, 191) - 0.5, wz = nature::fbm2(x / 2600.0, z / 2600.0 + 7.0, 192) - 0.5;
+	const double u = x / 900.0 + 1.8 * wx, v = z / 900.0 + 1.8 * wz;
+	double h = 0.0;
+	// heaps: the max of rounded cells, so the tops are domes and the troughs creases
+	for (int o = 0; o < 3; ++o) {
+		const double s = std::pow(2.1, o), a = std::pow(0.45, o);
+		const double n = nature::fbm2(u * s, v * s, 193 + o);
+		h += a * std::pow(n, 1.6);
+	}
+	return 980.0 + 260.0 * h;
+}
+inline std::string cloudSurfaceText() {
+	static const std::string file = film_cache::ply(kFilmKey, versioned("cloudtops", kDreamsVersion), [] {
+		Mesh m;
+		const int n = 700;
+		for (int j = 0; j <= n; ++j)
+			for (int i = 0; i <= n; ++i) {
+				const double x = lerp(kPeaksX0 - 6000.0, kPeaksX1 + 4000.0, static_cast<double>(i) / n), z = lerp(kPeaksZ0 - 6000.0, kPeaksZ1 + 6000.0, static_cast<double>(j) / n);
+				m.verts.push_back({x, cloudTopHeight(x, z), z});
+			}
+		for (int j = 0; j < n; ++j)
+			for (int i = 0; i < n; ++i) {
+				const int q = j * (n + 1) + i;
+				m.tris.push_back({q, q + n + 1, q + 1});
+				m.tris.push_back({q + 1, q + n + 1, q + n + 2});
+			}
+		for (auto &t : m.tris) {
+			const Vec3 nn = cross(m.verts[static_cast<std::size_t>(t[1])] - m.verts[static_cast<std::size_t>(t[0])], m.verts[static_cast<std::size_t>(t[2])] - m.verts[static_cast<std::size_t>(t[0])]);
+			if (nn.y < 0.0) std::swap(t[1], t[2]);
+		}
+		sdf::computeNormals(m);
+		return m;
+	});
+	return attr("Material \"diffusetransmission\" \"rgb reflectance\" [ 0.92 0.90 0.92 ] \"rgb transmittance\" [ 0.55 0.52 0.58 ]", film_cache::plyShape(file));
+}
+
+// Ridges without end: layer after layer of mountain ridges going away into the mist, the way a painter of the south sees the hills (a set of its own, seen from the origin
+// looking along -z: layer k is a long band of ridged hills k kilometres and more away, each a little higher than the one before it).
+inline std::string ridgeLayersText() {
+	static const std::string file = film_cache::ply(kFilmKey, versioned("ridgelayers", kDreamsVersion), [] {
+		Mesh all;
+		const double distances[] = {900.0, 1700.0, 2700.0, 4000.0, 5800.0, 8200.0, 11500.0};
+		for (int k = 0; k < 7; ++k) {
+			const double d = distances[k], width = d * 3.2, depth = d * 0.25;
+			const int nx = 360, nz = 12;
+			Mesh m;
+			for (int j = 0; j <= nz; ++j)
+				for (int i = 0; i <= nx; ++i) {
+					const double u = static_cast<double>(i) / nx, v = static_cast<double>(j) / nz;
+					const double x = lerp(-width / 2.0, width / 2.0, u), z = -d - depth * v;
+					const double crest = (0.10 + 0.012 * k) * d * (0.45 + 0.55 * ridged(x / (d * 0.35) + 13.0 * k, 0.5 * k, 211 + k));
+					// (each band rises from the valley floor to its crest and falls behind it)
+					m.verts.push_back({x, crest * std::sin(kPi * std::pow(v, 0.6)) - 30.0, z});
+				}
+			for (int j = 0; j < nz; ++j)
+				for (int i = 0; i < nx; ++i) {
+					const int q = j * (nx + 1) + i;
+					m.tris.push_back({q, q + nx + 1, q + 1});
+					m.tris.push_back({q + 1, q + nx + 1, q + nx + 2});
+				}
+			for (auto &t : m.tris) {
+				const Vec3 n = cross(m.verts[static_cast<std::size_t>(t[1])] - m.verts[static_cast<std::size_t>(t[0])], m.verts[static_cast<std::size_t>(t[2])] - m.verts[static_cast<std::size_t>(t[0])]);
+				if (n.y < 0.0) std::swap(t[1], t[2]);
+			}
+			sdf::computeNormals(m);
+			append(all, m, identity());
+		}
+		return all;
+	});
+	return attr(diffuseMaterial({0.05, 0.06, 0.07}), film_cache::plyShape(file));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -109,12 +186,13 @@ inline std::string inkPaperText() {
 	return "AttributeBegin\n  Texture \"fibre\" \"spectrum\" \"checkerboard\" \"rgb tex1\" [ 0.86 0.83 0.76 ] \"rgb tex2\" [ 0.83 0.80 0.73 ]\n  Material \"diffuse\" \"texture reflectance\" [ \"fibre\" ]\n" +
 		   emitMesh(sheet, identity()) + "AttributeEnd\n";
 }
-// A stroke of ink along `path` (on the paper, y = 0), `width(u)` wide, laid as far as `grow` (0..1) along it, its wet edge a little ragged.
+// A stroke of ink along `path` (on the paper, y = 0), `width(u)` wide, laid as far as `grow` (0..1) along it, its wet edge a little ragged. `tone` is how dark the ink is (1
+// black, 0.2 a pale wash of watered ink); `wet` how glossy it still is.
 template <typename Path, typename Width>
-inline std::string inkStroke(Path path, Width width, double grow, int salt, double wet = 1.0) {
+inline std::string inkStroke(Path path, Width width, double grow, int salt, double wet = 1.0, double tone = 1.0, double lift = 0.002) {
 	if (grow <= 0.0) return std::string();
 	Mesh m;
-	const int n = 120;
+	const int n = 160;
 	const int last = (std::max)(1, static_cast<int>(n * grow));
 	for (int k = 0; k <= last; ++k) {
 		const double u = static_cast<double>(k) / n;
@@ -122,9 +200,9 @@ inline std::string inkStroke(Path path, Width width, double grow, int salt, doub
 		const Vec3 tdir = normalize(q - p + Vec3{1e-9, 0.0, 0.0});
 		const Vec3 side{-tdir.z, 0.0, tdir.x};
 		const double ragged = 1.0 + 0.25 * (nature::noise2(u * 40.0, 0.5, salt) - 0.5) + 0.15 * (nature::noise2(u * 140.0, 1.5, salt + 1) - 0.5);
-		double w = width(u) * ragged * (k == last ? 0.6 : 1.0);
-		m.verts.push_back(p + side * (w / 2.0) + Vec3{0.0, 0.002, 0.0});
-		m.verts.push_back(p - side * (w / 2.0) + Vec3{0.0, 0.002, 0.0});
+		const double w = width(u) * ragged * (k == last ? 0.6 : 1.0);
+		m.verts.push_back(p + side * (w / 2.0) + Vec3{0.0, lift, 0.0});
+		m.verts.push_back(p - side * (w / 2.0) + Vec3{0.0, lift, 0.0});
 	}
 	for (int k = 0; k < last; ++k) {
 		const int a = 2 * k;
@@ -136,24 +214,55 @@ inline std::string inkStroke(Path path, Width width, double grow, int salt, doub
 		if (nn.y < 0.0) std::swap(t[1], t[2]);
 	}
 	m.normals.assign(m.verts.size(), Vec3{0.0, 1.0, 0.0});
-	char mat[200];
-	std::snprintf(mat, sizeof mat, "Material \"coateddiffuse\" \"rgb reflectance\" [ 0.012 0.011 0.011 ] \"float roughness\" [ %.3f ]", lerp(0.4, 0.02, wet));
+	const double g = lerp(0.82, 0.012, clamp01(tone));
+	char mat[220];
+	std::snprintf(mat, sizeof mat, "Material \"coateddiffuse\" \"rgb reflectance\" [ %.4f %.4f %.4f ] \"float roughness\" [ %.3f ]", g, g * 0.97, g * 0.95, lerp(0.4, 0.04, wet));
 	return attr(mat, emitMesh(m, identity()));
 }
-// A soft wash of ink (a blot spreading): a disc of grey whose edge is ragged, `r` across, `darkness` 0..1.
+// A soft wash of ink spreading in the paper, `r` across, `darkness` 0..1 at its heart: rings from a pale ragged edge in to the dark middle, so it fades out at its edge as
+// watered ink does.
 inline std::string inkWash(Vec3 c, double r, double darkness, int salt) {
-	Mesh m;
-	const int n = 64;
-	m.verts.push_back(c + Vec3{0.0, 0.0015, 0.0});
-	for (int k = 0; k <= n; ++k) {
-		const double a = 2.0 * kPi * k / n;
-		const double rr = r * (0.8 + 0.35 * nature::fbm2(std::cos(a) * 2.0 + salt, std::sin(a) * 2.0, salt));
-		m.verts.push_back(c + Vec3{rr * std::cos(a), 0.0015, rr * std::sin(a)});
+	std::string out;
+	const int rings = 14;
+	for (int k = 0; k < rings; ++k) {
+		const double s = 1.0 - 0.055 * k;   // each ring a little smaller and darker, laid on the one before
+		Mesh m;
+		const int n = 72;
+		m.verts.push_back(c + Vec3{0.0, 0.0010 + 0.00008 * k, 0.0});
+		for (int j = 0; j <= n; ++j) {
+			const double a = 2.0 * kPi * j / n;
+			const double rr = r * s * (0.78 + 0.4 * nature::fbm2(std::cos(a) * 2.2 + salt + 0.7 * k, std::sin(a) * 2.2, salt));
+			m.verts.push_back(c + Vec3{rr * std::cos(a), 0.0010 + 0.00008 * k, rr * std::sin(a)});
+		}
+		for (int j = 0; j < n; ++j) m.tris.push_back({0, j + 2, j + 1});
+		m.normals.assign(m.verts.size(), Vec3{0.0, 1.0, 0.0});
+		const double g = lerp(0.84, lerp(0.82, 0.02, darkness), std::pow((k + 1.0) / rings, 1.4));
+		out += attr("Material \"diffuse\" \"rgb reflectance\" [ " + fmt3({g, g * 0.98, g * 0.96}) + " ]", emitMesh(m, identity()));
 	}
-	for (int k = 0; k < n; ++k) m.tris.push_back({0, k + 2, k + 1});
-	m.normals.assign(m.verts.size(), Vec3{0.0, 1.0, 0.0});
-	const double g = lerp(0.8, 0.02, darkness);
-	return attr("Material \"diffuse\" \"rgb reflectance\" [ " + fmt3({g, g * 0.98, g * 0.96}) + " ]", emitMesh(m, identity()));
+	return out;
+}
+// A brush stroke as a painter makes it: a bundle of bristle trails, dense in the middle of the stroke and breaking up towards its end (the "flying white" of a dry brush),
+// over a pale wet bleed into the paper round it. `path(u)` is the stroke's line on the paper, `width(u)` its width, laid as far as `grow` along it.
+template <typename Path, typename Width>
+inline std::string inkBrush(Path path, Width width, double grow, int salt, double darkness = 1.0) {
+	std::string out = inkStroke(path, [&](double u) { return width(u) * 1.6; }, grow, salt + 1, 0.0, 0.25 * darkness, 0.0015);   // (the wet bleed)
+	const int bristles = 9;
+	for (int b = 0; b < bristles; ++b) {
+		const double across = (b + 0.5) / bristles - 0.5;   // -0.5 .. 0.5 across the stroke
+		const double ends = 1.0 - 0.4 * hash01(b, salt + 2) * (std::abs(across) * 2.0);   // the edge bristles run dry first
+		const auto bristlePath = [&](double u) {
+			const Vec3 p = path(u), q = path((std::min)(1.0, u + 0.01));
+			const Vec3 d = normalize(q - p + Vec3{1e-9, 0.0, 0.0});
+			return p + Vec3{-d.z, 0.0, d.x} * (across * width(u));
+		};
+		const auto bristleWidth = [&](double u) {
+			const double dry = 1.0 - smoothstep(ends - 0.3, ends, u);
+			const double flicker = 0.7 + 0.6 * nature::noise2(u * 30.0, b * 3.1, salt + 3);
+			return width(u) / bristles * 1.35 * dry * flicker;
+		};
+		out += inkStroke(bristlePath, bristleWidth, (std::min)(grow, ends), salt + 10 + b, darkness, darkness * (0.85 + 0.15 * hash01(b, salt + 4)), 0.002 + 0.0001 * b);
+	}
+	return out;
 }
 // The paper's light: an even white light from above (a studio), so the paper is white and the ink black.
 inline std::string inkStudioLight() { return "LightSource \"infinite\" \"rgb L\" [ 0.95 0.93 0.88 ]\n"; }

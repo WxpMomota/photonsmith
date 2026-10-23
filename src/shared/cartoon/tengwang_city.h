@@ -8,7 +8,7 @@
 namespace cartoon {
 namespace tengwang {
 
-constexpr int kCityVersion = 1;
+constexpr int kCityVersion = 2;
 
 // The city's walls: x from kCityX0 to kCityX1, z from kCityZ0 (the west wall, facing the river, behind the Pavilion) to kCityZ1.
 constexpr double kCityX0 = -980.0, kCityX1 = 1180.0, kCityZ0 = 150.0, kCityZ1 = 2250.0;
@@ -121,6 +121,8 @@ inline Parts cityParts() {
 	addWallRun(p, c10, c11, {1.0, 0.0, 0.0});
 	addWallRun(p, c11, c01, {0.0, 0.0, 1.0});
 	addWallRun(p, c01, c00, {-1.0, 0.0, 0.0});
+	// the paved square between the Pavilion's city stairs and the gate
+	addBox(p["stone"], {70.0, g + 0.05, 95.0}, {240.0, 0.1, 102.0});
 	// the gate: a thick block over a passage, and the tower on it
 	addBox(p["brick"], {kGateX - 13.0, g + kWallHeight / 2.0 - 1.0, kCityZ0}, {8.0, kWallHeight + 2.0, 16.0});
 	addBox(p["brick"], {kGateX + 13.0, g + kWallHeight / 2.0 - 1.0, kCityZ0}, {8.0, kWallHeight + 2.0, 16.0});

@@ -107,13 +107,15 @@ inline Vec3 nightSky(const Spec &s, Vec3 w, int row, int col) {
 		const double off = dot(w, pole);   // the distance from the band's mid-line (sine of it)
 		const Vec3 along = normalize(w - pole * off);
 		const double u = std::atan2(along.z, along.x), v = off;
-		// the band: wide and soft, brighter towards its core, with clumps and a dark lane of dust down the middle
-		double band = std::exp(-std::pow(v / 0.20, 2.0)) * (0.55 + 0.9 * nature::fbm2(u * 6.0, v * 22.0, 401));
-		band += 0.8 * std::exp(-std::pow(v / 0.07, 2.0)) * nature::fbm2(u * 14.0, v * 40.0, 402);
-		const double core = 0.6 + 0.8 * std::exp(-std::pow(std::remainder(u - 0.6, 2.0 * kPi) / 1.1, 2.0));
-		const double dust = std::exp(-std::pow((v - 0.015 * std::sin(3.0 * u)) / 0.035, 2.0)) * nature::fbm2(u * 9.0, v * 30.0, 403);
-		band = (std::max)(0.0, band * core * (1.0 - 0.85 * dust));
-		c = c + Vec3{0.80, 0.86, 1.0} * (0.022 * s.milkyWay * band);
+		// the band: wide and soft, brighter towards its core, made of clumpy star clouds (noise as fine along the band as across it) with a dark, ragged lane of dust down
+		// its middle
+		const double clump = nature::fbm2(u * 7.0 + 3.0 * v, v * 7.0, 401), fine = nature::fbm2(u * 22.0, v * 22.0, 402);
+		double band = std::exp(-std::pow(v / 0.15, 2.0)) * (0.30 + 0.8 * clump * clump + 0.3 * fine);
+		const double core = 0.55 + 0.9 * std::exp(-std::pow(std::remainder(u - 0.6, 2.0 * kPi) / 1.0, 2.0));
+		// dark clouds of dust here and there across it (patches, not a line)
+		const double dust = smoothstep(0.55, 0.75, nature::fbm2(u * 9.0 + 11.0, v * 9.0, 404)) * std::exp(-std::pow(v / 0.08, 2.0));
+		band = (std::max)(0.0, band * core * (1.0 - 0.8 * dust));
+		c = c + lerp(Vec3{0.78, 0.84, 1.0}, Vec3{1.0, 0.90, 0.78}, clamp01(core - 0.8)) * (0.016 * s.milkyWay * band);
 	}
 	if (s.stars > 0.0) {
 		const double h = hash01(row * 7919 + col, 404);
@@ -146,7 +148,7 @@ inline double cloudDensity(const Clouds &L, double x, double z) {
 inline std::string fileName(const Spec &s) {
 	std::string key;
 	char b[400];
-	std::snprintf(b, sizeof b, "v3|%.3f|%.3f|%.3f|%.4f|%.4f %.4f %.4f|%.3f|%.3f|%.3f|%.3f %.3f %.3f|%.3f|%.3f|%.4f %.4f %.4f|%.3f|%.4f %.4f %.4f|%.3f|%d", s.sunElevation, s.sunAzimuth, s.turbidity,
+	std::snprintf(b, sizeof b, "v5|%.3f|%.3f|%.3f|%.4f|%.4f %.4f %.4f|%.3f|%.3f|%.3f|%.3f %.3f %.3f|%.3f|%.3f|%.4f %.4f %.4f|%.3f|%.4f %.4f %.4f|%.3f|%d", s.sunElevation, s.sunAzimuth, s.turbidity,
 				  s.brightness, s.tint.x, s.tint.y, s.tint.z, s.night, s.nightBrightness, s.milkyWay, s.milkyPole.x, s.milkyPole.y, s.milkyPole.z, s.stars, s.glow, s.glowColour.x, s.glowColour.y,
 				  s.glowColour.z, s.afterglow, s.afterglowColour.x, s.afterglowColour.y, s.afterglowColour.z, s.belt, s.width);
 	key = b;

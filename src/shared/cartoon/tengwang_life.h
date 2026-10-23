@@ -740,7 +740,7 @@ inline std::string skeinText(Vec3 lead, Vec3 dir, int n, double t, double spacin
 	for (int k = 0; k < n; ++k) {
 		const int arm = k == 0 ? 0 : (k % 2 ? 1 : -1), rank = (k + 1) / 2;
 		const Vec3 at = lead - f * (spacing * rank) + side * (arm * spacing * 0.8 * rank) + Vec3{0.0, 0.15 * std::sin(t * 1.3 + k), 0.0};
-		out += birdText(at, dir, std::sin(t * 2.0 * kPi * 1.3 + k * 0.6), 1.6, {0.30, 0.27, 0.24}, {0.24, 0.22, 0.20});
+		out += birdText(at, dir, std::sin(t * 2.0 * kPi * 1.3 + k * 0.6), 2.3, {0.30, 0.27, 0.24}, {0.24, 0.22, 0.20});
 	}
 	return out;
 }

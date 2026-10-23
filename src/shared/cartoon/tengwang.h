@@ -49,7 +49,7 @@ inline film_sky::Clouds cloudLayer(double altitude, double coverage, double alon
 	return c;
 }
 inline SunPlace sunOf(int sky) {
-	static const SunPlace s[kSkyCount] = {{-3.5, 200.0}, {1.2, 200.0}, {9.0, 205.0}, {32.0, -55.0}, {14.0, -32.0}, {7.0, -27.0}, {2.2, -22.0}, {0.3, -21.0}, {-2.5, -20.0}, {-4.5, -20.0}, {-6.0, -20.0}, {-25.0, -20.0}, {-2.5, 200.0}};
+	static const SunPlace s[kSkyCount] = {{-3.5, 200.0}, {3.5, 200.0}, {9.0, 205.0}, {32.0, -55.0}, {14.0, -32.0}, {7.0, -27.0}, {2.2, -22.0}, {0.3, -21.0}, {-2.5, -20.0}, {-4.5, -20.0}, {-6.0, -20.0}, {-25.0, -20.0}, {-2.5, 200.0}};
 	return s[sky];
 }
 inline film_sky::Spec skySpec(int k) {
@@ -92,8 +92,8 @@ inline film_sky::Spec skySpec(int k) {
 			s.clouds = {cloudLayer(7500, 0.46, 20000, 2400, 78, {2.4, 0.75, 0.32}, {0.36, 0.10, 0.30}, 21), cloudLayer(3000, 0.36, 9000, 1800, 82, {1.9, 0.42, 0.22}, {0.16, 0.05, 0.15}, 22)};
 			break;
 		case Dusk:
-			s.turbidity = 3.8; s.afterglow = 0.55; s.afterglowColour = {1.0, 0.36, 0.14}; s.belt = 0.12;
-			s.clouds = {cloudLayer(7500, 0.42, 20000, 2400, 78, {1.3, 0.42, 0.40}, {0.07, 0.05, 0.12}, 21)};
+			s.turbidity = 3.8; s.afterglow = 0.32; s.afterglowColour = {1.0, 0.45, 0.20}; s.belt = 0.08;
+			s.clouds = {cloudLayer(7500, 0.42, 20000, 2400, 78, {1.0, 0.52, 0.58}, {0.07, 0.06, 0.13}, 21)};
 			break;
 		case Twilight:
 			s.turbidity = 3.5; s.afterglow = 0.25; s.afterglowColour = {0.9, 0.45, 0.25}; s.tint = {0.9, 0.95, 1.1};
@@ -104,7 +104,7 @@ inline film_sky::Spec skySpec(int k) {
 			s.clouds = {cloudLayer(6000, 0.38, 12000, 2000, 60, {0.28, 0.27, 0.45}, {0.03, 0.03, 0.07}, 24)};
 			break;
 		case Night:
-			s.night = 1.0; s.milkyWay = 1.0; s.stars = 1.0;
+			s.night = 1.0; s.milkyWay = 1.6; s.stars = 1.0; s.nightBrightness = 1.7;
 			break;
 		case LastDawn:
 			s.turbidity = 3.0; s.night = 0.35; s.stars = 0.3; s.afterglow = 0.45; s.afterglowColour = {1.0, 0.45, 0.25}; s.belt = 0.08;
@@ -180,8 +180,8 @@ inline Vec3 glide(double t0, double t1, double t, Vec3 a, Vec3 b) { return lerp(
 inline Vec3 glideLinear(double t0, double t1, double t, Vec3 a, Vec3 b) { return lerp(a, b, clamp01((t - t0) / (t1 - t0))); }
 inline CameraView cam(Vec3 eye, Vec3 target, double fov, double lens = 0.0) { return CameraView{eye, target, fov, lens, 0}; }
 // The world round `eye`: the land, the fields, the river, the Pavilion, the city and the villages, the trees near the camera.
-inline std::string worldText(Vec3 eye, double t, double treeRange = 3200.0, bool city = true, double wind = 0.4) {
-	std::string out = landText() + fieldsText() + riverText() + pavilionText();
+inline std::string worldText(Vec3 eye, double t, double treeRange = 3200.0, bool city = true, double wind = 0.4, bool fields = true) {
+	std::string out = landText() + (fields ? fieldsText() : std::string()) + riverText() + pavilionText();
 	if (city) out += cityText();
 	out += treesText(eye, treeRange, t, wind);
 	return out;
@@ -209,18 +209,21 @@ inline void shotClouds(double t, Frame &f, bool content) {
 	const Vec3 target = glide(0.0, 20.0, t, {-15000.0, 1250.0, -2600.0}, {-17500.0, 900.0, -3200.0});
 	f.view = cam(eye, target, 46.0);
 	f.sky = Sunrise;
-	f.skyScale = 0.6;
+	f.skyScale = 1.0;
+	f.sunStrength = 0.8;
 	f.iso = 150.0 * smoothstep(3.0, 9.0, t);   // (out of black)
-	f.mist = false;
+	f.haze = hazeAround(eye, 0.000022, 40000.0, {0.85, 0.92, 1.15});
+	f.iso = 210.0 * smoothstep(3.0, 9.0, t);
 	f.bloom = 0.24;
-	f.warmth = 0.1;
-	f.depth = 7;
-	if (content) f.content = peaksText() + cloudSeaText(1150.0, 0.85, 0.016, 7.0) + landText() + riverText();
+	f.warmth = 0.10;
+	if (content) f.content = peaksText() + cloudSurfaceText();
 }
 inline void shotRiverEmerges(double t, Frame &f, bool content) {
 	// the river coming out of the mountains: settlements, roads, boats; the camera following it downstream at a few hundred metres
-	const Vec3 eye = glideLinear(20.0, 28.0, t, {-8200.0, 420.0, -1700.0}, {-6000.0, 330.0, -1250.0});
-	f.view = cam(eye, eye + Vec3{1800.0, -260.0, 120.0}, 48.0);
+	// (over the water, between the mountains: the river's own line, high above it)
+	const double x = lerp(-8400.0, -6300.0, clamp01((t - 20.0) / 8.0));
+	const Vec3 eye{x, 360.0, riverMiddle(x) + 40.0};
+	f.view = cam(eye, {x + 1600.0, 60.0, riverMiddle(x + 1600.0)}, 48.0);
 	f.sky = Morning;
 	f.iso = 160.0;
 	f.haze = hazeAround(eye, 0.00002);
@@ -245,35 +248,34 @@ inline void shotRiverExpands(double t, Frame &f, bool content) {
 	}
 }
 inline void shotReveal(double t, Frame &f, bool content) {
-	// behind the willows on the south bank, then the Pavilion revealed: its roofs above the riverbank, its red columns glowing in the morning sun
-	const Vec3 eye = glide(37.0, 45.0, t, {-470.0, 9.0, -30.0}, {-330.0, 15.0, -95.0});
-	f.view = cam(eye, glide(37.0, 45.0, t, {-380.0, 9.0, -20.0}, {0.0, 26.0, 0.0}), 34.0);
+	// behind the city's west wall: for a moment nothing; the camera rises over the wall and the Pavilion is there, its roofs above the riverbank and its red columns glowing in the
+	// morning sun behind the camera, the river and the West Hills beyond it
+	const double rise = smoothstep(37.0, 40.5, t), forward = smoothstep(39.5, 45.0, t);
+	const Vec3 eye{lerp(60.0, 36.0, forward), lerp(5.0, 21.0, rise) + 5.0 * forward, lerp(166.0, 105.0, forward)};
+	f.view = cam(eye, {lerp(40.0, 0.0, rise), lerp(12.0, 26.0, rise), lerp(100.0, 0.0, rise)}, 40.0);
 	f.sky = Morning;
 	f.iso = 170.0;
 	f.bloom = 0.2;
 	f.haze = hazeAround(eye, 0.00003);
-	if (content) {
-		f.content = worldText(eye, t);
-		// the foreground willows the camera slides past
-		for (int k = 0; k < 5; ++k) f.content += nature::placeObject("tree_willow", mul(translate(-430.0 + 9.0 * k, 0.8, -28.0 - 6.0 * (k % 2)), rotate({0, 1, 0}, 40.0 * k), scale(1.2)));
-	}
+	if (content) f.content = worldText(eye, t);
 }
 
 // Scene 2 -------------------------------------------------------------------------------------------------------------------------------------------------------
 // The procession: riders, a carriage, officials on foot and banners, going in at the west gate (towards +z) along the road from the river.
 inline std::string processionText(double t, double t0) {
 	std::string out;
-	const double walk = 1.3 * (t - t0);
+	// (it is at the gate's road between z0 and the gate, coming nearer the gate as the shot goes on)
+	const double walk = 1.3 * (t - t0), z0 = 62.0;
 	std::vector<PersonPlace> walkers;
 	for (int k = 0; k < 14; ++k) {
-		const double z = 20.0 + walk + 3.2 * (k / 2) - 3.0 * (k % 2) * 0.3;
+		const double z = z0 + walk + 3.2 * (k / 2) - 0.9 * (k % 2);
 		if (z > kCityZ0 + 6.0) continue;
-		walkers.push_back({Walking, (k * 3 + 1) % 10, false, {kGateX + (k % 2 ? 1.5 : -1.5), kGround, z - 30.0}, 0.0});
+		walkers.push_back({Walking, (k * 3 + 1) % 10, false, {kGateX + (k % 2 ? 1.5 : -1.5), kGround, z}, 0.0});
 	}
 	out += crowdText(walkers);
 	static const Vec3 coats[] = {{0.35, 0.22, 0.12}, {0.82, 0.78, 0.72}, {0.12, 0.10, 0.09}, {0.55, 0.40, 0.25}};
 	for (int k = 0; k < 4; ++k) {
-		const double z = 30.0 + walk + 7.0 * k;
+		const double z = z0 + 26.0 + walk + 7.0 * k;
 		if (z > kCityZ0 + 10.0) continue;
 		const Vec3 at{kGateX + (k % 2 ? 2.2 : -2.2), kGround, z};
 		out += horseText(at, 0.0, (t - t0) * 5.0 + k, 0.8, coats[k], robeColours()[static_cast<std::size_t>(k * 2) % robeColours().size()]);
@@ -285,19 +287,19 @@ inline std::string processionText(double t, double t0) {
 		if (!riders.count(k)) riders.emplace(k, figureMeshes(rider, d, 0.03));
 		out += figureText(riders.at(k), d, mul(translate(at + Vec3{0.0, 1.25, 0.0}), scale(1.0)));
 	}
-	const double cz = 2.0 + walk;
+	const double cz = z0 - 9.0 + walk;
 	if (cz < kCityZ0 + 10.0) out += carriageText({kGateX, kGround, cz}, 0.0, (t - t0) * 1.3 / 0.75, {0.50, 0.08, 0.06}) + horseText({kGateX, kGround, cz + 3.8}, 0.0, (t - t0) * 5.0, 0.8, {0.20, 0.14, 0.10}, {0.70, 0.55, 0.12});
 	static const Vec3 bannerColours[] = {{0.75, 0.08, 0.06}, {0.92, 0.62, 0.08}, {0.10, 0.30, 0.65}};
 	for (int k = 0; k < 6; ++k) {
-		const double z = 12.0 + walk + 6.0 * k;
+		const double z = z0 + 2.0 + walk + 6.0 * k;
 		if (z > kCityZ0 + 6.0) continue;
 		out += bannerText({kGateX + (k % 2 ? 3.6 : -3.6), kGround, z}, 5.0, bannerColours[k % 3], t, 0.7, 90.0);
 	}
 	return out;
 }
 inline void shotGate(double t, Frame &f, bool content) {
-	const Vec3 eye = glide(45.0, 53.0, t, {kGateX - 22.0, 3.2, 40.0}, {kGateX - 16.0, 2.6, 70.0});
-	f.view = cam(eye, {kGateX, 7.0, kCityZ0}, 44.0);
+	const Vec3 eye = glide(45.0, 53.0, t, {kGateX - 24.0, 3.0, 34.0}, {kGateX - 17.0, 3.4, 56.0});
+	f.view = cam(eye, {kGateX + 2.0, 5.0, 112.0}, 44.0);
 	f.sky = Afternoon;
 	f.iso = 150.0;
 	f.haze = hazeAround(eye, 0.00003);
@@ -314,7 +316,7 @@ inline void shotMontageFeast(double t, Frame &f, bool content) {
 	const Vec3 here{kGateX + 30.0, kGround, 60.0};
 	switch (k) {
 		case 0: {   // a hoof striking the paving
-			f.view = cam(here + Vec3{0.9, 0.25, -0.6}, here + Vec3{0.0, 0.25, 0.4}, 30.0, 0.012);
+			f.view = cam(here + Vec3{1.3, 0.32, 0.2}, here + Vec3{-0.1, 0.18, -0.55 + 0.6 * u}, 30.0, 0.012);
 			if (content) f.content = landText() + horseText(here + Vec3{-0.16, 0.0, -1.2 + 0.6 * u}, 0.0, u * 5.0, 1.0, {0.35, 0.22, 0.12}, {0.6, 0.1, 0.1}) + pavilionText();
 			break;
 		}
@@ -420,9 +422,12 @@ inline void shotToStair(double t, Frame &f, bool content) {
 inline void shotClimb(double t, Frame &f, bool content) {
 	// up the stair: the camera below and behind him, the windows of the hall and then the open sky beyond
 	const double u = clamp01((t - 101.0) / 12.0);
-	const double x = lerp(kStairX0 - 0.3, kStairX1 + 0.5, u);
+	const double x = lerp(kStairX0 - 0.3, kHoleX1 + 1.2, u);   // (the shot ends as he comes to the opening; the next finds him at the top)
 	const Vec3 at{x, stairHeightAt(x), (kStairZ0 + kStairZ1) / 2.0};
-	hallFrame(f, at + Vec3{2.6, 0.9, -2.6}, at + Vec3{-2.0, 1.5, 0.6}, 52.0, Golden, 420.0);
+	// (from the hall floor below him and to one side, rising a little as he climbs: his figure going up the steep red stair, the lattice glowing beyond, and at last the
+	// opening above him)
+	const Vec3 eye{lerp(kStairX0 + 1.5, kStairX1 + 6.0, u), kDeck2 + 1.3 + 1.6 * u, kStairZ0 - 2.2};
+	hallFrame(f, eye, at + Vec3{0.0, 1.1, 0.0}, 46.0, Golden, 420.0);
 	if (content) {
 		Pose p = walkingPose(t, 1.3);
 		p.lean = 12.0;
@@ -438,7 +443,7 @@ inline void shotTerrace(double t, Frame &f, bool content) {
 	const Vec3 at = lerp(Vec3{-1.0, kDeck3, -5.4}, terraceSpot(-1.0), u);
 	f.view = cam(at + Vec3{0.7, 1.75, 2.6}, at + Vec3{-0.6, 1.3, -6.0}, 50.0);
 	f.sky = Golden;
-	f.iso = 170.0;
+	f.iso = 120.0;
 	f.haze = hazeAround(f.view.eye, 0.00003);
 	if (content) {
 		Pose p = u < 1.0 ? walkingPose(t) : standPose();
@@ -449,7 +454,7 @@ inline void shotTerrace(double t, Frame &f, bool content) {
 inline void shotLookDown(double t, Frame &f, bool content) {
 	// what he sees: the city below him, then the river, the plain, the hills, the clouds
 	const Vec3 eye = terraceSpot(-4.5) + Vec3{0.0, 1.62, 0.2};
-	f.view = cam(eye, glide(121.0, 127.0, t, eye + Vec3{30.0, -60.0, -40.0}, eye + Vec3{-300.0, -110.0, -1400.0}), 56.0);
+	f.view = cam(eye, glide(121.0, 127.0, t, eye + Vec3{-15.0, -40.0, -48.0}, eye + Vec3{-300.0, -110.0, -1400.0}), 56.0);
 	f.sky = Golden;
 	f.iso = 105.0;
 	f.haze = hazeAround(eye, 0.00003);
@@ -460,11 +465,17 @@ inline void shotLookDown(double t, Frame &f, bool content) {
 }
 inline void shotCircle(double t, Frame &f, bool content) {
 	// the camera circles him slowly; past his shoulder the whole land opens
-	const Vec3 at = terraceSpot(-2.0);
-	const double a = (lerp(-150.0, -35.0, ease(127.0, 140.0, t))) * kPi / 180.0;
-	f.view = cam(at + Vec3{3.4 * std::cos(a), 1.75, 3.4 * std::sin(a)}, at + Vec3{-0.4 * std::cos(a), 1.35, -0.4 * std::sin(a) - 0.0} + Vec3{0.0, 0.0, -1.0}, 46.0);
+	// (he stands midway between two columns; the camera goes round him close, from in front of him -- over the railing, his face and the Pavilion behind him -- past his right
+	// side to behind his shoulder, where the view is his: the whole land)
+	const Vec3 at = terraceSpot(-1.775);
+	const double phi = lerp(25.0, 165.0, ease(127.0, 140.0, t)) * kPi / 180.0, R = 1.2;
+	const Vec3 eye = at + Vec3{R * std::sin(phi), 1.70, -R * std::cos(phi)};
+	const double behind = smoothstep(115.0, 165.0, phi * 180.0 / kPi);
+	// (the aim turns from his face to the land as a direction, so he stays in the frame until the camera is behind him)
+	const Vec3 toFace = normalize(at + Vec3{0.0, 1.55, 0.0} - eye), toLand = normalize(Vec3{-60.0, -20.0, -400.0});
+	f.view = cam(eye, eye + normalize(lerp(toFace, toLand, behind)), lerp(40.0, 52.0, behind));
 	f.sky = Golden;
-	f.iso = 170.0;
+	f.iso = lerp(160.0, 100.0, behind);   // (behind him the camera looks into the low sun)
 	f.haze = hazeAround(f.view.eye, 0.00003);
 	if (content) f.content = worldText(f.view.eye, t, 3200.0) + wangBoAt(standPose({0.4, 0.2, -0.5}), at, 180.0);
 }
@@ -495,27 +506,28 @@ inline void shotMarket(double t, Frame &f, bool content) {
 	}
 }
 inline void shotBoatsBelow(double t, Frame &f, bool content) {
-	const Vec3 eye{-22.0, kDeck3 + 4.0, -22.0};
-	f.view = cam(eye, {-12.0, kWater, -95.0}, 40.0);
+	// fishing boats crossing below the Pavilion: low on the water, the boats sliding past close, the Pavilion towering behind them in the golden light
+	const Vec3 eye = glide(147.0, 153.0, t, {-44.0, kWater + 2.2, -112.0}, {-36.0, kWater + 2.6, -116.0});
+	f.view = cam(eye, {0.0, 18.0, -4.0}, 48.0);
 	f.sky = Golden;
-	f.iso = 170.0;
-	f.haze = hazeAround(eye, 0.00003);
+	f.iso = 150.0;
+	f.haze = hazeAround(eye, 0.00002);
 	if (content) {
 		f.content = worldText(eye, t, 2500.0);
-		for (int k = 0; k < 4; ++k) f.content += boatText(false, {-90.0 + 30.0 * k + 2.5 * (t - 147.0), kWater, -80.0 - 25.0 * k}, 90.0 - 10.0 * k, 1.5 * std::sin(t + k), k + 30);
+		for (int k = 0; k < 3; ++k) f.content += boatText(false, {-58.0 + 20.0 * k + 2.4 * (t - 147.0), kWater, -88.0 - 6.0 * k}, 90.0 - 6.0 * k, 1.2 * std::sin(t * 0.9 + k), k + 30);
 	}
 }
 inline void shotShepherd(double t, Frame &f, bool content) {
-	// a shepherd driving his sheep along the far bank, the river beyond them gold
+	// a shepherd driving his sheep along the far bank towards the camera, the river gold behind them
 	const double x0 = 600.0, zb = riverMiddle(x0) - riverHalfWidth(x0) - 30.0;
-	const Vec3 eye{x0 - 30.0, groundHeight(x0 - 30.0, zb - 22.0) + 1.4, zb - 22.0};
-	f.view = cam(eye, {x0 + 10.0, 0.8, zb + 8.0}, 38.0, 0.015);
+	const double walk = 1.1 * (t - 153.0);
+	const Vec3 eye{x0 + 9.0, groundHeight(x0 + 9.0, zb - 6.0) + 0.9, zb - 6.0};
+	f.view = cam(eye, {x0 - 6.0 + walk, groundHeight(x0, zb) + 0.6, zb + 3.0}, 42.0, 0.02);
 	f.sky = Golden;
-	f.iso = 165.0;
-	f.haze = hazeAround(eye, 0.00004);
+	f.iso = 160.0;
+	f.haze = hazeAround(eye, 0.00003);
 	if (content) {
 		f.content = worldText(eye, t, 1500.0);
-		const double walk = 1.1 * (t - 153.0);
 		for (int k = 0; k < 18; ++k) {
 			const double x = x0 - 12.0 + walk + 2.2 * (k % 6) + 0.7 * hash01(k, 231), z = zb + 3.0 * (k / 6) + 1.2 * hash01(k, 232);
 			f.content += sheepText({x, groundHeight(x, z), z}, 90.0 + 10.0 * (hash01(k, 233) - 0.5), t * 6.0 + k);
@@ -524,70 +536,75 @@ inline void shotShepherd(double t, Frame &f, bool content) {
 		d.robe = {0.45, 0.38, 0.26};
 		d.hat = false;
 		const double sx = x0 - 18.0 + walk;
-		f.content += figureText(figureMeshes(walkingPose(t), d, 0.022), d, mul(translate(sx, groundHeight(sx, zb + 2.0), zb + 2.0), rotate({0, 1, 0}, 90.0)));
+		f.content += figureText(figureMeshes(walkingPose(t), d, 0.02), d, mul(translate(sx, groundHeight(sx, zb + 2.0), zb + 2.0), rotate({0, 1, 0}, 90.0)));
 		f.content += attr(barkMaterial(), bar({sx + 0.3, groundHeight(sx, zb + 2.0) + 1.6, zb + 2.3}, {sx + 0.6, groundHeight(sx, zb + 2.0), zb + 2.6}, 0.02, 5));
 	}
 }
 inline void shotEgrets(double t, Frame &f, bool content) {
-	// egrets rising from the reeds of the wetland downstream
+	// egrets rising from the reeds of the wetland downstream, close, white against the clouds
 	const Vec3 reeds{1800.0, kWater, nearBank(1800.0) - 15.0};
-	const Vec3 eye = reeds + Vec3{-45.0, 5.0, 18.0};
-	f.view = cam(eye, reeds + Vec3{0.0, 6.0 + 2.0 * (t - 159.0), -20.0}, 42.0);
+	// (from the river side, the low sun behind the camera: the birds white against the dark bank, then against the blue of the eastern sky)
+	const Vec3 eye = reeds + Vec3{-8.0, 1.8, -24.0};
+	f.view = cam(eye, reeds + Vec3{0.0, 3.0 + 2.4 * (t - 159.0), 2.0}, 46.0);
 	f.sky = LateGolden;
-	f.iso = 100.0;
+	f.iso = 130.0;
 	f.haze = hazeAround(eye, 0.00002);
 	if (content) {
-		f.content = worldText(eye, t, 1500.0) + reedsText(reeds, 26.0, 160, t);
+		f.content = worldText(eye, t, 1500.0) + reedsText(reeds, 22.0, 140, t);
 		for (int k = 0; k < 14; ++k) {
 			const double start = 159.0 + 0.3 * k, age = (std::max)(0.0, t - start);
-			const Vec3 at = reeds + Vec3{-15.0 + 30.0 * hash01(k, 241), 0.8 + age * (1.8 + 0.8 * hash01(k, 242)), -10.0 + 18.0 * hash01(k, 243) - age * 3.0};
+			const Vec3 at = reeds + Vec3{-10.0 + 20.0 * hash01(k, 241), 0.8 + age * (1.6 + 0.7 * hash01(k, 242)), -8.0 + 12.0 * hash01(k, 243) - age * 2.0};
 			f.content += egretText(at, {0.4, 0.5, -1.0}, t, k);
 		}
 	}
 }
 inline void shotBoatsHome(double t, Frame &f, bool content) {
-	// the fishing boats coming home, their sails catching the evening wind; the low sun behind them
-	const Vec3 eye{-200.0, 6.0, -120.0};
-	f.view = cam(eye, glide(165.0, 174.0, t, {-800.0, 12.0, -900.0}, {-650.0, 14.0, -850.0}), 40.0);
+	// the fishing junks coming home, their sails catching the evening wind, dark against the low sun on the water
+	const Vec3 eye{-200.0, 5.0, -120.0};
+	const Vec3 dir = normalize(Vec3{-450.0, 2.0, -730.0}), across = normalize(Vec3{-dir.z, 0.0, dir.x});
+	f.view = cam(eye, eye + dir * 100.0 + Vec3{0.0, 6.0, 0.0}, 40.0);
 	f.sky = LateGolden;
-	f.iso = 100.0;
-	f.bloom = 0.22;
+	f.iso = 95.0;
+	f.bloom = 0.24;
 	f.haze = hazeAround(eye, 0.00002);
 	if (content) {
 		f.content = worldText(eye, t, 2500.0);
-		for (int k = 0; k < 7; ++k) {
-			const double z = -900.0 + 70.0 * k + 6.0 * (t - 165.0);
-			f.content += boatText(true, {-900.0 + 120.0 * k + 30.0 * hash01(k, 251), kWater, z}, 15.0 + 10.0 * k, 2.0 * std::sin(t * 0.8 + k), k + 40);
+		for (int k = 0; k < 5; ++k) {
+			const double d = 170.0 + 70.0 * k - 5.0 * (t - 165.0);
+			const Vec3 at = eye + dir * d + across * (-110.0 + 55.0 * k + 15.0 * hash01(k, 251));
+			f.content += boatText(true, {at.x, kWater, at.z}, 30.0 + 8.0 * k, 2.0 * std::sin(t * 0.8 + k), k + 40);
 		}
 	}
 }
 inline void shotGeese(double t, Frame &f, bool content) {
-	// skeins of geese crossing the sky towards the south, their calls echoing between the hills
+	// skeins of geese crossing the sky towards the south, their calls echoing between the hills (looking away from the sun, the geese against the lit clouds)
 	const Vec3 eye{-60.0, kDeck3 + 1.7, -14.0};
-	f.view = cam(eye, eye + Vec3{-300.0, 160.0, -900.0}, 44.0);
+	f.view = cam(eye, eye + Vec3{300.0, 160.0, -500.0}, 44.0);
 	f.sky = LateGolden;
-	f.iso = 100.0;
+	f.iso = 140.0;
 	f.haze = hazeAround(eye, 0.00002);
 	if (content) {
 		f.content = worldText(eye, t, 2000.0);
 		for (int s = 0; s < 3; ++s) {
-			const Vec3 lead = eye + Vec3{-40.0 - 30.0 * s - 9.0 * (t - 174.0), 45.0 + 14.0 * s, -150.0 - 45.0 * s + 2.2 * (t - 174.0)};
-			f.content += skeinText(lead, {-1.0, 0.0, 0.25}, 9 + 2 * s, t + s);
+			const Vec3 lead = eye + Vec3{75.0 - 18.0 * s - 7.0 * (t - 174.0), 32.0 + 9.0 * s, -110.0 - 30.0 * s};
+			f.content += skeinText(lead, {-1.0, 0.0, 0.25}, 9 + 2 * s, t + s, 3.0);
 		}
 	}
 }
 
 // Scene 5 -------------------------------------------------------------------------------------------------------------------------------------------------------
 inline void shotLeaf(double t, Frame &f, bool content) {
-	// a yellow ginkgo leaf lets go of its branch over the railing and falls; the camera follows it down past the railing and the river opens below
+	// a yellow ginkgo leaf lets go of its branch over the railing and falls; the camera follows it down past the railing, looking out, and the river opens below
 	const Vec3 branch{-6.0, kDeck3 + 3.4, -kRail3Z - 1.6};
 	const double u = clamp01((t - 187.0) / 9.0);
-	const Vec3 leaf = branch + Vec3{0.9, -0.12, 0.0} + Vec3{0.6 * std::sin(u * 9.0), -16.0 * u * u - 2.0 * u, -2.0 * u};
-	const Vec3 eye = (t < 187.0 ? branch + Vec3{0.9, 0.05, 0.45} : leaf + Vec3{0.25, 0.25 + 1.5 * u, 0.45 + 2.5 * u});
-	f.view = cam(eye, t < 187.0 ? branch + Vec3{0.9, -0.1, 0.0} : leaf, lerp(30.0, 50.0, u), 0.004 * (1.0 - u));
+	const Vec3 leaf = branch + Vec3{0.9, -0.12, 0.0} + Vec3{0.6 * std::sin(u * 9.0), -14.0 * u * u - 2.0 * u, -7.0 * u};
+	// (the camera stays just above the leaf, looking down past it, so the leaf stays near the middle of the picture as the river opens beyond it)
+	const Vec3 eye = t < 187.0 ? branch + Vec3{0.9, 0.05, 0.45} : leaf + Vec3{0.1, 0.45 + 0.9 * u, 0.35 + 0.2 * u};
+	const Vec3 target = t < 187.0 ? branch + Vec3{0.9, -0.1, 0.0} : leaf + Vec3{0.0, -0.6 - 6.0 * u, -0.4 - 9.0 * u};
+	f.view = cam(eye, target, lerp(30.0, 52.0, u), 0.004 * (1.0 - u));
 	f.sky = LateGolden;
-	f.iso = 165.0;
-	f.haze = hazeAround(eye, 0.00003);
+	f.iso = 140.0;
+	f.haze = hazeAround(eye, 0.00002);
 	if (content) f.content = worldText(eye, t, 2500.0) + ginkgoBranchText(branch, normalize(Vec3{1.0, -0.1, 0.1}), t, true, t < 187.0 ? branch + Vec3{0.9, -0.12, 0.0} : leaf, 200.0 * u);
 }
 inline void shotSunGoesDown(double t, Frame &f, bool content) {
@@ -681,11 +698,15 @@ inline void shotWine(double t, Frame &f, bool content) {
 	}
 }
 inline void shotPipa(double t, Frame &f, bool content) {
+	// (the first musician kneels at `at` facing yaw -60: the pipa stands in her lap, its neck up to her left, its strings to us)
 	const Vec3 at{9.6, kDeck2, 0.4};
-	feastFrame(f, at + Vec3{-1.6, 1.0, -1.3}, at + Vec3{0.0, 0.75, 0.0}, 34.0, 0.015);
+	const double yaw = -60.0 * kPi / 180.0;
+	const Vec3 facing{std::sin(yaw), 0.0, std::cos(yaw)}, side{std::cos(yaw), 0.0, -std::sin(yaw)};
+	const Vec3 pipaAt = at + facing * 0.30 + Vec3{0.0, 0.60, 0.0};
+	feastFrame(f, at + facing * 1.5 + side * 0.4 + Vec3{0.0, 0.85, 0.0}, pipaAt + Vec3{0.0, 0.15, 0.0}, 36.0, 0.012);
 	if (content) {
 		f.content = feastText(t, f.view.eye, -1, nullptr);
-		f.content += pipaText(mul(translate(at + Vec3{0.0, 0.70, 0.22}), rotate({0, 1, 0}, -60.0), rotate({0, 0, 1}, 20.0 + 2.0 * std::sin(t * 3.0))));
+		f.content += pipaText(mul(translate(pipaAt), rotate({0, 1, 0}, -60.0), rotate({0, 0, 1}, 24.0 + 2.0 * std::sin(t * 3.0))));
 	}
 }
 inline void shotPoems(double t, Frame &f, bool content) {
@@ -727,7 +748,7 @@ inline void shotBlankPaper(double t, Frame &f, bool content) {
 // The ink world on paper: a camera looking straight down at a sheet with strokes spreading. `kind` 0 the river, 1 the ridge, 2 the bird, 3 the storm.
 inline void inkPaperFrame(Frame &f, double t, double t0, int kind) {
 	const double u = clamp01((t - t0) / 5.0);
-	f.view = cam({0.0, 1.6 - 0.5 * u, 0.4}, {0.0, 0.0, 0.0}, 38.0);
+	f.view = cam({0.0, 0.95 - 0.12 * u, -0.06}, {0.0, 0.0, 0.0}, 38.0);   // (the camera a little to -z of straight above: +z is up the picture)
 	f.sky = Afternoon;
 	f.skyOverride = inkStudioLight();
 	f.sun = false;
@@ -737,19 +758,41 @@ inline void inkPaperFrame(Frame &f, double t, double t0, int kind) {
 	f.bloom = 0.0;
 	f.vignette = 0.45;
 	std::string c = inkPaperText();
+	// (the paper fills the picture: about 1.4 m by 0.6 m of it, x across, z up the picture; the brush lays each stroke as `u` grows)
 	switch (kind) {
-		case 0:
-			c += inkStroke([](double s) { return Vec3{lerp(-0.9, 0.9, s), 0.0, 0.25 * std::sin(s * 6.0) - 0.1}; }, [&](double s) { return 0.05 + 0.12 * u * (0.6 + 0.4 * std::sin(s * 9.0)); }, 0.3 + 0.7 * u, 301);
+		case 0: {   // the river seen from the sky: a pale wash of water between two dry bank lines, villages as dots beside it
+			const auto bank = [](double s, double side) { return Vec3{lerp(-0.72, 0.72, s), 0.0, 0.14 * std::sin(s * 5.0 + 0.4) + side * (0.035 + 0.02 * std::sin(s * 7.0))}; };
+			c += inkWash({-0.2, 0.0, 0.02}, 0.05 + 0.10 * u, 0.25, 308);
+			c += inkStroke([&](double s) { return bank(s, 0.0); }, [&](double) { return 0.06 + 0.02 * u; }, (std::min)(1.0, 0.2 + u), 309, 0.0, 0.18, 0.0012);
+			c += inkBrush([&](double s) { return bank(s, -1.0); }, [](double s) { return 0.006 + 0.005 * std::sin(kPi * s); }, (std::min)(1.0, u * 1.3), 310);
+			c += inkBrush([&](double s) { return bank(s, 1.0); }, [](double s) { return 0.005 + 0.005 * std::sin(kPi * s); }, (std::min)(1.0, (std::max)(0.0, u * 1.3 - 0.2)), 320);
+			for (int k = 0; k < 7; ++k)
+				if (u > 0.3 + 0.08 * k) c += inkWash(bank(0.12 + 0.12 * k, (k % 2 ? 1.0 : -1.0) * 2.4), 0.008 + 0.004 * hash01(k, 331), 0.95, 332 + k);
 			break;
-		case 1:
-			c += inkStroke([](double s) { return Vec3{lerp(-0.85, 0.85, s), 0.0, -0.15 * std::sin(s * 3.0) - 0.25 * std::exp(-std::pow((s - 0.55) / 0.12, 2.0)) + 0.1}; }, [](double s) { return 0.035 + 0.05 * std::sin(kPi * s); }, u, 302);
+		}
+		case 1: {   // a ridge: one bold stroke rising and falling, washes under it, a paler ridge behind
+			const auto ridge = [](double s) { return Vec3{lerp(-0.72, 0.72, s), 0.0, 0.08 * std::sin(s * 6.5) + 0.20 * std::exp(-std::pow((s - 0.58) / 0.09, 2.0)) + 0.10 * std::exp(-std::pow((s - 0.25) / 0.07, 2.0)) - 0.10}; };
+			const auto behind = [](double s) { return Vec3{lerp(-0.72, 0.72, s), 0.0, 0.22 + 0.06 * std::sin(s * 4.7 + 1.0) + 0.05 * std::exp(-std::pow((s - 0.3) / 0.08, 2.0))}; };
+			c += inkBrush(behind, [](double) { return 0.010; }, u, 340, 0.3);
+			// (the mountain's body: washes under the ridge line, darkest at the ridge and fading down the slope)
+			for (int k = 0; k < 9; ++k) c += inkStroke([&](double s) { return ridge(s) - Vec3{0.0, 0.0, 0.012 + 0.022 * k}; }, [&](double) { return 0.026; }, u, 341 + k, 0.0, 0.42 * std::pow(1.0 - k / 9.0, 1.5), 0.0011 + 0.00002 * (9 - k));
+			c += inkBrush(ridge, [](double s) { return 0.010 + 0.010 * std::sin(kPi * s); }, u, 345);
 			break;
-		case 2:
-			c += inkStroke([](double s) { return Vec3{0.1 + 0.08 * std::cos(s * 3.0) - 0.04, 0.0, -0.06 * s}; }, [&](double s) { return (0.02 + 0.03 * u) * std::sin(kPi * s); }, 1.0, 303) + inkWash({0.25, 0.0, -0.2}, 0.03 * u, 1.0, 304);
+		}
+		case 2: {   // a single dot of ink, which opens into a bird: two curved strokes for its wings
+			c += inkWash({0.05, 0.0, 0.05}, 0.012 + 0.006 * (std::min)(1.0, u * 3.0), 1.0, 350);
+			const double w = smoothstep(0.35, 0.9, u);
+			c += inkBrush([](double s) { return Vec3{0.05 - 0.09 * s, 0.0, 0.05 + 0.04 * std::sin(kPi * s * 0.9)}; }, [](double s) { return 0.005 * (1.0 - s); }, w, 351);
+			c += inkBrush([](double s) { return Vec3{0.05 + 0.08 * s, 0.0, 0.05 + 0.035 * std::sin(kPi * s * 0.9)}; }, [](double s) { return 0.0045 * (1.0 - s); }, w, 352);
 			break;
-		default:
-			c += inkWash({0.0, 0.0, 0.0}, 0.15 + 0.6 * u, 0.9, 305) + inkWash({-0.3, 0.0, 0.25}, 0.1 + 0.4 * u, 0.7, 306) + inkWash({0.35, 0.0, -0.2}, 0.08 + 0.5 * u, 0.8, 307);
+		}
+		default: {   // wet ink washes blooming into a storm
+			const double v = 0.3 + 0.7 * u;
+			c += inkWash({0.0, 0.0, 0.05}, 0.12 + 0.22 * v, 0.55, 360) + inkWash({-0.25, 0.0, -0.05}, 0.08 + 0.18 * v, 0.75, 361);
+			c += inkWash({0.28, 0.0, 0.10}, 0.06 + 0.20 * v, 0.85, 362) + inkWash({0.05, 0.0, -0.12}, 0.04 + 0.14 * v, 0.95, 363);
+			c += inkBrush([](double s) { return Vec3{lerp(-0.6, 0.6, s), 0.0, -0.05 + 0.08 * std::sin(s * 4.0)}; }, [](double) { return 0.016; }, v, 364);
 			break;
+		}
 	}
 	f.content = c;
 }
@@ -759,11 +802,11 @@ inline void inkLandFrame(Frame &f, double t, CameraView v, double colour) {
 	f.sky = Dusk;
 	f.sun = colour > 0.5;
 	if (colour < 0.5) f.skyOverride = "LightSource \"infinite\" \"rgb L\" [ 0.9 0.9 0.88 ]\n";
-	f.iso = lerp(110.0, 520.0, colour);
+	f.iso = lerp(150.0, 520.0, colour);
 	f.saturation = colour;
 	f.bloom = 0.1 + 0.15 * colour;
-	f.haze = hazeAround(v.eye, lerp(0.00045, 0.00003, std::pow(colour, 0.5)), lerp(5000.0, 30000.0, colour), {1.0, 1.0, 1.0});
-	f.content = worldText(v.eye, t, 2500.0, true, 0.2);
+	f.haze = hazeAround(v.eye, lerp(0.00022, 0.00003, std::pow(colour, 0.5)), lerp(6000.0, 30000.0, colour), {1.0, 1.0, 1.0});
+	f.content = worldText(v.eye, t, 2500.0, true, 0.2, colour > 0.5);   // (no field plots in the ink painting: the plain is one wash)
 }
 inline void shotInkRiver(double t, Frame &f, bool content) {
 	if (t < 300.0) inkPaperFrame(f, t, 295.0, 0);
@@ -796,7 +839,7 @@ inline void shotPullAway(double t, Frame &f, bool content) {
 	f.view = cam(eye, {0.0, 20.0, 200.0}, glide(335.0, 350.0, t, {34.0, 0.0, 0.0}, {52.0, 0.0, 0.0}).x);
 	f.sky = Dusk;
 	f.skyScale = 0.62;
-	f.iso = 520.0;
+	f.iso = 380.0;
 	f.warmth = 0.04;
 	f.haze = hazeAround(eye, 0.00003);
 	if (content) f.content = worldText(eye, t, 2500.0) + lanternLights(1.0) + hallGlow(0.5);
@@ -815,15 +858,17 @@ inline void shotAlone(double t, Frame &f, bool content) {
 	if (content) f.content = worldText(f.view.eye, t, 1500.0) + hallText(t) + crowdText(hallGuests()) + lanternLights(1.0) + hallGlow(0.4) + wangBoAt(standPose({0.2, 0.0, -0.2}), at, 180.0);
 }
 inline void shotRidges(double t, Frame &f, bool content) {
-	// ridges going away into the mist, one after another, without end
-	const Vec3 eye{-200.0, kDeck3 + 2.0, -20.0};
-	f.view = cam(eye, glide(360.0, 372.0, t, eye + Vec3{-2500.0, 200.0, -6000.0}, eye + Vec3{-3200.0, 180.0, -5600.0}), 26.0);
-	f.sky = Twilight;
-	f.iso = 900.0;
+	// ridges going away into the mist, one after another, without end (a place of its own: layered hills, the haze paling each layer more than the one before)
+	const Vec3 eye{0.0, 70.0, 0.0};
+	f.view = cam(eye, glide(360.0, 372.0, t, {-400.0, 120.0, -3000.0}, {400.0, 140.0, -3000.0}), 30.0);
+	f.sky = Dusk;
+	f.skyOverride = "LightSource \"infinite\" \"rgb L\" [ 0.20 0.24 0.34 ]\n";   // (a cool even twilight: the layers pale into blue)
+	f.sun = false;
+	f.iso = 420.0;
 	f.warmth = -0.18;
 	f.saturation = 0.85;
-	f.haze = hazeAround(eye, 0.00006, 25000.0, {0.8, 0.9, 1.2});
-	if (content) f.content = worldText(eye, t, 1500.0);
+	f.haze = hazeAround(eye, 0.00022, 16000.0, {0.8, 0.9, 1.2});
+	if (content) f.content = ridgeLayersText();
 }
 inline void passFrame(Frame &f) {
 	f.sky = Twilight;
@@ -839,7 +884,7 @@ inline void shotPass(double t, Frame &f, bool content) {
 	passFrame(f);
 	const double walk = 1.0 * (t - 372.0);
 	const Vec3 at{6.0 * std::sin((-60.0 - walk) / 40.0), 0.0, -60.0 - walk};
-	f.view = cam({18.0, 22.0, 40.0}, at + Vec3{0.0, 2.0, 0.0}, 34.0);
+	f.view = cam({8.0, 46.0, 70.0}, at + Vec3{0.0, -4.0, -40.0}, 40.0);   // (high over the road behind him: the small figure walking on into the pass)
 	f.haze = hazeAround(f.view.eye, 0.0035, 320.0, {0.9, 0.95, 1.05});
 	if (content) f.content = passText(t, 1.0) + wangBoAt(walkingPose(t, 1.0), {at.x, passHeight(at.x, at.z), at.z}, 180.0, 0.03);
 }
@@ -886,7 +931,7 @@ inline void shotGeneral(double t, Frame &f, bool content) {
 	f.iso = 260.0;
 	f.warmth = -0.2;
 	f.saturation = 0.8;
-	f.view = cam(glide(419.0, 431.0, t, {-3.5, 1.6, -9.0}, {-2.5, 1.7, -7.5}), {0.6, 2.2, 0.0}, 38.0);
+	f.view = cam(glide(419.0, 431.0, t, {-3.5, 1.6, -9.0}, {-2.5, 1.7, -7.5}), {0.8, 4.0, 0.0}, 46.0);
 	if (content) {
 		f.content = snowFieldText(t);
 		Dress g;
@@ -910,7 +955,7 @@ inline void shotGeneral(double t, Frame &f, bool content) {
 inline void shotHandTightens(double t, Frame &f, bool content) {
 	// his face calm; his hand tightening round the brush; ink dripping onto the page
 	const Vec3 table = tableBefore(hallSeats()[12]) + Vec3{0.0, 0.36, 0.0};
-	feastFrame(f, table + Vec3{-0.35, 0.30, 0.38}, table + Vec3{0.05, 0.12, 0.05}, 28.0, 0.006);
+	feastFrame(f, table + Vec3{0.30, 0.12, 0.12}, table + Vec3{0.06, 0.10, 0.06}, 24.0, 0.003);   // (across the table, low: the brush tip and the drop forming on it, his grip above out of focus)
 	f.sky = Twilight;
 	f.iso = 240.0;
 	if (content) {
@@ -940,7 +985,7 @@ inline void shotStone(double t, Frame &f, bool content) {
 	const double u = clamp01((t - 445.0) / 10.0);
 	const Vec3 stone{0.0, -1.0 - 26.0 * u, 0.0};
 	f.view = cam({1.8, -4.0 - 18.0 * u, 6.5}, stone, 50.0);
-	f.sky = Morning;
+	f.sky = Afternoon;   // (a high sun: its light comes down through the water in shafts)
 	f.skyScale = 0.8;
 	f.iso = 500.0 * (1.0 - 0.7 * u);
 	f.mist = true;
@@ -982,11 +1027,11 @@ inline void shotStandsUp(double t, Frame &f, bool content) {
 	// he steps onto the terrace; low behind him, the enormous sky; then an eagle rising from a cliff
 	if (t >= 482.0) {
 		const double u = clamp01((t - 482.0) / 8.0);
-		f.view = cam({-14.0, -3.0 + 6.0 * u, 26.0}, {0.0, 6.0 + 22.0 * u, 0.0}, 42.0);
+		f.view = cam({-6.0, -1.5 + 5.0 * u, 11.0}, {0.4, 4.0 + 22.0 * u, -0.5}, 40.0);
 		f.sky = BlueHour;
 		f.iso = 1100.0;
 		f.mist = false;
-		if (content) f.content = cliffText() + birdText({0.4, 2.0 + 24.0 * u * u + 6.0 * u, -2.0 * u}, {0.15, 1.0, -0.3}, std::sin(t * 2.0 * kPi * 1.1), 2.3, {0.24, 0.16, 0.10}, {0.20, 0.13, 0.08});
+		if (content) f.content = cliffText() + birdText({0.4, 2.0 + 12.0 * u * u + 4.0 * u, -2.0 * u}, {0.15, 1.0, -0.3}, std::sin(t * 2.0 * kPi * 1.1), 2.3, {0.24, 0.16, 0.10}, {0.20, 0.13, 0.08});
 		return;
 	}
 	const double u = clamp01((t - 473.0) / 5.0);
@@ -1090,7 +1135,8 @@ inline void shotFaces(double t, Frame &f, bool content) {
 inline void shotBrushDown(double t, Frame &f, bool content) {
 	// he lays the brush down; silence; he looks at what he has written as though he has only just found out what he wanted to say
 	const Vec3 table = tableBefore(hallSeats()[12]) + Vec3{0.0, 0.36, 0.0};
-	feastFrame(f, glide(529.0, 545.0, t, table + Vec3{0.9, 0.9, -0.2}, table + Vec3{0.6, 1.2, -0.6}), glide(529.0, 545.0, t, table, wangBoSeat() + Vec3{0.0, 1.3, 0.0}), 36.0, 0.012);
+	// (from the brush laid down, up to his face, three-quarters from the front, looking down at what he has written)
+	feastFrame(f, glide(529.0, 545.0, t, table + Vec3{0.9, 0.9, -0.2}, wangBoSeat() + Vec3{1.0, 1.2, 1.6}), glide(529.0, 545.0, t, table, wangBoSeat() + Vec3{0.0, 1.0, 0.25}), 36.0, 0.012);
 	f.sky = Night;
 	f.iso = 240.0;
 	if (content) {

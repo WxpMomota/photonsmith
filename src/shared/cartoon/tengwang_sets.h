@@ -15,7 +15,7 @@
 namespace cartoon {
 namespace tengwang {
 
-constexpr int kSetsVersion = 2;
+constexpr int kSetsVersion = 3;
 
 inline std::string lacquer(Vec3 c, double rough = 0.05) {
 	char buf[200];
@@ -369,7 +369,7 @@ inline const Mesh &reedClump() {
 			nature::addStrip(r, [&](double u) { return root + Vec3{0.0, h * u, 0.0} + lean * (u * u * h); }, [](double u) { return 0.02 * (1.0 - u * 0.7); }, normalize(Vec3{std::cos(a), 0.0, std::sin(a)}), 4);
 			// a feathery plume at the top
 			const Vec3 top = root + Vec3{0.0, h, 0.0} + lean * h;
-			nature::addLeaf(r, top, normalize(lean + Vec3{0.0, 0.6, 0.0}), {1.0, 0.0, 0.0}, 0.25, 0.08);
+			nature::addLeaf(r, top, normalize(lean + Vec3{0.0, 0.6, 0.0}), {1.0, 0.0, 0.0}, 0.32, 0.035);
 		}
 		return r;
 	}();
@@ -377,7 +377,7 @@ inline const Mesh &reedClump() {
 }
 inline std::string reedsText(Vec3 centre, double radius, int count, double t) {
 	std::string out = nature::objectBegin("reeds") +
-					  attr("Material \"diffusetransmission\" \"rgb reflectance\" [ 0.55 0.46 0.28 ] \"rgb transmittance\" [ 0.45 0.35 0.15 ]",
+					  attr("Material \"diffusetransmission\" \"rgb reflectance\" [ 0.70 0.60 0.42 ] \"rgb transmittance\" [ 0.55 0.45 0.25 ]",
 						   film_cache::plyShape(film_cache::ply(kFilmKey, versioned("reeds", kSetsVersion), [] { return reedClump(); }))) +
 					  nature::objectEnd();
 	for (int k = 0; k < count; ++k) {
@@ -389,7 +389,7 @@ inline std::string reedsText(Vec3 centre, double radius, int count, double t) {
 	return out;
 }
 // An egret: white, long-necked, rising from the reeds on broad slow wingbeats.
-inline std::string egretText(Vec3 at, Vec3 dir, double t, int salt) { return birdText(at, dir, std::sin(t * 2.0 * kPi * 0.9 + salt), 1.6, {0.92, 0.92, 0.90}, {0.95, 0.95, 0.93}); }
+inline std::string egretText(Vec3 at, Vec3 dir, double t, int salt) { return birdText(at, dir, std::sin(t * 2.0 * kPi * 0.9 + salt), 2.1, {0.92, 0.92, 0.90}, {0.95, 0.95, 0.93}); }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The ginkgo branch and its falling leaf
@@ -417,7 +417,7 @@ inline std::string ginkgoBranchText(Vec3 base, Vec3 dir, double t, bool withFall
 		const double sway = 6.0 * std::sin(t * 1.7 + k);
 		leaves += emitMesh(ginkgoLeaf(), mul(translate(at), rotate({0, 1, 0}, 360.0 * hash01(k, 135)), rotate({1, 0, 0}, 120.0 + 50.0 * hash01(k, 136) + sway)));
 	}
-	if (withFallingLeaf) leaves += emitMesh(ginkgoLeaf(), mul(translate(fallingAt), rotate({0, 1, 0}, fallingSpin * 1.3), rotate({1, 0, 0}, fallingSpin), scale(1.15)));
+	if (withFallingLeaf) leaves += emitMesh(ginkgoLeaf(), mul(translate(fallingAt), rotate({0, 1, 0}, fallingSpin * 1.3), rotate({1, 0, 0}, fallingSpin), scale(1.8)));
 	return out + attr(leafMaterial({0.95, 0.72, 0.08}), leaves);
 }
 
