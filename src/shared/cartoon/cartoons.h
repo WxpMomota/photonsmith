@@ -30,6 +30,7 @@
 #include "forest_dawn_score.h"
 #include "turtle_escape_score.h"
 #include "crystal_heart_score.h"
+#include "tengwang_score.h"
 #include "lamp_and_ball.h"
 #include "little_robot.h"
 #include "meet_pip.h"
@@ -115,6 +116,13 @@ inline const Film kFilms[] = {
 	 {21, "glass,emissive,fog,water,dawn", "The still lake|Among the spires|First light|The Heart|Ignition|The valley at sunrise", crystal_heart::kSamples, 3.5, false, crystal_heart::kWidth,
 	  crystal_heart::kHeight},
 	 &crystal_heart::soundtrack},
+	{"tengwang", "Preface to the Pavilion of Prince Teng",
+	 "One autumn day at Hongzhou after Wang Bo's preface of AD 675, from the sea of clouds before sunrise to the stars over the Gan River: the Pavilion of Prince Teng, the feast, the young "
+	 "poet alone on its high terrace above the whole land, the sunset and the solitary duck, the world inside his brush, and his resolve. With the preface's words on the screen in "
+	 "Chinese and English, and music.",
+	 tengwang::kDuration, tengwang::kFps, &tengwang::sceneAt, &tengwang::headerAt, &tengwang::shotStarts, 219.0,
+	 {22, "character,water,dusk,night,fog", tengwang::shotNamesText(), tengwang::kSamples, 5.0, false, tengwang::kWidth, tengwang::kHeight},
+	 &tengwang::soundtrack, &tengwang::captions},
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 

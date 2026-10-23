@@ -69,6 +69,7 @@ extern char** environ;
 #include "launcher/process.h"
 #include "launcher/render_setup.h"
 #include "launcher/cartoon_worker.h"
+#include "launcher/film_captions.h"    // a film's words on its frames
 
 // Converts rendered PPM frames to PNG on a background thread while the main
 // thread renders the next frame, instead of converting everything in a
@@ -828,6 +829,11 @@ inline int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
             std::cout << "\nNote: " << film->name << " has a soundtrack, made for " << cartoon::frameCountOf(*film) << " frames at " << film->fps << " frames per second; this video has "
                       << render_frame_count << " at " << s.video_fps << ", so it is made without sound." << std::endl;
         }
+    }
+    // a film's words (its story's lines, its title) go onto the finished frames (film_captions.h)
+    if (const cartoon::Film *film = cartoon::forCameraPath(s.camera_path.c_str()); film && film->captions) {
+        const int laid = film_captions::apply(*film, paths.frames_dir, render_frame_count);
+        if (laid > 0) std::cout << "\nLaid the words of " << film->name << " on " << laid << " frame(s)." << std::endl;
     }
     if (int rc = assembleVideoFile(paths.frames_dir, converted, s.video_fps, paths.video_path, soundtrack_path); rc != SUCCESS) return rc;
 

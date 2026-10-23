@@ -525,6 +525,17 @@ struct FilmMeta {
 	int width = 1280, height = 720;
 };
 
+// Words over a film's pictures (a line of the story, a title): a picture of them with transparency (`image`, a PNG, an absolute path) laid over the video's frames from t0 to t1
+// seconds, fading in and out over `fade` seconds, `width` of the frame's width wide with its middle `centreY` of the way down. Laid on when the video is made
+// (launcher/film_captions.h), so a still of the film and its frames as rendered have none.
+struct Caption {
+	double t0, t1;
+	std::string image;
+	double fade = 0.8;
+	double centreY = 0.84;
+	double width = 0.66;
+};
+
 struct Film {
 	const char *key;           // "lamp-and-ball": the --cartoon argument
 	const char *name;          // "Lamp and Ball"
@@ -537,6 +548,7 @@ struct Film {
 	double stillTime;          // a time that makes a good still picture (a thumbnail, a gallery image)
 	FilmMeta meta;
 	std::function<void(audio::Mix &)> soundtrack;   // (empty: a silent film) places the film's music and sounds on a mix of its length (cartoon_audio.h), or null for a silent film
+	std::function<std::vector<Caption>()> captions;  // (empty: none) the words laid over its video
 };
 
 }  // namespace cartoon

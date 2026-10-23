@@ -226,6 +226,9 @@ RayTracer_Package/tls/
 !pbrt_scenes/texture-mappings-*.png
 # an equal-area environment picture (pbrt_scenes/equal-area-sky.pbrt), same reasoning
 !pbrt_scenes/equal-area-sky.bmp
+# the pictures a film brings with it (its words, its textures: scripts/make_tengwang_assets.py)
+!pbrt_scenes/film_assets/**/*.png
+!pbrt_scenes/film_assets/**/*.jpg
 
 # Test output
 test_*.ppm

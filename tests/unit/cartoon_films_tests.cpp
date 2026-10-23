@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "pbrt_flatten_test_helpers.h"
+#include "../../src/shared/ply_mesh.h"
 #include "../../src/shared/cartoon/cartoons.h"
 #include "../../src/shared/video_preset.h"
 
@@ -214,12 +215,28 @@ TEST(CartoonCandle, TheCandleBurnsDownAndTheFlameDiesWithSmokeAfterwards) {
 }
 
 TEST(CartoonFilms, EveryFilmFlattensAtSeveralTimesWithoutWarnings) {
+	// (a film may keep its heavy meshes in PLY files of its cache, film_cache.h: read them as the scene loader does)
+	const MeshResolver plyFiles = [](const std::string &path, std::vector<float> &positions, std::vector<int> &indices, std::vector<float> &uvs, std::vector<float> &normals) {
+		ply_mesh::LoadResult m = ply_mesh::loadFile(path);
+		if (!m.ok) return false;
+		positions = std::move(m.mesh.positions);
+		indices = std::move(m.mesh.indices);
+		uvs = std::move(m.mesh.uvs);
+		normals = std::move(m.mesh.normals);
+		return true;
+	};
 	for (const cartoon::Film &film : cartoon::kFilms) {
 		for (double f : {0.0, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99}) {   // (0.99: the last second may be a cut to black)
 			const double t = f * film.duration;
-			const FlatScene s = flattenSource(film.sceneAt(t));
-			EXPECT_GT(s.triangles.size(), 1000u) << film.key << " t = " << t;
-			EXPECT_FALSE(s.areaLights.empty()) << film.key << " t = " << t;
+			const FlatScene s = flattenSource(film.sceneAt(t), plyFiles);
+			// (a black card -- a title over black: no light at all, a black sky -- is a picture too; and a frame lit by its sky alone, an ink painting on paper, needs no lamp)
+			const bool skyLit = s.infiniteLight.present && (s.infiniteLight.L[0] + s.infiniteLight.L[1] + s.infiniteLight.L[2] > 0.0 || !s.infiniteLight.imageFile.empty());
+			if (s.areaLights.empty() && s.infiniteLight.present && !skyLit) {
+				for (const auto &w : s.warnings) ADD_FAILURE() << film.key << " t = " << t << ": " << w.message;
+				continue;
+			}
+			if (!(s.areaLights.empty() && skyLit)) EXPECT_GT(s.triangles.size(), 1000u) << film.key << " t = " << t;
+			EXPECT_TRUE(!s.areaLights.empty() || skyLit) << film.key << " t = " << t;
 			for (const auto &w : s.warnings) ADD_FAILURE() << film.key << " t = " << t << ": " << w.message;
 		}
 	}
@@ -402,6 +419,54 @@ TEST(CartoonCrystalHeart, TheScoreIsTheSameEveryTimeAndNeverSilent) {
 	};
 	for (double t = 0.5; t < ch::kDuration - 3.0; t += 3.0) EXPECT_GT(rms(t, t + 3.0), 0.003) << "silence at " << t << " s";
 	EXPECT_GT(rms(ch::kIgnite, ch::kIgnite + 3.0), 2.0 * rms(2.0, 5.0)) << "the ignition is the loudest moment, not the lake";
+	int peak = 0;
+	for (std::int16_t s : pa) peak = (std::max)(peak, std::abs(static_cast<int>(s)));
+	EXPECT_GT(peak, 8000) << "not too quiet";
+	EXPECT_LT(peak, 32767) << "not clipped";
+}
+
+// Preface to the Pavilion of Prince Teng: its shots in order and named, its words (each picture there, inside the film, one at a time on the line), and its score, which is the
+// same every time, never clipped, near silent where the film asks for silence (the black before the bell, the stone sinking) and at its loudest when the orchestra opens.
+TEST(CartoonTengwang, TheShotsAndTheWordsFitTheFilm) {
+	namespace tw = cartoon::tengwang;
+	const std::vector<double> starts = tw::shotStarts();
+	ASSERT_FALSE(starts.empty());
+	EXPECT_DOUBLE_EQ(starts.front(), 0.0);
+	for (std::size_t i = 1; i < starts.size(); ++i) EXPECT_GT(starts[i], starts[i - 1]) << "shot " << i;
+	EXPECT_LT(starts.back(), tw::kDuration);
+	const std::vector<cartoon::Caption> words = tw::captions();
+	EXPECT_GE(words.size(), 18u);
+	double lastLineEnd = 0.0;
+	for (const cartoon::Caption &c : words) {
+		EXPECT_FALSE(c.image.empty()) << "a caption's picture is missing (scripts/make_tengwang_assets.py)";
+		std::ifstream f(c.image, std::ios::binary);
+		EXPECT_TRUE(static_cast<bool>(f)) << c.image;
+		EXPECT_GE(c.t0, 0.0);
+		EXPECT_LE(c.t1, tw::kDuration);
+		EXPECT_LT(c.t0, c.t1);
+		if (c.centreY > 0.8) {   // (the lines at the foot of the picture never overlap; the title's three parts share the screen)
+			EXPECT_GE(c.t0, lastLineEnd) << c.image;
+			lastLineEnd = c.t1;
+		}
+	}
+}
+
+TEST(CartoonTengwang, TheScoreIsTheSameEveryTimeQuietWhereItShouldBeAndNeverClipped) {
+	namespace tw = cartoon::tengwang;
+	cartoon::audio::Mix a(tw::kDuration), b(tw::kDuration);
+	tw::soundtrack(a);
+	tw::soundtrack(b);
+	const std::vector<std::int16_t> pa = a.finish(), pb = b.finish();
+	EXPECT_EQ(pa, pb);
+	if (const char *keep = std::getenv("RT_SOUNDTRACK_WAV")) cartoon::audio::writeWav(keep, pa);
+	auto rms = [&](double t0, double t1) {
+		double e = 0.0;
+		std::size_t n = 0;
+		for (std::size_t i = static_cast<std::size_t>(t0 * cartoon::audio::kRate) * 2; i < static_cast<std::size_t>(t1 * cartoon::audio::kRate) * 2 && i < pa.size(); ++i, ++n) e += static_cast<double>(pa[i]) * pa[i];
+		return std::sqrt(e / static_cast<double>((std::max)(std::size_t(1), n))) / 32768.0;
+	};
+	EXPECT_LT(rms(0.6, 2.8), rms(3.0, 6.0)) << "the bell breaks the quiet of the black";
+	EXPECT_GT(rms(491.0, 504.0), 2.0 * rms(447.0, 454.0)) << "the orchestra opens after the stone has sunk";
 	int peak = 0;
 	for (std::int16_t s : pa) peak = (std::max)(peak, std::abs(static_cast<int>(s)));
 	EXPECT_GT(peak, 8000) << "not too quiet";
