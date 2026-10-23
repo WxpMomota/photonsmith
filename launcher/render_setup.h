@@ -50,6 +50,16 @@ inline RenderOptions render_options_from_args(const LaunchArgs& args) {
     return render_opts;
 }
 
+// The picture's look (src/shared/lens_look.h) for the scene `scene_id`: its .pbrt file's own `# @rt-look` line (a film writes one into every frame), then the flags over it.
+inline lens_look::Look look_for_scene(const LaunchArgs& args, const std::string& scene_id) {
+    lens_look::Look look;
+    const char* path = cpu_scene_pbrt_path_by_id(scene_id.c_str());
+    std::string problem;
+    if (path && *path && lens_look::fromSceneFile(path, look, problem) && !problem.empty())
+        std::cerr << "Warning: the scene's @rt-look line: " << problem << "\n";
+    return lens_look::merged(look, args.look);
+}
+
 // The settings every render mode reads, resolved from the command line once in main().
 struct RenderSetup {
 	bool use_gpu = false;

@@ -35,11 +35,12 @@ TEST_P(PbrtReferencePackCpuTest, TheCpuRenderStaysWhereItWasAgainstPbrt) {
 	const SceneDescriptor* s = find_example_scene(row.name.c_str());
 	if (!s) GTEST_SKIP() << row.name << ".pbrt was not discovered - is pbrt_scenes/ present?";
 	const std::string out = "pbrt_pack_" + pbrtPackTestName(row.name) + "_cpu.exr";
-	// A scene whose estimator has a heavy tail is rendered five times and the render with the median mean is the one compared. Only camera-medium-absorbing is such a scene (its CPU
-	// tolerance is the table's only one of 10% or more): a point light inside a scattering fog gives a scatter point near the light a weight of 1/r^2, which has no bound, so a 64-sample
-	// render now and then holds one sample worth tens of thousands (measured: 6 of 200 renders read more than 10% bright, one 54%, against a median of -1.6%). pbrt-v4's estimator has
-	// the same tail; one render made this test fail at random. Every CPU render draws fresh randomness, so the five are independent; the median of five fails only when three of them do.
-	const int renders = row.tol[0] >= 0.10 ? 5 : 1;
+	// A scene whose estimator has a heavy tail is rendered five times and the render with the median mean is the one compared. A point light inside a scattering fog gives a scatter
+	// point near the light a weight of 1/r^2, which has no bound, so a 64-sample render now and then holds one sample worth tens of thousands: camera-medium-absorbing (measured: 6 of
+	// 200 renders read more than 10% bright, one 54%, against a median of -1.6%) and chromatic-camera-medium (+3.7% once in 30 renders that otherwise stay within 1.5%, +6.2% once against
+	// its 4.5%). pbrt-v4's estimator has the same tail; one render made this test fail at random. The noisy rows are the ones with a CPU tolerance of 4% or more (eight scenes, about 10 s
+	// in all). Every CPU render draws fresh randomness, so the five are independent; the median of five fails only when three of them do.
+	const int renders = row.tol[0] >= 0.04 ? 5 : 1;
 	std::vector<std::array<double, 4>> results;   // channel means and their mean, per render
 	for (int r = 0; r < renders; ++r) {
 		ASSERT_EQ(cpu_render_main(row.size, row.size, row.spp, row.depth, out.c_str(), s->id.c_str(), s->camera.lookfrom_x, s->camera.lookfrom_y, s->camera.lookfrom_z), 0);

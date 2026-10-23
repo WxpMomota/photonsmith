@@ -815,6 +815,10 @@ static void apply_loaded_scene_settings(const char* path,
 		out_camera_extra->cameraMediumLeRaw = cm.le;
 		out_camera_extra->cameraMediumMaterialIdx = builtScene.cameraMediumMaterialIdx;
 	}
+	if (loaded.scene.cameraMediumIndex >= 0 && loaded.scene.cameraMediumBound[3] > 0.0) {
+		scene.needsWavefront = true;
+		scene.needsWavefrontReason = "the camera's fog ends at a sphere (MediumInterface around the camera)";
+	}
 
 	// checkerboard/mix "tex1"/"tex2" nesting a further procedural texture
 	// (pbrt_flatten::NestedProceduralTexture's own comment) - CPU-only;
@@ -1534,4 +1538,4 @@ bool build_scene(
 	scene.failure.kind = SceneBuildFailureKind::UnknownScene;
 	return false;
 }
-
+

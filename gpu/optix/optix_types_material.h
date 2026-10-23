@@ -218,10 +218,14 @@ struct MaterialData {
 		// future Dielectric/RoughDielectric variant ever needs cauchy_A <= 0
 		// to be meaningful, this sentinel needs to become a real tag instead.
 		struct { float cauchy_A, cauchy_B, _dispersive_pad; } dispersive_extra;
+		// The wavefront backend's synthetic camera-medium material (pbrt_gpu_builder.h): the radius of the sphere the camera medium ends at
+		// (FlatScene::cameraMediumBound), 0 for one that fills all of space; its centre is camera_medium_bound_centre in the union below.
+		struct { float boundRadius, _cmb_pad1, _cmb_pad2; } camera_medium_extra;
 	};
 
 	union {
 		float3 k_c;         // Conductor/CoatedConductor only: imaginary part k per R/G/B channel
+		float3 camera_medium_bound_centre;   // the synthetic camera-medium material: see camera_medium_extra above
 		// Subsurface: RGB scattering coefficient (pbrt-v4 sigma_s, already
 		// scale-multiplied). k_c has no meaning for Subsurface (not a
 		// Conductor), so this slot is free to reuse - same alternate-name

@@ -825,6 +825,7 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
     // at all (see the warnings just above). See src/shared/
     // render_options.h's own field comments.
     RenderOptions render_opts = render_options_from_args(args);
+    render_opts.output.look = look_for_scene(args, scene_id);
     // A GPU render asked for a .png file writes the PNG itself, straight from the picture (OutputOptions::write_png), with no text PPM for this program to read back and convert, unless
     // the picture is cut afterwards (a crop window, the scene's own or --crop: cutToScenePicture reads a PPM or an EXR).
     {

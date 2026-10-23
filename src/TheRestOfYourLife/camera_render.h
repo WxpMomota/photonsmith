@@ -323,6 +323,18 @@ inline color camera::render_pixel(int i, int j, RenderSamplers& smp, const hitta
     return pixel_color;
 }
 
+// The PPM rows again from the linear picture (after the denoiser or a look changed it).
+inline void tone_map_rows(const camera& cam, const std::vector<float>& linear, std::vector<std::string>& scanlines) {
+    for (int j = 0; j < cam.image_height; ++j) {
+        std::ostringstream row;
+        for (int i = 0; i < cam.image_width; ++i) {
+            const size_t idx = (static_cast<size_t>(j) * cam.image_width + i) * 3;
+            write_color(row, color(linear[idx], linear[idx + 1], linear[idx + 2]), cam.tone_map);
+        }
+        scanlines[j] = row.str();
+    }
+}
+
 // --denoise: Open Image Denoise on the linear image. For a PPM the rows are then tone mapped again from the denoised pixels; an EXR is written from them.
 inline void denoise_rendered_image(camera& cam, const hittable& world, std::vector<float>& exr_pixels, std::vector<std::string>& scanlines) {
     const int image_width = cam.image_width;
@@ -330,7 +342,6 @@ inline void denoise_rendered_image(camera& cam, const hittable& world, std::vect
     const bool exr_output = cam.exr_output;
     const bool denoise_guides = cam.denoise_guides;
     const float denoise_keep = static_cast<float>(cam.denoise_keep);
-    const auto tone_map = cam.tone_map;
     std::string denoise_error;
     // The first-hit surface colour and normal go in too when every visible surface is matte (or with --denoise-guides, always), so texture and edges
     // the noise has hidden are not smoothed away; with glossy surfaces around they would smooth reflections instead.
@@ -339,16 +350,7 @@ inline void denoise_rendered_image(camera& cam, const hittable& world, std::vect
     if (oidn_runtime::denoiseHdr(exr_pixels.data(), image_width, image_height, 3, 1.0f - std::min(1.0f, std::max(0.0f, denoise_keep)), denoise_error,
                                  use_guides ? guide_albedo.data() : nullptr, use_guides ? guide_normal.data() : nullptr)) {
         std::clog << "\rDenoised with Open Image Denoise (" << oidn_runtime::libraryPath() << ")\n";
-        if (!exr_output) {
-            for (int j = 0; j < image_height; ++j) {
-                std::ostringstream row;
-                for (int i = 0; i < image_width; ++i) {
-                    const size_t idx = (static_cast<size_t>(j) * image_width + i) * 3;
-                    write_color(row, color(exr_pixels[idx], exr_pixels[idx + 1], exr_pixels[idx + 2]), tone_map);
-                }
-                scanlines[j] = row.str();
-            }
-        }
+        if (!exr_output) tone_map_rows(cam, exr_pixels, scanlines);
     } else {
         std::cerr << "Warning: --denoise: " << denoise_error << " - rendering without it.\n";
     }
@@ -407,7 +409,8 @@ inline bool camera::render(const hittable& world, const hittable& lights,
     // on the same flag). Interleaved RGB, row-major, matching
     // write_exr_image()/SaveEXR's own expected layout exactly.
     // Also kept for --denoise, which needs the whole linear image before anything is tone mapped.
-    const bool keep_linear = exr_output || denoise;
+    // And for a look (lens_look.h): the glow of a bright pixel reaches its neighbours, so it is applied to the whole linear picture, then the rows are tone mapped again.
+    const bool keep_linear = exr_output || denoise || look.active();
     std::vector<float> exr_pixels(
         keep_linear ? static_cast<size_t>(image_width) * image_height * 3 : 0);
     std::atomic<int> next_j(image_height - 1);
@@ -589,6 +592,10 @@ inline bool camera::render(const hittable& world, const hittable& lights,
     }
 
     if (denoise) denoise_rendered_image(*this, world, exr_pixels, scanlines);
+    if (!exr_output && look.active()) {
+        lens_look::apply(exr_pixels.data(), image_width, image_height, look);
+        tone_map_rows(*this, exr_pixels, scanlines);
+    }
 
     bool wrote_ok = true;
     if (exr_output) {

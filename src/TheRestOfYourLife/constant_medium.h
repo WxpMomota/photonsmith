@@ -628,11 +628,48 @@ class ambient_medium {
     // `out_pass_weight` (optional): for a medium whose extinction differs per channel, the weight to multiply onto beta when the flight
     // does NOT collide (see volume_scattering.h's sample_homogeneous_event); left untouched otherwise, so a caller that initialises it
     // to (1,1,1) is correct for a grey medium too.
+    // A medium that ends at a sphere (FlatScene::cameraMediumBound): the fog of a set lit from outside it. Radius 0 (the default) fills all of space.
+    void set_bound(const point3& centre, double radius) { bound_centre_ = centre; bound_radius_ = radius; }
+    bool bounded() const { return bound_radius_ > 0.0; }
+
+    // The part [t0, t1] of the ray's [0, t_max] (ray parameter) that is inside the medium; false when there is none. Unbounded: all of it.
+    bool clip(const ray& r, double t_max, double& t0, double& t1) const {
+        t0 = 0.0;
+        t1 = t_max;
+        if (!bounded()) return t_max > 0.0;
+        const vec3 oc = r.origin() - bound_centre_;
+        const double a = dot(r.direction(), r.direction());
+        const double half_b = dot(oc, r.direction());
+        const double c = dot(oc, oc) - bound_radius_ * bound_radius_;
+        const double disc = half_b * half_b - a * c;
+        if (a <= 0.0 || disc <= 0.0) return false;
+        const double root = std::sqrt(disc);
+        t0 = std::max(0.0, (-half_b - root) / a);
+        t1 = std::min(t_max, (-half_b + root) / a);
+        return t1 > t0;
+    }
+
+    // The transmittance along `r` from its origin over `distance` world units (may be infinity): the length that is inside the medium, through transmittance_over().
+    color transmittance_along(const ray& r, double distance) const {
+        if (!bounded()) return transmittance_over(distance);
+        const double len = r.direction().length();
+        double t0, t1;
+        if (len <= 0.0 || !clip(r, distance >= infinity ? infinity : distance / len, t0, t1)) return color(1, 1, 1);
+        return transmittance_over((t1 - t0) * len);
+    }
+
     bool sample_scatter(const ray& r, double t_max, hit_record& rec, double* out_ray_length = nullptr,
                         color* out_pass_weight = nullptr) const {
         const double ray_length = r.direction().length();
         if (out_ray_length) *out_ray_length = ray_length;
         if (t_max <= 0) return false;
+        // Only the part of the flight inside the medium can collide: [t_in, t_max] after the clip (t_in = 0 for an unbounded medium).
+        double t_in = 0.0;
+        if (bounded()) {
+            double t_out;
+            if (!clip(r, t_max, t_in, t_out)) return false;
+            t_max = t_out - t_in;
+        }
 
         if (chromatic_) {
             const double d = (t_max >= infinity) ? 1e30 : t_max * ray_length;
@@ -641,7 +678,7 @@ class ambient_medium {
                 if (out_pass_weight) *out_pass_weight = color(ev.w[0], ev.w[1], ev.w[2]);
                 return false;
             }
-            rec.t = ev.t / ray_length;
+            rec.t = t_in + ev.t / ray_length;
             rec.p = r.at(rec.t);
             rec.normal = vec3(1, 0, 0);
             rec.front_face = true;
@@ -664,7 +701,7 @@ class ambient_medium {
         const double hit_distance = med.sample_free_path(random_double());
         if (hit_distance > distance_inside) return false;
 
-        rec.t = hit_distance / ray_length;
+        rec.t = t_in + hit_distance / ray_length;
         rec.p = r.at(rec.t);
         rec.normal = vec3(1, 0, 0);   // arbitrary (volume has no surface normal)
         rec.front_face = true;
@@ -708,6 +745,8 @@ class ambient_medium {
     bool                          chromatic_ = false;
     color                         Le_raw_{0, 0, 0};
     shared_ptr<hg_phase_material> phase_mat;
+    point3                        bound_centre_{0, 0, 0};
+    double                        bound_radius_ = 0.0;
 };
 
 

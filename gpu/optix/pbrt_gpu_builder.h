@@ -1864,6 +1864,10 @@ inline void addCameraMedium(BuildCtx &c) {
 			if (cm.chromatic) bakeChromaticMedium(scene.media[static_cast<std::size_t>(scene.cameraMediumIndex)].sigma_a,
 			                                      scene.media[static_cast<std::size_t>(scene.cameraMediumIndex)].sigma_s,
 			                                      scene.media[static_cast<std::size_t>(scene.cameraMediumIndex)].Le, d);
+			// Where the medium ends (a sphere, or radius 0 = nowhere): the wavefront raygen clips every flight and shadow ray to it.
+			d.camera_medium_extra.boundRadius = static_cast<float>(scene.cameraMediumBound[3]);
+			d.camera_medium_bound_centre = make_float3(static_cast<float>(scene.cameraMediumBound[0]), static_cast<float>(scene.cameraMediumBound[1]),
+			                                           static_cast<float>(scene.cameraMediumBound[2]));
 			out.cameraMediumMaterialIdx = static_cast<int>(out.materials.size());
 			out.materials.push_back(d);
 		}

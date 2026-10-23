@@ -1,6 +1,26 @@
 // wavefront_raygen.h -- Intersect-phase and shadow-phase raygen programs
 // Included by wavefront_programs.cu, after wavefront_common.h.
 
+// The part [t0, t1] of a ray's [0, tMax] that is inside the camera medium (cmMat, the synthetic camera-medium material): all of it for a medium that fills
+// all of space, the chord through its bounding sphere for one that ends at a sphere (camera_medium_extra.boundRadius > 0; FlatScene::cameraMediumBound).
+// False when the ray spends no length in it. In the ray's own parameter, like tMax.
+__device__ __forceinline__ bool wf_camera_medium_segment(const MaterialData& cmMat, float3 origin, float3 dir, float tMax, float& t0, float& t1) {
+	t0 = 0.0f;
+	t1 = tMax;
+	const float r = cmMat.camera_medium_extra.boundRadius;
+	if (r <= 0.0f) return tMax > 0.0f;
+	const float3 oc = origin - cmMat.camera_medium_bound_centre;
+	const float a = dot(dir, dir);
+	const float halfB = dot(oc, dir);
+	const float c = dot(oc, oc) - r * r;
+	const float disc = halfB * halfB - a * c;
+	if (a <= 0.0f || disc <= 0.0f) return false;
+	const float root = sqrtf(disc);
+	t0 = fmaxf(0.0f, (-halfB - root) / a);
+	t1 = fminf(tMax, (-halfB + root) / a);
+	return t1 > t0;
+}
+
 // ============================================================================
 // __raygen__wf_intersect
 //   Launch dimensions: (numRaysInQueue, 1, 1).
@@ -69,22 +89,23 @@ extern "C" __global__ void __raygen__wf_intersect() {
 	float ambientT = 0.0f;
 	float ambientPass[kWFNWavelengths];   // pass-through weight of a camera medium whose extinction differs per wavelength; 1 otherwise
 	for (int i = 0; i < kWFNWavelengths; ++i) ambientPass[i] = 1.0f;
-	if (wf_params.cameraMediumSigmaT > 0.0f && wf_params.cameraMediumMaterialIdx >= 0) {
-		const float surfaceT = payload.hit ? payload.t : 1e30f;
+	float segT0 = 0.0f, segT1 = 0.0f;   // the part of the flight inside the camera medium (all of it unless the medium ends at a sphere)
+	if (wf_params.cameraMediumSigmaT > 0.0f && wf_params.cameraMediumMaterialIdx >= 0
+		&& wf_camera_medium_segment(wf_params.materials[wf_params.cameraMediumMaterialIdx], ray.origin, ray.direction, payload.hit ? payload.t : 1e30f, segT0, segT1)) {
 		const MaterialData& cmMat = wf_params.materials[wf_params.cameraMediumMaterialIdx];
 		if (wf_medium_is_chromatic(cmMat)) {
 			const float cu_channel = wf_rand(ambientSeed);
 			const float cu_dist = wf_rand(ambientSeed);
-			const WfChromaEvent cev = wf_chroma_event(cmMat, ray.wavelengths, surfaceT, cu_channel, cu_dist);
+			const WfChromaEvent cev = wf_chroma_event(cmMat, ray.wavelengths, segT1 - segT0, cu_channel, cu_dist);
 			if (cev.collided) {
-				ambientT = cev.t;
+				ambientT = segT0 + cev.t;
 				ambientScatter = true;
 			} else {
 				for (int i = 0; i < kWFNWavelengths; ++i) ambientPass[i] = cev.w[i];
 			}
 		} else {
-			ambientT = -logf(fmaxf(1e-8f, 1.0f - wf_rand(ambientSeed))) / wf_params.cameraMediumSigmaT;
-			ambientScatter = ambientT < surfaceT;
+			ambientT = segT0 + -logf(fmaxf(1e-8f, 1.0f - wf_rand(ambientSeed))) / wf_params.cameraMediumSigmaT;
+			ambientScatter = ambientT < segT1;
 		}
 	}
 
@@ -280,13 +301,22 @@ extern "C" __global__ void __raygen__wf_shadow() {
 	// Chromatic media crossed: the surviving fraction differs per wavelength, so it scales the item's spectral Ld here (the queue
 	// items are writable device memory, and accumulate_shadow reads Ld next).
 	// A camera medium with per-wavelength extinction attenuates the whole ray the same way (its scalar form is applied to T below).
+	// The length of the shadow ray inside the camera medium: all of it (s.tMax, >= 1e29 for a ray to the sky) unless the medium ends at a sphere.
+	float cmLength = s.tMax;
+	bool  cmInfinite = s.tMax >= 1e29f;
+	if (wf_params.cameraMediumSigmaT > 0.0f && wf_params.cameraMediumMaterialIdx >= 0
+		&& wf_params.materials[wf_params.cameraMediumMaterialIdx].camera_medium_extra.boundRadius > 0.0f) {
+		float c0, c1;
+		cmLength = wf_camera_medium_segment(wf_params.materials[wf_params.cameraMediumMaterialIdx], s.origin, s.direction, s.tMax, c0, c1) ? c1 - c0 : 0.0f;
+		cmInfinite = false;
+	}
 	const bool cameraMediumChromatic = wf_params.cameraMediumSigmaT > 0.0f && wf_params.cameraMediumMaterialIdx >= 0
 		&& wf_medium_is_chromatic(wf_params.materials[wf_params.cameraMediumMaterialIdx]);
 	if (cameraMediumChromatic) {
 		const MaterialData& cmMat = wf_params.materials[wf_params.cameraMediumMaterialIdx];
 		for (int i = 0; i < kWFNWavelengths; ++i) {
 			const float sigma = wf_chroma_sigma_a(cmMat, sp.lambda[i]) + wf_chroma_sigma_s(cmMat, sp.lambda[i]);
-			sp.tr[i] *= (s.tMax >= 1e29f) ? (sigma > 0.0f ? 0.0f : 1.0f) : expf(-sigma * s.tMax);
+			sp.tr[i] *= cmInfinite ? (sigma > 0.0f ? 0.0f : 1.0f) : expf(-sigma * cmLength);
 		}
 		sp.chromatic = 1;
 	}
@@ -297,6 +327,6 @@ extern "C" __global__ void __raygen__wf_shadow() {
 	// pbrt's camera medium attenuates every shadow ray over its whole length (the CPU/recursive NEE sites'
 	// camera_medium_shadow_trans); a ray to infinity (the sky) is fully extinguished.
 	if (wf_params.cameraMediumSigmaT > 0.0f && !cameraMediumChromatic)
-		T *= (s.tMax >= 1e29f) ? 0.0f : expf(-wf_params.cameraMediumSigmaT * s.tMax);
+		T *= cmInfinite ? 0.0f : expf(-wf_params.cameraMediumSigmaT * cmLength);
 	transmittance[idx]   = T;
 }

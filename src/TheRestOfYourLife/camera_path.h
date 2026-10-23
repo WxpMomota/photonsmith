@@ -398,8 +398,9 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
     // channel with real extinction, matching this same medium's own
     // physical model (nothing is visible arbitrarily far through an
     // unbounded absorbing/scattering fog).
-    auto camera_medium_trans = [&](double distance) -> color {
-        return camera_medium ? camera_medium->transmittance_over(distance) : color(1, 1, 1);
+    // `r` is the shadow ray (from the shading point towards the light): a medium bounded by a sphere only dims the part of it inside the sphere.
+    auto camera_medium_trans = [&](const ray& r, double distance) -> color {
+        return camera_medium ? camera_medium->transmittance_along(r, distance) : color(1, 1, 1);
     };
 
     const bool probing = path_probe::active();
@@ -429,7 +430,7 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
                         // The distance to the light's hit point is the real extent of the segment the media see.
                         const double dir_len = shadow_ray.direction().length();
                         const double t_light = (light_rec.p - shadow_ray.origin()).length() / dir_len;
-                        color med_trans = camera_medium_trans(t_light * dir_len)
+                        color med_trans = camera_medium_trans(shadow_ray, t_light * dir_len)
                             * shape_media_trans(shadow_ray, t_light);
                         const color nee_area = beta * w_l * atten * trans * med_trans * f_pdf * Le_d / pdf_l;
                         L += nee_area;
@@ -469,7 +470,7 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
                     portal->eval_Le_rgb(rec.p.x(), rec.p.y(), rec.p.z(), wx, wy, wz, lr, lg, lb);
                     color Le_portal(lr, lg, lb);
                     color atten = rec.mat->scattering_attenuation(current_ray, rec, portal_shadow, srec.attenuation) * refraction_scale(portal_dir);
-                    color med_trans = camera_medium_trans(infinity) * shape_media_trans(portal_shadow, infinity);
+                    color med_trans = camera_medium_trans(portal_shadow, infinity) * shape_media_trans(portal_shadow, infinity);
                     L += beta * w_portal * atten * trans * med_trans * f_pdf * Le_portal / pdf_portal;
                 }
             }
@@ -492,7 +493,7 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
                 if (!shadow_ray_hit(world, sky_shadow, sky_rec, infinity, &trans)) {
                     color Le_sky = sky->Le(unit_vector(sky_dir));
                     color atten = rec.mat->scattering_attenuation(current_ray, rec, sky_shadow, srec.attenuation) * refraction_scale(sky_dir);
-                    color med_trans = camera_medium_trans(infinity) * shape_media_trans(sky_shadow, infinity);
+                    color med_trans = camera_medium_trans(sky_shadow, infinity) * shape_media_trans(sky_shadow, infinity);
                     L += beta * w_sky * atten * trans * med_trans * f_pdf * Le_sky / pdf_sky;
                 }
             }
@@ -518,7 +519,7 @@ inline void add_direct_lighting(const camera& cam, const hittable& world, const 
             if (!shadow_ray_hit(world, punct_ray, shadow_rec, shadow_t_max, &trans)) {
                 // delta light: pdf=1, no MIS weight needed
                 color atten = rec.mat->scattering_attenuation(current_ray, rec, punct_ray, srec.attenuation) * refraction_scale(ps.wi);
-                color med_trans = camera_medium_trans(ps.t_max) * shape_media_trans(punct_ray, shadow_t_max);
+                color med_trans = camera_medium_trans(punct_ray, ps.t_max) * shape_media_trans(punct_ray, shadow_t_max);
                 L += beta * atten * trans * med_trans * f_pdf * ps.Li;
             }
         });

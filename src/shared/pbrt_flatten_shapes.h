@@ -1280,11 +1280,32 @@ inline void resolveAfterShapes(const pbrt_scene::Scene &scene, FlatScene &out) {
 			// rather than silently render an approximation nobody asked
 			// for; a scene that genuinely only wants the ambient fog (the
 			// common, motivating case for this feature) is unaffected.
-			bool hasShapeMedium = false;
-			for (const Sphere &s : out.spheres) if (s.medium >= 0) { hasShapeMedium = true; break; }
-			for (const Disk &d : out.disks) if (!hasShapeMedium && d.medium >= 0) { hasShapeMedium = true; break; }
-			for (const Cylinder &c : out.cylinders) if (!hasShapeMedium && c.medium >= 0) { hasShapeMedium = true; break; }
-			if (hasShapeMedium) {
+			// One exception, the pbrt way of bounding the camera's own fog: a single full sphere around the camera with Material "interface" that holds the
+			// camera medium inside and nothing outside. The fog is then the camera medium clipped to that sphere (FlatScene::cameraMediumBound), so a sun or a sky
+			// outside it lights the fog; the sphere itself stays as an invisible shell with no medium of its own.
+			int boundSphere = -1, shapeMedia = 0;
+			for (std::size_t i = 0; i < out.spheres.size(); ++i)
+				if (out.spheres[i].medium >= 0) { ++shapeMedia; boundSphere = static_cast<int>(i); }
+			for (const Disk &d : out.disks) if (d.medium >= 0) ++shapeMedia;
+			for (const Cylinder &c : out.cylinders) if (c.medium >= 0) ++shapeMedia;
+			if (shapeMedia == 1 && boundSphere >= 0) {
+				const Sphere &s = out.spheres[static_cast<std::size_t>(boundSphere)];
+				const bool interfaceMaterial = s.material >= 0 && static_cast<std::size_t>(s.material) < out.materials.size() &&
+					out.materials[static_cast<std::size_t>(s.material)].kind == MaterialKind::Interface;
+				double d2 = 0.0;
+				for (int c = 0; c < 3; ++c) d2 += (out.camera.lookfrom[c] - s.center[c]) * (out.camera.lookfrom[c] - s.center[c]);
+				const bool holdsCamera = d2 < s.radius * s.radius;
+				if (s.medium != scene.cameraMediumIndex || !interfaceMaterial || s.clipped || s.areaLight >= 0 || !holdsCamera) boundSphere = -1;
+			} else {
+				boundSphere = -1;
+			}
+			if (boundSphere >= 0) {
+				Sphere &s = out.spheres[static_cast<std::size_t>(boundSphere)];
+				for (int c = 0; c < 3; ++c) out.cameraMediumBound[c] = s.center[c];
+				out.cameraMediumBound[3] = s.radius;
+				s.medium = -1;
+				out.cameraMediumIndex = scene.cameraMediumIndex;
+			} else if (shapeMedia > 0) {
 				warn("the scene declares both a camera medium (MediumInterface's "
 					 "\"outside\" name active at the Camera directive) and at least "
 					 "one real per-shape medium; combining the two is not supported "

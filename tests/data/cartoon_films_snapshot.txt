@@ -60,3 +60,8 @@ pip-and-the-moon|0|56060|72
 pip-and-the-moon|18|56508|72
 pip-and-the-moon|48|56084|73
 pip-and-the-moon|95.9|56060|72
+meta|forest-dawn|V19|42 s|24 fps|5 shots|fog,nature,dawn,translucent,backlight|256 spp
+forest-dawn|0|16840|21
+forest-dawn|14|16840|1
+forest-dawn|21|16860|1
+forest-dawn|41.96|16928|1

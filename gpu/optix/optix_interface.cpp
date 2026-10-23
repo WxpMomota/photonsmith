@@ -241,6 +241,13 @@ static bool prepareSceneAndCamera(
 		return false;
 	}
 
+	// A scene only the wavefront renderer draws right (SceneData::needsWavefront) is prepared for it instead of the default renderer.
+	if (!wavefrontMode && scene.needsWavefront) {
+		if (verbose) std::cout << "[OptiX] " << scene.needsWavefrontReason << ": rendering with the wavefront renderer\n";
+		return prepareSceneAndCamera(scene_id, image_width, image_height, cam_x, cam_y, cam_z, force_camera_override, /*wavefrontMode=*/true, ptxPath, verbose, cameraExtra, errorCode,
+									 has_custom_lookat, lookat_x, lookat_y, lookat_z, has_dof_override, aperture_override, focus_distance_override, vfov_override);
+	}
+
 	// Scenes that don't use a non-default camera model leave cameraExtra
 	// untouched by build_scene() (still zero-init'd: kind=Perspective,
 	// defocus disk zero) - fill it from the plain 12-float camera_params in
@@ -588,7 +595,7 @@ extern "C" int optix_render_main(
 			// siblings), deliberately left for a follow-up: this export path
 			// is a bonus on top of denoising, not part of the "--denoise
 			// actually denoises under --wavefront" fix itself.
-			if (options.denoise && !wavefrontMode) {
+			if (options.denoise && !g_renderer->isWavefrontActive()) {   // (the renderer that ran: a scene can ask for the wavefront one, SceneData::needsWavefront)
 				try {
 					std::vector<float> albedo, normal;
 					if (g_renderer->readAovBuffers(static_cast<unsigned int>(image_width),
@@ -624,6 +631,9 @@ extern "C" int optix_render_main(
 		// as a real, visible color/contrast mismatch between the two
 		// renderers (ACES's filmic S-curve shifts shadow/midtone hue and
 		// softens contrast compared to a flat gamma curve).
+		// The camera's look (bloom, vignette, warmth, saturation: lens_look.h) on the linear picture; the exposure below is a plain multiply and commutes with it.
+		lens_look::apply(framebuffer.data(), image_width, image_height, options.output.look);
+
 		std::vector<unsigned char> bytes(pixelCount * 3);
 		ppm_text::parallel_ranges(pixelCount, [&](size_t begin, size_t end) {
 		for (size_t i = begin; i < end; ++i) {

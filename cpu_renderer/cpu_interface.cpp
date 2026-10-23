@@ -463,6 +463,7 @@ extern "C" int cpu_render_main(int width, int height, int spp, int max_depth, co
 		cam.samples_per_pixel = spp;
 		cam.max_depth         = max_depth;
 		cam.exposure          = options.exposure;
+		cam.look              = options.output.look;
 		cam.denoise           = options.denoise;
 		cam.denoise_guides    = options.denoise_guides;
 		cam.denoise_keep      = options.denoise_blend;

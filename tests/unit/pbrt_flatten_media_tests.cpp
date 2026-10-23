@@ -504,6 +504,50 @@ TEST(FlattenTest, CameraMediumCombinedWithPerShapeMediumWarnsAndIsDropped) {
 	EXPECT_EQ(s.spheres[0].medium, 0);
 }
 
+// The pbrt way of bounding the camera's fog (pbrt_scenes/sunbeams-in-mist.pbrt): one full sphere around the camera with Material "interface", the camera medium inside and
+// nothing outside. The fog becomes the camera medium clipped to that sphere, and the sphere an empty shell.
+TEST(FlattenTest, AnInterfaceSphereAroundTheCameraBoundsTheCameraMedium) {
+	const FlatScene s = flattenSource(
+		"MakeNamedMedium \"fog\" \"string type\" \"homogeneous\"\n"
+		"MediumInterface \"\" \"fog\"\n"
+		"Camera \"perspective\" \"float fov\" [ 40 ]\n"
+		"WorldBegin\n"
+		"AttributeBegin\n"
+		"  MediumInterface \"fog\" \"\"\n"
+		"  Material \"interface\"\n"
+		"  Translate 1 2 3\n"
+		"  Shape \"sphere\" \"float radius\" [ 10 ]\n"
+		"AttributeEnd\n"
+		+ std::string(kQuadMesh));
+	EXPECT_EQ(s.cameraMediumIndex, 0);
+	EXPECT_FALSE(warnedAbout(s, "camera medium"));
+	EXPECT_DOUBLE_EQ(s.cameraMediumBound[3], 10.0);
+	EXPECT_DOUBLE_EQ(s.cameraMediumBound[1], 2.0);
+	EXPECT_DOUBLE_EQ(s.cameraMediumBound[2], 3.0);
+	ASSERT_EQ(s.spheres.size(), 1u);
+	EXPECT_EQ(s.spheres[0].medium, -1) << "the sphere is left as an empty interface shell";
+}
+
+TEST(FlattenTest, AnInterfaceSphereThatMissesTheCameraDoesNotBoundIt) {
+	// The camera (at the origin) is outside the sphere: pbrt would put the camera's rays in the fog until they cross the sphere, which is not a bounded fog; dropped as before.
+	const FlatScene s = flattenSource(
+		"MakeNamedMedium \"fog\" \"string type\" \"homogeneous\"\n"
+		"MediumInterface \"\" \"fog\"\n"
+		"Camera \"perspective\" \"float fov\" [ 40 ]\n"
+		"WorldBegin\n"
+		"AttributeBegin\n"
+		"  MediumInterface \"fog\" \"\"\n"
+		"  Material \"interface\"\n"
+		"  Translate 50 0 0\n"
+		"  Shape \"sphere\" \"float radius\" [ 10 ]\n"
+		"AttributeEnd\n");
+	EXPECT_EQ(s.cameraMediumIndex, -1);
+	EXPECT_EQ(s.cameraMediumBound[3], 0.0);
+	EXPECT_TRUE(warnedAbout(s, "camera medium"));
+	ASSERT_EQ(s.spheres.size(), 1u);
+	EXPECT_EQ(s.spheres[0].medium, 0);
+}
+
 TEST(FlattenTest, NonHomogeneousCameraMediumWarnsAndIsDropped) {
 	const FlatScene s = flattenSource(
 		"MakeNamedMedium \"puff\" \"string type\" [ \"cloud\" ]\n"

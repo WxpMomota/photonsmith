@@ -15,12 +15,20 @@
 // for the fields that don't apply to them, matching this project's
 // existing "flag has no effect under X" warn-and-ignore convention rather
 // than a compile-time restriction.
+// (C++ linkage: callers include this header inside extern "C" { } blocks, and lens_look.h has templates and the standard library)
+extern "C++" {
+#include "lens_look.h"
+}
+
 // How a render's picture is written, apart from what is rendered: kept in its own struct so that the fields of RenderOptions above all mean "what to render".
 struct OutputOptions {
 	// Writes a tone-mapped 8-bit RGB picture (width x height x 3 bytes) to a PNG file, true on success. Handed over by the launcher (image_writer.h's write_png) so that the renderer
 	// library does not depend on a PNG writer; a renderer asked for a ".png" output file writes it with this, straight from the picture, instead of a text PPM that the launcher would
 	// read back and convert (a 1280 x 720 picture is 7 MB of text). GPU renderers only; null (the default) = write the text PPM as always.
 	bool (*write_png)(const char *path, int width, int height, const unsigned char *rgb) = nullptr;
+	// The camera's look (bloom, vignette, warmth, saturation: lens_look.h), applied to the linear picture before the tone map of a PNG or PPM; an EXR stays raw.
+	// Off by default. CPU default path tracer and both OptiX backends.
+	lens_look::Look look;
 };
 
 struct RenderOptions {

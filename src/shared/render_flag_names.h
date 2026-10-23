@@ -40,6 +40,10 @@ namespace render_flags {
 	constexpr const char* kBackground    = "--background";   // low priority, one worker: for using the computer meanwhile (launcher/background_mode.h)
 	constexpr const char* kOptixValidate = "--optix-validate";
 	constexpr const char* kExposure      = "--exposure";
+	constexpr const char* kBloom         = "--bloom";        // the camera's look: src/shared/lens_look.h
+	constexpr const char* kVignette      = "--vignette";
+	constexpr const char* kWarmth        = "--warmth";
+	constexpr const char* kSaturation    = "--saturation";
 	constexpr const char* kSampler       = "--sampler";
 	constexpr const char* kAdaptive      = "--adaptive";
 	constexpr const char* kAovs          = "--aovs";

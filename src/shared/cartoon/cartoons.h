@@ -26,6 +26,7 @@
 #include "dandelion.h"
 #include "domino_run.h"
 #include "fireflies.h"
+#include "forest_dawn.h"
 #include "lamp_and_ball.h"
 #include "little_robot.h"
 #include "meet_pip.h"
@@ -41,7 +42,7 @@ constexpr const char *kCameraPathPrefix = "cartoon:";
 constexpr const char *kStillSlugPrefix = "cartoon-";   // the scene a film's still is listed as: "cartoon-fireflies" (and its file, cartoon-fireflies.pbrt)
 
 // The words a film's tags are chosen from. They name what a film shows or how it is lit, so that the scene list's search can find "metal" or "dusk".
-constexpr const char *kTagVocabulary[] = {"character", "physics", "particles", "metal", "water", "subsurface", "translucent", "emissive", "backlight", "dof", "reflections", "night", "dusk"};
+constexpr const char *kTagVocabulary[] = {"character", "physics", "particles", "metal", "water", "subsurface", "translucent", "emissive", "backlight", "dof", "reflections", "night", "dusk", "fog", "nature", "dawn"};
 
 // The films. `meta.id` is the video preset's number (V<id>): give a new film the next number and never reuse one. `meta.secondsPerFrame` is measured by scripts/measure_cartoons.py.
 inline const Film kFilms[] = {
@@ -93,6 +94,10 @@ inline const Film kFilms[] = {
 	 "Pip finds the moon in a pond, tries to touch it and breaks it, scoops it up in a bucket and dances with it, trips on the way home and loses it, and is shown the real one by a firefly. With music and sounds.",
 	 pip_moon::kDuration, pip_moon::kFps, &pip_moon::sceneAt, &pip_moon::headerAt, &pip_moon::shotStarts, 18.0,
 	 {18, "character,emissive,water,reflections,night", "Moon and reflection|Stroll along the dock|The moon in the water|Sorrow and the idea|Running for the bucket|Scooping the moon|The dance|Carrying it home|The fall|Alone at the water|The firefly|Under the real moon|Pull back over the pond", pip_moon::kSamples, 1.7, true}, &pip_moon::soundtrack},
+	{"forest-dawn", "Forest Dawn",
+	 "A misty forest clearing from the blue before sunrise to the first warm light: the last fireflies go out, the sun comes up behind the hills and shines between the trunks in shafts through the mist, dew catches it on the grass, and leaves fall through the beams.",
+	 forest_dawn::kDuration, forest_dawn::kFps, &forest_dawn::sceneAt, &forest_dawn::headerAt, &forest_dawn::shotStarts, 14.0,
+	 {19, "fog,nature,dawn,translucent,backlight", "Into the blue clearing|Against the rising sun|Dew on the grass|Leaves in the beams|Crane up as the mist thins", forest_dawn::kSamples, 6.0, true}},
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 

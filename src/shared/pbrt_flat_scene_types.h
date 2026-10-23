@@ -433,6 +433,10 @@ struct FlatScene {
 	// consumed by optix_raygen.h) - ray_color_spectral()/BDPT/MLT/SPPM on
 	// CPU and the GPU-wavefront backend still don't consume this field.
 	int cameraMediumIndex = -1;
+	// Where the camera medium ends: a sphere (centre x, y, z, radius) that holds it, or radius 0 for a medium that fills all of space. Set when the scene bounds its camera medium
+	// the pbrt way, by one full sphere with Material "interface" and MediumInterface "<camera medium>" "" around the camera (resolveAfterShapes): the fog of a set lit by the sun
+	// or the sky, which an unbounded medium would put out (no light from infinitely far gets through infinite fog). That sphere stays in `spheres` with its medium cleared.
+	double cameraMediumBound[4] = {0, 0, 0, 0};
 	InfiniteLight infiniteLight;        // present=false if the scene has none
 	// The scene's OTHER portal infinite lights (pbrt sums every light; the pbrt-v4-scenes Watercolor has one per window). `infiniteLight` is the one with the largest window; each of
 	// these is a complete portal light of its own (picture, scale, corners). Empty for every scene with at most one infinite light. The renderers add them to the main portal

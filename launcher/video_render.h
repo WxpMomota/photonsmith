@@ -504,6 +504,7 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
     // See src/shared/render_options.h's own field comments.
     RenderOptions render_opts = render_options_from_args(args);
     render_opts.output.write_png = &write_png;   // (a GPU frame asked for a .png file: see frame_is_png)
+    render_opts.output.look = look_for_scene(args, scene_id);   // (a cartoon's frames are child runs: each reads its own frame file's look)
     // A cartoon preset (--camera-path cartoon:<key>): each frame is a scene of its own, rendered by a child run (launcher/cartoon_render.h).
     const cartoon::Film *cartoon_film = cartoon::forCameraPath(camera_path.c_str());
 

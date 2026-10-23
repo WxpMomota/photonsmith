@@ -1,0 +1,69 @@
+# @rt-category Volumes
+# @rt-description Low sun through a row of trunks into morning mist: the camera stands in fog that ends at a large sphere, so the sun and sky outside light it.
+# @rt-performance Fast
+# @rt-size 30
+# sunbeams-in-mist.pbrt -- the pbrt way of bounding the camera's own fog: the camera medium ("mist", named before the Camera) is held by one
+# big sphere with Material "interface" and MediumInterface "mist" "" around the camera, clear air outside. The distant sun and the sky are
+# outside the sphere and light the fog through it, which an unbounded camera medium cannot do (no light from infinitely far gets through
+# infinite fog: such a scene renders black). The renderers clip every flight and shadow ray to the sphere (FlatScene::cameraMediumBound);
+# the default GPU renderer hands the scene to the wavefront one, which can. Matches real pbrt-v4 to 1% (2026-10-22: CPU 1.007, wavefront
+# 1.004 of pbrt's mean at 512 samples).
+#
+# Original, not derived from any distributed scene, so it carries no licence constraints.
+MakeNamedMedium "mist" "string type" [ "homogeneous" ]
+  "rgb sigma_a" [ 0.002 0.002 0.002 ] "rgb sigma_s" [ 0.035 0.035 0.04 ] "float g" [ 0.6 ]
+MediumInterface "" "mist"
+LookAt  0 1.6 12    0 2.5 0    0 1 0
+Camera "perspective" "float fov" [ 50 ]
+Film "rgb" "integer xresolution" [ 640 ] "integer yresolution" [ 360 ]
+Sampler "zsobol" "integer pixelsamples" [ 256 ]
+WorldBegin
+AttributeBegin
+  MediumInterface "mist" ""
+  Material "interface"
+  Shape "sphere" "float radius" [ 30 ]
+AttributeEnd
+LightSource "distant" "point3 from" [ -6 3 -10 ] "point3 to" [ 0 0 0 ] "rgb L" [ 6 4.6 3.2 ]
+LightSource "infinite" "rgb L" [ 0.05 0.07 0.11 ]
+Material "diffuse" "rgb reflectance" [ 0.18 0.22 0.12 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -40 0 -40   40 0 -40   40 0 30   -40 0 30 ]
+Material "diffuse" "rgb reflectance" [ 0.12 0.09 0.07 ]
+AttributeBegin
+  Translate -3 0 -2
+  Rotate -90 1 0 0
+  Shape "cylinder" "float radius" [ 0.35 ] "float zmin" [ 0 ] "float zmax" [ 12 ]
+AttributeEnd
+AttributeBegin
+  Translate -1 0 -5
+  Rotate -90 1 0 0
+  Shape "cylinder" "float radius" [ 0.45 ] "float zmin" [ 0 ] "float zmax" [ 12 ]
+AttributeEnd
+AttributeBegin
+  Translate -5 0 -6
+  Rotate -90 1 0 0
+  Shape "cylinder" "float radius" [ 0.4 ] "float zmin" [ 0 ] "float zmax" [ 12 ]
+AttributeEnd
+AttributeBegin
+  Translate 1.5 0 -3.5
+  Rotate -90 1 0 0
+  Shape "cylinder" "float radius" [ 0.3 ] "float zmin" [ 0 ] "float zmax" [ 12 ]
+AttributeEnd
+AttributeBegin
+  Translate 4 0 -7
+  Rotate -90 1 0 0
+  Shape "cylinder" "float radius" [ 0.5 ] "float zmin" [ 0 ] "float zmax" [ 12 ]
+AttributeEnd
+AttributeBegin
+  Translate -7 0 -9
+  Rotate -90 1 0 0
+  Shape "cylinder" "float radius" [ 0.5 ] "float zmin" [ 0 ] "float zmax" [ 12 ]
+AttributeEnd
+# The canopy: a dark roof with two gaps the light comes through.
+Material "diffuse" "rgb reflectance" [ 0.05 0.08 0.03 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -40 9 -40   -6.5 9 -40   -6.5 9 30   -40 9 30 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -5.5 9 -40   -2.5 9 -40   -2.5 9 30   -5.5 9 30 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -1.8 9 -40   40 9 -40   40 9 30   -1.8 9 30 ]

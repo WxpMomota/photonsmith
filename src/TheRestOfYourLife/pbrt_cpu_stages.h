@@ -382,6 +382,8 @@ inline void buildCameraMedium(const pbrt_flatten::FlatScene &scene, BuildResult 
 		out.cameraMedium = std::make_shared<ambient_medium>(
 			color(m.sigma_a[0], m.sigma_a[1], m.sigma_a[2]), color(m.sigma_s[0], m.sigma_s[1], m.sigma_s[2]),
 			m.g, color(m.Le[0], m.Le[1], m.Le[2]));
+		if (scene.cameraMediumBound[3] > 0.0)
+			out.cameraMedium->set_bound(point3(scene.cameraMediumBound[0], scene.cameraMediumBound[1], scene.cameraMediumBound[2]), scene.cameraMediumBound[3]);
 	}
 }
 

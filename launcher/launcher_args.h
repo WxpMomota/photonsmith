@@ -16,6 +16,7 @@
 #include "../src/shared/video_preset.h"
 #include "../src/shared/cartoon/cartoons.h"   // --camera-path cartoon:<key>
 #include "../src/shared/render_flag_names.h"
+#include "../src/shared/lens_look.h"   // --bloom/--vignette/--warmth/--saturation
 #include "../src/shared/scene_slugs.h"
 
 namespace {
@@ -167,6 +168,8 @@ struct LaunchArgs {
 	// (main.cpp warns) - none of those entry points take an exposure
 	// parameter, same scope cut as denoise's own --wavefront exclusion above.
 	double exposure         = 1.0;
+	// --bloom/--vignette/--warmth/--saturation: the camera's look (src/shared/lens_look.h), over the scene file's own `# @rt-look` line; unset values keep the file's.
+	lens_look::Given look;
 	// Which ported pbrt-v4 sampler (src/shared/sobol_sampler.h,
 	// stratified_sampler.h, pmj02_sampler.h, halton_sampler.h,
 	// independent_sampler.h) drives camera.h's random decisions this
@@ -493,6 +496,18 @@ inline FlagResult handle_basic_flag(const std::string& arg, int argc, char** arg
 
 // Sampling, exposure, accelerator, crop, seed, tone map and other quality flags: returns whether it handled `arg` (advancing `i` past a value it consumed).
 inline FlagResult handle_quality_flag(const std::string& arg, int argc, char** argv, int& i, std::set<int>& consumed_args, LaunchArgs& out) {
+	// The camera's look (lens_look.h): each value is clamped to its range there; a value that is not a number is ignored with a warning.
+	struct LookFlag { const char *name; double *field; double lo, hi; };
+	const LookFlag lookFlags[] = {{render_flags::kBloom, &out.look.bloom, 0.0, 1.0}, {render_flags::kVignette, &out.look.vignette, 0.0, 1.0},
+								  {render_flags::kWarmth, &out.look.warmth, -1.0, 1.0}, {render_flags::kSaturation, &out.look.saturation, 0.0, 3.0}};
+	for (const LookFlag &f : lookFlags) {
+		if (arg == f.name && i + 1 < argc) {
+			const double lo = f.lo, hi = f.hi;
+			parseDoubleFlag(argv, i, consumed_args, *f.field, std::string("Invalid ") + f.name + " value, ignored\n", false, 0.0,
+							[lo, hi](double v) { return (std::min)(hi, (std::max)(lo, v)); });
+			return FlagResult::Handled;
+		}
+	}
 	if (arg == render_flags::kExposure && i + 1 < argc) {
 		// exposure <= 0 is a valid double but not a valid exposure -
 		// linear_to_srgb clamps non-positive input to 0, so this would
@@ -1043,6 +1058,11 @@ inline void print_launch_help(const char* program) {
 				  << "               (default 1.0 = no-op). CPU and GPU default path tracer only.\n"
 				  << "               E.g. 0.5 = darker, 2.0 = brighter. No effect under\n"
 				  << "               --bdpt/--mlt/--sppm (warns).\n"
+				  << "  " << render_flags::kBloom << " S, " << render_flags::kVignette << " V, " << render_flags::kWarmth << " W, " << render_flags::kSaturation << " S:\n"
+				  << "               The camera's look, on the linear picture before the tone map (not an EXR): bloom 0-1 (the\n"
+				  << "               glow bright lights spread), vignette 0-1 (darker corners), warmth -1 to 1 (blue to amber),\n"
+				  << "               saturation 0-3 (1 = as rendered). A scene file's `# @rt-look bloom 0.2 ...` line sets them\n"
+				  << "               too; a flag wins. CPU and GPU default path tracer.\n"
 				  << "  " << render_flags::kSampler << " NAME: Which ported pbrt-v4 sampler drives random decisions\n"
 				  << "               (default sobol, this project's pre-existing behavior).\n"
 				  << "               One of sobol, zsobol, paddedsobol, stratified, pmj02bn, halton,\n"

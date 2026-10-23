@@ -19,6 +19,7 @@
 #include "../shared/adaptive_sampling.h"  // pixel_convergence::has_converged - camera::adaptive_sampling's own comment
 #include "../shared/cpu_gpu.h"  // kMaxMediumBoundaryCrossings
 #include "../shared/tone_map.h"
+#include "../shared/lens_look.h"   // camera::look
 #include "../shared/film.h"     // clamp_sensor_rgb - camera::max_component_value's own comment
 #include "sky_light.h"
 #include "../shared/portal_image_infinite_light.h"   // PortalImageInfiniteLightData<double>
@@ -112,6 +113,8 @@ class camera {
     // exposureTime * ISO / 100 (film.cpp) collapsed to a single scalar -
     // see launcher_args.h's --exposure flag. 1.0 (default) is a no-op.
     double exposure          = 1.0;
+    // The camera's look (bloom, vignette, warmth, saturation: src/shared/lens_look.h), on the linear picture before the tone map of a PPM; off by default.
+    lens_look::Look look;
     // Which operator write_color() applies before the sRGB OETF - see
     // launcher_args.h's --tonemap flag and tone_map.h's own ToneMapMode
     // doc comment. ACES (default) matches this project's long-standing

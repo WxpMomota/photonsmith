@@ -164,6 +164,11 @@ struct SceneData {
 	// ordinary medium scatter code shades it (see __raygen__wf_trace). GpuCameraParams carries the same index.
 	int cameraMediumMaterialIdx = -1;
 
+	// True when only the wavefront renderer draws this scene right; optix_render_main then uses it even when the default renderer was asked for, and says why
+	// (needsWavefrontReason). So far: a camera medium that ends at a sphere (FlatScene::cameraMediumBound), which the default renderer's fog code cannot clip.
+	bool needsWavefront = false;
+	std::string needsWavefrontReason;
+
 	// Punctual (delta) lights: point/spot/distant. Separate from the area
 	// lights above - not geometry, evaluated deterministically every hit.
 	std::vector<PunctualLightGPU> punctualLights;
