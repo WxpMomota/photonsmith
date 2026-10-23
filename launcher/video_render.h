@@ -457,7 +457,7 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
             result = rc;
             return true;
         };
-        return cartoon_render::runWorkers(todo, workers, timeout, hooks, completed, inOrder, 25, cartoon_render::workerMemoryLimitBytes()) + resumed;
+        return cartoon_render::runWorkers(todo, workers, timeout, hooks, completed, inOrder, 25, cartoon_render::workerMemoryLimitBytes(args)) + resumed;
     }
     return cartoon_render::runInParallel(
         render_frame_count, jobs,

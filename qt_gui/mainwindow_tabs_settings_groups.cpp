@@ -1613,6 +1613,52 @@ void MainWindow::buildOutputGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	});
 	outputLayout->addWidget(m_backgroundCheck);
 
+	// Which graphics card renders, and when a video's worker process is replaced for holding too much memory (launcher --gpu-device / --worker-max-mb). Both remembered between runs;
+	// both are passed to the renderer only when they differ from its own default, so leaving them alone gives the command line this program always gave.
+	QHBoxLayout *resourceLayout = new QHBoxLayout();
+	resourceLayout->setSpacing(8);
+#ifndef Q_OS_MAC
+	m_gpuDeviceSpin = new QSpinBox(basicTab);
+	m_gpuDeviceSpin->setRange(0, 15);
+	styleSpinBox(m_gpuDeviceSpin);
+	m_gpuDeviceSpin->setToolTip(
+		tr("Which graphics card the GPU renders use, when the computer has more than one:\n"
+		"0 is the first. A number the computer does not have falls back to the first card\n"
+		"(the log says so)."));
+	{
+		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
+		m_gpuDeviceSpin->setValue(settings.value(settings_keys::kGpuDeviceKey, 0).toInt());
+	}
+	connect(m_gpuDeviceSpin, qOverload<int>(&QSpinBox::valueChanged), this, [](int value) {
+		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
+		settings.setValue(settings_keys::kGpuDeviceKey, value);
+	});
+	resourceLayout->addWidget(new QLabel(tr("Graphics card:"), basicTab));
+	resourceLayout->addWidget(m_gpuDeviceSpin);
+	resourceLayout->addSpacing(16);
+#endif
+	m_workerMemorySpin = new QSpinBox(basicTab);
+	m_workerMemorySpin->setRange(0, 256);
+	m_workerMemorySpin->setSuffix(tr(" GB"));
+	m_workerMemorySpin->setSpecialValueText(tr("No limit"));
+	styleSpinBox(m_workerMemorySpin);
+	m_workerMemorySpin->setToolTip(
+		tr("A video renders its frames in helper processes. One that comes to hold more memory\n"
+		"than this is replaced by a fresh one between two frames, so a long video cannot slowly\n"
+		"fill the computer's memory. The pictures are the same. \"No limit\" never replaces one."));
+	{
+		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
+		m_workerMemorySpin->setValue(settings.value(settings_keys::kWorkerMaxGbKey, 8).toInt());
+	}
+	connect(m_workerMemorySpin, qOverload<int>(&QSpinBox::valueChanged), this, [](int value) {
+		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
+		settings.setValue(settings_keys::kWorkerMaxGbKey, value);
+	});
+	resourceLayout->addWidget(new QLabel(tr("Video helper memory limit:"), basicTab));
+	resourceLayout->addWidget(m_workerMemorySpin);
+	resourceLayout->addStretch(1);
+	outputLayout->addLayout(resourceLayout);
+
 	layout->addWidget(outputGroup);
 }
 

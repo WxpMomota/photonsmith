@@ -106,6 +106,8 @@ struct AdvancedRenderFlags {
 	double denoiseBlend = 0.0;
 	bool stats = false;
 	bool background = false;   // --background: render as a polite guest (Settings tab: "Keep the PC responsive")
+	int gpuDevice = 0;         // --gpu-device N, passed only when not 0 (the CLI's own default)
+	int workerMaxGb = 8;       // --worker-max-mb N*1024, passed only when not 8 (the CLI's own default); 0 = never replace a video's worker
 	bool aovs = false;   // --aovs: also write the render passes (albedo, normal, depth, uv, coverage)
 	bool optixValidate = false;
 	double exposure = 1.0;

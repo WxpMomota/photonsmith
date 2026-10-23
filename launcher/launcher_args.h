@@ -262,6 +262,8 @@ struct LaunchArgs {
 	// --gpu-device N: which GPU an NVIDIA renderer uses (the CUDA device number, 0 = the first; see `nvidia-smi`); -1 = not given (RAY_TRACER_GPU_DEVICE, else 0). Passed to the renderer
 	// as RAY_TRACER_GPU_DEVICE, which the programs a video starts inherit.
 	int gpu_device = -1;
+	// --worker-max-mb N: a cartoon video's worker that holds more than N megabytes is replaced between two frames; 0 = never; -1 = not given (RAY_TRACER_WORKER_MAX_MB, else 8192).
+	int worker_max_mb = -1;
 	// An explicit override for the scene's own camera lens diameter
 	// ("lensradius"*2, world units) / focus distance - see
 	// RenderOptions::aperture_override's own comment (render_options.h)
@@ -656,6 +658,15 @@ inline FlagResult handle_quality_flag(const std::string& arg, int argc, char** a
 		} catch (const std::exception&) {
 			std::cerr << "Invalid --probe value (expected two whole numbers: the pixel's column and row)\n";
 			return FlagResult::Error;
+		}
+	} else if (arg == "--worker-max-mb" && i + 1 < argc) {
+		try {
+			out.worker_max_mb = (std::max)(0, std::stoi(argv[i + 1]));
+			consumed_args.insert(i);
+			consumed_args.insert(i + 1);
+			++i;
+		} catch (const std::exception&) {
+			std::cerr << "Invalid --worker-max-mb value, using the automatic limit\n";
 		}
 	} else if (arg == "--gpu-device" && i + 1 < argc) {
 		try {
@@ -1107,6 +1118,8 @@ inline void print_launch_help(const char* program) {
 				  << "               other arguments describe; the samples-per-pixel argument is how many\n"
 				  << "               paths are averaged (use a few thousand). CPU default path tracer\n"
 				  << "               only. The report is also written to <--output>.probe.txt.\n"
+				  << "  --worker-max-mb N: a cartoon video's worker that holds more than N MB is replaced between two\n"
+				  << "               frames (default 8192; 0 = never; RAY_TRACER_WORKER_MAX_MB also sets it)\n"
 				  << "  --gpu-device N: which GPU an NVIDIA renderer uses, as `nvidia-smi` numbers them (default 0, the\n"
 				  << "               first; the environment variable RAY_TRACER_GPU_DEVICE also sets it)\n"
 				  << "  " << render_flags::kSeed << " N: makes the render reproducible - the same scene, same\n"

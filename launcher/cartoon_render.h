@@ -181,15 +181,17 @@ struct WorkerHandle {
 	virtual unsigned long long memoryBytes() { return 0; }   // what the worker holds now; 0 when it cannot be said
 };
 
-// How much memory a worker may hold before the pool replaces it (between two frames, not counted as a failed frame): RAY_TRACER_WORKER_MAX_MB megabytes, 8192 when it is not set, 0 = never.
+// How much memory a worker may hold before the pool replaces it (between two frames, not counted as a failed frame): --worker-max-mb N, else RAY_TRACER_WORKER_MAX_MB, else 8192 megabytes;
+// 0 = never.
 // A worker's memory is flat in the measurements made (about 440 MB over 120 frames at 640 x 360), so this is protection against a leak that appears in a film or a driver, not a measure of
 // anything that happens today.
-inline unsigned long long workerMemoryLimitBytes() {
+inline unsigned long long workerMemoryLimitBytes(const LaunchArgs &args) {
 	long long mb = 8192;
 #ifdef _MSC_VER
 #pragma warning(suppress : 4996)
 #endif
-	if (const char *env = std::getenv("RAY_TRACER_WORKER_MAX_MB")) mb = std::atoll(env);
+	if (args.worker_max_mb >= 0) mb = args.worker_max_mb;
+	else if (const char *env = std::getenv("RAY_TRACER_WORKER_MAX_MB")) mb = std::atoll(env);
 	return mb > 0 ? static_cast<unsigned long long>(mb) * 1024ull * 1024ull : 0ull;
 }
 struct WorkerHooks {

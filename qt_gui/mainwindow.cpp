@@ -358,6 +358,8 @@ void RenderController::start() {
 	}
 	if (m_advancedFlags.stats)         args << render_flags::kStats;
 	if (m_advancedFlags.background)    args << render_flags::kBackground;
+	if (m_advancedFlags.gpuDevice != 0) args << render_flags::kGpuDevice << QString::number(m_advancedFlags.gpuDevice);
+	if (m_advancedFlags.workerMaxGb != 8) args << render_flags::kWorkerMaxMb << QString::number(m_advancedFlags.workerMaxGb * 1024);
 	if (m_advancedFlags.aovs)          args << render_flags::kAovs;
 	if (m_advancedFlags.optixValidate) args << render_flags::kOptixValidate;
 	if (m_advancedFlags.exposure != 1.0) args << render_flags::kExposure << QString::number(m_advancedFlags.exposure);

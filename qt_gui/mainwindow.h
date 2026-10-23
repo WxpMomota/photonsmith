@@ -1302,6 +1302,8 @@ private:
 	QComboBox *m_tonemapCombo;          // --tonemap (default path tracer only)
 	QCheckBox *m_statsCheck;            // --stats (default path tracer only)
 	QCheckBox *m_backgroundCheck = nullptr;   // --background (Settings tab, Output group); remembered between runs
+	QSpinBox *m_gpuDeviceSpin = nullptr;      // --gpu-device (same group; not on a Mac, which has one GPU path); remembered
+	QSpinBox *m_workerMemorySpin = nullptr;   // --worker-max-mb, in GB (same group); remembered
 	QCheckBox *m_aovsCheck = nullptr;   // --aovs (any backend; single images)
 	QCheckBox *m_denoiseCheck;          // --denoise (GPU only, both backends)
 	// --denoise-blend (GPU only, both backends) - spinbox only enabled/

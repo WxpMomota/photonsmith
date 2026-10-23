@@ -30,6 +30,10 @@ constexpr const char *kLanguageKey = "ui/language";
 constexpr const char *kLogFontDeltaKey = "ui/logFontDelta";
 // "Keep the PC responsive while rendering" (--background): remembered between runs. Absent = off.
 constexpr const char *kBackgroundModeKey = "render/backgroundMode";
+// The graphics card renders run on (--gpu-device; Windows/Linux only). Absent = 0, the first card.
+constexpr const char *kGpuDeviceKey = "render/gpuDevice";
+// A video's worker that holds more than this many GB is replaced between two frames (--worker-max-mb). Absent = 8; 0 = never.
+constexpr const char *kWorkerMaxGbKey = "render/workerMaxGb";
 // QSettings array group name (beginWriteArray/beginReadArray) for the
 // Recent Renders list - see recent_renders.cpp. The first list-shaped
 // value this app persists, hence its own group rather than a scalar key.

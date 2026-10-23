@@ -817,7 +817,7 @@ TEST(CartoonWorkers, AWorkerThatHoldsTooMuchMemoryIsReplacedBetweenFramesAndEver
 	EXPECT_EQ(handed.size(), 4u);
 }
 
-TEST(CartoonWorkers, TheMemoryLimitComesFromTheEnvironmentAndDefaultsToEightGigabytes) {
+TEST(CartoonWorkers, TheMemoryLimitIsTheFlagThenTheEnvironmentThenEightGigabytes) {
 	const char *saved = std::getenv("RAY_TRACER_WORKER_MAX_MB");
 	const std::string before = saved ? saved : "";
 	const auto put = [](const std::string &value, bool present) {
@@ -827,12 +827,18 @@ TEST(CartoonWorkers, TheMemoryLimitComesFromTheEnvironmentAndDefaultsToEightGiga
 		if (present) setenv("RAY_TRACER_WORKER_MAX_MB", value.c_str(), 1); else unsetenv("RAY_TRACER_WORKER_MAX_MB");
 #endif
 	};
+	LaunchArgs plain;
 	put("", false);
-	EXPECT_EQ(cartoon_render::workerMemoryLimitBytes(), 8192ull * 1024 * 1024);
+	EXPECT_EQ(cartoon_render::workerMemoryLimitBytes(plain), 8192ull * 1024 * 1024);
 	put("2048", true);
-	EXPECT_EQ(cartoon_render::workerMemoryLimitBytes(), 2048ull * 1024 * 1024);
+	EXPECT_EQ(cartoon_render::workerMemoryLimitBytes(plain), 2048ull * 1024 * 1024);
 	put("0", true);
-	EXPECT_EQ(cartoon_render::workerMemoryLimitBytes(), 0ull) << "0 = never";
+	EXPECT_EQ(cartoon_render::workerMemoryLimitBytes(plain), 0ull) << "0 = never";
+	LaunchArgs flagged;
+	ASSERT_TRUE(parseArgs({"--worker-max-mb", "4096", "--video"}, flagged));
+	EXPECT_EQ(flagged.worker_max_mb, 4096);
+	EXPECT_EQ(cartoon_render::workerMemoryLimitBytes(flagged), 4096ull * 1024 * 1024) << "the flag before the environment";
+	EXPECT_TRUE(cartoon_render::forwardedFlags(flagged).empty()) << "the video's own flag: the frames' runs are not given it";
 	put(before, saved != nullptr);
 }
 

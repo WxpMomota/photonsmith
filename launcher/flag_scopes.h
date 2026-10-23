@@ -31,7 +31,7 @@ inline constexpr FlagScopeEntry kFlagScopes[] = {
 	{"--camera-path", FlagScope::Video}, {"-p", FlagScope::Video}, {"--camera-keyframes", FlagScope::Video}, {"--output", FlagScope::Video}, {"-o", FlagScope::Video},
 	{"--height", FlagScope::Video},          // (each frame's run is given its own)
 	{"--time-limit", FlagScope::Video},      // (the video's whole budget: each frame is given its share, cartoon_render.h)
-	{"--cartoon-jobs", FlagScope::Video}, {"--cartoon-timeout", FlagScope::Video}, {"--cartoon-workers", FlagScope::Video}, {"--resume", FlagScope::Video},
+	{"--cartoon-jobs", FlagScope::Video}, {"--cartoon-timeout", FlagScope::Video}, {"--cartoon-workers", FlagScope::Video}, {"--worker-max-mb", FlagScope::Video}, {"--resume", FlagScope::Video},
 	{"--cartoon-worker", FlagScope::Video},  // (a worker is started by the video, with a job file of its own)
 	// other things than rendering
 	{"--help", FlagScope::Mode}, {"-h", FlagScope::Mode}, {"--diagnose", FlagScope::Mode}, {"--probe", FlagScope::Mode}, {"--list-video-presets", FlagScope::Mode},

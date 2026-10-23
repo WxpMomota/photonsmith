@@ -130,6 +130,8 @@ RenderJob MainWindow::captureRenderJob() {
 	job.advancedFlags.denoiseBlend = m_denoiseBlendSpin->isEnabled() ? m_denoiseBlendSpin->value() : 0.0;
 	job.advancedFlags.stats = m_statsCheck->isEnabled() && m_statsCheck->isChecked();
 	job.advancedFlags.background = m_backgroundCheck && m_backgroundCheck->isChecked();
+	job.advancedFlags.gpuDevice = m_gpuDeviceSpin ? m_gpuDeviceSpin->value() : 0;
+	job.advancedFlags.workerMaxGb = m_workerMemorySpin ? m_workerMemorySpin->value() : 8;
 	job.advancedFlags.aovs = m_aovsCheck && m_aovsCheck->isEnabled() && m_aovsCheck->isChecked();
 	job.advancedFlags.optixValidate = m_optixValidateCheck->isEnabled() && m_optixValidateCheck->isChecked();
 	job.advancedFlags.exposure = m_exposureSpin->isEnabled() ? m_exposureSpin->value() : 1.0;

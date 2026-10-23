@@ -1088,6 +1088,20 @@ void MainWindow::selfTestRenderQueue(const std::function<void(bool, const QStrin
 	check(m_queueModel->clearFinished() == 1 && m_queueModel->rowCount() == 0, "Clear Finished removes only the finished ones");
 	(void)idc;
 	refreshQueuePanel();
+	// The Settings tab's resource controls go into the job that is queued (and from there to --gpu-device / --worker-max-mb), and are remembered.
+	const int memoryBefore = m_workerMemorySpin->value();
+	m_workerMemorySpin->setValue(3);
+	check(captureRenderJob().advancedFlags.workerMaxGb == 3, "the video helper memory limit goes into the queued job");
+	check(QSettings(settings_keys::kOrg, settings_keys::kApp).value(settings_keys::kWorkerMaxGbKey).toInt() == 3, "and is remembered");
+	m_workerMemorySpin->setValue(memoryBefore);
+#ifndef Q_OS_MAC
+	const int deviceBefore = m_gpuDeviceSpin->value();
+	m_gpuDeviceSpin->setValue(1);
+	check(captureRenderJob().advancedFlags.gpuDevice == 1, "the graphics card number goes into the queued job");
+	m_gpuDeviceSpin->setValue(deviceBefore);
+#else
+	check(m_gpuDeviceSpin == nullptr, "a Mac shows no graphics card choice");
+#endif
 }
 
 // RT_GUI_SELFTEST=renderfail [RT_GUI_SELFTEST_SCENE=<a downloadable scene that is not downloaded, default H35>]: a real render through the Render button that
