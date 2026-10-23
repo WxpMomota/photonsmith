@@ -17,7 +17,7 @@
 namespace cartoon {
 namespace tengwang {
 
-constexpr int kLifeVersion = 3;
+constexpr int kLifeVersion = 4;
 
 // An ellipsoid's distance by its centre and radii (sdf::ellipsoid, with the centre typed so a braced list is never taken for a frame).
 inline double ell(Vec3 p, Vec3 centre, Vec3 radii) { return sdf::ellipsoid(p, centre, radii); }
@@ -53,15 +53,19 @@ inline Mesh willowTrunk(int salt) {
 	}
 	return m;
 }
+// The strands hang from the boughs' ends all over a rounded crown (a dome), each first arching out and then falling, so the tree is a soft weeping mound, not a curtain.
 inline Mesh willowStrands(int salt) {
 	Mesh m;
-	for (int s = 0; s < 260; ++s) {
-		const double a = 2.0 * kPi * hash01(s, salt + 3), r = 1.0 + 3.0 * std::sqrt(hash01(s, salt + 4));
-		const Vec3 top{0.3 + r * std::cos(a), 6.2 + 1.6 * hash01(s, salt + 5) - 0.25 * r, r * std::sin(a)};
-		const double len = 3.0 + 3.2 * hash01(s, salt + 6);
+	for (int s = 0; s < 520; ++s) {
+		const double a = 2.0 * kPi * hash01(s, salt + 3), e = std::asin(hash01(s, salt + 4));   // (more of them towards the dome's top)
+		const double r = 3.6 * std::cos(e) * (0.85 + 0.25 * hash01(s, salt + 5));
+		const Vec3 top{0.3 + r * std::cos(a), 5.4 + 3.0 * std::sin(e), r * std::sin(a)};
+		const double len = (1.6 + 3.0 * hash01(s, salt + 6)) * (0.6 + 0.6 * std::sin(e));
 		const Vec3 out = normalize(Vec3{std::cos(a), 0.0, std::sin(a)});
 		const Vec3 side = Vec3{-out.z, 0.0, out.x};
-		nature::addStrip(m, [&](double u) { return top + out * (0.5 * u - 0.6 * u * u) + Vec3{0.0, -len * u, 0.0}; }, [](double u) { return 0.16 * (1.0 - 0.6 * u); }, side, 6);
+		const double arch = 0.4 + 0.5 * std::cos(e);
+		nature::addStrip(m, [&](double u) { return top + out * (arch * std::sin(kPi * 0.5 * (std::min)(1.0, u * 2.0))) + Vec3{0.0, 0.25 * std::sin(kPi * u) - len * u * u, 0.0}; },
+						 [](double u) { return 0.11 * (1.0 - 0.7 * u); }, side, 7);
 	}
 	return m;
 }

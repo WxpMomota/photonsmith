@@ -33,6 +33,7 @@ inline std::string flameText(Vec3 at, double size, double strength, double t, in
 	const double flicker = 1.0 + 0.08 * std::sin(t * 23.0 + salt) + 0.05 * std::sin(t * 37.0 + 2.0 * salt);
 	std::string out = emissiveSphere(at + Vec3{0.0, size * 0.35, 0.0}, size * 0.18, Vec3{1.0, 0.78, 0.42} * (60.0 * flicker));
 	out += emissiveSphere(at + Vec3{0.0, size * 0.6, 0.0}, size * 0.11, Vec3{1.0, 0.55, 0.18} * (35.0 * flicker));
+	if (strength <= 0.0) return out;   // (a flame that only glows: its light comes from elsewhere)
 	const Vec3 I = Vec3{1.0, 0.62, 0.30} * (strength * flicker);
 	char buf[200];
 	std::snprintf(buf, sizeof buf, "LightSource \"point\" \"point3 from\" [ %.4f %.4f %.4f ] \"rgb I\" [ %.4f %.4f %.4f ]\n", -at.x, at.y + size * 0.5, at.z, I.x, I.y, I.z);
@@ -184,14 +185,15 @@ inline std::string hallText(double t, double lit = 1.0) {
 	for (const auto &[key, file] : files) out += attr(hallMaterial(key), film_cache::plyShape(file));
 	if (lit > 0.0) {
 		int k = 0;
-		for (const Vec3 &l : hallLamps()) out += flameText(l, 0.12, 6.0 * lit, t, ++k);
-		// and the light of the lanterns hung in the beams, filling the hall
-		for (int i = -2; i <= 2; ++i)
-			for (const double z : {-2.2, 2.2}) {
-				char buf[200];
-				std::snprintf(buf, sizeof buf, "LightSource \"point\" \"point3 from\" [ %.3f %.3f %.3f ] \"rgb I\" [ %.3f %.3f %.3f ]\n", -5.4 * i, kDeck2 + 4.6, z, 9.0 * lit, 6.6 * lit, 4.2 * lit);
-				out += buf;
-			}
+		// the lamps' flames (their own glow only: a point light per flame made a hall frame three times as slow, for light that the few lights below give as well)
+		for (const Vec3 &l : hallLamps()) out += flameText(l, 0.12, 0.0, t, ++k);
+		// the light of the lanterns hung in the beams, filling the hall: five, staggered down its length
+		const double spots[5][2] = {{-2.0, -2.2}, {-1.0, 2.2}, {0.0, -2.2}, {1.0, 2.2}, {2.0, -2.2}};
+		for (const auto &s : spots) {
+			char buf[200];
+			std::snprintf(buf, sizeof buf, "LightSource \"point\" \"point3 from\" [ %.3f %.3f %.3f ] \"rgb I\" [ %.3f %.3f %.3f ]\n", -5.4 * s[0], kDeck2 + 4.6, s[1], 29.0 * lit, 21.0 * lit, 13.5 * lit);
+			out += buf;
+		}
 	}
 	return out;
 }

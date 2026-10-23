@@ -118,7 +118,7 @@ inline std::string skyText(int k, double scale, double turn = 0.0) { return film
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The lights of the evening and the night: the lanterns (lit, or `out` of them put out), the halls glowing through their lattices
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
-inline std::string lanternLights(double strength, int out = 0) {
+inline std::string lanternLights(double strength, int out = 0, bool cast = true) {   // (`cast` false: they glow, but light nothing -- seen from inside the hall)
 	if (strength <= 0.0) return std::string();
 	std::string s;
 	int k = 0;
@@ -126,6 +126,7 @@ inline std::string lanternLights(double strength, int out = 0) {
 		if (k++ < out) continue;
 		const Vec3 c = top - Vec3{0.0, 1.05, 0.0};
 		s += emissiveSphere(c, 0.30, Vec3{1.0, 0.45, 0.18} * (6.0 * strength));
+		if (!cast) continue;
 		char buf[200];
 		const Vec3 I = Vec3{1.0, 0.55, 0.25} * (18.0 * strength);
 		std::snprintf(buf, sizeof buf, "LightSource \"point\" \"point3 from\" [ %.3f %.3f %.3f ] \"rgb I\" [ %.3f %.3f %.3f ]\n", -c.x, c.y - 0.7, c.z, I.x, I.y, I.z);
@@ -673,7 +674,7 @@ inline void shotWaterLevel(double t, Frame &f, bool content) {
 // Scene 6 -------------------------------------------------------------------------------------------------------------------------------------------------------
 // The feast at dusk: amber lamplight inside, the blue of the evening outside the open side.
 inline std::string feastText(double t, Vec3 eye, int wangBoColumns, const Pose *wangBoPose) {
-	std::string out = worldText(eye, t, 1500.0) + hallText(t) + crowdText(hallGuests()) + lanternLights(1.0) + hallGlow(0.4);
+	std::string out = worldText(eye, t, 1500.0) + hallText(t) + crowdText(hallGuests()) + lanternLights(1.0, 0, false);
 	if (wangBoPose) out += wangBoAt(*wangBoPose, wangBoSeat(), 0.0, 0.012);
 	if (wangBoColumns >= 0) out += paperText(tableBefore(hallSeats()[12]) + Vec3{0.0, 0.36, 0.0}, 0.0, wangBoColumns);
 	return out;
@@ -855,11 +856,11 @@ inline void shotAlone(double t, Frame &f, bool content) {
 	f.warmth = -0.12;
 	f.saturation = 0.95;
 	f.haze = hazeAround(f.view.eye, 0.00004);
-	if (content) f.content = worldText(f.view.eye, t, 1500.0) + hallText(t) + crowdText(hallGuests()) + lanternLights(1.0) + hallGlow(0.4) + wangBoAt(standPose({0.2, 0.0, -0.2}), at, 180.0);
+	if (content) f.content = worldText(f.view.eye, t, 1500.0) + hallText(t) + crowdText(hallGuests()) + lanternLights(1.0, 0, false) + wangBoAt(standPose({0.2, 0.0, -0.2}), at, 180.0);
 }
 inline void shotRidges(double t, Frame &f, bool content) {
 	// ridges going away into the mist, one after another, without end (a place of its own: layered hills, the haze paling each layer more than the one before)
-	const Vec3 eye{0.0, 70.0, 0.0};
+	const Vec3 eye{0.0, 170.0, 0.0};
 	f.view = cam(eye, glide(360.0, 372.0, t, {-400.0, 120.0, -3000.0}, {400.0, 140.0, -3000.0}), 30.0);
 	f.sky = Dusk;
 	f.skyOverride = "LightSource \"infinite\" \"rgb L\" [ 0.20 0.24 0.34 ]\n";   // (a cool even twilight: the layers pale into blue)
@@ -1006,7 +1007,7 @@ inline void shotRaisesHead(double t, Frame &f, bool content) {
 	if (content) {
 		Pose p = standPose({0.4, 0.1, -0.2});
 		p.headTilt = lerp(-14.0, 12.0, ease(456.0, 462.0, t));
-		f.content = worldText(f.view.eye, t, 1500.0) + hallText(t) + lanternLights(1.0) + hallGlow(0.4) + wangBoAt(p, at, 180.0, 0.012);
+		f.content = worldText(f.view.eye, t, 1500.0) + hallText(t) + lanternLights(1.0, 0, false) + wangBoAt(p, at, 180.0, 0.012);
 	}
 }
 inline void shotWind(double t, Frame &f, bool content) {
@@ -1364,9 +1365,27 @@ inline std::string headerOf(const Frame &f) {
 	if (d != std::string::npos) h.replace(d, 24, depth);
 	return std::string(look) + (f.mist ? nature::mistBeforeCamera(f.haze) : std::string()) + h;
 }
-inline std::string headerAt(double t) { return headerOf(frameAt(t, false)); }
+inline std::string headerAt(double t) {
+	Frame f = frameAt(t, false);
+	if (f.iso <= 1.0) {   // (a black frame: as sceneAt makes it)
+		f.iso = 100.0;
+		f.mist = false;
+		f.bloom = 0.0;
+	}
+	return headerOf(f);
+}
 inline std::string sceneAt(double t) {
-	const Frame f = frameAt(t, true);
+	Frame f = frameAt(t, true);
+	// A black frame (a cut to black, the title's card): a near-black scene at an ordinary exposure. (An exposure of almost nothing was taken as it came, and a frame of it
+	// took the renderer some minutes.)
+	if (f.iso <= 1.0) {
+		f.iso = 100.0;
+		f.mist = false;
+		f.sun = false;
+		f.bloom = 0.0;
+		f.skyOverride = "LightSource \"infinite\" \"rgb L\" [ 0.00001 0.00001 0.00001 ]\n";
+		f.content = attr(diffuseMaterial({0.0, 0.0, 0.0}), emitMesh(uvSphere(0.1, 8, 4), translate(f.view.eye + Vec3{0.0, 0.0, 5.0})));
+	}
 	std::string out = headerOf(f);
 	if (f.mist) out += nature::mistBoundary(f.haze);
 	if (!f.skyOverride.empty()) out += f.skyOverride;

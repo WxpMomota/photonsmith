@@ -169,7 +169,12 @@ inline std::string ridgeLayersText() {
 		}
 		return all;
 	});
-	return attr(diffuseMaterial({0.05, 0.06, 0.07}), film_cache::plyShape(file));
+	// (and the floor of the valley between them, so the foot of the picture is dark land in the mist, not the sky)
+	Mesh floor;
+	floor.verts = {{-40000.0, -25.0, 2000.0}, {40000.0, -25.0, 2000.0}, {40000.0, -25.0, -40000.0}, {-40000.0, -25.0, -40000.0}};
+	floor.normals.assign(4, Vec3{0.0, 1.0, 0.0});
+	floor.tris = {{0, 2, 1}, {0, 3, 2}};
+	return attr(diffuseMaterial({0.05, 0.06, 0.07}), film_cache::plyShape(file)) + attr(diffuseMaterial({0.035, 0.04, 0.045}), emitMesh(floor, identity()));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
