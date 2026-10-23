@@ -1126,6 +1126,16 @@ void MainWindow::restoreRenderForm() {
 	AppLog::info(QStringLiteral("startup"), QStringLiteral("render form restored: scene \"%1\", %2 x %3").arg(form.sceneId).arg(form.width).arg(form.height));
 }
 
+// The Resolution box shows the preset that Width x Height is, or "Custom size" (the last item) for any other size.
+void MainWindow::syncResolutionCombo() {
+	if (m_syncingResolution || !m_resolutionCombo || !m_widthSpinBox || !m_heightSpinBox) return;
+	int index = m_resolutionCombo->findData(QSize(m_widthSpinBox->value(), m_heightSpinBox->value()));
+	if (index < 0) index = m_resolutionCombo->count() - 1;
+	m_syncingResolution = true;
+	m_resolutionCombo->setCurrentIndex(index);
+	m_syncingResolution = false;
+}
+
 void MainWindow::saveRenderForm() const {
 	if (!m_sceneCombo || !m_widthSpinBox || !m_heightSpinBox) return;
 	render_form_memory::save({m_sceneCombo->currentData().toString(), m_widthSpinBox->value(), m_heightSpinBox->value()});
@@ -1314,9 +1324,20 @@ void MainWindow::setupUI() {
 	createStatusBar();
 
 	connect(m_widthSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
-			this, [this](int) { refreshStatusBarInfo(); });
+			this, [this](int) { refreshStatusBarInfo(); syncResolutionCombo(); });
 	connect(m_heightSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
-			this, [this](int) { refreshStatusBarInfo(); });
+			this, [this](int) { refreshStatusBarInfo(); syncResolutionCombo(); });
+	// a Resolution preset fills in Width and Height ("Custom size" leaves them as they are)
+	connect(m_resolutionCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
+		const QSize size = m_resolutionCombo->currentData().toSize();
+		if (m_syncingResolution || !size.isValid()) return;
+		m_syncingResolution = true;
+		m_widthSpinBox->setValue(size.width());
+		m_heightSpinBox->setValue(size.height());
+		m_syncingResolution = false;
+		refreshStatusBarInfo();
+	});
+	syncResolutionCombo();
 	connect(m_samplesSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
 			this, [this](int) { refreshStatusBarInfo(); });
 

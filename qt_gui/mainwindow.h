@@ -142,6 +142,7 @@ public:
 	void runCartoonUiSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runFramesStripSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runBannerSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
+	void runResolutionSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runVideoFramesSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runBuilderSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot, const QString &outPrefix);
 	void runDiagnosticsSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);
@@ -278,6 +279,8 @@ private:
 	void buildSceneInfoRows(QWidget *basicTab, QVBoxLayout *sceneGroupLayout);
 	void buildRenderSettingsGroup(QWidget *basicTab, QVBoxLayout *layout);
 	void buildQualityRows(QWidget *basicTab, QFormLayout *renderLayout);
+	void buildMachineRows(QWidget *basicTab, QFormLayout *renderLayout);   // graphics card, video helper memory, keep the PC responsive
+	void syncResolutionCombo();   // shows the preset that Width x Height is, or "Custom size"
 	void buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout);
 #ifdef RT_GUI_HAVE_LIVE_PREVIEW
 	void buildLiveControlsGroup(QWidget *basicTab, QVBoxLayout *layout);
@@ -1301,8 +1304,9 @@ private:
 	QDoubleSpinBox *m_exposureSpin;     // --exposure (default path tracer only)
 	QComboBox *m_tonemapCombo;          // --tonemap (default path tracer only)
 	QCheckBox *m_statsCheck;            // --stats (default path tracer only)
-	QCheckBox *m_backgroundCheck = nullptr;   // --background (Settings tab, Output group); remembered between runs
+	QCheckBox *m_backgroundCheck = nullptr;   // --background (Settings tab, Render Settings group); remembered between runs
 	QSpinBox *m_gpuDeviceSpin = nullptr;      // --gpu-device (same group; not on a Mac, which has one GPU path); remembered
+	bool m_syncingResolution = false;         // (Resolution preset <-> Width/Height, without the two setting each other off)
 	QSpinBox *m_workerMemorySpin = nullptr;   // --worker-max-mb, in GB (same group); remembered
 	// The camera's look (Render Options tab): the lowest value of each is "Scene's" (not passed)
 	QDoubleSpinBox *m_bloomSpin = nullptr;

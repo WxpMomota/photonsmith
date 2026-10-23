@@ -190,17 +190,9 @@ RenderJob MainWindow::captureRenderJob() {
 	job.integratorOptions.simplepathNoLights = m_simplepathNoLightsCheck->isChecked();
 	job.integratorOptions.simplepathNoBsdf = m_simplepathNoBsdfCheck->isChecked();
 
-	// Resolution: either from preset dropdown or the manual Advanced Parameters fields
-	if (m_qualityPresetCombo->currentIndex() == 6) {
-		// Custom quality preset - use manual width/height from Advanced Parameters
-		job.width = m_widthSpinBox->value();
-		job.height = m_heightSpinBox->value();
-	} else {
-		// Standard quality preset - use resolution from dropdown
-		QSize res = m_resolutionCombo->currentData().toSize();
-		job.width = res.width();
-		job.height = res.height();
-	}
+	// Resolution: Width x Height under Advanced Parameters (the Resolution preset fills them in; any size, square or not, can be typed there)
+	job.width = m_widthSpinBox->value();
+	job.height = m_heightSpinBox->value();
 
 	// Ray tracing quality parameters
 	job.samples = m_samplesSpinBox->value();    // Samples per pixel (higher = smoother but slower)

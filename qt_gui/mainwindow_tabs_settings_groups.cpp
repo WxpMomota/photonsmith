@@ -808,6 +808,7 @@ void MainWindow::buildRenderSettingsGroup(QWidget *basicTab, QVBoxLayout *layout
 		m_gpuBackendCombo);
 
 	buildQualityRows(basicTab, renderLayout);
+	buildMachineRows(basicTab, renderLayout);
 
 	layout->addWidget(renderGroup);
 }
@@ -855,33 +856,112 @@ void MainWindow::buildQualityRows(QWidget *basicTab, QFormLayout *renderLayout) 
 		"actually want to look at closely.")),
 		m_qualityPresetCombo);
 
-	// Resolution
+	// Resolution: a preset fills in Width and Height under Advanced Parameters (the way Quality fills in Samples and Max Depth), and typing a size there that is
+	// not a preset shows "Custom size" here. The render always uses Width and Height.
 	m_resolutionCombo = new QComboBox(basicTab);
-	m_resolutionCombo->addItem(tr("100 x 100 (Tiny)"), QSize(100, 100));
-	m_resolutionCombo->addItem(tr("200 x 200"), QSize(200, 200));
-	m_resolutionCombo->addItem(tr("400 x 400"), QSize(400, 400));
-	m_resolutionCombo->addItem(tr("512 x 512"), QSize(512, 512));
-	m_resolutionCombo->addItem(tr("600 x 600"), QSize(600, 600));
-	m_resolutionCombo->addItem(tr("800 x 800"), QSize(800, 800));
-	m_resolutionCombo->addItem(tr("1024 x 1024 (1K)"), QSize(1024, 1024));
-	m_resolutionCombo->addItem(tr("1080 x 1080 (Full HD)"), QSize(1080, 1080));
-	m_resolutionCombo->addItem(tr("1200 x 1200"), QSize(1200, 1200));
-	m_resolutionCombo->addItem(tr("1440 x 1440"), QSize(1440, 1440));
-	m_resolutionCombo->addItem(tr("1920 x 1920"), QSize(1920, 1920));
-	m_resolutionCombo->addItem(tr("2048 x 2048 (2K)"), QSize(2048, 2048));
-	m_resolutionCombo->addItem(tr("2560 x 2560"), QSize(2560, 2560));
-	m_resolutionCombo->addItem(tr("3840 x 3840 (4K)"), QSize(3840, 3840));
-	m_resolutionCombo->addItem(tr("4096 x 4096"), QSize(4096, 4096));
-	m_resolutionCombo->setCurrentIndex(5); // Default to 800x800
+	struct ResolutionPreset {
+		const char *label;
+		int w, h;
+	};
+	static const ResolutionPreset squares[] = {{QT_TR_NOOP("100 x 100 (tiny square)"), 100, 100}, {QT_TR_NOOP("200 x 200 (square)"), 200, 200}, {QT_TR_NOOP("400 x 400 (square)"), 400, 400},
+		{QT_TR_NOOP("512 x 512 (square)"), 512, 512}, {QT_TR_NOOP("600 x 600 (square)"), 600, 600}, {QT_TR_NOOP("800 x 800 (square)"), 800, 800},
+		{QT_TR_NOOP("1024 x 1024 (square, 1K)"), 1024, 1024}, {QT_TR_NOOP("1080 x 1080 (square)"), 1080, 1080}, {QT_TR_NOOP("1200 x 1200 (square)"), 1200, 1200},
+		{QT_TR_NOOP("1440 x 1440 (square)"), 1440, 1440}, {QT_TR_NOOP("1920 x 1920 (square)"), 1920, 1920}, {QT_TR_NOOP("2048 x 2048 (square, 2K)"), 2048, 2048},
+		{QT_TR_NOOP("2560 x 2560 (square)"), 2560, 2560}, {QT_TR_NOOP("3840 x 3840 (square, 4K)"), 3840, 3840}, {QT_TR_NOOP("4096 x 4096 (square)"), 4096, 4096}};
+	static const ResolutionPreset others[] = {{QT_TR_NOOP("854 x 480 (16:9, 480p)"), 854, 480}, {QT_TR_NOOP("1280 x 720 (16:9, HD)"), 1280, 720},
+		{QT_TR_NOOP("1920 x 1080 (16:9, Full HD)"), 1920, 1080}, {QT_TR_NOOP("2560 x 1440 (16:9, QHD)"), 2560, 1440}, {QT_TR_NOOP("3840 x 2160 (16:9, 4K UHD)"), 3840, 2160},
+		{QT_TR_NOOP("2560 x 1080 (21:9, cinema)"), 2560, 1080}, {QT_TR_NOOP("800 x 600 (4:3)"), 800, 600}, {QT_TR_NOOP("1024 x 768 (4:3)"), 1024, 768},
+		{QT_TR_NOOP("1600 x 1200 (4:3)"), 1600, 1200}, {QT_TR_NOOP("1200 x 800 (3:2, photo)"), 1200, 800}, {QT_TR_NOOP("1080 x 1350 (4:5, portrait)"), 1080, 1350},
+		{QT_TR_NOOP("1080 x 1920 (9:16, phone video)"), 1080, 1920}};
+	for (const ResolutionPreset &r : squares) m_resolutionCombo->addItem(tr(r.label), QSize(r.w, r.h));
+	m_resolutionCombo->insertSeparator(m_resolutionCombo->count());
+	for (const ResolutionPreset &r : others) m_resolutionCombo->addItem(tr(r.label), QSize(r.w, r.h));
+	m_resolutionCombo->insertSeparator(m_resolutionCombo->count());
+	m_resolutionCombo->addItem(tr("Custom size (Width and Height below)"), QSize());
+	m_resolutionCombo->setCurrentIndex(m_resolutionCombo->findData(QSize(800, 800)));   // the default, 800 x 800
+	m_resolutionCombo->setMaxVisibleItems(32);
 	styleComboBox(m_resolutionCombo);
+	m_resolutionCombo->setToolTip(
+		tr("The picture's size in pixels: squares, widescreen 16:9 (HD, Full HD, 4K),\n"
+		"cinema 21:9, 4:3, 3:2, and portrait sizes for phones. Choosing one fills in\n"
+		"Width and Height under Advanced Parameters; any other size can be typed there."));
 	renderLayout->addRow(labelWithInfo(tr("Resolution:"),
-		tr("How many pixels wide and tall the final image is.\n\n"
+		tr("How many pixels wide and tall the final image is - square, widescreen, "
+		"portrait or any size you type into Width and Height under Advanced Parameters.\n\n"
 		"Higher resolution means more individual pixels to trace - each "
 		"one independently sampled - so render time scales up roughly in "
 		"proportion to the pixel count (double the width AND height and "
 		"you're tracing about 4x as many pixels), independent of the "
 		"Samples per Pixel or Max Ray Depth settings.")),
 		m_resolutionCombo);
+}
+
+// The machine side of rendering, at the end of Render Settings: which graphics card renders, when a video's helper process is replaced for holding too much memory,
+// and whether a render keeps the computer responsive (launcher --gpu-device / --worker-max-mb / --background). All remembered between runs; the first two are passed
+// to the renderer only when they differ from its own defaults, so leaving them alone gives the command line this program always gave.
+void MainWindow::buildMachineRows(QWidget *basicTab, QFormLayout *renderLayout) {
+#ifndef Q_OS_MAC
+	m_gpuDeviceSpin = new QSpinBox(basicTab);
+	m_gpuDeviceSpin->setRange(0, 15);
+	styleSpinBox(m_gpuDeviceSpin);
+	m_gpuDeviceSpin->setToolTip(
+		tr("Which graphics card the GPU renders use, when the computer has more than one:\n"
+		"0 is the first. A number the computer does not have falls back to the first card\n"
+		"(the log says so)."));
+	{
+		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
+		m_gpuDeviceSpin->setValue(settings.value(settings_keys::kGpuDeviceKey, 0).toInt());
+	}
+	connect(m_gpuDeviceSpin, qOverload<int>(&QSpinBox::valueChanged), this, [](int value) {
+		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
+		settings.setValue(settings_keys::kGpuDeviceKey, value);
+	});
+	renderLayout->addRow(labelWithInfo(tr("Graphics Card:"),
+		tr("Which graphics card renders, when the computer has more than one. 0 is the first; "
+		"a number the computer does not have falls back to the first card.")),
+		m_gpuDeviceSpin);
+#endif
+	m_workerMemorySpin = new QSpinBox(basicTab);
+	m_workerMemorySpin->setRange(0, 256);
+	m_workerMemorySpin->setSuffix(tr(" GB"));
+	m_workerMemorySpin->setSpecialValueText(tr("No limit"));
+	styleSpinBox(m_workerMemorySpin);
+	m_workerMemorySpin->setToolTip(
+		tr("A video renders its frames in helper processes. One that comes to hold more memory\n"
+		"than this is replaced by a fresh one between two frames, so a long video cannot slowly\n"
+		"fill the computer's memory. The pictures are the same. \"No limit\" never replaces one."));
+	{
+		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
+		m_workerMemorySpin->setValue(settings.value(settings_keys::kWorkerMaxGbKey, 8).toInt());
+	}
+	connect(m_workerMemorySpin, qOverload<int>(&QSpinBox::valueChanged), this, [](int value) {
+		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
+		settings.setValue(settings_keys::kWorkerMaxGbKey, value);
+	});
+	renderLayout->addRow(labelWithInfo(tr("Video Helper Memory:"),
+		tr("A video renders its frames in helper processes. One that comes to hold more memory "
+		"than this is replaced by a fresh one between two frames, so a long video cannot slowly "
+		"fill the computer's memory. The pictures are the same; \"No limit\" never replaces one.")),
+		m_workerMemorySpin);
+
+	// For a long render or video that should not take the computer over: lower CPU and GPU priority, half the CPU cores, one worker and one frame at a time (launcher/background_mode.h).
+	// Applies to renders and videos, not to Live Preview (which runs inside this program).
+	m_backgroundCheck = new QCheckBox(tr("Keep the PC responsive while rendering"), basicTab);
+	m_backgroundCheck->setToolTip(
+		tr("Renders politely so you can use the computer meanwhile: a lower CPU priority,\n"
+		"half of the CPU cores, and a video pauses after every frame for as long as the\n"
+		"frame took, which leaves the graphics card to your other programs half of the time.\n"
+		"A video takes about twice as long. The pictures are the same."));
+	styleCheckBox(m_backgroundCheck);
+	{
+		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
+		m_backgroundCheck->setChecked(settings.value(settings_keys::kBackgroundModeKey, false).toBool());
+	}
+	connect(m_backgroundCheck, &QCheckBox::toggled, this, [](bool on) {
+		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
+		settings.setValue(settings_keys::kBackgroundModeKey, on);
+	});
+	renderLayout->addRow(QString(), m_backgroundCheck);
 }
 
 void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
@@ -1240,8 +1320,9 @@ void MainWindow::buildAdvancedParamsGroup(QWidget *basicTab, QVBoxLayout *layout
 	m_advancedParamsGroupBox = new InfoGroupBox(tr("Advanced Parameters"), basicTab);
 	styleGroupBox(m_advancedParamsGroupBox);
 	m_advancedParamsGroupBox->setInfoIcon(createInfoIcon(
-		tr("Manually override resolution, samples per pixel, and max ray "
-		"depth instead of using the Quality/Resolution presets above. "
+		tr("The exact size, samples per pixel and max ray depth a render "
+		"uses: the Quality and Resolution presets above fill them in, and "
+		"any value can be typed here instead. "
 		"Shared by Image and Video (Video reuses these as its per-frame "
 		"settings) - Live Preview always uses its own fixed, small "
 		"resolution instead.")));
@@ -1271,9 +1352,9 @@ void MainWindow::buildAdvancedParamsGroup(QWidget *basicTab, QVBoxLayout *layout
 	styleSpinBox(m_widthSpinBox);
 	advancedGrid->addWidget(labelWithInfo(tr("Width:"),
 		tr("The image's pixel width.\n\n"
-		"Paired with Height to set the resolution manually, "
-		"overriding whatever the Quality preset above would "
-		"otherwise use.")),
+		"Filled in by the Resolution preset above; type any width "
+		"(with Height) for a size of your own, and Resolution shows "
+		"Custom size.")),
 		0, 0);
 	advancedGrid->addWidget(m_widthSpinBox, 0, 1);
 
@@ -1284,8 +1365,9 @@ void MainWindow::buildAdvancedParamsGroup(QWidget *basicTab, QVBoxLayout *layout
 	styleSpinBox(m_heightSpinBox);
 	advancedGrid->addWidget(labelWithInfo(tr("Height:"),
 		tr("The image's pixel height.\n\n"
-		"Paired with Width - together they set the resolution "
-		"manually, overriding the Quality preset above.")),
+		"Filled in by the Resolution preset above; type any height "
+		"(with Width) for a size of your own - wider than tall, "
+		"taller than wide or square.")),
 		0, 2);
 	advancedGrid->addWidget(m_heightSpinBox, 0, 3);
 
@@ -1593,72 +1675,6 @@ void MainWindow::buildOutputGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	pathLayout->addWidget(m_outputPathEdit);
 	pathLayout->addWidget(m_browseButton);
 	outputLayout->addLayout(pathLayout);
-
-	// For a long render or video that should not take the computer over: lower CPU and GPU priority, half the CPU cores, one worker and one frame at a time (launcher/background_mode.h).
-	// Remembered between runs; applies to renders and videos, not to Live Preview (which runs inside this program).
-	m_backgroundCheck = new QCheckBox(tr("Keep the PC responsive while rendering"), basicTab);
-	m_backgroundCheck->setToolTip(
-		tr("Renders politely so you can use the computer meanwhile: a lower CPU priority,\n"
-		"half of the CPU cores, and a video pauses after every frame for as long as the\n"
-		"frame took, which leaves the graphics card to your other programs half of the time.\n"
-		"A video takes about twice as long. The pictures are the same."));
-	styleCheckBox(m_backgroundCheck);
-	{
-		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
-		m_backgroundCheck->setChecked(settings.value(settings_keys::kBackgroundModeKey, false).toBool());
-	}
-	connect(m_backgroundCheck, &QCheckBox::toggled, this, [](bool on) {
-		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
-		settings.setValue(settings_keys::kBackgroundModeKey, on);
-	});
-	outputLayout->addWidget(m_backgroundCheck);
-
-	// Which graphics card renders, and when a video's worker process is replaced for holding too much memory (launcher --gpu-device / --worker-max-mb). Both remembered between runs;
-	// both are passed to the renderer only when they differ from its own default, so leaving them alone gives the command line this program always gave.
-	QHBoxLayout *resourceLayout = new QHBoxLayout();
-	resourceLayout->setSpacing(8);
-#ifndef Q_OS_MAC
-	m_gpuDeviceSpin = new QSpinBox(basicTab);
-	m_gpuDeviceSpin->setRange(0, 15);
-	styleSpinBox(m_gpuDeviceSpin);
-	m_gpuDeviceSpin->setToolTip(
-		tr("Which graphics card the GPU renders use, when the computer has more than one:\n"
-		"0 is the first. A number the computer does not have falls back to the first card\n"
-		"(the log says so)."));
-	{
-		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
-		m_gpuDeviceSpin->setValue(settings.value(settings_keys::kGpuDeviceKey, 0).toInt());
-	}
-	connect(m_gpuDeviceSpin, qOverload<int>(&QSpinBox::valueChanged), this, [](int value) {
-		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
-		settings.setValue(settings_keys::kGpuDeviceKey, value);
-	});
-	resourceLayout->addWidget(new QLabel(tr("Graphics card:"), basicTab));
-	resourceLayout->addWidget(m_gpuDeviceSpin);
-	resourceLayout->addSpacing(16);
-#endif
-	m_workerMemorySpin = new QSpinBox(basicTab);
-	m_workerMemorySpin->setRange(0, 256);
-	m_workerMemorySpin->setSuffix(tr(" GB"));
-	m_workerMemorySpin->setSpecialValueText(tr("No limit"));
-	styleSpinBox(m_workerMemorySpin);
-	m_workerMemorySpin->setToolTip(
-		tr("A video renders its frames in helper processes. One that comes to hold more memory\n"
-		"than this is replaced by a fresh one between two frames, so a long video cannot slowly\n"
-		"fill the computer's memory. The pictures are the same. \"No limit\" never replaces one."));
-	{
-		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
-		m_workerMemorySpin->setValue(settings.value(settings_keys::kWorkerMaxGbKey, 8).toInt());
-	}
-	connect(m_workerMemorySpin, qOverload<int>(&QSpinBox::valueChanged), this, [](int value) {
-		QSettings settings(settings_keys::kOrg, settings_keys::kApp);
-		settings.setValue(settings_keys::kWorkerMaxGbKey, value);
-	});
-	resourceLayout->addWidget(new QLabel(tr("Video helper memory limit:"), basicTab));
-	resourceLayout->addWidget(m_workerMemorySpin);
-	resourceLayout->addStretch(1);
-	outputLayout->addLayout(resourceLayout);
-
 	layout->addWidget(outputGroup);
 }
 

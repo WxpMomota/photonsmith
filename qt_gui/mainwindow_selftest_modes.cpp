@@ -20,6 +20,7 @@
 #include <QMessageBox>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QGroupBox>
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
@@ -1416,6 +1417,61 @@ void MainWindow::runBannerSelfTest(const std::function<void(const QString &)> &l
 	if (const int video = m_modeCombo->findData(static_cast<int>(OutputMode::Image)); video >= 0) m_modeCombo->setCurrentIndex(video);
 	measure(m_videoModeWarningLabel, "the Video settings banner");
 	shot("banner");
+	log(ok ? "RESULT: OK" : "RESULT: FAIL");
+	QApplication::exit(ok ? 0 : 1);
+}
+
+// RT_GUI_SELFTEST=resolution: the Resolution box has square and non-square presets; a preset fills in Width and Height, a typed size of any shape shows "Custom
+// size", and the render takes Width x Height whatever the Quality preset; the graphics card, video helper memory and "keep the PC responsive" controls are in the
+// Render Settings group. A screenshot of the group with a widescreen size chosen.
+void MainWindow::runResolutionSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot) {
+	resize(1500, 950);
+	if (m_tabWidget) m_tabWidget->setCurrentIndex(0);
+	bool ok = true;
+	auto check = [&ok, log](bool cond, const QString &what) {
+		log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what));
+		ok = ok && cond;
+	};
+	int wide = 0, tall = 0;
+	for (int i = 0; i < m_resolutionCombo->count(); ++i) {
+		const QSize s = m_resolutionCombo->itemData(i).toSize();
+		if (s.isValid() && s.width() > s.height()) ++wide;
+		if (s.isValid() && s.width() < s.height()) ++tall;
+	}
+	check(wide >= 5 && tall >= 2, QString("the Resolution box offers wide (%1) and tall (%2) sizes, not only squares").arg(wide).arg(tall));
+	const int fullHd = m_resolutionCombo->findData(QSize(1920, 1080));
+	check(fullHd >= 0, "1920 x 1080 is a preset");
+	m_resolutionCombo->setCurrentIndex(fullHd);
+	check(m_widthSpinBox->value() == 1920 && m_heightSpinBox->value() == 1080, "choosing it fills in Width 1920 and Height 1080");
+	m_qualityPresetCombo->setCurrentIndex(2);   // Good: the size used to come from the box, squares only, under any preset but Custom
+	RenderJob job = captureRenderJob();
+	check(job.width == 1920 && job.height == 1080, QString("the render is %1 x %2 under the Good quality preset").arg(job.width).arg(job.height));
+	m_widthSpinBox->setValue(1000);
+	m_heightSpinBox->setValue(700);
+	check(!m_resolutionCombo->currentData().toSize().isValid(), "a typed 1000 x 700 shows Custom size: " + m_resolutionCombo->currentText());
+	job = captureRenderJob();
+	check(job.width == 1000 && job.height == 700, QString("and the render is %1 x %2").arg(job.width).arg(job.height));
+	m_widthSpinBox->setValue(1080);
+	m_heightSpinBox->setValue(1920);
+	check(m_resolutionCombo->currentData().toSize() == QSize(1080, 1920), "typing 1080 x 1920 picks the portrait preset: " + m_resolutionCombo->currentText());
+	m_resolutionCombo->setCurrentIndex(fullHd);
+	const auto inRenderSettings = [](QWidget *w) {
+		for (QWidget *p = w ? w->parentWidget() : nullptr; p; p = p->parentWidget())
+			if (auto *g = qobject_cast<QGroupBox *>(p)) return g->title() == tr("Render Settings");
+		return false;
+	};
+	check(inRenderSettings(m_backgroundCheck), "\"Keep the PC responsive\" is in Render Settings");
+	check(inRenderSettings(m_workerMemorySpin), "the video helper memory limit is in Render Settings");
+#ifndef Q_OS_MAC
+	check(inRenderSettings(m_gpuDeviceSpin), "the graphics card is in Render Settings");
+#endif
+	if (auto *scroll = qobject_cast<QScrollArea *>(m_tabWidget->widget(0))) {
+		show();
+		QApplication::processEvents();
+		scroll->ensureWidgetVisible(m_resolutionCombo, 50, 300);
+		QApplication::processEvents();
+	}
+	shot("resolution");
 	log(ok ? "RESULT: OK" : "RESULT: FAIL");
 	QApplication::exit(ok ? 0 : 1);
 }
