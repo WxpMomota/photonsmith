@@ -291,6 +291,14 @@ class material {
         return color(1, 1, 1);
     }
 
+    // A surface the path tracer's own shadow rays pass, scaled by `out` (the share of light it lets straight through at this hit), because its
+    // straight-through scatter is a free crossing on the path side (scatter_record::is_medium_boundary): only thin_dielectric. Used by shadow_ray_hit()
+    // when it is asked for a transmittance (the path tracer's NEE); the other integrators' shadow rays still stop at it.
+    virtual bool thin_pass_through(const hit_record& rec, const ray& r, color& out) const {
+        (void)rec; (void)r; (void)out;
+        return false;
+    }
+
     // Non-null only for `class subsurface` (material_pbrt.h): a material
     // carrying a real BSSRDF diffusion profile. camera.h's ray_color loop
     // uses this to detect when a specular-transmission scatter event should

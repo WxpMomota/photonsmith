@@ -939,12 +939,20 @@ class thin_dielectric : public material {
         srec.pdf_ptr      = nullptr;
         srec.skip_pdf     = true;
         srec.skip_pdf_ray = ray(rec.p, vec3(res.wo_x, res.wo_y, res.wo_z), r_in.time());
+        // The straight-through branch is a free crossing (the light-sampling weights of the last real vertex still hold), the counterpart of
+        // shadow rays passing the pane scaled by ThinDielectricTransmittance (thin_pass_through below). The reflection stays a specular bounce.
+        srec.is_medium_boundary = res.wo_x * in_dir.x() + res.wo_y * in_dir.y() + res.wo_z * in_dir.z() > 0.9999;
         return true;
     }
 
     double get_ior() const { return ior; }
 
-    // Opaque to shadow rays (the base default) - see rough_dielectric's comment for the pbrt-v4 reference.
+    // A shadow ray of the path tracer passes the pane, scaled by the share it lets through at this angle (see ThinDielectricTransmittance).
+    bool thin_pass_through(const hit_record& rec, const ray& r, color& out) const override {
+        const double t = ThinDielectricTransmittance<double>(dot(unit_vector(r.direction()), rec.normal), ior);
+        out = color(t, t, t);
+        return true;
+    }
 
     // No roughness parameter at all - scatter() above always takes the
     // skip_pdf=true path. See material::is_delta_bsdf()'s own comment.
@@ -1441,6 +1449,11 @@ class mix_material : public material {
         return (branch_hash01(rec.p) >= w) ? mat_a->is_shadow_transmissive(rec)
                                             : mat_b->is_shadow_transmissive(rec);
     }
+    bool thin_pass_through(const hit_record& rec, const ray& r, color& out) const override {
+        double w = weight_tex->value(rec.u, rec.v, rec.p).x();
+        w = w < 0.0 ? 0.0 : (w > 1.0 ? 1.0 : w);
+        return (branch_hash01(rec.p) >= w) ? mat_a->thin_pass_through(rec, r, out) : mat_b->thin_pass_through(rec, r, out);
+    }
 
   private:
     shared_ptr<material> mat_a;
@@ -1505,6 +1518,7 @@ class roughness_mapped_material : public material {
     bool is_delta_bsdf() const override { return false; }
     bool is_delta_bsdf(const hit_record& rec) const override { return at(rec)->is_delta_bsdf(rec); }
     bool is_shadow_transmissive(const hit_record& rec) const override { return at(rec)->is_shadow_transmissive(rec); }
+    bool thin_pass_through(const hit_record& rec, const ray& r, color& out) const override { return at(rec)->thin_pass_through(rec, r, out); }
 
   private:
     static int level(double roughness) {

@@ -342,7 +342,7 @@ TEST(CartoonScenes, EveryFilmIsListedFromItsHeaderAloneUnderCartoons) {
 			EXPECT_EQ(d.cartoonKey, film.key);
 			EXPECT_NE(d.description.find(film.description), std::string::npos);
 			EXPECT_TRUE(d.declaresCamera);
-			EXPECT_EQ(d.xResolution, 1280) << "the film's own Film line, from the header";
+			EXPECT_EQ(d.xResolution, film.meta.width) << "the film's own Film line, from the header";
 			EXPECT_FALSE(d.nested);
 			EXPECT_FALSE(d.userFile);
 		}

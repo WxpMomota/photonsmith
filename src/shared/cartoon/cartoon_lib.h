@@ -493,9 +493,9 @@ inline std::string cameraText(const CameraView &v) {
 }
 
 // A film's scene up to and including WorldBegin: `camera` (cameraText of the view at t), the picture's size, the sampler and the integrator. Every film starts this way.
-inline std::string sceneHeader(const std::string &camera, int samples = 128) {
+inline std::string sceneHeader(const std::string &camera, int samples = 128, int width = 1280, int height = 720) {
 	std::string out = camera;
-	out += "Film \"rgb\" \"integer xresolution\" [ 1280 ] \"integer yresolution\" [ 720 ]\n";
+	out += "Film \"rgb\" \"integer xresolution\" [ " + std::to_string(width) + " ] \"integer yresolution\" [ " + std::to_string(height) + " ]\n";
 	out += "Sampler \"halton\" \"integer pixelsamples\" [ " + std::to_string(samples) + " ]\n";
 	out += "Integrator \"volpath\" \"integer maxdepth\" [ 8 ]\n";
 	out += "WorldBegin\n";
@@ -521,6 +521,8 @@ struct FilmMeta {
 	// The film renders on the GPU with the wavefront renderer (about 25% faster than the default one on the same scene). Set only for a film whose frames were compared with the default
 	// renderer's and matched it (the wavefront renderer draws some materials differently: the candle's wax, the dandelion's seeds, chrome), see docs/VIDEO_GENERATION.md.
 	bool wavefront = false;
+	// The picture's own size: what its Film line says and what the GUI sets the render size to when the film is picked (a still or a video of it).
+	int width = 1280, height = 720;
 };
 
 struct Film {

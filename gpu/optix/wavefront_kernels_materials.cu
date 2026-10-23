@@ -826,7 +826,10 @@ extern "C" __global__ void evaluate_materials(
 		scattered_dir = wf_thin_dielectric_scatter(h.rayDir, normal, mat.ior, seed);
 		attenuation = SS(1.f);
 		scattered   = true;
-		is_specular = true;
+		// The straight-through branch is a free crossing, like Interface's (shadow rays pass the pane scaled by ThinDielectricTransmittance:
+		// wavefront_anyhit_shadow.h); the reflection stays a specular bounce.
+		is_medium_boundary = dot(scattered_dir, normalize(h.rayDir)) > 0.9999f;
+		is_specular = !is_medium_boundary;
 		break;
 	}
 	case MaterialType::CoatedConductor: {

@@ -979,7 +979,10 @@ __device__ __forceinline__ void shade_material_surface(
 			attenuation   = make_float3(1.0f, 1.0f, 1.0f);
 			scattered_dir = thin_dielectric_scatter(ray_dir, normal, mat.ior, seed);
 			scattered     = true;
-			is_specular   = true;
+			// The straight-through branch is a free crossing, like Interface's (the shadow rays pass the pane scaled by ThinDielectricTransmittance:
+			// optix_anyhit_shadow.h); the reflection stays a specular bounce.
+			is_medium_boundary = dot(scattered_dir, normalize(ray_dir)) > 0.9999f;
+			is_specular   = !is_medium_boundary;
 			break;
 		}
 

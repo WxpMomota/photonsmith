@@ -317,6 +317,12 @@ void MainWindow::syncCartoonVideoSettings(const QString &sceneId) {
 		m_filmTimeRow->setVisible(film && !isVideoMode());
 		if (film && QString::fromUtf8(film->key) != m_filmTimeFor) {
 			m_filmTimeFor = QString::fromUtf8(film->key);
+			// The film's own picture size (16:9: 1280 x 720, or 1920 x 1080 for the long films), once when it is first picked, so a still or a video of it is
+			// not square; a size typed in afterwards stays.
+			if (m_widthSpinBox && m_heightSpinBox) {
+				m_widthSpinBox->setValue(film->meta.width);
+				m_heightSpinBox->setValue(film->meta.height);
+			}
 			m_filmTimeSpin->setRange(0.0, film->duration);
 			m_filmTimeSpin->setValue(film->stillTime);
 			if (m_filmShotCombo) {

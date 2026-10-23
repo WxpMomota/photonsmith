@@ -214,9 +214,10 @@ short id or the descriptive key:
 | V17 | meet-pip | (its own scenes) | cartoon:meet-pip | 432 | 24 | 1.0 |
 | V18 | pip-and-the-moon | (its own scenes) | cartoon:pip-and-the-moon | 2304 | 24 | 1.0 |
 | V19 | forest-dawn | (its own scenes) | cartoon:forest-dawn | 1008 | 24 | 1.0 |
+| V20 | turtle-escape | (its own scenes) | cartoon:turtle-escape | 8184 | 24 | 1.0 |
 
 `ray_tracer --list-video-presets` prints the whole list (camera flythroughs and cartoons together: id, key, kind, length, name). The cartoons are presets like the rest: one per film in
-`src/shared/cartoon/cartoons.h`, numbered on from the camera presets (V7 to V19 so far), their name, description, frame count and fps taken from the film, so the table below and the film
+`src/shared/cartoon/cartoons.h`, numbered on from the camera presets (V7 to V20 so far), their name, description, frame count and fps taken from the film, so the table below and the film
 table cannot disagree.
 
 ```powershell
@@ -293,6 +294,7 @@ mesh is a light of its own to sample, so a mesh ball is hundreds of lights. The 
 | meet-pip | Meet Pip | 18 s | 3 | character, emissive, dof | Pip, a small round blue creature with two antennae, says hello, shows what its face can do (surprise, sadness, a scowl, a hop of joy), follows a glowing orb with its eyes and walks off across the stage. |
 | pip-and-the-moon | Pip and the Moon | 96 s | 13 | character, emissive, water, reflections, night | Pip finds the moon in a pond, tries to touch it and breaks it, scoops it up in a bucket and dances with it, trips on the way home and loses it, and is shown the real one by a firefly. With music and sounds. |
 | forest-dawn | Forest Dawn | 42 s | 5 | fog, nature, dawn, translucent, backlight | A misty forest clearing from the blue before sunrise to the first warm light: the last fireflies go out, the sun comes up behind the hills and shines between the trunks in shafts through the mist, dew catches it on the grass, and leaves fall through the beams. |
+| turtle-escape | The Great Turtle Escape | 341 s | 74 | character, comedy, water, glass, night | A tiny turtle escapes its perfect tank like a spy breaking out of prison - rocks, a thermometer, a hose and a robot vacuum stand in its way - and dives into a pool that turns out to be the tub its owner filled for it. |
 
 A frame of a film is also a scene: `ray_tracer --gpu 1280 256 8 cartoon:fireflies@13.5` renders that moment as one picture (`cartoon:<key>` alone is the film's own best still), which is the quickest
 way to look at a change to a film. The GUI's scene list has a Cartoons tab (beside Self-Contained and Requires External Files) with one still per film; it is listed from the films themselves (a still's file is written the first time it is rendered), so a new film appears there by itself, and its Film time box renders any other moment of the film as a picture.

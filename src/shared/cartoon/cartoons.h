@@ -28,6 +28,7 @@
 #include "fireflies.h"
 #include "forest_dawn.h"
 #include "forest_dawn_score.h"
+#include "turtle_escape_score.h"
 #include "lamp_and_ball.h"
 #include "little_robot.h"
 #include "meet_pip.h"
@@ -43,7 +44,7 @@ constexpr const char *kCameraPathPrefix = "cartoon:";
 constexpr const char *kStillSlugPrefix = "cartoon-";   // the scene a film's still is listed as: "cartoon-fireflies" (and its file, cartoon-fireflies.pbrt)
 
 // The words a film's tags are chosen from. They name what a film shows or how it is lit, so that the scene list's search can find "metal" or "dusk".
-constexpr const char *kTagVocabulary[] = {"character", "physics", "particles", "metal", "water", "subsurface", "translucent", "emissive", "backlight", "dof", "reflections", "night", "dusk", "fog", "nature", "dawn"};
+constexpr const char *kTagVocabulary[] = {"character", "physics", "particles", "metal", "water", "subsurface", "translucent", "emissive", "backlight", "dof", "reflections", "night", "dusk", "fog", "nature", "dawn", "comedy", "glass"};
 
 // The films. `meta.id` is the video preset's number (V<id>): give a new film the next number and never reuse one. `meta.secondsPerFrame` is measured by scripts/measure_cartoons.py.
 inline const Film kFilms[] = {
@@ -99,6 +100,14 @@ inline const Film kFilms[] = {
 	 "A misty forest clearing from the blue before sunrise to the first warm light: the last fireflies go out, the sun comes up behind the hills and shines between the trunks in shafts through the mist, dew catches it on the grass, and leaves fall through the beams.",
 	 forest_dawn::kDuration, forest_dawn::kFps, &forest_dawn::sceneAt, &forest_dawn::headerAt, &forest_dawn::shotStarts, 14.0,
 	 {19, "fog,nature,dawn,translucent,backlight", "Into the blue clearing|Against the rising sun|Dew on the grass|Leaves in the beams|Crane up as the mist thins", forest_dawn::kSamples, 6.0, true}, &forest_dawn::soundtrack},
+	{"turtle-escape", "The Great Turtle Escape",
+	 "A tiny turtle escapes its perfect tank like a spy breaking out of prison - rocks, a thermometer, a hose and a robot vacuum stand in its way - and dives into a pool that turns out to be the tub its owner filled for it.",
+	 turtle_escape::kDuration, turtle_escape::kFps, &turtle_escape::sceneAt, &turtle_escape::headerAt, &turtle_escape::shotStarts, 199.0,
+	 {20, "character,comedy,water,glass,night", "Wide on the room|The plant|The thermometer|Pellets|Through the glass: Perfect|The turtle stares|Keys|The door|Towards the door|Towards the top|Back to the door|The eyes narrow|"
+	  "The glass|Water to rim|The thermometer, close|The intake|The hose|The plan|The dive|The push|Again|The charge|Exhausted|The clock|Building the pile|The climb|The crash|The bubble|Plan B|The bite and the pop|The idea|The ramp|A foot on the rim|Lights out|"
+	  "The hose|Onto the slate|Hanging|The canyon|Eight inches|The climb|Over the top|Freedom|The slide|The towels|Across the floor|The vacuum wakes|Like a tank|Under the sofa|Beneath|The carpet cliff|The fibres|The far side|Water|"
+	  "The endless crawl|The box|The pool|Looking back|A smile|Splash|Swimming|Home|Something is wrong|The empty slate|The thermometer|The rocks|The hose|The bags|Inside the tank|Behind the tank|Under the table|Behind the sofa|Turtle?|The tub|Black",
+	  turtle_escape::kSamples, 3.0, true, turtle_escape::kWidth, turtle_escape::kHeight}, &turtle_escape::soundtrack},
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 

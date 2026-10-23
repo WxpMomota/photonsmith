@@ -77,6 +77,17 @@ inline bool shadow_ray_hit(
             return false;  // nothing (opaque or otherwise) left before t_max
 
         if (!rec.mat->is_shadow_transmissive(rec)) {
+            // Thin glass lets the path tracer's shadow rays through, scaled by what it transmits at this angle (material::thin_pass_through): the path side
+            // treats its straight-through scatter as a free crossing, so the two add up. Only when a transmittance is asked for: the other integrators'
+            // shadow rays (no out_transmittance) do not, and stop at it as pbrt-v4's do.
+            color pass;
+            if (out_transmittance && rec.mat->thin_pass_through(rec, current, pass)) {
+                *out_transmittance = *out_transmittance * pass;
+                remaining -= rec.t;
+                if (remaining <= t_min) return false;
+                current = ray(rec.p, r.direction(), r.time());
+                continue;
+            }
             out_hit = rec;
             return true;
         }

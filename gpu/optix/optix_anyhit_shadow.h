@@ -180,6 +180,20 @@ __device__ __forceinline__ void shadow_medium_sphere_chord(const SphereData& sph
 	t_far = (-half_b + sq) / a;
 }
 
+// Thin glass lets a shadow ray through, scaled by the share it transmits at this angle (ThinDielectricTransmittance, src/shared/bxdfs_simple.h): the path
+// side's straight-through scatter off it is a free crossing (optix_device_shade.h), so the two estimators add up. `cosTheta` is the ray's cosine with the
+// surface, in whichever space the caller has both in (1 where an any-hit has no cheap normal: disks, cylinders, bilinear patches).
+__device__ __forceinline__ void shadow_pass_thin_glass(const MaterialData& mat, float cosTheta) {
+	ShadowRayState* st = shadow_state_from_payload();
+	st->transmittance *= ThinDielectricTransmittance(cosTheta, mat.ior);   // memory write: survives optixIgnoreIntersection
+	if (st->transmittance <= 0.0f) {
+		st->occluded = 1;
+		optixTerminateRay();
+		return;
+	}
+	optixIgnoreIntersection();
+}
+
 extern "C" __global__ void __anyhit__shadow_sphere() {
 	// Get primitive and material
 	const unsigned int primIdx = optixGetPrimitiveIndex();
@@ -301,6 +315,13 @@ extern "C" __global__ void __anyhit__shadow_sphere() {
 		optixIgnoreIntersection();  // continue traversal (not an occluder)
 		return;
 	}
+	if (mat.type == MaterialType::ThinDielectric) {
+		const float3 c = make_float3(__int_as_float(optixGetAttribute_0()), __int_as_float(optixGetAttribute_1()), __int_as_float(optixGetAttribute_2()));
+		const float3 od = normalize(optixGetObjectRayDirection());
+		const float3 op = optixGetObjectRayOrigin() + optixGetRayTmax() * optixGetObjectRayDirection();
+		shadow_pass_thin_glass(mat, sphere.shapeKind == GpuMediumShapeKind::Box ? 1.0f : dot(od, normalize(op - c)));
+		return;
+	}
 
 	// For opaque materials, treat as occluder
 	shadow_state_from_payload()->occluded = 1;  // occluded = true
@@ -324,6 +345,10 @@ extern "C" __global__ void __anyhit__shadow_quad() {
 		optixIgnoreIntersection();  // continue traversal (not an occluder)
 		return;
 	}
+	if (mat.type == MaterialType::ThinDielectric) {
+		shadow_pass_thin_glass(mat, dot(normalize(optixGetWorldRayDirection()), quad.normal));
+		return;
+	}
 
 	// For opaque materials, treat as occluder
 	shadow_state_from_payload()->occluded = 1;  // occluded = true
@@ -342,6 +367,10 @@ extern "C" __global__ void __anyhit__shadow_bilinear_patch() {
 
 	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();
+		return;
+	}
+	if (mat.type == MaterialType::ThinDielectric) {
+		shadow_pass_thin_glass(mat, 1.0f);
 		return;
 	}
 
@@ -365,6 +394,10 @@ extern "C" __global__ void __anyhit__shadow_disk() {
 
 	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();
+		return;
+	}
+	if (mat.type == MaterialType::ThinDielectric) {
+		shadow_pass_thin_glass(mat, 1.0f);
 		return;
 	}
 
@@ -462,6 +495,10 @@ extern "C" __global__ void __anyhit__shadow_cylinder() {
 		optixIgnoreIntersection();
 		return;
 	}
+	if (mat.type == MaterialType::ThinDielectric) {
+		shadow_pass_thin_glass(mat, 1.0f);
+		return;
+	}
 
 	shadow_state_from_payload()->occluded = 1;  // occluded = true
 	optixTerminateRay();
@@ -512,6 +549,10 @@ extern "C" __global__ void __anyhit__shadow_triangle() {
 	// Only an "interface" lets a shadow ray through (a Subsurface surface is opaque, as in pbrt-v4: see the sphere any-hit above).
 	if (mat.type == MaterialType::Interface) {
 		optixIgnoreIntersection();
+		return;
+	}
+	if (mat.type == MaterialType::ThinDielectric) {
+		shadow_pass_thin_glass(mat, dot(normalize(optixGetObjectRayDirection()), normalize(cross(tri.p1 - tri.p0, tri.p2 - tri.p0))));
 		return;
 	}
 

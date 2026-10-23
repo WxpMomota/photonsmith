@@ -132,6 +132,25 @@ struct DielectricBxDF {
 	}
 };
 
+// The share of light a thin dielectric pane lets straight through at an incidence of |cos_theta|: 1 - R_eff, the probability ThinDielectricBxDF::sample
+// below takes the straight-through branch. A shadow ray crosses such a pane scaled by it, and the path side treats that branch as a free crossing (the
+// direction does not change, so the last real vertex's light-sampling weights still hold): the two estimators add up to the light that gets through
+// (thin glass lets direct light in, which pbrt-v4, where every surface with a material blocks shadow rays, finds only by BSDF sampling).
+template<typename T>
+CPU_GPU T ThinDielectricTransmittance(T cos_theta, T ior) {
+#if defined(__CUDACC__)
+	cos_theta = fabsf(cos_theta);
+#else
+	cos_theta = std::fabs(cos_theta);
+#endif
+	T R = FrDielectric(cos_theta, ior);
+	if (R < T(1)) {
+		const T Tv = T(1) - R;
+		R += Tv * Tv * R / (T(1) - R * R);
+	}
+	return T(1) - R;
+}
+
 // ===========================================================================
 
 //    Mirrors pbrt-v4 ThinDielectricBxDF::Sample_f

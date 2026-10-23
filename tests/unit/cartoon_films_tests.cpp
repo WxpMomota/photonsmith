@@ -215,7 +215,7 @@ TEST(CartoonCandle, TheCandleBurnsDownAndTheFlameDiesWithSmokeAfterwards) {
 
 TEST(CartoonFilms, EveryFilmFlattensAtSeveralTimesWithoutWarnings) {
 	for (const cartoon::Film &film : cartoon::kFilms) {
-		for (double f : {0.0, 0.1, 0.3, 0.5, 0.7, 0.9, 0.999}) {
+		for (double f : {0.0, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99}) {   // (0.99: the last second may be a cut to black)
 			const double t = f * film.duration;
 			const FlatScene s = flattenSource(film.sceneAt(t));
 			EXPECT_GT(s.triangles.size(), 1000u) << film.key << " t = " << t;
@@ -300,4 +300,45 @@ TEST(CartoonForestDawn, TheSoundtrackIsTheSameEveryTimeInRangeAndNeverSilent) {
 	int peak = 0;
 	for (std::int16_t s : pa) peak = (std::max)(peak, std::abs(static_cast<int>(s)));
 	EXPECT_GT(peak, 6000) << "not too quiet";
+}
+
+// The Great Turtle Escape: a wide 1920 x 1080 film whose camera stays in the room, whose turtle never jumps between frames, whose night is exposed brighter than its day, and whose
+// soundtrack is deterministic and never silent until the cut to black.
+TEST(CartoonTurtleEscape, WideFramesCamerasInTheRoomAndATurtleThatDoesNotJump) {
+	namespace te = cartoon::turtle_escape;
+	const std::string header = te::headerAt(10.0);
+	EXPECT_NE(header.find("\"integer xresolution\" [ 1920 ]"), std::string::npos);
+	EXPECT_NE(header.find("\"integer yresolution\" [ 1080 ]"), std::string::npos);
+	EXPECT_GT(te::exposureAt(250.0), te::exposureAt(10.0)) << "the night is opened up";
+	const double dt = 1.0 / te::kFps;
+	cartoon::Vec3 last = te::turtleAt(0.0).pos;
+	for (double t = 0.0; t < te::kBlack; t += dt) {
+		const cartoon::CameraView v = te::viewAt(t);
+		EXPECT_TRUE(v.eye.x > te::kRoomX0 && v.eye.x < te::kRoomX1 && v.eye.z > te::kRoomZ0 && v.eye.z < te::kRoomZ1 && v.eye.y > 0.0 && v.eye.y < te::kCeiling)
+			<< "the camera is outside the room at t = " << t;
+		const cartoon::Vec3 p = te::turtleAt(t).pos;
+		EXPECT_LT(cartoon::length(p - last), 0.25) << "the turtle jumped at t = " << t;
+		last = p;
+	}
+}
+
+TEST(CartoonTurtleEscape, TheSoundtrackIsTheSameEveryTimeAndNeverSilent) {
+	namespace te = cartoon::turtle_escape;
+	cartoon::audio::Mix a(te::kDuration), b(te::kDuration);
+	te::soundtrack(a);
+	te::soundtrack(b);
+	const std::vector<std::int16_t> pa = a.finish(), pb = b.finish();
+	EXPECT_EQ(pa, pb);
+	if (const char *keep = std::getenv("RT_SOUNDTRACK_WAV")) cartoon::audio::writeWav(keep, pa);
+	auto rms = [&](double t0, double t1) {
+		double e = 0.0;
+		std::size_t n = 0;
+		for (std::size_t i = static_cast<std::size_t>(t0 * cartoon::audio::kRate) * 2; i < static_cast<std::size_t>(t1 * cartoon::audio::kRate) * 2 && i < pa.size(); ++i, ++n) e += static_cast<double>(pa[i]) * pa[i];
+		return std::sqrt(e / static_cast<double>((std::max)(std::size_t(1), n))) / 32768.0;
+	};
+	for (double t = 0.5; t < te::kBlack - 4.0; t += 4.0) EXPECT_GT(rms(t, t + 4.0), 0.002) << "silence at " << t << " s";
+	int peak = 0;
+	for (std::int16_t s : pa) peak = (std::max)(peak, std::abs(static_cast<int>(s)));
+	EXPECT_GT(peak, 6000) << "not too quiet";
+	EXPECT_LT(peak, 32767) << "not clipped";
 }

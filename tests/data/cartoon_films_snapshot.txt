@@ -65,3 +65,8 @@ forest-dawn|0|16840|21
 forest-dawn|14|16840|1
 forest-dawn|21|16860|1
 forest-dawn|41.96|16928|1
+meta|turtle-escape|V20|341 s|24 fps|74 shots|character,comedy,water,glass,night|64 spp
+turtle-escape|0|68353|2
+turtle-escape|199|57877|2
+turtle-escape|170.5|56621|2
+turtle-escape|340.7|24|2

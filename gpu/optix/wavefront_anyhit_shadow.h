@@ -1,6 +1,8 @@
 // wavefront_anyhit_shadow.h -- Shadow-ray any-hit programs, one per geometry type
 // Included by wavefront_programs.cu, after wavefront_common.h.
 
+#include "../../src/shared/bxdfs_simple.h"   // ThinDielectricTransmittance (thin glass passes shadow rays)
+
 // __anyhit__wf_shadow_*: one per geometry type (sphere/quad/bilinear_patch/
 // triangle), mirroring optix_anyhit_shadow.h's __anyhit__shadow_* exactly -
 // see that file's own comments for why DiffuseLight and the transmissive
@@ -47,6 +49,15 @@
 //     medium, rather than treating it as fully non-occluding - see that
 //     field's own comment (wavefront_common.h) for why this replaced the
 //     old unconditional optixIgnoreIntersection() for these types.
+// Thin glass lets a shadow ray through, scaled by the share it transmits at this angle (ThinDielectricTransmittance, src/shared/bxdfs_simple.h): the
+// straight-through scatter off it is a free crossing on the path side (wavefront_kernels_materials.cu), so the two estimators add up. `cosTheta` is the
+// ray's cosine with the surface (1 where there is no cheap normal: spheres, disks, cylinders, bilinear patches).
+__device__ __forceinline__ void wf_shadow_pass_thin_glass(WfShadowPayload* sp, const MaterialData& mat, float cosTheta) {
+	sp->transmittance *= ThinDielectricTransmittance(cosTheta, mat.ior);
+	if (sp->transmittance <= 0.0f) { optixTerminateRay(); return; }
+	optixIgnoreIntersection();
+}
+
 extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 	const int instBase = wf_instance_base();
 	const SphereData& sph = wf_params.spheres[wf_prim_base(instBase) + optixGetPrimitiveIndex()];
@@ -74,6 +85,7 @@ extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 		optixIgnoreIntersection();
 		return;
 	}
+	if (mat.type == MaterialType::ThinDielectric) { wf_shadow_pass_thin_glass(sp, mat, 1.0f); return; }
 
 	// Participating media: attenuate the running transmittance instead of
 	// the old unconditional pass-through - see WfShadowPayload::
@@ -326,6 +338,7 @@ extern "C" __global__ void __anyhit__wf_shadow_quad() {
 		optixIgnoreIntersection();
 		return;
 	}
+	if (mat.type == MaterialType::ThinDielectric) { wf_shadow_pass_thin_glass(sp, mat, dot(normalize(optixGetWorldRayDirection()), quad.normal)); return; }
 	sp->transmittance = 0.0f;
 	optixTerminateRay();
 }
@@ -345,6 +358,7 @@ extern "C" __global__ void __anyhit__wf_shadow_bilinear_patch() {
 		optixIgnoreIntersection();
 		return;
 	}
+	if (mat.type == MaterialType::ThinDielectric) { wf_shadow_pass_thin_glass(sp, mat, 1.0f); return; }
 	sp->transmittance = 0.0f;
 	optixTerminateRay();
 }
@@ -392,6 +406,7 @@ extern "C" __global__ void __anyhit__wf_shadow_triangle() {
 		optixIgnoreIntersection();
 		return;
 	}
+	if (mat.type == MaterialType::ThinDielectric) { wf_shadow_pass_thin_glass(sp, mat, dot(normalize(optixGetObjectRayDirection()), normalize(cross(tri.p1 - tri.p0, tri.p2 - tri.p0)))); return; }
 	sp->transmittance = 0.0f;
 	optixTerminateRay();
 }
@@ -417,6 +432,7 @@ extern "C" __global__ void __anyhit__wf_shadow_disk() {
 		optixIgnoreIntersection();
 		return;
 	}
+	if (mat.type == MaterialType::ThinDielectric) { wf_shadow_pass_thin_glass(sp, mat, 1.0f); return; }
 	sp->transmittance = 0.0f;
 	optixTerminateRay();
 }
@@ -438,6 +454,7 @@ extern "C" __global__ void __anyhit__wf_shadow_cylinder() {
 		optixIgnoreIntersection();
 		return;
 	}
+	if (mat.type == MaterialType::ThinDielectric) { wf_shadow_pass_thin_glass(sp, mat, 1.0f); return; }
 	// MaterialType::Medium and MaterialType::DielectricMedium (homogeneous
 	// only - the pbrt loader never assigns CloudMedium/RgbGridMedium/
 	// GridMedium to a cylinder): Beer-Lambert over the cylinder's own
