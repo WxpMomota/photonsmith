@@ -868,7 +868,8 @@ void MainWindow::buildQualityRows(QWidget *basicTab, QFormLayout *renderLayout) 
 		{QT_TR_NOOP("1024 x 1024 (square, 1K)"), 1024, 1024}, {QT_TR_NOOP("1080 x 1080 (square)"), 1080, 1080}, {QT_TR_NOOP("1200 x 1200 (square)"), 1200, 1200},
 		{QT_TR_NOOP("1440 x 1440 (square)"), 1440, 1440}, {QT_TR_NOOP("1920 x 1920 (square)"), 1920, 1920}, {QT_TR_NOOP("2048 x 2048 (square, 2K)"), 2048, 2048},
 		{QT_TR_NOOP("2560 x 2560 (square)"), 2560, 2560}, {QT_TR_NOOP("3840 x 3840 (square, 4K)"), 3840, 3840}, {QT_TR_NOOP("4096 x 4096 (square)"), 4096, 4096}};
-	static const ResolutionPreset others[] = {{QT_TR_NOOP("854 x 480 (16:9, 480p)"), 854, 480}, {QT_TR_NOOP("1280 x 720 (16:9, HD)"), 1280, 720},
+	static const ResolutionPreset others[] = {{QT_TR_NOOP("214 x 120 (16:9, 120p)"), 214, 120}, {QT_TR_NOOP("426 x 240 (16:9, 240p)"), 426, 240},
+		{QT_TR_NOOP("854 x 480 (16:9, 480p)"), 854, 480}, {QT_TR_NOOP("1280 x 720 (16:9, HD)"), 1280, 720},
 		{QT_TR_NOOP("1920 x 1080 (16:9, Full HD)"), 1920, 1080}, {QT_TR_NOOP("2560 x 1440 (16:9, QHD)"), 2560, 1440}, {QT_TR_NOOP("3840 x 2160 (16:9, 4K UHD)"), 3840, 2160},
 		{QT_TR_NOOP("2560 x 1080 (21:9, cinema)"), 2560, 1080}, {QT_TR_NOOP("800 x 600 (4:3)"), 800, 600}, {QT_TR_NOOP("1024 x 768 (4:3)"), 1024, 768},
 		{QT_TR_NOOP("1600 x 1200 (4:3)"), 1600, 1200}, {QT_TR_NOOP("1200 x 800 (3:2, photo)"), 1200, 800}, {QT_TR_NOOP("1080 x 1350 (4:5, portrait)"), 1080, 1350},

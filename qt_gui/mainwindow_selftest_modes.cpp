@@ -1441,6 +1441,7 @@ void MainWindow::runResolutionSelfTest(const std::function<void(const QString &)
 		if (s.isValid() && s.width() < s.height()) ++tall;
 	}
 	check(wide >= 5 && tall >= 2, QString("the Resolution box offers wide (%1) and tall (%2) sizes, not only squares").arg(wide).arg(tall));
+	check(m_resolutionCombo->findData(QSize(426, 240)) >= 0 && m_resolutionCombo->findData(QSize(214, 120)) >= 0, "240p and 120p are presets");
 	const int fullHd = m_resolutionCombo->findData(QSize(1920, 1080));
 	check(fullHd >= 0, "1920 x 1080 is a preset");
 	m_resolutionCombo->setCurrentIndex(fullHd);
