@@ -20,6 +20,7 @@
 #else
 #include <fstream>
 #include <signal.h>
+#include <fcntl.h>
 #include <spawn.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -169,8 +170,10 @@ class Child {
 	Child &operator=(const Child &) = delete;
 	~Child() { release(); }
 
-	// Starts `exe args...`; false when it could not be started.
-	bool start(const std::string &exe, const std::vector<std::string> &args, const std::string &envName, const std::string &envValue) {
+	// Starts `exe args...`; false when it could not be started. With `logPath`, what it prints (stdout and stderr) is appended to that file instead of going where this
+	// program's own output goes: a video's frame runs print some fifty lines a frame, which a GUI reading this program's output could not keep up with at a few frames a
+	// second (its progress bar fell behind the frames for ever).
+	bool start(const std::string &exe, const std::vector<std::string> &args, const std::string &envName, const std::string &envValue, const std::string &logPath = std::string()) {
 		release();
 		exitCode_ = 1;
 		finished_ = false;
@@ -185,13 +188,41 @@ class Child {
 		}
 		if (!envName.empty()) block.append(envName + "=" + envValue).push_back('\0');
 		block.push_back('\0');
-		STARTUPINFOA si{};
-		si.cb = sizeof(si);
+		STARTUPINFOEXA si{};
+		si.StartupInfo.cb = sizeof(si);
 		PROCESS_INFORMATION pi{};
 		std::vector<char> mutableCmd(cmd.begin(), cmd.end());
 		mutableCmd.push_back('\0');
+		// the log: one inheritable handle, and ONLY that one handed to the child (an attribute list), so the child does not also hold this program's own output pipe open
+		HANDLE log = nullptr;
+		std::vector<char> attributeBuffer;
+		LPPROC_THREAD_ATTRIBUTE_LIST attributes = nullptr;
+		if (!logPath.empty()) {
+			SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
+			log = CreateFileA(logPath.c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, &sa, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+			if (log == INVALID_HANDLE_VALUE) log = nullptr;
+			SIZE_T size = 0;
+			InitializeProcThreadAttributeList(nullptr, 1, 0, &size);
+			attributeBuffer.resize(size);
+			attributes = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(attributeBuffer.data());
+			if (log && InitializeProcThreadAttributeList(attributes, 1, 0, &size) &&
+				UpdateProcThreadAttribute(attributes, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, &log, sizeof(log), nullptr, nullptr)) {
+				si.StartupInfo.dwFlags |= STARTF_USESTDHANDLES;
+				si.StartupInfo.hStdInput = nullptr;
+				si.StartupInfo.hStdOutput = si.StartupInfo.hStdError = log;
+				si.lpAttributeList = attributes;
+			} else {
+				if (log) CloseHandle(log);
+				log = nullptr;
+				attributes = nullptr;
+			}
+		}
 		// Started suspended and put in the kill-on-exit job BEFORE it runs a single instruction, so that nothing it starts can be outside the job.
-		if (!CreateProcessA(nullptr, mutableCmd.data(), nullptr, nullptr, FALSE, CREATE_SUSPENDED, block.data(), nullptr, &si, &pi)) return false;
+		const BOOL started = CreateProcessA(nullptr, mutableCmd.data(), nullptr, nullptr, log ? TRUE : FALSE, CREATE_SUSPENDED | (attributes ? EXTENDED_STARTUPINFO_PRESENT : 0), block.data(),
+											nullptr, reinterpret_cast<LPSTARTUPINFOA>(&si), &pi);
+		if (attributes) DeleteProcThreadAttributeList(attributes);
+		if (log) CloseHandle(log);   // (the child has its own copy)
+		if (!started) return false;
 		process_ = pi.hProcess;
 		if (HANDLE job = killOnExitJob()) {
 			if (!AssignProcessToJobObject(job, process_)) {
@@ -229,7 +260,15 @@ class Child {
 		for (std::string &e : envStore) envp.push_back(&e[0]);
 		envp.push_back(nullptr);
 		pid_ = 0;
-		if (posix_spawn(&pid_, exe.c_str(), nullptr, nullptr, argv.data(), envp.data()) != 0) {
+		posix_spawn_file_actions_t actions;
+		posix_spawn_file_actions_init(&actions);
+		if (!logPath.empty()) {
+			posix_spawn_file_actions_addopen(&actions, 1, logPath.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
+			posix_spawn_file_actions_adddup2(&actions, 1, 2);
+		}
+		const int spawned = posix_spawn(&pid_, exe.c_str(), &actions, nullptr, argv.data(), envp.data());
+		posix_spawn_file_actions_destroy(&actions);
+		if (spawned != 0) {
 			pid_ = 0;
 			return false;
 		}
@@ -322,10 +361,12 @@ class Child {
 
 // Runs `exe args...` with the extra environment variable (see Child) and waits for it; when it has not finished after `timeoutSeconds` (0: wait as long as it takes) the process is killed and
 // `*timedOut` set. Returns its exit code, or -1 when it could not be started.
-inline int runChild(const std::string &exe, const std::vector<std::string> &args, const std::string &envName, const std::string &envValue, int timeoutSeconds, bool *timedOut = nullptr) {
+// With `logPath`, its output goes to that file (Child::start).
+inline int runChild(const std::string &exe, const std::vector<std::string> &args, const std::string &envName, const std::string &envValue, int timeoutSeconds, bool *timedOut = nullptr,
+					const std::string &logPath = std::string()) {
 	if (timedOut) *timedOut = false;
 	Child child;
-	if (!child.start(exe, args, envName, envValue)) return -1;
+	if (!child.start(exe, args, envName, envValue, logPath)) return -1;
 	if (!child.wait(timeoutSeconds)) {
 		child.kill();
 		if (timedOut) *timedOut = true;

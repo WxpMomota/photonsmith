@@ -417,7 +417,7 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
         line << "\n[" << ++reported << "/" << render_frame_count << "] Rendering " << frame_file(frame).filename().string() << " (" << film.name << " at " << std::fixed << std::setprecision(2)
              << film.duration * frame / std::max(1, render_frame_count) << " s)...";
         if (rc == 0) line << " \u2713 (" << std::setprecision(1) << seconds << "s)";
-        else line << " \u2717 FAILED (error code: " << rc << ")";
+        else line << " \u2717 FAILED (error code: " << rc << "; what the renderer said is in " << (frames_dir / "work*").string() << "/" << (workers > 0 ? "worker.log" : "frames.log") << ")";
         (rc == 0 ? std::cout : std::cerr) << line.str() << std::endl;
     };
     auto inOrder = [&](int frame, int rc) {   // in frame order: the video's picture sequence
@@ -450,7 +450,8 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
                                           std::to_string(image_width), std::to_string(samples_per_pixel), std::to_string(max_ray_depth)})
                 childArgs.push_back(a);
             auto process = std::make_unique<WorkerProcess>();
-            if (!process->child.start(s.exe_path, childArgs, "RAY_TRACER_PBRT_DIR", dir.string())) return nullptr;
+            // (its output into its own log in its work folder, not this program's: some fifty lines a frame that a GUI reading this output could not keep up with)
+            if (!process->child.start(s.exe_path, childArgs, "RAY_TRACER_PBRT_DIR", dir.string(), (dir / "worker.log").string())) return nullptr;
             return process;
         };
         hooks.poll = [&](int frame, int &result) {

@@ -91,7 +91,8 @@ inline int renderFrame(const cartoon::Film &film, double t, const std::filesyste
 	int rc = -1;
 	for (int attempt = 0; attempt < 2; ++attempt) {
 		bool timedOut = false;
-		rc = runChild(exe, childArgs, "RAY_TRACER_PBRT_DIR", scenePath.parent_path().string(), timeoutSeconds, &timedOut);
+		// (its output into the work folder's log, not this program's: see Child::start)
+		rc = runChild(exe, childArgs, "RAY_TRACER_PBRT_DIR", scenePath.parent_path().string(), timeoutSeconds, &timedOut, (scenePath.parent_path() / "frames.log").string());
 		if (!timedOut) break;
 		std::cerr << "\nWARNING: " << std::filesystem::path(framePath).filename().string() << " took longer than " << timeoutSeconds << " s and was stopped" << (attempt == 0 ? "; trying it once more." : ".") << std::endl;
 		rc = -1;

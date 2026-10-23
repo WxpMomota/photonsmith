@@ -1342,3 +1342,33 @@ TEST(CartoonWorkers, AWorkerWatchesItsParentAndSeesItAliveWhileItRuns) {
 	const ParentWatch watch;   // (this test program's parent, the test runner, is alive)
 	EXPECT_FALSE(watch.parentGone());
 }
+
+// A frame run's or worker's output goes to its own log when asked (Child::start's logPath): what it prints - stdout and stderr - lands in the file, appended, and
+// none of it in this program's own output (a GUI reading a video's output could not keep up with fifty lines a frame).
+TEST(CartoonWorkers, AChildsOutputCanGoToItsOwnLog) {
+	const std::filesystem::path log = std::filesystem::temp_directory_path() / "rt_child_log_test.log";
+	std::filesystem::remove(log);
+#ifdef _WIN32
+	const std::string exe = "C:\\Windows\\System32\\cmd.exe";
+	const std::vector<std::string> say = {"/c", "echo to-out & echo to-err 1>&2"};
+#else
+	const std::string exe = "/bin/sh";
+	const std::vector<std::string> say = {"-c", "echo to-out; echo to-err 1>&2"};
+#endif
+	for (int run = 0; run < 2; ++run) {
+		Child child;
+		ASSERT_TRUE(child.start(exe, say, "", "", log.string()));
+		ASSERT_TRUE(child.wait(10));
+		EXPECT_EQ(child.exitCode(), 0);
+	}
+	std::ifstream in(log);
+	std::stringstream text;
+	text << in.rdbuf();
+	in.close();
+	const std::string s = text.str();
+	EXPECT_NE(s.find("to-out"), std::string::npos) << s;
+	EXPECT_NE(s.find("to-err"), std::string::npos) << "stderr too: " << s;
+	EXPECT_NE(s.find("to-out", s.find("to-out") + 1), std::string::npos) << "appended, not replaced, on a second start: " << s;
+	EXPECT_EQ(runChild(exe, say, "", "", 10, nullptr, log.string()), 0) << "runChild passes it on";
+	std::filesystem::remove(log);
+}
