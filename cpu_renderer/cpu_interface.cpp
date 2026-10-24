@@ -1034,6 +1034,17 @@ extern "C" int cpu_scene_crop_picture_by_id(const char* scene_id, double out[4])
 	return 1;
 }
 
+// A scene's .pbrt path without writing it: a generated scene's file (a cartoon still) may not exist yet. For what only reads the path or a file's header - the scene size
+// the GUI asks of every scene at startup: writing a still means building the film's frame (a long film's whole world), which took startup to a minute.
+static const char* scene_pbrt_path_unwritten(const char* scene_id) {
+	(void)get_scene_registry();
+	const auto& byId = pbrt_scene_registry::paths();
+	// paths() is keyed by id; scene_id may be a slug.
+	const SceneDescriptor* s = find_scene(scene_id);
+	const auto it = byId.find(s ? s->id : std::string(scene_id));
+	return it == byId.end() ? "" : it->second.c_str();
+}
+
 extern "C" const char* cpu_scene_pbrt_path_by_id(const char* scene_id) {
 	// get_scene_registry() must run at least once before pbrt_scene_
 	// registry::paths() has anything in it - that map is populated as a
@@ -1048,14 +1059,9 @@ extern "C" const char* cpu_scene_pbrt_path_by_id(const char* scene_id) {
 	// has (a real, previously-latent bug - found via gpu/metal/
 	// metal_poc.mm's own metal_render_main(), which calls this function
 	// first, before anything else has ever touched the registry).
-	(void)get_scene_registry();
-	const auto& byId = pbrt_scene_registry::paths();
-	// paths() is keyed by id; scene_id may be a slug.
-	const SceneDescriptor* s = find_scene(scene_id);
-	const auto it = byId.find(s ? s->id : std::string(scene_id));
-	if (it == byId.end()) return "";
-	pbrt_discover::materializeGenerated(it->second);   // the GPU backends load the file themselves: a generated scene (the cartoon stills) has to exist by now
-	return it->second.c_str();
+	const char* path = scene_pbrt_path_unwritten(scene_id);
+	if (path[0]) pbrt_discover::materializeGenerated(path);   // the GPU backends load the file themselves: a generated scene (the cartoon stills) has to exist by now
+	return path;
 }
 
 // Resolves a scene key - an id ("B10") or a slug ("rough-glass") - to the scene's id; returns 0 (and writes an empty string) for an unknown key.
@@ -1108,7 +1114,7 @@ extern "C" double cpu_scene_size_by_id(const char* scene_id) {
 	static std::mutex mutex;
 	static std::map<std::string, double> cache;
 	if (!scene_id) return 0.0;
-	const char* path = cpu_scene_pbrt_path_by_id(scene_id);
+	const char* path = scene_pbrt_path_unwritten(scene_id);   // (a cartoon still not yet written declares no size: its header has none)
 	if (!path || !path[0]) return 0.0;
 	std::lock_guard<std::mutex> lock(mutex);
 	const std::string key = std::string(scene_id) + "|" + path;
