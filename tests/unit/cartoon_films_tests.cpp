@@ -320,6 +320,32 @@ TEST(CartoonForestDawn, TheSoundtrackIsTheSameEveryTimeInRangeAndNeverSilent) {
 	EXPECT_GT(peak, 6000) << "not too quiet";
 }
 
+// Every film has a soundtrack: the same every time it is made, heard over its whole length (no stretch of 6 s in silence before its last second), and never driven into the
+// limiter (its loudest moment is below full scale). RT_SOUNDTRACK_DIR=<folder> keeps each film's mix as <key>.wav to listen to.
+TEST(CartoonSound, EveryFilmHasASoundtrackHeardFromStartToEnd) {
+	for (const cartoon::Film &film : cartoon::kFilms) {
+		ASSERT_TRUE(static_cast<bool>(film.soundtrack)) << film.key << " has no soundtrack";
+		if (film.duration > 120.0) continue;   // (the long films' mixes take most of a minute: they are made in their own tests and in a draft)
+		cartoon::audio::Mix a(film.duration), b(film.duration);
+		film.soundtrack(a);
+		film.soundtrack(b);
+		const std::vector<std::int16_t> pa = a.finish(), pb = b.finish();
+		EXPECT_EQ(pa, pb) << film.key << ": a film sounds the same every time it is rendered";
+		if (const char *dir = std::getenv("RT_SOUNDTRACK_DIR")) cartoon::audio::writeWav((std::filesystem::path(dir) / (std::string(film.key) + ".wav")).string(), pa);
+		const auto rms = [&](double t0, double t1) {
+			double e = 0.0;
+			std::size_t n = 0;
+			for (std::size_t i = static_cast<std::size_t>(t0 * cartoon::audio::kRate) * 2; i < static_cast<std::size_t>(t1 * cartoon::audio::kRate) * 2 && i < pa.size(); ++i, ++n) e += static_cast<double>(pa[i]) * pa[i];
+			return std::sqrt(e / static_cast<double>((std::max)(std::size_t(1), n))) / 32768.0;
+		};
+		// (a pause of a few seconds is the score's own: the long films have them on purpose)
+		for (double t = 0.0; t + 6.0 < film.duration - 1.0; t += 2.0) EXPECT_GT(rms(t, t + 6.0), 0.0008) << film.key << ": silence from " << t << " s";
+		int peak = 0;
+		for (std::int16_t s : pa) peak = (std::max)(peak, std::abs(static_cast<int>(s)));
+		EXPECT_GT(peak, 3000) << film.key << ": too quiet";
+	}
+}
+
 // The Great Turtle Escape: a wide 1920 x 1080 film whose camera stays in the room, whose turtle never jumps between frames, whose night is exposed brighter than its day, and whose
 // soundtrack is deterministic and never silent until the cut to black.
 TEST(CartoonTurtleEscape, WideFramesCamerasInTheRoomAndATurtleThatDoesNotJump) {

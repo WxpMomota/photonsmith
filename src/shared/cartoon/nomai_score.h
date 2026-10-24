@@ -258,6 +258,7 @@ inline void soundtrack(Mix &m) {
 		m.put(t + 0.2, audio::noiseBurst(0.3, 0.02, 8.0, 3000.0, 1500.0, 110u + static_cast<unsigned>(k)), 0.02, 0.0, 0.5);   // (the image forming)
 	}
 	m.put(223.6, audio::noiseBurst(0.25, 0.002, 18.0, 5000.0, 800.0, 120u), 0.06, 0.0, 0.4);   // the transmission ends
+	for (double t = 224.0; t < 231.0; t += 2.0) m.put(t, audio::noiseBurst(3.0, 1.0, 0.6, 180.0, 260.0, 121u + static_cast<unsigned>(t)), 0.035, 0.0, 0.8);   // (nearly silent: the hall's air)
 	play(m, 231.0, 1.15, themeQuestion(), -12.0, 0.18, -0.1, [](double n, double l) { return guitar(n, l + 2.0, static_cast<unsigned>(n) + 50u); }, 244.0);
 	strings(m, 236.0, {50, 57}, 9.0, 0.025, 4.0, 3.0);
 	strings(m, 244.5, {50, 57, 62, 66, 69}, 6.0, 0.05, 2.5, 2.0);

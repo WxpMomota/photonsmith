@@ -335,7 +335,7 @@ The scene list shows all of it for the film's still (length, shots by name, tags
 The film table above is the text `ray_tracer --film-table` prints, and a test (`CartoonMeta`) fails when this document, the tags, the shot names, the numbers or a description that restates a length
 are out of step with the table; `tests/data/cartoon_films_snapshot.txt` pins each film's `meta` line and what its scene holds (`RT_UPDATE_SNAPSHOT=1` rewrites it).
 
-**Sound.** A film can have a soundtrack: a function `void soundtrack(audio::Mix &)` named in its row (`Film::soundtrack`) that places notes and noises on a mix of the film's length.
+**Sound.** Every film has a soundtrack (the short ones' are in `src/shared/cartoon/short_scores.h`, each placed on its film's own motion: Lamp and Ball's bounces come from its physics pass, every ball of the parade plays its own note as it lands, each domino ticks as it strikes the next, each drop on the pond plinks where the film draws its ring; a test, `CartoonSound`, holds every film to one). a function `void soundtrack(audio::Mix &)` named in its row (`Film::soundtrack`) that places notes and noises on a mix of the film's length.
 `src/shared/cartoon/cartoon_audio.h` is a small synthesiser with no sample files: a few instruments (a marimba-like mallet, a glockenspiel, a plucked string, a pad, a bass), the noises a
 cartoon needs (a splash, a knock on wood, a boing, a slide), a voice that chirps, a reverb and a limiter. Every sound is a pure function of its arguments, so a film sounds the same each time it
 is rendered. The film can share its timeline with the picture: in "Pip and the Moon" the footsteps, Pip's chirps and the splashes come from the same lists (`pip_moon_story.h`) that move its
