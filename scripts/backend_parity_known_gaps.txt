@@ -1,0 +1,4 @@
+# Scenes scripts/backend_parity.py compares CPU against a GPU backend and that are known to differ. One per line: scene, backend (rec = GPU recursive,
+# wf = GPU wavefront), reason. A scene listed here does not fail the sweep; one that passes again is reported so its line can be removed.
+# Measured 2026-10-08 on an RTX 5080 at the default size (96 px, 64 spp, seed 7).
+# (none right now: E9 passes since the GPU reads NanoVDB grids, and G25 is compared at 192 px / 256 spp, see SIZE_OVERRIDES in backend_parity.py)

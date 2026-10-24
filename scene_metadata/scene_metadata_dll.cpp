@@ -19,6 +19,7 @@
 // (~400KB) is small enough that this hasn't mattered in practice; splitting
 // cpu_interface.cpp would be the fix if it ever does.
 #include "../cpu_renderer/cpu_interface.h"
+#include "../src/shared/pbrt_discover.h"   // filmSignature()
 
 // Every export below wraps its cpu_interface.h call in try/catch: this file
 // is the actual cross-toolchain boundary (an extern "C" function called via
@@ -257,5 +258,16 @@ SCENE_METADATA_API int scene_metadata_snapshot(const char* scene_id, SceneMetada
 		return cpu_scene_metadata_snapshot(scene_id, out);
 	} catch (...) {
 		return 0;
+	}
+}
+
+// What this library was built with, for the GUI to compare with what it was built with (qt_gui/scene_metadata_client.cpp): the size of the struct scene_metadata_snapshot()
+// fills (it has grown field by field, with no size inside it, so an older GUI next to a newer library would have it written past its end), and the film table.
+SCENE_METADATA_API int scene_metadata_snapshot_size() { return static_cast<int>(sizeof(SceneMetadataSnapshot)); }
+SCENE_METADATA_API const char* scene_metadata_film_signature() {
+	try {
+		return pbrt_discover::filmSignature();
+	} catch (...) {
+		return "";
 	}
 }

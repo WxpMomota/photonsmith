@@ -59,9 +59,28 @@ def exclusions():
     return files
 
 
+def gpu_problems():
+    """The OptiX renderer is built by optix_renderer/optix_renderer.vcxproj (host .cpp) with build_optix.targets (.cu), and by the root CMakeLists.txt when
+    RT_BUILD_GPU is on. CI builds neither, so a file split or renamed in the MSBuild lists left the CMake GPU build naming files that were gone (2026-10-23).
+    Every GPU source MSBuild compiles must be named in CMakeLists.txt, and every gpu/optix source CMakeLists.txt names must exist."""
+    problems = []
+    vcx = open(os.path.join(REPO, "optix_renderer", "optix_renderer.vcxproj"), encoding="utf-8").read()
+    targets = open(os.path.join(REPO, "build_optix.targets"), encoding="utf-8").read()
+    cmake = "\n".join(l for l in open(os.path.join(REPO, "CMakeLists.txt"), encoding="utf-8") if not l.lstrip().startswith("#"))
+    msbuild = set(re.findall(r'<ClCompile Include="[^"]*?gpu\\optix\\([A-Za-z0-9_]+\.cpp)"', vcx))
+    msbuild |= set(re.findall(r'<\w+Source Include="[^"]*?gpu\\optix\\([A-Za-z0-9_]+\.cu)"', targets))
+    for f in sorted(msbuild):
+        if os.path.splitext(f)[0] not in cmake:   # (the PTX programs are named without their path or extension, in a foreach list)
+            problems.append("gpu/optix/%s is compiled by the MSBuild solution but not named in CMakeLists.txt (RT_BUILD_GPU)" % f)
+    for f in sorted(set(re.findall(r"\bgpu/optix/([A-Za-z0-9_]+\.(?:cpp|cu))\b", cmake))):
+        if not os.path.exists(os.path.join(REPO, "gpu", "optix", f)):
+            problems.append("CMakeLists.txt names gpu/optix/%s, which does not exist" % f)
+    return problems
+
+
 def main():
     disk, vcx, cmake, excluded = test_files_on_disk(), vcxproj_files(), cmake_files(), exclusions()
-    problems = []
+    problems = gpu_problems()
     for f in sorted(disk - vcx):
         problems.append("%s exists but is not in tests/ray_tracer_tests.vcxproj (the Windows full build would never compile it)" % f)
     for f in sorted(vcx - disk):

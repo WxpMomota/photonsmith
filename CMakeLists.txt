@@ -279,10 +279,25 @@ if(RT_BUILD_GPU)
     # solution already uses (a self-contained .lib with the device-link
     # already resolved, so the final exe needs no CUDA-specific link
     # handling of its own).
+    # (the same files as build_optix.targets' WavefrontObjSource / SppmObjSource items: wavefront_kernels.cu was split into the ten wavefront_kernels_*.cu)
+    set(RT_WAVEFRONT_KERNEL_SOURCES
+        gpu/optix/wavefront_kernels_camera.cu
+        gpu/optix/wavefront_kernels_materials.cu
+        gpu/optix/wavefront_kernels_materials_simple.cu
+        gpu/optix/wavefront_kernels_materials_dielectric.cu
+        gpu/optix/wavefront_kernels_bssrdf.cu
+        gpu/optix/wavefront_kernels_accumulate.cu
+        gpu/optix/wavefront_kernels_restir.cu
+        gpu/optix/wavefront_kernels_svgf.cu
+        gpu/optix/wavefront_kernels_nrc.cu
+        gpu/optix/wavefront_kernels_upscale.cu
+        gpu/optix/wavefront_launch.cu)
+    set(RT_SPPM_KERNEL_SOURCES
+        gpu/optix/sppm_kernels.cu
+        gpu/optix/sppm_launch.cu)
     foreach(pair wavefront sppm)
-        add_library(${pair}_kernels_obj OBJECT
-            gpu/optix/${pair}_kernels.cu
-            gpu/optix/${pair}_launch.cu)
+        string(TOUPPER ${pair} PAIR)
+        add_library(${pair}_kernels_obj OBJECT ${RT_${PAIR}_KERNEL_SOURCES})
         target_include_directories(${pair}_kernels_obj PRIVATE
             ${RT_OPTIX_INCLUDE} gpu/optix src/shared)
         set_target_properties(${pair}_kernels_obj PROPERTIES
@@ -316,7 +331,10 @@ if(RT_BUILD_GPU)
     #     wavefront_path_tracer.cpp/sppm_path_tracer.cpp call via the
     #     wf_launch_*/sppm_launch_* extern "C" wrappers). ------------------
     add_library(optix_renderer STATIC
-        gpu/optix/optix_renderer.cpp
+        gpu/optix/optix_renderer_init.cpp
+        gpu/optix/optix_renderer_scene.cpp
+        gpu/optix/optix_renderer_upload.cpp
+        gpu/optix/optix_renderer_render.cpp
         gpu/optix/optix_interface.cpp
         gpu/optix/scene_builder.cpp
         gpu/optix/renderer_config.cpp

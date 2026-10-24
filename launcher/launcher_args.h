@@ -11,7 +11,9 @@
 #include <set>
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <functional>
+#include <stdexcept>
 
 #include "../src/shared/video_preset.h"
 #include "../src/shared/cartoon/cartoons.h"   // --camera-path cartoon:<key>
@@ -51,6 +53,22 @@ namespace {
 	// no O(maxDepth^2) cost blowup to defend against the way BDPT/MLT have.
 	constexpr double kDefaultAoMaxDist = 1e10;   // pbrt-v4's own "effectively unbounded" default
 	constexpr double kDefaultAoIllumScale = 1.0;
+
+	// std::stoi/stoll/stod that take the whole token or throw std::invalid_argument: the std ones read a number off the front and ignore the rest, so "12abc" was 12 and "1,5" was 1.
+	template <class T, class F>
+	inline T parseWhole(const std::string &s, F parse) {
+		std::size_t used = 0;
+		const T v = parse(s, &used);
+		if (used != s.size()) throw std::invalid_argument("not a number: " + s);
+		return v;
+	}
+	// "--name", or "-x" (a letter after one dash: "-3.5", a negative camera coordinate, is a number)
+	inline bool looks_like_flag(const std::string &arg) {
+		return arg.size() >= 2 && arg[0] == '-' && (arg[1] == '-' || std::isalpha(static_cast<unsigned char>(arg[1])) != 0);
+	}
+	inline int strict_stoi(const std::string &s) { return parseWhole<int>(s, [](const std::string &t, std::size_t *n) { return std::stoi(t, n); }); }
+	inline long long strict_stoll(const std::string &s) { return parseWhole<long long>(s, [](const std::string &t, std::size_t *n) { return std::stoll(t, n); }); }
+	inline double strict_stod(const std::string &s) { return parseWhole<double>(s, [](const std::string &t, std::size_t *n) { return std::stod(t, n); }); }
 
 	// Shared by --sampler/--lightsampler/--accelerator/--splitmethod below:
 	// lowercase the raw argv value, check it against the flag's own valid
@@ -96,7 +114,7 @@ namespace {
 		consumed_args.insert(i);
 		consumed_args.insert(i + 1);
 		try {
-			outField = validate(std::stod(argv[i + 1]));
+			outField = validate(strict_stod(argv[i + 1]));
 		} catch (const std::exception&) {
 			std::cerr << parseFailureMessage;
 			if (resetOnFailure) outField = failureDefault;
@@ -636,10 +654,10 @@ inline FlagResult handle_quality_flag(const std::string& arg, int argc, char** a
 						});
 	} else if (arg == render_flags::kCrop && i + 4 < argc) {
 		try {
-			const double x0 = std::stod(argv[i + 1]);
-			const double y0 = std::stod(argv[i + 2]);
-			const double x1 = std::stod(argv[i + 3]);
-			const double y1 = std::stod(argv[i + 4]);
+			const double x0 = strict_stod(argv[i + 1]);
+			const double y0 = strict_stod(argv[i + 2]);
+			const double x1 = strict_stod(argv[i + 3]);
+			const double y1 = strict_stod(argv[i + 4]);
 			if (x0 < 0.0 || y0 < 0.0 || x1 > 1.0 || y1 > 1.0 || x0 >= x1 || y0 >= y1) {
 				std::cerr << "Invalid --crop " << x0 << " " << y0 << " " << x1 << " " << y1
 						  << " (need 0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1), using full frame\n";
@@ -660,8 +678,8 @@ inline FlagResult handle_quality_flag(const std::string& arg, int argc, char** a
 		}
 	} else if (arg == render_flags::kProbe && i + 2 < argc) {
 		try {
-			out.probe_x = std::stoi(argv[i + 1]);
-			out.probe_y = std::stoi(argv[i + 2]);
+			out.probe_x = strict_stoi(argv[i + 1]);
+			out.probe_y = strict_stoi(argv[i + 2]);
 			if (out.probe_x < 0 || out.probe_y < 0) {
 				std::cerr << "Invalid --probe " << out.probe_x << " " << out.probe_y << " (the pixel's column and row, counted from the top left, must not be negative)\n";
 				return FlagResult::Error;
@@ -676,7 +694,7 @@ inline FlagResult handle_quality_flag(const std::string& arg, int argc, char** a
 		}
 	} else if (arg == "--worker-max-mb" && i + 1 < argc) {
 		try {
-			out.worker_max_mb = (std::max)(0, std::stoi(argv[i + 1]));
+			out.worker_max_mb = (std::max)(0, strict_stoi(argv[i + 1]));
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
 			++i;
@@ -685,7 +703,7 @@ inline FlagResult handle_quality_flag(const std::string& arg, int argc, char** a
 		}
 	} else if (arg == "--gpu-device" && i + 1 < argc) {
 		try {
-			out.gpu_device = std::stoi(argv[i + 1]);
+			out.gpu_device = strict_stoi(argv[i + 1]);
 			if (out.gpu_device < 0) {
 				std::cerr << "Invalid --gpu-device " << out.gpu_device << " (must be 0 or more), using the first GPU\n";
 				out.gpu_device = -1;
@@ -698,7 +716,7 @@ inline FlagResult handle_quality_flag(const std::string& arg, int argc, char** a
 		}
 	} else if (arg == render_flags::kSeed && i + 1 < argc) {
 		try {
-			out.seed = std::stoll(argv[i + 1]);
+			out.seed = strict_stoll(argv[i + 1]);
 			// Upper bound matches every actual consumer of this value:
 			// GpuCameraParams::userSeed (gpu/optix/optix_types.h) is a
 			// 32-bit int, and camera_t's alternate-sampler seeding
@@ -750,7 +768,7 @@ inline FlagResult handle_integrator_flag(const std::string& arg, int argc, char*
 		consumed_args.insert(i);
 	} else if (arg == "--sppm-iterations" && i + 1 < argc) {
 		try {
-			out.sppm_iterations = std::stoi(argv[i + 1]);
+			out.sppm_iterations = strict_stoi(argv[i + 1]);
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
 			++i;
@@ -759,7 +777,7 @@ inline FlagResult handle_integrator_flag(const std::string& arg, int argc, char*
 		}
 	} else if (arg == "--sppm-photons" && i + 1 < argc) {
 		try {
-			out.sppm_photons = std::stoi(argv[i + 1]);
+			out.sppm_photons = strict_stoi(argv[i + 1]);
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
 			++i;
@@ -771,7 +789,7 @@ inline FlagResult handle_integrator_flag(const std::string& arg, int argc, char*
 		consumed_args.insert(i);
 	} else if (arg == "--bdpt-max-depth" && i + 1 < argc) {
 		try {
-			out.bdpt_max_depth = std::stoi(argv[i + 1]);
+			out.bdpt_max_depth = strict_stoi(argv[i + 1]);
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
 			++i;
@@ -783,7 +801,7 @@ inline FlagResult handle_integrator_flag(const std::string& arg, int argc, char*
 		consumed_args.insert(i);
 	} else if (arg == "--mlt-bootstrap" && i + 1 < argc) {
 		try {
-			out.mlt_bootstrap = std::stoi(argv[i + 1]);
+			out.mlt_bootstrap = strict_stoi(argv[i + 1]);
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
 			++i;
@@ -792,7 +810,7 @@ inline FlagResult handle_integrator_flag(const std::string& arg, int argc, char*
 		}
 	} else if (arg == "--mlt-mutations" && i + 1 < argc) {
 		try {
-			out.mlt_mutations = std::stoll(argv[i + 1]);
+			out.mlt_mutations = strict_stoll(argv[i + 1]);
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
 			++i;
@@ -801,7 +819,7 @@ inline FlagResult handle_integrator_flag(const std::string& arg, int argc, char*
 		}
 	} else if (arg == "--mlt-max-depth" && i + 1 < argc) {
 		try {
-			out.mlt_max_depth = std::stoi(argv[i + 1]);
+			out.mlt_max_depth = strict_stoi(argv[i + 1]);
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
 			++i;
@@ -816,7 +834,7 @@ inline FlagResult handle_integrator_flag(const std::string& arg, int argc, char*
 		consumed_args.insert(i);
 	} else if (arg == "--ao-max-dist" && i + 1 < argc) {
 		try {
-			out.ao_max_dist = std::stod(argv[i + 1]);
+			out.ao_max_dist = strict_stod(argv[i + 1]);
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
 			++i;
@@ -828,7 +846,7 @@ inline FlagResult handle_integrator_flag(const std::string& arg, int argc, char*
 		consumed_args.insert(i);
 	} else if (arg == "--ao-illum-scale" && i + 1 < argc) {
 		try {
-			out.ao_illum_scale = std::stod(argv[i + 1]);
+			out.ao_illum_scale = strict_stod(argv[i + 1]);
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
 			++i;
@@ -837,9 +855,9 @@ inline FlagResult handle_integrator_flag(const std::string& arg, int argc, char*
 		}
 	} else if (arg == "--ao-illum-rgb" && i + 3 < argc) {
 		try {
-			out.ao_illum_r = std::stod(argv[i + 1]);
-			out.ao_illum_g = std::stod(argv[i + 2]);
-			out.ao_illum_b = std::stod(argv[i + 3]);
+			out.ao_illum_r = strict_stod(argv[i + 1]);
+			out.ao_illum_g = strict_stod(argv[i + 2]);
+			out.ao_illum_b = strict_stod(argv[i + 3]);
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
 			consumed_args.insert(i + 2);
@@ -873,7 +891,7 @@ inline FlagResult handle_integrator_flag(const std::string& arg, int argc, char*
 inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, char** argv, int& i, std::set<int>& consumed_args, LaunchArgs& out, int& explicit_height) {
 	if (arg == "--height" && i + 1 < argc) {
 		try {
-			const int h = std::stoi(argv[i + 1]);
+			const int h = strict_stoi(argv[i + 1]);
 			if (h > 0) explicit_height = h;
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
@@ -886,7 +904,7 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 		consumed_args.insert(i);
 	} else if ((arg == render_flags::kFrames || arg == "-f") && i + 1 < argc) {
 		try {
-			out.video_frames = std::stoi(argv[i + 1]);
+			out.video_frames = strict_stoi(argv[i + 1]);
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
 			++i;
@@ -895,7 +913,7 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 		}
 	} else if (arg == "--cartoon-jobs" && i + 1 < argc) {
 		try {
-			out.cartoon_jobs = std::stoi(argv[i + 1]);
+			out.cartoon_jobs = strict_stoi(argv[i + 1]);
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
 			++i;
@@ -904,7 +922,7 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 		}
 	} else if (arg == "--cartoon-timeout" && i + 1 < argc) {
 		try {
-			out.cartoon_timeout = std::max(0, std::stoi(argv[i + 1]));
+			out.cartoon_timeout = std::max(0, strict_stoi(argv[i + 1]));
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
 			++i;
@@ -918,7 +936,7 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 		++i;
 	} else if (arg == "--cartoon-workers" && i + 1 < argc) {
 		try {
-			out.cartoon_workers = std::max(0, std::stoi(argv[i + 1]));
+			out.cartoon_workers = std::max(0, strict_stoi(argv[i + 1]));
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
 			++i;
@@ -936,7 +954,12 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 		consumed_args.insert(i);
 	} else if (arg == render_flags::kFps && i + 1 < argc) {
 		try {
-			out.video_fps = std::stoi(argv[i + 1]);
+			const int fps = strict_stoi(argv[i + 1]);
+			if (fps < 1 || fps > 1000) {   // (it was taken as it came, and ffmpeg refused it only once every frame had been rendered)
+				std::cerr << "Error: " << render_flags::kFps << " must be from 1 to 1000, not " << fps << "\n";
+				return FlagResult::Error;
+			}
+			out.video_fps = fps;
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
 			++i;
@@ -945,7 +968,7 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 		}
 	} else if (arg == render_flags::kSpeed && i + 1 < argc) {
 		try {
-			out.video_speed = std::stod(argv[i + 1]);
+			out.video_speed = strict_stod(argv[i + 1]);
 			consumed_args.insert(i);
 			consumed_args.insert(i + 1);
 			++i;
@@ -1311,28 +1334,31 @@ inline bool parse_launch_args(int argc, char** argv, LaunchArgs& out,
 		if (r == FlagResult::NotMine) r = handle_integrator_flag(arg, argc, argv, i, consumed_args, out);
 		if (r == FlagResult::NotMine) r = handle_image_and_video_flag(arg, argc, argv, i, consumed_args, out, explicit_height);
 		if (r == FlagResult::Error) return false;
-		if (r == FlagResult::Handled) continue;
+		if (r == FlagResult::Handled) {
+			// A flag whose value did not parse has said so and kept its default, without consuming anything; its value must not then become a positional argument (it
+			// shifted the width, samples, depth and scene along)
+			if (consumed_args.count(i) == 0 && i + 1 < argc) {
+				consumed_args.insert(i);
+				consumed_args.insert(i + 1);
+				++i;
+			}
+			continue;
+		}
 
 		if (arg == "--help" || arg == "-h") {
 			print_launch_help(argv[0]);
 			if (help_requested) *help_requested = true;
 			return false;
-		} else if (arg.size() >= 2 && arg[0] == '-' && arg[1] == '-' && i + 1 >= argc) {
-			// Every value-taking flag above is gated on `&& i + 1 < argc`;
-			// a boolean/no-value flag (--regularize, --adaptive, etc.) has
-			// its own branch with no such gate and would already have
-			// matched above regardless of position. Reaching here as the
-			// LAST token means either an unrecognized flag, or a value-
-			// taking flag with its value missing/truncated from the command
-			// line - both previously fell through this whole if/else-if
-			// chain silently (never added to consumed_args, then also
-			// skipped by the positional-argument loop below since it starts
-			// with "--"), so a GUI-built command line truncated by a bug
-			// upstream rendered non-reproducibly with nothing in the log to
-			// explain why. Warn instead of guessing which case it is.
-			std::cerr << "Warning: \"" << arg << "\" is unrecognized, or is "
-					  << "missing the value it expects - ignoring\n";
-			consumed_args.insert(i);
+		} else if (looks_like_flag(arg)) {
+			// Not a flag any handler above knows: a typo (--denoize), a value-taking flag whose value is missing (every value-taking flag above is gated on
+			// `i + 1 < argc`), or one of the commands that must come first (--export-gltf ...). It used to be dropped without a word unless it was the last token, and the
+			// render went ahead without what was asked for.
+			static const std::set<std::string> kCommands = {"--prepare-gpu", "--assemble-video", "--export-gltf", "--scene-report", "--print-scene-size", "--list-video-presets",
+															 "--film-table", "--film-check"};
+			if (kCommands.count(arg)) std::cerr << "Error: " << arg << " is a command of its own and must be the first argument (see --help)\n";
+			else if (i + 1 >= argc) std::cerr << "Error: \"" << arg << "\" is not an option, or is missing the value it expects (see --help)\n";
+			else std::cerr << "Error: \"" << arg << "\" is not an option (see --help)\n";
+			return false;
 		}
 	}
 
@@ -1353,17 +1379,34 @@ inline bool parse_launch_args(int argc, char** argv, LaunchArgs& out,
 		positional_args.push_back(arg);
 	}
 
-	auto parse_positive_int = [](const std::string& s, int& out_value) {
+	// WIDTH SAMPLES DEPTH: whole numbers from 1 to `most`. Anything else is an error: a value that did not parse used to be passed over in silence, so `ray_tracer my.pbrt` or
+	// `ray_tracer 400 64 my.pbrt` rendered the Cornell box at the default settings.
+	static const char *kPositionNames[] = {"width", "samples per pixel", "depth"};
+	auto parse_positive_int = [&](std::size_t position, int most, int &out_value) {
+		const std::string &s = positional_args[position];
+		double v = 0.0;
 		try {
-			double v = std::stod(s);
-			if (v > 0) out_value = static_cast<int>(v);
-		} catch (const std::exception&) {}
+			v = strict_stod(s);
+		} catch (const std::exception &) {
+			const bool sceneLike = s.find('.') != std::string::npos || scene_slugs::looksLikeSlug(s) || cartoon::isCartoonPath(s.c_str());
+			std::cerr << "Error: the " << kPositionNames[position] << " (argument " << position + 1 << " after the options) must be a number, not \"" << s << "\""
+					  << (sceneLike ? "; the scene comes fourth: WIDTH SAMPLES DEPTH SCENE" : "") << " (see --help)\n";
+			return false;
+		}
+		if (!(v >= 1.0 && v <= most) || v != std::floor(v)) {
+			std::cerr << "Error: the " << kPositionNames[position] << " must be a whole number from 1 to " << most << ", not \"" << s << "\"\n";
+			return false;
+		}
+		out_value = static_cast<int>(v);
+		return true;
 	};
 
-	if (positional_args.size() >= 1) parse_positive_int(positional_args[0], out.image_width);
+	if (positional_args.size() >= 1 && !parse_positive_int(0, 65536, out.image_width)) return false;
 	out.image_height = explicit_height > 0 ? explicit_height : out.image_width;
-	if (positional_args.size() >= 2) parse_positive_int(positional_args[1], out.samples_per_pixel);
-	if (positional_args.size() >= 3) parse_positive_int(positional_args[2], out.max_ray_depth);
+	if (positional_args.size() >= 2 && !parse_positive_int(1, 100000000, out.samples_per_pixel)) return false;
+	if (positional_args.size() >= 3 && !parse_positive_int(2, 100000, out.max_ray_depth)) return false;
+	if (positional_args.size() >= 1 && positional_args.size() < 4 && out.cartoon_worker.empty() && !cartoon::isCartoonPath(out.camera_path.c_str()))
+		std::cerr << "Note: no scene was given (it comes fourth: WIDTH SAMPLES DEPTH SCENE), so the default one is rendered.\n";
 
 	if (positional_args.size() >= 4) {
 		const std::string& id = positional_args[3];
@@ -1398,15 +1441,15 @@ inline bool parse_launch_args(int argc, char** argv, LaunchArgs& out,
 	}
 
 	if (positional_args.size() >= 5) {
-		try { out.cam_x = std::stod(positional_args[4]); out.cam_explicit = true; }
+		try { out.cam_x = strict_stod(positional_args[4]); out.cam_explicit = true; }
 		catch (const std::exception&) { std::cerr << "Invalid cam_x value, using default\n"; }
 	}
 	if (positional_args.size() >= 6) {
-		try { out.cam_y = std::stod(positional_args[5]); }
+		try { out.cam_y = strict_stod(positional_args[5]); }
 		catch (const std::exception&) { std::cerr << "Invalid cam_y value, using default\n"; }
 	}
 	if (positional_args.size() >= 7) {
-		try { out.cam_z = std::stod(positional_args[6]); }
+		try { out.cam_z = strict_stod(positional_args[6]); }
 		catch (const std::exception&) { std::cerr << "Invalid cam_z value, using default\n"; }
 	}
 

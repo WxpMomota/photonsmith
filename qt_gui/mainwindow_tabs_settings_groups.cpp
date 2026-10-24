@@ -187,6 +187,8 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 			"this is often macOS blocking an unsigned library downloaded from the internet - try running "
 			"xattr -cr on the .app in Terminal.") + reasonSuffix);
 #endif
+	} else if (const QString mismatch = SceneMetadataClient::buildMismatch(); !mismatch.isEmpty() && !qEnvironmentVariableIsSet("RT_GUI_SELFTEST")) {
+		QMessageBox::warning(basicTab, tr("Renderer and GUI Differ"), mismatch);
 	}
 
 	// A second, higher-level filter above the letter-category tabs: every

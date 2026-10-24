@@ -276,6 +276,15 @@ inline std::vector<std::string> tagsOf(const Film &film) { return splitList(film
 inline std::vector<std::string> shotNamesOf(const Film &film) { return splitList(film.meta.shotNames, '|'); }
 inline int shotCountOf(const Film &film) { return static_cast<int>(film.shotStarts().size()); }
 inline int frameCountOf(const Film &film) { return static_cast<int>(std::lround(film.duration * film.fps)); }
+// What the film table says of each film that a program setting up a video relies on (key, length, fps, size, shots). The GUI keeps its own compiled copy of the table and compares
+// it with the renderer's (scene_metadata_film_signature): when they differ, the two were built from different sources and a film's video would get the wrong length or size.
+inline std::string filmSignature() {
+	std::string s;
+	for (const Film &film : kFilms)
+		s += std::string(film.key) + "|" + std::to_string(film.duration) + "|" + std::to_string(film.fps) + "|" + std::to_string(film.meta.width) + "x" + std::to_string(film.meta.height) + "|" +
+			 std::to_string(film.shotStarts().size()) + ";";
+	return s;
+}
 
 inline std::string join(const std::vector<std::string> &items, const char *separator) {
 	std::string out;

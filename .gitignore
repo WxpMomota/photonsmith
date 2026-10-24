@@ -473,8 +473,11 @@ total.txt
 # a real, documented (README.md's "Option B: CMake (manual)") build file).
 !CMakeLists.txt
 # The committed Metal parity snapshot (scripts/update_metal_golden.sh) - a data file, not a stray log.
-!gpu/metal/parity_golden.txt
-!gpu/metal/pbrt_pack_baseline.txt
+!gpu/metal/tests/parity_golden.txt
+!gpu/metal/tests/pbrt_pack_baseline.txt
+# The backend parity sweep's known gaps (scripts/backend_parity.py reads it; docs/BACKEND_SUPPORT.md): data, not a stray log - without it a fresh clone reports every known gap
+# as a failure.
+!scripts/backend_parity_known_gaps.txt
 # SIL Open Font License text bundled with qt_gui/fonts/NotoSansSC-Regular.ttf -
 # the OFL requires this file to ship alongside the font it licenses, not a
 # stray log the *.txt rule above was meant to catch.
@@ -511,7 +514,7 @@ mcparity_*.exr
 !qt_gui/material_thumbs/*.png
 
 # test pictures a Metal ctest scene loads (subsurface-sky-image.pbrt names white-sky.png): tracked, or a clean checkout fails that test
-!gpu/metal/test_scenes/*.png
+!gpu/metal/tests/test_scenes/*.png
 # The frozen pbrt-v4 reference means the pbrt reference pack tests read (scripts/pbrt_reference_pack.py writes it) - a data file, not a stray log.
 !tests/data/pbrt_reference_means.txt
 !tests/data/scene_registry_snapshot.txt

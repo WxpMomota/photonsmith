@@ -261,6 +261,27 @@ if (-not (Test-Path $testsExe)) {
 }
 $testsExe = (Resolve-Path $testsExe).Path
 
+# This script runs the test program it finds; it does not build it. A program older than the sources it is built from tests code that is no longer there, and "All shards passed"
+# then says nothing about the change (a snapshot change went unseen that way on 2026-10-23). The render tests also run the launcher (x64\<Configuration>\ray_tracer.exe), which is
+# built separately. Both are compared with the newest source file and a program older than it is reported, here and again beside the result. (A warning, not a failure: a build
+# that finds nothing to do leaves its program's time alone, and the newest file may be one that program does not use.)
+function Get-NewestSource([string[]]$Dirs) {
+	Get-ChildItem -Path ($Dirs | ForEach-Object { Join-Path $repoRoot $_ }) -Recurse -File -Include *.cpp, *.h, *.hpp, *.cu, *.cuh -ErrorAction SilentlyContinue |
+		Where-Object { $_.FullName -notmatch '\\(build|generated|_deps)\\' } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+}
+$rendererDirs = @("src", "gpu\optix", "launcher", "cpu_renderer")
+$staleWarnings = @()
+foreach ($check in @(@{ Exe = $testsExe; Dirs = $rendererDirs + @("tests") }, @{ Exe = (Join-Path $repoRoot "x64\$Configuration\ray_tracer.exe"); Dirs = $rendererDirs })) {
+	$exe = $check.Exe
+	$newestSource = Get-NewestSource $check.Dirs
+	if (-not $newestSource -or -not (Test-Path $exe)) { continue }
+	$built = (Get-Item $exe).LastWriteTime
+	if ($built -lt $newestSource.LastWriteTime) {
+		$staleWarnings += "$(Split-Path $exe -Leaf) was built at $built, before $($newestSource.FullName) was changed ($($newestSource.LastWriteTime)): if that change is one it is built from, these results are for the old code - rebuild (ray_tracer.sln)."
+	}
+}
+foreach ($w in $staleWarnings) { Write-Host "[STALE?] $w" -ForegroundColor Yellow }
+
 # Automated guard against the naming-convention drift $gpuAndOversubscribingFilter
 # depends on (see -Tier's own doc comment): rather than trusting that
 # invariant forever on the strength of a prose warning, re-derive it fresh
@@ -390,6 +411,7 @@ if ($hungJobs) { Stop-Job -Job $hungJobs | Out-Null }
 $failedShards = @()
 $totalPassed = 0
 $totalFailed = 0
+$totalSkipped = 0
 foreach ($job in $jobs) {
 	$logFile = Join-Path $logDir "$($job.Name).log"
 	$content = if (Test-Path $logFile) { Get-Content $logFile -Raw } else { "" }
@@ -408,6 +430,8 @@ foreach ($job in $jobs) {
 	$failedCount = [Math]::Max($(if ($failedMatch.Success) { [int]$failedMatch.Groups[1].Value } else { 0 }), $failedNames.Count)
 	$totalPassed += $passedCount
 	$totalFailed += $failedCount
+	$skippedMatch = [regex]::Match($content, '\[\s*SKIPPED\s*\]\s*(\d+)\s+test')
+	if ($skippedMatch.Success) { $totalSkipped += [int]$skippedMatch.Groups[1].Value }
 
 	# A crash (or a timeout kill above) before gtest ever prints its own
 	# summary line looks identical to "0 passed, 0 failed" to the two
@@ -430,7 +454,10 @@ Remove-Job -Job $jobs
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Total: $totalPassed passed, $totalFailed failed across $Shards shards" -ForegroundColor Cyan
+# (a test that skips itself - no GPU, a scene file or fixture not found - is neither; the count shows when that changes; a shard log's "[  SKIPPED ]" lines say which)
+if ($totalSkipped -gt 0) { Write-Host "Skipped: $totalSkipped" -ForegroundColor Yellow }
 Write-Host "========================================" -ForegroundColor Cyan
+foreach ($w in $staleWarnings) { Write-Host "[STALE?] $w" -ForegroundColor Yellow }
 
 if ($failedShards.Count -gt 0) {
 	Write-Host "Failed shards: $($failedShards -join ', ')" -ForegroundColor Red

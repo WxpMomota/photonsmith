@@ -131,6 +131,7 @@ struct Discovered {
 // alone, and its file is written the first time something loads it. Defined in cartoon_scenes.cpp, which carries the film code, so the many files that include this header do not.
 void listGenerated(std::vector<Discovered> &out);   // appends one Discovered for each generated scene (its path is where its file will be)
 void materializeGenerated(const std::string &path);   // writes `path` when it is a generated scene's file that is missing or out of date; any other path is left alone
+const char *filmSignature();   // cartoon::filmSignature() of the films compiled in here (for the GUI's check that it and the renderer agree)
 
 namespace detail {
 
