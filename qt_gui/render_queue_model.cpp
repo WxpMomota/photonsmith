@@ -142,8 +142,7 @@ QVariant RenderQueueModel::data(const QModelIndex &index, int role) const {
 			return tip;
 		}
 		case Qt::TextAlignmentRole:
-			if (index.column() == SamplesColumn || index.column() == TimeColumn) return int(Qt::AlignRight | Qt::AlignVCenter);
-			break;
+			return int(Qt::AlignLeft | Qt::AlignVCenter);   // (every column, like its header)
 		case Qt::FontRole:
 			if (e.state == job_queue::State::Running) { QFont f; f.setBold(true); return f; }
 			break;
