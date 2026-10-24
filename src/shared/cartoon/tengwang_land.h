@@ -107,7 +107,7 @@ inline const char *groundName(int g) {
 	return names[g];
 }
 inline Vec3 groundColour(int g) {
-	static const Vec3 c[] = {{0.30, 0.26, 0.20}, {0.19, 0.16, 0.09}, {0.055, 0.075, 0.035}, {0.15, 0.13, 0.045}, {0.16, 0.075, 0.035}, {0.21, 0.19, 0.17}, {0.17, 0.18, 0.07}, {0.30, 0.25, 0.19}};
+	static const Vec3 c[] = {{0.30, 0.26, 0.20}, {0.19, 0.16, 0.09}, {0.06, 0.08, 0.035}, {0.24, 0.16, 0.035}, {0.26, 0.085, 0.03}, {0.21, 0.19, 0.17}, {0.17, 0.18, 0.07}, {0.30, 0.25, 0.19}};
 	return c[g];
 }
 // Woodland in autumn: dark evergreens with patches of gold and rust (the canopy's colour, which is what a wooded hill is from afar).
@@ -218,7 +218,7 @@ inline const char *fieldName(int k) {
 	return names[k];
 }
 inline std::string fieldMaterial(int k) {
-	static const Vec3 c[] = {{0.50, 0.37, 0.13}, {0.40, 0.29, 0.11}, {0.58, 0.47, 0.22}, {0.15, 0.22, 0.07}, {0.24, 0.28, 0.09}, {0.25, 0.16, 0.09}, {0.0, 0.0, 0.0}};
+	static const Vec3 c[] = {{0.58, 0.40, 0.11}, {0.46, 0.31, 0.09}, {0.64, 0.50, 0.20}, {0.15, 0.22, 0.07}, {0.24, 0.28, 0.09}, {0.25, 0.16, 0.09}, {0.0, 0.0, 0.0}};
 	if (k == Paddy) return "Material \"dielectric\" \"float eta\" [ 1.333 ]";
 	return diffuseMaterial(c[k]);
 }

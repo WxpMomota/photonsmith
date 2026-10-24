@@ -68,7 +68,7 @@ inline film_sky::Spec skySpec(int k) {
 			s.clouds = {cloudLayer(6500, 0.33, 15000, 2600, 60, {2.4, 1.05, 0.55}, {0.20, 0.12, 0.24}, 12)};
 			break;
 		case Morning:
-			s.turbidity = 3.0; s.glow = 0.2;
+			s.turbidity = 2.3; s.glow = 0.2;
 			s.clouds = {cloudLayer(6000, 0.30, 14000, 3000, 70, {2.0, 1.6, 1.2}, {0.40, 0.38, 0.46}, 13)};
 			break;
 		case Afternoon:
@@ -76,7 +76,7 @@ inline film_sky::Spec skySpec(int k) {
 			s.clouds = {cloudLayer(2600, 0.30, 5200, 3200, 40, {3.0, 2.9, 2.7}, {0.55, 0.58, 0.70}, 14, 0.8), cloudLayer(8000, 0.22, 18000, 2500, 75, {2.4, 2.3, 2.2}, {0.6, 0.62, 0.72}, 15)};
 			break;
 		case Golden:
-			s.turbidity = 3.2; s.glow = 0.12; s.glowColour = {1.0, 0.70, 0.40};
+			s.turbidity = 2.5; s.glow = 0.12; s.glowColour = {1.0, 0.70, 0.40};
 			s.clouds = {cloudLayer(6500, 0.34, 15000, 3000, 70, {2.6, 1.9, 1.1}, {0.45, 0.40, 0.50}, 16), cloudLayer(2400, 0.18, 5000, 3000, 30, {2.4, 1.8, 1.1}, {0.40, 0.36, 0.44}, 17, 0.8)};
 			break;
 		case LateGolden:
@@ -159,7 +159,7 @@ struct Frame {
 	bool sun = true;
 	double sunStrength = 1.0;
 	double iso = 150.0;
-	double bloom = 0.16, vignette = 0.32, warmth = 0.0, saturation = 1.15;
+	double bloom = 0.16, vignette = 0.32, warmth = 0.04, saturation = 1.24;
 	bool mist = true;
 	nature::Mist haze;
 	int depth = 6;

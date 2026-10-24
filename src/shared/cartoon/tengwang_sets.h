@@ -191,8 +191,16 @@ inline std::string hallText(double t, double lit = 1.0) {
 		const double spots[5][2] = {{-2.0, -2.2}, {-1.0, 2.2}, {0.0, -2.2}, {1.0, 2.2}, {2.0, -2.2}};
 		for (const auto &s : spots) {
 			char buf[200];
-			std::snprintf(buf, sizeof buf, "LightSource \"point\" \"point3 from\" [ %.3f %.3f %.3f ] \"rgb I\" [ %.3f %.3f %.3f ]\n", -5.4 * s[0], kDeck2 + 4.6, s[1], 29.0 * lit, 21.0 * lit, 13.5 * lit);
+			std::snprintf(buf, sizeof buf, "LightSource \"point\" \"point3 from\" [ %.3f %.3f %.3f ] \"rgb I\" [ %.3f %.3f %.3f ]\n", -5.4 * s[0], kDeck2 + 4.05, s[1], 29.0 * lit, 21.0 * lit, 13.5 * lit);   // (just under the lantern's tassel)
 			out += buf;
+			// the lantern the light hangs under: red silk on a cord from the ceiling, glowing from within
+			const Vec3 c{5.4 * s[0], kDeck2 + 5.15, s[1]};
+			out += attr("Material \"diffusetransmission\" \"rgb reflectance\" [ 0.62 0.06 0.04 ] \"rgb transmittance\" [ 0.75 0.12 0.05 ]",
+						emitMesh(lathe({{0.0, -0.40}, {0.25, -0.38}, {0.42, -0.24}, {0.48, 0.0}, {0.42, 0.24}, {0.25, 0.38}, {0.0, 0.40}}, 24), translate(c)));
+			out += attr(pavilionMaterial("gold", 0.0), emitMesh(lathe({{0.0, 0.0}, {0.22, 0.0}, {0.20, 0.10}, {0.0, 0.10}}, 16), translate(c + Vec3{0.0, 0.38, 0.0})) +
+														  emitMesh(lathe({{0.0, 0.0}, {0.20, 0.0}, {0.22, 0.10}, {0.0, 0.10}}, 16), translate(c - Vec3{0.0, 0.48, 0.0})));
+			out += attr("Material \"diffuse\" \"rgb reflectance\" [ 0.6 0.05 0.04 ]", bar(c + Vec3{0.0, 0.45, 0.0}, c + Vec3{0.0, 0.95, 0.0}, 0.012, 5) + bar(c - Vec3{0.0, 0.5, 0.0}, c - Vec3{0.0, 0.95, 0.0}, 0.03, 6));
+			out += emissiveSphere(c, 0.16, Vec3{1.0, 0.55, 0.22} * (14.0 * lit));
 		}
 	}
 	return out;

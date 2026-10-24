@@ -160,7 +160,7 @@ inline const std::vector<TreePlace> &treePlaces() {
 			const double z = std::abs(x) < 380.0 ? nearBank(x) + 30.0 : nearBank(x) + 7.0 + 6.0 * hash01(static_cast<int>(x), 95);
 			if (std::abs(x) < 70.0 || (std::abs(x - kGateX) < 30.0)) continue;   // (the Pavilion's view, and the road to the gate)
 			add(0, x, z, 1.0);
-			if (hash01(static_cast<int>(x), 96) < 0.3) add(autumn(static_cast<int>(x)), x + 4.0, z + 9.0, 0.9);
+			if (hash01(static_cast<int>(x), 96) < 0.55) add(autumn(static_cast<int>(x)), x + 4.0, z + 9.0, 0.9);
 			const double farBank = riverMiddle(x) - riverHalfWidth(x) - 8.0 - 8.0 * hash01(static_cast<int>(x), 97);
 			if (hash01(static_cast<int>(x), 98) < 0.7) add(hash01(static_cast<int>(x), 99) < 0.6 ? 0 : autumn(static_cast<int>(x) + 1), x, farBank, 1.1);
 		}
