@@ -13,6 +13,8 @@
 namespace cartoon {
 namespace nomai {
 
+constexpr const char *kFilmKey = "nomai-signal";
+
 inline std::string meshText(const Mesh &mesh, const Mat4 &m) {
 	Mesh kept = mesh;
 	kept.tris.clear();

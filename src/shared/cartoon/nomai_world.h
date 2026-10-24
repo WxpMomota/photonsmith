@@ -28,7 +28,6 @@
 namespace cartoon {
 namespace nomai {
 
-constexpr const char *kFilmKey = "nomai-signal";
 constexpr double kMoonR = 2400.0;
 inline Vec3 moonCentre() { return {0.0, -kMoonR, 0.0}; }
 

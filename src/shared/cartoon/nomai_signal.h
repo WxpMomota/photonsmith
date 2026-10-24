@@ -6,7 +6,7 @@
 //   I   Arrival        0:00  darkness and a pulse; the stars; the giant and its tiny moon; the shuttle's descent; three eyes in the cockpit; the signal; the landing
 //   II  The signal     0:50  footsteps in the dust; the ridge; the canyon and its ruins; the third eye; the floating steps; the corridor wakes; the writing; the recording
 //   III Observatory    2:00  the elevator; into the dark; the hall; the staff answers; the hall wakes; the star map; the flashing star; it is gone
-//   IV  The message    3:10  the transmission rebuilt; the remote memories (orange, as the game shows a remote message); silence; the mask comes off; the answer
+//   IV  The message    3:10  the transmission rebuilt; the remote memories (orange, as the game shows a remote message); silence; stillness; the answer
 //   V   Ending         4:10  dawn; the campfire; the long pull back to the stars; the title
 //
 // Made here from scratch (no asset of the game is used): the world (nomai_world.h), the ruins and the observatory (nomai_ruins.h), the explorer (nomai_explorer.h), the
@@ -710,9 +710,10 @@ inline std::string memoryText(double t, const Mat4 &stage, Vec3 up) {
 		case 4: {   // three eyes, looking up at the sky
 			ExplorerPose q = standPose(t);
 			q.headPitch = -35.0;
-			q.maskShown = false;
-			q.hood = false;
 			out += holoFigureText(q, mul(stage, translate(0.0, -2.5, -0.4), scale(2.2)), remoteOrange(), s, t, 58, 0.22);
+			// (the three eyes glowing in its mask's windows)
+			const ExplorerBody qb = explorerBody(q);
+			for (int e = 0; e < 3; ++e) out += emissiveSphere(transformPoint(mul(stage, translate(0.0, -2.5, -0.4), scale(2.2), qb.head), eyePlace(e).c), 0.035, remoteOrange() * (5.0 * in));
 			break;
 		}
 		case 5: {   // a hand reaching for the recorder, close - and the transmission ends
@@ -752,36 +753,37 @@ inline void shotSilence(double t, Frame &f, bool content) {
 	f.haze = nature::Mist{ruinsPoint(consolePlace() + Vec3{0.0, 20.0, 0.0}), 60.0, 0.003, {0.9, 0.97, 1.1}, 0.001, 0.6};
 	if (content) f.content = observatoryText(t, 0.2, 0.3, 0.12) + consoleText(0.3, t) + explorerText(p, body, 0.016);
 }
-inline void shotUnmasking(double t, Frame &f, bool content) {
-	// close: slowly the mask comes off. The face, for the first time; the eyes hold the place where the star was. Stillness
+inline void shotStillness(double t, Frame &f, bool content) {
+	// close on the mask, very slowly closer: behind its windows the three eyes hold the place where the star was. Stillness: one slow blink, the third eye last
 	const Mat4 body = consoleBody();
 	ExplorerPose p = standPose(t);
-	p.maskOff = smoothstep(231.0, 237.0, t);
-	p.handL = lerp(Vec3{0.08, 1.62, 0.30}, Vec3{0.20, 1.02, 0.22}, smoothstep(233.0, 237.0, t));
-	if (t < 231.0) p.handL = lerp(Vec3{0.21, 0.90, 0.06}, Vec3{0.08, 1.62, 0.30}, smoothstep(230.0, 231.0, t));
-	p.headPitch = -5.0;
+	p.headPitch = -5.0 - 3.0 * smoothstep(232.0, 242.0, t);
 	p.headYaw = 8.0;
-	p.lidL = p.lidR = 0.12 + 0.88 * (1.0 - smoothstep(0.0, 0.12, std::abs(t - 240.5)));
-	p.lidTop = 0.30;
+	p.lidL = p.lidR = 0.12 + 0.88 * (1.0 - smoothstep(0.0, 0.14, std::abs(t - 238.5)));
+	p.lidTop = std::max(0.30, 1.0 - smoothstep(0.0, 0.14, std::abs(t - 238.85)));
 	p.gazePitch = -8.0;
 	p.ears = -0.45;
 	const ExplorerBody b = explorerBody(p);
 	const Mat4 head = mul(body, b.head);
 	const Vec3 face = transformPoint(head, {0.0, 0.10, 0.10});
 	const Vec3 out = normalize(transformPoint(body, {0.0, 0.0, 1.0}) - transformPoint(body, {0.0, 0.0, 0.0}));
-	f.view = cam(face + out * (1.15 - 0.15 * smoothstep(237.0, 244.0, t)) + upAt(kRuinsX, canyonZ(kRuinsX)) * -0.03, face + Vec3{0.0, -0.03 * (1.0 - smoothstep(231.0, 236.0, t)), 0.0}, lens(85.0), 0.004);
+	f.view = cam(face + out * (2.0 - 0.45 * smoothstep(230.0, 244.0, t)) + upAt(kRuinsX, canyonZ(kRuinsX)) * -0.05, face + upAt(kRuinsX, canyonZ(kRuinsX)) * 0.03, lens(85.0), 0.004);
 	inside(f, 650.0);
 	if (content) {
 		const Vec3 centre = ruinsPoint(standPlace() + Vec3{0.0, 1.6, 0.0});
 		f.content = observatoryText(t, 0.25, 0.35, 0.15) + consoleText(0.4, t) + explorerText(p, body, 0.008) + starMapText(centre, 0.35, 0.0, true, t);
+		// (the faint glow of the map before the face: enough to find the eyes in the mask's windows)
+		const Vec3 lp = face + out * 0.6 + upAt(kRuinsX, canyonZ(kRuinsX)) * 0.15;
+		char buf[200];
+		std::snprintf(buf, sizeof buf, "LightSource \"point\" \"point3 from\" [ %.4f %.4f %.4f ] \"rgb I\" [ 0.060 0.085 0.120 ]\n", -lp.x, lp.y, lp.z);
+		f.content += buf;
 	}
 }
 inline void shotAnswer(double t, Frame &f, bool content) {
 	// a hand on the lectern again; the explorer records an answer, and the machine sends it: a column of light up through the hall, and a ring going out
 	const Mat4 body = consoleBody();
 	ExplorerPose p = standPose(t);
-	p.maskOff = 1.0;
-	p.handL = lerp(Vec3{0.20, 1.02, 0.22}, Vec3{0.06, 1.10, 0.52}, smoothstep(244.0, 245.5, t));
+	p.handL = lerp(Vec3{0.21, 0.90, 0.06}, Vec3{0.06, 1.10, 0.52}, smoothstep(244.0, 245.5, t));
 	p.headPitch = lerp(10.0, -35.0, smoothstep(246.5, 248.5, t));
 	p.lidTop = 0.1;
 	const double send = smoothstep(246.0, 247.0, t);
@@ -810,7 +812,6 @@ inline void shotDawn(double t, Frame &f, bool content) {
 	f.view = cam(groundPoint(-2.0, -104.0, 1.2), groundPoint(14.0, -122.0, 2.2), lens(28.0));
 	if (content) {
 		ExplorerPose p = walkPose(w.walk, t, w.moving ? 1.0 : 0.0);
-		p.maskOff = 1.0;
 		f.content = worldText(f, t) + explorerText(p, w.frame, 0.014);
 	}
 }
@@ -827,24 +828,20 @@ inline ExplorerPose sittingPose(double t) {
 	blink(p, t);
 	return p;
 }
-inline Vec3 maskRest() { return {0.62, 0.04, 0.80}; }
+// The sceptre laid on the ground beside the explorer (campfire body space: its grip there, the shaft lying along the ground).
+inline Mat4 sceptreRest() { return mul(campfireBody(), translate(0.55, 0.03, 0.45), rotate({0.0, 1.0, 0.0}, -20.0), rotate({0.0, 0.0, 1.0}, -88.0)); }
 inline void shotCampfire(double t, Frame &f, bool content) {
-	// close behind: the explorer sits at the small fire and lays the mask on the ground beside it
+	// close behind: the explorer sits at the small fire, the sceptre laid beside it, and looks into the flames, then up at the sky
 	const Mat4 F = campfireFrame();
 	ExplorerPose p = sittingPose(t);
-	const double lay = smoothstep(259.0, 262.0, t);
-	p.maskOff = 1.0;
-	p.maskShown = lay < 1.0;
-	p.handL = lerp(Vec3{0.24, 0.80, 0.30}, Vec3{0.40, 0.20, 0.40}, lay);
-	p.headPitch = 10.0 + 12.0 * lay * (1.0 - smoothstep(262.5, 264.0, t));
+	p.headPitch = lerp(18.0, -12.0, smoothstep(261.0, 264.5, t));
 	f.dawn = lerp(0.97, 0.99, smoothstep(257.0, 266.0, t));
 	f.giantGlow = 0.10;
 	f.iso = 420.0;
 	f.warmth = 0.06;
 	f.view = cam(transformPoint(F, {-0.95, 1.45, 3.4}), transformPoint(F, {0.10, 0.55, -0.8}), lens(40.0), 0.01);
 	if (content) {
-		f.content = worldText(f, t, 60.0) + campfireText(t, 1.0) + explorerText(p, campfireBody(), 0.007);
-		if (lay >= 1.0) f.content += maskText(mul(campfireBody(), translate(maskRest()), rotate({1.0, 0.0, 0.0}, -84.0), rotate({0.0, 0.0, 1.0}, 15.0)));
+		f.content = worldText(f, t, 60.0) + campfireText(t, 1.0) + explorerText(p, campfireBody(), 0.007) + sceptreText(sceptreRest(), 0.15);
 	}
 }
 inline void shotPullBack(double t, Frame &f, bool content) {
@@ -874,8 +871,10 @@ inline void shotPullBack(double t, Frame &f, bool content) {
 		f.content = worldText(f, t, 60.0);
 		if (f.space && f.ruins) f.content += ruinsStatic() + ruinsGlow(t, 0.35);
 		if (d < 3000.0) {
-			f.content += campfireText(t, 1.0) + explorerText(sittingPose(t), campfireBody(), d < 30.0 ? 0.012 : 0.03);
-			f.content += maskText(mul(campfireBody(), translate(maskRest()), rotate({1.0, 0.0, 0.0}, -84.0), rotate({0.0, 0.0, 1.0}, 15.0)));
+			ExplorerPose p = sittingPose(t);
+			p.headPitch = -12.0;   // (still looking up at the sky, as the campfire shot left it)
+			f.content += campfireText(t, 1.0) + explorerText(p, campfireBody(), d < 30.0 ? 0.012 : 0.03);
+			f.content += sceptreText(sceptreRest(), 0.15);
 		}
 		// the fire as a point of light that stays about a pixel and a half across as the camera leaves it
 		if (d > 15.0 && d < 90000.0) {
@@ -920,7 +919,7 @@ inline const std::vector<ShotDef> &shotList() {
 		{190.0, "The transmission rebuilt", shotReconstruction},
 		{198.0, "The remote memories", shotTransmission},
 		{224.0, "Silence", shotSilence},
-		{230.0, "The face", shotUnmasking},
+		{230.0, "Stillness", shotStillness},
 		{244.0, "The answer", shotAnswer},
 		{250.0, "Dawn", shotDawn},
 		{257.0, "The campfire", shotCampfire},
