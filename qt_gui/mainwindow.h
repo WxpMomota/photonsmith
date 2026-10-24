@@ -83,6 +83,7 @@ namespace SceneMetadataClient { struct SceneMetadata; }
 // machinery dragged in just to see the member declaration.
 class RealtimePreviewSession; class LiveObjectEditor;
 class SceneBuilderWidget;
+class GpuWarmup;
 class PhotoHelperCheck;
 class PhotoHelperInstaller;
 
@@ -1066,6 +1067,8 @@ private:
 	OrbitPreviewLabel *m_livePreviewLabel = nullptr;
 	QLabel *m_livePreviewStatusLabel = nullptr;
 	QPointer<LiveObjectEditor> m_liveObjectEditor;   // moves objects with the mouse; lives with the Live Preview page (live_object_editor.h)
+	QPointer<GpuWarmup> m_gpuWarmup;   // the GPU renderer's background preparation at start (gpu_warmup.h): the Scene Builder does not start a GPU render while it runs
+	bool m_queueRetryPending = false;  // processQueueIfIdle is waiting for the Scene Builder's render, and will look again
 	bool m_livePreviewRunning = false;
 	// Started in startLivePreview(), read back in stopLivePreview() to log
 	// the session's wall-clock duration and average fps

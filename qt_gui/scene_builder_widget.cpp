@@ -93,6 +93,14 @@ void SceneBuilderWidget::showEvent(QShowEvent *e) {
 	m_leftPanel->setMinimumWidth(std::max({m_addButton->sizeHint().width(), m_duplicateButton->sizeHint().width(), m_deleteButton->sizeHint().width()}) + 6);
 }
 
+void SceneBuilderWidget::cancelRenders() {
+	m_compositeCancel = true;   // (Render into the photo and the day cycle look at it every 50 ms, kill their renderer and return)
+	if (m_process) {
+		m_cancelRequested = true;
+		m_process->kill();
+	}
+}
+
 SceneBuilderWidget::~SceneBuilderWidget() {
 	flushEditLog();   // the last edit is still waiting for its pause
 	if (m_process) {

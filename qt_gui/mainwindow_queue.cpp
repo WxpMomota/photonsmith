@@ -3,6 +3,7 @@
 
 #include "mainwindow.h"
 #include "icon_tint.h"
+#include "scene_builder_widget.h"
 #include "photo_import.h"
 #include "scene_metadata_client.h"
 #include "win_taskbar.h"
@@ -408,6 +409,19 @@ void MainWindow::startRenderJob(const RenderJob &job) {
 
 void MainWindow::processQueueIfIdle() {
 	if (m_isRendering || !m_queueModel->hasWaiting()) return;
+	// The Scene Builder is rendering (a Preview, Render into the photo, a day cycle): two renders at once fight for the GPU and the cores, so the queue waits, and looks
+	// again every two seconds.
+	if (m_sceneBuilder && m_sceneBuilder->isRendering()) {
+		m_statusLabel->setText(tr("Waiting for the Scene Builder's render to finish - %n render(s) queued", nullptr, m_queueModel->waitingCount()));
+		if (!m_queueRetryPending) {
+			m_queueRetryPending = true;
+			QTimer::singleShot(2000, this, [this]() {
+				m_queueRetryPending = false;
+				processQueueIfIdle();
+			});
+		}
+		return;
+	}
 	RenderJob job;
 	int id = 0;
 	if (!m_queueModel->takeNext(id, job)) return;

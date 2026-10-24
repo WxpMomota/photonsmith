@@ -196,12 +196,22 @@ static int check_render_mode_options(const LaunchArgs &args, const RenderSetup &
         const Renderer renderer = (use_bdpt || use_mlt || use_sppm || use_debug_integrator) ? Renderer::CpuOtherIntegrator
                                   : use_gpu ? (gpu_backend::kIsMetal ? Renderer::GpuMetal : Renderer::GpuOptix)
                                             : Renderer::CpuDefault;
+        // Every option some renderer ignores, asked of the table: the warnings for --exposure, --tonemap, --seed, --denoise and --accelerator were hand-written
+        // conditions of their own (here, and in a function of their own for the integrators), which could (and did) disagree with the table the GUI greys its controls by.
         const struct { Option option; bool requested; } flags[] = {
             {Option::Sampler, !args.sampler.empty()},
             {Option::LightSampler, !args.lightsampler.empty()},
             {Option::AdaptiveSampling, args.adaptive_sampling},
             {Option::TimeLimit, args.time_limit_seconds > 0.0},
             {Option::Spectral, args.spectral},
+            {Option::Regularize, args.regularize},
+            {Option::Denoise, args.denoise},
+            {Option::DofOverride, args.aperture_override >= 0.0 || args.focus_distance_override >= 0.0},
+            {Option::Seed, args.seed >= 0},   // (worth saying: a render that looks as if it honoured --seed would not be reproducible)
+            {Option::Exposure, args.exposure != 1.0},
+            {Option::Tonemap, args.tonemap != "aces"},
+            {Option::Accelerator, !args.accelerator.empty() || !args.splitmethod.empty()},
+            {Option::OptixValidate, args.optix_validate},
         };
         for (const auto &f : flags) {
             if (f.requested && !supports(renderer, f.option)) {
@@ -210,17 +220,6 @@ static int check_render_mode_options(const LaunchArgs &args, const RenderSetup &
             }
         }
     }
-    // Unlike --sampler/--lightsampler/--spectral above, --accelerator/
-    // --splitmethod affect scene CONSTRUCTION (scene_registry.h's
-    // build_world(), shared by every CPU integrator - default path tracer,
-    // BDPT/MLT, and SPPM all call it) rather than one integrator's own
-    // light-sampling logic, so they are NOT scoped to "CPU default path
-    // tracer only" - only GPU (which always builds its own fixed BVH,
-    // never touching this scene-registry path at all) has no use for them.
-    if ((!args.accelerator.empty() || !args.splitmethod.empty()) && use_gpu) {
-        std::cerr << "Warning: --accelerator/--splitmethod have no effect under --gpu "
-                     "(GPU always builds its own fixed BVH) - ignoring.\n";
-    }
     // A native (non-.pbrt) scene has no Accelerator directive to override at
     // all - see SceneDescriptor::is_pbrt_backed's own comment.
     if ((!args.accelerator.empty() || !args.splitmethod.empty()) && !use_gpu &&
@@ -228,21 +227,6 @@ static int check_render_mode_options(const LaunchArgs &args, const RenderSetup &
         std::cerr << "Warning: --accelerator/--splitmethod have no effect on scene '" << scene_id
                   << "' (it is a native, non-.pbrt scene with no Accelerator directive to "
                      "override) - ignoring.\n";
-    }
-    // --denoise reaches OptiXRenderer's recursive/wavefront post-process
-    // step; GPU SPPM (use_sppm && use_gpu) takes a separate render entry
-    // point that never runs a denoiser pass at all, so today the flag is a
-    // silent no-op there - same warn-instead-of-silently-drop shape as
-    // --sampler/--lightsampler/--spectral above.
-    if (args.denoise && use_sppm && use_gpu) {
-        std::cerr << "Warning: --denoise has no effect under --sppm --gpu "
-                     "(GPU SPPM does not support the OptiX AI denoiser) - ignoring.\n";
-    }
-    // On the CPU only the default path tracer denoises (Open Image Denoise, if its library is installed - docs/DENOISING.md).
-    if (args.denoise && !use_gpu && (use_bdpt || use_mlt || use_sppm || use_debug_integrator)) {
-        std::cerr << "Warning: --denoise has no effect under --bdpt/--mlt/--sppm/"
-                     "--randomwalk/--ao/--simplepath/--simplevolpath/--lightpath "
-                     "(only the default path tracer denoises) - ignoring.\n";
     }
     // --denoise-blend only means anything alongside an actual --denoise
     // pass - same "flag has no effect without its own gate" shape as
@@ -424,48 +408,6 @@ static void write_aov_passes(const std::string &out_path, int width, int height,
 	std::error_code ec;
 	fs::remove(passes, ec);
 	std::cout << "  - " << image.filename().string() << " now also holds the render passes (multilayer EXR: R G B + albedo, normal, depth, uv, A)" << std::endl;
-}
-
-// --exposure, --tonemap and --seed reach only the default path tracer: a warning for each one passed with an integrator that ignores it.
-static void warnFlagsIgnoredByIntegrator(const LaunchArgs &args, const RenderSetup &s) {
-    const bool use_sppm = s.use_sppm;
-    const bool use_bdpt = s.use_bdpt;
-    const bool use_mlt = s.use_mlt;
-    const bool use_debug_integrator = s.use_debug_integrator;
-    // --exposure only reaches cpu_render_main()/optix_render_main()/
-    // metal_render_main() (the plain path-tracer entry points, now all
-    // three backends per section 148, docs/history/METAL_GPU_FEASIBILITY.md) -
-    // BDPT/MLT/SPPM (CPU and GPU) have no exposure parameter at all, so
-    // the flag would otherwise be silently swallowed with zero indication
-    // why. Same warn-instead-of-silently-drop pattern this codebase uses
-    // elsewhere for a flag/mode combination that doesn't apply (--denoise
-    // --wavefront used to warn here too, before WavefrontPathTracer
-    // gained its own real denoiser support).
-    if (args.exposure != 1.0 && (use_bdpt || use_mlt || use_sppm || use_debug_integrator)) {
-        std::cerr << "Warning: --exposure has no effect under --bdpt/--mlt/--sppm/"
-                     "--randomwalk/--ao/--simplepath/--simplevolpath/--lightpath "
-                     "(only the default path tracer supports it) - rendering at exposure=1.0.\n";
-    }
-    // --tonemap reaches the same two plain path-tracer entry points
-    // exposure does (unlike --sampler/--spectral, both backends, not CPU
-    // only) - same warn-instead-of-silently-drop shape.
-    if (args.tonemap != "aces" && (use_bdpt || use_mlt || use_sppm || use_debug_integrator)) {
-        std::cerr << "Warning: --tonemap has no effect under --bdpt/--mlt/--sppm/"
-                     "--randomwalk/--ao/--simplepath/--simplevolpath/--lightpath "
-                     "(only the default path tracer supports it) - rendering with aces.\n";
-    }
-    // --seed reaches the same two plain path-tracer entry points exposure/
-    // tonemap do (both backends) - same warn-instead-of-silently-drop
-    // shape. Worth calling out explicitly (rather than just matching the
-    // pattern silently): reproducibility is the entire point of this
-    // flag, so a silent drop here would be especially misleading - the
-    // render would look like it honored --seed (no error) while actually
-    // being exactly as non-reproducible as if it had never been passed.
-    if (args.seed >= 0 && (use_bdpt || use_mlt || use_sppm || use_debug_integrator)) {
-        std::cerr << "Warning: --seed has no effect under --bdpt/--mlt/--sppm/"
-                     "--randomwalk/--ao/--simplepath/--simplevolpath/--lightpath "
-                     "(only the default path tracer supports it) - this render will not be reproducible.\n";
-    }
 }
 
 // Runs the integrator the flags chose (BDPT, MLT, the debug integrators, SPPM, the GPU path tracer or the CPU path tracer) and reports its result.
@@ -820,8 +762,6 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
     auto start_time = std::chrono::high_resolution_clock::now();
 
     int render_result = -1; // 0 = success, non-zero = error
-
-    warnFlagsIgnoredByIntegrator(args, s);
 
     // Used by the plain path-tracer branches only (use_gpu/else below) -
     // BDPT/MLT/SPPM/the debug integrators have no RenderOptions parameter

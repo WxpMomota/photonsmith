@@ -18,7 +18,9 @@
 // header is harmless, and this avoids re-deriving per-class minimums by
 // hand only to get one wrong.
 #include "../src/shared/render_events.h"
+#include "../src/shared/render_flag_names.h"   // render_defaults: the renderer's defaults, which the options below start from
 #include <QMainWindow>
+#include <QStringDecoder>
 #include <QTabWidget>
 #include <QComboBox>
 #include <QAbstractSpinBox>
@@ -103,7 +105,7 @@ struct AdvancedRenderFlags {
 	// unlike maxComponentValue's 0.0-vs-CLI's-1e9 sentinel mismatch below) -
 	// RenderController::start() only emits --denoise-blend when this
 	// differs from 0.0, and only alongside --denoise itself.
-	double denoiseBlend = 0.0;
+	double denoiseBlend = render_defaults::kDenoiseBlend;
 	bool stats = false;
 	bool background = false;   // --background: render as a polite guest (Settings tab, Render Settings: Power "Keep the PC responsive"; the default is Full power)
 	int gpuDevice = 0;         // --gpu-device N, passed only when not 0 (the CLI's own default)
@@ -130,7 +132,7 @@ struct AdvancedRenderFlags {
 	// --adaptive-threshold) when adaptiveSampling is true - same
 	// "checkbox gates a spinbox" shape as maxComponentValue below.
 	bool adaptiveSampling = false;
-	double adaptiveThreshold = 0.01;
+	double adaptiveThreshold = render_defaults::kAdaptiveThreshold;
 	// 0.0 = "not requested" (no --time-limit emitted at all) - same
 	// sentinel shape as maxComponentValue below, distinct from the CLI's
 	// own "<=0 disables it" convention since 0.0 never needs to be a real
@@ -196,15 +198,15 @@ enum class OutputMode { Image, Video, LivePreview };
 // command line unchanged.
 struct IntegratorOptions {
 	IntegratorMode mode = IntegratorMode::Default;
-	int sppmIterations = 100;          // kDefaultSppmIterations
-	int sppmPhotons = 5000;            // kDefaultSppmPhotons
-	int bdptMaxDepth = 5;              // kDefaultBdptMaxDepth
-	int mltBootstrap = 100000;         // kDefaultMltBootstrap
-	long long mltMutations = 4000000;  // kDefaultMltMutations
-	int mltMaxDepth = 5;               // kDefaultMltMaxDepth
-	double aoMaxDist = 1e10;           // kDefaultAoMaxDist
+	int sppmIterations = render_defaults::kSppmIterations;
+	int sppmPhotons = render_defaults::kSppmPhotons;
+	int bdptMaxDepth = render_defaults::kBdptMaxDepth;
+	int mltBootstrap = render_defaults::kMltBootstrap;
+	long long mltMutations = render_defaults::kMltMutations;
+	int mltMaxDepth = render_defaults::kMltMaxDepth;
+	double aoMaxDist = render_defaults::kAoMaxDist;
 	bool aoUniform = false;            // false = cosine (CLI ao_cosine default true)
-	double aoIllumScale = 1.0;         // kDefaultAoIllumScale
+	double aoIllumScale = render_defaults::kAoIllumScale;
 	double aoIllumR = 1.0, aoIllumG = 1.0, aoIllumB = 1.0;
 	bool simplepathNoLights = false;   // CLI simplepath_sample_lights default true
 	bool simplepathNoBsdf = false;     // CLI simplepath_sample_bsdf default true
@@ -370,6 +372,7 @@ private:
 
 	QElapsedTimer m_elapsed;   // Wall-clock timer for the render
 	QString m_lineBuffer;      // Incomplete trailing line awaiting the rest of its chunk
+	QStringDecoder m_outputDecoder{QStringDecoder::Utf8};   // the renderer's UTF-8 output: one decoder, so a character split between two reads is not lost
 	render_events::Event m_errorEvent;   // the renderer's own account of why it failed, when it gave one
 	bool m_hasErrorEvent = false;
 	int m_lastProgress = 0;    // Last emitted percentage (progress only moves forward)

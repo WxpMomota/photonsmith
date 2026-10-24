@@ -31,28 +31,28 @@ namespace {
 	constexpr double kDefaultCameraX = 278.0;
 	constexpr double kDefaultCameraY = 278.0;
 	constexpr double kDefaultCameraZ = -800.0;
-	constexpr int kDefaultSppmIterations = 100;
-	constexpr int kDefaultSppmPhotons = 5000;
+	constexpr int kDefaultSppmIterations = render_defaults::kSppmIterations;
+	constexpr int kDefaultSppmPhotons = render_defaults::kSppmPhotons;
 	// BDPT: smaller than kDefaultMaxDepth deliberately -- BDPT's per-sample
 	// cost is O(maxDepth^2) (every (s,t) strategy pair up to that depth is
 	// connected and MIS-weighted, unlike the path tracer's O(maxDepth) single
 	// walk), so pbrt-v4's own CLI default (5) is a much better starting point
 	// than reusing the path tracer's 20.
-	constexpr int kDefaultBdptMaxDepth = 5;
+	constexpr int kDefaultBdptMaxDepth = render_defaults::kBdptMaxDepth;
 	// MLT: pbrt-v4's own ballpark defaults (Render.cpp), scaled down for a
 	// CPU-only render in this codebase's existing time budget -- see
 	// launcher_args.h's --mlt-* help text for how to raise these for a
 	// higher-quality (slower) render.
-	constexpr int kDefaultMltBootstrap = 100000;
-	constexpr long long kDefaultMltMutations = 4000000;
-	constexpr int kDefaultMltMaxDepth = 5;
+	constexpr int kDefaultMltBootstrap = render_defaults::kMltBootstrap;
+	constexpr long long kDefaultMltMutations = render_defaults::kMltMutations;
+	constexpr int kDefaultMltMaxDepth = render_defaults::kMltMaxDepth;
 	// Round 6 Phase 2 debug integrators: RandomWalk/SimplePath share
 	// kDefaultMaxDepth's own value (20) rather than BDPT/MLT's smaller
 	// kDefaultBdptMaxDepth -- both are single-subpath integrators (like the
 	// default path tracer, O(maxDepth) cost), not bidirectional, so there's
 	// no O(maxDepth^2) cost blowup to defend against the way BDPT/MLT have.
-	constexpr double kDefaultAoMaxDist = 1e10;   // pbrt-v4's own "effectively unbounded" default
-	constexpr double kDefaultAoIllumScale = 1.0;
+	constexpr double kDefaultAoMaxDist = render_defaults::kAoMaxDist;   // pbrt-v4's own "effectively unbounded" default
+	constexpr double kDefaultAoIllumScale = render_defaults::kAoIllumScale;
 
 	// std::stoi/stoll/stod that take the whole token or throw std::invalid_argument: the std ones read a number off the front and ignore the rest, so "12abc" was 12 and "1,5" was 1.
 	template <class T, class F>
@@ -163,7 +163,7 @@ struct LaunchArgs {
 	// value range/rationale. Only consulted when denoise is true; same
 	// scope cut as denoise above. 0.0 (default) matches this project's
 	// prior, only-ever-100%-denoised behavior exactly.
-	double denoise_blend    = 0.0;
+	double denoise_blend    = render_defaults::kDenoiseBlend;
 	// Print a small end-of-render stats block (rays cast, bounces, shadow
 	// rays, samples/sec) - see main.cpp's own block right after "RENDER
 	// TIME". Observation-only: never changes what gets rendered, only what
@@ -214,7 +214,7 @@ struct LaunchArgs {
 	// see pixel_convergence::has_converged()'s own comment. Only consulted
 	// when adaptive_sampling is true. 0.01 matches Blender Cycles' own
 	// adaptive_threshold default.
-	double adaptive_threshold = 0.01;
+	double adaptive_threshold = render_defaults::kAdaptiveThreshold;
 	// Stops claiming new scanlines once this many seconds have elapsed
 	// since the render started - see camera::time_limit_seconds's own
 	// comment. <= 0.0 (default) means "no limit", unchanged prior

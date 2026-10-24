@@ -89,3 +89,18 @@ namespace render_flags {
 	constexpr const char* kSimplevolpath      = "--simplevolpath";
 	constexpr const char* kLightpath          = "--lightpath";
 }
+
+// What the renderer uses when a flag above is not given: the launcher's defaults (launcher/launcher_args.h) and the GUI's, which leaves a flag out of the command line when its
+// value is this one. Both read them here: the GUI kept copies of its own, so a default changed in the renderer would have had the GUI show one value and render with another.
+namespace render_defaults {
+	constexpr int kSppmIterations = 100;
+	constexpr int kSppmPhotons = 5000;
+	constexpr int kBdptMaxDepth = 5;          // pbrt-v4's own; smaller than the path tracer's because BDPT's cost grows with the square of the depth
+	constexpr int kMltBootstrap = 100000;     // pbrt-v4's ballpark, scaled down for a CPU render
+	constexpr long long kMltMutations = 4000000;
+	constexpr int kMltMaxDepth = 5;
+	constexpr double kAoMaxDist = 1e10;       // pbrt-v4's "effectively unbounded"
+	constexpr double kAoIllumScale = 1.0;
+	constexpr double kAdaptiveThreshold = 0.01;
+	constexpr double kDenoiseBlend = 0.0;
+}

@@ -273,23 +273,23 @@ QStringList RenderController::commandArguments() const {
 			break;
 		case IntegratorMode::Sppm:
 			args << render_flags::kSppm;
-			if (m_integratorOptions.sppmIterations != 100)
+			if (m_integratorOptions.sppmIterations != render_defaults::kSppmIterations)
 				args << render_flags::kSppmIterations << QString::number(m_integratorOptions.sppmIterations);
-			if (m_integratorOptions.sppmPhotons != 5000)
+			if (m_integratorOptions.sppmPhotons != render_defaults::kSppmPhotons)
 				args << render_flags::kSppmPhotons << QString::number(m_integratorOptions.sppmPhotons);
 			break;
 		case IntegratorMode::Bdpt:
 			args << render_flags::kBdpt;
-			if (m_integratorOptions.bdptMaxDepth != 5)
+			if (m_integratorOptions.bdptMaxDepth != render_defaults::kBdptMaxDepth)
 				args << render_flags::kBdptMaxDepth << QString::number(m_integratorOptions.bdptMaxDepth);
 			break;
 		case IntegratorMode::Mlt:
 			args << render_flags::kMlt;
-			if (m_integratorOptions.mltBootstrap != 100000)
+			if (m_integratorOptions.mltBootstrap != render_defaults::kMltBootstrap)
 				args << render_flags::kMltBootstrap << QString::number(m_integratorOptions.mltBootstrap);
-			if (m_integratorOptions.mltMutations != 4000000)
+			if (m_integratorOptions.mltMutations != render_defaults::kMltMutations)
 				args << render_flags::kMltMutations << QString::number(m_integratorOptions.mltMutations);
-			if (m_integratorOptions.mltMaxDepth != 5)
+			if (m_integratorOptions.mltMaxDepth != render_defaults::kMltMaxDepth)
 				args << render_flags::kMltMaxDepth << QString::number(m_integratorOptions.mltMaxDepth);
 			break;
 		case IntegratorMode::RandomWalk:
@@ -297,7 +297,7 @@ QStringList RenderController::commandArguments() const {
 			break;
 		case IntegratorMode::Ao:
 			args << render_flags::kAo;
-			if (m_integratorOptions.aoMaxDist != 1.0e10)
+			if (m_integratorOptions.aoMaxDist != render_defaults::kAoMaxDist)
 				// 'f', 2: matches m_aoMaxDistSpin's own setDecimals(2) exactly.
 				// QString::number(double)'s default ('g', 6 significant
 				// digits) would silently round a value like 123456789.99 down
@@ -307,7 +307,7 @@ QStringList RenderController::commandArguments() const {
 				args << render_flags::kAoMaxDist << QString::number(m_integratorOptions.aoMaxDist, 'f', 2);
 			if (m_integratorOptions.aoUniform)
 				args << render_flags::kAoUniform;
-			if (m_integratorOptions.aoIllumScale != 1.0)
+			if (m_integratorOptions.aoIllumScale != render_defaults::kAoIllumScale)
 				args << render_flags::kAoIllumScale << QString::number(m_integratorOptions.aoIllumScale);
 			if (m_integratorOptions.aoIllumR != 1.0 || m_integratorOptions.aoIllumG != 1.0 || m_integratorOptions.aoIllumB != 1.0)
 				args << render_flags::kAoIllumRgb << QString::number(m_integratorOptions.aoIllumR)
@@ -332,7 +332,7 @@ QStringList RenderController::commandArguments() const {
 	// produces exactly the same command line this GUI always has.
 	if (m_advancedFlags.denoise) {
 		args << render_flags::kDenoise;
-		if (m_advancedFlags.denoiseBlend != 0.0)
+		if (m_advancedFlags.denoiseBlend != render_defaults::kDenoiseBlend)
 			args << render_flags::kDenoiseBlend << QString::number(m_advancedFlags.denoiseBlend);
 	}
 	if (m_advancedFlags.stats)         args << render_flags::kStats;
@@ -352,7 +352,7 @@ QStringList RenderController::commandArguments() const {
 	if (!m_advancedFlags.splitMethod.isEmpty()) args << render_flags::kSplitMethod << m_advancedFlags.splitMethod;
 	if (m_advancedFlags.adaptiveSampling) {
 		args << render_flags::kAdaptive;
-		if (m_advancedFlags.adaptiveThreshold != 0.01)
+		if (m_advancedFlags.adaptiveThreshold != render_defaults::kAdaptiveThreshold)
 			args << render_flags::kAdaptiveThreshold << QString::number(m_advancedFlags.adaptiveThreshold);
 	}
 	if (m_advancedFlags.timeLimitSeconds > 0.0)
@@ -517,6 +517,7 @@ void RenderController::start() {
 	m_finished = false;
 	m_lastProgress = 0;
 	m_lineBuffer.clear();
+	m_outputDecoder.resetState();
 	m_hasErrorEvent = false;
 	m_errorEvent = render_events::Event();
 	m_elapsed.start();
@@ -544,7 +545,7 @@ void RenderController::onReadyRead() {
 	// codepage instead, mangling every non-ASCII character (e.g. "─" ->
 	// "â”€"). QProcess pipes raw bytes with no codepage translation, so the
 	// bytes read here are exactly what the child process wrote.
-	handleOutputChunk(QString::fromUtf8(m_renderProcess->readAll()));
+	handleOutputChunk(m_outputDecoder.decode(m_renderProcess->readAll()));
 }
 
 void RenderController::handleOutputChunk(const QString &chunk) {
@@ -630,7 +631,7 @@ void RenderController::onProcessFinished(int exitCode, QProcess::ExitStatus exit
 	const double totalTime = (m_elapsed.elapsed() - pausedMs) / 1000.0;
 
 	// Drain whatever is left, then flush any final partial line.
-	handleOutputChunk(QString::fromUtf8(m_renderProcess->readAll()));
+	handleOutputChunk(m_outputDecoder.decode(m_renderProcess->readAll()));
 	QString finalOutput = m_lineBuffer.trimmed();
 	if (!finalOutput.isEmpty()) {
 		emit logMessage(finalOutput);
@@ -1081,6 +1082,7 @@ MainWindow::MainWindow(QWidget *parent, const QString &startupLanguageCode)
 	// Metal builds its renderer for this Mac the first time (about a minute and a half): do it now, in the background, and say so (gpu_warmup.h).
 	if (m_metalGpuAvailable) {
 		GpuWarmup *warmup = new GpuWarmup(this);
+		m_gpuWarmup = warmup;
 		connect(warmup, &GpuWarmup::slow, this, [this] { statusBar()->showMessage(tr("Preparing the GPU renderer for this Mac (first run only, about a minute or two)..."), 0); });
 		connect(warmup, &GpuWarmup::done, this, [this](bool ok, bool wasSlow) {
 			if (wasSlow) statusBar()->showMessage(ok ? tr("The GPU renderer is ready.") : tr("The GPU renderer could not be prepared ahead of time; the first GPU render will build it."), 8000);
@@ -1093,6 +1095,7 @@ MainWindow::MainWindow(QWidget *parent, const QString &startupLanguageCode)
 	// and say so; a warm start finishes in a second and says nothing (gpu_warmup.h).
 	{
 		GpuWarmup *warmup = new GpuWarmup(this);
+		m_gpuWarmup = warmup;
 		connect(warmup, &GpuWarmup::slow, this, [this] {
 			statusBar()->showMessage(tr("Preparing the GPU renderer (first run on this computer, or after an update: up to 25 minutes). You can use the program meanwhile; the wavefront renderer and Live Preview do not wait for it..."), 0);
 		});
@@ -1229,6 +1232,7 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
 void MainWindow::closeEvent(QCloseEvent *event) {
 	window_geometry::save(this);
 	saveRenderForm();
+	if (m_sceneBuilder) m_sceneBuilder->cancelRenders();   // (its own render loops do not end with the application's)
 	QMainWindow::closeEvent(event);
 }
 

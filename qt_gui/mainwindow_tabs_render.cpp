@@ -24,6 +24,7 @@
 #include <QDialogButtonBox>
 #include <QFontDatabase>
 #include "scene_builder_widget.h"
+#include "gpu_warmup.h"
 #include "scene_metadata_client.h"
 #ifdef RT_GUI_HAVE_LIVE_PREVIEW
 #include "realtime_preview_session.h"
@@ -126,6 +127,13 @@ void MainWindow::createRenderOptionsTab() {
 // The Scene Builder tab: build a scene from shapes and lights, preview it, save it as a .pbrt file (scene_builder_widget.h).
 void MainWindow::createSceneBuilderTab() {
 	m_sceneBuilder = new SceneBuilderWidget(this);
+	// What else has the GPU, for the Scene Builder to say before it starts a GPU render of its own (the queue, for its part, waits for the Scene Builder: processQueueIfIdle).
+	m_sceneBuilder->setGpuBusyCheck([this]() -> QString {
+		if (m_isRendering && m_currentJob.useGPU) return tr("a render in the Render tab");
+		if (m_thumbnailGenerator && m_thumbnailGenerator->isRunning()) return tr("making the scene list's pictures");
+		if (m_gpuWarmup && m_gpuWarmup->running()) return tr("preparing the GPU renderer (the first start after an update)");
+		return QString();
+	});
 	connect(m_sceneBuilder, &SceneBuilderWidget::statusMessage, this, [this](const QString &text) { statusBar()->showMessage(text, 5000); });
 	connect(m_sceneBuilder, &SceneBuilderWidget::logMessage, this, &MainWindow::onLogMessage);   // what the Scene Builder is doing, in the Log Output pane
 	// "Add to scene list": list the saved file now (the registry grows while the program runs) and select it in the Settings tab.

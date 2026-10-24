@@ -149,6 +149,8 @@ void SceneBuilderWidget::runRender(int width, int height, int samples, bool toFi
 		if (done) done(false, msg);
 	};
 	if (m_process) return fail(tr("A render is already running."));
+	if (m_gpuCheck->isChecked() && m_gpuBusy)
+		if (const QString busy = m_gpuBusy(); !busy.isEmpty()) return fail(tr("The GPU is busy with %1. Wait for it, or untick GPU to render on the CPU.").arg(busy));
 	const auto problems = scene_doc::validate(m_doc);
 	if (scene_doc::hasErrors(problems)) return fail(tr("Fix the problems listed under the properties first."));
 	if (!QFileInfo::exists(launcherPath())) return fail(tr("The renderer (%1) was not found next to the program.").arg(launcherPath()));

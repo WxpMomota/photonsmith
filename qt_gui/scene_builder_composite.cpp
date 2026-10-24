@@ -4,6 +4,7 @@
 // The method and its arithmetic are src/shared/photo_composite.h; this file runs the three renders with the renderer, reads them back as linear radiance, calls the compositor and saves the picture.
 #include "scene_builder_widget.h"
 #include "app_log.h"
+#include "render_output_parser.h"
 #include "../src/shared/environment_from_photo.h"
 #include "../src/shared/photo_composite.h"
 #include "../src/external/tinyexr.h"
@@ -28,6 +29,7 @@
 #include <QPixmap>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QStringDecoder>
 #include <QProgressDialog>
 #include <QSignalBlocker>
 #include <QTimer>
@@ -102,7 +104,9 @@ std::vector<photo_composite::Role> SceneBuilderWidget::compositeRoles() const {
 }
 
 bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::vector<photo_composite::Role> &rolesGiven, double exposureStops, int samples, int maxWidth, bool matchToPhoto, QString *error, QStringList *notes, const CompositeJob *job) {
-	const scene_doc::Document &doc = job && job->source ? *job->source : m_doc;   // (a day cycle into the photo renders its own moment of the scene)
+	// (a day cycle into the photo renders its own moment of the scene). A copy, not a reference to the scene being edited: the window stays usable while the three renders run,
+	// and an edit made meanwhile was mixed into the result where it is read again afterwards.
+	const scene_doc::Document doc = job && job->source ? *job->source : m_doc;
 	const bool nested = job && job->nested;
 	const QString statusPrefix = job ? job->statusPrefix : QString();
 	struct Quiet {   // (a quiet render is as a Live refresh: the flag is put back however this function ends)
@@ -114,6 +118,12 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 	if (m_process || (m_compositeRunning && !nested)) {   // (a Preview, final picture or video is running: two renders at once would fight for the GPU, and the window would take clicks meant for the first)
 		if (error) *error = tr("A render is already running.");
 		return false;
+	}
+	if (!nested && m_gpuCheck && m_gpuCheck->isChecked() && m_gpuBusy) {
+		if (const QString busy = m_gpuBusy(); !busy.isEmpty()) {
+			if (error) *error = tr("The GPU is busy with %1. Wait for it, or untick GPU to render on the CPU.").arg(busy);
+			return false;
+		}
 	}
 	if (m_cameraPhoto.isNull()) {
 		if (error) *error = tr("Match the camera to a photo first (Camera section: Match to a photo...): the scene is put into that photo.");
@@ -228,8 +238,9 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 		// what the renderer says: its progress goes to the progress window and (a line in four) the log, the rest straight to the log
 		QString partial, outputTail;   // (outputTail: the last of what it said, for an error message)
 		int lastQuarter = -1, kept = 0;
+		QStringDecoder utf8(QStringDecoder::Utf8);   // (the renderer writes UTF-8; one decoder keeps a character split between two reads whole)
 		auto drain = [&]() {
-			partial += QString::fromLocal8Bit(process.readAll());
+			partial += utf8.decode(process.readAll());
 			const QStringList parts = partial.split(QRegularExpression(QStringLiteral("[%1r%1n]").arg(QChar(92))));
 			partial = parts.last();
 			for (int k = 0; k + 1 < parts.size(); ++k) {
@@ -237,9 +248,7 @@ bool SceneBuilderWidget::renderIntoPhotoRoles(QImage *resultImage, const std::ve
 				if (line.isEmpty()) continue;
 				outputTail = (outputTail + line + QChar(10)).right(1200);
 				if (line.contains(QLatin1String("--denoise:"))) denoiseProblem = line;   // ("Warning: --denoise: <why> - rendering without it.")
-				if (line.startsWith(QLatin1String("Scanlines remaining:"))) {
-					const int left = line.mid(20).trimmed().toInt();
-					const int percent = std::min(100, std::max(0, 100 * (h - left) / h));
+				if (const int percent = render_output::parseScanlineProgress(line.toStdString(), h); percent != render_output::kNoProgress) {
 					m_previewStatus->setText(statusPrefix + tr("Rendering the scene for the photo: %1 of 3, %2%...").arg(p + 1).arg(percent));
 					if (percent / 25 != lastQuarter) {
 						lastQuarter = percent / 25;

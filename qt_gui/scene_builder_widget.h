@@ -61,6 +61,16 @@ public:
 	explicit SceneBuilderWidget(QWidget *parent = nullptr);
 	~SceneBuilderWidget() override;
 
+	// Stops whatever this tab is rendering (a Preview, Render into the photo, a day cycle): called when the main window closes. Render into the photo and the
+	// day cycle wait for their renderer in loops of their own, which a quitting application does not end: they left a renderer running for up to an hour
+	// after the window had gone.
+	void cancelRenders();
+	// Whether this tab is rendering (a Preview, a final picture, Render into the photo or a day cycle): the main window's queue waits for it.
+	bool isRendering() const { return m_process || m_compositeRunning || m_dayCycleRunning; }
+	// What else is using the GPU, as the main window knows it ("" when nothing): asked before a GPU render here starts. Two renders at once fight for the card
+	// (and on a cold shader cache both compile the shaders), so this tab says what is busy instead.
+	void setGpuBusyCheck(std::function<QString()> check) { m_gpuBusy = std::move(check); }
+
 	// For the automated self-test (mainwindow_selftest.cpp) and tests: drive the editor without a mouse.
 	const scene_doc::Document &document() const { return m_doc; }
 	void newScene();
@@ -605,6 +615,7 @@ private:
 	QPushButton *m_redoButton = nullptr;
 
 	// A running render
+	std::function<QString()> m_gpuBusy;   // setGpuBusyCheck
 	QProcess *m_process = nullptr;
 	QElapsedTimer m_renderClock;
 	QString m_previewPng;

@@ -126,6 +126,8 @@ bool SceneBuilderWidget::renderDayCycle(const QString &outMp4, int frames, int f
 	};
 	flushEditLog();
 	if (m_process || m_compositeRunning) return fail(tr("A render is already running."));
+	if (m_gpuCheck && m_gpuCheck->isChecked() && m_gpuBusy)
+		if (const QString busy = m_gpuBusy(); !busy.isEmpty()) return fail(tr("The GPU is busy with %1. Wait for it, or untick GPU to render on the CPU.").arg(busy));
 	if (frames < 1 || fps < 1 || width < 1) return fail(tr("A video needs at least one frame."));
 	// The scene as it is now: every frame is made from this copy (and these roles), so an edit made while the video renders (the window stays usable) does not reach the later frames or move the sky's index.
 	const scene_doc::Document base = m_doc;
@@ -227,10 +229,10 @@ bool SceneBuilderWidget::renderDayCycle(const QString &outMp4, int frames, int f
 			QString tail;
 			for (int waited = 0; process.state() != QProcess::NotRunning && waited < 20 * 60 * 1000 && !m_compositeCancel; waited += 50) {
 				process.waitForFinished(50);
-				tail = (tail + QString::fromLocal8Bit(process.readAll())).right(600);
+				tail = (tail + QString::fromUtf8(process.readAll())).right(600);
 				QCoreApplication::processEvents();
 			}
-			tail = (tail + QString::fromLocal8Bit(process.readAll())).right(600);
+			tail = (tail + QString::fromUtf8(process.readAll())).right(600);
 			if (process.state() != QProcess::NotRunning) {
 				process.kill();
 				process.waitForFinished(3000);
@@ -254,10 +256,10 @@ bool SceneBuilderWidget::renderDayCycle(const QString &outMp4, int frames, int f
 	QString output;
 	for (int waited = 0; assemble.state() != QProcess::NotRunning && waited < 10 * 60 * 1000 && !m_compositeCancel; waited += 50) {
 		assemble.waitForFinished(50);
-		output += QString::fromLocal8Bit(assemble.readAll());
+		output += QString::fromUtf8(assemble.readAll());
 		QCoreApplication::processEvents();
 	}
-	output += QString::fromLocal8Bit(assemble.readAll());
+	output += QString::fromUtf8(assemble.readAll());
 	if (assemble.state() != QProcess::NotRunning) {
 		assemble.kill();
 		assemble.waitForFinished(3000);
