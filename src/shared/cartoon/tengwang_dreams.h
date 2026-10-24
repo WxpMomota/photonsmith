@@ -444,7 +444,7 @@ inline std::string snowFieldText(double t) {
 			for (int i = 0; i <= nu; ++i) {
 				const double u = static_cast<double>(i) / nu, v = static_cast<double>(j) / nv;
 				cloth.verts.push_back({1.5 + 2.6 * u, 9.6 - 3.9 * v, 0.35 * u * std::sin(u * 6.0 - t * 5.0 + v)});
-				cloth.uvs.push_back({u, 1.0 - v});
+				cloth.uvs.push_back({1.0 - u, 1.0 - v});   // (the camera sees it looking along +z, where +x is on the left)
 			}
 		for (int j = 0; j < nv; ++j)
 			for (int i = 0; i < nu; ++i) {

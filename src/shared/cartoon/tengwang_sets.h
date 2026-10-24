@@ -273,7 +273,7 @@ inline std::string paperText(Vec3 at, double yaw, int columns) {
 	sheet.verts = {{-w / 2.0, 0.0, -d / 2.0}, {w / 2.0, 0.0, -d / 2.0}, {w / 2.0, 0.0, d / 2.0}, {-w / 2.0, 0.0, d / 2.0}};
 	sheet.normals.assign(4, Vec3{0.0, 1.0, 0.0});
 	// (the picture's top is the sheet's far edge, its right-hand column at the writer's right)
-	sheet.uvs = {{1.0, 0.0}, {0.0, 0.0}, {0.0, 1.0}, {1.0, 1.0}};
+	sheet.uvs = {{1.0, 1.0}, {0.0, 1.0}, {0.0, 0.0}, {1.0, 0.0}};   // (v = 1 is the picture's top: pbrt's imagemap reads t upwards, and v = 0 at the far edge mirrored the writing)
 	sheet.tris = {{0, 2, 1}, {0, 3, 2}};
 	const Mat4 frame = mul(translate(at + Vec3{0.0, 0.004, 0.0}), rotate({0, 1, 0}, yaw));
 	std::string out;

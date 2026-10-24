@@ -692,7 +692,7 @@ inline std::string pavilionText(double night = 0.0) {
 		const double y = kDeck2 + kCol2 + 0.75, z = -14.8;
 		board.verts = {{-3.6, y - 1.2, z}, {3.6, y - 1.2, z}, {3.6, y + 1.2, z}, {-3.6, y + 1.2, z}};
 		board.normals.assign(4, Vec3{0.0, 0.0, -1.0});
-		board.uvs = {{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}};
+		board.uvs = {{1.0, 0.0}, {0.0, 0.0}, {0.0, 1.0}, {1.0, 1.0}};   // (seen from the river, looking along +z, +x is on the left)
 		board.tris = {{0, 2, 1}, {0, 3, 2}};
 		out += "AttributeBegin\n  Texture \"plaque\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + plaque + "\" ]\n  Material \"coateddiffuse\" \"texture reflectance\" [ \"plaque\" ] \"float roughness\" [ 0.2 ]\n" +
 			   emitMesh(board, identity()) + "AttributeEnd\n";
