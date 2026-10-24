@@ -259,6 +259,25 @@ inline std::string file(const std::string &film, const Spec &s) {
 	}
 	return film_cache::scenePath(target);
 }
+// A picture a film paints for itself (a planet's face, a ground's colours: an "imagemap" texture or an area light's image), w x h linear RGB from `make(rgb)`, written once as
+// an HDR file in the film's cache folder of this build (film_cache::dir) and named by every frame that uses it. Returns the path as a scene file wants it.
+template <typename Make>
+inline std::string picture(const std::string &film, const std::string &name, int w, int h, Make make) {
+	static std::set<std::string> known;
+	std::lock_guard<std::mutex> hold(film_cache::lock());
+	const std::filesystem::path target = film_cache::dir(film) / (name + ".hdr");
+	const std::string key = target.string();
+	if (known.count(key)) return film_cache::scenePath(target);
+	std::error_code ec;
+	if (!(std::filesystem::exists(target, ec) && std::filesystem::file_size(target, ec) > 0)) {
+		std::vector<float> rgb(static_cast<std::size_t>(w) * h * 3, 0.0f);
+		make(rgb);
+		if (!film_cache::writeOnce(target, scene_doc::sky::encodeHdr(rgb, w, h))) throw std::runtime_error("film " + film + ": could not write " + target.string());
+	}
+	known.insert(key);
+	return film_cache::scenePath(target);
+}
+
 inline std::string light(const std::string &film, const Spec &s, double scale = 1.0, double turnDeg = 0.0) {
 	char buf[160];
 	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Rotate %.4f 0 1 0\n", turnDeg);

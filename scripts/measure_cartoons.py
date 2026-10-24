@@ -81,7 +81,7 @@ def main():
     if args.write:
         table = open(TABLE, encoding="utf-8", newline="").read()
         for key, seconds in results.items():
-            pattern = re.compile(r'(\{"%s", .*?::kSamples, )[0-9.]+(,\s*true\}|\})' % re.escape(key), re.S)
+            pattern = re.compile(r'(\{"%s", .*?::kSamples, )[0-9.]+(,[^}]*\}|\})' % re.escape(key), re.S)   # (a row may go on: wavefront, width, height)
             table, n = pattern.subn(lambda m: "%s%.1f%s" % (m.group(1), seconds, m.group(2)), table, count=1)
             if n != 1:
                 sys.exit("cannot find the row of %s in cartoons.h" % key)

@@ -80,3 +80,8 @@ tengwang|0|48|0
 tengwang|219|314|1
 tengwang|310|18|0
 tengwang|619.4|48|0
+meta|nomai-signal|V23|300 s|24 fps|32 shots|character,emissive,night,dawn,fog|32 spp
+nomai-signal|0|48|0
+nomai-signal|45|336950|5
+nomai-signal|150|443090|13
+nomai-signal|299.7|48|0

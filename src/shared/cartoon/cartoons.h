@@ -31,6 +31,7 @@
 #include "turtle_escape_score.h"
 #include "crystal_heart_score.h"
 #include "tengwang_score.h"
+#include "nomai_score.h"
 #include "lamp_and_ball.h"
 #include "little_robot.h"
 #include "meet_pip.h"
@@ -123,6 +124,13 @@ inline const Film kFilms[] = {
 	 tengwang::kDuration, tengwang::kFps, &tengwang::sceneAt, &tengwang::headerAt, &tengwang::shotStarts, 219.0,
 	 {22, "character,water,dusk,night,fog", tengwang::shotNamesText(), tengwang::kSamples, 5.0, false, tengwang::kWidth, tengwang::kHeight},
 	 &tengwang::soundtrack, &tengwang::captions},
+	{"nomai-signal", "The Last Nomai Signal",
+	 "An unofficial fan film after Outer Wilds: a lone Nomai explorer follows a faint repeating signal to a small moon of a gas giant, finds the ruins of an expedition that "
+	 "came there long before, wakes their observatory deep under the ground, and learns the signal comes from a star that is already gone. The explorer answers it anyway. "
+	 "With music.",
+	 nomai::kDuration, nomai::kFps, &nomai::sceneAt, &nomai::headerAt, &nomai::shotStarts, 45.0,
+	 {23, "character,emissive,night,dawn,fog", nomai::shotNamesText(), nomai::kSamples, 8.6, false, nomai::kWidth, nomai::kHeight},
+	 &nomai::soundtrack, &nomai::captions},
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 

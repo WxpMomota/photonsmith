@@ -1,0 +1,4 @@
+# The words of "The Last Nomai Signal" (src/shared/cartoon/nomai_signal.h): its title at the end, and the credit. Read when the video is made (caption_file.h).
+style title font=segoeuil.ttf size=0.062 colour=0.93,0.95,0.97
+style credit font=segoeuil.ttf size=0.022 colour=0.62,0.68,0.74
+caption 292.6 299.6 fade=1.6 centre=0.50 width=0.9 gap=0.9 | title: T H E   L A S T   N O M A I   S I G N A L | credit: an unofficial fan film after Outer Wilds by Mobius Digital

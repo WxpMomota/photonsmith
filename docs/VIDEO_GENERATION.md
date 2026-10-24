@@ -217,9 +217,10 @@ short id or the descriptive key:
 | V20 | turtle-escape | (its own scenes) | cartoon:turtle-escape | 8184 | 24 | 1.0 |
 | V21 | crystal-heart | (its own scenes) | cartoon:crystal-heart | 1440 | 24 | 1.0 |
 | V22 | tengwang | (its own scenes) | cartoon:tengwang | 14880 | 24 | 1.0 |
+| V23 | nomai-signal | (its own scenes) | cartoon:nomai-signal | 7200 | 24 | 1.0 |
 
 `ray_tracer --list-video-presets` prints the whole list (camera flythroughs and cartoons together: id, key, kind, length, name). The cartoons are presets like the rest: one per film in
-`src/shared/cartoon/cartoons.h`, numbered on from the camera presets (V7 to V22 so far), their name, description, frame count and fps taken from the film, so the table below and the film
+`src/shared/cartoon/cartoons.h`, numbered on from the camera presets (V7 to V23 so far), their name, description, frame count and fps taken from the film, so the table below and the film
 table cannot disagree.
 
 ```powershell
@@ -305,6 +306,7 @@ mesh is a light of its own to sample, so a mesh ball is hundreds of lights. The 
 | turtle-escape | The Great Turtle Escape | 341 s | 74 | character, comedy, water, glass, night | A tiny turtle escapes its perfect tank like a spy breaking out of prison - rocks, a thermometer, a hose and a robot vacuum stand in its way - and dives into a pool that turns out to be the tub its owner filled for it. |
 | crystal-heart | The Crystal Heart | 60 s | 6 | glass, emissive, fog, water, dawn | A valley of colossal glowing crystals rising out of a mirror lake, from the deep blue before dawn to sunrise: the sun breaks through the ridge and its light falls between the spires through the mist, and the giant crystal floating over the valley wakes, beats and ignites, its light cutting through the mist in beams. With music. |
 | tengwang | Preface to the Pavilion of Prince Teng | 620 s | 59 | character, water, dusk, night, fog | One autumn day at Hongzhou after Wang Bo's preface of AD 675, from the sea of clouds before sunrise to the stars over the Gan River: the Pavilion of Prince Teng, the feast, the young poet alone on its high terrace above the whole land, the sunset and the solitary duck, the world inside his brush, and his resolve. With the preface's words on the screen in Chinese and English, and music. |
+| nomai-signal | The Last Nomai Signal | 300 s | 32 | character, emissive, night, dawn, fog | An unofficial fan film after Outer Wilds: a lone Nomai explorer follows a faint repeating signal to a small moon of a gas giant, finds the ruins of an expedition that came there long before, wakes their observatory deep under the ground, and learns the signal comes from a star that is already gone. The explorer answers it anyway. With music. |
 
 A frame of a film is also a scene: `ray_tracer --gpu 1280 256 8 cartoon:fireflies@13.5` renders that moment as one picture (`cartoon:<key>` alone is the film's own best still), which is the quickest
 way to look at a change to a film. The GUI's scene list has a Cartoons tab (beside Self-Contained and Requires External Files) with one still per film; it is listed from the films themselves (a still's file is written the first time it is rendered), so a new film appears there by itself, and its Film time box renders any other moment of the film as a picture.
