@@ -165,6 +165,13 @@ inline int fillMissingFrames(const std::filesystem::path &dir, int count) {
 	}
 	return filled;
 }
+// The frames fillMissingFrames has made (copies of a neighbour) in `dir`.
+inline std::set<int> filledFrames(const std::filesystem::path &dir) {
+	std::set<int> out;
+	std::ifstream in(dir / kFilledList);
+	for (int i = 0; in >> i;) out.insert(i);
+	return out;
+}
 // Before a video is resumed: the frames that were copies of their neighbours are removed (and the list with them), so that they are rendered this time.
 inline int dropFilledFrames(const std::filesystem::path &dir) {
 	std::ifstream in(dir / kFilledList);

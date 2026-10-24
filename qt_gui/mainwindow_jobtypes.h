@@ -237,7 +237,7 @@ public:
 					   const QString &outputPath = QString(), bool useWavefront = false);
 
 	// Set video generation parameters
-	void setVideoParameters(bool enabled, int frames, int fps, const QString &cameraPath, double speed = 1.0);
+	void setVideoParameters(bool enabled, int frames, int fps, const QString &cameraPath, double speed = 1.0, int draftStep = 1);
 
 	// Set the "Render Options" tab's flags - a separate setter rather than
 	// growing setParameters()'s already-large signature further, and one
@@ -382,6 +382,7 @@ private:
 	int m_videoFrames;      // Number of frames to render
 	int m_videoFPS;         // Target frames per second
 	double m_videoSpeed;    // Camera movement speed multiplier (1.0 = default path speed)
+	int m_draftStep = 1;    // --draft N (a film: one frame in N)
 	QString m_cameraPath;   // Camera animation path (orbit, linear, figure8, spiral)
 };
 
@@ -542,6 +543,7 @@ struct RenderJob {
 	int videoFrames = 0;
 	int videoFPS = 0;
 	double videoSpeed = 1.0;
+	int draftStep = 1;   // --draft N: a film renders one frame in N (1 = every frame)
 	QString cameraPath;
 	QString displayTitle;      // Scene name, for the queue list row - see describeRenderJob()
 	QString sceneDescription;  // Scene's own description, for the finished Preview tab's tooltip

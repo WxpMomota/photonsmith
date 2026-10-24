@@ -528,6 +528,18 @@ TEST(CartoonRender, AFrameThatFailedIsFilledFromTheOneBeforeSoTheVideoKeepsItsLe
 	EXPECT_EQ(cartoon_render::fillMissingFrames(dir, 3), 0) << "nothing to fill from";
 }
 
+TEST(CartoonRender, ADraftRendersOneFrameInNAndIsAVideoFlagNotAFrameFlag) {
+	LaunchArgs a;
+	ASSERT_TRUE(parseArgs({"--gpu", "--draft", "4"}, a));
+	EXPECT_EQ(a.draft_step, 4);
+	EXPECT_EQ(LaunchArgs().draft_step, 1) << "every frame unless asked";
+	EXPECT_TRUE(cartoon_render::forwardedFlags(a) == std::vector<std::string>{"--gpu"}) << "the frame runs render one frame each: --draft stays with the video";
+	LaunchArgs b;
+	EXPECT_FALSE(parseArgs({"--draft", "0"}, b));
+	EXPECT_FALSE(parseArgs({"--draft", "25"}, b));
+	EXPECT_FALSE(parseArgs({"--draft", "four"}, b));
+}
+
 TEST(CartoonRender, AFilledInFrameIsListedAndKeepsTheTimeOfTheFrameItCopies) {
 	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "photonsmith_fill_list_test";
 	std::filesystem::remove_all(dir);

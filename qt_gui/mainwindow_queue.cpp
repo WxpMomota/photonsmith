@@ -268,6 +268,7 @@ RenderJob MainWindow::captureRenderJob() {
 		job.videoFrames = m_videoFramesSpinBox->value();
 		job.videoFPS = m_videoFPSSpinBox->value();
 		job.videoSpeed = m_videoSpeedSpinBox->value();
+		job.draftStep = m_videoDraftCombo ? m_videoDraftCombo->currentData().toInt() : 1;
 		job.cameraPath = videoCameraPath();
 
 		// Named scene+path+frames/fps/speed bundle, if one is selected - see
@@ -295,7 +296,7 @@ RenderController *MainWindow::makeRenderController(const RenderJob &job) {
 	controller->setAdvancedFlags(job.advancedFlags);
 	controller->setIntegratorOptions(job.integratorOptions);
 	if (job.videoMode) {
-		controller->setVideoParameters(true, job.videoFrames, job.videoFPS, job.cameraPath, job.videoSpeed);
+		controller->setVideoParameters(true, job.videoFrames, job.videoFPS, job.cameraPath, job.videoSpeed, job.draftStep);
 	} else {
 		controller->setVideoParameters(false, 0, 0, "", 1.0);
 	}

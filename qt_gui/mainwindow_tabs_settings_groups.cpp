@@ -1163,6 +1163,20 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 		"many frames, covering the same journey faster.")),
 		m_videoSpeedSpinBox);
 
+	// A draft of a film: one frame in N rendered and repeated in the others (--draft N), so the whole film, its sound in step, can be watched in a fraction of the time.
+	m_videoDraftCombo = new QComboBox();
+	m_videoDraftCombo->addItem(tr("Off (every frame)"), 1);
+	m_videoDraftCombo->addItem(tr("1 frame in 2"), 2);
+	m_videoDraftCombo->addItem(tr("1 frame in 4"), 4);
+	m_videoDraftCombo->addItem(tr("1 frame in 8"), 8);
+	videoLayout->addRow(labelWithInfo(tr("Draft:"),
+		tr("For a cartoon film: render only one frame in N and repeat it in the frames after it. The video keeps "
+		"its length and the film's sound stays in step, so you can watch and listen to the whole film in a fraction "
+		"of the time (use a small size and few samples too).\n\n"
+		"The frames a draft renders are kept: render again with Draft off and the same size, samples and options, "
+		"and only the frames the draft left out are rendered.")),
+		m_videoDraftCombo);
+
 	// Video duration/summary info (calculated from frames/fps), plus the
 	// static ffmpeg-requirement/step-by-step usage text a separate
 	// "Video render requirements & usage:" row used to show below this

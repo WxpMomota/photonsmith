@@ -313,6 +313,11 @@ Making a film of your own: the toolkit is `src/shared/cartoon/cartoon_lib.h` (th
 a finished film is a function `std::string sceneAt(double t)` (with `headerAt(t)`, `shotStarts()` and `kSamples` beside it) and a row in the table in `src/shared/cartoon/cartoons.h`; that row alone makes it a video preset
 (`video_preset::all()` builds the preset from it), a scene on the GUI's Cartoons tab and a line of `--list-video-presets`.
 
+**A draft of a film: `--draft N`** (the GUI's Draft box under the video settings): a cartoon video renders one frame in N (2 to 24) and repeats it in the frames after it, so the
+video keeps its length and the film's soundtrack is added and stays in step - the whole film, to watch and listen to, in a fraction of the time (The Crystal Heart, 1440 frames, at
+213 x 120 and 4 samples with `--draft 8`: 27 seconds with its sound). The frames a draft renders are real renders: a render at the same size, samples and flags with `--resume`
+(the GUI always resumes a film) and no draft renders only the frames the draft left out.
+
 **Checking a film before rendering it: `python scripts/anim/film.py doctor <key>`.** It renders every shot at its start, middle and end, small (120 pixels high, 8 samples, three at a time:
 about six minutes for the 59 shots of tengwang), and reports what looks wrong, framed in red (a warning) or yellow (a note) on a contact sheet with a row a shot: black frames in the
 middle of a shot (a black shot, or a black start or end with a picture in the middle, is a cut or a fade: a note), very dark frames (a light boxed in, an exposure far too low), blown-out

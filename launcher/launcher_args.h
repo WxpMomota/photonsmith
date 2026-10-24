@@ -404,6 +404,8 @@ struct LaunchArgs {
 	int cartoon_timeout = -1;
 	// --resume: continue an interrupted cartoon video from the frames it already rendered (when the settings and the film are the same), instead of starting again.
 	bool cartoon_resume = false;
+	// --draft N: a cartoon video renders one frame in N and repeats it in the others (launcher/video_render.h, renderCartoonFrames); 1 = every frame.
+	int draft_step = 1;
 	// --ppm-only: write the picture as a PPM and no PNG beside it. A cartoon video's frame runs are started with it (the video turns each PPM into its numbered PNG itself and deletes the
 	// frame run's own PNG, so making one was a second encode of every frame); people have no use for it.
 	bool ppm_only = false;
@@ -946,6 +948,21 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 	} else if (arg == "--resume") {
 		out.cartoon_resume = true;
 		consumed_args.insert(i);
+	} else if (arg == "--draft" && i + 1 < argc) {
+		try {
+			const int n = strict_stoi(argv[i + 1]);
+			if (n < 1 || n > 24) {
+				std::cerr << "Error: --draft takes a number from 1 to 24 (one frame in N is rendered), not " << n << "\n";
+				return FlagResult::Error;
+			}
+			out.draft_step = n;
+			consumed_args.insert(i);
+			consumed_args.insert(i + 1);
+			++i;
+		} catch (const std::exception&) {
+			std::cerr << "Error: --draft takes a whole number (one frame in N is rendered)\n";
+			return FlagResult::Error;
+		}
 	} else if (arg == "--ppm-only") {
 		out.ppm_only = true;
 		consumed_args.insert(i);
@@ -1290,6 +1307,9 @@ inline void print_launch_help(const char* program) {
 				  << "               (the environment variable RAY_TRACER_BACKGROUND=1 also sets it)\n"
 				  << "  --resume:    continue an interrupted cartoon video from the frames already rendered, when the film and\n"
 				  << "               the settings (size, samples, flags) are the same; otherwise it starts again\n"
+				  << "  --draft N:   a cartoon video renders one frame in N (2 to 24) and repeats it in the others: the whole\n"
+				  << "               film, its sound in step, in a fraction of the time; a full render with the same\n"
+				  << "               settings and --resume then renders only the frames the draft left out\n"
 				  << "               Accepts either short id or descriptive key:\n"
 				  << "               V1/cornell-orbit, V2/teapot-spin, V3/one-weekend-flyby,\n"
 				  << "               V4/next-week-finale, V5/glass-dragon-caustics,\n"

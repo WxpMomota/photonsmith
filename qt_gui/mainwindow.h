@@ -1717,6 +1717,7 @@ private:
 	QSpinBox *m_videoFramesSpinBox;     // Number of frames to render
 	QSpinBox *m_videoFPSSpinBox;        // Target FPS for video
 	QDoubleSpinBox *m_videoSpeedSpinBox; // Camera movement speed multiplier
+	QComboBox *m_videoDraftCombo = nullptr;   // a film's draft: one frame in N (--draft N); 1 = off
 	// Info icon whose tooltip is rewritten on every recompute (duration/
 	// camera path/output) rather than an always-visible text block - same
 	// pattern m_sceneTechInfoIcon uses. Default-constructed nullptr like

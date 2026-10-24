@@ -186,8 +186,9 @@ void RenderController::setParameters(bool useGPU, int width, int height, int sam
 	m_outputPath = outputPath;
 }
 
-void RenderController::setVideoParameters(bool enabled, int frames, int fps, const QString &cameraPath, double speed) {
+void RenderController::setVideoParameters(bool enabled, int frames, int fps, const QString &cameraPath, double speed, int draftStep) {
 	m_videoMode = enabled;
+	m_draftStep = draftStep;
 	m_videoFrames = frames;
 	m_videoFPS = fps;
 	m_videoSpeed = speed;
@@ -384,6 +385,7 @@ QStringList RenderController::commandArguments() const {
 		// A cartoon film's frames are kept in <output_dir>/frames, so a render that was stopped (closed window, crash, power) continues from them when started again with the same settings;
 		// the launcher starts afresh when anything differs.
 		if (m_cameraPath.startsWith(QStringLiteral("cartoon:"))) args << QStringLiteral("--resume");
+		if (m_draftStep > 1 && m_cameraPath.startsWith(QStringLiteral("cartoon:"))) args << QStringLiteral("--draft") << QString::number(m_draftStep);
 
 		// Use the same per-render output path image mode does (see
 		// onRenderClicked()'s comment on why it's refreshed with a fresh

@@ -228,6 +228,8 @@ static int check_render_mode_options(const LaunchArgs &args, const RenderSetup &
                   << "' (it is a native, non-.pbrt scene with no Accelerator directive to "
                      "override) - ignoring.\n";
     }
+    if (args.draft_step > 1 && !(video_mode && cartoon::isCartoonPath(s.camera_path.c_str())))
+        std::cerr << "Warning: --draft is for the video of a cartoon film (--video with --camera-path cartoon:<key>) - ignoring.\n";
     // --denoise-blend only means anything alongside an actual --denoise
     // pass - same "flag has no effect without its own gate" shape as
     // --maxcomponentvalue's checkbox/spinbox pairing (GUI) has, just for

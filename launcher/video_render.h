@@ -398,6 +398,14 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
             if (std::filesystem::exists(frames_dir / cartoon_render::encName(frame))) already[static_cast<std::size_t>(frame)] = 1, ++resumed;
         if (resumed > 0) std::cout << "\nResuming: " << resumed << " of " << render_frame_count << " frames are already rendered." << std::endl;
     }
+    // --draft N: only every Nth frame is rendered; the others repeat the one before (renderVideoFrames fills them in, as it fills a failed frame), so the video keeps its length
+    // and the film's sound stays in step: a whole film to look at and listen to in a fraction of the time. The drafted frames are real renders, so a full render at the same
+    // size, samples and flags resumes from them and renders only the rest.
+    const int draftStep = std::max(1, args.draft_step);
+    for (int frame = 0; frame < render_frame_count; ++frame)
+        if (frame % draftStep != 0) already[static_cast<std::size_t>(frame)] = 1;
+    if (draftStep > 1) std::cout << "\nDraft: rendering one frame in " << draftStep << " (" << (render_frame_count + draftStep - 1) / draftStep << " of " << render_frame_count
+                                 << "); each is repeated in the frames after it." << std::endl;
     const int timeout = cartoon_render::timeoutFor(args, use_gpu);
     // --time-limit is the whole video's budget (CPU only, as for any video): each frame gets its share, and `jobs` frames share the clock
     const double frameTimeLimit = (args.time_limit_seconds > 0.0 && !use_gpu) ? args.time_limit_seconds * jobs / std::max(1, render_frame_count - resumed) : 0.0;
@@ -674,7 +682,7 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
         std::cerr << "ERROR: No frames rendered successfully!" << std::endl;
         return ERR_FILE_WRITE_FAILED;
     }
-    if (successful_frames < render_frame_count) {
+    if (successful_frames < render_frame_count && !cartoon_film) {   // (a film fills its holes, and says below how many frames failed: a draft's are left out on purpose)
         std::cout << "WARNING: " << (render_frame_count - successful_frames) << " of " << render_frame_count
                    << " frames failed to render and will be skipped - the video will be shorter than requested."
                    << std::endl;
@@ -691,8 +699,16 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
         converted = cartoon_render::countFrames(frames_dir, render_frame_count);
         if (converted > 0 && converted < render_frame_count) {
             const int filled = cartoon_render::fillMissingFrames(frames_dir, render_frame_count);
-            std::cout << "WARNING: " << (render_frame_count - converted) << " frame(s) failed; each is repeated from the frame before it so that the video keeps its length"
-                      << (filled == render_frame_count - converted ? "." : " (some could not be).") << std::endl;
+            // (a draft leaves out all but one frame in N on purpose: only the frames it meant to render and could not are failures)
+            const int draftStep = std::max(1, args.draft_step);
+            const int intended = (render_frame_count + draftStep - 1) / draftStep;
+            const std::set<int> copies = cartoon_render::filledFrames(frames_dir);
+            int failed = 0;
+            for (int f = 0; f < render_frame_count; f += draftStep)
+                if (copies.count(f) || !std::filesystem::exists(frames_dir / cartoon_render::encName(f))) ++failed;
+            if (failed > 0)
+                std::cout << "WARNING: " << failed << " of " << intended << " frame(s) failed; each is repeated from the frame before it so that the video keeps its length"
+                          << (filled >= render_frame_count - converted ? "." : " (some could not be).") << std::endl;
             converted = cartoon_render::countFrames(frames_dir, render_frame_count);
         }
     }
