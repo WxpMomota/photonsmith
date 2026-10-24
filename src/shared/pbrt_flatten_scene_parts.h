@@ -387,6 +387,12 @@ inline void flattenLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 			cand.scale = ld.params.getFloat("scale", 1.0);
 			cand.imageFile = ld.params.getString("filename", "");
 			cand.xform = ld.xform;
+			// "illuminance" (lux, on an upward-facing patch): pbrt-v4 scales a uniform sky so that its emission, 1 nit before, gives that much - a uniform hemisphere
+			// of 1 nit gives pi (lights.cpp, `k_e = Pi`). For a picture pbrt integrates the picture's upper hemisphere, which needs the picture: not done here.
+			if (const double E_v = ld.params.getFloat("illuminance", -1.0); E_v > 0.0) {
+				if (cand.imageFile.empty() && !ld.params.find("portal")) cand.scale *= E_v / 3.14159265358979323846;
+				else warn("infinite light \"illuminance\" with a picture or a portal is not supported (pbrt-v4 integrates the picture's upper hemisphere); ignored");
+			}
 			// "point3 portal[4]" (pbrt-v4's windowed infinite light) - 4 corner points, 12 numbers total. They are WORLD-space points as written: pbrt maps them with the
 			// camera transform alone (`cameraTransform.RenderFromWorld(p)`, lights.cpp) and never through the light's CTM, which only turns the environment picture
 			// (pbrt_load.h resamples it). The pbrt-v4-scenes Kroken has `Rotate 340 0 1 0` / `Rotate -90 1 0 0` before its portal light, whose corners are the window's own
@@ -529,13 +535,15 @@ inline void flattenLights(const pbrt_scene::Scene &scene, FlatScene &out) {
 			const pbrt_scene::Vec3 L = resolveEmissionColor(ld.params, "L", pbrt_scene::Vec3{1, 1, 1}, RGBColorSpaceFromName(ld.colorSpaceName));
 			pl.intensity[0] = L.x; pl.intensity[1] = L.y; pl.intensity[2] = L.z;
 			pl.scale = ld.params.getFloat("scale", 1.0);
+			// "illuminance" (lux): pbrt-v4's DistantLight::Create multiplies its scale by it, the emission having been made 1 nit first (it was ignored here, so a
+			// scene that set the sun's brightness this way was lit by a 1-lux sun).
+			if (const double E_v = ld.params.getFloat("illuminance", -1.0); E_v > 0.0) pl.scale *= E_v;
 			// pbrt-v4 itself has no "power" for a distant light - unlike every
 			// other punctual kind, its irradiance doesn't fall off with
 			// distance, so there is no finite total Phi to solve for without
-			// an arbitrary reference area (real pbrt-v4 instead reads a
-			// separate "illuminance" parameter, in lux, which this loader
-			// does not parse either - out of scope here). Warn rather than
-			// silently ignoring a "power" a scene author expected to matter.
+			// an arbitrary reference area (pbrt-v4 reads "illuminance" instead,
+			// above). Warn rather than silently ignoring a "power" a scene
+			// author expected to matter.
 			if (ld.params.find("power")) {
 				warn("distant light \"power\" is not supported (pbrt-v4 has no "
 					 "finite total power for a directional light); ignored");

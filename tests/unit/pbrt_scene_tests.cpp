@@ -198,8 +198,8 @@ TEST(PbrtStateTest, WorldBeginRegistersBuiltinWorldCoordinateSystem) {
 }
 
 TEST(PbrtStateTest, CameraDirectiveRegistersBuiltinCameraCoordinateSystem) {
-	// pbrt-v4 builtin: "camera" always names the CTM in effect at the Camera
-	// statement - the standard camera-relative-light idiom.
+	// pbrt-v4 builtin: "camera" names the camera's space, worldFromCamera - the inverse of the CTM at the Camera statement (cameraFromWorld): pbrt-v4
+	// scene.cpp, namedCoordinateSystems["camera"] = Inverse(cameraFromWorld). The standard camera-relative-light idiom.
 	const Scene s = parseOk(
 		"Translate 5 0 0\n"
 		"Camera \"perspective\"\n"
@@ -207,9 +207,38 @@ TEST(PbrtStateTest, CameraDirectiveRegistersBuiltinCameraCoordinateSystem) {
 		"CoordSysTransform \"camera\"\n"
 		"Shape \"sphere\"\n");
 	ASSERT_EQ(s.shapes.size(), 1u);
-	EXPECT_DOUBLE_EQ(s.shapes[0].xform.m[3], 5.0)
-		<< "CoordSysTransform \"camera\" must recall the CTM in effect at the Camera directive";
+	EXPECT_DOUBLE_EQ(s.shapes[0].xform.m[3], -5.0)
+		<< "a camera at world x = -5 (cameraFromWorld translates by +5): the camera's space puts the sphere's centre there";
 	EXPECT_FALSE(hasWarningContaining(s, "unknown coordinate system"));
+}
+
+TEST(PbrtStateTest, MakeNamedMaterialDefinesAMaterialWithoutMakingItCurrent) {
+	// pbrt-v4's BasicSceneBuilder::MakeNamedMaterial only adds the material; Material and NamedMaterial choose one.
+	const Scene s = parseOk(
+		"WorldBegin\n"
+		"Material \"conductor\"\n"
+		"MakeNamedMaterial \"glass\" \"string type\" [ \"dielectric\" ]\n"
+		"Shape \"sphere\"\n"
+		"NamedMaterial \"glass\"\n"
+		"Shape \"sphere\"\n");
+	ASSERT_EQ(s.shapes.size(), 2u);
+	ASSERT_GE(s.shapes[0].materialIndex, 0);
+	EXPECT_EQ(s.materials[s.shapes[0].materialIndex].type, "conductor") << "the material in effect, not the one just made";
+	ASSERT_GE(s.shapes[1].materialIndex, 0);
+	EXPECT_EQ(s.materials[s.shapes[1].materialIndex].type, "dielectric");
+	const Scene d = parseOk("WorldBegin\nMakeNamedMaterial \"gold\" \"string type\" [ \"conductor\" ]\nShape \"sphere\"\n");
+	ASSERT_EQ(d.shapes.size(), 1u);
+	EXPECT_EQ(d.shapes[0].materialIndex, -1) << "no material chosen yet: pbrt's default";
+}
+
+TEST(PbrtStateTest, MediumInterfaceWithOneNameMeansThatMediumOnBothSides) {
+	// pbrt-v4 parser.cpp: a single name is both the inside and the outside; "" as the second name is vacuum outside.
+	const std::string medium = "MakeNamedMedium \"fog\" \"string type\" [ \"homogeneous\" ]\n";
+	const Scene one = parseOk(medium + "MediumInterface \"fog\"\nCamera \"perspective\"\nWorldBegin\n");
+	ASSERT_EQ(one.media.size(), 1u);
+	EXPECT_EQ(one.cameraMediumIndex, 0) << "the camera starts in the fog";
+	const Scene two = parseOk(medium + "MediumInterface \"fog\" \"\"\nCamera \"perspective\"\nWorldBegin\n");
+	EXPECT_EQ(two.cameraMediumIndex, -1) << "fog inside, vacuum outside, where the camera is";
 }
 
 TEST(PbrtStateTest, UnmatchedAttributeEndIsFatal) {

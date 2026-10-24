@@ -32,6 +32,19 @@ TEST(FlattenInfiniteLightTest, ConstantColorFormPopulatesLAndScale) {
 	EXPECT_TRUE(s.infiniteLight.imageFile.empty());
 }
 
+TEST(FlattenInfiniteLightTest, IlluminanceScalesAUniformSkyAndADistantLightAsPbrtDoes) {
+	// pbrt-v4 lights.cpp: a uniform sky of 1 nit gives pi lux on an upward patch, so "illuminance" E scales it by E / pi; a distant light's scale is
+	// multiplied by E. (Both used to be ignored without a word.)
+	const FlatScene sky = flattenSource("LightSource \"infinite\" \"rgb L\" [ 1 1 1 ] \"float scale\" [ 2 ] \"float illuminance\" [ 3.14159265358979323846 ]\n");
+	ASSERT_TRUE(sky.infiniteLight.present);
+	EXPECT_NEAR(sky.infiniteLight.scale, 2.0, 1e-9);
+	const FlatScene sun = flattenSource("LightSource \"distant\" \"rgb L\" [ 1 1 1 ] \"float scale\" [ 2 ] \"float illuminance\" [ 50000 ]\n");
+	ASSERT_EQ(sun.punctualLights.size(), 1u);
+	EXPECT_DOUBLE_EQ(sun.punctualLights[0].scale, 100000.0);
+	const FlatScene none = flattenSource("LightSource \"distant\" \"rgb L\" [ 1 1 1 ] \"float illuminance\" [ -1 ]\n");
+	EXPECT_DOUBLE_EQ(none.punctualLights[0].scale, 1.0) << "not given (pbrt's -1 default)";
+}
+
 TEST(FlattenInfiniteLightTest, FilenameFormRecordsThePathButDoesNotDecodeIt) {
 	// flatten() is filesystem-free by design (see the file comment) - decoding
 	// filename into imagePixels is pbrt_load::loadFile()'s job, done AFTER

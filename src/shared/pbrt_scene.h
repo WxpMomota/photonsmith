@@ -1153,10 +1153,13 @@ private:
 			s_.cameraMediumIndex = gs_.outsideMedium;
 			if (pos_ < t_.size() && t_[pos_].quoted) { s_.cameraType = t_[pos_].text; ++pos_; }
 			s_.cameraParams = readParams();
-			// pbrt-v4 builtin: "camera" always names the CTM in effect at the
-			// Camera statement - the standard idiom for positioning a light
-			// relative to the camera via a later CoordSysTransform "camera".
-			namedCoordinateSystems_.push_back({"camera", {gs_.ctm, gs_.ctmEnd}});
+			// pbrt-v4 builtin: "camera" names the camera's own space - the standard idiom for positioning a light relative to the camera via a later
+			// CoordSysTransform "camera". The CTM at the Camera statement is cameraFromWorld, so the space is its inverse, worldFromCamera (pbrt-v4
+			// scene.cpp: namedCoordinateSystems["camera"] = Inverse(cameraFromWorld)); the CTM itself put such a light somewhere meaningless.
+			Matrix4 worldFromCamera = gs_.ctm, worldFromCameraEnd = gs_.ctmEnd;
+			if (!gs_.ctm.inverseAffine(worldFromCamera) || !gs_.ctmEnd.inverseAffine(worldFromCameraEnd))
+				warn(line, "the camera's transform cannot be inverted, so CoordSysTransform \"camera\" will not place things in the camera's space");
+			namedCoordinateSystems_.push_back({"camera", {worldFromCamera, worldFromCameraEnd}});
 			return true;
 		}
 		if (d == "Film") {
@@ -1238,13 +1241,16 @@ private:
 			m.params = readParams();
 			if (d == "MakeNamedMaterial") m.type = m.params.getString("type", "diffuse");
 			if (d == "MakeNamedMaterial") {
+				// Only defines the material: the current one stays what it was, as in pbrt-v4 (BasicSceneBuilder::MakeNamedMaterial). Making it current gave a
+				// shape after a block of MakeNamedMaterials the last of them instead of the material in effect (the default diffuse, in a scene that names each one).
 				for (std::size_t i = 0; i < s_.materials.size(); ++i) {
 					if (s_.materials[i].forwardRef && s_.materials[i].name == m.name) {
 						s_.materials[i] = m;   // the placeholder a NamedMaterial left for it; shapes that used it already point here
-						gs_.materialIndex = static_cast<int>(i);
 						return true;
 					}
 				}
+				s_.materials.push_back(m);
+				return true;
 			}
 			s_.materials.push_back(m);
 			gs_.materialIndex = static_cast<int>(s_.materials.size()) - 1;
@@ -1301,7 +1307,9 @@ private:
 			// before that feature existed.
 			std::string insideName, outsideName;
 			if (pos_ < t_.size() && t_[pos_].quoted) { insideName = t_[pos_].text; ++pos_; }
+			// one name is both sides (pbrt-v4 parser.cpp); "" as the second name is vacuum outside
 			if (pos_ < t_.size() && t_[pos_].quoted) { outsideName = t_[pos_].text; ++pos_; }
+			else outsideName = insideName;
 			auto resolve = [&](const std::string &name) -> int {
 				int found = -1;
 				for (std::size_t i = 0; i < s_.media.size(); ++i)
