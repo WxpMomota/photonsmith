@@ -297,7 +297,7 @@ inline std::string brushText(Vec3 tipAt, Vec3 dir) {
 // A jade pendant (a green disc with a hole) on a red silk cord with a tassel, swinging by `swing` degrees from `top`.
 inline std::string jadeText(Vec3 top, double swing) {
 	const Mat4 f = mul(translate(top), rotate({0, 0, 1}, swing));
-	std::string out = attr(subsurfaceMaterial({0.25, 0.62, 0.38}, {0.02, 0.05, 0.03}, 0.05), emitMesh(torus(0.032, 0.014, 32, 12), mul(f, translate(0.0, -0.16, 0.0), rotate({1, 0, 0}, 90.0), scale(1.0, 0.35, 1.0))));
+	std::string out = attr("Material \"coateddiffuse\" \"rgb reflectance\" [ 0.08 0.46 0.24 ] \"float roughness\" [ 0.04 ]", emitMesh(torus(0.032, 0.014, 32, 12), mul(f, translate(0.0, -0.16, 0.0), rotate({1, 0, 0}, 90.0), scale(1.0, 0.35, 1.0))));
 	out += attr("Material \"diffuse\" \"rgb reflectance\" [ 0.70 0.06 0.05 ]", emitMesh(capsule(0.003, 0.11, 6, 1), mul(f, translate(0.0, -0.12, 0.0))) + emitMesh(capsule(0.01, 0.09, 8, 2), mul(f, translate(0.0, -0.31, 0.0))));
 	return out;
 }
@@ -322,7 +322,7 @@ inline std::string carriageText(Vec3 at, double yaw, double roll, Vec3 colour) {
 }
 // A wine jar of brown glazed pottery with a red cloth over its mouth, lifted off by `open` (0..1).
 inline std::string wineJarText(Vec3 at, double open) {
-	std::string out = attr("Material \"coateddiffuse\" \"rgb reflectance\" [ 0.24 0.12 0.05 ] \"float roughness\" [ 0.12 ]",
+	std::string out = attr("Material \"coateddiffuse\" \"rgb reflectance\" [ 0.55 0.34 0.08 ] \"float roughness\" [ 0.06 ]",   // (an amber Tang glaze)
 						   emitMesh(lathe({{0.0, 0.0}, {0.16, 0.0}, {0.26, 0.15}, {0.27, 0.32}, {0.16, 0.50}, {0.09, 0.54}, {0.10, 0.58}, {0.0, 0.58}}, 28), translate(at)));
 	out += attr("Material \"diffusetransmission\" \"rgb reflectance\" [ 0.70 0.06 0.05 ] \"rgb transmittance\" [ 0.5 0.05 0.03 ]",
 				emitMesh(lathe({{0.0, 0.07}, {0.12, 0.05}, {0.15, -0.04}, {0.13, -0.06}, {0.0, 0.03}}, 24), mul(translate(at + Vec3{0.18 * open, 0.58 + 0.25 * open, 0.0}), rotate({0, 0, 1}, -40.0 * open))));
