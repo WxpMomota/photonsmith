@@ -1,0 +1,35 @@
+# The words of Preface to the Pavilion of Prince Teng (tengwang): the preface's lines in Chinese with the English beneath, and the end title.
+# Read when the video is made (src/shared/cartoon/caption_file.h says how this file is written); edit a line here and render again - nothing is rebuilt.
+# The preface (AD 675) is in the public domain; the English lines are the film's own.
+
+style zh     font=simsun.ttc size=0.057 colour=1,0.965,0.886 weight=0.67
+style en     font=palai.ttf size=0.032 colour=0.925,0.894,0.831
+style title  font=simsun.ttc size=0.093 colour=1,0.965,0.886 weight=0.67
+style name   font=simsun.ttc size=0.044 colour=1,0.965,0.886 weight=0.67
+style byline font=palai.ttf size=0.030 colour=0.925,0.894,0.831
+style last   font=simsun.ttc size=0.049 colour=1,0.965,0.886 weight=0.67
+style lasten font=palai.ttf size=0.029 colour=0.925,0.894,0.831
+
+caption 9.0 15.5 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 豫章故郡，洪都新府。 | en: The ancient commandery of Yuzhang is now called Hongzhou.
+caption 38.5 44.6 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 星分翼轸，地接衡庐。 | en: Its stars correspond to the constellations Yi and Zhen; its territory connects Mount Heng and Mount Lu.
+caption 86.0 93.5 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 千里逢迎，高朋满座。 | en: Distinguished guests fill the hall; honored friends arrive from a thousand li away.
+caption 128.0 139.0 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 披绣闼，俯雕甍，山原旷其盈视，川泽纡其骇瞩。 | en: Opening the embroidered gates and looking down from the carved roofs, the mountains spread endlessly before the eye, while the rivers and plains astonish the beholder.
+caption 166.0 173.5 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 渔舟唱晚，响穷彭蠡之滨； | en: Fishing boats sing in the evening, their voices reaching the shores of Lake Pengli.
+caption 176.0 184.0 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 雁阵惊寒，声断衡阳之浦。 | en: Wild geese, chilled by the autumn air, cry out beneath the heights of Mount Heng.
+caption 212.0 219.0 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 落霞与孤鹜齐飞， | en: The setting clouds and the solitary bird fly together.
+caption 220.0 227.5 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 秋水共长天一色。 | en: The autumn waters merge with the endless sky into a single hue.
+caption 322.0 330.0 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 天高地迥，觉宇宙之无穷； | en: Heaven is high, the earth vast; one feels the infinity of the universe.
+caption 338.0 345.0 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 兴尽悲来，识盈虚之有数。 | en: Joy exhausted, sorrow follows.
+caption 362.0 370.5 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 关山难越，谁悲失路之人？ | en: The mountain passes are difficult to cross. Who will pity the traveler who has lost his way?
+caption 396.0 403.5 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 萍水相逢，尽是他乡之客。 | en: Meeting by chance, all are guests from distant lands.
+caption 407.0 413.5 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 嗟乎！冯唐易老， | en: Alas, Feng Tang grew old…
+caption 421.0 428.0 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 李广难封。 | en: …and Li Guang found promotion difficult.
+caption 456.0 463.5 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 所赖君子见机，达人知命。 | en: Yet though fate may be unfavorable, a noble man does not abandon his aspirations.
+caption 475.0 481.5 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 老当益壮，宁移白首之心？ | en: Though old, one’s ambition should remain strong.
+caption 483.0 490.0 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 穷且益坚，不坠青云之志。 | en: Though poor and frustrated, one’s resolve should become even firmer.
+caption 593.0 600.0 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 滕王高阁临江渚， | en: The Pavilion of Prince Teng stands high above the riverbank…
+
+# the end title: the name, the author and the year, the last line
+caption 611.0 619.6 fade=1.2 centre=0.40 width=0.583 | title: 《滕王阁序》
+caption 612.5 619.6 fade=1.2 centre=0.55 width=0.583 gap=0.45 | name: 王勃 | byline: WANG BO · 675 AD
+caption 614.0 619.6 fade=1.2 centre=0.74 width=0.583 gap=0.45 | last: 穷且益坚，不坠青云之志。 | lasten: “Though poor and frustrated, one’s resolve should become even firmer, never allowing one’s ambition to fall from the clouds.”

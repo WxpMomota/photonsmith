@@ -439,14 +439,18 @@ TEST(CartoonTengwang, TheShotsAndTheWordsFitTheFilm) {
 	EXPECT_GE(words.size(), 18u);
 	double lastLineEnd = 0.0;
 	for (const cartoon::Caption &c : words) {
-		EXPECT_FALSE(c.image.empty()) << "a caption's picture is missing (scripts/make_tengwang_assets.py)";
-		std::ifstream f(c.image, std::ios::binary);
-		EXPECT_TRUE(static_cast<bool>(f)) << c.image;
+		const std::string first = c.lines.empty() ? std::string() : c.lines.front().text;
+		ASSERT_FALSE(c.lines.empty()) << "a caption with no text (pbrt_scenes/film_assets/tengwang/captions.txt)";
+		for (const cartoon::CaptionLine &l : c.lines) {
+			EXPECT_FALSE(l.text.empty()) << first;
+			EXPECT_FALSE(l.font.empty()) << first;
+			EXPECT_GT(l.size, 0.0) << first;
+		}
 		EXPECT_GE(c.t0, 0.0);
 		EXPECT_LE(c.t1, tw::kDuration);
 		EXPECT_LT(c.t0, c.t1);
 		if (c.centreY > 0.8) {   // (the lines at the foot of the picture never overlap; the title's three parts share the screen)
-			EXPECT_GE(c.t0, lastLineEnd) << c.image;
+			EXPECT_GE(c.t0, lastLineEnd) << first;
 			lastLineEnd = c.t1;
 		}
 	}

@@ -534,15 +534,28 @@ struct FilmMeta {
 	int width = 1280, height = 720;
 };
 
-// Words over a film's pictures (a line of the story, a title): a picture of them with transparency (`image`, a PNG, an absolute path) laid over the video's frames from t0 to t1
-// seconds, fading in and out over `fade` seconds, `width` of the frame's width wide with its middle `centreY` of the way down. Laid on when the video is made
-// (launcher/film_captions.h), so a still of the film and its frames as rendered have none.
+// One line of a caption's text and how it is set: a font file (found as launcher/film_captions.h says; `fontIndex` picks a face of a .ttc), its height as a share of the frame's
+// height, its colour (sRGB, 0..1) and a little extra weight (pixels at 1080 lines: a thin face like SimSun reads better with half a pixel).
+struct CaptionLine {
+	std::string text;   // UTF-8
+	std::string font;
+	int fontIndex = 0;
+	double size = 0.04;
+	Vec3 colour{1.0, 1.0, 1.0};
+	double weight = 0.0;
+};
+// Words over a film's pictures (a line of the story, a title), laid over the video's frames from t0 to t1 seconds, fading in and out over `fade` seconds, at most `width` of the
+// frame's width wide with its middle `centreY` of the way down: `lines` of text (set when the video is made, at the frame's own size, with a soft shadow; a line wider than
+// `width` is wrapped at its spaces), or - with no lines - a picture of them with transparency (`image`, a PNG, an absolute path) scaled to `width`. Laid on when the video is
+// made (launcher/film_captions.h), so a still of the film and its frames as rendered have none. A film's captions are best kept in a text file (caption_file.h).
 struct Caption {
 	double t0, t1;
 	std::string image;
 	double fade = 0.8;
 	double centreY = 0.84;
 	double width = 0.66;
+	std::vector<CaptionLine> lines;
+	double lineGap = 0.3;   // between two lines, as a share of the taller one's height
 };
 
 struct Film {

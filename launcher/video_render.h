@@ -293,7 +293,7 @@ static int prepareVideoDirectories(const std::string &out_path, int render_frame
         // (video_frames.h: what is kept on a resume; a fresh start empties the folder, so that stale frames cannot mix with this run's, but only a folder this program made)
         if (keep) {
             if (const int dropped = video_frames::keepForResume(frames_dir); dropped > 0)
-                std::cout << dropped << " frame(s) that failed last time and were repeated from their neighbours are rendered again." << std::endl;
+                std::cout << dropped << " frame(s) repeated from a neighbour last time (left out by a draft, or failed) will be rendered (a draft leaves them out again)." << std::endl;
         } else if (!video_frames::startAfresh(frames_dir)) {
             std::cerr << "ERROR: " << frames_dir << " holds files this program did not make, so it is not emptied for the video's frames. Move them, or choose an output in another "
                          "folder." << std::endl;
@@ -848,6 +848,13 @@ inline int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
     if (const cartoon::Film *film = cartoon::forCameraPath(s.camera_path.c_str()); film && film->captions) {
         const int laid = film_captions::apply(*film, paths.frames_dir, render_frame_count);
         if (laid > 0) std::cout << "\nLaid the words of " << film->name << " on " << laid << " frame(s)." << std::endl;
+        // and as a subtitle file beside the video, in the video's own time (a video of another length than the film's runs its moments faster or slower)
+        std::vector<cartoon::Caption> words = film->captions();
+        const double toVideo = film->duration > 0.0 ? (static_cast<double>(render_frame_count) / (std::max)(1, s.video_fps)) / film->duration : 1.0;
+        for (cartoon::Caption &c : words) c.t0 *= toVideo, c.t1 *= toVideo;
+        std::filesystem::path srt = paths.video_path;
+        srt.replace_extension(".srt");
+        if (film_captions::writeSrt(words, srt)) std::cout << "Subtitles: " << srt << std::endl;
     }
     if (int rc = assembleVideoFile(paths.frames_dir, converted, s.video_fps, paths.video_path, soundtrack_path); rc != SUCCESS) return rc;
 

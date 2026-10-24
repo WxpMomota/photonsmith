@@ -316,6 +316,10 @@ New-Item -ItemType Directory -Force $licenseDir | Out-Null
 Get-ChildItem (Join-Path $repoRoot "licenses") -Filter "*.txt" -ErrorAction SilentlyContinue | Copy-Item -Destination $licenseDir -Force
 $fontLicense = Join-Path $repoRoot "qt_gui\fonts\OFL.txt"
 if (Test-Path $fontLicense) { Copy-Item $fontLicense (Join-Path $licenseDir "NotoSansSC-OFL.txt") -Force }
+# The font a film's captions fall back on when their own is not on the machine (launcher/film_captions.h looks in fonts\ beside the executable).
+$fontDir = Join-Path $OutputDir "fonts"
+New-Item -ItemType Directory -Force $fontDir | Out-Null
+Copy-Item (Join-Path $repoRoot "qt_gui\fonts\NotoSansSC-Regular.ttf") $fontDir -Force
 Write-Host "  OK licenses\ ($((Get-ChildItem $licenseDir -File).Count) files)" -ForegroundColor Green
 
 # The scene collection and the small demo assets. Nearly every scene in the list loads from pbrt_scenes\*.pbrt, and the GUI runs the renderer with the package folder

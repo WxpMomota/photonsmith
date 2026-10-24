@@ -21,6 +21,7 @@
 
 #include <functional>
 
+#include "caption_file.h"
 #include "film_kit.h"
 #include "tengwang_dreams.h"
 
@@ -1368,24 +1369,9 @@ inline std::string sceneAt(double t) {
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The words
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
-inline std::vector<Caption> captions() {
-	const auto c = [](const char *key, double t0, double t1, double fade = 1.0) { return Caption{t0, t1, film_cache::asset(std::string("tengwang/captions/") + key + ".png"), fade, 0.86, 0.625}; };
-	std::vector<Caption> v = {
-		c("c01", 9.0, 15.5), c("c02", 38.5, 44.6), c("c03", 86.0, 93.5), c("c04", 128.0, 139.0), c("c05", 166.0, 173.5), c("c06", 176.0, 184.0), c("c07", 212.0, 219.0),
-		c("c08", 220.0, 227.5), c("c09", 322.0, 330.0), c("c10", 338.0, 345.0), c("c11", 362.0, 370.5), c("c12", 396.0, 403.5), c("c13", 407.0, 413.5), c("c14", 421.0, 428.0),
-		c("c15", 456.0, 463.5), c("c16", 475.0, 481.5), c("c17", 483.0, 490.0), c("c18", 593.0, 600.0),
-	};
-	Caption title = c("t01", 611.0, 619.6, 1.2);
-	title.centreY = 0.40;
-	Caption author = c("t02", 612.5, 619.6, 1.2);
-	author.centreY = 0.55;
-	Caption line = c("t03", 614.0, 619.6, 1.2);
-	line.centreY = 0.74;
-	v.push_back(title);
-	v.push_back(author);
-	v.push_back(line);
-	return v;
-}
+// The preface's lines in Chinese with the English beneath, and the end title: pbrt_scenes/film_assets/tengwang/captions.txt (caption_file.h), set in their fonts when the video
+// is made - a line is changed there, with nothing rebuilt.
+inline std::vector<Caption> captions() { return caption_file::read(film_cache::asset("tengwang/captions.txt")); }
 
 }  // namespace tengwang
 }  // namespace cartoon

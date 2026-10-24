@@ -34,7 +34,8 @@ A film told in many shots (tengwang, 59 of them) starts from the kit instead of 
   (a cut to black, a title card), made a near-black scene at an ordinary exposure (an exposure of almost nothing took the renderer minutes a frame). `kit::cam`, `glide`, `ease`.
 - `kit_people.h`: robed figures sculpted from blended shapes in a `Pose` and a `Dress` (standing, clasping, bowing, kneeling, walking, carrying; ladies, soldiers, a beard),
   placed as cached PLY objects (`kit::crowdText(film, version, people)`) or sculpted for a frame (`figureMeshes`, `figureText`), and horses, boats, birds and skeins, sheep.
-- `film_sky.h` (painted HDR skies from dawn to night, with clouds and stars), `film_cache.h` (heavy meshes written once as PLY files), `Caption` (words on the screen).
+- `film_sky.h` (painted HDR skies from dawn to night, with clouds and stars), `film_cache.h` (heavy meshes written once as PLY files), `caption_file.h` (the film's words as a text file of styles and
+  captions, set in a font when the video is made and written as an .srt too: edit it with no rebuild; `docs/VIDEO_GENERATION.md` has the format).
 
 `tengwang.h` is the worked example. Then `film.py doctor`, and `--draft 8` to watch the whole film with its sound before the real render.
 

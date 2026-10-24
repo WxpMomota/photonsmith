@@ -26,7 +26,7 @@ inline bool isOurs(const std::filesystem::path &dir) {
 		const std::string name = entry.path().filename().string();
 		const std::string ext = entry.path().extension().string();
 		const bool ours = entry.is_directory() ? name.rfind("work", 0) == 0
-											   : (name.rfind("enc_", 0) == 0 || name.rfind("frame_", 0) == 0 || name.rfind("frames", 0) == 0 || ext == ".done" || name == cartoon_render::kFilledList);
+											   : (name.rfind("enc_", 0) == 0 || name.rfind(film_captions::kCleanPrefix, 0) == 0 || name.rfind("frame_", 0) == 0 || name.rfind("frames", 0) == 0 || ext == ".done" || name == cartoon_render::kFilledList);
 		if (!ours) return false;
 	}
 	return true;

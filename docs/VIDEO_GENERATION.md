@@ -341,6 +341,24 @@ feet, open its mouth and strike the water, so what you hear is on the beat of wh
 ffmpeg, and the .wav is kept beside the video (`<name>_video.wav`); a video of another length is made without sound, since the sound is made for the film's own timing. On a Mac the built-in
 encoder cannot add sound, so a film's sound needs ffmpeg there (without it the video is silent and the .wav is beside it).
 
+**Words on the screen: a caption file.** A film's captions are a UTF-8 text file read when the video is made, so a line is corrected, retimed or put into another language with no
+rebuild: change the file and make the video again with `--resume` (the GUI always resumes a film): no frame is rendered again, the changed words are laid again on the
+pictures as rendered, which are kept beside the frames that have words (`clean_NNNN.png`). tengwang's is `pbrt_scenes/film_assets/tengwang/captions.txt`; a film gets
+its own by returning `caption_file::read(film_cache::asset("<film>/captions.txt"))` from its row's `captions`. The file has styles, then captions:
+
+```
+# a style: a name and key=value settings (font, index for a .ttc face, size as a share of the frame's height, colour r,g,b from 0 to 1, weight in extra pixels at 1080 lines)
+style zh  font=simsun.ttc size=0.057 colour=1,0.965,0.886 weight=0.67
+style en  font=palai.ttf  size=0.032 colour=0.925,0.894,0.831
+# a caption: start and end in seconds of the film, optional fade= centre= width= gap=, then its lines, each "style: text"
+caption 9.0 15.5 fade=1 centre=0.86 width=0.583 gap=0.45 | zh: 豫章故郡，洪都新府。 | en: The ancient commandery of Yuzhang is now called Hongzhou.
+```
+
+The text is set in the font at the frame's own size (sharp at any resolution), centred, with a soft dark halo so it reads over a bright sky; a line wider than the caption's `width`
+wraps at its spaces into rows of even length. A font is looked for as a full path, then in `pbrt_scenes/film_assets/fonts`, the system's fonts folder and the program's `fonts`
+folder; a font that cannot be found is reported once and Noto Sans SC is used instead. A line the file cannot read is reported with its number and left out. The video also gets the
+captions as subtitles, `<name>_video.srt` beside it, with times scaled to the video's length (a video made at another length or frame rate keeps its subtitles in step).
+
 ## Films from files: animate a pbrt scene without C++
 
 A film does not have to be C++. A **film file** (`name.film`, plain text) animates an ordinary pbrt scene of your own: a camera that cuts between shots, parts that move, turn, grow, light up

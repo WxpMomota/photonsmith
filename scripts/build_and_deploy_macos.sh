@@ -239,6 +239,10 @@ cp "$REPO_ROOT/images/earthmap.jpg" "$APP_BUNDLE/Contents/MacOS/images/earthmap.
 # "Scene is Empty (CPU)" (error 101).
 cp -R "$REPO_ROOT/pbrt_scenes" "$APP_BUNDLE/Contents/MacOS/pbrt_scenes"
 
+# The font a film's captions fall back on when their own (SimSun, Palatino: Windows fonts) is not on the machine (launcher/film_captions.h looks in fonts/ beside the executable).
+mkdir -p "$APP_BUNDLE/Contents/MacOS/fonts"
+cp "$REPO_ROOT/qt_gui/fonts/NotoSansSC-Regular.ttf" "$APP_BUNDLE/Contents/MacOS/fonts/NotoSansSC-Regular.ttf"
+
 # The optional "Object from a photo" helper (docs/PHOTO_TO_SCENE.md): its Python tool and the script that sets up its Python environment (about 5 GB, made on
 # the user's request from the Diagnostics tab). Inside the bundle, beside the executable, so they travel with the app when it is dragged out of the disk image.
 # Copied after macdeployqt (like the Metal shaders above) since they are not Mach-O files.

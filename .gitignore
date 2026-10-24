@@ -486,6 +486,8 @@ total.txt
 # release (with {TIER} substituted) - a real, hand-written source file, not
 # a stray log the *.txt rule above was meant to catch.
 !scripts/templates/README_PACKAGE.txt
+# A film's words (src/shared/cartoon/caption_file.h): the captions of its video, read when the video is made - data, not a stray log.
+!pbrt_scenes/film_assets/*/captions.txt
 # Generated/preprocessed test artifacts
 tests/generated/
 

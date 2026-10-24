@@ -15,6 +15,7 @@ are the terms you inherit.
 | **tinyexr** (Syoyo Fujita and contributors; contains code derived from OpenEXR, Industrial Light & Magic) | `src/external/tinyexr.h` and `exr_reader.hh`, `streamreader.hh` | BSD-3-Clause; the licence text is at the top of the header |
 | **Hosek-Wilkie sky model** (Lukas Hosek and Alexander Wilkie; coefficient tables as shipped in Blender's Cycles) | `src/shared/hosek_sky.h` (a re-write of the evaluation code) and `src/external/hosek_sky_data.h` (the tables, copied unchanged) | BSD-3-Clause, full text in [`licenses/BSD-3-Clause-Hosek-Wilkie.txt`](licenses/BSD-3-Clause-Hosek-Wilkie.txt) |
 | **stb_image / stb_image_write** (Sean Barrett and contributors) | `src/external/stb_image.h`, `stb_image_write.h` | Public domain (or MIT, at your choice); see the end of each header |
+| **stb_truetype** (Sean Barrett and contributors) | `src/external/stb_truetype.h` (sets a film's captions in a font) | Public domain (or MIT, at your choice); see the end of the header |
 | **miniz** (Rich Geldreich and contributors) | `src/external/miniz.c`, `miniz.h` | Public domain ("unlicense" statement at the end of the file) |
 | **Noto Sans SC** (the Source Han Sans design: Copyright 2014-2021 Adobe, Reserved Font Name 'Source'; distributed by Google as Noto Sans CJK) | `qt_gui/fonts/NotoSansSC-Regular.ttf`, compiled into the GUI so Simplified Chinese text renders on a machine without a CJK font | SIL Open Font License 1.1 (`qt_gui/fonts/OFL.txt`; the release packages carry it as `licenses/NotoSansSC-OFL.txt`) |
 

@@ -1,13 +1,11 @@
 """make_tengwang_assets.py -- the pictures "Preface to the Pavilion of Prince Teng" (src/shared/cartoon/tengwang*.h) brings with it, in pbrt_scenes/film_assets/tengwang:
 
-  captions/cNN.png    each line of Wang Bo's preface the film shows, in Chinese with the English beneath, white on transparent with a soft shadow, all on the same canvas width
-                      (so the film lays every one at the same size: cartoon::Caption width 0.625)
-  captions/tNN.png    the end title: the preface's name, the author and the year, and the line the film ends on
   plaque.jpg          the Pavilion's name board, gold on blue
   banner_li.jpg       the general Li Guang's banner
   manuscript_N.jpg    the paper Wang Bo writes on, with N of its columns written (0, 3, 6, 9, 12): the end of the preface and its closing poem, top to bottom and right to left
 
-The preface (AD 675) is in the public domain; the English lines are the film's own. Needs Pillow and the Windows fonts SimSun (simsun.ttc) and Palatino Linotype (pala*.ttf).
+The film's words are not pictures: they are pbrt_scenes/film_assets/tengwang/captions.txt, set in a font when the video is made (src/shared/cartoon/caption_file.h).
+The preface (AD 675) is in the public domain. Needs Pillow and the Windows font SimSun (simsun.ttc).
 Run from the repository root:  python scripts/make_tengwang_assets.py
 """
 
@@ -20,32 +18,6 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "pbrt_scenes", "film_assets", "tengwang")
 FONTS = os.path.join(os.environ.get("WINDIR", "C:/Windows"), "Fonts")
 
-CANVAS_W = 2400          # every caption is this wide (2x the 1200 px it is laid at on a 1920-wide frame)
-ZH_SIZE, EN_SIZE = 92, 52
-ZH_COLOUR = (255, 246, 226)
-EN_COLOUR = (236, 228, 212)
-
-CAPTIONS = [
-    ("c01", "豫章故郡，洪都新府。", "The ancient commandery of Yuzhang is now called Hongzhou."),
-    ("c02", "星分翼轸，地接衡庐。", "Its stars correspond to the constellations Yi and Zhen; its territory connects Mount Heng and Mount Lu."),
-    ("c03", "千里逢迎，高朋满座。", "Distinguished guests fill the hall; honored friends arrive from a thousand li away."),
-    ("c04", "披绣闼，俯雕甍，山原旷其盈视，川泽纡其骇瞩。",
-     "Opening the embroidered gates and looking down from the carved roofs, the mountains spread endlessly before the eye, while the rivers and plains astonish the beholder."),
-    ("c05", "渔舟唱晚，响穷彭蠡之滨；", "Fishing boats sing in the evening, their voices reaching the shores of Lake Pengli."),
-    ("c06", "雁阵惊寒，声断衡阳之浦。", "Wild geese, chilled by the autumn air, cry out beneath the heights of Mount Heng."),
-    ("c07", "落霞与孤鹜齐飞，", "The setting clouds and the solitary bird fly together."),
-    ("c08", "秋水共长天一色。", "The autumn waters merge with the endless sky into a single hue."),
-    ("c09", "天高地迥，觉宇宙之无穷；", "Heaven is high, the earth vast; one feels the infinity of the universe."),
-    ("c10", "兴尽悲来，识盈虚之有数。", "Joy exhausted, sorrow follows."),
-    ("c11", "关山难越，谁悲失路之人？", "The mountain passes are difficult to cross. Who will pity the traveler who has lost his way?"),
-    ("c12", "萍水相逢，尽是他乡之客。", "Meeting by chance, all are guests from distant lands."),
-    ("c13", "嗟乎！冯唐易老，", "Alas, Feng Tang grew old\u2026"),
-    ("c14", "李广难封。", "\u2026and Li Guang found promotion difficult."),
-    ("c15", "所赖君子见机，达人知命。", "Yet though fate may be unfavorable, a noble man does not abandon his aspirations."),
-    ("c16", "老当益壮，宁移白首之心？", "Though old, one\u2019s ambition should remain strong."),
-    ("c17", "穷且益坚，不坠青云之志。", "Though poor and frustrated, one\u2019s resolve should become even firmer."),
-    ("c18", "滕王高阁临江渚，", "The Pavilion of Prince Teng stands high above the riverbank\u2026"),
-]
 
 # The manuscript: the last part of the preface and its poem, one column per entry (each column top to bottom, the columns from right to left).
 MANUSCRIPT = [
@@ -66,54 +38,6 @@ MANUSCRIPT = [
 
 def font(name, size, index=0):
     return ImageFont.truetype(os.path.join(FONTS, name), size, index=index)
-
-
-def wrap(draw, text, fnt, width):
-    """Splits English text into lines no wider than `width`."""
-    words, lines, line = text.split(" "), [], ""
-    for w in words:
-        trial = (line + " " + w).strip()
-        if draw.textlength(trial, font=fnt) <= width or not line:
-            line = trial
-        else:
-            lines.append(line)
-            line = w
-    if line:
-        lines.append(line)
-    return lines
-
-
-def with_shadow(layer, radius=7, strength=0.62):
-    """The text layer over a soft dark halo of itself (the words stay legible over a bright sky)."""
-    alpha = layer.split()[3]
-    halo = alpha.filter(ImageFilter.MaxFilter(5)).filter(ImageFilter.GaussianBlur(radius))
-    halo = halo.point(lambda v: int(v * strength))
-    shadow = Image.new("RGBA", layer.size, (8, 6, 4, 0))
-    shadow.putalpha(halo)
-    return Image.alpha_composite(shadow, layer)
-
-
-def caption(zh, en, zh_size=ZH_SIZE, en_size=EN_SIZE, gap=26):
-    zh_font, en_font = font("simsun.ttc", zh_size), font("palai.ttf", en_size)
-    probe = ImageDraw.Draw(Image.new("RGBA", (10, 10)))
-    en_lines = wrap(probe, en, en_font, CANVAS_W - 160) if en else []
-    pad = 40
-    zh_h = zh_size + 16 if zh else 0
-    en_h = len(en_lines) * int(en_size * 1.32)
-    h = pad * 2 + zh_h + (gap if zh and en_lines else 0) + en_h
-    layer = Image.new("RGBA", (CANVAS_W, h), (0, 0, 0, 0))
-    d = ImageDraw.Draw(layer)
-    y = pad
-    if zh:
-        w = d.textlength(zh, font=zh_font)
-        # (SimSun is thin: a hair of stroke gives it the weight of a brush at this size)
-        d.text(((CANVAS_W - w) / 2, y), zh, font=zh_font, fill=ZH_COLOUR + (255,), stroke_width=1, stroke_fill=ZH_COLOUR + (255,))
-        y += zh_h + gap
-    for line in en_lines:
-        w = d.textlength(line, font=en_font)
-        d.text(((CANVAS_W - w) / 2, y), line, font=en_font, fill=EN_COLOUR + (255,))
-        y += int(en_size * 1.32)
-    return with_shadow(layer)
 
 
 def manuscript(columns_written, seed=7):
@@ -197,14 +121,7 @@ def banner():
 
 
 def main():
-    os.makedirs(os.path.join(OUT, "captions"), exist_ok=True)
-    for key, zh, en in CAPTIONS:
-        caption(zh, en).save(os.path.join(OUT, "captions", key + ".png"), optimize=True)
-    # the end title: the name large, the author and the year, the last line
-    caption("《滕王阁序》", "", zh_size=150).save(os.path.join(OUT, "captions", "t01.png"), optimize=True)
-    caption("王勃", "WANG BO \u00b7 675 AD", zh_size=70, en_size=48).save(os.path.join(OUT, "captions", "t02.png"), optimize=True)
-    caption("穷且益坚，不坠青云之志。", "\u201cThough poor and frustrated, one\u2019s resolve should become even firmer, never allowing one\u2019s ambition to fall from the clouds.\u201d",
-            zh_size=78, en_size=46).save(os.path.join(OUT, "captions", "t03.png"), optimize=True)
+    os.makedirs(OUT, exist_ok=True)
     for n in (0, 3, 6, 9, 12):
         manuscript(n).save(os.path.join(OUT, "manuscript_%d.jpg" % n), quality=90)
     plaque().save(os.path.join(OUT, "plaque.jpg"), quality=92)
