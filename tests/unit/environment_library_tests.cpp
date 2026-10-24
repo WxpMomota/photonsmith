@@ -1,5 +1,6 @@
 // environment_library_tests.cpp - src/shared/environment_library.h: the catalog of photographic skies, and the files it names.
 #include <gtest/gtest.h>
+#include "fixture_skip.h"
 
 #include "../../src/shared/environment_library.h"
 
@@ -24,7 +25,7 @@ TEST(EnvironmentLibraryTest, TheCatalogHasUniqueStemsAndNamesAndKnownCategories)
 
 TEST(EnvironmentLibraryTest, EveryEnvironmentIsInTheFolderWithAThumbnailAndIsARadianceFile) {
 	// The tests run from the repository root (ctest sets the working directory); skip quietly when run elsewhere.
-	if (!std::filesystem::exists("environments/CREDITS.md")) GTEST_SKIP() << "environments/ is not next to the working directory";
+	if (!std::filesystem::exists("environments/CREDITS.md")) RT_SKIP_MISSING_FIXTURE("environments/ is not next to the working directory");
 	for (const environment_library::Entry& e : environment_library::catalog()) {
 		const std::string file = "environments/" + environment_library::fileOf(e);
 		ASSERT_TRUE(std::filesystem::exists(file)) << file;

@@ -26,6 +26,7 @@
  */
 
 #include <gtest/gtest.h>
+#include "fixture_skip.h"
 #include "../../src/external/tinyexr.h"
 #include <algorithm>
 #include <array>
@@ -503,7 +504,7 @@ static bool gpuSppmMeans(const std::string& sceneId, int size, int iterations, i
 TEST(PbrtBackendAgreementTest, GpuSppmUniformSkyFurnaceIsExact) {
 	if (!optix_is_available()) GTEST_SKIP() << "OptiX not available";
 	const SceneDescriptor* s = find_example_scene("path-depth-furnace");
-	if (!s) GTEST_SKIP() << "path-depth-furnace.pbrt was not discovered - is pbrt_scenes/ present?";
+	if (!s) RT_SKIP_MISSING_FIXTURE("path-depth-furnace.pbrt was not discovered - is pbrt_scenes/ present?");
 	double m[3];
 	ASSERT_TRUE(gpuSppmMeans(s->id, 32, 100, 20000, 4, m));
 	std::printf("[gpu sppm] sky furnace: %.4f %.4f %.4f (0.5 expected)\n", m[0], m[1], m[2]);

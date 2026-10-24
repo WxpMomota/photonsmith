@@ -103,7 +103,7 @@ TEST_F(EnergyConservationTest, GPUPixelsInValidRange) {
 	files_.push_back(out);
 
 	if (int rc = optix_render_main(32, 32, 100, 5, out, "A1", 278.0, 278.0, -800.0))
-		GTEST_SKIP() << "optix_render_main failed (rc=" << rc << ") — driver/PTX incompatibility";
+		FAIL() << "optix_render_main failed (rc=" << rc << ") although OptiX is available";   // (it was a skip: a render the GPU code broke showed as skipped, not failed)
 	RenderResult r = load_render(out);
 	ASSERT_TRUE(r.valid) << "GPU render failed";
 
@@ -127,7 +127,7 @@ TEST_F(EnergyConservationTest, GPUNoFireflies) {
 	files_.push_back(out);
 
 	if (int rc = optix_render_main(64, 64, 150, 10, out, "A1", 278.0, 278.0, -800.0))
-		GTEST_SKIP() << "optix_render_main failed (rc=" << rc << ") — driver/PTX incompatibility";
+		FAIL() << "optix_render_main failed (rc=" << rc << ") although OptiX is available";   // (it was a skip: a render the GPU code broke showed as skipped, not failed)
 	RenderResult r = load_render(out);
 	ASSERT_TRUE(r.valid) << "GPU render failed";
 
@@ -232,7 +232,7 @@ TEST_F(EnergyConservationTest, GPUAverageBrightnessPhysicallyBounded) {
 	files_.push_back(out);
 
 	if (int rc = optix_render_main(32, 32, 200, 5, out, "A1", 278.0, 278.0, -800.0))
-		GTEST_SKIP() << "optix_render_main failed (rc=" << rc << ") — driver/PTX incompatibility";
+		FAIL() << "optix_render_main failed (rc=" << rc << ") although OptiX is available";   // (it was a skip: a render the GPU code broke showed as skipped, not failed)
 	RenderResult r = load_render(out);
 	ASSERT_TRUE(r.valid) << "GPU render failed";
 
@@ -275,7 +275,7 @@ TEST_F(EnergyConservationTest, GPUNoNaNOrInf) {
 	files_.push_back(out);
 
 	if (int rc = optix_render_main(32, 32, 100, 5, out, "A1", 278.0, 278.0, -800.0))
-		GTEST_SKIP() << "optix_render_main failed (rc=" << rc << ") — driver/PTX incompatibility";
+		FAIL() << "optix_render_main failed (rc=" << rc << ") although OptiX is available";   // (it was a skip: a render the GPU code broke showed as skipped, not failed)
 	RenderResult r = load_render(out);
 	ASSERT_TRUE(r.valid) << "GPU render failed";
 

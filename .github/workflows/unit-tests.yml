@@ -84,6 +84,8 @@ jobs:
         # corrupt-data problem - reproduced locally on macOS by running
         # the exact same binary from tests/ instead of the repo root, so
         # this was never actually a Windows-specific issue.
+        env:
+          RT_REQUIRE_FIXTURES: "1"   # a test whose file of the repository is not found fails instead of skipping (tests/unit/fixture_skip.h)
         run: .\tests\build\Release\unit_tests.exe --gtest_color=yes
 
       - name: Build the launcher (ray_tracer)
@@ -104,6 +106,7 @@ jobs:
         env:
           RT_LAUNCHER: ${{ github.workspace }}\build_rt\Release\ray_tracer.exe
           RT_REQUIRE_LAUNCHER: "1"   # a render test that cannot find the launcher fails instead of skipping
+          RT_REQUIRE_FIXTURES: "1"
         run: .\tests\build\Release\cpu_integrator_tests.exe --gtest_color=yes
 
   unit-tests-macos:
@@ -137,6 +140,7 @@ jobs:
         # context is not available at job level, so it is set on the steps that run tests.
         env:
           TEMP: ${{ runner.temp }}
+          RT_REQUIRE_FIXTURES: "1"
         run: build_tests/unit_tests --gtest_color=yes
 
       - name: Build the launcher (ray_tracer)
@@ -152,6 +156,7 @@ jobs:
           TEMP: ${{ runner.temp }}
           RT_LAUNCHER: ${{ github.workspace }}/build_rt/ray_tracer
           RT_REQUIRE_LAUNCHER: "1"
+          RT_REQUIRE_FIXTURES: "1"
         run: build_tests/cpu_integrator_tests --gtest_color=yes
 
   metal-poc:
@@ -319,6 +324,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check the test build lists agree
         run: python3 scripts/check_build_lists.py
+      - name: Check every environment variable the code reads is in docs/ENVIRONMENT.md
+        run: python3 scripts/check_env_docs.py
 
   code-size:
     # A size ratchet (scripts/check_code_size.py): no NEW function over 300 lines or file over 2000 lines, and no known one growing past its

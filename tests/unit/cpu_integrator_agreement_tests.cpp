@@ -8,6 +8,7 @@
  */
 
 #include "agreement_test_helpers.h"
+#include "fixture_skip.h"
 
 #include <array>
 #include <fstream>
@@ -92,7 +93,7 @@ TEST(ChromaticMediaPerChannelTest, AbsorberFollowsBeerLambertUnderEveryIntegrato
 
 // A fog that scatters without absorbing, differently per colour, is invisible under a uniform sky in every channel.
 TEST(ChromaticMediaPerChannelTest, FogFurnaceStaysInvisibleUnderEveryIntegrator) {
-	if (!find_example_scene("chromatic-fog-furnace")) GTEST_SKIP() << "chromatic-fog-furnace.pbrt was not discovered - is pbrt_scenes/ present?";
+	if (!find_example_scene("chromatic-fog-furnace")) RT_SKIP_MISSING_FIXTURE("chromatic-fog-furnace.pbrt was not discovered - is pbrt_scenes/ present?");
 	for (const char* integrator : {"bdpt", "simplepath", "mlt"}) {
 		double m[3] = {0, 0, 0};
 		ASSERT_TRUE(renderChannelMeans(integrator, "chromatic-fog-furnace", 24, m)) << integrator;
@@ -108,7 +109,7 @@ TEST(ChromaticMediaPerChannelTest, FogFurnaceStaysInvisibleUnderEveryIntegrator)
 // multiplied by a cosine against that normal and the half of the sphere below it was discarded. A medium vertex has no normal (pbrt's MediumInteraction
 // has n = 0) and no cosine anywhere; the adapter now hands BDPT a zero normal and the bridge evaluates albedo * phase there.
 TEST(ChromaticMediaPerChannelTest, GreyFogFurnaceStaysInvisibleUnderBdptMltAndSimplePath) {
-	if (!find_example_scene("fog-furnace")) GTEST_SKIP() << "fog-furnace.pbrt was not discovered - is pbrt_scenes/ present?";
+	if (!find_example_scene("fog-furnace")) RT_SKIP_MISSING_FIXTURE("fog-furnace.pbrt was not discovered - is pbrt_scenes/ present?");
 	const double sky[3] = {0.6, 0.7, 0.9};
 	for (const char* integrator : {"bdpt", "simplepath", "mlt"}) {
 		double m[3] = {0, 0, 0};
@@ -204,7 +205,7 @@ static void expectBdptAgreesWithPathTracer(const char* stem, int depth, double t
 // shell read +14% at depth 3 and a rough glass sphere +8%. Both have an independent answer here (a closed form; the path tracer).
 TEST(PbrtBackendAgreementTest, BdptSkyLitDiffuseTransmissionShellHasItsClosedForm) {
 	const SceneDescriptor* s = find_example_scene("diffuse-transmission-furnace");
-	if (!s) GTEST_SKIP() << "diffuse-transmission-furnace.pbrt was not discovered - is pbrt_scenes/ present?";
+	if (!s) RT_SKIP_MISSING_FIXTURE("diffuse-transmission-furnace.pbrt was not discovered - is pbrt_scenes/ present?");
 	const std::string out = "pbrt_agree_dtf_bdpt.exr";
 	double bdptMean = 0.0;
 	ASSERT_EQ(cpu_render_main_bdpt(48, 48, 512, 4, out.c_str(), s->id.c_str(), 0.0, 0.0, 0.0), 0);
@@ -223,7 +224,7 @@ TEST(PbrtBackendAgreementTest, BdptSkyLitRoughGlassSphereAgreesWithPathTracer) {
 // against 0.65). The radius now starts at 2% of the scene's bounding radius (never above 10). See pbrt_scenes/sppm-transmissive-furnace.pbrt.
 TEST(PbrtBackendAgreementTest, SppmInASmallSceneAgreesWithPathTracer) {
 	const SceneDescriptor* s = find_example_scene("sppm-transmissive-furnace");
-	if (!s) GTEST_SKIP() << "sppm-transmissive-furnace.pbrt was not discovered - is pbrt_scenes/ present?";
+	if (!s) RT_SKIP_MISSING_FIXTURE("sppm-transmissive-furnace.pbrt was not discovered - is pbrt_scenes/ present?");
 	const std::string pathOut = "pbrt_agree_sppm_path.exr", sppmOut = "pbrt_agree_sppm_sppm.exr";
 	double pathMean = 0.0, sppmMean = 0.0;
 	ASSERT_EQ(cpu_render_main(32, 32, 256, 30, pathOut.c_str(), s->id.c_str(), 0.0, 0.0, 0.0), 0);
@@ -395,7 +396,7 @@ TEST(PbrtBackendAgreementTest, LightPathSeesAVisibleEmitterOfEveryShapeLikeThePa
 
 TEST(PbrtBackendAgreementTest, SimplePathHasTheInterreflectionFurnaceClosedForm) {
 	const SceneDescriptor* s = find_example_scene("bdpt-room-furnace");
-	if (!s) GTEST_SKIP() << "bdpt-room-furnace.pbrt was not discovered - is pbrt_scenes/ present?";
+	if (!s) RT_SKIP_MISSING_FIXTURE("bdpt-room-furnace.pbrt was not discovered - is pbrt_scenes/ present?");
 	const double kDepth4 = 0.9375;   // 0.5 * (1 + 0.5 + 0.25 + 0.125)
 	const double m = renderMeanWith("simplepath", s, 4, 128);
 	std::printf("[debug-integrators] bdpt-room-furnace depth 4: simplepath %.4f (closed form %.4f)\n", m, kDepth4);

@@ -3,6 +3,7 @@
 // would be too big for one object file.)
 
 #include <gtest/gtest.h>
+#include "fixture_skip.h"
 
 #include <algorithm>
 #include <cmath>
@@ -78,7 +79,7 @@ TEST(CartoonMeta, DescriptionsDoNotRestateWhatIsWorkedOutFromTheData) {
 
 TEST(CartoonMeta, TheDocumentTablesSayWhatTheTableSays) {
 	std::ifstream in("docs/VIDEO_GENERATION.md", std::ios::binary);
-	if (!in) GTEST_SKIP() << "docs/VIDEO_GENERATION.md is not next to the working directory";
+	if (!in) RT_SKIP_MISSING_FIXTURE("docs/VIDEO_GENERATION.md is not next to the working directory");
 	std::stringstream all;
 	all << in.rdbuf();
 	std::string doc = all.str();

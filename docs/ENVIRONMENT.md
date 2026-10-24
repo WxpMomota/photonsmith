@@ -20,6 +20,11 @@ Rule for new ones: prefer a command-line option or a setting in the GUI; add an 
 | `RT_TRIPOSR_DIR` | `tools/photo_to_mesh/photo_to_mesh.py` | Where the TripoSR model lives |
 | `RT_OIDN_DIR` | `src/shared/oidn_runtime.h` | A folder with an Intel Open Image Denoise release (`lib/` or `bin/`), searched first |
 | `RT_ASSET_BASE_URL` | `qt_gui/asset_downloader.cpp` | Replaces the base URL "Download missing files" fetches the statue models from (a local server, for tests and mirrors) |
+| `RAY_TRACER_BACKGROUND`, `RAY_TRACER_BACKGROUND_DUTY` | `launcher/run_policy.h` | `1`: as `--background` (lower priorities, one worker, a pause after each frame of a video); the duty is the share of the time it renders (the pauses follow from it) |
+| `RAY_TRACER_CARTOON_JOBS`, `RAY_TRACER_CARTOON_WORKERS`, `RAY_TRACER_CARTOON_TIMEOUT` | `launcher/cartoon_render.h` | As `--cartoon-jobs`, `--cartoon-workers` and `--cartoon-timeout` (the flag wins): how many frames of a cartoon video at once, how many long-lived worker processes (0: a process per frame), and how long one frame may take |
+| `RAY_TRACER_WORKER_MAX_MB` | `launcher/cartoon_render.h` | As `--worker-max-mb`: a cartoon worker that holds more memory than this is replaced between two frames (0: never) |
+| `RAY_TRACER_GPU_DEVICE` | `gpu/optix/optix_renderer_init.cpp`, `launcher/main.cpp`, `launcher/video_render.h` | Which graphics card the OptiX renderer uses (as `--gpu-device`, which sets it for the programs a video starts too) |
+| `RAY_TRACER_OPTIX_CACHE_GB` | `gpu/optix/optix_renderer_init.cpp` | The size limit OptiX's shader cache is raised to (4 by default; only ever raised), so that an old build's shaders are not evicted into a 20-minute recompile |
 | `RT_NO_GPU_WARMUP`, `RT_LIVE_SCHEDULER`, `RT_METAL_POST_EFFECTS` | `qt_gui/gpu_warmup.cpp`, `qt_gui/realtime_preview_session.cpp`, `gpu/metal/host/metal_poc.mm` | macOS only: skip the Metal warm-up, turn off the Live Preview scheduler, turn off Metal's post effects |
 
 ## Plumbing (set by the program)
@@ -36,10 +41,14 @@ Rule for new ones: prefer a command-line option or a setting in the GUI; add an 
 | Variable | Read by | Meaning |
 |----------|---------|---------|
 | `RT_GUI_SELFTEST` and `RT_GUI_SELFTEST_*` | `qt_gui/mainwindow_selftest*.cpp` | The GUI's self-test modes (`livepreview`, `queue`, `renderfail`, `download`, `composite`, ...) and their options: the mode's own comment says which |
-| `RT_UPDATE_SNAPSHOT` | `tests/unit/scene_registry_snapshot_tests.cpp` | Rewrite `tests/data/scene_registry_snapshot.txt` instead of checking it |
+| `RT_UPDATE_SNAPSHOT` | `tests/unit/scene_registry_snapshot_tests.cpp`, `tests/unit/cartoon_snapshot_tests.cpp` | Rewrite `tests/data/scene_registry_snapshot.txt` / `cartoon_films_snapshot.txt` instead of checking them |
 | `RT_LAUNCHER`, `RT_REQUIRE_LAUNCHER` | `tests/unit/agreement_test_helpers.h` | Where the launcher is for the CPU/GPU agreement tests, and whether a missing one fails or skips them |
+| `RT_REQUIRE_FIXTURES` | `tests/unit/fixture_skip.h` | A test whose file of the repository (a scene, a snapshot, a list) is not found fails instead of skipping. CI and `scripts/run_tests_parallel.ps1` set it |
+| `RT_SOUNDTRACK_WAV` | `tests/unit/cartoon_films_tests.cpp` | Where the soundtrack tests write the film's mix, to listen to |
+| `RT_TEST_VAR` | `tests/unit/cartoon_tests.cpp` | Set by a test for a child process it starts, to check that the variable reaches it |
+| `RT_FORBID_GPU` | `gpu/optix/optix_renderer_init.cpp` | Set by `scripts/run_tests_parallel.ps1` in its Fast tier's shards: a test there that asks for the GPU stops the shard (a GPU test must say GPU in its name) |
 | `RT_SKIP_GALLERY`, `RT_GALLERY_ALL`, `RT_GALLERY_CPU`, `RT_GALLERY_LIST` | `tests/integration/gallery_scenes_render_test.cpp`, `tests/unit/pbrt_reference_pack_tests.cpp` | Skip the gallery render suite; include the Large Scenes (gigabyte meshes, off by default); also render each scene on the CPU and compare brightness (off by default); list which scenes would run (`scripts/run_gallery_isolated.ps1`) |
 | `RAY_TRACER_RUN_VALIDATION_SWEEP` | `tests/integration/optix_validation_sweep_test.cpp` | Run the OptiX validation-layer sweep (slow) |
 | `RAY_TRACER_GLB_DIR`, `RAY_TRACER_RECENT_SCAN_DIR` | `tests/unit/gltf_import_tests.cpp`, `qt_gui/recent_renders.cpp` | A folder of `.glb` files to read as a test; the only folder the Recent Renders list scans in a self-test |
 | `RT_OIDN_RESCAN_DIR`, `RT_PRESET_SCENES_DIR`, `RT_COMBO_SCENES_DIR`, `RT_VOLUMES_PBRT`, `RT_FOREST_PBRT`, `RT_SKY_GALLERY_OUT`, `RT_SHOWCASE_OUT`, `RT_SCENE_BUILDER_STARTER_OUT` | the unit tests that name them | Where a test finds or writes the files it uses |
-| `METAL_PARITY_*` | `gpu/metal/metal_cpu_gpu_parity_check.cpp` | The Metal parity sweep's options (macOS; see `docs/METAL_PARITY_STATUS.md`) |
+| `METAL_PARITY_*` | `gpu/metal/tests/metal_cpu_gpu_parity_check.cpp` | The Metal parity sweep's options (macOS; see `docs/METAL_PARITY_STATUS.md`) |

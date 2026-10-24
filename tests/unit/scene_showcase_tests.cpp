@@ -1,6 +1,7 @@
 // Tests for the Scene Builder's showcase scene (src/shared/scene_showcase.h, pbrt_scenes/studio-showcase.pbrt): that it is a valid Scene Builder document that uses what it says it
 // uses, that the committed file is exactly what the code writes (so they cannot drift), and that the file opens in the Builder and is listed under its tags.
 #include <gtest/gtest.h>
+#include "fixture_skip.h"
 
 #include "../../src/shared/pbrt_discover.h"
 #include "../../src/shared/pbrt_load.h"
@@ -119,7 +120,7 @@ TEST(SceneShowcaseTest, ItIsAValidDocumentThatUsesWhatItSaysItUses) {
 
 TEST(SceneShowcaseTest, TheCommittedFileIsExactlyWhatTheCodeWritesAndItOpensInTheBuilder) {
 	const std::string path = findShowcaseFile();
-	if (path.empty()) GTEST_SKIP() << "pbrt_scenes/studio-showcase.pbrt was not found from here";
+	if (path.empty()) RT_SKIP_MISSING_FIXTURE("pbrt_scenes/studio-showcase.pbrt was not found from here");
 	const std::string text = readAll(path);
 	const std::string fileRounded = roundNumbers(text), codeRounded = roundNumbers(showcaseFileText());
 	EXPECT_TRUE(fileRounded == codeRounded) << "the scene changed: write the file again with RT_SHOWCASE_OUT=" << path << " ray_tracer_tests --gtest_filter=SceneShowcaseTest.WriteTheFile\nfirst difference " << firstDifference(fileRounded, codeRounded);
@@ -139,7 +140,7 @@ TEST(SceneShowcaseTest, TheCommittedFileIsExactlyWhatTheCodeWritesAndItOpensInTh
 
 TEST(SceneShowcaseTest, TheRenderersLoaderReadsEveryPartOfIt) {
 	const std::string path = findShowcaseFile();
-	if (path.empty()) GTEST_SKIP() << "pbrt_scenes/studio-showcase.pbrt was not found from here";
+	if (path.empty()) RT_SKIP_MISSING_FIXTURE("pbrt_scenes/studio-showcase.pbrt was not found from here");
 	const pbrt_load::LoadResult r = pbrt_load::loadFile(path);
 	ASSERT_TRUE(r.ok) << r.error;
 	bool projection = false, mixed = false;

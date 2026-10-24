@@ -12,6 +12,7 @@
  */
 
 #include <gtest/gtest.h>
+#include "fixture_skip.h"
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -1148,7 +1149,7 @@ TEST(SceneHeaderTagsTest, ASceneCanSayItIsCpuOnly) {
 // write exactly that file: a pack whose member lands anywhere else downloads fine and the scene still says its files are missing.
 TEST(FindSceneTest, EveryDownloadableBitterliSceneHasAPackThatWritesItsFile) {
 	std::ifstream in("qt_gui/scene_packs.txt");
-	if (!in) GTEST_SKIP() << "qt_gui/scene_packs.txt is not next to the working directory";
+	if (!in) RT_SKIP_MISSING_FIXTURE("qt_gui/scene_packs.txt is not next to the working directory");
 	const std::string catalogue((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 	int checked = 0;
 	for (const auto& entry : pbrt_scene_registry::paths()) {

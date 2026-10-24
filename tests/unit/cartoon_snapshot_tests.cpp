@@ -8,6 +8,7 @@
 //
 // (run from the repository root).
 #include <gtest/gtest.h>
+#include "fixture_skip.h"
 
 #include <cstdlib>
 #include <fstream>
@@ -52,7 +53,7 @@ TEST(CartoonFilmSnapshot, TheFilmsContainWhatTheSnapshotFileSays) {
 		GTEST_SKIP() << "snapshot rewritten: " << now.size() << " instants";
 	}
 	std::ifstream in(path, std::ios::binary);
-	if (!in) GTEST_SKIP() << path << " is not next to the working directory";
+	if (!in) RT_SKIP_MISSING_FIXTURE(path << " is not next to the working directory");
 	std::vector<std::string> pinned;
 	for (std::string l; std::getline(in, l);) {
 		if (!l.empty() && l.back() == '\r') l.pop_back();

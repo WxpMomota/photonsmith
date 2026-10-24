@@ -106,7 +106,22 @@ OptiXRenderer::~OptiXRenderer() {
 	cleanup();
 }
 
+// The test runner sets RT_FORBID_GPU in the shards of its Fast tier, which runs many tests at once on the assumption that none of them uses the GPU (scripts/run_tests_parallel.ps1
+// picks the GPU tests out by name). A GPU test named without "GPU" used to run there unnoticed, and the check meant to catch it could not fail: now the shard stops here, and
+// its log ends with the test that asked.
+static void refuseIfGpuForbidden() {
+	char *forbid = nullptr;
+	size_t len = 0;
+	const bool set = _dupenv_s(&forbid, &len, "RT_FORBID_GPU") == 0 && forbid && forbid[0] && forbid[0] != '0';
+	std::free(forbid);
+	if (!set) return;
+	std::cerr << "RT_FORBID_GPU: a test of the Fast tier asked for the GPU. Put GPU (or Gpu) in its name, or add it to the GPU tests' filter in scripts/run_tests_parallel.ps1."
+			  << std::endl;
+	std::abort();
+}
+
 bool OptiXRenderer::isAvailable() noexcept {
+	refuseIfGpuForbidden();
 	// Step 1: Check CUDA device availability
 	int deviceCount = 0;
 	const cudaError_t cudaErr = cudaGetDeviceCount(&deviceCount);
@@ -263,6 +278,7 @@ bool OptiXRenderer::getDiagnostics(OptixDiagnostics& out) noexcept {
 }
 
 bool OptiXRenderer::initialize() {
+	refuseIfGpuForbidden();
 	if (!createContext()) {
 		std::cerr << "Failed to create OptiX context\n";
 		return false;

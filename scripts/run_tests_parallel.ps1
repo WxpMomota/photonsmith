@@ -282,16 +282,9 @@ foreach ($check in @(@{ Exe = $testsExe; Dirs = $rendererDirs + @("tests") }, @{
 }
 foreach ($w in $staleWarnings) { Write-Host "[STALE?] $w" -ForegroundColor Yellow }
 
-# Automated guard against the naming-convention drift $gpuAndOversubscribingFilter
-# depends on (see -Tier's own doc comment): rather than trusting that
-# invariant forever on the strength of a prose warning, re-derive it fresh
-# on every -Tier Fast/Slow run by independently counting both sides via
-# --gtest_list_tests (cheap - it only enumerates, never runs a test) and
-# asserting they still sum to the unfiltered total. A future GPU test added
-# without Gpu/GPU/gpu in its name (or one of the two explicitly-listed
-# exceptions) silently escapes the exclusion pattern - this check catches
-# that the moment it happens instead of only showing up as unexplained
-# GPU contention in "Fast" runs later.
+# A count of the tiers against the whole suite (--gtest_list_tests: cheap, it only enumerates). It checks that the three filters together cover every test
+# once; it cannot tell a GPU test that its name does not give away (that one lands in Fast and adds up all the same). That is caught when it runs: the Fast
+# shards set RT_FORBID_GPU, and the GPU renderer stops the shard (gpu/optix/optix_renderer_init.cpp).
 function Get-GTestCount {
 	param([string]$Exe, [string]$Filter)
 	$argList = @("--gtest_list_tests")
@@ -331,6 +324,7 @@ New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 # the repo root's own top-level directory listing doesn't change between
 # shards).
 $repoTopLevelDirs = Get-ChildItem -Path $repoRoot -Directory
+$repoTopLevelDocs = Get-ChildItem -Path $repoRoot -File -Filter *.md
 
 $jobs = for ($i = 0; $i -lt $Shards; $i++) {
 	$logFile = Join-Path $logDir "shard_$i.log"
@@ -356,6 +350,9 @@ $jobs = for ($i = 0; $i -lt $Shards; $i++) {
 	foreach ($dir in $repoTopLevelDirs) {
 		New-Item -ItemType Junction -Path (Join-Path $shardDir $dir.Name) -Target $dir.FullName -Force | Out-Null
 	}
+	# The documents at the top (README.md ...) are copied, not linked (a copy can never be written through): a test that checks what they say read nothing here
+	# and skipped without a word until missing files were made failures (RT_REQUIRE_FIXTURES).
+	foreach ($doc in $repoTopLevelDocs) { Copy-Item -Path $doc.FullName -Destination $shardDir -Force }
 	# Many render/integration tests spawn their OWN worker-thread pool sized
 	# to the full logical-core count (determine_render_thread_count(),
 	# src/TheRestOfYourLife/thread_count.h) - fine for one process, but N
@@ -369,8 +366,8 @@ $jobs = for ($i = 0; $i -lt $Shards; $i++) {
 	# across all shards close to the real core count instead of Shards-times
 	# over it.
 	$threadsPerShard = [Math]::Max(1, [Math]::Ceiling([System.Environment]::ProcessorCount / $Shards))
-	Start-Job -Name "shard_$i" -ArgumentList $testsExe, $Shards, $i, $Filter, $logFile, $shardDir, $threadsPerShard -ScriptBlock {
-		param($exe, $total, $index, $filter, $log, $cwd, $threads)
+	Start-Job -Name "shard_$i" -ArgumentList $testsExe, $Shards, $i, $Filter, $logFile, $shardDir, $threadsPerShard, ($Tier -eq "Fast") -ScriptBlock {
+		param($exe, $total, $index, $filter, $log, $cwd, $threads, $forbidGpu)
 		Set-Location $cwd
 		# Each shard's own TEMP/TMP: about ten test fixtures build a scratch tree under a FIXED name in %TEMP% (pbrt_load_tests, pbrt_discover_tests,
 		# ...), and tests of one fixture land in different shards, so two shards used to delete each other's files mid-test ("found.size() 0, expected 2").
@@ -381,6 +378,11 @@ $jobs = for ($i = 0; $i -lt $Shards; $i++) {
 		$env:GTEST_TOTAL_SHARDS = $total
 		$env:GTEST_SHARD_INDEX = $index
 		$env:RAY_TRACER_THREADS = $threads
+		# The Fast tier runs its shards side by side on the assumption that no test in them uses the GPU: a GPU test that its name does not give away stops its shard
+		# (RT_FORBID_GPU, gpu/optix/optix_renderer_init.cpp) instead of running there unnoticed.
+		if ($forbidGpu) { $env:RT_FORBID_GPU = "1" }
+		# The shards run in folders linked to the repository, so every file of it is there: a test that cannot find one fails instead of skipping (tests/unit/fixture_skip.h).
+		$env:RT_REQUIRE_FIXTURES = "1"
 		$argList = @("--gtest_brief=1")
 		if ($filter) { $argList += "--gtest_filter=$filter" }
 		& $exe @argList *> $log
@@ -415,6 +417,7 @@ $totalSkipped = 0
 foreach ($job in $jobs) {
 	$logFile = Join-Path $logDir "$($job.Name).log"
 	$content = if (Test-Path $logFile) { Get-Content $logFile -Raw } else { "" }
+	if ($null -eq $content) { $content = "" }   # (Get-Content -Raw of an empty log is $null: a shard that died before writing anything)
 	# Receive-Job returns the scriptblock's own last expression (see the job
 	# definition above) - the real process exit code, not PowerShell's
 	# notion of job State (which stays "Completed" even after a crash).

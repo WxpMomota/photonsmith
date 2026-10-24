@@ -24,6 +24,7 @@
  */
 
 #include <gtest/gtest.h>
+#include "fixture_skip.h"
 #include "rtweekend.h"
 #include "hittable.h"
 #include "material.h"
@@ -543,7 +544,7 @@ TEST(SppmResolveMaterial, ResolvedNonDeltaSubMaterialIsClassifiedAsNonDelta) {
 // the bridge, E[f * cos / pdf] over sppm_bsdf_sample_f, must be the table's own albedo (integrated here from f() alone) in each channel.
 TEST(SppmBsdfSampleF, MeasuredEnergyConservationMatchesTheTablesAlbedo) {
 	const char* const kTable = "pbrt_scenes/synthetic-gold.bsdf";
-	{ std::ifstream probe(kTable); if (!probe) GTEST_SKIP() << kTable << " not found from this working directory"; }
+	{ std::ifstream probe(kTable); if (!probe) RT_SKIP_MISSING_FIXTURE(kTable << " not found from this working directory"); }
 	auto mat = make_shared<measured>(kTable);
 	ASSERT_TRUE(mat->loaded());
 	SPPMShadingContext ctx;

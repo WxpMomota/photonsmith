@@ -8,6 +8,7 @@
 //
 // (run from the repository root). The test also tells the documents that quote the number of scenes (README, the scene guide) when they are out of date.
 #include <gtest/gtest.h>
+#include "fixture_skip.h"
 
 #include "scene_registry.h"
 
@@ -76,7 +77,7 @@ TEST(SceneRegistrySnapshot, TheBuiltInScenesAreTheOnesInTheSnapshotFile) {
 		GTEST_SKIP() << "snapshot rewritten: " << now.size() << " scenes";
 	}
 	std::ifstream in(path, std::ios::binary);
-	if (!in) GTEST_SKIP() << path << " is not next to the working directory";
+	if (!in) RT_SKIP_MISSING_FIXTURE(path << " is not next to the working directory");
 	std::vector<std::string> pinned;
 	for (std::string l; std::getline(in, l);) {
 		if (!l.empty() && l.back() == '\r') l.pop_back();
@@ -100,7 +101,7 @@ TEST(SceneRegistrySnapshot, TheDocumentsQuoteTheRealSceneCount) {
 	};
 	for (const auto& [file, re] : docs) {
 		std::ifstream in(file, std::ios::binary);
-		if (!in) { GTEST_SKIP() << file << " is not next to the working directory"; }
+		if (!in) { RT_SKIP_MISSING_FIXTURE(file << " is not next to the working directory"); }
 		const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 		int found = 0;
 		for (std::sregex_iterator it(text.begin(), text.end(), re), end; it != end; ++it) {

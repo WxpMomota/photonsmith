@@ -33,6 +33,7 @@
  */
 
 #include <gtest/gtest.h>
+#include "fixture_skip.h"
 
 #include <cmath>
 #include <cstdint>
@@ -579,7 +580,7 @@ TEST(MeasuredBxdfPbrtWiring, UnresolvableFilenameFallsBackToDiffuse) {
 // instead of the luminance-warped point (pbrt-v4 Sample_f's `u`, and what f() reaches through vndf.Invert); they now agree to ~0.1%.
 TEST(MeasuredBxdfConsistency, SampleFAlbedoMatchesEvalFAlbedo) {
 	const std::string path = FindRepoFile("pbrt_scenes/synthetic-gold.bsdf");
-	if (path.empty()) GTEST_SKIP() << "pbrt_scenes/synthetic-gold.bsdf not found";
+	if (path.empty()) RT_SKIP_MISSING_FIXTURE("pbrt_scenes/synthetic-gold.bsdf not found");
 	std::string err;
 	const auto data = measured_bxdf_io::GetMeasuredBRDFDataCached(path, err);
 	ASSERT_TRUE(data) << err;
