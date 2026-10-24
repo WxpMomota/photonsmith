@@ -1071,7 +1071,8 @@ extern "C" __global__ void __raygen__sppm_camera_pass() {
 				float3 bsdf_val = sppm_bsdf_f(mat, pixel.vp_wo, to_light, pixel.vp_n, pixel.vp_albedo);
 				float3 Ld_contrib = beta * bsdf_val * cos_l * light_emission / light_pdf;
 
-				if (sppm_trace_shadow_ray(pixel.vp_p + 0.001f * pixel.vp_n, to_light, max_dist - 0.002f)) {
+				// (a contribution that is NaN or infinite, e.g. from a vanishing light_pdf, is dropped as pbrt-v4 drops such a sample: it would stay in the pixel for good)
+				if (isfinite(Ld_contrib.x) && isfinite(Ld_contrib.y) && isfinite(Ld_contrib.z) && sppm_trace_shadow_ray(pixel.vp_p + 0.001f * pixel.vp_n, to_light, max_dist - 0.002f)) {
 					pixel.Ld = pixel.Ld + Ld_contrib;
 				}
 			}
@@ -1224,6 +1225,7 @@ extern "C" __global__ void __raygen__sppm_photon_pass() {
 							const MaterialData& vpMat = sppm_params.materials[vp.vp_materialIdx];
 							float3 f = sppm_bsdf_f(vpMat, vp.vp_wo, wi, vp.vp_n, vp.vp_albedo);
 							float3 phi_add = beta * vp.vp_beta * f;
+							if (!isfinite(phi_add.x) || !isfinite(phi_add.y) || !isfinite(phi_add.z)) phi_add = make_float3(0.0f, 0.0f, 0.0f);   // (a NaN photon would spoil the point for good)
 							atomicAdd(&vp.Phi.x, phi_add.x);
 							atomicAdd(&vp.Phi.y, phi_add.y);
 							atomicAdd(&vp.Phi.z, phi_add.z);

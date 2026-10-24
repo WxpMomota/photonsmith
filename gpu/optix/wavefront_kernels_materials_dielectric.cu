@@ -135,18 +135,8 @@ extern "C" __global__ void evaluate_materials_dielectric(
 										kDevCIEMin, kDevCIENSamples);
 		float r, g, b;
 		wf_xyz_to_linear_rgb(xyz.x, xyz.y, xyz.z, r, g, b);
-		// "float maxcomponentvalue" firefly clamp - see
-		// GpuCameraParams::maxComponentValue's own comment (optix_types.h)
-		// for why this is a per-CONTRIBUTION clamp, not a true
-		// per-sample-total clamp CPU/the recursive backend apply.
-		const float m = fmaxf(r, fmaxf(g, b));
-		if (maxComponentValue > 0.0f && m > maxComponentValue) {
-			const float s = maxComponentValue / m;
-			r *= s; g *= s; b *= s;
-		}
-		atomicAdd(&framebuffer[pixIdx].x, r);
-		atomicAdd(&framebuffer[pixIdx].y, g);
-		atomicAdd(&framebuffer[pixIdx].z, b);
+		// (dropped if not finite, then the per-CONTRIBUTION "float maxcomponentvalue" clamp: GpuCameraParams::maxComponentValue, optix_types.h)
+		wf_add_to_pixel(framebuffer, pixIdx, r, g, b, maxComponentValue);
 	};
 
 	if (h.depth >= maxDepth) {

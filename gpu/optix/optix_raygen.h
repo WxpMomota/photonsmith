@@ -639,6 +639,9 @@ extern "C" __global__ void __raygen__rg() {
 		// (cropX1, cameraMediumSigmaT) - protects every caller that never
 		// explicitly sets this field, not just the ones this round touched.
 		{
+			// a sample that is NaN or infinite is dropped, as pbrt-v4 and the CPU renderer do (camera_render.h): it would stay in the pixel for good, and the clamp below would
+			// turn an infinity into a NaN
+			if (!isfinite(radiance.x) || !isfinite(radiance.y) || !isfinite(radiance.z)) radiance = make_float3(0.0f, 0.0f, 0.0f);
 			const float m = fmaxf(radiance.x, fmaxf(radiance.y, radiance.z));
 			if (params.camera.maxComponentValue > 0.0f && m > params.camera.maxComponentValue) {
 				const float s = params.camera.maxComponentValue / m;

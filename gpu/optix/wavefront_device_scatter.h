@@ -360,22 +360,9 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 										kDevCIEMin, kDevCIENSamples);
 		float r, g, b;
 		wf_xyz_to_linear_rgb(xyz.x, xyz.y, xyz.z, r, g, b);
-		// "float maxcomponentvalue" firefly clamp - see
-		// GpuCameraParams::maxComponentValue's own comment (optix_types.h)
-		// for why this is a per-CONTRIBUTION clamp here, not the true
-		// per-sample-total clamp CPU/the recursive backend apply: this
-		// atomicAdd is one of several independent partial contributions to
-		// the same sample's eventual total, with no single point on this
-		// backend where the whole sample's radiance is ever known as one
-		// value to clamp.
-		const float m = fmaxf(r, fmaxf(g, b));
-		if (maxComponentValue > 0.0f && m > maxComponentValue) {
-			const float s = maxComponentValue / m;
-			r *= s; g *= s; b *= s;
-		}
-		atomicAdd(&framebuffer[pixIdx].x, r);
-		atomicAdd(&framebuffer[pixIdx].y, g);
-		atomicAdd(&framebuffer[pixIdx].z, b);
+		// (dropped if not finite, then the "float maxcomponentvalue" clamp: per CONTRIBUTION here, not the true per-sample-total clamp CPU/the recursive backend apply - this is
+		// one of several independent partial contributions to the same sample's total, with no single point on this backend where the whole sample's radiance is known)
+		wf_add_to_pixel(framebuffer, pixIdx, r, g, b, maxComponentValue);
 	};
 
 	// ReSTIR GI (see this function's own giOriginContext/giCandidateOut

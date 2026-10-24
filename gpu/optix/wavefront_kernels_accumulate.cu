@@ -109,19 +109,8 @@ extern "C" __global__ void accumulate_miss(
 	auto xyz = SampledSpectrumToXYZ(L, swl, d_cie_x, d_cie_y, d_cie_z, kDevCIEMin, kDevCIENSamples);
 	float r, g, b;
 	wf_xyz_to_linear_rgb(xyz.x, xyz.y, xyz.z, r, g, b);
-	// "float maxcomponentvalue" firefly clamp - see
-	// GpuCameraParams::maxComponentValue's own comment (optix_types.h) for
-	// why this is a per-contribution clamp, not a true per-sample one.
-	{
-		const float m2 = fmaxf(r, fmaxf(g, b));
-		if (maxComponentValue > 0.0f && m2 > maxComponentValue) {
-			const float s = maxComponentValue / m2;
-			r *= s; g *= s; b *= s;
-		}
-	}
-	atomicAdd(&framebuffer[m.pixelIndex].x, r);
-	atomicAdd(&framebuffer[m.pixelIndex].y, g);
-	atomicAdd(&framebuffer[m.pixelIndex].z, b);
+	// (dropped if not finite, then the per-contribution "float maxcomponentvalue" clamp: GpuCameraParams::maxComponentValue, optix_types.h)
+	wf_add_to_pixel(framebuffer, m.pixelIndex, r, g, b, maxComponentValue);
 }
 
 // ============================================================================
@@ -251,18 +240,8 @@ extern "C" __global__ void accumulate_shadow(
 			return;
 		}
 
-		// "float maxcomponentvalue" firefly clamp - see
-		// GpuCameraParams::maxComponentValue's own comment (optix_types.h)
-		// for why this is a per-contribution clamp, not a true
-		// per-sample one.
-		const float m = fmaxf(r, fmaxf(g, b));
-		if (maxComponentValue > 0.0f && m > maxComponentValue) {
-			const float s2 = maxComponentValue / m;
-			r *= s2; g *= s2; b *= s2;
-		}
-		atomicAdd(&framebuffer[s.pixelIndex].x, r);
-		atomicAdd(&framebuffer[s.pixelIndex].y, g);
-		atomicAdd(&framebuffer[s.pixelIndex].z, b);
+		// (dropped if not finite, then the per-contribution "float maxcomponentvalue" clamp: GpuCameraParams::maxComponentValue, optix_types.h)
+		wf_add_to_pixel(framebuffer, s.pixelIndex, r, g, b, maxComponentValue);
 	}
 }
 

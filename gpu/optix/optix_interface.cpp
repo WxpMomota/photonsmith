@@ -272,6 +272,9 @@ static bool prepareSceneAndCamera(
 	// (same scene, moving camera, many frames in one process) expensive:
 	// skip it when nothing but the camera moved.
 	if (!sceneAlreadyUploaded) {
+		// The device state below is overwritten piece by piece, and the upload can fail (or throw) part way: from here until record() nothing is known to be on the GPU,
+		// or a failed upload of B would leave the record saying A is still there, and going back to A would draw it with half of B.
+		g_uploaded.clear();
 		// Instanced geometry travels separately - see setInstanceData().
 		// Called inside this same cache-skip guard as buildScene() itself,
 		// so instance data is part of what "this scene is already uploaded"
@@ -330,6 +333,12 @@ static bool prepareSceneAndCamera(
 	// enableWavefront() falls back to the default renderer when the wavefront one cannot start; the scene above was uploaded for the wavefront renderer only (no default-renderer
 	// SBT, no default pipeline), so it is prepared again for the default renderer.
 	if (wavefrontMode && !g_renderer->isWavefrontActive()) {
+		// ... unless only the wavefront renderer draws the scene right: preparing it for the default renderer would send it straight back here (SceneData::needsWavefront), for ever
+		if (scene.needsWavefront) {
+			std::cerr << "ERROR: " << scene.needsWavefrontReason << " needs the wavefront renderer, which could not be started (see above)." << std::endl;
+			errorCode = ERR_GPU_UNSUPPORTED_SCENE;
+			return false;
+		}
 		return prepareSceneAndCamera(scene_id, image_width, image_height, cam_x, cam_y, cam_z, force_camera_override, /*wavefrontMode=*/false, ptxPath, verbose, cameraExtra, errorCode,
 									 has_custom_lookat, lookat_x, lookat_y, lookat_z, has_dof_override, aperture_override, focus_distance_override, vfov_override);
 	}
@@ -839,6 +848,7 @@ extern "C" bool rt_realtime_render_frame(
 		const std::string uploadKey = uploadKeyFor(scene_id);
 		const bool cacheHit = s_haveCache && s_cachedSceneId == uploadKey &&
 			g_uploaded.serves(uploadKey, RendererKind::Wavefront) &&
+			g_renderer->isWavefrontActive() &&   // (a batch render in the same process may have switched the wavefront renderer off since)
 			s_cachedWidth == image_width && s_cachedHeight == image_height &&
 			s_cachedCamX == cam_x && s_cachedCamY == cam_y && s_cachedCamZ == cam_z &&
 			s_cachedHasCustomLookAt == has_custom_lookat &&
@@ -1399,6 +1409,7 @@ extern "C" int optix_render_main_sppm(
 		}
 
 		if (!g_uploaded.serves(uploadKeyFor(scene_id), RendererKind::Sppm)) {
+			g_uploaded.clear();   // (nothing is known to be on the GPU until record(): see prepareSceneAndCamera)
 			// Instanced geometry travels separately - see setInstanceData().
 			// Called inside this same cache-skip guard as buildScene() itself,
 			// so instance data is part of what "this scene is already

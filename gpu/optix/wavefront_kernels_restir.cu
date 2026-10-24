@@ -546,14 +546,7 @@ extern "C" __global__ void restir_gi_finalize(
 	auto xyz = SampledSpectrumToXYZ(Ld, swl, d_cie_x, d_cie_y, d_cie_z, kDevCIEMin, kDevCIENSamples);
 	float rr, gg, bb;
 	wf_xyz_to_linear_rgb(xyz.x, xyz.y, xyz.z, rr, gg, bb);
-	const float m = fmaxf(rr, fmaxf(gg, bb));
-	if (maxComponentValue > 0.0f && m > maxComponentValue) {
-		const float s2 = maxComponentValue / m;
-		rr *= s2; gg *= s2; bb *= s2;
-	}
-	atomicAdd(&framebuffer[idx].x, rr);
-	atomicAdd(&framebuffer[idx].y, gg);
-	atomicAdd(&framebuffer[idx].z, bb);
+	wf_add_to_pixel(framebuffer, idx, rr, gg, bb, maxComponentValue);
 }
 
 // GI's own spatial reuse - same one-frame-delay design as DI's own

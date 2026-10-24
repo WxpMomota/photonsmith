@@ -739,6 +739,21 @@ __device__ __forceinline__ void wf_xyz_to_linear_rgb(float X, float Y, float Z,
 	XYZToLinearRGBMatrix(X, Y, Z, r, g, b);
 }
 
+// Adds one contribution (linear RGB) to a pixel of the framebuffer, as every wavefront stage that finds light does: a contribution that is NaN or infinite is dropped (pbrt-v4 and
+// the CPU renderer drop such a sample: one would otherwise stay in the pixel for good, and the "float maxcomponentvalue" clamp below would turn an infinity into a NaN), and the rest
+// is clamped to maxComponentValue (> 0; per contribution here: GpuCameraParams::maxComponentValue says why).
+__device__ __forceinline__ void wf_add_to_pixel(float3 *framebuffer, int pixelIndex, float r, float g, float b, float maxComponentValue) {
+	if (!isfinite(r) || !isfinite(g) || !isfinite(b)) return;
+	const float m = fmaxf(r, fmaxf(g, b));
+	if (maxComponentValue > 0.0f && m > maxComponentValue) {
+		const float s = maxComponentValue / m;
+		r *= s; g *= s; b *= s;
+	}
+	atomicAdd(&framebuffer[pixelIndex].x, r);
+	atomicAdd(&framebuffer[pixelIndex].y, g);
+	atomicAdd(&framebuffer[pixelIndex].z, b);
+}
+
 // Forward-declared: defined further down alongside wf_dc_apply_vector/
 // wf_dc_apply_normal_from_w2o (this function's own header comment there),
 // needed here by wf_sample_sphere_light's ClippedSphere UV branch below.

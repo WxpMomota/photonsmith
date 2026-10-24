@@ -126,18 +126,8 @@ extern "C" __global__ void resolve_bssrdf_exit(
 											kDevCIEMin, kDevCIENSamples);
 			float r, g, b;
 			wf_xyz_to_linear_rgb(xyz.x, xyz.y, xyz.z, r, g, b);
-			// "float maxcomponentvalue" firefly clamp - see
-			// GpuCameraParams::maxComponentValue's own comment (optix_types.h)
-			// and evaluate_materials's own addToFramebuffer comment for why
-			// this is a per-contribution clamp, not a true per-sample one.
-			const float m = fmaxf(r, fmaxf(g, b));
-			if (maxComponentValue > 0.0f && m > maxComponentValue) {
-				const float s = maxComponentValue / m;
-				r *= s; g *= s; b *= s;
-			}
-			atomicAdd(&framebuffer[item.pixelIndex].x, r);
-			atomicAdd(&framebuffer[item.pixelIndex].y, g);
-			atomicAdd(&framebuffer[item.pixelIndex].z, b);
+			// (dropped if not finite, then the per-contribution "float maxcomponentvalue" clamp: GpuCameraParams::maxComponentValue, optix_types.h)
+			wf_add_to_pixel(framebuffer, item.pixelIndex, r, g, b, maxComponentValue);
 		}
 		return;
 	}
