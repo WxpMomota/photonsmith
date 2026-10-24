@@ -21,6 +21,7 @@
 
 #include <functional>
 
+#include "film_kit.h"
 #include "tengwang_dreams.h"
 
 namespace cartoon {
@@ -151,20 +152,23 @@ inline std::string hallGlow(double strength) {
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The shots
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
-// What a moment of a shot needs: the camera, the light, the look, and (built only for the scene) everything in it.
-struct Frame {
-	CameraView view{{0.0, 0.0, 0.0}, {0.0, 0.0, -1.0}, 40.0, 0.0, 0};
+// What a moment of a shot needs: the film kit's moment (the camera, the exposure, the look, the haze, the content: film_kit.h), and which of the day's skies lights it.
+using namespace kit;
+struct Frame : kit::Moment {
 	int sky = Golden;
 	double skyScale = 0.55, skyTurn = 0.0;
 	bool sun = true;
 	double sunStrength = 1.0;
-	double iso = 150.0;
-	double bloom = 0.16, vignette = 0.32, warmth = 0.04, saturation = 1.24;
-	bool mist = true;
-	nature::Mist haze;
-	int depth = 6;
 	std::string skyOverride;   // a light of its own instead of the day's sky (the dreams)
-	std::string content;
+	Frame() {   // (this film's own defaults: a warm, saturated look, in a haze)
+		iso = 150.0;
+		bloom = 0.16;
+		vignette = 0.32;
+		warmth = 0.04;
+		saturation = 1.24;
+		mist = true;
+		depth = 6;
+	}
 };
 inline nature::Mist hazeAround(Vec3 eye, double density, double radius = 40000.0, Vec3 tint = {0.85, 0.95, 1.15}) {
 	nature::Mist m;
@@ -176,10 +180,7 @@ inline nature::Mist hazeAround(Vec3 eye, double density, double radius = 40000.0
 	m.absorption = density * 0.3;
 	return m;
 }
-inline double ease(double t0, double t1, double t) { return smoothstep(t0, t1, t); }
-inline Vec3 glide(double t0, double t1, double t, Vec3 a, Vec3 b) { return lerp(a, b, ease(t0, t1, t)); }
-inline Vec3 glideLinear(double t0, double t1, double t, Vec3 a, Vec3 b) { return lerp(a, b, clamp01((t - t0) / (t1 - t0))); }
-inline CameraView cam(Vec3 eye, Vec3 target, double fov, double lens = 0.0) { return CameraView{eye, target, fov, lens, 0}; }
+// (cam, ease, glide and glideLinear are the kit's: film_kit.h)
 // The world round `eye`: the land, the fields, the river, the Pavilion, the city and the villages, the trees near the camera.
 inline std::string worldText(Vec3 eye, double t, double treeRange = 3200.0, bool city = true, double wind = 0.4, bool fields = true) {
 	std::string out = landText() + (fields ? fieldsText() : std::string()) + riverText() + pavilionText();
@@ -197,11 +198,7 @@ inline Pose standPose(Vec3 wind = {0.0, 0.0, 0.0}) {
 	return p;
 }
 
-struct ShotDef {
-	double start;
-	const char *name;
-	std::function<void(double, Frame &, bool)> fill;   // (film time, the frame, whether to build the content)
-};
+using ShotDef = kit::Shot<Frame>;   // (film time, the frame, whether to build the content)
 
 // Scene 1 -------------------------------------------------------------------------------------------------------------------------------------------------------
 inline void shotClouds(double t, Frame &f, bool content) {
@@ -1342,72 +1339,30 @@ inline const std::vector<ShotDef> &shotList() {
 	return shots;
 }
 inline std::vector<double> shotStarts() { return startsOf(shotList()); }
-inline std::string shotNames() {
-	std::string s;
-	for (const ShotDef &d : shotList()) s += (s.empty() ? "" : "|") + std::string(d.name);
-	return s;
-}
+inline std::string shotNames() { return kit::shotNamesOf(shotList()); }
 // (the same as a lasting C string, for the film table)
 inline const char *shotNamesText() {
 	static const std::string s = shotNames();
 	return s.c_str();
 }
-inline Frame frameAt(double t, bool content) {
-	const std::vector<ShotDef> &shots = shotList();
-	std::size_t k = 0;
-	for (std::size_t i = 0; i < shots.size(); ++i)
-		if (t >= shots[i].start) k = i;
-	Frame f;
-	shots[k].fill(t, f, content);
-	f.view.shot = static_cast<int>(k);
-	return f;
-}
+inline Frame frameAt(double t, bool content) { return kit::momentAt(shotList(), t, content); }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
-// The scene
+// The scene (film_kit.h makes it from a moment: the header, the haze, the light, the content; a black frame - a cut to black, the title's card - made renderable)
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
-inline std::string headerOf(const Frame &f) {
-	char look[220];
-	std::snprintf(look, sizeof look, "# @rt-look bloom %.3f vignette %.3f warmth %.3f saturation %.3f\n", f.bloom, f.vignette, f.warmth, f.saturation);
-	std::string h = sceneHeader(cameraText(f.view), kSamples, kWidth, kHeight);
-	char film[160];
-	// (an iso of 0 is a black frame: a cut to black)
-	std::snprintf(film, sizeof film, "Film \"rgb\" \"float iso\" [ %.6g ] \"float maxcomponentvalue\" [ 40 ] ", (std::max)(1e-6, f.iso));
-	const std::size_t at = h.find("Film \"rgb\" ");
-	if (at != std::string::npos) h.replace(at, 11, film);
-	const std::string depth = "\"integer maxdepth\" [ " + std::to_string(f.depth) + " ]";
-	const std::size_t d = h.find("\"integer maxdepth\" [ 8 ]");
-	if (d != std::string::npos) h.replace(d, 24, depth);
-	return std::string(look) + (f.mist ? nature::mistBeforeCamera(f.haze) : std::string()) + h;
+constexpr kit::FilmFormat kFormat{kSamples, kWidth, kHeight};
+// A moment's light: its own (the dreams) or the day's sky and its sun.
+inline std::string lightOf(const Frame &f) {
+	if (!f.skyOverride.empty()) return f.skyOverride;
+	std::string light = skyText(f.sky, f.skyScale, f.skyTurn);
+	if (f.sun) light += sunText(sunOf(f.sky), f.sunStrength, f.view.eye);
+	return light;
 }
-inline std::string headerAt(double t) {
-	Frame f = frameAt(t, false);
-	if (f.iso <= 1.0) {   // (a black frame: as sceneAt makes it)
-		f.iso = 100.0;
-		f.mist = false;
-		f.bloom = 0.0;
-	}
-	return headerOf(f);
-}
+inline std::string headerAt(double t) { return kit::headerText(frameAt(t, false), kFormat); }
 inline std::string sceneAt(double t) {
 	Frame f = frameAt(t, true);
-	// A black frame (a cut to black, the title's card): a near-black scene at an ordinary exposure. (An exposure of almost nothing was taken as it came, and a frame of it
-	// took the renderer some minutes.)
-	if (f.iso <= 1.0) {
-		f.iso = 100.0;
-		f.mist = false;
-		f.sun = false;
-		f.bloom = 0.0;
-		f.skyOverride = "LightSource \"infinite\" \"rgb L\" [ 0.00001 0.00001 0.00001 ]\n";
-		f.content = attr(diffuseMaterial({0.0, 0.0, 0.0}), emitMesh(uvSphere(0.1, 8, 4), translate(f.view.eye + Vec3{0.0, 0.0, 5.0})));
-	}
-	std::string out = headerOf(f);
-	if (f.mist) out += nature::mistBoundary(f.haze);
-	if (!f.skyOverride.empty()) out += f.skyOverride;
-	else out += skyText(f.sky, f.skyScale, f.skyTurn);
-	if (f.sun && f.skyOverride.empty()) out += sunText(sunOf(f.sky), f.sunStrength, f.view.eye);
-	out += f.content;
-	return out;
+	if (f.iso > 1.0) f.light = lightOf(f);   // (a black frame has a light of its own: kit::makeBlack)
+	return kit::sceneText(f, kFormat);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------

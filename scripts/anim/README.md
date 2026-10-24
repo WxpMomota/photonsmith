@@ -23,6 +23,20 @@ length, fps, still time and the `meta` record (the next free preset number, tags
 `film.py doctor <key>` to have every shot checked (black, very dark, blown-out and flat frames, jumps across cuts, slow shots, the whole render's time), then
 `python scripts/measure_cartoons.py <key> --write` for its cost and `RT_UPDATE_SNAPSHOT=1 ray_tracer_tests --gtest_filter=CartoonFilmSnapshot*`; paste `ray_tracer --film-table` into the docs. `docs/VIDEO_GENERATION.md` has the user's side.
 
+## The film kit: start a long film here
+
+A film told in many shots (tengwang, 59 of them) starts from the kit instead of its own plumbing:
+
+- `film_kit.h`: a `kit::Moment` (camera, exposure, look, haze, depth, light, content) that a film's `Frame` derives from with what its own shots set (which sky, a sun); a
+  `kit::Shot<Frame>` table (start, name, a function filling the moment at time t) from which `startsOf`, `kit::shotNamesOf` and `kit::momentAt` give shotStarts(), the shot names
+  for the film table and the moment of any time; and `kit::sceneText` / `kit::headerText`, which write the scene and its header - a moment with an iso of 1 or less is a black frame
+  (a cut to black, a title card), made a near-black scene at an ordinary exposure (an exposure of almost nothing took the renderer minutes a frame). `kit::cam`, `glide`, `ease`.
+- `kit_people.h`: robed figures sculpted from blended shapes in a `Pose` and a `Dress` (standing, clasping, bowing, kneeling, walking, carrying; ladies, soldiers, a beard),
+  placed as cached PLY objects (`kit::crowdText(film, version, people)`) or sculpted for a frame (`figureMeshes`, `figureText`), and horses, boats, birds and skeins, sheep.
+- `film_sky.h` (painted HDR skies from dawn to night, with clouds and stars), `film_cache.h` (heavy meshes written once as PLY files), `Caption` (words on the screen).
+
+`tengwang.h` is the worked example. Then `film.py doctor`, and `--draft 8` to watch the whole film with its sound before the real render.
+
 ## What the toolkit gives a film
 
 | | |
