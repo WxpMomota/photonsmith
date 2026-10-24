@@ -6,8 +6,8 @@
 #include "render_output_parser.h"
 #include "app_log.h"
 #include "camera_math.h"
-#include "../src/shared/video_preset.h"
-#include "../src/shared/cartoon/cartoons.h"
+#include "../src/shared/video_preset_camera.h"
+#include "film_info.h"   // the cartoon films, as the renderer's library says them (this program does not compile them)
 #include "../src/shared/scene_descriptor.h"
 #include <QApplication>
 #include <QFileDialog>
@@ -312,7 +312,7 @@ void MainWindow::onCameraPresetChanged(int index) {
 void MainWindow::onVideoPresetChanged(int index) {
 	if (index <= 0 || !m_videoPresetCombo) return;
 	const QString id = m_videoPresetCombo->itemData(index).toString();
-	const video_preset::VideoPreset* preset = video_preset::find(id.toUtf8().constData());
+	const video_preset::VideoPreset* preset = video_preset::findCamera(id.toUtf8().constData());
 	if (!preset) return;
 
 	// Switch to Generate Video first: onModeChanged()'s own side effects

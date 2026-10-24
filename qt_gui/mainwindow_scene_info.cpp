@@ -9,9 +9,8 @@
 #include "render_output_parser.h"
 #include "app_log.h"
 #include "camera_math.h"
-#include "../src/shared/video_preset.h"
-#include "../src/shared/cartoon/cartoon_stills.h"
-#include "../src/shared/cartoon/cartoons.h"
+#include "../src/shared/video_preset_camera.h"
+#include "film_info.h"   // the cartoon films, as the renderer's library says them (this program does not compile them)
 #include "../src/shared/scene_descriptor.h"
 #include <QApplication>
 #include <functional>
@@ -224,7 +223,7 @@ QList<MainWindow::SceneRecommendation> MainWindow::sceneRecommendations(const QS
 		return out;
 	SceneMetadataClient::SceneMetadata local;
 	const SceneMetadataClient::SceneMetadata *meta = resolveSceneMeta(preloaded, sceneId, local);
-	const cartoon::Film *film = meta->filmKey.isEmpty() ? nullptr : cartoon::find(meta->filmKey.toUtf8().constData());
+	const film_info::Film *film = meta->filmKey.isEmpty() ? nullptr : film_info::find(meta->filmKey.toUtf8().constData());
 	const auto add = [&out](const QString &wanted, const QString &now, std::function<void()> apply) { out.append({wanted, now, std::move(apply)}); };
 
 	// the rendering method
@@ -248,7 +247,7 @@ QList<MainWindow::SceneRecommendation> MainWindow::sceneRecommendations(const QS
 	const int depth = meta->recommendedMaxDepth;
 	if (depth > 0 && depth != 5 && depth != m_maxDepthSpinBox->value() && depth >= m_maxDepthSpinBox->minimum() && depth <= m_maxDepthSpinBox->maximum())
 		add(tr("max ray depth %1").arg(depth), QString::number(m_maxDepthSpinBox->value()), [this, depth]() { m_maxDepthSpinBox->setValue(depth); });
-	const int spp = film ? film->meta.samples : meta->recommendedSpp;
+	const int spp = film ? film->samples : meta->recommendedSpp;
 	if (spp > 0 && spp != m_samplesSpinBox->value())
 		add(tr("%1 samples per pixel").arg(spp), QString::number(m_samplesSpinBox->value()), [this, spp]() { m_samplesSpinBox->setValue(spp); });
 	if (m_exposureSpin && meta->recommendedExposure > 0.0 && std::abs(meta->recommendedExposure - m_exposureSpin->value()) > 1e-6) {
@@ -257,7 +256,7 @@ QList<MainWindow::SceneRecommendation> MainWindow::sceneRecommendations(const QS
 	}
 
 	// the picture's shape
-	const int w = film ? film->meta.width : meta->filmWidth, h = film ? film->meta.height : meta->filmHeight;
+	const int w = film ? film->width : meta->filmWidth, h = film ? film->height : meta->filmHeight;
 	if (w > 0 && h > 0 && (w != m_widthSpinBox->value() || h != m_heightSpinBox->value()) && w <= m_widthSpinBox->maximum() && h <= m_heightSpinBox->maximum() &&
 		w >= m_widthSpinBox->minimum() && h >= m_heightSpinBox->minimum())
 		add(tr("%1 x %2 pixels").arg(w).arg(h), QStringLiteral("%1 x %2").arg(m_widthSpinBox->value()).arg(m_heightSpinBox->value()), [this, w, h]() {
@@ -269,16 +268,16 @@ QList<MainWindow::SceneRecommendation> MainWindow::sceneRecommendations(const QS
 		// the GPU renderer the film was made for, when the GPU renders and both are on offer
 		const bool gpu = m_renderModeCombo && m_renderModeCombo->currentData().toBool();
 		if (gpu && kGpuOptionAvailable && m_gpuBackendCombo && m_gpuBackendCombo->isEnabled()) {
-			const int idx = m_gpuBackendCombo->findData(film->meta.wavefront);
+			const int idx = m_gpuBackendCombo->findData(film->wavefront);
 			if (idx >= 0 && idx != m_gpuBackendCombo->currentIndex())
-				add(film->meta.wavefront ? tr("the Wavefront GPU renderer") : tr("the Recursive GPU renderer"), m_gpuBackendCombo->currentText(),
+				add(film->wavefront ? tr("the Wavefront GPU renderer") : tr("the Recursive GPU renderer"), m_gpuBackendCombo->currentText(),
 					[this, idx]() { m_gpuBackendCombo->setCurrentIndex(idx); });
 		}
 		if (m_denoiseCheck && m_denoiseCheck->isEnabled() && !m_denoiseCheck->isChecked())
 			add(tr("the AI denoiser on"), tr("off"), [this]() { m_denoiseCheck->setChecked(true); });
 		// its own length and frame rate, for a video (its soundtrack is made for them)
 		if (isVideoMode() && m_videoFramesSpinBox && m_videoFPSSpinBox) {
-			const int frames = cartoon::frameCountOf(*film), fps = film->fps;
+			const int frames = film_info::frameCountOf(*film), fps = film->fps;
 			if (frames != m_videoFramesSpinBox->value() || fps != m_videoFPSSpinBox->value())
 				add(tr("%1 frames at %2 fps (the whole film, with its soundtrack)").arg(frames).arg(fps),
 					tr("%1 frames at %2 fps").arg(m_videoFramesSpinBox->value()).arg(m_videoFPSSpinBox->value()), [this, frames, fps]() {
@@ -323,23 +322,23 @@ void MainWindow::applyRecommendedSettings() {
 // The camera path is the film's own (videoCameraPath, not a choice in the list); the frame count, fps and speed only when the film is
 // first selected, so a length the user typed in survives a tab switch, a search or the start-up restore. Selecting any other scene forgets the film.
 void MainWindow::syncCartoonVideoSettings(const QString &sceneId) {
-	const cartoon::Film *film = nullptr;
+	const film_info::Film *film = nullptr;
 	SceneMetadataClient::SceneMetadata meta;
-	if (!sceneId.isEmpty() && SceneMetadataClient::sceneMetadata(sceneId, meta) && !meta.filmKey.isEmpty()) film = cartoon::find(meta.filmKey.toUtf8().constData());   // the still's own @rt-cartoon tag
+	if (!sceneId.isEmpty() && SceneMetadataClient::sceneMetadata(sceneId, meta) && !meta.filmKey.isEmpty()) film = film_info::find(meta.filmKey.toUtf8().constData());   // the still's own @rt-cartoon tag
 	// The film time (a still picture's moment) is for image mode; its range and first value are the film's, set when the film is first selected.
 	if (m_filmTimeRow && m_filmTimeSpin) {
 		m_filmTimeRow->setVisible(film && !isVideoMode());
-		if (film && QString::fromUtf8(film->key) != m_filmTimeFor) {
-			m_filmTimeFor = QString::fromUtf8(film->key);
+		if (film && QString::fromStdString(film->key) != m_filmTimeFor) {
+			m_filmTimeFor = QString::fromStdString(film->key);
 			// The film's own picture size (16:9: 1280 x 720, or 1920 x 1080 for the long films), once when it is first picked, so a still or a video of it is
 			// not square; a size typed in afterwards stays.
 			if (m_widthSpinBox && m_heightSpinBox) {
-				m_widthSpinBox->setValue(film->meta.width);
-				m_heightSpinBox->setValue(film->meta.height);
+				m_widthSpinBox->setValue(film->width);
+				m_heightSpinBox->setValue(film->height);
 			}
 			if (m_filmShotCombo) {
 				m_filmShotCombo->clear();
-				for (const std::string &shot : cartoon::shotNamesOf(*film)) m_filmShotCombo->addItem(QString::fromStdString(shot));
+				for (const std::string &shot : film->shotNames) m_filmShotCombo->addItem(QString::fromStdString(shot));
 			}
 			m_filmTimeSpin->setRange(0.0, film->duration);
 			m_filmTimeSpin->setSuffix(tr(" s of %1 s").arg(film->duration, 0, 'f', 0));   // "15.0 s of 60 s": a moment, not a length
@@ -369,7 +368,7 @@ void MainWindow::syncCartoonVideoSettings(const QString &sceneId) {
 	}
 	if (!isVideoMode()) return;   // applied when the mode changes to video (onModeChanged)
 	if (m_updateVideoDuration) m_updateVideoDuration();   // the film's own camera is the path now
-	const QString key = QString::fromUtf8(film->key);
+	const QString key = QString::fromStdString(film->key);
 	if (key == m_cartoonSettingsFor) return;
 	m_cartoonSettingsFor = key;
 	if (m_videoFramesSpinBox) m_videoFramesSpinBox->setValue(static_cast<int>(std::lround(film->duration * film->fps)));
@@ -559,7 +558,7 @@ QString MainWindow::videoCameraPath() const {
 	SceneMetadataClient::SceneMetadata meta;
 	const QString sceneId = m_sceneCombo && m_sceneCombo->currentIndex() >= 0 ? m_sceneCombo->currentData().toString() : QString();
 	if (!sceneId.isEmpty() && SceneMetadataClient::sceneMetadata(sceneId, meta) && !meta.filmKey.isEmpty()) {
-		if (const cartoon::Film *film = cartoon::find(meta.filmKey.toUtf8().constData())) return QString::fromStdString(cartoon::cameraPathOf(*film));
+		if (const film_info::Film *film = film_info::find(meta.filmKey.toUtf8().constData())) return QString::fromStdString(film_info::cameraPathOf(*film));
 	}
 	return m_cameraPathCombo ? m_cameraPathCombo->currentData().toString() : QStringLiteral("orbit");
 }

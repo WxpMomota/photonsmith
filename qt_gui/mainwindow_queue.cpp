@@ -10,7 +10,7 @@
 #include "render_output_parser.h"
 #include "app_log.h"
 #include "camera_math.h"
-#include "../src/shared/video_preset.h"
+#include "../src/shared/video_preset_camera.h"
 #include "../src/shared/scene_descriptor.h"
 #include <QApplication>
 #include <QFileDialog>
@@ -278,7 +278,7 @@ RenderJob MainWindow::captureRenderJob() {
 		// this combo for a different queued job.
 		if (m_videoPresetCombo && m_videoPresetCombo->currentIndex() > 0) {
 			const QString id = m_videoPresetCombo->currentData().toString();
-			if (const video_preset::VideoPreset *preset = video_preset::find(id.toUtf8().constData()))
+			if (const video_preset::VideoPreset *preset = video_preset::findCamera(id.toUtf8().constData()))
 				job.videoPresetName = QString::fromUtf8(preset->name);
 		}
 	}

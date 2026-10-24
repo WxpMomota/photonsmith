@@ -80,6 +80,7 @@ SOURCES += \
 	palette_file.cpp \
 	theme_load.cpp \
 	scene_metadata_client.cpp \
+	film_info.cpp \
 	asset_downloader.cpp \
 	scene_packs.cpp \
 	../src/external/miniz.c \
@@ -150,6 +151,7 @@ HEADERS += \
 	palette_file.h \
 	render_output_parser.h \
 	scene_metadata_client.h \
+	film_info.h \
 	scene_bucket.h \
 	frames_strip.h \
 	asset_downloader.h \

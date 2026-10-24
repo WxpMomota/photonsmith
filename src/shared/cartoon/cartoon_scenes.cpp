@@ -46,9 +46,9 @@ void materializeGenerated(const std::string &path) {
 	}
 }
 
-const char *filmSignature() {
-	static const std::string signature = cartoon::filmSignature();
-	return signature.c_str();
+const char *filmTable() {
+	static const std::string table = cartoon::filmTable();
+	return table.c_str();
 }
 
 }  // namespace pbrt_discover

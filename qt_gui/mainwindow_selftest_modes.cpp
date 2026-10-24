@@ -8,7 +8,7 @@
 #include "live_ai_denoise.h"
 #include "app_log.h"
 #include "settings_keys.h"
-#include "../src/shared/cartoon/cartoons.h"
+#include "film_info.h"   // the cartoon films, as the renderer's library says them (this program does not compile them)
 #include <iostream>
 #include "../src/shared/pbrt_asset_check.h"
 
@@ -1277,13 +1277,13 @@ void MainWindow::runCartoonUiSelfTest(const std::function<void(const QString &)>
 	check(!videoCameraPath().startsWith(QStringLiteral("cartoon:")), "and the video's path is the chosen one again: " + videoCameraPath());
 	// A picture of a film: the moment it shows reads as a moment of the whole film ("15.0 s of 60 s"), and the shot box names the shot that moment is in.
 	if (const int image = m_modeCombo->findData(static_cast<int>(OutputMode::Image)); image >= 0) m_modeCombo->setCurrentIndex(image);
-	const cartoon::Film *film = nullptr;   // one with several shots
+	const film_info::Film *film = nullptr;   // one with several shots
 	for (int i = 0, n = SceneMetadataClient::sceneCount(); i < n && !film; ++i) {
 		const QString id = SceneMetadataClient::sceneIdAtIndex(i);
 		SceneMetadataClient::SceneMetadata meta;
 		if (!SceneMetadataClient::sceneMetadata(id, meta) || meta.filmKey.isEmpty()) continue;
-		const cartoon::Film *f = cartoon::find(meta.filmKey.toUtf8().constData());
-		if (f && f->shotStarts().size() >= 3) {
+		const film_info::Film *f = film_info::find(meta.filmKey.toUtf8().constData());
+		if (f && f->shotStarts.size() >= 3) {
 			film = f;
 			filmScene = id;
 		}
@@ -1294,7 +1294,7 @@ void MainWindow::runCartoonUiSelfTest(const std::function<void(const QString &)>
 		check(m_filmTimeRow->isVisibleTo(this), "a picture of a film shows the moment row");
 		const QString of = QStringLiteral(" of %1 s").arg(film->duration, 0, 'f', 0);
 		check(m_filmTimeSpin->text().endsWith(of), "the moment says which length it is a moment of: " + m_filmTimeSpin->text());
-		const std::vector<double> starts = film->shotStarts();
+		const std::vector<double> starts = film->shotStarts;
 		int expected = 0;
 		for (std::size_t i = 0; i < starts.size(); ++i)
 			if (film->stillTime >= starts[i]) expected = static_cast<int>(i);
@@ -1649,7 +1649,7 @@ void MainWindow::runRecommendSelfTest(const std::function<void(const QString &)>
 		if (meta.filmKey.isEmpty() && wideScene.isEmpty() && meta.filmWidth > 0 && meta.filmWidth != meta.filmHeight && !meta.requiresFiles) wideScene = id;
 	}
 	check(!turtle.isEmpty() && !wideScene.isEmpty(), "the turtle film's scene (" + turtle + ") and a non-square scene file (" + wideScene + ") are listed");
-	const cartoon::Film *film = cartoon::find("turtle-escape");
+	const film_info::Film *film = film_info::find("turtle-escape");
 	if (turtle.isEmpty() || !film) {
 		log("RESULT: FAIL");
 		QApplication::exit(1);
@@ -1684,10 +1684,10 @@ void MainWindow::runRecommendSelfTest(const std::function<void(const QString &)>
 	shot("recommend");
 	applyRecommendedSettings();
 	QApplication::processEvents();
-	check(m_widthSpinBox->value() == film->meta.width && m_heightSpinBox->value() == film->meta.height, QString("Apply: %1 x %2").arg(m_widthSpinBox->value()).arg(m_heightSpinBox->value()));
-	check(m_maxDepthSpinBox->value() == 8 && m_samplesSpinBox->value() == film->meta.samples, QString("max depth %1, %2 samples").arg(m_maxDepthSpinBox->value()).arg(m_samplesSpinBox->value()));
-	check(m_videoFramesSpinBox->value() == cartoon::frameCountOf(*film) && m_videoFPSSpinBox->value() == film->fps, "the film's own length and frame rate");
-	if (wavefrontOffered) check(m_gpuBackendCombo->currentData().toBool() == film->meta.wavefront, "its GPU renderer: " + m_gpuBackendCombo->currentText());
+	check(m_widthSpinBox->value() == film->width && m_heightSpinBox->value() == film->height, QString("Apply: %1 x %2").arg(m_widthSpinBox->value()).arg(m_heightSpinBox->value()));
+	check(m_maxDepthSpinBox->value() == 8 && m_samplesSpinBox->value() == film->samples, QString("max depth %1, %2 samples").arg(m_maxDepthSpinBox->value()).arg(m_samplesSpinBox->value()));
+	check(m_videoFramesSpinBox->value() == film_info::frameCountOf(*film) && m_videoFPSSpinBox->value() == film->fps, "the film's own length and frame rate");
+	if (wavefrontOffered) check(m_gpuBackendCombo->currentData().toBool() == film->wavefront, "its GPU renderer: " + m_gpuBackendCombo->currentText());
 	if (m_denoiseCheck->isEnabled()) check(m_denoiseCheck->isChecked(), "the denoiser on");
 	check(!m_sceneRecommendedSettingsHint->isVisible() && !m_applyRecommendedSettingsButton->isVisible(), "and the tip has nothing left to say");
 	// a scene file made for a non-square picture offers its size

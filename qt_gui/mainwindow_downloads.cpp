@@ -8,7 +8,7 @@
 #include "render_output_parser.h"
 #include "app_log.h"
 #include "camera_math.h"
-#include "../src/shared/video_preset.h"
+#include "../src/shared/video_preset_camera.h"
 #include "../src/shared/scene_descriptor.h"
 #include <QApplication>
 #include <QFileDialog>

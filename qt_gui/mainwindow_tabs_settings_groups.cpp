@@ -7,8 +7,8 @@
 #include "scene_technique_notes.h"
 
 #include "../src/shared/scene_descriptor.h"
-#include "../src/shared/video_preset.h"
-#include "../src/shared/cartoon/cartoons.h"
+#include "../src/shared/video_preset_camera.h"
+#include "film_info.h"   // the cartoon films, as the renderer's library says them (this program does not compile them)
 
 #include <QTabBar>
 #include "scene_metadata_client.h"
@@ -187,8 +187,6 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 			"this is often macOS blocking an unsigned library downloaded from the internet - try running "
 			"xattr -cr on the .app in Terminal.") + reasonSuffix);
 #endif
-	} else if (const QString mismatch = SceneMetadataClient::buildMismatch(); !mismatch.isEmpty() && !qEnvironmentVariableIsSet("RT_GUI_SELFTEST")) {
-		QMessageBox::warning(basicTab, tr("Renderer and GUI Differ"), mismatch);
 	}
 
 	// A second, higher-level filter above the letter-category tabs: every
@@ -458,18 +456,18 @@ void MainWindow::buildSceneInfoRows(QWidget *basicTab, QVBoxLayout *sceneGroupLa
 	m_filmShotCombo->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
 	m_filmShotCombo->setToolTip(tr("The shots of the film, by name: choosing one sets the film time to a moment inside it."));
 	connect(m_filmShotCombo, QOverload<int>::of(&QComboBox::activated), this, [this](int index) {
-		const cartoon::Film *film = cartoon::find(m_filmTimeFor.toUtf8().constData());
+		const film_info::Film *film = film_info::find(m_filmTimeFor.toUtf8().constData());
 		if (!film || index < 0) return;
-		const std::vector<double> starts = film->shotStarts();
+		const std::vector<double> starts = film->shotStarts;
 		if (index >= static_cast<int>(starts.size())) return;
 		const double end = index + 1 < static_cast<int>(starts.size()) ? starts[static_cast<std::size_t>(index) + 1] : film->duration;
 		m_filmTimeSpin->setValue(starts[static_cast<std::size_t>(index)] + std::min(1.0, 0.25 * (end - starts[static_cast<std::size_t>(index)])));   // a little way into the shot
 	});
 	// and the other way round: the shot box names the shot the time is in (it was empty, as if the time were in none)
 	m_syncFilmShot = [this]() {
-		const cartoon::Film *film = cartoon::find(m_filmTimeFor.toUtf8().constData());
+		const film_info::Film *film = film_info::find(m_filmTimeFor.toUtf8().constData());
 		if (!film) return;
-		const std::vector<double> starts = film->shotStarts();
+		const std::vector<double> starts = film->shotStarts;
 		int shot = -1;
 		for (std::size_t i = 0; i < starts.size(); ++i)
 			if (m_filmTimeSpin->value() >= starts[i] - 1e-6) shot = static_cast<int>(i);
@@ -1035,7 +1033,7 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 	m_videoPresetCombo = new QComboBox();
 	m_videoPresetCombo->addItem(tr("(custom - choose settings below)"), QString());
 	// The camera flythroughs only: a cartoon is chosen as a scene (the Cartoons tab above), and selecting one sets its own camera path, frame count and fps.
-	for (const video_preset::VideoPreset& p : video_preset::all()) {
+	for (const video_preset::VideoPreset& p : video_preset::kCameraPresets) {
 		if (p.isCartoon()) continue;
 		m_videoPresetCombo->addItem(
 			QString("[%1] %2").arg(QString::fromUtf8(p.id), QString::fromUtf8(p.name)),
@@ -1214,11 +1212,11 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 		// A film with a soundtrack is made for its own length and frame rate: the video has the sound only when it has them (the launcher says the same when it renders).
 		QString soundNote;
 		if (const QString path = videoCameraPath(); path.startsWith(QStringLiteral("cartoon:"))) {
-			if (const cartoon::Film *film = cartoon::find(path.mid(8).toUtf8().constData()); film && film->soundtrack) {
-				soundNote = (actualFrames == cartoon::frameCountOf(*film) && fps == film->fps)
+			if (const film_info::Film *film = film_info::find(path.mid(8).toUtf8().constData()); film && film->soundtrack) {
+				soundNote = (actualFrames == film_info::frameCountOf(*film) && fps == film->fps)
 					? tr("\nSound: included (the film's own soundtrack)")
 					: tr("\nSound: NOT included - the soundtrack is made for %1 frames at %2 fps; with another frame count, speed or fps the video has no sound")
-						  .arg(cartoon::frameCountOf(*film)).arg(film->fps);
+						  .arg(film_info::frameCountOf(*film)).arg(film->fps);
 			}
 		}
 

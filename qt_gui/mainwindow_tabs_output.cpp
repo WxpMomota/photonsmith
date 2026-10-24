@@ -7,7 +7,7 @@
 #include "scene_technique_notes.h"
 
 #include "../src/shared/scene_descriptor.h"
-#include "../src/shared/video_preset.h"
+#include "../src/shared/video_preset_camera.h"
 
 #include <QTabBar>
 #include <QTextDocument>

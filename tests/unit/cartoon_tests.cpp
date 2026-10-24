@@ -38,6 +38,7 @@
 #include "../../src/shared/output_format.h"
 #include "../../src/shared/ppm_text.h"
 #include "../../qt_gui/scene_bucket.h"
+#include "../../qt_gui/film_info.h"
 #include "../../src/shared/video_preset.h"
 
 namespace {
@@ -207,7 +208,7 @@ TEST(VideoPresets, EveryFilmIsAPresetAndTheCameraPresetsComeFirst) {
 		ASSERT_NE(p, nullptr) << f.key;
 		EXPECT_EQ(std::string(p->name), std::string(f.name) + " (cartoon)");
 		EXPECT_STREQ(p->description, f.description) << "the preset's text is the film's own";
-		EXPECT_EQ(p->film(), &f);
+		EXPECT_EQ(video_preset::filmOf(*p), &f);
 	}
 }
 
@@ -526,6 +527,33 @@ TEST(CartoonRender, AFrameThatFailedIsFilledFromTheOneBeforeSoTheVideoKeepsItsLe
 	EXPECT_EQ(read(5), "five") << "the frames there were are not touched";
 	std::filesystem::remove_all(dir);
 	EXPECT_EQ(cartoon_render::fillMissingFrames(dir, 3), 0) << "nothing to fill from";
+}
+
+// The GUI does not compile the films: it reads the renderer's film table (cartoon::filmTable, served by scene_metadata.dll) with qt_gui/film_info.h. What it reads must be what
+// the films are.
+TEST(CartoonFilmTable, TheGuiReadsEveryFilmAsTheRendererHasIt) {
+	const std::vector<film_info::Film> read = film_info::parse(cartoon::filmTable());
+	ASSERT_EQ(read.size(), cartoon::films().size());
+	for (std::size_t i = 0; i < read.size(); ++i) {
+		const cartoon::Film &f = *cartoon::films()[i];
+		const film_info::Film &g = read[i];
+		EXPECT_EQ(g.key, f.key);
+		EXPECT_EQ(g.name, f.name);
+		EXPECT_DOUBLE_EQ(g.duration, f.duration) << f.key;
+		EXPECT_EQ(g.fps, f.fps) << f.key;
+		EXPECT_DOUBLE_EQ(g.stillTime, f.stillTime) << f.key;
+		EXPECT_EQ(g.width, f.meta.width) << f.key;
+		EXPECT_EQ(g.height, f.meta.height) << f.key;
+		EXPECT_EQ(g.samples, f.meta.samples) << f.key;
+		EXPECT_EQ(g.wavefront, f.meta.wavefront) << f.key;
+		EXPECT_EQ(g.soundtrack, f.soundtrack != nullptr) << f.key;
+		EXPECT_EQ(g.shotStarts, f.shotStarts()) << f.key;
+		EXPECT_EQ(g.shotNames, cartoon::shotNamesOf(f)) << f.key;
+		EXPECT_EQ(film_info::frameCountOf(g), cartoon::frameCountOf(f)) << f.key;
+		EXPECT_EQ(film_info::cameraPathOf(g), cartoon::cameraPathOf(f)) << f.key;
+	}
+	EXPECT_TRUE(film_info::parse("").empty());
+	EXPECT_TRUE(film_info::parse("too\tfew\tfields\n").empty()) << "a line it cannot read is left out";
 }
 
 TEST(CartoonRender, ADraftRendersOneFrameInNAndIsAVideoFlagNotAFrameFlag) {

@@ -1,7 +1,6 @@
 #include "scene_metadata_client.h"
 #include "../cpu_renderer/scene_metadata_snapshot.h"
 #include "cross_abi_library.h"
-#include "../src/shared/cartoon/cartoons.h"   // cartoon::filmSignature(), compared with the renderer's
 
 #include <QCoreApplication>
 #include <QString>
@@ -40,6 +39,7 @@ struct DllHandle {
 	// Optional: lists scenes added to the per-user folder while the program runs. Absent in an older library: a new scene then needs a restart.
 	CountFn refreshFn = nullptr;
 	StringByIdFn idForFileFn = nullptr;   // optional, like refreshFn
+	StringFn filmTableFn = nullptr;       // optional: the cartoon films (film_info.h)
 };
 
 // See SceneMetadataClient::lastLoadError()'s own comment (scene_metadata_
@@ -50,11 +50,7 @@ QString& loadErrorStorage() {
 	static QString err;
 	return err;
 }
-// SceneMetadataClient::buildMismatch(): set, like the load error, once by the load below.
-QString& buildMismatchStorage() {
-	static QString mismatch;
-	return mismatch;
-}
+
 
 // scene_metadata.dll on Windows, .dylib on macOS, .so on Linux - matches
 // CMakeLists.txt's `set_target_properties(scene_metadata PROPERTIES
@@ -143,8 +139,7 @@ DllHandle& handle() {
 		}
 
 		// Built from the same sources as this program? The snapshot struct has grown field by field with no size inside it: a library whose struct is not this one's would
-		// write past the end of the one this program hands it, so it is not used at all. A different film table is only a warning (buildMismatch()): the scene list still
-		// works, but a film's video would get the length and size this program knows, not the renderer's.
+		// write past the end of the one this program hands it, so it is not used at all.
 		const auto sizeFn = reinterpret_cast<CountFn>(cross_abi_library::lookupSymbol(h.module, "scene_metadata_snapshot_size"));
 		if (!sizeFn || sizeFn() != static_cast<int>(sizeof(SceneMetadataSnapshot))) {
 			loadErrorStorage() = QStringLiteral(
@@ -154,11 +149,8 @@ DllHandle& handle() {
 			h = DllHandle{};
 			return;
 		}
-		const auto filmsFn = reinterpret_cast<StringFn>(cross_abi_library::lookupSymbol(h.module, "scene_metadata_film_signature"));
-		if (!filmsFn || cartoon::filmSignature() != filmsFn())
-			buildMismatchStorage() = QStringLiteral(
-				"RayTracerGUI and the renderer were built from different sources: their lists of cartoon films differ, so a film's video could get the "
-				"wrong length or size. Rebuild and install both together.");
+		// The cartoon films: this program does not compile them, the library says what they are (film_info.h). Optional: an older library has no films for the GUI.
+		h.filmTableFn = reinterpret_cast<StringFn>(cross_abi_library::lookupSymbol(h.module, "scene_metadata_film_table"));
 	});
 	return h;
 }
@@ -175,9 +167,9 @@ QString lastLoadError() {
 	return loadErrorStorage();
 }
 
-QString buildMismatch() {
-	handle();
-	return buildMismatchStorage();
+QString filmTable() {
+	if (!ensureLoaded() || !handle().filmTableFn) return QString();
+	return QString::fromUtf8(handle().filmTableFn());
 }
 
 bool gpuCompatible(const QString& scene_id, bool& out_compatible) {

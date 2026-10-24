@@ -19,7 +19,7 @@
 // (~400KB) is small enough that this hasn't mattered in practice; splitting
 // cpu_interface.cpp would be the fix if it ever does.
 #include "../cpu_renderer/cpu_interface.h"
-#include "../src/shared/pbrt_discover.h"   // filmSignature()
+#include "../src/shared/pbrt_discover.h"   // filmTable()
 
 // Every export below wraps its cpu_interface.h call in try/catch: this file
 // is the actual cross-toolchain boundary (an extern "C" function called via
@@ -261,12 +261,13 @@ SCENE_METADATA_API int scene_metadata_snapshot(const char* scene_id, SceneMetada
 	}
 }
 
-// What this library was built with, for the GUI to compare with what it was built with (qt_gui/scene_metadata_client.cpp): the size of the struct scene_metadata_snapshot()
-// fills (it has grown field by field, with no size inside it, so an older GUI next to a newer library would have it written past its end), and the film table.
+// The size of the struct scene_metadata_snapshot() fills, for the GUI to compare with its own (qt_gui/scene_metadata_client.cpp): it has grown field by field, with no size
+// inside it, so an older GUI next to a newer library would have it written past its end.
 SCENE_METADATA_API int scene_metadata_snapshot_size() { return static_cast<int>(sizeof(SceneMetadataSnapshot)); }
-SCENE_METADATA_API const char* scene_metadata_film_signature() {
+// The cartoon films, one line each (cartoon::filmTable): the GUI does not compile the films, it reads them here (qt_gui/film_info.h).
+SCENE_METADATA_API const char* scene_metadata_film_table() {
 	try {
-		return pbrt_discover::filmSignature();
+		return pbrt_discover::filmTable();
 	} catch (...) {
 		return "";
 	}

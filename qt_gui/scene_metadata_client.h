@@ -42,9 +42,9 @@ bool ensureLoaded();
 // entirely different reason.
 QString lastLoadError();
 
-// Empty, or why this program and the renderer's library look like builds of different sources (their film tables differ; a struct that differs fails the load instead,
-// lastLoadError()). The GUI compiles its own copy of the film table, so a GUI not rebuilt with a new film gave that film's video the wrong length.
-QString buildMismatch();
+// The cartoon films as the renderer's library knows them, one line each (cartoon::filmTable); empty when it says nothing. Read through film_info.h: this program does not
+// compile the films.
+QString filmTable();
 
 // Returns true and sets out_compatible if scene_id's GPU-compatibility
 // could be queried; false (out_compatible left untouched) otherwise. Kept

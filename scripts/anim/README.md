@@ -19,7 +19,8 @@ A frame is also an ordinary scene: `ray_tracer --gpu --denoise 1280 256 8 cartoo
 ## Writing a film
 
 Add `src/shared/cartoon/<name>.h` with `headerAt(t)`, `sceneAt(t)`, `shotStarts()` and `kSamples` in the style of the others, and a row at the end of the table in `cartoons.h`: key, name, description,
-length, fps, still time and the `meta` record (the next free preset number, tags from the vocabulary, one name for each shot, samples). Rebuild, `film.py sheet <key>` to look at it,
+length, fps, still time and the `meta` record (the next free preset number, tags from the vocabulary, one name for each shot, samples). Rebuild the renderer (`ray_tracer.exe` and
+`scene_metadata.dll`: the GUI does not compile the films, it reads them from that library, qt_gui/film_info.h), `film.py sheet <key>` to look at it,
 `film.py doctor <key>` to have every shot checked (black, very dark, blown-out and flat frames, jumps across cuts, slow shots, the whole render's time), then
 `python scripts/measure_cartoons.py <key> --write` for its cost and `RT_UPDATE_SNAPSHOT=1 ray_tracer_tests --gtest_filter=CartoonFilmSnapshot*`; paste `ray_tracer --film-table` into the docs. `docs/VIDEO_GENERATION.md` has the user's side.
 

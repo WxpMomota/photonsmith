@@ -272,13 +272,24 @@ inline std::vector<std::string> tagsOf(const Film &film) { return splitList(film
 inline std::vector<std::string> shotNamesOf(const Film &film) { return splitList(film.meta.shotNames, '|'); }
 inline int shotCountOf(const Film &film) { return static_cast<int>(film.shotStarts().size()); }
 inline int frameCountOf(const Film &film) { return static_cast<int>(std::lround(film.duration * film.fps)); }
-// What the film table says of each film that a program setting up a video relies on (key, length, fps, size, shots). The GUI keeps its own compiled copy of the table and compares
-// it with the renderer's (scene_metadata_film_signature): when they differ, the two were built from different sources and a film's video would get the wrong length or size.
-inline std::string filmSignature() {
+// What a program that sets up a film's video needs of every film, one line a film, tab-separated: key, name, seconds, fps, still time, width, height, samples, wavefront (0/1),
+// soundtrack (0/1), the shot starts (comma-separated) and the shot names ('|'-separated). The GUI reads it from the renderer's library (scene_metadata_film_table; qt_gui/film_info.h)
+// instead of compiling the films itself: a GUI not rebuilt with a new film gave its video the wrong length, and every film edit rebuilt most of the GUI.
+inline std::string filmTable() {
 	std::string s;
-	for (const Film &film : kFilms)
-		s += std::string(film.key) + "|" + std::to_string(film.duration) + "|" + std::to_string(film.fps) + "|" + std::to_string(film.meta.width) + "x" + std::to_string(film.meta.height) + "|" +
-			 std::to_string(film.shotStarts().size()) + ";";
+	char num[64];
+	const auto put = [&](double v) {
+		std::snprintf(num, sizeof num, "%.17g", v);
+		return std::string(num);
+	};
+	for (const Film *f : films()) {
+		const Film &film = *f;
+		std::string starts;
+		for (const double t : film.shotStarts()) starts += (starts.empty() ? "" : ",") + put(t);
+		s += std::string(film.key) + "\t" + film.name + "\t" + put(film.duration) + "\t" + std::to_string(film.fps) + "\t" + put(film.stillTime) + "\t" + std::to_string(film.meta.width) + "\t" +
+			 std::to_string(film.meta.height) + "\t" + std::to_string(film.meta.samples) + "\t" + (film.meta.wavefront ? "1" : "0") + "\t" + (film.soundtrack ? "1" : "0") + "\t" + starts + "\t" +
+			 (film.meta.shotNames ? film.meta.shotNames : "") + "\n";
+	}
 	return s;
 }
 
