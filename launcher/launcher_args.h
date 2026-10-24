@@ -1354,7 +1354,7 @@ inline bool parse_launch_args(int argc, char** argv, LaunchArgs& out,
 			// `i + 1 < argc`), or one of the commands that must come first (--export-gltf ...). It used to be dropped without a word unless it was the last token, and the
 			// render went ahead without what was asked for.
 			static const std::set<std::string> kCommands = {"--prepare-gpu", "--assemble-video", "--export-gltf", "--scene-report", "--print-scene-size", "--list-video-presets",
-															 "--film-table", "--film-check"};
+															 "--film-table", "--film-check", "--film-shots"};
 			if (kCommands.count(arg)) std::cerr << "Error: " << arg << " is a command of its own and must be the first argument (see --help)\n";
 			else if (i + 1 >= argc) std::cerr << "Error: \"" << arg << "\" is not an option, or is missing the value it expects (see --help)\n";
 			else std::cerr << "Error: \"" << arg << "\" is not an option (see --help)\n";

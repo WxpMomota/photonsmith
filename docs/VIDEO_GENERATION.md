@@ -313,6 +313,13 @@ Making a film of your own: the toolkit is `src/shared/cartoon/cartoon_lib.h` (th
 a finished film is a function `std::string sceneAt(double t)` (with `headerAt(t)`, `shotStarts()` and `kSamples` beside it) and a row in the table in `src/shared/cartoon/cartoons.h`; that row alone makes it a video preset
 (`video_preset::all()` builds the preset from it), a scene on the GUI's Cartoons tab and a line of `--list-video-presets`.
 
+**Checking a film before rendering it: `python scripts/anim/film.py doctor <key>`.** It renders every shot at its start, middle and end, small (120 pixels high, 8 samples, three at a time:
+about six minutes for the 59 shots of tengwang), and reports what looks wrong, framed in red (a warning) or yellow (a note) on a contact sheet with a row a shot: black frames in the
+middle of a shot (a black shot, or a black start or end with a picture in the middle, is a cut or a fade: a note), very dark frames (a light boxed in, an exposure far too low), blown-out
+frames (more than 8% of the picture near white), flat frames (the camera inside something or against a wall), jumps in brightness across a cut, and frames much slower to render than
+the rest; and it estimates the whole film's render time from the film's measured cost a frame. It exits 1 when there is a warning. `ray_tracer --film-shots <key>` prints what it
+reads of a film (its facts and its shots, tab-separated). Every problem it looks for was found by eye at least once while making tengwang.
+
 **What a film says about itself** is its row and nothing else, and nothing is typed twice. The row has the key, the name, a description of the story (one sentence, without the length or the number
 of shots: those are worked out), the length and fps, the still's time, and a `meta` record: `id` (the number of its video preset, V<id>: give a new film the next number and never reuse one, so
 reordering or removing a film moves no preset), `tags` (from the vocabulary `kTagVocabulary`: what the film shows or how it is lit), `shotNames` (one for each shot of its `shotStarts()`),

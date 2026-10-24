@@ -35,7 +35,7 @@ inline constexpr FlagScopeEntry kFlagScopes[] = {
 	{"--cartoon-worker", FlagScope::Video},  // (a worker is started by the video, with a job file of its own)
 	// other things than rendering
 	{"--help", FlagScope::Mode}, {"-h", FlagScope::Mode}, {"--diagnose", FlagScope::Mode}, {"--probe", FlagScope::Mode}, {"--list-video-presets", FlagScope::Mode},
-	{"--film-table", FlagScope::Mode}, {"--film-check", FlagScope::Mode}, {"--prepare-gpu", FlagScope::Mode}, {"--assemble-video", FlagScope::Mode}, {"--export-gltf", FlagScope::Mode},
+	{"--film-table", FlagScope::Mode}, {"--film-check", FlagScope::Mode}, {"--film-shots", FlagScope::Mode}, {"--prepare-gpu", FlagScope::Mode}, {"--assemble-video", FlagScope::Mode}, {"--export-gltf", FlagScope::Mode},
 	{"--scene-report", FlagScope::Mode}, {"--print-scene-size", FlagScope::Mode},
 	// set by the program for its own runs
 	{"--ppm-only", FlagScope::Internal},

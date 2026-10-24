@@ -904,6 +904,21 @@ int main(int argc, char** argv) {
 		return EXIT_SUCCESS;
 	}
 	if (argc >= 2 && std::string(argv[1]) == "--film-check") return film_check_command(argc, argv);
+	// `ray_tracer --film-shots <key>`: what a tool driving the films needs of one (scripts/anim/film.py doctor), as tab-separated lines: a `film` line (key, name, seconds, fps,
+	// width, height, samples, measured seconds a frame) and a `shot` line for each shot (start, name).
+	if (argc >= 2 && std::string(argv[1]) == "--film-shots") {
+		const cartoon::Film *film = argc >= 3 ? cartoon::find(argv[2]) : nullptr;
+		if (!film) {
+			std::cerr << "usage: " << argv[0] << " --film-shots <film key>   (the keys: --list-video-presets)\n";
+			return EXIT_FAILURE;
+		}
+		std::cout << "film\t" << film->key << "\t" << film->name << "\t" << film->duration << "\t" << film->fps << "\t" << film->meta.width << "\t" << film->meta.height << "\t"
+				  << film->meta.samples << "\t" << film->meta.secondsPerFrame << "\n";
+		const std::vector<double> starts = film->shotStarts();
+		const std::vector<std::string> names = cartoon::shotNamesOf(*film);
+		for (std::size_t i = 0; i < starts.size(); ++i) std::cout << "shot\t" << starts[i] << "\t" << (i < names.size() ? names[i] : std::string()) << "\n";
+		return EXIT_SUCCESS;
+	}
 	std::cout << "========================================" << std::endl;
 	std::cout << "RAY TRACER LAUNCHER (Unified GPU/CPU)" << std::endl;
 	std::cout << "========================================" << std::endl;
