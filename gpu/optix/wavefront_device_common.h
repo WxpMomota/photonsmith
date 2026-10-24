@@ -697,11 +697,8 @@ __device__ __forceinline__ void wf_sample_normalized_fresnel(
 	out_brdf_pdf   = (1.0f - fr) * cos_wi / (nf_c * 3.14159265f);
 }
 
-// MIS power heuristic (balance if both 0)
-__device__ __forceinline__ float wf_mis(float a, float b) {
-	float a2 = a * a, b2 = b * b;
-	return (a2 + b2 < 1e-10f) ? 1.0f : a2 / (a2 + b2);
-}
+// (MIS weights use the shared PowerHeuristic, math_utils.h, as the recursive backend and the CPU do: this file's own copy returned 1 when both densities were tiny and
+// had no guard against an infinite square, so a light pdf above ~1.8e19 gave NaN)
 
 // XYZ -> LINEAR sRGB (matrix only, no gamma/OETF curve).
 //

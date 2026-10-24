@@ -359,16 +359,7 @@ extern "C" __global__ void __closesthit__triangle() {
 			// array. An instanced triangle is never emissive, so its global
 			// index simply never matches, which is the correct answer.
 			const int prim_global = (int)(triBase + primIdx);
-			float sel_pdf = 0.0f;
-			for (unsigned int li = 0; li < params.numLights; ++li) {
-				if (params.lightIndices[li] == prim_global &&
-					params.lightKinds[li] == GpuLightKind::Triangle) {
-					sel_pdf = (params.lightBvhNodeCount > 0)
-						? gpu_light_bvh_pmf(mis_o.x, mis_o.y, mis_o.z, 0.f, 0.f, 0.f, (int)li)
-						: params.aliasTable[li].pdf;
-					break;
-				}
-			}
+			const float sel_pdf = gpu_light_selection_pmf(GpuLightKind::Triangle, prim_global, mis_o);
 			if (sel_pdf > 0.0f) {
 				const float3 e1 = tri.p1 - tri.p0;
 				const float3 e2 = tri.p2 - tri.p0;

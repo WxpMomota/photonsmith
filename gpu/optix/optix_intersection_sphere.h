@@ -1082,23 +1082,9 @@ extern "C" __global__ void __closesthit__sphere() {
 			// sphere array. An instanced sphere is never emissive (flatten()
 			// bakes emitters per placement instead), so its index simply never
 			// matches - which is the correct answer, not a missed case.
-			int prim_idx = (int)(sphBase + primIdx);
-			float sel_pdf = 0.0f;
-			for (unsigned int li = 0; li < params.numLights; ++li) {
-				if (params.lightIndices[li] == prim_idx && params.lightKinds[li] == GpuLightKind::Sphere) {
-					// Light BVH's selection pmf is position-dependent (see
-					// gpu_light_bvh_pmf()'s own comment) - evaluated at
-					// mis_o, the shading point the BSDF sample that
-					// reached this light was actually taken from, so this
-					// MIS weight matches whatever NEE would have used from
-					// there. Falls back to the alias table's fixed pdf for
-					// any scene that didn't build a light BVH.
-					sel_pdf = (params.lightBvhNodeCount > 0)
-						? gpu_light_bvh_pmf(mis_o.x, mis_o.y, mis_o.z, 0.f, 0.f, 0.f, (int)li)
-						: params.aliasTable[li].pdf;
-					break;
-				}
-			}
+			// (the light BVH's pmf at mis_o, the shading point the BSDF sample that reached this light was taken from, so the MIS weight matches whatever NEE
+			// would have used from there: gpu_light_selection_pmf)
+			const float sel_pdf = gpu_light_selection_pmf(GpuLightKind::Sphere, (int)(sphBase + primIdx), mis_o);
 			// Solid-angle PDF: 1 / (2*pi*(1 - cos_theta_max)). ClippedSphere
 			// uses sphere.center/sphere.radius (the real struct fields,
 			// populated in pbrt_gpu_builder.h purely for this full-sphere-

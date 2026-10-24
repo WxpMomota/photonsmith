@@ -95,7 +95,7 @@ extern "C" __global__ void accumulate_miss(
 	float3 weightedBackground = color;
 	if (m.brdf_pdf > 0.0f && (backgroundColor.x > 0.0f || backgroundColor.y > 0.0f || backgroundColor.z > 0.0f)) {
 		const float pdf_sky = wf_sky_pdf_for_mis(skyDist, portalLight, m.rayDir, m.rayOrigin);
-		float w_b = wf_mis(m.brdf_pdf, pdf_sky);
+		float w_b = PowerHeuristic(m.brdf_pdf, pdf_sky);
 		weightedBackground = w_b * color;
 	}
 	// m.radiance is already fully weighted (accumulated by evaluate_materials

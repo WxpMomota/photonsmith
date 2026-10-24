@@ -215,18 +215,7 @@ extern "C" __global__ void __closesthit__disk() {
 		float light_pdf_for_incoming = 0.0f;
 		const float3 mis_o = mis_origin_from_payload();  // last real vertex, not the (possibly moved) ray origin
 		if (params.aliasTable && params.numLights > 0) {
-			const int prim_idx = (int)primIdx;
-			float sel_pdf = 0.0f;
-			for (unsigned int li = 0; li < params.numLights; ++li) {
-				if (params.lightIndices[li] == prim_idx && params.lightKinds[li] == GpuLightKind::Disk) {
-					// See optix_intersection_sphere.h's identical block for
-					// why this checks the light BVH first.
-					sel_pdf = (params.lightBvhNodeCount > 0)
-						? gpu_light_bvh_pmf(mis_o.x, mis_o.y, mis_o.z, 0.f, 0.f, 0.f, (int)li)
-						: params.aliasTable[li].pdf;
-					break;
-				}
-			}
+			const float sel_pdf = gpu_light_selection_pmf(GpuLightKind::Disk, (int)primIdx, mis_o);
 			if (sel_pdf > 0.0f) {
 				const float geom_pdf = dc_pdf_disk(disk, mis_o, normalize(ray_dir));
 				light_pdf_for_incoming = sel_pdf * geom_pdf;
@@ -797,16 +786,7 @@ extern "C" __global__ void __closesthit__cylinder() {
 		float light_pdf_for_incoming = 0.0f;
 		const float3 mis_o = mis_origin_from_payload();  // last real vertex, not the (possibly moved) ray origin
 		if (params.aliasTable && params.numLights > 0) {
-			const int prim_idx = (int)primIdx;
-			float sel_pdf = 0.0f;
-			for (unsigned int li = 0; li < params.numLights; ++li) {
-				if (params.lightIndices[li] == prim_idx && params.lightKinds[li] == GpuLightKind::Cylinder) {
-					sel_pdf = (params.lightBvhNodeCount > 0)
-						? gpu_light_bvh_pmf(mis_o.x, mis_o.y, mis_o.z, 0.f, 0.f, 0.f, (int)li)
-						: params.aliasTable[li].pdf;
-					break;
-				}
-			}
+			const float sel_pdf = gpu_light_selection_pmf(GpuLightKind::Cylinder, (int)primIdx, mis_o);
 			if (sel_pdf > 0.0f) {
 				const float geom_pdf = dc_pdf_cylinder(cyl, mis_o, normalize(ray_dir));
 				light_pdf_for_incoming = sel_pdf * geom_pdf;

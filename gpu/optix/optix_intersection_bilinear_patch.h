@@ -226,16 +226,7 @@ extern "C" __global__ void __closesthit__bilinear_patch() {
 		float light_pdf_for_incoming = 0.0f;
 		const float3 mis_o = mis_origin_from_payload();  // last real vertex, not the (possibly moved) ray origin
 		if (params.aliasTable && params.numLights > 0) {
-			float sel_pdf = 0.0f;
-			for (unsigned int li = 0; li < params.numLights; ++li) {
-				if (params.lightIndices[li] == (int)primIdx &&
-					params.lightKinds[li] == GpuLightKind::BilinearPatch) {
-					sel_pdf = (params.lightBvhNodeCount > 0)
-						? gpu_light_bvh_pmf(mis_o.x, mis_o.y, mis_o.z, 0.f, 0.f, 0.f, (int)li)
-						: params.aliasTable[li].pdf;
-					break;
-				}
-			}
+			const float sel_pdf = gpu_light_selection_pmf(GpuLightKind::BilinearPatch, (int)primIdx, mis_o);
 			if (sel_pdf > 0.0f) {
 				const float p00[3] = {patch.p00.x, patch.p00.y, patch.p00.z};
 				const float p10[3] = {patch.p10.x, patch.p10.y, patch.p10.z};

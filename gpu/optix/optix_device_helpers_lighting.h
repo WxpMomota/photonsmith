@@ -162,7 +162,9 @@ __device__ __forceinline__ float3 sample_quad_light(
 	float area = length(quad.w);  // w = u x v, so |w| = area
 	float cosine = fabsf(dot(direction, quad.normal));
 
-	if (cosine < 1e-6f || area < 1e-6f) {
+	// (a degenerate quad only: an area cut-off of 1e-6 depended on the scene's units - a 1 mm^2 lamp in a scene in metres got no light sampling at all, where the
+	// wavefront backend and the CPU sample it)
+	if (cosine < 1e-6f || !(area > 0.0f)) {
 		pdf = 0.0f;
 		return direction;
 	}
@@ -747,6 +749,16 @@ __device__ __forceinline__ float gpu_light_bvh_pmf(
 		params.lightBvhNodes, params.lightBvhBitTrail, params.lightBvhNodeCount,
 		params.lightBvhAllBMinX, params.lightBvhAllBMinY, params.lightBvhAllBMinZ,
 		params.lightBvhAllBMaxX, params.lightBvhAllBMaxY, params.lightBvhAllBMaxZ);
+}
+
+// The probability that light sampling at `o` picks the light that is primitive `primIdx` of `kind` (0 when it is not a sampled light): the selection part of
+// a hit emitter's light pdf, for its MIS weight. The light BVH's pmf depends on the shading point, so it is evaluated at `o` - the vertex the BSDF sample
+// that reached the light was taken from - and the alias table's fixed pdf is used for a scene with no light BVH. The light is found by binary search in the
+// sorted light list (gpu_find_light, as the wavefront backend does); each hit program used to scan every light, on every emitter hit.
+__device__ __forceinline__ float gpu_light_selection_pmf(GpuLightKind kind, int primIdx, const float3 &o) {
+	const int li = gpu_find_light(params.lightIndices, params.lightKinds, params.numLights, kind, primIdx);
+	if (li < 0) return 0.0f;
+	return params.lightBvhNodeCount > 0 ? gpu_light_bvh_pmf(o.x, o.y, o.z, 0.f, 0.f, 0.f, li) : params.aliasTable[li].pdf;
 }
 
 // Selects one area light (light BVH when the scene built one - see

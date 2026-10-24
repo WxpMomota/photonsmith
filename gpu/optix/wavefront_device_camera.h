@@ -622,7 +622,7 @@ __device__ __forceinline__ NeeLightSample wf_nee_pick_light(
 				// would be wrong whenever it was actually drawn via the light BVH's
 				// position-dependent pmf (a fixed, power-only alias pdf can differ
 				// from the BVH pmf by an order of magnitude or more at this exact
-				// hit_point), corrupting the MIS weight below (wf_mis(light_pdf,
+				// hit_point), corrupting the MIS weight below (PowerHeuristic(light_pdf,
 				// brdf_pdf_l)). wf_light_bvh_pmf() replays the bit-trail to recover
 				// the SAME pmf the BVH draw would have produced at this point,
 				// exactly like gpu_light_bvh_pmf() does for the recursive backend's
@@ -725,7 +725,7 @@ __device__ __forceinline__ float wf_emitter_hit_mis_weight(
 		: aliasTable[li].pdf;
 	const float pl = selection * geomPdf;
 	if (!(pl > 0.0f)) return 1.0f;
-	return 1.0f - wf_mis(pl, h.brdf_pdf);   // wf_mis(a, b) = a^2/(a^2+b^2), so this is pb^2/(pb^2+pl^2)
+	return PowerHeuristic(h.brdf_pdf, pl);   // pb^2/(pb^2+pl^2)
 }
 
 // Extracted out of wf_finish_material_scatter() (item 4 sub-step 4 of this

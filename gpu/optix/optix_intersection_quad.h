@@ -193,24 +193,13 @@ extern "C" __global__ void __closesthit__quad() {
 		float light_pdf_for_incoming = 0.0f;
 		const float3 mis_o = mis_origin_from_payload();  // last real vertex, not the (possibly moved) ray origin
 		if (params.aliasTable && params.numLights > 0) {
-			int prim_idx = (int)primIdx;
-			float sel_pdf = 0.0f;
-			for (unsigned int li = 0; li < params.numLights; ++li) {
-				if (params.lightIndices[li] == prim_idx && params.lightKinds[li] == GpuLightKind::Quad) {
-					// See optix_intersection_sphere.h's identical block for
-					// why this checks the light BVH first.
-					sel_pdf = (params.lightBvhNodeCount > 0)
-						? gpu_light_bvh_pmf(mis_o.x, mis_o.y, mis_o.z, 0.f, 0.f, 0.f, (int)li)
-						: params.aliasTable[li].pdf;
-					break;
-				}
-			}
+			const float sel_pdf = gpu_light_selection_pmf(GpuLightKind::Quad, (int)primIdx, mis_o);
 			// Solid-angle PDF for quad: dist^2 / (cos * area)
 			float3 to_light = hit_point - mis_o;
 			float dist_sq = dot(to_light, to_light);
 			float area = length(quad.w);  // |u x v|
 			float cos_theta = fabsf(dot(normalize(ray_dir), quad.normal));
-			if (cos_theta > 1e-6f && area > 1e-6f && dist_sq > 1e-6f)
+			if (cos_theta > 1e-6f && area > 0.0f && dist_sq > 1e-12f)   // (as sample_quad_light: no cut-off that depends on the scene's units)
 				light_pdf_for_incoming = sel_pdf * dist_sq / (cos_theta * area);
 		}
 		return light_pdf_for_incoming;
