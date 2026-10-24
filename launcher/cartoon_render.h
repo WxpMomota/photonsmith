@@ -81,9 +81,17 @@ inline int renderFrame(const cartoon::Film &film, double t, const std::filesyste
 					   int depth, const std::string &framePath, int timeoutSeconds = 0, double timeLimitSeconds = 0.0, bool gpu = false) {
 	try {
 		std::ofstream f(scenePath, std::ios::binary);
-		if (!f) return -1;
+		if (!f) {
+			std::cerr << "\nERROR: could not write " << scenePath << std::endl;
+			return -1;
+		}
+		// One frame's scene at a time: runInParallel calls this from several threads, and a film's code keeps caches of its own (static maps of figure meshes and the like)
+		// that are not made for that. Building a scene is quick beside rendering it.
+		static std::mutex building;
+		std::lock_guard<std::mutex> hold(building);
 		f << film.sceneAt(t);
-	} catch (const std::exception &) {   // (a film's code failing on one frame fails that frame, not the whole video)
+	} catch (const std::exception &e) {   // (a film's code failing on one frame fails that frame, not the whole video; why is said, not dropped)
+		std::cerr << "\nERROR: " << film.name << " at " << t << " s: " << e.what() << std::endl;
 		return -1;
 	}
 	const std::vector<std::string> childArgs = frameArgs(frameFlags(args, film, gpu), width, height, spp, depth, framePath, scenePath.string(), timeLimitSeconds);

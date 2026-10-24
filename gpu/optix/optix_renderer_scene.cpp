@@ -142,7 +142,7 @@ void OptiXRenderer::uploadGeometryBuffers(const SceneInputs &in, SceneBuildState
 	size_t sphereSize = allSpheres.size() * sizeof(SphereData);
 
 	if (d_spheres_) {
-		cudaFree(reinterpret_cast<void*>(d_spheres_));
+		cudaFree(reinterpret_cast<void*>(d_spheres_)); d_spheres_ = 0;
 	}
 
 	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_spheres_), sphereSize));
@@ -187,7 +187,7 @@ void OptiXRenderer::uploadGeometryBuffers(const SceneInputs &in, SceneBuildState
 	size_t triangleSize = allTriangles.size() * sizeof(TriangleData);
 
 	if (d_triangles_) {
-		cudaFree(reinterpret_cast<void*>(d_triangles_));
+		cudaFree(reinterpret_cast<void*>(d_triangles_)); d_triangles_ = 0;
 		d_triangles_ = 0;
 	}
 
@@ -491,7 +491,7 @@ void OptiXRenderer::uploadLightBuffers(const SceneInputs &in, SceneBuildState &s
 		// Upload light indices
 		size_t lightIndexSize = lightIndices.size() * sizeof(int);
 		if (d_lightIndices_) {
-			cudaFree(reinterpret_cast<void*>(d_lightIndices_));
+			cudaFree(reinterpret_cast<void*>(d_lightIndices_)); d_lightIndices_ = 0;
 		}
 		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_lightIndices_), lightIndexSize));
 		CUDA_CHECK(cudaMemcpy(
@@ -517,7 +517,7 @@ void OptiXRenderer::uploadLightBuffers(const SceneInputs &in, SceneBuildState &s
 
 		size_t lightKindSize = lightKinds.size() * sizeof(GpuLightKind);
 		if (d_lightKinds_) {
-			cudaFree(reinterpret_cast<void*>(d_lightKinds_));
+			cudaFree(reinterpret_cast<void*>(d_lightKinds_)); d_lightKinds_ = 0;
 		}
 		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_lightKinds_), lightKindSize));
 		CUDA_CHECK(cudaMemcpy(
@@ -539,7 +539,7 @@ void OptiXRenderer::uploadLightBuffers(const SceneInputs &in, SceneBuildState &s
 		const std::vector<GpuAliasEntry> table = buildAliasTable(powers);
 
 		size_t aliasTableSize = table.size() * sizeof(GpuAliasEntry);
-		if (d_aliasTable_) cudaFree(reinterpret_cast<void*>(d_aliasTable_));
+		if (d_aliasTable_) cudaFree(reinterpret_cast<void*>(d_aliasTable_)); d_aliasTable_ = 0;
 		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_aliasTable_), aliasTableSize));
 		CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(d_aliasTable_),
 			table.data(), aliasTableSize, cudaMemcpyHostToDevice));
@@ -581,15 +581,15 @@ void OptiXRenderer::uploadLightBuffers(const SceneInputs &in, SceneBuildState &s
 	} else {
 		// No lights in scene
 		if (d_lightIndices_) {
-			cudaFree(reinterpret_cast<void*>(d_lightIndices_));
+			cudaFree(reinterpret_cast<void*>(d_lightIndices_)); d_lightIndices_ = 0;
 			d_lightIndices_ = 0;
 		}
 		if (d_lightKinds_) {
-			cudaFree(reinterpret_cast<void*>(d_lightKinds_));
+			cudaFree(reinterpret_cast<void*>(d_lightKinds_)); d_lightKinds_ = 0;
 			d_lightKinds_ = 0;
 		}
 		if (d_aliasTable_) {
-			cudaFree(reinterpret_cast<void*>(d_aliasTable_));
+			cudaFree(reinterpret_cast<void*>(d_aliasTable_)); d_aliasTable_ = 0;
 			d_aliasTable_ = 0;
 		}
 		if (d_lightBvhNodes_) { cudaFree(reinterpret_cast<void*>(d_lightBvhNodes_)); d_lightBvhNodes_ = 0; }
@@ -1260,11 +1260,11 @@ void OptiXRenderer::buildInstanceGases(const SceneInputs &in, SceneBuildState &s
 		outputGuard.release();
 	}
 
-	if (d_gasCustom_) cudaFree(reinterpret_cast<void*>(d_gasCustom_));
+	if (d_gasCustom_) cudaFree(reinterpret_cast<void*>(d_gasCustom_)); d_gasCustom_ = 0;
 	d_gasCustom_ = d_gasCustomOutput;
-	if (d_gasTri_) cudaFree(reinterpret_cast<void*>(d_gasTri_));
+	if (d_gasTri_) cudaFree(reinterpret_cast<void*>(d_gasTri_)); d_gasTri_ = 0;
 	d_gasTri_ = d_gasTriOutput;
-	if (d_gasDiskCylinder_) cudaFree(reinterpret_cast<void*>(d_gasDiskCylinder_));
+	if (d_gasDiskCylinder_) cudaFree(reinterpret_cast<void*>(d_gasDiskCylinder_)); d_gasDiskCylinder_ = 0;
 	d_gasDiskCylinder_ = d_gasDiskCylinderOutput;
 }
 
@@ -1389,7 +1389,7 @@ void OptiXRenderer::buildTopLevelIas(const SceneInputs &in, SceneBuildState &st)
 	));
 	CUDA_CHECK(cudaStreamSynchronize(stream_));
 
-	if (d_gas_) cudaFree(reinterpret_cast<void*>(d_gas_));
+	if (d_gas_) cudaFree(reinterpret_cast<void*>(d_gas_)); d_gas_ = 0;
 	d_gas_ = iasOutputGuard.ptr;
 	iasOutputGuard.release();
 
@@ -1510,7 +1510,7 @@ bool OptiXRenderer::buildSBT(
 	OPTIX_CHECK(optixSbtRecordPackHeader(raygenPG_, &raygenRecord));
 	raygenRecord.data = 0;  // No data
 
-	if (d_raygenRecord_) cudaFree(reinterpret_cast<void*>(d_raygenRecord_));
+	if (d_raygenRecord_) cudaFree(reinterpret_cast<void*>(d_raygenRecord_)); d_raygenRecord_ = 0;
 	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_raygenRecord_), sizeof(RaygenRecord)));
 	CUDA_CHECK(cudaMemcpy(
 		reinterpret_cast<void*>(d_raygenRecord_),
@@ -1537,7 +1537,7 @@ bool OptiXRenderer::buildSBT(
 	OPTIX_CHECK(optixSbtRecordPackHeader(probeMissPG_, &missRecords[RAY_TYPE_PROBE]));
 	missRecords[RAY_TYPE_PROBE].data = 0;
 
-	if (d_missRecord_) cudaFree(reinterpret_cast<void*>(d_missRecord_));
+	if (d_missRecord_) cudaFree(reinterpret_cast<void*>(d_missRecord_)); d_missRecord_ = 0;
 	size_t missRecordSize = missRecords.size() * sizeof(MissRecord);
 	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_missRecord_), missRecordSize));
 	CUDA_CHECK(cudaMemcpy(
@@ -1661,7 +1661,7 @@ bool OptiXRenderer::buildSBT(
 		hitGroupRecords.back().data = {};
 	}
 
-	if (d_hitgroupRecords_) cudaFree(reinterpret_cast<void*>(d_hitgroupRecords_));
+	if (d_hitgroupRecords_) cudaFree(reinterpret_cast<void*>(d_hitgroupRecords_)); d_hitgroupRecords_ = 0;
 	size_t hitRecordSize = hitGroupRecords.size() * sizeof(HitGroupRecord);
 	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_hitgroupRecords_), hitRecordSize));
 	CUDA_CHECK(cudaMemcpy(
@@ -1686,4 +1686,4 @@ bool OptiXRenderer::buildSBT(
 		<< hitGroupRecords.size() << " hit records (one radiance+shadow+probe triple per present geometry type"
 		<< (disks.empty() && cylinders.empty() ? "" : ", including disk/cylinder's own trailing region") << ")\n";
 	return true;
-}
+}

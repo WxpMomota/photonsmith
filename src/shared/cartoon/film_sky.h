@@ -244,12 +244,18 @@ inline std::vector<float> render(const Spec &s) {
 }
 
 // The sky's file (made the first time it is asked for) and the LightSource text that puts it round the scene, turned `turnDeg` about the vertical (clouds drifting) and scaled.
+// The file is named by every number the sky is made from, so it is kept across builds, in the film's folder (not a build's: film_cache.h); its time is renewed on each use, so
+// film_cache::prune deletes only skies nothing has asked for in a week.
 inline std::string file(const std::string &film, const Spec &s) {
-	const std::filesystem::path target = film_cache::dir(film) / fileName(s);
+	const std::filesystem::path base = film_cache::filmDir(film);
+	film_cache::prune(base);
+	const std::filesystem::path target = base / fileName(s);
 	std::error_code ec;
-	if (!(std::filesystem::exists(target, ec) && std::filesystem::file_size(target, ec) > 0)) {
+	if (std::filesystem::exists(target, ec) && std::filesystem::file_size(target, ec) > 0) {
+		std::filesystem::last_write_time(target, std::filesystem::file_time_type::clock::now(), ec);
+	} else {
 		const std::vector<float> rgb = render(s);
-		film_cache::writeOnce(target, scene_doc::sky::encodeHdr(rgb, s.width, s.width / 2));
+		if (!film_cache::writeOnce(target, scene_doc::sky::encodeHdr(rgb, s.width, s.width / 2))) throw std::runtime_error("film " + film + ": could not write " + target.string());
 	}
 	return film_cache::scenePath(target);
 }

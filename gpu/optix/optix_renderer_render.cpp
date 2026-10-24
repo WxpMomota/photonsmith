@@ -336,9 +336,19 @@ bool OptiXRenderer::render(
 	if (useWavefront_ && wavefrontTracer_) return renderWavefront(width, height, samplesPerPixel, maxDepth, gpuCam, outputFramebuffer);
 
 
+	// The transient device buffers of this render, freed however it ends: an early return or a throwing CUDA_CHECK below used to leak them (a Live Preview that fails
+	// on every frame lost a framebuffer a frame).
+	CUdeviceptr d_framebuffer = 0, d_statsBounceRays = 0, d_statsShadowRays = 0;
+	struct FreeOnExit {
+		CUdeviceptr *buffers[3];
+		~FreeOnExit() {
+			for (CUdeviceptr *b : buffers)
+				if (*b) cudaFree(reinterpret_cast<void*>(*b));
+		}
+	} freeOnExit{{&d_framebuffer, &d_statsBounceRays, &d_statsShadowRays}};
+
 	// Allocate framebuffer on device
-	CUdeviceptr d_framebuffer;
-	size_t fbSize = width * height * sizeof(float3);
+	size_t fbSize = static_cast<size_t>(width) * height * sizeof(float3);
 	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_framebuffer), fbSize));
 
 	// Denoiser albedo/normal guide-layer AOV buffers (recursive backend
@@ -367,8 +377,6 @@ bool OptiXRenderer::render(
 	// pattern main.cpp/wavefront_path_tracer.cpp already use.
 #pragma warning(suppress: 4996)
 	const bool statsEnabled = (std::getenv("RAY_TRACER_STATS") != nullptr);
-	CUdeviceptr d_statsBounceRays = 0;
-	CUdeviceptr d_statsShadowRays = 0;
 	if (statsEnabled) {
 		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_statsBounceRays), sizeof(unsigned long long)));
 		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_statsShadowRays), sizeof(unsigned long long)));
@@ -423,9 +431,7 @@ bool OptiXRenderer::render(
 		cudaMemcpyDeviceToHost
 	));
 
-	// Cleanup framebuffer (transient). d_albedo/d_normal are NOT freed here -
-	// they persist across render() calls, see ensureAovBuffers()'s comment.
-	cudaFree(reinterpret_cast<void*>(d_framebuffer));
+	// (the framebuffer and the stats counters are freed by freeOnExit; d_albedo/d_normal persist across render() calls, see ensureAovBuffers()'s comment)
 
 	std::cout << "[OptiX] Rendered " << width << "x" << height
 		<< " @ " << samplesPerPixel << " spp\n";
@@ -449,9 +455,6 @@ bool OptiXRenderer::render(
 		std::cout << "[REC-STATS] Shadow rays (NEE)        : " << shadowRays << "\n";
 		std::cout << "[REC-STATS] ─────────────────────────────────────────────\n";
 	}
-	if (d_statsBounceRays) cudaFree(reinterpret_cast<void*>(d_statsBounceRays));
-	if (d_statsShadowRays) cudaFree(reinterpret_cast<void*>(d_statsShadowRays));
-
 	return true;
 }
 

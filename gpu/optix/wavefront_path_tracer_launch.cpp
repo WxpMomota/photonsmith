@@ -13,6 +13,7 @@
 #include "optix_module_parallel.h"
 #include <cuda.h>
 #include <algorithm>
+#include <limits>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -57,7 +58,26 @@ bool WavefrontPathTracer::allocateQueues(int numPixels, int numPunctualLights) {
 	// through OptiX's own `optixTrace()` immediately rather than queuing it
 	// for a later kernel pass, have no equivalent capacity to overflow).
 	const int maxShadowRaysPerHit = 2 + std::max(0, numPunctualLights);
-	const int shadowCapacity = numPixels * maxShadowRaysPerHit;
+	// In 64 bits (the product of pixels and lights overflowed an int at about a thousand point lights), and at most half the graphics card's free memory: a 1080p film with
+	// thirty point lights asked for some 6 GB. A capped queue drops the shadow rays that do not fit (WorkQueue::push), which darkens, so it is said once.
+	long long wantedShadow = static_cast<long long>(numPixels) * maxShadowRaysPerHit;
+	{
+		size_t freeBytes = 0, totalBytes = 0;
+		const long long perItem = static_cast<long long>(sizeof(ShadowRayWorkItem) + sizeof(float));
+		long long most = std::numeric_limits<int>::max();
+		if (cudaMemGetInfo(&freeBytes, &totalBytes) == cudaSuccess && freeBytes > 0) most = std::min(most, static_cast<long long>(freeBytes / 2) / perItem);
+		most = std::max<long long>(most, numPixels);   // (one shadow ray a pixel at least, as every other queue)
+		if (wantedShadow > most) {
+			static bool said = false;
+			if (!said) {
+				said = true;
+				std::cerr << "Warning: the wavefront renderer's shadow-ray queue for " << numPunctualLights << " point/spot lights at this size would need " << wantedShadow
+						  << " entries; it holds " << most << " (half the graphics card's free memory), so some point-light shadow rays are dropped and those lights look dimmer." << std::endl;
+			}
+			wantedShadow = most;
+		}
+	}
+	const int shadowCapacity = static_cast<int>(wantedShadow);
 	if (queueCapacity_ == numPixels && shadowQueueCapacity_ == shadowCapacity) return true;  // already allocated
 
 	freeQueues();

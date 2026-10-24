@@ -88,10 +88,14 @@ struct Job {
 			if (std::regex_search(header, m, look))
 				for (int i = 0; i < 3; ++i) eye[i] = std::stod(m[i + 1].str());
 			std::ofstream f(scenePath(), std::ios::binary | std::ios::trunc);
-			if (!f) return false;
+			if (!f) {
+				std::cerr << "ERROR: frame " << frame << ": could not write " << scenePath() << std::endl;
+				return false;
+			}
 			f << filmPtr->sceneAt(timeOf(frame));
 			return static_cast<bool>(f);
-		} catch (const std::exception &) {
+		} catch (const std::exception &e) {   // (the film's code failed on this frame: why goes to this worker's log, which the launcher's failure line points to)
+			std::cerr << "ERROR: frame " << frame << " of " << film << ": " << e.what() << std::endl;
 			return false;
 		}
 	}
