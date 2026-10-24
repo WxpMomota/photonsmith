@@ -70,6 +70,7 @@ extern char** environ;
 #include "launcher/render_setup.h"
 #include "launcher/cartoon_worker.h"
 #include "launcher/film_captions.h"    // a film's words on its frames
+#include "launcher/video_frames.h"     // the frames folder: kept on a resume, emptied (when ours) on a fresh start
 
 // Converts rendered PPM frames to PNG on a background thread while the main
 // thread renders the next frame, instead of converting everything in a
@@ -282,25 +283,21 @@ static int prepareVideoDirectories(const std::string &out_path, int render_frame
 
     try {
         bool keep = false;
+        if (resume && signature.empty()) std::cout << "Note: --resume continues only a cartoon's video (whose frames say what they are); this video starts again." << std::endl;
         if (resume && !signature.empty() && std::filesystem::exists(frames_dir / "resume.txt")) {
             std::ifstream in(frames_dir / "resume.txt");
             const std::string saved((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             keep = saved == signature;
             if (!keep) std::cout << "The frames in " << frames_dir << " are not those of this video (another film, size, quality or flags); starting again." << std::endl;
         }
+        // (video_frames.h: what is kept on a resume; a fresh start empties the folder, so that stale frames cannot mix with this run's, but only a folder this program made)
         if (keep) {
-            // pictures that were being written when the earlier run stopped, and its working folders, are not frames
-            for (const auto &entry : std::filesystem::directory_iterator(frames_dir)) {
-                const std::string name = entry.path().filename().string();
-                if (name.find(".tmp.png") != std::string::npos || entry.path().extension() == ".ppm" || entry.path().extension() == ".done") std::filesystem::remove(entry.path());
-                else if (entry.is_directory()) std::filesystem::remove_all(entry.path());
-            }
-        } else {
-            // Clear any frames left over from a previous video render - otherwise
-            // stale files can mix with (or mask) this run's sequence, especially
-            // when this run has fewer frames than the last one.
-            if (std::filesystem::exists(frames_dir)) std::filesystem::remove_all(frames_dir);
-            std::filesystem::create_directories(frames_dir);
+            if (const int dropped = video_frames::keepForResume(frames_dir); dropped > 0)
+                std::cout << dropped << " frame(s) that failed last time and were repeated from their neighbours are rendered again." << std::endl;
+        } else if (!video_frames::startAfresh(frames_dir)) {
+            std::cerr << "ERROR: " << frames_dir << " holds files this program did not make, so it is not emptied for the video's frames. Move them, or choose an output in another "
+                         "folder." << std::endl;
+            return ERR_FILE_WRITE_FAILED;
         }
         if (!signature.empty()) {
             std::ofstream out(frames_dir / "resume.txt", std::ios::binary);
@@ -467,7 +464,8 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
             result = rc;
             return true;
         };
-        return cartoon_render::runWorkers(todo, workers, timeout, hooks, completed, inOrder, 25, cartoon_render::workerMemoryLimitBytes(args)) + resumed;
+        // (a worker's first frame on a GPU also compiles the shaders when their cache is cold, about 18 minutes for the default renderer: it gets 45)
+        return cartoon_render::runWorkers(todo, workers, timeout, hooks, completed, inOrder, 25, cartoon_render::workerMemoryLimitBytes(args), use_gpu ? 45 * 60 : 0) + resumed;
     }
     return cartoon_render::runInParallel(
         render_frame_count, jobs,

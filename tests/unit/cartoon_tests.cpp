@@ -30,6 +30,7 @@
 #include "../../launcher/render_setup.h"
 #include "../../launcher/background_mode.h"
 #include "../../launcher/run_policy.h"
+#include "../../launcher/video_frames.h"
 #include "../../src/shared/cartoon/cartoons.h"
 #include "../../src/shared/cartoon/cartoon_stills.h"
 #include "../../src/shared/pbrt_discover.h"
@@ -527,6 +528,87 @@ TEST(CartoonRender, AFrameThatFailedIsFilledFromTheOneBeforeSoTheVideoKeepsItsLe
 	EXPECT_EQ(cartoon_render::fillMissingFrames(dir, 3), 0) << "nothing to fill from";
 }
 
+TEST(CartoonRender, AFilledInFrameIsListedAndKeepsTheTimeOfTheFrameItCopies) {
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "photonsmith_fill_list_test";
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	std::ofstream(dir / cartoon_render::encName(0), std::ios::binary) << "zero";
+	std::ofstream(dir / cartoon_render::encName(3), std::ios::binary) << "three";
+	const auto old = std::filesystem::last_write_time(dir / cartoon_render::encName(0)) - std::chrono::hours(1);
+	std::filesystem::last_write_time(dir / cartoon_render::encName(0), old);
+	EXPECT_EQ(cartoon_render::fillMissingFrames(dir, 4), 2);
+	EXPECT_EQ(std::filesystem::last_write_time(dir / cartoon_render::encName(1)), old) << "a copy keeps its source's time, which is how the captions know it";
+	std::ifstream list(dir / cartoon_render::kFilledList);
+	std::vector<int> listed;
+	for (int i = 0; list >> i;) listed.push_back(i);
+	list.close();
+	EXPECT_EQ(listed, (std::vector<int>{1, 2}));
+	EXPECT_EQ(cartoon_render::dropFilledFrames(dir), 2);
+	EXPECT_EQ(cartoon_render::countFrames(dir, 4), 2) << "the copies go, the frames that were rendered stay";
+	EXPECT_FALSE(std::filesystem::exists(dir / cartoon_render::kFilledList));
+	std::filesystem::remove_all(dir);
+}
+
+TEST(VideoFrames, AResumedVideoKeepsItsFramesAndCaptionsRecordAndRendersTheCopiesAgain) {
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "photonsmith_resume_folder_test";
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir / "work0");
+	for (const char *f : {"enc_0000.png", "enc_0001.png", "enc_0002.png", "captions.done", "frame_0003.done", "frame_0003.ppm", "enc_0003.png.tmp.png", "resume.txt"})
+		std::ofstream(dir / f) << "x";
+	std::ofstream(dir / cartoon_render::kFilledList) << "2\n";
+	EXPECT_EQ(video_frames::keepForResume(dir), 1);
+	for (const char *kept : {"enc_0000.png", "enc_0001.png", "captions.done", "resume.txt"}) EXPECT_TRUE(std::filesystem::exists(dir / kept)) << kept;
+	for (const char *gone : {"enc_0002.png", "frame_0003.done", "frame_0003.ppm", "enc_0003.png.tmp.png", "work0", cartoon_render::kFilledList})
+		EXPECT_FALSE(std::filesystem::exists(dir / gone)) << gone;
+	std::filesystem::remove_all(dir);
+}
+
+TEST(VideoFrames, AFreshVideoEmptiesOnlyAFramesFolderThisProgramMade) {
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "photonsmith_fresh_folder_test";
+	std::filesystem::remove_all(dir);
+	EXPECT_TRUE(video_frames::startAfresh(dir)) << "no folder yet";
+	EXPECT_TRUE(std::filesystem::exists(dir / video_frames::kMarker));
+	std::ofstream(dir / "enc_0000.png") << "x";
+	std::ofstream(dir / "holiday.jpg") << "someone's";
+	EXPECT_TRUE(video_frames::startAfresh(dir)) << "it has the marker";
+	EXPECT_FALSE(std::filesystem::exists(dir / "holiday.jpg"));
+	std::filesystem::remove(dir / video_frames::kMarker);
+	std::ofstream(dir / "holiday.jpg") << "someone's";
+	EXPECT_FALSE(video_frames::startAfresh(dir)) << "a folder called frames that someone keeps their own files in";
+	EXPECT_TRUE(std::filesystem::exists(dir / "holiday.jpg"));
+	std::filesystem::remove(dir / "holiday.jpg");
+	std::ofstream(dir / "enc_0000.png") << "x";
+	std::filesystem::create_directories(dir / "work1");
+	EXPECT_TRUE(video_frames::startAfresh(dir)) << "a frames folder from before the marker: nothing but frames";
+	EXPECT_FALSE(std::filesystem::exists(dir / "enc_0000.png"));
+	std::filesystem::remove_all(dir);
+}
+
+TEST(FilmCaptions, AFrameGetsItsWordsOnceEvenWhenTheVideoIsResumedOrTheFrameIsACopy) {
+	const cartoon::Film *film = cartoon::find("tengwang");
+	ASSERT_NE(film, nullptr);
+	ASSERT_TRUE(film->captions);
+	const cartoon::Caption first = film->captions().front();
+	const int frames = cartoon::frameCountOf(*film);
+	const int i = static_cast<int>(0.5 * (first.t0 + first.t1) * film->fps);
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "photonsmith_captions_once_test";
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	const std::vector<unsigned char> grey(static_cast<std::size_t>(192) * 80 * 3, 90);
+	ASSERT_TRUE(write_png((dir / cartoon_render::encName(i)).string().c_str(), 192, 80, grey.data()));
+	EXPECT_EQ(film_captions::apply(*film, dir, frames), 1);
+	EXPECT_EQ(film_captions::apply(*film, dir, frames), 0) << "the same frame, a second time (a resumed video)";
+	// the next frame failed and is a copy of this one: it already has the words
+	std::filesystem::copy_file(dir / cartoon_render::encName(i), dir / cartoon_render::encName(i + 1));
+	std::filesystem::last_write_time(dir / cartoon_render::encName(i + 1), std::filesystem::last_write_time(dir / cartoon_render::encName(i)));
+	EXPECT_EQ(film_captions::apply(*film, dir, frames), 0);
+	std::ifstream a(dir / cartoon_render::encName(i), std::ios::binary), b(dir / cartoon_render::encName(i + 1), std::ios::binary);
+	EXPECT_EQ(std::string((std::istreambuf_iterator<char>(a)), std::istreambuf_iterator<char>()), std::string((std::istreambuf_iterator<char>(b)), std::istreambuf_iterator<char>()));
+	a.close();
+	b.close();
+	std::filesystem::remove_all(dir);
+}
+
 TEST(CartoonRender, TheFramesOfAnInterruptedVideoAreResumedOnlyForTheSameFilmSizeAndFlags) {
 	const cartoon::Film *film = cartoon::find("lamp-and-ball");
 	ASSERT_NE(film, nullptr);
@@ -622,7 +704,8 @@ TEST(FlagScopes, EveryRenderFlagTheFramesRepeatIsAFlagTheParserKnows) {
 		{"--denoise-blend", {"0.5"}}, {"--exposure", {"1.5"}}, {"--sampler", {"halton"}}, {"--adaptive-threshold", {"0.02"}}, {"--lightsampler", {"power"}}, {"--accelerator", {"bvh"}},
 		{"--splitmethod", {"sah"}}, {"--maxcomponentvalue", {"10"}}, {"--crop", {"0", "0", "1", "1"}}, {"--seed", {"3"}}, {"--aperture", {"0.1"}}, {"--focus-distance", {"5"}},
 		{"--tonemap", {"aces"}}, {"--gpu-device", {"0"}}, {"--sppm-iterations", {"3"}}, {"--sppm-photons", {"1000"}}, {"--bdpt-max-depth", {"4"}}, {"--mlt-bootstrap", {"100"}}, {"--mlt-mutations", {"100"}},
-		{"--mlt-max-depth", {"4"}}, {"--ao-max-dist", {"2"}}, {"--ao-illum-scale", {"1"}}, {"--ao-illum-rgb", {"1", "1", "1"}}};
+		{"--mlt-max-depth", {"4"}}, {"--ao-max-dist", {"2"}}, {"--ao-illum-scale", {"1"}}, {"--ao-illum-rgb", {"1", "1", "1"}}, {"--bloom", {"0.2"}}, {"--vignette", {"0.3"}},
+		{"--warmth", {"0.1"}}, {"--saturation", {"1.2"}}};
 	for (const FlagScopeEntry &e : kFlagScopes) {
 		if (e.scope != FlagScope::Render) continue;
 		std::vector<std::string> words = {e.name};

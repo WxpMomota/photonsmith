@@ -133,22 +133,40 @@ inline int countFrames(const std::filesystem::path &dir, int count) {
 		if (std::filesystem::exists(dir / encName(i))) ++n;
 	return n;
 }
+// The frames fillMissingFrames made, listed in the frames folder so that a resumed video renders them again instead of keeping the copies.
+constexpr const char *kFilledList = "filled.txt";
 // A frame that failed leaves a hole in the sequence, which would shorten the video and put its sound out of step; each hole is filled with the frame before it (the first with the next
-// one). Returns how many were filled.
+// one). The copy keeps its source's file time, so that a frame already captioned (film_captions.h, which knows a file by its size and time) is known as captioned in its copy too. Returns
+// how many were filled.
 inline int fillMissingFrames(const std::filesystem::path &dir, int count) {
 	int first = -1;
 	for (int i = 0; i < count && first < 0; ++i)
 		if (std::filesystem::exists(dir / encName(i))) first = i;
 	if (first < 0) return 0;
 	int filled = 0;
-	std::error_code ec;
+	std::ofstream list(dir / kFilledList, std::ios::app);
 	for (int i = 0; i < count; ++i) {
 		if (std::filesystem::exists(dir / encName(i))) continue;
 		const int from = i == 0 ? first : i - 1;
+		std::error_code ec;
 		std::filesystem::copy_file(dir / encName(from), dir / encName(i), std::filesystem::copy_options::overwrite_existing, ec);
-		if (!ec) ++filled;
+		if (ec) continue;
+		std::filesystem::last_write_time(dir / encName(i), std::filesystem::last_write_time(dir / encName(from), ec), ec);
+		list << i << "\n";
+		++filled;
 	}
 	return filled;
+}
+// Before a video is resumed: the frames that were copies of their neighbours are removed (and the list with them), so that they are rendered this time.
+inline int dropFilledFrames(const std::filesystem::path &dir) {
+	std::ifstream in(dir / kFilledList);
+	int dropped = 0;
+	std::error_code ec;
+	for (int i = 0; in >> i;)
+		if (std::filesystem::remove(dir / encName(i), ec)) ++dropped;
+	in.close();
+	std::filesystem::remove(dir / kFilledList, ec);
+	return dropped;
 }
 
 // The soundtrack. A film with one (Film::soundtrack, cartoon_audio.h) has it mixed and written as a 16-bit stereo .wav; the video then gets it. It is made for the film's own length and
@@ -207,7 +225,7 @@ struct WorkerHooks {
 // the rest of the list, starting with the frame that was in hand; a frame that has taken a worker down twice fails (result -1) and the new worker starts after it. Returns the number of
 // frames whose result was 0.
 inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, const WorkerHooks &hooks, const std::function<void(int frame, int result, double seconds)> &completed,
-					  const std::function<void(int frame, int result)> &inOrder, int pollMilliseconds = 25, unsigned long long maxWorkerBytes = 0) {
+					  const std::function<void(int frame, int result)> &inOrder, int pollMilliseconds = 25, unsigned long long maxWorkerBytes = 0, int firstFrameStallSeconds = 0) {
 	using Clock = std::chrono::steady_clock;
 	std::sort(todo.begin(), todo.end());
 	if (todo.empty()) return 0;
@@ -225,6 +243,9 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 	std::size_t nextToHand = 0, reported = 0;
 	int succeeded = 0;
 	auto seconds = [](Clock::time_point since) { return std::chrono::duration<double>(Clock::now() - since).count(); };
+	// a worker's first frame may have a longer limit (firstFrameStallSeconds: on a GPU it also compiles the shaders when their cache is cold)
+	const auto limitFor = [&](const Worker &worker) { return worker.framesSinceStart == 0 && stallSeconds > 0 ? (std::max)(stallSeconds, firstFrameStallSeconds) : stallSeconds; };
+	Clock::time_point lastTick = Clock::now();
 	auto report = [&](int frame, int rc, double took) {
 		result[frame] = rc;
 		finished.insert(frame);
@@ -237,6 +258,12 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 		}
 	};
 	while (reported < todo.size()) {
+		// This loop wakes every `pollMilliseconds`; a much longer gap means this program was paused (the GUI's Pause suspends it and its workers), and that time is nobody's frame.
+		const Clock::time_point now = Clock::now();
+		const auto gap = now - lastTick;
+		lastTick = now;
+		if (gap > std::chrono::seconds(5))
+			for (Worker &worker : ws) worker.last += gap;
 		for (std::size_t w = 0; w < ws.size(); ++w) {
 			Worker &worker = ws[w];
 			if (worker.remaining.empty()) continue;
@@ -277,17 +304,18 @@ inline int runWorkers(std::vector<int> todo, int workers, int stallSeconds, cons
 				worker.handle.reset();
 				continue;
 			}
-			const bool stalled = stallSeconds > 0 && seconds(worker.last) > stallSeconds;
+			const int limit = limitFor(worker);
+			const bool stalled = limit > 0 && seconds(worker.last) > limit;
 			if (ended || stalled) {
 				if (stalled) worker.handle->kill();
 				worker.handle.reset();
 				const int frame = worker.remaining.front();
 				if (++attempts[frame] >= 2) {
-					std::cerr << "\nWARNING: frame " << frame << " " << (stalled ? "took longer than " + std::to_string(stallSeconds) + " s" : std::string("ended its worker")) << " twice and is given up." << std::endl;
+					std::cerr << "\nWARNING: frame " << frame << " " << (stalled ? "took longer than " + std::to_string(limit) + " s" : std::string("ended its worker")) << " twice and is given up." << std::endl;
 					report(frame, -1, seconds(worker.last));
 					worker.remaining.pop_front();
 				} else {
-					std::cerr << "\nWARNING: a worker " << (stalled ? "did not finish frame " + std::to_string(frame) + " in " + std::to_string(stallSeconds) + " s" : "ended while rendering frame " + std::to_string(frame)) << "; starting another." << std::endl;
+					std::cerr << "\nWARNING: a worker " << (stalled ? "did not finish frame " + std::to_string(frame) + " in " + std::to_string(limit) + " s" : "ended while rendering frame " + std::to_string(frame)) << "; starting another." << std::endl;
 				}
 				worker.last = Clock::now();
 			}

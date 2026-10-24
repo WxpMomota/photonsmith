@@ -2,8 +2,8 @@
 // film_captions.h -- the words a film lays over its video (cartoon::Caption: a line of the story, a title), laid onto the finished frames just before they become the video.
 //
 // The frames are the video's own pictures (enc_0000.png ...), which a resumed video keeps, so a frame must not get its words twice: the frames this has written are listed in
-// captions.done beside them with the size and time of the file it left, and a frame whose file is still that one is skipped. A frame rendered again (resumed, or filled in) is a
-// different file, and gets its words. A caption's picture is read once, scaled to the frame (an area average, so the small text stays crisp) and laid on with its transparency;
+// captions.done beside them with the size and time of the file it left, and a frame whose file is still that one is skipped. A frame rendered again is a different file, and gets
+// its words; a frame filled in with a copy of its neighbour (which keeps the neighbour's time) has the words its neighbour has. A caption's picture is read once, scaled to the frame (an area average, so the small text stays crisp) and laid on with its transparency;
 // a missing picture is reported once and skipped.
 
 #include <algorithm>
@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -92,19 +93,22 @@ inline void over(std::vector<unsigned char> &frame, int w, int h, const Picture 
 	}
 }
 
+// The record of the frames that have their words, beside them (a resumed video keeps it: video_render.h).
+constexpr const char *kRecord = "captions.done";
 // Lays the film's captions on frames 0 .. count-1 in `dir` (enc_NNNN.png). Returns how many frames got words.
 inline int apply(const cartoon::Film &film, const std::filesystem::path &dir, int count) {
 	if (!film.captions) return 0;
 	const std::vector<cartoon::Caption> captions = film.captions();
 	if (captions.empty()) return 0;
 	namespace fs = std::filesystem;
-	const fs::path record = dir / "captions.done";
+	const fs::path record = dir / kRecord;
 	std::map<int, std::string> done;   // frame -> "size time" of the file this left
+	std::set<std::string> captioned;   // those stamps: a frame that failed is a copy of its neighbour with the neighbour's time (cartoon_render.h), and has its words if that had
 	{
 		std::ifstream in(record);
 		int frame = 0;
 		std::string stamp;
-		while (in >> frame && std::getline(in, stamp)) done[frame] = stamp;
+		while (in >> frame && std::getline(in, stamp)) done[frame] = stamp, captioned.insert(stamp);
 	}
 	const auto stampOf = [](const fs::path &p) {
 		std::error_code ec;
@@ -128,7 +132,12 @@ inline int apply(const cartoon::Film &film, const std::filesystem::path &dir, in
 		const fs::path file = dir / name;
 		std::error_code ec;
 		if (!fs::exists(file, ec)) continue;
-		if (auto it = done.find(i); it != done.end() && it->second == stampOf(file)) continue;
+		const std::string stamp = stampOf(file);
+		if (auto it = done.find(i); it != done.end() && it->second == stamp) continue;
+		if (captioned.count(stamp)) {   // (a copy of a frame that has its words)
+			log << i << stamp << "\n";
+			continue;
+		}
 		int w = 0, h = 0, n = 0;
 		unsigned char *px = stbi_load(file.string().c_str(), &w, &h, &n, 3);
 		if (!px) continue;
@@ -152,7 +161,14 @@ inline int apply(const cartoon::Film &film, const std::filesystem::path &dir, in
 			if (!sized.count(key)) sized[key] = scaled(src, pw, ph);
 			over(frame, w, h, sized[key], (w - pw) / 2, static_cast<int>(std::lround(c->centreY * h - ph / 2.0)), a);
 		}
-		if (!write_png(file.string().c_str(), w, h, frame.data())) continue;
+		// (written beside it and renamed over it: a run stopped in the middle of the write must not leave half a frame that a resumed video would keep)
+		const fs::path tmp = dir / (std::string(name) + ".tmp.png");
+		if (!write_png(tmp.string().c_str(), w, h, frame.data())) continue;
+		fs::rename(tmp, file, ec);
+		if (ec) {
+			fs::remove(tmp, ec);
+			continue;
+		}
 		log << i << stampOf(file) << "\n";
 		log.flush();
 		++laid;

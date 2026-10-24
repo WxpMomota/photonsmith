@@ -9,8 +9,7 @@
 #include <gtest/gtest.h>
 #include "mesh.h"
 #include "material_simple.h"
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "external/stb_image_write.h"
+#include "external/stb_image_write.h"   // (its implementation is src/external/image_writer.cpp, which the test targets compile)
 #include <cstdio>
 #include <fstream>
 #include <memory>

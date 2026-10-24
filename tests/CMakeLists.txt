@@ -241,6 +241,7 @@ add_executable(unit_tests
     # mirrors).
     ${CMAKE_SOURCE_DIR}/../src/external/stb_image_impl.cpp
     ${CMAKE_SOURCE_DIR}/../src/external/tinyexr_impl.cpp
+    ${CMAKE_SOURCE_DIR}/../src/external/image_writer.cpp   # stbi_write_png, which mtl_material_tests.cpp calls
     # tinyexr's Pxr24 compression path needs miniz's mz_compress/
     # mz_compressBound/mz_uncompress - same pairing cpu_renderer.vcxproj
     # already builds tinyexr_impl.cpp alongside.
@@ -366,7 +367,7 @@ add_executable(cpu_integrator_tests
     ${CMAKE_SOURCE_DIR}/../src/shared/cartoon/cartoon_scenes.cpp   # pbrt_discover::listGenerated / materializeGenerated, which cpu_interface.cpp calls (cpu_renderer.vcxproj has it too)
     ${CMAKE_SOURCE_DIR}/../src/data/rgb_spectrum_table_data.cpp
     ${CMAKE_SOURCE_DIR}/../src/external/stb_image_impl.cpp
-    ${CMAKE_SOURCE_DIR}/../src/external/image_writer.cpp   # stbi_write_png, which scene_builder_tests.cpp calls (the MSBuild target gets it from mtl_material_tests.cpp)
+    ${CMAKE_SOURCE_DIR}/../src/external/image_writer.cpp   # write_png / stbi_write_png, which film_captions.h (cartoon_tests.cpp) and scene_builder_tests.cpp call (the MSBuild target compiles it too)
     ${CMAKE_SOURCE_DIR}/../src/external/tinyexr_impl.cpp
     ${CMAKE_SOURCE_DIR}/../src/external/miniz.c
 )

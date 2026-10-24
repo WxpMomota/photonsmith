@@ -49,6 +49,8 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <tlhelp32.h>
+#include <algorithm>
+#include <vector>
 #else
 #include <csignal>
 #include <sys/types.h>
@@ -65,8 +67,32 @@ namespace {
 // state render, since ray_tracer.exe spins up its worker pool once at
 // startup) would not be caught, but that's an acceptable gap for a
 // best-effort pause rather than a correctness-critical one.
+//
+// The launcher renders a film's frames in worker processes of its own, so the
+// whole tree under `pid` is suspended, not just the launcher: suspending only
+// the launcher left its workers rendering on (the launcher, when resumed,
+// leaves the paused time out of its frame timeouts: cartoon_render.h).
 #ifdef _WIN32
+// `pid` and every process descended from it.
+std::vector<DWORD> processTree(DWORD pid) {
+	std::vector<DWORD> tree{pid};
+	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (snapshot == INVALID_HANDLE_VALUE) return tree;
+	std::vector<std::pair<DWORD, DWORD>> parentOf;   // (process, its parent)
+	PROCESSENTRY32 entry;
+	entry.dwSize = sizeof(entry);
+	if (Process32First(snapshot, &entry)) {
+		do parentOf.push_back({entry.th32ProcessID, entry.th32ParentProcessID});
+		while (Process32Next(snapshot, &entry));
+	}
+	CloseHandle(snapshot);
+	for (std::size_t i = 0; i < tree.size(); ++i)   // (breadth first; a recycled parent id could only add a process whose parent died, and the tree is checked for repeats)
+		for (const auto &[child, parent] : parentOf)
+			if (parent == tree[i] && child != parent && std::find(tree.begin(), tree.end(), child) == tree.end()) tree.push_back(child);
+	return tree;
+}
 void setProcessThreadsSuspended(DWORD pid, bool suspend) {
+	const std::vector<DWORD> tree = processTree(pid);
 	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
 	if (snapshot == INVALID_HANDLE_VALUE) return;
 
@@ -74,7 +100,7 @@ void setProcessThreadsSuspended(DWORD pid, bool suspend) {
 	entry.dwSize = sizeof(entry);
 	if (Thread32First(snapshot, &entry)) {
 		do {
-			if (entry.th32OwnerProcessID != pid) continue;
+			if (std::find(tree.begin(), tree.end(), entry.th32OwnerProcessID) == tree.end()) continue;
 			HANDLE thread = OpenThread(THREAD_SUSPEND_RESUME, FALSE, entry.th32ThreadID);
 			if (!thread) continue;
 			if (suspend) SuspendThread(thread);

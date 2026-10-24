@@ -107,6 +107,8 @@
     <!-- Unit Tests -->
     <ClCompile Include="gtest_all.cpp" />
     <ClCompile Include="gtest_main_wrapper.cpp" />
+    <!-- write_png and stb_image_write (film_captions.h writes the frames it captions; scene builder and .mtl tests write fixture pictures) -->
+    <ClCompile Include="..\src\external\image_writer.cpp" />
     <ClCompile Include="unit\area_light_sampling_tests.cpp" />
     <ClCompile Include="unit\bsdf_chi2_tests.cpp" />
     <ClCompile Include="unit\bvh_light_sampler_tests.cpp" />
