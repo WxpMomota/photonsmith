@@ -199,9 +199,14 @@ void MainWindow::onRenderComplete(bool success, const QString &message, double t
 		m_statusLabel->setText(tr("❌ %1").arg(shownMessage));
 
 		// Only show error popup for actual failures, not for user-stopped/
-		// abandoned renders.
+		// abandoned renders - and not while more jobs are queued: the dialog is
+		// modal, and an overnight queue then waited at the first failure until
+		// someone clicked OK. The failed job's row and the status line say it.
 		if (!userEndedWithoutFailure) {
-			QMessageBox::critical(this, tr("Render Failed"), shownMessage);
+			if (m_queueModel->hasWaiting())
+				m_statusLabel->setText(tr("❌ %1 - going on with the next queued render").arg(shownMessage));
+			else
+				QMessageBox::critical(this, tr("Render Failed"), shownMessage);
 		}
 	}
 
@@ -425,4 +430,4 @@ void MainWindow::onElapsedTick() {
 		m_framesStrip->refresh();
 		m_framesStripLabel->setText(tr("Frames rendered so far: %1 (double-click one to open it)").arg(m_framesStrip->pictures()));
 	}
-}
+}

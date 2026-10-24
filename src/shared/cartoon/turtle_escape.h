@@ -1117,11 +1117,7 @@ inline const std::vector<Shot> &shots() {
 	return s;
 }
 
-inline std::vector<double> shotStarts() {
-	std::vector<double> v;
-	for (const Shot &s : shots()) v.push_back(s.start);
-	return v;
-}
+inline std::vector<double> shotStarts() { return startsOf(shots()); }
 
 // The camera at t: the shot's own, a held camera's wander, and for the long tracking shots of the turtle on the floor, a camera that follows it.
 inline CameraView viewAt(double t) {

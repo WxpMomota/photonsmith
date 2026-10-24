@@ -27,7 +27,7 @@ constexpr double kStandX = 1.5;                  // where the robot stops beside
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Time helpers
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
-inline double fade(double t) { return smoothstep(0.0, 1.4, t) * (1.0 - smoothstep(kDuration - 1.8, kDuration, t)); }
+inline double fade(double t) { return fadeInOut(t, 1.4, 1.8, kDuration); }
 
 inline double robotX(double t) {
 	return Track1::withEases({{0.0, -2.4, Ease::Smooth}, {12.6, -2.4, Ease::Smooth}, {17.0, 0.9, Ease::Smooth}, {18.0, 0.9, Ease::Smooth}, {20.6, kStandX, Ease::Smooth}, {40.0, kStandX, Ease::Smooth}})(t);
@@ -378,11 +378,7 @@ inline const std::vector<Shot> &shots() {
 // Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator. Cheap, and all the scene list
 // needs to describe the film's still.
 inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t)), kSamples); }
-inline std::vector<double> shotStarts() {
-	std::vector<double> v;
-	for (const Shot &s : shots()) v.push_back(s.start);
-	return v;
-}
+inline std::vector<double> shotStarts() { return startsOf(shots()); }
 
 inline std::string sceneAt(double t) {
 	const double f = fade(t);

@@ -16,11 +16,7 @@ using audio::Mix;
 
 constexpr double kBeat = 60.0 / 72.0;   // 72 beats a minute
 
-inline double unit(unsigned seed) {
-	audio::Noise n(seed);
-	n.next();
-	return 0.5 * (n.next() + 1.0);
-}
+using audio::unit;   // (cartoon_audio.h)
 
 // A choir-like chord: one pad per note, spread across the stereo field, with plenty of reverb.
 inline void choir(Mix &m, double t, std::initializer_list<double> midis, double length, double gain, double attack, double release) {

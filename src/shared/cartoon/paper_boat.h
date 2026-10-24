@@ -22,7 +22,7 @@ constexpr int kGridX = 96, kGridZ = 64;
 constexpr double kRippleSpeed = 1.7;   // how fast a ring spreads (units per second)
 constexpr int kDrops = 200;            // candidate drops; the rain's strength thins them out
 
-inline double fade(double t) { return smoothstep(0.0, 1.0, t) * (1.0 - smoothstep(kDuration - 1.5, kDuration, t)); }
+inline double fade(double t) { return fadeInOut(t, 1.0, 1.5, kDuration); }
 
 // How hard it rains: heavy for the first twelve seconds, then easing to none by twenty.
 inline double rainAt(double t) { return 1.0 - smoothstep(12.0, 20.0, t); }
@@ -195,11 +195,7 @@ inline const std::vector<Shot> &shots() {
 
 // Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator.
 inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t)), kSamples); }
-inline std::vector<double> shotStarts() {
-	std::vector<double> v;
-	for (const Shot &s : shots()) v.push_back(s.start);
-	return v;
-}
+inline std::vector<double> shotStarts() { return startsOf(shots()); }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The scene

@@ -1341,11 +1341,7 @@ inline const std::vector<ShotDef> &shotList() {
 	};
 	return shots;
 }
-inline std::vector<double> shotStarts() {
-	std::vector<double> v;
-	for (const ShotDef &s : shotList()) v.push_back(s.start);
-	return v;
-}
+inline std::vector<double> shotStarts() { return startsOf(shotList()); }
 inline std::string shotNames() {
 	std::string s;
 	for (const ShotDef &d : shotList()) s += (s.empty() ? "" : "|") + std::string(d.name);

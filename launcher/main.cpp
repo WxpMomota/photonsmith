@@ -713,8 +713,9 @@ static void cutToScenePicture(const LaunchArgs &args, const std::string &scene_i
     if (!done) std::cerr << "Note: the scene's crop window is its picture, but '" << out_path << "' could not be cut to it; the full frame is kept." << std::endl;
 }
 
-// After a successful render: PPM to PNG (Metal and EXR output are already final) and the list of files to open.
-static void announceRenderedFile(const std::string &out_path, bool use_gpu, bool ppm_only) {
+// After a successful render: PPM to PNG (Metal and EXR output are already final) and the list of files to open. False when the PNG could not be written: the
+// render then fails (the GUI trusts the exit code, and reported a render whose picture was missing as done).
+static bool announceRenderedFile(const std::string &out_path, bool use_gpu, bool ppm_only) {
     (void)use_gpu;  // (read only by the Metal branch)
         std::filesystem::path ppm_path_obj(out_path);
 
@@ -778,13 +779,15 @@ static void announceRenderedFile(const std::string &out_path, bool use_gpu, bool
             if (convert_ppm_to_png(out_path.c_str(), png_path.string().c_str())) {
                 std::cout << "✓ PNG saved: " << png_path << std::endl;
             } else {
-                std::cout << "✗ PNG conversion failed" << std::endl;
+                std::cerr << "ERROR: the picture could not be written as " << png_path << " (the PPM is " << ppm_path_obj << ")" << std::endl;
+                return false;
             }
 
             std::cout << "\nRender complete! You can now open:" << std::endl;
             std::cout << "  - " << png_path.filename() << " (PNG - lossless, widely supported)" << std::endl;
             std::cout << "  - " << ppm_path_obj.filename() << " (PPM - raw data)" << std::endl;
         }
+        return true;
 }
 
 static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
@@ -850,7 +853,7 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
     printCpuStats(args, s, seconds);
 
     if (render_result == 0 && !args.aovs) cutToScenePicture(args, scene_id, out_path);
-    if (render_result == 0) announceRenderedFile(out_path, use_gpu, args.ppm_only);
+    if (render_result == 0 && !announceRenderedFile(out_path, use_gpu, args.ppm_only)) render_result = ERR_FILE_WRITE_FAILED;
 
     if (render_result == 0 && args.aovs) write_aov_passes(out_path, image_width, image_height, samples_per_pixel, scene_id, cam_x, cam_y, cam_z);
     return render_result;

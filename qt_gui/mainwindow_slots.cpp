@@ -36,7 +36,6 @@
 #include <QComboBox>
 #include <QCheckBox>
 #include <QAbstractSlider>
-#include <QThread>
 #include <QHash>
 #include <array>
 #include <cmath>
@@ -594,8 +593,7 @@ void MainWindow::assembleVideoAutomatically(const QString &baseOutputPath, const
 	// below is mainly a defensive path for the case where the process
 	// exited 0 but the expected video filename wasn't where we expect it.
 
-	// Wait a moment for file to be fully written
-	QThread::msleep(500);
+	// (no wait here: ray_tracer.exe has exited, so the video is written; a sleep on this thread only froze the window)
 
 	// main.cpp derives the final video's name from the SAME stem it was
 	// given via --output (see its own "Output Video" step: "<stem>_video.

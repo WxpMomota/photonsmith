@@ -317,11 +317,7 @@ inline const std::vector<Shot> &shots() {
 	return s;
 }
 
-inline std::vector<double> shotStarts() {
-	std::vector<double> v;
-	for (const Shot &s : shots()) v.push_back(s.start);
-	return v;
-}
+inline std::vector<double> shotStarts() { return startsOf(shots()); }
 
 // Everything up to and including WorldBegin: the look of the moment, the mist the camera stands in, the camera, the picture's size, the sampler and the integrator.
 inline std::string headerAt(double t) {

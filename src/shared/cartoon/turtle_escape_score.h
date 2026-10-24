@@ -17,11 +17,7 @@ using audio::Mix;
 
 constexpr double kSpyBeat = 60.0 / 112.0;
 
-inline double unit(unsigned seed) {
-	audio::Noise n(seed);
-	n.next();
-	return 0.5 * (n.next() + 1.0);
-}
+using audio::unit;   // (cartoon_audio.h)
 
 inline void chord(Mix &m, double t, std::initializer_list<double> midis, double length, double gain, double attack = 0.5, double release = 1.2) {
 	double pan = -0.45;

@@ -22,7 +22,7 @@ constexpr double kRadius = 0.50;
 constexpr double kOut = 16.6;       // the flame starts to die
 constexpr double kDark = 18.0;      // the flame is gone
 
-inline double fade(double t) { return smoothstep(0.0, 1.2, t) * (1.0 - smoothstep(kDuration - 1.2, kDuration, t)); }
+inline double fade(double t) { return fadeInOut(t, 1.2, 1.2, kDuration); }
 inline double heightAt(double t) { return 3.0 - 0.9 * t / 20.0; }
 
 // How big the flame is: 1 while it burns, dying away between kOut and kDark with a few last flickers.
@@ -69,11 +69,7 @@ inline const std::vector<Shot> &shots() {
 
 // Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator.
 inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t)), kSamples); }
-inline std::vector<double> shotStarts() {
-	std::vector<double> v;
-	for (const Shot &s : shots()) v.push_back(s.start);
-	return v;
-}
+inline std::vector<double> shotStarts() { return startsOf(shots()); }
 
 inline std::string buildCandle(double t) {
 	const Parts &P = parts();

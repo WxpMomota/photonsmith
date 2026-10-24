@@ -13,11 +13,7 @@ using audio::hz;
 using audio::Mix;
 
 // A fixed number in [0, 1) from a seed (the film sounds the same every time).
-inline double unit(unsigned seed) {
-	audio::Noise n(seed);
-	n.next();
-	return 0.5 * (n.next() + 1.0);
-}
+using audio::unit;   // (cartoon_audio.h)
 
 // A pad chord: one held tone per note, spread across the stereo field.
 inline void padChord(Mix &m, double t, std::initializer_list<double> midis, double length, double gain, double attack, double release) {

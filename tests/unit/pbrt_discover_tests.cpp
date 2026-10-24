@@ -17,6 +17,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <set>
@@ -47,6 +48,27 @@ TEST(PbrtDiscover, ReadsCameraAndFilmFromTheHeader) {
 	EXPECT_NEAR(d.camera.lookfrom[0], 3.0, 1e-9);
 	EXPECT_NEAR(d.camera.lookfrom[1], 4.0, 1e-9);
 	EXPECT_NEAR(d.camera.lookfrom[2], 5.0, 1e-9);
+}
+
+TEST(PbrtDiscover, AWorldBeginInACommentOrAStringDoesNotEndTheHeader) {
+	const pbrt_discover::Discovered d = pbrt_discover::describe("scenes/commented.pbrt",
+		"# the camera comes before WorldBegin, as always\n"
+		"Film \"rgb\" \"string filename\" [ \"WorldBegin.exr\" ] \"integer xresolution\" [ 320 ] \"integer yresolution\" [ 200 ]\n"
+		"LookAt 7 1 2  0 0 0  0 1 0\nCamera \"perspective\"\nWorldBegin\nShape \"sphere\"\n");
+	ASSERT_TRUE(d.ok) << d.error;
+	EXPECT_EQ(d.xResolution, 320);
+	EXPECT_NEAR(d.camera.lookfrom[0], 7.0, 1e-9);
+}
+
+TEST(PbrtDiscover, ACameraInAnIncludedFileBeforeWorldBeginIsRead) {
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "photonsmith_discover_include_test";
+	std::filesystem::create_directories(dir);
+	std::ofstream(dir / "camera.pbrt") << "LookAt 0 2 9  0 0 0  0 1 0\nCamera \"perspective\" \"float fov\" [ 40 ]\nSampler \"halton\" \"integer pixelsamples\" [ 77 ]\n";
+	const pbrt_discover::Discovered d = pbrt_discover::describe((dir / "scene.pbrt").string(), "Include \"camera.pbrt\"\nWorldBegin\nShape \"sphere\"\n");
+	ASSERT_TRUE(d.ok) << d.error;
+	EXPECT_EQ(d.samplesPerPixel, 77);
+	EXPECT_NEAR(d.camera.lookfrom[2], 9.0, 1e-9);
+	std::filesystem::remove_all(dir);
 }
 
 TEST(PbrtDiscover, ReadsMaxComponentValueFromTheFilmDirective) {

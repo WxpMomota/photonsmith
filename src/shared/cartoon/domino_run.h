@@ -27,7 +27,7 @@ constexpr double kOuter = 4.4, kInner = 1.35, kTurns = 3.3;       // the spiral:
 constexpr double kFirst = 0.8;                                    // distance along the path of the first domino
 constexpr double kMarbleRadius = 0.2;
 
-inline double fade(double t) { return smoothstep(0.0, 1.0, t) * (1.0 - smoothstep(kDuration - 1.4, kDuration, t)); }
+inline double fade(double t) { return fadeInOut(t, 1.0, 1.4, kDuration); }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The path
@@ -163,11 +163,7 @@ inline const std::vector<Shot> &shots() {
 
 // Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator.
 inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t)), kSamples); }
-inline std::vector<double> shotStarts() {
-	std::vector<double> v;
-	for (const Shot &s : shots()) v.push_back(s.start);
-	return v;
-}
+inline std::vector<double> shotStarts() { return startsOf(shots()); }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The scene

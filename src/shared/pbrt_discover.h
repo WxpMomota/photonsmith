@@ -151,8 +151,28 @@ namespace detail {
 //
 // Falls back to the whole text when absent: a file that is only options is
 // unusual but legal, and truncating nothing is the right answer.
+// Where the WorldBegin directive is: not inside a comment or a quoted string (a header comment that mentions "WorldBegin" cut the header there, and the camera
+// after it was never seen), and as a whole word. npos when there is none.
+inline std::size_t worldBeginAt(const std::string &text) {
+	bool quoted = false;
+	for (std::size_t i = 0; i < text.size(); ++i) {
+		const char c = text[i];
+		if (quoted) {
+			if (c == '"') quoted = false;
+			continue;
+		}
+		if (c == '"') quoted = true;
+		else if (c == '#') {
+			i = text.find('\n', i);
+			if (i == std::string::npos) return std::string::npos;
+		} else if (c == 'W' && text.compare(i, 10, "WorldBegin") == 0 && (i == 0 || !std::isalnum(static_cast<unsigned char>(text[i - 1]))) &&
+				   (i + 10 >= text.size() || !std::isalnum(static_cast<unsigned char>(text[i + 10]))))
+			return i;
+	}
+	return std::string::npos;
+}
 inline std::string headerOf(const std::string &text) {
-	const std::size_t at = text.find("WorldBegin");
+	const std::size_t at = worldBeginAt(text);
 	if (at == std::string::npos) return text;
 	return text.substr(0, at) + "WorldBegin\n";
 }
@@ -262,10 +282,19 @@ inline Discovered describe(const std::string &path, const std::string &text) {
 	d.path = path;
 	d.name = detail::stemOf(path);
 
-	// No file resolver: an Include before WorldBegin is legal but rare, and
-	// resolving it here would reintroduce exactly the disk cost this avoids.
-	// The full load later sees the complete file, so nothing is lost.
-	const pbrt_scene::ParseResult parsed = pbrt_scene::parse(detail::headerOf(text));
+	// Only the header is parsed (the camera, film, sampler and integrator the scene list and the render's defaults come from), but an Include in it is
+	// read, relative to the scene's folder as pbrt does: it is rare and costs nothing when absent, and without it a scene that keeps its camera in an
+	// included file rendered from the origin at 16 samples. One that is not found is left out here; the full load reports it.
+	const std::filesystem::path base = std::filesystem::path(path).parent_path();
+	const pbrt_scene::FileResolver includes = [base](const std::string &file, std::string &out, const std::vector<std::string> &) {
+		std::filesystem::path p(file);
+		if (p.is_relative()) p = base / p;
+		std::ifstream in(p, std::ios::binary);
+		out.clear();
+		if (in) out.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+		return true;
+	};
+	const pbrt_scene::ParseResult parsed = pbrt_scene::parse(detail::headerOf(text), includes);
 	if (!parsed.ok) {
 		d.error = parsed.error;
 		return d;
@@ -424,23 +453,8 @@ inline std::vector<Discovered> scanDirectory(const std::string &dir) {
 	return found;
 }
 
-// Where to look, in order, for a directory of user scenes.
-//
-// RAY_TRACER_PBRT_DIR wins so a user can point at a scene collection living
-// anywhere without copying it into the install. The relative fallbacks cover
-// the two ways this program actually runs: from the repository root during
-// development, and from RayTracer_Package/ when launched by the GUI, whose
-// working directory is the package rather than the repo.
-inline std::vector<std::string> defaultSearchPaths() {
-	std::vector<std::string> dirs;
-	if (const char *env = std::getenv("RAY_TRACER_PBRT_DIR")) {
-		if (*env) dirs.emplace_back(env);
-	}
-	dirs.emplace_back("pbrt_scenes");
-	dirs.emplace_back("../pbrt_scenes");
-	dirs.emplace_back("../../pbrt_scenes");
-	return dirs;
-}
+// Where to look, in order, for a directory of user scenes (pbrt_asset_check::sceneSearchPaths says why each).
+inline std::vector<std::string> defaultSearchPaths() { return pbrt_asset_check::sceneSearchPaths(); }
 
 // The first search path that exists and holds at least one .pbrt wins. An
 // empty directory is skipped rather than accepted, so a stray empty

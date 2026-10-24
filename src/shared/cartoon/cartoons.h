@@ -131,11 +131,7 @@ inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilm
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Where film files (*.film) are looked for: the folders scenes are (RAY_TRACER_PBRT_DIR, pbrt_scenes beside the program or up from it, the per-user scenes folder).
 inline std::vector<std::string> filmFileDirs() {
-	std::vector<std::string> dirs;
-	if (const char *env = std::getenv("RAY_TRACER_PBRT_DIR")) {
-		if (*env) dirs.emplace_back(env);
-	}
-	for (const char *d : {"pbrt_scenes", "../pbrt_scenes", "../../pbrt_scenes"}) dirs.emplace_back(d);
+	std::vector<std::string> dirs = pbrt_asset_check::sceneSearchPaths();
 	if (const std::string user = pbrt_asset_check::userSceneDir(); !user.empty()) dirs.push_back(user);
 	return dirs;
 }

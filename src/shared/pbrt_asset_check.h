@@ -28,26 +28,38 @@ namespace pbrt_asset_check {
 // a read-only disk image or in a protected folder - so they go to a per-user folder whose layout mirrors the application
 // folder (models/x.obj under it stands in for models/x.obj next to the app). The GUI exports its location as
 // RAY_TRACER_USER_ASSETS; every process it starts, and the renderer libraries it loads, then look there as a fallback.
-inline std::string userAssetRoot() {
+// An environment variable's value, "" when it is not set.
+inline std::string environmentValue(const char *name) {
 #ifdef _WIN32
 	// _dupenv_s, not getenv: MSVC rejects getenv (C4996, an error) in a project that does not define _CRT_SECURE_NO_WARNINGS, and the OptiX renderer's project does not.
-	char *root = nullptr;
+	char *raw = nullptr;
 	size_t len = 0;
 	std::string value;
-	if (_dupenv_s(&root, &len, "RAY_TRACER_USER_ASSETS") == 0 && root) value = root;
-	std::free(root);
+	if (_dupenv_s(&raw, &len, name) == 0 && raw) value = raw;
+	std::free(raw);
 	return value;
 #else
-	const char *root = std::getenv("RAY_TRACER_USER_ASSETS");
-	return root ? std::string(root) : std::string();
+	const char *raw = std::getenv(name);
+	return raw ? std::string(raw) : std::string();
 #endif
 }
+inline std::string userAssetRoot() { return environmentValue("RAY_TRACER_USER_ASSETS"); }
 
 // The per-user folder for scenes (not assets): <RAY_TRACER_USER_ASSETS>/user_scenes, "" when the variable is not set. Where the Scene Builder's "Add to scene
 // list" saves when the program sits somewhere it must not write (a macOS .app bundle, a read-only disk image); scene discovery (pbrt_discover.h) scans it.
 inline std::string userSceneDir() {
 	const std::string root = userAssetRoot();
 	return root.empty() ? std::string() : (std::filesystem::path(root) / "user_scenes").string();
+}
+
+// Where, in order, the scenes folder is looked for: RAY_TRACER_PBRT_DIR (a scene collection anywhere, without copying it into the install), then pbrt_scenes in the
+// working directory and up from it - the repository root during development, RayTracer_Package/ when the GUI starts the program there, a scratch folder below either.
+// The one list for scene discovery (pbrt_discover.h), film files (cartoons.h) and a film's pictures (film_cache.h), which each had their own copy.
+inline std::vector<std::string> sceneSearchPaths() {
+	std::vector<std::string> dirs;
+	if (const std::string env = environmentValue("RAY_TRACER_PBRT_DIR"); !env.empty()) dirs.push_back(env);
+	for (const char *d : {"pbrt_scenes", "../pbrt_scenes", "../../pbrt_scenes", "../../../pbrt_scenes"}) dirs.emplace_back(d);
+	return dirs;
 }
 
 // The per-user folder of cartoon stills (cartoon_stills.h): <RAY_TRACER_USER_ASSETS>/cartoon_stills, "" when the variable is not set. Generated, so it can be deleted at any time.

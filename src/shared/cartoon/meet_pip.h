@@ -15,7 +15,7 @@ constexpr double kDuration = 18.0;
 constexpr int kFps = 24;
 constexpr int kSamples = 128;   // recommended samples per pixel (the Sampler line of the film's header)
 
-inline double fade(double t) { return smoothstep(0.0, 0.8, t) * (1.0 - smoothstep(kDuration - 1.2, kDuration, t)); }
+inline double fade(double t) { return fadeInOut(t, 0.8, 1.2, kDuration); }
 
 using actor::Character;
 using actor::Pose;
@@ -141,11 +141,7 @@ inline const std::vector<Shot> &shots() {
 	};
 	return s;
 }
-inline std::vector<double> shotStarts() {
-	std::vector<double> v;
-	for (const Shot &s : shots()) v.push_back(s.start);
-	return v;
-}
+inline std::vector<double> shotStarts() { return startsOf(shots()); }
 
 // Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator.
 inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t)), kSamples); }

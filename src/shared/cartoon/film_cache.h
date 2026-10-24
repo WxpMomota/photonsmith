@@ -130,8 +130,7 @@ inline std::string plyShape(const std::string &path) { return path.empty() ? std
 // it is not found.
 inline std::string asset(const std::string &rel) {
 	std::vector<std::filesystem::path> dirs;
-	if (const char *env = std::getenv("RAY_TRACER_PBRT_DIR"); env && *env) dirs.emplace_back(env);
-	for (const char *d : {"pbrt_scenes", "../pbrt_scenes", "../../pbrt_scenes", "../../../pbrt_scenes"}) dirs.emplace_back(d);
+	for (const std::string &d : pbrt_asset_check::sceneSearchPaths()) dirs.emplace_back(d);
 	std::error_code ec;
 	for (const std::filesystem::path &d : dirs) {
 		const std::filesystem::path p = d / "film_assets" / rel;

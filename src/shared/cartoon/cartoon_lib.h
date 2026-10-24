@@ -505,6 +505,15 @@ inline double smoothstep(double a, double b, double x) {
 	const double u = clamp01((x - a) / (b - a));
 	return u * u * (3.0 - 2.0 * u);
 }
+// The start times of a film's shots, from its list of shots (any type with a `start`): what Film::shotStarts returns.
+template <class Shots>
+inline std::vector<double> startsOf(const Shots &shots) {
+	std::vector<double> v;
+	for (const auto &s : shots) v.push_back(s.start);
+	return v;
+}
+// A film's fade from black over its first `in` seconds and to black over its last `out` (of `duration`): 0 .. 1, to multiply its exposure by.
+inline double fadeInOut(double t, double in, double out, double duration) { return smoothstep(0.0, in, t) * (1.0 - smoothstep(duration - out, duration, t)); }
 
 // A film: what a cartoon video preset renders. `sceneAt(t)` is the scene text at time t seconds (0 <= t <= duration); `resolutionHint` is only what its Film line says (the renderer's
 // own --width / --height / --samples settings take over).

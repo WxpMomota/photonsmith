@@ -27,7 +27,7 @@ constexpr double kQuarter = 0.62;      // seconds: a quarter of the pendulum's p
 constexpr double kAmplitude = 36.0;    // degrees: how far the first ball is lifted
 constexpr double kKeep = 0.93;         // the swing keeps this fraction of its amplitude at each strike
 
-inline double fade(double t) { return smoothstep(0.0, 1.2, t) * (1.0 - smoothstep(kDuration - 1.6, kDuration, t)); }
+inline double fade(double t) { return fadeInOut(t, 1.2, 1.6, kDuration); }
 
 // The angle (degrees, from the vertical) of the ball at each end: the left one swings to negative x, the right one to positive.
 struct Swing {
@@ -80,11 +80,7 @@ inline const std::vector<Shot> &shots() {
 
 // Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator.
 inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t)), kSamples); }
-inline std::vector<double> shotStarts() {
-	std::vector<double> v;
-	for (const Shot &s : shots()) v.push_back(s.start);
-	return v;
-}
+inline std::vector<double> shotStarts() { return startsOf(shots()); }
 
 inline std::string buildCradle(double t) {
 	const Parts &P = parts();

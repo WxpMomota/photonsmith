@@ -22,7 +22,7 @@ constexpr int kSamples = 64;   // recommended samples per pixel (the Sampler lin
 using actor::Character;
 using actor::Pose;
 
-inline double fade(double t) { return smoothstep(0.0, 2.0, t) * (1.0 - smoothstep(kDuration - 2.5, kDuration, t)); }
+inline double fade(double t) { return fadeInOut(t, 2.0, 2.5, kDuration); }
 inline double trap(double t, double a, double b, double c, double d) { return smoothstep(a, b, t) * (1.0 - smoothstep(c, d, t)); }
 inline Vec3 frontOf(double yawDeg) {
 	const double y = yawDeg * kPi / 180.0;
@@ -618,11 +618,7 @@ inline const std::vector<Shot> &shots() {
 	};
 	return s;
 }
-inline std::vector<double> shotStarts() {
-	std::vector<double> v;
-	for (const Shot &s : shots()) v.push_back(s.start);
-	return v;
-}
+inline std::vector<double> shotStarts() { return startsOf(shots()); }
 
 // Everything up to and including WorldBegin: the camera at t, the picture's size, the sampler and the integrator.
 inline std::string headerAt(double t) { return sceneHeader(cameraText(cameraAt(shots(), t)), kSamples); }

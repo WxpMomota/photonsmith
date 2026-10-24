@@ -98,11 +98,7 @@ inline const std::vector<Shot> &shots() {
 	};
 	return s;
 }
-inline std::vector<double> shotStarts() {
-	std::vector<double> v;
-	for (const Shot &s : shots()) v.push_back(s.start);
-	return v;
-}
+inline std::vector<double> shotStarts() { return startsOf(shots()); }
 inline CameraView viewAt(double t) {
 	CameraView v = cameraAt(shots(), t);
 	if (t >= 40.0 && t < kRise) {   // round the Heart as it ignites

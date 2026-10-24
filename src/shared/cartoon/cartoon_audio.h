@@ -33,6 +33,12 @@ struct Noise {
 		return static_cast<double>((s >> 8) & 0xFFFF) / 32768.0 - 1.0;
 	}
 };
+// A number from 0 to 1 that depends only on `seed`: a score's choices (which note, how loud) that must be the same every time the film is made.
+inline double unit(unsigned seed) {
+	Noise n(seed);
+	n.next();
+	return 0.5 * (n.next() + 1.0);
+}
 
 inline std::size_t samplesFor(double seconds) { return static_cast<std::size_t>(std::max(0.0, seconds) * kRate) + 1; }
 
