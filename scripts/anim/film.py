@@ -9,6 +9,8 @@ The films themselves are C++ (src/shared/cartoon/: cartoon_lib.h is the toolkit,
   python scripts/anim/film.py sheet fireflies --count 16        the whole film as a contact sheet: 16 stills, evenly spaced, tiled with their times
   python scripts/anim/film.py sheet little-robot --times 2,8,20,30
   python scripts/anim/film.py video fireflies                   the finished video (a film is a video preset: --video-preset <key>)
+  python scripts/anim/film.py baseline [KEY ...] [--write]     every film (or those named), shot by shot, against tests/data/film_baseline.txt: which films and shots a change
+                                                                to shared code (the rig, the kit, a sky) changed; --write records them as they are now (ray_tracer --film-baseline)
   python scripts/anim/film.py preview nomai-signal              a quick look at the whole film with its sound: characters built coarser (--preview), 640 x 360, 4 samples, one
                                                                 frame in two (--every N), in minutes; run again after an edit and only the frames that changed are rendered
   python scripts/anim/film.py doctor tengwang                   every shot at its start, middle and end, small, with a report of what looks wrong (black, very dark, blown-out
@@ -605,6 +607,25 @@ def cmd_budget(args):
     print(report)
 
 
+def cmd_baseline(args):
+    """Every film, shot by shot, against the repository's baseline (tests/data/film_baseline.txt): what changed. --write records the films as they are now."""
+    path = os.path.join(REPO, "tests", "data", "film_baseline.txt")
+    cmd = [find_exe(args.exe), "--film-baseline", path] + (["--write"] if args.write else []) + (args.target.split(",") if args.target else [])
+    done = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, cwd=run_dir())
+    changed = {}
+    for line in done.stdout.splitlines():
+        f = line.split("\t")
+        if len(f) >= 4 and f[0] in ("changed", "new", "gone"):
+            changed.setdefault(f[1], []).append("%s shot %s %s" % (f[0], f[2], f[3]))
+        else:
+            print(line)
+    for film, shots in changed.items():
+        print("%s: %d shot(s)" % (film, len(shots)))
+        for s in shots:
+            print("  " + s)
+    sys.exit(done.returncode)
+
+
 def cmd_preview(args):
     """The whole film, quickly, with its sound: `--preview` (the characters built coarser: building them, not rendering, is most of a frame's time), a small picture, few
     samples, one frame in `--every` held for the next; resumed, so that after an edit only the frames whose scene changed are rendered again."""
@@ -640,7 +661,7 @@ def cmd_video(args):
 
 def main():
     p = argparse.ArgumentParser(description="Look at a cartoon film (the films are C++: src/shared/cartoon/).")
-    p.add_argument("command", choices=["list", "still", "sheet", "video", "doctor", "budget", "preview"])
+    p.add_argument("command", choices=["list", "still", "sheet", "video", "doctor", "budget", "preview", "baseline"])
     p.add_argument("target", nargs="?", help="still: <key>[@seconds]; sheet and video: <key>")
     p.add_argument("--exe")
     p.add_argument("--cpu", action="store_true")
@@ -652,7 +673,7 @@ def main():
     p.add_argument("--jobs", type=int, help="doctor: how many frames to render at once (default 3)")
     p.add_argument("--no-framing", action="store_true", help="doctor: skip the subject checks (out of frame, hidden, camera against something)")
     p.add_argument("--shots", help="doctor, budget: only these shots (comma-separated numbers, 1 the first: as the sheet counts)")
-    p.add_argument("--write", action="store_true", help="budget: write the shots' samples into the film's cameras file")
+    p.add_argument("--write", action="store_true", help="budget: write the shots' samples into the film's cameras file; baseline: record the films as they are now")
     p.add_argument("--motion", action="store_true", help="doctor: also render three frames in a row from each shot's middle and report flicker")
     p.add_argument("--every", type=int, help="preview: render one frame in N (default 2; 1 renders every frame)")
     args = p.parse_args()
@@ -660,9 +681,10 @@ def main():
         args.out = os.path.abspath(args.out)   # (the program runs from its package folder)
     if args.exe:
         args.exe = os.path.abspath(args.exe)
-    if args.command != "list" and not args.target:
+    if args.command not in ("list", "baseline") and not args.target:
         p.error("%s needs a film key" % args.command)
-    {"list": cmd_list, "still": cmd_still, "sheet": cmd_sheet, "video": cmd_video, "doctor": cmd_doctor, "budget": cmd_budget, "preview": cmd_preview}[args.command](args)
+    {"list": cmd_list, "still": cmd_still, "sheet": cmd_sheet, "video": cmd_video, "doctor": cmd_doctor, "budget": cmd_budget, "preview": cmd_preview,
+     "baseline": cmd_baseline}[args.command](args)
 
 
 if __name__ == "__main__":

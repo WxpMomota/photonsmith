@@ -533,6 +533,12 @@ explorer: 8.7 s at its usual detail, 40 s for a face close-up; the renderer take
 `frames-<key>-preview`, never the film's own); `film.py preview` adds 640 x 360, 4 samples, one frame in two (`--every N`) and the soundtrack, and resumes, so after an edit only
 the frames whose scene changed are rendered again. A Nomai frame went from 18 s to 2.6 s; the whole five-minute film, one frame in four, previewed in 13.7 minutes.
 
+**What a change to shared code did to every film: `python scripts/anim/film.py baseline`.** The films share a lot of code (the rig, the gait, the kit, the skies), so a change
+made for one film can quietly change the others. `tests/data/film_baseline.txt` records every film shot by shot: the fingerprint of the scene at each shot's middle, built at
+preview coarseness (`ray_tracer --film-baseline FILE`, src/shared/cartoon/film_baseline.h; a character's shape still changes when its code does). `film.py baseline` lists
+the films and shots that now differ (and exits 1); `film.py baseline --write` records them as they are, after a change made on purpose - the diff of the file shows which
+shots it touched. All 18 films, 226 shots: 128 s the first time, 33 s once the meshes are cached. `film.py baseline nomai-signal,tengwang` looks at some films only.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

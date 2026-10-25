@@ -37,6 +37,7 @@
 #include "../../src/shared/cartoon/cartoons.h"
 #include "../../src/shared/cartoon/cartoon_stills.h"
 #include "../../src/shared/cartoon/film_checks.h"
+#include "../../src/shared/cartoon/film_baseline.h"
 #include "../../src/shared/pbrt_discover.h"
 #include "../../src/shared/output_crop.h"
 #include "../../src/shared/output_format.h"
@@ -2302,4 +2303,33 @@ TEST(MusicCues, AFilmsCuesAreHeardAtTheirTimesOnItsSoundtrack) {
 	if (saved) setenv("RAY_TRACER_PBRT_DIR", savedValue.c_str(), 1); else unsetenv("RAY_TRACER_PBRT_DIR");
 #endif
 	std::filesystem::remove_all(dir);
+}
+
+// ---- the films' baseline (film_baseline.h) --------------------------------------------------------------------------------------------------------------
+
+// Each shot is recorded by the fingerprint of its middle's scene; a comparison names the shots that changed, the new ones and the ones gone, for the films looked at only; and
+// recording keeps the other films' lines, in film and shot order.
+TEST(FilmBaseline, AFilmsShotsAreRecordedAndAChangeNamesTheShotsItTouched) {
+	namespace fb = cartoon::film_baseline;
+	int version = 0;
+	cartoon::Film film{"baseline-test", "Baseline test", "", 6.0, 24, [&](double t) { return std::string("scene at ") + std::to_string(t < 3.0 ? 0 : 1 + version); },
+					   [](double) { return std::string(); }, []() { return std::vector<double>{0.0, 3.0}; }, 0.0, {9994, "", "One|Two", 8, 0.0}};
+	const auto fp = [](const std::string &s) { return s; };   // (the scene's text itself stands for its fingerprint here)
+	const std::vector<fb::Entry> first = fb::entriesOf(film, fp);
+	ASSERT_EQ(first.size(), 2u);
+	EXPECT_EQ(first[1].name, "Two");
+	EXPECT_EQ(first[0].fingerprint, "scene at 0") << "the first shot's middle";
+	const std::string text = fb::merged(fb::parse("other|1|abc|A shot of another film\n"), first);
+	const std::vector<fb::Entry> recorded = fb::parse(text);
+	ASSERT_EQ(recorded.size(), 3u) << "the other film's line is kept";
+	EXPECT_EQ(recorded[0].film, "baseline-test") << "in film order";
+	EXPECT_TRUE(fb::compare(recorded, fb::entriesOf(film, fp)).empty()) << "nothing changed";
+	version = 1;   // the second shot changes
+	const std::vector<fb::Difference> d = fb::compare(recorded, fb::entriesOf(film, fp));
+	ASSERT_EQ(d.size(), 1u);
+	EXPECT_EQ(d[0].kind, "changed");
+	EXPECT_EQ(d[0].entry.shot, 2);
+	std::vector<fb::Entry> shorter = fb::entriesOf(film, fp);
+	shorter.pop_back();
+	EXPECT_EQ(fb::compare(recorded, shorter).back().kind, "gone");
 }

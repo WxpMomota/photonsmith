@@ -79,7 +79,8 @@ extern char** environ;
 #include "launcher/launcher_args.h"   // Argument parsing
 #include "launcher/cartoon_render.h"
 #include "src/shared/cartoon/film_subjects.h"
-#include "src/shared/cartoon/film_checks.h"   // --film-feet: planted feet that slide   // --film-subjects: where a film's subjects fall in its frame
+#include "src/shared/cartoon/film_checks.h"
+#include "src/shared/cartoon/film_baseline.h"   // --film-baseline: every film, shot by shot, against a recorded baseline   // --film-feet: planted feet that slide   // --film-subjects: where a film's subjects fall in its frame
 #include "launcher/cartoon_still.h"  // one frame of a film as a temporary scene file  // cartoon video presets: one child run per frame
 #include <fstream>
 #include "src/shared/path_probe.h"    // --probe X Y
@@ -965,6 +966,52 @@ int main(int argc, char** argv) {
 			for (const cartoon::FilmEvent &e : film->events())
 				std::cout << "event\t" << e.t << "\t" << kinds[static_cast<int>(e.kind)] << "\t" << e.strength << "\t" << e.pan << "\t" << e.seed << "\n";
 		return EXIT_SUCCESS;
+	}
+	// `ray_tracer --film-baseline FILE [--write] [KEY ...]`: every film (or the ones named), shot by shot, against the baseline file (film_baseline.h): a tab-separated line for each
+	// shot that differs (`changed`, `new` or `gone`, the film, the shot, its name) and the exit code 1; `--write` records them as they are now instead. The scenes are built at
+	// preview coarseness (set here, before any film's code runs).
+	if (argc >= 2 && std::string(argv[1]) == "--film-baseline") {
+		if (argc < 3) {
+			std::cerr << "usage: " << argv[0] << " --film-baseline FILE [--write] [KEY ...]" << std::endl;
+			return EXIT_FAILURE;
+		}
+#ifdef _WIN32
+		_putenv_s("RAY_TRACER_FILM_PREVIEW", "3");
+#else
+		setenv("RAY_TRACER_FILM_PREVIEW", "3", 1);
+#endif
+		const std::string file = argv[2];
+		bool write = false;
+		std::vector<std::string> keys;
+		for (int i = 3; i < argc; ++i) {
+			if (std::string(argv[i]) == "--write") write = true;
+			else keys.push_back(argv[i]);
+		}
+		std::string text;
+		{
+			std::ifstream in(file, std::ios::binary);
+			std::stringstream all;
+			all << in.rdbuf();
+			text = all.str();
+		}
+		const std::vector<cartoon::film_baseline::Entry> recorded = cartoon::film_baseline::parse(text);
+		std::vector<cartoon::film_baseline::Entry> now;
+		for (const cartoon::Film *film : cartoon::films()) {
+			if (!keys.empty() && std::find(keys.begin(), keys.end(), std::string(film->key)) == keys.end()) continue;
+			std::cerr << film->key << "..." << std::endl;
+			const std::vector<cartoon::film_baseline::Entry> e = cartoon::film_baseline::entriesOf(*film, [](const std::string &scene) { return frame_fingerprint::of(scene); });
+			now.insert(now.end(), e.begin(), e.end());
+		}
+		if (write) {
+			std::ofstream out(file, std::ios::binary | std::ios::trunc);
+			out << cartoon::film_baseline::merged(recorded, now);
+			std::cout << "recorded " << now.size() << " shots in " << file << std::endl;
+			return out ? EXIT_SUCCESS : EXIT_FAILURE;
+		}
+		const std::vector<cartoon::film_baseline::Difference> diffs = cartoon::film_baseline::compare(recorded, now);
+		for (const auto &d : diffs) std::cout << d.kind << '\t' << d.entry.film << '\t' << d.entry.shot << '\t' << d.entry.name << std::endl;
+		std::cout << (diffs.empty() ? "the same" : std::to_string(diffs.size()) + " shot(s) differ") << " (" << now.size() << " shots looked at)" << std::endl;
+		return diffs.empty() ? EXIT_SUCCESS : 1;
 	}
 	// `ray_tracer --film-cues <key>`: the film's cues file read and placed (music_cues.h), one tab-separated line a cue: `cue  seconds  instrument  notes (comma-separated)`,
 	// and a `problem` line for each thing in it that cannot be played. Nothing when the film has no cues file.
