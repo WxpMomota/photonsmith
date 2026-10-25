@@ -7,10 +7,14 @@
 // Set by flags (--bloom, --vignette, --warmth, --saturation) or by a scene file's own line `# @rt-look bloom 0.2 vignette 0.3 warmth 0.1 saturation 1.1` (any of the four,
 // in any order), which is how a film gives its stills and videos one look; a flag wins over the file. EXR output stays raw (it is for compositing). Off by default: a picture
 // with no look is the rendered one, byte for byte.
+//
+// A grade too (a shot's own colour, from a film's cameras file: shot_cameras.h): `lift R G B` (added light, lifting the shadows), `gamma G` (c^(1/G): above 1 brightens the
+// middle), `gain R G B` (multiplied) and `tint R G B` (a colour cast, scaled to keep the brightness) - each one number or three (red, green, blue).
 
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -26,7 +30,17 @@ struct Look {
 	double vignette = 0.0;      // 0..1: how much darker the corners are than the centre
 	double warmth = 0.0;        // -1..1: towards blue (cool, night) or amber (warm, dawn); the picture's brightness stays the same
 	double saturation = 1.0;    // 0 = grey, 1 = as rendered, above 1 = more colourful
-	bool active() const { return bloom > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0; }
+	// the grade: c' = (max(0, c * gain * tint + lift))^(1 / gamma), per channel
+	double lift[3] = {0.0, 0.0, 0.0};
+	double gamma[3] = {1.0, 1.0, 1.0};
+	double gain[3] = {1.0, 1.0, 1.0};
+	double tint[3] = {1.0, 1.0, 1.0};
+	bool graded() const {
+		for (int k = 0; k < 3; ++k)
+			if (lift[k] != 0.0 || gamma[k] != 1.0 || gain[k] != 1.0 || tint[k] != 1.0) return true;
+		return false;
+	}
+	bool active() const { return bloom > 0.0 || vignette > 0.0 || warmth != 0.0 || saturation != 1.0 || graded(); }
 };
 
 // Values that were set (a flag, a scene line) override `base`; a negative bloom/vignette or a saturation below 0 means "not given" in `given`.
@@ -46,6 +60,28 @@ inline std::string parse(const std::string &text, Look &out) {
 	std::istringstream in(text);
 	std::string word;
 	while (in >> word) {
+		if (word == "lift" || word == "gamma" || word == "gain" || word == "tint") {   // one number (all three channels) or three (red, green, blue)
+			double v[3];
+			int n = 0;
+			for (; n < 3; ++n) {
+				const std::streampos at = in.tellg();
+				std::string tok;
+				if (!(in >> tok)) break;
+				char *end = nullptr;
+				const double x = std::strtod(tok.c_str(), &end);
+				if (end == tok.c_str() || *end != '\0' || !std::isfinite(x)) {   // (the next word, not a number: put it back)
+					in.clear();
+					in.seekg(at);
+					break;
+				}
+				v[n] = x;
+			}
+			if (n != 1 && n != 3) return "\"" + word + "\" takes one number or three (red, green, blue)";
+			if (n == 1) v[1] = v[2] = v[0];
+			double *dst = word == "lift" ? out.lift : word == "gamma" ? out.gamma : word == "gain" ? out.gain : out.tint;
+			for (int k = 0; k < 3; ++k) dst[k] = word == "lift" ? std::clamp(v[k], -1.0, 1.0) : std::clamp(v[k], 0.01, 10.0);
+			continue;
+		}
 		double v = 0.0;
 		if (!(in >> v) || !std::isfinite(v)) return "\"" + word + "\" needs a number after it";
 		if (word == "bloom") out.bloom = std::clamp(v, 0.0, 1.0);
@@ -53,7 +89,7 @@ inline std::string parse(const std::string &text, Look &out) {
 		else if (word == "vignette") out.vignette = std::clamp(v, 0.0, 1.0);
 		else if (word == "warmth") out.warmth = std::clamp(v, -1.0, 1.0);
 		else if (word == "saturation") out.saturation = std::clamp(v, 0.0, 3.0);
-		else return "unknown word \"" + word + "\" (bloom, bloom-radius, vignette, warmth, saturation)";
+		else return "unknown word \"" + word + "\" (bloom, bloom-radius, vignette, warmth, saturation, lift, gamma, gain, tint)";
 	}
 	return "";
 }
@@ -142,12 +178,23 @@ inline void apply(float *rgb, int w, int h, const Look &look) {
 		const double y = 0.2126 * gain[0] + 0.7152 * gain[1] + 0.0722 * gain[2];
 		for (double &g : gain) g /= y;
 	}
+	// the grade's tint keeps the brightness (like the warmth); its gain and tint go with the white balance
+	if (look.graded()) {
+		const double y = 0.2126 * look.tint[0] + 0.7152 * look.tint[1] + 0.0722 * look.tint[2];
+		for (int k = 0; k < 3; ++k) gain[k] *= look.gain[k] * look.tint[k] / (y > 0.0 ? y : 1.0);
+	}
+	const bool lifted = look.lift[0] != 0.0 || look.lift[1] != 0.0 || look.lift[2] != 0.0;
+	const bool bent = look.gamma[0] != 1.0 || look.gamma[1] != 1.0 || look.gamma[2] != 1.0;
 	const double s = look.saturation, v = look.vignette;
 	const double cx = 0.5 * w, cy = 0.5 * h, halfDiag2 = cx * cx + cy * cy;
 	ppm_text::parallel_ranges(n, [&](std::size_t begin, std::size_t end) {
 		for (std::size_t i = begin; i < end; ++i) {
 			double c[3];
 			for (int k = 0; k < 3; ++k) c[k] = rgb[i * 3 + k] * gain[k];
+			if (lifted)
+				for (int k = 0; k < 3; ++k) c[k] = (std::max)(0.0, c[k] + look.lift[k]);
+			if (bent)
+				for (int k = 0; k < 3; ++k) c[k] = std::pow((std::max)(0.0, c[k]), 1.0 / look.gamma[k]);
 			if (s != 1.0) {
 				const double y = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 				for (double &ck : c) ck = (std::max)(0.0, y + s * (ck - y));

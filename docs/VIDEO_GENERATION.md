@@ -566,6 +566,28 @@ frame and steps at a time and its gait's foot place and planted flag (`explorerF
 finds 10⁻¹² m/s where it found up to 0.11 (the spiral) and 0.27 (a corner in a film file), and on a straight flat walk the lock gives exactly the gait's feet. What is left is
 one frame where a walk starts from a standing pose (under 0.1 m/s).
 
+**Motion blur of moving meshes on the GPU.** A mesh under pbrt's object motion (`ActiveTransform "StartTime"` / `"EndTime"` around it) was blurred on the CPU only;
+the GPU drew it at its start. Now the GPU's triangles are built with two motion keys whenever one of them moves - their StartTime and EndTime places (the loader keeps the
+moving ones' EndTime vertices: `pbrt_flatten::Triangle::motion`, `FlatScene::triangleEnds`; `OptixRenderer::setTriangleMotion`) - and each ray's time blends them, on the
+default and the wavefront renderer alike (SPPM keeps them still). The hit programs needed nothing new (they take the hit point from the ray; shading uses the StartTime
+normals). The default renderer's shadow rays were traced at time 0, so a moving thing cast the shadow of where it started - a sphere too; they now use their sample's
+time (`LaunchParams::rayTimes`). `pbrt_scenes/mesh-motion-blur.pbrt` has a still box beside one moving 2 m over the shutter: the CPU, the default GPU renderer and the
+wavefront renderer show the same streak. A film file blurs its moving blocks (move, turn, grow, bounce, topple) over `shutter` of a frame, 0.5 by default (a film camera's
+180-degree shutter; `shutter 0`: sharp): the block's transform at the frame's time and that much later.
+
+**Recorded sound and voices.** A cues file can lay a recording on the soundtrack: `2.2  sample voice.wav  gain 0.5  by kai` plays a WAV file beside the cues file
+(8, 16, 24 or 32-bit PCM or 32-bit float, any number of channels, any rate: `audio::readWav`, resampled to the mix's rate). `by NAME` makes it that character's voice:
+`music_cues::voiceAt(key, NAME, t, ...)` is how loud it is at each moment (its loudness each 1/100 s, the loudest of the line 1) - a film's code opens a mouth by it,
+and a film-file character gets it as `CharacterMoment::voice` (the masked Nomai explorer's staff lights up as it speaks). The cues file is part of a resumed video's
+program stamp, so a voice moved re-renders the frames it changes. A Walk at Dusk's explorer says a short wordless phrase to the first star
+(`film_assets/a-walk-at-dusk/voice.wav`, made by formant synthesis - any recording of your own goes in its place).
+
+**A shot's colour grade.** A cameras file grades a shot: `lift` (light added, lifting the shadows), `gamma` (the middle brightened above 1), `gain` (multiplied) and `tint`
+(a colour cast that keeps the brightness), each one number or red, green and blue; `[*]` grades the whole film and a shot's own grade goes on top. They are written onto
+the frame's `# @rt-look` line (`lens_look.h` applies them with the bloom, vignette, warmth and saturation, on the linear picture before the tone map), so stills,
+videos and the GUI all show them, and a resume re-renders the frames whose grade changed. The doctor notes a cut across which the colour cast changes (the two frames'
+mean chromaticity more than 0.05 apart: "warmer", "cooler", "greener"), which a grade can then match.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

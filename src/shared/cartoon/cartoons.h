@@ -201,6 +201,7 @@ inline void installCharacterKinds() {
 	const auto pose = [](const film_file::CharacterMoment &m) {
 		nomai::ExplorerPose p = m.moving || m.steps > 0.0 ? nomai::walkPose(m.steps, m.t, 1.0) : nomai::standPose(m.t);   // (after a walk: its feet where they came down)
 		p.wind = p.wind + m.trail * 0.5;   // (the robe's hem trails the body: nomai::robeTrail)
+		p.staffGlow += (1.0 - p.staffGlow) * m.voice;   // (it speaks behind a mask: its staff lights up with its voice, and is as it was when it is silent)
 		if (m.feetLocked) {   // (its feet held where they came down: rig::FootLock)
 			p.lockFeet = true;
 			p.lockedBall[0] = m.lockedFeet[0];

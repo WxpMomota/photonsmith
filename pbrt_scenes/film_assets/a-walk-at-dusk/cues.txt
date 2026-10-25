@@ -11,3 +11,4 @@
 [The first star]
 1.6   bell D6 3.0  gain 0.05  send 0.9                      # the first star
 1.4   strings D3 A3 F#4  length 3.6  gain 0.045  send 0.8
+2.2   sample voice.wav  gain 0.5  send 0.4  by kai           # the explorer speaks to the star (its staff lights with its voice)

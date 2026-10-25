@@ -10,6 +10,8 @@
 #include <memory>
 #include <cctype>
 #include <cmath>
+#include <cstring>
+#include <tuple>
 #include <filesystem>
 #include <fstream>
 #include <random>
@@ -41,6 +43,7 @@
 #include "../../src/shared/cartoon/prop_physics.h"
 #include "../../src/shared/pbrt_discover.h"
 #include "../../src/shared/output_crop.h"
+#include "../../src/shared/lens_look.h"
 #include "../../src/shared/output_format.h"
 #include "../../src/shared/ppm_text.h"
 #include "../../qt_gui/scene_bucket.h"
@@ -2444,4 +2447,157 @@ TEST(FootLock, APlantedFootStaysWhereItCameDownOnTheGroundAndLiftsWithoutAJump) 
 	EXPECT_LT(worst, 1e-4) << "held (to a tenth of a millimetre a second: where the search pins the landing)";
 	EXPECT_GT(unlocked, 0.2) << "(the gait alone slides)";
 	EXPECT_LT(jump, 0.01) << "no jump when it lifts (a 240th of a second apart)";
+}
+
+// ---- recordings and voices (audio::readWav, music_cues `sample ... by NAME`) -----------------------------------------------------------------------------
+
+namespace {
+// A WAV file of a tone: `bits` 16 or 24 PCM or 32 float, at `rate`, `channels` the same in each.
+void writeToneWav(const std::filesystem::path &path, int rate, int bits, int channels, double seconds, double hz) {
+	std::ofstream f(path, std::ios::binary);
+	const auto u32 = [&](std::uint32_t v) { for (int i = 0; i < 4; ++i) f.put(static_cast<char>((v >> (8 * i)) & 0xFF)); };
+	const auto u16 = [&](std::uint16_t v) { for (int i = 0; i < 2; ++i) f.put(static_cast<char>((v >> (8 * i)) & 0xFF)); };
+	const std::uint32_t frames = static_cast<std::uint32_t>(rate * seconds), bytes = frames * channels * (bits / 8);
+	f.write("RIFF", 4);
+	u32(36 + bytes);
+	f.write("WAVEfmt ", 8);
+	u32(16);
+	u16(bits == 32 ? 3 : 1);
+	u16(static_cast<std::uint16_t>(channels));
+	u32(static_cast<std::uint32_t>(rate));
+	u32(static_cast<std::uint32_t>(rate * channels * (bits / 8)));
+	u16(static_cast<std::uint16_t>(channels * (bits / 8)));
+	u16(static_cast<std::uint16_t>(bits));
+	f.write("data", 4);
+	u32(bytes);
+	for (std::uint32_t i = 0; i < frames; ++i) {
+		const double v = 0.5 * std::sin(2.0 * cartoon::kPi * hz * i / rate);
+		for (int c = 0; c < channels; ++c) {
+			if (bits == 16) u16(static_cast<std::uint16_t>(static_cast<std::int16_t>(v * 32767)));
+			else if (bits == 24) {
+				const std::int32_t s = static_cast<std::int32_t>(v * 8388607);
+				for (int k = 0; k < 3; ++k) f.put(static_cast<char>((s >> (8 * k)) & 0xFF));
+			} else {
+				const float x = static_cast<float>(v);
+				std::uint32_t raw;
+				std::memcpy(&raw, &x, 4);
+				u32(raw);
+			}
+		}
+	}
+}
+}  // namespace
+
+// A WAV file is read whatever its bits, channels and rate, as one channel at the mix's rate; what is not a WAV file is said.
+TEST(Recordings, AWavFileIsReadAsOneChannelAtTheMixsRateWhateverItsFormat) {
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "rt_recordings_test";
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir);
+	for (const auto &[rate, bits, channels] : std::vector<std::tuple<int, int, int>>{{44100, 16, 1}, {22050, 16, 1}, {48000, 24, 2}, {32000, 32, 2}}) {
+		const std::filesystem::path p = dir / ("tone_" + std::to_string(rate) + "_" + std::to_string(bits) + ".wav");
+		writeToneWav(p, rate, bits, channels, 0.5, 440.0);
+		std::vector<float> s;
+		std::string why;
+		ASSERT_TRUE(cartoon::audio::readWav(p.string(), s, &why)) << why;
+		EXPECT_NEAR(static_cast<double>(s.size()), 0.5 * cartoon::audio::kRate, 3.0) << rate << " Hz: resampled to the mix's rate";
+		double peak = 0.0;
+		for (float v : s) peak = std::max(peak, static_cast<double>(std::abs(v)));
+		EXPECT_NEAR(peak, 0.5, 0.02) << bits << "-bit, " << channels << " channel(s)";
+	}
+	std::ofstream(dir / "not.wav") << "hello";
+	std::vector<float> s;
+	std::string why;
+	EXPECT_FALSE(cartoon::audio::readWav((dir / "not.wav").string(), s, &why));
+	EXPECT_NE(why.find("not a WAV"), std::string::npos);
+	std::filesystem::remove_all(dir);
+}
+
+// A recording cued `by` a character is its voice: voiceAt is how loud it is at a moment (the loudest of the line 1), 0 before and after, and the recording is heard on the
+// film's soundtrack at its time.
+TEST(Recordings, ACharactersVoiceIsAsLoudAsItsLineAtEachMomentAndIsHeard) {
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "rt_voice_test";
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir / "film_assets" / "voice-test");
+	const char *saved = std::getenv("RAY_TRACER_PBRT_DIR");
+	const std::string savedValue = saved ? saved : "";
+#ifdef _WIN32
+	_putenv_s("RAY_TRACER_PBRT_DIR", dir.string().c_str());
+#else
+	setenv("RAY_TRACER_PBRT_DIR", dir.string().c_str(), 1);
+#endif
+	writeToneWav(dir / "film_assets" / "voice-test" / "line.wav", 22050, 16, 1, 1.0, 300.0);
+	{
+		std::ofstream(dir / "film_assets" / "voice-test" / "cues.txt") << "[Second]\n0.5 sample line.wav gain 0.8 send 0 by kai\n";
+	}
+	const std::vector<double> starts = {0.0, 2.0};
+	const std::vector<std::string> names = {"First", "Second"};
+	EXPECT_DOUBLE_EQ(cartoon::music_cues::voiceAt("voice-test", "kai", 2.0, starts, names), 0.0) << "before its line";
+	EXPECT_GT(cartoon::music_cues::voiceAt("voice-test", "kai", 3.0, starts, names), 0.9) << "speaking (a steady tone: as loud as its loudest)";
+	EXPECT_DOUBLE_EQ(cartoon::music_cues::voiceAt("voice-test", "kai", 4.0, starts, names), 0.0) << "after it";
+	EXPECT_DOUBLE_EQ(cartoon::music_cues::voiceAt("voice-test", "mira", 3.0, starts, names), 0.0) << "someone else is silent";
+	cartoon::Film film{"voice-test", "Voice test", "", 5.0, 24, [](double) { return std::string(); }, [](double) { return std::string(); },
+					   [starts]() { return starts; }, 0.0, {9993, "", "First|Second", 8, 0.0}};
+	const cartoon::Film shown = cartoon::detail::withFilmFiles(film);
+	ASSERT_TRUE(static_cast<bool>(shown.soundtrack));
+	cartoon::audio::Mix mix(5.0);
+	shown.soundtrack(mix);
+	const std::vector<std::int16_t> pcm = mix.finish(0.0, 0.0);
+	const auto loudness = [&](double t0, double t1) {
+		double sum = 0.0;
+		std::size_t n = 0;
+		for (std::size_t i = static_cast<std::size_t>(t0 * cartoon::audio::kRate) * 2; i < static_cast<std::size_t>(t1 * cartoon::audio::kRate) * 2 && i < pcm.size(); ++i, ++n) sum += std::abs(pcm[i]);
+		return n ? sum / n : 0.0;
+	};
+	EXPECT_LT(loudness(1.0, 2.4), 1.0);
+	EXPECT_GT(loudness(2.6, 3.4), 100.0) << "the line at the second shot's start + 0.5 s";
+#ifdef _WIN32
+	_putenv_s("RAY_TRACER_PBRT_DIR", savedValue.c_str());
+#else
+	if (saved) setenv("RAY_TRACER_PBRT_DIR", savedValue.c_str(), 1); else unsetenv("RAY_TRACER_PBRT_DIR");
+#endif
+	std::filesystem::remove_all(dir);
+}
+
+// ---- a shot's colour grade (lens_look.h's lift, gamma, gain, tint; shot_cameras.h) --------------------------------------------------------------------
+
+// The grade's words take one number (all three channels) or three; gain multiplies, lift adds, gamma bends the middle, tint casts a colour and keeps grey's brightness;
+// a cameras file's grade goes onto the frame's look line (after the film's own words, so it wins), or makes one.
+TEST(ShotGrade, LiftGammaGainAndTintGradeAPictureAndACamerasFileSetsThemForAShot) {
+	lens_look::Look look;
+	EXPECT_EQ(lens_look::parse("warmth 0.1 lift 0.02 gain 1 1 2 gamma 2 tint 1 0.5 1", look), "");
+	EXPECT_DOUBLE_EQ(look.warmth, 0.1) << "the other words still read";
+	EXPECT_DOUBLE_EQ(look.lift[1], 0.02) << "one number: all three";
+	EXPECT_DOUBLE_EQ(look.gain[2], 2.0);
+	EXPECT_DOUBLE_EQ(look.gamma[0], 2.0);
+	EXPECT_NE(lens_look::parse("gain 1 2", look), "") << "two numbers: neither one nor three";
+
+	const auto graded = [](const std::string &words, float r, float g, float b) {
+		lens_look::Look l;
+		EXPECT_EQ(lens_look::parse(words, l), "");
+		float px[3] = {r, g, b};
+		lens_look::apply(px, 1, 1, l);
+		return std::array<float, 3>{px[0], px[1], px[2]};
+	};
+	EXPECT_NEAR(graded("gain 2", 0.25f, 0.25f, 0.25f)[0], 0.5f, 1e-6);
+	EXPECT_NEAR(graded("lift 0.1", 0.25f, 0.25f, 0.25f)[1], 0.35f, 1e-6);
+	EXPECT_NEAR(graded("gamma 2", 0.25f, 0.25f, 0.25f)[2], 0.5f, 1e-6) << "0.25 ^ (1/2)";
+	const std::array<float, 3> tinted = graded("tint 1.2 1 0.8", 0.5f, 0.5f, 0.5f);
+	EXPECT_GT(tinted[0], tinted[2]) << "warmer";
+	EXPECT_NEAR(0.2126 * tinted[0] + 0.7152 * tinted[1] + 0.0722 * tinted[2], 0.5, 1e-5) << "grey keeps its brightness";
+
+	namespace sc = cartoon::shot_cameras;
+	const sc::File f = sc::parse("[*]\ngain 1.1\n[2]\ntint 1 0.9 1.1\nlift 0.01\n");
+	EXPECT_TRUE(f.problems.empty());
+	const sc::Change c = sc::changeFor(f, 1, "");
+	EXPECT_DOUBLE_EQ(c.gain[0], 1.1) << "[*] and the shot's together";
+	EXPECT_DOUBLE_EQ(c.tint[2], 1.1);
+	const std::string withLook = sc::apply("# @rt-look bloom 0.1 warmth 0.2\n" + testHeader(), c);
+	const std::size_t line = withLook.find("# @rt-look");
+	const std::string lookLine = withLook.substr(line, withLook.find('\n', line) - line);
+	EXPECT_NE(lookLine.find("bloom 0.1 warmth 0.2 lift 0.01"), std::string::npos) << "added after the film's own words: " << lookLine;
+	lens_look::Look read;
+	EXPECT_EQ(lens_look::parse(lookLine.substr(10), read), "");
+	EXPECT_DOUBLE_EQ(read.gain[1], 1.1);
+	EXPECT_NE(sc::apply(testHeader(), c).find("# @rt-look lift 0.01"), std::string::npos) << "a header without a look line gets one";
+	EXPECT_EQ(sc::parse("[*]\ngain 1 2\n").problems.size(), 1u);
 }

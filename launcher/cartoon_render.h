@@ -150,6 +150,9 @@ inline std::string programStamp(const cartoon::Film &film, const std::string &ex
 	// (and its cameras file, read when a frame is made: an edit to one shot's camera changes neither the program nor, often, those two instants)
 	const std::string cameras = cartoon::film_cache::asset(std::string(film.key) + "/cameras.txt");
 	if (!cameras.empty()) s += "|cameras " + std::to_string(static_cast<unsigned long long>(frame_fingerprint::fileHash(cameras)));
+	// (and its cues file: a voice moves a character - music_cues::voiceAt)
+	const std::string cues = cartoon::film_cache::asset(std::string(film.key) + "/cues.txt");
+	if (!cues.empty()) s += "|cues " + std::to_string(static_cast<unsigned long long>(frame_fingerprint::fileHash(cues)));
 	return s;
 }
 constexpr const char *kFingerprints = "fingerprints.txt";

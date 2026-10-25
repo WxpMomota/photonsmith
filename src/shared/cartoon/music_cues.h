@@ -14,6 +14,9 @@
 // and a number with a point after them is the length ("piano D4 3.0"). The
 // instruments are the generic ones (genericInstruments: bell, mallet, pluck, bass, pad, strings, knock, swell, and the sound effects footstep-<surface>, impact, flash,
 // touch) and the film's own (Film::instruments: the Nomai film's guitar, banjo, piano, resonance, drone, beep). What the file says wrong is printed once and the line left out.
+//
+// A recording: `3.0  sample voices/hello.wav  gain 0.8  by kai` plays a WAV file (beside the cues file; any rate, mono or stereo: audio::readWav). `by NAME` makes it that
+// character's voice: voiceAt() is how loud it is at a moment (0..1, the loudest of the line 1), for the film's code to open a mouth by - or, behind a mask, to light up.
 
 #include <cctype>
 #include <cmath>
@@ -40,6 +43,8 @@ struct Cue {
 	double time = 0.0;     // seconds after it
 	bool absolute = false; // @time: a film time, whatever the section
 	std::string instrument;
+	std::string file;      // `sample`: the WAV file (as written: beside the cues file)
+	std::string by;        // `by NAME`: whose voice it is (voiceAt)
 	std::vector<double> notes;
 	double length = 2.0, gain = 0.1, pan = 0.0, send = 0.3, spread = 0.0;
 	int line = 0;
@@ -47,6 +52,7 @@ struct Cue {
 struct Sheet {
 	std::vector<Cue> cues;
 	std::vector<std::string> problems;
+	std::string folder;   // where the cues file is (a sample's file is looked for beside it)
 };
 
 // A note's MIDI number from a number or a name (C4 = 60, F#3, Bb2); false when it is neither.
@@ -116,10 +122,19 @@ inline Sheet parse(const std::string &text) {
 			s.problems.push_back(where + "the cue names no instrument");
 			continue;
 		}
+		if (c.instrument == "sample" && !(words >> c.file)) {
+			s.problems.push_back(where + "`sample` needs a WAV file's name");
+			continue;
+		}
 		bool ok = true;
 		for (std::string w; ok && words >> w;) {
 			double v = 0.0;
-			if (w == "length" || w == "gain" || w == "pan" || w == "send" || w == "spread") {
+			if (w == "by") {
+				if (!(words >> c.by)) {
+					s.problems.push_back(where + "`by` needs a character's name");
+					ok = false;
+				}
+			} else if (w == "length" || w == "gain" || w == "pan" || w == "send" || w == "spread") {
 				if (!(words >> v)) {
 					s.problems.push_back(where + "'" + w + "' needs a number");
 					ok = false;
@@ -202,6 +217,46 @@ inline bool timeOf(const Cue &c, const std::vector<double> &starts, const std::v
 	return false;
 }
 
+// A recording: its sound (audio::readWav, one channel at audio::kRate), its loudness each 1/100 s (RMS, the loudest 1), or why it could not be read.
+struct Recording {
+	std::filesystem::file_time_type time;
+	std::vector<float> sound, loudness;
+	std::string why;
+};
+// A recording, read once a program and kept (by path; read again when the file changes).
+inline const Recording &recording(const std::string &path) {
+	using Kept = Recording;
+	static std::mutex lock;
+	static std::map<std::string, Kept> kept;
+	const std::lock_guard<std::mutex> hold(lock);
+	std::error_code ec;
+	const auto time = std::filesystem::last_write_time(path, ec);
+	auto it = kept.find(path);
+	if (it == kept.end() || it->second.time != time) {
+		Kept k;
+		k.time = time;
+		if (audio::readWav(path, k.sound, &k.why)) {
+			const std::size_t window = audio::kRate / 100;
+			double loudest = 1e-9;
+			for (std::size_t at = 0; at < k.sound.size(); at += window) {
+				double sum = 0.0;
+				const std::size_t end = std::min(k.sound.size(), at + window);
+				for (std::size_t i = at; i < end; ++i) sum += static_cast<double>(k.sound[i]) * k.sound[i];
+				const double rms = std::sqrt(sum / std::max<std::size_t>(1, end - at));
+				k.loudness.push_back(static_cast<float>(rms));
+				loudest = std::max(loudest, rms);
+			}
+			for (float &l : k.loudness) l = static_cast<float>(l / loudest);
+		}
+		it = kept.insert_or_assign(path, std::move(k)).first;
+	}
+	return it->second;
+}
+inline std::string recordingPath(const Sheet &sheet, const std::string &file) {
+	const std::filesystem::path p(file);
+	return (p.is_absolute() ? p : std::filesystem::path(sheet.folder) / p).string();
+}
+
 // The cues on a mix: each at its time with its instrument (the film's own, else a generic one). What cannot be played is added to `problems`.
 inline void play(audio::Mix &m, const Sheet &sheet, const std::map<std::string, CueInstrument> &own, const std::vector<double> &starts, const std::vector<std::string> &names,
 				 std::vector<std::string> &problems) {
@@ -210,6 +265,12 @@ inline void play(audio::Mix &m, const Sheet &sheet, const std::map<std::string, 
 		std::string why;
 		if (!timeOf(c, starts, names, t, why)) {
 			problems.push_back("line " + std::to_string(c.line) + ": " + why);
+			continue;
+		}
+		if (c.instrument == "sample") {   // a recording: as it is, at its gain and pan
+			const Recording &r = recording(recordingPath(sheet, c.file));
+			if (r.sound.empty()) problems.push_back("line " + std::to_string(c.line) + ": the recording " + c.file + " " + (r.why.empty() ? "is empty" : r.why));
+			else m.put(t, r.sound, c.gain, c.pan, c.send);
 			continue;
 		}
 		auto it = own.find(c.instrument);
@@ -244,7 +305,41 @@ inline Sheet read(const std::string &path) {
 	std::ifstream in(path, std::ios::binary);
 	std::stringstream text;
 	text << in.rdbuf();
-	return parse(text.str());
+	Sheet s = parse(text.str());
+	s.folder = std::filesystem::path(path).parent_path().string();
+	return s;
+}
+
+// How loud a character's voice is at film time t, 0 (silent) .. 1 (the loudest of its line): its `sample ... by NAME` cues in the film's cues file (read when it changes),
+// the recording's loudness each 1/100 s, times the cue's gain over the loudest gain it has. For the film's code: a mouth opens by it.
+inline double voiceAt(const std::string &key, const std::string &speaker, double t, const std::vector<double> &starts, const std::vector<std::string> &names) {
+	const std::string file = fileOf(key);
+	if (file.empty()) return 0.0;
+	static std::mutex lock;
+	static std::map<std::string, std::pair<std::filesystem::file_time_type, Sheet>> sheets;
+	Sheet sheet;
+	{
+		const std::lock_guard<std::mutex> hold(lock);
+		std::error_code ec;
+		const auto time = std::filesystem::last_write_time(file, ec);
+		auto it = sheets.find(file);
+		if (it == sheets.end() || it->second.first != time) it = sheets.insert_or_assign(file, std::make_pair(time, read(file))).first;
+		sheet = it->second.second;
+	}
+	double loudest = 0.0;
+	for (const Cue &c : sheet.cues)
+		if (c.instrument == "sample" && c.by == speaker) loudest = std::max(loudest, c.gain);
+	double v = 0.0;
+	for (const Cue &c : sheet.cues) {
+		if (c.instrument != "sample" || c.by != speaker || loudest <= 0.0) continue;
+		double t0 = 0.0;
+		std::string why;
+		if (!timeOf(c, starts, names, t0, why) || t < t0) continue;
+		const Recording &r = recording(recordingPath(sheet, c.file));
+		const std::size_t k = static_cast<std::size_t>((t - t0) * 100.0);
+		if (k < r.loudness.size()) v = std::max(v, r.loudness[k] * c.gain / loudest);
+	}
+	return std::min(1.0, v);
 }
 
 }  // namespace music_cues

@@ -16,6 +16,10 @@
 //     iso 300          # the exposure (the Film's iso) ...
 //     stops 0.5        # ... or the code's times 2 to this
 //     samples 0.5      # the shot renders at half the video's samples a pixel (a quiet, dark or still shot needs fewer; `python scripts/anim/film.py budget` measures it)
+//     lift 0.01 0 0.02 # the shot's grade (lens_look.h): light added (lifting the shadows), one number or red green blue ...
+//     gamma 1.1        # ... the middle brightened (above 1) or darkened ...
+//     gain 1.05        # ... multiplied ...
+//     tint 1 0.95 1.1  # ... and a colour cast that keeps the brightness
 //     [The answer]
 //     tilt 3
 //
@@ -53,8 +57,14 @@ struct Change {
 	double iso = 0.0;    // 0: the code's
 	double stops = 0.0;
 	double samples = 1.0;   // the share of the video's samples a pixel
+	double lift[3] = {0.0, 0.0, 0.0}, gamma[3] = {1.0, 1.0, 1.0}, gain[3] = {1.0, 1.0, 1.0}, tint[3] = {1.0, 1.0, 1.0};   // the grade (lens_look::Look)
+	bool graded() const {
+		for (int k = 0; k < 3; ++k)
+			if (lift[k] != 0.0 || gamma[k] != 1.0 || gain[k] != 1.0 || tint[k] != 1.0) return true;
+		return false;
+	}
 	bool moves() const { return dolly != 0.0 || truck != 0.0 || pedestal != 0.0 || pan != 0.0 || tilt != 0.0; }
-	bool any() const { return moves() || fov > 0.0 || zoom != 1.0 || iso > 0.0 || stops != 0.0 || samples != 1.0; }
+	bool any() const { return moves() || fov > 0.0 || zoom != 1.0 || iso > 0.0 || stops != 0.0 || samples != 1.0 || graded(); }
 };
 
 // A section on top of another: moves add up, zooms multiply, a set fov or iso replaces.
@@ -68,6 +78,12 @@ inline Change combine(const Change &under, const Change &over) {
 	c.zoom *= over.zoom;
 	c.stops += over.stops;
 	c.samples *= over.samples;
+	for (int k = 0; k < 3; ++k) {   // (a shot's grade on top of the film's: lifts add, the rest multiply)
+		c.lift[k] += over.lift[k];
+		c.gamma[k] *= over.gamma[k];
+		c.gain[k] *= over.gain[k];
+		c.tint[k] *= over.tint[k];
+	}
 	if (over.fov > 0.0) c.fov = over.fov;
 	if (over.iso > 0.0) c.iso = over.iso;
 	return c;
@@ -118,6 +134,21 @@ inline File parse(const std::string &text) {
 		std::string word;
 		double value = 0.0;
 		words >> word;
+		if (word == "lift" || word == "gamma" || word == "gain" || word == "tint") {   // one number or three (red, green, blue)
+			std::vector<double> v;
+			for (double x; words >> x;) v.push_back(x);
+			if (!at) {
+				f.problems.push_back(where + "'" + word + "' before any [shot] section");
+				continue;
+			}
+			if (v.size() != 1 && v.size() != 3) {
+				f.problems.push_back(where + "'" + word + "' takes one number or three (red, green, blue)");
+				continue;
+			}
+			double *dst = word == "lift" ? at->lift : word == "gamma" ? at->gamma : word == "gain" ? at->gain : at->tint;
+			for (int k = 0; k < 3; ++k) dst[k] = v[v.size() == 1 ? 0 : static_cast<std::size_t>(k)];
+			continue;
+		}
 		if (!(words >> value)) {
 			f.problems.push_back(where + "'" + word + "' needs a number");
 			continue;
@@ -136,7 +167,7 @@ inline File parse(const std::string &text) {
 		else if (word == "iso" && value > 0.0) at->iso = value;
 		else if (word == "stops") at->stops = value;
 		else if (word == "samples" && value > 0.0 && value <= 8.0) at->samples = value;
-		else f.problems.push_back(where + "'" + word + " " + trimmed(line.substr(word.size())) + "' is not a change this file knows (dolly, truck, pedestal, pan, tilt, fov, zoom, iso, stops, samples 0-8)");
+		else f.problems.push_back(where + "'" + word + " " + trimmed(line.substr(word.size())) + "' is not a change this file knows (dolly, truck, pedestal, pan, tilt, fov, zoom, iso, stops, samples 0-8, lift, gamma, gain, tint)");
 	}
 	return f;
 }
@@ -277,6 +308,20 @@ inline std::string apply(const std::string &scene, const Change &c) {
 		}
 	}
 	if (c.samples != 1.0) head = samplesLine(c.samples) + head;
+	if (c.graded()) {   // the grade: words added to the frame's look line (later words win: lens_look::parse), or a look line of its own
+		char g[320];
+		std::snprintf(g, sizeof g, " lift %.4g %.4g %.4g gamma %.4g %.4g %.4g gain %.4g %.4g %.4g tint %.4g %.4g %.4g", c.lift[0], c.lift[1], c.lift[2], c.gamma[0], c.gamma[1],
+					  c.gamma[2], c.gain[0], c.gain[1], c.gain[2], c.tint[0], c.tint[1], c.tint[2]);
+		const std::size_t look = head.find("# @rt-look");
+		if (look != std::string::npos) {
+			std::size_t end = head.find('\n', look);
+			if (end == std::string::npos) end = head.size();
+			if (end > look && head[end - 1] == '\r') --end;
+			head.insert(end, g);
+		} else {
+			head = "# @rt-look" + std::string(g) + "\n" + head;
+		}
+	}
 	return head + scene.substr(headerEnd);
 }
 

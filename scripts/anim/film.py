@@ -148,6 +148,7 @@ CLIPPED = 0.08     # more than this share of pixels near white (brightness 0.95 
                    # channel at full: a saturated red curtain is not blown out
 FLAT = 0.025       # brightness this even over the whole frame (standard deviation): a camera inside something, or against a wall
 JUMP = 5.0         # brightness ratio across a cut worth a note
+COLOUR_JUMP = 0.05 # a change of the colour cast across a cut worth a note (the distance between the two frames' mean chromaticity, r g b over their sum)
 SLOW = 3.0         # a frame this many times the film's median render time: worth a note
 # The framing checks (a film's subjects, Film::subjectsAt, against the depth pass of the frame: `--aovs`, depth.Z = the distance along each camera ray, 0 where nothing is hit)
 HIDDEN_RATIO = 0.75   # a subject is hidden when everything round its pixel is nearer than this share of its distance, and nearer by HIDDEN_MARGIN or more: a subject
@@ -171,6 +172,29 @@ def frame_stats(png):
     a = np.asarray(Image.open(png).convert("RGB"), dtype=np.float32) / 255.0
     lum = 0.2126 * a[..., 0] + 0.7152 * a[..., 1] + 0.0722 * a[..., 2]
     return float(lum.mean()), float(lum.std()), float((lum >= 0.95).mean()), float((lum < 0.02).mean())
+
+
+def frame_colour(png):
+    """The mean chromaticity of a picture: its mean red, green and blue over their sum (the colour cast, whatever the brightness)."""
+    import numpy as np
+    from PIL import Image
+    a = np.asarray(Image.open(png).convert("RGB"), dtype=np.float32).reshape(-1, 3).mean(axis=0)
+    return a / max(1e-6, float(a.sum()))
+
+
+def describe_cast(before, after):
+    """How the colour cast changed, in a word or two: warmer, cooler, greener, more magenta."""
+    d = after - before
+    words = []
+    if d[0] - d[2] > 0.02:
+        words.append("warmer")
+    elif d[2] - d[0] > 0.02:
+        words.append("cooler")
+    if d[1] > 0.015:
+        words.append("greener")
+    elif d[1] < -0.015:
+        words.append("more magenta")
+    return " and ".join(words) or "a different cast"
 
 
 def judge(stats):
@@ -419,6 +443,10 @@ def cmd_doctor(args):
             ratio = max(a["stats"][0], b["stats"][0]) / min(a["stats"][0], b["stats"][0])
             if ratio > JUMP:
                 findings.append(("note", s + 1, "start", b["t"], "brightness jumps %.0fx across the cut from shot %d" % (ratio, s + 1)))
+            ca, cb = frame_colour(a["png"]), frame_colour(b["png"])
+            shift = float(((ca - cb) ** 2).sum() ** 0.5)
+            if shift > COLOUR_JUMP:   # (a grade that changes between shots of one scene: cameras.txt's lift/gamma/gain/tint can match them)
+                findings.append(("note", s + 1, "start", b["t"], "the colour cast changes across the cut from shot %d: %s (%.3f)" % (s + 1, describe_cast(ca, cb), shift)))
     times = sorted(j["seconds"] for j in jobs if j["png"])
     median = times[len(times) // 2] if times else 0.0
     for j in jobs:

@@ -22,6 +22,7 @@
 //     still    6                            # the moment the scene list's picture shows (default: the middle)
 //     tags     emissive,dusk                # words from the scene list's vocabulary (cartoons.h); others are ignored
 //     ease     1                            # 1 (the default): motions start and stop gently; 0: they move at an even pace
+//     shutter  0.5                          # motion blur: a moving block is blurred over this share of a frame (0.5, the default: a film camera's 180-degree shutter); 0: sharp
 //
 //     shot 0 The sails                      # a camera shot that begins at 0 seconds ... (a hard cut at the next shot's start)
 //       key  px py pz  tx ty tz  [fov [lensRadius focusDistance]]  [hold S]    # as in a camera keyframes file: where the camera is and what it looks at
@@ -76,6 +77,7 @@
 
 #include "../camera_keyframes.h"
 #include "film_subjects.h"
+#include "music_cues.h"
 #include "prop_physics.h"
 #include "rig.h"
 
@@ -139,6 +141,7 @@ struct CharacterMoment {
 	const std::vector<rig::Gesture> *gestures = nullptr;
 	double detail = 0.0;
 	Vec3 trail;   // how far a spring on its place lags it (body space: +x its left, +z forward): for what hangs and swings - a robe's hem, a tail (rig::lag)
+	double voice = 0.0;        // how loud it is speaking, 0..1 (its `sample ... by NAME` cues: music_cues::voiceAt) - a mouth opens by it
 	bool feetLocked = false;   // its two feet held where they came down (rig::FootLock), in body space: when its kind says where its gait puts them
 	Vec3 lockedFeet[2];
 };
@@ -166,6 +169,7 @@ struct Spec {
 	double length = 0.0, still = -1.0;
 	int fps = 24;
 	bool ease = true;
+	double shutter = 0.5;   // the share of a frame a moving block is blurred over (0: none)
 	std::vector<Shot> shots;
 	std::vector<Anim> anims;
 	std::vector<Character> characters;
@@ -310,6 +314,8 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			if (w.size() != 2 || !number(w[1], v)) return fail("ease is 1 or 0");
 			if (s.shots.empty()) s.ease = v != 0.0;
 			else shotText += line + "\n";   // inside a shot it is the camera path's own `ease`
+		} else if (verb == "shutter") {
+			if (w.size() != 2 || !number(w[1], s.shutter) || s.shutter < 0.0 || s.shutter > 1.0) return fail("shutter is a share of a frame, from 0 (sharp) to 1");
 		} else if (verb == "shot") {
 			if (const std::string e = closeShot(); !e.empty()) return fail(e);
 			Shot shot;
@@ -483,7 +489,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shot, key, follow, subject, move, turn, grow, light, show, bounce, topple, character, walk, gesture)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, shot, key, follow, subject, move, turn, grow, light, show, bounce, topple, character, walk, gesture)");
 		}
 	}
 	n = shotLine;
@@ -907,6 +913,11 @@ class DataFilm {
 		if (v.empty()) v.push_back(0.0);
 		return v;
 	}
+	std::vector<std::string> shotNameList() const {
+		std::vector<std::string> out;
+		for (const Shot &s : spec.shots) out.push_back(s.name);
+		return out;
+	}
 	std::string shotNames() const {
 		std::string out;
 		for (const Shot &s : spec.shots) out += (out.empty() ? "" : "|") + s.name;
@@ -938,6 +949,7 @@ class DataFilm {
 			CharacterMoment m = momentOf(c, t);
 			m.trail = trailOf(c, t, m);
 			lockFeet(c, t, m);
+			m.voice = music_cues::voiceAt(spec.key, c.name, t, shotStarts(), shotNameList());
 			out += "# " + c.name + " (" + c.kind + ")\n" + kind.text(m);
 		}
 		return out;
@@ -972,7 +984,16 @@ class DataFilm {
 		std::snprintf(buf, sizeof(buf), "%.6g", v);
 		return buf;
 	}
+	// The transforms of a block at t; with a shutter, a moving block's at the shutter's opening (StartTime) and closing (EndTime) - pbrt's object motion blur, which
+	// the CPU and the GPU both render (gpu: a two-key triangle GAS, moving spheres).
 	std::string transformsFor(const std::string &name, double t) const {
+		const std::string open = transformsAt(name, t);
+		if (spec.shutter <= 0.0) return open;
+		const std::string close = transformsAt(name, t + spec.shutter / std::max(1, spec.fps));
+		if (close == open) return open;
+		return "  ActiveTransform \"StartTime\"\n" + open + "  ActiveTransform \"EndTime\"\n" + close + "  ActiveTransform \"All\"\n";
+	}
+	std::string transformsAt(const std::string &name, double t) const {
 		std::string out;
 		for (const auto &[block, b] : spec.bounces) {   // where its physics has it: moved from where the scene has it, and turned as it rolls
 			if (block != name) continue;

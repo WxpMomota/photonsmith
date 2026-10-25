@@ -1035,6 +1035,12 @@ int main(int argc, char** argv) {
 				std::cout << "problem" << '\t' << "line " << c.line << ": " << why << std::endl;
 				continue;
 			}
+			if (c.instrument == "sample") {   // a recording: it must read
+				const cartoon::music_cues::Recording &r = cartoon::music_cues::recording(cartoon::music_cues::recordingPath(sheet, c.file));
+				if (r.sound.empty()) std::cout << "problem" << '\t' << "line " << c.line << ": the recording " << c.file << " " << (r.why.empty() ? "is empty" : r.why) << std::endl;
+				else std::cout << "cue" << '\t' << t << '\t' << "sample " << c.file << (c.by.empty() ? "" : " by " + c.by) << '\t' << r.sound.size() / static_cast<double>(cartoon::audio::kRate) << " s" << std::endl;
+				continue;
+			}
 			if (!own.count(c.instrument) && !cartoon::music_cues::genericInstruments().count(c.instrument)) {
 				std::cout << "problem" << '\t' << "line " << c.line << ": no instrument called \"" << c.instrument << "\"" << std::endl;
 				continue;

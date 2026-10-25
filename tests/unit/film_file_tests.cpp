@@ -399,3 +399,21 @@ TEST(FilmFile, APropBouncesOrTopplesWithPhysicsAndItsLandingsAreHeard) {
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nbounce rock 1 from 0 1 0\n", bad).find("`# @anim rock`"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nbounce fan 1 velocity 0 0 0\n", bad).find("needs `from X Y Z`"), std::string::npos);
 }
+
+// A moving block is blurred over its shutter: its transform at the frame's time (StartTime) and a share of a frame later (EndTime); a block that is still at that moment
+// keeps one transform, and `shutter 0` makes every block sharp.
+TEST(FilmFile, AMovingBlockIsBlurredOverTheShutterAndAStillOneIsNot) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 10\nfps 25\nmove fan 0 0 0 0  4 4 0 0\n", film), "");
+	EXPECT_DOUBLE_EQ(film.spec.shutter, 0.5) << "a film camera's 180 degrees by default";
+	const std::string moving = film.sceneAt(2.0);
+	ASSERT_NE(moving.find("ActiveTransform \"StartTime\""), std::string::npos) << moving;
+	EXPECT_NE(moving.find("ActiveTransform \"EndTime\""), std::string::npos);
+	EXPECT_NE(moving.find("ActiveTransform \"All\""), std::string::npos);
+	EXPECT_EQ(film.sceneAt(6.0).find("ActiveTransform"), std::string::npos) << "after its last key it is still: one transform";
+	ff::DataFilm sharp;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 10\nshutter 0\nmove fan 0 0 0 0  4 4 0 0\n", sharp), "");
+	EXPECT_EQ(sharp.sceneAt(2.0).find("ActiveTransform"), std::string::npos);
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nshutter 2\n", bad).find("shutter is a share of a frame"), std::string::npos);
+}

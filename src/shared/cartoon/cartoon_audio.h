@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
+#include <iterator>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -308,6 +310,81 @@ inline bool writeWav(const std::string &path, const std::vector<std::int16_t> &p
 	u32(bytes);
 	for (std::int16_t s : pcm) u16(static_cast<std::uint16_t>(s));
 	return static_cast<bool>(f);
+}
+
+// A WAV file's sound as one channel at kRate, -1 .. 1: 8, 16, 24 or 32-bit PCM or 32-bit float, any number of channels (averaged), any rate (resampled linearly). False,
+// with why, when it is not one this reads (a recording to lay on a film: music_cues.h's `sample`).
+inline bool readWav(const std::string &path, std::vector<float> &out, std::string *why = nullptr) {
+	out.clear();
+	const auto fail = [&](const std::string &w) {
+		if (why) *why = w;
+		return false;
+	};
+	std::ifstream f(path, std::ios::binary);
+	if (!f) return fail("cannot be read");
+	const std::vector<unsigned char> b((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+	const auto u16 = [&](std::size_t at) { return static_cast<unsigned>(b[at] | (b[at + 1] << 8)); };
+	const auto u32 = [&](std::size_t at) { return static_cast<std::uint32_t>(b[at] | (b[at + 1] << 8) | (b[at + 2] << 16) | (static_cast<std::uint32_t>(b[at + 3]) << 24)); };
+	if (b.size() < 12 || std::string(b.begin(), b.begin() + 4) != "RIFF" || std::string(b.begin() + 8, b.begin() + 12) != "WAVE") return fail("is not a WAV file");
+	unsigned format = 0, channels = 0, rate = 0, bits = 0;
+	std::size_t data = 0, dataSize = 0;
+	for (std::size_t at = 12; at + 8 <= b.size();) {
+		const std::string id(b.begin() + static_cast<std::ptrdiff_t>(at), b.begin() + static_cast<std::ptrdiff_t>(at) + 4);
+		const std::size_t size = u32(at + 4);
+		if (id == "fmt " && size >= 16 && at + 8 + 16 <= b.size()) {
+			format = u16(at + 8);
+			channels = u16(at + 10);
+			rate = u32(at + 12);
+			bits = u16(at + 22);
+			if (format == 0xFFFE && size >= 26 && at + 8 + 26 <= b.size()) format = u16(at + 8 + 24);   // (WAVE_FORMAT_EXTENSIBLE: the sub-format's first two bytes)
+		} else if (id == "data") {
+			data = at + 8;
+			dataSize = std::min(size, b.size() - data);
+		}
+		at += 8 + size + (size & 1);
+	}
+	if (!data || !channels || !rate) return fail("has no sound in it (no fmt or data chunk)");
+	const bool pcm = format == 1, flt = format == 3;
+	if (!(pcm && (bits == 8 || bits == 16 || bits == 24 || bits == 32)) && !(flt && bits == 32)) return fail("is not 8/16/24/32-bit PCM or 32-bit float");
+	const std::size_t step = bits / 8, frames = dataSize / (step * channels);
+	std::vector<float> mono(frames);
+	for (std::size_t i = 0; i < frames; ++i) {
+		double sum = 0.0;
+		for (unsigned c = 0; c < channels; ++c) {
+			const std::size_t at = data + (i * channels + c) * step;
+			double v = 0.0;
+			if (flt) {
+				const std::uint32_t raw = u32(at);
+				float x;
+				std::memcpy(&x, &raw, 4);
+				v = x;
+			} else if (bits == 8) {
+				v = (static_cast<int>(b[at]) - 128) / 128.0;
+			} else if (bits == 16) {
+				v = static_cast<std::int16_t>(u16(at)) / 32768.0;
+			} else if (bits == 24) {
+				const std::int32_t s = static_cast<std::int32_t>((b[at] << 8) | (b[at + 1] << 16) | (static_cast<std::uint32_t>(b[at + 2]) << 24)) >> 8;
+				v = s / 8388608.0;
+			} else {
+				v = static_cast<std::int32_t>(u32(at)) / 2147483648.0;
+			}
+			sum += v;
+		}
+		mono[i] = static_cast<float>(sum / channels);
+	}
+	if (rate == static_cast<unsigned>(kRate)) {
+		out = std::move(mono);
+		return true;
+	}
+	const double ratio = static_cast<double>(rate) / kRate;
+	out.resize(static_cast<std::size_t>(frames / ratio));
+	for (std::size_t i = 0; i < out.size(); ++i) {
+		const double x = i * ratio;
+		const std::size_t k = static_cast<std::size_t>(x);
+		const double u = x - k;
+		out[i] = static_cast<float>(k + 1 < mono.size() ? mono[k] * (1.0 - u) + mono[k + 1] * u : mono[std::min(k, mono.size() - 1)]);
+	}
+	return true;
 }
 
 }  // namespace audio
