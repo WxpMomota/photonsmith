@@ -51,6 +51,8 @@ struct Pose {
 	Vec3 handL = {0.0, 0.0, 0.0}, handR = {0.0, 0.0, 0.0};
 	double handWeightL = 0.0, handWeightR = 0.0;
 	double stepPhase = 0.0, stepAmount = 0.0;
+	bool feetHeld = false;        // the feet at `heldFoot` (world: left, right) instead of where the walk puts them - a foot held where it came down (rig::FootLock)
+	Vec3 heldFoot[2];
 };
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -137,6 +139,15 @@ inline Arm armOf(const Character &c, const Pose &pose, double side /* -1 the act
 	if (length(toT) > reachMax) handP = shoulder + normalize(toT) * reachMax;
 	const Limb limb = limbIk(shoulder, handP, 0.31 * S, 0.29 * S, normalize(transformPoint(f.stance, {-0.4, -0.8, side * 0.9}) - transformPoint(f.stance, {0.0, 0.0, 0.0})));
 	return {shoulder, limb.elbow, limb.hand};
+}
+
+// Where the walk puts a foot (the rig's frame at scale 1, from the stance's root: +x forward, +z right): a stride forwards and back, lifted as it swings through. The feet stay
+// under the body when it hops: they trail it a little.
+inline Vec3 footPlace(const Pose &pose, double side /* -1 left, +1 right */) {
+	const double ph = pose.stepPhase + (side < 0 ? 0.0 : kPi);
+	const double fwd = 0.17 * pose.stepAmount * std::sin(ph);
+	const double up = 0.10 * pose.stepAmount * std::max(0.0, std::cos(ph));
+	return {0.05 + fwd, 0.055 + up, side * 0.15};
 }
 
 inline std::string emitActor(const Character &c, const Pose &pose) {
@@ -274,11 +285,12 @@ inline std::string emitActor(const Character &c, const Pose &pose) {
 		std::string feet;
 		for (double side : {-1.0, 1.0}) {
 			const double ph = pose.stepPhase + (side < 0 ? 0.0 : kPi);
-			const double fwd = 0.17 * pose.stepAmount * std::sin(ph);
-			const double up = 0.10 * pose.stepAmount * std::max(0.0, std::cos(ph));
-			// feet stay under the body when it hops: they trail it a little
-			const Vec3 f = {0.05 + fwd, 0.055 + up, side * 0.15};
-			feet += emitMesh(P.foot, mul(root, rotate({0, 0, 1}, -(10.0 * pose.stepAmount * std::cos(ph))), translate(f * S), scale(0.16 * S, 0.062 * S, 0.105 * S)));
+			const Mat4 tilt = rotate({0, 0, 1}, -(10.0 * pose.stepAmount * std::cos(ph)));
+			if (pose.feetHeld) {
+				feet += emitMesh(P.foot, mul(translate(pose.heldFoot[side < 0 ? 0 : 1]), rotate({0, 1, 0}, -pose.yaw), tilt, scale(0.16 * S, 0.062 * S, 0.105 * S)));
+				continue;
+			}
+			feet += emitMesh(P.foot, mul(root, tilt, translate(footPlace(pose, side) * S), scale(0.16 * S, 0.062 * S, 0.105 * S)));
 		}
 		out += attr(feetMat, feet);
 	}

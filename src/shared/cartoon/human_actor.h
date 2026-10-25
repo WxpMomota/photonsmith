@@ -43,6 +43,8 @@ struct HumanPose {
 	double handWeightL = 0.0, handWeightR = 0.0;
 	bool keys = false;            // car keys in the right hand
 	bool bags = false;            // a grocery bag in each hand
+	bool feetHeld = false;        // the feet at `heldFoot` (world: left, right) instead of where the walk puts them - a foot held where it came down (rig::FootLock)
+	Vec3 heldFoot[2];
 };
 
 constexpr double kHip = 0.92, kThigh = 0.45, kShin = 0.44, kTorso = 0.55, kHeadR = 0.122;
@@ -185,6 +187,7 @@ inline Frames framesOf(const HumanPose &p) {
 
 // Where a foot is (world) for the walk: a stride forwards and back, lifted as it swings through.
 inline Vec3 footOf(const Frames &f, const HumanPose &p, double side) {
+	if (p.feetHeld) return p.heldFoot[side < 0 ? 0 : 1];
 	const double ph = p.walkPhase + (side < 0 ? 0.0 : kPi);
 	const double fwd = 0.30 * p.walkAmount * std::sin(ph), up = 0.11 * p.walkAmount * std::max(0.0, std::cos(ph));
 	return transformPoint(f.root, {fwd + 0.02, 0.055 + up, side * (0.11 + 0.05 * clamp01(p.crouch))});

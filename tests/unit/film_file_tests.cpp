@@ -417,3 +417,65 @@ TEST(FilmFile, AMovingBlockIsBlurredOverTheShutterAndAStillOneIsNot) {
 	ff::DataFilm bad;
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nshutter 2\n", bad).find("shutter is a share of a frame"), std::string::npos);
 }
+
+// The kinds of character beside the Nomai explorer (film_kinds.h): Pip, a person and the turtle each walk a path with a corner, are drawn where the walk has them, keep their
+// planted feet where they came down (a turtle's four), step once a stride, act with their own poses (a pose of another kind's library is refused, with the kind's own
+// listed), and the two that can be scaled are scaled with their stride and chest.
+TEST(FilmFile, PipAPersonAndTheTurtleWalkTurnACornerWithFeetThatStayPutAndActWithTheirOwnPoses) {
+	(void)cartoon::films();
+	struct Case {
+		const char *kind, *gesture;
+		double speed, scale;
+		std::size_t feet;
+	};
+	for (const Case &k : {Case{"pip", "wave", 0.5, 1.0, 2}, Case{"person", "point", 1.0, 1.0, 2}, Case{"turtle", "nod", 0.3, 6.0, 4}}) {
+		SCOPED_TRACE(k.kind);
+		ff::DataFilm film;
+		const std::string scaled = k.scale != 1.0 ? " scale " + std::to_string(k.scale) : "";
+		ASSERT_EQ(loadFilm(std::string("scene s.pbrt\nlength 12\n") + "character c " + k.kind + " at 0 0 4 facing 180" + scaled + "\n" + "walk c 1.0 " + std::to_string(k.speed) +
+							   " 0 1  2 1\n" + "gesture c \"" + k.gesture + "\" 9 9.5\n",
+						   film),
+				  "");
+		const ff::CharacterKind &kind = ff::characterKinds().at(k.kind);
+		const std::string scene = film.sceneAt(9.8);
+		EXPECT_NE(scene.find(std::string("# c (") + k.kind + ")"), std::string::npos);
+		EXPECT_GT(scene.size(), 2000u) << "the character's meshes";
+		// its feet: planted ones stay put round the corner
+		const double end = 1.0 + 5.0 / k.speed;   // (3 m to the corner, 2 m after it)
+		std::vector<cartoon::Foot> before = film.feetAt(1.0);
+		ASSERT_EQ(before.size(), k.feet);
+		double worst = 0.0;
+		int planted = 0;
+		for (double t = 1.0 + 1.0 / 24.0; t < end + 1.0; t += 1.0 / 24.0) {
+			const std::vector<cartoon::Foot> now = film.feetAt(t);
+			for (std::size_t i = 0; i < now.size(); ++i)
+				if (before[i].planted && now[i].planted) {
+					worst = std::max(worst, cartoon::length(now[i].at - before[i].at) * 24.0);
+					++planted;
+				}
+			before = now;
+		}
+		EXPECT_GT(planted, 50);
+		EXPECT_LT(worst, 0.01) << "m/s";
+		// a footfall each stride from a step in
+		const double stride = kind.stride * k.scale;
+		int steps = 0;
+		for (const cartoon::FilmEvent &e : film.events()) steps += e.kind == cartoon::EventKind::Footfall;
+		EXPECT_EQ(steps, static_cast<int>(std::floor(5.0 / stride - kind.firstStep + 1.0 + 1e-9)));
+		// its chest, scaled with it
+		std::vector<cartoon::Vec3> chest;
+		ff::DataFilm followed;
+		ASSERT_EQ(loadFilm(std::string("scene s.pbrt\nlength 12\ncharacter c ") + k.kind + " at 0 0 4" + scaled + "\nshot 0 A\n  key 0 1 0 0 1 4\n  subject c\n", followed), "");
+		chest = followed.subjectsAt(1.0);
+		ASSERT_EQ(chest.size(), 1u);
+		EXPECT_NEAR(chest[0].y, kind.chest.y * k.scale, 1e-9);
+		// a pose it does not have
+		ff::DataFilm bad;
+		const std::string problem = loadFilm(std::string("scene s.pbrt\nlength 12\ncharacter c ") + k.kind + "\ngesture c \"reach to the wall\" 1 2\n", bad);
+		EXPECT_NE(problem.find("is not a pose of a"), std::string::npos) << problem;
+		EXPECT_NE(problem.find(std::string("\"") + k.gesture + "\""), std::string::npos) << "its own poses are listed: " << problem;
+	}
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 12\ncharacter c person scale 2\n", bad).find("a person cannot be scaled"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 12\ncharacter c pip scale 0\n", bad).find("above 0"), std::string::npos);
+}

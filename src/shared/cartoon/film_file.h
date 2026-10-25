@@ -40,7 +40,8 @@
 // scene's, not the cartoon toolkit's), and a film with no `shot` lines keeps the scene's own camera. Everything a pbrt file refers to by a relative path (meshes, pictures) is looked up
 // beside the pbrt file. A problem in a film file is reported with its line number when the file is loaded (`ray_tracer --film-check FILE`) and the film is left out.
 //
-// Characters - a film blocked out as a screenplay. A character from the library (characterKinds: the Nomai explorer, `nomai-explorer`) is brought in, walks and acts:
+// Characters - a film blocked out as a screenplay. A character from the library (characterKinds, film_kinds.h: `nomai-explorer`, `pip`, `person`, `turtle`) is brought in,
+// walks and acts (`scale S` on its line sizes a pip or a turtle):
 //
 //     character  kai nomai-explorer  at 0 0 4  facing 180       # NAME KIND, where it stands (pbrt's x y z; y is the ground) and which way it faces (0: +z, 90: +x)
 //     walk       kai  2.0 0.7   0 -2   3 -6                     # NAME, from 2 s at 0.7 m/s, through these points (x z) from where it is
@@ -65,6 +66,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -126,6 +128,7 @@ struct Character {
 	double start[3] = {0.0, 0.0, 0.0};   // pbrt's coordinates
 	double facing = 0.0;                 // degrees: 0 faces +z, 90 faces +x (pbrt's)
 	double detail = 0.0;                 // the kind's sculpting cell (0: its own)
+	double scale = 1.0;                  // its size (a kind that can be scaled: a child Pip 0.6, a turtle as big as a dog 6)
 	std::vector<WalkLine> walks;
 	std::vector<rig::Gesture> gestures;
 	int line = 0;
@@ -142,8 +145,10 @@ struct CharacterMoment {
 	double detail = 0.0;
 	Vec3 trail;   // how far a spring on its place lags it (body space: +x its left, +z forward): for what hangs and swings - a robe's hem, a tail (rig::lag)
 	double voice = 0.0;        // how loud it is speaking, 0..1 (its `sample ... by NAME` cues: music_cues::voiceAt) - a mouth opens by it
-	bool feetLocked = false;   // its two feet held where they came down (rig::FootLock), in body space: when its kind says where its gait puts them
-	Vec3 lockedFeet[2];
+	bool feetLocked = false;   // its feet held where they came down (rig::FootLock), in body space: when its kind says where its gait puts them
+	Vec3 lockedFeet[4];
+	double scale = 1.0;        // its size (Character::scale)
+	int seed = 0;              // a number of its own (from its name): its blinks
 };
 // A kind of character: its scene text (story space, as the toolkit writes it) and its feet at a moment, the point a camera and the film doctor look at (body space), and its walk's
 // step (rig::PathWalk's stride and first step).
@@ -152,9 +157,12 @@ struct CharacterKind {
 	std::function<std::vector<Foot>(const CharacterMoment &)> feet;
 	Vec3 chest{0.0, 1.25, 0.0};
 	double stride = 0.84, firstStep = 0.5;
-	// (optional) where its gait puts each of its two feet at so many steps (body space) and whether that foot is down: then its feet are locked where they come down
+	// (optional) where its gait puts each of its feet at so many steps (body space, at scale 1) and whether that foot is down: then its feet are locked where they come down
 	std::function<Vec3(double, int)> footAt;
 	std::function<bool(double, int)> plantedAt;
+	int footCount = 2;             // (a turtle has four)
+	bool scalable = false;         // whether `scale` on its character line is drawn (its stride, chest and feet are scaled with it)
+	std::vector<std::string> poses;   // its library's poses (a gesture naming another is an error when the film is loaded)
 };
 // The library of kinds, by name (cartoons.h fills it before any film file is read).
 inline std::map<std::string, CharacterKind> &characterKinds() {
@@ -377,7 +385,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			s.physicsLines.push_back({t[1], n});
 		} else if (verb == "character") {
 			const std::vector<std::string> t = detail::tokens(line);
-			if (t.size() < 3) return fail("`character NAME KIND [at X Y Z] [facing DEGREES] [detail CELL]`");
+			if (t.size() < 3) return fail("`character NAME KIND [at X Y Z] [facing DEGREES] [scale S] [detail CELL]`");
 			Character c;
 			c.name = t[1];
 			c.kind = t[2];
@@ -389,11 +397,11 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 					for (int k = 0; k < 3; ++k)
 						if (!number(t[i + 1 + k], c.start[k])) return fail("`at` takes three numbers");
 					i += 4;
-				} else if ((t[i] == "facing" || t[i] == "detail") && i + 1 < t.size()) {
-					if (!number(t[i + 1], t[i] == "facing" ? c.facing : c.detail)) return fail("`" + t[i] + "` takes a number");
+				} else if ((t[i] == "facing" || t[i] == "detail" || t[i] == "scale") && i + 1 < t.size()) {
+					if (!number(t[i + 1], t[i] == "facing" ? c.facing : t[i] == "detail" ? c.detail : c.scale) || !(c.scale > 0.0)) return fail("`" + t[i] + "` takes a number" + std::string(t[i] == "scale" ? " above 0" : ""));
 					i += 2;
 				} else {
-					return fail("\"" + t[i] + "\": a character takes `at X Y Z`, `facing DEGREES` and `detail CELL`");
+					return fail("\"" + t[i] + "\": a character takes `at X Y Z`, `facing DEGREES`, `scale S` and `detail CELL`");
 				}
 			}
 			s.characters.push_back(c);
@@ -724,6 +732,17 @@ class DataFilm {
 				for (const auto &[name, kind] : characterKinds()) known += (known.empty() ? "" : ", ") + name;
 				return filePath + ":" + std::to_string(c.line) + ": no kind of character called \"" + c.kind + "\" (there are: " + (known.empty() ? "none" : known) + ")";
 			}
+		for (const Character &c : spec.characters) {
+			const CharacterKind &kind = characterKinds().at(c.kind);
+			if (c.scale != 1.0 && !kind.scalable) return filePath + ":" + std::to_string(c.line) + ": a " + c.kind + " cannot be scaled";
+			if (kind.poses.empty()) continue;
+			for (const rig::Gesture &g : c.gestures)
+				if (std::find(kind.poses.begin(), kind.poses.end(), g.pose) == kind.poses.end()) {
+					std::string known;
+					for (const std::string &pose : kind.poses) known += (known.empty() ? "\"" : ", \"") + pose + "\"";
+					return filePath + ": " + c.name + "'s gesture \"" + g.pose + "\" is not a pose of a " + c.kind + " (its poses: " + known + ")";
+				}
+		}
 		for (const Shot &shot : spec.shots) {
 			std::vector<std::string> named = shot.about;
 			if (shot.following) named.push_back(shot.follow.who);
@@ -753,7 +772,7 @@ class DataFilm {
 		for (const auto &pt : c.walks[walk].points) w.points.push_back(story(pt.first, c.start[1], pt.second));
 		w.start = c.walks[walk].t0;
 		w.speed = c.walks[walk].speed;
-		w.stride = kind.stride;
+		w.stride = kind.stride * c.scale;
 		w.firstStep = kind.firstStep;
 		return w;
 	}
@@ -780,6 +799,8 @@ class DataFilm {
 		m.t = t;
 		m.gestures = &c.gestures;
 		m.detail = c.detail;
+		m.scale = c.scale;
+		m.seed = seedOf(c.name);
 		if (at) *at = where;
 		return m;
 	}
@@ -790,10 +811,11 @@ class DataFilm {
 		rig::FootLock k;
 		k.frameAt = [this, &c](double u) { return momentOf(c, u).frame; };
 		k.stepsAt = [this, &c](double u) { return momentOf(c, u).steps; };
-		k.footAt = kind.footAt;
+		const double scale = c.scale;
+		k.footAt = [&kind, scale](double steps, int s) { return kind.footAt(steps, s) * scale; };
 		k.plantedAt = kind.plantedAt;
 		m.feetLocked = true;
-		for (int s = 0; s < 2; ++s) m.lockedFeet[s] = rig::lockedFoot(k, s, t);
+		for (int s = 0; s < std::min(4, kind.footCount); ++s) m.lockedFeet[s] = rig::lockedFoot(k, s, t);
 	}
 	// How far a loose spring on the character's place lags it at t, in its body's space (CharacterMoment::trail).
 	Vec3 trailOf(const Character &c, double t, const CharacterMoment &m) const {
@@ -807,7 +829,12 @@ class DataFilm {
 		const Vec3 left = transformPoint(m.frame, {1.0, 0.0, 0.0}) - origin, forward = transformPoint(m.frame, {0.0, 0.0, 1.0}) - origin;
 		return {dot(lag, left), 0.0, dot(lag, forward)};
 	}
-	Vec3 chestOf(const Character &c, double t) const { return transformPoint(momentOf(c, t).frame, characterKinds().at(c.kind).chest); }
+	Vec3 chestOf(const Character &c, double t) const { return transformPoint(momentOf(c, t).frame, characterKinds().at(c.kind).chest * c.scale); }
+	static int seedOf(const std::string &name) {
+		std::uint32_t h = 2166136261u;
+		for (char ch : name) h = (h ^ static_cast<unsigned char>(ch)) * 16777619u;
+		return static_cast<int>(h % 100000u);
+	}
 	std::size_t shotAt(double t) const {
 		std::size_t k = 0;
 		for (std::size_t i = 0; i < spec.shots.size(); ++i)
@@ -1068,7 +1095,7 @@ class DataFilm {
 			Vec3 feet;
 			const CharacterMoment m = momentOf(c, t, &feet);
 			const Vec3 forward = normalize(transformPoint(m.frame, {0.0, 0.0, 1.0}) - feet), up{0.0, 1.0, 0.0}, right = cross(forward, up);
-			const Vec3 eye = feet - forward * shot.follow.behind + right * shot.follow.side + up * shot.follow.up, target = transformPoint(m.frame, characterKinds().at(c.kind).chest);
+			const Vec3 eye = feet - forward * shot.follow.behind + right * shot.follow.side + up * shot.follow.up, target = transformPoint(m.frame, characterKinds().at(c.kind).chest * c.scale);
 			key.pos[0] = -eye.x;
 			key.pos[1] = eye.y;
 			key.pos[2] = eye.z;

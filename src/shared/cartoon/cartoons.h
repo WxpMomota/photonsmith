@@ -37,6 +37,7 @@
 #include "meet_pip.h"
 #include "newtons_cradle.h"
 #include "film_file.h"
+#include "film_kinds.h"
 #include "orrery.h"
 #include "paper_boat.h"
 #include "pip_and_the_moon.h"
@@ -195,30 +196,6 @@ inline Film withFilmFiles(Film f) {
 	return f;
 }
 
-// The kinds of character a film file can bring in (film_file.h `character NAME KIND`): the Nomai explorer, walking with its own cycle and acting with its pose library.
-inline void installCharacterKinds() {
-	film_file::CharacterKind explorer;
-	const auto pose = [](const film_file::CharacterMoment &m) {
-		nomai::ExplorerPose p = m.moving || m.steps > 0.0 ? nomai::walkPose(m.steps, m.t, 1.0) : nomai::standPose(m.t);   // (after a walk: its feet where they came down)
-		p.wind = p.wind + m.trail * 0.5;   // (the robe's hem trails the body: nomai::robeTrail)
-		p.staffGlow += (1.0 - p.staffGlow) * m.voice;   // (it speaks behind a mask: its staff lights up with its voice, and is as it was when it is silent)
-		if (m.feetLocked) {   // (its feet held where they came down: rig::FootLock)
-			p.lockFeet = true;
-			p.lockedBall[0] = m.lockedFeet[0];
-			p.lockedBall[1] = m.lockedFeet[1];
-		}
-		return m.gestures && !m.gestures->empty() ? rig::act(p, *m.gestures, m.t, nomai::explorerPoses()) : p;
-	};
-	explorer.text = [pose](const film_file::CharacterMoment &m) { return nomai::explorerText(pose(m), m.frame, m.detail > 0.0 ? m.detail : 0.012); };
-	explorer.feet = [pose](const film_file::CharacterMoment &m) { return nomai::explorerFeet(pose(m), m.frame); };
-	explorer.chest = {0.0, 1.25, 0.0};
-	explorer.footAt = [](double steps, int s) { return nomai::explorerBody(nomai::walkPose(steps, 0.0, 1.0)).ball[s]; };
-	explorer.plantedAt = [](double steps, int s) { return nomai::explorerBody(nomai::walkPose(steps, 0.0, 1.0)).planted[s]; };
-	explorer.stride = 0.84;
-	explorer.firstStep = 0.5;
-	film_file::characterKinds()["nomai-explorer"] = explorer;
-}
-
 // Loads one film file into the registry (or says why not).
 inline void addFilmFile(Registry &r, const std::string &file) {
 	r.data.emplace_back();
@@ -276,7 +253,7 @@ inline void addFilmFile(Registry &r, const std::string &file) {
 inline Registry &registry() {
 	static Registry *r = [] {
 		Registry *reg = new Registry();   // (lives as long as the program: films hand out pointers into it)
-		installCharacterKinds();   // (before any film file is read: its characters are of these kinds)
+		film_kinds::install();   // (before any film file is read: its characters are of these kinds)
 		for (const Film &f : kFilms) {
 			reg->made.push_back(withFilmFiles(f));
 			reg->all.push_back(&reg->made.back());

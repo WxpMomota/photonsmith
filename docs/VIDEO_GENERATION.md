@@ -509,7 +509,7 @@ of the scene list, never half-loaded). A film made from a file has a video prese
 are added. The sound of a built-in film is C++; a film file's is its cues file (`film_assets/<key>/cues.txt`) and, when it has characters, their footsteps.
 
 **A film blocked out as a screenplay: characters in a film file.** A film file can bring in characters from the library of kinds (`film_file::characterKinds`, filled in
-cartoons.h: `nomai-explorer` so far), walk them along paths, act with gestures from their pose library and follow them with the camera, with no C++:
+film_kinds.h: `nomai-explorer`, `pip`, `person` and `turtle`), walk them along paths, act with gestures from their pose library and follow them with the camera, with no C++:
 
 ```
 character  kai nomai-explorer  at 0 0 4.2  facing 180   # NAME KIND, where it stands (x y z; y is the ground) and which way it faces (0: +z, 90: +x); `detail CELL` for its sculpting
@@ -525,7 +525,20 @@ shot 9 The lantern
 After a walk the character stands with its feet where they came down. A film with characters reports what its shots are about, its characters' feet (the sliding-feet check)
 and its footfalls and gesture contacts, which are its soundtrack's footsteps and touches; its cues file adds the music. `pbrt_scenes/a-walk-at-dusk.film` is a complete example:
 a set (`film_assets/a-walk-at-dusk/set.pbrt`: a sandy flat at dusk, stones, a path, a lantern that lights), the explorer walking the path, looking up and pointing, four shots
-(one following it) and a cues file. A new kind of character is a `CharacterKind` added in `installCharacterKinds()`: its scene text and feet at a moment, its chest, its step.
+(one following it) and a cues file. A new kind of character is a `CharacterKind` added in `film_kinds::install()`: its scene text and feet at a moment, its chest, its step.
+
+**The kinds of character.** Each walks with its own gait with its feet held where they come down (a turtle's four), blinks on its own, opens its mouth when it speaks (a
+`sample ... by NAME` cue) and has its own poses for gestures; a gesture naming a pose its kind does not have is an error when the film is loaded, and the message lists the
+kind's poses.
+
+| kind | what | size | poses |
+|---|---|---|---|
+| `nomai-explorer` | the masked Nomai explorer, with a staff | 2.1 m | its thirteen (nomai_explorer.h) |
+| `pip` | Pip, the round creature with a big head (cartoon_actor.h) | 1.5 m, `scale` | wave, point, reach, cheer, shrug, think, look up, look down, nod, shake head, bow, hop |
+| `person` | a cartoon adult in a sweater (human_actor.h) | 1.8 m | wave, point, reach, cheer, shrug, think, hands on hips, look up, look down, nod, shake head, bow, crouch |
+| `turtle` | the turtle (turtle_actor.h) | 13 cm long, `scale` | hide, stretch, wave, reach, rear up, swim, look up, look down, nod, shake head |
+
+`scale` on a character line (`character tess turtle at 1.6 0 -2 scale 6`) sizes a kind that can be scaled, its stride and the point the camera looks at with it.
 
 **A quick preview of a whole film: `python scripts/anim/film.py preview <key>`.** Building a film's characters, not rendering them, is most of a frame's time (the Nomai
 explorer: 8.7 s at its usual detail, 40 s for a face close-up; the renderer takes 3 to 5 s for a 1080p frame), so a real-time renderer would not make a film quick to watch.
