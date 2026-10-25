@@ -525,6 +525,7 @@ mcparity_*.exr
 !tests/data/pbrt_reference_means.txt
 !tests/data/scene_registry_snapshot.txt
 !tests/data/cartoon_films_snapshot.txt
+!tests/data/film_baseline.txt
 
 # Python bytecode (the photo helpers' tests)
 __pycache__/

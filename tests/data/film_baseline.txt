@@ -1,0 +1,228 @@
+# Every film, shot by shot: film|shot|fingerprint of the scene at the shot's middle (at preview coarseness)|name. Written by
+# `python scripts/anim/film.py baseline --write` (ray_tracer --film-baseline); a difference is a film that changed - on purpose or not.
+a-walk-at-dusk|1|ad91e807d54e1544|Setting out
+a-walk-at-dusk|2|e291968e6eaf9272|Along the path
+a-walk-at-dusk|3|cbb356bb85b51031|The lantern
+a-walk-at-dusk|4|18241ce264027f87|The first star
+ball-parade|1|be82b9a4eec4a8ce|The row of balls
+candle|1|8782ad171cbdf69c|Portrait of the flame
+candle|2|ff22690a18254670|Macro on the wax and drips
+candle|3|cf24a271002c7d81|Pull back as it dies
+crystal-heart|1|94d37b9df886c275|The still lake
+crystal-heart|2|df4de173c36571d2|Among the spires
+crystal-heart|3|61d19d2019afef5d|First light
+crystal-heart|4|db8f337370698f78|The Heart
+crystal-heart|5|e748ac6a733216e4|Ignition
+crystal-heart|6|77178674704eb502|The valley at sunrise
+dandelion|1|a72eb64eb156b65c|Close beside the seed head
+dandelion|2|dd48aac589266142|Following the seeds
+dandelion|3|9d9e5bfe02c5dd20|Wide pull back
+domino-run|1|deb045f89c6b796d|The spiral and the marble
+domino-run|2|e9e1e356b423eb5f|The chase
+domino-run|3|9a46243a3518904c|Close-up at the lamp
+domino-run|4|69bb702e81bf3204|Rising pull back
+fireflies|1|3ac9e141c444374a|Ground-level macro
+fireflies|2|f3a33d5523be34a3|The meeting
+fireflies|3|f5c9c3c310b4fb1d|Orbit round the pair
+fireflies|4|1741a7b22ee8b0be|Crane up over the meadow
+forest-dawn|1|857dcc7aee02d039|Into the blue clearing
+forest-dawn|2|6757515e186ef5ee|Against the rising sun
+forest-dawn|3|f3b643b8837decd5|Dew on the grass
+forest-dawn|4|06dbd13989af885b|Leaves in the beams
+forest-dawn|5|c86301af1f9949d9|Crane up as the mist thins
+lamp-and-ball|1|cb3aa4cd9b44fb6c|The desk
+little-robot|1|381397381a8bad30|Wide establishing
+little-robot|2|89564f3949c008a1|Medium on the waking robot
+little-robot|3|d61aa549c5793851|Tracking to the seedling
+little-robot|4|5e08302dd774ccec|Close on the watering and the bloom
+little-robot|5|a2d4943ea20a6d31|Wide crane up
+meet-pip|1|a30d5096d1fffce0|Hello and the faces
+meet-pip|2|b6d73ea643892e14|Following the orb
+meet-pip|3|b5673143e379c8d6|Side-on walk
+newtons-cradle|1|1e62719550e13359|The whole cradle
+newtons-cradle|2|db6910fdb47fa90b|Close-up of the strike
+newtons-cradle|3|db9eaef071ab74b1|Wide pull back
+nomai-signal|1|c0aab3c7d52da60c|Darkness and a pulse
+nomai-signal|2|b7f8ac8638b59ac6|The giant and its moon
+nomai-signal|3|420724ad147d345e|The descent
+nomai-signal|4|7da6d13ff912584c|Three eyes
+nomai-signal|5|ac8160a1766e222a|The signal
+nomai-signal|6|dcfa9abcdfec48dd|The landing
+nomai-signal|7|60b022e3605ef4c5|Under the giant
+nomai-signal|8|31c486f4edc67641|Footsteps
+nomai-signal|9|18ca7ea33118cc7f|The ridge
+nomai-signal|10|8df68e95ae89c97c|The canyon
+nomai-signal|11|ec9055947302a083|The third eye
+nomai-signal|12|bb7a1943f42984d1|The floating steps
+nomai-signal|13|5cbd86cbc1ee297e|The corridor wakes
+nomai-signal|14|9bd4397f726df928|Writing on the wall
+nomai-signal|15|b594114ccb6cf76e|The recording
+nomai-signal|16|518507b0b5847989|The elevator
+nomai-signal|17|f687d274fcb94c23|Into the dark
+nomai-signal|18|0a2a22d185b19212|The observatory
+nomai-signal|19|c361e0a6638e8d4d|The staff answers
+nomai-signal|20|d1ade546c6aa6985|The hall wakes
+nomai-signal|21|c2a849e0e739a30d|The star map
+nomai-signal|22|7f79e908f46bd0a6|The flashing star
+nomai-signal|23|8eb936f6e634b147|Gone
+nomai-signal|24|a8593fef6de3846b|The transmission rebuilt
+nomai-signal|25|6f4962e3ec572002|The remote memories
+nomai-signal|26|d7e2f0faf6f6d09f|Silence
+nomai-signal|27|760bdf5da26de7ee|Stillness
+nomai-signal|28|d659bed76440ae38|The answer
+nomai-signal|29|796686c5c0b9ceab|Dawn
+nomai-signal|30|62a1cb9a4c040998|The campfire
+nomai-signal|31|ef5890c2b9e7d53d|Pulling away
+nomai-signal|32|da4aefe2b100fae9|The title
+orrery|1|2784ffb350302bc9|Wide orbit
+orrery|2|62cd47bd19dfe413|Close-up on the third planet
+orrery|3|e551c7b694fdf8f1|Rising look down
+paper-boat|1|9b8febb8e17002c0|Low beside the water
+paper-boat|2|9fe89851fc72e3a2|Chase from above
+paper-boat|3|3081b1c10b8c79b1|Wide pull back
+pip-and-the-moon|1|449f9e6c656f87ed|Moon and reflection
+pip-and-the-moon|2|33ce7a3fdc0ee9fb|Stroll along the dock
+pip-and-the-moon|3|0d97afef8970bd2c|The moon in the water
+pip-and-the-moon|4|a89f4dd11f2744bb|Sorrow and the idea
+pip-and-the-moon|5|8098368e0a109a3e|Running for the bucket
+pip-and-the-moon|6|467cc09ac58222ff|Scooping the moon
+pip-and-the-moon|7|6bc3fd4ef1555754|The dance
+pip-and-the-moon|8|26e0bb477f3c0a1d|Carrying it home
+pip-and-the-moon|9|f79009d2fc5e6d2c|The fall
+pip-and-the-moon|10|578f15558fff4e6b|Alone at the water
+pip-and-the-moon|11|5caeceecfc68504f|The firefly
+pip-and-the-moon|12|e8298ef6e53ff15e|Under the real moon
+pip-and-the-moon|13|0503e1c3de0b1302|Pull back over the pond
+tengwang|1|8fa5c7a59d8748b0|Black, a bell, the sea of clouds
+tengwang|2|df520deb6621eb1c|The river comes out of the mountains
+tengwang|3|9cd4554012f19a35|The Gan River and Hongzhou
+tengwang|4|d10db0833fb049d9|The Pavilion revealed
+tengwang|5|982159772f8807c6|The procession at the gate
+tengwang|6|d9b85ba1c470f061|Hoof, wheel, jade, scrolls, wine, strings
+tengwang|7|aede40e3452eec83|The hall made ready
+tengwang|8|cbb67660ce4a317f|The guests arrive
+tengwang|9|557a8d86030169ad|The young traveller
+tengwang|10|c8555ec47f5d0973|To the stair
+tengwang|11|932bd4451295e4b7|The climb
+tengwang|12|c5f0af905d20092b|The highest terrace
+tengwang|13|a8f90461941f1f82|Looking down
+tengwang|14|2d103b0f30d30787|The land opens
+tengwang|15|ab7ea1aebac1b9fa|The market
+tengwang|16|ab647c1929b1027d|Boats below the Pavilion
+tengwang|17|01d8e3bc9a89f71d|The shepherd
+tengwang|18|7b12242871b71de7|Egrets rise
+tengwang|19|52a5a3b67500cc91|The boats come home
+tengwang|20|87a0944c9dd495b2|The geese
+tengwang|21|4910dd0ba9589dbd|A ginkgo leaf falls
+tengwang|22|926959e4438e1f12|The sun goes down
+tengwang|23|42df3f79f218bf70|The setting clouds and the solitary duck
+tengwang|24|576783ff79382d63|The water and the sky one colour
+tengwang|25|ea8b1aab13d7c611|Wine
+tengwang|26|48f8b191a135236a|The pipa
+tengwang|27|56d36aa091c7b80b|Poems
+tengwang|28|5321b957b6a258af|The paper goes round
+tengwang|29|7d46ac5b7c557f30|The blank paper
+tengwang|30|954e314d4f9b5614|Ink becomes the river
+tengwang|31|9948ab54d82a89d3|A stroke becomes the ridge
+tengwang|32|b866054633e40ae7|A dot becomes a bird; a wash, a storm
+tengwang|33|201bfa1b777f6f4e|Through the painted clouds
+tengwang|34|f635300c33c96e64|Far away
+tengwang|35|a461b6a785e425c3|Alone
+tengwang|36|4f082ff8274774fc|Ridges without end
+tengwang|37|30c9f94a5ec89faf|The pass in the rain
+tengwang|38|a0319beffdab6a80|The crossroads
+tengwang|39|046f28df4750475e|The palace doors
+tengwang|40|67c4bde5999d8b8b|The general in the snow
+tengwang|41|60a8866b40a09ffa|The hand tightens
+tengwang|42|839a3410c55c28ad|The ink drop and the stone
+tengwang|43|a2819cf2504df979|He raises his head
+tengwang|44|74c4242ced14f5d6|The wind
+tengwang|45|4a5e332d9ad96b1d|The terrace and the eagle
+tengwang|46|96f76e7c55867115|Against the whole sky
+tengwang|47|8ad5e3985616f644|Everything at once
+tengwang|48|85e1686363bb96c5|The last lines
+tengwang|49|58615e0c3f6973e8|The faces
+tengwang|50|695e0efdcf43f43c|The brush laid down
+tengwang|51|2c41b84cd415aee0|The lanterns go out
+tengwang|52|7a61159d72e47bff|Down the stair
+tengwang|53|abc0e561f42979e9|The horse
+tengwang|54|904fcccaa1ebff89|The ride away
+tengwang|55|61a5f94a43a3f95d|Rising over the night
+tengwang|56|b9cb5709f2e86d37|The stars over the river
+tengwang|57|2f2c88b36040426e|The manuscript
+tengwang|58|75ab1db41651b364|Dawn
+tengwang|59|d5560262f6b0c819|The title
+turtle-escape|1|cffe5681acb9d1b4|Wide on the room
+turtle-escape|2|32e0e1985fa12972|The plant
+turtle-escape|3|3b8ffe27735f87dd|The thermometer
+turtle-escape|4|c655ae390ea0bb64|Pellets
+turtle-escape|5|79e495536d190206|Through the glass: Perfect
+turtle-escape|6|d510f095ccec052a|The turtle stares
+turtle-escape|7|103784ae4d5b4e9f|Keys
+turtle-escape|8|c9c13b18eba517eb|The door
+turtle-escape|9|bac2569c68ffe9f6|Towards the door
+turtle-escape|10|cac88d3780bc6180|Towards the top
+turtle-escape|11|b157445555e10e5a|Back to the door
+turtle-escape|12|dfbc27500680b193|The eyes narrow
+turtle-escape|13|3c8de2fc79acb953|The glass
+turtle-escape|14|cd1a9fd56645e1d9|Water to rim
+turtle-escape|15|5c8de48bb1eef847|The thermometer, close
+turtle-escape|16|79fe4cd17ceadba5|The intake
+turtle-escape|17|0e8a6d230e02d084|The hose
+turtle-escape|18|2a456a21296a3336|The plan
+turtle-escape|19|8dfeb8e3c17f1382|The dive
+turtle-escape|20|ed64fc023305ac04|The push
+turtle-escape|21|de398039ac53d207|Again
+turtle-escape|22|c52f26999f742c1a|The charge
+turtle-escape|23|1bcc150eda3b5c5f|Exhausted
+turtle-escape|24|acc567eb8214474b|The clock
+turtle-escape|25|ee9313e80612c2b7|Building the pile
+turtle-escape|26|a6a958725e4247fd|The climb
+turtle-escape|27|b03f786ff78596c0|The crash
+turtle-escape|28|9da95b7c06e8bd41|The bubble
+turtle-escape|29|fc24fa2bc307d11c|Plan B
+turtle-escape|30|4a23bca0a5453eb6|The bite and the pop
+turtle-escape|31|d42d14f80e3e8c9b|The idea
+turtle-escape|32|46e22429a0ac8eec|The ramp
+turtle-escape|33|13864cef34693eb3|A foot on the rim
+turtle-escape|34|881c11fb38033300|Lights out
+turtle-escape|35|c52849c68d959472|The hose
+turtle-escape|36|0424e2cecc706b3b|Onto the slate
+turtle-escape|37|f39650f6370aeece|Hanging
+turtle-escape|38|8dca050eff23a7a7|The canyon
+turtle-escape|39|c5c6f08481e283cc|Eight inches
+turtle-escape|40|2457c0e87c95a2f7|The climb
+turtle-escape|41|d88785e7beb67502|Over the top
+turtle-escape|42|a1f3ddbdf92f26bb|Freedom
+turtle-escape|43|28c198e43d8ab3b0|The slide
+turtle-escape|44|904cc53121e4d23f|The towels
+turtle-escape|45|c0555bf9eb047b3c|Across the floor
+turtle-escape|46|cc67eafe1a5881b2|The vacuum wakes
+turtle-escape|47|e20e67fffdc08594|Like a tank
+turtle-escape|48|a014cd7b1a172ee0|Under the sofa
+turtle-escape|49|06108e05cca35ac4|Beneath
+turtle-escape|50|3b89aa6b04d56e18|The carpet cliff
+turtle-escape|51|427fb3e11840e9e4|The fibres
+turtle-escape|52|14cdf17a9a9e3562|The far side
+turtle-escape|53|7e995ab8d1508740|Water
+turtle-escape|54|103f998ff6f1e3d7|The endless crawl
+turtle-escape|55|0bdfd3bc1cf87f42|The box
+turtle-escape|56|d226f606279cb1ed|The pool
+turtle-escape|57|026db1a8c025349e|Looking back
+turtle-escape|58|e92cedc3ee6ac83e|A smile
+turtle-escape|59|a31eb20486856476|Splash
+turtle-escape|60|47a4813dae131cdc|Swimming
+turtle-escape|61|5394f89d0e67cacf|Home
+turtle-escape|62|dd33b04b0a6bcddc|Something is wrong
+turtle-escape|63|0e42e3a02db8568b|The empty slate
+turtle-escape|64|653a24bbe273fef7|The thermometer
+turtle-escape|65|529f3ed36e9413c6|The rocks
+turtle-escape|66|2b8f573cad20b2fd|The hose
+turtle-escape|67|0fa4f2a57aed5595|The bags
+turtle-escape|68|e5f479ea6d486c57|Inside the tank
+turtle-escape|69|e1c77a78a963f3f1|Behind the tank
+turtle-escape|70|6e09f5d3bbf6e42a|Under the table
+turtle-escape|71|6f2de973fa2e5ff3|Behind the sofa
+turtle-escape|72|38f2667aa655d8db|Turtle?
+turtle-escape|73|36c6346b2f446b99|The tub
+turtle-escape|74|6585bd4d22b77349|Black
