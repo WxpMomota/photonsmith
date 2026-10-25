@@ -45,6 +45,7 @@
 //
 //     character  kai nomai-explorer  at 0 0 4  facing 180       # NAME KIND, where it stands (pbrt's x y z; y is the ground) and which way it faces (0: +z, 90: +x)
 //     walk       kai  2.0 0.7   0 -2   3 -6                     # NAME, from 2 s at 0.7 m/s, through these points (x z) from where it is
+//     walk       kai  9.0 0.7   to 3 -6                         # ... or to a place, finding its own way round the set and whoever stands there (film_paths.h)
 //     gesture    kai  "look up" 8.0 9.0 11.0 11.5               # NAME, a pose of its library, eased in from 8 s to 9 s, out from 11 s to 11.5 s (no out times: held)
 //     gesture    kai  "reach to the wall" 12 13 contact 12.8    # contact: the hand meets something (a touch on the soundtrack)
 //     say        kai  14.4 "Look, the first star."  rate 1.1  pitch 2   # NAME, a line it says from 14.4 s: its voice, its mouth and a caption (film_speech.h; `nocaption`)
@@ -89,6 +90,7 @@
 
 #include "../camera_keyframes.h"
 #include "film_faces.h"
+#include "film_paths.h"
 #include "film_speech.h"
 #include "film_subjects.h"
 #include "music_cues.h"
@@ -132,7 +134,8 @@ struct Shot {
 // A character a film file brings in (`character NAME KIND ...`), its walks (`walk`) and its gestures (`gesture`).
 struct WalkLine {
 	double t0 = 0.0, speed = 0.8;
-	std::vector<std::pair<double, double>> points;   // pbrt x z
+	std::vector<std::pair<double, double>> points;   // pbrt x z (for a walk that finds its way: the way found, when the film is loaded)
+	std::vector<std::pair<double, double>> targets;  // (`to X Z ...`) the places it goes to, finding its way
 	int line = 0;
 };
 struct Character {
@@ -194,6 +197,8 @@ struct CharacterKind {
 	Vec3 carry{0.25, 1.0, 0.35};
 	int hand = 1;
 	Vec3 head{0.0, 1.6, 0.05};
+	// its size on the floor and its height (scale 1): what is in its way when it finds its way, and how close another may come
+	double radius = 0.3, height = 1.8;
 };
 // The library of kinds, by name (cartoons.h fills it before any film file is read).
 inline std::map<std::string, CharacterKind> &characterKinds() {
@@ -488,12 +493,21 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			if (verb == "walk") {
 				WalkLine wl;
 				wl.line = n;
-				if (t.size() < 6 || (t.size() - 4) % 2 != 0 || !number(t[2], wl.t0) || !number(t[3], wl.speed) || wl.speed <= 0.0)
-					return fail("`walk NAME FROM SPEED X Z [X Z ...]`: a start time, a speed above 0 and points");
-				for (std::size_t i = 4; i + 1 < t.size(); i += 2) {
-					double x = 0, z = 0;
-					if (!number(t[i], x) || !number(t[i + 1], z)) return fail("a walk's points are pairs of numbers (x z)");
-					wl.points.push_back({x, z});
+				if (t.size() > 4 && t[4] == "to") {   // places to go to, finding its way
+					if (!number(t[2], wl.t0) || !number(t[3], wl.speed) || wl.speed <= 0.0 || (t.size() - 4) % 3 != 0) return fail("`walk NAME FROM SPEED to X Z [to X Z ...]`");
+					for (std::size_t i = 4; i + 2 < t.size(); i += 3) {
+						double x = 0, z = 0;
+						if (t[i] != "to" || !number(t[i + 1], x) || !number(t[i + 2], z)) return fail("`walk NAME FROM SPEED to X Z [to X Z ...]`");
+						wl.targets.push_back({x, z});
+					}
+				} else {
+					if (t.size() < 6 || (t.size() - 4) % 2 != 0 || !number(t[2], wl.t0) || !number(t[3], wl.speed) || wl.speed <= 0.0)
+						return fail("`walk NAME FROM SPEED X Z [X Z ...]` (or `to X Z`): a start time, a speed above 0 and points");
+					for (std::size_t i = 4; i + 1 < t.size(); i += 2) {
+						double x = 0, z = 0;
+						if (!number(t[i], x) || !number(t[i + 1], z)) return fail("a walk's points are pairs of numbers (x z)");
+						wl.points.push_back({x, z});
+					}
 				}
 				if (!c->walks.empty() && wl.t0 < c->walks.back().t0) return fail("a character's walks go in time order");
 				c->walks.push_back(wl);
@@ -898,6 +912,8 @@ class DataFilm {
 		for (const Spec::Prop &pr : spec.props)
 			if (std::find(scene.names.begin(), scene.names.end(), pr.name) == scene.names.end())
 				return filePath + ":" + std::to_string(pr.line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + pr.name + "`";
+		if (const std::string e = findWays(); !e.empty()) return filePath + ":" + e;
+		if (const std::string e = crowding(); !e.empty()) return filePath + ": " + e;
 		if (const std::string e = holdingTimeline(); !e.empty()) return filePath + ":" + e;
 		for (const Spec::Look &l : spec.looks) {
 			if (!character(l.who)) return filePath + ":" + std::to_string(l.line) + ": " + l.who + " is not brought in with `character`";
@@ -913,6 +929,99 @@ class DataFilm {
 	}
 
 	std::vector<std::vector<speech::Syllable>> spoken;   // each line's syllables (spec.lines)
+
+	// ---- walks that find their way ----
+	// The set at t without its characters and its props (pbrt text): what is in the way.
+	std::string setAt(double t) const {
+		std::string out = headerAt(t);
+		for (const Piece &piece : scene.world) {
+			if (piece.block < 0) {
+				out += piece.text;
+				continue;
+			}
+			const Block &b = scene.blocks[static_cast<std::size_t>(piece.block)];
+			if (!visible(b.name, t) || prop(b.name)) continue;
+			out += b.head + transformsAt(b.name, t) + b.body;
+		}
+		return out;
+	}
+	// Finds the way of every walk that goes `to` places, in time order (so whoever walked before is where their walk left them): "" or "line: what is wrong".
+	std::string findWays() {
+		std::vector<std::pair<Character *, std::size_t>> walks;
+		for (Character &c : spec.characters)
+			for (std::size_t i = 0; i < c.walks.size(); ++i)
+				if (!c.walks[i].targets.empty()) walks.push_back({&c, i});
+		std::stable_sort(walks.begin(), walks.end(), [](const auto &a, const auto &b) { return a.first->walks[a.second].t0 < b.first->walks[b.second].t0; });
+		std::map<std::string, pbrt_flatten::FlatScene> flattened;   // (by the set's text: a set that does not move is flattened once)
+		const pbrt_flatten::MeshResolver meshes = [](const std::string &path, std::vector<float> &positions, std::vector<int> &indices, std::vector<float> &uvs, std::vector<float> &normals) {
+			ply_mesh::LoadResult m = ply_mesh::loadFile(path);
+			if (!m.ok) return false;
+			positions = std::move(m.mesh.positions);
+			indices = std::move(m.mesh.indices);
+			uvs = std::move(m.mesh.uvs);
+			normals = std::move(m.mesh.normals);
+			return true;
+		};
+		for (const auto &[c, i] : walks) {
+			WalkLine &w = c->walks[i];
+			const CharacterKind &kind = characterKinds().at(c->kind);
+			double fx = c->start[0], fz = c->start[2];   // from where its last walk left it
+			if (i > 0) {
+				fx = c->walks[i - 1].points.back().first;
+				fz = c->walks[i - 1].points.back().second;
+			}
+			const std::string set = setAt(w.t0);
+			if (!flattened.count(set)) flattened[set] = film_paths::flattenText(set, meshes);
+			const pbrt_flatten::FlatScene &flat = flattened[set];
+			// the map round the walk: the set between its ankles and its head, whoever else stands there, grown by its size
+			double x0 = fx, x1 = fx, z0 = fz, z1 = fz;
+			for (const auto &[x, z] : w.targets) x0 = std::min(x0, x), x1 = std::max(x1, x), z0 = std::min(z0, z), z1 = std::max(z1, z);
+			const double half = std::min(30.0, 0.5 * std::max(x1 - x0, z1 - z0) + 6.0);
+			film_paths::Grid g = film_paths::gridAround(0.5 * (x0 + x1), 0.5 * (z0 + z1), half, std::max(0.05, std::min(0.12, kind.radius * c->scale * 0.4)));
+			const double height = std::min(2.0, kind.height * c->scale);
+			film_paths::addScene(g, flat, c->start[1], std::min(0.15, 0.4 * height), height);
+			for (const Character &other : spec.characters) {
+				if (&other == c) continue;
+				Vec3 at;
+				momentOf(other, w.t0, &at);
+				film_paths::addDisc(g, -at.x, at.z, characterKinds().at(other.kind).radius * other.scale);
+			}
+			const film_paths::Grid ways = film_paths::grown(g, kind.radius * c->scale);
+			w.points.clear();
+			for (const auto &[tx, tz] : w.targets) {
+				std::vector<std::pair<double, double>> leg;
+				std::string why;
+				if (!film_paths::findWay(ways, fx, fz, tx, tz, leg, why)) {
+					char buf[200];
+					std::snprintf(buf, sizeof buf, "%d: %s cannot find a way to %g %g: %s", w.line, c->name.c_str(), tx, tz, why.c_str());
+					return buf;
+				}
+				w.points.insert(w.points.end(), leg.begin(), leg.end());
+				fx = tx;
+				fz = tz;
+			}
+		}
+		return std::string();
+	}
+	// Two characters that walk into each other (closer than most of their sizes while one of them walks): "" or what happens when.
+	std::string crowding() const {
+		const double step = 0.05;
+		for (double t = 0.0; t <= spec.length; t += step)
+			for (std::size_t a = 0; a < spec.characters.size(); ++a)
+				for (std::size_t b = a + 1; b < spec.characters.size(); ++b) {
+					const Character &ca = spec.characters[a], &cb = spec.characters[b];
+					Vec3 pa, pb;
+					const bool movingA = momentOf(ca, t, &pa).moving, movingB = momentOf(cb, t, &pb).moving;
+					if (!movingA && !movingB) continue;
+					const double reach = 0.8 * (characterKinds().at(ca.kind).radius * ca.scale + characterKinds().at(cb.kind).radius * cb.scale);
+					if (std::hypot(pa.x - pb.x, pa.z - pb.z) < reach) {
+						char buf[200];
+						std::snprintf(buf, sizeof buf, "%s and %s walk into each other at %.2f s (give one of them a walk `to` a place: it finds its way round the other)", ca.name.c_str(), cb.name.c_str(), t);
+						return buf;
+					}
+				}
+		return std::string();
+	}
 
 	// ---- props characters handle ----
 	// Who holds a prop from a time on: a character's hand, or nobody (it rests at `rest`, pbrt's).
@@ -1091,7 +1200,7 @@ class DataFilm {
 		double heading = -c.facing, steps = 0.0;
 		bool moving = false;
 		for (std::size_t i = 0; i < c.walks.size(); ++i) {
-			if (t < c.walks[i].t0) break;
+			if (t < c.walks[i].t0 || c.walks[i].points.empty()) break;   // (a way not found yet: the film is being loaded)
 			const rig::PathWalk path = pathOf(c, i);
 			const rig::PathWalk::At a = path.at(t);
 			where = a.at;

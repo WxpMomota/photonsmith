@@ -221,6 +221,8 @@ inline CharacterKind pipKind() {
 	};
 	k.carry = {0.25, 0.35, 0.45};   // (in front of its belly, below its big head, on the hand's side)
 	k.head = {0.0, 0.96, 0.2};
+	k.radius = 0.5;   // (its head, wider than its feet)
+	k.height = 1.5;
 	k.feet = [k](const CharacterMoment &m) { return feetOf(m, k); };
 	return k;
 }
@@ -321,6 +323,8 @@ inline CharacterKind personKind() {
 	k.handAt = [pose](const CharacterMoment &m, int s) { return human::handOf(pose(m), s == 0 ? -1.0 : 1.0); };
 	k.carry = {0.20, 1.05, 0.35};
 	k.head = {0.0, 1.64, 0.05};
+	k.radius = 0.25;
+	k.height = 1.8;
 	k.feet = [k](const CharacterMoment &m) { return feetOf(m, k); };
 	return k;
 }
@@ -423,6 +427,8 @@ inline CharacterKind turtleKind() {
 	};
 	k.carry = {0.03, 0.03, 0.085};
 	k.head = {0.0, 0.045, 0.085};
+	k.radius = 0.07;
+	k.height = 0.1;
 	k.feet = [k](const CharacterMoment &m) { return feetOf(m, k); };
 	return k;
 }
@@ -471,6 +477,8 @@ inline CharacterKind explorerKind() {
 	explorer.carry = {0.18, 1.0, 0.32};
 	explorer.hand = 0;
 	explorer.head = {0.0, 1.72, 0.08};
+	explorer.radius = 0.3;
+	explorer.height = 2.1;
 	return explorer;
 }
 

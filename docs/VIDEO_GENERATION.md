@@ -580,6 +580,15 @@ crouch; the explorer takes things with its left hand (its staff is in its right)
 between where they got to; when they cannot meet the film is refused with how far apart the hands stay ("bring them closer"), as are a pick of a prop someone holds, a put
 or give by someone who does not hold it, and two changes to a prop less than 1.1 s apart. Each pick, put and give is a touch on the soundtrack.
 
+**Walks that find their way: `walk NAME T SPEED to X Z`.** Instead of the points of its path, a walk can name where it goes (`to X Z`, as many as it likes, one after
+another), and the way is found when the film is loaded (film_paths.h): the set at the walk's start - without its characters and props - is flattened and everything of it
+between the walker's ankles and its head (`0.15` m and its height, from the ground it stands on) is drawn on a map of the floor seen from above (triangles cut to that slab,
+spheres, disks and cylinders), with the characters standing there as discs of their size; the map is grown by the walker's own size and the shortest way across it is found
+(A* over 5-12 cm cells, without cutting between two blocked cells) and straightened wherever nothing is in the way; the walk then turns its corners gradually as any walk.
+Walks are found in time order, so a walker goes round whoever stands where an earlier walk left them. A place that is in the way, or one with no way to it, refuses the film
+("ann cannot find a way to 0 0: something is in the way there"), and so do two characters whose walks run into each other (closer than 80% of their sizes while one of them
+walks; the sizes on the floor: Pip 0.5 m, the person 0.25 m, the explorer 0.3 m, the turtle 7 cm, times their scale).
+
 `ray_tracer --film-lines <key>` lists the lines with their start, end and syllables; `ray_tracer --film-sound <key> OUT.wav` writes a film's soundtrack alone, to listen to
 the lines (and the music and footsteps) without rendering a frame; `--film-check` counts a film file's characters and lines.
 

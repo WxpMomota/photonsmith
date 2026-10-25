@@ -701,3 +701,64 @@ TEST(FilmProps, ACharacterLooksAtSomeoneAPropOrAPoint) {
 	ff::DataFilm bad;
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter pip pip\nlook pip at ann 1 2\n", bad).find("neither a character nor a prop"), std::string::npos);
 }
+
+// ---- walks that find their way ------------------------------------------------------------------------------------------------------------------------------------------------
+
+// A floor map from the set (what stands between ankle and head height, seen from above), grown by the walker's size, and the shortest way across it: straight when nothing is
+// in the way, round a wall otherwise, never through it; no way into a closed room.
+TEST(FilmPaths, TheWayRoundAWallIsFoundOnAMapOfTheSetAndNeverCrossesIt) {
+	namespace fp = cartoon::film_paths;
+	const std::string wall = "WorldBegin\nShape \"trianglemesh\" \"integer indices\" [ 0 1 2 0 2 3 ] \"point3 P\" [ -2 0 0  2 0 0  2 2 0  -2 2 0 ]\n"   // a wall across x -2..2 at z 0
+							 "Shape \"sphere\" \"float radius\" [ 0.5 ]\n";   // (a ball half sunk in the floor at the origin: in the wall anyway)
+	const pbrt_flatten::FlatScene s = fp::flattenText(wall, {});
+	ASSERT_EQ(s.triangles.size(), 2u);
+	fp::Grid g = fp::gridAround(0.0, 0.0, 6.0, 0.08);
+	fp::addScene(g, s, 0.0, 0.15, 1.8);
+	EXPECT_TRUE(g.at(g.col(1.0), g.row(0.0))) << "the wall is on the map";
+	EXPECT_FALSE(g.at(g.col(1.0), g.row(1.0)));
+	const fp::Grid ways = fp::grown(g, 0.3);
+	std::vector<std::pair<double, double>> way;
+	std::string why;
+	ASSERT_TRUE(fp::findWay(ways, 3.0, -3.0, 3.0, 3.0, way, why)) << why;
+	EXPECT_EQ(way.size(), 1u) << "beside the wall: straight";
+	ASSERT_TRUE(fp::findWay(ways, 0.0, -3.0, 0.0, 3.0, way, why)) << why;
+	ASSERT_GE(way.size(), 2u) << "round it";
+	double length = 0.0, px = 0.0, pz = -3.0;
+	for (const auto &[x, z] : way) {
+		EXPECT_TRUE(fp::clear(ways, px, pz, x, z)) << "no leg crosses the wall";
+		length += std::hypot(x - px, z - pz);
+		px = x, pz = z;
+	}
+	EXPECT_GT(length, 6.0);
+	EXPECT_LT(length, 2.0 * std::hypot(2.3, 3.0) + 0.3) << "the short way round an end";
+	// shut in: no way
+	const std::string room = "WorldBegin\nShape \"trianglemesh\" \"integer indices\" [ 0 1 2 0 2 3  4 5 6 4 6 7  8 9 10 8 10 11  12 13 14 12 14 15 ] \"point3 P\" [ "
+							 "-1 0 -1  1 0 -1  1 2 -1  -1 2 -1   -1 0 1  1 0 1  1 2 1  -1 2 1   -1 0 -1  -1 0 1  -1 2 1  -1 2 -1   1 0 -1  1 0 1  1 2 1  1 2 -1 ]\n";
+	fp::Grid shut = fp::gridAround(0.0, 0.0, 6.0, 0.08);
+	fp::addScene(shut, fp::flattenText(room, {}), 0.0, 0.15, 1.8);
+	EXPECT_FALSE(fp::findWay(fp::grown(shut, 0.25), 3.0, 0.0, 0.0, 0.0, way, why));
+}
+
+// In a film file a walk `to` a place goes round what is in the way, the set's and a character standing there; a way that cannot be found is refused, and two characters whose
+// walks run into each other are told of.
+TEST(FilmPaths, AWalkToAPlaceGoesRoundTheSetAndWhoeverStandsThere) {
+	(void)cartoon::films();
+	// the test scene has a ball of radius 1 at the origin: a walk from one side to the other goes round it
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 20\ncharacter ann person at 0 0 -3\ncharacter pip pip at 2.5 0 0\nwalk ann 1 1.0 to 0 3\n", film), "");
+	const ff::WalkLine &w = film.spec.characters[0].walks[0];
+	ASSERT_GE(w.points.size(), 2u) << "round the ball";
+	double closest = 1e9, closestPip = 1e9;
+	for (double t = 1.0; t < 12.0; t += 0.02) {
+		cartoon::Vec3 at;
+		film.momentOf(film.spec.characters[0], t, &at);
+		closest = std::min(closest, std::hypot(at.x, at.z));
+		closestPip = std::min(closestPip, std::hypot(-at.x - 2.5, at.z));
+	}
+	EXPECT_GT(closest, 1.0 + 0.25 - 0.1) << "it keeps its size away from the ball";
+	EXPECT_GT(closestPip, 0.25 + 0.35 - 0.1) << "and from pip";
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 20\ncharacter ann person at 0 0 -3\nwalk ann 1 1.0 to 0 0\n", bad).find("ann cannot find a way to 0 0: something is in the way there"), std::string::npos);
+	const std::string bump = loadFilm("scene s.pbrt\nlength 20\ncharacter ann person at -3 0 3\ncharacter pip pip at 3 0 3 facing -90\nwalk ann 1 1 3 3\n", bad);
+	EXPECT_NE(bump.find("ann and pip walk into each other"), std::string::npos) << bump;
+}
