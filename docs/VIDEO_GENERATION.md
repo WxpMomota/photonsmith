@@ -540,6 +540,26 @@ kind's poses.
 
 `scale` on a character line (`character tess turtle at 1.6 0 -2 scale 6`) sizes a kind that can be scaled, its stride and the point the camera looks at with it.
 
+**Dialogue: `say`.** A line of a film file makes a character speak:
+
+```
+say  pip  0.5  "Look at the moon! Is it made of cheese?"      # NAME, from 0.5 s, the words
+say  ann  4.0  "No, it is made of rock, I think."  rate 1.2  pitch -1  nocaption   # faster, a semitone lower, no caption
+```
+
+One line gives three things (film_speech.h). The timing: each word is cut into syllables at its vowel groups (a silent e is not one; a character of another script, a
+Chinese one, is one of its own), about 0.17 s each over `rate`, with pauses at commas (0.22 s) and full stops, '!' and '?' (0.42 s). The mouth: each syllable's vowel gives
+its shape - open for an "ah", wide for an "ee", round for an "oo" - the lips meet for an m, b or p, between the syllables of a phrase it goes half open from one shape to the
+next and it shuts at a pause; Pip, the person and the turtle draw it, and the masked explorer's staff glows with the voice. The voice: a cartoon babble made from the words, so
+no recording or speech engine is needed - a buzz at the character's pitch (its kind's, moved up to 1.5 semitones by its name, lower when it is scaled up) shaped by the three
+formants of each vowel, a hiss for an s or an f, a pop for a t or a k; it falls over a sentence, rises at the end of a question and is higher for '!'. The line is panned to
+where the camera sees the speaker and quietened with the distance. And a caption: the words from the line's start to a little after its end (cut short where the next line
+begins), beside any of the film's captions file (`film_assets/<key>/captions.txt`). A recorded line can be used instead: a cues file's `sample FILE.wav ... by NAME` opens
+the character's mouth by its loudness.
+
+`ray_tracer --film-lines <key>` lists the lines with their start, end and syllables; `ray_tracer --film-sound <key> OUT.wav` writes a film's soundtrack alone, to listen to
+the lines (and the music and footsteps) without rendering a frame; `--film-check` counts a film file's characters and lines.
+
 **A quick preview of a whole film: `python scripts/anim/film.py preview <key>`.** Building a film's characters, not rendering them, is most of a frame's time (the Nomai
 explorer: 8.7 s at its usual detail, 40 s for a face close-up; the renderer takes 3 to 5 s for a 1080p frame), so a real-time renderer would not make a film quick to watch.
 `--preview` builds every sculpted shape three times coarser (`sdf::surfaceNets`, `previewCoarsening()`; its meshes are cached apart, and its frames go to

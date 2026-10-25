@@ -38,6 +38,8 @@
 #include "newtons_cradle.h"
 #include "film_file.h"
 #include "film_kinds.h"
+#include "caption_file.h"
+#include "film_cache.h"
 #include "orrery.h"
 #include "paper_boat.h"
 #include "pip_and_the_moon.h"
@@ -244,7 +246,21 @@ inline void addFilmFile(Registry &r, const std::string &file) {
 		f.subjectsAt = [p](double t) { return p->subjectsAt(t); };
 		f.events = [p]() { return p->events(); };
 		f.feetAt = [p](double t) { return p->feetAt(t); };
-		f.soundtrack = [p](audio::Mix &m) { sfx::play(m, p->events()); };   // (its footsteps and touches; its cues file adds the music: withFilmFiles)
+		f.soundtrack = [p](audio::Mix &m) {   // (its footsteps, touches and lines; its cues file adds the music: withFilmFiles)
+			sfx::play(m, p->events());
+			p->speak(m);
+		};
+	}
+	// its captions: its captions file (film_assets/<key>/captions.txt) and its characters' lines
+	const std::string captionsFile = film_cache::asset(d.spec.key + "/captions.txt");
+	const bool hasCaptionsFile = std::filesystem::exists(captionsFile);
+	if (hasCaptionsFile || !d.lineCaptions().empty()) {
+		f.captions = [p, captionsFile, hasCaptionsFile]() {
+			std::vector<Caption> out = hasCaptionsFile ? caption_file::read(captionsFile) : std::vector<Caption>();
+			const std::vector<Caption> lines = p->lineCaptions();
+			out.insert(out.end(), lines.begin(), lines.end());
+			return out;
+		};
 	}
 	r.made.push_back(withFilmFiles(std::move(f)));
 	r.all.push_back(&r.made.back());
@@ -281,6 +297,12 @@ inline Registry &registry() {
 inline const std::vector<const Film *> &films() { return detail::registry().all; }
 // What was wrong with the film files that were left out ("file:line: what"), one entry each.
 inline const std::vector<std::string> &filmFileProblems() { return detail::registry().problems; }
+// The film file a film was made from (null for a built-in film): its characters and their lines.
+inline const film_file::DataFilm *filmFileOf(const std::string &key) {
+	for (const film_file::DataFilm &d : detail::registry().data)
+		if (d.spec.key == key) return &d;
+	return nullptr;
+}
 
 inline const Film *find(const char *key) {
 	if (!key) return nullptr;

@@ -47,6 +47,7 @@
 //     walk       kai  2.0 0.7   0 -2   3 -6                     # NAME, from 2 s at 0.7 m/s, through these points (x z) from where it is
 //     gesture    kai  "look up" 8.0 9.0 11.0 11.5               # NAME, a pose of its library, eased in from 8 s to 9 s, out from 11 s to 11.5 s (no out times: held)
 //     gesture    kai  "reach to the wall" 12 13 contact 12.8    # contact: the hand meets something (a touch on the soundtrack)
+//     say        kai  14.4 "Look, the first star."  rate 1.1  pitch 2   # NAME, a line it says from 14.4 s: its voice, its mouth and a caption (film_speech.h; `nocaption`)
 //
 //     shot 0 Walking
 //       follow   kai  behind 3  up 1.7  side 0.6  fov 35          # instead of `key` lines: the camera behind NAME (metres), at a height, to its right, looking at its chest
@@ -78,6 +79,7 @@
 #include <vector>
 
 #include "../camera_keyframes.h"
+#include "film_speech.h"
 #include "film_subjects.h"
 #include "music_cues.h"
 #include "prop_physics.h"
@@ -144,7 +146,8 @@ struct CharacterMoment {
 	const std::vector<rig::Gesture> *gestures = nullptr;
 	double detail = 0.0;
 	Vec3 trail;   // how far a spring on its place lags it (body space: +x its left, +z forward): for what hangs and swings - a robe's hem, a tail (rig::lag)
-	double voice = 0.0;        // how loud it is speaking, 0..1 (its `sample ... by NAME` cues: music_cues::voiceAt) - a mouth opens by it
+	double voice = 0.0;        // how loud it is speaking, 0..1 (its `say` lines, its `sample ... by NAME` cues: music_cues::voiceAt) - a mouth opens by it
+	speech::Mouth mouth;       // the mouth shape its `say` lines need now (open, wide, round)
 	bool feetLocked = false;   // its feet held where they came down (rig::FootLock), in body space: when its kind says where its gait puts them
 	Vec3 lockedFeet[4];
 	double scale = 1.0;        // its size (Character::scale)
@@ -163,6 +166,7 @@ struct CharacterKind {
 	int footCount = 2;             // (a turtle has four)
 	bool scalable = false;         // whether `scale` on its character line is drawn (its stride, chest and feet are scaled with it)
 	std::vector<std::string> poses;   // its library's poses (a gesture naming another is an error when the film is loaded)
+	speech::Voice voice;              // how its `say` lines sound (its pitch is moved a little for each character, by its name)
 };
 // The library of kinds, by name (cartoons.h fills it before any film file is read).
 inline std::map<std::string, CharacterKind> &characterKinds() {
@@ -185,6 +189,7 @@ struct Spec {
 	std::vector<std::pair<std::string, physics::Bounce>> bounces;
 	std::vector<std::pair<std::string, physics::Topple>> topples;
 	std::vector<std::pair<std::string, int>> physicsLines;
+	std::vector<speech::Line> lines;   // what the characters say (`say`)
 };
 
 struct Parsed {
@@ -439,6 +444,25 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				if (i != t.size()) return fail("\"" + t[i] + "\" is not part of a gesture");
 				c->gestures.push_back(g);
 			}
+		} else if (verb == "say") {
+			const std::vector<std::string> t = detail::tokens(line);
+			speech::Line l;
+			l.line = n;
+			if (t.size() < 4 || !number(t[2], l.t) || l.t < 0.0) return fail("`say NAME T \"WHAT IT SAYS\" [rate R] [pitch SEMITONES] [nocaption]`");
+			l.who = t[1];
+			l.text = t[3];
+			for (std::size_t i = 4; i < t.size();) {
+				if (t[i] == "nocaption") {
+					l.caption = false;
+					++i;
+				} else if ((t[i] == "rate" || t[i] == "pitch") && i + 1 < t.size() && number(t[i + 1], t[i] == "rate" ? l.rate : l.pitch)) {
+					i += 2;
+				} else {
+					return fail("\"" + t[i] + "\": a line takes rate R, pitch SEMITONES and nocaption");
+				}
+			}
+			if (!(l.rate > 0.0)) return fail("a line's rate is more than 0");
+			s.lines.push_back(l);
 		} else if (verb == "follow" || verb == "subject") {
 			if (s.shots.empty()) return fail("`" + verb + "` belongs to a shot: start one with `shot 0 NAME` first");
 			const std::vector<std::string> t = detail::tokens(line);
@@ -497,7 +521,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, shot, key, follow, subject, move, turn, grow, light, show, bounce, topple, character, walk, gesture)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, shot, key, follow, subject, move, turn, grow, light, show, bounce, topple, character, walk, gesture, say)");
 		}
 	}
 	n = shotLine;
@@ -743,6 +767,10 @@ class DataFilm {
 					return filePath + ": " + c.name + "'s gesture \"" + g.pose + "\" is not a pose of a " + c.kind + " (its poses: " + known + ")";
 				}
 		}
+		for (const speech::Line &l : spec.lines)
+			if (!character(l.who)) return filePath + ":" + std::to_string(l.line) + ": " + l.who + " says a line but is not brought in with `character`";
+		spoken.clear();
+		for (const speech::Line &l : spec.lines) spoken.push_back(speech::syllablesOf(l));
 		for (const Shot &shot : spec.shots) {
 			std::vector<std::string> named = shot.about;
 			if (shot.following) named.push_back(shot.follow.who);
@@ -751,6 +779,8 @@ class DataFilm {
 		}
 		return std::string();
 	}
+
+	std::vector<std::vector<speech::Syllable>> spoken;   // each line's syllables (spec.lines)
 
 	// ---- characters ----
 	const Character *character(const std::string &name) const {
@@ -924,6 +954,63 @@ class DataFilm {
 		return out;
 	}
 	bool hasEvents() const { return !spec.characters.empty() || !spec.bounces.empty() || !spec.topples.empty(); }
+
+	// ---- what the characters say ----
+	// A character's mouth and voice at t from its lines.
+	void speakingAt(const Character &c, double t, CharacterMoment &m) const {
+		for (std::size_t i = 0; i < spec.lines.size(); ++i) {
+			if (spec.lines[i].who != c.name || t < spec.lines[i].t - 0.1 || t > speech::endOf(spoken[i], spec.lines[i].t) + 0.1) continue;
+			const speech::Mouth mouth = speech::mouthAt(spoken[i], t);
+			m.mouth.open = std::max(m.mouth.open, mouth.open);
+			m.mouth.wide = std::max(m.mouth.wide, mouth.wide);
+			m.mouth.round = std::max(m.mouth.round, mouth.round);
+			m.voice = std::max(m.voice, speech::loudnessAt(spoken[i], t));
+		}
+	}
+	// The voice a character speaks in: its kind's, its pitch moved by up to 1.5 semitones either way by its name.
+	speech::Voice voiceOf(const Character &c) const {
+		speech::Voice v = characterKinds().at(c.kind).voice;
+		v.pitch *= std::pow(2.0, (static_cast<double>(seedOf(c.name) % 1000) / 999.0 * 3.0 - 1.5) / 12.0) / std::sqrt(c.scale);   // (a bigger one is lower)
+		return v;
+	}
+	// The lines spoken on a mix: each panned and quietened from where the camera is when it starts.
+	void speak(audio::Mix &mix) const {
+		for (std::size_t i = 0; i < spec.lines.size(); ++i) {
+			const Character &c = *character(spec.lines[i].who);
+			const double t0 = spec.lines[i].t;
+			Vec3 eye, target;
+			double fov = 40.0;
+			film_subjects::cameraOf(headerAt(t0), eye, target, fov);
+			const CameraView view{eye, target, fov, 0.0, 0};
+			const Vec3 at = chestOf(c, t0);
+			mix.put(t0, speech::speak(spoken[i], t0, voiceOf(c), static_cast<unsigned>(i + 1)), 0.55 * std::max(0.35, audibility(length(at - eye))), panOf(view, at) * 0.6, 0.25);
+		}
+	}
+	// The captions of the lines (those not marked nocaption): each from its start to a little after its end, cut short where the next begins.
+	std::vector<Caption> lineCaptions() const {
+		std::vector<Caption> out;
+		std::vector<std::size_t> order;
+		for (std::size_t i = 0; i < spec.lines.size(); ++i)
+			if (spec.lines[i].caption) order.push_back(i);
+		std::stable_sort(order.begin(), order.end(), [this](std::size_t a, std::size_t b) { return spec.lines[a].t < spec.lines[b].t; });
+		for (std::size_t k = 0; k < order.size(); ++k) {
+			const speech::Line &l = spec.lines[order[k]];
+			Caption cap;
+			cap.t0 = l.t;
+			cap.t1 = speech::endOf(spoken[order[k]], l.t) + 0.6;
+			if (k + 1 < order.size()) cap.t1 = std::min(cap.t1, spec.lines[order[k + 1]].t - 0.05);
+			cap.t1 = std::max(cap.t1, cap.t0 + 0.5);
+			cap.fade = 0.15;
+			cap.centreY = 0.88;
+			cap.width = 0.72;
+			CaptionLine text;
+			text.text = l.text;
+			text.size = 0.042;
+			cap.lines.push_back(text);
+			out.push_back(cap);
+		}
+		return out;
+	}
 	// (film_events.h's panOf and audibility, here so that this header does not need the sound library)
 	static double panOf(const CameraView &view, Vec3 at) {
 		const Vec3 f = normalize(view.target - view.eye), right = normalize(cross(f, Vec3{0.0, 1.0, 0.0}));
@@ -977,6 +1064,7 @@ class DataFilm {
 			m.trail = trailOf(c, t, m);
 			lockFeet(c, t, m);
 			m.voice = music_cues::voiceAt(spec.key, c.name, t, shotStarts(), shotNameList());
+			speakingAt(c, t, m);
 			out += "# " + c.name + " (" + c.kind + ")\n" + kind.text(m);
 		}
 		return out;

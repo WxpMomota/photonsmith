@@ -841,7 +841,9 @@ static int film_check_command(int argc, char** argv) {
 			continue;
 		}
 		std::cout << "OK       " << argv[i] << ": film \"" << film.spec.key << "\", " << film.spec.length << " s at " << film.spec.fps << " fps, " << film.shotStarts().size() << (film.shotStarts().size() == 1 ? " shot" : " shots")
-				  << ", " << film.spec.anims.size() << " animation line" << (film.spec.anims.size() == 1 ? "" : "s") << ", " << film.scene.names.size() << " animated block" << (film.scene.names.size() == 1 ? "" : "s") << std::endl;
+				  << ", " << film.spec.anims.size() << " animation line" << (film.spec.anims.size() == 1 ? "" : "s") << ", " << film.scene.names.size() << " animated block" << (film.scene.names.size() == 1 ? "" : "s")
+				  << (film.spec.characters.empty() ? std::string() : ", " + std::to_string(film.spec.characters.size()) + " character" + (film.spec.characters.size() == 1 ? "" : "s"))
+				  << (film.spec.lines.empty() ? std::string() : ", " + std::to_string(film.spec.lines.size()) + " line" + (film.spec.lines.size() == 1 ? "" : "s") + " of dialogue") << std::endl;
 	}
 	if (argc == 2) {
 		for (const cartoon::Film *f : cartoon::films())
@@ -1015,6 +1017,34 @@ int main(int argc, char** argv) {
 	}
 	// `ray_tracer --film-cues <key>`: the film's cues file read and placed (music_cues.h), one tab-separated line a cue: `cue  seconds  instrument  notes (comma-separated)`,
 	// and a `problem` line for each thing in it that cannot be played. Nothing when the film has no cues file.
+	// `ray_tracer --film-lines <key>`: what a film file's characters say (film_speech.h), one tab-separated line each: `line  start  end  who  syllables  text`.
+	if (argc >= 2 && std::string(argv[1]) == "--film-lines") {
+		(void)cartoon::films();
+		const cartoon::film_file::DataFilm *film = argc >= 3 ? cartoon::filmFileOf(argv[2]) : nullptr;
+		if (!film) {
+			std::cerr << "usage: " << argv[0] << " --film-lines <key of a film made from a film file>" << std::endl;
+			return EXIT_FAILURE;
+		}
+		for (std::size_t i = 0; i < film->spec.lines.size(); ++i) {
+			const cartoon::speech::Line &l = film->spec.lines[i];
+			std::cout << "line" << '	' << l.t << '	' << cartoon::speech::endOf(film->spoken[i], l.t) << '	' << l.who << '	' << film->spoken[i].size() << '	' << l.text << std::endl;
+		}
+		return EXIT_SUCCESS;
+	}
+	// `ray_tracer --film-sound <key> OUT.wav`: a film's soundtrack alone (its music, sounds and lines), to listen to without rendering a frame.
+	if (argc >= 2 && std::string(argv[1]) == "--film-sound") {
+		const cartoon::Film *film = argc >= 4 ? cartoon::find(argv[2]) : nullptr;
+		if (!film || !film->soundtrack) {
+			std::cerr << "usage: " << argv[0] << " --film-sound <key of a film with a soundtrack> OUT.wav" << std::endl;
+			return EXIT_FAILURE;
+		}
+		if (!cartoon_render::writeSoundtrack(*film, argv[3])) {
+			std::cerr << "cannot write " << argv[3] << std::endl;
+			return EXIT_FAILURE;
+		}
+		std::cout << "wrote " << argv[3] << std::endl;
+		return EXIT_SUCCESS;
+	}
 	if (argc >= 2 && std::string(argv[1]) == "--film-cues") {
 		const cartoon::Film *film = argc >= 3 ? cartoon::find(argv[2]) : nullptr;
 		if (!film) {

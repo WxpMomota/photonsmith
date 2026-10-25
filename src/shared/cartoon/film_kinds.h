@@ -69,6 +69,13 @@ inline std::vector<std::string> namesOf(const rig::PoseLibrary<P> &library) {
 	for (const auto &[name, pose] : library) out.push_back(name);
 	return out;
 }
+// How far a mouth opens and how it smiles for a moment: the shape its `say` lines need (wide for an "ee", round for an "oo"), or, for a recording (a cues file's
+// `sample ... by NAME`), open by the voice's loudness.
+inline void speakWith(const CharacterMoment &m, double &mouthOpen, double &smile) {
+	const bool line = m.mouth.wide + m.mouth.round > 0.0;
+	mouthOpen = std::max(mouthOpen, line ? m.mouth.open : 0.85 * m.voice);
+	smile += 0.35 * m.mouth.wide - 0.3 * m.mouth.round;
+}
 // A to-and-fro at `hz` (a wave, a shake of the head), from the gesture's start.
 inline double wiggle(double since, double hz) { return std::sin(2.0 * kPi * hz * since); }
 
@@ -141,12 +148,13 @@ inline CharacterKind pipKind() {
 	k.chest = {0.0, 0.75, 0.0};
 	k.scalable = true;
 	k.poses = namesOf(pipPoses(1.0));
+	k.voice = {290.0, 1.3, 0.04};   // (high and small)
 	const auto pose = [](const CharacterMoment &m) {
 		actor::Pose p = pipWalk(m.steps);
 		placeOf(m.frame, p.pos, p.yaw);
 		p.blink = rig::blink(m.t, m.seed);
 		p.squash = actor::breathe(m.t);
-		p.mouthOpen = 0.85 * m.voice;
+		speakWith(m, p.mouthOpen, p.smile);
 		if (m.feetLocked) {
 			p.feetHeld = true;
 			for (int s = 0; s < 2; ++s) p.heldFoot[s] = transformPoint(m.frame, m.lockedFeet[s]);
@@ -226,11 +234,12 @@ inline CharacterKind personKind() {
 	k.firstStep = 1.0;
 	k.chest = {0.0, 1.35, 0.0};
 	k.poses = namesOf(personPoses());
+	k.voice = {140.0, 1.0, 0.04};
 	const auto pose = [](const CharacterMoment &m) {
 		human::HumanPose p = personWalk(m.steps);
 		placeOf(m.frame, p.pos, p.yaw);
 		p.blink = rig::blink(m.t, m.seed);
-		p.mouthOpen = 0.85 * m.voice;
+		speakWith(m, p.mouthOpen, p.smile);
 		if (m.feetLocked) {
 			p.feetHeld = true;
 			for (int s = 0; s < 2; ++s) p.heldFoot[s] = transformPoint(m.frame, m.lockedFeet[s]);
@@ -295,11 +304,12 @@ inline CharacterKind turtleKind() {
 	k.chest = {0.0, 0.035, 0.03};
 	k.scalable = true;
 	k.poses = namesOf(turtlePoses(1.0));
+	k.voice = {360.0, 1.4, 0.06};
 	const auto pose = [](const CharacterMoment &m) {
 		turtle::TurtlePose p = turtleWalk(m.steps);
 		placeOf(m.frame, p.pos, p.yaw);
 		p.blink = rig::blink(m.t, m.seed);
-		p.mouthOpen = 0.85 * m.voice;
+		speakWith(m, p.mouthOpen, p.smile);
 		if (m.feetLocked) {   // (its legs reach for where their feet came down: a turtle's feet follow world targets)
 			Vec3 *target[4] = {&p.frontL, &p.frontR, &p.hindL, &p.hindR};
 			double *weight[4] = {&p.frontWeightL, &p.frontWeightR, &p.hindWeightL, &p.hindWeightR};
@@ -343,6 +353,7 @@ inline CharacterKind explorerKind() {
 	explorer.stride = 0.84;
 	explorer.firstStep = 0.5;
 	explorer.poses = namesOf(nomai::explorerPoses());
+	explorer.voice = {165.0, 1.05, 0.12};   // (behind a mask: breathier)
 	return explorer;
 }
 

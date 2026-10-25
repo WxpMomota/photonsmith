@@ -479,3 +479,117 @@ TEST(FilmFile, PipAPersonAndTheTurtleWalkTurnACornerWithFeetThatStayPutAndActWit
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 12\ncharacter c person scale 2\n", bad).find("a person cannot be scaled"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 12\ncharacter c pip scale 0\n", bad).find("above 0"), std::string::npos);
 }
+
+// ---- what characters say ------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// A line is cut into syllables at its vowel groups (a silent e is not one; a Chinese character is one of its own), paced with pauses at its punctuation; its pitch falls over
+// a statement and rises at the end of a question.
+TEST(FilmSpeech, ALineIsTimedBySyllablesWithPausesAndAnIntonationThatFollowsItsPunctuation) {
+	namespace sp = cartoon::speech;
+	sp::Line l;
+	l.t = 2.0;
+	l.text = "Hello there, friend.";
+	const std::vector<sp::Syllable> y = sp::syllablesOf(l);
+	ASSERT_EQ(y.size(), 4u) << "hel-lo there friend";
+	EXPECT_EQ(y[0].vowel, 'e');
+	EXPECT_EQ(y[1].vowel, 'o');
+	EXPECT_EQ(y[0].onset, 'h');
+	EXPECT_GT(y[0].t0, 2.0);
+	for (std::size_t i = 1; i < y.size(); ++i) EXPECT_GT(y[i].t0, y[i - 1].t1) << "one after another";
+	EXPECT_GT(y[3].t0 - y[2].t1, 0.2) << "the comma pauses";
+	EXPECT_GT(y[0].pitch, y[3].pitch) << "a statement falls";
+	l.text = "Are you there?";
+	const std::vector<sp::Syllable> q = sp::syllablesOf(l);
+	ASSERT_GE(q.size(), 3u);
+	EXPECT_GT(q.back().pitch, q.front().pitch) << "a question rises at its end";
+	l.text = "\xE4\xBD\xA0\xE5\xA5\xBD\xEF\xBC\x8C\xE6\x9C\x8B\xE5\x8F\x8B\xE3\x80\x82";   // 你好，朋友。
+	const std::vector<sp::Syllable> zh = sp::syllablesOf(l);
+	ASSERT_EQ(zh.size(), 4u) << "a syllable a character";
+	EXPECT_GT(zh[2].t0 - zh[1].t1, 0.2) << "the full-width comma pauses";
+	l.text = "Faster.";
+	const double slow = sp::endOf(sp::syllablesOf(l), l.t);
+	l.rate = 2.0;
+	EXPECT_LT(sp::endOf(sp::syllablesOf(l), l.t) - l.t, 0.6 * (slow - l.t)) << "rate 2 is about twice as quick";
+}
+
+// The mouth takes each vowel's shape while it is heard (wide for an "ee", round for an "oo"), the lips meet at the start of an m, and between lines it is shut; the voice is
+// loud while a syllable is spoken and silent after the line.
+TEST(FilmSpeech, TheMouthTakesEachVowelsShapeAndTheLipsMeetForAnM) {
+	namespace sp = cartoon::speech;
+	sp::Line l;
+	l.text = "me too";
+	const std::vector<sp::Syllable> y = sp::syllablesOf(l);
+	ASSERT_EQ(y.size(), 2u);
+	const double mid0 = 0.5 * (y[0].t0 + y[0].t1), mid1 = 0.5 * (y[1].t0 + y[1].t1);
+	const sp::Mouth ee = sp::mouthAt(y, mid0), oo = sp::mouthAt(y, mid1);
+	EXPECT_GT(ee.wide, 0.7);
+	EXPECT_LT(ee.round, 0.01);
+	EXPECT_GT(oo.round, 0.7);
+	EXPECT_LT(oo.wide, 0.01);
+	EXPECT_LT(sp::mouthAt(y, y[0].t0 - 0.005).open, 0.05) << "the lips meet for the m";
+	EXPECT_GT(sp::loudnessAt(y, mid0), 0.9);
+	EXPECT_EQ(sp::loudnessAt(y, y[1].t1 + 0.2), 0.0);
+	EXPECT_EQ(sp::mouthAt(y, y[1].t1 + 0.2).open, 0.0);
+	// the voice: as long as the line, not silent, not clipped, louder where a syllable is
+	const std::vector<float> v = sp::speak(y, l.t, sp::Voice{});
+	EXPECT_NEAR(v.size() / static_cast<double>(cartoon::audio::kRate), y.back().t1 + 0.12, 0.01);
+	const auto rms = [&](double a, double b) {
+		double sum = 0.0;
+		const std::size_t i0 = static_cast<std::size_t>(a * cartoon::audio::kRate), i1 = std::min(v.size(), static_cast<std::size_t>(b * cartoon::audio::kRate));
+		for (std::size_t i = i0; i < i1; ++i) sum += static_cast<double>(v[i]) * v[i];
+		return std::sqrt(sum / std::max<std::size_t>(1, i1 - i0));
+	};
+	float peak = 0.0f;
+	for (float s : v) peak = std::max(peak, std::abs(s));
+	EXPECT_GT(peak, 0.1f);
+	EXPECT_LT(peak, 1.0f);
+	EXPECT_GT(rms(mid0 - 0.03, mid0 + 0.03), 4.0 * rms(y[1].t1 + 0.08, y[1].t1 + 0.11));
+}
+
+// A film file's `say` line: read with its rate, pitch and caption choice; the character's mouth and voice follow it; its soundtrack has it, and its captions show it until a
+// little after its end, cut short where the next line begins. A line by someone not brought in is refused.
+TEST(FilmSpeech, AFilmFilesCharactersSayTheirLinesWithMouthsVoicesAndCaptions) {
+	(void)cartoon::films();
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 10\n"
+					   "character pip pip at -1 0 0\ncharacter ann person at 1 0 0\n"
+					   "say pip 1.0 \"Look at the moon!\" rate 1.2 pitch 2\n"
+					   "say ann 2.0 \"It is very round.\"\n"
+					   "say pip 5.0 \"Hmm.\" nocaption\n",
+					   film),
+			  "");
+	ASSERT_EQ(film.spec.lines.size(), 3u);
+	EXPECT_DOUBLE_EQ(film.spec.lines[0].rate, 1.2);
+	EXPECT_DOUBLE_EQ(film.spec.lines[0].pitch, 2.0);
+	EXPECT_FALSE(film.spec.lines[2].caption);
+	// pip speaks at its first syllable, ann does not
+	const cartoon::speech::Syllable &first = film.spoken[0][0];
+	const double mid = 0.5 * (first.t0 + first.t1);
+	ff::CharacterMoment pip, ann;
+	film.speakingAt(*film.character("pip"), mid, pip);
+	film.speakingAt(*film.character("ann"), mid, ann);
+	EXPECT_GT(pip.voice, 0.5);
+	EXPECT_GT(pip.mouth.open, 0.3);
+	EXPECT_EQ(ann.voice, 0.0);
+	// the captions: two (the third is not captioned), the first cut short where ann begins
+	const std::vector<cartoon::Caption> caps = film.lineCaptions();
+	ASSERT_EQ(caps.size(), 2u);
+	EXPECT_DOUBLE_EQ(caps[0].t0, 1.0);
+	EXPECT_LE(caps[0].t1, 2.0);
+	ASSERT_EQ(caps[1].lines.size(), 1u);
+	EXPECT_EQ(caps[1].lines[0].text, "It is very round.");
+	EXPECT_GT(caps[1].t1, cartoon::speech::endOf(film.spoken[1], 2.0));
+	// the soundtrack has the lines: louder while pip speaks than before
+	cartoon::audio::Mix mix(10.0);
+	film.speak(mix);
+	const std::vector<std::int16_t> pcm = mix.finish(0.0, 0.0);
+	const auto level = [&](double a, double b) {
+		double sum = 0.0;
+		for (std::size_t i = static_cast<std::size_t>(a * cartoon::audio::kRate) * 2; i < static_cast<std::size_t>(b * cartoon::audio::kRate) * 2; ++i) sum += std::abs(static_cast<double>(pcm[i]));
+		return sum;
+	};
+	EXPECT_GT(level(1.0, 1.8), 10.0 * level(0.2, 0.9) + 1.0);
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nsay kim 1 \"Hi.\"\n", bad).find("kim says a line but is not brought in"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter kim pip\nsay kim 1 \"Hi.\" loudly\n", bad).find("a line takes rate"), std::string::npos);
+}
