@@ -1,7 +1,7 @@
 # Every film, shot by shot: film|shot|fingerprint of the scene at the shot's middle (at preview coarseness)|name. Written by
 # `python scripts/anim/film.py baseline --write` (ray_tracer --film-baseline); a difference is a film that changed - on purpose or not.
 a-walk-at-dusk|1|106357e308b317f9|Setting out
-a-walk-at-dusk|2|d6f0a3b82b1bd758|Along the path
+a-walk-at-dusk|2|427090ae0e516988|Along the path
 a-walk-at-dusk|3|2872547434baaba4|The lantern
 a-walk-at-dusk|4|53062fcf8efe7124|The first star
 ball-parade|1|be82b9a4eec4a8ce|The row of balls
@@ -48,12 +48,12 @@ nomai-signal|3|420724ad147d345e|The descent
 nomai-signal|4|7da6d13ff912584c|Three eyes
 nomai-signal|5|ac8160a1766e222a|The signal
 nomai-signal|6|dcfa9abcdfec48dd|The landing
-nomai-signal|7|4cb2ccd3a5f60f84|Under the giant
-nomai-signal|8|0dff6a2f219ca618|Footsteps
-nomai-signal|9|3b7aedaac072e51a|The ridge
-nomai-signal|10|8ee4bfb3036f0b4b|The canyon
+nomai-signal|7|5265fd65cc000299|Under the giant
+nomai-signal|8|9287abac38475567|Footsteps
+nomai-signal|9|1de9fca0e55db74a|The ridge
+nomai-signal|10|04fe41a36025443d|The canyon
 nomai-signal|11|ec9055947302a083|The third eye
-nomai-signal|12|bb7a1943f42984d1|The floating steps
+nomai-signal|12|068def57986472bb|The floating steps
 nomai-signal|13|5cbd86cbc1ee297e|The corridor wakes
 nomai-signal|14|9bd4397f726df928|Writing on the wall
 nomai-signal|15|b594114ccb6cf76e|The recording
@@ -70,7 +70,7 @@ nomai-signal|25|6f4962e3ec572002|The remote memories
 nomai-signal|26|d7e2f0faf6f6d09f|Silence
 nomai-signal|27|760bdf5da26de7ee|Stillness
 nomai-signal|28|d659bed76440ae38|The answer
-nomai-signal|29|2e96a8418818d4b1|Dawn
+nomai-signal|29|16fe243c2a4df0b9|Dawn
 nomai-signal|30|62a1cb9a4c040998|The campfire
 nomai-signal|31|ef5890c2b9e7d53d|Pulling away
 nomai-signal|32|da4aefe2b100fae9|The title

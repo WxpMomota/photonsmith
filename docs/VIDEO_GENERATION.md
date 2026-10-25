@@ -558,6 +558,14 @@ topple  tablet  8.4  pivot -1.04 0 -3.0  axis 0 0 1  height 0.6  depth 0.08  pus
 Each landing is heard (its strength from how hard it hit, panned by the camera). A Walk at Dusk drops a pebble onto the path ahead of the explorer and tips over a stone tablet as
 it passes.
 
+**Feet locked to the ground.** A gait moves the feet in the body's space, so on a curve, a ramp or uneven ground a planted foot slides. `rig::FootLock` keeps it where it came
+down: while planted, its place is that spot in the world (at the ground's height there, `groundAt`) carried into the body's space, and the leg's own IK bends to reach it; once
+lifted it follows its gait over the ground, easing out of where the lock held it over a quarter of a second, so it never jumps. Any character can have one: it needs only its
+frame and steps at a time and its gait's foot place and planted flag (`explorerFootLock` builds the explorer's; `ExplorerPose::lockFeet`). The Nomai film's walks on the moon
+(on its uneven ground) and down the floating steps, and every film-file character (`CharacterKind::footAt` and `plantedAt`), have their feet locked: the sliding-feet check now
+finds 10⁻¹² m/s where it found up to 0.11 (the spiral) and 0.27 (a corner in a film file), and on a straight flat walk the lock gives exactly the gait's feet. What is left is
+one frame where a walk starts from a standing pose (under 0.1 m/s).
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

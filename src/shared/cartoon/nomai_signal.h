@@ -121,6 +121,15 @@ inline Walk walkOver(const rig::PathWalk &path, double t) {
 	return w;
 }
 inline Walk walkOver(Vec3 a, Vec3 b, double t0, double t, double speed = 0.72) { return walkOver(walkPath(a, b, t0, speed), t); }
+// The feet of a walk on the moon held where they came down, on its uneven ground (rig::FootLock): the body where walkOver puts it at each moment.
+inline rig::FootLock walkLock(const rig::PathWalk &path) {
+	return explorerFootLock([path](double u) { return walkOver(path, u).frame; }, [path](double u) { return walkOver(path, u).walk; }, 1.0, 0.0,
+							[](double x, double z) { return groundPoint(x, z).y; });
+}
+inline ExplorerPose locked(ExplorerPose p, const rig::FootLock &k, double t) {
+	lockFeet(p, k, t);
+	return p;
+}
 // The robe's trail on a walk (robeTrail): the hem follows the body's place on a spring.
 inline Vec3 trailOf(const Walk &w, double t) {
 	const rig::PathWalk path = w.path;
@@ -295,11 +304,11 @@ inline void shotUnderGiant(double t, Frame &f, bool content) {
 	const Vec3 eye = groundPoint(back.x, back.z, 1.1);
 	f.view = cam(eye, eye + giantDir() * 100.0 + Vec3{0.0, -26.0, 0.0}, lens(24.0));
 	f.subjects = {transformPoint(w.frame, {0.0, 1.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
-	f.feet = explorerFeet(w.moving ? walkPose(w.walk, t) : standPose(t), w.frame);   // (the sliding-feet check: Film::feetAt)
+	f.feet = explorerFeet(w.moving ? locked(walkPose(w.walk, t), walkLock(w.path), t) : standPose(t), w.frame);   // (the sliding-feet check: Film::feetAt)
 	night(f);
 	f.ruins = false;
 	if (content) {
-		ExplorerPose p = w.moving ? walkPose(w.walk, t, 1.0, trailOf(w, t)) : standPose(t);
+		ExplorerPose p = w.moving ? locked(walkPose(w.walk, t, 1.0, trailOf(w, t)), walkLock(w.path), t) : standPose(t);
 		f.content = worldText(f, t, 120.0) + shuttleText(shuttleOnGround(0.0), 0.0, 1.0) + explorerText(p, w.frame, 0.016) + footDust(w, exitStart(), t);
 	}
 }
@@ -315,10 +324,10 @@ inline void shotFootsteps(double t, Frame &f, bool content) {
 	const Vec3 eye = groundPoint(eyeArc.x, eyeArc.z, 0.28);
 	f.view = cam(eye, groundPoint(w.at.x + d.x * 2.0, w.at.z + d.z * 2.0, 0.25), lens(30.0), 0.01);
 	f.subjects = {transformPoint(w.frame, {0.0, 0.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
-	f.feet = explorerFeet(walkPose(w.walk, t), w.frame);   // (the sliding-feet check: Film::feetAt)
+	f.feet = explorerFeet(locked(walkPose(w.walk, t), walkLock(w.path), t), w.frame);   // (the sliding-feet check: Film::feetAt)
 	night(f);
 	f.ruins = false;
-	if (content) f.content = worldText(f, t, 60.0) + explorerText(walkPose(w.walk, t, 1.0, trailOf(w, t)), w.frame, 0.012) + footDust(w, stepsStart(), t, 8);
+	if (content) f.content = worldText(f, t, 60.0) + explorerText(locked(walkPose(w.walk, t, 1.0, trailOf(w, t)), walkLock(w.path), t), w.frame, 0.012) + footDust(w, stepsStart(), t, 8);
 }
 inline rig::PathWalk ridgeWalk() { return walkPath({-14.0, 0.0, ridgeZ(-14.0)}, {6.0, 0.0, ridgeZ(6.0)}, 55.0, 0.70); }
 inline void shotRidge(double t, Frame &f, bool content) {
@@ -329,11 +338,11 @@ inline void shotRidge(double t, Frame &f, bool content) {
 	const Vec3 eye = groundPoint(camArc.x, camArc.z, 0.5);
 	f.view = cam(eye, groundPoint(w.at.x, w.at.z, 2.6), lens(70.0));
 	f.subjects = {transformPoint(w.frame, {0.0, 1.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
-	f.feet = explorerFeet(walkPose(w.walk, t), w.frame);   // (the sliding-feet check: Film::feetAt)
+	f.feet = explorerFeet(locked(walkPose(w.walk, t), walkLock(w.path), t), w.frame);   // (the sliding-feet check: Film::feetAt)
 	f.giantGlow = 0.5;
 	night(f);
 	f.ruins = false;
-	if (content) f.content = worldText(f, t, 120.0) + explorerText(walkPose(w.walk, t, 1.0, trailOf(w, t)), w.frame, 0.016);
+	if (content) f.content = worldText(f, t, 120.0) + explorerText(locked(walkPose(w.walk, t, 1.0, trailOf(w, t)), walkLock(w.path), t), w.frame, 0.016);
 }
 inline Vec3 rimStart() { return {-2.5, 0.0, -112.0}; }
 inline Vec3 rimEnd() { return {0.0, 0.0, -130.0}; }
@@ -350,10 +359,10 @@ inline void shotCanyonReveal(double t, Frame &f, bool content) {
 	const Vec3 farSide = ruinsPoint({-6.0, 4.0 + 40.0 * (1.0 - smoothstep(0.35, 1.0, u)), -8.0});
 	f.view = cam(eye, lerp(groundPoint(w.at.x + d.x * 10.0, w.at.z + d.z * 10.0, 1.0), farSide, smoothstep(0.05, 0.45, u)), lens(lerp(35.0, 20.0, u)));
 	f.subjects = {u < 0.2 ? transformPoint(w.frame, {0.0, 1.25, 0.0}) : farSide};   // (what the shot is about: the explorer, then the canyon, then - over the rim - the ruins)
-	f.feet = explorerFeet(w.moving ? walkPose(w.walk, t) : standPose(t), w.frame);   // (the sliding-feet check: Film::feetAt)
+	f.feet = explorerFeet(w.moving ? locked(walkPose(w.walk, t), walkLock(w.path), t) : standPose(t), w.frame);   // (the sliding-feet check: Film::feetAt)
 	night(f);
 	if (content) {
-		ExplorerPose p = w.moving ? walkPose(w.walk, t, 1.0, trailOf(w, t)) : standPose(t);
+		ExplorerPose p = w.moving ? locked(walkPose(w.walk, t, 1.0, trailOf(w, t)), walkLock(w.path), t) : standPose(t);
 		f.content = worldText(f, t) + explorerText(p, w.frame, 0.014);
 	}
 }
@@ -377,17 +386,23 @@ inline void shotThirdEye(double t, Frame &f, bool content) {
 }
 inline double spiralU(double t) { return lerp(0.48, 0.565, clamp01((t - 80.0) / 8.0)); }   // how far round the floating steps the explorer is
 inline double spiralWalked(double t) { return spiralU(t) * kSpiralTurns * 2.0 * kPi * kSpiralRadius; }
-inline ExplorerPose spiralPose(double t) {   // walking down the floating steps: the feet on the spiral's slope
+inline Mat4 spiralBody(double t) {   // the explorer on the floating steps: on the spiral, facing along it
+	const double u = spiralU(t);
+	const Vec3 p0 = spiralStep(u), p1 = spiralStep(u + 0.004);
+	return mul(ruinsFrame(), translate(p0), rotate({0.0, 1.0, 0.0}, yawOf(p1 - p0)));
+}
+inline ExplorerPose spiralPose(double t) {   // walking down the floating steps: the feet on the spiral's slope, held where they came down as it turns
+	const double slope = -kSpiralDrop / (kSpiralTurns * 2.0 * kPi * kSpiralRadius);
 	ExplorerPose p = walkPose(spiralWalked(t) / 0.84, t);
-	p.slope = -kSpiralDrop / (kSpiralTurns * 2.0 * kPi * kSpiralRadius);
+	p.slope = slope;
+	lockFeet(p, explorerFootLock(spiralBody, [](double u) { return spiralWalked(u) / 0.84; }, 1.0, slope), t);
 	return p;
 }
 inline void shotSpiralSteps(double t, Frame &f, bool content) {
 	// from the canyon floor, wide: the explorer walks down the floating steps round the spire, the giant over the canyon's rim
 	const double u = spiralU(t);
 	const Vec3 p0 = spiralStep(u), p1 = spiralStep(u + 0.004);
-	const double yaw = yawOf(p1 - p0);
-	const Mat4 body = mul(ruinsFrame(), translate(p0), rotate({0.0, 1.0, 0.0}, yaw));
+	const Mat4 body = spiralBody(t);
 	const Vec3 radial = normalize(Vec3{p0.x - spiralCentre().x, 0.0, p0.z - spiralCentre().z});
 	const Vec3 tangent = normalize(Vec3{p1.x - p0.x, 0.0, p1.z - p0.z});
 	(void)radial;
@@ -845,9 +860,10 @@ inline void shotDawn(double t, Frame &f, bool content) {
 	f.warmth = 0.10;
 	f.view = cam(groundPoint(-2.0, -104.0, 1.2), groundPoint(14.0, -122.0, 2.2), lens(28.0));
 	f.subjects = {transformPoint(w.frame, {0.0, 1.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
-	f.feet = explorerFeet(walkPose(w.walk, t, w.moving ? 1.0 : 0.0), w.frame);   // (the sliding-feet check: Film::feetAt)
+	f.feet = explorerFeet(w.moving ? locked(walkPose(w.walk, t), walkLock(w.path), t) : walkPose(w.walk, t, 0.0), w.frame);   // (the sliding-feet check: Film::feetAt)
 	if (content) {
 		ExplorerPose p = walkPose(w.walk, t, w.moving ? 1.0 : 0.0, trailOf(w, t));
+		if (w.moving) lockFeet(p, walkLock(w.path), t);
 		f.content = worldText(f, t) + explorerText(p, w.frame, 0.014);
 	}
 }

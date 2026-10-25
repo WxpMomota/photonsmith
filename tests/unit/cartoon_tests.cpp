@@ -2123,7 +2123,7 @@ TEST(FilmChecks, TheNomaiExplorersPlantedFeetStayPut) {
 	const std::vector<cartoon::film_checks::Slide> found = cartoon::film_checks::slidingFeet(*film);
 	ASSERT_GE(found.size(), 8u) << "every shot it walks in";
 	const std::vector<std::string> names = cartoon::shotNamesOf(*film);
-	for (const cartoon::film_checks::Slide &s : found) EXPECT_LT(s.worst, 0.15) << names[static_cast<std::size_t>(s.shot)] << " at " << s.at << " s";
+	for (const cartoon::film_checks::Slide &s : found) EXPECT_LT(s.worst, 0.12) << names[static_cast<std::size_t>(s.shot)] << " at " << s.at << " s";   // (feet locked: only where a walk starts)
 	// the gait itself: planted for one step from half a step in, the foot's place going back evenly from 1 to -1
 	double swing = 0.0, lift = 0.0;
 	bool planted = false;
@@ -2408,4 +2408,40 @@ TEST(PropPhysics, APushedBlockTopplesAndLandsAndOneNotPushedStands) {
 	const ph::Topple still{2.0, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, 0.6, 0.08, 0.0};
 	EXPECT_DOUBLE_EQ(ph::angleOf(still, 10.0), 0.0) << "not pushed past its balance: it stands";
 	EXPECT_TRUE(ph::impactsOf(still).empty());
+}
+
+// ---- feet locked to the ground (rig::FootLock) -----------------------------------------------------------------------------------------------------------
+
+// A gait that slides (its feet move too little for the body's pace) on bumpy ground: with the lock, a planted foot stays exactly where it came down, on the ground there; it
+// lifts off without a jump; in the air it follows its gait over the ground.
+TEST(FootLock, APlantedFootStaysWhereItCameDownOnTheGroundAndLiftsWithoutAJump) {
+	using cartoon::Vec3;
+	cartoon::rig::FootLock k;
+	k.frameAt = [](double t) { return cartoon::translate(0.0, 0.0, t); };   // 1 m/s along +z
+	k.stepsAt = [](double t) { return t; };
+	k.footAt = [](double steps, int s) { return Vec3{s == 0 ? 0.1 : -0.1, 0.03, 0.3 * std::sin(cartoon::kPi * (steps + s))}; };
+	k.plantedAt = [](double steps, int s) { return std::cos(cartoon::kPi * (steps + s)) <= 0.0; };
+	k.groundAt = [](double x, double z) { return 0.2 * std::sin(x + 2.0 * z); };
+	double worst = 0.0, unlocked = 0.0, jump = 0.0;
+	Vec3 last[2], lastFree[2];
+	bool wasPlanted[2] = {false, false};
+	for (double t = 1.0; t < 6.0; t += 1.0 / 240.0) {
+		for (int s = 0; s < 2; ++s) {
+			const bool planted = k.plantedAt(t, s);
+			const Vec3 world = cartoon::transformPoint(k.frameAt(t), cartoon::rig::lockedFoot(k, s, t));
+			const Vec3 free = cartoon::transformPoint(k.frameAt(t), k.footAt(t, s));
+			if (planted && wasPlanted[s]) {
+				worst = std::max(worst, cartoon::length(world - last[s]) * 240.0);
+				unlocked = std::max(unlocked, cartoon::length(free - lastFree[s]) * 240.0);
+				EXPECT_NEAR(world.y, 0.2 * std::sin(world.x + 2.0 * world.z) + 0.03, 1e-6) << "on the ground where it came down";
+			}
+			if (!planted && wasPlanted[s]) jump = std::max(jump, cartoon::length(world - last[s]));
+			last[s] = world;
+			lastFree[s] = free;
+			wasPlanted[s] = planted;
+		}
+	}
+	EXPECT_LT(worst, 1e-4) << "held (to a tenth of a millimetre a second: where the search pins the landing)";
+	EXPECT_GT(unlocked, 0.2) << "(the gait alone slides)";
+	EXPECT_LT(jump, 0.01) << "no jump when it lifts (a 240th of a second apart)";
 }

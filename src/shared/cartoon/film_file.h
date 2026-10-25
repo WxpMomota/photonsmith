@@ -139,6 +139,8 @@ struct CharacterMoment {
 	const std::vector<rig::Gesture> *gestures = nullptr;
 	double detail = 0.0;
 	Vec3 trail;   // how far a spring on its place lags it (body space: +x its left, +z forward): for what hangs and swings - a robe's hem, a tail (rig::lag)
+	bool feetLocked = false;   // its two feet held where they came down (rig::FootLock), in body space: when its kind says where its gait puts them
+	Vec3 lockedFeet[2];
 };
 // A kind of character: its scene text (story space, as the toolkit writes it) and its feet at a moment, the point a camera and the film doctor look at (body space), and its walk's
 // step (rig::PathWalk's stride and first step).
@@ -147,6 +149,9 @@ struct CharacterKind {
 	std::function<std::vector<Foot>(const CharacterMoment &)> feet;
 	Vec3 chest{0.0, 1.25, 0.0};
 	double stride = 0.84, firstStep = 0.5;
+	// (optional) where its gait puts each of its two feet at so many steps (body space) and whether that foot is down: then its feet are locked where they come down
+	std::function<Vec3(double, int)> footAt;
+	std::function<bool(double, int)> plantedAt;
 };
 // The library of kinds, by name (cartoons.h fills it before any film file is read).
 inline std::map<std::string, CharacterKind> &characterKinds() {
@@ -772,6 +777,18 @@ class DataFilm {
 		if (at) *at = where;
 		return m;
 	}
+	// Its feet held where they came down (CharacterMoment::lockedFeet), when its kind says where its gait puts them and it has walked.
+	void lockFeet(const Character &c, double t, CharacterMoment &m) const {
+		const CharacterKind &kind = characterKinds().at(c.kind);
+		if (!kind.footAt || !kind.plantedAt || (m.steps <= 0.0 && !m.moving)) return;
+		rig::FootLock k;
+		k.frameAt = [this, &c](double u) { return momentOf(c, u).frame; };
+		k.stepsAt = [this, &c](double u) { return momentOf(c, u).steps; };
+		k.footAt = kind.footAt;
+		k.plantedAt = kind.plantedAt;
+		m.feetLocked = true;
+		for (int s = 0; s < 2; ++s) m.lockedFeet[s] = rig::lockedFoot(k, s, t);
+	}
 	// How far a loose spring on the character's place lags it at t, in its body's space (CharacterMoment::trail).
 	Vec3 trailOf(const Character &c, double t, const CharacterMoment &m) const {
 		static const rig::Spring loose{30.0, 5.0, 3.0, 1.0 / 240.0};
@@ -808,7 +825,9 @@ class DataFilm {
 		for (const Character &c : spec.characters) {
 			const CharacterKind &kind = characterKinds().at(c.kind);
 			if (!kind.feet) continue;
-			const std::vector<Foot> f = kind.feet(momentOf(c, t));
+			CharacterMoment m = momentOf(c, t);
+			lockFeet(c, t, m);
+			const std::vector<Foot> f = kind.feet(m);
 			out.insert(out.end(), f.begin(), f.end());
 		}
 		return out;
@@ -918,6 +937,7 @@ class DataFilm {
 			if (!kind.text) continue;
 			CharacterMoment m = momentOf(c, t);
 			m.trail = trailOf(c, t, m);
+			lockFeet(c, t, m);
 			out += "# " + c.name + " (" + c.kind + ")\n" + kind.text(m);
 		}
 		return out;

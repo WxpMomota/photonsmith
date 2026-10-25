@@ -201,11 +201,18 @@ inline void installCharacterKinds() {
 	const auto pose = [](const film_file::CharacterMoment &m) {
 		nomai::ExplorerPose p = m.moving || m.steps > 0.0 ? nomai::walkPose(m.steps, m.t, 1.0) : nomai::standPose(m.t);   // (after a walk: its feet where they came down)
 		p.wind = p.wind + m.trail * 0.5;   // (the robe's hem trails the body: nomai::robeTrail)
+		if (m.feetLocked) {   // (its feet held where they came down: rig::FootLock)
+			p.lockFeet = true;
+			p.lockedBall[0] = m.lockedFeet[0];
+			p.lockedBall[1] = m.lockedFeet[1];
+		}
 		return m.gestures && !m.gestures->empty() ? rig::act(p, *m.gestures, m.t, nomai::explorerPoses()) : p;
 	};
 	explorer.text = [pose](const film_file::CharacterMoment &m) { return nomai::explorerText(pose(m), m.frame, m.detail > 0.0 ? m.detail : 0.012); };
 	explorer.feet = [pose](const film_file::CharacterMoment &m) { return nomai::explorerFeet(pose(m), m.frame); };
 	explorer.chest = {0.0, 1.25, 0.0};
+	explorer.footAt = [](double steps, int s) { return nomai::explorerBody(nomai::walkPose(steps, 0.0, 1.0)).ball[s]; };
+	explorer.plantedAt = [](double steps, int s) { return nomai::explorerBody(nomai::walkPose(steps, 0.0, 1.0)).planted[s]; };
 	explorer.stride = 0.84;
 	explorer.firstStep = 0.5;
 	film_file::characterKinds()["nomai-explorer"] = explorer;

@@ -149,6 +149,9 @@ add_executable(ray_tracer
 )
 target_include_directories(ray_tracer PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(ray_tracer PRIVATE cpu_renderer)
+if(MSVC)
+    target_compile_options(ray_tracer PRIVATE /bigobj)   # (main.cpp reaches every film through the film tools)
+endif()
 set_target_properties(ray_tracer PROPERTIES OUTPUT_NAME "ray_tracer")
 
 # macOS: Video -> MP4 without ffmpeg. launcher/main.cpp assembles the frame sequence with AVFoundation (always present on

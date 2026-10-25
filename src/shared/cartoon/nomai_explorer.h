@@ -34,6 +34,8 @@ struct ExplorerPose {
 	double walk = 0.0;     // the walk cycle (a whole number of steps: each foot has stepped once at 2)
 	double stride = 0.0;   // 0 standing .. 1 a full stride
 	double slope = 0.0;    // the ground's rise per unit forward under the walk (negative: going down a ramp or a stair)
+	bool lockFeet = false; // the balls of the feet are `lockedBall` (body space), held where they came down (rig::FootLock: explorerFootLock), not where the gait puts them
+	Vec3 lockedBall[2];
 	double sit = 0.0;      // 0 standing .. 1 sitting on the ground, legs folded
 	double crouch = 0.0;   // 0 .. 1 knees bent, body lowered (reaching to the ground)
 	double lean = 0.0;     // degrees forward
@@ -176,6 +178,7 @@ inline ExplorerBody explorerBody(const ExplorerPose &p) {
 		if (p.stride <= 0.0) b.planted[s] = true;
 		Vec3 ball{0.11 * side, 0.03 + 0.07 * lift * p.stride, 0.07 + 0.42 * p.stride * swing};
 		ball.y += p.slope * ball.z;   // (on a ramp the feet stand on it: a planted foot keeps its height while the body goes down or up, and the knee takes it)
+		if (p.lockFeet) ball = p.lockedBall[s];
 		if (p.sit > 0.0) ball = lerp(ball, Vec3{0.30 * side, 0.03, 0.32}, p.sit);   // (sitting: the feet out in front, crossed)
 		b.ball[s] = ball;
 		const Vec3 hockTarget = ball + Vec3{0.0, 0.20 - 0.08 * p.sit, -0.10};
@@ -188,6 +191,27 @@ inline ExplorerBody explorerBody(const ExplorerPose &p) {
 	b.headInv = invertAffine(b.head);
 	b.hemY = 0.34 + 0.12 * p.sit - 0.10 * p.crouch;
 	return b;
+}
+// A foot lock for the explorer walking with its body at `frameAt(t)` and its walk `stepsAt(t)` steps in (stride and slope as walkPose and ExplorerPose have them), on the
+// ground `groundAt` (empty: its own ground): rig::lockedFoot then gives where each foot is held.
+inline rig::FootLock explorerFootLock(std::function<Mat4(double)> frameAt, std::function<double(double)> stepsAt, double stride = 1.0, double slope = 0.0,
+									  std::function<double(double, double)> groundAt = {}) {
+	rig::FootLock k;
+	k.frameAt = std::move(frameAt);
+	k.stepsAt = std::move(stepsAt);
+	k.footAt = [stride, slope](double steps, int s) {
+		ExplorerPose p = walkPose(steps, 0.0, stride);
+		p.slope = slope;
+		return explorerBody(p).ball[s];
+	};
+	k.plantedAt = [stride](double steps, int s) { return explorerBody(walkPose(steps, 0.0, stride)).planted[s]; };
+	k.groundAt = std::move(groundAt);
+	return k;
+}
+// The pose with its feet held by the lock at t.
+inline void lockFeet(ExplorerPose &p, const rig::FootLock &k, double t) {
+	p.lockFeet = true;
+	for (int s = 0; s < 2; ++s) p.lockedBall[s] = rig::lockedFoot(k, s, t);
 }
 
 inline double ellv(Vec3 p, Vec3 c, Vec3 r) { return sdf::ellipsoid(p, translate(c * -1.0), r); }

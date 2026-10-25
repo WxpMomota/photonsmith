@@ -155,6 +155,71 @@ inline double sitAmount(double t, double down, double up, double ease = 0.8) {
 	return up > down ? in * (1.0 - smoothstep(up, up + ease, t)) : in;
 }
 
+// ---- feet locked to the ground ----
+// A walk's gait moves each foot in the body's space; on a curve, a slope or bumpy ground a planted foot then slides. A foot lock keeps it where it came down, in the world,
+// on the ground there: while it is planted its place is that spot carried into the body's space at t (the leg's own IK bends to reach it); in the air it follows its gait, raised
+// or lowered by the ground under it, and eases out of where the lock left it over `release` seconds after it lifts. Any character can have one: it needs only its frame and its
+// walk's steps at a time, and its gait's foot place and planted flag at so many steps.
+struct FootLock {
+	std::function<Mat4(double)> frameAt;              // the body's frame at a time (body space -> world, the body's up its +y)
+	std::function<double(double)> stepsAt;            // its walk's steps at a time
+	std::function<Vec3(double, int)> footAt;          // a foot's place in body space for the walk at so many steps (the gait's own; its y the height above the ground)
+	std::function<bool(double, int)> plantedAt;       // whether that foot is on the ground at so many steps
+	std::function<double(double, double)> groundAt;   // the ground's height under a world x z (empty: the ground is the body's own y = 0)
+	double lookBack = 3.0, release = 0.25;
+};
+namespace detail {
+// The last moment before t that `on(time)` changed (searched back at 1/60 s, then halved thirty times); t - lookBack when it did not.
+inline double lastChange(const std::function<bool(double)> &on, double t, double lookBack) {
+	const bool now = on(t);
+	double hi = t, lo = t;
+	for (double back = 1.0 / 60.0; back <= lookBack; back += 1.0 / 60.0) {
+		lo = t - back;
+		if (on(lo) != now) break;
+		hi = lo;
+		if (back + 1.0 / 60.0 > lookBack) return t - lookBack;
+	}
+	for (int i = 0; i < 30; ++i) {
+		const double mid = 0.5 * (lo + hi);
+		(on(mid) == now ? hi : lo) = mid;
+	}
+	return hi;
+}
+// The ground's height under a body-space point carried into the world, made a body-space lift (the body's up taken as the world's +y).
+inline double groundLift(const FootLock &k, const Mat4 &frame, Vec3 body) {
+	if (!k.groundAt) return 0.0;
+	const Vec3 w = transformPoint(frame, Vec3{body.x, 0.0, body.z});
+	return k.groundAt(w.x, w.z) - w.y;
+}
+}  // namespace detail
+// Where a planted foot is held: the spot it came down on (the world), the ground's height there.
+inline Vec3 plantSpot(const FootLock &k, int foot, double t) {
+	const double down = detail::lastChange([&](double u) { return k.plantedAt(k.stepsAt(u), foot); }, t, k.lookBack);
+	const Mat4 frame = k.frameAt(down);
+	const Vec3 rest = k.footAt(k.stepsAt(down), foot);
+	Vec3 w = transformPoint(frame, rest);
+	if (k.groundAt) w.y = k.groundAt(w.x, w.z) + rest.y;
+	return w;
+}
+// A foot's place in body space at t with the lock.
+inline Vec3 lockedFoot(const FootLock &k, int foot, double t) {
+	const double steps = k.stepsAt(t);
+	const Mat4 frame = k.frameAt(t);
+	if (k.plantedAt(steps, foot)) return transformPoint(invertAffine(frame), plantSpot(k, foot, t));
+	Vec3 f = k.footAt(steps, foot);
+	f.y += detail::groundLift(k, frame, f);
+	// just lifted: from where the lock held it to its gait
+	const double up = detail::lastChange([&](double u) { return k.plantedAt(k.stepsAt(u), foot); }, t, k.lookBack);
+	if (t - up < k.release && up > t - k.lookBack) {
+		const double before = up - 1e-4;
+		const Vec3 held = transformPoint(invertAffine(k.frameAt(up)), plantSpot(k, foot, before));
+		Vec3 gait = k.footAt(k.stepsAt(up), foot);
+		gait.y += detail::groundLift(k, k.frameAt(up), gait);
+		f = f + (held - gait) * (1.0 - smoothstep(0.0, k.release, t - up));
+	}
+	return f;
+}
+
 // ---- follow-through ----
 // A damped spring that follows a moving point: what lags behind and settles - a robe's hem when its wearer starts and stops, an antenna's tip, a lantern on a pole. A frame is a
 // function of its time alone (frames render in any order, on several workers), so the spring is run at a fixed step over the `settle` seconds before t, starting at rest on the
