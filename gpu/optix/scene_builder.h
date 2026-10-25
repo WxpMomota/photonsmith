@@ -45,6 +45,9 @@ struct SceneData {
 	std::vector<DiskData> disks;
 	std::vector<CylinderData> cylinders;
 	std::vector<TriangleData> triangles;
+	// The triangles' vertices at EndTime (three a triangle, in `triangles`' order), when any of them moves (pbrt_flatten::Triangle::motion); empty otherwise. Host only:
+	// OptixRenderer::setTriangleMotion builds the triangle GAS with these as its second motion key.
+	std::vector<float3> triangleEndVertices;
 	std::vector<MaterialData> materials;
 	std::vector<CloudMedium<float>> cloudMediums;  // indexed by MaterialType::CloudMedium's cloud_medium_extra.cloudMediumIdx
 	std::vector<GpuRgbGridMedium> rgbGridMediums;  // indexed by MaterialType::RgbGridMedium's rgb_grid_medium_extra.rgbGridMediumIdx

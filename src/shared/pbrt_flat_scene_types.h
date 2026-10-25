@@ -401,6 +401,8 @@ struct FlatScene {
 	// trianglemesh/plymesh/loopsubdiv, CPU only, populated only when a
 	// shape's xformEnd genuinely differs from xform.
 	std::vector<AnimatedTriangleMesh> animatedTriangleMeshes;
+	// The EndTime world-space vertices of each moving triangle's GPU duplicate (Triangle::motion indexes this): nine numbers, three vertices.
+	std::vector<std::array<double, 9>> triangleEnds;
 	std::vector<Sphere> spheres;
 	std::vector<Disk> disks;
 	std::vector<Cylinder> cylinders;

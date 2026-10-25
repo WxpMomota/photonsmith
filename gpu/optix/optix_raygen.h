@@ -145,6 +145,7 @@ extern "C" __global__ void __raygen__rg() {
 		// with the wavefront backend (see GpuCameraParams::motionBlurEnabled's
 		// own comment for why this isn't a separate LaunchParams-level field).
 		float ray_time = params.camera.motionBlurEnabled ? random_float(seed) : 0.0f;
+		if (params.rayTimes) params.rayTimes[py * params.width + px] = ray_time;   // (its shadow rays are traced at the same time: trace_shadow_ray)
 
 		// Path tracing loop
 		// filter_w is deliberately NOT folded in here (unlike cam_weight,

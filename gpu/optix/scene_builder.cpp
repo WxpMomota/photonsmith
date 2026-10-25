@@ -911,16 +911,8 @@ static void apply_loaded_scene_settings(const char* path,
 			     "blurred; use --cpu instead if that motion matters for this "
 			     "render.\n";
 	}
-	// See BuildStats::animatedMeshCount's own comment - real on CPU
-	// (animated_transform_instance.h), not yet ported to either GPU backend.
-	if (stats.animatedMeshCount > 0) {
-		std::cerr << "[OptiX] Warning: " << stats.animatedMeshCount
-			  << " trianglemesh/plymesh/loopsubdiv shape(s) have an "
-			     "ActiveTransform \"StartTime\"/\"EndTime\" motion pair, which "
-			     "GPU has no real support for - rendered static at their "
-			     "StartTime position instead of blurred; use --cpu instead if "
-			     "that motion matters for this render.\n";
-	}
+	// Moving meshes (BuildStats::animatedMeshCount) are blurred on the GPU now: a two-key triangle GAS (OptixRenderer::setTriangleMotion), shaded with their StartTime
+	// normals; SPPM alone keeps them at StartTime. Nothing to warn about.
 	// See BuildStats::animatedBilinearPatchCount/animatedCurveCount's own
 	// comment - real on CPU (animated_transform_instance.h), not yet ported
 	// to either GPU backend.

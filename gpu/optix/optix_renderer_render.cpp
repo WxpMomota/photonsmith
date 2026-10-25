@@ -80,7 +80,7 @@ GpuCameraParams OptiXRenderer::makeRenderCamera(const GpuCameraParams& camera) {
 	// below; the wavefront backend directly, since its plain-CUDA-kernel
 	// programs never see a `LaunchParams params` global) - see
 	// GpuCameraParams::motionBlurEnabled's own comment.
-	gpuCam.motionBlurEnabled = sceneHasMotion_ ? 1 : 0;
+	gpuCam.motionBlurEnabled = (sceneHasMotion_ || sceneHasTriangleMotion_) ? 1 : 0;
 
 	// Real importance-sampled HDR sky distribution (LightSource "infinite"
 	// with an image - see optix_types.h's GpuSkyDistribution comment) - same
@@ -200,7 +200,7 @@ bool OptiXRenderer::renderWavefront(unsigned int width, unsigned int height, uns
 // The recursive launch's parameters: the camera, every scene buffer, the light tables and the --stats counters.
 LaunchParams OptiXRenderer::makeLaunchParams(unsigned int width, unsigned int height, unsigned int samplesPerPixel, unsigned int maxDepth,
 											 const GpuCameraParams& gpuCam, CUdeviceptr d_framebuffer, CUdeviceptr d_albedo, CUdeviceptr d_normal,
-											 CUdeviceptr d_statsBounceRays, CUdeviceptr d_statsShadowRays) {
+											 CUdeviceptr d_statsBounceRays, CUdeviceptr d_statsShadowRays, CUdeviceptr d_rayTimes) {
 	// Setup launch params. Zero-initialised on purpose: LaunchParams is a POD
 	// whose fields are assigned one by one below, so any field NOT assigned
 	// here would otherwise hold stack garbage. instancePrimBase is read on the
@@ -319,6 +319,7 @@ LaunchParams OptiXRenderer::makeLaunchParams(unsigned int width, unsigned int he
 	// --stats device counters - null unless statsEnabled (see alloc above).
 	params.statsBounceRays = reinterpret_cast<unsigned long long*>(d_statsBounceRays);
 	params.statsShadowRays = reinterpret_cast<unsigned long long*>(d_statsShadowRays);
+	params.rayTimes = reinterpret_cast<float*>(d_rayTimes);   // (motion blur: each sample's time, for its shadow rays)
 	return params;
 }
 
@@ -338,14 +339,16 @@ bool OptiXRenderer::render(
 
 	// The transient device buffers of this render, freed however it ends: an early return or a throwing CUDA_CHECK below used to leak them (a Live Preview that fails
 	// on every frame lost a framebuffer a frame).
-	CUdeviceptr d_framebuffer = 0, d_statsBounceRays = 0, d_statsShadowRays = 0;
+	CUdeviceptr d_framebuffer = 0, d_statsBounceRays = 0, d_statsShadowRays = 0, d_rayTimes = 0;
 	struct FreeOnExit {
-		CUdeviceptr *buffers[3];
+		CUdeviceptr *buffers[4];
 		~FreeOnExit() {
 			for (CUdeviceptr *b : buffers)
 				if (*b) cudaFree(reinterpret_cast<void*>(*b));
 		}
-	} freeOnExit{{&d_framebuffer, &d_statsBounceRays, &d_statsShadowRays}};
+	} freeOnExit{{&d_framebuffer, &d_statsBounceRays, &d_statsShadowRays, &d_rayTimes}};
+	// Motion blur: a float a pixel for the time of the sample being traced, read by its shadow rays (LaunchParams::rayTimes)
+	if (gpuCam.motionBlurEnabled) CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_rayTimes), static_cast<size_t>(width) * height * sizeof(float)));
 
 	// Allocate framebuffer on device
 	size_t fbSize = static_cast<size_t>(width) * height * sizeof(float3);
@@ -384,7 +387,7 @@ bool OptiXRenderer::render(
 		CUDA_CHECK(cudaMemset(reinterpret_cast<void*>(d_statsShadowRays), 0, sizeof(unsigned long long)));
 	}
 
-	const LaunchParams params = makeLaunchParams(width, height, samplesPerPixel, maxDepth, gpuCam, d_framebuffer, d_albedo, d_normal, d_statsBounceRays, d_statsShadowRays);
+	const LaunchParams params = makeLaunchParams(width, height, samplesPerPixel, maxDepth, gpuCam, d_framebuffer, d_albedo, d_normal, d_statsBounceRays, d_statsShadowRays, d_rayTimes);
 
 
 	// Upload launch params

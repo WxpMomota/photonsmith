@@ -908,10 +908,20 @@ void OptiXRenderer::buildGeometryGases(const SceneInputs &in, SceneBuildState &s
 		));
 	}
 	// Triangles get their own GAS (see the "two GASes + one IAS" comment
-	// below) built with motionOptions.numKeys=0 always, since triangles
-	// never move - so unlike the AABB types above, no duplicate-for-key-1
-	// buffer is needed here, just a single vertex buffer.
-	CUdeviceptr d_tri_vertex_keys[1] = { d_triVertices };
+	// below). Static (one key) unless some triangle moves: then a second
+	// vertex buffer, their EndTime places (setTriangleMotion: the still ones
+	// repeated), makes it a two-key motion GAS - optixTrace's ray time blends
+	// the two, and the hit programs need nothing new (they take the hit point
+	// from the ray, and shade with the StartTime normals).
+	const bool triangleMotion = !triangles.empty() && triangleMotion_.size() == triangles.size() * 3;
+	sceneHasTriangleMotion_ = triangleMotion;
+	CUdeviceptr d_triVerticesEnd = 0;
+	if (triangleMotion) {
+		const size_t endSize = triangleMotion_.size() * sizeof(float3);
+		CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_triVerticesEnd), endSize));
+		CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(d_triVerticesEnd), triangleMotion_.data(), endSize, cudaMemcpyHostToDevice));
+	}
+	CUdeviceptr d_tri_vertex_keys[2] = { d_triVertices, d_triVerticesEnd };
 	// flags[] for a triangle build input is indexed per SBT record (here:
 	// just 1, since numSbtRecords=1), NOT per primitive like the AABB
 	// custom-primitive arrays above - a single entry is correct.
@@ -1002,12 +1012,15 @@ void OptiXRenderer::buildGeometryGases(const SceneInputs &in, SceneBuildState &s
 	cudaFree(reinterpret_cast<void*>(d_aabb));
 	cudaFree(reinterpret_cast<void*>(d_aabbKey1));  // cudaFree(0) is a documented no-op when motion wasn't used
 
-	// Triangle GAS - always static (numKeys=0): triangles never move
-	// regardless of sceneHasMotion_ (that flag only tracks moving spheres).
+	// Triangle GAS - static (numKeys=0) unless a triangle moves (two keys over
+	// ray time 0..1, StartTime to EndTime, as the moving spheres' AABBs).
 	OptixAccelBuildOptions triAccelOptions = {};
 	triAccelOptions.buildFlags = OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
 	triAccelOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
-	triAccelOptions.motionOptions.numKeys = 0;
+	triAccelOptions.motionOptions.numKeys = triangleMotion ? 2 : 0;
+	triAccelOptions.motionOptions.timeBegin = 0.0f;
+	triAccelOptions.motionOptions.timeEnd = 1.0f;
+	triAccelOptions.motionOptions.flags = OPTIX_MOTION_FLAG_NONE;
 
 	CUdeviceptr d_gasTriOutput = 0;
 	if (!triangles.empty()) {
@@ -1031,6 +1044,8 @@ void OptiXRenderer::buildGeometryGases(const SceneInputs &in, SceneBuildState &s
 		outputGuard.release();
 	}
 	cudaFree(reinterpret_cast<void*>(d_triVertices));  // cudaFree(0) is a no-op when there were no triangles
+	cudaFree(reinterpret_cast<void*>(d_triVerticesEnd));
+	triangleMotion_.clear();   // (for this scene only: the next must say again)
 
 	// Disk/Cylinder: their OWN GAS, deliberately separate from both the
 	// shared custom-prim GAS (spheres/quads/bilinear-patches) and the

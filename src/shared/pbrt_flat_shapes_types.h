@@ -55,6 +55,9 @@ struct Triangle {
 	// entry instead, so building an extra static `triangle` hittable here
 	// too would double-render it.
 	bool gpuOnlyStaticFallback = false;
+	// >= 0 (only on a gpuOnlyStaticFallback triangle): its vertices at EndTime, in world space, are FlatScene::triangleEnds[motion] - the GPU builds its triangles with
+	// two motion keys from these (StartTime: v above) and blurs the mesh as the CPU does (gpu/optix/pbrt_gpu_builder.h, OptixRenderer::setTriangleMotion).
+	int motion = -1;
 };
 
 // A trianglemesh/plymesh/loopsubdiv shape under real object motion blur

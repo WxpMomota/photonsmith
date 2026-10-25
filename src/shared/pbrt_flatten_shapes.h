@@ -736,7 +736,18 @@ inline bool flattenTriangleMeshShape(const pbrt_scene::Scene &scene, FlatScene &
 		// triangle - so it's flagged rather than skipped.
 		// pbrt_cpu_builder.h's emitGeometry() is what actually skips
 		// building a CPU `triangle` hittable for a flagged entry.
-		if (meshAnimated) t.gpuOnlyStaticFallback = true;
+		if (meshAnimated) {
+			t.gpuOnlyStaticFallback = true;
+			if (w.triangles == &out.triangles) {   // (its EndTime vertices too: the GPU blurs it - Triangle::motion)
+				std::array<double, 9> end{};
+				const int corner[3] = {a, b, c};
+				for (int k = 0; k < 3; ++k)
+					transformPoint(w.xformEnd, objP[static_cast<std::size_t>(corner[k]) * 3], objP[static_cast<std::size_t>(corner[k]) * 3 + 1],
+								   objP[static_cast<std::size_t>(corner[k]) * 3 + 2], &end[static_cast<std::size_t>(k) * 3]);
+				t.motion = static_cast<int>(out.triangleEnds.size());
+				out.triangleEnds.push_back(end);
+			}
+		}
 		w.triangles->push_back(t);
 
 		if (meshAnimated) {

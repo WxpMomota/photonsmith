@@ -1253,6 +1253,8 @@ inline void addTrianglesAndQuads(BuildCtx &c) {
 	}
 	stats.quadLights = out.quads.size();
 
+	std::vector<float3> ends;   // (EndTime vertices: the moving ones' own, the still ones' as they are)
+	bool anyMoving = false;
 	for (const pbrt_flatten::Triangle &t : merged.leftover) {
 		TriangleData td = {};
 		td.p0 = f3(&t.v[0]);
@@ -1289,8 +1291,20 @@ inline void addTrianglesAndQuads(BuildCtx &c) {
 			out.lightKinds.push_back(GpuLightKind::Triangle);
 		}
 		out.triangles.push_back(td);
+		if (t.motion >= 0 && static_cast<std::size_t>(t.motion) < scene.triangleEnds.size()) {
+			const std::array<double, 9> &e = scene.triangleEnds[static_cast<std::size_t>(t.motion)];
+			ends.push_back(f3(&e[0]));
+			ends.push_back(f3(&e[3]));
+			ends.push_back(f3(&e[6]));
+			anyMoving = true;
+		} else {
+			ends.push_back(td.p0);
+			ends.push_back(td.p1);
+			ends.push_back(td.p2);
+		}
 	}
 	stats.triangles = out.triangles.size();
+	if (anyMoving) out.triangleEndVertices = std::move(ends);   // (the GPU blurs the moving meshes: OptixRenderer::setTriangleMotion)
 	// Kept as a stat because it still says something real - how many lights
 	// needed the per-triangle path rather than the cheaper merged-quad one -
 	// but it no longer means "these will not be sampled". The caller's warning

@@ -951,6 +951,14 @@ __device__ __forceinline__ bool trace_shadow_ray(
 	// two backends sharing this header.
 	if (params.statsShadowRays) atomicAdd(params.statsShadowRays, 1ull);
 
+	// The time of the sample this shadow ray belongs to (motion blur: moving geometry is where the camera ray saw it - at time 0 a moving mesh cast its start pose's
+	// shadow); 0 without motion.
+	float shadow_time = 0.0f;
+	if (params.rayTimes) {
+		const uint3 li = optixGetLaunchIndex();
+		shadow_time = params.rayTimes[li.y * params.width + li.x];
+	}
+
 	// Trace shadow ray with occlusion testing
 	optixTrace(
 		params.traversable,           // Acceleration structure
@@ -958,7 +966,7 @@ __device__ __forceinline__ bool trace_shadow_ray(
 		direction,                     // Ray direction
 		0.001f,                        // tmin (avoid self-intersection)
 		max_distance,                  // tmax
-		0.0f,                          // rayTime
+		shadow_time,                   // rayTime
 		OptixVisibilityMask(255),      // Visibility mask
 		OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT | OPTIX_RAY_FLAG_DISABLE_CLOSESTHIT,  // Flags
 		RAY_TYPE_SHADOW,               // SBT offset (shadow ray type)

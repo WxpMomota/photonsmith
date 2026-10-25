@@ -164,7 +164,8 @@ public:
 	GpuCameraParams makeRenderCamera(const GpuCameraParams& camera);
 	bool renderWavefront(unsigned int width, unsigned int height, unsigned int samplesPerPixel, unsigned int maxDepth, const GpuCameraParams& gpuCam, float* outputFramebuffer);
 	LaunchParams makeLaunchParams(unsigned int width, unsigned int height, unsigned int samplesPerPixel, unsigned int maxDepth, const GpuCameraParams& gpuCam,
-	                              CUdeviceptr d_framebuffer, CUdeviceptr d_albedo, CUdeviceptr d_normal, CUdeviceptr d_statsBounceRays, CUdeviceptr d_statsShadowRays);
+	                              CUdeviceptr d_framebuffer, CUdeviceptr d_albedo, CUdeviceptr d_normal, CUdeviceptr d_statsBounceRays, CUdeviceptr d_statsShadowRays,
+	                              CUdeviceptr d_rayTimes = 0);
 
 	/// @brief Check if OptiX is available on this system
 	/// @details Verifies driver support and SDK availability
@@ -612,6 +613,8 @@ private:
 	OptixTraversableHandle gasDiskCylinderHandle_ = 0;
 	CUdeviceptr d_gasDiskCylinder_ = 0;
 	bool sceneHasMotion_ = false;          ///< True if the uploaded scene has >=1 moving sphere (see buildScene())
+	bool sceneHasTriangleMotion_ = false;  ///< True if its triangle GAS has two motion keys (setTriangleMotion)
+	std::vector<float3> triangleMotion_;   ///< setTriangleMotion's vertices, for the next buildScene()
 
 	// -------------------------------------------------------------------
 	// Scene Geometry and Materials (Device Memory)
@@ -663,6 +666,10 @@ private:
 	/// next scene built.
 	/// @brief Uploads the scene's other portal lights (pbrt sums every light; see GpuPortalLight::extra). Called with the scene's list, empty for none, on every scene upload.
 	void uploadExtraPortalLights(const std::vector<ExtraPortalLightHost>& extras, bool skyBeside = false);   // skyBeside: SceneData::skyBesidePortals
+	/// @brief The triangles' vertices at EndTime for the next buildScene() (three a triangle, in its `triangles` order; empty: none moves). With them the triangle GAS is
+	/// built with two motion keys and the camera samples a time per ray, so a moving mesh is blurred (pbrt_flatten::Triangle::motion). Not for a pipeline without motion
+	/// blur (SPPM passes none).
+	void setTriangleMotion(const std::vector<float3>& endVertices) { triangleMotion_ = endVertices; }
 	void setInstanceData(const std::vector<TriangleData>& triangles,
 						 const std::vector<SphereData>& spheres,
 						 const std::vector<SceneData::InstanceGroupGPU>& groups,

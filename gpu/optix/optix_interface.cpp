@@ -282,6 +282,7 @@ static bool prepareSceneAndCamera(
 		// PREVIOUS scene's placements around.
 		g_renderer->setInstanceData(scene.instanceTriangles, scene.instanceSpheres,
 									scene.instanceGroups, scene.instancePlacements);
+		g_renderer->setTriangleMotion(scene.triangleEndVertices);   // (moving meshes blurred: a two-key triangle GAS)
 		g_renderer->uploadExtraPortalLights(scene.extraPortals, scene.skyBesidePortals);
 		// The GPU upload writes its own errors to std::cerr ("Scene contains no geometry"); kept, when not verbose, to say why this failed.
 		std::unique_ptr<CerrCapture> uploadCapture;
@@ -1417,6 +1418,7 @@ extern "C" int optix_render_main_sppm(
 			// keep a PREVIOUS scene's placements around.
 			g_renderer->setInstanceData(scene.instanceTriangles, scene.instanceSpheres,
 										scene.instanceGroups, scene.instancePlacements);
+			g_renderer->setTriangleMotion({});   // (SPPM's pipeline has no motion blur: its meshes stay at StartTime)
 			g_renderer->uploadExtraPortalLights(scene.extraPortals, scene.skyBesidePortals);
 			if (!g_renderer->buildScene(scene.spheres, scene.quads, scene.materials,
 			                             scene.lightIndices, scene.lightKinds,

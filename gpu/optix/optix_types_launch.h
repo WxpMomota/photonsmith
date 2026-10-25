@@ -178,6 +178,9 @@ struct LaunchParams {
 	// would overestimate whenever a path terminates early.
 	unsigned long long* statsBounceRays;
 	unsigned long long* statsShadowRays;
+	// Per pixel (py * width + px): the time of the sample now being traced (motion blur: optix_raygen.h writes it), so that its shadow rays see moving geometry where its
+	// camera ray did (trace_shadow_ray). Null when the scene has no motion.
+	float* rayTimes;
 };
 
 // Hit group data (per-geometry instance in SBT)
