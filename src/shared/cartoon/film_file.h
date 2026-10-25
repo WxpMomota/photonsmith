@@ -48,6 +48,7 @@
 //     gesture    kai  "look up" 8.0 9.0 11.0 11.5               # NAME, a pose of its library, eased in from 8 s to 9 s, out from 11 s to 11.5 s (no out times: held)
 //     gesture    kai  "reach to the wall" 12 13 contact 12.8    # contact: the hand meets something (a touch on the soundtrack)
 //     say        kai  14.4 "Look, the first star."  rate 1.1  pitch 2   # NAME, a line it says from 14.4 s: its voice, its mouth and a caption (film_speech.h; `nocaption`)
+//     feel       pip  happy 3 3.5 6 6.8  amount 0.8             # NAME, an expression on its face eased in and out (film_faces.h: happy, sad, angry, surprised, ...)
 //
 //     shot 0 Walking
 //       follow   kai  behind 3  up 1.7  side 0.6  fov 35          # instead of `key` lines: the camera behind NAME (metres), at a height, to its right, looking at its chest
@@ -79,6 +80,7 @@
 #include <vector>
 
 #include "../camera_keyframes.h"
+#include "film_faces.h"
 #include "film_speech.h"
 #include "film_subjects.h"
 #include "music_cues.h"
@@ -133,6 +135,7 @@ struct Character {
 	double scale = 1.0;                  // its size (a kind that can be scaled: a child Pip 0.6, a turtle as big as a dog 6)
 	std::vector<WalkLine> walks;
 	std::vector<rig::Gesture> gestures;
+	std::vector<faces::Feeling> feelings;   // its expressions (`feel`)
 	int line = 0;
 };
 
@@ -148,6 +151,7 @@ struct CharacterMoment {
 	Vec3 trail;   // how far a spring on its place lags it (body space: +x its left, +z forward): for what hangs and swings - a robe's hem, a tail (rig::lag)
 	double voice = 0.0;        // how loud it is speaking, 0..1 (its `say` lines, its `sample ... by NAME` cues: music_cues::voiceAt) - a mouth opens by it
 	speech::Mouth mouth;       // the mouth shape its `say` lines need now (open, wide, round)
+	faces::Face face;          // what it feels now, on its face (its `feel` lines)
 	bool feetLocked = false;   // its feet held where they came down (rig::FootLock), in body space: when its kind says where its gait puts them
 	Vec3 lockedFeet[4];
 	double scale = 1.0;        // its size (Character::scale)
@@ -167,6 +171,7 @@ struct CharacterKind {
 	bool scalable = false;         // whether `scale` on its character line is drawn (its stride, chest and feet are scaled with it)
 	std::vector<std::string> poses;   // its library's poses (a gesture naming another is an error when the film is loaded)
 	speech::Voice voice;              // how its `say` lines sound (its pitch is moved a little for each character, by its name)
+	bool face = true;                 // whether it has a face to show a feeling on (the masked explorer has not)
 };
 // The library of kinds, by name (cartoons.h fills it before any film file is read).
 inline std::map<std::string, CharacterKind> &characterKinds() {
@@ -410,12 +415,31 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				}
 			}
 			s.characters.push_back(c);
-		} else if (verb == "walk" || verb == "gesture") {
+		} else if (verb == "walk" || verb == "gesture" || verb == "feel") {
 			const std::vector<std::string> t = detail::tokens(line);
 			Character *c = nullptr;
 			for (Character &each : s.characters)
 				if (t.size() > 1 && each.name == t[1]) c = &each;
 			if (!c) return fail("`" + verb + "` needs the name of a character brought in before it with `character`");
+			if (verb == "feel") {
+				faces::Feeling f;
+				rig::Gesture &g = f.when;
+				if (t.size() < 5 || !number(t[3], g.in0) || !number(t[4], g.in1) || g.in1 < g.in0) return fail("`feel NAME EXPRESSION IN0 IN1 [OUT0 OUT1] [amount A]`");
+				g.pose = t[2];
+				if (!faces::expressions().count(g.pose)) return fail("no expression called \"" + g.pose + "\" (there are: " + faces::expressionList() + ")");
+				std::size_t i = 5;
+				if (i + 1 < t.size() && t[i] != "amount") {
+					if (!number(t[i], g.out0) || !number(t[i + 1], g.out1) || g.out0 < g.in1 || g.out1 < g.out0) return fail("a feeling's out times come after its in times");
+					i += 2;
+				}
+				if (i + 1 < t.size() && t[i] == "amount") {
+					if (!number(t[i + 1], f.amount) || f.amount < 0.0 || f.amount > 2.0) return fail("`amount` is from 0 to 2");
+					i += 2;
+				}
+				if (i != t.size()) return fail("\"" + t[i] + "\" is not part of a feeling");
+				c->feelings.push_back(f);
+				continue;
+			}
 			if (verb == "walk") {
 				WalkLine wl;
 				wl.line = n;
@@ -521,7 +545,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, shot, key, follow, subject, move, turn, grow, light, show, bounce, topple, character, walk, gesture, say)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, shot, key, follow, subject, move, turn, grow, light, show, bounce, topple, character, walk, gesture, feel, say)");
 		}
 	}
 	n = shotLine;
@@ -759,6 +783,7 @@ class DataFilm {
 		for (const Character &c : spec.characters) {
 			const CharacterKind &kind = characterKinds().at(c.kind);
 			if (c.scale != 1.0 && !kind.scalable) return filePath + ":" + std::to_string(c.line) + ": a " + c.kind + " cannot be scaled";
+			if (!c.feelings.empty() && !kind.face) return filePath + ": " + c.name + " has a `feel` line, but a " + c.kind + " has no face to show it (give it a gesture)";
 			if (kind.poses.empty()) continue;
 			for (const rig::Gesture &g : c.gestures)
 				if (std::find(kind.poses.begin(), kind.poses.end(), g.pose) == kind.poses.end()) {
@@ -1065,6 +1090,7 @@ class DataFilm {
 			lockFeet(c, t, m);
 			m.voice = music_cues::voiceAt(spec.key, c.name, t, shotStarts(), shotNameList());
 			speakingAt(c, t, m);
+			m.face = faces::faceAt(c.feelings, t);
 			out += "# " + c.name + " (" + c.kind + ")\n" + kind.text(m);
 		}
 		return out;

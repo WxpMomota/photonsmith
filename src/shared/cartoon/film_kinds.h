@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "cartoon_actor.h"
+#include "film_faces.h"
 #include "film_file.h"
 #include "human_actor.h"
 #include "nomai_explorer.h"
@@ -76,12 +77,32 @@ inline void speakWith(const CharacterMoment &m, double &mouthOpen, double &smile
 	mouthOpen = std::max(mouthOpen, line ? m.mouth.open : 0.85 * m.voice);
 	smile += 0.35 * m.mouth.wide - 0.3 * m.mouth.round;
 }
+// Lids lowered by a feeling, and a blink on top of them.
+inline double lidsWith(double lids, double blink) {
+	lids = std::clamp(lids, 0.0, 0.9);
+	return lids + (1.0 - lids) * blink;
+}
 // A to-and-fro at `hz` (a wave, a shake of the head), from the gesture's start.
 inline double wiggle(double since, double hz) { return std::sin(2.0 * kPi * hz * since); }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Pip (its head is a ball of 0.5 round 0.96 up: what a hand reaches for is outside it)
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+// What Pip feels, on its face: brows, lids, eyes, mouth, its ears and its head.
+inline void pipFace(const faces::Face &f, actor::Pose &p) {
+	p.smile += f.smile;
+	p.browRaiseL += f.browRaise;
+	p.browRaiseR += f.browRaise;
+	p.browTiltL += f.browTilt;
+	p.browTiltR += f.browTilt;
+	p.lidTilt += f.lidTilt;
+	p.eyeWide += f.eyeWide;
+	p.blink = lidsWith(f.lids, p.blink);
+	p.mouthOpen = std::max(p.mouthOpen, f.mouthOpen);
+	p.earDroop += f.droop;
+	p.headPitch += f.headPitch;
+	p.headRoll += f.headRoll;
+}
 inline actor::Pose pipWalk(double steps) {
 	actor::Pose p;
 	p.stepPhase = gaitPhase(steps);
@@ -154,6 +175,7 @@ inline CharacterKind pipKind() {
 		placeOf(m.frame, p.pos, p.yaw);
 		p.blink = rig::blink(m.t, m.seed);
 		p.squash = actor::breathe(m.t);
+		pipFace(m.face, p);
 		speakWith(m, p.mouthOpen, p.smile);
 		if (m.feetLocked) {
 			p.feetHeld = true;
@@ -173,6 +195,16 @@ inline CharacterKind pipKind() {
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // A person
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+// What a person feels, on their face (a person's head does not tilt sideways, and their lids do not slant).
+inline void personFace(const faces::Face &f, human::HumanPose &p) {
+	p.smile += f.smile;
+	p.browRaise += f.browRaise;
+	p.browTilt += f.browTilt;
+	p.eyeWide += f.eyeWide;
+	p.blink = lidsWith(f.lids, p.blink);
+	p.mouthOpen = std::max(p.mouthOpen, f.mouthOpen);
+	p.headPitch += f.headPitch;
+}
 inline human::HumanPose personWalk(double steps) {
 	human::HumanPose p;
 	p.walkPhase = gaitPhase(steps);
@@ -239,6 +271,7 @@ inline CharacterKind personKind() {
 		human::HumanPose p = personWalk(m.steps);
 		placeOf(m.frame, p.pos, p.yaw);
 		p.blink = rig::blink(m.t, m.seed);
+		personFace(m.face, p);
 		speakWith(m, p.mouthOpen, p.smile);
 		if (m.feetLocked) {
 			p.feetHeld = true;
@@ -254,6 +287,19 @@ inline CharacterKind personKind() {
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The turtle
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+// What the turtle feels, on its face (its brows: -1 worried .. 1 cross; an angry turtle narrows its eyes).
+inline void turtleFace(const faces::Face &f, turtle::TurtlePose &p) {
+	p.smile += f.smile;
+	p.browRaise += f.browRaise;
+	p.browL -= f.browTilt;
+	p.browR -= f.browTilt;
+	p.squint += 0.4 * std::max(0.0, f.lidTilt);
+	p.eyeWide += f.eyeWide;
+	p.blink = lidsWith(f.lids, p.blink);
+	p.mouthOpen = std::max(p.mouthOpen, f.mouthOpen);
+	p.headPitch += f.headPitch;
+	p.headRoll += f.headRoll;
+}
 inline turtle::TurtlePose turtleWalk(double steps) {
 	turtle::TurtlePose p;
 	p.walkPhase = gaitPhase(steps);
@@ -309,6 +355,7 @@ inline CharacterKind turtleKind() {
 		turtle::TurtlePose p = turtleWalk(m.steps);
 		placeOf(m.frame, p.pos, p.yaw);
 		p.blink = rig::blink(m.t, m.seed);
+		turtleFace(m.face, p);
 		speakWith(m, p.mouthOpen, p.smile);
 		if (m.feetLocked) {   // (its legs reach for where their feet came down: a turtle's feet follow world targets)
 			Vec3 *target[4] = {&p.frontL, &p.frontR, &p.hindL, &p.hindR};
@@ -354,6 +401,7 @@ inline CharacterKind explorerKind() {
 	explorer.firstStep = 0.5;
 	explorer.poses = namesOf(nomai::explorerPoses());
 	explorer.voice = {165.0, 1.05, 0.12};   // (behind a mask: breathier)
+	explorer.face = false;                   // (its mask)
 	return explorer;
 }
 

@@ -593,3 +593,38 @@ TEST(FilmSpeech, AFilmFilesCharactersSayTheirLinesWithMouthsVoicesAndCaptions) {
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nsay kim 1 \"Hi.\"\n", bad).find("kim says a line but is not brought in"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter kim pip\nsay kim 1 \"Hi.\" loudly\n", bad).find("a line takes rate"), std::string::npos);
 }
+
+// ---- what characters feel -----------------------------------------------------------------------------------------------------------------------------------------------------
+
+// A `feel` line eases an expression in and out like a gesture, at its amount; two at once add up; an expression that does not exist is refused with the list, and the
+// masked explorer, who has no face, is told to use a gesture.
+TEST(FilmFaces, AFeelingEasesAnExpressionInAndOutAndFeelingsAddUp) {
+	(void)cartoon::films();
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 10\ncharacter pip pip\n"
+					   "feel pip happy 1 2 5 6\n"
+					   "feel pip surprised 3 3.2 4 4.5 amount 0.5\n",
+					   film),
+			  "");
+	const ff::Character &pip = *film.character("pip");
+	ASSERT_EQ(pip.feelings.size(), 2u);
+	const cartoon::faces::Face &happy = cartoon::faces::expressions().at("happy"), &surprised = cartoon::faces::expressions().at("surprised");
+	EXPECT_EQ(cartoon::faces::faceAt(pip.feelings, 0.5).smile, 0.0) << "before it";
+	EXPECT_NEAR(cartoon::faces::faceAt(pip.feelings, 2.5).smile, happy.smile, 1e-12) << "held";
+	EXPECT_NEAR(cartoon::faces::faceAt(pip.feelings, 1.5).smile, 0.5 * happy.smile, 1e-12) << "half way in (smoothly)";
+	const cartoon::faces::Face both = cartoon::faces::faceAt(pip.feelings, 3.5);
+	EXPECT_NEAR(both.browRaise, happy.browRaise + 0.5 * surprised.browRaise, 1e-12) << "two at once add up, at their amounts";
+	EXPECT_EQ(cartoon::faces::faceAt(pip.feelings, 7.0).smile, 0.0) << "after it";
+	// it is on the face drawn: Pip's scene text differs between a happy and a sad moment
+	ff::DataFilm sad;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 10\ncharacter pip pip\nfeel pip sad 1 2 5 6\n", sad), "");
+	const auto pipText = [](const std::string &scene) { return scene.substr(scene.find("# pip (pip)")); };   // (the scenes are in folders of their own)
+	EXPECT_NE(pipText(film.sceneAt(2.5)), pipText(sad.sceneAt(2.5)));
+	EXPECT_TRUE(pipText(film.sceneAt(8.0)) == pipText(sad.sceneAt(8.0))) << "at rest the same";
+	ff::DataFilm bad;
+	const std::string unknown = loadFilm("scene s.pbrt\nlength 10\ncharacter pip pip\nfeel pip giddy 1 2\n", bad);
+	EXPECT_NE(unknown.find("no expression called \"giddy\""), std::string::npos) << unknown;
+	EXPECT_NE(unknown.find("sleepy"), std::string::npos) << "the list";
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter kai nomai-explorer\nfeel kai sad 1 2\n", bad).find("has no face"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter pip pip\nfeel pip sad 1 2 amount 3\n", bad).find("`amount` is from 0 to 2"), std::string::npos);
+}

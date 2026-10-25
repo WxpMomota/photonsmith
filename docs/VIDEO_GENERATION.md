@@ -557,6 +557,13 @@ where the camera sees the speaker and quietened with the distance. And a caption
 begins), beside any of the film's captions file (`film_assets/<key>/captions.txt`). A recorded line can be used instead: a cues file's `sample FILE.wav ... by NAME` opens
 the character's mouth by its loudness.
 
+**Faces: `feel`.** `feel pip sad 8 8.6 12 13 amount 0.8` eases an expression onto a character's face and off again, as a gesture is eased (no out times: held; `amount` 0
+to 2, 1 by default; two at once add up). The expressions (film_faces.h) are happy, sad, angry, surprised, scared, worried, sleepy, smug, thinking and disgusted, each a few
+numbers any face can take - the smile, the brows' height and slant, how open the eyes are and how the lids slant, the lids lowered, the mouth hanging open, the ears, a tip and
+a tilt of the head - and each kind draws them its own way: Pip with its brows, lids, mouth and ears, the person with brows, eyes and mouth, the turtle with its brows, a
+squint for anger and its mouth. The masked explorer has no face; a `feel` line for it is refused (a gesture shows how it feels). A feeling and a line can go together: the
+mouth speaks while the brows are sad.
+
 `ray_tracer --film-lines <key>` lists the lines with their start, end and syllables; `ray_tracer --film-sound <key> OUT.wav` writes a film's soundtrack alone, to listen to
 the lines (and the music and footsteps) without rendering a frame; `--film-check` counts a film file's characters and lines.
 
