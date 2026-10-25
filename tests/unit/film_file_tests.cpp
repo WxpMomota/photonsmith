@@ -802,3 +802,35 @@ TEST(FilmCoverage, AnAutoShotCutsToEachSpeakerAndKeepsToOneSideOfTheLine) {
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter pip pip\nshot 0 A\n  auto kim\n", bad).find("covers kim"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter pip pip\nshot 0 A\n  auto\n  key 0 1 0 0 1 4\n", bad).find("both `key` lines and `auto`"), std::string::npos);
 }
+
+// ---- transitions --------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// A shot comes in with a dissolve, a fade or a wipe; the film can end with a fade out; the other side of a dissolve is the scene seen by the camera across the cut.
+TEST(FilmTransitions, AShotComesInWithADissolveAFadeOrAWipeAndTheOtherSideIsSeenFromAcrossTheCut) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 20\nfadeout 1.5\n"
+					   "shot 0 A\n  key 0 1 10 0 1 0\n  fade 1\n"
+					   "shot 5 B\n  key 6 1 10 0 1 0\n  dissolve 2\n"
+					   "shot 12 C\n  key -6 1 10 0 1 0\n  wipe 1\n",
+					   film),
+			  "");
+	const std::vector<cartoon::Transition> trs = film.transitions();
+	ASSERT_EQ(trs.size(), 4u);
+	EXPECT_EQ(trs[0].kind, cartoon::Transition::Fade);
+	EXPECT_DOUBLE_EQ(trs[0].at, 0.0);
+	EXPECT_EQ(trs[1].kind, cartoon::Transition::Dissolve);
+	EXPECT_DOUBLE_EQ(trs[1].at, 5.0);
+	EXPECT_EQ(trs[2].kind, cartoon::Transition::Wipe);
+	EXPECT_EQ(trs[3].kind, cartoon::Transition::Fade);
+	EXPECT_DOUBLE_EQ(trs[3].at, 20.0) << "the fade out ends with the film";
+	EXPECT_DOUBLE_EQ(trs[3].length, 3.0);
+	// across the dissolve's cut: before it, the other side is shot B's camera; after it, shot A's; away from it, the frame itself
+	const auto lookAt = [](const std::string &scene) { return scene.substr(scene.find("LookAt"), scene.find('\n', scene.find("LookAt")) - scene.find("LookAt")); };
+	EXPECT_EQ(lookAt(film.sceneAcross(4.5)).rfind("LookAt 6 ", 0), 0u) << lookAt(film.sceneAcross(4.5));
+	EXPECT_EQ(lookAt(film.sceneAcross(5.5)).rfind("LookAt 0 ", 0), 0u) << lookAt(film.sceneAcross(5.5));
+	EXPECT_EQ(film.sceneAcross(8.0), film.sceneAt(8.0));
+	EXPECT_EQ(film.sceneAcross(0.2), film.sceneAt(0.2)) << "a fade needs no other side";
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 20\nshot 0 A\n  key 0 1 10 0 1 0\n  dissolve 1\n", bad).find("can only fade in"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 20\ndissolve 1\n", bad).find("belongs to a shot"), std::string::npos);
+}

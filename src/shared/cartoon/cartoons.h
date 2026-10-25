@@ -251,6 +251,13 @@ inline void addFilmFile(Registry &r, const std::string &file) {
 			p->speak(m);
 		};
 	}
+	// how its shots give way to each other
+	if (!d.transitions().empty()) {
+		f.transitions = [p]() { return p->transitions(); };
+		f.sceneAcross = [p, names = d.shotNameList()](double t) {   // (the other side of a cut is the other shot's: its cameras file's changes)
+			return shot_cameras::at(p->spec.key, [p]() { return p->shotStarts(); }, names, p->acrossShotTime(t), p->sceneAcross(t));
+		};
+	}
 	// its captions: its captions file (film_assets/<key>/captions.txt) and its characters' lines
 	const std::string captionsFile = film_cache::asset(d.spec.key + "/captions.txt");
 	const bool hasCaptionsFile = std::filesystem::exists(captionsFile);

@@ -29,6 +29,8 @@
 //       key  ...
 //     shot 6 Pull back
 //       key  ...
+//       dissolve 0.8                        # how this shot comes in: `dissolve`, `fade` (to black and up) or `wipe`, over so many seconds centred on its cut (default: a cut)
+//     fadeout  1.5                          # the film ends with a fade to black over its last 1.5 s (a `fade` in its first shot fades it up from black)
 //
 //     turn  windmill about 0 3 0 axis 0 0 1   0 0   12 720   # rotate NAME: `about X Y Z` the point it turns about (default 0 0 0), `axis X Y Z` (default 0 1 0), then pairs: time degrees
 //     move  cart   0 -5 0 0   12 5 0 0                      # translate NAME: groups of time x y z
@@ -135,6 +137,7 @@ struct Shot {
 	bool coverage = false;            // `auto`: chosen from what happens, when the film is loaded (it becomes shots of its own)
 	std::vector<std::string> cover;   // (auto) the characters it covers (none named: those who speak in it, or everyone)
 	int side = 1;                     // (auto) 1: the first of them on the left of the frame, -1: on the right
+	Transition transition;            // how it comes in (length 0: a cut)
 };
 
 // A character a film file brings in (`character NAME KIND ...`), its walks (`walk`) and its gestures (`gesture`).
@@ -220,6 +223,7 @@ struct Spec {
 	int fps = 24;
 	bool ease = true;
 	double shutter = 0.5;   // the share of a frame a moving block is blurred over (0: none)
+	double fadeOut = 0.0;   // seconds of a fade to black at the end
 	std::vector<Shot> shots;
 	std::vector<Anim> anims;
 	std::vector<Character> characters;
@@ -607,6 +611,14 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			if (!(l.rate > 0.0)) return fail("a line's rate is more than 0");
 			s.lines.push_back(l);
+		} else if (verb == "dissolve" || verb == "fade" || verb == "wipe") {
+			if (s.shots.empty()) return fail("`" + verb + " SECONDS` belongs to a shot (how it comes in): start one with `shot 0 NAME` first");
+			Transition &tr = s.shots.back().transition;
+			if (w.size() != 2 || !number(w[1], tr.length) || tr.length <= 0.0 || tr.length > 10.0) return fail("`" + verb + " SECONDS`: from more than 0 to 10 seconds");
+			tr.kind = verb == "dissolve" ? Transition::Dissolve : verb == "fade" ? Transition::Fade : Transition::Wipe;
+			if (s.shots.size() == 1 && tr.kind != Transition::Fade) return fail("the first shot can only fade in (`fade`): there is nothing before it to " + verb + " from");
+		} else if (verb == "fadeout") {
+			if (w.size() != 2 || !number(w[1], s.fadeOut) || s.fadeOut <= 0.0) return fail("`fadeout SECONDS`: the fade to black at the end");
 		} else if (verb == "auto" || verb == "side") {
 			if (s.shots.empty()) return fail("`" + verb + "` belongs to a shot: start one with `shot 0 NAME` first");
 			const std::vector<std::string> t = detail::tokens(line);
@@ -676,7 +688,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, shot, key, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, walk, gesture, feel, say, look, prop, pick, put, give)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, shot, key, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, walk, gesture, feel, say, look, prop, pick, put, give)");
 		}
 	}
 	n = shotLine;
@@ -1162,6 +1174,7 @@ class DataFilm {
 				g.name = shot.name + (beats.size() == 1 ? std::string() : beats[b].second ? ": " + beats[b].second->name : ": everyone");
 				g.path.keys = {coverageKey(cast, beats[b].second, shot.side, from), coverageKey(cast, beats[b].second, shot.side, std::max(from, to - 1e-3))};
 				g.path.ease = true;
+				if (b == 0) g.transition = shot.transition;   // (how the auto shot comes in)
 				if (beats[b].second) g.about.push_back(beats[b].second->name);
 				else
 					for (const Character *c : cast) g.about.push_back(c->name);
@@ -1593,8 +1606,46 @@ class DataFilm {
 		return scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n";
 	}
 
-	std::string sceneAt(double t) const {
-		std::string out = headerAt(t);
+	std::string sceneAt(double t) const { return worldAt(headerAt(t), t); }
+
+	// ---- how shots give way to each other ----
+	std::vector<Transition> transitions() const {
+		std::vector<Transition> out;
+		for (const Shot &shot : spec.shots)
+			if (shot.transition.length > 0.0) {
+				Transition tr = shot.transition;
+				tr.at = shot.start;
+				out.push_back(tr);
+			}
+		if (spec.fadeOut > 0.0) out.push_back({Transition::Fade, spec.length, 2.0 * spec.fadeOut});   // (half of a fade is before its cut: all of it before the end)
+		return out;
+	}
+	// The scene at t seen by the other side of the dissolve or wipe it is in (the shot after the cut before it, the shot before after it); outside one, the scene itself.
+	std::string sceneAcross(double t) const {
+		for (std::size_t k = 1; k < spec.shots.size(); ++k) {
+			const Transition &tr = spec.shots[k].transition;
+			const double cut = spec.shots[k].start;
+			if (tr.length <= 0.0 || tr.kind == Transition::Fade || std::abs(t - cut) > 0.5 * tr.length) continue;
+			std::string lookAt, camera;
+			cameraAt(t, lookAt, camera, static_cast<int>(t < cut ? k : k - 1));
+			return worldAt(spec.shots.empty() ? scene.header : scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n", t);
+		}
+		return sceneAt(t);
+	}
+	// The time that picks the shot whose camera sceneAcross(t) uses (what a cameras file changes is that shot's).
+	double acrossShotTime(double t) const {
+		for (std::size_t k = 1; k < spec.shots.size(); ++k) {
+			const Transition &tr = spec.shots[k].transition;
+			const double cut = spec.shots[k].start;
+			if (tr.length <= 0.0 || tr.kind == Transition::Fade || std::abs(t - cut) > 0.5 * tr.length) continue;
+			return t < cut ? cut : spec.shots[k - 1].start;
+		}
+		return t;
+	}
+
+	// The scene with this header at t: the set, its animated blocks and its characters.
+	std::string worldAt(const std::string &header, double t) const {
+		std::string out = header;
 		for (const Piece &piece : scene.world) {
 			if (piece.block < 0) {
 				out += piece.text;
@@ -1721,10 +1772,11 @@ class DataFilm {
 		}
 		return out;
 	}
-	void cameraAt(double t, std::string &lookAt, std::string &camera) const {
+	void cameraAt(double t, std::string &lookAt, std::string &camera, int shotIndex = -1) const {
 		std::size_t k = 0;
 		for (std::size_t i = 0; i < spec.shots.size(); ++i)
 			if (t >= spec.shots[i].start) k = i;
+		if (shotIndex >= 0) k = static_cast<std::size_t>(shotIndex);   // (the camera of another shot: the other side of a dissolve)
 		const Shot &shot = spec.shots[k];
 		const double end = k + 1 < spec.shots.size() ? spec.shots[k + 1].start : spec.length;
 		const double span = std::max(1e-6, end - shot.start);

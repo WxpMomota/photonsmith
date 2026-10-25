@@ -46,6 +46,7 @@ struct Job {
 	int frames = 0;
 	std::vector<int> list;
 	std::map<int, std::string> keep;   // finished frames and the fingerprints they were rendered from
+	bool across = false;               // the other side of the film's dissolves and wipes (Film::sceneAcross), not its own frames
 	const cartoon::Film *filmPtr = nullptr;
 
 	std::string scenePath() const { return (std::filesystem::path(scenes) / "frame.pbrt").string(); }
@@ -59,6 +60,7 @@ struct Job {
 		for (int f : list) o << " " << f;
 		o << "\n";
 		for (const auto &[f, fp] : keep) o << "keep " << f << " " << fp << "\n";
+		if (across) o << "across 1\n";
 		return o.str();
 	}
 
@@ -76,6 +78,7 @@ struct Job {
 			else if (verb == "scenes") std::getline(words >> std::ws, scenes);
 			else if (verb == "out") std::getline(words >> std::ws, out);
 			else if (verb == "ext") words >> ext;
+			else if (verb == "across") words >> across;
 			else if (verb == "list")
 				for (int f; words >> f;) list.push_back(f);
 			else if (verb == "keep") {
@@ -99,12 +102,13 @@ struct Job {
 		unchanged = false;
 		share = 1.0;
 		try {
-			const std::string header = filmPtr->headerAt(timeOf(frame));
+			const bool otherSide = across && filmPtr->sceneAcross;
+			const std::string text = otherSide ? filmPtr->sceneAcross(timeOf(frame)) : filmPtr->sceneAt(timeOf(frame));
+			const std::string header = otherSide ? text : filmPtr->headerAt(timeOf(frame));   // (the other side's camera is in its own text)
 			static const std::regex look("LookAt\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)");
 			std::smatch m;
 			if (std::regex_search(header, m, look))
 				for (int i = 0; i < 3; ++i) eye[i] = std::stod(m[i + 1].str());
-			const std::string text = filmPtr->sceneAt(timeOf(frame));
 			fingerprint = frame_fingerprint::of(text);
 			share = cartoon::shot_cameras::sampleShareOf(text);
 			if (const auto it = keep.find(frame); it != keep.end() && it->second == fingerprint) {

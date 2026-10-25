@@ -572,6 +572,14 @@ struct Caption {
 	double lineGap = 0.3;   // between two lines, as a share of the taller one's height
 };
 
+// How one shot gives way to the next (Film::transitions), at the cut `at` over `length` seconds centred on it: a dissolve (the two pictures blended), a fade (to black and up
+// again; at the film's start a fade up from black, at its end, `at` its length, a fade out) or a wipe (the next picture coming in from the left). Done when the video is made
+// (launcher/film_transitions.h): a dissolve or a wipe needs the other side's picture of each frame in it, which Film::sceneAcross makes.
+struct Transition {
+	enum Kind { Dissolve, Fade, Wipe } kind = Dissolve;
+	double at = 0.0, length = 0.0;
+};
+
 // Something a film's motion does that its soundtrack hears (Film::events; film_events.h makes them, sfx.h plays them): a foot coming down, a thing landing, a flash, a hand
 // laid on something.
 enum class EventKind { Footfall, Impact, Flash, Touch };
@@ -617,6 +625,10 @@ struct Film {
 	std::function<std::vector<Foot>(double)> feetAt;
 	// (empty: only the generic ones) the instruments of its own that its cues file can name (pbrt_scenes/film_assets/<key>/cues.txt, music_cues.h): its score's voices.
 	std::function<std::map<std::string, CueInstrument>()> instruments;
+	// (empty: none, every cut is hard) how its shots give way to each other, and (for a dissolve or a wipe) the scene at t seen by the camera of the other side of the cut - the
+	// shot before it after the cut, the shot after it before the cut.
+	std::function<std::vector<Transition>()> transitions;
+	std::function<std::string(double)> sceneAcross;
 };
 
 }  // namespace cartoon

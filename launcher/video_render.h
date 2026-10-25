@@ -70,6 +70,7 @@ extern char** environ;
 #include "launcher/render_setup.h"
 #include "launcher/cartoon_worker.h"
 #include "launcher/film_captions.h"    // a film's words on its frames
+#include "launcher/film_transitions.h" // its dissolves, fades and wipes
 #include "launcher/video_frames.h"     // the frames folder: kept on a resume, emptied (when ours) on a fresh start
 
 // Converts rendered PPM frames to PNG on a background thread while the main
@@ -371,8 +372,9 @@ struct WorkerProcess : cartoon_render::WorkerHandle {
 // A cartoon video's frames. With workers (the default on an OptiX GPU: cartoon_worker.h) a few long-lived processes each render a list of frames, which spares the second and a half every
 // frame run spends starting up (most of a frame at a draft quality); otherwise one child run renders each frame, a few at once (cartoon_render.h). Either way a frame's picture is
 // handed to `png_converter` in frame order, and a resumed video's finished frames are not rendered again. Returns the number of frames that are rendered.
+// With `only`, just the frames it flags are rendered; `across` renders the other side of the film's dissolves and wipes (Film::sceneAcross) instead of its own frames.
 inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, const cartoon::Film &film, const std::filesystem::path &frames_dir, int render_frame_count,
-                               BackgroundPngConverter &png_converter) {
+                               BackgroundPngConverter &png_converter, const std::vector<char> *only = nullptr, bool across = false) {
     const bool use_gpu = s.use_gpu;
     const int image_width = s.image_width, image_height = s.image_height, samples_per_pixel = s.samples_per_pixel, max_ray_depth = s.max_ray_depth;
     // how many frames to keep in flight follows the frame's size, its samples and the graphics card's free memory (RunPolicy::framesInFlight), unless the user chose
@@ -422,13 +424,14 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
     // size, samples and flags resumes from them and renders only the rest.
     const int draftStep = std::max(1, args.draft_step);
     for (int frame = 0; frame < render_frame_count; ++frame)
-        if (frame % draftStep != 0) already[static_cast<std::size_t>(frame)] = 1;
+        if (frame % draftStep != 0 || (only && !(*only)[static_cast<std::size_t>(frame)])) already[static_cast<std::size_t>(frame)] = 1;
     if (draftStep > 1) std::cout << "\nDraft: rendering one frame in " << draftStep << " (" << (render_frame_count + draftStep - 1) / draftStep << " of " << render_frame_count
                                  << "); each is repeated in the frames after it." << std::endl;
     const int timeout = cartoon_render::timeoutFor(args, use_gpu);
     // --time-limit is the whole video's budget (CPU only, as for any video): each frame gets its share, and `jobs` frames share the clock
-    const double frameTimeLimit = (args.time_limit_seconds > 0.0 && !use_gpu) ? args.time_limit_seconds * jobs / std::max(1, render_frame_count - resumed) : 0.0;
-    std::cout << "\nRendering " << (render_frame_count - resumed) << " frames of " << film.name << ", ";
+    const int toRender = static_cast<int>(std::count(already.begin(), already.end(), 0));   // (a draft's, or only the frames asked for: the others are not rendered)
+    const double frameTimeLimit = (args.time_limit_seconds > 0.0 && !use_gpu) ? args.time_limit_seconds * jobs / std::max(1, toRender) : 0.0;
+    std::cout << "\nRendering " << toRender << " frames of " << film.name << ", ";
     if (workers > 0) std::cout << workers << " workers";
     else std::cout << jobs << " at a time";
     if (load.freeVramMb > 0 && use_gpu) std::cout << " (for " << image_width << " x " << image_height << " at " << samples_per_pixel << " samples, " << std::fixed << std::setprecision(1)
@@ -474,6 +477,7 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
         job.frames = render_frame_count;
         job.out = frames_dir.string();
         job.ext = frame_is_png ? "png" : "ppm";   // (the same names the video looks for: frame_file above)
+        job.across = across;
         cartoon_render::WorkerHooks hooks;
         hooks.start = [&](int worker, const std::vector<int> &frames) -> std::unique_ptr<cartoon_render::WorkerHandle> {
             const std::filesystem::path dir = frames_dir / ("work" + std::to_string(worker));
@@ -768,6 +772,19 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
         }
     }
 
+    // the other side of the film's dissolves and wipes: the frames in them seen by the camera of the shot across the cut (film_transitions.h blends them when the video is made)
+    if (cartoon_film && converted > 0 && film_transitions::needsAcross(*cartoon_film, render_frame_count)) {
+        const std::filesystem::path across = frames_dir / film_transitions::kAcrossFolder;
+        std::filesystem::create_directories(across);
+        const std::vector<char> only = film_transitions::acrossFrames(*cartoon_film, render_frame_count);
+        cartoon::Film side = *cartoon_film;
+        side.sceneAt = side.sceneAcross;
+        std::cout << "\nRendering the other side of the dissolves and wipes of " << cartoon_film->name << "..." << std::endl;
+        BackgroundPngConverter across_png(across);
+        renderCartoonFrames(args, s, side, across, render_frame_count, across_png, &only, true);
+        across_png.finish();
+    }
+
     std::cout << "Rendered: " << successful_frames << " frames, converted: " << converted << " PNG files" << std::endl;
 
     if (converted == 0) {
@@ -898,6 +915,11 @@ inline int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
             std::cout << "\nNote: " << film->name << " has a soundtrack, made for " << cartoon::frameCountOf(*film) << " frames at " << film->fps << " frames per second; this video has "
                       << render_frame_count << " at " << s.video_fps << ", so it is made without sound." << std::endl;
         }
+    }
+    // its dissolves, fades and wipes, on the finished frames before their words (film_transitions.h)
+    if (const cartoon::Film *film = cartoon::forCameraPath(s.camera_path.c_str()); film && film->transitions) {
+        const int made = film_transitions::apply(*film, paths.frames_dir, render_frame_count);
+        if (made > 0) std::cout << "\nMade the transitions of " << film->name << " on " << made << " frame(s)." << std::endl;
     }
     // a film's words (its story's lines, its title) go onto the finished frames (film_captions.h)
     if (const cartoon::Film *film = cartoon::forCameraPath(s.camera_path.c_str()); film && film->captions) {

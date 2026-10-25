@@ -604,6 +604,29 @@ the camera side) - and back to the two-shot when nobody speaks for more than 2 s
 from the first covered character to the second, so screen direction holds across the cuts (`--film-cuts` finds nothing to warn of), and each shot is about who it shows (the
 doctor's framing checks). The cameras follow the characters over the shot (a key at its start and its end).
 
+**Transitions: `dissolve`, `fade`, `wipe`, `fadeout`.** A line in a shot says how it comes in, over so many seconds centred on its cut:
+
+```
+shot 0 Wide
+  key ...
+  fade 1          # the film fades up from black (the first shot can only fade in)
+shot 2 Close
+  key ...
+  dissolve 1.2    # the wide shot dissolves into this one
+shot 4 Side
+  key ...
+  wipe 1          # this one comes in from the left over the last
+fadeout 0.8       # (a film line) the film fades to black over its last 0.8 s
+```
+
+They are made when the video is assembled, on the finished frames and before the captions (launcher/film_transitions.h), so a still of the film has none. A frame in a
+dissolve or a wipe is two pictures: its own and the other side's - the scene at the same moment seen by the camera of the shot across the cut (`Film::sceneAcross`; with that
+shot's cameras-file changes) - which the video renders, for just those frames, into the frames folder's `across` folder; the two are blended in linear light (half way through
+a dissolve is half of each one's light, not of their pixel values), a wipe with a soft edge. A fade takes the frame to black and up again. Each frame's own picture is kept
+beside it (`plain_NNNN.png`) and what was made is recorded (`transitions.done`), so a resumed video makes nothing twice and a transition that is changed or removed is made
+again from the pictures as rendered - without rendering a frame. (Editing a film file otherwise re-renders only the frames whose scene changed: moving a cut renders again the
+frames whose camera changed, as for any resumed film.)
+
 `ray_tracer --film-lines <key>` lists the lines with their start, end and syllables; `ray_tracer --film-sound <key> OUT.wav` writes a film's soundtrack alone, to listen to
 the lines (and the music and footsteps) without rendering a frame; `--film-check` counts a film file's characters and lines.
 

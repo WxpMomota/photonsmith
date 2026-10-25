@@ -28,6 +28,7 @@
 #include "../../launcher/cartoon_render.h"
 #include "../../launcher/cartoon_worker.h"
 #include "../../launcher/cartoon_still.h"
+#include "../../launcher/film_transitions.h"
 #include "../../launcher/launcher_args.h"
 #include "../../launcher/flag_scopes.h"
 #include "../../launcher/render_setup.h"
@@ -2600,4 +2601,35 @@ TEST(ShotGrade, LiftGammaGainAndTintGradeAPictureAndACamerasFileSetsThemForAShot
 	EXPECT_DOUBLE_EQ(read.gain[1], 1.1);
 	EXPECT_NE(sc::apply(testHeader(), c).find("# @rt-look lift 0.01"), std::string::npos) << "a header without a look line gets one";
 	EXPECT_EQ(sc::parse("[*]\ngain 1 2\n").problems.size(), 1u);
+}
+
+// ---- transitions ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// A dissolve blends the outgoing and incoming pictures in linear light (half way: the mean of their light, not of their numbers), a fade takes a frame to black and up, and a wipe
+// brings the incoming picture in from the left with a soft edge; before the cut the frame's own picture is the outgoing one, after it the incoming one.
+TEST(FilmTransitions, ADissolveBlendsInLinearLightAFadeGoesToBlackAndAWipeComesInFromTheLeft) {
+	const int w = 40, h = 2;
+	const std::vector<unsigned char> black(w * h * 3, 0), white(w * h * 3, 255);
+	const std::vector<cartoon::Transition> trs = {{cartoon::Transition::Dissolve, 5.0, 2.0}, {cartoon::Transition::Fade, 10.0, 1.0}, {cartoon::Transition::Wipe, 15.0, 2.0}};
+	EXPECT_EQ(film_transitions::at(trs, 3.0).in, nullptr) << "a plain frame";
+	// half way through the dissolve, just before its cut: the frame's own (black, the outgoing shot) and the other side's (white)
+	const film_transitions::At mid = film_transitions::at(trs, 5.0 - 1e-6);
+	ASSERT_NE(mid.in, nullptr);
+	EXPECT_TRUE(mid.beforeCut);
+	EXPECT_NEAR(mid.amount, 0.5, 1e-3);
+	const std::vector<unsigned char> d = film_transitions::blend(mid, black, white, w, h);
+	EXPECT_NEAR(d[0], 188, 1) << "half the light of white is 188 in sRGB, not 128";
+	// after the cut the frame's own is the incoming shot: late in the dissolve it is mostly itself
+	const film_transitions::At late = film_transitions::at(trs, 5.9);
+	EXPECT_FALSE(late.beforeCut);
+	EXPECT_GT(film_transitions::blend(late, white, black, w, h)[0], 240);
+	// a fade: black at its cut, the frame itself at its ends
+	const film_transitions::At atCut = film_transitions::at(trs, 10.0);
+	EXPECT_EQ(film_transitions::blend(atCut, white, white, w, h)[0], 0);
+	EXPECT_GT(film_transitions::blend(film_transitions::at(trs, 10.49), white, white, w, h)[0], 250);
+	// a wipe a third of the way: the left of the frame is the incoming picture, the right the outgoing one
+	const film_transitions::At wipe = film_transitions::at(trs, 15.2);   // (after its cut: the frame's own picture is the incoming one)
+	const std::vector<unsigned char> p = film_transitions::blend(wipe, white, black, w, h);
+	EXPECT_EQ(p[0], 255) << "the left: incoming";
+	EXPECT_EQ(p[(w - 1) * 3], 0) << "the right: outgoing";
 }

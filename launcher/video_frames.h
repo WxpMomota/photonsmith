@@ -11,6 +11,7 @@
 
 #include "cartoon_render.h"
 #include "film_captions.h"
+#include "film_transitions.h"
 
 namespace video_frames {
 
@@ -25,8 +26,8 @@ inline bool isOurs(const std::filesystem::path &dir) {
 	for (const auto &entry : std::filesystem::directory_iterator(dir, ec)) {
 		const std::string name = entry.path().filename().string();
 		const std::string ext = entry.path().extension().string();
-		const bool ours = entry.is_directory() ? name.rfind("work", 0) == 0
-											   : (name.rfind("enc_", 0) == 0 || name.rfind(film_captions::kCleanPrefix, 0) == 0 || name.rfind("frame_", 0) == 0 || name.rfind("frames", 0) == 0 || ext == ".done" || name == cartoon_render::kFilledList || name == cartoon_render::kFingerprints || name == cartoon_render::kProgramStamp);
+		const bool ours = entry.is_directory() ? name.rfind("work", 0) == 0 || name == film_transitions::kAcrossFolder
+											   : (name.rfind("enc_", 0) == 0 || name.rfind(film_captions::kCleanPrefix, 0) == 0 || name.rfind(film_transitions::kPlainPrefix, 0) == 0 || name.rfind("frame_", 0) == 0 || name.rfind("frames", 0) == 0 || ext == ".done" || name == cartoon_render::kFilledList || name == cartoon_render::kFingerprints || name == cartoon_render::kProgramStamp);
 		if (!ours) return false;
 	}
 	return true;
@@ -43,13 +44,16 @@ inline bool startAfresh(const std::filesystem::path &dir) {
 	return true;
 }
 
-// Prepares `dir` for a video that resumes: pictures that were being written when the earlier run stopped, its frame markers and its working folders go; the frames and the captions
-// record stay; the frames that were copies of a neighbour go too, so that they are rendered this time. Returns how many of those there were.
+// Prepares `dir` for a video that resumes: pictures that were being written when the earlier run stopped, its frame markers and its working folders go; the frames, the captions and
+// transitions records (with the pictures they keep: clean_, plain_) and the other side of the transitions (the `across` folder, resumed the same way) stay; the frames that were
+// copies of a neighbour go too, so that they are rendered this time. Returns how many of those there were.
 inline int keepForResume(const std::filesystem::path &dir) {
 	for (const auto &entry : std::filesystem::directory_iterator(dir)) {
 		const std::string name = entry.path().filename().string();
-		if (name.find(".tmp.png") != std::string::npos || entry.path().extension() == ".ppm" || (entry.path().extension() == ".done" && name != film_captions::kRecord))
+		if (name.find(".tmp.png") != std::string::npos || entry.path().extension() == ".ppm" ||
+			(entry.path().extension() == ".done" && name != film_captions::kRecord && name != film_transitions::kRecord))
 			std::filesystem::remove(entry.path());
+		else if (entry.is_directory() && name == film_transitions::kAcrossFolder) keepForResume(entry.path());
 		else if (entry.is_directory()) std::filesystem::remove_all(entry.path());
 	}
 	return cartoon_render::dropFilledFrames(dir);
