@@ -64,6 +64,9 @@
 //     shot 9 Looking up
 //       key ...
 //       subject  kai                                            # what the shot is about (the film doctor's framing checks); a follow shot is about whom it follows
+//     shot 12 Talking
+//       auto     pip ann                                        # instead of `key` lines: shots chosen from what happens - a two-shot, over-the-shoulder shots of
+//       side     left                                           # each speaker as they speak - all on one side of the line between the first two (`left`: the first on the left)
 //
 // A film with characters reports its subjects, its footfalls and gesture contacts (Film::events: footsteps on the soundtrack) and its characters' feet (the sliding-feet check).
 //
@@ -129,6 +132,9 @@ struct Shot {
 	bool following = false;
 	Follow follow;
 	std::vector<std::string> about;   // the characters the shot is about
+	bool coverage = false;            // `auto`: chosen from what happens, when the film is loaded (it becomes shots of its own)
+	std::vector<std::string> cover;   // (auto) the characters it covers (none named: those who speak in it, or everyone)
+	int side = 1;                     // (auto) 1: the first of them on the left of the frame, -1: on the right
 };
 
 // A character a film file brings in (`character NAME KIND ...`), its walks (`walk`) and its gestures (`gesture`).
@@ -328,8 +334,9 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 	std::string shotText;   // the key lines of the shot being read
 	auto closeShot = [&]() -> std::string {
 		if (s.shots.empty()) return std::string();
-		if (s.shots.back().following) {
-			if (!shotText.empty()) return "the shot \"" + s.shots.back().name + "\" has both `key` lines and `follow`";
+		if (s.shots.back().following || s.shots.back().coverage) {
+			if (!shotText.empty()) return "the shot \"" + s.shots.back().name + "\" has both `key` lines and `" + (s.shots.back().following ? "follow" : "auto") + "`";
+			if (s.shots.back().following && s.shots.back().coverage) return "the shot \"" + s.shots.back().name + "\" has both `follow` and `auto`";
 			return std::string();
 		}
 		if (shotText.empty()) return "the shot \"" + s.shots.back().name + "\" has no `key` lines (or a `follow` line)";
@@ -600,6 +607,17 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			if (!(l.rate > 0.0)) return fail("a line's rate is more than 0");
 			s.lines.push_back(l);
+		} else if (verb == "auto" || verb == "side") {
+			if (s.shots.empty()) return fail("`" + verb + "` belongs to a shot: start one with `shot 0 NAME` first");
+			const std::vector<std::string> t = detail::tokens(line);
+			Shot &shot = s.shots.back();
+			if (verb == "side") {
+				if (t.size() != 2 || (t[1] != "left" && t[1] != "right")) return fail("`side left` or `side right`: where the first character covered is in the frame");
+				shot.side = t[1] == "left" ? 1 : -1;
+				continue;
+			}
+			shot.coverage = true;
+			for (std::size_t i = 1; i < t.size(); ++i) shot.cover.push_back(t[i]);
 		} else if (verb == "follow" || verb == "subject") {
 			if (s.shots.empty()) return fail("`" + verb + "` belongs to a shot: start one with `shot 0 NAME` first");
 			const std::vector<std::string> t = detail::tokens(line);
@@ -658,7 +676,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, shot, key, follow, subject, move, turn, grow, light, show, bounce, topple, character, walk, gesture, feel, say, look, prop, pick, put, give)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, shot, key, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, walk, gesture, feel, say, look, prop, pick, put, give)");
 		}
 	}
 	n = shotLine;
@@ -919,6 +937,7 @@ class DataFilm {
 			if (!character(l.who)) return filePath + ":" + std::to_string(l.line) + ": " + l.who + " is not brought in with `character`";
 			if (!l.target.empty() && !character(l.target) && !prop(l.target)) return filePath + ":" + std::to_string(l.line) + ": " + l.target + " is neither a character nor a prop";
 		}
+		if (const std::string e = coverShots(); !e.empty()) return filePath + ": " + e;
 		for (const Shot &shot : spec.shots) {
 			std::vector<std::string> named = shot.about;
 			if (shot.following) named.push_back(shot.follow.who);
@@ -1020,6 +1039,136 @@ class DataFilm {
 						return buf;
 					}
 				}
+		return std::string();
+	}
+
+	// ---- automatic coverage ----
+	// A camera key from story-space places (pbrt's: x mirrored), with a field of view and, for a shot of one speaker, a shallow focus on them.
+	static camera_keyframes::Key keyOf(Vec3 eye, Vec3 target, double fov, double lens) {
+		camera_keyframes::Key k;
+		k.pos[0] = -eye.x, k.pos[1] = eye.y, k.pos[2] = eye.z;
+		k.target[0] = -target.x, k.target[1] = target.y, k.target[2] = target.z;
+		k.fov = fov;
+		if (lens > 0.0) {
+			k.lensRadius = lens;
+			k.focus = length(target - eye);
+		}
+		return k;
+	}
+	Vec3 headOf(const Character &c, double t) const { return bodyPoint(c, t, characterKinds().at(c.kind).head); }
+	// The field of view that frames a speaker of this height from this far: their head and shoulders (a frame about 0.55 of their height and 0.3 m more: a big head needs room).
+	static double framing(double size, double distance) { return std::clamp(2.0 * std::atan(0.5 * (0.55 * size + 0.3) / std::max(0.1, distance)) * 180.0 / kPi, 12.0, 50.0); }
+	double sizeOf(const Character &c) const { return characterKinds().at(c.kind).height * c.scale; }
+	// Where the camera is for a beat at t (story space): `speaker` null for the shot of them all (a two-shot), else a shot of the speaker over the shoulder of the nearest of the
+	// others (or, alone, from in front of them, turned to the side), every camera on the `side` of the line from the first covered to the second.
+	camera_keyframes::Key coverageKey(const std::vector<const Character *> &cast, const Character *speaker, int side, double t) const {
+		static const Vec3 up{0.0, 1.0, 0.0};
+		const auto flat = [](Vec3 v) { return Vec3{v.x, 0.0, v.z}; };
+		// the line: from the first to the second (one alone: its own left to right)
+		Vec3 d;
+		if (cast.size() >= 2) d = flat(headOf(*cast[1], t) - headOf(*cast[0], t));
+		if (length(d) < 1e-6) {
+			const Mat4 f = momentOf(*cast[0], t).frame;
+			d = transformPoint(f, {-1.0, 0.0, 0.0}) - transformPoint(f, {0.0, 0.0, 0.0});   // (its right)
+		}
+		d = normalize(d);
+		const Vec3 n = Vec3{-d.z, 0.0, d.x} * static_cast<double>(side);   // (looking back at the line from here, the first is on the left)
+		const double hfov = 2.0 * std::atan(std::tan(35.0 * kPi / 360.0) * 16.0 / 9.0);
+		if (!speaker) {   // all of them: square on to the line, far enough back for everyone
+			// everyone from their feet to above the tallest head, side to side
+			Vec3 mid{0.0, 0.0, 0.0};
+			double size = 0.0, half = 0.0, top = -1e30, bottom = 1e30;
+			for (const Character *c : cast) {
+				const Vec3 h = headOf(*c, t), feet = bodyPoint(*c, t, {0.0, 0.0, 0.0});
+				mid = mid + h * (1.0 / cast.size());
+				size = std::max(size, sizeOf(*c));
+				top = std::max(top, feet.y + 1.08 * sizeOf(*c));
+				bottom = std::min(bottom, feet.y - 0.05 * sizeOf(*c));
+			}
+			for (const Character *c : cast) half = std::max(half, std::abs(dot(flat(headOf(*c, t) - mid), d)) + 0.45 * sizeOf(*c));
+			const double dist = std::max({1.6 * size, half / std::tan(0.5 * hfov) * 1.15, 0.5 * (top - bottom) / std::tan(35.0 * kPi / 360.0) * 1.1});
+			const Vec3 target{mid.x, 0.5 * (top + bottom), mid.z};
+			return keyOf(target + n * dist + up * (0.1 * size), target, 35.0, 0.0);
+		}
+		const Vec3 hs = headOf(*speaker, t);
+		const Character *listener = nullptr;
+		for (const Character *c : cast)
+			if (c != speaker && (!listener || length(headOf(*c, t) - hs) < length(headOf(*listener, t) - hs))) listener = c;
+		const double size = sizeOf(*speaker);
+		if (!listener) {   // alone: from in front, a third of the way round to the camera side
+			const Mat4 f = momentOf(*speaker, t).frame;
+			const Vec3 front = normalize(transformPoint(f, {0.0, 0.0, 1.0}) - transformPoint(f, {0.0, 0.0, 0.0}));
+			const Vec3 at = normalize(front * 0.87 + n * 0.5);
+			const Vec3 eye = hs + at * (1.1 * size) - up * (0.03 * size), target = hs - up * (0.08 * size);
+			return keyOf(eye, target, framing(size, length(target - eye)), 0.012 * size);
+		}
+		// over the listener's shoulder: behind them, to the camera side, about their head's height (between theirs and the speaker's)
+		const Vec3 hl = headOf(*listener, t), away = normalize(flat(hl - hs));
+		const double ls = sizeOf(*listener);
+		const double beside = 1.5 * characterKinds().at(listener->kind).radius * listener->scale + 0.3;   // (to the side of the listener's head and shoulders: a third of the frame)
+		const Vec3 eye = hl + away * (0.35 * ls) + n * beside + up * (0.2 * (hs.y - hl.y) + 0.02 * ls);
+		const Vec3 target = hs - up * (0.08 * size);
+		return keyOf(eye, target, framing(size, length(target - eye)), 0.012 * size);
+	}
+	// Every `auto` shot made into shots of its own, from what happens in it: a two-shot from its start, a shot of each speaker from just before they speak, back to the
+	// two-shot when nobody speaks for a while; no cut less than a second after the last. "" or what is wrong.
+	std::string coverShots() {
+		std::vector<Shot> out;
+		for (std::size_t k = 0; k < spec.shots.size(); ++k) {
+			const Shot &shot = spec.shots[k];
+			if (!shot.coverage) {
+				out.push_back(shot);
+				continue;
+			}
+			const double t0 = shot.start, t1 = k + 1 < spec.shots.size() ? spec.shots[k + 1].start : spec.length;
+			std::vector<const Character *> cast;
+			for (const std::string &name : shot.cover) {
+				const Character *c = character(name);
+				if (!c) return "the shot \"" + shot.name + "\" covers " + name + ", who is not brought in with `character`";
+				cast.push_back(c);
+			}
+			std::vector<std::size_t> lines;   // its lines, in time order
+			for (std::size_t i = 0; i < spec.lines.size(); ++i)
+				if (spec.lines[i].t >= t0 && spec.lines[i].t < t1) lines.push_back(i);
+			std::stable_sort(lines.begin(), lines.end(), [this](std::size_t a, std::size_t b) { return spec.lines[a].t < spec.lines[b].t; });
+			if (cast.empty()) {
+				for (std::size_t i : lines)
+					if (std::find(cast.begin(), cast.end(), character(spec.lines[i].who)) == cast.end()) cast.push_back(character(spec.lines[i].who));
+				for (const Character &c : spec.characters)
+					if (std::find(cast.begin(), cast.end(), &c) == cast.end()) cast.push_back(&c);
+			}
+			if (cast.empty()) return "the shot \"" + shot.name + "\" is `auto` but the film has no characters to cover";
+			// the beats: who is on screen from when
+			std::vector<std::pair<double, const Character *>> beats{{t0, nullptr}};
+			for (std::size_t j = 0; j < lines.size(); ++j) {
+				const speech::Line &l = spec.lines[lines[j]];
+				const Character *who = character(l.who);
+				if (std::find(cast.begin(), cast.end(), who) == cast.end()) continue;
+				const double cut = std::max(t0, l.t - 0.15);
+				if (cut - beats.back().first < 1.0) {
+					if (beats.size() == 1) beats.back() = {t0, who};   // (it opens on the speaker)
+					else if (beats.back().second != who) beats.back().second = who;
+				} else if (beats.back().second != who) {
+					beats.push_back({cut, who});
+				}
+				const double end = speech::endOf(spoken[lines[j]], l.t);
+				const double next = j + 1 < lines.size() ? spec.lines[lines[j + 1]].t : t1;
+				if (next - end > 2.0 && end + 0.6 < t1 - 1.0) beats.push_back({end + 0.6, nullptr});
+			}
+			for (std::size_t b = 0; b < beats.size(); ++b) {
+				const double from = beats[b].first, to = b + 1 < beats.size() ? beats[b + 1].first : t1;
+				Shot g;
+				g.start = from;
+				g.name = shot.name + (beats.size() == 1 ? std::string() : beats[b].second ? ": " + beats[b].second->name : ": everyone");
+				g.path.keys = {coverageKey(cast, beats[b].second, shot.side, from), coverageKey(cast, beats[b].second, shot.side, std::max(from, to - 1e-3))};
+				g.path.ease = true;
+				if (beats[b].second) g.about.push_back(beats[b].second->name);
+				else
+					for (const Character *c : cast) g.about.push_back(c->name);
+				out.push_back(g);
+			}
+		}
+		spec.shots = out;
 		return std::string();
 	}
 

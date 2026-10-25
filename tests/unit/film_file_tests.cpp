@@ -762,3 +762,43 @@ TEST(FilmPaths, AWalkToAPlaceGoesRoundTheSetAndWhoeverStandsThere) {
 	const std::string bump = loadFilm("scene s.pbrt\nlength 20\ncharacter ann person at -3 0 3\ncharacter pip pip at 3 0 3 facing -90\nwalk ann 1 1 3 3\n", bad);
 	EXPECT_NE(bump.find("ann and pip walk into each other"), std::string::npos) << bump;
 }
+
+// ---- automatic coverage -------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// An `auto` shot becomes shots of its own when the film is loaded: a two-shot, then each speaker from just before they speak (over the other's shoulder, in focus), back to the
+// two-shot in a long pause; every camera stays on one side of the line between the first two characters (`side right` the other side), and each shot is about who it shows.
+TEST(FilmCoverage, AnAutoShotCutsToEachSpeakerAndKeepsToOneSideOfTheLine) {
+	(void)cartoon::films();
+	const std::string film0 = "scene s.pbrt\nlength 16\ncharacter pip pip at -0.9 0 3 facing 90\ncharacter ann person at 0.5 0 3 facing -90\n"
+							  "say pip 1.5 \"Look at the moon!\"\nsay ann 4.0 \"It is very round.\"\nsay pip 10.0 \"So it is.\"\n"
+							  "shot 0 Talk\n  auto pip ann\n";
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm(film0, film), "");
+	std::vector<std::string> names;
+	for (const ff::Shot &s : film.spec.shots) names.push_back(s.name);
+	const std::vector<std::string> want = {"Talk: everyone", "Talk: pip", "Talk: ann", "Talk: everyone", "Talk: pip", "Talk: everyone"};   // (pauses before the third line and after it)
+	EXPECT_EQ(names, want);
+	ASSERT_EQ(film.spec.shots.size(), want.size());
+	EXPECT_NEAR(film.spec.shots[1].start, 1.35, 1e-9) << "a little before the line";
+	EXPECT_EQ(film.spec.shots[1].about, std::vector<std::string>{"pip"});
+	EXPECT_TRUE(film.spec.shots[1].path.keys[0].hasLens()) << "a shallow focus on the speaker";
+	// all on one side: the line runs from pip (story x 0.9) to ann (story x -0.5) at z 3; the cameras are on the +z side (in front of it, seen from where the first is on the left)
+	const auto sideOf = [&](const ff::DataFilm &f) {
+		int plus = 0, minus = 0;
+		for (const ff::Shot &s : f.spec.shots)
+			for (const auto &k : s.path.keys) (k.pos[2] > 3.0 ? plus : minus)++;
+		return std::make_pair(plus, minus);
+	};
+	const auto [plus, minus] = sideOf(film);
+	EXPECT_TRUE(plus == 0 || minus == 0) << plus << " in front, " << minus << " behind: every camera on one side";
+	ff::DataFilm other;
+	ASSERT_EQ(loadFilm(film0 + "  side right\n", other), "");
+	const auto [plus2, minus2] = sideOf(other);
+	EXPECT_EQ(plus2, minus) << "`side right`: the other side";
+	EXPECT_EQ(minus2, plus);
+	// what cannot be covered
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nshot 0 A\n  auto\n", bad).find("no characters to cover"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter pip pip\nshot 0 A\n  auto kim\n", bad).find("covers kim"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter pip pip\nshot 0 A\n  auto\n  key 0 1 0 0 1 4\n", bad).find("both `key` lines and `auto`"), std::string::npos);
+}

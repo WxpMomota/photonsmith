@@ -589,6 +589,21 @@ Walks are found in time order, so a walker goes round whoever stands where an ea
 ("ann cannot find a way to 0 0: something is in the way there"), and so do two characters whose walks run into each other (closer than 80% of their sizes while one of them
 walks; the sizes on the floor: Pip 0.5 m, the person 0.25 m, the explorer 0.3 m, the turtle 7 cm, times their scale).
 
+**Automatic coverage: `auto`.** A shot can leave its cameras to the film:
+
+```
+shot 0 Talk
+  auto  pip ann       # the characters it covers (none named: those who speak in it, then everyone)
+  side  left          # where the first of them is in the frame (left, the default, or right)
+```
+
+When the film is loaded the shot becomes shots of its own, named after it ("Talk: everyone", "Talk: pip", ...), so cameras files, cues, the cut checks and the doctor see
+them as any shots: a two-shot from its start (everyone from their feet to above the tallest head), a shot of each speaker from 0.15 s before their line - over the shoulder
+of the nearest of the others, framed to the speaker's head and shoulders by their size, with a shallow focus on them (one alone: from in front, turned a third of the way to
+the camera side) - and back to the two-shot when nobody speaks for more than 2 s; no cut comes less than a second after the last. Every camera stays on one side of the line
+from the first covered character to the second, so screen direction holds across the cuts (`--film-cuts` finds nothing to warn of), and each shot is about who it shows (the
+doctor's framing checks). The cameras follow the characters over the shot (a key at its start and its end).
+
 `ray_tracer --film-lines <key>` lists the lines with their start, end and syllables; `ray_tracer --film-sound <key> OUT.wav` writes a film's soundtrack alone, to listen to
 the lines (and the music and footsteps) without rendering a frame; `--film-check` counts a film file's characters and lines.
 
