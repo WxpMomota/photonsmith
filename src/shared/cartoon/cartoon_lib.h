@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <functional>
 #include <initializer_list>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -569,6 +570,17 @@ struct FilmEvent {
 	int seed = 0;            // which take of its sound (two footfalls in a row should not sound the same)
 };
 
+// A character's foot at a moment (Film::feetAt): where it is - in story space, or in the space of what it stands on when that moves (a sinking platform) - and whether
+// the walk means it to be on the ground (a planted foot should not move: film_checks.h).
+struct Foot {
+	Vec3 at;
+	bool planted = false;
+};
+
+// An instrument a film's music cues can name (music_cues.h): plays `notes` (MIDI numbers; none for a sound without a pitch) at film time t for `length` seconds, at a gain,
+// a pan (-1 left .. 1 right) and a reverb send.
+using CueInstrument = std::function<void(audio::Mix &, double t, const std::vector<double> &notes, double length, double gain, double pan, double send)>;
+
 struct Film {
 	const char *key;           // "lamp-and-ball": the --cartoon argument
 	const char *name;          // "Lamp and Ball"
@@ -588,6 +600,10 @@ struct Film {
 	// (empty: none) what its motion does that the soundtrack should hear, in time order: footfalls from its walks, impacts, flashes, touches (film_events.h). The soundtrack
 	// places its sounds from this list (sfx::play), so a retimed walk retimes its footsteps; `ray_tracer --film-events <key>` prints it.
 	std::function<std::vector<FilmEvent>()> events;
+	// (empty: none) its characters' feet at time t, in the same order at every moment (film_checks.h finds planted feet that slide; `ray_tracer --film-feet <key>`).
+	std::function<std::vector<Foot>(double)> feetAt;
+	// (empty: only the generic ones) the instruments of its own that its cues file can name (pbrt_scenes/film_assets/<key>/cues.txt, music_cues.h): its score's voices.
+	std::function<std::map<std::string, CueInstrument>()> instruments;
 };
 
 }  // namespace cartoon

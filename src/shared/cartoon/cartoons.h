@@ -42,6 +42,7 @@
 #include "pip_and_the_moon.h"
 #include "short_scores.h"
 #include "shot_cameras.h"
+#include "music_cues.h"
 
 namespace cartoon {
 
@@ -132,7 +133,7 @@ inline const Film kFilms[] = {
 	 "With music.",
 	 nomai::kDuration, nomai::kFps, &nomai::sceneAt, &nomai::headerAt, &nomai::shotStarts, 45.0,
 	 {23, "character,emissive,night,dawn,fog", nomai::shotNamesText(), nomai::kSamples, 8.6, false, nomai::kWidth, nomai::kHeight},
-	 &nomai::soundtrack, &nomai::captions, &nomai::subjectsAt, &nomai::events},
+	 &nomai::soundtrack, &nomai::captions, &nomai::subjectsAt, &nomai::events, &nomai::feetAt, &nomai::instruments},
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 
@@ -160,8 +161,9 @@ struct Registry {
 	}
 };
 
-// A film as the program shows it: its frames with the changes of its cameras file made (shot_cameras.h: pbrt_scenes/film_assets/<key>/cameras.txt, read when a frame is made).
-inline Film withShotCameras(Film f) {
+// A film as the program shows it: its frames with the changes of its cameras file made (shot_cameras.h: pbrt_scenes/film_assets/<key>/cameras.txt, read when a frame is
+// made), and its soundtrack with the cues of its cues file (music_cues.h: pbrt_scenes/film_assets/<key>/cues.txt, read when the soundtrack is made).
+inline Film withFilmFiles(Film f) {
 	std::vector<std::string> names;
 	std::string name;
 	for (const char *p = f.meta.shotNames ? f.meta.shotNames : ""; ; ++p) {
@@ -180,6 +182,16 @@ inline Film withShotCameras(Film f) {
 	};
 	f.sceneAt = wrap(f.sceneAt);
 	f.headerAt = wrap(f.headerAt);
+	const std::string cues = music_cues::fileOf(key);
+	if (!cues.empty()) {
+		f.soundtrack = [base = f.soundtrack, starts = f.shotStarts, names, own = f.instruments, cues](audio::Mix &m) {
+			if (base) base(m);
+			const music_cues::Sheet sheet = music_cues::read(cues);
+			std::vector<std::string> problems = sheet.problems;
+			music_cues::play(m, sheet, own ? own() : std::map<std::string, CueInstrument>(), starts ? starts() : std::vector<double>(), names, problems);
+			for (const std::string &problem : problems) std::cerr << "[cues] " << cues << ": " << problem << std::endl;
+		};
+	}
 	return f;
 }
 
@@ -227,7 +239,7 @@ inline void addFilmFile(Registry &r, const std::string &file) {
 	Film f{r.keep(d.spec.key), r.keep(d.spec.name), r.keep(d.spec.about.empty() ? "A film made from " + std::filesystem::path(d.spec.scene).filename().string() + "." : d.spec.about),
 		   d.spec.length, d.spec.fps, [p](double t) { return p->sceneAt(t); }, [p](double t) { return p->headerAt(t); }, [p]() { return p->shotStarts(); }, d.spec.still,
 		   {id, r.keep(tags), r.keep(d.shotNames()), d.scene.samples, 0.0}};
-	r.made.push_back(withShotCameras(std::move(f)));
+	r.made.push_back(withFilmFiles(std::move(f)));
 	r.all.push_back(&r.made.back());
 }
 
@@ -235,7 +247,7 @@ inline Registry &registry() {
 	static Registry *r = [] {
 		Registry *reg = new Registry();   // (lives as long as the program: films hand out pointers into it)
 		for (const Film &f : kFilms) {
-			reg->made.push_back(withShotCameras(f));
+			reg->made.push_back(withFilmFiles(f));
 			reg->all.push_back(&reg->made.back());
 		}
 		std::vector<std::string> files;

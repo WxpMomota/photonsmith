@@ -78,7 +78,8 @@ extern char** environ;
 #include "launcher/gpu_backend.h"      // the GPU renderer this build has (Metal or OptiX), behind one call
 #include "launcher/launcher_args.h"   // Argument parsing
 #include "launcher/cartoon_render.h"
-#include "launcher/film_subjects.h"   // --film-subjects: where a film's subjects fall in its frame
+#include "src/shared/cartoon/film_subjects.h"
+#include "src/shared/cartoon/film_checks.h"   // --film-feet: planted feet that slide   // --film-subjects: where a film's subjects fall in its frame
 #include "launcher/cartoon_still.h"  // one frame of a film as a temporary scene file  // cartoon video presets: one child run per frame
 #include <fstream>
 #include "src/shared/path_probe.h"    // --probe X Y
@@ -816,7 +817,8 @@ static bool prepare_cartoon_worker(LaunchArgs &args, cartoon_worker::Job &job) {
 	opening.keep.clear();
 	std::string fingerprint;
 	bool unchanged = false;
-	if (!opening.writeScene(job.list.front(), first_eye, fingerprint, unchanged)) {
+	double share = 1.0;
+	if (!opening.writeScene(job.list.front(), first_eye, fingerprint, unchanged, share)) {
 		std::cerr << "Cannot write the scene of frame " << job.list.front() << " to " << job.scenePath() << std::endl;
 		return false;
 	}
@@ -912,7 +914,7 @@ int main(int argc, char** argv) {
 	}
 	if (argc >= 2 && std::string(argv[1]) == "--film-check") return film_check_command(argc, argv);
 	// `ray_tracer --film-shots <key>`: what a tool driving the films needs of one (scripts/anim/film.py doctor), as tab-separated lines: a `film` line (key, name, seconds, fps,
-	// width, height, samples, measured seconds a frame) and a `shot` line for each shot (start, name).
+	// width, height, samples, measured seconds a frame) and a `shot` line for each shot (start, name, its share of the samples: the film's cameras file's `samples`).
 	if (argc >= 2 && std::string(argv[1]) == "--film-shots") {
 		const cartoon::Film *film = argc >= 3 ? cartoon::find(argv[2]) : nullptr;
 		if (!film) {
@@ -923,7 +925,10 @@ int main(int argc, char** argv) {
 				  << film->meta.samples << "\t" << film->meta.secondsPerFrame << "\n";
 		const std::vector<double> starts = film->shotStarts();
 		const std::vector<std::string> names = cartoon::shotNamesOf(*film);
-		for (std::size_t i = 0; i < starts.size(); ++i) std::cout << "shot\t" << starts[i] << "\t" << (i < names.size() ? names[i] : std::string()) << "\n";
+		for (std::size_t i = 0; i < starts.size(); ++i) {
+			const double middle = 0.5 * (starts[i] + (i + 1 < starts.size() ? starts[i + 1] : film->duration));
+			std::cout << "shot\t" << starts[i] << "\t" << (i < names.size() ? names[i] : std::string()) << "\t" << cartoon::shot_cameras::sampleShareOf(film->headerAt(middle)) << "\n";
+		}
 		return EXIT_SUCCESS;
 	}
 	// `ray_tracer --film-subjects <key> <seconds> <width> <height>`: where the moment's subjects (Film::subjectsAt) fall in a picture of that size, one tab-separated line each:
@@ -958,6 +963,67 @@ int main(int argc, char** argv) {
 		if (film->events)
 			for (const cartoon::FilmEvent &e : film->events())
 				std::cout << "event\t" << e.t << "\t" << kinds[static_cast<int>(e.kind)] << "\t" << e.strength << "\t" << e.pan << "\t" << e.seed << "\n";
+		return EXIT_SUCCESS;
+	}
+	// `ray_tracer --film-cues <key>`: the film's cues file read and placed (music_cues.h), one tab-separated line a cue: `cue  seconds  instrument  notes (comma-separated)`,
+	// and a `problem` line for each thing in it that cannot be played. Nothing when the film has no cues file.
+	if (argc >= 2 && std::string(argv[1]) == "--film-cues") {
+		const cartoon::Film *film = argc >= 3 ? cartoon::find(argv[2]) : nullptr;
+		if (!film) {
+			std::cerr << "usage: " << argv[0] << " --film-cues <film key>" << std::endl;
+			return EXIT_FAILURE;
+		}
+		const std::string file = cartoon::music_cues::fileOf(film->key);
+		if (file.empty()) return EXIT_SUCCESS;
+		const cartoon::music_cues::Sheet sheet = cartoon::music_cues::read(file);
+		const std::vector<double> starts = film->shotStarts ? film->shotStarts() : std::vector<double>();
+		const std::vector<std::string> names = cartoon::shotNamesOf(*film);
+		const std::map<std::string, cartoon::CueInstrument> own = film->instruments ? film->instruments() : std::map<std::string, cartoon::CueInstrument>();
+		for (const std::string &p : sheet.problems) std::cout << "problem" << '\t' << p << std::endl;
+		for (const cartoon::music_cues::Cue &c : sheet.cues) {
+			double t = 0.0;
+			std::string why;
+			if (!cartoon::music_cues::timeOf(c, starts, names, t, why)) {
+				std::cout << "problem" << '\t' << "line " << c.line << ": " << why << std::endl;
+				continue;
+			}
+			if (!own.count(c.instrument) && !cartoon::music_cues::genericInstruments().count(c.instrument)) {
+				std::cout << "problem" << '\t' << "line " << c.line << ": no instrument called \"" << c.instrument << "\"" << std::endl;
+				continue;
+			}
+			std::string notes;
+			for (double n : c.notes) notes += (notes.empty() ? "" : ",") + std::to_string(static_cast<int>(std::lround(n)));
+			std::cout << "cue" << '\t' << t << '\t' << c.instrument << '\t' << notes << std::endl;
+		}
+		return EXIT_SUCCESS;
+	}
+	// `ray_tracer --film-cuts <key>`: the cuts where screen direction breaks (film_checks.h), one tab-separated line each: `cut  shot after it (1 = the first)  kind  before
+	// after  name`, kind `flip` (the same moving thing in the same place reverses across the screen), `journey` (a traveller cut to another place reverses) or `line` (two
+	// subjects swap sides). No line when nothing breaks or the film names no subjects.
+	if (argc >= 2 && std::string(argv[1]) == "--film-cuts") {
+		const cartoon::Film *film = argc >= 3 ? cartoon::find(argv[2]) : nullptr;
+		if (!film) {
+			std::cerr << "usage: " << argv[0] << " --film-cuts <film key>" << std::endl;
+			return EXIT_FAILURE;
+		}
+		const std::vector<std::string> names = cartoon::shotNamesOf(*film);
+		for (const cartoon::film_checks::CutIssue &c : cartoon::film_checks::screenDirection(*film))
+			std::cout << "cut" << '\t' << c.shot + 1 << '\t' << (c.crossedLine ? "line" : (c.samePlace ? "flip" : "journey")) << '\t' << c.before << '\t' << c.after << '\t'
+					  << (c.shot < static_cast<int>(names.size()) ? names[static_cast<std::size_t>(c.shot)] : std::string()) << std::endl;
+		return EXIT_SUCCESS;
+	}
+	// `ray_tracer --film-feet <key>`: how fast the planted feet of the film's characters move in each shot that has any (film_checks.h), one tab-separated line a shot:
+	// `slide  shot (1 = the first)  worst (units a second)  when  mean  planted samples  name`. No line when the film reports no feet.
+	if (argc >= 2 && std::string(argv[1]) == "--film-feet") {
+		const cartoon::Film *film = argc >= 3 ? cartoon::find(argv[2]) : nullptr;
+		if (!film) {
+			std::cerr << "usage: " << argv[0] << " --film-feet <film key>" << std::endl;
+			return EXIT_FAILURE;
+		}
+		const std::vector<std::string> names = cartoon::shotNamesOf(*film);
+		for (const cartoon::film_checks::Slide &s : cartoon::film_checks::slidingFeet(*film))
+			std::cout << "slide" << '\t' << s.shot + 1 << '\t' << s.worst << '\t' << s.at << '\t' << s.mean << '\t' << s.planted << '\t'
+					  << (s.shot < static_cast<int>(names.size()) ? names[static_cast<std::size_t>(s.shot)] : std::string()) << std::endl;
 		return EXIT_SUCCESS;
 	}
 	std::cout << "========================================" << std::endl;

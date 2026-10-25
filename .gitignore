@@ -490,6 +490,8 @@ total.txt
 !pbrt_scenes/film_assets/*/captions.txt
 # A film's shot cameras (src/shared/cartoon/shot_cameras.h), read when a frame is made - data too.
 !pbrt_scenes/film_assets/*/cameras.txt
+# ... and its music cues (src/shared/cartoon/music_cues.h), read when its soundtrack is made.
+!pbrt_scenes/film_assets/*/cues.txt
 # Generated/preprocessed test artifacts
 tests/generated/
 

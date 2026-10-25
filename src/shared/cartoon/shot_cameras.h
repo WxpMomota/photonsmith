@@ -15,6 +15,7 @@
 //     zoom 1.2         # ... or the code's divided by this
 //     iso 300          # the exposure (the Film's iso) ...
 //     stops 0.5        # ... or the code's times 2 to this
+//     samples 0.5      # the shot renders at half the video's samples a pixel (a quiet, dark or still shot needs fewer; `python scripts/anim/film.py budget` measures it)
 //     [The answer]
 //     tilt 3
 //
@@ -22,8 +23,10 @@
 // own section on top of it (moves add up, zooms multiply, a set fov or iso is the shot's own). What the file says wrong (a word it does not know, a number that is not one) is
 // printed once to the error output and the line left out.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -49,8 +52,9 @@ struct Change {
 	double zoom = 1.0;
 	double iso = 0.0;    // 0: the code's
 	double stops = 0.0;
+	double samples = 1.0;   // the share of the video's samples a pixel
 	bool moves() const { return dolly != 0.0 || truck != 0.0 || pedestal != 0.0 || pan != 0.0 || tilt != 0.0; }
-	bool any() const { return moves() || fov > 0.0 || zoom != 1.0 || iso > 0.0 || stops != 0.0; }
+	bool any() const { return moves() || fov > 0.0 || zoom != 1.0 || iso > 0.0 || stops != 0.0 || samples != 1.0; }
 };
 
 // A section on top of another: moves add up, zooms multiply, a set fov or iso replaces.
@@ -63,6 +67,7 @@ inline Change combine(const Change &under, const Change &over) {
 	c.tilt += over.tilt;
 	c.zoom *= over.zoom;
 	c.stops += over.stops;
+	c.samples *= over.samples;
 	if (over.fov > 0.0) c.fov = over.fov;
 	if (over.iso > 0.0) c.iso = over.iso;
 	return c;
@@ -130,7 +135,8 @@ inline File parse(const std::string &text) {
 		else if (word == "zoom" && value > 0.0) at->zoom = value;
 		else if (word == "iso" && value > 0.0) at->iso = value;
 		else if (word == "stops") at->stops = value;
-		else f.problems.push_back(where + "'" + word + " " + trimmed(line.substr(word.size())) + "' is not a change this file knows (dolly, truck, pedestal, pan, tilt, fov, zoom, iso, stops)");
+		else if (word == "samples" && value > 0.0 && value <= 8.0) at->samples = value;
+		else f.problems.push_back(where + "'" + word + " " + trimmed(line.substr(word.size())) + "' is not a change this file knows (dolly, truck, pedestal, pan, tilt, fov, zoom, iso, stops, samples 0-8)");
 	}
 	return f;
 }
@@ -181,6 +187,24 @@ inline Vec3 turned(Vec3 v, Vec3 axis, double degrees) {   // v turned about the 
 	return v * c + cross(axis, v) * s + axis * (dot(axis, v) * (1.0 - c));
 }
 }  // namespace detail
+
+// The header line that tells a video to render a frame at a share of its samples a pixel (sampleShareOf reads it back). In the scene's text, so that a frame whose share changes
+// has a new fingerprint and a resumed video renders it again.
+inline std::string samplesLine(double share) {
+	char b[64];
+	std::snprintf(b, sizeof b, "# @rt-samples %.4g\n", share);
+	return b;
+}
+// The share a frame's text asks for (1 when it has no such line).
+inline double sampleShareOf(const std::string &text) {
+	const std::size_t worldBegin = text.find("WorldBegin");
+	const std::size_t at = text.find("# @rt-samples ");
+	if (at == std::string::npos || (worldBegin != std::string::npos && at > worldBegin)) return 1.0;
+	const double v = std::atof(text.c_str() + at + 14);
+	return v > 0.0 ? v : 1.0;
+}
+// The samples a pixel of a frame of a video made at `spp`: its share of them, never fewer than one.
+inline int samplesFor(int spp, double share) { return std::max(1, static_cast<int>(std::lround(spp * share))); }
 
 // A frame's scene (or header) with the change made to it: its LookAt moved and turned, the Camera's fov and focus distance, the Film's iso. Only the header (before WorldBegin)
 // is touched; a scene without a LookAt is returned as it is.
@@ -252,6 +276,7 @@ inline std::string apply(const std::string &scene, const Change &c) {
 			}
 		}
 	}
+	if (c.samples != 1.0) head = samplesLine(c.samples) + head;
 	return head + scene.substr(headerEnd);
 }
 

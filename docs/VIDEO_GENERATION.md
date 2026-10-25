@@ -336,7 +336,7 @@ reads of a film (its facts and its shots, tab-separated). Every problem it looks
 
 *Framing checks.* A film can name what each shot is about: its row's `subjectsAt(t)` (with `film_kit.h`, a shot sets `f.subjects`, even without building the scene: the explorer's
 chest, a face, the fire). For such a film the doctor also renders a depth pass with each frame (`--aovs`, on the CPU, a few seconds a frame; `--no-framing` skips it), asks
-`ray_tracer --film-subjects <key> <t> <width> <height>` where each subject falls in the picture (`launcher/film_subjects.h`: through the camera of the moment's own header), and warns
+`ray_tracer --film-subjects <key> <t> <width> <height>` where each subject falls in the picture (`src/shared/cartoon/film_subjects.h`: through the camera of the moment's own header), and warns
 when a subject is out of the frame or behind the camera (a note at a shot's start or end when it is in the frame in the middle: it enters or leaves), when it is hidden (everything
 round its pixel is nearer than it), and when most of the frame is within 20 cm of the camera (against a wall). A subject point should be on what is seen, not inside it: the Nomai
 film's moon is `moonFacing(eye)`, the point of its surface nearest the camera, not its centre. A unit test (`FilmSubjects`) holds every such film to subjects in the frame in the
@@ -377,6 +377,55 @@ its distance. `src/shared/cartoon/sfx.h` is the sound library - footsteps on dus
 heavy, flashes, a hand on stone - and `sfx::play(mix, events, palette)` places them. The Nomai film's footsteps (72 events: outside in dust, in the ruins on stone), its
 touchdown and the hands on the stone come from its events now, not from times typed into the score: a walk that is retimed retimes its steps. `ray_tracer --film-events <key>`
 prints a film's list (`event  seconds  kind  strength  pan  seed`).
+
+**Fewer samples where a shot does not need them: `python scripts/anim/film.py budget <key> --write`.** A video renders every frame at its samples a pixel, but a dark
+interior, a fade or a wide still shot is as clean with fewer as a firelit close-up is with all of them. The budget renders the middle of each shot (at 360 lines) at the
+film's samples, at half and at a quarter, each twice with different seeds and denoised: the difference of the two is the noise the denoiser leaves, and the difference of
+their mean from the full render's is what fewer samples lose. A shot may drop to the fewest samples whose noise is no more than the film's median shot has at full samples
+(or its own, if more) and whose loss is within 1.5 times that. `--write` puts a `samples` line (a share of the video's samples) for each such shot into the film's cameras
+file, between two marker lines that the next `--write` replaces; the frame's header then carries `# @rt-samples <share>`, the video renders the frame at that share (never
+fewer than one sample), and a resume renders again only the frames whose share changed. `--shots` measures some shots only. On five shots of the Nomai film the giant
+in space and the canyon dropped to a quarter (no visible change, side by side) and the face close-up, the dark hall and the campfire kept all 32.
+
+**Feet that slide, and flicker: the doctor watches the motion.** A film can report its characters' feet (its row's `feetAt(t)`: each foot's place and whether the walk means
+it to be on the ground; a film_kit shot sets `f.feet`, the Nomai explorer's are `explorerFeet(pose, frame)`). `src/shared/cartoon/film_checks.h` samples every shot at the
+film's frame rate and reports the fastest a planted foot moves (`ray_tracer --film-feet <key>`, no render); the doctor notes more than 0.10 m/s and warns above 0.25.
+A foot on a moving floor is reported in that floor's space (the sinking platform). On the Nomai film the check found the explorer's swinging gait skating at 0.55 to
+0.92 m/s in every walk (the foot's sine swing did not keep pace with the body), feet that slid down the floating steps with the body, and a snap from walking to
+standing in the elevator; the gait now keeps a planted foot going back under the body at its own pace (`gait()`), the feet stand on a ramp's slope (`ExplorerPose::slope`)
+and the elevator stops on the step it is on - every walk is now under 0.07 m/s but the floating steps (0.11: the body turning on the 6 m spiral). `film.py doctor --motion`
+also renders three frames in a row from each shot's middle at the samples the video gives that shot, and the same three at four times as many: the second difference
+of each (b - (a + c) / 2) holds the motion and the shimmer, the motion is in both and cancels, and what is left is the denoiser's frame-to-frame flicker (a note above
+0.004, a warning above 0.008; the Nomai shots measured 0.001 to 0.003, the campfire 0.0044). It is how a budget that took too many samples away would show.
+
+**Acting with gestures.** A gesture is a named pose from a character's library, eased in, held and eased out at film times (`rig::Gesture{"point up", 180.0, 181.5,
+184.0, 184.0}`: easing in from 180 s, fully there at 181.5, gone at 184), and `rig::act(pose, gestures, t, library)` puts them on a pose in their order. A library
+(`rig::PoseLibrary<P>`) is the character's own: each pose blends the parts it changes by the gesture's weight, and may move with the time since the gesture began (a nod).
+The Nomai explorer's (`explorerPoses()`, nomai_explorer.h) has reach to the wall, hand on the lectern, point up, kneel and touch, look up, look down, surprised, hands
+together, raise the sceptre, nod, shake head, sit and crouch. A gesture's `contact` time is a hand meeting something: `rig::contactsOf` lists them and the film's events turn
+them into touches. The Nomai film's acting is one list (`acting()` in nomai_signal.h) that the shots read; its four hand-written moves were moved onto it with the frames'
+fingerprints unchanged. A gesture ends when its shot does (its out times at the shot's end): one held "for ever" would carry into a later shot that also acts.
+
+**Screen direction across the cuts.** `film_checks::screenDirection` (`ray_tracer --film-cuts <key>`, and the doctor) takes each cut's subjects through the cameras on its
+two sides, each camera held for the moment (so a tracking camera shows the walker's real direction): a moving subject that goes left to right before the cut and right to
+left after it is a flip (a warning when it is the same thing in the same place; a note when a traveller is cut to another place - a journey should keep its direction), and
+two subjects that swap sides mean the camera crossed the line between them (a warning). Only motion more across the view than into it or out of it has a direction to
+keep: a walk away from the camera has none. The Nomai film has none of these.
+
+**Music cues in a text file: `pbrt_scenes/film_assets/<key>/cues.txt`.** Read when the soundtrack is made (`src/shared/cartoon/music_cues.h`; the film registry adds the cues
+to every film's soundtrack, and a film with a cues file and no score gets one), so a note added, moved or made quieter needs no rebuild, and a cue placed by its shot moves
+with the shot when it is retimed:
+
+    [The canyon]                       # times after a section are from that shot's start ([12]: the 12th shot; [*] or none: the film's start)
+    2.2   piano D4 3.0                 # notes as MIDI numbers or names; a number with a point after them is the length
+    4.0   strings D3 A3 D4  length 6  gain 0.04  pan -0.2  send 0.8
+    6.5   pluck A4 C5 E5  spread 0.25  # an arpeggio
+    @77.2 bell 86                      # @: a film time
+
+The instruments are the generic ones (bell, mallet, pluck, bass, pad, strings, knock, swell, and the sound effects footstep-<surface>, impact, flash, touch) and the film's
+own (its row's `instruments`: the Nomai film's guitar, banjo, piano, resonance, drone and beep). `ray_tracer --film-cues <key>` prints each cue at its film time and what
+cannot be played. The Nomai film's three banjo notes on the ridge and the third eye's tone moved from the score's code into its cues file; the mix is the same (46 of its
+26 million samples differ by one step, from the order of the sums).
 
 **What a film says about itself** is its row and nothing else, and nothing is typed twice. The row has the key, the name, a description of the story (one sentence, without the length or the number
 of shots: those are worked out), the length and fps, the still's time, and a `meta` record: `id` (the number of its video preset, V<id>: give a new film the next number and never reuse one, so

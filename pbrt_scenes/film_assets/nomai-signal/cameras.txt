@@ -17,3 +17,32 @@
 #   stops -0.3
 #
 # A resumed video renders again only the frames whose scene this changes.
+
+# ---- samples each shot needs (python scripts/anim/film.py budget --write; the next --write replaces this block) ----
+[1]   # Darkness and a pulse: noise 0.0000, loss 0.0001 at 0.25 of the samples (noise 0.0000 at all)
+samples 0.25
+[2]   # The giant and its moon: noise 0.0001, loss 0.0005 at 0.25 of the samples (noise 0.0001 at all)
+samples 0.25
+[3]   # The descent: noise 0.0013, loss 0.0025 at 0.25 of the samples (noise 0.0012 at all)
+samples 0.25
+[6]   # The landing: noise 0.0007, loss 0.0016 at 0.25 of the samples (noise 0.0005 at all)
+samples 0.25
+[7]   # Under the giant: noise 0.0005, loss 0.0015 at 0.25 of the samples (noise 0.0004 at all)
+samples 0.25
+[8]   # Footsteps: noise 0.0021, loss 0.0017 at 0.25 of the samples (noise 0.0015 at all)
+samples 0.25
+[9]   # The ridge: noise 0.0002, loss 0.0004 at 0.25 of the samples (noise 0.0002 at all)
+samples 0.25
+[10]   # The canyon: noise 0.0020, loss 0.0019 at 0.25 of the samples (noise 0.0014 at all)
+samples 0.25
+[12]   # The floating steps: noise 0.0023, loss 0.0015 at 0.5 of the samples (noise 0.0019 at all)
+samples 0.5
+[17]   # Into the dark: noise 0.0023, loss 0.0021 at 0.5 of the samples (noise 0.0018 at all)
+samples 0.5
+[19]   # The staff answers: noise 0.0018, loss 0.0020 at 0.25 of the samples (noise 0.0013 at all)
+samples 0.25
+[29]   # Dawn: noise 0.0024, loss 0.0038 at 0.25 of the samples (noise 0.0024 at all)
+samples 0.25
+[32]   # The title: noise 0.0000, loss 0.0000 at 0.25 of the samples (noise 0.0000 at all)
+samples 0.25
+# ---- end of the samples ----

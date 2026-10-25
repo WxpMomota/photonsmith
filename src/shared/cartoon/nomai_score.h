@@ -196,12 +196,10 @@ inline void soundtrack(Mix &m) {
 	// corridor's lamps (a tone each); the writing (glass); the recording - cut off ----
 	play(m, 51.0, 0.85, themeQuestion(), -12.0, 0.26, -0.15, [](double n, double l) { return guitar(n, l + 1.5, static_cast<unsigned>(n)); });
 	arpeggios(m, 51.0, 3.4, {{38, 45, 50, 53}, {34, 41, 46, 50}, {36, 43, 48, 52}, {33, 40, 45, 48}, {38, 45, 50, 53}}, 0.10);
-	m.put(60.0, banjo(74, 1.2), 0.08, 0.4, 0.6);
-	m.put(61.7, banjo(76, 1.2), 0.07, 0.4, 0.6);
-	m.put(63.4, banjo(77, 1.6), 0.07, 0.4, 0.6);
+	// (the banjo's three notes on the ridge: pbrt_scenes/film_assets/nomai-signal/cues.txt)
 	strings(m, 66.0, {50, 57, 62, 65}, 10.0, 0.05, 4.0, 4.0);
 	m.put(70.0, drone(26, 14.0, 4.0, 5.0), 0.18, 0.0, 0.5);
-	m.put(77.2, resonance(86, 6.0), 0.07, 0.2, 0.8);   // the third eye opens
+	// (the third eye opens: a high resonance, in the cues file)
 	wind(m, 80.0, 8.0, 0.25, 33);
 	for (int k = 0; k < 6; ++k) m.put(80.5 + 1.3 * k, piano(62 + (k % 3 == 0 ? 0 : (k % 3 == 1 ? 5 : 7)), 3.0), 0.07, 0.1, 0.6);
 	// the corridor: each lamp wakes with a soft tone, rising
@@ -284,6 +282,22 @@ inline void soundtrack(Mix &m) {
 }  // namespace score
 
 inline void soundtrack(audio::Mix &m) { score::soundtrack(m); }
+// The score's voices, for the film's cues file (Film::instruments, music_cues.h): a cue `2.2 resonance 86 6.0` plays score::resonance(86, 6.0).
+inline std::map<std::string, CueInstrument> instruments() {
+	const auto voice = [](std::vector<float> (*make)(double, double)) {
+		return CueInstrument([make](audio::Mix &m, double t, const std::vector<double> &notes, double length, double gain, double pan, double send) {
+			for (double n : notes) m.put(t, make(n, length), gain, pan, send);
+		});
+	};
+	return {
+		{"guitar", voice([](double n, double l) { return score::guitar(n, l); })},
+		{"banjo", voice([](double n, double l) { return score::banjo(n, l); })},
+		{"piano", voice([](double n, double l) { return score::piano(n, l); })},
+		{"resonance", voice([](double n, double l) { return score::resonance(n, l); })},
+		{"drone", voice([](double n, double l) { return score::drone(n, l); })},
+		{"beep", CueInstrument([](audio::Mix &m, double t, const std::vector<double> &, double length, double gain, double pan, double send) { m.put(t, score::beep(length), gain, pan, send); })},
+	};
+}
 
 }  // namespace nomai
 }  // namespace cartoon

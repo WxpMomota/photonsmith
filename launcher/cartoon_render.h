@@ -94,6 +94,7 @@ inline int renderFrame(const cartoon::Film &film, double t, const std::filesyste
 		}
 		const std::string fp = frame_fingerprint::of(text);
 		if (fingerprint) *fingerprint = fp;
+		spp = cartoon::shot_cameras::samplesFor(spp, cartoon::shot_cameras::sampleShareOf(text));   // (a shot that needs fewer samples: its cameras file's `samples`)
 		if (!keepIf.empty() && fp == keepIf) {
 			if (kept) *kept = true;
 			return 0;

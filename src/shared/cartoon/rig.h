@@ -9,10 +9,15 @@
 //     const rig::Aim aim = rig::aimAt(headPosition, at.yaw, candle);      // the head's turn to look at the candle, within what a neck can do
 //     pose.sit = rig::sitAmount(t, 30.0, 41.0);                            // sits down at 30 s, stands up at 41 s
 //
-// The footfalls (PathWalk::footfalls) are when and where each foot came down: the film's dust puffs and its footstep sounds come from the same list.
+// The footfalls (PathWalk::footfalls) are when and where each foot came down: the film's dust puffs and its footstep sounds come from the same list. Acting beyond that -
+// pointing, kneeling, reaching, looking up, a nod - is gestures (Gesture, act): named poses from the character's own library, eased in and out at film times.
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
+#include <map>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "cartoon_lib.h"
@@ -132,6 +137,48 @@ inline Aim aimAt(Vec3 from, double facing, Vec3 target, double maxYaw = 70.0, do
 inline double sitAmount(double t, double down, double up, double ease = 0.8) {
 	const double in = smoothstep(down, down + ease, t);
 	return up > down ? in * (1.0 - smoothstep(up, up + ease, t)) : in;
+}
+
+// A gesture: a named pose from the character's library, eased in from `in0` to `in1`, held, and eased out from `out0` to `out1` (absolute film times; leave the out times at
+// their default to hold it from then on). `contact` (when not negative) is the moment a hand or a foot meets something: a Touch event for the soundtrack (contactsOf).
+//
+//     const std::vector<rig::Gesture> acting = {{"reach to the wall", 99.4, 100.6, kForever, kForever, 100.4}, {"look up", 246.5, 248.5}};
+//     pose = rig::act(pose, acting, t, explorerPoses());
+constexpr double kForever = 1e30;
+struct Gesture {
+	std::string pose;
+	double in0 = 0.0, in1 = 0.0, out0 = kForever, out1 = kForever;
+	double contact = -1.0;
+};
+// How far into a gesture time t is, 0..1 (smoothly in, held, smoothly out).
+inline double gestureWeight(const Gesture &g, double t) {
+	const double in = g.in1 > g.in0 ? smoothstep(g.in0, g.in1, t) : (t >= g.in0 ? 1.0 : 0.0);
+	if (g.out0 >= kForever) return in;
+	const double out = g.out1 > g.out0 ? smoothstep(g.out0, g.out1, t) : (t >= g.out0 ? 1.0 : 0.0);
+	return in * (1.0 - out);
+}
+// A character's library of poses: each one changes a pose of the character's own type by a weight (0 leaves it, 1 is the whole pose), given the time since the gesture
+// began (a nod, a wave: poses that move).
+template <class P>
+using PoseLibrary = std::map<std::string, std::function<void(P &, double, double)>>;
+// A pose with its gestures at time t, in their order (a later one on top of an earlier). A gesture whose pose is not in the library is an error, said by name.
+template <class P>
+inline P act(P pose, const std::vector<Gesture> &gestures, double t, const PoseLibrary<P> &library) {
+	for (const Gesture &g : gestures) {
+		const double w = gestureWeight(g, t);
+		if (w <= 0.0) continue;
+		const auto it = library.find(g.pose);
+		if (it == library.end()) throw std::invalid_argument("no pose called \"" + g.pose + "\" in the character's library");
+		it->second(pose, w, t - g.in0);
+	}
+	return pose;
+}
+// The gestures' contact moments in [from, to): when a hand or a foot meets something.
+inline std::vector<double> contactsOf(const std::vector<Gesture> &gestures, double from = -kForever, double to = kForever) {
+	std::vector<double> out;
+	for (const Gesture &g : gestures)
+		if (g.contact >= 0.0 && g.contact >= from && g.contact < to) out.push_back(g.contact);
+	return out;
 }
 
 }  // namespace rig

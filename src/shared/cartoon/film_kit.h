@@ -41,6 +41,7 @@ struct Moment {
 	std::string light;     // the LightSource lines (the sky, the sun, ...): the film's own
 	std::string content;   // everything in the scene
 	std::vector<Vec3> subjects;   // what the shot is about (story space): set by a shot even without its content, for the film doctor's framing checks (Film::subjectsAt)
+	std::vector<Foot> feet;       // its characters' feet, likewise (Film::feetAt: the sliding-feet check)
 };
 
 // How a film's frames are made: samples per pixel and the picture's size.

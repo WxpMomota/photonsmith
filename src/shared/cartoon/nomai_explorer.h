@@ -23,6 +23,7 @@
 #include "film_sky.h"
 #include "nature_lib.h"
 #include "nomai_mesh.h"
+#include "rig.h"
 #include "sdf_mesh.h"
 
 namespace cartoon {
@@ -31,6 +32,7 @@ namespace nomai {
 struct ExplorerPose {
 	double walk = 0.0;     // the walk cycle (a whole number of steps: each foot has stepped once at 2)
 	double stride = 0.0;   // 0 standing .. 1 a full stride
+	double slope = 0.0;    // the ground's rise per unit forward under the walk (negative: going down a ramp or a stair)
 	double sit = 0.0;      // 0 standing .. 1 sitting on the ground, legs folded
 	double crouch = 0.0;   // 0 .. 1 knees bent, body lowered (reaching to the ground)
 	double lean = 0.0;     // degrees forward
@@ -49,13 +51,68 @@ struct ExplorerPose {
 	double time = 0.0;                                         // for the breath and the flutter
 };
 
+// The explorer's poses for gestures (rig::act): each blends what it changes towards its own values by the weight. Hand places are body space (+x its left, +z forward).
+inline const rig::PoseLibrary<ExplorerPose> &explorerPoses() {
+	static const rig::PoseLibrary<ExplorerPose> poses = {
+		{"reach to the wall", [](ExplorerPose &p, double w, double) { p.handL = lerp(p.handL, Vec3{0.12, 1.50, 0.52}, w); }},
+		{"hand on the lectern", [](ExplorerPose &p, double w, double) { p.handL = lerp(p.handL, Vec3{0.06, 1.10, 0.52}, w); }},
+		{"point up", [](ExplorerPose &p, double w, double) { p.handL = lerp(p.handL, Vec3{0.30, 1.40, 0.45}, w); }},
+		{"kneel and touch", [](ExplorerPose &p, double w, double) {
+			 p.crouch = lerp(p.crouch, 1.0, w);
+			 p.handL = lerp(p.handL, Vec3{0.18, 0.12, 0.42}, w);
+			 p.headPitch = lerp(p.headPitch, 34.0, w);
+		 }},
+		{"look up", [](ExplorerPose &p, double w, double) { p.headPitch = lerp(p.headPitch, -35.0, w); }},
+		{"look down", [](ExplorerPose &p, double w, double) { p.headPitch = lerp(p.headPitch, 30.0, w); }},
+		{"surprised", [](ExplorerPose &p, double w, double) {   // a start back: leaning away, hands up, every eye wide, the ears up
+			 p.lean = lerp(p.lean, -8.0, w);
+			 p.handL = lerp(p.handL, Vec3{0.26, 1.30, 0.30}, w);
+			 p.handR = lerp(p.handR, Vec3{-0.26, 1.30, 0.30}, w);
+			 p.lidL = lerp(p.lidL, 0.0, w);
+			 p.lidR = lerp(p.lidR, 0.0, w);
+			 p.lidTop = lerp(p.lidTop, 0.0, w);
+			 p.ears = lerp(p.ears, 1.0, w);
+		 }},
+		{"hands together", [](ExplorerPose &p, double w, double) {
+			 p.handL = lerp(p.handL, Vec3{0.06, 1.02, 0.30}, w);
+			 p.handR = lerp(p.handR, Vec3{-0.06, 1.02, 0.30}, w);
+		 }},
+		{"raise the sceptre", [](ExplorerPose &p, double w, double) {
+			 p.handR = lerp(p.handR, Vec3{-0.20, 1.62, 0.30}, w);
+			 p.staffGlow = lerp(p.staffGlow, 1.0, w);
+		 }},
+		{"nod", [](ExplorerPose &p, double w, double s) { p.headPitch += 12.0 * w * std::sin(2.0 * kPi * 1.4 * s); }},
+		{"shake head", [](ExplorerPose &p, double w, double s) { p.headYaw += 18.0 * w * std::sin(2.0 * kPi * 1.6 * s); }},
+		{"sit", [](ExplorerPose &p, double w, double) { p.sit = lerp(p.sit, 1.0, w); }},
+		{"crouch", [](ExplorerPose &p, double w, double) { p.crouch = lerp(p.crouch, 1.0, w); }},
+	};
+	return poses;
+}
+
 // ---- the skeleton ---------------------------------------------------------------------------------------------------------------------------------------------------
 struct ExplorerBody {
 	Vec3 pelvis, chest, neck, headPivot, shoulder[2], elbow[2], wrist[2], hip[2], knee[2], hock[2], ball[2];
 	Mat4 head, headInv;   // head space -> body space, and back
 	Vec3 handDir[2];      // where each hand points (wrist to fingers)
 	double hemY;          // the robe's hem
+	bool planted[2];      // whether each foot is on the ground (the walk's stance)
 };
+// Where a foot is in its walk, `steps` steps into it (a step is half a cycle): on the ground from half a step in to a step and a half (`swing` going from 1 to -1 at an even pace:
+// the foot's place ahead of the hip, in strides, moves back as the body moves on), then in the air for a step, swinging forward smoothly from -1 to 1 and lifted (`lift`,
+// 0..1, highest half way).
+inline void gait(double steps, double &swing, double &lift, bool &planted) {
+	const double u = steps / 2.0 - std::floor(steps / 2.0);   // through the cycle, 0..1 (two steps)
+	const double stance = u - 0.25 - std::floor(u - 0.25);    // 0..1, from the moment the foot comes down
+	planted = stance < 0.5;
+	if (planted) {
+		swing = 1.0 - 4.0 * stance;
+		lift = 0.0;
+	} else {
+		const double v = (stance - 0.5) / 0.5;   // through the swing, 0..1
+		swing = -1.0 + 2.0 * smoothstep(0.0, 1.0, v);
+		lift = std::sin(kPi * v);
+	}
+}
 inline ExplorerBody explorerBody(const ExplorerPose &p) {
 	ExplorerBody b;
 	const double breath = 0.006 * std::sin(p.time * 2.0 * kPi / 4.2);
@@ -74,11 +131,14 @@ inline ExplorerBody explorerBody(const ExplorerPose &p) {
 		b.elbow[s] = arm.elbow;
 		b.wrist[s] = arm.hand;
 		b.handDir[s] = normalize(arm.hand - arm.elbow);
-		// the legs: the hip, the knee (forward), the hock (back), the ball of the foot; the walk swings each foot forward in turn and lifts it a little
+		// the legs: the hip, the knee (forward), the hock (back), the ball of the foot. The walk: each foot in turn is on the ground for a step - going back under the body at
+		// exactly the body's pace (0.84 m a step, so it does not slide: film_checks.h) - then swings forward, lifted a little, for the next
 		b.hip[s] = b.pelvis + Vec3{0.095 * side, -0.04, 0.0};
-		const double phase = p.walk * kPi + (s == 0 ? 0.0 : kPi);
-		const double swing = std::sin(phase), lift = std::max(0.0, std::cos(phase));
+		double swing = 0.0, lift = 0.0;
+		gait(p.walk + (s == 0 ? 0.0 : 1.0), swing, lift, b.planted[s]);
+		if (p.stride <= 0.0) b.planted[s] = true;
 		Vec3 ball{0.11 * side, 0.03 + 0.07 * lift * p.stride, 0.07 + 0.42 * p.stride * swing};
+		ball.y += p.slope * ball.z;   // (on a ramp the feet stand on it: a planted foot keeps its height while the body goes down or up, and the knee takes it)
 		if (p.sit > 0.0) ball = lerp(ball, Vec3{0.30 * side, 0.03, 0.32}, p.sit);   // (sitting: the feet out in front, crossed)
 		b.ball[s] = ball;
 		const Vec3 hockTarget = ball + Vec3{0.0, 0.20 - 0.08 * p.sit, -0.10};
@@ -642,6 +702,11 @@ inline void wrapUV(Mesh &m) {
 }
 
 // ---- the figure ----------------------------------------------------------------------------------------------------------------------------------------------------
+// The explorer's feet in pose `p` at `world` (body space -> story space): the balls of its feet, and whether each is on the ground (Film::feetAt: the sliding-feet check).
+inline std::vector<Foot> explorerFeet(const ExplorerPose &p, const Mat4 &world) {
+	const ExplorerBody b = explorerBody(p);
+	return {{transformPoint(world, b.ball[0]), b.planted[0]}, {transformPoint(world, b.ball[1]), b.planted[1]}};
+}
 // The mask's frame (mask space -> body space): on the face, lifted away from it, then lowered into the left hand.
 inline Mat4 maskFrame(const ExplorerPose &p, const ExplorerBody &b) {
 	if (p.maskOff <= 0.0) return b.head;

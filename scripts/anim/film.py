@@ -12,7 +12,14 @@ The films themselves are C++ (src/shared/cartoon/: cartoon_lib.h is the toolkit,
   python scripts/anim/film.py doctor tengwang                   every shot at its start, middle and end, small, with a report of what looks wrong (black, very dark, blown-out
                                                                 and flat frames, jumps in brightness across a cut, slow frames; and, for a film that names its subjects, a subject out of the
                                                                 frame, behind the camera or hidden behind something, and a camera against a wall) and the whole film's render time; exit 1
-                                                                on a warning. --no-framing skips the subject checks (they add a depth pass to each frame)
+                                                                on a warning. --no-framing skips the subject checks (they add a depth pass to each frame). Feet that slide (from the
+                                                                film's own motion, no render) are checked too, and cuts that reverse a subject's direction across the screen or swap two
+                                                                subjects' sides (ray_tracer --film-cuts); --motion also renders three frames in a row from the middle of each shot,
+                                                                at the samples the video will use, and reports frame-to-frame shimmer (the denoiser's flicker)
+  python scripts/anim/film.py budget nomai-signal --write       how many samples each shot needs: the middle of every shot rendered twice (two seeds) at the film's samples and at
+                                                                fewer, denoised; a shot may drop to fewer while it is no noisier than the film's median shot at full samples and no
+                                                                blurrier than its own full render. --write puts a `samples` line for each such shot into the film's cameras file
+                                                                (pbrt_scenes/film_assets/<key>/cameras.txt), which the video reads
 
 Options (before or after the command): --exe PATH (default: RayTracer_Package/ray_tracer next to this repository), --cpu (default is the GPU, denoised), --height N (picture height,
 default 270 for a sheet and 720 otherwise), --spp N, --out PATH. Plain Python 3; the contact sheet needs Pillow (pip install pillow).
@@ -115,7 +122,7 @@ def film_info(args, key):
     done = subprocess.run([find_exe(args.exe), "--film-shots", key], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=run_dir())
     if done.returncode != 0:
         sys.exit("unknown film %r: python scripts/anim/film.py list\n%s" % (key, done.stdout.strip()))
-    info, shots = None, []
+    info, shots, shares = None, [], []
     for line in done.stdout.splitlines():
         f = line.split("\t")
         if f[0] == "film":
@@ -123,8 +130,10 @@ def film_info(args, key):
                     "seconds_per_frame": float(f[8])}
         elif f[0] == "shot":
             shots.append((float(f[1]), f[2] if len(f) > 2 else ""))
+            shares.append(float(f[3]) if len(f) > 3 else 1.0)
     if not info or not shots:
         sys.exit("ray_tracer --film-shots %s said nothing useful:\n%s" % (key, done.stdout))
+    info["shares"] = shares   # each shot's share of the samples (its `samples` in the film's cameras file)
     return info, shots
 
 
@@ -141,6 +150,14 @@ HIDDEN_RATIO = 0.75   # a subject is hidden when everything round its pixel is n
 HIDDEN_MARGIN = 0.3   # point is often inside what it names (a chest inside a body, a ship's middle inside its hull, a machine's centre inside its rings), not behind a wall
 NEAR = 0.2            # depth below this ...
 NEAR_SHARE = 0.5      # ... over this share of the frame: the camera against something (or inside it)
+# Feet (ray_tracer --film-feet: how fast a planted foot moves, units - metres - a second)
+SLIDE_NOTE = 0.10     # a planted foot this fast slides a little (a body turning on a tight curve)
+SLIDE_WARN = 0.25     # ... and this fast it skates
+# Flicker (--motion): three frames in a row at the video's samples and again at FLICKER_REFERENCE times them; of each, b - (a + c) / 2 (sRGB brightness); the mean difference
+# of the two is the shimmer the samples leave (motion - a camera move, a flame - is in both and cancels; noise from too few samples is not)
+FLICKER_REFERENCE = 4
+FLICKER_NOTE = 0.004
+FLICKER_WARN = 0.008
 
 
 def frame_stats(png):
@@ -214,6 +231,36 @@ def judge_framing(subjects, aovs_path):
         if near > NEAR_SHARE:
             found.append(("warn", "the camera is against something: %.0f%% of the frame is nearer than %.2f" % (100 * near, NEAR)))
     return found
+
+
+def film_feet(args, key):
+    """How fast the planted feet move in each shot that has any (`ray_tracer --film-feet`): [(shot from 0, worst, when, mean)]."""
+    done = subprocess.run([find_exe(args.exe), "--film-feet", key], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=run_dir())
+    found = []
+    for line in done.stdout.splitlines():
+        f = line.split("\t")
+        if f[0] == "slide" and len(f) >= 6:
+            found.append((int(f[1]) - 1, float(f[2]), float(f[3]), float(f[4])))
+    return found
+
+
+def film_cuts(args, key):
+    """The cuts where screen direction breaks (`ray_tracer --film-cuts`): [(shot after the cut from 0, kind, before, after)], kind flip, journey or line."""
+    done = subprocess.run([find_exe(args.exe), "--film-cuts", key], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=run_dir())
+    found = []
+    for line in done.stdout.splitlines():
+        f = line.split("\t")
+        if f[0] == "cut" and len(f) >= 5:
+            found.append((int(f[1]) - 1, f[2], float(f[3]), float(f[4])))
+    return found
+
+
+def flicker_of(pngs, reference):
+    """The frame-to-frame shimmer of three frames in a row against the same three at more samples: the mean of |d - D|, d = b - (a + c) / 2 of their brightness."""
+    import numpy as np
+    a, b, c = (luminance(p) for p in pngs)
+    A, B, C = (luminance(p) for p in reference)
+    return float(np.abs((b - (a + c) / 2.0) - (B - (A + C) / 2.0)).mean())
 
 
 def cmd_doctor(args):
@@ -310,6 +357,56 @@ def cmd_doctor(args):
             return ("note", s, which, t, text + (": it enters the frame" if which == "start" else ": it leaves the frame"))
         return ("warn", s, which, t, text)
     findings = [outside_finding(f) if f[0] == "outside" else f for f in findings]
+    # feet that slide: from the film's own motion, no render
+    for shot, worst, when, mean in film_feet(args, info["key"]):
+        if only is not None and shot not in only:
+            continue
+        if worst > SLIDE_NOTE:
+            findings.append(("warn" if worst > SLIDE_WARN else "note", shot, "middle", when,
+                             "a planted foot slides %.2f m/s at worst (%.2f on average)%s" % (worst, mean, "" if worst > SLIDE_WARN else ": slightly")))
+    # screen direction across the cuts: from the film's own subjects and cameras, no render
+    def way(v):
+        return "left to right" if v > 0 else "right to left"
+    for shot, kind, before, after in film_cuts(args, info["key"]):
+        if only is not None and shot not in only and shot - 1 not in only:
+            continue
+        start = shots[shot][0]
+        if kind == "line":
+            findings.append(("warn", shot, "start", start, "the camera crossed the line: the two subjects swap sides on the screen at the cut from shot %d" % shot))
+        elif kind == "flip":
+            findings.append(("warn", shot, "start", start, "screen direction flips at the cut from shot %d: %s, then %s (the same thing, in the same place)" % (shot, way(before), way(after))))
+        else:
+            findings.append(("note", shot, "start", start, "the journey changes direction across the screen at the cut from shot %d: %s, then %s" % (shot, way(before), way(after))))
+    # flicker (--motion): three frames in a row from each shot's middle, at the samples the video gives the shot
+    if args.motion:
+        dt = 1.0 / max(1, info["fps"])
+        mh = max(height, 270)
+        mw = max(16, round(mh * aspect))
+        middles = [j for j in jobs if j["which"] == "middle" and j.get("png")]
+
+        def motion(job):
+            spp = max(1, round(info["samples"] * info["shares"][job["shot"]]))
+            made = {}
+            for label, samples in (("", spp), ("_ref", min(512, spp * FLICKER_REFERENCE))):
+                made[label] = []
+                for k, t in enumerate((job["t"] - dt, job["t"], job["t"] + dt)):
+                    png = os.path.join(out_dir, "s%02d_motion%d%s.png" % (job["shot"], k, label))
+                    cmd = [find_exe(args.exe)] + renderer_flags(args) + ["--output", png, "--height", str(mh), str(mw), str(samples), "8", "cartoon:%s@%.4f" % (info["key"], t)]
+                    done = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=run_dir())
+                    if done.returncode != 0 or not os.path.exists(png):
+                        return job, None, spp
+                    made[label].append(png)
+            return job, flicker_of(made[""], made["_ref"]), spp
+
+        print("Flicker: three frames in a row from %d shots at %d x %d..." % (len(middles), mw, mh), flush=True)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs or 3) as pool:
+            for job, flick, spp in pool.map(motion, middles):
+                if flick is None:
+                    findings.append(("note", job["shot"], "middle", job["t"], "the flicker frames did not render"))
+                elif flick > FLICKER_NOTE:
+                    findings.append(("warn" if flick > FLICKER_WARN else "note", job["shot"], "middle", job["t"],
+                                     "flickers: frame-to-frame shimmer %.4f at %d samples (more samples, or fewer taken away by the budget, steady it)" % (flick, spp)))
+                job["flicker"] = flick
     # across each cut: from the end of one shot to the start of the next
     by_key = {(j["shot"], j["which"]): j for j in jobs if j.get("stats")}
     for s in range(len(shots) - 1):
@@ -371,6 +468,141 @@ def cmd_doctor(args):
     sys.exit(1 if warns else 0)
 
 
+# The budget: the shares of the film's samples tried, and what "no blurrier" allows (the mean difference from the shot's own full render, against its noise there).
+BUDGET_LEVELS = (1.0, 0.5, 0.25)
+BLUR_ALLOWANCE = 1.5
+BUDGET_BEGIN = "# ---- samples each shot needs (python scripts/anim/film.py budget --write; the next --write replaces this block) ----"
+BUDGET_END = "# ---- end of the samples ----"
+
+
+def luminance(png):
+    import numpy as np
+    from PIL import Image
+    a = np.asarray(Image.open(png).convert("RGB"), dtype=np.float32) / 255.0
+    return 0.2126 * a[..., 0] + 0.7152 * a[..., 1] + 0.0722 * a[..., 2]
+
+
+def write_budget(key, shares, names, notes):
+    """Puts a `samples` line for each shot whose share is below 1 into the film's cameras file, between BUDGET_BEGIN and BUDGET_END (made, or replaced)."""
+    path = os.path.join(REPO, "pbrt_scenes", "film_assets", key, "cameras.txt")
+    text = open(path, encoding="utf-8").read() if os.path.exists(path) else ""
+    if BUDGET_BEGIN in text:
+        a = text.index(BUDGET_BEGIN)
+        b = text.find(BUDGET_END, a)
+        text = text[:a] + (text[b + len(BUDGET_END):].lstrip("\n") if b >= 0 else "")
+    lines = [BUDGET_BEGIN]
+    for shot in sorted(shares):
+        if shares[shot] < 1.0:
+            lines += ["[%d]   # %s: %s" % (shot + 1, names[shot], notes[shot]), "samples %g" % shares[shot]]
+    lines.append(BUDGET_END)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write((text.rstrip("\n") + "\n\n" if text.strip() else "") + "\n".join(lines) + "\n")
+    return path
+
+
+def cmd_budget(args):
+    """How many samples each shot needs. The middle of every shot is rendered at the film's own samples and at fewer (BUDGET_LEVELS), each twice with different seeds,
+    denoised: the difference between the two is the noise the denoiser leaves; the difference of their mean from the full render's mean is what fewer samples lose (detail,
+    a blur). A shot may drop to the fewest samples whose noise is no more than the film's median shot has at full samples (or its own, if more) and whose loss is within
+    BLUR_ALLOWANCE times that noise."""
+    try:
+        import numpy as np
+        from PIL import Image  # noqa: F401
+    except ImportError:
+        sys.exit("the budget needs Pillow and numpy: pip install pillow numpy")
+    import concurrent.futures
+    info, shots = film_info(args, args.target)
+    base = info["samples"]
+    height = args.height or 360
+    aspect = info["width"] / info["height"] if info["width"] > 0 and info["height"] > 0 else 16 / 9
+    width = max(16, round(height * aspect))
+    out_dir = args.out or os.path.join(tempfile.gettempdir(), "film_budget_" + info["key"])
+    os.makedirs(out_dir, exist_ok=True)
+    only = {int(n) - 1 for n in args.shots.split(",")} if args.shots else None
+    duration = info["duration"]
+
+    def render(shot, t, level, seed):
+        png = os.path.join(out_dir, "s%02d_l%g_seed%d.png" % (shot, level, seed))
+        spp = max(1, round(base * level))
+        cmd = [find_exe(args.exe)] + renderer_flags(args) + ["--seed", str(seed), "--output", png, "--height", str(height), str(width), str(spp), "8", "cartoon:%s@%.3f" % (info["key"], t)]
+        for attempt in range(2):   # (a GPU render can fail now and then - a copy to the card, a busy driver: tried once more, as a video does)
+            done = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=run_dir())
+            if done.returncode == 0 and os.path.exists(png):
+                return luminance(png)
+        raise RuntimeError("shot %d at %.2f s did not render: %s" % (shot + 1, t, done.stdout[-300:].strip()))
+
+    def measure(shot):
+        start = shots[shot][0]
+        end = shots[shot + 1][0] if shot + 1 < len(shots) else duration
+        t = min(max((start + end) / 2, 0.0), duration * 0.9999)
+        found = {}
+        full_mean = None
+        for level in BUDGET_LEVELS:
+            try:
+                a, b = render(shot, t, level, 1), render(shot, t, level, 2)
+            except RuntimeError as e:   # (a shot that will not render stays at full samples: said, not fatal)
+                print("  " + str(e), flush=True)
+                if level == 1.0:
+                    return shot, t, None
+                break
+            noise = float(np.abs(a - b).mean()) / np.sqrt(2.0)
+            mean = (a + b) / 2
+            if full_mean is None:
+                full_mean = mean
+            loss = float(np.abs(mean - full_mean).mean())
+            found[level] = (noise, loss, float(a.mean()))
+            # (no lower level once this one is clearly over: the next would be worse)
+            if level < 1.0 and noise > 2.0 * found[1.0][0] and noise > 0.004:
+                break
+        return shot, t, found
+
+    todo = [i for i in range(len(shots)) if only is None or i in only]
+    print("%s: %d shots, the film's %d samples and %s of them, %d x %d, two seeds each..." % (info["name"], len(todo), base,
+          ", ".join("%g" % l for l in BUDGET_LEVELS[1:]), width, height), flush=True)
+    results = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs or 3) as pool:
+        for shot, t, found in pool.map(measure, todo):
+            if found is None:
+                continue
+            results[shot] = (t, found)
+            print("  shot %2d %-28s noise at full %.4f" % (shot + 1, shots[shot][1][:28], found[1.0][0]), flush=True)
+    if not results:
+        sys.exit("no shot rendered")
+    full_noise = sorted(found[1.0][0] for _, found in results.values())
+    reference = full_noise[len(full_noise) // 2]
+    shares, notes = {}, {}
+    lines = ["%s (%s): %d samples a pixel; the median shot's noise at full samples %.4f (the bar)" % (info["name"], info["key"], base, reference)]
+    for shot in sorted(results):
+        t, found = results[shot]
+        allowed = max(reference, found[1.0][0])
+        share = 1.0
+        for level in BUDGET_LEVELS[1:]:
+            if level not in found:
+                break
+            noise, loss, _ = found[level]
+            if noise <= allowed and loss <= BLUR_ALLOWANCE * allowed:
+                share = level
+            else:
+                break
+        shares[shot] = share
+        noise, loss, _ = found[share]
+        notes[shot] = "noise %.4f, loss %.4f at %g of the samples (noise %.4f at all)" % (noise, loss, share, found[1.0][0])
+        lines.append("  shot %2d %-28s %4d samples (%3.0f%%)   %s" % (shot + 1, shots[shot][1][:28], max(1, round(base * share)), 100 * share, notes[shot]))
+    # what the whole film saves: each shot's frames at its share (the samples, which is most of a frame's time on the GPU; the scene's own setting up is not saved)
+    total = sum((shots[i + 1][0] if i + 1 < len(shots) else duration) - shots[i][0] for i in results)
+    kept = sum(((shots[i + 1][0] if i + 1 < len(shots) else duration) - shots[i][0]) * shares[i] for i in results)
+    lines.append("Samples over the shots measured: %.0f%% of the film's (%.0f%% fewer)" % (100 * kept / max(1e-9, total), 100 * (1 - kept / max(1e-9, total))))
+    if args.write:
+        lines.append("Written: " + write_budget(info["key"], shares, {i: shots[i][1] for i in results}, notes))
+    else:
+        lines.append("(--write puts these into the film's cameras file)")
+    report = "\n".join(lines)
+    with open(os.path.join(out_dir, "budget.txt"), "w", encoding="utf-8") as f:
+        f.write(report + "\n")
+    print(report)
+
+
 def cmd_video(args):
     height = args.height or 720
     width = round(height * 16 / 9)
@@ -382,7 +614,7 @@ def cmd_video(args):
 
 def main():
     p = argparse.ArgumentParser(description="Look at a cartoon film (the films are C++: src/shared/cartoon/).")
-    p.add_argument("command", choices=["list", "still", "sheet", "video", "doctor"])
+    p.add_argument("command", choices=["list", "still", "sheet", "video", "doctor", "budget"])
     p.add_argument("target", nargs="?", help="still: <key>[@seconds]; sheet and video: <key>")
     p.add_argument("--exe")
     p.add_argument("--cpu", action="store_true")
@@ -393,7 +625,9 @@ def main():
     p.add_argument("--times", help="sheet: comma-separated seconds instead of --count")
     p.add_argument("--jobs", type=int, help="doctor: how many frames to render at once (default 3)")
     p.add_argument("--no-framing", action="store_true", help="doctor: skip the subject checks (out of frame, hidden, camera against something)")
-    p.add_argument("--shots", help="doctor: only these shots (comma-separated numbers, 1 the first: as the sheet counts)")
+    p.add_argument("--shots", help="doctor, budget: only these shots (comma-separated numbers, 1 the first: as the sheet counts)")
+    p.add_argument("--write", action="store_true", help="budget: write the shots' samples into the film's cameras file")
+    p.add_argument("--motion", action="store_true", help="doctor: also render three frames in a row from each shot's middle and report flicker")
     args = p.parse_args()
     if args.out:
         args.out = os.path.abspath(args.out)   # (the program runs from its package folder)
@@ -401,7 +635,7 @@ def main():
         args.exe = os.path.abspath(args.exe)
     if args.command != "list" and not args.target:
         p.error("%s needs a film key" % args.command)
-    {"list": cmd_list, "still": cmd_still, "sheet": cmd_sheet, "video": cmd_video, "doctor": cmd_doctor}[args.command](args)
+    {"list": cmd_list, "still": cmd_still, "sheet": cmd_sheet, "video": cmd_video, "doctor": cmd_doctor, "budget": cmd_budget}[args.command](args)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,13 @@
+# The Last Nomai Signal: music cues on top of the score (src/shared/cartoon/nomai_score.h), read when the soundtrack is made - no rebuild (music_cues.h).
+# A section is a shot, by name or number (as the film doctor's sheet counts); the times after it are from that shot's start, so a retimed shot takes its cues along.
+# A line: <time> <instrument> [notes] [length L] [gain G] [pan P] [send S] [spread D]. Notes are MIDI numbers (62 = D4) or names (D4, F#3, Bb2); a number with a
+# point after them is the length. The film's own voices: guitar, banjo, piano, resonance, drone, beep; and the generic ones: bell, mallet, pluck, bass, pad, strings,
+# knock, swell, footstep-<dust|stone|grass|wood|metal|snow>, impact, flash, touch.
+
+[The ridge]
+3.0   banjo 74 1.2  gain 0.08  pan 0.4  send 0.6
+4.7   banjo 76 1.2  gain 0.07  pan 0.4  send 0.6
+6.4   banjo 77 1.6  gain 0.07  pan 0.4  send 0.6
+
+[The third eye]
+2.2   resonance 86 6.0  gain 0.07  pan 0.2  send 0.8      # the third eye opens

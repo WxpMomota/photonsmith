@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "../src/shared/cartoon/cartoon_lib.h"
+#include "cartoon_lib.h"
 
 namespace film_subjects {
 

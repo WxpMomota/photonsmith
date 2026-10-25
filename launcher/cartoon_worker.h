@@ -93,9 +93,11 @@ struct Job {
 	}
 
 	// Writes the scene of `frame` to scenePath(); false when it cannot be written. `eye` is where the scene's own camera is (the first LookAt of its header); `fingerprint` gets the
-	// scene's fingerprint, and `unchanged` is true (and nothing is written) when the frame is one to keep and its fingerprint is the one it was rendered from.
-	bool writeScene(int frame, double eye[3], std::string &fingerprint, bool &unchanged) const {
+	// scene's fingerprint, and `unchanged` is true (and nothing is written) when the frame is one to keep and its fingerprint is the one it was rendered from. `share` gets the
+	// share of the video's samples the frame asks for (its shot's `samples` in the film's cameras file; 1 when it says nothing).
+	bool writeScene(int frame, double eye[3], std::string &fingerprint, bool &unchanged, double &share) const {
 		unchanged = false;
+		share = 1.0;
 		try {
 			const std::string header = filmPtr->headerAt(timeOf(frame));
 			static const std::regex look("LookAt\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)");
@@ -104,6 +106,7 @@ struct Job {
 				for (int i = 0; i < 3; ++i) eye[i] = std::stod(m[i + 1].str());
 			const std::string text = filmPtr->sceneAt(timeOf(frame));
 			fingerprint = frame_fingerprint::of(text);
+			share = cartoon::shot_cameras::sampleShareOf(text);
 			if (const auto it = keep.find(frame); it != keep.end() && it->second == fingerprint) {
 				unchanged = true;
 				return true;
@@ -145,7 +148,8 @@ inline int run(const Job &job, const LaunchArgs &args, const RenderSetup &setup,
 		int rc = -1;
 		std::string fingerprint;
 		bool unchanged = false;
-		const bool written = job.writeScene(frame, eye, fingerprint, unchanged);
+		double share = 1.0;
+		const bool written = job.writeScene(frame, eye, fingerprint, unchanged, share);
 		if (written && unchanged) {
 			rc = 0;   // (finished, and its scene has not changed: kept as it is)
 		} else if (written) {
@@ -156,6 +160,7 @@ inline int run(const Job &job, const LaunchArgs &args, const RenderSetup &setup,
 			a.cam_y = s.cam_y = eye[1];
 			a.cam_z = s.cam_z = eye[2];
 			s.out_path = job.picturePath(frame);
+			s.samples_per_pixel = cartoon::shot_cameras::samplesFor(setup.samples_per_pixel, share);
 			rc = render(a, s);
 		}
 		// written under another name and moved into place, so the parent never reads half a marker

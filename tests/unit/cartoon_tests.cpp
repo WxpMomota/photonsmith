@@ -32,10 +32,11 @@
 #include "../../launcher/background_mode.h"
 #include "../../launcher/run_policy.h"
 #include "../../launcher/video_frames.h"
-#include "../../launcher/film_subjects.h"
+#include "../../src/shared/cartoon/film_subjects.h"
 #include "fixture_skip.h"
 #include "../../src/shared/cartoon/cartoons.h"
 #include "../../src/shared/cartoon/cartoon_stills.h"
+#include "../../src/shared/cartoon/film_checks.h"
 #include "../../src/shared/pbrt_discover.h"
 #include "../../src/shared/output_crop.h"
 #include "../../src/shared/output_format.h"
@@ -212,7 +213,7 @@ TEST(VideoPresets, EveryFilmIsAPresetAndTheCameraPresetsComeFirst) {
 		EXPECT_EQ(std::string(p->name), std::string(f.name) + " (cartoon)");
 		EXPECT_STREQ(p->description, f.description) << "the preset's text is the film's own";
 		ASSERT_NE(video_preset::filmOf(*p), nullptr);
-		EXPECT_STREQ(video_preset::filmOf(*p)->key, f.key) << "(the program's film: the table's row with its cameras file, cartoons.h withShotCameras)";
+		EXPECT_STREQ(video_preset::filmOf(*p)->key, f.key) << "(the program's film: the table's row with its cameras file, cartoons.h withFilmFiles)";
 	}
 }
 
@@ -1803,7 +1804,7 @@ TEST(ShotCameras, AFilmsCameraFileIsReadWhenAFrameIsMadeAndChangesOnlyItsShot) {
 	}
 	cartoon::Film film{"camera-file-test", "Camera file test", "", 10.0, 24, [](double) { return testHeader() + "Shape \"sphere\"\n"; }, [](double) { return testHeader(); },
 					   []() { return std::vector<double>{0.0, 5.0, 8.0}; }, 1.0, {9999, "", "First|Second|Third", 8, 0.0}};
-	const cartoon::Film shown = cartoon::detail::withShotCameras(film);
+	const cartoon::Film shown = cartoon::detail::withFilmFiles(film);
 	EXPECT_NEAR(headerCamera(shown.sceneAt(2.0)).eye.z, 10.0, 1e-4) << "the first shot is as the code made it";
 	EXPECT_NEAR(headerCamera(shown.sceneAt(7.0)).eye.z, 8.0, 1e-4) << "the second is moved, by its name";
 	EXPECT_NEAR(headerCamera(shown.headerAt(7.0)).eye.z, 8.0, 1e-4) << "the header alone too (the doctor's framing checks read it)";
@@ -2025,4 +2026,277 @@ TEST(FilmEvents, TheNomaiFilmsFootstepsAreTheShotsOwnWalks) {
 	EXPECT_NEAR(std::fmod(inShot[0] - 49.0, 1.2), 0.6, 1e-9);
 	for (const cartoon::FilmEvent &e : events)
 		if (e.kind == cartoon::EventKind::Footfall) EXPECT_FALSE(e.t > 166.0 && e.t < 250.0) << "nobody walks between the star map and the dawn: " << e.t;
+}
+
+// ---- a shot's share of the samples (shot_cameras.h `samples`, read by the video) ------------------------------------------------------------------------
+
+// A shot's `samples` line puts its share into the frame's header, where it changes the fingerprint (so a resume renders the frame again) and where the worker reads it: each frame
+// renders at its own shot's share of the video's samples, never fewer than one.
+TEST(ShotSamples, AFrameRendersAtItsShotsShareOfTheVideosSamples) {
+	namespace sc = cartoon::shot_cameras;
+	EXPECT_DOUBLE_EQ(sc::sampleShareOf("LookAt 0 0 0 0 0 -1 0 1 0\nWorldBegin\n"), 1.0);
+	const std::string halved = sc::apply(testHeader() + "Shape \"sphere\"\n", sc::changeFor(sc::parse("[*]\nsamples 0.5\n"), 0, ""));
+	EXPECT_DOUBLE_EQ(sc::sampleShareOf(halved), 0.5);
+	EXPECT_NE(frame_fingerprint::of(halved), frame_fingerprint::of(testHeader() + "Shape \"sphere\"\n")) << "a new share is a new frame";
+	EXPECT_DOUBLE_EQ(sc::sampleShareOf("WorldBegin\n# @rt-samples 0.5\n"), 1.0) << "only the header's line counts";
+	EXPECT_EQ(sc::samplesFor(32, 0.25), 8);
+	EXPECT_EQ(sc::samplesFor(2, 0.1), 1) << "never fewer than one";
+	EXPECT_EQ(sc::parse("[*]\nsamples 0\n").problems.size(), 1u);
+
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "rt_shot_samples_test";
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir / "film_assets" / "samples-test");
+	const char *saved = std::getenv("RAY_TRACER_PBRT_DIR");
+	const std::string savedValue = saved ? saved : "";
+#ifdef _WIN32
+	_putenv_s("RAY_TRACER_PBRT_DIR", dir.string().c_str());
+#else
+	setenv("RAY_TRACER_PBRT_DIR", dir.string().c_str(), 1);
+#endif
+	{
+		std::ofstream(dir / "film_assets" / "samples-test" / "cameras.txt") << "[2]\nsamples 0.25\n";
+	}
+	const cartoon::Film film{"samples-test", "Samples test", "", 10.0, 24, [](double) { return testHeader() + "Shape \"sphere\"\n"; }, [](double) { return testHeader(); },
+							 []() { return std::vector<double>{0.0, 5.0}; }, 1.0, {9998, "", "First|Second", 8, 0.0}};
+	const cartoon::Film shown = cartoon::detail::withFilmFiles(film);
+	cartoon_worker::Job job;
+	job.film = "samples-test";
+	job.filmPtr = &shown;
+	job.frames = 240;
+	job.scenes = (dir / "scenes").string();
+	job.out = (dir / "out").string();
+	job.list = {24, 168};   // 1 s (the first shot) and 7 s (the second)
+	std::filesystem::create_directories(job.out);
+	LaunchArgs args;
+	RenderSetup setup;
+	setup.samples_per_pixel = 32;
+	std::vector<int> used;
+	cartoon_worker::run(job, args, setup, [&](const LaunchArgs &, const RenderSetup &s) {
+		used.push_back(s.samples_per_pixel);
+		return 0;
+	});
+	ASSERT_EQ(used.size(), 2u);
+	EXPECT_EQ(used[0], 32) << "the first shot at the video's samples";
+	EXPECT_EQ(used[1], 8) << "the second at its quarter";
+#ifdef _WIN32
+	_putenv_s("RAY_TRACER_PBRT_DIR", savedValue.c_str());
+#else
+	if (saved) setenv("RAY_TRACER_PBRT_DIR", savedValue.c_str(), 1); else unsetenv("RAY_TRACER_PBRT_DIR");
+#endif
+	std::filesystem::remove_all(dir);
+}
+
+// ---- sliding feet (film_checks.h) -----------------------------------------------------------------------------------------------------------------------
+
+// The check samples each shot at the film's frame rate and reports the fastest a planted foot moves: a foot planted and held is still, one planted while the body drags it
+// skates, and a foot in the air may move as it likes.
+TEST(FilmChecks, APlantedFootThatMovesIsFoundAndOneThatStaysIsNot) {
+	using cartoon::Vec3;
+	cartoon::Film film{"feet-test", "Feet test", "", 4.0, 24, [](double) { return std::string(); }, [](double) { return std::string(); },
+					   []() { return std::vector<double>{0.0, 2.0}; }, 0.0, {9997, "", "Still|Skating", 8, 0.0}};
+	film.feetAt = [](double t) {
+		std::vector<cartoon::Foot> feet(2);
+		feet[0] = {{0.0, 0.0, 0.0}, true};                    // planted and still
+		feet[1] = {{t < 2.0 ? 0.0 : 0.5 * t, 0.0, 0.0}, t >= 2.0};   // in the air for the first shot; planted and dragged at 0.5 a second in the second
+		if (t < 2.0) feet[1].at = {std::sin(t * 9.0), 1.0, 0.0};   // (flying about: not planted, not counted)
+		return feet;
+	};
+	const std::vector<cartoon::film_checks::Slide> found = cartoon::film_checks::slidingFeet(film);
+	ASSERT_EQ(found.size(), 2u);
+	EXPECT_EQ(found[0].shot, 0);
+	EXPECT_LT(found[0].worst, 1e-9) << "the still foot, and the flying one is not counted";
+	EXPECT_EQ(found[1].shot, 1);
+	EXPECT_NEAR(found[1].worst, 0.5, 1e-6) << "the dragged foot";
+	EXPECT_GT(found[1].worst, cartoon::film_checks::kSlideLimit);
+}
+
+// The Nomai explorer's walk: a foot on the ground goes back under the body at the body's own pace, so in every shot it walks in the planted feet stay put (the turning
+// floating steps, a body on a 6 m curve, the most: a little over a tenth of a metre a second). Its old swinging gait skated at 0.55 to 0.92 m/s.
+TEST(FilmChecks, TheNomaiExplorersPlantedFeetStayPut) {
+	const cartoon::Film *film = cartoon::find("nomai-signal");
+	ASSERT_NE(film, nullptr);
+	const std::vector<cartoon::film_checks::Slide> found = cartoon::film_checks::slidingFeet(*film);
+	ASSERT_GE(found.size(), 8u) << "every shot it walks in";
+	const std::vector<std::string> names = cartoon::shotNamesOf(*film);
+	for (const cartoon::film_checks::Slide &s : found) EXPECT_LT(s.worst, 0.15) << names[static_cast<std::size_t>(s.shot)] << " at " << s.at << " s";
+	// the gait itself: planted for one step from half a step in, the foot's place going back evenly from 1 to -1
+	double swing = 0.0, lift = 0.0;
+	bool planted = false;
+	cartoon::nomai::gait(0.5, swing, lift, planted);
+	EXPECT_TRUE(planted);
+	EXPECT_NEAR(swing, 1.0, 1e-9);
+	cartoon::nomai::gait(1.0, swing, lift, planted);
+	EXPECT_NEAR(swing, 0.0, 1e-9) << "half way through the stance, under the hip";
+	EXPECT_DOUBLE_EQ(lift, 0.0);
+	cartoon::nomai::gait(2.0, swing, lift, planted);
+	EXPECT_FALSE(planted) << "then a step in the air (down again at 2.5)";
+	EXPECT_NEAR(lift, 1.0, 1e-9) << "highest half way through the swing";
+}
+
+// ---- gestures (rig.h: named poses from a character's library) -------------------------------------------------------------------------------------------
+
+// A gesture eases in, holds and eases out at its film times; later gestures go on top of earlier ones; a moving pose gets the time since its gesture began; a pose that
+// the library does not have is an error by name; and contacts are listed for the soundtrack.
+TEST(Gestures, AGestureEasesInHoldsEasesOutAndGoesOnTopOfTheOnesBefore) {
+	struct Pose {
+		double arm = 0.0, head = 0.0;
+	};
+	const cartoon::rig::PoseLibrary<Pose> library = {
+		{"raise", [](Pose &p, double w, double) { p.arm = cartoon::lerp(p.arm, 1.0, w); }},
+		{"lower", [](Pose &p, double w, double) { p.arm = cartoon::lerp(p.arm, -1.0, w); }},
+		{"nod", [](Pose &p, double w, double since) { p.head += w * since; }},
+	};
+	const std::vector<cartoon::rig::Gesture> acting = {{"raise", 1.0, 2.0, 5.0, 6.0, 1.8}, {"lower", 3.0, 3.0, 4.0, 4.0}, {"nod", 7.0, 7.0}};
+	EXPECT_DOUBLE_EQ(cartoon::rig::act(Pose{}, acting, 0.5, library).arm, 0.0) << "before";
+	EXPECT_DOUBLE_EQ(cartoon::rig::act(Pose{}, acting, 1.5, library).arm, 0.5) << "half way in (smoothly)";
+	EXPECT_DOUBLE_EQ(cartoon::rig::act(Pose{}, acting, 2.5, library).arm, 1.0) << "held";
+	EXPECT_DOUBLE_EQ(cartoon::rig::act(Pose{}, acting, 3.5, library).arm, -1.0) << "a later gesture on top (an instant one)";
+	EXPECT_DOUBLE_EQ(cartoon::rig::act(Pose{}, acting, 4.5, library).arm, 1.0) << "and gone again";
+	EXPECT_DOUBLE_EQ(cartoon::rig::act(Pose{}, acting, 6.5, library).arm, 0.0) << "eased out";
+	EXPECT_DOUBLE_EQ(cartoon::rig::act(Pose{}, acting, 9.0, library).head, 2.0) << "a moving pose gets the time since it began, and holds from then on";
+	EXPECT_THROW(cartoon::rig::act(Pose{}, {{"wave", 0.0, 1.0}}, 0.5, library), std::invalid_argument);
+	const std::vector<double> contacts = cartoon::rig::contactsOf(acting);
+	ASSERT_EQ(contacts.size(), 1u);
+	EXPECT_DOUBLE_EQ(contacts[0], 1.8);
+	EXPECT_TRUE(cartoon::rig::contactsOf(acting, 2.0, 9.0).empty());
+}
+
+// The Nomai explorer's library has the poses its film acts with and the ones a new film would want, each changing only what it says (a look moves only the head).
+TEST(Gestures, TheExplorersLibraryHasItsPosesAndEachChangesOnlyItsOwnParts) {
+	const auto &poses = cartoon::nomai::explorerPoses();
+	for (const char *name : {"reach to the wall", "hand on the lectern", "point up", "kneel and touch", "look up", "look down", "surprised", "hands together",
+							 "raise the sceptre", "nod", "shake head", "sit", "crouch"})
+		EXPECT_EQ(poses.count(name), 1u) << name;
+	cartoon::nomai::ExplorerPose p;
+	const cartoon::nomai::ExplorerPose before = p;
+	poses.at("look up")(p, 1.0, 0.0);
+	EXPECT_DOUBLE_EQ(p.headPitch, -35.0);
+	EXPECT_DOUBLE_EQ(p.handL.y, before.handL.y);
+	EXPECT_DOUBLE_EQ(p.crouch, before.crouch);
+	poses.at("kneel and touch")(p, 0.5, 0.0);
+	EXPECT_DOUBLE_EQ(p.crouch, 0.5);
+}
+
+// ---- screen direction across a cut (film_checks.h) ------------------------------------------------------------------------------------------------------
+
+// A walker going left to right, then filmed from the other side in the same place (a flip); then cut to somewhere else going the other way (a journey); two still subjects,
+// then seen from the other side (the camera crossed the line between them).
+TEST(FilmChecks, ACutThatReversesTheScreenDirectionOrCrossesTheLineIsFound) {
+	using cartoon::Vec3;
+	const auto front = [] { return cartoon::sceneHeader(cartoon::cameraText(cartoon::CameraView{{0.0, 0.0, 10.0}, {0.0, 0.0, 0.0}, 40.0, 0.0, 0}), 8, 320, 180); };
+	const auto back = [] { return cartoon::sceneHeader(cartoon::cameraText(cartoon::CameraView{{0.0, 0.0, -10.0}, {0.0, 0.0, 0.0}, 40.0, 0.0, 0}), 8, 320, 180); };
+	cartoon::Film film{"cuts-test", "Cuts test", "", 10.0, 24, [](double) { return std::string(); },
+					   [=](double t) { return (t >= 2.0 && t < 4.0) || t >= 8.0 ? back() : front(); }, []() { return std::vector<double>{0.0, 2.0, 4.0, 6.0, 8.0}; }, 0.0,
+					   {9996, "", "Walks|Other side|Far away|Two|Two, other side", 8, 0.0}};
+	film.meta.width = 320;
+	film.meta.height = 180;
+	film.subjectsAt = [](double t) -> std::vector<Vec3> {
+		if (t < 4.0) return {{-1.0 + 0.5 * t, 0.0, 0.0}};                  // walking along +x
+		if (t < 6.0) return {{-2.0 + 2.0 * (t - 4.0), 0.0, -20.0}};       // far away, along +x, seen from the front again: left to right
+		return {{-1.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};                         // two, standing
+	};
+	const std::vector<cartoon::film_checks::CutIssue> found = cartoon::film_checks::screenDirection(film);
+	ASSERT_EQ(found.size(), 3u);
+	EXPECT_EQ(found[0].shot, 1);
+	EXPECT_TRUE(found[0].samePlace) << "the same walker in the same place, from the other side: a flip";
+	EXPECT_FALSE(found[0].crossedLine);
+	EXPECT_GT(found[0].before, 0.0);
+	EXPECT_LT(found[0].after, 0.0);
+	EXPECT_EQ(found[1].shot, 2);
+	EXPECT_FALSE(found[1].samePlace) << "somewhere else on the way: a journey";
+	EXPECT_EQ(found[2].shot, 4);
+	EXPECT_TRUE(found[2].crossedLine) << "the two swapped sides";
+}
+
+// ---- music cues (music_cues.h) --------------------------------------------------------------------------------------------------------------------------
+
+// A cues file: sections by shot name or number (or none: the film's start), times from the shot's start or @ a film time, notes as numbers or names, a length after the
+// notes, the options; what it cannot read is said by line.
+TEST(MusicCues, TheFileIsReadAndEachCueIsPlacedByItsShot) {
+	namespace mc = cartoon::music_cues;
+	const mc::Sheet sheet = mc::parse(
+		"# a comment\n"
+		"1.0 bell C4\n"
+		"[Second]\n"
+		"2.5 piano D4 F#4 3.0 gain 0.05 pan -0.3\n"
+		"@9.0 knock\n"
+		"[2]\n"
+		"+0.5 pluck A4 C5 E5 spread 0.25\n"
+		"[Third]\n"
+		"1.0 guitar Bb2\n"
+		"oops bell C4\n"
+		"2.0\n"
+		"3.0 bell C4 gain\n");
+	ASSERT_EQ(sheet.cues.size(), 5u);
+	EXPECT_EQ(sheet.problems.size(), 3u) << "a time that is not one, a cue without an instrument, an option without its number";
+	EXPECT_DOUBLE_EQ(sheet.cues[0].notes[0], 60.0) << "C4 is middle C";
+	EXPECT_EQ(sheet.cues[1].notes.size(), 2u);
+	EXPECT_DOUBLE_EQ(sheet.cues[1].notes[1], 66.0) << "F#4";
+	EXPECT_DOUBLE_EQ(sheet.cues[1].length, 3.0) << "a number with a point after the notes is the length";
+	EXPECT_DOUBLE_EQ(sheet.cues[1].gain, 0.05);
+	EXPECT_DOUBLE_EQ(sheet.cues[1].pan, -0.3);
+	EXPECT_DOUBLE_EQ(sheet.cues[4].notes[0], 46.0) << "Bb2";
+	const std::vector<double> starts = {0.0, 4.0, 8.0};
+	const std::vector<std::string> names = {"First", "Second", "Third"};
+	double t = 0.0;
+	std::string why;
+	ASSERT_TRUE(mc::timeOf(sheet.cues[0], starts, names, t, why));
+	EXPECT_DOUBLE_EQ(t, 1.0) << "no section: from the film's start";
+	ASSERT_TRUE(mc::timeOf(sheet.cues[1], starts, names, t, why));
+	EXPECT_DOUBLE_EQ(t, 6.5) << "from the second shot's start, by name";
+	ASSERT_TRUE(mc::timeOf(sheet.cues[2], starts, names, t, why));
+	EXPECT_DOUBLE_EQ(t, 9.0) << "@: a film time";
+	ASSERT_TRUE(mc::timeOf(sheet.cues[3], starts, names, t, why));
+	EXPECT_DOUBLE_EQ(t, 4.5) << "by number";
+	EXPECT_FALSE(mc::timeOf(sheet.cues[4], {0.0}, {"First"}, t, why)) << "a shot the film does not have";
+	EXPECT_NE(why.find("Third"), std::string::npos);
+}
+
+// The cues go on the soundtrack at their times, with the film's own instruments or the generic ones; a film with a cues file and no score of its own gets a soundtrack
+// from the cues, read when it is made.
+TEST(MusicCues, AFilmsCuesAreHeardAtTheirTimesOnItsSoundtrack) {
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "rt_music_cues_test";
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir / "film_assets" / "cues-test");
+	const char *saved = std::getenv("RAY_TRACER_PBRT_DIR");
+	const std::string savedValue = saved ? saved : "";
+#ifdef _WIN32
+	_putenv_s("RAY_TRACER_PBRT_DIR", dir.string().c_str());
+#else
+	setenv("RAY_TRACER_PBRT_DIR", dir.string().c_str(), 1);
+#endif
+	{
+		std::ofstream(dir / "film_assets" / "cues-test" / "cues.txt") << "[Second]\n1.0 bell A4 1.0 gain 0.3 send 0\n2.0 thud\n@0.5 whistle C5 send 0\n";   // (send 0: no reverb tail between them)
+	}
+	cartoon::Film film{"cues-test", "Cues test", "", 6.0, 24, [](double) { return std::string(); }, [](double) { return std::string(); },
+					   []() { return std::vector<double>{0.0, 2.0}; }, 0.0, {9995, "", "First|Second", 8, 0.0}};
+	film.instruments = [] {
+		return std::map<std::string, cartoon::CueInstrument>{{"whistle", [](cartoon::audio::Mix &m, double t, const std::vector<double> &n, double, double g, double p, double s) {
+																   m.put(t, cartoon::audio::chirp(cartoon::audio::hz(n[0]), cartoon::audio::hz(n[0]), 0.3), g, p, s);
+															   }}};
+	};
+	const cartoon::Film shown = cartoon::detail::withFilmFiles(film);
+	ASSERT_TRUE(static_cast<bool>(shown.soundtrack)) << "a cues file makes a soundtrack";
+	cartoon::audio::Mix mix(6.0);
+	testing::internal::CaptureStderr();
+	shown.soundtrack(mix);
+	const std::string said = testing::internal::GetCapturedStderr();
+	EXPECT_NE(said.find("thud"), std::string::npos) << "an instrument it does not know is said: " << said;
+	const std::vector<std::int16_t> pcm = mix.finish(0.0, 0.0);
+	const auto loudness = [&](double t0, double t1) {
+		double sum = 0.0;
+		std::size_t n = 0;
+		for (std::size_t i = static_cast<std::size_t>(t0 * cartoon::audio::kRate) * 2; i < static_cast<std::size_t>(t1 * cartoon::audio::kRate) * 2 && i < pcm.size(); ++i, ++n) sum += std::abs(pcm[i]);
+		return n ? sum / n : 0.0;
+	};
+	EXPECT_LT(loudness(0.1, 0.45), 1.0) << "silence before the first cue";
+	EXPECT_GT(loudness(0.5, 0.75), 20.0) << "the film's own instrument at 0.5 s";
+	EXPECT_LT(loudness(1.5, 2.95), 1.0) << "silence";
+	EXPECT_GT(loudness(3.0, 3.3), 20.0) << "the bell at the second shot's start + 1 s";
+#ifdef _WIN32
+	_putenv_s("RAY_TRACER_PBRT_DIR", savedValue.c_str());
+#else
+	if (saved) setenv("RAY_TRACER_PBRT_DIR", savedValue.c_str(), 1); else unsetenv("RAY_TRACER_PBRT_DIR");
+#endif
+	std::filesystem::remove_all(dir);
 }
