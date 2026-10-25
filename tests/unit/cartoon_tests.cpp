@@ -2333,3 +2333,28 @@ TEST(FilmBaseline, AFilmsShotsAreRecordedAndAChangeNamesTheShotsItTouched) {
 	shorter.pop_back();
 	EXPECT_EQ(fb::compare(recorded, shorter).back().kind, "gone");
 }
+
+// ---- follow-through (rig::Spring) ------------------------------------------------------------------------------------------------------------------------
+
+// A spring settles on a point that stops, trails one that moves steadily by speed x damping / stiffness, swings past one that stops suddenly, and is the same at the same time
+// however often it is asked (a frame is a function of its time alone).
+TEST(FollowThrough, ASpringTrailsAMovingPointSwingsWhenItStopsAndSettles) {
+	using cartoon::Vec3;
+	const cartoon::rig::Spring s{60.0, 8.0, 3.0, 1.0 / 240.0};
+	// moving at 1 m/s along +z until 5 s, then stopped
+	const auto where = [](double t) { return Vec3{0.0, 0.0, std::min(t, 5.0)}; };
+	const Vec3 steady = cartoon::rig::lag(s, where, 4.0);
+	EXPECT_NEAR(steady.z, -8.0 / 60.0, 0.01) << "speed x damping / stiffness behind";
+	EXPECT_NEAR(steady.x, 0.0, 1e-12);
+	double most = -1.0;
+	for (double t = 5.0; t < 6.0; t += 0.02) most = std::max(most, cartoon::rig::lag(s, where, t).z);
+	EXPECT_GT(most, 0.005) << "it swings past where the point stopped";
+	EXPECT_NEAR(cartoon::rig::lag(s, where, 9.0).z, 0.0, 1e-3) << "and settles";
+	EXPECT_EQ(cartoon::rig::follow(s, where, 5.37).z, cartoon::rig::follow(s, where, 5.37).z) << "the same each time";
+	// the explorer's robe: back as it sets off (and walks), forward just after it stops
+	const auto walker = [](double t) { return Vec3{0.0, 0.0, 0.8 * std::clamp(t - 1.0, 0.0, 4.0)}; };
+	EXPECT_LT(cartoon::nomai::robeTrail(walker, 0.0, 3.0).z, -0.02) << "facing +z and walking: the hem trails back";
+	double forward = -1.0;
+	for (double t = 5.0; t < 6.5; t += 0.05) forward = std::max(forward, cartoon::nomai::robeTrail(walker, 0.0, t).z);
+	EXPECT_GT(forward, 0.005) << "when it stops the hem swings forward";
+}

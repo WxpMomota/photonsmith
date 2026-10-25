@@ -539,6 +539,13 @@ preview coarseness (`ray_tracer --film-baseline FILE`, src/shared/cartoon/film_b
 the films and shots that now differ (and exits 1); `film.py baseline --write` records them as they are, after a change made on purpose - the diff of the file shows which
 shots it touched. All 18 films, 226 shots: 128 s the first time, 33 s once the meshes are cached. `film.py baseline nomai-signal,tengwang` looks at some films only.
 
+**Follow-through: what lags and settles.** `rig::Spring` (stiffness, damping) and `rig::follow(spring, target, t)` / `rig::lag(...)` give the place of something that trails a
+moving point - a robe's hem, an antenna, a tail, a lantern on a pole. A frame is a function of its time alone, so the spring is run at a fixed step (1/240 s) over the
+3 s before t, starting at rest on the point: what came before has died away, and frames still render in any order on any worker. Moving steadily, it trails by speed x damping
+/ stiffness; when the point stops it swings past and settles. The Nomai explorer's robe hem trails its body in the walking shots (`robeTrail`, `walkPose`'s `trail`), and every
+character of a film file gets the same (`CharacterMoment::trail`). The baseline showed exactly the shots it changed: the five walking shots of the Nomai film and the four of
+A Walk at Dusk, and no other film.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

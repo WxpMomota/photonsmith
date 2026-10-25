@@ -130,6 +130,7 @@ struct CharacterMoment {
 	double t = 0.0;
 	const std::vector<rig::Gesture> *gestures = nullptr;
 	double detail = 0.0;
+	Vec3 trail;   // how far a spring on its place lags it (body space: +x its left, +z forward): for what hangs and swings - a robe's hem, a tail (rig::lag)
 };
 // A kind of character: its scene text (story space, as the toolkit writes it) and its feet at a moment, the point a camera and the film doctor look at (body space), and its walk's
 // step (rig::PathWalk's stride and first step).
@@ -707,6 +708,18 @@ class DataFilm {
 		if (at) *at = where;
 		return m;
 	}
+	// How far a loose spring on the character's place lags it at t, in its body's space (CharacterMoment::trail).
+	Vec3 trailOf(const Character &c, double t, const CharacterMoment &m) const {
+		static const rig::Spring loose{30.0, 5.0, 3.0, 1.0 / 240.0};
+		const Vec3 lag = rig::lag(loose, [this, &c](double u) {
+			Vec3 at;
+			momentOf(c, u, &at);
+			return at;
+		}, t);
+		const Vec3 origin = transformPoint(m.frame, {0.0, 0.0, 0.0});
+		const Vec3 left = transformPoint(m.frame, {1.0, 0.0, 0.0}) - origin, forward = transformPoint(m.frame, {0.0, 0.0, 1.0}) - origin;
+		return {dot(lag, left), 0.0, dot(lag, forward)};
+	}
 	Vec3 chestOf(const Character &c, double t) const { return transformPoint(momentOf(c, t).frame, characterKinds().at(c.kind).chest); }
 	std::size_t shotAt(double t) const {
 		std::size_t k = 0;
@@ -816,7 +829,10 @@ class DataFilm {
 		}
 		for (const Character &c : spec.characters) {   // the characters, as their kinds draw them
 			const CharacterKind &kind = characterKinds().at(c.kind);
-			if (kind.text) out += "# " + c.name + " (" + c.kind + ")\n" + kind.text(momentOf(c, t));
+			if (!kind.text) continue;
+			CharacterMoment m = momentOf(c, t);
+			m.trail = trailOf(c, t, m);
+			out += "# " + c.name + " (" + c.kind + ")\n" + kind.text(m);
 		}
 		return out;
 	}

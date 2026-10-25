@@ -155,6 +155,30 @@ inline double sitAmount(double t, double down, double up, double ease = 0.8) {
 	return up > down ? in * (1.0 - smoothstep(up, up + ease, t)) : in;
 }
 
+// ---- follow-through ----
+// A damped spring that follows a moving point: what lags behind and settles - a robe's hem when its wearer starts and stops, an antenna's tip, a lantern on a pole. A frame is a
+// function of its time alone (frames render in any order, on several workers), so the spring is run at a fixed step over the `settle` seconds before t, starting at rest on the
+// point (with its velocity): what came before that has died away. `stiffness` (1/s^2) and `damping` (1/s): 60 and 8 lag a little and overshoot once; more damping, no
+// overshoot; less stiffness, a slower, looser swing.
+struct Spring {
+	double stiffness = 60.0, damping = 8.0, settle = 3.0, step = 1.0 / 240.0;
+};
+// Where the spring is at t, following `target` (a point at each time).
+inline Vec3 follow(const Spring &s, const std::function<Vec3(double)> &target, double t) {
+	const double t0 = t - s.settle;
+	Vec3 x = target(t0), v = (target(t0 + s.step) - x) * (1.0 / s.step);
+	const int n = std::max(1, static_cast<int>(std::lround(s.settle / s.step)));
+	const double dt = s.settle / n;
+	for (int i = 1; i <= n; ++i) {   // (semi-implicit Euler: stable at these steps)
+		const Vec3 goal = target(t0 + i * dt);
+		v = v + ((goal - x) * s.stiffness - v * s.damping) * dt;
+		x = x + v * dt;
+	}
+	return x;
+}
+// How far the spring trails its point at t (spring minus point): what to add to a dangling thing's rest place.
+inline Vec3 lag(const Spring &s, const std::function<Vec3(double)> &target, double t) { return follow(s, target, t) - target(t); }
+
 // A gesture: a named pose from the character's library, eased in from `in0` to `in1`, held, and eased out from `out0` to `out1` (absolute film times; leave the out times at
 // their default to hold it from then on). `contact` (when not negative) is the moment a hand or a foot meets something: a Touch event for the soundtrack (contactsOf).
 //

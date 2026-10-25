@@ -121,6 +121,11 @@ inline Walk walkOver(const rig::PathWalk &path, double t) {
 	return w;
 }
 inline Walk walkOver(Vec3 a, Vec3 b, double t0, double t, double speed = 0.72) { return walkOver(walkPath(a, b, t0, speed), t); }
+// The robe's trail on a walk (robeTrail): the hem follows the body's place on a spring.
+inline Vec3 trailOf(const Walk &w, double t) {
+	const rig::PathWalk path = w.path;
+	return robeTrail([path](double u) { return path.at(u).at; }, w.yaw, t);
+}
 // The footstep puffs of a walk: one at each of its last footfalls, where the foot came down (half a stride ahead of the body as it lands).
 inline std::string footDust(const Walk &w, Vec3 a, double t, int maxSteps = 6) {
 	std::string out;
@@ -294,7 +299,7 @@ inline void shotUnderGiant(double t, Frame &f, bool content) {
 	night(f);
 	f.ruins = false;
 	if (content) {
-		ExplorerPose p = w.moving ? walkPose(w.walk, t) : standPose(t);
+		ExplorerPose p = w.moving ? walkPose(w.walk, t, 1.0, trailOf(w, t)) : standPose(t);
 		f.content = worldText(f, t, 120.0) + shuttleText(shuttleOnGround(0.0), 0.0, 1.0) + explorerText(p, w.frame, 0.016) + footDust(w, exitStart(), t);
 	}
 }
@@ -313,7 +318,7 @@ inline void shotFootsteps(double t, Frame &f, bool content) {
 	f.feet = explorerFeet(walkPose(w.walk, t), w.frame);   // (the sliding-feet check: Film::feetAt)
 	night(f);
 	f.ruins = false;
-	if (content) f.content = worldText(f, t, 60.0) + explorerText(walkPose(w.walk, t), w.frame, 0.012) + footDust(w, stepsStart(), t, 8);
+	if (content) f.content = worldText(f, t, 60.0) + explorerText(walkPose(w.walk, t, 1.0, trailOf(w, t)), w.frame, 0.012) + footDust(w, stepsStart(), t, 8);
 }
 inline rig::PathWalk ridgeWalk() { return walkPath({-14.0, 0.0, ridgeZ(-14.0)}, {6.0, 0.0, ridgeZ(6.0)}, 55.0, 0.70); }
 inline void shotRidge(double t, Frame &f, bool content) {
@@ -328,7 +333,7 @@ inline void shotRidge(double t, Frame &f, bool content) {
 	f.giantGlow = 0.5;
 	night(f);
 	f.ruins = false;
-	if (content) f.content = worldText(f, t, 120.0) + explorerText(walkPose(w.walk, t), w.frame, 0.016);
+	if (content) f.content = worldText(f, t, 120.0) + explorerText(walkPose(w.walk, t, 1.0, trailOf(w, t)), w.frame, 0.016);
 }
 inline Vec3 rimStart() { return {-2.5, 0.0, -112.0}; }
 inline Vec3 rimEnd() { return {0.0, 0.0, -130.0}; }
@@ -348,7 +353,7 @@ inline void shotCanyonReveal(double t, Frame &f, bool content) {
 	f.feet = explorerFeet(w.moving ? walkPose(w.walk, t) : standPose(t), w.frame);   // (the sliding-feet check: Film::feetAt)
 	night(f);
 	if (content) {
-		ExplorerPose p = w.moving ? walkPose(w.walk, t) : standPose(t);
+		ExplorerPose p = w.moving ? walkPose(w.walk, t, 1.0, trailOf(w, t)) : standPose(t);
 		f.content = worldText(f, t) + explorerText(p, w.frame, 0.014);
 	}
 }
@@ -842,7 +847,7 @@ inline void shotDawn(double t, Frame &f, bool content) {
 	f.subjects = {transformPoint(w.frame, {0.0, 1.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	f.feet = explorerFeet(walkPose(w.walk, t, w.moving ? 1.0 : 0.0), w.frame);   // (the sliding-feet check: Film::feetAt)
 	if (content) {
-		ExplorerPose p = walkPose(w.walk, t, w.moving ? 1.0 : 0.0);
+		ExplorerPose p = walkPose(w.walk, t, w.moving ? 1.0 : 0.0, trailOf(w, t));
 		f.content = worldText(f, t) + explorerText(p, w.frame, 0.014);
 	}
 }

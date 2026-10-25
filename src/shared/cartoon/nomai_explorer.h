@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -94,8 +95,9 @@ inline void blink(ExplorerPose &p, double t) {
 	p.lidL = p.lidR = std::max(p.lidL, rig::blink(t, 7));
 	p.lidTop = std::max(p.lidTop, std::max(rig::blink(t - 0.14, 7), rig::blink(t, 8)));   // (the third eye: late, or on its own)
 }
-// A walking pose: long, slow strides, the staff in the right hand, the left arm swinging a little.
-inline ExplorerPose walkPose(double walk, double t, double stride = 1.0) {
+// A walking pose: long, slow strides, the staff in the right hand, the left arm swinging a little. `trail` (body space: +x its left, +z forward) is how far the robe's hem
+// trails its body (robeTrail): it swings back as the explorer sets off and forward when it stops.
+inline ExplorerPose walkPose(double walk, double t, double stride = 1.0, Vec3 trail = {0.0, 0.0, 0.0}) {
 	ExplorerPose p;
 	p.walk = walk;
 	p.stride = stride;
@@ -104,10 +106,19 @@ inline ExplorerPose walkPose(double walk, double t, double stride = 1.0) {
 	p.handL = {0.21, 0.90, 0.06 - 0.10 * sw * stride};
 	p.handR = {-0.25, 1.18, 0.16 + 0.06 * sw * stride};
 	p.headPitch = 4.0;
-	p.wind = {0.03, 0.0, -0.025};
+	p.wind = Vec3{0.03, 0.0, -0.025} + trail;
 	p.staffGlow = 0.22;
 	blink(p, t);
 	return p;
+}
+// How far the robe's hem trails the body (body space) at t, the body at `where(t)` (story space) facing `yaw(t)`: a loose spring on the body's place (rig::Spring), half of its
+// lag put into the hem.
+inline Vec3 robeTrail(const std::function<Vec3(double)> &where, double yawDegrees, double t) {
+	static const rig::Spring hem{30.0, 5.0, 3.0, 1.0 / 240.0};
+	const Vec3 lag = rig::lag(hem, where, t) * 0.5;
+	const double a = yawDegrees * kPi / 180.0;
+	const Vec3 left{std::cos(a), 0.0, -std::sin(a)}, forward{std::sin(a), 0.0, std::cos(a)};
+	return {dot(lag, left), 0.0, dot(lag, forward)};
 }
 inline ExplorerPose standPose(double t) {
 	ExplorerPose p = walkPose(0.0, t, 0.0);
