@@ -246,7 +246,10 @@ inline void addFilmFile(Registry &r, const std::string &file) {
 		f.subjectsAt = [p](double t) { return p->subjectsAt(t); };
 		f.events = [p]() { return p->events(); };
 		f.feetAt = [p](double t) { return p->feetAt(t); };
-		f.soundtrack = [p](audio::Mix &m) {   // (its footsteps, touches and lines; its cues file adds the music: withFilmFiles)
+	}
+	if (d.hasEvents() || !d.spec.ambience.empty()) {
+		f.soundtrack = [p](audio::Mix &m) {   // (its set's sound, its footsteps, touches and lines; its cues file adds the music: withFilmFiles)
+			dressing::play(m, p->spec.ambience);
 			sfx::play(m, p->events());
 			p->speak(m);
 		};

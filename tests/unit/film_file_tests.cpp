@@ -834,3 +834,54 @@ TEST(FilmTransitions, AShotComesInWithADissolveAFadeOrAWipeAndTheOtherSideIsSeen
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 20\nshot 0 A\n  key 0 1 10 0 1 0\n  dissolve 1\n", bad).find("can only fade in"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 20\ndissolve 1\n", bad).find("belongs to a shot"), std::string::npos);
 }
+
+// ---- dressing the set ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// The sun of a `sky` line follows the time of day: high at noon in the south, low in the west in the evening, set at night; a dressed film's scene has its things (the pieces
+// once, a placement each), its sun and sky instead of the scene's own, and its sound; a placed rock is in a walk's way and grass is not.
+TEST(FilmDressing, TheSkyFollowsTheTimeOfDayAndTheSetIsDressedWithThingsAndSound) {
+	namespace dr = cartoon::dressing;
+	dr::Sky sky;   // (south 180: -z; latitude 40, the longest day)
+	double el = 0.0, facing = 0.0;
+	dr::sunAt(sky, 12.0, el, facing);
+	EXPECT_NEAR(el, 90.0 - 40.0 + 23.44, 0.2) << "noon on the longest day";
+	EXPECT_NEAR(facing, 180.0, 0.5) << "in the south";
+	dr::sunAt(sky, 18.5, el, facing);
+	EXPECT_GT(el, 2.0);
+	EXPECT_LT(el, 15.0) << "low in the evening";
+	EXPECT_GT(facing, 180.0 + 60.0) << "towards the west (270)";
+	dr::sunAt(sky, 23.0, el, facing);
+	EXPECT_LT(el, 0.0) << "set";
+	(void)cartoon::films();
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 10\nsky 18:00 20:00\nplace rock at 2 0 0 scale 2\nplace tree at -3 0 -3\nscatter grass 50 in -2 3 2 5 seed 4\nambience birds\nambience water 0.5\n"
+					   "character ann person at 2 0 -3\nwalk ann 1 1 to 2 3\n",
+					   film),
+			  "");
+	EXPECT_EQ(film.spec.placements.size(), 52u);
+	const std::string scene = film.sceneAt(1.0);
+	EXPECT_NE(scene.find("ObjectBegin \"dress_rock0\""), std::string::npos) << "the pieces";
+	EXPECT_NE(scene.find("ObjectInstance \"dress_soft_tuft"), std::string::npos) << "the grass";
+	EXPECT_NE(scene.find("LightSource \"distant\""), std::string::npos) << "the sun";
+	EXPECT_EQ(scene.find("\"rgb L\" [ 0.1 0.1 0.1 ]"), std::string::npos) << "the scene's own sky is left out";
+	EXPECT_NE(film.sceneAt(1.0), film.sceneAt(9.0)) << "the sun moves";
+	// the walk goes round the rock (2 0 0, half a metre or so across) but straight through the grass
+	double closest = 1e9;
+	for (double t = 1.0; t < 10.0; t += 0.02) {
+		cartoon::Vec3 at;
+		film.momentOf(film.spec.characters[0], t, &at);
+		closest = std::min(closest, std::hypot(-at.x - 2.0, at.z));
+	}
+	EXPECT_GT(closest, 0.6) << "round the rock";
+	// the sound
+	cartoon::audio::Mix mix(10.0);
+	dr::play(mix, film.spec.ambience);
+	const std::vector<std::int16_t> pcm = mix.finish(0.0, 0.0);
+	double sum = 0.0;
+	for (std::int16_t v : pcm) sum += std::abs(static_cast<double>(v));
+	EXPECT_GT(sum / pcm.size(), 20.0) << "birds and water";
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nplace castle at 0 0 0\n", bad).find("tree, rock, fern, bush or grass"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nsky 25:00 26:00\n", bad).find("times of day"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nambience traffic\n", bad).find("wind, birds, crickets, water or night"), std::string::npos);
+}

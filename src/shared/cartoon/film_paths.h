@@ -122,6 +122,15 @@ inline void addScene(Grid &g, const pbrt_flatten::FlatScene &s, double ground, d
 		const double d = sp.center[1] < y0 ? y0 - sp.center[1] : sp.center[1] > y1 ? sp.center[1] - y1 : 0.0;
 		if (d < sp.radius) addDisc(g, sp.center[0], sp.center[2], std::sqrt(sp.radius * sp.radius - d * d));
 	}
+	for (const pbrt_flatten::Instance &in : s.instances) {   // (placed objects: a soft one - grass, a fern, a bush - is walked through)
+		if (in.group < 0 || static_cast<std::size_t>(in.group) >= s.groups.size()) continue;
+		const pbrt_flatten::InstanceGroup &g2 = s.groups[static_cast<std::size_t>(in.group)];
+		if (g2.name.find("_soft_") != std::string::npos) continue;
+		for (const pbrt_flatten::Triangle &t : g2.triangles) {
+			const P3 a = detail::applyXform(in.xform, t.v[0], t.v[1], t.v[2]), b = detail::applyXform(in.xform, t.v[3], t.v[4], t.v[5]), c = detail::applyXform(in.xform, t.v[6], t.v[7], t.v[8]);
+			detail::fillPolygon(g, detail::clipToSlab({a, b, c}, y0, y1));
+		}
+	}
 	constexpr int kSides = 16;
 	for (const pbrt_flatten::Disk &dk : s.disks)
 		for (int k = 0; k < kSides; ++k) {

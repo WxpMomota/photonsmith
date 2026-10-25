@@ -627,6 +627,23 @@ beside it (`plain_NNNN.png`) and what was made is recorded (`transitions.done`),
 again from the pictures as rendered - without rendering a frame. (Editing a film file otherwise re-renders only the frames whose scene changed: moving a cut renders again the
 frames whose camera changed, as for any resumed film.)
 
+**Dressing a set: `place`, `scatter`, `sky`, `ambience`.** A film file can add to its set without touching the pbrt file (film_dressing.h):
+
+```
+place    tree  at -3 0 -6  scale 1.2  turn 40         # a tree, rock, fern, bush or grass tuft, its foot there (x y z); `seed` for another shape
+scatter  grass 400 in -8 -14 8 3  scale 0.7 1.3  seed 3   # so many of a kind over a rectangle of the ground (x0 z0 x1 z1; `y` its height)
+sky      18:20 19:20  south 180  latitude 40          # the sun and sky follow the time of day over the film
+ambience birds 0.7                                    # a sound under the whole film: wind, birds, crickets, water or night, at a gain
+```
+
+The things are nature_lib's (a tree about 3.6 m high at scale 1 with a dozen or more leaf clusters, a rock 1 m across), written once as pbrt objects and placed as instances,
+so hundreds of tufts cost little; leaves and grass sway in the wind. Grass, ferns and bushes are soft: a walk that finds its way goes through them, while trees and rocks
+are in its way. `sky` puts in the Scene Builder's Sun & sky (scene_sky.h): a Hosek-Wilkie sky picture (made once for each tenth of a degree of the sun, in the film's cache
+folder) and a sun whose colour and strength come from the air its light crosses, both in the same units; the sun's place comes from the hour, the latitude and the day of
+the year (`day`, 172 by default, the longest), with `south` saying which way south is on the set (as a character's `facing`; west is a quarter turn on from it); below the
+horizon the sun goes out and the sky dims into twilight. A film with a `sky` leaves out its scene's own infinite and distant lights. The ambiences are made like the films'
+own (crickets, birds and wind as in Forest Dawn and the Nomai film; a brook of rushing noise and bubbles; night is crickets with an owl far off).
+
 `ray_tracer --film-lines <key>` lists the lines with their start, end and syllables; `ray_tracer --film-sound <key> OUT.wav` writes a film's soundtrack alone, to listen to
 the lines (and the music and footsteps) without rendering a frame; `--film-check` counts a film file's characters and lines.
 

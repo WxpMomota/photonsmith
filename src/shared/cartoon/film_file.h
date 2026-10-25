@@ -78,6 +78,13 @@
 //     topple   tablet 9.2  pivot 1.4 0 -3.6   axis 0 0 1   height 0.6  depth 0.08   # from 9.2 s it tips over its bottom edge through `pivot` (right-hand turn about `axis`)
 //
 // (bounce also takes restitution, grip and rolling; topple push and lean: prop_physics.h.)
+//
+// Dressing the set (film_dressing.h) - things from the nature library on the ground, a sun and sky that follow the time of day, and the set's sound:
+//
+//     place    tree  at 3 0 -6  scale 1.2  turn 40              # a tree, rock, fern, bush or grass tuft, its foot there (pbrt's x y z)
+//     scatter  grass 300 in -8 -10 8 2  scale 0.7 1.3  seed 2   # so many of a kind over a rectangle of the ground (x0 z0 x1 z1; `y` its height)
+//     sky      18:30 19:10  south 180  latitude 40              # the sun and sky from 6:30 to 7:10 pm over the film (the scene's own infinite and distant lights are left out)
+//     ambience birds 0.6                                        # a sound under the whole film: wind, birds, crickets, water or night, at a gain
 
 #include <algorithm>
 #include <cctype>
@@ -94,6 +101,7 @@
 #include <vector>
 
 #include "../camera_keyframes.h"
+#include "film_dressing.h"
 #include "film_faces.h"
 #include "film_paths.h"
 #include "film_speech.h"
@@ -255,6 +263,11 @@ struct Spec {
 	std::vector<Prop> props;
 	std::vector<Handling> handling;
 	std::vector<Look> looks;
+	// the set's dressing (`place`, `scatter`), its time of day (`sky`) and its sound (`ambience`)
+	std::vector<dressing::Placement> placements;
+	bool hasSky = false;
+	dressing::Sky sky;
+	std::vector<dressing::Ambience> ambience;
 };
 
 struct Parsed {
@@ -538,6 +551,73 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				if (i != t.size()) return fail("\"" + t[i] + "\" is not part of a gesture");
 				c->gestures.push_back(g);
 			}
+		} else if (verb == "place" || verb == "scatter") {
+			const std::vector<std::string> t = detail::tokens(line);
+			const auto known = [&](const std::string &k) { return std::find(dressing::kinds().begin(), dressing::kinds().end(), k) != dressing::kinds().end(); };
+			if (t.size() < 2 || !known(t[1])) return fail("`" + verb + "` takes a kind: tree, rock, fern, bush or grass");
+			if (verb == "place") {
+				dressing::Placement p;
+				p.kind = t[1];
+				if (t.size() < 6 || t[2] != "at" || !number(t[3], p.at.x) || !number(t[4], p.at.y) || !number(t[5], p.at.z)) return fail("`place KIND at X Y Z [scale S] [turn DEGREES] [seed N]`");
+				for (std::size_t i = 6; i < t.size(); i += 2) {
+					double v = 0.0;
+					if (i + 1 >= t.size() || !number(t[i + 1], v) || (t[i] != "scale" && t[i] != "turn" && t[i] != "seed")) return fail("a place takes scale, turn and seed");
+					if (t[i] == "scale") p.scale = v;
+					else if (t[i] == "turn") p.turn = v;
+					else p.seed = static_cast<int>(v);
+				}
+				s.placements.push_back(p);
+			} else {
+				dressing::Scatter sc;
+				sc.kind = t[1];
+				double count = 0.0;
+				if (t.size() < 8 || !number(t[2], count) || count < 1 || count > 20000 || t[3] != "in" || !number(t[4], sc.x0) || !number(t[5], sc.z0) || !number(t[6], sc.x1) || !number(t[7], sc.z1))
+					return fail("`scatter KIND COUNT in X0 Z0 X1 Z1 [y Y] [seed N] [scale A B]` (1 to 20000 of them)");
+				sc.count = static_cast<int>(count);
+				for (std::size_t i = 8; i < t.size();) {
+					double v = 0.0;
+					if (t[i] == "scale" && i + 2 < t.size() && number(t[i + 1], sc.scale0) && number(t[i + 2], sc.scale1)) {
+						i += 3;
+					} else if ((t[i] == "y" || t[i] == "seed") && i + 1 < t.size() && number(t[i + 1], v)) {
+						if (t[i] == "y") sc.y = v;
+						else sc.seed = static_cast<int>(v);
+						i += 2;
+					} else {
+						return fail("\"" + t[i] + "\": a scatter takes y, seed and scale A B");
+					}
+				}
+				const std::vector<dressing::Placement> many = dressing::placementsOf(sc);
+				s.placements.insert(s.placements.end(), many.begin(), many.end());
+			}
+		} else if (verb == "sky") {
+			const std::vector<std::string> t = detail::tokens(line);
+			const auto hour = [&](const std::string &w, double &h) {   // 18:30 or 18.5
+				const std::size_t colon = w.find(':');
+				double a = 0.0, b = 0.0;
+				if (colon == std::string::npos) return number(w, h) && h >= 0.0 && h <= 24.0;
+				if (!number(w.substr(0, colon), a) || !number(w.substr(colon + 1), b) || a < 0 || a > 24 || b < 0 || b >= 60) return false;
+				h = a + b / 60.0;
+				return true;
+			};
+			if (t.size() < 3 || !hour(t[1], s.sky.from) || !hour(t[2], s.sky.to)) return fail("`sky FROM TO [south DEGREES] [latitude L] [day N] [haze H]`: times of day as 18:30 or 18.5");
+			for (std::size_t i = 3; i < t.size(); i += 2) {
+				double v = 0.0;
+				if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail("a sky takes south, latitude, day and haze, each with a number");
+				if (t[i] == "south") s.sky.south = v;
+				else if (t[i] == "latitude" && std::abs(v) <= 89.0) s.sky.latitude = v;
+				else if (t[i] == "day" && v >= 1 && v <= 366) s.sky.day = static_cast<int>(v);
+				else if (t[i] == "haze" && v >= 1.7 && v <= 10.0) s.sky.haze = v;
+				else return fail("\"" + t[i] + "\": a sky takes south, latitude (-89 to 89), day (1 to 366) and haze (1.7 to 10)");
+			}
+			s.hasSky = true;
+		} else if (verb == "ambience") {
+			const std::vector<std::string> t = detail::tokens(line);
+			dressing::Ambience a;
+			if (t.size() < 2 || std::find(dressing::ambienceKinds().begin(), dressing::ambienceKinds().end(), t[1]) == dressing::ambienceKinds().end())
+				return fail("`ambience KIND [GAIN]`: wind, birds, crickets, water or night");
+			a.kind = t[1];
+			if (t.size() > 3 || (t.size() == 3 && (!number(t[2], a.gain) || a.gain < 0.0 || a.gain > 4.0))) return fail("an ambience's gain is a number from 0 to 4");
+			s.ambience.push_back(a);
 		} else if (verb == "prop") {
 			const std::vector<std::string> t = detail::tokens(line);
 			Spec::Prop pr;
@@ -688,7 +768,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, shot, key, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, walk, gesture, feel, say, look, prop, pick, put, give)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, shot, key, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, walk, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience)");
 		}
 	}
 	n = shotLine;
@@ -939,6 +1019,7 @@ class DataFilm {
 			if (!character(l.who)) return filePath + ":" + std::to_string(l.line) + ": " + l.who + " says a line but is not brought in with `character`";
 		spoken.clear();
 		for (const speech::Line &l : spec.lines) spoken.push_back(speech::syllablesOf(l));
+		if (spec.hasSky) leaveOutSkyLights();
 		for (const Spec::Prop &pr : spec.props)
 			if (std::find(scene.names.begin(), scene.names.end(), pr.name) == scene.names.end())
 				return filePath + ":" + std::to_string(pr.line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + pr.name + "`";
@@ -961,6 +1042,32 @@ class DataFilm {
 
 	std::vector<std::vector<speech::Syllable>> spoken;   // each line's syllables (spec.lines)
 
+	// ---- the set's dressing ----
+	// The scene's own infinite and distant lights left out of its plain text (a `sky` brings its own sun and sky).
+	void leaveOutSkyLights() {
+		for (Piece &piece : scene.world) {
+			if (piece.block >= 0) continue;
+			const std::vector<std::string> lines = detail::splitLines(piece.text);
+			std::string kept;
+			for (std::size_t i = 0; i < lines.size();) {
+				const std::string t = detail::trim(lines[i]);
+				if (detail::firstWord(lines[i]) == "LightSource" && (t.find("\"infinite\"") != std::string::npos || t.find("\"distant\"") != std::string::npos)) {
+					i = detail::statementEnd(lines, i);
+					continue;
+				}
+				kept += lines[i++];
+			}
+			piece.text = kept;
+		}
+	}
+	// The dressing at t: the pieces once, then every placed thing (swaying), as scene text.
+	std::string dressingAt(double t) const {
+		if (spec.placements.empty()) return std::string();
+		std::string out = "# the set's dressing (film_dressing.h)\n" + dressing::objects();
+		for (const dressing::Placement &p : spec.placements) out += dressing::placementText(p, t);
+		return out;
+	}
+
 	// ---- walks that find their way ----
 	// The set at t without its characters and its props (pbrt text): what is in the way.
 	std::string setAt(double t) const {
@@ -974,7 +1081,7 @@ class DataFilm {
 			if (!visible(b.name, t) || prop(b.name)) continue;
 			out += b.head + transformsAt(b.name, t) + b.body;
 		}
-		return out;
+		return out + dressingAt(t);
 	}
 	// Finds the way of every walk that goes `to` places, in time order (so whoever walked before is where their walk left them): "" or "line: what is wrong".
 	std::string findWays() {
@@ -1643,9 +1750,11 @@ class DataFilm {
 		return t;
 	}
 
-	// The scene with this header at t: the set, its animated blocks and its characters.
+	// The scene with this header at t: the set, its animated blocks, its dressing, its sky and its characters.
 	std::string worldAt(const std::string &header, double t) const {
 		std::string out = header;
+		if (spec.hasSky) out += "# the sun and sky at " + std::to_string(dressing::hourAt(spec.sky, t, spec.length)) + " h (film_dressing.h)\n" + dressing::skyText(spec.key, spec.sky, t, spec.length);
+		out += dressingAt(t);
 		for (const Piece &piece : scene.world) {
 			if (piece.block < 0) {
 				out += piece.text;
