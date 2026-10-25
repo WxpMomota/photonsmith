@@ -15,6 +15,8 @@ gesture    kai  "point up" 13.4 14.2
 gesture    kai  "nod" 14.6 14.8 15.4 15.8
 
 light   lantern  0 0   11.5 0   12.8 1   16 1
+bounce  pebble  5.0  from -0.5 2.2 -2.0  velocity 0.3 0 -0.4  radius 0.07     # a pebble drops onto the path ahead
+topple  tablet  8.4  pivot -1.04 0 -3.0  axis 0 0 1  height 0.6  depth 0.08  push 40   # the stone tablet tips over as the explorer passes
 
 shot 0 Setting out
   key   4 2.2 8   0 1 1   38

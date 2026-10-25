@@ -120,6 +120,9 @@ add_library(cpu_renderer STATIC
     src/external/miniz.c
     src/data/rgb_spectrum_table_data.cpp
 )
+if(MSVC)
+    target_compile_options(cpu_renderer PRIVATE /bigobj)   # (cartoon_scenes.cpp holds every film: more sections than an object file allows without it)
+endif()
 target_include_directories(cpu_renderer PUBLIC
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/TheRestOfYourLife

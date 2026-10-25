@@ -1,9 +1,9 @@
 # Every film, shot by shot: film|shot|fingerprint of the scene at the shot's middle (at preview coarseness)|name. Written by
 # `python scripts/anim/film.py baseline --write` (ray_tracer --film-baseline); a difference is a film that changed - on purpose or not.
-a-walk-at-dusk|1|ab3c313f5a643eea|Setting out
-a-walk-at-dusk|2|86c9d615101a3c7c|Along the path
-a-walk-at-dusk|3|ed1f1d52859feff6|The lantern
-a-walk-at-dusk|4|8049bd4f0cd78cd0|The first star
+a-walk-at-dusk|1|106357e308b317f9|Setting out
+a-walk-at-dusk|2|d6f0a3b82b1bd758|Along the path
+a-walk-at-dusk|3|2872547434baaba4|The lantern
+a-walk-at-dusk|4|53062fcf8efe7124|The first star
 ball-parade|1|be82b9a4eec4a8ce|The row of balls
 candle|1|8782ad171cbdf69c|Portrait of the flame
 candle|2|ff22690a18254670|Macro on the wax and drips

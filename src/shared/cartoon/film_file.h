@@ -53,6 +53,13 @@
 //       subject  kai                                            # what the shot is about (the film doctor's framing checks); a follow shot is about whom it follows
 //
 // A film with characters reports its subjects, its footfalls and gesture contacts (Film::events: footsteps on the soundtrack) and its characters' feet (the sliding-feet check).
+//
+// Props with physics (prop_physics.h) - a marked block that is dropped or thrown and bounces and rolls, or that topples over; each landing is heard (an impact):
+//
+//     bounce   pebble 6.0  from 0.6 2.4 -3   velocity 0.4 0 -0.2   radius 0.06   # from 6 s: its centre at `from` (where the scene has it), thrown at `velocity`
+//     topple   tablet 9.2  pivot 1.4 0 -3.6   axis 0 0 1   height 0.6  depth 0.08   # from 9.2 s it tips over its bottom edge through `pivot` (right-hand turn about `axis`)
+//
+// (bounce also takes restitution, grip and rolling; topple push and lean: prop_physics.h.)
 
 #include <algorithm>
 #include <cctype>
@@ -69,6 +76,7 @@
 
 #include "../camera_keyframes.h"
 #include "film_subjects.h"
+#include "prop_physics.h"
 #include "rig.h"
 
 namespace cartoon {
@@ -156,6 +164,10 @@ struct Spec {
 	std::vector<Shot> shots;
 	std::vector<Anim> anims;
 	std::vector<Character> characters;
+	// props with physics: the block they move, and the line that says so
+	std::vector<std::pair<std::string, physics::Bounce>> bounces;
+	std::vector<std::pair<std::string, physics::Topple>> topples;
+	std::vector<std::pair<std::string, int>> physicsLines;
 };
 
 struct Parsed {
@@ -303,6 +315,55 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			if (!s.shots.empty() && shot.start <= s.shots.back().start) return fail("shots must start later one after the other");
 			s.shots.push_back(shot);
 			shotLine = n;
+		} else if (verb == "bounce" || verb == "topple") {
+			const std::vector<std::string> t = detail::tokens(line);
+			double start = 0.0;
+			if (t.size() < 3 || !number(t[2], start)) return fail("`" + verb + " NAME START ...`: a block's name and a start time");
+			const auto three = [&](std::size_t i, Vec3 &v) {   // the three numbers after word i
+				double a = 0, b = 0, c = 0;
+				if (i + 3 >= t.size() || !number(t[i + 1], a) || !number(t[i + 2], b) || !number(t[i + 3], c)) return false;
+				v = {a, b, c};
+				return true;
+			};
+			if (verb == "bounce") {
+				physics::Bounce b;
+				b.start = start;
+				bool from = false;
+				for (std::size_t i = 3; i < t.size();) {
+					double v = 0.0;
+					if ((t[i] == "from" || t[i] == "velocity") && i + 3 < t.size()) {
+						if (!three(i, t[i] == "from" ? b.from : b.velocity)) return fail("`" + t[i] + "` takes three numbers");
+						from = from || t[i] == "from";
+						i += 4;
+					} else if ((t[i] == "radius" || t[i] == "restitution" || t[i] == "grip" || t[i] == "rolling") && i + 1 < t.size() && number(t[i + 1], v)) {
+						(t[i] == "radius" ? b.radius : t[i] == "restitution" ? b.restitution : t[i] == "grip" ? b.grip : b.rolling) = v;
+						i += 2;
+					} else {
+						return fail("\"" + t[i] + "\": a bounce takes from X Y Z, velocity X Y Z, radius, restitution, grip and rolling");
+					}
+				}
+				if (!from) return fail("a bounce needs `from X Y Z`: where the block's centre is in the scene");
+				b.ground = 0.0;
+				s.bounces.push_back({t[1], b});
+			} else {
+				physics::Topple p;
+				p.start = start;
+				for (std::size_t i = 3; i < t.size();) {
+					double v = 0.0;
+					if ((t[i] == "pivot" || t[i] == "axis") && i + 3 < t.size()) {
+						if (!three(i, t[i] == "pivot" ? p.pivot : p.axis)) return fail("`" + t[i] + "` takes three numbers");
+						i += 4;
+					} else if ((t[i] == "height" || t[i] == "depth" || t[i] == "push" || t[i] == "lean") && i + 1 < t.size() && number(t[i + 1], v)) {
+						(t[i] == "height" ? p.height : t[i] == "depth" ? p.depth : t[i] == "push" ? p.push : p.lean) = v;
+						i += 2;
+					} else {
+						return fail("\"" + t[i] + "\": a topple takes pivot X Y Z, axis X Y Z, height, depth, push and lean");
+					}
+				}
+				if (length(p.axis) < 1e-9) return fail("a topple's axis must not be 0 0 0");
+				s.topples.push_back({t[1], p});
+			}
+			s.physicsLines.push_back({t[1], n});
 		} else if (verb == "character") {
 			const std::vector<std::string> t = detail::tokens(line);
 			if (t.size() < 3) return fail("`character NAME KIND [at X Y Z] [facing DEGREES] [detail CELL]`");
@@ -417,7 +478,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shot, key, follow, subject, move, turn, grow, light, show, character, walk, gesture)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shot, key, follow, subject, move, turn, grow, light, show, bounce, topple, character, walk, gesture)");
 		}
 	}
 	n = shotLine;
@@ -643,6 +704,9 @@ class DataFilm {
 				for (const std::string &n : scene.names) known += (known.empty() ? "" : ", ") + n;
 				return filePath + ":" + std::to_string(a.line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + a.name + "`" + (known.empty() ? " (it has none)" : " (it has: " + known + ")");
 			}
+		for (const auto &[name, line] : spec.physicsLines)
+			if (std::find(scene.names.begin(), scene.names.end(), name) == scene.names.end())
+				return filePath + ":" + std::to_string(line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + name + "`";
 		for (const Character &c : spec.characters)
 			if (!characterKinds().count(c.kind)) {
 				std::string known;
@@ -783,9 +847,31 @@ class DataFilm {
 				out.push_back(e);
 			}
 		}
+		// the props' landings (pbrt's coordinates: x mirrored for the story-space camera)
+		std::vector<physics::Impact> impacts;
+		for (const auto &[block, b] : spec.bounces) {
+			const std::vector<physics::Impact> i = physics::impactsOf(b);
+			impacts.insert(impacts.end(), i.begin(), i.end());
+		}
+		for (const auto &[block, p] : spec.topples) {
+			const std::vector<physics::Impact> i = physics::impactsOf(p);
+			impacts.insert(impacts.end(), i.begin(), i.end());
+		}
+		for (const physics::Impact &i : impacts) {
+			FilmEvent e;
+			e.t = i.t;
+			e.kind = EventKind::Impact;
+			e.seed = ++seed;
+			const CameraView v = viewAt(i.t);
+			const Vec3 at = story(i.at.x, i.at.y, i.at.z);
+			e.pan = panOf(v, at);
+			e.strength = std::min(1.0, std::max(0.05, i.speed / 4.0)) * audibility(length(at - v.eye));
+			out.push_back(e);
+		}
 		std::stable_sort(out.begin(), out.end(), [](const FilmEvent &a, const FilmEvent &b) { return a.t < b.t; });
 		return out;
 	}
+	bool hasEvents() const { return !spec.characters.empty() || !spec.bounces.empty() || !spec.topples.empty(); }
 	// (film_events.h's panOf and audibility, here so that this header does not need the sound library)
 	static double panOf(const CameraView &view, Vec3 at) {
 		const Vec3 f = normalize(view.target - view.eye), right = normalize(cross(f, Vec3{0.0, 1.0, 0.0}));
@@ -868,6 +954,18 @@ class DataFilm {
 	}
 	std::string transformsFor(const std::string &name, double t) const {
 		std::string out;
+		for (const auto &[block, b] : spec.bounces) {   // where its physics has it: moved from where the scene has it, and turned as it rolls
+			if (block != name) continue;
+			const physics::Body body = physics::at(b, t);
+			out += "  Translate " + num(body.at.x) + " " + num(body.at.y) + " " + num(body.at.z) + "\n  Rotate " + num(body.spin * 180.0 / kPi) + " " + num(body.spinAxis.x) + " " +
+				   num(body.spinAxis.y) + " " + num(body.spinAxis.z) + "\n  Translate " + num(-b.from.x) + " " + num(-b.from.y) + " " + num(-b.from.z) + "\n";
+		}
+		for (const auto &[block, p] : spec.topples) {
+			if (block != name) continue;
+			const Vec3 a = normalize(p.axis);
+			out += "  Translate " + num(p.pivot.x) + " " + num(p.pivot.y) + " " + num(p.pivot.z) + "\n  Rotate " + num(physics::angleOf(p, t)) + " " + num(a.x) + " " + num(a.y) + " " + num(a.z) +
+				   "\n  Translate " + num(-p.pivot.x) + " " + num(-p.pivot.y) + " " + num(-p.pivot.z) + "\n";
+		}
 		for (const Anim &a : spec.anims) {
 			if (a.name != name) continue;
 			if (a.kind == Kind::Move) {

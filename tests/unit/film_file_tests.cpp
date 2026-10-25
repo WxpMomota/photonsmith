@@ -375,3 +375,27 @@ TEST(FilmFile, ACharacterWalksActsIsFollowedByTheCameraAndIsHeard) {
 	EXPECT_EQ(steps, 7);
 	EXPECT_EQ(touches, 1);
 }
+
+// Props with physics in a film file: a marked block that bounces (moved to where its physics has it) and one that topples (turned about its edge), each landing an impact on
+// the film's events; a block the scene does not mark is refused.
+TEST(FilmFile, APropBouncesOrTopplesWithPhysicsAndItsLandingsAreHeard) {
+	(void)cartoon::films();
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 10\n"
+					   "bounce fan 1.0 from 0 2 0 velocity 0.5 0 0 radius 0.5\n"
+					   "topple lamp 2.0 pivot 0 0 0 axis 0 0 1 height 1 depth 0.1 push 50\n",
+					   film),
+			  "");
+	ASSERT_EQ(film.spec.bounces.size(), 1u);
+	ASSERT_EQ(film.spec.topples.size(), 1u);
+	const std::string before = film.sceneAt(0.5), falling = film.sceneAt(1.3);
+	EXPECT_NE(before.find("Translate 0 2 0"), std::string::npos) << "before it starts, where it was: " << before.substr(before.find("# @anim fan"), 120);
+	EXPECT_EQ(falling.find("Translate 0 2 0\n  Rotate"), std::string::npos) << "falling, lower";
+	EXPECT_NE(film.sceneAt(9.0).find("Rotate 90 0 0 1"), std::string::npos) << "the lamp has toppled";
+	int impacts = 0;
+	for (const cartoon::FilmEvent &e : film.events()) impacts += e.kind == cartoon::EventKind::Impact;
+	EXPECT_GE(impacts, 3) << "the fan's bounces and the lamp's landing";
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nbounce rock 1 from 0 1 0\n", bad).find("`# @anim rock`"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nbounce fan 1 velocity 0 0 0\n", bad).find("needs `from X Y Z`"), std::string::npos);
+}

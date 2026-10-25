@@ -38,6 +38,7 @@
 #include "../../src/shared/cartoon/cartoon_stills.h"
 #include "../../src/shared/cartoon/film_checks.h"
 #include "../../src/shared/cartoon/film_baseline.h"
+#include "../../src/shared/cartoon/prop_physics.h"
 #include "../../src/shared/pbrt_discover.h"
 #include "../../src/shared/output_crop.h"
 #include "../../src/shared/output_format.h"
@@ -2357,4 +2358,54 @@ TEST(FollowThrough, ASpringTrailsAMovingPointSwingsWhenItStopsAndSettles) {
 	double forward = -1.0;
 	for (double t = 5.0; t < 6.5; t += 0.05) forward = std::max(forward, cartoon::nomai::robeTrail(walker, 0.0, t).z);
 	EXPECT_GT(forward, 0.005) << "when it stops the hem swings forward";
+}
+
+// ---- props with physics (prop_physics.h) ----------------------------------------------------------------------------------------------------------------
+
+// A dropped ball lands when gravity says, bounces lower each time (its restitution), rolls on with what its grip left, turning by the distance over its radius, and stops; every
+// landing is an impact, each softer than the last.
+TEST(PropPhysics, ADroppedBallBouncesLowerEachTimeRollsAndStops) {
+	using cartoon::Vec3;
+	namespace ph = cartoon::physics;
+	const ph::Bounce ball{{0.0, 2.1, 0.0}, {1.0, 0.0, 0.0}, 1.0, 0.1};
+	const std::vector<ph::Impact> hits = ph::impactsOf(ball);
+	ASSERT_GE(hits.size(), 3u);
+	EXPECT_NEAR(hits[0].t, 1.0 + std::sqrt(2.0 * 2.0 / ph::kGravity), 1e-9) << "2 m to fall (its centre to the ground less its radius)";
+	EXPECT_NEAR(hits[0].speed, std::sqrt(2.0 * ph::kGravity * 2.0), 1e-9);
+	EXPECT_NEAR(hits[0].at.x, hits[0].t - 1.0, 1e-9) << "drifting at 1 m/s";
+	for (std::size_t i = 1; i < hits.size(); ++i) EXPECT_LT(hits[i].speed, hits[i - 1].speed);
+	EXPECT_NEAR(hits[1].speed / hits[0].speed, ball.restitution, 1e-9);
+	EXPECT_NEAR(ph::at(ball, 0.5).at.y, 2.1, 1e-12) << "before it starts, where it was";
+	const ph::Body flying = ph::at(ball, hits[0].t - 0.1);
+	EXPECT_GT(flying.at.y, ball.radius);
+	EXPECT_FALSE(flying.resting);
+	const ph::Body late = ph::at(ball, 30.0);
+	EXPECT_TRUE(late.resting) << "rolled to a stop";
+	EXPECT_NEAR(late.at.y, ball.radius, 1e-9) << "on the ground";
+	EXPECT_NEAR(ph::at(ball, 31.0).at.x, late.at.x, 1e-12) << "and stays";
+	EXPECT_NEAR(late.spin, ph::at(ball, 30.0).spin, 1e-12);
+	EXPECT_NEAR(late.spinAxis.z, -1.0, 1e-9) << "rolling along +x turns it about -z (up x the way it goes)";
+}
+
+// A block tips over its bottom edge once it is pushed past its balance, lands at 90 degrees (an impact where its top meets the ground) and stays; one not pushed stands.
+TEST(PropPhysics, APushedBlockTopplesAndLandsAndOneNotPushedStands) {
+	using cartoon::Vec3;
+	namespace ph = cartoon::physics;
+	const ph::Topple slab{2.0, {1.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, 0.6, 0.08, 60.0};
+	double landed = -1.0;
+	EXPECT_DOUBLE_EQ(ph::angleOf(slab, 1.0), 0.0);
+	EXPECT_DOUBLE_EQ(ph::angleOf(slab, 10.0, &landed), 90.0);
+	EXPECT_GT(landed, 2.2);
+	EXPECT_LT(landed, 4.0);
+	EXPECT_LT(ph::angleOf(slab, 0.5 * (2.0 + landed)), 90.0);
+	const std::vector<ph::Impact> hits = ph::impactsOf(slab);
+	ASSERT_EQ(hits.size(), 1u);
+	EXPECT_NEAR(hits[0].t, landed, 1e-9);
+	EXPECT_NEAR(hits[0].at.x, 1.0 - 0.6, 1e-9) << "its top lands 0.6 m away on the side the turn takes it (+y about +z goes to -x)";
+	const Vec3 top = cartoon::transformPoint(ph::transformOf(slab, 10.0), {1.0, 0.6, 0.0});
+	EXPECT_NEAR(top.x, 0.4, 1e-9);
+	EXPECT_NEAR(top.y, 0.0, 1e-9);
+	const ph::Topple still{2.0, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, 0.6, 0.08, 0.0};
+	EXPECT_DOUBLE_EQ(ph::angleOf(still, 10.0), 0.0) << "not pushed past its balance: it stands";
+	EXPECT_TRUE(ph::impactsOf(still).empty());
 }

@@ -546,6 +546,18 @@ moving point - a robe's hem, an antenna, a tail, a lantern on a pole. A frame is
 character of a film file gets the same (`CharacterMoment::trail`). The baseline showed exactly the shots it changed: the five walking shots of the Nomai film and the four of
 A Walk at Dusk, and no other film.
 
+**Props with physics.** `src/shared/cartoon/prop_physics.h`: `physics::Bounce` (a ball dropped or thrown: it flies, bounces lower each time by its restitution, keeps its grip's
+share of its speed along the ground, rolls to a stop turning by distance over radius) and `physics::Topple` (a block tipping over its bottom edge under gravity once pushed past its
+balance, until it lies flat), each worked out from its start so any frame's place is exact, and each landing an impact (`impactsOf`: when, where, how hard). In a film file:
+
+```
+bounce  pebble  5.0  from -0.5 2.2 -2.0  velocity 0.3 0 -0.4  radius 0.07     # the marked block `pebble`, its centre at `from` (as the scene has it); restitution, grip, rolling
+topple  tablet  8.4  pivot -1.04 0 -3.0  axis 0 0 1  height 0.6  depth 0.08  push 40   # tips about its edge through `pivot` (right-hand turn about `axis`); lean
+```
+
+Each landing is heard (its strength from how hard it hit, panned by the camera). A Walk at Dusk drops a pebble onto the path ahead of the explorer and tips over a stone tablet as
+it passes.
+
 ## Examples
 
 ### Example 1: Quick Preview (Low Quality)

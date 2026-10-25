@@ -59,3 +59,18 @@ AttributeBegin
   Translate 2.6 2.0 -6.4
   Shape "sphere" "float radius" [ 0.13 ]
 AttributeEnd
+
+# @anim pebble
+AttributeBegin
+  Material "diffuse" "rgb reflectance" [ 0.45 0.42 0.40 ]
+  Translate -0.5 2.2 -2.0
+  Shape "sphere" "float radius" [ 0.07 ]
+AttributeEnd
+
+# @anim tablet
+AttributeBegin
+  Material "diffuse" "rgb reflectance" [ 0.70 0.66 0.58 ]
+  Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3   4 6 5  4 7 6   0 4 5  0 5 1   1 5 6  1 6 2   2 6 7  2 7 3   3 7 4  3 4 0 ]
+    "point3 P" [ -1.04 0 -3.2   -0.96 0 -3.2   -0.96 0 -2.8   -1.04 0 -2.8
+                 -1.04 0.6 -3.2   -0.96 0.6 -3.2   -0.96 0.6 -2.8   -1.04 0.6 -2.8 ]
+AttributeEnd

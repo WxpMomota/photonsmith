@@ -323,7 +323,7 @@ else()
     option(UNIT_TESTS_FAST_COMPILE "Compile the unit tests without optimisation (faster build, slower run)" ON)
 endif()
 if(UNIT_TESTS_FAST_COMPILE)
-    target_compile_options(unit_tests PRIVATE $<IF:$<CXX_COMPILER_ID:MSVC>,/Od;/Ob0,-O0>)
+    target_compile_options(unit_tests PRIVATE $<IF:$<CXX_COMPILER_ID:MSVC>,/Od;/Ob0;/bigobj,-O0>)   # (/bigobj: cartoon_scenes.cpp holds every film)
 endif()
 
 

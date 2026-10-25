@@ -255,7 +255,7 @@ inline void addFilmFile(Registry &r, const std::string &file) {
 	Film f{r.keep(d.spec.key), r.keep(d.spec.name), r.keep(d.spec.about.empty() ? "A film made from " + std::filesystem::path(d.spec.scene).filename().string() + "." : d.spec.about),
 		   d.spec.length, d.spec.fps, [p](double t) { return p->sceneAt(t); }, [p](double t) { return p->headerAt(t); }, [p]() { return p->shotStarts(); }, d.spec.still,
 		   {id, r.keep(tags), r.keep(d.shotNames()), d.scene.samples, 0.0}};
-	if (!d.spec.characters.empty()) {   // a film with characters: what its shots are about, its footsteps and touches, its characters' feet
+	if (d.hasEvents()) {   // a film with characters or props with physics: what its shots are about, its footsteps, touches and landings, its characters' feet
 		f.subjectsAt = [p](double t) { return p->subjectsAt(t); };
 		f.events = [p]() { return p->events(); };
 		f.feetAt = [p](double t) { return p->feetAt(t); };
