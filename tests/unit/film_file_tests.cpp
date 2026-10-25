@@ -628,3 +628,76 @@ TEST(FilmFaces, AFeelingEasesAnExpressionInAndOutAndFeelingsAddUp) {
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter kai nomai-explorer\nfeel kai sad 1 2\n", bad).find("has no face"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter pip pip\nfeel pip sad 1 2 amount 3\n", bad).find("`amount` is from 0 to 2"), std::string::npos);
 }
+
+// ---- props characters handle, and where they look ------------------------------------------------------------------------------------------------------------------------------
+
+// A prop is picked up (the hand reaches it as it is taken), carried (it goes where its holder goes), handed over (the two hands meet; it is the other's from then on) and put
+// down (it stays there); each is a touch on the soundtrack. Handling that cannot happen is refused.
+TEST(FilmProps, APropIsPickedUpCarriedHandedOverAndPutDownInTheHandThatHoldsIt) {
+	(void)cartoon::films();
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 20\n"
+					   "character ann person at 0 0 0 facing 0\ncharacter pip pip at 0 0 1.35 facing 180\n"
+					   "prop fan at 0.25 0.95 0.35\n"
+					   "pick ann fan 2.0\n"
+					   "walk ann 4.0 0.8  0 0.6\n"
+					   "give ann fan 8.0 to pip\n"
+					   "put pip fan 12.0 at -0.4 0.5 1.9\n",
+					   film),
+			  "");
+	const auto pbrt = [](cartoon::Vec3 v) { return cartoon::Vec3{-v.x, v.y, v.z}; };   // (story space to the film file's)
+	const cartoon::Vec3 home{0.25, 0.95, 0.35};
+	EXPECT_LT(cartoon::length(pbrt(film.propAt("fan", 1.0)) - home), 1e-9) << "where the scene has it";
+	const ff::Character &ann = *film.character("ann"), &pip = *film.character("pip");
+	const ff::CharacterKind &person = ff::characterKinds().at("person");
+	// as it is taken, ann's hand is at it
+	EXPECT_LT(cartoon::length(person.handAt(film.actingMoment(ann, 2.0), 1) - film.propAt("fan", 1.99)), 0.03);
+	// carried: in front of her, and with her as she walks
+	const cartoon::Vec3 carried = film.propAt("fan", 3.5), walked = film.propAt("fan", 4.8);
+	EXPECT_GT(walked.z - carried.z, 0.3) << "it went with her";
+	EXPECT_LT(cartoon::length(film.propAt("fan", 4.8) - person.handAt(film.actingMoment(ann, 4.8), 1)), 1e-9) << "in her hand";
+	// handed over: it is in pip's hand after, and the two hands met (close) as it was given
+	const ff::CharacterKind &pipKind = ff::characterKinds().at("pip");
+	EXPECT_LT(cartoon::length(person.handAt(film.actingMoment(ann, 8.0), 1) - pipKind.handAt(film.actingMoment(pip, 8.0), 1)), 0.08);
+	EXPECT_LT(cartoon::length(film.propAt("fan", 9.0) - pipKind.handAt(film.actingMoment(pip, 9.0), 1)), 1e-9);
+	// put down: there, and it stays
+	EXPECT_LT(cartoon::length(pbrt(film.propAt("fan", 13.0)) - cartoon::Vec3{-0.4, 0.5, 1.9}), 1e-9);
+	EXPECT_LT(cartoon::length(pbrt(film.propAt("fan", 19.0)) - cartoon::Vec3{-0.4, 0.5, 1.9}), 1e-9);
+	// the block is moved in the scene text, and the hands are heard
+	EXPECT_NE(film.sceneAt(13.0).find("Translate -0.65 -0.45 1.55"), std::string::npos);
+	int touches = 0;
+	for (const cartoon::FilmEvent &e : film.events()) touches += e.kind == cartoon::EventKind::Touch;
+	EXPECT_EQ(touches, 3);
+	// what cannot happen
+	const std::string base = "scene s.pbrt\nlength 20\ncharacter ann person\ncharacter pip pip\nprop fan at 0 1 0\n";
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm(base + "pick ann fan 2\npick pip fan 4\n", bad).find("in ann's hand"), std::string::npos);
+	EXPECT_NE(loadFilm(base + "put pip fan 2 at 0 0 0\n", bad).find("pip does not hold fan"), std::string::npos);
+	EXPECT_NE(loadFilm(base + "pick ann fan 2\ngive ann fan 2.5 to pip\n", bad).find("too soon"), std::string::npos);
+	EXPECT_NE(loadFilm(base + "pick ann cup 2\n", bad).find("cup is not a prop"), std::string::npos);
+	EXPECT_NE(loadFilm(base + "prop rock at 0 0 0\n", bad).find("`# @anim rock`"), std::string::npos);
+	EXPECT_NE(loadFilm(base + "pick ann fan 2\ngive ann fan 4 to ann\n", bad).find("to itself"), std::string::npos);
+	const std::string apart = loadFilm("scene s.pbrt\nlength 20\ncharacter ann person at 0 0 0\ncharacter pip pip at 0 0 3 facing 180\nprop fan at 0.25 0.95 0.35\npick ann fan 2\ngive ann fan 4 to pip\n", bad);
+	EXPECT_NE(apart.find("cannot reach each other"), std::string::npos) << apart;
+}
+
+// `look` turns a character's head and eyes to someone (their head), a prop or a point, eased in and out; what it looks at is in its moment and changes how it is drawn.
+TEST(FilmProps, ACharacterLooksAtSomeoneAPropOrAPoint) {
+	(void)cartoon::films();
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 10\ncharacter ann person at 0 0 0 facing 0\ncharacter pip pip at 1.5 0 1 facing -90\nprop fan at 0 2 0\n"
+					   "look pip at ann 1 1.5 4 4.5\nlook ann at fan 6 6.5\nlook pip at 0 3 5 7 7.5\n",
+					   film),
+			  "");
+	const ff::Character &ann = *film.character("ann"), &pip = *film.character("pip");
+	EXPECT_EQ(film.actingMoment(pip, 0.5).look.weight, 0.0);
+	const ff::CharacterMoment at = film.actingMoment(pip, 2.0);
+	EXPECT_DOUBLE_EQ(at.look.weight, 1.0);
+	EXPECT_LT(cartoon::length(at.look.at - film.bodyPoint(ann, 2.0, ff::characterKinds().at("person").head)), 1e-9) << "at ann's head";
+	EXPECT_LT(cartoon::length(film.actingMoment(ann, 7.0).look.at - film.propAt("fan", 7.0)), 1e-9) << "at the prop";
+	EXPECT_NEAR(film.actingMoment(pip, 8.0).look.at.z, 5.0, 1e-9) << "at a point";
+	const auto pipText = [](const std::string &scene) { return scene.substr(scene.find("# pip (pip)")); };
+	EXPECT_NE(pipText(film.sceneAt(2.0)), pipText(film.sceneAt(5.0))) << "its head turned";
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter pip pip\nlook pip at ann 1 2\n", bad).find("neither a character nor a prop"), std::string::npos);
+}

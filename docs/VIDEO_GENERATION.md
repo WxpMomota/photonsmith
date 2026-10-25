@@ -564,6 +564,22 @@ a tilt of the head - and each kind draws them its own way: Pip with its brows, l
 squint for anger and its mouth. The masked explorer has no face; a `feel` line for it is refused (a gesture shows how it feels). A feeling and a line can go together: the
 mouth speaks while the brows are sad.
 
+**Props and looks: `prop`, `pick`, `put`, `give`, `look`.** A block of the scene marked `# @anim cup` becomes something characters handle:
+
+```
+prop  cup  at 0.75 0.86 0.1          # the block and where its handle is in the scene
+look  ann  at cup 1.0 1.5 3.0 3.4    # ann looks at it (her head and eyes; a character's head, a prop, or a point X Y Z), and away again
+pick  ann  cup 2.5                   # she reaches for it and takes it at 2.5 s (her usual hand; `left` or `right`)
+give  ann  cup 6.5 to pip            # their hands meet where both can reach and it is pip's from then on
+put   pip  cup 9.5 at -1.3 0 1.0     # pip puts it down there, where it stays
+```
+
+A hand reaches for the prop over the 0.6 s before it is taken, put down or given and settles over the 0.5 s after; in between the holder carries it in front of them, so it
+goes where they go, and the prop follows the hand that holds it (whatever else the arm is doing). Reaching low makes a person crouch and bend, Pip lean and the explorer
+crouch; the explorer takes things with its left hand (its staff is in its right). Where two hands meet to give a prop is found by letting both reach and moving the point
+between where they got to; when they cannot meet the film is refused with how far apart the hands stay ("bring them closer"), as are a pick of a prop someone holds, a put
+or give by someone who does not hold it, and two changes to a prop less than 1.1 s apart. Each pick, put and give is a touch on the soundtrack.
+
 `ray_tracer --film-lines <key>` lists the lines with their start, end and syllables; `ray_tracer --film-sound <key> OUT.wav` writes a film's soundtrack alone, to listen to
 the lines (and the music and footsteps) without rendering a frame; `--film-check` counts a film file's characters and lines.
 

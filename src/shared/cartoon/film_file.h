@@ -49,6 +49,14 @@
 //     gesture    kai  "reach to the wall" 12 13 contact 12.8    # contact: the hand meets something (a touch on the soundtrack)
 //     say        kai  14.4 "Look, the first star."  rate 1.1  pitch 2   # NAME, a line it says from 14.4 s: its voice, its mouth and a caption (film_speech.h; `nocaption`)
 //     feel       pip  happy 3 3.5 6 6.8  amount 0.8             # NAME, an expression on its face eased in and out (film_faces.h: happy, sad, angry, surprised, ...)
+//     look       pip  at ann 2 2.5 8 8.5                        # NAME turns its head and eyes to someone, a prop or a point (`at X Y Z`) and back
+//
+// Props that characters handle - a marked block that is picked up, carried, put down and handed over (it follows the hand that holds it):
+//
+//     prop       cup  at 0.6 0.82 -1.0                          # a block (`# @anim cup`) a character can pick up: where its handle is in the scene
+//     pick       ann  cup 3.0  left                             # NAME reaches for it and takes it at 3.0 s (its usual hand, or `left` / `right`)
+//     put        ann  cup 7.5  at 1.2 0.8 -1.5                  # puts it down there at 7.5 s
+//     give       ann  cup 9.0  to pip                           # hands it to pip at 9.0 s (their hands meet half way)
 //
 //     shot 0 Walking
 //       follow   kai  behind 3  up 1.7  side 0.6  fov 35          # instead of `key` lines: the camera behind NAME (metres), at a height, to its right, looking at its chest
@@ -156,6 +164,14 @@ struct CharacterMoment {
 	Vec3 lockedFeet[4];
 	double scale = 1.0;        // its size (Character::scale)
 	int seed = 0;              // a number of its own (from its name): its blinks
+	// where its hands reach (0 the left, 1 the right) and where it looks, in the world (story space), each with how far it is there (0..1): a prop it picks up, carries, puts
+	// down or hands over, someone it looks at
+	struct Reach {
+		Vec3 at;
+		double weight = 0.0;
+	};
+	Reach hands[2];
+	Reach look;
 };
 // A kind of character: its scene text (story space, as the toolkit writes it) and its feet at a moment, the point a camera and the film doctor look at (body space), and its walk's
 // step (rig::PathWalk's stride and first step).
@@ -172,6 +188,12 @@ struct CharacterKind {
 	std::vector<std::string> poses;   // its library's poses (a gesture naming another is an error when the film is loaded)
 	speech::Voice voice;              // how its `say` lines sound (its pitch is moved a little for each character, by its name)
 	bool face = true;                 // whether it has a face to show a feeling on (the masked explorer has not)
+	// (for props) where a hand of it is at a moment, in the world (its arm's reach decides: a prop held follows it), where it carries a prop (body space, scale 1, the left
+	// hand's: the right's is mirrored) and which hand it uses (0 the left, 1 the right); (for `look`) its head, body space at scale 1
+	std::function<Vec3(const CharacterMoment &, int)> handAt;
+	Vec3 carry{0.25, 1.0, 0.35};
+	int hand = 1;
+	Vec3 head{0.0, 1.6, 0.05};
 };
 // The library of kinds, by name (cartoons.h fills it before any film file is read).
 inline std::map<std::string, CharacterKind> &characterKinds() {
@@ -195,6 +217,29 @@ struct Spec {
 	std::vector<std::pair<std::string, physics::Topple>> topples;
 	std::vector<std::pair<std::string, int>> physicsLines;
 	std::vector<speech::Line> lines;   // what the characters say (`say`)
+	// props characters handle (`prop`), what they do with them (`pick`, `put`, `give`) in time order, and where they look (`look`)
+	struct Prop {
+		std::string name;
+		Vec3 home;   // its handle, where the scene has it (pbrt's)
+		int line = 0;
+	};
+	struct Handling {
+		enum Kind { Pick, Put, Give } kind = Pick;
+		std::string who, prop, to;
+		double t = 0.0;
+		int hand = -1;   // -1: the holder's usual (or, for put and give, the one that holds it)
+		Vec3 at;         // put: where (pbrt's)
+		int line = 0;
+	};
+	struct Look {
+		std::string who, target;   // target: a character, a prop, or "" for `point`
+		Vec3 point;                // (pbrt's)
+		rig::Gesture when;
+		int line = 0;
+	};
+	std::vector<Prop> props;
+	std::vector<Handling> handling;
+	std::vector<Look> looks;
 };
 
 struct Parsed {
@@ -468,6 +513,60 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				if (i != t.size()) return fail("\"" + t[i] + "\" is not part of a gesture");
 				c->gestures.push_back(g);
 			}
+		} else if (verb == "prop") {
+			const std::vector<std::string> t = detail::tokens(line);
+			Spec::Prop pr;
+			pr.line = n;
+			if (t.size() != 6 || t[2] != "at" || !number(t[3], pr.home.x) || !number(t[4], pr.home.y) || !number(t[5], pr.home.z)) return fail("`prop NAME at X Y Z`: a marked block and where its handle is");
+			pr.name = t[1];
+			for (const Spec::Prop &other : s.props)
+				if (other.name == pr.name) return fail("there is already a prop called " + pr.name);
+			s.props.push_back(pr);
+		} else if (verb == "pick" || verb == "put" || verb == "give") {
+			const std::vector<std::string> t = detail::tokens(line);
+			Spec::Handling h;
+			h.line = n;
+			h.kind = verb == "pick" ? Spec::Handling::Pick : verb == "put" ? Spec::Handling::Put : Spec::Handling::Give;
+			if (t.size() < 4 || !number(t[3], h.t)) return fail("`" + verb + " NAME PROP T ...`: who, which prop and when");
+			h.who = t[1];
+			h.prop = t[2];
+			std::size_t i = 4;
+			if (h.kind == Spec::Handling::Pick && i < t.size() && (t[i] == "left" || t[i] == "right")) h.hand = t[i++] == "left" ? 0 : 1;
+			if (h.kind == Spec::Handling::Put) {
+				if (i + 3 >= t.size() || t[i] != "at" || !number(t[i + 1], h.at.x) || !number(t[i + 2], h.at.y) || !number(t[i + 3], h.at.z)) return fail("`put NAME PROP T at X Y Z`: where it is put down");
+				i += 4;
+			}
+			if (h.kind == Spec::Handling::Give) {
+				if (i + 1 >= t.size() || t[i] != "to") return fail("`give NAME PROP T to OTHER`: whom it is given to");
+				h.to = t[i + 1];
+				i += 2;
+			}
+			if (i != t.size()) return fail("\"" + t[i] + "\" is not part of a " + verb);
+			if (!s.handling.empty() && h.t < s.handling.back().t) return fail("picks, puts and gives go in time order");
+			s.handling.push_back(h);
+		} else if (verb == "look") {
+			const std::vector<std::string> t = detail::tokens(line);
+			Spec::Look l;
+			l.line = n;
+			if (t.size() < 4 || t[2] != "at") return fail("`look NAME at WHO|PROP|X Y Z IN0 IN1 [OUT0 OUT1]`");
+			l.who = t[1];
+			std::size_t i = 3;
+			double x = 0.0, y = 0.0, z = 0.0;
+			if (t.size() >= i + 5 && number(t[i], x) && number(t[i + 1], y) && number(t[i + 2], z)) {   // a point
+				l.point = {x, y, z};
+				i += 3;
+			} else {
+				l.target = t[i++];
+			}
+			if (i + 1 >= t.size() || !number(t[i], l.when.in0) || !number(t[i + 1], l.when.in1)) return fail("a look needs its times: IN0 IN1 [OUT0 OUT1]");
+			i += 2;
+			if (i + 1 < t.size()) {
+				if (!number(t[i], l.when.out0) || !number(t[i + 1], l.when.out1) || l.when.out0 < l.when.in1 || l.when.out1 < l.when.out0) return fail("a look's out times come after its in times");
+				i += 2;
+			}
+			if (i != t.size() || l.when.in1 < l.when.in0) return fail("`look NAME at WHO|PROP|X Y Z IN0 IN1 [OUT0 OUT1]`");
+			l.when.pose = l.target;
+			s.looks.push_back(l);
 		} else if (verb == "say") {
 			const std::vector<std::string> t = detail::tokens(line);
 			speech::Line l;
@@ -545,7 +644,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, shot, key, follow, subject, move, turn, grow, light, show, bounce, topple, character, walk, gesture, feel, say)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, shot, key, follow, subject, move, turn, grow, light, show, bounce, topple, character, walk, gesture, feel, say, look, prop, pick, put, give)");
 		}
 	}
 	n = shotLine;
@@ -796,6 +895,14 @@ class DataFilm {
 			if (!character(l.who)) return filePath + ":" + std::to_string(l.line) + ": " + l.who + " says a line but is not brought in with `character`";
 		spoken.clear();
 		for (const speech::Line &l : spec.lines) spoken.push_back(speech::syllablesOf(l));
+		for (const Spec::Prop &pr : spec.props)
+			if (std::find(scene.names.begin(), scene.names.end(), pr.name) == scene.names.end())
+				return filePath + ":" + std::to_string(pr.line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + pr.name + "`";
+		if (const std::string e = holdingTimeline(); !e.empty()) return filePath + ":" + e;
+		for (const Spec::Look &l : spec.looks) {
+			if (!character(l.who)) return filePath + ":" + std::to_string(l.line) + ": " + l.who + " is not brought in with `character`";
+			if (!l.target.empty() && !character(l.target) && !prop(l.target)) return filePath + ":" + std::to_string(l.line) + ": " + l.target + " is neither a character nor a prop";
+		}
 		for (const Shot &shot : spec.shots) {
 			std::vector<std::string> named = shot.about;
 			if (shot.following) named.push_back(shot.follow.who);
@@ -806,6 +913,152 @@ class DataFilm {
 	}
 
 	std::vector<std::vector<speech::Syllable>> spoken;   // each line's syllables (spec.lines)
+
+	// ---- props characters handle ----
+	// Who holds a prop from a time on: a character's hand, or nobody (it rests at `rest`, pbrt's).
+	struct Holding {
+		double t = -1e30;
+		std::string who;
+		int hand = 1;
+		Vec3 rest;
+		Vec3 meet;   // (a give) where the two hands meet (story space)
+	};
+	std::map<std::string, std::vector<Holding>> holdings;   // each prop's, in time order
+	static constexpr double kReach = 0.6, kSettle = 0.5;    // seconds: a hand reaches for a prop (or puts it down) over this; it carries it in, or goes back to rest, over that
+
+	const Spec::Prop *prop(const std::string &name) const {
+		for (const Spec::Prop &p : spec.props)
+			if (p.name == name) return &p;
+		return nullptr;
+	}
+	// Plays the picks, puts and gives through (who holds what, from when): "" or "line: what is wrong".
+	std::string holdingTimeline() {
+		holdings.clear();
+		for (const Spec::Prop &p : spec.props) holdings[p.name].push_back({-1e30, std::string(), 1, p.home});
+		for (const Spec::Handling &h : spec.handling) {
+			const std::string where = std::to_string(h.line) + ": ";
+			if (!prop(h.prop)) return where + h.prop + " is not a prop (`prop " + h.prop + " at X Y Z`)";
+			if (!character(h.who)) return where + h.who + " is not brought in with `character`";
+			std::vector<Holding> &line = holdings[h.prop];
+			const Holding now = line.back();
+			Holding next;
+			next.t = h.t;
+			if (h.kind == Spec::Handling::Pick) {
+				if (!now.who.empty()) return where + h.prop + " is in " + now.who + "'s hand then";
+				next.who = h.who;
+				next.hand = h.hand >= 0 ? h.hand : characterKinds().at(character(h.who)->kind).hand;
+				for (const auto &[other, held] : holdings)
+					if (other != h.prop && !held.empty() && held.back().who == h.who && held.back().hand == next.hand) return where + h.who + "'s hand already holds " + other;
+			} else {
+				if (now.who != h.who) return where + h.who + " does not hold " + h.prop + " then";
+				if (h.kind == Spec::Handling::Put) {
+					next.rest = h.at;
+				} else {
+					if (!character(h.to)) return where + h.to + " is not brought in with `character`";
+					if (h.to == h.who) return where + "a character cannot give a prop to itself";
+					next.who = h.to;
+					next.hand = characterKinds().at(character(h.to)->kind).hand;
+				}
+			}
+			if (h.t - now.t < kReach + kSettle && now.t > -1e29) return where + "too soon after the last thing done with " + h.prop + " (" + std::to_string(kReach + kSettle) + " s at least)";
+			if (h.kind == Spec::Handling::Give) {
+				double gap = 0.0;
+				next.meet = meetingOf(*character(now.who), now.hand, *character(next.who), next.hand, h.t, &gap);
+				if (gap > 0.06) {
+					char buf[160];
+					std::snprintf(buf, sizeof buf, "%s and %s cannot reach each other to give %s at %g s (their hands stay %.2f m apart): bring them closer", now.who.c_str(), next.who.c_str(), h.prop.c_str(), h.t, gap);
+					return where + buf;
+				}
+			}
+			line.push_back(next);
+		}
+		return std::string();
+	}
+	// The world place (story space) of a body-space point of a character at t.
+	Vec3 bodyPoint(const Character &c, double t, Vec3 local) const { return transformPoint(momentOf(c, t).frame, local * c.scale); }
+	// Where a character carries a prop in a hand at t (story space).
+	Vec3 carryOf(const Character &c, int hand, double t) const {
+		Vec3 k = characterKinds().at(c.kind).carry;
+		if (hand == 1) k.x = -k.x;   // (body space: +x its left)
+		return bodyPoint(c, t, k);
+	}
+	// Where two characters' hands meet to give a prop at t: from half way between where each carries it, each hand reaches for the point and the point moves half way between
+	// where they got to (an arm too short, a hand too high), a few times over - a place both can reach when there is one.
+	Vec3 meetingOf(const Character &a, int handA, const Character &b, int handB, double t, double *gap = nullptr) const {
+		Vec3 meet = (carryOf(a, handA, t) + carryOf(b, handB, t)) * 0.5;
+		const CharacterKind &ka = characterKinds().at(a.kind), &kb = characterKinds().at(b.kind);
+		if (gap) *gap = 0.0;
+		if (!ka.handAt || !kb.handAt) return meet;
+		for (int i = 0; i < 8; ++i) {
+			CharacterMoment ma = momentOf(a, t), mb = momentOf(b, t);
+			ma.hands[handA] = {meet, 1.0};
+			mb.hands[handB] = {meet, 1.0};
+			const Vec3 ha = ka.handAt(ma, handA), hb = kb.handAt(mb, handB);
+			meet = (ha + hb) * 0.5;
+			if (gap) *gap = length(ha - hb);
+		}
+		return meet;
+	}
+	// Where the hands of a character reach at t for the props it handles (CharacterMoment::hands), as its picks, puts and gives say.
+	void handsAt(const Character &c, double t, CharacterMoment &m) const {
+		for (const auto &[name, line] : holdings) {
+			for (std::size_t i = 1; i < line.size(); ++i) {
+				const Holding &before = line[i - 1], &now = line[i];
+				const double T = now.t;
+				if (t < T - kReach - 0.01 || t > T + kSettle + 0.01) {
+					// holding it between two changes: its hand at its carry spot
+					const double until = i + 1 < line.size() ? line[i + 1].t - kReach : 1e30;
+					if (now.who == c.name && t > T + kSettle && t < until) m.hands[now.hand] = {carryOf(c, now.hand, t), 1.0};
+					continue;
+				}
+				const double in = smoothstep(T - kReach, T, t), out = smoothstep(T, T + kSettle, t);
+				if (before.who.empty() && now.who == c.name) {   // a pick: reach for where it rests, then bring it in
+					const Vec3 rest = story(before.rest.x, before.rest.y, before.rest.z);
+					m.hands[now.hand] = t < T ? CharacterMoment::Reach{rest, in} : CharacterMoment::Reach{lerp(rest, carryOf(c, now.hand, t), out), 1.0};
+				} else if (before.who == c.name && now.who.empty()) {   // a put: take it to where it goes, let go, the hand goes back
+					const Vec3 to = story(now.rest.x, now.rest.y, now.rest.z);
+					m.hands[before.hand] = t < T ? CharacterMoment::Reach{lerp(carryOf(c, before.hand, t), to, in), 1.0} : CharacterMoment::Reach{to, 1.0 - out};
+				} else if (before.who == c.name || now.who == c.name) {   // a give: both hands go to where they meet
+					const Vec3 meet = now.meet;
+					if (before.who == c.name) m.hands[before.hand] = t < T ? CharacterMoment::Reach{lerp(carryOf(c, before.hand, t), meet, in), 1.0} : CharacterMoment::Reach{meet, 1.0 - out};
+					else m.hands[now.hand] = t < T ? CharacterMoment::Reach{meet, in} : CharacterMoment::Reach{lerp(meet, carryOf(c, now.hand, t), out), 1.0};
+				}
+			}
+		}
+	}
+	// A character's moment with its hands and its look: what its kind needs to draw it, or to say where its hand is.
+	CharacterMoment actingMoment(const Character &c, double t) const {
+		CharacterMoment m = momentOf(c, t);
+		handsAt(c, t, m);
+		lookAt(c, t, m);
+		return m;
+	}
+	// Where a prop's handle is at t (story space): where it rests, or in the hand that holds it.
+	Vec3 propAt(const std::string &name, double t) const {
+		const std::vector<Holding> &line = holdings.at(name);
+		const Holding *h = &line.front();
+		for (const Holding &each : line)
+			if (each.t <= t) h = &each;
+		if (h->who.empty()) return story(h->rest.x, h->rest.y, h->rest.z);
+		const Character &c = *character(h->who);
+		const CharacterKind &kind = characterKinds().at(c.kind);
+		CharacterMoment m = momentOf(c, t);   // (its hands; not its look - it may be looking at this prop)
+		handsAt(c, t, m);
+		return kind.handAt ? kind.handAt(m, h->hand) : carryOf(c, h->hand, t);
+	}
+	// ---- where characters look ----
+	void lookAt(const Character &c, double t, CharacterMoment &m) const {
+		for (const Spec::Look &l : spec.looks) {
+			if (l.who != c.name) continue;
+			const double w = rig::gestureWeight(l.when, t);
+			if (w <= 0.0) continue;
+			Vec3 target;
+			if (l.target.empty()) target = story(l.point.x, l.point.y, l.point.z);
+			else if (const Character *other = character(l.target)) target = bodyPoint(*other, t, characterKinds().at(other->kind).head);
+			else target = propAt(l.target, t);
+			m.look = {m.look.weight > 0.0 ? lerp(m.look.at, target, w) : target, std::max(m.look.weight, w)};
+		}
+	}
 
 	// ---- characters ----
 	const Character *character(const std::string &name) const {
@@ -954,6 +1207,17 @@ class DataFilm {
 				out.push_back(e);
 			}
 		}
+		for (const Spec::Handling &h : spec.handling) {   // a hand meets a prop
+			FilmEvent e;
+			e.t = h.t;
+			e.kind = EventKind::Touch;
+			e.seed = ++seed;
+			const CameraView v = viewAt(h.t);
+			const Vec3 at = propAt(h.prop, h.t);
+			e.pan = panOf(v, at);
+			e.strength = 0.8 * audibility(length(at - v.eye));
+			out.push_back(e);
+		}
 		// the props' landings (pbrt's coordinates: x mirrored for the story-space camera)
 		std::vector<physics::Impact> impacts;
 		for (const auto &[block, b] : spec.bounces) {
@@ -978,7 +1242,7 @@ class DataFilm {
 		std::stable_sort(out.begin(), out.end(), [](const FilmEvent &a, const FilmEvent &b) { return a.t < b.t; });
 		return out;
 	}
-	bool hasEvents() const { return !spec.characters.empty() || !spec.bounces.empty() || !spec.topples.empty(); }
+	bool hasEvents() const { return !spec.characters.empty() || !spec.bounces.empty() || !spec.topples.empty(); }   // (props are handled by characters)
 
 	// ---- what the characters say ----
 	// A character's mouth and voice at t from its lines.
@@ -1085,7 +1349,7 @@ class DataFilm {
 		for (const Character &c : spec.characters) {   // the characters, as their kinds draw them
 			const CharacterKind &kind = characterKinds().at(c.kind);
 			if (!kind.text) continue;
-			CharacterMoment m = momentOf(c, t);
+			CharacterMoment m = actingMoment(c, t);
 			m.trail = trailOf(c, t, m);
 			lockFeet(c, t, m);
 			m.voice = music_cues::voiceAt(spec.key, c.name, t, shotStarts(), shotNameList());
@@ -1136,6 +1400,10 @@ class DataFilm {
 	}
 	std::string transformsAt(const std::string &name, double t) const {
 		std::string out;
+		if (const Spec::Prop *pr = prop(name)) {   // a prop: moved from where the scene has it to where it is (pbrt's: x mirrored back)
+			const Vec3 at = propAt(name, t);
+			out += "  Translate " + num(-at.x - pr->home.x) + " " + num(at.y - pr->home.y) + " " + num(at.z - pr->home.z) + "\n";
+		}
 		for (const auto &[block, b] : spec.bounces) {   // where its physics has it: moved from where the scene has it, and turned as it rolls
 			if (block != name) continue;
 			const physics::Body body = physics::at(b, t);

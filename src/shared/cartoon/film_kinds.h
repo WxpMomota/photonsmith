@@ -82,6 +82,29 @@ inline double lidsWith(double lids, double blink) {
 	lids = std::clamp(lids, 0.0, 0.9);
 	return lids + (1.0 - lids) * blink;
 }
+// Its hands where the moment's props need them (CharacterMoment::hands: 0 the left, 1 the right), eased in by their weights.
+inline void reachWith(const CharacterMoment &m, Vec3 &handL, double &weightL, Vec3 &handR, double &weightR) {
+	if (m.hands[0].weight > 0.0) reachTo(handL, weightL, m.hands[0].at, m.hands[0].weight);
+	if (m.hands[1].weight > 0.0) reachTo(handR, weightR, m.hands[1].at, m.hands[1].weight);
+}
+// How far a hand reaches below `low` (metres above its feet; 0 .. 1 at `low - range`): how much it bends down for it.
+inline double reachingDown(const CharacterMoment &m, double low, double range) {
+	const double feet = transformPoint(m.frame, {0.0, 0.0, 0.0}).y;
+	double d = 0.0;
+	for (const CharacterMoment::Reach &h : m.hands) d = std::max(d, h.weight * clamp01((low - (h.at.y - feet)) / range));
+	return d;
+}
+// Its head and eyes turned to what it looks at (CharacterMoment::look), as far as a neck turns: a rig's head yaw turns it to its right and its pitch looks down, so the aim
+// (to its left and up) is taken away.
+inline void lookWith(const CharacterMoment &m, Vec3 headLocal, double maxYaw, double &headYaw, double &headPitch, Vec3 &look, double &lookWeight) {
+	if (m.look.weight <= 0.0) return;
+	const Vec3 head = transformPoint(m.frame, headLocal * m.scale), ahead = transformPoint(m.frame, {0.0, 0.0, 1.0}) - transformPoint(m.frame, {0.0, 0.0, 0.0});
+	const rig::Aim aim = rig::aimAt(head, rig::headingOf(ahead), m.look.at, maxYaw, 40.0, m.look.weight);
+	headYaw -= aim.yaw;
+	headPitch -= aim.pitch;
+	look = m.look.at;
+	lookWeight = std::max(lookWeight, m.look.weight);
+}
 // A to-and-fro at `hz` (a wave, a shake of the head), from the gesture's start.
 inline double wiggle(double since, double hz) { return std::sin(2.0 * kPi * hz * since); }
 
@@ -177,6 +200,9 @@ inline CharacterKind pipKind() {
 		p.squash = actor::breathe(m.t);
 		pipFace(m.face, p);
 		speakWith(m, p.mouthOpen, p.smile);
+		reachWith(m, p.handL, p.handWeightL, p.handR, p.handWeightR);
+		p.lean += 30.0 * reachingDown(m, 0.35 * m.scale, 0.3 * m.scale);
+		lookWith(m, {0.0, 0.96, 0.2}, 70.0, p.headYaw, p.headPitch, p.look, p.lookWeight);
 		if (m.feetLocked) {
 			p.feetHeld = true;
 			for (int s = 0; s < 2; ++s) p.heldFoot[s] = transformPoint(m.frame, m.lockedFeet[s]);
@@ -188,6 +214,13 @@ inline CharacterKind pipKind() {
 		c.scale = m.scale;
 		return actor::emitActor(c, pose(m));
 	};
+	k.handAt = [pose](const CharacterMoment &m, int s) {
+		actor::Character c;
+		c.scale = m.scale;
+		return actor::armOf(c, pose(m), s == 0 ? -1.0 : 1.0).hand;
+	};
+	k.carry = {0.25, 0.35, 0.45};   // (in front of its belly, below its big head, on the hand's side)
+	k.head = {0.0, 0.96, 0.2};
 	k.feet = [k](const CharacterMoment &m) { return feetOf(m, k); };
 	return k;
 }
@@ -273,6 +306,11 @@ inline CharacterKind personKind() {
 		p.blink = rig::blink(m.t, m.seed);
 		personFace(m.face, p);
 		speakWith(m, p.mouthOpen, p.smile);
+		reachWith(m, p.handL, p.handWeightL, p.handR, p.handWeightR);
+		const double down = reachingDown(m, 1.1, 0.6);   // (a cup on a low table, a hand held out to someone small: they crouch and bend for it)
+		p.crouch += 0.8 * down;
+		p.lean += 30.0 * down;
+		lookWith(m, {0.0, 1.64, 0.05}, 75.0, p.headYaw, p.headPitch, p.look, p.lookWeight);
 		if (m.feetLocked) {
 			p.feetHeld = true;
 			for (int s = 0; s < 2; ++s) p.heldFoot[s] = transformPoint(m.frame, m.lockedFeet[s]);
@@ -280,6 +318,9 @@ inline CharacterKind personKind() {
 		return m.gestures && !m.gestures->empty() ? rig::act(p, *m.gestures, m.t, personPoses()) : p;
 	};
 	k.text = [pose](const CharacterMoment &m) { return human::emitHuman(pose(m)); };
+	k.handAt = [pose](const CharacterMoment &m, int s) { return human::handOf(pose(m), s == 0 ? -1.0 : 1.0); };
+	k.carry = {0.20, 1.05, 0.35};
+	k.head = {0.0, 1.64, 0.05};
 	k.feet = [k](const CharacterMoment &m) { return feetOf(m, k); };
 	return k;
 }
@@ -357,6 +398,8 @@ inline CharacterKind turtleKind() {
 		p.blink = rig::blink(m.t, m.seed);
 		turtleFace(m.face, p);
 		speakWith(m, p.mouthOpen, p.smile);
+		reachWith(m, p.frontL, p.frontWeightL, p.frontR, p.frontWeightR);
+		lookWith(m, {0.0, 0.045, 0.085}, 60.0, p.headYaw, p.headPitch, p.look, p.lookWeight);
 		if (m.feetLocked) {   // (its legs reach for where their feet came down: a turtle's feet follow world targets)
 			Vec3 *target[4] = {&p.frontL, &p.frontR, &p.hindL, &p.hindR};
 			double *weight[4] = {&p.frontWeightL, &p.frontWeightR, &p.hindWeightL, &p.hindWeightR};
@@ -372,6 +415,14 @@ inline CharacterKind turtleKind() {
 		look.scale = m.scale;
 		return turtle::emitTurtle(pose(m), look);
 	};
+	k.handAt = [pose](const CharacterMoment &m, int s) {
+		turtle::Look look;
+		look.scale = m.scale;
+		const turtle::TurtlePose p = pose(m);
+		return turtle::footOf(turtle::framesOf(look, p), p, s);   // (its front feet: 0 the left, 1 the right)
+	};
+	k.carry = {0.03, 0.03, 0.085};
+	k.head = {0.0, 0.045, 0.085};
 	k.feet = [k](const CharacterMoment &m) { return feetOf(m, k); };
 	return k;
 }
@@ -385,6 +436,17 @@ inline CharacterKind explorerKind() {
 		nomai::ExplorerPose p = m.moving || m.steps > 0.0 ? nomai::walkPose(m.steps, m.t, 1.0) : nomai::standPose(m.t);   // (after a walk: its feet where they came down)
 		p.wind = p.wind + m.trail * 0.5;   // (the robe's hem trails the body: nomai::robeTrail)
 		p.staffGlow += (1.0 - p.staffGlow) * m.voice;   // (it speaks behind a mask: its staff lights up with its voice, and is as it was when it is silent)
+		const Mat4 toBody = invertAffine(m.frame);   // (its hands are placed in body space)
+		if (m.hands[0].weight > 0.0) p.handL = lerp(p.handL, transformPoint(toBody, m.hands[0].at), m.hands[0].weight);
+		if (m.hands[1].weight > 0.0) p.handR = lerp(p.handR, transformPoint(toBody, m.hands[1].at), m.hands[1].weight);
+		p.crouch += 0.8 * reachingDown(m, 1.0, 0.6);
+		if (m.look.weight > 0.0) {   // (its head turns left with a positive yaw)
+			double yaw = 0.0, pitch = 0.0, weight = 0.0;
+			Vec3 look;
+			lookWith(m, {0.0, 1.72, 0.08}, 70.0, yaw, pitch, look, weight);
+			p.headYaw -= yaw;
+			p.headPitch += pitch;
+		}
 		if (m.feetLocked) {   // (its feet held where they came down: rig::FootLock)
 			p.lockFeet = true;
 			p.lockedBall[0] = m.lockedFeet[0];
@@ -402,6 +464,13 @@ inline CharacterKind explorerKind() {
 	explorer.poses = namesOf(nomai::explorerPoses());
 	explorer.voice = {165.0, 1.05, 0.12};   // (behind a mask: breathier)
 	explorer.face = false;                   // (its mask)
+	explorer.handAt = [pose](const CharacterMoment &m, int s) {
+		const nomai::ExplorerBody b = nomai::explorerBody(pose(m));
+		return transformPoint(m.frame, b.wrist[s] + b.handDir[s] * 0.06);
+	};
+	explorer.carry = {0.18, 1.0, 0.32};
+	explorer.hand = 0;
+	explorer.head = {0.0, 1.72, 0.08};
 	return explorer;
 }
 
