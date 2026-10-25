@@ -485,13 +485,7 @@ inline std::string corridorText(double lampsOn, double t) {
 	});
 	std::string out;
 	// (the PLY is in the ruins frame: placed by it)
-	{
-		const Mat4 mirror = scale(-1.0, 1.0, 1.0), p = mul(mirror, F, mirror);
-		char buf[400];
-		std::snprintf(buf, sizeof buf, "  ConcatTransform [ %.6f %.6f %.6f %.6f  %.6f %.6f %.6f %.6f  %.6f %.6f %.6f %.6f  %.6f %.6f %.6f %.6f ]\n", p[0], p[4], p[8], p[12], p[1], p[5], p[9], p[13], p[2], p[6],
-					  p[10], p[14], p[3], p[7], p[11], p[15]);
-		out += attr(paintedMaterial(10), std::string(buf) + film_cache::plyShape(ply));
-	}
+	out += attr(paintedMaterial(10), film_cache::placement(F) + film_cache::plyShape(ply));
 	// the lamps: bronze cups on the walls with a pale blue glow, lit one by one
 	std::string cups;
 	for (int k = 0; k < kCorridorLamps; ++k) {

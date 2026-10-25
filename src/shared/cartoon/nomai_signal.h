@@ -22,7 +22,6 @@
 #include "nomai_ruins.h"
 #include "nomai_world.h"
 #include "rig.h"
-#include "rig.h"
 
 namespace cartoon {
 namespace nomai {
@@ -85,19 +84,10 @@ inline void inside(Frame &f, double iso) {
 	f.warmth = -0.06;
 }
 
-// The explorer's blinks: the two lower eyes together every few seconds, the third on its own - and now and then a little after them.
-inline double blinkAt(double t, int seed) {
-	double c = 0.0;
-	for (int k = -1; k <= 1; ++k) {
-		const double slot = std::floor(t / 4.3) + k;
-		const double tb = slot * 4.3 + 3.2 * hash01(static_cast<int>(slot) + 1000, seed);
-		c = std::max(c, 1.0 - std::abs(t - tb) / 0.10);
-	}
-	return clamp01(c);
-}
+// The explorer's blinks (rig::blink): the two lower eyes together every few seconds, the third on its own - and now and then a little after them.
 inline void blink(ExplorerPose &p, double t) {
-	p.lidL = p.lidR = std::max(p.lidL, blinkAt(t, 7));
-	p.lidTop = std::max(p.lidTop, std::max(blinkAt(t - 0.14, 7), blinkAt(t, 8)));   // (the third eye: late, or on its own)
+	p.lidL = p.lidR = std::max(p.lidL, rig::blink(t, 7));
+	p.lidTop = std::max(p.lidTop, std::max(rig::blink(t - 0.14, 7), rig::blink(t, 8)));   // (the third eye: late, or on its own)
 }
 // A walking pose: long, slow strides, the staff in the right hand, the left arm swinging a little.
 inline ExplorerPose walkPose(double walk, double t, double stride = 1.0) {
@@ -119,36 +109,36 @@ inline ExplorerPose standPose(double t) {
 	p.handR = {-0.25, 1.15, 0.14};
 	return p;
 }
-// A walk on the ground from a to b (arc coordinates in x and z), starting at t0: where the body is, how far the feet have gone, and its frame.
+// A walk on the ground from a to b (arc coordinates in x and z), starting at t0 (rig::PathWalk, 0.84 m a step): where the body is, how far the feet have gone, and its frame.
 struct Walk {
 	Vec3 at;
 	double yaw, walk, dist;
 	bool moving;
 	Mat4 frame;
+	rig::PathWalk path;
 };
 inline Walk walkOver(Vec3 a, Vec3 b, double t0, double t, double speed = 0.72) {
-	const Vec3 d{b.x - a.x, 0.0, b.z - a.z};
-	const double len = length(d);
-	const double dist = clamp01((t - t0) * speed / len) * len;
 	Walk w;
-	w.at = a + d * (dist / len);
-	w.yaw = yawOf(d);
-	w.dist = dist;
-	w.walk = dist / 0.84;
-	w.moving = t > t0 && dist < len;
+	w.path = rig::PathWalk{{a, b}, t0, speed, 0.84};
+	const rig::PathWalk::At at = w.path.at(t);
+	w.at = at.at;
+	w.yaw = at.yaw;
+	w.dist = at.dist;
+	w.walk = at.steps;
+	w.moving = at.moving;
 	w.frame = groundFrame(w.at.x, w.at.z, w.yaw);
 	return w;
 }
-// The footstep puffs of a walk: one at each step the feet have made, at the foot that came down.
-inline std::string footDust(const Walk &w, Vec3 a, double t0, double speed, double t, int maxSteps = 6) {
+// The footstep puffs of a walk: one at each of its last footfalls, at the foot that came down.
+inline std::string footDust(const Walk &w, Vec3 a, double t, int maxSteps = 6) {
 	std::string out;
-	const int steps = static_cast<int>(std::floor(w.walk));
-	for (int k = std::max(1, steps - maxSteps); k <= steps; ++k) {
-		const double tk = t0 + k * 0.84 / speed;
+	const std::vector<rig::PathWalk::Footfall> steps = w.path.footfalls(-1e9, t);
+	for (std::size_t i = steps.size() > static_cast<std::size_t>(maxSteps) ? steps.size() - static_cast<std::size_t>(maxSteps) - 1 : 0; i < steps.size(); ++i) {
+		const rig::PathWalk::Footfall &s = steps[i];
 		const Vec3 d = normalize(Vec3{w.at.x - a.x, 0.0, w.at.z - a.z} + Vec3{1e-9, 0.0, 0.0});
 		const Vec3 side = normalize(cross(Vec3{0.0, 1.0, 0.0}, d));
-		const Vec3 foot = a + d * (k * 0.84 + 0.1) + side * (k % 2 == 0 ? 0.11 : -0.11);
-		out += dustPuffText(groundPoint(foot.x, foot.z), upAt(foot.x, foot.z), tk, t, 40, 0.40, 600 + k, 0.005);
+		const Vec3 foot = s.at + d * 0.1 + side * (s.step % 2 == 0 ? 0.11 : -0.11);
+		out += dustPuffText(groundPoint(foot.x, foot.z), upAt(foot.x, foot.z), s.t, t, 40, 0.40, 600 + s.step, 0.005);
 	}
 	return out;
 }
@@ -311,7 +301,7 @@ inline void shotUnderGiant(double t, Frame &f, bool content) {
 	f.ruins = false;
 	if (content) {
 		ExplorerPose p = w.moving ? walkPose(w.walk, t) : standPose(t);
-		f.content = worldText(f, t, 120.0) + shuttleText(shuttleOnGround(0.0), 0.0, 1.0) + explorerText(p, w.frame, 0.016) + footDust(w, exitStart(), 43.5, 0.62, t);
+		f.content = worldText(f, t, 120.0) + shuttleText(shuttleOnGround(0.0), 0.0, 1.0) + explorerText(p, w.frame, 0.016) + footDust(w, exitStart(), t);
 	}
 }
 // II The signal ---------------------------------------------------------------------------------------------------------------------------------------------------
@@ -328,7 +318,7 @@ inline void shotFootsteps(double t, Frame &f, bool content) {
 	f.subjects = {transformPoint(w.frame, {0.0, 0.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	night(f);
 	f.ruins = false;
-	if (content) f.content = worldText(f, t, 60.0) + explorerText(walkPose(w.walk, t), w.frame, 0.012) + footDust(w, stepsStart(), 49.0, speed, t, 8);
+	if (content) f.content = worldText(f, t, 60.0) + explorerText(walkPose(w.walk, t), w.frame, 0.012) + footDust(w, stepsStart(), t, 8);
 }
 inline void shotRidge(double t, Frame &f, bool content) {
 	// a wide silhouette: the explorer crosses the ridge's crest against the giant's face

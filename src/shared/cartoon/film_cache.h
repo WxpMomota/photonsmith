@@ -230,6 +230,25 @@ inline std::string ply(const std::string &film, const std::string &name, Make ma
 // The Shape line that names a PLY file (empty text for an empty path).
 inline std::string plyShape(const std::string &path) { return path.empty() ? std::string() : "  Shape \"plymesh\" \"string filename\" [ \"" + path + "\" ]\n"; }
 
+// The ConcatTransform line that places a PLY written by plyBytes (or a mesh written by emitMesh) by the story-space transform `m`: the file is already mirrored, so the
+// placement is mirror * m * mirror, and pbrt takes the matrix by columns.
+inline std::string placement(const Mat4 &m) {
+	static const Mat4 mirror = scale(-1.0, 1.0, 1.0);
+	const Mat4 p = mul(mirror, m, mirror);
+	char buf[400];
+	std::snprintf(buf, sizeof buf, "  ConcatTransform [ %.6f %.6f %.6f %.6f  %.6f %.6f %.6f %.6f  %.6f %.6f %.6f %.6f  %.6f %.6f %.6f %.6f ]\n", p[0], p[4], p[8], p[12], p[1], p[5], p[9],
+				  p[13], p[2], p[6], p[10], p[14], p[3], p[7], p[11], p[15]);
+	return buf;
+}
+
+// A part that never changes shape - a mask, a tank, a pair of horns - made once (`make()`, in the part's own space) as the PLY `name` of `film`, and placed in a frame by
+// `frame` (part space -> story space) with its material. A character sculpted every frame spends most of its time on such parts, and writes them into every frame's text.
+template <typename Make>
+inline std::string part(const std::string &film, const std::string &name, const std::string &material, const Mat4 &frame, Make make) {
+	const std::string file = ply(film, name, make);
+	return file.empty() ? std::string() : attr(material, placement(frame) + plyShape(file));
+}
+
 // A file that comes with a film: <scenes folder>/film_assets/<rel>, looked for where the scenes are (RAY_TRACER_PBRT_DIR, pbrt_scenes beside the program or up from it). "" when
 // it is not found.
 inline std::string asset(const std::string &rel) {

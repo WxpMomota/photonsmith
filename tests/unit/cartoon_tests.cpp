@@ -1833,3 +1833,89 @@ TEST(ShotCameras, AFilmsCameraFileIsReadWhenAFrameIsMadeAndChangesOnlyItsShot) {
 	std::filesystem::remove_all(dir);
 }
 
+// ---- the character rig (rig.h) and parts made once (film_cache::part) ------------------------------------------------------------------------------------
+
+// A walk along a path: where it is and which way it faces on each segment, how many steps it has made, that it stops at the end, and a footfall every stride at the time the
+// walk reaches it, feet in turn.
+TEST(CharacterRig, AWalkFollowsItsPathAndItsFootfallsComeEveryStrideInTurn) {
+	using cartoon::Vec3;
+	const cartoon::rig::PathWalk w{{{0.0, 0.0, 0.0}, {0.0, 0.0, 4.0}, {3.0, 0.0, 4.0}}, 10.0, 2.0, 1.0};
+	EXPECT_DOUBLE_EQ(w.length(), 7.0);
+	cartoon::rig::PathWalk::At a = w.at(9.0);
+	EXPECT_FALSE(a.moving) << "not yet started";
+	EXPECT_NEAR(a.at.z, 0.0, 1e-12);
+	a = w.at(11.0);
+	EXPECT_TRUE(a.moving);
+	EXPECT_NEAR(a.at.z, 2.0, 1e-12);
+	EXPECT_NEAR(a.yaw, 0.0, 1e-12) << "along +z";
+	EXPECT_NEAR(a.steps, 2.0, 1e-12);
+	a = w.at(12.5);
+	EXPECT_NEAR(a.at.x, 1.0, 1e-12) << "round the corner";
+	EXPECT_NEAR(a.at.z, 4.0, 1e-12);
+	EXPECT_NEAR(a.yaw, 90.0, 1e-12) << "along +x";
+	a = w.at(100.0);
+	EXPECT_FALSE(a.moving) << "stopped at the end";
+	EXPECT_NEAR(a.at.x, 3.0, 1e-12);
+	EXPECT_NEAR(a.dist, 7.0, 1e-12);
+
+	const std::vector<cartoon::rig::PathWalk::Footfall> all = w.footfalls(-1e9, 1e9);
+	ASSERT_EQ(all.size(), 7u) << "one each metre of the 7";
+	for (std::size_t i = 0; i < all.size(); ++i) {
+		EXPECT_NEAR(all[i].t, 10.0 + 0.5 * (i + 1), 1e-12);
+		EXPECT_EQ(all[i].foot, static_cast<int>(i % 2)) << "the left first, then in turn";
+		EXPECT_EQ(all[i].step, static_cast<int>(i + 1));
+	}
+	EXPECT_NEAR(all[4].at.x, 1.0, 1e-12) << "the fifth step is a metre round the corner";
+	const std::vector<cartoon::rig::PathWalk::Footfall> some = w.footfalls(11.0, 12.0);
+	ASSERT_EQ(some.size(), 2u) << "(from, to]: the steps at 11.5 and 12";
+	EXPECT_EQ(some[0].step, 3);
+}
+
+// A blink shuts and opens within its half-time each way, once a period; a look at something turns the head within its limits; sitting eases in and out.
+TEST(CharacterRig, BlinksLooksAndSittingStayInTheirRanges) {
+	using cartoon::Vec3;
+	int shut = 0;
+	bool wasShut = false;
+	for (double t = 0.0; t < 43.0; t += 0.01) {
+		const double b = cartoon::rig::blink(t, 7);
+		ASSERT_GE(b, 0.0);
+		ASSERT_LE(b, 1.0);
+		if (b > 0.5 && !wasShut) ++shut;
+		wasShut = b > 0.5;
+	}
+	EXPECT_GE(shut, 9) << "about one blink in every 4.3 s";
+	EXPECT_LE(shut, 11);
+
+	cartoon::rig::Aim aim = cartoon::rig::aimAt({0.0, 1.6, 0.0}, 0.0, {1.0, 1.6, 1.0});
+	EXPECT_NEAR(aim.yaw, 45.0, 1e-9) << "+x is to the left of a body facing +z";
+	EXPECT_NEAR(aim.pitch, 0.0, 1e-9);
+	aim = cartoon::rig::aimAt({0.0, 1.6, 0.0}, 0.0, {0.0, 1.6, -1.0});
+	EXPECT_NEAR(std::abs(aim.yaw), 70.0, 1e-9) << "behind it: held at what a neck can do";
+	aim = cartoon::rig::aimAt({0.0, 1.6, 0.0}, 350.0, {0.0, 11.6, 1.0}, 70.0, 40.0, 0.5);
+	EXPECT_NEAR(aim.yaw, 5.0, 1e-9) << "350 degrees round is 10 to the right, so 10 to the left to face +z; half of it";
+	EXPECT_NEAR(aim.pitch, 20.0, 1e-9) << "up, held at 40, half of it";
+
+	EXPECT_DOUBLE_EQ(cartoon::rig::sitAmount(29.0, 30.0, 41.0), 0.0);
+	EXPECT_DOUBLE_EQ(cartoon::rig::sitAmount(35.0, 30.0, 41.0), 1.0);
+	EXPECT_DOUBLE_EQ(cartoon::rig::sitAmount(42.0, 30.0, 41.0), 0.0);
+	EXPECT_GT(cartoon::rig::sitAmount(30.4, 30.0, 41.0), 0.0);
+	EXPECT_DOUBLE_EQ(cartoon::rig::sitAmount(99.0, 30.0, 0.0), 1.0) << "no standing up: seated from then on";
+}
+
+// A part that never changes shape is made once - a second frame does not make it again - and placed by its frame, mirrored into pbrt's space like every film mesh.
+TEST(CharacterRig, APartIsMadeOnceAndPlacedByItsFrame) {
+	int made = 0;
+	const auto make = [&] {
+		++made;
+		return cartoon::uvSphere(0.1, 8, 4);
+	};
+	const std::string name = "rig_test_part_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+	const std::string a = cartoon::film_cache::part("rig-test", name, "Material \"diffuse\"", cartoon::translate(2.0, 0.0, 0.0), make);
+	const std::string b = cartoon::film_cache::part("rig-test", name, "Material \"diffuse\"", cartoon::translate(0.0, 3.0, 0.0), make);
+	EXPECT_EQ(made, 1) << "made once";
+	EXPECT_NE(a.find("Shape \"plymesh\""), std::string::npos) << a;
+	EXPECT_NE(a.find("ConcatTransform [ 1.000000 0.000000 0.000000 0.000000  0.000000 1.000000 0.000000 0.000000  0.000000 0.000000 1.000000 0.000000  -2.000000 0.000000 0.000000 1.000000 ]"),
+			  std::string::npos) << "+x in story space is -x in pbrt's: " << a;
+	EXPECT_NE(b.find("0.000000 3.000000 0.000000 1.000000 ]"), std::string::npos) << b;
+	EXPECT_EQ(cartoon::film_cache::part("rig-test", name + "_empty", "Material \"diffuse\"", cartoon::Mat4{}, [] { return cartoon::Mesh{}; }), std::string()) << "nothing to draw";
+}

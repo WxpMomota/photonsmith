@@ -678,16 +678,23 @@ inline const Mesh &maskTealMesh() {
 	static const Mesh m = sdf::surfaceNets([](Vec3 q) { return maskTealSdf(q); }, {-0.20, 0.04, 0.05}, {0.20, 0.16, 0.20}, 0.0015);
 	return m;
 }
-// The mask on its own (laid on the ground beside the campfire): at `frame` (mask space -> world).
+// The mask on its own (laid on the ground beside the campfire): at `frame` (mask space -> world). Its four meshes never change: made once as PLY parts (film_cache::part).
 inline std::string maskText(const Mat4 &frame, double = 0.0) {
-	return attr(ivoryMaterial(), meshText(maskIvoryMesh(), frame)) + attr(goldMaterial(), meshText(maskGoldMesh(), frame)) +
-		   attr(diffuseMaterial({0.10, 0.07, 0.05}), meshText(maskDarkMesh(), frame)) + attr(diffuseMaterial({0.28, 0.55, 0.55}), meshText(maskTealMesh(), frame));
+	return film_cache::part(kFilmKey, "mask_ivory", ivoryMaterial(), frame, [] { return maskIvoryMesh(); }) +
+		   film_cache::part(kFilmKey, "mask_gold", goldMaterial(), frame, [] { return maskGoldMesh(); }) +
+		   film_cache::part(kFilmKey, "mask_dark", diffuseMaterial({0.10, 0.07, 0.05}), frame, [] { return maskDarkMesh(); }) +
+		   film_cache::part(kFilmKey, "mask_teal", diffuseMaterial({0.28, 0.55, 0.55}), frame, [] { return maskTealMesh(); });
 }
 
 // The explorer standing at `world` (body space -> story space) in pose `p`, sculpted at `cell` metres (the face and the hands finer).
 inline std::string explorerText(const ExplorerPose &p, const Mat4 &world, double cell = 0.012) {
 	const ExplorerBody b = explorerBody(p);
 	const double fine = cell * 0.4;
+	// the parts that never change shape - the horns (head space), the pack and its tank (the neck's space: they only move with it) - are made once a cell size as PLY parts
+	const std::string grain = "_" + std::to_string(std::lround(cell * 1e5));
+	ExplorerBody atNeck = b;
+	atNeck.neck = {0.0, 0.0, 0.0};
+	const Mat4 neck = mul(world, translate(b.neck));
 	const Vec3 lo{-0.70, -0.02, -0.70}, hi{0.70, 1.90, 0.80};
 	std::string out;
 	// the head: fur, eyelids, ears, the beard (let down when the mask comes off), the horns, the eyes
@@ -702,7 +709,8 @@ inline std::string explorerText(const ExplorerPose &p, const Mat4 &world, double
 	out += attr(furMaterial(), meshText(skin, head));
 	const double beardLength = p.maskShown ? smoothstep(0.2, 0.9, p.maskOff) : 1.0;
 	out += attr(beardMaterial(), meshText(sdf::surfaceNets([&](Vec3 q) { return beardSdf(q, beardLength); }, {-0.10, -0.32, 0.02}, {0.10, 0.0, 0.26}, fine), head));
-	out += attr("Material \"coateddiffuse\" \"rgb reflectance\" [ 0.55 0.42 0.30 ] \"float roughness\" [ 0.5 ]", meshText(sdf::surfaceNets([](Vec3 q) { return hornSdf(q); }, {-0.22, 0.0, -0.26}, {0.22, 0.38, 0.08}, fine), head));
+	out += film_cache::part(kFilmKey, "horns" + grain, "Material \"coateddiffuse\" \"rgb reflectance\" [ 0.55 0.42 0.30 ] \"float roughness\" [ 0.5 ]", head,
+							[&] { return sdf::surfaceNets([](Vec3 q) { return hornSdf(q); }, {-0.22, 0.0, -0.26}, {0.22, 0.38, 0.08}, fine); });
 	std::string eyes, pupils;
 	for (int k = 0; k < 3; ++k) {
 		const EyePlace &e = eyePlace(k);
@@ -723,10 +731,12 @@ inline std::string explorerText(const ExplorerPose &p, const Mat4 &world, double
 	out += attr(diffuseMaterial({0.86, 0.82, 0.62}), meshText(sdf::surfaceNets([&](Vec3 q) { return creamLineSdf(q, p, b); }, {-0.55, -0.02, -0.55}, {0.55, b.pelvis.y + 0.02, 0.65}, cell * 0.4), world));
 	out += attr(diffuseMaterial({0.50, 0.21, 0.11}), meshText(sdf::surfaceNets([&](Vec3 q) { return padSdf(q, b); }, {-0.45, b.chest.y - 0.25, -0.30}, {0.45, b.neck.y + 0.15, 0.30}, cell * 0.5), world));
 	// the life-support pack and the hose
-	const Vec3 plo = b.neck + Vec3{-0.40, -0.15, -0.45}, phi = b.neck + Vec3{0.40, 0.40, 0.0};
-	out += attr(metalMaterial({0.60, 0.44, 0.26}, 0.40), meshText(sdf::surfaceNets([&](Vec3 q) { return packHousingSdf(q, b); }, plo, phi, cell * 0.6), world));
-	out += attr(ivoryMaterial(), meshText(sdf::surfaceNets([&](Vec3 q) { return std::min(tankSdf(q, b), tankCapSdf(q, b)); }, plo, phi, cell * 0.5), world));
-	out += attr(goldMaterial(), meshText(sdf::surfaceNets([&](Vec3 q) { return tankGoldSdf(q, b); }, plo, phi, cell * 0.5), world));
+	const Vec3 plo{-0.40, -0.15, -0.45}, phi{0.40, 0.40, 0.0};
+	out += film_cache::part(kFilmKey, "pack" + grain, metalMaterial({0.60, 0.44, 0.26}, 0.40), neck,
+							[&] { return sdf::surfaceNets([&](Vec3 q) { return packHousingSdf(q, atNeck); }, plo, phi, cell * 0.6); });
+	out += film_cache::part(kFilmKey, "tank" + grain, ivoryMaterial(), neck,
+							[&] { return sdf::surfaceNets([&](Vec3 q) { return std::min(tankSdf(q, atNeck), tankCapSdf(q, atNeck)); }, plo, phi, cell * 0.5); });
+	out += film_cache::part(kFilmKey, "tank_gold" + grain, goldMaterial(), neck, [&] { return sdf::surfaceNets([&](Vec3 q) { return tankGoldSdf(q, atNeck); }, plo, phi, cell * 0.5); });
 	if (p.maskShown) {
 		const Mat4 mf = maskFrame(p, b);
 		const Vec3 chin = transformPoint(mf, {0.020, -0.070, 0.180});

@@ -360,6 +360,15 @@ The change is made to the camera the code gives at each moment, so a moving came
 fingerprints above, a resumed video renders again only the frames of the shots the file changed (the file is part of `program.txt`'s stamp, so an edit always makes a resume
 compare the frames). When a change is right, it can stay in the file or be moved into the film's code.
 
+**A character's moves and its fixed parts, written once.** `src/shared/cartoon/rig.h` is what any film's characters do: `rig::PathWalk` walks a path of points at a speed
+(where the walker is, which way it faces, how many steps it has made, whether it is moving) and lists its footfalls (when and where each foot came down, feet in turn: the
+dust puffs and footstep sounds come from the same list); `rig::blink` blinks once a period at a moment a seed picks; `rig::aimAt` turns a head to look at something within
+what a neck can do; `rig::sitAmount` eases a sit down and a stand up. The Nomai explorer's walks, footstep dust and blinks are these. `film_cache::part(film, name, material,
+frame, make)` makes a part that never changes shape - a mask, a tank, a pair of horns - once as a PLY in the film's cache and places it in each frame by its frame (the
+explorer's mask, horns, pack and tank: the horns were sculpted again on every frame, and the mask's meshes written into every frame's text). A close-up of the explorer's
+face went from 33 s to 29 s a frame; the renderer loads the same triangles (2,368,110 at 45 s, before and after). `film_cache::placement(m)` is the ConcatTransform for
+any such PLY.
+
 **What a film says about itself** is its row and nothing else, and nothing is typed twice. The row has the key, the name, a description of the story (one sentence, without the length or the number
 of shots: those are worked out), the length and fps, the still's time, and a `meta` record: `id` (the number of its video preset, V<id>: give a new film the next number and never reuse one, so
 reordering or removing a film moves no preset), `tags` (from the vocabulary `kTagVocabulary`: what the film shows or how it is lit), `shotNames` (one for each shot of its `shotStarts()`),
