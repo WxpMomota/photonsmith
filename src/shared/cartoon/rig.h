@@ -28,6 +28,7 @@ inline double headingOf(Vec3 dir) { return std::atan2(dir.x, dir.z) * 180.0 / kP
 struct PathWalk {
 	std::vector<Vec3> points;
 	double start = 0.0, speed = 1.0, stride = 0.84;
+	double firstStep = 1.0;   // how far in strides the first foot comes down (a walk cycle whose foot lands half a step in: 0.5); the rest follow a stride apart
 
 	struct At {
 		Vec3 at;             // where it is (y from the path's points)
@@ -78,16 +79,17 @@ struct PathWalk {
 		a.moving = t > start && dist < total;
 		return a;
 	}
-	// The footfalls in (from, to]: one every stride along the path, at the time the walk reaches it.
+	// The footfalls in (from, to]: one every stride along the path from firstStep strides in, at the time the walk reaches it.
 	std::vector<Footfall> footfalls(double from, double to) const {
 		std::vector<Footfall> out;
 		const double total = length();
 		if (speed <= 0.0 || stride <= 0.0) return out;
-		for (int k = 1; k * stride <= total + 1e-9; ++k) {
-			const double t = start + k * stride / speed;
+		for (int k = 1; (k - 1 + firstStep) * stride <= total + 1e-9; ++k) {
+			const double d = (k - 1 + firstStep) * stride;
+			const double t = start + d / speed;
 			if (t <= from) continue;
 			if (t > to) break;
-			out.push_back({t, along(k * stride).at, (k - 1) % 2, k});
+			out.push_back({t, along(d).at, (k - 1) % 2, k});
 		}
 		return out;
 	}

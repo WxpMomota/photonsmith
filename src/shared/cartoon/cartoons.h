@@ -132,7 +132,7 @@ inline const Film kFilms[] = {
 	 "With music.",
 	 nomai::kDuration, nomai::kFps, &nomai::sceneAt, &nomai::headerAt, &nomai::shotStarts, 45.0,
 	 {23, "character,emissive,night,dawn,fog", nomai::shotNamesText(), nomai::kSamples, 8.6, false, nomai::kWidth, nomai::kHeight},
-	 &nomai::soundtrack, &nomai::captions, &nomai::subjectsAt},
+	 &nomai::soundtrack, &nomai::captions, &nomai::subjectsAt, &nomai::events},
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 

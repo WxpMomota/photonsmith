@@ -21,6 +21,7 @@
 #include "nomai_fx.h"
 #include "nomai_ruins.h"
 #include "nomai_world.h"
+#include "film_events.h"
 #include "rig.h"
 
 namespace cartoon {
@@ -109,7 +110,8 @@ inline ExplorerPose standPose(double t) {
 	p.handR = {-0.25, 1.15, 0.14};
 	return p;
 }
-// A walk on the ground from a to b (arc coordinates in x and z), starting at t0 (rig::PathWalk, 0.84 m a step): where the body is, how far the feet have gone, and its frame.
+// A walk on the ground along a path (arc coordinates in x and z; rig::PathWalk, 0.84 m a step, a foot coming down half a step in - walkPose's cycle): where the body is,
+// how far the feet have gone, and its frame.
 struct Walk {
 	Vec3 at;
 	double yaw, walk, dist;
@@ -117,9 +119,10 @@ struct Walk {
 	Mat4 frame;
 	rig::PathWalk path;
 };
-inline Walk walkOver(Vec3 a, Vec3 b, double t0, double t, double speed = 0.72) {
+inline rig::PathWalk walkPath(Vec3 a, Vec3 b, double t0, double speed = 0.72) { return rig::PathWalk{{a, b}, t0, speed, 0.84, 0.5}; }
+inline Walk walkOver(const rig::PathWalk &path, double t) {
 	Walk w;
-	w.path = rig::PathWalk{{a, b}, t0, speed, 0.84};
+	w.path = path;
 	const rig::PathWalk::At at = w.path.at(t);
 	w.at = at.at;
 	w.yaw = at.yaw;
@@ -129,7 +132,8 @@ inline Walk walkOver(Vec3 a, Vec3 b, double t0, double t, double speed = 0.72) {
 	w.frame = groundFrame(w.at.x, w.at.z, w.yaw);
 	return w;
 }
-// The footstep puffs of a walk: one at each of its last footfalls, at the foot that came down.
+inline Walk walkOver(Vec3 a, Vec3 b, double t0, double t, double speed = 0.72) { return walkOver(walkPath(a, b, t0, speed), t); }
+// The footstep puffs of a walk: one at each of its last footfalls, where the foot came down (half a stride ahead of the body as it lands).
 inline std::string footDust(const Walk &w, Vec3 a, double t, int maxSteps = 6) {
 	std::string out;
 	const std::vector<rig::PathWalk::Footfall> steps = w.path.footfalls(-1e9, t);
@@ -137,7 +141,7 @@ inline std::string footDust(const Walk &w, Vec3 a, double t, int maxSteps = 6) {
 		const rig::PathWalk::Footfall &s = steps[i];
 		const Vec3 d = normalize(Vec3{w.at.x - a.x, 0.0, w.at.z - a.z} + Vec3{1e-9, 0.0, 0.0});
 		const Vec3 side = normalize(cross(Vec3{0.0, 1.0, 0.0}, d));
-		const Vec3 foot = s.at + d * 0.1 + side * (s.step % 2 == 0 ? 0.11 : -0.11);
+		const Vec3 foot = s.at + d * 0.52 + side * (s.step % 2 == 0 ? 0.11 : -0.11);
 		out += dustPuffText(groundPoint(foot.x, foot.z), upAt(foot.x, foot.z), s.t, t, 40, 0.40, 600 + s.step, 0.005);
 	}
 	return out;
@@ -290,9 +294,10 @@ inline void shotLanding(double t, Frame &f, bool content) {
 }
 inline Vec3 exitStart() { return {kLandX + 2.8, 0.0, kLandZ - 1.5}; }
 inline Vec3 exitEnd() { return exitStart() + Vec3{giantDir().x, 0.0, giantDir().z} * 30.0; }
+inline rig::PathWalk exitWalk() { return walkPath(exitStart(), exitEnd(), 43.5, 0.62); }
 inline void shotUnderGiant(double t, Frame &f, bool content) {
 	// far behind: the explorer steps from the shuttle and walks out under the giant, very small
-	const Walk w = walkOver(exitStart(), exitEnd(), 43.5, t, 0.62);
+	const Walk w = walkOver(exitWalk(), t);
 	const Vec3 back = exitStart() - Vec3{giantDir().x, 0.0, giantDir().z} * 34.0 + Vec3{12.0, 0.0, 0.0};
 	const Vec3 eye = groundPoint(back.x, back.z, 1.1);
 	f.view = cam(eye, eye + giantDir() * 100.0 + Vec3{0.0, -26.0, 0.0}, lens(24.0));
@@ -307,10 +312,10 @@ inline void shotUnderGiant(double t, Frame &f, bool content) {
 // II The signal ---------------------------------------------------------------------------------------------------------------------------------------------------
 inline Vec3 stepsStart() { return {1.0, 0.0, -12.0}; }
 inline Vec3 stepsEnd() { return {-5.0, 0.0, -40.0}; }
+inline rig::PathWalk stepsWalk() { return walkPath(stepsStart(), stepsEnd(), 49.0, 0.70); }
 inline void shotFootsteps(double t, Frame &f, bool content) {
 	// low behind the feet: each long step lifts a little dust that drifts down slowly
-	const double speed = 0.70;
-	const Walk w = walkOver(stepsStart(), stepsEnd(), 49.0, t, speed);
+	const Walk w = walkOver(stepsWalk(), t);
 	const Vec3 d = normalize(Vec3{stepsEnd().x - stepsStart().x, 0.0, stepsEnd().z - stepsStart().z});
 	const Vec3 eyeArc = w.at - d * 1.7 + Vec3{0.35, 0.0, 0.0};
 	const Vec3 eye = groundPoint(eyeArc.x, eyeArc.z, 0.28);
@@ -320,10 +325,10 @@ inline void shotFootsteps(double t, Frame &f, bool content) {
 	f.ruins = false;
 	if (content) f.content = worldText(f, t, 60.0) + explorerText(walkPose(w.walk, t), w.frame, 0.012) + footDust(w, stepsStart(), t, 8);
 }
+inline rig::PathWalk ridgeWalk() { return walkPath({-14.0, 0.0, ridgeZ(-14.0)}, {6.0, 0.0, ridgeZ(6.0)}, 55.0, 0.70); }
 inline void shotRidge(double t, Frame &f, bool content) {
 	// a wide silhouette: the explorer crosses the ridge's crest against the giant's face
-	const Vec3 a{-14.0, 0.0, ridgeZ(-14.0)}, b{6.0, 0.0, ridgeZ(6.0)};
-	const Walk w = walkOver(a, b, 55.0, t, 0.70);
+	const Walk w = walkOver(ridgeWalk(), t);
 	const Vec3 g = normalize(Vec3{giantDir().x, 0.0, giantDir().z});
 	const Vec3 camArc = Vec3{-4.0, 0.0, ridgeZ(-4.0)} - g * 27.0;
 	const Vec3 eye = groundPoint(camArc.x, camArc.z, 0.5);
@@ -336,9 +341,10 @@ inline void shotRidge(double t, Frame &f, bool content) {
 }
 inline Vec3 rimStart() { return {-2.5, 0.0, -112.0}; }
 inline Vec3 rimEnd() { return {0.0, 0.0, -130.0}; }
+inline rig::PathWalk rimWalk() { return walkPath(rimStart(), rimEnd(), 63.0, 0.62); }
 inline void shotCanyonReveal(double t, Frame &f, bool content) {
 	// behind the explorer to the rim; the camera rises over the shoulder and the canyon opens below - the ruins, the floating steps, the broken bridge
-	const Walk w = walkOver(rimStart(), rimEnd(), 63.0, t, 0.62);
+	const Walk w = walkOver(rimWalk(), t);
 	const double u = smoothstep(66.0, 74.5, t);
 	const Vec3 d = normalize(Vec3{rimEnd().x - rimStart().x, 0.0, rimEnd().z - rimStart().z});
 	const Vec3 eyeArc = w.at + d * lerp(-3.2, 9.0, u) + Vec3{lerp(0.8, -3.0, u), 0.0, 0.0};
@@ -372,9 +378,11 @@ inline void shotThirdEye(double t, Frame &f, bool content) {
 	night(f);
 	if (content) f.content = worldText(f, t, 40.0) + explorerText(p, body, 0.008);
 }
+inline double spiralU(double t) { return lerp(0.48, 0.565, clamp01((t - 80.0) / 8.0)); }   // how far round the floating steps the explorer is
+inline double spiralWalked(double t) { return spiralU(t) * kSpiralTurns * 2.0 * kPi * kSpiralRadius; }
 inline void shotSpiralSteps(double t, Frame &f, bool content) {
 	// from the canyon floor, wide: the explorer walks down the floating steps round the spire, the giant over the canyon's rim
-	const double u = lerp(0.48, 0.565, clamp01((t - 80.0) / 8.0));
+	const double u = spiralU(t);
 	const Vec3 p0 = spiralStep(u), p1 = spiralStep(u + 0.004);
 	const double yaw = yawOf(p1 - p0);
 	const Mat4 body = mul(ruinsFrame(), translate(p0), rotate({0.0, 1.0, 0.0}, yaw));
@@ -385,7 +393,7 @@ inline void shotSpiralSteps(double t, Frame &f, bool content) {
 	f.view = cam(ruinsPoint(Vec3{p0.x + 3.0, p0.y - 1.2, p0.z - 8.0}), ruinsPoint(p0 + Vec3{0.0, 1.0, 0.0}), lens(28.0));
 	f.subjects = {transformPoint(body, {0.0, 1.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	night(f);
-	if (content) f.content = worldText(f, t) + explorerText(walkPose(u * kSpiralTurns * 2.0 * kPi * kSpiralRadius / 0.84, t, 0.8), body, 0.014);
+	if (content) f.content = worldText(f, t) + explorerText(walkPose(spiralWalked(t) / 0.84, t, 0.8), body, 0.014);
 }
 inline double corridorS(double t) { return lerp(0.02, 0.30, clamp01((t - 88.0) / 10.0)); }
 inline double lampsLit(double s) {   // the lamps wake ahead of the explorer, one by one
@@ -486,10 +494,11 @@ inline double elevatorDrop(double t) {
 	if (t < 136.0) return 60.0 * std::pow(smoothstep(126.0, 136.0, t), 1.6);
 	return lerp(kShaftDepth - 6.0, landingDrop(), smoothstep(136.0, 145.5, t));
 }
+inline double elevatorWalkU(double t) { return smoothstep(120.0, 123.0, t); }   // from the corridor's end to the platform's middle
 inline void shotElevator(double t, Frame &f, bool content) {
 	// the round room: onto the platform; the explorer kneels and touches the ring of glyphs, which wakes; the floor begins to sink
 	const Vec3 start = corridorPoint(0.96), centre = rotundaCentre();
-	const double u = smoothstep(120.0, 123.0, t);
+	const double u = elevatorWalkU(t);
 	const Vec3 at = lerp(start, centre, u);
 	const double yaw = yawOf(centre - start);
 	const double drop = elevatorDrop(t);
@@ -536,9 +545,10 @@ inline void shotHall(double t, Frame &f, bool content) {
 }
 inline Vec3 landing() { return observatoryFloor() + Vec3{0.0, 0.0, kObservatoryOffset}; }
 inline Vec3 towardMachine(double dist) { return landing() + normalize(Vec3{0.0, 0.0, -1.0}) * dist; }
+inline double staffWalkDist(double t) { return clamp01((t - 146.5) / 7.5) * 5.4 + 1.8; }   // off the platform towards the machine
 inline void shotStaffReacts(double t, Frame &f, bool content) {
 	// off the platform towards the machine; the staff brightens, and light runs out through the floor from the middle
-	const double dist = clamp01((t - 146.5) / 7.5) * 5.4 + 1.8;
+	const double dist = staffWalkDist(t);
 	const Vec3 at = towardMachine(dist);
 	const Mat4 body = mul(ruinsFrame(), translate(at), rotate({0.0, 1.0, 0.0}, 180.0));
 	ExplorerPose p = walkPose(dist / 0.84, t, t < 154.0 ? 1.0 : 0.0);
@@ -824,10 +834,10 @@ inline void shotAnswer(double t, Frame &f, bool content) {
 	}
 }
 // V Ending --------------------------------------------------------------------------------------------------------------------------------------------------------
+inline rig::PathWalk dawnWalk() { return walkPath({15.6, 0.0, -121.0}, {8.0, 0.0, -112.0}, 250.5, 0.62); }
 inline void shotDawn(double t, Frame &f, bool content) {
 	// outside: the night ending; the explorer steps off the floating bridge onto the rim in the first warm light
-	const Vec3 a{15.6, 0.0, -121.0}, b{8.0, 0.0, -112.0};
-	const Walk w = walkOver(a, b, 250.5, t, 0.62);
+	const Walk w = walkOver(dawnWalk(), t);
 	f.dawn = lerp(0.95, 0.97, smoothstep(250.0, 257.0, t));
 	f.giantGlow = 0.10;
 	f.iso = 420.0;
@@ -964,6 +974,47 @@ inline const char *shotNamesText() {
 inline Frame frameAt(double t, bool content) { return kit::momentAt(shotList(), t, content); }
 // What each moment is about (Film::subjectsAt): the shots' own subjects.
 inline std::vector<Vec3> subjectsAt(double t) { return frameAt(t, false).subjects; }
+
+// When a shot starts and ends (the next one's start), by its name.
+inline void shotSpan(const std::string &name, double &from, double &to) {
+	const auto &s = shotList();
+	from = to = 0.0;
+	for (std::size_t i = 0; i < s.size(); ++i)
+		if (name == s[i].name) {
+			from = s[i].start;
+			to = i + 1 < s.size() ? s[i + 1].start : kDuration;
+		}
+}
+// What the film's motion does that its soundtrack hears (Film::events): the explorer's footfalls in every shot it walks in, from the shots' own walks (so a retimed walk
+// retimes its steps), panned and quietened from each moment's camera; the shuttle's touchdown; the hand on the carved wall and on the ring of glyphs.
+inline std::vector<FilmEvent> events() {
+	std::vector<FilmEvent> out;
+	const film_events::ViewAt view = [](double t) { return frameAt(t, false).view; };
+	const auto ground = [](Vec3 p) { return groundPoint(p.x, p.z); };
+	double a = 0.0, b = 0.0;
+	const std::pair<const char *, rig::PathWalk> walks[] = {{"Under the giant", exitWalk()}, {"Footsteps", stepsWalk()}, {"The ridge", ridgeWalk()}, {"The canyon", rimWalk()},
+															 {"Dawn", dawnWalk()}};
+	for (const auto &[shot, walk] : walks) {
+		shotSpan(shot, a, b);
+		film_events::footfalls(out, walk, a, b, 1.0, view, ground);
+	}
+	shotSpan("The floating steps", a, b);
+	film_events::stepsAlong(out, spiralWalked, [](double t) { return ruinsPoint(spiralStep(spiralU(t))); }, a, b, 0.84, 0.5, 1.0, view);
+	shotSpan("The corridor wakes", a, b);
+	film_events::stepsAlong(out, [](double t) { return corridorS(t) * kCorridorLength; }, [](double t) { return ruinsPoint(corridorPoint(corridorS(t))); }, a, b, 0.84, 0.5, 1.0, view);
+	shotSpan("The elevator", a, b);
+	const Vec3 corridorEnd = corridorPoint(0.96), platform = rotundaCentre();
+	film_events::stepsAlong(out, [=](double t) { return elevatorWalkU(t) * length(platform - corridorEnd); },
+							[=](double t) { return ruinsPoint(lerp(corridorEnd, platform, elevatorWalkU(t))); }, a, b, 0.84, 0.5, 1.0, view);
+	shotSpan("The staff answers", a, b);
+	film_events::stepsAlong(out, staffWalkDist, [](double t) { return ruinsPoint(towardMachine(staffWalkDist(t))); }, a, b, 0.84, 0.5, 1.0, view);
+	film_events::at(out, kTouchdown, EventKind::Impact, 1.0, groundPoint(kLandX, kLandZ), view, 82, 40.0);
+	Vec3 wall, right, up;
+	writingPanel(wall, right, up);
+	film_events::at(out, 100.4, EventKind::Touch, 1.0, wall, view, 85);
+	film_events::at(out, 124.0, EventKind::Touch, 1.0, ruinsPoint(platform), view, 86);   // (kneeling: the hand on the ring of glyphs)
+	return film_events::sorted(out);
+}
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The scene (film_kit.h makes it from a moment)

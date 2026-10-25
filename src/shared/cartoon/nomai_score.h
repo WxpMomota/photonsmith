@@ -9,6 +9,7 @@
 
 #include "cartoon_audio.h"
 #include "nomai_signal.h"
+#include "sfx.h"
 
 namespace cartoon {
 namespace nomai {
@@ -94,13 +95,19 @@ inline void wind(Mix &m, double t, double length, double strength, unsigned seed
 		m.put(t + s, audio::noiseBurst(3.2, 1.2, 0.5, 220.0 + 400.0 * strength, 380.0 + 600.0 * strength, seed + static_cast<unsigned>(s)), 0.13 * g, 0.7 * std::sin(s * 0.3), 0.35);
 	}
 }
-// Footsteps in fine dust: a soft thud and a little grit, one per step.
-inline void steps(Mix &m, double t0, double interval, int count, double gain) {
-	for (int k = 0; k < count; ++k) {
-		const double t = t0 + k * interval;
-		m.put(t, audio::noiseBurst(0.18, 0.004, 18.0, 520.0, 180.0, 300u + static_cast<unsigned>(k)), gain, k % 2 == 0 ? -0.15 : 0.15, 0.15);
-		m.put(t + 0.02, audio::noiseBurst(0.10, 0.002, 40.0, 3200.0, 1800.0, 400u + static_cast<unsigned>(k)), gain * 0.25, k % 2 == 0 ? -0.15 : 0.15, 0.1);
-	}
+// What the film's motion does (nomai::events): the footsteps - in dust outside, on stone in the ruins - the touchdown and the hand on the stone, each where and when the
+// picture has it.
+inline void filmSounds(Mix &m) {
+	std::vector<FilmEvent> outside, ruins;
+	for (const FilmEvent &e : events()) (e.t >= 80.0 && e.t < 250.0 ? ruins : outside).push_back(e);
+	sfx::Palette dust;
+	dust.weight = 1.0;   // (the one impact outside: the shuttle setting down)
+	sfx::Palette stone = dust;
+	stone.ground = sfx::Surface::Stone;
+	stone.footfall = 0.11;
+	stone.send = 0.35;   // (the corridor and the hall ring)
+	sfx::play(m, outside, dust);
+	sfx::play(m, ruins, stone);
 }
 // A low electrical hum (old machinery waking), steady for `length`.
 inline void hum(Mix &m, double t, double length, double gain, double midi = 33.0) { m.put(t, drone(midi, length, 1.5, 2.0), gain, 0.0, 0.4); }
@@ -180,21 +187,18 @@ inline void soundtrack(Mix &m) {
 	for (int k = 0; k < 4; ++k) m.put(31.5 + 0.7 * k, audio::knock(900.0 + 120.0 * k, 0.05, 80u + static_cast<unsigned>(k)), 0.10, 0.3, 0.1);   // (the keys)
 	m.put(28.0, piano(74, 4.0), 0.10, 0.0, 0.6);
 	engine(m, 36.0, 4.0, 0.16);
-	m.put(kTouchdown - 0.1, audio::noiseBurst(4.0, 0.05, 0.8, 380.0, 120.0, 81u), 0.30, 0.0, 0.5);   // (touchdown: the dust rolls out)
-	m.put(kTouchdown, audio::knock(70.0, 0.4, 82u), 0.25, 0.0, 0.3);
+	filmSounds(m);   // (the footsteps, the touchdown, the hands on the stone: from the film's events)
 	wind(m, 40.0, 25.0, 0.30);
 	m.put(42.0, guitar(50, 6.0), 0.20, -0.2, 0.5);
 	m.put(44.0, guitar(57, 6.0), 0.14, 0.1, 0.5);
 
 	// ---- II. The signal (50 - 120): the theme on the guitar as the explorer walks; the ridge; the canyon (strings); the third eye (a high tone); the floating steps; the
 	// corridor's lamps (a tone each); the writing (glass); the recording - cut off ----
-	steps(m, 49.6, 1.2, 6, 0.18);
 	play(m, 51.0, 0.85, themeQuestion(), -12.0, 0.26, -0.15, [](double n, double l) { return guitar(n, l + 1.5, static_cast<unsigned>(n)); });
 	arpeggios(m, 51.0, 3.4, {{38, 45, 50, 53}, {34, 41, 46, 50}, {36, 43, 48, 52}, {33, 40, 45, 48}, {38, 45, 50, 53}}, 0.10);
 	m.put(60.0, banjo(74, 1.2), 0.08, 0.4, 0.6);
 	m.put(61.7, banjo(76, 1.2), 0.07, 0.4, 0.6);
 	m.put(63.4, banjo(77, 1.6), 0.07, 0.4, 0.6);
-	steps(m, 63.0, 1.3, 9, 0.16);
 	strings(m, 66.0, {50, 57, 62, 65}, 10.0, 0.05, 4.0, 4.0);
 	m.put(70.0, drone(26, 14.0, 4.0, 5.0), 0.18, 0.0, 0.5);
 	m.put(77.2, resonance(86, 6.0), 0.07, 0.2, 0.8);   // the third eye opens
@@ -207,8 +211,6 @@ inline void soundtrack(Mix &m) {
 		const double tk = 88.0 + clamp01((s - 0.02) / 0.28) * 10.0;
 		if (tk < 98.0 && tk >= 88.0) m.put(tk, resonance(62 + 2.0 * (k % 5), 3.0), 0.06, k % 2 == 0 ? -0.4 : 0.4, 0.7);
 	}
-	steps(m, 88.0, 1.15, 8, 0.10);
-	m.put(100.4, audio::knock(300.0, 0.1, 85u), 0.06, -0.3, 0.3);   // the hand on the stone
 	shimmer(m, 100.5, 4.8, 0.035, 79.0);
 	m.put(100.6, resonance(69, 6.0), 0.07, -0.2, 0.8);
 	strings(m, 101.0, {57, 62, 64}, 6.0, 0.03, 2.0, 3.0);
@@ -218,14 +220,12 @@ inline void soundtrack(Mix &m) {
 
 	// ---- III. The observatory (120 - 190): the elevator (stone grinding, a descending drone); the hall (deep and empty); the staff; the hall wakes (a slow build, a tone for
 	// each ring); the star map (the theme on banjo and guitar, shimmering); the flashing star; it is gone (the music stops; the signal goes on) ----
-	steps(m, 120.0, 1.1, 3, 0.10);
 	m.put(124.2, resonance(74, 5.0), 0.08, 0.0, 0.8);
 	grind(m, 126.0, 10.0, 0.10);
 	m.put(126.0, drone(43, 10.0, 2.0, 2.0), 0.12, 0.0, 0.5);
 	m.put(132.0, drone(38, 14.0, 2.0, 4.0), 0.11, 0.0, 0.7);
 	m.put(136.0, drone(26, 20.0, 4.0, 5.0), 0.12, 0.0, 0.8);
 	for (int k = 0; k < 3; ++k) m.put(138.0 + 2.6 * k, piano(50 + 7 * k, 5.0), 0.06, 0.0, 0.9);
-	steps(m, 146.5, 1.2, 6, 0.10);
 	hum(m, 147.0, 40.0, 0.06, 38.0);
 	strings(m, 149.0, {38, 45}, 18.0, 0.05, 4.0, 3.0);
 	for (int k = 0; k < kRings; ++k) {   // a tone for each ring that wakes
@@ -271,7 +271,6 @@ inline void soundtrack(Mix &m) {
 	// ---- V. Ending (250 - 300): dawn (wind, the theme answered in major on guitar and banjo, strings); the campfire; the long pull back (the music opens and thins, and the
 	// new signal - the explorer's own - beeps out into space); the title in silence ----
 	wind(m, 250.0, 16.0, 0.25, 55);
-	steps(m, 250.5, 1.3, 5, 0.12);
 	arpeggios(m, 251.0, 3.0, {{38, 45, 50, 54}, {35, 42, 47, 50}, {43, 50, 55, 59}, {45, 52, 57, 61}, {38, 45, 50, 54}, {35, 42, 47, 50}, {43, 50, 55, 59}, {45, 52, 57, 61}, {38, 45, 50, 54}, {43, 50, 55, 59}, {38, 45, 50, 54}}, 0.11);
 	play(m, 254.0, 0.9, themeAnswer(), 0.0, 0.20, 0.1, [](double n, double l) { return guitar(n, l + 1.8, static_cast<unsigned>(n) + 90u); });
 	campfire(m, 257.0, 30.0, 0.10);

@@ -558,6 +558,17 @@ struct Caption {
 	double lineGap = 0.3;   // between two lines, as a share of the taller one's height
 };
 
+// Something a film's motion does that its soundtrack hears (Film::events; film_events.h makes them, sfx.h plays them): a foot coming down, a thing landing, a flash, a hand
+// laid on something.
+enum class EventKind { Footfall, Impact, Flash, Touch };
+struct FilmEvent {
+	double t = 0.0;          // seconds
+	EventKind kind = EventKind::Footfall;
+	double strength = 1.0;   // 0..1 (film_events quietens it with the distance from the camera)
+	double pan = 0.0;        // -1 left .. 1 right: where the camera sees it
+	int seed = 0;            // which take of its sound (two footfalls in a row should not sound the same)
+};
+
 struct Film {
 	const char *key;           // "lamp-and-ball": the --cartoon argument
 	const char *name;          // "Lamp and Ball"
@@ -574,6 +585,9 @@ struct Film {
 	// (empty: none) what each moment is about - the points a shot frames (a character's chest, a thing on a table), in story space. The film doctor (scripts/anim/film.py) warns when
 	// one is out of the frame or hidden behind something nearer (`ray_tracer --film-subjects`).
 	std::function<std::vector<Vec3>(double)> subjectsAt;
+	// (empty: none) what its motion does that the soundtrack should hear, in time order: footfalls from its walks, impacts, flashes, touches (film_events.h). The soundtrack
+	// places its sounds from this list (sfx::play), so a retimed walk retimes its footsteps; `ray_tracer --film-events <key>` prints it.
+	std::function<std::vector<FilmEvent>()> events;
 };
 
 }  // namespace cartoon

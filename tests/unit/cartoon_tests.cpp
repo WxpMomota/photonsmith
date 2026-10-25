@@ -1919,3 +1919,110 @@ TEST(CharacterRig, APartIsMadeOnceAndPlacedByItsFrame) {
 	EXPECT_NE(b.find("0.000000 3.000000 0.000000 1.000000 ]"), std::string::npos) << b;
 	EXPECT_EQ(cartoon::film_cache::part("rig-test", name + "_empty", "Material \"diffuse\"", cartoon::Mat4{}, [] { return cartoon::Mesh{}; }), std::string()) << "nothing to draw";
 }
+
+// ---- a film's events and the sound effects they play (film_events.h, sfx.h) ------------------------------------------------------------------------------
+
+// Events from motion: a walk's footfalls in a shot's span, a body moved along a curve stepping each time its distance passes a step, panned by where the camera sees them
+// (+x to the right of the picture) and quieter further away.
+TEST(FilmEvents, FootfallsComeFromTheWalksAndArePannedAndQuietenedFromTheCamera) {
+	using cartoon::Vec3;
+	const cartoon::CameraView view{{0.0, 1.5, 10.0}, {0.0, 1.5, 0.0}, 40.0, 0.0, 0};
+	EXPECT_GT(cartoon::film_events::panOf(view, {3.0, 1.5, 0.0}), 0.3) << "+x: the right";
+	EXPECT_LT(cartoon::film_events::panOf(view, {-3.0, 1.5, 0.0}), -0.3);
+	EXPECT_NEAR(cartoon::film_events::panOf(view, {0.0, 0.0, 0.0}), 0.0, 1e-9);
+	EXPECT_DOUBLE_EQ(cartoon::film_events::panOf(view, {5.0, 1.5, 20.0}), 0.0) << "behind the camera: the middle";
+	EXPECT_DOUBLE_EQ(cartoon::film_events::audibility(2.0, 3.0), 1.0);
+	EXPECT_LT(cartoon::film_events::audibility(30.0, 3.0), 0.3);
+	EXPECT_GE(cartoon::film_events::audibility(1e6, 3.0), 0.1);
+
+	const cartoon::film_events::ViewAt at = [&](double) { return view; };
+	std::vector<cartoon::FilmEvent> out;
+	const cartoon::rig::PathWalk walk{{{-4.0, 0.0, 0.0}, {4.0, 0.0, 0.0}}, 1.0, 1.0, 1.0, 0.5};
+	cartoon::film_events::footfalls(out, walk, 0.0, 4.0, 1.0, at);
+	ASSERT_EQ(out.size(), 3u) << "steps half a stride in: at 1.5, 2.5 and 3.5 s";
+	EXPECT_NEAR(out[0].t, 1.5, 1e-12);
+	EXPECT_LT(out[0].pan, out[2].pan) << "walking to the right, heard moving to the right";
+	EXPECT_NE(out[0].seed, out[1].seed) << "each step its own take";
+
+	std::vector<cartoon::FilmEvent> curve;
+	cartoon::film_events::stepsAlong(curve, [](double t) { return 2.0 * t; }, [](double t) { return Vec3{0.0, 0.0, -t}; }, 0.0, 2.0, 1.0, 0.5, 1.0, at);
+	ASSERT_EQ(curve.size(), 4u) << "2 units a second, a step at 0.5, 1.5, 2.5, 3.5 units";
+	EXPECT_NEAR(curve[0].t, 0.25, 1.0 / 240.0);
+	EXPECT_NEAR(curve[3].t, 1.75, 1.0 / 240.0);
+	EXPECT_GT(curve[0].strength, curve[3].strength) << "further from the camera, quieter";
+	std::vector<cartoon::FilmEvent> mixed = {curve[2], out[0], curve[0]};
+	mixed = cartoon::film_events::sorted(mixed);
+	EXPECT_TRUE(mixed[0].t <= mixed[1].t && mixed[1].t <= mixed[2].t);
+}
+
+// The sound effects: every footstep surface, impact, flash and touch is a sound, different from take to take, and play() puts each event's sound at its time.
+TEST(FilmEvents, TheSoundLibraryMakesEverySoundAndPlaysEachEventAtItsTime) {
+	using cartoon::sfx::Surface;
+	for (Surface s : {Surface::Dust, Surface::Stone, Surface::Grass, Surface::Wood, Surface::Metal, Surface::Snow}) {
+		const std::vector<float> a = cartoon::sfx::footstep(s, 1), b = cartoon::sfx::footstep(s, 2);
+		ASSERT_FALSE(a.empty());
+		double energy = 0.0, diff = 0.0;
+		for (std::size_t i = 0; i < std::min(a.size(), b.size()); ++i) {
+			energy += a[i] * a[i];
+			diff += (a[i] - b[i]) * (a[i] - b[i]);
+		}
+		EXPECT_GT(energy, 1e-4) << static_cast<int>(s);
+		EXPECT_GT(diff, 1e-6) << "two takes differ: " << static_cast<int>(s);
+	}
+	EXPECT_FALSE(cartoon::sfx::impact(0.0, 1).empty());
+	EXPECT_GT(cartoon::sfx::impact(1.0, 1).size(), cartoon::sfx::impact(0.0, 1).size()) << "a heavy landing rings longer";
+	EXPECT_FALSE(cartoon::sfx::flash(1).empty());
+	EXPECT_FALSE(cartoon::sfx::touch(1).empty());
+
+	cartoon::audio::Mix mix(4.0);
+	cartoon::FilmEvent step;
+	step.t = 1.0;
+	step.kind = cartoon::EventKind::Footfall;
+	cartoon::FilmEvent bang;
+	bang.t = 3.0;
+	bang.kind = cartoon::EventKind::Impact;
+	cartoon::sfx::play(mix, {step, bang});
+	const std::vector<std::int16_t> pcm = mix.finish(0.0, 0.0);
+	const auto loudness = [&](double t0, double t1) {
+		double sum = 0.0;
+		std::size_t n = 0;
+		for (std::size_t i = static_cast<std::size_t>(t0 * cartoon::audio::kRate) * 2; i < static_cast<std::size_t>(t1 * cartoon::audio::kRate) * 2 && i < pcm.size(); ++i, ++n) sum += std::abs(pcm[i]);
+		return n ? sum / n : 0.0;
+	};
+	EXPECT_LT(loudness(0.2, 0.95), 1.0) << "silence before the step";
+	EXPECT_GT(loudness(1.0, 1.15), 20.0) << "the step at 1 s";
+	EXPECT_GT(loudness(3.0, 3.3), 20.0) << "the impact at 3 s";
+}
+
+// The Nomai film's events: in time order, its footfalls only while the explorer walks in the shot on screen (a step every 0.84 m at the walk's speed), the touchdown when the
+// shuttle sets down, and the hands on the stone.
+TEST(FilmEvents, TheNomaiFilmsFootstepsAreTheShotsOwnWalks) {
+	const cartoon::Film *film = cartoon::find("nomai-signal");
+	ASSERT_NE(film, nullptr);
+	ASSERT_TRUE(static_cast<bool>(film->events));
+	const std::vector<cartoon::FilmEvent> events = film->events();
+	ASSERT_GT(events.size(), 40u);
+	int footfalls = 0, impacts = 0, touches = 0;
+	for (std::size_t i = 0; i < events.size(); ++i) {
+		const cartoon::FilmEvent &e = events[i];
+		if (i > 0) EXPECT_LE(events[i - 1].t, e.t) << "in time order";
+		EXPECT_GE(e.strength, 0.0);
+		EXPECT_LE(e.strength, 1.0);
+		EXPECT_LE(std::abs(e.pan), 1.0);
+		footfalls += e.kind == cartoon::EventKind::Footfall;
+		impacts += e.kind == cartoon::EventKind::Impact;
+		touches += e.kind == cartoon::EventKind::Touch;
+	}
+	EXPECT_EQ(impacts, 1) << "the touchdown";
+	EXPECT_EQ(touches, 2) << "the carved wall and the ring of glyphs";
+	EXPECT_GT(footfalls, 40);
+	// the footsteps shot (50 - 57 s): the walk from 49 s at 0.70 m/s, a step every 1.2 s, half a step in
+	std::vector<double> inShot;
+	for (const cartoon::FilmEvent &e : events)
+		if (e.kind == cartoon::EventKind::Footfall && e.t >= 50.0 && e.t < 57.0) inShot.push_back(e.t);
+	ASSERT_GE(inShot.size(), 5u);
+	for (std::size_t i = 1; i < inShot.size(); ++i) EXPECT_NEAR(inShot[i] - inShot[i - 1], 0.84 / 0.70, 1e-9);
+	EXPECT_NEAR(std::fmod(inShot[0] - 49.0, 1.2), 0.6, 1e-9);
+	for (const cartoon::FilmEvent &e : events)
+		if (e.kind == cartoon::EventKind::Footfall) EXPECT_FALSE(e.t > 166.0 && e.t < 250.0) << "nobody walks between the star map and the dawn: " << e.t;
+}

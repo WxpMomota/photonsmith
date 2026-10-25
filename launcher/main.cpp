@@ -946,6 +946,20 @@ int main(int argc, char** argv) {
 		}
 		return EXIT_SUCCESS;
 	}
+	// `ray_tracer --film-events <key>`: what the film's motion does that its soundtrack hears (Film::events), one tab-separated line each, in time order:
+	// `event  seconds  kind  strength  pan  seed`. No line when the film reports none.
+	if (argc >= 2 && std::string(argv[1]) == "--film-events") {
+		const cartoon::Film *film = argc >= 3 ? cartoon::find(argv[2]) : nullptr;
+		if (!film) {
+			std::cerr << "usage: " << argv[0] << " --film-events <film key>\n";
+			return EXIT_FAILURE;
+		}
+		static const char *kinds[] = {"footfall", "impact", "flash", "touch"};
+		if (film->events)
+			for (const cartoon::FilmEvent &e : film->events())
+				std::cout << "event\t" << e.t << "\t" << kinds[static_cast<int>(e.kind)] << "\t" << e.strength << "\t" << e.pan << "\t" << e.seed << "\n";
+		return EXIT_SUCCESS;
+	}
 	std::cout << "========================================" << std::endl;
 	std::cout << "RAY TRACER LAUNCHER (Unified GPU/CPU)" << std::endl;
 	std::cout << "========================================" << std::endl;

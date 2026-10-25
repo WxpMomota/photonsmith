@@ -369,6 +369,15 @@ explorer's mask, horns, pack and tank: the horns were sculpted again on every fr
 face went from 33 s to 29 s a frame; the renderer loads the same triangles (2,368,110 at 45 s, before and after). `film_cache::placement(m)` is the ConcatTransform for
 any such PLY.
 
+**Sound from the motion: a film's events and a library of sound effects.** A film can report what its motion does that the soundtrack should hear (its row's `events`, a
+list of `FilmEvent`: a footfall, an impact, a flash, a touch, each with its time, strength and pan). `src/shared/cartoon/film_events.h` makes the list from the same walks
+and moments the shots use: `film_events::footfalls` for a `rig::PathWalk` in a shot's span, `film_events::stepsAlong` for a body moved along a curve (a step each time its
+distance passes one), `film_events::at` for one event at a place; each is panned by where the moment's camera sees it (+x to the right of the picture) and quietened with
+its distance. `src/shared/cartoon/sfx.h` is the sound library - footsteps on dust, stone, grass, wood, metal and snow (a different take for each step), impacts light to
+heavy, flashes, a hand on stone - and `sfx::play(mix, events, palette)` places them. The Nomai film's footsteps (72 events: outside in dust, in the ruins on stone), its
+touchdown and the hands on the stone come from its events now, not from times typed into the score: a walk that is retimed retimes its steps. `ray_tracer --film-events <key>`
+prints a film's list (`event  seconds  kind  strength  pan  seed`).
+
 **What a film says about itself** is its row and nothing else, and nothing is typed twice. The row has the key, the name, a description of the story (one sentence, without the length or the number
 of shots: those are worked out), the length and fps, the still's time, and a `meta` record: `id` (the number of its video preset, V<id>: give a new film the next number and never reuse one, so
 reordering or removing a film moves no preset), `tags` (from the vocabulary `kTagVocabulary`: what the film shows or how it is lit), `shotNames` (one for each shot of its `shotStarts()`),
