@@ -1,0 +1,31 @@
+# A Walk at Dusk: a film blocked out as a screenplay - a set, a character, its walk and its acting, four shots and music cues - with no C++ (src/shared/cartoon/film_file.h).
+# The music is pbrt_scenes/film_assets/a-walk-at-dusk/cues.txt; the footsteps and the touch come from the walk and the gestures.
+film    a-walk-at-dusk
+name    A Walk at Dusk
+about   A Nomai explorer walks the pale path to a lantern at dusk, looks up as it lights, and points at the first star.
+scene   film_assets/a-walk-at-dusk/set.pbrt
+length  16
+still   13.8
+tags    character, dusk, emissive
+
+character  kai nomai-explorer  at 0 0 4.2  facing 180
+walk       kai  1.0 0.9   0 -1.2   1.6 -5.2
+gesture    kai  "look up" 12.4 13.2
+gesture    kai  "point up" 13.4 14.2
+gesture    kai  "nod" 14.6 14.8 15.4 15.8
+
+light   lantern  0 0   11.5 0   12.8 1   16 1
+
+shot 0 Setting out
+  key   4 2.2 8   0 1 1   38
+  key   3.2 2.0 6.5   0 1 0   38
+  subject kai
+shot 4 Along the path
+  follow  kai  behind 3.4  up 1.9  side 0.7  fov 36
+shot 9 The lantern
+  key   -3.2 1.6 -2.2   0.8 1.2 -4.0   36
+  key   -2.8 1.5 -2.8   1.4 1.3 -5.0   36
+  subject kai
+shot 12.2 The first star
+  key   1.0 0.6 -8.6   1.5 1.7 -5   40
+  subject kai

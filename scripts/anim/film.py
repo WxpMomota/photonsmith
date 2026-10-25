@@ -9,6 +9,8 @@ The films themselves are C++ (src/shared/cartoon/: cartoon_lib.h is the toolkit,
   python scripts/anim/film.py sheet fireflies --count 16        the whole film as a contact sheet: 16 stills, evenly spaced, tiled with their times
   python scripts/anim/film.py sheet little-robot --times 2,8,20,30
   python scripts/anim/film.py video fireflies                   the finished video (a film is a video preset: --video-preset <key>)
+  python scripts/anim/film.py preview nomai-signal              a quick look at the whole film with its sound: characters built coarser (--preview), 640 x 360, 4 samples, one
+                                                                frame in two (--every N), in minutes; run again after an edit and only the frames that changed are rendered
   python scripts/anim/film.py doctor tengwang                   every shot at its start, middle and end, small, with a report of what looks wrong (black, very dark, blown-out
                                                                 and flat frames, jumps in brightness across a cut, slow frames; and, for a film that names its subjects, a subject out of the
                                                                 frame, behind the camera or hidden behind something, and a camera against a wall) and the whole film's render time; exit 1
@@ -603,6 +605,30 @@ def cmd_budget(args):
     print(report)
 
 
+def cmd_preview(args):
+    """The whole film, quickly, with its sound: `--preview` (the characters built coarser: building them, not rendering, is most of a frame's time), a small picture, few
+    samples, one frame in `--every` held for the next; resumed, so that after an edit only the frames whose scene changed are rendered again."""
+    import time
+    info, _ = film_info(args, args.target)
+    height = args.height or 360
+    aspect = info["width"] / info["height"] if info["width"] > 0 and info["height"] > 0 else 16 / 9
+    width = max(16, round(height * aspect))
+    out = args.out or os.path.join(tempfile.gettempdir(), "%s-preview.mp4" % info["key"])
+    every = args.every or 2
+    cmd = [find_exe(args.exe)] + renderer_flags(args) + ["--preview", "--resume", "--video-preset", info["key"], "--output", out, "--height", str(height), str(width),
+                                                         str(args.spp or 4), "6"]
+    if every > 1:
+        cmd[1:1] = ["--draft", str(every)]
+    print("%s: a preview at %d x %d, %d samples, one frame in %d..." % (info["name"], width, height, args.spp or 4, every), flush=True)
+    t0 = time.time()
+    done = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=run_dir())
+    seconds = time.time() - t0
+    if done.returncode != 0:
+        sys.exit("the preview failed (%d):\n%s" % (done.returncode, done.stdout[-1500:]))
+    video = os.path.splitext(out)[0] + "_video.mp4"
+    print("Done in %.1f minutes: %s" % (seconds / 60, video if os.path.exists(video) else out))
+
+
 def cmd_video(args):
     height = args.height or 720
     width = round(height * 16 / 9)
@@ -614,7 +640,7 @@ def cmd_video(args):
 
 def main():
     p = argparse.ArgumentParser(description="Look at a cartoon film (the films are C++: src/shared/cartoon/).")
-    p.add_argument("command", choices=["list", "still", "sheet", "video", "doctor", "budget"])
+    p.add_argument("command", choices=["list", "still", "sheet", "video", "doctor", "budget", "preview"])
     p.add_argument("target", nargs="?", help="still: <key>[@seconds]; sheet and video: <key>")
     p.add_argument("--exe")
     p.add_argument("--cpu", action="store_true")
@@ -628,6 +654,7 @@ def main():
     p.add_argument("--shots", help="doctor, budget: only these shots (comma-separated numbers, 1 the first: as the sheet counts)")
     p.add_argument("--write", action="store_true", help="budget: write the shots' samples into the film's cameras file")
     p.add_argument("--motion", action="store_true", help="doctor: also render three frames in a row from each shot's middle and report flicker")
+    p.add_argument("--every", type=int, help="preview: render one frame in N (default 2; 1 renders every frame)")
     args = p.parse_args()
     if args.out:
         args.out = os.path.abspath(args.out)   # (the program runs from its package folder)
@@ -635,7 +662,7 @@ def main():
         args.exe = os.path.abspath(args.exe)
     if args.command != "list" and not args.target:
         p.error("%s needs a film key" % args.command)
-    {"list": cmd_list, "still": cmd_still, "sheet": cmd_sheet, "video": cmd_video, "doctor": cmd_doctor, "budget": cmd_budget}[args.command](args)
+    {"list": cmd_list, "still": cmd_still, "sheet": cmd_sheet, "video": cmd_video, "doctor": cmd_doctor, "budget": cmd_budget, "preview": cmd_preview}[args.command](args)
 
 
 if __name__ == "__main__":

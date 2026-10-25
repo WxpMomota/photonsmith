@@ -506,7 +506,32 @@ Between two keys a value changes smoothly (evenly with `ease 0`); before the fir
 no shots keeps the scene's own camera. Meshes and pictures the pbrt file names by a relative path are looked up beside the pbrt file. `ray_tracer --film-check FILE.film` loads a film file and its
 scene and says what it found or what is wrong, with the file and line; with no file it lists the films found in the scene folders and the files that were left out (a film with a problem is left out
 of the scene list, never half-loaded). A film made from a file has a video preset number of its own, `V` and a number from 1000 up worked out from its key, so it never changes when other films
-are added. The sound of a built-in film is C++; a film file has none.
+are added. The sound of a built-in film is C++; a film file's is its cues file (`film_assets/<key>/cues.txt`) and, when it has characters, their footsteps.
+
+**A film blocked out as a screenplay: characters in a film file.** A film file can bring in characters from the library of kinds (`film_file::characterKinds`, filled in
+cartoons.h: `nomai-explorer` so far), walk them along paths, act with gestures from their pose library and follow them with the camera, with no C++:
+
+```
+character  kai nomai-explorer  at 0 0 4.2  facing 180   # NAME KIND, where it stands (x y z; y is the ground) and which way it faces (0: +z, 90: +x); `detail CELL` for its sculpting
+walk       kai  1.0 0.9   0 -1.2   1.6 -5.2             # NAME, from 1 s at 0.9 m/s, through these points (x z) from where it is (corners are turned over 2 m)
+gesture    kai  "look up" 12.4 13.2                     # a pose of its library, eased in from 12.4 s to 13.2 s (and out OUT0 OUT1 if given; `contact T`: a touch heard)
+shot 4 Along the path
+  follow   kai  behind 3.4  up 1.9  side 0.7  fov 36      # instead of `key` lines: the camera behind it, at a height, to its right, looking at its chest
+shot 9 The lantern
+  key ...
+  subject  kai                                          # what the shot is about (the doctor's framing checks); a follow shot is about whom it follows
+```
+
+After a walk the character stands with its feet where they came down. A film with characters reports what its shots are about, its characters' feet (the sliding-feet check)
+and its footfalls and gesture contacts, which are its soundtrack's footsteps and touches; its cues file adds the music. `pbrt_scenes/a-walk-at-dusk.film` is a complete example:
+a set (`film_assets/a-walk-at-dusk/set.pbrt`: a sandy flat at dusk, stones, a path, a lantern that lights), the explorer walking the path, looking up and pointing, four shots
+(one following it) and a cues file. A new kind of character is a `CharacterKind` added in `installCharacterKinds()`: its scene text and feet at a moment, its chest, its step.
+
+**A quick preview of a whole film: `python scripts/anim/film.py preview <key>`.** Building a film's characters, not rendering them, is most of a frame's time (the Nomai
+explorer: 8.7 s at its usual detail, 40 s for a face close-up; the renderer takes 3 to 5 s for a 1080p frame), so a real-time renderer would not make a film quick to watch.
+`--preview` builds every sculpted shape three times coarser (`sdf::surfaceNets`, `previewCoarsening()`; its meshes are cached apart, and its frames go to
+`frames-<key>-preview`, never the film's own); `film.py preview` adds 640 x 360, 4 samples, one frame in two (`--every N`) and the soundtrack, and resumes, so after an edit only
+the frames whose scene changed are rendered again. A Nomai frame went from 18 s to 2.6 s; the whole five-minute film, one frame in four, previewed in 13.7 minutes.
 
 ## Examples
 

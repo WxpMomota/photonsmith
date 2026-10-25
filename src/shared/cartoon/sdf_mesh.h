@@ -140,9 +140,11 @@ inline Mesh radialMesh(const F &f, Vec3 centre, double rMax, int nu, int nv, Vec
 	return m;
 }
 
-// Any shape inside the box [lo, hi], meshed on a grid of `cell` sized cubes (naive surface nets, with every vertex pulled onto the surface).
+// Any shape inside the box [lo, hi], meshed on a grid of `cell` sized cubes (naive surface nets, with every vertex pulled onto the surface). In a quick preview
+// (previewCoarsening) the cubes are that much bigger.
 template <typename F>
 inline Mesh surfaceNets(const F &f, Vec3 lo, Vec3 hi, double cell) {
+	cell *= previewCoarsening();
 	const int nx = std::max(2, static_cast<int>(std::ceil((hi.x - lo.x) / cell)) + 1), ny = std::max(2, static_cast<int>(std::ceil((hi.y - lo.y) / cell)) + 1),
 			  nz = std::max(2, static_cast<int>(std::ceil((hi.z - lo.z) / cell)) + 1);
 	const auto at = [&](int i, int j, int k) { return (static_cast<std::size_t>(k) * ny + j) * nx + i; };

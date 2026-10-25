@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <initializer_list>
 #include <map>
@@ -17,6 +18,18 @@
 #include "cartoon_audio.h"
 
 namespace cartoon {
+
+// How much coarser a film's sculpted shapes are made for a quick preview (`--preview`, which sets RAY_TRACER_FILM_PREVIEW for the programs a video starts): 1 for the film
+// itself; 3 for a preview (sdf::surfaceNets takes its cell size times this - building a character, not rendering it, is most of a frame's time). Read once a program.
+inline double previewCoarsening() {
+	static const double c = [] {
+		const char *e = std::getenv("RAY_TRACER_FILM_PREVIEW");
+		if (!e || !*e || (e[0] == '0' && e[1] == '\0')) return 1.0;
+		const double v = std::atof(e);
+		return v > 1.0 ? v : 3.0;
+	}();
+	return c;
+}
 
 constexpr double kPi = 3.14159265358979323846;
 

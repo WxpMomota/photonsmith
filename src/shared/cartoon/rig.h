@@ -34,6 +34,7 @@ struct PathWalk {
 	std::vector<Vec3> points;
 	double start = 0.0, speed = 1.0, stride = 0.84;
 	double firstStep = 1.0;   // how far in strides the first foot comes down (a walk cycle whose foot lands half a step in: 0.5); the rest follow a stride apart
+	double turn = 2.0;        // at a corner the walker turns over this distance (half before it, half after), not all at once: a sudden turn swings its planted feet round
 
 	struct At {
 		Vec3 at;             // where it is (y from the path's points)
@@ -54,21 +55,36 @@ struct PathWalk {
 		for (std::size_t i = 0; i + 1 < points.size(); ++i) l += cartoon::length(flat(points[i + 1] - points[i]));
 		return l;
 	}
-	// The place and the heading at a distance along the path.
+	// The place and the heading at a distance along the path (the heading turning smoothly round each corner, over `turn`).
 	At along(double dist) const {
 		At a;
 		if (points.empty()) return a;
 		a.at = points.front();
 		if (points.size() == 1) return a;
 		double left = std::max(0.0, dist);
+		std::vector<double> headings, lengths;
 		for (std::size_t i = 0; i + 1 < points.size(); ++i) {
 			const Vec3 d = flat(points[i + 1] - points[i]);
-			const double l = cartoon::length(d);
-			if (l <= 0.0) continue;
-			a.yaw = headingOf(d);
-			if (left <= l || i + 2 == points.size()) {
-				const double u = std::min(1.0, left / l);
+			lengths.push_back(cartoon::length(d));
+			headings.push_back(lengths.back() > 0.0 ? headingOf(d) : (headings.empty() ? 0.0 : headings.back()));
+		}
+		for (std::size_t i = 0; i < lengths.size(); ++i) {
+			const double l = lengths[i];
+			if (left <= l || i + 1 == lengths.size()) {
+				const double u = l > 0.0 ? std::min(1.0, left / l) : 1.0;
 				a.at = points[i] + (points[i + 1] - points[i]) * u;
+				a.yaw = headings[i];
+				// near a corner: part of the way round it (the corner before this segment, or the one after)
+				const double half = 0.5 * std::min({turn, i > 0 ? lengths[i - 1] : turn, l});
+				const auto blend = [&](double from, double to, double w) {
+					double d = to - from;
+					while (d > 180.0) d -= 360.0;
+					while (d < -180.0) d += 360.0;
+					return from + d * smoothstep(0.0, 1.0, w);
+				};
+				if (i > 0 && half > 0.0 && left < half) a.yaw = blend(headings[i - 1], headings[i], 0.5 + 0.5 * left / half);
+				const double halfNext = i + 1 < lengths.size() ? 0.5 * std::min({turn, l, lengths[i + 1]}) : 0.0;
+				if (halfNext > 0.0 && l - left < halfNext) a.yaw = blend(headings[i], headings[i + 1], 0.5 - 0.5 * (l - left) / halfNext);
 				return a;
 			}
 			left -= l;

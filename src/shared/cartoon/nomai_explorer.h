@@ -89,6 +89,32 @@ inline const rig::PoseLibrary<ExplorerPose> &explorerPoses() {
 	return poses;
 }
 
+// The explorer's blinks (rig::blink): the two lower eyes together every few seconds, the third on its own - and now and then a little after them.
+inline void blink(ExplorerPose &p, double t) {
+	p.lidL = p.lidR = std::max(p.lidL, rig::blink(t, 7));
+	p.lidTop = std::max(p.lidTop, std::max(rig::blink(t - 0.14, 7), rig::blink(t, 8)));   // (the third eye: late, or on its own)
+}
+// A walking pose: long, slow strides, the staff in the right hand, the left arm swinging a little.
+inline ExplorerPose walkPose(double walk, double t, double stride = 1.0) {
+	ExplorerPose p;
+	p.walk = walk;
+	p.stride = stride;
+	p.time = t;
+	const double sw = std::sin(walk * kPi);
+	p.handL = {0.21, 0.90, 0.06 - 0.10 * sw * stride};
+	p.handR = {-0.25, 1.18, 0.16 + 0.06 * sw * stride};
+	p.headPitch = 4.0;
+	p.wind = {0.03, 0.0, -0.025};
+	p.staffGlow = 0.22;
+	blink(p, t);
+	return p;
+}
+inline ExplorerPose standPose(double t) {
+	ExplorerPose p = walkPose(0.0, t, 0.0);
+	p.handR = {-0.25, 1.15, 0.14};
+	return p;
+}
+
 // ---- the skeleton ---------------------------------------------------------------------------------------------------------------------------------------------------
 struct ExplorerBody {
 	Vec3 pelvis, chest, neck, headPivot, shoulder[2], elbow[2], wrist[2], hip[2], knee[2], hock[2], ball[2];

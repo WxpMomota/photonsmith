@@ -38,7 +38,7 @@ inline constexpr FlagScopeEntry kFlagScopes[] = {
 	{"--film-table", FlagScope::Mode}, {"--film-check", FlagScope::Mode}, {"--film-shots", FlagScope::Mode}, {"--film-subjects", FlagScope::Mode}, {"--film-events", FlagScope::Mode}, {"--film-feet", FlagScope::Mode}, {"--film-cuts", FlagScope::Mode}, {"--film-cues", FlagScope::Mode}, {"--prepare-gpu", FlagScope::Mode}, {"--assemble-video", FlagScope::Mode}, {"--export-gltf", FlagScope::Mode},
 	{"--scene-report", FlagScope::Mode}, {"--print-scene-size", FlagScope::Mode},
 	// set by the program for its own runs
-	{"--ppm-only", FlagScope::Internal},
+	{"--ppm-only", FlagScope::Internal}, {"--preview", FlagScope::Render},
 	// how to render
 	{"--gpu", FlagScope::Render}, {"-gpu", FlagScope::Render}, {"--gpu-device", FlagScope::Render}, {"--cpu", FlagScope::Render}, {"-cpu", FlagScope::Render}, {"--wavefront", FlagScope::Render}, {"--optix-validate", FlagScope::Render},
 	{"--isolate-pbrt-lighting", FlagScope::Render}, {"--denoise", FlagScope::Render}, {"--denoise-guides", FlagScope::Render}, {"--denoise-blend", FlagScope::Render},

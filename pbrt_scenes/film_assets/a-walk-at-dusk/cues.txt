@@ -1,0 +1,13 @@
+# A Walk at Dusk: its music (src/shared/cartoon/music_cues.h). The footsteps and the touch come from the film's walk and gestures.
+[Setting out]
+0.2   pad D3 A3 D4  length 9  gain 0.05  send 0.7
+1.5   pluck D4 F4 A4  spread 0.4  gain 0.06  pan -0.2
+[Along the path]
+0.5   pluck A4 C5 D5  spread 0.5  gain 0.05  pan 0.2
+3.0   pad Bb2 F3 D4  length 6  gain 0.04  send 0.7
+[The lantern]
+2.6   bell A5 2.0  gain 0.06  pan 0.4                       # the lantern lights
+1.0   pad G3 D4 B4  length 5  gain 0.04  send 0.8
+[The first star]
+1.6   bell D6 3.0  gain 0.05  send 0.9                      # the first star
+1.4   strings D3 A3 F#4  length 3.6  gain 0.045  send 0.8

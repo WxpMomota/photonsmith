@@ -118,7 +118,7 @@ inline std::filesystem::path dir(const std::string &film) {
 	prune(base);
 	const std::string stamp = buildStamp();
 	if (stamp.empty()) return base;
-	const std::filesystem::path d = base / stamp;
+	const std::filesystem::path d = base / (previewCoarsening() > 1.0 ? stamp + "_preview" : stamp);   // (a preview's coarse meshes never stand in for the film's)
 	std::error_code ec;
 	std::filesystem::create_directories(d, ec);
 	std::filesystem::last_write_time(d, std::filesystem::file_time_type::clock::now(), ec);

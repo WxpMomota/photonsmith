@@ -38,6 +38,21 @@
 // Between two keys a value goes smoothly (or evenly with `ease 0`); before the first key it holds the first value and after the last it holds the last. Coordinates are pbrt's own (the
 // scene's, not the cartoon toolkit's), and a film with no `shot` lines keeps the scene's own camera. Everything a pbrt file refers to by a relative path (meshes, pictures) is looked up
 // beside the pbrt file. A problem in a film file is reported with its line number when the file is loaded (`ray_tracer --film-check FILE`) and the film is left out.
+//
+// Characters - a film blocked out as a screenplay. A character from the library (characterKinds: the Nomai explorer, `nomai-explorer`) is brought in, walks and acts:
+//
+//     character  kai nomai-explorer  at 0 0 4  facing 180       # NAME KIND, where it stands (pbrt's x y z; y is the ground) and which way it faces (0: +z, 90: +x)
+//     walk       kai  2.0 0.7   0 -2   3 -6                     # NAME, from 2 s at 0.7 m/s, through these points (x z) from where it is
+//     gesture    kai  "look up" 8.0 9.0 11.0 11.5               # NAME, a pose of its library, eased in from 8 s to 9 s, out from 11 s to 11.5 s (no out times: held)
+//     gesture    kai  "reach to the wall" 12 13 contact 12.8    # contact: the hand meets something (a touch on the soundtrack)
+//
+//     shot 0 Walking
+//       follow   kai  behind 3  up 1.7  side 0.6  fov 35          # instead of `key` lines: the camera behind NAME (metres), at a height, to its right, looking at its chest
+//     shot 9 Looking up
+//       key ...
+//       subject  kai                                            # what the shot is about (the film doctor's framing checks); a follow shot is about whom it follows
+//
+// A film with characters reports its subjects, its footfalls and gesture contacts (Film::events: footsteps on the soundtrack) and its characters' feet (the sliding-feet check).
 
 #include <algorithm>
 #include <cctype>
@@ -46,12 +61,15 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <map>
 #include <regex>
 #include <sstream>
 #include <string>
 #include <vector>
 
 #include "../camera_keyframes.h"
+#include "film_subjects.h"
+#include "rig.h"
 
 namespace cartoon {
 namespace film_file {
@@ -73,11 +91,59 @@ struct Anim {
 	std::vector<std::pair<double, double>> intervals;   // Show
 };
 
+// A shot's camera that follows a character (`follow NAME behind D up H side S fov F`).
+struct Follow {
+	std::string who;
+	double behind = 3.0, up = 1.6, side = 0.0, fov = 0.0;   // fov 0: the scene's
+};
 struct Shot {
 	double start = 0.0;
 	std::string name;
 	camera_keyframes::Path path;
+	bool following = false;
+	Follow follow;
+	std::vector<std::string> about;   // the characters the shot is about
 };
+
+// A character a film file brings in (`character NAME KIND ...`), its walks (`walk`) and its gestures (`gesture`).
+struct WalkLine {
+	double t0 = 0.0, speed = 0.8;
+	std::vector<std::pair<double, double>> points;   // pbrt x z
+	int line = 0;
+};
+struct Character {
+	std::string name, kind;
+	double start[3] = {0.0, 0.0, 0.0};   // pbrt's coordinates
+	double facing = 0.0;                 // degrees: 0 faces +z, 90 faces +x (pbrt's)
+	double detail = 0.0;                 // the kind's sculpting cell (0: its own)
+	std::vector<WalkLine> walks;
+	std::vector<rig::Gesture> gestures;
+	int line = 0;
+};
+
+// What a character of one kind is at a moment: its frame in story space (the toolkit's: x mirrored from pbrt's), how many steps it has walked, whether it is walking, its
+// gestures, the time and its detail.
+struct CharacterMoment {
+	Mat4 frame;
+	double steps = 0.0;
+	bool moving = false;
+	double t = 0.0;
+	const std::vector<rig::Gesture> *gestures = nullptr;
+	double detail = 0.0;
+};
+// A kind of character: its scene text (story space, as the toolkit writes it) and its feet at a moment, the point a camera and the film doctor look at (body space), and its walk's
+// step (rig::PathWalk's stride and first step).
+struct CharacterKind {
+	std::function<std::string(const CharacterMoment &)> text;
+	std::function<std::vector<Foot>(const CharacterMoment &)> feet;
+	Vec3 chest{0.0, 1.25, 0.0};
+	double stride = 0.84, firstStep = 0.5;
+};
+// The library of kinds, by name (cartoons.h fills it before any film file is read).
+inline std::map<std::string, CharacterKind> &characterKinds() {
+	static std::map<std::string, CharacterKind> kinds;
+	return kinds;
+}
 
 // What a film file says.
 struct Spec {
@@ -88,6 +154,7 @@ struct Spec {
 	bool ease = true;
 	std::vector<Shot> shots;
 	std::vector<Anim> anims;
+	std::vector<Character> characters;
 };
 
 struct Parsed {
@@ -103,6 +170,27 @@ inline std::string trim(const std::string &s) {
 	while (a < b && std::isspace(static_cast<unsigned char>(s[a]))) ++a;
 	while (b > a && std::isspace(static_cast<unsigned char>(s[b - 1]))) --b;
 	return s.substr(a, b - a);
+}
+// The words of a line, a "quoted phrase" as one (a gesture's pose: "look up").
+inline std::vector<std::string> tokens(const std::string &s) {
+	std::vector<std::string> out;
+	for (std::size_t i = 0; i < s.size();) {
+		if (std::isspace(static_cast<unsigned char>(s[i]))) {
+			++i;
+			continue;
+		}
+		if (s[i] == '"') {
+			const std::size_t close = s.find('"', i + 1);
+			out.push_back(s.substr(i + 1, (close == std::string::npos ? s.size() : close) - i - 1));
+			i = close == std::string::npos ? s.size() : close + 1;
+			continue;
+		}
+		std::size_t j = i;
+		while (j < s.size() && !std::isspace(static_cast<unsigned char>(s[j]))) ++j;
+		out.push_back(s.substr(i, j - i));
+		i = j;
+	}
+	return out;
 }
 inline std::vector<std::string> words(const std::string &s) {
 	std::vector<std::string> out;
@@ -150,7 +238,11 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 	std::string shotText;   // the key lines of the shot being read
 	auto closeShot = [&]() -> std::string {
 		if (s.shots.empty()) return std::string();
-		if (shotText.empty()) return "the shot \"" + s.shots.back().name + "\" has no `key` lines";
+		if (s.shots.back().following) {
+			if (!shotText.empty()) return "the shot \"" + s.shots.back().name + "\" has both `key` lines and `follow`";
+			return std::string();
+		}
+		if (shotText.empty()) return "the shot \"" + s.shots.back().name + "\" has no `key` lines (or a `follow` line)";
 		// one `key` is a camera that stays where it is (a camera path wants two)
 		std::size_t keyLines = 0;
 		for (std::size_t at = shotText.find("key "); at != std::string::npos; at = shotText.find("key ", at + 1)) ++keyLines;
@@ -210,6 +302,82 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			if (!s.shots.empty() && shot.start <= s.shots.back().start) return fail("shots must start later one after the other");
 			s.shots.push_back(shot);
 			shotLine = n;
+		} else if (verb == "character") {
+			const std::vector<std::string> t = detail::tokens(line);
+			if (t.size() < 3) return fail("`character NAME KIND [at X Y Z] [facing DEGREES] [detail CELL]`");
+			Character c;
+			c.name = t[1];
+			c.kind = t[2];
+			c.line = n;
+			for (const Character &other : s.characters)
+				if (other.name == c.name) return fail("there is already a character called " + c.name);
+			for (std::size_t i = 3; i < t.size();) {
+				if (t[i] == "at" && i + 3 < t.size()) {
+					for (int k = 0; k < 3; ++k)
+						if (!number(t[i + 1 + k], c.start[k])) return fail("`at` takes three numbers");
+					i += 4;
+				} else if ((t[i] == "facing" || t[i] == "detail") && i + 1 < t.size()) {
+					if (!number(t[i + 1], t[i] == "facing" ? c.facing : c.detail)) return fail("`" + t[i] + "` takes a number");
+					i += 2;
+				} else {
+					return fail("\"" + t[i] + "\": a character takes `at X Y Z`, `facing DEGREES` and `detail CELL`");
+				}
+			}
+			s.characters.push_back(c);
+		} else if (verb == "walk" || verb == "gesture") {
+			const std::vector<std::string> t = detail::tokens(line);
+			Character *c = nullptr;
+			for (Character &each : s.characters)
+				if (t.size() > 1 && each.name == t[1]) c = &each;
+			if (!c) return fail("`" + verb + "` needs the name of a character brought in before it with `character`");
+			if (verb == "walk") {
+				WalkLine wl;
+				wl.line = n;
+				if (t.size() < 6 || (t.size() - 4) % 2 != 0 || !number(t[2], wl.t0) || !number(t[3], wl.speed) || wl.speed <= 0.0)
+					return fail("`walk NAME FROM SPEED X Z [X Z ...]`: a start time, a speed above 0 and points");
+				for (std::size_t i = 4; i + 1 < t.size(); i += 2) {
+					double x = 0, z = 0;
+					if (!number(t[i], x) || !number(t[i + 1], z)) return fail("a walk's points are pairs of numbers (x z)");
+					wl.points.push_back({x, z});
+				}
+				if (!c->walks.empty() && wl.t0 < c->walks.back().t0) return fail("a character's walks go in time order");
+				c->walks.push_back(wl);
+			} else {
+				rig::Gesture g;
+				if (t.size() < 5 || !number(t[3], g.in0) || !number(t[4], g.in1) || g.in1 < g.in0) return fail("`gesture NAME \"POSE\" IN0 IN1 [OUT0 OUT1] [contact T]`");
+				g.pose = t[2];
+				std::size_t i = 5;
+				if (i + 1 < t.size() && t[i] != "contact") {
+					if (!number(t[i], g.out0) || !number(t[i + 1], g.out1) || g.out0 < g.in1 || g.out1 < g.out0) return fail("a gesture's out times come after its in times");
+					i += 2;
+				}
+				if (i + 1 < t.size() && t[i] == "contact") {
+					if (!number(t[i + 1], g.contact)) return fail("`contact` takes a time");
+					i += 2;
+				}
+				if (i != t.size()) return fail("\"" + t[i] + "\" is not part of a gesture");
+				c->gestures.push_back(g);
+			}
+		} else if (verb == "follow" || verb == "subject") {
+			if (s.shots.empty()) return fail("`" + verb + "` belongs to a shot: start one with `shot 0 NAME` first");
+			const std::vector<std::string> t = detail::tokens(line);
+			if (t.size() < 2) return fail("`" + verb + "` needs a character's name");
+			Shot &shot = s.shots.back();
+			if (verb == "subject") {
+				for (std::size_t i = 1; i < t.size(); ++i) shot.about.push_back(t[i]);
+				continue;
+			}
+			shot.following = true;
+			shot.follow.who = t[1];
+			for (std::size_t i = 2; i < t.size(); i += 2) {
+				double v = 0.0;
+				if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail("`follow NAME [behind D] [up H] [side S] [fov F]`: each takes a number");
+				if (t[i] == "behind") shot.follow.behind = v;
+				else if (t[i] == "up") shot.follow.up = v;
+				else if (t[i] == "side") shot.follow.side = v;
+				else if (t[i] == "fov") shot.follow.fov = v;
+				else return fail("\"" + t[i] + "\": a follow takes behind, up, side and fov");
+			}
 		} else if (verb == "move" || verb == "turn" || verb == "grow" || verb == "light" || verb == "show") {
 			if (w.size() < 3) return fail("`" + verb + " NAME ...` needs a name and values");
 			Anim a;
@@ -248,7 +416,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shot, key, move, turn, grow, light, show)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shot, key, follow, subject, move, turn, grow, light, show, character, walk, gesture)");
 		}
 	}
 	n = shotLine;
@@ -474,8 +642,146 @@ class DataFilm {
 				for (const std::string &n : scene.names) known += (known.empty() ? "" : ", ") + n;
 				return filePath + ":" + std::to_string(a.line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + a.name + "`" + (known.empty() ? " (it has none)" : " (it has: " + known + ")");
 			}
+		for (const Character &c : spec.characters)
+			if (!characterKinds().count(c.kind)) {
+				std::string known;
+				for (const auto &[name, kind] : characterKinds()) known += (known.empty() ? "" : ", ") + name;
+				return filePath + ":" + std::to_string(c.line) + ": no kind of character called \"" + c.kind + "\" (there are: " + (known.empty() ? "none" : known) + ")";
+			}
+		for (const Shot &shot : spec.shots) {
+			std::vector<std::string> named = shot.about;
+			if (shot.following) named.push_back(shot.follow.who);
+			for (const std::string &who : named)
+				if (!character(who)) return filePath + ": the shot \"" + shot.name + "\" names " + who + ", who is not brought in with `character`";
+		}
 		return std::string();
 	}
+
+	// ---- characters ----
+	const Character *character(const std::string &name) const {
+		for (const Character &c : spec.characters)
+			if (c.name == name) return &c;
+		return nullptr;
+	}
+	static Vec3 story(double x, double y, double z) { return {-x, y, z}; }   // (pbrt's coordinates to the toolkit's: x mirrored)
+	// A walk of a character as a path in story space, from where it was before the walk.
+	rig::PathWalk pathOf(const Character &c, std::size_t walk) const {
+		const CharacterKind &kind = characterKinds().at(c.kind);
+		Vec3 from = story(c.start[0], c.start[1], c.start[2]);
+		for (std::size_t i = 0; i < walk; ++i) {
+			const auto &last = c.walks[i].points.back();
+			from = story(last.first, c.start[1], last.second);
+		}
+		rig::PathWalk w;
+		w.points.push_back(from);
+		for (const auto &pt : c.walks[walk].points) w.points.push_back(story(pt.first, c.start[1], pt.second));
+		w.start = c.walks[walk].t0;
+		w.speed = c.walks[walk].speed;
+		w.stride = kind.stride;
+		w.firstStep = kind.firstStep;
+		return w;
+	}
+	// Where a character is at t (story space), which way it faces (degrees, rig::headingOf), how many steps it has made in its walk and whether it is walking. After a walk it
+	// stands where the walk ended, its feet where they came down.
+	CharacterMoment momentOf(const Character &c, double t, Vec3 *at = nullptr) const {
+		Vec3 where = story(c.start[0], c.start[1], c.start[2]);
+		double heading = -c.facing, steps = 0.0;
+		bool moving = false;
+		for (std::size_t i = 0; i < c.walks.size(); ++i) {
+			if (t < c.walks[i].t0) break;
+			const rig::PathWalk path = pathOf(c, i);
+			const rig::PathWalk::At a = path.at(t);
+			where = a.at;
+			heading = a.yaw;
+			steps = a.steps;
+			moving = a.moving;
+			if (moving) break;
+		}
+		CharacterMoment m;
+		m.frame = mul(translate(where), rotate({0.0, 1.0, 0.0}, heading));
+		m.steps = steps;
+		m.moving = moving;
+		m.t = t;
+		m.gestures = &c.gestures;
+		m.detail = c.detail;
+		if (at) *at = where;
+		return m;
+	}
+	Vec3 chestOf(const Character &c, double t) const { return transformPoint(momentOf(c, t).frame, characterKinds().at(c.kind).chest); }
+	std::size_t shotAt(double t) const {
+		std::size_t k = 0;
+		for (std::size_t i = 0; i < spec.shots.size(); ++i)
+			if (t >= spec.shots[i].start) k = i;
+		return k;
+	}
+	// What the moment is about (Film::subjectsAt): the characters its shot names, or the one it follows.
+	std::vector<Vec3> subjectsAt(double t) const {
+		std::vector<Vec3> out;
+		if (spec.shots.empty()) return out;
+		const Shot &shot = spec.shots[shotAt(t)];
+		std::vector<std::string> named = shot.about;
+		if (shot.following && std::find(named.begin(), named.end(), shot.follow.who) == named.end()) named.insert(named.begin(), shot.follow.who);
+		for (const std::string &who : named)
+			if (const Character *c = character(who)) out.push_back(chestOf(*c, t));
+		return out;
+	}
+	// The characters' feet, in the same order at every moment (Film::feetAt).
+	std::vector<Foot> feetAt(double t) const {
+		std::vector<Foot> out;
+		for (const Character &c : spec.characters) {
+			const CharacterKind &kind = characterKinds().at(c.kind);
+			if (!kind.feet) continue;
+			const std::vector<Foot> f = kind.feet(momentOf(c, t));
+			out.insert(out.end(), f.begin(), f.end());
+		}
+		return out;
+	}
+	// The footfalls of every walk and the gestures' contacts (Film::events), panned and quietened from the camera at each moment.
+	std::vector<FilmEvent> events() const {
+		std::vector<FilmEvent> out;
+		const auto viewAt = [this](double t) {
+			Vec3 eye, target;
+			double fov = 40.0;
+			film_subjects::cameraOf(headerAt(t), eye, target, fov);
+			return CameraView{eye, target, fov, 0.0, 0};
+		};
+		int seed = 0;
+		for (const Character &c : spec.characters) {
+			for (std::size_t i = 0; i < c.walks.size(); ++i)
+				for (const rig::PathWalk::Footfall &f : pathOf(c, i).footfalls(-1e30, 1e30)) {
+					FilmEvent e;
+					e.t = f.t;
+					e.kind = EventKind::Footfall;
+					e.seed = ++seed;
+					const CameraView v = viewAt(f.t);
+					e.pan = panOf(v, f.at);
+					e.strength = audibility(length(f.at - v.eye));
+					out.push_back(e);
+				}
+			for (const double t : rig::contactsOf(c.gestures)) {
+				FilmEvent e;
+				e.t = t;
+				e.kind = EventKind::Touch;
+				e.seed = ++seed;
+				const CameraView v = viewAt(t);
+				const Vec3 at = chestOf(c, t);
+				e.pan = panOf(v, at);
+				e.strength = audibility(length(at - v.eye));
+				out.push_back(e);
+			}
+		}
+		std::stable_sort(out.begin(), out.end(), [](const FilmEvent &a, const FilmEvent &b) { return a.t < b.t; });
+		return out;
+	}
+	// (film_events.h's panOf and audibility, here so that this header does not need the sound library)
+	static double panOf(const CameraView &view, Vec3 at) {
+		const Vec3 f = normalize(view.target - view.eye), right = normalize(cross(f, Vec3{0.0, 1.0, 0.0}));
+		const Vec3 d = at - view.eye;
+		const double depth = dot(d, f);
+		if (depth <= 1e-6) return 0.0;
+		return std::max(-1.0, std::min(1.0, dot(d, right) / (depth * std::tan(view.fov * kPi / 360.0) * 16.0 / 9.0))) * 0.8;
+	}
+	static double audibility(double distance) { return distance <= 3.0 ? 1.0 : std::max(0.1, std::pow(3.0 / distance, 0.7)); }
 
 	std::vector<double> shotStarts() const {
 		std::vector<double> v;
@@ -507,6 +813,10 @@ class DataFilm {
 			const Block &b = scene.blocks[static_cast<std::size_t>(piece.block)];
 			if (!visible(b.name, t)) continue;
 			out += b.head + transformsFor(b.name, t) + lightsScaled(b.name, b.body, t);
+		}
+		for (const Character &c : spec.characters) {   // the characters, as their kinds draw them
+			const CharacterKind &kind = characterKinds().at(c.kind);
+			if (kind.text) out += "# " + c.name + " (" + c.kind + ")\n" + kind.text(momentOf(c, t));
 		}
 		return out;
 	}
@@ -596,7 +906,24 @@ class DataFilm {
 		const Shot &shot = spec.shots[k];
 		const double end = k + 1 < spec.shots.size() ? spec.shots[k + 1].start : spec.length;
 		const double span = std::max(1e-6, end - shot.start);
-		const camera_keyframes::Key key = camera_keyframes::at(shot.path, std::min(1.0, std::max(0.0, (t - shot.start) / span)), span);
+		camera_keyframes::Key key;
+		if (shot.following) {
+			// behind the character, at a height above its feet, to its right, looking at its chest (story space, then pbrt's: x mirrored)
+			const Character &c = *character(shot.follow.who);
+			Vec3 feet;
+			const CharacterMoment m = momentOf(c, t, &feet);
+			const Vec3 forward = normalize(transformPoint(m.frame, {0.0, 0.0, 1.0}) - feet), up{0.0, 1.0, 0.0}, right = cross(forward, up);
+			const Vec3 eye = feet - forward * shot.follow.behind + right * shot.follow.side + up * shot.follow.up, target = transformPoint(m.frame, characterKinds().at(c.kind).chest);
+			key.pos[0] = -eye.x;
+			key.pos[1] = eye.y;
+			key.pos[2] = eye.z;
+			key.target[0] = -target.x;
+			key.target[1] = target.y;
+			key.target[2] = target.z;
+			key.fov = shot.follow.fov;
+		} else {
+			key = camera_keyframes::at(shot.path, std::min(1.0, std::max(0.0, (t - shot.start) / span)), span);
+		}
 		lookAt = "LookAt " + num(key.pos[0]) + " " + num(key.pos[1]) + " " + num(key.pos[2]) + "  " + num(key.target[0]) + " " + num(key.target[1]) + " " + num(key.target[2]) + "  0 1 0\n";
 		// the scene's own field of view and lens unless the keys give theirs
 		static const std::regex fovRe("\"float\\s+fov\"\\s*\\[\\s*([-+0-9.eE]+)");

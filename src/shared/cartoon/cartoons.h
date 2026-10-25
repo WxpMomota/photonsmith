@@ -195,6 +195,21 @@ inline Film withFilmFiles(Film f) {
 	return f;
 }
 
+// The kinds of character a film file can bring in (film_file.h `character NAME KIND`): the Nomai explorer, walking with its own cycle and acting with its pose library.
+inline void installCharacterKinds() {
+	film_file::CharacterKind explorer;
+	const auto pose = [](const film_file::CharacterMoment &m) {
+		nomai::ExplorerPose p = m.moving || m.steps > 0.0 ? nomai::walkPose(m.steps, m.t, 1.0) : nomai::standPose(m.t);   // (after a walk: its feet where they came down)
+		return m.gestures && !m.gestures->empty() ? rig::act(p, *m.gestures, m.t, nomai::explorerPoses()) : p;
+	};
+	explorer.text = [pose](const film_file::CharacterMoment &m) { return nomai::explorerText(pose(m), m.frame, m.detail > 0.0 ? m.detail : 0.012); };
+	explorer.feet = [pose](const film_file::CharacterMoment &m) { return nomai::explorerFeet(pose(m), m.frame); };
+	explorer.chest = {0.0, 1.25, 0.0};
+	explorer.stride = 0.84;
+	explorer.firstStep = 0.5;
+	film_file::characterKinds()["nomai-explorer"] = explorer;
+}
+
 // Loads one film file into the registry (or says why not).
 inline void addFilmFile(Registry &r, const std::string &file) {
 	r.data.emplace_back();
@@ -239,6 +254,12 @@ inline void addFilmFile(Registry &r, const std::string &file) {
 	Film f{r.keep(d.spec.key), r.keep(d.spec.name), r.keep(d.spec.about.empty() ? "A film made from " + std::filesystem::path(d.spec.scene).filename().string() + "." : d.spec.about),
 		   d.spec.length, d.spec.fps, [p](double t) { return p->sceneAt(t); }, [p](double t) { return p->headerAt(t); }, [p]() { return p->shotStarts(); }, d.spec.still,
 		   {id, r.keep(tags), r.keep(d.shotNames()), d.scene.samples, 0.0}};
+	if (!d.spec.characters.empty()) {   // a film with characters: what its shots are about, its footsteps and touches, its characters' feet
+		f.subjectsAt = [p](double t) { return p->subjectsAt(t); };
+		f.events = [p]() { return p->events(); };
+		f.feetAt = [p](double t) { return p->feetAt(t); };
+		f.soundtrack = [p](audio::Mix &m) { sfx::play(m, p->events()); };   // (its footsteps and touches; its cues file adds the music: withFilmFiles)
+	}
 	r.made.push_back(withFilmFiles(std::move(f)));
 	r.all.push_back(&r.made.back());
 }
@@ -246,6 +267,7 @@ inline void addFilmFile(Registry &r, const std::string &file) {
 inline Registry &registry() {
 	static Registry *r = [] {
 		Registry *reg = new Registry();   // (lives as long as the program: films hand out pointers into it)
+		installCharacterKinds();   // (before any film file is read: its characters are of these kinds)
 		for (const Film &f : kFilms) {
 			reg->made.push_back(withFilmFiles(f));
 			reg->all.push_back(&reg->made.back());

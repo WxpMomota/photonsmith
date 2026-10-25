@@ -85,11 +85,6 @@ inline void inside(Frame &f, double iso) {
 	f.warmth = -0.06;
 }
 
-// The explorer's blinks (rig::blink): the two lower eyes together every few seconds, the third on its own - and now and then a little after them.
-inline void blink(ExplorerPose &p, double t) {
-	p.lidL = p.lidR = std::max(p.lidL, rig::blink(t, 7));
-	p.lidTop = std::max(p.lidTop, std::max(rig::blink(t - 0.14, 7), rig::blink(t, 8)));   // (the third eye: late, or on its own)
-}
 // The explorer's acting beyond walking: gestures from its pose library (explorerPoses, rig::act), at film times. A gesture with a contact time is a hand meeting stone: the
 // film's events hear it (a Touch).
 inline const std::vector<rig::Gesture> &acting() {
@@ -103,26 +98,6 @@ inline const std::vector<rig::Gesture> &acting() {
 	return g;
 }
 inline ExplorerPose acted(ExplorerPose p, double t) { return rig::act(p, acting(), t, explorerPoses()); }
-// A walking pose: long, slow strides, the staff in the right hand, the left arm swinging a little.
-inline ExplorerPose walkPose(double walk, double t, double stride = 1.0) {
-	ExplorerPose p;
-	p.walk = walk;
-	p.stride = stride;
-	p.time = t;
-	const double sw = std::sin(walk * kPi);
-	p.handL = {0.21, 0.90, 0.06 - 0.10 * sw * stride};
-	p.handR = {-0.25, 1.18, 0.16 + 0.06 * sw * stride};
-	p.headPitch = 4.0;
-	p.wind = {0.03, 0.0, -0.025};
-	p.staffGlow = 0.22;
-	blink(p, t);
-	return p;
-}
-inline ExplorerPose standPose(double t) {
-	ExplorerPose p = walkPose(0.0, t, 0.0);
-	p.handR = {-0.25, 1.15, 0.14};
-	return p;
-}
 // A walk on the ground along a path (arc coordinates in x and z; rig::PathWalk, 0.84 m a step, a foot coming down half a step in - walkPose's cycle): where the body is,
 // how far the feet have gone, and its frame.
 struct Walk {

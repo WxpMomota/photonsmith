@@ -409,6 +409,9 @@ struct LaunchArgs {
 	// --ppm-only: write the picture as a PPM and no PNG beside it. A cartoon video's frame runs are started with it (the video turns each PPM into its numbered PNG itself and deletes the
 	// frame run's own PNG, so making one was a second encode of every frame); people have no use for it.
 	bool ppm_only = false;
+	// --preview: a quick look at a film: its sculpted characters three times coarser (RAY_TRACER_FILM_PREVIEW, cartoon_lib.h previewCoarsening; set for the programs the
+	// video starts too), its frames in a folder of their own (frames-<key>-preview). With a small size, few samples and --draft: a whole film in minutes (film.py preview).
+	bool preview = false;
 	// --background: be a polite guest on the computer (launcher/background_mode.h): lower CPU and GPU priority, half the CPU cores, one worker and one frame at a time. Passed on to every program
 	// a video starts. RAY_TRACER_BACKGROUND=1 does the same.
 	bool background = false;
@@ -966,6 +969,9 @@ inline FlagResult handle_image_and_video_flag(const std::string& arg, int argc, 
 	} else if (arg == "--ppm-only") {
 		out.ppm_only = true;
 		consumed_args.insert(i);
+	} else if (arg == "--preview") {
+		out.preview = true;
+		consumed_args.insert(i);
 	} else if (arg == "--background") {
 		out.background = true;
 		consumed_args.insert(i);
@@ -1307,6 +1313,8 @@ inline void print_launch_help(const char* program) {
 				  << "               (the environment variable RAY_TRACER_BACKGROUND=1 also sets it)\n"
 				  << "  --resume:    continue an interrupted cartoon video from the frames already rendered, when the film and\n"
 				  << "               the settings (size, samples, flags) are the same; otherwise it starts again\n"
+				  << "  --preview:   a quick look at a cartoon: its characters built coarser (most of a frame's time), its frames\n"
+				  << "               in frames-<key>-preview (python scripts/anim/film.py preview <key> sets the rest)\n"
 				  << "  --draft N:   a cartoon video renders one frame in N (2 to 24) and repeats it in the others: the whole\n"
 				  << "               film, its sound in step, in a fraction of the time; a full render with the same\n"
 				  << "               settings and --resume then renders only the frames the draft left out\n"

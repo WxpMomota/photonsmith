@@ -831,6 +831,7 @@ static bool prepare_cartoon_worker(LaunchArgs &args, cartoon_worker::Job &job) {
 static int film_check_command(int argc, char** argv) {
 	int bad = 0;
 	for (int i = 2; i < argc; ++i) {
+		(void)cartoon::films();   // (the film registry knows the kinds of character a file can bring in)
 		cartoon::film_file::DataFilm film;
 		const std::string problem = film.load(argv[i]);
 		if (!problem.empty()) {
@@ -1040,6 +1041,15 @@ int main(int argc, char** argv) {
 		// GUI's RenderController (which trusts the exit code) report the
 		// render as successful even though no image was ever written.
 		return help_requested ? EXIT_SUCCESS : EXIT_FAILURE;
+	}
+	// --preview: this program's film code and every program the video starts (they inherit the variable, and are given the flag) build the characters coarser
+	// (cartoon_lib.h previewCoarsening, read once: so before any film's scene is made)
+	if (args.preview) {
+#ifdef _WIN32
+		_putenv_s("RAY_TRACER_FILM_PREVIEW", "3");
+#else
+		setenv("RAY_TRACER_FILM_PREVIEW", "3", 1);
+#endif
 	}
 
 	// --background (or RAY_TRACER_BACKGROUND=1): lower priorities for this process, which the programs it starts inherit (launcher/background_mode.h, decided by RunPolicy)

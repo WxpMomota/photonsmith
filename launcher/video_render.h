@@ -875,7 +875,7 @@ inline int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
         resume_signature = cartoon_render::resumeSignature(*film, args, render_frame_count, s.video_fps, image_width, image_height, s.samples_per_pixel, s.max_ray_depth);
     // a cartoon's frames are in a folder of the film's own (frames-<key>), so that rendering another film does not wipe the frames of one that was stopped, and two films never share a folder
     const cartoon::Film *frames_film = cartoon::forCameraPath(s.camera_path.c_str());
-    const std::string frames_folder = frames_film ? std::string("frames-") + frames_film->key : std::string("frames");
+    const std::string frames_folder = frames_film ? std::string("frames-") + frames_film->key + (args.preview ? "-preview" : "") : std::string("frames");   // (a preview never shares the film's frames)
     if (int rc = prepareVideoDirectories(s.out_path, render_frame_count, paths, resume_signature, args.cartoon_resume, frames_folder); rc != SUCCESS) return rc;
     const VideoCameraStart start = cartoon::isCartoonPath(s.camera_path.c_str()) ? VideoCameraStart{0, 0, 0, 0, 0, 0} : videoCameraStart(args, s);
 
