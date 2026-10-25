@@ -32,6 +32,7 @@
 #include "process.h"
 #include "background_mode.h"
 #include "flag_scopes.h"
+#include "frame_fingerprint.h"
 #include "launcher_args.h"
 #include "../src/shared/cartoon/cartoons.h"
 
@@ -77,19 +78,32 @@ inline int timeoutFor(const LaunchArgs &args, bool gpu) {
 // Writes the frame's scene, runs the child, removes the scene file. Returns the child's exit code (0 = SUCCESS), or -1 when the scene file could not be written or the child could not be
 // started or did not finish in `timeoutSeconds` (it is stopped and tried once more first). `scenePath` is in a folder of its own (one per worker): the child's scene list reads that
 // folder and nothing else (RAY_TRACER_PBRT_DIR), so that it does not read the 200-odd scene files of pbrt_scenes/ (about half a second of every frame) to render this one.
+// `fingerprint` (when given) gets the scene's fingerprint; with `keepIf` (a finished frame's old fingerprint) the frame is not rendered when the scene's is the same, and `*kept` says so.
 inline int renderFrame(const cartoon::Film &film, double t, const std::filesystem::path &scenePath, const std::string &exe, const LaunchArgs &args, int width, int height, int spp,
-					   int depth, const std::string &framePath, int timeoutSeconds = 0, double timeLimitSeconds = 0.0, bool gpu = false) {
+					   int depth, const std::string &framePath, int timeoutSeconds = 0, double timeLimitSeconds = 0.0, bool gpu = false, std::string *fingerprint = nullptr,
+					   const std::string &keepIf = std::string(), bool *kept = nullptr) {
+	if (kept) *kept = false;
 	try {
+		// One frame's scene at a time: runInParallel calls this from several threads, and a film's code keeps caches of its own (static maps of figure meshes and the like)
+		// that are not made for that. Building a scene is quick beside rendering it.
+		std::string text;
+		{
+			static std::mutex building;
+			std::lock_guard<std::mutex> hold(building);
+			text = film.sceneAt(t);
+		}
+		const std::string fp = frame_fingerprint::of(text);
+		if (fingerprint) *fingerprint = fp;
+		if (!keepIf.empty() && fp == keepIf) {
+			if (kept) *kept = true;
+			return 0;
+		}
 		std::ofstream f(scenePath, std::ios::binary);
 		if (!f) {
 			std::cerr << "\nERROR: could not write " << scenePath << std::endl;
 			return -1;
 		}
-		// One frame's scene at a time: runInParallel calls this from several threads, and a film's code keeps caches of its own (static maps of figure meshes and the like)
-		// that are not made for that. Building a scene is quick beside rendering it.
-		static std::mutex building;
-		std::lock_guard<std::mutex> hold(building);
-		f << film.sceneAt(t);
+		f << text;
 	} catch (const std::exception &e) {   // (a film's code failing on one frame fails that frame, not the whole video; why is said, not dropped)
 		std::cerr << "\nERROR: " << film.name << " at " << t << " s: " << e.what() << std::endl;
 		return -1;
@@ -111,23 +125,69 @@ inline int renderFrame(const cartoon::Film &film, double t, const std::filesyste
 	return rc;
 }
 
-// ---- resuming an interrupted video ----
-// What identifies a cartoon video's frames: the film (its scene text at two instants, so that a change to the film's code is noticed), the size, the samples, the depth, the frame count and
-// every flag given, and the program itself (its file's size and time, so that a renderer that has been rebuilt does not continue the frames of the old one). Written beside the frames;
-// --resume continues from them only when it is the same.
-inline std::string resumeSignature(const cartoon::Film &film, const LaunchArgs &args, int frames, int fps, int width, int height, int spp, int depth, const std::string &exePath = std::string()) {
+// ---- resuming an interrupted (or edited) video ----
+// What makes a cartoon video's frames comparable at all: the film, the size, the samples, the depth, the frame count and fps, and every flag given. Written beside the frames (resume.txt);
+// --resume keeps the frames only when it is the same, and otherwise starts again.
+inline std::string resumeSignature(const cartoon::Film &film, const LaunchArgs &args, int frames, int fps, int width, int height, int spp, int depth) {
 	std::string s = std::string(film.key) + "|" + std::to_string(frames) + "|" + std::to_string(fps) + "|" + std::to_string(width) + "x" + std::to_string(height) + "|" + std::to_string(spp) + "|" +
 					std::to_string(depth);
 	for (const std::string &f : forwardedFlags(args)) s += "|" + f;
+	return s;
+}
+// Which program and which film made the frames: the program's file (size and time) and the film's scene at two instants. When it is the same as last time, a resumed video keeps every
+// finished frame without looking at it; when it is not (the program was rebuilt, the film edited), each finished frame's scene is made again and compared with the fingerprint it was
+// rendered from (frame_fingerprint.h), and only the frames that changed are rendered again. Written beside the frames (program.txt) once a run has compared them all.
+inline std::string programStamp(const cartoon::Film &film, const std::string &exePath) {
+	std::string s;
 	if (!exePath.empty()) {
 		std::error_code ec;
 		const auto size = std::filesystem::file_size(exePath, ec);
 		const auto when = std::filesystem::last_write_time(exePath, ec);
-		s += "|" + std::to_string(static_cast<unsigned long long>(size)) + "|" + std::to_string(static_cast<long long>(when.time_since_epoch().count()));
+		s += std::to_string(static_cast<unsigned long long>(size)) + "|" + std::to_string(static_cast<long long>(when.time_since_epoch().count()));
 	}
-	const std::hash<std::string> h;
-	s += "|" + std::to_string(h(film.sceneAt(0.0))) + "|" + std::to_string(h(film.sceneAt(film.duration * 0.5)));
+	s += "|" + frame_fingerprint::of(film.sceneAt(0.0)) + "|" + frame_fingerprint::of(film.sceneAt(film.duration * 0.5));
+	// (and its cameras file, read when a frame is made: an edit to one shot's camera changes neither the program nor, often, those two instants)
+	const std::string cameras = cartoon::film_cache::asset(std::string(film.key) + "/cameras.txt");
+	if (!cameras.empty()) s += "|cameras " + std::to_string(static_cast<unsigned long long>(frame_fingerprint::fileHash(cameras)));
 	return s;
+}
+constexpr const char *kFingerprints = "fingerprints.txt";
+constexpr const char *kProgramStamp = "program.txt";
+// The fingerprints recorded beside the frames: frame -> what its picture was rendered from (the last line for a frame wins).
+inline std::map<int, std::string> readFingerprints(const std::filesystem::path &dir) {
+	std::map<int, std::string> out;
+	std::ifstream in(dir / kFingerprints);
+	int frame = 0;
+	std::string fp;
+	while (in >> frame >> fp) out[frame] = fp;
+	return out;
+}
+inline void recordFingerprint(const std::filesystem::path &dir, int frame, const std::string &fp) {
+	if (fp.empty()) return;
+	std::ofstream out(dir / kFingerprints, std::ios::app);
+	out << frame << " " << fp << "\n";
+}
+// What a resumed video does with each frame: keep it as it is, check it (make its scene again and render it only when its fingerprint has changed), or render it.
+struct ResumePlan {
+	std::vector<char> keep;              // finished and kept without a look
+	std::map<int, std::string> check;    // finished: kept only if its scene's fingerprint is still this
+	int kept = 0, unknown = 0;           // (unknown: finished, but from before fingerprints were kept, and the program or film has changed: rendered again)
+};
+inline ResumePlan planResume(int count, const std::function<bool(int)> &finished, const std::map<int, std::string> &fingerprints, bool sameProgram) {
+	ResumePlan p;
+	p.keep.assign(static_cast<std::size_t>(std::max(0, count)), 0);
+	for (int f = 0; f < count; ++f) {
+		if (!finished(f)) continue;
+		if (sameProgram) {
+			p.keep[static_cast<std::size_t>(f)] = 1;
+			++p.kept;
+		} else if (const auto it = fingerprints.find(f); it != fingerprints.end()) {
+			p.check[f] = it->second;
+		} else {
+			++p.unknown;
+		}
+	}
+	return p;
 }
 inline std::string encName(int index) {
 	char name[32];

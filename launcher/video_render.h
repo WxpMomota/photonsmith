@@ -390,14 +390,33 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
         std::snprintf(name, sizeof(name), frame_is_png ? "frame_%04d.png" : "frame_%04d.ppm", frame);
         return frames_dir / name;
     };
-    // frames a resumed run finds already rendered (their pictures are in the folder: prepareVideoDirectories kept them because the video is the same)
+    // A resumed run's finished frames (their pictures are in the folder: prepareVideoDirectories kept them because the video's settings are the same) are kept without a look when the
+    // program and the film are the same as last time; when they are not, each finished frame's scene is made again and the frame is rendered only if its fingerprint has changed
+    // (cartoon_render.h, planResume) - after a film is edited, only the shots that changed are rendered again.
+    const std::string stamp = args.cartoon_resume ? cartoon_render::programStamp(film, s.exe_path) : std::string();
     std::vector<char> already(static_cast<std::size_t>(render_frame_count), 0);
+    std::map<int, std::string> check;   // finished frames to compare, with the fingerprints they were rendered from
     int resumed = 0;
     if (args.cartoon_resume) {
-        for (int frame = 0; frame < render_frame_count; ++frame)
-            if (std::filesystem::exists(frames_dir / cartoon_render::encName(frame))) already[static_cast<std::size_t>(frame)] = 1, ++resumed;
+        std::string savedStamp;
+        {
+            std::ifstream in(frames_dir / cartoon_render::kProgramStamp);
+            std::getline(in, savedStamp);
+        }
+        const cartoon_render::ResumePlan plan = cartoon_render::planResume(render_frame_count, [&](int f) { return std::filesystem::exists(frames_dir / cartoon_render::encName(f)); },
+                                                                           cartoon_render::readFingerprints(frames_dir), savedStamp == stamp);
+        already = plan.keep;
+        resumed = plan.kept;
+        check = plan.check;
         if (resumed > 0) std::cout << "\nResuming: " << resumed << " of " << render_frame_count << " frames are already rendered." << std::endl;
+        if (!check.empty())
+            std::cout << "\nThe program or the film has changed since the last run: the " << check.size() << " finished frames are compared with what they were rendered from, and only "
+                      << "the ones that changed are rendered again." << std::endl;
+        if (plan.unknown > 0) std::cout << plan.unknown << " finished frame(s) from before fingerprints were kept are rendered again." << std::endl;
     }
+    std::mutex keptLock;
+    std::set<int> kept;                       // compared and unchanged: kept as they are
+    std::map<int, std::string> fingerprintOf;   // what each frame of this run was made from
     // --draft N: only every Nth frame is rendered; the others repeat the one before (renderVideoFrames fills them in, as it fills a failed frame), so the video keeps its length
     // and the film's sound stays in step: a whole film to look at and listen to in a fraction of the time. The drafted frames are real renders, so a full render at the same
     // size, samples and flags resumes from them and renders only the rest.
@@ -417,17 +436,34 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
     if (timeout > 0) std::cout << " (a frame that takes more than " << timeout << " s is stopped and tried once more)";
     std::cout << "." << std::endl;
     int reported = resumed;
+    const auto wasKept = [&](int frame) {
+        std::lock_guard<std::mutex> hold(keptLock);
+        return kept.count(frame) > 0;
+    };
     auto completed = [&](int frame, int rc, double seconds) {   // as each frame finishes: one line, the count being how many are done
         if (already[static_cast<std::size_t>(frame)]) return;
+        {
+            std::lock_guard<std::mutex> hold(keptLock);
+            if (rc == 0) {
+                if (const auto it = fingerprintOf.find(frame); it != fingerprintOf.end()) cartoon_render::recordFingerprint(frames_dir, frame, it->second);
+            }
+        }
         std::ostringstream line;
         line << "\n[" << ++reported << "/" << render_frame_count << "] Rendering " << frame_file(frame).filename().string() << " (" << film.name << " at " << std::fixed << std::setprecision(2)
              << film.duration * frame / std::max(1, render_frame_count) << " s)...";
-        if (rc == 0) line << " \u2713 (" << std::setprecision(1) << seconds << "s)";
+        if (rc == 0 && wasKept(frame)) line << " unchanged, kept";
+        else if (rc == 0) line << " \u2713 (" << std::setprecision(1) << seconds << "s)";
         else line << " \u2717 FAILED (error code: " << rc << "; what the renderer said is in " << (frames_dir / "work*").string() << "/" << (workers > 0 ? "worker.log" : "frames.log") << ")";
         (rc == 0 ? std::cout : std::cerr) << line.str() << std::endl;
     };
-    auto inOrder = [&](int frame, int rc) {   // in frame order: the video's picture sequence
-        if (rc == 0 && !already[static_cast<std::size_t>(frame)]) png_converter.push(frame_file(frame).string(), frame_is_png, frame);
+    auto inOrder = [&](int frame, int rc) {   // in frame order: the video's picture sequence (a frame kept as it was already has its picture there)
+        if (rc == 0 && !already[static_cast<std::size_t>(frame)] && !wasKept(frame)) png_converter.push(frame_file(frame).string(), frame_is_png, frame);
+    };
+    // once every frame has been through: the program and the film these frames are now known to match (the next resume keeps them without a look)
+    const auto finish = [&](int done) {
+        std::ofstream out(frames_dir / cartoon_render::kProgramStamp, std::ios::trunc);
+        out << (stamp.empty() ? cartoon_render::programStamp(film, s.exe_path) : stamp) << "\n";
+        return done;
     };
     if (workers > 0) {
         std::vector<int> todo;
@@ -444,6 +480,8 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
             cartoon_worker::Job mine = job;
             mine.scenes = dir.string();
             mine.list = frames;
+            for (int f : frames)
+                if (const auto it = check.find(f); it != check.end()) mine.keep[f] = it->second;
             std::error_code ec;
             for (int f : frames) std::filesystem::remove(mine.markerPath(f), ec);   // (a marker left by an earlier worker is not this one's)
             const std::string file = (dir / "job.txt").string();
@@ -465,25 +503,42 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
             std::ifstream in(marker);
             if (!in) return false;
             int rc = -1;
-            in >> rc;
+            std::string fp, how;
+            in >> rc >> fp >> how;   // (the result, the scene's fingerprint, and whether the frame was kept as it was)
             in.close();
             std::error_code ec;
             std::filesystem::remove(marker, ec);
+            {
+                std::lock_guard<std::mutex> hold(keptLock);
+                if (!fp.empty() && fp != "-") fingerprintOf[frame] = fp;
+                if (how == "kept") kept.insert(frame);
+            }
             result = rc;
             return true;
         };
         // (a worker's first frame on a GPU also compiles the shaders when their cache is cold, about 18 minutes for the default renderer: it gets 45)
-        return cartoon_render::runWorkers(todo, workers, timeout, hooks, completed, inOrder, 25, cartoon_render::workerMemoryLimitBytes(args), use_gpu ? 45 * 60 : 0) + resumed;
+        return finish(cartoon_render::runWorkers(todo, workers, timeout, hooks, completed, inOrder, 25, cartoon_render::workerMemoryLimitBytes(args), use_gpu ? 45 * 60 : 0) + resumed);
     }
-    return cartoon_render::runInParallel(
+    return finish(cartoon_render::runInParallel(
         render_frame_count, jobs,
         [&](int frame, int worker) {
             if (already[static_cast<std::size_t>(frame)]) return 0;
             const double film_time = film.duration * frame / std::max(1, render_frame_count);
-            return cartoon_render::renderFrame(film, film_time, frames_dir / ("work" + std::to_string(worker)) / ("cartoon_" + std::to_string(frame) + ".pbrt"), s.exe_path, args, image_width,
-                                               image_height, samples_per_pixel, max_ray_depth, frame_file(frame).string(), timeout, frameTimeLimit, use_gpu);
+            std::string fp, keepIf;
+            {
+                std::lock_guard<std::mutex> hold(keptLock);
+                if (const auto it = check.find(frame); it != check.end()) keepIf = it->second;
+            }
+            bool unchanged = false;
+            const int rc = cartoon_render::renderFrame(film, film_time, frames_dir / ("work" + std::to_string(worker)) / ("cartoon_" + std::to_string(frame) + ".pbrt"), s.exe_path, args,
+                                                       image_width, image_height, samples_per_pixel, max_ray_depth, frame_file(frame).string(), timeout, frameTimeLimit, use_gpu, &fp, keepIf,
+                                                       &unchanged);
+            std::lock_guard<std::mutex> hold(keptLock);
+            if (!fp.empty()) fingerprintOf[frame] = fp;
+            if (unchanged) kept.insert(frame);
+            return rc;
         },
-        completed, inOrder);
+        completed, inOrder));
 }
 
 // Renders every frame (the camera moving along the path), converts them to PNG on a background thread, and reports the counts. SUCCESS, or the error code to exit with;
@@ -817,7 +872,7 @@ inline int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
     VideoPaths paths;
     std::string resume_signature;
     if (const cartoon::Film *film = cartoon::forCameraPath(s.camera_path.c_str()))
-        resume_signature = cartoon_render::resumeSignature(*film, args, render_frame_count, s.video_fps, image_width, image_height, s.samples_per_pixel, s.max_ray_depth, s.exe_path);
+        resume_signature = cartoon_render::resumeSignature(*film, args, render_frame_count, s.video_fps, image_width, image_height, s.samples_per_pixel, s.max_ray_depth);
     // a cartoon's frames are in a folder of the film's own (frames-<key>), so that rendering another film does not wipe the frames of one that was stopped, and two films never share a folder
     const cartoon::Film *frames_film = cartoon::forCameraPath(s.camera_path.c_str());
     const std::string frames_folder = frames_film ? std::string("frames-") + frames_film->key : std::string("frames");

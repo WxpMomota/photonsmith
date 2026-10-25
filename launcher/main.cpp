@@ -78,6 +78,7 @@ extern char** environ;
 #include "launcher/gpu_backend.h"      // the GPU renderer this build has (Metal or OptiX), behind one call
 #include "launcher/launcher_args.h"   // Argument parsing
 #include "launcher/cartoon_render.h"
+#include "launcher/film_subjects.h"   // --film-subjects: where a film's subjects fall in its frame
 #include "launcher/cartoon_still.h"  // one frame of a film as a temporary scene file  // cartoon video presets: one child run per frame
 #include <fstream>
 #include "src/shared/path_probe.h"    // --probe X Y
@@ -811,7 +812,11 @@ static bool prepare_cartoon_worker(LaunchArgs &args, cartoon_worker::Job &job) {
 	std::error_code dir_ec;
 	std::filesystem::create_directories(job.scenes, dir_ec);
 	double first_eye[3] = {0, 0, 0};
-	if (!job.writeScene(job.list.front(), first_eye)) {
+	cartoon_worker::Job opening = job;   // (always written, even a frame that is only to be compared: the renderer starts from this file)
+	opening.keep.clear();
+	std::string fingerprint;
+	bool unchanged = false;
+	if (!opening.writeScene(job.list.front(), first_eye, fingerprint, unchanged)) {
 		std::cerr << "Cannot write the scene of frame " << job.list.front() << " to " << job.scenePath() << std::endl;
 		return false;
 	}
@@ -919,6 +924,26 @@ int main(int argc, char** argv) {
 		const std::vector<double> starts = film->shotStarts();
 		const std::vector<std::string> names = cartoon::shotNamesOf(*film);
 		for (std::size_t i = 0; i < starts.size(); ++i) std::cout << "shot\t" << starts[i] << "\t" << (i < names.size() ? names[i] : std::string()) << "\n";
+		return EXIT_SUCCESS;
+	}
+	// `ray_tracer --film-subjects <key> <seconds> <width> <height>`: where the moment's subjects (Film::subjectsAt) fall in a picture of that size, one tab-separated line each:
+	// `subject  i  x  y  distance  in-frame (1/0)  in-front (1/0)` (film_subjects.h). No line when the film names none.
+	if (argc >= 2 && std::string(argv[1]) == "--film-subjects") {
+		const cartoon::Film *film = argc >= 6 ? cartoon::find(argv[2]) : nullptr;
+		if (!film) {
+			std::cerr << "usage: " << argv[0] << " --film-subjects <film key> <seconds> <width> <height>\n";
+			return EXIT_FAILURE;
+		}
+		const double t = std::atof(argv[3]);
+		const int w = std::atoi(argv[4]), h = std::atoi(argv[5]);
+		cartoon::Vec3 eye, target;
+		double fov = 90.0;
+		if (!film->subjectsAt || !film_subjects::cameraOf(film->headerAt(t), eye, target, fov)) return EXIT_SUCCESS;
+		const std::vector<cartoon::Vec3> subjects = film->subjectsAt(t);
+		for (std::size_t i = 0; i < subjects.size(); ++i) {
+			const film_subjects::View v = film_subjects::project(eye, target, fov, subjects[i], w, h);
+			std::cout << "subject\t" << i << "\t" << v.x << "\t" << v.y << "\t" << v.distance << "\t" << (v.inFrame ? 1 : 0) << "\t" << (v.inFront ? 1 : 0) << "\n";
+		}
 		return EXIT_SUCCESS;
 	}
 	std::cout << "========================================" << std::endl;

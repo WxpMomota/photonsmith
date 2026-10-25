@@ -571,6 +571,9 @@ struct Film {
 	FilmMeta meta;
 	std::function<void(audio::Mix &)> soundtrack;   // (empty: a silent film) places the film's music and sounds on a mix of its length (cartoon_audio.h), or null for a silent film
 	std::function<std::vector<Caption>()> captions;  // (empty: none) the words laid over its video
+	// (empty: none) what each moment is about - the points a shot frames (a character's chest, a thing on a table), in story space. The film doctor (scripts/anim/film.py) warns when
+	// one is out of the frame or hidden behind something nearer (`ray_tracer --film-subjects`).
+	std::function<std::vector<Vec3>(double)> subjectsAt;
 };
 
 }  // namespace cartoon

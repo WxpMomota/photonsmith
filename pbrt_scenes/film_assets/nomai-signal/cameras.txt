@@ -1,0 +1,19 @@
+# The Last Nomai Signal: changes to the shots' cameras, read when a frame is made (no rebuild; src/shared/cartoon/shot_cameras.h).
+# A section a shot - its number (1 is the first, as the film doctor's sheet counts) or its name (python scripts/anim/film.py doctor nomai-signal, or
+# ray_tracer --film-shots nomai-signal) - and [*] for every shot. Each change is made to the camera the code gives at every moment of the shot, so a move keeps moving.
+#
+#   dolly 1.5      forward along the view (negative: back); the aim stays where it was
+#   truck -0.4     to the right (negative: left), aim and all
+#   pedestal 0.3   up (negative: down), aim and all
+#   pan 4          turn the aim to the right, degrees
+#   tilt -6        turn the aim up (negative: down), degrees
+#   fov 50         the field of view, degrees (across the shorter side) - or: zoom 1.2 (the code's divided by 1.2)
+#   iso 300        the exposure - or: stops 0.5 (the code's times 2 to the 0.5)
+#
+# For example:
+#
+#   [The answer]
+#   tilt 3
+#   stops -0.3
+#
+# A resumed video renders again only the frames whose scene this changes.

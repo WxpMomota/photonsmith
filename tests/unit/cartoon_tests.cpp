@@ -32,6 +32,7 @@
 #include "../../launcher/background_mode.h"
 #include "../../launcher/run_policy.h"
 #include "../../launcher/video_frames.h"
+#include "../../launcher/film_subjects.h"
 #include "fixture_skip.h"
 #include "../../src/shared/cartoon/cartoons.h"
 #include "../../src/shared/cartoon/cartoon_stills.h"
@@ -210,7 +211,8 @@ TEST(VideoPresets, EveryFilmIsAPresetAndTheCameraPresetsComeFirst) {
 		ASSERT_NE(p, nullptr) << f.key;
 		EXPECT_EQ(std::string(p->name), std::string(f.name) + " (cartoon)");
 		EXPECT_STREQ(p->description, f.description) << "the preset's text is the film's own";
-		EXPECT_EQ(video_preset::filmOf(*p), &f);
+		ASSERT_NE(video_preset::filmOf(*p), nullptr);
+		EXPECT_STREQ(video_preset::filmOf(*p)->key, f.key) << "(the program's film: the table's row with its cameras file, cartoons.h withShotCameras)";
 	}
 }
 
@@ -396,7 +398,8 @@ TEST(CartoonStills, EveryStillNamesItsFilmByKeyAndTheNamesAgree) {
 		EXPECT_EQ(cartoon::cameraPathOf(film), std::string("cartoon:") + film.key);
 		EXPECT_EQ(cartoon::stillSlugOf(film), std::string("cartoon-") + film.key);
 		EXPECT_EQ(cartoon_stills::fileName(film), cartoon::stillSlugOf(film) + ".pbrt");
-		EXPECT_EQ(cartoon::forCameraPath(cartoon::cameraPathOf(film).c_str()), &film) << "a camera path finds its film again";
+		ASSERT_NE(cartoon::forCameraPath(cartoon::cameraPathOf(film).c_str()), nullptr);
+		EXPECT_STREQ(cartoon::forCameraPath(cartoon::cameraPathOf(film).c_str())->key, film.key) << "a camera path finds its film again";
 		EXPECT_NE(cartoon_stills::text(film).find(std::string("# @rt-cartoon ") + film.key + "\n"), std::string::npos) << "the tag that links a listed still to its film";
 	}
 }
@@ -760,14 +763,59 @@ TEST(CartoonRender, TheFramesOfAnInterruptedVideoAreResumedOnlyForTheSameFilmSiz
 	EXPECT_NE(base, cartoon_render::resumeSignature(*film, a, 240, 24, 1280, 720, 128, 8)) << "another length";
 	EXPECT_NE(base, cartoon_render::resumeSignature(*film, b, 480, 24, 1280, 720, 128, 8)) << "other flags";
 	EXPECT_NE(base, cartoon_render::resumeSignature(*cartoon::find("fireflies"), a, 480, 24, 1280, 720, 128, 8)) << "another film";
-	// a program that has been rebuilt is another program
+	// a program that has been rebuilt is another program (its frames are then compared one by one, not thrown away)
 	const std::filesystem::path exe = std::filesystem::temp_directory_path() / "photonsmith_signature_test.exe";
 	std::ofstream(exe, std::ios::binary) << "one";
-	const std::string before = cartoon_render::resumeSignature(*film, a, 480, 24, 1280, 720, 128, 8, exe.string());
-	EXPECT_EQ(before, cartoon_render::resumeSignature(*film, a, 480, 24, 1280, 720, 128, 8, exe.string()));
+	const std::string before = cartoon_render::programStamp(*film, exe.string());
+	EXPECT_EQ(before, cartoon_render::programStamp(*film, exe.string()));
 	std::ofstream(exe, std::ios::binary) << "another program";
-	EXPECT_NE(before, cartoon_render::resumeSignature(*film, a, 480, 24, 1280, 720, 128, 8, exe.string()));
+	EXPECT_NE(before, cartoon_render::programStamp(*film, exe.string()));
 	std::filesystem::remove(exe);
+}
+
+TEST(CartoonRender, AFrameFingerprintIgnoresTheBuildFolderButNotWhatIsInTheFiles) {
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "photonsmith_fingerprint_test";
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir / "build_0123456789abcdef");
+	std::filesystem::create_directories(dir / "build_fedcba9876543210");
+	std::ofstream(dir / "build_0123456789abcdef" / "ground.ply", std::ios::binary) << "mesh one";
+	std::ofstream(dir / "build_fedcba9876543210" / "ground.ply", std::ios::binary) << "mesh one";
+	const auto scene = [&](const char *stamp) {
+		return "WorldBegin\nShape \"plymesh\" \"string filename\" [ \"" + (dir / stamp / "ground.ply").generic_string() + "\" ]\n";
+	};
+	const std::string a = frame_fingerprint::of(scene("build_0123456789abcdef")), b = frame_fingerprint::of(scene("build_fedcba9876543210"));
+	EXPECT_EQ(a, b) << "another build's folder, the same mesh: the same picture";
+	std::ofstream(dir / "build_fedcba9876543210" / "ground.ply", std::ios::binary) << "mesh two, longer";   // (files are known by path, size and time)
+	EXPECT_NE(a, frame_fingerprint::of(scene("build_fedcba9876543210"))) << "a mesh made differently is noticed";
+	EXPECT_NE(a, frame_fingerprint::of(scene("build_0123456789abcdef") + "Shape \"sphere\"\n")) << "the scene text itself";
+	std::filesystem::remove_all(dir);
+}
+
+TEST(CartoonRender, AResumeKeepsUnchangedFramesComparesThemWhenTheProgramChangedAndRendersTheUnknown) {
+	const std::map<int, std::string> fps = {{0, "aaaa"}, {1, "bbbb"}, {3, "dddd"}};
+	const auto finished = [](int f) { return f != 2; };   // frames 0, 1, 3 and 4 have pictures; 4 has no fingerprint (an older render)
+	const cartoon_render::ResumePlan same = cartoon_render::planResume(5, finished, fps, true);
+	EXPECT_EQ(same.kept, 4);
+	EXPECT_TRUE(same.check.empty()) << "the same program and film: nothing to compare";
+	const cartoon_render::ResumePlan changed = cartoon_render::planResume(5, finished, fps, false);
+	EXPECT_EQ(changed.kept, 0);
+	EXPECT_EQ(changed.check.size(), 3u) << "the program or the film changed: the frames with fingerprints are compared";
+	EXPECT_EQ(changed.check.at(1), "bbbb");
+	EXPECT_EQ(changed.unknown, 1) << "frame 4 has no fingerprint: rendered again";
+	// the worker's job carries the frames to compare and their fingerprints
+	cartoon_worker::Job job;
+	job.film = "lamp-and-ball";
+	job.frames = 480;
+	job.scenes = "s";
+	job.out = "o";
+	job.list = {1, 3};
+	job.keep = changed.check;
+	const std::filesystem::path file = std::filesystem::temp_directory_path() / "photonsmith_job_keep.txt";
+	std::ofstream(file) << job.text();
+	cartoon_worker::Job read;
+	ASSERT_EQ(read.load(file.string()), "");
+	EXPECT_EQ(read.keep, job.keep);
+	std::filesystem::remove(file);
 }
 
 TEST(FlagScopes, EveryFlagOfTheVideoIsKnownToTheParserAndIsNotRepeatedByTheFrames) {
@@ -1593,3 +1641,195 @@ TEST(CartoonWorkers, AChildsOutputCanGoToItsOwnLog) {
 	EXPECT_EQ(runChild(exe, say, "", "", 10, nullptr, log.string()), 0) << "runChild passes it on";
 	std::filesystem::remove(log);
 }
+
+// ---- the film doctor's framing checks (film_subjects.h) -------------------------------------------------------------------------------------------------
+
+// The camera is read back from a film's header as the film wrote it (cameraText negates x), and a subject goes to the pixel the renderer draws it at: a ball at (2, 1, 0)
+// seen from (0, 0, 10) with a 40-degree lens, rendered at 320 x 180 on the CPU and the GPU, has its middle at (208.9, 64.7) - the projection says (209.4, 65.3), half a pixel
+// off for the pixel centres.
+TEST(FilmSubjects, ASubjectGoesWhereThePictureShowsItAndOutOfTheFrameOrBehindTheCameraIsSaid) {
+	using cartoon::Vec3;
+	const std::string header = cartoon::sceneHeader(cartoon::cameraText(cartoon::CameraView{{0.0, 0.0, 10.0}, {0.0, 0.0, 0.0}, 40.0, 0.0, 0}), 8, 320, 180);
+	Vec3 eye, target;
+	double fov = 0.0;
+	ASSERT_TRUE(film_subjects::cameraOf(header, eye, target, fov)) << header;
+	EXPECT_NEAR(eye.z, 10.0, 1e-9);
+	EXPECT_NEAR(eye.x, 0.0, 1e-9);
+	EXPECT_NEAR(fov, 40.0, 1e-9);
+
+	film_subjects::View v = film_subjects::project(eye, target, fov, {2.0, 1.0, 0.0}, 320, 180);
+	EXPECT_TRUE(v.inFrame);
+	EXPECT_NEAR(v.x, 209.44, 0.05) << "+x is to the right of the picture";
+	EXPECT_NEAR(v.y, 65.27, 0.05) << "+y is up";
+	EXPECT_NEAR(v.distance, std::sqrt(105.0), 1e-9);
+	v = film_subjects::project(eye, target, fov, {0.0, 0.0, 0.0}, 320, 180);
+	EXPECT_NEAR(v.x, 160.0, 1e-9);
+	EXPECT_NEAR(v.y, 90.0, 1e-9);
+
+	// the fov is across the shorter side: the top edge of a wide picture at tan(20 degrees), of a tall one at the sides
+	const double edge = 10.0 * std::tan(20.0 * cartoon::kPi / 180.0);
+	EXPECT_TRUE(film_subjects::project(eye, target, fov, {0.0, edge * 0.98, 0.0}, 320, 180).inFrame);
+	EXPECT_FALSE(film_subjects::project(eye, target, fov, {0.0, edge * 1.02, 0.0}, 320, 180).inFrame);
+	EXPECT_TRUE(film_subjects::project(eye, target, fov, {edge * 0.98, 0.0, 0.0}, 180, 320).inFrame);
+	EXPECT_FALSE(film_subjects::project(eye, target, fov, {edge * 1.02, 0.0, 0.0}, 180, 320).inFrame);
+
+	v = film_subjects::project(eye, target, fov, {0.0, 0.0, 20.0}, 320, 180);
+	EXPECT_FALSE(v.inFront);
+	EXPECT_FALSE(v.inFrame);
+	EXPECT_FALSE(film_subjects::cameraOf("Film \"rgb\"\nWorldBegin\n", eye, target, fov)) << "no LookAt, no camera";
+}
+
+// Every film that names its subjects keeps them in the frame in the middle of each shot (a start or an end may be a subject entering or leaving). This is the doctor's check
+// without a render: a camera move that loses its subject fails here.
+TEST(FilmSubjects, EveryFilmThatNamesItsSubjectsKeepsThemInTheFrameInTheMiddleOfEachShot) {
+	int checked = 0;
+	for (const cartoon::Film *film : cartoon::films()) {
+		if (!film->subjectsAt) continue;
+		const std::vector<double> starts = film->shotStarts();
+		for (std::size_t i = 0; i < starts.size(); ++i) {
+			const double end = i + 1 < starts.size() ? starts[i + 1] : film->duration;
+			const double t = 0.5 * (starts[i] + end);
+			cartoon::Vec3 eye, target;
+			double fov = 0.0;
+			ASSERT_TRUE(film_subjects::cameraOf(film->headerAt(t), eye, target, fov)) << film->key << " at " << t;
+			for (const cartoon::Vec3 &p : film->subjectsAt(t)) {
+				const film_subjects::View v = film_subjects::project(eye, target, fov, p, film->meta.width, film->meta.height);
+				EXPECT_TRUE(v.inFrame) << film->key << ": shot " << i + 1 << " at " << t << " s loses its subject (" << v.x << ", " << v.y << (v.inFront ? "" : ", behind")
+									   << ")";
+				++checked;
+			}
+		}
+	}
+	EXPECT_GT(checked, 20) << "the Nomai film names a subject for most of its shots";
+}
+
+// ---- a film's cameras file (shot_cameras.h) ------------------------------------------------------------------------------------------------------------------
+
+namespace {
+// The camera a header holds, in story space (the LookAt's x negated back), with its fov, focus distance and iso.
+struct HeaderCamera {
+	cartoon::Vec3 eye, target;
+	double fov = 0.0, focus = 0.0, iso = 0.0;
+};
+HeaderCamera headerCamera(const std::string &header) {
+	HeaderCamera c;
+	EXPECT_TRUE(film_subjects::cameraOf(header, c.eye, c.target, c.fov)) << header;
+	std::smatch m;
+	if (std::regex_search(header, m, std::regex(R"("float focaldistance"\s*\[\s*(\S+))"))) c.focus = std::stod(m[1].str());
+	if (std::regex_search(header, m, std::regex(R"("float iso"\s*\[\s*(\S+))"))) c.iso = std::stod(m[1].str());
+	return c;
+}
+std::string testHeader() {
+	return cartoon::sceneHeader(cartoon::cameraText(cartoon::CameraView{{1.0, 2.0, 10.0}, {1.0, 2.0, 0.0}, 40.0, 0.01, 0}), 8, 320, 180);
+}
+}  // namespace
+
+// What the file says: a section a shot by number or name and [*] for all; moves, a fov or zoom, an iso or stops; and what it cannot read is said and left out.
+TEST(ShotCameras, TheFileNamesShotsByNumberOrNameAndSaysWhatItCannotRead) {
+	const cartoon::shot_cameras::File f = cartoon::shot_cameras::parse(
+		"# a comment\n"
+		"[*]\n"
+		"stops 0.5\n"
+		"zoom 1.5\n"
+		"[2]   # the second shot\n"
+		"dolly 1.5\n"
+		"zoom 2\n"
+		"[The answer]\n"
+		"tilt -6\n"
+		"fov 50\n"
+		"wobble 3\n"
+		"pan\n");
+	EXPECT_EQ(f.problems.size(), 2u) << "an unknown word and a missing number";
+	const cartoon::shot_cameras::Change second = cartoon::shot_cameras::changeFor(f, 1, "Whatever");
+	EXPECT_DOUBLE_EQ(second.dolly, 1.5);
+	EXPECT_DOUBLE_EQ(second.zoom, 3.0) << "zooms multiply: [*] then the shot's";
+	EXPECT_DOUBLE_EQ(second.stops, 0.5) << "[*] applies to every shot";
+	const cartoon::shot_cameras::Change answer = cartoon::shot_cameras::changeFor(f, 6, "The answer");
+	EXPECT_DOUBLE_EQ(answer.tilt, -6.0);
+	EXPECT_DOUBLE_EQ(answer.fov, 50.0);
+	EXPECT_DOUBLE_EQ(answer.dolly, 0.0);
+	EXPECT_FALSE(cartoon::shot_cameras::changeFor(cartoon::shot_cameras::parse(""), 0, "").any());
+	EXPECT_EQ(cartoon::shot_cameras::parse("dolly 1\n").problems.size(), 1u) << "a change before any section";
+}
+
+// The changes made to a header: the camera moved along its own axes in story space (+x to the right of the picture), the aim turned, the focus kept on what the aim was on,
+// the fov and the iso set (or added when the header has none); what follows WorldBegin is left alone.
+TEST(ShotCameras, AChangeMovesAndTurnsTheCameraOnItsOwnAxesAndSetsTheFovAndExposure) {
+	namespace sc = cartoon::shot_cameras;
+	const std::string scene = testHeader() + "LookAt 9 9 9 9 9 9 0 1 0 # (not the camera: after WorldBegin)\n";
+	const auto with = [&](const std::string &text) {
+		sc::Change c = sc::changeFor(sc::parse("[*]\n" + text), 0, "");
+		return sc::apply(scene, c);
+	};
+	HeaderCamera c = headerCamera(with("dolly 4"));
+	EXPECT_NEAR(c.eye.z, 6.0, 1e-4) << "4 nearer along the view";
+	EXPECT_NEAR(c.target.z, 0.0, 1e-4) << "the aim stays where it was";
+	EXPECT_NEAR(c.focus, 6.0, 1e-3) << "the focus stays on it";
+	c = headerCamera(with("truck 1\npedestal 0.5"));
+	EXPECT_NEAR(c.eye.x, 2.0, 1e-4) << "truck is to the right of the picture: +x in story space";
+	EXPECT_NEAR(c.target.x, 2.0, 1e-4);
+	EXPECT_NEAR(c.eye.y, 2.5, 1e-4);
+	c = headerCamera(with("pan 90"));
+	EXPECT_NEAR(c.eye.x, 1.0, 1e-4);
+	EXPECT_GT(c.target.x - c.eye.x, 9.9) << "pan right turns the aim towards +x";
+	c = headerCamera(with("tilt 30"));
+	EXPECT_NEAR((c.target.y - c.eye.y) / 10.0, std::sin(30.0 * cartoon::kPi / 180.0), 1e-4) << "tilt is up";
+	c = headerCamera(with("zoom 2"));
+	EXPECT_NEAR(std::tan(c.fov * cartoon::kPi / 360.0), std::tan(20.0 * cartoon::kPi / 180.0) / 2.0, 1e-5);
+	c = headerCamera(with("fov 55"));
+	EXPECT_NEAR(c.fov, 55.0, 1e-9);
+	c = headerCamera(with("iso 300\nstops 1"));
+	EXPECT_NEAR(c.iso, 600.0, 1e-9) << "a header without an iso gets one";
+	const std::string moved = with("dolly 1\nfov 30");
+	EXPECT_NE(moved.find("LookAt 9 9 9 9 9 9 0 1 0 # (not the camera"), std::string::npos) << "after WorldBegin is left alone";
+	EXPECT_EQ(sc::apply(scene, sc::Change{}), scene) << "no change, the same text";
+}
+
+// Every film the program lists reads its cameras file when a frame is made: an edit is seen by the next frame, without a rebuild, and only in the shot it names.
+TEST(ShotCameras, AFilmsCameraFileIsReadWhenAFrameIsMadeAndChangesOnlyItsShot) {
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "rt_shot_cameras_test";
+	std::filesystem::remove_all(dir);
+	std::filesystem::create_directories(dir / "film_assets" / "camera-file-test");
+	const char *saved = std::getenv("RAY_TRACER_PBRT_DIR");
+	const std::string savedValue = saved ? saved : "";
+#ifdef _WIN32
+	_putenv_s("RAY_TRACER_PBRT_DIR", dir.string().c_str());
+#else
+	setenv("RAY_TRACER_PBRT_DIR", dir.string().c_str(), 1);
+#endif
+	const std::filesystem::path file = dir / "film_assets" / "camera-file-test" / "cameras.txt";
+	{
+		std::ofstream(file) << "[Second]\ndolly 2\n";
+	}
+	cartoon::Film film{"camera-file-test", "Camera file test", "", 10.0, 24, [](double) { return testHeader() + "Shape \"sphere\"\n"; }, [](double) { return testHeader(); },
+					   []() { return std::vector<double>{0.0, 5.0, 8.0}; }, 1.0, {9999, "", "First|Second|Third", 8, 0.0}};
+	const cartoon::Film shown = cartoon::detail::withShotCameras(film);
+	EXPECT_NEAR(headerCamera(shown.sceneAt(2.0)).eye.z, 10.0, 1e-4) << "the first shot is as the code made it";
+	EXPECT_NEAR(headerCamera(shown.sceneAt(7.0)).eye.z, 8.0, 1e-4) << "the second is moved, by its name";
+	EXPECT_NEAR(headerCamera(shown.headerAt(7.0)).eye.z, 8.0, 1e-4) << "the header alone too (the doctor's framing checks read it)";
+	EXPECT_NE(shown.sceneAt(7.0).find("Shape \"sphere\""), std::string::npos);
+	std::this_thread::sleep_for(std::chrono::milliseconds(20));
+	{
+		std::ofstream(file) << "[1]\ndolly 3\n# longer, so that the size changes as well as the time\n";
+	}
+	EXPECT_NEAR(headerCamera(shown.sceneAt(2.0)).eye.z, 7.0, 1e-4) << "an edit is read by the next frame";
+	EXPECT_NEAR(headerCamera(shown.sceneAt(7.0)).eye.z, 10.0, 1e-4);
+	// an edit to a shot that neither of the two instants the program stamp looks at (0 s and half way) falls in still changes the stamp, so a resume compares the frames again
+	const std::string stamp = cartoon_render::programStamp(shown, "");
+	const std::string atStart = shown.sceneAt(0.0), halfWay = shown.sceneAt(5.0);
+	std::this_thread::sleep_for(std::chrono::milliseconds(20));
+	{
+		std::ofstream(file) << "[1]\ndolly 3\n# longer, so that the size changes as well as the time\n[Third]\ndolly 1\n";
+	}
+	EXPECT_NEAR(headerCamera(shown.sceneAt(9.0)).eye.z, 9.0, 1e-4);
+	EXPECT_EQ(shown.sceneAt(0.0), atStart);
+	EXPECT_EQ(shown.sceneAt(5.0), halfWay);
+	EXPECT_NE(cartoon_render::programStamp(shown, ""), stamp) << "the cameras file is part of the program stamp";
+#ifdef _WIN32
+	_putenv_s("RAY_TRACER_PBRT_DIR", savedValue.c_str());
+#else
+	if (saved) setenv("RAY_TRACER_PBRT_DIR", savedValue.c_str(), 1); else unsetenv("RAY_TRACER_PBRT_DIR");
+#endif
+	std::filesystem::remove_all(dir);
+}
+

@@ -285,6 +285,13 @@ video keeps its length and its sound stays in step (the run says how many). **`-
 `frames` folder, written whole or not at all), and only the missing ones are rendered; it does this only when the film, the size, the samples and the flags are the same as the interrupted run's
 (a signature file in the folder says so), and otherwise starts again. The GUI passes it for every cartoon video, so a render that was stopped continues when you start it again with the same settings and output folder. A rendered frame leaves only its picture in the folder, not the renderer's own files (a film has thousands).
 
+**After a change to a film, only the frames that changed are rendered again.** Each rendered frame's scene has a fingerprint (`launcher/frame_fingerprint.h`: the scene text, without the
+build folder's name, and the content of every file it names - meshes, pictures), kept in the frames folder's `fingerprints.txt`. `program.txt` records the program that rendered the frames
+(its size and time, and the fingerprints of two of the film's moments). A resume by the same program keeps every finished frame, as before. A resume by a new program (a film or the renderer
+changed) builds each finished frame's scene again and compares fingerprints: a frame whose scene is the same is kept without rendering ("unchanged, kept"), the rest are rendered. So after
+moving one shot's camera, a resume renders that shot's frames and keeps the other 7,000. Frames rendered before fingerprints existed have none and are rendered again once. A change to
+the renderer itself that leaves every scene the same keeps every frame: delete the frames folder to render them all again.
+
 **Writing a film that renders fast:** a glowing ball must be `emissiveSphere(centre, radius, light)` (pbrt's own sphere, one light), never an emitting `uvSphere` mesh: every triangle of an emitting
 mesh is a light of its own to sample, so a mesh ball is hundreds of lights. The Candle's 70 out-of-focus lights took a frame from 7 s to 19 s as meshes, and cost 7 s again as spheres.
 
@@ -326,6 +333,32 @@ middle of a shot (a black shot, or a black start or end with a picture in the mi
 frames (more than 8% of the picture near white), flat frames (the camera inside something or against a wall), jumps in brightness across a cut, and frames much slower to render than
 the rest; and it estimates the whole film's render time from the film's measured cost a frame. It exits 1 when there is a warning. `ray_tracer --film-shots <key>` prints what it
 reads of a film (its facts and its shots, tab-separated). Every problem it looks for was found by eye at least once while making tengwang.
+
+*Framing checks.* A film can name what each shot is about: its row's `subjectsAt(t)` (with `film_kit.h`, a shot sets `f.subjects`, even without building the scene: the explorer's
+chest, a face, the fire). For such a film the doctor also renders a depth pass with each frame (`--aovs`, on the CPU, a few seconds a frame; `--no-framing` skips it), asks
+`ray_tracer --film-subjects <key> <t> <width> <height>` where each subject falls in the picture (`launcher/film_subjects.h`: through the camera of the moment's own header), and warns
+when a subject is out of the frame or behind the camera (a note at a shot's start or end when it is in the frame in the middle: it enters or leaves), when it is hidden (everything
+round its pixel is nearer than it), and when most of the frame is within 20 cm of the camera (against a wall). A subject point should be on what is seen, not inside it: the Nomai
+film's moon is `moonFacing(eye)`, the point of its surface nearest the camera, not its centre. A unit test (`FilmSubjects`) holds every such film to subjects in the frame in the
+middle of each shot, without rendering. Its first run on the Nomai film found two shots that lost their subject (The answer looked up at the machine with the explorer below the
+frame; the canyon reveal looked at the ground before the rim), both reframed.
+
+**Changing a shot's camera without a rebuild: `pbrt_scenes/film_assets/<key>/cameras.txt`.** A film's cameras file is read when a frame is made
+(`src/shared/cartoon/shot_cameras.h`; every film has it, through the film registry), so its video, its stills, the GUI's renders and the doctor all see the change at once.
+A section a shot, by its number (1 is the first, as the doctor's sheet counts) or its name, and `[*]` for every shot:
+
+    [28]
+    dolly 1.5        # forward along the view (negative: back); the aim stays where it was
+    truck -0.4       # to the right, aim and all;   pedestal 0.3: up, aim and all
+    pan 4            # turn the aim to the right, degrees;   tilt -6: aim down
+    zoom 1.2         # the code's field of view divided by 1.2;   fov 50: set it
+    stops 0.5        # the exposure times 2^0.5;   iso 300: set it
+    [The answer]
+    tilt 3
+
+The change is made to the camera the code gives at each moment, so a moving camera keeps its move. A word the file does not know is printed once and left out. With the
+fingerprints above, a resumed video renders again only the frames of the shots the file changed (the file is part of `program.txt`'s stamp, so an edit always makes a resume
+compare the frames). When a change is right, it can stay in the file or be moved into the film's code.
 
 **What a film says about itself** is its row and nothing else, and nothing is typed twice. The row has the key, the name, a description of the story (one sentence, without the length or the number
 of shots: those are worked out), the length and fps, the still's time, and a `meta` record: `id` (the number of its video preset, V<id>: give a new film the next number and never reuse one, so

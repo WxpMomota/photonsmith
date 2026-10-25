@@ -21,6 +21,8 @@
 #include "nomai_fx.h"
 #include "nomai_ruins.h"
 #include "nomai_world.h"
+#include "rig.h"
+#include "rig.h"
 
 namespace cartoon {
 namespace nomai {
@@ -214,6 +216,7 @@ inline void shotGiantAndMoon(double t, Frame &f, bool content) {
 	const Vec3 eye = wideEye();
 	const double u = smoothstep(9.0, 19.0, t);
 	f.view = cam(eye, lerp(moonCentre() + giantDir() * 22000.0, moonCentre() + giantDir() * 16000.0, u), lens(50.0));
+	f.subjects = {moonFacing(eye)};   // (what the shot is about: the film doctor's framing checks)
 	inSpace(f, 70.0);
 	if (content) {
 		f.content = worldText(f, t);
@@ -230,6 +233,7 @@ inline void shotDescent(double t, Frame &f, bool content) {
 	const Vec3 away = normalize(giantDir() * -1.0 + up * 0.15);
 	(void)fwd;
 	f.view = cam(at + away * 16.0 + handheld(t, 0.3, 3), at + giantDir() * 6.0, lens(30.0));
+	f.subjects = {at};   // (what the shot is about: the film doctor's framing checks)
 	night(f);
 	f.space = true;
 	f.giantGlow = 0.14;
@@ -259,6 +263,7 @@ inline void shotEyes(double t, Frame &f, bool content) {
 	const ExplorerBody b = explorerBody(p);
 	const Mat4 head = mul(body, b.head);
 	f.view = cam(transformPoint(head, {0.0, 0.08, 1.15 - 0.08 * smoothstep(25.0, 31.0, t)}), transformPoint(head, {0.0, 0.11, 0.10}), lens(85.0), 0.003);
+	f.subjects = {transformPoint(head, {0.0, 0.11, 0.10})};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 900.0);
 	if (content) f.content = shuttleText(ship, 0.6, 0.0) + cockpitText(ship, t, 0.4) + explorerText(p, body, 0.008);
 }
@@ -275,6 +280,7 @@ inline void shotSignal(double t, Frame &f, bool content) {
 	const Vec3 head = transformPoint(body, b.headPivot);
 	(void)head;
 	f.view = cam(transformPoint(c, {-0.95, 1.25, -0.95}), transformPoint(c, {0.0, 0.32, 0.55}), lens(32.0), 0.004);
+	f.subjects = {transformPoint(c, {0.0, 0.38, 0.62})};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 900.0);
 	if (content) f.content = shuttleText(ship, 0.6, 0.0) + cockpitText(ship, t, 1.0) + explorerText(p, body, 0.010);
 }
@@ -284,6 +290,7 @@ inline void shotLanding(double t, Frame &f, bool content) {
 	const Mat4 s = shuttleOnGround(lift);
 	const Mat4 site = groundFrame(kLandX, kLandZ, kLandYaw);
 	f.view = cam(transformPoint(site, {16.0, 0.9, 20.0}), transformPoint(site, {0.0, 2.6 + lift * 0.6, 0.0}), lens(32.0));
+	f.subjects = {transformPoint(site, {0.0, 2.2 + lift, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	night(f);
 	f.ruins = false;
 	if (content) {
@@ -299,6 +306,7 @@ inline void shotUnderGiant(double t, Frame &f, bool content) {
 	const Vec3 back = exitStart() - Vec3{giantDir().x, 0.0, giantDir().z} * 34.0 + Vec3{12.0, 0.0, 0.0};
 	const Vec3 eye = groundPoint(back.x, back.z, 1.1);
 	f.view = cam(eye, eye + giantDir() * 100.0 + Vec3{0.0, -26.0, 0.0}, lens(24.0));
+	f.subjects = {transformPoint(w.frame, {0.0, 1.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	night(f);
 	f.ruins = false;
 	if (content) {
@@ -317,6 +325,7 @@ inline void shotFootsteps(double t, Frame &f, bool content) {
 	const Vec3 eyeArc = w.at - d * 1.7 + Vec3{0.35, 0.0, 0.0};
 	const Vec3 eye = groundPoint(eyeArc.x, eyeArc.z, 0.28);
 	f.view = cam(eye, groundPoint(w.at.x + d.x * 2.0, w.at.z + d.z * 2.0, 0.25), lens(30.0), 0.01);
+	f.subjects = {transformPoint(w.frame, {0.0, 0.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	night(f);
 	f.ruins = false;
 	if (content) f.content = worldText(f, t, 60.0) + explorerText(walkPose(w.walk, t), w.frame, 0.012) + footDust(w, stepsStart(), 49.0, speed, t, 8);
@@ -329,6 +338,7 @@ inline void shotRidge(double t, Frame &f, bool content) {
 	const Vec3 camArc = Vec3{-4.0, 0.0, ridgeZ(-4.0)} - g * 27.0;
 	const Vec3 eye = groundPoint(camArc.x, camArc.z, 0.5);
 	f.view = cam(eye, groundPoint(w.at.x, w.at.z, 2.6), lens(70.0));
+	f.subjects = {transformPoint(w.frame, {0.0, 1.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	f.giantGlow = 0.5;
 	night(f);
 	f.ruins = false;
@@ -343,7 +353,11 @@ inline void shotCanyonReveal(double t, Frame &f, bool content) {
 	const Vec3 d = normalize(Vec3{rimEnd().x - rimStart().x, 0.0, rimEnd().z - rimStart().z});
 	const Vec3 eyeArc = w.at + d * lerp(-3.2, 9.0, u) + Vec3{lerp(0.8, -3.0, u), 0.0, 0.0};
 	const Vec3 eye = groundPoint(w.at.x, w.at.z, 0.0) + upAt(eyeArc.x, eyeArc.z) * lerp(1.75, 13.0, u) + Vec3{eyeArc.x - w.at.x, 0.0, eyeArc.z - w.at.z};
-	f.view = cam(eye, lerp(groundPoint(w.at.x + d.x * 10.0, w.at.z + d.z * 10.0, 1.0), ruinsPoint({-6.0, 4.0, -8.0}), smoothstep(0.1, 0.9, u)), lens(lerp(35.0, 20.0, u)));
+	// (the aim goes from the ground ahead to the far side of the canyon while the camera rises, and only then down to the ruins: aimed at the ruins too soon, it looked
+	// at the ground before the rim)
+	const Vec3 farSide = ruinsPoint({-6.0, 4.0 + 40.0 * (1.0 - smoothstep(0.35, 1.0, u)), -8.0});
+	f.view = cam(eye, lerp(groundPoint(w.at.x + d.x * 10.0, w.at.z + d.z * 10.0, 1.0), farSide, smoothstep(0.05, 0.45, u)), lens(lerp(35.0, 20.0, u)));
+	f.subjects = {u < 0.2 ? transformPoint(w.frame, {0.0, 1.25, 0.0}) : farSide};   // (what the shot is about: the explorer, then the canyon, then - over the rim - the ruins)
 	night(f);
 	if (content) {
 		ExplorerPose p = w.moving ? walkPose(w.walk, t) : standPose(t);
@@ -364,6 +378,7 @@ inline void shotThirdEye(double t, Frame &f, bool content) {
 	const Vec3 fwd = normalize(transformPoint(body, {0.0, 0.0, 1.0}) - transformPoint(body, {0.0, 0.0, 0.0}));
 	const Vec3 side = normalize(cross(upAt(rimEnd().x, rimEnd().z), fwd));
 	f.view = cam(face + fwd * 1.05 + side * 0.25 + Vec3{0.0, -0.18, 0.0}, face, lens(85.0), 0.004);
+	f.subjects = {face};   // (what the shot is about: the film doctor's framing checks)
 	night(f);
 	if (content) f.content = worldText(f, t, 40.0) + explorerText(p, body, 0.008);
 }
@@ -378,6 +393,7 @@ inline void shotSpiralSteps(double t, Frame &f, bool content) {
 	(void)radial;
 	(void)tangent;
 	f.view = cam(ruinsPoint(Vec3{p0.x + 3.0, p0.y - 1.2, p0.z - 8.0}), ruinsPoint(p0 + Vec3{0.0, 1.0, 0.0}), lens(28.0));
+	f.subjects = {transformPoint(body, {0.0, 1.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	night(f);
 	if (content) f.content = worldText(f, t) + explorerText(walkPose(u * kSpiralTurns * 2.0 * kPi * kSpiralRadius / 0.84, t, 0.8), body, 0.014);
 }
@@ -393,6 +409,7 @@ inline void shotCorridor(double t, Frame &f, bool content) {
 	const double s = corridorS(t);
 	const Vec3 eye = corridorPoint(std::max(0.0, s - 0.07)) + Vec3{0.25, 1.55, 0.0};
 	f.view = cam(ruinsPoint(eye), ruinsPoint(corridorPoint(std::min(1.0, s + 0.18)) + Vec3{0.0, 1.4, 0.0}), lens(32.0));
+	f.subjects = {transformPoint(corridorBody(s), {0.0, 1.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 520.0);
 	f.mist = true;
 	f.haze = nature::Mist{ruinsPoint(corridorPoint(s)), 30.0, 0.012, {0.9, 0.97, 1.1}, 0.003, 0.5};
@@ -422,6 +439,7 @@ inline void shotWriting(double t, Frame &f, bool content) {
 	p.headYaw = 6.0;
 	p.lidTop = 0.3 * (1.0 - smoothstep(101.0, 101.6, t));
 	f.view = cam(c + r * 1.9 + ruinsDir(cross(corridorHeading(kWritingS), Vec3{0.0, 1.0, 0.0})) * 2.0 + up * -0.15, c + r * 0.15 + up * -0.25, lens(40.0));
+	f.subjects = {c};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 520.0);
 	if (content) {
 		const double reveal = smoothstep(100.4, 105.0, t);
@@ -440,6 +458,7 @@ inline void shotRecording(double t, Frame &f, bool content) {
 	p.headPitch = -2.0;
 	const Vec3 holo = transformPoint(body, {0.0, 1.25, 1.15});
 	f.view = cam(transformPoint(body, {1.6, 1.45, 2.6}), transformPoint(body, {-0.1, 1.25, 0.7}), lens(35.0));
+	f.subjects = {holo};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 520.0);
 	if (content) {
 		std::string h;
@@ -492,6 +511,7 @@ inline void shotElevator(double t, Frame &f, bool content) {
 	p.headPitch = 4.0 + 30.0 * kneel;
 	const double glow = smoothstep(124.0, 124.8, t);
 	f.view = cam(ruinsPoint(centre + Vec3{-3.6, 2.3, 3.0}), ruinsPoint(at + Vec3{0.0, 0.9 - drop, 0.0}), lens(24.0));
+	f.subjects = {transformPoint(body, {0.0, 1.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 520.0);
 	if (content) f.content = corridorText(kCorridorLamps, t) + rotundaText(drop, glow, t) + explorerText(p, body, 0.012);
 }
@@ -500,6 +520,7 @@ inline void shotIntoDark(double t, Frame &f, bool content) {
 	const double drop = elevatorDrop(t);
 	const Vec3 c = rotundaCentre();
 	f.view = cam(ruinsPoint(c + Vec3{0.25, 6.2, 0.0}), ruinsPoint(c + Vec3{0.0, -drop - 10.0, 0.0}), lens(32.0));
+	f.subjects = {ruinsPoint(c + Vec3{0.0, -drop, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 600.0);
 	if (content) {
 		ExplorerPose p = standPose(t);
@@ -513,6 +534,7 @@ inline void shotHall(double t, Frame &f, bool content) {
 	const double drop = elevatorDrop(t);
 	const Vec3 fl = observatoryFloor();
 	f.view = cam(ruinsPoint(fl + Vec3{18.0, 1.6, -6.0}), ruinsPoint(rotundaCentre() + Vec3{0.0, -drop - 4.0, 0.0} + Vec3{0.0, -40.0 * (1.0 - smoothstep(136.0, 146.0, t)), 0.0}), lens(16.0));
+	f.subjects = {ruinsPoint(rotundaCentre() + Vec3{0.0, -drop, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 1200.0);
 	f.mist = true;
 	f.haze = nature::Mist{ruinsPoint(fl + Vec3{0.0, 30.0, 0.0}), 60.0, 0.0025, {0.9, 0.97, 1.1}, 0.001, 0.6};
@@ -533,6 +555,7 @@ inline void shotStaffReacts(double t, Frame &f, bool content) {
 	p.staffGlow = 0.3 + 0.7 * smoothstep(147.0, 151.0, t);
 	p.handR = {-0.24, 1.25, 0.24};
 	f.view = cam(ruinsPoint(at + Vec3{3.6, 1.2, 1.5}), ruinsPoint(at + Vec3{0.0, 1.1, -1.5}), lens(35.0));
+	f.subjects = {transformPoint(body, {0.0, 1.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 950.0);
 	f.mist = true;
 	f.haze = nature::Mist{ruinsPoint(at + Vec3{0.0, 20.0, 0.0}), 55.0, 0.003, {0.9, 0.97, 1.1}, 0.001, 0.6};
@@ -549,6 +572,7 @@ inline void shotAwakening(double t, Frame &f, bool content) {
 	p.ears = 0.5;
 	const Vec3 sp = standPlace();
 	f.view = cam(ruinsPoint(sp + Vec3{5.0 + 4.0 * u, 1.4 + 22.0 * u, 7.0 + 6.0 * u}), ruinsPoint(lerp(sp + Vec3{0.0, 3.0, 0.0}, machineCentre(), 0.55 + 0.25 * u)), lens(24.0));
+	f.subjects = {ruinsPoint(machineCentre())};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 520.0);
 	f.mist = true;
 	f.haze = nature::Mist{ruinsPoint(sp + Vec3{0.0, 25.0, 0.0}), 60.0, 0.004, {0.9, 0.97, 1.1}, 0.001, 0.6};
@@ -575,6 +599,7 @@ inline void shotStarMap(double t, Frame &f, bool content) {
 	p.staffGlow = 0.9;
 	p.ears = 0.3;
 	f.view = cam(ruinsPoint(sp + Vec3{4.2 * std::sin(a), 1.7, 4.2 * std::cos(a)}), ruinsPoint(sp + Vec3{0.0, 1.5, 0.0}), lens(35.0));
+	f.subjects = {transformPoint(standBody(), {0.0, 1.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 520.0);
 	if (content) {
 		const Vec3 centre = ruinsPoint(sp + Vec3{0.0, 1.6, 0.0});
@@ -596,6 +621,7 @@ inline void shotFlashingStar(double t, Frame &f, bool content) {
 	const Vec3 side = normalize(cross(star - head, upv));
 	const Vec3 back = normalize((head - star) - upv * dot(head - star, upv));   // (level: behind the head, not down through the floor)
 	f.view = cam(head + back * 2.6 + side * 0.7 + upv * 0.05, lerp(head, star, 0.55), lens(35.0), 0.004);
+	f.subjects = {star};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 520.0);
 	if (content) f.content = observatoryText(t, 0.6, 1.0, 0.4) + explorerText(p, standBody(), 0.012) + starMapText(centre, 1.0, pulseAt(t), false, t);
 }
@@ -616,6 +642,7 @@ inline void shotGone(double t, Frame &f, bool content) {
 	const Vec3 face = transformPoint(head, {0.0, 0.11, 0.10});
 	const Vec3 out = normalize(transformPoint(standBody(), {0.0, 0.0, 1.0}) - transformPoint(standBody(), {0.0, 0.0, 0.0}));
 	f.view = cam(face + out * 1.0 + upAt(kRuinsX, canyonZ(kRuinsX)) * 0.05, face, lens(85.0), 0.004);
+	f.subjects = {face};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 600.0);
 	if (content) f.content = observatoryText(t, 0.6, 1.0, 0.4) + explorerText(p, standBody(), 0.008) + starMapText(centre, 1.0, t < 185.5 ? pulseAt(t) : 0.0, t >= 185.5, t);
 }
@@ -642,6 +669,7 @@ inline void shotReconstruction(double t, Frame &f, bool content) {
 	p.headPitch = 10.0;
 	const double dim = smoothstep(195.0, 198.0, t);
 	f.view = cam(ruinsPoint(to + Vec3{-4.5, 2.0, 4.0}), ruinsPoint(to + Vec3{0.0, 1.3, -1.6}), lens(35.0));
+	f.subjects = {transformPoint(body, {0.0, 1.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 560.0);
 	if (content) {
 		f.content = observatoryText(t, lerp(1.0, 0.25, dim), lerp(1.0, 0.35, dim), lerp(0.5, 0.15, dim)) + consoleText(palm, t) + explorerText(p, body, 0.012);
@@ -737,6 +765,7 @@ inline void shotTransmission(double t, Frame &f, bool content) {
 	const double u = smoothstep(198.0, 224.0, t);
 	const Vec3 sp = consolePlace() + Vec3{0.0, 0.0, 0.85};
 	f.view = cam(ruinsPoint(sp + Vec3{2.3 - 0.6 * u, 1.75, 1.3 + 0.5 * u}), ruinsPoint(consolePlace() + Vec3{-0.4, 1.2, -2.4}), lens(32.0), 0.01);
+	f.subjects = {transformPoint(stage, {0.0, 1.0, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 600.0);
 	if (content) f.content = observatoryText(t, 0.2, 0.3, 0.12) + consoleText(1.0, t) + explorerText(p, body, 0.012) + memoryText(t, stage, upAt(kRuinsX, canyonZ(kRuinsX)));
 }
@@ -748,6 +777,7 @@ inline void shotSilence(double t, Frame &f, bool content) {
 	p.headPitch = 12.0;
 	p.ears = -0.5;
 	f.view = cam(ruinsPoint(consolePlace() + Vec3{-26.0, 6.0, 24.0}), ruinsPoint(consolePlace() + Vec3{0.0, 3.0, 0.0}), lens(24.0));
+	f.subjects = {transformPoint(body, {0.0, 1.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 900.0);
 	f.mist = true;
 	f.haze = nature::Mist{ruinsPoint(consolePlace() + Vec3{0.0, 20.0, 0.0}), 60.0, 0.003, {0.9, 0.97, 1.1}, 0.001, 0.6};
@@ -768,6 +798,7 @@ inline void shotStillness(double t, Frame &f, bool content) {
 	const Vec3 face = transformPoint(head, {0.0, 0.10, 0.10});
 	const Vec3 out = normalize(transformPoint(body, {0.0, 0.0, 1.0}) - transformPoint(body, {0.0, 0.0, 0.0}));
 	f.view = cam(face + out * (2.0 - 0.45 * smoothstep(230.0, 244.0, t)) + upAt(kRuinsX, canyonZ(kRuinsX)) * -0.05, face + upAt(kRuinsX, canyonZ(kRuinsX)) * 0.03, lens(85.0), 0.004);
+	f.subjects = {face};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 650.0);
 	if (content) {
 		const Vec3 centre = ruinsPoint(standPlace() + Vec3{0.0, 1.6, 0.0});
@@ -787,7 +818,9 @@ inline void shotAnswer(double t, Frame &f, bool content) {
 	p.headPitch = lerp(10.0, -35.0, smoothstep(246.5, 248.5, t));
 	p.lidTop = 0.1;
 	const double send = smoothstep(246.0, 247.0, t);
-	f.view = cam(ruinsPoint(consolePlace() + Vec3{6.0, 1.0, 8.0}), ruinsPoint(lerp(consolePlace() + Vec3{0.0, 1.5, 0.0}, machineCentre(), 0.45)), lens(24.0));
+	// (low and wide, from behind the lectern's side: the explorer at the foot of the frame, the column going up through the rest of it)
+	f.view = cam(ruinsPoint(consolePlace() + Vec3{4.5, 1.1, 10.0}), ruinsPoint(consolePlace() + Vec3{0.0, 8.0, -4.0}), lens(16.0));
+	f.subjects = {transformPoint(body, {0.0, 1.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	inside(f, 600.0);
 	if (content) {
 		f.content = observatoryText(t, 0.4 + 0.6 * send, 0.35 + 0.65 * send, 0.15 + 0.85 * send) + consoleText(1.0, t) + explorerText(p, body, 0.012);
@@ -810,6 +843,7 @@ inline void shotDawn(double t, Frame &f, bool content) {
 	f.iso = 420.0;
 	f.warmth = 0.10;
 	f.view = cam(groundPoint(-2.0, -104.0, 1.2), groundPoint(14.0, -122.0, 2.2), lens(28.0));
+	f.subjects = {transformPoint(w.frame, {0.0, 1.25, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	if (content) {
 		ExplorerPose p = walkPose(w.walk, t, w.moving ? 1.0 : 0.0);
 		f.content = worldText(f, t) + explorerText(p, w.frame, 0.014);
@@ -839,7 +873,9 @@ inline void shotCampfire(double t, Frame &f, bool content) {
 	f.giantGlow = 0.10;
 	f.iso = 420.0;
 	f.warmth = 0.06;
-	f.view = cam(transformPoint(F, {-0.95, 1.45, 3.4}), transformPoint(F, {0.10, 0.55, -0.8}), lens(40.0), 0.01);
+	// (behind and to the left, so that the flames show past the explorer's shoulder: straight behind, the body hid them)
+	f.view = cam(transformPoint(F, {-2.0, 1.30, 3.0}), transformPoint(F, {0.15, 0.55, -0.3}), lens(40.0), 0.01);
+	f.subjects = {transformPoint(F, {0.0, 0.4, 0.0})};   // (what the shot is about: the film doctor's framing checks)
 	if (content) {
 		f.content = worldText(f, t, 60.0) + campfireText(t, 1.0) + explorerText(p, campfireBody(), 0.007) + sceptreText(sceptreRest(), 0.15);
 	}
@@ -851,7 +887,7 @@ inline void shotPullBack(double t, Frame &f, bool content) {
 	const double u = clamp01((t - 266.0) / 25.0);
 	const double d = 4.0 * std::pow(180000.0 / 4.0, std::pow(u, 1.35));
 	const Vec3 up = upAt(campfireArc().x, campfireArc().y);
-	const Vec3 behind = normalize(transformPoint(F, {0.0, 0.0, 1.0}) - transformPoint(F, {0.0, 0.0, 0.0}));
+	const Vec3 behind = normalize(transformPoint(F, {-0.55, 0.0, 1.0}) - transformPoint(F, {0.0, 0.0, 0.0}));   // (behind and to the left, as the campfire shot: the fire past the shoulder)
 	const double rise = smoothstep(0.0, 0.5, u);
 	Vec3 dir = normalize(behind * (1.0 - 0.6 * rise) + up * (0.35 + 0.9 * rise));
 	dir = normalize(lerp(dir, normalize(wideEye() - moonCentre()), smoothstep(0.45, 0.9, u)));
@@ -860,6 +896,7 @@ inline void shotPullBack(double t, Frame &f, bool content) {
 	const double away = smoothstep(std::log(300.0), std::log(60000.0), std::log(d));
 	const Vec3 target = lerp(fire, lerp(moonCentre(), moonCentre() + giantDir() * 30000.0, smoothstep(0.7, 1.0, u)), away);
 	f.view = cam(eye, target, lens(lerp(40.0, 50.0, u)));
+	f.subjects = {d < 2000.0 ? fire : moonFacing(eye)};   // (what the shot is about: the film doctor's framing checks)
 	f.dawn = 0.99 + 0.01 * u;
 	f.giantGlow = lerp(0.10, 1.0, away);
 	f.giantshine = 1.0 - away;
@@ -935,6 +972,8 @@ inline const char *shotNamesText() {
 	return s.c_str();
 }
 inline Frame frameAt(double t, bool content) { return kit::momentAt(shotList(), t, content); }
+// What each moment is about (Film::subjectsAt): the shots' own subjects.
+inline std::vector<Vec3> subjectsAt(double t) { return frameAt(t, false).subjects; }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The scene (film_kit.h makes it from a moment)

@@ -488,6 +488,8 @@ total.txt
 !scripts/templates/README_PACKAGE.txt
 # A film's words (src/shared/cartoon/caption_file.h): the captions of its video, read when the video is made - data, not a stray log.
 !pbrt_scenes/film_assets/*/captions.txt
+# A film's shot cameras (src/shared/cartoon/shot_cameras.h), read when a frame is made - data too.
+!pbrt_scenes/film_assets/*/cameras.txt
 # Generated/preprocessed test artifacts
 tests/generated/
 

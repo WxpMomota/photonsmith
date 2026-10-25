@@ -30,6 +30,7 @@ namespace nomai {
 
 constexpr double kMoonR = 2400.0;
 inline Vec3 moonCentre() { return {0.0, -kMoonR, 0.0}; }
+inline Vec3 moonFacing(Vec3 eye) { return moonCentre() + normalize(eye - moonCentre()) * kMoonR; }   // the point of the moon's surface nearest a camera at eye
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 // The sky's bodies

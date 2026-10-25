@@ -1,0 +1,306 @@
+#pragma once
+// shot_cameras.h -- changes to a film's shot cameras, written in a text file that is read when a frame is made: a framing tweak needs no rebuild. The file is
+// pbrt_scenes/film_assets/<film key>/cameras.txt (film_cache::asset); a film without one is left as its code makes it. Every film gets it (the film registry in cartoons.h
+// wraps each film's sceneAt and headerAt), so its video, its stills, the GUI's renders of it and the film doctor all see the same cameras.
+//
+//     # The Last Nomai Signal: what the code's cameras are changed by. A section a shot - its number (1 is the first, as the doctor's sheet counts) or its name - and [*]
+//     # for every shot.
+//     [28]
+//     dolly 1.5        # forward along the view, in the film's units (negative: back); the aim stays where it was
+//     truck -0.4       # to the right (negative: left), aim and all
+//     pedestal 0.3     # up (negative: down), aim and all
+//     pan 4            # turn the aim to the right, degrees
+//     tilt -6          # turn the aim up (negative: down), degrees
+//     fov 50           # the field of view in degrees (pbrt's: across the shorter side of the picture) ...
+//     zoom 1.2         # ... or the code's divided by this
+//     iso 300          # the exposure (the Film's iso) ...
+//     stops 0.5        # ... or the code's times 2 to this
+//     [The answer]
+//     tilt 3
+//
+// A change is made to the camera the code gives at each moment, so a camera that moves keeps moving: dolly 1.5 brings the whole move 1.5 nearer. [*] comes first and the shot's
+// own section on top of it (moves add up, zooms multiply, a set fov or iso is the shot's own). What the file says wrong (a word it does not know, a number that is not one) is
+// printed once to the error output and the line left out.
+
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <functional>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <sstream>
+#include <string>
+#include <vector>
+
+#include "cartoon_lib.h"
+#include "film_cache.h"
+
+namespace cartoon {
+namespace shot_cameras {
+
+// What one section says.
+struct Change {
+	double dolly = 0.0, truck = 0.0, pedestal = 0.0, pan = 0.0, tilt = 0.0;
+	double fov = 0.0;    // 0: the code's
+	double zoom = 1.0;
+	double iso = 0.0;    // 0: the code's
+	double stops = 0.0;
+	bool moves() const { return dolly != 0.0 || truck != 0.0 || pedestal != 0.0 || pan != 0.0 || tilt != 0.0; }
+	bool any() const { return moves() || fov > 0.0 || zoom != 1.0 || iso > 0.0 || stops != 0.0; }
+};
+
+// A section on top of another: moves add up, zooms multiply, a set fov or iso replaces.
+inline Change combine(const Change &under, const Change &over) {
+	Change c = under;
+	c.dolly += over.dolly;
+	c.truck += over.truck;
+	c.pedestal += over.pedestal;
+	c.pan += over.pan;
+	c.tilt += over.tilt;
+	c.zoom *= over.zoom;
+	c.stops += over.stops;
+	if (over.fov > 0.0) c.fov = over.fov;
+	if (over.iso > 0.0) c.iso = over.iso;
+	return c;
+}
+
+// A whole file.
+struct File {
+	Change all;                              // [*]
+	std::map<int, Change> byNumber;          // [28]: the 28th shot
+	std::map<std::string, Change> byName;    // [The answer]
+	std::vector<std::string> problems;       // "line 4: ..."
+	bool empty() const { return !all.any() && byNumber.empty() && byName.empty(); }
+};
+
+inline std::string trimmed(const std::string &s) {
+	const std::size_t a = s.find_first_not_of(" \t\r\n");
+	if (a == std::string::npos) return std::string();
+	const std::size_t b = s.find_last_not_of(" \t\r\n");
+	return s.substr(a, b - a + 1);
+}
+
+inline File parse(const std::string &text) {
+	File f;
+	std::istringstream in(text);
+	std::string line;
+	Change *at = nullptr;
+	for (int n = 1; std::getline(in, line); ++n) {
+		const std::size_t hash = line.find('#');
+		line = trimmed(hash == std::string::npos ? line : line.substr(0, hash));
+		if (line.empty()) continue;
+		const std::string where = "line " + std::to_string(n) + ": ";
+		if (line.front() == '[') {
+			const std::size_t close = line.find(']');
+			const std::string name = trimmed(line.substr(1, close == std::string::npos ? std::string::npos : close - 1));
+			if (close == std::string::npos || name.empty()) {
+				f.problems.push_back(where + "a section is [shot number], [shot name] or [*]");
+				at = nullptr;
+			} else if (name == "*") {
+				at = &f.all;
+			} else if (name.find_first_not_of("0123456789") == std::string::npos) {
+				at = &f.byNumber[std::atoi(name.c_str())];
+			} else {
+				at = &f.byName[name];
+			}
+			continue;
+		}
+		std::istringstream words(line);
+		std::string word;
+		double value = 0.0;
+		words >> word;
+		if (!(words >> value)) {
+			f.problems.push_back(where + "'" + word + "' needs a number");
+			continue;
+		}
+		if (!at) {
+			f.problems.push_back(where + "'" + word + "' before any [shot] section");
+			continue;
+		}
+		if (word == "dolly") at->dolly = value;
+		else if (word == "truck") at->truck = value;
+		else if (word == "pedestal") at->pedestal = value;
+		else if (word == "pan") at->pan = value;
+		else if (word == "tilt") at->tilt = value;
+		else if (word == "fov" && value > 0.0 && value < 180.0) at->fov = value;
+		else if (word == "zoom" && value > 0.0) at->zoom = value;
+		else if (word == "iso" && value > 0.0) at->iso = value;
+		else if (word == "stops") at->stops = value;
+		else f.problems.push_back(where + "'" + word + " " + trimmed(line.substr(word.size())) + "' is not a change this file knows (dolly, truck, pedestal, pan, tilt, fov, zoom, iso, stops)");
+	}
+	return f;
+}
+
+// The change for a shot (its index from 0 and its name): [*], then [number], then [name].
+inline Change changeFor(const File &f, int shot, const std::string &name) {
+	Change c = f.all;
+	const auto byNumber = f.byNumber.find(shot + 1);
+	if (byNumber != f.byNumber.end()) c = combine(c, byNumber->second);
+	const auto byName = f.byName.find(name);
+	if (!name.empty() && byName != f.byName.end()) c = combine(c, byName->second);
+	return c;
+}
+
+namespace detail {
+inline bool numbersAt(const std::string &s, std::size_t pos, int count, std::vector<double> &out, std::size_t &end) {
+	out.clear();
+	const char *p = s.c_str() + pos;
+	for (int i = 0; i < count; ++i) {
+		char *next = nullptr;
+		const double v = std::strtod(p, &next);
+		if (next == p) return false;
+		out.push_back(v);
+		p = next;
+	}
+	end = static_cast<std::size_t>(p - s.c_str());
+	return true;
+}
+inline std::string num(double v) {
+	char b[40];
+	std::snprintf(b, sizeof b, "%.6g", v);
+	return b;
+}
+// The value of a `"float <name>" [ v ]` parameter in [from, to) of s: its place (the number's start and end) or false.
+inline bool floatParam(const std::string &s, std::size_t from, std::size_t to, const std::string &name, std::size_t &numStart, std::size_t &numEnd, double &value) {
+	const std::size_t at = s.find("\"float " + name + "\"", from);
+	if (at == std::string::npos || at >= to) return false;
+	const std::size_t open = s.find('[', at);
+	if (open == std::string::npos || open >= to) return false;
+	numStart = s.find_first_not_of(" \t", open + 1);
+	std::vector<double> v;
+	if (numStart == std::string::npos || !numbersAt(s, numStart, 1, v, numEnd)) return false;
+	value = v[0];
+	return true;
+}
+inline Vec3 turned(Vec3 v, Vec3 axis, double degrees) {   // v turned about the unit axis (Rodrigues)
+	const double a = degrees * kPi / 180.0, c = std::cos(a), s = std::sin(a);
+	return v * c + cross(axis, v) * s + axis * (dot(axis, v) * (1.0 - c));
+}
+}  // namespace detail
+
+// A frame's scene (or header) with the change made to it: its LookAt moved and turned, the Camera's fov and focus distance, the Film's iso. Only the header (before WorldBegin)
+// is touched; a scene without a LookAt is returned as it is.
+inline std::string apply(const std::string &scene, const Change &c) {
+	if (!c.any()) return scene;
+	const std::size_t worldBegin = scene.find("WorldBegin");
+	const std::size_t headerEnd = worldBegin == std::string::npos ? scene.size() : worldBegin;
+	std::string head = scene.substr(0, headerEnd);
+	if (c.moves()) {
+		const std::size_t look = head.find("LookAt");
+		std::vector<double> v;
+		std::size_t end = 0;
+		if (look == std::string::npos || !detail::numbersAt(head, look + 6, 9, v, end)) return scene;
+		// (pbrt's LookAt has x negated against the films' story space: cameraText. The moves are made in story space, where +x is to the right of the picture.)
+		Vec3 eye{-v[0], v[1], v[2]}, target{-v[3], v[4], v[5]};
+		const Vec3 worldUp = normalize(Vec3{-v[6], v[7], v[8]});
+		const double focus = length(target - eye);
+		Vec3 forward = normalize(target - eye);
+		Vec3 right = normalize(cross(forward, worldUp));
+		eye = eye + right * c.truck + worldUp * c.pedestal;
+		target = target + right * c.truck + worldUp * c.pedestal;
+		Vec3 aim = target - eye;
+		aim = detail::turned(aim, worldUp, -c.pan);   // (turning right about up is negative in a right-handed space)
+		right = normalize(cross(normalize(aim), worldUp));
+		aim = detail::turned(aim, right, c.tilt);
+		forward = normalize(aim);
+		eye = eye + forward * c.dolly;
+		target = eye + forward * std::max(1e-3, length(aim) - c.dolly);
+		const std::string lookAt = "LookAt " + detail::num(-eye.x) + " " + detail::num(eye.y) + " " + detail::num(eye.z) + "  " + detail::num(-target.x) + " " + detail::num(target.y) + " " +
+								   detail::num(target.z) + "  " + detail::num(v[6]) + " " + detail::num(v[7]) + " " + detail::num(v[8]);
+		head.replace(look, end - look, lookAt);
+		// the focus follows the subject the aim was on: as far as before, less the dolly
+		const std::size_t camera = head.find("Camera");
+		std::size_t a = 0, b = 0;
+		double d = 0.0;
+		if (camera != std::string::npos && detail::floatParam(head, camera, head.size(), "focaldistance", a, b, d))
+			head.replace(a, b - a, detail::num(std::max(1e-3, focus - c.dolly)));
+	}
+	if (c.fov > 0.0 || c.zoom != 1.0) {
+		const std::size_t camera = head.find("Camera");
+		if (camera != std::string::npos) {
+			const std::size_t lineEnd = std::min(head.find('\n', camera), head.size());
+			std::size_t a = 0, b = 0;
+			double fov = 90.0;   // (pbrt's default)
+			const bool has = detail::floatParam(head, camera, lineEnd, "fov", a, b, fov);
+			double now = c.fov > 0.0 ? c.fov : fov;
+			now = 2.0 * std::atan(std::tan(now * kPi / 360.0) / c.zoom) * 180.0 / kPi;
+			if (has) {
+				head.replace(a, b - a, detail::num(now));
+			} else {
+				const std::size_t kind = head.find('"', head.find('"', camera) + 1);   // after "perspective"
+				if (kind != std::string::npos && kind < lineEnd) head.insert(kind + 1, " \"float fov\" [ " + detail::num(now) + " ]");
+			}
+		}
+	}
+	if (c.iso > 0.0 || c.stops != 0.0) {
+		const std::size_t film = head.find("Film ");
+		if (film != std::string::npos) {
+			const std::size_t lineEnd = std::min(head.find('\n', film), head.size());
+			std::size_t a = 0, b = 0;
+			double iso = 100.0;   // (pbrt's default: an exposure of 1)
+			const bool has = detail::floatParam(head, film, lineEnd, "iso", a, b, iso);
+			const double now = (c.iso > 0.0 ? c.iso : iso) * std::pow(2.0, c.stops);
+			if (has) {
+				head.replace(a, b - a, detail::num(now));
+			} else {
+				const std::size_t kind = head.find('"', head.find('"', film) + 1);   // after "rgb"
+				if (kind != std::string::npos && kind < lineEnd) head.insert(kind + 1, " \"float iso\" [ " + detail::num(now) + " ]");
+			}
+		}
+	}
+	return head + scene.substr(headerEnd);
+}
+
+// The file of a film (null when it has none), read again when it changes. Thread-safe; what it says wrong is printed once a reading.
+inline std::shared_ptr<const File> forFilm(const std::string &key) {
+	struct Seen {
+		std::string path;
+		bool looked = false;
+		std::filesystem::file_time_type time{};
+		std::uintmax_t size = 0;
+		std::shared_ptr<const File> file;
+	};
+	static std::mutex lock;
+	static std::map<std::string, Seen> seen;
+	const std::lock_guard<std::mutex> hold(lock);
+	Seen &s = seen[key];
+	if (!s.looked) {
+		s.path = film_cache::asset(key + "/cameras.txt");   // (looked for once: a file made later is seen by the next program)
+		s.looked = true;
+	}
+	if (s.path.empty()) return nullptr;
+	std::error_code ec;
+	const auto time = std::filesystem::last_write_time(s.path, ec);
+	const auto size = ec ? 0 : std::filesystem::file_size(s.path, ec);
+	if (ec) return nullptr;
+	if (!s.file || time != s.time || size != s.size) {
+		std::ifstream in(s.path, std::ios::binary);
+		std::stringstream text;
+		text << in.rdbuf();
+		auto file = std::make_shared<File>(parse(text.str()));
+		for (const std::string &p : file->problems) std::cerr << "[cameras] " << s.path << ": " << p << std::endl;
+		s.file = std::move(file);
+		s.time = time;
+		s.size = size;
+	}
+	return s.file;
+}
+
+// A film's frame text at time t with its cameras file's change for the shot t falls in (the text as it is when the film has no file).
+inline std::string at(const std::string &key, const std::function<std::vector<double>()> &starts, const std::vector<std::string> &shotNames, double t, const std::string &text) {
+	const std::shared_ptr<const File> file = forFilm(key);
+	if (!file || file->empty()) return text;
+	const std::vector<double> shotStarts = starts ? starts() : std::vector<double>();
+	int shot = 0;
+	for (std::size_t i = 0; i < shotStarts.size(); ++i)
+		if (t >= shotStarts[i]) shot = static_cast<int>(i);
+	const std::string name = shot < static_cast<int>(shotNames.size()) ? shotNames[static_cast<std::size_t>(shot)] : std::string();
+	return shot_cameras::apply(text, changeFor(*file, shot, name));
+}
+
+}  // namespace shot_cameras
+}  // namespace cartoon

@@ -10,7 +10,9 @@ The films themselves are C++ (src/shared/cartoon/: cartoon_lib.h is the toolkit,
   python scripts/anim/film.py sheet little-robot --times 2,8,20,30
   python scripts/anim/film.py video fireflies                   the finished video (a film is a video preset: --video-preset <key>)
   python scripts/anim/film.py doctor tengwang                   every shot at its start, middle and end, small, with a report of what looks wrong (black, very dark, blown-out
-                                                                and flat frames, jumps in brightness across a cut, slow frames) and the whole film's render time; exit 1 on a warning
+                                                                and flat frames, jumps in brightness across a cut, slow frames; and, for a film that names its subjects, a subject out of the
+                                                                frame, behind the camera or hidden behind something, and a camera against a wall) and the whole film's render time; exit 1
+                                                                on a warning. --no-framing skips the subject checks (they add a depth pass to each frame)
 
 Options (before or after the command): --exe PATH (default: RayTracer_Package/ray_tracer next to this repository), --cpu (default is the GPU, denoised), --height N (picture height,
 default 270 for a sheet and 720 otherwise), --spp N, --out PATH. Plain Python 3; the contact sheet needs Pillow (pip install pillow).
@@ -134,6 +136,11 @@ CLIPPED = 0.08     # more than this share of pixels near white (brightness 0.95 
 FLAT = 0.025       # brightness this even over the whole frame (standard deviation): a camera inside something, or against a wall
 JUMP = 5.0         # brightness ratio across a cut worth a note
 SLOW = 3.0         # a frame this many times the film's median render time: worth a note
+# The framing checks (a film's subjects, Film::subjectsAt, against the depth pass of the frame: `--aovs`, depth.Z = the distance along each camera ray, 0 where nothing is hit)
+HIDDEN_RATIO = 0.75   # a subject is hidden when everything round its pixel is nearer than this share of its distance, and nearer by HIDDEN_MARGIN or more: a subject
+HIDDEN_MARGIN = 0.3   # point is often inside what it names (a chest inside a body, a ship's middle inside its hull, a machine's centre inside its rings), not behind a wall
+NEAR = 0.2            # depth below this ...
+NEAR_SHARE = 0.5      # ... over this share of the frame: the camera against something (or inside it)
 
 
 def frame_stats(png):
@@ -160,6 +167,55 @@ def judge(stats):
     return found
 
 
+def film_subjects(args, key, t, width, height):
+    """Where the film's subjects fall in a width x height frame at film time t (`ray_tracer --film-subjects`): [{"x", "y", "distance", "in_frame", "in_front"}], empty
+    for a film that names none."""
+    done = subprocess.run([find_exe(args.exe), "--film-subjects", key, "%.3f" % t, str(width), str(height)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                          cwd=run_dir())
+    found = []
+    for line in done.stdout.splitlines():
+        f = line.split("\t")
+        if f[0] == "subject" and len(f) >= 7:
+            found.append({"x": float(f[2]), "y": float(f[3]), "distance": float(f[4]), "in_frame": f[5] == "1", "in_front": f[6] == "1"})
+    return found
+
+
+def judge_framing(subjects, aovs_path):
+    """The framing findings for one frame: [(level, text)]. A subject out of the frame or behind the camera (level "outside": the doctor decides, from the rest of the
+    shot, whether it is entering or leaving); one hidden behind something nearer (the depth pass round its pixel); the camera against something (most of the frame very
+    near)."""
+    found = []
+    depth = cover = None
+    if aovs_path and os.path.exists(aovs_path):
+        sys.path.insert(0, os.path.join(REPO, "scripts"))
+        from exr_io import read_exr
+        _, _, ch = read_exr(aovs_path)
+        if "depth.Z" in ch:
+            depth = ch["depth.Z"]
+            cover = (ch["A"] > 0.5) & (depth > 0.0) if "A" in ch else depth > 0.0
+    for i, s in enumerate(subjects):
+        name = "the subject" if len(subjects) == 1 else "subject %d" % (i + 1)
+        if not s["in_front"]:
+            found.append(("outside", "%s is behind the camera" % name))
+            continue
+        if not s["in_frame"]:
+            found.append(("outside", "%s is out of the frame (at %.0f, %.0f)" % (name, s["x"], s["y"])))
+            continue
+        if depth is None:
+            continue
+        h, w = depth.shape
+        x, y = min(max(int(s["x"]), 0), w - 1), min(max(int(s["y"]), 0), h - 1)
+        window = (slice(max(0, y - 1), y + 2), slice(max(0, x - 1), x + 2))
+        nearest = min(HIDDEN_RATIO * s["distance"], s["distance"] - HIDDEN_MARGIN)
+        if cover[window].all() and float(depth[window].max()) < nearest:
+            found.append(("warn", "%s is hidden: something %.2f away is in front of it (it is %.2f away)" % (name, float(depth[window].max()), s["distance"])))
+    if depth is not None and cover.any():
+        near = float(((depth < NEAR) & cover).mean())
+        if near > NEAR_SHARE:
+            found.append(("warn", "the camera is against something: %.0f%% of the frame is nearer than %.2f" % (100 * near, NEAR)))
+    return found
+
+
 def cmd_doctor(args):
     """Every shot of a film at its start, middle and end, small, with a report of what looks wrong: black or very dark frames, blown-out ones, flat ones (a camera inside
     something), big jumps in brightness across a cut, and frames much slower to render than the rest - and an estimate of the whole film's render time."""
@@ -180,23 +236,41 @@ def cmd_doctor(args):
     os.makedirs(out_dir, exist_ok=True)
     # the moments: each shot's start, middle and end (a little inside its cuts, so that a frame is not the neighbour's)
     jobs = []
+    only = {int(n) - 1 for n in args.shots.split(",")} if args.shots else None
     for i, (start, name) in enumerate(shots):
+        if only is not None and i not in only:
+            continue
         end = shots[i + 1][0] if i + 1 < len(shots) else duration
         inset = min(0.3, (end - start) / 4)
         for which, t in (("start", start + inset), ("middle", (start + end) / 2), ("end", end - inset)):
             jobs.append({"shot": i, "name": name, "which": which, "t": min(max(t, 0.0), duration * 0.9999)})
 
+    # the framing checks: for a film that names its subjects (Film::subjectsAt), each frame also gets a depth pass
+    framing = not args.no_framing and any(film_subjects(args, info["key"], j["t"], width, height) for j in jobs[::5])
+
     def render(job):
         png = os.path.join(out_dir, "s%02d_%s.png" % (job["shot"], job["which"]))
-        cmd = [find_exe(args.exe)] + renderer_flags(args) + ["--output", png, "--height", str(height), str(width), str(spp), "8", "cartoon:%s@%.3f" % (info["key"], job["t"])]
+        cmd = [find_exe(args.exe)] + renderer_flags(args) + (["--aovs"] if framing else []) + ["--output", png, "--height", str(height), str(width), str(spp), "8",
+                                                                                                "cartoon:%s@%.3f" % (info["key"], job["t"])]
         t0 = time.time()
-        done = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=run_dir())
-        job["seconds"] = time.time() - t0
-        job["png"] = png if done.returncode == 0 and os.path.exists(png) else None
-        job["error"] = None if job["png"] else done.stdout[-600:]
+        # the frame's time stops where the depth pass starts (that pass is the doctor's, not the film's)
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=run_dir())
+        out, seconds = [], None
+        for line in proc.stdout:
+            out.append(line)
+            if seconds is None and line.startswith("Writing the render passes"):
+                seconds = time.time() - t0
+        proc.wait()
+        job["seconds"] = seconds if seconds is not None else time.time() - t0
+        job["png"] = png if proc.returncode == 0 and os.path.exists(png) else None
+        job["error"] = None if job["png"] else "".join(out)[-600:]
+        job["aovs"] = os.path.splitext(png)[0] + ".aovs.exr" if framing else None
+        if job["png"] and framing:
+            job["subjects"] = film_subjects(args, info["key"], job["t"], width, height)
         return job
 
-    print("%s: %d shots, %d frames at %d x %d, %d samples..." % (info["name"], len(shots), len(jobs), width, height, spp), flush=True)
+    print("%s: %d shots, %d frames at %d x %d, %d samples%s..." % (info["name"], len(shots), len(jobs), width, height, spp,
+                                                                   ", with the framing checks" if framing else ""), flush=True)
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs or 3) as pool:
         for k, job in enumerate(pool.map(render, jobs)):
             if k % 10 == 9:
@@ -208,8 +282,12 @@ def cmd_doctor(args):
             findings.append(("warn", job["shot"], job["which"], job["t"], "did not render" + (": " + said[-1] if said else "")))
             continue
         job["stats"] = frame_stats(job["png"])
-        for level, text in judge(job["stats"]):
+        verdict = judge(job["stats"])
+        for level, text in verdict:
             findings.append((level, job["shot"], job["which"], job["t"], text))
+        if job.get("subjects") is not None and not any(level == "black" for level, _ in verdict):
+            for level, text in judge_framing(job["subjects"], job["aovs"]):
+                findings.append((level, job["shot"], job["which"], job["t"], text))
     # A black frame is on purpose when its whole shot is black (a cut to black, a title card) or it is the shot's start or end with a picture in its middle (a fade): a note.
     # A black middle in a shot that is not black throughout is a warning.
     def is_black(shot, which):
@@ -223,6 +301,15 @@ def cmd_doctor(args):
             return ("note", s, which, t, "black at the shot's %s: a fade" % which)
         return ("warn", s, which, t, "black in the middle of a shot that is not black throughout")
     findings = [black_finding(f) if f[0] == "black" else f for f in findings]
+    # A subject out of the frame at a shot's start or end, but in it in the middle, is entering or leaving: a note. Out of it in the middle is a warning.
+    outside = {(f[1], f[2]) for f in findings if f[0] == "outside"}
+    seen_middle = {j["shot"] for j in jobs if j["which"] == "middle" and j.get("subjects")}
+    def outside_finding(f):
+        level, s, which, t, text = f
+        if which != "middle" and s in seen_middle and (s, "middle") not in outside:
+            return ("note", s, which, t, text + (": it enters the frame" if which == "start" else ": it leaves the frame"))
+        return ("warn", s, which, t, text)
+    findings = [outside_finding(f) if f[0] == "outside" else f for f in findings]
     # across each cut: from the end of one shot to the start of the next
     by_key = {(j["shot"], j["which"]): j for j in jobs if j.get("stats")}
     for s in range(len(shots) - 1):
@@ -250,14 +337,15 @@ def cmd_doctor(args):
     tw = max(160, width)
     th = round(tw / aspect)
     label_h = 14
-    sheet = Image.new("RGB", (tw * 3, (th + label_h) * len(shots)), (24, 24, 24))
+    rows = sorted({j["shot"] for j in jobs})
+    sheet = Image.new("RGB", (tw * 3, (th + label_h) * len(rows)), (24, 24, 24))
     draw = ImageDraw.Draw(sheet)
     flagged = {}
     for level, s, which, t, text in findings:
         if level != "note" or flagged.get((s, which)) != "warn":
             flagged[(s, which)] = level if flagged.get((s, which)) != "warn" else "warn"
     for j in jobs:
-        x, y = tw * ("start", "middle", "end").index(j["which"]), (th + label_h) * j["shot"]
+        x, y = tw * ("start", "middle", "end").index(j["which"]), (th + label_h) * rows.index(j["shot"])
         if j["png"]:
             sheet.paste(Image.open(j["png"]).convert("RGB").resize((tw, th)), (x, y + label_h))
         level = flagged.get((j["shot"], j["which"]))
@@ -304,6 +392,8 @@ def main():
     p.add_argument("--count", type=int, help="sheet: how many stills, evenly spaced over the film (default 16)")
     p.add_argument("--times", help="sheet: comma-separated seconds instead of --count")
     p.add_argument("--jobs", type=int, help="doctor: how many frames to render at once (default 3)")
+    p.add_argument("--no-framing", action="store_true", help="doctor: skip the subject checks (out of frame, hidden, camera against something)")
+    p.add_argument("--shots", help="doctor: only these shots (comma-separated numbers, 1 the first: as the sheet counts)")
     args = p.parse_args()
     if args.out:
         args.out = os.path.abspath(args.out)   # (the program runs from its package folder)

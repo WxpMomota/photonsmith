@@ -41,6 +41,7 @@
 #include "paper_boat.h"
 #include "pip_and_the_moon.h"
 #include "short_scores.h"
+#include "shot_cameras.h"
 
 namespace cartoon {
 
@@ -131,7 +132,7 @@ inline const Film kFilms[] = {
 	 "With music.",
 	 nomai::kDuration, nomai::kFps, &nomai::sceneAt, &nomai::headerAt, &nomai::shotStarts, 45.0,
 	 {23, "character,emissive,night,dawn,fog", nomai::shotNamesText(), nomai::kSamples, 8.6, false, nomai::kWidth, nomai::kHeight},
-	 &nomai::soundtrack, &nomai::captions},
+	 &nomai::soundtrack, &nomai::captions, &nomai::subjectsAt},
 };
 inline constexpr int kFilmCount = static_cast<int>(sizeof(kFilms) / sizeof(kFilms[0]));
 
@@ -158,6 +159,29 @@ struct Registry {
 		return strings.back().c_str();
 	}
 };
+
+// A film as the program shows it: its frames with the changes of its cameras file made (shot_cameras.h: pbrt_scenes/film_assets/<key>/cameras.txt, read when a frame is made).
+inline Film withShotCameras(Film f) {
+	std::vector<std::string> names;
+	std::string name;
+	for (const char *p = f.meta.shotNames ? f.meta.shotNames : ""; ; ++p) {
+		if (*p == '|' || *p == '\0') {
+			names.push_back(name);
+			name.clear();
+			if (*p == '\0') break;
+		} else {
+			name += *p;
+		}
+	}
+	const std::string key = f.key;
+	const auto wrap = [&](std::function<std::string(double)> base) -> std::function<std::string(double)> {
+		if (!base) return base;
+		return [base, key, starts = f.shotStarts, names](double t) { return shot_cameras::at(key, starts, names, t, base(t)); };
+	};
+	f.sceneAt = wrap(f.sceneAt);
+	f.headerAt = wrap(f.headerAt);
+	return f;
+}
 
 // Loads one film file into the registry (or says why not).
 inline void addFilmFile(Registry &r, const std::string &file) {
@@ -203,14 +227,17 @@ inline void addFilmFile(Registry &r, const std::string &file) {
 	Film f{r.keep(d.spec.key), r.keep(d.spec.name), r.keep(d.spec.about.empty() ? "A film made from " + std::filesystem::path(d.spec.scene).filename().string() + "." : d.spec.about),
 		   d.spec.length, d.spec.fps, [p](double t) { return p->sceneAt(t); }, [p](double t) { return p->headerAt(t); }, [p]() { return p->shotStarts(); }, d.spec.still,
 		   {id, r.keep(tags), r.keep(d.shotNames()), d.scene.samples, 0.0}};
-	r.made.push_back(std::move(f));
+	r.made.push_back(withShotCameras(std::move(f)));
 	r.all.push_back(&r.made.back());
 }
 
 inline Registry &registry() {
 	static Registry *r = [] {
 		Registry *reg = new Registry();   // (lives as long as the program: films hand out pointers into it)
-		for (const Film &f : kFilms) reg->all.push_back(&f);
+		for (const Film &f : kFilms) {
+			reg->made.push_back(withShotCameras(f));
+			reg->all.push_back(&reg->made.back());
+		}
 		std::vector<std::string> files;
 		for (const std::string &dir : filmFileDirs()) {
 			std::error_code ec;

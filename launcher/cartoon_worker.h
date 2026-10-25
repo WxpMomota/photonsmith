@@ -14,6 +14,9 @@
 //     scenes C:/out/frames/work0       a folder of the worker's own, for the one scene file it rewrites
 //     out    C:/out/frames             where the pictures and the markers go
 //     list   0 2 4 6                   the frames to render, in this order
+//     keep   4 0123456789abcdef        (any number) a finished frame and the fingerprint it was rendered from: not rendered again if its scene's fingerprint is still that
+//
+// A marker holds the result, the fingerprint of the scene the frame was made from (frame_fingerprint.h), and "kept" when the frame was not rendered because it had not changed.
 
 #include <chrono>
 #include <cstdio>
@@ -26,6 +29,9 @@
 #include <vector>
 
 #include "background_mode.h"
+#include <map>
+
+#include "frame_fingerprint.h"
 #include "process.h"
 #include "launcher_args.h"
 #include "render_setup.h"
@@ -39,6 +45,7 @@ struct Job {
 	std::string ext = "ppm";
 	int frames = 0;
 	std::vector<int> list;
+	std::map<int, std::string> keep;   // finished frames and the fingerprints they were rendered from
 	const cartoon::Film *filmPtr = nullptr;
 
 	std::string scenePath() const { return (std::filesystem::path(scenes) / "frame.pbrt").string(); }
@@ -51,6 +58,7 @@ struct Job {
 		o << "film " << film << "\nframes " << frames << "\nscenes " << scenes << "\nout " << out << "\next " << ext << "\nlist";
 		for (int f : list) o << " " << f;
 		o << "\n";
+		for (const auto &[f, fp] : keep) o << "keep " << f << " " << fp << "\n";
 		return o.str();
 	}
 
@@ -70,6 +78,11 @@ struct Job {
 			else if (verb == "ext") words >> ext;
 			else if (verb == "list")
 				for (int f; words >> f;) list.push_back(f);
+			else if (verb == "keep") {
+				int f = -1;
+				std::string fp;
+				if (words >> f >> fp) keep[f] = fp;
+			}
 		}
 		filmPtr = cartoon::find(film.c_str());
 		if (!filmPtr) return "the job names a film (" + film + ") this program does not have";
@@ -79,20 +92,28 @@ struct Job {
 		return std::string();
 	}
 
-	// Writes the scene of `frame` to scenePath(); false when it cannot be written. `eye` is where the scene's own camera is (the first LookAt of its header).
-	bool writeScene(int frame, double eye[3]) const {
+	// Writes the scene of `frame` to scenePath(); false when it cannot be written. `eye` is where the scene's own camera is (the first LookAt of its header); `fingerprint` gets the
+	// scene's fingerprint, and `unchanged` is true (and nothing is written) when the frame is one to keep and its fingerprint is the one it was rendered from.
+	bool writeScene(int frame, double eye[3], std::string &fingerprint, bool &unchanged) const {
+		unchanged = false;
 		try {
 			const std::string header = filmPtr->headerAt(timeOf(frame));
 			static const std::regex look("LookAt\\s+(\\S+)\\s+(\\S+)\\s+(\\S+)");
 			std::smatch m;
 			if (std::regex_search(header, m, look))
 				for (int i = 0; i < 3; ++i) eye[i] = std::stod(m[i + 1].str());
+			const std::string text = filmPtr->sceneAt(timeOf(frame));
+			fingerprint = frame_fingerprint::of(text);
+			if (const auto it = keep.find(frame); it != keep.end() && it->second == fingerprint) {
+				unchanged = true;
+				return true;
+			}
 			std::ofstream f(scenePath(), std::ios::binary | std::ios::trunc);
 			if (!f) {
 				std::cerr << "ERROR: frame " << frame << ": could not write " << scenePath() << std::endl;
 				return false;
 			}
-			f << filmPtr->sceneAt(timeOf(frame));
+			f << text;
 			return static_cast<bool>(f);
 		} catch (const std::exception &e) {   // (the film's code failed on this frame: why goes to this worker's log, which the launcher's failure line points to)
 			std::cerr << "ERROR: frame " << frame << " of " << film << ": " << e.what() << std::endl;
@@ -122,7 +143,12 @@ inline int run(const Job &job, const LaunchArgs &args, const RenderSetup &setup,
 		const auto frameStart = std::chrono::steady_clock::now();
 		double eye[3] = {args.cam_x, args.cam_y, args.cam_z};
 		int rc = -1;
-		if (job.writeScene(frame, eye)) {
+		std::string fingerprint;
+		bool unchanged = false;
+		const bool written = job.writeScene(frame, eye, fingerprint, unchanged);
+		if (written && unchanged) {
+			rc = 0;   // (finished, and its scene has not changed: kept as it is)
+		} else if (written) {
 			LaunchArgs a = args;
 			RenderSetup s = setup;
 			a.cam_explicit = true;
@@ -136,7 +162,7 @@ inline int run(const Job &job, const LaunchArgs &args, const RenderSetup &setup,
 		const std::string marker = job.markerPath(frame), temporary = marker + ".tmp";
 		{
 			std::ofstream out(temporary, std::ios::trunc);
-			out << rc << "\n";
+			out << rc << "\n" << (fingerprint.empty() ? "-" : fingerprint) << "\n" << (unchanged ? "kept" : "rendered") << "\n";
 		}
 		std::error_code ec;
 		std::filesystem::rename(temporary, marker, ec);

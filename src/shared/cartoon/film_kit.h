@@ -40,6 +40,7 @@ struct Moment {
 	double maxComponentValue = 40.0;   // the Film's firefly clamp
 	std::string light;     // the LightSource lines (the sky, the sun, ...): the film's own
 	std::string content;   // everything in the scene
+	std::vector<Vec3> subjects;   // what the shot is about (story space): set by a shot even without its content, for the film doctor's framing checks (Film::subjectsAt)
 };
 
 // How a film's frames are made: samples per pixel and the picture's size.
