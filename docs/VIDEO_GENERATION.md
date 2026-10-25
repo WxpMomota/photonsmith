@@ -644,6 +644,20 @@ the year (`day`, 172 by default, the longest), with `south` saying which way sou
 horizon the sun goes out and the sky dims into twilight. A film with a `sky` leaves out its scene's own infinite and distant lights. The ambiences are made like the films'
 own (crickets, birds and wind as in Forest Dawn and the Nomai film; a brook of rushing noise and bubbles; night is crickets with an owl far off).
 
+**Weather and particles: `weather`, `particles`, `burst`.** (film_particles.h)
+
+```
+weather   rain 0.8 from 4 to 14            # rain, snow or leaves; amount 1 a good shower (up to 4); eased in and out over 1.5 s; `ground Y`
+particles sparks at 1 0.9 -2  3 5  rate 80 # sparks, dust or a splash thrown from a place from 3 s to 5 s, 80 a second (`speed S`)
+burst     splash at 0 0 -1  6.2  count 60  # all at once
+```
+
+Every particle is a fixed function of time - its birth and its throw come from its number - so frames stay independent. Weather fills tiles of the world 10 m square round
+the camera (out to 14 m) with the same pattern in each, so it stands still in the world whatever the camera does and is as dense near the camera as it should be however big
+the set: rain as thin light streaks the length a drop falls while the shutter is open, facing the camera, with a dot of a splash where each lands; snow as little balls that
+drift; leaves tumbling as they fall. Sparks glow (each a small light) and fall, dust rises and settles, a splash's drops (water) arc and fall back. Rain is heard: a hiss that
+grows and fades with it. (Rain and snow cast shadows: a low sun stretches them into lines.)
+
 `ray_tracer --film-lines <key>` lists the lines with their start, end and syllables; `ray_tracer --film-sound <key> OUT.wav` writes a film's soundtrack alone, to listen to
 the lines (and the music and footsteps) without rendering a frame; `--film-check` counts a film file's characters and lines.
 

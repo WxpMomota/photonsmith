@@ -85,6 +85,12 @@
 //     scatter  grass 300 in -8 -10 8 2  scale 0.7 1.3  seed 2   # so many of a kind over a rectangle of the ground (x0 z0 x1 z1; `y` its height)
 //     sky      18:30 19:10  south 180  latitude 40              # the sun and sky from 6:30 to 7:10 pm over the film (the scene's own infinite and distant lights are left out)
 //     ambience birds 0.6                                        # a sound under the whole film: wind, birds, crickets, water or night, at a gain
+//
+// Weather and particles (film_particles.h):
+//
+//     weather   rain 0.8 from 4 to 14                          # rain, snow or leaves over the set round the camera (amount 1 a good shower; eased in and out; `ground Y`)
+//     particles sparks at 1 0.9 -2  3 5  rate 80               # sparks, dust or a splash thrown from a place from 3 s to 5 s, so many a second (`speed S`)
+//     burst     splash at 0 0 -1  6.2  count 60                # all at once at 6.2 s
 
 #include <algorithm>
 #include <cctype>
@@ -103,6 +109,7 @@
 #include "../camera_keyframes.h"
 #include "film_dressing.h"
 #include "film_faces.h"
+#include "film_particles.h"
 #include "film_paths.h"
 #include "film_speech.h"
 #include "film_subjects.h"
@@ -268,6 +275,9 @@ struct Spec {
 	bool hasSky = false;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
+	// weather and particles (`weather`, `particles`, `burst`)
+	std::vector<particles::Weather> weather;
+	std::vector<particles::Emitter> emitters;
 };
 
 struct Parsed {
@@ -610,6 +620,44 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				else return fail("\"" + t[i] + "\": a sky takes south, latitude (-89 to 89), day (1 to 366) and haze (1.7 to 10)");
 			}
 			s.hasSky = true;
+		} else if (verb == "weather") {
+			const std::vector<std::string> t = detail::tokens(line);
+			particles::Weather wt;
+			if (t.size() < 2 || std::find(particles::weatherKinds().begin(), particles::weatherKinds().end(), t[1]) == particles::weatherKinds().end())
+				return fail("`weather KIND [AMOUNT] [from T] [to T] [ground Y]`: rain, snow or leaves");
+			wt.kind = t[1];
+			std::size_t i = 2;
+			if (i < t.size() && number(t[i], wt.amount)) ++i;
+			for (; i < t.size(); i += 2) {
+				double v = 0.0;
+				if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail("a weather takes from, to and ground, each with a number");
+				if (t[i] == "from") wt.t0 = v;
+				else if (t[i] == "to") wt.t1 = v;
+				else if (t[i] == "ground") wt.ground = v;
+				else return fail("\"" + t[i] + "\": a weather takes from, to and ground");
+			}
+			if (!(wt.amount > 0.0 && wt.amount <= 4.0) || wt.t1 <= wt.t0) return fail("a weather's amount is from 0 to 4 and its end after its start");
+			s.weather.push_back(wt);
+		} else if (verb == "particles" || verb == "burst") {
+			const std::vector<std::string> t = detail::tokens(line);
+			particles::Emitter e;
+			const bool burst = verb == "burst";
+			if (t.size() < 2 || std::find(particles::emitterKinds().begin(), particles::emitterKinds().end(), t[1]) == particles::emitterKinds().end())
+				return fail("`" + verb + "` takes a kind: sparks, dust or splash");
+			e.kind = t[1];
+			const std::size_t need = burst ? 7 : 8;
+			if (t.size() < need || t[2] != "at" || !number(t[3], e.at.x) || !number(t[4], e.at.y) || !number(t[5], e.at.z) || !number(t[6], e.t0) || (!burst && (!number(t[7], e.t1) || e.t1 <= e.t0)))
+				return fail(burst ? "`burst KIND at X Y Z T [count N] [speed S]`" : "`particles KIND at X Y Z FROM TO [rate R] [speed S]`");
+			if (burst) e.count = 40;
+			for (std::size_t i = need; i < t.size(); i += 2) {
+				double v = 0.0;
+				if (i + 1 >= t.size() || !number(t[i + 1], v) || v <= 0.0) return fail("\"" + t[i] + "\" takes a number above 0");
+				if (t[i] == "speed") e.speed = v;
+				else if (t[i] == "rate" && !burst && v <= 1000.0) e.rate = v;
+				else if (t[i] == "count" && burst && v <= 2000.0) e.count = static_cast<int>(v);
+				else return fail("\"" + t[i] + "\": " + (burst ? "a burst takes count (up to 2000) and speed" : "particles take rate (up to 1000 a second) and speed"));
+			}
+			s.emitters.push_back(e);
 		} else if (verb == "ambience") {
 			const std::vector<std::string> t = detail::tokens(line);
 			dressing::Ambience a;
@@ -768,7 +816,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, shot, key, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, walk, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, shot, key, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, walk, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1755,6 +1803,14 @@ class DataFilm {
 		std::string out = header;
 		if (spec.hasSky) out += "# the sun and sky at " + std::to_string(dressing::hourAt(spec.sky, t, spec.length)) + " h (film_dressing.h)\n" + dressing::skyText(spec.key, spec.sky, t, spec.length);
 		out += dressingAt(t);
+		if (!spec.weather.empty() || !spec.emitters.empty()) {   // weather round the camera, and particles (film_particles.h)
+			Vec3 eye, target;
+			double fov = 40.0;
+			film_subjects::cameraOf(header, eye, target, fov);
+			const Vec3 at{-eye.x, eye.y, eye.z};   // (pbrt's)
+			for (const particles::Weather &w : spec.weather) out += particles::weatherText(w, t, at, spec.shutter / std::max(1, spec.fps));
+			for (const particles::Emitter &e : spec.emitters) out += particles::emitterText(e, t);
+		}
 		for (const Piece &piece : scene.world) {
 			if (piece.block < 0) {
 				out += piece.text;

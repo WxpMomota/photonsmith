@@ -885,3 +885,69 @@ TEST(FilmDressing, TheSkyFollowsTheTimeOfDayAndTheSetIsDressedWithThingsAndSound
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nsky 25:00 26:00\n", bad).find("times of day"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nambience traffic\n", bad).find("wind, birds, crickets, water or night"), std::string::npos);
 }
+
+// ---- weather and particles ----------------------------------------------------------------------------------------------------------------------------------------------------
+
+// Weather is a function of time that stands still in the world (the same drops whatever the camera, falling between frames), eased in and out and as dense as its amount;
+// particles are thrown from their place when they are due and are gone after their life; a film file's lines are read and its rain is heard.
+TEST(FilmParticles, WeatherStandsStillInTheWorldAndParticlesLiveTheirLives) {
+	namespace pt = cartoon::particles;
+	pt::Weather rain;
+	rain.kind = "rain";
+	rain.t0 = 2.0;
+	rain.t1 = 10.0;
+	EXPECT_EQ(pt::weatherText(rain, 1.0, {0, 1.5, 5}, 0.02), "") << "before it";
+	EXPECT_NEAR(pt::strength(rain, 2.75), 0.5, 1e-9) << "easing in";
+	const std::string a = pt::weatherText(rain, 5.0, {0, 1.5, 5}, 0.02), b = pt::weatherText(rain, 5.0, {0, 1.5, 5}, 0.02);
+	EXPECT_EQ(a, b) << "a function of time";
+	EXPECT_NE(a, pt::weatherText(rain, 5.04, {0, 1.5, 5}, 0.02)) << "it falls";
+	rain.amount = 0.5;
+	EXPECT_LT(pt::weatherText(rain, 5.0, {0, 1.5, 5}, 0.02).size(), 0.6 * a.size()) << "half as much rain";
+	// a drop's place does not follow the camera: a mesh round a camera moved a metre has the drops of both near both
+	pt::Weather snow;
+	snow.kind = "snow";
+	const std::string here = pt::weatherText(snow, 3.0, {0, 1.5, 0}, 0.02), there = pt::weatherText(snow, 3.0, {1, 1.5, 0}, 0.02);
+	std::string flake;   // (one near both cameras: far ones drop out of reach as it moves)
+	for (std::size_t at = here.find("Translate"); at != std::string::npos && flake.empty(); at = here.find("Translate", at + 1)) {
+		double x = 0, y = 0, z = 0;
+		if (std::sscanf(here.c_str() + at, "Translate %lf %lf %lf", &x, &y, &z) == 3 && std::hypot(x, z) < 4.0) flake = here.substr(at, here.find('\n', at) - at);
+	}
+	ASSERT_FALSE(flake.empty());
+	EXPECT_NE(there.find(flake), std::string::npos) << "the same flake in the same place: " << flake;
+	// particles: sparks only while they are due (and a little after, as the last ones die), a burst all at once
+	pt::Emitter sparks;
+	sparks.kind = "sparks";
+	sparks.at = {0, 1, 0};
+	sparks.t0 = 1.0;
+	sparks.t1 = 2.0;
+	sparks.rate = 50.0;
+	const auto count = [](const std::string &s) { std::size_t n = 0; for (std::size_t at = s.find("AreaLightSource"); at != std::string::npos; at = s.find("AreaLightSource", at + 1)) ++n; return n; };
+	EXPECT_EQ(count(pt::emitterText(sparks, 0.9)), 0u);
+	EXPECT_GT(count(pt::emitterText(sparks, 1.8)), 20u);
+	EXPECT_EQ(count(pt::emitterText(sparks, 4.0)), 0u) << "all gone";
+	pt::Emitter splash;
+	splash.kind = "splash";
+	splash.t0 = 1.0;
+	splash.count = 30;
+	const auto spheres = [](const std::string &s) { std::size_t n = 0; for (std::size_t at = s.find("\"sphere\""); at != std::string::npos; at = s.find("\"sphere\"", at + 1)) ++n; return n; };
+	EXPECT_EQ(spheres(pt::emitterText(splash, 1.05)), 30u) << "a burst: all at once";
+	// in a film file
+	(void)cartoon::films();
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 10\nweather rain 0.8 from 1 to 8\nparticles sparks at 1 1 0 2 3 rate 40\nburst dust at 0 0 1 4 count 25\n", film), "");
+	ASSERT_EQ(film.spec.weather.size(), 1u);
+	ASSERT_EQ(film.spec.emitters.size(), 2u);
+	EXPECT_EQ(film.spec.emitters[1].count, 25);
+	EXPECT_NE(film.sceneAt(5.0).find("Shape \"trianglemesh\""), std::string::npos) << "the rain";
+	EXPECT_NE(film.sceneAt(2.5).find("AreaLightSource"), std::string::npos) << "the sparks";
+	cartoon::audio::Mix mix(10.0);
+	pt::rainSound(mix, film.spec.weather[0]);
+	const std::vector<std::int16_t> pcm = mix.finish(0.0, 0.0);
+	double during = 0.0, before = 0.0;
+	for (std::size_t i = 0; i < pcm.size(); ++i) (i < cartoon::audio::kRate * 2 * 0.9 ? before : during) += std::abs(static_cast<double>(pcm[i]));
+	EXPECT_GT(during, 10.0 * before + 1.0) << "the rain is heard while it rains";
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nweather hail\n", bad).find("rain, snow or leaves"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nparticles smoke at 0 0 0 1 2\n", bad).find("sparks, dust or splash"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nburst splash at 0 0 0 1 rate 5\n", bad).find("a burst takes count"), std::string::npos);
+}

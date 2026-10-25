@@ -247,9 +247,11 @@ inline void addFilmFile(Registry &r, const std::string &file) {
 		f.events = [p]() { return p->events(); };
 		f.feetAt = [p](double t) { return p->feetAt(t); };
 	}
-	if (d.hasEvents() || !d.spec.ambience.empty()) {
-		f.soundtrack = [p](audio::Mix &m) {   // (its set's sound, its footsteps, touches and lines; its cues file adds the music: withFilmFiles)
+	if (d.hasEvents() || !d.spec.ambience.empty() || !d.spec.weather.empty()) {
+		f.soundtrack = [p](audio::Mix &m) {   // (its set's sound and its rain, its footsteps, touches and lines; its cues file adds the music: withFilmFiles)
 			dressing::play(m, p->spec.ambience);
+			for (const particles::Weather &w : p->spec.weather)
+				if (w.kind == "rain") particles::rainSound(m, w);
 			sfx::play(m, p->events());
 			p->speak(m);
 		};
