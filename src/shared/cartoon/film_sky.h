@@ -56,6 +56,7 @@ struct Spec {
 	double afterglow = 0.0;          // the warm band along the horizon under the sun
 	Vec3 afterglowColour = {1.0, 0.42, 0.16};
 	double belt = 0.0;               // the pink band opposite the sun at twilight (the belt of Venus)
+	double rainbow = 0.0;            // a rainbow round the point opposite the sun (0 none .. 1 a bright one): the primary bow at 42 degrees, the secondary at 51
 	std::vector<Clouds> clouds;
 	int width = 4096;                // the picture is width x width/2
 };
@@ -152,6 +153,10 @@ inline std::string fileName(const Spec &s) {
 				  s.brightness, s.tint.x, s.tint.y, s.tint.z, s.night, s.nightBrightness, s.milkyWay, s.milkyPole.x, s.milkyPole.y, s.milkyPole.z, s.stars, s.glow, s.glowColour.x, s.glowColour.y,
 				  s.glowColour.z, s.afterglow, s.afterglowColour.x, s.afterglowColour.y, s.afterglowColour.z, s.belt, s.width);
 	key = b;
+	if (s.rainbow > 0.0) {
+		std::snprintf(b, sizeof b, "|r%.3f", s.rainbow);
+		key += b;
+	}
 	for (const Clouds &c : s.clouds) {
 		std::snprintf(b, sizeof b, "|%.1f %.1f %.1f %.2f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.1f %.1f %.1f %d", c.altitude, c.scaleAlong, c.scaleAcross, c.direction, c.coverage,
 					  c.softness, c.opacity, c.lit.x, c.lit.y, c.lit.z, c.shade.x, c.shade.y, c.shade.z, c.silver, c.offsetX, c.offsetZ, c.haze, 0.0, 0.0, c.seed);
@@ -211,6 +216,18 @@ inline std::vector<float> render(const Spec &s) {
 					c = c + s.afterglowColour * (s.afterglow * std::exp(-(std::max)(0.0, elevDeg) / 5.0) * std::exp(-std::pow(daz / 65.0, 2.0)));
 					c = c + Vec3{0.85, 0.45, 0.55} * (s.belt * std::exp(-std::pow((elevDeg - 7.0) / 6.0, 2.0)) * std::exp(-std::pow((180.0 - daz) / 80.0, 2.0)));
 				}
+			}
+			if (s.rainbow > 0.0 && elevDeg > -1.0) {   // a rainbow: its bows round the point opposite the sun, red outside the primary, inside the secondary
+				const double ang = 180.0 - gamma;
+				const auto hue = [](double x) {   // violet (0) .. red (1)
+					return Vec3{clamp01(1.5 - std::abs(x - 1.0) * 3.0) + clamp01(0.6 - x * 3.0), clamp01(1.5 - std::abs(x - 0.55) * 3.5), clamp01(1.5 - std::abs(x - 0.15) * 4.0)};
+				};
+				const double bright = 0.7 * detail::luminance(c) + 0.03;
+				const double p = (ang - 40.4) / 2.4, q = (53.6 - ang) / 3.2;
+				if (p > -0.2 && p < 1.2) c = c + hue(clamp01(p)) * (s.rainbow * bright * 0.9 * smoothstep(-0.2, 0.1, p) * (1.0 - smoothstep(0.9, 1.2, p)));
+				if (q > -0.2 && q < 1.2) c = c + hue(clamp01(1.0 - q)) * (s.rainbow * bright * 0.35 * smoothstep(-0.2, 0.1, q) * (1.0 - smoothstep(0.9, 1.2, q)));
+				if (ang < 40.4) c = c * (1.0 + 0.25 * s.rainbow * std::exp(-(40.4 - ang) / 6.0));            // (brighter inside the bow)
+				if (ang > 42.8 && ang < 50.4) c = c * (1.0 - 0.15 * s.rainbow);                            // (Alexander's dark band between them)
 			}
 			c = detail::mulc(c, s.tint);
 			// clouds, nearest layer last

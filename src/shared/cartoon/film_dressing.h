@@ -15,6 +15,7 @@
 #include "cartoon_audio.h"
 #include "cartoon_lib.h"
 #include "film_cache.h"
+#include "film_sky.h"
 #include "nature_lib.h"
 
 namespace cartoon {
@@ -141,11 +142,13 @@ inline void sunAt(const Sky &s, double hour, double &elevation, double &facing) 
 	facing = s.south + fromSouth;
 }
 inline double hourAt(const Sky &s, double t, double length) { return s.from + (s.to - s.from) * (length > 0.0 ? std::max(0.0, std::min(1.0, t / length)) : 0.0); }
-// The sun (a distant light) and the sky (an infinite light: a Hosek-Wilkie picture made once for each tenth of a degree of the sun, in the film's cache folder) at t, as
-// scene text. Below the horizon the sun goes out and the sky dims into twilight.
-inline std::string skyText(const std::string &film, const Sky &s, double t, double length) {
+// The sun (a distant light) and the sky (an infinite light: film_sky.h's picture, made once for each quarter degree of the sun, in the film's cache folder) at t, as scene
+// text. Round sunset a glow round the sun and a warm afterglow along the horizon under it, the pink belt opposite; below the horizon the sun goes out and the sky dims into
+// twilight, then night: the Milky Way and the stars, turning about the celestial pole as the hours go by. `rainbow` (0 to 1) paints a rainbow opposite the sun.
+inline std::string skyText(const std::string &film, const Sky &s, double t, double length, double rainbow = 0.0) {
 	double el = 0.0, facing = 0.0;
-	sunAt(s, hourAt(s, t, length), el, facing);
+	const double hour = hourAt(s, t, length);
+	sunAt(s, hour, el, facing);
 	const double d2r = kPi / 180.0;
 	const double ce = std::cos(std::max(0.5, el) * d2r);
 	const Vec3 toward{ce * std::sin(facing * d2r), std::sin(std::max(0.5, el) * d2r), ce * std::cos(facing * d2r)};   // (pbrt's)
@@ -163,13 +166,27 @@ inline std::string skyText(const std::string &film, const Sky &s, double t, doub
 					  sun.colour.r * sun.irradiance * sunUp, sun.colour.g * sun.irradiance * sunUp, sun.colour.b * sun.irradiance * sunUp);
 		out += buf;
 	}
-	if (scene_doc::sky::ensureSkyFile(film_cache::filmDir(film).string(), p, path, error)) {
-		std::snprintf(buf, sizeof buf, "\" ] \"float scale\" [ %.5f ]\n", twilight);
-		out += "LightSource \"infinite\" \"string filename\" [ \"" + film_cache::scenePath(path) + buf;
-	} else {
-		std::snprintf(buf, sizeof buf, "LightSource \"infinite\" \"rgb L\" [ %.4f %.4f %.4f ]\n", 0.12 * twilight, 0.16 * twilight, 0.26 * twilight);   // (no picture: a plain blue)
-		out += buf;
-	}
+	(void)twilight, (void)path, (void)error;
+	film_sky::Spec fs;
+	fs.width = 2048;
+	fs.sunElevation = std::round(el * 4.0) / 4.0;
+	const double hx = -std::sin(facing * d2r), hz = std::cos(facing * d2r);   // (the sun's way in story space: film_sky's azimuth runs from -z towards +x)
+	fs.sunAzimuth = std::round(std::atan2(hx, -hz) / d2r);
+	fs.turbidity = s.haze;
+	const double night = smoothstep(-5.0, -15.0, el) * (el < -5.0 ? 1.0 : 0.0);
+	fs.night = std::round(night * 20.0) / 20.0;
+	fs.milkyWay = fs.stars = fs.night;
+	const double low = smoothstep(-9.0, -1.0, el) * (1.0 - smoothstep(3.0, 14.0, el));   // (the sun near the horizon)
+	fs.glow = std::round(0.6 * low * 20.0) / 20.0;
+	fs.afterglow = std::round(0.45 * low * 20.0) / 20.0;
+	fs.belt = std::round(0.3 * smoothstep(-6.0, -1.0, el) * (1.0 - smoothstep(1.0, 6.0, el)) * 20.0) / 20.0;
+	fs.rainbow = std::round(std::max(0.0, std::min(1.0, rainbow)) * 20.0) / 20.0;
+	// the stars turn about the celestial pole, 15 degrees an hour (the sky's picture with them, as far as it is night)
+	const double nf = (s.south + 180.0) * d2r, lat = s.latitude * d2r;
+	const Vec3 pole{std::sin(nf) * std::cos(lat), std::sin(lat), std::cos(nf) * std::cos(lat)};
+	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Rotate %.4f %.5f %.5f %.5f\n", -15.0 * (hour - s.from) * fs.night, pole.x, pole.y, pole.z);
+	out += buf;
+	out += "  LightSource \"infinite\" \"string filename\" [ \"" + film_sky::file(film, fs) + "\" ]\nAttributeEnd\n";
 	return out;
 }
 

@@ -412,3 +412,80 @@ TEST(FilmWildlife, FlocksSwirlRoundTheirPlaceGeeseFlyInAVAndHerdsGraze) {
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }
+
+// ---- the sky's spectacles ------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace skyfx = cartoon::skyfx;
+
+// Lightning strikes at times of its own and flashes in strokes over a quarter of a second, lighting the land; thunder comes after it, later the further off it is; an aurora
+// hangs in curtains of light; meteors streak and are gone; a rainbow needs a sun; the night sky has its stars.
+TEST(FilmSkyFx, LightningFlashesInStrokesAndThunderFollowsAurorasHangAndRainbowsNeedASun) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("skyfx", "scene s.pbrt\nlength 12\nlightning 3 at 0 -2000 radius 500 during 1 11 seed 2\naurora green\nmeteors 30 during 0 10\nrainbow 0.6 during 2 8\nsky 22:00 22:00 south 0 latitude 64 day 355\n", film), "");
+	ASSERT_EQ(film.spec.lightnings.size(), 1u);
+	const auto &strikes = film.spec.lightnings[0].strikes;
+	ASSERT_EQ(strikes.size(), 3u);
+	for (std::size_t i = 0; i < strikes.size(); ++i) {
+		EXPECT_GE(strikes[i].t, 1.0);
+		EXPECT_LE(strikes[i].t, 11.0);
+		if (i > 0) EXPECT_GT(strikes[i].t - strikes[i - 1].t, 1.5) << "apart in time";
+	}
+	const skyfx::Strike &s = strikes[0];
+	double lit = 0.0;
+	int flashes = 0;
+	bool wasOn = false;
+	for (double dt = 0.0; dt < 0.4; dt += 0.002) {
+		const double v = skyfx::strokes(s, dt);
+		lit += v;
+		if (v > 0.5 && !wasOn) ++flashes;
+		wasOn = v > 0.5;
+	}
+	EXPECT_GE(flashes, 3) << "it flickers in strokes";
+	EXPECT_EQ(skyfx::strokes(s, 0.5), 0.0) << "and is over in a quarter of a second or so";
+	std::string during;
+	for (double dt = 0.0; dt < 0.3 && during.find("lightning strike") == std::string::npos; dt += 0.005) during = film.sceneAt(s.t + dt);
+	EXPECT_NE(during.find("# a lightning strike"), std::string::npos) << "the bolt is drawn while it flashes";
+	EXPECT_NE(during.find("LightSource \"point\""), std::string::npos) << "with its flash";
+	EXPECT_EQ(film.sceneAt(s.t + 0.6).find("# a lightning strike"), std::string::npos);
+	// thunder after it, later for a strike further off
+	cartoon::audio::Mix near(30.0), far(30.0);
+	skyfx::Lightning one = film.spec.lightnings[0];
+	one.strikes = {s};
+	skyfx::thunder(near, one, [](double, double, double) { return 500.0; });
+	skyfx::thunder(far, one, [](double, double, double) { return 3000.0; });
+	const auto firstSound = [](const cartoon::audio::Mix &m) {
+		const std::vector<std::int16_t> pcm = m.finish(0.0, 0.0);
+		for (std::size_t i = 0; i < pcm.size(); ++i)
+			if (std::abs(pcm[i]) > 3) return static_cast<double>(i / 2) / cartoon::audio::kRate;
+		return 1e9;
+	};
+	EXPECT_NEAR(firstSound(near), s.t + 500.0 / 343.0, 0.1);
+	EXPECT_NEAR(firstSound(far), s.t + 3000.0 / 343.0, 0.4);
+	// the aurora, the meteors, the stars, the rainbow
+	const std::string night = film.sceneAt(5.0);
+	EXPECT_NE(night.find("# the aurora"), std::string::npos);
+	EXPECT_NE(night.find("aurora_green"), std::string::npos) << "its glow's picture";
+	int streaks = 0;
+	for (double t = 0.0; t < 10.0; t += 0.25) streaks += skyfx::meteorText(film.spec.meteors[0], t, {0.0, 2.0, 0.0}).find("# a meteor") != std::string::npos;
+	EXPECT_GT(streaks, 3) << "meteors now and then";
+	cartoon::film_sky::Spec dark;
+	dark.night = 1.0, dark.stars = 1.0, dark.width = 256;
+	const std::vector<float> nightSky = cartoon::film_sky::render(dark);
+	float brightest = 0.0f, median = 0.0f;
+	std::vector<float> lum;
+	for (std::size_t i = 0; i < nightSky.size() / 2; i += 3) lum.push_back(nightSky[i + 1]), brightest = std::max(brightest, nightSky[i + 1]);
+	std::nth_element(lum.begin(), lum.begin() + lum.size() / 2, lum.end());
+	median = lum[lum.size() / 2];
+	EXPECT_GT(brightest, 10.0f * median) << "stars in the night sky";
+	cartoon::film_sky::Spec day, bow;
+	day.width = bow.width = 256;
+	day.sunElevation = bow.sunElevation = 20.0;
+	bow.rainbow = 1.0;
+	EXPECT_NE(cartoon::film_sky::fileName(day), cartoon::film_sky::fileName(bow));
+	const std::vector<float> a = cartoon::film_sky::render(day), b = cartoon::film_sky::render(bow);
+	double changed = 0.0;
+	for (std::size_t i = 0; i < a.size(); ++i) changed += std::abs(a[i] - b[i]);
+	EXPECT_GT(changed, 1.0) << "the rainbow is painted";
+	ff::DataFilm bad;
+	EXPECT_NE(loadNature("skyfx_bad", "scene s.pbrt\nlength 4\nrainbow 0.5\n", bad).find("needs a `sky` line"), std::string::npos);
+}

@@ -824,6 +824,29 @@ behind the one ahead, and are heard (an `ambience geese` of honking unless the f
 then to graze, and grazing when it arrives. `during T0 T1` limits when a flock is there; `start T` when a herd sets off; `seed N` changes them. Each kind is drawn from eight poses
 of its wingbeat, tail beat or stride (pbrt objects written once a frame) placed once per animal: 2000 starlings are 2000 placements.
 
+**The sky's spectacles: `aurora`, `lightning`, `meteors`, `rainbow`.** (film_skyfx.h; the sky itself is film_sky.h's)
+
+```
+sky       22:00 23:00  south 0  latitude 64  day 355   # a winter night in the north: stars, the Milky Way
+aurora    green  brightness 1.2  during 4 30            # green, red or violet; `facing D` (the film's north when it has a sky), `distance M`
+meteors   40  during 0 20
+lightning 6  at 0 -2500  radius 1200  during 1 11       # `base H` (the cloud base it falls from), `seed N`
+rainbow   0.8  during 6 16                              # opposite the sun; it needs a `sky` line
+```
+
+The `sky` line's sky is film_sky.h's picture now: the clear sky by day, round sunset a glow round the sun, a warm afterglow along the horizon under it and the pink belt
+opposite, then twilight, and at night the Milky Way and the stars, turning about the celestial pole 15 degrees an hour (as far as it is night). A `rainbow` is painted into it:
+the primary bow 42 degrees from the point opposite the sun (red outside), the fainter secondary at 51 (red inside), brighter inside the primary and darker between them, eased
+in and out over two seconds - seen against the sky (not in front of the land).
+
+An aurora is three curtains of light some kilometres off towards the pole: ribbons whose folds drift and whose rays run along them, a bright lower edge (green, red or violet)
+fading up into a red-violet crown, each ray as tall as it is strong - a lamp is drawn as pure light, so a curtain ends where its glow does instead of fading to black against
+the stars - lighting the land and the snow below a little. A lightning strike comes at a time of its own (spread over its `during`, none within 1.5 s of another): a jagged,
+branching bolt from the cloud base to the ground (midpoint displacement, a few branches), flickering in three or four strokes over a third of a second, with a flash at its top
+that lights the clouds from inside and the land; its thunder comes as long after as sound takes to come from it to the camera at that moment (a crack when it is near, then
+rolls of rumble, quieter the further off). Meteors streak across a stretch of the upper sky in under a second, a bright head and a fading tail. Night scenes are dark: use
+the film's exposure (`--exposure`, or the auto-exposure of feature 7 below).
+
 **Music that follows the film.** Three things (music_cues.h, film_score.h):
 
 - *Ducking.* A film file's music cues are mixed on their own and laid on the soundtrack brought down under the characters' lines - by up to two thirds while a line is

@@ -114,6 +114,9 @@
 //     flock    starlings 300  at 0 80 -200  radius 40           # animals (film_wildlife.h): starlings or fish (flocking round `at`), geese (`from X Y Z to X Y Z`, in
 //                                                               # a V), butterflies (`in X0 Z0 X1 Z1`); `speed S`, `during T0 T1`, `seed N`; on a terrain Y is above it
 //     herd     deer 12  from -200 0  to 200 -150  speed 1.1     # a herd walking over the land, grazing now and then; `start T`, `seed N`
+//     aurora   green  brightness 1.2  during 4 30               # the sky's spectacles (film_skyfx.h): curtains of light (green, red or violet; `facing D`, `distance M`),
+//     lightning 5  at 0 -3000  radius 2000  during 2 20         # strikes with their flash and thunder (`base H`, `seed N`), shooting stars (`meteors COUNT`), and
+//     rainbow  0.8  during 6 16                                 # a rainbow opposite the sun (the `sky` line's); at night the sky has its stars, turning with the hours
 //
 // Weather and particles (film_particles.h):
 //
@@ -144,6 +147,7 @@
 #include "film_subjects.h"
 #include "film_clouds.h"
 #include "film_forest.h"
+#include "film_skyfx.h"
 #include "film_terrain.h"
 #include "film_wildlife.h"
 #include "film_water.h"
@@ -386,6 +390,14 @@ struct Spec {
 	// animals (`flock`, `herd`)
 	std::vector<wildlife::Flock> flocks;
 	std::vector<wildlife::Herd> herds;
+	// the sky's spectacles (`aurora`, `lightning`, `meteors`, `rainbow`)
+	std::vector<skyfx::Aurora> auroras;
+	std::vector<skyfx::Lightning> lightnings;
+	std::vector<skyfx::Meteors> meteors;
+	struct Rainbow {
+		double strength = 0.8, t0 = 0.0, t1 = 1e30;
+	};
+	std::vector<Rainbow> rainbows;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	// weather and particles (`weather`, `particles`, `burst`)
@@ -1056,6 +1068,50 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				else return fail("\"" + t[i] + "\": a herd takes speed, start and seed");
 			}
 			s.herds.push_back(h);
+		} else if (verb == "aurora" || verb == "lightning" || verb == "meteors" || verb == "rainbow") {
+			const std::vector<std::string> t = detail::tokens(line);
+			skyfx::Aurora au;
+			skyfx::Lightning li;
+			skyfx::Meteors me;
+			Spec::Rainbow rb;
+			double *t0 = verb == "aurora" ? &au.t0 : verb == "lightning" ? &li.t0 : verb == "meteors" ? &me.t0 : &rb.t0;
+			double *t1 = verb == "aurora" ? &au.t1 : verb == "lightning" ? &li.t1 : verb == "meteors" ? &me.t1 : &rb.t1;
+			std::size_t i = 1;
+			double v = 0.0;
+			if (verb == "aurora" && i < t.size() && std::find(skyfx::auroraColours().begin(), skyfx::auroraColours().end(), t[i]) != skyfx::auroraColours().end()) au.colour = t[i++];
+			if (i < t.size() && number(t[i], v)) {   // (a count, or a rainbow's strength)
+				if (verb == "lightning" && v >= 1 && v <= 200) li.count = static_cast<int>(v);
+				else if (verb == "meteors" && v >= 1 && v <= 500) me.count = static_cast<int>(v);
+				else if (verb == "rainbow" && v > 0.0 && v <= 1.0) rb.strength = v;
+				else return fail(verb == "rainbow" ? "a rainbow's strength is from 0 to 1" : verb == "aurora" ? "`aurora [green|red|violet] [brightness B] [facing DEGREES] [distance M] [during T0 T1]`"
+																							: "`" + verb + " [COUNT]`: " + (verb == "lightning" ? "1 to 200 strikes" : "1 to 500 meteors"));
+				++i;
+			}
+			for (; i < t.size();) {
+				double a = 0.0, b = 0.0;
+				if (t[i] == "during" && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && b > a) {
+					*t0 = a, *t1 = b;
+					i += 3;
+				} else if (verb == "lightning" && t[i] == "at" && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b)) {
+					li.x = a, li.z = b;
+					i += 3;
+				} else if (i + 1 < t.size() && number(t[i + 1], a)) {
+					if (verb == "aurora" && t[i] == "brightness" && a > 0.0) au.brightness = a;
+					else if (verb == "aurora" && t[i] == "facing") au.facing = a, au.facingSet = true;
+					else if (verb == "aurora" && t[i] == "distance" && a > 100.0) au.distance = a;
+					else if (verb == "lightning" && t[i] == "radius" && a >= 0.0) li.radius = a;
+					else if (verb == "lightning" && t[i] == "base" && a > 0.0) li.base = a;
+					else if ((verb == "lightning" || verb == "meteors") && t[i] == "seed") (verb == "lightning" ? li.seed : me.seed) = static_cast<int>(a);
+					else return fail("\"" + t[i] + "\" is not part of a `" + verb + "` line (aurora: brightness, facing, distance; lightning: at X Z, radius, base, seed; meteors: seed; all: during T0 T1)");
+					i += 2;
+				} else {
+					return fail("\"" + t[i] + "\" is not part of a `" + verb + "` line");
+				}
+			}
+			if (verb == "aurora") s.auroras.push_back(au);
+			else if (verb == "lightning") s.lightnings.push_back(li);
+			else if (verb == "meteors") s.meteors.push_back(me);
+			else s.rainbows.push_back(rb);
 		} else if (verb == "sky") {
 			const std::vector<std::string> t = detail::tokens(line);
 			const auto hour = [&](const std::string &w, double &h) {   // 18:30 or 18.5
@@ -1320,7 +1376,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, clouds, forest, flock, herd, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1396,6 +1452,13 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		e.speed = std::min(8.0, 2.0 + 0.12 * f.drop);
 		s.emitters.push_back(e);
 	}
+	if (!s.rainbows.empty() && !s.hasSky) {
+		n = 0;
+		return fail("a rainbow is opposite the sun: the film needs a `sky` line");
+	}
+	for (skyfx::Lightning &l : s.lightnings) l.strikes = skyfx::strikesOf(l, s.length);
+	for (skyfx::Aurora &a : s.auroras)
+		if (!a.facingSet && s.hasSky) a.facing = s.sky.south + 180.0;   // (the aurora is towards the pole: the film's own north)
 	const auto hears = [&](const std::string &kind) { return std::any_of(s.ambience.begin(), s.ambience.end(), [&](const dressing::Ambience &a) { return a.kind == kind; }); };
 	if (!s.seas.empty() && s.seas[0].kind == "sea" && !hears("sea")) s.ambience.push_back({"sea", 0.8});   // (water is heard: unless the film file says how)
 	if (!s.rivers.empty() && !hears("water")) s.ambience.push_back({"water", 0.7});
@@ -2610,10 +2673,24 @@ class DataFilm {
 		return t;
 	}
 
+	// The thunder of its lightning, each strike heard as long after as sound takes to come from it to the camera at its time.
+	void thunder(audio::Mix &m) const {
+		for (const skyfx::Lightning &l : spec.lightnings)
+			skyfx::thunder(m, l, [this](double t, double x, double z) {
+				Vec3 eye, target;
+				double fov = 40.0;
+				if (!film_subjects::cameraOf(headerAt(t), eye, target, fov)) return std::hypot(x, z);
+				return std::hypot(x + eye.x, z - eye.z);   // (eye is story space: pbrt's x is -eye.x)
+			});
+	}
 	// The scene with this header at t: the set, its animated blocks, its dressing, its sky and its characters.
 	std::string worldAt(const std::string &header, double t) const {
 		std::string out = header;
-		if (spec.hasSky) out += "# the sun and sky at " + std::to_string(dressing::hourAt(spec.sky, t, spec.length)) + " h (film_dressing.h)\n" + dressing::skyText(spec.key, spec.sky, t, spec.length);
+		if (spec.hasSky) {
+			double rainbow = 0.0;   // (eased in and out over two seconds)
+			for (const Spec::Rainbow &r : spec.rainbows) rainbow = std::max(rainbow, r.strength * smoothstep(r.t0, r.t0 + 2.0, t) * (1.0 - smoothstep(r.t1 - 2.0, r.t1, t)));
+			out += "# the sun and sky at " + std::to_string(dressing::hourAt(spec.sky, t, spec.length)) + " h (film_dressing.h)\n" + dressing::skyText(spec.key, spec.sky, t, spec.length, rainbow);
+		}
 		out += dressingAt(t);
 		if (!spec.weather.empty() || !spec.emitters.empty()) {   // weather round the camera, and particles (film_particles.h)
 			Vec3 eye, target;
@@ -2633,6 +2710,19 @@ class DataFilm {
 			for (const water::Sea &sea : spec.seas) out += water::seaText(sea, t, eye, target, hfov, ground.get());
 			for (const water::River &r : spec.rivers) out += water::riverText(r, t, ground.get());
 			for (const water::Fall &f : spec.falls) out += water::fallText(f, t, ground.get());
+		}
+		if (!spec.auroras.empty() || !spec.lightnings.empty() || !spec.meteors.empty()) {   // the sky's spectacles (film_skyfx.h)
+			const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+			const Vec3 centre = ground ? Vec3{spec.terrain.x, spec.terrain.y, spec.terrain.z} : Vec3{0.0, 0.0, 0.0};
+			for (const skyfx::Aurora &a : spec.auroras) out += skyfx::auroraText(spec.key.empty() ? std::string("film") : spec.key, a, t, centre);
+			const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
+			for (const skyfx::Lightning &l : spec.lightnings) out += skyfx::lightningText(l, t, groundAt);
+			if (!spec.meteors.empty()) {
+				Vec3 eye, target;
+				double fov = 40.0;
+				film_subjects::cameraOf(header, eye, target, fov);
+				for (const skyfx::Meteors &m : spec.meteors) out += skyfx::meteorText(m, t, eye);
+			}
 		}
 		if (!spec.flocks.empty() || !spec.herds.empty()) {   // animals (film_wildlife.h): each kind's poses once
 			const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
