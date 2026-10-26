@@ -187,11 +187,14 @@ inline Film withFilmFiles(Film f) {
 	f.headerAt = wrap(f.headerAt);
 	const std::string cues = music_cues::fileOf(key);
 	if (!cues.empty()) {
-		f.soundtrack = [base = f.soundtrack, starts = f.shotStarts, names, own = f.instruments, cues](audio::Mix &m) {
+		f.soundtrack = [base = f.soundtrack, starts = f.shotStarts, names, own = f.instruments, cues, speech = f.speechAt](audio::Mix &m) {
 			if (base) base(m);
 			const music_cues::Sheet sheet = music_cues::read(cues);
 			std::vector<std::string> problems = sheet.problems;
-			music_cues::play(m, sheet, own ? own() : std::map<std::string, CueInstrument>(), starts ? starts() : std::vector<double>(), names, problems);
+			// the cues on a mix of their own, ducked under the characters' lines (down by up to two thirds, in 0.06 s and back over 0.5 s) and laid on the film's sound
+			audio::Mix music(m.seconds());
+			music_cues::play(music, sheet, own ? own() : std::map<std::string, CueInstrument>(), starts ? starts() : std::vector<double>(), names, problems);
+			m.add(music, speech ? music_cues::duckingOf(speech, m.seconds() + 4.0) : std::vector<float>());
 			for (const std::string &problem : problems) std::cerr << "[cues] " << cues << ": " << problem << std::endl;
 		};
 	}
@@ -256,6 +259,8 @@ inline void addFilmFile(Registry &r, const std::string &file) {
 			p->speak(m);
 		};
 	}
+	// how loud its characters speak (its music is ducked under it)
+	if (!d.spec.lines.empty() || !d.spec.characters.empty()) f.speechAt = [p](double t) { return p->speechAt(t); };
 	// how its shots give way to each other
 	if (!d.transitions().empty()) {
 		f.transitions = [p]() { return p->transitions(); };

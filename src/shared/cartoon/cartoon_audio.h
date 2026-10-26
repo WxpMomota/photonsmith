@@ -260,6 +260,21 @@ class Mix {
 		}
 	}
 
+	// Another mix laid on this one, its level `gain` (one value each 1/100 s, eased between them; past its end the last): music under dialogue, ducked.
+	void add(const Mix &other, const std::vector<float> &gain) {
+		const std::size_t hop = static_cast<std::size_t>(kRate / 100);
+		for (std::size_t i = 0; i < dry_[0].size() && i < other.dry_[0].size(); ++i) {
+			const std::size_t k = i / hop;
+			const double u = static_cast<double>(i % hop) / hop;
+			const double g0 = gain.empty() ? 1.0 : gain[std::min(k, gain.size() - 1)], g1 = gain.empty() ? 1.0 : gain[std::min(k + 1, gain.size() - 1)];
+			const float g = static_cast<float>(g0 + (g1 - g0) * u);
+			for (int c = 0; c < 2; ++c) {
+				dry_[c][i] += other.dry_[c][i] * g;
+				wet_[c][i] += other.wet_[c][i] * g;
+			}
+		}
+	}
+
 	// The reverb, a fade in and out, a soft limiter; 16-bit stereo, interleaved, exactly `seconds` long.
 	std::vector<std::int16_t> finish(double fadeIn = 0.5, double fadeOut = 2.0, double headroom = 0.89) const {
 		const std::size_t n = samplesFor(seconds_) - 1;

@@ -629,6 +629,8 @@ struct Film {
 	// shot before it after the cut, the shot after it before the cut.
 	std::function<std::vector<Transition>()> transitions;
 	std::function<std::string(double)> sceneAcross;
+	// (empty: none) how loud its characters are speaking at t, 0..1: its music cues are ducked under it.
+	std::function<double(double)> speechAt;
 };
 
 }  // namespace cartoon

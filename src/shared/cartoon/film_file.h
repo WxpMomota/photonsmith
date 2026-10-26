@@ -2150,6 +2150,15 @@ class DataFilm {
 			m.voice = std::max(m.voice, speech::loudnessAt(spoken[i], t));
 		}
 	}
+	// How loud the characters are speaking at t, 0..1: their lines and their recorded voices (the music is ducked under it).
+	double speechAt(double t) const {
+		double v = 0.0;
+		for (std::size_t i = 0; i < spec.lines.size(); ++i)
+			if (t >= spec.lines[i].t - 0.1 && t <= speech::endOf(spoken[i], spec.lines[i].t) + 0.1) v = std::max(v, speech::loudnessAt(spoken[i], t));
+		for (const Character &c : spec.characters)
+			if (!c.extra) v = std::max(v, music_cues::voiceAt(spec.key, c.name, t, shotStarts(), shotNameList()));
+		return std::min(1.0, v);
+	}
 	// The voice a character speaks in: its kind's, its pitch moved by up to 1.5 semitones either way by its name.
 	speech::Voice voiceOf(const Character &c) const {
 		speech::Voice v = characterKinds().at(c.kind).voice;

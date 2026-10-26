@@ -13,6 +13,7 @@
 
 #include "../../src/shared/cartoon/cartoons.h"
 #include "../../src/shared/cartoon/fountain.h"
+#include "../../src/shared/cartoon/film_score.h"
 
 namespace ff = cartoon::film_file;
 
@@ -1322,4 +1323,56 @@ TEST(FilmCrowd, ExtrasOfVariedLooksWanderInCellsOfTheirOwn) {
 	for (const ff::Shot &s : film.spec.shots)
 		for (const std::string &who : s.about) EXPECT_EQ(who.rfind("folk", 0), std::string::npos) << s.name << " is about " << who;
 	EXPECT_NE(film.sceneAt(5.0).find("# folk-6 (person)"), std::string::npos);
+}
+
+// ---- music that follows the film --------------------------------------------------------------------------------------------------------------------------------------------------
+
+// The music is ducked under the lines (down by two thirds while one is heard, back after it); an `oncuts` cue hits every cut; a drafted score gives each shot the mood its
+// characters feel (minor and slow for sad, major for happy) and reads back as a cues file with nothing wrong in it.
+TEST(FilmMusic, MusicDucksUnderLinesHitsTheCutsAndADraftScoreFollowsTheMood) {
+	namespace mc = cartoon::music_cues;
+	// ducking: speech from 2 s to 4 s
+	const std::vector<float> gain = mc::duckingOf([](double t) { return t >= 2.0 && t < 4.0 ? 1.0 : 0.0; }, 8.0);
+	EXPECT_NEAR(gain[100], 1.0, 1e-6) << "before the line";
+	EXPECT_NEAR(gain[350], 0.35, 0.01) << "under it: down by two thirds";
+	EXPECT_GT(gain[700], 0.95) << "back after it";
+	cartoon::audio::Mix a(3.0), music(3.0);
+	music.put(0.5, std::vector<float>(cartoon::audio::kRate, 0.5f), 1.0, 0.0, 0.0);
+	a.add(music, std::vector<float>(400, 0.5f));
+	cartoon::audio::Mix full(3.0);
+	full.add(music, {});
+	const std::vector<std::int16_t> pcm = a.finish(0.0, 0.0), whole = full.finish(0.0, 0.0);
+	EXPECT_NEAR(static_cast<double>(pcm[cartoon::audio::kRate * 2]) / whole[cartoon::audio::kRate * 2], 0.5, 0.03) << "laid on at half its level";
+	// cut hits
+	const mc::Sheet sheet = mc::parse("oncuts mallet A3 0.5 gain 0.3\n");
+	ASSERT_TRUE(sheet.problems.empty());
+	cartoon::audio::Mix hits(8.0);
+	std::vector<std::string> problems;
+	mc::play(hits, sheet, {}, {0.0, 2.0, 5.0}, {"A", "B", "C"}, problems);
+	const std::vector<std::int16_t> h = hits.finish(0.0, 0.0);
+	const auto level = [&](double t0, double t1) {
+		double s = 0.0;
+		for (std::size_t i = static_cast<std::size_t>(t0 * cartoon::audio::kRate) * 2; i < static_cast<std::size_t>(t1 * cartoon::audio::kRate) * 2; ++i) s += std::abs(static_cast<double>(h[i]));
+		return s;
+	};
+	EXPECT_GT(level(2.0, 2.3), 100.0 * (level(0.0, 0.3) + 1.0)) << "a hit at the second shot's cut, none at the start";
+	EXPECT_GT(level(5.0, 5.3), 100.0 * (level(0.0, 0.3) + 1.0));
+	// a drafted score
+	(void)cartoon::films();
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 16\ncharacter ann person\nfeel ann happy 0 0.5 6 7\nfeel ann sad 8 8.5\nshot 0 Glad\n  key 0 1 5 0 1 0\nshot 8 Sorry\n  key 0 1 5 0 1 0\n", film), "");
+	const std::string draft = cartoon::score::draft(film);
+	EXPECT_NE(draft.find("[1]   # Glad: happy, major"), std::string::npos) << draft.substr(0, 400);
+	EXPECT_NE(draft.find("[2]   # Sorry: sad, minor"), std::string::npos);
+	const mc::Sheet drafted = mc::parse(draft);
+	EXPECT_TRUE(drafted.problems.empty()) << (drafted.problems.empty() ? "" : drafted.problems[0]);
+	cartoon::audio::Mix scored(16.0);
+	problems.clear();
+	mc::play(scored, drafted, {}, film.shotStarts(), film.shotNameList(), problems);
+	EXPECT_TRUE(problems.empty()) << (problems.empty() ? "" : problems[0]);
+	// the film's speech, which ducks it
+	ff::DataFilm talk;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 6\ncharacter ann person\nsay ann 1 \"Hello there.\"\n", talk), "");
+	EXPECT_EQ(talk.speechAt(0.5), 0.0);
+	EXPECT_GT(talk.speechAt(talk.spoken[0][0].t0 + 0.05), 0.5);
 }

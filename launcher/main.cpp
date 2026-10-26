@@ -81,6 +81,7 @@ extern char** environ;
 #include "src/shared/cartoon/film_subjects.h"
 #include "src/shared/cartoon/film_checks.h"
 #include "src/shared/cartoon/fountain.h"   // --film-from-script: a film file from a screenplay
+#include "src/shared/cartoon/film_score.h"   // --film-score: a first score drafted from a film
 #include "src/shared/cartoon/film_baseline.h"   // --film-baseline: every film, shot by shot, against a recorded baseline   // --film-feet: planted feet that slide   // --film-subjects: where a film's subjects fall in its frame
 #include "launcher/cartoon_still.h"  // one frame of a film as a temporary scene file  // cartoon video presets: one child run per frame
 #include <fstream>
@@ -1057,6 +1058,29 @@ int main(int argc, char** argv) {
 		std::size_t lines = 0;
 		for (const auto &sc : script.scenes) lines += sc.lines.size();
 		std::cout << "wrote " << out.string() << ": " << script.scenes.size() << " scene(s), " << script.characters.size() << " character(s), " << lines << " line(s)" << std::endl;
+		return EXIT_SUCCESS;
+	}
+	// `ray_tracer --film-score <key> [OUT]`: a first score for a film made from a file, drafted from what happens in it (cartoon/film_score.h): a cues file's text, printed, or
+	// written to OUT (film_assets/<key>/cues.txt is where the film reads it).
+	if (argc >= 2 && std::string(argv[1]) == "--film-score") {
+		(void)cartoon::films();
+		const cartoon::film_file::DataFilm *film = argc >= 3 ? cartoon::filmFileOf(argv[2]) : nullptr;
+		if (!film) {
+			std::cerr << "usage: " << argv[0] << " --film-score <key of a film made from a film file> [OUT]" << std::endl;
+			return EXIT_FAILURE;
+		}
+		const std::string text = cartoon::score::draft(*film);
+		if (argc < 4) {
+			std::cout << text;
+			return EXIT_SUCCESS;
+		}
+		std::ofstream out(argv[3], std::ios::binary | std::ios::trunc);
+		out << text;
+		if (!out) {
+			std::cerr << "cannot write " << argv[3] << std::endl;
+			return EXIT_FAILURE;
+		}
+		std::cout << "wrote " << argv[3] << std::endl;
 		return EXIT_SUCCESS;
 	}
 	// `ray_tracer --film-lines <key>`: what a film file's characters say (film_speech.h), one tab-separated line each: `line  start  end  who  syllables  text`.

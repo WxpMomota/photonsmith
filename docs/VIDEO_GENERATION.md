@@ -697,6 +697,17 @@ all, the noise is the same in every frame (it does not flicker where nothing mov
 only those whose neighbours changed. A still camera on a walking person at 8 samples: the error against a 512-sample picture went from 2.84 to 2.14 (the floor from 3.21 to
 2.10, the walker's box from 4.54 to 3.91 - moving parts are not smeared), and the frame-to-frame flicker of the floor from 3.79 to 1.54.
 
+**Music that follows the film.** Three things (music_cues.h, film_score.h):
+
+- *Ducking.* A film file's music cues are mixed on their own and laid on the soundtrack brought down under the characters' lines - by up to two thirds while a line is
+  heard (its `say` lines' loudness and its recorded voices), in 0.06 s, back up over half a second after it - so the music never fights the words.
+- *Hits on the cuts.* `oncuts mallet A2 1.5 gain 0.04` in a cues file plays at the start of every shot but the first.
+- *A drafted score: `ray_tracer --film-score <key> [OUT]`.* A cues file to start from, made from what happens in each shot: its mood from what the characters feel in it
+  (their `feel` lines; nothing felt is calm) and its pace (running is lively, a short shot quicker) give a key, a tempo and chords - happy: C major I-V-vi-IV at 112 a minute
+  with a bell; sad: A minor i-VI-III-VII at 66 with strings; scared, worried or angry: A minor i-iv with a knocking pulse; surprised: a sus chord and a swell; sleepy or
+  thinking: a soft pad and a mallet; calm: I-IV-I-V with a pluck - each chord held by a pad with the bass on its root and a melody of its notes on the beat, quiet under
+  the lines. Printed, or written to OUT (`film_assets/<key>/cues.txt` is where the film reads it); change it as any cues file.
+
 **A film file from a screenplay: `ray_tracer --film-from-script SCRIPT.fountain OUT.film [--set SET.pbrt]`.** A script written in Fountain (fountain.io, the plain
 screenplay format most screenwriting programs read and write) becomes a film file to start from (cartoon/fountain.h). The title page's `Title` names the film (its key is
 made from it) and `Cast` says what kind each character is and its size (`Cast: PIP=pip, TESS=turtle 6`; anyone else is a person). Each scene heading (`EXT. A MEADOW - DAY`,

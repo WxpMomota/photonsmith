@@ -15,6 +15,9 @@
 // instruments are the generic ones (genericInstruments: bell, mallet, pluck, bass, pad, strings, knock, swell, and the sound effects footstep-<surface>, impact, flash,
 // touch) and the film's own (Film::instruments: the Nomai film's guitar, banjo, piano, resonance, drone, beep). What the file says wrong is printed once and the line left out.
 //
+// A hit on every cut: `oncuts mallet A2 1.0 gain 0.05` (the rest as a cue's) plays at the start of every shot but the first. And under the characters' lines the cues are
+// ducked: a film that says when it speaks (Film::speechAt) has its music brought down by up to two thirds while a line is heard (cartoons.h, withFilmFiles).
+//
 // A recording: `3.0  sample voices/hello.wav  gain 0.8  by kai` plays a WAV file (beside the cues file; any rate, mono or stereo: audio::readWav). `by NAME` makes it that
 // character's voice: voiceAt() is how loud it is at a moment (0..1, the loudest of the line 1), for the film's code to open a mouth by - or, behind a mask, to light up.
 
@@ -48,6 +51,7 @@ struct Cue {
 	std::string by;        // `by NAME`: whose voice it is (voiceAt)
 	std::vector<double> notes;
 	double length = 2.0, gain = 0.1, pan = 0.0, send = 0.3, spread = 0.0;
+	bool everyCut = false;   // `oncuts`: played at every cut (its time after the cut)
 	int line = 0;
 };
 struct Sheet {
@@ -106,6 +110,11 @@ inline Sheet parse(const std::string &text) {
 		Cue c;
 		c.line = n;
 		c.shot = section;
+		if (first == "oncuts") {   // (a hit on every cut: the rest of the line as a cue's, its time 0 after each cut)
+			c.everyCut = true;
+			c.shot.clear();
+			first = "0";
+		}
 		std::string timeWord = first;
 		if (timeWord.front() == '@') {
 			c.absolute = true;
@@ -260,10 +269,36 @@ inline std::string recordingPath(const Sheet &sheet, const std::string &file) {
 	return (p.is_absolute() ? p : std::filesystem::path(sheet.folder) / p).string();
 }
 
+// The level of the music under speech (`speech`: how loud the lines are at a time, 0..1), one value each 1/100 s for `seconds`: brought down by up to two thirds as a line is
+// heard, in 0.06 s, and back up over 0.5 s after it.
+inline std::vector<float> duckingOf(const std::function<double(double)> &speech, double seconds) {
+	std::vector<float> gain;
+	double level = 0.0;
+	for (double t = 0.0; t <= seconds; t += 0.01) {
+		const double target = std::min(1.0, 1.6 * speech(t));
+		level += (target - level) * (target > level ? 1.0 - std::exp(-0.01 / 0.06) : 1.0 - std::exp(-0.01 / 0.5));
+		gain.push_back(static_cast<float>(1.0 - 0.65 * level));
+	}
+	return gain;
+}
+
 // The cues on a mix: each at its time with its instrument (the film's own, else a generic one). What cannot be played is added to `problems`.
 inline void play(audio::Mix &m, const Sheet &sheet, const std::map<std::string, CueInstrument> &own, const std::vector<double> &starts, const std::vector<std::string> &names,
 				 std::vector<std::string> &problems) {
+	std::vector<Cue> cues;   // (an `oncuts` cue made into one at each cut)
 	for (const Cue &c : sheet.cues) {
+		if (!c.everyCut) {
+			cues.push_back(c);
+			continue;
+		}
+		for (std::size_t k = 1; k < starts.size(); ++k) {
+			Cue at = c;
+			at.absolute = true;
+			at.time = starts[k] + c.time;
+			cues.push_back(at);
+		}
+	}
+	for (const Cue &c : cues) {
 		double t = 0.0;
 		std::string why;
 		if (!timeOf(c, starts, names, t, why)) {
