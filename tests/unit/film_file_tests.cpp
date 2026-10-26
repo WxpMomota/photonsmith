@@ -451,6 +451,84 @@ TEST(FilmParts, WhatIsWrongWithAFilmInPartsIsSaidWithItsLine) {
 	EXPECT_TRUE(r.data.empty()) << "nothing of it is kept";
 }
 
+// The library: a cast (what a `character` line says but where it stands) and a set (film-file lines: a scene from the set's folder and what dresses it) brought in by name,
+// beside the film file; a cast's voice is under each of its lines; what is wrong in a library file is said with that file's own line.
+TEST(FilmLibrary, CastsAndSetsAreBroughtInByNameFromTheLibrary) {
+	const std::filesystem::path d = tempDir("library");
+	std::filesystem::create_directories(d / "library" / "rooms");
+	write(d / "library" / "rooms" / "den.pbrt", kScene);
+	write(d / "library" / "den.set", "# a den\nscene rooms/den.pbrt\nambience night 0.4\nplace rock at 1 0 -2\n");
+	write(d / "library" / "bea.cast", "# Bea\nkind person\nsweater #c0392b   # a colour, not a comment\nhair blond\npitch -3\nrate 0.9\n");
+	write(d / "f.film", "set den\nlength 6\ncast bea at 0.5 0 1 facing 90\ncast twin as bea at -0.5 0 1 hair black\nsay bea 1 \"Hello.\" pitch 1\nshot 0 A\n key 0 1 5  0 1 0\n");
+	ff::DataFilm film;
+	ASSERT_EQ(film.load((d / "f.film").string()), "");
+	EXPECT_EQ(std::filesystem::path(film.spec.scene).lexically_normal(), (d / "library" / "rooms" / "den.pbrt").lexically_normal()) << "the set's scene is from the set's folder";
+	EXPECT_NE(film.sceneAt(1.0).find("@anim"), std::string::npos) << "the set's scene is the film's";
+	ASSERT_EQ(film.spec.ambience.size(), 1u);
+	EXPECT_EQ(film.spec.ambience[0].kind, "night");
+	EXPECT_EQ(film.spec.placements.size(), 1u);
+	ASSERT_EQ(film.spec.characters.size(), 2u);
+	const ff::Character &bea = film.spec.characters[0], &twin = film.spec.characters[1];
+	EXPECT_EQ(bea.name, "bea");
+	EXPECT_EQ(bea.kind, "person");
+	EXPECT_DOUBLE_EQ(bea.start[0], 0.5);
+	EXPECT_DOUBLE_EQ(bea.facing, 90.0);
+	EXPECT_EQ(bea.line, 3) << "the film's line that brought it in";
+	ASSERT_TRUE(bea.colours.count("sweater"));
+	cartoon::Vec3 red;
+	ASSERT_TRUE(ff::colourOf("#c0392b", red));
+	EXPECT_DOUBLE_EQ(bea.colours.at("sweater").x, red.x) << "#c0392b is a colour";
+	EXPECT_DOUBLE_EQ(bea.pitch, -3.0);
+	EXPECT_EQ(twin.name, "twin");
+	EXPECT_EQ(twin.kind, "person");
+	EXPECT_NE(twin.colours.at("hair").x, bea.colours.at("hair").x) << "this film's look on top of the cast's";
+	ASSERT_EQ(film.spec.lines.size(), 1u);
+	EXPECT_DOUBLE_EQ(film.spec.lines[0].pitch, -2.0) << "the voice's pitch under the line's own";
+	EXPECT_DOUBLE_EQ(film.spec.lines[0].rate, 0.9);
+	// what is wrong: the film's line, or the library file's own
+	const auto problem = [&](const std::string &text) {
+		write(d / "g.film", text);
+		ff::DataFilm g;
+		return g.load((d / "g.film").string());
+	};
+	EXPECT_NE(problem("set nowhere\nlength 4\n").find("g.film:1: no set called \"nowhere\""), std::string::npos);
+	EXPECT_NE(problem("set ../x\nlength 4\n").find("g.film:1: `set NAME`"), std::string::npos);
+	EXPECT_NE(problem("set den\nlength 4\ncast nobody\n").find("g.film:3: no cast called \"nobody\""), std::string::npos);
+	write(d / "library" / "bad.set", "scene rooms/den.pbrt\n\nlength 5\n");
+	EXPECT_NE(problem("set bad\nlength 4\n").find("bad.set:3: `length` is the film's"), std::string::npos) << problem("set bad\nlength 4\n");
+	write(d / "library" / "kindless.cast", "sweater red\n");
+	EXPECT_NE(problem("set den\nlength 4\ncast x as kindless\n").find("has no `kind KIND` line"), std::string::npos);
+	write(d / "library" / "odd.cast", "kind person\nwings blue\n");
+	const std::string odd = problem("set den\nlength 4\ncast x as odd\n");
+	EXPECT_NE(odd.find("g.film"), std::string::npos) << odd;
+	EXPECT_NE(odd.find("wings"), std::string::npos) << odd;
+	// a set in a part of a film in parts
+	write(d / "parted.film", "part One\nset den\nlength 3\nshot 0 A\n key 0 1 5  0 1 0\npart Two\nset den\nlength 3\ncast bea\nshot 0 B\n key 0 1 5  0 1 0\n");
+	ff::DataFilm two;
+	ASSERT_EQ(two.load((d / "parted.film").string(), 1), "");
+	EXPECT_EQ(two.spec.characters.size(), 1u);
+}
+
+// Every cast and set of the library that comes with the program can be brought into a film.
+TEST(FilmLibrary, TheLibraryThatComesWithTheProgramLoads) {
+	(void)cartoon::films();   // (the kinds of character)
+	const std::string libraryDir = cartoon::film_cache::asset("library");
+	if (libraryDir.empty()) GTEST_SKIP() << "run where the scenes are";
+	const std::filesystem::path d = tempDir("bundled_library");
+	int casts = 0, sets = 0;
+	for (const auto &entry : std::filesystem::directory_iterator(libraryDir)) {
+		const std::string name = entry.path().stem().string(), ext = entry.path().extension().string();
+		if (ext != ".cast" && ext != ".set") continue;
+		const std::string text = ext == ".set" ? "set " + name + "\nlength 2\n" : "set meadow\nlength 2\ncast " + name + " at 0 0 0\n";
+		write(d / (name + ext + ".film"), text);
+		ff::DataFilm film;
+		EXPECT_EQ(film.load((d / (name + ext + ".film")).string()), "") << entry.path();
+		(ext == ".cast" ? casts : sets) += 1;
+	}
+	EXPECT_GE(casts, 5);
+	EXPECT_GE(sets, 3);
+}
+
 TEST(FilmFile, TheExampleFilmIsGoodAndAnimatesWhatItSays) {
 	std::string file;
 	for (const char *candidate : {"examples/animated/windmill.film", "../examples/animated/windmill.film", "../../examples/animated/windmill.film"})

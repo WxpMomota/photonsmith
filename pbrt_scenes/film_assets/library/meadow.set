@@ -1,0 +1,9 @@
+# A morning meadow: the stage under a morning sun, grass, two trees, a bush and a rock, and birdsong.
+scene    ../stage/set.pbrt
+sky      9:30 10:00  south 180
+ambience birds 0.7
+scatter  grass 500 in -9 -12 9 4  scale 0.7 1.2  seed 3
+place    tree  at -4.5 0 -7  scale 1.3
+place    tree  at 5 0 -9  turn 40
+place    bush  at 2.6 0 -3
+place    rock  at -2 0 -1.5  scale 0.8

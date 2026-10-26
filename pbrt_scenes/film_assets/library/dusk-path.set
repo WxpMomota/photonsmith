@@ -1,0 +1,3 @@
+# The lantern path at dusk: a sandy flat, stones, a pale path and a lantern that lights (`light lantern ...`), with crickets.
+scene    ../a-walk-at-dusk/set.pbrt
+ambience crickets 0.5

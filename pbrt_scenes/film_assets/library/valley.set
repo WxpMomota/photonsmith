@@ -1,0 +1,5 @@
+# A green valley: rolling hills with a wood on them under a late-afternoon sun, wind and birds. Big: a camera for it stands some metres up.
+scene    ../wild/set.pbrt
+terrain  hills  size 1200  height 120  seed 7
+forest   broadleaf 2500  seed 4
+sky      16:00 17:00  south 180

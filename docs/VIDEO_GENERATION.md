@@ -549,6 +549,15 @@ score drafted from it. `ray_tracer --film-check FILE` checks each part as the fi
 `<key>--2` (`--film-lines`, `--film-score`). `pbrt_scenes/pip-goes-out.film` is an example: Pip trots down the lantern path at dusk, and after a fade comes out into a morning
 meadow on the stage set (`sky`, grass, trees, birds) and cheers.
 
+**The library: casts and sets by name.** A character or a set used in more than one film is kept once in the film library and brought in by name. `cast NAME [as WHO] [at X Y Z]
+[facing D] ...` brings in a character as `library/WHO.cast` says it (WHO is NAME unless given): a cast file is what a `character` line says of a character but where it
+stands - a `kind` line, then its size, its parts' colours and its voice (`pitch` in semitones, `rate`), one to a line - and the rest of the `cast` line goes on top (`cast kid
+as pip-child at 0 0 1 skin #a0d0ff`). `set NAME` reads `library/NAME.set` there: film-file lines - its `scene` (from the set's own folder), `sky`, `place`, `scatter`,
+`ambience`, `terrain`, `forest`, `water`, weather, even characters - but not the film's own (`film`, `name`, `length`, `fps`, shots, parts). A film looks beside its own file
+first (`library/` next to it), then in `pbrt_scenes/film_assets/library`, which comes with casts (pip, pip-child, kai, ann, sam, shelly) and sets (dusk-path, meadow,
+valley). A problem in a library file is said with that file's own line. `pip-goes-out.film` uses `set dusk-path`, `set meadow` and `cast pip`. Any character can have a
+voice of its own the same way: `character bo person pitch -2 rate 0.9` (each line's own `pitch` and `rate` go on top).
+
 **The kinds of character.** Each walks with its own gait with its feet held where they come down (a turtle's four), blinks on its own, opens its mouth when it speaks (a
 `sample ... by NAME` cue) and has its own poses for gestures; a gesture naming a pose its kind does not have is an error when the film is loaded, and the message lists the
 kind's poses.

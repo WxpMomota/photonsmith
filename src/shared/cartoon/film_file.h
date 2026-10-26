@@ -150,6 +150,13 @@
 //     ...
 //     part     "The meadow" fade 1.2                           # ... and how it comes in after the one before: a cut, or `dissolve`, `fade` or `wipe` over so many seconds
 //     scene    film_assets/stage/set.pbrt
+//
+// The library - casts and sets kept once and brought into any film by name (library/NAME.cast and library/NAME.set beside the film file, else in film_assets/library):
+//
+//     set      meadow                                          # a set's lines read here: its scene (from the set's folder), its sky, dressing and sound
+//     cast     ann  at -0.8 0 0  facing 30                     # a character as its cast file says (kind, look, voice), standing here
+//     cast     kid as pip-child  at 0 0 0.8                    # ... named `kid` in this film; anything more on the line is on top of the cast's
+//     character  bo person  pitch -2  rate 0.9                 # (a voice for any character: semitones up from its kind's, and how fast it speaks)
 
 #include <algorithm>
 #include <cctype>
@@ -176,6 +183,7 @@
 #include "film_fire.h"
 #include "film_forest.h"
 #include "film_skyfx.h"
+#include "film_cache.h"
 #include "film_camera.h"
 #include "film_terrain.h"
 #include "film_underwater.h"
@@ -258,6 +266,7 @@ struct Character {
 	double detail = 0.0;                 // the kind's sculpting cell (0: its own)
 	double scale = 1.0;                  // its size (a kind that can be scaled: a child Pip 0.6, a turtle as big as a dog 6)
 	std::map<std::string, Vec3> colours; // the colours of its parts (`sweater red`): the kind's names for them
+	double pitch = 0.0, rate = 1.0;      // its voice: so many semitones up from its kind's, and how fast it speaks (every line of it; a line's own are on top)
 	bool extra = false;                  // one of a crowd (`crowd`): in the background
 	std::vector<WalkLine> walks;
 	std::vector<rig::Gesture> gestures;
@@ -597,17 +606,55 @@ inline std::vector<Character> crowdOf(const std::string &name, const std::string
 	return out;
 }
 
-// Reads a film file's text. `where` names it in the messages. The scene is not read here (see load()), so the names it animates are not yet checked.
+namespace detail {
+
+// A file of the library of casts and sets (`cast`, `set`): library/NAME.EXT beside the film file, else film_assets/library/NAME.EXT where the scenes are. "" when there is none.
+inline std::string libraryFile(const std::string &name, const std::string &ext, const std::string &filmFile) {
+	std::error_code ec;
+	const std::filesystem::path beside = std::filesystem::path(filmFile).parent_path() / "library" / (name + ext);
+	if (std::filesystem::exists(beside, ec)) return beside.string();
+	return film_cache::asset("library/" + name + ext);
+}
+// A line without its comment: '#' starts one - but not a colour, #rrggbb.
+inline std::string withoutComment(std::string line) {
+	for (std::size_t hash = line.find('#'); hash != std::string::npos; hash = line.find('#', hash + 1)) {
+		bool colour = hash + 7 <= line.size() && (hash + 7 == line.size() || std::isspace(static_cast<unsigned char>(line[hash + 7])));
+		for (std::size_t k = hash + 1; colour && k < hash + 7; ++k) colour = std::isxdigit(static_cast<unsigned char>(line[k])) != 0;
+		if (!colour) {
+			line.erase(hash);
+			break;
+		}
+	}
+	return line;
+}
+inline std::string textOf(const std::string &file) {
+	std::ifstream in(file, std::ios::binary);
+	return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+}
+
+}  // namespace detail
+
+// Reads a film file's text. `where` names it in the messages. The scene is not read here (see load()), so the names it animates are not yet checked. The library files it
+// brings in (`set NAME`: library/NAME.set, film-file lines - a scene and what dresses it; `cast NAME`: library/NAME.cast, what a `character` line says of a character but
+// where it stands) are read here, as if their lines were the film file's at that place.
 inline Parsed parse(const std::string &text, const std::string &where) {
 	using detail::number;
 	Parsed r;
 	Spec &s = r.spec;
-	std::istringstream in(text);
+	struct Source {   // a text being read: the film file, or a set of the library it brings in
+		std::shared_ptr<std::istringstream> in;
+		std::string where;
+		int n = 0;
+		std::filesystem::path dir;   // a library file's folder: its `scene` is from there
+		bool library = false;
+	};
+	std::vector<Source> sources{{std::make_shared<std::istringstream>(text), where, 0, {}, false}};
+	std::string here = where;   // the file of the line being read
 	std::string line;
 	int n = 0;
 	auto fail = [&](const std::string &what) {
 		r.ok = false;
-		r.error = where + ":" + std::to_string(n) + ": " + what;
+		r.error = here + ":" + std::to_string(n) + ": " + what;
 		return r;
 	};
 	std::string shotText;   // the key lines of the shot being read
@@ -641,24 +688,54 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		return std::string();
 	};
 	int shotLine = 0;
-	while (std::getline(in, line)) {
-		++n;
-		for (std::size_t hash = line.find('#'); hash != std::string::npos; hash = line.find('#', hash + 1)) {   // '#' starts a comment - but not a colour, #rrggbb
-			bool colour = hash + 7 <= line.size() && (hash + 7 == line.size() || std::isspace(static_cast<unsigned char>(line[hash + 7])));
-			for (std::size_t k = hash + 1; colour && k < hash + 7; ++k) colour = std::isxdigit(static_cast<unsigned char>(line[k])) != 0;
-			if (!colour) {
-				line.erase(hash);
-				break;
-			}
+	for (;;) {
+		if (!std::getline(*sources.back().in, line)) {   // (the end of a library file: back to the file that brought it in)
+			if (sources.size() == 1) break;
+			sources.pop_back();
+			here = sources.back().where, n = sources.back().n;
+			continue;
 		}
-		line = detail::trim(line);
+		n = ++sources.back().n;
+		here = sources.back().where;
+		line = detail::trim(detail::withoutComment(line));
 		if (line.empty()) continue;
 		const std::vector<std::string> w = detail::words(line);
 		const std::string &verb = w[0];
 		const std::string rest = detail::trim(line.substr(verb.size()));
+		if (sources.back().library && (verb == "film" || verb == "name" || verb == "about" || verb == "tags" || verb == "still" || verb == "length" || verb == "fps" || verb == "music" ||
+									   verb == "shot" || verb == "key" || verb == "part"))
+			return fail("`" + verb + "` is the film's, not a set's: a set is a scene and what dresses it, its sound and who is on it");
 		if (verb == "key") {
 			if (s.shots.empty()) return fail("a `key` line belongs to a shot: start one with `shot 0 NAME` first");
 			shotText += line + "\n";
+		} else if (verb == "set") {   // a set of the library: its lines read here
+			if (w.size() != 2 || !detail::validKey(w[1])) return fail("`set NAME`: a set of the library (library/NAME.set), its name lower-case letters, digits and '-'");
+			if (sources.size() > 4) return fail("sets that bring in sets, more than four deep");
+			const std::string file = detail::libraryFile(w[1], ".set", where);
+			if (file.empty()) return fail("no set called \"" + w[1] + "\" (library/" + w[1] + ".set beside the film file, or in film_assets/library)");
+			sources.push_back({std::make_shared<std::istringstream>(detail::textOf(file)), file, 0, std::filesystem::path(file).parent_path(), true});
+		} else if (verb == "cast") {   // a character of the library: its cast file's kind and look, and where it stands here, as one `character` line
+			const std::vector<std::string> t = detail::tokens(line);
+			if (t.size() < 2) return fail("`cast NAME [as WHO] [at X Y Z] [facing DEGREES] ...`: a character of the library (library/WHO.cast; WHO is NAME unless it is given)");
+			std::size_t i = 2;
+			std::string who = t[1];
+			if (t.size() > 3 && t[2] == "as") who = t[3], i = 4;
+			if (!detail::validKey(who)) return fail("a cast's name is lower-case letters, digits and '-' (got \"" + who + "\")");
+			const std::string file = detail::libraryFile(who, ".cast", where);
+			if (file.empty()) return fail("no cast called \"" + who + "\" (library/" + who + ".cast beside the film file, or in film_assets/library)");
+			std::string kind, look;
+			std::istringstream castText(detail::textOf(file));
+			for (std::string c; std::getline(castText, c);) {
+				c = detail::withoutComment(c);
+				const std::vector<std::string> cw = detail::words(c);
+				if (cw.empty()) continue;
+				if (cw[0] == "kind" && cw.size() == 2) kind = cw[1];
+				else look += " " + detail::trim(c);
+			}
+			if (kind.empty()) return fail("the cast " + file + " has no `kind KIND` line");
+			std::string character = "character \"" + t[1] + "\" " + kind + look;
+			for (; i < t.size(); ++i) character += " " + t[i];
+			sources.push_back({std::make_shared<std::istringstream>(character + "\n"), here, n - 1, sources.back().dir, sources.back().library});   // (read next, as this line)
 		} else if (verb == "film") {
 			if (!detail::validKey(rest)) return fail("the film's key must be lower-case letters, digits and '-' (got \"" + rest + "\")");
 			s.key = rest;
@@ -666,8 +743,8 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			s.name = rest;
 		} else if (verb == "about") {
 			s.about = rest;
-		} else if (verb == "scene") {
-			s.scene = rest;
+		} else if (verb == "scene") {   // (a set's scene is from the set's folder; the film file's from its own, when it is loaded)
+			s.scene = sources.back().library && std::filesystem::path(rest).is_relative() ? (sources.back().dir / rest).lexically_normal().string() : rest;
 		} else if (verb == "tags") {
 			s.tags = rest;
 		} else if (verb == "length") {
@@ -780,11 +857,14 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				} else if ((t[i] == "facing" || t[i] == "detail" || t[i] == "scale") && i + 1 < t.size()) {
 					if (!number(t[i + 1], t[i] == "facing" ? c.facing : t[i] == "detail" ? c.detail : c.scale) || !(c.scale > 0.0)) return fail("`" + t[i] + "` takes a number" + std::string(t[i] == "scale" ? " above 0" : ""));
 					i += 2;
+				} else if ((t[i] == "pitch" || t[i] == "rate") && i + 1 < t.size()) {   // its voice
+					if (!number(t[i + 1], t[i] == "pitch" ? c.pitch : c.rate) || !(c.rate > 0.0) || std::abs(c.pitch) > 24.0) return fail("a voice's `pitch` is semitones (-24 to 24) and its `rate` a number above 0");
+					i += 2;
 				} else if (Vec3 colour; i + 1 < t.size() && colourOf(t[i + 1], colour)) {   // a part's colour (the kind's parts are checked when the film is loaded)
 					c.colours[t[i]] = colour;
 					i += 2;
 				} else {
-					return fail("\"" + t[i] + "\": a character takes `at X Y Z`, `facing DEGREES`, `scale S`, `detail CELL` and its parts' colours (`sweater red`, `hair 0.2,0.1,0.05`, `skin #f0c8a0`)");
+					return fail("\"" + t[i] + "\": a character takes `at X Y Z`, `facing DEGREES`, `scale S`, `detail CELL`, its voice's `pitch SEMITONES` and `rate R` and its parts' colours (`sweater red`, `hair 0.2,0.1,0.05`, `skin #f0c8a0`)");
 				}
 			}
 			s.characters.push_back(c);
@@ -1774,16 +1854,7 @@ inline FilmParts partsOf(const std::string &text, const std::string &where) {
 	std::vector<std::string> clean(lines.size());   // each line's words, its comment left out
 	std::vector<std::size_t> starts;
 	for (std::size_t i = 0; i < lines.size(); ++i) {
-		std::string line = lines[i];
-		for (std::size_t hash = line.find('#'); hash != std::string::npos; hash = line.find('#', hash + 1)) {   // (as parse: '#' starts a comment, but not a colour #rrggbb)
-			bool colour = hash + 7 <= line.size() && (hash + 7 == line.size() || std::isspace(static_cast<unsigned char>(line[hash + 7])));
-			for (std::size_t k = hash + 1; colour && k < hash + 7; ++k) colour = std::isxdigit(static_cast<unsigned char>(line[k])) != 0;
-			if (!colour) {
-				line.erase(hash);
-				break;
-			}
-		}
-		clean[i] = detail::trim(line);
+		clean[i] = detail::trim(detail::withoutComment(lines[i]));
 		if (!clean[i].empty() && detail::words(clean[i])[0] == "part") starts.push_back(i);
 	}
 	if (starts.empty()) return out;
@@ -2111,6 +2182,8 @@ class DataFilm {
 		}
 		for (const speech::Line &l : spec.lines)
 			if (!character(l.who)) return filePath + ":" + std::to_string(l.line) + ": " + l.who + " says a line but is not brought in with `character`";
+		for (speech::Line &l : spec.lines)   // (a character's voice: its pitch and pace under each of its lines' own)
+			if (const Character *c = character(l.who)) l.pitch += c->pitch, l.rate *= c->rate;
 		spoken.clear();
 		for (const speech::Line &l : spec.lines) spoken.push_back(speech::syllablesOf(l));
 		if (spec.hasSky) leaveOutSkyLights();

@@ -1,0 +1,8 @@
+# Sam: a person in a green sweater with dark hair, a lower and slower voice.
+kind      person
+sweater   #2e8b57
+trousers  #5d4e37
+hair      #2b1d14
+skin      #c8956d
+pitch     -3
+rate      0.92

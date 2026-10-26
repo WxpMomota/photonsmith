@@ -1,0 +1,6 @@
+# A small Pip, a child: two thirds of Pip's size, a voice to match.
+kind    pip
+scale   0.66
+skin    #7fb8f0
+pitch   3
+rate    1.1
