@@ -8,13 +8,17 @@
 // camera than its `near` distance is drawn near, the rest far; each sways a little in the wind (its placement leans).
 //
 // Seasons: summer (greens), autumn (broadleaf trees and birches turn orange, red, yellow and brown, a colour to each), winter (they are bare; conifers carry snow on their
-// tiers), spring (fresh light green, and some broadleaf trees in blossom).
+// tiers), spring (fresh light green, and some broadleaf trees in blossom). A forest can go from one season to another over the film (`season summer to autumn from T0 to
+// T1`): each tree in its own time within that, through eight stages between them - its leaves turning colour, dropping one by one (a stage keeps a share of the summer
+// crown's leaves, the same leaves going first at every stage), coming out again; blossom and snow coming and going the same way. And it can grow (`grow T0 T1`): each tree
+// from a sapling to its full size over its own part of that time.
 //
 // Coordinates are pbrt's, as a film file's; the meshes are made in story space and placed with nature::placeObject.
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -51,6 +55,9 @@ struct Forest {
 	bool area = false;
 	double below = -1.0, above = -1e9, steep = 0.2, scale0 = 0.8, scale1 = 1.25, fullWithin = 120.0;
 	std::string season = "summer";
+	std::string seasonTo;              // (a change of season: to this one, each tree turning in its own time within turn0..turn1, film seconds)
+	double turn0 = 0.0, turn1 = 0.0;
+	double grow0 = -1.0, grow1 = -1.0;   // (growing: each tree from a sapling to its size within grow0..grow1; below 0 not)
 	int seed = 1;
 };
 // A tree: its species, its variant, where its foot is (pbrt's), its size and turn.
@@ -245,6 +252,30 @@ inline Vec3 foliageOf(const std::string &sp, const std::string &season, int v) {
 	return sp == "birch" ? Vec3{0.14, 0.27, 0.06} : sp == "shrub" ? Vec3{0.09, 0.18, 0.05} : Vec3{0.08, 0.17, 0.045} * (0.85 + 0.1 * v);
 }
 
+// ---- between seasons ----
+constexpr int kStages = 8;
+inline bool deciduous(const std::string &sp) { return sp == "broadleaf" || sp == "birch" || sp == "shrub"; }
+inline double leavesIn(const std::string &sp, const std::string &season) { return deciduous(sp) && season == "winter" ? 0.0 : 1.0; }
+// A mesh with a share `keep` of its groups of `per` triangles (whole leaves: nature::addLeaf makes four), chosen by a hash of each group so a larger share keeps the
+// smaller one's: the same leaves fall first.
+inline Mesh shareOf(const Mesh &m, double keep, int per, int salt) {
+	Mesh out;
+	out.verts = m.verts, out.normals = m.normals, out.uvs = m.uvs;
+	for (std::size_t t = 0; t < m.tris.size(); ++t)
+		if (hash01(static_cast<int>(t / static_cast<std::size_t>(per)), salt) < keep) out.tris.push_back(m.tris[t]);
+	return out;
+}
+// The far lumps (each a uvSphere of `n` points, one after another) shrunk towards their middles by `k`.
+inline Mesh shrunk(const Mesh &m, double k, std::size_t n) {
+	Mesh out = m;
+	for (std::size_t b = 0; b + n <= out.verts.size(); b += n) {
+		Vec3 mid{0, 0, 0};
+		for (std::size_t i = b; i < b + n; ++i) mid = mid + out.verts[i] * (1.0 / n);
+		for (std::size_t i = b; i < b + n; ++i) out.verts[i] = mid + (out.verts[i] - mid) * k;
+	}
+	return out;
+}
+
 }  // namespace detail
 
 // The objects (near and far) of a species' variant in a season, as scene text: ObjectBegin ... ObjectEnd for each, its meshes PLY files in the film's cache.
@@ -270,6 +301,46 @@ inline std::string objectText(const std::string &film, const std::string &sp, in
 	if (!snow.empty()) out += "  AttributeBegin\n  " + diffuseMaterial({0.82, 0.84, 0.88}) + "\n" + film_cache::plyShape(snow) + "  AttributeEnd\n";
 	if (!blossom.empty())
 		out += "  AttributeBegin\n  " + translucentMaterial(v % 2 ? Vec3{0.85, 0.55, 0.65} : Vec3{0.88, 0.86, 0.84}, {0.3, 0.25, 0.25}) + "\n" + film_cache::plyShape(blossom) + "  AttributeEnd\n";
+	return out + nature::objectEnd();
+}
+
+// The object of a species' variant at stage k (1 to kStages - 1) of the change from season `a` to `b`: the summer crown's leaves in the share between the two seasons'
+// (falling into winter, coming out of it), in a colour between theirs (leaves keep their colour as they fall, and come out in spring's), blossom and snow likewise; the
+// limbs of the bare tree whenever one of the two is winter.
+inline std::string stageName(const std::string &sp, int v, const std::string &a, const std::string &b, int k, bool full) {
+	return "forest_" + sp + "_" + std::to_string(v) + "_" + a + "-" + b + "_" + std::to_string(k) + (full ? "_near" : "_far");
+}
+inline std::string stageText(const std::string &film, const std::string &sp, int v, const std::string &a, const std::string &b, int k, bool full) {
+	const double u = static_cast<double>(k) / detail::kStages;
+	const double leaves = lerp(detail::leavesIn(sp, a), detail::leavesIn(sp, b), u), blossom = lerp(a == "spring" ? 1.0 : 0.0, b == "spring" ? 1.0 : 0.0, u),
+				 snow = lerp(a == "winter" ? 1.0 : 0.0, b == "winter" ? 1.0 : 0.0, u);
+	const bool bare = a == "winter" || b == "winter";
+	const std::string base = stageName(sp, v, a, b, k, full);
+	const int salt = 401 + 977 * v;
+	std::shared_ptr<detail::Grown> leafy, winter;
+	const auto getLeafy = [&]() -> const detail::Grown & {
+		if (!leafy) leafy = std::make_shared<detail::Grown>(full ? detail::grow(sp, v, false, true) : detail::growFar(sp, v, false));
+		return *leafy;
+	};
+	const auto getWinter = [&]() -> const detail::Grown & {
+		if (!winter) winter = std::make_shared<detail::Grown>(full ? detail::grow(sp, v, true, false) : detail::growFar(sp, v, true));
+		return *winter;
+	};
+	const std::string wood = film_cache::ply(film, base + "_wood", [&] { return bare ? getWinter().wood : getLeafy().wood; });
+	const std::string foliage = film_cache::ply(film, base + "_foliage", [&] {
+		if (leaves >= 1.0) return getLeafy().foliage;
+		return full ? detail::shareOf(getLeafy().foliage, leaves, 4, salt) : detail::shrunk(getLeafy().foliage, std::sqrt(leaves), uvSphere(1.0, 10, 6).verts.size());
+	});
+	const std::string blooms = film_cache::ply(film, base + "_blossom", [&] { return full ? detail::shareOf(getLeafy().blossom, blossom, 4, salt + 1) : Mesh(); });
+	const std::string snowy = film_cache::ply(film, base + "_snow", [&] { return full ? detail::shareOf(getWinter().snow, snow, 4, salt + 2) : snow > 0.5 ? getWinter().snow : Mesh(); });
+	const auto colourIn = [&](const std::string &season, const std::string &other) { return detail::foliageOf(sp, detail::leavesIn(sp, season) > 0.0 ? season : other, v); };
+	const Vec3 leaf = lerp(colourIn(a, b), colourIn(b, a), u);
+	std::string out = nature::objectBegin(base) + "  AttributeBegin\n  " + coated(detail::barkOf(sp), 0.8) + "\n" + film_cache::plyShape(wood) + "  AttributeEnd\n";
+	if (!foliage.empty() && leaves > 0.0)
+		out += "  AttributeBegin\n  " + (full ? translucentMaterial(leaf, leaf * 1.3 + Vec3{0.03, 0.05, 0.0}) : diffuseMaterial(leaf * 0.9)) + "\n" + film_cache::plyShape(foliage) + "  AttributeEnd\n";
+	if (!snowy.empty() && snow > 0.0) out += "  AttributeBegin\n  " + diffuseMaterial({0.82, 0.84, 0.88}) + "\n" + film_cache::plyShape(snowy) + "  AttributeEnd\n";
+	if (!blooms.empty() && blossom > 0.0)
+		out += "  AttributeBegin\n  " + translucentMaterial(v % 2 ? Vec3{0.85, 0.55, 0.65} : Vec3{0.88, 0.86, 0.84}, {0.3, 0.25, 0.25}) + "\n" + film_cache::plyShape(blooms) + "  AttributeEnd\n";
 	return out + nature::objectEnd();
 }
 
@@ -321,25 +392,40 @@ inline std::vector<Tree> plant(const Forest &f, const terrain::Field *ground, do
 	return out;
 }
 
-// A forest's trees at t, seen from `eye` (story space; near ones in full), as scene text: the objects it uses, then a placement for each tree, leaning in the wind.
-inline std::string text(const std::string &film, const std::vector<Tree> &trees, const std::string &season, double t, const Vec3 &eyeStory, double nearDistance,
-						const dressing::Gusts &gusts = {}) {
+// A forest's trees at t (the wind's time; `filmT` the film's, for a change of season and growing), seen from `eye` (story space; near ones in full), as scene text: the
+// objects it uses, then a placement for each tree, leaning in the wind.
+inline std::string text(const std::string &film, const std::vector<Tree> &trees, const Forest &f, double t, double filmT, const Vec3 &eyeStory, const dressing::Gusts &gusts = {}) {
 	std::string objects, places;
 	std::vector<std::string> made;
-	const auto need = [&](const std::string &sp, int v, bool full) {
-		const std::string name = objectName(sp, v, season, full);
+	const auto need = [&](const std::string &name, const std::function<std::string()> &make) {
 		if (std::find(made.begin(), made.end(), name) == made.end()) {
 			made.push_back(name);
-			objects += objectText(film, sp, v, season, full);
+			objects += make();
 		}
 		return name;
 	};
+	const double turnSpan = std::max(1e-6, f.turn1 - f.turn0), growSpan = std::max(1e-6, f.grow1 - f.grow0);
 	for (const Tree &tr : trees) {
 		const Vec3 foot{-tr.at.x, tr.at.y, tr.at.z};   // (story space)
-		const bool full = length(foot - eyeStory) < nearDistance * tr.scale;
-		const std::string name = need(tr.species, tr.variant, full);
-		const Vec3 w = nature::windLean(foot.x, foot.z, t, tr.species == "conifer" ? 0.008 : 0.014) + dressing::gustAt(gusts, foot.x, foot.z, t) * (tr.species == "conifer" ? 0.04 : 0.07);
-		places += nature::placeObject(name, mul(translate(foot), nature::shearXZ(w.x, w.z), rotate({0, 1, 0}, tr.turn), scale(tr.scale)));
+		const int own = static_cast<int>(std::floor(tr.at.x * 7.31 + tr.at.z * 3.17)) ^ (tr.variant * 101);   // (each tree's own moment)
+		double size = tr.scale;
+		if (f.grow0 >= 0.0) {   // growing: from a sapling over its own half of the time
+			const double start = f.grow0 + 0.5 * growSpan * hash01(own, 31);
+			size *= 0.03 + 0.97 * smoothstep(start, start + 0.5 * growSpan, filmT);
+		}
+		const bool full = length(foot - eyeStory) < f.fullWithin * size;
+		int stage = 0;
+		if (!f.seasonTo.empty()) {   // turning: over its own 40% of the change
+			const double start = f.turn0 + 0.6 * turnSpan * hash01(own, 32);
+			stage = static_cast<int>(std::lround(smoothstep(start, start + 0.4 * turnSpan, filmT) * detail::kStages));
+		}
+		const std::string &sp = tr.species;
+		const int v = tr.variant;
+		const std::string name = stage == 0 ? need(objectName(sp, v, f.season, full), [&] { return objectText(film, sp, v, f.season, full); })
+								 : stage == detail::kStages ? need(objectName(sp, v, f.seasonTo, full), [&] { return objectText(film, sp, v, f.seasonTo, full); })
+															: need(stageName(sp, v, f.season, f.seasonTo, stage, full), [&] { return stageText(film, sp, v, f.season, f.seasonTo, stage, full); });
+		const Vec3 w = nature::windLean(foot.x, foot.z, t, sp == "conifer" ? 0.008 : 0.014) + dressing::gustAt(gusts, foot.x, foot.z, t) * (sp == "conifer" ? 0.04 : 0.07);
+		places += nature::placeObject(name, mul(translate(foot), nature::shearXZ(w.x, w.z), rotate({0, 1, 0}, tr.turn), scale(size)));
 	}
 	return trees.empty() ? std::string() : "# a forest (film_forest.h)\n" + objects + places;
 }

@@ -23,6 +23,7 @@ namespace particles {
 struct Weather {
 	std::string kind;
 	double amount = 1.0, t0 = 0.0, t1 = 1e30, ground = 0.0;
+	bool onLand = false;   // (its ground the land's under the camera: the leaves a forest drops)
 };
 // Particles thrown from a place: sparks, dust or a splash, from t0 to t1 at `rate` a second (a burst: all at t0), at a speed.
 struct Emitter {

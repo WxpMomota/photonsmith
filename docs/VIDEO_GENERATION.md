@@ -903,6 +903,29 @@ and shrubs low down, conifers coming in on the way up, conifers alone near the t
 yellow); `winter` (broadleaf trees and birches bare, showing their twigs; conifers with snow on their tiers); `spring` (fresh light green, some broadleaf trees and shrubs in
 blossom). Walks do not go round forest trees (they are not part of the set's floor map).
 
+**Plants changing over time: `season A to B`, `grow`, `flowers`.** (film_forest.h, film_flowers.h)
+
+```
+forest   broadleaf 400  season summer to autumn from 2 to 10   # each tree turning in its own time between 2 s and 10 s
+forest   mixed 2000  season autumn to winter from 0 to 20      # the leaves turning and falling, the land's bare by the end (leaves fall round the camera)
+forest   birch 300  grow 0 30                                  # a time-lapse: each tree from a sapling to its full size
+flowers  poppies 3000  in -6 -6 6 4  bloom 1 7  close 20 26   # opening one by one in the morning, closing at dusk
+flowers  sunflowers 40  in 3 -10 8 -6                         # their heads follow the sun across the sky
+```
+
+A forest can go from one season to another over the film: each tree turns over its own 40% of the change (from somewhere in its first 60%), through eight stages
+between the two seasons - its leaves changing colour (a broadleaf tree to its own autumn colour), dropping one by one into winter (each stage keeps a share of the summer
+crown's leaves, the same leaves going first at every stage; deciduous trees only - conifers and palms keep theirs), coming out again in spring, blossom and a conifer's
+snow coming and going the same way. A change that drops leaves brings `weather leaves` round the camera (falling to the land under it) unless the film has its own.
+`grow T0 T1` grows each tree from a sapling to its size over its own half of that time. The stages are objects like the seasons' own (their meshes PLY files in the film's
+cache), so a turning forest of thousands costs a few more objects, not more trees.
+
+`flowers KIND COUNT` is a meadow over `in X0 Z0 X1 Z1` (10 m round the middle when not given), on the land and out of the water: poppies (a nodding bud that lifts its
+head, then four red petals opening from a cup to a bowl round a dark centre), daisies (white rays folded over a yellow disc, opening flat), lupins (a purple spike opening
+from the bottom up over palmate leaves) or sunflowers (a tall stem and broad leaves, a heavy head whose rays unfold, turned to the sun from the `sky` line - east to west
+over the day, back to the east at night). `bloom T0 T1` opens them, each over its own part of that time; `close T0 T1` closes them again; `scale S`, `seed N`. A kind is
+made in three variants at eight stages of opening, each an object written once a frame when it is used and placed once per flower, leaning in the wind.
+
 **Animals: `flock`, `herd`.** (film_wildlife.h)
 
 ```

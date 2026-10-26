@@ -3,9 +3,11 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <sstream>
 #include <string>
 
@@ -351,7 +353,7 @@ TEST(FilmForest, TreesGrowWhereTheLandSuitsThemAndAreDrawnNearOrFar) {
 	ASSERT_GT(nConifer, 10);
 	EXPECT_LT(lowBroad / nBroad, highConifer / nConifer) << "broadleaf trees lower down, conifers higher";
 	// near and far: with `near 0` every tree is drawn far; a winter conifer carries snow
-	const std::string far = forest::text("photonsmith-test-forest", film.spec.planted[1], "winter", 1.0, {0.0, 50.0, 0.0}, 0.0);
+	const std::string far = forest::text("photonsmith-test-forest", film.spec.planted[1], film.spec.forests[1], 1.0, 1.0, {0.0, 50.0, 0.0});
 	EXPECT_NE(far.find("ObjectBegin \"forest_conifer_"), std::string::npos);
 	EXPECT_EQ(far.find("_near\""), std::string::npos);
 	EXPECT_NE(far.find("_far\""), std::string::npos);
@@ -956,5 +958,89 @@ TEST(FilmAir, ThePhysicalSkyReddensTheLowSunAndTheAirIsABlueLayerRoundTheCamera)
 		ff::DataFilm bad;
 		const std::string problem = loadNature("air_bad", "scene s.pbrt\nlength 4\n" + text, bad);
 		EXPECT_NE(problem.find(says), std::string::npos) << text << " -> " << problem;
+	}
+}
+
+// Plants changing over time: a forest turning from summer to autumn tree by tree and dropping its leaves into winter (the same leaves going first; leaves falling round
+// the camera meanwhile), a forest growing from saplings, and meadows of flowers opening each in its own time, sunflowers turning to the sun.
+TEST(FilmPlants, ForestsTurnAndGrowAndMeadowsOpenWithSunflowersFollowingTheSun) {
+	namespace fl = cartoon::flowers;
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("plants", "scene s.pbrt\nlength 20\nterrain hills size 300 height 10 seed 2 far off\nsky 6:00 20:00\n"
+								   "forest broadleaf 40 in -40 -40 40 40 season autumn to winter from 2 to 12 near 0\nforest birch 30 in -40 -40 40 40 grow 0 10 near 0\n"
+								   "flowers poppies 400 in -10 -10 10 10 bloom 2 8 close 15 19\nflowers sunflowers 30 in -5 -5 5 5\n",
+						 film),
+			  "");
+	const forest::Forest &turning = film.spec.forests[0];
+	EXPECT_EQ(turning.seasonTo, "winter");
+	EXPECT_DOUBLE_EQ(turning.turn1, 12.0);
+	EXPECT_TRUE(std::any_of(film.spec.weather.begin(), film.spec.weather.end(), [](const auto &w) { return w.kind == "leaves" && w.onLand; })) << "leaves falling";
+	const cartoon::Vec3 eye{0.0, 30.0, 60.0};
+	const auto at = [&](std::size_t i, double t) { return forest::text("photonsmith-test-plants", film.spec.planted[i], film.spec.forests[i], t, t, eye); };
+	EXPECT_NE(at(0, 0.0).find("forest_broadleaf_0_autumn_far") == std::string::npos && at(0, 0.0).find("forest_broadleaf_1_autumn_far") == std::string::npos &&
+				  at(0, 0.0).find("forest_broadleaf_2_autumn_far") == std::string::npos,
+			  true) << "all in autumn before the change";
+	EXPECT_EQ(at(0, 0.0).find("autumn-winter"), std::string::npos);
+	EXPECT_NE(at(0, 7.0).find("_autumn-winter_"), std::string::npos) << "half way: trees between the seasons";
+	EXPECT_EQ(at(0, 13.0).find("_autumn_"), std::string::npos) << "all bare after it";
+	// a stage keeps a share of the summer crown's leaves, and a later stage's leaves are among an earlier one's
+	const cartoon::Mesh crown = forest::detail::grow("broadleaf", 0, false, true).foliage;
+	const cartoon::Mesh many = forest::detail::shareOf(crown, 0.75, 4, 5), few = forest::detail::shareOf(crown, 0.25, 4, 5);
+	EXPECT_NEAR(static_cast<double>(many.tris.size()) / crown.tris.size(), 0.75, 0.03);
+	EXPECT_NEAR(static_cast<double>(few.tris.size()) / crown.tris.size(), 0.25, 0.03);
+	std::set<std::array<int, 3>> kept(many.tris.begin(), many.tris.end());
+	for (const auto &tri : few.tris) ASSERT_TRUE(kept.count(tri)) << "the same leaves go first";
+	// growing: saplings first, full size after
+	const auto sizes = [&](double t) {
+		std::vector<double> out;
+		const std::string text = at(1, t);
+		for (std::size_t p = text.find("ObjectInstance"); p != std::string::npos; p = text.find("ObjectInstance", p + 1)) {
+			const std::size_t c = text.rfind("ConcatTransform [", p);
+			std::istringstream in(text.substr(c + 17, 120));
+			double a = 0.0, b = 0.0, d = 0.0;
+			in >> a >> b >> d;
+			out.push_back(std::sqrt(a * a + b * b + d * d));
+		}
+		return out;
+	};
+	const std::vector<double> young = sizes(0.5), grown = sizes(11.0);
+	ASSERT_EQ(young.size(), grown.size());
+	ASSERT_FALSE(young.empty());
+	for (std::size_t i = 0; i < young.size(); ++i) EXPECT_LT(young[i], 0.3 * grown[i]);
+	// the meadow: buds, then open, then closing at dusk, each flower in its own time
+	const fl::Meadow &poppies = film.spec.meadows[0];
+	int budding = 0, open = 0;
+	for (int i = 0; i < 100; ++i) {
+		EXPECT_EQ(fl::openAt(poppies, i, 1.0), 0.0);
+		EXPECT_EQ(fl::openAt(poppies, i, 10.0), 1.0);
+		EXPECT_EQ(fl::openAt(poppies, i, 19.5), 0.0);
+		const double mid = fl::openAt(poppies, i, 5.0);
+		budding += mid < 0.5, open += mid >= 0.5;
+	}
+	EXPECT_GT(budding, 10) << "not all at once";
+	EXPECT_GT(open, 10);
+	// an open daisy spreads wider than a bud
+	const auto spread = [](const fl::detail::Parts &p) {
+		double r = 0.0;
+		for (const cartoon::Vec3 &v : p.petals.verts) r = std::max(r, std::hypot(v.x, v.z));
+		return r;
+	};
+	EXPECT_GT(spread(fl::detail::flowerAt("daisies", 0, 1.0)), 1.5 * spread(fl::detail::flowerAt("daisies", 0, 0.1)));
+	// sunflowers turn: their heads face another way in the evening than in the morning
+	const std::string morning = film.sceneAt(1.0), evening = film.sceneAt(18.0);
+	const auto firstSunflower = [](const std::string &s) {
+		const std::size_t p = s.find("ObjectInstance \"flower_sunflowers_");
+		const std::size_t c = s.rfind("ConcatTransform [", p);
+		return s.substr(c, p - c);
+	};
+	EXPECT_NE(firstSunflower(morning), firstSunflower(evening));
+	EXPECT_NE(morning.find("ObjectBegin \"flower_poppies_"), std::string::npos);
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"flowers roses 10", "poppies, daisies, lupins or sunflowers"},
+																						 {"flowers daisies 10 bloom 5 2", "flowers take"},
+																						 {"forest birch 10 season summer to summer from 1 2", "`season A to B from T0 to T1`"},
+																						 {"forest birch 10 season summer to autumn from 4 2", "`season A to B from T0 to T1`"}}) {
+		ff::DataFilm bad;
+		const std::string problem = loadNature("plants_bad", "scene s.pbrt\nlength 4\n" + line + "\n", bad);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }

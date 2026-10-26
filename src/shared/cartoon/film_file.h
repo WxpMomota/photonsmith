@@ -113,6 +113,8 @@
 //     clouds   cumulus  cover 0.4  base 900  wind 90  speed 6   # clouds you can see round (film_clouds.h): cumulus, towering or wisps; `size W` across, `density D`,
 //                                                               # `area A` (the square they are spread over, round `at X Z`), `seed N`; they drift and cast shadows
 //     forest   mixed 3000  season autumn                        # conifer, broadleaf, birch, palm, shrub or mixed (by height), so many trees where the land suits them;
+//                                                               # `season summer to autumn from T0 to T1` (each tree turning in its own time), `grow T0 T1` (from saplings)
+//     flowers  poppies 3000  in -20 -20 20 20  bloom 2 10       # poppies, daisies, lupins or sunflowers (turning to the sun), opening each in its own time; `close T0 T1`
 //                                                               # `in X0 Z0 X1 Z1`, `below H` (the tree line above the land's base), `above H`, `steep S`, `scale A B`,
 //                                                               # `near D` (drawn in full within D m of the camera), `season` summer, autumn, winter or spring, `seed N`
 //     flock    starlings 300  at 0 80 -200  radius 40           # animals (film_wildlife.h): starlings or fish (flocking round `at`), geese (`from X Y Z to X Y Z`, in
@@ -223,6 +225,7 @@
 #include "film_subjects.h"
 #include "film_clouds.h"
 #include "film_fire.h"
+#include "film_flowers.h"
 #include "film_forest.h"
 #include "film_skyfx.h"
 #include "film_cache.h"
@@ -484,6 +487,7 @@ struct Spec {
 	std::vector<clouds::Clouds> cloudLayers;
 	// forests (`forest`), and their trees (planted when the film is loaded, on the land as it is drawn)
 	std::vector<forest::Forest> forests;
+	std::vector<flowers::Meadow> meadows;   // wild flowers (`flowers`: film_flowers.h)
 	std::vector<std::vector<forest::Tree>> planted;
 	// animals (`flock`, `herd`)
 	std::vector<wildlife::Flock> flocks;
@@ -1262,19 +1266,55 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				} else if (t[i] == "season" && i + 1 < t.size() && std::find(forest::seasons().begin(), forest::seasons().end(), t[i + 1]) != forest::seasons().end()) {
 					f.season = t[i + 1];
 					i += 2;
+					if (i < t.size() && t[i] == "to") {   // a change of season: `season A to B from T0 to T1`
+						if (!(i + 5 < t.size() && std::find(forest::seasons().begin(), forest::seasons().end(), t[i + 1]) != forest::seasons().end() && t[i + 1] != f.season &&
+							  t[i + 2] == "from" && number(t[i + 3], a) && t[i + 4] == "to" && number(t[i + 5], b) && b > a))
+							return fail("`season A to B from T0 to T1`: from one season to another (summer, autumn, winter, spring), each tree turning in its own time between T0 and T1");
+						f.seasonTo = t[i + 1], f.turn0 = a, f.turn1 = b;
+						i += 6;
+					}
+				} else if (t[i] == "grow" && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && b > a && a >= 0.0) {
+					f.grow0 = a, f.grow1 = b;
+					i += 3;
 				} else if (i + 1 < t.size() && number(t[i + 1], a)) {
 					if (t[i] == "below" && a >= 0.0) f.below = a;
 					else if (t[i] == "above") f.above = a;
 					else if (t[i] == "steep" && a > 0.0 && a <= 1.0) f.steep = a;
 					else if (t[i] == "near" && a >= 0.0) f.fullWithin = a;
 					else if (t[i] == "seed") f.seed = static_cast<int>(a);
-					else return fail("\"" + t[i] + "\": a forest takes in X0 Z0 X1 Z1, below, above, steep (0 to 1), scale A B, near, season (summer, autumn, winter or spring) and seed");
+					else return fail("\"" + t[i] + "\": a forest takes in X0 Z0 X1 Z1, below, above, steep (0 to 1), scale A B, near, season (summer, autumn, winter or spring; `to B from T0 to T1`), grow T0 T1 and seed");
 					i += 2;
 				} else {
-					return fail("\"" + t[i] + "\": a forest takes in X0 Z0 X1 Z1, below, above, steep, scale A B, near, season and seed");
+					return fail("\"" + t[i] + "\": a forest takes in X0 Z0 X1 Z1, below, above, steep, scale A B, near, season, grow T0 T1 and seed");
 				}
 			}
 			s.forests.push_back(f);
+		} else if (verb == "flowers") {   // a meadow of wild flowers, opening and closing (film_flowers.h)
+			const std::vector<std::string> t = detail::tokens(line);
+			flowers::Meadow m;
+			double count = 0.0;
+			if (t.size() < 3 || std::find(flowers::kinds().begin(), flowers::kinds().end(), t[1]) == flowers::kinds().end() || !number(t[2], count) || count < 1 || count > 100000)
+				return fail("`flowers KIND COUNT [in X0 Z0 X1 Z1] [bloom T0 T1] [close T0 T1] [scale S] [seed N]`: poppies, daisies, lupins or sunflowers, 1 to 100000 of them");
+			m.kind = t[1];
+			m.count = static_cast<int>(count);
+			for (std::size_t i = 3; i < t.size();) {
+				double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
+				if (t[i] == "in" && i + 4 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c) && number(t[i + 4], d)) {
+					m.x0 = std::min(a, c), m.z0 = std::min(b, d), m.x1 = std::max(a, c), m.z1 = std::max(b, d);
+					i += 5;
+				} else if ((t[i] == "bloom" || t[i] == "close") && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && b > a) {
+					(t[i] == "bloom" ? m.bloom0 : m.close0) = a;
+					(t[i] == "bloom" ? m.bloom1 : m.close1) = b;
+					i += 3;
+				} else if ((t[i] == "scale" || t[i] == "seed") && i + 1 < t.size() && number(t[i + 1], a) && (t[i] == "seed" || a > 0.0)) {
+					if (t[i] == "scale") m.scale = a;
+					else m.seed = static_cast<int>(a);
+					i += 2;
+				} else {
+					return fail("\"" + t[i] + "\": flowers take in X0 Z0 X1 Z1, bloom T0 T1 (each opening in its own time between them), close T0 T1, scale and seed");
+				}
+			}
+			s.meadows.push_back(m);
 		} else if (verb == "flock") {
 			const std::vector<std::string> t = detail::tokens(line);
 			wildlife::Flock f;
@@ -1934,7 +1974,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, surf, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, surf, flowers, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1992,6 +2032,13 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		const std::shared_ptr<const terrain::Field> ground = s.hasTerrain ? terrain::fieldOf(s.terrain) : nullptr;
 		const double level = s.seas.empty() ? -1e30 : s.seas[0].level;
 		for (const forest::Forest &f : s.forests) s.planted.push_back(forest::plant(f, ground.get(), level, s.terrain.channels));
+		for (const forest::Forest &f : s.forests)   // (leaves falling while a forest drops them, unless the film says what falls)
+			if (!f.seasonTo.empty() && (f.seasonTo == "winter" || f.season == "autumn") && f.season != "winter" && f.kind != "conifer" && f.kind != "palm" &&
+				std::none_of(s.weather.begin(), s.weather.end(), [](const particles::Weather &w) { return w.kind == "leaves"; })) {
+				particles::Weather w;
+				w.kind = "leaves", w.amount = 0.5, w.t0 = f.turn0 + 0.3 * (f.turn1 - f.turn0), w.t1 = f.turn1 + 2.0, w.onLand = true;
+				s.weather.push_back(w);
+			}
 	}
 	{   // the flocks: their heights above the land (on a terrain), and their flights worked out
 		const std::shared_ptr<const terrain::Field> ground = s.hasTerrain ? terrain::fieldOf(s.terrain) : nullptr;
@@ -3828,7 +3875,11 @@ class DataFilm {
 			double fov = 40.0;
 			film_subjects::cameraOf(header, eye, target, fov);
 			const Vec3 at{-eye.x, eye.y, eye.z};   // (pbrt's)
-			for (const particles::Weather &w : spec.weather) out += particles::weatherText(w, t, at, spec.shutter / std::max(1, spec.fps));
+			const std::shared_ptr<const terrain::Field> land = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+			for (particles::Weather w : spec.weather) {
+				if (w.onLand && land) w.ground = land->heightAt(at.x, at.z);
+				out += particles::weatherText(w, t, at, spec.shutter / std::max(1, spec.fps));
+			}
 			for (const particles::Emitter &e : spec.emitters) out += particles::emitterText(e, t);
 		}
 		for (const clouds::Clouds &c : spec.cloudLayers) out += clouds::text(spec.key.empty() ? std::string("film") : spec.key, c, nt);   // (film_clouds.h)
@@ -3869,12 +3920,21 @@ class DataFilm {
 				if (t >= f.t0 && t <= f.t1) out += wildlife::flockText(f, t, ground.get(), poses, first(f.kind));
 			for (const wildlife::Herd &h : spec.herds) out += wildlife::herdText(h, t, ground.get(), poses);
 		}
+		if (!spec.meadows.empty()) {   // wild flowers (film_flowers.h): sunflowers turn to the sun
+			const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+			double el = 45.0, facing = 180.0;
+			if (spec.hasSky) dressing::sunAt(spec.sky, dressing::hourAt(spec.sky, t, spec.storyEnd), el, facing);
+			const double east = spec.hasSky ? spec.sky.south - 90.0 : 90.0;
+			std::set<std::string> written;
+			for (const flowers::Meadow &m : spec.meadows)
+				out += flowers::text(m, t, nt, ground.get(), spec.seas.empty() ? -1e30 : spec.seas[0].level, facing, el > -1.0, east, written);
+		}
 		if (!spec.forests.empty()) {   // forests (film_forest.h): near the camera in full
 			Vec3 eye, target;
 			double fov = 40.0;
 			film_subjects::cameraOf(header, eye, target, fov);
 			for (std::size_t i = 0; i < spec.forests.size() && i < spec.planted.size(); ++i)
-				out += forest::text(spec.key.empty() ? std::string("film") : spec.key, spec.planted[i], spec.forests[i].season, nt, eye, spec.forests[i].fullWithin, spec.gusts);
+				out += forest::text(spec.key.empty() ? std::string("film") : spec.key, spec.planted[i], spec.forests[i], nt, t, eye, spec.gusts);
 		}
 		for (const Piece &piece : scene.world) {
 			if (piece.block < 0) {
