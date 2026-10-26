@@ -11,6 +11,7 @@
 #include <string>
 
 #include "../../src/shared/cartoon/cartoons.h"
+#include "../../src/shared/cartoon/fountain.h"
 
 namespace ff = cartoon::film_file;
 
@@ -950,4 +951,57 @@ TEST(FilmParticles, WeatherStandsStillInTheWorldAndParticlesLiveTheirLives) {
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nweather hail\n", bad).find("rain, snow or leaves"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nparticles smoke at 0 0 0 1 2\n", bad).find("sparks, dust or splash"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\nburst splash at 0 0 0 1 rate 5\n", bad).find("a burst takes count"), std::string::npos);
+}
+
+// ---- a film file from a screenplay ---------------------------------------------------------------------------------------------------------------------------------------------
+
+// A Fountain screenplay is read (its title page, scene headings, action, cues, parentheticals and transitions; notes and emphasis taken out) and made into a film file that
+// loads: its characters of the cast's kinds, its lines one after another without overlapping, a covered shot of each scene, its dissolve and fades, a parenthetical's
+// expression and gesture.
+TEST(Fountain, AScreenplayBecomesAFilmFileThatLoads) {
+	(void)cartoon::films();
+	const std::string script =
+		"Title: The *First* Star\nCast: PIP=pip\n\n"
+		"FADE IN:\n\n"
+		"EXT. THE PATH - DUSK\n\n"
+		"Pip looks up at the sky. [[a note]]\n\n"
+		"PIP\n(excited)\nLook, the first star!\n\n"
+		"ANN (V.O.)\nIt is very bright.\n\n"
+		"DISSOLVE TO:\n\n"
+		"EXT. THE HILL - NIGHT\n\n"
+		"PIP\n(waving)\nGoodnight, star.\n\n"
+		"FADE OUT.\n";
+	const cartoon::fountain::Script s = cartoon::fountain::parse(script);
+	EXPECT_EQ(s.title, "The First Star");
+	ASSERT_EQ(s.scenes.size(), 2u);
+	EXPECT_EQ(s.scenes[0].heading, "EXT. THE PATH - DUSK");
+	EXPECT_EQ(s.scenes[0].transition, "fade");
+	EXPECT_EQ(s.scenes[1].transition, "dissolve");
+	ASSERT_EQ(s.scenes[0].action.size(), 1u);
+	EXPECT_EQ(s.scenes[0].action[0], "Pip looks up at the sky.");
+	ASSERT_EQ(s.scenes[0].lines.size(), 2u);
+	EXPECT_EQ(s.scenes[0].lines[1].who, "ANN") << "without (V.O.)";
+	EXPECT_EQ(s.scenes[0].lines[0].parenthetical, "excited");
+	EXPECT_TRUE(s.fadeOut);
+	EXPECT_EQ(s.characters, (std::vector<std::string>{"PIP", "ANN"}));
+	// the film file
+	const std::string text = cartoon::fountain::filmFile(s, "s.pbrt", "first");
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm(text, film), "") << text;
+	EXPECT_EQ(film.spec.key, "the-first-star");
+	ASSERT_EQ(film.spec.characters.size(), 2u);
+	EXPECT_EQ(film.spec.characters[0].kind, "pip");
+	EXPECT_EQ(film.spec.characters[1].kind, "person");
+	ASSERT_EQ(film.spec.lines.size(), 3u);
+	for (std::size_t i = 1; i < film.spec.lines.size(); ++i) EXPECT_GT(film.spec.lines[i].t, cartoon::speech::endOf(film.spoken[i - 1], film.spec.lines[i - 1].t)) << "one after another";
+	EXPECT_GE(film.spec.length, cartoon::speech::endOf(film.spoken.back(), film.spec.lines.back().t));
+	EXPECT_EQ(film.spec.characters[0].feelings.size(), 1u) << "(excited)";
+	EXPECT_EQ(film.spec.characters[0].feelings[0].when.pose, "happy");
+	ASSERT_EQ(film.spec.characters[0].gestures.size(), 1u) << "(waving)";
+	EXPECT_EQ(film.spec.characters[0].gestures[0].pose, "wave");
+	const std::vector<cartoon::Transition> trs = film.transitions();
+	ASSERT_EQ(trs.size(), 3u) << "fade in, dissolve, fade out";
+	EXPECT_EQ(trs[1].kind, cartoon::Transition::Dissolve);
+	EXPECT_GE(film.spec.shots.size(), 2u) << "each scene covered";
+	EXPECT_NE(film.spec.shots[0].name.find("EXT. THE PATH"), std::string::npos);
 }

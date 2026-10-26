@@ -80,6 +80,7 @@ extern char** environ;
 #include "launcher/cartoon_render.h"
 #include "src/shared/cartoon/film_subjects.h"
 #include "src/shared/cartoon/film_checks.h"
+#include "src/shared/cartoon/fountain.h"   // --film-from-script: a film file from a screenplay
 #include "src/shared/cartoon/film_baseline.h"   // --film-baseline: every film, shot by shot, against a recorded baseline   // --film-feet: planted feet that slide   // --film-subjects: where a film's subjects fall in its frame
 #include "launcher/cartoon_still.h"  // one frame of a film as a temporary scene file  // cartoon video presets: one child run per frame
 #include <fstream>
@@ -1015,8 +1016,49 @@ int main(int argc, char** argv) {
 		std::cout << (diffs.empty() ? "the same" : std::to_string(diffs.size()) + " shot(s) differ") << " (" << now.size() << " shots looked at)" << std::endl;
 		return diffs.empty() ? EXIT_SUCCESS : 1;
 	}
-	// `ray_tracer --film-cues <key>`: the film's cues file read and placed (music_cues.h), one tab-separated line a cue: `cue  seconds  instrument  notes (comma-separated)`,
-	// and a `problem` line for each thing in it that cannot be played. Nothing when the film has no cues file.
+	// `ray_tracer --film-from-script SCRIPT.fountain OUT.film [--set SET.pbrt]`: a film file to start from, made from a screenplay in Fountain (cartoon/fountain.h): its lines timed
+	// one after another, a shot of each scene with its cameras chosen from what happens, its transitions; on the stage set (film_assets/stage/set.pbrt) unless another is named.
+	if (argc >= 2 && std::string(argv[1]) == "--film-from-script") {
+		if (argc < 4) {
+			std::cerr << "usage: " << argv[0] << " --film-from-script SCRIPT.fountain OUT.film [--set SET.pbrt]" << std::endl;
+			return EXIT_FAILURE;
+		}
+		(void)cartoon::films();   // (the kinds of character: what a parenthetical's gesture can be)
+		std::ifstream in(argv[2], std::ios::binary);
+		if (!in) {
+			std::cerr << "cannot read " << argv[2] << std::endl;
+			return EXIT_FAILURE;
+		}
+		const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+		const cartoon::fountain::Script script = cartoon::fountain::parse(text);
+		namespace fs = std::filesystem;
+		const fs::path out = fs::absolute(argv[3]);
+		fs::path set;
+		if (argc >= 6 && std::string(argv[4]) == "--set") set = fs::absolute(argv[5]);
+		else
+			for (const std::string &dir : cartoon::filmFileDirs())
+				if (fs::exists(fs::path(dir) / "film_assets" / "stage" / "set.pbrt")) {
+					set = fs::absolute(fs::path(dir) / "film_assets" / "stage" / "set.pbrt");
+					break;
+				}
+		if (set.empty()) {
+			std::cerr << "no stage set found (film_assets/stage/set.pbrt beside the scenes): name one with --set" << std::endl;
+			return EXIT_FAILURE;
+		}
+		std::error_code ec;
+		fs::path written = fs::relative(set, out.parent_path(), ec);
+		if (ec || written.empty()) written = set;
+		std::ofstream file(out, std::ios::binary | std::ios::trunc);
+		file << cartoon::fountain::filmFile(script, written.generic_string(), fs::path(argv[2]).stem().string());
+		if (!file) {
+			std::cerr << "cannot write " << out.string() << std::endl;
+			return EXIT_FAILURE;
+		}
+		std::size_t lines = 0;
+		for (const auto &sc : script.scenes) lines += sc.lines.size();
+		std::cout << "wrote " << out.string() << ": " << script.scenes.size() << " scene(s), " << script.characters.size() << " character(s), " << lines << " line(s)" << std::endl;
+		return EXIT_SUCCESS;
+	}
 	// `ray_tracer --film-lines <key>`: what a film file's characters say (film_speech.h), one tab-separated line each: `line  start  end  who  syllables  text`.
 	if (argc >= 2 && std::string(argv[1]) == "--film-lines") {
 		(void)cartoon::films();
@@ -1045,6 +1087,8 @@ int main(int argc, char** argv) {
 		std::cout << "wrote " << argv[3] << std::endl;
 		return EXIT_SUCCESS;
 	}
+	// `ray_tracer --film-cues <key>`: the film's cues file read and placed (music_cues.h), one tab-separated line a cue: `cue  seconds  instrument  notes (comma-separated)`,
+	// and a `problem` line for each thing in it that cannot be played. Nothing when the film has no cues file.
 	if (argc >= 2 && std::string(argv[1]) == "--film-cues") {
 		const cartoon::Film *film = argc >= 3 ? cartoon::find(argv[2]) : nullptr;
 		if (!film) {

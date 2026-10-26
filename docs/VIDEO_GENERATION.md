@@ -667,6 +667,19 @@ all, the noise is the same in every frame (it does not flicker where nothing mov
 only those whose neighbours changed. A still camera on a walking person at 8 samples: the error against a 512-sample picture went from 2.84 to 2.14 (the floor from 3.21 to
 2.10, the walker's box from 4.54 to 3.91 - moving parts are not smeared), and the frame-to-frame flicker of the floor from 3.79 to 1.54.
 
+**A film file from a screenplay: `ray_tracer --film-from-script SCRIPT.fountain OUT.film [--set SET.pbrt]`.** A script written in Fountain (fountain.io, the plain
+screenplay format most screenwriting programs read and write) becomes a film file to start from (cartoon/fountain.h). The title page's `Title` names the film (its key is
+made from it) and `Cast` says what kind each character is and its size (`Cast: PIP=pip, TESS=turtle 6`; anyone else is a person). Each scene heading (`EXT. A MEADOW - DAY`,
+or a line forced with a leading '.') is a shot whose cameras are chosen from what happens (`auto`), with its action kept as comments; each character's cue and dialogue is a
+`say` line, the lines one after another (each as long as its syllables, 0.6 s apart, 1.2 s into a new scene); a parenthetical is an expression (`feel`: "(excited)" is happy,
+"(nervous)" worried, "(gasps)" surprised ...) and, when the kind has it, a gesture ("(waving)" waves) while the line is said. `FADE IN:` fades the film up, `DISSOLVE TO:`
+dissolves into the next scene, `FADE OUT.` fades it out; notes `[[...]]`, the boneyard `/* ... */`, emphasis and centred titles are left out. The characters stand round the
+middle of the stage set (`film_assets/stage/set.pbrt`, a plain floor, sky and sun; or the set named) facing it, two facing each other. `film_assets/stage/example.fountain`
+is a short example: three characters, four lines.
+
+With three or more, the coverage now keeps its cameras on the side the characters' faces look to (unless the shot says `side`), backs its two-shot away until everyone is in
+the frame, and shoots a speaker much smaller than the one they speak to from in front rather than over a tall shoulder.
+
 `ray_tracer --film-lines <key>` lists the lines with their start, end and syllables; `ray_tracer --film-sound <key> OUT.wav` writes a film's soundtrack alone, to listen to
 the lines (and the music and footsteps) without rendering a frame; `--film-check` counts a film file's characters and lines.
 

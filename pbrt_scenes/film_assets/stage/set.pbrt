@@ -1,0 +1,16 @@
+# The stage: a plain set for a film to start on (a film made from a screenplay is put here: fountain.h). A wide pale floor, a soft sky and a low warm sun; dress it with the film
+# file's `place`, `scatter` and `sky` lines, or name another set with `scene`.
+LookAt 0 1.6 6  0 1 0  0 1 0
+Camera "perspective" "float fov" [ 38 ]
+Film "rgb" "integer xresolution" [ 1280 ] "integer yresolution" [ 720 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+Integrator "volpath" "integer maxdepth" [ 6 ]
+WorldBegin
+
+LightSource "infinite" "rgb L" [ 0.22 0.26 0.34 ]
+LightSource "distant" "point3 from" [ -4 6 5 ] "point3 to" [ 0 0 0 ] "rgb L" [ 2.2 1.9 1.55 ]
+
+AttributeBegin
+  Material "diffuse" "rgb reflectance" [ 0.58 0.55 0.5 ]
+  Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ] "point3 P" [ -60 0 -60   60 0 -60   60 0 60   -60 0 60 ]
+AttributeEnd

@@ -151,7 +151,7 @@ struct Shot {
 	std::vector<std::string> about;   // the characters the shot is about
 	bool coverage = false;            // `auto`: chosen from what happens, when the film is loaded (it becomes shots of its own)
 	std::vector<std::string> cover;   // (auto) the characters it covers (none named: those who speak in it, or everyone)
-	int side = 1;                     // (auto) 1: the first of them on the left of the frame, -1: on the right
+	int side = 0;                     // (auto) 1: the first of them on the left of the frame, -1: on the right, 0: the side their faces look to
 	Transition transition;            // how it comes in (length 0: a cut)
 };
 
@@ -1226,19 +1226,34 @@ class DataFilm {
 	// The field of view that frames a speaker of this height from this far: their head and shoulders (a frame about 0.55 of their height and 0.3 m more: a big head needs room).
 	static double framing(double size, double distance) { return std::clamp(2.0 * std::atan(0.5 * (0.55 * size + 0.3) / std::max(0.1, distance)) * 180.0 / kPi, 12.0, 50.0); }
 	double sizeOf(const Character &c) const { return characterKinds().at(c.kind).height * c.scale; }
-	// Where the camera is for a beat at t (story space): `speaker` null for the shot of them all (a two-shot), else a shot of the speaker over the shoulder of the nearest of the
-	// others (or, alone, from in front of them, turned to the side), every camera on the `side` of the line from the first covered to the second.
-	camera_keyframes::Key coverageKey(const std::vector<const Character *> &cast, const Character *speaker, int side, double t) const {
-		static const Vec3 up{0.0, 1.0, 0.0};
-		const auto flat = [](Vec3 v) { return Vec3{v.x, 0.0, v.z}; };
-		// the line: from the first to the second (one alone: its own left to right)
+	// The line of a coverage at t: from the first covered to the second, on the ground (one alone: its own left to right).
+	Vec3 lineOf(const std::vector<const Character *> &cast, double t) const {
 		Vec3 d;
-		if (cast.size() >= 2) d = flat(headOf(*cast[1], t) - headOf(*cast[0], t));
+		if (cast.size() >= 2) d = headOf(*cast[1], t) - headOf(*cast[0], t);
+		d.y = 0.0;
 		if (length(d) < 1e-6) {
 			const Mat4 f = momentOf(*cast[0], t).frame;
 			d = transformPoint(f, {-1.0, 0.0, 0.0}) - transformPoint(f, {0.0, 0.0, 0.0});   // (its right)
 		}
-		d = normalize(d);
+		return normalize(d);
+	}
+	// The side of the line the cameras keep to when the shot does not say: the one the characters' faces look to (more of them look that way than the other), the first on the left
+	// when it is even.
+	int sideTheyFace(const std::vector<const Character *> &cast, double t) const {
+		const Vec3 d = lineOf(cast, t), n{-d.z, 0.0, d.x};
+		double toward = 0.0;
+		for (const Character *c : cast) {
+			const Mat4 f = momentOf(*c, t).frame;
+			toward += dot(transformPoint(f, {0.0, 0.0, 1.0}) - transformPoint(f, {0.0, 0.0, 0.0}), n);
+		}
+		return toward < -1e-6 ? -1 : 1;
+	}
+	// Where the camera is for a beat at t (story space): `speaker` null for the shot of them all (a two-shot), else a shot of the speaker over the shoulder of the nearest of the
+	// others (or, alone or much smaller than that listener, from in front of them, turned to the side), every camera on the `side` of the line from the first covered to the second.
+	camera_keyframes::Key coverageKey(const std::vector<const Character *> &cast, const Character *speaker, int side, double t) const {
+		static const Vec3 up{0.0, 1.0, 0.0};
+		const auto flat = [](Vec3 v) { return Vec3{v.x, 0.0, v.z}; };
+		const Vec3 d = lineOf(cast, t);
 		const Vec3 n = Vec3{-d.z, 0.0, d.x} * static_cast<double>(side);   // (looking back at the line from here, the first is on the left)
 		const double hfov = 2.0 * std::atan(std::tan(35.0 * kPi / 360.0) * 16.0 / 9.0);
 		if (!speaker) {   // all of them: square on to the line, far enough back for everyone
@@ -1253,8 +1268,24 @@ class DataFilm {
 				bottom = std::min(bottom, feet.y - 0.05 * sizeOf(*c));
 			}
 			for (const Character *c : cast) half = std::max(half, std::abs(dot(flat(headOf(*c, t) - mid), d)) + 0.45 * sizeOf(*c));
-			const double dist = std::max({1.6 * size, half / std::tan(0.5 * hfov) * 1.15, 0.5 * (top - bottom) / std::tan(35.0 * kPi / 360.0) * 1.1});
+			double dist = std::max({1.6 * size, half / std::tan(0.5 * hfov) * 1.15, 0.5 * (top - bottom) / std::tan(35.0 * kPi / 360.0) * 1.1});
 			const Vec3 target{mid.x, 0.5 * (top + bottom), mid.z};
+			// back away until everyone's feet and head, either side of them, are in the frame (one standing off the line, nearer the camera, may not be yet)
+			const double tanH = std::tan(0.5 * hfov) * 0.92, tanV = std::tan(35.0 * kPi / 360.0) * 0.92;
+			for (int i = 0; i < 40; ++i) {
+				const Vec3 eye = target + n * dist + up * (0.1 * size), fwd = normalize(target - eye), right = normalize(cross(fwd, up)), camUp = cross(right, fwd);
+				bool fits = true;
+				for (const Character *c : cast) {
+					const Vec3 feet = bodyPoint(*c, t, {0.0, 0.0, 0.0});
+					const double r = characterKinds().at(c->kind).radius * c->scale;
+					for (const Vec3 &q : {feet + right * r, feet - right * r, feet + up * (1.05 * sizeOf(*c)) + right * r, feet + up * (1.05 * sizeOf(*c)) - right * r}) {
+						const double depth = dot(q - eye, fwd);
+						if (depth <= 0.1 || std::abs(dot(q - eye, right)) > tanH * depth || std::abs(dot(q - eye, camUp)) > tanV * depth) fits = false;
+					}
+				}
+				if (fits) break;
+				dist *= 1.08;
+			}
 			return keyOf(target + n * dist + up * (0.1 * size), target, 35.0, 0.0);
 		}
 		const Vec3 hs = headOf(*speaker, t);
@@ -1262,7 +1293,7 @@ class DataFilm {
 		for (const Character *c : cast)
 			if (c != speaker && (!listener || length(headOf(*c, t) - hs) < length(headOf(*listener, t) - hs))) listener = c;
 		const double size = sizeOf(*speaker);
-		if (!listener) {   // alone: from in front, a third of the way round to the camera side
+		if (!listener || sizeOf(*listener) > 1.6 * size) {   // alone, or small beside the listener (over a tall one's shoulder it would be lost below them): from in front, a third of the way round
 			const Mat4 f = momentOf(*speaker, t).frame;
 			const Vec3 front = normalize(transformPoint(f, {0.0, 0.0, 1.0}) - transformPoint(f, {0.0, 0.0, 0.0}));
 			const Vec3 at = normalize(front * 0.87 + n * 0.5);
@@ -1327,7 +1358,8 @@ class DataFilm {
 				Shot g;
 				g.start = from;
 				g.name = shot.name + (beats.size() == 1 ? std::string() : beats[b].second ? ": " + beats[b].second->name : ": everyone");
-				g.path.keys = {coverageKey(cast, beats[b].second, shot.side, from), coverageKey(cast, beats[b].second, shot.side, std::max(from, to - 1e-3))};
+				const int side = shot.side != 0 ? shot.side : sideTheyFace(cast, t0);
+				g.path.keys = {coverageKey(cast, beats[b].second, side, from), coverageKey(cast, beats[b].second, side, std::max(from, to - 1e-3))};
 				g.path.ease = true;
 				if (b == 0) g.transition = shot.transition;   // (how the auto shot comes in)
 				if (beats[b].second) g.about.push_back(beats[b].second->name);
