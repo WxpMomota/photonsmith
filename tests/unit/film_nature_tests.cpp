@@ -587,3 +587,37 @@ TEST(FilmWeather, WetGroundIsDarkAndGlossySnowSettlesGustsSweepAndMistSurroundsT
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }
+
+// ---- under the sea -------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace underwater = cartoon::underwater;
+
+// Under the film's water the camera is in the sea's medium (ended by a sphere whose top is the surface), the surface is seen from below as thin water, caustics lie on the
+// seabed and a projector shines shafts down; the net of light loops and tiles; kelp sways and coral stands on the seabed.
+TEST(FilmUnderwater, TheCameraIsInTheSeaUnderAThinSurfaceWithCausticsShaftsKelpAndCoral) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("reef", "scene s.pbrt\nlength 10\nwater sea level 0 waves 0.8\nunderwater clarity 1.5 colour teal\nkelp 20 in -10 -20 10 -5 height 8\ncoral 15 in -5 -10 5 -2\nshot 0 Reef\n  key 0 -10 6   0 -12 -20   60\n", film), "");
+	EXPECT_TRUE(film.spec.hasUnderwater);
+	EXPECT_TRUE(film.spec.seas[0].fromBelow);
+	const std::string scene = film.sceneAt(2.0);
+	EXPECT_LT(scene.find("MakeNamedMedium \"sea\""), scene.find("Camera \"")) << "the camera is in the sea";
+	EXPECT_NE(scene.find("MediumInterface \"sea\" \"\""), std::string::npos) << "and the sphere it ends at";
+	EXPECT_NE(scene.find("\"float radius\" [ 3000.000 ]"), std::string::npos) << "so big its top is the surface";
+	EXPECT_NE(scene.find("Material \"thindielectric\""), std::string::npos) << "the surface from below";
+	EXPECT_NE(scene.find("# caustics on the seabed"), std::string::npos);
+	EXPECT_NE(scene.find("LightSource \"projection\""), std::string::npos) << "shafts of light";
+	EXPECT_NE(scene.find("# kelp"), std::string::npos);
+	EXPECT_NE(scene.find("# coral"), std::string::npos);
+	EXPECT_NE(scene.find("# marine snow"), std::string::npos);
+	EXPECT_NE(film.sceneAt(2.0).find(underwater::causticPicture(film.spec.key, underwater::causticFrame(2.0), 512)), std::string::npos);
+	EXPECT_EQ(underwater::causticFrame(0.05), underwater::causticFrame(2.45)) << "the net loops every 2.4 s";
+	EXPECT_NE(underwater::kelpText(film.spec.kelps[0], 0.0, [](double, double) { return -15.0; }), underwater::kelpText(film.spec.kelps[0], 1.0, [](double, double) { return -15.0; })) << "kelp sways";
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"underwater", "needs a `water ... level Y` line"},
+																						 {"water sea level 0\nunderwater\nmist 0.01", "use one"},
+																						 {"water sea level 0\nunderwater clarity 0", "`underwater [clarity C]"},
+																						 {"kelp 0", "`kelp COUNT"}}) {
+		ff::DataFilm bad;
+		const std::string problem = loadNature("reef_bad", "scene s.pbrt\nlength 4\n" + line + "\n", bad);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}

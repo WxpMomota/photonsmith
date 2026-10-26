@@ -120,6 +120,8 @@
 //     wet      0.8  from 4 to 14                                # weather that changes the land: wet (darker, glossy, puddles in the flat hollows), snowcover (snow on the
 //     snowcover 0.7  from 0 to 20                               # ground level enough to hold it), each reached from T0 to T1; `gusts S [wind D] [speed V]`: fronts that
 //     gusts    1.5  wind 90                                     # sweep across the grass and trees; `mist DENSITY [radius R]`: a mist round the camera
+//     underwater  clarity 1.5  colour teal                      # the camera is under the film's water (film_underwater.h): the sea round it, caustics on the seabed, shafts
+//     kelp     60  in -20 -20 20 20  height 9                   # of light, marine snow; kelp swaying and coral (`coral COUNT [in X0 Z0 X1 Z1]`) on the seabed
 //     timelapse 60                                              # nature 60 times faster: the clouds, the water, the aurora, the wind (the camera and the characters not)
 //     exposure auto                                             # (or a factor) the exposure follows the light: 1 by day, opening up through sunset into night
 //     shot 0 Over the valley
@@ -158,6 +160,7 @@
 #include "film_skyfx.h"
 #include "film_camera.h"
 #include "film_terrain.h"
+#include "film_underwater.h"
 #include "film_wildlife.h"
 #include "film_water.h"
 #include "music_cues.h"
@@ -424,6 +427,11 @@ struct Spec {
 	dressing::Gusts gusts;
 	bool hasMist = false;
 	nature::Mist mist;
+	// under the sea (`underwater`, `kelp`, `coral`)
+	bool hasUnderwater = false;
+	underwater::Water underwater;
+	std::vector<underwater::Kelp> kelps;
+	std::vector<underwater::Coral> corals;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	// weather and particles (`weather`, `particles`, `burst`)
@@ -1340,6 +1348,38 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				!(t.size() == 2 || (t.size() == 4 && t[2] == "radius" && number(t[3], s.mist.radius) && s.mist.radius > 1.0)))
 				return fail("`mist DENSITY [radius R]`: scattering per metre (0.02 a light haze, 0.08 a thick mist) round the camera, out to R metres (60)");
 			s.hasMist = true;
+		} else if (verb == "underwater") {
+			const std::vector<std::string> t = detail::tokens(line);
+			for (std::size_t i = 1; i < t.size(); i += 2) {
+				double v = 0.0;
+				if (i + 1 < t.size() && t[i] == "clarity" && number(t[i + 1], v) && v > 0.05 && v <= 10.0) s.underwater.clarity = v;
+				else if (i + 1 < t.size() && t[i] == "colour" && std::find(underwater::colours().begin(), underwater::colours().end(), t[i + 1]) != underwater::colours().end()) s.underwater.colour = t[i + 1];
+				else return fail("`underwater [clarity C] [colour blue|green|teal]`: the camera is under the film's `water` (clarity 1 a clear sea, 2 tropical, 0.5 murky)");
+			}
+			s.hasUnderwater = true;
+		} else if (verb == "kelp" || verb == "coral") {
+			const std::vector<std::string> t = detail::tokens(line);
+			underwater::Kelp kp;
+			underwater::Coral co;
+			double count = 0.0, a = 0.0, b = 0.0, c = 0.0, d = 0.0;
+			if (t.size() < 2 || !number(t[1], count) || count < 1 || count > 2000) return fail("`" + verb + " COUNT [in X0 Z0 X1 Z1]" + (verb == "kelp" ? " [height H]" : "") + " [seed N]` (1 to 2000)");
+			(verb == "kelp" ? kp.count : co.count) = static_cast<int>(count);
+			for (std::size_t i = 2; i < t.size();) {
+				if (t[i] == "in" && i + 4 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c) && number(t[i + 4], d)) {
+					if (verb == "kelp") kp.x0 = std::min(a, c), kp.z0 = std::min(b, d), kp.x1 = std::max(a, c), kp.z1 = std::max(b, d);
+					else co.x0 = std::min(a, c), co.z0 = std::min(b, d), co.x1 = std::max(a, c), co.z1 = std::max(b, d);
+					i += 5;
+				} else if (i + 1 < t.size() && number(t[i + 1], a)) {
+					if (t[i] == "seed") (verb == "kelp" ? kp.seed : co.seed) = static_cast<int>(a);
+					else if (verb == "kelp" && t[i] == "height" && a > 0.0) kp.height = a;
+					else return fail("\"" + t[i] + "\" is not part of a `" + verb + "` line (in X0 Z0 X1 Z1, " + (verb == "kelp" ? "height, " : "") + "seed)");
+					i += 2;
+				} else {
+					return fail("\"" + t[i] + "\" is not part of a `" + verb + "` line");
+				}
+			}
+			if (verb == "kelp") s.kelps.push_back(kp);
+			else s.corals.push_back(co);
 		} else if (verb == "timelapse") {
 			double v = 0.0;
 			if (!number(rest, v) || v < 1.0 || v > 100000.0) return fail("`timelapse FACTOR`: how many times faster the clouds, the water and the wind go (1 to 100000)");
@@ -1468,7 +1508,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1554,6 +1594,18 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 	if (!s.rainbows.empty() && !s.hasSky) {
 		n = 0;
 		return fail("a rainbow is opposite the sun: the film needs a `sky` line");
+	}
+	if (s.hasUnderwater) {   // under the film's water: its surface seen from below
+		if (s.seas.empty()) {
+			n = 0;
+			return fail("`underwater` puts the camera under the film's water: it needs a `water ... level Y` line");
+		}
+		if (s.hasMist) {
+			n = 0;
+			return fail("`underwater` and `mist` both fill the air round the camera: use one");
+		}
+		s.seas[0].fromBelow = true;
+		s.seas[0].foam = false;
 	}
 	for (skyfx::Lightning &l : s.lightnings) l.strikes = skyfx::strikesOf(l, s.length);
 	for (skyfx::Aurora &a : s.auroras)
@@ -2801,6 +2853,28 @@ class DataFilm {
 	std::string worldAt(const std::string &header, double t) const {
 		std::string out = film_camera::exposed(header, exposureAt(t));
 		const double nt = t * spec.timelapse;   // (nature's time: the clouds, the water, the aurora, the wind)
+		if (spec.hasUnderwater) {   // under the sea (film_underwater.h): the water round the camera, the light coming down through it, what drifts and grows in it
+			Vec3 eye, target;
+			double fov = 40.0;
+			film_subjects::cameraOf(header, eye, target, fov);
+			const std::size_t camera = out.find("Camera \"");
+			if (camera != std::string::npos) out = out.substr(0, camera) + underwater::beforeCamera(spec.underwater) + out.substr(camera) + underwater::boundary(Vec3{eye.x, spec.seas[0].level - 3000.0, eye.z}, 3000.0);   // (a sphere so big its top is the surface: the water below it, the sun down through its depth)
+			const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+			const double floorY = spec.seas[0].level - 15.0;
+			const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : floorY); };
+			const std::string film = spec.key.empty() ? std::string("film") : spec.key;
+			if (!ground) {   // (no terrain: a plain sandy floor 15 m down)
+				char buf[320];
+				std::snprintf(buf, sizeof buf, "AttributeBegin\n  Material \"diffuse\" \"rgb reflectance\" [ 0.5 0.44 0.32 ]\n  Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 0 2 3 ] \"point3 P\" [ -2000 %.3f -2000  2000 %.3f -2000  2000 %.3f 2000  -2000 %.3f 2000 ]\nAttributeEnd\n",
+							  floorY, floorY, floorY, floorY);
+				out += buf;
+			}
+			out += underwater::causticText(film, nt, -eye.x, eye.z, groundAt);
+			out += underwater::shaftsText(film, nt, Vec3{-eye.x, eye.y, eye.z}, spec.seas[0].level);
+			out += underwater::snowText(t, eye);
+			for (const underwater::Kelp &k : spec.kelps) out += underwater::kelpText(k, nt, groundAt);
+			for (const underwater::Coral &c : spec.corals) out += underwater::coralText(c, groundAt);
+		}
 		if (spec.hasMist) {   // a mist round the camera (nature_lib.h: the camera's own medium, ended by a sphere round it, so the sun and sky outside light it)
 			Vec3 eye, target;
 			double fov = 40.0;

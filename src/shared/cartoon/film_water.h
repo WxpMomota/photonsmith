@@ -32,6 +32,7 @@ struct Sea {
 	double level = 0.0, waves = 0.8, wind = 0.0, choppy = 0.65;
 	std::string kind = "sea";
 	bool foam = true;
+	bool fromBelow = false;   // (film_underwater.h) seen from under it: a thin water surface, which lets the sun's light down
 };
 // A river: its waypoints (pbrt's x z), its width and its speed (metres a second), its surface's height when there is no terrain under it. On a terrain a river may
 // instead start at one point and find its own way downhill (`from`), or run along a canyon's riverbed (`canyon`).
@@ -146,6 +147,7 @@ inline void seaAt(const Sea &s, double x, double z, double t, double rippleWeigh
 inline std::string shoreText(const Sea &s, double t, const terrain::Field &ground);
 
 inline std::string seaMaterial(const Sea &s) {
+	if (s.fromBelow) return "Material \"thindielectric\" \"float eta\" [ 1.333 ]";
 	if (s.kind == "clear") return glassMaterial(1.333, 0.0);
 	return s.kind == "lake" ? coated({0.025, 0.06, 0.045}, 0.0) : coated({0.015, 0.055, 0.07}, 0.0);   // (a smooth coat over the colour of deep water: the sky in the coat)
 }

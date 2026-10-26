@@ -886,6 +886,27 @@ along `wind`, bending grass, bushes and trees as they pass (a sharp front, easin
 by a sphere round the camera (nature_lib.h's Mist: the sun and sky outside light it, so a low sun draws shafts), rendered with the wavefront renderer. Fog banks lying on the
 land as volumes were tried and left out: a medium in a sphere with the land inside it is drawn wrongly by the GPU renderers.
 
+**Under the sea: `underwater`, `kelp`, `coral`.** (film_underwater.h)
+
+```
+terrain    dunes  size 400  height 6  y -20  seed 3  far off   # a sandy seabed 20 m down
+water      sea  level 0  waves 0.8
+underwater clarity 2  colour teal                         # blue, green or teal; clarity 1 a clear sea (about 25 m), 2 tropical, 0.5 murky
+kelp       50  in -25 -45 25 -10  height 10
+coral      40  in -10 -20 10 -5
+flock      fish 80  at 0 5 -18  radius 5
+```
+
+The camera is in the sea: its own medium, which absorbs red fastest and blue slowest and scatters the blue-green glow all round, ended by a sphere 3 km across whose top is
+the water's surface, so everything under the surface is water (near enough) and the sun and sky light it down through its depth - a sphere round the camera instead lit the
+water through its whole height and showed its edge. (It is drawn with the wavefront renderer.) The surface is seen from below as a thin water surface, which lets the sun
+through. Caustics - the net of light the waves focus onto the seabed - are a decal on the seabed round the camera: sand coloured by a picture of the net (two layers of moving
+cells, bright along their edges, tileable, a loop of 24 pictures over 2.4 s), tiled every 4 m; a projector above the camera shines a coarse version of the same net down
+through the water, so the medium shows shafts of light (the GPU renderers read a projector's picture at 64 x 64 at most: shafts, not lines). Marine snow drifts down round the
+camera. Kelp rises in gentle curves with blades along it, swaying with the swell; corals - lumpy brain corals, branching corals and tube sponges - stand in bright colours on the
+seabed (on a terrain, its ground; otherwise a sandy floor 15 m under the surface). `underwater` needs the film's `water` line, and fills the air round the camera, so it does not go
+with `mist`.
+
 **Music that follows the film.** Three things (music_cues.h, film_score.h):
 
 - *Ducking.* A film file's music cues are mixed on their own and laid on the soundtrack brought down under the characters' lines - by up to two thirds while a line is
