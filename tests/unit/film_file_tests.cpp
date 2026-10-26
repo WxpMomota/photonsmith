@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <regex>
+#include <set>
 #include <string>
 
 #include "../../src/shared/cartoon/cartoons.h"
@@ -1276,4 +1277,49 @@ TEST(FilmCamera, OrbitCranePushTrackHandheldAndAFocusPull) {
 	ff::DataFilm bad;
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter ann person\nshot 0 A\n  orbit ann\n  key 0 1 0 0 1 4\n", bad).find("has a move and"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter ann person\nshot 0 A\n  orbit ann side 3\n", bad).find("an orbit takes"), std::string::npos);
+}
+
+// ---- crowds ----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// A crowd is so many extras of varied looks, each wandering in a cell of its own of the rectangle (they never meet), the same every time the film is loaded; they are not in
+// an `auto` shot's cast unless named.
+TEST(FilmCrowd, ExtrasOfVariedLooksWanderInCellsOfTheirOwn) {
+	(void)cartoon::films();
+	const std::string text = "scene s.pbrt\nlength 20\ncrowd folk person 6 in 3 -6 9 -2 seed 4\ncharacter ann person at -3 0 2\ncharacter bo person at -3 0 4\n"
+							 "say ann 1 \"Look at them all.\"\nshot 0 Talk\n  auto\n";
+	ff::DataFilm film, again;
+	ASSERT_EQ(loadFilm(text, film), "");
+	ASSERT_EQ(loadFilm(text, again), "");
+	ASSERT_EQ(film.spec.characters.size(), 8u);
+	std::set<std::string> sweaters;
+	for (std::size_t i = 0; i < 6; ++i) {
+		const ff::Character &c = film.spec.characters[i];
+		EXPECT_TRUE(c.extra);
+		EXPECT_EQ(c.name, "folk-" + std::to_string(i + 1));
+		EXPECT_GT(c.walks.size(), 1u) << "it wanders";
+		const cartoon::Vec3 col = c.colours.at("sweater");
+		char buf[64];
+		std::snprintf(buf, sizeof buf, "%.3f %.3f %.3f", col.x, col.y, col.z);
+		sweaters.insert(buf);
+		EXPECT_EQ(c.start[0], again.spec.characters[i].start[0]) << "the same every time";
+	}
+	EXPECT_GE(sweaters.size(), 3u) << "varied looks";
+	// over the film: inside the rectangle, and never two closer than their sizes
+	for (double t = 0.0; t < 20.0; t += 0.25) {
+		std::vector<cartoon::Vec3> at;
+		for (std::size_t i = 0; i < 6; ++i) {
+			cartoon::Vec3 p;
+			film.momentOf(film.spec.characters[i], t, &p);
+			EXPECT_GE(-p.x, 3.0 - 1e-6);
+			EXPECT_LE(-p.x, 9.0 + 1e-6);
+			EXPECT_GE(p.z, -6.0 - 1e-6);
+			EXPECT_LE(p.z, -2.0 + 1e-6);
+			at.push_back(p);
+		}
+		for (std::size_t a = 0; a < at.size(); ++a)
+			for (std::size_t b = a + 1; b < at.size(); ++b) EXPECT_GT(std::hypot(at[a].x - at[b].x, at[a].z - at[b].z), 0.5) << "t " << t;
+	}
+	for (const ff::Shot &s : film.spec.shots)
+		for (const std::string &who : s.about) EXPECT_EQ(who.rfind("folk", 0), std::string::npos) << s.name << " is about " << who;
+	EXPECT_NE(film.sceneAt(5.0).find("# folk-6 (person)"), std::string::npos);
 }

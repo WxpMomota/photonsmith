@@ -710,6 +710,13 @@ is a short example: three characters, four lines.
 With three or more, the coverage now keeps its cameras on the side the characters' faces look to (unless the shot says `side`), backs its two-shot away until everyone is in
 the frame, and shoots a speaker much smaller than the one they speak to from in front rather than over a tall shoulder.
 
+**Crowds: `crowd NAME KIND COUNT in X0 Z0 X1 Z1 [seed S] [from T] [to T]`.** Extras for the background: `crowd folk person 10 in -6 -9 6 -3 seed 2` brings in ten people
+named folk-1 to folk-10. The rectangle is cut into a cell each (so they never meet) and each wanders in its own: a pause of 1.5 to 5 s, a walk that finds its way to another
+place in its cell at a pace of its own, a pause ... from `from` until `to` (or the film's end). Each has its own look - a person's sweater, trousers, hair and skin from a
+palette, Pip's skin and size, the turtle's shell and size - and idle life, and they turn to whoever speaks. The same seed gives the same crowd every time. A crowd is left out
+of the walking-into-each-other check and of an `auto` shot's cast (unless the shot names them); a character's own walks go round the extras standing where it walks. Ten
+people and four Pips load in about a second and a half and render in about 5.5 s a frame at 480 x 270.
+
 **Uneven ground.** Characters stand and walk on the set's own floor: up a ramp or a flight of steps onto a platform, over a hill, down again (film_paths.h, `Terrain`).
 The set is read as columns: in each cell of a map (5 to 12 cm), the heights each thing spans there. A walker's floor is found from where it stands a cell at a time - the
 highest surface within a step of the floor beside it (a step is 0.17 of the character's height: 0.3 m for a person) that is level enough to stand on (25 degrees at most: a

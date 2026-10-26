@@ -57,6 +57,8 @@
 //     say        kai  14.4 "Look, the first star."  rate 1.1  pitch 2   # NAME, a line it says from 14.4 s: its voice, its mouth and a caption (film_speech.h; `nocaption`)
 //     feel       pip  happy 3 3.5 6 6.8  amount 0.8             # NAME, an expression on its face eased in and out (film_faces.h: happy, sad, angry, surprised, ...)
 //     look       pip  at ann 2 2.5 8 8.5                        # NAME turns its head and eyes to someone, a prop or a point (`at X Y Z`) and back
+//     crowd      folk person 12 in -8 -12 8 -4  seed 3          # NAME KIND COUNT in X0 Z0 X1 Z1: extras of varied looks that wander, pause and turn, each in a cell of its
+//                                                               # own (`from T`, `to T`: when they wander); not in the crowding check or an `auto` shot unless named
 //     idle       off                                            # (a film line) no idle life: by default a character breathes, shifts its weight, darts its eyes,
 //                                                               # turns to whoever speaks and looks at the one it speaks to (film_kinds.h; a `look` line wins)
 //
@@ -196,6 +198,7 @@ struct Character {
 	double detail = 0.0;                 // the kind's sculpting cell (0: its own)
 	double scale = 1.0;                  // its size (a kind that can be scaled: a child Pip 0.6, a turtle as big as a dog 6)
 	std::map<std::string, Vec3> colours; // the colours of its parts (`sweater red`): the kind's names for them
+	bool extra = false;                  // one of a crowd (`crowd`): in the background
 	std::vector<WalkLine> walks;
 	std::vector<rig::Gesture> gestures;
 	std::vector<faces::Feeling> feelings;   // its expressions (`feel`)
@@ -419,6 +422,75 @@ inline std::string keyFromFileName(const std::string &path) {
 
 }  // namespace detail
 
+// A crowd's extras (`crowd`): `count` characters of a kind named NAME-1, NAME-2 ..., each in a cell of its own of the rectangle (so they never meet), with looks of their own
+// (colours from a palette of the kind's parts, a size for a kind that can be scaled), wandering from `from` to `until`: a pause, a walk that finds its way to another place in
+// its cell, a pause ... - all from `seed`, the same every time.
+inline std::vector<Character> crowdOf(const std::string &name, const std::string &kindName, int count, double x0, double z0, double x1, double z1, int seed, double from, double until, int line) {
+	std::vector<Character> out;
+	const auto kindIt = characterKinds().find(kindName);
+	const double radius = kindIt == characterKinds().end() ? 0.4 : kindIt->second.radius;
+	const bool scalable = kindIt != characterKinds().end() && kindIt->second.scalable;
+	const double w = std::max(0.1, x1 - x0), d = std::max(0.1, z1 - z0);
+	const int cols = std::max(1, static_cast<int>(std::ceil(std::sqrt(count * w / d)))), rows = (count + cols - 1) / cols;
+	const double cw = w / cols, cd = d / rows;
+	std::vector<int> cells(static_cast<std::size_t>(cols * rows));
+	for (std::size_t i = 0; i < cells.size(); ++i) cells[i] = static_cast<int>(i);
+	for (std::size_t i = cells.size(); i > 1; --i) std::swap(cells[i - 1], cells[static_cast<std::size_t>(hash01(seed * 7 + static_cast<int>(i), 991) * i)]);   // (which cells, shuffled)
+	static const char *tones[] = {"red", "orange", "yellow", "green", "teal", "blue", "navy", "purple", "pink", "brown", "cream", "olive", "lilac", "mint", "sky", "crimson", "peach", "denim"};
+	static const char *hair[] = {"black", "brown", "dark", "blond", "ginger", "grey"};
+	static const char *skin[] = {"pale", "peach", "tan", "brown", "dark"};
+	const auto pick = [&](const char *const *list, int n, int i, int k) { Vec3 c; colourOf(list[static_cast<int>(hash01(seed * 131 + i, k) * n) % n], c); return c; };
+	for (int i = 0; i < count; ++i) {
+		Character c;
+		c.name = name + "-" + std::to_string(i + 1);
+		c.kind = kindName;
+		c.line = line;
+		c.extra = true;
+		const int cell = cells[static_cast<std::size_t>(i)];
+		const double cx0 = x0 + (cell % cols) * cw, cz0 = z0 + (cell / cols) * cd;
+		const double scale = scalable ? (kindName == "turtle" ? 4.0 + 2.0 * hash01(seed * 17 + i, 5) : 0.7 + 0.35 * hash01(seed * 17 + i, 5)) : 1.0;
+		c.scale = scale;
+		const double margin = std::min(0.45 * std::min(cw, cd), radius * scale + 0.25);
+		const auto spot = [&](int k) {   // a place in its cell, clear of the cell's edges by its size
+			return std::make_pair(cx0 + margin + (cw - 2.0 * margin) * hash01(seed * 37 + i * 11 + k, 1), cz0 + margin + (cd - 2.0 * margin) * hash01(seed * 37 + i * 11 + k, 2));
+		};
+		const auto [sx, sz] = spot(0);
+		c.start[0] = sx, c.start[1] = 0.0, c.start[2] = sz;
+		c.facing = 360.0 * hash01(seed * 41 + i, 3);
+		if (kindName == "person") {
+			c.colours["sweater"] = pick(tones, 18, i, 11);
+			c.colours["trousers"] = pick(tones, 18, i, 12) * 0.6;
+			c.colours["hair"] = pick(hair, 6, i, 13);
+			c.colours["skin"] = pick(skin, 5, i, 14);
+		} else if (kindName == "pip") {
+			c.colours["skin"] = pick(tones, 18, i, 11);
+		} else if (kindName == "turtle") {
+			c.colours["shell"] = pick(tones, 18, i, 11);
+		}
+		// wandering: pauses and walks to places in its cell, a walk's time allowed generously (it finds its own way)
+		double t = from + 3.0 * hash01(seed * 43 + i, 4);
+		const double speed = (0.55 + 0.4 * hash01(seed * 47 + i, 6)) * (kindName == "person" ? 1.0 : 0.6) * std::sqrt(scale);
+		double px = sx, pz = sz;
+		for (int k = 1; t < std::min(until, 1e4) - 1.0 && k < 400; ++k) {
+			const auto [tx, tz] = spot(k);
+			const double dist = std::hypot(tx - px, tz - pz);
+			if (dist > 0.3) {
+				WalkLine wl;
+				wl.t0 = t;
+				wl.speed = speed;
+				wl.targets.push_back({tx, tz});
+				wl.line = line;
+				c.walks.push_back(wl);
+				t += dist / speed * 1.6 + 0.5;
+				px = tx, pz = tz;
+			}
+			t += 1.5 + 3.5 * hash01(seed * 53 + i * 13 + k, 7);   // (a pause)
+		}
+		out.push_back(c);
+	}
+	return out;
+}
+
 // Reads a film file's text. `where` names it in the messages. The scene is not read here (see load()), so the names it animates are not yet checked.
 inline Parsed parse(const std::string &text, const std::string &where) {
 	using detail::number;
@@ -562,6 +634,25 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				s.topples.push_back({t[1], p});
 			}
 			s.physicsLines.push_back({t[1], n});
+		} else if (verb == "crowd") {
+			const std::vector<std::string> t = detail::tokens(line);
+			double count = 0.0, x0 = 0.0, z0 = 0.0, x1 = 0.0, z1 = 0.0;
+			if (t.size() < 9 || !number(t[3], count) || count < 1 || count > 200 || t[4] != "in" || !number(t[5], x0) || !number(t[6], z0) || !number(t[7], x1) || !number(t[8], z1))
+				return fail("`crowd NAME KIND COUNT in X0 Z0 X1 Z1 [seed S] [from T] [to T]` (1 to 200 of them)");
+			double seed = 1.0, from = 0.0, until = 1e30;
+			for (std::size_t i = 9; i < t.size(); i += 2) {
+				double v = 0.0;
+				if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail("a crowd takes seed, from and to, each with a number");
+				if (t[i] == "seed") seed = v;
+				else if (t[i] == "from") from = v;
+				else if (t[i] == "to") until = v;
+				else return fail("\"" + t[i] + "\": a crowd takes seed, from and to");
+			}
+			const std::vector<Character> folk = crowdOf(t[1], t[2], static_cast<int>(count), std::min(x0, x1), std::min(z0, z1), std::max(x0, x1), std::max(z0, z1), static_cast<int>(seed), from, until, n);
+			for (const Character &c : folk)
+				for (const Character &other : s.characters)
+					if (other.name == c.name) return fail("there is already a character called " + c.name);
+			s.characters.insert(s.characters.end(), folk.begin(), folk.end());
 		} else if (verb == "character") {
 			const std::vector<std::string> t = detail::tokens(line);
 			if (t.size() < 3) return fail("`character NAME KIND [at X Y Z] [facing DEGREES] [scale S] [detail CELL]`");
@@ -980,7 +1071,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -998,6 +1089,8 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			n = shotLine;
 			return fail("the shot \"" + shot.name + "\" starts at " + std::to_string(shot.start) + ", after the film's end");
 		}
+	for (Character &c : s.characters)   // (a crowd's wandering was made before the film's length was known: what starts after the film ends is not walked)
+		if (c.extra) c.walks.erase(std::remove_if(c.walks.begin(), c.walks.end(), [&](const WalkLine &w) { return w.t0 > s.length - 1.0; }), c.walks.end());
 	r.ok = true;
 	return r;
 }
@@ -1436,6 +1529,7 @@ class DataFilm {
 			for (std::size_t a = 0; a < spec.characters.size(); ++a)
 				for (std::size_t b = a + 1; b < spec.characters.size(); ++b) {
 					const Character &ca = spec.characters[a], &cb = spec.characters[b];
+					if (ca.extra || cb.extra) continue;   // (a crowd keeps to its cells; the others are told of each other)
 					Vec3 pa, pb;
 					const bool movingA = momentOf(ca, t, &pa).moving, movingB = momentOf(cb, t, &pb).moving;
 					if (!movingA && !movingB) continue;
@@ -1573,7 +1667,7 @@ class DataFilm {
 				for (std::size_t i : lines)
 					if (std::find(cast.begin(), cast.end(), character(spec.lines[i].who)) == cast.end()) cast.push_back(character(spec.lines[i].who));
 				for (const Character &c : spec.characters)
-					if (std::find(cast.begin(), cast.end(), &c) == cast.end()) cast.push_back(&c);
+					if (!c.extra && std::find(cast.begin(), cast.end(), &c) == cast.end()) cast.push_back(&c);
 			}
 			if (cast.empty()) return "the shot \"" + shot.name + "\" is `auto` but the film has no characters to cover";
 			// the beats: who is on screen from when
