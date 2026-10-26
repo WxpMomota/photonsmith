@@ -117,6 +117,11 @@
 //     aurora   green  brightness 1.2  during 4 30               # the sky's spectacles (film_skyfx.h): curtains of light (green, red or violet; `facing D`, `distance M`),
 //     lightning 5  at 0 -3000  radius 2000  during 2 20         # strikes with their flash and thunder (`base H`, `seed N`), shooting stars (`meteors COUNT`), and
 //     rainbow  0.8  during 6 16                                 # a rainbow opposite the sun (the `sky` line's); at night the sky has its stars, turning with the hours
+//     timelapse 60                                              # nature 60 times faster: the clouds, the water, the aurora, the wind (the camera and the characters not)
+//     exposure auto                                             # (or a factor) the exposure follows the light: 1 by day, opening up through sunset into night
+//     shot 0 Over the valley
+//       fly  -800 200  0 -100  600 -600  height 80  look 0 40 -900   # (instead of `key` lines) a drone over waypoints at a height above the land, smoothed, looking ahead and
+//                                                               # down (or at a point; `fov F`)
 //
 // Weather and particles (film_particles.h):
 //
@@ -148,6 +153,7 @@
 #include "film_clouds.h"
 #include "film_forest.h"
 #include "film_skyfx.h"
+#include "film_camera.h"
 #include "film_terrain.h"
 #include "film_wildlife.h"
 #include "film_water.h"
@@ -202,6 +208,11 @@ struct Shot {
 		double fov = 0.0;
 	} move;
 	double handheld = 0.0;
+	// (`fly`) a drone's flight over waypoints (pbrt's x z), a height above the land (smoothed so it does not bob over every rise), looking ahead and down or at a point
+	std::vector<std::pair<double, double>> fly;
+	double flyHeight = 60.0, flyFov = 0.0;
+	bool flyLook = false;
+	Vec3 flyAt;
 	std::vector<std::pair<double, std::string>> focus;   // who is in focus from when (the first from the shot's start)
 	double aperture = 0.0;
 };
@@ -398,6 +409,9 @@ struct Spec {
 		double strength = 0.8, t0 = 0.0, t1 = 1e30;
 	};
 	std::vector<Rainbow> rainbows;
+	// how fast nature runs (`timelapse`: the clouds, the water, the aurora, the wind in the trees), and the exposure (`exposure`: a factor, or `auto` - following the light)
+	double timelapse = 1.0, exposure = 1.0;
+	bool exposureAuto = false;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	// weather and particles (`weather`, `particles`, `burst`)
@@ -557,6 +571,10 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		if (s.shots.empty()) return std::string();
 		if (s.shots.back().move.kind != Shot::Move::None) {
 			if (!shotText.empty() || s.shots.back().following || s.shots.back().coverage) return "the shot \"" + s.shots.back().name + "\" has a move and `key`, `follow` or `auto` lines too";
+			return std::string();
+		}
+		if (!s.shots.back().fly.empty()) {
+			if (!shotText.empty() || s.shots.back().following || s.shots.back().coverage) return "the shot \"" + s.shots.back().name + "\" has a `fly` line and `key`, `follow` or `auto` lines too";
 			return std::string();
 		}
 		if (s.shots.back().following || s.shots.back().coverage) {
@@ -1263,6 +1281,44 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			s.idle = w[1] == "on";
 		} else if (verb == "fadeout") {
 			if (w.size() != 2 || !number(w[1], s.fadeOut) || s.fadeOut <= 0.0) return fail("`fadeout SECONDS`: the fade to black at the end");
+		} else if (verb == "fly") {
+			if (s.shots.empty()) return fail("`fly` belongs to a shot: start one with `shot 0 NAME` first");
+			const std::vector<std::string> t = detail::tokens(line);
+			Shot &shot = s.shots.back();
+			std::size_t i = 1;
+			for (; i + 1 < t.size(); i += 2) {
+				double x = 0.0, z = 0.0;
+				if (!number(t[i], x) || !number(t[i + 1], z)) break;
+				shot.fly.push_back({x, z});
+			}
+			for (; i < t.size();) {
+				double a = 0.0, b = 0.0, c = 0.0;
+				if (t[i] == "look" && i + 3 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c)) {
+					shot.flyLook = true, shot.flyAt = Vec3{a, b, c};
+					i += 4;
+				} else if ((t[i] == "height" || t[i] == "fov") && i + 1 < t.size() && number(t[i + 1], a) && a > 0.0) {
+					(t[i] == "height" ? shot.flyHeight : shot.flyFov) = a;
+					i += 2;
+				} else {
+					return fail("\"" + t[i] + "\": `fly X Z X Z [X Z ...] [height H] [look X Y Z] [fov F]` (waypoints, pbrt's x z; heights above the land)");
+				}
+			}
+			if (shot.fly.size() < 2) return fail("`fly X Z X Z [X Z ...] [height H] [look X Y Z] [fov F]`: at least two waypoints");
+		} else if (verb == "timelapse") {
+			double v = 0.0;
+			if (!number(rest, v) || v < 1.0 || v > 100000.0) return fail("`timelapse FACTOR`: how many times faster the clouds, the water and the wind go (1 to 100000)");
+			s.timelapse = v;
+		} else if (verb == "exposure") {
+			const std::vector<std::string> t = detail::tokens(line);
+			double v = 0.0;
+			if (t.size() >= 2 && t[1] == "auto" && t.size() <= 3 && (t.size() == 2 || (number(t[2], v) && v > 0.0))) {
+				s.exposureAuto = true;
+				if (t.size() == 3) s.exposure = v;
+			} else if (t.size() == 2 && number(t[1], v) && v > 0.0) {
+				s.exposure = v;
+			} else {
+				return fail("`exposure auto [KEY]` (follows the light: day, sunset, night) or `exposure FACTOR`");
+			}
 		} else if (verb == "orbit" || verb == "crane" || verb == "push" || verb == "track" || verb == "handheld" || verb == "focus" || verb == "aperture") {
 			if (s.shots.empty()) return fail("`" + verb + "` belongs to a shot: start one with `shot 0 NAME` first");
 			const std::vector<std::string> t = detail::tokens(line);
@@ -1376,7 +1432,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1423,6 +1479,8 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				k.pos[1] += ground->heightAt(k.pos[0], k.pos[2]);
 				k.target[1] += ground->heightAt(k.target[0], k.target[2]);
 			}
+		for (Shot &shot : s.shots)
+			if (shot.flyLook) shot.flyAt.y += ground->heightAt(shot.flyAt.x, shot.flyAt.z);
 		for (dressing::Placement &p : s.placements) p.at.y += ground->heightAt(p.at.x, p.at.z);
 		for (Character &c : s.characters) c.start[1] += ground->heightAt(c.start[0], c.start[2]);
 	}
@@ -1441,6 +1499,11 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			wildlife::prepare(f, s.length);
 		}
+	}
+	{   // the drones' flights: keys along each `fly` (the camera_keyframes path is spaced by distance, so the drone goes at an even pace, easing at its ends)
+		const std::shared_ptr<const terrain::Field> ground = s.hasTerrain ? terrain::fieldOf(s.terrain) : nullptr;
+		for (Shot &shot : s.shots)
+			if (!shot.fly.empty()) shot.path = film_camera::flight(shot.fly, shot.flyHeight, shot.flyLook, shot.flyAt, shot.flyFov, ground.get());
 	}
 	for (const water::Fall &f : s.falls) {   // a waterfall throws up spray where it lands, the whole film long
 		particles::Emitter e;
@@ -2673,6 +2736,13 @@ class DataFilm {
 		return t;
 	}
 
+	// The exposure at t: the film's factor, and (`exposure auto`) one that follows the light - 1 by day, opening up through sunset to about 30 times at night.
+	double exposureAt(double t) const {
+		if (!spec.exposureAuto || !spec.hasSky) return spec.exposure;
+		double el = 0.0, facing = 0.0;
+		dressing::sunAt(spec.sky, dressing::hourAt(spec.sky, t, spec.length), el, facing);
+		return spec.exposure * film_camera::autoExposure(el);
+	}
 	// The thunder of its lightning, each strike heard as long after as sound takes to come from it to the camera at its time.
 	void thunder(audio::Mix &m) const {
 		for (const skyfx::Lightning &l : spec.lightnings)
@@ -2685,7 +2755,8 @@ class DataFilm {
 	}
 	// The scene with this header at t: the set, its animated blocks, its dressing, its sky and its characters.
 	std::string worldAt(const std::string &header, double t) const {
-		std::string out = header;
+		std::string out = film_camera::exposed(header, exposureAt(t));
+		const double nt = t * spec.timelapse;   // (nature's time: the clouds, the water, the aurora, the wind)
 		if (spec.hasSky) {
 			double rainbow = 0.0;   // (eased in and out over two seconds)
 			for (const Spec::Rainbow &r : spec.rainbows) rainbow = std::max(rainbow, r.strength * smoothstep(r.t0, r.t0 + 2.0, t) * (1.0 - smoothstep(r.t1 - 2.0, r.t1, t)));
@@ -2700,16 +2771,16 @@ class DataFilm {
 			for (const particles::Weather &w : spec.weather) out += particles::weatherText(w, t, at, spec.shutter / std::max(1, spec.fps));
 			for (const particles::Emitter &e : spec.emitters) out += particles::emitterText(e, t);
 		}
-		for (const clouds::Clouds &c : spec.cloudLayers) out += clouds::text(spec.key.empty() ? std::string("film") : spec.key, c, t);   // (film_clouds.h)
+		for (const clouds::Clouds &c : spec.cloudLayers) out += clouds::text(spec.key.empty() ? std::string("film") : spec.key, c, nt);   // (film_clouds.h)
 		if (!spec.seas.empty() || !spec.rivers.empty() || !spec.falls.empty()) {   // water (film_water.h)
 			Vec3 eye, target;
 			double fov = 40.0;
 			film_subjects::cameraOf(header, eye, target, fov);
 			const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 			const double aspect = 16.0 / 9.0, hfov = 2.0 * std::atan(std::tan(fov * kPi / 360.0) * aspect) * 180.0 / kPi;   // (a film's fov is its shorter side's)
-			for (const water::Sea &sea : spec.seas) out += water::seaText(sea, t, eye, target, hfov, ground.get());
-			for (const water::River &r : spec.rivers) out += water::riverText(r, t, ground.get());
-			for (const water::Fall &f : spec.falls) out += water::fallText(f, t, ground.get());
+			for (const water::Sea &sea : spec.seas) out += water::seaText(sea, nt, eye, target, hfov, ground.get());
+			for (const water::River &r : spec.rivers) out += water::riverText(r, nt, ground.get());
+			for (const water::Fall &f : spec.falls) out += water::fallText(f, nt, ground.get());
 		}
 		if (!spec.auroras.empty() || !spec.lightnings.empty() || !spec.meteors.empty()) {   // the sky's spectacles (film_skyfx.h)
 			const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
@@ -2741,7 +2812,7 @@ class DataFilm {
 			double fov = 40.0;
 			film_subjects::cameraOf(header, eye, target, fov);
 			for (std::size_t i = 0; i < spec.forests.size() && i < spec.planted.size(); ++i)
-				out += forest::text(spec.key.empty() ? std::string("film") : spec.key, spec.planted[i], spec.forests[i].season, t, eye, spec.forests[i].fullWithin);
+				out += forest::text(spec.key.empty() ? std::string("film") : spec.key, spec.planted[i], spec.forests[i].season, nt, eye, spec.forests[i].fullWithin);
 		}
 		for (const Piece &piece : scene.world) {
 			if (piece.block < 0) {

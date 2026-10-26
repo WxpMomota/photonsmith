@@ -847,6 +847,26 @@ that lights the clouds from inside and the land; its thunder comes as long after
 rolls of rumble, quieter the further off). Meteors streak across a stretch of the upper sky in under a second, a bright head and a fading tail. Night scenes are dark: use
 the film's exposure (`--exposure`, or the auto-exposure of feature 7 below).
 
+**Aerial and time-lapse cameras, and an exposure that follows the light: `fly`, `timelapse`, `exposure`.** (film_camera.h)
+
+```
+timelapse 60                                   # nature 60 times faster: the clouds, the water, the wind in the trees
+exposure  auto                                 # 1 by day, opening up through sunset to about 30 times at night (`exposure auto 1.5`: a key; `exposure 4`: fixed)
+sky       19:30 22:30  south 180  latitude 46  # three hours of sunset into night over the film
+shot 0 Over the valley
+  fly  -500 400  -100 100  200 -200  500 -700  height 70     # (instead of `key` lines) waypoints, pbrt's x z
+```
+
+A `fly` is a drone's flight: its waypoints smoothed into a path; the drone keeps `height` metres above the land - above the highest ground from 40 m behind it to 80 m ahead
+(so it rises before a ridge instead of skimming it), smoothed again over 50 m each way so it does not bob over every hump, and never lower than half its height - and looks 400 m
+ahead along its way and gently down (the horizon in the picture), or at a point (`look X Y Z`, its height above the land there; `fov F`). It becomes the shot's camera keys,
+spaced along the path, so the drone goes at an even pace, easing in at the start and out at the end; a `fly` shot has no `key` lines.
+
+`timelapse F` runs nature F times faster than the film - the clouds drift, the waves roll, rivers and waterfalls run and the trees sway at F times their pace - while the
+camera, the characters and the animals keep theirs; the sun and the stars go as the `sky` line's hours say (three hours over twenty seconds is a time-lapse already). `exposure
+auto` follows the sun: 1 by day (8 degrees up and higher), opening up smoothly to about 30 times (2^4.9) when it is 12 degrees below the horizon, so a film that runs from
+sunset into night stays readable; it is written into each frame's Film line as pbrt's `"float iso"` (100 times the exposure, or the set's own iso multiplied by it).
+
 **Music that follows the film.** Three things (music_cues.h, film_score.h):
 
 - *Ducking.* A film file's music cues are mixed on their own and laid on the soundtrack brought down under the characters' lines - by up to two thirds while a line is

@@ -489,3 +489,48 @@ TEST(FilmSkyFx, LightningFlashesInStrokesAndThunderFollowsAurorasHangAndRainbows
 	ff::DataFilm bad;
 	EXPECT_NE(loadNature("skyfx_bad", "scene s.pbrt\nlength 4\nrainbow 0.5\n", bad).find("needs a `sky` line"), std::string::npos);
 }
+
+// ---- aerial and time-lapse cameras, exposure -----------------------------------------------------------------------------------------------------------------------------------
+
+namespace film_camera = cartoon::film_camera;
+
+// A drone flies its waypoints at its height above the land (never lower than half of it, smoothed), looking ahead; time-lapse runs nature faster; the exposure follows
+// the light from day into night, written into the Film line.
+TEST(FilmCamera, DronesKeepAboveTheLandTimeLapseRunsNatureAndExposureFollowsTheLight) {
+	terrain::Spec ts;
+	ts.kind = "mountains", ts.size = 800.0, ts.height = 200.0, ts.seed = 3, ts.ranges = false;
+	const auto ground = terrain::make(ts);
+	const std::vector<std::pair<double, double>> way{{-300.0, 300.0}, {0.0, 0.0}, {300.0, -300.0}};
+	const camera_keyframes::Path path = film_camera::flight(way, 60.0, false, {}, 0.0, ground.get());
+	ASSERT_GE(path.keys.size(), 20u);
+	EXPECT_NEAR(path.keys.front().pos[0], -300.0, 1e-6);
+	EXPECT_NEAR(path.keys.back().pos[2], -300.0, 1e-6);
+	for (std::size_t k = 0; k < path.keys.size(); ++k) {
+		const auto &key = path.keys[k];
+		EXPECT_GE(key.pos[1], ground->heightAt(key.pos[0], key.pos[2]) + 30.0 - 1e-6) << "above the land";
+		EXPECT_LT(key.target[1], key.pos[1] + 1e-6) << "looking ahead and down";
+		if (k > 0) EXPECT_LT(std::abs(key.pos[1] - path.keys[k - 1].pos[1]), 40.0) << "no lurches";
+	}
+	// time-lapse and exposure from a film file
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("flight", "scene s.pbrt\nlength 20\nterrain hills size 600 height 30 seed 2 far off\ntimelapse 60\nexposure auto\nsky 19:30 22:30 south 180 latitude 46\nshot 0 Over\n  fly -200 0  0 0  200 -100  height 40\n", film), "");
+	EXPECT_DOUBLE_EQ(film.spec.timelapse, 60.0);
+	EXPECT_FALSE(film.spec.shots[0].path.keys.empty()) << "the fly became the shot's keys";
+	EXPECT_LT(film.exposureAt(0.0), film.exposureAt(19.0)) << "it opens up as night falls";
+	EXPECT_NEAR(film_camera::autoExposure(20.0), 1.0, 1e-9);
+	EXPECT_NEAR(film_camera::autoExposure(-15.0), std::pow(2.0, 4.9), 1e-6);
+	const std::string header = "LookAt 0 0 0  0 0 -1  0 1 0\nCamera \"perspective\"\nFilm \"rgb\" \"integer xresolution\" [ 320 ]\nWorldBegin\n";
+	const std::string brighter = film_camera::exposed(header, 4.0);
+	EXPECT_NE(brighter.find("Film \"rgb\" \"float iso\" [ 400.0000 ]"), std::string::npos) << brighter;
+	EXPECT_NE(film_camera::exposed(brighter, 2.0).find("\"float iso\" [ 800.0000 ]"), std::string::npos) << "an iso of its own is multiplied";
+	EXPECT_EQ(film_camera::exposed(header, 1.0), header);
+	EXPECT_NE(film.sceneAt(19.0).find("\"float iso\""), std::string::npos) << "a night frame is exposed";
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"timelapse 0.5", "`timelapse FACTOR`"},
+																						 {"exposure dark", "`exposure auto [KEY]`"},
+																						 {"shot 0 A\n  fly 0 0", "at least two waypoints"},
+																						 {"shot 0 A\n  key 0 1 0  0 0 -1  40\n  fly 0 0 5 5", "has a `fly` line and `key`"}}) {
+		ff::DataFilm bad;
+		const std::string problem = loadNature("flight_bad", "scene s.pbrt\nlength 4\n" + line + "\n", bad);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}
