@@ -1876,10 +1876,11 @@ inline void addCameraMedium(BuildCtx &c) {
 			d.ior = cm.sigmaT;
 			d.medium_emission = cm.emission;
 			const pbrt_flatten::Medium &cmMedium = scene.media[static_cast<std::size_t>(scene.cameraMediumIndex)];
-			if (cmMedium.type == "heightfog") {   // a fog in a layer (height_fog.h): grey, its density falling off above its top
+			if (cmMedium.type == "heightfog") {   // a fog in a layer (height_fog.h): its density falling off above its top (per wavelength too: air)
 				d.camera_medium_extra.fogTop = static_cast<float>(cmMedium.fogTop);
 				d.camera_medium_extra.fogThickness = static_cast<float>(cmMedium.fogThickness);
-			} else if (cm.chromatic) bakeChromaticMedium(scene.media[static_cast<std::size_t>(scene.cameraMediumIndex)].sigma_a,
+			}
+			if (cm.chromatic) bakeChromaticMedium(scene.media[static_cast<std::size_t>(scene.cameraMediumIndex)].sigma_a,
 			                                      scene.media[static_cast<std::size_t>(scene.cameraMediumIndex)].sigma_s,
 			                                      scene.media[static_cast<std::size_t>(scene.cameraMediumIndex)].Le, d);
 			// Where the medium ends (a sphere, or radius 0 = nowhere): the wavefront raygen clips every flight and shadow ray to it.

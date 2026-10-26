@@ -236,6 +236,7 @@ inline void flattenMedia(const pbrt_scene::Scene &scene, FlatScene &out) {
 		if (isHeightFog) {
 			medium.fogTop = md.params.getFloat("top", 0.0);
 			medium.fogThickness = std::max(1e-3, md.params.getFloat("thickness", 1.0));
+			medium.fogRadius = std::max(0.0, md.params.getFloat("radius", 0.0));
 		}
 
 		// sigma_a/sigma_s/scale/g: for homogeneous, these ARE the medium

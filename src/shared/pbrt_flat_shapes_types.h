@@ -305,7 +305,8 @@ struct Medium {
 	double g = 0.0;    // Henyey-Greenstein asymmetry
 	// type "heightfog" (this renderer's, not pbrt's: src/shared/height_fog.h): a fog as dense as sigma_a + sigma_s below `fogTop`, thinning out above it over
 	// `fogThickness` - the camera medium of a valley fog. Meaningful only as the camera medium; elsewhere it is taken as homogeneous.
-	double fogTop = 0.0, fogThickness = 0.0;
+	// `fogRadius` (> 0): it ends at a sphere that far round the camera (FlatScene::cameraMediumBound) - air near the camera, the sky's picture beyond it.
+	double fogTop = 0.0, fogThickness = 0.0, fogRadius = 0.0;
 
 	// MakeNamedMedium's own "rgb Le"/"float Lescale" (pbrt-v4) - a
 	// self-emitting medium (fire/plasma/glowing fog). Lescale is baked into

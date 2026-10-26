@@ -12,6 +12,7 @@
 #endif
 
 #include "wavefront_device_helpers.h"
+#include "wavefront_camera_medium.h"
 
 // ============================================================================
 // Kernel 2 — evaluate_materials
@@ -929,7 +930,14 @@ extern "C" __global__ void evaluate_materials(
 			SS cmW(1.f), cmE(0.f);
 			if (cmChroma) {
 				float cw[kWFNWavelengths], ce[kWFNWavelengths];
-				if (wf_chroma_collision_at(mat, swl.lambda, h.t, cw, ce))
+				float depth = h.t;   // (a layer, air: the weights are those at the optical depth per unit of extinction reached, height_fog.h)
+				if (mat.camera_medium_extra.fogThickness > 0.0f) {
+					float s0 = 0.0f, s1 = h.t;
+					depth = wf_camera_medium_segment(mat, h.rayOrigin, h.rayDir, h.t, s0, s1)
+						? height_fog::opticalDepth(1.0f, mat.camera_medium_extra.fogTop, mat.camera_medium_extra.fogThickness, h.rayOrigin.y, h.rayDir.y, length(h.rayDir), s0, s1)
+						: 0.0f;
+				}
+				if (wf_chroma_collision_at(mat, swl.lambda, depth, cw, ce))
 					for (int i = 0; i < kWFNWavelengths; ++i) { cmW[i] = cw[i]; cmE[i] = ce[i]; }
 			}
 			attenuation   = cmChroma ? cmW : unboundedSpectrum(mat.albedo);   // tint * sigma_s/sigma_t; the tint can exceed 1, so unbounded

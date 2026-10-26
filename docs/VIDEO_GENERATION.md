@@ -764,6 +764,7 @@ frames whose camera changed, as for any resumed film.)
 place    tree  at -3 0 -6  scale 1.2  turn 40         # a tree, rock, fern, bush or grass tuft, its foot there (x y z); `seed` for another shape
 scatter  grass 400 in -8 -14 8 3  scale 0.7 1.3  seed 3   # so many of a kind over a rectangle of the ground (x0 z0 x1 z1; `y` its height)
 sky      18:20 19:20  south 180  latitude 40          # the sun and sky follow the time of day over the film
+sky      5:10 6:10  physical  altitude 1200          # or the atmosphere itself (see "The physical sky and the air" below)
 ambience birds 0.7                                    # a sound under the whole film: wind, birds, crickets, water or night, at a gain
 ```
 
@@ -982,6 +983,30 @@ are kept to steps of 0.025 so frames a moment apart are the same text.) A winter
 along `wind`, bending grass, bushes and trees as they pass (a sharp front, easing behind it, the fronts' lines broken by noise). The mist is the camera's own medium ended
 by a sphere round the camera (nature_lib.h's Mist: the sun and sky outside light it, so a low sun draws shafts), rendered with the wavefront renderer. Fog banks lying on the
 land as volumes in spheres were tried and left out (a medium in a sphere with the land inside it is drawn wrongly by the GPU renderers); valley fog is `fog`, below.
+
+**The physical sky and the air: `sky ... physical`, `air`.** (src/shared/atmosphere.h)
+
+```
+sky   5:10 6:10  physical  altitude 1200   # the sky and the sun's light from the atmosphere itself, as an eye 1200 m above the sea sees them
+air   strength 2  haze 1.5                 # the air between the camera and the far land: the distant ranges fade into blue
+```
+
+`physical` makes the sky's picture and the sun's light from a model of the Earth's atmosphere instead of the Hosek-Wilkie sky and its painted glow, afterglow and
+belt: the air's molecules scattering the sunlight (Rayleigh: three times stronger in the blue than the red), its haze scattering it forward round the sun (Mie; the sky
+line's `haze`, 3 a clear day), ozone absorbing it (which keeps the twilight sky blue), over a round Earth seen from `altitude` metres up. Each direction is integrated
+through the air (single scattering, through a table of the transmittance to the top of the air, which is 0 where the Earth is in the way: its shadow) with Hillaire's
+approximation of all the further scattering. What the eye sees round sunrise and sunset falls out of it: the sun reddening and dimming as it nears the horizon and its
+light crosses more air (the sun's distant light is that light too), the glow round it, the pink belt of Venus opposite it above the blue-grey of the Earth's shadow,
+and the sky still lit high up after the sun has set, fading into night. From a mountain the sky is darker and the sun whiter. A picture takes a second or two (on every
+processor), made once for each quarter degree of the sun.
+
+`air` is aerial perspective: the camera's own medium, the atmosphere's scattering at the sky's `altitude` (Rayleigh's blue and the haze's grey; its haze the sky's
+unless given), thinning with height over the haze's 1.2 km scale height - the air near the ground, between the camera and the land; the air above it is in the sky's
+picture already - and ended at a sphere round the camera (`radius`, 4.5 times the terrain's size, or 8 km). The real air (`strength 1`) gives a land a few kilometres
+across only a little haze on its far ranges; `strength` thickens it for a smaller land. It is the `"heightfog"` medium (see `fog`) with an extinction that differs per
+colour channel and a `"float radius"`: a flight is drawn per channel in units of the optical depth per unit of extinction, where the layer is homogeneous, and turned back
+into a distance, on the CPU and the GPU wavefront renderer. (In an air as strongly coloured and thick as a hundred times the real one the GPU's spectral colours and
+the CPU's RGB ones part by several percent, as they do for any such medium; in the real air they agree.) It does not go with `fog`, `mist` or `underwater`.
 
 **Surf on a coast: `surf`.** (film_surf.h)
 

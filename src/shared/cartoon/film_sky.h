@@ -1,7 +1,9 @@
 #pragma once
 // film_sky.h -- painted skies for the long films: a whole sky as one picture (an equirectangular HDR image the renderers read as an "infinite" light), made once from a few
 // numbers and kept in the film's cache folder (film_cache.h). A sky is:
-//   the clear sky       the Hosek-Wilkie model (hosek_sky.h, as scene_sky.h uses it) for the sun's height, carried below the horizon into the blue of twilight;
+//   the clear sky       the Hosek-Wilkie model (hosek_sky.h, as scene_sky.h uses it) for the sun's height, carried below the horizon into the blue of twilight; or, for a
+//                       `physical` sky, the Earth's atmosphere itself (atmosphere.h): Rayleigh, haze and ozone over a round Earth seen from an altitude, its twilight, the
+//                       Earth's shadow and the belt of Venus from the physics rather than painted;
 //   the night           a deep blue sky with the Milky Way across it (a band of glow with dark lanes of dust) and a field of faint stars;
 //   the sun's glow      a halo round the sun and the afterglow along the horizon under it, for the drama of a sunrise or sunset;
 //   clouds              layers of cloud at a height, streaked along the wind, lit from the sun's side (bright, warm edges towards it, darker cores away from it), fading into the
@@ -15,10 +17,12 @@
 #include <cmath>
 #include <cstdio>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "film_cache.h"
 #include "nature_lib.h"
+#include "../atmosphere.h"
 #include "../scene_sky.h"
 
 namespace cartoon {
@@ -59,7 +63,17 @@ struct Spec {
 	double rainbow = 0.0;            // a rainbow round the point opposite the sun (0 none .. 1 a bright one): the primary bow at 42 degrees, the secondary at 51
 	std::vector<Clouds> clouds;
 	int width = 4096;                // the picture is width x width/2
+	bool physical = false;           // the clear sky from atmosphere.h (turbidity as its haze; the glow, afterglow and belt then come from it, not painted)
+	double altitude = 0.0;           // (physical) the eye's height above the sea, metres
 };
+
+// A physical sky's numbers: its haze from the turbidity (3 a clear day: 1), and the scale that puts the model's units (a sun of irradiance 1 above the air) into the
+// pictures' (a full sun's irradiance 3.0, as scene_sky.h's): the sun straight up at the sea's level gives 3.
+inline double physicalHaze(double turbidity) { return std::max(0.2, (turbidity - 1.0) / 2.0); }
+inline double physicalScale(const atmosphere::Model &m) {
+	const double up[3] = {0.0, 1.0, 0.0};
+	return 3.0 / std::max(1e-6, m.sunAt(up, 0.0).luminance());
+}
 
 inline Vec3 direction(double elevationDeg, double azimuthDeg) {
 	const double el = elevationDeg * kPi / 180.0, az = azimuthDeg * kPi / 180.0;
@@ -71,15 +85,26 @@ namespace detail {
 inline double luminance(Vec3 c) { return 0.2126 * c.x + 0.7152 * c.y + 0.0722 * c.z; }
 inline Vec3 mulc(Vec3 a, Vec3 b) { return {a.x * b.x, a.y * b.y, a.z * b.z}; }
 
-// The clear sky (Hosek-Wilkie, scene_sky.h's units) at `w`, for a sun at `sun`; below the horizon the model's sky for a sun just up, darkened and turned blue.
+// The clear sky (Hosek-Wilkie, scene_sky.h's units) at `w`, for a sun at `sun`; below the horizon the model's sky for a sun just up, darkened and turned blue. A physical
+// sky is the atmosphere's (atmosphere.h) for the sun where it is, above or below the horizon.
 struct ClearSky {
 	explicit ClearSky(const Spec &s) : spec(s), model(s.turbidity, 0.1, (std::max)(0.5, s.sunElevation) * kPi / 180.0) {
+		if (s.physical) {
+			air = atmosphere::modelFor(physicalHaze(s.turbidity));
+			airScale = physicalScale(*air);
+			trueSun = direction(s.sunElevation, s.sunAzimuth);
+		}
 		sun = direction((std::max)(0.5, s.sunElevation), s.sunAzimuth);
 		const double below = (std::max)(0.0, 0.5 - s.sunElevation);   // degrees under "just up"
 		dim = std::exp(-below / 2.4);
 		blue = clamp01(below / 7.0);
 	}
 	Vec3 at(Vec3 w) const {
+		if (air) {
+			const double v[3] = {w.x, w.y, w.z}, sv[3] = {trueSun.x, trueSun.y, trueSun.z};
+			const atmosphere::RGB L = air->sky(v, sv, spec.altitude);
+			return Vec3{L.r, L.g, L.b} * airScale;
+		}
 		const double theta = std::acos((std::max)(0.0, (std::min)(1.0, w.y)));
 		const double gamma = std::acos((std::max)(-1.0, (std::min)(1.0, dot(w, sun))));
 		double xyz[3];
@@ -97,6 +122,9 @@ struct ClearSky {
 	hosek_sky::Model model;
 	Vec3 sun;
 	double dim = 1.0, blue = 0.0;
+	std::shared_ptr<const atmosphere::Model> air;   // (a physical sky)
+	double airScale = 1.0;
+	Vec3 trueSun;
 };
 
 // The night sky in direction w: a gradient from a lighter horizon to a deep zenith, the Milky Way and the faint stars.
@@ -153,6 +181,10 @@ inline std::string fileName(const Spec &s) {
 				  s.brightness, s.tint.x, s.tint.y, s.tint.z, s.night, s.nightBrightness, s.milkyWay, s.milkyPole.x, s.milkyPole.y, s.milkyPole.z, s.stars, s.glow, s.glowColour.x, s.glowColour.y,
 				  s.glowColour.z, s.afterglow, s.afterglowColour.x, s.afterglowColour.y, s.afterglowColour.z, s.belt, s.width);
 	key = b;
+	if (s.physical) {
+		std::snprintf(b, sizeof b, "|p%.1f", s.altitude);
+		key += b;
+	}
 	if (s.rainbow > 0.0) {
 		std::snprintf(b, sizeof b, "|r%.3f", s.rainbow);
 		key += b;
@@ -181,14 +213,25 @@ inline std::vector<float> render(const Spec &s) {
 		return Vec3{-st * std::cos(phi), ct, -st * std::sin(phi)};
 	};
 	const int coarseRows = ch / 2 + 1;   // (rows down to the horizon; below it the horizon's colour)
-	if (s.night < 1.0)
-		for (int r = 0; r <= coarseRows; ++r)
-			for (int c = 0; c < cw; ++c) {
-				const double theta = (std::min)(kPi / 2.0, (r + 0.5) / ch * kPi), phi = (c + 0.5) / cw * 2.0 * kPi;
-				Vec3 w = pbrtToStory(theta, phi);
-				w.y = (std::max)(w.y, 0.0005);
-				coarse[static_cast<std::size_t>(r) * cw + c] = clear.at(normalize(w));
-			}
+	if (s.night < 1.0) {
+		const auto rows = [&](int first, int step) {
+			for (int r = first; r <= coarseRows; r += step)
+				for (int c = 0; c < cw; ++c) {
+					const double theta = (std::min)(kPi / 2.0, (r + 0.5) / ch * kPi), phi = (c + 0.5) / cw * 2.0 * kPi;
+					Vec3 w = pbrtToStory(theta, phi);
+					w.y = (std::max)(w.y, 0.0005);
+					coarse[static_cast<std::size_t>(r) * cw + c] = clear.at(normalize(w));
+				}
+		};
+		if (s.physical) {   // (the atmosphere is integrated along every direction: spread over the processors)
+			const int n = static_cast<int>(std::max(1u, std::min(16u, std::thread::hardware_concurrency())));
+			std::vector<std::thread> workers;
+			for (int k = 0; k < n; ++k) workers.emplace_back(rows, k, n);
+			for (std::thread &w : workers) w.join();
+		} else {
+			rows(0, 1);
+		}
+	}
 	for (int row = 0; row < H; ++row) {
 		const double theta = (row + 0.5) / H * kPi;
 		for (int col = 0; col < W; ++col) {

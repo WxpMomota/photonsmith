@@ -126,6 +126,9 @@
 //     gusts    1.5  wind 90                                     # sweep across the grass and trees; `mist DENSITY [radius R]`: a mist round the camera
 //     fog      0.04  top 30  thickness 4  lift 10 20             # fog lying in the valleys (height_fog.h): dense below the height `top` (pbrt's y; a quarter of the land's
 //                                                               # height by default), thinning over `thickness`; lifting from 10 s to 20 s, it thins away and sinks
+//     air      strength 3  haze 1.5                             # the air between the camera and the far land (aerial perspective): the atmosphere's blue and haze,
+//                                                               # thinning with height, out to `radius` (4.5 times the terrain's size); `sky ... physical [altitude A]`
+//                                                               # makes the sky and the sun's light from the atmosphere itself (atmosphere.h), as the eye A m up sees it
 //     underwater  clarity 1.5  colour teal                      # the camera is under the film's water (film_underwater.h): the sea round it, caustics on the seabed, shafts
 //     kelp     60  in -20 -20 20 20  height 9                   # of light, marine snow; kelp swaying and coral (`coral COUNT [in X0 Z0 X1 Z1]`) on the seabed
 //     fire     at 0 0 -4  size 1.2                              # fire (film_fire.h): flames (glowing volumes, flickering, a light among them, sparks) with smoke above;
@@ -511,6 +514,12 @@ struct Spec {
 		bool topSet = false;
 		double liftT0 = -1.0, liftT1 = -1.0;
 	} fog;
+	// the air (`air`): aerial perspective - the camera medium of type "heightfog" with the atmosphere's scattering (atmosphere.h: Rayleigh's blue, the haze's grey),
+	// thinning with height, out to `radius` round the camera (the sky's picture beyond)
+	struct Air {
+		bool on = false;
+		double strength = 1.0, haze = -1.0, radius = 0.0;   // (haze below 0: the sky's; radius 0: four and a half times the terrain's size, or 8 km)
+	} air;
 	nature::Mist mist;
 	// under the sea (`underwater`, `kelp`, `coral`)
 	bool hasUnderwater = false;
@@ -1373,15 +1382,25 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				h = a + b / 60.0;
 				return true;
 			};
-			if (t.size() < 3 || !hour(t[1], s.sky.from) || !hour(t[2], s.sky.to)) return fail("`sky FROM TO [south DEGREES] [latitude L] [day N] [haze H]`: times of day as 18:30 or 18.5");
+			if (t.size() < 3 || !hour(t[1], s.sky.from) || !hour(t[2], s.sky.to))
+				return fail("`sky FROM TO [south DEGREES] [latitude L] [day N] [haze H] [physical] [altitude A]`: times of day as 18:30 or 18.5");
 			for (std::size_t i = 3; i < t.size(); i += 2) {
 				double v = 0.0;
-				if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail("a sky takes south, latitude, day and haze, each with a number");
+				if (t[i] == "physical") {   // (a word on its own: the sky from the atmosphere itself, atmosphere.h)
+					s.sky.physical = true;
+					--i;
+					continue;
+				}
+				if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail("a sky takes south, latitude, day, haze and altitude, each with a number, and physical");
+				if (t[i] == "altitude" && v >= 0.0 && v <= 9000.0) {
+					s.sky.altitude = v;
+					continue;
+				}
 				if (t[i] == "south") s.sky.south = v;
 				else if (t[i] == "latitude" && std::abs(v) <= 89.0) s.sky.latitude = v;
 				else if (t[i] == "day" && v >= 1 && v <= 366) s.sky.day = static_cast<int>(v);
 				else if (t[i] == "haze" && v >= 1.7 && v <= 10.0) s.sky.haze = v;
-				else return fail("\"" + t[i] + "\": a sky takes south, latitude (-89 to 89), day (1 to 366) and haze (1.7 to 10)");
+				else return fail("\"" + t[i] + "\": a sky takes south, latitude (-89 to 89), day (1 to 366), haze (1.7 to 10), physical and altitude (0 to 9000 m)");
 			}
 			s.hasSky = true;
 		} else if (verb == "weather") {
@@ -1658,6 +1677,17 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				else return fail("\"" + t[i] + "\": surf takes period (3 to 25 s) and toward (which way it runs, degrees as a facing)");
 			}
 			s.swell.on = true;
+		} else if (verb == "air") {   // the air between the camera and the far land (aerial perspective)
+			const std::vector<std::string> t = detail::tokens(line);
+			for (std::size_t i = 1; i < t.size(); i += 2) {
+				double v = 0.0;
+				if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail("`air [strength S] [haze H] [radius R]`: \"" + t[i] + "\" needs a number");
+				if (t[i] == "strength" && v > 0.0 && v <= 200.0) s.air.strength = v;
+				else if (t[i] == "haze" && v >= 0.2 && v <= 10.0) s.air.haze = v;
+				else if (t[i] == "radius" && v >= 50.0) s.air.radius = v;
+				else return fail("\"" + t[i] + "\": air takes strength (1 the real air; more for a small land), haze (0.2 very clear to 10, as a sky's) and radius (metres, 50 or more)");
+			}
+			s.air.on = true;
 		} else if (verb == "fog") {   // fog lying in the valleys (height_fog.h)
 			const std::vector<std::string> t = detail::tokens(line);
 			if (t.size() < 2 || !number(t[1], s.fog.density) || !(s.fog.density > 0.0) || s.fog.density > 2.0)
@@ -1901,7 +1931,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, surf, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, surf, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -2043,6 +2073,14 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			return fail("`surf` breaks on a shore: the film needs a `water sea` line and a `terrain` for it to break on");
 		}
 		if (!s.swell.towardSet) s.swell.toward = s.seas[0].wind;
+	}
+	if (s.air.on) {   // (one medium round the camera)
+		if (s.hasMist || s.fog.on || s.hasUnderwater) {
+			n = 0;
+			return fail(std::string("`air` and `") + (s.hasMist ? "mist" : s.fog.on ? "fog" : "underwater") + "` both fill the air round the camera: use one");
+		}
+		if (s.air.haze < 0.0) s.air.haze = s.hasSky ? film_sky::physicalHaze(s.sky.haze) : 1.0;
+		if (s.air.radius <= 0.0) s.air.radius = s.hasTerrain ? 4.5 * s.terrain.size : 8000.0;
 	}
 	if (s.fog.on) {   // (one medium round the camera: a fog in the valleys or a mist, not both; its top and thickness from the land unless the film says)
 		if (s.hasMist) {
@@ -3661,6 +3699,25 @@ class DataFilm {
 			});
 	}
 	// The scene with this header at t: the set, its animated blocks, its dressing, its sky and its characters.
+	// The air as a camera medium: the atmosphere's scattering at the film's altitude (the sky line's; pbrt's y = 0 there) - Rayleigh's, three times stronger in the blue,
+	// and the haze's, grey and thrown forward - thinning with height over the haze's scale height (1.2 km: the air near the ground, between the camera and the land; the
+	// air above is in the sky's picture already, and a sky ray should not cross it twice), written as height_fog.h's layer far above its top (ten scale heights under
+	// the ground: its upper tail, an exponential), and ended at a sphere round the camera.
+	std::string airMedium() const {
+		const atmosphere::Air a(spec.air.haze);
+		const double A = spec.hasSky ? spec.sky.altitude : 0.0;
+		const atmosphere::RGB R = a.rayleigh * a.rayleighDensity(A);
+		const double Ms = a.mieScatter * a.mieDensity(A), Ma = a.mieAbsorb * a.mieDensity(A), lumR = R.luminance();
+		const double H = a.mieHeight;
+		const double k = spec.air.strength * (1.0 + std::exp(10.0)), g = a.mieG * Ms / std::max(1e-12, Ms + lumR);
+		char buf[480];
+		std::snprintf(buf, sizeof buf,
+					  "MakeNamedMedium \"air\" \"string type\" [ \"heightfog\" ] \"rgb sigma_a\" [ %.6g %.6g %.6g ] \"rgb sigma_s\" [ %.6g %.6g %.6g ] \"float g\" [ %.4f ] "
+					  "\"float top\" [ %.2f ] \"float thickness\" [ %.2f ] \"float radius\" [ %.2f ]\nMediumInterface \"\" \"air\"\n",
+					  Ma * k, Ma * k, Ma * k, (R.r + Ms) * k, (R.g + Ms) * k, (R.b + Ms) * k, g, -10.0 * H, H, spec.air.radius);
+		return buf;
+	}
+
 	std::string worldAt(const std::string &header, double t) const {
 		std::string out = film_camera::exposed(header, exposureAt(t));
 		const double nt = t * spec.timelapse;   // (nature's time: the clouds, the water, the aurora, the wind)
@@ -3743,6 +3800,10 @@ class DataFilm {
 							  0.02 * density, 0.02 * density, 0.02 * density, density, density, 1.03 * density, spec.fog.top - lift * 3.0 * spec.fog.thickness, spec.fog.thickness);
 				out = out.substr(0, camera) + medium + out.substr(camera);
 			}
+		}
+		if (spec.air.on) {   // the air: the camera's own medium, the atmosphere's scattering thinning with height (height_fog.h's layer far above its "top": an exponential)
+			const std::size_t camera = out.find("Camera \"");
+			if (camera != std::string::npos) out = out.substr(0, camera) + airMedium() + out.substr(camera);
 		}
 		if (spec.hasMist) {   // a mist round the camera (nature_lib.h: the camera's own medium, ended by a sphere round it, so the sun and sky outside light it)
 			Vec3 eye, target;

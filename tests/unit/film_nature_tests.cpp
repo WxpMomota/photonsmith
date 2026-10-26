@@ -827,3 +827,61 @@ TEST(FilmSurf, TheSwellTurnsToTheShoreGrowsAndBreaksWhite) {
 		EXPECT_NE(problem.find(says), std::string::npos) << text << " -> " << problem;
 	}
 }
+
+// The air and the physical sky (atmosphere.h): `sky ... physical` makes the sky's picture and the sun's light from the atmosphere (a red sun at sunrise, a blue zenith);
+// `air` puts the atmosphere's scattering round the camera as a layered medium, bluer than it is red, ended at a sphere round the camera.
+TEST(FilmAir, ThePhysicalSkyReddensTheLowSunAndTheAirIsABlueLayerRoundTheCamera) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("air", "scene s.pbrt\nlength 10\nterrain mountains size 1000 height 200 seed 2 far off\nsky 5:20 7:00 physical altitude 1200\nair strength 2\nshot 0 A\n key 0 60 300  0 80 -500\n",
+						 film),
+			  "");
+	EXPECT_TRUE(film.spec.sky.physical);
+	EXPECT_DOUBLE_EQ(film.spec.sky.altitude, 1200.0);
+	EXPECT_DOUBLE_EQ(film.spec.air.radius, 4500.0) << "four and a half times the land";
+	const auto sunRGB = [](const std::string &scene) {
+		const std::size_t at = scene.find("LightSource \"distant\"");
+		if (at == std::string::npos) return std::vector<double>{};
+		const std::size_t L = scene.find("\"rgb L\" [ ", at);
+		std::istringstream in(scene.substr(L + 10, 80));
+		std::vector<double> v(3);
+		in >> v[0] >> v[1] >> v[2];
+		return v;
+	};
+	const std::vector<double> dawn = sunRGB(film.sceneAt(1.5)), later = sunRGB(film.sceneAt(9.5));
+	ASSERT_EQ(dawn.size(), 3u);
+	ASSERT_EQ(later.size(), 3u);
+	EXPECT_GT(dawn[0], 2.0 * dawn[2]) << "the low sun is red";
+	EXPECT_LT(later[0] / later[2], dawn[0] / dawn[2]) << "and whiter as it climbs";
+	EXPECT_GT(later[1], dawn[1]);
+	const std::string scene = film.sceneAt(5.0);
+	const std::size_t medium = scene.find("MakeNamedMedium \"air\""), camera = scene.find("Camera \"");
+	ASSERT_NE(medium, std::string::npos);
+	EXPECT_LT(medium, camera);
+	EXPECT_NE(scene.find("\"heightfog\"", medium), std::string::npos);
+	EXPECT_NE(scene.find("\"float radius\" [ 4500.00 ]", medium), std::string::npos);
+	std::istringstream sig(scene.substr(scene.find("\"rgb sigma_s\" [ ", medium) + 16, 80));
+	double r = 0.0, g = 0.0, b = 0.0;
+	sig >> r >> g >> b;
+	EXPECT_GT(b, 2.5 * r) << "Rayleigh's blue";
+	EXPECT_GT(g, r);
+	// the sky's picture itself: a blue zenith over the morning
+	cartoon::film_sky::Spec fs;
+	fs.width = 256;
+	fs.physical = true;
+	fs.sunElevation = 20.0;
+	const std::vector<float> rgb = cartoon::film_sky::render(fs);
+	EXPECT_GT(rgb[2], rgb[1]);
+	EXPECT_GT(rgb[1], rgb[0]);
+	cartoon::film_sky::Spec painted = fs;
+	painted.physical = false;
+	EXPECT_NE(cartoon::film_sky::fileName(fs), cartoon::film_sky::fileName(painted));
+	for (const auto &[text, says] : std::vector<std::pair<std::string, std::string>>{{"air\nfog 0.02\n", "`air` and `fog`"},
+																						  {"air strength 0\n", "air takes strength"},
+																						  {"air colour 2\n", "air takes strength"},
+																						  {"air haze\n", "needs a number"},
+																						  {"sky 6 7 altitude 20000\n", "altitude (0 to 9000 m)"}}) {
+		ff::DataFilm bad;
+		const std::string problem = loadNature("air_bad", "scene s.pbrt\nlength 4\n" + text, bad);
+		EXPECT_NE(problem.find(says), std::string::npos) << text << " -> " << problem;
+	}
+}

@@ -144,6 +144,8 @@ struct Sky {
 	double from = 12.0, to = 12.0;
 	double south = 180.0, latitude = 40.0, haze = 3.0;
 	int day = 172;   // (the longest day)
+	bool physical = false;   // the sky and the sun's light from the atmosphere itself (atmosphere.h), seen from `altitude` metres above the sea
+	double altitude = 0.0;
 };
 // The sun's height above the horizon and its direction on the ground (a `facing`, degrees) at an hour.
 inline void sunAt(const Sky &s, double hour, double &elevation, double &facing) {
@@ -169,8 +171,16 @@ inline std::string skyText(const std::string &film, const Sky &s, double t, doub
 	p.sunElevation = std::round(std::max(0.5, el) * 10.0) / 10.0;
 	p.sunAzimuth = std::round(std::fmod(std::atan2(-toward.z, toward.x) / d2r + 720.0, 360.0));   // (scene_sky.h: 0 is +x, 90 is -z)
 	p.turbidity = s.haze;
-	const scene_doc::sky::SunLight sun = scene_doc::sky::sunLight(p);
-	const double twilight = std::max(0.02, smoothstep(-7.0, 0.5, el)), sunUp = smoothstep(-0.4, 1.2, el);
+	scene_doc::sky::SunLight sun = scene_doc::sky::sunLight(p);
+	if (s.physical) {   // (the sunlight through the air from the atmosphere itself: red and faint at the horizon, gone when the Earth hides the sun)
+		const std::shared_ptr<const atmosphere::Model> air = atmosphere::modelFor(film_sky::physicalHaze(s.haze));
+		const double up[3] = {0.0, std::sin(el * d2r), std::cos(el * d2r)};
+		const atmosphere::RGB L = air->sunAt(up, s.altitude) * film_sky::physicalScale(*air);
+		sun.irradiance = std::max(1e-9, L.luminance());
+		sun.colour.r = L.r / sun.irradiance, sun.colour.g = L.g / sun.irradiance, sun.colour.b = L.b / sun.irradiance;
+		if (!(L.luminance() > 1e-6)) sun.irradiance = 0.0;
+	}
+	const double twilight = std::max(0.02, smoothstep(-7.0, 0.5, el)), sunUp = s.physical ? (sun.irradiance > 0.0 ? 1.0 : 0.0) : smoothstep(-0.4, 1.2, el);
 	std::string path, error;
 	char buf[400];
 	std::string out;
@@ -194,6 +204,11 @@ inline std::string skyText(const std::string &film, const Sky &s, double t, doub
 	fs.afterglow = std::round(0.45 * low * 20.0) / 20.0;
 	fs.belt = std::round(0.3 * smoothstep(-6.0, -1.0, el) * (1.0 - smoothstep(1.0, 6.0, el)) * 20.0) / 20.0;
 	fs.rainbow = std::round(std::max(0.0, std::min(1.0, rainbow)) * 20.0) / 20.0;
+	if (s.physical) {   // (the glow round the sun, the afterglow and the belt of Venus are the atmosphere's own)
+		fs.physical = true;
+		fs.altitude = s.altitude;
+		fs.glow = fs.afterglow = fs.belt = 0.0;
+	}
 	// the stars turn about the celestial pole, 15 degrees an hour (the sky's picture with them, as far as it is night)
 	const double nf = (s.south + 180.0) * d2r, lat = s.latitude * d2r;
 	const Vec3 pole{std::sin(nf) * std::cos(lat), std::sin(lat), std::cos(nf) * std::cos(lat)};

@@ -9,6 +9,11 @@
 // form, F(y) = y - thickness * softplus((y - top) / thickness) - so a shadow ray's transmittance is exact and a free flight is sampled by solving F for the height where the
 // sampled optical depth is reached (a safeguarded Newton search between the segment's ends). A ray that runs level is in fog of one density.
 //
+// Its extinction can differ per colour channel (the profile is the same for each): with sigma_t = 1 these functions give the optical depth per unit of extinction D, in which
+// the medium is a homogeneous one - each channel's transmittance is exp(-sigma_c D) - so a flight is drawn by the homogeneous per-channel samplers over the segment's D
+// (volume_scattering.h sample_homogeneous_event, wf_chroma_event) and turned back into a distance by sampleFlight(1, ..., D). That is air (film_file.h `air`): Rayleigh
+// scattering, three times stronger in the blue than the red, thinning with height.
+//
 // std-only, header-only; the functions compile for the CPU and for CUDA (CPU_GPU).
 
 #include <cmath>
@@ -27,9 +32,12 @@ template <typename T>
 CPU_GPU T profile(T y, T top, T thickness) {
 	return T(1) / (T(1) + std::exp((y - top) / thickness));
 }
+// (Above the top it is written as top - thickness * log(1 + e^-u), which is the same, so that far above it - air, whose "top" is kilometres under the ground and whose
+// density is the profile's exponential tail - the small part that varies is not lost to float rounding against y and top.)
 template <typename T>
 CPU_GPU T integral(T y, T top, T thickness) {
-	return y - thickness * softplus((y - top) / thickness);
+	const T u = (y - top) / thickness;
+	return u > T(0) ? top - thickness * std::log1p(std::exp(-u)) : y - thickness * std::log1p(std::exp(u));
 }
 
 // Where a segment that runs on for ever can stop: where a rising ray is 40 thicknesses above the layer (the fog there is e^-40 of its own), and in any case 1e7 units on

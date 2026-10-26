@@ -160,6 +160,7 @@
     </ClCompile>
     <ClCompile Include="unit\toon_look_tests.cpp" />
     <ClCompile Include="unit\height_fog_tests.cpp" />
+    <ClCompile Include="unit\atmosphere_tests.cpp" />
     <ClCompile Include="unit\cartoon_snapshot_tests.cpp" />
     <ClCompile Include="unit\path_probe_tests.cpp" />
     <ClCompile Include="unit\texture_mapping_tests.cpp" />

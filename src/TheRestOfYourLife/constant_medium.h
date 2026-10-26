@@ -632,12 +632,11 @@ class ambient_medium {
     // A medium that ends at a sphere (FlatScene::cameraMediumBound): the fog of a set lit from outside it. Radius 0 (the default) fills all of space.
     void set_bound(const point3& centre, double radius) { bound_centre_ = centre; bound_radius_ = radius; }
     bool bounded() const { return bound_radius_ > 0.0; }
-    // A fog in a layer (the camera medium of type "heightfog": src/shared/height_fog.h): its sigma_t below `top`, thinning above it over `thickness`. Grey: a per-channel
-    // extinction is taken by its luminance.
+    // A fog in a layer (the camera medium of type "heightfog": src/shared/height_fog.h): its sigma_t below `top`, thinning above it over `thickness`. Its extinction may
+    // differ per channel (air): then a flight is drawn per channel in units of the optical depth per unit of extinction (height_fog.h).
     void set_height(double top, double thickness) {
         fog_top_ = top;
         fog_thickness_ = thickness;
-        chromatic_ = false;
     }
     bool layered() const { return fog_thickness_ > 0.0; }
 
@@ -665,8 +664,9 @@ class ambient_medium {
             double t0, t1;
             if (len <= 0.0 || !clip(r, distance >= infinity ? infinity : distance / len, t0, t1)) return color(1, 1, 1);
             if (t1 >= infinity) t1 = 1e30 / len;
-            const double tau = height_fog::opticalDepth(med.sigma_tr(), fog_top_, fog_thickness_, r.origin().y(), r.direction().y(), len, t0, t1);
-            const double T = std::exp(-tau);
+            const double D = height_fog::opticalDepth(1.0, fog_top_, fog_thickness_, r.origin().y(), r.direction().y(), len, t0, t1);
+            if (chromatic_) return color(std::exp(-med_rgb.sigma_tr() * D), std::exp(-med_rgb.sigma_tg() * D), std::exp(-med_rgb.sigma_tb() * D));
+            const double T = std::exp(-med.sigma_tr() * D);
             return color(T, T, T);
         }
         if (!bounded()) return transmittance_over(distance);
@@ -691,6 +691,26 @@ class ambient_medium {
 
         if (layered()) {   // a flight through the layer: sampled by its exact optical depth (height_fog.h)
             const double t_end = t_max >= infinity ? 1e30 / ray_length : t_in + t_max;
+            if (chromatic_) {   // (per channel, in units of the optical depth per unit of extinction: there the layer is homogeneous)
+                const double oy = r.origin().y(), dy = r.direction().y();
+                const double D = height_fog::opticalDepth(1.0, fog_top_, fog_thickness_, oy, dy, ray_length, t_in, t_end);
+                const HomogeneousEvent<double> ev = sample_homogeneous_event<double>(med_rgb, D, random_double(), random_double());
+                if (!ev.collided) {
+                    if (out_pass_weight) *out_pass_weight = color(ev.w[0], ev.w[1], ev.w[2]);
+                    return false;
+                }
+                rec.t = std::min(t_end, height_fog::sampleFlight(1.0, fog_top_, fog_thickness_, oy, dy, ray_length, t_in, t_end, ev.t));
+                rec.p = r.at(rec.t);
+                rec.normal = vec3(1, 0, 0);
+                rec.front_face = true;
+                rec.mat = phase_mat;
+                rec.u = 0.0;
+                rec.v = 0.0;
+                rec.has_medium_event = true;
+                rec.medium_weight = color(ev.w[0], ev.w[1], ev.w[2]);
+                rec.medium_emission = Le_raw_ * color(ev.e[0], ev.e[1], ev.e[2]);
+                return true;
+            }
             const double t = height_fog::sampleFlight(med.sigma_tr(), fog_top_, fog_thickness_, r.origin().y(), r.direction().y(), ray_length, t_in, t_end,
                                                       -std::log(std::max(1e-12, 1.0 - random_double())));
             if (!(t < t_end)) return false;

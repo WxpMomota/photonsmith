@@ -1,26 +1,6 @@
 // wavefront_raygen.h -- Intersect-phase and shadow-phase raygen programs
 // Included by wavefront_programs.cu, after wavefront_common.h.
-#include "../../src/shared/height_fog.h"   // (a camera medium that lies in a layer)
-
-// The part [t0, t1] of a ray's [0, tMax] that is inside the camera medium (cmMat, the synthetic camera-medium material): all of it for a medium that fills
-// all of space, the chord through its bounding sphere for one that ends at a sphere (camera_medium_extra.boundRadius > 0; FlatScene::cameraMediumBound).
-// False when the ray spends no length in it. In the ray's own parameter, like tMax.
-__device__ __forceinline__ bool wf_camera_medium_segment(const MaterialData& cmMat, float3 origin, float3 dir, float tMax, float& t0, float& t1) {
-	t0 = 0.0f;
-	t1 = tMax;
-	const float r = cmMat.camera_medium_extra.boundRadius;
-	if (r <= 0.0f) return tMax > 0.0f;
-	const float3 oc = origin - cmMat.camera_medium_bound_centre;
-	const float a = dot(dir, dir);
-	const float halfB = dot(oc, dir);
-	const float c = dot(oc, oc) - r * r;
-	const float disc = halfB * halfB - a * c;
-	if (a <= 0.0f || disc <= 0.0f) return false;
-	const float root = sqrtf(disc);
-	t0 = fmaxf(0.0f, (-halfB - root) / a);
-	t1 = fminf(tMax, (-halfB + root) / a);
-	return t1 > t0;
-}
+#include "wavefront_camera_medium.h"   // (the part of a ray inside the camera medium; a camera medium that lies in a layer)
 
 // ============================================================================
 // __raygen__wf_intersect
@@ -94,7 +74,21 @@ extern "C" __global__ void __raygen__wf_intersect() {
 	if (wf_params.cameraMediumSigmaT > 0.0f && wf_params.cameraMediumMaterialIdx >= 0
 		&& wf_camera_medium_segment(wf_params.materials[wf_params.cameraMediumMaterialIdx], ray.origin, ray.direction, payload.hit ? payload.t : 1e30f, segT0, segT1)) {
 		const MaterialData& cmMat = wf_params.materials[wf_params.cameraMediumMaterialIdx];
-		if (cmMat.camera_medium_extra.fogThickness > 0.0f) {   // a fog in a layer: the flight sampled by its exact optical depth (height_fog.h)
+		if (cmMat.camera_medium_extra.fogThickness > 0.0f && wf_medium_is_chromatic(cmMat)) {
+			// a layer whose extinction differs per wavelength (air): drawn per wavelength over the segment's optical depth per unit of extinction, where the layer is
+			// homogeneous, then turned back into a distance (height_fog.h)
+			const float top = cmMat.camera_medium_extra.fogTop, thick = cmMat.camera_medium_extra.fogThickness, dlen = length(ray.direction);
+			const float D = height_fog::opticalDepth(1.0f, top, thick, ray.origin.y, ray.direction.y, dlen, segT0, segT1);
+			const float cu_channel = wf_rand(ambientSeed);
+			const float cu_dist = wf_rand(ambientSeed);
+			const WfChromaEvent cev = wf_chroma_event(cmMat, ray.wavelengths, D, cu_channel, cu_dist);
+			if (cev.collided) {
+				ambientT = fminf(segT1, height_fog::sampleFlight(1.0f, top, thick, ray.origin.y, ray.direction.y, dlen, segT0, segT1, cev.t));
+				ambientScatter = true;
+			} else {
+				for (int i = 0; i < kWFNWavelengths; ++i) ambientPass[i] = cev.w[i];
+			}
+		} else if (cmMat.camera_medium_extra.fogThickness > 0.0f) {   // a fog in a layer: the flight sampled by its exact optical depth (height_fog.h)
 			ambientT = height_fog::sampleFlight(wf_params.cameraMediumSigmaT, cmMat.camera_medium_extra.fogTop, cmMat.camera_medium_extra.fogThickness, ray.origin.y,
 			                                    ray.direction.y, length(ray.direction), segT0, segT1, -logf(fmaxf(1e-8f, 1.0f - wf_rand(ambientSeed))));
 			ambientScatter = ambientT < segT1;
@@ -319,9 +313,16 @@ extern "C" __global__ void __raygen__wf_shadow() {
 		&& wf_medium_is_chromatic(wf_params.materials[wf_params.cameraMediumMaterialIdx]);
 	if (cameraMediumChromatic) {
 		const MaterialData& cmMat = wf_params.materials[wf_params.cameraMediumMaterialIdx];
+		float D = -1.0f;   // (a layer: the optical depth per unit of extinction along the shadow ray, height_fog.h)
+		if (cmMat.camera_medium_extra.fogThickness > 0.0f) {
+			float c0 = 0.0f, c1 = s.tMax;
+			D = wf_camera_medium_segment(cmMat, s.origin, s.direction, s.tMax, c0, c1)
+				? height_fog::opticalDepth(1.0f, cmMat.camera_medium_extra.fogTop, cmMat.camera_medium_extra.fogThickness, s.origin.y, s.direction.y, length(s.direction), c0, c1)
+				: 0.0f;
+		}
 		for (int i = 0; i < kWFNWavelengths; ++i) {
 			const float sigma = wf_chroma_sigma_a(cmMat, sp.lambda[i]) + wf_chroma_sigma_s(cmMat, sp.lambda[i]);
-			sp.tr[i] *= cmInfinite ? (sigma > 0.0f ? 0.0f : 1.0f) : expf(-sigma * cmLength);
+			sp.tr[i] *= D >= 0.0f ? expf(-sigma * D) : cmInfinite ? (sigma > 0.0f ? 0.0f : 1.0f) : expf(-sigma * cmLength);
 		}
 		sp.chromatic = 1;
 	}

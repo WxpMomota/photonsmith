@@ -1330,6 +1330,11 @@ inline void resolveAfterShapes(const pbrt_scene::Scene &scene, FlatScene &out) {
 			} else {
 				out.cameraMediumIndex = scene.cameraMediumIndex;
 			}
+			const Medium &cm = out.media[static_cast<std::size_t>(scene.cameraMediumIndex)];
+			if (out.cameraMediumIndex >= 0 && heightFog && cm.fogRadius > 0.0 && !(out.cameraMediumBound[3] > 0.0)) {   // (a layer that ends round the camera: air)
+				for (int c = 0; c < 3; ++c) out.cameraMediumBound[c] = out.camera.lookfrom[c];
+				out.cameraMediumBound[3] = cm.fogRadius;
+			}
 		}
 	}
 

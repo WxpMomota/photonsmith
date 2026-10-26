@@ -85,3 +85,37 @@ TEST(HeightFog, TheCpusCameraMediumScattersAsTheLayerSays) {
 	EXPECT_GT(up.x(), 0.0);
 	EXPECT_LT(up.x(), 1.0);
 }
+
+// A layer whose extinction differs per channel (air): drawn per channel in units of the optical depth per unit of extinction, its weights estimate each channel's own
+// transmittance on the way through and its own scattering on a collision - unbiased in every channel at once.
+TEST(HeightFog, AColouredLayerIsUnbiasedInEveryChannel) {
+	ambient_medium air(color(0, 0, 0), color(0.01, 0.03, 0.08), 0.0, color(0, 0, 0));
+	air.set_height(10.0, 2.5);
+	ASSERT_TRUE(air.layered());
+	ASSERT_TRUE(air.chromatic());
+	const ray r(point3(0, 2, 0), vec3(0.6, 0.2, 0.0));
+	const double len = r.direction().length(), tMax = 60.0;
+	const double D = height_fog::opticalDepth(1.0, 10.0, 2.5, 2.0, 0.2, len, 0.0, tMax);
+	const double sig[3] = {0.01, 0.03, 0.08};
+	double pass[3] = {0, 0, 0}, hit[3] = {0, 0, 0};
+	const int n = 200000;
+	for (int i = 0; i < n; ++i) {
+		hit_record rec;
+		color w(1, 1, 1);
+		if (air.sample_scatter(r, tMax, rec, nullptr, &w)) {
+			ASSERT_TRUE(rec.has_medium_event);
+			ASSERT_LE(rec.t, tMax);
+			for (int c = 0; c < 3; ++c) hit[c] += rec.medium_weight[c];
+		} else {
+			for (int c = 0; c < 3; ++c) pass[c] += w[c];
+		}
+	}
+	const color T = air.transmittance_along(r, tMax * len);
+	for (int c = 0; c < 3; ++c) {
+		const double expect = std::exp(-sig[c] * D);
+		EXPECT_NEAR(T[c], expect, 1e-9);
+		EXPECT_NEAR(pass[c] / n, expect, 0.01) << "channel " << c << ": what gets through";
+		EXPECT_NEAR(hit[c] / n, 1.0 - expect, 0.01) << "channel " << c << ": what scatters (no absorption)";
+	}
+	EXPECT_LT(T[2], T[0]) << "the blue scattered more";
+}
