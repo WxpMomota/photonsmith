@@ -730,6 +730,69 @@ TEST(FilmContacts, HandsGoOnTheSetAndOnEachOther) {
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 12\ncharacter ann person\nhold ann zed 3 1\n", bad).find("later T1"), std::string::npos);
 }
 
+// Titles and credits: a title card over the opening with its episode, cards of credits after the story over black frames (the name, the cast, the film's own lines), and a
+// theme under the title; in a film in parts the title is the first part's and the credits the last's.
+TEST(FilmTitles, ATitleCardCreditsAfterTheStoryAndATheme) {
+	(void)cartoon::films();
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nname The Lost Mitten\nlength 8\ntitle at 0.5 for 3\nepisode 2 \"Winter\"\ncredits\ncredit \"Music by Sam\"\ntheme jingle\n"
+					   "character pip pip\ncharacter ann person at 2 0 0\nshot 0 A\n key 0 1 5  0 1 0\n", film), "");
+	EXPECT_DOUBLE_EQ(film.spec.storyEnd, 8.0);
+	EXPECT_DOUBLE_EQ(film.spec.length, 8.0 + 3.0 * 3) << "the name, the cast (two), the film's own lines: three cards";
+	ASSERT_EQ(film.spec.shots.size(), 2u);
+	EXPECT_EQ(film.spec.shots[1].name, "Credits");
+	EXPECT_DOUBLE_EQ(film.spec.shots[1].start, 8.0);
+	// the credits' frames: black (the set and the characters left out)
+	EXPECT_NE(film.sceneAt(4.0).find("# pip (pip)"), std::string::npos);
+	const std::string black = film.sceneAt(10.0);
+	EXPECT_EQ(black.find("# pip (pip)"), std::string::npos);
+	EXPECT_EQ(black.find("@anim"), std::string::npos);
+	EXPECT_NE(black.find("WorldBegin"), std::string::npos);
+	EXPECT_EQ(black.find("AreaLightSource"), std::string::npos);
+	// a fade into them
+	bool fade = false;
+	for (const cartoon::Transition &tr : film.transitions()) fade = fade || (tr.kind == cartoon::Transition::Fade && tr.at == 8.0);
+	EXPECT_TRUE(fade);
+	// the cards
+	const std::vector<cartoon::Caption> cards = film.titleCaptions();
+	ASSERT_EQ(cards.size(), 4u) << "the title and three cards of credits";
+	EXPECT_EQ(cards[0].lines[0].text, "The Lost Mitten");
+	ASSERT_EQ(cards[0].lines.size(), 2u);
+	EXPECT_EQ(cards[0].lines[1].text, "Episode 2: Winter");
+	EXPECT_DOUBLE_EQ(cards[0].t0, 0.5);
+	EXPECT_GE(cards[1].t0, 8.0);
+	EXPECT_EQ(cards[2].lines[0].text, "Cast");
+	EXPECT_EQ(cards[2].lines[1].text, "Pip  -  a pip");
+	EXPECT_EQ(cards[2].lines[2].text, "Ann  -  a person");
+	EXPECT_EQ(cards[3].lines[0].text, "Music by Sam");
+	EXPECT_LE(cards[3].t1, film.spec.length);
+	// the theme: heard under the title, and not without it
+	cartoon::audio::Mix with(film.spec.length), without(film.spec.length);
+	film.playTheme(with);
+	const std::vector<std::int16_t> a = with.finish(), b = without.finish();
+	double heard = 0.0;
+	for (std::size_t i = static_cast<std::size_t>(0.6 * cartoon::audio::kRate) * 2; i < static_cast<std::size_t>(2.5 * cartoon::audio::kRate) * 2; ++i) heard += std::abs(a[i] - b[i]);
+	EXPECT_GT(heard, 1e6);
+	// what is wrong
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\ncredits\n", bad).find("needs a `shot` line"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\nepisode two\n", bad).find("`episode N"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\ntheme\n", bad).find("`theme jingle"), std::string::npos);
+	// a film in parts: the title over the first part, the credits after the last, both with the whole film's name
+	const std::filesystem::path d = tempDir("titles");
+	write(d / "s.pbrt", kScene);
+	write(d / "two.film", "name Two Parts\ntitle\ncredits\nscene s.pbrt\npart One\nlength 4\nshot 0 A\n key 0 1 5  0 1 0\npart Two\nlength 4\nshot 0 B\n key 0 1 5  0 1 0\n");
+	ff::DataFilm one, two;
+	ASSERT_EQ(one.load((d / "two.film").string(), 0), "");
+	ASSERT_EQ(two.load((d / "two.film").string(), 1), "");
+	EXPECT_TRUE(one.spec.hasTitle);
+	EXPECT_FALSE(one.spec.credits);
+	EXPECT_FALSE(two.spec.hasTitle);
+	EXPECT_TRUE(two.spec.credits);
+	EXPECT_EQ(one.titleCaptions()[0].lines[0].text, "Two Parts");
+	EXPECT_EQ(two.titleCaptions()[0].lines[0].text, "Two Parts");
+}
+
 // Every cast and set of the library that comes with the program can be brought into a film.
 TEST(FilmLibrary, TheLibraryThatComesWithTheProgramLoads) {
 	(void)cartoon::films();   // (the kinds of character)

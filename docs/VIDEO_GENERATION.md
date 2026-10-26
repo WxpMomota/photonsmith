@@ -577,6 +577,14 @@ speaker's kind has (the turtle has no shrug; the masked explorer no face), and n
 (a script's parentheticals win). The timing is the line's syllables (the babble timing, the same in every program, whatever voice says it). A film made from a script
 (`--film-from-script`) has the line.
 
+**Titles, credits and a theme.** `title ["TEXT"] [at T] [for S]` lays a title card over the opening (the film's name unless given, large and centred, fading in and
+out); `episode N ["NAME"]` adds "Episode N: NAME" under it. `credits` adds cards of three seconds after the story, over black: the film's name (and episode), its cast
+five to a card ("Pip - a pip"), then its `credit "TEXT"` lines, a word on the voices when the computer said them, and "Made with Photonsmith". The film becomes that much
+longer; the story fades into the credits (a `Credits` shot), whose frames are a scene with nothing lit in it, so they cost nothing to render; the sky's time of day and the
+rest of the story keep the story's own length. `theme jingle` plays a fanfare of its own under the title (a bell's arpeggio over a chord); `theme FILE.wav [gain G]` plays
+a recording from the film library (`library/` beside the film file, or `film_assets/library`), so a series can open every episode with the same theme. In a film in parts
+the title and the theme are the first part's and the credits the last's, both with the whole film's name. `pip-goes-out.film` has them.
+
 **Hands on the set and on each other.** `touch NAME T0 T1 X Y Z [left|right]` puts a hand on a place of the set (pbrt's coordinates) from T0 to T1 - a wall to lean on,
 a door's handle (with a `turn` of the door's block), a lamp to switch on; `hold A B T0 T1` holds A's right hand and B's left together where they meet between them; `hug A B
 T0 T1` puts each one's arms round the other's sides. Each is reached for over the 0.6 s before T0 and let go over the 0.5 s after T1, like a prop, and heard as a touch at

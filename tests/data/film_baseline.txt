@@ -97,6 +97,7 @@ pip-goes-out|1|80877f19a94ee551|Down the path
 pip-goes-out|2|fa21ac06b9574f98|The lantern lights
 pip-goes-out|3|769db4e21e3fcf7c|Into the sun
 pip-goes-out|4|d9864c5aba8d066b|Cheering
+pip-goes-out|5|3c333a32d94cf28f|Credits
 tengwang|1|8fa5c7a59d8748b0|Black, a bell, the sea of clouds
 tengwang|2|df520deb6621eb1c|The river comes out of the mountains
 tengwang|3|9cd4554012f19a35|The Gan River and Hongzhou

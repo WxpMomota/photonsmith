@@ -273,6 +273,7 @@ inline Film filmOf(Registry &r, const film_file::DataFilm &d, bool drafted, int 
 		sfx::play(m, p->events());
 		p->thunder(m);
 		p->speak(m);
+		p->playTheme(m);
 		if (!drafted) return;
 		const music_cues::Sheet sheet = music_cues::parse(score::draft(*p));
 		std::vector<std::string> problems = sheet.problems;

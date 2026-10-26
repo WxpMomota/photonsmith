@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Films: titles, credits and a theme (2026-10-26).** `title`, `episode N "NAME"`, `credits`, `credit "TEXT"` and `theme jingle|FILE.wav` in a film file: a title card over the opening, cards of credits (the name, the cast, the film's own lines) after the story over black frames that cost nothing to render, and a fanfare or a library recording under the title. In a film in parts the title is the first part's and the credits the last's. The sky's time of day now runs over the story's length, not the film's. `pip-goes-out.film` has them.
+
 * **Films: hands on the set and on each other (2026-10-26).** `touch NAME T0 T1 X Y Z [left|right]` (lean on a wall, take a door's handle), `hold A B T0 T1` (hands held) and `hug A B T0 T1` in a film file: the hands are reached for, held and let go like a prop's, and each contact is heard as a touch.
 
 * **Films: shot lighting (2026-10-26).** `lighting [key K] [fill F] [rim R] [side left|right] [on WHO]` in a film file's shot or a cameras file's section adds three-point lighting round the subject from the camera (src/shared/cartoon/shot_lighting.h): a warm key, a cool fill and a rim, as soft-edged spot lights that are not seen, each strength the irradiance it gives the subject at any camera distance. Auto shots light each speaker; built-in films get it through their cameras file.

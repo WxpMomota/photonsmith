@@ -167,6 +167,14 @@
 //     hold     ann sam 6 9                                     # ann's right hand and sam's left held together
 //     hug      pip kid 6 9                                     # both of each one's arms round the other (stand them close: about a third of a metre chest to chest)
 //
+// Titles and credits - a title card over the opening, cards of credits after the story over black, a theme under the title:
+//
+//     title    "The Lost Mitten"  at 0.5  for 3                # (the film's name unless given)
+//     episode  2 "Winter"                                      # a line under the title: "Episode 2: Winter"
+//     credits                                                  # cards of three seconds after the story: the name, the cast five to a card, the `credit` lines
+//     credit   "Music by Sam"
+//     theme    jingle                                          # a fanfare of its own under the title, or a WAV of the film library (`theme opening.wav gain 0.8`)
+//
 // A shot's own lighting (shot_lighting.h) - a key, a fill and a rim round its subject, from where the camera is (in a shot's lines; a cameras file can say it too):
 //
 //       lighting key 1.5 fill 0.5 rim 1.2 side right on ann    # (any of them; `lighting` alone: key 1.2, fill 0.4, rim 0.8 on what the camera looks at)
@@ -507,6 +515,18 @@ struct Spec {
 		int line = 0;
 	};
 	std::vector<Contact> contacts;
+	// titles and credits: a title card over the opening (`title`, `episode`), cards of credits after the story over black (`credits`, `credit`), a theme under the title
+	bool hasTitle = false;
+	std::string title;              // "": the film's name
+	double titleAt = 0.5, titleFor = 3.0;
+	int episode = 0;
+	std::string episodeName;
+	bool credits = false;
+	std::vector<std::string> creditLines;
+	double storyEnd = 0.0;          // where the story ends and the credits begin (the length without them)
+	std::string theme;              // "jingle" or a WAV of the library ("": none)
+	double themeGain = 0.8;
+	std::string filmName;           // (a part of a film in parts: the whole film's name, for its title and credits)
 	// weather and particles (`weather`, `particles`, `burst`)
 	std::vector<particles::Weather> weather;
 	std::vector<particles::Emitter> emitters;
@@ -747,7 +767,8 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		const std::string &verb = w[0];
 		const std::string rest = detail::trim(line.substr(verb.size()));
 		if (sources.back().library && (verb == "film" || verb == "name" || verb == "about" || verb == "tags" || verb == "still" || verb == "length" || verb == "fps" || verb == "music" ||
-									   verb == "shot" || verb == "key" || verb == "part"))
+									   verb == "shot" || verb == "key" || verb == "part" || verb == "title" || verb == "episode" || verb == "credits" || verb == "credit" ||
+									   verb == "theme"))
 			return fail("`" + verb + "` is the film's, not a set's: a set is a scene and what dresses it, its sound and who is on it");
 		if (verb == "key") {
 			if (s.shots.empty()) return fail("a `key` line belongs to a shot: start one with `shot 0 NAME` first");
@@ -1368,6 +1389,39 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			a.kind = t[1];
 			if (t.size() > 3 || (t.size() == 3 && (!number(t[2], a.gain) || a.gain < 0.0 || a.gain > 4.0))) return fail("an ambience's gain is a number from 0 to 4");
 			s.ambience.push_back(a);
+		} else if (verb == "title") {   // a title card over the opening
+			const std::vector<std::string> t = detail::tokens(line);
+			s.hasTitle = true;
+			for (std::size_t i = 1; i < t.size(); ++i) {
+				if ((t[i] == "at" || t[i] == "for") && i + 1 < t.size()) {
+					if (!number(t[i + 1], t[i] == "at" ? s.titleAt : s.titleFor) || s.titleAt < 0.0 || !(s.titleFor > 0.5)) return fail("a title's `at` is a time and its `for` more than half a second");
+					++i;
+				} else if (i == 1) {
+					s.title = t[i];
+				} else {
+					return fail("`title [\"TEXT\"] [at T] [for SECONDS]` (the text: the film's name unless given)");
+				}
+			}
+		} else if (verb == "episode") {
+			const std::vector<std::string> t = detail::tokens(line);
+			double v = 0.0;
+			if (t.size() < 2 || t.size() > 3 || !number(t[1], v) || v < 1 || v != std::floor(v)) return fail("`episode N [\"NAME\"]`: its number (from 1) and its name");
+			s.episode = static_cast<int>(v);
+			if (t.size() == 3) s.episodeName = t[2];
+			s.hasTitle = true;
+		} else if (verb == "credits") {
+			if (w.size() != 1) return fail("`credits` (the cast and the film's own `credit` lines, on cards after the story)");
+			s.credits = true;
+		} else if (verb == "credit") {
+			const std::vector<std::string> t = detail::tokens(line);
+			if (t.size() != 2) return fail("`credit \"TEXT\"`: a line of the credits (\"Music by Sam\")");
+			s.creditLines.push_back(t[1]);
+			s.credits = true;
+		} else if (verb == "theme") {
+			const std::vector<std::string> t = detail::tokens(line);
+			if (t.size() != 2 && !(t.size() == 4 && t[2] == "gain" && number(t[3], s.themeGain) && s.themeGain >= 0.0 && s.themeGain <= 4.0))
+				return fail("`theme jingle|FILE.wav [gain G]`: a fanfare under the title, or a recording of the film library");
+			s.theme = t[1];
 		} else if (verb == "touch" || verb == "hold" || verb == "hug") {   // hands on the set, or on another character
 			const std::vector<std::string> t = detail::tokens(line);
 			Spec::Contact c;
@@ -1754,7 +1808,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1892,6 +1946,23 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 	for (skyfx::Lightning &l : s.lightnings) l.strikes = skyfx::strikesOf(l, s.length);
 	for (skyfx::Aurora &a : s.auroras)
 		if (!a.facingSet && s.hasSky) a.facing = s.sky.south + 180.0;   // (the aurora is towards the pole: the film's own north)
+	s.storyEnd = s.length;
+	if (s.credits) {   // the credits: cards of three seconds after the story, over black (the film's name; the cast, five to a card; the film's own lines and how it was made)
+		if (s.shots.empty()) {
+			n = 0;
+			return fail("`credits` come after the film's shots: the film needs a `shot` line");
+		}
+		std::size_t cast = 0;
+		for (const Character &c : s.characters) cast += c.extra ? 0 : 1;
+		s.length += 3.0 * static_cast<double>(2 + (cast + 4) / 5);
+		Shot credits;
+		credits.start = s.storyEnd;
+		credits.name = "Credits";
+		credits.path = camera_keyframes::parse("key 0 1 5  0 1 0\nkey 0 1 5  0 1 0\n").path;   // (its frames are black: DataFilm::inCredits)
+		credits.transition.kind = Transition::Fade;
+		credits.transition.length = 1.0;
+		s.shots.push_back(credits);
+	}
 	if (s.ambience.empty() && !s.hasUnderwater && (s.hasTerrain || !s.forests.empty())) {   // a landscape is heard as what it is, unless an `ambience` line says how: wind over the
 		double elevation = 0.0, facing = 0.0;                                                // land, and birds in a wood by day, crickets in it and the night's sounds after dark
 		dressing::sunAt(s.sky, 0.5 * (s.sky.from + s.sky.to), elevation, facing);
@@ -1947,7 +2018,7 @@ inline FilmParts partsOf(const std::string &text, const std::string &where) {
 		return out;
 	};
 	// the film's own lines, before the first part
-	std::vector<bool> shared(lines.size(), false);
+	std::vector<bool> shared(lines.size(), false), opening(lines.size(), false), closing(lines.size(), false);
 	for (std::size_t i = 0; i < starts[0]; ++i) {
 		const std::string &w = clean[i];
 		if (w.empty()) continue;
@@ -1968,6 +2039,10 @@ inline FilmParts partsOf(const std::string &text, const std::string &where) {
 			out.draftMusic = rest == "draft";
 		} else if (verb == "shot" || verb == "key") {
 			return fail(i, "a shot belongs to a part: the lines before the first `part` are what every part shares");
+		} else if (verb == "title" || verb == "episode" || verb == "theme") {
+			opening[i] = true;   // (the first part's: the title is over the film's opening)
+		} else if (verb == "credits" || verb == "credit") {
+			closing[i] = true;   // (the last part's: the credits come after the film's end)
 		} else {
 			shared[i] = true;
 		}
@@ -1988,7 +2063,9 @@ inline FilmParts partsOf(const std::string &text, const std::string &where) {
 		}
 		for (const PartText &other : out.parts)
 			if (other.name == part.name) return fail(at, "there is already a part called \"" + part.name + "\"");
-		for (std::size_t i = 0; i < lines.size(); ++i) part.text += (shared[i] || (i > at && i < end) ? lines[i] : std::string()) + "\n";
+		const bool first = p == 0, last = p + 1 == starts.size();
+		for (std::size_t i = 0; i < lines.size(); ++i)
+			part.text += (shared[i] || (opening[i] && first) || (closing[i] && last) || (i > at && i < end) ? lines[i] : std::string()) + "\n";
 		out.parts.push_back(part);
 	}
 	return out;
@@ -2219,6 +2296,7 @@ class DataFilm {
 		if (partIndex >= 0) {
 			spec.key = (parts.key.empty() ? detail::keyFromFileName(filePath) : parts.key) + "--" + std::to_string(partIndex + 1);
 			spec.name = parts.parts[static_cast<std::size_t>(partIndex)].name;
+			spec.filmName = parts.name.empty() ? (parts.key.empty() ? detail::keyFromFileName(filePath) : parts.key) : parts.name;   // (for its title and credits)
 		}
 		if (spec.key.empty()) spec.key = detail::keyFromFileName(filePath);
 		if (!detail::validKey(spec.key)) return filePath + ": the key \"" + spec.key + "\" is not lower-case letters, digits and '-'; give the film a `film KEY` line";
@@ -3291,7 +3369,82 @@ class DataFilm {
 			cap.lines.push_back(text);
 			out.push_back(cap);
 		}
+		const std::vector<Caption> cards = titleCaptions();
+		out.insert(out.end(), cards.begin(), cards.end());
 		return out;
+	}
+	// The title card (`title`, `episode`) and the cards of the credits (`credits`, `credit`): the film's name; its cast, five to a card; its own lines and how it was made.
+	std::vector<Caption> titleCaptions() const {
+		std::vector<Caption> out;
+		const std::string name = spec.filmName.empty() ? spec.name : spec.filmName;
+		const std::string episode = spec.episode > 0 ? "Episode " + std::to_string(spec.episode) + (spec.episodeName.empty() ? std::string() : ": " + spec.episodeName) : std::string();
+		const auto card = [&](double t0, double t1, double fade, const std::vector<std::pair<std::string, double>> &lines) {
+			Caption c;
+			c.t0 = t0, c.t1 = t1, c.fade = fade, c.centreY = 0.46, c.width = 0.8;
+			for (const auto &[text, size] : lines) {
+				CaptionLine l;
+				l.text = text;
+				l.size = size;
+				l.weight = size > 0.06 ? 1.5 : 0.0;
+				c.lines.push_back(l);
+			}
+			out.push_back(c);
+		};
+		if (spec.hasTitle) {
+			std::vector<std::pair<std::string, double>> lines{{spec.title.empty() ? name : spec.title, 0.09}};
+			if (!episode.empty()) lines.push_back({episode, 0.045});
+			card(spec.titleAt, spec.titleAt + spec.titleFor, 0.7, lines);
+		}
+		if (!spec.credits) return out;
+		double t = spec.storyEnd + 0.6;   // (after the fade to black)
+		std::vector<std::pair<std::string, double>> first{{name, 0.075}};
+		if (!episode.empty()) first.push_back({episode, 0.042});
+		card(t, t + 2.6, 0.45, first);
+		t += 3.0;
+		std::vector<const Character *> cast;
+		for (const Character &c : spec.characters)
+			if (!c.extra) cast.push_back(&c);
+		for (std::size_t k = 0; k < cast.size(); k += 5) {
+			std::vector<std::pair<std::string, double>> lines{{k == 0 ? "Cast" : "Cast (continued)", 0.05}};
+			for (std::size_t j = k; j < std::min(cast.size(), k + 5); ++j) {
+				std::string who = cast[j]->name, kind = cast[j]->kind;
+				if (!who.empty()) who[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(who[0])));
+				std::replace(kind.begin(), kind.end(), '-', ' ');
+				lines.push_back({who + "  -  a " + kind, 0.038});
+			}
+			card(t, t + 2.6, 0.45, lines);
+			t += 3.0;
+		}
+		std::vector<std::pair<std::string, double>> last;
+		for (const std::string &l : spec.creditLines) last.push_back({l, 0.04});
+		bool voiced = false;
+		for (const Character &c : spec.characters) voiced = voiced || !voiceAskedOf(c).empty();
+		if (voiced) last.push_back({"Voices by the computer's own text-to-speech", 0.034});
+		last.push_back({"Made with Photonsmith", 0.034});
+		card(t, std::min(spec.length - 0.1, t + 2.6), 0.45, last);
+		return out;
+	}
+	// The film's theme under its title (`theme`): a fanfare of its own (`jingle`: a bell's arpeggio over a chord), or a recording of the film library (library/FILE beside the
+	// film file, else in film_assets/library).
+	void playTheme(audio::Mix &m) const {
+		if (spec.theme.empty()) return;
+		const double t0 = spec.hasTitle ? std::max(0.0, spec.titleAt - 0.3) : 0.0, g = spec.themeGain;
+		if (spec.theme == "jingle") {
+			const double arpeggio[4] = {72.0, 76.0, 79.0, 84.0};   // C E G C, up
+			for (int i = 0; i < 4; ++i) m.put(t0 + 0.22 * i, audio::bell(audio::hz(arpeggio[i]), 2.2), 0.11 * g, -0.3 + 0.2 * i, 0.5);
+			for (const double note : {60.0, 64.0, 67.0}) m.put(t0 + 0.9, audio::pad(audio::hz(note), 2.6, 0.3, 1.2), 0.035 * g, 0.0, 0.7);
+			m.put(t0 + 0.9, audio::bass(audio::hz(48.0), 2.2), 0.09 * g, 0.0, 0.2);
+			return;
+		}
+		std::error_code ec;
+		std::string file = (std::filesystem::path(sourcePath).parent_path() / "library" / spec.theme).string();
+		if (!std::filesystem::exists(file, ec)) file = film_cache::asset("library/" + spec.theme);
+		const music_cues::Recording &r = music_cues::recording(file);
+		if (r.sound.empty()) {
+			std::cerr << "[theme] " << spec.key << ": " << spec.theme << " " << (r.why.empty() ? "is not in the film library" : r.why) << std::endl;
+			return;
+		}
+		m.put(t0, r.sound, 0.6 * g, 0.0, 0.2);
 	}
 	// (film_events.h's panOf and audibility, here so that this header does not need the sound library)
 	static double panOf(const CameraView &view, Vec3 at) {
@@ -3320,7 +3473,14 @@ class DataFilm {
 		return out.empty() ? "The whole film" : out;
 	}
 
+	// Whether t is in the credits (after the story: `credits`), whose frames are black.
+	bool inCredits(double t) const { return spec.credits && t >= spec.storyEnd; }
+	// A black frame: the scene's own header and nothing lit (a speck far below the set: a world with nothing in it is not a scene).
+	std::string creditsScene() const {
+		return scene.header + "AttributeBegin\n  Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]\n  Translate 0 -100000 0\n  Shape \"sphere\" \"float radius\" [ 0.001 ]\nAttributeEnd\n";
+	}
 	std::string headerAt(double t) const {
+		if (inCredits(t)) return scene.header;
 		if (spec.shots.empty()) return toonLine() + scene.header;
 		std::string lookAt, camera;
 		cameraAt(t, lookAt, camera);
@@ -3330,7 +3490,7 @@ class DataFilm {
 	// The `# @rt-toon` line of every frame of a film with the toon look (`toon`), else nothing.
 	std::string toonLine() const { return spec.toon.on ? toon_look::tagOf(spec.toon) : std::string(); }
 
-	std::string sceneAt(double t) const { return worldAt(headerAt(t), t); }
+	std::string sceneAt(double t) const { return inCredits(t) ? creditsScene() : worldAt(headerAt(t), t); }
 
 	// ---- how shots give way to each other ----
 	std::vector<Transition> transitions() const {
@@ -3371,7 +3531,7 @@ class DataFilm {
 	double exposureAt(double t) const {
 		if (!spec.exposureAuto || !spec.hasSky) return spec.exposure;
 		double el = 0.0, facing = 0.0;
-		dressing::sunAt(spec.sky, dressing::hourAt(spec.sky, t, spec.length), el, facing);
+		dressing::sunAt(spec.sky, dressing::hourAt(spec.sky, t, spec.storyEnd), el, facing);
 		return spec.exposure * film_camera::autoExposure(el);
 	}
 	// The thunder of its lightning, each strike heard as long after as sound takes to come from it to the camera at its time.
@@ -3467,7 +3627,7 @@ class DataFilm {
 		if (spec.hasSky) {
 			double rainbow = 0.0;   // (eased in and out over two seconds)
 			for (const Spec::Rainbow &r : spec.rainbows) rainbow = std::max(rainbow, r.strength * smoothstep(r.t0, r.t0 + 2.0, t) * (1.0 - smoothstep(r.t1 - 2.0, r.t1, t)));
-			out += "# the sun and sky at " + std::to_string(dressing::hourAt(spec.sky, t, spec.length)) + " h (film_dressing.h)\n" + dressing::skyText(spec.key, spec.sky, t, spec.length, rainbow);
+			out += "# the sun and sky at " + std::to_string(dressing::hourAt(spec.sky, t, spec.storyEnd)) + " h (film_dressing.h)\n" + dressing::skyText(spec.key, spec.sky, t, spec.storyEnd, rainbow);
 		}
 		out += dressingAt(t);
 		if (!spec.weather.empty() || !spec.emitters.empty()) {   // weather round the camera, and particles (film_particles.h)
