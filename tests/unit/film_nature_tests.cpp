@@ -410,27 +410,100 @@ TEST(FilmWildlife, FlocksSwirlRoundTheirPlaceGeeseFlyInAVAndHerdsGraze) {
 		crowded += nearest < 0.3;
 	}
 	EXPECT_LT(crowded, static_cast<int>(p.size()) / 20) << "they keep apart";
-	const std::string a = wildlife::flockText(f, 6.0, ground.get());
+	cartoon::animals::Poses poses;
+	const std::string a = wildlife::flockText(f, 6.0, ground.get(), poses);
 	std::size_t placed = 0;
 	for (std::size_t at = a.find("ObjectInstance"); at != std::string::npos; at = a.find("ObjectInstance", at + 1)) ++placed;
 	EXPECT_EQ(placed, 300u);
 	EXPECT_NE(a.find("ObjectBegin \"wild_starlings_0\""), std::string::npos);
-	EXPECT_EQ(wildlife::flockText(f, 6.0, ground.get(), false).find("ObjectBegin"), std::string::npos) << "(another flock of the kind wrote the poses)";
+	EXPECT_EQ(wildlife::flockText(f, 6.0, ground.get(), poses, false).find("ObjectBegin"), std::string::npos) << "(another flock of the kind wrote the poses)";
 	// the herd: on its way, stopping to graze, on the ground
 	const wildlife::Herd &h = film.spec.herds[0];
-	const std::string h0 = wildlife::herdText(h, 0.0, ground.get()), h6 = wildlife::herdText(h, 6.0, ground.get()), h60 = wildlife::herdText(h, 60.0, ground.get());
+	cartoon::animals::Poses p0, p6, p60;
+	const std::string h0 = wildlife::herdText(h, 0.0, ground.get(), p0), h6 = wildlife::herdText(h, 6.0, ground.get(), p6), h60 = wildlife::herdText(h, 60.0, ground.get(), p60);
 	EXPECT_NE(h0, h6) << "they walk";
-	EXPECT_NE(h60.find("wild_deer_graze"), std::string::npos) << "and graze where they arrive";
+	EXPECT_NE(h60.find("anim_deer_graze_"), std::string::npos) << "and graze where they arrive";
 	// the geese are heard; the film's own line errors
 	EXPECT_TRUE(std::any_of(film.spec.ambience.begin(), film.spec.ambience.end(), [](const auto &am) { return am.kind == "geese"; }));
-	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"flock bats 10 at 0 0 0", "starlings, geese, fish or butterflies"},
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"flock bats 10 at 0 0 0", "starlings, geese, fish, butterflies or eagles"},
 																						 {"flock geese 5", "from X Y Z to X Y Z"},
 																						 {"flock starlings 20 radius 3", "needs its `at X Y Z`"},
-																						 {"herd deer 5 from 0 0", "`herd deer COUNT from X Z to X Z"}}) {
+																						 {"herd deer 5 from 0 0", "`herd KIND COUNT from X Z to X Z"}}) {
 		ff::DataFilm bad;
 		const std::string problem = loadNature("wild_bad", "scene s.pbrt\nlength 4\n" + line + "\n", bad);
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
+}
+
+// The rigged animals (film_animals.h): every model reads, stands on the ground at life size and has its clips; a quadruped's feet stay where they are on the ground for the
+// part of the walk they are down (the stride the film plays the clip by is the clip's own: no sliding); a herd walks, grazes, then bolts at a gallop when it flees; eagles
+// circle and climb, each pose written once a frame.
+TEST(FilmAnimals, RiggedAnimalsWalkWithoutSlidingGrazeAndBoltAndEaglesCircle) {
+	namespace an = cartoon::animals;
+	for (const char *kind : {"deer", "horses", "wolves", "eagles", "geese"}) {
+		std::string why;
+		const std::shared_ptr<const an::Model> m = an::modelOf(kind, &why);
+		ASSERT_TRUE(m) << kind << ": " << why;
+		double lo[3], hi[3];
+		gltf_skin::boundsOf(gltf_skin::posed(m->rig, gltf_skin::restPose(m->rig)), lo, hi);
+		const an::Species &sp = *an::species(kind);
+		if (sp.bird) {
+			EXPECT_GE(m->clip("flap"), 0) << kind;
+			EXPECT_GE(m->clip("glide"), 0) << kind;
+			EXPECT_GT(hi[0] - lo[0], 1.4) << kind << ": its wingspan";
+			continue;
+		}
+		for (const char *clip : {"walk", "trot", "run", "graze", "idle"}) EXPECT_GE(m->clip(clip), 0) << kind << " " << clip;
+		EXPECT_NEAR(lo[1], 0.0, 0.03) << kind << ": standing on the ground";
+		EXPECT_GT(hi[1], 0.9 * sp.length) << kind;
+		// the left fore hoof through the walk: while it is down its height stays low and it moves back under the body at the pace the stride says
+		const gltf_skin::Rig &rig = m->rig;
+		int foot = -1;
+		for (std::size_t n = 0; n < rig.nodes.size(); ++n)
+			if (rig.nodes[n].name == "fl.foot") foot = static_cast<int>(n);
+		ASSERT_GE(foot, 0);
+		const gltf_skin::Clip &walk = rig.clips[static_cast<std::size_t>(m->clip("walk"))];
+		const auto footAt = [&](double u, double xyz[3]) {
+			gltf_skin::Pose pose = gltf_skin::restPose(rig);
+			gltf_skin::apply(rig, walk, u * walk.length, pose);
+			const std::vector<gltf_skin::Mat> world = gltf_skin::worldOf(rig, pose);
+			const double origin[3] = {0, 0, 0};
+			gltf_skin::detail::transformPoint(world[static_cast<std::size_t>(foot)], origin, xyz);
+		};
+		double a[3], b[3];
+		footAt(0.27, a);   // (the left fore is down from 0.25 to 0.9 of the cycle)
+		footAt(0.85, b);
+		const double travelled = a[2] - b[2], body = sp.walkStride * (0.85 - 0.27);
+		EXPECT_NEAR(travelled / body, 1.0, 0.12) << kind << ": the hoof goes back as fast as the body goes forward";
+		EXPECT_LT(std::abs(a[1] - b[1]), 0.05 * sp.length) << kind;
+	}
+	// a herd in a film: walking, grazing, then fleeing at a gallop and running on past where it was going
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("animals", "scene s.pbrt\nlength 20\nterrain hills size 600 height 20 seed 6 far off\nherd horses 8 from -20 0 to 20 0 flee 10\nflock eagles 3 at 0 80 -50\n", film), "");
+	const auto ground = cartoon::terrain::fieldOf(film.spec.terrain);
+	const wildlife::Herd &h = film.spec.herds[0];
+	EXPECT_DOUBLE_EQ(h.flee, 10.0);
+	const auto clipsIn = [](const std::string &text, const std::string &clip) {
+		std::size_t n = 0;
+		for (std::size_t at = text.find("ObjectInstance \"anim_horses_" + clip); at != std::string::npos; at = text.find("ObjectInstance \"anim_horses_" + clip, at + 1)) ++n;
+		return n;
+	};
+	an::Poses early, late;
+	const std::string before = wildlife::herdText(h, 4.0, ground.get(), early), after = wildlife::herdText(h, 16.0, ground.get(), late);
+	EXPECT_GT(clipsIn(before, "walk") + clipsIn(before, "graze"), 7u);
+	EXPECT_EQ(clipsIn(before, "run"), 0u);
+	EXPECT_EQ(clipsIn(after, "run"), 8u) << "all galloping";
+	std::size_t objects = 0;
+	for (std::size_t at = after.find("ObjectBegin"); at != std::string::npos; at = after.find("ObjectBegin", at + 1)) ++objects;
+	EXPECT_LE(objects, 8u) << "each pose written once";
+	EXPECT_EQ(wildlife::goingAt(30.0, 1.3, 10.0, 3.0, 0.0, 10.0, 13.0).speed, 13.0);
+	EXPECT_NEAR(wildlife::goingAt(30.0, 1.3, 10.0, 3.0, 0.0, 10.0, 13.0).covered - wildlife::goingAt(29.0, 1.3, 10.0, 3.0, 0.0, 10.0, 13.0).covered, 13.0, 1e-9);
+	// the eagles: circling, banked, drawn from their glide and flap
+	an::Poses birds;
+	const std::string sky = wildlife::flockText(film.spec.flocks[0], 5.0, ground.get(), birds);
+	EXPECT_NE(sky.find("anim_eagles_"), std::string::npos);
+	ff::DataFilm bad;
+	EXPECT_NE(loadNature("animals_bad", "scene s.pbrt\nlength 4\nherd lions 5 from 0 0 to 10 0\n", bad).find("deer, horses or wolves"), std::string::npos);
 }
 
 // ---- the sky's spectacles ------------------------------------------------------------------------------------------------------------------------------------------------------

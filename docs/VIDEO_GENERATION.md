@@ -910,7 +910,9 @@ flock  starlings 2000  at 0 45 -110  radius 50       # a murmuration (on a terra
 flock  geese 9  from 60 30 -40  to -200 40 -120      # a skein, in a V
 flock  fish 80  at 0 -3 -10  radius 6                # a school
 flock  butterflies 12  in -3 -1 3 -5                 # over a patch of meadow (`height H` lifts them)
-herd   deer 10  from -15 -22  to 30 -26  speed 1.2   # crossing the land
+flock  eagles 3  at 0 120 -300  radius 60           # circling up a thermal
+herd   deer 10  from -15 -22  to 30 -26  speed 1.2   # crossing the land (deer, horses or wolves)
+herd   horses 30  from -200 0  to 300 -40  flee 12  # walking, grazing; at 12 s they bolt and gallop away
 ```
 
 Starlings and fish flock: each keeps apart from those nearest it, turns as its seven nearest neighbours turn, closes on them, and is drawn to a centre that wanders round where
@@ -918,9 +920,18 @@ the flock was put (within its `radius`), so the flock swirls, stretches and fold
 turns and beat their wings (or tails) at their own rates. The flight is worked out once when the film is loaded, 24 steps a second over the film (neighbours found through a
 grid, so a flock of thousands is quick), and each frame takes the step at its time. Geese fly in a V behind a leader on its way from one point to another, each half a wingbeat
 behind the one ahead, and are heard (an `ambience geese` of honking unless the film file says otherwise); butterflies wander their patch near the ground, flitting up and down
-(orange, yellow and blue, twice life size so they read); a herd walks from one point to the other in a loose bunch, on the ground, each deer stopping for a few seconds now and
-then to graze, and grazing when it arrives. `during T0 T1` limits when a flock is there; `start T` when a herd sets off; `seed N` changes them. Each kind is drawn from eight poses
-of its wingbeat, tail beat or stride (pbrt objects written once a frame) placed once per animal: 2000 starlings are 2000 placements.
+(orange, yellow and blue, twice life size so they read); eagles circle the thermal at `at`, each on a circle of its own within `radius` (60 m), banked into it, rising
+slowly, gliding with a few wingbeats now and then. A herd walks from one point to the other in a loose bunch (a pack of wolves closer), on the ground and pitched to its slope,
+each animal stopping for a few seconds now and then to graze (wolves: to stand and look round), and grazing when it arrives; from `flee T` on they bolt one after another,
+breaking into a trot and a gallop over a second and a half (deer 10 m/s, horses 13, wolves 11) and running on past where they were going. `during T0 T1` limits when a flock is
+there; `start T` when a herd sets off; `speed S` its walking pace; `seed N` changes them.
+
+Starlings, fish and butterflies are drawn from eight poses of their wingbeat or tail beat. Deer, horses, wolves, eagles and geese are rigged glTF models
+(`film_assets/library/animals/*.glb`, made by `scripts/make_rigged_animals.py`, posed by gltf_skin.h: film_animals.h): a skeleton of a spine, a neck, a head, a tail and four
+legs of three bones (a bird's wings of three), a body lofted round it and skinned smoothly across its joints, and clips - the four-beat walk, the trot of diagonal pairs, the
+rotary gallop with its spine flexing, grazing, standing and looking round; a bird's wingbeat (folding at the wrist on the upstroke) and its glide. A gait is chosen by the
+animal's speed and played by the ground it covers - one cycle of its clip for each stride the clip makes - so the hooves do not slide. Either way a kind's poses are pbrt
+objects written once a frame (a rigged kind's only those the frame uses: 16 to a gait's cycle) and placed once per animal: 2000 starlings are 2000 placements.
 
 **The sky's spectacles: `aurora`, `lightning`, `meteors`, `rainbow`.** (film_skyfx.h; the sky itself is film_sky.h's)
 

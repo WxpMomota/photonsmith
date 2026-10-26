@@ -1,6 +1,6 @@
 #pragma once
 // film_wildlife.h -- animals for a film file (film_file.h `flock`, `herd`): a murmuration of starlings, a skein of geese in a V, a school of fish, butterflies over a meadow,
-// a herd of deer crossing the land.
+// eagles circling up a thermal, a herd of deer, horses or wolves crossing the land.
 //
 // How they move:
 //   starlings, fish   flocking (boids): each keeps apart from the nearest, turns as its seven nearest neighbours turn, closes on them, and is drawn to a centre that wanders
@@ -8,9 +8,12 @@
 //                     over the film, and each frame takes the step at its time (frames stay independent and render in any order);
 //   geese             a V behind a leader that flies from one point to another, each bird half a wingbeat after the one before;
 //   butterflies       each wanders over its patch near the ground, flitting up and down;
-//   deer              a loose herd walking from one point to another over the land, each stopping now and then to graze.
-// How they look: each kind is drawn from a few poses of its wingbeat, tail beat or stride (pbrt objects, written once per frame and placed once per animal), turned along its
-// way and banked into its turns.
+//   eagles            each circling on the thermal at `at`, rising, banked into its circle, gliding and now and then flapping;
+//   deer, horses,     a loose herd (a pack) walking from one point to another over the land, each stopping now and then to graze (wolves: to stand and look round), and
+//   wolves            from `flee T` on breaking into a gallop, one after another, and running on.
+// How they look: starlings, fish and butterflies are drawn from a few poses of their wingbeat or tail beat made here; deer, horses, wolves, eagles and geese are rigged
+// models with their clips (film_animals.h: walking, trotting, galloping by their speed, without sliding; grazing; flapping and gliding). Either way the poses are pbrt
+// objects written once a frame and placed once per animal, turned along its way and banked into its turns.
 //
 // Coordinates are pbrt's, as a film file's; the shapes are made in story space and placed with nature::placeObject.
 
@@ -22,6 +25,7 @@
 #include <vector>
 
 #include "cartoon_lib.h"
+#include "film_animals.h"
 #include "film_terrain.h"
 #include "nature_lib.h"
 
@@ -29,11 +33,11 @@ namespace cartoon {
 namespace wildlife {
 
 inline const std::vector<std::string> &flockKinds() {
-	static const std::vector<std::string> k = {"starlings", "geese", "fish", "butterflies"};
+	static const std::vector<std::string> k = {"starlings", "geese", "fish", "butterflies", "eagles"};
 	return k;
 }
 inline const std::vector<std::string> &herdKinds() {
-	static const std::vector<std::string> k = {"deer"};
+	static const std::vector<std::string> k = {"deer", "horses", "wolves"};
 	return k;
 }
 
@@ -49,17 +53,17 @@ struct Flock {
 	std::vector<std::vector<Vec3>> pos, vel;
 	double dt = 1.0 / 24.0;
 };
-// A herd: its kind, how many, from where to where (pbrt's x z), how fast, when it sets off, a seed.
+// A herd: its kind, how many, from where to where (pbrt's x z), how fast it walks (0: its kind's pace), when it sets off, when it flees (below 0: never), a seed.
 struct Herd {
 	std::string kind = "deer";
 	int count = 10;
-	double fx = 0.0, fz = 0.0, tx = 0.0, tz = 0.0, speed = 1.1, t0 = 0.0;
+	double fx = 0.0, fz = 0.0, tx = 0.0, tz = 0.0, speed = 0.0, t0 = 0.0, flee = -1.0;
 	int seed = 1;
 };
 
 namespace detail {
 
-inline double speedOf(const std::string &kind) { return kind == "starlings" ? 11.0 : kind == "geese" ? 15.0 : kind == "fish" ? 1.4 : 1.2; }
+inline double speedOf(const std::string &kind) { return kind == "starlings" ? 11.0 : kind == "geese" ? 15.0 : kind == "fish" ? 1.4 : kind == "eagles" ? 12.0 : 1.2; }
 
 // Flocking, stepped from t = 0 to `length`: the flock's positions and velocities every dt.
 inline void fly(Flock &f, double seconds) {
@@ -217,43 +221,17 @@ inline Mesh butterflyPose(int k) {
 	}
 	return m;
 }
-// A deer (forward +z, standing on y 0) at phase k of its stride; `graze`: its head down to the grass.
-inline Mesh deerPose(int k, bool graze) {
-	Mesh m;
-	const double ph = 2.0 * kPi * k / kPoses;
-	blob(m, {0, 1.0, 0}, {0.22, 0.25, 0.62});                                // body
-	const Vec3 neckBase{0, 1.15, 0.5}, head = graze ? Vec3{0, 0.35, 0.95} : Vec3{0, 1.6, 0.78};
-	nature::addStrip(m, [&](double s) { return neckBase + (head - neckBase) * s; }, [](double s) { return 0.16 - 0.06 * s; }, {1, 0, 0}, 3);
-	blob(m, head, {0.09, 0.1, 0.18});
-	for (const double side : {-1.0, 1.0}) blob(m, head + Vec3{side * 0.07, 0.12, -0.06}, {0.025, 0.07, 0.04});   // ears
-	for (int leg = 0; leg < 4; ++leg) {   // legs swinging in a walk (diagonal pairs together)
-		const double side = leg % 2 ? 1.0 : -1.0, front = leg < 2 ? 1.0 : -1.0;
-		const double swing = 0.35 * std::sin(ph + (leg == 0 || leg == 3 ? 0.0 : kPi));
-		const Vec3 hip{side * 0.12, 0.95, front * 0.45}, knee = hip + Vec3{0, -0.45, swing * 0.5 + 0.03 * front}, hoof{hip.x, 0.0, hip.z + swing};
-		nature::addStrip(m, [&](double s) { return hip + (knee - hip) * s; }, [](double) { return 0.07; }, {1, 0, 0}, 1);
-		nature::addStrip(m, [&](double s) { return knee + (hoof - knee) * s; }, [](double) { return 0.045; }, {1, 0, 0}, 1);
-		nature::addStrip(m, [&](double s) { return hip + (knee - hip) * s; }, [](double) { return 0.07; }, {0, 0, 1}, 1);
-		nature::addStrip(m, [&](double s) { return knee + (hoof - knee) * s; }, [](double) { return 0.045; }, {0, 0, 1}, 1);
-	}
-	return m;
-}
-
 inline std::string poseObjects(const std::string &kind) {
 	std::string out;
 	for (int k = 0; k < kPoses; ++k) {
 		const std::string name = "wild_" + kind + "_" + std::to_string(k);
 		if (kind == "starlings") out += nature::objectBegin(name) + attr(coated({0.03, 0.03, 0.035}, 0.3), emitMesh(birdPose(k, 0.6), identity())) + nature::objectEnd();   // (a little larger than life)
-		else if (kind == "geese") out += nature::objectBegin(name) + attr(diffuseMaterial({0.28, 0.25, 0.22}), emitMesh(birdPose(k, 1.6), identity())) + nature::objectEnd();
 		else if (kind == "fish") out += nature::objectBegin(name) + attr(coated({0.45, 0.48, 0.5}, 0.15), emitMesh(fishPose(k, 0.3), identity())) + nature::objectEnd();
 		else if (kind == "butterflies")
 			for (int c = 0; c < 3; ++c) {   // three colours: orange, yellow, blue
 				static const Vec3 col[3] = {{0.75, 0.32, 0.04}, {0.8, 0.7, 0.15}, {0.12, 0.25, 0.7}};
 				out += nature::objectBegin(name + "_" + std::to_string(c)) + attr(translucentMaterial(col[c], col[c] * 0.4), emitMesh(butterflyPose(k), identity())) + nature::objectEnd();
 			}
-		else if (kind == "deer") {
-			out += nature::objectBegin(name) + attr(diffuseMaterial({0.36, 0.22, 0.12}), emitMesh(deerPose(k, false), identity())) + nature::objectEnd();
-			if (k == 0) out += nature::objectBegin("wild_deer_graze") + attr(diffuseMaterial({0.36, 0.22, 0.12}), emitMesh(deerPose(0, true), identity())) + nature::objectEnd();
-		}
 	}
 	return out;
 }
@@ -265,10 +243,12 @@ inline void prepare(Flock &f, double seconds) {
 	if (f.kind == "starlings" || f.kind == "fish") detail::fly(f, std::min(seconds, std::max(0.0, f.t1)) + 1.0);
 }
 
-// A flock at t, as scene text: the poses of its kind (unless `objects` is false: another flock of the kind wrote them) and a placement for each animal. "" outside its time.
-inline std::string flockText(const Flock &f, double t, const terrain::Field *ground, bool objects = true) {
+// A flock at t, as scene text: the poses of its kind (unless `objects` is false: another flock of the kind wrote them; a rigged kind's go through `poses`) and a placement
+// for each animal. "" outside its time.
+inline std::string flockText(const Flock &f, double t, const terrain::Field *ground, animals::Poses &poses, bool objects = true) {
 	if (t < f.t0 || t > f.t1) return std::string();
-	std::string out = "# a flock of " + f.kind + " (film_wildlife.h)\n" + (objects ? detail::poseObjects(f.kind) : std::string());
+	const bool rigged = f.kind == "geese" || f.kind == "eagles";
+	std::string out = "# a flock of " + f.kind + " (film_wildlife.h)\n" + (objects && !rigged ? detail::poseObjects(f.kind) : std::string());
 	const auto place = [&](const std::string &name, Vec3 at, Vec3 fwd, double bank, double s) {   // pbrt's at and fwd
 		const Vec3 storyAt{-at.x, at.y, at.z}, storyFwd{-fwd.x, fwd.y, fwd.z};
 		const Mat4 turn = detail::facing(storyFwd, Vec3{0, 1, 0});
@@ -298,8 +278,21 @@ inline std::string flockText(const Flock &f, double t, const terrain::Field *gro
 		for (int i = 0; i < f.count; ++i) {
 			const int rank = (i + 1) / 2, arm = i % 2 ? 1 : -1;
 			const Vec3 p = lead - dir * (2.2 * rank) + side * (1.8 * rank * arm) + Vec3{0, 0.4 * std::sin(t * 0.8 + i), 0};
-			const int pose = static_cast<int>(std::floor((t * 3.0 - 0.5 * rank) * detail::kPoses)) % detail::kPoses;
-			place("wild_geese_" + std::to_string((pose + detail::kPoses) % detail::kPoses), p, dir, 0.0, 1.0);
+			const int pose = static_cast<int>(std::floor((t * 3.0 - 0.5 * rank) * animals::posesOf("flap")));
+			place(poses.poseName("geese", "flap", pose, out), p, dir, 0.0, 1.0);
+		}
+	} else if (f.kind == "eagles") {   // each circling the thermal, rising; gliding, a few wingbeats now and then
+		const double speed = f.speed > 0.0 ? f.speed : detail::speedOf(f.kind);
+		for (int i = 0; i < f.count; ++i) {
+			const int s = f.seed * 37 + i;
+			const double r = f.radius * (0.55 + 0.6 * hash01(s, 1)), w = speed / r, a = 2.0 * kPi * hash01(s, 2) + w * rel;
+			const Vec3 c = f.at + Vec3{f.radius * 0.25 * (hash01(s, 3) - 0.5), 12.0 * hash01(s, 4) + 0.6 * rel, f.radius * 0.25 * (hash01(s, 5) - 0.5)};
+			const Vec3 p = c + Vec3{r * std::cos(a), 1.5 * std::sin(0.3 * rel + i), r * std::sin(a)}, fwd{-std::sin(a), 0.0, std::cos(a)};
+			const double bank = std::atan(speed * speed / (r * 9.81)) * 180.0 / kPi;
+			const double cycle = 9.0 + 6.0 * hash01(s, 6), when = std::fmod(t + cycle * hash01(s, 7), cycle);
+			const std::string pose = when < 2.0 ? poses.poseName("eagles", "flap", static_cast<int>(std::floor(t * 2.2 * animals::posesOf("flap"))), out)
+												: poses.poseName("eagles", "glide", static_cast<int>(std::floor(t / 4.0 * animals::posesOf("glide"))), out);
+			place(pose, p, fwd, bank, 1.0);
 		}
 	} else if (f.kind == "butterflies") {   // each wandering its patch, flitting up and down
 		for (int i = 0; i < f.count; ++i) {
@@ -314,29 +307,66 @@ inline std::string flockText(const Flock &f, double t, const terrain::Field *gro
 	return out;
 }
 
-// A herd at t, as scene text: each animal walking from `from` towards `to` in a loose bunch, standing on the land, stopping now and then to graze.
-inline std::string herdText(const Herd &h, double t, const terrain::Field *ground, bool objects = true) {
-	std::string out = "# a herd of " + h.kind + " (film_wildlife.h)\n" + (objects ? detail::poseObjects(h.kind) : std::string());
+// Where an animal of a herd is along its way at `rel` seconds after the herd sets off, and how fast it goes then: walking at `pace` but for its pauses (a few seconds
+// in every cycle of its own), after `flee` (relative; below 0: never) breaking into a run up to `fleeSpeed` over a second and a half, without pausing again.
+struct Going {
+	double covered = 0.0, speed = 0.0;
+	bool paused = false;
+};
+inline Going goingAt(double rel, double pace, double cycle, double pause, double offset, double flee, double fleeSpeed) {
+	const auto W = [&](double x) { return pace * (std::floor(x / cycle) * (cycle - pause) + std::min(std::fmod(x, cycle), cycle - pause)); };
+	Going g;
+	if (flee < 0.0 || rel <= flee) {
+		g.covered = W(rel + offset) - W(offset);
+		g.paused = std::fmod(rel + offset, cycle) > cycle - pause;
+		g.speed = g.paused ? 0.0 : pace;
+		return g;
+	}
+	const double ramp = 1.5, x = rel - flee, u = std::min(1.0, x / ramp);
+	const double before = W(flee + offset) - W(offset), start = std::fmod(flee + offset, cycle) > cycle - pause ? 0.0 : pace;   // (from a standstill if it was grazing)
+	// the speed from `start` to fleeSpeed by smoothstep over the ramp, integrated: ramp (u^3 - u^4/2) of the difference over the ramp, then steady
+	const double rise = x < ramp ? ramp * (u * u * u - 0.5 * u * u * u * u) : 0.5 * ramp + (x - ramp);
+	g.covered = before + start * x + (fleeSpeed - start) * rise;
+	g.speed = start + (fleeSpeed - start) * u * u * (3.0 - 2.0 * u);
+	return g;
+}
+
+// A herd at t, as scene text: each animal walking from `from` towards `to` in a loose bunch, standing on the land, stopping now and then to graze (wolves: to look round),
+// fleeing at a gallop from `flee` on; its pose from its kind's clips (film_animals.h) through `poses`.
+inline std::string herdText(const Herd &h, double t, const terrain::Field *ground, animals::Poses &poses) {
+	const animals::Species *sp = animals::species(h.kind);
+	if (!sp) return std::string();
+	std::string out = "# a herd of " + h.kind + " (film_wildlife.h)\n";
 	const Vec3 from{h.fx, 0, h.fz}, to{h.tx, 0, h.tz};
 	const Vec3 dir = normalize(to - from + Vec3{1e-9, 0, 0}), side{-dir.z, 0, dir.x};
-	const double total = length(to - from);
+	const double total = length(to - from), size = sp->length / 0.95, pace = h.speed > 0.0 ? h.speed : sp->walkSpeed;
 	for (int i = 0; i < h.count; ++i) {
 		const int s = h.seed * 61 + i;
-		const double behind = 3.0 * std::sqrt(static_cast<double>(i)) + 2.0 * hash01(s, 1), across = 4.0 * (hash01(s, 2) - 0.5) * std::sqrt(static_cast<double>(i + 1));
-		// walking, except while it grazes: a pause of a few seconds in every cycle of its own (W: how far it has walked x seconds into its cycles)
+		const double behind = size * (3.0 * std::sqrt(static_cast<double>(i)) + 2.0 * hash01(s, 1)), across = size * 4.0 * (hash01(s, 2) - 0.5) * std::sqrt(static_cast<double>(i + 1));
 		const double rel = std::max(0.0, t - h.t0);
-		const double cycle = 9.0 + 5.0 * hash01(s, 3), pause = 2.5 + 2.0 * hash01(s, 4), offset = cycle * hash01(s, 5);
-		const auto W = [&](double x) { return h.speed * (std::floor(x / cycle) * (cycle - pause) + std::min(std::fmod(x, cycle), cycle - pause)); };
-		double walked = W(rel + offset) - W(offset);
-		bool grazing = std::fmod(rel + offset, cycle) > cycle - pause;
-		walked = std::clamp(walked, 0.0, total);
-		if (walked >= total) grazing = true;
-		Vec3 p = from + dir * walked - dir * behind + side * across;
-		p.y = ground ? ground->heightAt(p.x, p.z) : 0.0;
-		const int pose = static_cast<int>(std::floor((walked / 0.9 + hash01(s, 6)) * detail::kPoses)) % detail::kPoses;   // (a stride every 0.9 m)
+		const double cycle = 9.0 + 5.0 * hash01(s, 3), pause = (sp->grazes ? 2.5 : 1.2) + 2.0 * hash01(s, 4), offset = cycle * hash01(s, 5);
+		const double flee = h.flee >= 0.0 ? std::max(0.0, h.flee - h.t0) + 0.15 * std::sqrt(static_cast<double>(i)) + 0.3 * hash01(s, 9) : -1.0;   // (one after another)
+		Going g = goingAt(rel, pace, cycle, pause, offset, flee, sp->fleeSpeed * (0.92 + 0.16 * hash01(s, 10)));
+		if (flee < 0.0 && g.covered >= total) g.covered = total, g.paused = true, g.speed = 0.0;   // (there: it stops)
+		Vec3 p = from + dir * g.covered - dir * behind + side * across;
+		const auto groundAt = [&](const Vec3 &q) { return ground ? ground->heightAt(q.x, q.z) : 0.0; };
+		p.y = groundAt(p);
+		const double pitch = std::atan2(groundAt(p + dir * (0.5 * sp->length)) - groundAt(p - dir * (0.5 * sp->length)), sp->length) * 180.0 / kPi;   // (to the slope)
+		std::string pose;
+		double turn = 6.0 * (hash01(s, 7) - 0.5);
+		if (g.paused) {
+			const std::string clip = sp->grazes ? "graze" : "idle";
+			const double len = clip == "graze" ? 4.0 : 5.0;
+			pose = poses.poseName(h.kind, clip, static_cast<int>(std::floor((t / len + hash01(s, 11)) * animals::posesOf(clip))), out);
+			turn = 50.0 * (hash01(s, 7) - 0.5);
+		} else {
+			std::string clip;
+			double cycles = 0.0;
+			animals::gaitOf(*sp, g.speed, g.covered, clip, cycles);
+			pose = poses.poseName(h.kind, clip, static_cast<int>(std::floor((cycles + hash01(s, 6)) * animals::posesOf(clip))), out);
+		}
 		const Vec3 storyAt{-p.x, p.y, p.z}, storyFwd{-dir.x, 0.0, dir.z};
-		const std::string name = grazing ? std::string("wild_deer_graze") : "wild_deer_" + std::to_string(pose);
-		out += nature::placeObject(name, mul(translate(storyAt), detail::facing(storyFwd, {0, 1, 0}), rotate({0, 1, 0}, 20.0 * (hash01(s, 7) - 0.5)), scale(0.9 + 0.2 * hash01(s, 8))));
+		out += nature::placeObject(pose, mul(translate(storyAt), detail::facing(storyFwd, {0, 1, 0}), rotate({0, 1, 0}, turn), rotate({1, 0, 0}, -pitch), scale(0.9 + 0.2 * hash01(s, 8))));
 	}
 	return out;
 }

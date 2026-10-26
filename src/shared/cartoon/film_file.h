@@ -117,7 +117,8 @@
 //                                                               # `near D` (drawn in full within D m of the camera), `season` summer, autumn, winter or spring, `seed N`
 //     flock    starlings 300  at 0 80 -200  radius 40           # animals (film_wildlife.h): starlings or fish (flocking round `at`), geese (`from X Y Z to X Y Z`, in
 //                                                               # a V), butterflies (`in X0 Z0 X1 Z1`); `speed S`, `during T0 T1`, `seed N`; on a terrain Y is above it
-//     herd     deer 12  from -200 0  to 200 -150  speed 1.1     # a herd walking over the land, grazing now and then; `start T`, `seed N`
+//     herd     deer 12  from -200 0  to 200 -150  speed 1.1     # deer, horses or wolves (rigged: film_animals.h) walking over the land, grazing now and then;
+//                                                               # `flee T` (they bolt and gallop away), `start T`, `seed N`; `flock eagles` circle a thermal
 //     aurora   green  brightness 1.2  during 4 30               # the sky's spectacles (film_skyfx.h): curtains of light (green, red or violet; `facing D`, `distance M`),
 //     lightning 5  at 0 -3000  radius 2000  during 2 20         # strikes with their flash and thunder (`base H`, `seed N`), shooting stars (`meteors COUNT`), and
 //     rainbow  0.8  during 6 16                                 # a rainbow opposite the sun (the `sky` line's); at night the sky has its stars, turning with the hours
@@ -1279,10 +1280,11 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			wildlife::Flock f;
 			double count = 0.0;
 			if (t.size() < 3 || std::find(wildlife::flockKinds().begin(), wildlife::flockKinds().end(), t[1]) == wildlife::flockKinds().end() || !number(t[2], count) || count < 1 || count > 3000)
-				return fail("`flock KIND COUNT ...`: starlings, geese, fish or butterflies, 1 to 3000 of them (`at X Y Z` and `radius R`; geese `from X Y Z to X Y Z`; butterflies `in X0 Z0 X1 Z1`)");
+				return fail("`flock KIND COUNT ...`: starlings, geese, fish, butterflies or eagles, 1 to 3000 of them (`at X Y Z` and `radius R`; geese `from X Y Z to X Y Z`; butterflies `in X0 Z0 X1 Z1`)");
 			f.kind = t[1];
 			f.count = static_cast<int>(count);
 			if (f.kind == "fish") f.radius = 6.0;
+			if (f.kind == "eagles") f.radius = 60.0;
 			bool where = false;
 			for (std::size_t i = 3; i < t.size();) {
 				double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
@@ -1316,16 +1318,17 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			double count = 0.0;
 			if (t.size() < 9 || std::find(wildlife::herdKinds().begin(), wildlife::herdKinds().end(), t[1]) == wildlife::herdKinds().end() || !number(t[2], count) || count < 1 || count > 500 ||
 				t[3] != "from" || !number(t[4], h.fx) || !number(t[5], h.fz) || t[6] != "to" || !number(t[7], h.tx) || !number(t[8], h.tz))
-				return fail("`herd deer COUNT from X Z to X Z [speed S] [start T] [seed N]` (1 to 500 of them)");
+				return fail("`herd KIND COUNT from X Z to X Z [speed S] [start T] [flee T] [seed N]`: deer, horses or wolves, 1 to 500 of them");
 			h.kind = t[1];
 			h.count = static_cast<int>(count);
 			for (std::size_t i = 9; i < t.size(); i += 2) {
 				double a = 0.0;
-				if (i + 1 >= t.size() || !number(t[i + 1], a)) return fail("\"" + t[i] + "\": a herd takes speed, start and seed, each with a number");
+				if (i + 1 >= t.size() || !number(t[i + 1], a)) return fail("\"" + t[i] + "\": a herd takes speed, start, flee and seed, each with a number");
 				if (t[i] == "speed" && a > 0.0) h.speed = a;
 				else if (t[i] == "start") h.t0 = a;
+				else if (t[i] == "flee" && a >= 0.0) h.flee = a;
 				else if (t[i] == "seed") h.seed = static_cast<int>(a);
-				else return fail("\"" + t[i] + "\": a herd takes speed, start and seed");
+				else return fail("\"" + t[i] + "\": a herd takes speed, start, flee (when it bolts) and seed");
 			}
 			s.herds.push_back(h);
 		} else if (verb == "aurora" || verb == "lightning" || verb == "meteors" || verb == "rainbow") {
@@ -3861,9 +3864,10 @@ class DataFilm {
 				written.push_back(kind);
 				return true;
 			};
+			animals::Poses poses;   // (the rigged kinds' poses this frame uses: film_animals.h)
 			for (const wildlife::Flock &f : spec.flocks)
-				if (t >= f.t0 && t <= f.t1) out += wildlife::flockText(f, t, ground.get(), first(f.kind));
-			for (const wildlife::Herd &h : spec.herds) out += wildlife::herdText(h, t, ground.get(), first(h.kind));
+				if (t >= f.t0 && t <= f.t1) out += wildlife::flockText(f, t, ground.get(), poses, first(f.kind));
+			for (const wildlife::Herd &h : spec.herds) out += wildlife::herdText(h, t, ground.get(), poses);
 		}
 		if (!spec.forests.empty()) {   // forests (film_forest.h): near the camera in full
 			Vec3 eye, target;

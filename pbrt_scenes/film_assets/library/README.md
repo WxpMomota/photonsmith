@@ -9,3 +9,6 @@ characters next to it and still use the shared ones.
 A .cast file is what a `character` line says of a character but where it stands: a `kind` line, then one line for each other thing (`scale 0.8`, `sweater red`,
 `pitch -3`, `rate 0.95` ...). A .set file is film-file lines: `scene FILE.pbrt` (from the set's own folder), `sky`, `place`, `scatter`, `ambience`, `terrain`,
 `forest`, `water`, `weather` and so on - and even characters - but not the film's own lines (film, name, length, fps, shots, parts).
+
+animals/ holds the films' rigged animals (deer, horse, wolf, eagle, goose: glTF models with their clips, made by scripts/make_rigged_animals.py), which `herd` and `flock`
+lines bring in (src/shared/cartoon/film_animals.h). robot.glb is a rigged character a `rigged` line can make a kind of (scripts/make_rigged_robot.py).
