@@ -1118,3 +1118,50 @@ TEST(FilmMoves, ARunAJumpAndSittingDown) {
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter c pip\njump c 2 to 1 1 height 9\n", bad).find("up to 5 m"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter c pip\nsit c 2 until 2.1\n", bad).find("by 0.7 s at least"), std::string::npos);
 }
+
+// ---- uneven ground ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// A platform 0.6 m up with a ramp to it on one side and drops on the others: a walk to its top from below a drop goes round by the ramp and climbs it, a jump lands on it, and
+// a walk on the level ground keeps exactly its height.
+TEST(FilmGround, AWalkClimbsTheRampToAPlatformAndAJumpLandsOnIt) {
+	(void)cartoon::films();
+	const std::string set =
+		"WorldBegin\n"
+		"Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 0 2 3 ] \"point3 P\" [ -20 0 -20  20 0 -20  20 0 20  -20 0 20 ]\n"   // the ground
+		"Shape \"trianglemesh\" \"integer indices\" [ 0 1 2 0 2 3  4 5 6 4 6 7  8 9 10 8 10 11  12 13 14 12 14 15  16 17 18 16 18 19 ] \"point3 P\" [ "
+		"2 0.6 -1  4 0.6 -1  4 0.6 1  2 0.6 1 "   // the platform's top
+		"2 0 -1  4 0 -1  4 0.6 -1  2 0.6 -1 "     // its sides (the drops)
+		"2 0 1  4 0 1  4 0.6 1  2 0.6 1 "
+		"4 0 -1  4 0 1  4 0.6 1  4 0.6 -1 "
+		"0 0 -1  2 0.6 -1  2 0.6 1  0 0 1 ]\n";   // the ramp up to it from x 0
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 30\ncharacter ann person at 3 0 -3\nwalk ann 1 1 to 3.2 0\njump ann 15 to 3.2 -2.5 height 0.3\ncharacter bo person at -6 0 6\nwalk bo 1 1 -3 6\n",
+					   film, set),
+			  "");
+	const ff::WalkLine &w = film.spec.characters[0].walks[0];
+	ASSERT_EQ(w.heights.size(), w.points.size());
+	EXPECT_NEAR(w.heights.back(), 0.6, 0.05) << "on top";
+	bool onRamp = false, overDrop = false;
+	for (std::size_t i = 0; i < w.points.size(); ++i) {
+		const double x = w.points[i].first, z = w.points[i].second, y = w.heights[i];
+		onRamp = onRamp || (x > 0.2 && x < 1.8 && std::abs(z) < 1.0 && y > 0.1 && y < 0.5);
+		if (y < 0.3 && x > 2.05 && x < 3.95 && std::abs(z) < 0.95) overDrop = true;   // (low, yet over the platform: through its side)
+	}
+	EXPECT_TRUE(onRamp) << "it went up the ramp";
+	EXPECT_FALSE(overDrop) << "not through the platform's side";
+	cartoon::Vec3 top;
+	film.momentOf(film.spec.characters[0], 14.0, &top);
+	EXPECT_NEAR(top.y, 0.6, 0.05) << "standing on it";
+	// off it again: a jump down lands on the ground
+	cartoon::Vec3 down;
+	film.momentOf(film.spec.characters[0], 20.0, &down);
+	EXPECT_NEAR(down.y, 0.0, 1e-9) << "jumped down onto the ground";
+	// the level walk: exactly its own height
+	for (double h : film.spec.characters[1].walks[0].heights) EXPECT_EQ(h, 0.0);
+	EXPECT_EQ(film.terrainFor(film.spec.characters[1]), nullptr) << "level ground: its feet as ever";
+	EXPECT_NE(film.terrainFor(film.spec.characters[0]), nullptr);
+	ff::DataFilm bad;
+	const std::string cliff = loadFilm("scene s.pbrt\nlength 30\ncharacter ann person at 3 0 -3\nwalk ann 1 1 to 3 0.5\n", bad,
+									   set.substr(0, set.find("0 0 -1  2 0.6 -1  2 0.6 1  0 0 1")) + "0 0 -1  0 0 -1  0 0 1  0 0 1 ]\n");   // (no ramp)
+	EXPECT_NE(cliff.find("cannot find a way"), std::string::npos) << cliff;
+}

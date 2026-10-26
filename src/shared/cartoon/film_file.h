@@ -168,6 +168,7 @@ struct WalkLine {
 	double t0 = 0.0, speed = 0.8;
 	std::vector<std::pair<double, double>> points;   // pbrt x z (for a walk that finds its way: the way found, when the film is loaded)
 	std::vector<std::pair<double, double>> targets;  // (`to X Z ...`) the places it goes to, finding its way
+	std::vector<double> heights;                     // the floor's height at each point (from the set: uneven ground), or none (the character's own height)
 	int line = 0;
 };
 struct Character {
@@ -1175,6 +1176,7 @@ class DataFilm {
 			if (std::find(scene.names.begin(), scene.names.end(), pr.name) == scene.names.end())
 				return filePath + ":" + std::to_string(pr.line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + pr.name + "`";
 		if (const std::string e = findWays(); !e.empty()) return filePath + ":" + e;
+		heightsOfWalks();
 		if (const std::string e = crowding(); !e.empty()) return filePath + ": " + e;
 		if (const std::string e = holdingTimeline(); !e.empty()) return filePath + ":" + e;
 		for (const Spec::Look &l : spec.looks) {
@@ -1254,10 +1256,10 @@ class DataFilm {
 		for (const auto &[c, i] : walks) {
 			WalkLine &w = c->walks[i];
 			const CharacterKind &kind = characterKinds().at(c->kind);
-			double fx = c->start[0], fz = c->start[2];   // from where its last walk left it
+			double fx = c->start[0], fz = c->start[2], fy = c->start[1];   // from where its last walk left it
 			if (i > 0) {
-				fx = c->walks[i - 1].points.back().first;
-				fz = c->walks[i - 1].points.back().second;
+				const Vec3 last = endOf(*c, i - 1);
+				fx = -last.x, fy = last.y, fz = last.z;
 			}
 			const std::string set = setAt(w.t0);
 			if (!flattened.count(set)) flattened[set] = film_paths::flattenText(set, meshes);
@@ -1266,9 +1268,11 @@ class DataFilm {
 			double x0 = fx, x1 = fx, z0 = fz, z1 = fz;
 			for (const auto &[x, z] : w.targets) x0 = std::min(x0, x), x1 = std::max(x1, x), z0 = std::min(z0, z), z1 = std::max(z1, z);
 			const double half = std::min(30.0, 0.5 * std::max(x1 - x0, z1 - z0) + 6.0);
-			film_paths::Grid g = film_paths::gridAround(0.5 * (x0 + x1), 0.5 * (z0 + z1), half, std::max(0.05, std::min(0.12, kind.radius * c->scale * 0.4)));
-			const double height = std::min(2.0, kind.height * c->scale);
-			film_paths::addScene(g, flat, c->start[1], std::min(0.15, 0.4 * height), height);
+			const double cell = std::max(0.05, std::min(0.12, kind.radius * c->scale * 0.4));
+			const double height = std::min(2.0, kind.height * c->scale), step = stepOf(*c);
+			const film_paths::Terrain terrain = film_paths::terrainOf(flat, 0.5 * (x0 + x1), 0.5 * (z0 + z1), half, cell, c->start[1]);
+			std::vector<double> floors;
+			film_paths::Grid g = film_paths::reachable(terrain, fx, fy, fz, step, std::min(0.15, 0.4 * height), height, floors);   // (the floor it can walk on, from where it stands)
 			for (const Character &other : spec.characters) {
 				if (&other == c) continue;
 				Vec3 at;
@@ -1277,20 +1281,84 @@ class DataFilm {
 			}
 			const film_paths::Grid ways = film_paths::grown(g, kind.radius * c->scale);
 			w.points.clear();
+			w.heights.clear();
 			for (const auto &[tx, tz] : w.targets) {
 				std::vector<std::pair<double, double>> leg;
 				std::string why;
 				if (!film_paths::findWay(ways, fx, fz, tx, tz, leg, why)) {
+					if (why == "something is in the way there" && std::isnan(film_paths::floorFrom(g, floors, tx, tz)) &&
+						terrain.roomy(terrain.grid.col(tx), terrain.grid.row(tz), terrain.floorAt(tx, tz, fy + 50.0, 100.0), std::min(0.15, 0.4 * height), height))
+						why = "it cannot get up or down there (a drop or a rise of more than a step)";   // (the place has room: the way there is the trouble)
 					char buf[200];
 					std::snprintf(buf, sizeof buf, "%d: %s cannot find a way to %g %g: %s", w.line, c->name.c_str(), tx, tz, why.c_str());
 					return buf;
 				}
-				w.points.insert(w.points.end(), leg.begin(), leg.end());
+				// along each leg every quarter of a metre, at the floor's height (over a hill, up the steps)
+				double px = fx, pz = fz;
+				for (const auto &[lx, lz] : leg) {
+					const int n = std::max(1, static_cast<int>(std::ceil(std::hypot(lx - px, lz - pz) / 0.25)));
+					for (int k = 1; k <= n; ++k) {
+						const double u = static_cast<double>(k) / n, x = px + (lx - px) * u, z = pz + (lz - pz) * u;
+						const double y = film_paths::floorFrom(g, floors, x, z);
+						w.points.push_back({x, z});
+						w.heights.push_back(std::isnan(y) ? c->start[1] : (std::abs(y - c->start[1]) < terrain.flat ? c->start[1] : y));
+					}
+					px = lx, pz = lz;
+				}
 				fx = tx;
 				fz = tz;
 			}
 		}
 		return std::string();
+	}
+	// How high a step a character takes in its stride (a person 0.3 m, Pip a little less, a turtle at its own scale).
+	double stepOf(const Character &c) const { return 0.17 * characterKinds().at(c.kind).height * c.scale; }
+	// The heights of the walks and jumps that do not find their way, from the floor under each point (the walk's own points: it goes where it is told, on whatever is there).
+	void heightsOfWalks() {
+		terrains.clear();
+		const bool anyWalks = std::any_of(spec.characters.begin(), spec.characters.end(), [](const Character &c) { return !c.walks.empty(); });
+		if (!anyWalks) return;
+		const pbrt_flatten::MeshResolver meshes = [](const std::string &path, std::vector<float> &positions, std::vector<int> &indices, std::vector<float> &uvs, std::vector<float> &normals) {
+			ply_mesh::LoadResult m = ply_mesh::loadFile(path);
+			if (!m.ok) return false;
+			positions = std::move(m.mesh.positions);
+			indices = std::move(m.mesh.indices);
+			uvs = std::move(m.mesh.uvs);
+			normals = std::move(m.mesh.normals);
+			return true;
+		};
+		const pbrt_flatten::FlatScene flat = film_paths::flattenText(setAt(0.0), meshes);
+		for (Character &c : spec.characters) {
+			double x0 = c.start[0], x1 = x0, z0 = c.start[2], z1 = z0;
+			for (const WalkLine &w : c.walks)
+				for (const auto &[x, z] : w.points) x0 = std::min(x0, x), x1 = std::max(x1, x), z0 = std::min(z0, z), z1 = std::max(z1, z);
+			const double half = std::min(30.0, 0.5 * std::max(x1 - x0, z1 - z0) + 2.0);
+			auto terrain = std::make_shared<film_paths::Terrain>(film_paths::terrainOf(flat, 0.5 * (x0 + x1), 0.5 * (z0 + z1), half, 0.1, c.start[1]));
+			double y = c.start[1];
+			bool uneven = false;
+			const double step = stepOf(c);
+			for (std::size_t i = 0; i < c.walks.size(); ++i) {
+				WalkLine &w = c.walks[i];
+				if (!w.targets.empty()) {   // (found already, on the floor)
+					if (!w.heights.empty()) y = w.heights.back();
+					continue;
+				}
+				w.heights.clear();
+				for (const auto &[x, z] : w.points) {
+					// a jump lands on the highest floor within its height; a walk keeps to a floor within a step of the last
+					y = terrain->floorAt(x, z, y, w.style == WalkLine::Jump ? std::max(step, w.height) : step);
+					w.heights.push_back(y);
+				}
+			}
+			for (const WalkLine &w : c.walks)
+				for (double h : w.heights) uneven = uneven || h != c.start[1];
+			if (uneven) terrains[c.name] = terrain;   // (its feet on the floor too)
+		}
+	}
+	std::map<std::string, std::shared_ptr<const film_paths::Terrain>> terrains;   // the floor of each character that walks on uneven ground
+	const film_paths::Terrain *terrainFor(const Character &c) const {
+		const auto it = terrains.find(c.name);
+		return it == terrains.end() ? nullptr : it->second.get();
 	}
 	// Two characters that walk into each other (closer than most of their sizes while one of them walks): "" or what happens when.
 	std::string crowding() const {
@@ -1667,18 +1735,21 @@ class DataFilm {
 	rig::PathWalk pathOf(const Character &c, std::size_t walk) const {
 		const CharacterKind &kind = characterKinds().at(c.kind);
 		Vec3 from = story(c.start[0], c.start[1], c.start[2]);
-		for (std::size_t i = 0; i < walk; ++i) {
-			const auto &last = c.walks[i].points.back();
-			from = story(last.first, c.start[1], last.second);
-		}
+		for (std::size_t i = 0; i < walk; ++i) from = endOf(c, i);
 		rig::PathWalk w;
 		w.points.push_back(from);
-		for (const auto &pt : c.walks[walk].points) w.points.push_back(story(pt.first, c.start[1], pt.second));
+		const WalkLine &wl = c.walks[walk];
+		for (std::size_t p = 0; p < wl.points.size(); ++p) w.points.push_back(story(wl.points[p].first, p < wl.heights.size() ? wl.heights[p] : c.start[1], wl.points[p].second));
 		w.start = c.walks[walk].t0;
 		w.speed = c.walks[walk].speed;
 		w.stride = kind.stride * c.scale * (c.walks[walk].style == WalkLine::Run ? kRunStride : 1.0);
 		w.firstStep = kind.firstStep;
 		return w;
+	}
+	// Where a walk, a run or a jump leaves a character (story space; its height the floor's there).
+	Vec3 endOf(const Character &c, std::size_t walk) const {
+		const WalkLine &w = c.walks[walk];
+		return story(w.points.back().first, w.heights.empty() ? c.start[1] : w.heights.back(), w.points.back().second);
 	}
 	static constexpr double kRunStride = 1.6;   // a run's gait, and so its stride, is this much wider than a walk's
 	static double flightOf(const WalkLine &w) { return 2.0 * std::sqrt(2.0 * w.height / 9.81); }   // (a jump's time in the air)
@@ -1702,7 +1773,7 @@ class DataFilm {
 				break;
 			}
 			if (w.style == WalkLine::Jump) {   // an arc from where it was to there; it faces where it jumps
-				const Vec3 from = where, to = story(w.points[0].first, c.start[1], w.points[0].second);
+				const Vec3 from = where, to = story(w.points[0].first, w.heights.empty() ? c.start[1] : w.heights[0], w.points[0].second);
 				if (std::hypot(to.x - from.x, to.z - from.z) > 1e-6) heading = rig::headingOf(to - from);
 				const double flight = flightOf(w);
 				if (t < w.t0 + flight) {
@@ -1760,6 +1831,11 @@ class DataFilm {
 				const Vec3 rest = kind.footAt(0.0, s), f = kind.footAt(mu.steps, s);
 				return (rest + (f - rest) * (1.0 + (kRunStride - 1.0) * mu.running)) * scale;
 			};
+		if (const film_paths::Terrain *ground = terrainFor(c)) {   // (on uneven ground: a planted foot on the floor under it)
+			const double bodyY = transformPoint(m.frame, {0.0, 0.0, 0.0}).y;
+			const double step = stepOf(c);
+			k.groundAt = [ground, bodyY, step](double x, double z) { return ground->floorAt(-x, z, bodyY, step); };
+		}
 		const double land = landedAt(c, t);   // (after a jump its feet are held from where it landed, not from before it jumped)
 		if (t - land < k.lookBack) k.lookBack = std::max(1.0 / 60.0, t - land);
 		k.plantedAt = kind.plantedAt;
@@ -1831,7 +1907,7 @@ class DataFilm {
 					e.t = c.walks[i].t0 + flightOf(c.walks[i]);
 					e.kind = EventKind::Footfall;
 					e.seed = ++seed;
-					const Vec3 at = story(c.walks[i].points[0].first, c.start[1], c.walks[i].points[0].second);
+					const Vec3 at = endOf(c, i);
 					const CameraView v = viewAt(e.t);
 					e.pan = panOf(v, at);
 					e.strength = std::min(1.0, 1.4 * audibility(length(at - v.eye)));

@@ -687,6 +687,15 @@ is a short example: three characters, four lines.
 With three or more, the coverage now keeps its cameras on the side the characters' faces look to (unless the shot says `side`), backs its two-shot away until everyone is in
 the frame, and shoots a speaker much smaller than the one they speak to from in front rather than over a tall shoulder.
 
+**Uneven ground.** Characters stand and walk on the set's own floor: up a ramp or a flight of steps onto a platform, over a hill, down again (film_paths.h, `Terrain`).
+The set is read as columns: in each cell of a map (5 to 12 cm), the heights each thing spans there. A walker's floor is found from where it stands a cell at a time - the
+highest surface within a step of the floor beside it (a step is 0.17 of the character's height: 0.3 m for a person) that is level enough to stand on (25 degrees at most: a
+boulder's flank or a roof's pitch is not a floor) and has room above it for the walker - so a rise or a drop of more than a step is a cliff it neither climbs nor walks off.
+A walk that finds its way (`to`) goes by this floor, round the cliffs, and is followed a quarter of a metre at a time at the floor's height; a walk with its own points keeps
+to the floor under them; a jump lands on the highest floor it can reach. On uneven ground its planted feet stand on the floor under them. Heights within 5 cm of the set's
+ground are that ground (a path's slabs), so a level set stays exactly level and its films do not change; a place that cannot be reached is refused ("it cannot get up or down
+there").
+
 **Running, jumping, sitting: `run`, `jump`, `sit`.**
 
 ```

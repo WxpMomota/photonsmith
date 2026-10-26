@@ -255,6 +255,153 @@ inline bool findWay(Grid g, double ax, double az, double bx, double bz, std::vec
 	return true;
 }
 
+// ---- the floor: uneven ground, steps, platforms ----
+// The set as columns of what is in each cell of the map: the heights each thing spans there (a floor's top is where one can stand, a wall spans its height). A walker's floor is
+// found from where it stands, a cell at a time: the highest top within a step of the floor beside it, with room above it for the walker; a drop or a rise of more than a step is
+// a cliff. Only a surface no steeper than 25 degrees is a floor (a boulder's flank, a roof's pitch is not: it stays in the way). Heights under `flat` from the set's own ground
+// are that ground (a path's slabs, a rug), so a level set stays exactly level.
+struct Span {
+	float lo = 0.0f, hi = 0.0f;
+	bool floor = false;   // its top can be stood on (it is level enough)
+};
+constexpr double kMaxSlope = 0.47;   // tan(25 degrees)
+struct Terrain {
+	Grid grid;   // (the cells; its `blocked` is not used)
+	double base = 0.0, flat = 0.05;
+	std::vector<std::vector<Span>> spans;   // per cell: each thing in it, lowest to highest
+	const std::vector<Span> &at(int i, int k) const {
+		static const std::vector<Span> none;
+		return grid.inside(i, k) ? spans[static_cast<std::size_t>(k) * grid.nx + i] : none;
+	}
+	// The floor under (x, z) for a walker near height `around`: the highest top no more than `step` above it (and no more than 3 m below), or the ground.
+	double floorAt(double x, double z, double around, double step) const {
+		double best = base;
+		bool found = false;
+		for (const Span &s : at(grid.col(x), grid.row(z)))
+			if (s.floor && s.hi <= around + step && s.hi >= around - 3.0 && (!found || s.hi > best)) best = s.hi, found = true;
+		if (!found) best = base;
+		return std::abs(best - base) < flat ? base : best;
+	}
+	// Whether a walker on a floor at height `floor` in a cell has room: nothing in it between `low` and `high` above the floor (its own floor's top is not in the way).
+	bool roomy(int i, int k, double floor, double low, double high) const {
+		for (const Span &s : at(i, k))
+			if (s.hi > floor + low && s.lo < floor + high) return false;
+		return true;
+	}
+};
+namespace detail {
+inline void addSpan(Terrain &t, int i, int k, double lo, double hi, bool floor) {
+	if (!t.grid.inside(i, k) || hi < t.base - 3.0 || lo > t.base + 8.0) return;
+	t.spans[static_cast<std::size_t>(k) * t.grid.nx + i].push_back({static_cast<float>(lo), static_cast<float>(hi), floor});
+}
+// A triangle's spans: in each cell it covers, the heights it takes there (a slope's, from its plane round the cell's middle; a wall's, its whole height).
+inline void addTriangle(Terrain &t, P3 a, P3 b, P3 c) {
+	const Grid &g = t.grid;
+	const double ux = b.x - a.x, uy = b.y - a.y, uz = b.z - a.z, vx = c.x - a.x, vy = c.y - a.y, vz = c.z - a.z;
+	const double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, nl = std::sqrt(nx * nx + ny * ny + nz * nz);
+	if (nl < 1e-12) return;
+	const double ylo = std::min({a.y, b.y, c.y}), yhi = std::max({a.y, b.y, c.y});
+	const bool steep = std::abs(ny) / nl < 0.2;
+	const bool level = !steep && std::hypot(nx, nz) / std::abs(ny) <= kMaxSlope;   // (one can stand on it)
+	const double slope = steep ? 0.0 : std::hypot(nx, nz) / std::abs(ny) * 0.5 * g.cell * 1.42;
+	std::vector<std::pair<int, int>> cells;
+	{
+		Grid mark = g;
+		mark.blocked.assign(mark.blocked.size(), 0);
+		const double xmin = std::min({a.x, b.x, c.x}), xmax = std::max({a.x, b.x, c.x}), zmin = std::min({a.z, b.z, c.z}), zmax = std::max({a.z, b.z, c.z});
+		if (xmax < g.x0 || zmax < g.z0 || xmin > g.x0 + g.nx * g.cell || zmin > g.z0 + g.nz * g.cell) return;
+		fillPolygon(mark, {a, b, c});
+		for (int k = std::max(0, g.row(zmin)); k <= std::min(g.nz - 1, g.row(zmax)); ++k)
+			for (int i = std::max(0, g.col(xmin)); i <= std::min(g.nx - 1, g.col(xmax)); ++i)
+				if (mark.blocked[static_cast<std::size_t>(k) * g.nx + i]) cells.push_back({i, k});
+	}
+	for (const auto &[i, k] : cells) {
+		if (steep) {
+			addSpan(t, i, k, ylo, yhi, false);
+			continue;
+		}
+		const double y = a.y - (nx * (g.cx(i) - a.x) + nz * (g.cz(k) - a.z)) / ny;   // (the plane at the cell's middle)
+		addSpan(t, i, k, std::max(ylo, y - slope), std::min(yhi, y + slope), level);   // (either way up: a pbrt file may wind it either way)
+	}
+}
+}  // namespace detail
+// The terrain of a flattened scene over a map `half` metres either way round (cx, cz), `cell` a cell, its ground at `base` (soft placed things - grass - are not in it).
+inline Terrain terrainOf(const pbrt_flatten::FlatScene &s, double cx, double cz, double half, double cell, double base) {
+	using detail::P3;
+	Terrain t;
+	t.grid = gridAround(cx, cz, half, cell);
+	t.base = base;
+	t.spans.assign(t.grid.blocked.size(), {});
+	for (const pbrt_flatten::Triangle &tr : s.triangles) detail::addTriangle(t, {tr.v[0], tr.v[1], tr.v[2]}, {tr.v[3], tr.v[4], tr.v[5]}, {tr.v[6], tr.v[7], tr.v[8]});
+	for (const pbrt_flatten::Sphere &sp : s.spheres)
+		for (int k = t.grid.row(sp.center[2] - sp.radius); k <= t.grid.row(sp.center[2] + sp.radius); ++k)
+			for (int i = t.grid.col(sp.center[0] - sp.radius); i <= t.grid.col(sp.center[0] + sp.radius); ++i) {
+				const double d2 = (t.grid.cx(i) - sp.center[0]) * (t.grid.cx(i) - sp.center[0]) + (t.grid.cz(k) - sp.center[2]) * (t.grid.cz(k) - sp.center[2]);
+				if (d2 < sp.radius * sp.radius) {
+					const double h = std::sqrt(sp.radius * sp.radius - d2);   // (its top is level enough to stand on near the crown)
+					detail::addSpan(t, i, k, sp.center[1] - h, sp.center[1] + h, std::sqrt(d2) <= kMaxSlope * h);
+				}
+			}
+	for (const pbrt_flatten::Instance &in : s.instances) {
+		if (in.group < 0 || static_cast<std::size_t>(in.group) >= s.groups.size()) continue;
+		const pbrt_flatten::InstanceGroup &g2 = s.groups[static_cast<std::size_t>(in.group)];
+		if (g2.name.find("_soft_") != std::string::npos) continue;
+		for (const pbrt_flatten::Triangle &tr : g2.triangles)
+			detail::addTriangle(t, detail::applyXform(in.xform, tr.v[0], tr.v[1], tr.v[2]), detail::applyXform(in.xform, tr.v[3], tr.v[4], tr.v[5]), detail::applyXform(in.xform, tr.v[6], tr.v[7], tr.v[8]));
+	}
+	return t;
+}
+// Where a walker standing at (x, y, z) can go: the floor of every cell it can reach a cell at a time (a step up or down at most `step`, room above for `low` .. `high`), and a
+// map whose blocked cells are those it cannot reach or that stand at a cliff's edge. `floors` gets each cell's floor (NaN where it cannot go).
+inline Grid reachable(const Terrain &t, double x, double y, double z, double step, double low, double high, std::vector<double> &floors) {
+	const Grid &g = t.grid;
+	Grid out = g;
+	out.blocked.assign(g.blocked.size(), 1);
+	floors.assign(g.blocked.size(), std::nan(""));
+	const int si = g.col(x), sk = g.row(z);
+	if (!g.inside(si, sk)) return out;
+	std::vector<std::pair<int, int>> queue{{si, sk}};
+	floors[static_cast<std::size_t>(sk) * g.nx + si] = t.floorAt(x, z, y, step);
+	for (std::size_t q = 0; q < queue.size(); ++q) {
+		const auto [i, k] = queue[q];
+		const double f = floors[static_cast<std::size_t>(k) * g.nx + i];
+		static const int di[4] = {1, -1, 0, 0}, dk[4] = {0, 0, 1, -1};
+		for (int d = 0; d < 4; ++d) {
+			const int ni = i + di[d], nk = k + dk[d];
+			if (!g.inside(ni, nk) || !std::isnan(floors[static_cast<std::size_t>(nk) * g.nx + ni])) continue;
+			const double f2 = t.floorAt(g.cx(ni), g.cz(nk), f, step);
+			if (std::abs(f2 - f) > step || !t.roomy(ni, nk, f2, low, high)) continue;
+			floors[static_cast<std::size_t>(nk) * g.nx + ni] = f2;
+			queue.push_back({ni, nk});
+		}
+	}
+	for (int k = 0; k < g.nz; ++k)
+		for (int i = 0; i < g.nx; ++i) {
+			const double f = floors[static_cast<std::size_t>(k) * g.nx + i];
+			if (std::isnan(f)) continue;
+			bool cliff = false;   // (beside a cell whose floor is more than a step away: the edge of a drop)
+			static const int di[4] = {1, -1, 0, 0}, dk[4] = {0, 0, 1, -1};
+			for (int d = 0; d < 4 && !cliff; ++d) {
+				const int ni = i + di[d], nk = k + dk[d];
+				if (!g.inside(ni, nk)) continue;
+				const double f2 = floors[static_cast<std::size_t>(nk) * g.nx + ni];
+				cliff = !std::isnan(f2) && std::abs(f2 - f) > step;
+			}
+			if (!cliff) out.blocked[static_cast<std::size_t>(k) * g.nx + i] = 0;
+		}
+	return out;
+}
+// The floor under a point from a reachable map's floors: the mean of the reached cells round it (a smooth slope, not steps of a cell), or NaN.
+inline double floorFrom(const Grid &g, const std::vector<double> &floors, double x, double z) {
+	const int i0 = g.col(x), k0 = g.row(z);
+	double sum = 0.0;
+	int n = 0;
+	for (int k = k0 - 1; k <= k0 + 1; ++k)
+		for (int i = i0 - 1; i <= i0 + 1; ++i)
+			if (g.inside(i, k) && !std::isnan(floors[static_cast<std::size_t>(k) * g.nx + i])) sum += floors[static_cast<std::size_t>(k) * g.nx + i], ++n;
+	return n ? sum / n : std::nan("");
+}
+
 // A flattened scene from its text (meshes it names by an absolute path are read).
 inline pbrt_flatten::FlatScene flattenText(const std::string &text, const pbrt_flatten::MeshResolver &meshes) {
 	const pbrt_scene::ParseResult r = pbrt_scene::parse(text);
