@@ -154,12 +154,13 @@ inline std::string giantPicture(double dawn) {
 }
 inline std::string giantText(double dawn, double brightness = 1.0) {
 	const Vec3 g = giantCentre();
-	char buf[480];
-	std::snprintf(buf, sizeof buf,
-				  "AttributeBegin\n  AreaLightSource \"diffuse\" \"string filename\" [ \"%s\" ] \"float scale\" [ %.5f ]\n  Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]\n"
-				  "  Translate %.3f %.3f %.3f\n  Rotate %.4f 0 0 1\n  Rotate -90 1 0 0\n  Shape \"sphere\" \"float radius\" [ %.3f ]\nAttributeEnd\n",
-				  giantPicture(dawn).c_str(), brightness, -g.x, g.y, g.z, kGiantTilt, kGiantR);
-	return buf;
+	// (the picture's path is put in as it is: a fixed buffer cut a long one off)
+	char scale[64], place[240];
+	std::snprintf(scale, sizeof scale, "%.5f", brightness);
+	std::snprintf(place, sizeof place, "  Translate %.3f %.3f %.3f\n  Rotate %.4f 0 0 1\n  Rotate -90 1 0 0\n  Shape \"sphere\" \"float radius\" [ %.3f ]\nAttributeEnd\n", -g.x, g.y, g.z,
+				  kGiantTilt, kGiantR);
+	return "AttributeBegin\n  AreaLightSource \"diffuse\" \"string filename\" [ \"" + giantPicture(dawn) + "\" ] \"float scale\" [ " + scale +
+		   " ]\n  Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]\n" + place;
 }
 // The giant's light on the ground at night, as the film wants it: cool blue-cyan moonlight from the giant's side of the sky (four distant lights spread over its disc, so the
 // shadows are soft-edged). The giant's own glow is kept low enough that its bands show in a night exposure; this fill is what lights the land - the brief's "strong cool
