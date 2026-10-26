@@ -1718,3 +1718,55 @@ void MainWindow::runRecommendSelfTest(const std::function<void(const QString &)>
 	log(ok ? "RESULT: OK" : "RESULT: FAIL");
 	QApplication::exit(ok ? 0 : 1);
 }
+
+// RT_GUI_SELFTEST=quality: the Quality box says what a render will use. A preset the user picks fills in Samples and Max Depth and is kept when the scene changes
+// (it used to keep only its name: the scene's own samples went in, the box still said High, and picking High again changed nothing); Samples typed in shows Custom,
+// values that are a preset's show that preset.
+void MainWindow::runQualitySelfTest(const std::function<void(const QString &)> &log) {
+	bool ok = true;
+	auto check = [&ok, log](bool cond, const QString &what) {
+		log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what));
+		ok = ok && cond;
+	};
+	QStringList scenes;   // two scenes whose own samples are not High's
+	for (int i = 0, n = SceneMetadataClient::sceneCount(); i < n && scenes.size() < 2; ++i) {
+		const QString id = SceneMetadataClient::sceneIdAtIndex(i);
+		SceneMetadataClient::SceneMetadata meta;
+		if (SceneMetadataClient::sceneMetadata(id, meta) && meta.filmKey.isEmpty() && meta.recommendedSpp > 0 && meta.recommendedSpp != 500) scenes << id;
+	}
+	check(scenes.size() == 2, "two scenes to switch between: " + scenes.join(", "));
+	if (scenes.size() < 2) {
+		log("RESULT: FAIL");
+		QApplication::exit(1);
+		return;
+	}
+	selectSceneById(scenes[0]);
+	QApplication::processEvents();
+	check(m_qualityPresetCombo->currentIndex() == 6 || m_samplesSpinBox->value() == QList<int>{25, 50, 100, 500, 1000, 5000}.value(m_qualityPresetCombo->currentIndex()),
+		  QString("a scene's own samples show as what they are: %1 (%2 samples)").arg(m_qualityPresetCombo->currentText()).arg(m_samplesSpinBox->value()));
+	// pick High as the user does
+	m_qualityPresetCombo->setCurrentIndex(3);
+	emit m_qualityPresetCombo->activated(3);
+	check(captureRenderJob().samples == 500 && captureRenderJob().maxDepth == 50, "High: the render takes 500 samples, depth 50");
+	selectSceneById(scenes[1]);
+	QApplication::processEvents();
+	check(m_qualityPresetCombo->currentIndex() == 3, "another scene: the box still says " + m_qualityPresetCombo->currentText());
+	check(captureRenderJob().samples == 500, QString("and the render still takes High's samples (%1)").arg(captureRenderJob().samples));
+	// picking the preset already shown applies it (the user's way to put it back)
+	m_samplesSpinBox->setValue(123);
+	check(m_qualityPresetCombo->currentIndex() == 6, "Samples typed in: the box says " + m_qualityPresetCombo->currentText());
+	selectSceneById(scenes[0]);
+	QApplication::processEvents();
+	check(m_samplesSpinBox->value() != 123, "with Custom a scene's own samples go in again");
+	m_samplesSpinBox->setValue(100);
+	m_maxDepthSpinBox->setValue(50);
+	check(m_qualityPresetCombo->currentIndex() == 2, "Good's values: the box says " + m_qualityPresetCombo->currentText());
+	m_samplesSpinBox->setValue(333);
+	m_qualityPresetCombo->setCurrentIndex(3);
+	emit m_qualityPresetCombo->activated(3);
+	check(captureRenderJob().samples == 500, "choosing High from Custom: 500 samples");
+	emit m_qualityPresetCombo->activated(3);   // (High again, already shown)
+	check(captureRenderJob().samples == 500 && m_qualityPresetCombo->currentIndex() == 3, "choosing it again keeps it");
+	log(ok ? "RESULT: OK" : "RESULT: FAIL");
+	QApplication::exit(ok ? 0 : 1);
+}

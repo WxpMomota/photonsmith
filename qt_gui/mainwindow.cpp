@@ -1399,6 +1399,10 @@ void MainWindow::setupUI() {
 	}
 	connect(m_samplesSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
 			this, [this](int) { refreshStatusBarInfo(); });
+	// the Quality box follows Samples and Max Depth, however they are changed (typed in, a scene's recommendation, a section's Defaults)
+	for (QSpinBox *spin : {m_samplesSpinBox, m_maxDepthSpinBox})
+		connect(spin, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int) { syncQualityPreset(); });
+	syncQualityPreset();
 
 	mainLayout->addWidget(m_tabWidget);
 

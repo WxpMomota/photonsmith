@@ -147,6 +147,7 @@ public:
 	RenderController *makeRenderController(const RenderJob &job);   // set up for the job (mainwindow_queue.cpp)
 	void runRecommendSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runDefaultsSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
+	void runQualitySelfTest(const std::function<void(const QString &)> &log);   // mainwindow_selftest_modes.cpp
 	void runVideoFramesSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);   // mainwindow_selftest_modes.cpp
 	void runBuilderSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot, const QString &outPrefix);
 	void runDiagnosticsSelfTest(const std::function<void(const QString &)> &log, const std::function<void(const QString &)> &shot);
@@ -206,6 +207,8 @@ private slots:
 	// to RenderController::pauseStateChanged() from startRenderJob().
 	void onControllerPauseStateChanged(bool paused);
 	void onQualityPresetChanged(int index);
+	// The Quality box shows what Samples and Max Depth are: the preset they match, or Custom (called whenever either changes, except while a preset fills them in).
+	void syncQualityPreset();
 	// Each settings section's "Defaults" button (mainwindow_slots.cpp): the controls of every section as they were when the window was built are its defaults;
 	// a reset puts a section's controls back to them, then applies the current scene's own recommendations again (its samples, exposure, camera, a film's
 	// size) without touching any other section.
@@ -1022,6 +1025,8 @@ private:
 	// and no other platform has any GPU backend at all.
 	bool m_metalGpuAvailable = false;
 	QComboBox *m_qualityPresetCombo;    // Quality preset dropdown
+	bool m_qualityChosen = false;       // the user picked a Quality preset (not Custom): it keeps its samples when the scene changes, instead of the scene's own
+	bool m_applyingQualityPreset = false;   // (a preset is filling in Samples and Max Depth: the box is not to follow them meanwhile)
 	QComboBox *m_resolutionCombo;       // Resolution preset dropdown
 	QLineEdit *m_outputPathEdit;        // Output file path (timestamped by default)
 	QPushButton *m_browseButton;

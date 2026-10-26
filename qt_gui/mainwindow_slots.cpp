@@ -135,15 +135,34 @@ void MainWindow::onControllerPauseStateChanged(bool paused) {
 	}
 }
 
-void MainWindow::onQualityPresetChanged(int index) {
-	// Draft: 25 samples, Preview: 50 samples, Good: 100 samples, High: 500 samples, Ultra: 1000 samples, Maximum: 5000 samples
-	const int presetSamples[] = {25, 50, 100, 500, 1000, 5000, m_samplesSpinBox->value()};
-	const int presetDepth[] = {10, 20, 50, 50, 100, 100, m_maxDepthSpinBox->value()};
+namespace {
+// The Quality presets (Draft, Preview, Good, High, Ultra, Maximum; Custom, the 7th, leaves the boxes as they are): samples per pixel and max ray depth.
+constexpr int kQualitySamples[6] = {25, 50, 100, 500, 1000, 5000};
+constexpr int kQualityDepth[6] = {10, 20, 50, 50, 100, 100};
+}  // namespace
 
-	if (index >= 0 && index < 7) {
-		m_samplesSpinBox->setValue(presetSamples[index]);
-		m_maxDepthSpinBox->setValue(presetDepth[index]);
-	}
+void MainWindow::onQualityPresetChanged(int index) {
+	if (index < 0 || index >= 6) return;   // (Custom: the boxes stay as they are)
+	m_applyingQualityPreset = true;
+	m_samplesSpinBox->setValue(kQualitySamples[index]);
+	m_maxDepthSpinBox->setValue(kQualityDepth[index]);
+	m_applyingQualityPreset = false;
+}
+
+// The box used to keep the preset it was set to whatever happened to Samples: choosing a scene put that scene's own samples in, the box still said High, and
+// choosing High again changed nothing (the index had not changed) - the render was not the quality the box said.
+void MainWindow::syncQualityPreset() {
+	if (m_applyingQualityPreset || !m_qualityPresetCombo || !m_samplesSpinBox || !m_maxDepthSpinBox) return;
+	int match = 6;
+	for (int i = 0; i < 6; ++i)
+		if (kQualitySamples[i] == m_samplesSpinBox->value() && kQualityDepth[i] == m_maxDepthSpinBox->value()) {
+			match = i;
+			break;
+		}
+	if (match == m_qualityPresetCombo->currentIndex()) return;
+	const QSignalBlocker hold(m_qualityPresetCombo);   // (showing it, not applying it: the boxes already say it)
+	m_qualityPresetCombo->setCurrentIndex(match);
+	m_qualityChosen = false;   // (what is in the boxes now is not the preset's doing)
 }
 
 // ============================================================================
@@ -237,6 +256,7 @@ void MainWindow::resetSection(InfoGroupBox *section) {
 	QList<QPair<QWidget *, QVariant>> outside;
 	for (QWidget *w : resettableIn(this))
 		if (!inside.contains(w)) outside.append({w, valueOf(w)});
+	if (inside.contains(m_qualityPresetCombo)) m_qualityChosen = false;   // (back to the scenes' own samples)
 	for (QWidget *w : inside)
 		if (m_sectionDefaults.contains(w)) setValueOf(w, m_sectionDefaults.value(w));
 	// the scene's own recommendations (samples, exposure, camera, a film's picture size) are the defaults of the settings that follow the scene

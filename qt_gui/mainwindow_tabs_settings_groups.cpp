@@ -874,6 +874,11 @@ void MainWindow::buildQualityRows(QWidget *basicTab, QFormLayout *renderLayout) 
 	m_qualityPresetCombo->setCurrentIndex(2); // Default to Good
 	connect(m_qualityPresetCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 			this, &MainWindow::onQualityPresetChanged);
+	// a preset the user picks (activated: only the user's choosing sends it, also of the item already shown) is applied, and kept from scene to scene
+	connect(m_qualityPresetCombo, QOverload<int>::of(&QComboBox::activated), this, [this](int index) {
+		onQualityPresetChanged(index);
+		m_qualityChosen = index >= 0 && index < 6;
+	});
 	styleComboBox(m_qualityPresetCombo);
 	// The preset names are relative ("Ultra", "Maximum") and say nothing
 	// quantitative; spell out what each actually sets. Keep in sync with

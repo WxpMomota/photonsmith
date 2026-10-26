@@ -455,8 +455,13 @@ void MainWindow::onSceneChanged(int index) {
 	// 100/200/500 sentinel check that could both wrongly clobber a
 	// deliberately-chosen 200 and wrongly leave a stale 512 in place;
 	// unifying it here removes that inconsistency rather than adding a new
-	// one.
-	m_samplesSpinBox->setValue(meta.recommendedSpp);
+	// one. The one exception is a Quality preset the user picked: that is a
+	// choice for every scene, not a value left over, so it keeps its samples
+	// (the scene's own are offered in its recommended-settings hint).
+	if (m_qualityChosen && m_qualityPresetCombo && m_qualityPresetCombo->currentIndex() >= 0 && m_qualityPresetCombo->currentIndex() < 6)
+		onQualityPresetChanged(m_qualityPresetCombo->currentIndex());
+	else
+		m_samplesSpinBox->setValue(meta.recommendedSpp);
 	m_exposureSpin->setValue(meta.recommendedExposure);
 
 	// Same unconditional-reset reasoning for the Video Generation Settings'
