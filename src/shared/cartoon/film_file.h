@@ -106,6 +106,8 @@
 //     river    0 -300  20 -100  0 0  width 12  speed 1.5        # waypoints downstream (pbrt's x z); on a terrain it lies in the lowest ground across its width;
 //                                                               # `river from X Z` finds its own way downhill, `river canyon` runs along a canyon's riverbed
 //     waterfall at 40 0 -80  width 8  drop 30  facing 180       # the middle of its lip (on a terrain, Y above the ground), how far it drops, which way it pours
+//     clouds   cumulus  cover 0.4  base 900  wind 90  speed 6   # clouds you can see round (film_clouds.h): cumulus, towering or wisps; `size W` across, `density D`,
+//                                                               # `area A` (the square they are spread over, round `at X Z`), `seed N`; they drift and cast shadows
 //
 // Weather and particles (film_particles.h):
 //
@@ -134,6 +136,7 @@
 #include "film_paths.h"
 #include "film_speech.h"
 #include "film_subjects.h"
+#include "film_clouds.h"
 #include "film_terrain.h"
 #include "film_water.h"
 #include "music_cues.h"
@@ -367,6 +370,8 @@ struct Spec {
 	std::vector<water::Sea> seas;
 	std::vector<water::River> rivers;
 	std::vector<water::Fall> falls;
+	// clouds you can see round (`clouds`)
+	std::vector<clouds::Clouds> cloudLayers;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	// weather and particles (`weather`, `particles`, `burst`)
@@ -918,6 +923,35 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				else return fail("\"" + t[i] + "\": a waterfall takes width (up to 200 m), drop (up to 1000 m) and facing");
 			}
 			s.falls.push_back(fl);
+		} else if (verb == "clouds") {
+			const std::vector<std::string> t = detail::tokens(line);
+			clouds::Clouds c;
+			if (t.size() < 2 || std::find(clouds::kinds().begin(), clouds::kinds().end(), t[1]) == clouds::kinds().end())
+				return fail("`clouds KIND [cover C] [base H] [size W] [wind DEGREES] [speed S] [density D] [area A] [at X Z] [seed N]`: cumulus, towering or wisps");
+			c.kind = t[1];
+			if (c.kind == "towering") c.size = 1500.0, c.base = 1000.0, c.cover = 0.2, c.density = 1.4;
+			else if (c.kind == "wisps") c.size = 1400.0, c.base = 5000.0, c.cover = 0.3, c.density = 0.35, c.area = 12000.0;
+			for (std::size_t i = 2; i < t.size();) {
+				double a = 0.0, b = 0.0;
+				if (t[i] == "at" && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b)) {
+					c.x = a, c.z = b;
+					i += 3;
+				} else if (i + 1 < t.size() && number(t[i + 1], a)) {
+					if (t[i] == "cover" && a > 0.0 && a <= 1.0) c.cover = a;
+					else if (t[i] == "base") c.base = a;
+					else if (t[i] == "size" && a >= 20.0 && a <= 5000.0) c.size = a;
+					else if (t[i] == "wind") c.wind = a;
+					else if (t[i] == "speed" && a >= 0.0) c.speed = a;
+					else if (t[i] == "density" && a > 0.0 && a <= 10.0) c.density = a;
+					else if (t[i] == "area" && a >= 100.0) c.area = a;
+					else if (t[i] == "seed") c.seed = static_cast<int>(a);
+					else return fail("\"" + t[i] + "\": clouds take cover (0 to 1), base, size (20 to 5000 m), wind, speed, density (up to 10), area, at X Z and seed");
+					i += 2;
+				} else {
+					return fail("\"" + t[i] + "\": clouds take cover, base, size, wind, speed, density, area, at X Z and seed");
+				}
+			}
+			s.cloudLayers.push_back(c);
 		} else if (verb == "sky") {
 			const std::vector<std::string> t = detail::tokens(line);
 			const auto hour = [&](const std::string &w, double &h) {   // 18:30 or 18.5
@@ -1182,7 +1216,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, clouds, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -2468,6 +2502,7 @@ class DataFilm {
 			for (const particles::Weather &w : spec.weather) out += particles::weatherText(w, t, at, spec.shutter / std::max(1, spec.fps));
 			for (const particles::Emitter &e : spec.emitters) out += particles::emitterText(e, t);
 		}
+		for (const clouds::Clouds &c : spec.cloudLayers) out += clouds::text(spec.key.empty() ? std::string("film") : spec.key, c, t);   // (film_clouds.h)
 		if (!spec.seas.empty() || !spec.rivers.empty() || !spec.falls.empty()) {   // water (film_water.h)
 			Vec3 eye, target;
 			double fov = 40.0;

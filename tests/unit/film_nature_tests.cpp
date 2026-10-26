@@ -239,3 +239,66 @@ TEST(FilmWater, RiversRunDownhillInTheirBedsAndWaterfallsStandOnTheirCliffs) {
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }
+
+// ---- clouds --------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace clouds = cartoon::clouds;
+
+// A cloud is a volume heaped up from a flat base, billowed at its edges; clouds are spread so their spheres never overlap, drift with the wind, and each is a medium in a
+// pass-through sphere, its densities in a file of its own.
+TEST(FilmClouds, CloudsHaveFlatBasesNeverOverlapAndDriftWithTheWind) {
+	const std::vector<float> d = clouds::densities("cumulus", 2), e = clouds::densities("cumulus", 3);
+	const int nx = 48, ny = 22, nz = 48;
+	ASSERT_EQ(d.size(), static_cast<std::size_t>(nx) * ny * nz);
+	EXPECT_FALSE(d == e) << "shapes of their own";
+	double base = 0.0, middle = 0.0, top = 0.0;
+	for (int k = 0; k < nz; ++k)
+		for (int i = 0; i < nx; ++i) {
+			base += d[(static_cast<std::size_t>(k) * ny + 0) * nx + i];
+			middle += d[(static_cast<std::size_t>(k) * ny + ny / 3) * nx + i];
+			top += d[(static_cast<std::size_t>(k) * ny + ny - 1) * nx + i];
+		}
+	EXPECT_EQ(base, 0.0) << "nothing below its flat base";
+	EXPECT_GT(middle, 100.0) << "dense in its body";
+	EXPECT_LT(top, middle * 0.3) << "and rounded on top";
+	for (float v : d) ASSERT_TRUE(v >= 0.0f && v <= 1.0f);
+	clouds::Clouds c;
+	c.cover = 0.5;
+	const std::vector<clouds::Placed> placed = clouds::layout(c);
+	ASSERT_GT(placed.size(), 5u);
+	for (std::size_t i = 0; i < placed.size(); ++i)
+		for (std::size_t j = i + 1; j < placed.size(); ++j)
+			EXPECT_GE(std::hypot(placed[i].at.x - placed[j].at.x, placed[i].at.z - placed[j].at.z),
+					  clouds::sphereOf(c.kind, placed[i].width, placed[i].stretch) + clouds::sphereOf(c.kind, placed[j].width, placed[j].stretch))
+				<< "their spheres do not overlap";
+	const std::string a = clouds::text("photonsmith-test-clouds", c, 0.0), b = clouds::text("photonsmith-test-clouds", c, 10.0);
+	std::size_t includes = 0;
+	for (std::size_t at = a.find("Include \""); at != std::string::npos; at = a.find("Include \"", at + 1)) ++includes;
+	EXPECT_EQ(includes, placed.size());
+	EXPECT_NE(a.find("MediumInterface \"cloud_cumulus_1_0\" \"\""), std::string::npos);
+	EXPECT_NE(a.find("Material \"interface\""), std::string::npos);
+	EXPECT_NE(a, b) << "they drift";
+	// the first cloud's sphere, 10 s later, is 60 m on with a 6 m/s wind towards +x (facing 90), unless it wrapped round the area
+	const auto sphereAt = [](const std::string &text) {
+		const std::size_t at = text.find("Material \"interface\"");
+		const std::size_t tr = text.rfind("Translate ", at);
+		double x = 0.0, y = 0.0, z = 0.0;
+		std::istringstream(text.substr(tr + 10)) >> x >> y >> z;
+		return cartoon::Vec3{x, y, z};
+	};
+	const cartoon::Vec3 pa = sphereAt(a), pb = sphereAt(b);
+	EXPECT_NEAR(std::fmod(pb.x - pa.x + c.area, c.area), 60.0, 1e-3);
+	EXPECT_NEAR(pb.z, pa.z, 1e-9);
+	// a film file's line
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("clouds", "scene s.pbrt\nlength 4\nclouds towering cover 0.3 base 1500 seed 4\nclouds wisps\n", film), "");
+	ASSERT_EQ(film.spec.cloudLayers.size(), 2u);
+	EXPECT_EQ(film.spec.cloudLayers[0].kind, "towering");
+	EXPECT_DOUBLE_EQ(film.spec.cloudLayers[0].base, 1500.0);
+	EXPECT_DOUBLE_EQ(film.spec.cloudLayers[1].base, 5000.0) << "wisps are high";
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"clouds fog", "cumulus, towering or wisps"}, {"clouds cumulus cover 2", "cover (0 to 1)"}}) {
+		ff::DataFilm bad;
+		const std::string problem = loadNature("clouds_bad", "scene s.pbrt\nlength 4\n" + line + "\n", bad);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}

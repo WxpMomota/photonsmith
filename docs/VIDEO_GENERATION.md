@@ -767,6 +767,23 @@ terrain the land is shaped for it - raised behind the lip into a plateau whose f
 pool; elsewhere it brings a face of rock of its own. Water is heard unless the film file says how: a sea brings an `ambience sea` (the wash, a wave breaking now and then), a
 river `ambience water`, a waterfall `ambience falls` (a roar).
 
+**Clouds you can see round: `clouds`.** (film_clouds.h)
+
+```
+clouds  cumulus   cover 0.4  base 900  wind 90  speed 6    # cumulus (800 m across), towering (1500 m, from 1000 m up) or wisps (high, thin, 5 km up)
+clouds  towering  cover 0.2  density 1.4  area 8000  at 0 -2000  seed 3
+```
+
+Each cloud is a volume of droplets - a `uniformgrid` medium inside a pass-through sphere, which every renderer draws: it scatters the sun (forward, g 0.8), is dark
+underneath and bright where the sun shines through its edges, and throws a shadow that moves over the land. Its densities (48 x 22 x 48 for a cumulus) come from blobs - one big
+one, a ring of smaller ones heaped round it, a few on top, a broad skirt low down - cut flat at the base where the air stops rising and eaten into billows at the edges by 3D
+noise; a towering cloud is a tower of billows of every size from a broad base to a crown and an anvil; wisps are long thin streaks. Each is written once as a MakeNamedMedium in a
+file of the film's cache and named in every frame by an `Include` inside the transform that places it (each stretched along x by up to 1.7, so no two look alike). The clouds are
+spread over a square `area` metres across round `at` X Z (6 km, 12 km for wisps), as many as `cover` asks for, never so close that their spheres overlap (a renderer follows one
+medium at a time); they drift with the `wind` at `speed` and wrap round the area. `sigma_s` is 0.09 per metre times `density`. Several `clouds` lines make layers (keep their
+heights apart). The camera should stay outside the clouds: from inside a cloud's sphere a renderer sees it only in part. They cost little: a frame of a hilly land with a dozen
+cumulus renders in about 2.5 s at 640 x 360 and 128 samples (with the denoiser).
+
 **Music that follows the film.** Three things (music_cues.h, film_score.h):
 
 - *Ducking.* A film file's music cues are mixed on their own and laid on the soundtrack brought down under the characters' lines - by up to two thirds while a line is
