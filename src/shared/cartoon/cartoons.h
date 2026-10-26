@@ -38,6 +38,7 @@
 #include "newtons_cradle.h"
 #include "film_file.h"
 #include "film_kinds.h"
+#include "film_score.h"
 #include "caption_file.h"
 #include "film_cache.h"
 #include "orrery.h"
@@ -250,18 +251,28 @@ inline void addFilmFile(Registry &r, const std::string &file) {
 		f.events = [p]() { return p->events(); };
 		f.feetAt = [p](double t) { return p->feetAt(t); };
 	}
-	if (d.hasEvents() || !d.spec.ambience.empty() || !d.spec.weather.empty() || !d.spec.lightnings.empty()) {
-		f.soundtrack = [p](audio::Mix &m) {   // (its set's sound and its rain, its footsteps, touches and lines; its cues file adds the music: withFilmFiles)
-			dressing::play(m, p->spec.ambience);
-			for (const particles::Weather &w : p->spec.weather)
-				if (w.kind == "rain") particles::rainSound(m, w);
-			sfx::play(m, p->events());
-			p->thunder(m);
-			p->speak(m);
-		};
-	}
 	// how loud its characters speak (its music is ducked under it)
 	if (!d.spec.lines.empty() || !d.spec.characters.empty()) f.speechAt = [p](double t) { return p->speechAt(t); };
+	// every film file has a soundtrack: its set's sound and its rain, its footsteps, touches and lines, and its music - its cues file's (withFilmFiles) or, when it has none,
+	// the score drafted from what happens in it (film_score.h; `music none` leaves it out), ducked under the lines as a cues file's music is. (One with no music and nothing
+	// else to hear has a soft wind: a video of a film is never silent.)
+	const bool drafted = d.spec.draftMusic && music_cues::fileOf(d.spec.key).empty();
+	const bool quiet = !drafted && music_cues::fileOf(d.spec.key).empty() && !d.hasEvents() && d.spec.ambience.empty() && d.spec.weather.empty() && d.spec.lightnings.empty();
+	f.soundtrack = [p, drafted, quiet, names = d.shotNameList(), speech = f.speechAt](audio::Mix &m) {
+		dressing::play(m, quiet ? std::vector<dressing::Ambience>{{"wind", 0.6}} : p->spec.ambience);
+		for (const particles::Weather &w : p->spec.weather)
+			if (w.kind == "rain") particles::rainSound(m, w);
+		sfx::play(m, p->events());
+		p->thunder(m);
+		p->speak(m);
+		if (!drafted) return;
+		const music_cues::Sheet sheet = music_cues::parse(score::draft(*p));
+		std::vector<std::string> problems = sheet.problems;
+		audio::Mix music(m.seconds());
+		music_cues::play(music, sheet, {}, p->shotStarts(), names, problems);
+		m.add(music, speech ? music_cues::duckingOf(speech, m.seconds() + 4.0) : std::vector<float>());
+		for (const std::string &problem : problems) std::cerr << "[score] " << p->spec.key << ": " << problem << std::endl;
+	};
 	// how its shots give way to each other
 	if (!d.transitions().empty()) {
 		f.transitions = [p]() { return p->transitions(); };

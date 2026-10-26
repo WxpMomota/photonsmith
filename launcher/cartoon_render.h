@@ -252,14 +252,18 @@ inline int dropFilledFrames(const std::filesystem::path &dir) {
 	return dropped;
 }
 
-// The soundtrack. A film with one (Film::soundtrack, cartoon_audio.h) has it mixed and written as a 16-bit stereo .wav; the video then gets it. It is made for the film's own length and
-// frame rate, so it is only added to a video that has them (a shorter or faster one would not fit it).
-inline bool soundtrackFits(const cartoon::Film &film, int frames, int fps) { return film.soundtrack != nullptr && frames == cartoon::frameCountOf(film) && fps == film.fps; }
-inline bool writeSoundtrack(const cartoon::Film &film, const std::filesystem::path &wavPath) {
+// The soundtrack. A film with one (Film::soundtrack, cartoon_audio.h; every film has one) has it mixed and written as a 16-bit stereo .wav; the video then gets it. It is made
+// for the film's own length: a video of the whole film at any frame rate takes it as it is when it lasts as long, and stretched to its length at the same pitch when it is longer
+// or shorter (another frame count, --speed; cartoon_audio.h `stretched`), so its sounds stay on their pictures. `videoSeconds` 0: the film's own length.
+inline double videoSecondsOf(int frames, int fps) { return static_cast<double>(frames) / std::max(1, fps); }
+inline bool soundtrackStretched(const cartoon::Film &film, int frames, int fps) { return std::abs(videoSecondsOf(frames, fps) - film.duration) > 0.001 * film.duration; }
+inline bool writeSoundtrack(const cartoon::Film &film, const std::filesystem::path &wavPath, double videoSeconds = 0.0) {
 	if (!film.soundtrack) return false;
 	cartoon::audio::Mix mix(film.duration);
 	film.soundtrack(mix);
-	return cartoon::audio::writeWav(wavPath.string(), mix.finish());
+	std::vector<std::int16_t> pcm = mix.finish();
+	if (videoSeconds > 0.0) pcm = cartoon::audio::stretched(pcm, static_cast<std::size_t>(videoSeconds * cartoon::audio::kRate));
+	return cartoon::audio::writeWav(wavPath.string(), pcm);
 }
 
 // ---- long-lived workers (cartoon_worker.h) ----

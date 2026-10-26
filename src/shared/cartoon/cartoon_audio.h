@@ -304,6 +304,62 @@ class Mix {
 	std::vector<float> dry_[2], wet_[2];
 };
 
+// A finished mix (16-bit stereo, interleaved) made `frames` sample frames long at the same pitch: the soundtrack of a video of a whole film made at another length than the film's own
+// (its frames spread over more or fewer seconds: another frame count, --speed), in step with its pictures. Windows of 40 ms overlap by half, each taken from near where the time
+// scale puts it, at the place (within 10 ms) that best continues the window before it (WSOLA), so a held note neither warbles nor changes its pitch. Within 0.1% of the length the
+// sound is only cut or padded with silence.
+inline std::vector<std::int16_t> stretched(const std::vector<std::int16_t> &pcm, std::size_t frames) {
+	const std::size_t in = pcm.size() / 2;
+	if (in == 0 || frames == 0) return std::vector<std::int16_t>(frames * 2, 0);
+	if (std::abs(static_cast<double>(frames) - static_cast<double>(in)) <= 0.001 * static_cast<double>(in)) {
+		std::vector<std::int16_t> out(pcm.begin(), pcm.begin() + static_cast<std::ptrdiff_t>(std::min(in, frames) * 2));
+		out.resize(frames * 2, 0);
+		return out;
+	}
+	const std::size_t N = static_cast<std::size_t>(kRate / 25), hop = N / 2, reach = static_cast<std::size_t>(kRate / 100);
+	const double step = static_cast<double>(hop) * static_cast<double>(in) / static_cast<double>(frames);   // (the input moved on for each output hop)
+	std::vector<float> mono(in);
+	for (std::size_t i = 0; i < in; ++i) mono[i] = 0.5f * (static_cast<float>(pcm[2 * i]) + static_cast<float>(pcm[2 * i + 1]));
+	std::vector<float> window(N);
+	for (std::size_t n = 0; n < N; ++n) window[n] = static_cast<float>(0.5 - 0.5 * std::cos(kTau * static_cast<double>(n) / static_cast<double>(N)));   // (periodic Hann: halves sum to 1)
+	std::vector<float> out[2];
+	for (int c = 0; c < 2; ++c) out[c].assign(frames + N, 0.0f);
+	const auto at = [&](std::ptrdiff_t i) { return i >= 0 && static_cast<std::size_t>(i) < in ? mono[static_cast<std::size_t>(i)] : 0.0f; };
+	std::ptrdiff_t previous = 0;
+	for (std::size_t k = 0; k * hop < frames; ++k) {
+		const std::ptrdiff_t nominal = static_cast<std::ptrdiff_t>(std::llround(static_cast<double>(k) * step));
+		std::ptrdiff_t chosen = nominal;
+		if (k > 0) {   // the offset within `reach` whose first half matches best what would have followed the window before (every 8th sample, every other offset, then the neighbours)
+			const std::ptrdiff_t follow = previous + static_cast<std::ptrdiff_t>(hop);
+			const auto match = [&](std::ptrdiff_t start) {
+				double sum = 0.0;
+				for (std::size_t n = 0; n < hop; n += 8) sum += static_cast<double>(at(start + static_cast<std::ptrdiff_t>(n))) * at(follow + static_cast<std::ptrdiff_t>(n));
+				return sum;
+			};
+			double best = -1e300;
+			const std::ptrdiff_t r = static_cast<std::ptrdiff_t>(reach);
+			for (std::ptrdiff_t d = -r; d <= r; d += 2) {
+				const double v = match(nominal + d);
+				if (v > best) best = v, chosen = nominal + d;
+			}
+			for (const std::ptrdiff_t d : {chosen - 1, chosen + 1}) {
+				const double v = match(d);
+				if (v > best) best = v, chosen = d;
+			}
+		}
+		previous = chosen;
+		for (std::size_t n = 0; n < N; ++n) {
+			const std::ptrdiff_t i = chosen + static_cast<std::ptrdiff_t>(n);
+			if (i < 0 || static_cast<std::size_t>(i) >= in) continue;
+			for (int c = 0; c < 2; ++c) out[c][k * hop + n] += window[n] * static_cast<float>(pcm[2 * static_cast<std::size_t>(i) + static_cast<std::size_t>(c)]);
+		}
+	}
+	std::vector<std::int16_t> result(frames * 2);   // (the first 20 ms rise with their window: a soundtrack fades in over half a second anyway)
+	for (std::size_t i = 0; i < frames; ++i)
+		for (int c = 0; c < 2; ++c) result[2 * i + static_cast<std::size_t>(c)] = static_cast<std::int16_t>(std::lround(std::max(-32767.0f, std::min(32767.0f, out[c][i]))));
+	return result;
+}
+
 // A 16-bit stereo PCM WAV file. False when the file cannot be written.
 inline bool writeWav(const std::string &path, const std::vector<std::int16_t> &pcm) {
 	std::ofstream f(path, std::ios::binary);

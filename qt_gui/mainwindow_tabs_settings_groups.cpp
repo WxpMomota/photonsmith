@@ -1241,14 +1241,15 @@ void MainWindow::buildVideoGroup(QWidget *basicTab, QVBoxLayout *layout) {
 				.arg(actualFrames).arg(baseFrames).arg(QString::number(speed, 'f', 2))
 				.arg(capped ? tr(" - capped at 20000") : QString());
 
-		// A film with a soundtrack is made for its own length and frame rate: the video has the sound only when it has them (the launcher says the same when it renders).
+		// A film's soundtrack is made for its own length: a video as long has it as it is, a longer or shorter one has it stretched to fit at the same pitch (the launcher does the
+		// same when it renders: cartoon_render.h writeSoundtrack).
 		QString soundNote;
 		if (const QString path = videoCameraPath(); path.startsWith(QStringLiteral("cartoon:"))) {
 			if (const film_info::Film *film = film_info::find(path.mid(8).toUtf8().constData()); film && film->soundtrack) {
-				soundNote = (actualFrames == film_info::frameCountOf(*film) && fps == film->fps)
+				soundNote = std::abs(duration - film->duration) <= 0.001 * film->duration
 					? tr("\nSound: included (the film's own soundtrack)")
-					: tr("\nSound: NOT included - the soundtrack is made for %1 frames at %2 fps; with another frame count, speed or fps the video has no sound")
-						  .arg(film_info::frameCountOf(*film)).arg(film->fps);
+					: tr("\nSound: included, stretched from the film's %1 s to %2 s at the same pitch")
+						  .arg(QString::number(film->duration, 'f', 1)).arg(QString::number(duration, 'f', 1));
 			}
 		}
 

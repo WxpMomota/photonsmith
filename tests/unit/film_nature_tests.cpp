@@ -187,6 +187,25 @@ TEST(FilmWater, TheSeasWavesRollAndAreDrawnWhereTheCameraLooks) {
 	EXPECT_EQ(behind, 0) << "nothing far behind the camera";
 }
 
+// A landscape with no `ambience` line is heard as what it is: wind over the land, birds in a wood by day, crickets in it after dark; an `ambience` line is heard instead.
+TEST(FilmWater, ALandscapeIsHeardAsWhatItIsUnlessTheFilmSaysHow) {
+	const auto kinds = [](const ff::DataFilm &f) {
+		std::vector<std::string> k;
+		for (const auto &a : f.spec.ambience) k.push_back(a.kind);
+		return k;
+	};
+	const std::string land = "scene s.pbrt\nlength 4\nterrain hills size 200 height 20 seed 1 far off\n";
+	ff::DataFilm bare, wood, night, said;
+	ASSERT_EQ(loadNature("bare", land, bare), "");
+	EXPECT_EQ(kinds(bare), (std::vector<std::string>{"wind"}));
+	ASSERT_EQ(loadNature("wood", land + "sky 10:00 11:00\nforest broadleaf 40 seed 2\n", wood), "");
+	EXPECT_EQ(kinds(wood), (std::vector<std::string>{"wind", "birds"}));
+	ASSERT_EQ(loadNature("nightwood", land + "sky 23:00 23:30\nforest broadleaf 40 seed 2\n", night), "");
+	EXPECT_EQ(kinds(night), (std::vector<std::string>{"wind", "crickets"}));
+	ASSERT_EQ(loadNature("said", land + "ambience night 0.7\n", said), "");
+	EXPECT_EQ(kinds(said), (std::vector<std::string>{"night"}));
+}
+
 // A river's water never runs uphill, and on a terrain its bed is cut under it; a waterfall pours in the arc thrown water takes, its cliff raised behind it and its pool cut
 // before it, and it is seen and heard: spray where it lands, the roar under the film.
 TEST(FilmWater, RiversRunDownhillInTheirBedsAndWaterfallsStandOnTheirCliffs) {
@@ -212,6 +231,7 @@ TEST(FilmWater, RiversRunDownhillInTheirBedsAndWaterfallsStandOnTheirCliffs) {
 	const auto heard = [&](const std::string &kind) { return std::any_of(film.spec.ambience.begin(), film.spec.ambience.end(), [&](const auto &a) { return a.kind == kind; }); };
 	EXPECT_TRUE(heard("falls"));
 	EXPECT_TRUE(heard("water"));
+	EXPECT_TRUE(heard("wind")) << "and the land's own wind, nothing being said of its sound";
 	ASSERT_FALSE(film.spec.emitters.empty());
 	EXPECT_EQ(film.spec.emitters.back().kind, "splash") << "spray where it lands";
 	// a lake's shore: the ground just above its level is drawn under it

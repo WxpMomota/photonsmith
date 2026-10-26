@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <regex>
 #include <set>
 #include <string>
@@ -280,6 +281,85 @@ TEST(FilmFile, FilmsFromFilesAreFilmsLikeTheOthersWithAStableNumberFilteredTagsA
 	ASSERT_EQ(other.all.size(), 1u);
 	EXPECT_EQ(other.all[0]->meta.id, f.meta.id);
 	EXPECT_NE(cartoon::summaryOf(f).find("A film made from"), std::string::npos) << "a film with no `about` still says something";
+}
+
+// Every film has a soundtrack: a film file with nothing to hear plays the score drafted from it (no cues file), `music none` leaves the score out (a soft wind then, if nothing else
+// is heard), and its set's sound stays under the score. Each is heard over its length and is the same every time it is made.
+TEST(FilmFile, EveryFilmFileHasASoundtrackEvenWithNothingInItToHear) {
+	const std::filesystem::path d = tempDir("soundtracks");
+	write(d / "s.pbrt", kScene);
+	const std::string shots = "scene s.pbrt\nlength 8\nshot 0 A\n key 0 0 5  0 0 0\nshot 4 B\n key 0 0 6  0 0 0\n";
+	write(d / "plain.film", shots);
+	write(d / "hushed.film", shots + "music none\n");
+	write(d / "brook.film", shots + "music none\nambience water 0.8\n");
+	write(d / "both.film", shots + "music draft\nambience water 0.8\n");
+	write(d / "loud.film", shots + "music loud\n");
+	cartoon::detail::Registry r;
+	for (const char *file : {"plain.film", "hushed.film", "brook.film", "both.film", "loud.film"}) cartoon::detail::addFilmFile(r, (d / file).string());
+	ASSERT_EQ(r.all.size(), 4u);
+	ASSERT_EQ(r.problems.size(), 1u);
+	EXPECT_NE(r.problems[0].find("`music none`"), std::string::npos) << r.problems[0];
+	std::map<std::string, std::vector<std::int16_t>> heard;
+	for (const cartoon::Film *f : r.all) {
+		ASSERT_TRUE(static_cast<bool>(f->soundtrack)) << f->key << " has no soundtrack";
+		cartoon::audio::Mix a(f->duration), b(f->duration);
+		f->soundtrack(a);
+		f->soundtrack(b);
+		const std::vector<std::int16_t> pa = a.finish();
+		EXPECT_EQ(pa, b.finish()) << f->key << ": the same every time";
+		for (double t = 0.5; t + 2.0 < f->duration - 1.0; t += 1.0) {
+			double e = 0.0;
+			const std::size_t i0 = static_cast<std::size_t>(t * cartoon::audio::kRate) * 2, i1 = static_cast<std::size_t>((t + 2.0) * cartoon::audio::kRate) * 2;
+			for (std::size_t i = i0; i < i1; ++i) e += static_cast<double>(pa[i]) * pa[i];
+			EXPECT_GT(std::sqrt(e / static_cast<double>(i1 - i0)) / 32768.0, 0.0008) << f->key << ": silence from " << t << " s";
+		}
+		heard[f->key] = pa;
+	}
+	EXPECT_NE(heard["plain"], heard["hushed"]) << "the drafted score is played";
+	EXPECT_NE(heard["hushed"], heard["brook"]) << "the film's own sound, not the wind, when it has one";
+	EXPECT_NE(heard["brook"], heard["both"]) << "the score over the set's sound";
+}
+
+// A video of a film at another length gets its soundtrack stretched to fit at the same pitch: exactly the video's length, a tone still the same tone, as loud, and a click at a
+// moment of the film still at that moment of the video.
+TEST(CartoonAudioStretch, ASoundtrackStretchedToAnotherLengthKeepsItsPitchLoudnessAndTiming) {
+	const double seconds = 4.0;
+	const std::size_t n = static_cast<std::size_t>(seconds * cartoon::audio::kRate);
+	std::vector<std::int16_t> pcm(n * 2);
+	for (std::size_t i = 0; i < n; ++i) {
+		const double t = static_cast<double>(i) / cartoon::audio::kRate;
+		const double v = 8000.0 * std::sin(cartoon::audio::kTau * 440.0 * t) + (std::abs(t - 2.0) < 0.002 ? 20000.0 : 0.0);
+		pcm[2 * i] = pcm[2 * i + 1] = static_cast<std::int16_t>(std::lround(std::max(-32767.0, std::min(32767.0, v))));
+	}
+	for (const double factor : {1.5, 0.6}) {
+		const std::size_t frames = static_cast<std::size_t>(static_cast<double>(n) * factor);
+		const std::vector<std::int16_t> out = cartoon::audio::stretched(pcm, frames);
+		ASSERT_EQ(out.size(), frames * 2) << factor;
+		// the tone: its rising zero crossings over the middle second, and its loudness (away from the click)
+		const std::size_t m0 = frames / 8, m1 = m0 + static_cast<std::size_t>(cartoon::audio::kRate) / 2;
+		int rises = 0;
+		double e = 0.0;
+		for (std::size_t i = m0; i < m1; ++i) {
+			rises += out[2 * (i - 1)] < 0 && out[2 * i] >= 0;
+			e += static_cast<double>(out[2 * i]) * out[2 * i];
+		}
+		EXPECT_NEAR(rises * 2.0, 440.0, 440.0 * 0.03) << factor << ": the same pitch";
+		EXPECT_NEAR(std::sqrt(e / static_cast<double>(m1 - m0)), 8000.0 / std::sqrt(2.0), 8000.0 / std::sqrt(2.0) * 0.12) << factor << ": as loud";
+		// the click: the loudest sample, where the film's 2 s falls in the video
+		std::size_t loudest = 0;
+		for (std::size_t i = 0; i < frames; ++i)
+			if (std::abs(out[2 * i]) > std::abs(out[2 * loudest])) loudest = i;
+		EXPECT_NEAR(static_cast<double>(loudest) / cartoon::audio::kRate, 2.0 * factor, 0.03) << factor << ": in step with the pictures";
+	}
+	// within 0.1% of its length the sound is only cut or padded
+	const std::vector<std::int16_t> same = cartoon::audio::stretched(pcm, n + 10);
+	EXPECT_TRUE(std::equal(pcm.begin(), pcm.end(), same.begin()));
+	EXPECT_EQ(same.back(), 0);
+}
+
+// Every film the program has - built in or read from a film file in the scene folders - has a soundtrack.
+TEST(FilmFile, EveryFilmInTheProgramHasASoundtrack) {
+	for (const cartoon::Film *f : cartoon::films()) EXPECT_TRUE(static_cast<bool>(f->soundtrack)) << f->key << " has no soundtrack";
 }
 
 TEST(FilmFile, TheExampleFilmIsGoodAndAnimatesWhatItSays) {

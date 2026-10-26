@@ -448,7 +448,9 @@ are out of step with the table; `tests/data/cartoon_films_snapshot.txt` pins eac
 cartoon needs (a splash, a knock on wood, a boing, a slide), a voice that chirps, a reverb and a limiter. Every sound is a pure function of its arguments, so a film sounds the same each time it
 is rendered. The film can share its timeline with the picture: in "Pip and the Moon" the footsteps, Pip's chirps and the splashes come from the same lists (`pip_moon_story.h`) that move its
 feet, open its mouth and strike the water, so what you hear is on the beat of what you see. A video of the film's own length and frame rate (the preset's defaults) gets the sound added by
-ffmpeg, and the .wav is kept beside the video (`<name>_video.wav`); a video of another length is made without sound, since the sound is made for the film's own timing. On a Mac the built-in
+ffmpeg, and the .wav is kept beside the video (`<name>_video.wav`); a video of the whole film at another length (another frame count or `--speed`) gets the soundtrack stretched to its
+length at the same pitch (`audio::stretched`: overlapping 40 ms windows, each placed where it best continues the last), so every sound stays on its picture, and one of the same length at
+another frame rate gets it as it is. On a Mac the built-in
 encoder cannot add sound, so a film's sound needs ffmpeg there (without it the video is silent and the .wav is beside it).
 
 **Words on the screen: a caption file.** A film's captions are a UTF-8 text file read when the video is made, so a line is corrected, retimed or put into another language with no
@@ -514,7 +516,9 @@ Between two keys a value changes smoothly (evenly with `ease 0`); before the fir
 no shots keeps the scene's own camera. Meshes and pictures the pbrt file names by a relative path are looked up beside the pbrt file. `ray_tracer --film-check FILE.film` loads a film file and its
 scene and says what it found or what is wrong, with the file and line; with no file it lists the films found in the scene folders and the files that were left out (a film with a problem is left out
 of the scene list, never half-loaded). A film made from a file has a video preset number of its own, `V` and a number from 1000 up worked out from its key, so it never changes when other films
-are added. The sound of a built-in film is C++; a film file's is its cues file (`film_assets/<key>/cues.txt`) and, when it has characters, their footsteps.
+are added. The sound of a built-in film is C++; a film file's is its set's sound (`ambience`, rain, thunder, and the water it has), its characters' footsteps, touches and lines, and its
+music: its cues file (`film_assets/<key>/cues.txt`), or with none the score drafted from it (`--film-score`, made when the soundtrack is made, so it follows the film's changes; `music
+none` leaves it out, and a film with no music and nothing else to hear gets a soft wind). Every film, built in or from a file, has a soundtrack.
 
 **A film blocked out as a screenplay: characters in a film file.** A film file can bring in characters from the library of kinds (`film_file::characterKinds`, filled in
 film_kinds.h: `nomai-explorer`, `pip`, `person` and `turtle`), walk them along paths, act with gestures from their pose library and follow them with the camera, with no C++:

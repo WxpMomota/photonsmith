@@ -98,6 +98,8 @@
 //     scatter  grass 300 in -8 -10 8 2  scale 0.7 1.3  seed 2   # so many of a kind over a rectangle of the ground (x0 z0 x1 z1; `y` its height)
 //     sky      18:30 19:10  south 180  latitude 40              # the sun and sky from 6:30 to 7:10 pm over the film (the scene's own infinite and distant lights are left out)
 //     ambience birds 0.6                                        # a sound under the whole film: wind, birds, crickets, water or night, at a gain
+//     music    none                                             # no music: without a cues file (film_assets/<key>/cues.txt) a film plays its drafted score
+//                                                               # (film_score.h, `--film-score`) under its sounds; `music draft` says so
 //     terrain  mountains  size 1500  height 320  seed 3         # the land (film_terrain.h): hills, mountains, dunes or canyon, eroded, coloured by height, slope and water,
 //                                                               # with far ranges round it (`far off`); `at X Z`, `y Y`, `focus X Z` (finest there; a valley floor round it),
 //                                                               # `snow H` (the snow line above y), `erosion E` (0 to 3); on a terrain every height is above the ground
@@ -443,6 +445,7 @@ struct Spec {
 	std::vector<fire::Wildfire> wildfires;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
+	bool draftMusic = true;   // (`music none`: no drafted score when there is no cues file)
 	// weather and particles (`weather`, `particles`, `burst`)
 	std::vector<particles::Weather> weather;
 	std::vector<particles::Emitter> emitters;
@@ -1226,6 +1229,10 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			a.kind = t[1];
 			if (t.size() > 3 || (t.size() == 3 && (!number(t[2], a.gain) || a.gain < 0.0 || a.gain > 4.0))) return fail("an ambience's gain is a number from 0 to 4");
 			s.ambience.push_back(a);
+		} else if (verb == "music") {
+			const std::vector<std::string> t = detail::tokens(line);
+			if (t.size() != 2 || (t[1] != "none" && t[1] != "draft")) return fail("`music none` (no music) or `music draft` (the drafted score when there is no cues file)");
+			s.draftMusic = t[1] == "draft";
 		} else if (verb == "prop") {
 			const std::vector<std::string> t = detail::tokens(line);
 			Spec::Prop pr;
@@ -1570,7 +1577,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, music, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1708,6 +1715,14 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 	for (skyfx::Lightning &l : s.lightnings) l.strikes = skyfx::strikesOf(l, s.length);
 	for (skyfx::Aurora &a : s.auroras)
 		if (!a.facingSet && s.hasSky) a.facing = s.sky.south + 180.0;   // (the aurora is towards the pole: the film's own north)
+	if (s.ambience.empty() && !s.hasUnderwater && (s.hasTerrain || !s.forests.empty())) {   // a landscape is heard as what it is, unless an `ambience` line says how: wind over the
+		double elevation = 0.0, facing = 0.0;                                                // land, and birds in a wood by day, crickets in it and the night's sounds after dark
+		dressing::sunAt(s.sky, 0.5 * (s.sky.from + s.sky.to), elevation, facing);
+		const bool night = s.hasSky && elevation < -4.0;
+		s.ambience.push_back({"wind", 0.5});
+		if (!s.forests.empty()) s.ambience.push_back({night ? "crickets" : "birds", 0.5});
+		else if (night) s.ambience.push_back({"night", 0.5});
+	}
 	const auto hears = [&](const std::string &kind) { return std::any_of(s.ambience.begin(), s.ambience.end(), [&](const dressing::Ambience &a) { return a.kind == kind; }); };
 	if (!s.seas.empty() && s.seas[0].kind == "sea" && !hears("sea")) s.ambience.push_back({"sea", 0.8});   // (water is heard: unless the film file says how)
 	if (!s.rivers.empty() && !hears("water")) s.ambience.push_back({"water", 0.7});

@@ -906,22 +906,25 @@ inline int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
 
     int converted = 0;
     if (int rc = renderVideoFrames(args, s, paths, render_frame_count, keyframes, use_keyframes, start, converted); rc != SUCCESS) return rc;
-    // a film with a soundtrack gets it, when the video is the film's own length (the sound is made for that: a shorter or faster video would not fit it)
+    // a film's soundtrack goes with it: as it is when the video lasts as long as the film, stretched to the video's length (same pitch) when it is longer or shorter
     std::filesystem::path soundtrack_path;
     if (const cartoon::Film *film = cartoon::forCameraPath(s.camera_path.c_str()); film && film->soundtrack) {
         if (converted != render_frame_count) {
             std::cout << "\nNote: " << (render_frame_count - converted) << " frame(s) failed, so the sound (made for every frame) would drift out of step; the video is made without it." << std::endl;
-        } else if (cartoon_render::soundtrackFits(*film, render_frame_count, s.video_fps)) {
+        } else {
             soundtrack_path = paths.video_path;
             soundtrack_path.replace_extension(".wav");
-            std::cout << "\nMaking the soundtrack of " << film->name << "..." << std::endl;
-            if (!cartoon_render::writeSoundtrack(*film, soundtrack_path)) {
+            const double seconds = cartoon_render::videoSecondsOf(render_frame_count, s.video_fps);
+            if (cartoon_render::soundtrackStretched(*film, render_frame_count, s.video_fps)) {
+                char lengths[96];
+                std::snprintf(lengths, sizeof lengths, "stretched from its %.1f s to the video's %.1f s", film->duration, seconds);
+                std::cout << "\nMaking the soundtrack of " << film->name << ", " << lengths << " (same pitch)..." << std::endl;
+            } else
+                std::cout << "\nMaking the soundtrack of " << film->name << "..." << std::endl;
+            if (!cartoon_render::writeSoundtrack(*film, soundtrack_path, seconds)) {
                 std::cerr << "WARNING: the soundtrack could not be written to " << soundtrack_path << "; the video will be silent." << std::endl;
                 soundtrack_path.clear();
             }
-        } else {
-            std::cout << "\nNote: " << film->name << " has a soundtrack, made for " << cartoon::frameCountOf(*film) << " frames at " << film->fps << " frames per second; this video has "
-                      << render_frame_count << " at " << s.video_fps << ", so it is made without sound." << std::endl;
         }
     }
     // its dissolves, fades and wipes, on the finished frames before their words (film_transitions.h)
