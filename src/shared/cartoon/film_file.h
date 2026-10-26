@@ -162,6 +162,7 @@
 //
 //     voices   system                                          # every character in one of the computer's voices (by its name; `babble` the default)
 //     cast     ann  at -0.7 0 0  voice zira                    # ... or one of them in the voice with that word in its name
+//     acting   words                                           # each line acted from its words (film_acting.h): a gesture and an expression where none is given
 //
 // The toon look (src/shared/toon_look.h) - the light in flat bands, ink lines round shapes and along creases, stronger colour - on every frame:
 //
@@ -190,6 +191,7 @@
 #include "film_faces.h"
 #include "film_particles.h"
 #include "film_paths.h"
+#include "film_acting.h"
 #include "film_speech.h"
 #include "film_tts.h"
 #include "film_subjects.h"
@@ -484,6 +486,7 @@ struct Spec {
 	bool draftMusic = true;   // (`music none`: no drafted score when there is no cues file)
 	toon_look::Style toon;    // the toon look (`toon`): written into every frame's header as its `# @rt-toon` line
 	std::string voices;       // what the characters' lines are said in unless a character says (`voices`): "" or "babble", "system", a word of a computer voice's name
+	bool actingWords = false; // `acting words`: each line brings the gesture and the expression its words ask for (film_acting.h), where the film gives none
 	// weather and particles (`weather`, `particles`, `burst`)
 	std::vector<particles::Weather> weather;
 	std::vector<particles::Emitter> emitters;
@@ -1345,6 +1348,9 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			a.kind = t[1];
 			if (t.size() > 3 || (t.size() == 3 && (!number(t[2], a.gain) || a.gain < 0.0 || a.gain > 4.0))) return fail("an ambience's gain is a number from 0 to 4");
 			s.ambience.push_back(a);
+		} else if (verb == "acting") {   // gestures and expressions from the words of the lines (film_acting.h)
+			if (w.size() != 2 || (w[1] != "words" && w[1] != "off")) return fail("`acting words` (each line acted from its words) or `acting off`");
+			s.actingWords = w[1] == "words";
 		} else if (verb == "voices") {   // what every character's lines are said in (film_tts.h)
 			if (w.size() != 2) return fail("`voices babble|system|NAME`: the babble voice, one of the computer's own voices, or the computer voice with NAME in its name");
 			s.voices = detail::lowerWord(w[1]);
@@ -1701,7 +1707,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -2216,6 +2222,7 @@ class DataFilm {
 			if (const Character *c = character(l.who)) l.pitch += c->pitch, l.rate *= c->rate;
 		spoken.clear();
 		for (const speech::Line &l : spec.lines) spoken.push_back(speech::syllablesOf(l));
+		if (spec.actingWords) actFromWords();
 		if (spec.hasSky) leaveOutSkyLights();
 		for (const Spec::Prop &pr : spec.props)
 			if (std::find(scene.names.begin(), scene.names.end(), pr.name) == scene.names.end())
@@ -2242,6 +2249,49 @@ class DataFilm {
 	}
 
 	std::vector<std::vector<speech::Syllable>> spoken;   // each line's syllables (spec.lines)
+
+	// `acting words`: each line's gesture and expression from its words (film_acting.h), timed by its syllables, added to its speaker where the film gives that character
+	// no gesture (or no expression) of its own during the line. A nod or a shake of the head is quick; the others are held to the line's end; an expression stays a little
+	// after it.
+	void actFromWords() {
+		std::map<std::string, std::vector<std::pair<double, double>>> ownGestures, ownFeelings;   // (the film's own, before any is added)
+		for (const Character &c : spec.characters) {
+			for (const rig::Gesture &g : c.gestures) ownGestures[c.name].push_back({g.in0, g.out1 >= rig::kForever ? 1e30 : g.out1});
+			for (const faces::Feeling &f : c.feelings) ownFeelings[c.name].push_back({f.when.in0, f.when.out1 >= rig::kForever ? 1e30 : f.when.out1});
+		}
+		const auto busy = [](const std::vector<std::pair<double, double>> &spans, double t0, double t1) {
+			for (const auto &[a, b] : spans)
+				if (a < t1 && b > t0) return true;
+			return false;
+		};
+		for (std::size_t i = 0; i < spec.lines.size(); ++i) {
+			Character *c = nullptr;
+			for (Character &each : spec.characters)
+				if (each.name == spec.lines[i].who) c = &each;
+			if (!c) continue;
+			const CharacterKind &kind = characterKinds().at(c->kind);
+			const double t0 = spec.lines[i].t, t1 = speech::endOf(spoken[i], t0);
+			for (const acting::Cue &cue : acting::cuesOf(spec.lines[i].text, t0, t1, kind.poses, kind.face)) {
+				if (cue.expression) {
+					if (busy(ownFeelings[c->name], t0 - 0.3, t1 + 0.5)) continue;
+					faces::Feeling f;
+					f.when = {cue.what, cue.at - 0.25, cue.at + 0.15, std::max(cue.at + 0.6, t1 + 0.4), std::max(cue.at + 1.1, t1 + 0.9)};
+					f.amount = 0.8;
+					c->feelings.push_back(f);
+				} else {
+					if (busy(ownGestures[c->name], t0 - 0.5, t1 + 0.5)) continue;
+					const bool quick = cue.what == "nod" || cue.what == "shake head";
+					rig::Gesture g;
+					g.pose = cue.what;
+					g.in0 = cue.at - (quick ? 0.15 : 0.35);
+					g.in1 = cue.at + (quick ? 0.1 : 0.15);
+					g.out0 = quick ? cue.at + 0.75 : std::max(cue.at + 0.9, t1);
+					g.out1 = g.out0 + (quick ? 0.3 : 0.45);
+					c->gestures.push_back(g);
+				}
+			}
+		}
+	}
 
 	// ---- the set's dressing ----
 	// The scene's own infinite and distant lights left out of its plain text (a `sky` brings its own sun and sky).

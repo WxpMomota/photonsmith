@@ -264,6 +264,7 @@ inline std::string filmFile(const Script &s, const std::string &set, const std::
 	std::snprintf(buf, sizeof buf, "length  %.1f\n", std::ceil(length * 10.0) / 10.0);
 	out += buf;
 	if (s.fadeOut) out += "fadeout 1.5\n";
+	out += "acting  words      # each line acted from its words where the script gives no direction (film_acting.h)\n";
 	out += "\n# who, standing round the middle of the stage facing it (two face each other)\n";
 	const std::size_t n = s.characters.size();
 	const double radius = std::max(0.8, 0.45 * static_cast<double>(n));

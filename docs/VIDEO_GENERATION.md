@@ -569,6 +569,14 @@ its kind's voice. The speech engine runs as a program of its own with no console
 said shows the babble mouth. Real voices are slower than the babble: `ray_tracer --film-lines <key>` lists each line's start and end, to space them. Where the computer
 has no voice (or no voice with the word asked for) the line keeps its babble voice and the run says so.
 
+**Acting from the words.** `acting words` in a film file has each line bring the gesture and the expression its words ask for (`src/shared/cartoon/film_acting.h`),
+so a film blocked out from a screenplay is acted without a `gesture` and a `feel` for every line: a greeting waves, a yes nods, a no shakes the head, "look" or "there"
+points, "hmm" or "maybe" thinks, a happy exclamation cheers, a thank-you bows, a plain question shrugs; the words of a feeling show on the face (happy, sad, angry, scared,
+worried, thinking; an exclaimed question or "wow!" is a surprise). Each comes at the word that brings it, one gesture and one expression a line at most, only poses the
+speaker's kind has (the turtle has no shrug; the masked explorer no face), and none where the film gives that character a gesture or a feeling of its own during the line
+(a script's parentheticals win). The timing is the line's syllables (the babble timing, the same in every program, whatever voice says it). A film made from a script
+(`--film-from-script`) has the line.
+
 **The toon look: cel shading and ink lines.** `toon [bands N] [lines W] [ink COLOUR] [saturation S] [shadow S]` in a film file draws every frame as a cartoon
 (`src/shared/toon_look.h`): the light on each surface in a few flat bands, ink lines round what stands in front of something, along sharp creases and against the sky, and
 stronger colour. It is made after the render, in the run that rendered the frame, from the picture and its passes (a cheap first-hit pass on the CPU: albedo, normal,

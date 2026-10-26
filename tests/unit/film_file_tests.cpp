@@ -569,6 +569,49 @@ TEST(FilmVoices, ALineSaidInAComputersVoiceIsItsRecording) {
 	cartoon::tts::runner() = kept;
 }
 
+// Acting from the words (film_acting.h): a line's words bring a gesture its speaker's kind has and an expression, at the word that brings them.
+TEST(FilmActing, ALineIsActedFromItsWords) {
+	const std::vector<std::string> person = {"bow", "cheer", "nod", "point", "shake head", "shrug", "think", "wave"};
+	const auto cues = [&](const std::string &line, const std::vector<std::string> &poses = {"bow", "cheer", "nod", "point", "shake head", "shrug", "think", "wave"}, bool face = true) {
+		std::string out;
+		for (const cartoon::acting::Cue &c : cartoon::acting::cuesOf(line, 10.0, 12.0, poses, face)) out += (out.empty() ? "" : ", ") + c.what;
+		return out;
+	};
+	EXPECT_EQ(cues("Hello there!"), "wave");
+	EXPECT_EQ(cues("No, I don't think so."), "shake head, thinking");
+	EXPECT_EQ(cues("Yes, that's wonderful!"), "cheer, happy");
+	EXPECT_EQ(cues("Yes, let's go."), "nod");
+	EXPECT_EQ(cues("Look over there."), "point");
+	EXPECT_EQ(cues("Where did it go?"), "shrug");
+	EXPECT_EQ(cues("Hmm, maybe."), "think, thinking");
+	EXPECT_EQ(cues("I'm so sorry."), "sad");
+	EXPECT_EQ(cues("Thank you, friend."), "bow, happy");
+	EXPECT_EQ(cues("What?!"), "surprised");
+	EXPECT_EQ(cues("Where did it go?!"), "surprised") << "an exclaimed question is a surprise, not a shrug";
+	EXPECT_EQ(cues("Where did it go?", {"wave", "nod"}), "") << "a kind without the pose does without";
+	EXPECT_EQ(cues("I'm so sorry.", person, false), "") << "no face, no expression";
+	// at the word that brings it
+	const std::vector<cartoon::acting::Cue> c = cartoon::acting::cuesOf("Well, look at that.", 10.0, 12.0, person, true);
+	ASSERT_EQ(c.size(), 1u);
+	EXPECT_NEAR(c[0].at, 10.0 + 2.0 * 6.0 / 19.0, 1e-9) << "\"look\" starts at the 7th of 19 characters";
+	// in a film: `acting words` adds them where the film gives none of its own
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 12\nacting words\ncharacter ann person\ncharacter bo person\nsay ann 1 \"Hello, Bo!\"\nsay bo 3 \"No, I'm sorry.\"\n"
+					   "say ann 6 \"Look over there.\"\ngesture ann \"cheer\" 5.5 6 8 8.5\n", film), "");
+	const ff::Character &ann = film.spec.characters[0], &bo = film.spec.characters[1];
+	ASSERT_EQ(ann.gestures.size(), 2u) << "the wave; the point is not added where ann cheers already";
+	EXPECT_EQ(ann.gestures[1].pose, "wave");
+	EXPECT_LT(ann.gestures[1].in0, 1.2);
+	ASSERT_EQ(bo.gestures.size(), 1u);
+	EXPECT_EQ(bo.gestures[0].pose, "shake head");
+	EXPECT_LT(bo.gestures[0].out1, 4.5) << "a shake of the head is quick";
+	ASSERT_EQ(bo.feelings.size(), 1u);
+	EXPECT_EQ(bo.feelings[0].when.pose, "sad");
+	ff::DataFilm plain;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 12\ncharacter ann person\nsay ann 1 \"Hello, Bo!\"\n", plain), "");
+	EXPECT_TRUE(plain.spec.characters[0].gestures.empty()) << "only with `acting words`";
+}
+
 // Every cast and set of the library that comes with the program can be brought into a film.
 TEST(FilmLibrary, TheLibraryThatComesWithTheProgramLoads) {
 	(void)cartoon::films();   // (the kinds of character)
@@ -1331,8 +1374,10 @@ TEST(Fountain, AScreenplayBecomesAFilmFileThatLoads) {
 	EXPECT_GE(film.spec.length, cartoon::speech::endOf(film.spoken.back(), film.spec.lines.back().t));
 	EXPECT_EQ(film.spec.characters[0].feelings.size(), 1u) << "(excited)";
 	EXPECT_EQ(film.spec.characters[0].feelings[0].when.pose, "happy");
-	ASSERT_EQ(film.spec.characters[0].gestures.size(), 1u) << "(waving)";
+	ASSERT_EQ(film.spec.characters[0].gestures.size(), 2u) << "(waving), and a point at \"Look\" (acting words: the script gives that line a feeling, no gesture)";
 	EXPECT_EQ(film.spec.characters[0].gestures[0].pose, "wave");
+	EXPECT_EQ(film.spec.characters[0].gestures[1].pose, "point");
+	EXPECT_TRUE(film.spec.actingWords);
 	const std::vector<cartoon::Transition> trs = film.transitions();
 	ASSERT_EQ(trs.size(), 3u) << "fade in, dissolve, fade out";
 	EXPECT_EQ(trs[1].kind, cartoon::Transition::Dissolve);
