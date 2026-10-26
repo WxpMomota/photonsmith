@@ -100,11 +100,13 @@
 //     ambience birds 0.6                                        # a sound under the whole film: wind, birds, crickets, water or night, at a gain
 //     music    none                                             # no music: without a cues file (film_assets/<key>/cues.txt) a film plays its drafted score
 //                                                               # (film_score.h, `--film-score`) under its sounds; `music draft` says so
-//     terrain  mountains  size 1500  height 320  seed 3         # the land (film_terrain.h): hills, mountains, dunes or canyon, eroded, coloured by height, slope and water,
+//     terrain  mountains  size 1500  height 320  seed 3         # the land (film_terrain.h): hills, mountains, dunes, canyon or coast, eroded, coloured by height, slope and water,
 //                                                               # with far ranges round it (`far off`); `at X Z`, `y Y`, `focus X Z` (finest there; a valley floor round it),
 //                                                               # `snow H` (the snow line above y), `erosion E` (0 to 3); on a terrain every height is above the ground
 //     water    sea  level 0  waves 1.2  wind 30                 # a sea, lake or clear water at a height (pbrt's y), its waves rolling (the significant height, which way
 //                                                               # they run, `choppy C`, `foam off`); on a terrain it fills what lies below its level and laps the shore
+//     surf     1.5  period 10  toward 20                       # a swell breaking on the terrain's shore (film_surf.h): it slows, turns to the beach, grows, breaks white;
+//                                                               # clear shallows over caustics, foam streaks, spray (the sea's wind when `toward` is not given)
 //     river    0 -300  20 -100  0 0  width 12  speed 1.5        # waypoints downstream (pbrt's x z); on a terrain it lies in the lowest ground across its width;
 //                                                               # `river from X Z` finds its own way downhill, `river canyon` runs along a canyon's riverbed
 //     waterfall at 40 0 -80  width 8  drop 30  facing 180       # the middle of its lip (on a terrain, Y above the ground), how far it drops, which way it pours
@@ -122,6 +124,8 @@
 //     wet      0.8  from 4 to 14                                # weather that changes the land: wet (darker, glossy, puddles in the flat hollows), snowcover (snow on the
 //     snowcover 0.7  from 0 to 20                               # ground level enough to hold it), each reached from T0 to T1; `gusts S [wind D] [speed V]`: fronts that
 //     gusts    1.5  wind 90                                     # sweep across the grass and trees; `mist DENSITY [radius R]`: a mist round the camera
+//     fog      0.04  top 30  thickness 4  lift 10 20             # fog lying in the valleys (height_fog.h): dense below the height `top` (pbrt's y; a quarter of the land's
+//                                                               # height by default), thinning over `thickness`; lifting from 10 s to 20 s, it thins away and sinks
 //     underwater  clarity 1.5  colour teal                      # the camera is under the film's water (film_underwater.h): the sea round it, caustics on the seabed, shafts
 //     kelp     60  in -20 -20 20 20  height 9                   # of light, marine snow; kelp swaying and coral (`coral COUNT [in X0 Z0 X1 Z1]`) on the seabed
 //     fire     at 0 0 -4  size 1.2                              # fire (film_fire.h): flames (glowing volumes, flickering, a light among them, sparks) with smoke above;
@@ -471,6 +475,7 @@ struct Spec {
 	std::vector<water::Sea> seas;
 	std::vector<water::River> rivers;
 	std::vector<water::Fall> falls;
+	surf::Swell swell;   // surf on the sea's shore (`surf`: film_surf.h)
 	// clouds you can see round (`clouds`)
 	std::vector<clouds::Clouds> cloudLayers;
 	// forests (`forest`), and their trees (planted when the film is loaded, on the land as it is drawn)
@@ -498,6 +503,14 @@ struct Spec {
 	std::vector<Ramp> wetness, snowcover;
 	dressing::Gusts gusts;
 	bool hasMist = false;
+	// a fog lying in the low ground (`fog`): the camera medium of type "heightfog" (height_fog.h), dense below `top` (pbrt's y), thinning over `thickness` above it; it lifts
+	// (thins away and sinks) from liftT0 to liftT1
+	struct ValleyFog {
+		bool on = false;
+		double density = 0.02, top = 0.0, thickness = 0.0;
+		bool topSet = false;
+		double liftT0 = -1.0, liftT1 = -1.0;
+	} fog;
 	nature::Mist mist;
 	// under the sea (`underwater`, `kelp`, `coral`)
 	bool hasUnderwater = false;
@@ -1093,13 +1106,14 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		} else if (verb == "terrain") {
 			const std::vector<std::string> t = detail::tokens(line);
 			if (t.size() < 2 || std::find(terrain::kinds().begin(), terrain::kinds().end(), t[1]) == terrain::kinds().end())
-				return fail("`terrain KIND [size S] [height H] [at X Z] [y Y] [focus X Z] [snow H] [erosion E] [seed N] [far off]`: hills, mountains, dunes or canyon");
+				return fail("`terrain KIND [size S] [height H] [at X Z] [y Y] [focus X Z] [snow H] [erosion E] [seed N] [far off]`: hills, mountains, dunes, canyon or coast");
 			if (s.hasTerrain) return fail("a film has one terrain");
 			terrain::Spec &ts = s.terrain;
 			ts.kind = t[1];
 			if (ts.kind == "mountains") ts.size = 1500.0, ts.height = 320.0;
 			else if (ts.kind == "dunes") ts.size = 800.0, ts.height = 35.0;
 			else if (ts.kind == "canyon") ts.size = 1000.0, ts.height = 120.0;
+			else if (ts.kind == "coast") ts.height = 40.0;
 			for (std::size_t i = 2; i < t.size();) {
 				double a = 0.0, b = 0.0;
 				if ((t[i] == "at" || t[i] == "focus") && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b)) {
@@ -1112,7 +1126,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				} else if (i + 1 < t.size() && number(t[i + 1], a)) {
 					if (t[i] == "size" && a >= 20.0 && a <= 20000.0) ts.size = a;
 					else if (t[i] == "height" && a > 0.0 && a <= 5000.0) ts.height = a;
-					else if (t[i] == "y") ts.y = a;
+					else if (t[i] == "y") ts.y = a, ts.ySet = true;
 					else if (t[i] == "snow" && a >= 0.0) ts.snow = a;
 					else if (t[i] == "erosion" && a >= 0.0 && a <= 3.0) ts.erosion = a;
 					else if (t[i] == "seed") ts.seed = static_cast<int>(a);
@@ -1134,6 +1148,8 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				double v = 0.0;
 				if (t[i] == "foam" && i + 1 < t.size() && (t[i + 1] == "off" || t[i + 1] == "on")) {
 					sea.foam = t[i + 1] == "on";
+				} else if (t[i] == "model" && i + 1 < t.size() && (t[i + 1] == "spectrum" || t[i + 1] == "gerstner")) {
+					sea.spectral = t[i + 1] == "spectrum";
 				} else if (i + 1 < t.size() && number(t[i + 1], v)) {
 					if (t[i] == "level") sea.level = v, level = true;
 					else if (t[i] == "waves" && v >= 0.0 && v <= 15.0) sea.waves = v;
@@ -1141,7 +1157,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 					else if (t[i] == "choppy" && v >= 0.0 && v <= 1.0) sea.choppy = v;
 					else return fail("\"" + t[i] + "\": water takes level, waves (0 to 15 m), wind, choppy (0 to 1) and foam off");
 				} else {
-					return fail("`water [sea|lake|clear] level Y [waves H] [wind DEGREES] [choppy C] [foam off]`");
+					return fail("`water [sea|lake|clear] level Y [waves H] [wind DEGREES] [choppy C] [foam off] [model spectrum|gerstner]`");
 				}
 				i += 2;
 			}
@@ -1630,6 +1646,37 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				!(t.size() == 2 || (t.size() == 4 && t[2] == "radius" && number(t[3], s.mist.radius) && s.mist.radius > 1.0)))
 				return fail("`mist DENSITY [radius R]`: scattering per metre (0.02 a light haze, 0.08 a thick mist) round the camera, out to R metres (60)");
 			s.hasMist = true;
+		} else if (verb == "surf") {   // swell breaking on the shore (film_surf.h)
+			const std::vector<std::string> t = detail::tokens(line);
+			if (t.size() < 2 || !number(t[1], s.swell.height) || !(s.swell.height > 0.0) || s.swell.height > 8.0)
+				return fail("`surf HEIGHT [period SECONDS] [toward DEGREES]`: the swell's height out at sea (0.5 to 3 m a beach, up to 8), breaking on the land's shore");
+			for (std::size_t i = 2; i < t.size(); i += 2) {
+				double v = 0.0;
+				if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail("\"" + t[i] + "\" needs a number");
+				if (t[i] == "period" && v >= 3.0 && v <= 25.0) s.swell.period = v;
+				else if (t[i] == "toward") s.swell.toward = v, s.swell.towardSet = true;
+				else return fail("\"" + t[i] + "\": surf takes period (3 to 25 s) and toward (which way it runs, degrees as a facing)");
+			}
+			s.swell.on = true;
+		} else if (verb == "fog") {   // fog lying in the valleys (height_fog.h)
+			const std::vector<std::string> t = detail::tokens(line);
+			if (t.size() < 2 || !number(t[1], s.fog.density) || !(s.fog.density > 0.0) || s.fog.density > 2.0)
+				return fail("`fog DENSITY [top Y] [thickness T] [lift T0 T1]`: scattering per metre (0.01 a thin haze, 0.05 a white sea of fog) below the height Y");
+			for (std::size_t i = 2; i < t.size();) {
+				double a = 0.0, b = 0.0;
+				if ((t[i] == "top" || t[i] == "thickness") && i + 1 < t.size() && number(t[i + 1], a)) {
+					if (t[i] == "top") s.fog.top = a, s.fog.topSet = true;
+					else if (a > 0.0) s.fog.thickness = a;
+					else return fail("a fog's thickness is above 0");
+					i += 2;
+				} else if (t[i] == "lift" && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && b > a) {
+					s.fog.liftT0 = a, s.fog.liftT1 = b;
+					i += 3;
+				} else {
+					return fail("\"" + t[i] + "\": a fog takes top Y (a height in the world, pbrt's y), thickness T and lift T0 T1 (thinning away and sinking)");
+				}
+			}
+			s.fog.on = true;
 		} else if (verb == "underwater") {
 			const std::vector<std::string> t = detail::tokens(line);
 			for (std::size_t i = 1; i < t.size(); i += 2) {
@@ -1854,7 +1901,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, surf, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1881,6 +1928,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		}
 	if (s.hasTerrain) {   // on a terrain, heights are above the ground: what is placed and who is brought in stand on it
 		if (!s.seas.empty()) s.terrain.waterLevel = s.seas[0].level;   // (its shore is drawn for the water)
+		if (s.terrain.kind == "coast" && !s.terrain.ySet) s.terrain.y = (s.seas.empty() ? 0.0 : s.seas[0].level) - 0.25 * s.terrain.height;   // (its beach at the water)
 		for (const fire::Volcano &v : s.volcanoes) s.terrain.cones.push_back({v.x, v.z, v.height, v.radius});   // (a volcano's cone is part of the land)
 		if (!s.rivers.empty()) {   // each river's way over the land, then a bed cut under it (so no rise of the ground hides it)
 			const std::shared_ptr<const terrain::Field> uncut = terrain::fieldOf(s.terrain);
@@ -1982,12 +2030,27 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			n = 0;
 			return fail("`underwater` puts the camera under the film's water: it needs a `water ... level Y` line");
 		}
-		if (s.hasMist) {
+		if (s.hasMist || s.fog.on) {
 			n = 0;
-			return fail("`underwater` and `mist` both fill the air round the camera: use one");
+			return fail(std::string("`underwater` and `") + (s.hasMist ? "mist" : "fog") + "` both fill the air round the camera: use one");
 		}
 		s.seas[0].fromBelow = true;
 		s.seas[0].foam = false;
+	}
+	if (s.swell.on) {   // (the surf needs a sea and a shore)
+		if (s.seas.empty() || s.seas[0].kind == "lake" || !s.hasTerrain) {
+			n = 0;
+			return fail("`surf` breaks on a shore: the film needs a `water sea` line and a `terrain` for it to break on");
+		}
+		if (!s.swell.towardSet) s.swell.toward = s.seas[0].wind;
+	}
+	if (s.fog.on) {   // (one medium round the camera: a fog in the valleys or a mist, not both; its top and thickness from the land unless the film says)
+		if (s.hasMist) {
+			n = 0;
+			return fail("`fog` and `mist` both fill the air round the camera: use one");
+		}
+		if (!s.fog.topSet) s.fog.top = s.hasTerrain ? s.terrain.y + 0.25 * s.terrain.height : 2.0;
+		if (s.fog.thickness <= 0.0) s.fog.thickness = s.hasTerrain ? std::max(2.0, 0.06 * s.terrain.height) : 1.0;
 	}
 	for (skyfx::Lightning &l : s.lightnings) l.strikes = skyfx::strikesOf(l, s.length);
 	for (skyfx::Aurora &a : s.auroras)
@@ -3668,6 +3731,19 @@ class DataFilm {
 				}
 			}
 		}
+		if (spec.fog.on) {   // fog in the valleys: the camera's own medium, lying in a layer (height_fog.h); lifting, it thins away and sinks
+			const double lift = spec.fog.liftT1 > spec.fog.liftT0 ? smoothstep(spec.fog.liftT0, spec.fog.liftT1, t) : 0.0;
+			const double density = spec.fog.density * (1.0 - lift);
+			const std::size_t camera = out.find("Camera \"");
+			if (density > 1e-6 && camera != std::string::npos) {
+				char medium[400];
+				std::snprintf(medium, sizeof medium,
+							  "MakeNamedMedium \"valleyfog\" \"string type\" [ \"heightfog\" ] \"rgb sigma_a\" [ %.6f %.6f %.6f ] \"rgb sigma_s\" [ %.6f %.6f %.6f ] \"float g\" [ 0.55 ] "
+							  "\"float top\" [ %.4f ] \"float thickness\" [ %.4f ]\nMediumInterface \"\" \"valleyfog\"\n",
+							  0.02 * density, 0.02 * density, 0.02 * density, density, density, 1.03 * density, spec.fog.top - lift * 3.0 * spec.fog.thickness, spec.fog.thickness);
+				out = out.substr(0, camera) + medium + out.substr(camera);
+			}
+		}
 		if (spec.hasMist) {   // a mist round the camera (nature_lib.h: the camera's own medium, ended by a sphere round it, so the sun and sky outside light it)
 			Vec3 eye, target;
 			double fov = 40.0;
@@ -3698,7 +3774,8 @@ class DataFilm {
 			film_subjects::cameraOf(header, eye, target, fov);
 			const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 			const double aspect = 16.0 / 9.0, hfov = 2.0 * std::atan(std::tan(fov * kPi / 360.0) * aspect) * 180.0 / kPi;   // (a film's fov is its shorter side's)
-			for (const water::Sea &sea : spec.seas) out += water::seaText(sea, nt, eye, target, hfov, ground.get());
+			for (const water::Sea &sea : spec.seas) out += water::seaText(sea, nt, eye, target, hfov, ground.get(), spec.swell.on ? &spec.swell : nullptr);
+			if (spec.swell.on && ground) out += surf::shallowsCausticText(spec.key.empty() ? std::string("film") : spec.key, nt, -eye.x, eye.z, *ground, spec.seas[0].level);
 			for (const water::River &r : spec.rivers) out += water::riverText(r, nt, ground.get());
 			for (const water::Fall &f : spec.falls) out += water::fallText(f, nt, ground.get());
 		}

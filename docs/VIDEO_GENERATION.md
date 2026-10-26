@@ -806,14 +806,16 @@ line replaces) to name with `scene` and build on with the lines below.
 **The land: `terrain`.** (film_terrain.h)
 
 ```
-terrain  mountains  size 1500  height 320  seed 3   # hills, mountains, dunes or canyon (sizes and heights of their own when not given)
+terrain  mountains  size 1500  height 320  seed 3   # hills, mountains, dunes, canyon or coast (sizes and heights of their own when not given)
 terrain  canyon  focus 40 -120  snow 200  erosion 1.5  y -10  at 0 0  far off
 ```
 
 The land is a square `size` metres across centred `at` X Z (pbrt's), its ground from `y` up to `height` above it. It is made from its numbers alone, the same in every frame and
 every process: a grid of heights (257 x 257, and eight samples beyond each edge) from noise of the kind's shape - mountains are warped ridged noise gathered into massifs with a
 valley floor round the `focus` (the centre when not given), hills gentle noise, dunes asymmetric ridges (a long windward face, a steep slip face) across a wind that comes
-from the seed, a canyon mesas in steps with cliffs between and a river winding through the focus - then carved by tens of thousands of droplets that run downhill, pick up
+from the seed, a canyon mesas in steps with cliffs between and a river winding through the focus, a coast a sea floor on its -z side shelving up (as d ~ x^(2/3), with a
+sandbar off the beach) to a beach at a quarter of its height, the shore bending into bays, rocky headlands dropping straight into deeper water, and hills behind (40 m high
+unless given; with a sea and no `y`, its beach is put at the sea's level) - then carved by tens of thousands of droplets that run downhill, pick up
 ground as they speed up and drop it as they slow (`erosion`, 0 to 3: mountains 1, hills 0.7, canyons 0.5, dunes none). Where the water ran most is the land's flow.
 
 What is drawn: one mesh over the square whose rows and columns crowd round the focus (about 40 cm apart there, several metres at the edge; about 160,000 points), its
@@ -840,8 +842,10 @@ river     0 -300  20 -100  0 0  width 12        # waypoints downstream (pbrt's x
 waterfall at 40 12 -80  width 8  drop 18  facing 180   # the middle of its lip (on a terrain, 12 m above the ground there)
 ```
 
-*The sea* is twenty Gerstner waves, from swells as long as 22 times the wave height down to short chop, about the wind's direction (the chop from further round it), each
-moving at the speed deep water gives its length; short waves are gentler than long ones, as the sea's are. It is written every frame as a mesh in front of the camera only: a
+*The sea* is an ocean spectrum (film_ocean.h, Tessendorf's FFT ocean): a 128 x 128 tile of waves of every length the wind raises (Phillips' spectrum for the wind that, fully
+risen, makes waves of `waves` significant height; few run against the wind), each turning at the speed deep water gives its length, summed by an inverse FFT each frame -
+heights, the sideways pull that sharpens the crests (`choppy`), slopes, and where the surface folds over (the foam). A second tile a quarter the size, turned, adds chop that
+does not line up with the first, so the tiling is not seen. (`model gerstner` keeps the older sea of twenty summed Gerstner waves.) It is written every frame as a mesh in front of the camera only: a
 wedge a little wider than the picture, its rings crowding round the camera - centimetres apart at its feet, tens of metres at the horizon, out to 8 km, flat beyond 2.5 km so the
 horizon is a clean line (about 16,500 points, about 1.2 MB of text a frame). Ripples too small for the mesh are in its normals, fading with distance. Foam lies on the crests the
 waves fold over (`foam off`). The water is a smooth coat over the colour of deep water, so the sky is in it at a grazing angle and its body shows looking down; a lake is calmer
@@ -977,7 +981,40 @@ ranges the same way; steep rock and cliffs stay bare. (Each is a texture graph o
 are kept to steps of 0.025 so frames a moment apart are the same text.) A winter forest (`forest ... season winter`) matches it. Gusts are fronts that sweep across at `speed`
 along `wind`, bending grass, bushes and trees as they pass (a sharp front, easing behind it, the fronts' lines broken by noise). The mist is the camera's own medium ended
 by a sphere round the camera (nature_lib.h's Mist: the sun and sky outside light it, so a low sun draws shafts), rendered with the wavefront renderer. Fog banks lying on the
-land as volumes were tried and left out: a medium in a sphere with the land inside it is drawn wrongly by the GPU renderers.
+land as volumes in spheres were tried and left out (a medium in a sphere with the land inside it is drawn wrongly by the GPU renderers); valley fog is `fog`, below.
+
+**Surf on a coast: `surf`.** (film_surf.h)
+
+```
+terrain  coast  size 600  seed 2      # a sea floor shelving up to a beach, bays and headlands
+water    sea  level 0  waves 0.6      # the open sea's own waves
+surf     1.5  period 10  toward 20    # a swell 1.5 m high out at sea, a crest every 10 s, running towards facing 20 (the sea's wind when not given)
+```
+
+The swell comes in from the open sea and breaks on the land's shore. When the film is loaded the time it takes to reach each point of the terrain's grid is worked out - a
+shortest-time sweep from the deep water (and the open sea at the square's edge) at the speed sqrt(g d) the depth d allows - and a crest is wherever that time is a whole
+number of periods ago, so the crests slow in the shallows, bend to follow the depth lines and turn to face the beach, as real swell does (refraction). Each grows as it shoals
+(as d^(-1/4), Green's law) and sharpens to a narrow crest between flat troughs; where it reaches 0.78 of the depth it breaks, and from there in it is a bore 0.78 of the depth
+high, white at its front and in the turbulent water behind it, keeping the water's mean level. The open sea's own waves give way to it as the water shoals; streaks of foam
+are left on the surf zone and drift along the shore; spray blows off the breaking crests near the camera; and water less than 2.5 m deep is clear (glass, eta 1.33) over sand
+netted with moving caustics. It needs a `water sea` and a `terrain` (`coast` is made for it, but any land with a shore will do). The surf is part of the sea's mesh, so it
+is drawn by every renderer.
+
+**Fog in the valleys: `fog`.** (src/shared/height_fog.h)
+
+```
+fog   0.05  top 35  thickness 5  lift 6 11   # scattering per metre below the height 35 (pbrt's y), thinning over 5 m above it; lifting from 6 s to 11 s
+```
+
+The fog is the camera's own medium, but one that lies in a layer: as dense as `DENSITY` below `top`, thinning out above it over `thickness` (its density at height y is
+DENSITY / (1 + e^((y - top) / thickness))), so it fills the valleys and the hills and peaks stand out of a white sea, and the sun and sky light it from above through the
+thin air. Its `top` is a height in the world (pbrt's y), not above the ground (on a terrain: a quarter of the land's height unless given, `thickness` 6% of it).
+`lift T0 T1` burns it off: from T0 to T1 it thins away to nothing and sinks three thicknesses. This is the renderer's own medium type, `"heightfog"` (not pbrt's: a
+`MakeNamedMedium "x" "string type" [ "heightfog" ] "rgb sigma_s" [...] "float top" [...] "float thickness" [...]` before the Camera line, with `MediumInterface "" "x"`):
+its optical depth along any ray is exact (the profile integrates in closed form), so a shadow ray's transmittance is exact and a free flight is sampled by solving for the
+height where its sampled depth is reached - no ray marching. It is drawn on the CPU and by the wavefront renderer (the default GPU renderer hands such a scene to it);
+unlike a homogeneous camera fog it goes with clouds and flames (their own media), since it has thinned to nothing at their height. It is grey (a per-channel colour is taken
+by its brightness), fills the air round the camera, so it does not go with `mist` or `underwater`, and Metal does not draw it yet.
 
 **Under the sea: `underwater`, `kelp`, `coral`.** (film_underwater.h)
 

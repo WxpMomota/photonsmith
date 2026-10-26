@@ -68,34 +68,36 @@ inline std::string boundary(const Vec3 &eyeStory, double radius) {
 }
 
 // ---- the light ----
-// The net of light at frame k of the loop (24 of them over 2.4 s): two layers of moving cells, bright where a cell's nearest and second-nearest centres are equally far
-// (the cells' edges), tileable, at `size` pixels.
+// The net of light at (u, v) (it repeats over 0 to 1 each way) at frame k of the loop (24 of them over 2.4 s): two layers of moving cells, bright where a cell's nearest and
+// second-nearest centres are equally far (the cells' edges); 0 dark to about 1 on the brightest lines.
+inline double causticAt(double u, double v, int k) {
+	const double ph = 2.0 * kPi * k / 24.0;
+	const auto layer = [&](double u, double v, int cells, int salt, double scale) {
+		const double x = u * cells, y = v * cells;
+		const int cx = static_cast<int>(std::floor(x)), cy = static_cast<int>(std::floor(y));
+		double f1 = 1e9, f2 = 1e9;
+		for (int dy = -1; dy <= 1; ++dy)
+			for (int dx = -1; dx <= 1; ++dx) {
+				const int gx = ((cx + dx) % cells + cells) % cells, gy = ((cy + dy) % cells + cells) % cells;   // (wrapped: the picture tiles)
+				const double a = 2.0 * kPi * hash01(gx * 131 + gy, salt), r = 0.25 + 0.15 * hash01(gx * 17 + gy, salt + 1);
+				const double turn = ph * (hash01(gx + gy * 7, salt + 2) < 0.5 ? 1.0 : -1.0);   // (each centre circles once a loop)
+				const double px = cx + dx + 0.5 + r * std::cos(a + turn), py = cy + dy + 0.5 + r * std::sin(a + turn);
+				const double d = std::hypot(x - px, y - py);
+				if (d < f1) f2 = f1, f1 = d;
+				else if (d < f2) f2 = d;
+			}
+		return std::pow(1.0 - smoothstep(0.0, 0.18 * scale, f2 - f1), 2.0);
+	};
+	return 0.55 * layer(u, v, 6, 11, 1.0) + 0.45 * layer(u + 0.37, v + 0.21, 9, 23, 0.8);
+}
+// The net as a tiling picture at `size` pixels.
 inline std::string causticPicture(const std::string &film, int k, int size) {
 	char name[48];
 	std::snprintf(name, sizeof name, "caustic_%d_%02d", size, k);
 	return film_sky::picture(film, name, size, size, [&](std::vector<float> &rgb) {
-		const double ph = 2.0 * kPi * k / 24.0;
-		const auto layer = [&](double u, double v, int cells, int salt, double scale) {
-			const double x = u * cells, y = v * cells;
-			const int cx = static_cast<int>(std::floor(x)), cy = static_cast<int>(std::floor(y));
-			double f1 = 1e9, f2 = 1e9;
-			for (int dy = -1; dy <= 1; ++dy)
-				for (int dx = -1; dx <= 1; ++dx) {
-					const int gx = ((cx + dx) % cells + cells) % cells, gy = ((cy + dy) % cells + cells) % cells;   // (wrapped: the picture tiles)
-					const double a = 2.0 * kPi * hash01(gx * 131 + gy, salt), r = 0.25 + 0.15 * hash01(gx * 17 + gy, salt + 1);
-					const double turn = ph * (hash01(gx + gy * 7, salt + 2) < 0.5 ? 1.0 : -1.0);   // (each centre circles once a loop)
-					const double px = cx + dx + 0.5 + r * std::cos(a + turn), py = cy + dy + 0.5 + r * std::sin(a + turn);
-					const double d = std::hypot(x - px, y - py);
-					if (d < f1) f2 = f1, f1 = d;
-					else if (d < f2) f2 = d;
-				}
-			return std::pow(1.0 - smoothstep(0.0, 0.18 * scale, f2 - f1), 2.0);
-		};
 		for (int j = 0; j < size; ++j)
 			for (int i = 0; i < size; ++i) {
-				const double u = (i + 0.5) / size, v = (j + 0.5) / size;
-				const double c = 0.55 * layer(u, v, 6, 11, 1.0) + 0.45 * layer(u + 0.37, v + 0.21, 9, 23, 0.8);
-				const float val = static_cast<float>(0.35 + 1.9 * c);
+				const float val = static_cast<float>(0.35 + 1.9 * causticAt((i + 0.5) / size, (j + 0.5) / size, k));
 				const std::size_t q = (static_cast<std::size_t>(j) * size + i) * 3;
 				rgb[q] = rgb[q + 1] = rgb[q + 2] = val;
 			}

@@ -227,11 +227,16 @@ inline void flattenMedia(const pbrt_scene::Scene &scene, FlatScene &out) {
 		const bool isRgbGrid = (md.type == "rgbgrid");
 		const bool isUniformGrid = (md.type == "uniformgrid");
 		const bool isNanoVdb = (md.type == "nanovdb");
-		if (!isCloud && !isRgbGrid && !isUniformGrid && !isNanoVdb && md.type != "homogeneous") {
+		const bool isHeightFog = (md.type == "heightfog");   // (this renderer's own: a fog in a layer, height_fog.h; the camera medium only)
+		if (!isCloud && !isRgbGrid && !isUniformGrid && !isNanoVdb && !isHeightFog && md.type != "homogeneous") {
 			warn("medium type '" + md.type + "' is not supported; "
 				 "treated as homogeneous with its given sigma_a/sigma_s");
 		}
-		medium.type = (isCloud || isRgbGrid || isUniformGrid || isNanoVdb) ? md.type : "homogeneous";
+		medium.type = (isCloud || isRgbGrid || isUniformGrid || isNanoVdb || isHeightFog) ? md.type : "homogeneous";
+		if (isHeightFog) {
+			medium.fogTop = md.params.getFloat("top", 0.0);
+			medium.fogThickness = std::max(1e-3, md.params.getFloat("thickness", 1.0));
+		}
 
 		// sigma_a/sigma_s/scale/g: for homogeneous, these ARE the medium
 		// (a flat RGB colour each). For rgbgrid, these same param NAMES

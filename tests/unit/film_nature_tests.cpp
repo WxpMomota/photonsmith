@@ -135,7 +135,7 @@ TEST(FilmTerrain, AFilmFilesTerrainCarriesWhatIsPlacedOnItAndIsSceneText) {
 	EXPECT_EQ(shapes, 3u) << "the ground and the cliffs facing either way (no far ranges)";
 	EXPECT_NE(scene.find("\"string mapping\" \"planar\""), std::string::npos) << "the cliffs' pictures are projected from the side";
 	// errors
-	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"terrain volcano", "hills, mountains, dunes or canyon"},
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"terrain volcano", "hills, mountains, dunes, canyon or coast"},
 																						 {"terrain hills size 5", "size (20 to 20000 m)"},
 																						 {"terrain hills wobble 3", "a terrain takes"},
 																						 {"terrain hills\nterrain dunes", "a film has one terrain"}}) {
@@ -683,5 +683,147 @@ TEST(FilmFire, FlamesFlickerVolcanoesRiseFromTheLandAndLavaCreepsDown) {
 		ff::DataFilm bad;
 		const std::string problem = loadNature("fire_bad", "scene s.pbrt\nlength 4\n" + line + "\n", bad);
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}
+
+// Fog in the valleys (`fog`: height_fog.h): every frame's camera medium is a "heightfog" layer before its Camera line, its top a quarter of the land's height unless given;
+// lifting, it thins away and sinks; it does not go with a mist or the sea round the camera.
+TEST(FilmFog, FogLiesInTheValleysAndLifts) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("fog", "scene s.pbrt\nlength 10\nterrain hills size 300 height 80 seed 2 far off\nfog 0.04 lift 4 8\nshot 0 A\n key 0 60 150  0 20 0\n", film), "");
+	EXPECT_DOUBLE_EQ(film.spec.fog.top, 20.0) << "a quarter of the land's height";
+	EXPECT_NEAR(film.spec.fog.thickness, 4.8, 1e-9);
+	const std::string early = film.sceneAt(1.0);
+	const std::size_t medium = early.find("\"heightfog\""), camera = early.find("Camera \"");
+	ASSERT_NE(medium, std::string::npos);
+	EXPECT_LT(medium, camera) << "before the Camera line: the camera's own medium";
+	EXPECT_NE(early.find("MediumInterface \"\" \"valleyfog\""), std::string::npos);
+	EXPECT_NE(early.find("\"float top\" [ 20.0000 ]"), std::string::npos) << early.substr(medium, 300);
+	const auto sigmaS = [](const std::string &s) {
+		const std::size_t at = s.find("\"rgb sigma_s\" [ ");
+		return at == std::string::npos ? 0.0 : std::atof(s.c_str() + at + 16);
+	};
+	EXPECT_NEAR(sigmaS(early), 0.04, 1e-6);
+	EXPECT_LT(sigmaS(film.sceneAt(6.0)), 0.04) << "lifting";
+	EXPECT_GT(sigmaS(film.sceneAt(6.0)), 0.0);
+	EXPECT_EQ(film.sceneAt(9.0).find("\"heightfog\""), std::string::npos) << "gone";
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"fog", "`fog DENSITY"},
+																						{"fog 0.05 thickness 0", "thickness is above 0"},
+																						{"fog 0.05 colour red", "takes top Y"},
+																						{"fog 0.05\nmist 0.01", "`fog` and `mist`"}}) {
+		ff::DataFilm bad;
+		const std::string problem = loadNature("fog_bad", "scene s.pbrt\nlength 4\n" + line + "\n", bad);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}
+
+// The sea as an ocean spectrum (film_ocean.h): its significant height is the sea's, it is the same every time it is made and repeats over its tile, it moves on with time,
+// and sharp crests fold over (foam) where a gentle sea does not.
+TEST(FilmOcean, TheSpectrumMakesTheSeasWavesAndTheyMove) {
+	namespace oc = cartoon::ocean;
+	const oc::Tile a = oc::tileAt(2.0, 30.0, 0.8, 300.0, 5.0, 4001);
+	double sum = 0.0, sum2 = 0.0;
+	for (double h : a.h) sum += h, sum2 += h * h;
+	const double mean = sum / a.h.size(), rms = std::sqrt(sum2 / a.h.size() - mean * mean);
+	EXPECT_NEAR(4.0 * rms, 2.0, 0.05) << "the significant height is four times the surface's rms";
+	EXPECT_NEAR(mean, 0.0, 0.01);
+	const oc::Tile again = oc::tileAt(2.0, 30.0, 0.8, 300.0, 5.0, 4001);
+	EXPECT_EQ(a.h, again.h) << "the same every time";
+	EXPECT_NEAR(oc::sample(a, 12.3, -45.6).h, oc::sample(a, 12.3 + 300.0, -45.6 - 600.0).h, 1e-9) << "it repeats over its tile";
+	const oc::Tile later = oc::tileAt(2.0, 30.0, 0.8, 300.0, 6.0, 4001);
+	double moved = 0.0;
+	for (std::size_t i = 0; i < a.h.size(); ++i) moved += std::abs(later.h[i] - a.h[i]);
+	EXPECT_GT(moved / a.h.size(), 0.05) << "a second later the waves have moved";
+	double sharp = 0.0, gentle = 0.0;
+	for (double f : a.fold) sharp = std::max(sharp, f);
+	for (double f : oc::tileAt(2.0, 30.0, 0.1, 300.0, 5.0, 4001).fold) gentle = std::max(gentle, f);
+	EXPECT_GT(sharp, gentle) << "sharp crests fold over more";
+	EXPECT_GT(sharp, 0.3);
+	// the waves run along the wind: the slopes across the wind are smaller than along it
+	double along = 0.0, across = 0.0;
+	const double wx = std::sin(30.0 * cartoon::kPi / 180.0), wz = std::cos(30.0 * cartoon::kPi / 180.0);
+	for (std::size_t i = 0; i < a.h.size(); ++i) {
+		along += std::abs(a.sx[i] * wx + a.sz[i] * wz);
+		across += std::abs(a.sx[i] * wz - a.sz[i] * wx);
+	}
+	EXPECT_GT(along, 1.5 * across);
+	// and the film's sea uses it
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("ocean", "scene s.pbrt\nlength 4\nwater sea level 0 waves 1.5\nshot 0 A\n key 0 3 20  0 0 -50\n", film), "");
+	EXPECT_TRUE(film.spec.seas[0].spectral);
+	cartoon::Vec3 p, n;
+	double fold = 0.0;
+	cartoon::water::seaAt(film.spec.seas[0], 10.0, -20.0, 1.0, 1.0, p, n, fold);
+	EXPECT_LT(std::abs(p.y), 2.0);
+	EXPECT_GT(n.y, 0.5);
+	ff::DataFilm old;
+	ASSERT_EQ(loadNature("ocean_old", "scene s.pbrt\nlength 4\nwater sea level 0 waves 1.5 model gerstner\n", old), "");
+	EXPECT_FALSE(old.spec.seas[0].spectral);
+}
+
+// Surf on a coast (film_surf.h): the coast's sea floor shelves up to a beach at the sea's level; the swell slows in the shallows and turns to meet the shore, grows there and
+// breaks white, keeps the water's mean level, and the film draws the shallows clear over sand netted with caustics.
+TEST(FilmSurf, TheSwellTurnsToTheShoreGrowsAndBreaksWhite) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("surf", "scene s.pbrt\nlength 6\nterrain coast size 400 far off\nwater sea level 0 waves 0.4\nsurf 1.5 period 10 toward 45\nshot 0 A\n key 0 4 -10  0 0 -80\n", film), "");
+	EXPECT_DOUBLE_EQ(film.spec.terrain.y, -10.0) << "a coast's beach is put at the sea's level";
+	const std::shared_ptr<const terrain::Field> ground = terrain::fieldOf(film.spec.terrain);
+	EXPECT_LT(ground->heightAt(0.0, -180.0), -5.0) << "the sea floor off the coast";
+	EXPECT_GT(ground->heightAt(0.0, 150.0), 2.0) << "the land behind";
+	const cartoon::surf::Swell &sw = film.spec.swell;
+	ASSERT_TRUE(sw.on);
+	EXPECT_DOUBLE_EQ(sw.toward, 45.0);
+	const std::shared_ptr<const cartoon::surf::Grid> grid = cartoon::surf::gridOf(*ground, 0.0, sw);
+	// a point in the shallows along a line straight out from the shore at x = 0
+	double zShallow = 0.0, zDeep = 0.0;
+	for (double z = 100.0; z > -200.0; z -= 0.5) {
+		const double d = -ground->heightAt(0.0, z);
+		if (zShallow == 0.0 && d > 1.2) zShallow = z;
+		if (d > grid->deep) {
+			zDeep = z;
+			break;
+		}
+	}
+	ASSERT_NE(zShallow, 0.0);
+	ASSERT_NE(zDeep, 0.0);
+	// refraction: the crests' way of running (the arrival time's gradient) turns from 45 degrees out at sea towards the shore's normal (+z) in the shallows
+	const auto heading = [&](double x, double z) {
+		bool in = false;
+		const double e = 2.0, gx = grid->sample(grid->arrive, x + e, z, in) - grid->sample(grid->arrive, x - e, z, in), gz = grid->sample(grid->arrive, x, z + e, in) - grid->sample(grid->arrive, x, z - e, in);
+		return std::atan2(gx, gz) * 180.0 / cartoon::kPi;
+	};
+	EXPECT_NEAR(heading(0.0, zDeep - 20.0), 45.0, 8.0);
+	EXPECT_LT(std::abs(heading(0.0, zShallow)), 32.0) << "turned to meet the shore";
+	// shoaling and breaking: the water in the shallows rises higher than the swell out at sea, never above 0.78 of its depth, keeps its mean, and goes white
+	double lo = 1e9, hi = -1e9, sum = 0.0, white = 0.0;
+	const int steps = 400;
+	for (int k = 0; k < steps; ++k) {
+		const cartoon::surf::At a = cartoon::surf::at(*grid, sw, 0.0, zShallow, k * sw.period / steps);
+		lo = std::min(lo, a.rise), hi = std::max(hi, a.rise), sum += a.rise, white = std::max(white, a.white);
+		EXPECT_TRUE(a.shallow);
+		EXPECT_LT(a.open, 0.2) << "the open sea's waves have given way";
+	}
+	EXPECT_NEAR(sum / steps, 0.0, 0.05) << "the mean level stays";
+	EXPECT_LE(hi - lo, 0.78 * -ground->heightAt(0.0, zShallow) + 1e-6);
+	EXPECT_GT(hi - lo, 0.5);
+	EXPECT_GT(white, 0.9) << "breaking";
+	const cartoon::surf::At out = cartoon::surf::at(*grid, sw, 0.0, zDeep - 30.0, 1.0);
+	EXPECT_EQ(out.white, 0.0);
+	EXPECT_DOUBLE_EQ(out.open, 1.0);
+	// the film draws it: clear shallows and caustics under them
+	const std::string scene = film.sceneAt(2.0);
+	EXPECT_NE(scene.find("# the shallows: clear water"), std::string::npos);
+	EXPECT_NE(scene.find("# the sand under the water, with its caustics"), std::string::npos);
+	ff::DataFilm plain;
+	ASSERT_EQ(loadNature("surf_wind", "scene s.pbrt\nlength 4\nterrain coast size 400 far off\nwater sea level 0 wind 20\nsurf 1\n", plain), "");
+	EXPECT_DOUBLE_EQ(plain.spec.swell.toward, 20.0) << "the sea's wind unless given";
+	for (const auto &[text, says] : std::vector<std::pair<std::string, std::string>>{{"surf 1\n", "`water sea` line and a `terrain`"},
+																						  {"water sea level 0\nsurf 1\n", "`water sea` line and a `terrain`"},
+																						  {"surf 0\n", "`surf HEIGHT"},
+																						  {"surf 1 colour 2\n", "surf takes period"},
+																						  {"surf 1 period\n", "needs a number"}}) {
+		ff::DataFilm bad;
+		const std::string problem = loadNature("surf_bad", "scene s.pbrt\nlength 4\n" + text, bad);
+		EXPECT_NE(problem.find(says), std::string::npos) << text << " -> " << problem;
 	}
 }

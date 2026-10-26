@@ -548,6 +548,31 @@ TEST(FlattenTest, AnInterfaceSphereThatMissesTheCameraDoesNotBoundIt) {
 	EXPECT_EQ(s.spheres[0].medium, 0);
 }
 
+// A fog in a layer as the camera medium (this renderer's "heightfog": height_fog.h): its top and thickness read, and kept with a cloud's medium in the same scene (it has
+// thinned to nothing at the clouds' height), where a homogeneous camera medium is dropped.
+TEST(FlattenTest, AHeightFogCameraMediumIsKeptWithCloudsAboveIt) {
+	const FlatScene s = flattenSource(
+		"MakeNamedMedium \"valley\" \"string type\" [ \"heightfog\" ] \"rgb sigma_s\" [ 0.05 0.05 0.05 ] \"float top\" [ 30 ] \"float thickness\" [ 4 ]\n"
+		"MediumInterface \"\" \"valley\"\n"
+		"Camera \"perspective\" \"float fov\" [ 40 ]\n"
+		"WorldBegin\n"
+		"MakeNamedMedium \"puff\" \"string type\" [ \"homogeneous\" ]\n"
+		"AttributeBegin\n"
+		"  MediumInterface \"puff\" \"\"\n"
+		"  Material \"interface\"\n"
+		"  Translate 0 500 0\n"
+		"  Shape \"sphere\" \"float radius\" [ 100 ]\n"
+		"AttributeEnd\n"
+		+ std::string(kQuadMesh));
+	ASSERT_EQ(s.cameraMediumIndex, 0);
+	EXPECT_EQ(s.media[0].type, "heightfog");
+	EXPECT_DOUBLE_EQ(s.media[0].fogTop, 30.0);
+	EXPECT_DOUBLE_EQ(s.media[0].fogThickness, 4.0);
+	EXPECT_FALSE(warnedAbout(s, "camera medium is ignored"));
+	ASSERT_EQ(s.spheres.size(), 1u);
+	EXPECT_EQ(s.spheres[0].medium, 1) << "the cloud keeps its own medium";
+}
+
 TEST(FlattenTest, NonHomogeneousCameraMediumWarnsAndIsDropped) {
 	const FlatScene s = flattenSource(
 		"MakeNamedMedium \"puff\" \"string type\" [ \"cloud\" ]\n"

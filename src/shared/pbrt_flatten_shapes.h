@@ -1275,7 +1275,8 @@ inline void resolveAfterShapes(const pbrt_scene::Scene &scene, FlatScene &out) {
 	// each warned rather than silently ignored or silently wrong.
 	if (scene.cameraMediumIndex >= 0 &&
 		static_cast<std::size_t>(scene.cameraMediumIndex) < out.media.size()) {
-		if (out.media[static_cast<std::size_t>(scene.cameraMediumIndex)].type != "homogeneous") {
+		const bool heightFog = out.media[static_cast<std::size_t>(scene.cameraMediumIndex)].type == "heightfog";
+		if (out.media[static_cast<std::size_t>(scene.cameraMediumIndex)].type != "homogeneous" && !heightFog) {
 			warn("the camera's own medium (MediumInterface's \"outside\" name active "
 				 "at the Camera directive) is a \"" +
 				 out.media[static_cast<std::size_t>(scene.cameraMediumIndex)].type +
@@ -1315,6 +1316,10 @@ inline void resolveAfterShapes(const pbrt_scene::Scene &scene, FlatScene &out) {
 				for (int c = 0; c < 3; ++c) out.cameraMediumBound[c] = s.center[c];
 				out.cameraMediumBound[3] = s.radius;
 				s.medium = -1;
+				out.cameraMediumIndex = scene.cameraMediumIndex;
+			} else if (shapeMedia > 0 && heightFog) {
+				// A fog in a layer with clouds (or flames) above it: it has thinned to nothing well below them, so counting it everywhere and theirs inside their
+				// shapes is what the light sees (height_fog.h).
 				out.cameraMediumIndex = scene.cameraMediumIndex;
 			} else if (shapeMedia > 0) {
 				warn("the scene declares both a camera medium (MediumInterface's "

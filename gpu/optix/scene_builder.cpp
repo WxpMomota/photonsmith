@@ -819,6 +819,11 @@ static void apply_loaded_scene_settings(const char* path,
 		scene.needsWavefront = true;
 		scene.needsWavefrontReason = "the camera's fog ends at a sphere (MediumInterface around the camera)";
 	}
+	if (loaded.scene.cameraMediumIndex >= 0 && static_cast<std::size_t>(loaded.scene.cameraMediumIndex) < loaded.scene.media.size() &&
+		loaded.scene.media[static_cast<std::size_t>(loaded.scene.cameraMediumIndex)].type == "heightfog") {
+		scene.needsWavefront = true;
+		scene.needsWavefrontReason = "the camera's fog lies in a layer (a \"heightfog\" medium)";
+	}
 
 	// checkerboard/mix "tex1"/"tex2" nesting a further procedural texture
 	// (pbrt_flatten::NestedProceduralTexture's own comment) - CPU-only;

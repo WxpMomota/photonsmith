@@ -1,5 +1,5 @@
 #pragma once
-// film_terrain.h -- a landscape for a film file (film_file.h `terrain`): hills, mountains, dunes or a canyon of mesas, carved by running water (droplet erosion), coloured by
+// film_terrain.h -- a landscape for a film file (film_file.h `terrain`): hills, mountains, dunes, a canyon of mesas or a coast, carved by running water (droplet erosion), coloured by
 // what lies where (grass in the valleys, darker where water gathers, rock on the steep faces, scree under them, snow above the snow line on the slopes it can hold to, sand, the
 // red bands of a canyon's walls), finer near where the film happens, and ringed by distant ranges that fade into the haze.
 //
@@ -34,6 +34,7 @@ struct Spec {
 	std::string kind = "hills";
 	double size = 600.0, height = 60.0;   // the square's side and its highest ground above `y` (metres)
 	double x = 0.0, z = 0.0, y = 0.0;     // its centre (pbrt's x z) and its base height
+	bool ySet = false;                    // (whether the film gave `y`: a coast without it is put so its beach is at the sea's level)
 	double focusX = 0.0, focusZ = 0.0;    // where the film happens: the mesh is finest there, and mountains and canyons leave a floor round it
 	bool focusSet = false;
 	double snow = -1.0;                   // the snow line, metres above `y` (below 0: the kind's own - mountains at 0.45 of the height, none for the others)
@@ -94,7 +95,7 @@ struct Spec {
 	}
 };
 inline const std::vector<std::string> &kinds() {
-	static const std::vector<std::string> k = {"hills", "mountains", "dunes", "canyon"};
+	static const std::vector<std::string> k = {"hills", "mountains", "dunes", "canyon", "coast"};
 	return k;
 }
 
@@ -175,6 +176,22 @@ inline double shape(const Spec &s, double u, double v, double fu, double fv) {
 		const double d = std::abs(u - canyonRiverU(s, v, fu));
 		h *= 0.04 + 0.96 * smoothstep(0.012, 0.07, d);
 		return h;
+	}
+	if (s.kind == "coast") {
+		// the sea floor on the -z side rising to a beach at a quarter of the height (Dean's profile, d ~ x^(2/3), with a sandbar off it), the shore bending into bays, rocky
+		// headlands pushed out where the cliffs drop straight into deeper water, and hills behind the beach
+		const double head = smoothstep(0.58, 0.72, fbm(u * 3.0 + 1.3, 0.2, salt + 33, 3));
+		const double shore = 0.45 + 0.2 * (fbm(u * 1.6, 0.5, salt + 31, 3) - 0.5) - 0.08 * head;
+		const double sd = v - shore;   // (below 0: under the sea)
+		double h;
+		if (sd < 0.0) {
+			const double dean = 0.25 * (1.0 - std::pow(std::min(1.0, -sd / 0.35), 0.67)) + 0.03 * std::exp(-std::pow((-sd - 0.07) / 0.018, 2.0));
+			h = lerp(dean, 0.25 * (1.0 - smoothstep(0.0, 0.08, -sd)), head);
+		} else {
+			const double hills = 0.4 + 0.6 * fbm(u * 2.4, v * 2.4, salt, 4);
+			h = 0.25 + 0.05 * (1.0 - head) * smoothstep(0.0, 0.03, sd) + 0.7 * hills * smoothstep(0.03 * (1.0 - head), lerp(0.35, 0.08, head), sd);
+		}
+		return std::clamp(h, 0.0, 1.0);
 	}
 	// hills
 	const double f = fbm(u * 2.4, v * 2.4, salt, 4);
@@ -264,7 +281,7 @@ struct Field {
 	}
 	// fine detail on top of the field: rough rock on mountains, almost none on sand
 	double detail(double px, double pz) const {
-		const double amp = spec.kind == "mountains" ? 0.6 : spec.kind == "dunes" ? 0.03 : spec.kind == "canyon" ? 0.3 : 0.25;
+		const double amp = spec.kind == "mountains" ? 0.6 : spec.kind == "dunes" ? 0.03 : spec.kind == "canyon" ? 0.3 : spec.kind == "coast" ? 0.06 : 0.25;
 		const int salt = spec.seed * 31 + 5;
 		return amp * ((detail::fbm(px / 11.0, pz / 11.0, salt, 4) - 0.5) * 1.6 + (nature::noise2(px / 2.3, pz / 2.3, salt + 7) - 0.5) * 0.25);
 	}
@@ -305,6 +322,7 @@ inline std::shared_ptr<const Field> make(const Spec &s) {
 			lo = std::min(lo, v);
 			hi = std::max(hi, v);
 		}
+	if (s.kind == "coast") lo = 0.0, hi = 1.0;   // (a coast keeps its own scale: its beach is at a quarter of the height)
 	for (float &v : h) v = static_cast<float>((v - lo) / std::max(1e-9, hi - lo));
 	f->lo = lo;
 	f->hi = std::max(lo + 1e-9, hi);
@@ -415,6 +433,7 @@ inline Vec3 paint(const Spec &s, double px, double pz, double frac, double steep
 	else c = lerp(c, dry, 0.6 * smoothstep(0.6, 0.8, detail::fbm(px / 140.0, pz / 140.0, salt + 13, 3)));   // (hills: a few patches burnt dry)
 	c = lerp(c, dark, 0.5 * smoothstep(0.15, 0.7, wet) * (1.0 - smoothstep(0.4, 0.7, frac)));
 	if (s.kind == "mountains") c = lerp(c, scree, smoothstep(0.38, 0.58, frac + 0.1 * (var - 0.5)) * 0.8);   // above the grass: stones
+	if (s.kind == "coast") c = lerp(c, Vec3{0.50, 0.44, 0.33} * (0.9 + 0.2 * fine), 1.0 - smoothstep(0.262, 0.285, frac + 0.01 * (var - 0.5)));   // (the beach)
 	c = lerp(c, rock, smoothstep(0.12, 0.24, steep + 0.04 * (var - 0.5)));         // the steep faces: bare rock
 	const double line = s.snowLine() / std::max(1.0, s.height);
 	if (line < 1e8) {   // snow above the line, where it is not too steep to hold
@@ -423,6 +442,13 @@ inline Vec3 paint(const Spec &s, double px, double pz, double frac, double steep
 		c = lerp(c, Vec3{0.82, 0.84, 0.88} * (0.95 + 0.05 * fine), above * holds);
 	}
 	return c;
+}
+// A coast's sandy bed `depth` metres under clear water, as seen through it: the water takes the red first, then the green, until the bed is the deep sea's own colour
+// (film_water.h's seaMaterial). `grain` (0 to 1) varies the sand.
+inline Vec3 seabed(double depth, double grain) {
+	const Vec3 sand = Vec3{0.46, 0.40, 0.30} * (0.9 + 0.2 * grain), deep{0.015, 0.055, 0.07};
+	const double d = std::max(0.0, depth);
+	return {deep.x + (sand.x - deep.x) * std::exp(-0.9 * d), deep.y + (sand.y - deep.y) * std::exp(-0.35 * d), deep.z + (sand.z - deep.z) * std::exp(-0.25 * d)};
 }
 // The ground's colour (linear albedo) at pbrt's x z.
 inline Vec3 colourAt(const Field &f, double px, double pz) {
@@ -435,7 +461,8 @@ inline Vec3 colourAt(const Field &f, double px, double pz) {
 		const Vec3 sand = Vec3{0.46, 0.40, 0.30} * (0.9 + 0.2 * grain), wet = Vec3{0.24, 0.21, 0.16}, bed = Vec3{0.12, 0.13, 0.08} * (0.8 + 0.4 * grain);
 		c = lerp(c, sand, 1.0 - smoothstep(0.6, 2.2, above));
 		c = lerp(c, wet, 1.0 - smoothstep(-0.1, 0.4, above));
-		c = lerp(c, bed, 1.0 - smoothstep(-1.5, -0.3, above));
+		if (s.kind == "coast") c = lerp(c, seabed(-above, grain), 1.0 - smoothstep(-0.4, 0.0, above));   // (sand under clear water, the water's colour with depth)
+		else c = lerp(c, bed, 1.0 - smoothstep(-1.5, -0.3, above));
 	}
 	return c;
 }

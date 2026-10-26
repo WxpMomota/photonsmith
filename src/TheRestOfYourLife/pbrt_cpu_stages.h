@@ -384,6 +384,7 @@ inline void buildCameraMedium(const pbrt_flatten::FlatScene &scene, BuildResult 
 			m.g, color(m.Le[0], m.Le[1], m.Le[2]));
 		if (scene.cameraMediumBound[3] > 0.0)
 			out.cameraMedium->set_bound(point3(scene.cameraMediumBound[0], scene.cameraMediumBound[1], scene.cameraMediumBound[2]), scene.cameraMediumBound[3]);
+		if (m.type == "heightfog") out.cameraMedium->set_height(m.fogTop, m.fogThickness);   // (a fog in a layer: height_fog.h)
 	}
 }
 

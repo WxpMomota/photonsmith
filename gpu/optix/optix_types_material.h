@@ -220,7 +220,8 @@ struct MaterialData {
 		struct { float cauchy_A, cauchy_B, _dispersive_pad; } dispersive_extra;
 		// The wavefront backend's synthetic camera-medium material (pbrt_gpu_builder.h): the radius of the sphere the camera medium ends at
 		// (FlatScene::cameraMediumBound), 0 for one that fills all of space; its centre is camera_medium_bound_centre in the union below.
-		struct { float boundRadius, _cmb_pad1, _cmb_pad2; } camera_medium_extra;
+		// fogTop/fogThickness: a fog in a layer (the camera medium of type "heightfog", src/shared/height_fog.h); fogThickness 0 for one dense everywhere.
+		struct { float boundRadius, fogTop, fogThickness; } camera_medium_extra;
 	};
 
 	union {

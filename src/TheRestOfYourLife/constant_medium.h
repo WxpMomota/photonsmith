@@ -24,6 +24,7 @@
 #include "material.h"
 #include "texture.h"
 #include "../shared/volume_scattering.h"
+#include "../shared/height_fog.h"
 #include "pdf.h"
 #include <atomic>
 #include <functional>
@@ -631,6 +632,14 @@ class ambient_medium {
     // A medium that ends at a sphere (FlatScene::cameraMediumBound): the fog of a set lit from outside it. Radius 0 (the default) fills all of space.
     void set_bound(const point3& centre, double radius) { bound_centre_ = centre; bound_radius_ = radius; }
     bool bounded() const { return bound_radius_ > 0.0; }
+    // A fog in a layer (the camera medium of type "heightfog": src/shared/height_fog.h): its sigma_t below `top`, thinning above it over `thickness`. Grey: a per-channel
+    // extinction is taken by its luminance.
+    void set_height(double top, double thickness) {
+        fog_top_ = top;
+        fog_thickness_ = thickness;
+        chromatic_ = false;
+    }
+    bool layered() const { return fog_thickness_ > 0.0; }
 
     // The part [t0, t1] of the ray's [0, t_max] (ray parameter) that is inside the medium; false when there is none. Unbounded: all of it.
     bool clip(const ray& r, double t_max, double& t0, double& t1) const {
@@ -651,6 +660,15 @@ class ambient_medium {
 
     // The transmittance along `r` from its origin over `distance` world units (may be infinity): the length that is inside the medium, through transmittance_over().
     color transmittance_along(const ray& r, double distance) const {
+        if (layered()) {   // (the optical depth through the layer, exact: height_fog.h)
+            const double len = r.direction().length();
+            double t0, t1;
+            if (len <= 0.0 || !clip(r, distance >= infinity ? infinity : distance / len, t0, t1)) return color(1, 1, 1);
+            if (t1 >= infinity) t1 = 1e30 / len;
+            const double tau = height_fog::opticalDepth(med.sigma_tr(), fog_top_, fog_thickness_, r.origin().y(), r.direction().y(), len, t0, t1);
+            const double T = std::exp(-tau);
+            return color(T, T, T);
+        }
         if (!bounded()) return transmittance_over(distance);
         const double len = r.direction().length();
         double t0, t1;
@@ -669,6 +687,22 @@ class ambient_medium {
             double t_out;
             if (!clip(r, t_max, t_in, t_out)) return false;
             t_max = t_out - t_in;
+        }
+
+        if (layered()) {   // a flight through the layer: sampled by its exact optical depth (height_fog.h)
+            const double t_end = t_max >= infinity ? 1e30 / ray_length : t_in + t_max;
+            const double t = height_fog::sampleFlight(med.sigma_tr(), fog_top_, fog_thickness_, r.origin().y(), r.direction().y(), ray_length, t_in, t_end,
+                                                      -std::log(std::max(1e-12, 1.0 - random_double())));
+            if (!(t < t_end)) return false;
+            rec.t = t;
+            rec.p = r.at(rec.t);
+            rec.normal = vec3(1, 0, 0);
+            rec.front_face = true;
+            rec.mat = phase_mat;
+            rec.u = 0.0;
+            rec.v = 0.0;
+            rec.has_medium_event = false;
+            return true;
         }
 
         if (chromatic_) {
@@ -747,6 +781,7 @@ class ambient_medium {
     shared_ptr<hg_phase_material> phase_mat;
     point3                        bound_centre_{0, 0, 0};
     double                        bound_radius_ = 0.0;
+    double                        fog_top_ = 0.0, fog_thickness_ = 0.0;   // (a layered fog: set_height)
 };
 
 
