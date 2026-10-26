@@ -231,8 +231,8 @@ inline std::string shoreText(const Sea &s, double t, const terrain::Field &groun
 				// which way is the land: up the slope of the ground
 				const double e = 1.0;
 				const Vec3 up = normalize(Vec3{ground.heightAt(mid.x + e, mid.z) - ground.heightAt(mid.x - e, mid.z), 0.0, ground.heightAt(mid.x, mid.z + e) - ground.heightAt(mid.x, mid.z - e)} + Vec3{1e-9, 0.0, 0.0});
-				const double lap = 0.6 * std::sin(t * 1.2 + 0.05 * (mid.x + mid.z));   // up the beach and back
-				const double width = 0.5 + 0.4 * nature::noise2(mid.x * 0.3, mid.z * 0.3 - t * 0.4, 93);
+				const double lap = 0.35 * std::sin(t * 1.2 + 0.05 * (mid.x + mid.z));   // up the beach and back
+				const double width = 0.3 + 0.3 * nature::noise2(mid.x * 0.3, mid.z * 0.3 - t * 0.4, 93);
 				const Vec3 in = up * lap, out = up * (lap - width);
 				const int base = static_cast<int>(m.verts.size());
 				for (const Vec3 &v : {a + out, b + out, b + in, a + in}) {

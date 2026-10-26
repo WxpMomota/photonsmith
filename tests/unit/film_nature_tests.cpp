@@ -302,3 +302,58 @@ TEST(FilmClouds, CloudsHaveFlatBasesNeverOverlapAndDriftWithTheWind) {
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }
+
+// ---- forests -------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace forest = cartoon::forest;
+
+// Trees grow where the land suits them - not on cliffs, not in the water, not in a river's bed, not above the tree line - a mixed wood by height (broadleaf low, conifers
+// high), each tree drawn in full near the camera and as a far version beyond, with the season's leaves.
+TEST(FilmForest, TreesGrowWhereTheLandSuitsThemAndAreDrawnNearOrFar) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("forest", "scene s.pbrt\nlength 4\nterrain mountains size 800 height 200 seed 3 far off\nwater lake level 12\nriver from 150 -200 width 8\nforest mixed 600 seed 2\nforest conifer 50 in -50 -50 50 50 season winter near 0\n", film), "");
+	ASSERT_EQ(film.spec.planted.size(), 2u);
+	const auto ground = cartoon::terrain::fieldOf(film.spec.terrain);
+	const std::vector<forest::Tree> &trees = film.spec.planted[0];
+	ASSERT_GT(trees.size(), 300u);
+	double lowBroad = 0.0, highConifer = 0.0;
+	int nBroad = 0, nConifer = 0;
+	for (const forest::Tree &t : trees) {
+		EXPECT_NEAR(t.at.y, ground->heightAt(t.at.x, t.at.z) - 0.05, 1e-6) << "standing on the ground";
+		EXPECT_GE(t.at.y, 12.0 + 0.5) << "not in the lake";
+		EXPECT_LE(1.0 - ground->normalAt(t.at.x, t.at.z, 2.0).y, 0.2 + 1e-9) << "not on a cliff";
+		EXPECT_LE(t.at.y - film.spec.terrain.y, 0.55 * 200.0 + 6.0) << "not above the tree line";
+		for (const cartoon::Vec3 &p : film.spec.rivers[0].path) ASSERT_GE(std::hypot(p.x - t.at.x, p.z - t.at.z), 0.5 * 8.0 + 1.0) << "not in the river";
+		if (t.species == "broadleaf") lowBroad += t.at.y, ++nBroad;
+		if (t.species == "conifer") highConifer += t.at.y, ++nConifer;
+	}
+	ASSERT_GT(nBroad, 10);
+	ASSERT_GT(nConifer, 10);
+	EXPECT_LT(lowBroad / nBroad, highConifer / nConifer) << "broadleaf trees lower down, conifers higher";
+	// near and far: with `near 0` every tree is drawn far; a winter conifer carries snow
+	const std::string far = forest::text("photonsmith-test-forest", film.spec.planted[1], "winter", 1.0, {0.0, 50.0, 0.0}, 0.0);
+	EXPECT_NE(far.find("ObjectBegin \"forest_conifer_"), std::string::npos);
+	EXPECT_EQ(far.find("_near\""), std::string::npos);
+	EXPECT_NE(far.find("_far\""), std::string::npos);
+	std::size_t placements = 0;
+	for (std::size_t at = far.find("ObjectInstance"); at != std::string::npos; at = far.find("ObjectInstance", at + 1)) ++placements;
+	EXPECT_EQ(placements, film.spec.planted[1].size());
+	EXPECT_NE(far.find("[ 0.82000 0.84000 0.88000 ]"), std::string::npos) << "snow on the winter conifers";
+	// the species grow: leaves in summer, none on a broadleaf tree in winter
+	const auto summer = forest::detail::grow("broadleaf", 1, false, false), winter = forest::detail::grow("broadleaf", 1, true, false);
+	EXPECT_GT(summer.foliage.tris.size(), 10000u);
+	EXPECT_TRUE(winter.foliage.tris.empty());
+	EXPECT_GT(winter.wood.tris.size(), summer.wood.tris.size()) << "(bare, more twigs show)";
+	for (const std::string &sp : forest::species()) {
+		EXPECT_FALSE(forest::detail::grow(sp, 0, false, false).wood.tris.empty()) << sp;
+		EXPECT_FALSE(forest::detail::growFar(sp, 0, false).foliage.tris.empty()) << sp;
+	}
+	EXPECT_NE(forest::detail::foliageOf("broadleaf", "autumn", 0).x, forest::detail::foliageOf("broadleaf", "summer", 0).x) << "autumn colours";
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"forest oak", "conifer, broadleaf, birch, palm, shrub or mixed"},
+																						 {"forest mixed 100 season monsoon", "a forest takes"},
+																						 {"forest mixed 0", "1 to 50000 trees"}}) {
+		ff::DataFilm bad;
+		const std::string problem = loadNature("forest_bad", "scene s.pbrt\nlength 4\n" + line + "\n", bad);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}

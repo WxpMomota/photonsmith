@@ -108,6 +108,9 @@
 //     waterfall at 40 0 -80  width 8  drop 30  facing 180       # the middle of its lip (on a terrain, Y above the ground), how far it drops, which way it pours
 //     clouds   cumulus  cover 0.4  base 900  wind 90  speed 6   # clouds you can see round (film_clouds.h): cumulus, towering or wisps; `size W` across, `density D`,
 //                                                               # `area A` (the square they are spread over, round `at X Z`), `seed N`; they drift and cast shadows
+//     forest   mixed 3000  season autumn                        # conifer, broadleaf, birch, palm, shrub or mixed (by height), so many trees where the land suits them;
+//                                                               # `in X0 Z0 X1 Z1`, `below H` (the tree line above the land's base), `above H`, `steep S`, `scale A B`,
+//                                                               # `near D` (drawn in full within D m of the camera), `season` summer, autumn, winter or spring, `seed N`
 //
 // Weather and particles (film_particles.h):
 //
@@ -137,6 +140,7 @@
 #include "film_speech.h"
 #include "film_subjects.h"
 #include "film_clouds.h"
+#include "film_forest.h"
 #include "film_terrain.h"
 #include "film_water.h"
 #include "music_cues.h"
@@ -372,6 +376,9 @@ struct Spec {
 	std::vector<water::Fall> falls;
 	// clouds you can see round (`clouds`)
 	std::vector<clouds::Clouds> cloudLayers;
+	// forests (`forest`), and their trees (planted when the film is loaded, on the land as it is drawn)
+	std::vector<forest::Forest> forests;
+	std::vector<std::vector<forest::Tree>> planted;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	// weather and particles (`weather`, `particles`, `burst`)
@@ -952,6 +959,42 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				}
 			}
 			s.cloudLayers.push_back(c);
+		} else if (verb == "forest") {
+			const std::vector<std::string> t = detail::tokens(line);
+			forest::Forest f;
+			if (t.size() < 2 || std::find(forest::kinds().begin(), forest::kinds().end(), t[1]) == forest::kinds().end())
+				return fail("`forest KIND [COUNT] [in X0 Z0 X1 Z1] [below H] [above H] [steep S] [scale A B] [near D] [season S] [seed N]`: conifer, broadleaf, birch, palm, shrub or mixed");
+			f.kind = t[1];
+			std::size_t i = 2;
+			double count = 0.0;
+			if (i < t.size() && number(t[i], count)) {
+				if (count < 1 || count > 50000) return fail("a forest has 1 to 50000 trees");
+				f.count = static_cast<int>(count), ++i;
+			}
+			for (; i < t.size();) {
+				double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
+				if (t[i] == "in" && i + 4 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c) && number(t[i + 4], d)) {
+					f.x0 = std::min(a, c), f.z0 = std::min(b, d), f.x1 = std::max(a, c), f.z1 = std::max(b, d), f.area = true;
+					i += 5;
+				} else if (t[i] == "scale" && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && a > 0.0 && b >= a) {
+					f.scale0 = a, f.scale1 = b;
+					i += 3;
+				} else if (t[i] == "season" && i + 1 < t.size() && std::find(forest::seasons().begin(), forest::seasons().end(), t[i + 1]) != forest::seasons().end()) {
+					f.season = t[i + 1];
+					i += 2;
+				} else if (i + 1 < t.size() && number(t[i + 1], a)) {
+					if (t[i] == "below" && a >= 0.0) f.below = a;
+					else if (t[i] == "above") f.above = a;
+					else if (t[i] == "steep" && a > 0.0 && a <= 1.0) f.steep = a;
+					else if (t[i] == "near" && a >= 0.0) f.fullWithin = a;
+					else if (t[i] == "seed") f.seed = static_cast<int>(a);
+					else return fail("\"" + t[i] + "\": a forest takes in X0 Z0 X1 Z1, below, above, steep (0 to 1), scale A B, near, season (summer, autumn, winter or spring) and seed");
+					i += 2;
+				} else {
+					return fail("\"" + t[i] + "\": a forest takes in X0 Z0 X1 Z1, below, above, steep, scale A B, near, season and seed");
+				}
+			}
+			s.forests.push_back(f);
 		} else if (verb == "sky") {
 			const std::vector<std::string> t = detail::tokens(line);
 			const auto hour = [&](const std::string &w, double &h) {   // 18:30 or 18.5
@@ -1216,7 +1259,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, clouds, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, clouds, forest, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1265,6 +1308,11 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 		for (dressing::Placement &p : s.placements) p.at.y += ground->heightAt(p.at.x, p.at.z);
 		for (Character &c : s.characters) c.start[1] += ground->heightAt(c.start[0], c.start[2]);
+	}
+	{   // the forests' trees, on the land as it is drawn (out of the water and the rivers' beds)
+		const std::shared_ptr<const terrain::Field> ground = s.hasTerrain ? terrain::fieldOf(s.terrain) : nullptr;
+		const double level = s.seas.empty() ? -1e30 : s.seas[0].level;
+		for (const forest::Forest &f : s.forests) s.planted.push_back(forest::plant(f, ground.get(), level, s.terrain.channels));
 	}
 	for (const water::Fall &f : s.falls) {   // a waterfall throws up spray where it lands, the whole film long
 		particles::Emitter e;
@@ -2512,6 +2560,13 @@ class DataFilm {
 			for (const water::Sea &sea : spec.seas) out += water::seaText(sea, t, eye, target, hfov, ground.get());
 			for (const water::River &r : spec.rivers) out += water::riverText(r, t, ground.get());
 			for (const water::Fall &f : spec.falls) out += water::fallText(f, t, ground.get());
+		}
+		if (!spec.forests.empty()) {   // forests (film_forest.h): near the camera in full
+			Vec3 eye, target;
+			double fov = 40.0;
+			film_subjects::cameraOf(header, eye, target, fov);
+			for (std::size_t i = 0; i < spec.forests.size() && i < spec.planted.size(); ++i)
+				out += forest::text(spec.key.empty() ? std::string("film") : spec.key, spec.planted[i], spec.forests[i].season, t, eye, spec.forests[i].fullWithin);
 		}
 		for (const Piece &piece : scene.world) {
 			if (piece.block < 0) {

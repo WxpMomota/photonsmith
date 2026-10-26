@@ -784,6 +784,27 @@ medium at a time); they drift with the `wind` at `speed` and wrap round the area
 heights apart). The camera should stay outside the clouds: from inside a cloud's sphere a renderer sees it only in part. They cost little: a frame of a hilly land with a dozen
 cumulus renders in about 2.5 s at 640 x 360 and 128 samples (with the denoiser).
 
+**Forests: `forest`.** (film_forest.h)
+
+```
+forest  mixed 4000  season autumn                 # conifer, broadleaf, birch, palm, shrub or mixed; so many trees where the land suits them
+forest  conifer 800  in -300 -400 300 0  below 180  steep 0.15  scale 0.7 1.4  near 150  seed 3
+```
+
+Each species is grown once in four variants: a conifer as a trunk with twenty tiers of drooping arms, each with pads of needles, round a dark core; a broadleaf tree as a short
+trunk whose limbs spread wide and fork into twigs, inside a crown of leaf clusters filling an ellipsoid (most towards its outer shell, where they show); a birch slender and white
+with a tall narrow crown; a palm a curved trunk with a crown of arching fronds; a shrub a mound of leaves on a few stems. Each variant has a near version (tens of thousands of
+triangles: every leaf) and a far one (a trunk and lumps or a cone of foliage in its place, the same colours); both are PLY files in the film's cache wrapped in pbrt objects, and
+every tree is a placement of one of them, leaning a little in the wind. Trees nearer the camera than `near` metres (120, times the tree's size) are drawn near, the rest far, so a
+valley of 4000 trees is about 4,000 placements of a few dozen objects: a frame of one renders in a few seconds.
+
+Where they grow: tried at points of a fixed sequence over the rectangle (`in X0 Z0 X1 Z1`; the whole terrain when not given), kept on ground no steeper than `steep` (0.2: about
+37 degrees; no trees on cliffs), out of the water and its edge, out of rivers' beds, below the tree line (`below H` metres above the land's base; for mountains 0.55 of their
+height, conifers getting smaller towards it), above `above`, and more often where water gathers (the terrain's flow). A `mixed` wood is chosen by height: broadleaf trees, birches
+and shrubs low down, conifers coming in on the way up, conifers alone near the tree line. Seasons: `summer`; `autumn` (each broadleaf tree orange, red, yellow or brown, birches
+yellow); `winter` (broadleaf trees and birches bare, showing their twigs; conifers with snow on their tiers); `spring` (fresh light green, some broadleaf trees and shrubs in
+blossom). Walks do not go round forest trees (they are not part of the set's floor map).
+
 **Music that follows the film.** Three things (music_cues.h, film_score.h):
 
 - *Ducking.* A film file's music cues are mixed on their own and laid on the soundtrack brought down under the characters' lines - by up to two thirds while a line is
