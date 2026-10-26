@@ -1092,6 +1092,28 @@ TEST(FilmTransitions, AShotComesInWithADissolveAFadeOrAWipeAndTheOtherSideIsSeen
 
 // The sun of a `sky` line follows the time of day: high at noon in the south, low in the west in the evening, set at night; a dressed film's scene has its things (the pieces
 // once, a placement each), its sun and sky instead of the scene's own, and its sound; a placed rock is in a walk's way and grass is not.
+// Every object a placed thing uses is one the dressing defines, wherever it stands (a tree left of or behind the middle once named leaves "dress_leaves-1", which did not
+// exist, and lost them).
+TEST(FilmDressing, EveryPlacedThingUsesObjectsTheDressingDefines) {
+	const std::string defined = cartoon::dressing::objects();
+	int checked = 0;
+	for (const char *kind : {"tree", "rock", "fern", "bush", "grass"})
+		for (double x = -9.0; x <= 9.0; x += 3.0)
+			for (double z = -9.0; z <= 9.0; z += 3.0) {
+				cartoon::dressing::Placement p;
+				p.kind = kind;
+				p.at = {x, 0.0, z};
+				const std::string text = cartoon::dressing::placementText(p, 1.0);
+				for (std::size_t at = text.find("ObjectInstance \""); at != std::string::npos; at = text.find("ObjectInstance \"", at + 1)) {
+					const std::size_t from = at + 16, to = text.find('"', from);
+					const std::string name = text.substr(from, to - from);
+					EXPECT_NE(defined.find("ObjectBegin \"" + name + "\""), std::string::npos) << kind << " at " << x << " " << z << " uses " << name;
+					++checked;
+				}
+			}
+	EXPECT_GT(checked, 500);
+}
+
 TEST(FilmDressing, TheSkyFollowsTheTimeOfDayAndTheSetIsDressedWithThingsAndSound) {
 	namespace dr = cartoon::dressing;
 	dr::Sky sky;   // (south 180: -z; latitude 40, the longest day)

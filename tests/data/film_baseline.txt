@@ -95,8 +95,8 @@ pip-and-the-moon|12|e8298ef6e53ff15e|Under the real moon
 pip-and-the-moon|13|0503e1c3de0b1302|Pull back over the pond
 pip-goes-out|1|80877f19a94ee551|Down the path
 pip-goes-out|2|fa21ac06b9574f98|The lantern lights
-pip-goes-out|3|4484170a28f3c3ea|Into the sun
-pip-goes-out|4|3af0abe32c98c7d5|Cheering
+pip-goes-out|3|769db4e21e3fcf7c|Into the sun
+pip-goes-out|4|d9864c5aba8d066b|Cheering
 tengwang|1|8fa5c7a59d8748b0|Black, a bell, the sea of clouds
 tengwang|2|df520deb6621eb1c|The river comes out of the mountains
 tengwang|3|9cd4554012f19a35|The Gan River and Hongzhou

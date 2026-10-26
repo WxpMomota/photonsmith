@@ -116,7 +116,7 @@ inline std::string placementText(const Placement &p, double t, const Gusts &gust
 		const Vec3 from = transformPoint(place, onTrunk), to = transformPoint(place, centre * 0.92 + onTrunk * 0.08);
 		const double r = (0.04 + 0.03 * (1.0 - h)) * s;
 		out += nature::placeObject("dress_branch", mul(alignY(from, to - from), scale(r, length(to - from), r)));
-		out += nature::placeObject("dress_leaves" + std::to_string((salt + c) % 4),
+		out += nature::placeObject("dress_leaves" + std::to_string(((salt + c) % 4 + 4) % 4),   // (a tree left of or behind the middle has a negative salt)
 								   mul(place, translate(centre), nature::shearXZ(w.x, w.z), rotate({0, 1, 0}, 360.0 * hash01(salt * 31 + c, 57)), scale((0.8 + 0.5 * hash01(salt * 31 + c, 56)) * s)));
 	}
 	return out;
