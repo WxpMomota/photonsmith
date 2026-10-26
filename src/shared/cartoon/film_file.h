@@ -117,6 +117,9 @@
 //     aurora   green  brightness 1.2  during 4 30               # the sky's spectacles (film_skyfx.h): curtains of light (green, red or violet; `facing D`, `distance M`),
 //     lightning 5  at 0 -3000  radius 2000  during 2 20         # strikes with their flash and thunder (`base H`, `seed N`), shooting stars (`meteors COUNT`), and
 //     rainbow  0.8  during 6 16                                 # a rainbow opposite the sun (the `sky` line's); at night the sky has its stars, turning with the hours
+//     wet      0.8  from 4 to 14                                # weather that changes the land: wet (darker, glossy, puddles in the flat hollows), snowcover (snow on the
+//     snowcover 0.7  from 0 to 20                               # ground level enough to hold it), each reached from T0 to T1; `gusts S [wind D] [speed V]`: fronts that
+//     gusts    1.5  wind 90                                     # sweep across the grass and trees; `mist DENSITY [radius R]`: a mist round the camera
 //     timelapse 60                                              # nature 60 times faster: the clouds, the water, the aurora, the wind (the camera and the characters not)
 //     exposure auto                                             # (or a factor) the exposure follows the light: 1 by day, opening up through sunset into night
 //     shot 0 Over the valley
@@ -412,6 +415,15 @@ struct Spec {
 	// how fast nature runs (`timelapse`: the clouds, the water, the aurora, the wind in the trees), and the exposure (`exposure`: a factor, or `auto` - following the light)
 	double timelapse = 1.0, exposure = 1.0;
 	bool exposureAuto = false;
+	// weather that changes the land (`wet`, `snowcover`: each an amount reached from T0 to T1), its gusts (`gusts`) and a mist round the camera (`mist`)
+	struct Ramp {
+		double amount = 1.0, t0 = 0.0, t1 = 0.0;
+		double at(double t) const { return t1 > t0 ? amount * smoothstep(t0, t1, t) : amount; }
+	};
+	std::vector<Ramp> wetness, snowcover;
+	dressing::Gusts gusts;
+	bool hasMist = false;
+	nature::Mist mist;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	// weather and particles (`weather`, `particles`, `burst`)
@@ -1304,6 +1316,30 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				}
 			}
 			if (shot.fly.size() < 2) return fail("`fly X Z X Z [X Z ...] [height H] [look X Y Z] [fov F]`: at least two waypoints");
+		} else if (verb == "wet" || verb == "snowcover") {
+			const std::vector<std::string> t = detail::tokens(line);
+			Spec::Ramp r;
+			if (t.size() < 2 || !number(t[1], r.amount) || r.amount < 0.0 || r.amount > 1.0 || !(t.size() == 2 || (t.size() == 6 && t[2] == "from" && number(t[3], r.t0) && t[4] == "to" && number(t[5], r.t1) && r.t1 > r.t0)))
+				return fail("`" + verb + " AMOUNT [from T0 to T1]`: 0 to 1, reached from T0 to T1 (or from the start)");
+			(verb == "wet" ? s.wetness : s.snowcover).push_back(r);
+		} else if (verb == "gusts") {
+			const std::vector<std::string> t = detail::tokens(line);
+			double a = 0.0, wind = 0.0;
+			if (t.size() < 2 || !number(t[1], s.gusts.strength) || s.gusts.strength <= 0.0 || s.gusts.strength > 5.0)
+				return fail("`gusts STRENGTH [wind DEGREES] [speed S]`: a strength from 0 to 5 (1 a stiff breeze)");
+			for (std::size_t i = 2; i < t.size(); i += 2) {
+				if (i + 1 >= t.size() || !number(t[i + 1], a)) return fail("\"" + t[i] + "\": gusts take wind and speed, each with a number");
+				if (t[i] == "wind") wind = a;
+				else if (t[i] == "speed" && a > 0.0) s.gusts.speed = a;
+				else return fail("\"" + t[i] + "\": gusts take wind and speed");
+			}
+			s.gusts.dx = -std::sin(wind * kPi / 180.0), s.gusts.dz = std::cos(wind * kPi / 180.0);   // (story space)
+		} else if (verb == "mist") {
+			const std::vector<std::string> t = detail::tokens(line);
+			if (t.size() < 2 || !number(t[1], s.mist.density) || s.mist.density <= 0.0 || s.mist.density > 1.0 ||
+				!(t.size() == 2 || (t.size() == 4 && t[2] == "radius" && number(t[3], s.mist.radius) && s.mist.radius > 1.0)))
+				return fail("`mist DENSITY [radius R]`: scattering per metre (0.02 a light haze, 0.08 a thick mist) round the camera, out to R metres (60)");
+			s.hasMist = true;
 		} else if (verb == "timelapse") {
 			double v = 0.0;
 			if (!number(rest, v) || v < 1.0 || v > 100000.0) return fail("`timelapse FACTOR`: how many times faster the clouds, the water and the wind go (1 to 100000)");
@@ -1432,7 +1468,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1837,11 +1873,19 @@ class DataFilm {
 	}
 	// The dressing at t: the pieces once, then every placed thing (swaying), as scene text.
 	std::string dressingAt(double t) const {
-		std::string out = spec.hasTerrain ? terrain::text(spec.key.empty() ? std::string("film") : spec.key, spec.terrain) : std::string();
+		std::string out = spec.hasTerrain ? terrain::text(spec.key.empty() ? std::string("film") : spec.key, spec.terrain, weatherAt(t)) : std::string();
 		if (spec.placements.empty()) return out;
 		out += "# the set's dressing (film_dressing.h)\n" + dressing::objects();
-		for (const dressing::Placement &p : spec.placements) out += dressing::placementText(p, t);
+		for (const dressing::Placement &p : spec.placements) out += dressing::placementText(p, t * spec.timelapse, spec.gusts);
 		return out;
+	}
+	// The weather on the land at t: how wet it is and how much snow lies on it (film_file.h `wet`, `snowcover`).
+	terrain::Weather weatherAt(double t) const {
+		terrain::Weather w;
+		for (const Spec::Ramp &r : spec.wetness) w.wet = std::max(w.wet, r.at(t));
+		for (const Spec::Ramp &r : spec.snowcover) w.snow = std::max(w.snow, r.at(t));
+		w.wet = std::round(w.wet * 40.0) / 40.0, w.snow = std::round(w.snow * 40.0) / 40.0;   // (frames a moment apart write the same text)
+		return w;
 	}
 
 	// ---- walks that find their way ----
@@ -2757,6 +2801,15 @@ class DataFilm {
 	std::string worldAt(const std::string &header, double t) const {
 		std::string out = film_camera::exposed(header, exposureAt(t));
 		const double nt = t * spec.timelapse;   // (nature's time: the clouds, the water, the aurora, the wind)
+		if (spec.hasMist) {   // a mist round the camera (nature_lib.h: the camera's own medium, ended by a sphere round it, so the sun and sky outside light it)
+			Vec3 eye, target;
+			double fov = 40.0;
+			film_subjects::cameraOf(header, eye, target, fov);
+			nature::Mist m = spec.mist;
+			m.centre = eye;
+			const std::size_t camera = out.find("Camera \"");
+			if (camera != std::string::npos) out = out.substr(0, camera) + nature::mistBeforeCamera(m) + out.substr(camera) + nature::mistBoundary(m);
+		}
 		if (spec.hasSky) {
 			double rainbow = 0.0;   // (eased in and out over two seconds)
 			for (const Spec::Rainbow &r : spec.rainbows) rainbow = std::max(rainbow, r.strength * smoothstep(r.t0, r.t0 + 2.0, t) * (1.0 - smoothstep(r.t1 - 2.0, r.t1, t)));
@@ -2812,7 +2865,7 @@ class DataFilm {
 			double fov = 40.0;
 			film_subjects::cameraOf(header, eye, target, fov);
 			for (std::size_t i = 0; i < spec.forests.size() && i < spec.planted.size(); ++i)
-				out += forest::text(spec.key.empty() ? std::string("film") : spec.key, spec.planted[i], spec.forests[i].season, nt, eye, spec.forests[i].fullWithin);
+				out += forest::text(spec.key.empty() ? std::string("film") : spec.key, spec.planted[i], spec.forests[i].season, nt, eye, spec.forests[i].fullWithin, spec.gusts);
 		}
 		for (const Piece &piece : scene.world) {
 			if (piece.block < 0) {

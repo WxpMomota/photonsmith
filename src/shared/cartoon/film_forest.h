@@ -21,6 +21,7 @@
 
 #include "cartoon_lib.h"
 #include "film_cache.h"
+#include "film_dressing.h"
 #include "film_terrain.h"
 #include "nature_lib.h"
 
@@ -321,7 +322,8 @@ inline std::vector<Tree> plant(const Forest &f, const terrain::Field *ground, do
 }
 
 // A forest's trees at t, seen from `eye` (story space; near ones in full), as scene text: the objects it uses, then a placement for each tree, leaning in the wind.
-inline std::string text(const std::string &film, const std::vector<Tree> &trees, const std::string &season, double t, const Vec3 &eyeStory, double nearDistance) {
+inline std::string text(const std::string &film, const std::vector<Tree> &trees, const std::string &season, double t, const Vec3 &eyeStory, double nearDistance,
+						const dressing::Gusts &gusts = {}) {
 	std::string objects, places;
 	std::vector<std::string> made;
 	const auto need = [&](const std::string &sp, int v, bool full) {
@@ -336,7 +338,7 @@ inline std::string text(const std::string &film, const std::vector<Tree> &trees,
 		const Vec3 foot{-tr.at.x, tr.at.y, tr.at.z};   // (story space)
 		const bool full = length(foot - eyeStory) < nearDistance * tr.scale;
 		const std::string name = need(tr.species, tr.variant, full);
-		const Vec3 w = nature::windLean(foot.x, foot.z, t, tr.species == "conifer" ? 0.008 : 0.014);
+		const Vec3 w = nature::windLean(foot.x, foot.z, t, tr.species == "conifer" ? 0.008 : 0.014) + dressing::gustAt(gusts, foot.x, foot.z, t) * (tr.species == "conifer" ? 0.04 : 0.07);
 		places += nature::placeObject(name, mul(translate(foot), nature::shearXZ(w.x, w.z), rotate({0, 1, 0}, tr.turn), scale(tr.scale)));
 	}
 	return trees.empty() ? std::string() : "# a forest (film_forest.h)\n" + objects + places;

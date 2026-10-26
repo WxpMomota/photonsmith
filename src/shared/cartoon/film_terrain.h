@@ -564,12 +564,93 @@ inline Vec3 farColour(const Field &f, double a, double t) {
 	return lerp(c, Vec3{0.46, 0.52, 0.62}, 0.5 * smoothstep(0.3, 1.0, t));
 }
 
-inline std::string rangesText(const std::string &film, const Field &field);
+// The weather on the land at a moment: how wet it is (0 dry .. 1 soaked: darker, glossy, puddles in its flat wet hollows) and how much snow lies on it (0 .. 1: on the ground
+// level enough to hold it, more as it grows).
+struct Weather {
+	double wet = 0.0, snow = 0.0;
+};
+// The material lines for ground painted with the picture texture `tex` under `w`: the snow mixed in by `snowMask` (a float picture of where snow lies) times its amount, the
+// whole darkened and coated when it is wet. (Texture graphs of pictures, constants, scale and mix: the GPU renderers draw them per pixel.)
+inline std::string groundMaterial(const std::string &tex, const Weather &w, const std::string &snowMask) {
+	std::string out, top = tex;
+	char buf[160];
+	if (w.snow > 0.0 && !snowMask.empty()) {
+		std::snprintf(buf, sizeof buf, "\" \"float scale\" [ %.4f ]\n", w.snow);
+		out += "  Texture \"" + tex + "_snowmask\" \"float\" \"imagemap\" \"string wrap\" \"clamp\" \"string filename\" [ \"" + snowMask + "\" ]\n";
+		out += "  Texture \"" + tex + "_snowamount\" \"float\" \"scale\" \"texture tex\" \"" + tex + "_snowmask" + buf;
+		out += "  Texture \"" + tex + "_snowy\" \"spectrum\" \"mix\" \"texture tex1\" \"" + top + "\" \"rgb tex2\" [ 0.84 0.86 0.9 ] \"texture amount\" \"" + tex + "_snowamount\"\n";
+		top = tex + "_snowy";
+	}
+	if (w.wet > 0.0) {
+		std::snprintf(buf, sizeof buf, "\" \"float scale\" [ %.4f ]\n", 1.0 - 0.45 * w.wet);
+		out += "  Texture \"" + tex + "_wet\" \"spectrum\" \"scale\" \"texture tex\" \"" + top + buf;
+		std::snprintf(buf, sizeof buf, "\" \"float roughness\" [ %.4f ]\n", 0.35 * (1.0 - w.wet) + 0.03);
+		return out + "  Material \"coateddiffuse\" \"texture reflectance\" \"" + tex + "_wet" + buf;
+	}
+	return out + "  Material \"diffuse\" \"texture reflectance\" \"" + top + "\"\n";
+}
+// Where snow lies on the land (a float picture over the square): ground level enough to hold it, a little patchy.
+inline std::string snowMaskPicture(const std::string &film, const Field &f) {
+	const Spec &s = f.spec;
+	return film_sky::picture(film, s.key() + "_snowmask", 1024, 1024, [&](std::vector<float> &rgb) {
+		for (int j = 0; j < 1024; ++j)
+			for (int i = 0; i < 1024; ++i) {
+				const double px = f.sx0 + (i + 0.5) / 1024.0 * s.size, pz = f.sz0 + (1.0 - (j + 0.5) / 1024.0) * s.size;
+				const Vec3 n = f.normalAt(px, pz, std::max(1.5, f.cell * 0.6));
+				const float v = static_cast<float>(smoothstep(0.78, 0.93, n.y) * (0.75 + 0.25 * nature::noise2(px / 7.0, pz / 7.0, s.seed + 81)));
+				const std::size_t k = (static_cast<std::size_t>(j) * 1024 + i) * 3;
+				rgb[k] = rgb[k + 1] = rgb[k + 2] = v;
+			}
+	});
+}
+// Puddles: the flat hollows where the water gathers, each a patch of still water a hand's breadth above the ground (story space), made once.
+inline Mesh puddleMesh(const Field &f) {
+	Mesh m;
+	const Spec &s = f.spec;
+	for (int j = Field::kMargin; j < f.n - Field::kMargin; ++j)
+		for (int i = Field::kMargin; i < f.n - Field::kMargin; ++i) {
+			const double px = f.x0 + i * f.cell, pz = f.z0 + j * f.cell;
+			if (f.flow[static_cast<std::size_t>(j) * f.n + i] < 0.6 || f.normalAt(px, pz, 2.0).y < 0.99 || hash01(i * 7919 + j, s.seed + 91) > 0.3) continue;
+			if (s.waterLevel > -1e29 && f.heightAt(px, pz) < s.waterLevel + 0.3) continue;   // (not in the lake)
+			const double r = f.cell * (0.2 + 0.25 * hash01(i * 31 + j, s.seed + 93));
+			const int ring = 10;
+			// a hollow only: the water lies at its lowest, and most of the ground round it is higher (its edge then runs under the ground)
+			double lowest = f.heightAt(px, pz);
+			std::vector<Vec3> rim;
+			for (int k = 0; k < ring; ++k) {
+				const double a = 2.0 * kPi * k / ring, rr = r * (0.7 + 0.5 * nature::noise2(std::cos(a) + px * 0.1, std::sin(a) + pz * 0.1, s.seed + 95));
+				const double qx = px + rr * std::cos(a), qz = pz + rr * std::sin(a);
+				rim.push_back({qx, f.heightAt(qx, qz), qz});
+				lowest = std::min(lowest, rim.back().y);
+			}
+			const double y = lowest + 0.04;
+			int higher = 0;
+			for (const Vec3 &q : rim) higher += q.y > y;
+			if (higher < 7) continue;
+			const int base = static_cast<int>(m.verts.size());
+			m.verts.push_back({-px, y, pz});
+			m.normals.push_back({0, 1, 0});
+			for (int k = 0; k <= ring; ++k) {
+				const Vec3 &q = rim[static_cast<std::size_t>(k % ring)];
+				m.verts.push_back({-q.x, y, q.z});
+				m.normals.push_back({0, 1, 0});
+				if (k > 0) m.tris.push_back({base, base + k, base + k + 1});
+			}
+		}
+	return m;
+}
+inline std::string rangesText(const std::string &film, const Field &field, const Weather &w = {});
 
 // The terrain as scene text: the surface with its painted colours, and the far ranges. `film` names the cache it is kept in.
-inline std::string text(const std::string &film, const Spec &s) {
+inline std::string text(const std::string &film, const Spec &s, const Weather &w = {}) {
 	const std::shared_ptr<const Field> f = fieldOf(s);
 	const std::string key = s.key();
+	const std::string mask = w.snow > 0.0 ? snowMaskPicture(film, *f) : std::string();
+	std::string puddles;   // (in the flat wet hollows, once the ground is wet through)
+	if (w.wet > 0.35) {
+		const std::string file = film_cache::ply(film, key + "_puddles", [&] { return puddleMesh(*f); });
+		if (!file.empty()) puddles = "AttributeBegin\n  " + coated({0.02, 0.025, 0.03}, 0.0) + "\n" + film_cache::plyShape(file) + "AttributeEnd\n";
+	}
 	const int W = 2048;
 	const std::string picture = film_sky::picture(film, key + "_colours", W, W, [&](std::vector<float> &rgb) {
 		for (int j = 0; j < W; ++j) {
@@ -622,23 +703,23 @@ inline std::string text(const std::string &film, const Spec &s) {
 		};
 		const double vdelta = canyon ? -s.y / period : 0.0;
 		std::string out = "# the terrain: " + s.kind + " (film_terrain.h)\nAttributeBegin\n  Texture \"" + key + "\" \"spectrum\" \"imagemap\" \"string wrap\" \"clamp\" \"string filename\" [ \"" +
-						  picture + "\" ]\n  Material \"diffuse\" \"texture reflectance\" \"" + key + "\"\n" + film_cache::plyShape(part(0)) + "AttributeEnd\n";
+						  picture + "\" ]\n" + groundMaterial(key, w, mask) + film_cache::plyShape(part(0)) + "AttributeEnd\n" + puddles;
 		for (int k = 1; k <= 2; ++k) {   // the cliffs that face along x take the picture projected onto the z-y plane, those along z onto the x-y plane
 			char proj[300];
 			std::snprintf(proj, sizeof proj, "\"string mapping\" \"planar\" \"vector3 v1\" [ %.8f 0 %.8f ] \"vector3 v2\" [ 0 %.8f 0 ] \"float vdelta\" [ %.6f ]", k == 1 ? 0.0 : 1.0 / 300.0,
 						  k == 1 ? 1.0 / 300.0 : 0.0, 1.0 / period, vdelta);
 			const std::string name = key + (k == 1 ? "_cliff_x" : "_cliff_z");
-			out += "AttributeBegin\n  Texture \"" + name + "\" \"spectrum\" \"imagemap\" " + proj + " \"string filename\" [ \"" + sidePicture + "\" ]\n  Material \"diffuse\" \"texture reflectance\" \"" +
-				   name + "\"\n" + film_cache::plyShape(part(k)) + "AttributeEnd\n";
+			out += "AttributeBegin\n  Texture \"" + name + "\" \"spectrum\" \"imagemap\" " + proj + " \"string filename\" [ \"" + sidePicture + "\" ]\n" + groundMaterial(name, {w.wet, 0.0}, "") +
+				   film_cache::plyShape(part(k)) + "AttributeEnd\n";
 		}
-		return out + rangesText(film, *f);
+		return out + rangesText(film, *f, w);
 	}
 	const std::string surface = film_cache::ply(film, key + "_surface", [&] { return surfaceMesh(*f); });
 	return "# the terrain: " + s.kind + " (film_terrain.h)\nAttributeBegin\n  Texture \"" + key + "\" \"spectrum\" \"imagemap\" \"string wrap\" \"clamp\" \"string filename\" [ \"" +
-		   picture + "\" ]\n  Material \"diffuse\" \"texture reflectance\" \"" + key + "\"\n" + film_cache::plyShape(surface) + "AttributeEnd\n" + rangesText(film, *f);
+		   picture + "\" ]\n" + groundMaterial(key, w, mask) + film_cache::plyShape(surface) + "AttributeEnd\n" + puddles + rangesText(film, *f, w);
 }
 // The far ranges as scene text ("" when they are turned off).
-inline std::string rangesText(const std::string &film, const Field &field) {
+inline std::string rangesText(const std::string &film, const Field &field, const Weather &w) {
 	const Spec &s = field.spec;
 	const Field *f = &field;
 	const std::string key = s.key();
@@ -656,8 +737,20 @@ inline std::string rangesText(const std::string &film, const Field &field) {
 					rgb[k + 2] = static_cast<float>(c.z);
 				}
 		});
-		out += "AttributeBegin\n  Texture \"" + key + "_far\" \"spectrum\" \"imagemap\" \"string wrap\" \"clamp\" \"string filename\" [ \"" + farPicture + "\" ]\n  Material \"diffuse\" \"texture reflectance\" \"" + key +
-			   "_far\"\n" + film_cache::plyShape(ring) + "AttributeEnd\n";
+		// (snow on the far ranges: their picture is mixed with snow as the land's is, where their ground is level enough)
+		std::string farMask;
+		if (w.snow > 0.0)
+			farMask = film_sky::picture(film, key + "_far_snowmask", 1024, 128, [&](std::vector<float> &rgb) {
+				for (int j = 0; j < 128; ++j)
+					for (int i = 0; i < 1024; ++i) {
+						const double a = 2.0 * kPi * (i + 0.5) / 1024.0, t = 1.0 - (j + 0.5) / 128.0;
+						const float v = static_cast<float>(smoothstep(0.75, 0.92, farNormal(*f, a, t).y));
+						const std::size_t k = (static_cast<std::size_t>(j) * 1024 + i) * 3;
+						rgb[k] = rgb[k + 1] = rgb[k + 2] = v;
+					}
+			});
+		out += "AttributeBegin\n  Texture \"" + key + "_far\" \"spectrum\" \"imagemap\" \"string wrap\" \"clamp\" \"string filename\" [ \"" + farPicture + "\" ]\n" + groundMaterial(key + "_far", w, farMask) +
+			   film_cache::plyShape(ring) + "AttributeEnd\n";
 	}
 	return out;
 }

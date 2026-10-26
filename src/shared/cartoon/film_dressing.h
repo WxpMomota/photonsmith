@@ -73,8 +73,21 @@ inline const std::string &objects() {
 	return s;
 }
 
-// A placed thing at t (its leaves and grass sway in the wind), as scene text.
-inline std::string placementText(const Placement &p, double t) {
+// Gusts of wind (film_file.h `gusts`): fronts that sweep across the land at `speed` along `wind` (story space), bending what grows as they pass.
+struct Gusts {
+	double strength = 0.0, dx = 0.0, dz = 1.0, speed = 7.0;
+};
+// How much a gust bends what grows at story-space (x, z) at t (0 between fronts): a sharp front, a slow easing behind it, the fronts' lines broken by noise.
+inline Vec3 gustAt(const Gusts &g, double x, double z, double t) {
+	if (g.strength <= 0.0) return {0.0, 0.0, 0.0};
+	const double along = x * g.dx + z * g.dz, across = -x * g.dz + z * g.dx;
+	const double phase = (along - g.speed * t) / 28.0 + 0.6 * nature::noise2(across / 40.0, t * 0.05, 61);
+	const double f = phase - std::floor(phase);
+	const double pulse = f < 0.15 ? smoothstep(0.0, 0.15, f) : 1.0 - smoothstep(0.15, 0.7, f);
+	return Vec3{g.dx, 0.0, g.dz} * (g.strength * pulse * pulse);
+}
+// A placed thing at t (its leaves and grass sway in the wind, and bend in its gusts), as scene text.
+inline std::string placementText(const Placement &p, double t, const Gusts &gusts = {}) {
 	const Vec3 foot{-p.at.x, p.at.y, p.at.z};   // (story space)
 	const double s = p.scale;
 	const int salt = p.seed * 7919 + static_cast<int>(std::lround(p.at.x * 13.0 + p.at.z * 71.0));
@@ -83,11 +96,11 @@ inline std::string placementText(const Placement &p, double t) {
 	if (p.kind == "rock") return nature::placeObject("dress_rock" + std::to_string(variant(3, 1)), mul(translate(foot - Vec3{0.0, 0.05 * s, 0.0}), rotate({0, 1, 0}, p.turn), scale(s)));   // (1 m across, a third of that high)
 	if (p.kind == "fern") return nature::placeObject("dress_soft_fern" + std::to_string(variant(2, 1)), mul(place, scale(s)));
 	if (p.kind == "grass") {
-		const Vec3 w = nature::windLean(foot.x, foot.z, t, 0.06);
+		const Vec3 w = nature::windLean(foot.x, foot.z, t, 0.06) + gustAt(gusts, foot.x, foot.z, t) * 0.5;
 		return nature::placeObject("dress_soft_tuft" + std::to_string(variant(4, 1)), mul(translate(foot), nature::shearXZ(w.x, w.z), rotate({0, 1, 0}, p.turn), scale(s)));
 	}
 	if (p.kind == "bush") {
-		const Vec3 w = nature::windLean(foot.x, foot.z, t, 0.02);
+		const Vec3 w = nature::windLean(foot.x, foot.z, t, 0.02) + gustAt(gusts, foot.x, foot.z, t) * 0.2;
 		return nature::placeObject("dress_soft_bush" + std::to_string(variant(2, 1)), mul(translate(foot + Vec3{0.0, 0.35 * s, 0.0}), nature::shearXZ(w.x, w.z), rotate({0, 1, 0}, p.turn), scale(0.7 * s, 0.55 * s, 0.7 * s)));
 	}
 	// a tree: its trunk (the unit one scaled), branches out to its leaf clusters, and the clusters, which sway a little

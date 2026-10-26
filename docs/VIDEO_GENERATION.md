@@ -867,6 +867,25 @@ camera, the characters and the animals keep theirs; the sun and the stars go as 
 auto` follows the sun: 1 by day (8 degrees up and higher), opening up smoothly to about 30 times (2^4.9) when it is 12 degrees below the horizon, so a film that runs from
 sunset into night stays readable; it is written into each frame's Film line as pbrt's `"float iso"` (100 times the exposure, or the set's own iso multiplied by it).
 
+**Weather that changes the land: `wet`, `snowcover`, `gusts`, `mist`.** (film_terrain.h, film_dressing.h, nature_lib.h)
+
+```
+weather   rain 1.2 from 2 to 12
+wet       0.9  from 3 to 8            # an amount (0 to 1) reached from T0 to T1 (without from/to: from the start)
+snowcover 0.8  from 0 to 30           # snow settling on the land as the film goes on
+gusts     1.5  wind 90  speed 7       # fronts of wind sweeping across the grass and the trees
+mist      0.003  radius 400           # a mist round the camera: scattering per metre, out to R metres (density x radius about 1 is a good haze)
+```
+
+On a terrain, wet ground is darker (its picture scaled by 1 - 0.45 x the wetness) under a glossy coat (rougher when damp, near a mirror when soaked), and once it is wet
+through (above 0.35) still water lies in the flat hollows where water gathers, each at its hollow's lowest point (puddles: a mesh made once from the land). Snow is mixed into
+the land's picture where the ground is level enough to hold it (a mask from its slope, a little patchy), times the amount - so it settles as the amount grows - and on the far
+ranges the same way; steep rock and cliffs stay bare. (Each is a texture graph of the land's pictures, a constant, scale and mix, which every renderer draws per pixel; amounts
+are kept to steps of 0.025 so frames a moment apart are the same text.) A winter forest (`forest ... season winter`) matches it. Gusts are fronts that sweep across at `speed`
+along `wind`, bending grass, bushes and trees as they pass (a sharp front, easing behind it, the fronts' lines broken by noise). The mist is the camera's own medium ended
+by a sphere round the camera (nature_lib.h's Mist: the sun and sky outside light it, so a low sun draws shafts), rendered with the wavefront renderer. Fog banks lying on the
+land as volumes were tried and left out: a medium in a sphere with the land inside it is drawn wrongly by the GPU renderers.
+
 **Music that follows the film.** Three things (music_cues.h, film_score.h):
 
 - *Ducking.* A film file's music cues are mixed on their own and laid on the soundtrack brought down under the characters' lines - by up to two thirds while a line is

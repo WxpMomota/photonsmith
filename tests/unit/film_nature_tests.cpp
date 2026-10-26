@@ -534,3 +534,56 @@ TEST(FilmCamera, DronesKeepAboveTheLandTimeLapseRunsNatureAndExposureFollowsTheL
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }
+
+// ---- weather that changes the land ---------------------------------------------------------------------------------------------------------------------------------------------
+
+// Wet ground is darker and glossy (a coat over the land's picture scaled down), snow is mixed into it where the ground is level, both reached over their times; puddles lie
+// only in hollows; gusts sweep across as fronts; a mist is the camera's own medium ended by a sphere round it.
+TEST(FilmWeather, WetGroundIsDarkAndGlossySnowSettlesGustsSweepAndMistSurroundsTheCamera) {
+	const cartoon::terrain::Weather dry, wet{1.0, 0.0}, snowy{0.0, 0.8};
+	EXPECT_NE(terrain::groundMaterial("g", dry, "").find("Material \"diffuse\" \"texture reflectance\" \"g\""), std::string::npos);
+	const std::string w = terrain::groundMaterial("g", wet, "");
+	EXPECT_NE(w.find("\"scale\" \"texture tex\" \"g\" \"float scale\" [ 0.5500 ]"), std::string::npos) << w;
+	EXPECT_NE(w.find("Material \"coateddiffuse\" \"texture reflectance\" \"g_wet\""), std::string::npos) << w;
+	const std::string sn = terrain::groundMaterial("g", snowy, "mask.hdr");
+	EXPECT_NE(sn.find("\"float scale\" [ 0.8000 ]"), std::string::npos) << sn;
+	EXPECT_NE(sn.find("\"mix\" \"texture tex1\" \"g\" \"rgb tex2\""), std::string::npos) << sn;
+	EXPECT_NE(sn.find("Material \"diffuse\" \"texture reflectance\" \"g_snowy\""), std::string::npos) << sn;
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("weather", "scene s.pbrt\nlength 10\nterrain hills size 400 height 20 seed 2 far off\nwet 0.8 from 2 to 6\nsnowcover 0.5\ngusts 2 wind 90\nmist 0.004 radius 300\n", film), "");
+	EXPECT_DOUBLE_EQ(film.weatherAt(0.0).wet, 0.0);
+	EXPECT_DOUBLE_EQ(film.weatherAt(8.0).wet, 0.8);
+	EXPECT_GT(film.weatherAt(4.0).wet, 0.2);
+	EXPECT_LT(film.weatherAt(4.0).wet, 0.6);
+	EXPECT_DOUBLE_EQ(film.weatherAt(0.0).snow, 0.5) << "(from the start)";
+	// puddles: each lies at the lowest of its hollow, and the ground round most of it is higher
+	const auto ground = terrain::fieldOf(film.spec.terrain);
+	const cartoon::Mesh puddles = terrain::puddleMesh(*ground);
+	for (std::size_t i = 0; i < puddles.verts.size(); i += 12) {
+		const cartoon::Vec3 c{-puddles.verts[i].x, puddles.verts[i].y, puddles.verts[i].z};
+		EXPECT_LE(c.y, ground->heightAt(c.x, c.z) + 0.05) << "not floating above the ground";
+	}
+	// gusts: fronts that move with the wind
+	const cartoon::dressing::Gusts &g = film.spec.gusts;
+	EXPECT_NEAR(g.dx, -1.0, 1e-9) << "wind 90 is towards +x: -x in story space";
+	double most = 0.0, least = 1e9;
+	for (double x = -50.0; x <= 50.0; x += 1.0) {
+		const double v = cartoon::length(cartoon::dressing::gustAt(g, x, 0.0, 3.0));
+		most = std::max(most, v), least = std::min(least, v);
+	}
+	EXPECT_GT(most, 1.0);
+	EXPECT_LT(least, 0.1) << "between the fronts it is still";
+	// the mist: round the camera
+	const std::string scene = film.sceneAt(1.0);
+	EXPECT_NE(scene.find("MakeNamedMedium \"mist\""), std::string::npos);
+	EXPECT_LT(scene.find("MakeNamedMedium \"mist\""), scene.find("Camera \"")) << "before the camera";
+	EXPECT_NE(scene.find("MediumInterface \"mist\" \"\""), std::string::npos) << "and the sphere it ends at";
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"wet 2", "`wet AMOUNT [from T0 to T1]`"},
+																						 {"snowcover 0.5 from 3", "`snowcover AMOUNT [from T0 to T1]`"},
+																						 {"gusts 9", "`gusts STRENGTH"},
+																						 {"mist 3", "`mist DENSITY"}}) {
+		ff::DataFilm bad;
+		const std::string problem = loadNature("weather_bad", "scene s.pbrt\nlength 4\n" + line + "\n", bad);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}
