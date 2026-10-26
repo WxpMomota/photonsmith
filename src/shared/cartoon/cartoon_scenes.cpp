@@ -4,6 +4,11 @@
 // functions are the only link: listGenerated() describes each film's still from its header alone, and materializeGenerated() writes a still's file when something is about to load it
 // (cartoon_stills.h). Part of cpu_renderer, where the scene list is built.
 
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
+#include <sstream>
+
 #include "../pbrt_discover.h"
 #include "cartoon_stills.h"
 
@@ -50,5 +55,51 @@ const char *filmTable() {
 	static const std::string table = cartoon::filmTable();
 	return table.c_str();
 }
+
+std::string filmMoment(const std::string &id) {
+	if (id.rfind("cartoon:", 0) != 0) return std::string();
+	const std::size_t at = id.find('@');
+	const std::string key = id.substr(8, at == std::string::npos ? std::string::npos : at - 8);
+	const double t = at == std::string::npos ? -1.0 : std::atof(id.c_str() + at + 1);
+	cartoon::refreshFilmFile(key);
+	const cartoon::Film *film = cartoon::find(key.c_str());
+	if (!film) return std::string();
+	const double when = t >= 0.0 ? std::min(t, film->duration) : film->stillTime;
+	std::error_code ec;
+	const std::filesystem::path dir = std::filesystem::path(cacheDir()) / "moments";
+	std::filesystem::create_directories(dir, ec);
+	char name[160];
+	std::snprintf(name, sizeof name, "%s@%.2f.pbrt", key.c_str(), when);
+	const std::filesystem::path file = dir / name;
+	const std::string text = "# @rt-name " + std::string(film->name) + " at " + std::to_string(when) + " s\n" + film->sceneAt(when);
+	std::string old;
+	{
+		std::ifstream in(file, std::ios::binary);
+		old.assign((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+	}
+	if (old != text) std::ofstream(file, std::ios::binary | std::ios::trunc) << text;   // (the same moment of an unchanged film is not written again)
+	// only the latest moment of a film is kept: scrubbing a film with big meshes would otherwise leave a file of many megabytes behind at every stop
+	for (const auto &entry : std::filesystem::directory_iterator(dir, ec)) {
+		const std::string other = entry.path().filename().string();
+		if (other.rfind(key + "@", 0) == 0 && entry.path() != file) std::filesystem::remove(entry.path(), ec);
+	}
+	return file.string();
+}
+
+bool filmCamera(const char *key, double t, double out[6]) {
+	if (!key) return false;
+	cartoon::refreshFilmFile(key);
+	const cartoon::Film *film = cartoon::find(key);
+	if (!film || !film->headerAt) return false;
+	const std::string header = film->headerAt(std::max(0.0, std::min(t, film->duration)));
+	const std::size_t at = header.find("LookAt");
+	if (at == std::string::npos) return false;
+	std::istringstream in(header.substr(at + 6));
+	for (int i = 0; i < 6; ++i)
+		if (!(in >> out[i])) return false;
+	return true;
+}
+
+int filmChanged(const char *key) { return key && cartoon::refreshFilmFile(key) ? 1 : 0; }
 
 }  // namespace pbrt_discover

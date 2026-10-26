@@ -1496,6 +1496,14 @@ private:
 	QComboBox *m_filmShotCombo = nullptr;    // the film's shots by name: choosing one sets the film time to a moment inside it
 	std::function<void()> m_syncFilmShot;    // shows in m_filmShotCombo the shot the film time is in (buildSceneInfoRows)
 	QString m_filmTimeFor;                   // key of the film the spin box's range and value were last set for
+	// The film timeline: a slider beside the film time that scrubs through the film; Live Preview of a film's still draws the moment it is at (its scene id
+	// "cartoon:<key>@<seconds>", the shot's own camera), drawn again a moment after the time changes and whenever the film's file is saved.
+	QSlider *m_filmTimeSlider = nullptr;
+	QTimer *m_filmMomentTimer = nullptr;   // (waits for the scrubbing to rest before Live Preview draws the new moment)
+	QTimer *m_filmWatchTimer = nullptr;    // (asks once a second whether the film's file was saved)
+	QString m_liveFilmKey;                 // the film whose moment Live Preview draws ("" when it draws a scene)
+	QString filmMomentId() const;          // "cartoon:<key>@<seconds>" for the film time shown, or "" when no film's still is chosen
+	void showFilmMoment();                 // Live Preview draws the moment the film time is at (from the shot's camera)
 	QList<InfoGroupBox *> m_resetSections;           // the settings sections with a "Defaults" button
 	QHash<QWidget *, QVariant> m_sectionDefaults;    // each of their controls' default value
 	QString m_cartoonSettingsFor;   // key of the film whose frames/fps/speed were last set from a cartoon scene; empty when the scene is not a cartoon

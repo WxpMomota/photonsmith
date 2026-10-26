@@ -474,8 +474,35 @@ void MainWindow::buildSceneInfoRows(QWidget *basicTab, QVBoxLayout *sceneGroupLa
 		if (shot < m_filmShotCombo->count()) m_filmShotCombo->setCurrentIndex(shot);
 	};
 	connect(m_filmTimeSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this]() { m_syncFilmShot(); });
+	// the film timeline: a slider over the film's length (tenths of a second), the same moment as the spin box; while Live Preview draws the film, it follows
+	m_filmTimeSlider = new QSlider(Qt::Horizontal, m_filmTimeRow);
+	m_filmTimeSlider->setMinimumWidth(220);
+	m_filmTimeSlider->setToolTip(tr("Scrub through the film: Live Preview shows the moment the film time is at, from the shot's own camera, and draws it again when the film's file is saved."));
+	connect(m_filmTimeSlider, &QSlider::valueChanged, this, [this](int tenths) {
+		if (std::abs(m_filmTimeSpin->value() * 10.0 - tenths) > 0.5) m_filmTimeSpin->setValue(tenths / 10.0);
+	});
+	connect(m_filmTimeSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double seconds) {
+		const QSignalBlocker hold(m_filmTimeSlider);
+		m_filmTimeSlider->setRange(0, static_cast<int>(std::lround(m_filmTimeSpin->maximum() * 10.0)));
+		m_filmTimeSlider->setValue(static_cast<int>(std::lround(seconds * 10.0)));
+		if (m_livePreviewRunning && !m_liveFilmKey.isEmpty()) m_filmMomentTimer->start();   // (Live Preview draws the new moment once the scrubbing rests)
+	});
+	m_filmMomentTimer = new QTimer(this);
+	m_filmMomentTimer->setSingleShot(true);
+	m_filmMomentTimer->setInterval(250);
+	connect(m_filmMomentTimer, &QTimer::timeout, this, [this]() { showFilmMoment(); });
+	m_filmWatchTimer = new QTimer(this);
+	m_filmWatchTimer->setInterval(1000);
+	connect(m_filmWatchTimer, &QTimer::timeout, this, [this]() {
+		if (m_livePreviewRunning && !m_liveFilmKey.isEmpty() && SceneMetadataClient::filmChanged(m_liveFilmKey)) {
+			onLogMessage(tr("[Live Preview] The film's file was saved: drawing the moment again."));
+			showFilmMoment();
+		}
+	});
+	m_filmWatchTimer->start();
 	filmTimeLayout->addWidget(filmTimeLabel);
 	filmTimeLayout->addWidget(m_filmTimeSpin);
+	filmTimeLayout->addWidget(m_filmTimeSlider, 1);
 	filmTimeLayout->addWidget(new QLabel(tr("Shot:"), m_filmTimeRow));
 	filmTimeLayout->addWidget(m_filmShotCombo);
 	filmTimeLayout->addStretch(1);

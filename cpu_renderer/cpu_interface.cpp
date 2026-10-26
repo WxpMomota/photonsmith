@@ -1059,6 +1059,11 @@ extern "C" const char* cpu_scene_pbrt_path_by_id(const char* scene_id) {
 	// has (a real, previously-latent bug - found via gpu/metal/
 	// metal_poc.mm's own metal_render_main(), which calls this function
 	// first, before anything else has ever touched the registry).
+	if (scene_id && std::strncmp(scene_id, "cartoon:", 8) == 0) {   // a moment of a film (cartoon:<key>@<seconds>: Live Preview's film timeline), written as a file of its own
+		thread_local std::string moment;
+		moment = pbrt_discover::filmMoment(scene_id);
+		return moment.c_str();
+	}
 	const char* path = scene_pbrt_path_unwritten(scene_id);
 	if (path[0]) pbrt_discover::materializeGenerated(path);   // the GPU backends load the file themselves: a generated scene (the cartoon stills) has to exist by now
 	return path;

@@ -314,6 +314,18 @@ inline Registry &registry() {
 inline const std::vector<const Film *> &films() { return detail::registry().all; }
 // What was wrong with the film files that were left out ("file:line: what"), one entry each.
 inline const std::vector<std::string> &filmFileProblems() { return detail::registry().problems; }
+// A film made from a file read again when its file (or its scene) was saved since: true when it was (a film timeline follows the edits). Its Film keeps pointing at it,
+// so frames made after it are of the new film; its length and its shots' names in the film table stay as they were until the program starts again.
+inline bool refreshFilmFile(const std::string &key) {
+	for (film_file::DataFilm &d : detail::registry().data)
+		if (d.spec.key == key) {
+			std::string problem;
+			const bool changed = d.reloadIfChanged(&problem);
+			if (!problem.empty()) std::cerr << "[film] " << problem << std::endl;
+			return changed;
+		}
+	return false;
+}
 // The film file a film was made from (null for a built-in film): its characters and their lines.
 inline const film_file::DataFilm *filmFileOf(const std::string &key) {
 	for (const film_file::DataFilm &d : detail::registry().data)

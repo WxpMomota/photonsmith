@@ -132,6 +132,11 @@ struct Discovered {
 void listGenerated(std::vector<Discovered> &out);   // appends one Discovered for each generated scene (its path is where its file will be)
 void materializeGenerated(const std::string &path);   // writes `path` when it is a generated scene's file that is missing or out of date; any other path is left alone
 const char *filmTable();   // the films compiled in here, one line each, for the GUI (which does not compile them: qt_gui/film_info.h reads the lines)
+// A moment of a film as a scene file: `cartoon:<key>@<seconds>` written to a file of its own (a film made from a file read again first when it was saved since), its path;
+// "" when it names no film. What Live Preview's film timeline draws.
+std::string filmMoment(const std::string &id);
+bool filmCamera(const char *key, double t, double out[6]);   // where the film's camera is at t and what it looks at (its LookAt); false for no such film
+int filmChanged(const char *key);                             // 1 when the film's file was saved since it was last read (and it is read again), else 0
 
 namespace detail {
 

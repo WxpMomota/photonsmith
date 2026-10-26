@@ -4,7 +4,9 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <regex>
@@ -14,6 +16,7 @@
 #include "../../src/shared/cartoon/cartoons.h"
 #include "../../src/shared/cartoon/fountain.h"
 #include "../../src/shared/cartoon/film_score.h"
+#include "../../src/shared/pbrt_discover.h"
 
 namespace ff = cartoon::film_file;
 
@@ -1375,4 +1378,61 @@ TEST(FilmMusic, MusicDucksUnderLinesHitsTheCutsAndADraftScoreFollowsTheMood) {
 	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 6\ncharacter ann person\nsay ann 1 \"Hello there.\"\n", talk), "");
 	EXPECT_EQ(talk.speechAt(0.5), 0.0);
 	EXPECT_GT(talk.speechAt(talk.spoken[0][0].t0 + 0.05), 0.5);
+}
+
+// ---- the film timeline -----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// A moment of a film is a scene file of its own (what Live Preview draws for "cartoon:<key>@<seconds>"), its camera the film's camera then; a film made from a file is read
+// again when it is saved, and the moment drawn after that is of the new film.
+TEST(FilmTimeline, AMomentIsASceneFileAndAFilmFileIsReadAgainWhenSaved) {
+	(void)cartoon::films();
+	const std::string moment = pbrt_discover::filmMoment("cartoon:lamp-and-ball@3.5");
+	ASSERT_FALSE(moment.empty());
+	std::string text;
+	{
+		std::ifstream in(moment, std::ios::binary);
+		text.assign((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+	}
+	EXPECT_NE(text.find("WorldBegin"), std::string::npos);
+	const cartoon::Film *film = cartoon::find("lamp-and-ball");
+	ASSERT_NE(film, nullptr);
+	EXPECT_NE(text.find(film->sceneAt(3.5)), std::string::npos) << "the film at that moment";
+	EXPECT_TRUE(pbrt_discover::filmMoment("cartoon:no-such-film@1").empty());
+	const std::string later = pbrt_discover::filmMoment("cartoon:lamp-and-ball@4");
+	EXPECT_NE(later, moment);
+	EXPECT_TRUE(std::filesystem::exists(later));
+	EXPECT_FALSE(std::filesystem::exists(moment)) << "only the latest moment of a film is kept";
+	double cam[6];
+	ASSERT_TRUE(pbrt_discover::filmCamera("lamp-and-ball", 3.5, cam));
+	const std::string header = film->headerAt(3.5);
+	char want[64];
+	std::snprintf(want, sizeof want, "LookAt %g", cam[0]);
+	EXPECT_NE(header.find(want), std::string::npos) << "the film's own camera then: " << header.substr(header.find("LookAt"), 60);
+	// read again when saved
+	ff::DataFilm film2;
+	const std::filesystem::path d = std::filesystem::temp_directory_path() / "photonsmith_film_test_reload";
+	std::filesystem::remove_all(d);
+	std::filesystem::create_directories(d);
+	{
+		std::ofstream(d / "s.pbrt", std::ios::binary) << kScene;
+		std::ofstream(d / "t.film", std::ios::binary) << "scene s.pbrt\nlength 10\n";
+	}
+	ASSERT_EQ(film2.load((d / "t.film").string()), "");
+	EXPECT_FALSE(film2.reloadIfChanged()) << "not saved since";
+	std::filesystem::last_write_time(d / "t.film", std::filesystem::last_write_time(d / "t.film") + std::chrono::seconds(2));
+	{
+		std::ofstream(d / "t.film", std::ios::binary) << "scene s.pbrt\nlength 12\n";
+	}
+	std::filesystem::last_write_time(d / "t.film", std::filesystem::last_write_time(d / "t.film") + std::chrono::seconds(4));
+	EXPECT_TRUE(film2.reloadIfChanged());
+	EXPECT_DOUBLE_EQ(film2.spec.length, 12.0) << "the saved film";
+	// a saved file with a mistake: said, and the film stays as it was
+	{
+		std::ofstream(d / "t.film", std::ios::binary) << "scene s.pbrt\nlength 12\nwobble fan\n";
+	}
+	std::filesystem::last_write_time(d / "t.film", std::filesystem::last_write_time(d / "t.film") + std::chrono::seconds(6));
+	std::string problem;
+	EXPECT_FALSE(film2.reloadIfChanged(&problem));
+	EXPECT_NE(problem.find("wobble"), std::string::npos);
+	EXPECT_DOUBLE_EQ(film2.spec.length, 12.0);
 }

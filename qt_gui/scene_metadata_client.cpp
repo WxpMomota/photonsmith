@@ -40,6 +40,10 @@ struct DllHandle {
 	CountFn refreshFn = nullptr;
 	StringByIdFn idForFileFn = nullptr;   // optional, like refreshFn
 	StringFn filmTableFn = nullptr;       // optional: the cartoon films (film_info.h)
+	using FilmCameraFn = int (*)(const char *, double, double *);
+	using FilmChangedFn = int (*)(const char *);
+	FilmCameraFn filmCameraFn = nullptr;     // optional: a film's camera at a moment (the film timeline)
+	FilmChangedFn filmChangedFn = nullptr;   // optional: whether a film's file was saved since
 };
 
 // See SceneMetadataClient::lastLoadError()'s own comment (scene_metadata_
@@ -151,6 +155,8 @@ DllHandle& handle() {
 		}
 		// The cartoon films: this program does not compile them, the library says what they are (film_info.h). Optional: an older library has no films for the GUI.
 		h.filmTableFn = reinterpret_cast<StringFn>(cross_abi_library::lookupSymbol(h.module, "scene_metadata_film_table"));
+		h.filmCameraFn = reinterpret_cast<DllHandle::FilmCameraFn>(cross_abi_library::lookupSymbol(h.module, "scene_metadata_film_camera"));
+		h.filmChangedFn = reinterpret_cast<DllHandle::FilmChangedFn>(cross_abi_library::lookupSymbol(h.module, "scene_metadata_film_changed"));
 	});
 	return h;
 }
@@ -170,6 +176,16 @@ QString lastLoadError() {
 QString filmTable() {
 	if (!ensureLoaded() || !handle().filmTableFn) return QString();
 	return QString::fromUtf8(handle().filmTableFn());
+}
+
+bool filmCamera(const QString &key, double t, double out[6]) {
+	if (!ensureLoaded() || !handle().filmCameraFn) return false;
+	return handle().filmCameraFn(key.toUtf8().constData(), t, out) != 0;
+}
+
+bool filmChanged(const QString &key) {
+	if (!ensureLoaded() || !handle().filmChangedFn) return false;
+	return handle().filmChangedFn(key.toUtf8().constData()) != 0;
 }
 
 bool gpuCompatible(const QString& scene_id, bool& out_compatible) {

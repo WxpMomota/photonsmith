@@ -343,6 +343,11 @@ void MainWindow::syncCartoonVideoSettings(const QString &sceneId) {
 			m_filmTimeSpin->setRange(0.0, film->duration);
 			m_filmTimeSpin->setSuffix(tr(" s of %1 s").arg(film->duration, 0, 'f', 0));   // "15.0 s of 60 s": a moment, not a length
 			m_filmTimeSpin->setValue(film->stillTime);
+			if (m_filmTimeSlider) {   // (the film timeline: over the film's length, at the still's moment)
+				const QSignalBlocker hold(m_filmTimeSlider);
+				m_filmTimeSlider->setRange(0, static_cast<int>(std::lround(film->duration * 10.0)));
+				m_filmTimeSlider->setValue(static_cast<int>(std::lround(film->stillTime * 10.0)));
+			}
 			if (m_syncFilmShot) m_syncFilmShot();   // (also when the value did not change, so no valueChanged)
 		}
 		if (!film) m_filmTimeFor.clear();

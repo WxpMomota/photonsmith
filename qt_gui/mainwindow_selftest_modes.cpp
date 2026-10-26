@@ -1304,6 +1304,19 @@ void MainWindow::runCartoonUiSelfTest(const std::function<void(const QString &)>
 		m_filmShotCombo->setCurrentIndex(0);
 		emit m_filmShotCombo->activated(0);
 		check(m_filmTimeSpin->value() < (starts.size() > 1 ? starts[1] : film->duration), "choosing the first shot moves the moment into it");
+		// the film timeline: a slider over the whole film at the same moment; scrubbing it moves the moment, and the moment is a scene Live Preview can draw
+		check(m_filmTimeSlider && m_filmTimeSlider->isVisibleTo(this), "the film timeline is beside the moment");
+		check(m_filmTimeSlider->maximum() == static_cast<int>(std::lround(film->duration * 10.0)), QString("it spans the film (%1 tenths)").arg(m_filmTimeSlider->maximum()));
+		check(m_filmTimeSlider->value() == static_cast<int>(std::lround(m_filmTimeSpin->value() * 10.0)), "and is at the moment shown");
+		m_filmTimeSlider->setValue(static_cast<int>(std::lround(starts.back() * 10.0)) + 3);
+		check(std::abs(m_filmTimeSpin->value() - (std::lround(starts.back() * 10.0) + 3) / 10.0) < 1e-6, "scrubbing it moves the moment: " + m_filmTimeSpin->text());
+		check(m_filmShotCombo->currentIndex() == static_cast<int>(starts.size()) - 1, "into the last shot: " + m_filmShotCombo->currentText());
+		check(filmMomentId() == QStringLiteral("cartoon:%1@%2").arg(QString::fromStdString(film->key)).arg(m_filmTimeSpin->value(), 0, 'f', 1), "the moment's scene id: " + filmMomentId());
+		double cam[6] = {0, 0, 0, 0, 0, 0};
+		const bool hasCamera = SceneMetadataClient::filmCamera(QString::fromStdString(film->key), m_filmTimeSpin->value(), cam);
+		check(hasCamera && (cam[0] != cam[3] || cam[1] != cam[4] || cam[2] != cam[5]),
+		      QString("the film's camera then: from %1 %2 %3 to %4 %5 %6").arg(cam[0]).arg(cam[1]).arg(cam[2]).arg(cam[3]).arg(cam[4]).arg(cam[5]));
+		check(!SceneMetadataClient::filmChanged(QString::fromStdString(film->key)), "an unchanged film is not drawn again");
 		shot("cartoonui_film_picture");
 	} else
 		check(false, "a film with several shots is in the list");

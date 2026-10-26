@@ -178,11 +178,38 @@ void MainWindow::stopLivePreviewIfNavigatedAway() {
 	if (m_livePreviewRunning) stopLivePreview();
 }
 
+QString MainWindow::filmMomentId() const {
+	if (m_filmTimeFor.isEmpty() || !m_filmTimeRow || !m_filmTimeSpin || !m_filmTimeRow->isVisibleTo(m_filmTimeRow->parentWidget())) return QString();
+	return QStringLiteral("cartoon:%1@%2").arg(m_filmTimeFor).arg(m_filmTimeSpin->value(), 0, 'f', 1);
+}
+
+void MainWindow::showFilmMoment() {
+	if (!m_livePreviewRunning) return;
+	stopLivePreview();
+	startLivePreview();
+}
+
 void MainWindow::startLivePreview() {
 	if (!m_livePreviewSession || m_livePreviewRunning) return;
 	if (m_sceneBuilder) m_sceneBuilder->stopRenderedViewport();   // (the Scene Builder's rendered viewport has the GPU's scene: only one renderer at a time)
 
-	const QString sceneId = m_sceneCombo->currentData().toString();
+	// A film's still: Live Preview draws the moment the film time is at (the film timeline), from the film's own camera there
+	const QString moment = filmMomentId();
+	m_liveFilmKey.clear();
+	if (!moment.isEmpty()) {
+		double cam[6];
+		if (SceneMetadataClient::filmCamera(m_filmTimeFor, m_filmTimeSpin->value(), cam)) {
+			const QSignalBlocker bx(m_cameraPosX), by(m_cameraPosY), bz(m_cameraPosZ);
+			m_cameraPosX->setValue(cam[0]);
+			m_cameraPosY->setValue(cam[1]);
+			m_cameraPosZ->setValue(cam[2]);
+			m_currentLookatX = cam[3];
+			m_currentLookatY = cam[4];
+			m_currentLookatZ = cam[5];
+		}
+		m_liveFilmKey = m_filmTimeFor;
+	}
+	const QString sceneId = moment.isEmpty() ? m_sceneCombo->currentData().toString() : moment;
 	if (sceneId.isEmpty()) {
 		// No live sub-tab exists yet at this point (it's only created
 		// below, once a preview actually starts) - m_statusLabel is the

@@ -265,6 +265,23 @@ SCENE_METADATA_API int scene_metadata_snapshot(const char* scene_id, SceneMetada
 // inside it, so an older GUI next to a newer library would have it written past its end.
 SCENE_METADATA_API int scene_metadata_snapshot_size() { return static_cast<int>(sizeof(SceneMetadataSnapshot)); }
 // The cartoon films, one line each (cartoon::filmTable): the GUI does not compile the films, it reads them here (qt_gui/film_info.h).
+// Where a film's camera is at t and what it looks at (its LookAt, x y z x y z), for Live Preview's film timeline; 0 when there is no such film.
+SCENE_METADATA_API int scene_metadata_film_camera(const char* key, double t, double* out6) {
+	try {
+		return out6 && pbrt_discover::filmCamera(key, t, out6) ? 1 : 0;
+	} catch (...) {
+		return 0;
+	}
+}
+// 1 when a film made from a file was saved since it was last read (it is read again), else 0: the film timeline draws the moment again.
+SCENE_METADATA_API int scene_metadata_film_changed(const char* key) {
+	try {
+		return pbrt_discover::filmChanged(key);
+	} catch (...) {
+		return 0;
+	}
+}
+
 SCENE_METADATA_API const char* scene_metadata_film_table() {
 	try {
 		return pbrt_discover::filmTable();

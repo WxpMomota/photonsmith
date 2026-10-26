@@ -1269,12 +1269,36 @@ class DataFilm {
 
 	// Reads the film file and its scene; returns "" or the problem, with the file and line.
 	std::string load(const std::string &filePath) {
+		sourcePath = filePath;
+		std::error_code ec;
+		sourceTime = std::filesystem::last_write_time(filePath, ec);
 		try {
-			return loadFile(filePath);
+			const std::string problem = loadFile(filePath);
+			sceneTime = std::filesystem::last_write_time(sceneFile, ec);
+			return problem;
 		} catch (const std::exception &e) {   // (a pattern or a number the text does not fit: a problem of this file, not a crash)
 			return filePath + ": " + e.what();
 		}
 	}
+	// The film file read again when it, or its scene, was saved since it was read (a film timeline that follows the edits): true when it was. When the new file has a
+	// problem it is said (`problem`) and the film stays as it was.
+	bool reloadIfChanged(std::string *problem = nullptr) {
+		std::error_code ec;
+		if (sourcePath.empty()) return false;
+		const auto t = std::filesystem::last_write_time(sourcePath, ec), ts = std::filesystem::last_write_time(sceneFile, ec);
+		if (t == sourceTime && ts == sceneTime) return false;
+		DataFilm fresh;
+		const std::string why = fresh.load(sourcePath);
+		sourceTime = t, sceneTime = ts;   // (a bad file is not read again until it is saved again)
+		if (!why.empty()) {
+			if (problem) *problem = why;
+			return false;
+		}
+		*this = std::move(fresh);
+		return true;
+	}
+	std::string sourcePath;
+	std::filesystem::file_time_type sourceTime{}, sceneTime{};
 
 	std::string loadFile(const std::string &filePath) {
 		std::ifstream f(filePath, std::ios::binary);

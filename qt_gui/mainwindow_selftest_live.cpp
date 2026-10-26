@@ -422,9 +422,10 @@ void MainWindow::runLivePreviewSelfTest(const std::function<void(const QString &
 	// The preview must frame the scene like the image render does: same aspect ratio as the Resolution setting.
 	{
 		const QString text = m_logTextEdit ? m_logTextEdit->toPlainText() : QString();
-		QRegularExpressionMatch m = QRegularExpression(R"(\[Live Preview\] Starting: scene=\S+, (\d+)x(\d+))").match(text);
+		QRegularExpressionMatch m = QRegularExpression(R"(\[Live Preview\] Starting: scene=(\S+), (\d+)x(\d+))").match(text);
 		if (m.hasMatch()) {
-			const double pw = m.captured(1).toDouble(), ph = m.captured(2).toDouble();
+			log("drawing " + m.captured(1));   // (a film's still: the moment, cartoon:<key>@<seconds>)
+			const double pw = m.captured(2).toDouble(), ph = m.captured(3).toDouble();
 			const double rw = m_widthSpinBox->value(), rh = m_heightSpinBox->value();
 			log(QString("preview %1x%2 (aspect %3) vs Resolution setting %4x%5 (aspect %6)").arg(pw).arg(ph).arg(pw / ph, 0, 'f', 3)
 				.arg(rw).arg(rh).arg(rw / rh, 0, 'f', 3));

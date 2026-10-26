@@ -432,6 +432,14 @@ of shots: those are worked out), the length and fps, the still's time, and a `me
 reordering or removing a film moves no preset), `tags` (from the vocabulary `kTagVocabulary`: what the film shows or how it is lit), `shotNames` (one for each shot of its `shotStarts()`),
 `samples` (the samples per pixel its own Sampler line asks for) and `secondsPerFrame` (what a 1280 x 720 frame of it takes on the GPU with the denoiser, written by `python scripts/measure_cartoons.py --write`).
 The scene list shows all of it for the film's still (length, shots by name, tags, cost), and searching the list for a tag finds the films; the GUI's Shot box beside the Film time box jumps to a shot.
+
+**The film timeline in the GUI.** Beside the Film time box is a slider over the whole film (in tenths of a second). With a film's still chosen, Live Preview draws the moment the
+film time is at - its scene id is `cartoon:<key>@<seconds>`, which `cpu_scene_pbrt_path_by_id` turns into a scene file of its own (`pbrt_discover::filmMoment`, written to the
+stills folder's `moments` folder; only the latest moment of each film is kept) - from the film's own camera then (`scene_metadata_film_camera`). Scrubbing the slider or the box
+draws the new moment a quarter of a second after it rests. A film made from a file is read again when the file (or its scene) is saved: once a second the GUI asks whether it
+was (`scene_metadata_film_changed`), and Live Preview draws the moment again from the new file; a saved file with a mistake is said in the log and the film stays as it was.
+The film's length and shot names in the GUI stay as they were until the program starts again. A film whose characters have big meshes (the Nomai explorer: a moment of
+A Walk at Dusk is 19 MB of scene) takes a few seconds to draw each new moment.
 The film table above is the text `ray_tracer --film-table` prints, and a test (`CartoonMeta`) fails when this document, the tags, the shot names, the numbers or a description that restates a length
 are out of step with the table; `tests/data/cartoon_films_snapshot.txt` pins each film's `meta` line and what its scene holds (`RT_UPDATE_SNAPSHOT=1` rewrites it).
 
