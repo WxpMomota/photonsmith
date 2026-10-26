@@ -885,6 +885,8 @@ return bad == 0 ? EXIT_SUCCESS : 1;
 }
 
 int main(int argc, char** argv) {
+	// a film's characters can speak in the computer's own voices (cartoon/film_tts.h): its speech engine runs as a program of its own, with no console window to flash up
+	cartoon::tts::runner() = [](const std::vector<std::string> &command) { return run_subprocess(command, true); };
 	// `ray_tracer --prepare-gpu`: builds the GPU renderer for this machine and exits (a Mac's first Metal render otherwise waits about a minute and a half for it). The GUI runs
 	// this in the background at its start. Exit code 0 when it is ready or there is nothing to prepare.
 	if (argc >= 2 && std::string(argv[1]) == "--prepare-gpu") {
@@ -1119,7 +1121,7 @@ int main(int argc, char** argv) {
 		}
 		for (std::size_t i = 0; i < film->spec.lines.size(); ++i) {
 			const cartoon::speech::Line &l = film->spec.lines[i];
-			std::cout << "line" << '	' << l.t << '	' << cartoon::speech::endOf(film->spoken[i], l.t) << '	' << l.who << '	' << film->spoken[i].size() << '	' << l.text << std::endl;
+			std::cout << "line" << '	' << l.t << '	' << film->lineEnd(i) << '	' << l.who << '	' << film->spoken[i].size() << '	' << l.text << std::endl;
 		}
 		return EXIT_SUCCESS;
 	}

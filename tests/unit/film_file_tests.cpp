@@ -18,6 +18,7 @@
 #include "../../src/shared/cartoon/fountain.h"
 #include "../../src/shared/cartoon/film_score.h"
 #include "../../src/shared/pbrt_discover.h"
+#include "../../launcher/process.h"   // (a speech engine for the real voices)
 
 namespace ff = cartoon::film_file;
 
@@ -507,6 +508,65 @@ TEST(FilmLibrary, CastsAndSetsAreBroughtInByNameFromTheLibrary) {
 	ff::DataFilm two;
 	ASSERT_EQ(two.load((d / "parted.film").string(), 1), "");
 	EXPECT_EQ(two.spec.characters.size(), 1u);
+}
+
+// Real voices (film_tts.h): a film's `voices` and a character's `voice` choose what its lines are said in; with a speech engine a line is said into a recording that the
+// mouth, the loudness, the line's end and the soundtrack all follow; without one (and no recording yet) it keeps the babble voice.
+TEST(FilmVoices, ALineSaidInAComputersVoiceIsItsRecording) {
+	(void)cartoon::films();
+	ff::DataFilm parsed;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 6\nvoices system\ncharacter ann person voice Zira\ncharacter bo person voice babble\ncharacter cy person\n", parsed), "");
+	EXPECT_EQ(parsed.spec.voices, "system");
+	EXPECT_EQ(parsed.voiceAskedOf(parsed.spec.characters[0]), "zira");
+	EXPECT_EQ(parsed.voiceAskedOf(parsed.spec.characters[1]), "") << "babble";
+	EXPECT_EQ(parsed.voiceAskedOf(parsed.spec.characters[2]), "system") << "the film's";
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 6\nvoices\n", bad).find("`voices babble|system|NAME`"), std::string::npos);
+	// a line whose recording is not made, in a program without a speech engine: the babble voice
+	const cartoon::tts::Runner kept = cartoon::tts::runner();
+	cartoon::tts::runner() = nullptr;
+	const std::string unique = "Never said before " + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".";
+	ff::DataFilm quiet;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 6\nvoices system\ncharacter ann person\nsay ann 1 \"" + unique + "\"\n", quiet), "");
+	EXPECT_EQ(quiet.recordingOf(0), nullptr);
+	EXPECT_DOUBLE_EQ(quiet.lineEnd(0), cartoon::speech::endOf(quiet.spoken[0], 1.0));
+	// with a speech engine
+	cartoon::tts::runner() = [](const std::vector<std::string> &command) { return run_subprocess(command, true); };
+	if (cartoon::tts::voices().empty()) {
+		cartoon::tts::runner() = kept;
+		GTEST_SKIP() << "this computer has no text-to-speech voice";
+	}
+	ff::DataFilm said;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 6\nvoices system\ncharacter ann person\nsay ann 1 \"Hello there, how are you today?\"\n", said), "");
+	const cartoon::music_cues::Recording *r = said.recordingOf(0);
+	ASSERT_NE(r, nullptr);
+	const double end = said.lineEnd(0);
+	EXPECT_GT(end, 2.0) << "a sentence takes a second or more";
+	EXPECT_LT(end, 5.0);
+	double loudest = 0.0, widest = 0.0;
+	for (double t = 1.0; t < end; t += 0.01) {
+		loudest = std::max(loudest, said.speechAt(t));
+		cartoon::film_file::CharacterMoment m;
+		said.speakingAt(said.spec.characters[0], t, m);
+		widest = std::max(widest, m.mouth.open);
+	}
+	EXPECT_GT(loudest, 0.5);
+	EXPECT_GT(widest, 0.3) << "the mouth opens with the recording";
+	EXPECT_EQ(said.speechAt(0.5), 0.0);
+	// the same line in another process (another DataFilm) is the same recording
+	ff::DataFilm again;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 6\nvoices system\ncharacter ann person\nsay ann 1 \"Hello there, how are you today?\"\n", again), "");
+	ASSERT_NE(again.recordingOf(0), nullptr);
+	EXPECT_EQ(again.recordingOf(0), r);
+	EXPECT_DOUBLE_EQ(again.lineEnd(0), end);
+	// the soundtrack has it
+	cartoon::audio::Mix with(6.0), without(6.0);
+	said.speak(with);
+	const std::vector<std::int16_t> a = with.finish(), b = without.finish();
+	double energy = 0.0;
+	for (std::size_t i = static_cast<std::size_t>(1.2 * cartoon::audio::kRate) * 2; i < static_cast<std::size_t>(end * cartoon::audio::kRate) * 2; ++i) energy += std::abs(a[i] - b[i]);
+	EXPECT_GT(energy, 1e5);
+	cartoon::tts::runner() = kept;
 }
 
 // Every cast and set of the library that comes with the program can be brought into a film.

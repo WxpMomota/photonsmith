@@ -558,6 +558,17 @@ first (`library/` next to it), then in `pbrt_scenes/film_assets/library`, which 
 valley). A problem in a library file is said with that file's own line. `pip-goes-out.film` uses `set dusk-path`, `set meadow` and `cast pip`. Any character can have a
 voice of its own the same way: `character bo person pitch -2 rate 0.9` (each line's own `pitch` and `rate` go on top).
 
+**Real voices: lines in the computer's own voices.** `voices system` in a film file (or `voice system` on one character's `character` or `cast` line, or `voice
+zira` - a word of a voice's name) has the lines said by the computer's text-to-speech instead of the babble voice (`src/shared/cartoon/film_tts.h`): offline, with no
+download - on Windows the System.Speech voices (Settings > Time & language > Speech lists them; Microsoft David and Zira come with Windows), on a Mac `say`, elsewhere
+espeak-ng. `voice system` picks one of the installed voices by the character's name, so two characters differ. A line is said into a WAV in the film cache
+(`<temp>/photonsmith_film_cache/_voices`, named by its words, voice, pitch and pace), made once by whichever run needs it first and then read by every frame's run; the
+film takes it as a recorded voice - the mouth follows its vowels and loudness, the music is ducked under it, its caption lasts as long as it is heard, it is panned and
+quietened from where the camera is. The character's `pitch` and `rate` and the line's own go into it (SSML prosody); a small creature (Pip, the turtle) is raised towards
+its kind's voice. The speech engine runs as a program of its own with no console window (`launcher/process.h`); the GUI's preview starts none, so there a line not yet
+said shows the babble mouth. Real voices are slower than the babble: `ray_tracer --film-lines <key>` lists each line's start and end, to space them. Where the computer
+has no voice (or no voice with the word asked for) the line keeps its babble voice and the run says so.
+
 **The toon look: cel shading and ink lines.** `toon [bands N] [lines W] [ink COLOUR] [saturation S] [shadow S]` in a film file draws every frame as a cartoon
 (`src/shared/toon_look.h`): the light on each surface in a few flat bands, ink lines round what stands in front of something, along sharp creases and against the sky, and
 stronger colour. It is made after the render, in the run that rendered the frame, from the picture and its passes (a cheap first-hit pass on the CPU: albedo, normal,

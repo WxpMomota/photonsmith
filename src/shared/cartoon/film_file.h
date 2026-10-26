@@ -158,6 +158,11 @@
 //     cast     kid as pip-child  at 0 0 0.8                    # ... named `kid` in this film; anything more on the line is on top of the cast's
 //     character  bo person  pitch -2  rate 0.9                 # (a voice for any character: semitones up from its kind's, and how fast it speaks)
 //
+// Real voices (film_tts.h) - lines said by the computer's own text-to-speech, offline, the mouth following the recording:
+//
+//     voices   system                                          # every character in one of the computer's voices (by its name; `babble` the default)
+//     cast     ann  at -0.7 0 0  voice zira                    # ... or one of them in the voice with that word in its name
+//
 // The toon look (src/shared/toon_look.h) - the light in flat bands, ink lines round shapes and along creases, stronger colour - on every frame:
 //
 //     toon     bands 3  lines 2.5  ink #1a1420  saturation 1.25  shadow 0.35    # (any of them, or none for the default style; `toon off`)
@@ -170,8 +175,11 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <iostream>
 #include <map>
+#include <mutex>
 #include <regex>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -183,6 +191,7 @@
 #include "film_particles.h"
 #include "film_paths.h"
 #include "film_speech.h"
+#include "film_tts.h"
 #include "film_subjects.h"
 #include "film_clouds.h"
 #include "film_fire.h"
@@ -272,6 +281,7 @@ struct Character {
 	double scale = 1.0;                  // its size (a kind that can be scaled: a child Pip 0.6, a turtle as big as a dog 6)
 	std::map<std::string, Vec3> colours; // the colours of its parts (`sweater red`): the kind's names for them
 	double pitch = 0.0, rate = 1.0;      // its voice: so many semitones up from its kind's, and how fast it speaks (every line of it; a line's own are on top)
+	std::string voice;                   // what its lines are said in (`voice`): "babble", "system" or a word of a computer voice's name (film_tts.h); "": the film's `voices`
 	bool extra = false;                  // one of a crowd (`crowd`): in the background
 	std::vector<WalkLine> walks;
 	std::vector<rig::Gesture> gestures;
@@ -473,6 +483,7 @@ struct Spec {
 	std::vector<dressing::Ambience> ambience;
 	bool draftMusic = true;   // (`music none`: no drafted score when there is no cues file)
 	toon_look::Style toon;    // the toon look (`toon`): written into every frame's header as its `# @rt-toon` line
+	std::string voices;       // what the characters' lines are said in unless a character says (`voices`): "" or "babble", "system", a word of a computer voice's name
 	// weather and particles (`weather`, `particles`, `burst`)
 	std::vector<particles::Weather> weather;
 	std::vector<particles::Emitter> emitters;
@@ -528,6 +539,10 @@ inline bool number(const std::string &s, double &out) {
 	} catch (const std::exception &) {
 		return false;
 	}
+}
+inline std::string lowerWord(std::string w) {
+	for (char &c : w) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+	return w;
 }
 inline bool validKey(const std::string &k) {
 	if (k.empty() || k.size() > 60) return false;
@@ -866,11 +881,14 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				} else if ((t[i] == "pitch" || t[i] == "rate") && i + 1 < t.size()) {   // its voice
 					if (!number(t[i + 1], t[i] == "pitch" ? c.pitch : c.rate) || !(c.rate > 0.0) || std::abs(c.pitch) > 24.0) return fail("a voice's `pitch` is semitones (-24 to 24) and its `rate` a number above 0");
 					i += 2;
+				} else if (t[i] == "voice" && i + 1 < t.size()) {   // babble, system, or a word of a computer voice's name (film_tts.h)
+					c.voice = detail::lowerWord(t[i + 1]);
+					i += 2;
 				} else if (Vec3 colour; i + 1 < t.size() && colourOf(t[i + 1], colour)) {   // a part's colour (the kind's parts are checked when the film is loaded)
 					c.colours[t[i]] = colour;
 					i += 2;
 				} else {
-					return fail("\"" + t[i] + "\": a character takes `at X Y Z`, `facing DEGREES`, `scale S`, `detail CELL`, its voice's `pitch SEMITONES` and `rate R` and its parts' colours (`sweater red`, `hair 0.2,0.1,0.05`, `skin #f0c8a0`)");
+					return fail("\"" + t[i] + "\": a character takes `at X Y Z`, `facing DEGREES`, `scale S`, `detail CELL`, its voice's `pitch SEMITONES`, `rate R` and `voice babble|system|NAME`, and its parts' colours (`sweater red`, `hair 0.2,0.1,0.05`, `skin #f0c8a0`)");
 				}
 			}
 			s.characters.push_back(c);
@@ -1327,6 +1345,9 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			a.kind = t[1];
 			if (t.size() > 3 || (t.size() == 3 && (!number(t[2], a.gain) || a.gain < 0.0 || a.gain > 4.0))) return fail("an ambience's gain is a number from 0 to 4");
 			s.ambience.push_back(a);
+		} else if (verb == "voices") {   // what every character's lines are said in (film_tts.h)
+			if (w.size() != 2) return fail("`voices babble|system|NAME`: the babble voice, one of the computer's own voices, or the computer voice with NAME in its name");
+			s.voices = detail::lowerWord(w[1]);
 		} else if (verb == "toon") {   // the toon look on every frame (toon_look.h)
 			if (rest == "off") s.toon = toon_look::Style();
 			else if (const std::string e = toon_look::parse(rest, s.toon); !e.empty()) return fail(e);
@@ -1680,7 +1701,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, music, toon, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -2709,7 +2730,7 @@ class DataFilm {
 		double weights = 0.0, most = 0.0;
 		for (std::size_t i = 0; i < spec.lines.size(); ++i) {
 			const speech::Line &l = spec.lines[i];
-			const double end = speech::endOf(spoken[i], l.t);
+			const double end = lineEnd(i);
 			if (t < l.t - 0.3 || t > end + 1.2) continue;
 			const double w = smoothstep(l.t - 0.25, l.t + 0.35, t) * (1.0 - smoothstep(end + 0.4, end + 1.1, t));
 			if (w <= 0.0) continue;
@@ -3013,22 +3034,71 @@ class DataFilm {
 	bool hasEvents() const { return !spec.characters.empty() || !spec.bounces.empty() || !spec.topples.empty(); }   // (props are handled by characters)
 
 	// ---- what the characters say ----
-	// A character's mouth and voice at t from its lines.
+	// What a character's lines are said in: its own `voice`, else the film's `voices`; "" for the babble voice.
+	std::string voiceAskedOf(const Character &c) const {
+		const std::string v = c.voice.empty() ? spec.voices : c.voice;
+		return v == "babble" ? std::string() : v;
+	}
+	// The recording of line i in a computer's voice (film_tts.h), made when it is first needed; null when it is said in the babble voice (asked for, or no speech engine, or
+	// not made yet in a program that cannot make it). A small creature's voice (its kind's above 200 Hz) is raised towards its own, by up to 9 semitones.
+	const music_cues::Recording *recordingOf(std::size_t i) const {
+		const Character *c = character(spec.lines[i].who);
+		const std::string asked = c ? voiceAskedOf(*c) : std::string();
+		if (asked.empty()) return nullptr;
+		const double kindHz = characterKinds().at(c->kind).voice.pitch;
+		const double raise = kindHz > 200.0 ? std::min(9.0, 12.0 * std::log2(kindHz / 165.0)) : 0.0;
+		std::string why;
+		const std::string path = tts::wavFor(spec.lines[i].text, asked, static_cast<unsigned>(seedOf(c->name)), spec.lines[i].pitch + raise, spec.lines[i].rate, &why);
+		if (path.empty()) {
+			static std::mutex lock;
+			static std::set<std::string> said;
+			const std::lock_guard<std::mutex> hold(lock);
+			if (tts::runner() && said.insert(spec.key + "|" + std::to_string(i)).second)   // (once; and not where no speech engine is expected: the GUI's preview)
+				std::cerr << "[voice] " << spec.key << " line " << spec.lines[i].line << ": " << why << " - it is said in the babble voice" << std::endl;
+			return nullptr;
+		}
+		const music_cues::Recording &r = music_cues::recording(path);
+		return r.loudness.empty() ? nullptr : &r;
+	}
+	// When line i ends: the last sound of its recording, or its last syllable.
+	double lineEnd(std::size_t i) const {
+		if (const music_cues::Recording *r = recordingOf(i)) {
+			std::size_t last = 0;
+			for (std::size_t k = 0; k < r->loudness.size(); ++k)
+				if (r->loudness[k] > 0.05f) last = k;
+			return spec.lines[i].t + (last + 1) / 100.0;
+		}
+		return speech::endOf(spoken[i], spec.lines[i].t);
+	}
+	// A character's mouth and voice at t from its lines (a line in a computer's voice: its recording's mouth shapes and loudness).
 	void speakingAt(const Character &c, double t, CharacterMoment &m) const {
 		for (std::size_t i = 0; i < spec.lines.size(); ++i) {
-			if (spec.lines[i].who != c.name || t < spec.lines[i].t - 0.1 || t > speech::endOf(spoken[i], spec.lines[i].t) + 0.1) continue;
-			const speech::Mouth mouth = speech::mouthAt(spoken[i], t);
+			if (spec.lines[i].who != c.name || t < spec.lines[i].t - 0.1 || t > lineEnd(i) + 0.1) continue;
+			speech::Mouth mouth = speech::mouthAt(spoken[i], t);
+			double loud = speech::loudnessAt(spoken[i], t);
+			if (const music_cues::Recording *r = recordingOf(i)) {
+				const std::size_t k = static_cast<std::size_t>(std::max(0.0, t - spec.lines[i].t) * 100.0);
+				mouth = k < r->mouth.size() ? r->mouth[k] : speech::Mouth();
+				loud = k < r->loudness.size() ? r->loudness[k] : 0.0;
+			}
 			m.mouth.open = std::max(m.mouth.open, mouth.open);
 			m.mouth.wide = std::max(m.mouth.wide, mouth.wide);
 			m.mouth.round = std::max(m.mouth.round, mouth.round);
-			m.voice = std::max(m.voice, speech::loudnessAt(spoken[i], t));
+			m.voice = std::max(m.voice, loud);
 		}
 	}
 	// How loud the characters are speaking at t, 0..1: their lines and their recorded voices (the music is ducked under it).
 	double speechAt(double t) const {
 		double v = 0.0;
-		for (std::size_t i = 0; i < spec.lines.size(); ++i)
-			if (t >= spec.lines[i].t - 0.1 && t <= speech::endOf(spoken[i], spec.lines[i].t) + 0.1) v = std::max(v, speech::loudnessAt(spoken[i], t));
+		for (std::size_t i = 0; i < spec.lines.size(); ++i) {
+			if (t < spec.lines[i].t - 0.1 || t > lineEnd(i) + 0.1) continue;
+			if (const music_cues::Recording *r = recordingOf(i)) {
+				const std::size_t k = static_cast<std::size_t>(std::max(0.0, t - spec.lines[i].t) * 100.0);
+				if (k < r->loudness.size()) v = std::max(v, static_cast<double>(r->loudness[k]));
+			} else {
+				v = std::max(v, speech::loudnessAt(spoken[i], t));
+			}
+		}
 		for (const Character &c : spec.characters)
 			if (!c.extra) v = std::max(v, music_cues::voiceAt(spec.key, c.name, t, shotStarts(), shotNameList()));
 		return std::min(1.0, v);
@@ -3049,7 +3119,9 @@ class DataFilm {
 			film_subjects::cameraOf(headerAt(t0), eye, target, fov);
 			const CameraView view{eye, target, fov, 0.0, 0};
 			const Vec3 at = chestOf(c, t0);
-			mix.put(t0, speech::speak(spoken[i], t0, voiceOf(c), static_cast<unsigned>(i + 1)), 0.55 * std::max(0.35, audibility(length(at - eye))), panOf(view, at) * 0.6, 0.25);
+			const double gain = std::max(0.35, audibility(length(at - eye)));
+			if (const music_cues::Recording *r = recordingOf(i)) mix.put(t0, r->sound, 0.8 * gain, panOf(view, at) * 0.6, 0.2);   // (a computer's voice: its recording)
+			else mix.put(t0, speech::speak(spoken[i], t0, voiceOf(c), static_cast<unsigned>(i + 1)), 0.55 * gain, panOf(view, at) * 0.6, 0.25);
 		}
 	}
 	// The captions of the lines (those not marked nocaption): each from its start to a little after its end, cut short where the next begins.
@@ -3063,7 +3135,7 @@ class DataFilm {
 			const speech::Line &l = spec.lines[order[k]];
 			Caption cap;
 			cap.t0 = l.t;
-			cap.t1 = speech::endOf(spoken[order[k]], l.t) + 0.6;
+			cap.t1 = lineEnd(order[k]) + 0.6;
 			if (k + 1 < order.size()) cap.t1 = std::min(cap.t1, spec.lines[order[k + 1]].t - 0.05);
 			cap.t1 = std::max(cap.t1, cap.t0 + 0.5);
 			cap.fade = 0.15;

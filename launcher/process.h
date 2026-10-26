@@ -88,7 +88,10 @@ inline std::string win32_quote_arg(const std::string& arg) {
 // CreateProcess's behavior above. A signal-killed child is mapped to
 // 128+signal so it can't collide with this function's own -1 "launch
 // failed" sentinel.
-inline int run_subprocess(const std::vector<std::string>& argv) {
+//
+// `hidden` (Windows): the child gets no console window of its own - for a helper started by a run the GUI started without one (a speech engine for a film's voices,
+// film_tts.h), which would otherwise open a console that flashes up on the screen.
+inline int run_subprocess(const std::vector<std::string>& argv, bool hidden = false) {
 #ifdef _WIN32
     std::string cmdline;
     for (size_t i = 0; i < argv.size(); ++i) {
@@ -105,7 +108,7 @@ inline int run_subprocess(const std::vector<std::string>& argv) {
     mutableCmd.push_back('\0');
 
     BOOL ok = CreateProcessA(nullptr, mutableCmd.data(), nullptr, nullptr, FALSE,
-                              0, nullptr, nullptr, &si, &pi);
+                              hidden ? CREATE_NO_WINDOW : 0, nullptr, nullptr, &si, &pi);
     if (!ok) {
         return -1;
     }
@@ -117,6 +120,7 @@ inline int run_subprocess(const std::vector<std::string>& argv) {
     CloseHandle(pi.hThread);
     return static_cast<int>(exitCode);
 #else
+    (void)hidden;   // (no console windows here)
     if (argv.empty()) return -1;
 
     std::vector<char*> cargv;
