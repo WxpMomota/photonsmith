@@ -102,4 +102,13 @@ bool filmCamera(const char *key, double t, double out[6]) {
 
 int filmChanged(const char *key) { return key && cartoon::refreshFilmFile(key) ? 1 : 0; }
 
+std::string filmFileShots(const char *key) {
+	if (!key) return std::string();
+	const cartoon::FileShots f = cartoon::fileShotsOf(key);
+	std::string starts, names;
+	for (const double t : f.starts) starts += (starts.empty() ? "" : ",") + std::to_string(t);
+	for (const std::string &n : f.names) names += (names.empty() ? "" : "|") + n;
+	return f.path + "\n" + starts + "\n" + names;
+}
+
 }  // namespace pbrt_discover

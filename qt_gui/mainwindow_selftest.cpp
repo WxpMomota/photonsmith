@@ -107,6 +107,7 @@ void MainWindow::runSelfTest(const QString &mode, const QString &outPrefix) {
 	if (mode == "resolution") { runResolutionSelfTest(log, shot); return; }   // see mainwindow_selftest_modes.cpp
 	if (mode == "defaults") { runDefaultsSelfTest(log, shot); return; }   // see mainwindow_selftest_modes.cpp
 	if (mode == "quality") { runQualitySelfTest(log); return; }   // see mainwindow_selftest_modes.cpp
+	if (mode == "filmedit") { runFilmEditSelfTest(log); return; }   // see mainwindow_selftest_modes.cpp
 	if (mode == "recommend") { runRecommendSelfTest(log, shot); return; }   // see mainwindow_selftest_modes.cpp
 	if (mode == "videoframes") { runVideoFramesSelfTest(log, shot); return; }   // see mainwindow_selftest_modes.cpp
 

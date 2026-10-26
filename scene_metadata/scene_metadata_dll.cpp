@@ -282,6 +282,18 @@ SCENE_METADATA_API int scene_metadata_film_changed(const char* key) {
 	}
 }
 
+// A film's file and its shots as they are now (pbrt_discover::filmFileShots: path, starts, names, a line each), for the film timeline's changes to it. The text lives until the
+// next call.
+SCENE_METADATA_API const char* scene_metadata_film_file_shots(const char* key) {
+	static thread_local std::string text;
+	try {
+		text = pbrt_discover::filmFileShots(key);
+	} catch (...) {
+		text.clear();
+	}
+	return text.c_str();
+}
+
 SCENE_METADATA_API const char* scene_metadata_film_table() {
 	try {
 		return pbrt_discover::filmTable();

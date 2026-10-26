@@ -410,6 +410,33 @@ inline bool refreshFilmFile(const std::string &key) {
 		}
 	return changed;
 }
+// The film file a film was made from and its shots as they are now (read again first when it was saved since): for the changes the GUI's film timeline writes to it
+// (film_edit.h). An empty path for a built-in film. A film in parts: its parts' shots in order (their names; the starts in the whole film).
+inline const Film *find(const char *key);
+struct FileShots {
+	std::string path;
+	std::vector<double> starts;
+	std::vector<std::string> names;
+};
+inline FileShots fileShotsOf(const std::string &key) {
+	FileShots out;
+	refreshFilmFile(key);
+	const Film *film = find(key.c_str());
+	if (!film) return out;
+	for (const film_file::DataFilm &d : detail::registry().data) {
+		if (d.spec.key != key && !(d.partIndex >= 0 && d.spec.key == key + "--" + std::to_string(d.partIndex + 1))) continue;
+		if (out.path.empty()) out.path = d.sourcePath;
+		const std::string names = d.shotNames();
+		for (std::size_t at = 0;;) {
+			const std::size_t bar = names.find('|', at);
+			out.names.push_back(names.substr(at, bar == std::string::npos ? std::string::npos : bar - at));
+			if (bar == std::string::npos) break;
+			at = bar + 1;
+		}
+	}
+	if (film->shotStarts) out.starts = film->shotStarts();
+	return out;
+}
 // The film file a film was made from (null for a built-in film): its characters and their lines. (A film in parts: each part by its own key, "<key>--2".)
 inline const film_file::DataFilm *filmFileOf(const std::string &key) {
 	for (const film_file::DataFilm &d : detail::registry().data)

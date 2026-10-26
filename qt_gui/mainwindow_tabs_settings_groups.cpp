@@ -11,6 +11,7 @@
 #include "film_info.h"   // the cartoon films, as the renderer's library says them (this program does not compile them)
 
 #include <QTabBar>
+#include <QMenu>
 #include "scene_metadata_client.h"
 #ifdef RT_GUI_HAVE_LIVE_PREVIEW
 #include "realtime_preview_session.h"
@@ -505,6 +506,23 @@ void MainWindow::buildSceneInfoRows(QWidget *basicTab, QVBoxLayout *sceneGroupLa
 	filmTimeLayout->addWidget(m_filmTimeSlider, 1);
 	filmTimeLayout->addWidget(new QLabel(tr("Shot:"), m_filmTimeRow));
 	filmTimeLayout->addWidget(m_filmShotCombo);
+	// changes to a film made from a file, written into it: the shot's camera from Live Preview's view, the shot's start at the film time (film_edit.h)
+	m_filmCameraButton = new QToolButton(m_filmTimeRow);
+	m_filmCameraButton->setText(tr("Camera"));
+	m_filmCameraButton->setPopupMode(QToolButton::InstantPopup);
+	m_filmCameraButton->setToolTip(tr("Write Live Preview's view into the film's file: as this shot's camera (its keys, follow or move replaced), or as the next key of its camera's path.\n"
+									  "Move the view in Live Preview first (the film time's moment, from the shot's camera)."));
+	QMenu *cameraMenu = new QMenu(m_filmCameraButton);
+	cameraMenu->addAction(tr("Use this view for the shot"), this, [this]() { editFilm(0); });
+	cameraMenu->addAction(tr("Add this view as the shot's next key"), this, [this]() { editFilm(1); });
+	m_filmCameraButton->setMenu(cameraMenu);
+	m_filmCutButton = new QPushButton(tr("Start shot here"), m_filmTimeRow);
+	m_filmCutButton->setToolTip(tr("Move the start of the shot the film time is in to the film time, in the film's file (the shot before it gets longer or shorter)."));
+	connect(m_filmCutButton, &QPushButton::clicked, this, [this]() { editFilm(2); });
+	filmTimeLayout->addWidget(m_filmCameraButton);
+	filmTimeLayout->addWidget(m_filmCutButton);
+	m_filmCameraButton->setVisible(false);
+	m_filmCutButton->setVisible(false);
 	filmTimeLayout->addStretch(1);
 	m_filmTimeRow->setVisible(false);
 	sceneGroupLayout->addWidget(m_filmTimeRow);

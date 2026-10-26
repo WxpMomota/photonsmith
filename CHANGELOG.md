@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **GUI: film edits written into the film file (2026-10-26).** For a film made from a file, the film timeline row has Camera (*Use this view for the shot*, *Add this view as the shot's next key*: Live Preview's view written as `key` lines) and *Start shot here* (the shot's start moved to the film time). The file is edited in place, line for line (src/shared/cartoon/film_edit.h), and read again; a new library call (`scene_metadata_film_file_shots`) gives the file and its shots as they are now. Self-test `filmedit` (on a copy of the example film's file).
+
 * **Films: titles, credits and a theme (2026-10-26).** `title`, `episode N "NAME"`, `credits`, `credit "TEXT"` and `theme jingle|FILE.wav` in a film file: a title card over the opening, cards of credits (the name, the cast, the film's own lines) after the story over black frames that cost nothing to render, and a fanfare or a library recording under the title. In a film in parts the title is the first part's and the credits the last's. The sky's time of day now runs over the story's length, not the film's. `pip-goes-out.film` has them.
 
 * **Films: hands on the set and on each other (2026-10-26).** `touch NAME T0 T1 X Y Z [left|right]` (lean on a wall, take a door's handle), `hold A B T0 T1` (hands held) and `hug A B T0 T1` in a film file: the hands are reached for, held and let go like a prop's, and each contact is heard as a touch.

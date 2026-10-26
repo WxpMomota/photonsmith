@@ -4,6 +4,9 @@
 #include <QString>
 #include <QStringList>
 
+#include <string>
+#include <vector>
+
 // ============================================================================
 // SceneMetadataClient
 // ============================================================================
@@ -49,6 +52,9 @@ QString filmTable();
 bool filmCamera(const QString &key, double t, double out[6]);
 // Whether a film made from a file was saved since it was last read (the library reads it again): the film timeline draws the moment again.
 bool filmChanged(const QString &key);
+// The film file a film was made from and its shots as they are now (their starts in the whole film and their names): false (an empty path) for a built-in film or an
+// older library. For the film timeline's changes to the file (film_edit.h).
+bool filmFileShots(const QString &key, QString &path, std::vector<double> &starts, std::vector<std::string> &names);
 
 // Returns true and sets out_compatible if scene_id's GPU-compatibility
 // could be queried; false (out_compatible left untouched) otherwise. Kept

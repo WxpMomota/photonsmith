@@ -137,6 +137,7 @@ const char *filmTable();   // the films compiled in here, one line each, for the
 std::string filmMoment(const std::string &id);
 bool filmCamera(const char *key, double t, double out[6]);   // where the film's camera is at t and what it looks at (its LookAt); false for no such film
 int filmChanged(const char *key);                             // 1 when the film's file was saved since it was last read (and it is read again), else 0
+std::string filmFileShots(const char *key);                   // its film file's path, its shot starts (commas) and names (|) as they are now, a line each; "" path: built in
 
 namespace detail {
 

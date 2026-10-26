@@ -1509,6 +1509,14 @@ private:
 	QString m_liveFilmKey;                 // the film whose moment Live Preview draws ("" when it draws a scene)
 	QString filmMomentId() const;          // "cartoon:<key>@<seconds>" for the film time shown, or "" when no film's still is chosen
 	void showFilmMoment();                 // Live Preview draws the moment the film time is at (from the shot's camera)
+	// Changes to a film made from a file, written into its file (src/shared/cartoon/film_edit.h): the shot at the film time given Live Preview's view (as its camera, or as
+	// its next key), or started at the film time. Shown for a film made from a file.
+	QToolButton *m_filmCameraButton = nullptr;
+	QPushButton *m_filmCutButton = nullptr;
+	QString m_filmEditFileOverride;        // (the self-test's copy of the film file, written instead of the film's own)
+	void editFilm(int what);               // 0: the view as the shot's camera, 1: the view as its next key, 2: the shot starts at the film time
+	void syncFilmEditButtons();            // shows them for a film made from a file
+	void runFilmEditSelfTest(const std::function<void(const QString &)> &log);   // mainwindow_selftest_modes.cpp
 	QList<InfoGroupBox *> m_resetSections;           // the settings sections with a "Defaults" button
 	QHash<QWidget *, QVariant> m_sectionDefaults;    // each of their controls' default value
 	QString m_cartoonSettingsFor;   // key of the film whose frames/fps/speed were last set from a cartoon scene; empty when the scene is not a cartoon

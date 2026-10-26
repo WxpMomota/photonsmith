@@ -1776,3 +1776,77 @@ void MainWindow::runQualitySelfTest(const std::function<void(const QString &)> &
 	log(ok ? "RESULT: OK" : "RESULT: FAIL");
 	QApplication::exit(ok ? 0 : 1);
 }
+
+// RT_GUI_SELFTEST=filmedit: the film timeline's changes to a film made from a file (film_edit.h), written into a copy of the example film's file (pip-goes-out.film) so that
+// the real one is not touched: Live Preview's view as a shot's camera and as its next key, a shot started at the film time; and a built-in film shows no such buttons.
+void MainWindow::runFilmEditSelfTest(const std::function<void(const QString &)> &log) {
+	bool ok = true;
+	auto check = [&ok, log](bool cond, const QString &what) {
+		log(QString("%1: %2").arg(cond ? "ok" : "FAIL", what));
+		ok = ok && cond;
+	};
+	const auto finish = [&]() {
+		m_filmEditFileOverride.clear();
+		log(ok ? "RESULT: OK" : "RESULT: FAIL");
+		QApplication::exit(ok ? 0 : 1);
+	};
+	if (const int image = m_modeCombo->findData(static_cast<int>(OutputMode::Image)); image >= 0) m_modeCombo->setCurrentIndex(image);
+	const auto stillOf = [](const QString &key) {
+		for (int i = 0, n = SceneMetadataClient::sceneCount(); i < n; ++i) {
+			const QString id = SceneMetadataClient::sceneIdAtIndex(i);
+			SceneMetadataClient::SceneMetadata meta;
+			if (SceneMetadataClient::sceneMetadata(id, meta) && meta.filmKey == key) return id;
+		}
+		return QString();
+	};
+	const QString still = stillOf(QStringLiteral("pip-goes-out"));
+	check(!still.isEmpty(), "the example film made from a file has a still: " + still);
+	QString path;
+	std::vector<double> starts;
+	std::vector<std::string> names;
+	const bool known = SceneMetadataClient::filmFileShots(QStringLiteral("pip-goes-out"), path, starts, names);
+	check(known, QString("the library says its file and %1 shots: %2").arg(starts.size()).arg(path));
+	if (still.isEmpty() || path.isEmpty()) return finish();
+	selectSceneById(still);
+	QApplication::processEvents();
+	check(m_filmCameraButton->isVisibleTo(this) && m_filmCutButton->isVisibleTo(this), "a film made from a file shows Camera and Start shot here");
+	// a copy of its file, to change
+	QTemporaryDir dir;
+	const QString copy = dir.path() + "/pip-goes-out.film";
+	check(QFile::copy(path, copy), "a copy of the film's file");
+	m_filmEditFileOverride = copy;
+	const auto text = [&]() {
+		QFile f(copy);
+		f.open(QIODevice::ReadOnly);
+		return QString::fromUtf8(f.readAll()).replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+	};
+	// the view for "The lantern lights" (the film time 5 s: its keys), then as its next key
+	m_filmTimeSpin->setValue(5.0);
+	m_cameraPosX->setValue(1.25);
+	m_cameraPosY->setValue(2.5);
+	m_cameraPosZ->setValue(-3.75);
+	m_currentLookatX = 0.5, m_currentLookatY = 0.75, m_currentLookatZ = 0.25;
+	editFilm(0);
+	check(text().contains(QStringLiteral("shot 4 The lantern lights\n  key   1.25 2.5 -3.75   0.5 0.75 0.25   40\n  subject pip")),
+		  "the view is the shot's camera, its own fov kept, its other lines kept: " + m_statusLabel->text());
+	editFilm(1);
+	check(text().count(QStringLiteral("key   1.25 2.5 -3.75")) == 2, "and again as its next key");
+	// the shot started at the film time
+	m_filmTimeSpin->setValue(5.5);
+	editFilm(2);
+	check(text().contains(QStringLiteral("shot 5.5 The lantern lights\n")), "\"The lantern lights\" starts at 5.5 s now: " + m_statusLabel->text());
+	m_filmTimeSpin->setValue(1.0);
+	const QString before = text();
+	editFilm(2);
+	check(text() == before && m_statusLabel->text().contains(QStringLiteral("starts at 0")), "the first shot stays at 0, and says so: " + m_statusLabel->text());
+	// a built-in film: its shots are code
+	m_filmEditFileOverride.clear();
+	const QString builtIn = stillOf(QStringLiteral("lamp-and-ball"));
+	selectSceneById(builtIn);
+	QApplication::processEvents();
+	check(!m_filmCameraButton->isVisibleTo(this) && !m_filmCutButton->isVisibleTo(this), "a built-in film shows neither");
+	QFile real(path);
+	real.open(QIODevice::ReadOnly);
+	check(!QString::fromUtf8(real.readAll()).contains(QStringLiteral("1.25 2.5 -3.75")), "the film's own file is not touched");
+	finish();
+}

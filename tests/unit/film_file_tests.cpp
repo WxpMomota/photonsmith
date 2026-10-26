@@ -17,6 +17,7 @@
 #include "../../src/shared/cartoon/cartoons.h"
 #include "../../src/shared/cartoon/fountain.h"
 #include "../../src/shared/cartoon/film_score.h"
+#include "../../src/shared/cartoon/film_edit.h"
 #include "../../src/shared/pbrt_discover.h"
 #include "../../launcher/process.h"   // (a speech engine for the real voices)
 
@@ -791,6 +792,72 @@ TEST(FilmTitles, ATitleCardCreditsAfterTheStoryAndATheme) {
 	EXPECT_TRUE(two.spec.credits);
 	EXPECT_EQ(one.titleCaptions()[0].lines[0].text, "Two Parts");
 	EXPECT_EQ(two.titleCaptions()[0].lines[0].text, "Two Parts");
+}
+
+// Changes to a film file from the program (film_edit.h): a listed shot found as its file's line, its camera set to a view or given one more key, its start moved - the rest
+// of the file kept as it was, and the file still a film that does what was asked.
+TEST(FilmEdit, AShotsCameraAndStartAreChangedInTheFilmFile) {
+	namespace fe = cartoon::film_edit;
+	const std::string text =
+		"name Edits   # a film to change\nscene s.pbrt\ncharacter ann person at -1 0 0 facing 90\ncharacter bo person at 1 0 0 facing -90\n"
+		"part One\nlength 10\nshot 0 Wide   # the opening\n  key 0 1 5  0 1 0  40\n  key 1 1 5  0 1 0  40\nsay ann 2 \"Hello, Bo.\"\nshot 4 Talk\n  auto\nsay bo 6 \"Hello.\"\n"
+		"part Two\nlength 6\nshot 0 Follow\n  follow ann\nshot 3 End\n  key 0 2 6  0 1 0\n";
+	const std::vector<fe::ShotLine> lines = fe::shotLines(text);
+	ASSERT_EQ(lines.size(), 4u);
+	EXPECT_EQ(lines[0].name, "Wide") << "without its comment";
+	EXPECT_DOUBLE_EQ(lines[1].start, 4.0);
+	// the film's listed shots to the file's lines
+	const std::vector<std::string> names = {"Wide", "Talk: ann", "Talk: bo", "Follow", "End", "Credits"};
+	bool first = false;
+	EXPECT_EQ(fe::shotLineFor(text, names, 0, &first), 0);
+	EXPECT_EQ(fe::shotLineFor(text, names, 1, &first), 1);
+	EXPECT_TRUE(first);
+	EXPECT_EQ(fe::shotLineFor(text, names, 2, &first), 1);
+	EXPECT_FALSE(first) << "the auto shot's second listed shot";
+	EXPECT_EQ(fe::shotLineFor(text, names, 3), 2);
+	EXPECT_EQ(fe::shotLineFor(text, names, 4), 3);
+	EXPECT_EQ(fe::shotLineFor(text, names, 5), -1) << "the credits have no line";
+	// a view for the shot: its camera (keys, follow, auto) replaced by one key, everything else kept
+	const double eye[3] = {2, 1.5, 4}, target[3] = {0, 1, 0};
+	const std::string key = fe::keyLine(eye, target, 35);
+	EXPECT_EQ(key, "key   2 1.5 4   0 1 0   35");
+	std::string why;
+	const std::string wide = fe::setShotView(text, 0, key, false, why);
+	EXPECT_EQ(why, "");
+	EXPECT_NE(wide.find("shot 0 Wide   # the opening\n  key   2 1.5 4   0 1 0   35\nsay ann"), std::string::npos) << wide;
+	EXPECT_EQ(wide.find("key 1 1 5"), std::string::npos);
+	const std::string keepsFov = fe::setShotView(text, 0, fe::keyLine(eye, target), false, why);
+	EXPECT_NE(keepsFov.find("  key   2 1.5 4   0 1 0   40\n"), std::string::npos) << "a view with no fov keeps the shot's (40)";
+	const std::string follow = fe::setShotView(text, 2, key, false, why);
+	EXPECT_EQ(follow.find("follow ann"), std::string::npos);
+	EXPECT_NE(follow.find("shot 0 Follow\n  key   2 1.5 4"), std::string::npos);
+	// one more key: after its keys; not for a shot whose camera is not keys
+	const std::string more = fe::setShotView(text, 0, key, true, why);
+	EXPECT_NE(more.find("  key 1 1 5  0 1 0  40\n  key   2 1.5 4   0 1 0   35\nsay ann"), std::string::npos) << more;
+	EXPECT_EQ(fe::setShotView(text, 2, key, true, why), text);
+	EXPECT_NE(why.find("not keys"), std::string::npos);
+	// a shot's start moved; not the first of a part, not past its neighbours
+	const std::string moved = fe::moveShotStart(text, 1, 5.5, why);
+	EXPECT_EQ(why, "");
+	EXPECT_NE(moved.find("shot 5.5 Talk\n"), std::string::npos);
+	EXPECT_EQ(fe::moveShotStart(text, 2, 1.0, why), text);
+	EXPECT_NE(why.find("starts at 0"), std::string::npos);
+	EXPECT_EQ(fe::moveShotStart(text, 3, 0.01, why), text);
+	EXPECT_NE(why.find("after the one before"), std::string::npos);
+	// Windows line ends stay
+	std::string crlf;
+	for (char c : text) crlf += c == '\n' ? std::string("\r\n") : std::string(1, c);
+	const std::string movedCrlf = fe::moveShotStart(crlf, 1, 5.5, why);
+	EXPECT_NE(movedCrlf.find("shot 5.5 Talk\r\n"), std::string::npos);
+	EXPECT_EQ(movedCrlf.find("\r\r"), std::string::npos);
+	// the changed file is still the film, with the change
+	const std::filesystem::path d = tempDir("edits");
+	write(d / "s.pbrt", kScene);
+	write(d / "e.film", fe::moveShotStart(fe::setShotView(text, 0, key, false, why), 1, 5.5, why));
+	ff::DataFilm one;
+	ASSERT_EQ(one.load((d / "e.film").string(), 0), "");
+	EXPECT_NE(one.headerAt(1.0).find("LookAt 2 1.5 4"), std::string::npos) << one.headerAt(1.0);
+	EXPECT_DOUBLE_EQ(one.spec.shots[1].start, 5.5);
 }
 
 // Every cast and set of the library that comes with the program can be brought into a film.

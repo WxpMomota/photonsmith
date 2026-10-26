@@ -577,6 +577,15 @@ speaker's kind has (the turtle has no shrug; the masked explorer no face), and n
 (a script's parentheticals win). The timing is the line's syllables (the babble timing, the same in every program, whatever voice says it). A film made from a script
 (`--film-from-script`) has the line.
 
+**Changes made in the GUI, written into the film file.** For a film made from a file, the film timeline's row (Settings, a film's still in Render Single Image) has
+**Camera** and **Start shot here**. Move the view in Live Preview (it starts at the film time's moment, from the shot's own camera), then Camera > *Use this view for the
+shot* writes it as the shot's camera (its `key` lines, a `follow`, a move, `auto` or a flight replaced by one `key`, the shot's own field of view kept), or *Add this view as
+the shot's next key* adds it after the shot's keys, so the camera moves on to it. *Start shot here* moves the start of the shot the film time is in to the film time (not
+the first shot of the film or of a part, and not past its neighbours; an `auto` shot's own cuts are made by the film). The file is changed in place, line for line, its
+comments and order kept (`src/shared/cartoon/film_edit.h`; the GUI asks the renderer's library for the file and its shots as they are now:
+`scene_metadata_film_file_shots`), and the film is read again: Live Preview draws the moment again. The shot box's times are the ones the program started with until it
+starts again. A built-in film has neither button: its shots are code, and its cameras file changes them.
+
 **Titles, credits and a theme.** `title ["TEXT"] [at T] [for S]` lays a title card over the opening (the film's name unless given, large and centred, fading in and
 out); `episode N ["NAME"]` adds "Episode N: NAME" under it. `credits` adds cards of three seconds after the story, over black: the film's name (and episode), its cast
 five to a card ("Pip - a pip"), then its `credit "TEXT"` lines, a word on the voices when the computer said them, and "Made with Photonsmith". The film becomes that much

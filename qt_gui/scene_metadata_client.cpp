@@ -44,6 +44,7 @@ struct DllHandle {
 	using FilmChangedFn = int (*)(const char *);
 	FilmCameraFn filmCameraFn = nullptr;     // optional: a film's camera at a moment (the film timeline)
 	FilmChangedFn filmChangedFn = nullptr;   // optional: whether a film's file was saved since
+	StringByIdFn filmFileShotsFn = nullptr;  // optional: a film's file and its shots as they are now (the film timeline's changes)
 };
 
 // See SceneMetadataClient::lastLoadError()'s own comment (scene_metadata_
@@ -157,6 +158,7 @@ DllHandle& handle() {
 		h.filmTableFn = reinterpret_cast<StringFn>(cross_abi_library::lookupSymbol(h.module, "scene_metadata_film_table"));
 		h.filmCameraFn = reinterpret_cast<DllHandle::FilmCameraFn>(cross_abi_library::lookupSymbol(h.module, "scene_metadata_film_camera"));
 		h.filmChangedFn = reinterpret_cast<DllHandle::FilmChangedFn>(cross_abi_library::lookupSymbol(h.module, "scene_metadata_film_changed"));
+		h.filmFileShotsFn = reinterpret_cast<StringByIdFn>(cross_abi_library::lookupSymbol(h.module, "scene_metadata_film_file_shots"));
 	});
 	return h;
 }
@@ -186,6 +188,19 @@ bool filmCamera(const QString &key, double t, double out[6]) {
 bool filmChanged(const QString &key) {
 	if (!ensureLoaded() || !handle().filmChangedFn) return false;
 	return handle().filmChangedFn(key.toUtf8().constData()) != 0;
+}
+
+bool filmFileShots(const QString &key, QString &path, std::vector<double> &starts, std::vector<std::string> &names) {
+	path.clear();
+	starts.clear();
+	names.clear();
+	if (!ensureLoaded() || !handle().filmFileShotsFn) return false;
+	const QStringList lines = QString::fromUtf8(handle().filmFileShotsFn(key.toUtf8().constData())).split(QLatin1Char('\n'));
+	if (lines.size() < 3) return false;
+	path = lines[0];
+	for (const QString &t : lines[1].split(QLatin1Char(','), Qt::SkipEmptyParts)) starts.push_back(t.toDouble());
+	for (const QString &n : lines[2].split(QLatin1Char('|'))) names.push_back(n.toStdString());
+	return !path.isEmpty();
 }
 
 bool gpuCompatible(const QString& scene_id, bool& out_compatible) {

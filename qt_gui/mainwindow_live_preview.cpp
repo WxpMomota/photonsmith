@@ -9,6 +9,7 @@
 #include "settings_keys.h"
 
 #include "../src/shared/scene_descriptor.h"
+#include "../src/shared/cartoon/film_edit.h"   // the film timeline's changes to a film file
 
 #include <cmath>
 
@@ -36,6 +37,7 @@
 #include <QScrollBar>
 #include <QScreen>
 #include <QTimer>
+#include <QFileInfo>
 #include <QAbstractItemView>
 #include <QIcon>
 #include <QDesktopServices>
@@ -181,6 +183,72 @@ void MainWindow::stopLivePreviewIfNavigatedAway() {
 QString MainWindow::filmMomentId() const {
 	if (m_filmTimeFor.isEmpty() || !m_filmTimeRow || !m_filmTimeSpin || !m_filmTimeRow->isVisibleTo(m_filmTimeRow->parentWidget())) return QString();
 	return QStringLiteral("cartoon:%1@%2").arg(m_filmTimeFor).arg(m_filmTimeSpin->value(), 0, 'f', 1);
+}
+
+void MainWindow::syncFilmEditButtons() {
+	if (!m_filmCameraButton || !m_filmCutButton) return;
+	QString path;
+	std::vector<double> starts;
+	std::vector<std::string> names;
+	const bool fromFile = !m_filmTimeFor.isEmpty() && (!m_filmEditFileOverride.isEmpty() || SceneMetadataClient::filmFileShots(m_filmTimeFor, path, starts, names));
+	m_filmCameraButton->setVisible(fromFile);
+	m_filmCutButton->setVisible(fromFile);
+}
+
+// A change to the film made from a file, written into it (film_edit.h): the shot the film time is in given Live Preview's view (0: as its camera, 1: as its next key), or
+// started at the film time (2). The library reads the file again (the film timeline redraws the moment); the shot box's times are the ones the program started with.
+void MainWindow::editFilm(int what) {
+	QString path;
+	std::vector<double> starts;
+	std::vector<std::string> names;
+	SceneMetadataClient::filmFileShots(m_filmTimeFor, path, starts, names);
+	if (!m_filmEditFileOverride.isEmpty()) path = m_filmEditFileOverride;
+	const auto say = [this](const QString &text) {
+		m_statusLabel->setText(text);
+		onLogMessage(QStringLiteral("[Film] ") + text);
+	};
+	if (path.isEmpty() || starts.empty()) {
+		say(tr("This film is not made from a film file: its shots are in the program's code (a cameras file changes them: docs/VIDEO_GENERATION.md)."));
+		return;
+	}
+	const double t = m_filmTimeSpin->value();
+	std::size_t shot = 0;
+	for (std::size_t i = 0; i < starts.size(); ++i)
+		if (t >= starts[i] - 1e-6) shot = i;
+	QFile in(path);
+	if (!in.open(QIODevice::ReadOnly)) {
+		say(tr("The film's file cannot be read: %1").arg(path));
+		return;
+	}
+	const std::string text = in.readAll().toStdString();
+	in.close();
+	bool first = true;
+	const int line = cartoon::film_edit::shotLineFor(text, names, shot, &first);
+	const QString shotName = shot < names.size() ? QString::fromStdString(names[shot]) : QString();
+	std::string why, changed;
+	if (line < 0) {
+		why = "the film's file has no line for the shot \"" + shotName.toStdString() + "\" (the credits are made by the film)";
+	} else if (what == 2) {
+		if (!first) why = "\"" + shotName.toStdString() + "\" is one of the cuts an `auto` shot makes by itself; move the `auto` shot's own start instead";
+		else changed = cartoon::film_edit::moveShotStart(text, line, cartoon::film_edit::shotLines(text)[static_cast<std::size_t>(line)].start + (t - starts[shot]), why);
+	} else {
+		const camera_math::Vec3 eye = currentCameraPosition(), target = m_livePreviewRunning ? m_livePreviewLookAt : currentLookAt();
+		const double e[3] = {eye.x, eye.y, eye.z}, a[3] = {target.x, target.y, target.z};
+		changed = cartoon::film_edit::setShotView(text, line, cartoon::film_edit::keyLine(e, a), what == 1, why);
+	}
+	if (!why.empty() || changed.empty() || changed == text) {
+		say(tr("The film's file is not changed: %1").arg(QString::fromStdString(why.empty() ? std::string("nothing to change") : why)));
+		return;
+	}
+	QFile out(path);
+	if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate) || out.write(changed.data(), static_cast<qint64>(changed.size())) != static_cast<qint64>(changed.size())) {
+		say(tr("The film's file cannot be written: %1").arg(path));
+		return;
+	}
+	out.close();
+	say(what == 2 ? tr("\"%1\" now starts at %2 s: written to %3").arg(shotName).arg(t, 0, 'f', 1).arg(QFileInfo(path).fileName())
+				  : tr("\"%1\" %2 Live Preview's view: written to %3").arg(shotName, what == 1 ? tr("moves on to") : tr("is now seen from")).arg(QFileInfo(path).fileName()));
+	if (m_livePreviewRunning && !m_liveFilmKey.isEmpty() && SceneMetadataClient::filmChanged(m_liveFilmKey)) showFilmMoment();
 }
 
 void MainWindow::showFilmMoment() {

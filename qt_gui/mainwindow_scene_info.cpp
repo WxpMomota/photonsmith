@@ -351,6 +351,7 @@ void MainWindow::syncCartoonVideoSettings(const QString &sceneId) {
 			if (m_syncFilmShot) m_syncFilmShot();   // (also when the value did not change, so no valueChanged)
 		}
 		if (!film) m_filmTimeFor.clear();
+		syncFilmEditButtons();
 	}
 	// A film has its own camera (its shots), so a flythrough preset and a camera path do not apply to it: while a film is the scene of a video they are greyed out and say so.
 	const bool filmVideo = film && isVideoMode();
