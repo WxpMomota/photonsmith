@@ -29,6 +29,7 @@
 #include "../../launcher/cartoon_worker.h"
 #include "../../launcher/cartoon_still.h"
 #include "../../launcher/film_transitions.h"
+#include "../../launcher/film_temporal.h"
 #include "../../launcher/launcher_args.h"
 #include "../../launcher/flag_scopes.h"
 #include "../../launcher/render_setup.h"
@@ -2632,4 +2633,60 @@ TEST(FilmTransitions, ADissolveBlendsInLinearLightAFadeGoesToBlackAndAWipeComesI
 	const std::vector<unsigned char> p = film_transitions::blend(wipe, white, black, w, h);
 	EXPECT_EQ(p[0], 255) << "the left: incoming";
 	EXPECT_EQ(p[(w - 1) * 3], 0) << "the right: outgoing";
+}
+
+// ---- temporal denoising ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// Each frame is made again from its neighbours in its shot where its neighbourhood is the same (noise): a still picture's noise goes down, an edge that moves stays where this
+// frame has it, and nothing is taken across a cut; a resumed run makes nothing again.
+TEST(FilmTemporal, StillNoiseIsAveragedAwayAMovingEdgeStaysSharpAndCutsAreKept) {
+	namespace fs = std::filesystem;
+	const fs::path dir = fs::temp_directory_path() / "photonsmith_temporal_test";
+	fs::remove_all(dir);
+	fs::create_directories(dir);
+	const int w = 64, h = 32, count = 10;
+	std::mt19937 rng(7);
+	std::normal_distribution<double> noise(0.0, 8.0);
+	// shot 1 (frames 0-4): a grey field with an edge moving right 4 pixels a frame; shot 2 (frames 5-9): a brighter field
+	for (int f = 0; f < count; ++f) {
+		std::vector<unsigned char> px(static_cast<std::size_t>(w) * h * 3);
+		for (int y = 0; y < h; ++y)
+			for (int x = 0; x < w; ++x) {
+				const double base = f < 5 ? (x < 20 + 4 * f ? 90.0 : 160.0) : 200.0;
+				const unsigned char v = static_cast<unsigned char>(std::clamp(base + noise(rng), 0.0, 255.0));
+				for (int c = 0; c < 3; ++c) px[(static_cast<std::size_t>(y) * w + x) * 3 + c] = v;
+			}
+		ASSERT_TRUE(write_png((dir / cartoon_render::encName(f)).string().c_str(), w, h, px.data()));
+	}
+	cartoon::Film film{};
+	film.duration = 10.0;
+	film.shotStarts = []() { return std::vector<double>{0.0, 5.0}; };
+	EXPECT_EQ(film_temporal::apply(film, dir, count, 2), count);
+	const auto load = [&](const fs::path &p) { return film_temporal::load(p); };
+	const auto spread = [&](const film_temporal::Frame &f, int x0, int x1) {   // the noise left in a band of columns: the mean distance from its mean
+		double sum = 0.0, sum2 = 0.0;
+		int n = 0;
+		for (int y = 0; y < h; ++y)
+			for (int x = x0; x < x1; ++x) {
+				const double v = f.rgb[(static_cast<std::size_t>(y) * w + x) * 3];
+				sum += v, sum2 += v * v, ++n;
+			}
+		return std::sqrt(sum2 / n - (sum / n) * (sum / n));
+	};
+	const auto raw = load(dir / cartoon_render::encName(7)), den = load(dir / film_temporal::kFolder / cartoon_render::encName(7));
+	ASSERT_TRUE(raw && den);
+	EXPECT_LT(spread(*den, 0, w), 0.62 * spread(*raw, 0, w)) << "a still picture's noise: five frames averaged";
+	// the moving edge in frame 2 is at x = 28: left of it dark, right of it bright, as in the frame itself
+	const auto edge = load(dir / film_temporal::kFolder / cartoon_render::encName(2));
+	double left = 0.0, right = 0.0;
+	for (int y = 0; y < h; ++y) left += edge->rgb[(static_cast<std::size_t>(y) * w + 25) * 3], right += edge->rgb[(static_cast<std::size_t>(y) * w + 31) * 3];
+	EXPECT_LT(left / h, 110.0) << "not smeared by its neighbours' edges";
+	EXPECT_GT(right / h, 140.0);
+	// across the cut: the last frame of shot 1 is not brightened by shot 2
+	const auto last = load(dir / film_temporal::kFolder / cartoon_render::encName(4));
+	double edgeOfShot = 0.0;
+	for (int y = 0; y < h; ++y) edgeOfShot += last->rgb[(static_cast<std::size_t>(y) * w + 5) * 3];
+	EXPECT_LT(edgeOfShot / h, 100.0);
+	EXPECT_EQ(film_temporal::apply(film, dir, count, 2), 0) << "made already from the same frames";
+	fs::remove_all(dir);
 }

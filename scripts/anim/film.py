@@ -684,6 +684,8 @@ def cmd_video(args):
     cmd = [find_exe(args.exe)] + renderer_flags(args) + ["--video-preset", args.target, "--height", str(height), str(width), str(args.spp or 128), "8"]
     if args.out:
         cmd[1:1] = ["--output", args.out]
+    if args.temporal:   # each frame denoised with its neighbours (launcher/film_temporal.h): less flicker, or as smooth with fewer samples
+        cmd[1:1] = ["--temporal-denoise", str(args.temporal)]
     sys.exit(subprocess.run(cmd, cwd=run_dir()).returncode)
 
 
@@ -696,6 +698,7 @@ def main():
     p.add_argument("--height", type=int)
     p.add_argument("--spp", type=int)
     p.add_argument("--out")
+    p.add_argument("--temporal", type=int, choices=[1, 2, 3], help="video: denoise each frame with the R frames either side in its shot (--temporal-denoise R)")
     p.add_argument("--count", type=int, help="sheet: how many stills, evenly spaced over the film (default 16)")
     p.add_argument("--times", help="sheet: comma-separated seconds instead of --count")
     p.add_argument("--jobs", type=int, help="doctor: how many frames to render at once (default 3)")

@@ -658,6 +658,15 @@ the set: rain as thin light streaks the length a drop falls while the shutter is
 drift; leaves tumbling as they fall. Sparks glow (each a small light) and fall, dust rises and settles, a splash's drops (water) arc and fall back. Rain is heard: a hiss that
 grows and fades with it. (Rain and snow cast shadows: a low sun stretches them into lines.)
 
+**Temporal denoising: `--temporal-denoise [R]` (`film.py video <key> --temporal 2`).** A film's frames are rendered one by one, in any order, so a filter over time can
+only work on what the frames are when they are all done: launcher/film_temporal.h makes each frame again from itself and the R frames either side in its shot (1 to 3, 2
+when not given; never across a cut), taking a neighbour's pixel in as far as the 5 x 5 neighbourhood round it is the same in both frames - the same picture under other
+noise - and not where something moved or the light changed. With it every frame is rendered with a seed of its own (the base `--seed` and its number): with one seed for
+all, the noise is the same in every frame (it does not flicker where nothing moves, but it does not average away either). The denoised frames go to the frames folder's
+`temporal` folder, which the video is assembled from (the frames as rendered are kept); each is remembered with the frames it was made from, so a resumed video makes again
+only those whose neighbours changed. A still camera on a walking person at 8 samples: the error against a 512-sample picture went from 2.84 to 2.14 (the floor from 3.21 to
+2.10, the walker's box from 4.54 to 3.91 - moving parts are not smeared), and the frame-to-frame flicker of the floor from 3.79 to 1.54.
+
 `ray_tracer --film-lines <key>` lists the lines with their start, end and syllables; `ray_tracer --film-sound <key> OUT.wav` writes a film's soundtrack alone, to listen to
 the lines (and the music and footsteps) without rendering a frame; `--film-check` counts a film file's characters and lines.
 

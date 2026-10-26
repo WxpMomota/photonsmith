@@ -11,6 +11,7 @@
 
 #include "cartoon_render.h"
 #include "film_captions.h"
+#include "film_temporal.h"
 #include "film_transitions.h"
 
 namespace video_frames {
@@ -26,7 +27,7 @@ inline bool isOurs(const std::filesystem::path &dir) {
 	for (const auto &entry : std::filesystem::directory_iterator(dir, ec)) {
 		const std::string name = entry.path().filename().string();
 		const std::string ext = entry.path().extension().string();
-		const bool ours = entry.is_directory() ? name.rfind("work", 0) == 0 || name == film_transitions::kAcrossFolder
+		const bool ours = entry.is_directory() ? name.rfind("work", 0) == 0 || name == film_transitions::kAcrossFolder || name == film_temporal::kFolder
 											   : (name.rfind("enc_", 0) == 0 || name.rfind(film_captions::kCleanPrefix, 0) == 0 || name.rfind(film_transitions::kPlainPrefix, 0) == 0 || name.rfind("frame_", 0) == 0 || name.rfind("frames", 0) == 0 || ext == ".done" || name == cartoon_render::kFilledList || name == cartoon_render::kFingerprints || name == cartoon_render::kProgramStamp);
 		if (!ours) return false;
 	}
@@ -54,6 +55,7 @@ inline int keepForResume(const std::filesystem::path &dir) {
 			(entry.path().extension() == ".done" && name != film_captions::kRecord && name != film_transitions::kRecord))
 			std::filesystem::remove(entry.path());
 		else if (entry.is_directory() && name == film_transitions::kAcrossFolder) keepForResume(entry.path());
+		else if (entry.is_directory() && name == film_temporal::kFolder) continue;   // (the denoised frames: each is made again only when its neighbours changed)
 		else if (entry.is_directory()) std::filesystem::remove_all(entry.path());
 	}
 	return cartoon_render::dropFilledFrames(dir);

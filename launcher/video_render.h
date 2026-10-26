@@ -71,6 +71,7 @@ extern char** environ;
 #include "launcher/cartoon_worker.h"
 #include "launcher/film_captions.h"    // a film's words on its frames
 #include "launcher/film_transitions.h" // its dissolves, fades and wipes
+#include "launcher/film_temporal.h"    // --temporal-denoise
 #include "launcher/video_frames.h"     // the frames folder: kept on a resume, emptied (when ours) on a fresh start
 
 // Converts rendered PPM frames to PNG on a background thread while the main
@@ -478,6 +479,7 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
         job.out = frames_dir.string();
         job.ext = frame_is_png ? "png" : "ppm";   // (the same names the video looks for: frame_file above)
         job.across = across;
+        job.seeds = args.temporal_radius > 0;
         cartoon_render::WorkerHooks hooks;
         hooks.start = [&](int worker, const std::vector<int> &frames) -> std::unique_ptr<cartoon_render::WorkerHandle> {
             const std::filesystem::path dir = frames_dir / ("work" + std::to_string(worker));
@@ -534,7 +536,13 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
                 if (const auto it = check.find(frame); it != check.end()) keepIf = it->second;
             }
             bool unchanged = false;
-            const int rc = cartoon_render::renderFrame(film, film_time, frames_dir / ("work" + std::to_string(worker)) / ("cartoon_" + std::to_string(frame) + ".pbrt"), s.exe_path, args,
+            LaunchArgs frame_args = args;
+            if (args.temporal_radius > 0) {   // (a seed of its own: --temporal-denoise; the frame's run is given it as a flag, after any the user typed)
+                frame_args.seed = cartoon_render::frameSeed(args, frame);
+                frame_args.consumed_tokens.push_back("--seed");
+                frame_args.consumed_tokens.push_back(std::to_string(frame_args.seed));
+            }
+            const int rc = cartoon_render::renderFrame(film, film_time, frames_dir / ("work" + std::to_string(worker)) / ("cartoon_" + std::to_string(frame) + ".pbrt"), s.exe_path, frame_args,
                                                        image_width, image_height, samples_per_pixel, max_ray_depth, frame_file(frame).string(), timeout, frameTimeLimit, use_gpu, &fp, keepIf,
                                                        &unchanged);
             std::lock_guard<std::mutex> hold(keptLock);
@@ -933,7 +941,15 @@ inline int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
         srt.replace_extension(".srt");
         if (film_captions::writeSrt(words, srt)) std::cout << "Subtitles: " << srt << std::endl;
     }
-    if (int rc = assembleVideoFile(paths.frames_dir, converted, s.video_fps, paths.video_path, soundtrack_path); rc != SUCCESS) return rc;
+    // --temporal-denoise: the finished frames denoised with their neighbours into frames/temporal, which the video is made from (film_temporal.h)
+    std::filesystem::path assemble_from = paths.frames_dir;
+    if (const cartoon::Film *film = cartoon::forCameraPath(s.camera_path.c_str()); film && args.temporal_radius > 0 && converted == render_frame_count) {
+        std::cout << "\nDenoising the frames of " << film->name << " with the " << args.temporal_radius << " either side of each..." << std::endl;
+        const int made = film_temporal::apply(*film, paths.frames_dir, render_frame_count, args.temporal_radius);
+        std::cout << "Denoised " << made << " frame(s) (the others were already, from the same frames)." << std::endl;
+        assemble_from = paths.frames_dir / film_temporal::kFolder;
+    }
+    if (int rc = assembleVideoFile(assemble_from, converted, s.video_fps, paths.video_path, soundtrack_path); rc != SUCCESS) return rc;
 
     std::cout << "\n========================================" << std::endl;
     std::cout << "VIDEO COMPLETE!" << std::endl;

@@ -133,8 +133,12 @@ inline std::string resumeSignature(const cartoon::Film &film, const LaunchArgs &
 	std::string s = std::string(film.key) + "|" + std::to_string(frames) + "|" + std::to_string(fps) + "|" + std::to_string(width) + "x" + std::to_string(height) + "|" + std::to_string(spp) + "|" +
 					std::to_string(depth);
 	for (const std::string &f : forwardedFlags(args)) s += "|" + f;
+	if (args.temporal_radius > 0) s += "|a seed a frame";   // (--temporal-denoise: frames rendered with seeds of their own are other pictures)
 	return s;
 }
+// The seed of a frame when each has its own (--temporal-denoise: noise that differs from frame to frame averages away; one seed for all would leave the same noise in every
+// frame, which no filter over time can take out): the base seed (--seed, else 0) and the frame's number.
+inline long long frameSeed(const LaunchArgs &args, int frame) { return ((args.seed >= 0 ? args.seed : 0) + 1 + frame) % 2147483647LL; }
 // Which program and which film made the frames: the program's file (size and time) and the film's scene at two instants. When it is the same as last time, a resumed video keeps every
 // finished frame without looking at it; when it is not (the program was rebuilt, the film edited), each finished frame's scene is made again and compared with the fingerprint it was
 // rendered from (frame_fingerprint.h), and only the frames that changed are rendered again. Written beside the frames (program.txt) once a run has compared them all.

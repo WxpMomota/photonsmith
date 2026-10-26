@@ -47,6 +47,7 @@ struct Job {
 	std::vector<int> list;
 	std::map<int, std::string> keep;   // finished frames and the fingerprints they were rendered from
 	bool across = false;               // the other side of the film's dissolves and wipes (Film::sceneAcross), not its own frames
+	bool seeds = false;                // each frame renders with a seed of its own (its noise is its own: --temporal-denoise averages it away), not one for all
 	const cartoon::Film *filmPtr = nullptr;
 
 	std::string scenePath() const { return (std::filesystem::path(scenes) / "frame.pbrt").string(); }
@@ -61,6 +62,7 @@ struct Job {
 		o << "\n";
 		for (const auto &[f, fp] : keep) o << "keep " << f << " " << fp << "\n";
 		if (across) o << "across 1\n";
+		if (seeds) o << "seeds 1\n";
 		return o.str();
 	}
 
@@ -79,6 +81,7 @@ struct Job {
 			else if (verb == "out") std::getline(words >> std::ws, out);
 			else if (verb == "ext") words >> ext;
 			else if (verb == "across") words >> across;
+			else if (verb == "seeds") words >> seeds;
 			else if (verb == "list")
 				for (int f; words >> f;) list.push_back(f);
 			else if (verb == "keep") {
@@ -165,6 +168,7 @@ inline int run(const Job &job, const LaunchArgs &args, const RenderSetup &setup,
 			a.cam_z = s.cam_z = eye[2];
 			s.out_path = job.picturePath(frame);
 			s.samples_per_pixel = cartoon::shot_cameras::samplesFor(setup.samples_per_pixel, share);
+			if (job.seeds) a.seed = cartoon_render::frameSeed(args, frame);
 			rc = render(a, s);
 		}
 		// written under another name and moved into place, so the parent never reads half a marker
