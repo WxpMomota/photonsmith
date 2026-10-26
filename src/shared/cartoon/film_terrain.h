@@ -39,7 +39,21 @@ struct Spec {
 	double snow = -1.0;                   // the snow line, metres above `y` (below 0: the kind's own - mountains at 0.45 of the height, none for the others)
 	double erosion = -1.0;                // how much water has carved it (0 to 3; below 0: the kind's own)
 	int seed = 1;
-	bool ranges = true;                      // the distant ranges round it
+	bool ranges = true;
+	// rivers' channels, cut into the ground under them (set by the film from its rivers): each a path of points (pbrt's x z, and the water's height there) and a width
+	struct Channel {
+		std::vector<Vec3> path;
+		double width = 8.0;
+	};
+	std::vector<Channel> channels;
+	// waterfalls' cliffs (set by the film from its waterfalls): the ground behind each lip raised to it (a plateau whose front is the cliff), and a basin below for its pool
+	struct Step {
+		Vec3 lip;   // pbrt's x y z
+		double width = 6.0, drop = 20.0, facing = 0.0;
+	};
+	std::vector<Step> steps;
+	double waterLevel = -1e30;   // a sea's or lake's level (pbrt's y), set by the film when it has one: the ground just above it is drawn under it (a clean shore, not a
+	                             // scatter of islands as small as the fine detail), and the shore is sand and mud                      // the distant ranges round it
 	double fx() const { return focusSet ? focusX : x; }
 	double fz() const { return focusSet ? focusZ : z; }
 	double snowLine() const { return snow >= 0.0 ? snow : kind == "mountains" ? 0.45 * height : 1e9; }
@@ -47,9 +61,25 @@ struct Spec {
 	// every number it is made from: names its files
 	std::string key() const {
 		char b[320];
-		std::snprintf(b, sizeof b, "v1|%s|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.3f|%d|%d", kind.c_str(), size, height, x, z, y, fx(), fz(), snowLine(), erosionAmount(), seed, ranges ? 1 : 0);
+		std::snprintf(b, sizeof b, "v1|%s|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.3f|%d|%d|%.3f", kind.c_str(), size, height, x, z, y, fx(), fz(), snowLine(), erosionAmount(), seed, ranges ? 1 : 0,
+					  waterLevel > -1e29 ? waterLevel : -1.0);
+		std::string all = b;
+		for (const Channel &c : channels) {
+			char w[32];
+			std::snprintf(w, sizeof w, "|c%.2f", c.width);
+			all += w;
+			for (const Vec3 &p : c.path) {
+				std::snprintf(w, sizeof w, ",%.1f %.2f %.1f", p.x, p.y, p.z);
+				all += w;
+			}
+		}
+		for (const Step &st : steps) {
+			char w[96];
+			std::snprintf(w, sizeof w, "|s%.2f %.2f %.2f %.2f %.2f %.2f", st.lip.x, st.lip.y, st.lip.z, st.width, st.drop, st.facing);
+			all += w;
+		}
 		char name[40];
-		std::snprintf(name, sizeof name, "terrain_%016llx", static_cast<unsigned long long>(std::hash<std::string>()(b)));
+		std::snprintf(name, sizeof name, "terrain_%016llx", static_cast<unsigned long long>(std::hash<std::string>()(all)));
 		return name;
 	}
 };
@@ -102,6 +132,12 @@ inline double cr(double p0, double p1, double p2, double p3, double t) {   // Ca
 	return p1 + 0.5 * t * (p2 - p0 + t * (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3 + t * (3.0 * (p1 - p2) + p3 - p0)));
 }
 
+// Where a canyon's river runs: its u (across the square, 0 to 1) at v (along it), winding through the focus `fu`.
+inline double canyonRiverU(const Spec &s, double v, double fu) {
+	const int salt = s.seed * 7717;
+	return fu + 0.09 * std::sin(v * 9.0 + 6.0 * hash01(salt, 7)) + 0.05 * std::sin(v * 21.0 + 2.0);
+}
+
 // The kind's shape at (u, v) over the square (0 to 1 each way), before it is scaled to the height. `fu`, `fv`: the focus.
 inline double shape(const Spec &s, double u, double v, double fu, double fv) {
 	const int salt = s.seed * 7717;
@@ -126,8 +162,7 @@ inline double shape(const Spec &s, double u, double v, double fu, double fv) {
 		const double q = plateau * 5.0, k = std::floor(q), fr = q - k;
 		double h = (k + smoothstep(0.55, 0.92, fr)) / 5.0;   // mesas: flat tops, cliffs between
 		// a river winding through the focus
-		const double meander = fu + 0.09 * std::sin(v * 9.0 + 6.0 * hash01(salt, 7)) + 0.05 * std::sin(v * 21.0 + 2.0);
-		const double d = std::abs(u - meander);
+		const double d = std::abs(u - canyonRiverU(s, v, fu));
 		h *= 0.04 + 0.96 * smoothstep(0.012, 0.07, d);
 		return h;
 	}
@@ -230,7 +265,10 @@ struct Field {
 		const double u = gx - i, v = gz - j;
 		double rows[4];
 		for (int b = 0; b < 4; ++b) rows[b] = detail::cr(sample(i - 1, j - 1 + b), sample(i, j - 1 + b), sample(i + 1, j - 1 + b), sample(i + 2, j - 1 + b), u);
-		return spec.y + std::max(0.0, detail::cr(rows[0], rows[1], rows[2], rows[3], v)) + detail(px, pz);
+		const double h = spec.y + std::max(0.0, detail::cr(rows[0], rows[1], rows[2], rows[3], v)) + detail(px, pz);
+		if (spec.waterLevel < -1e29) return h;
+		const double above = h - spec.waterLevel;   // the shallows pulled under: what was a hand's breadth above the water is below it, the bed a little deeper
+		return above > 1.5 ? h : h - smoothstep(1.5, -0.5, above) * (0.8 + 0.5 * std::min(4.0, std::max(0.0, -above)));
 	}
 	Vec3 normalAt(double px, double pz, double e = 0.4) const {   // (pbrt's)
 		return normalize(Vec3{heightAt(px - e, pz) - heightAt(px + e, pz), 2.0 * e, heightAt(px, pz - e) - heightAt(px, pz + e)});
@@ -268,6 +306,45 @@ inline std::shared_ptr<const Field> make(const Spec &s) {
 		for (float &v : flow) v = static_cast<float>(std::min(1.0, std::log1p(v) / std::log1p(std::max(1.0, peak * 0.25))));
 	}
 	for (float &v : h) v = static_cast<float>(std::max(0.0f, v) * s.height);
+	for (const Spec::Channel &c : s.channels) {   // the rivers' beds: a trough under each, below its water, and banks rising from it
+		const double half = 0.5 * c.width, depth = 1.5 + 0.05 * c.width, bank = std::max(6.0, c.width);
+		for (std::size_t k = 0; k + 1 < c.path.size(); ++k) {
+			const Vec3 a = c.path[k], b = c.path[k + 1];
+			const double reach = half + bank + 2.0 * f->cell;
+			const int i0 = std::max(0, static_cast<int>((std::min(a.x, b.x) - reach - f->x0) / f->cell)), i1 = std::min(n - 1, static_cast<int>((std::max(a.x, b.x) + reach - f->x0) / f->cell) + 1);
+			const int j0 = std::max(0, static_cast<int>((std::min(a.z, b.z) - reach - f->z0) / f->cell)), j1 = std::min(n - 1, static_cast<int>((std::max(a.z, b.z) + reach - f->z0) / f->cell) + 1);
+			const double ex = b.x - a.x, ez = b.z - a.z, ll = std::max(1e-9, ex * ex + ez * ez);
+			for (int j = j0; j <= j1; ++j)
+				for (int i = i0; i <= i1; ++i) {
+					const double px = f->x0 + i * f->cell, pz = f->z0 + j * f->cell;
+					const double u = std::clamp(((px - a.x) * ex + (pz - a.z) * ez) / ll, 0.0, 1.0);
+					const double d = std::hypot(px - (a.x + u * ex), pz - (a.z + u * ez));
+					const double level = a.y + u * (b.y - a.y) - s.y;
+					const double target = d < half ? level - depth * (1.0 - 0.6 * (d / half) * (d / half)) : level - 0.4 * depth + (d - half) * 0.8;
+					float &v = h[static_cast<std::size_t>(j) * n + i];
+					v = static_cast<float>(std::min(static_cast<double>(v), std::max(target, -2.0 * depth)));
+				}
+		}
+	}
+	for (const Spec::Step &st : s.steps) {   // a waterfall's cliff: the plateau behind its lip, the basin before it
+		const double a = st.facing * kPi / 180.0, ox = std::sin(a), oz = std::cos(a);
+		const double reach = std::max(40.0, 4.0 * st.width), wide = 2.5 * st.width, top = st.lip.y - s.y, foot = top - st.drop;
+		for (int j = 0; j < n; ++j)
+			for (int i = 0; i < n; ++i) {
+				const double dx = f->x0 + i * f->cell - st.lip.x, dz = f->z0 + j * f->cell - st.lip.z;
+				const double along = dx * ox + dz * oz, across = std::abs(dx * oz - dz * ox);   // (along: in front of the lip, positive)
+				float &v = h[static_cast<std::size_t>(j) * n + i];
+				if (along <= 0.0) {   // behind: up to the lip, falling away to the land round it (an outline rounded and broken by noise)
+					const double d = std::hypot(across / wide, -along / reach) * (0.8 + 0.4 * nature::noise2(dx * 0.04, dz * 0.04, 53)) + (across < 0.6 * st.width ? 0.0 : 0.0);
+					const double keep = 1.0 - smoothstep(1.0, 1.9, d);
+					v = static_cast<float>(std::max(static_cast<double>(v), lerp(static_cast<double>(v), top - 0.3 * (nature::noise2(dx * 0.1, dz * 0.1, 51) - 0.5), keep)));
+				} else {             // in front: down to the pool, rising back to the land beyond it
+					const double fall = 0.5 * st.width + 1.5 * st.drop * 0.1;   // (how far out the water lands, about)
+					const double keep = (1.0 - smoothstep(fall + st.width, fall + 3.0 * st.width, along)) * (1.0 - smoothstep(0.8 * st.width, 1.8 * st.width, across));
+					v = static_cast<float>(std::min(static_cast<double>(v), lerp(static_cast<double>(v), foot - 1.2, keep)));
+				}
+			}
+	}
 	f->h = std::move(h);
 	f->flow = std::move(flow);
 	return f;
@@ -328,9 +405,17 @@ inline Vec3 paint(const Spec &s, double px, double pz, double frac, double steep
 // The ground's colour (linear albedo) at pbrt's x z.
 inline Vec3 colourAt(const Field &f, double px, double pz) {
 	const Spec &s = f.spec;
-	const double frac = (f.heightAt(px, pz) - s.y) / std::max(1.0, s.height);
+	const double h = f.heightAt(px, pz), frac = (h - s.y) / std::max(1.0, s.height);
 	const Vec3 n = f.normalAt(px, pz, std::max(1.5, f.cell * 0.6));   // (the slope a few metres across: the fine detail does not speckle it with rock)
-	return paint(s, px, pz, frac, 1.0 - n.y, f.flowAt(px, pz));
+	Vec3 c = paint(s, px, pz, frac, 1.0 - n.y, f.flowAt(px, pz));
+	if (s.waterLevel > -1e29) {   // the shore: pale sand just above the water, darker wet sand at its edge, mud and weed below
+		const double above = h - s.waterLevel, grain = nature::noise2(px / 2.0, pz / 2.0, s.seed + 61);
+		const Vec3 sand = Vec3{0.46, 0.40, 0.30} * (0.9 + 0.2 * grain), wet = Vec3{0.24, 0.21, 0.16}, bed = Vec3{0.12, 0.13, 0.08} * (0.8 + 0.4 * grain);
+		c = lerp(c, sand, 1.0 - smoothstep(0.6, 2.2, above));
+		c = lerp(c, wet, 1.0 - smoothstep(-0.1, 0.4, above));
+		c = lerp(c, bed, 1.0 - smoothstep(-1.5, -0.3, above));
+	}
+	return c;
 }
 
 // ---- the meshes ----

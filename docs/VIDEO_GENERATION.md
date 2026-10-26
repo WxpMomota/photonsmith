@@ -737,6 +737,36 @@ On a terrain every height in the film file is above the ground: what is placed o
 their way over it like any set's floor (film_paths.h reads its meshes). (Two limits: the side pictures are projected along x or z, so a cliff facing 45 degrees between them
 shows them stretched by up to 1.4; the GPU renderers read pictures without a mip pyramid, so the painted ground shimmers a little when seen from far above.)
 
+On a terrain the camera's `key` heights are above the ground too: the camera's above the ground under it, and what it looks at above the ground under that.
+
+**Water: `water`, `river`, `waterfall`.** (film_water.h)
+
+```
+water     sea  level 0  waves 1.2  wind 200    # sea, lake or clear; its surface's height (pbrt's y, not above the ground); the waves' significant height and the way they run
+river     0 -300  20 -100  0 0  width 12        # waypoints downstream (pbrt's x z), or `river from X Z` (downhill from there) or `river canyon` (a canyon's riverbed)
+waterfall at 40 12 -80  width 8  drop 18  facing 180   # the middle of its lip (on a terrain, 12 m above the ground there)
+```
+
+*The sea* is twenty Gerstner waves, from swells as long as 22 times the wave height down to short chop, about the wind's direction (the chop from further round it), each
+moving at the speed deep water gives its length; short waves are gentler than long ones, as the sea's are. It is written every frame as a mesh in front of the camera only: a
+wedge a little wider than the picture, its rings crowding round the camera - centimetres apart at its feet, tens of metres at the horizon, out to 8 km, flat beyond 2.5 km so the
+horizon is a clean line (about 16,500 points, about 1.2 MB of text a frame). Ripples too small for the mesh are in its normals, fading with distance. Foam lies on the crests the
+waves fold over (`foam off`). The water is a smooth coat over the colour of deep water, so the sky is in it at a grazing angle and its body shows looking down; a lake is calmer
+(5 cm when `waves` is not given) and greener; `clear` water is glass (eta 1.33) and shows the ground under it. On a terrain the water fills what lies below its level: the ground
+just above the level is drawn under it (a clean shore, not islands as small as the fine detail), the shore is painted sand, wet sand and mud, and foam laps up the beach and back
+along the waterline (traced over the terrain's grid every frame).
+
+*A river* is a ribbon through its waypoints, smoothed, whose water never runs uphill. On a terrain its way is worked out when the film is loaded - in the lowest ground across
+its width, or downhill from a point (`from`: steps down the slope of the ground with a little momentum, until it leaves the square or the ground stops falling), or along a
+canyon's own riverbed (`canyon`) - and a bed is cut into the terrain under it, so no rise of the ground hides it. Its ripples are carried downstream at its `speed`, and it is
+white where it drops fast.
+
+*A waterfall* pours from its lip in the arc thrown water takes (out at about 1.2 m/s, falling under gravity, spreading as it falls): strands of white water broken into clumps
+that fall with it, in front of a see-through sheet, onto a pool with foam churning where it lands, and spray thrown up there (a `particles splash` the length of the film). On a
+terrain the land is shaped for it - raised behind the lip into a plateau whose front is the cliff (painted with the cliffs' side picture), lowered before it into a basin for its
+pool; elsewhere it brings a face of rock of its own. Water is heard unless the film file says how: a sea brings an `ambience sea` (the wash, a wave breaking now and then), a
+river `ambience water`, a waterfall `ambience falls` (a roar).
+
 **Music that follows the film.** Three things (music_cues.h, film_score.h):
 
 - *Ducking.* A film file's music cues are mixed on their own and laid on the soundtrack brought down under the characters' lines - by up to two thirds while a line is

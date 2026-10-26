@@ -6,6 +6,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
 
 #include "../../src/shared/cartoon/cartoons.h"
@@ -140,6 +141,101 @@ TEST(FilmTerrain, AFilmFilesTerrainCarriesWhatIsPlacedOnItAndIsSceneText) {
 																						 {"terrain hills\nterrain dunes", "a film has one terrain"}}) {
 		ff::DataFilm bad;
 		const std::string problem = loadNature("terrain_bad", "scene s.pbrt\nlength 4\n" + line + "\n", bad);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}
+
+// ---- water ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace water = cartoon::water;
+
+// The sea's waves roll: the surface is the same at the same time, moves on with time, keeps within its height, and is written only where the camera looks.
+TEST(FilmWater, TheSeasWavesRollAndAreDrawnWhereTheCameraLooks) {
+	water::Sea sea;
+	sea.level = 2.0;
+	sea.waves = 1.0;
+	double lo = 1e9, hi = -1e9, moved = 0.0;
+	for (double x = -40.0; x <= 40.0; x += 1.7)
+		for (double z = -40.0; z <= 40.0; z += 1.9) {
+			cartoon::Vec3 p, n, q, m;
+			double fold = 0.0;
+			water::seaAt(sea, x, z, 3.0, 1.0, p, n, fold);
+			lo = std::min(lo, p.y), hi = std::max(hi, p.y);
+			EXPECT_GT(n.y, 0.0);
+			water::seaAt(sea, x, z, 3.0, 1.0, q, m, fold);
+			EXPECT_DOUBLE_EQ(p.y, q.y) << "the same at the same time";
+			water::seaAt(sea, x, z, 4.0, 1.0, q, m, fold);
+			moved = std::max(moved, std::abs(p.y - q.y));
+		}
+	EXPECT_GT(hi - lo, 0.5 * sea.waves) << "waves as high as asked";
+	EXPECT_LT(hi - lo, 2.5 * sea.waves);
+	EXPECT_NEAR(0.5 * (hi + lo), sea.level, 0.4 * sea.waves);
+	EXPECT_GT(moved, 0.1) << "they move on";
+	// written in front of the camera only (story space: looking along -z from the origin, 10 m up)
+	const std::string text = water::seaText(sea, 1.0, {0.0, 10.0, 0.0}, {0.0, 0.0, -100.0}, 60.0, nullptr);
+	ASSERT_NE(text.find("trianglemesh"), std::string::npos);
+	std::size_t at = text.find("\"point3 P\" [ ");
+	ASSERT_NE(at, std::string::npos);
+	std::istringstream in(text.substr(at + 13, text.find(']', at) - at - 13));
+	double x = 0.0, y = 0.0, z = 0.0;
+	int behind = 0, points = 0;
+	while (in >> x >> y >> z) {
+		++points;
+		if (z > 30.0) ++behind;   // (pbrt's z: the camera looks towards -z)
+	}
+	EXPECT_GT(points, 1000);
+	EXPECT_EQ(behind, 0) << "nothing far behind the camera";
+}
+
+// A river's water never runs uphill, and on a terrain its bed is cut under it; a waterfall pours in the arc thrown water takes, its cliff raised behind it and its pool cut
+// before it, and it is seen and heard: spray where it lands, the roar under the film.
+TEST(FilmWater, RiversRunDownhillInTheirBedsAndWaterfallsStandOnTheirCliffs) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("water", "scene s.pbrt\nlength 6\nterrain hills size 400 height 40 seed 3 far off\nriver from 60 -80 width 6\nwaterfall at 0 12 -30 width 8 drop 12 facing 180\n", film), "");
+	ASSERT_EQ(film.spec.rivers.size(), 1u);
+	const auto ground = cartoon::terrain::fieldOf(film.spec.terrain);
+	const std::vector<cartoon::Vec3> &path = film.spec.rivers[0].path;
+	ASSERT_GT(path.size(), 10u);
+	for (std::size_t i = 1; i < path.size(); ++i) EXPECT_LE(path[i].y, path[i - 1].y + 1e-9) << "water does not run uphill";
+	int dry = 0;
+	for (const cartoon::Vec3 &p : path)
+		if (ground->inside(p.x, p.z) && ground->heightAt(p.x, p.z) > p.y - 0.2) ++dry;
+	EXPECT_LE(dry, static_cast<int>(path.size()) / 20) << "its bed is under it (the fine detail may poke through here and there)";
+	// the waterfall
+	ASSERT_EQ(film.spec.falls.size(), 1u);
+	const water::Fall &f = film.spec.falls[0];
+	EXPECT_NEAR(water::fallPoint(f, 0.0, 0.0).y, f.lip.y, 1e-9);
+	EXPECT_NEAR(water::fallFoot(f).y, f.lip.y - f.drop, 1e-6);
+	EXPECT_LT(water::fallFoot(f).z, f.lip.z) << "it pours the way it faces (180: towards -z)";
+	EXPECT_NEAR(ground->heightAt(f.lip.x, f.lip.z + 8.0), f.lip.y, 1.5) << "the cliff behind is raised to its lip";
+	EXPECT_LT(ground->heightAt(water::fallFoot(f).x, water::fallFoot(f).z), f.lip.y - f.drop + 0.5) << "and the pool cut before it";
+	const auto heard = [&](const std::string &kind) { return std::any_of(film.spec.ambience.begin(), film.spec.ambience.end(), [&](const auto &a) { return a.kind == kind; }); };
+	EXPECT_TRUE(heard("falls"));
+	EXPECT_TRUE(heard("water"));
+	ASSERT_FALSE(film.spec.emitters.empty());
+	EXPECT_EQ(film.spec.emitters.back().kind, "splash") << "spray where it lands";
+	// a lake's shore: the ground just above its level is drawn under it
+	ff::DataFilm lake;
+	ASSERT_EQ(loadNature("lake", "scene s.pbrt\nlength 4\nterrain hills size 300 height 30 seed 5 far off\nwater lake level 6\n", lake), "");
+	EXPECT_DOUBLE_EQ(lake.spec.terrain.waterLevel, 6.0);
+	EXPECT_DOUBLE_EQ(lake.spec.seas[0].waves, 0.05) << "a lake is calm";
+	const auto shore = cartoon::terrain::fieldOf(lake.spec.terrain);
+	int justAbove = 0;
+	for (double x = -140.0; x <= 140.0; x += 2.0)
+		for (double z = -140.0; z <= 140.0; z += 2.0) {
+			const double h = shore->heightAt(x, z);
+			justAbove += h > 6.0 && h < 6.1;
+		}
+	EXPECT_LT(justAbove, 40) << "no scatter of islands a hand's breadth high";
+	// errors
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"water sea waves 2", "needs its `level Y`"},
+																						 {"water level 0\nwater lake level 3", "one sea or lake"},
+																						 {"river 0 0", "at least two waypoints"},
+																						 {"river canyon", "no `terrain canyon`"},
+																						 {"river from 0 0", "no `terrain`"},
+																						 {"waterfall 0 1 2", "the middle of its lip"}}) {
+		ff::DataFilm bad;
+		const std::string problem = loadNature("water_bad", "scene s.pbrt\nlength 4\n" + line + "\n", bad);
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }

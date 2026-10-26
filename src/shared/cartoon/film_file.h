@@ -101,6 +101,11 @@
 //     terrain  mountains  size 1500  height 320  seed 3         # the land (film_terrain.h): hills, mountains, dunes or canyon, eroded, coloured by height, slope and water,
 //                                                               # with far ranges round it (`far off`); `at X Z`, `y Y`, `focus X Z` (finest there; a valley floor round it),
 //                                                               # `snow H` (the snow line above y), `erosion E` (0 to 3); on a terrain every height is above the ground
+//     water    sea  level 0  waves 1.2  wind 30                 # a sea, lake or clear water at a height (pbrt's y), its waves rolling (the significant height, which way
+//                                                               # they run, `choppy C`, `foam off`); on a terrain it fills what lies below its level and laps the shore
+//     river    0 -300  20 -100  0 0  width 12  speed 1.5        # waypoints downstream (pbrt's x z); on a terrain it lies in the lowest ground across its width;
+//                                                               # `river from X Z` finds its own way downhill, `river canyon` runs along a canyon's riverbed
+//     waterfall at 40 0 -80  width 8  drop 30  facing 180       # the middle of its lip (on a terrain, Y above the ground), how far it drops, which way it pours
 //
 // Weather and particles (film_particles.h):
 //
@@ -130,6 +135,7 @@
 #include "film_speech.h"
 #include "film_subjects.h"
 #include "film_terrain.h"
+#include "film_water.h"
 #include "music_cues.h"
 #include "prop_physics.h"
 #include "rig.h"
@@ -357,6 +363,10 @@ struct Spec {
 	// the land (`terrain`): what is placed, scattered or brought in stands on it (their heights are above it)
 	terrain::Spec terrain;
 	bool hasTerrain = false;
+	// water (`water`, `river`, `waterfall`)
+	std::vector<water::Sea> seas;
+	std::vector<water::River> rivers;
+	std::vector<water::Fall> falls;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	// weather and particles (`weather`, `particles`, `burst`)
@@ -847,6 +857,67 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				}
 			}
 			s.hasTerrain = true;
+		} else if (verb == "water") {
+			const std::vector<std::string> t = detail::tokens(line);
+			water::Sea sea;
+			std::size_t i = 1;
+			if (i < t.size() && std::find(water::seaKinds().begin(), water::seaKinds().end(), t[i]) != water::seaKinds().end()) sea.kind = t[i++];
+			if (sea.kind == "lake") sea.waves = 0.05, sea.choppy = 0.4;
+			bool level = false;
+			for (; i < t.size();) {
+				double v = 0.0;
+				if (t[i] == "foam" && i + 1 < t.size() && (t[i + 1] == "off" || t[i + 1] == "on")) {
+					sea.foam = t[i + 1] == "on";
+				} else if (i + 1 < t.size() && number(t[i + 1], v)) {
+					if (t[i] == "level") sea.level = v, level = true;
+					else if (t[i] == "waves" && v >= 0.0 && v <= 15.0) sea.waves = v;
+					else if (t[i] == "wind") sea.wind = v;
+					else if (t[i] == "choppy" && v >= 0.0 && v <= 1.0) sea.choppy = v;
+					else return fail("\"" + t[i] + "\": water takes level, waves (0 to 15 m), wind, choppy (0 to 1) and foam off");
+				} else {
+					return fail("`water [sea|lake|clear] level Y [waves H] [wind DEGREES] [choppy C] [foam off]`");
+				}
+				i += 2;
+			}
+			if (!level) return fail("water needs its `level Y` (its surface's height, pbrt's y: not above the ground)");
+			if (!s.seas.empty()) return fail("a film has one sea or lake (rivers and waterfalls as many as it likes)");
+			s.seas.push_back(sea);
+		} else if (verb == "river") {
+			const std::vector<std::string> t = detail::tokens(line);
+			water::River rv;
+			std::size_t i = 1;
+			if (i < t.size() && t[i] == "canyon") rv.canyon = true, ++i;
+			else if (i < t.size() && t[i] == "from") rv.downhill = true, ++i;
+			for (; i + 1 < t.size() && !(rv.canyon || (rv.downhill && rv.points.size() == 1)); i += 2) {
+				double x = 0.0, z = 0.0;
+				if (!number(t[i], x) || !number(t[i + 1], z)) break;
+				rv.points.push_back({x, z});
+			}
+			for (; i < t.size(); i += 2) {
+				double v = 0.0;
+				if (i + 1 >= t.size() || !number(t[i + 1], v) || v < 0.0) return fail("\"" + t[i] + "\": a river takes width, speed and y, each with a number");
+				if (t[i] == "width" && v > 0.0) rv.width = v;
+				else if (t[i] == "speed") rv.speed = v;
+				else if (t[i] == "y") rv.y = v;
+				else return fail("\"" + t[i] + "\": a river takes width, speed and y");
+			}
+			if (!rv.canyon && rv.points.size() < (rv.downhill ? 1u : 2u))
+				return fail("`river X Z X Z [X Z ...] [width W] [speed S] [y Y]` (at least two waypoints, downstream), `river from X Z ...` (on a terrain: downhill from there) or `river canyon ...`");
+			s.rivers.push_back(rv);
+		} else if (verb == "waterfall") {
+			const std::vector<std::string> t = detail::tokens(line);
+			water::Fall fl;
+			if (t.size() < 5 || t[1] != "at" || !number(t[2], fl.lip.x) || !number(t[3], fl.lip.y) || !number(t[4], fl.lip.z))
+				return fail("`waterfall at X Y Z [width W] [drop H] [facing DEGREES]`: the middle of its lip");
+			for (std::size_t i = 5; i < t.size(); i += 2) {
+				double v = 0.0;
+				if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail("\"" + t[i] + "\": a waterfall takes width, drop and facing, each with a number");
+				if (t[i] == "width" && v > 0.0 && v <= 200.0) fl.width = v;
+				else if (t[i] == "drop" && v > 0.0 && v <= 1000.0) fl.drop = v;
+				else if (t[i] == "facing") fl.facing = v;
+				else return fail("\"" + t[i] + "\": a waterfall takes width (up to 200 m), drop (up to 1000 m) and facing");
+			}
+			s.falls.push_back(fl);
 		} else if (verb == "sky") {
 			const std::vector<std::string> t = detail::tokens(line);
 			const auto hour = [&](const std::string &w, double &h) {   // 18:30 or 18.5
@@ -1111,7 +1182,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1131,11 +1202,50 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		}
 	for (Character &c : s.characters)   // (a crowd's wandering was made before the film's length was known: what starts after the film ends is not walked)
 		if (c.extra) c.walks.erase(std::remove_if(c.walks.begin(), c.walks.end(), [&](const WalkLine &w) { return w.t0 > s.length - 1.0; }), c.walks.end());
+	for (const water::River &rv : s.rivers)
+		if ((rv.downhill || rv.canyon) && !(s.hasTerrain && (rv.downhill || s.terrain.kind == "canyon"))) {
+			n = 0;
+			return fail(rv.canyon ? "`river canyon` runs along a canyon terrain's riverbed: the film has no `terrain canyon`" : "`river from X Z` finds its way downhill over a terrain: the film has no `terrain`");
+		}
 	if (s.hasTerrain) {   // on a terrain, heights are above the ground: what is placed and who is brought in stand on it
+		if (!s.seas.empty()) s.terrain.waterLevel = s.seas[0].level;   // (its shore is drawn for the water)
+		if (!s.rivers.empty()) {   // each river's way over the land, then a bed cut under it (so no rise of the ground hides it)
+			const std::shared_ptr<const terrain::Field> uncut = terrain::fieldOf(s.terrain);
+			for (water::River &rv : s.rivers) {
+				rv.path = water::riverPath(rv, uncut.get());
+				s.terrain.channels.push_back({rv.path, rv.width});
+			}
+		}
+		if (!s.falls.empty()) {   // a waterfall's lip is above the ground there: the land is raised behind it into a cliff, and lowered before it for its pool
+			const std::shared_ptr<const terrain::Field> before = terrain::fieldOf(s.terrain);
+			for (water::Fall &f : s.falls) {
+				f.lip.y += before->heightAt(f.lip.x, f.lip.z);
+				s.terrain.steps.push_back({f.lip, f.width, f.drop, f.facing});
+			}
+		}
 		const std::shared_ptr<const terrain::Field> ground = terrain::fieldOf(s.terrain);
+		for (Shot &shot : s.shots)   // (a camera's heights too: above the ground under it, and what it looks at above the ground under that)
+			for (camera_keyframes::Key &k : shot.path.keys) {
+				k.pos[1] += ground->heightAt(k.pos[0], k.pos[2]);
+				k.target[1] += ground->heightAt(k.target[0], k.target[2]);
+			}
 		for (dressing::Placement &p : s.placements) p.at.y += ground->heightAt(p.at.x, p.at.z);
 		for (Character &c : s.characters) c.start[1] += ground->heightAt(c.start[0], c.start[2]);
 	}
+	for (const water::Fall &f : s.falls) {   // a waterfall throws up spray where it lands, the whole film long
+		particles::Emitter e;
+		e.kind = "splash";
+		e.at = water::fallFoot(f);
+		e.t0 = 0.0;
+		e.t1 = s.length;
+		e.rate = std::min(600.0, 30.0 * f.width);
+		e.speed = std::min(8.0, 2.0 + 0.12 * f.drop);
+		s.emitters.push_back(e);
+	}
+	const auto hears = [&](const std::string &kind) { return std::any_of(s.ambience.begin(), s.ambience.end(), [&](const dressing::Ambience &a) { return a.kind == kind; }); };
+	if (!s.seas.empty() && s.seas[0].kind == "sea" && !hears("sea")) s.ambience.push_back({"sea", 0.8});   // (water is heard: unless the film file says how)
+	if (!s.rivers.empty() && !hears("water")) s.ambience.push_back({"water", 0.7});
+	if (!s.falls.empty() && !hears("falls")) s.ambience.push_back({"falls", 0.8});
 	r.ok = true;
 	return r;
 }
@@ -2357,6 +2467,16 @@ class DataFilm {
 			const Vec3 at{-eye.x, eye.y, eye.z};   // (pbrt's)
 			for (const particles::Weather &w : spec.weather) out += particles::weatherText(w, t, at, spec.shutter / std::max(1, spec.fps));
 			for (const particles::Emitter &e : spec.emitters) out += particles::emitterText(e, t);
+		}
+		if (!spec.seas.empty() || !spec.rivers.empty() || !spec.falls.empty()) {   // water (film_water.h)
+			Vec3 eye, target;
+			double fov = 40.0;
+			film_subjects::cameraOf(header, eye, target, fov);
+			const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+			const double aspect = 16.0 / 9.0, hfov = 2.0 * std::atan(std::tan(fov * kPi / 360.0) * aspect) * 180.0 / kPi;   // (a film's fov is its shorter side's)
+			for (const water::Sea &sea : spec.seas) out += water::seaText(sea, t, eye, target, hfov, ground.get());
+			for (const water::River &r : spec.rivers) out += water::riverText(r, t, ground.get());
+			for (const water::Fall &f : spec.falls) out += water::fallText(f, t, ground.get());
 		}
 		for (const Piece &piece : scene.world) {
 			if (piece.block < 0) {

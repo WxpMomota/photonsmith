@@ -174,13 +174,14 @@ inline std::string skyText(const std::string &film, const Sky &s, double t, doub
 }
 
 // ---- the set's sound ----
-// A sound that goes on under the whole film: wind, birds, crickets, water or night (crickets and an owl), at a gain.
+// A sound that goes on under the whole film: wind, birds, crickets, water (a stream), night (crickets and an owl), sea (the wash of waves, each breaking now and then) or
+// falls (the roar of a waterfall), at a gain.
 struct Ambience {
 	std::string kind;
 	double gain = 1.0;
 };
 inline const std::vector<std::string> &ambienceKinds() {
-	static const std::vector<std::string> k = {"wind", "birds", "crickets", "water", "night"};
+	static const std::vector<std::string> k = {"wind", "birds", "crickets", "water", "night", "sea", "falls"};
 	return k;
 }
 namespace sound {
@@ -221,6 +222,21 @@ inline void water(audio::Mix &m, double length, double gain) {
 		m.put(t, audio::chirp(f, f * 1.6, 0.035, 0.0, 0.0), 0.025 * gain, -0.6 + 1.2 * audio::unit(static_cast<unsigned>(t * 991.0)), 0.3);
 	}
 }
+inline void sea(audio::Mix &m, double length, double gain) {
+	for (double s = 0.0; s < length; s += 1.4)   // the wash: low noise, overlapping
+		m.put(s, audio::noiseBurst(2.8, 1.0, 0.8, 300.0, 700.0, 61u + static_cast<unsigned>(s * 10.0)), 0.06 * gain, 0.4 * std::sin(s * 0.2), 0.4);
+	for (double t = 1.5; t < length; t += 5.5 + 3.5 * audio::unit(static_cast<unsigned>(t * 100.0) + 3u)) {   // a wave breaking: a swell of noise that opens up, then a long hiss
+		const unsigned seed = static_cast<unsigned>(t * 1000.0) + 5u;
+		m.put(t, audio::noiseBurst(1.2, 0.9, 0.2, 400.0, 2400.0, seed), 0.12 * gain, -0.5 + audio::unit(seed), 0.5);
+		m.put(t + 1.0, audio::noiseBurst(3.5, 0.05, 3.2, 2600.0, 900.0, seed + 1u), 0.07 * gain, -0.5 + audio::unit(seed + 2u), 0.5);
+	}
+}
+inline void falls(audio::Mix &m, double length, double gain) {
+	for (double s = 0.0; s < length; s += 0.8) {   // a roar: broad noise, low and high, overlapping so it never breathes
+		m.put(s, audio::noiseBurst(1.8, 0.6, 0.6, 180.0, 400.0, 71u + static_cast<unsigned>(s * 10.0)), 0.10 * gain, -0.2, 0.3);
+		m.put(s + 0.4, audio::noiseBurst(1.8, 0.6, 0.6, 1500.0, 3000.0, 73u + static_cast<unsigned>(s * 10.0)), 0.035 * gain, 0.2, 0.3);
+	}
+}
 inline void night(audio::Mix &m, double length, double gain) {
 	crickets(m, length, gain);
 	for (double t = 3.0; t < length; t += 9.0 + 6.0 * audio::unit(static_cast<unsigned>(t * 10.0) + 17u)) {   // an owl far off
@@ -236,6 +252,8 @@ inline void play(audio::Mix &m, const std::vector<Ambience> &beds) {
 		else if (a.kind == "crickets") sound::crickets(m, m.seconds(), a.gain);
 		else if (a.kind == "water") sound::water(m, m.seconds(), a.gain);
 		else if (a.kind == "night") sound::night(m, m.seconds(), a.gain);
+		else if (a.kind == "sea") sound::sea(m, m.seconds(), a.gain);
+		else if (a.kind == "falls") sound::falls(m, m.seconds(), a.gain);
 	}
 }
 
