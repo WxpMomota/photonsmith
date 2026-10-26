@@ -111,6 +111,9 @@
 //     forest   mixed 3000  season autumn                        # conifer, broadleaf, birch, palm, shrub or mixed (by height), so many trees where the land suits them;
 //                                                               # `in X0 Z0 X1 Z1`, `below H` (the tree line above the land's base), `above H`, `steep S`, `scale A B`,
 //                                                               # `near D` (drawn in full within D m of the camera), `season` summer, autumn, winter or spring, `seed N`
+//     flock    starlings 300  at 0 80 -200  radius 40           # animals (film_wildlife.h): starlings or fish (flocking round `at`), geese (`from X Y Z to X Y Z`, in
+//                                                               # a V), butterflies (`in X0 Z0 X1 Z1`); `speed S`, `during T0 T1`, `seed N`; on a terrain Y is above it
+//     herd     deer 12  from -200 0  to 200 -150  speed 1.1     # a herd walking over the land, grazing now and then; `start T`, `seed N`
 //
 // Weather and particles (film_particles.h):
 //
@@ -142,6 +145,7 @@
 #include "film_clouds.h"
 #include "film_forest.h"
 #include "film_terrain.h"
+#include "film_wildlife.h"
 #include "film_water.h"
 #include "music_cues.h"
 #include "prop_physics.h"
@@ -379,6 +383,9 @@ struct Spec {
 	// forests (`forest`), and their trees (planted when the film is loaded, on the land as it is drawn)
 	std::vector<forest::Forest> forests;
 	std::vector<std::vector<forest::Tree>> planted;
+	// animals (`flock`, `herd`)
+	std::vector<wildlife::Flock> flocks;
+	std::vector<wildlife::Herd> herds;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	// weather and particles (`weather`, `particles`, `burst`)
@@ -995,6 +1002,60 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				}
 			}
 			s.forests.push_back(f);
+		} else if (verb == "flock") {
+			const std::vector<std::string> t = detail::tokens(line);
+			wildlife::Flock f;
+			double count = 0.0;
+			if (t.size() < 3 || std::find(wildlife::flockKinds().begin(), wildlife::flockKinds().end(), t[1]) == wildlife::flockKinds().end() || !number(t[2], count) || count < 1 || count > 3000)
+				return fail("`flock KIND COUNT ...`: starlings, geese, fish or butterflies, 1 to 3000 of them (`at X Y Z` and `radius R`; geese `from X Y Z to X Y Z`; butterflies `in X0 Z0 X1 Z1`)");
+			f.kind = t[1];
+			f.count = static_cast<int>(count);
+			if (f.kind == "fish") f.radius = 6.0;
+			bool where = false;
+			for (std::size_t i = 3; i < t.size();) {
+				double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
+				if ((t[i] == "at" || t[i] == "from" || t[i] == "to") && i + 3 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c)) {
+					(t[i] == "at" ? f.at : t[i] == "from" ? f.from : f.to) = Vec3{a, b, c};
+					where = where || t[i] != "to";
+					i += 4;
+				} else if (t[i] == "in" && i + 4 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && number(t[i + 3], c) && number(t[i + 4], d)) {
+					f.x0 = std::min(a, c), f.z0 = std::min(b, d), f.x1 = std::max(a, c), f.z1 = std::max(b, d);
+					where = true;
+					i += 5;
+				} else if (t[i] == "during" && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && b > a) {
+					f.t0 = a, f.t1 = b;
+					i += 3;
+				} else if (i + 1 < t.size() && number(t[i + 1], a)) {
+					if (t[i] == "radius" && a > 0.0) f.radius = a;
+					else if (t[i] == "speed" && a > 0.0) f.speed = a;
+					else if (t[i] == "height") f.at.y = a;
+					else if (t[i] == "seed") f.seed = static_cast<int>(a);
+					else return fail("\"" + t[i] + "\": a flock takes at X Y Z, from X Y Z, to X Y Z, in X0 Z0 X1 Z1, radius, speed, height, during T0 T1 and seed");
+					i += 2;
+				} else {
+					return fail("\"" + t[i] + "\": a flock takes at X Y Z, from X Y Z, to X Y Z, in X0 Z0 X1 Z1, radius, speed, height, during T0 T1 and seed");
+				}
+			}
+			if (!where) return fail(f.kind == "geese" ? "geese fly `from X Y Z to X Y Z`" : f.kind == "butterflies" ? "butterflies flit `in X0 Z0 X1 Z1`" : "a flock needs its `at X Y Z`");
+			s.flocks.push_back(f);
+		} else if (verb == "herd") {
+			const std::vector<std::string> t = detail::tokens(line);
+			wildlife::Herd h;
+			double count = 0.0;
+			if (t.size() < 9 || std::find(wildlife::herdKinds().begin(), wildlife::herdKinds().end(), t[1]) == wildlife::herdKinds().end() || !number(t[2], count) || count < 1 || count > 500 ||
+				t[3] != "from" || !number(t[4], h.fx) || !number(t[5], h.fz) || t[6] != "to" || !number(t[7], h.tx) || !number(t[8], h.tz))
+				return fail("`herd deer COUNT from X Z to X Z [speed S] [start T] [seed N]` (1 to 500 of them)");
+			h.kind = t[1];
+			h.count = static_cast<int>(count);
+			for (std::size_t i = 9; i < t.size(); i += 2) {
+				double a = 0.0;
+				if (i + 1 >= t.size() || !number(t[i + 1], a)) return fail("\"" + t[i] + "\": a herd takes speed, start and seed, each with a number");
+				if (t[i] == "speed" && a > 0.0) h.speed = a;
+				else if (t[i] == "start") h.t0 = a;
+				else if (t[i] == "seed") h.seed = static_cast<int>(a);
+				else return fail("\"" + t[i] + "\": a herd takes speed, start and seed");
+			}
+			s.herds.push_back(h);
 		} else if (verb == "sky") {
 			const std::vector<std::string> t = detail::tokens(line);
 			const auto hour = [&](const std::string &w, double &h) {   // 18:30 or 18.5
@@ -1259,7 +1320,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, clouds, forest, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, clouds, forest, flock, herd, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1314,6 +1375,17 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		const double level = s.seas.empty() ? -1e30 : s.seas[0].level;
 		for (const forest::Forest &f : s.forests) s.planted.push_back(forest::plant(f, ground.get(), level, s.terrain.channels));
 	}
+	{   // the flocks: their heights above the land (on a terrain), and their flights worked out
+		const std::shared_ptr<const terrain::Field> ground = s.hasTerrain ? terrain::fieldOf(s.terrain) : nullptr;
+		for (wildlife::Flock &f : s.flocks) {
+			if (ground && f.kind != "butterflies") {
+				f.at.y += ground->heightAt(f.at.x, f.at.z);
+				f.from.y += ground->heightAt(f.from.x, f.from.z);
+				f.to.y += ground->heightAt(f.to.x, f.to.z);
+			}
+			wildlife::prepare(f, s.length);
+		}
+	}
 	for (const water::Fall &f : s.falls) {   // a waterfall throws up spray where it lands, the whole film long
 		particles::Emitter e;
 		e.kind = "splash";
@@ -1328,6 +1400,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 	if (!s.seas.empty() && s.seas[0].kind == "sea" && !hears("sea")) s.ambience.push_back({"sea", 0.8});   // (water is heard: unless the film file says how)
 	if (!s.rivers.empty() && !hears("water")) s.ambience.push_back({"water", 0.7});
 	if (!s.falls.empty() && !hears("falls")) s.ambience.push_back({"falls", 0.8});
+	if (std::any_of(s.flocks.begin(), s.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "geese"; }) && !hears("geese")) s.ambience.push_back({"geese", 0.8});
 	r.ok = true;
 	return r;
 }
@@ -2560,6 +2633,18 @@ class DataFilm {
 			for (const water::Sea &sea : spec.seas) out += water::seaText(sea, t, eye, target, hfov, ground.get());
 			for (const water::River &r : spec.rivers) out += water::riverText(r, t, ground.get());
 			for (const water::Fall &f : spec.falls) out += water::fallText(f, t, ground.get());
+		}
+		if (!spec.flocks.empty() || !spec.herds.empty()) {   // animals (film_wildlife.h): each kind's poses once
+			const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+			std::vector<std::string> written;
+			const auto first = [&](const std::string &kind) {
+				if (std::find(written.begin(), written.end(), kind) != written.end()) return false;
+				written.push_back(kind);
+				return true;
+			};
+			for (const wildlife::Flock &f : spec.flocks)
+				if (t >= f.t0 && t <= f.t1) out += wildlife::flockText(f, t, ground.get(), first(f.kind));
+			for (const wildlife::Herd &h : spec.herds) out += wildlife::herdText(h, t, ground.get(), first(h.kind));
 		}
 		if (!spec.forests.empty()) {   // forests (film_forest.h): near the camera in full
 			Vec3 eye, target;

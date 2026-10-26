@@ -1,0 +1,345 @@
+#pragma once
+// film_wildlife.h -- animals for a film file (film_file.h `flock`, `herd`): a murmuration of starlings, a skein of geese in a V, a school of fish, butterflies over a meadow,
+// a herd of deer crossing the land.
+//
+// How they move:
+//   starlings, fish   flocking (boids): each keeps apart from the nearest, turns as its seven nearest neighbours turn, closes on them, and is drawn to a centre that wanders
+//                     round where the flock was put - so the flock swirls, stretches and folds. The flight is worked out once when the film is loaded, 24 steps a second
+//                     over the film, and each frame takes the step at its time (frames stay independent and render in any order);
+//   geese             a V behind a leader that flies from one point to another, each bird half a wingbeat after the one before;
+//   butterflies       each wanders over its patch near the ground, flitting up and down;
+//   deer              a loose herd walking from one point to another over the land, each stopping now and then to graze.
+// How they look: each kind is drawn from a few poses of its wingbeat, tail beat or stride (pbrt objects, written once per frame and placed once per animal), turned along its
+// way and banked into its turns.
+//
+// Coordinates are pbrt's, as a film file's; the shapes are made in story space and placed with nature::placeObject.
+
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <map>
+#include <string>
+#include <vector>
+
+#include "cartoon_lib.h"
+#include "film_terrain.h"
+#include "nature_lib.h"
+
+namespace cartoon {
+namespace wildlife {
+
+inline const std::vector<std::string> &flockKinds() {
+	static const std::vector<std::string> k = {"starlings", "geese", "fish", "butterflies"};
+	return k;
+}
+inline const std::vector<std::string> &herdKinds() {
+	static const std::vector<std::string> k = {"deer"};
+	return k;
+}
+
+// A flock: its kind, how many, where (`at`, the middle it keeps round, and `radius`; geese: `from` and `to`; butterflies: the rectangle x0 z0 x1 z1 at height `at.y`),
+// how fast (metres a second), when it flies (t0 to t1), and a seed.
+struct Flock {
+	std::string kind;
+	int count = 100;
+	Vec3 at, from, to;
+	double radius = 30.0, speed = 0.0, t0 = 0.0, t1 = 1e30, x0 = 0.0, z0 = 0.0, x1 = 0.0, z1 = 0.0;
+	int seed = 1;
+	// (starlings, fish) the flight, worked out when the film is loaded: positions and velocities at each step (pbrt's)
+	std::vector<std::vector<Vec3>> pos, vel;
+	double dt = 1.0 / 24.0;
+};
+// A herd: its kind, how many, from where to where (pbrt's x z), how fast, when it sets off, a seed.
+struct Herd {
+	std::string kind = "deer";
+	int count = 10;
+	double fx = 0.0, fz = 0.0, tx = 0.0, tz = 0.0, speed = 1.1, t0 = 0.0;
+	int seed = 1;
+};
+
+namespace detail {
+
+inline double speedOf(const std::string &kind) { return kind == "starlings" ? 11.0 : kind == "geese" ? 15.0 : kind == "fish" ? 1.4 : 1.2; }
+
+// Flocking, stepped from t = 0 to `length`: the flock's positions and velocities every dt.
+inline void fly(Flock &f, double seconds) {
+	const int n = f.count;
+	const double speed = f.speed > 0.0 ? f.speed : speedOf(f.kind);
+	const double space = f.kind == "fish" ? 0.5 : 3.0;   // (how close they come: a murmuration seen from afar is a cloud of birds a few metres apart)
+	std::vector<Vec3> p(static_cast<std::size_t>(n)), v(p.size());
+	for (int i = 0; i < n; ++i) {   // a ball of them, all heading roughly one way
+		const int s = f.seed * 4999 + i;
+		const double u = hash01(s, 1), w = hash01(s, 2), r = 0.4 * f.radius * std::cbrt(hash01(s, 3));
+		const double th = 2.0 * kPi * u, ph = std::acos(2.0 * w - 1.0);
+		p[static_cast<std::size_t>(i)] = f.at + Vec3{r * std::sin(ph) * std::cos(th), 0.5 * r * std::cos(ph), r * std::sin(ph) * std::sin(th)};
+		v[static_cast<std::size_t>(i)] = normalize(Vec3{1.0, 0.0, 0.2 * (hash01(s, 4) - 0.5)}) * speed;
+	}
+	const int steps = static_cast<int>(std::ceil(seconds / f.dt)) + 2;
+	f.pos.assign(static_cast<std::size_t>(steps), {});
+	f.vel.assign(static_cast<std::size_t>(steps), {});
+	std::vector<std::pair<double, int>> around;
+	const double cellSize = 3.0 * space;   // (neighbours are looked for in the 27 cells round each one: a flock of thousands costs no more per bird than one of tens)
+	std::map<long long, std::vector<int>> grid;
+	const auto cellOf = [&](const Vec3 &q, int dx, int dy, int dz) {
+		const long long cx = static_cast<long long>(std::floor(q.x / cellSize)) + dx, cy = static_cast<long long>(std::floor(q.y / cellSize)) + dy, cz = static_cast<long long>(std::floor(q.z / cellSize)) + dz;
+		return (cx * 73856093LL) ^ (cy * 19349663LL) ^ (cz * 83492791LL);
+	};
+	for (int k = 0; k < steps; ++k) {
+		f.pos[static_cast<std::size_t>(k)] = p;
+		f.vel[static_cast<std::size_t>(k)] = v;
+		const double t = k * f.dt;
+		// the centre it is drawn to wanders round where the flock was put (slowly; fish stay in a smaller sweep)
+		const Vec3 centre = f.at + Vec3{f.radius * (nature::noise2(t * 0.07, 1.3, f.seed) - 0.5) * 1.6, f.radius * (nature::noise2(t * 0.09, 4.1, f.seed + 1) - 0.5) * 0.5,
+										f.radius * (nature::noise2(t * 0.07, 7.7, f.seed + 2) - 0.5) * 1.6};
+		std::vector<Vec3> nv = v;
+		grid.clear();
+		for (int i = 0; i < n; ++i) grid[cellOf(p[static_cast<std::size_t>(i)], 0, 0, 0)].push_back(i);
+		for (int i = 0; i < n; ++i) {
+			around.clear();
+			for (int dz = -1; dz <= 1; ++dz)
+				for (int dy = -1; dy <= 1; ++dy)
+					for (int dx = -1; dx <= 1; ++dx) {
+						const auto it = grid.find(cellOf(p[static_cast<std::size_t>(i)], dx, dy, dz));
+						if (it == grid.end()) continue;
+						for (int j : it->second)
+							if (j != i) around.push_back({length(p[static_cast<std::size_t>(j)] - p[static_cast<std::size_t>(i)]), j});
+					}
+			const int topo = std::min(7, static_cast<int>(around.size()));
+			std::partial_sort(around.begin(), around.begin() + topo, around.end());
+			Vec3 sep{0, 0, 0}, ali{0, 0, 0}, coh{0, 0, 0};
+			for (int q = 0; q < topo; ++q) {
+				const auto [d, j] = around[static_cast<std::size_t>(q)];
+				const Vec3 off = p[static_cast<std::size_t>(i)] - p[static_cast<std::size_t>(j)];
+				if (d < space * 2.0) sep = sep + off * (1.0 / std::max(0.05, d * d));
+				ali = ali + v[static_cast<std::size_t>(j)];
+				coh = coh + p[static_cast<std::size_t>(j)];
+			}
+			if (topo > 0) {
+				ali = ali * (1.0 / topo) - v[static_cast<std::size_t>(i)];
+				coh = coh * (1.0 / topo) - p[static_cast<std::size_t>(i)];
+			}
+			const Vec3 home = centre - p[static_cast<std::size_t>(i)];
+			const Vec3 accel = sep * (2.5 * space) + ali * 1.2 + coh * 0.35 + home * (1.2 / std::max(1.0, f.radius)) * speed;
+			Vec3 w = v[static_cast<std::size_t>(i)] + accel * f.dt;
+			w.y *= 0.96;   // (they turn more than they climb)
+			const double sp = length(w);
+			w = w * (std::clamp(sp, 0.6 * speed, 1.3 * speed) / std::max(1e-9, sp));
+			nv[static_cast<std::size_t>(i)] = w;
+		}
+		v = nv;
+		for (int i = 0; i < n; ++i) p[static_cast<std::size_t>(i)] = p[static_cast<std::size_t>(i)] + v[static_cast<std::size_t>(i)] * f.dt;
+	}
+}
+
+// The turn that faces +z along `fwd` with its up as near `upHint` as it can be (story space; columns right, up, forward).
+inline Mat4 facing(Vec3 fwd, Vec3 upHint) {
+	fwd = normalize(fwd);
+	Vec3 right = cross(upHint, fwd);
+	right = length(right) > 1e-9 ? normalize(right) : Vec3{1, 0, 0};
+	const Vec3 up = cross(fwd, right);
+	return {right.x, up.x, fwd.x, 0, right.y, up.y, fwd.y, 0, right.z, up.z, fwd.z, 0, 0, 0, 0, 1};
+}
+
+// ---- the shapes, in poses ----
+constexpr int kPoses = 8;
+inline void wing(Mesh &m, Vec3 shoulder, double span, double chord, double angle, double side) {   // a wing out to one side, raised by `angle` (radians)
+	const Vec3 out{side * std::cos(angle), std::sin(angle), 0.0};
+	const Vec3 tip = shoulder + out * span, mid = shoulder + out * (span * 0.55);
+	const int b = static_cast<int>(m.verts.size());
+	for (const Vec3 &q : {shoulder + Vec3{0, 0, chord * 0.5}, shoulder - Vec3{0, 0, chord * 0.6}, mid - Vec3{0, 0, chord * 0.55}, tip - Vec3{0, 0, chord * 0.15}, mid + Vec3{0, 0, chord * 0.3}}) {
+		m.verts.push_back(q);
+		m.normals.push_back(normalize(Vec3{-out.y * side, out.x * side, 0.0}));
+	}
+	m.tris.push_back({b, b + 1, b + 2});
+	m.tris.push_back({b, b + 2, b + 4});
+	m.tris.push_back({b + 4, b + 2, b + 3});
+}
+inline void blob(Mesh &m, Vec3 at, Vec3 size) {
+	const Mesh s = uvSphere(1.0, 10, 6);
+	const int b = static_cast<int>(m.verts.size());
+	for (std::size_t i = 0; i < s.verts.size(); ++i) {
+		m.verts.push_back(at + Vec3{s.verts[i].x * size.x, s.verts[i].y * size.y, s.verts[i].z * size.z});
+		m.normals.push_back(normalize(Vec3{s.normals[i].x / size.x, s.normals[i].y / size.y, s.normals[i].z / size.z}));
+	}
+	for (const auto &t : s.tris) m.tris.push_back({t[0] + b, t[1] + b, t[2] + b});
+}
+// A bird (forward +z, up +y; `span` metres wingtip to wingtip) at phase k of its wingbeat.
+inline Mesh birdPose(int k, double span) {
+	Mesh m;
+	const double L = span * 0.42, beat = std::sin(2.0 * kPi * k / kPoses);
+	blob(m, {0, 0, 0}, {0.09 * L, 0.08 * L, 0.32 * L});
+	blob(m, {0, 0.05 * L, 0.33 * L}, {0.07 * L, 0.07 * L, 0.08 * L});
+	for (const double side : {-1.0, 1.0}) wing(m, {side * 0.05 * L, 0.03 * L, 0.05 * L}, span * 0.48, 0.42 * L, 0.65 * beat + 0.1, side);
+	const int b = static_cast<int>(m.verts.size());   // the tail, a little fan
+	for (const Vec3 &q : {Vec3{0, 0, -0.25 * L}, Vec3{-0.12 * L, 0, -0.5 * L}, Vec3{0.12 * L, 0, -0.5 * L}}) {
+		m.verts.push_back(q);
+		m.normals.push_back({0, 1, 0});
+	}
+	m.tris.push_back({b, b + 1, b + 2});
+	return m;
+}
+// A fish (forward +z) `len` long, at phase k of its tail beat.
+inline Mesh fishPose(int k, double len) {
+	Mesh m;
+	const double sway = 0.35 * std::sin(2.0 * kPi * k / kPoses);
+	const Mesh body = lathe({{0.0, -0.5}, {0.08, -0.35}, {0.14, -0.05}, {0.12, 0.2}, {0.06, 0.4}, {0.0, 0.5}}, 10);
+	for (std::size_t i = 0; i < body.verts.size(); ++i) {   // (the lathe's axis is y: lay it along z, squash it side to side, and bend its tail)
+		const Vec3 v = body.verts[i], n = body.normals[i];
+		const double z = v.y * len, bend = z < 0.0 ? sway * (z / len) * (z / len) * len : 0.0;
+		m.verts.push_back({v.x * len * 0.55 + bend, v.z * len, z});
+		m.normals.push_back(normalize(Vec3{n.x / 0.55, n.z, n.y}));
+	}
+	m.tris = body.tris;
+	const int b = static_cast<int>(m.verts.size());
+	const double tailX = sway * 0.25 * len;
+	for (const Vec3 &q : {Vec3{tailX * 0.8, 0, -0.45 * len}, Vec3{tailX, 0.16 * len, -0.68 * len}, Vec3{tailX, -0.16 * len, -0.68 * len}}) {
+		m.verts.push_back(q);
+		m.normals.push_back({1, 0, 0});
+	}
+	m.tris.push_back({b, b + 1, b + 2});
+	return m;
+}
+// A butterfly (forward +z) at phase k of its wingbeat: two pairs of wings.
+inline Mesh butterflyPose(int k) {
+	Mesh m;
+	const double a = 1.2 * std::sin(2.0 * kPi * k / kPoses) + 0.25;
+	blob(m, {0, 0, 0}, {0.006, 0.006, 0.03});
+	for (const double side : {-1.0, 1.0}) {
+		const Vec3 out{side * std::cos(a), std::sin(a), 0.0};
+		const int b = static_cast<int>(m.verts.size());
+		for (const Vec3 &q : {Vec3{0, 0, 0.01}, out * 0.05 + Vec3{0, 0, 0.035}, out * 0.055 + Vec3{0, 0, -0.005}, Vec3{0, 0, -0.012}, out * 0.04 + Vec3{0, 0, -0.04}}) {
+			m.verts.push_back(q);
+			m.normals.push_back(normalize(Vec3{-out.y * side, out.x * side, 0.0}));
+		}
+		m.tris.push_back({b, b + 1, b + 2});
+		m.tris.push_back({b, b + 2, b + 3});
+		m.tris.push_back({b + 3, b + 2, b + 4});
+	}
+	return m;
+}
+// A deer (forward +z, standing on y 0) at phase k of its stride; `graze`: its head down to the grass.
+inline Mesh deerPose(int k, bool graze) {
+	Mesh m;
+	const double ph = 2.0 * kPi * k / kPoses;
+	blob(m, {0, 1.0, 0}, {0.22, 0.25, 0.62});                                // body
+	const Vec3 neckBase{0, 1.15, 0.5}, head = graze ? Vec3{0, 0.35, 0.95} : Vec3{0, 1.6, 0.78};
+	nature::addStrip(m, [&](double s) { return neckBase + (head - neckBase) * s; }, [](double s) { return 0.16 - 0.06 * s; }, {1, 0, 0}, 3);
+	blob(m, head, {0.09, 0.1, 0.18});
+	for (const double side : {-1.0, 1.0}) blob(m, head + Vec3{side * 0.07, 0.12, -0.06}, {0.025, 0.07, 0.04});   // ears
+	for (int leg = 0; leg < 4; ++leg) {   // legs swinging in a walk (diagonal pairs together)
+		const double side = leg % 2 ? 1.0 : -1.0, front = leg < 2 ? 1.0 : -1.0;
+		const double swing = 0.35 * std::sin(ph + (leg == 0 || leg == 3 ? 0.0 : kPi));
+		const Vec3 hip{side * 0.12, 0.95, front * 0.45}, knee = hip + Vec3{0, -0.45, swing * 0.5 + 0.03 * front}, hoof{hip.x, 0.0, hip.z + swing};
+		nature::addStrip(m, [&](double s) { return hip + (knee - hip) * s; }, [](double) { return 0.07; }, {1, 0, 0}, 1);
+		nature::addStrip(m, [&](double s) { return knee + (hoof - knee) * s; }, [](double) { return 0.045; }, {1, 0, 0}, 1);
+		nature::addStrip(m, [&](double s) { return hip + (knee - hip) * s; }, [](double) { return 0.07; }, {0, 0, 1}, 1);
+		nature::addStrip(m, [&](double s) { return knee + (hoof - knee) * s; }, [](double) { return 0.045; }, {0, 0, 1}, 1);
+	}
+	return m;
+}
+
+inline std::string poseObjects(const std::string &kind) {
+	std::string out;
+	for (int k = 0; k < kPoses; ++k) {
+		const std::string name = "wild_" + kind + "_" + std::to_string(k);
+		if (kind == "starlings") out += nature::objectBegin(name) + attr(coated({0.03, 0.03, 0.035}, 0.3), emitMesh(birdPose(k, 0.6), identity())) + nature::objectEnd();   // (a little larger than life)
+		else if (kind == "geese") out += nature::objectBegin(name) + attr(diffuseMaterial({0.28, 0.25, 0.22}), emitMesh(birdPose(k, 1.6), identity())) + nature::objectEnd();
+		else if (kind == "fish") out += nature::objectBegin(name) + attr(coated({0.45, 0.48, 0.5}, 0.15), emitMesh(fishPose(k, 0.3), identity())) + nature::objectEnd();
+		else if (kind == "butterflies")
+			for (int c = 0; c < 3; ++c) {   // three colours: orange, yellow, blue
+				static const Vec3 col[3] = {{0.75, 0.32, 0.04}, {0.8, 0.7, 0.15}, {0.12, 0.25, 0.7}};
+				out += nature::objectBegin(name + "_" + std::to_string(c)) + attr(translucentMaterial(col[c], col[c] * 0.4), emitMesh(butterflyPose(k), identity())) + nature::objectEnd();
+			}
+		else if (kind == "deer") {
+			out += nature::objectBegin(name) + attr(diffuseMaterial({0.36, 0.22, 0.12}), emitMesh(deerPose(k, false), identity())) + nature::objectEnd();
+			if (k == 0) out += nature::objectBegin("wild_deer_graze") + attr(diffuseMaterial({0.36, 0.22, 0.12}), emitMesh(deerPose(0, true), identity())) + nature::objectEnd();
+		}
+	}
+	return out;
+}
+
+}  // namespace detail
+
+// Works out what a flock does over a film `length` seconds long (starlings and fish: their flight).
+inline void prepare(Flock &f, double seconds) {
+	if (f.kind == "starlings" || f.kind == "fish") detail::fly(f, std::min(seconds, std::max(0.0, f.t1)) + 1.0);
+}
+
+// A flock at t, as scene text: the poses of its kind (unless `objects` is false: another flock of the kind wrote them) and a placement for each animal. "" outside its time.
+inline std::string flockText(const Flock &f, double t, const terrain::Field *ground, bool objects = true) {
+	if (t < f.t0 || t > f.t1) return std::string();
+	std::string out = "# a flock of " + f.kind + " (film_wildlife.h)\n" + (objects ? detail::poseObjects(f.kind) : std::string());
+	const auto place = [&](const std::string &name, Vec3 at, Vec3 fwd, double bank, double s) {   // pbrt's at and fwd
+		const Vec3 storyAt{-at.x, at.y, at.z}, storyFwd{-fwd.x, fwd.y, fwd.z};
+		const Mat4 turn = detail::facing(storyFwd, Vec3{0, 1, 0});
+		out += nature::placeObject(name, mul(translate(storyAt), turn, rotate({0, 0, 1}, bank), scale(s)));
+	};
+	const double rel = t - f.t0;
+	if (f.kind == "starlings" || f.kind == "fish") {
+		if (f.pos.empty()) return std::string();
+		const double step = rel / f.dt;
+		const std::size_t k = std::min(f.pos.size() - 2, static_cast<std::size_t>(std::max(0.0, step)));
+		const double u = std::clamp(step - k, 0.0, 1.0);
+		for (int i = 0; i < f.count; ++i) {
+			const Vec3 p = f.pos[k][static_cast<std::size_t>(i)] * (1.0 - u) + f.pos[k + 1][static_cast<std::size_t>(i)] * u;
+			const Vec3 v = f.vel[k][static_cast<std::size_t>(i)] * (1.0 - u) + f.vel[k + 1][static_cast<std::size_t>(i)] * u;
+			const Vec3 dv = f.vel[k + 1][static_cast<std::size_t>(i)] - f.vel[k][static_cast<std::size_t>(i)];   // (bank into the turn)
+			const double bank = std::clamp(-(dv.x * v.z - dv.z * v.x) / std::max(1e-6, length(v) * length(v)) * 900.0, -50.0, 50.0);
+			const double beats = f.kind == "fish" ? 3.0 : 12.0;
+			const int pose = static_cast<int>(std::floor((t * beats + hash01(f.seed + i, 9)) * detail::kPoses)) % detail::kPoses;
+			place("wild_" + f.kind + "_" + std::to_string(pose), p, v, bank, 0.85 + 0.3 * hash01(f.seed + i, 10));
+		}
+	} else if (f.kind == "geese") {   // a V behind the leader, on its way from `from` to `to`
+		const double speed = f.speed > 0.0 ? f.speed : detail::speedOf(f.kind);
+		const Vec3 dir = normalize(f.to - f.from + Vec3{1e-9, 0, 0});
+		const Vec3 side = normalize(cross(Vec3{0, 1, 0}, dir) + Vec3{1e-9, 0, 0});
+		const double dist = std::min(length(f.to - f.from), rel * speed);
+		const Vec3 lead = f.from + dir * dist;
+		for (int i = 0; i < f.count; ++i) {
+			const int rank = (i + 1) / 2, arm = i % 2 ? 1 : -1;
+			const Vec3 p = lead - dir * (2.2 * rank) + side * (1.8 * rank * arm) + Vec3{0, 0.4 * std::sin(t * 0.8 + i), 0};
+			const int pose = static_cast<int>(std::floor((t * 3.0 - 0.5 * rank) * detail::kPoses)) % detail::kPoses;
+			place("wild_geese_" + std::to_string((pose + detail::kPoses) % detail::kPoses), p, dir, 0.0, 1.0);
+		}
+	} else if (f.kind == "butterflies") {   // each wandering its patch, flitting up and down
+		for (int i = 0; i < f.count; ++i) {
+			const int s = f.seed * 31 + i;
+			const double wx = f.x0 + (f.x1 - f.x0) * nature::noise2(t * 0.12 + 3.1 * i, 0.5, s), wz = f.z0 + (f.z1 - f.z0) * nature::noise2(t * 0.12 + 3.1 * i, 7.5, s + 1);
+			const double h = 0.4 + 1.2 * nature::noise2(t * 0.9 + i, 2.5, s + 2) + (ground ? ground->heightAt(wx, wz) : 0.0) + f.at.y;
+			const double wx2 = f.x0 + (f.x1 - f.x0) * nature::noise2((t + 0.05) * 0.12 + 3.1 * i, 0.5, s), wz2 = f.z0 + (f.z1 - f.z0) * nature::noise2((t + 0.05) * 0.12 + 3.1 * i, 7.5, s + 1);
+			const int pose = static_cast<int>(std::floor((t * 9.0 + hash01(s, 3)) * detail::kPoses)) % detail::kPoses;
+			place("wild_butterflies_" + std::to_string(pose) + "_" + std::to_string(i % 3), {wx, h, wz}, Vec3{wx2 - wx, 0.0, wz2 - wz} + Vec3{1e-6, 0, 0}, 0.0, 2.0);   // (twice life size: they read on screen)
+		}
+	}
+	return out;
+}
+
+// A herd at t, as scene text: each animal walking from `from` towards `to` in a loose bunch, standing on the land, stopping now and then to graze.
+inline std::string herdText(const Herd &h, double t, const terrain::Field *ground, bool objects = true) {
+	std::string out = "# a herd of " + h.kind + " (film_wildlife.h)\n" + (objects ? detail::poseObjects(h.kind) : std::string());
+	const Vec3 from{h.fx, 0, h.fz}, to{h.tx, 0, h.tz};
+	const Vec3 dir = normalize(to - from + Vec3{1e-9, 0, 0}), side{-dir.z, 0, dir.x};
+	const double total = length(to - from);
+	for (int i = 0; i < h.count; ++i) {
+		const int s = h.seed * 61 + i;
+		const double behind = 3.0 * std::sqrt(static_cast<double>(i)) + 2.0 * hash01(s, 1), across = 4.0 * (hash01(s, 2) - 0.5) * std::sqrt(static_cast<double>(i + 1));
+		// walking, except while it grazes: a pause of a few seconds in every cycle of its own (W: how far it has walked x seconds into its cycles)
+		const double rel = std::max(0.0, t - h.t0);
+		const double cycle = 9.0 + 5.0 * hash01(s, 3), pause = 2.5 + 2.0 * hash01(s, 4), offset = cycle * hash01(s, 5);
+		const auto W = [&](double x) { return h.speed * (std::floor(x / cycle) * (cycle - pause) + std::min(std::fmod(x, cycle), cycle - pause)); };
+		double walked = W(rel + offset) - W(offset);
+		bool grazing = std::fmod(rel + offset, cycle) > cycle - pause;
+		walked = std::clamp(walked, 0.0, total);
+		if (walked >= total) grazing = true;
+		Vec3 p = from + dir * walked - dir * behind + side * across;
+		p.y = ground ? ground->heightAt(p.x, p.z) : 0.0;
+		const int pose = static_cast<int>(std::floor((walked / 0.9 + hash01(s, 6)) * detail::kPoses)) % detail::kPoses;   // (a stride every 0.9 m)
+		const Vec3 storyAt{-p.x, p.y, p.z}, storyFwd{-dir.x, 0.0, dir.z};
+		const std::string name = grazing ? std::string("wild_deer_graze") : "wild_deer_" + std::to_string(pose);
+		out += nature::placeObject(name, mul(translate(storyAt), detail::facing(storyFwd, {0, 1, 0}), rotate({0, 1, 0}, 20.0 * (hash01(s, 7) - 0.5)), scale(0.9 + 0.2 * hash01(s, 8))));
+	}
+	return out;
+}
+
+}  // namespace wildlife
+}  // namespace cartoon

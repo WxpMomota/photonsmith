@@ -805,6 +805,25 @@ and shrubs low down, conifers coming in on the way up, conifers alone near the t
 yellow); `winter` (broadleaf trees and birches bare, showing their twigs; conifers with snow on their tiers); `spring` (fresh light green, some broadleaf trees and shrubs in
 blossom). Walks do not go round forest trees (they are not part of the set's floor map).
 
+**Animals: `flock`, `herd`.** (film_wildlife.h)
+
+```
+flock  starlings 2000  at 0 45 -110  radius 50       # a murmuration (on a terrain, 45 m above the ground there)
+flock  geese 9  from 60 30 -40  to -200 40 -120      # a skein, in a V
+flock  fish 80  at 0 -3 -10  radius 6                # a school
+flock  butterflies 12  in -3 -1 3 -5                 # over a patch of meadow (`height H` lifts them)
+herd   deer 10  from -15 -22  to 30 -26  speed 1.2   # crossing the land
+```
+
+Starlings and fish flock: each keeps apart from those nearest it, turns as its seven nearest neighbours turn, closes on them, and is drawn to a centre that wanders round where
+the flock was put (within its `radius`), so the flock swirls, stretches and folds; they fly at about their own speed (starlings 11 m/s, fish 1.4; `speed S`), bank into their
+turns and beat their wings (or tails) at their own rates. The flight is worked out once when the film is loaded, 24 steps a second over the film (neighbours found through a
+grid, so a flock of thousands is quick), and each frame takes the step at its time. Geese fly in a V behind a leader on its way from one point to another, each half a wingbeat
+behind the one ahead, and are heard (an `ambience geese` of honking unless the film file says otherwise); butterflies wander their patch near the ground, flitting up and down
+(orange, yellow and blue, twice life size so they read); a herd walks from one point to the other in a loose bunch, on the ground, each deer stopping for a few seconds now and
+then to graze, and grazing when it arrives. `during T0 T1` limits when a flock is there; `start T` when a herd sets off; `seed N` changes them. Each kind is drawn from eight poses
+of its wingbeat, tail beat or stride (pbrt objects written once a frame) placed once per animal: 2000 starlings are 2000 placements.
+
 **Music that follows the film.** Three things (music_cues.h, film_score.h):
 
 - *Ducking.* A film file's music cues are mixed on their own and laid on the soundtrack brought down under the characters' lines - by up to two thirds while a line is

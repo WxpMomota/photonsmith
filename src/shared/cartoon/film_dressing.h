@@ -181,7 +181,7 @@ struct Ambience {
 	double gain = 1.0;
 };
 inline const std::vector<std::string> &ambienceKinds() {
-	static const std::vector<std::string> k = {"wind", "birds", "crickets", "water", "night", "sea", "falls"};
+	static const std::vector<std::string> k = {"wind", "birds", "crickets", "water", "night", "sea", "falls", "geese"};
 	return k;
 }
 namespace sound {
@@ -237,6 +237,16 @@ inline void falls(audio::Mix &m, double length, double gain) {
 		m.put(s + 0.4, audio::noiseBurst(1.8, 0.6, 0.6, 1500.0, 3000.0, 73u + static_cast<unsigned>(s * 10.0)), 0.035 * gain, 0.2, 0.3);
 	}
 }
+inline void geese(audio::Mix &m, double length, double gain) {   // honking: two or three calls together, now and then
+	for (double t = 0.8; t < length; t += 1.4 + 2.6 * audio::unit(static_cast<unsigned>(t * 100.0) + 41u)) {
+		const unsigned seed = static_cast<unsigned>(t * 1000.0) + 43u;
+		const int calls = 2 + static_cast<int>(2.0 * audio::unit(seed));
+		for (int k = 0; k < calls; ++k) {
+			const double f = 330.0 + 90.0 * audio::unit(seed + static_cast<unsigned>(k) * 7u), at = t + 0.22 * k;
+			for (int hm = 1; hm <= 3; ++hm) m.put(at, audio::chirp(f * hm, f * hm * 0.88, 0.2, 6.0, 0.01, 1.0), 0.03 * gain / hm, -0.4 + 0.8 * audio::unit(seed + 3u), 0.5);
+		}
+	}
+}
 inline void night(audio::Mix &m, double length, double gain) {
 	crickets(m, length, gain);
 	for (double t = 3.0; t < length; t += 9.0 + 6.0 * audio::unit(static_cast<unsigned>(t * 10.0) + 17u)) {   // an owl far off
@@ -254,6 +264,7 @@ inline void play(audio::Mix &m, const std::vector<Ambience> &beds) {
 		else if (a.kind == "night") sound::night(m, m.seconds(), a.gain);
 		else if (a.kind == "sea") sound::sea(m, m.seconds(), a.gain);
 		else if (a.kind == "falls") sound::falls(m, m.seconds(), a.gain);
+		else if (a.kind == "geese") sound::geese(m, m.seconds(), a.gain);
 	}
 }
 

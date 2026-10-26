@@ -357,3 +357,58 @@ TEST(FilmForest, TreesGrowWhereTheLandSuitsThemAndAreDrawnNearOrFar) {
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }
+
+// ---- wildlife ------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace wildlife = cartoon::wildlife;
+
+// A murmuration flocks (worked out once: the same every time), its birds keeping apart, flying at about their speed, staying round where it was put; geese fly in a V behind
+// their leader; a herd walks to where it is going, pausing to graze, on the ground.
+TEST(FilmWildlife, FlocksSwirlRoundTheirPlaceGeeseFlyInAVAndHerdsGraze) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("wild", "scene s.pbrt\nlength 8\nterrain hills size 600 height 20 seed 6 far off\nflock starlings 300 at 0 40 -100 radius 40\nflock geese 7 from 50 30 0 to -150 30 -60\nflock butterflies 6 in -3 -1 3 -5\nherd deer 6 from -15 -20 to 30 -26 speed 1.2\n", film), "");
+	ASSERT_EQ(film.spec.flocks.size(), 3u);
+	const wildlife::Flock &f = film.spec.flocks[0];
+	ASSERT_FALSE(f.pos.empty());
+	const auto ground = cartoon::terrain::fieldOf(film.spec.terrain);
+	EXPECT_NEAR(f.at.y, 40.0 + ground->heightAt(0.0, -100.0), 1e-9) << "its height above the land";
+	wildlife::Flock again = f;
+	again.pos.clear(), again.vel.clear();
+	wildlife::prepare(again, 8.0);
+	for (std::size_t i = 0; i < f.pos.back().size(); ++i) ASSERT_EQ(cartoon::length(again.pos.back()[i] - f.pos.back()[i]), 0.0) << "the same flight every time";
+	const std::vector<cartoon::Vec3> &p = f.pos[static_cast<std::size_t>(6.0 / f.dt)], &v = f.vel[static_cast<std::size_t>(6.0 / f.dt)];
+	cartoon::Vec3 mid{0, 0, 0};
+	for (const cartoon::Vec3 &q : p) mid = mid + q * (1.0 / p.size());
+	EXPECT_LT(cartoon::length(mid - f.at), 2.0 * f.radius) << "it stays round where it was put";
+	int crowded = 0;
+	for (std::size_t i = 0; i < p.size(); ++i) {
+		EXPECT_GT(cartoon::length(v[i]), 0.5 * 11.0);
+		EXPECT_LT(cartoon::length(v[i]), 1.35 * 11.0);
+		double nearest = 1e9;
+		for (std::size_t j = 0; j < p.size(); ++j)
+			if (j != i) nearest = std::min(nearest, cartoon::length(p[i] - p[j]));
+		crowded += nearest < 0.3;
+	}
+	EXPECT_LT(crowded, static_cast<int>(p.size()) / 20) << "they keep apart";
+	const std::string a = wildlife::flockText(f, 6.0, ground.get());
+	std::size_t placed = 0;
+	for (std::size_t at = a.find("ObjectInstance"); at != std::string::npos; at = a.find("ObjectInstance", at + 1)) ++placed;
+	EXPECT_EQ(placed, 300u);
+	EXPECT_NE(a.find("ObjectBegin \"wild_starlings_0\""), std::string::npos);
+	EXPECT_EQ(wildlife::flockText(f, 6.0, ground.get(), false).find("ObjectBegin"), std::string::npos) << "(another flock of the kind wrote the poses)";
+	// the herd: on its way, stopping to graze, on the ground
+	const wildlife::Herd &h = film.spec.herds[0];
+	const std::string h0 = wildlife::herdText(h, 0.0, ground.get()), h6 = wildlife::herdText(h, 6.0, ground.get()), h60 = wildlife::herdText(h, 60.0, ground.get());
+	EXPECT_NE(h0, h6) << "they walk";
+	EXPECT_NE(h60.find("wild_deer_graze"), std::string::npos) << "and graze where they arrive";
+	// the geese are heard; the film's own line errors
+	EXPECT_TRUE(std::any_of(film.spec.ambience.begin(), film.spec.ambience.end(), [](const auto &am) { return am.kind == "geese"; }));
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"flock bats 10 at 0 0 0", "starlings, geese, fish or butterflies"},
+																						 {"flock geese 5", "from X Y Z to X Y Z"},
+																						 {"flock starlings 20 radius 3", "needs its `at X Y Z`"},
+																						 {"herd deer 5 from 0 0", "`herd deer COUNT from X Z to X Z"}}) {
+		ff::DataFilm bad;
+		const std::string problem = loadNature("wild_bad", "scene s.pbrt\nlength 4\n" + line + "\n", bad);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}
