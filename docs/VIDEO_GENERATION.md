@@ -907,6 +907,26 @@ camera. Kelp rises in gentle curves with blades along it, swaying with the swell
 seabed (on a terrain, its ground; otherwise a sandy floor 15 m under the surface). `underwater` needs the film's `water` line, and fills the air round the camera, so it does not go
 with `mist`.
 
+**Fire, lava and smoke: `fire`, `lava`, `volcano`, `wildfire`.** (film_fire.h)
+
+```
+fire      at 0 0 -6  size 1.2                          # flames 1.2 m tall (on a terrain, on the ground there); `during T0 T1`, `smoke off`, `seed N`
+volcano   at 0 -1500  height 450  radius 900           # a cone raised in the land, erupting (`erupting T0 T1`)
+lava      from 120 -300  width 6  speed 0.4            # a flow down the land from a vent (`start T`)
+wildfire  in -200 -300 200 -100  during 0 20  wind 0   # a fire front sweeping across with the wind
+```
+
+Flames are a glowing volume: an `rgbgrid` medium whose voxels give out light (pbrt's `Le`; it glows where it absorbs), in a pass-through sphere, written into every frame -
+a teardrop of hot gas, widest low down, broken into tongues by 3D noise that climbs through it, white-yellow where it is hottest, then orange, then deep red at its tips; a point
+light among them flickers with them (with how much is burning that frame) and lights what is round them, and sparks fly up (`particles sparks`). Smoke rises above a fire:
+a dark `uniformgrid` volume that absorbs more than it scatters, spreading and billowing as it climbs and leaning with any drift. A volcano is a cone raised in the land (part of
+the terrain: steeper towards the top, ridged, with a crater); erupting, it throws lava fountains (sparks, hundreds a second), glows in its crater (a light down in it, which
+lights the plume's base from below), and a towering plume of ash leans away from it; three lava flows run down its flanks from the crater's rim. Lava finds its way down the land
+as water would (film_water.h's way downhill) but lies on the ground: a ribbon whose surface is a crust of dark plates between glowing cracks (an area light with a picture),
+creeping downhill, its front advancing. A wildfire is a line of flames (one every 10 m, 7 to 12 m tall) across its rectangle that sweeps from one side to the other over its
+time along the wind, smoke plumes of their own sizes rising behind it. Flames and smoke are kept in spheres apart from each other; keep the camera outside them. Night fires
+want `exposure auto` (feature 7) or a lower one by day.
+
 **Music that follows the film.** Three things (music_cues.h, film_score.h):
 
 - *Ducking.* A film file's music cues are mixed on their own and laid on the soundtrack brought down under the characters' lines - by up to two thirds while a line is

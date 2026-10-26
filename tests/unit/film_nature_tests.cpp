@@ -621,3 +621,47 @@ TEST(FilmUnderwater, TheCameraIsInTheSeaUnderAThinSurfaceWithCausticsShaftsKelpA
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }
+
+// ---- fire, lava and smoke ------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace firefx = cartoon::fire;
+
+// Flames are a glowing volume that flickers frame to frame, with a light among them and sparks; smoke rises above; a volcano is a cone in the land with a crater, erupting a
+// plume, fountains and lava flows that creep down from its rim; a wildfire's front moves across with time.
+TEST(FilmFire, FlamesFlickerVolcanoesRiseFromTheLandAndLavaCreepsDown) {
+	const std::string a = firefx::flameText("f", {0, 0, 0}, 1.2, 1.0, 1, 10), b = firefx::flameText("f", {0, 0, 0}, 1.2, 1.1, 1, 10);
+	EXPECT_NE(a.find("\"rgbgrid\""), std::string::npos);
+	EXPECT_NE(a.find("\"rgb Le\""), std::string::npos);
+	EXPECT_NE(a.find("LightSource \"point\""), std::string::npos) << "a light among the flames";
+	EXPECT_NE(a, b) << "they flicker";
+	EXPECT_NE(firefx::smokeText("s", {0, 2, 0}, 3.0, 10.0, 1.0, 1).find("\"uniformgrid\""), std::string::npos);
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("fire", "scene s.pbrt\nlength 10\nterrain hills size 3000 height 40 seed 3 far off\nvolcano at 0 -800 height 300 radius 600\nfire at 50 0 50 size 1.5\nwildfire in -300 100 300 400 during 0 10 wind 0\n", film), "");
+	const auto ground = terrain::fieldOf(film.spec.terrain);
+	EXPECT_GT(ground->heightAt(0.0, -800.0 + 0.1 * 600.0), 0.8 * 300.0) << "the cone rises from the land";
+	EXPECT_LT(ground->heightAt(0.0, -800.0), ground->heightAt(0.0, -800.0 + 0.1 * 600.0)) << "a crater in its top";
+	EXPECT_EQ(film.spec.lavas.size(), 3u) << "lava runs down its flanks";
+	for (const auto &l : film.spec.lavas) {
+		ASSERT_GT(l.path.size(), 20u);
+		EXPECT_LT(l.path.back().y, l.path.front().y - 100.0) << "downhill";
+	}
+	const auto &l = film.spec.lavas[0];
+	const auto tris = [](const std::string &text) { return std::count(text.begin(), text.end(), '\n'); };
+	EXPECT_GE(tris(firefx::lavaText(film.spec.key, l, 5.0)), tris(firefx::lavaText(film.spec.key, l, 1.0))) << "its front advances";
+	EXPECT_NEAR(film.spec.fires[0].at.y, ground->heightAt(50.0, 50.0), 1e-9) << "the fire stands on the land";
+	int sparks = 0;
+	for (const auto &e : film.spec.emitters) sparks += e.kind == "sparks";
+	EXPECT_EQ(sparks, 2) << "sparks from the fire and the crater's fountains";
+	const std::string s1 = film.sceneAt(2.0), s2 = film.sceneAt(8.0);
+	EXPECT_NE(s1.find("MediumInterface \"wild_0_0\""), std::string::npos) << "the wildfire's flames";
+	EXPECT_NE(s1.find("MediumInterface \"plume_0\""), std::string::npos) << "the volcano's plume";
+	EXPECT_NE(s1.substr(s1.find("wild_0_0")), s2.substr(s2.find("wild_0_0"))) << "the front moves";
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"lava from 0 0", "the film needs a `terrain` line"},
+																						 {"fire 0 0 0", "`fire at X Y Z"},
+																						 {"fire at 0 0 0 size 500", "`fire at X Y Z"},
+																						 {"wildfire in 0 0 1", "`wildfire in X0 Z0 X1 Z1"}}) {
+		ff::DataFilm bad;
+		const std::string problem = loadNature("fire_bad", "scene s.pbrt\nlength 4\n" + line + "\n", bad);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}

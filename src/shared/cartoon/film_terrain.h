@@ -52,6 +52,11 @@ struct Spec {
 		double width = 6.0, drop = 20.0, facing = 0.0;
 	};
 	std::vector<Step> steps;
+	// volcanoes (set by the film from its `volcano` lines): a cone raised to `height` above the land's base over `radius`, a crater at its top
+	struct Cone {
+		double x = 0.0, z = 0.0, height = 400.0, radius = 800.0;
+	};
+	std::vector<Cone> cones;
 	double waterLevel = -1e30;   // a sea's or lake's level (pbrt's y), set by the film when it has one: the ground just above it is drawn under it (a clean shore, not a
 	                             // scatter of islands as small as the fine detail), and the shore is sand and mud                      // the distant ranges round it
 	double fx() const { return focusSet ? focusX : x; }
@@ -72,6 +77,11 @@ struct Spec {
 				std::snprintf(w, sizeof w, ",%.1f %.2f %.1f", p.x, p.y, p.z);
 				all += w;
 			}
+		}
+		for (const Cone &c : cones) {
+			char w[96];
+			std::snprintf(w, sizeof w, "|v%.2f %.2f %.2f %.2f", c.x, c.z, c.height, c.radius);
+			all += w;
 		}
 		for (const Step &st : steps) {
 			char w[96];
@@ -326,6 +336,18 @@ inline std::shared_ptr<const Field> make(const Spec &s) {
 				}
 		}
 	}
+	for (const Spec::Cone &c : s.cones)   // a volcano: its cone, steeper towards the top, ridged by noise, a crater in its top
+		for (int j = 0; j < n; ++j)
+			for (int i = 0; i < n; ++i) {
+				const double dx = f->x0 + i * f->cell - c.x, dz = f->z0 + j * f->cell - c.z, d = std::hypot(dx, dz) / c.radius;
+				if (d >= 1.0) continue;
+				const double ridge = 1.0 + 0.08 * (nature::noise2(std::atan2(dz, dx) * 4.0, d * 3.0, s.seed + 71) - 0.5);
+				double cone = c.height * std::pow(1.0 - d, 1.6) * ridge;
+				const double crater = 0.1;   // (the crater: a bowl in the top tenth of the radius)
+				if (d < crater) cone = c.height * std::pow(1.0 - crater, 1.6) - c.height * 0.12 * (1.0 - d / crater) * (1.0 - d / crater);
+				float &v = h[static_cast<std::size_t>(j) * n + i];
+				v = static_cast<float>(std::max(static_cast<double>(v), cone));
+			}
 	for (const Spec::Step &st : s.steps) {   // a waterfall's cliff: the plateau behind its lip, the basin before it
 		const double a = st.facing * kPi / 180.0, ox = std::sin(a), oz = std::cos(a);
 		const double reach = std::max(40.0, 4.0 * st.width), wide = 2.5 * st.width, top = st.lip.y - s.y, foot = top - st.drop;

@@ -122,6 +122,9 @@
 //     gusts    1.5  wind 90                                     # sweep across the grass and trees; `mist DENSITY [radius R]`: a mist round the camera
 //     underwater  clarity 1.5  colour teal                      # the camera is under the film's water (film_underwater.h): the sea round it, caustics on the seabed, shafts
 //     kelp     60  in -20 -20 20 20  height 9                   # of light, marine snow; kelp swaying and coral (`coral COUNT [in X0 Z0 X1 Z1]`) on the seabed
+//     fire     at 0 0 -4  size 1.2                              # fire (film_fire.h): flames (glowing volumes, flickering, a light among them, sparks) with smoke above;
+//     lava     from 120 -300  width 6                           # lava creeping down the land from a vent; a volcano raised in the land (`volcano at X Z [height H]
+//     wildfire in -200 -200 200 200  during 0 30  wind 90       # [radius R] [erupting T0 T1]`), and a fire front sweeping across with the wind
 //     timelapse 60                                              # nature 60 times faster: the clouds, the water, the aurora, the wind (the camera and the characters not)
 //     exposure auto                                             # (or a factor) the exposure follows the light: 1 by day, opening up through sunset into night
 //     shot 0 Over the valley
@@ -156,6 +159,7 @@
 #include "film_speech.h"
 #include "film_subjects.h"
 #include "film_clouds.h"
+#include "film_fire.h"
 #include "film_forest.h"
 #include "film_skyfx.h"
 #include "film_camera.h"
@@ -432,6 +436,11 @@ struct Spec {
 	underwater::Water underwater;
 	std::vector<underwater::Kelp> kelps;
 	std::vector<underwater::Coral> corals;
+	// fire, lava and smoke (`fire`, `lava`, `volcano`, `wildfire`)
+	std::vector<fire::Fire> fires;
+	std::vector<fire::Lava> lavas;
+	std::vector<fire::Volcano> volcanoes;
+	std::vector<fire::Wildfire> wildfires;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	// weather and particles (`weather`, `particles`, `burst`)
@@ -1380,6 +1389,59 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			if (verb == "kelp") s.kelps.push_back(kp);
 			else s.corals.push_back(co);
+		} else if (verb == "fire" || verb == "lava" || verb == "volcano" || verb == "wildfire") {
+			const std::vector<std::string> t = detail::tokens(line);
+			fire::Fire fi;
+			fire::Lava la;
+			fire::Volcano vo;
+			fire::Wildfire wf;
+			std::size_t i = 1;
+			double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
+			const std::string usage = verb == "fire" ? "`fire at X Y Z [size S] [during T0 T1] [smoke off] [seed N]`"
+									  : verb == "lava" ? "`lava from X Z [width W] [speed S] [start T]` (down the land from a vent: it needs a `terrain`)"
+									  : verb == "volcano" ? "`volcano at X Z [height H] [radius R] [erupting T0 T1]` (raised in the land: it needs a `terrain`)"
+														  : "`wildfire in X0 Z0 X1 Z1 [during T0 T1] [wind DEGREES]`";
+			if (verb == "fire") {
+				if (t.size() < 5 || t[1] != "at" || !number(t[2], fi.at.x) || !number(t[3], fi.at.y) || !number(t[4], fi.at.z)) return fail(usage);
+				i = 5;
+			} else if (verb == "lava" || verb == "volcano") {
+				if (t.size() < 4 || t[1] != (verb == "lava" ? "from" : "at") || !number(t[2], a) || !number(t[3], b)) return fail(usage);
+				(verb == "lava" ? la.x : vo.x) = a, (verb == "lava" ? la.z : vo.z) = b;
+				i = 4;
+			} else {
+				if (t.size() < 6 || t[1] != "in" || !number(t[2], a) || !number(t[3], b) || !number(t[4], c) || !number(t[5], d)) return fail(usage);
+				wf.x0 = std::min(a, c), wf.z0 = std::min(b, d), wf.x1 = std::max(a, c), wf.z1 = std::max(b, d);
+				i = 6;
+			}
+			for (; i < t.size();) {
+				if ((t[i] == "during" || t[i] == "erupting") && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && b > a) {
+					if (verb == "fire") fi.t0 = a, fi.t1 = b;
+					else if (verb == "volcano") vo.t0 = a, vo.t1 = b;
+					else if (verb == "wildfire") wf.t0 = a, wf.t1 = b;
+					else return fail(usage);
+					i += 3;
+				} else if (verb == "fire" && t[i] == "smoke" && i + 1 < t.size() && t[i + 1] == "off") {
+					fi.smoke = false;
+					i += 2;
+				} else if (i + 1 < t.size() && number(t[i + 1], a)) {
+					if (verb == "fire" && t[i] == "size" && a > 0.05 && a <= 100.0) fi.size = a;
+					else if (verb == "fire" && t[i] == "seed") fi.seed = static_cast<int>(a);
+					else if (verb == "lava" && t[i] == "width" && a > 0.0) la.width = a;
+					else if (verb == "lava" && t[i] == "speed" && a > 0.0) la.speed = a;
+					else if (verb == "lava" && t[i] == "start") la.t0 = a;
+					else if (verb == "volcano" && t[i] == "height" && a > 10.0) vo.height = a;
+					else if (verb == "volcano" && t[i] == "radius" && a > 20.0) vo.radius = a;
+					else if (verb == "wildfire" && t[i] == "wind") wf.wind = a;
+					else return fail("\"" + t[i] + "\": " + usage);
+					i += 2;
+				} else {
+					return fail("\"" + t[i] + "\": " + usage);
+				}
+			}
+			if (verb == "fire") s.fires.push_back(fi);
+			else if (verb == "lava") s.lavas.push_back(la);
+			else if (verb == "volcano") s.volcanoes.push_back(vo);
+			else s.wildfires.push_back(wf);
 		} else if (verb == "timelapse") {
 			double v = 0.0;
 			if (!number(rest, v) || v < 1.0 || v > 100000.0) return fail("`timelapse FACTOR`: how many times faster the clouds, the water and the wind go (1 to 100000)");
@@ -1508,7 +1570,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1535,6 +1597,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		}
 	if (s.hasTerrain) {   // on a terrain, heights are above the ground: what is placed and who is brought in stand on it
 		if (!s.seas.empty()) s.terrain.waterLevel = s.seas[0].level;   // (its shore is drawn for the water)
+		for (const fire::Volcano &v : s.volcanoes) s.terrain.cones.push_back({v.x, v.z, v.height, v.radius});   // (a volcano's cone is part of the land)
 		if (!s.rivers.empty()) {   // each river's way over the land, then a bed cut under it (so no rise of the ground hides it)
 			const std::shared_ptr<const terrain::Field> uncut = terrain::fieldOf(s.terrain);
 			for (water::River &rv : s.rivers) {
@@ -1581,6 +1644,41 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		for (Shot &shot : s.shots)
 			if (!shot.fly.empty()) shot.path = film_camera::flight(shot.fly, shot.flyHeight, shot.flyLook, shot.flyAt, shot.flyFov, ground.get());
 	}
+	if ((!s.lavas.empty() || !s.volcanoes.empty()) && !s.hasTerrain) {
+		n = 0;
+		return fail("lava and volcanoes are part of the land: the film needs a `terrain` line");
+	}
+	if (s.hasTerrain) {   // fire on the land: flames stand on it; a volcano's lava runs down its flanks from its crater's rim; lava finds its way down as water would
+		const std::shared_ptr<const terrain::Field> ground = terrain::fieldOf(s.terrain);
+		for (fire::Fire &f : s.fires) f.at.y += ground->heightAt(f.at.x, f.at.z);
+		for (const fire::Volcano &v : s.volcanoes)
+			for (int k = 0; k < 3; ++k) {
+				const double a = 2.0 * kPi * (k + 0.2) / 3.0;
+				fire::Lava la;
+				la.x = v.x + 0.13 * v.radius * std::cos(a), la.z = v.z + 0.13 * v.radius * std::sin(a), la.width = 0.035 * v.radius, la.speed = 0.8, la.t0 = v.t0 - 25.0;   // (already flowing)
+				s.lavas.push_back(la);
+			}
+		for (fire::Lava &l : s.lavas) {
+			water::River way;
+			way.points = {{l.x, l.z}};
+			way.downhill = true;
+			way.width = l.width;
+			l.path = water::riverPath(way, ground.get());
+			for (Vec3 &p : l.path) p.y = ground->heightAt(p.x, p.z);   // (lava lies on the ground: it does not fill the valley as water would)
+		}
+	}
+	for (const fire::Fire &f : s.fires) {   // sparks fly up from a fire
+		particles::Emitter e;
+		e.kind = "sparks", e.at = f.at + Vec3{0.0, 0.3 * f.size, 0.0}, e.t0 = std::max(0.0, f.t0), e.t1 = std::min(s.length, f.t1), e.rate = 12.0 * f.size, e.speed = 1.5 * std::sqrt(f.size);
+		s.emitters.push_back(e);
+	}
+	if (s.hasTerrain)
+		for (const fire::Volcano &v : s.volcanoes) {   // a volcano's lava fountains
+			const std::shared_ptr<const terrain::Field> ground = terrain::fieldOf(s.terrain);
+			particles::Emitter e;
+			e.kind = "sparks", e.at = {v.x, ground->heightAt(v.x, v.z) + 5.0, v.z}, e.t0 = std::max(0.0, v.t0), e.t1 = std::min(s.length, v.t1), e.rate = 400.0, e.speed = 0.06 * v.height;
+			s.emitters.push_back(e);
+		}
 	for (const water::Fall &f : s.falls) {   // a waterfall throws up spray where it lands, the whole film long
 		particles::Emitter e;
 		e.kind = "splash";
@@ -2874,6 +2972,51 @@ class DataFilm {
 			out += underwater::snowText(t, eye);
 			for (const underwater::Kelp &k : spec.kelps) out += underwater::kelpText(k, nt, groundAt);
 			for (const underwater::Coral &c : spec.corals) out += underwater::coralText(c, groundAt);
+		}
+		if (!spec.fires.empty() || !spec.lavas.empty() || !spec.volcanoes.empty() || !spec.wildfires.empty()) {   // fire, lava and smoke (film_fire.h)
+			const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+			const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
+			const std::string film = spec.key.empty() ? std::string("film") : spec.key;
+			for (std::size_t i = 0; i < spec.fires.size(); ++i) {
+				const fire::Fire &f = spec.fires[i];
+				if (t < f.t0 || t > f.t1) continue;
+				out += fire::flameText("flame_" + std::to_string(i), f.at, f.size, nt, f.seed);
+				if (f.smoke) out += fire::smokeText("smoke_" + std::to_string(i), f.at + Vec3{0.0, 1.25 * f.size, 0.0}, 2.5 * f.size, 8.0 * f.size, nt, f.seed, 0.6);
+			}
+			for (const fire::Lava &l : spec.lavas) out += fire::lavaText(film, l, nt);
+			for (std::size_t i = 0; i < spec.volcanoes.size(); ++i) {   // an eruption: the plume of ash over the crater, the crater's glow
+				const fire::Volcano &v = spec.volcanoes[i];
+				if (t < v.t0 || t > v.t1) continue;
+				const double top = groundAt(v.x, v.z);
+				out += fire::smokeText("plume_" + std::to_string(i), {v.x, top + 40.0, v.z}, 1.1 * v.radius, 2.4 * v.height, nt, 31 + static_cast<int>(i), 3.0, {0.4 * v.radius, 0.0, 0.0});
+				char buf[200];
+				std::snprintf(buf, sizeof buf, "LightSource \"point\" \"point3 from\" [ %.3f %.3f %.3f ] \"rgb I\" [ %.1f %.1f %.1f ]\n", v.x, top - 15.0, v.z, 6e4 * v.height / 400.0, 2.2e4 * v.height / 400.0,
+							  4e3 * v.height / 400.0);   // (down in the crater: it lights the plume's base from below, not its whole height)
+				out += buf;
+			}
+			for (std::size_t i = 0; i < spec.wildfires.size(); ++i) {   // the front: a line of flames across the land, sweeping along with the wind, smoke rising behind it
+				const fire::Wildfire &w = spec.wildfires[i];
+				if (t < w.t0 || t > w.t1) continue;
+				const double a = w.wind * kPi / 180.0, ux = std::sin(a), uz = std::cos(a);
+				const double cx = 0.5 * (w.x0 + w.x1), cz = 0.5 * (w.z0 + w.z1), span = 0.5 * (std::abs(ux) * (w.x1 - w.x0) + std::abs(uz) * (w.z1 - w.z0));
+				const double along = -span + 2.0 * span * (t - w.t0) / std::max(1e-6, w.t1 - w.t0);
+				const double width = std::abs(uz) * (w.x1 - w.x0) + std::abs(ux) * (w.z1 - w.z0);
+				const int flames = std::clamp(static_cast<int>(width / 10.0), 2, 48);
+				for (int k = 0; k < flames; ++k) {
+					const double across = (k + 0.5) / flames - 0.5;
+					const double wob = 6.0 * (nature::noise2(k * 0.7, t * 0.2, 41) - 0.5);
+					const double x = cx + ux * (along + wob) + uz * across * width, z = cz + uz * (along + wob) - ux * across * width;
+					const double size = 7.0 + 5.0 * hash01(k, static_cast<int>(i) + 51);
+					out += fire::flameText("wild_" + std::to_string(i) + "_" + std::to_string(k), {x, groundAt(x, z), z}, size, nt + k * 0.37, 61 + k, 14);
+				}
+				const int plumes = 5;
+				for (int k = 0; k < plumes; ++k) {   // smoke behind the front: plumes of their own sizes and places, leaning with the wind
+					const double across = (k + 0.2 + 0.6 * hash01(k, 81)) / plumes - 0.5, back = 30.0 + 40.0 * hash01(k, 83), size = 0.7 + 0.6 * hash01(k, 85);
+					const double x = cx + ux * (along - back) + uz * across * width, z = cz + uz * (along - back) - ux * across * width;
+					out += fire::smokeText("wildsmoke_" + std::to_string(i) + "_" + std::to_string(k), {x, groundAt(x, z) + 16.0, z}, 0.2 * width * size, 0.45 * width * size, nt, 71 + k, 2.0,
+										   {ux * 0.25 * width * size, 0.0, uz * 0.25 * width * size});
+				}
+			}
 		}
 		if (spec.hasMist) {   // a mist round the camera (nature_lib.h: the camera's own medium, ended by a sphere round it, so the sun and sky outside light it)
 			Vec3 eye, target;
