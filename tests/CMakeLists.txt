@@ -281,6 +281,7 @@ add_executable(unit_tests
     unit/uploaded_scene_tests.cpp
     unit/lens_look_tests.cpp
     unit/film_file_tests.cpp
+    unit/film_nature_tests.cpp
     unit/cartoon_snapshot_tests.cpp
     unit/path_probe_tests.cpp
     unit/texture_mapping_tests.cpp

@@ -1,0 +1,11 @@
+# The wild: an empty set for a nature film - a camera, a sun and a sky, and nothing on the ground. Bring the land in with the film file's `terrain` line, the sun and sky with
+# `sky`, and dress it with `scatter` (the film file's lines are film_file.h's).
+LookAt 0 40 200  0 30 0  0 1 0
+Camera "perspective" "float fov" [ 40 ]
+Film "rgb" "integer xresolution" [ 1280 ] "integer yresolution" [ 720 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+Integrator "volpath" "integer maxdepth" [ 6 ]
+WorldBegin
+
+LightSource "infinite" "rgb L" [ 0.22 0.26 0.34 ]
+LightSource "distant" "point3 from" [ -4 6 5 ] "point3 to" [ 0 0 0 ] "rgb L" [ 2.2 1.9 1.55 ]

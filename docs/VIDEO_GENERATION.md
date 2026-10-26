@@ -705,6 +705,38 @@ all, the noise is the same in every frame (it does not flicker where nothing mov
 only those whose neighbours changed. A still camera on a walking person at 8 samples: the error against a 512-sample picture went from 2.84 to 2.14 (the floor from 3.21 to
 2.10, the walker's box from 4.54 to 3.91 - moving parts are not smeared), and the frame-to-frame flicker of the floor from 3.79 to 1.54.
 
+### Nature films
+
+A film file can be a landscape with nothing of the set's own in it: `pbrt_scenes/film_assets/wild/set.pbrt` is an empty set (a camera, a sampler, a plain sky that a `sky`
+line replaces) to name with `scene` and build on with the lines below.
+
+**The land: `terrain`.** (film_terrain.h)
+
+```
+terrain  mountains  size 1500  height 320  seed 3   # hills, mountains, dunes or canyon (sizes and heights of their own when not given)
+terrain  canyon  focus 40 -120  snow 200  erosion 1.5  y -10  at 0 0  far off
+```
+
+The land is a square `size` metres across centred `at` X Z (pbrt's), its ground from `y` up to `height` above it. It is made from its numbers alone, the same in every frame and
+every process: a grid of heights (257 x 257, and eight samples beyond each edge) from noise of the kind's shape - mountains are warped ridged noise gathered into massifs with a
+valley floor round the `focus` (the centre when not given), hills gentle noise, dunes asymmetric ridges (a long windward face, a steep slip face) across a wind that comes
+from the seed, a canyon mesas in steps with cliffs between and a river winding through the focus - then carved by tens of thousands of droplets that run downhill, pick up
+ground as they speed up and drop it as they slow (`erosion`, 0 to 3: mountains 1, hills 0.7, canyons 0.5, dunes none). Where the water ran most is the land's flow.
+
+What is drawn: one mesh over the square whose rows and columns crowd round the focus (about 40 cm apart there, several metres at the edge; about 160,000 points), its
+heights the grid smoothed (Catmull-Rom) with a little detail on top; one picture over the whole square painted from the height, the slope and the flow at each point (grass
+and lighter meadows in the valleys, darker growth where water gathers, scree above, bare rock on the steep faces, snow above the snow line where it is not too steep to hold -
+`snow` metres above `y`, mountains at 0.45 of their height when not given; sand, paler on the crests; a canyon's red and ochre bands by height); the cliffs as meshes of their
+own (the steep triangles, cut by which way they face) with a picture projected from the side - rock strata, or the canyon's bands - since a picture painted from above smears
+down a cliff; and the far ranges, a ring from the square's edge out to four times its size that carries the same land on beyond the square (mountains growing higher with
+distance) without a step where they meet, painted the same way and towards the blue-grey of distance (`far off` leaves them out). The meshes are PLY files and the pictures HDR
+files in the film's cache (film_cache.h): a mountain range is made in about 20 s the first time and read in a fraction of a second after that; a frame of it renders in about
+a second at 640 x 360 and 32 samples.
+
+On a terrain every height in the film file is above the ground: what is placed or scattered stands on it, and a character brought in at X Y Z stands Y above it; walks find
+their way over it like any set's floor (film_paths.h reads its meshes). (Two limits: the side pictures are projected along x or z, so a cliff facing 45 degrees between them
+shows them stretched by up to 1.4; the GPU renderers read pictures without a mip pyramid, so the painted ground shimmers a little when seen from far above.)
+
 **Music that follows the film.** Three things (music_cues.h, film_score.h):
 
 - *Ducking.* A film file's music cues are mixed on their own and laid on the soundtrack brought down under the characters' lines - by up to two thirds while a line is

@@ -155,6 +155,9 @@
     <ClCompile Include="unit\film_file_tests.cpp">
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
+    <ClCompile Include="unit\film_nature_tests.cpp">
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="unit\cartoon_snapshot_tests.cpp" />
     <ClCompile Include="unit\path_probe_tests.cpp" />
     <ClCompile Include="unit\texture_mapping_tests.cpp" />

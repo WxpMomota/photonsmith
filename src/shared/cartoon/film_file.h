@@ -98,6 +98,9 @@
 //     scatter  grass 300 in -8 -10 8 2  scale 0.7 1.3  seed 2   # so many of a kind over a rectangle of the ground (x0 z0 x1 z1; `y` its height)
 //     sky      18:30 19:10  south 180  latitude 40              # the sun and sky from 6:30 to 7:10 pm over the film (the scene's own infinite and distant lights are left out)
 //     ambience birds 0.6                                        # a sound under the whole film: wind, birds, crickets, water or night, at a gain
+//     terrain  mountains  size 1500  height 320  seed 3         # the land (film_terrain.h): hills, mountains, dunes or canyon, eroded, coloured by height, slope and water,
+//                                                               # with far ranges round it (`far off`); `at X Z`, `y Y`, `focus X Z` (finest there; a valley floor round it),
+//                                                               # `snow H` (the snow line above y), `erosion E` (0 to 3); on a terrain every height is above the ground
 //
 // Weather and particles (film_particles.h):
 //
@@ -126,6 +129,7 @@
 #include "film_paths.h"
 #include "film_speech.h"
 #include "film_subjects.h"
+#include "film_terrain.h"
 #include "music_cues.h"
 #include "prop_physics.h"
 #include "rig.h"
@@ -350,6 +354,9 @@ struct Spec {
 	// the set's dressing (`place`, `scatter`), its time of day (`sky`) and its sound (`ambience`)
 	std::vector<dressing::Placement> placements;
 	bool hasSky = false;
+	// the land (`terrain`): what is placed, scattered or brought in stands on it (their heights are above it)
+	terrain::Spec terrain;
+	bool hasTerrain = false;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	// weather and particles (`weather`, `particles`, `burst`)
@@ -807,6 +814,39 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				const std::vector<dressing::Placement> many = dressing::placementsOf(sc);
 				s.placements.insert(s.placements.end(), many.begin(), many.end());
 			}
+		} else if (verb == "terrain") {
+			const std::vector<std::string> t = detail::tokens(line);
+			if (t.size() < 2 || std::find(terrain::kinds().begin(), terrain::kinds().end(), t[1]) == terrain::kinds().end())
+				return fail("`terrain KIND [size S] [height H] [at X Z] [y Y] [focus X Z] [snow H] [erosion E] [seed N] [far off]`: hills, mountains, dunes or canyon");
+			if (s.hasTerrain) return fail("a film has one terrain");
+			terrain::Spec &ts = s.terrain;
+			ts.kind = t[1];
+			if (ts.kind == "mountains") ts.size = 1500.0, ts.height = 320.0;
+			else if (ts.kind == "dunes") ts.size = 800.0, ts.height = 35.0;
+			else if (ts.kind == "canyon") ts.size = 1000.0, ts.height = 120.0;
+			for (std::size_t i = 2; i < t.size();) {
+				double a = 0.0, b = 0.0;
+				if ((t[i] == "at" || t[i] == "focus") && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b)) {
+					if (t[i] == "at") ts.x = a, ts.z = b;
+					else ts.focusX = a, ts.focusZ = b, ts.focusSet = true;
+					i += 3;
+				} else if (t[i] == "far" && i + 1 < t.size() && (t[i + 1] == "off" || t[i + 1] == "on")) {
+					ts.ranges = t[i + 1] == "on";
+					i += 2;
+				} else if (i + 1 < t.size() && number(t[i + 1], a)) {
+					if (t[i] == "size" && a >= 20.0 && a <= 20000.0) ts.size = a;
+					else if (t[i] == "height" && a > 0.0 && a <= 5000.0) ts.height = a;
+					else if (t[i] == "y") ts.y = a;
+					else if (t[i] == "snow" && a >= 0.0) ts.snow = a;
+					else if (t[i] == "erosion" && a >= 0.0 && a <= 3.0) ts.erosion = a;
+					else if (t[i] == "seed") ts.seed = static_cast<int>(a);
+					else return fail("\"" + t[i] + "\": a terrain takes size (20 to 20000 m), height (up to 5000 m), at X Z, y, focus X Z, snow, erosion (0 to 3), seed and far off");
+					i += 2;
+				} else {
+					return fail("\"" + t[i] + "\": a terrain takes size, height, at X Z, y, focus X Z, snow, erosion, seed and far off");
+				}
+			}
+			s.hasTerrain = true;
 		} else if (verb == "sky") {
 			const std::vector<std::string> t = detail::tokens(line);
 			const auto hour = [&](const std::string &w, double &h) {   // 18:30 or 18.5
@@ -1071,7 +1111,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, terrain, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1091,6 +1131,11 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		}
 	for (Character &c : s.characters)   // (a crowd's wandering was made before the film's length was known: what starts after the film ends is not walked)
 		if (c.extra) c.walks.erase(std::remove_if(c.walks.begin(), c.walks.end(), [&](const WalkLine &w) { return w.t0 > s.length - 1.0; }), c.walks.end());
+	if (s.hasTerrain) {   // on a terrain, heights are above the ground: what is placed and who is brought in stand on it
+		const std::shared_ptr<const terrain::Field> ground = terrain::fieldOf(s.terrain);
+		for (dressing::Placement &p : s.placements) p.at.y += ground->heightAt(p.at.x, p.at.z);
+		for (Character &c : s.characters) c.start[1] += ground->heightAt(c.start[0], c.start[2]);
+	}
 	r.ok = true;
 	return r;
 }
@@ -1401,8 +1446,9 @@ class DataFilm {
 	}
 	// The dressing at t: the pieces once, then every placed thing (swaying), as scene text.
 	std::string dressingAt(double t) const {
-		if (spec.placements.empty()) return std::string();
-		std::string out = "# the set's dressing (film_dressing.h)\n" + dressing::objects();
+		std::string out = spec.hasTerrain ? terrain::text(spec.key.empty() ? std::string("film") : spec.key, spec.terrain) : std::string();
+		if (spec.placements.empty()) return out;
+		out += "# the set's dressing (film_dressing.h)\n" + dressing::objects();
 		for (const dressing::Placement &p : spec.placements) out += dressing::placementText(p, t);
 		return out;
 	}
