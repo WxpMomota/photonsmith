@@ -275,6 +275,22 @@ class Mix {
 		}
 	}
 
+	// Another mix laid on this one from `t` seconds (a part of a film on the whole film's mix): faded in over `fadeIn` seconds from its start and out over `fadeOut` before its
+	// own end, and nothing of it after that end (so one part's sound gives way to the next's at the cut between them).
+	void addAt(const Mix &other, double t, double fadeIn = 0.0, double fadeOut = 0.0) {
+		if (t < 0.0) return;
+		const std::size_t start = static_cast<std::size_t>(t * kRate), length = samplesFor(other.seconds_) - 1;
+		const double in = std::max(1.0, fadeIn * kRate), out = std::max(1.0, fadeOut * kRate);
+		for (std::size_t i = 0; i < length && i < other.dry_[0].size() && start + i < dry_[0].size(); ++i) {
+			const double u = static_cast<double>(i), left = static_cast<double>(length - i);
+			const float g = static_cast<float>((fadeIn > 0.0 ? std::min(1.0, u / in) : 1.0) * (fadeOut > 0.0 ? std::min(1.0, left / out) : 1.0));
+			for (int c = 0; c < 2; ++c) {
+				dry_[c][start + i] += other.dry_[c][i] * g;
+				wet_[c][start + i] += other.wet_[c][i] * g;
+			}
+		}
+	}
+
 	// The reverb, a fade in and out, a soft limiter; 16-bit stereo, interleaved, exactly `seconds` long.
 	std::vector<std::int16_t> finish(double fadeIn = 0.5, double fadeOut = 2.0, double headroom = 0.89) const {
 		const std::size_t n = samplesFor(seconds_) - 1;

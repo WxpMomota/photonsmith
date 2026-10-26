@@ -138,6 +138,18 @@
 //     weather   rain 0.8 from 4 to 14                          # rain, snow or leaves over the set round the camera (amount 1 a good shower; eased in and out; `ground Y`)
 //     particles sparks at 1 0.9 -2  3 5  rate 80               # sparks, dust or a splash thrown from a place from 3 s to 5 s, so many a second (`speed S`)
 //     burst     splash at 0 0 -1  6.2  count 60                # all at once at 6.2 s
+//
+// Several sets in one film - a film in parts (partsOf; film_parts.h joins them): each `part` is a film of its own, with its `scene`, its `length`, its characters, its shots
+// and its sound, and the parts play one after another. The lines before the first part are every part's (a cast, a default set, an fps), except the film's own `film`,
+// `name`, `about`, `tags`, `still` (a time in the whole film) and `music`:
+//
+//     film     pip-goes-out
+//     part     "The lantern path"                              # a part: its name ...
+//     scene    film_assets/a-walk-at-dusk/set.pbrt
+//     length   7
+//     ...
+//     part     "The meadow" fade 1.2                           # ... and how it comes in after the one before: a cut, or `dissolve`, `fade` or `wipe` over so many seconds
+//     scene    film_assets/stage/set.pbrt
 
 #include <algorithm>
 #include <cctype>
@@ -1576,8 +1588,10 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				a.keys.push_back(key);
 			}
 			s.anims.push_back(a);
+		} else if (verb == "part") {
+			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, music, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, music, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1730,6 +1744,100 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 	if (std::any_of(s.flocks.begin(), s.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "geese"; }) && !hears("geese")) s.ambience.push_back({"geese", 0.8});
 	r.ok = true;
 	return r;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+// A film in parts
+// ---------------------------------------------------------------------------------------------------------------------------------------------------------------
+// A film file may be cut into parts - `part NAME [dissolve|fade|wipe SECONDS]` - each a film of its own, with its set (`scene`), its length, its cast, its shots and its sound,
+// played one after another as one film (film_parts.h). The lines before the first part are every part's (a cast, a set, an fps they share; a part's own `scene` or `length`
+// is its own), except the film's own `film`, `name`, `about`, `tags`, `still` and `music`, which are the whole film's (`still` a time in the whole film).
+struct PartText {
+	std::string name;
+	int line = 0;
+	Transition in;      // how it comes in (length 0: a cut)
+	std::string text;   // the file with the shared lines and this part's, the others left blank (so a problem names the file's own line)
+};
+struct FilmParts {
+	std::vector<PartText> parts;   // none: the film is not in parts
+	std::string key, name, about, tags, error;
+	double still = -1.0;
+	bool draftMusic = true;
+};
+inline FilmParts partsOf(const std::string &text, const std::string &where) {
+	FilmParts out;
+	std::vector<std::string> lines;
+	{
+		std::istringstream in(text);
+		for (std::string line; std::getline(in, line);) lines.push_back(line);
+	}
+	std::vector<std::string> clean(lines.size());   // each line's words, its comment left out
+	std::vector<std::size_t> starts;
+	for (std::size_t i = 0; i < lines.size(); ++i) {
+		std::string line = lines[i];
+		for (std::size_t hash = line.find('#'); hash != std::string::npos; hash = line.find('#', hash + 1)) {   // (as parse: '#' starts a comment, but not a colour #rrggbb)
+			bool colour = hash + 7 <= line.size() && (hash + 7 == line.size() || std::isspace(static_cast<unsigned char>(line[hash + 7])));
+			for (std::size_t k = hash + 1; colour && k < hash + 7; ++k) colour = std::isxdigit(static_cast<unsigned char>(line[k])) != 0;
+			if (!colour) {
+				line.erase(hash);
+				break;
+			}
+		}
+		clean[i] = detail::trim(line);
+		if (!clean[i].empty() && detail::words(clean[i])[0] == "part") starts.push_back(i);
+	}
+	if (starts.empty()) return out;
+	const auto fail = [&](std::size_t i, const std::string &what) {
+		out.error = where + ":" + std::to_string(i + 1) + ": " + what;
+		out.parts.clear();
+		return out;
+	};
+	// the film's own lines, before the first part
+	std::vector<bool> shared(lines.size(), false);
+	for (std::size_t i = 0; i < starts[0]; ++i) {
+		const std::string &w = clean[i];
+		if (w.empty()) continue;
+		const std::string verb = detail::words(w)[0], rest = detail::trim(w.substr(verb.size()));
+		if (verb == "film") {
+			if (!detail::validKey(rest)) return fail(i, "the film's key must be lower-case letters, digits and '-' (got \"" + rest + "\")");
+			out.key = rest;
+		} else if (verb == "name") {
+			out.name = rest;
+		} else if (verb == "about") {
+			out.about = rest;
+		} else if (verb == "tags") {
+			out.tags = rest;
+		} else if (verb == "still") {
+			if (!detail::number(rest, out.still) || out.still < 0.0) return fail(i, "still is a time in seconds (in the whole film)");
+		} else if (verb == "music") {
+			if (rest != "none" && rest != "draft") return fail(i, "`music none` (no music) or `music draft` (the drafted score when there is no cues file)");
+			out.draftMusic = rest == "draft";
+		} else if (verb == "shot" || verb == "key") {
+			return fail(i, "a shot belongs to a part: the lines before the first `part` are what every part shares");
+		} else {
+			shared[i] = true;
+		}
+	}
+	for (std::size_t p = 0; p < starts.size(); ++p) {
+		const std::size_t at = starts[p], end = p + 1 < starts.size() ? starts[p + 1] : lines.size();
+		const std::vector<std::string> t = detail::tokens(clean[at]);
+		PartText part;
+		part.line = static_cast<int>(at + 1);
+		if (t.size() < 2) return fail(at, "`part NAME [dissolve|fade|wipe SECONDS]`: a part has a name");
+		part.name = t[1];
+		if (t.size() > 2) {
+			double length = 0.0;
+			if (t.size() != 4 || (t[2] != "dissolve" && t[2] != "fade" && t[2] != "wipe") || !detail::number(t[3], length) || !(length > 0.0 && length <= 10.0))
+				return fail(at, "a part comes in with `dissolve`, `fade` or `wipe` and how many seconds it takes (up to 10)");
+			part.in.kind = t[2] == "dissolve" ? Transition::Dissolve : t[2] == "fade" ? Transition::Fade : Transition::Wipe;
+			part.in.length = length;
+		}
+		for (const PartText &other : out.parts)
+			if (other.name == part.name) return fail(at, "there is already a part called \"" + part.name + "\"");
+		for (std::size_t i = 0; i < lines.size(); ++i) part.text += (shared[i] || (i > at && i < end) ? lines[i] : std::string()) + "\n";
+		out.parts.push_back(part);
+	}
+	return out;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1904,9 +2012,11 @@ class DataFilm {
 	Scene scene;
 	std::filesystem::path sceneFile;
 
-	// Reads the film file and its scene; returns "" or the problem, with the file and line.
-	std::string load(const std::string &filePath) {
+	// Reads the film file and its scene; returns "" or the problem, with the file and line. `part` >= 0: that part of a film in parts (partsOf), a film of its own whose key is
+	// the whole film's and its number ("journey--2") and whose name is the part's.
+	std::string load(const std::string &filePath, int part = -1) {
 		sourcePath = filePath;
+		partIndex = part;
 		std::error_code ec;
 		sourceTime = std::filesystem::last_write_time(filePath, ec);
 		try {
@@ -1925,7 +2035,7 @@ class DataFilm {
 		const auto t = std::filesystem::last_write_time(sourcePath, ec), ts = std::filesystem::last_write_time(sceneFile, ec);
 		if (t == sourceTime && ts == sceneTime) return false;
 		DataFilm fresh;
-		const std::string why = fresh.load(sourcePath);
+		const std::string why = fresh.load(sourcePath, partIndex);
 		sourceTime = t, sceneTime = ts;   // (a bad file is not read again until it is saved again)
 		if (!why.empty()) {
 			if (problem) *problem = why;
@@ -1936,14 +2046,26 @@ class DataFilm {
 	}
 	std::string sourcePath;
 	std::filesystem::file_time_type sourceTime{}, sceneTime{};
+	int partIndex = -1;   // >= 0: the part of a film in parts this is
 
 	std::string loadFile(const std::string &filePath) {
 		std::ifstream f(filePath, std::ios::binary);
 		if (!f) return filePath + ": the file cannot be read";
-		const std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+		std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+		FilmParts parts;
+		if (partIndex >= 0) {
+			parts = partsOf(text, filePath);
+			if (!parts.error.empty()) return parts.error;
+			if (partIndex >= static_cast<int>(parts.parts.size())) return filePath + ": it has no part " + std::to_string(partIndex + 1) + " (it has " + std::to_string(parts.parts.size()) + ")";
+			text = parts.parts[static_cast<std::size_t>(partIndex)].text;
+		}
 		Parsed p = parse(text, filePath);
 		if (!p.ok) return p.error;
 		spec = p.spec;
+		if (partIndex >= 0) {
+			spec.key = (parts.key.empty() ? detail::keyFromFileName(filePath) : parts.key) + "--" + std::to_string(partIndex + 1);
+			spec.name = parts.parts[static_cast<std::size_t>(partIndex)].name;
+		}
 		if (spec.key.empty()) spec.key = detail::keyFromFileName(filePath);
 		if (!detail::validKey(spec.key)) return filePath + ": the key \"" + spec.key + "\" is not lower-case letters, digits and '-'; give the film a `film KEY` line";
 		if (spec.name.empty()) spec.name = spec.key;

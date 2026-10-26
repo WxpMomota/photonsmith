@@ -539,6 +539,16 @@ and its footfalls and gesture contacts, which are its soundtrack's footsteps and
 a set (`film_assets/a-walk-at-dusk/set.pbrt`: a sandy flat at dusk, stones, a path, a lantern that lights), the explorer walking the path, looking up and pointing, four shots
 (one following it) and a cues file. A new kind of character is a `CharacterKind` added in `film_kinds::install()`: its scene text and feet at a moment, its chest, its step.
 
+**Several sets in one film: a film in parts.** A film file can be cut into parts with `part NAME [dissolve|fade|wipe SECONDS]` lines. Each part is a film of its own, with its
+set (`scene`), its `length`, its characters and walks, its shots, its dressing and its sound, and the parts play one after another as one film (`film_file::partsOf` splits the
+file, `film_parts.h` joins the parts' films): its shots are the parts' shots in order, each part's soundtrack is laid at its start (crossfaded into the next), its captions,
+footsteps, feet and subjects are moved to the part's start, and a part that comes in with a dissolve or a wipe shows the other part's scene on the other side of the cut. The
+lines before the first part are every part's - a cast, a default set, an fps - except the film's own `film`, `name`, `about`, `tags`, `still` (a time in the whole film) and
+`music`. The whole film's cameras, cues and captions files are its own (`film_assets/<key>/`, its shots named as the parts name them); with no cues file each part plays the
+score drafted from it. `ray_tracer --film-check FILE` checks each part as the film it is (a problem names the file's own line), and a part can be read on its own by its key,
+`<key>--2` (`--film-lines`, `--film-score`). `pbrt_scenes/pip-goes-out.film` is an example: Pip trots down the lantern path at dusk, and after a fade comes out into a morning
+meadow on the stage set (`sky`, grass, trees, birds) and cheers.
+
 **The kinds of character.** Each walks with its own gait with its feet held where they come down (a turtle's four), blinks on its own, opens its mouth when it speaks (a
 `sample ... by NAME` cue) and has its own poses for gestures; a gesture naming a pose its kind does not have is an error when the film is loaded, and the message lists the
 kind's poses.

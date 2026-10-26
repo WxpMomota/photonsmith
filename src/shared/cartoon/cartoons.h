@@ -16,6 +16,7 @@
 #include <deque>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -38,6 +39,7 @@
 #include "newtons_cradle.h"
 #include "film_file.h"
 #include "film_kinds.h"
+#include "film_parts.h"
 #include "film_score.h"
 #include "caption_file.h"
 #include "film_cache.h"
@@ -202,46 +204,53 @@ inline Film withFilmFiles(Film f) {
 	return f;
 }
 
-// Loads one film file into the registry (or says why not).
-inline void addFilmFile(Registry &r, const std::string &file) {
-	r.data.emplace_back();
-	film_file::DataFilm &d = r.data.back();
-	std::string problem = d.load(file);
-	if (problem.empty()) {
-		for (const Film *f : r.all)
-			if (d.spec.key == f->key) problem = file + ": the key \"" + d.spec.key + "\" is already a film's (" + f->name + ")";
-	}
-	if (!problem.empty()) {
-		r.data.pop_back();
-		r.problems.push_back(problem);
-		return;
-	}
-	// the tags that are in the vocabulary
-	std::string tags;
-	{
-		std::string word;
-		for (std::size_t i = 0; i <= d.spec.tags.size(); ++i) {
-			const char c = i < d.spec.tags.size() ? d.spec.tags[i] : ',';
-			if (c == ',' || c == ' ') {
-				if (!word.empty()) {
-					for (const char *v : kTagVocabulary)
-						if (word == v) tags += (tags.empty() ? "" : ",") + word;
-					word.clear();
-				}
-			} else {
-				word += c;
+// The words of a film file's `tags` line that are in the vocabulary, joined with commas.
+inline std::string tagsIn(const std::string &line) {
+	std::string tags, word;
+	for (std::size_t i = 0; i <= line.size(); ++i) {
+		const char c = i < line.size() ? line[i] : ',';
+		if (c == ',' || c == ' ') {
+			if (!word.empty()) {
+				for (const char *v : kTagVocabulary)
+					if (word == v) tags += (tags.empty() ? "" : ",") + word;
+				word.clear();
 			}
+		} else {
+			word += c;
 		}
 	}
-	// a stable number from the key (fixed once given, whatever other films there are): 1000 + a hash, moved on past any that is taken
+	return tags;
+}
+// A stable number from a film's key (fixed once given, whatever other films there are): 1000 + a hash, moved on past any that is taken.
+inline int idFor(const Registry &r, const std::string &key) {
 	std::uint32_t h = 2166136261u;
-	for (char c : d.spec.key) h = (h ^ static_cast<unsigned char>(c)) * 16777619u;
+	for (char c : key) h = (h ^ static_cast<unsigned char>(c)) * 16777619u;
 	int id = 1000 + static_cast<int>(h % 9000u);
 	for (bool taken = true; taken;) {
 		taken = false;
 		for (const Film *f : r.all) taken = taken || f->meta.id == id;
 		if (taken) ++id;
 	}
+	return id;
+}
+// Its captions file's captions (film_assets/<key>/captions.txt) and `lines` (its characters' words); null when it has neither.
+inline std::function<std::vector<Caption>()> captionsOf(const std::string &key, std::function<std::vector<Caption>()> lines) {
+	const std::string file = film_cache::asset(key + "/captions.txt");
+	const bool hasFile = std::filesystem::exists(file);
+	if (!hasFile && (!lines || lines().empty())) return nullptr;
+	return [file, hasFile, lines]() {
+		std::vector<Caption> out = hasFile ? caption_file::read(file) : std::vector<Caption>();
+		if (lines) {
+			const std::vector<Caption> said = lines();
+			out.insert(out.end(), said.begin(), said.end());
+		}
+		return out;
+	};
+}
+
+// The Film of a film read from a file (or of one part of a film in parts): its frames, shots, sound, captions and transitions. `drafted`: its music is the score drafted from
+// it (it has no cues file).
+inline Film filmOf(Registry &r, const film_file::DataFilm &d, bool drafted, int id, const std::string &tags) {
 	const film_file::DataFilm *p = &d;
 	Film f{r.keep(d.spec.key), r.keep(d.spec.name), r.keep(d.spec.about.empty() ? "A film made from " + std::filesystem::path(d.spec.scene).filename().string() + "." : d.spec.about),
 		   d.spec.length, d.spec.fps, [p](double t) { return p->sceneAt(t); }, [p](double t) { return p->headerAt(t); }, [p]() { return p->shotStarts(); }, d.spec.still,
@@ -256,7 +265,6 @@ inline void addFilmFile(Registry &r, const std::string &file) {
 	// every film file has a soundtrack: its set's sound and its rain, its footsteps, touches and lines, and its music - its cues file's (withFilmFiles) or, when it has none,
 	// the score drafted from what happens in it (film_score.h; `music none` leaves it out), ducked under the lines as a cues file's music is. (One with no music and nothing
 	// else to hear has a soft wind: a video of a film is never silent.)
-	const bool drafted = d.spec.draftMusic && music_cues::fileOf(d.spec.key).empty();
 	const bool quiet = !drafted && music_cues::fileOf(d.spec.key).empty() && !d.hasEvents() && d.spec.ambience.empty() && d.spec.weather.empty() && d.spec.lightnings.empty();
 	f.soundtrack = [p, drafted, quiet, names = d.shotNameList(), speech = f.speechAt](audio::Mix &m) {
 		dressing::play(m, quiet ? std::vector<dressing::Ambience>{{"wind", 0.6}} : p->spec.ambience);
@@ -279,19 +287,81 @@ inline void addFilmFile(Registry &r, const std::string &file) {
 		f.sceneAcross = [p, names = d.shotNameList()](double t) {   // (the other side of a cut is the other shot's: its cameras file's changes)
 			return shot_cameras::at(p->spec.key, [p]() { return p->shotStarts(); }, names, p->acrossShotTime(t), p->sceneAcross(t));
 		};
+		f.acrossShotTime = [p](double t) { return p->acrossShotTime(t); };
 	}
-	// its captions: its captions file (film_assets/<key>/captions.txt) and its characters' lines
-	const std::string captionsFile = film_cache::asset(d.spec.key + "/captions.txt");
-	const bool hasCaptionsFile = std::filesystem::exists(captionsFile);
-	if (hasCaptionsFile || !d.lineCaptions().empty()) {
-		f.captions = [p, captionsFile, hasCaptionsFile]() {
-			std::vector<Caption> out = hasCaptionsFile ? caption_file::read(captionsFile) : std::vector<Caption>();
-			const std::vector<Caption> lines = p->lineCaptions();
-			out.insert(out.end(), lines.begin(), lines.end());
-			return out;
+	// its captions: its captions file and its characters' lines
+	if (!d.lineCaptions().empty()) f.captions = [p]() { return p->lineCaptions(); };
+	return f;
+}
+
+// Loads one film file into the registry (or says why not): a film, or a film in parts (film_file::partsOf) made of a film for each part (film_parts.h).
+inline void addFilmFile(Registry &r, const std::string &file) {
+	std::string text;
+	{
+		std::ifstream in(file, std::ios::binary);
+		text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+	}
+	const film_file::FilmParts parts = film_file::partsOf(text, file);
+	const std::size_t before = r.data.size();
+	std::string problem = parts.error;
+	const std::size_t count = parts.parts.empty() ? 1 : parts.parts.size();
+	for (std::size_t k = 0; k < count && problem.empty(); ++k) {
+		r.data.emplace_back();
+		problem = r.data.back().load(file, parts.parts.empty() ? -1 : static_cast<int>(k));
+		if (problem.empty() && k > 0 && r.data.back().spec.fps != r.data[before].spec.fps)
+			problem = file + ":" + std::to_string(parts.parts[k].line) + ": the part \"" + parts.parts[k].name + "\" has another fps than the film's first part";
+	}
+	const std::string key = problem.empty() ? (parts.parts.empty() ? r.data.back().spec.key : parts.key.empty() ? film_file::detail::keyFromFileName(file) : parts.key) : std::string();
+	if (problem.empty()) {
+		for (const Film *f : r.all)
+			if (key == f->key) problem = file + ": the key \"" + key + "\" is already a film's (" + f->name + ")";
+	}
+	if (!problem.empty()) {
+		while (r.data.size() > before) r.data.pop_back();
+		r.problems.push_back(problem);
+		return;
+	}
+	if (parts.parts.empty()) {
+		const film_file::DataFilm &d = r.data.back();
+		Film f = filmOf(r, d, d.spec.draftMusic && music_cues::fileOf(d.spec.key).empty(), idFor(r, d.spec.key), tagsIn(d.spec.tags));
+		f.captions = captionsOf(d.spec.key, f.captions);
+		r.made.push_back(withFilmFiles(std::move(f)));
+		r.all.push_back(&r.made.back());
+		return;
+	}
+	// a film in parts: each part a film (its music drafted from it when the whole film has no cues file), joined; the whole film's cameras, cues and captions files are its own
+	const bool drafted = parts.draftMusic && music_cues::fileOf(key).empty();
+	std::vector<Film> films;
+	std::vector<Transition> ins;
+	std::string shotNames;
+	std::vector<std::string> names;
+	int samples = 0;
+	for (std::size_t k = 0; k < parts.parts.size(); ++k) {
+		const film_file::DataFilm &d = r.data[before + k];
+		films.push_back(filmOf(r, d, drafted, 0, std::string()));
+		ins.push_back(parts.parts[k].in);
+		const std::string own = d.shotNames();   // (a part with no shots is one shot, "The whole film")
+		shotNames += (shotNames.empty() ? "" : "|") + own;
+		for (std::size_t at = 0;;) {
+			const std::size_t bar = own.find('|', at);
+			names.push_back(own.substr(at, bar == std::string::npos ? std::string::npos : bar - at));
+			if (bar == std::string::npos) break;
+			at = bar + 1;
+		}
+		samples = std::max(samples, d.scene.samples);
+	}
+	const film_file::DataFilm &first = r.data[before];
+	Film whole{r.keep(key), r.keep(parts.name.empty() ? key : parts.name), r.keep(parts.about.empty() ? "A film in " + std::to_string(parts.parts.size()) + " parts." : parts.about),
+			   0.0, first.spec.fps, nullptr, nullptr, nullptr, 0.0, {idFor(r, key), r.keep(tagsIn(parts.tags)), r.keep(shotNames), samples, 0.0}};
+	whole = film_parts::joined(std::move(whole), films, ins);
+	whole.stillTime = parts.still >= 0.0 && parts.still <= whole.duration ? parts.still : whole.duration * 0.5;
+	whole.captions = captionsOf(key, whole.captions);
+	if (whole.sceneAcross) {   // (the other side of a cut is the other shot's: the whole film's cameras file's changes)
+		whole.sceneAcross = [across = whole.sceneAcross, when = whole.acrossShotTime, starts = whole.shotStarts, key, names](double t) {
+			return shot_cameras::at(key, starts, names, when(t), across(t));
 		};
 	}
-	r.made.push_back(withFilmFiles(std::move(f)));
+	r.made.push_back(withFilmFiles(std::move(whole)));
 	r.all.push_back(&r.made.back());
 }
 
@@ -328,17 +398,18 @@ inline const std::vector<const Film *> &films() { return detail::registry().all;
 inline const std::vector<std::string> &filmFileProblems() { return detail::registry().problems; }
 // A film made from a file read again when its file (or its scene) was saved since: true when it was (a film timeline follows the edits). Its Film keeps pointing at it,
 // so frames made after it are of the new film; its length and its shots' names in the film table stay as they were until the program starts again.
+// (A film in parts has each part read again: they are its film file's "<key>--1", "<key>--2" ...)
 inline bool refreshFilmFile(const std::string &key) {
+	bool changed = false;
 	for (film_file::DataFilm &d : detail::registry().data)
-		if (d.spec.key == key) {
+		if (d.spec.key == key || (d.partIndex >= 0 && d.spec.key == key + "--" + std::to_string(d.partIndex + 1))) {
 			std::string problem;
-			const bool changed = d.reloadIfChanged(&problem);
+			changed = d.reloadIfChanged(&problem) || changed;
 			if (!problem.empty()) std::cerr << "[film] " << problem << std::endl;
-			return changed;
 		}
-	return false;
+	return changed;
 }
-// The film file a film was made from (null for a built-in film): its characters and their lines.
+// The film file a film was made from (null for a built-in film): its characters and their lines. (A film in parts: each part by its own key, "<key>--2".)
 inline const film_file::DataFilm *filmFileOf(const std::string &key) {
 	for (const film_file::DataFilm &d : detail::registry().data)
 		if (d.spec.key == key) return &d;

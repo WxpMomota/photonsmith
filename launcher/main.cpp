@@ -835,17 +835,28 @@ static int film_check_command(int argc, char** argv) {
 	int bad = 0;
 	for (int i = 2; i < argc; ++i) {
 		(void)cartoon::films();   // (the film registry knows the kinds of character a file can bring in)
-		cartoon::film_file::DataFilm film;
-		const std::string problem = film.load(argv[i]);
-		if (!problem.empty()) {
-			std::cout << "PROBLEM  " << problem << std::endl;
+		std::ifstream in(argv[i], std::ios::binary);
+		const cartoon::film_file::FilmParts parts = cartoon::film_file::partsOf(std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()), argv[i]);
+		if (!parts.error.empty()) {
+			std::cout << "PROBLEM  " << parts.error << std::endl;
 			++bad;
 			continue;
 		}
-		std::cout << "OK       " << argv[i] << ": film \"" << film.spec.key << "\", " << film.spec.length << " s at " << film.spec.fps << " fps, " << film.shotStarts().size() << (film.shotStarts().size() == 1 ? " shot" : " shots")
-				  << ", " << film.spec.anims.size() << " animation line" << (film.spec.anims.size() == 1 ? "" : "s") << ", " << film.scene.names.size() << " animated block" << (film.scene.names.size() == 1 ? "" : "s")
-				  << (film.spec.characters.empty() ? std::string() : ", " + std::to_string(film.spec.characters.size()) + " character" + (film.spec.characters.size() == 1 ? "" : "s"))
-				  << (film.spec.lines.empty() ? std::string() : ", " + std::to_string(film.spec.lines.size()) + " line" + (film.spec.lines.size() == 1 ? "" : "s") + " of dialogue") << std::endl;
+		for (int part = parts.parts.empty() ? -1 : 0; part < static_cast<int>(parts.parts.size()); ++part) {   // (a film in parts: each part checked as the film it is)
+			cartoon::film_file::DataFilm film;
+			const std::string problem = film.load(argv[i], part);
+			if (!problem.empty()) {
+				std::cout << "PROBLEM  " << problem << std::endl;
+				++bad;
+				break;
+			}
+			if (part >= 0) std::cout << "PART     " << part + 1 << " \"" << film.spec.name << "\" of " << argv[i] << std::endl;
+			std::cout << "OK       " << argv[i] << ": film \"" << film.spec.key << "\", " << film.spec.length << " s at " << film.spec.fps << " fps, " << film.shotStarts().size() << (film.shotStarts().size() == 1 ? " shot" : " shots")
+					  << ", " << film.spec.anims.size() << " animation line" << (film.spec.anims.size() == 1 ? "" : "s") << ", " << film.scene.names.size() << " animated block" << (film.scene.names.size() == 1 ? "" : "s")
+					  << (film.spec.characters.empty() ? std::string() : ", " + std::to_string(film.spec.characters.size()) + " character" + (film.spec.characters.size() == 1 ? "" : "s"))
+					  << (film.spec.lines.empty() ? std::string() : ", " + std::to_string(film.spec.lines.size()) + " line" + (film.spec.lines.size() == 1 ? "" : "s") + " of dialogue") << std::endl;
+			if (part < 0) break;
+		}
 	}
 	if (argc == 2) {
 		for (const cartoon::Film *f : cartoon::films())

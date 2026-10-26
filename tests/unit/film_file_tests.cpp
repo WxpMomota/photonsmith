@@ -362,6 +362,95 @@ TEST(FilmFile, EveryFilmInTheProgramHasASoundtrack) {
 	for (const cartoon::Film *f : cartoon::films()) EXPECT_TRUE(static_cast<bool>(f->soundtrack)) << f->key << " has no soundtrack";
 }
 
+// A film in parts: each part a film of its own - its set, its length, its shots, its lines - played one after another as one film, the lines before the first part shared
+// by every part (here the cast and a set) and the film's own (its key, name, tags, still) the whole film's.
+TEST(FilmParts, AFilmInPartsPlaysItsPartsOneAfterAnotherEachOnItsOwnSet) {
+	const std::filesystem::path d = tempDir("parts");
+	write(d / "s.pbrt", kScene);
+	write(d / "b.pbrt", "LookAt 0 3 10  0 1 0  0 1 0\nCamera \"perspective\" \"float fov\" [ 40 ]\nWorldBegin\nShape \"cylinder\" \"float radius\" [ 3 ]\n");
+	write(d / "journey.film", "film journey\nname The Journey\ntags dusk,made-up\nstill 9\nscene s.pbrt\ncharacter ann person\n"
+							  "part Home\nlength 6\nshot 0 Door\n key 0 1 5  0 1 0\nshot 3 Hall\n key 0 2 6  0 1 0\n"
+							  "part \"The Lake\" dissolve 1   # a part comes in as a shot does\nscene b.pbrt\nlength 8\nsay ann 1 \"Hello there.\"\nshot 0 Shore\n key 0 1 9  0 1 0\n");
+	cartoon::detail::Registry r;
+	cartoon::detail::addFilmFile(r, (d / "journey.film").string());
+	ASSERT_TRUE(r.problems.empty()) << r.problems[0];
+	ASSERT_EQ(r.all.size(), 1u) << "one film, not one for each part";
+	const cartoon::Film &f = *r.all[0];
+	EXPECT_STREQ(f.key, "journey");
+	EXPECT_STREQ(f.name, "The Journey");
+	EXPECT_DOUBLE_EQ(f.duration, 14.0);
+	EXPECT_DOUBLE_EQ(f.stillTime, 9.0) << "a time in the whole film";
+	EXPECT_EQ(cartoon::tagsOf(f), (std::vector<std::string>{"dusk"}));
+	EXPECT_GE(f.meta.id, 1000);
+	EXPECT_EQ(f.shotStarts(), (std::vector<double>{0.0, 3.0, 6.0}));
+	EXPECT_STREQ(f.meta.shotNames, "Door|Hall|Shore");
+	// each part on its own set, at its own time
+	EXPECT_EQ(f.sceneAt(2.0).find("cylinder"), std::string::npos);
+	EXPECT_NE(f.sceneAt(2.0).find("\"sphere\""), std::string::npos) << "the first part's set";
+	EXPECT_NE(f.sceneAt(7.0).find("cylinder"), std::string::npos) << "the second part's set";
+	EXPECT_NE(f.headerAt(7.0).find("LookAt"), std::string::npos);
+	// the way in to the second part: a dissolve at its start, whose other side is the other part's scene
+	ASSERT_TRUE(static_cast<bool>(f.transitions));
+	const std::vector<cartoon::Transition> tr = f.transitions();
+	ASSERT_EQ(tr.size(), 1u);
+	EXPECT_EQ(tr[0].kind, cartoon::Transition::Dissolve);
+	EXPECT_DOUBLE_EQ(tr[0].at, 6.0);
+	EXPECT_DOUBLE_EQ(tr[0].length, 1.0);
+	EXPECT_NE(f.sceneAcross(5.8).find("cylinder"), std::string::npos) << "before the cut, the part coming in";
+	EXPECT_EQ(f.sceneAcross(6.2).find("cylinder"), std::string::npos) << "after it, the part going out";
+	EXPECT_NE(f.sceneAcross(9.0).find("cylinder"), std::string::npos) << "away from the cut, the scene itself";
+	// the shared character speaks in the second part: its caption and its voice at the second part's time
+	ASSERT_TRUE(static_cast<bool>(f.captions));
+	const std::vector<cartoon::Caption> words = f.captions();
+	ASSERT_EQ(words.size(), 1u);
+	EXPECT_GE(words[0].t0, 7.0);
+	ASSERT_TRUE(static_cast<bool>(f.speechAt));
+	EXPECT_EQ(f.speechAt(1.5), 0.0);
+	EXPECT_GT(f.speechAt(words[0].t0 + 0.1), 0.0);
+	// its sound: both parts', heard from start to end
+	ASSERT_TRUE(static_cast<bool>(f.soundtrack));
+	cartoon::audio::Mix m(f.duration);
+	f.soundtrack(m);
+	const std::vector<std::int16_t> pcm = m.finish();
+	for (double t = 0.5; t + 2.0 < f.duration - 1.0; t += 1.0) {
+		double e = 0.0;
+		const std::size_t i0 = static_cast<std::size_t>(t * cartoon::audio::kRate) * 2, i1 = static_cast<std::size_t>((t + 2.0) * cartoon::audio::kRate) * 2;
+		for (std::size_t i = i0; i < i1; ++i) e += static_cast<double>(pcm[i]) * pcm[i];
+		EXPECT_GT(std::sqrt(e / static_cast<double>(i1 - i0)) / 32768.0, 0.0008) << "silence from " << t << " s";
+	}
+	// a part read on its own: the whole film's key and its number, the part's name
+	ff::DataFilm second;
+	ASSERT_EQ(second.load((d / "journey.film").string(), 1), "");
+	EXPECT_EQ(second.spec.key, "journey--2");
+	EXPECT_EQ(second.spec.name, "The Lake");
+	EXPECT_EQ(second.spec.characters.size(), 1u) << "the shared cast";
+	ff::DataFilm whole;
+	EXPECT_NE(whole.load((d / "journey.film").string()).find("a film in parts"), std::string::npos) << "the file as one film is not a film";
+}
+
+TEST(FilmParts, WhatIsWrongWithAFilmInPartsIsSaidWithItsLine) {
+	const auto problem = [](const std::string &text) { return ff::partsOf(text, "f.film").error; };
+	EXPECT_EQ(problem("scene s.pbrt\nlength 4\n"), "") << "not in parts";
+	EXPECT_TRUE(ff::partsOf("scene s.pbrt\nlength 4\n", "f.film").parts.empty());
+	EXPECT_NE(problem("scene s.pbrt\nshot 0 A\npart B\n").find("f.film:2: a shot belongs to a part"), std::string::npos);
+	EXPECT_NE(problem("part A\npart A\n").find("f.film:2: there is already a part called \"A\""), std::string::npos);
+	EXPECT_NE(problem("part A spin 2\n").find("f.film:1: a part comes in with"), std::string::npos);
+	EXPECT_NE(problem("part\n").find("a part has a name"), std::string::npos);
+	EXPECT_NE(problem("music loud\npart A\n").find("`music none`"), std::string::npos);
+	// a part's lines are the file's own lines (the others blank): a problem in one names the file's line
+	const std::filesystem::path d = tempDir("partsbad");
+	write(d / "s.pbrt", kScene);
+	write(d / "bad.film", "scene s.pbrt\npart A\nlength 4\npart B\nlength x\n");
+	ff::DataFilm b;
+	EXPECT_NE(b.load((d / "bad.film").string(), 1).find("bad.film:5:"), std::string::npos);
+	cartoon::detail::Registry r;
+	cartoon::detail::addFilmFile(r, (d / "bad.film").string());
+	EXPECT_TRUE(r.all.empty());
+	ASSERT_EQ(r.problems.size(), 1u);
+	EXPECT_NE(r.problems[0].find("bad.film:5:"), std::string::npos) << r.problems[0];
+	EXPECT_TRUE(r.data.empty()) << "nothing of it is kept";
+}
+
 TEST(FilmFile, TheExampleFilmIsGoodAndAnimatesWhatItSays) {
 	std::string file;
 	for (const char *candidate : {"examples/animated/windmill.film", "../examples/animated/windmill.film", "../../examples/animated/windmill.film"})

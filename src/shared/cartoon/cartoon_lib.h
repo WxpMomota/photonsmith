@@ -631,6 +631,8 @@ struct Film {
 	std::function<std::string(double)> sceneAcross;
 	// (empty: none) how loud its characters are speaking at t, 0..1: its music cues are ducked under it.
 	std::function<double(double)> speechAt;
+	// (empty: t) the time whose shot's camera sceneAcross(t) uses: what a cameras file changes of that shot is changed on the other side of the cut too.
+	std::function<double(double)> acrossShotTime;
 };
 
 }  // namespace cartoon
