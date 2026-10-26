@@ -680,6 +680,12 @@ is a short example: three characters, four lines.
 With three or more, the coverage now keeps its cameras on the side the characters' faces look to (unless the shot says `side`), backs its two-shot away until everyone is in
 the frame, and shoots a speaker much smaller than the one they speak to from in front rather than over a tall shoulder.
 
+**Idle life.** A character nobody tells what to do is not a statue: while someone speaks the others turn their heads and eyes to the speaker (just after the line begins,
+back a little after it ends, the look moving smoothly from one speaker to the next) and the speaker looks at the nearest of them; standing, a character breathes, shifts its
+weight from foot to foot, lets its head drift a few degrees, and its eyes dart - a quick jump every second or two to another point near what it looks at (between the eyes and
+the mouth of whoever it listens to) or near straight ahead (film_kinds.h, `idleAt`). A `look` line wins over the listening; `idle off` in a film file turns all of it off.
+Pip, the person and the turtle have it; the Nomai explorer keeps its own (it already breathes and blinks).
+
 `ray_tracer --film-lines <key>` lists the lines with their start, end and syllables; `ray_tracer --film-sound <key> OUT.wav` writes a film's soundtrack alone, to listen to
 the lines (and the music and footsteps) without rendering a frame; `--film-check` counts a film file's characters and lines.
 

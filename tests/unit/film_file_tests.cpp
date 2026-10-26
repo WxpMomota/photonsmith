@@ -1005,3 +1005,31 @@ TEST(Fountain, AScreenplayBecomesAFilmFileThatLoads) {
 	EXPECT_GE(film.spec.shots.size(), 2u) << "each scene covered";
 	EXPECT_NE(film.spec.shots[0].name.find("EXT. THE PATH"), std::string::npos);
 }
+
+// ---- idle life ------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// While someone speaks the others turn to them (and the speaker to the nearest listener), the look moving from one speaker to the next; a `look` line wins; standing still a
+// character is not still (its head drifts, its eyes dart); `idle off` turns all of it off.
+TEST(FilmIdle, ListenersTurnToTheSpeakerAndAStandingCharacterIsNotStill) {
+	(void)cartoon::films();
+	const std::string base = "scene s.pbrt\nlength 12\ncharacter pip pip at -1 0 0 facing 90\ncharacter ann person at 1 0 0 facing -90\ncharacter tess turtle at 0 0 2 scale 6\n"
+							 "say pip 1.0 \"Have you seen my mitten?\"\nsay ann 5.0 \"I think Tess has it.\"\n";
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm(base + "look tess at 3 0 5 6 6.5\n", film), "");
+	const ff::Character &pip = *film.character("pip"), &ann = *film.character("ann"), &tess = *film.character("tess");
+	const auto head = [&](const ff::Character &c, double t) { return film.bodyPoint(c, t, ff::characterKinds().at(c.kind).head); };
+	EXPECT_EQ(film.actingMoment(ann, 0.3).look.weight, 0.0) << "before anyone speaks";
+	const ff::CharacterMoment listening = film.actingMoment(ann, 2.0);
+	EXPECT_GT(listening.look.weight, 0.8);
+	EXPECT_LT(cartoon::length(listening.look.at - head(pip, 2.0)), 1e-9) << "ann looks at pip while pip speaks";
+	EXPECT_LT(cartoon::length(film.actingMoment(pip, 2.0).look.at - head(ann, 2.0)), 1e-9) << "pip at the nearest listener";
+	EXPECT_LT(cartoon::length(film.actingMoment(tess, 6.0).look.at - head(ann, 6.0)), 0.6) << "tess turns to ann when ann speaks";
+	EXPECT_NEAR(film.actingMoment(tess, 8.0).look.at.z, 5.0, 1e-9) << "its own look wins";
+	// idle: a character standing still looks a little different a second later
+	const auto text = [](const std::string &scene, const std::string &who) { const std::size_t at = scene.find("# " + who + " ("); return scene.substr(at, scene.find("\n# ", at + 1) - at); };
+	EXPECT_NE(text(film.sceneAt(10.0), "pip"), text(film.sceneAt(10.7), "pip"));
+	ff::DataFilm still;
+	ASSERT_EQ(loadFilm(base + "idle off\n", still), "");
+	EXPECT_EQ(still.actingMoment(ann, 2.0).look.weight, 0.0) << "no turning to the speaker";
+	EXPECT_EQ(still.actingMoment(pip, 10.0).idle, false) << "and no idle life";
+}

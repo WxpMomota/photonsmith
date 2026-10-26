@@ -105,6 +105,39 @@ inline void lookWith(const CharacterMoment &m, Vec3 headLocal, double maxYaw, do
 	look = m.look.at;
 	lookWeight = std::max(lookWeight, m.look.weight);
 }
+// Idle life (CharacterMoment::idle): a head that drifts a little, eyes that dart - a jump every second or two to another point near what they look at (or, looking at
+// nothing, near straight ahead), quick as a real saccade - and the slow numbers a body breathes and shifts its weight by. All from the time and the character's seed.
+struct Idle {
+	double headYaw = 0.0, headPitch = 0.0;   // degrees
+	Vec3 gaze;                                // an offset for the eyes' target (world, metres at the target)
+	double breath = 0.0, sway = 0.0;          // -1..1: in and out, from foot to foot
+};
+inline Idle idleAt(double t, int seed) {
+	Idle i;
+	const double s = seed * 0.37;
+	i.headYaw = 3.5 * std::sin(0.31 * t + s) + 1.5 * std::sin(0.73 * t + 2.0 * s);
+	i.headPitch = 2.0 * std::sin(0.23 * t + 1.7 * s);
+	i.breath = std::sin(2.0 * kPi * t / 3.6 + s);
+	i.sway = std::sin(2.0 * kPi * t / 5.3 + 3.0 * s);
+	// the saccades: segments of 1.1 to 2.6 s, each with its own small offset, jumped to in 0.05 s
+	const double period = 1.85;
+	const int k = static_cast<int>(std::floor(t / period));
+	const auto offsetOf = [&](int n) { return Vec3{0.12 * (hash01(n, seed) - 0.5), 0.08 * (hash01(n, seed + 7) - 0.5), 0.0}; };
+	const double start = (k + 0.7 * hash01(k, seed + 13)) * period;
+	const Vec3 before = offsetOf(t < start ? k - 1 : k), after = offsetOf(t < start ? k : k + 1);
+	const double jumpAt = t < start ? start : (k + 1 + 0.7 * hash01(k + 1, seed + 13)) * period;
+	i.gaze = lerp(before, after, smoothstep(jumpAt, jumpAt + 0.05, t));
+	return i;
+}
+// The eyes' target and how much they follow it with idle life: what the moment looks at, darting a little round it, or straight ahead (2 m out from the head) when it looks
+// at nothing.
+inline void idleEyes(const CharacterMoment &m, const Idle &i, Vec3 headLocal, Vec3 &look, double &lookWeight) {
+	if (!m.idle) return;
+	const Vec3 ahead = transformPoint(m.frame, headLocal * m.scale + Vec3{0.0, 0.0, 2.0 * m.scale});
+	const Vec3 base = lookWeight > 0.0 ? look : ahead;
+	look = base + i.gaze * (lookWeight > 0.0 ? 0.6 : 2.5) * m.scale;
+	lookWeight = std::max(lookWeight, 0.85);
+}
 // A to-and-fro at `hz` (a wave, a shake of the head), from the gesture's start.
 inline double wiggle(double since, double hz) { return std::sin(2.0 * kPi * hz * since); }
 
@@ -203,6 +236,14 @@ inline CharacterKind pipKind() {
 		reachWith(m, p.handL, p.handWeightL, p.handR, p.handWeightR);
 		p.lean += 30.0 * reachingDown(m, 0.35 * m.scale, 0.3 * m.scale);
 		lookWith(m, {0.0, 0.96, 0.2}, 70.0, p.headYaw, p.headPitch, p.look, p.lookWeight);
+		if (m.idle) {
+			const Idle i = idleAt(m.t, m.seed);
+			p.headYaw += i.headYaw;
+			p.headPitch += i.headPitch;
+			p.roll += (m.moving ? 0.3 : 1.0) * 1.8 * i.sway;   // (from foot to foot)
+			p.squash *= 1.0 + 0.006 * i.breath;
+			idleEyes(m, i, {0.0, 0.96, 0.2}, p.look, p.lookWeight);
+		}
 		if (m.feetLocked) {
 			p.feetHeld = true;
 			for (int s = 0; s < 2; ++s) p.heldFoot[s] = transformPoint(m.frame, m.lockedFeet[s]);
@@ -313,6 +354,13 @@ inline CharacterKind personKind() {
 		p.crouch += 0.8 * down;
 		p.lean += 30.0 * down;
 		lookWith(m, {0.0, 1.64, 0.05}, 75.0, p.headYaw, p.headPitch, p.look, p.lookWeight);
+		if (m.idle) {
+			const Idle i = idleAt(m.t, m.seed);
+			p.headYaw += i.headYaw;
+			p.headPitch += i.headPitch;
+			p.lean += 0.8 * i.breath + (m.moving ? 0.0 : 0.6 * i.sway);   // (a breath, a slow shift of the weight)
+			idleEyes(m, i, {0.0, 1.64, 0.05}, p.look, p.lookWeight);
+		}
 		if (m.feetLocked) {
 			p.feetHeld = true;
 			for (int s = 0; s < 2; ++s) p.heldFoot[s] = transformPoint(m.frame, m.lockedFeet[s]);
@@ -404,6 +452,13 @@ inline CharacterKind turtleKind() {
 		speakWith(m, p.mouthOpen, p.smile);
 		reachWith(m, p.frontL, p.frontWeightL, p.frontR, p.frontWeightR);
 		lookWith(m, {0.0, 0.045, 0.085}, 60.0, p.headYaw, p.headPitch, p.look, p.lookWeight);
+		if (m.idle) {
+			const Idle i = idleAt(m.t, m.seed);
+			p.headYaw += 1.5 * i.headYaw;   // (a turtle's head is restless)
+			p.headPitch += i.headPitch;
+			p.neck += 0.04 * i.breath;
+			idleEyes(m, i, {0.0, 0.045, 0.085}, p.look, p.lookWeight);
+		}
 		if (m.feetLocked) {   // (its legs reach for where their feet came down: a turtle's feet follow world targets)
 			Vec3 *target[4] = {&p.frontL, &p.frontR, &p.hindL, &p.hindR};
 			double *weight[4] = {&p.frontWeightL, &p.frontWeightR, &p.hindWeightL, &p.hindWeightR};

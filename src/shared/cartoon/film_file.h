@@ -53,6 +53,8 @@
 //     say        kai  14.4 "Look, the first star."  rate 1.1  pitch 2   # NAME, a line it says from 14.4 s: its voice, its mouth and a caption (film_speech.h; `nocaption`)
 //     feel       pip  happy 3 3.5 6 6.8  amount 0.8             # NAME, an expression on its face eased in and out (film_faces.h: happy, sad, angry, surprised, ...)
 //     look       pip  at ann 2 2.5 8 8.5                        # NAME turns its head and eyes to someone, a prop or a point (`at X Y Z`) and back
+//     idle       off                                            # (a film line) no idle life: by default a character breathes, shifts its weight, darts its eyes,
+//                                                               # turns to whoever speaks and looks at the one it speaks to (film_kinds.h; a `look` line wins)
 //
 // Props that characters handle - a marked block that is picked up, carried, put down and handed over (it follows the hand that holds it):
 //
@@ -199,6 +201,7 @@ struct CharacterMoment {
 	};
 	Reach hands[2];
 	Reach look;
+	bool idle = false;   // its idle life: breathing, a shifting weight, darting eyes (the film's `idle`, on unless it says off)
 };
 // A kind of character: its scene text (story space, as the toolkit writes it) and its feet at a moment, the point a camera and the film doctor look at (body space), and its walk's
 // step (rig::PathWalk's stride and first step).
@@ -239,6 +242,7 @@ struct Spec {
 	bool ease = true;
 	double shutter = 0.5;   // the share of a frame a moving block is blurred over (0: none)
 	double fadeOut = 0.0;   // seconds of a fade to black at the end
+	bool idle = true;       // the characters' idle life, and turning to whoever speaks (`idle off`)
 	std::vector<Shot> shots;
 	std::vector<Anim> anims;
 	std::vector<Character> characters;
@@ -745,6 +749,9 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			if (w.size() != 2 || !number(w[1], tr.length) || tr.length <= 0.0 || tr.length > 10.0) return fail("`" + verb + " SECONDS`: from more than 0 to 10 seconds");
 			tr.kind = verb == "dissolve" ? Transition::Dissolve : verb == "fade" ? Transition::Fade : Transition::Wipe;
 			if (s.shots.size() == 1 && tr.kind != Transition::Fade) return fail("the first shot can only fade in (`fade`): there is nothing before it to " + verb + " from");
+		} else if (verb == "idle") {
+			if (w.size() != 2 || (w[1] != "on" && w[1] != "off")) return fail("`idle on` or `idle off`");
+			s.idle = w[1] == "on";
 		} else if (verb == "fadeout") {
 			if (w.size() != 2 || !number(w[1], s.fadeOut) || s.fadeOut <= 0.0) return fail("`fadeout SECONDS`: the fade to black at the end");
 		} else if (verb == "auto" || verb == "side") {
@@ -816,7 +823,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, shot, key, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, walk, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, walk, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1488,8 +1495,43 @@ class DataFilm {
 	CharacterMoment actingMoment(const Character &c, double t) const {
 		CharacterMoment m = momentOf(c, t);
 		handsAt(c, t, m);
+		m.idle = spec.idle;
+		if (spec.idle) listenAt(c, t, m);
 		lookAt(c, t, m);
 		return m;
+	}
+	// Where a character looks of itself while someone speaks (CharacterMoment::look): at the speaker, turning to them just after they begin and back a little after they end
+	// (the look moves smoothly from one speaker to the next); and while it speaks, at the nearest of those who listen. A `look` line is on top of this.
+	void listenAt(const Character &c, double t, CharacterMoment &m) const {
+		Vec3 sum{0.0, 0.0, 0.0};
+		double weights = 0.0, most = 0.0;
+		for (std::size_t i = 0; i < spec.lines.size(); ++i) {
+			const speech::Line &l = spec.lines[i];
+			const double end = speech::endOf(spoken[i], l.t);
+			if (t < l.t - 0.3 || t > end + 1.2) continue;
+			const double w = smoothstep(l.t - 0.25, l.t + 0.35, t) * (1.0 - smoothstep(end + 0.4, end + 1.1, t));
+			if (w <= 0.0) continue;
+			const Character *speaker = character(l.who);
+			Vec3 at;
+			if (speaker != &c) {
+				at = bodyPoint(*speaker, t, characterKinds().at(speaker->kind).head);
+			} else {   // it speaks: to the nearest of the others
+				const Character *nearest = nullptr;
+				double best = 1e30;
+				for (const Character &o : spec.characters) {
+					if (&o == &c) continue;
+					const double d = length(bodyPoint(o, t, {0.0, 0.0, 0.0}) - bodyPoint(c, t, {0.0, 0.0, 0.0}));
+					if (d < best) best = d, nearest = &o;
+				}
+				if (!nearest || best > 8.0) continue;
+				at = bodyPoint(*nearest, t, characterKinds().at(nearest->kind).head);
+			}
+			if (length(at - bodyPoint(c, t, characterKinds().at(c.kind).head)) > 12.0) continue;   // (too far to be talking to)
+			sum = sum + at * w;
+			weights += w;
+			most = std::max(most, w);
+		}
+		if (weights > 0.0) m.look = {sum * (1.0 / weights), most * 0.9};
 	}
 	// Where a prop's handle is at t (story space): where it rests, or in the hand that holds it.
 	Vec3 propAt(const std::string &name, double t) const {
