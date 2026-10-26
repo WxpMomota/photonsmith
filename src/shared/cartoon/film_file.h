@@ -50,6 +50,9 @@
 //     walk       kai  2.0 0.7   0 -2   3 -6                     # NAME, from 2 s at 0.7 m/s, through these points (x z) from where it is
 //     walk       kai  9.0 0.7   to 3 -6                         # ... or to a place, finding its own way round the set and whoever stands there (film_paths.h)
 //     gesture    kai  "look up" 8.0 9.0 11.0 11.5               # NAME, a pose of its library, eased in from 8 s to 9 s, out from 11 s to 11.5 s (no out times: held)
+//     run        kai  4.0 3.0   2 -6                            # as `walk` (points, or `to` a place), running: a longer stride, a lean
+//     jump       kai  7.0 to 3 -7  height 0.5                   # NAME, at 7 s, a jump to there: a crouch before it, an arc, a landing that squashes and is heard
+//     sit        kai  9.0 height 0.45 until 14                  # NAME sits down at 9 s on a seat that high (0: the ground) and stands up at 14 s
 //     gesture    kai  "reach to the wall" 12 13 contact 12.8    # contact: the hand meets something (a touch on the soundtrack)
 //     say        kai  14.4 "Look, the first star."  rate 1.1  pitch 2   # NAME, a line it says from 14.4 s: its voice, its mouth and a caption (film_speech.h; `nocaption`)
 //     feel       pip  happy 3 3.5 6 6.8  amount 0.8             # NAME, an expression on its face eased in and out (film_faces.h: happy, sad, angry, surprised, ...)
@@ -160,6 +163,8 @@ struct Shot {
 
 // A character a film file brings in (`character NAME KIND ...`), its walks (`walk`) and its gestures (`gesture`).
 struct WalkLine {
+	enum Style { Walk, Run, Jump } style = Walk;
+	double height = 0.5;   // (a jump) how high it rises
 	double t0 = 0.0, speed = 0.8;
 	std::vector<std::pair<double, double>> points;   // pbrt x z (for a walk that finds its way: the way found, when the film is loaded)
 	std::vector<std::pair<double, double>> targets;  // (`to X Z ...`) the places it goes to, finding its way
@@ -175,6 +180,10 @@ struct Character {
 	std::vector<WalkLine> walks;
 	std::vector<rig::Gesture> gestures;
 	std::vector<faces::Feeling> feelings;   // its expressions (`feel`)
+	struct Sit {
+		double t0 = 0.0, t1 = 1e30, height = 0.0;
+	};
+	std::vector<Sit> sits;                  // when it sits down, on what height, and stands up (`sit`)
 	int line = 0;
 };
 
@@ -205,6 +214,11 @@ struct CharacterMoment {
 	Reach hands[2];
 	Reach look;
 	bool idle = false;   // its idle life: breathing, a shifting weight, darting eyes (the film's `idle`, on unless it says off)
+	double running = 0.0;    // 1 while it runs (a longer stride: its gait 1.6 times as wide), 0 walking
+	double crouch = 0.0;     // 0..1: crouched before a jump, squashed by a landing
+	bool airborne = false;   // in the air in a jump
+	double sit = 0.0;        // 0 standing .. 1 sitting, on a seat `seat` high
+	double seat = 0.0;
 };
 // A kind of character: its scene text (story space, as the toolkit writes it) and its feet at a moment, the point a camera and the film doctor look at (body space), and its walk's
 // step (rig::PathWalk's stride and first step).
@@ -550,7 +564,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				}
 			}
 			s.characters.push_back(c);
-		} else if (verb == "walk" || verb == "gesture" || verb == "feel") {
+		} else if (verb == "walk" || verb == "run" || verb == "jump" || verb == "sit" || verb == "gesture" || verb == "feel") {
 			const std::vector<std::string> t = detail::tokens(line);
 			Character *c = nullptr;
 			for (Character &each : s.characters)
@@ -575,9 +589,38 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				c->feelings.push_back(f);
 				continue;
 			}
-			if (verb == "walk") {
+			if (verb == "jump") {
 				WalkLine wl;
 				wl.line = n;
+				wl.style = WalkLine::Jump;
+				double x = 0.0, z = 0.0;
+				if (t.size() < 6 || !number(t[2], wl.t0) || t[3] != "to" || !number(t[4], x) || !number(t[5], z)) return fail("`jump NAME T to X Z [height H]`");
+				if (t.size() == 8 && t[6] == "height" && number(t[7], wl.height) && wl.height > 0.0 && wl.height <= 5.0) {
+				} else if (t.size() != 6) {
+					return fail("`jump NAME T to X Z [height H]` (a height above 0, up to 5 m)");
+				}
+				wl.points.push_back({x, z});
+				if (!c->walks.empty() && wl.t0 < c->walks.back().t0) return fail("a character's walks, runs and jumps go in time order");
+				c->walks.push_back(wl);
+				continue;
+			}
+			if (verb == "sit") {
+				Character::Sit st;
+				if (t.size() < 3 || !number(t[2], st.t0)) return fail("`sit NAME T [height H] [until T]`");
+				for (std::size_t i = 3; i < t.size(); i += 2) {
+					double v = 0.0;
+					if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail("a sit takes height and until, each with a number");
+					if (t[i] == "height" && v >= 0.0 && v <= 1.5) st.height = v;
+					else if (t[i] == "until" && v > st.t0 + 0.7) st.t1 = v;
+					else return fail("\"" + t[i] + "\": a sit takes height (0 to 1.5 m) and until (later than it sits down, by 0.7 s at least)");
+				}
+				c->sits.push_back(st);
+				continue;
+			}
+			if (verb == "walk" || verb == "run") {
+				WalkLine wl;
+				wl.line = n;
+				if (verb == "run") wl.style = WalkLine::Run;
 				if (t.size() > 4 && t[4] == "to") {   // places to go to, finding its way
 					if (!number(t[2], wl.t0) || !number(t[3], wl.speed) || wl.speed <= 0.0 || (t.size() - 4) % 3 != 0) return fail("`walk NAME FROM SPEED to X Z [to X Z ...]`");
 					for (std::size_t i = 4; i + 2 < t.size(); i += 3) {
@@ -870,7 +913,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, walk, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1633,27 +1676,62 @@ class DataFilm {
 		for (const auto &pt : c.walks[walk].points) w.points.push_back(story(pt.first, c.start[1], pt.second));
 		w.start = c.walks[walk].t0;
 		w.speed = c.walks[walk].speed;
-		w.stride = kind.stride * c.scale;
+		w.stride = kind.stride * c.scale * (c.walks[walk].style == WalkLine::Run ? kRunStride : 1.0);
 		w.firstStep = kind.firstStep;
 		return w;
+	}
+	static constexpr double kRunStride = 1.6;   // a run's gait, and so its stride, is this much wider than a walk's
+	static double flightOf(const WalkLine &w) { return 2.0 * std::sqrt(2.0 * w.height / 9.81); }   // (a jump's time in the air)
+	// The moment a character last landed from a jump at or before t (or -1e30).
+	double landedAt(const Character &c, double t) const {
+		double land = -1e30;
+		for (const WalkLine &w : c.walks)
+			if (w.style == WalkLine::Jump && w.t0 + flightOf(w) <= t) land = w.t0 + flightOf(w);
+		return land;
 	}
 	// Where a character is at t (story space), which way it faces (degrees, rig::headingOf), how many steps it has made in its walk and whether it is walking. After a walk it
 	// stands where the walk ended, its feet where they came down.
 	CharacterMoment momentOf(const Character &c, double t, Vec3 *at = nullptr) const {
 		Vec3 where = story(c.start[0], c.start[1], c.start[2]);
-		double heading = -c.facing, steps = 0.0;
-		bool moving = false;
+		double heading = -c.facing, steps = 0.0, running = 0.0, crouch = 0.0;
+		bool moving = false, airborne = false;
 		for (std::size_t i = 0; i < c.walks.size(); ++i) {
-			if (t < c.walks[i].t0 || c.walks[i].points.empty()) break;   // (a way not found yet: the film is being loaded)
+			const WalkLine &w = c.walks[i];
+			if (t < w.t0 || w.points.empty()) {   // (a way not found yet: the film is being loaded)
+				if (w.style == WalkLine::Jump && !w.points.empty()) crouch = std::max(crouch, smoothstep(w.t0 - 0.34, w.t0 - 0.08, t) * (1.0 - smoothstep(w.t0 - 0.08, w.t0, t)));   // (gathering itself)
+				break;
+			}
+			if (w.style == WalkLine::Jump) {   // an arc from where it was to there; it faces where it jumps
+				const Vec3 from = where, to = story(w.points[0].first, c.start[1], w.points[0].second);
+				if (std::hypot(to.x - from.x, to.z - from.z) > 1e-6) heading = rig::headingOf(to - from);
+				const double flight = flightOf(w);
+				if (t < w.t0 + flight) {
+					const double u = (t - w.t0) / flight;
+					where = lerp(from, to, u) + Vec3{0.0, 4.0 * w.height * c.scale * u * (1.0 - u), 0.0};
+					airborne = true;
+					break;
+				}
+				where = to;
+				crouch = std::max(crouch, 1.0 - smoothstep(w.t0 + flight + 0.04, w.t0 + flight + 0.42, t));   // (the landing squashes it)
+				continue;
+			}
 			const rig::PathWalk path = pathOf(c, i);
 			const rig::PathWalk::At a = path.at(t);
 			where = a.at;
 			heading = a.yaw;
 			steps = a.steps;
 			moving = a.moving;
+			running = w.style == WalkLine::Run ? 1.0 : 0.0;
 			if (moving) break;
 		}
 		CharacterMoment m;
+		m.running = running;
+		m.crouch = crouch;
+		m.airborne = airborne;
+		for (const Character::Sit &st : c.sits) {
+			const double s = smoothstep(st.t0, st.t0 + 0.7, t) * (1.0 - smoothstep(st.t1, st.t1 + 0.7, t));
+			if (s > m.sit) m.sit = s, m.seat = st.height * c.scale;
+		}
 		m.frame = mul(translate(where), rotate({0.0, 1.0, 0.0}, heading));
 		m.steps = steps;
 		m.moving = moving;
@@ -1669,12 +1747,21 @@ class DataFilm {
 	// Its feet held where they came down (CharacterMoment::lockedFeet), when its kind says where its gait puts them and it has walked.
 	void lockFeet(const Character &c, double t, CharacterMoment &m) const {
 		const CharacterKind &kind = characterKinds().at(c.kind);
-		if (!kind.footAt || !kind.plantedAt || (m.steps <= 0.0 && !m.moving)) return;
+		if (!kind.footAt || !kind.plantedAt || (m.steps <= 0.0 && !m.moving) || m.airborne) return;
 		rig::FootLock k;
 		k.frameAt = [this, &c](double u) { return momentOf(c, u).frame; };
 		k.stepsAt = [this, &c](double u) { return momentOf(c, u).steps; };
 		const double scale = c.scale;
 		k.footAt = [&kind, scale](double steps, int s) { return kind.footAt(steps, s) * scale; };
+		const bool runs = std::any_of(c.walks.begin(), c.walks.end(), [](const WalkLine &w) { return w.style == WalkLine::Run; });
+		if (runs)   // (a run's gait is wider about the feet's rest)
+			k.footAtTime = [this, &c, &kind, scale](double u, int s) {
+				const CharacterMoment mu = momentOf(c, u);
+				const Vec3 rest = kind.footAt(0.0, s), f = kind.footAt(mu.steps, s);
+				return (rest + (f - rest) * (1.0 + (kRunStride - 1.0) * mu.running)) * scale;
+			};
+		const double land = landedAt(c, t);   // (after a jump its feet are held from where it landed, not from before it jumped)
+		if (t - land < k.lookBack) k.lookBack = std::max(1.0 / 60.0, t - land);
 		k.plantedAt = kind.plantedAt;
 		m.feetLocked = true;
 		for (int s = 0; s < std::min(4, kind.footCount); ++s) m.lockedFeet[s] = rig::lockedFoot(k, s, t);
@@ -1738,7 +1825,19 @@ class DataFilm {
 		};
 		int seed = 0;
 		for (const Character &c : spec.characters) {
-			for (std::size_t i = 0; i < c.walks.size(); ++i)
+			for (std::size_t i = 0; i < c.walks.size(); ++i) {
+				if (c.walks[i].style == WalkLine::Jump) {   // the landing
+					FilmEvent e;
+					e.t = c.walks[i].t0 + flightOf(c.walks[i]);
+					e.kind = EventKind::Footfall;
+					e.seed = ++seed;
+					const Vec3 at = story(c.walks[i].points[0].first, c.start[1], c.walks[i].points[0].second);
+					const CameraView v = viewAt(e.t);
+					e.pan = panOf(v, at);
+					e.strength = std::min(1.0, 1.4 * audibility(length(at - v.eye)));
+					out.push_back(e);
+					continue;
+				}
 				for (const rig::PathWalk::Footfall &f : pathOf(c, i).footfalls(-1e30, 1e30)) {
 					FilmEvent e;
 					e.t = f.t;
@@ -1746,9 +1845,10 @@ class DataFilm {
 					e.seed = ++seed;
 					const CameraView v = viewAt(f.t);
 					e.pan = panOf(v, f.at);
-					e.strength = audibility(length(f.at - v.eye));
+					e.strength = audibility(length(f.at - v.eye)) * (c.walks[i].style == WalkLine::Run ? 1.3 : 1.0);
 					out.push_back(e);
 				}
+			}
 			for (const double t : rig::contactsOf(c.gestures)) {
 				FilmEvent e;
 				e.t = t;

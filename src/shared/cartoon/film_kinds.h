@@ -143,6 +143,8 @@ inline void colourFrom(const CharacterMoment &m, const char *part, Vec3 &colour)
 	if (!m.colours) return;
 	if (const auto it = m.colours->find(part); it != m.colours->end()) colour = it->second;
 }
+// How much wider a run's gait is than a walk's (film_file.h, DataFilm::kRunStride: its stride is as much longer).
+inline double runWidth(const CharacterMoment &m) { return 1.0 + (film_file::DataFilm::kRunStride - 1.0) * m.running; }
 // A to-and-fro at `hz` (a wave, a shake of the head), from the gesture's start.
 inline double wiggle(double since, double hz) { return std::sin(2.0 * kPi * hz * since); }
 
@@ -233,6 +235,7 @@ inline CharacterKind pipKind() {
 	k.voice = {290.0, 1.3, 0.04};   // (high and small)
 	const auto pose = [](const CharacterMoment &m) {
 		actor::Pose p = pipWalk(m.steps);
+		p.stepAmount *= runWidth(m);
 		placeOf(m.frame, p.pos, p.yaw);
 		p.blink = rig::blink(m.t, m.seed);
 		p.squash = actor::breathe(m.t);
@@ -249,10 +252,19 @@ inline CharacterKind pipKind() {
 			p.squash *= 1.0 + 0.006 * i.breath;
 			idleEyes(m, i, {0.0, 0.96, 0.2}, p.look, p.lookWeight);
 		}
+		// running leans into it; a jump gathers, stretches in the air and squashes on landing; sitting lifts it onto its seat, its feet forward
+		p.lean += 12.0 * m.running;
+		p.squash *= (1.0 - 0.22 * m.crouch) * (m.airborne ? 1.12 : 1.0);
+		if (m.airborne) p.stepAmount = 0.0;
+		p.lean -= 8.0 * m.sit;
+		p.lift += m.seat / m.scale * m.sit;
 		if (m.feetLocked) {
 			p.feetHeld = true;
 			for (int s = 0; s < 2; ++s) p.heldFoot[s] = transformPoint(m.frame, m.lockedFeet[s]);
 		}
+		if (m.sit > 0.0 && p.feetHeld)
+			for (int s = 0; s < 2; ++s)
+				p.heldFoot[s] = lerp(p.heldFoot[s], transformPoint(m.frame, Vec3{s == 0 ? 0.15 : -0.15, std::max(0.055, m.seat / m.scale - 0.12), 0.30} * m.scale), m.sit);
 		return m.gestures && !m.gestures->empty() ? rig::act(p, *m.gestures, m.t, pipPoses(m.scale)) : p;
 	};
 	k.text = [pose](const CharacterMoment &m) {
@@ -356,6 +368,7 @@ inline CharacterKind personKind() {
 	k.voice = {140.0, 1.0, 0.04};
 	const auto pose = [](const CharacterMoment &m) {
 		human::HumanPose p = personWalk(m.steps);
+		p.walkAmount *= runWidth(m);
 		placeOf(m.frame, p.pos, p.yaw);
 		p.blink = rig::blink(m.t, m.seed);
 		personFace(m.face, p);
@@ -372,9 +385,23 @@ inline CharacterKind personKind() {
 			p.lean += 0.8 * i.breath + (m.moving ? 0.0 : 0.6 * i.sway);   // (a breath, a slow shift of the weight)
 			idleEyes(m, i, {0.0, 1.64, 0.05}, p.look, p.lookWeight);
 		}
+		// running leans into it; a jump crouches before it, tucks its legs in the air and bends its knees to land; sitting lowers the hips to the seat, the feet forward
+		p.lean += 10.0 * m.running;
+		p.crouch += 0.45 * m.crouch + (m.airborne ? 0.25 : 0.0);
+		if (m.airborne) p.walkAmount = 0.0;
 		if (m.feetLocked) {
 			p.feetHeld = true;
 			for (int s = 0; s < 2; ++s) p.heldFoot[s] = transformPoint(m.frame, m.lockedFeet[s]);
+		}
+		if (m.sit > 0.0) {
+			const double hips = std::clamp((1.0 - (m.seat + 0.1) / human::kHip) / 0.42, 0.0, 1.0);   // (the crouch that puts the hips on the seat)
+			for (int s = 0; s < 2; ++s) {
+				const Vec3 from = p.feetHeld ? p.heldFoot[s] : human::footOf(human::framesOf(p), p, s == 0 ? -1.0 : 1.0);
+				p.heldFoot[s] = lerp(from, transformPoint(m.frame, Vec3{s == 0 ? 0.11 : -0.11, 0.055, 0.42}), m.sit);
+			}
+			p.feetHeld = true;
+			p.crouch = std::max(p.crouch, hips * m.sit);
+			p.lean -= 4.0 * m.sit;
 		}
 		return m.gestures && !m.gestures->empty() ? rig::act(p, *m.gestures, m.t, personPoses()) : p;
 	};
@@ -470,6 +497,7 @@ inline CharacterKind turtleKind() {
 	k.voice = {360.0, 1.4, 0.06};
 	const auto pose = [](const CharacterMoment &m) {
 		turtle::TurtlePose p = turtleWalk(m.steps);
+		p.walkAmount *= runWidth(m);
 		placeOf(m.frame, p.pos, p.yaw);
 		p.blink = rig::blink(m.t, m.seed);
 		turtleFace(m.face, p);
@@ -483,6 +511,11 @@ inline CharacterKind turtleKind() {
 			p.neck += 0.04 * i.breath;
 			idleEyes(m, i, {0.0, 0.045, 0.085}, p.look, p.lookWeight);
 		}
+		// a jump gathers it and tucks its legs in the air; sitting is lying down on its belly, its legs drawn in
+		p.squash *= 1.0 - 0.15 * m.crouch;
+		if (m.airborne) p.tuck = std::max(p.tuck, 0.3), p.walkAmount = 0.0;
+		p.tuck = std::max(p.tuck, 0.6 * m.sit);
+		p.lift += (0.002 - p.lift) * m.sit;
 		if (m.feetLocked) {   // (its legs reach for where their feet came down: a turtle's feet follow world targets)
 			Vec3 *target[4] = {&p.frontL, &p.frontR, &p.hindL, &p.hindR};
 			double *weight[4] = {&p.frontWeightL, &p.frontWeightR, &p.hindWeightL, &p.hindWeightR};
@@ -542,6 +575,8 @@ inline CharacterKind explorerKind() {
 			p.headYaw -= yaw;
 			p.headPitch += pitch;
 		}
+		p.crouch += 0.5 * m.crouch;   // (a jump's gathering and landing)
+		p.sit = std::max(p.sit, m.sit);
 		if (m.feetLocked) {   // (its feet held where they came down: rig::FootLock)
 			p.lockFeet = true;
 			p.lockedBall[0] = m.lockedFeet[0];

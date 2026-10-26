@@ -687,6 +687,20 @@ is a short example: three characters, four lines.
 With three or more, the coverage now keeps its cameras on the side the characters' faces look to (unless the shot says `side`), backs its two-shot away until everyone is in
 the frame, and shoots a speaker much smaller than the one they speak to from in front rather than over a tall shoulder.
 
+**Running, jumping, sitting: `run`, `jump`, `sit`.**
+
+```
+run   kai 4.0 3.0   2 -6              # as `walk` (points, or `to` a place, finding its way), running
+jump  kai 7.0 to 3 -7  height 0.5     # a jump to there, rising half a metre
+sit   kai 9.0 height 0.45 until 14    # sits down at 9 s on a seat that high (0: the ground), stands up at 14 s
+```
+
+A run's gait is 1.6 times as wide as a walk's, so its stride is (the planted feet still held where they come down, its footsteps louder), and the body leans into it. A
+jump gathers itself in the third of a second before it, rises in an arc for the time a fall from its height takes twice (0.7 s for half a metre), stretched in the air with
+its legs drawn up, lands where it was sent with a squash that is heard, and its feet are then held from where it landed. Sitting eases down over 0.7 s: a person's hips onto
+the seat with the feet forward, Pip lifted onto it (or squatting on the ground), the turtle lying on its belly, the Nomai explorer as its own sit; it stands up the same way.
+Walks, runs and jumps go in time order, each from where the last left the character.
+
 **Idle life.** A character nobody tells what to do is not a statue: while someone speaks the others turn their heads and eyes to the speaker (just after the line begins,
 back a little after it ends, the look moving smoothly from one speaker to the next) and the speaker looks at the nearest of them; standing, a character breathes, shifts its
 weight from foot to foot, lets its head drift a few degrees, and its eyes dart - a quick jump every second or two to another point near what it looks at (between the eyes and

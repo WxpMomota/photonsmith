@@ -1060,3 +1060,61 @@ TEST(FilmLooks, ACharacterLineColoursItsKindsParts) {
 	EXPECT_NE(wrong.find("belly"), std::string::npos) << "its parts listed";
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 4\ncharacter kai nomai-explorer robe red\n", bad).find("its colours are its own"), std::string::npos);
 }
+
+// ---- more ways to move ---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// A run steps 1.6 times as far as a walk with its planted feet still held; a jump gathers before it, rises in an arc, lands where it was sent (heard) and its feet are held
+// from where it landed; a character sits down on a seat and stands up again.
+TEST(FilmMoves, ARunAJumpAndSittingDown) {
+	(void)cartoon::films();
+	for (const char *kind : {"person", "pip"}) {
+		SCOPED_TRACE(kind);
+		ff::DataFilm film;
+		ASSERT_EQ(loadFilm(std::string("scene s.pbrt\nlength 20\ncharacter c ") + kind + " at 0 0 4 facing 180\n"
+										"run c 1 3.0  0 -2\n"
+										"jump c 5 to 0 -4 height 0.6\n"
+										"walk c 8 0.8  1 -6\n"
+										"sit c 13 height 0.45 until 16\n",
+						   film),
+				  "");
+		const ff::Character &c = film.spec.characters[0];
+		const ff::CharacterKind &k = ff::characterKinds().at(kind);
+		// the run: steps 1.6 times a walk's stride, and its planted feet do not slide
+		EXPECT_NEAR(film.pathOf(c, 0).stride, k.stride * 1.6, 1e-12);
+		EXPECT_DOUBLE_EQ(film.momentOf(c, 2.0).running, 1.0);
+		double worst = 0.0;
+		std::vector<cartoon::Foot> before = film.feetAt(1.0);
+		for (double t = 1.0 + 1.0 / 48.0; t < 3.0; t += 1.0 / 48.0) {
+			const std::vector<cartoon::Foot> now = film.feetAt(t);
+			for (std::size_t i = 0; i < now.size(); ++i)
+				if (before[i].planted && now[i].planted) worst = std::max(worst, cartoon::length(now[i].at - before[i].at) * 48.0);
+			before = now;
+		}
+		EXPECT_LT(worst, 0.02) << "m/s";
+		// the jump: gathering just before it, in the air half way, landed where it was sent
+		EXPECT_GT(film.momentOf(c, 4.85).crouch, 0.5) << "gathering itself";
+		const double flight = 2.0 * std::sqrt(2.0 * 0.6 / 9.81);
+		cartoon::Vec3 mid, landed;
+		const ff::CharacterMoment air = film.momentOf(c, 5.0 + 0.5 * flight, &mid);
+		EXPECT_TRUE(air.airborne);
+		EXPECT_NEAR(mid.y, 0.6, 1e-6) << "the top of the arc";
+		film.momentOf(c, 5.0 + flight + 0.5, &landed);
+		EXPECT_NEAR(landed.z, -4.0, 1e-9);
+		EXPECT_GT(film.momentOf(c, 5.0 + flight + 0.1).crouch, 0.5) << "the landing squashes it";
+		int landings = 0;
+		for (const cartoon::FilmEvent &e : film.events())
+			if (std::abs(e.t - (5.0 + flight)) < 1e-6) ++landings;
+		EXPECT_EQ(landings, 1) << "heard";
+		// after landing its feet are held where it landed, not where it took off (2 m back)
+		for (const cartoon::Foot &f : film.feetAt(5.0 + flight + 0.3)) EXPECT_LT(std::abs(f.at.z - (-4.0)), 0.6);
+		// sitting down and standing up
+		EXPECT_EQ(film.momentOf(c, 12.5).sit, 0.0);
+		EXPECT_DOUBLE_EQ(film.momentOf(c, 14.0).sit, 1.0);
+		EXPECT_NEAR(film.momentOf(c, 14.0).seat, 0.45, 1e-12);
+		EXPECT_EQ(film.momentOf(c, 17.0).sit, 0.0);
+		EXPECT_GT(film.sceneAt(14.0).size(), 1000u);
+	}
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter c pip\njump c 2 to 1 1 height 9\n", bad).find("up to 5 m"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter c pip\nsit c 2 until 2.1\n", bad).find("by 0.7 s at least"), std::string::npos);
+}

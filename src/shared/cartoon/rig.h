@@ -166,9 +166,12 @@ struct FootLock {
 	std::function<Vec3(double, int)> footAt;          // a foot's place in body space for the walk at so many steps (the gait's own; its y the height above the ground)
 	std::function<bool(double, int)> plantedAt;       // whether that foot is on the ground at so many steps
 	std::function<double(double, double)> groundAt;   // the ground's height under a world x z (empty: the ground is the body's own y = 0)
+	std::function<Vec3(double, int)> footAtTime;      // (optional) a foot's gait place at a time, when the gait itself changes (a run's longer stride): instead of footAt(stepsAt(t))
 	double lookBack = 3.0, release = 0.25;
 };
 namespace detail {
+// A foot's gait place at a time (body space).
+inline Vec3 gaitFoot(const FootLock &k, double t, int foot) { return k.footAtTime ? k.footAtTime(t, foot) : k.footAt(k.stepsAt(t), foot); }
 // The last moment before t that `on(time)` changed (searched back at 1/60 s, then halved thirty times); t - lookBack when it did not.
 inline double lastChange(const std::function<bool(double)> &on, double t, double lookBack) {
 	const bool now = on(t);
@@ -196,7 +199,7 @@ inline double groundLift(const FootLock &k, const Mat4 &frame, Vec3 body) {
 inline Vec3 plantSpot(const FootLock &k, int foot, double t) {
 	const double down = detail::lastChange([&](double u) { return k.plantedAt(k.stepsAt(u), foot); }, t, k.lookBack);
 	const Mat4 frame = k.frameAt(down);
-	const Vec3 rest = k.footAt(k.stepsAt(down), foot);
+	const Vec3 rest = detail::gaitFoot(k, down, foot);
 	Vec3 w = transformPoint(frame, rest);
 	if (k.groundAt) w.y = k.groundAt(w.x, w.z) + rest.y;
 	return w;
@@ -206,14 +209,14 @@ inline Vec3 lockedFoot(const FootLock &k, int foot, double t) {
 	const double steps = k.stepsAt(t);
 	const Mat4 frame = k.frameAt(t);
 	if (k.plantedAt(steps, foot)) return transformPoint(invertAffine(frame), plantSpot(k, foot, t));
-	Vec3 f = k.footAt(steps, foot);
+	Vec3 f = detail::gaitFoot(k, t, foot);
 	f.y += detail::groundLift(k, frame, f);
 	// just lifted: from where the lock held it to its gait
 	const double up = detail::lastChange([&](double u) { return k.plantedAt(k.stepsAt(u), foot); }, t, k.lookBack);
 	if (t - up < k.release && up > t - k.lookBack) {
 		const double before = up - 1e-4;
 		const Vec3 held = transformPoint(invertAffine(k.frameAt(up)), plantSpot(k, foot, before));
-		Vec3 gait = k.footAt(k.stepsAt(up), foot);
+		Vec3 gait = detail::gaitFoot(k, up, foot);
 		gait.y += detail::groundLift(k, k.frameAt(up), gait);
 		f = f + (held - gait) * (1.0 - smoothstep(0.0, k.release, t - up));
 	}
