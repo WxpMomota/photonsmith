@@ -46,6 +46,7 @@
 // walks and acts (`scale S` on its line sizes a pip or a turtle):
 //
 //     character  kai nomai-explorer  at 0 0 4  facing 180       # NAME KIND, where it stands (pbrt's x y z; y is the ground) and which way it faces (0: +z, 90: +x)
+//     character  ann person  sweater red  hair blond            # ... and the colours of its parts (each kind's: --film-check lists them): a name, r,g,b (0 to 1) or #rrggbb
 //     walk       kai  2.0 0.7   0 -2   3 -6                     # NAME, from 2 s at 0.7 m/s, through these points (x z) from where it is
 //     walk       kai  9.0 0.7   to 3 -6                         # ... or to a place, finding its own way round the set and whoever stands there (film_paths.h)
 //     gesture    kai  "look up" 8.0 9.0 11.0 11.5               # NAME, a pose of its library, eased in from 8 s to 9 s, out from 11 s to 11.5 s (no out times: held)
@@ -170,6 +171,7 @@ struct Character {
 	double facing = 0.0;                 // degrees: 0 faces +z, 90 faces +x (pbrt's)
 	double detail = 0.0;                 // the kind's sculpting cell (0: its own)
 	double scale = 1.0;                  // its size (a kind that can be scaled: a child Pip 0.6, a turtle as big as a dog 6)
+	std::map<std::string, Vec3> colours; // the colours of its parts (`sweater red`): the kind's names for them
 	std::vector<WalkLine> walks;
 	std::vector<rig::Gesture> gestures;
 	std::vector<faces::Feeling> feelings;   // its expressions (`feel`)
@@ -193,6 +195,7 @@ struct CharacterMoment {
 	Vec3 lockedFeet[4];
 	double scale = 1.0;        // its size (Character::scale)
 	int seed = 0;              // a number of its own (from its name): its blinks
+	const std::map<std::string, Vec3> *colours = nullptr;   // the colours of its parts (Character::colours)
 	// where its hands reach (0 the left, 1 the right) and where it looks, in the world (story space), each with how far it is there (0..1): a prop it picks up, carries, puts
 	// down or hands over, someone it looks at
 	struct Reach {
@@ -226,7 +229,41 @@ struct CharacterKind {
 	Vec3 head{0.0, 1.6, 0.05};
 	// its size on the floor and its height (scale 1): what is in its way when it finds its way, and how close another may come
 	double radius = 0.3, height = 1.8;
+	std::vector<std::string> parts;   // the parts whose colour a character line can set (`sweater red`)
 };
+
+// A colour as a film file writes it: a name (the cartoon palette below), r,g,b from 0 to 1, or #rrggbb. False when it is none of those.
+inline bool colourOf(const std::string &w, Vec3 &out) {
+	static const std::map<std::string, Vec3> names = {
+		{"red", {0.78, 0.12, 0.10}},     {"orange", {0.90, 0.45, 0.10}}, {"yellow", {0.92, 0.78, 0.18}}, {"green", {0.22, 0.58, 0.20}},  {"teal", {0.10, 0.52, 0.52}},
+		{"blue", {0.15, 0.35, 0.78}},    {"navy", {0.08, 0.12, 0.35}},   {"purple", {0.45, 0.20, 0.62}}, {"pink", {0.92, 0.55, 0.65}},   {"brown", {0.40, 0.24, 0.12}},
+		{"black", {0.04, 0.04, 0.045}},  {"white", {0.92, 0.92, 0.90}},  {"grey", {0.45, 0.45, 0.46}},  {"gray", {0.45, 0.45, 0.46}},   {"cream", {0.93, 0.86, 0.70}},
+		{"blond", {0.85, 0.68, 0.36}},   {"ginger", {0.72, 0.32, 0.10}}, {"tan", {0.80, 0.62, 0.45}},    {"olive", {0.42, 0.42, 0.16}},  {"lilac", {0.70, 0.60, 0.85}},
+		{"mint", {0.60, 0.88, 0.70}},    {"sky", {0.55, 0.78, 0.95}},    {"gold", {0.85, 0.65, 0.20}},   {"silver", {0.75, 0.76, 0.78}}, {"crimson", {0.60, 0.05, 0.12}},
+		{"pale", {0.93, 0.80, 0.70}},    {"dark", {0.36, 0.22, 0.14}},   {"lime", {0.55, 0.85, 0.20}},   {"peach", {0.98, 0.72, 0.55}},  {"denim", {0.25, 0.38, 0.58}}};
+	if (const auto it = names.find(w); it != names.end()) {
+		out = it->second;
+		return true;
+	}
+	if (w.size() == 7 && w[0] == '#') {
+		unsigned v = 0;
+		for (std::size_t i = 1; i < 7; ++i) {
+			const char c = static_cast<char>(std::tolower(static_cast<unsigned char>(w[i])));
+			if (!std::isxdigit(static_cast<unsigned char>(c))) return false;
+			v = v * 16 + static_cast<unsigned>(std::isdigit(static_cast<unsigned char>(c)) ? c - '0' : c - 'a' + 10);
+		}
+		const auto lin = [](unsigned b) { const double c = b / 255.0; return c <= 0.04045 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4); };   // (sRGB, as a picker gives it)
+		out = {lin((v >> 16) & 255), lin((v >> 8) & 255), lin(v & 255)};
+		return true;
+	}
+	double r = 0, g = 0, b = 0;
+	char extra = 0;
+	if (std::sscanf(w.c_str(), "%lf,%lf,%lf%c", &r, &g, &b, &extra) == 3 && r >= 0 && g >= 0 && b >= 0 && r <= 1 && g <= 1 && b <= 1) {
+		out = {r, g, b};
+		return true;
+	}
+	return false;
+}
 // The library of kinds, by name (cartoons.h fills it before any film file is read).
 inline std::map<std::string, CharacterKind> &characterKinds() {
 	static std::map<std::string, CharacterKind> kinds;
@@ -387,7 +424,14 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 	int shotLine = 0;
 	while (std::getline(in, line)) {
 		++n;
-		if (const std::size_t hash = line.find('#'); hash != std::string::npos) line.erase(hash);
+		for (std::size_t hash = line.find('#'); hash != std::string::npos; hash = line.find('#', hash + 1)) {   // '#' starts a comment - but not a colour, #rrggbb
+			bool colour = hash + 7 <= line.size() && (hash + 7 == line.size() || std::isspace(static_cast<unsigned char>(line[hash + 7])));
+			for (std::size_t k = hash + 1; colour && k < hash + 7; ++k) colour = std::isxdigit(static_cast<unsigned char>(line[k])) != 0;
+			if (!colour) {
+				line.erase(hash);
+				break;
+			}
+		}
 		line = detail::trim(line);
 		if (line.empty()) continue;
 		const std::vector<std::string> w = detail::words(line);
@@ -498,8 +542,11 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				} else if ((t[i] == "facing" || t[i] == "detail" || t[i] == "scale") && i + 1 < t.size()) {
 					if (!number(t[i + 1], t[i] == "facing" ? c.facing : t[i] == "detail" ? c.detail : c.scale) || !(c.scale > 0.0)) return fail("`" + t[i] + "` takes a number" + std::string(t[i] == "scale" ? " above 0" : ""));
 					i += 2;
+				} else if (Vec3 colour; i + 1 < t.size() && colourOf(t[i + 1], colour)) {   // a part's colour (the kind's parts are checked when the film is loaded)
+					c.colours[t[i]] = colour;
+					i += 2;
 				} else {
-					return fail("\"" + t[i] + "\": a character takes `at X Y Z`, `facing DEGREES`, `scale S` and `detail CELL`");
+					return fail("\"" + t[i] + "\": a character takes `at X Y Z`, `facing DEGREES`, `scale S`, `detail CELL` and its parts' colours (`sweater red`, `hair 0.2,0.1,0.05`, `skin #f0c8a0`)");
 				}
 			}
 			s.characters.push_back(c);
@@ -1061,6 +1108,12 @@ class DataFilm {
 		for (const Character &c : spec.characters) {
 			const CharacterKind &kind = characterKinds().at(c.kind);
 			if (c.scale != 1.0 && !kind.scalable) return filePath + ":" + std::to_string(c.line) + ": a " + c.kind + " cannot be scaled";
+			for (const auto &[part, colour] : c.colours)
+				if (std::find(kind.parts.begin(), kind.parts.end(), part) == kind.parts.end()) {
+					std::string known;
+					for (const std::string &k : kind.parts) known += (known.empty() ? "" : ", ") + k;
+					return filePath + ":" + std::to_string(c.line) + ": a " + c.kind + " has no part called \"" + part + "\" to colour" + (known.empty() ? std::string(" (its colours are its own)") : " (its parts: " + known + ")");
+				}
 			if (!c.feelings.empty() && !kind.face) return filePath + ": " + c.name + " has a `feel` line, but a " + c.kind + " has no face to show it (give it a gesture)";
 			if (kind.poses.empty()) continue;
 			for (const rig::Gesture &g : c.gestures)
@@ -1609,6 +1662,7 @@ class DataFilm {
 		m.detail = c.detail;
 		m.scale = c.scale;
 		m.seed = seedOf(c.name);
+		m.colours = &c.colours;
 		if (at) *at = where;
 		return m;
 	}

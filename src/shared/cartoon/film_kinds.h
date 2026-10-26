@@ -138,6 +138,11 @@ inline void idleEyes(const CharacterMoment &m, const Idle &i, Vec3 headLocal, Ve
 	look = base + i.gaze * (lookWeight > 0.0 ? 0.6 : 2.5) * m.scale;
 	lookWeight = std::max(lookWeight, 0.85);
 }
+// A part's colour from the moment's character line, if it gives one (`sweater red`).
+inline void colourFrom(const CharacterMoment &m, const char *part, Vec3 &colour) {
+	if (!m.colours) return;
+	if (const auto it = m.colours->find(part); it != m.colours->end()) colour = it->second;
+}
 // A to-and-fro at `hz` (a wave, a shake of the head), from the gesture's start.
 inline double wiggle(double since, double hz) { return std::sin(2.0 * kPi * hz * since); }
 
@@ -253,8 +258,14 @@ inline CharacterKind pipKind() {
 	k.text = [pose](const CharacterMoment &m) {
 		actor::Character c;
 		c.scale = m.scale;
+		colourFrom(m, "skin", c.skin);
+		colourFrom(m, "belly", c.belly);
+		colourFrom(m, "feet", c.feet);
+		colourFrom(m, "cheeks", c.cheek);
+		colourFrom(m, "eyes", c.pupil);
 		return actor::emitActor(c, pose(m));
 	};
+	k.parts = {"skin", "belly", "feet", "cheeks", "eyes"};
 	k.handAt = [pose](const CharacterMoment &m, int s) {
 		actor::Character c;
 		c.scale = m.scale;
@@ -367,7 +378,20 @@ inline CharacterKind personKind() {
 		}
 		return m.gestures && !m.gestures->empty() ? rig::act(p, *m.gestures, m.t, personPoses()) : p;
 	};
-	k.text = [pose](const CharacterMoment &m) { return human::emitHuman(pose(m)); };
+	k.text = [pose](const CharacterMoment &m) {
+		human::Outfit o;
+		colourFrom(m, "skin", o.skin);
+		colourFrom(m, "hair", o.hair);
+		colourFrom(m, "sweater", o.sweater);
+		colourFrom(m, "trousers", o.trousers);
+		colourFrom(m, "shoes", o.shoes);
+		colourFrom(m, "soles", o.sole);
+		colourFrom(m, "eyes", o.eyes);
+		colourFrom(m, "lips", o.lips);
+		colourFrom(m, "cheeks", o.blush);
+		return human::emitHuman(pose(m), o);
+	};
+	k.parts = {"skin", "hair", "sweater", "trousers", "shoes", "soles", "eyes", "lips", "cheeks"};
 	k.handAt = [pose](const CharacterMoment &m, int s) { return human::handOf(pose(m), s == 0 ? -1.0 : 1.0); };
 	k.carry = {0.20, 1.05, 0.35};
 	k.head = {0.0, 1.64, 0.05};
@@ -472,8 +496,18 @@ inline CharacterKind turtleKind() {
 	k.text = [pose](const CharacterMoment &m) {
 		turtle::Look look;
 		look.scale = m.scale;
+		colourFrom(m, "skin", look.skin);
+		colourFrom(m, "shell", look.plate);
+		colourFrom(m, "seams", look.shell);
+		colourFrom(m, "rings", look.ring);
+		colourFrom(m, "rim", look.rim);
+		colourFrom(m, "belly", look.plastron);
+		colourFrom(m, "cheeks", look.blush);
+		colourFrom(m, "eyes", look.iris);
+		colourFrom(m, "brows", look.brow);
 		return turtle::emitTurtle(pose(m), look);
 	};
+	k.parts = {"skin", "shell", "seams", "rings", "rim", "belly", "cheeks", "eyes", "brows"};
 	k.handAt = [pose](const CharacterMoment &m, int s) {
 		turtle::Look look;
 		look.scale = m.scale;

@@ -1033,3 +1033,30 @@ TEST(FilmIdle, ListenersTurnToTheSpeakerAndAStandingCharacterIsNotStill) {
 	EXPECT_EQ(still.actingMoment(ann, 2.0).look.weight, 0.0) << "no turning to the speaker";
 	EXPECT_EQ(still.actingMoment(pip, 10.0).idle, false) << "and no idle life";
 }
+
+// ---- character looks ------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// A character line colours its kind's parts - by name, r,g,b or #rrggbb - and the colour is in the scene; a part its kind has not is refused with the kind's parts.
+TEST(FilmLooks, ACharacterLineColoursItsKindsParts) {
+	(void)cartoon::films();
+	cartoon::Vec3 c;
+	EXPECT_TRUE(ff::colourOf("red", c));
+	EXPECT_TRUE(ff::colourOf("0.2,0.4,0.6", c));
+	EXPECT_NEAR(c.y, 0.4, 1e-12);
+	EXPECT_TRUE(ff::colourOf("#ffffff", c));
+	EXPECT_NEAR(c.x, 1.0, 1e-12);
+	EXPECT_FALSE(ff::colourOf("reddish", c));
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 4\ncharacter ann person sweater 0.1,0.7,0.3 hair blond\ncharacter kim pip skin #ff80c0 at 2 0 0\n", film), "");
+	EXPECT_EQ(film.spec.characters[0].colours.size(), 2u);
+	const std::string scene = film.sceneAt(1.0);
+	EXPECT_NE(scene.find("0.10000 0.70000 0.30000"), std::string::npos) << "the green sweater";
+	ff::DataFilm plain;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 4\ncharacter ann person\ncharacter kim pip at 2 0 0\n", plain), "");
+	EXPECT_EQ(plain.sceneAt(1.0).find("0.10000 0.70000 0.30000"), std::string::npos);
+	ff::DataFilm bad;
+	const std::string wrong = loadFilm("scene s.pbrt\nlength 4\ncharacter kim pip sweater red\n", bad);
+	EXPECT_NE(wrong.find("a pip has no part called \"sweater\""), std::string::npos) << wrong;
+	EXPECT_NE(wrong.find("belly"), std::string::npos) << "its parts listed";
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 4\ncharacter kai nomai-explorer robe red\n", bad).find("its colours are its own"), std::string::npos);
+}

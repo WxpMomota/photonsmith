@@ -540,6 +540,13 @@ kind's poses.
 
 `scale` on a character line (`character tess turtle at 1.6 0 -2 scale 6`) sizes a kind that can be scaled, its stride and the point the camera looks at with it.
 
+**Character looks.** A character line also colours its parts: `character ann person sweater red hair blond trousers navy`, `character kim pip skin pink`,
+`character tess turtle scale 5 shell #3070c0 rim gold`. A colour is a name (red, orange, yellow, green, teal, blue, navy, purple, pink, brown, black, white, grey, cream,
+blond, ginger, tan, olive, lilac, mint, sky, gold, silver, crimson, pale, dark, lime, peach, denim), `r,g,b` from 0 to 1, or `#rrggbb` as a colour picker gives it (a '#'
+followed by six hex digits is a colour, not a comment). The parts: a person's skin, hair, sweater, trousers, shoes, soles, eyes, lips and cheeks; Pip's skin, belly, feet,
+cheeks and eyes; the turtle's skin, shell, seams, rings, rim, belly, cheeks, eyes and brows. A part the kind does not have is refused with the kind's list; the Nomai
+explorer's colours are its own.
+
 **Dialogue: `say`.** A line of a film file makes a character speak:
 
 ```
