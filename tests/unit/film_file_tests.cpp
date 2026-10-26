@@ -1165,3 +1165,49 @@ TEST(FilmGround, AWalkClimbsTheRampToAPlatformAndAJumpLandsOnIt) {
 									   set.substr(0, set.find("0 0 -1  2 0.6 -1  2 0.6 1  0 0 1")) + "0 0 -1  0 0 -1  0 0 1  0 0 1 ]\n");   // (no ramp)
 	EXPECT_NE(cliff.find("cannot find a way"), std::string::npos) << cliff;
 }
+
+// ---- lip sync from a recording ----------------------------------------------------------------------------------------------------------------------------------------------------
+
+// A recorded voice's mouth shapes from its formants: an "ah" opens the mouth widest, an "ee" is wide, an "oo" round, and the mouth is shut where it is silent. (The recordings
+// here are the babble voice, whose vowels' formants are known.)
+TEST(FilmLipSync, ARecordingsVowelsGiveTheMouthItsShapes) {
+	namespace sp = cartoon::speech;
+	const auto shapes = [](const std::string &text, double pitch) {
+		sp::Line l;
+		l.text = text;
+		const std::vector<sp::Syllable> y = sp::syllablesOf(l);
+		sp::Voice v;
+		v.pitch = pitch;
+		const std::vector<float> sound = sp::speak(y, 0.0, v);
+		std::vector<float> loud;
+		double top = 1e-9;
+		for (std::size_t at = 0; at < sound.size(); at += cartoon::audio::kRate / 100) {
+			double s = 0.0;
+			const std::size_t end = std::min(sound.size(), at + cartoon::audio::kRate / 100);
+			for (std::size_t i = at; i < end; ++i) s += static_cast<double>(sound[i]) * sound[i];
+			loud.push_back(static_cast<float>(std::sqrt(s / std::max<std::size_t>(1, end - at))));
+			top = std::max(top, static_cast<double>(loud.back()));
+		}
+		for (float &x : loud) x = static_cast<float>(x / top);
+		const std::vector<sp::Mouth> m = sp::mouthsOf(sound, loud);
+		sp::Mouth mean;
+		int n = 0;
+		for (std::size_t f = 0; f < m.size(); ++f)
+			if (loud[f] > 0.5) mean.open += m[f].open, mean.wide += m[f].wide, mean.round += m[f].round, ++n;
+		mean.open /= std::max(1, n), mean.wide /= std::max(1, n), mean.round /= std::max(1, n);
+		return std::make_pair(mean, m);
+	};
+	for (double pitch : {140.0, 290.0}) {
+		SCOPED_TRACE(pitch);
+		const auto [ah, ahFrames] = shapes("ah ah ah ah", pitch);
+		const auto [ee, eeFrames] = shapes("ee ee ee ee", pitch);
+		const auto [oo, ooFrames] = shapes("oo oo oo oo", pitch);
+		EXPECT_GT(ah.open, ee.open);
+		EXPECT_GT(ah.open, oo.open) << "an ah opens widest";
+		EXPECT_GT(ee.wide, 0.3) << "an ee is wide";
+		EXPECT_GT(ee.wide, oo.wide + 0.2);
+		EXPECT_GT(oo.round, 0.3) << "an oo is round";
+		EXPECT_GT(oo.round, ee.round + 0.2);
+		EXPECT_EQ(ahFrames.back().open, 0.0) << "silent at the end: shut";
+	}
+}

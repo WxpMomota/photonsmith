@@ -2130,7 +2130,7 @@ class DataFilm {
 			CharacterMoment m = actingMoment(c, t);
 			m.trail = trailOf(c, t, m);
 			lockFeet(c, t, m);
-			m.voice = music_cues::voiceAt(spec.key, c.name, t, shotStarts(), shotNameList());
+			m.voice = music_cues::voiceAt(spec.key, c.name, t, shotStarts(), shotNameList(), &m.mouth);   // (a recording's loudness and mouth shapes)
 			speakingAt(c, t, m);
 			m.face = faces::faceAt(c.feelings, t);
 			out += "# " + c.name + " (" + c.kind + ")\n" + kind.text(m);

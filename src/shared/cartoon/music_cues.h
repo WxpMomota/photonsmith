@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "cartoon_audio.h"
+#include "film_speech.h"   // (a recording's mouth shapes)
 #include "cartoon_lib.h"
 #include "film_cache.h"
 #include "sfx.h"
@@ -221,6 +222,7 @@ inline bool timeOf(const Cue &c, const std::vector<double> &starts, const std::v
 struct Recording {
 	std::filesystem::file_time_type time;
 	std::vector<float> sound, loudness;
+	std::vector<speech::Mouth> mouth;   // its mouth shapes, a hundredth of a second each (speech::mouthsOf): a recorded voice's lip sync
 	std::string why;
 };
 // A recording, read once a program and kept (by path; read again when the file changes).
@@ -247,6 +249,7 @@ inline const Recording &recording(const std::string &path) {
 				loudest = std::max(loudest, rms);
 			}
 			for (float &l : k.loudness) l = static_cast<float>(l / loudest);
+			k.mouth = speech::mouthsOf(k.sound, k.loudness);
 		}
 		it = kept.insert_or_assign(path, std::move(k)).first;
 	}
@@ -312,7 +315,9 @@ inline Sheet read(const std::string &path) {
 
 // How loud a character's voice is at film time t, 0 (silent) .. 1 (the loudest of its line): its `sample ... by NAME` cues in the film's cues file (read when it changes),
 // the recording's loudness each 1/100 s, times the cue's gain over the loudest gain it has. For the film's code: a mouth opens by it.
-inline double voiceAt(const std::string &key, const std::string &speaker, double t, const std::vector<double> &starts, const std::vector<std::string> &names) {
+// (`mouth`, when given, gets the mouth shape its recordings have then: speech::mouthsOf)
+inline double voiceAt(const std::string &key, const std::string &speaker, double t, const std::vector<double> &starts, const std::vector<std::string> &names,
+					  speech::Mouth *mouth = nullptr) {
 	const std::string file = fileOf(key);
 	if (file.empty()) return 0.0;
 	static std::mutex lock;
@@ -338,6 +343,12 @@ inline double voiceAt(const std::string &key, const std::string &speaker, double
 		const Recording &r = recording(recordingPath(sheet, c.file));
 		const std::size_t k = static_cast<std::size_t>((t - t0) * 100.0);
 		if (k < r.loudness.size()) v = std::max(v, r.loudness[k] * c.gain / loudest);
+		if (mouth && k < r.mouth.size()) {
+			const double share = std::min(1.0, c.gain / loudest);
+			mouth->open = std::max(mouth->open, r.mouth[k].open * share);
+			mouth->wide = std::max(mouth->wide, r.mouth[k].wide * share);
+			mouth->round = std::max(mouth->round, r.mouth[k].round * share);
+		}
 	}
 	return std::min(1.0, v);
 }

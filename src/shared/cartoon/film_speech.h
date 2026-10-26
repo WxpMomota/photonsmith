@@ -163,6 +163,9 @@ inline double envelope(const Syllable &y, double t) {
 	const double up = smoothstep(y.t0 - 0.025, y.t0 + 0.01, t), down = 1.0 - smoothstep(y.t1 - 0.02, y.t1 + 0.05, t);
 	return up * down * y.stress;
 }
+// The centres formantsOf finds for each vowel of an adult voice (measured on the Windows speech voice saying "father", "see" and "moon", and on the babble voice at
+// 140 Hz; a child's or a small creature's higher voice is read less well).
+constexpr double kRefA1 = 630, kRefA2 = 1090, kRefE1 = 470, kRefE2 = 1680, kRefI1 = 330, kRefI2 = 1950, kRefO1 = 495, kRefO2 = 980, kRefU1 = 300, kRefU2 = 1300;
 inline Mouth shapeOf(char vowel) {
 	switch (vowel) {
 		case 'a': return {0.95, 0.45, 0.0};
@@ -209,6 +212,78 @@ inline double loudnessAt(const std::vector<Syllable> &syllables, double t) {
 		l = std::max(l, envelope(y, t));
 	}
 	return std::min(1.0, l);
+}
+
+// ---- mouths from a recording ----
+// A recorded voice's first two formants, one estimate every 1/100 s (0 where it is quiet): the centres of its energy between 200 Hz and 1 kHz and between 0.9 and 3 kHz,
+// through a Hann window of 1024 samples round each moment.
+inline void formantsOf(const std::vector<float> &sound, const std::vector<float> &loudness, std::vector<double> &f1, std::vector<double> &f2) {
+	f1.assign(loudness.size(), 0.0);
+	f2.assign(loudness.size(), 0.0);
+	const int window = 1024, hop = audio::kRate / 100;
+	std::vector<double> hann(window);
+	for (int i = 0; i < window; ++i) hann[static_cast<std::size_t>(i)] = 0.5 - 0.5 * std::cos(2.0 * kPi * i / (window - 1));
+	for (std::size_t f = 0; f < loudness.size(); ++f) {
+		if (loudness[f] < 0.08f) continue;
+		const long centre = static_cast<long>(f) * hop + hop / 2;
+		const auto energy = [&](double hz) {   // (Goertzel at one frequency)
+			const double w = 2.0 * kPi * hz / audio::kRate, k = 2.0 * std::cos(w);
+			double s1 = 0.0, s2 = 0.0;
+			for (int i = 0; i < window; ++i) {
+				const long at = centre - window / 2 + i;
+				const double x = at >= 0 && at < static_cast<long>(sound.size()) ? sound[static_cast<std::size_t>(at)] * hann[static_cast<std::size_t>(i)] : 0.0;
+				const double s0 = x + k * s1 - s2;
+				s2 = s1;
+				s1 = s0;
+			}
+			return s1 * s1 + s2 * s2 - k * s1 * s2;
+		};
+		double e1 = 0.0, c1 = 0.0, e2 = 0.0, c2 = 0.0;
+		for (double hz = 200.0; hz <= 1000.0; hz += 50.0) {
+			const double e = energy(hz);
+			e1 += e, c1 += e * hz;
+		}
+		for (double hz = 900.0; hz <= 3000.0; hz += 75.0) {
+			const double e = energy(hz);
+			e2 += e, c2 += e * hz;
+		}
+		if (e1 > 0.0 && e2 > 0.0) f1[f] = c1 / e1, f2[f] = c2 / e2;
+	}
+}
+// A recorded voice's mouth shapes, one every 1/100 s: each moment's formants (formantsOf) compared with those the five vowels give such centres (in octaves), and the
+// vowels' mouths blended by how near each is; by how loud it is then (`loudness`, 0..1); quiet, the mouth shuts.
+inline std::vector<Mouth> mouthsOf(const std::vector<float> &sound, const std::vector<float> &loudness) {
+	std::vector<double> f1, f2;
+	formantsOf(sound, loudness, f1, f2);
+	struct Ref {
+		char vowel;
+		double f1, f2;
+	};
+	static const Ref refs[] = {{'a', kRefA1, kRefA2}, {'e', kRefE1, kRefE2}, {'i', kRefI1, kRefI2}, {'o', kRefO1, kRefO2}, {'u', kRefU1, kRefU2}};
+	std::vector<Mouth> out(loudness.size());
+	for (std::size_t f = 0; f < out.size(); ++f) {
+		if (f1[f] <= 0.0) continue;
+		double weights = 0.0;
+		Mouth m;
+		for (const Ref &r : refs) {
+			const double d1 = std::log2(f1[f] / r.f1), d2 = std::log2(f2[f] / r.f2);
+			const double w = std::exp(-(d1 * d1 + d2 * d2) / (2.0 * 0.15 * 0.15));
+			const Mouth v = shapeOf(r.vowel);
+			m.open += w * v.open, m.wide += w * v.wide, m.round += w * v.round;
+			weights += w;
+		}
+		if (weights <= 1e-12) continue;
+		const double l = std::min(1.0, loudness[f] * 1.4) / weights;
+		out[f] = {m.open * l, m.wide * l, m.round * l};
+	}
+	// a little smoothing over three hundredths: a mouth does not jump with every window
+	std::vector<Mouth> smooth = out;
+	for (std::size_t f = 1; f + 1 < out.size(); ++f) {
+		smooth[f].open = (out[f - 1].open + 2.0 * out[f].open + out[f + 1].open) / 4.0;
+		smooth[f].wide = (out[f - 1].wide + 2.0 * out[f].wide + out[f + 1].wide) / 4.0;
+		smooth[f].round = (out[f - 1].round + 2.0 * out[f].round + out[f + 1].round) / 4.0;
+	}
+	return smooth;
 }
 
 // ---- the voice ----

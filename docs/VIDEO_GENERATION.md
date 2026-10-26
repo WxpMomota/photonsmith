@@ -561,8 +561,11 @@ next and it shuts at a pause; Pip, the person and the turtle draw it, and the ma
 no recording or speech engine is needed - a buzz at the character's pitch (its kind's, moved up to 1.5 semitones by its name, lower when it is scaled up) shaped by the three
 formants of each vowel, a hiss for an s or an f, a pop for a t or a k; it falls over a sentence, rises at the end of a question and is higher for '!'. The line is panned to
 where the camera sees the speaker and quietened with the distance. And a caption: the words from the line's start to a little after its end (cut short where the next line
-begins), beside any of the film's captions file (`film_assets/<key>/captions.txt`). A recorded line can be used instead: a cues file's `sample FILE.wav ... by NAME` opens
-the character's mouth by its loudness.
+begins), beside any of the film's captions file (`film_assets/<key>/captions.txt`). A recorded line can be used instead: a cues file's `sample FILE.wav ... by NAME` gives
+the character's mouth the recording's own shapes (film_speech.h, `mouthsOf`): every hundredth of a second its first two formants are found (the centres of its energy between
+200 Hz and 1 kHz and between 0.9 and 3 kHz), compared in octaves with the centres each of the five vowels gives, and the vowels' mouths blended by how near each is, as open as
+the voice is loud; quiet, the mouth shuts. Measured on the Windows speech voice: "father" opens the mouth (open 0.84, round 0.04), "see" widens it (wide 0.79) and "moon"
+rounds it (round 0.58). The references are an adult voice's: a child's or a small creature's higher voice is read less well.
 
 **Faces: `feel`.** `feel pip sad 8 8.6 12 13 amount 0.8` eases an expression onto a character's face and off again, as a gesture is eased (no out times: held; `amount` 0
 to 2, 1 by default; two at once add up). The expressions (film_faces.h) are happy, sad, angry, surprised, scared, worried, sleepy, smug, thinking and disgusted, each a few
