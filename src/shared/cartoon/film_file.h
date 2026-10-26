@@ -164,6 +164,10 @@
 //     cast     ann  at -0.7 0 0  voice zira                    # ... or one of them in the voice with that word in its name
 //     acting   words                                           # each line acted from its words (film_acting.h): a gesture and an expression where none is given
 //
+// A shot's own lighting (shot_lighting.h) - a key, a fill and a rim round its subject, from where the camera is (in a shot's lines; a cameras file can say it too):
+//
+//       lighting key 1.5 fill 0.5 rim 1.2 side right on ann    # (any of them; `lighting` alone: key 1.2, fill 0.4, rim 0.8 on what the camera looks at)
+//
 // The toon look (src/shared/toon_look.h) - the light in flat bands, ink lines round shapes and along creases, stronger colour - on every frame:
 //
 //     toon     bands 3  lines 2.5  ink #1a1420  saturation 1.25  shadow 0.35    # (any of them, or none for the default style; `toon off`)
@@ -193,6 +197,7 @@
 #include "film_paths.h"
 #include "film_acting.h"
 #include "film_speech.h"
+#include "shot_lighting.h"
 #include "film_tts.h"
 #include "film_subjects.h"
 #include "film_clouds.h"
@@ -263,6 +268,8 @@ struct Shot {
 	Vec3 flyAt;
 	std::vector<std::pair<double, std::string>> focus;   // who is in focus from when (the first from the shot's start)
 	double aperture = 0.0;
+	shot_lighting::Lighting lighting;   // (`lighting`) key, fill and rim lights round the subject, from the camera
+	std::string lightOn;                // ... on this character's chest ("": what the camera looks at)
 };
 
 // A character a film file brings in (`character NAME KIND ...`), its walks (`walk`) and its gestures (`gesture`).
@@ -1592,6 +1599,15 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			} else {
 				return fail("`exposure auto [KEY]` (follows the light: day, sunset, night) or `exposure FACTOR`");
 			}
+		} else if (verb == "lighting") {   // key, fill and rim lights round the shot's subject (shot_lighting.h)
+			if (s.shots.empty()) return fail("`lighting` belongs to a shot: start one with `shot 0 NAME` first");
+			Shot &shot = s.shots.back();
+			std::string words;
+			for (std::size_t i = 1; i < w.size(); ++i) {
+				if (w[i] == "on" && i + 1 < w.size()) shot.lightOn = w[++i];
+				else words += " " + w[i];
+			}
+			if (const std::string e = shot_lighting::parse(words, shot.lighting); !e.empty()) return fail(e + " (and `on WHO`: the character it lights)");
 		} else if (verb == "orbit" || verb == "crane" || verb == "push" || verb == "track" || verb == "handheld" || verb == "focus" || verb == "aperture") {
 			if (s.shots.empty()) return fail("`" + verb + "` belongs to a shot: start one with `shot 0 NAME` first");
 			const std::vector<std::string> t = detail::tokens(line);
@@ -2242,6 +2258,7 @@ class DataFilm {
 			std::vector<std::string> named = shot.about;
 			if (shot.following) named.push_back(shot.follow.who);
 			for (const auto &[at, who] : shot.focus) named.push_back(who);
+			if (!shot.lightOn.empty()) named.push_back(shot.lightOn);
 			for (const std::string &who : named)
 				if (!character(who)) return filePath + ": the shot \"" + shot.name + "\" names " + who + ", who is not brought in with `character`";
 		}
@@ -2642,6 +2659,8 @@ class DataFilm {
 				g.path.ease = true;
 				if (b == 0) g.transition = shot.transition;   // (how the auto shot comes in)
 				g.handheld = shot.handheld;
+				g.lighting = shot.lighting;   // (its lighting on the speaker the shot is of, unless it names someone)
+				g.lightOn = !shot.lightOn.empty() ? shot.lightOn : beats[b].second ? beats[b].second->name : std::string();
 				if (beats[b].second) g.about.push_back(beats[b].second->name);
 				else
 					for (const Character *c : cast) g.about.push_back(c->name);
@@ -3447,7 +3466,18 @@ class DataFilm {
 			m.face = faces::faceAt(c.feelings, t);
 			out += "# " + c.name + " (" + c.kind + ")\n" + kind.text(m);
 		}
-		return out;
+		return shot_lighting::withLights(out, shotLightsAt(header, t));
+	}
+	// The shot's own lighting at t (`lighting`: shot_lighting.h): round the character it is on, or what the camera looks at, from where the camera is.
+	std::string shotLightsAt(const std::string &header, double t) const {
+		if (spec.shots.empty()) return std::string();
+		const Shot &shot = spec.shots[shotAt(t)];
+		if (!shot.lighting.on) return std::string();
+		Vec3 eye, target;
+		double fov = 40.0;
+		if (!film_subjects::cameraOf(header, eye, target, fov)) return std::string();
+		if (const Character *c = shot.lightOn.empty() ? nullptr : character(shot.lightOn)) target = chestOf(*c, t);
+		return shot_lighting::lightsText(eye, target, shot.lighting);
 	}
 
   private:

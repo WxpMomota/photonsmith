@@ -20,6 +20,7 @@
 //     gamma 1.1        # ... the middle brightened (above 1) or darkened ...
 //     gain 1.05        # ... multiplied ...
 //     tint 1 0.95 1.1  # ... and a colour cast that keeps the brightness
+//     lighting key 1.5 fill 0.5 rim 1 side right   # key, fill and rim lights round what the camera looks at (shot_lighting.h; `lighting` alone: the usual three)
 //     [The answer]
 //     tilt 3
 //
@@ -45,6 +46,7 @@
 
 #include "cartoon_lib.h"
 #include "film_cache.h"
+#include "shot_lighting.h"
 
 namespace cartoon {
 namespace shot_cameras {
@@ -58,13 +60,14 @@ struct Change {
 	double stops = 0.0;
 	double samples = 1.0;   // the share of the video's samples a pixel
 	double lift[3] = {0.0, 0.0, 0.0}, gamma[3] = {1.0, 1.0, 1.0}, gain[3] = {1.0, 1.0, 1.0}, tint[3] = {1.0, 1.0, 1.0};   // the grade (lens_look::Look)
+	shot_lighting::Lighting lighting;   // key, fill and rim round what the camera looks at
 	bool graded() const {
 		for (int k = 0; k < 3; ++k)
 			if (lift[k] != 0.0 || gamma[k] != 1.0 || gain[k] != 1.0 || tint[k] != 1.0) return true;
 		return false;
 	}
 	bool moves() const { return dolly != 0.0 || truck != 0.0 || pedestal != 0.0 || pan != 0.0 || tilt != 0.0; }
-	bool any() const { return moves() || fov > 0.0 || zoom != 1.0 || iso > 0.0 || stops != 0.0 || samples != 1.0 || graded(); }
+	bool any() const { return moves() || fov > 0.0 || zoom != 1.0 || iso > 0.0 || stops != 0.0 || samples != 1.0 || graded() || lighting.on; }
 };
 
 // A section on top of another: moves add up, zooms multiply, a set fov or iso replaces.
@@ -86,6 +89,7 @@ inline Change combine(const Change &under, const Change &over) {
 	}
 	if (over.fov > 0.0) c.fov = over.fov;
 	if (over.iso > 0.0) c.iso = over.iso;
+	if (over.lighting.on) c.lighting = over.lighting;   // (a shot's own lighting, whole)
 	return c;
 }
 
@@ -134,6 +138,19 @@ inline File parse(const std::string &text) {
 		std::string word;
 		double value = 0.0;
 		words >> word;
+		if (word == "lighting") {   // the rest of the line: shot_lighting::parse
+			if (!at) {
+				f.problems.push_back(where + "'lighting' before any [shot] section");
+				continue;
+			}
+			std::string rest;
+			std::getline(words, rest);
+			if (const std::string e = shot_lighting::parse(rest, at->lighting); !e.empty()) {
+				at->lighting = shot_lighting::Lighting();
+				f.problems.push_back(where + e);
+			}
+			continue;
+		}
 		if (word == "lift" || word == "gamma" || word == "gain" || word == "tint") {   // one number or three (red, green, blue)
 			std::vector<double> v;
 			for (double x; words >> x;) v.push_back(x);
@@ -167,7 +184,7 @@ inline File parse(const std::string &text) {
 		else if (word == "iso" && value > 0.0) at->iso = value;
 		else if (word == "stops") at->stops = value;
 		else if (word == "samples" && value > 0.0 && value <= 8.0) at->samples = value;
-		else f.problems.push_back(where + "'" + word + " " + trimmed(line.substr(word.size())) + "' is not a change this file knows (dolly, truck, pedestal, pan, tilt, fov, zoom, iso, stops, samples 0-8, lift, gamma, gain, tint)");
+		else f.problems.push_back(where + "'" + word + " " + trimmed(line.substr(word.size())) + "' is not a change this file knows (dolly, truck, pedestal, pan, tilt, fov, zoom, iso, stops, samples 0-8, lift, gamma, gain, tint, lighting)");
 	}
 	return f;
 }
@@ -321,6 +338,13 @@ inline std::string apply(const std::string &scene, const Change &c) {
 		} else {
 			head = "# @rt-look" + std::string(g) + "\n" + head;
 		}
+	}
+	if (c.lighting.on) {   // the shot's lighting round what the (changed) camera looks at
+		const std::size_t look = head.find("LookAt");
+		std::vector<double> v;
+		std::size_t end = 0;
+		if (look != std::string::npos && detail::numbersAt(head, look + 6, 9, v, end))
+			return shot_lighting::withLights(head + scene.substr(headerEnd), shot_lighting::lightsText({-v[0], v[1], v[2]}, {-v[3], v[4], v[5]}, c.lighting));
 	}
 	return head + scene.substr(headerEnd);
 }

@@ -577,6 +577,14 @@ speaker's kind has (the turtle has no shrug; the masked explorer no face), and n
 (a script's parentheticals win). The timing is the line's syllables (the babble timing, the same in every program, whatever voice says it). A film made from a script
 (`--film-from-script`) has the line.
 
+**Shot lighting: key, fill and rim.** A shot can light its subject the way a film crew does (`src/shared/cartoon/shot_lighting.h`): `lighting [key K] [fill F] [rim R]
+[side left|right] [on WHO]` in a film file's shot, or `lighting ...` in a section of a film's cameras file (`film_assets/<key>/cameras.txt`, so the built-in films can have
+it too). Three spot lights are added to the frame's world, placed round the subject from where the camera is, so they follow every camera: a warm key 40 degrees to one
+side of the camera and 35 up, a cool fill 50 degrees to the other side and a little up, and a rim behind and high. They light but are not seen, and their cones are wide
+and soft. Each strength is the light it gives the subject (its irradiance, in the units of a sun's `L`: the stage's sun is 2.2), whatever the camera's distance: a light
+stands as far from the subject as the camera does and is that much stronger. The subject is what the camera looks at, or the character `on` names (its chest); an `auto`
+shot lights each speaker in turn. `lighting` alone is key 1.2, fill 0.4, rim 0.8.
+
 **The toon look: cel shading and ink lines.** `toon [bands N] [lines W] [ink COLOUR] [saturation S] [shadow S]` in a film file draws every frame as a cartoon
 (`src/shared/toon_look.h`): the light on each surface in a few flat bands, ink lines round what stands in front of something, along sharp creases and against the sky, and
 stronger colour. It is made after the render, in the run that rendered the frame, from the picture and its passes (a cheap first-hit pass on the CPU: albedo, normal,

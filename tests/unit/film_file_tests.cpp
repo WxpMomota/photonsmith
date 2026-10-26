@@ -612,6 +612,83 @@ TEST(FilmActing, ALineIsActedFromItsWords) {
 	EXPECT_TRUE(plain.spec.characters[0].gestures.empty()) << "only with `acting words`";
 }
 
+// Shot lighting (shot_lighting.h): a key to one side and up, a fill to the other, a rim behind, each giving the subject the light it says however far the camera is; in a
+// film file's shot (on what the camera looks at, or a character), in an auto shot (on its speaker), and in a cameras file.
+TEST(ShotLighting, AKeyAFillAndARimLightTheSubjectFromTheCamera) {
+	namespace sl = cartoon::shot_lighting;
+	sl::Lighting l;
+	EXPECT_EQ(sl::parse("key 2 fill 0.5 rim 1.5 side right", l), "");
+	EXPECT_TRUE(l.on);
+	EXPECT_DOUBLE_EQ(l.key, 2.0);
+	EXPECT_DOUBLE_EQ(l.side, 1.0);
+	EXPECT_NE(sl::parse("key lots", l).find("strength"), std::string::npos);
+	EXPECT_NE(sl::parse("glow 1", l).find("takes key, fill, rim and side"), std::string::npos);
+	// the lights round a subject at the origin, the camera 4 in front (story space +z), the key on the picture's left (story space -x)
+	sl::Lighting usual;
+	ASSERT_EQ(sl::parse("", usual), "");
+	for (const double distance : {4.0, 12.0}) {
+		const std::string text = sl::lightsText({0.0, 1.0, distance}, {0.0, 1.0, 0.0}, usual);
+		std::vector<std::vector<double>> spots;   // from x y z, to x y z, I r g b (pbrt's x)
+		for (std::size_t at = text.find("\"point3 from\""); at != std::string::npos; at = text.find("\"point3 from\"", at + 1)) {
+			std::vector<double> v;
+			std::istringstream in(text.substr(at));
+			std::string word;
+			while (v.size() < 9 && in >> word) {
+				char *end = nullptr;
+				const double x = std::strtod(word.c_str(), &end);
+				if (end && *end == '\0' && !word.empty()) v.push_back(x);
+			}
+			spots.push_back(v);
+		}
+		ASSERT_EQ(spots.size(), 3u);
+		const auto irradiance = [&](const std::vector<double> &s) {
+			const double d2 = (s[0] - s[3]) * (s[0] - s[3]) + (s[1] - s[4]) * (s[1] - s[4]) + (s[2] - s[5]) * (s[2] - s[5]);
+			return (0.2126 * s[6] + 0.7152 * s[7] + 0.0722 * s[8]) / d2;
+		};
+		EXPECT_NEAR(irradiance(spots[0]), 1.2 * 0.9206, 0.02) << "the key gives the subject its strength (times its warm colour's brightness), at any distance";
+		EXPECT_GT(spots[0][0], 0.5) << "the key on the picture's left: story space -x is pbrt's +x";
+		EXPECT_GT(spots[0][1], 1.5) << "and up";
+		EXPECT_LT(spots[1][0], 0.0) << "the fill on the other side";
+		EXPECT_LT(spots[1][1], spots[0][1]) << "lower";
+		EXPECT_LT(spots[2][2], 0.0) << "the rim behind the subject";
+		EXPECT_LT(irradiance(spots[1]), irradiance(spots[0]));
+	}
+	// a film file's shot: only in that shot, round the character it names
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 8\ncharacter ann person at 2 0 0\nshot 0 A\n key 0 1 5  0 1 0\nshot 4 B\n key 0 1 5  0 1 0\n lighting key 1.5 on ann\n", film), "");
+	EXPECT_EQ(film.sceneAt(2.0).find("\"spot\""), std::string::npos);
+	const std::string lit = film.sceneAt(6.0);
+	ASSERT_NE(lit.find("\"spot\""), std::string::npos);
+	EXPECT_GT(lit.find("\"spot\""), lit.find("WorldBegin")) << "in the world";
+	EXPECT_EQ(film.headerAt(6.0).find("\"spot\""), std::string::npos) << "the header stays the header";
+	const std::size_t to = lit.find("\"point3 to\" [ ");
+	ASSERT_NE(to, std::string::npos);
+	EXPECT_NEAR(std::atof(lit.c_str() + to + 14), 2.0, 0.3) << "aimed at ann (pbrt's x 2), not at what the camera looks at";
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\nlighting\n", bad).find("belongs to a shot"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\nshot 0 A\n key 0 1 5  0 1 0\n lighting on nobody\n", bad).find("nobody"), std::string::npos);
+	// an auto shot: on each speaker
+	ff::DataFilm talk;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 8\ncharacter ann person at -1 0 0 facing 90\ncharacter bo person at 1 0 0 facing -90\nsay ann 1 \"Hello, Bo.\"\nsay bo 3.5 \"Hello, Ann.\"\n"
+					   "shot 0 Talk\n auto\n lighting\n", talk), "");
+	bool litBo = false;
+	for (const ff::Shot &s : talk.spec.shots) {
+		EXPECT_TRUE(s.lighting.on) << s.name;
+		litBo = litBo || s.lightOn == "bo";
+	}
+	EXPECT_TRUE(litBo);
+	// a cameras file's section
+	const cartoon::shot_cameras::File cams = cartoon::shot_cameras::parse("[2]\nlighting rim 2\n[3]\nlighting side up\n");
+	ASSERT_EQ(cams.problems.size(), 1u);
+	const cartoon::shot_cameras::Change c = cartoon::shot_cameras::changeFor(cams, 1, "B");
+	EXPECT_TRUE(c.lighting.on);
+	EXPECT_DOUBLE_EQ(c.lighting.rim, 2.0);
+	const std::string scene = "LookAt 0 1 5  0 1 0  0 1 0\nCamera \"perspective\"\nWorldBegin\nShape \"sphere\"\n";
+	const std::string changed = cartoon::shot_cameras::apply(scene, c);
+	EXPECT_NE(changed.find("\"spot\""), std::string::npos);
+	EXPECT_EQ(cartoon::shot_cameras::apply("LookAt 0 1 5  0 1 0  0 1 0\nCamera \"perspective\"\nWorldBegin\n", c).find("\"spot\""), std::string::npos) << "a header alone";
+}
+
 // Every cast and set of the library that comes with the program can be brought into a film.
 TEST(FilmLibrary, TheLibraryThatComesWithTheProgramLoads) {
 	(void)cartoon::films();   // (the kinds of character)
