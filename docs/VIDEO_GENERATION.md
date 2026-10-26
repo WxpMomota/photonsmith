@@ -577,6 +577,11 @@ speaker's kind has (the turtle has no shrug; the masked explorer no face), and n
 (a script's parentheticals win). The timing is the line's syllables (the babble timing, the same in every program, whatever voice says it). A film made from a script
 (`--film-from-script`) has the line.
 
+**Hands on the set and on each other.** `touch NAME T0 T1 X Y Z [left|right]` puts a hand on a place of the set (pbrt's coordinates) from T0 to T1 - a wall to lean on,
+a door's handle (with a `turn` of the door's block), a lamp to switch on; `hold A B T0 T1` holds A's right hand and B's left together where they meet between them; `hug A B
+T0 T1` puts each one's arms round the other's sides. Each is reached for over the 0.6 s before T0 and let go over the 0.5 s after T1, like a prop, and heard as a touch at
+T0. The hands go as far as the arms reach: stand two characters who hug close (about a third of a metre chest to chest for two people).
+
 **Shot lighting: key, fill and rim.** A shot can light its subject the way a film crew does (`src/shared/cartoon/shot_lighting.h`): `lighting [key K] [fill F] [rim R]
 [side left|right] [on WHO]` in a film file's shot, or `lighting ...` in a section of a film's cameras file (`film_assets/<key>/cameras.txt`, so the built-in films can have
 it too). Three spot lights are added to the frame's world, placed round the subject from where the camera is, so they follow every camera: a warm key 40 degrees to one

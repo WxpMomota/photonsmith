@@ -6,6 +6,8 @@ Before this, see `git log`. Each item has a commit with the measurements behind 
 
 ## 0.1.5 (2026-10-21)
 
+* **Films: hands on the set and on each other (2026-10-26).** `touch NAME T0 T1 X Y Z [left|right]` (lean on a wall, take a door's handle), `hold A B T0 T1` (hands held) and `hug A B T0 T1` in a film file: the hands are reached for, held and let go like a prop's, and each contact is heard as a touch.
+
 * **Films: shot lighting (2026-10-26).** `lighting [key K] [fill F] [rim R] [side left|right] [on WHO]` in a film file's shot or a cameras file's section adds three-point lighting round the subject from the camera (src/shared/cartoon/shot_lighting.h): a warm key, a cool fill and a rim, as soft-edged spot lights that are not seen, each strength the irradiance it gives the subject at any camera distance. Auto shots light each speaker; built-in films get it through their cameras file.
 
 * **Films: acting from the words (2026-10-26).** `acting words` in a film file gives each line the gesture and expression its words ask for (src/shared/cartoon/film_acting.h): greetings wave, yes nods, no shakes the head, "look"/"there" points, "hmm"/"maybe" thinks, happy exclamations cheer, thanks bow, plain questions shrug, and feeling words show on the face - at the word that brings them, only with poses the kind has, never over the film's own gestures and feelings. Films made from a screenplay get the line.

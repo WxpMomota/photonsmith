@@ -689,6 +689,47 @@ TEST(ShotLighting, AKeyAFillAndARimLightTheSubjectFromTheCamera) {
 	EXPECT_EQ(cartoon::shot_cameras::apply("LookAt 0 1 5  0 1 0  0 1 0\nCamera \"perspective\"\nWorldBegin\n", c).find("\"spot\""), std::string::npos) << "a header alone";
 }
 
+// Contact actions: a hand on the set (`touch`: a wall to lean on, a door's handle), two characters' hands held (`hold`), a hug (`hug`) - reached for before, held, let go
+// after, each heard as a touch.
+TEST(FilmContacts, HandsGoOnTheSetAndOnEachOther) {
+	(void)cartoon::films();
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 12\ncharacter ann person at 0 0 0 facing 90\ncharacter bo person at 0.9 0 0 facing -90\ncharacter cy person at 5 0 0\n"
+					   "character di person at 5.35 0 0 facing -90\n"
+					   "touch ann 1 3 -0.45 1.1 0.2 left\nhold ann bo 4 6\nhug cy di 7 9\n", film), "");
+	const auto &kinds = ff::characterKinds();
+	const ff::Character &ann = film.spec.characters[0], &bo = film.spec.characters[1], &cy = film.spec.characters[2], &di = film.spec.characters[3];
+	const auto hand = [&](const ff::Character &c, int h, double t) { return kinds.at(c.kind).handAt(film.actingMoment(c, t), h); };
+	// the touch: her left hand on the place (pbrt's x -0.45 is story space's 0.45), and not before or after
+	const cartoon::Vec3 place{0.45, 1.1, 0.2};
+	EXPECT_LT(cartoon::length(hand(ann, 0, 2.0) - place), 0.08);
+	EXPECT_GT(cartoon::length(hand(ann, 0, 0.2) - place), 0.2);
+	EXPECT_GT(cartoon::length(hand(ann, 0, 3.8) - place), 0.2);
+	// holding hands: her right and his left together
+	EXPECT_LT(cartoon::length(hand(ann, 1, 5.0) - hand(bo, 0, 5.0)), 0.08);
+	EXPECT_GT(cartoon::length(hand(ann, 1, 2.0) - hand(bo, 0, 2.0)), 0.15);
+	// the hug: both of cy's hands behind di (and di's behind cy)
+	const cartoon::Vec3 cyChest = film.chestOf(cy, 8.0), diChest = film.chestOf(di, 8.0);
+	cartoon::Vec3 toward = diChest - cyChest;
+	toward.y = 0.0;
+	toward = cartoon::normalize(toward);
+	for (int h = 0; h < 2; ++h) {
+		EXPECT_GT(cartoon::dot(hand(cy, h, 8.0) - cyChest, toward), 0.75 * cartoon::length(diChest - cyChest)) << "cy's hand " << h << " reaches round di's side";
+		EXPECT_GT(cartoon::dot(hand(di, h, 8.0) - diChest, toward * -1.0), 0.75 * cartoon::length(diChest - cyChest)) << "di's hand " << h << " reaches round cy's side";
+	}
+	// each heard
+	int touches = 0;
+	for (const cartoon::FilmEvent &e : film.events())
+		if (e.kind == cartoon::EventKind::Touch && (e.t == 1.0 || e.t == 4.0 || e.t == 7.0)) ++touches;
+	EXPECT_EQ(touches, 3);
+	// what is wrong
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 12\ncharacter ann person\ntouch ann 1 3 0 1\n", bad).find("`touch NAME T0 T1 X Y Z"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 12\ncharacter ann person\nhug ann ann 1 3\n", bad).find("someone else"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 12\ncharacter ann person\nhold ann zed 1 3\n", bad).find("zed is not brought in"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 12\ncharacter ann person\nhold ann zed 3 1\n", bad).find("later T1"), std::string::npos);
+}
+
 // Every cast and set of the library that comes with the program can be brought into a film.
 TEST(FilmLibrary, TheLibraryThatComesWithTheProgramLoads) {
 	(void)cartoon::films();   // (the kinds of character)

@@ -163,6 +163,9 @@
 //     voices   system                                          # every character in one of the computer's voices (by its name; `babble` the default)
 //     cast     ann  at -0.7 0 0  voice zira                    # ... or one of them in the voice with that word in its name
 //     acting   words                                           # each line acted from its words (film_acting.h): a gesture and an expression where none is given
+//     touch    ann 2 5  -0.3 1.2 -0.6 left                     # a hand on a place of the set from 2 s to 5 s (a wall to lean on, a door's handle), reached for and let go
+//     hold     ann sam 6 9                                     # ann's right hand and sam's left held together
+//     hug      pip kid 6 9                                     # both of each one's arms round the other (stand them close: about a third of a metre chest to chest)
 //
 // A shot's own lighting (shot_lighting.h) - a key, a fill and a rim round its subject, from where the camera is (in a shot's lines; a cameras file can say it too):
 //
@@ -494,6 +497,16 @@ struct Spec {
 	toon_look::Style toon;    // the toon look (`toon`): written into every frame's header as its `# @rt-toon` line
 	std::string voices;       // what the characters' lines are said in unless a character says (`voices`): "" or "babble", "system", a word of a computer voice's name
 	bool actingWords = false; // `acting words`: each line brings the gesture and the expression its words ask for (film_acting.h), where the film gives none
+	// hands on the set and on each other (`touch`, `hold`, `hug`): reached for half a second before T0, held to T1, let go over half a second
+	struct Contact {
+		enum Kind { Touch, Hold, Hug } kind = Touch;
+		std::string who, other;   // (hold, hug: the other character)
+		double t0 = 0.0, t1 = 0.0;
+		Vec3 at;                  // (touch: where, pbrt's x y z)
+		int hand = 1;             // (touch: 0 the left, 1 the right)
+		int line = 0;
+	};
+	std::vector<Contact> contacts;
 	// weather and particles (`weather`, `particles`, `burst`)
 	std::vector<particles::Weather> weather;
 	std::vector<particles::Emitter> emitters;
@@ -1355,6 +1368,24 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			a.kind = t[1];
 			if (t.size() > 3 || (t.size() == 3 && (!number(t[2], a.gain) || a.gain < 0.0 || a.gain > 4.0))) return fail("an ambience's gain is a number from 0 to 4");
 			s.ambience.push_back(a);
+		} else if (verb == "touch" || verb == "hold" || verb == "hug") {   // hands on the set, or on another character
+			const std::vector<std::string> t = detail::tokens(line);
+			Spec::Contact c;
+			c.kind = verb == "touch" ? Spec::Contact::Touch : verb == "hold" ? Spec::Contact::Hold : Spec::Contact::Hug;
+			c.line = n;
+			if (verb == "touch") {
+				if (t.size() < 7 || t.size() > 8 || !number(t[2], c.t0) || !number(t[3], c.t1) || !number(t[4], c.at.x) || !number(t[5], c.at.y) || !number(t[6], c.at.z) ||
+					(t.size() == 8 && t[7] != "left" && t[7] != "right"))
+					return fail("`touch NAME T0 T1 X Y Z [left|right]`: a hand on a place of the set (a wall to lean on, a door's handle) from T0 to T1");
+				if (t.size() == 8) c.hand = t[7] == "left" ? 0 : 1;
+			} else {
+				if (t.size() != 5 || !number(t[3], c.t0) || !number(t[4], c.t1)) return fail("`" + verb + " NAME OTHER T0 T1`: from T0 to T1");
+				c.other = t[2];
+				if (c.other == t[1]) return fail("a character " + verb + "s someone else");
+			}
+			c.who = t[1];
+			if (!(c.t1 > c.t0) || c.t0 < 0.0) return fail("`" + verb + "` lasts from T0 to a later T1");
+			s.contacts.push_back(c);
 		} else if (verb == "acting") {   // gestures and expressions from the words of the lines (film_acting.h)
 			if (w.size() != 2 || (w[1] != "words" && w[1] != "off")) return fail("`acting words` (each line acted from its words) or `acting off`");
 			s.actingWords = w[1] == "words";
@@ -1723,7 +1754,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -2247,6 +2278,9 @@ class DataFilm {
 		heightsOfWalks();
 		if (const std::string e = crowding(); !e.empty()) return filePath + ": " + e;
 		if (const std::string e = holdingTimeline(); !e.empty()) return filePath + ":" + e;
+		for (const Spec::Contact &k : spec.contacts)
+			for (const std::string &name : {k.who, k.other})
+				if (!name.empty() && !character(name)) return filePath + ":" + std::to_string(k.line) + ": " + name + " is not brought in with `character`";
 		for (const Spec::Look &l : spec.looks) {
 			if (!character(l.who)) return filePath + ":" + std::to_string(l.line) + ": " + l.who + " is not brought in with `character`";
 			if (!l.target.empty() && !character(l.target) && !prop(l.target)) return filePath + ":" + std::to_string(l.line) + ": " + l.target + " is neither a character nor a prop";
@@ -2782,6 +2816,34 @@ class DataFilm {
 				}
 			}
 		}
+		contactsAt(c, t, m);
+	}
+	// Its hands on the set and on others (`touch`, `hold`, `hug`): reached for over half a second up to T0, held, let go over half a second after T1.
+	void contactsAt(const Character &c, double t, CharacterMoment &m) const {
+		for (const Spec::Contact &k : spec.contacts) {
+			const bool mine = k.who == c.name, theirs = k.other == c.name;
+			if ((!mine && !theirs) || t < k.t0 - kReach || t > k.t1 + kSettle) continue;
+			const double weight = smoothstep(k.t0 - kReach, k.t0, t) * (1.0 - smoothstep(k.t1, k.t1 + kSettle, t));
+			if (k.kind == Spec::Contact::Touch) {
+				m.hands[k.hand] = {story(k.at.x, k.at.y, k.at.z), weight};
+				continue;
+			}
+			const Character *other = character(mine ? k.other : k.who);
+			if (!other) continue;
+			if (k.kind == Spec::Contact::Hold) {   // the one's right hand and the other's left meet between them
+				const Character &a = mine ? c : *other, &b = mine ? *other : c;
+				m.hands[mine ? 1 : 0] = {meetingOf(a, 1, b, 0, t), weight};
+				continue;
+			}
+			// a hug: both arms round the other's sides, a little below the shoulders
+			const Vec3 me = chestOf(c, t), them = chestOf(*other, t);
+			Vec3 toward = them - me;
+			toward.y = 0.0;
+			toward = length(toward) > 1e-6 ? normalize(toward) : Vec3{0.0, 0.0, 1.0};
+			const Vec3 side = cross(Vec3{0.0, 1.0, 0.0}, toward);
+			const double reach = 0.18 * std::min(c.scale, other->scale);
+			for (int h = 0; h < 2; ++h) m.hands[h] = {them + toward * (0.3 * reach) + side * ((h == 0 ? 1.0 : -1.0) * reach) + Vec3{0.0, -0.05, 0.0}, weight};   // (round its sides, just behind them)
+		}
 	}
 	// A character's moment with its hands and its look: what its kind needs to draw it, or to say where its hand is.
 	CharacterMoment actingMoment(const Character &c, double t) const {
@@ -3064,6 +3126,19 @@ class DataFilm {
 				e.strength = audibility(length(at - v.eye));
 				out.push_back(e);
 			}
+		}
+		for (const Spec::Contact &k : spec.contacts) {   // a hand on the set, two hands, a hug
+			const Character *c = character(k.who);
+			if (!c) continue;
+			FilmEvent e;
+			e.t = k.t0;
+			e.kind = EventKind::Touch;
+			e.seed = ++seed;
+			const CameraView v = viewAt(k.t0);
+			const Vec3 at = k.kind == Spec::Contact::Touch ? story(k.at.x, k.at.y, k.at.z) : chestOf(*c, k.t0);
+			e.pan = panOf(v, at);
+			e.strength = (k.kind == Spec::Contact::Hug ? 0.6 : 0.8) * audibility(length(at - v.eye));
+			out.push_back(e);
 		}
 		for (const Spec::Handling &h : spec.handling) {   // a hand meets a prop
 			FilmEvent e;
