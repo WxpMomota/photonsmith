@@ -577,6 +577,17 @@ speaker's kind has (the turtle has no shrug; the masked explorer no face), and n
 (a script's parentheticals win). The timing is the line's syllables (the babble timing, the same in every program, whatever voice says it). A film made from a script
 (`--film-from-script`) has the line.
 
+**Rigged characters from glTF models.** `rigged KIND FILE.glb [height H] [stride S] [turn DEGREES] [walk CLIP] [idle CLIP] [run CLIP]` in a film file makes a kind of
+character from a rigged glTF 2.0 model with animation clips - one made in Blender, or from Mixamo (download it as glTF/GLB, or bring its FBX into Blender and export glTF)
+- and `character NAME KIND ...` brings it in like any other (`src/shared/gltf_skin.h` reads the skeleton, the skins and the clips; `src/shared/cartoon/film_rigged.h` makes
+the kind). Standing it plays its idle clip (one named "idle"; none: its rest pose), walking its walk clip in step with its walk (one cycle of the clip is two steps; its run
+clip when it runs), and a gesture plays the clip named as its pose (`gesture bob "wave" 3 3.4 5 5.4`), eased in and out; its clips other than walk, idle and run are its
+poses. It is sized to `height` (1.7 by default) and stood on the ground; what its walk clip moves it forward is taken out, since the film walks it. Its materials are the
+file's base colours and pictures (written once to the film cache), metal where the file says. A skinned mesh is moved by its joints (four weights a vertex), a mesh
+without a skin by its node. It has no face (no `feel`) and its hands are its own (no props). The FILE is beside the film file or in the film library; a cast file can name
+its model (`rigged robot.glb height 1.2`) so that `cast robo as robot` is all a film needs: the library has `robot.cast` and `robot.glb`, a small orange robot with idle,
+walk, wave, cheer and nod clips, made by `scripts/make_rigged_robot.py` as a real skinned model.
+
 **Changes made in the GUI, written into the film file.** For a film made from a file, the film timeline's row (Settings, a film's still in Render Single Image) has
 **Camera** and **Start shot here**. Move the view in Live Preview (it starts at the film time's moment, from the shot's own camera), then Camera > *Use this view for the
 shot* writes it as the shot's camera (its `key` lines, a `follow`, a move, `auto` or a flight replaced by one `key`, the shot's own field of view kept), or *Add this view as

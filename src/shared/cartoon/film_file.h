@@ -156,6 +156,8 @@
 //     set      meadow                                          # a set's lines read here: its scene (from the set's folder), its sky, dressing and sound
 //     cast     ann  at -0.8 0 0  facing 30                     # a character as its cast file says (kind, look, voice), standing here
 //     cast     kid as pip-child  at 0 0 0.8                    # ... named `kid` in this film; anything more on the line is on top of the cast's
+//     rigged   bot models/bot.glb  height 1.6                  # a kind of character from a rigged glTF model with clips (film_rigged.h): idle, walk, run, and its gestures
+//                                                              # (`stride S`, `turn DEGREES`, `walk CLIP`, `idle CLIP`, `run CLIP`); a cast file can name its model the same way
 //     character  bo person  pitch -2  rate 0.9                 # (a voice for any character: semitones up from its kind's, and how fast it speaks)
 //
 // Real voices (film_tts.h) - lines said by the computer's own text-to-speech, offline, the mouth following the recording:
@@ -410,6 +412,14 @@ inline std::map<std::string, CharacterKind> &characterKinds() {
 	return kinds;
 }
 
+}  // namespace film_file
+}  // namespace cartoon
+
+#include "film_rigged.h"   // (kinds made from rigged glTF characters: it needs CharacterKind and characterKinds above)
+
+namespace cartoon {
+namespace film_file {
+
 // What a film file says.
 struct Spec {
 	std::string key, name, about, scene;   // `scene` as written
@@ -515,6 +525,14 @@ struct Spec {
 		int line = 0;
 	};
 	std::vector<Contact> contacts;
+	// kinds made from rigged glTF characters (`rigged KIND FILE ...`: film_rigged.h), added when the film is loaded
+	struct Rigged {
+		std::string kind, file;
+		std::filesystem::path dir;   // where `file` is from ("": beside the film file, else the library's)
+		RigOptions options;
+		int line = 0;
+	};
+	std::vector<Rigged> rigged;
 	// titles and credits: a title card over the opening (`title`, `episode`), cards of credits after the story over black (`credits`, `credit`), a theme under the title
 	bool hasTitle = false;
 	std::string title;              // "": the film's name
@@ -788,19 +806,26 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			if (!detail::validKey(who)) return fail("a cast's name is lower-case letters, digits and '-' (got \"" + who + "\")");
 			const std::string file = detail::libraryFile(who, ".cast", where);
 			if (file.empty()) return fail("no cast called \"" + who + "\" (library/" + who + ".cast beside the film file, or in film_assets/library)");
-			std::string kind, look;
+			std::string kind, look, model;
 			std::istringstream castText(detail::textOf(file));
 			for (std::string c; std::getline(castText, c);) {
 				c = detail::withoutComment(c);
 				const std::vector<std::string> cw = detail::words(c);
 				if (cw.empty()) continue;
 				if (cw[0] == "kind" && cw.size() == 2) kind = cw[1];
+				else if (cw[0] == "rigged" && cw.size() >= 2) model = detail::trim(c).substr(6);   // (its kind is a rigged model: the file and how it is drawn, from the cast's folder)
 				else look += " " + detail::trim(c);
 			}
 			if (kind.empty()) return fail("the cast " + file + " has no `kind KIND` line");
 			std::string character = "character \"" + t[1] + "\" " + kind + look;
 			for (; i < t.size(); ++i) character += " " + t[i];
 			sources.push_back({std::make_shared<std::istringstream>(character + "\n"), here, n - 1, sources.back().dir, sources.back().library});   // (read next, as this line)
+			if (!model.empty()) {   // (and before it, its kind from its model: `rigged KIND FILE ...` with the file from the cast's folder)
+				const std::vector<std::string> mw = detail::tokens(model);
+				std::string rigged = "rigged " + kind + " \"" + (std::filesystem::path(file).parent_path() / mw[0]).lexically_normal().generic_string() + "\"";
+				for (std::size_t k = 1; k < mw.size(); ++k) rigged += " " + mw[k];
+				sources.push_back({std::make_shared<std::istringstream>(rigged + "\n"), file, 0, std::filesystem::path(file).parent_path(), false});
+			}
 		} else if (verb == "film") {
 			if (!detail::validKey(rest)) return fail("the film's key must be lower-case letters, digits and '-' (got \"" + rest + "\")");
 			s.key = rest;
@@ -1389,6 +1414,27 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			a.kind = t[1];
 			if (t.size() > 3 || (t.size() == 3 && (!number(t[2], a.gain) || a.gain < 0.0 || a.gain > 4.0))) return fail("an ambience's gain is a number from 0 to 4");
 			s.ambience.push_back(a);
+		} else if (verb == "rigged") {   // a kind of character from a rigged glTF model (film_rigged.h)
+			const std::vector<std::string> t = detail::tokens(line);
+			Spec::Rigged rg;
+			rg.line = n;
+			rg.dir = sources.back().dir;
+			if (t.size() < 3 || !detail::validKey(t[1])) return fail("`rigged KIND FILE.glb [height H] [stride S] [turn DEGREES] [walk CLIP] [idle CLIP] [run CLIP]` (KIND: lower-case letters, digits and '-')");
+			rg.kind = t[1];
+			rg.file = t[2];
+			for (std::size_t i = 3; i < t.size(); i += 2) {
+				if (i + 1 >= t.size()) return fail("\"" + t[i] + "\" needs a value");
+				double v = 0.0;
+				if (t[i] == "height" || t[i] == "stride" || t[i] == "turn") {
+					if (!number(t[i + 1], v) || (t[i] != "turn" && !(v > 0.0))) return fail("a rigged model's " + t[i] + " is a number" + (t[i] == "turn" ? "" : " above 0"));
+					(t[i] == "height" ? rg.options.height : t[i] == "stride" ? rg.options.stride : rg.options.turn) = v;
+				} else if (t[i] == "walk" || t[i] == "idle" || t[i] == "run") {
+					(t[i] == "walk" ? rg.options.walk : t[i] == "idle" ? rg.options.idle : rg.options.run) = detail::lowerWord(t[i + 1]);
+				} else {
+					return fail("\"" + t[i] + "\": a rigged model takes height, stride, turn, walk, idle and run");
+				}
+			}
+			s.rigged.push_back(rg);
 		} else if (verb == "title") {   // a title card over the opening
 			const std::vector<std::string> t = detail::tokens(line);
 			s.hasTitle = true;
@@ -1808,7 +1854,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -2317,6 +2363,13 @@ class DataFilm {
 		for (const auto &[name, line] : spec.physicsLines)
 			if (std::find(scene.names.begin(), scene.names.end(), name) == scene.names.end())
 				return filePath + ":" + std::to_string(line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + name + "`";
+		for (const Spec::Rigged &rg : spec.rigged) {   // the kinds its rigged models make (beside the film file, else in the library)
+			std::filesystem::path file = std::filesystem::path(rg.file).is_absolute() ? std::filesystem::path(rg.file) : (rg.dir.empty() ? base : rg.dir) / rg.file;
+			std::error_code ec;
+			if (!std::filesystem::exists(file, ec) && !std::filesystem::path(rg.file).is_absolute())
+				if (const std::string lib = film_cache::asset("library/" + rg.file); !lib.empty()) file = lib;
+			if (const std::string e = addRiggedKind(rg.kind, file.string(), rg.options); !e.empty()) return filePath + ":" + std::to_string(rg.line) + ": " + e;
+		}
 		for (const Character &c : spec.characters)
 			if (!characterKinds().count(c.kind)) {
 				std::string known;

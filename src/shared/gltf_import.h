@@ -20,6 +20,7 @@
 #include <cstring>
 #include <functional>
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
@@ -70,10 +71,12 @@ struct Model {
 	std::vector<std::string> notes;
 };
 
+namespace detail { struct Doc; }
 struct Result {
 	bool ok = false;
 	std::string error;
 	Model model;
+	std::shared_ptr<detail::Doc> doc;   // the file as read (its JSON and buffers): for what reads more of it - its skins and animations (gltf_skin.h)
 };
 
 using FileFetcher = std::function<bool(const std::string& uri, std::vector<unsigned char>& bytes)>;
@@ -174,6 +177,9 @@ inline int componentsOf(const std::string& type) {
 	if (type == "VEC2") return 2;
 	if (type == "VEC3") return 3;
 	if (type == "VEC4") return 4;
+	if (type == "MAT2") return 4;
+	if (type == "MAT3") return 9;
+	if (type == "MAT4") return 16;   // (a skin's inverse bind matrices)
 	return 0;
 }
 inline int componentBytes(long type) {
@@ -278,6 +284,7 @@ inline std::string mimeOfName(const std::string& name) {
 class Reader {
   public:
 	Reader(const FileFetcher& fetch, Result& result) : fetch_(fetch), result_(result), model_(result.model) {}
+	Doc& doc() { return d_; }
 
 	bool run(const std::string& bytes) {
 		std::string jsonText;
@@ -658,6 +665,7 @@ inline Result parse(const std::string& bytes, const FileFetcher& fetch = FileFet
 	Result result;
 	detail::Reader reader(fetch, result);
 	result.ok = reader.run(bytes);
+	if (result.ok) result.doc = std::make_shared<detail::Doc>(std::move(reader.doc()));
 	return result;
 }
 

@@ -1,0 +1,4 @@
+# Robo: a small orange robot, a rigged glTF model (robot.glb, made by scripts/make_rigged_robot.py) with clips to idle, walk, wave, cheer and nod.
+kind    robot
+rigged  robot.glb  height 1.2
+pitch   -2

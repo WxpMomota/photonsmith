@@ -18,6 +18,7 @@
 #include "../../src/shared/cartoon/fountain.h"
 #include "../../src/shared/cartoon/film_score.h"
 #include "../../src/shared/cartoon/film_edit.h"
+#include "../../src/shared/gltf_skin.h"
 #include "../../src/shared/pbrt_discover.h"
 #include "../../launcher/process.h"   // (a speech engine for the real voices)
 
@@ -858,6 +859,63 @@ TEST(FilmEdit, AShotsCameraAndStartAreChangedInTheFilmFile) {
 	ASSERT_EQ(one.load((d / "e.film").string(), 0), "");
 	EXPECT_NE(one.headerAt(1.0).find("LookAt 2 1.5 4"), std::string::npos) << one.headerAt(1.0);
 	EXPECT_DOUBLE_EQ(one.spec.shots[1].start, 5.5);
+}
+
+// A rigged glTF character (gltf_skin.h): its skeleton, skin and clips read, its vertices moved by their joints - the library's robot raises its right arm in its wave, swings
+// its legs in its walk, half as far at half the weight - and as a kind of a film file (film_rigged.h: `rigged`, or a cast that names its model).
+TEST(RiggedCharacters, ARiggedGltfModelIsPosedByItsClipsAndIsAKindOfCharacter) {
+	(void)cartoon::films();
+	const std::string file = cartoon::film_cache::asset("library/robot.glb");
+	if (file.empty()) GTEST_SKIP() << "run where the scenes are";
+	std::ifstream in(file, std::ios::binary);
+	const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+	const gltf_skin::Result r = gltf_skin::load(bytes);
+	ASSERT_TRUE(r.ok) << r.error;
+	const gltf_skin::Rig &rig = r.rig;
+	ASSERT_EQ(rig.skins.size(), 1u);
+	EXPECT_EQ(rig.skins[0].joints.size(), 7u);
+	EXPECT_EQ(rig.clips.size(), 5u);
+	for (const char *name : {"walk", "idle", "wave", "cheer", "nod"}) EXPECT_GE(rig.clipNamed(name), 0) << name;
+	const auto box = [&](const gltf_skin::Pose &pose, double lo[3], double hi[3]) { gltf_skin::boundsOf(gltf_skin::posed(rig, pose), lo, hi); };
+	double lo[3], hi[3];
+	box(gltf_skin::restPose(rig), lo, hi);
+	EXPECT_NEAR(lo[1], 0.0, 1e-6) << "its feet on the ground";
+	EXPECT_NEAR(hi[1], 1.86, 1e-3) << "the top of its antenna";
+	EXPECT_NEAR(lo[0], -0.345, 1e-3) << "its right arm hangs (its right is -x)";
+	// the wave: the right arm up and out (150 degrees about z at 0.4 s)
+	gltf_skin::Pose wave = gltf_skin::restPose(rig);
+	gltf_skin::apply(rig, rig.clips[static_cast<std::size_t>(rig.clipNamed("wave"))], 0.4, wave, 1.0, false);
+	box(wave, lo, hi);
+	EXPECT_NEAR(lo[0], -0.558, 0.005) << "the arm swung out: its far corner (0.015, -0.55) from the shoulder turned by -150 degrees";
+	EXPECT_GT(hi[1], 1.88) << "and above the antenna";
+	// half the weight: half way (the arm out by about 75 degrees)
+	gltf_skin::Pose half = gltf_skin::restPose(rig);
+	gltf_skin::apply(rig, rig.clips[static_cast<std::size_t>(rig.clipNamed("wave"))], 0.4, half, 0.5, false);
+	box(half, lo, hi);
+	EXPECT_LT(lo[0], -0.6) << "75 degrees out reaches further to the side than 150";
+	// the walk: the legs swing forward and back
+	gltf_skin::Pose walk = gltf_skin::restPose(rig);
+	gltf_skin::apply(rig, rig.clips[static_cast<std::size_t>(rig.clipNamed("walk"))], 0.25, walk);
+	box(walk, lo, hi);
+	EXPECT_GT(hi[2] - lo[2], 0.5) << "a stride";
+	// as a kind of character: from the library's cast (its model named there), walking and waving
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 8\ncast robo as robot at 0 0 0 facing 0\nwalk robo 1 0.6  0 3\ngesture robo \"wave\" 5 5.4 6.6 7\nshot 0 A\n key 0 1 5  0 1 0\n", film), "");
+	const auto &kinds = ff::characterKinds();
+	ASSERT_TRUE(kinds.count("robot"));
+	const ff::CharacterKind &kind = kinds.at("robot");
+	EXPECT_NEAR(kind.height, 1.2, 1e-9) << "sized by its cast (height 1.2)";
+	EXPECT_EQ(kind.poses, (std::vector<std::string>{"wave", "cheer", "nod"})) << "its clips but walk and idle, as the file has them";
+	const std::string standing = film.sceneAt(0.5), walking = film.sceneAt(2.0), waving = film.sceneAt(5.8);
+	EXPECT_NE(standing.find("# robo (robot)"), std::string::npos);
+	EXPECT_NE(standing.find("\"trianglemesh\""), std::string::npos);
+	EXPECT_NE(standing, film.sceneAt(1.2)) << "it moves when it walks";
+	EXPECT_NE(walking.find("conductor"), std::string::npos) << "its metal limbs";
+	EXPECT_NE(waving, film.sceneAt(4.5));
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\ncast robo as robot\ngesture robo \"juggle\" 1 2\n", bad).find("\"wave\""), std::string::npos) << "its poses are its clips";
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\nrigged bot nowhere.glb\n", bad).find("cannot be read"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\nrigged bot " + file + " walk moonwalk\n", bad).find("no clip called \"moonwalk\""), std::string::npos);
 }
 
 // Every cast and set of the library that comes with the program can be brought into a film.
