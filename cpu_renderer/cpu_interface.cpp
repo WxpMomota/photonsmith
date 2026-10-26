@@ -989,6 +989,10 @@ extern "C" int cpu_register_scene_file(const char* path, char* id_out, int id_ou
 	return built_before ? 2 : 3;
 }
 
+extern "C" int cpu_reload_scene_file(const char* scene_id) {
+	return scene_id && reload_scene_file(scene_id) ? 1 : 0;
+}
+
 extern "C" const char* cpu_scene_name_by_id(const char* scene_id) {
 	const SceneDescriptor* s = find_scene(scene_id);
 	return s ? s->name : "";

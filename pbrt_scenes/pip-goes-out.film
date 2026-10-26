@@ -1,11 +1,13 @@
 # Pip Goes Out: a film in two parts on two sets (src/shared/cartoon/film_file.h `part`): each part has its own set, length, cast, shots and sound, and the
 # parts play one after another as one film. The lines before the first part are the whole film's (and any others there would be every part's). Its sets and
-# its Pip come from the film library (pbrt_scenes/film_assets/library: `set dusk-path`, `set meadow`, `cast pip`).
+# its Pip come from the film library (pbrt_scenes/film_assets/library: `set dusk-path`, `set meadow`, `cast pip`), and it is drawn with the toon look
+# (`toon`: the light in flat bands, ink lines; src/shared/toon_look.h), shared by both parts.
 film    pip-goes-out
 name    Pip Goes Out
 about   Pip trots down the lantern path at dusk and comes out into a bright morning meadow, where it cheers at the day.
 tags    character, dusk
 still   13
+toon    bands 3  lines 2.5  saturation 1.25
 
 part "The lantern path"
 set     dusk-path

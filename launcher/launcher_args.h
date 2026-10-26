@@ -211,6 +211,9 @@ struct LaunchArgs {
 	// Also write the render's passes (albedo, normal, depth, uv, coverage) - see src/TheRestOfYourLife/aov_pass.h. Into the same file when the output is an .exr
 	// (a multilayer EXR with the beauty's R/G/B), else into <stem>.aovs.exr beside the image. Any backend; single images only.
 	bool aovs = false;
+	// The toon look on the picture (src/shared/toon_look.h, launcher/toon_frame.h): cel shading, ink lines, stronger colour - the scene's own `# @rt-toon` style, or the default.
+	// A scene with that line has the look without the flag.
+	bool toon = false;
 	// Target relative standard error of a pixel's running luminance mean -
 	// see pixel_convergence::has_converged()'s own comment. Only consulted
 	// when adaptive_sampling is true. 0.01 matches Blender Cycles' own
@@ -559,6 +562,9 @@ inline FlagResult handle_quality_flag(const std::string& arg, int argc, char** a
 		++i;
 	} else if (arg == render_flags::kAovs) {
 		out.aovs = true;
+		consumed_args.insert(i);
+	} else if (arg == render_flags::kToon) {
+		out.toon = true;
 		consumed_args.insert(i);
 	} else if (arg == render_flags::kAdaptive) {
 		out.adaptive_sampling = true;
@@ -1130,6 +1136,11 @@ inline void print_launch_help(const char* program) {
 				  << "               from first-hit camera rays, for compositing. Into the same file for\n"
 				  << "               an .exr output (a multilayer EXR with the image's R/G/B), else into\n"
 				  << "               <name>.aovs.exr next to the image. Any backend; single images only.\n"
+				  << "  " << render_flags::kToon << "     : A cartoon look - the light in a few flat bands, ink lines round shapes\n"
+				  << "               and along creases, stronger colour - made after the render from the\n"
+				  << "               picture and its passes. A scene file's `# @rt-toon bands 3 lines 2 ...`\n"
+				  << "               line gives it by itself, with its own style (a film's `toon` line\n"
+				  << "               writes one into every frame). Any backend; not for an EXR.\n"
 				  << "  " << render_flags::kAdaptive << " : Stop sampling a pixel once it's converged instead of\n"
 				  << "               always spending the full samples-per-pixel budget on every\n"
 				  << "               pixel - samples_per_pixel becomes a ceiling, not a fixed count.\n"

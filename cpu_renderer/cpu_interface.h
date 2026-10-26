@@ -306,6 +306,10 @@ int cpu_render_main_aovs(
     int force_camera_override = 0
 );
 
+/// @brief The same passes as cpu_render_main_aovs, into memory: `out` holds 10 planes of width*height floats one after another (aov_pass::channelNames()'s order) - for
+/// the toon look (src/shared/toon_look.h), made from the picture and its passes in the run that rendered it. @return 0 on success, non-zero error code on failure
+int cpu_render_aov_planes(int width, int height, int spp, const char* scene_id, double cam_x, double cam_y, double cam_z, int force_camera_override, float* out);
+
 /// @brief Merges the channels of the EXR `passes_path` (see cpu_render_main_aovs) into the EXR `image_path`, writing the result over it: one multilayer EXR. A channel
 /// the image already has is kept. @return 0 on success; on failure non-zero with a message in `error_out`.
 int cpu_merge_exr_passes(const char* image_path, const char* passes_path, char* error_out, int error_out_size);
@@ -517,6 +521,10 @@ int cpu_resolve_scene_id(const char* key, char* id_out, int id_out_size);
 /// scene registry in this process, which is built once.
 /// @return 0 on success; 1 bad arguments; 2 the registry was already built without this file; 3 the file could not be read as a scene (its error is on stderr)
 int cpu_register_scene_file(const char* path, char* id_out, int id_out_size);
+
+/// Reads a scene loaded from a .pbrt file again from its file (its camera, settings and geometry as the file has them now): for a process that renders frame after
+/// frame from one scene file it rewrites (a film's worker). @return 1 when it was read again, 0 when the id is not a file's scene or the file cannot be read
+int cpu_reload_scene_file(const char* scene_id);
 
 /// Whether this scene's CameraConfig.mode is CameraMode::UserControlled
 /// (the Cornell-box family's kCornellBoxCamera, and any pbrt-backed scene

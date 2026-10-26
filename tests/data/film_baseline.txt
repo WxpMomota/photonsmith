@@ -93,10 +93,10 @@ pip-and-the-moon|10|578f15558fff4e6b|Alone at the water
 pip-and-the-moon|11|5caeceecfc68504f|The firefly
 pip-and-the-moon|12|e8298ef6e53ff15e|Under the real moon
 pip-and-the-moon|13|0503e1c3de0b1302|Pull back over the pond
-pip-goes-out|1|b5f300d0d3bb2f9f|Down the path
-pip-goes-out|2|ccc35b4a90c01962|The lantern lights
-pip-goes-out|3|15450523df411c6c|Into the sun
-pip-goes-out|4|c78295df2c951023|Cheering
+pip-goes-out|1|80877f19a94ee551|Down the path
+pip-goes-out|2|fa21ac06b9574f98|The lantern lights
+pip-goes-out|3|4484170a28f3c3ea|Into the sun
+pip-goes-out|4|3af0abe32c98c7d5|Cheering
 tengwang|1|8fa5c7a59d8748b0|Black, a bell, the sea of clouds
 tengwang|2|df520deb6621eb1c|The river comes out of the mountains
 tengwang|3|9cd4554012f19a35|The Gan River and Hongzhou

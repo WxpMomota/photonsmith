@@ -157,6 +157,10 @@
 //     cast     ann  at -0.8 0 0  facing 30                     # a character as its cast file says (kind, look, voice), standing here
 //     cast     kid as pip-child  at 0 0 0.8                    # ... named `kid` in this film; anything more on the line is on top of the cast's
 //     character  bo person  pitch -2  rate 0.9                 # (a voice for any character: semitones up from its kind's, and how fast it speaks)
+//
+// The toon look (src/shared/toon_look.h) - the light in flat bands, ink lines round shapes and along creases, stronger colour - on every frame:
+//
+//     toon     bands 3  lines 2.5  ink #1a1420  saturation 1.25  shadow 0.35    # (any of them, or none for the default style; `toon off`)
 
 #include <algorithm>
 #include <cctype>
@@ -173,6 +177,7 @@
 #include <vector>
 
 #include "../camera_keyframes.h"
+#include "../toon_look.h"
 #include "film_dressing.h"
 #include "film_faces.h"
 #include "film_particles.h"
@@ -467,6 +472,7 @@ struct Spec {
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	bool draftMusic = true;   // (`music none`: no drafted score when there is no cues file)
+	toon_look::Style toon;    // the toon look (`toon`): written into every frame's header as its `# @rt-toon` line
 	// weather and particles (`weather`, `particles`, `burst`)
 	std::vector<particles::Weather> weather;
 	std::vector<particles::Emitter> emitters;
@@ -1321,6 +1327,9 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			a.kind = t[1];
 			if (t.size() > 3 || (t.size() == 3 && (!number(t[2], a.gain) || a.gain < 0.0 || a.gain > 4.0))) return fail("an ambience's gain is a number from 0 to 4");
 			s.ambience.push_back(a);
+		} else if (verb == "toon") {   // the toon look on every frame (toon_look.h)
+			if (rest == "off") s.toon = toon_look::Style();
+			else if (const std::string e = toon_look::parse(rest, s.toon); !e.empty()) return fail(e);
 		} else if (verb == "music") {
 			const std::vector<std::string> t = detail::tokens(line);
 			if (t.size() != 2 || (t[1] != "none" && t[1] != "draft")) return fail("`music none` (no music) or `music draft` (the drafted score when there is no cues file)");
@@ -1671,7 +1680,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, music, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, music, toon, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -3096,12 +3105,14 @@ class DataFilm {
 	}
 
 	std::string headerAt(double t) const {
-		if (spec.shots.empty()) return scene.header;
+		if (spec.shots.empty()) return toonLine() + scene.header;
 		std::string lookAt, camera;
 		cameraAt(t, lookAt, camera);
 		// The scene's lines before its LookAt, then the new LookAt, the lines between, the new Camera, the lines after. A scene with neither statement gets both after all its header lines.
-		return scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n";
+		return toonLine() + scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n";
 	}
+	// The `# @rt-toon` line of every frame of a film with the toon look (`toon`), else nothing.
+	std::string toonLine() const { return spec.toon.on ? toon_look::tagOf(spec.toon) : std::string(); }
 
 	std::string sceneAt(double t) const { return worldAt(headerAt(t), t); }
 
@@ -3125,7 +3136,7 @@ class DataFilm {
 			if (tr.length <= 0.0 || tr.kind == Transition::Fade || std::abs(t - cut) > 0.5 * tr.length) continue;
 			std::string lookAt, camera;
 			cameraAt(t, lookAt, camera, static_cast<int>(t < cut ? k : k - 1));
-			return worldAt(spec.shots.empty() ? scene.header : scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n", t);
+			return worldAt(toonLine() + (spec.shots.empty() ? scene.header : scene.headerBefore + lookAt + scene.headerBetween + camera + scene.headerAfter + "WorldBegin\n"), t);
 		}
 		return sceneAt(t);
 	}

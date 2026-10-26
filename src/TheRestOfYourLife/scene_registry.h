@@ -1241,6 +1241,24 @@ inline int refresh_user_scenes(bool prune = false) {
     return added;
 }
 
+// The scene of a .pbrt file read again from its file, in its own place (the same id, slug, name and category; its camera, settings and geometry as the file has them now,
+// loaded when it is next rendered). A process that renders frame after frame from one scene file it rewrites - a film's worker (launcher/cartoon_worker.h) - gets each
+// frame's scene this way, not the first one it cached. False when `id` is not a scene loaded from a file or the file cannot be read.
+inline bool reload_scene_file(const std::string& id) {
+    std::vector<SceneDescriptor>& registry = scene_registry_storage();
+    std::lock_guard<std::mutex> lock(registry_refresh_mutex());
+    const auto path = pbrt_scene_registry::paths().find(id);
+    if (path == pbrt_scene_registry::paths().end()) return false;
+    const pbrt_discover::Discovered d = pbrt_discover::describeFile(path->second);
+    if (!d.ok) return false;
+    for (SceneDescriptor& s : registry)
+        if (s.id == id) {
+            pbrt_scene_registry::wire_pbrt_backed_scene(s, d, d.path);
+            return true;
+        }
+    return false;
+}
+
 // Lookup by id ("B10") or by slug ("rough-glass") -- returns nullptr if not found. The two kinds of key cannot collide: an id is upper case, a slug is not.
 inline const SceneDescriptor* find_scene(const std::string& key) {
     const auto lookup = [&key]() -> const SceneDescriptor* {

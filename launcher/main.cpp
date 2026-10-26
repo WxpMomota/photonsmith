@@ -91,6 +91,7 @@ extern char** environ;
 #include "launcher/render_setup.h"
 #include "launcher/background_mode.h"   // --background
 #include "launcher/cartoon_worker.h"
+#include "launcher/toon_frame.h"
 #include "launcher/video_render.h"   // --video, --assemble-video
 #ifdef RT_HAVE_AVFOUNDATION_ENCODER
 #include "launcher/video_encoder_mac.h"   // Video -> MP4 via AVFoundation, no ffmpeg needed
@@ -799,6 +800,20 @@ static int render_single_image(const LaunchArgs &args, const RenderSetup &s) {
 
     printCpuStats(args, s, seconds);
 
+    // the toon look (src/shared/toon_look.h), when --toon or the scene's own `# @rt-toon` line asks for it: on the picture as rendered, before it is cut or converted
+    if (render_result == 0) {
+        const char *scene_file = cpu_scene_pbrt_path_by_id(scene_id.c_str());
+        std::string problem;
+        const toon_look::Style toon = toon_frame::styleFor(args.toon, scene_file ? scene_file : "", &problem);
+        if (!problem.empty()) std::cerr << "Warning: the scene's @rt-toon line: " << problem << " (the look is left out)" << std::endl;
+        if (toon.on && is_exr_output_path(out_path)) {
+            std::cout << "Note: the toon look is for pictures; the EXR stays as rendered." << std::endl;
+        } else if (toon.on) {
+            std::cout << "\nMaking the toon look (its passes, then the bands and lines)..." << std::endl;
+            if (!toon_frame::apply(out_path, image_width, image_height, toon, scene_id, cam_x, cam_y, cam_z, problem))
+                std::cerr << "WARNING: the toon look could not be made (" << problem << "); the picture stays as rendered." << std::endl;
+        }
+    }
     if (render_result == 0 && !args.aovs) cutToScenePicture(args, scene_id, out_path);
     if (render_result == 0 && !announceRenderedFile(out_path, use_gpu, args.ppm_only)) render_result = ERR_FILE_WRITE_FAILED;
 

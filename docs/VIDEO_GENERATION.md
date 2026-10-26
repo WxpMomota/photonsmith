@@ -558,6 +558,16 @@ first (`library/` next to it), then in `pbrt_scenes/film_assets/library`, which 
 valley). A problem in a library file is said with that file's own line. `pip-goes-out.film` uses `set dusk-path`, `set meadow` and `cast pip`. Any character can have a
 voice of its own the same way: `character bo person pitch -2 rate 0.9` (each line's own `pitch` and `rate` go on top).
 
+**The toon look: cel shading and ink lines.** `toon [bands N] [lines W] [ink COLOUR] [saturation S] [shadow S]` in a film file draws every frame as a cartoon
+(`src/shared/toon_look.h`): the light on each surface in a few flat bands, ink lines round what stands in front of something, along sharp creases and against the sky, and
+stronger colour. It is made after the render, in the run that rendered the frame, from the picture and its passes (a cheap first-hit pass on the CPU: albedo, normal,
+depth, coverage; `launcher/toon_frame.h`), so it works on every backend. The light at a pixel is the picture over its surface's colour, smoothed over the surface without
+crossing an edge (the render's noise goes), measured against the picture's bright end (its 95th percentile) and put into bands (the darkest `shadow` of the brightest); the
+picture there is the surface's colour - textures stay - in that light, with the light's own colour. Lines are where the depth jumps (a floor seen edge-on draws none) or the
+normal turns by more than about 55 degrees, `lines` pixels wide at 1080 lines. The film writes a `# @rt-toon ...` line into every frame's scene, and any scene file with that
+line gets the look; `--toon` gives any picture or video it (the scene's style, or the default). Default: 3 bands, lines 2, near-black ink, saturation 1.2, shadow 0.35. A
+frame worker reads the frame's scene file again for the passes (`cpu_reload_scene_file`), so each frame's lines are its own. `pip-goes-out.film` uses it.
+
 **The kinds of character.** Each walks with its own gait with its feet held where they come down (a turtle's four), blinks on its own, opens its mouth when it speaks (a
 `sample ... by NAME` cue) and has its own poses for gestures; a gesture naming a pose its kind does not have is an error when the film is loaded, and the message lists the
 kind's poses.

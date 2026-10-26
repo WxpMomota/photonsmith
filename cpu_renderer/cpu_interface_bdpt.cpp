@@ -727,6 +727,37 @@ extern "C" int cpu_render_main_aovs(int width, int height, int spp, const char* 
 	}
 }
 
+// The passes into memory (10 planes of width*height floats), for a look made from them in the run that rendered the picture (toon_look.h).
+extern "C" int cpu_render_aov_planes(int width, int height, int spp, const char* scene_id, double cam_x, double cam_y, double cam_z, int force_camera_override, float* out) {
+	try {
+		if (width <= 0 || height <= 0) { std::cerr << ErrorInfo(ERR_INVALID_DIMENSIONS).to_string() << std::endl; return ERR_INVALID_DIMENSIONS; }
+		if (spp <= 0) { std::cerr << ErrorInfo(ERR_INVALID_SAMPLE_COUNT).to_string() << std::endl; return ERR_INVALID_SAMPLE_COUNT; }
+		if (!out) return ERR_OUTPUT_PATH_INVALID;
+		hittable_list world;
+		camera cam;
+		int err = SUCCESS;
+		const SceneDescriptor* scene_desc = build_scene_for_bdpt(scene_id, width, height, cam_x, cam_y, cam_z, force_camera_override, world, cam, err, /*quiet_light_warnings=*/true);
+		if (!scene_desc) return err;
+		cam.initialize();
+		if (cam.image_width != width || cam.image_height != height) return ERR_INVALID_DIMENSIONS;
+		BDPTSceneAdapter adapter(world, cam);
+		std::vector<std::vector<float>> planes;
+		aov_pass::render(adapter, width, height, spp, planes);
+		const size_t count = static_cast<size_t>(width) * static_cast<size_t>(height);
+		for (size_t p = 0; p < planes.size(); ++p) std::copy(planes[p].begin(), planes[p].end(), out + p * count);
+		return SUCCESS;
+	} catch (const std::bad_alloc& e) {
+		std::cerr << "[cpu_interface_bdpt] " << ErrorInfo(ERR_CPU_MEMORY_ALLOCATION).to_string() << " - " << e.what() << std::endl;
+		return ERR_CPU_MEMORY_ALLOCATION;
+	} catch (const std::exception& e) {
+		std::cerr << "[cpu_interface_bdpt] " << ErrorInfo(ERR_CPU_RENDER_FAILED).to_string() << " - " << e.what() << std::endl;
+		return ERR_CPU_RENDER_FAILED;
+	} catch (...) {
+		std::cerr << "[cpu_interface_bdpt] " << ErrorInfo(ERR_UNKNOWN).to_string() << std::endl;
+		return ERR_UNKNOWN;
+	}
+}
+
 // Adds the channels of the EXR `passes_path` (cpu_render_main_aovs) to the EXR `image_path` (R, G, B from a render), writing the result over `image_path`: one
 // multilayer EXR. A channel the image already has (its own "A") is kept. Lives here, with the other tinyexr callers in this library, rather than in the launcher:
 // ray_tracer links two static libraries that each carry a tinyexr implementation, and a direct tinyexr reference from launcher/*.cpp makes both get pulled in
