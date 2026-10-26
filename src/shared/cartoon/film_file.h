@@ -72,6 +72,11 @@
 //     shot 9 Looking up
 //       key ...
 //       subject  kai                                            # what the shot is about (the film doctor's framing checks); a follow shot is about whom it follows
+//     shot 10 Around her
+//       orbit    ann  radius 3  degrees 120  height 1.6        # instead of `key` lines, a move about a character: orbit (round them), crane (rise in front of them:
+//                                                               # from H1 to H2, distance D), push (in towards them: from D1 to D2), track (beside them as they go: side S)
+//       handheld 1                                              # (any shot) a gentle shake, as a hand-held camera
+//       focus    ann  4.5 pip                                   # (any shot) the focus on ann, pulled to pip at 4.5 s (`aperture R`, 0.02 when not given)
 //     shot 12 Talking
 //       auto     pip ann                                        # instead of `key` lines: shots chosen from what happens - a two-shot, over-the-shoulder shots of
 //       side     left                                           # each speaker as they speak - all on one side of the line between the first two (`left`: the first on the left)
@@ -159,6 +164,19 @@ struct Shot {
 	std::vector<std::string> cover;   // (auto) the characters it covers (none named: those who speak in it, or everyone)
 	int side = 0;                     // (auto) 1: the first of them on the left of the frame, -1: on the right, 0: the side their faces look to
 	Transition transition;            // how it comes in (length 0: a cut)
+	// (a move about a character: `orbit`, `crane`, `push`, `track`) and what any shot may add: a hand-held shake, a focus pulled between characters
+	struct Move {
+		enum Kind { None, Orbit, Crane, Push, Track } kind = None;
+		std::string who;
+		double radius = 3.0, height = 1.6, degrees = 90.0, from = 0.0;   // orbit
+		double low = 0.8, high = 4.0, distance = 4.0;                   // crane (low, high: heights; distance in front)
+		double near0 = 5.0, near1 = 2.0;                                // push: from and to (distances)
+		double side = 3.0;                                              // track
+		double fov = 0.0;
+	} move;
+	double handheld = 0.0;
+	std::vector<std::pair<double, std::string>> focus;   // who is in focus from when (the first from the shot's start)
+	double aperture = 0.0;
 };
 
 // A character a film file brings in (`character NAME KIND ...`), its walks (`walk`) and its gestures (`gesture`).
@@ -417,6 +435,10 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 	std::string shotText;   // the key lines of the shot being read
 	auto closeShot = [&]() -> std::string {
 		if (s.shots.empty()) return std::string();
+		if (s.shots.back().move.kind != Shot::Move::None) {
+			if (!shotText.empty() || s.shots.back().following || s.shots.back().coverage) return "the shot \"" + s.shots.back().name + "\" has a move and `key`, `follow` or `auto` lines too";
+			return std::string();
+		}
 		if (s.shots.back().following || s.shots.back().coverage) {
 			if (!shotText.empty()) return "the shot \"" + s.shots.back().name + "\" has both `key` lines and `" + (s.shots.back().following ? "follow" : "auto") + "`";
 			if (s.shots.back().following && s.shots.back().coverage) return "the shot \"" + s.shots.back().name + "\" has both `follow` and `auto`";
@@ -845,6 +867,50 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			s.idle = w[1] == "on";
 		} else if (verb == "fadeout") {
 			if (w.size() != 2 || !number(w[1], s.fadeOut) || s.fadeOut <= 0.0) return fail("`fadeout SECONDS`: the fade to black at the end");
+		} else if (verb == "orbit" || verb == "crane" || verb == "push" || verb == "track" || verb == "handheld" || verb == "focus" || verb == "aperture") {
+			if (s.shots.empty()) return fail("`" + verb + "` belongs to a shot: start one with `shot 0 NAME` first");
+			const std::vector<std::string> t = detail::tokens(line);
+			Shot &shot = s.shots.back();
+			if (verb == "handheld" || verb == "aperture") {
+				double v = verb == "handheld" ? 1.0 : 0.02;
+				if (t.size() > 2 || (t.size() == 2 && (!number(t[1], v) || v < 0.0 || v > (verb == "handheld" ? 4.0 : 0.5)))) return fail(verb == "handheld" ? "`handheld [AMOUNT]` (0 to 4)" : "`aperture RADIUS` (0 to 0.5 m)");
+				(verb == "handheld" ? shot.handheld : shot.aperture) = v;
+				continue;
+			}
+			if (verb == "focus") {
+				if (t.size() < 2 || t.size() % 2 != 0) return fail("`focus WHO [T WHO ...]`: who is in focus, and from when another is");
+				shot.focus.push_back({shot.start, t[1]});
+				for (std::size_t i = 2; i + 1 < t.size(); i += 2) {
+					double at = 0.0;
+					if (!number(t[i], at) || at < shot.focus.back().first) return fail("a focus pull's times go in order");
+					shot.focus.push_back({at, t[i + 1]});
+				}
+				continue;
+			}
+			Shot::Move &mv = shot.move;
+			if (t.size() < 2) return fail("`" + verb + " WHO ...`: whom the camera moves about");
+			mv.kind = verb == "orbit" ? Shot::Move::Orbit : verb == "crane" ? Shot::Move::Crane : verb == "push" ? Shot::Move::Push : Shot::Move::Track;
+			mv.who = t[1];
+			if (mv.kind == Shot::Move::Track) mv.height = 1.5;
+			for (std::size_t i = 2; i < t.size(); i += 2) {
+				double v = 0.0;
+				if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail("\"" + t[i] + "\" takes a number");
+				const std::string &k = t[i];
+				bool ok = true;
+				if (k == "fov") mv.fov = v;
+				else if (mv.kind == Shot::Move::Orbit && k == "radius" && v > 0.0) mv.radius = v;
+				else if ((mv.kind == Shot::Move::Orbit || mv.kind == Shot::Move::Push || mv.kind == Shot::Move::Track) && k == "height") mv.height = v;
+				else if (mv.kind == Shot::Move::Orbit && k == "degrees") mv.degrees = v;
+				else if (mv.kind == Shot::Move::Orbit && k == "from") mv.from = v;
+				else if (mv.kind == Shot::Move::Crane && k == "from") mv.low = v;
+				else if (mv.kind == Shot::Move::Crane && k == "to") mv.high = v;
+				else if (mv.kind == Shot::Move::Crane && k == "distance" && v > 0.0) mv.distance = v;
+				else if (mv.kind == Shot::Move::Push && k == "from" && v > 0.0) mv.near0 = v;
+				else if (mv.kind == Shot::Move::Push && k == "to" && v > 0.0) mv.near1 = v;
+				else if (mv.kind == Shot::Move::Track && k == "side") mv.side = v;
+				else ok = false;
+				if (!ok) return fail("\"" + k + "\": " + (mv.kind == Shot::Move::Orbit ? "an orbit takes radius, height, degrees, from and fov" : mv.kind == Shot::Move::Crane ? "a crane takes from, to, distance and fov" : mv.kind == Shot::Move::Push ? "a push takes from, to, height and fov" : "a track takes side, height and fov"));
+			}
 		} else if (verb == "auto" || verb == "side") {
 			if (s.shots.empty()) return fail("`" + verb + "` belongs to a shot: start one with `shot 0 NAME` first");
 			const std::vector<std::string> t = detail::tokens(line);
@@ -914,7 +980,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			}
 			s.anims.push_back(a);
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, walk, run, jump, sit, gesture, feel, say, look, prop, pick, put, give, place, scatter, sky, ambience, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1184,9 +1250,12 @@ class DataFilm {
 			if (!l.target.empty() && !character(l.target) && !prop(l.target)) return filePath + ":" + std::to_string(l.line) + ": " + l.target + " is neither a character nor a prop";
 		}
 		if (const std::string e = coverShots(); !e.empty()) return filePath + ": " + e;
+		for (Shot &shot : spec.shots)   // (what a move is about, it is about)
+			if (shot.move.kind != Shot::Move::None && std::find(shot.about.begin(), shot.about.end(), shot.move.who) == shot.about.end()) shot.about.push_back(shot.move.who);
 		for (const Shot &shot : spec.shots) {
 			std::vector<std::string> named = shot.about;
 			if (shot.following) named.push_back(shot.follow.who);
+			for (const auto &[at, who] : shot.focus) named.push_back(who);
 			for (const std::string &who : named)
 				if (!character(who)) return filePath + ": the shot \"" + shot.name + "\" names " + who + ", who is not brought in with `character`";
 		}
@@ -1533,6 +1602,7 @@ class DataFilm {
 				g.path.keys = {coverageKey(cast, beats[b].second, side, from), coverageKey(cast, beats[b].second, side, std::max(from, to - 1e-3))};
 				g.path.ease = true;
 				if (b == 0) g.transition = shot.transition;   // (how the auto shot comes in)
+				g.handheld = shot.handheld;
 				if (beats[b].second) g.about.push_back(beats[b].second->name);
 				else
 					for (const Character *c : cast) g.about.push_back(c->name);
@@ -2241,6 +2311,33 @@ class DataFilm {
 		}
 		return out;
 	}
+	// A move's camera at t: about its character, the way along it eased (an orbit at an even pace), in story space and then pbrt's.
+	camera_keyframes::Key moveKey(const Shot &shot, double t, double span) const {
+		const Shot::Move &mv = shot.move;
+		const Character &c = *character(mv.who);
+		Vec3 feet;
+		const CharacterMoment m = momentOf(c, t, &feet);
+		const Vec3 up{0.0, 1.0, 0.0}, front = normalize(transformPoint(m.frame, {0.0, 0.0, 1.0}) - feet), right = cross(front, up);
+		const Vec3 chest = transformPoint(m.frame, characterKinds().at(c.kind).chest * c.scale);
+		const double u = std::min(1.0, std::max(0.0, (t - shot.start) / span)), eased = smoothstep(0.0, 1.0, u);
+		Vec3 eye = chest + front * 3.0;
+		switch (mv.kind) {
+			case Shot::Move::Orbit: {   // round it from `from` degrees off its front, `degrees` over the shot (to its left: positive)
+				const double a = (mv.from + mv.degrees * u) * kPi / 180.0;
+				eye = feet + (front * std::cos(a) + right * -std::sin(a)) * mv.radius + up * mv.height;
+				break;
+			}
+			case Shot::Move::Crane: eye = feet + front * mv.distance + up * (mv.low + (mv.high - mv.low) * eased); break;
+			case Shot::Move::Push: eye = Vec3{chest.x, feet.y + mv.height, chest.z} + front * (mv.near0 + (mv.near1 - mv.near0) * eased); break;
+			case Shot::Move::Track: eye = feet + right * mv.side + up * mv.height; break;
+			default: break;
+		}
+		camera_keyframes::Key key;
+		key.pos[0] = -eye.x, key.pos[1] = eye.y, key.pos[2] = eye.z;
+		key.target[0] = -chest.x, key.target[1] = chest.y, key.target[2] = chest.z;
+		key.fov = mv.fov;
+		return key;
+	}
 	void cameraAt(double t, std::string &lookAt, std::string &camera, int shotIndex = -1) const {
 		std::size_t k = 0;
 		for (std::size_t i = 0; i < spec.shots.size(); ++i)
@@ -2264,8 +2361,35 @@ class DataFilm {
 			key.target[1] = target.y;
 			key.target[2] = target.z;
 			key.fov = shot.follow.fov;
+		} else if (shot.move.kind != Shot::Move::None) {
+			key = moveKey(shot, t, span);
 		} else {
 			key = camera_keyframes::at(shot.path, std::min(1.0, std::max(0.0, (t - shot.start) / span)), span);
+		}
+		if (shot.handheld > 0.0) {   // a hand-held camera: a slow wander of where it is and what it looks at (sums of sines: the same every run)
+			const double a = shot.handheld, p = static_cast<double>(k) * 1.7;
+			const double dx = std::sin(1.31 * t + p) + 0.5 * std::sin(3.07 * t + 2.0 * p), dy = std::sin(1.73 * t + 0.4 * p) + 0.5 * std::sin(2.71 * t + p);
+			const double dz = std::sin(0.97 * t + 3.0 * p), tx = std::sin(1.13 * t + 5.0 * p) + 0.4 * std::sin(4.1 * t + p), ty = std::sin(1.57 * t + 4.0 * p);
+			key.pos[0] += 0.012 * a * dx, key.pos[1] += 0.010 * a * dy, key.pos[2] += 0.008 * a * dz;
+			key.target[0] += 0.03 * a * tx, key.target[1] += 0.025 * a * ty;
+		}
+		if (!shot.focus.empty() || shot.aperture > 0.0) {   // the focus on who the shot says (pulled from one to the next over 0.6 s), or on what the move is about
+			const Vec3 eye{-key.pos[0], key.pos[1], key.pos[2]};
+			const auto distanceTo = [&](const std::string &who) {
+				const Character *c = character(who);
+				return c ? length(bodyPoint(*c, t, characterKinds().at(c->kind).head) - eye) : 0.0;
+			};
+			double d = 0.0;
+			if (!shot.focus.empty()) {
+				d = distanceTo(shot.focus.front().second);
+				for (std::size_t f = 1; f < shot.focus.size(); ++f) d += (distanceTo(shot.focus[f].second) - d) * smoothstep(shot.focus[f].first, shot.focus[f].first + 0.6, t);
+			} else if (!shot.move.who.empty()) {
+				d = distanceTo(shot.move.who);
+			}
+			if (d > 0.0) {
+				key.lensRadius = shot.aperture > 0.0 ? shot.aperture : 0.02;
+				key.focus = d;
+			}
 		}
 		lookAt = "LookAt " + num(key.pos[0]) + " " + num(key.pos[1]) + " " + num(key.pos[2]) + "  " + num(key.target[0]) + " " + num(key.target[1]) + " " + num(key.target[2]) + "  0 1 0\n";
 		// the scene's own field of view and lens unless the keys give theirs

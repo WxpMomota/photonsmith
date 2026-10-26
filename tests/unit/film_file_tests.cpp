@@ -1211,3 +1211,69 @@ TEST(FilmLipSync, ARecordingsVowelsGiveTheMouthItsShapes) {
 		EXPECT_EQ(ahFrames.back().open, 0.0) << "silent at the end: shut";
 	}
 }
+
+// ---- camera moves ----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// An orbit goes round its character, a crane rises in front of it, a push comes in towards it, a track keeps beside it as it walks; a hand-held camera wanders a little; a focus
+// pull moves the focus from one character to another.
+TEST(FilmCamera, OrbitCranePushTrackHandheldAndAFocusPull) {
+	(void)cartoon::films();
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 20\ncharacter ann person at 0 0 0 facing 0\ncharacter pip pip at 1.5 0 3\nwalk ann 15 1.0  0 6\n"
+					   "shot 0 Round\n  orbit ann radius 3 degrees 90\n"
+					   "shot 4 Up\n  crane ann from 1 to 4 distance 4\n"
+					   "shot 8 In\n  push ann from 6 to 2\n  focus ann 10 pip\n  aperture 0.05\n"
+					   "shot 12 Shaky\n  key 0 1.5 6  0 1 0\n  handheld 2\n"
+					   "shot 15 Along\n  track ann side 3\n",
+					   film),
+			  "");
+	const auto cam = [&](double t, cartoon::Vec3 &eye, cartoon::Vec3 &target) {
+		double fov = 0;
+		film_subjects::cameraOf(film.headerAt(t), eye, target, fov);
+	};
+	cartoon::Vec3 e0, e1, tg;
+	// the orbit: 3 m out from her, a quarter of the way round over the shot
+	cam(0.0, e0, tg);
+	cam(3.999, e1, tg);
+	EXPECT_NEAR(std::hypot(e0.x, e0.z), 3.0, 1e-6);
+	EXPECT_NEAR(std::hypot(e1.x, e1.z), 3.0, 1e-3);
+	const double turned = std::acos(std::clamp((e0.x * e1.x + e0.z * e1.z) / 9.0, -1.0, 1.0)) * 180.0 / 3.14159265358979;
+	EXPECT_NEAR(turned, 90.0, 1.0);
+	// the crane: from 1 m up to 4
+	cam(4.0, e0, tg);
+	cam(7.999, e1, tg);
+	EXPECT_NEAR(e0.y, 1.0, 1e-6);
+	EXPECT_NEAR(e1.y, 4.0, 1e-3);
+	// the push: from 6 m to 2
+	cam(8.0, e0, tg);
+	cam(11.999, e1, tg);
+	EXPECT_NEAR(std::hypot(e0.x, e0.z), 6.0, 0.2);
+	EXPECT_NEAR(std::hypot(e1.x, e1.z), 2.0, 0.2);
+	// the focus pull: on ann, then on pip
+	const auto focusAt = [&](double t) {
+		const std::string h = film.headerAt(t);
+		const std::size_t at = h.find("focaldistance");
+		return at == std::string::npos ? -1.0 : std::stod(h.substr(h.find('[', at) + 1));
+	};
+	cartoon::Vec3 eye, target;
+	cam(9.0, eye, target);
+	EXPECT_NEAR(focusAt(9.0), cartoon::length(film.bodyPoint(*film.character("ann"), 9.0, ff::characterKinds().at("person").head) - eye), 1e-3);
+	cam(11.0, eye, target);
+	EXPECT_NEAR(focusAt(11.0), cartoon::length(film.bodyPoint(*film.character("pip"), 11.0, ff::characterKinds().at("pip").head) - eye), 1e-3);
+	// hand-held: near where its key puts it, not quite still
+	cam(13.0, e0, tg);
+	cam(13.5, e1, tg);
+	EXPECT_LT(std::abs(e0.x) + std::abs(e0.y - 1.5) + std::abs(e0.z - 6.0), 0.15);
+	EXPECT_GT(cartoon::length(e0 - e1), 1e-4);
+	// the track: 3 m to her side all along her walk
+	for (double t : {15.5, 17.0, 19.0}) {
+		cartoon::Vec3 feet;
+		film.momentOf(*film.character("ann"), t, &feet);
+		cam(t, e0, tg);
+		EXPECT_NEAR(std::hypot(e0.x - feet.x, e0.z - feet.z), 3.0, 1e-6);
+		EXPECT_NEAR(e0.z, feet.z, 1e-6) << "level with her";
+	}
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter ann person\nshot 0 A\n  orbit ann\n  key 0 1 0 0 1 4\n", bad).find("has a move and"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 10\ncharacter ann person\nshot 0 A\n  orbit ann side 3\n", bad).find("an orbit takes"), std::string::npos);
+}

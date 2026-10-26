@@ -599,6 +599,26 @@ Walks are found in time order, so a walker goes round whoever stands where an ea
 ("ann cannot find a way to 0 0: something is in the way there"), and so do two characters whose walks run into each other (closer than 80% of their sizes while one of them
 walks; the sizes on the floor: Pip 0.5 m, the person 0.25 m, the explorer 0.3 m, the turtle 7 cm, times their scale).
 
+**Camera moves: `orbit`, `crane`, `push`, `track`, `handheld`, `focus`.** A shot's camera can move about a character instead of following keys:
+
+```
+shot 0 Round
+  orbit  ann  radius 3.5  degrees 120  height 1.5  from 0   # round her, 120 degrees over the shot from her front (to her left), 1.5 m up
+shot 4 Up
+  crane  ann  from 0.6  to 3.5  distance 4                # in front of her, 4 m out, rising from 0.6 m to 3.5 m
+shot 8 In
+  push   ann  from 5  to 1.8  height 1.55                 # in towards her, from 5 m to 1.8 m
+  focus  ann  10 pip                                      # (any shot) in focus: ann, then pip from 10 s (pulled over 0.6 s)
+  aperture 0.06                                           # its lens (0.02 when a focus is given without it)
+shot 12 Along
+  track  ann  side 3  height 1.5                          # beside her as she walks, 3 m to her right (negative: her left), level with her
+  handheld 1                                              # (any shot) a gentle wander of where the camera is and what it looks at
+```
+
+Each move looks at the character's chest and works from where the character is at every moment, so it holds on a character that walks; a crane and a push ease in and out,
+an orbit goes at an even pace. A move's character is what the shot is about (the doctor's framing checks). `handheld` (0 to 4) adds a slow, fixed wander - centimetres - to
+any shot, an `auto` shot's included; `focus` pulls the focus between characters at the times given.
+
 **Automatic coverage: `auto`.** A shot can leave its cameras to the film:
 
 ```
