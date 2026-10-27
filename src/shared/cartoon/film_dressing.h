@@ -160,7 +160,13 @@ inline double hourAt(const Sky &s, double t, double length) { return s.from + (s
 // The sun (a distant light) and the sky (an infinite light: film_sky.h's picture, made once for each quarter degree of the sun, in the film's cache folder) at t, as scene
 // text. Round sunset a glow round the sun and a warm afterglow along the horizon under it, the pink belt opposite; below the horizon the sun goes out and the sky dims into
 // twilight, then night: the Milky Way and the stars, turning about the celestial pole as the hours go by. `rainbow` (0 to 1) paints a rainbow opposite the sun.
-inline std::string skyText(const std::string &film, const Sky &s, double t, double length, double rainbow = 0.0) {
+// `storm` (0 .. 1, film_file.h `storm`; `stormKind` rain, snow or sand): the sky darkens under a deck of cloud (a dust storm's turns ochre), the sun dims behind it, rain shafts
+// hang under it round the horizon, and the deck drifts (the sky's picture turned a little with the time).
+struct SkyStorm {
+	double level = 0.0;
+	std::string kind = "rain";
+};
+inline std::string skyText(const std::string &film, const Sky &s, double t, double length, double rainbow = 0.0, const SkyStorm &storm = SkyStorm()) {
 	double el = 0.0, facing = 0.0;
 	const double hour = hourAt(s, t, length);
 	sunAt(s, hour, el, facing);
@@ -180,6 +186,8 @@ inline std::string skyText(const std::string &film, const Sky &s, double t, doub
 		sun.colour.r = L.r / sun.irradiance, sun.colour.g = L.g / sun.irradiance, sun.colour.b = L.b / sun.irradiance;
 		if (!(L.luminance() > 1e-6)) sun.irradiance = 0.0;
 	}
+	const double stormy = std::round(std::clamp(storm.level, 0.0, 1.0) * 20.0) / 20.0;   // (in twentieths: a sky picture for each)
+	sun.irradiance *= 1.0 - (storm.kind == "sand" ? 0.85 : 0.97) * std::min(1.0, stormy / 0.6);   // (behind the deck: hidden once it has closed)
 	const double twilight = std::max(0.02, smoothstep(-7.0, 0.5, el)), sunUp = s.physical ? (sun.irradiance > 0.0 ? 1.0 : 0.0) : smoothstep(-0.4, 1.2, el);
 	std::string path, error;
 	char buf[400];
@@ -204,6 +212,19 @@ inline std::string skyText(const std::string &film, const Sky &s, double t, doub
 	fs.afterglow = std::round(0.45 * low * 20.0) / 20.0;
 	fs.belt = std::round(0.3 * smoothstep(-6.0, -1.0, el) * (1.0 - smoothstep(1.0, 6.0, el)) * 20.0) / 20.0;
 	fs.rainbow = std::round(std::max(0.0, std::min(1.0, rainbow)) * 20.0) / 20.0;
+	if (stormy > 0.0) {   // the storm's deck of cloud, dark beneath, over all but a little of the sky; the sky under it dim and grey (ochre in a dust storm)
+		film_sky::Clouds deck;
+		deck.altitude = 1400.0, deck.scaleAlong = 7000.0, deck.scaleAcross = 3500.0, deck.coverage = std::min(0.97, 0.4 + 0.6 * stormy), deck.softness = 0.22;
+		deck.lit = storm.kind == "sand" ? Vec3{0.55, 0.42, 0.28} : Vec3{0.42, 0.44, 0.47};
+		deck.shade = storm.kind == "sand" ? Vec3{0.3, 0.2, 0.11} : Vec3{0.17, 0.18, 0.2};
+		deck.silver = 0.3, deck.opacity = 0.97, deck.seed = 29;
+		fs.clouds.push_back(deck);
+		fs.brightness *= 1.0 - 0.5 * stormy;
+		fs.tint = lerp(Vec3{1.0, 1.0, 1.0}, storm.kind == "sand" ? Vec3{1.0, 0.72, 0.42} : Vec3{0.85, 0.9, 1.0}, stormy);
+		fs.glow *= 1.0 - stormy, fs.afterglow *= 1.0 - stormy, fs.belt *= 1.0 - stormy;
+		if (storm.kind == "rain") fs.shafts = stormy;
+		else fs.shafts = 0.0;
+	}
 	if (s.physical) {   // (the glow round the sun, the afterglow and the belt of Venus are the atmosphere's own)
 		fs.physical = true;
 		fs.altitude = s.altitude;
@@ -214,6 +235,10 @@ inline std::string skyText(const std::string &film, const Sky &s, double t, doub
 	const Vec3 pole{std::sin(nf) * std::cos(lat), std::sin(lat), std::cos(nf) * std::cos(lat)};
 	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Rotate %.4f %.5f %.5f %.5f\n", -15.0 * (hour - s.from) * fs.night, pole.x, pole.y, pole.z);
 	out += buf;
+	if (stormy > 0.0) {   // (the deck drifting: the sky turned a fifth of a degree a second)
+		std::snprintf(buf, sizeof buf, "  Rotate %.4f 0 1 0\n", 0.2 * t);
+		out += buf;
+	}
 	out += "  LightSource \"infinite\" \"string filename\" [ \"" + film_sky::file(film, fs) + "\" ]\nAttributeEnd\n";
 	return out;
 }

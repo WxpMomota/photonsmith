@@ -1044,3 +1044,68 @@ TEST(FilmPlants, ForestsTurnAndGrowAndMeadowsOpenWithSunflowersFollowingTheSun) 
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }
+
+namespace particles = cartoon::particles;
+
+// A storm builds up and dies away: the sky darkens and the sun dims behind its deck, rain shafts hang round the horizon, its rain is blown slanting by its wind, the ground
+// gets wet, lightning comes, the wind is heard, a murk of rain closes round the camera; a blizzard streams snow, a dust storm carries dust and turns the sky ochre.
+TEST(FilmStorm, AStormDarkensTheSkyBlowsItsRainAndBringsLightning) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("storm", "scene s.pbrt\nlength 40\nterrain hills size 300 height 10 seed 2 far off\nsky 15:00 15:30\nstorm rain strength 0.8 from 2 to 36 wind 90 speed 15\nshot 0 A\n key 0 3 20  0 2 0\n", film), "");
+	const auto &st = film.spec.storm;
+	ASSERT_TRUE(st.on);
+	EXPECT_EQ(st.levelAt(1.0), 0.0);
+	EXPECT_NEAR(st.levelAt(20.0), 0.8, 1e-9);
+	EXPECT_EQ(st.levelAt(37.0), 0.0);
+	const auto rain = std::find_if(film.spec.weather.begin(), film.spec.weather.end(), [](const auto &w) { return w.kind == "rain"; });
+	ASSERT_NE(rain, film.spec.weather.end());
+	EXPECT_NEAR(rain->windX, 15.0, 1e-9);
+	EXPECT_GT(film.spec.gusts.strength, 0.0);
+	ASSERT_FALSE(film.spec.wetness.empty());
+	ASSERT_FALSE(film.spec.lightnings.empty());
+	EXPECT_GT(film.spec.lightnings[0].strikes.size(), 3u);
+	EXPECT_TRUE(std::any_of(film.spec.ambience.begin(), film.spec.ambience.end(), [](const auto &a) { return a.kind == "wind"; }));
+	const auto sunIrradiance = [](const std::string &scene) {
+		const std::size_t at = scene.find("LightSource \"distant\"");
+		if (at == std::string::npos) return 0.0;
+		std::istringstream in(scene.substr(scene.find("\"rgb L\" [ ", at) + 10, 80));
+		double r = 0.0, g = 0.0, b = 0.0;
+		in >> r >> g >> b;
+		return r + g + b;
+	};
+	const std::string calm = film.sceneAt(0.5), wild = film.sceneAt(20.0);
+	EXPECT_LT(sunIrradiance(wild), 0.2 * sunIrradiance(calm)) << "the sun behind the deck";
+	EXPECT_EQ(calm.find("MakeNamedMedium \"storm\""), std::string::npos);
+	EXPECT_NE(wild.find("MakeNamedMedium \"storm\""), std::string::npos) << "the murk of rain round the camera";
+	EXPECT_NE(wild.find("Rotate"), std::string::npos);
+	// the rain slants downwind
+	particles::Weather w = *rain;
+	const std::string streaks = particles::weatherText(w, 5.0, {0.0, 2.0, 0.0}, 1.0 / 48.0);
+	EXPECT_FALSE(streaks.empty());
+	// the sky's picture with rain shafts round the horizon is another picture, and darker in places low down
+	cartoon::film_sky::Spec plain;
+	plain.width = 256;
+	plain.sunElevation = 30.0;
+	cartoon::film_sky::Spec shafts = plain;
+	shafts.shafts = 1.0;
+	EXPECT_NE(cartoon::film_sky::fileName(plain), cartoon::film_sky::fileName(shafts));
+	const std::vector<float> a = cartoon::film_sky::render(plain), b = cartoon::film_sky::render(shafts);
+	double darker = 0.0;
+	for (std::size_t i = 0; i < a.size(); ++i) darker = std::max(darker, static_cast<double>(a[i] - b[i]));
+	EXPECT_GT(darker, 0.02);
+	// a dust storm: dust carried on the wind, an ochre sky, no lightning
+	ff::DataFilm dusty;
+	ASSERT_EQ(loadNature("storm_sand", "scene s.pbrt\nlength 20\nterrain dunes size 400 height 10 seed 2 far off\nstorm sand from 0 to 18 wind 0 speed 18\nshot 0 A\n key 0 3 20  0 2 0\n", dusty), "");
+	EXPECT_TRUE(dusty.spec.lightnings.empty());
+	EXPECT_TRUE(dusty.spec.hasSky) << "a storm brings a sky to darken";
+	const auto dust = std::find_if(dusty.spec.weather.begin(), dusty.spec.weather.end(), [](const auto &x) { return x.kind == "dust"; });
+	ASSERT_NE(dust, dusty.spec.weather.end());
+	EXPECT_NE(particles::weatherText(*dust, 9.0, {0.0, 2.0, 0.0}, 1.0 / 48.0).find("0.55 0.42 0.27"), std::string::npos);
+	for (const auto &[text, says] : std::vector<std::pair<std::string, std::string>>{{"storm hail", "storm [rain|snow|sand]"},
+																						  {"storm strength 2", "a storm takes"},
+																						  {"storm from 5 to 3", "`to` is after its `from`"}}) {
+		ff::DataFilm bad;
+		const std::string problem = loadNature("storm_bad", "scene s.pbrt\nlength 4\n" + text + "\n", bad);
+		EXPECT_NE(problem.find(says), std::string::npos) << text << " -> " << problem;
+	}
+}

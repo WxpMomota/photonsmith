@@ -61,6 +61,8 @@ struct Spec {
 	Vec3 afterglowColour = {1.0, 0.42, 0.16};
 	double belt = 0.0;               // the pink band opposite the sun at twilight (the belt of Venus)
 	double rainbow = 0.0;            // a rainbow round the point opposite the sun (0 none .. 1 a bright one): the primary bow at 42 degrees, the secondary at 51
+	double shafts = 0.0;             // a storm's rain shafts (0 none .. 1): grey curtains hanging from the cloud base to the horizon here and there round the sky
+	Vec3 shaftColour = {0.30, 0.32, 0.36};   // (their colour against a bright sky: dust for a dust storm)
 	std::vector<Clouds> clouds;
 	int width = 4096;                // the picture is width x width/2
 	bool physical = false;           // the clear sky from atmosphere.h (turbidity as its haze; the glow, afterglow and belt then come from it, not painted)
@@ -185,6 +187,10 @@ inline std::string fileName(const Spec &s) {
 		std::snprintf(b, sizeof b, "|p%.1f", s.altitude);
 		key += b;
 	}
+	if (s.shafts > 0.0) {
+		std::snprintf(b, sizeof b, "|s%.3f %.3f %.3f %.3f", s.shafts, s.shaftColour.x, s.shaftColour.y, s.shaftColour.z);
+		key += b;
+	}
 	if (s.rainbow > 0.0) {
 		std::snprintf(b, sizeof b, "|r%.3f", s.rainbow);
 		key += b;
@@ -271,6 +277,13 @@ inline std::vector<float> render(const Spec &s) {
 				if (q > -0.2 && q < 1.2) c = c + hue(clamp01(1.0 - q)) * (s.rainbow * bright * 0.35 * smoothstep(-0.2, 0.1, q) * (1.0 - smoothstep(0.9, 1.2, q)));
 				if (ang < 40.4) c = c * (1.0 + 0.25 * s.rainbow * std::exp(-(40.4 - ang) / 6.0));            // (brighter inside the bow)
 				if (ang > 42.8 && ang < 50.4) c = c * (1.0 - 0.15 * s.rainbow);                            // (Alexander's dark band between them)
+			}
+			if (s.shafts > 0.0 && elevDeg > -2.0 && elevDeg < 14.0) {   // rain shafts: curtains in bands round the horizon, streaked down, thinning towards the cloud base
+				const double az = std::atan2(w.x, -w.z);
+				const double band = smoothstep(0.52, 0.7, nature::fbm2(az * 2.2 + 3.0, 0.5, 611)) * (0.6 + 0.4 * nature::noise2(az * 40.0, elevDeg * 0.08, 613));
+				const double reach = 1.0 - smoothstep(4.0 + 6.0 * nature::noise2(az * 3.0, 1.5, 617), 14.0, elevDeg);
+				const double a = s.shafts * band * reach;
+				if (a > 0.0) c = lerp(c, s.shaftColour * (0.5 + 0.8 * detail::luminance(c)), (std::min)(0.85, a));
 			}
 			c = detail::mulc(c, s.tint);
 			// clouds, nearest layer last

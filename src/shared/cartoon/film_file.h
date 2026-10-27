@@ -129,6 +129,8 @@
 //     gusts    1.5  wind 90                                     # sweep across the grass and trees; `mist DENSITY [radius R]`: a mist round the camera
 //     fog      0.04  top 30  thickness 4  lift 10 20             # fog lying in the valleys (height_fog.h): dense below the height `top` (pbrt's y; a quarter of the land's
 //                                                               # height by default), thinning over `thickness`; lifting from 10 s to 20 s, it thins away and sinks
+//     storm    rain  strength 0.8  from 4 to 40  wind 120       # a storm building up and dying away: the sky darkening under a deck of cloud, rain shafts, its rain
+//                                                               # (snow: a blizzard; sand: a dust storm) blown by its wind (`speed V`), gusts, wet ground, lightning
 //     air      strength 3  haze 1.5                             # the air between the camera and the far land (aerial perspective): the atmosphere's blue and haze,
 //                                                               # thinning with height, out to `radius` (4.5 times the terrain's size); `sky ... physical [altitude A]`
 //                                                               # makes the sky and the sun's light from the atmosphere itself (atmosphere.h), as the eye A m up sees it
@@ -526,6 +528,18 @@ struct Spec {
 		double strength = 1.0, haze = -1.0, radius = 0.0;   // (haze below 0: the sky's; radius 0: four and a half times the terrain's size, or 8 km)
 	} air;
 	nature::Mist mist;
+	// a storm (`storm`): rain, snow (a blizzard) or sand (a dust storm), building up from t0 to its strength and dying away to t1 (film seconds), blown by a wind of `speed`
+	// m/s from `wind` (a facing)
+	struct Storm {
+		bool on = false;
+		std::string kind = "rain";
+		double strength = 1.0, t0 = 0.0, t1 = 1e30, wind = 90.0, speed = 12.0;
+		double build() const { return t1 < 1e29 ? std::clamp((t1 - t0) / 3.0, 2.0, 8.0) : 6.0; }
+		double levelAt(double t) const {   // 0 .. strength
+			if (!on) return 0.0;
+			return strength * smoothstep(t0, t0 + build(), t) * (t1 < 1e29 ? 1.0 - smoothstep(t1 - build(), t1, t) : 1.0);
+		}
+	} storm;
 	// under the sea (`underwater`, `kelp`, `coral`)
 	bool hasUnderwater = false;
 	underwater::Water underwater;
@@ -1450,7 +1464,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			const std::vector<std::string> t = detail::tokens(line);
 			particles::Weather wt;
 			if (t.size() < 2 || std::find(particles::weatherKinds().begin(), particles::weatherKinds().end(), t[1]) == particles::weatherKinds().end())
-				return fail("`weather KIND [AMOUNT] [from T] [to T] [ground Y]`: rain, snow or leaves");
+				return fail("`weather KIND [AMOUNT] [from T] [to T] [ground Y]`: rain, snow, leaves or dust");
 			wt.kind = t[1];
 			std::size_t i = 2;
 			if (i < t.size() && number(t[i], wt.amount)) ++i;
@@ -1720,6 +1734,22 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				else return fail("\"" + t[i] + "\": surf takes period (3 to 25 s) and toward (which way it runs, degrees as a facing)");
 			}
 			s.swell.on = true;
+		} else if (verb == "storm") {   // a storm building up and dying away: its sky, its wind, its rain, snow or dust, its lightning
+			const std::vector<std::string> t = detail::tokens(line);
+			std::size_t i = 1;
+			if (i < t.size() && (t[i] == "rain" || t[i] == "snow" || t[i] == "sand")) s.storm.kind = t[i++];
+			for (; i < t.size(); i += 2) {
+				double v = 0.0;
+				if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail("`storm [rain|snow|sand] [strength S] [from T] [to T] [wind D] [speed V]`: \"" + t[i] + "\" needs a number");
+				if (t[i] == "strength" && v > 0.0 && v <= 1.0) s.storm.strength = v;
+				else if (t[i] == "from" && v >= 0.0) s.storm.t0 = v;
+				else if (t[i] == "to") s.storm.t1 = v;
+				else if (t[i] == "wind") s.storm.wind = v;
+				else if (t[i] == "speed" && v >= 0.0 && v <= 40.0) s.storm.speed = v;
+				else return fail("\"" + t[i] + "\": a storm takes rain, snow or sand, strength (0 to 1), from T, to T, wind (a facing) and speed (0 to 40 m/s)");
+			}
+			if (s.storm.t1 <= s.storm.t0) return fail("a storm's `to` is after its `from`");
+			s.storm.on = true;
 		} else if (verb == "air") {   // the air between the camera and the far land (aerial perspective)
 			const std::vector<std::string> t = detail::tokens(line);
 			for (std::size_t i = 1; i < t.size(); i += 2) {
@@ -1974,7 +2004,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, surf, flowers, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -2123,6 +2153,33 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			return fail("`surf` breaks on a shore: the film needs a `water sea` line and a `terrain` for it to break on");
 		}
 		if (!s.swell.towardSet) s.swell.toward = s.seas[0].wind;
+	}
+	if (s.storm.on) {   // a storm brings what it is made of, unless the film says otherwise: a sky to darken, its weather blown by its wind, gusts, wet or snowy ground,
+						// lightning in a rainstorm, the wind heard
+		Spec::Storm &st = s.storm;
+		if (!s.hasSky) s.hasSky = true, s.sky.from = s.sky.to = 15.0;
+		const double a = st.wind * kPi / 180.0;
+		const std::string kind = st.kind == "sand" ? "dust" : st.kind;
+		if (std::none_of(s.weather.begin(), s.weather.end(), [&](const particles::Weather &w) { return w.kind == kind; })) {
+			particles::Weather w;
+			w.kind = kind, w.amount = std::min(4.0, (st.kind == "rain" ? 2.5 : st.kind == "snow" ? 3.0 : 2.0) * st.strength), w.t0 = st.t0, w.t1 = st.t1, w.onLand = true;
+			w.windX = std::sin(a) * st.speed, w.windZ = std::cos(a) * st.speed;
+			s.weather.push_back(w);
+		}
+		if (s.gusts.strength <= 0.0) s.gusts.strength = std::min(5.0, 0.3 + 0.2 * st.speed * st.strength), s.gusts.dx = -std::sin(a), s.gusts.dz = std::cos(a);
+		std::vector<Spec::Ramp> &ground = st.kind == "snow" ? s.snowcover : s.wetness;
+		if (st.kind != "sand" && ground.empty()) {
+			Spec::Ramp r;
+			r.amount = std::min(1.0, 0.9 * st.strength), r.t0 = st.t0 + 0.5 * st.build(), r.t1 = st.t0 + 3.0 * st.build();
+			ground.push_back(r);
+		}
+		if (st.kind == "rain" && s.lightnings.empty()) {
+			skyfx::Lightning l;
+			l.t0 = st.t0 + st.build(), l.t1 = std::min(st.t1, s.length);
+			l.count = std::max(2, static_cast<int>(std::lround(st.strength * (l.t1 - l.t0) / 4.0)));
+			if (l.t1 > l.t0) s.lightnings.push_back(l);
+		}
+		if (std::none_of(s.ambience.begin(), s.ambience.end(), [](const dressing::Ambience &am) { return am.kind == "wind"; })) s.ambience.push_back({"wind", 0.5 + 0.5 * st.strength});
 	}
 	if (s.air.on) {   // (one medium round the camera)
 		if (s.hasMist || s.fog.on || s.hasUnderwater) {
@@ -3851,6 +3908,26 @@ class DataFilm {
 				out = out.substr(0, camera) + medium + out.substr(camera);
 			}
 		}
+		if (spec.storm.on && !spec.air.on && !spec.fog.on && !spec.hasMist && !spec.hasUnderwater) {   // the storm's murk round the camera: a layer of rain, snow or dust
+			const double level = spec.storm.levelAt(t);
+			const std::size_t camera = out.find("Camera \"");
+			if (level > 0.01 && camera != std::string::npos) {
+				Vec3 eye, target;
+				double fov = 40.0;
+				film_subjects::cameraOf(header, eye, target, fov);
+				const std::shared_ptr<const terrain::Field> land = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+				const double ground = land ? land->heightAt(-eye.x, eye.z) : 0.0;
+				const double d = level * (spec.storm.kind == "rain" ? 0.006 : spec.storm.kind == "snow" ? 0.035 : 0.05);
+				const Vec3 tint = spec.storm.kind == "sand" ? Vec3{1.0, 0.74, 0.46} : Vec3{0.95, 0.97, 1.0};
+				const double absorb = spec.storm.kind == "sand" ? 0.25 * d : 0.02 * d;
+				char medium[480];
+				std::snprintf(medium, sizeof medium,
+							  "MakeNamedMedium \"storm\" \"string type\" [ \"heightfog\" ] \"rgb sigma_a\" [ %.6f %.6f %.6f ] \"rgb sigma_s\" [ %.6f %.6f %.6f ] \"float g\" [ 0.5 ] "
+							  "\"float top\" [ %.3f ] \"float thickness\" [ 25 ] \"float radius\" [ 400 ]\nMediumInterface \"\" \"storm\"\n",
+							  absorb, absorb, absorb * 1.2, d * tint.x, d * tint.y, d * tint.z, ground + 120.0);
+				out = out.substr(0, camera) + medium + out.substr(camera);
+			}
+		}
 		if (spec.air.on) {   // the air: the camera's own medium, the atmosphere's scattering thinning with height (height_fog.h's layer far above its "top": an exponential)
 			const std::size_t camera = out.find("Camera \"");
 			if (camera != std::string::npos) out = out.substr(0, camera) + airMedium() + out.substr(camera);
@@ -3867,7 +3944,9 @@ class DataFilm {
 		if (spec.hasSky) {
 			double rainbow = 0.0;   // (eased in and out over two seconds)
 			for (const Spec::Rainbow &r : spec.rainbows) rainbow = std::max(rainbow, r.strength * smoothstep(r.t0, r.t0 + 2.0, t) * (1.0 - smoothstep(r.t1 - 2.0, r.t1, t)));
-			out += "# the sun and sky at " + std::to_string(dressing::hourAt(spec.sky, t, spec.storyEnd)) + " h (film_dressing.h)\n" + dressing::skyText(spec.key, spec.sky, t, spec.storyEnd, rainbow);
+			dressing::SkyStorm storm;
+			storm.level = spec.storm.levelAt(t), storm.kind = spec.storm.kind;
+			out += "# the sun and sky at " + std::to_string(dressing::hourAt(spec.sky, t, spec.storyEnd)) + " h (film_dressing.h)\n" + dressing::skyText(spec.key, spec.sky, t, spec.storyEnd, rainbow, storm);
 		}
 		out += dressingAt(t);
 		if (!spec.weather.empty() || !spec.emitters.empty()) {   // weather round the camera, and particles (film_particles.h)
@@ -3878,6 +3957,11 @@ class DataFilm {
 			const std::shared_ptr<const terrain::Field> land = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 			for (particles::Weather w : spec.weather) {
 				if (w.onLand && land) w.ground = land->heightAt(at.x, at.z);
+				if (w.windX != 0.0 || w.windZ != 0.0) {   // (a storm's: as heavy as the storm is now, its wind gusting)
+					const double level = spec.storm.on ? spec.storm.levelAt(t) / spec.storm.strength : 1.0, gust = 0.7 + 0.6 * nature::noise2(t * 0.35, 0.5, 733);
+					w.amount *= level, w.windX *= gust, w.windZ *= gust;
+					if (!(w.amount > 0.01)) continue;
+				}
 				out += particles::weatherText(w, t, at, spec.shutter / std::max(1, spec.fps));
 			}
 			for (const particles::Emitter &e : spec.emitters) out += particles::emitterText(e, t);

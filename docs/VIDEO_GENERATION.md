@@ -779,7 +779,7 @@ own (crickets, birds and wind as in Forest Dawn and the Nomai film; a brook of r
 **Weather and particles: `weather`, `particles`, `burst`.** (film_particles.h)
 
 ```
-weather   rain 0.8 from 4 to 14            # rain, snow or leaves; amount 1 a good shower (up to 4); eased in and out over 1.5 s; `ground Y`
+weather   rain 0.8 from 4 to 14            # rain, snow, leaves or dust; amount 1 a good shower (up to 4); eased in and out over 1.5 s; `ground Y`
 particles sparks at 1 0.9 -2  3 5  rate 80 # sparks, dust or a splash thrown from a place from 3 s to 5 s, 80 a second (`speed S`)
 burst     splash at 0 0 -1  6.2  count 60  # all at once
 ```
@@ -1058,6 +1058,23 @@ high, white at its front and in the turbulent water behind it, keeping the water
 are left on the surf zone and drift along the shore; spray blows off the breaking crests near the camera; and water less than 2.5 m deep is clear (glass, eta 1.33) over sand
 netted with moving caustics. It needs a `water sea` and a `terrain` (`coast` is made for it, but any land with a shore will do). The surf is part of the sea's mesh, so it
 is drawn by every renderer.
+
+**Storms: `storm`.** (film_file.h, film_dressing.h, film_particles.h)
+
+```
+storm  rain  strength 0.9  from 2 to 30  wind 120  speed 14   # a rainstorm rolling in and passing over
+storm  snow  strength 1  from 0 to 60  speed 18               # a blizzard
+storm  sand  from 5 to 40  wind 270  speed 20                 # a dust storm
+```
+
+A storm builds up from `from` to its `strength` (over a third of its time, two to eight seconds) and dies away by `to`, and brings what it is made of unless the film says
+otherwise: the sky darkens and greys under a deck of cloud that closes over it (a dust storm's turns ochre) and drifts across (the sky's picture turned a fifth of a degree
+a second); the sun dims behind it and is hidden once it has closed; in a rainstorm grey rain shafts hang under the deck round the horizon (painted into the sky's picture,
+so every renderer draws them). Its rain, snow or dust (`weather`, as heavy as the storm is at each moment) is blown by its wind - `speed` metres a second from `wind` (a
+facing), gusting - so rain slants and drifts downwind, snow streams (a blizzard) and dust is carried along low over the ground in streaks; none is drawn within 1.5 m of the
+lens. Gusts sweep the grass and trees; a rainstorm wets the ground and brings lightning and thunder, a blizzard lays snow; the wind is heard. And the air round the camera
+thickens with it - a murk of rain, a white-out of snow, a wall of dust - a `"heightfog"` medium 120 m deep over the land, out to 400 m (so it goes with clouds, but not with
+`fog`, `air`, `mist` or `underwater`, any of which it leaves alone). A film without a `sky` line gets one (3 pm) for the storm to darken.
 
 **Fog in the valleys: `fog`.** (src/shared/height_fog.h)
 
