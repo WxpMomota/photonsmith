@@ -58,8 +58,8 @@ void MainWindow::onRenderClicked() {
 	// thumbnail queue cleanly (already-generated thumbnails stay cached, and
 	// re-clicking "Generate Thumbnails" later just picks up where it left
 	// off), rather than letting two ray_tracer.exe processes run at once.
-	if (m_thumbnailGenerator && m_thumbnailGenerator->isRunning()) {
-		m_thumbnailGenerator->stop();
+	if (m_thumbnails.generator && m_thumbnails.generator->isRunning()) {
+		m_thumbnails.generator->stop();
 		onLogMessage("Paused background thumbnail generation to start this render.");
 	}
 
@@ -387,7 +387,7 @@ void MainWindow::startRenderJob(const RenderJob &job) {
 	// Start elapsed timer. Its 1 Hz tick doubles as the ETA sampling clock,
 	// which is the same cadence HandBrake samples at.
 	m_renderStartTime = QDateTime::currentDateTime();
-	resetProgressSamples();
+	m_progressEta.reset();
 	setProgressResultState("");
 	// Indeterminate until the first real progress line: scene loading and
 	// BVH/pipeline build report nothing, and a bar pinned at 0% reads as

@@ -71,6 +71,8 @@
 #include "mainwindow_widgets.h"
 #include "mainwindow_jobtypes.h"
 #include "expanding_tabs.h"   // ExpandingTabBar / ExpandingTabWidget
+#include "progress_eta.h"     // the status line's time remaining
+#include "thumbnail_batch.h"  // a "Generate Thumbnails" run's state
 
 // Forward-declared rather than #include "scene_metadata_client.h" here -
 // only used below as an optional pointer parameter type, so callers of
@@ -238,7 +240,7 @@ private slots:
 	void onDiagnosticsFailed(const QString &message);
 	void onGenerateThumbnailsClicked();
 	void onThumbnailReady(const QString &sceneId, bool success, const QString &outputPath);
-	// Fired before each scene starts - drives m_thumbnailProgressBar's
+	// Fired before each scene starts - drives m_thumbnails.progressBar's
 	// value/text (see ThumbnailGenerator::progress()'s own comment for why
 	// `completed`/`total` already exclude scenes that were skipped for
 	// having a cached thumbnail).
@@ -249,7 +251,7 @@ private slots:
 	// never drift out of sync with what the process is actually doing.
 	void onThumbnailPauseClicked();
 	// Mirrors onControllerPauseStateChanged()'s own bookkeeping trick for
-	// m_thumbnailBatchStartTime: shifts the elapsed-time origin forward by
+	// m_thumbnails.startTime: shifts the elapsed-time origin forward by
 	// however long the pause lasted, so onThumbnailsAllDone()'s plain
 	// wall-clock formula keeps reading correctly without a separate
 	// paused-time accumulator.
@@ -264,7 +266,7 @@ private slots:
 	// (mainwindow_tabs.cpp) and from onThumbnailsAllDone() - the latter so
 	// finishing a generation started on one view doesn't wrongly re-enable
 	// the button if the user switched to an empty one while it was still
-	// running. A no-op while m_thumbnailGenerator->isRunning(): that state's
+	// running. A no-op while m_thumbnails.generator->isRunning(): that state's
 	// own disable (onGenerateThumbnailsClicked()) must not be fought by a
 	// tab switch mid-generation.
 	void updateGenerateThumbnailsButtonState();
@@ -1543,44 +1545,8 @@ private:
 	QStackedWidget *m_sceneViewStack = nullptr;   // page 0 = m_sceneCombo, page 1 = m_sceneGrid
 	QPushButton *m_sceneViewToggle = nullptr;     // checked = grid page showing (a push button, so it has the common control height)
 	QPushButton *m_generateThumbnailsButton = nullptr;
-	// Hidden until the first "Generate Thumbnails" click, then shows live
-	// progress ("Generating 3 of 12: Bouncing Spheres") via its own format
-	// string (not the default "%p%") - see onThumbnailProgress(). Hidden
-	// again once onThumbnailsAllDone() fires. Deliberately its own widget
-	// rather than reusing m_progressBar (the real-render progress bar) -
-	// see ThumbnailGenerator's own class comment for why the two must never
-	// share chrome.
-	QProgressBar *m_thumbnailProgressBar = nullptr;
-	// Same show/hide lifecycle as m_thumbnailProgressBar - visible only
-	// while a batch is running (onGenerateThumbnailsClicked()/
-	// onThumbnailsAllDone()). Stop mirrors the real render's Stop button;
-	// Pause toggles its own label between "Pause"/"Resume" the same way
-	// m_pauseButton does, driven by onThumbnailPauseStateChanged() rather
-	// than a locally tracked bool.
-	QPushButton *m_thumbnailPauseButton = nullptr;
-	QPushButton *m_thumbnailStopButton = nullptr;
-	// Counts successes/failures across one "Generate Thumbnails" run, reset
-	// at the start of onGenerateThumbnailsClicked() - onThumbnailsAllDone()
-	// folds both into its finish summary (log line + status message).
-	int m_thumbnailSucceededCount = 0;
-	int m_thumbnailFailedCount = 0;
-	// Wall-clock start of one "Generate Thumbnails" run, set right before
-	// ThumbnailGenerator::start() - onThumbnailsAllDone() logs the elapsed
-	// time in its finish summary so a slow run (e.g. every scene falling
-	// back to a software rasterizer) is visible without timestamp-
-	// subtracting the log by hand. A QDateTime rather than a QElapsedTimer
-	// so onThumbnailPauseStateChanged() can shift its origin forward by
-	// however long a pause lasted, the same trick RenderController uses for
-	// the totalTime it reports on a single render's completion - otherwise
-	// a batch paused over lunch would report a multi-hour "elapsed" for
-	// what was actually a few minutes of real work.
-	QDateTime m_thumbnailBatchStartTime;
-	// Valid only while paused - see onThumbnailPauseStateChanged().
-	QDateTime m_thumbnailPauseStartedAt;
-	// Lazily created (and reused across multiple "Generate Thumbnails"
-	// clicks) by onGenerateThumbnailsClicked() the first time it's needed -
-	// see that slot's own comment.
-	ThumbnailGenerator *m_thumbnailGenerator = nullptr;
+	// A "Generate Thumbnails" run: its progress bar and buttons, its counts, its clock and its generator (thumbnail_batch.h)
+	ThumbnailBatch m_thumbnails;
 
 	// Rebuilds m_sceneCategoryTabs' tab set for the given availability filter
 	// (true = only scenes with sceneRequiresFiles()==true, false = only
@@ -1965,37 +1931,8 @@ private:
 	// onElapsedTick()'s status-label ticker correct across a pause/resume.
 	QDateTime m_pauseStartedAt;
 
-	// ------------------------------------------------------------------
-	// Progress sampling for the time-remaining estimate
-	// ------------------------------------------------------------------
-	// Modelled on HandBrake's UpdateState() (libhb/sync.c), which is the
-	// most carefully-built ETA of the render/encode tools surveyed. Two
-	// separate rates are derived from the same samples:
-	//
-	//   * an INSTANTANEOUS rate over the short sliding window, which is
-	//     responsive enough to be worth showing, but far too noisy to
-	//     divide by; and
-	//   * a CUMULATIVE rate over the whole render, whose sensitivity to
-	//     new noise keeps shrinking, so the ETA drifts smoothly instead
-	//     of oscillating every tick.
-	//
-	// The ETA uses the cumulative rate for exactly that reason. Nothing is
-	// shown at all until kEtaWarmupMs has passed - an early estimate from
-	// two samples is worse than admitting we don't know yet, so the label
-	// reads "--:--" rather than a wild (or zero) guess.
-	struct ProgressSample {
-		qint64 elapsedMs = 0;
-		int percent = 0;
-	};
-	static constexpr int kProgressSamples = 4;     // ring depth (~3s window at 1Hz)
-	static constexpr qint64 kEtaWarmupMs = 4000;   // no estimate before this
-	ProgressSample m_progressRing[kProgressSamples];
-	int m_progressRingCount = 0;        // how many slots are actually filled
-
-	void resetProgressSamples();
-	// Appends a sample and returns the formatted "elapsed / ETA" status
-	// text for the current tick.
-	QString formatProgressStatus(qint64 elapsedMs, int percent);
+	// The status line's elapsed time, rate and time remaining, from the progress samples of the last few seconds (progress_eta.h: how the estimate is made)
+	ProgressEta m_progressEta;
 	// Paints the progress bar green on success / red on failure, matching
 	// Qt Creator's ProgressBarColorFinished / ProgressBarColorError.
 	void setProgressResultState(const char *state);

@@ -230,66 +230,6 @@ void MainWindow::onRenderComplete(bool success, const QString &message, double t
 	}
 }
 
-namespace {
-
-// H:MM:SS once past an hour, else M:SS. Always at least M:SS so the field
-// width stays stable and the status line doesn't jitter as digits change -
-// the same reason HandBrake's status string uses fixed-width specifiers.
-QString formatDuration(qint64 seconds) {
-	if (seconds < 0) return QStringLiteral("--:--");
-	const qint64 h = seconds / 3600;
-	const qint64 m = (seconds % 3600) / 60;
-	const qint64 s = seconds % 60;
-	if (h > 0)
-		return QString("%1:%2:%3").arg(h).arg(m, 2, 10, QChar('0')).arg(s, 2, 10, QChar('0'));
-	return QString("%1:%2").arg(m).arg(s, 2, 10, QChar('0'));
-}
-
-} // namespace
-
-void MainWindow::resetProgressSamples() {
-	m_progressRingCount = 0;
-	for (ProgressSample &sample : m_progressRing)
-		sample = ProgressSample{};
-}
-
-QString MainWindow::formatProgressStatus(qint64 elapsedMs, int percent) {
-	// Append this tick's sample, shifting the ring when it's full.
-	if (m_progressRingCount < kProgressSamples) {
-		m_progressRing[m_progressRingCount++] = ProgressSample{elapsedMs, percent};
-	} else {
-		for (int i = 0; i < kProgressSamples - 1; ++i)
-			m_progressRing[i] = m_progressRing[i + 1];
-		m_progressRing[kProgressSamples - 1] = ProgressSample{elapsedMs, percent};
-	}
-
-	QString text = tr("Rendering  ·  %1%  ·  elapsed %2")
-		.arg(percent, 3)
-		.arg(formatDuration(elapsedMs / 1000));
-
-	// Instantaneous rate across the ring - shown, never divided by.
-	const ProgressSample &oldest = m_progressRing[0];
-	const qint64 windowMs = elapsedMs - oldest.elapsedMs;
-	if (m_progressRingCount == kProgressSamples && windowMs > 0) {
-		const double pctPerSec = 1000.0 * (percent - oldest.percent) / windowMs;
-		if (pctPerSec > 0.0)
-			text += tr("  ·  %1 %/s").arg(pctPerSec, 0, 'f', 1);
-	}
-
-	// ETA from the cumulative rate, suppressed during warm-up.
-	if (elapsedMs >= kEtaWarmupMs && percent > 0 && percent < 100) {
-		const double pctPerMs = double(percent) / double(elapsedMs);
-		if (pctPerMs > 0.0) {
-			const qint64 remainingMs = qint64((100.0 - percent) / pctPerMs);
-			text += tr("  ·  ETA %1").arg(formatDuration(remainingMs / 1000));
-		}
-	} else if (percent < 100) {
-		text += tr("  ·  ETA --:--");
-	}
-
-	return text;
-}
-
 void MainWindow::notifyRenderFinished(bool success, const QString &message, double totalTime) {
 	const bool stoppedByUser = message.contains("stopped by user", Qt::CaseInsensitive);
 
@@ -425,7 +365,7 @@ void MainWindow::clearStatusWarning() {
 void MainWindow::onElapsedTick() {
 	if (!m_isRendering) return;
 	const qint64 elapsedMs = m_renderStartTime.msecsTo(QDateTime::currentDateTime());
-	m_statusLabel->setText(formatProgressStatus(elapsedMs, m_progressBar->value()));
+	m_statusLabel->setText(m_progressEta.status(elapsedMs, m_progressBar->value()));
 	if (m_framesStrip && m_framesStrip->isVisible()) {
 		m_framesStrip->refresh();
 		m_framesStripLabel->setText(tr("Frames rendered so far: %1 (double-click one to open it)").arg(m_framesStrip->pictures()));

@@ -281,6 +281,7 @@ add_executable(unit_tests
     unit/uploaded_scene_tests.cpp
     unit/lens_look_tests.cpp
     unit/film_file_tests.cpp
+    unit/film_story_tests.cpp
     unit/film_nature_tests.cpp
     unit/film_whole_tests.cpp
     unit/toon_look_tests.cpp
@@ -340,6 +341,7 @@ endif()
 add_executable(cpu_integrator_tests
     unit/cpu_integrator_agreement_tests.cpp
     unit/cartoon_tests.cpp   # calls cpu_scene_pbrt_path_by_id, which cpu_interface.cpp (below) defines
+    unit/cartoon_craft_tests.cpp   # (split from cartoon_tests.cpp, beside it: the same libraries)
     unit/pbrt_reference_pack_tests.cpp
     unit/bump_footprint_cpu_tests.cpp
     unit/scene_text_tests.cpp

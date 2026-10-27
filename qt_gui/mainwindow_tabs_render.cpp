@@ -130,7 +130,7 @@ void MainWindow::createSceneBuilderTab() {
 	// What else has the GPU, for the Scene Builder to say before it starts a GPU render of its own (the queue, for its part, waits for the Scene Builder: processQueueIfIdle).
 	m_sceneBuilder->setGpuBusyCheck([this]() -> QString {
 		if (m_isRendering && m_currentJob.useGPU) return tr("a render in the Render tab");
-		if (m_thumbnailGenerator && m_thumbnailGenerator->isRunning()) return tr("making the scene list's pictures");
+		if (m_thumbnails.generator && m_thumbnails.generator->isRunning()) return tr("making the scene list's pictures");
 		if (m_gpuWarmup && m_gpuWarmup->running()) return tr("preparing the GPU renderer (the first start after an update)");
 		return QString();
 	});

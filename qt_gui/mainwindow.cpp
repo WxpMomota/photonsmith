@@ -1248,8 +1248,8 @@ MainWindow::~MainWindow() {
 	// render path got this; both were left to Qt's own QProcess destructor
 	// (which does forcibly kill a still-running child, but via a blocking
 	// wait and a logged warning rather than this app's own quieter path).
-	if (m_thumbnailGenerator && m_thumbnailGenerator->isRunning()) {
-		m_thumbnailGenerator->stop();
+	if (m_thumbnails.generator && m_thumbnails.generator->isRunning()) {
+		m_thumbnails.generator->stop();
 	}
 	if (m_diagnosticsRunner && m_diagnosticsRunner->isRunning()) {
 		m_diagnosticsRunner->stop();

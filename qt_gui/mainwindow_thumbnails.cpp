@@ -85,7 +85,7 @@ QStringList MainWindow::eligibleThumbnailIds(const QString &category) const {
 // actually on screen stay placeholders, was the surprising part. Disabled
 // (see createSettingsTab()'s button tooltip) while a real render is in
 // flight so thumbnail generation can never compete with the user's own
-// queued work - m_thumbnailGenerator owns a private RenderController instead
+// queued work - m_thumbnails.generator owns a private RenderController instead
 // of reusing m_renderController/m_renderQueue precisely so it never needs to
 // cooperate with those at all, only avoid running alongside them.
 void MainWindow::onGenerateThumbnailsClicked() {
@@ -93,7 +93,7 @@ void MainWindow::onGenerateThumbnailsClicked() {
 		setStatusWarning(tr("Can't generate thumbnails while a render is in progress or queued."));
 		return;
 	}
-	if (m_thumbnailGenerator && m_thumbnailGenerator->isRunning()) return;
+	if (m_thumbnails.generator && m_thumbnails.generator->isRunning()) return;
 
 	const QString currentCategory = (m_sceneCategoryTabs && m_sceneCategoryTabs->count() > 0)
 		? m_sceneCategoryTabs->tabData(m_sceneCategoryTabs->currentIndex()).toString() : QString();
@@ -103,82 +103,82 @@ void MainWindow::onGenerateThumbnailsClicked() {
 		return;
 	}
 
-	if (!m_thumbnailGenerator) {
-		m_thumbnailGenerator = new ThumbnailGenerator(this);
-		connect(m_thumbnailGenerator, &ThumbnailGenerator::thumbnailReady,
+	if (!m_thumbnails.generator) {
+		m_thumbnails.generator = new ThumbnailGenerator(this);
+		connect(m_thumbnails.generator, &ThumbnailGenerator::thumbnailReady,
 				this, &MainWindow::onThumbnailReady);
-		connect(m_thumbnailGenerator, &ThumbnailGenerator::progress,
+		connect(m_thumbnails.generator, &ThumbnailGenerator::progress,
 				this, &MainWindow::onThumbnailProgress);
 		// Forwards this generator's own private RenderController's log
 		// lines (see ThumbnailGenerator::logMessage()'s own comment) into
 		// the same Log Output tab a user-requested render uses - without
 		// this, a failed thumbnail gave no way to tell WHY.
-		connect(m_thumbnailGenerator, &ThumbnailGenerator::logMessage,
+		connect(m_thumbnails.generator, &ThumbnailGenerator::logMessage,
 				this, &MainWindow::onLogMessage);
-		connect(m_thumbnailGenerator, &ThumbnailGenerator::pauseStateChanged,
+		connect(m_thumbnails.generator, &ThumbnailGenerator::pauseStateChanged,
 				this, &MainWindow::onThumbnailPauseStateChanged);
-		connect(m_thumbnailGenerator, &ThumbnailGenerator::allDone,
+		connect(m_thumbnails.generator, &ThumbnailGenerator::allDone,
 				this, &MainWindow::onThumbnailsAllDone);
 	}
 
 	if (m_generateThumbnailsButton) m_generateThumbnailsButton->setEnabled(false);
-	if (m_thumbnailPauseButton) {
-		m_thumbnailPauseButton->setText(tr("Pause"));
-		m_thumbnailPauseButton->setVisible(true);
+	if (m_thumbnails.pauseButton) {
+		m_thumbnails.pauseButton->setText(tr("Pause"));
+		m_thumbnails.pauseButton->setVisible(true);
 	}
-	if (m_thumbnailStopButton) m_thumbnailStopButton->setVisible(true);
-	m_thumbnailSucceededCount = 0;
-	m_thumbnailFailedCount = 0;
-	m_thumbnailBatchStartTime = QDateTime::currentDateTime();
+	if (m_thumbnails.stopButton) m_thumbnails.stopButton->setVisible(true);
+	m_thumbnails.succeeded = 0;
+	m_thumbnails.failed = 0;
+	m_thumbnails.startTime = QDateTime::currentDateTime();
 	onLogMessage(QString("Generating thumbnails for up to %1 scene(s) in \"%2\"...")
 		.arg(ids.size()).arg(currentCategory));
-	m_thumbnailGenerator->start(ids, [this](const QString &id) { return thumbnailCachePath(id); });
+	m_thumbnails.generator->start(ids, [this](const QString &id) { return thumbnailCachePath(id); });
 }
 
 void MainWindow::onThumbnailStopClicked() {
-	if (!m_thumbnailGenerator) return;
+	if (!m_thumbnails.generator) return;
 	// Resume first if paused - stop() itself works fine on a suspended
 	// process (RenderController::stopRender()'s own comment), but skipping
 	// this would leave onThumbnailPauseStateChanged()'s elapsed-time shift
 	// never applied for this final pause segment, over-counting it as
 	// elapsed work time in onThumbnailsAllDone()'s summary.
-	if (m_thumbnailGenerator->isPaused()) m_thumbnailGenerator->resume();
+	if (m_thumbnails.generator->isPaused()) m_thumbnails.generator->resume();
 	// onThumbnailsAllDone() (connected to ThumbnailGenerator::allDone) does
 	// the actual UI teardown once the killed process's renderComplete
 	// signal actually arrives - same async shape as the real render's own
 	// onStopClicked()/RenderController::stopRender().
-	m_thumbnailGenerator->stop();
+	m_thumbnails.generator->stop();
 }
 
 void MainWindow::onThumbnailPauseClicked() {
-	if (!m_thumbnailGenerator || !m_thumbnailGenerator->isRunning()) return;
-	if (m_thumbnailGenerator->isPaused()) {
-		m_thumbnailGenerator->resume();
+	if (!m_thumbnails.generator || !m_thumbnails.generator->isRunning()) return;
+	if (m_thumbnails.generator->isPaused()) {
+		m_thumbnails.generator->resume();
 	} else {
-		m_thumbnailGenerator->pause();
+		m_thumbnails.generator->pause();
 	}
 	// onThumbnailPauseStateChanged() (connected above) flips the button's
 	// own label once ThumbnailGenerator confirms the change.
 }
 
 void MainWindow::onThumbnailPauseStateChanged(bool paused) {
-	if (m_thumbnailPauseButton) m_thumbnailPauseButton->setText(paused ? tr("Resume") : tr("Pause"));
+	if (m_thumbnails.pauseButton) m_thumbnails.pauseButton->setText(paused ? tr("Resume") : tr("Pause"));
 	if (paused) {
-		m_thumbnailPauseStartedAt = QDateTime::currentDateTime();
-	} else if (m_thumbnailPauseStartedAt.isValid()) {
-		m_thumbnailBatchStartTime = m_thumbnailBatchStartTime.addMSecs(
-			m_thumbnailPauseStartedAt.msecsTo(QDateTime::currentDateTime()));
-		m_thumbnailPauseStartedAt = QDateTime();
+		m_thumbnails.pauseStartedAt = QDateTime::currentDateTime();
+	} else if (m_thumbnails.pauseStartedAt.isValid()) {
+		m_thumbnails.startTime = m_thumbnails.startTime.addMSecs(
+			m_thumbnails.pauseStartedAt.msecsTo(QDateTime::currentDateTime()));
+		m_thumbnails.pauseStartedAt = QDateTime();
 	}
 }
 
 void MainWindow::onThumbnailReady(const QString &sceneId, bool success, const QString &outputPath) {
 	if (!success) {
-		++m_thumbnailFailedCount;
+		++m_thumbnails.failed;
 		onLogMessage(QString("Thumbnail generation failed for scene %1").arg(sceneId));
 		return;
 	}
-	++m_thumbnailSucceededCount;
+	++m_thumbnails.succeeded;
 	if (!m_sceneGrid) return;
 	bool matched = false;
 	for (int i = 0; i < m_sceneGrid->count(); ++i) {
@@ -203,12 +203,12 @@ void MainWindow::onThumbnailProgress(int completed, int total, const QString &sc
 	// only place that sequence survives to be scrolled back through.
 	onLogMessage(QString("[Thumbnail] (%1/%2) Rendering %3 (%4)...")
 		.arg(completed + 1).arg(total).arg(SceneMetadataClient::sceneName(sceneId), sceneId));
-	if (!m_thumbnailProgressBar) return;
-	m_thumbnailProgressBar->setRange(0, total);
-	m_thumbnailProgressBar->setValue(completed);
-	m_thumbnailProgressBar->setFormat(tr("Generating thumbnail %1 of %2: %3")
+	if (!m_thumbnails.progressBar) return;
+	m_thumbnails.progressBar->setRange(0, total);
+	m_thumbnails.progressBar->setValue(completed);
+	m_thumbnails.progressBar->setFormat(tr("Generating thumbnail %1 of %2: %3")
 		.arg(completed + 1).arg(total).arg(SceneMetadataClient::sceneName(sceneId)));
-	m_thumbnailProgressBar->setVisible(true);
+	m_thumbnails.progressBar->setVisible(true);
 }
 
 void MainWindow::onThumbnailsAllDone() {
@@ -218,19 +218,19 @@ void MainWindow::onThumbnailsAllDone() {
 	// against whatever category is CURRENTLY showing avoids leaving the
 	// button wrongly enabled there.
 	updateGenerateThumbnailsButtonState();
-	if (m_thumbnailProgressBar) m_thumbnailProgressBar->setVisible(false);
-	if (m_thumbnailPauseButton) m_thumbnailPauseButton->setVisible(false);
-	if (m_thumbnailStopButton) m_thumbnailStopButton->setVisible(false);
-	// m_thumbnailBatchStartTime's origin was shifted forward by however long
+	if (m_thumbnails.progressBar) m_thumbnails.progressBar->setVisible(false);
+	if (m_thumbnails.pauseButton) m_thumbnails.pauseButton->setVisible(false);
+	if (m_thumbnails.stopButton) m_thumbnails.stopButton->setVisible(false);
+	// m_thumbnails.startTime's origin was shifted forward by however long
 	// any pause lasted (onThumbnailPauseStateChanged()), so this plain
 	// wall-clock diff already excludes paused time - same trick
 	// RenderController uses for a single render's own totalTime.
-	const double elapsedSec = m_thumbnailBatchStartTime.msecsTo(QDateTime::currentDateTime()) / 1000.0;
+	const double elapsedSec = m_thumbnails.startTime.msecsTo(QDateTime::currentDateTime()) / 1000.0;
 	onLogMessage(QString("Thumbnail generation finished: %1 succeeded, %2 failed, %3s elapsed.")
-		.arg(m_thumbnailSucceededCount).arg(m_thumbnailFailedCount)
+		.arg(m_thumbnails.succeeded).arg(m_thumbnails.failed)
 		.arg(elapsedSec, 0, 'f', 1));
-	statusBar()->showMessage(m_thumbnailFailedCount > 0
-		? tr("Thumbnail generation finished - %1 failed.").arg(m_thumbnailFailedCount)
+	statusBar()->showMessage(m_thumbnails.failed > 0
+		? tr("Thumbnail generation finished - %1 failed.").arg(m_thumbnails.failed)
 		: tr("Thumbnail generation finished."), 5000);
 }
 
@@ -239,7 +239,7 @@ void MainWindow::updateGenerateThumbnailsButtonState() {
 	// A tab switch mid-generation must not fight onGenerateThumbnailsClicked()'s
 	// own disable - the button stays disabled until allDone() (which calls
 	// this function itself, see its own comment) re-evaluates for real.
-	if (m_thumbnailGenerator && m_thumbnailGenerator->isRunning()) return;
+	if (m_thumbnails.generator && m_thumbnails.generator->isRunning()) return;
 
 	const QString currentCategory = (m_sceneCategoryTabs && m_sceneCategoryTabs->count() > 0)
 		? m_sceneCategoryTabs->tabData(m_sceneCategoryTabs->currentIndex()).toString() : QString();

@@ -148,11 +148,17 @@
     <ClCompile Include="unit\cartoon_tests.cpp">
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
+    <ClCompile Include="unit\cartoon_craft_tests.cpp">
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="unit\cartoon_films_tests.cpp" />
     <ClCompile Include="unit\cartoon_pip_tests.cpp" />
     <ClCompile Include="unit\uploaded_scene_tests.cpp" />
     <ClCompile Include="unit\lens_look_tests.cpp" />
     <ClCompile Include="unit\film_file_tests.cpp">
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <ClCompile Include="unit\film_story_tests.cpp">
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ClCompile Include="unit\film_nature_tests.cpp">

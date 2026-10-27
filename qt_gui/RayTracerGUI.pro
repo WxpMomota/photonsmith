@@ -154,6 +154,8 @@ HEADERS += \
 	film_info.h \
 	scene_bucket.h \
 	frames_strip.h \
+	progress_eta.h \
+	thumbnail_batch.h \
 	asset_downloader.h \
 	scene_packs.h \
 	realtime_preview_session.h \

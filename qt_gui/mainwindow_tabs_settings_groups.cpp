@@ -125,25 +125,25 @@ QWidget *MainWindow::buildSceneGridPage(QWidget *basicTab) {
 	gridPageLayout->addWidget(m_generateThumbnailsButton);
 	// Hidden until generation actually starts (onGenerateThumbnailsClicked())
 	// and hidden again once it finishes (onThumbnailsAllDone()) - see
-	// m_thumbnailProgressBar's own comment (mainwindow.h).
-	m_thumbnailProgressBar = new QProgressBar(gridPage);
-	m_thumbnailProgressBar->setTextVisible(true);
-	m_thumbnailProgressBar->setVisible(false);
-	gridPageLayout->addWidget(m_thumbnailProgressBar);
-	// Same show/hide lifecycle as m_thumbnailProgressBar just above - visible
+	// m_thumbnails.progressBar's own comment (mainwindow.h).
+	m_thumbnails.progressBar = new QProgressBar(gridPage);
+	m_thumbnails.progressBar->setTextVisible(true);
+	m_thumbnails.progressBar->setVisible(false);
+	gridPageLayout->addWidget(m_thumbnails.progressBar);
+	// Same show/hide lifecycle as m_thumbnails.progressBar just above - visible
 	// only while a batch is actually running, right below its own progress
 	// bar rather than reusing the real render's Stop/Pause row (which drives
 	// m_renderController/m_renderQueue, a completely separate job).
 	QHBoxLayout *thumbnailControlsRow = new QHBoxLayout();
-	m_thumbnailPauseButton = new QPushButton(tr("Pause"), gridPage);
-	m_thumbnailPauseButton->setVisible(false);
-	thumbnailControlsRow->addWidget(m_thumbnailPauseButton);
-	m_thumbnailStopButton = new QPushButton(tr("Stop"), gridPage);
-	m_thumbnailStopButton->setVisible(false);
-	thumbnailControlsRow->addWidget(m_thumbnailStopButton);
+	m_thumbnails.pauseButton = new QPushButton(tr("Pause"), gridPage);
+	m_thumbnails.pauseButton->setVisible(false);
+	thumbnailControlsRow->addWidget(m_thumbnails.pauseButton);
+	m_thumbnails.stopButton = new QPushButton(tr("Stop"), gridPage);
+	m_thumbnails.stopButton->setVisible(false);
+	thumbnailControlsRow->addWidget(m_thumbnails.stopButton);
 	gridPageLayout->addLayout(thumbnailControlsRow);
-	connect(m_thumbnailPauseButton, &QPushButton::clicked, this, &MainWindow::onThumbnailPauseClicked);
-	connect(m_thumbnailStopButton, &QPushButton::clicked, this, &MainWindow::onThumbnailStopClicked);
+	connect(m_thumbnails.pauseButton, &QPushButton::clicked, this, &MainWindow::onThumbnailPauseClicked);
+	connect(m_thumbnails.stopButton, &QPushButton::clicked, this, &MainWindow::onThumbnailStopClicked);
 	return gridPage;
 }
 

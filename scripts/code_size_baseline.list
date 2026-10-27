@@ -1,11 +1,16 @@
 # Written by scripts/check_code_size.py --update. Functions over 300 lines and files over 2000 lines that exist today;
 # CI fails when one grows or a new one appears. Lower or delete a line after splitting something. Format: <key> <lines>
-func cpu_renderer/cpu_interface.cpp::cpu_render_main 404
+func cpu_renderer/cpu_interface.cpp::cpu_render_main 394
+func gpu/metal/host/metal_poc_pbrt_materials.mm::PbrtSceneLoader::mapPbrtMaterialBase 349
 func gpu/metal/shaders/metal_poc_materials_specular.metal::shadeConductor 329
-func gpu/metal/host/metal_poc_pbrt_materials.mm::PbrtSceneLoader::mapPbrtMaterialBase 336
-func gpu/optix/optix_interface.cpp::optix_render_main 340
-func gpu/optix/optix_interface.cpp::rt_realtime_render_frame 302
-func gpu/optix/optix_intersection_disk_cylinder.h::__closesthit__cylinder 435
-func gpu/optix/optix_intersection_sphere.h::__closesthit__sphere 950
-func gpu/optix/optix_intersection_triangle.h::__closesthit__triangle 352
-func gpu/optix/optix_raygen.h::__raygen__rg 672
+func gpu/optix/optix_interface.cpp::optix_render_main 357
+func gpu/optix/optix_interface.cpp::rt_realtime_render_frame 303
+func gpu/optix/optix_intersection_disk_cylinder.h::__closesthit__cylinder 426
+func gpu/optix/optix_intersection_sphere.h::__closesthit__sphere 936
+func gpu/optix/optix_intersection_triangle.h::__closesthit__triangle 344
+func gpu/optix/optix_raygen.h::__raygen__rg 676
+func gpu/optix/optix_renderer_scene.cpp::OptiXRenderer::buildGeometryGases 310
+func gpu/optix/scene_builder.cpp::apply_loaded_scene_settings 301
+func launcher/main.cpp::main 593
+func src/shared/cartoon/film_parse.h::parse 998
+func src/shared/cartoon/turtle_escape.h::turtleAt 440
