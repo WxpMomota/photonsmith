@@ -83,7 +83,7 @@ struct Spec {
 		}
 		for (const Cone &c : cones) {
 			char w[96];
-			std::snprintf(w, sizeof w, "|v%.2f %.2f %.2f %.2f", c.x, c.z, c.height, c.radius);
+			std::snprintf(w, sizeof w, "|w%.2f %.2f %.2f %.2f", c.x, c.z, c.height, c.radius);
 			all += w;
 		}
 		for (const Step &st : steps) {
@@ -305,6 +305,27 @@ struct Field {
 	bool inside(double px, double pz) const { return std::abs(px - spec.x) <= spec.size / 2 && std::abs(pz - spec.z) <= spec.size / 2; }
 };
 
+// A volcano's cone at d (its distance out as a share of its radius) in the direction `ang` (radians, round its middle): concave flanks steepening to the top, ridged (noise
+// sampled round a circle, so it has no seam), cut by gullies running down it, and a crater whose rim is ragged and lower on one side (where its lava spills).
+// How much of a gully a volcano's flank is at d, `ang` (0 on its ridges, 1 down a gully's middle): forty or so running down it, wandering a little as they go.
+inline double coneGully(double d, double ang, int seed) {
+	const double wander = 1.0 + 0.15 * d, ca = std::cos(ang), sa = std::sin(ang);
+	const double g = std::abs(2.0 * nature::noise2(9.0 + 5.5 * ca * wander, 9.0 + 5.5 * sa * wander, seed + 73) - 1.0);
+	return std::exp(-(g / 0.38) * (g / 0.38));
+}
+inline double coneHeight(const Spec::Cone &c, double d, double ang, int seed) {
+	const double ca = std::cos(ang), sa = std::sin(ang);
+	const double ridge = 1.0 + 0.08 * (nature::noise2(3.0 + 2.5 * ca, 3.0 + 2.5 * sa + 3.0 * d, seed + 71) - 0.5);
+	const double gully = coneGully(d, ang, seed) * smoothstep(0.12, 0.3, d) * (1.0 - smoothstep(0.65, 0.95, d));
+	const double lumps = nature::noise2(20.0 * ca * d + 5.0, 20.0 * sa * d + 5.0, seed + 75) - 0.5;   // (old flows and spatter on the flanks)
+	const double cone = c.height * (std::pow(1.0 - d, 1.6) * ridge - 0.06 * gully + 0.012 * lumps * d);
+	const double notch = smoothstep(0.75, 1.0, std::cos(ang - 2.0 * kPi * hash01(seed, 77)));   // (the low side of the rim)
+	const double crater = 0.11 * (1.0 + 0.3 * (nature::noise2(4.0 + 1.5 * ca, 4.0 + 1.5 * sa, seed + 79) - 0.5)), rim = c.height * (std::pow(1.0 - crater, 1.6) * ridge - 0.04 * notch);
+	if (d < crater) return rim - c.height * 0.14 * (1.0 - d / crater) * (1.0 - d / crater);
+	const double nearRim = 1.0 - smoothstep(crater, crater + 0.12, d);
+	return cone - c.height * (0.04 * notch - 0.006 * (nature::noise2(30.0 * ca, 30.0 * sa, seed + 81) - 0.5)) * nearRim;   // (the notch runs down from the rim; the rim is jagged)
+}
+
 inline std::shared_ptr<const Field> make(const Spec &s) {
 	auto f = std::make_shared<Field>();
 	f->spec = s;
@@ -356,17 +377,13 @@ inline std::shared_ptr<const Field> make(const Spec &s) {
 				}
 		}
 	}
-	for (const Spec::Cone &c : s.cones)   // a volcano: its cone, steeper towards the top, ridged by noise, a crater in its top
+	for (const Spec::Cone &c : s.cones)   // a volcano: its cone, steeper towards the top, gullied, a ragged crater in its top
 		for (int j = 0; j < n; ++j)
 			for (int i = 0; i < n; ++i) {
 				const double dx = f->x0 + i * f->cell - c.x, dz = f->z0 + j * f->cell - c.z, d = std::hypot(dx, dz) / c.radius;
 				if (d >= 1.0) continue;
-				const double ridge = 1.0 + 0.08 * (nature::noise2(std::atan2(dz, dx) * 4.0, d * 3.0, s.seed + 71) - 0.5);
-				double cone = c.height * std::pow(1.0 - d, 1.6) * ridge;
-				const double crater = 0.1;   // (the crater: a bowl in the top tenth of the radius)
-				if (d < crater) cone = c.height * std::pow(1.0 - crater, 1.6) - c.height * 0.12 * (1.0 - d / crater) * (1.0 - d / crater);
 				float &v = h[static_cast<std::size_t>(j) * n + i];
-				v = static_cast<float>(std::max(static_cast<double>(v), cone));
+				v = static_cast<float>(std::max(static_cast<double>(v), coneHeight(c, d, std::atan2(dz, dx), s.seed)));
 			}
 	for (const Spec::Step &st : s.steps) {   // a waterfall's cliff: the plateau behind its lip, the basin before it
 		const double a = st.facing * kPi / 180.0, ox = std::sin(a), oz = std::cos(a);
@@ -495,6 +512,19 @@ inline Vec3 colourAt(const Field &f, double px, double pz) {
 	const double h = f.heightAt(px, pz), frac = (h - s.y) / std::max(1.0, s.height);
 	const Vec3 n = f.normalAt(px, pz, std::max(1.5, f.cell * 0.6));   // (the slope a few metres across: the fine detail does not speckle it with rock)
 	Vec3 c = paint(s, px, pz, frac, 1.0 - n.y, f.flowAt(px, pz));
+	for (const Spec::Cone &k : s.cones) {   // a volcano: dark ash and old lava, streaked down its flanks, rusty scoria near the top, snow on its upper slopes but for the ribs
+		const double dx = px - k.x, dz = pz - k.z, d = std::hypot(dx, dz) / k.radius;   // of rock standing through it, and none round the warm crater
+		if (d >= 1.05) continue;
+		const double ang = std::atan2(dz, dx), ca = std::cos(ang), sa = std::sin(ang), wander = 1.0 + 0.3 * d;
+		const double streak = nature::noise2(3.0 + 4.0 * ca * wander, 3.0 + 4.0 * sa * wander, s.seed + 83), grain = nature::noise2(px / 4.0, pz / 4.0, s.seed + 85);
+		Vec3 ash = lerp(Vec3{0.045, 0.04, 0.036}, Vec3{0.12, 0.10, 0.085}, streak) * (0.85 + 0.3 * grain);
+		ash = lerp(ash, Vec3{0.17, 0.08, 0.045} * (0.85 + 0.3 * grain), 0.6 * smoothstep(0.6, 0.75, nature::noise2(px / 40.0, pz / 40.0, s.seed + 89)) * (1.0 - smoothstep(0.2, 0.4, d)));
+		// the snow: down the gullies in long fingers, the ridges between them blown bare where it is thin
+		const double gully = coneGully(d, ang, s.seed), line = 0.38 + 0.08 * (nature::noise2(5.0 + 1.8 * ca, 5.0 + 1.8 * sa, s.seed + 91) - 0.5) + 0.3 * gully;
+		const double upper = 1.0 - smoothstep(line - 0.05, line + 0.03, d), bare = (1.0 - gully) * smoothstep(0.18, line, d);
+		const double snow = upper * smoothstep(0.14, 0.2, d) * (1.0 - 0.9 * smoothstep(0.35, 0.75, bare)) * (0.85 + 0.15 * grain);
+		c = lerp(c, lerp(ash, Vec3{0.82, 0.84, 0.88} * (0.95 + 0.05 * grain), snow), 1.0 - smoothstep(0.82, 1.05, d));
+	}
 	if (s.waterLevel > -1e29) {   // the shore: pale sand just above the water, darker wet sand at its edge, mud and weed below
 		const double above = h - s.waterLevel, grain = nature::noise2(px / 2.0, pz / 2.0, s.seed + 61);
 		const Vec3 sand = Vec3{0.46, 0.40, 0.30} * (0.9 + 0.2 * grain), wet = Vec3{0.24, 0.21, 0.16}, bed = Vec3{0.12, 0.13, 0.08} * (0.8 + 0.4 * grain);
@@ -556,12 +586,16 @@ inline Mesh surfaceMesh(const Field &f, int half = 200) {
 }
 // A part of the surface as a mesh of its own (the vertices its triangles use, renumbered): `which` 0 the ground (the triangles not steeper than `steep`, 1 - the face
 // normal's y), 1 the steeper ones that face more along x, 2 those that face more along z. A cliff takes a picture projected from the side it faces.
-inline Mesh surfacePart(const Mesh &m, int which, double steep) {
+inline Mesh surfacePart(const Mesh &m, int which, double steep, const std::vector<Spec::Cone> &cones = {}) {
 	Mesh out;
 	std::vector<int> renumber(m.verts.size(), -1);
+	// (a volcano's flanks are steep but not cliffs: they keep the picture from above, with its ash, gullies and snow - the mesh is in story space, x mirrored)
+	const auto onCone = [&cones](const Vec3 &p) {
+		return std::any_of(cones.begin(), cones.end(), [&p](const Spec::Cone &c) { return std::hypot(-p.x - c.x, p.z - c.z) < 0.95 * c.radius; });
+	};
 	for (const auto &t : m.tris) {
 		const Vec3 n = normalize(cross(m.verts[t[1]] - m.verts[t[0]], m.verts[t[2]] - m.verts[t[0]]));
-		const int part = 1.0 - std::abs(n.y) <= steep ? 0 : std::abs(n.x) > std::abs(n.z) ? 1 : 2;
+		const int part = 1.0 - std::abs(n.y) <= steep || onCone(m.verts[t[0]]) ? 0 : std::abs(n.x) > std::abs(n.z) ? 1 : 2;
 		if (part != which) continue;
 		std::array<int, 3> nt{};
 		for (int c = 0; c < 3; ++c) {
@@ -786,7 +820,7 @@ inline std::string text(const std::string &film, const Spec &s, const Weather &w
 			static const char *names[3] = {"_ground", "_cliff_x", "_cliff_z"};
 			return film_cache::ply(film, key + names[which], [&] {
 				if (!whole) whole = std::make_shared<Mesh>(surfaceMesh(*f));
-				return surfacePart(*whole, which, steep);
+				return surfacePart(*whole, which, steep, s.cones);
 			});
 		};
 		const double vdelta = canyon ? -s.y / period : 0.0;

@@ -1,0 +1,154 @@
+# Valley of Mists: the score (music_cues.h). Times with @ are the film's; a line is <time> <instrument> <notes> length L gain G pan P send S.
+# E minor in the mist, G major from first light, 60 to the minute: a drone and a piano, the geese on harp, strings rising as the mists lift.
+
+@0.00    drone    E2  length 14.00  gain 0.140  pan +0.00  send 0.60
+@0.00    strings  E3 G3 B3  length 4.30  gain 0.044  pan +0.00  send 0.70
+@0.00    piano    B5  length 1.60  gain 0.088  pan +0.15  send 0.60
+@1.00    piano    A5  length 0.80  gain 0.088  pan +0.15  send 0.60
+@2.00    piano    F#5  length 1.60  gain 0.088  pan +0.15  send 0.60
+@3.00    piano    D5  length 1.60  gain 0.088  pan +0.15  send 0.60
+@4.00    strings  C4 E4 G4  length 4.30  gain 0.044  pan +0.00  send 0.70
+@4.00    piano    C6  length 1.60  gain 0.088  pan +0.15  send 0.60
+@5.00    piano    A5  length 0.80  gain 0.088  pan +0.15  send 0.60
+@5.50    piano    F#5  length 0.80  gain 0.088  pan +0.15  send 0.60
+@7.00    piano    D5  length 1.60  gain 0.088  pan +0.15  send 0.60
+@8.00    strings  G3 B3 D4  length 4.30  gain 0.044  pan +0.00  send 0.70
+@8.00    piano    G5  length 1.60  gain 0.088  pan +0.15  send 0.60
+@9.00    piano    E5  length 0.80  gain 0.088  pan +0.15  send 0.60
+@11.00   piano    D5  length 1.60  gain 0.088  pan +0.15  send 0.60
+@12.00   strings  D4 F#4 A4  length 1.30  gain 0.044  pan +0.00  send 0.70
+@12.00   piano    D6  length 1.60  gain 0.088  pan +0.15  send 0.60
+@13.00   bell     D6  length 3.00  gain 0.050  pan +0.30  send 0.80
+@13.00   strings  G3 B3 D4  length 4.30  gain 0.052  pan +0.00  send 0.70
+@13.00   pad      G4 B4 D5  length 4.00  gain 0.028  pan +0.00  send 0.60
+@13.00   piano    D5  length 1.60  gain 0.104  pan +0.15  send 0.60
+@14.00   piano    E5  length 0.80  gain 0.104  pan +0.15  send 0.60
+@14.50   piano    F#5  length 0.80  gain 0.104  pan +0.15  send 0.60
+@15.00   piano    D5  length 1.60  gain 0.104  pan +0.15  send 0.60
+@16.00   piano    B4  length 1.60  gain 0.104  pan +0.15  send 0.60
+@17.00   strings  D4 F#4 A4  length 4.30  gain 0.052  pan +0.00  send 0.70
+@17.00   pad      D5 F#5 A5  length 4.00  gain 0.028  pan +0.00  send 0.60
+@17.00   piano    D5  length 1.60  gain 0.104  pan +0.15  send 0.60
+@18.00   piano    F#5  length 0.80  gain 0.104  pan +0.15  send 0.60
+@18.50   piano    E5  length 0.80  gain 0.104  pan +0.15  send 0.60
+@19.00   piano    D5  length 1.60  gain 0.104  pan +0.15  send 0.60
+@20.00   piano    F#5  length 1.60  gain 0.104  pan +0.15  send 0.60
+@21.00   strings  E4 G4 B4  length 2.30  gain 0.052  pan +0.00  send 0.70
+@21.00   pad      E5 G5 B5  length 2.00  gain 0.028  pan +0.00  send 0.60
+@21.00   piano    G5  length 1.60  gain 0.104  pan +0.15  send 0.60
+@22.00   piano    E5  length 0.80  gain 0.104  pan +0.15  send 0.60
+@23.00   strings  E4 G4 B4  length 4.30  gain 0.058  pan +0.00  send 0.70
+@23.00   bass     E3  length 2.60  gain 0.168  pan +0.00  send 0.20
+@23.00   pluck    E5  length 1.25  gain 0.074  pan -0.30  send 0.50
+@23.00   bowed    E5  length 2.10  gain 0.210  pan +0.15  send 0.60
+@23.50   pluck    G5  length 1.25  gain 0.074  pan +0.30  send 0.50
+@24.00   pluck    B5  length 1.25  gain 0.074  pan -0.30  send 0.50
+@24.50   pluck    D6  length 1.25  gain 0.074  pan +0.30  send 0.50
+@25.00   bass     E3  length 2.00  gain 0.116  pan +0.00  send 0.20
+@25.00   pluck    B5  length 1.25  gain 0.074  pan -0.30  send 0.50
+@25.00   bowed    D5  length 1.05  gain 0.210  pan +0.15  send 0.60
+@25.50   pluck    G5  length 1.25  gain 0.074  pan +0.30  send 0.50
+@26.00   pluck    B5  length 1.25  gain 0.074  pan -0.30  send 0.50
+@26.00   bowed    F#5  length 1.05  gain 0.210  pan +0.15  send 0.60
+@26.50   pluck    G5  length 1.25  gain 0.074  pan +0.30  send 0.50
+@27.00   strings  C4 E4 G4  length 4.30  gain 0.058  pan +0.00  send 0.70
+@27.00   bass     C3  length 2.60  gain 0.168  pan +0.00  send 0.20
+@27.00   pluck    C5  length 1.25  gain 0.074  pan -0.30  send 0.50
+@27.00   bowed    G5  length 2.10  gain 0.210  pan +0.15  send 0.60
+@27.50   pluck    E5  length 1.25  gain 0.074  pan +0.30  send 0.50
+@28.00   pluck    G5  length 1.25  gain 0.074  pan -0.30  send 0.50
+@28.50   pluck    B5  length 1.25  gain 0.074  pan +0.30  send 0.50
+@29.00   bass     C3  length 2.00  gain 0.116  pan +0.00  send 0.20
+@29.00   pluck    G5  length 1.25  gain 0.074  pan -0.30  send 0.50
+@29.00   bowed    E5  length 1.05  gain 0.210  pan +0.15  send 0.60
+@29.50   pluck    E5  length 1.25  gain 0.074  pan +0.30  send 0.50
+@30.00   pluck    G5  length 1.25  gain 0.074  pan -0.30  send 0.50
+@30.00   bowed    C5  length 1.05  gain 0.210  pan +0.15  send 0.60
+@30.50   pluck    E5  length 1.25  gain 0.074  pan +0.30  send 0.50
+@31.00   strings  G3 B3 D4  length 2.30  gain 0.058  pan +0.00  send 0.70
+@31.00   bass     G2  length 2.00  gain 0.168  pan +0.00  send 0.20
+@31.00   pluck    G4  length 1.25  gain 0.074  pan -0.30  send 0.50
+@31.00   bowed    B4  length 2.10  gain 0.210  pan +0.15  send 0.60
+@31.50   pluck    B4  length 1.25  gain 0.074  pan +0.30  send 0.50
+@32.00   pluck    D5  length 1.25  gain 0.074  pan -0.30  send 0.50
+@32.50   pluck    F#5  length 1.25  gain 0.074  pan +0.30  send 0.50
+@33.00   strings  C4 E4 G4  length 4.30  gain 0.066  pan +0.00  send 0.70
+@33.00   pad      C5 E5 G5  length 4.00  gain 0.036  pan +0.00  send 0.60
+@33.00   bass     C3  length 2.60  gain 0.192  pan +0.00  send 0.20
+@33.00   bowed    C4  length 4.20  gain 0.192  pan -0.25  send 0.60
+@33.00   piano    C5  length 1.25  gain 0.060  pan -0.30  send 0.50
+@33.00   bowed    C5  length 2.10  gain 0.240  pan +0.15  send 0.60
+@33.50   piano    E5  length 1.25  gain 0.060  pan +0.30  send 0.50
+@34.00   piano    G5  length 1.25  gain 0.060  pan -0.30  send 0.50
+@34.50   piano    B5  length 1.25  gain 0.060  pan +0.30  send 0.50
+@35.00   bass     C3  length 2.00  gain 0.132  pan +0.00  send 0.20
+@35.00   piano    G5  length 1.25  gain 0.060  pan -0.30  send 0.50
+@35.00   bowed    A4  length 1.05  gain 0.240  pan +0.15  send 0.60
+@35.50   piano    E5  length 1.25  gain 0.060  pan +0.30  send 0.50
+@36.00   piano    G5  length 1.25  gain 0.060  pan -0.30  send 0.50
+@36.00   bowed    F#4  length 1.05  gain 0.240  pan +0.15  send 0.60
+@36.50   piano    E5  length 1.25  gain 0.060  pan +0.30  send 0.50
+@37.00   strings  G3 B3 D4  length 4.30  gain 0.066  pan +0.00  send 0.70
+@37.00   pad      G4 B4 D5  length 4.00  gain 0.036  pan +0.00  send 0.60
+@37.00   bass     G2  length 2.60  gain 0.192  pan +0.00  send 0.20
+@37.00   bowed    G3  length 4.20  gain 0.192  pan -0.25  send 0.60
+@37.00   piano    G4  length 1.25  gain 0.060  pan -0.30  send 0.50
+@37.00   bowed    G4  length 2.10  gain 0.240  pan +0.15  send 0.60
+@37.50   piano    B4  length 1.25  gain 0.060  pan +0.30  send 0.50
+@38.00   piano    D5  length 1.25  gain 0.060  pan -0.30  send 0.50
+@38.50   piano    F#5  length 1.25  gain 0.060  pan +0.30  send 0.50
+@39.00   bass     G2  length 2.00  gain 0.132  pan +0.00  send 0.20
+@39.00   piano    D5  length 1.25  gain 0.060  pan -0.30  send 0.50
+@39.00   bowed    A4  length 1.05  gain 0.240  pan +0.15  send 0.60
+@39.50   piano    B4  length 1.25  gain 0.060  pan +0.30  send 0.50
+@40.00   piano    D5  length 1.25  gain 0.060  pan -0.30  send 0.50
+@40.00   bowed    B4  length 1.05  gain 0.240  pan +0.15  send 0.60
+@40.50   piano    B4  length 1.25  gain 0.060  pan +0.30  send 0.50
+@41.00   strings  D4 F#4 A4  length 3.30  gain 0.066  pan +0.00  send 0.70
+@41.00   pad      D5 F#5 A5  length 3.00  gain 0.036  pan +0.00  send 0.60
+@41.00   bass     D3  length 2.60  gain 0.192  pan +0.00  send 0.20
+@41.00   bowed    D4  length 3.20  gain 0.192  pan -0.25  send 0.60
+@41.00   piano    D5  length 1.25  gain 0.060  pan -0.30  send 0.50
+@41.00   bowed    D5  length 2.10  gain 0.240  pan +0.15  send 0.60
+@41.50   piano    F#5  length 1.25  gain 0.060  pan +0.30  send 0.50
+@42.00   piano    A5  length 1.25  gain 0.060  pan -0.30  send 0.50
+@42.50   piano    C6  length 1.25  gain 0.060  pan +0.30  send 0.50
+@43.00   bass     D3  length 2.00  gain 0.132  pan +0.00  send 0.20
+@43.00   piano    A5  length 1.25  gain 0.060  pan -0.30  send 0.50
+@43.50   piano    F#5  length 1.25  gain 0.060  pan +0.30  send 0.50
+@44.00   strings  G3 B3 D4  length 4.30  gain 0.052  pan +0.00  send 0.70
+@44.00   pluck    G4  length 1.25  gain 0.067  pan -0.30  send 0.50
+@44.00   piano    D5  length 1.60  gain 0.104  pan +0.15  send 0.60
+@44.50   pluck    B4  length 1.25  gain 0.067  pan +0.30  send 0.50
+@45.00   pluck    D5  length 1.25  gain 0.067  pan -0.30  send 0.50
+@45.00   piano    E5  length 0.80  gain 0.104  pan +0.15  send 0.60
+@45.50   pluck    F#5  length 1.25  gain 0.067  pan +0.30  send 0.50
+@46.00   pluck    D5  length 1.25  gain 0.067  pan -0.30  send 0.50
+@46.00   piano    F#5  length 1.60  gain 0.104  pan +0.15  send 0.60
+@46.50   pluck    B4  length 1.25  gain 0.067  pan +0.30  send 0.50
+@47.00   pluck    D5  length 1.25  gain 0.067  pan -0.30  send 0.50
+@47.00   piano    E5  length 1.60  gain 0.104  pan +0.15  send 0.60
+@47.50   pluck    B4  length 1.25  gain 0.067  pan +0.30  send 0.50
+@48.00   strings  C4 E4 G4  length 4.30  gain 0.052  pan +0.00  send 0.70
+@48.00   pluck    C5  length 1.25  gain 0.067  pan -0.30  send 0.50
+@48.00   piano    E5  length 1.60  gain 0.104  pan +0.15  send 0.60
+@48.50   pluck    E5  length 1.25  gain 0.067  pan +0.30  send 0.50
+@49.00   pluck    G5  length 1.25  gain 0.067  pan -0.30  send 0.50
+@49.00   piano    F#5  length 0.80  gain 0.104  pan +0.15  send 0.60
+@49.50   pluck    B5  length 1.25  gain 0.067  pan +0.30  send 0.50
+@49.50   piano    E5  length 0.80  gain 0.104  pan +0.15  send 0.60
+@50.00   pluck    G5  length 1.25  gain 0.067  pan -0.30  send 0.50
+@50.50   pluck    E5  length 1.25  gain 0.067  pan +0.30  send 0.50
+@51.00   pluck    G5  length 1.25  gain 0.067  pan -0.30  send 0.50
+@51.00   piano    C5  length 1.60  gain 0.104  pan +0.15  send 0.60
+@51.50   pluck    E5  length 1.25  gain 0.067  pan +0.30  send 0.50
+@52.00   strings  C4 E4 G4  length 2.80  gain 0.050  pan +0.00  send 0.70
+@52.00   bell     C5  length 0.33  gain 0.045  pan +0.15  send 0.60
+@52.31   bell     B4  length 0.66  gain 0.045  pan +0.15  send 0.60
+@53.25   bell     D5  length 1.31  gain 0.045  pan +0.15  send 0.60
+@54.50   strings  G3 B3 D4  length 2.80  gain 0.050  pan +0.00  send 0.70
+@54.50   bell     D5  length 0.33  gain 0.045  pan +0.15  send 0.60
+@54.81   bell     C5  length 0.66  gain 0.045  pan +0.15  send 0.60
+@55.44   bell     D5  length 0.33  gain 0.045  pan +0.15  send 0.60
+@55.75   bell     E5  length 1.31  gain 0.045  pan +0.15  send 0.60
+@57.00   piano    G3 D4 B4  length 3.00  gain 0.080  pan +0.00  send 0.70

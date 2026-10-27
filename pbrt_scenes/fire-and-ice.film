@@ -9,6 +9,7 @@ tags    nature, volcano, aurora, geysers, night, showcase
 
 terrain  mountains  size 2400  height 380  seed 5  focus 0 -350
 biome    tundra
+mute     birds        # the music carries it: no birdsong, no cries
 sky      13:30 18:30  physical  latitude 64  day 300  south 0
 exposure auto 0.4
 volcano  at 0 -900  height 520  radius 700

@@ -10,6 +10,7 @@ tags    nature, ocean, surf, sunset, showcase
 terrain  coast  size 600  seed 2
 water    sea  level 0  waves 0.6  wind 0
 surf     1.7  period 9
+mute     birds        # the music carries it: no birdsong, no cries
 sky      18:25 19:45  south 60  physical  haze 2.5
 air      strength 2
 exposure auto

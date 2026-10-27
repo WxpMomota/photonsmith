@@ -211,7 +211,7 @@ extern "C" __global__ void __closesthit__quad() {
 		// A lamp that also reflects: its own light, weighted against the light sampling (p13-p15, which only a subsurface exit otherwise uses; raygen adds it
 		// for flag 1). The input p12 (the arriving BSDF pdf) is read here, before this program overwrites it.
 		float3 lamp_le = make_float3(0.0f, 0.0f, 0.0f);
-		if (lamp_reflects(mat))
+		if (lamp_scatters(mat))
 			lamp_le = lamp_own_emission(material_emission(mat, front_face, uv_u, uv_v, hit_point), __uint_as_float(optixGetPayload_12()), quad_light_pdf());
 		// p12: BRDF PDF for MIS on the next bounce.
 		// Specular (Metal/Dielectric): 0 = no MIS (pbrt-v4 specularBounce pattern).

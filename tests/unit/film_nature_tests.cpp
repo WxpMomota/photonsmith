@@ -189,7 +189,8 @@ TEST(FilmWater, TheSeasWavesRollAndAreDrawnWhereTheCameraLooks) {
 	EXPECT_EQ(behind, 0) << "nothing far behind the camera";
 }
 
-// A landscape with no `ambience` line is heard as what it is: wind over the land, birds in a wood by day, crickets in it after dark; an `ambience` line is heard instead.
+// A landscape with no `ambience` line is heard as what it is: wind over the land, birds in a wood by day, crickets in it after dark; an `ambience` line is heard instead,
+// and `mute birds` takes every bird out of it.
 TEST(FilmWater, ALandscapeIsHeardAsWhatItIsUnlessTheFilmSaysHow) {
 	const auto kinds = [](const ff::DataFilm &f) {
 		std::vector<std::string> k;
@@ -206,6 +207,14 @@ TEST(FilmWater, ALandscapeIsHeardAsWhatItIsUnlessTheFilmSaysHow) {
 	EXPECT_EQ(kinds(night), (std::vector<std::string>{"wind", "crickets"}));
 	ASSERT_EQ(loadNature("said", land + "ambience night 0.7\n", said), "");
 	EXPECT_EQ(kinds(said), (std::vector<std::string>{"night"}));
+	ff::DataFilm muted, mutedNight;   // `mute birds`: no birds heard, the owl of the night's sounds too
+	ASSERT_EQ(loadNature("muted", land + "sky 10:00 11:00\nforest broadleaf 40 seed 2\nflock geese 5 from -50 40 0 to 50 40 0\nmute birds\n", muted), "");
+	EXPECT_EQ(kinds(muted), (std::vector<std::string>{"wind"}));
+	EXPECT_TRUE(muted.spec.muteBirds);
+	ASSERT_EQ(loadNature("mutednight", land + "ambience night 0.7\nmute birds\n", mutedNight), "");
+	EXPECT_EQ(kinds(mutedNight), (std::vector<std::string>{"crickets"}));
+	ff::DataFilm bad;
+	EXPECT_NE(loadNature("mutebad", land + "mute wind\n", bad), "");
 }
 
 // A river's water never runs uphill, and on a terrain its bed is cut under it; a waterfall pours in the arc thrown water takes, its cliff raised behind it and its pool cut
@@ -559,7 +568,8 @@ TEST(FilmSkyFx, LightningFlashesInStrokesAndThunderFollowsAurorasHangAndRainbows
 	// the aurora, the meteors, the stars, the rainbow
 	const std::string night = film.sceneAt(5.0);
 	EXPECT_NE(night.find("# the aurora"), std::string::npos);
-	EXPECT_NE(night.find("aurora_green"), std::string::npos) << "its glow's picture";
+	EXPECT_NE(night.find("aurora2_green"), std::string::npos) << "its glow's picture";
+	EXPECT_NE(night.find("\"dielectric\" \"float eta\" [ 1 ]"), std::string::npos) << "a glow the stars show through: a lamp of clear glass";
 	int streaks = 0;
 	for (double t = 0.0; t < 10.0; t += 0.25) streaks += skyfx::meteorText(film.spec.meteors[0], t, {0.0, 2.0, 0.0}).find("# a meteor") != std::string::npos;
 	EXPECT_GT(streaks, 3) << "meteors now and then";

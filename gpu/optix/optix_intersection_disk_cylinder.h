@@ -228,7 +228,7 @@ extern "C" __global__ void __closesthit__disk() {
 		// A lamp that also reflects: its own light, weighted against the light sampling (p13-p15, which only a subsurface exit otherwise uses; raygen
 		// adds it for flag 1). The input p12 (the arriving BSDF pdf) is read here, before this program overwrites it.
 		float3 lamp_le = make_float3(0.0f, 0.0f, 0.0f);
-		if (lamp_reflects(mat))
+		if (lamp_scatters(mat))
 			lamp_le = lamp_own_emission(material_emission(mat, front_face, uv_u, uv_v, hit_point), __uint_as_float(optixGetPayload_12()), disk_light_pdf());
 		float t_hit = optixGetRayTmax();
 		float brdf_pdf_out = is_specular ? 0.0f
@@ -799,7 +799,7 @@ extern "C" __global__ void __closesthit__cylinder() {
 		// A lamp that also reflects: its own light, weighted against the light sampling (p13-p15, which only a subsurface exit otherwise uses; raygen
 		// adds it for flag 1). The input p12 (the arriving BSDF pdf) is read here, before this program overwrites it.
 		float3 lamp_le = make_float3(0.0f, 0.0f, 0.0f);
-		if (lamp_reflects(mat))
+		if (lamp_scatters(mat))
 			lamp_le = lamp_own_emission(material_emission(mat, front_face, uv_u, uv_v, hit_point), __uint_as_float(optixGetPayload_12()), cyl_light_pdf());
 		// Medium: the scatter/exit point is not the cylinder's entry root
 		// (optixGetRayTmax()) - use the distance computed in the Medium case

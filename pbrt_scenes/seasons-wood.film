@@ -8,6 +8,7 @@ still   28
 tags    nature, forest, seasons, flowers, time-lapse, showcase
 
 terrain  hills  size 800  height 30  seed 2
+mute     birds        # the music carries it: no birdsong, no cries
 sky      7:30 17:30
 forest   mixed 1400  in -260 -360 260 -40  near 140  season summer to autumn from 14 to 30 then winter from 34 to 46
 flowers  poppies 4000  in -18 -14 18 8  bloom 0 7  close 26 33

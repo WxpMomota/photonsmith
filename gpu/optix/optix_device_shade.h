@@ -1107,7 +1107,8 @@ __device__ __forceinline__ void shade_material_surface(
 	out_eta = eta;
 }
 
-// A lamp that also reflects (lamp_reflects(), optix_types_material.h) shades as a diffuse surface: the caller's `emission` is reset to just the light that surface collects, and
+// A lamp that also reflects (lamp_reflects(), optix_types_material.h) shades as a diffuse surface, and one of glass (lamp_glass()) as a smooth Dielectric: the caller's
+// `emission` is reset to just the light that surface collects, and
 // the lamp's OWN light, weighted against the light sampling like any emitter hit, is added by the hit program (lamp_own_emission()) since only it knows the shape's light pdf.
 // A roughness image on a Conductor, CoatedDiffuse or CoatedConductor (MaterialData::roughTexIdx / condRoughTexIdx): this hit's roughness, in a per-hit copy of the material.
 __device__ __forceinline__ void patch_roughness_textures(MaterialData& view, float uv_u, float uv_v, const float3& hit_point) {
@@ -1150,9 +1151,9 @@ __device__ __forceinline__ void shade_material(
 	// OptiX compile. The material is changed for this hit only in those two cases, in storage that is constructed only then (a MaterialData is about 300 bytes with 31 member initialisers).
 	alignas(MaterialData) unsigned char viewStorage[sizeof(MaterialData)];
 	const MaterialData *use = &mat;
-	if (lamp_reflects(mat)) {
+	if (lamp_scatters(mat)) {
 		MaterialData *view = ::new (static_cast<void *>(viewStorage)) MaterialData(mat);
-		view->type = MaterialType::Lambertian;
+		view->type = lamp_glass(mat) ? MaterialType::Dielectric : MaterialType::Lambertian;   // (glass: `ior` and `transmission_filter` are already the glass's)
 		view->textureIdx = -1;   // (the texture of a lamp is its emission, not its reflectance)
 		emission = make_float3(0.0f, 0.0f, 0.0f);
 		use = view;

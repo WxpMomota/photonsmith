@@ -244,7 +244,7 @@ extern "C" __global__ void __closesthit__bilinear_patch() {
 		// A lamp that also reflects: its own light, weighted against the light sampling (p13-p15, which only a subsurface exit otherwise uses; raygen
 		// adds it for flag 1). The input p12 (the arriving BSDF pdf) is read here, before this program overwrites it.
 		float3 lamp_le = make_float3(0.0f, 0.0f, 0.0f);
-		if (lamp_reflects(mat))
+		if (lamp_scatters(mat))
 			lamp_le = lamp_own_emission(material_emission(mat, front_face, u, v, hit_point), __uint_as_float(optixGetPayload_12()), blp_light_pdf());
 		float t_hit = optixGetRayTmax();
 		float brdf_pdf_out = is_specular ? 0.0f

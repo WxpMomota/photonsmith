@@ -12,8 +12,8 @@
 //
 // A cue line is `<time> <instrument> [notes...] [length L] [gain G] [pan P] [send S] [spread D]`. Notes are whole MIDI numbers (60 is middle C) or names (C4, F#3, Bb2),
 // and a number with a point after them is the length ("piano D4 3.0"). The
-// instruments are the generic ones (genericInstruments: bell, mallet, pluck, bass, pad, strings, knock, swell, and the sound effects footstep-<surface>, impact, flash,
-// touch) and the film's own (Film::instruments: the Nomai film's guitar, banjo, piano, resonance, drone, beep). What the file says wrong is printed once and the line left out.
+// instruments are the generic ones (genericInstruments: bell, mallet, pluck, bass, pad, strings, knock, swell, piano, guitar, bowed, drone, and the sound effects
+// footstep-<surface>, impact, flash, touch) and the film's own (Film::instruments: the Nomai film's banjo, resonance, beep). What the file says wrong is printed once and the line left out.
 //
 // A hit on every cut: `oncuts mallet A2 1.0 gain 0.05` (the rest as a cue's) plays at the start of every shot but the first. And under the characters' lines the cues are
 // ducked: a film that says when it speaks (Film::speechAt) has its music brought down by up to two thirds while a line is heard (cartoons.h, withFilmFiles).
@@ -35,6 +35,7 @@
 
 #include "cartoon_audio.h"
 #include "film_speech.h"   // (a recording's mouth shapes)
+#include "film_voices.h"
 #include "cartoon_lib.h"
 #include "film_cache.h"
 #include "sfx.h"
@@ -181,6 +182,15 @@ inline const std::map<std::string, CueInstrument> &genericInstruments() {
 		i["pluck"] = pitched([](double f, double l) { return audio::pluck(f, l); });
 		i["pad"] = pitched([](double f, double l) { return audio::pad(f, l); });
 		i["strings"] = pitched([](double f, double l) { return audio::pad(f, l, std::min(2.0, l / 3.0), std::min(2.0, l / 3.0)); });
+		const auto voiced = [](std::vector<float> (*make)(double, double)) {   // (film_voices.h's, which take the note itself)
+			return CueInstrument([make](audio::Mix &mix, double t, const std::vector<double> &notes, double length, double gain, double pan, double send) {
+				for (double n : notes) mix.put(t, make(n, length), gain, pan, send);
+			});
+		};
+		i["piano"] = voiced([](double n, double l) { return voices::piano(n, l); });
+		i["guitar"] = voiced([](double n, double l) { return voices::guitar(n, l); });
+		i["bowed"] = voiced([](double n, double l) { return voices::bowed(n, l); });
+		i["drone"] = voiced([](double n, double l) { return voices::drone(n, l); });
 		i["knock"] = [](audio::Mix &mix, double t, const std::vector<double> &notes, double, double gain, double pan, double send) {
 			mix.put(t, audio::knock(notes.empty() ? 160.0 : hz(notes[0])), gain, pan, send);
 		};

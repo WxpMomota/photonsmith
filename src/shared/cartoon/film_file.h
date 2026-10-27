@@ -98,6 +98,7 @@
 //     scatter  grass 300 in -8 -10 8 2  scale 0.7 1.3  seed 2   # so many of a kind over a rectangle of the ground (x0 z0 x1 z1; `y` its height)
 //     sky      18:30 19:10  south 180  latitude 40              # the sun and sky from 6:30 to 7:10 pm over the film (the scene's own infinite and distant lights are left out)
 //     ambience birds 0.6                                        # a sound under the whole film: wind, birds, crickets, water or night, at a gain
+//     mute     birds                                            # no birds heard: no birdsong (the trees' or an ambience's), no eagles' cries, no geese, no owl
 //     music    none                                             # no music: without a cues file (film_assets/<key>/cues.txt) a film plays its drafted score
 //                                                               # (film_score.h, `--film-score`) under its sounds; `music draft` says so
 //     terrain  mountains  size 1500  height 320  seed 3         # the land (film_terrain.h): hills, mountains, dunes, canyon or coast, eroded, coloured by height, slope and water,
@@ -573,6 +574,7 @@ struct Spec {
 	std::vector<fire::Wildfire> wildfires;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
+	bool muteBirds = false;   // (`mute birds`: no birdsong, no eagles' cries, no geese - whatever flies in the picture)
 	bool draftMusic = true;   // (`music none`: no drafted score when there is no cues file)
 	toon_look::Style toon;    // the toon look (`toon`): written into every frame's header as its `# @rt-toon` line
 	std::string voices;       // what the characters' lines are said in unless a character says (`voices`): "" or "babble", "system", a word of a computer voice's name
@@ -1538,6 +1540,10 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				else return fail("\"" + t[i] + "\": " + (burst ? "a burst takes count (up to 2000) and speed" : "particles take rate (up to 1000 a second) and speed"));
 			}
 			s.emitters.push_back(e);
+		} else if (verb == "mute") {
+			const std::vector<std::string> t = detail::tokens(line);
+			if (t.size() != 2 || t[1] != "birds") return fail("`mute birds`: no birds heard (their songs in the trees, eagles' cries, geese, the night's owl), though they are seen");
+			s.muteBirds = true;
 		} else if (verb == "ambience") {
 			const std::vector<std::string> t = detail::tokens(line);
 			dressing::Ambience a;
@@ -2102,7 +2108,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -2374,7 +2380,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		dressing::sunAt(s.sky, 0.5 * (s.sky.from + s.sky.to), elevation, facing);
 		const bool night = s.hasSky && elevation < -4.0;
 		s.ambience.push_back({"wind", 0.5});
-		if (!s.forests.empty()) s.ambience.push_back({night ? "crickets" : "birds", 0.5});
+		if (!s.forests.empty()) s.ambience.push_back({night ? "crickets" : "birds", night ? 0.5 : 0.25});   // (birds softly: the trees near the camera sing too)
 		else if (night) s.ambience.push_back({"night", 0.5});
 	}
 	const auto hears = [&](const std::string &kind) { return std::any_of(s.ambience.begin(), s.ambience.end(), [&](const dressing::Ambience &a) { return a.kind == kind; }); };
@@ -2382,6 +2388,11 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 	if (!s.rivers.empty() && !hears("water")) s.ambience.push_back({"water", 0.7});
 	if (!s.falls.empty() && !hears("falls")) s.ambience.push_back({"falls", 0.8});
 	if (std::any_of(s.flocks.begin(), s.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "geese"; }) && !hears("geese")) s.ambience.push_back({"geese", 0.8});
+	if (s.muteBirds) {   // (the night's owl too: crickets alone)
+		for (dressing::Ambience &a : s.ambience)
+			if (a.kind == "night") a.kind = "crickets";
+		s.ambience.erase(std::remove_if(s.ambience.begin(), s.ambience.end(), [](const dressing::Ambience &a) { return a.kind == "birds" || a.kind == "geese"; }), s.ambience.end());
+	}
 	r.ok = true;
 	return r;
 }
@@ -4149,7 +4160,7 @@ class DataFilm {
 			}
 		}
 		for (const wildlife::Flock &f : spec.flocks) {
-			if (f.kind != "eagles") continue;
+			if (f.kind != "eagles" || spec.muteBirds) continue;
 			const std::vector<float> cry = ss::eagleCry();
 			for (int i = 0; i < f.count; ++i) {
 				const double every = 9.0 + 9.0 * audio::unit(static_cast<unsigned>(1001 + i));
@@ -4181,10 +4192,10 @@ class DataFilm {
 			const geology::Quake &q = spec.quakes[i];
 			ss::lay(m, ears, q.t0, q.t1, 0.4, [&ears](double t) { return ears(t).eye + Vec3{0.0, -2.0, 0.0}; }, [&q](double t) { return 0.8 * q.levelAt(t); }, ss::roar(18.0, 110.0, 1.2, 1501u + static_cast<unsigned>(i)), 5.0);
 		}
-		// birds in the trees near the camera, by day
-		if (!spec.planted.empty()) {
+		// birds in the trees near the camera, by day: a phrase every few seconds (not a wall of song: the music is heard over them)
+		if (!spec.planted.empty() && !spec.muteBirds) {
 			unsigned k = 0;
-			for (double t = 0.4; t < T; t += 0.9, ++k) {
+			for (double t = 0.4; t < T; t += 1.8 + 2.4 * audio::unit(1301u + k), ++k) {
 				if (spec.hasSky) {
 					double el = 0.0, facing = 0.0;
 					dressing::sunAt(spec.sky, dressing::hourAt(spec.sky, t, spec.storyEnd), el, facing);
@@ -4200,7 +4211,7 @@ class DataFilm {
 						const double score = d * (0.3 + audio::unit(static_cast<unsigned>(std::lround(tr.at.x * 13.0 + tr.at.z * 7.0)) + k));
 						if (score < bestScore) bestScore = score, best = &tr;
 					}
-				if (best) ss::place(m, ears, t + 0.5 * audio::unit(1101u + k), best->at + Vec3{0.0, 5.0 * best->scale, 0.0}, ss::birdPhrase(1201u + k), 0.12, 15.0);
+				if (best) ss::place(m, ears, t + 0.5 * audio::unit(1101u + k), best->at + Vec3{0.0, 5.0 * best->scale, 0.0}, ss::birdPhrase(1201u + k), 0.09, 15.0);
 			}
 		}
 	}

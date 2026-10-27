@@ -8,6 +8,7 @@ still   20
 tags    nature, mountains, fog, dawn, showcase
 
 terrain  mountains  size 3000  height 600  seed 3
+mute     birds        # the music carries it: no birdsong, no cries
 sky      5:05 6:35  physical  altitude 900
 fog      0.035  lift 30 48
 forest   mixed 2600  near 140

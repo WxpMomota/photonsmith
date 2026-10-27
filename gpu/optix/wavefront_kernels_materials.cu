@@ -320,8 +320,8 @@ extern "C" __global__ void evaluate_materials(
 			}
 		}
 		// A lamp that also reflects (pbrt-v4: an AreaLightSource keeps the shape's Material, default diffuse 0.5; the builder stores the reflectance in
-		// `albedo`) goes on to scatter as a diffuse surface below; any other emitter ends the path here.
-		if (!lampReflects) {
+		// `albedo`) goes on to scatter as a diffuse surface below, and one of glass (lamp_glass()) as a smooth Dielectric; any other emitter ends the path here.
+		if (!lampReflects && !lamp_glass(mat)) {
 			addToFramebuffer(h.pixelIndex, radiance * h.filterWeight);
 			return; // path ends at emissive surface
 		}
@@ -415,7 +415,7 @@ extern "C" __global__ void evaluate_materials(
 	// MIS decision, a real bias a true duplicate would need to additionally
 	// take over next-ray-setup/RR/throughput logic to avoid - this
 	// substitution avoids that trade-off entirely instead.
-	MaterialType effectiveMatType = lampReflects ? MaterialType::Lambertian : mat.type;
+	MaterialType effectiveMatType = lampReflects ? MaterialType::Lambertian : lamp_glass(mat) ? MaterialType::Dielectric : mat.type;   // (glass: `ior` and `transmission_filter` are the glass's)
 
 	// Helper: uplift RGB albedo to SampledSpectrum via device sigmoid polynomial
 	auto albedoSpectrum = [&](float3 rgb) -> SS {
@@ -462,7 +462,7 @@ extern "C" __global__ void evaluate_materials(
 		return s;
 	};
 
-	switch (mat.type) {
+	switch (lamp_glass(mat) ? MaterialType::Dielectric : mat.type) {   // (a lamp of glass refracts as the Dielectric below)
 	case MaterialType::DiffuseLight: {
 		// Only a lamp that also reflects gets here (every other emitter returned above): a diffuse surface of the lamp's flat reflectance.
 		scattered_dir = normalize(normal + wf_rand_unit(seed));

@@ -13,7 +13,6 @@
 #include <cmath>
 #include <cstdio>
 #include <functional>
-#include <tuple>
 #include <string>
 #include <vector>
 
@@ -82,25 +81,26 @@ inline void ribbon(Mesh &m, const std::vector<Vec3> &bottom, const std::vector<V
 }  // namespace detail
 
 // ---- aurora ----
-// How strong the aurora's ray is at u (0 to 1 along its picture): the picture is painted with it, and the curtain's top follows it (a strong ray reaches higher).
-inline double auroraRay(double u) {
-	u -= std::floor(u);
-	return clamp01(std::pow(nature::fbm2(u * 42.0, 0.5, 71), 2.0) * 2.6);
+// How strong the aurora's ray is at u (0 to 1 across its picture, the whole curtain): its rays a few hundred metres apart, finely striated; `salt` a curtain's own.
+inline double auroraRay(double u, int salt = 0) {
+	const double broad = clamp01(std::pow(nature::fbm2(u * 126.0, 0.5, 71 + 7 * salt), 2.0) * 2.6), fine = nature::noise2(u * 700.0, 0.5, 72 + 7 * salt);
+	return broad * (0.7 + 0.3 * fine);
 }
-// The aurora's glow, painted once: u along its curtain (rays), v up it (a bright lower edge, fading up through its colours).
-inline std::string auroraPicture(const std::string &film, const std::string &colour) {
-	return film_sky::picture(film, "aurora_" + colour, 1024, 256, [&](std::vector<float> &rgb) {
+// The aurora's glow, painted once: u across its curtain, v up it - a bright lower edge, each ray rising as high as it is strong and fading out at its top, green going up into red
+// or violet. It is a glow the sky shows through (auroraText: the curtain is clear glass that is a lamp), so it fades to nothing.
+// `curtain`: which of the three (each its own rays).
+inline std::string auroraPicture(const std::string &film, const std::string &colour, int curtain = 0) {
+	return film_sky::picture(film, "aurora2_" + colour + "_" + std::to_string(curtain), 4096, 256, [&](std::vector<float> &rgb) {
 		const Vec3 low = colour == "red" ? Vec3{1.0, 0.18, 0.22} : colour == "violet" ? Vec3{0.6, 0.25, 1.0} : Vec3{0.25, 1.0, 0.45};
 		const Vec3 high = colour == "green" ? Vec3{0.35, 0.08, 0.3} : Vec3{0.3, 0.06, 0.35};
-		for (int j = 0; j < 256; ++j) {
-			const double v = 1.0 - (j + 0.5) / 256.0;
-			// (a renderer ends a path at a light: where the glow ran out the curtain would be black against the stars, so it keeps a faint glow to its top)
-			const double edge = std::exp(-v / 0.05) * 1.6, body = (std::exp(-v / 0.4) + 0.25) * (1.0 - std::exp(-v / 0.02)), fade = 1.0 - 0.45 * smoothstep(0.7, 1.0, v);
-			for (int i = 0; i < 1024; ++i) {
-				const double u = (i + 0.5) / 1024.0;
-				const double rays = 0.35 + 0.65 * auroraRay(u);
-				const Vec3 c = (lerp(low, high, smoothstep(0.35, 0.9, v)) * (edge + body) * rays) * fade;
-				const std::size_t k = (static_cast<std::size_t>(j) * 1024 + i) * 3;
+		for (int i = 0; i < 4096; ++i) {
+			const double u = (i + 0.5) / 4096.0, ray = auroraRay(u, curtain), reach = 0.3 + 0.7 * ray, across = 0.25 + 0.75 * ray;
+			const double ends = smoothstep(0.0, 0.12, u) * (1.0 - smoothstep(0.88, 1.0, u));   // (the curtain's ends fade out)
+			for (int j = 0; j < 256; ++j) {
+				const double v = 1.0 - (j + 0.5) / 256.0;
+				const double edge = std::exp(-v / 0.05) * 1.4, body = std::exp(-v / 0.35), rise = smoothstep(0.0, 0.03, v), top = 1.0 - smoothstep(0.45 * reach, reach, v);
+				const Vec3 c = lerp(low, high, smoothstep(0.3, 0.85, v / reach)) * ((edge + body) * rise * top * across * ends);
+				const std::size_t k = (static_cast<std::size_t>(j) * 4096 + i) * 3;
 				rgb[k] = static_cast<float>(c.x);
 				rgb[k + 1] = static_cast<float>(c.y);
 				rgb[k + 2] = static_cast<float>(c.z);
@@ -108,19 +108,18 @@ inline std::string auroraPicture(const std::string &film, const std::string &col
 		}
 	});
 }
-// The aurora at t (seen round `centre`, pbrt's), as scene text: three curtains at different distances, their folds drifting and their rays running along them.
+// The aurora at t (seen round `centre`, pbrt's), as scene text: three curtains at different distances, their folds drifting and their rays running along them. Each is a lamp of
+// clear glass (index 1): its light is added and the stars and the other curtains show through it, as through the real thing.
 inline std::string auroraText(const std::string &film, const Aurora &a, double t, Vec3 centre) {
 	if (t < a.t0 || t > a.t1) return std::string();
 	const double fade = smoothstep(a.t0, a.t0 + 3.0, t) * (1.0 - smoothstep(a.t1 - 3.0, a.t1, t));
-	const std::string picture = auroraPicture(film, a.colour);
 	std::string out = "# the aurora (film_skyfx.h)\n";
 	for (int c = 0; c < 3; ++c) {
 		Mesh m;
 		std::vector<Vec3> bottom, top;
 		const double D = a.distance * (0.8 + 0.25 * c), mid = a.facing * kPi / 180.0 + 0.25 * (c - 1);
 		const double low = (0.22 + 0.04 * c) * D, high = low + (0.34 + 0.08 * c) * D;   // (from about 13 degrees up to 30 or 40: high in the sky)
-		const int n = 640;
-		const double run = 0.02 * t + 0.31 * c, span = 2.0 + c;   // (the rays run along it)
+		const int n = 900;
 		// a point of the curtain: s along it (0 to 1), h up it (0 its lower edge, 1 as high as its rays reach), in story space; it folds and sways
 		const auto at = [&](double s, double h) {
 			const double ang = mid + (s - 0.5) * 1.8;
@@ -130,33 +129,16 @@ inline std::string auroraText(const std::string &film, const Aurora &a, double t
 			const double bottomY = low * (1.0 + 0.15 * std::sin(s * 5.0 + t * 0.2)), topY = high * (1.0 + 0.2 * std::sin(s * 3.0 - t * 0.1 + c));
 			return detail::story(foot + Vec3{0.0, bottomY + (topY - bottomY) * h, 0.0});
 		};
-		// the bright lower band: a ribbon a quarter of the way up (its picture's lower quarter)
-		const double band = 0.25;
-		for (int i = 0; i <= n; ++i) bottom.push_back(at(i / double(n), 0.0)), top.push_back(at(i / double(n), band));
-		detail::ribbon(m, bottom, top, run, run + span);
-		for (std::size_t q = m.uvs.size() - 2 * static_cast<std::size_t>(n + 1) + 1; q < m.uvs.size(); q += 2) m.uvs[q].second = band;
-		// the rays above it: hundreds of thin strips, each rising as high as it is strong, drifting along and flickering, with the sky between them - a lamp is drawn as
-		// pure light, so a curtain whose glow ran out would be dark against the stars: these end where their glow still shows
-		const int rays = 1600;
-		for (int k = 0; k < rays; ++k) {
-			const double s = std::fmod(hash01(k, 31 + c) + 0.004 * t * (1.0 + 0.3 * c) + 1.0, 1.0), w = 0.0009 * (0.6 + 0.8 * hash01(k, 41 + c));
-			if (s + w > 1.0) continue;
-			const double strength = std::pow(hash01(k, 51 + c), 0.7) * (0.55 + 0.45 * nature::fbm2(s * 3.0 + c * 1.7, t * 0.05 + 0.5 * c, 73));
-			const double flicker = 0.85 + 0.15 * std::sin(t * (2.0 + 3.0 * hash01(k, 61 + c)) + 6.28 * hash01(k, 71 + c));
-			const double reach = band + (1.0 - band) * strength * flicker, u = hash01(k, 81 + c) * span;   // (a column of the picture of its own: its own strength there)
-			const int b = static_cast<int>(m.verts.size());
-			for (const auto &[ss, hh, vv] : {std::tuple<double, double, double>{s, band - 0.05, band - 0.05}, {s + w, band - 0.05, band - 0.05}, {s + w, reach, reach}, {s, reach, reach}}) {
-				m.verts.push_back(at(ss, hh));
-				m.normals.push_back({0.0, 0.0, 1.0});
-				m.uvs.push_back({u + (ss - s) * 0.3, vv});
-			}
-			m.tris.push_back({b, b + 1, b + 2});
-			m.tris.push_back({b, b + 2, b + 3});
-		}
+		for (int i = 0; i <= n; ++i) bottom.push_back(at(i / double(n), 0.0)), top.push_back(at(i / double(n), 1.0));
+		// the whole picture along it, so its faded ends are the curtain's (the lookup is clamped at the picture's edges, as pbrt's area light's: a stretch beyond them is one
+		// colour); its rays move as it folds and sways
+		detail::ribbon(m, bottom, top, 0.0, 1.0);
+		const std::string picture = auroraPicture(film, a.colour, c);
+		const double pulse = 0.85 + 0.15 * std::sin(t * 0.7 + 2.1 * c);   // (it brightens and dims)
 		char scale[64];   // (the picture's path is put in as it is: a fixed buffer cut a long one off)
-		std::snprintf(scale, sizeof scale, "%.5f", 0.07 * a.brightness * fade * (1.0 - 0.25 * c));
+		std::snprintf(scale, sizeof scale, "%.5f", 0.07 * a.brightness * fade * pulse * (1.0 - 0.25 * c));
 		out += "AttributeBegin\n  AreaLightSource \"diffuse\" \"string filename\" [ \"" + picture + "\" ] \"float scale\" [ " + scale + " ] \"bool twosided\" [ true ]\n";
-		out += "  Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]\n" + emitMesh(m, identity()) + "AttributeEnd\n";
+		out += "  Material \"dielectric\" \"float eta\" [ 1 ]\n" + emitMesh(m, identity()) + "AttributeEnd\n";
 	}
 	return out;
 }

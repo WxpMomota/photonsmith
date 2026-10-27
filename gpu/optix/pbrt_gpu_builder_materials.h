@@ -820,8 +820,15 @@ inline MaterialData makeMaterial(const pbrt_flatten::Material &m,
 		// CPU builder wraps any material), and a textured reflectance uses its flat colour.
 		if (m.kind == pbrt_flatten::MaterialKind::Diffuse)
 			d.albedo = make_float3(static_cast<float>(m.color[0]), static_cast<float>(m.color[1]), static_cast<float>(m.color[2]));
-		// (the CPU builder reflects anything but an interface or a black diffuse body: count what the flat diffuse above does not stand for, so the scene builder can say so)
-		if (m.kind != pbrt_flatten::MaterialKind::Interface && !(m.kind == pbrt_flatten::MaterialKind::Diffuse && m.textureFilename.empty())) ++out.lampMaterialsNotReflected;
+		// A smooth glass lamp adds its light and refracts (lamp_glass()): at index 1, a glow the scene behind shows through - an aurora's curtain, a beam of light.
+		const bool glass = m.kind == pbrt_flatten::MaterialKind::Dielectric && m.roughness_u <= 0.0 && m.roughness_v <= 0.0 && m.roughnessTextureFilename.empty();
+		if (glass) {
+			d.lampGlass = true;
+			d.ior = static_cast<float>(m.ior);
+			d.transmission_filter = make_float3(static_cast<float>(m.transmissionFilter[0]), static_cast<float>(m.transmissionFilter[1]), static_cast<float>(m.transmissionFilter[2]));
+		}
+		// (the CPU builder reflects anything but an interface or a black diffuse body: count what the flat diffuse and the glass above do not stand for, so the scene builder can say so)
+		if (!glass && m.kind != pbrt_flatten::MaterialKind::Interface && !(m.kind == pbrt_flatten::MaterialKind::Diffuse && m.textureFilename.empty())) ++out.lampMaterialsNotReflected;
 		return d;
 	}
 

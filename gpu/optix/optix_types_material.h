@@ -418,6 +418,9 @@ struct MaterialData {
 	float3 chromaCoefS  = {0.0f, 0.0f, 0.0f};
 	float  chromaScaleA = 0.0f;
 	float  chromaScaleS = 0.0f;
+	// DiffuseLight only: the lamp's surface is smooth glass (pbrt: an AreaLightSource on a "dielectric" shape) of index `ior`, tinted by `transmission_filter` - it adds its
+	// light and then refracts like a Dielectric, so at index 1 it is a glow the scene behind shows through (lamp_glass()).
+	bool lampGlass = false;
 };
 
 // A lamp that also reflects (pbrt-v4: an AreaLightSource keeps the shape's Material, default diffuse 0.5). The builder (pbrt_gpu_builder_materials.h makeMaterial) stores a flat
@@ -429,7 +432,16 @@ struct MaterialData {
 #define RT_LAMP_FN inline
 #endif
 RT_LAMP_FN bool lamp_reflects(const MaterialData& mat) {
-	return mat.type == MaterialType::DiffuseLight && (mat.albedo.x > 0.0f || mat.albedo.y > 0.0f || mat.albedo.z > 0.0f);
+	return mat.type == MaterialType::DiffuseLight && !mat.lampGlass && (mat.albedo.x > 0.0f || mat.albedo.y > 0.0f || mat.albedo.z > 0.0f);
+}
+// A lamp whose surface is smooth glass (MaterialData::lampGlass): its light is added and the path goes on through it as through a Dielectric (the recursive hit programs and the
+// wavefront material kernel; SPPM still ends its paths there).
+RT_LAMP_FN bool lamp_glass(const MaterialData& mat) {
+	return mat.type == MaterialType::DiffuseLight && mat.lampGlass;
+}
+// A lamp that goes on scattering after its light is added: one that reflects or one of glass.
+RT_LAMP_FN bool lamp_scatters(const MaterialData& mat) {
+	return lamp_reflects(mat) || lamp_glass(mat);
 }
 
 // Punctual (delta) light kinds - point/spot/distant. These are evaluated
