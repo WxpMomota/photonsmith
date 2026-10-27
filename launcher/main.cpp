@@ -1208,8 +1208,9 @@ int main(int argc, char** argv) {
 					  << (s.shot < static_cast<int>(names.size()) ? names[static_cast<std::size_t>(s.shot)] : std::string()) << std::endl;
 		return EXIT_SUCCESS;
 	}
-	// `ray_tracer --film-media <key> [samples a shot]`: the moments the camera is inside the sphere of a medium not its own - smoke, a flame, a plume, a cloud, unseen from in
-	// there (film_checks.h) - one tab-separated line each: `inside  shot (1 = the first)  when  medium  radius  how far inside  name`; then `spheres  N`, the most in a frame.
+	// `ray_tracer --film-media <key> [samples a shot]`: the moments the camera is inside the sphere of a medium not its own - smoke, a flame, a plume, a cloud, which the Mac's
+	// renderer draws only in part from in there (film_checks.h) - one tab-separated line each: `inside  shot (1 = the first)  when  medium  radius  how far inside  name`; then
+	// `spheres  N`, the most in a frame.
 	if (argc >= 2 && std::string(argv[1]) == "--film-media") {
 		const cartoon::Film *film = argc >= 3 ? cartoon::find(argv[2]) : nullptr;
 		if (!film) {

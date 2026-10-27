@@ -179,6 +179,7 @@ bool OptiXRenderer::renderWavefront(unsigned int width, unsigned int height, uns
 	wavefrontTracer_->setCloudMediums(d_cloudMediums_, numCloudMediums_);
 	wavefrontTracer_->setRgbGridMediums(d_rgbGridMediums_, numRgbGridMediums_, d_rgbGridData_, rgbGridDataCount_);
 	wavefrontTracer_->setGridMediums(d_gridMediums_, numGridMediums_, d_gridData_, gridDataCount_);
+	wavefrontTracer_->setMediumShapes(d_mediumShapes_, numMediumShapes_, d_listedMediumSphere_);
 	wavefrontTracer_->setBssrdfTables(d_bssrdfTables_, numBssrdfTables_,
 		d_bssrdfRhoSamples_, d_bssrdfRadiusSamples_, d_bssrdfProfile_, d_bssrdfProfileCdf_);
 	wavefrontTracer_->setMeasuredTables(d_measuredTables_, numMeasuredTables_,
@@ -567,6 +568,8 @@ void OptiXRenderer::cleanup() noexcept {
 	if (d_cloudMediums_) cudaFree(reinterpret_cast<void*>(d_cloudMediums_));
 	if (d_rgbGridMediums_) cudaFree(reinterpret_cast<void*>(d_rgbGridMediums_));
 	if (d_rgbGridData_) cudaFree(reinterpret_cast<void*>(d_rgbGridData_));
+	if (d_mediumShapes_) cudaFree(reinterpret_cast<void*>(d_mediumShapes_));
+	if (d_listedMediumSphere_) cudaFree(reinterpret_cast<void*>(d_listedMediumSphere_));
 	if (d_bssrdfTables_) cudaFree(reinterpret_cast<void*>(d_bssrdfTables_));
 	if (d_bssrdfRhoSamples_) cudaFree(reinterpret_cast<void*>(d_bssrdfRhoSamples_));
 	if (d_bssrdfRadiusSamples_) cudaFree(reinterpret_cast<void*>(d_bssrdfRadiusSamples_));

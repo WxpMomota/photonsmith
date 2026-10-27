@@ -194,6 +194,7 @@ extern "C" __global__ void generate_camera_rays(
 	item.scatterOrigin = item.origin;
 	item.tMin       = 0.001f;
 	item.tMax       = 1e30f;
+	item.mediaTMin  = 0.0f;
 
 	rayQueue.push(item);
 }

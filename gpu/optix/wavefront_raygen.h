@@ -2,6 +2,26 @@
 // Included by wavefront_programs.cu, after wavefront_common.h.
 #include "wavefront_camera_medium.h"   // (the part of a ray inside the camera medium; a camera medium that lies in a layer)
 
+// The part [t0, t1] of a ray's flight [tFrom, tTo] inside a listed volume's boundary (GpuMediumShape), in the ray's own parameter. False when the
+// flight spends no length in it.
+__device__ __forceinline__ bool wf_medium_shape_flight(const GpuMediumShape& s, float3 o, float3 d, float tFrom, float tTo, float& t0, float& t1) {
+	float a, b;
+	if (s.isBox) {
+		if (!wf_box_slab_intersect(o, d, s.boxMin, s.boxMax, a, b)) return false;
+	} else {
+		const float3 oc = o - s.center;
+		const float A = dot(d, d), halfB = dot(oc, d), C = dot(oc, oc) - s.radius * s.radius;
+		const float disc = halfB * halfB - A * C;
+		if (A <= 0.0f || disc <= 0.0f) return false;
+		const float root = sqrtf(disc);
+		a = (-halfB - root) / A;
+		b = (-halfB + root) / A;
+	}
+	t0 = fmaxf(a, tFrom);
+	t1 = fminf(b, tTo);
+	return t1 > t0;
+}
+
 // ============================================================================
 // __raygen__wf_intersect
 //   Launch dimensions: (numRaysInQueue, 1, 1).
@@ -60,11 +80,30 @@ extern "C" __global__ void __raygen__wf_intersect() {
 		p0, p1
 	);
 
+	// The listed volumes (GpuMediumShape: fog, smoke and cloud volumes, whose boundary spheres the trace skipped): the first one the flight from
+	// mediaTMin to the nearest surface enters, and the part of the flight inside it - pbrt's medium along the ray up to the next surface, so the
+	// ground and objects inside a volume stop the flight, and a ray that starts inside one (the camera, a bounce off something in it) is in it from
+	// its origin. The flight becomes a hit on the volume's medium material (geomType kWfGeomListedMedium), sampled by the material kernels; one that
+	// gets through comes back here as the same ray with mediaTMin past it, so each volume along the ray is sampled in turn. (Where two volumes
+	// overlap, the second is sampled only beyond the first one's far side.)
+	const float tSurface = payload.hit ? payload.t : 1e30f;
+	int   listed = -1;
+	float listedT0 = 0.0f, listedT1 = 0.0f;
+	for (unsigned int i = 0; i < wf_params.numMediumShapes; ++i) {
+		float t0, t1;
+		if (wf_medium_shape_flight(wf_params.mediumShapes[i], ray.origin, ray.direction, ray.mediaTMin, tSurface, t0, t1) && (listed < 0 || t0 < listedT0)) {
+			listed   = (int)i;
+			listedT0 = t0;
+			listedT1 = t1;
+		}
+	}
+
 	// pbrt's camera medium (unbounded fog the camera starts inside): sample the free flight against the nearest
 	// surface (or infinity on a miss), as CPU's ambient_medium::sample_scatter() does after its own world.hit().
 	// A scatter before the surface becomes a hit on the synthetic Medium material at the scatter point, shaded by
 	// the ordinary medium scatter code (phase NEE + bounce); no scatter passes with weight 1 - the sample already
 	// picked pass with probability T, so multiplying by T as well would attenuate a surviving ray twice.
+	// The flight ends where a listed volume begins (inside one, the volume alone is sampled) and starts at mediaTMin.
 	unsigned int ambientSeed = ray.seed;
 	bool  ambientScatter = false;
 	float ambientT = 0.0f;
@@ -72,7 +111,7 @@ extern "C" __global__ void __raygen__wf_intersect() {
 	for (int i = 0; i < kWFNWavelengths; ++i) ambientPass[i] = 1.0f;
 	float segT0 = 0.0f, segT1 = 0.0f;   // the part of the flight inside the camera medium (all of it unless the medium ends at a sphere)
 	if (wf_params.cameraMediumSigmaT > 0.0f && wf_params.cameraMediumMaterialIdx >= 0
-		&& wf_camera_medium_segment(wf_params.materials[wf_params.cameraMediumMaterialIdx], ray.origin, ray.direction, payload.hit ? payload.t : 1e30f, segT0, segT1)) {
+		&& wf_camera_medium_segment(wf_params.materials[wf_params.cameraMediumMaterialIdx], ray.origin, ray.direction, listed >= 0 ? listedT0 : tSurface, segT0, segT1, ray.mediaTMin)) {
 		const MaterialData& cmMat = wf_params.materials[wf_params.cameraMediumMaterialIdx];
 		if (cmMat.camera_medium_extra.fogThickness > 0.0f && wf_medium_is_chromatic(cmMat)) {
 			// a layer whose extinction differs per wavelength (air): drawn per wavelength over the segment's optical depth per unit of extinction, where the layer is
@@ -108,7 +147,7 @@ extern "C" __global__ void __raygen__wf_intersect() {
 		}
 	}
 
-	if (payload.hit || ambientScatter) {
+	if (payload.hit || ambientScatter || listed >= 0) {
 		HitWorkItem h;
 		if (ambientScatter) {
 			h.hitPoint    = ray.origin + ambientT * ray.direction;
@@ -118,7 +157,20 @@ extern "C" __global__ void __raygen__wf_intersect() {
 			h.materialIdx = wf_params.cameraMediumMaterialIdx;
 			h.geomType    = kWfGeomCameraMedium;
 			h.primIdx     = -1;
-			h.mediumTFar  = 0.0f;
+			h.mediumTFar  = segT0;   // (a camera-medium scatter: where its flight began, for the collision weights the material kernel recomputes)
+			h.frontFace   = 1;
+			h.objDpdu     = make_float3(0.0f, 0.0f, 0.0f);
+			h.uv_u        = 0.0f;
+			h.uv_v        = 0.0f;
+		} else if (listed >= 0) {
+			h.hitPoint    = ray.origin + listedT0 * ray.direction;
+			h.normal      = -ray.direction;
+			h.geomNormal  = make_float3(0.0f, 0.0f, 0.0f);
+			h.t           = listedT0;
+			h.materialIdx = wf_params.mediumShapes[listed].materialIdx;
+			h.geomType    = kWfGeomListedMedium;
+			h.primIdx     = -1;
+			h.mediumTFar  = listedT1;
 			h.frontFace   = 1;
 			h.objDpdu     = make_float3(0.0f, 0.0f, 0.0f);
 			h.uv_u        = 0.0f;
@@ -289,6 +341,15 @@ extern "C" __global__ void __raygen__wf_shadow() {
 							// memory footprint crash outright instead of "working".
 		p0, p1
 	);
+
+	// The listed volumes (their boundary spheres were skipped by the trace): what gets through the part of the shadow ray inside each - all of it
+	// that lies in one, wherever the ray starts and ends (a fog point lit by a lamp in the same fog).
+	for (unsigned int i = 0; i < wf_params.numMediumShapes && sp.transmittance > 0.0f; ++i) {
+		const GpuMediumShape& shape = wf_params.mediumShapes[i];
+		float t0, t1;
+		if (wf_medium_shape_flight(shape, s.origin, s.direction, 0.0f, s.tMax, t0, t1))
+			wf_shadow_through_medium(wf_params.materials[shape.materialIdx], s.origin, s.direction, t0, t1, &sp);
+	}
 
 	// Write result into the transmittance array (reused from framebuffer
 	// pointer during shadow pass) - see WfShadowPayload::transmittance's own

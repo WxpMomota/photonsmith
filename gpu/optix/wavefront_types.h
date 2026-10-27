@@ -38,6 +38,23 @@ inline float3 make_float3(float x, float y, float z) { return float3{x, y, z}; }
 static constexpr int kWFNWavelengths = 4;
 // HitWorkItem::geomType of a scatter event in the camera medium (not a surface hit) - see __raygen__wf_trace.
 static constexpr int kWfGeomCameraMedium = 6;
+// HitWorkItem::geomType of a ray's flight through a listed volume (GpuMediumShape): t and mediumTFar are the part of the flight inside it, up to
+// the nearest surface - see __raygen__wf_intersect.
+static constexpr int kWfGeomListedMedium = 7;
+
+// A fog, smoke or cloud volume this renderer samples along each ray's flight up to the nearest surface, as pbrt does, instead of when the ray
+// meets its boundary (the boundary sphere is left out of the trace: __intersection__wf_sphere skips it). A boundary hit could not see a surface
+// inside the volume - a ray entering passed through the ground and the objects in it - nor the volume around a ray that starts inside it (the
+// camera, or a bounce off something in the fog). The medium material of a top-level "interface" sphere or box with a MediumInterface
+// (wavefront_medium_shapes.h picks them); a clipped, moving or instanced one keeps the boundary-hit sampling.
+struct GpuMediumShape {
+	float3 center;      // a sphere: centre and radius
+	float  radius;
+	float3 boxMin;      // a box (isBox): its corners
+	float3 boxMax;
+	int    isBox;
+	int    materialIdx;   // a Medium, CloudMedium, RgbGridMedium or GridMedium material
+};
 
 // A primary or bounce ray pending intersection.
 struct RayWorkItem {
@@ -110,6 +127,10 @@ struct RayWorkItem {
 	float3       scatterOrigin;
 	float        tMin;             // ray t_min (normally 0.001)
 	float        tMax;             // ray t_max (normally 1e30)
+	// How far along this ray the listed volumes (GpuMediumShape) have already been sampled: 0, except for the ray that goes on after a flight
+	// through one ended without a collision - it starts again at the same origin, so that the surface which ended the flight is found by the same
+	// trace, and only the volumes beyond this distance are sampled.
+	float        mediaTMin;
 	// Object (per-primitive sphere) motion blur shutter time in [0,1] -
 	// RTIOW convention, matching the recursive backend's own PathTracingPayload
 	// equivalent (optix_raygen.h's ray_time local) and CPU's ray::time(). One
@@ -872,6 +893,11 @@ struct WavefrontLaunchParams {
 	// shadow ray by exp(-sigmaT * length).
 	float cameraMediumSigmaT;
 	int   cameraMediumMaterialIdx;
+	// The volumes sampled along each ray's flight (GpuMediumShape), and per top-level sphere a 1 for the boundary spheres among them, which the
+	// trace skips. Null / 0 when the scene has none.
+	const GpuMediumShape* mediumShapes;
+	unsigned int          numMediumShapes;
+	const unsigned char*  listedMediumSphere;
 
 	// Scene
 	OptixTraversableHandle traversable;

@@ -9,6 +9,7 @@
 #include "optix_math_helpers.h"
 #include "../../src/shared/bilinear_patch.h"  // blp_area - alias-table power for GpuLightKind::BilinearPatch
 #include "optix_disk_cylinder_helpers.h"  // dc_area_disk/dc_area_cylinder - alias-table power for GpuLightKind::Disk/Cylinder
+#include "wavefront_medium_shapes.h"  // the volumes the wavefront renderer samples along each flight (uploadMediumShapes)
 #include "../../src/shared/bvh_light_sampler2.h"  // BVHLightSampler2 - host-side light-BVH tree builder (see d_lightBvhNodes_'s own comment, optix_renderer.h)
 #include <cuda.h>
 #include <iostream>

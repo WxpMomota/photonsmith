@@ -1178,6 +1178,7 @@ __device__ __forceinline__ void wf_finish_material_scatter(
 
 	next.tMin       = 0.001f;
 	next.tMax       = 1e30f;
+	next.mediaTMin  = 0.0f;
 	// Fixed for the whole path once sampled at the camera - see RayWorkItem::
 	// time's own comment.
 	next.time       = time;

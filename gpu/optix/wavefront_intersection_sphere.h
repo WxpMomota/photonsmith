@@ -127,6 +127,9 @@ __device__ __forceinline__ bool wf_material_needs_dpdu(MaterialType type) {
 
 extern "C" __global__ void __intersection__wf_sphere() {
 	const unsigned int primIdx = optixGetPrimitiveIndex();
+	// The boundary of a listed volume (GpuMediumShape) is not a surface to this renderer: the volume is sampled along every flight instead
+	// (__raygen__wf_intersect, __raygen__wf_shadow). Listed spheres are all top-level, where primIdx is the sphere's index.
+	if (wf_params.listedMediumSphere && wf_instance_base() < 0 && wf_params.listedMediumSphere[primIdx]) return;
 	const SphereData& sphere = wf_params.spheres[wf_prim_base(wf_instance_base()) + primIdx];
 
 	// OBJECT space - the sphere's centre/radius live in whatever space its GAS

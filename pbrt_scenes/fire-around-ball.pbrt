@@ -1,0 +1,40 @@
+# @rt-category Test Scenes
+# @rt-description A glowing RGB grid (a fire's medium) in a box round a red ball. Checks emission and scattering of a grid medium with an object inside it.
+# @rt-performance Fast
+# @rt-size 10
+# fire-around-ball.pbrt -- a 4x4x4 "rgbgrid" medium that scatters and glows (hotter in the middle columns), filling a 4 m box that holds a red
+# ball and cuts into the ground, inside an interface sphere. Against real pbrt-v4: the CPU and both GPU renderers within 0.1%.
+#
+# The GPU used to sample a volume only where a ray met its boundary sphere: a ray that entered went straight through the ground and the
+# objects inside, and a ray that started inside (the camera's, or a bounce off something in the fog) saw no fog before the first surface.
+# Now both GPU renderers sample a fog, smoke or cloud volume along each ray up to the nearest surface, as pbrt and the CPU do
+# (gpu/optix/wavefront_medium_shapes.h; the default GPU renderer hands such a scene to the wavefront one).
+LookAt 0 3 -9  0 1 0  0 1 0
+Camera "perspective" "float fov" [ 40 ]
+Film "rgb" "integer xresolution" [ 320 ] "integer yresolution" [ 320 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+WorldBegin
+LightSource "distant" "point3 from" [ 3 8 -4 ] "point3 to" [ 0 0 0 ] "rgb L" [ 3 3 3 ]
+LightSource "infinite" "rgb L" [ 0.25 0.3 0.4 ]
+Material "diffuse" "rgb reflectance" [ 0.5 0.5 0.5 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -20 0 -20   20 0 -20   20 0 20   -20 0 20 ]
+AttributeBegin
+  Material "diffuse" "rgb reflectance" [ 0.7 0.15 0.1 ]
+  Translate 0 1 0
+  Shape "sphere" "float radius" [ 1 ]
+AttributeEnd
+AttributeBegin
+  Translate -2 -0.5 -2
+  Scale 4 4 4
+  MakeNamedMedium "fire" "string type" [ "rgbgrid" ] "integer nx" [ 4 ] "integer ny" [ 4 ] "integer nz" [ 4 ] "float g" [ 0 ] "float Lescale" [ 0.04 ]
+    "rgb sigma_s" [ 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 0.6 0.4 0.3 ]
+    "rgb sigma_a" [ 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 0.3 ]
+    "rgb Le" [ 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 1.5 0.75 0.225 1.5 0.75 0.225 0.3 0.15 0.045 0.3 0.15 0.045 1.5 0.75 0.225 1.5 0.75 0.225 0.3 0.15 0.045 0.3 0.15 0.045 1.5 0.75 0.225 1.5 0.75 0.225 0.3 0.15 0.045 0.3 0.15 0.045 1.5 0.75 0.225 1.5 0.75 0.225 0.3 0.15 0.045 0.3 0.15 0.045 1.5 0.75 0.225 1.5 0.75 0.225 0.3 0.15 0.045 0.3 0.15 0.045 1.5 0.75 0.225 1.5 0.75 0.225 0.3 0.15 0.045 0.3 0.15 0.045 1.5 0.75 0.225 1.5 0.75 0.225 0.3 0.15 0.045 0.3 0.15 0.045 1.5 0.75 0.225 1.5 0.75 0.225 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 0.3 0.15 0.045 ]
+AttributeEnd
+AttributeBegin
+  Translate 0 1.5 0
+  Material "interface"
+  MediumInterface "fire" ""
+  Shape "sphere" "float radius" [ 3.5 ]
+AttributeEnd

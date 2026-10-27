@@ -11,6 +11,7 @@
 // this project's own output.
 #include "../../cpu_renderer/cpu_interface.h"
 #include "pbrt_gpu_builder.h"
+#include "wavefront_medium_shapes.h"   // the fog/smoke/cloud volumes that send a scene to the wavefront renderer
 #include "../../src/shared/pbrt_load.h"
 #include "optix_live_edit.h"   // Live Preview moves objects: the offsets applied here, and what picking needs
 #include "../../src/shared/gpu_tessellate.h"   // cones and paraboloids become triangles (the same step Metal uses for all its unsupported shapes)
@@ -629,6 +630,105 @@ static void warn_lamp_materials_not_reflected(const SceneData& scene) {
 		             "reflects light off them as that material, this renderer draws them as pure emitters - use --cpu if the lamp's own surface matters.\n";
 }
 
+// Whether the default GPU renderer would draw one of the scene's fog/smoke/cloud volumes (wavefront_medium_shapes.h) wrong: it samples a volume only from where a
+// ray meets its sphere to the sphere's far side, which is right only while nothing is inside - so the camera inside one, or any surface whose bounding box reaches
+// into one (the ground under a smoke plume, a ball in a fog), sends the scene to the wavefront renderer. Conservative: a box corner that dips into the sphere counts.
+static bool something_inside_a_volume(const SceneData& scene, const double camera[3]) {
+	const std::vector<GpuMediumShape> volumes = wavefront_media::shapes(scene.spheres, scene.materials);
+	if (volumes.empty()) return false;
+	struct Box { float lo[3] = {1e30f, 1e30f, 1e30f}, hi[3] = {-1e30f, -1e30f, -1e30f};
+		void add(float x, float y, float z) { const float p[3] = {x, y, z}; for (int i = 0; i < 3; ++i) { lo[i] = std::min(lo[i], p[i]); hi[i] = std::max(hi[i], p[i]); } }
+		void add(const float3& p) { add(p.x, p.y, p.z); } };
+	// does a box reach into a volume? (sphere: its centre's distance to the box; box: the boxes overlap)
+	const auto meets = [&volumes](const Box& b) {
+		for (const GpuMediumShape& v : volumes) {
+			if (v.isBox) {
+				const float vlo[3] = {v.boxMin.x, v.boxMin.y, v.boxMin.z}, vhi[3] = {v.boxMax.x, v.boxMax.y, v.boxMax.z};
+				bool all = true;
+				for (int i = 0; i < 3; ++i) all = all && b.lo[i] < vhi[i] && b.hi[i] > vlo[i];
+				if (all) return true;
+			} else {
+				const float c[3] = {v.center.x, v.center.y, v.center.z};
+				float d2 = 0.0f;
+				for (int i = 0; i < 3; ++i) { const float d = std::max({b.lo[i] - c[i], 0.0f, c[i] - b.hi[i]}); d2 += d * d; }
+				if (d2 < v.radius * v.radius) return true;
+			}
+		}
+		return false;
+	};
+	{   // the camera
+		Box b;
+		b.add(static_cast<float>(camera[0]), static_cast<float>(camera[1]), static_cast<float>(camera[2]));
+		if (meets(b)) return true;
+	}
+	const auto sphereBox = [](const SphereData& s) {
+		Box b;
+		if (s.shapeKind == GpuMediumShapeKind::Box) { b.add(s.boxMin); b.add(s.boxMax); }
+		else { b.add(s.center.x - s.radius, s.center.y - s.radius, s.center.z - s.radius); b.add(s.center.x + s.radius, s.center.y + s.radius, s.center.z + s.radius); }
+		return b;
+	};
+	// a surface, not a volume or an invisible interface shell
+	const auto isSurface = [&scene](int materialIdx) {
+		if (materialIdx < 0 || static_cast<size_t>(materialIdx) >= scene.materials.size()) return true;
+		const MaterialType t = scene.materials[static_cast<size_t>(materialIdx)].type;
+		return t != MaterialType::Interface && t != MaterialType::Medium && t != MaterialType::CloudMedium && t != MaterialType::RgbGridMedium && t != MaterialType::GridMedium;
+	};
+	for (const SphereData& s : scene.spheres)
+		if (isSurface(s.materialIdx) && meets(sphereBox(s))) return true;
+	for (const QuadData& q : scene.quads) {
+		Box b;
+		b.add(q.Q); b.add(q.Q + q.u); b.add(q.Q + q.v); b.add(q.Q + q.u + q.v);
+		if (meets(b)) return true;
+	}
+	for (const BilinearPatchData& p : scene.bilinearPatches) {
+		Box b;
+		b.add(p.p00); b.add(p.p10); b.add(p.p01); b.add(p.p11);
+		if (meets(b)) return true;
+	}
+	for (const TriangleData& t : scene.triangles) {
+		Box b;
+		b.add(t.p0); b.add(t.p1); b.add(t.p2);
+		if (meets(b)) return true;
+	}
+	// a disk's or a cylinder's object-space box, carried to the world by its own transform (3x4 row-major)
+	const auto placedBox = [](const float m[12], const Box& o) {
+		Box b;
+		for (int k = 0; k < 8; ++k) {
+			const float x = (k & 1) ? o.hi[0] : o.lo[0], y = (k & 2) ? o.hi[1] : o.lo[1], z = (k & 4) ? o.hi[2] : o.lo[2];
+			b.add(m[0] * x + m[1] * y + m[2] * z + m[3], m[4] * x + m[5] * y + m[6] * z + m[7], m[8] * x + m[9] * y + m[10] * z + m[11]);
+		}
+		return b;
+	};
+	for (const DiskData& d : scene.disks) {
+		Box o;
+		o.add(-d.radius, -d.radius, d.height); o.add(d.radius, d.radius, d.height);
+		if (meets(placedBox(d.o2w, o))) return true;
+	}
+	for (const CylinderData& c : scene.cylinders) {
+		Box o;
+		o.add(-c.radius, -c.radius, c.zMin); o.add(c.radius, c.radius, c.zMax);
+		if (meets(placedBox(c.o2w, o))) return true;
+	}
+	// placed objects: each definition's object-space box, carried to the world by each placement
+	std::vector<Box> groupBoxes(scene.instanceGroups.size());
+	for (size_t g = 0; g < scene.instanceGroups.size(); ++g) {
+		const SceneData::InstanceGroupGPU& grp = scene.instanceGroups[g];
+		for (int i = 0; i < grp.triangleCount; ++i) {
+			const TriangleData& t = scene.instanceTriangles[static_cast<size_t>(grp.triangleBase + i)];
+			groupBoxes[g].add(t.p0); groupBoxes[g].add(t.p1); groupBoxes[g].add(t.p2);
+		}
+		for (int i = 0; i < grp.sphereCount; ++i) {
+			const Box b = sphereBox(scene.instanceSpheres[static_cast<size_t>(grp.sphereBase + i)]);
+			groupBoxes[g].add(b.lo[0], b.lo[1], b.lo[2]); groupBoxes[g].add(b.hi[0], b.hi[1], b.hi[2]);
+		}
+	}
+	for (const SceneData::InstancePlacementGPU& p : scene.instancePlacements) {
+		if (p.group < 0 || static_cast<size_t>(p.group) >= groupBoxes.size() || groupBoxes[static_cast<size_t>(p.group)].lo[0] > groupBoxes[static_cast<size_t>(p.group)].hi[0]) continue;
+		if (meets(placedBox(p.transform, groupBoxes[static_cast<size_t>(p.group)]))) return true;
+	}
+	return false;
+}
+
 // Everything a loaded .pbrt scene says about the render besides geometry and camera placement (sky, filter, firefly clamp, crop window, media, textures, lights),
 // copied into `scene` and `out_camera_extra`. A pure split of build_loaded_pbrt_scene(); nothing here changed.
 static void apply_loaded_scene_settings(const char* path,
@@ -823,6 +923,14 @@ static void apply_loaded_scene_settings(const char* path,
 		loaded.scene.media[static_cast<std::size_t>(loaded.scene.cameraMediumIndex)].type == "heightfog") {
 		scene.needsWavefront = true;
 		scene.needsWavefrontReason = "the camera's fog lies in a layer (a \"heightfog\" medium)";
+	}
+	// Fog, smoke and cloud volumes with something inside: the wavefront renderer samples a volume along each ray's flight up to the nearest surface
+	// (wavefront_medium_shapes.h); the default renderer only where a ray meets its boundary, so a ray that entered went through the ground and the
+	// objects inside, and a ray starting inside one (the camera's, or a bounce off something in it) saw no fog before the first surface. A volume with
+	// nothing inside it stays with the default renderer, which draws it right (and per colour channel where the wavefront renderer is spectral).
+	if (!scene.needsWavefront && something_inside_a_volume(builtScene, loaded.scene.camera.lookfrom)) {
+		scene.needsWavefront = true;
+		scene.needsWavefrontReason = "the camera or a surface is inside a fog, smoke or cloud volume";
 	}
 
 	// checkerboard/mix "tex1"/"tex2" nesting a further procedural texture

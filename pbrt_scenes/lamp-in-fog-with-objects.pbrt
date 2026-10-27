@@ -1,0 +1,35 @@
+# @rt-category Test Scenes
+# @rt-description A point lamp inside a fog ball over the ground, with a red ball beside it. Checks the light that reaches things inside a volume from a lamp inside it.
+# @rt-performance Fast
+# @rt-size 10
+# lamp-in-fog-with-objects.pbrt -- the fog ball of fog-around-objects.pbrt lit only by a point lamp inside it (and the sky): every shadow ray from
+# the ground or the ball to the lamp starts and ends inside the fog, so it never crosses the fog's sphere. Against real pbrt-v4: the CPU and both
+# GPU renderers within 0.2% (the GPU was +11% / +14%: its shadow rays only saw the fog where they crossed the sphere).
+#
+# The GPU used to sample a volume only where a ray met its boundary sphere: a ray that entered went straight through the ground and the
+# objects inside, and a ray that started inside (the camera's, or a bounce off something in the fog) saw no fog before the first surface.
+# Now both GPU renderers sample a fog, smoke or cloud volume along each ray up to the nearest surface, as pbrt and the CPU do
+# (gpu/optix/wavefront_medium_shapes.h; the default GPU renderer hands such a scene to the wavefront one).
+LookAt 0 3 -9  0 1 0  0 1 0
+Camera "perspective" "float fov" [ 40 ]
+Film "rgb" "integer xresolution" [ 320 ] "integer yresolution" [ 320 ]
+Sampler "halton" "integer pixelsamples" [ 64 ]
+WorldBegin
+LightSource "distant" "point3 from" [ 3 8 -4 ] "point3 to" [ 0 0 0 ] "rgb L" [ 0 0 0 ]
+LightSource "infinite" "rgb L" [ 0.25 0.3 0.4 ]
+Material "diffuse" "rgb reflectance" [ 0.5 0.5 0.5 ]
+Shape "trianglemesh" "integer indices" [ 0 1 2  0 2 3 ]
+  "point3 P" [ -20 0 -20   20 0 -20   20 0 20   -20 0 20 ]
+AttributeBegin
+  Material "diffuse" "rgb reflectance" [ 0.7 0.15 0.1 ]
+  Translate 0 1 0
+  Shape "sphere" "float radius" [ 1 ]
+AttributeEnd
+LightSource "point" "point3 from" [ 1.2 2.2 -1.0 ] "rgb I" [ 4 4 4 ]
+MakeNamedMedium "fog" "string type" [ "homogeneous" ] "rgb sigma_a" [ 0.05 0.05 0.05 ] "rgb sigma_s" [ 0.5 0.5 0.5 ] "float g" [ 0.3 ]
+AttributeBegin
+  Translate 0 1 0
+  Material "interface"
+  MediumInterface "fog" ""
+  Shape "sphere" "float radius" [ 2.5 ]
+AttributeEnd

@@ -340,8 +340,9 @@ tradeoff, not a NanoVDB limitation), capped at 512 voxels/axis
 integer-overflow-into-heap-overflow risk a code-review pass found for a
 corrupt/malicious file claiming an extreme bbox). **On the GPU** (both OptiX backends) the file is read and densified on the host by the same code the CPU uses (`src/shared/nanovdb_dense.h`) and then rendered by the dense-grid medium `"uniformgrid"` already has, so no NanoVDB code runs on a device (which avoids the device-crash problems earlier GPU media work ran into). E9 matches the CPU to 0.1% in brightness (0.6075 CPU, 0.6080 recursive, 0.6074 wavefront), where it used to render as flat fog. Differences: a `"temperaturename"` blackbody grid is read on the CPU only (the GPU grid medium has no per-voxel emission; `scene_builder.cpp` warns and renders the density), and the file is read once per process (Live Preview does not re-read it on every camera move). Metal reads them too (since 2026-10-09): the same shared reader, drawn by Metal's per-voxel RGB grid medium.
 
-**Gap**: GPU medium dispatch (all types) is sphere-hit-triggered only — a
-`MediumInterface` on a disk/cylinder/trianglemesh has no effect on GPU
+**Gap**: a GPU medium must live in a sphere (sampled along each ray's flight up to the nearest
+surface by the wavefront renderer since 2026-10-27, so surfaces and the camera may be inside it;
+see docs/PBRT_SUPPORT.md) — a `MediumInterface` on a disk/cylinder/trianglemesh has no effect on GPU
 (cylinder gained real homogeneous-medium support since; disk is
 structurally not meaningful — zero-thickness, no "inside" to bound).
 **Trianglemesh specifically canary-tested and confirmed blocked** (same

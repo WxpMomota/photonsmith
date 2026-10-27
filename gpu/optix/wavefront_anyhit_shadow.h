@@ -58,56 +58,15 @@ __device__ __forceinline__ void wf_shadow_pass_thin_glass(WfShadowPayload* sp, c
 	optixIgnoreIntersection();
 }
 
-extern "C" __global__ void __anyhit__wf_shadow_sphere() {
-	const int instBase = wf_instance_base();
-	const SphereData& sph = wf_params.spheres[wf_prim_base(instBase) + optixGetPrimitiveIndex()];
-	// Resolved to a real, non-Mix material before any mat.type check below -
-	// see MaterialType::Mix's own comment (optix_types.h). Matches CPU's
-	// mix_material::is_shadow_transmissive(), which delegates to the same
-	// deterministic (hashed-hit-point) sub-material pick as scatter().
-	const float shadow_t = optixGetRayTmax();
-	const float3 ray_orig = optixGetWorldRayOrigin();
-	const float3 ray_dir  = optixGetWorldRayDirection();
-	const float3 shadow_hit_point = ray_orig + shadow_t * ray_dir;
-	int matIdx = sph.materialIdx;
-	const MaterialData mat = wf_resolve_mix_material(wf_params.materials[matIdx], matIdx, shadow_hit_point, matIdx);
-
-	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
-		optixGetPayload_0(), optixGetPayload_1());
-
-	// An emissive sphere is an occluder like every other pbrt-v4 surface: the shadow ray a light sample fires stops
-	// just short of its target (NEE call sites subtract 0.002) and sphere lights are cone-sampled, so the target is
-	// on the sphere's near side and the ray never reaches it - a hit here is a DIFFERENT emitter, or the light's own
-	// far side, in the way. It used to be ignored, so an emissive sphere hanging in front of a lamp cast no shadow
-	// (a dim emissive ball under a quad lamp over a floor: 117% of the CPU on both GPU backends).
-	// Only an "interface" lets a shadow ray through: a Subsurface surface is opaque to NEE shadow rays like every other surface with a material in pbrt-v4.
-	if (mat.type == MaterialType::Interface) {
-		optixIgnoreIntersection();
-		return;
-	}
-	if (mat.type == MaterialType::ThinDielectric) { wf_shadow_pass_thin_glass(sp, mat, 1.0f); return; }
-
-	// Participating media: attenuate the running transmittance instead of
-	// the old unconditional pass-through - see WfShadowPayload::
-	// transmittance's own comment (wavefront_common.h). Homogeneous Medium
-	// gets deterministic Beer-Lambert over the sphere's own
-	// analytic near/far chord; the three heterogeneous kinds get stochastic
-	// ratio tracking against their existing GLOBAL majorant (sigma_maj) -
-	// same simplification the primary-ray free-path sampling already makes
-	// (wavefront_kernels_materials.cu), so shadow and primary-ray results
-	// stay mutually consistent.
-	// DielectricMedium (a real glass surface that bounds a medium) is deliberately NOT here: like every pbrt-v4
-	// surface with a material it is opaque to NEE shadow rays (VolPathIntegrator::SampleLd), so it falls through to
-	// the occluder case below. Light reaches the fog inside only along specular chains, as in pbrt.
+// What gets through the part [t0, t1] of a shadow ray inside a participating medium (`mat`), multiplied into sp's running transmittance: Beer-Lambert
+// for a homogeneous Medium (per hero wavelength into sp->tr for one whose extinction differs per wavelength), ratio tracking against the medium's
+// GLOBAL majorant (sigma_maj) for the three heterogeneous kinds - the same simplification the primary-ray free-path sampling already makes
+// (wavefront_kernels_materials.cu), so shadow and primary-ray results stay mutually consistent; a cloud or grid only inside its own box as well.
+// The shadow any-hit passes the chord through the medium's boundary shape, __raygen__wf_shadow the chord through each listed volume
+// (GpuMediumShape). unit_dir is the ray's unit direction; t0, t1 are along it. False when `mat` is not one of the four medium kinds.
+__device__ __forceinline__ bool wf_shadow_through_medium(const MaterialData& mat, float3 ray_orig, float3 unit_dir, float t0, float t1, WfShadowPayload* sp) {
 	if (mat.type == MaterialType::Medium) {
-		const float3 unit_dir = normalize(ray_dir);
-		const bool is_box = (sph.shapeKind == GpuMediumShapeKind::Box);
-		const float3 sphere_center = wf_read_hit_sphere_center();
-		float t_near, t_far;
-		wf_medium_sphere_near_far(ray_orig, unit_dir, sph, sphere_center, is_box, wf_instance_base(), t_near, t_far);
-		const float sigma_t = mat.sigma_t;
-		const float segFar = fminf(t_far, sp->tMax);
-		const float segLen = fmaxf(0.0f, segFar - fmaxf(0.0f, t_near));
+		const float segLen = fmaxf(0.0f, t1 - t0);
 		if (wf_medium_is_chromatic(mat)) {
 			// Per-wavelength Beer-Lambert through this chord: tr[] carries the colour product, `transmittance` stays the scalar one.
 			bool alive = false;
@@ -117,23 +76,11 @@ extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 				if (sp->tr[i] > 0.0f) alive = true;
 			}
 			sp->chromatic = 1;
-			if (!alive) { sp->transmittance = 0.0f; optixTerminateRay(); return; }
-			optixIgnoreIntersection();
-			return;
+			if (!alive) sp->transmittance = 0.0f;
+			return true;
 		}
-		sp->transmittance *= expf(-sigma_t * segLen);
-		if (sp->transmittance <= 0.0f) { optixTerminateRay(); return; }
-		optixIgnoreIntersection();
-		return;
-	}
-	// The part of the shadow ray inside the medium's INTERFACE SHAPE (a pbrt medium fills it, not its grid box, which can stick out of it): the heterogeneous media below
-	// track only through that chord, like optix_anyhit_shadow.h's shadow_ratio_track_heterogeneous(). A ClippedSphere is not clipped (no attributes to read).
-	float clipNear = 0.0f, clipFar = 1e30f;
-	if (mat.type == MaterialType::CloudMedium || mat.type == MaterialType::RgbGridMedium || mat.type == MaterialType::GridMedium) {
-		if (sph.shapeKind != GpuMediumShapeKind::ClippedSphere) {
-			wf_medium_sphere_near_far(ray_orig, normalize(ray_dir), sph, wf_read_hit_sphere_center(), sph.shapeKind == GpuMediumShapeKind::Box, wf_instance_base(), clipNear, clipFar);
-			clipNear = fmaxf(0.0f, clipNear);
-		}
+		sp->transmittance *= expf(-mat.sigma_t * segLen);
+		return true;
 	}
 	if (mat.type == MaterialType::CloudMedium) {
 		const int cloudIdx = (int)mat.cloud_medium_extra.cloudMediumIdx;
@@ -149,19 +96,17 @@ extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 		// GridMedium's identical case crashed CUDA 700 "illegal memory
 		// access" on exactly this kind of scene).
 		if (cloudIdx < 0 || (unsigned int)cloudIdx >= wf_params.numCloudMediums) {
-			optixIgnoreIntersection();
-			return;
+			return true;
 		}
-		const float3 unit_dir = normalize(ray_dir);
 		const CloudMedium<float>& cloud = wf_params.cloudMediums[cloudIdx];
 		float ray_o3[3] = { ray_orig.x, ray_orig.y, ray_orig.z };
 		float ray_d3[3] = { unit_dir.x, unit_dir.y, unit_dir.z };
-		auto maj_it = cloud.sample_ray(ray_o3, ray_d3, sp->tMax);
+		auto maj_it = cloud.sample_ray(ray_o3, ray_d3, t1);
 		float segMin, segMax, sigma_maj;
 		if (maj_it.next(segMin, segMax, sigma_maj) && sigma_maj > 0.0f) {
 			if (segMin < 0.0f) segMin = 0.0f;
-			segMin = fmaxf(segMin, clipNear);   // (a segment left empty by the clip ends the loop below at once)
-			segMax = fminf(segMax, clipFar);
+			segMin = fmaxf(segMin, t0);   // (a segment left empty by the clip ends the loop below at once)
+			segMax = fminf(segMax, t1);
 			float t = segMin;
 			// Cap matches wavefront_kernels_materials.cu's primary-path
 			// CloudMedium branch.
@@ -192,9 +137,7 @@ extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 				sp->transmittance *= fmaxf(0.0f, 1.0f - sigma_t_local / sigma_maj);
 			}
 		}
-		if (sp->transmittance <= 0.0f) { optixTerminateRay(); return; }
-		optixIgnoreIntersection();
-		return;
+		return true;
 	}
 	if (mat.type == MaterialType::RgbGridMedium || mat.type == MaterialType::GridMedium) {
 		const bool isRgb = (mat.type == MaterialType::RgbGridMedium);
@@ -209,10 +152,8 @@ extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 		// uploaded a GpuRgbGridMedium/GpuGridMedium entry.
 		const unsigned int count = isRgb ? wf_params.numRgbGridMediums : wf_params.numGridMediums;
 		if (idx < 0 || (unsigned int)idx >= count) {
-			optixIgnoreIntersection();
-			return;
+			return true;
 		}
-		const float3 unit_dir = normalize(ray_dir);
 		const float* mat9; const float* translate3; int nx, ny, nz, dataOffset; float sigma_maj, sigma_scale;
 		if (isRgb) {
 			const GpuRgbGridMedium& g = wf_params.rgbGridMediums[idx];
@@ -237,7 +178,7 @@ extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 		float mdy = mat9[3]*unit_dir.x + mat9[4]*unit_dir.y + mat9[5]*unit_dir.z;
 		float mdz = mat9[6]*unit_dir.x + mat9[7]*unit_dir.y + mat9[8]*unit_dir.z;
 
-		float segMin = 0.0f, segMax = sp->tMax;
+		float segMin = 0.0f, segMax = t1;
 		bool has_seg = true;
 		{
 			float invd, s0, s1;
@@ -262,8 +203,8 @@ extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 
 		if (has_seg && sigma_maj > 0.0f) {
 			if (segMin < 0.0f) segMin = 0.0f;
-			segMin = fmaxf(segMin, clipNear);   // (a segment left empty by the clip ends the loops below at once)
-			segMax = fminf(segMax, clipFar);
+			segMin = fmaxf(segMin, t0);   // (a segment left empty by the clip ends the loops below at once)
+			segMax = fminf(segMax, t1);
 			float tt = segMin;
 			const int voxelCount = nx * ny * nz;
 			if (isRgb) {
@@ -314,6 +255,57 @@ extern "C" __global__ void __anyhit__wf_shadow_sphere() {
 				}
 			}
 		}
+		return true;
+	}
+	return false;
+}
+
+extern "C" __global__ void __anyhit__wf_shadow_sphere() {
+	const int instBase = wf_instance_base();
+	const SphereData& sph = wf_params.spheres[wf_prim_base(instBase) + optixGetPrimitiveIndex()];
+	// Resolved to a real, non-Mix material before any mat.type check below -
+	// see MaterialType::Mix's own comment (optix_types.h). Matches CPU's
+	// mix_material::is_shadow_transmissive(), which delegates to the same
+	// deterministic (hashed-hit-point) sub-material pick as scatter().
+	const float shadow_t = optixGetRayTmax();
+	const float3 ray_orig = optixGetWorldRayOrigin();
+	const float3 ray_dir  = optixGetWorldRayDirection();
+	const float3 shadow_hit_point = ray_orig + shadow_t * ray_dir;
+	int matIdx = sph.materialIdx;
+	const MaterialData mat = wf_resolve_mix_material(wf_params.materials[matIdx], matIdx, shadow_hit_point, matIdx);
+
+	WfShadowPayload* sp = (WfShadowPayload*)unpackPointer(
+		optixGetPayload_0(), optixGetPayload_1());
+
+	// An emissive sphere is an occluder like every other pbrt-v4 surface: the shadow ray a light sample fires stops
+	// just short of its target (NEE call sites subtract 0.002) and sphere lights are cone-sampled, so the target is
+	// on the sphere's near side and the ray never reaches it - a hit here is a DIFFERENT emitter, or the light's own
+	// far side, in the way. It used to be ignored, so an emissive sphere hanging in front of a lamp cast no shadow
+	// (a dim emissive ball under a quad lamp over a floor: 117% of the CPU on both GPU backends).
+	// Only an "interface" lets a shadow ray through: a Subsurface surface is opaque to NEE shadow rays like every other surface with a material in pbrt-v4.
+	if (mat.type == MaterialType::Interface) {
+		optixIgnoreIntersection();
+		return;
+	}
+	if (mat.type == MaterialType::ThinDielectric) { wf_shadow_pass_thin_glass(sp, mat, 1.0f); return; }
+
+	// Participating media: attenuate the running transmittance through the shape's chord (wf_shadow_through_medium) instead of the old
+	// unconditional pass-through - see WfShadowPayload::transmittance's own comment (wavefront_common.h). A listed volume's sphere never gets
+	// here (__intersection__wf_sphere skips it; __raygen__wf_shadow attenuates through it).
+	// DielectricMedium (a real glass surface that bounds a medium) is deliberately NOT here: like every pbrt-v4
+	// surface with a material it is opaque to NEE shadow rays (VolPathIntegrator::SampleLd), so it falls through to
+	// the occluder case below. Light reaches the fog inside only along specular chains, as in pbrt.
+	if (mat.type == MaterialType::Medium || mat.type == MaterialType::CloudMedium || mat.type == MaterialType::RgbGridMedium || mat.type == MaterialType::GridMedium) {
+		// The part of the shadow ray inside the medium's INTERFACE SHAPE (a pbrt medium fills it, not its grid box, which can stick out of it), like
+		// optix_anyhit_shadow.h's shadow_ratio_track_heterogeneous(). A ClippedSphere is not clipped for the heterogeneous kinds (no attributes to read).
+		float t0 = 0.0f, t1 = sp->tMax;
+		if (mat.type == MaterialType::Medium || sph.shapeKind != GpuMediumShapeKind::ClippedSphere) {
+			float t_near, t_far;
+			wf_medium_sphere_near_far(ray_orig, normalize(ray_dir), sph, wf_read_hit_sphere_center(), sph.shapeKind == GpuMediumShapeKind::Box, wf_instance_base(), t_near, t_far);
+			t0 = fmaxf(0.0f, t_near);
+			t1 = fminf(t_far, sp->tMax);
+		}
+		wf_shadow_through_medium(mat, ray_orig, normalize(ray_dir), t0, t1, sp);
 		if (sp->transmittance <= 0.0f) { optixTerminateRay(); return; }
 		optixIgnoreIntersection();
 		return;

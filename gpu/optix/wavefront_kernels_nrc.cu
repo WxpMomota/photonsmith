@@ -196,6 +196,7 @@ extern "C" __global__ void nrc_generate_training_rays(
 	item.scatterOrigin = item.origin;
 	item.tMin = 0.001f;
 	item.tMax = 1e30f;
+	item.mediaTMin = 0.0f;
 	rayQueue.push(item);
 }
 
@@ -287,6 +288,7 @@ extern "C" __global__ void nrc_training_shade_simple(
 	next.scatterOrigin = h.hitPoint;
 	next.tMin = 0.001f;
 	next.tMax = 1e30f;
+	next.mediaTMin = 0.0f;
 	next.time = h.time;
 	nextRayQueue.push(next);
 }
@@ -410,6 +412,7 @@ extern "C" __global__ void nrc_training_shade_full(
 	next.scatterOrigin = h.hitPoint;
 	next.tMin = 0.001f;
 	next.tMax = 1e30f;
+	next.mediaTMin = 0.0f;
 	next.time = h.time;
 	nextRayQueue.push(next);
 }

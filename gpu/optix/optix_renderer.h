@@ -703,6 +703,9 @@ private:
 	unsigned int numGridMediums_ = 0;      ///< Number of single-channel grid media
 	CUdeviceptr d_gridData_ = 0;           ///< Device flat voxel data for all single-channel grid media
 	unsigned int gridDataCount_ = 0;       ///< Number of floats in d_gridData_
+	CUdeviceptr d_mediumShapes_ = 0;       ///< Device GpuMediumShape table: the volumes the wavefront renderer samples along each flight
+	unsigned int numMediumShapes_ = 0;
+	CUdeviceptr d_listedMediumSphere_ = 0; ///< Device byte per top-level sphere: 1 for a listed volume's boundary (the wavefront trace skips it)
 
 	// Tabulated BSSRDF tables (MaterialType::Subsurface, recursive backend
 	// only, Phase 1 - see optix_types.h's GpuBssrdfTable comment).
@@ -879,6 +882,10 @@ private:
 	///        (d_gridMediums_/numGridMediums_, d_gridData_/gridDataCount_).
 	void uploadGridMedia(const std::vector<GpuGridMedium>& gridMediums,
 						 const std::vector<float>& gridData);
+
+	/// @brief Upload the volumes the wavefront renderer samples along each ray's flight (wavefront_medium_shapes.h) and the per-sphere flags
+	///        that tell its trace to skip their boundaries (d_mediumShapes_/numMediumShapes_, d_listedMediumSphere_).
+	void uploadMediumShapes(const std::vector<SphereData>& spheres, const std::vector<MaterialData>& materials);
 
 	/// @brief Upload tabulated BSSRDF tables and their four shared flat
 	///        float buffers (d_bssrdfTables_/numBssrdfTables_,

@@ -430,6 +430,22 @@ void OptiXRenderer::uploadGridMedia(const std::vector<GpuGridMedium>& gridMedium
 	}
 }
 
+void OptiXRenderer::uploadMediumShapes(const std::vector<SphereData>& spheres, const std::vector<MaterialData>& materials) {
+	std::vector<unsigned char> isListed;
+	const std::vector<GpuMediumShape> shapes = wavefront_media::shapes(spheres, materials, &isListed);
+	numMediumShapes_ = static_cast<unsigned int>(shapes.size());
+	for (CUdeviceptr* p : { &d_mediumShapes_, &d_listedMediumSphere_ }) {
+		if (*p) cudaFree(reinterpret_cast<void*>(*p));
+		*p = 0;
+	}
+	if (shapes.empty()) return;
+	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_mediumShapes_), shapes.size() * sizeof(GpuMediumShape)));
+	CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(d_mediumShapes_), shapes.data(), shapes.size() * sizeof(GpuMediumShape), cudaMemcpyHostToDevice));
+	CUDA_CHECK(cudaMalloc(reinterpret_cast<void**>(&d_listedMediumSphere_), isListed.size()));
+	CUDA_CHECK(cudaMemcpy(reinterpret_cast<void*>(d_listedMediumSphere_), isListed.data(), isListed.size(), cudaMemcpyHostToDevice));
+	std::cout << "[OptiX] " << shapes.size() << " fog/smoke/cloud volume(s) sampled along each ray (wavefront renderer)\n";
+}
+
 void OptiXRenderer::uploadBssrdfTables(const std::vector<GpuBssrdfTable>& bssrdfTables,
 										const std::vector<float>& bssrdfRhoSamples,
 										const std::vector<float>& bssrdfRadiusSamples,
@@ -618,4 +634,4 @@ void OptiXRenderer::uploadPunctualLights(const std::vector<PunctualLightGPU>& pu
 		));
 		std::cout << "[OptiX] Uploaded " << numPunctualLights_ << " punctual (point/spot/distant) lights\n";
 	}
-}
+}

@@ -930,10 +930,11 @@ extern "C" __global__ void evaluate_materials(
 			SS cmW(1.f), cmE(0.f);
 			if (cmChroma) {
 				float cw[kWFNWavelengths], ce[kWFNWavelengths];
-				float depth = h.t;   // (a layer, air: the weights are those at the optical depth per unit of extinction reached, height_fog.h)
+				// The flight began at h.mediumTFar (the bounding sphere's near side, or where a listed volume's flight ended: __raygen__wf_intersect).
+				float depth = h.t - h.mediumTFar;   // (a layer, air: the weights are those at the optical depth per unit of extinction reached, height_fog.h)
 				if (mat.camera_medium_extra.fogThickness > 0.0f) {
 					float s0 = 0.0f, s1 = h.t;
-					depth = wf_camera_medium_segment(mat, h.rayOrigin, h.rayDir, h.t, s0, s1)
+					depth = wf_camera_medium_segment(mat, h.rayOrigin, h.rayDir, h.t, s0, s1, h.mediumTFar)
 						? height_fog::opticalDepth(1.0f, mat.camera_medium_extra.fogTop, mat.camera_medium_extra.fogThickness, h.rayOrigin.y, h.rayDir.y, length(h.rayDir), s0, s1)
 						: 0.0f;
 				}
@@ -1055,6 +1056,7 @@ extern "C" __global__ void evaluate_materials(
 		float segMin, segMax, sigma_maj;
 		bool has_seg = maj_it.next(segMin, segMax, sigma_maj);
 		if (has_seg) mediumMeanFreePath = wf_restir_volume_mean_free_path(sigma_maj);
+		wf_clip_to_listed_flight(h, has_seg, segMin, segMax);
 
 		bool did_scatter = false;
 		float medium_t = 0.0f;
@@ -1139,6 +1141,7 @@ extern "C" __global__ void evaluate_materials(
 			if (segMin > segMax) has_seg = false;
 		}
 
+		wf_clip_to_listed_flight(h, has_seg, segMin, segMax);
 		bool did_scatter = false;
 		float medium_t = 0.0f;
 		// Running product of the null-collision weights: the path weight of a ray that gets through without a real collision.
@@ -1256,6 +1259,7 @@ extern "C" __global__ void evaluate_materials(
 			if (segMin > segMax) has_seg = false;
 		}
 
+		wf_clip_to_listed_flight(h, has_seg, segMin, segMax);
 		bool did_scatter = false;
 		float medium_t = 0.0f;
 		if (has_seg && grid.sigma_maj > 0.0f) {
@@ -1635,6 +1639,14 @@ extern "C" __global__ void evaluate_materials(
 		wf_carry_ray_state(next, h);  // pixelIndex/depth/specular_bounce/any_nonspecular/etaScale/filterWeight/brdf_pdf, unchanged
 		next.tMin      = 0.001f;
 		next.tMax      = 1e30f;
+		next.mediaTMin = 0.0f;
+		if (h.geomType == kWfGeomListedMedium) {
+			// Through a listed volume without a collision: the same ray again, from the same origin, so that the surface that ended the flight
+			// (h.mediumTFar may be that surface, not the volume's far side) is found by the trace, and only the volumes beyond are sampled.
+			next.origin    = h.rayOrigin;
+			next.direction = h.rayDir;
+			next.mediaTMin = h.mediumTFar;
+		}
 		for (int i = 0; i < kWFNWavelengths; ++i) {
 			next.throughput[i]      = throughput[i] * attenuation[i];
 			next.radiance[i]        = radiance[i];

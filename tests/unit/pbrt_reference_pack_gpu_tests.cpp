@@ -40,14 +40,24 @@ class PbrtReferencePackGpuTest : public ::testing::TestWithParam<PbrtPackRow> {
 		const SceneDescriptor* s = find_example_scene(row.name.c_str());
 		if (!s) GTEST_SKIP() << row.name << ".pbrt was not discovered - is pbrt_scenes/ present?";
 		const std::string out = "pbrt_pack_" + pbrtPackTestName(row.name) + "_" + label + ".exr";
-		setWavefront(wavefront);
-		const int rc = optix_render_main(row.size, row.size, row.spp, row.depth, out.c_str(), s->id.c_str(), s->camera.lookfrom_x, s->camera.lookfrom_y, s->camera.lookfrom_z);
-		setWavefront("0");
-		ASSERT_EQ(rc, 0);
-		double mean = 0.0;
-		const bool ok = loadLinearMean(out, mean);
-		std::remove(out.c_str());
-		ASSERT_TRUE(ok) << row.name << ": no readable EXR";
+		// A heavy-tailed scene (the rows with a CPU tolerance of 4% or more: a point light in a scattering fog, see pbrt_reference_pack_tests.cpp) is rendered five times
+		// and the median compared, as on the CPU. The wavefront renderer seeds each render from a frame counter that runs over the whole process, so where the row falls
+		// in a run decides its draw: camera-medium-absorbing read 1.59, 1.57, 1.56 and 1.62 behind different tests, and +19% at one place in the Slow tier.
+		const int renders = row.tol[0] >= 0.04 ? 5 : 1;
+		std::vector<double> means;
+		for (int r = 0; r < renders; ++r) {
+			setWavefront(wavefront);
+			const int rc = optix_render_main(row.size, row.size, row.spp, row.depth, out.c_str(), s->id.c_str(), s->camera.lookfrom_x, s->camera.lookfrom_y, s->camera.lookfrom_z);
+			setWavefront("0");
+			ASSERT_EQ(rc, 0);
+			double one = 0.0;
+			const bool ok = loadLinearMean(out, one);
+			std::remove(out.c_str());
+			ASSERT_TRUE(ok) << row.name << ": no readable EXR";
+			means.push_back(one);
+		}
+		std::sort(means.begin(), means.end());
+		const double mean = means[means.size() / 2];
 		const double expected = row.pbrtMean() * row.ratio[backend];
 		std::printf("[pack] %-40s %s %.5f  expected %.5f (pbrt %.5f x %.3f, tolerance %.1f%%): %+.1f%%\n", row.name.c_str(), label, mean, expected, row.pbrtMean(), row.ratio[backend], 100.0 * row.tol[backend], 100.0 * (mean / expected - 1.0));
 		EXPECT_GT(mean, (1.0 - row.tol[backend]) * expected) << row.name << " " << label << " reads darker than it did against pbrt-v4";

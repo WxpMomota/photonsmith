@@ -236,6 +236,14 @@ public:
         gridDataCount_ = gridDataCount;
     }
 
+    /// The volumes sampled along each ray's flight (GpuMediumShape, wavefront_medium_shapes.h) and the per-sphere flags that make the trace skip
+    /// their boundaries - OptiXRenderer's d_mediumShapes_/numMediumShapes_/d_listedMediumSphere_, same setter pattern as setCloudMediums(). 0/0/0: none.
+    void setMediumShapes(CUdeviceptr d_mediumShapes, unsigned int numMediumShapes, CUdeviceptr d_listedMediumSphere) {
+        d_mediumShapes_ = d_mediumShapes;
+        numMediumShapes_ = numMediumShapes;
+        d_listedMediumSphere_ = d_listedMediumSphere;
+    }
+
     /// Tabulated BSSRDF profile tables (MaterialType::Subsurface) - same
     /// setter-not-render()-parameter pattern as setCloudMediums()/
     /// setRgbGridMediums() above, for the same reason. These are the SAME
@@ -990,6 +998,9 @@ private:
     unsigned int numGridMediums_ = 0;
     CUdeviceptr  d_gridData_ = 0;
     unsigned int gridDataCount_ = 0;
+    CUdeviceptr  d_mediumShapes_ = 0;       ///< see setMediumShapes()
+    unsigned int numMediumShapes_ = 0;
+    CUdeviceptr  d_listedMediumSphere_ = 0;
     bool         haveInstancedTriangles_ = false;  ///< see setInstancedGeometryFlags()
     bool         haveInstancedSpheres_ = false;
     unsigned int numSpheres_  = 0;

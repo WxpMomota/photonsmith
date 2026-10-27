@@ -387,10 +387,11 @@ file, between two marker lines that the next `--write` replaces; the frame's hea
 fewer than one sample), and a resume renders again only the frames whose share changed. `--shots` measures some shots only. On five shots of the Nomai film the giant
 in space and the canyon dropped to a quarter (no visible change, side by side) and the face close-up, the dark hall and the campfire kept all 32.
 
-**A camera inside smoke or a cloud.** Smoke, flames, a volcano's plume and clouds are media that fill a sphere round their box, the air outside. A camera inside such a
-sphere is not in the medium - its rays start in the air - so the smoke or the cloud is not seen from in there and pops in as the camera leaves. `ray_tracer --film-media <key>`
-samples each shot five times (no render) and lists the moments the camera is inside a medium that is not its own (mist round the camera and the sea are its own, and fine);
-the doctor warns on each.
+**A camera inside smoke or a cloud.** Smoke, flames, a volcano's plume and clouds are media that fill a sphere round their box, the air outside. On Windows the CPU and the
+GPU sample such a volume along each ray up to the nearest surface (the default GPU renderer hands a frame with something inside a volume to the wavefront renderer), so a camera can fly into
+smoke or through a cloud, and the ground, trees and animals inside a volume are in it as they should be. The Mac's renderer still samples a volume only where a ray meets its
+sphere: from inside, it misses the smoke in front of anything else inside the sphere. `ray_tracer --film-media <key>` samples each shot five times (no render) and lists the
+moments the camera is inside a medium that is not its own (mist round the camera and the sea are its own, and fine); the doctor warns on each when it runs on a Mac.
 
 **Feet that slide, and flicker: the doctor watches the motion.** A film can report its characters' feet (its row's `feetAt(t)`: each foot's place and whether the walk means
 it to be on the ground; a film_kit shot sets `f.feet`, the Nomai explorer's are `explorerFeet(pose, frame)`). `src/shared/cartoon/film_checks.h` samples every shot at the
@@ -1208,7 +1209,7 @@ the terrain: steeper towards the top, ridged, with a crater); erupting, it throw
 lights the plume's base from below), and a towering plume of ash leans away from it; three lava flows run down its flanks from the crater's rim. Lava finds its way down the land
 as water would (film_water.h's way downhill) but lies on the ground: a ribbon whose surface is a crust of dark plates between glowing cracks (an area light with a picture),
 creeping downhill, its front advancing. A wildfire is a line of flames (one every 10 m, 7 to 12 m tall) across its rectangle that sweeps from one side to the other over its
-time along the wind, smoke plumes of their own sizes rising behind it. Flames and smoke are kept in spheres apart from each other; keep the camera outside them. Night fires
+time along the wind, smoke plumes of their own sizes rising behind it. Flames and smoke are kept in spheres apart from each other (where two overlap, the GPU samples the second only beyond the first). Night fires
 want `exposure auto` (feature 7) or a lower one by day.
 
 **Music that follows the film.** Three things (music_cues.h, film_score.h):

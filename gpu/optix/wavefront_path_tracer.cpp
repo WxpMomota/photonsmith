@@ -642,6 +642,9 @@ void WavefrontPathTracer::renderPrepareLaunch(RenderCall &rc) {
 	lp.bumpFootprint = gpu_make_bump_footprint(camera, width, height, samples_per_pixel);
 	lp.cameraMediumSigmaT       = camera.cameraMediumSigmaT;
 	lp.cameraMediumMaterialIdx  = camera.cameraMediumMaterialIdx;
+	lp.mediumShapes       = reinterpret_cast<const GpuMediumShape*>(d_mediumShapes_);
+	lp.numMediumShapes    = numMediumShapes_;
+	lp.listedMediumSphere = reinterpret_cast<const unsigned char*>(d_listedMediumSphere_);
 	lp.traversable   = gas_handle;
 	lp.spheres       = reinterpret_cast<SphereData*>(d_spheres);
 	lp.numSpheres    = num_spheres;

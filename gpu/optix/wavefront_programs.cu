@@ -14,6 +14,6 @@
 #include "wavefront_intersection_triangle.h"
 #include "wavefront_intersection_disk_cylinder.h"
 #include "wavefront_miss.h"
+#include "wavefront_anyhit_shadow.h"   // (before the raygen programs: __raygen__wf_shadow uses its wf_shadow_through_medium)
 #include "wavefront_raygen.h"
-#include "wavefront_anyhit_shadow.h"
 #include "wavefront_probe_cache.h"

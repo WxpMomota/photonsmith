@@ -273,7 +273,8 @@ def film_feet(args, key):
 
 
 def film_media(args, key):
-    """The moments the camera is inside the sphere of a medium not its own - smoke, a flame, a plume, a cloud, unseen from in there (`ray_tracer --film-media`):
+    """The moments the camera is inside the sphere of a medium not its own - smoke, a flame, a plume, a cloud, which the Mac's renderer draws only in part from in there
+    (`ray_tracer --film-media`):
     [(shot from 0, when, medium, radius, how far inside)]."""
     done = subprocess.run([find_exe(args.exe), "--film-media", key], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=run_dir())
     found = []
@@ -404,11 +405,13 @@ def cmd_doctor(args):
         if worst > SLIDE_NOTE:
             findings.append(("warn" if worst > SLIDE_WARN else "note", shot, "middle", when,
                              "a planted foot slides %.2f m/s at worst (%.2f on average)%s" % (worst, mean, "" if worst > SLIDE_WARN else ": slightly")))
-    # the camera inside smoke, a flame or a cloud: unseen from in there, and popping in as the camera leaves (no render)
-    for shot, when, medium, radius, inside in film_media(args, info["key"]):
+    # the camera inside smoke, a flame or a cloud (no render): only the Mac's renderer misses some of it from in there - on Windows the CPU and the GPU sample a volume
+    # along each ray up to the nearest surface
+    for shot, when, medium, radius, inside in (film_media(args, info["key"]) if sys.platform == "darwin" else []):
         if only is not None and shot not in only:
             continue
-        findings.append(("warn", shot, "middle", when, "the camera is %.2f inside the sphere of the medium \"%s\" (radius %.2f): it is not seen from in there" % (inside, medium, radius)))
+        findings.append(("warn", shot, "middle", when, "the camera is %.2f inside the sphere of the medium \"%s\" (radius %.2f): on the Mac the smoke in front of anything else "
+                         "inside it is not drawn" % (inside, medium, radius)))
     # screen direction across the cuts: from the film's own subjects and cameras, no render
     def way(v):
         return "left to right" if v > 0 else "right to left"
