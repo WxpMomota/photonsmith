@@ -83,9 +83,19 @@ inline void lay(audio::Mix &m, const Ears &ears, double t0, double t1, double st
 }
 
 // ---- the sounds ----
-inline std::vector<std::vector<float>> roar(double lo, double hi, double length, unsigned seed) {   // grains of a roar between lo and hi Hz
+// Grains of a roar between lo and hi Hz, each swelling and dying away smoothly (a raised-cosine window: grains laid half a grain apart sum to an even roar, not a pulse).
+// Filtered noise is quieter the lower its band (its power goes with the cut-off), so a low rumble is brought up to stand with the rest: a volcano is not 20 dB under a crackle.
+inline std::vector<std::vector<float>> roar(double lo, double hi, double length, unsigned seed) {
 	std::vector<std::vector<float>> out;
-	for (unsigned k = 0; k < 6; ++k) out.push_back(audio::noiseBurst(length, 0.35 * length, 0.55 * length, lo, hi, seed + 13 * k));
+	const double level = std::clamp(std::sqrt(1000.0 / std::max(1.0, 0.5 * (lo + hi))), 0.5, 4.0);
+	for (unsigned k = 0; k < 6; ++k) {
+		std::vector<float> g = audio::noiseBurst(length, 0.0, 0.0, lo, hi, seed + 13 * k);
+		for (std::size_t i = 0; i < g.size(); ++i) {
+			const double w = std::sin(kPi * static_cast<double>(i) / std::max<std::size_t>(1, g.size() - 1));
+			g[i] = static_cast<float>(g[i] * w * w * level);
+		}
+		out.push_back(std::move(g));
+	}
 	return out;
 }
 inline std::vector<float> crackle(unsigned seed) { return audio::noiseBurst(0.025, 0.001, 0.02, 2500.0, 9000.0, seed); }

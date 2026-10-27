@@ -231,7 +231,7 @@ inline void thunder(audio::Mix &mix, const Lightning &l, const std::function<dou
 		const double len = 3.5 + d / 1500.0;
 		for (int k = 0; k < 4; ++k)   // the rumble: rolls of low noise
 			mix.put(heard + 0.15 + k * len / 5.0 * (0.7 + 0.6 * audio::unit(seed + static_cast<unsigned>(k))), audio::noiseBurst(len * 0.6, 0.15, len * 0.5, 260.0, 90.0, seed + static_cast<unsigned>(k) * 3u),
-					gain * (1.0 - 0.18 * k), -0.3 + 0.6 * audio::unit(seed + 11u + static_cast<unsigned>(k)), 0.6);
+					2.2 * gain * (1.0 - 0.18 * k), -0.3 + 0.6 * audio::unit(seed + 11u + static_cast<unsigned>(k)), 0.6);   // (2.2: low noise is quieter than the crack's at the same gain)
 	}
 }
 

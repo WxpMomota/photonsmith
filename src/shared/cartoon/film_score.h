@@ -90,15 +90,18 @@ inline std::string draft(const film_file::DataFilm &d) {
 		for (double at = 0.0; at < t1 - t0 - 0.2; at += 2.0 * bar, ++chord) {
 			const std::vector<int> &c = s.chords[static_cast<std::size_t>(chord) % s.chords.size()];
 			const double len = std::min(2.0 * bar, t1 - t0 - at) + 0.6;
-			std::snprintf(buf, sizeof buf, "%-6.2f %-7s %d %d %d  length %.2f  gain 0.03  send 0.7\n", at, s.pad.c_str(), noteOf(c[0], s.minor, -1), noteOf(c[1], s.minor, -1),
-						  noteOf(c[2], s.minor, -1), len);
+			// (the chords round middle C and the bass an octave under, at levels heard over a film's ambience: an octave lower they were under 200 Hz, where small
+			// speakers and ears are weakest, and birdsong at 2 to 5 kHz hid them)
+			std::snprintf(buf, sizeof buf, "%-6.2f %-7s %d %d %d  length %.2f  gain 0.05  send 0.7\n", at, s.pad.c_str(), noteOf(c[0], s.minor, 0), noteOf(c[1], s.minor, 0),
+						  noteOf(c[2], s.minor, 0), len);
 			out += buf;
-			std::snprintf(buf, sizeof buf, "%-6.2f bass    %d  length %.2f  gain 0.05\n", at, noteOf(c[0], s.minor, -2), std::min(2.0 * bar, len));
+			std::snprintf(buf, sizeof buf, "%-6.2f bass    %d  length %.2f  gain 0.08\n", at, noteOf(c[0], s.minor, -1), std::min(2.0 * bar, len));
 			out += buf;
 			for (int b = 0; b < 8 && at + b * beat < t1 - t0 - 0.1; b += (s.melody == "knock" ? 1 : 2)) {   // (the melody on every other beat; a pulse on every beat)
 				const int degree = c[static_cast<std::size_t>((b / 2 + chord) % 3)] + (b % 4 == 2 ? 7 : 0);
-				if (s.melody == "knock") std::snprintf(buf, sizeof buf, "%-6.2f knock  gain %.3f\n", at + b * beat, b % 4 == 0 ? s.melodyGain : 0.6 * s.melodyGain);
-				else std::snprintf(buf, sizeof buf, "%-6.2f %-7s %d  length %.2f  gain %.3f  send 0.5\n", at + b * beat, s.melody.c_str(), noteOf(degree, s.minor, 0), 2.0 * beat, s.melodyGain);
+				const double g = 2.0 * s.melodyGain;   // (the melody over the chords and the ambience)
+				if (s.melody == "knock") std::snprintf(buf, sizeof buf, "%-6.2f knock  gain %.3f\n", at + b * beat, b % 4 == 0 ? g : 0.6 * g);
+				else std::snprintf(buf, sizeof buf, "%-6.2f %-7s %d  length %.2f  gain %.3f  send 0.5\n", at + b * beat, s.melody.c_str(), noteOf(degree, s.minor, 0), 2.0 * beat, g);
 				out += buf;
 			}
 		}

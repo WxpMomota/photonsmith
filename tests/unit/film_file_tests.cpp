@@ -2024,7 +2024,7 @@ TEST(FilmMusic, MusicDucksUnderLinesHitsTheCutsAndADraftScoreFollowsTheMood) {
 	a.add(music, std::vector<float>(400, 0.5f));
 	cartoon::audio::Mix full(3.0);
 	full.add(music, {});
-	const std::vector<std::int16_t> pcm = a.finish(0.0, 0.0), whole = full.finish(0.0, 0.0);
+	const std::vector<std::int16_t> pcm = a.finish(0.0, 0.0, 0.89, 0.0), whole = full.finish(0.0, 0.0, 0.89, 0.0);   // (as made: two mixes compared)
 	EXPECT_NEAR(static_cast<double>(pcm[cartoon::audio::kRate * 2]) / whole[cartoon::audio::kRate * 2], 0.5, 0.03) << "laid on at half its level";
 	// cut hits
 	const mc::Sheet sheet = mc::parse("oncuts mallet A3 0.5 gain 0.3\n");

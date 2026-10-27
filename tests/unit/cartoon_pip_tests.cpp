@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -178,6 +179,76 @@ TEST(CartoonAudio, TheLimiterKeepsAnyLoudnessInRangeAndTheWavFileHasTheRightSize
 	EXPECT_EQ(std::string(head + 8, 4), "WAVE");
 	f.close();
 	std::filesystem::remove(path);
+}
+
+// Neighbouring seeds give unrelated numbers: a run of seeds 1, 2, 3 (one each event) must not make a ladder of pitches or a sawtooth of gaps.
+TEST(CartoonAudio, NeighbouringSeedsGiveUnrelatedNumbers) {
+	namespace au = cartoon::audio;
+	double mean = 0.0, meanSq = 0.0, lag = 0.0;
+	const int n = 4000;
+	for (int s = 1; s <= n; ++s) {
+		const double a = au::unit(static_cast<unsigned>(s)) - 0.5, b = au::unit(static_cast<unsigned>(s + 1)) - 0.5;
+		mean += a, meanSq += a * a, lag += a * b;
+	}
+	mean /= n, meanSq /= n, lag /= n;
+	EXPECT_NEAR(mean, 0.0, 0.02);
+	EXPECT_NEAR(meanSq, 1.0 / 12.0, 0.01) << "spread evenly over 0..1";
+	EXPECT_LT(std::abs(lag / meanSq), 0.05) << "one seed's number says nothing of the next one's";
+	std::set<long> steps;   // (the differences between neighbours: they were all the same)
+	for (unsigned s = 1; s <= 50; ++s) steps.insert(std::lround(1000.0 * std::fmod(au::unit(s + 1) - au::unit(s) + 1.0, 1.0)));
+	EXPECT_GT(steps.size(), 40u);
+}
+
+// The loudness meter reads BS.1770's reference (a 997 Hz tone at full scale in one channel: -3.01 LUFS), and a finished mix is brought to a film's loudness whatever it
+// was made at, its peaks held under the ceiling by the limiter.
+TEST(CartoonAudio, AFinishedMixIsBroughtToAFilmsLoudnessAndItsPeaksAreHeldUnderTheCeiling) {
+	namespace au = cartoon::audio;
+	std::vector<float> left(static_cast<std::size_t>(3 * au::kRate)), right(left.size(), 0.0f);
+	for (std::size_t i = 0; i < left.size(); ++i) left[i] = static_cast<float>(std::sin(au::kTau * 997.0 * static_cast<double>(i) / au::kRate));
+	EXPECT_NEAR(au::loudness(left, right), -3.01, 0.15);
+	const auto lufsOf = [](const std::vector<std::int16_t> &pcm) {
+		std::vector<float> l(pcm.size() / 2), r(pcm.size() / 2);
+		for (std::size_t i = 0; i < l.size(); ++i) l[i] = pcm[2 * i] / 32767.0f, r[i] = pcm[2 * i + 1] / 32767.0f;
+		return au::loudness(l, r);
+	};
+	for (const double level : {0.05, 0.6}) {   // (a quiet mix and a loud one)
+		au::Mix m(6.0);
+		for (double t = 0.0; t < 6.0; t += 0.5) m.put(t, au::pad(330.0, 0.6), level, 0.0, 0.2);
+		const std::vector<std::int16_t> pcm = m.finish(0.0, 0.0);
+		EXPECT_NEAR(lufsOf(pcm), -16.0, 1.0) << "made at " << level;
+		int peak = 0;
+		for (std::int16_t s : pcm) peak = std::max(peak, std::abs(static_cast<int>(s)));
+		EXPECT_LE(peak, static_cast<int>(0.89 * 32767.0) + 2);
+	}
+	au::Mix kept(2.0);   // (and a mix finished as it is keeps its level)
+	kept.put(0.1, au::pad(330.0, 1.5), 0.02, 0.0, 0.0);
+	const std::vector<std::int16_t> pcm = kept.finish(0.0, 0.0, 0.89, 0.0);
+	int peak = 0;
+	for (std::int16_t s : pcm) peak = std::max(peak, std::abs(static_cast<int>(s)));
+	EXPECT_LT(peak, 0.1 * 32767.0);
+}
+
+// A plucked string is in tune at the top of the treble too (a whole-sample loop was 15 cents flat at C6).
+TEST(CartoonAudio, APluckedStringIsInTune) {
+	namespace au = cartoon::audio;
+	for (const double f : {329.63, 659.26, 1046.5}) {
+		const std::vector<float> v = au::pluck(f, 0.8, 3, 0.999);
+		const std::size_t from = static_cast<std::size_t>(0.1 * au::kRate), span = static_cast<std::size_t>(0.4 * au::kRate);
+		const auto power = [&](double hz) {   // (the windowed spectrum at one frequency)
+			double re = 0.0, im = 0.0;
+			for (std::size_t i = 0; i < span; ++i) {
+				const double w = 0.5 - 0.5 * std::cos(au::kTau * static_cast<double>(i) / span), a = au::kTau * hz * static_cast<double>(i) / au::kRate;
+				re += w * v[from + i] * std::cos(a), im += w * v[from + i] * std::sin(a);
+			}
+			return re * re + im * im;
+		};
+		double best = f, bestP = -1.0;
+		for (double c = -30.0; c <= 30.0; c += 0.25) {
+			const double hz = f * std::pow(2.0, c / 1200.0), p = power(hz);
+			if (p > bestP) bestP = p, best = hz;
+		}
+		EXPECT_NEAR(1200.0 * std::log2(best / f), 0.0, 2.0) << f << " Hz";
+	}
 }
 
 TEST(CartoonPipAndTheMoon, TheSoundtrackIsTheSameEveryTimeInRangeAndHasSomethingToSayThroughoutExceptWhereTheStoryIsSilent) {

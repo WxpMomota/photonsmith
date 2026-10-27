@@ -240,7 +240,7 @@ TEST(FilmWater, RiversRunDownhillInTheirBedsAndWaterfallsStandOnTheirCliffs) {
 	EXPECT_NEAR(ground->heightAt(f.lip.x, f.lip.z + 8.0), f.lip.y, 1.5) << "the cliff behind is raised to its lip";
 	EXPECT_LT(ground->heightAt(water::fallFoot(f).x, water::fallFoot(f).z), f.lip.y - f.drop + 0.5) << "and the pool cut before it";
 	const auto heard = [&](const std::string &kind) { return std::any_of(film.spec.ambience.begin(), film.spec.ambience.end(), [&](const auto &a) { return a.kind == kind; }); };
-	EXPECT_TRUE(heard("falls"));
+	EXPECT_FALSE(heard("falls")) << "a waterfall is heard from its pool (the soundscape), not as a sound all round as well";
 	EXPECT_TRUE(heard("water"));
 	EXPECT_TRUE(heard("wind")) << "and the land's own wind, nothing being said of its sound";
 	ASSERT_FALSE(film.spec.emitters.empty());
@@ -1132,7 +1132,7 @@ TEST(FilmSound, NaturesSoundsAreHeardFromWhereTheyAre) {
 	ears.at.push_back({{0.0, 0.0, 0.0}, {-1.0, 0.0, 0.0}});   // (pbrt's: the camera's right is -x)
 	const std::vector<float> noise = audio::noiseBurst(0.5, 0.01, 0.4, 500.0, 3000.0, 5);
 	const auto channels = [](const audio::Mix &m, double from, double to) {
-		const std::vector<std::int16_t> pcm = m.finish(0.0, 0.0);
+		const std::vector<std::int16_t> pcm = m.finish(0.0, 0.0, 0.89, 0.0);   // (levels compared between mixes: none brought to a film's loudness)
 		double l = 0.0, r = 0.0;
 		for (std::size_t i = static_cast<std::size_t>(from * audio::kRate); i < static_cast<std::size_t>(to * audio::kRate) && 2 * i + 1 < pcm.size(); ++i)
 			l += double(pcm[2 * i]) * pcm[2 * i], r += double(pcm[2 * i + 1]) * pcm[2 * i + 1];

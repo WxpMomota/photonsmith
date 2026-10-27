@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <map>
 #include <mutex>
 #include <random>
 #include <sstream>
@@ -123,14 +124,31 @@ inline std::string pick(const std::string &asked, unsigned seed) {
 
 // The recording of `text` said in the voice `asked` (see pick) for a character whose seed is `seed`, `pitch` semitones up and at `rate`: its path, made now when it is not
 // made yet and a runner is installed. "" (and why) when there is none.
+// A line that could not be made is remembered for the rest of the process with why: it is asked for many times a second (a voice's loudness, the music's ducking), and
+// each try would start the speech engine again.
 inline std::string wavFor(const std::string &text, const std::string &asked, unsigned seed, double pitch, double rate, std::string *why = nullptr) {
-	char key[96];
-	std::snprintf(key, sizeof key, "v1|%s|%u|%.2f|%.3f|", asked.c_str(), asked == "system" ? seed : 0u, pitch, rate);
+	char numbers[64];
+	std::snprintf(numbers, sizeof numbers, "|%u|%.2f|%.3f|", asked == "system" ? seed : 0u, pitch, rate);
+	const std::string key = "v1|" + asked + numbers;   // (as a string: a long voice name no longer cuts the numbers off)
 	const std::filesystem::path dir = folder(), wav = dir / (detail::hex(detail::fnv(key + text)) + ".wav");
 	std::error_code ec;
 	if (std::filesystem::exists(wav, ec)) return wav.string();
+	static std::mutex failedLock;
+	static std::map<std::string, std::string> failed;
+	{
+		const std::lock_guard<std::mutex> hold(failedLock);
+		const auto it = failed.find(key + text);
+		if (it != failed.end()) {
+			if (why) *why = it->second;
+			return std::string();
+		}
+	}
 	const auto fail = [&](const std::string &w) {
 		if (why) *why = w;
+		if (runner()) {   // (without an engine a later call in a render may make it)
+			const std::lock_guard<std::mutex> hold(failedLock);
+			failed[key + text] = w;
+		}
 		return std::string();
 	};
 	if (!runner()) return fail("no speech engine in this program (the line keeps its babble voice until a render makes its recording)");

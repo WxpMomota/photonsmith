@@ -212,6 +212,7 @@
 #include <functional>
 #include <iostream>
 #include <map>
+#include <limits>
 #include <mutex>
 #include <regex>
 #include <set>
@@ -2384,9 +2385,10 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		else if (night) s.ambience.push_back({"night", 0.5});
 	}
 	const auto hears = [&](const std::string &kind) { return std::any_of(s.ambience.begin(), s.ambience.end(), [&](const dressing::Ambience &a) { return a.kind == kind; }); };
-	if (!s.seas.empty() && s.seas[0].kind == "sea" && !hears("sea")) s.ambience.push_back({"sea", 0.8});   // (water is heard: unless the film file says how)
+	// (water is heard, unless the film file says how: a sea's wash - only its wash where `surf` breaks, the soundscape's crashes being the waves; a river's rush. A waterfall
+	// is heard from its pool, placed: soundscape())
+	if (!s.seas.empty() && s.seas[0].kind == "sea" && !hears("sea")) s.ambience.push_back({s.swell.on ? "seawash" : "sea", 0.8});
 	if (!s.rivers.empty() && !hears("water")) s.ambience.push_back({"water", 0.7});
-	if (!s.falls.empty() && !hears("falls")) s.ambience.push_back({"falls", 0.8});
 	if (std::any_of(s.flocks.begin(), s.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "geese"; }) && !hears("geese")) s.ambience.push_back({"geese", 0.8});
 	if (s.muteBirds) {   // (the night's owl too: crickets alone)
 		for (dressing::Ambience &a : s.ambience)
@@ -3786,15 +3788,23 @@ class DataFilm {
 		const music_cues::Recording &r = music_cues::recording(path);
 		return r.loudness.empty() ? nullptr : &r;
 	}
-	// When line i ends: the last sound of its recording, or its last syllable.
+	// When line i ends: the last sound of its recording, or its last syllable. (Kept once known: it is asked for every 1/100 s of the film by the music's ducking.)
 	double lineEnd(std::size_t i) const {
+		{
+			const std::lock_guard<std::mutex> hold(lineEnds_.lock);
+			if (lineEnds_.ends.size() == spec.lines.size() && lineEnds_.ends[i] == lineEnds_.ends[i]) return lineEnds_.ends[i];
+		}
+		double end = speech::endOf(spoken[i], spec.lines[i].t);
 		if (const music_cues::Recording *r = recordingOf(i)) {
 			std::size_t last = 0;
 			for (std::size_t k = 0; k < r->loudness.size(); ++k)
 				if (r->loudness[k] > 0.05f) last = k;
-			return spec.lines[i].t + (last + 1) / 100.0;
+			end = spec.lines[i].t + (last + 1) / 100.0;
 		}
-		return speech::endOf(spoken[i], spec.lines[i].t);
+		const std::lock_guard<std::mutex> hold(lineEnds_.lock);
+		if (lineEnds_.ends.size() != spec.lines.size()) lineEnds_.ends.assign(spec.lines.size(), std::numeric_limits<double>::quiet_NaN());
+		lineEnds_.ends[i] = end;
+		return end;
 	}
 	// A character's mouth and voice at t from its lines (a line in a computer's voice: its recording's mouth shapes and loudness).
 	void speakingAt(const Character &c, double t, CharacterMoment &m) const {
@@ -3825,8 +3835,14 @@ class DataFilm {
 				v = std::max(v, speech::loudnessAt(spoken[i], t));
 			}
 		}
-		for (const Character &c : spec.characters)
-			if (!c.extra) v = std::max(v, music_cues::voiceAt(spec.key, c.name, t, shotStarts(), shotNameList()));
+		bool voiced = false;   // (the shots worked out once, not once for each character)
+		for (const Character &c : spec.characters) voiced = voiced || !c.extra;
+		if (voiced) {
+			const std::vector<double> starts = shotStarts();
+			const std::vector<std::string> names = shotNameList();
+			for (const Character &c : spec.characters)
+				if (!c.extra) v = std::max(v, music_cues::voiceAt(spec.key, c.name, t, starts, names));
+		}
 		return std::min(1.0, v);
 	}
 	// The voice a character speaks in: its kind's, its pitch moved by up to 1.5 semitones either way by its name.
@@ -4047,8 +4063,8 @@ class DataFilm {
 			return;
 		namespace ss = soundscape;
 		const ss::Ears ears = ss::earsOf(m.seconds(), [this](double t, Vec3 &eye, Vec3 &target) {
-			double fov = 40.0;
-			return film_subjects::cameraOf(headerAt(t), eye, target, fov);
+			double fov = 40.0;   // (over the credits the ears stay where the story's last camera was: the cards' own header is the base scene's)
+			return film_subjects::cameraOf(headerAt(inCredits(t) ? std::max(0.0, spec.storyEnd - 1e-3) : t), eye, target, fov);
 		});
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 		const auto groundAt = [&](double x, double z) { return ground ? ground->heightAt(x, z) : 0.0; };
@@ -4103,7 +4119,7 @@ class DataFilm {
 		for (std::size_t i = 0; i < spec.volcanoes.size(); ++i) {
 			const fire::Volcano &v = spec.volcanoes[i];
 			const Vec3 top{v.x, groundAt(v.x, v.z), v.z};
-			ss::lay(m, ears, v.t0, v.t1, 0.5, [top](double) { return top; }, [](double) { return 0.6; }, ss::roar(25.0, 140.0, 1.4, 601u + static_cast<unsigned>(i)), 400.0);
+			ss::lay(m, ears, v.t0, v.t1, 0.5, [top](double) { return top; }, [](double) { return 0.6; }, ss::roar(35.0, 180.0, 1.4, 601u + static_cast<unsigned>(i)), 400.0);   // (above 35 Hz: what speakers can play)
 		}
 		// surf: each wave crashing where it breaks near the camera, its wash after
 		if (spec.swell.on && ground && !spec.seas.empty()) {
@@ -4148,8 +4164,11 @@ class DataFilm {
 						static const double walk[4] = {0.0, 0.25, 0.5, 0.75}, trot[4] = {0.0, 0.5, 0.5, 0.0}, run[4] = {0.0, 0.40, 0.08, 0.50};
 						const double *starts = a.clip == "walk" ? walk : a.clip == "trot" ? trot : run;
 						for (int foot = 0; foot < 4; ++foot)
-							if (std::floor(a.cycles - starts[foot]) > std::floor(lastCycles - starts[foot]))
-								ss::place(m, ears, t, a.at, ss::hoof(f * (0.9 + 0.2 * audio::unit(static_cast<unsigned>(i * 4 + foot))), static_cast<unsigned>(i * 4 + foot)), gain, 5.0);
+							if (std::floor(a.cycles - starts[foot]) > std::floor(lastCycles - starts[foot])) {   // (each step its own: one sample over and over is a machine gun)
+								const unsigned step = static_cast<unsigned>(i * 4 + foot) + 7919u * static_cast<unsigned>(std::max(0.0, std::floor(a.cycles - starts[foot])));
+								ss::place(m, ears, t, a.at, ss::hoof(f * (0.9 + 0.2 * audio::unit(static_cast<unsigned>(i * 4 + foot))) * (0.95 + 0.1 * audio::unit(step + 3u)), step),
+										  gain * (0.85 + 0.3 * audio::unit(step + 5u)), 5.0);
+							}
 					}
 					if (wolves && a.going.paused && i % 3 == 0) {   // (a wolf standing howls now and then)
 						const double every = 21.0 + 8.0 * audio::unit(static_cast<unsigned>(951 + i)), when = std::fmod(t + every * audio::unit(static_cast<unsigned>(961 + i)), every);
@@ -4190,7 +4209,7 @@ class DataFilm {
 		}
 		for (std::size_t i = 0; i < spec.quakes.size(); ++i) {
 			const geology::Quake &q = spec.quakes[i];
-			ss::lay(m, ears, q.t0, q.t1, 0.4, [&ears](double t) { return ears(t).eye + Vec3{0.0, -2.0, 0.0}; }, [&q](double t) { return 0.8 * q.levelAt(t); }, ss::roar(18.0, 110.0, 1.2, 1501u + static_cast<unsigned>(i)), 5.0);
+			ss::lay(m, ears, q.t0, q.t1, 0.4, [&ears](double t) { return ears(t).eye + Vec3{0.0, -2.0, 0.0}; }, [&q](double t) { return 0.8 * q.levelAt(t); }, ss::roar(30.0, 150.0, 1.2, 1501u + static_cast<unsigned>(i)), 5.0);
 		}
 		// birds in the trees near the camera, by day: a phrase every few seconds (not a wall of song: the music is heard over them)
 		if (!spec.planted.empty() && !spec.muteBirds) {
@@ -4494,6 +4513,15 @@ class DataFilm {
 	}
 
   private:
+	// The lines' ends once worked out (lineEnd): a copy of the film starts without them.
+	struct LineEnds {
+		std::mutex lock;
+		std::vector<double> ends;
+		LineEnds() = default;
+		LineEnds(const LineEnds &) {}
+		LineEnds &operator=(const LineEnds &) { return *this; }
+	};
+	mutable LineEnds lineEnds_;
 	double progress(const std::vector<Key> &keys, double t, int component) const {
 		if (keys.empty()) return 0.0;
 		if (t <= keys.front().t) return keys.front().v[component];

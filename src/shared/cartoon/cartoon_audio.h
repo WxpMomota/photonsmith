@@ -27,9 +27,19 @@ constexpr double kTau = 6.283185307179586;
 inline double hz(double midiNote) { return 440.0 * std::pow(2.0, (midiNote - 69.0) / 12.0); }
 
 // A fixed-seed noise source: the same numbers every run.
+// A seed mixed through an integer hash (lowbias32): neighbouring seeds give unrelated numbers. (Through the LCG alone they did not: unit(s + 1) - unit(s) was the same for
+// every s, so a run of seeds 1, 2, 3 made a bird's notes climb like a ladder and footsteps rise in pitch.)
+inline unsigned mixSeed(unsigned x) {
+	x ^= x >> 16;
+	x *= 0x7feb352du;
+	x ^= x >> 15;
+	x *= 0x846ca68bu;
+	x ^= x >> 16;
+	return x;
+}
 struct Noise {
 	unsigned s;
-	explicit Noise(unsigned seed) : s(seed * 2654435761u + 12345u) {}
+	explicit Noise(unsigned seed) : s(mixSeed(seed * 2654435761u + 12345u)) {}
 	double next() {   // -1 .. 1
 		s = s * 1664525u + 1013904223u;
 		return static_cast<double>((s >> 8) & 0xFFFF) / 32768.0 - 1.0;
@@ -101,17 +111,29 @@ inline std::vector<float> pad(double f, double length, double attack = 0.7, doub
 }
 
 // A plucked string (Karplus-Strong): a burst of noise circulating in a delay line that is a little duller each time round.
+// The loop's period is the whole samples of the line, half a sample of the averaging and the fraction left over, taken by an allpass filter (Jaffe and Smith): in tune
+// (a whole-sample loop is up to 15 cents off at the top of the treble, and beats against a body tuned exactly).
 inline std::vector<float> pluck(double f, double length = 1.6, unsigned seed = 1, double damping = 0.996) {
-	const std::size_t n = std::max<std::size_t>(2, static_cast<std::size_t>(kRate / f));
+	const double period = kRate / std::max(1.0, f);
+	std::size_t n = static_cast<std::size_t>(std::max(2.0, std::floor(period - 0.5)));
+	double frac = period - 0.5 - static_cast<double>(n);
+	if (frac < 0.1 && n > 2) --n, frac += 1.0;   // (an allpass delay near 0 rings: keep it between 0.1 and 1.1)
+	frac = std::clamp(frac, 0.1, 1.1);
+	const double c = (1.0 - frac) / (1.0 + frac);
 	std::vector<double> line(n);
 	Noise noise(seed);
 	for (double &x : line) x = noise.next() * 0.8;
 	std::vector<float> v(samplesFor(length), 0.0f);
 	std::size_t pos = 0;
+	double previous = 0.0, inPast = 0.0, outPast = 0.0;
 	for (std::size_t i = 0; i < v.size(); ++i) {
-		const double cur = line[pos], next = line[(pos + 1) % n];
+		const double cur = line[pos];
 		v[i] = static_cast<float>(cur);
-		line[pos] = damping * 0.5 * (cur + next);
+		const double averaged = damping * 0.5 * (cur + previous);
+		previous = cur;
+		const double passed = c * averaged + inPast - c * outPast;
+		inPast = averaged, outPast = passed;
+		line[pos] = passed;
 		pos = (pos + 1) % n;
 	}
 	edges(v, 0.001, 0.05);
@@ -234,6 +256,85 @@ class Reverb {
 	float feedback_ = 0.86f, damp_ = 0.25f;
 };
 
+// A biquad filter, one channel; the two of BS.1770's K-weighting made for our rate the way libebur128 makes them (the standard gives them at 48 kHz only).
+struct Biquad {
+	double b0 = 1.0, b1 = 0.0, b2 = 0.0, a1 = 0.0, a2 = 0.0, x1 = 0.0, x2 = 0.0, y1 = 0.0, y2 = 0.0;
+	static Biquad kShelf() {   // (the head's effect: up 4 dB above about 1.7 kHz)
+		const double K = std::tan(kTau / 2.0 * 1681.974450955533 / kRate), Q = 0.7071752369554196, Vh = std::pow(10.0, 3.999843853973347 / 20.0), Vb = std::pow(Vh, 0.4996667741545416);
+		const double a0 = 1.0 + K / Q + K * K;
+		Biquad f;
+		f.b0 = (Vh + Vb * K / Q + K * K) / a0, f.b1 = 2.0 * (K * K - Vh) / a0, f.b2 = (Vh - Vb * K / Q + K * K) / a0;
+		f.a1 = 2.0 * (K * K - 1.0) / a0, f.a2 = (1.0 - K / Q + K * K) / a0;
+		return f;
+	}
+	static Biquad kHighPass() {   // (RLB: the lowest notes count for little)
+		const double K = std::tan(kTau / 2.0 * 38.13547087602444 / kRate), Q = 0.5003270373238773, a0 = 1.0 + K / Q + K * K;
+		Biquad f;
+		f.b0 = 1.0, f.b1 = -2.0, f.b2 = 1.0, f.a1 = 2.0 * (K * K - 1.0) / a0, f.a2 = (1.0 - K / Q + K * K) / a0;
+		return f;
+	}
+	double operator()(double x) {
+		const double y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+		x2 = x1, x1 = x, y2 = y1, y1 = y;
+		return y;
+	}
+};
+// How loud a stereo mix is, in LUFS (ITU-R BS.1770: K-weighted - a shelf up 4 dB above 1.7 kHz and a high-pass at 38 Hz, as the ear weighs it - in 400 ms blocks a
+// tenth of a second apart, those under -70 LUFS and then those 10 LU under the rest's mean left out). -100 for silence.
+inline double loudness(const std::vector<float> &left, const std::vector<float> &right) {
+	const std::size_t n = std::min(left.size(), right.size()), block = static_cast<std::size_t>(0.4 * kRate), hop = block / 4;
+	std::vector<double> sq(n, 0.0);
+	for (int c = 0; c < 2; ++c) {
+		Biquad shelf = Biquad::kShelf(), pass = Biquad::kHighPass();
+		const std::vector<float> &x = c == 0 ? left : right;
+		for (std::size_t i = 0; i < n; ++i) {
+			const double y = pass(shelf(x[i]));
+			sq[i] += y * y;
+		}
+	}
+	std::vector<double> blocks;
+	double sum = 0.0;
+	std::size_t i = 0;
+	for (; i < n; ++i) {   // (a running sum over each block)
+		sum += sq[i];
+		if (i + 1 >= block && (i + 1 - block) % hop == 0) {
+			blocks.push_back(sum / block);
+			sum = 0.0;
+			for (std::size_t k = i + 1 - block + hop; k <= i; ++k) sum += sq[k];   // (start the next block's sum from its overlap with this one)
+		}
+	}
+	const auto lufs = [](double meanSquare) { return meanSquare > 0.0 ? -0.691 + 10.0 * std::log10(meanSquare) : -100.0; };
+	double kept = 0.0;
+	int count = 0;
+	for (double b : blocks)
+		if (lufs(b) > -70.0) kept += b, ++count;
+	if (count == 0) return -100.0;
+	const double gate = lufs(kept / count) - 10.0;
+	kept = 0.0, count = 0;
+	for (double b : blocks)
+		if (lufs(b) > -70.0 && lufs(b) > gate) kept += b, ++count;
+	return count ? lufs(kept / count) : -100.0;
+}
+// A look-ahead limiter: the gain falls smoothly over the 5 ms before a peak that would pass `ceiling`, just enough to keep it under, and recovers over a quarter of a second -
+// the loudest moments brought down without the distortion of clipping them.
+inline void limit(std::vector<float> &left, std::vector<float> &right, double ceiling) {
+	const std::size_t n = std::min(left.size(), right.size());
+	if (n == 0) return;
+	std::vector<float> gain(n);
+	for (std::size_t i = 0; i < n; ++i) {
+		const double p = std::max(std::abs(left[i]), std::abs(right[i]));
+		gain[i] = static_cast<float>(p > ceiling ? ceiling / p : 1.0);
+	}
+	const double attack = 1.0 / (0.005 * kRate), release = 1.0 - std::exp(-1.0 / (0.25 * kRate));
+	for (std::size_t i = n - 1; i-- > 0;) gain[i] = std::min(gain[i], static_cast<float>(gain[i + 1] + attack));   // (down ahead of a peak)
+	double g = gain[0];
+	for (std::size_t i = 0; i < n; ++i) {
+		g = std::min(static_cast<double>(gain[i]), g + (1.0 - g) * release);   // (back up slowly after it)
+		left[i] = static_cast<float>(left[i] * g);
+		right[i] = static_cast<float>(right[i] * g);
+	}
+}
+
 class Mix {
   public:
 	// A mix of `seconds` seconds. (The buffers run on a few seconds past the end so that a sound placed near the end is not cut off; finish() returns exactly `seconds`.)
@@ -291,8 +392,10 @@ class Mix {
 		}
 	}
 
-	// The reverb, a fade in and out, a soft limiter; 16-bit stereo, interleaved, exactly `seconds` long.
-	std::vector<std::int16_t> finish(double fadeIn = 0.5, double fadeOut = 2.0, double headroom = 0.89) const {
+	// The reverb; brought to a film's loudness (`targetLufs`, BS.1770: a video's soundtrack is heard at about -16 LUFS, and one made quieter is not turned up by the
+	// player); a fade in and out; a look-ahead limiter that keeps every peak under `headroom` without the distortion of clipping; 16-bit stereo, interleaved, exactly
+	// `seconds` long. (`targetLufs` of 0 or more: leave the level as it is.)
+	std::vector<std::int16_t> finish(double fadeIn = 0.5, double fadeOut = 2.0, double headroom = 0.89, double targetLufs = -16.0) const {
 		const std::size_t n = samplesFor(seconds_) - 1;
 		std::vector<float> out[2];
 		for (int c = 0; c < 2; ++c) {
@@ -300,14 +403,18 @@ class Mix {
 			out[c].resize(n);
 			for (std::size_t i = 0; i < n; ++i) out[c][i] = dry_[c][i] + room.process(wet_[c][i]) * 2.5f;
 		}
-		double peak = 1e-9;
+		const double loud = loudness(out[0], out[1]);
+		const double level = targetLufs < 0.0 && loud > -70.0 ? std::clamp(std::pow(10.0, (targetLufs - loud) / 20.0), 0.25, 10.0) : 1.0;   // (at most 20 dB up: a silent mix stays silent)
 		for (int c = 0; c < 2; ++c)
 			for (std::size_t i = 0; i < n; ++i) {
 				const double t = static_cast<double>(i) / kRate;
 				const double fade = std::min(1.0, t / std::max(1e-6, fadeIn)) * std::min(1.0, (seconds_ - t) / std::max(1e-6, fadeOut));
-				out[c][i] = static_cast<float>(std::tanh(out[c][i] * fade * 1.1));
-				peak = std::max(peak, static_cast<double>(std::abs(out[c][i])));
+				out[c][i] = static_cast<float>(out[c][i] * level * fade);
 			}
+		limit(out[0], out[1], headroom);
+		double peak = 1e-9;
+		for (int c = 0; c < 2; ++c)
+			for (std::size_t i = 0; i < n; ++i) peak = std::max(peak, static_cast<double>(std::abs(out[c][i])));
 		const double scale = peak > headroom ? headroom / peak : 1.0;
 		std::vector<std::int16_t> pcm(n * 2);
 		for (std::size_t i = 0; i < n; ++i)
