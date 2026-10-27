@@ -323,13 +323,16 @@ inline std::string flockText(const Flock &f, double t, const terrain::Field *gro
 struct Going {
 	double covered = 0.0, speed = 0.0;
 	bool paused = false;
+	double still = 0.0;   // how settled into its pause, 0 .. 1, easing in and out over most of a second (what turns smoothly as it stops and sets off)
 };
 inline Going goingAt(double rel, double pace, double cycle, double pause, double offset, double flee, double fleeSpeed) {
 	const auto W = [&](double x) { return pace * (std::floor(x / cycle) * (cycle - pause) + std::min(std::fmod(x, cycle), cycle - pause)); };
 	Going g;
 	if (flee < 0.0 || rel <= flee) {
 		g.covered = W(rel + offset) - W(offset);
-		g.paused = std::fmod(rel + offset, cycle) > cycle - pause;
+		const double phase = std::fmod(rel + offset, cycle), ease = std::min(0.8, 0.4 * pause);
+		g.paused = phase > cycle - pause;
+		g.still = smoothstep(cycle - pause, cycle - pause + ease, phase) * (1.0 - smoothstep(cycle - ease, cycle, phase));
 		g.speed = g.paused ? 0.0 : pace;
 		return g;
 	}
@@ -360,12 +363,25 @@ inline Animal animalAt(const Herd &h, const animals::Species &sp, int i, double 
 	const double rel = std::max(0.0, t - h.t0);
 	const double cycle = 9.0 + 5.0 * hash01(s, 3), pause = (sp.grazes ? 2.5 : 1.2) + 2.0 * hash01(s, 4), offset = cycle * hash01(s, 5);
 	const double flee = h.flee >= 0.0 ? std::max(0.0, h.flee - h.t0) + 0.15 * std::sqrt(static_cast<double>(i)) + 0.3 * hash01(s, 9) : -1.0;   // (one after another)
-	a.going = goingAt(rel, pace, cycle, pause, offset, flee, sp.fleeSpeed * (0.92 + 0.16 * hash01(s, 10)));
-	if (flee < 0.0 && a.going.covered >= total) a.going.covered = total, a.going.paused = true, a.going.speed = 0.0;   // (there: it stops)
+	const double fleeSpeed = sp.fleeSpeed * (0.92 + 0.16 * hash01(s, 10));
+	a.going = goingAt(rel, pace, cycle, pause, offset, flee, fleeSpeed);
+	if (flee < 0.0 && a.going.covered >= total) a.going.covered = total, a.going.paused = true, a.going.speed = 0.0, a.going.still = 1.0;   // (there: it stops)
 	a.at = from + a.dir * a.going.covered - a.dir * behind + side * across;
 	a.at.y = ground ? ground->heightAt(a.at.x, a.at.z) : 0.0;
 	if (!a.going.paused) {
 		animals::gaitOf(sp, a.going.speed, a.going.covered, a.clip, a.cycles);
+		if (flee >= 0.0 && rel > flee) {   // fleeing, through the gaits: the cycles counted a step at a time at each gait's stride, so the legs carry on from where they were
+			const auto strideAt = [&](double v) { return v < sp.trotFrom ? sp.walkStride : v < sp.runFrom ? sp.trotStride : sp.runStride; };
+			Going before = goingAt(flee, pace, cycle, pause, offset, flee, fleeSpeed);
+			double cycles = before.covered / strideAt(pace);
+			const double dt = 0.05;
+			for (double x = flee; x < rel; x += dt) {
+				const Going next = goingAt(std::min(rel, x + dt), pace, cycle, pause, offset, flee, fleeSpeed);
+				cycles += (next.covered - before.covered) / strideAt(0.5 * (before.speed + next.speed));
+				before = next;
+			}
+			a.cycles = cycles;
+		}
 		a.cycles += hash01(s, 6);
 	}
 	return a;
@@ -384,12 +400,11 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 		const auto groundAt = [&](const Vec3 &q) { return ground ? ground->heightAt(q.x, q.z) : 0.0; };
 		const double pitch = std::atan2(groundAt(p + dir * (0.5 * sp->length)) - groundAt(p - dir * (0.5 * sp->length)), sp->length) * 180.0 / kPi;   // (to the slope)
 		std::string pose;
-		double turn = 6.0 * (hash01(s, 7) - 0.5);
+		const double turn = (6.0 + 44.0 * a.going.still) * (hash01(s, 7) - 0.5);   // (turned further aside as it settles to graze: it snapped 22 degrees in a frame)
 		if (a.going.paused) {
 			const std::string clip = sp->grazes ? "graze" : "idle";
 			const double len = clip == "graze" ? 4.0 : 5.0;
 			pose = poses.poseName(h.kind, clip, static_cast<int>(std::floor((t / len + hash01(s, 11)) * animals::posesOf(clip))), out);
-			turn = 50.0 * (hash01(s, 7) - 0.5);
 		} else {
 			pose = poses.poseName(h.kind, a.clip, static_cast<int>(std::floor(a.cycles * animals::posesOf(a.clip))), out);
 		}

@@ -1028,14 +1028,39 @@ TEST(FilmFile, ACharacterWalksActsIsFollowedByTheCameraAndIsHeard) {
 		before = now;
 	}
 	EXPECT_LT(worst, 0.02);
-	// its events: a footfall every 0.84 m from half a step in (6 m: 7 of them), and the touch
+	// its events: a footfall about every 0.84 m from half a step in, the last as it stops (6 m: 8 of them), and the touch
 	int steps = 0, touches = 0;
 	for (const cartoon::FilmEvent &e : film.events()) {
 		steps += e.kind == cartoon::EventKind::Footfall;
 		touches += e.kind == cartoon::EventKind::Touch;
 	}
-	EXPECT_EQ(steps, 7);
+	EXPECT_EQ(steps, 8);
 	EXPECT_EQ(touches, 1);
+}
+
+// A walk ends as a foot comes down: the walker stands on both feet, not mid-stride with one in the air (a 5 m walk was 8.33 strides); it turns to its way as it sets
+// off rather than in one frame; and a walk that starts before the one before it has ended is refused.
+TEST(FilmFile, AWalkEndsOnBothFeetTurnsAsItSetsOffAndWalksDoNotOverlap) {
+	(void)cartoon::films();
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 12\ncharacter ann person at 0 0 0 facing 90\nwalk ann 1 1.0 0 -5\nshot 0 A\n  key 0 1.6 6  0 1 0\n", film), "");
+	for (double t : {8.0, 10.0}) {
+		const std::vector<cartoon::Foot> feet = film.feetAt(t);
+		ASSERT_EQ(feet.size(), 2u);
+		EXPECT_TRUE(feet[0].planted && feet[1].planted) << "both feet down at " << t << " s";
+		EXPECT_LT(std::abs(feet[0].at.y - feet[1].at.y), 0.01);
+	}
+	const ff::Character &ann = film.spec.characters[0];
+	double before = film.momentOf(ann, 0.98).frame[0], worst = 0.0;
+	for (double t = 1.0; t < 2.0; t += 1.0 / 48.0) {   // (the frame's turn: its first column, frame to frame)
+		const double now = film.momentOf(ann, t).frame[0];
+		worst = std::max(worst, std::abs(now - before));
+		before = now;
+	}
+	EXPECT_LT(worst, 0.25) << "it faced +x and walks towards -z: a quarter turn, eased";
+	ff::DataFilm overlap;
+	const std::string problem = loadFilm("scene s.pbrt\nlength 12\ncharacter ann person at 0 0 0\nwalk ann 1 1.0 0 -8\nwalk ann 4 1.0 4 -8\nshot 0 A\n  key 0 1.6 6  0 1 0\n", overlap);
+	EXPECT_NE(problem.find("goes on until"), std::string::npos) << problem;
 }
 
 // Props with physics in a film file: a marked block that bounces (moved to where its physics has it) and one that topples (turned about its edge), each landing an impact on
@@ -1119,11 +1144,13 @@ TEST(FilmFile, PipAPersonAndTheTurtleWalkTurnACornerWithFeetThatStayPutAndActWit
 		}
 		EXPECT_GT(planted, 50);
 		EXPECT_LT(worst, 0.01) << "m/s";
-		// a footfall each stride from a step in
-		const double stride = kind.stride * k.scale;
+		// a footfall each stride from a step in (the stride fitted to the way: it ends as a foot comes down)
+		const double stride = kind.stride * k.scale, frac = kind.firstStep - std::floor(kind.firstStep);
+		const double fitted = 5.0 / std::max(frac > 0.0 ? frac : 1.0, std::round(5.0 / stride - frac) + frac);
+		EXPECT_NEAR(fitted, stride, 0.5 * stride);
 		int steps = 0;
 		for (const cartoon::FilmEvent &e : film.events()) steps += e.kind == cartoon::EventKind::Footfall;
-		EXPECT_EQ(steps, static_cast<int>(std::floor(5.0 / stride - kind.firstStep + 1.0 + 1e-9)));
+		EXPECT_EQ(steps, static_cast<int>(std::floor(5.0 / fitted - kind.firstStep + 1.0 + 1e-9)));
 		// its chest, scaled with it
 		std::vector<cartoon::Vec3> chest;
 		ff::DataFilm followed;

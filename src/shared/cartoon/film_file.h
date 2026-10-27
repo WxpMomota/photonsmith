@@ -342,6 +342,7 @@ struct CharacterMoment {
 	Mat4 frame;
 	double steps = 0.0;
 	bool moving = false;
+	double going = 0.0;      // how much it is walking, 0 .. 1, eased over 0.3 s as a walk starts and ends (a rigged model fades between its idle and walk clips by it)
 	double t = 0.0;
 	const std::vector<rig::Gesture> *gestures = nullptr;
 	double detail = 0.0;
@@ -2780,6 +2781,7 @@ class DataFilm {
 				return filePath + ":" + std::to_string(pr.line) + ": no block of " + sceneFile.filename().string() + " is marked `# @anim " + pr.name + "`";
 		if (const std::string e = findWays(); !e.empty()) return filePath + ":" + e;
 		heightsOfWalks();
+		if (const std::string e = walksInTurn(); !e.empty()) return filePath + ":" + e;
 		if (const std::string e = crowding(); !e.empty()) return filePath + ": " + e;
 		if (const std::string e = holdingTimeline(); !e.empty()) return filePath + ":" + e;
 		for (const Spec::Contact &k : spec.contacts)
@@ -3524,6 +3526,28 @@ class DataFilm {
 	}
 	static constexpr double kRunStride = 1.6;   // a run's gait, and so its stride, is this much wider than a walk's
 	static double flightOf(const WalkLine &w) { return 2.0 * std::sqrt(2.0 * w.height / 9.81); }   // (a jump's time in the air)
+	// A character's walks, runs and jumps one after another: each starts when the one before has ended (its way's length at its pace, or a jump's flight). One that started
+	// sooner was put off until the other ended and then went on as if it had left on time - the walker jumped ahead and its footsteps were heard twice. A crowd's walks are
+	// made, not written: the next is put off until it can start instead.
+	std::string walksInTurn() {
+		for (Character &c : spec.characters)
+			for (std::size_t i = 0; i + 1 < c.walks.size(); ++i) {
+				const WalkLine &w = c.walks[i];
+				if (w.points.empty()) continue;
+				const double end = w.style == WalkLine::Jump ? w.t0 + flightOf(w) : w.t0 + pathOf(c, i).length() / std::max(1e-6, pathOf(c, i).speed);
+				WalkLine &next = c.walks[i + 1];
+				if (next.t0 >= end - 1e-3) continue;
+				if (c.extra) {
+					next.t0 = end;
+					continue;
+				}
+				char b[200];
+				std::snprintf(b, sizeof b, "%d: %s's walk starts at %.2f s, but the one before it (line %d) goes on until %.2f s: start it then, or make the one before shorter or quicker",
+							  next.line, c.name.c_str(), next.t0, w.line, end);
+				return b;
+			}
+		return std::string();
+	}
 	// The moment a character last landed from a jump at or before t (or -1e30).
 	double landedAt(const Character &c, double t) const {
 		double land = -1e30;
@@ -3535,7 +3559,7 @@ class DataFilm {
 	// stands where the walk ended, its feet where they came down.
 	CharacterMoment momentOf(const Character &c, double t, Vec3 *at = nullptr) const {
 		Vec3 where = story(c.start[0], c.start[1], c.start[2]);
-		double heading = -c.facing, steps = 0.0, running = 0.0, crouch = 0.0;
+		double heading = -c.facing, steps = 0.0, running = 0.0, crouch = 0.0, going = 0.0;
 		bool moving = false, airborne = false;
 		for (std::size_t i = 0; i < c.walks.size(); ++i) {
 			const WalkLine &w = c.walks[i];
@@ -3559,8 +3583,16 @@ class DataFilm {
 			}
 			const rig::PathWalk path = pathOf(c, i);
 			const rig::PathWalk::At a = path.at(t);
+			const double end = w.t0 + path.length() / std::max(1e-6, path.speed);
+			going = a.moving ? smoothstep(w.t0, w.t0 + 0.3, t) : 1.0 - smoothstep(end, end + 0.3, t);
 			where = a.at;
-			heading = a.yaw;
+			// it turns to its way as it sets off, from the way it faced (a quarter of a second, and more the further it turns): it took the path's heading in one frame,
+			// its planted feet twisting under it
+			double turnBy = a.yaw - heading;
+			while (turnBy > 180.0) turnBy -= 360.0;
+			while (turnBy < -180.0) turnBy += 360.0;
+			const double turning = 0.25 + std::abs(turnBy) / 360.0;
+			heading = t < w.t0 + turning ? heading + turnBy * smoothstep(w.t0, w.t0 + turning, t) : a.yaw;
 			steps = a.steps;
 			moving = a.moving;
 			running = w.style == WalkLine::Run ? 1.0 : 0.0;
@@ -3577,6 +3609,7 @@ class DataFilm {
 		m.frame = mul(translate(where), rotate({0.0, 1.0, 0.0}, heading));
 		m.steps = steps;
 		m.moving = moving;
+		m.going = going;
 		m.t = t;
 		m.gestures = &c.gestures;
 		m.detail = c.detail;

@@ -59,10 +59,12 @@ inline std::vector<Foot> feetOf(const CharacterMoment &m, const CharacterKind &k
 	for (int s = 0; s < kind.footCount; ++s) out.push_back({worldFoot(m, kind, s), kind.plantedAt(m.steps, s)});
 	return out;
 }
-// A hand target eased in by a gesture's weight: the first gesture on a hand puts it there; a later one moves it from where the earlier one had it.
+// A hand target eased in by a gesture's weight. Several at once take the mean of their targets by their weights, so a gesture fading out under the next hands the hand over smoothly (the first one used to claim it
+// outright: when it faded to nothing the hand jumped to the other's target). `weight` is their sum; the arm clamps it to 1.
 inline void reachTo(Vec3 &hand, double &weight, Vec3 target, double w) {
-	hand = weight > 0.0 ? lerp(hand, target, w) : target;
-	weight = std::max(weight, w);
+	if (!(w > 0.0)) return;
+	hand = weight > 0.0 ? (hand * weight + target * w) * (1.0 / (weight + w)) : target;
+	weight += w;
 }
 template <class P>
 inline std::vector<std::string> namesOf(const rig::PoseLibrary<P> &library) {

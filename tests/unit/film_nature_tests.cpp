@@ -434,6 +434,20 @@ TEST(FilmWildlife, FlocksSwirlRoundTheirPlaceGeeseFlyInAVAndHerdsGraze) {
 	const std::string h0 = wildlife::herdText(h, 0.0, ground.get(), p0), h6 = wildlife::herdText(h, 6.0, ground.get(), p6), h60 = wildlife::herdText(h, 60.0, ground.get(), p60);
 	EXPECT_NE(h0, h6) << "they walk";
 	EXPECT_NE(h60.find("anim_deer_graze_"), std::string::npos) << "and graze where they arrive";
+	// stopping and setting off without a jerk: how settled each is into a pause eases in and out (its turn aside follows it; it snapped 22 degrees in a frame)
+	const cartoon::animals::Species *deer = cartoon::animals::species("deer");
+	ASSERT_NE(deer, nullptr);
+	double jump = 0.0, settled = 0.0;
+	for (int i = 0; i < h.count; ++i) {
+		double before = wildlife::animalAt(h, *deer, i, 0.0, ground.get()).going.still;
+		for (double t = 1.0 / 24.0; t < 40.0; t += 1.0 / 24.0) {
+			const double now = wildlife::animalAt(h, *deer, i, t, ground.get()).going.still;
+			jump = std::max(jump, std::abs(now - before)), settled = std::max(settled, now);
+			before = now;
+		}
+	}
+	EXPECT_GT(settled, 0.99) << "they do stop";
+	EXPECT_LT(jump, 0.15) << "a frame's change";
 	// the geese are heard; the film's own line errors
 	EXPECT_TRUE(std::any_of(film.spec.ambience.begin(), film.spec.ambience.end(), [](const auto &am) { return am.kind == "geese"; }));
 	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"flock bats 10 at 0 0 0", "starlings, geese, fish, butterflies or eagles"},

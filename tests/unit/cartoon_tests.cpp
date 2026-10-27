@@ -1948,7 +1948,7 @@ TEST(FilmEvents, FootfallsComeFromTheWalksAndArePannedAndQuietenedFromTheCamera)
 
 	const cartoon::film_events::ViewAt at = [&](double) { return view; };
 	std::vector<cartoon::FilmEvent> out;
-	const cartoon::rig::PathWalk walk{{{-4.0, 0.0, 0.0}, {4.0, 0.0, 0.0}}, 1.0, 1.0, 1.0, 0.5};
+	const cartoon::rig::PathWalk walk{{{-4.0, 0.0, 0.0}, {3.5, 0.0, 0.0}}, 1.0, 1.0, 1.0, 0.5};   // (7.5 m: whole strides after the first half one)
 	cartoon::film_events::footfalls(out, walk, 0.0, 4.0, 1.0, at);
 	ASSERT_EQ(out.size(), 3u) << "steps half a stride in: at 1.5, 2.5 and 3.5 s";
 	EXPECT_NEAR(out[0].t, 1.5, 1e-12);
@@ -2032,8 +2032,9 @@ TEST(FilmEvents, TheNomaiFilmsFootstepsAreTheShotsOwnWalks) {
 	for (const cartoon::FilmEvent &e : events)
 		if (e.kind == cartoon::EventKind::Footfall && e.t >= 50.0 && e.t < 57.0) inShot.push_back(e.t);
 	ASSERT_GE(inShot.size(), 5u);
-	for (std::size_t i = 1; i < inShot.size(); ++i) EXPECT_NEAR(inShot[i] - inShot[i - 1], 0.84 / 0.70, 1e-9);
-	EXPECT_NEAR(std::fmod(inShot[0] - 49.0, 1.2), 0.6, 1e-9);
+	// (a stride of about 0.84 m: stretched or shrunk a little so the walk ends as a foot comes down)
+	for (std::size_t i = 1; i < inShot.size(); ++i) EXPECT_NEAR(inShot[i] - inShot[i - 1], 0.84 / 0.70, 0.03);
+	EXPECT_NEAR(std::fmod(inShot[0] - 49.0, inShot[1] - inShot[0]), 0.5 * (inShot[1] - inShot[0]), 1e-6);
 	for (const cartoon::FilmEvent &e : events)
 		if (e.kind == cartoon::EventKind::Footfall) EXPECT_FALSE(e.t > 166.0 && e.t < 250.0) << "nobody walks between the star map and the dawn: " << e.t;
 }

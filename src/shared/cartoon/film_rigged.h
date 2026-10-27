@@ -120,9 +120,11 @@ inline std::shared_ptr<const Kept> kept(const std::string &path, const RigOption
 inline std::string textOf(const Kept &k, const std::string &kind, const RigOptions &o, const CharacterMoment &m) {
 	const gltf_skin::Rig &rig = k.rig;
 	gltf_skin::Pose pose = gltf_skin::restPose(rig);
+	// standing (its idle clip, or the rest pose) faded into its walk by how much it is walking: it snapped from one to the other the frame a walk began or ended
 	const int moving = m.running > 0.5 && k.run >= 0 ? k.run : k.walk;
-	if (m.moving && moving >= 0) gltf_skin::apply(rig, rig.clips[static_cast<std::size_t>(moving)], m.steps * 0.5 * rig.clips[static_cast<std::size_t>(moving)].length, pose);
-	else if (k.idle >= 0) gltf_skin::apply(rig, rig.clips[static_cast<std::size_t>(k.idle)], m.t, pose);
+	if (k.idle >= 0 && m.going < 1.0) gltf_skin::apply(rig, rig.clips[static_cast<std::size_t>(k.idle)], m.t, pose);
+	if (moving >= 0 && m.going > 0.0)
+		gltf_skin::apply(rig, rig.clips[static_cast<std::size_t>(moving)], m.steps * 0.5 * rig.clips[static_cast<std::size_t>(moving)].length, pose, m.going);
 	for (int n : k.roots) {   // (the film carries it forward: what the clip moves it along the ground is taken out)
 		pose[static_cast<std::size_t>(n)].t[0] = rig.nodes[static_cast<std::size_t>(n)].rest.t[0];
 		pose[static_cast<std::size_t>(n)].t[2] = rig.nodes[static_cast<std::size_t>(n)].rest.t[2];

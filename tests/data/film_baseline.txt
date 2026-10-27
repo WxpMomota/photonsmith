@@ -1,9 +1,9 @@
 # Every film, shot by shot: film|shot|fingerprint of the scene at the shot's middle (at preview coarseness)|name. Written by
 # `python scripts/anim/film.py baseline --write` (ray_tracer --film-baseline); a difference is a film that changed - on purpose or not.
-a-walk-at-dusk|1|106357e308b317f9|Setting out
-a-walk-at-dusk|2|410a294c10738ba5|Along the path
-a-walk-at-dusk|3|2872547434baaba4|The lantern
-a-walk-at-dusk|4|53062fcf8efe7124|The first star
+a-walk-at-dusk|1|2dd58822c1e2caac|Setting out
+a-walk-at-dusk|2|5202a6c4bf962d6d|Along the path
+a-walk-at-dusk|3|3fe1ceb5b5c206ab|The lantern
+a-walk-at-dusk|4|2de02c8e3d67dd76|The first star
 ball-parade|1|be82b9a4eec4a8ce|The row of balls
 candle|1|8782ad171cbdf69c|Portrait of the flame
 candle|2|ff22690a18254670|Macro on the wax and drips
@@ -21,12 +21,12 @@ domino-run|1|deb045f89c6b796d|The spiral and the marble
 domino-run|2|e9e1e356b423eb5f|The chase
 domino-run|3|9a46243a3518904c|Close-up at the lamp
 domino-run|4|69bb702e81bf3204|Rising pull back
-fire-and-ice|1|2f02f1004a84a1bf|Geysers at dusk
-fire-and-ice|2|7b8f637e28ef3a79|The fire mountain
-fire-and-ice|3|80d012a8adb044da|Fire at dusk
-fire-and-ice|4|6693e3c70ece9b62|Lights in the sky
-fire-and-ice|5|b3f5640206251f1d|The ground shakes
-fire-and-ice|6|034149b24c4e867d|Fire and ice
+fire-and-ice|1|4583fe167c319118|Geysers at dusk
+fire-and-ice|2|b925ebcd99f6a4b3|The fire mountain
+fire-and-ice|3|4800b664e63b2537|Fire at dusk
+fire-and-ice|4|92e6142cd563a818|Lights in the sky
+fire-and-ice|5|5861c17c5bc22a9d|The ground shakes
+fire-and-ice|6|4a5dedc3ce34b316|Fire and ice
 fireflies|1|3ac9e141c444374a|Ground-level macro
 fireflies|2|f3a33d5523be34a3|The meeting
 fireflies|3|f5c9c3c310b4fb1d|Orbit round the pair
@@ -48,18 +48,18 @@ meet-pip|3|b5673143e379c8d6|Side-on walk
 newtons-cradle|1|1e62719550e13359|The whole cradle
 newtons-cradle|2|db6910fdb47fa90b|Close-up of the strike
 newtons-cradle|3|db9eaef071ab74b1|Wide pull back
-nomai-signal|1|c0aab3c7d52da60c|Darkness and a pulse
-nomai-signal|2|b7f8ac8638b59ac6|The giant and its moon
-nomai-signal|3|420724ad147d345e|The descent
+nomai-signal|1|8c5d52dd08b3d1ba|Darkness and a pulse
+nomai-signal|2|e91cb3dc9b8c00c8|The giant and its moon
+nomai-signal|3|6e27657df2343500|The descent
 nomai-signal|4|7da6d13ff912584c|Three eyes
 nomai-signal|5|ac8160a1766e222a|The signal
-nomai-signal|6|dcfa9abcdfec48dd|The landing
-nomai-signal|7|5265fd65cc000299|Under the giant
-nomai-signal|8|9287abac38475567|Footsteps
-nomai-signal|9|1de9fca0e55db74a|The ridge
-nomai-signal|10|04fe41a36025443d|The canyon
-nomai-signal|11|ec9055947302a083|The third eye
-nomai-signal|12|068def57986472bb|The floating steps
+nomai-signal|6|26245c78d54f9fa7|The landing
+nomai-signal|7|3f975702a322cc70|Under the giant
+nomai-signal|8|3bf2a77ed1dd4326|Footsteps
+nomai-signal|9|b2a25bcf23014233|The ridge
+nomai-signal|10|c57bdd3ec6f6b73b|The canyon
+nomai-signal|11|0b276b8203243799|The third eye
+nomai-signal|12|c7705362b339fd39|The floating steps
 nomai-signal|13|5cbd86cbc1ee297e|The corridor wakes
 nomai-signal|14|9bd4397f726df928|Writing on the wall
 nomai-signal|15|b594114ccb6cf76e|The recording
@@ -76,9 +76,9 @@ nomai-signal|25|6f4962e3ec572002|The remote memories
 nomai-signal|26|d7e2f0faf6f6d09f|Silence
 nomai-signal|27|760bdf5da26de7ee|Stillness
 nomai-signal|28|d659bed76440ae38|The answer
-nomai-signal|29|16fe243c2a4df0b9|Dawn
-nomai-signal|30|62a1cb9a4c040998|The campfire
-nomai-signal|31|ef5890c2b9e7d53d|Pulling away
+nomai-signal|29|e6047264eab69c46|Dawn
+nomai-signal|30|87d47f692364f9de|The campfire
+nomai-signal|31|f9f5ca88a2ec70db|Pulling away
 nomai-signal|32|da4aefe2b100fae9|The title
 orrery|1|2784ffb350302bc9|Wide orbit
 orrery|2|62cd47bd19dfe413|Close-up on the third planet
@@ -99,87 +99,87 @@ pip-and-the-moon|10|578f15558fff4e6b|Alone at the water
 pip-and-the-moon|11|5caeceecfc68504f|The firefly
 pip-and-the-moon|12|e8298ef6e53ff15e|Under the real moon
 pip-and-the-moon|13|0503e1c3de0b1302|Pull back over the pond
-pip-goes-out|1|80877f19a94ee551|Down the path
-pip-goes-out|2|fa21ac06b9574f98|The lantern lights
-pip-goes-out|3|769db4e21e3fcf7c|Into the sun
-pip-goes-out|4|d9864c5aba8d066b|Cheering
+pip-goes-out|1|ea0351b984926c53|Down the path
+pip-goes-out|2|05e3ce496e23b642|The lantern lights
+pip-goes-out|3|a3bf882c6d0a8e15|Into the sun
+pip-goes-out|4|b704b1a840cc3d74|Cheering
 pip-goes-out|5|3c333a32d94cf28f|Credits
-seasons-wood|1|55b9ff1a7bdf54e2|The meadow wakes
-seasons-wood|2|c40ffbd73ede9dc2|Following the sun
-seasons-wood|3|46874f45b856fe9d|The wood turns
-seasons-wood|4|2357a82634cafeab|Leaves fall
-seasons-wood|5|efb89f21ad9c4f7a|Winter
-swell-breaks|1|dbe1ef986e716050|Open water
-swell-breaks|2|247be51510c4a922|The breakers
-swell-breaks|3|5265c8b3cd046ccd|A wave
-swell-breaks|4|0e55221f50390f60|Evening clouds
-swell-breaks|5|883be9259f538e25|Sundown
-swell-breaks|6|0e89ae44793e41cc|Twilight
-tengwang|1|8fa5c7a59d8748b0|Black, a bell, the sea of clouds
-tengwang|2|df520deb6621eb1c|The river comes out of the mountains
-tengwang|3|9cd4554012f19a35|The Gan River and Hongzhou
-tengwang|4|d10db0833fb049d9|The Pavilion revealed
-tengwang|5|982159772f8807c6|The procession at the gate
-tengwang|6|d9b85ba1c470f061|Hoof, wheel, jade, scrolls, wine, strings
-tengwang|7|aede40e3452eec83|The hall made ready
-tengwang|8|cbb67660ce4a317f|The guests arrive
-tengwang|9|557a8d86030169ad|The young traveller
-tengwang|10|c8555ec47f5d0973|To the stair
-tengwang|11|932bd4451295e4b7|The climb
-tengwang|12|c5f0af905d20092b|The highest terrace
-tengwang|13|a8f90461941f1f82|Looking down
-tengwang|14|2d103b0f30d30787|The land opens
-tengwang|15|ab7ea1aebac1b9fa|The market
-tengwang|16|ab647c1929b1027d|Boats below the Pavilion
-tengwang|17|01d8e3bc9a89f71d|The shepherd
-tengwang|18|7b12242871b71de7|Egrets rise
-tengwang|19|52a5a3b67500cc91|The boats come home
-tengwang|20|87a0944c9dd495b2|The geese
-tengwang|21|4910dd0ba9589dbd|A ginkgo leaf falls
-tengwang|22|926959e4438e1f12|The sun goes down
-tengwang|23|42df3f79f218bf70|The setting clouds and the solitary duck
-tengwang|24|576783ff79382d63|The water and the sky one colour
-tengwang|25|ea8b1aab13d7c611|Wine
-tengwang|26|48f8b191a135236a|The pipa
-tengwang|27|56d36aa091c7b80b|Poems
-tengwang|28|5321b957b6a258af|The paper goes round
-tengwang|29|7d46ac5b7c557f30|The blank paper
+seasons-wood|1|81f2ac4b5c4110b2|The meadow wakes
+seasons-wood|2|4f7a44a33f539767|Following the sun
+seasons-wood|3|9753fc76cee69a62|The wood turns
+seasons-wood|4|fcfdb9202288102c|Leaves fall
+seasons-wood|5|be6a2032d4fbf148|Winter
+swell-breaks|1|9e3c47b1753579c3|Open water
+swell-breaks|2|0e8cd3e25a4b7077|The breakers
+swell-breaks|3|7555967c436daa4b|A wave
+swell-breaks|4|adbd48988d2422f2|Evening clouds
+swell-breaks|5|076d56a191b6cb61|Sundown
+swell-breaks|6|19f629ea06264b2b|Twilight
+tengwang|1|2721aabe4cea555a|Black, a bell, the sea of clouds
+tengwang|2|16dacfa7e01a8226|The river comes out of the mountains
+tengwang|3|7dd5e3960541e443|The Gan River and Hongzhou
+tengwang|4|d872da8615aa2207|The Pavilion revealed
+tengwang|5|79cf141da6d5ac6a|The procession at the gate
+tengwang|6|92ac024839739be5|Hoof, wheel, jade, scrolls, wine, strings
+tengwang|7|93042b609d111057|The hall made ready
+tengwang|8|11126bfef2a9e323|The guests arrive
+tengwang|9|f33738b54304b689|The young traveller
+tengwang|10|0b21195d96a610be|To the stair
+tengwang|11|d22e3b6cfce418d6|The climb
+tengwang|12|c3dd29bbc827260a|The highest terrace
+tengwang|13|e51e5a67f48e0223|Looking down
+tengwang|14|f9e8657612eadf5c|The land opens
+tengwang|15|10a339331442daf7|The market
+tengwang|16|d4965e00eda37866|Boats below the Pavilion
+tengwang|17|a7c4773926c39a0e|The shepherd
+tengwang|18|3dfe84f5a76d4c71|Egrets rise
+tengwang|19|db7c8e7afc5876ff|The boats come home
+tengwang|20|fb2adedf28950558|The geese
+tengwang|21|5a110daaeb235a23|A ginkgo leaf falls
+tengwang|22|d108165aa1a5a3f6|The sun goes down
+tengwang|23|51154bd3b2ab1e04|The setting clouds and the solitary duck
+tengwang|24|26c64789fa47081e|The water and the sky one colour
+tengwang|25|df75d7a0dad9d8ee|Wine
+tengwang|26|e82d0dfab1ebcc83|The pipa
+tengwang|27|78a7c92453181ade|Poems
+tengwang|28|03c4e2ff5f8dd97c|The paper goes round
+tengwang|29|e9ef49b9ab37e809|The blank paper
 tengwang|30|954e314d4f9b5614|Ink becomes the river
 tengwang|31|9948ab54d82a89d3|A stroke becomes the ridge
 tengwang|32|b866054633e40ae7|A dot becomes a bird; a wash, a storm
 tengwang|33|201bfa1b777f6f4e|Through the painted clouds
-tengwang|34|f635300c33c96e64|Far away
-tengwang|35|a461b6a785e425c3|Alone
-tengwang|36|4f082ff8274774fc|Ridges without end
+tengwang|34|52babd83ef8e02a3|Far away
+tengwang|35|2be9dd0480beae45|Alone
+tengwang|36|f68ca9066d608c43|Ridges without end
 tengwang|37|30c9f94a5ec89faf|The pass in the rain
 tengwang|38|a0319beffdab6a80|The crossroads
 tengwang|39|046f28df4750475e|The palace doors
 tengwang|40|67c4bde5999d8b8b|The general in the snow
-tengwang|41|60a8866b40a09ffa|The hand tightens
-tengwang|42|839a3410c55c28ad|The ink drop and the stone
-tengwang|43|a2819cf2504df979|He raises his head
-tengwang|44|74c4242ced14f5d6|The wind
-tengwang|45|4a5e332d9ad96b1d|The terrace and the eagle
-tengwang|46|96f76e7c55867115|Against the whole sky
-tengwang|47|8ad5e3985616f644|Everything at once
-tengwang|48|85e1686363bb96c5|The last lines
-tengwang|49|58615e0c3f6973e8|The faces
-tengwang|50|695e0efdcf43f43c|The brush laid down
-tengwang|51|2c41b84cd415aee0|The lanterns go out
-tengwang|52|7a61159d72e47bff|Down the stair
-tengwang|53|abc0e561f42979e9|The horse
-tengwang|54|904fcccaa1ebff89|The ride away
-tengwang|55|61a5f94a43a3f95d|Rising over the night
-tengwang|56|b9cb5709f2e86d37|The stars over the river
-tengwang|57|2f2c88b36040426e|The manuscript
-tengwang|58|75ab1db41651b364|Dawn
+tengwang|41|1527526daf4f5214|The hand tightens
+tengwang|42|4abf60c1ef22c9d9|The ink drop and the stone
+tengwang|43|4b2a5df04a4cfe91|He raises his head
+tengwang|44|fe56f5659fad837a|The wind
+tengwang|45|d42b69b547c23c89|The terrace and the eagle
+tengwang|46|a5d225c2a068dae9|Against the whole sky
+tengwang|47|806d3f5a664f14f8|Everything at once
+tengwang|48|76e7d453aea34eaa|The last lines
+tengwang|49|29460ee3269fbf4f|The faces
+tengwang|50|d899ac32ca237507|The brush laid down
+tengwang|51|e97efc49488e747f|The lanterns go out
+tengwang|52|241770861a4f9cf8|Down the stair
+tengwang|53|fe611389040192fe|The horse
+tengwang|54|a6312275958d6676|The ride away
+tengwang|55|2dfabb36862d41e2|Rising over the night
+tengwang|56|1dcc69bba87f241c|The stars over the river
+tengwang|57|aadb2428114de955|The manuscript
+tengwang|58|a313dc1fd0a5f477|Dawn
 tengwang|59|d5560262f6b0c819|The title
-thunder-plains|1|37cee5bf34d5620b|The plain
-thunder-plains|2|e588941ccccec657|Wheeling
-thunder-plains|3|5fd8b7f30726983c|The storm comes
-thunder-plains|4|17e3e191b3c4bd86|The herd
-thunder-plains|5|18fc1b9dd0288068|They bolt
-thunder-plains|6|6686516d39cbf35f|The rain
+thunder-plains|1|acbfac4f59aaf96a|The plain
+thunder-plains|2|170a12ad852ed35f|Wheeling
+thunder-plains|3|0eef5bd9471f1cdd|The storm comes
+thunder-plains|4|7f3e150aa7f5caa7|The herd
+thunder-plains|5|e13ba098833c99c4|They bolt
+thunder-plains|6|095fe9f7ea6f7a02|The rain
 turtle-escape|1|cffe5681acb9d1b4|Wide on the room
 turtle-escape|2|32e0e1985fa12972|The plant
 turtle-escape|3|3b8ffe27735f87dd|The thermometer
@@ -254,9 +254,9 @@ turtle-escape|71|6f2de973fa2e5ff3|Behind the sofa
 turtle-escape|72|38f2667aa655d8db|Turtle?
 turtle-escape|73|36c6346b2f446b99|The tub
 turtle-escape|74|6585bd4d22b77349|Black
-valley-of-mists|1|33c0fd29f5f99801|Above the mists
-valley-of-mists|2|def0078a3f37c361|First light
-valley-of-mists|3|a574dff27ea460f7|Geese
-valley-of-mists|4|03d1e6dcb4cb0a94|The mists lift
-valley-of-mists|5|533cc3a05da67711|The valley floor
-valley-of-mists|6|19215db83df5e53d|Morning
+valley-of-mists|1|3c08824bed1fa474|Above the mists
+valley-of-mists|2|771735dee2134215|First light
+valley-of-mists|3|09a8fde30f43354d|Geese
+valley-of-mists|4|de1e8caea90781d4|The mists lift
+valley-of-mists|5|9677caedd892ab9f|The valley floor
+valley-of-mists|6|772a3c3fee12f209|Morning

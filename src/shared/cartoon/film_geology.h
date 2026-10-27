@@ -163,7 +163,7 @@ inline std::string avalancheText(const Avalanche &a, double t) {
 		Vec3 dir;
 		const Vec3 p = along(front - back, dir), side{-dir.z, 0.0, dir.x};
 		const double grow = 0.25 + 0.75 * std::min(1.0, (front - back) / 60.0), rise = back / 140.0;
-		const double churn = std::fmod(t * 0.8 + hash01(i, 2), 1.0);
+		const double churn = 0.5 + 0.5 * std::sin(2.0 * kPi * (t * 0.8 + hash01(i, 2)));   // (a puff bobbing up and down: a sawtooth dropped it 3 m each cycle)
 		const Vec3 c = p + side * ((hash01(i, 3) - 0.5) * a.width * grow) + Vec3{0.0, (2.0 + 28.0 * rise * hash01(i, 4) + 3.0 * churn) * grow, 0.0};
 		const double r = (1.5 + 4.0 * hash01(i, 5)) * grow * (0.6 + 0.8 * rise);
 		std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.3f %.3f %.3f\n  Shape \"sphere\" \"float radius\" [ %.3f ]\nAttributeEnd\n", c.x, c.y, c.z, r);   // (raw text: pbrt's x)
@@ -205,12 +205,15 @@ inline std::string geyserText(const Geyser &gy, double t, double ground) {
 	Mesh water;
 	const int n = static_cast<int>(1400 * s);
 	for (int i = 0; i < n; ++i) {   // each drop thrown up at a speed of its own, a little out from the vertical, living its flight again and again
-		const double v = std::sqrt(2.0 * 9.81 * gy.height) * s * (0.55 + 0.45 * hash01(i, gy.seed)), out_ = 0.12 * hash01(i, gy.seed + 1), a = 2.0 * kPi * hash01(i, gy.seed + 2);
+		// (its flight is the full eruption's, scaled down by the strength - heights as its square, spread as itself - so a drop moves smoothly while the eruption builds
+		// and dies: a flight time that followed the strength put each drop somewhere new every frame)
+		const double v = std::sqrt(2.0 * 9.81 * gy.height) * (0.55 + 0.45 * hash01(i, gy.seed)), out_ = 0.12 * hash01(i, gy.seed + 1), a = 2.0 * kPi * hash01(i, gy.seed + 2);
 		const double life = 2.0 * v / 9.81, age = std::fmod(t + life * hash01(i, gy.seed + 3), std::max(0.05, life));
-		const Vec3 vel{v * out_ * std::cos(a), v, v * out_ * std::sin(a)};
-		const Vec3 p{gy.x + vel.x * age, ground + 0.9 + vel.y * age - 4.905 * age * age, gy.z + vel.z * age};
-		const Vec3 d = normalize(Vec3{vel.x, vel.y - 9.81 * age, vel.z} + Vec3{1e-9, 0, 0});
-		const double len = 0.6 + 0.05 * std::abs(vel.y - 9.81 * age), r = 0.12 + 0.2 * hash01(i, gy.seed + 4);   // (gouts of water and spray: they read from afar)
+		const Vec3 vel{v * out_ * std::cos(a) * s, v, v * out_ * std::sin(a) * s};
+		const double up = (vel.y * age - 4.905 * age * age) * s * s, rising = (vel.y - 9.81 * age) * s;
+		const Vec3 p{gy.x + vel.x * age, ground + 0.9 + up, gy.z + vel.z * age};
+		const Vec3 d = normalize(Vec3{vel.x, rising, vel.z} + Vec3{1e-9, 0, 0});
+		const double len = 0.6 + 0.05 * std::abs(rising), r = 0.12 + 0.2 * hash01(i, gy.seed + 4);   // (gouts of water and spray: they read from afar)
 		const Vec3 side = normalize(cross(d, Vec3{0.3, 0.1, 1.0}));
 		const int b = static_cast<int>(water.verts.size());
 		for (const Vec3 &q : {p - side * r, p + side * r, p + side * r + d * len, p - side * r + d * len}) {

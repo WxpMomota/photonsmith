@@ -91,22 +91,30 @@ struct PathWalk {
 		}
 		return a;
 	}
+	// The stride it takes: `stride` stretched or shrunk a little so the path ends as a foot comes down (a whole number of steps after the first comes down), and the walker
+	// stops with its feet planted - not mid-stride with a foot in the air, as a walk of 8.33 steps did.
+	double strideFitted() const {
+		const double total = length();
+		if (total <= 0.0 || stride <= 0.0) return stride;
+		const double frac = firstStep - std::floor(firstStep);
+		return total / std::max(frac > 0.0 ? frac : 1.0, std::round(total / stride - frac) + frac);
+	}
 	At at(double t) const {
 		const double total = length();
 		const double dist = total > 0.0 ? clamp01((t - start) * speed / total) * total : 0.0;
 		At a = along(dist);
 		a.dist = dist;
-		a.steps = dist / stride;
+		a.steps = dist / strideFitted();
 		a.moving = t > start && dist < total;
 		return a;
 	}
 	// The footfalls in (from, to]: one every stride along the path from firstStep strides in, at the time the walk reaches it.
 	std::vector<Footfall> footfalls(double from, double to) const {
 		std::vector<Footfall> out;
-		const double total = length();
-		if (speed <= 0.0 || stride <= 0.0) return out;
-		for (int k = 1; (k - 1 + firstStep) * stride <= total + 1e-9; ++k) {
-			const double d = (k - 1 + firstStep) * stride;
+		const double total = length(), step = strideFitted();
+		if (speed <= 0.0 || step <= 0.0) return out;
+		for (int k = 1; (k - 1 + firstStep) * step <= total + 1e-9; ++k) {
+			const double d = (k - 1 + firstStep) * step;
 			const double t = start + d / speed;
 			if (t <= from) continue;
 			if (t > to) break;

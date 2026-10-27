@@ -171,31 +171,64 @@ inline std::string lavaPicture(const std::string &film) {
 // `glow`: how bright its cracks shine (3 by day; less when the film's exposure has opened up for the night, so they stay orange instead of white).
 inline std::string lavaText(const std::string &film, const Lava &l, double t, double glow = 3.0) {
 	if (l.path.size() < 2 || t < l.t0) return std::string();
-	Mesh m;
 	const int across = 6;
 	double s = 0.0;
 	const double reach = std::max(4.0, (t - l.t0) * l.speed * 20.0);   // (the front advances)
+	// its cross-sections down the path: points (pbrt's), and how far down it each is
+	std::vector<std::vector<Vec3>> rows;
+	std::vector<double> at;
+	std::vector<double> widths;
 	for (std::size_t i = 0; i < l.path.size(); ++i) {
 		if (i > 0) s += length(Vec3{l.path[i].x - l.path[i - 1].x, 0.0, l.path[i].z - l.path[i - 1].z});
 		if (s > reach) break;
 		const Vec3 a = l.path[i > 0 ? i - 1 : i], b = l.path[i + 1 < l.path.size() ? i + 1 : i];
 		const Vec3 along = normalize(Vec3{b.x - a.x, 0.0, b.z - a.z} + Vec3{1e-9, 0, 0}), side{-along.z, 0.0, along.x};
 		const double w = l.width * (1.0 - 0.6 * smoothstep(reach - 15.0, reach, s));   // (narrowing to its front)
+		std::vector<Vec3> row;
 		for (int k = 0; k <= across; ++k) {
 			const double c = k / double(across) - 0.5;
-			const Vec3 p = l.path[i] + side * (c * w) + Vec3{0.0, 0.25 - 0.4 * c * c, 0.0};
-			m.verts.push_back({-p.x, p.y, p.z});
-			m.normals.push_back({0.0, 1.0, 0.0});
-			m.uvs.push_back({(c + 0.5) * w / 12.0, (s - l.speed * t) / 12.0});
+			row.push_back(l.path[i] + side * (c * w) + Vec3{0.0, 0.25 - 0.4 * c * c, 0.0});
+		}
+		rows.push_back(std::move(row)), at.push_back(s), widths.push_back(w);
+	}
+	// The crust picture tiles every 12 m down the flow and creeps with it. An area light's picture is read clamped at its edges (pbrt's, and so the renderers'), so a
+	// stretch whose v ran past 0..1 was its edge smeared into stripes: the ribbon is cut where v passes a whole number, each piece reading the picture from 0 to 1.
+	// Across, the picture spans the flow (at most 12 m of it).
+	Mesh m;
+	const auto put = [&](const std::vector<Vec3> &a, const std::vector<Vec3> &b, double va, double vb, double ua, double ub) {   // (the strip between cross-sections a and b,
+		                                                                                                                             // its picture va to vb down, ua to ub across)
+		const int base = static_cast<int>(m.verts.size());
+		for (int k = 0; k <= across; ++k) {
+			const double across01 = k / double(across);
+			for (const auto &[row, v] : {std::pair<const std::vector<Vec3> *, double>{&a, va}, {&b, vb}}) {
+				const Vec3 p = (*row)[static_cast<std::size_t>(k)];
+				m.verts.push_back({-p.x, p.y, p.z});
+				m.normals.push_back({0.0, 1.0, 0.0});
+				m.uvs.push_back({ua + (ub - ua) * across01, v});
+			}
+		}
+		for (int k = 0; k < across; ++k) {
+			const int q = base + 2 * k;
+			m.tris.push_back({q, q + 2, q + 1});
+			m.tris.push_back({q + 1, q + 2, q + 3});
+		}
+	};
+	for (std::size_t i = 0; i + 1 < rows.size(); ++i) {
+		const double v0 = (at[i] - l.speed * t) / 12.0, v1 = (at[i + 1] - l.speed * t) / 12.0;
+		const double u1 = std::min(1.0, 0.5 * (widths[i] + widths[i + 1]) / 12.0);
+		double va = v0;
+		while (va < v1 - 1e-9) {
+			const double tile = std::floor(va + 1e-9), vb = std::min(v1, tile + 1.0);
+			const auto cut = [&](double v) {   // (the cross-section where the picture's v is v)
+				const double f = (v - v0) / std::max(1e-12, v1 - v0);
+				std::vector<Vec3> row;
+				for (int k = 0; k <= across; ++k) row.push_back(lerp(rows[i][static_cast<std::size_t>(k)], rows[i + 1][static_cast<std::size_t>(k)], f));
+				return row;
+			};
+			put(cut(va), cut(vb), va - tile, vb - tile, 0.0, u1);
+			va = vb;
 		}
 	}
-	const int rows = static_cast<int>(m.verts.size()) / (across + 1);
-	for (int i = 0; i + 1 < rows; ++i)
-		for (int k = 0; k < across; ++k) {
-			const int a = i * (across + 1) + k;
-			m.tris.push_back({a, a + 1, a + across + 1});
-			m.tris.push_back({a + 1, a + across + 2, a + across + 1});
-		}
 	if (m.tris.empty()) return std::string();
 	char scale[32];
 	std::snprintf(scale, sizeof scale, "%.4f", glow);

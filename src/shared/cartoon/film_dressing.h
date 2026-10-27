@@ -156,6 +156,18 @@ inline void sunAt(const Sky &s, double hour, double &elevation, double &facing) 
 	const double fromSouth = std::atan2(std::sin(H), std::cos(H) * std::sin(lat) - std::tan(dec) * std::cos(lat)) / d2r;   // (towards the west, positive)
 	facing = s.south + fromSouth;
 }
+// The hour, within the film's sky, when the sun crosses 5 degrees under the horizon (night falling, or ending), to the minute: the stars' turn is counted from it, so the
+// twilight in the sky's picture is turned least while it shows. The film's first hour when the sun never crosses it.
+inline double nightBegan(const Sky &s) {
+	double el = 0.0, facing = 0.0;
+	sunAt(s, s.from, el, facing);
+	const bool startsDark = el < -5.0;
+	for (double h = s.from; h <= s.to; h += 1.0 / 60.0) {
+		sunAt(s, h, el, facing);
+		if ((el < -5.0) != startsDark) return h;
+	}
+	return s.from;
+}
 inline double hourAt(const Sky &s, double t, double length) { return s.from + (s.to - s.from) * (length > 0.0 ? std::max(0.0, std::min(1.0, t / length)) : 0.0); }
 // The sun (a distant light) and the sky (an infinite light: film_sky.h's picture, made once for each quarter degree of the sun, in the film's cache folder) at t, as scene
 // text. Round sunset a glow round the sun and a warm afterglow along the horizon under it, the pink belt opposite; below the horizon the sun goes out and the sky dims into
@@ -231,10 +243,12 @@ inline std::string skyText(const std::string &film, const Sky &s, double t, doub
 		fs.altitude = s.altitude;
 		fs.glow = fs.afterglow = fs.belt = 0.0;
 	}
-	// the stars turn about the celestial pole, 15 degrees an hour (the sky's picture with them, as far as it is night)
+	// the stars turn about the celestial pole, 15 degrees an hour, from when night began (the sky's picture with them: the renderers keep one sky light, so the stars are
+	// in it). Counted from the night's start, not the film's, the twilight glow still in the picture then is turned only a little away from the sun; and the angle is the
+	// hour's own, smooth (it was scaled by the night's twentieths: the stars jumped at each step).
 	const double nf = (s.south + 180.0) * d2r, lat = s.latitude * d2r;
 	const Vec3 pole{std::sin(nf) * std::cos(lat), std::sin(lat), std::cos(nf) * std::cos(lat)};
-	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Rotate %.4f %.5f %.5f %.5f\n", -15.0 * (hour - s.from) * fs.night, pole.x, pole.y, pole.z);
+	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Rotate %.4f %.5f %.5f %.5f\n", fs.night > 0.0 ? -15.0 * std::max(0.0, hour - nightBegan(s)) : 0.0, pole.x, pole.y, pole.z);
 	out += buf;
 	if (stormy > 0.0) {   // (the deck drifting: the sky turned a fifth of a degree a second)
 		std::snprintf(buf, sizeof buf, "  Rotate %.4f 0 1 0\n", 0.2 * t);

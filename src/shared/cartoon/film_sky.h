@@ -140,11 +140,13 @@ inline Vec3 nightSky(const Spec &s, Vec3 w, int row, int col) {
 		const double u = std::atan2(along.z, along.x), v = off;
 		// the band: wide and soft, brighter towards its core, made of clumpy star clouds (noise as fine along the band as across it) with a dark, ragged lane of dust down
 		// its middle
-		const double clump = nature::fbm2(u * 7.0 + 3.0 * v, v * 7.0, 401), fine = nature::fbm2(u * 22.0, v * 22.0, 402);
+		// (noise read round a circle, cos u and sin u: fed u itself, it was cut where u wraps from pi to -pi, a seam across the band)
+		const double cu = std::cos(u), su = std::sin(u);
+		const double clump = nature::fbm2(7.0 * cu + 3.0 * v, 7.0 * su + 7.0 * v, 401), fine = nature::fbm2(22.0 * cu + 15.0 * v, 22.0 * su + 15.0 * v, 402);
 		double band = std::exp(-std::pow(v / 0.15, 2.0)) * (0.30 + 0.8 * clump * clump + 0.3 * fine);
 		const double core = 0.55 + 0.9 * std::exp(-std::pow(std::remainder(u - 0.6, 2.0 * kPi) / 1.0, 2.0));
 		// dark clouds of dust here and there across it (patches, not a line)
-		const double dust = smoothstep(0.55, 0.75, nature::fbm2(u * 9.0 + 11.0, v * 9.0, 404)) * std::exp(-std::pow(v / 0.08, 2.0));
+		const double dust = smoothstep(0.55, 0.75, nature::fbm2(9.0 * cu + 11.0 + 6.0 * v, 9.0 * su + 6.0 * v, 404)) * std::exp(-std::pow(v / 0.08, 2.0));
 		band = (std::max)(0.0, band * core * (1.0 - 0.8 * dust));
 		c = c + lerp(Vec3{0.78, 0.84, 1.0}, Vec3{1.0, 0.90, 0.78}, clamp01(core - 0.8)) * (0.016 * s.milkyWay * band);
 	}
@@ -180,7 +182,8 @@ inline double cloudDensity(const Clouds &L, double x, double z) {
 inline std::string fileName(const Spec &s) {
 	std::string key;
 	char b[400];
-	std::snprintf(b, sizeof b, "v5|%.3f|%.3f|%.3f|%.4f|%.4f %.4f %.4f|%.3f|%.3f|%.3f|%.3f %.3f %.3f|%.3f|%.3f|%.4f %.4f %.4f|%.3f|%.4f %.4f %.4f|%.3f|%d", s.sunElevation, s.sunAzimuth, s.turbidity,
+	// ("v6": what render() paints; change it whenever render() or what it calls changes - a sky's file outlives builds)
+	std::snprintf(b, sizeof b, "v6|%.3f|%.3f|%.3f|%.4f|%.4f %.4f %.4f|%.3f|%.3f|%.3f|%.3f %.3f %.3f|%.3f|%.3f|%.4f %.4f %.4f|%.3f|%.4f %.4f %.4f|%.3f|%d", s.sunElevation, s.sunAzimuth, s.turbidity,
 				  s.brightness, s.tint.x, s.tint.y, s.tint.z, s.night, s.nightBrightness, s.milkyWay, s.milkyPole.x, s.milkyPole.y, s.milkyPole.z, s.stars, s.glow, s.glowColour.x, s.glowColour.y,
 				  s.glowColour.z, s.afterglow, s.afterglowColour.x, s.afterglowColour.y, s.afterglowColour.z, s.belt, s.width);
 	key = b;
@@ -280,9 +283,9 @@ inline std::vector<float> render(const Spec &s) {
 				if (ang > 42.8 && ang < 50.4) c = c * (1.0 - 0.15 * s.rainbow);                            // (Alexander's dark band between them)
 			}
 			if (s.shafts > 0.0 && elevDeg > -2.0 && elevDeg < 14.0) {   // rain shafts: curtains in bands round the horizon, streaked down, thinning towards the cloud base
-				const double az = std::atan2(w.x, -w.z);
-				const double band = smoothstep(0.52, 0.7, nature::fbm2(az * 2.2 + 3.0, 0.5, 611)) * (0.6 + 0.4 * nature::noise2(az * 40.0, elevDeg * 0.08, 613));
-				const double reach = 1.0 - smoothstep(4.0 + 6.0 * nature::noise2(az * 3.0, 1.5, 617), 14.0, elevDeg);
+				const double az = std::atan2(w.x, -w.z), ca = std::cos(az), sa = std::sin(az);   // (noise round a circle: no seam behind)
+				const double band = smoothstep(0.52, 0.7, nature::fbm2(2.2 * ca + 3.0, 2.2 * sa + 0.5, 611)) * (0.6 + 0.4 * nature::noise2(40.0 * ca, 40.0 * sa + elevDeg * 0.08, 613));
+				const double reach = 1.0 - smoothstep(4.0 + 6.0 * nature::noise2(3.0 * ca, 3.0 * sa + 1.5, 617), 14.0, elevDeg);
 				const double a = s.shafts * band * reach;
 				if (a > 0.0) c = lerp(c, s.shaftColour * (0.5 + 0.8 * detail::luminance(c)), (std::min)(0.85, a));
 			}
