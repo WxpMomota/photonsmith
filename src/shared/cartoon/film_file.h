@@ -509,6 +509,14 @@ struct Spec {
 	std::vector<Rainbow> rainbows;
 	// how fast nature runs (`timelapse`: the clouds, the water, the aurora, the wind in the trees), and the exposure (`exposure`: a factor, or `auto` - following the light)
 	double timelapse = 1.0, exposure = 1.0;
+	// slow motion (`slowmo T0 T1 RATE`): nature's time running at RATE of the film's between T0 and T1 (eased in and out over 0.4 s); nature's time at every
+	// kNatureStep seconds of the film, worked out when the film is loaded (empty without slow motion: then it is the film's times the timelapse)
+	struct SlowMo {
+		double t0 = 0.0, t1 = 0.0, rate = 0.25;
+	};
+	std::vector<SlowMo> slowmos;
+	static constexpr double kNatureStep = 0.01;
+	std::vector<double> natureClock;
 	bool exposureAuto = false;
 	// weather that changes the land (`wet`, `snowcover`: each an amount reached from T0 to T1), its gusts (`gusts`) and a mist round the camera (`mist`)
 	struct Ramp {
@@ -1879,6 +1887,12 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			else if (verb == "lava") s.lavas.push_back(la);
 			else if (verb == "volcano") s.volcanoes.push_back(vo);
 			else s.wildfires.push_back(wf);
+		} else if (verb == "slowmo") {   // nature in slow motion for a while
+			const std::vector<std::string> t = detail::tokens(line);
+			Spec::SlowMo sm;
+			if (t.size() < 3 || t.size() > 4 || !number(t[1], sm.t0) || !number(t[2], sm.t1) || sm.t1 <= sm.t0 || (t.size() == 4 && (!number(t[3], sm.rate) || sm.rate <= 0.0 || sm.rate > 1.0)))
+				return fail("`slowmo T0 T1 [RATE]`: from T0 to T1 nature runs at RATE of its speed (0.25 when not given: a high-speed camera's slow motion)");
+			s.slowmos.push_back(sm);
 		} else if (verb == "timelapse") {
 			double v = 0.0;
 			if (!number(rest, v) || v < 1.0 || v > 100000.0) return fail("`timelapse FACTOR`: how many times faster the clouds, the water and the wind go (1 to 100000)");
@@ -2018,7 +2032,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -2232,6 +2246,15 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		if (s.fog.thickness <= 0.0) s.fog.thickness = s.hasTerrain ? std::max(2.0, 0.06 * s.terrain.height) : 1.0;
 	}
 	for (skyfx::Lightning &l : s.lightnings) l.strikes = skyfx::strikesOf(l, s.length);
+	if (!s.slowmos.empty()) {   // nature's clock: its rate eased into and out of each slow motion, summed
+		const auto rate = [&](double t) {
+			double r = 1.0;
+			for (const Spec::SlowMo &sm : s.slowmos) r = std::min(r, 1.0 - (1.0 - sm.rate) * smoothstep(sm.t0, sm.t0 + 0.4, t) * (1.0 - smoothstep(sm.t1 - 0.4, sm.t1, t)));
+			return r * s.timelapse;
+		};
+		s.natureClock.assign(1, 0.0);
+		for (double t = Spec::kNatureStep; t <= s.length + 4.0; t += Spec::kNatureStep) s.natureClock.push_back(s.natureClock.back() + 0.5 * (rate(t - Spec::kNatureStep) + rate(t)) * Spec::kNatureStep);
+	}
 	for (skyfx::Aurora &a : s.auroras)
 		if (!a.facingSet && s.hasSky) a.facing = s.sky.south + 180.0;   // (the aurora is towards the pole: the film's own north)
 	s.storyEnd = s.length;
@@ -2666,8 +2689,11 @@ class DataFilm {
 			if (shot.following) named.push_back(shot.follow.who);
 			for (const auto &[at, who] : shot.focus) named.push_back(who);
 			if (!shot.lightOn.empty()) named.push_back(shot.lightOn);
-			for (const std::string &who : named)
-				if (!character(who)) return filePath + ": the shot \"" + shot.name + "\" names " + who + ", who is not brought in with `character`";
+			for (const std::string &who : named) {
+				Vec3 feet, front, chest;
+				if (!character(who) && !wildSubject(who, shot.start, feet, front, chest))
+					return filePath + ": the shot \"" + shot.name + "\" names " + who + ", who is not brought in with `character` (nor a herd or a flock: herd1, flock1 ...)";
+			}
 		}
 		return std::string();
 	}
@@ -2740,7 +2766,7 @@ class DataFilm {
 		std::string out = spec.hasTerrain ? terrain::text(spec.key.empty() ? std::string("film") : spec.key, spec.terrain, weatherAt(t)) : std::string();
 		if (spec.placements.empty()) return out;
 		out += "# the set's dressing (film_dressing.h)\n" + dressing::objects();
-		for (const dressing::Placement &p : spec.placements) out += dressing::placementText(p, t * spec.timelapse, spec.gusts);
+		for (const dressing::Placement &p : spec.placements) out += dressing::placementText(p, natureAt(t), spec.gusts);
 		return out;
 	}
 	// The weather on the land at t: how wet it is and how much snow lies on it (film_file.h `wet`, `snowcover`).
@@ -3294,6 +3320,80 @@ class DataFilm {
 		return nullptr;
 	}
 	static Vec3 story(double x, double y, double z) { return {-x, y, z}; }   // (pbrt's coordinates to the toolkit's: x mirrored)
+	// Nature's time at film time t (`timelapse`, and `slowmo` windows where it runs slower): what the clouds, the water, the wind and the animals go by.
+	double natureAt(double t) const {
+		if (spec.natureClock.empty()) return t * spec.timelapse;
+		const double k = t / Spec::kNatureStep;
+		if (k <= 0.0) return t * spec.timelapse;
+		const std::size_t i = static_cast<std::size_t>(k);
+		if (i + 1 >= spec.natureClock.size()) return spec.natureClock.back() + (t - (spec.natureClock.size() - 1) * Spec::kNatureStep) * spec.timelapse;
+		return spec.natureClock[i] + (spec.natureClock[i + 1] - spec.natureClock[i]) * (k - i);
+	}
+	// A herd or a flock as a shot's subject - `herd1`, `herd2` ..., `flock1` ... (the film's herds and flocks in the order of their lines): where its middle is at t, which
+	// way it is going, and the height a camera looks at (story space, as a character's feet, front and chest). False when `who` is none.
+	bool wildSubject(const std::string &who, double t, Vec3 &feet, Vec3 &front, Vec3 &chest) const {
+		const bool herd = who.rfind("herd", 0) == 0, flock = who.rfind("flock", 0) == 0;
+		if (!herd && !flock) return false;
+		double n = 0.0;
+		if (!detail::number(who.substr(herd ? 4 : 5), n) || n < 1.0 || n != std::floor(n)) return false;
+		const std::size_t i = static_cast<std::size_t>(n) - 1;
+		const double nt = natureAt(t);
+		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+		Vec3 sum{0, 0, 0}, way{0, 0, 0};
+		double lift = 1.0;
+		int count = 0;
+		if (herd) {
+			if (i >= spec.herds.size()) return false;
+			const wildlife::Herd &h = spec.herds[i];
+			const animals::Species *sp = animals::species(h.kind);
+			if (!sp) return false;
+			for (int a = 0; a < std::min(h.count, 12); ++a, ++count) {   // (the herd's leading animals: the bunch the camera is on)
+				const wildlife::Animal an = wildlife::animalAt(h, *sp, a, nt, ground.get());
+				sum = sum + an.at, way = an.dir;
+			}
+			lift = 0.85 * sp->length;
+		} else {
+			if (i >= spec.flocks.size()) return false;
+			const wildlife::Flock &f = spec.flocks[i];
+			if (f.kind == "eagles") {
+				for (int a = 0; a < f.count; ++a, ++count) {
+					Vec3 fwd;
+					sum = sum + wildlife::eagleAt(f, a, nt, &fwd);
+					way = way + fwd;
+				}
+			} else if ((f.kind == "starlings" || f.kind == "fish") && !f.pos.empty()) {
+				const std::size_t k = std::min(f.pos.size() - 1, static_cast<std::size_t>(std::max(0.0, (t - f.t0) / f.dt)));
+				for (std::size_t a = 0; a < f.pos[k].size(); ++a, ++count) sum = sum + f.pos[k][a], way = way + f.vel[k][a];
+			} else if (f.kind == "geese") {
+				const double speed = f.speed > 0.0 ? f.speed : 15.0;
+				way = normalize(f.to - f.from + Vec3{1e-9, 0, 0});
+				sum = f.from + way * std::min(length(f.to - f.from), (nt - f.t0) * speed), count = 1;
+			} else {   // butterflies: over their patch
+				sum = Vec3{0.5 * (f.x0 + f.x1), f.at.y + (ground ? ground->heightAt(0.5 * (f.x0 + f.x1), 0.5 * (f.z0 + f.z1)) : 0.0) + 0.8, 0.5 * (f.z0 + f.z1)}, count = 1;
+				way = {0, 0, 1};
+			}
+			lift = 0.0;
+		}
+		if (count == 0) return false;
+		const Vec3 mid = sum * (1.0 / count);
+		way.y = 0.0;
+		if (length(way) < 1e-9) way = {0, 0, 1};
+		way = normalize(way);
+		feet = story(mid.x, mid.y, mid.z);
+		front = story(way.x, 0.0, way.z);
+		chest = feet + Vec3{0.0, lift, 0.0};
+		return true;
+	}
+	// A shot's subject, a character or a herd or flock: its feet, front and chest at t (story space). False when it is neither.
+	bool subjectFrame(const std::string &who, double t, Vec3 &feet, Vec3 &front, Vec3 &chest) const {
+		if (const Character *c = character(who)) {
+			const CharacterMoment m = momentOf(*c, t, &feet);
+			front = normalize(transformPoint(m.frame, {0.0, 0.0, 1.0}) - feet);
+			chest = transformPoint(m.frame, characterKinds().at(c->kind).chest * c->scale);
+			return true;
+		}
+		return wildSubject(who, t, feet, front, chest);
+	}
 	// A walk of a character as a path in story space, from where it was before the walk.
 	rig::PathWalk pathOf(const Character &c, std::size_t walk) const {
 		const CharacterKind &kind = characterKinds().at(c.kind);
@@ -3436,8 +3536,11 @@ class DataFilm {
 		const Shot &shot = spec.shots[shotAt(t)];
 		std::vector<std::string> named = shot.about;
 		if (shot.following && std::find(named.begin(), named.end(), shot.follow.who) == named.end()) named.insert(named.begin(), shot.follow.who);
-		for (const std::string &who : named)
+		for (const std::string &who : named) {
+			Vec3 feet, front, chest;
 			if (const Character *c = character(who)) out.push_back(chestOf(*c, t));
+			else if (wildSubject(who, t, feet, front, chest)) out.push_back(chest);
+		}
 		return out;
 	}
 	// The characters' feet, in the same order at every moment (Film::feetAt).
@@ -3934,7 +4037,7 @@ class DataFilm {
 				std::string lastClip;
 				double lastCycles = 0.0;
 				for (double t = 0.0; t < T; t += 0.02) {
-					const wildlife::Animal a = wildlife::animalAt(h, *sp, i, t, ground.get());
+					const wildlife::Animal a = wildlife::animalAt(h, *sp, i, natureAt(t), ground.get());
 					if (!a.clip.empty() && a.clip == lastClip) {
 						static const double walk[4] = {0.0, 0.25, 0.5, 0.75}, trot[4] = {0.0, 0.5, 0.5, 0.0}, run[4] = {0.0, 0.40, 0.08, 0.50};
 						const double *starts = a.clip == "walk" ? walk : a.clip == "trot" ? trot : run;
@@ -3956,7 +4059,7 @@ class DataFilm {
 			for (int i = 0; i < f.count; ++i) {
 				const double every = 9.0 + 9.0 * audio::unit(static_cast<unsigned>(1001 + i));
 				for (double t = std::max(0.0, f.t0) + every * audio::unit(static_cast<unsigned>(1011 + i)); t < std::min(T, f.t1); t += every)
-					ss::place(m, ears, t, wildlife::eagleAt(f, i, t), cry, 0.35, 50.0);
+					ss::place(m, ears, t, wildlife::eagleAt(f, i, natureAt(t)), cry, 0.35, 50.0);
 			}
 		}
 		// birds in the trees near the camera, by day
@@ -4014,7 +4117,7 @@ class DataFilm {
 
 	std::string worldAt(const std::string &header, double t) const {
 		std::string out = film_camera::exposed(header, exposureAt(t));
-		const double nt = t * spec.timelapse;   // (nature's time: the clouds, the water, the aurora, the wind)
+		const double nt = natureAt(t);   // (nature's time: the clouds, the water, the aurora, the wind, the animals; `timelapse`, `slowmo`)
 		if (spec.hasUnderwater) {   // under the sea (film_underwater.h): the water round the camera, the light coming down through it, what drifts and grows in it
 			Vec3 eye, target;
 			double fov = 40.0;
@@ -4188,8 +4291,8 @@ class DataFilm {
 			};
 			animals::Poses poses;   // (the rigged kinds' poses this frame uses: film_animals.h)
 			for (const wildlife::Flock &f : spec.flocks)
-				if (t >= f.t0 && t <= f.t1) out += wildlife::flockText(f, t, ground.get(), poses, first(f.kind));
-			for (const wildlife::Herd &h : spec.herds) out += wildlife::herdText(h, t, ground.get(), poses);
+				if (t >= f.t0 && t <= f.t1) out += wildlife::flockText(f, f.kind == "eagles" || f.kind == "geese" ? nt : t, ground.get(), poses, first(f.kind));
+			for (const wildlife::Herd &h : spec.herds) out += wildlife::herdText(h, nt, ground.get(), poses);
 		}
 		if (!spec.meadows.empty()) {   // wild flowers (film_flowers.h): sunflowers turn to the sun
 			const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
@@ -4347,11 +4450,9 @@ class DataFilm {
 	// A move's camera at t: about its character, the way along it eased (an orbit at an even pace), in story space and then pbrt's.
 	camera_keyframes::Key moveKey(const Shot &shot, double t, double span) const {
 		const Shot::Move &mv = shot.move;
-		const Character &c = *character(mv.who);
-		Vec3 feet;
-		const CharacterMoment m = momentOf(c, t, &feet);
-		const Vec3 up{0.0, 1.0, 0.0}, front = normalize(transformPoint(m.frame, {0.0, 0.0, 1.0}) - feet), right = cross(front, up);
-		const Vec3 chest = transformPoint(m.frame, characterKinds().at(c.kind).chest * c.scale);
+		Vec3 feet, front, chest;   // (a character, or a herd or a flock)
+		subjectFrame(mv.who, t, feet, front, chest);
+		const Vec3 up{0.0, 1.0, 0.0}, right = cross(front, up);
 		const double u = std::min(1.0, std::max(0.0, (t - shot.start) / span)), eased = smoothstep(0.0, 1.0, u);
 		Vec3 eye = chest + front * 3.0;
 		switch (mv.kind) {
@@ -4382,11 +4483,10 @@ class DataFilm {
 		camera_keyframes::Key key;
 		if (shot.following) {
 			// behind the character, at a height above its feet, to its right, looking at its chest (story space, then pbrt's: x mirrored)
-			const Character &c = *character(shot.follow.who);
-			Vec3 feet;
-			const CharacterMoment m = momentOf(c, t, &feet);
-			const Vec3 forward = normalize(transformPoint(m.frame, {0.0, 0.0, 1.0}) - feet), up{0.0, 1.0, 0.0}, right = cross(forward, up);
-			const Vec3 eye = feet - forward * shot.follow.behind + right * shot.follow.side + up * shot.follow.up, target = transformPoint(m.frame, characterKinds().at(c.kind).chest * c.scale);
+			Vec3 feet, forward, target;   // (a character, or a herd or a flock)
+			subjectFrame(shot.follow.who, t, feet, forward, target);
+			const Vec3 up{0.0, 1.0, 0.0}, right = cross(forward, up);
+			const Vec3 eye = feet - forward * shot.follow.behind + right * shot.follow.side + up * shot.follow.up;
 			key.pos[0] = -eye.x;
 			key.pos[1] = eye.y;
 			key.pos[2] = eye.z;
@@ -4410,7 +4510,8 @@ class DataFilm {
 			const Vec3 eye{-key.pos[0], key.pos[1], key.pos[2]};
 			const auto distanceTo = [&](const std::string &who) {
 				const Character *c = character(who);
-				return c ? length(bodyPoint(*c, t, characterKinds().at(c->kind).head) - eye) : 0.0;
+				Vec3 feet, front, chest;
+				return c ? length(bodyPoint(*c, t, characterKinds().at(c->kind).head) - eye) : wildSubject(who, t, feet, front, chest) ? length(chest - eye) : 0.0;
 			};
 			double d = 0.0;
 			if (!shot.focus.empty()) {

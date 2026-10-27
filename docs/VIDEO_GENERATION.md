@@ -903,6 +903,28 @@ and shrubs low down, conifers coming in on the way up, conifers alone near the t
 yellow); `winter` (broadleaf trees and birches bare, showing their twigs; conifers with snow on their tiers); `spring` (fresh light green, some broadleaf trees and shrubs in
 blossom). Walks do not go round forest trees (they are not part of the set's floor map).
 
+**Documentary cameras: herds and flocks as subjects, `slowmo`.** (film_file.h)
+
+```
+herd   horses 14  from -40 0  to 400 0  flee 2
+slowmo 6 12 0.25                         # from 6 s to 12 s nature runs at a quarter of its speed
+shot 0 Alongside
+  track herd1 side 14 height 1.6 fov 38  # beside the herd as it gallops (a vehicle alongside)
+  focus herd1                            # and focused on it
+  aperture 0.04
+shot 12 Above
+  follow flock1 behind 40 up 10 fov 30   # after the eagles
+```
+
+A shot's moves and focus take a herd or a flock as they take a character: `herd1`, `herd2` ... and `flock1` ... are the film's herds and flocks in the order of their lines.
+A herd's place is the middle of its leading animals (the bunch the camera is on), its front the way it is going, and the camera looks at its backs; a flock's is the middle
+of its birds or fish (geese: their leader), its front the way they fly. So `follow` drives behind a herd, `track` runs alongside it, `orbit` circles it, `push` and `crane`
+move in on it and rise over it, and `focus` keeps it sharp - as it walks, grazes, bolts and gallops away. They are the shot's subjects for the film doctor's framing checks.
+
+`slowmo T0 T1 [RATE]` is a high-speed camera's slow motion: from T0 to T1 nature's time - the animals, the water and surf, the clouds, the wind - runs at RATE of the
+film's (0.25 when not given), eased into and out of over 0.4 s, while the camera keeps the film's pace; `timelapse` sets its speed elsewhere. A herd's hoofbeats and the
+eagles' cries keep time with what is seen.
+
 **Biomes: `biome`.** (film_terrain.h, film_forest.h)
 
 ```

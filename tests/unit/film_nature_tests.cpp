@@ -1207,3 +1207,46 @@ TEST(FilmBiomes, ABiomePaintsTheLandAndPlantsItsOwn) {
 		EXPECT_NE(problem.find(says), std::string::npos) << text << " -> " << problem;
 	}
 }
+
+// Documentary cameras: a shot can follow, orbit or track a herd or a flock (`herd1`, `flock1`) and pull focus to it, as it would a character; `slowmo` slows nature's
+// time (the animals, the water, the clouds) for a while while the camera keeps its pace.
+TEST(FilmDocumentary, CamerasFollowHerdsAndNatureRunsSlowInSlowMotion) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("docu", "scene s.pbrt\nlength 20\nherd horses 10 from -40 0 to 200 0 speed 1.3 flee 4\nflock eagles 2 at 0 60 -50\nslowmo 8 14 0.25\n"
+								 "shot 0 Alongside\n track herd1 side 15 height 2 fov 40\n focus herd1\n aperture 0.05\nshot 12 Above\n follow flock1 behind 40 up 10 fov 30\n",
+						 film),
+			  "");
+	// the nature clock: a quarter speed in the middle of the slow motion, the film's speed outside it
+	EXPECT_NEAR(film.natureAt(5.0), 5.0, 1e-6);
+	EXPECT_NEAR(film.natureAt(11.0) - film.natureAt(10.0), 0.25, 0.01);
+	EXPECT_NEAR(film.natureAt(19.0) - film.natureAt(18.0), 1.0, 0.01);
+	// the camera alongside the herd: as it gallops away the camera goes with it, looking at it, focused on it
+	cartoon::Vec3 feet, front, chest;
+	ASSERT_TRUE(film.wildSubject("herd1", 6.0, feet, front, chest));
+	EXPECT_GT(chest.y, feet.y + 0.5);
+	std::string camera = film.headerAt(6.0);
+	std::istringstream in(camera.substr(camera.find("LookAt") + 7));
+	double ex = 0, ey = 0, ez = 0, tx = 0, ty = 0, tz = 0;
+	in >> ex >> ey >> ez >> tx >> ty >> tz;
+	EXPECT_NEAR(std::hypot(-tx - chest.x, tz - chest.z), 0.0, 0.5) << "looking at the herd";
+	EXPECT_NEAR(std::hypot(-ex - feet.x, ez - feet.z), 15.0, 0.5) << "alongside it";
+	EXPECT_NE(camera.find("focaldistance"), std::string::npos) << camera;
+	cartoon::Vec3 later;
+	film.wildSubject("herd1", 7.0, later, front, chest);
+	const double fast = length(later - feet);
+	cartoon::Vec3 slowA, slowB;
+	film.wildSubject("herd1", 10.0, slowA, front, chest);
+	film.wildSubject("herd1", 11.0, slowB, front, chest);
+	EXPECT_LT(length(slowB - slowA), 0.4 * fast) << "in slow motion the gallop crawls";
+	// the second shot follows the eagles
+	ASSERT_TRUE(film.wildSubject("flock1", 15.0, feet, front, chest));
+	EXPECT_NE(film.headerAt(15.0).find("LookAt"), std::string::npos);
+	EXPECT_EQ(film.subjectsAt(15.0).size(), 1u);
+	for (const auto &[text, says] : std::vector<std::pair<std::string, std::string>>{{"herd deer 3 from 0 0 to 10 0\nshot 0 A\n follow herd2\n", "nor a herd or a flock"},
+																						  {"slowmo 5 3\n", "`slowmo T0 T1"},
+																						  {"slowmo 1 3 2\n", "`slowmo T0 T1"}}) {
+		ff::DataFilm bad;
+		const std::string problem = loadNature("docu_bad", "scene s.pbrt\nlength 10\n" + text, bad);
+		EXPECT_NE(problem.find(says), std::string::npos) << text << " -> " << problem;
+	}
+}
