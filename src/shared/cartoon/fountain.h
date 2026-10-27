@@ -131,7 +131,7 @@ inline Script parse(const std::string &text) {
 				std::istringstream items(value);
 				for (std::string item; std::getline(items, item, ',');) {
 					const std::size_t eq = item.find('=');
-					if (eq != std::string::npos) out.cast[upper(trim(item.substr(0, eq)))] = trim(item.substr(eq + 1));
+					if (eq != std::string::npos) out.cast[upper(trim(item.substr(0, eq)))] = lower(trim(item.substr(eq + 1)));   // (kinds are lower case: `PIP=Pip` is pip)
 				}
 			}
 		}
@@ -222,10 +222,14 @@ inline std::string poseIn(const std::string &p, const std::vector<std::string> &
 inline std::string filmFile(const Script &s, const std::string &set, const std::string &keyIfNoTitle) {
 	char buf[400];
 	std::string out = "# Made from a screenplay (fountain.h): its lines timed one after another, a shot of each scene; stage it from here.\n";
-	std::string key = film_file::detail::keyFromFileName(s.title.empty() ? keyIfNoTitle : s.title);
+	// (the key from the title's own letters - not keyFromFileName, which takes a path's stem: "Dr. No" and "Dr. Strangelove" were both "dr", "AC/DC" was "dc" - at most
+	// 60 of them, as a key may have)
+	std::string key;
+	for (const char c : s.title.empty() ? keyIfNoTitle : s.title) key += std::isalnum(static_cast<unsigned char>(c)) ? static_cast<char>(std::tolower(static_cast<unsigned char>(c))) : '-';
 	key.erase(std::unique(key.begin(), key.end(), [](char a, char b) { return a == '-' && b == '-'; }), key.end());
-	while (!key.empty() && key.back() == '-') key.pop_back();
 	while (!key.empty() && key.front() == '-') key.erase(0, 1);
+	if (key.size() > 60) key.resize(60);
+	while (!key.empty() && key.back() == '-') key.pop_back();
 	out += "film    " + (key.empty() ? std::string("from-a-script") : key) + "\n";
 	out += "name    " + (s.title.empty() ? keyIfNoTitle : s.title) + "\n";
 	out += "scene   " + set + "\n";

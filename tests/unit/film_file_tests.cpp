@@ -2174,3 +2174,19 @@ TEST(FilmCache, OldStampFoldersArePrunedButTheTwoUsedLastAreKept) {
 	std::error_code ec;
 	fs::remove_all(dir, ec);
 }
+
+// Numbers a film file gives are kept in range, and a prop is given only to a free hand: a `detail` finer than 4 mm (billions of sculpting samples), a time of day past
+// 24:00, a fade out longer than the film, and a give to a hand that already holds something are refused; a screenplay's title makes its own key.
+TEST(FilmFile, OutOfRangeNumbersAndAFullHandAreRefused) {
+	(void)cartoon::films();
+	ff::DataFilm bad;
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\ncharacter kai person at 0 0 0 detail 0.0005\n", bad).find("`detail`"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\nsky 18:00 24:59\n", bad).find("times of day"), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\nfadeout 9\n", bad).find("longer than the film"), std::string::npos);
+	const std::string two = "scene s.pbrt\nlength 14\ncharacter ann person at 0 0 0 facing 0\ncharacter pip pip at 0 0 1.35 facing 180\nprop fan at 0.25 0.95 0.35\nprop lamp at 0.1 0.4 1.5\n";
+	const std::string problem = loadFilm(two + "pick pip lamp 1\npick ann fan 3\ngive ann fan 6 to pip\nshot 0 A\n  key 0 1.6 5  0 1 0\n", bad);
+	EXPECT_NE(problem.find("already holds lamp"), std::string::npos) << problem;
+	cartoon::fountain::Script s;
+	s.title = "Dr. No";
+	EXPECT_NE(cartoon::fountain::filmFile(s, "s.pbrt", "x").find("film    dr-no\n"), std::string::npos) << "not just \"dr\" (a path's stem)";
+}

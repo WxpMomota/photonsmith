@@ -34,7 +34,7 @@ inline camera_keyframes::Path flight(const std::vector<std::pair<double, double>
 	};
 	for (int i = 0; i + 1 < static_cast<int>(points.size()); ++i) {
 		const Vec3 p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2);
-		const int steps = std::max(2, static_cast<int>(length(p2 - p1) / 2.0));
+		const int steps = std::clamp(static_cast<int>(length(p2 - p1) / 2.0), 2, 20000);   // (at most 40 km a leg at 2 m: a typo of 1e9 made 500 million points)
 		for (int k = 0; k < steps; ++k) {
 			const double u = k / double(steps);
 			const auto cr = [u](double a, double b, double c, double d) { return b + 0.5 * u * (c - a + u * (2.0 * a - 5.0 * b + 4.0 * c - d + u * (3.0 * (b - c) + d - a))); };

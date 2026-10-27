@@ -116,10 +116,10 @@
 //     biome    savanna                                         # the land as a biome (savanna, jungle, desert, tundra, arctic): its ground's colours, its plants, its sound
 //     forest   mixed 3000  season autumn                        # conifer, broadleaf, birch, palm, shrub, acacia, kapok, cactus, fern; or mixed (by height), savanna,
 //                                                               # jungle, desert or tundra (a biome's mix): so many trees where the land suits them;
-//                                                               # `season summer to autumn from T0 to T1` (each tree turning in its own time), `grow T0 T1` (from saplings)
+//                                                               # `season summer to autumn from T0 to T1` (each tree turning in its own time; `then winter from T2 to T3`
+//                                                               # on to the next), `grow T0 T1` (from saplings), `in X0 Z0 X1 Z1`, `below H` (the tree line above the land's
+//                                                               # base), `above H`, `steep S`, `scale A B`, `near D` (drawn in full within D m of the camera), `seed N`
 //     flowers  poppies 3000  in -20 -20 20 20  bloom 2 10       # poppies, daisies, lupins or sunflowers (turning to the sun), opening each in its own time; `close T0 T1`
-//                                                               # `in X0 Z0 X1 Z1`, `below H` (the tree line above the land's base), `above H`, `steep S`, `scale A B`,
-//                                                               # `near D` (drawn in full within D m of the camera), `season` summer, autumn, winter or spring, `seed N`
 //     flock    starlings 300  at 0 80 -200  radius 40           # animals (film_wildlife.h): starlings or fish (flocking round `at`), geese (`from X Y Z to X Y Z`, in
 //                                                               # a V), butterflies (`in X0 Z0 X1 Z1`); `speed S`, `during T0 T1`, `seed N`; on a terrain Y is above it
 //     herd     deer 12  from -200 0  to 200 -150  speed 1.1     # deer, horses or wolves (rigged: film_animals.h) walking over the land, grazing now and then;
@@ -145,6 +145,7 @@
 //     lava     from 120 -300  width 6                           # lava creeping down the land from a vent; a volcano raised in the land (`volcano at X Z [height H]
 //     wildfire in -200 -200 200 200  during 0 30  wind 90       # [radius R] [erupting T0 T1]`), and a fire front sweeping across with the wind
 //     timelapse 60                                              # nature 60 times faster: the clouds, the water, the aurora, the wind (the camera and the characters not)
+//     slowmo   22 30 0.3                                        # from 22 s to 30 s nature runs at 0.3 of its speed (0.25 when not given): a high-speed camera's slow motion
 //     exposure auto                                             # (or a factor) the exposure follows the light: 1 by day, opening up through sunset into night
 //     shot 0 Over the valley
 //       fly  -800 200  0 -100  600 -600  height 80  look 0 40 -900   # (instead of `key` lines) a drone over waypoints at a height above the land, smoothed, looking ahead and
@@ -153,7 +154,8 @@
 // Weather and particles (film_particles.h):
 //
 //     weather   rain 0.8 from 4 to 14                          # rain, snow or leaves over the set round the camera (amount 1 a good shower; eased in and out; `ground Y`)
-//     particles sparks at 1 0.9 -2  3 5  rate 80               # sparks, dust or a splash thrown from a place from 3 s to 5 s, so many a second (`speed S`)
+//     particles sparks at 1 0.9 -2  3 5  rate 80               # sparks, dust or a splash thrown from a place from 3 s to 5 s, so many a second (`speed S`); its y is the
+//                                                               # scene's own, not above a terrain
 //     burst     splash at 0 0 -1  6.2  count 60                # all at once at 6.2 s
 //
 // Several sets in one film - a film in parts (partsOf; film_parts.h joins them): each `part` is a film of its own, with its `scene`, its `length`, its characters, its shots
@@ -1018,6 +1020,8 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 					i += 4;
 				} else if ((t[i] == "facing" || t[i] == "detail" || t[i] == "scale") && i + 1 < t.size()) {
 					if (!number(t[i + 1], t[i] == "facing" ? c.facing : t[i] == "detail" ? c.detail : c.scale) || !(c.scale > 0.0)) return fail("`" + t[i] + "` takes a number" + std::string(t[i] == "scale" ? " above 0" : ""));
+					if (t[i] == "detail" && !(c.detail >= 0.004 && c.detail <= 0.1))   // (its sculpting grid: finer than 4 mm is billions of samples, the program out of memory)
+						return fail("`detail` is the sculpting cell in metres, from 0.004 to 0.1");
 					i += 2;
 				} else if ((t[i] == "pitch" || t[i] == "rate") && i + 1 < t.size()) {   // its voice
 					if (!number(t[i + 1], t[i] == "pitch" ? c.pitch : c.rate) || !(c.rate > 0.0) || std::abs(c.pitch) > 24.0) return fail("a voice's `pitch` is semitones (-24 to 24) and its `rate` a number above 0");
@@ -1487,7 +1491,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				if (colon == std::string::npos) return number(w, h) && h >= 0.0 && h <= 24.0;
 				if (!number(w.substr(0, colon), a) || !number(w.substr(colon + 1), b) || a < 0 || a > 24 || b < 0 || b >= 60) return false;
 				h = a + b / 60.0;
-				return true;
+				return h <= 24.0;   // (24:59 is not a time of day)
 			};
 			if (t.size() < 3 || !hour(t[1], s.sky.from) || !hour(t[2], s.sky.to))
 				return fail("`sky FROM TO [south DEGREES] [latitude L] [day N] [haze H] [physical] [altitude A]`: times of day as 18:30 or 18.5");
@@ -2116,7 +2120,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -2134,6 +2138,10 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			n = shotLine;
 			return fail("the shot \"" + shot.name + "\" starts at " + std::to_string(shot.start) + ", after the film's end");
 		}
+	if (s.fadeOut > s.length) {   // (longer, it darkened the whole film)
+		n = 0;
+		return fail("`fadeout " + std::to_string(s.fadeOut) + "` is longer than the film (" + std::to_string(s.length) + " s)");
+	}
 	for (Character &c : s.characters)   // (a crowd's wandering was made before the film's length was known: what starts after the film ends is not walked)
 		if (c.extra) c.walks.erase(std::remove_if(c.walks.begin(), c.walks.end(), [&](const WalkLine &w) { return w.t0 > s.length - 1.0; }), c.walks.end());
 	for (const water::River &rv : s.rivers)
@@ -3270,6 +3278,8 @@ class DataFilm {
 					if (h.to == h.who) return where + "a character cannot give a prop to itself";
 					next.who = h.to;
 					next.hand = characterKinds().at(character(h.to)->kind).hand;
+					for (const auto &[other, held] : holdings)   // (as a pick: one prop to a hand)
+						if (other != h.prop && !held.empty() && held.back().who == h.to && held.back().hand == next.hand) return where + h.to + "'s hand already holds " + other;
 				}
 			}
 			if (h.t - now.t < kReach + kSettle && now.t > -1e29) return where + "too soon after the last thing done with " + h.prop + " (" + std::to_string(kReach + kSettle) + " s at least)";
@@ -4749,7 +4759,10 @@ class DataFilm {
 				for (std::size_t f = 1; f < shot.focus.size(); ++f) d += (distanceTo(shot.focus[f].second) - d) * smoothstep(shot.focus[f].first, shot.focus[f].first + 0.6, t);
 			} else if (!shot.move.who.empty()) {
 				d = distanceTo(shot.move.who);
+			} else if (shot.following && !shot.follow.who.empty()) {   // (an `aperture` alone: on who the camera follows, else on what it looks at - it was dropped)
+				d = distanceTo(shot.follow.who);
 			}
+			if (!(d > 0.0)) d = length(Vec3{key.target[0] - key.pos[0], key.target[1] - key.pos[1], key.target[2] - key.pos[2]});
 			if (d > 0.0) {
 				key.lensRadius = shot.aperture > 0.0 ? shot.aperture : 0.02;
 				key.focus = d;
