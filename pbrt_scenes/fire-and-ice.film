@@ -1,0 +1,38 @@
+# Fire and Ice: dusk into night on a tundra under a volcano - geysers erupting, the volcano throwing fire and running lava, the aurora over the snow, the ground shaking.
+film    fire-and-ice
+name    Fire and Ice
+about   Dusk into night where fire meets ice: geysers erupt on the tundra, a volcano throws fire and lava runs down its flanks, the aurora lights the snow and the ground shakes.
+scene   film_assets/wild/set.pbrt
+length  60
+still   46
+tags    nature, volcano, aurora, geysers, night, showcase
+
+terrain  mountains  size 2400  height 380  seed 5  focus 0 -350
+biome    tundra
+sky      13:30 18:30  physical  latitude 64  day 300  south 0
+exposure auto 0.4
+volcano  at 0 -900  height 520  radius 700
+lava     from 180 -720  width 10  speed 0.6
+geyser   at 40 160  height 32  every 16  last 7  first 1
+geyser   at -70 220  height 18  every 11  last 5  first 5
+aurora   green  brightness 0.7  during 33 60
+quake    44 50  strength 1.2
+timelapse 3
+
+shot 0 Geysers at dusk
+  key   10 6 290   20 25 160   42
+  key   0 6 280   10 25 150   42
+shot 12 The fire mountain
+  fly   300 700  150 420  20 250  height 90  look 0 420 -900
+shot 24 Fire at dusk
+  key   40 25 40   0 170 -900   46
+  key   30 22 -60   0 190 -900   42
+shot 34 Lights in the sky
+  key   -100 25 420   0 380 -900   68
+  key   -90 25 420   10 400 -900   68
+shot 44 The ground shakes
+  key   -60 12 330   0 300 -900   55
+  key   -50 12 320   0 310 -900   55
+shot 51 Fire and ice
+  key   0 18 380   0 300 -900   62
+  key   20 24 390   0 300 -900   62

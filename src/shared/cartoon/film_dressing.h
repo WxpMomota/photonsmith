@@ -199,7 +199,7 @@ inline std::string skyText(const std::string &film, const Sky &s, double t, doub
 	}
 	(void)twilight, (void)path, (void)error;
 	film_sky::Spec fs;
-	fs.width = 2048;
+	fs.width = 2048;   // (4096 at night, below: the stars a quarter the size on the screen)
 	fs.sunElevation = std::round(el * 4.0) / 4.0;
 	const double hx = -std::sin(facing * d2r), hz = std::cos(facing * d2r);   // (the sun's way in story space: film_sky's azimuth runs from -z towards +x)
 	fs.sunAzimuth = std::round(std::atan2(hx, -hz) / d2r);
@@ -207,6 +207,7 @@ inline std::string skyText(const std::string &film, const Sky &s, double t, doub
 	const double night = smoothstep(-5.0, -15.0, el) * (el < -5.0 ? 1.0 : 0.0);
 	fs.night = std::round(night * 20.0) / 20.0;
 	fs.milkyWay = fs.stars = fs.night;
+	if (fs.night > 0.0) fs.width = 4096;
 	const double low = smoothstep(-9.0, -1.0, el) * (1.0 - smoothstep(3.0, 14.0, el));   // (the sun near the horizon)
 	fs.glow = std::round(0.6 * low * 20.0) / 20.0;
 	fs.afterglow = std::round(0.45 * low * 20.0) / 20.0;

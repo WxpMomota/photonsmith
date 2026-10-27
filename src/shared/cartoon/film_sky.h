@@ -148,12 +148,13 @@ inline Vec3 nightSky(const Spec &s, Vec3 w, int row, int col) {
 		band = (std::max)(0.0, band * core * (1.0 - 0.8 * dust));
 		c = c + lerp(Vec3{0.78, 0.84, 1.0}, Vec3{1.0, 0.90, 0.78}, clamp01(core - 0.8)) * (0.016 * s.milkyWay * band);
 	}
-	if (s.stars > 0.0) {
+	if (s.stars > 0.0) {   // (as many stars over the sky, and as much light from each, whatever the picture's size: a finer picture has smaller, brighter pixels)
+		const double k = std::min(1.0, (2048.0 / s.width) * (2048.0 / s.width)), share = 0.0035 * k;   // (finer than 2048: fewer per pixel and brighter)
 		const double h = hash01(row * 7919 + col, 404);
-		if (h > 0.9965) {
-			const double b = std::pow((h - 0.9965) / 0.0035, 6.0);
+		if (h > 1.0 - share) {
+			const double b = std::pow((h - (1.0 - share)) / share, 6.0);
 			const double tintK = hash01(row * 13 + col * 7, 405);
-			c = c + lerp(Vec3{1.0, 0.85, 0.7}, Vec3{0.75, 0.85, 1.0}, tintK) * (0.25 * s.stars * (0.15 + b));
+			c = c + lerp(Vec3{1.0, 0.85, 0.7}, Vec3{0.75, 0.85, 1.0}, tintK) * (0.25 * s.stars * (0.15 + b) / k);
 		}
 	}
 	return c;

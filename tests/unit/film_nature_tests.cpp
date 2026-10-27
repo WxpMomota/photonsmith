@@ -744,9 +744,12 @@ TEST(FilmFire, FlamesFlickerVolcanoesRiseFromTheLandAndLavaCreepsDown) {
 	const auto tris = [](const std::string &text) { return std::count(text.begin(), text.end(), '\n'); };
 	EXPECT_GE(tris(firefx::lavaText(film.spec.key, l, 5.0)), tris(firefx::lavaText(film.spec.key, l, 1.0))) << "its front advances";
 	EXPECT_NEAR(film.spec.fires[0].at.y, ground->heightAt(50.0, 50.0), 1e-9) << "the fire stands on the land";
-	int sparks = 0;
-	for (const auto &e : film.spec.emitters) sparks += e.kind == "sparks";
-	EXPECT_EQ(sparks, 2) << "sparks from the fire and the crater's fountains";
+	int sparks = 0, bombs = 0;
+	for (const auto &e : film.spec.emitters) sparks += e.kind == "sparks", bombs += e.kind == "bombs";
+	EXPECT_EQ(sparks, 1) << "sparks from the fire";
+	EXPECT_EQ(bombs, 1) << "lava bombs from the crater";
+	cartoon::particles::Emitter bomb = *std::find_if(film.spec.emitters.begin(), film.spec.emitters.end(), [](const auto &e) { return e.kind == "bombs"; });
+	EXPECT_NE(cartoon::particles::emitterText(bomb, bomb.t0 + 3.0).find("AreaLightSource"), std::string::npos) << "glowing as they fly";
 	const std::string s1 = film.sceneAt(2.0), s2 = film.sceneAt(8.0);
 	EXPECT_NE(s1.find("MediumInterface \"wild_0_0\""), std::string::npos) << "the wildfire's flames";
 	EXPECT_NE(s1.find("MediumInterface \"plume_0\""), std::string::npos) << "the volcano's plume";
@@ -1298,4 +1301,21 @@ TEST(FilmGeology, GeysersEruptRocksFallAvalanchesRaceAndQuakesShake) {
 		const std::string problem = loadNature("geology_bad", "scene s.pbrt\nlength 10\n" + text, bad);
 		EXPECT_NE(problem.find(says), std::string::npos) << text << " -> " << problem;
 	}
+}
+
+// A forest's seasons chained: summer to autumn, then on to winter - between the second pair in the middle of the second change, all bare after it; a `then` that starts
+// before the change before it ends is an error.
+TEST(FilmPlants, SeasonsChainSummerToAutumnThenWinter) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("seasons_chain", "scene s.pbrt\nlength 30\nterrain hills size 300 height 10 seed 2 far off\nforest broadleaf 30 in -40 -40 40 40 near 0 season summer to autumn from 2 to 10 then winter from 12 to 20\n",
+						 film),
+			  "");
+	ASSERT_EQ(film.spec.forests[0].then.size(), 1u);
+	const auto at = [&](double t) { return forest::text("photonsmith-test-chain", film.spec.planted[0], film.spec.forests[0], t, t, {0.0, 30.0, 60.0}); };
+	EXPECT_NE(at(6.0).find("_summer-autumn_"), std::string::npos);
+	EXPECT_NE(at(16.0).find("_autumn-winter_"), std::string::npos);
+	EXPECT_EQ(at(25.0).find("_autumn"), std::string::npos) << "all bare";
+	EXPECT_NE(at(25.0).find("_winter_far"), std::string::npos);
+	ff::DataFilm bad;
+	EXPECT_NE(loadNature("seasons_chain_bad", "scene s.pbrt\nlength 30\nforest birch 10 season summer to autumn from 2 to 10 then winter from 8 to 20\n", bad).find("`... then C"), std::string::npos);
 }

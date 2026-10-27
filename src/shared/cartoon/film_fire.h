@@ -168,7 +168,8 @@ inline std::string lavaPicture(const std::string &film) {
 	});
 }
 // A lava flow at t, as scene text: a ribbon down its path (its surface a little above it), its crust creeping downhill.
-inline std::string lavaText(const std::string &film, const Lava &l, double t) {
+// `glow`: how bright its cracks shine (3 by day; less when the film's exposure has opened up for the night, so they stay orange instead of white).
+inline std::string lavaText(const std::string &film, const Lava &l, double t, double glow = 3.0) {
 	if (l.path.size() < 2 || t < l.t0) return std::string();
 	Mesh m;
 	const int across = 6;
@@ -196,8 +197,10 @@ inline std::string lavaText(const std::string &film, const Lava &l, double t) {
 			m.tris.push_back({a + 1, a + across + 2, a + across + 1});
 		}
 	if (m.tris.empty()) return std::string();
+	char scale[32];
+	std::snprintf(scale, sizeof scale, "%.4f", glow);
 	return "# a lava flow (film_fire.h)\nAttributeBegin\n  AreaLightSource \"diffuse\" \"string filename\" [ \"" + lavaPicture(film) +
-		   "\" ] \"float scale\" [ 3.0 ] \"bool twosided\" [ true ]\n  Material \"diffuse\" \"rgb reflectance\" [ 0.05 0.04 0.035 ]\n" + emitMesh(m, identity()) + "AttributeEnd\n";
+		   "\" ] \"float scale\" [ " + scale + " ] \"bool twosided\" [ true ]\n  Material \"diffuse\" \"rgb reflectance\" [ 0.05 0.04 0.035 ]\n" + emitMesh(m, identity()) + "AttributeEnd\n";
 }
 
 }  // namespace fire

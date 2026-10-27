@@ -152,6 +152,24 @@ inline std::string weatherText(const Weather &w, double t, Vec3 eye, double shut
 
 // The particles an emitter has in the air at t, as scene text: sparks glow and fall, dust rises and settles, a splash's drops arc and fall back.
 inline std::string emitterText(const Emitter &e, double t) {
+	if (e.kind == "bombs") {   // a volcano's lava bombs: glowing blocks metres across thrown up in arcs, cooling from yellow-white to a dull red as they fall
+		std::string out;
+		const int total = static_cast<int>(std::max(0.0, (e.t1 - e.t0) * e.rate));
+		char buf[320];
+		for (int n = 0; n < total; ++n) {
+			const double born = e.t0 + n / e.rate, age = t - born;
+			const double a = 6.28318 * detail::u01(n, 21), up = 0.75 + 0.25 * detail::u01(n, 22), v = e.speed * (0.4 + 0.8 * detail::u01(n, 23));
+			const Vec3 vel{v * std::cos(a) * (1.0 - up) * 1.6, v * up, v * std::sin(a) * (1.0 - up) * 1.6};
+			const double flight = 2.0 * vel.y / 9.81 + 1.0;
+			if (age < 0.0 || age > flight) continue;
+			const Vec3 p = e.at + vel * age + Vec3{0.0, -4.905 * age * age, 0.0};
+			const double cool = std::exp(-age / 2.5), r = e.speed * 0.05 * (0.4 + 0.8 * detail::u01(n, 24));
+			std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.3f %.3f %.3f\n  AreaLightSource \"diffuse\" \"rgb L\" [ %.3f %.3f %.3f ]\n  Shape \"sphere\" \"float radius\" [ %.3f ]\nAttributeEnd\n",
+						  p.x, p.y, p.z, 9.0 * cool + 0.6, 3.5 * cool * cool + 0.08, 0.8 * cool * cool * cool, r);
+			out += buf;
+		}
+		return out.empty() ? out : "# lava bombs (film_particles.h)\n" + out;
+	}
 	const bool burst = e.count > 0;
 	const double life = e.kind == "sparks" ? 1.0 : e.kind == "dust" ? 2.2 : 0.9;
 	const int total = burst ? e.count : static_cast<int>(std::max(0.0, (e.t1 - e.t0) * e.rate));

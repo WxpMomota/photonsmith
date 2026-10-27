@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdio>
 #include <functional>
+#include <tuple>
 #include <string>
 #include <vector>
 
@@ -117,21 +118,41 @@ inline std::string auroraText(const std::string &film, const Aurora &a, double t
 		Mesh m;
 		std::vector<Vec3> bottom, top;
 		const double D = a.distance * (0.8 + 0.25 * c), mid = a.facing * kPi / 180.0 + 0.25 * (c - 1);
-		const double low = 0.12 * D, high = low + (0.16 + 0.05 * c) * D;
+		const double low = (0.22 + 0.04 * c) * D, high = low + (0.34 + 0.08 * c) * D;   // (from about 13 degrees up to 30 or 40: high in the sky)
 		const int n = 640;
 		const double run = 0.02 * t + 0.31 * c, span = 2.0 + c;   // (the rays run along it)
-		for (int i = 0; i <= n; ++i) {
-			const double s = i / double(n), ang = mid + (s - 0.5) * 1.8;
+		// a point of the curtain: s along it (0 to 1), h up it (0 its lower edge, 1 as high as its rays reach), in story space; it folds and sways
+		const auto at = [&](double s, double h) {
+			const double ang = mid + (s - 0.5) * 1.8;
 			const double fold = 0.10 * std::sin(s * 9.0 + t * 0.15 + c * 2.0) + 0.05 * std::sin(s * 23.0 - t * 0.35 + c) + 0.03 * std::sin(s * 47.0 + t * 0.6);
 			const double r = D * (1.0 + fold);
 			const Vec3 foot = centre + Vec3{r * std::sin(ang), 0.0, r * std::cos(ang)};
-			bottom.push_back(detail::story(foot + Vec3{0.0, low * (1.0 + 0.15 * std::sin(s * 5.0 + t * 0.2)), 0.0}));
-			// (a renderer draws a lamp as pure light, so where the glow ran out the curtain would be dark against the stars: its top is ragged instead, each ray as tall as it is strong)
-			const double reach = 0.3 + 0.7 * auroraRay(run + span * s);
 			const double bottomY = low * (1.0 + 0.15 * std::sin(s * 5.0 + t * 0.2)), topY = high * (1.0 + 0.2 * std::sin(s * 3.0 - t * 0.1 + c));
-			top.push_back(detail::story(foot + Vec3{0.0, bottomY + (topY - bottomY) * reach, 0.0}));
-		}
+			return detail::story(foot + Vec3{0.0, bottomY + (topY - bottomY) * h, 0.0});
+		};
+		// the bright lower band: a ribbon a quarter of the way up (its picture's lower quarter)
+		const double band = 0.25;
+		for (int i = 0; i <= n; ++i) bottom.push_back(at(i / double(n), 0.0)), top.push_back(at(i / double(n), band));
 		detail::ribbon(m, bottom, top, run, run + span);
+		for (std::size_t q = m.uvs.size() - 2 * static_cast<std::size_t>(n + 1) + 1; q < m.uvs.size(); q += 2) m.uvs[q].second = band;
+		// the rays above it: hundreds of thin strips, each rising as high as it is strong, drifting along and flickering, with the sky between them - a lamp is drawn as
+		// pure light, so a curtain whose glow ran out would be dark against the stars: these end where their glow still shows
+		const int rays = 1600;
+		for (int k = 0; k < rays; ++k) {
+			const double s = std::fmod(hash01(k, 31 + c) + 0.004 * t * (1.0 + 0.3 * c) + 1.0, 1.0), w = 0.0009 * (0.6 + 0.8 * hash01(k, 41 + c));
+			if (s + w > 1.0) continue;
+			const double strength = std::pow(hash01(k, 51 + c), 0.7) * (0.55 + 0.45 * nature::fbm2(s * 3.0 + c * 1.7, t * 0.05 + 0.5 * c, 73));
+			const double flicker = 0.85 + 0.15 * std::sin(t * (2.0 + 3.0 * hash01(k, 61 + c)) + 6.28 * hash01(k, 71 + c));
+			const double reach = band + (1.0 - band) * strength * flicker, u = hash01(k, 81 + c) * span;   // (a column of the picture of its own: its own strength there)
+			const int b = static_cast<int>(m.verts.size());
+			for (const auto &[ss, hh, vv] : {std::tuple<double, double, double>{s, band - 0.05, band - 0.05}, {s + w, band - 0.05, band - 0.05}, {s + w, reach, reach}, {s, reach, reach}}) {
+				m.verts.push_back(at(ss, hh));
+				m.normals.push_back({0.0, 0.0, 1.0});
+				m.uvs.push_back({u + (ss - s) * 0.3, vv});
+			}
+			m.tris.push_back({b, b + 1, b + 2});
+			m.tris.push_back({b, b + 2, b + 3});
+		}
 		char scale[64];   // (the picture's path is put in as it is: a fixed buffer cut a long one off)
 		std::snprintf(scale, sizeof scale, "%.5f", 0.07 * a.brightness * fade * (1.0 - 0.25 * c));
 		out += "AttributeBegin\n  AreaLightSource \"diffuse\" \"string filename\" [ \"" + picture + "\" ] \"float scale\" [ " + scale + " ] \"bool twosided\" [ true ]\n";

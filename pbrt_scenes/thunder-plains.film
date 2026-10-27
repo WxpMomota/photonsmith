@@ -1,0 +1,36 @@
+# Thunder on the Plains: a golden afternoon on the savanna turns to storm - eagles wheel, the clouds close in, lightning strikes and the wild horses bolt.
+film    thunder-plains
+name    Thunder on the Plains
+about   A golden afternoon on the savanna: eagles wheel over the acacias and wild horses graze until a storm rolls in, lightning strikes and the herd bolts across the plain.
+scene   film_assets/wild/set.pbrt
+length  60
+still   38
+tags    nature, savanna, storm, horses, showcase
+
+terrain  hills  size 2500  height 40  seed 7
+biome    savanna
+sky      15:30 16:30  south 0  haze 4
+herd     horses 26  from -120 0  to 900 -60  speed 1.2  flee 33
+flock    eagles 3  at 40 45 -60  radius 40
+storm    rain  strength 0.9  from 16 to 60  wind 120  speed 16
+slowmo   41 47 0.3
+
+shot 0 The plain
+  key   0 6 60   0 10 -500   48
+  key   20 6 60   -20 10 -500   48
+shot 9 Wheeling
+  follow flock1  behind 35  up 6  fov 40
+shot 17 The storm comes
+  key   -60 12 120   100 60 -1200   52
+  key   -60 12 110   140 60 -1200   52
+shot 27 The herd
+  key   -60 2.5 30   -100 1.5 0   40
+  focus herd1
+  aperture 0.03
+shot 33 They bolt
+  track herd1  side 16  height 1.8  fov 40
+  focus herd1
+  aperture 0.04
+shot 50 The rain
+  key   60 3 30   200 2 -200   50
+  key   65 3 26   205 2 -205   50

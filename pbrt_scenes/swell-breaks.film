@@ -1,0 +1,38 @@
+# Where the Swell Breaks: a minute on a wild coast at sunset - the ocean, its surf, the cliffs, eagles, the sun going down into the sea (no characters; film_file.h).
+film    swell-breaks
+name    Where the Swell Breaks
+about   A minute on a wild coast as the sun goes down into the sea: the swell rolling in and breaking on the beach, eagles over the headland, the long twilight.
+scene   film_assets/wild/set.pbrt
+length  60
+still   44
+tags    nature, ocean, surf, sunset, showcase
+
+terrain  coast  size 600  seed 2
+water    sea  level 0  waves 0.6  wind 0
+surf     1.7  period 9
+sky      18:25 19:45  south 60  physical  haze 2.5
+air      strength 2
+exposure auto
+clouds   cumulus  cover 0.18  base 1400  wind 80  speed 5
+flock    eagles 3  at 20 20 0  radius 22
+slowmo   22 30 0.3
+timelapse 2
+
+shot 0 Open water
+  key   -20 34 -280   10 4 -20   45
+  key   -10 24 -160   20 3 0   45
+shot 11 The breakers
+  key   -60 9 15    20 0 -60   50
+  key   -48 8 12    25 0 -58   50
+shot 21 A wave
+  key   -36 4.5 4   10 0.5 -46   40
+  key   -34 4.3 2   12 0.5 -46   40
+shot 30 Evening clouds
+  key   -10 3 45   20 38 0   52
+  key   -6 3 45   20 42 0   52
+shot 40 Sundown
+  key   40 22 60   -40 2 -400   55
+  key   20 18 40   -60 2 -400   55
+shot 51 Twilight
+  key   -40 5 0   0 1 -300   60
+  key   -40 5.5 2   10 1 -300   60

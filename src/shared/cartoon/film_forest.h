@@ -57,6 +57,11 @@ struct Forest {
 	std::string season = "summer";
 	std::string seasonTo;              // (a change of season: to this one, each tree turning in its own time within turn0..turn1, film seconds)
 	double turn0 = 0.0, turn1 = 0.0;
+	struct Change {   // (a further change of season after that one: `then WINTER from T0 to T1`)
+		std::string to;
+		double t0 = 0.0, t1 = 0.0;
+	};
+	std::vector<Change> then;
 	double grow0 = -1.0, grow1 = -1.0;   // (growing: each tree from a sapling to its size within grow0..grow1; below 0 not)
 	int seed = 1;
 };
@@ -514,16 +519,26 @@ inline std::string text(const std::string &film, const std::vector<Tree> &trees,
 			size *= 0.03 + 0.97 * smoothstep(start, start + 0.5 * growSpan, filmT);
 		}
 		const bool full = length(foot - eyeStory) < f.fullWithin * size;
+		// turning: each change over its own 40% of its time; the last change it has begun says between which two seasons it is
 		int stage = 0;
-		if (!f.seasonTo.empty()) {   // turning: over its own 40% of the change
+		std::string from = f.season, to = f.seasonTo;
+		if (!f.seasonTo.empty()) {
 			const double start = f.turn0 + 0.6 * turnSpan * hash01(own, 32);
 			stage = static_cast<int>(std::lround(smoothstep(start, start + 0.4 * turnSpan, filmT) * detail::kStages));
+			std::string before = f.seasonTo;
+			for (std::size_t c = 0; c < f.then.size(); ++c) {
+				const Forest::Change &ch = f.then[c];
+				const double span = std::max(1e-6, ch.t1 - ch.t0), s0 = ch.t0 + 0.6 * span * hash01(own, 33 + static_cast<int>(c));
+				const int k = static_cast<int>(std::lround(smoothstep(s0, s0 + 0.4 * span, filmT) * detail::kStages));
+				if (k > 0) from = before, to = ch.to, stage = k;
+				before = ch.to;
+			}
 		}
 		const std::string &sp = tr.species;
 		const int v = tr.variant;
-		const std::string name = stage == 0 ? need(objectName(sp, v, f.season, full), [&] { return objectText(film, sp, v, f.season, full); })
-								 : stage == detail::kStages ? need(objectName(sp, v, f.seasonTo, full), [&] { return objectText(film, sp, v, f.seasonTo, full); })
-															: need(stageName(sp, v, f.season, f.seasonTo, stage, full), [&] { return stageText(film, sp, v, f.season, f.seasonTo, stage, full); });
+		const std::string name = stage == 0 ? need(objectName(sp, v, from, full), [&] { return objectText(film, sp, v, from, full); })
+								 : stage == detail::kStages ? need(objectName(sp, v, to, full), [&] { return objectText(film, sp, v, to, full); })
+															: need(stageName(sp, v, from, to, stage, full), [&] { return stageText(film, sp, v, from, to, stage, full); });
 		const Vec3 w = nature::windLean(foot.x, foot.z, t, sp == "conifer" ? 0.008 : 0.014) + dressing::gustAt(gusts, foot.x, foot.z, t) * (sp == "conifer" ? 0.04 : 0.07);
 		places += nature::placeObject(name, mul(translate(foot), nature::shearXZ(w.x, w.z), rotate({0, 1, 0}, tr.turn), scale(size)));
 	}

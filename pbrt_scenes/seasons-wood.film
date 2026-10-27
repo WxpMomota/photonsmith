@@ -1,0 +1,32 @@
+# Seasons of the Wood: a summer meadow of poppies and sunflowers before a wood that turns gold, drops its leaves and stands bare in the snow - a year in a minute.
+film    seasons-wood
+name    Seasons of the Wood
+about   A year in a minute: poppies open in a summer meadow, sunflowers follow the sun, the wood beyond turns gold and red, its leaves fall, and winter comes in snow.
+scene   film_assets/wild/set.pbrt
+length  60
+still   28
+tags    nature, forest, seasons, flowers, time-lapse, showcase
+
+terrain  hills  size 800  height 30  seed 2
+sky      7:30 17:30
+forest   mixed 1400  in -260 -360 260 -40  near 140  season summer to autumn from 14 to 30 then winter from 34 to 46
+flowers  poppies 4000  in -18 -14 18 8  bloom 0 7  close 26 33
+flowers  sunflowers 70  in 8 -24 26 -12  close 30 38
+snowcover 0.95 from 44 to 54
+weather  snow 1.6 from 46 to 60
+timelapse 300
+
+shot 0 The meadow wakes
+  key   0 0.45 7   0 0.35 -8   40
+  key   1 0.42 5   1 0.35 -9   40
+shot 10 Following the sun
+  key   2 1.8 -4   18 1.5 -20   40
+  key   4 1.8 -6   18 1.5 -20   40
+shot 20 The wood turns
+  fly   -200 40  -60 -40  120 -120  height 45  look 0 10 -220
+shot 34 Leaves fall
+  key   0 2 -10   0 8 -80   50
+  key   0 2 -16   0 9 -80   50
+shot 46 Winter
+  key   -30 6 30   0 8 -160   55
+  key   -20 9 30   0 8 -160   55

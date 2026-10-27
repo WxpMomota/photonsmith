@@ -1,0 +1,33 @@
+# Valley of Mists: dawn in the mountains - a sea of fog in the valleys lifting as the sun comes up, the peaks lit pink, geese crossing, deer grazing below.
+film    valley-of-mists
+name    Valley of Mists
+about   Dawn in the mountains: fog fills the valleys, the first light turns the peaks pink, geese cross overhead and deer graze below as the fog burns away.
+scene   film_assets/wild/set.pbrt
+length  60
+still   20
+tags    nature, mountains, fog, dawn, showcase
+
+terrain  mountains  size 3000  height 600  seed 3
+sky      5:05 6:35  physical  altitude 900
+fog      0.035  lift 30 48
+forest   mixed 2600  near 140
+flock    geese 9  from -700 260 200  to 600 260 -900
+herd     deer 7  from -60 -40  to 40 -60  speed 0.8
+exposure auto
+timelapse 4
+
+shot 0 Above the mists
+  fly   -800 900  -300 400  200 -100  height 260
+shot 13 First light
+  key   0 140 600   0 260 -1500   28
+  key   40 140 600   -40 270 -1500   28
+shot 23 Geese
+  follow flock1  behind 60  up 15  side 20  fov 45
+shot 33 The mists lift
+  key   60 120 400   0 120 -900   50
+  key   60 220 420   0 140 -900   50
+shot 44 The valley floor
+  orbit herd1  radius 22  height 2.5  degrees 35  from 200  fov 42
+shot 52 Morning
+  key   60 20 260   0 60 -900   55
+  key   70 30 250   -10 60 -900   55

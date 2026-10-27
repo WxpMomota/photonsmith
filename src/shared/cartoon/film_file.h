@@ -1307,6 +1307,16 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 							return fail("`season A to B from T0 to T1`: from one season to another (summer, autumn, winter, spring), each tree turning in its own time between T0 and T1");
 						f.seasonTo = t[i + 1], f.turn0 = a, f.turn1 = b;
 						i += 6;
+						std::string last = f.seasonTo;
+						double lastEnd = b;
+						while (i < t.size() && t[i] == "then") {   // and on: `then C from T2 to T3`
+							if (!(i + 5 < t.size() && std::find(forest::seasons().begin(), forest::seasons().end(), t[i + 1]) != forest::seasons().end() && t[i + 1] != last &&
+								  t[i + 2] == "from" && number(t[i + 3], a) && t[i + 4] == "to" && number(t[i + 5], b) && b > a && a >= lastEnd))
+								return fail("`... then C from T2 to T3`: on to another season, after the change before it has ended");
+							f.then.push_back({t[i + 1], a, b});
+							last = t[i + 1], lastEnd = b;
+							i += 6;
+						}
 					}
 				} else if (t[i] == "grow" && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && b > a && a >= 0.0) {
 					f.grow0 = a, f.grow1 = b;
@@ -2170,13 +2180,20 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		const std::shared_ptr<const terrain::Field> ground = s.hasTerrain ? terrain::fieldOf(s.terrain) : nullptr;
 		const double level = s.seas.empty() ? -1e30 : s.seas[0].level;
 		for (const forest::Forest &f : s.forests) s.planted.push_back(forest::plant(f, ground.get(), level, s.terrain.channels));
-		for (const forest::Forest &f : s.forests)   // (leaves falling while a forest drops them, unless the film says what falls)
-			if (!f.seasonTo.empty() && (f.seasonTo == "winter" || f.season == "autumn") && f.season != "winter" && f.kind != "conifer" && f.kind != "palm" &&
-				std::none_of(s.weather.begin(), s.weather.end(), [](const particles::Weather &w) { return w.kind == "leaves"; })) {
+		for (const forest::Forest &f : s.forests) {   // (leaves falling while a forest drops them, unless the film says what falls: its change from autumn, or into winter)
+			if (f.seasonTo.empty() || f.kind == "conifer" || f.kind == "palm" || std::any_of(s.weather.begin(), s.weather.end(), [](const particles::Weather &w) { return w.kind == "leaves"; }))
+				continue;
+			std::string from = f.season, to = f.seasonTo;
+			double t0 = f.turn0, t1 = f.turn1;
+			for (std::size_t c = 0; c <= f.then.size(); ++c) {
+				if (c > 0) from = to, to = f.then[c - 1].to, t0 = f.then[c - 1].t0, t1 = f.then[c - 1].t1;
+				if (from == "winter" || !(to == "winter" || from == "autumn")) continue;
 				particles::Weather w;
-				w.kind = "leaves", w.amount = 0.5, w.t0 = f.turn0 + 0.3 * (f.turn1 - f.turn0), w.t1 = f.turn1 + 2.0, w.onLand = true;
+				w.kind = "leaves", w.amount = 0.5, w.t0 = t0 + 0.3 * (t1 - t0), w.t1 = t1 + 2.0, w.onLand = true;
 				s.weather.push_back(w);
+				break;
 			}
+		}
 	}
 	{   // the flocks: their heights above the land (on a terrain), and their flights worked out
 		const std::shared_ptr<const terrain::Field> ground = s.hasTerrain ? terrain::fieldOf(s.terrain) : nullptr;
@@ -2226,7 +2243,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		for (const fire::Volcano &v : s.volcanoes) {   // a volcano's lava fountains
 			const std::shared_ptr<const terrain::Field> ground = terrain::fieldOf(s.terrain);
 			particles::Emitter e;
-			e.kind = "sparks", e.at = {v.x, ground->heightAt(v.x, v.z) + 5.0, v.z}, e.t0 = std::max(0.0, v.t0), e.t1 = std::min(s.length, v.t1), e.rate = 400.0, e.speed = 0.06 * v.height;
+			e.kind = "bombs", e.at = {v.x, ground->heightAt(v.x, v.z) + 5.0, v.z}, e.t0 = std::max(0.0, v.t0), e.t1 = std::min(s.length, v.t1), e.rate = 40.0, e.speed = 0.14 * v.height;   // (glowing bombs metres across, seen from kilometres)
 			s.emitters.push_back(e);
 		}
 	for (const water::Fall &f : s.falls) {   // a waterfall throws up spray where it lands, the whole film long
@@ -4252,7 +4269,8 @@ class DataFilm {
 				out += fire::flameText("flame_" + std::to_string(i), f.at, f.size, nt, f.seed);
 				if (f.smoke) out += fire::smokeText("smoke_" + std::to_string(i), f.at + Vec3{0.0, 1.25 * f.size, 0.0}, 2.5 * f.size, 8.0 * f.size, nt, f.seed, 0.6);
 			}
-			for (const fire::Lava &l : spec.lavas) out += fire::lavaText(film, l, nt);
+			const double lavaGlow = 3.0 / std::pow(std::max(1.0, exposureAt(t)), 0.85);   // (exposed for the lava as the night camera opens up: orange, not white)
+			for (const fire::Lava &l : spec.lavas) out += fire::lavaText(film, l, nt, lavaGlow);
 			for (std::size_t i = 0; i < spec.volcanoes.size(); ++i) {   // an eruption: the plume of ash over the crater, the crater's glow
 				const fire::Volcano &v = spec.volcanoes[i];
 				if (t < v.t0 || t > v.t1) continue;
@@ -4309,7 +4327,7 @@ class DataFilm {
 				film_subjects::cameraOf(header, eye, target, fov);
 				const std::shared_ptr<const terrain::Field> land = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 				const double ground = land ? land->heightAt(-eye.x, eye.z) : 0.0;
-				const double d = level * (spec.storm.kind == "rain" ? 0.006 : spec.storm.kind == "snow" ? 0.035 : 0.05);
+				const double d = level * (spec.storm.kind == "rain" ? 0.0025 : spec.storm.kind == "snow" ? 0.035 : 0.05);
 				const Vec3 tint = spec.storm.kind == "sand" ? Vec3{1.0, 0.74, 0.46} : Vec3{0.95, 0.97, 1.0};
 				const double absorb = spec.storm.kind == "sand" ? 0.25 * d : 0.02 * d;
 				char medium[480];
