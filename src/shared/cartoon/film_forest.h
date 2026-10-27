@@ -33,11 +33,11 @@ namespace cartoon {
 namespace forest {
 
 inline const std::vector<std::string> &species() {
-	static const std::vector<std::string> k = {"conifer", "broadleaf", "birch", "palm", "shrub"};
+	static const std::vector<std::string> k = {"conifer", "broadleaf", "birch", "palm", "shrub", "acacia", "kapok", "cactus", "fern"};
 	return k;
 }
 inline const std::vector<std::string> &kinds() {   // what a `forest` line may ask for: a species, or a mixed wood chosen by height
-	static const std::vector<std::string> k = {"conifer", "broadleaf", "birch", "palm", "shrub", "mixed"};
+	static const std::vector<std::string> k = {"conifer", "broadleaf", "birch", "palm", "shrub", "acacia", "kapok", "cactus", "fern", "mixed", "savanna", "jungle", "desert", "tundra"};
 	return k;
 }
 inline const std::vector<std::string> &seasons() {
@@ -196,6 +196,79 @@ inline Grown grow(const std::string &sp, int v, bool winter, bool spring) {
 				}
 			}
 		}
+	} else if (sp == "acacia") {   // a short trunk splitting into limbs that spread up and out to a flat, wide umbrella of a crown
+		const double trunkH = 1.8 + 0.8 * hash01(salt, 1), lean = 0.4 * (hash01(salt, 2) - 0.5), top = 5.2 + 1.0 * hash01(salt, 3), reach = 3.6 + 1.0 * hash01(salt, 4);
+		addInto(g.wood, nature::trunk(trunkH, 0.22, lean, salt), identity());
+		const Vec3 fork{lean * trunkH, trunkH, 0.0};
+		const int limbs = 3 + static_cast<int>(2 * hash01(salt, 5));
+		for (int k = 0; k < limbs; ++k) {
+			const double a = 2.0 * kPi * (k + 0.3 * hash01(salt + k, 6)) / limbs, r = reach * (0.45 + 0.35 * hash01(salt + k, 7));
+			const Vec3 end{fork.x + r * std::cos(a), top - 0.4, r * std::sin(a)}, mid = fork + (end - fork) * 0.5 + Vec3{0.0, 0.4, 0.0};
+			addLimb(g.wood, fork, mid, 0.13, 0.09);
+			addLimb(g.wood, mid, end, 0.09, 0.05);
+		}
+		for (int k = 0; k < 120; ++k) {   // the umbrella: clusters spread over a flat disc, thin top to bottom
+			const double a = 2.0 * kPi * hash01(salt + k, 8), r = reach * std::sqrt(hash01(salt + k, 9)) * 1.05;
+			addInto(g.foliage, nature::leafCluster(90, 1.7, 0.2, salt + 31 * k), mul(translate(fork.x + r * std::cos(a), top + 0.25 * (hash01(salt + k, 10) - 0.5), r * std::sin(a)), scale(1.0, 0.35, 1.0)));
+		}
+	} else if (sp == "kapok") {   // a jungle giant: a tall straight trunk on buttress roots, a broad dome of a crown high above the rest of the forest
+		const double H = 24.0 + 6.0 * hash01(salt, 1);
+		addInto(g.wood, nature::trunk(H, 0.75, 0.0, salt), identity());
+		for (int k = 0; k < 5; ++k) {   // the buttresses: thin fins of wood out from the trunk's foot
+			const double a = 2.0 * kPi * (k + 0.3 * hash01(salt + k, 2)) / 5.0, out = 2.2 + 1.0 * hash01(salt + k, 3), up = 2.5 + 1.5 * hash01(salt + k, 4);
+			const Vec3 d{std::cos(a), 0.0, std::sin(a)}, side{-d.z, 0.0, d.x};
+			const Vec3 pts[3] = {d * 0.5 + Vec3{0.0, up, 0.0}, d * out, d * 0.5};
+			for (const double w : {-0.07, 0.07}) {
+				const int b = static_cast<int>(g.wood.verts.size());
+				for (const Vec3 &p : pts) {
+					g.wood.verts.push_back(p + side * w);
+					g.wood.normals.push_back(side * (w > 0 ? 1.0 : -1.0));
+				}
+				if (w > 0) g.wood.tris.push_back({b, b + 1, b + 2});
+				else g.wood.tris.push_back({b, b + 2, b + 1});
+			}
+		}
+		Grown crown;
+		branchOut(crown, {0.0, H * 0.82, 0.0}, {0.0, 1.0, 0.0}, 4.0, 0.45, 0, 3, salt, 62.0, 3.0, 0, 0.3, false);
+		addInto(g.wood, crown.wood, identity());
+		fillCrown(g, {0.0, H + 2.5, 0.0}, {7.5, 3.2, 7.5}, 150, 120, 2.6, 0.32, salt, false);
+	} else if (sp == "cactus") {   // a saguaro: a ribbed column with arms that bend up
+		const double H = 4.5 + 2.5 * hash01(salt, 1), r = 0.24 + 0.06 * hash01(salt, 2);
+		const auto ribbed = [&](double radius, double len) {   // a column of 12 ribs, rounded at its top
+			std::vector<std::pair<double, double>> prof;
+			for (int k = 0; k <= 8; ++k) {
+				const double u = k / 8.0;
+				prof.push_back({radius * (u < 0.85 ? 1.0 : std::sqrt(std::max(0.0, 1.0 - std::pow((u - 0.85) / 0.15, 2.0)))), len * u});
+			}
+			Mesh m = lathe(prof, 24);
+			for (std::size_t i = 0; i < m.verts.size(); ++i) {   // (the ribs: pleats round it)
+				const double a = std::atan2(m.verts[i].z, m.verts[i].x), k = 1.0 + 0.09 * std::cos(12.0 * a);
+				m.verts[i].x *= k, m.verts[i].z *= k;
+			}
+			return m;
+		};
+		addInto(g.foliage, ribbed(r, H), identity());
+		const int arms = static_cast<int>(3.0 * hash01(salt, 3));
+		for (int k = 0; k < arms; ++k) {
+			const double a = 2.0 * kPi * (k + hash01(salt + k, 4)) / std::max(1, arms), h0 = H * (0.4 + 0.25 * hash01(salt + k, 5)), out = 0.6 + 0.3 * hash01(salt + k, 6);
+			const Vec3 d{std::cos(a), 0.0, std::sin(a)};
+			addInto(g.foliage, ribbed(0.75 * r, out), mul(translate(Vec3{0.0, h0, 0.0}), alignY(Vec3{0, 0, 0}, d)));   // (out to the side)
+			addInto(g.foliage, ribbed(0.75 * r, H * (0.35 + 0.2 * hash01(salt + k, 7))), translate(d * out + Vec3{0.0, h0 - 0.05, 0.0}));   // (and up)
+		}
+	} else if (sp == "fern") {   // a fern: arching fronds from a crown at the ground, each a midrib with leaflets
+		for (int f = 0; f < 14; ++f) {
+			const double a = 2.0 * kPi * (f + 0.4 * hash01(salt + f, 1)) / 14.0, len = 0.8 + 0.4 * hash01(salt + f, 2), rise = 0.9 + 0.5 * hash01(salt + f, 3);
+			const Vec3 out{std::cos(a), 0.0, std::sin(a)}, side = normalize(cross(Vec3{0, 1, 0}, out));
+			const auto path = [&](double s) { return out * (len * s) + Vec3{0.0, len * (rise * s - 1.1 * s * s), 0.0}; };
+			for (int k = 1; k <= 12; ++k) {
+				const double s = k / 13.0;
+				const Vec3 p = path(s), tangent = normalize(path(std::min(1.0, s + 0.02)) - path(std::max(0.0, s - 0.02)));
+				for (int sg = -1; sg <= 1; sg += 2) {
+					const Vec3 dir = normalize(side * static_cast<double>(sg) + tangent * 0.6);
+					nature::addLeaf(g.foliage, p, dir, normalize(cross(dir, tangent) * static_cast<double>(sg) + Vec3{0, 0.6, 0}), 0.16 * (1.0 - 0.7 * s), 0.035);
+				}
+			}
+		}
 	} else {   // shrub
 		for (int k = 0; k < 5; ++k) {
 			const double a = 2.0 * kPi * k / 5.0;
@@ -223,6 +296,16 @@ inline Grown growFar(const std::string &sp, int v, bool winter) {
 		addInto(g.foliage, lump, mul(translate(bend, H - 0.3, 0.0), scale(3.5, 0.9, 3.5)));
 	} else if (sp == "shrub") {
 		if (!winter) addInto(g.foliage, lump, mul(translate(0.0, 0.8, 0.0), scale(0.8, 0.55, 0.8)));
+	} else if (sp == "acacia") {   // (a trunk and a flat lump of a crown)
+		const double top = 5.2 + 1.0 * hash01(salt, 3), reach = 3.6 + 1.0 * hash01(salt, 4);
+		addLimb(g.wood, {0, 0, 0}, {0, top - 0.3, 0}, 0.22, 0.1);
+		addInto(g.foliage, lump, mul(translate(0.0, top, 0.0), scale(reach, 0.5, reach)));
+	} else if (sp == "kapok") {   // (a trunk and a broad dome)
+		const double H = 24.0 + 6.0 * hash01(salt, 1);
+		addLimb(g.wood, {0, 0, 0}, {0, H, 0}, 0.75, 0.4);
+		addInto(g.foliage, lump, mul(translate(0.0, H + 2.5, 0.0), scale(7.5, 3.4, 7.5)));
+	} else if (sp == "cactus" || sp == "fern") {   // (small enough to draw as they are)
+		return grow(sp, v, false, false);
 	} else {
 		const bool birch = sp == "birch";
 		const double trunkH = birch ? 4.5 + 1.5 * hash01(salt, 1) : 2.4 + 1.0 * hash01(salt, 1);
@@ -239,11 +322,17 @@ inline Grown growFar(const std::string &sp, int v, bool winter) {
 
 // The colours: bark, and the foliage for the season (variant v: each broadleaf its own autumn colour).
 inline Vec3 barkOf(const std::string &sp) {
+	if (sp == "acacia") return {0.18, 0.13, 0.09};
+	if (sp == "kapok") return {0.42, 0.40, 0.36};   // (pale grey bark)
 	return sp == "birch" ? Vec3{0.62, 0.6, 0.55} : sp == "palm" ? Vec3{0.25, 0.2, 0.14} : sp == "conifer" ? Vec3{0.13, 0.09, 0.06} : Vec3{0.12, 0.09, 0.065};
 }
 inline Vec3 foliageOf(const std::string &sp, const std::string &season, int v) {
 	if (sp == "conifer") return Vec3{0.045, 0.095, 0.045} * (0.85 + 0.1 * v);
 	if (sp == "palm") return {0.10, 0.20, 0.05};
+	if (sp == "acacia") return Vec3{0.11, 0.15, 0.045} * (0.9 + 0.08 * v);   // (evergreen: no autumn for these)
+	if (sp == "kapok") return Vec3{0.05, 0.13, 0.035} * (0.9 + 0.08 * v);
+	if (sp == "cactus") return {0.12, 0.20, 0.08};
+	if (sp == "fern") return {0.07, 0.20, 0.04};
 	if (season == "autumn" && sp != "shrub") {
 		static const Vec3 autumn[4] = {{0.55, 0.22, 0.04}, {0.45, 0.07, 0.03}, {0.60, 0.45, 0.07}, {0.32, 0.18, 0.06}};
 		return sp == "birch" ? Vec3{0.62, 0.48, 0.08} : autumn[v % 4];
@@ -297,7 +386,7 @@ inline std::string objectText(const std::string &film, const std::string &sp, in
 	const Vec3 leaf = detail::foliageOf(sp, season, v);
 	std::string out = nature::objectBegin(base) + "  AttributeBegin\n  " + coated(detail::barkOf(sp), 0.8) + "\n" + film_cache::plyShape(wood) + "  AttributeEnd\n";
 	if (!leaves.empty())   // (leaves let a little light through; the far lumps are opaque)
-		out += "  AttributeBegin\n  " + (full ? translucentMaterial(leaf, leaf * 1.3 + Vec3{0.03, 0.05, 0.0}) : diffuseMaterial(leaf * 0.9)) + "\n" + film_cache::plyShape(leaves) + "  AttributeEnd\n";
+		out += "  AttributeBegin\n  " + (full && sp != "cactus" ? translucentMaterial(leaf, leaf * 1.3 + Vec3{0.03, 0.05, 0.0}) : diffuseMaterial(leaf * 0.9)) + "\n" + film_cache::plyShape(leaves) + "  AttributeEnd\n";
 	if (!snow.empty()) out += "  AttributeBegin\n  " + diffuseMaterial({0.82, 0.84, 0.88}) + "\n" + film_cache::plyShape(snow) + "  AttributeEnd\n";
 	if (!blossom.empty())
 		out += "  AttributeBegin\n  " + translucentMaterial(v % 2 ? Vec3{0.85, 0.55, 0.65} : Vec3{0.88, 0.86, 0.84}, {0.3, 0.25, 0.25}) + "\n" + film_cache::plyShape(blossom) + "  AttributeEnd\n";
@@ -337,7 +426,7 @@ inline std::string stageText(const std::string &film, const std::string &sp, int
 	const Vec3 leaf = lerp(colourIn(a, b), colourIn(b, a), u);
 	std::string out = nature::objectBegin(base) + "  AttributeBegin\n  " + coated(detail::barkOf(sp), 0.8) + "\n" + film_cache::plyShape(wood) + "  AttributeEnd\n";
 	if (!foliage.empty() && leaves > 0.0)
-		out += "  AttributeBegin\n  " + (full ? translucentMaterial(leaf, leaf * 1.3 + Vec3{0.03, 0.05, 0.0}) : diffuseMaterial(leaf * 0.9)) + "\n" + film_cache::plyShape(foliage) + "  AttributeEnd\n";
+		out += "  AttributeBegin\n  " + (full && sp != "cactus" ? translucentMaterial(leaf, leaf * 1.3 + Vec3{0.03, 0.05, 0.0}) : diffuseMaterial(leaf * 0.9)) + "\n" + film_cache::plyShape(foliage) + "  AttributeEnd\n";
 	if (!snowy.empty() && snow > 0.0) out += "  AttributeBegin\n  " + diffuseMaterial({0.82, 0.84, 0.88}) + "\n" + film_cache::plyShape(snowy) + "  AttributeEnd\n";
 	if (!blooms.empty() && blossom > 0.0)
 		out += "  AttributeBegin\n  " + translucentMaterial(v % 2 ? Vec3{0.85, 0.55, 0.65} : Vec3{0.88, 0.86, 0.84}, {0.3, 0.25, 0.25}) + "\n" + film_cache::plyShape(blooms) + "  AttributeEnd\n";
@@ -381,11 +470,22 @@ inline std::vector<Tree> plant(const Forest &f, const terrain::Field *ground, do
 			if (up < 0.35) t.species = r < 0.55 ? "broadleaf" : r < 0.8 ? "birch" : r < 0.92 ? "shrub" : "conifer";
 			else if (up < 0.7) t.species = r < 0.3 ? "broadleaf" : r < 0.45 ? "birch" : r < 0.55 ? "shrub" : "conifer";
 			else t.species = r < 0.9 ? "conifer" : "shrub";
+		} else if (f.kind == "savanna") {   // the mixes of the biomes: acacias over the grass with a few bushes; the jungle's giants over palms, broadleaf trees and ferns;
+			const double r = hash01(s, 5);    // the desert's cacti among scrub; the tundra's low scrub and a few stunted conifers
+			t.species = r < 0.7 ? "acacia" : "shrub";
+		} else if (f.kind == "jungle") {
+			const double r = hash01(s, 5);
+			t.species = r < 0.18 ? "kapok" : r < 0.42 ? "palm" : r < 0.62 ? "broadleaf" : "fern";
+		} else if (f.kind == "desert") {
+			t.species = hash01(s, 5) < 0.6 ? "cactus" : "shrub";
+		} else if (f.kind == "tundra") {
+			t.species = hash01(s, 5) < 0.8 ? "shrub" : "conifer";
 		}
 		t.variant = static_cast<int>(hash01(s, 6) * kVariants) % kVariants;
 		t.at = {x, y - 0.05, z};
 		t.scale = f.scale0 + (f.scale1 - f.scale0) * hash01(s, 7);
 		if (t.species == "conifer" && ground) t.scale *= 1.0 - 0.35 * std::min(1.0, frac / std::max(0.05, treeline / height));   // (smaller towards the tree line)
+		if (f.kind == "tundra") t.scale *= 0.45;   // (stunted)
 		t.turn = 360.0 * hash01(s, 8);
 		out.push_back(t);
 	}

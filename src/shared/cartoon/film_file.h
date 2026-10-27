@@ -112,7 +112,9 @@
 //     waterfall at 40 0 -80  width 8  drop 30  facing 180       # the middle of its lip (on a terrain, Y above the ground), how far it drops, which way it pours
 //     clouds   cumulus  cover 0.4  base 900  wind 90  speed 6   # clouds you can see round (film_clouds.h): cumulus, towering or wisps; `size W` across, `density D`,
 //                                                               # `area A` (the square they are spread over, round `at X Z`), `seed N`; they drift and cast shadows
-//     forest   mixed 3000  season autumn                        # conifer, broadleaf, birch, palm, shrub or mixed (by height), so many trees where the land suits them;
+//     biome    savanna                                         # the land as a biome (savanna, jungle, desert, tundra, arctic): its ground's colours, its plants, its sound
+//     forest   mixed 3000  season autumn                        # conifer, broadleaf, birch, palm, shrub, acacia, kapok, cactus, fern; or mixed (by height), savanna,
+//                                                               # jungle, desert or tundra (a biome's mix): so many trees where the land suits them;
 //                                                               # `season summer to autumn from T0 to T1` (each tree turning in its own time), `grow T0 T1` (from saplings)
 //     flowers  poppies 3000  in -20 -20 20 20  bloom 2 10       # poppies, daisies, lupins or sunflowers (turning to the sun), opening each in its own time; `close T0 T1`
 //                                                               # `in X0 Z0 X1 Z1`, `below H` (the tree line above the land's base), `above H`, `steep S`, `scale A B`,
@@ -491,6 +493,8 @@ struct Spec {
 	// forests (`forest`), and their trees (planted when the film is loaded, on the land as it is drawn)
 	std::vector<forest::Forest> forests;
 	std::vector<flowers::Meadow> meadows;   // wild flowers (`flowers`: film_flowers.h)
+	std::string biome;                      // the land as a biome (`biome`): its ground (film_terrain.h biomePaint), its plants (film_forest.h's mixes), its sound
+	int biomeTrees = -1;                    // (how many plants it brings: below 0 by the land's size)
 	std::vector<std::vector<forest::Tree>> planted;
 	// animals (`flock`, `herd`)
 	std::vector<wildlife::Flock> flocks;
@@ -1262,7 +1266,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			const std::vector<std::string> t = detail::tokens(line);
 			forest::Forest f;
 			if (t.size() < 2 || std::find(forest::kinds().begin(), forest::kinds().end(), t[1]) == forest::kinds().end())
-				return fail("`forest KIND [COUNT] [in X0 Z0 X1 Z1] [below H] [above H] [steep S] [scale A B] [near D] [season S] [seed N]`: conifer, broadleaf, birch, palm, shrub or mixed");
+				return fail("`forest KIND [COUNT] [in X0 Z0 X1 Z1] [below H] [above H] [steep S] [scale A B] [near D] [season S] [seed N]`: conifer, broadleaf, birch, palm, shrub, acacia, kapok, cactus or fern, or a mix: mixed, savanna, jungle, desert or tundra");
 			f.kind = t[1];
 			std::size_t i = 2;
 			double count = 0.0;
@@ -1304,6 +1308,15 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 				}
 			}
 			s.forests.push_back(f);
+		} else if (verb == "biome") {   // the land as a biome: savanna, jungle, desert, tundra or arctic
+			const std::vector<std::string> t = detail::tokens(line);
+			static const std::vector<std::string> biomes = {"savanna", "jungle", "desert", "tundra", "arctic"};
+			double count = 0.0;
+			if (t.size() < 2 || std::find(biomes.begin(), biomes.end(), t[1]) == biomes.end() ||
+				!(t.size() == 2 || (t.size() == 4 && t[2] == "plants" && number(t[3], count) && count >= 0.0 && count <= 50000.0)))
+				return fail("`biome NAME [plants N]`: savanna, jungle, desert, tundra or arctic - the land's colours, its plants (N of them; by the land's size when not given) and its sound");
+			s.biome = t[1];
+			if (t.size() == 4) s.biomeTrees = static_cast<int>(count);
 		} else if (verb == "flowers") {   // a meadow of wild flowers, opening and closing (film_flowers.h)
 			const std::vector<std::string> t = detail::tokens(line);
 			flowers::Meadow m;
@@ -2005,7 +2018,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -2030,6 +2043,26 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			n = 0;
 			return fail(rv.canyon ? "`river canyon` runs along a canyon terrain's riverbed: the film has no `terrain canyon`" : "`river from X Z` finds its way downhill over a terrain: the film has no `terrain`");
 		}
+	if (!s.biome.empty()) {   // a biome: the land's colours, its plants unless the film plants its own, its sound unless the film says
+		if (!s.hasTerrain) {
+			n = 0;
+			return fail("`biome` is the land's: the film needs a `terrain` line");
+		}
+		s.terrain.biome = s.biome;
+		if (s.forests.empty() && s.biome != "arctic") {
+			forest::Forest f;
+			f.kind = s.biome;
+			const double perSquareMetre = s.biome == "jungle" ? 0.003 : s.biome == "savanna" ? 0.0004 : s.biome == "desert" ? 0.0007 : 0.001;
+			f.count = s.biomeTrees >= 0 ? s.biomeTrees : static_cast<int>(std::clamp(perSquareMetre * s.terrain.size * s.terrain.size, 40.0, 8000.0));
+			f.steep = s.biome == "jungle" ? 0.3 : 0.2;
+			if (f.count > 0) s.forests.push_back(f);
+		}
+		if (s.ambience.empty()) {
+			if (s.biome == "jungle") s.ambience = {{"birds", 0.7}, {"crickets", 0.5}};
+			else if (s.biome == "savanna") s.ambience = {{"crickets", 0.4}, {"wind", 0.4}};
+			else s.ambience = {{"wind", s.biome == "desert" ? 0.6 : 0.8}};
+		}
+	}
 	if (s.hasTerrain) {   // on a terrain, heights are above the ground: what is placed and who is brought in stand on it
 		if (!s.seas.empty()) s.terrain.waterLevel = s.seas[0].level;   // (its shore is drawn for the water)
 		if (s.terrain.kind == "coast" && !s.terrain.ySet) s.terrain.y = (s.seas.empty() ? 0.0 : s.seas[0].level) - 0.25 * s.terrain.height;   // (its beach at the water)

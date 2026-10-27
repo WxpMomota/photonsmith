@@ -903,6 +903,21 @@ and shrubs low down, conifers coming in on the way up, conifers alone near the t
 yellow); `winter` (broadleaf trees and birches bare, showing their twigs; conifers with snow on their tiers); `spring` (fresh light green, some broadleaf trees and shrubs in
 blossom). Walks do not go round forest trees (they are not part of the set's floor map).
 
+**Biomes: `biome`.** (film_terrain.h, film_forest.h)
+
+```
+terrain  hills  size 1500  height 40
+biome    savanna                 # golden grass and red earth, acacias and bushes, crickets and wind
+biome    jungle  plants 6000     # deep greens and mossy rock, kapok giants over palms, broadleaf trees and ferns, birds and insects
+```
+
+A biome is a land's colours, its plants and its sound, from one line (it needs a `terrain`): `savanna` (golden grass, greener where water gathers, patches of red earth;
+acacias with their flat umbrellas of crowns and a few bushes), `jungle` (deep greens, mossy rock; kapok giants 25-30 m tall on buttress roots with broad domes of crowns
+over palms, broadleaf trees and ferns), `desert` (sand, bands of red rock on the slopes, scattered stones; saguaro cacti - ribbed columns with arms bending up - among
+scrub), `tundra` (moss and lichen, snow on the heights and drifted in the hollows; low scrub and a few stunted conifers) or `arctic` (snow, blue ice where it is steep,
+rock where it is steeper; nothing grows). It plants a forest of its mix (`plants N`, or as many as the land's size suits) unless the film plants its own, and is heard as
+it is unless the film has an `ambience`. The species and mixes are a `forest`'s too: `forest acacia 200`, `forest jungle 3000 in ...`, `forest desert 400`.
+
 **Plants changing over time: `season A to B`, `grow`, `flowers`.** (film_forest.h, film_flowers.h)
 
 ```

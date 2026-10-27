@@ -367,11 +367,11 @@ TEST(FilmForest, TreesGrowWhereTheLandSuitsThemAndAreDrawnNearOrFar) {
 	EXPECT_TRUE(winter.foliage.tris.empty());
 	EXPECT_GT(winter.wood.tris.size(), summer.wood.tris.size()) << "(bare, more twigs show)";
 	for (const std::string &sp : forest::species()) {
-		EXPECT_FALSE(forest::detail::grow(sp, 0, false, false).wood.tris.empty()) << sp;
+		EXPECT_FALSE(forest::detail::grow(sp, 0, false, false).wood.tris.empty() && forest::detail::grow(sp, 0, false, false).foliage.tris.empty()) << sp;
 		EXPECT_FALSE(forest::detail::growFar(sp, 0, false).foliage.tris.empty()) << sp;
 	}
 	EXPECT_NE(forest::detail::foliageOf("broadleaf", "autumn", 0).x, forest::detail::foliageOf("broadleaf", "summer", 0).x) << "autumn colours";
-	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"forest oak", "conifer, broadleaf, birch, palm, shrub or mixed"},
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"forest oak", "conifer, broadleaf, birch, palm, shrub, acacia, kapok, cactus or fern"},
 																						 {"forest mixed 100 season monsoon", "a forest takes"},
 																						 {"forest mixed 0", "1 to 50000 trees"}}) {
 		ff::DataFilm bad;
@@ -1154,4 +1154,56 @@ TEST(FilmSound, NaturesSoundsAreHeardFromWhereTheyAre) {
 	const auto [b0, b1] = channels(hooves, 9.0, 13.0);
 	EXPECT_GT(a0 + a1, 0.0) << "hoofbeats while they walk";
 	EXPECT_GT(b0 + b1, 2.0 * (a0 + a1)) << "a galloping herd thunders";
+}
+
+// Biomes: a biome paints the land its colours (golden savanna, green jungle, sandy desert, white arctic) and plants its own mix (acacias on the savanna, giants and ferns
+// in the jungle, cacti in the desert); the new species grow in their own shapes.
+TEST(FilmBiomes, ABiomePaintsTheLandAndPlantsItsOwn) {
+	const auto mean = [](const std::string &biome) {
+		ff::DataFilm film;
+		const std::string problem = loadNature("biome_" + biome, "scene s.pbrt\nlength 4\nterrain hills size 400 height 30 seed 3 far off\nbiome " + biome + "\n", film);
+		EXPECT_EQ(problem, "");
+		const auto ground = cartoon::terrain::fieldOf(film.spec.terrain);
+		cartoon::Vec3 sum{0, 0, 0};
+		for (int i = 0; i < 400; ++i) sum = sum + cartoon::terrain::colourAt(*ground, -150.0 + 300.0 * (i % 20) / 19.0, -150.0 + 300.0 * (i / 20) / 19.0) * (1.0 / 400.0);
+		return std::make_pair(sum, film.spec.planted);
+	};
+	const auto [savanna, savannaTrees] = mean("savanna");
+	const auto [jungle, jungleTrees] = mean("jungle");
+	const auto [desert, desertTrees] = mean("desert");
+	const auto [arctic, arcticTrees] = mean("arctic");
+	EXPECT_GT(savanna.x, savanna.z * 1.8) << "golden";
+	EXPECT_GT(jungle.y, jungle.x * 1.5) << "green";
+	EXPECT_GT(desert.x, 0.4) << "sand";
+	EXPECT_GT(arctic.z, 0.7) << "snow";
+	EXPECT_TRUE(arcticTrees.empty());
+	ASSERT_EQ(savannaTrees.size(), 1u);
+	int acacias = 0;
+	for (const forest::Tree &t : savannaTrees[0]) acacias += t.species == "acacia";
+	EXPECT_GT(acacias, static_cast<int>(savannaTrees[0].size()) / 2);
+	ASSERT_EQ(jungleTrees.size(), 1u);
+	EXPECT_TRUE(std::any_of(jungleTrees[0].begin(), jungleTrees[0].end(), [](const forest::Tree &t) { return t.species == "kapok"; }));
+	EXPECT_TRUE(std::any_of(jungleTrees[0].begin(), jungleTrees[0].end(), [](const forest::Tree &t) { return t.species == "fern"; }));
+	ASSERT_EQ(desertTrees.size(), 1u);
+	EXPECT_TRUE(std::any_of(desertTrees[0].begin(), desertTrees[0].end(), [](const forest::Tree &t) { return t.species == "cactus"; }));
+	// the species' shapes
+	const auto bounds = [](const cartoon::Mesh &m, cartoon::Vec3 &lo, cartoon::Vec3 &hi) {
+		lo = {1e9, 1e9, 1e9}, hi = {-1e9, -1e9, -1e9};
+		for (const cartoon::Vec3 &v : m.verts) lo = {std::min(lo.x, v.x), std::min(lo.y, v.y), std::min(lo.z, v.z)}, hi = {std::max(hi.x, v.x), std::max(hi.y, v.y), std::max(hi.z, v.z)};
+	};
+	cartoon::Vec3 lo, hi;
+	bounds(forest::detail::grow("acacia", 0, false, false).foliage, lo, hi);
+	EXPECT_LT(hi.y - lo.y, 0.35 * (hi.x - lo.x)) << "an acacia's crown is flat and wide";
+	bounds(forest::detail::grow("kapok", 0, false, false).wood, lo, hi);
+	EXPECT_GT(hi.y, 20.0) << "a jungle giant";
+	bounds(forest::detail::grow("cactus", 1, false, false).foliage, lo, hi);
+	EXPECT_GT(hi.y, 4.0);
+	bounds(forest::detail::grow("fern", 0, false, false).foliage, lo, hi);
+	EXPECT_LT(hi.y, 1.5);
+	for (const std::string &sp : forest::species()) EXPECT_FALSE(forest::detail::growFar(sp, 0, false).foliage.tris.empty() && forest::detail::growFar(sp, 0, false).wood.tris.empty()) << sp;
+	for (const auto &[text, says] : std::vector<std::pair<std::string, std::string>>{{"biome savanna\n", "needs a `terrain` line"}, {"terrain hills\nbiome moon\n", "`biome NAME"}}) {
+		ff::DataFilm bad;
+		const std::string problem = loadNature("biome_bad", "scene s.pbrt\nlength 4\n" + text, bad);
+		EXPECT_NE(problem.find(says), std::string::npos) << text << " -> " << problem;
+	}
 }

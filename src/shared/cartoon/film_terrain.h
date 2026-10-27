@@ -34,7 +34,8 @@ struct Spec {
 	std::string kind = "hills";
 	double size = 600.0, height = 60.0;   // the square's side and its highest ground above `y` (metres)
 	double x = 0.0, z = 0.0, y = 0.0;     // its centre (pbrt's x z) and its base height
-	bool ySet = false;                    // (whether the film gave `y`: a coast without it is put so its beach is at the sea's level)
+	bool ySet = false;
+	std::string biome;                    // (its ground painted as a biome: savanna, jungle, desert, tundra or arctic; "" its kind's own: biomePaint)                    // (whether the film gave `y`: a coast without it is put so its beach is at the sea's level)
 	double focusX = 0.0, focusZ = 0.0;    // where the film happens: the mesh is finest there, and mountains and canyons leave a floor round it
 	bool focusSet = false;
 	double snow = -1.0;                   // the snow line, metres above `y` (below 0: the kind's own - mountains at 0.45 of the height, none for the others)
@@ -70,6 +71,7 @@ struct Spec {
 		std::snprintf(b, sizeof b, "v1|%s|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.3f|%d|%d|%.3f", kind.c_str(), size, height, x, z, y, fx(), fz(), snowLine(), erosionAmount(), seed, ranges ? 1 : 0,
 					  waterLevel > -1e29 ? waterLevel : -1.0);
 		std::string all = b;
+		if (!biome.empty()) all += "|b" + biome;
 		for (const Channel &c : channels) {
 			char w[32];
 			std::snprintf(w, sizeof w, "|c%.2f", c.width);
@@ -400,11 +402,48 @@ inline std::shared_ptr<const Field> fieldOf(const Spec &s) {
 }
 
 // ---- the colours ----
+// A biome's ground (Spec::biome): savanna (golden grass, greener where water gathers, red earth showing through), jungle (deep greens, mossy rock), desert (sand,
+// bands of red rock on the slopes, scattered stones), tundra (moss and lichen, snow lying in the hollows and on the heights) or arctic (snow, blue ice where it is
+// steep, rock where it is steeper still). `var` and `fine` are paint's large and small variation.
+inline Vec3 biomePaint(const Spec &s, double px, double pz, double frac, double steep, double wet, double var, double fine) {
+	const int salt = s.seed * 53;
+	const double patch = detail::fbm(px / 45.0, pz / 45.0, salt + 21, 3);
+	if (s.biome == "savanna") {
+		Vec3 c = lerp(Vec3{0.36, 0.28, 0.12}, Vec3{0.46, 0.37, 0.17}, var) * (0.9 + 0.2 * fine);
+		c = lerp(c, Vec3{0.15, 0.19, 0.07}, 0.65 * smoothstep(0.12, 0.6, wet));   // (green along the water)
+		c = lerp(c, Vec3{0.34, 0.17, 0.08} * (0.9 + 0.2 * fine), 0.75 * smoothstep(0.62, 0.74, patch));   // (red earth)
+		return lerp(c, Vec3{0.32, 0.22, 0.15} * (0.85 + 0.3 * var), smoothstep(0.12, 0.24, steep));
+	}
+	if (s.biome == "jungle") {
+		Vec3 c = lerp(Vec3{0.03, 0.085, 0.02}, Vec3{0.065, 0.14, 0.035}, var) * (0.85 + 0.3 * fine);
+		c = lerp(c, Vec3{0.02, 0.05, 0.015}, 0.5 * smoothstep(0.2, 0.7, wet));
+		return lerp(c, Vec3{0.12, 0.14, 0.08} * (0.85 + 0.3 * var), smoothstep(0.16, 0.3, steep));   // (mossy rock)
+	}
+	if (s.biome == "desert") {
+		Vec3 c = lerp(Vec3{0.58, 0.42, 0.26}, Vec3{0.68, 0.50, 0.31}, var) * (0.93 + 0.1 * fine);
+		const double q = frac * 10.0 + 0.5 * (var - 0.5);
+		const Vec3 rock = lerp(Vec3{0.45, 0.21, 0.11}, Vec3{0.56, 0.31, 0.16}, smoothstep(0.4, 0.6, q - std::floor(q))) * (0.85 + 0.25 * fine);
+		c = lerp(c, rock, smoothstep(0.08, 0.2, steep));
+		return fine > 0.86 && steep < 0.1 ? Vec3{0.2, 0.14, 0.1} : c;   // (stones)
+	}
+	if (s.biome == "tundra") {
+		Vec3 c = lerp(Vec3{0.17, 0.16, 0.08}, Vec3{0.27, 0.25, 0.14}, var) * (0.9 + 0.2 * fine);
+		c = lerp(c, Vec3{0.42, 0.40, 0.33}, 0.7 * smoothstep(0.6, 0.72, patch));   // (lichen)
+		c = lerp(c, Vec3{0.28, 0.27, 0.25} * (0.85 + 0.3 * var), smoothstep(0.12, 0.24, steep));
+		const double snow = std::max(smoothstep(0.55, 0.7, frac + 0.15 * (var - 0.5)), smoothstep(0.35, 0.6, wet) * smoothstep(0.66, 0.8, patch));   // (the heights, and drifts in hollows)
+		return lerp(c, Vec3{0.82, 0.84, 0.88}, snow * (1.0 - smoothstep(0.2, 0.32, steep)));
+	}
+	// arctic
+	Vec3 c = Vec3{0.82, 0.84, 0.88} * (0.95 + 0.07 * fine) * (0.97 + 0.04 * var);
+	c = lerp(c, Vec3{0.40, 0.56, 0.67} * (0.9 + 0.2 * fine), smoothstep(0.1, 0.22, steep));   // (blue ice)
+	return lerp(c, Vec3{0.2, 0.2, 0.22} * (0.85 + 0.3 * var), smoothstep(0.3, 0.45, steep));
+}
 // What lies at pbrt's x z (linear albedo), from its height above the base as a share of the terrain's height (`frac`), how steep it is (`steep`: 1 - the normal's y, 0.29 at
 // 45 degrees) and how much water runs there (`wet`).
 inline Vec3 paint(const Spec &s, double px, double pz, double frac, double steep, double wet) {
 	const int salt = s.seed * 53;
 	const double var = detail::fbm(px / 23.0, pz / 23.0, salt, 4), fine = nature::noise2(px / 3.1, pz / 3.1, salt + 3);
+	if (!s.biome.empty()) return biomePaint(s, px, pz, frac, steep, wet, var, fine);
 	if (s.kind == "dunes") {
 		Vec3 sand = lerp(Vec3{0.56, 0.38, 0.22}, Vec3{0.70, 0.52, 0.32}, var);
 		sand = sand * (0.92 + 0.12 * fine);
