@@ -157,6 +157,7 @@ inline int run(const Job &job, const LaunchArgs &args, const RenderSetup &setup,
 		bool unchanged = false;
 		double share = 1.0;
 		const bool written = job.writeScene(frame, eye, fingerprint, unchanged, share);
+		const double sceneSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - frameStart).count();   // (its scene made: the launcher's time summary)
 		if (written && unchanged) {
 			rc = 0;   // (finished, and its scene has not changed: kept as it is)
 		} else if (written) {
@@ -175,7 +176,7 @@ inline int run(const Job &job, const LaunchArgs &args, const RenderSetup &setup,
 		const std::string marker = job.markerPath(frame), temporary = marker + ".tmp";
 		{
 			std::ofstream out(temporary, std::ios::trunc);
-			out << rc << "\n" << (fingerprint.empty() ? "-" : fingerprint) << "\n" << (unchanged ? "kept" : "rendered") << "\n";
+			out << rc << "\n" << (fingerprint.empty() ? "-" : fingerprint) << "\n" << (unchanged ? "kept" : "rendered") << "\n" << sceneSeconds << "\n";
 		}
 		std::error_code ec;
 		std::filesystem::rename(temporary, marker, ec);

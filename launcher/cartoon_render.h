@@ -81,16 +81,19 @@ inline int timeoutFor(const LaunchArgs &args, bool gpu) {
 // `fingerprint` (when given) gets the scene's fingerprint; with `keepIf` (a finished frame's old fingerprint) the frame is not rendered when the scene's is the same, and `*kept` says so.
 inline int renderFrame(const cartoon::Film &film, double t, const std::filesystem::path &scenePath, const std::string &exe, const LaunchArgs &args, int width, int height, int spp,
 					   int depth, const std::string &framePath, int timeoutSeconds = 0, double timeLimitSeconds = 0.0, bool gpu = false, std::string *fingerprint = nullptr,
-					   const std::string &keepIf = std::string(), bool *kept = nullptr) {
+					   const std::string &keepIf = std::string(), bool *kept = nullptr, double *sceneSeconds = nullptr) {
 	if (kept) *kept = false;
+	if (sceneSeconds) *sceneSeconds = 0.0;
 	try {
 		// One frame's scene at a time: runInParallel calls this from several threads, and a film's code keeps caches of its own (static maps of figure meshes and the like)
-		// that are not made for that. Building a scene is quick beside rendering it.
+		// that are not made for that. Building a scene is usually quick beside rendering it; `sceneSeconds` says how long it took (the wait for the lock left out).
 		std::string text;
 		{
 			static std::mutex building;
 			std::lock_guard<std::mutex> hold(building);
+			const auto built = std::chrono::steady_clock::now();
 			text = film.sceneAt(t);
+			if (sceneSeconds) *sceneSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - built).count();
 		}
 		const std::string fp = frame_fingerprint::of(text);
 		if (fingerprint) *fingerprint = fp;

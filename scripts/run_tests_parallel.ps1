@@ -196,8 +196,8 @@ $gpuAndOversubscribingFilter = "*GPU*:*Gpu*:*gpu*:LivePreview*:WavefrontRenderTe
 
 # The CPU-render suites (see -Tier Render above), measured in a full serial run (October 2026, seconds in brackets): PbrtBackendAgreementTest [97], ChromaticMediaPerChannelTest [87],
 # BundledPbrtLightCoverageTest [72], PbrtReferencePackCpuTest [39], SceneBuilderRenderTest [23], PbrtReferenceTest [10], RenderIntegrationTest [8],
-# PbrtExampleSceneTest [6], SceneVolumeRenderTest [6]. Parameterized suites carry a prefix ("Bundled/..."), hence the leading *. Anything that also matches the GPU filter stays in Slow.
-$renderSuites = "PbrtBackendAgreementTest.*:ChromaticMediaPerChannelTest.*:*BundledPbrtLightCoverageTest.*:*PbrtReferencePackCpuTest.*:SceneBuilderRenderTest.*:PbrtReferenceTest.*:RenderIntegrationTest.*:*PbrtExampleSceneTest.*:SceneVolumeRenderTest.*"
+# PbrtExampleSceneTest [6], SceneVolumeRenderTest [6]; FilmRenderTest (every film through the program: the baseline, stills, a video) added later. Parameterized suites carry a prefix ("Bundled/..."), hence the leading *. Anything that also matches the GPU filter stays in Slow.
+$renderSuites = "FilmRenderTest.*:PbrtBackendAgreementTest.*:ChromaticMediaPerChannelTest.*:*BundledPbrtLightCoverageTest.*:*PbrtReferencePackCpuTest.*:SceneBuilderRenderTest.*:PbrtReferenceTest.*:RenderIntegrationTest.*:*PbrtExampleSceneTest.*:SceneVolumeRenderTest.*"
 $renderFilter = "$renderSuites-$gpuAndOversubscribingFilter"
 $cheapExclusion = "${gpuAndOversubscribingFilter}:$renderSuites"
 
@@ -366,8 +366,8 @@ $jobs = for ($i = 0; $i -lt $Shards; $i++) {
 	# across all shards close to the real core count instead of Shards-times
 	# over it.
 	$threadsPerShard = [Math]::Max(1, [Math]::Ceiling([System.Environment]::ProcessorCount / $Shards))
-	Start-Job -Name "shard_$i" -ArgumentList $testsExe, $Shards, $i, $Filter, $logFile, $shardDir, $threadsPerShard, ($Tier -eq "Fast") -ScriptBlock {
-		param($exe, $total, $index, $filter, $log, $cwd, $threads, $forbidGpu)
+	Start-Job -Name "shard_$i" -ArgumentList $testsExe, $Shards, $i, $Filter, $logFile, $shardDir, $threadsPerShard, ($Tier -eq "Fast"), $(if ($env:RT_MACHINE_TEMP) { $env:RT_MACHINE_TEMP } else { $env:TEMP }) -ScriptBlock {
+		param($exe, $total, $index, $filter, $log, $cwd, $threads, $forbidGpu, $machineTemp)
 		Set-Location $cwd
 		# Each shard's own TEMP/TMP: about ten test fixtures build a scratch tree under a FIXED name in %TEMP% (pbrt_load_tests, pbrt_discover_tests,
 		# ...), and tests of one fixture land in different shards, so two shards used to delete each other's files mid-test ("found.size() 0, expected 2").
@@ -375,6 +375,9 @@ $jobs = for ($i = 0; $i -lt $Shards; $i++) {
 		New-Item -ItemType Directory -Force -Path $shardTemp | Out-Null
 		$env:TEMP = $shardTemp
 		$env:TMP = $shardTemp
+		# (the machine's own, for what is made to be shared between processes: the film tests run the program with it, so their films use the film cache every run of the
+		# program shares - built once - and not a cold one in every shard: tests/unit/film_whole_tests.cpp)
+		$env:RT_MACHINE_TEMP = $machineTemp
 		$env:GTEST_TOTAL_SHARDS = $total
 		$env:GTEST_SHARD_INDEX = $index
 		$env:RAY_TRACER_THREADS = $threads

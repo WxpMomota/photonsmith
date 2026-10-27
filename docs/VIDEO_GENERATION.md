@@ -1393,6 +1393,9 @@ Create different videos from the same scene (each run clears and re-populates `o
 
 ## Troubleshooting
 
+### What happened during a long render
+Every video keeps its own log beside it, `<stem>_video.log`: everything the run printed (the console scrolls the early lines away, and is gone when the run ends). The run ends with a summary - "No problems were reported", or how many warnings and failures were printed and each different one with how many times (a `[score]` line, a frame that failed) - on the console and at the end of the log. A frame that failed says where its own run's output is (`frames-<key>/work*/frames.log` or `worker.log`). A cartoon's frames also say how long each one's scene took to make, and the run sums it up ("Time: ... making a frame's scene 1.80 s of that (32%)"): when making the scenes, not rendering them, sets the pace, the run says so.
+
 ### "No frame_*.ppm files found"
 Check that video rendering completed successfully. Look for `output/frames/` directory (a cartoon's frames are in `output/frames-<film key>/`, e.g. `frames-pip-and-the-moon`, so rendering one film never clears another's).
 
@@ -1433,6 +1436,7 @@ output/
 │   ├── enc_0001.png         # (skips any frame that failed to render)
 │   └── ...
 ├── <stem>_video.mp4         # Final video, assembled by ffmpeg (<stem> from --output)
+├── <stem>_video.log         # What the run printed, ending with its warnings and failures summed up
 └── image.ppm                # Single-frame renders (normal mode)
 ```
 

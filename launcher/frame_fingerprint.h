@@ -13,6 +13,8 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace frame_fingerprint {
 
@@ -52,18 +54,25 @@ inline std::uint64_t fileHash(const std::string &path) {
 }
 
 // The fingerprint of a frame's scene text (16 hex digits).
-inline std::string of(const std::string &scene) {
+// `places` (the films' baseline, film_baseline.h): folders whose place on this computer is left out of the text, each pair a folder as the scene writes it and the name it
+// goes by instead - the scenes folder, the film cache - so a scene has one fingerprint wherever the program runs from. (A frame's own fingerprint keeps them: a resumed video
+// is on one computer, and its files are where they are.)
+inline std::string of(const std::string &scene, const std::vector<std::pair<std::string, std::string>> &places = {}) {
 	std::uint64_t h = 14695981039346656037ull;
+	std::string text = scene;
+	for (const auto &[folder, name] : places)
+		if (!folder.empty())
+			for (std::size_t at = text.find(folder); at != std::string::npos; at = text.find(folder, at + name.size())) text.replace(at, folder.size(), name);
 	// the text, the build folders' names left out
 	std::size_t from = 0;
-	for (std::size_t at = scene.find("build_"); at != std::string::npos; at = scene.find("build_", at + 6)) {
-		bool stamp = at + 22 <= scene.size();
-		for (std::size_t k = at + 6; stamp && k < at + 22; ++k) stamp = isHex(scene[k]);
+	for (std::size_t at = text.find("build_"); at != std::string::npos; at = text.find("build_", at + 6)) {
+		bool stamp = at + 22 <= text.size();
+		for (std::size_t k = at + 6; stamp && k < at + 22; ++k) stamp = isHex(text[k]);
 		if (!stamp) continue;
-		h = fnv(scene.data() + from, at + 6 - from, h);
+		h = fnv(text.data() + from, at + 6 - from, h);
 		from = at + 22;
 	}
-	h = fnv(scene.data() + from, scene.size() - from, h);
+	h = fnv(text.data() + from, text.size() - from, h);
 	// the files it names: each one's contents
 	const std::string tag = "\"string filename\"";
 	for (std::size_t at = scene.find(tag); at != std::string::npos; at = scene.find(tag, at + tag.size())) {

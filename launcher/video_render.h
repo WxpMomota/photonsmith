@@ -73,6 +73,7 @@ extern char** environ;
 #include "launcher/film_transitions.h" // its dissolves, fades and wipes
 #include "launcher/film_temporal.h"    // --temporal-denoise
 #include "launcher/video_frames.h"     // the frames folder: kept on a resume, emptied (when ours) on a fresh start
+#include "launcher/run_log.h"          // the run's own log beside the video, and its warnings summed up at the end
 
 // Converts rendered PPM frames to PNG on a background thread while the main
 // thread renders the next frame, instead of converting everything in a
@@ -420,6 +421,9 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
     std::mutex keptLock;
     std::set<int> kept;                       // compared and unchanged: kept as they are
     std::map<int, std::string> fingerprintOf;   // what each frame of this run was made from
+    std::map<int, double> sceneSecondsOf;       // how long each frame's scene took to make (the time summary: is making the scenes, not rendering them, what holds the video up?)
+    double frameSecondsTotal = 0.0, sceneSecondsTotal = 0.0;
+    int timedFrames = 0;
     // --draft N: only every Nth frame is rendered; the others repeat the one before (renderVideoFrames fills them in, as it fills a failed frame), so the video keeps its length
     // and the film's sound stays in step: a whole film to look at and listen to in a fraction of the time. The drafted frames are real renders, so a full render at the same
     // size, samples and flags resumes from them and renders only the rest.
@@ -446,17 +450,24 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
     };
     auto completed = [&](int frame, int rc, double seconds) {   // as each frame finishes: one line, the count being how many are done
         if (already[static_cast<std::size_t>(frame)]) return;
+        double sceneSeconds = 0.0;
         {
             std::lock_guard<std::mutex> hold(keptLock);
             if (rc == 0) {
                 if (const auto it = fingerprintOf.find(frame); it != fingerprintOf.end()) cartoon_render::recordFingerprint(frames_dir, frame, it->second);
             }
+            if (const auto it = sceneSecondsOf.find(frame); it != sceneSecondsOf.end()) sceneSeconds = it->second;
+            if (rc == 0 && !kept.count(frame)) frameSecondsTotal += seconds, sceneSecondsTotal += sceneSeconds, ++timedFrames;
         }
         std::ostringstream line;
         line << "\n[" << ++reported << "/" << render_frame_count << "] Rendering " << frame_file(frame).filename().string() << " (" << film.name << " at " << std::fixed << std::setprecision(2)
              << film.duration * frame / std::max(1, render_frame_count) << " s)...";
         if (rc == 0 && wasKept(frame)) line << " unchanged, kept";
-        else if (rc == 0) line << " \u2713 (" << std::setprecision(1) << seconds << "s)";
+        else if (rc == 0) {
+            line << " \u2713 (" << std::setprecision(1) << seconds << "s";
+            if (sceneSeconds >= 0.05) line << "; its scene " << std::setprecision(2) << sceneSeconds << "s";
+            line << ")";
+        }
         else line << " \u2717 FAILED (error code: " << rc << "; what the renderer said is in " << (frames_dir / "work*").string() << "/" << (workers > 0 ? "worker.log" : "frames.log") << ")";
         (rc == 0 ? std::cout : std::cerr) << line.str() << std::endl;
     };
@@ -467,6 +478,15 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
     const auto finish = [&](int done) {
         std::ofstream out(frames_dir / cartoon_render::kProgramStamp, std::ios::trunc);
         out << (stamp.empty() ? cartoon_render::programStamp(film, s.exe_path) : stamp) << "\n";
+        // where the time went: rendering the frames, and making their scenes - one at a time in this program while the frame runs render (workers: each in its own)
+        if (timedFrames > 0) {
+            std::ostringstream t;
+            t << std::fixed << std::setprecision(2) << "\nTime: " << timedFrames << " frame(s) rendered, " << frameSecondsTotal / timedFrames << " s a frame; making a frame's scene "
+              << sceneSecondsTotal / timedFrames << " s of that (" << std::setprecision(0) << 100.0 * sceneSecondsTotal / std::max(1e-9, frameSecondsTotal) << "%)";
+            if (workers == 0 && jobs > 1 && sceneSecondsTotal * jobs > frameSecondsTotal)
+                t << " - the scenes are made one at a time here, so making them, not rendering, sets the pace of the " << jobs << " frame runs";
+            std::cout << t.str() << "." << std::endl;
+        }
         return done;
     };
     if (workers > 0) {
@@ -510,7 +530,8 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
             if (!in) return false;
             int rc = -1;
             std::string fp, how;
-            in >> rc >> fp >> how;   // (the result, the scene's fingerprint, and whether the frame was kept as it was)
+            double sceneSeconds = 0.0;
+            in >> rc >> fp >> how >> sceneSeconds;   // (the result, the scene's fingerprint, whether the frame was kept as it was, and how long its scene took to make)
             in.close();
             std::error_code ec;
             std::filesystem::remove(marker, ec);
@@ -518,6 +539,7 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
                 std::lock_guard<std::mutex> hold(keptLock);
                 if (!fp.empty() && fp != "-") fingerprintOf[frame] = fp;
                 if (how == "kept") kept.insert(frame);
+                sceneSecondsOf[frame] = sceneSeconds;
             }
             result = rc;
             return true;
@@ -536,6 +558,7 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
                 if (const auto it = check.find(frame); it != check.end()) keepIf = it->second;
             }
             bool unchanged = false;
+            double sceneSeconds = 0.0;
             LaunchArgs frame_args = args;
             if (args.temporal_radius > 0) {   // (a seed of its own: --temporal-denoise; the frame's run is given it as a flag, after any the user typed)
                 frame_args.seed = cartoon_render::frameSeed(args, frame);
@@ -544,10 +567,11 @@ inline int renderCartoonFrames(const LaunchArgs &args, const RenderSetup &s, con
             }
             const int rc = cartoon_render::renderFrame(film, film_time, frames_dir / ("work" + std::to_string(worker)) / ("cartoon_" + std::to_string(frame) + ".pbrt"), s.exe_path, frame_args,
                                                        image_width, image_height, samples_per_pixel, max_ray_depth, frame_file(frame).string(), timeout, frameTimeLimit, use_gpu, &fp, keepIf,
-                                                       &unchanged);
+                                                       &unchanged, &sceneSeconds);
             std::lock_guard<std::mutex> hold(keptLock);
             if (!fp.empty()) fingerprintOf[frame] = fp;
             if (unchanged) kept.insert(frame);
+            sceneSecondsOf[frame] = sceneSeconds;
             return rc;
         },
         completed, inOrder));
@@ -904,6 +928,9 @@ inline int assembleVideoFile(const std::filesystem::path &frames_dir, int conver
 inline int run_video_render(const LaunchArgs &args, const RenderSetup &s) {
     const int image_width = s.image_width;
     const int image_height = s.image_height;
+    // what this run prints, kept beside the video (<name>_video.log), and its warnings and errors summed up when it ends, however it ends (run_log.h)
+    const std::filesystem::path out_path_obj(s.out_path);
+    const run_log::Capture log(out_path_obj.parent_path() / (out_path_obj.stem().string() + "_video.log"));
 
     std::cout << "\n========================================" << std::endl;
     std::cout << "VIDEO RENDERING" << std::endl;

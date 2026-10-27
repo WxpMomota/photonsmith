@@ -36,6 +36,7 @@
 #include "../../launcher/background_mode.h"
 #include "../../launcher/run_policy.h"
 #include "../../launcher/video_frames.h"
+#include "../../launcher/run_log.h"
 #include "../../src/shared/cartoon/film_subjects.h"
 #include "fixture_skip.h"
 #include "../../src/shared/cartoon/cartoons.h"
@@ -800,6 +801,65 @@ TEST(CartoonRender, AFrameFingerprintIgnoresTheBuildFolderButNotWhatIsInTheFiles
 	EXPECT_NE(a, frame_fingerprint::of(scene("build_fedcba9876543210"))) << "a mesh made differently is noticed";
 	EXPECT_NE(a, frame_fingerprint::of(scene("build_0123456789abcdef") + "Shape \"sphere\"\n")) << "the scene text itself";
 	std::filesystem::remove_all(dir);
+}
+
+// The films' baseline leaves out where the scenes folder is (film_baseline::places): the same scene from two copies of the folder has one fingerprint, a frame's own
+// fingerprint (no places) tells them apart, and the folder's files are still read where they are.
+TEST(CartoonRender, ABaselineFingerprintIsTheSameFromAnotherCopyOfTheScenesFolder) {
+	const std::filesystem::path dir = std::filesystem::temp_directory_path() / "photonsmith_places_test";
+	std::filesystem::remove_all(dir);
+	for (const char *copy : {"one", "two"}) {
+		std::filesystem::create_directories(dir / copy / "pbrt_scenes");
+		std::ofstream(dir / copy / "pbrt_scenes" / "sky.exr", std::ios::binary) << "the same sky";
+	}
+	const auto scene = [&](const char *copy) { return "WorldBegin\nLightSource \"infinite\" \"string filename\" [ \"" + (dir / copy / "pbrt_scenes" / "sky.exr").generic_string() + "\" ]\n"; };
+	const auto placesOf = [&](const char *copy) { return std::vector<std::pair<std::string, std::string>>{{(dir / copy / "pbrt_scenes").generic_string(), "<scenes>"}}; };
+	EXPECT_EQ(frame_fingerprint::of(scene("one"), placesOf("one")), frame_fingerprint::of(scene("two"), placesOf("two")));
+	EXPECT_NE(frame_fingerprint::of(scene("one")), frame_fingerprint::of(scene("two"))) << "a frame's own fingerprint keeps where its files are";
+	std::ofstream(dir / "two" / "pbrt_scenes" / "sky.exr", std::ios::binary) << "another sky, longer";
+	EXPECT_NE(frame_fingerprint::of(scene("one"), placesOf("one")), frame_fingerprint::of(scene("two"), placesOf("two"))) << "what is in the file still counts";
+	// the places the baseline leaves out: the film cache, and the scenes folders that are there, longest first
+	const auto places = cartoon::film_baseline::places();
+	ASSERT_FALSE(places.empty());
+	EXPECT_TRUE(std::any_of(places.begin(), places.end(), [](const auto &p) { return p.second == "<cache>"; }));
+	for (std::size_t i = 1; i < places.size(); ++i) EXPECT_GE(places[i - 1].first.size(), places[i].first.size());
+	std::filesystem::remove_all(dir);
+}
+
+// A run's log (run_log.h): what is printed goes on to the console as before and into the file; the error stream's lines and the output's warnings are the problems, counted
+// once each with how often; the summary at the end says how many and which, and the streams are as they were afterwards.
+TEST(RunLog, AVideosLogKeepsWhatItPrintedAndEndsWithItsProblems) {
+	const std::filesystem::path file = std::filesystem::temp_directory_path() / "photonsmith_run_log_test.log";
+	std::streambuf *const out = std::cout.rdbuf(), *const err = std::cerr.rdbuf();
+	std::ostringstream console, consoleErr;   // (the console, as the test sees it)
+	std::cout.rdbuf(console.rdbuf());
+	std::cerr.rdbuf(consoleErr.rdbuf());
+	{
+		run_log::Capture log(file);
+		ASSERT_TRUE(log.open());
+		std::cout << "[1/3] Rendering frame_0000.png ... done" << std::endl;
+		std::cout << "WARNING: the caption font was not found" << std::endl;
+		std::cerr << "[score] film: no such instrument" << std::endl;
+		std::cerr << "[score] film: no such instrument" << std::endl;
+		std::cerr << "\n" << std::flush;   // (a blank line is no problem)
+		EXPECT_EQ(log.problems().total(), 3);
+		EXPECT_EQ(log.problems().lines.size(), 2u);
+	}
+	EXPECT_EQ(std::cout.rdbuf(), console.rdbuf()) << "the streams are as they were";
+	EXPECT_EQ(std::cerr.rdbuf(), consoleErr.rdbuf());
+	std::cout.rdbuf(out);
+	std::cerr.rdbuf(err);
+	EXPECT_NE(console.str().find("[1/3] Rendering"), std::string::npos) << "the console still has what was printed";
+	EXPECT_NE(console.str().find("3 problem(s) were reported (2 different)"), std::string::npos) << console.str();
+	EXPECT_NE(console.str().find("[score] film: no such instrument  (x2)"), std::string::npos);
+	std::ifstream in(file, std::ios::binary);
+	const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+	in.close();
+	EXPECT_NE(text.find("[1/3] Rendering"), std::string::npos) << "the log has the output";
+	EXPECT_NE(text.find("[score] film"), std::string::npos) << "and the errors";
+	EXPECT_NE(text.find("3 problem(s) were reported"), std::string::npos) << "and the summary";
+	EXPECT_EQ(text.find("error"), std::string::npos) << "the summary does not say \"error\" (the GUI shows such a line in red)";
+	std::filesystem::remove(file);
 }
 
 TEST(CartoonRender, AResumeKeepsUnchangedFramesComparesThemWhenTheProgramChangedAndRendersTheUnknown) {

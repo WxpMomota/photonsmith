@@ -53,15 +53,36 @@ void materializeGenerated(const std::string &path) {
 	}
 }
 
+namespace {
+std::string &tableProblem() {   // why the films could not be listed at all ("": they were)
+	static std::string why;
+	return why;
+}
+}  // namespace
+
 const char *filmTable() {
-	static const std::string table = cartoon::filmTable();
+	static const std::string table = [] {
+		try {
+			return cartoon::filmTable();
+		} catch (const std::exception &e) {   // (the GUI would show no films and not say why: filmProblems says it)
+			tableProblem() = std::string("the films could not be listed: ") + e.what();
+		} catch (...) {
+			tableProblem() = "the films could not be listed (an unknown error)";
+		}
+		return std::string();
+	}();
 	return table.c_str();
 }
 
 const char *filmProblems() {
 	static const std::string text = [] {
-		std::string out;
-		for (const std::string &p : cartoon::filmFileProblems()) out += p + "\n";
+		(void)filmTable();   // (so a failure to list them is known)
+		std::string out = tableProblem().empty() ? std::string() : tableProblem() + "\n";
+		try {
+			for (const std::string &p : cartoon::filmFileProblems()) out += p + "\n";
+		} catch (const std::exception &e) {
+			out += std::string("the film files could not be read: ") + e.what() + "\n";
+		}
 		return out;
 	}();
 	return text.c_str();

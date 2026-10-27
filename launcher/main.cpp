@@ -1029,10 +1029,11 @@ int main(int argc, char** argv) {
 		}
 		const std::vector<cartoon::film_baseline::Entry> recorded = cartoon::film_baseline::parse(text);
 		std::vector<cartoon::film_baseline::Entry> now;
+		const auto places = cartoon::film_baseline::places();   // (where the scenes and the film cache are left out: a baseline holds from any folder)
 		for (const cartoon::Film *film : cartoon::films()) {
 			if (!keys.empty() && std::find(keys.begin(), keys.end(), std::string(film->key)) == keys.end()) continue;
 			std::cerr << film->key << "..." << std::endl;
-			const std::vector<cartoon::film_baseline::Entry> e = cartoon::film_baseline::entriesOf(*film, [](const std::string &scene) { return frame_fingerprint::of(scene); });
+			const std::vector<cartoon::film_baseline::Entry> e = cartoon::film_baseline::entriesOf(*film, [&](const std::string &scene) { return frame_fingerprint::of(scene, places); });
 			now.insert(now.end(), e.begin(), e.end());
 		}
 		if (write) {

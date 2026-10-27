@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "cartoon_lib.h"
+#include "film_cache.h"
 
 namespace cartoon {
 namespace film_baseline {
@@ -50,6 +51,22 @@ inline std::vector<Entry> entriesOf(const Film &film, const std::function<std::s
 		e.fingerprint = fingerprint(film.sceneAt(0.5 * (starts[i] + end)));
 		out.push_back(e);
 	}
+	return out;
+}
+
+// The folders whose place on this computer a recorded fingerprint leaves out (frame_fingerprint::of's `places`), longest first: the scenes folders as the films write them
+// (absolute and canonical: a film's file assets are `absolute`, its scene's files canonical) as "<scenes>", and the film cache as "<cache>". So a baseline recorded from the
+// package folder holds from the repository, a test's own temporary folder, or another computer.
+inline std::vector<std::pair<std::string, std::string>> places() {
+	std::vector<std::pair<std::string, std::string>> out;
+	std::error_code ec;
+	for (const std::string &d : pbrt_asset_check::sceneSearchPaths()) {
+		if (!std::filesystem::is_directory(d, ec)) continue;
+		for (const std::filesystem::path &p : {std::filesystem::absolute(d, ec), std::filesystem::weakly_canonical(d, ec)}) out.push_back({film_cache::scenePath(p), "<scenes>"});
+	}
+	out.push_back({film_cache::scenePath(film_cache::cacheRoot()), "<cache>"});
+	std::sort(out.begin(), out.end(), [](const auto &a, const auto &b) { return a.first.size() > b.first.size(); });
+	out.erase(std::unique(out.begin(), out.end()), out.end());
 	return out;
 }
 

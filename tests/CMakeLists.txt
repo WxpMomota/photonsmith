@@ -282,6 +282,7 @@ add_executable(unit_tests
     unit/lens_look_tests.cpp
     unit/film_file_tests.cpp
     unit/film_nature_tests.cpp
+    unit/film_whole_tests.cpp
     unit/toon_look_tests.cpp
     unit/height_fog_tests.cpp
     unit/atmosphere_tests.cpp

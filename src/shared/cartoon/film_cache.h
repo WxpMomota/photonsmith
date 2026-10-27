@@ -62,12 +62,18 @@ inline std::string buildStamp() {
 	return stamp;
 }
 
-// <temp>/photonsmith_film_cache/<film>, created on first use: the film's skies, and the stamp folders of its meshes.
-inline std::filesystem::path filmDir(const std::string &film) {
+// <temp>/photonsmith_film_cache: every film's folder is in it (not created here).
+inline std::filesystem::path cacheRoot() {
 	std::error_code ec;
 	std::filesystem::path base = std::filesystem::temp_directory_path(ec);
 	if (ec) base = ".";
-	const std::filesystem::path d = base / "photonsmith_film_cache" / film;
+	return base / "photonsmith_film_cache";
+}
+
+// <temp>/photonsmith_film_cache/<film>, created on first use: the film's skies, and the stamp folders of its meshes.
+inline std::filesystem::path filmDir(const std::string &film) {
+	std::error_code ec;
+	const std::filesystem::path d = cacheRoot() / film;
 	std::filesystem::create_directories(d, ec);
 	return d;
 }

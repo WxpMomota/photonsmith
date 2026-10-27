@@ -158,6 +158,9 @@
     <ClCompile Include="unit\film_nature_tests.cpp">
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
+    <ClCompile Include="unit\film_whole_tests.cpp">
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="unit\toon_look_tests.cpp" />
     <ClCompile Include="unit\height_fog_tests.cpp" />
     <ClCompile Include="unit\atmosphere_tests.cpp" />
