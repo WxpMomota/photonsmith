@@ -11,6 +11,7 @@
 // raised by hand when a mesh changed; a change to a shared generator raised none, and an old mesh was used.) The skies (film_sky.h) are named by every number they are made from,
 // so they are kept across builds. Stamp folders, skies and temporary files that have not been used for some days are deleted (prune), or the cache only grew.
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -29,10 +30,9 @@
 // GetModuleFileNameW exactly as windows.h declares it (STRICT: HMODULE is HINSTANCE__*), so that a file which includes both agrees; windows.h itself is not included here,
 // because this header reaches files that do not want its min/max/near/far macros.
 extern "C" __declspec(dllimport) unsigned long __stdcall GetModuleFileNameW(struct HINSTANCE__ *hModule, wchar_t *lpFilename, unsigned long nSize);
-#elif defined(__APPLE__)
-#include <mach-o/dyld.h>   // _NSGetExecutablePath
-#include <unistd.h>
+extern "C" __declspec(dllimport) int __stdcall GetModuleHandleExW(unsigned long dwFlags, const wchar_t *lpModuleName, struct HINSTANCE__ **phModule);
 #else
+#include <dlfcn.h>   // dladdr
 #include <unistd.h>
 #endif
 
@@ -48,23 +48,23 @@ inline std::mutex &lock() {
 	return m;
 }
 
-// The program this process is: its path, size and time, hashed (FNV-1a) to a short name. "" when the path is not known.
+// The program this code is in - the module holding it: ray_tracer.exe, or the GUI's scene_metadata.dll and realtime_renderer.dll (stamping the GUI's own exe, an updated DLL
+// reused the meshes the older one made) - its path, size and time, hashed (FNV-1a) to a short name. "" when the path is not known.
 inline std::string buildStamp() {
+	static const int anchor = 0;   // (an address inside the module)
 	static const std::string stamp = [] {
 		std::filesystem::path exe;
 #if defined(_WIN32)
-		// (GetModuleFileNameW, declared below as windows.h declares it. Not _get_wpgmptr: it is only set in a program whose entry is wmain, and in any other one -
-		// every program here - it is a fatal invalid-parameter error.)
+		// (GetModuleHandleExW and GetModuleFileNameW, declared above as windows.h declares them: 4 is ..._FROM_ADDRESS, 2 ..._UNCHANGED_REFCOUNT. Not _get_wpgmptr: it is
+		// only set in a program whose entry is wmain, and in any other one - every program here - it is a fatal invalid-parameter error.)
+		struct HINSTANCE__ *module = nullptr;
+		if (!GetModuleHandleExW(4u | 2u, reinterpret_cast<const wchar_t *>(&anchor), &module)) module = nullptr;
 		wchar_t buf[32768];
-		const unsigned long n = GetModuleFileNameW(nullptr, buf, static_cast<unsigned long>(sizeof(buf) / sizeof(buf[0])));
+		const unsigned long n = GetModuleFileNameW(module, buf, static_cast<unsigned long>(sizeof(buf) / sizeof(buf[0])));
 		if (n > 0 && n < sizeof(buf) / sizeof(buf[0])) exe = std::wstring(buf, n);
-#elif defined(__APPLE__)
-		char buf[4096];
-		uint32_t size = sizeof(buf);
-		if (_NSGetExecutablePath(buf, &size) == 0) exe = buf;
 #else
-		std::error_code ec;
-		exe = std::filesystem::read_symlink("/proc/self/exe", ec);
+		Dl_info info{};
+		if (dladdr(&anchor, &info) && info.dli_fname) exe = info.dli_fname;
 #endif
 		std::error_code ec;
 		if (exe.empty() || !std::filesystem::exists(exe, ec)) return std::string();
@@ -90,21 +90,31 @@ inline std::filesystem::path filmDir(const std::string &film) {
 }
 
 // Deletes, in a film's folder, what has not been used for `days`: other programs' stamp folders, skies, temporary files left by a process that was stopped mid-write, and meshes
-// from before the stamp folders. Once per film and process.
+// from before the stamp folders. Of the other programs' folders used within the week, only the two used last are kept beyond a day (every rebuild of the program, the tests or
+// the GUI makes a folder: one film had 146 of them, 22 GB, in four days); a folder in use is renewed each time it is asked for, so it is never one of those. Once per film and
+// process.
 inline void prune(const std::filesystem::path &dir, int days = 7) {
 	static std::mutex pruning;   // (not lock(): ply() holds that while it asks for its folder)
 	static std::set<std::string> done;
 	std::lock_guard<std::mutex> hold(pruning);
 	if (!done.insert(dir.string()).second) return;
 	std::error_code ec;
-	const auto cutoff = std::filesystem::file_time_type::clock::now() - std::chrono::hours(24 * days);
+	const auto now = std::filesystem::file_time_type::clock::now(), cutoff = now - std::chrono::hours(24 * days), dayAgo = now - std::chrono::hours(24);
 	const std::string mine = buildStamp();
+	std::vector<std::pair<std::filesystem::file_time_type, std::filesystem::path>> builds;   // (other programs' folders, newest first)
+	for (const auto &entry : std::filesystem::directory_iterator(dir, ec)) {
+		const std::string name = entry.path().filename().string();
+		if (name.rfind("build_", 0) == 0 && entry.is_directory(ec) && name.rfind(mine, 0) != 0) builds.push_back({entry.last_write_time(ec), entry.path()});
+	}
+	std::sort(builds.begin(), builds.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
+	for (std::size_t k = 0; k < builds.size(); ++k)
+		if (builds[k].first < cutoff || (k >= 2 && builds[k].first < dayAgo)) std::filesystem::remove_all(builds[k].second, ec);
 	for (const auto &entry : std::filesystem::directory_iterator(dir, ec)) {
 		const std::string name = entry.path().filename().string();
 		if (name == mine) continue;
 		const bool old = entry.last_write_time(ec) < cutoff;
 		if (entry.is_directory(ec)) {
-			if (name.rfind("build_", 0) == 0 && old) std::filesystem::remove_all(entry.path(), ec);
+			continue;   // (the stamp folders: above)
 		} else if (entry.path().extension() == ".ply" || (old && (name.find(".tmp") != std::string::npos || entry.path().extension() == ".hdr"))) {
 			std::filesystem::remove(entry.path(), ec);   // (a loose .ply is from before the stamp folders: never read again)
 		}
@@ -115,6 +125,12 @@ inline void prune(const std::filesystem::path &dir, int days = 7) {
 // program that is still used keeps its meshes however old they are.
 inline std::filesystem::path dir(const std::string &film) {
 	const std::filesystem::path base = filmDir(film);
+	static std::once_flag everyFilm;   // (every film's folder once a process, not only those used: a film not made again kept its folders for ever)
+	std::call_once(everyFilm, [&base] {
+		std::error_code ec;
+		for (const auto &entry : std::filesystem::directory_iterator(base.parent_path(), ec))
+			if (entry.is_directory(ec)) prune(entry.path());
+	});
 	prune(base);
 	const std::string stamp = buildStamp();
 	if (stamp.empty()) return base;

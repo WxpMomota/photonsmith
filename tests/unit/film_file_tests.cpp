@@ -902,12 +902,15 @@ TEST(RiggedCharacters, ARiggedGltfModelIsPosedByItsClipsAndIsAKindOfCharacter) {
 	ff::DataFilm film;
 	ASSERT_EQ(loadFilm("scene s.pbrt\nlength 8\ncast robo as robot at 0 0 0 facing 0\nwalk robo 1 0.6  0 3\ngesture robo \"wave\" 5 5.4 6.6 7\nshot 0 A\n key 0 1 5  0 1 0\n", film), "");
 	const auto &kinds = ff::characterKinds();
-	ASSERT_TRUE(kinds.count("robot"));
-	const ff::CharacterKind &kind = kinds.at("robot");
+	const std::string robot = film.spec.characters[0].kind;   // (the film's own kind: "<film>/robot", not shared with another film's robot)
+	EXPECT_EQ(robot, film.spec.key + "/robot");
+	ASSERT_TRUE(kinds.count(robot));
+	EXPECT_FALSE(kinds.count("robot"));
+	const ff::CharacterKind &kind = kinds.at(robot);
 	EXPECT_NEAR(kind.height, 1.2, 1e-9) << "sized by its cast (height 1.2)";
 	EXPECT_EQ(kind.poses, (std::vector<std::string>{"wave", "cheer", "nod"})) << "its clips but walk and idle, as the file has them";
 	const std::string standing = film.sceneAt(0.5), walking = film.sceneAt(2.0), waving = film.sceneAt(5.8);
-	EXPECT_NE(standing.find("# robo (robot)"), std::string::npos);
+	EXPECT_NE(standing.find("# robo (" + robot + ")"), std::string::npos);
 	EXPECT_NE(standing.find("\"trianglemesh\""), std::string::npos);
 	EXPECT_NE(standing, film.sceneAt(1.2)) << "it moves when it walks";
 	EXPECT_NE(walking.find("conductor"), std::string::npos) << "its metal limbs";
@@ -916,6 +919,14 @@ TEST(RiggedCharacters, ARiggedGltfModelIsPosedByItsClipsAndIsAKindOfCharacter) {
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\ncast robo as robot\ngesture robo \"juggle\" 1 2\n", bad).find("\"wave\""), std::string::npos) << "its poses are its clips";
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\nrigged bot nowhere.glb\n", bad).find("cannot be read"), std::string::npos);
 	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\nrigged bot " + file + " walk moonwalk\n", bad).find("no clip called \"moonwalk\""), std::string::npos);
+	EXPECT_NE(loadFilm("scene s.pbrt\nlength 8\nrigged person " + file + "\n", bad).find("is a kind of character already"), std::string::npos) << "it would have replaced every film's person";
+}
+
+// A # inside quoted text is the text's, not a comment (`say kai 3 "Room #4"` lost the rest of its line); a colour like #ff8800 is a colour; a # after a space is a comment.
+TEST(FilmFile, AHashInsideQuotesIsTheTextsOwn) {
+	EXPECT_EQ(ff::detail::withoutComment("say kai 3 \"Room #4, please\" rate 1.1  # a note"), "say kai 3 \"Room #4, please\" rate 1.1  ");
+	EXPECT_EQ(ff::detail::withoutComment("title \"#1\" 0 2"), "title \"#1\" 0 2");
+	EXPECT_EQ(ff::detail::withoutComment("walk kai 1 1 0 -2 # then"), "walk kai 1 1 0 -2 ");
 }
 
 // Every cast and set of the library that comes with the program can be brought into a film.
@@ -2142,4 +2153,24 @@ TEST(FilmTimeline, AMomentIsASceneFileAndAFilmFileIsReadAgainWhenSaved) {
 	EXPECT_FALSE(film2.reloadIfChanged(&problem));
 	EXPECT_NE(problem.find("wobble"), std::string::npos);
 	EXPECT_DOUBLE_EQ(film2.spec.length, 12.0);
+}
+
+// The film cache keeps, of the other programs' stamp folders, those used within a day and the two used last; older ones go, and every one over a week old (every rebuild made
+// a folder: one film had 146, 22 GB, in four days).
+TEST(FilmCache, OldStampFoldersArePrunedButTheTwoUsedLastAreKept) {
+	namespace fs = std::filesystem;
+	const fs::path dir = fs::temp_directory_path() / ("photonsmith-test-prune-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+	fs::create_directories(dir);
+	const auto now = fs::file_time_type::clock::now();
+	const std::vector<std::pair<std::string, int>> folders = {{"build_a", 0}, {"build_b", 30}, {"build_c", 48}, {"build_d", 60}, {"build_e", 72}, {"build_f", 200}};   // (hours ago)
+	for (const auto &[name, hours] : folders) {
+		fs::create_directories(dir / name);
+		fs::last_write_time(dir / name, now - std::chrono::hours(hours));
+	}
+	cartoon::film_cache::prune(dir);
+	std::set<std::string> left;
+	for (const auto &e : fs::directory_iterator(dir)) left.insert(e.path().filename().string());
+	EXPECT_EQ(left, (std::set<std::string>{"build_a", "build_b"})) << "the newest two (and anything within a day); not the week-old one";
+	std::error_code ec;
+	fs::remove_all(dir, ec);
 }

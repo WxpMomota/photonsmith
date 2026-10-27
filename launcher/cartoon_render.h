@@ -157,6 +157,9 @@ inline std::string programStamp(const cartoon::Film &film, const std::string &ex
 	// (and its cues file: a voice moves a character - music_cues::voiceAt)
 	const std::string cues = cartoon::film_cache::asset(std::string(film.key) + "/cues.txt");
 	if (!cues.empty()) s += "|cues " + std::to_string(static_cast<unsigned long long>(frame_fingerprint::fileHash(cues)));
+	// (and the film file and scene it is made from: an edit to one shot - a camera, a walk - changes neither the program nor, often, the two instants above, and a resumed
+	// video kept that shot's old frames)
+	for (const std::string &file : cartoon::sourceFilesOf(film.key)) s += "|file " + std::to_string(static_cast<unsigned long long>(frame_fingerprint::fileHash(file)));
 	return s;
 }
 constexpr const char *kFingerprints = "fingerprints.txt";

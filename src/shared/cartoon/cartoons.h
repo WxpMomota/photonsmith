@@ -398,6 +398,21 @@ inline Registry &registry() {
 inline const std::vector<const Film *> &films() { return detail::registry().all; }
 // What was wrong with the film files that were left out ("file:line: what"), one entry each.
 inline const std::vector<std::string> &filmFileProblems() { return detail::registry().problems; }
+// Why there is no film called `key` (or "cartoon:key", "cartoon:key@t") when a film file of that name could not be read: what "unknown cartoon" goes on to say, so a
+// film left out for a mistake in its file (or a word only a newer program knows) is not just missing. "" when no such file failed.
+inline std::string whyNoFilm(std::string key) {
+	const std::string prefix = kCameraPathPrefix;
+	if (key.compare(0, prefix.size(), prefix) == 0) key = key.substr(prefix.size());
+	key = key.substr(0, key.find('@'));
+	std::string out;
+	for (const std::string &p : filmFileProblems())
+		for (const std::string &file : {"/" + key + ".film", "\\" + key + ".film"})
+			if (p.find(file) != std::string::npos) {
+				out += "\n  " + key + ".film could not be read: " + p;
+				break;
+			}
+	return out;
+}
 // A film made from a file read again when its file (or its scene) was saved since: true when it was (a film timeline follows the edits). Its Film keeps pointing at it,
 // so frames made after it are of the new film; its length and its shots' names in the film table stay as they were until the program starts again.
 // (A film in parts has each part read again: they are its film file's "<key>--1", "<key>--2" ...)
@@ -410,6 +425,17 @@ inline bool refreshFilmFile(const std::string &key) {
 			if (!problem.empty()) std::cerr << "[film] " << problem << std::endl;
 		}
 	return changed;
+}
+// The files a film made from a file is read from: its film file and its scene (for each part of a film in parts). None for a built-in film. What a resumed video
+// compares (launcher/cartoon_render.h programStamp): an edit to them changes the frames.
+inline std::vector<std::string> sourceFilesOf(const std::string &key) {
+	std::vector<std::string> out;
+	for (const film_file::DataFilm &d : detail::registry().data)
+		if (d.spec.key == key || (d.partIndex >= 0 && d.spec.key == key + "--" + std::to_string(d.partIndex + 1))) {
+			if (!d.sourcePath.empty() && std::find(out.begin(), out.end(), d.sourcePath) == out.end()) out.push_back(d.sourcePath);
+			if (!d.sceneFile.empty()) out.push_back(d.sceneFile.string());
+		}
+	return out;
 }
 // The film file a film was made from and its shots as they are now (read again first when it was saved since): for the changes the GUI's film timeline writes to it
 // (film_edit.h). An empty path for a built-in film. A film in parts: its parts' shots in order (their names; the starts in the whole film).
@@ -569,6 +595,7 @@ inline bool parseStill(const std::string &spec, Still &out, std::string &error) 
 	if (!film) {
 		error = "Unknown cartoon \"" + key + "\" - valid cartoons:";
 		for (const Film *f : films()) error += " " + cameraPathOf(*f);
+		error += whyNoFilm(key);
 		return false;
 	}
 	double t = film->stillTime;

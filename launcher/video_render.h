@@ -791,6 +791,14 @@ inline int renderVideoFrames(const LaunchArgs &args, const RenderSetup &s, const
         BackgroundPngConverter across_png(across);
         renderCartoonFrames(args, s, side, across, render_frame_count, across_png, &only, true);
         across_png.finish();
+        // (a draft renders one frame in N here too: each gap in a dissolve is filled with its frame before, as the film's own frames are - left empty, every other frame of
+        // a dissolve was blended and the next was not, and it flickered)
+        for (int f = 1; f < render_frame_count; ++f) {
+            const std::filesystem::path here = across / cartoon_render::encName(f), before = across / cartoon_render::encName(f - 1);
+            std::error_code ec;
+            if (only[static_cast<std::size_t>(f)] && only[static_cast<std::size_t>(f - 1)] && !std::filesystem::exists(here, ec) && std::filesystem::exists(before, ec))
+                std::filesystem::copy_file(before, here, std::filesystem::copy_options::overwrite_existing, ec);
+        }
     }
 
     std::cout << "Rendered: " << successful_frames << " frames, converted: " << converted << " PNG files" << std::endl;
@@ -837,10 +845,23 @@ inline int assembleVideoFile(const std::filesystem::path &frames_dir, int conver
         }
         ffmpeg_argv.push_back("-movflags");
         ffmpeg_argv.push_back("+faststart");
-        ffmpeg_argv.push_back(video_path.string());
+        // (written beside it and renamed once whole: a failed or stopped run left a cut-short file - or the last run's video - under the name a player opens)
+        std::filesystem::path partial = video_path;
+        partial.replace_filename(video_path.stem().string() + ".partial" + video_path.extension().string());
+        ffmpeg_argv.push_back(partial.string());
         manual_cmd += " -movflags +faststart \"" + video_path.string() + "\"";
         std::cout << "Running: " << manual_cmd << std::endl;
-        const int result = run_subprocess(ffmpeg_argv);
+        int result = run_subprocess(ffmpeg_argv);
+        std::error_code ec;
+        if (result == 0) {
+            std::filesystem::rename(partial, video_path, ec);
+            if (ec) {
+                std::cerr << "ERROR: the video was made but could not be named " << video_path << ": " << ec.message() << " (it is " << partial << ")" << std::endl;
+                result = 1;
+            }
+        } else {
+            std::filesystem::remove(partial, ec);
+        }
         if (result == -1) {
             std::cerr << "ERROR: Could not launch ffmpeg - is it installed and on PATH?" << std::endl;
             std::cerr << "Install ffmpeg (https://ffmpeg.org/download.html), add it to PATH, then assemble manually:" << std::endl;

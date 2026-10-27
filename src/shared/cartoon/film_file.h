@@ -765,7 +765,13 @@ inline std::string libraryFile(const std::string &name, const std::string &ext, 
 }
 // A line without its comment: '#' starts one - but not a colour, #rrggbb.
 inline std::string withoutComment(std::string line) {
+	const auto quoted = [&line](std::size_t at) {   // (a # inside "..." is the text's: `say kai 3 "Room #4"`)
+		bool in = false;
+		for (std::size_t k = 0; k < at; ++k) in = line[k] == '"' ? !in : in;
+		return in;
+	};
 	for (std::size_t hash = line.find('#'); hash != std::string::npos; hash = line.find('#', hash + 1)) {
+		if (quoted(hash)) continue;
 		bool colour = hash + 7 <= line.size() && (hash + 7 == line.size() || std::isspace(static_cast<unsigned char>(line[hash + 7])));
 		for (std::size_t k = hash + 1; colour && k < hash + 7; ++k) colour = std::isxdigit(static_cast<unsigned char>(line[k])) != 0;
 		if (!colour) {
@@ -2742,7 +2748,13 @@ class DataFilm {
 			std::error_code ec;
 			if (!std::filesystem::exists(file, ec) && !std::filesystem::path(rg.file).is_absolute())
 				if (const std::string lib = film_cache::asset("library/" + rg.file); !lib.empty()) file = lib;
-			if (const std::string e = addRiggedKind(rg.kind, file.string(), rg.options); !e.empty()) return filePath + ":" + std::to_string(rg.line) + ": " + e;
+			// (the kind is this film's own - "<film>/<kind>" in the table every film shares - and its characters are pointed at it: two films' rigged kinds of one name
+			// were one kind, the last film's, and a rigged kind named as a built-in one replaced it in every film)
+			if (characterKinds().count(rg.kind)) return filePath + ":" + std::to_string(rg.line) + ": \"" + rg.kind + "\" is a kind of character already: name the rigged model something else";
+			const std::string own = spec.key + "/" + rg.kind;
+			if (const std::string e = addRiggedKind(own, file.string(), rg.options); !e.empty()) return filePath + ":" + std::to_string(rg.line) + ": " + e;
+			for (Character &c : spec.characters)
+				if (c.kind == rg.kind) c.kind = own;
 		}
 		for (const Character &c : spec.characters)
 			if (!characterKinds().count(c.kind)) {

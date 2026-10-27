@@ -136,17 +136,31 @@ inline int apply(const cartoon::Film &film, const std::filesystem::path &dir, in
 		for (auto it = loaded.begin(); it != loaded.end();) it = it->first < i - radius ? loaded.erase(it) : std::next(it);
 		for (int j : used)
 			if (!loaded.count(j)) loaded[j] = load(dir / cartoon_render::encName(j));
+		// (a frame that cannot be read or written denoised goes in as it is: a hole stopped ffmpeg at it, and the video and its sound came out short)
+		const auto asItIs = [&] {
+			std::error_code copied;
+			fs::copy_file(dir / cartoon_render::encName(i), target, fs::copy_options::overwrite_existing, copied);
+		};
 		const Frame *self = loaded[i].get();
-		if (!self) continue;
+		if (!self) {
+			asItIs();
+			continue;
+		}
 		std::vector<const Frame *> neighbours;
 		for (int j : used)
 			if (j != i && loaded[j] && loaded[j]->w == self->w && loaded[j]->h == self->h) neighbours.push_back(loaded[j].get());
 		const std::vector<unsigned char> picture = denoise(*self, neighbours);
 		const fs::path tmp = out / (cartoon_render::encName(i) + ".tmp.png");
-		if (!write_png(tmp.string().c_str(), self->w, self->h, picture.data())) continue;
+		if (!write_png(tmp.string().c_str(), self->w, self->h, picture.data())) {
+			asItIs();
+			continue;
+		}
 		std::error_code ec;
 		fs::rename(tmp, target, ec);
-		if (ec) continue;
+		if (ec) {
+			asItIs();
+			continue;
+		}
 		log << i << " " << sources << "\n";
 		++n;
 	}
