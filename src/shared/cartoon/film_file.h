@@ -138,6 +138,8 @@
 //                                                               # makes the sky and the sun's light from the atmosphere itself (atmosphere.h), as the eye A m up sees it
 //     underwater  clarity 1.5  colour teal                      # the camera is under the film's water (film_underwater.h): the sea round it, caustics on the seabed, shafts
 //     kelp     60  in -20 -20 20 20  height 9                   # of light, marine snow; kelp swaying and coral (`coral COUNT [in X0 Z0 X1 Z1]`) on the seabed
+//     geyser   at 30 -40  height 25  every 20                  # the land in action (film_geology.h): a geyser erupting every so often; `rockfall from X Z [at T]`: rocks
+//                                                               # tumbling down the slope; `avalanche from X Z [at T]`: a powder cloud racing down; `quake T0 T1`: shaking
 //     fire     at 0 0 -4  size 1.2                              # fire (film_fire.h): flames (glowing volumes, flickering, a light among them, sparks) with smoke above;
 //     lava     from 120 -300  width 6                           # lava creeping down the land from a vent; a volcano raised in the land (`volcano at X Z [height H]
 //     wildfire in -200 -200 200 200  during 0 30  wind 90       # [radius R] [erupting T0 T1]`), and a fire front sweeping across with the wind
@@ -230,6 +232,7 @@
 #include "film_clouds.h"
 #include "film_fire.h"
 #include "film_flowers.h"
+#include "film_geology.h"
 #include "film_soundscape.h"
 #include "film_forest.h"
 #include "film_skyfx.h"
@@ -493,6 +496,11 @@ struct Spec {
 	// forests (`forest`), and their trees (planted when the film is loaded, on the land as it is drawn)
 	std::vector<forest::Forest> forests;
 	std::vector<flowers::Meadow> meadows;   // wild flowers (`flowers`: film_flowers.h)
+	// the land in action (film_geology.h): geysers, rockfalls and avalanches (their ways down worked out when the film is loaded), earthquakes
+	std::vector<geology::Geyser> geysers;
+	std::vector<geology::Rockfall> rockfalls;
+	std::vector<geology::Avalanche> avalanches;
+	std::vector<geology::Quake> quakes;
 	std::string biome;                      // the land as a biome (`biome`): its ground (film_terrain.h biomePaint), its plants (film_forest.h's mixes), its sound
 	int biomeTrees = -1;                    // (how many plants it brings: below 0 by the land's size)
 	std::vector<std::vector<forest::Tree>> planted;
@@ -1887,6 +1895,58 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			else if (verb == "lava") s.lavas.push_back(la);
 			else if (verb == "volcano") s.volcanoes.push_back(vo);
 			else s.wildfires.push_back(wf);
+		} else if (verb == "geyser" || verb == "rockfall" || verb == "avalanche") {   // the land in action (film_geology.h)
+			const std::vector<std::string> t = detail::tokens(line);
+			const std::string where = verb == "geyser" ? "at" : "from";
+			double x = 0.0, z = 0.0;
+			if (t.size() < 4 || t[1] != where || !number(t[2], x) || !number(t[3], z))
+				return fail(verb == "geyser" ? "`geyser at X Z [height H] [every S] [last D] [first T] [seed N]`: its vent (pbrt's x z)"
+					: verb == "rockfall" ? "`rockfall from X Z [at T] [count N] [size S] [seed N]`: where the rocks break away (pbrt's x z), and when"
+										 : "`avalanche from X Z [at T] [width W] [speed V]`: where it breaks away (pbrt's x z), and when");
+			geology::Geyser gy;
+			geology::Rockfall rf;
+			geology::Avalanche av;
+			gy.x = rf.x = av.x = x, gy.z = rf.z = av.z = z;
+			for (std::size_t i = 4; i < t.size(); i += 2) {
+				double v = 0.0;
+				if (i + 1 >= t.size() || !number(t[i + 1], v)) return fail("\"" + t[i] + "\" needs a number");
+				const std::string &k = t[i];
+				bool ok = true;
+				if (verb == "geyser") {
+					if (k == "height" && v > 0.0) gy.height = v;
+					else if (k == "every" && v >= 4.0) gy.every = v;
+					else if (k == "last" && v >= 2.0) gy.last = v;
+					else if (k == "first" && v >= 0.0) gy.first = v;
+					else if (k == "seed") gy.seed = static_cast<int>(v);
+					else ok = false;
+				} else if (verb == "rockfall") {
+					if (k == "at" && v >= 0.0) rf.t0 = v;
+					else if (k == "count" && v >= 1.0 && v <= 200.0) rf.count = static_cast<int>(v);
+					else if (k == "size" && v > 0.0) rf.size = v;
+					else if (k == "seed") rf.seed = static_cast<int>(v);
+					else ok = false;
+				} else {
+					if (k == "at" && v >= 0.0) av.t0 = v;
+					else if (k == "width" && v > 0.0) av.width = v;
+					else if (k == "speed" && v > 0.0) av.speed = v;
+					else ok = false;
+				}
+				if (!ok)
+					return fail("\"" + k + "\": " + (verb == "geyser" ? std::string("a geyser takes height, every (4 s or more), last (2 s or more), first and seed")
+														 : verb == "rockfall" ? std::string("a rockfall takes at, count (1 to 200), size and seed")
+																			  : std::string("an avalanche takes at, width and speed")));
+			}
+			if (gy.last > gy.every) gy.last = gy.every;
+			if (verb == "geyser") s.geysers.push_back(gy);
+			else if (verb == "rockfall") s.rockfalls.push_back(rf);
+			else s.avalanches.push_back(av);
+		} else if (verb == "quake") {   // the ground shaking
+			const std::vector<std::string> t = detail::tokens(line);
+			geology::Quake q;
+			if (t.size() < 3 || t.size() > 5 || !number(t[1], q.t0) || !number(t[2], q.t1) || q.t1 <= q.t0 ||
+				(t.size() > 3 && !(t.size() == 5 && t[3] == "strength" && number(t[4], q.strength) && q.strength > 0.0 && q.strength <= 3.0)))
+				return fail("`quake T0 T1 [strength S]`: the ground shaking from T0 to T1 (strength 1 a strong quake, up to 3)");
+			s.quakes.push_back(q);
 		} else if (verb == "slowmo") {   // nature in slow motion for a while
 			const std::vector<std::string> t = detail::tokens(line);
 			Spec::SlowMo sm;
@@ -2032,7 +2092,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, music, toon, voices, acting, terrain, water, river, waterfall, clouds, forest, flock, herd, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -2246,6 +2306,24 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		if (s.fog.thickness <= 0.0) s.fog.thickness = s.hasTerrain ? std::max(2.0, 0.06 * s.terrain.height) : 1.0;
 	}
 	for (skyfx::Lightning &l : s.lightnings) l.strikes = skyfx::strikesOf(l, s.length);
+	if (!s.rockfalls.empty() || !s.avalanches.empty()) {   // the rocks' and the avalanches' ways down the land, and a puff of dust where each rock lands
+		if (!s.hasTerrain) {
+			n = 0;
+			return fail(std::string("a ") + (s.rockfalls.empty() ? "n `avalanche`" : " `rockfall`") + " comes down the land: the film needs a `terrain` line");
+		}
+		const std::shared_ptr<const terrain::Field> ground = terrain::fieldOf(s.terrain);
+		for (geology::Rockfall &rf : s.rockfalls) {
+			geology::fall(rf, *ground);
+			for (const geology::Rock &r : rf.rocks)
+				for (std::size_t k = 0; k < r.impacts.size(); ++k) {
+					const std::size_t at = std::min(r.at.size() - 1, static_cast<std::size_t>((r.impacts[k] - r.t0) * 48.0));
+					particles::Emitter e;
+					e.kind = "dust", e.at = r.at[at] - Vec3{0.0, 0.5 * r.size, 0.0}, e.t0 = e.t1 = r.impacts[k], e.count = static_cast<int>(10 + 14 * r.size), e.speed = 0.8 + 0.6 * r.size;
+					s.emitters.push_back(e);
+				}
+		}
+		for (geology::Avalanche &av : s.avalanches) av.path = geology::downhill(*ground, av.x, av.z);
+	}
 	if (!s.slowmos.empty()) {   // nature's clock: its rate eased into and out of each slow motion, summed
 		const auto rate = [&](double t) {
 			double r = 1.0;
@@ -3937,7 +4015,7 @@ class DataFilm {
 	void soundscape(audio::Mix &m) const {
 		const bool eagles = std::any_of(spec.flocks.begin(), spec.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "eagles"; });
 		if (spec.falls.empty() && spec.fires.empty() && spec.lavas.empty() && spec.volcanoes.empty() && spec.wildfires.empty() && !spec.swell.on && spec.herds.empty() && !eagles &&
-			spec.forests.empty())
+			spec.forests.empty() && spec.geysers.empty() && spec.rockfalls.empty() && spec.avalanches.empty() && spec.quakes.empty())
 			return;
 		namespace ss = soundscape;
 		const ss::Ears ears = ss::earsOf(m.seconds(), [this](double t, Vec3 &eye, Vec3 &target) {
@@ -4061,6 +4139,30 @@ class DataFilm {
 				for (double t = std::max(0.0, f.t0) + every * audio::unit(static_cast<unsigned>(1011 + i)); t < std::min(T, f.t1); t += every)
 					ss::place(m, ears, t, wildlife::eagleAt(f, i, natureAt(t)), cry, 0.35, 50.0);
 			}
+		}
+		// the land in action: a geyser's roar while it erupts, each rock's knock as it lands, an avalanche's rumble from its front, a quake's rumble all round
+		for (std::size_t i = 0; i < spec.geysers.size(); ++i) {
+			const geology::Geyser &gy = spec.geysers[i];
+			const Vec3 vent{gy.x, groundAt(gy.x, gy.z) + 3.0, gy.z};
+			ss::lay(m, ears, 0.0, T, 0.25, [vent](double) { return vent; }, [&gy](double t) { return 0.4 * gy.strengthAt(t); }, ss::roar(250.0, 3500.0, 0.6, 1301u + static_cast<unsigned>(i)), 20.0);
+		}
+		for (const geology::Rockfall &rf : spec.rockfalls)
+			for (const geology::Rock &r : rf.rocks)
+				for (std::size_t k = 0; k < r.impacts.size(); ++k) {
+					const std::size_t at = std::min(r.at.size() - 1, static_cast<std::size_t>((r.impacts[k] - r.t0) * 48.0));
+					ss::place(m, ears, r.impacts[k], r.at[at], ss::hoof(55.0 + 40.0 * audio::unit(static_cast<unsigned>(r.seed * 7 + k)), static_cast<unsigned>(r.seed + k)), 0.25 * std::min(2.0, r.size), 12.0);
+					ss::place(m, ears, r.impacts[k] + 0.01, r.at[at], ss::crackle(static_cast<unsigned>(r.seed * 13 + k)), 0.3 * std::min(2.0, r.size), 12.0);
+				}
+		for (std::size_t i = 0; i < spec.avalanches.size(); ++i) {
+			const geology::Avalanche &av = spec.avalanches[i];
+			if (av.path.size() < 2) continue;
+			const auto front = [&av](double t) { return av.path[std::min(av.path.size() - 1, static_cast<std::size_t>(av.frontAt(t) / 2.0))]; };
+			ss::lay(m, ears, av.t0, T, 0.4, front, [&av](double t) { return 0.9 * smoothstep(av.t0, av.t0 + 2.0, t) * (av.frontAt(t) < 2.0 * (av.path.size() - 1) - 1.0 ? 1.0 : 0.3); },
+					ss::roar(25.0, 300.0, 1.2, 1401u + static_cast<unsigned>(i)), 150.0);
+		}
+		for (std::size_t i = 0; i < spec.quakes.size(); ++i) {
+			const geology::Quake &q = spec.quakes[i];
+			ss::lay(m, ears, q.t0, q.t1, 0.4, [&ears](double t) { return ears(t).eye + Vec3{0.0, -2.0, 0.0}; }, [&q](double t) { return 0.8 * q.levelAt(t); }, ss::roar(18.0, 110.0, 1.2, 1501u + static_cast<unsigned>(i)), 5.0);
 		}
 		// birds in the trees near the camera, by day
 		if (!spec.planted.empty()) {
@@ -4294,6 +4396,24 @@ class DataFilm {
 				if (t >= f.t0 && t <= f.t1) out += wildlife::flockText(f, f.kind == "eagles" || f.kind == "geese" ? nt : t, ground.get(), poses, first(f.kind));
 			for (const wildlife::Herd &h : spec.herds) out += wildlife::herdText(h, nt, ground.get(), poses);
 		}
+		if (!spec.geysers.empty() || !spec.rockfalls.empty() || !spec.avalanches.empty()) {   // the land in action (film_geology.h)
+			const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+			for (std::size_t i = 0; i < spec.geysers.size(); ++i) {
+				const geology::Geyser &gy = spec.geysers[i];
+				const double base = ground ? ground->heightAt(gy.x, gy.z) : 0.0;
+				out += geology::geyserText(gy, t, base);
+				double steam = 0.0;   // (the steam lingers after an eruption, and wisps from the pool between)
+				for (double back = 0.0; back <= 6.0; back += 1.0) steam = std::max(steam, gy.strengthAt(t - back) * (1.0 - back / 7.0));
+				steam = std::max(steam, 0.12);
+				// (its sphere kept clear of the vent, the mound and the pool - a shape's medium with things inside it is drawn wrong on the GPU - so it starts a little up the
+				// column: the sphere reaches 0.16 of the plume's height below its base)
+				const double tall = gy.height * (0.4 + 1.4 * steam);
+				out += fire::smokeText("steam_" + std::to_string(i), {gy.x, base + 2.5 + 0.17 * tall, gy.z}, 0.5 * gy.height * (0.5 + 0.5 * steam), tall, nt, 51 + static_cast<int>(i), 0.04,
+									   {0.3 * gy.height, 0.0, 0.0});
+			}
+			for (const geology::Rockfall &rf : spec.rockfalls) out += geology::rockfallText(rf, t);
+			for (const geology::Avalanche &av : spec.avalanches) out += geology::avalancheText(av, t);
+		}
 		if (!spec.meadows.empty()) {   // wild flowers (film_flowers.h): sunflowers turn to the sun
 			const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 			double el = 45.0, facing = 180.0;
@@ -4505,6 +4625,14 @@ class DataFilm {
 			const double dz = std::sin(0.97 * t + 3.0 * p), tx = std::sin(1.13 * t + 5.0 * p) + 0.4 * std::sin(4.1 * t + p), ty = std::sin(1.57 * t + 4.0 * p);
 			key.pos[0] += 0.012 * a * dx, key.pos[1] += 0.010 * a * dy, key.pos[2] += 0.008 * a * dz;
 			key.target[0] += 0.03 * a * tx, key.target[1] += 0.025 * a * ty;
+		}
+		double quaking = 0.0;   // an earthquake: the camera shaken, fast and jolting
+		for (const geology::Quake &q : spec.quakes) quaking = std::max(quaking, q.levelAt(t));
+		if (quaking > 0.0) {
+			const double jx = std::sin(41.0 * t) + 0.6 * std::sin(67.0 * t + 1.3) + 0.4 * std::sin(13.0 * t), jy = std::sin(53.0 * t + 0.7) + 0.5 * std::sin(29.0 * t + 2.0);
+			const double jz = std::sin(47.0 * t + 2.1) + 0.5 * std::sin(17.0 * t);
+			key.pos[0] += 0.05 * quaking * jx, key.pos[1] += 0.04 * quaking * jy, key.pos[2] += 0.05 * quaking * jz;
+			key.target[0] += 0.12 * quaking * jy, key.target[1] += 0.10 * quaking * jx;
 		}
 		if (!shot.focus.empty() || shot.aperture > 0.0) {   // the focus on who the shot says (pulled from one to the next over 0.6 s), or on what the move is about
 			const Vec3 eye{-key.pos[0], key.pos[1], key.pos[2]};

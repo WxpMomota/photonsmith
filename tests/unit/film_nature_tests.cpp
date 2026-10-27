@@ -1250,3 +1250,52 @@ TEST(FilmDocumentary, CamerasFollowHerdsAndNatureRunsSlowInSlowMotion) {
 		EXPECT_NE(problem.find(says), std::string::npos) << text << " -> " << problem;
 	}
 }
+
+// The land in action (film_geology.h): a geyser erupts every so often and is quiet between; rocks come down the slope, faster where it is steep, bouncing (dust where
+// they land) and stopping below; an avalanche races down the steepest way; a quake shakes the camera.
+TEST(FilmGeology, GeysersEruptRocksFallAvalanchesRaceAndQuakesShake) {
+	namespace geo = cartoon::geology;
+	geo::Geyser gy;
+	gy.first = 3.0, gy.every = 20.0, gy.last = 6.0;
+	EXPECT_EQ(gy.strengthAt(2.0), 0.0);
+	EXPECT_NEAR(gy.strengthAt(5.0), 1.0, 1e-9);
+	EXPECT_EQ(gy.strengthAt(15.0), 0.0) << "quiet between eruptions";
+	EXPECT_GT(gy.strengthAt(24.5), 0.5) << "and again";
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("geology", "scene s.pbrt\nlength 30\nterrain mountains size 1200 height 300 seed 3 far off\ngeyser at 0 0 height 20 first 1\n"
+									"rockfall from 120 -200 at 2 count 6\navalanche from -150 -250 at 5 width 50\nquake 10 14 strength 1\nshot 0 A\n key 0 30 120  0 20 0\n",
+							film),
+			  "");
+	ASSERT_EQ(film.spec.rockfalls.size(), 1u);
+	const geo::Rockfall &rf = film.spec.rockfalls[0];
+	ASSERT_FALSE(rf.rocks.empty());
+	int fell = 0;
+	for (const geo::Rock &r : rf.rocks) {
+		if (r.at.size() < 10) continue;
+		EXPECT_LT(r.at.back().y, r.at.front().y) << "down the slope";
+		fell += !r.impacts.empty();
+	}
+	EXPECT_GT(fell, 0) << "bouncing";
+	EXPECT_TRUE(std::any_of(film.spec.emitters.begin(), film.spec.emitters.end(), [](const auto &e) { return e.kind == "dust"; })) << "dust where they land";
+	const geo::Avalanche &av = film.spec.avalanches[0];
+	ASSERT_GT(av.path.size(), 5u);
+	EXPECT_LT(av.path.back().y, av.path.front().y - 5.0);
+	EXPECT_EQ(av.frontAt(4.0), 0.0);
+	EXPECT_GT(av.frontAt(12.0), av.frontAt(8.0));
+	const std::string erupting = film.sceneAt(3.0), avalanche = film.sceneAt(12.0);
+	EXPECT_NE(erupting.find("# a geyser"), std::string::npos);
+	EXPECT_NE(erupting.find("steam_0"), std::string::npos);
+	EXPECT_NE(avalanche.find("# an avalanche"), std::string::npos);
+	EXPECT_NE(film.sceneAt(2.5).find("# a rockfall"), std::string::npos);
+	// the quake shakes the camera: the same shot's camera moves between two moments close together only while it quakes
+	EXPECT_EQ(film.headerAt(5.0).substr(film.headerAt(5.0).find("LookAt"), 60), film.headerAt(5.01).substr(film.headerAt(5.01).find("LookAt"), 60));
+	EXPECT_NE(film.headerAt(12.0).substr(film.headerAt(12.0).find("LookAt"), 60), film.headerAt(12.01).substr(film.headerAt(12.01).find("LookAt"), 60));
+	for (const auto &[text, says] : std::vector<std::pair<std::string, std::string>>{{"rockfall from 0 0\n", "needs a `terrain` line"},
+																						  {"geyser 0 0\n", "`geyser at X Z"},
+																						  {"quake 5 2\n", "`quake T0 T1"},
+																						  {"terrain hills\nrockfall from 0 0 count 0\n", "a rockfall takes"}}) {
+		ff::DataFilm bad;
+		const std::string problem = loadNature("geology_bad", "scene s.pbrt\nlength 10\n" + text, bad);
+		EXPECT_NE(problem.find(says), std::string::npos) << text << " -> " << problem;
+	}
+}

@@ -903,6 +903,24 @@ and shrubs low down, conifers coming in on the way up, conifers alone near the t
 yellow); `winter` (broadleaf trees and birches bare, showing their twigs; conifers with snow on their tiers); `spring` (fresh light green, some broadleaf trees and shrubs in
 blossom). Walks do not go round forest trees (they are not part of the set's floor map).
 
+**The land in action: `geyser`, `rockfall`, `avalanche`, `quake`.** (film_geology.h)
+
+```
+geyser     at 0 60  height 30  every 30  last 10  first 1   # a vent erupting every 30 s for 10 s, the first at 1 s
+rockfall   from 120 -200  at 4  count 12  size 1.2          # rocks breaking away and coming down the slope
+avalanche  from -200 -350  at 2  width 70  speed 22         # a powder avalanche racing down
+quake      10 14  strength 1                                 # the ground shaking
+```
+
+A geyser is a vent on a low, pale mound of sinter with a steaming pool round it; each eruption builds over a second, throws a column of water up as high as `height`
+(gouts and spray arcing out and falling back), and dies away over its last two seconds, while a plume of white steam rises and drifts and lingers after it (and wisps from
+the pool between). A rockfall's rocks break away where the land is steepest within 25 m of `from`, a few metres apart and over a second or so, and come down the steepest
+way: gravity along the slope against a rolling friction, hopping as their speed throws them, tumbling, a puff of dust where each lands, until the ground levels out. An
+avalanche races down the steepest way from where it breaks away, from rest up to its speed: a cloud of snow crowding behind its front and billowing up the further back it
+is, over a white flow on the ground. A quake shakes the camera, fast and jolting, eased in and out. All are heard (film_soundscape.h): the geyser's roar while it erupts,
+each rock's knock and crack as it lands, the avalanche's rumble from its front, a quake's rumble all round. A rockfall and an avalanche need a `terrain`; their ways down
+are worked out when the film is loaded.
+
 **Documentary cameras: herds and flocks as subjects, `slowmo`.** (film_file.h)
 
 ```
