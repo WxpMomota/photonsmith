@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <fstream>
 #include <atomic>
+#include <map>
 #include <mutex>
 #include <set>
 #include <stdexcept>
@@ -124,6 +125,16 @@ inline void prune(const std::filesystem::path &dir, int days = 7) {
 // Where `film`'s meshes go: <film folder>/<buildStamp>, created on first use (the film folder itself when the program's path is not known). The folder's time is renewed, so a
 // program that is still used keeps its meshes however old they are.
 inline std::filesystem::path dir(const std::string &film) {
+	// (worked out once a film and process, its time renewed every ten minutes at most: it is asked for by every mesh and picture of every frame, and each time made the
+	// folders and set their time)
+	static std::mutex knownLock;
+	static std::map<std::string, std::pair<std::filesystem::path, std::chrono::steady_clock::time_point>> known;
+	const std::string id = film + (previewCoarsening() > 1.0 ? "|preview" : "");
+	{
+		const std::lock_guard<std::mutex> hold(knownLock);
+		const auto it = known.find(id);
+		if (it != known.end() && std::chrono::steady_clock::now() - it->second.second < std::chrono::minutes(10)) return it->second.first;
+	}
 	const std::filesystem::path base = filmDir(film);
 	static std::once_flag everyFilm;   // (every film's folder once a process, not only those used: a film not made again kept its folders for ever)
 	std::call_once(everyFilm, [&base] {
@@ -133,11 +144,17 @@ inline std::filesystem::path dir(const std::string &film) {
 	});
 	prune(base);
 	const std::string stamp = buildStamp();
-	if (stamp.empty()) return base;
+	if (stamp.empty()) {
+		const std::lock_guard<std::mutex> hold(knownLock);
+		known[id] = {base, std::chrono::steady_clock::now()};
+		return base;
+	}
 	const std::filesystem::path d = base / (previewCoarsening() > 1.0 ? stamp + "_preview" : stamp);   // (a preview's coarse meshes never stand in for the film's)
 	std::error_code ec;
 	std::filesystem::create_directories(d, ec);
 	std::filesystem::last_write_time(d, std::filesystem::file_time_type::clock::now(), ec);
+	const std::lock_guard<std::mutex> hold(knownLock);
+	known[id] = {d, std::chrono::steady_clock::now()};
 	return d;
 }
 

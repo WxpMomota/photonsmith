@@ -379,6 +379,7 @@ struct CharacterKind {
 	std::function<std::vector<Foot>(const CharacterMoment &)> feet;
 	Vec3 chest{0.0, 1.25, 0.0};
 	double stride = 0.84, firstStep = 0.5;
+	bool trails = false;   // something on it hangs and swings behind it (CharacterMoment::trail: hundreds of moments of its walk worked out each frame, so only when it is used)
 	// (optional) where its gait puts each of its feet at so many steps (body space, at scale 1) and whether that foot is down: then its feet are locked where they come down
 	std::function<Vec3(double, int)> footAt;
 	std::function<bool(double, int)> plantedAt;
@@ -4546,7 +4547,7 @@ class DataFilm {
 			const CharacterKind &kind = characterKinds().at(c.kind);
 			if (!kind.text) continue;
 			CharacterMoment m = actingMoment(c, t);
-			m.trail = trailOf(c, t, m);
+			if (kind.trails) m.trail = trailOf(c, t, m);
 			lockFeet(c, t, m);
 			m.voice = music_cues::voiceAt(spec.key, c.name, t, shotStarts(), shotNameList(), &m.mouth);   // (a recording's loudness and mouth shapes)
 			speakingAt(c, t, m);

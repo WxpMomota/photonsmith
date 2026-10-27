@@ -21,6 +21,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "film_cache.h"
@@ -102,6 +103,18 @@ inline const std::vector<std::string> &kinds() {
 }
 
 namespace detail {
+// Rows 0 .. n-1 of a picture painted on every processor (each row by one thread: what it paints is its own): the land's pictures are millions of pixels, each several
+// height and noise lookups, and painted on one thread they took minutes.
+template <class Row>
+inline void rows(int n, const Row &row) {
+	const int threads = static_cast<int>(std::max(1u, std::min(16u, std::thread::hardware_concurrency())));
+	std::vector<std::thread> workers;
+	for (int k = 0; k < threads; ++k)
+		workers.emplace_back([&, k] {
+			for (int j = k; j < n; j += threads) row(j);
+		});
+	for (std::thread &w : workers) w.join();
+}
 
 // Gradient (Perlin) noise in [0, 1): smoother and less blocky than value noise, whose lattice shows as cones and pyramids once it is folded into ridges.
 inline double perlin(double x, double z, int salt) {
@@ -775,7 +788,7 @@ inline std::string text(const std::string &film, const Spec &s, const Weather &w
 	}
 	const int W = 2048;
 	const std::string picture = film_sky::picture(film, key + "_colours", W, W, [&](std::vector<float> &rgb) {
-		for (int j = 0; j < W; ++j) {
+		detail::rows(W, [&](int j) {
 			const double v = 1.0 - (j + 0.5) / W, pz = f->sz0 + v * s.size;
 			for (int i = 0; i < W; ++i) {
 				const double u = (i + 0.5) / W, px = f->sx0 + u * s.size;
@@ -785,7 +798,7 @@ inline std::string text(const std::string &film, const Spec &s, const Weather &w
 				rgb[k + 1] = static_cast<float>(c.y);
 				rgb[k + 2] = static_cast<float>(c.z);
 			}
-		}
+		});
 	});
 	// The cliffs: a picture painted from above smears down a cliff, so the steep triangles are a mesh of their own (two: those that face more along x, those along z)
 	// with a picture projected from the side they face (pbrt's "planar" mapping): rock strata, or a canyon's bands by height. (Inside a mix of pictures the GPU renderers
@@ -850,7 +863,7 @@ inline std::string rangesText(const std::string &film, const Field &field, const
 		const std::string ring = film_cache::ply(film, key + "_far", [&] { return farMesh(*f); });
 		const int FW = 4096, FH = 512;
 		const std::string farPicture = film_sky::picture(film, key + "_far", FW, FH, [&](std::vector<float> &rgb) {
-			for (int j = 0; j < FH; ++j)
+			detail::rows(FH, [&](int j) {
 				for (int i = 0; i < FW; ++i) {
 					const Vec3 c = farColour(*f, 2.0 * kPi * (i + 0.5) / FW, 1.0 - (j + 0.5) / FH);
 					const std::size_t k = (static_cast<std::size_t>(j) * FW + i) * 3;
@@ -858,6 +871,7 @@ inline std::string rangesText(const std::string &film, const Field &field, const
 					rgb[k + 1] = static_cast<float>(c.y);
 					rgb[k + 2] = static_cast<float>(c.z);
 				}
+			});
 		});
 		// (snow on the far ranges: their picture is mixed with snow as the land's is, where their ground is level enough)
 		std::string farMask;

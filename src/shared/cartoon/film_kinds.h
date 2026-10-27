@@ -593,6 +593,7 @@ inline CharacterKind explorerKind() {
 	explorer.plantedAt = [](double steps, int s) { return nomai::explorerBody(nomai::walkPose(steps, 0.0, 1.0)).planted[s]; };
 	explorer.stride = 0.84;
 	explorer.firstStep = 0.5;
+	explorer.trails = true;   // (its robe's hem)
 	explorer.poses = namesOf(nomai::explorerPoses());
 	explorer.voice = {165.0, 1.05, 0.12};   // (behind a mask: breathier)
 	explorer.face = false;                   // (its mask)

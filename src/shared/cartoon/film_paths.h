@@ -306,14 +306,21 @@ inline void addTriangle(Terrain &t, P3 a, P3 b, P3 c) {
 	const double slope = steep ? 0.0 : std::hypot(nx, nz) / std::abs(ny) * 0.5 * g.cell * 1.42;
 	std::vector<std::pair<int, int>> cells;
 	{
-		Grid mark = g;
-		mark.blocked.assign(mark.blocked.size(), 0);
 		const double xmin = std::min({a.x, b.x, c.x}), xmax = std::max({a.x, b.x, c.x}), zmin = std::min({a.z, b.z, c.z}), zmax = std::max({a.z, b.z, c.z});
 		if (xmax < g.x0 || zmax < g.z0 || xmin > g.x0 + g.nx * g.cell || zmin > g.z0 + g.nz * g.cell) return;
+		// (one scratch grid a thread, its marks cleared again over the triangle's box - fillPolygon marks nothing outside it: a fresh copy of the whole map for each
+		// triangle made a scene of a million triangles on a fine map take hours)
+		thread_local Grid mark;
+		if (mark.nx != g.nx || mark.nz != g.nz || mark.x0 != g.x0 || mark.z0 != g.z0 || mark.cell != g.cell) {
+			mark = g;
+			mark.blocked.assign(mark.blocked.size(), 0);
+		}
 		fillPolygon(mark, {a, b, c});
 		for (int k = std::max(0, g.row(zmin)); k <= std::min(g.nz - 1, g.row(zmax)); ++k)
-			for (int i = std::max(0, g.col(xmin)); i <= std::min(g.nx - 1, g.col(xmax)); ++i)
-				if (mark.blocked[static_cast<std::size_t>(k) * g.nx + i]) cells.push_back({i, k});
+			for (int i = std::max(0, g.col(xmin)); i <= std::min(g.nx - 1, g.col(xmax)); ++i) {
+				std::uint8_t &m = mark.blocked[static_cast<std::size_t>(k) * g.nx + i];
+				if (m) cells.push_back({i, k}), m = 0;
+			}
 	}
 	for (const auto &[i, k] : cells) {
 		if (steep) {
