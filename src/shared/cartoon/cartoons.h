@@ -271,6 +271,7 @@ inline Film filmOf(Registry &r, const film_file::DataFilm &d, bool drafted, int 
 		for (const particles::Weather &w : p->spec.weather)
 			if (w.kind == "rain") particles::rainSound(m, w);
 		sfx::play(m, p->events());
+		p->soundscape(m);   // (its nature placed where it is heard from: film_soundscape.h)
 		p->thunder(m);
 		p->speak(m);
 		p->playTheme(m);

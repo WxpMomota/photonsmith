@@ -228,6 +228,7 @@
 #include "film_clouds.h"
 #include "film_fire.h"
 #include "film_flowers.h"
+#include "film_soundscape.h"
 #include "film_forest.h"
 #include "film_skyfx.h"
 #include "film_cache.h"
@@ -3794,6 +3795,159 @@ class DataFilm {
 		double el = 0.0, facing = 0.0;
 		dressing::sunAt(spec.sky, dressing::hourAt(spec.sky, t, spec.storyEnd), el, facing);
 		return spec.exposure * film_camera::autoExposure(el);
+	}
+	// The sounds of its nature placed where they come from (film_soundscape.h): waterfalls, fire, lava and volcanoes, surf, animals, birds in the trees - each heard from
+	// the camera as it moves.
+	void soundscape(audio::Mix &m) const {
+		const bool eagles = std::any_of(spec.flocks.begin(), spec.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "eagles"; });
+		if (spec.falls.empty() && spec.fires.empty() && spec.lavas.empty() && spec.volcanoes.empty() && spec.wildfires.empty() && !spec.swell.on && spec.herds.empty() && !eagles &&
+			spec.forests.empty())
+			return;
+		namespace ss = soundscape;
+		const ss::Ears ears = ss::earsOf(m.seconds(), [this](double t, Vec3 &eye, Vec3 &target) {
+			double fov = 40.0;
+			return film_subjects::cameraOf(headerAt(t), eye, target, fov);
+		});
+		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+		const auto groundAt = [&](double x, double z) { return ground ? ground->heightAt(x, z) : 0.0; };
+		const double T = m.seconds();
+		const auto always = [](double) { return 1.0; };
+		// waterfalls: a roar from the pool at the foot of each
+		for (std::size_t i = 0; i < spec.falls.size(); ++i) {
+			const water::Fall &f = spec.falls[i];
+			const Vec3 pool = f.lip + Vec3{0.0, -0.85 * f.drop, 0.0};
+			const double g = 0.3 * std::sqrt(std::max(1.0, f.width * f.drop) / 120.0);
+			ss::lay(m, ears, 0.0, T, 0.3, [pool](double) { return pool; }, [g](double) { return g; }, ss::roar(250.0, 1500.0, 0.8, 101u + static_cast<unsigned>(i)), 12.0);
+		}
+		// fires: a low roar and the crackle; a wildfire's roar over its land; lava's hiss and its bubbles; a volcano's rumble
+		for (std::size_t i = 0; i < spec.fires.size(); ++i) {
+			const fire::Fire &f = spec.fires[i];
+			const double g = 0.12 * f.size;
+			ss::lay(m, ears, f.t0, f.t1, 0.25, [&f](double) { return f.at + Vec3{0.0, 0.3 * f.size, 0.0}; }, [g](double) { return g; }, ss::roar(120.0, 700.0, 0.6, 201u + static_cast<unsigned>(i)), 4.0);
+			double t = std::max(0.0, f.t0);
+			for (unsigned k = 0; t < std::min(f.t1, T); ++k) {
+				ss::place(m, ears, t, f.at + Vec3{0.0, 0.4 * f.size, 0.0}, ss::crackle(301u + k), 0.3 * f.size * (0.4 + audio::unit(311u + k)), 4.0);
+				t += -std::log(std::max(1e-6, 1.0 - audio::unit(331u + k + 7919u * static_cast<unsigned>(i)))) / (8.0 * f.size);
+			}
+		}
+		for (std::size_t i = 0; i < spec.wildfires.size(); ++i) {
+			const fire::Wildfire &w = spec.wildfires[i];
+			const Vec3 mid{0.5 * (w.x0 + w.x1), groundAt(0.5 * (w.x0 + w.x1), 0.5 * (w.z0 + w.z1)) + 3.0, 0.5 * (w.z0 + w.z1)};
+			ss::lay(m, ears, w.t0, w.t1, 0.3, [mid](double) { return mid; }, [&w](double t) { return 0.9 * smoothstep(w.t0, w.t0 + 3.0, t) * (1.0 - smoothstep(w.t1 - 3.0, w.t1, t)); },
+					ss::roar(90.0, 900.0, 1.0, 401u + static_cast<unsigned>(i)), 60.0);
+			for (unsigned k = 0; k < static_cast<unsigned>(std::max(0.0, std::min(w.t1, T) - w.t0) * 30.0); ++k) {
+				const double t = w.t0 + (std::min(w.t1, T) - w.t0) * audio::unit(411u + k), x = w.x0 + (w.x1 - w.x0) * audio::unit(421u + k), z = w.z0 + (w.z1 - w.z0) * audio::unit(431u + k);
+				ss::place(m, ears, t, {x, groundAt(x, z) + 1.0, z}, ss::crackle(441u + k), 0.6, 30.0);
+			}
+		}
+		for (std::size_t i = 0; i < spec.lavas.size(); ++i) {
+			const fire::Lava &l = spec.lavas[i];
+			if (l.path.size() < 2) continue;
+			const auto front = [&l](double t) {   // (the flow's front: where it is newest and loudest)
+				const double reach = std::max(4.0, (t - l.t0) * l.speed * 20.0);
+				double s = 0.0;
+				for (std::size_t k = 1; k < l.path.size(); ++k) {
+					s += length(Vec3{l.path[k].x - l.path[k - 1].x, 0.0, l.path[k].z - l.path[k - 1].z});
+					if (s > reach) return l.path[k];
+				}
+				return l.path.back();
+			};
+			ss::lay(m, ears, l.t0, T, 0.3, front, [](double) { return 0.07; }, ss::roar(1800.0, 6000.0, 0.6, 501u + static_cast<unsigned>(i)), 10.0);
+			for (unsigned k = 0; k < static_cast<unsigned>(std::max(0.0, T - l.t0) * 2.5); ++k) {
+				const double t = l.t0 + (T - l.t0) * audio::unit(511u + k);
+				ss::place(m, ears, t, front(t), ss::bubble(521u + k), 0.3, 8.0);
+			}
+		}
+		for (std::size_t i = 0; i < spec.volcanoes.size(); ++i) {
+			const fire::Volcano &v = spec.volcanoes[i];
+			const Vec3 top{v.x, groundAt(v.x, v.z), v.z};
+			ss::lay(m, ears, v.t0, v.t1, 0.5, [top](double) { return top; }, [](double) { return 0.6; }, ss::roar(25.0, 140.0, 1.4, 601u + static_cast<unsigned>(i)), 400.0);
+		}
+		// surf: each wave crashing where it breaks near the camera, its wash after
+		if (spec.swell.on && ground && !spec.seas.empty()) {
+			const std::shared_ptr<const surf::Grid> grid = surf::gridOf(*ground, spec.seas[0].level, spec.swell);
+			std::vector<Vec3> points;   // (break points round where the camera goes: cells 0.8 to 2.2 m deep that the swell reaches)
+			for (double t = 0.0; t <= T && points.size() < 16; t += 3.0) {
+				const Vec3 eye = ears(t).eye;
+				for (int k = 0; k < 400 && points.size() < 16; ++k) {
+					const double a = 2.0 * kPi * audio::unit(701u + static_cast<unsigned>(k)), r = 150.0 * std::sqrt(audio::unit(709u + static_cast<unsigned>(k)));
+					const double x = eye.x + r * std::cos(a), z = eye.z + r * std::sin(a);
+					bool in = false;
+					const double d = grid->sample(grid->depth, x, z, in), arrive = grid->sample(grid->arrive, x, z, in);
+					if (!in || d < 0.8 || d > 2.2 || arrive < 0.0) continue;
+					bool taken = false;
+					for (const Vec3 &q : points) taken = taken || std::hypot(q.x - x, q.z - z) < 25.0;
+					if (!taken) points.push_back({x, spec.seas[0].level, z});
+				}
+			}
+			for (std::size_t p = 0; p < points.size(); ++p) {
+				bool in = false;
+				const double arrive = grid->sample(grid->arrive, points[p].x, points[p].z, in);
+				for (double t = std::fmod(arrive, spec.swell.period); t < T; t += spec.swell.period) {
+					const double set = 0.8 + 0.2 * std::sin(2.0 * kPi * (t - arrive) / (7.3 * spec.swell.period));
+					ss::place(m, ears, t, points[p], ss::crash(801u + static_cast<unsigned>(p * 31 + static_cast<std::size_t>(t))), 0.14 * spec.swell.height * set, 15.0);
+					ss::place(m, ears, t + 0.9, points[p] + Vec3{0.0, 0.0, 0.0}, ss::wash(901u + static_cast<unsigned>(p)), 0.05 * spec.swell.height, 15.0);
+				}
+			}
+		}
+		// animals: hoofbeats at each footfall of a herd's gait; wolves howling while they stand; eagles crying
+		for (std::size_t hi = 0; hi < spec.herds.size(); ++hi) {
+			const wildlife::Herd &h = spec.herds[hi];
+			const animals::Species *sp = animals::species(h.kind);
+			if (!sp) continue;
+			const bool wolves = h.kind == "wolves";
+			const double gain = h.kind == "horses" ? 0.3 : wolves ? 0.05 : 0.15, f = h.kind == "horses" ? 85.0 : wolves ? 230.0 : 140.0;
+			for (int i = 0; i < std::min(h.count, 40); ++i) {
+				std::string lastClip;
+				double lastCycles = 0.0;
+				for (double t = 0.0; t < T; t += 0.02) {
+					const wildlife::Animal a = wildlife::animalAt(h, *sp, i, t, ground.get());
+					if (!a.clip.empty() && a.clip == lastClip) {
+						static const double walk[4] = {0.0, 0.25, 0.5, 0.75}, trot[4] = {0.0, 0.5, 0.5, 0.0}, run[4] = {0.0, 0.40, 0.08, 0.50};
+						const double *starts = a.clip == "walk" ? walk : a.clip == "trot" ? trot : run;
+						for (int foot = 0; foot < 4; ++foot)
+							if (std::floor(a.cycles - starts[foot]) > std::floor(lastCycles - starts[foot]))
+								ss::place(m, ears, t, a.at, ss::hoof(f * (0.9 + 0.2 * audio::unit(static_cast<unsigned>(i * 4 + foot))), static_cast<unsigned>(i * 4 + foot)), gain, 5.0);
+					}
+					if (wolves && a.going.paused && i % 3 == 0) {   // (a wolf standing howls now and then)
+						const double every = 21.0 + 8.0 * audio::unit(static_cast<unsigned>(951 + i)), when = std::fmod(t + every * audio::unit(static_cast<unsigned>(961 + i)), every);
+						if (when < 0.02) ss::place(m, ears, t, a.at + Vec3{0.0, 0.7, 0.0}, ss::howl(static_cast<unsigned>(971 + i)), 0.4, 60.0);
+					}
+					lastClip = a.clip, lastCycles = a.cycles;
+				}
+			}
+		}
+		for (const wildlife::Flock &f : spec.flocks) {
+			if (f.kind != "eagles") continue;
+			const std::vector<float> cry = ss::eagleCry();
+			for (int i = 0; i < f.count; ++i) {
+				const double every = 9.0 + 9.0 * audio::unit(static_cast<unsigned>(1001 + i));
+				for (double t = std::max(0.0, f.t0) + every * audio::unit(static_cast<unsigned>(1011 + i)); t < std::min(T, f.t1); t += every)
+					ss::place(m, ears, t, wildlife::eagleAt(f, i, t), cry, 0.35, 50.0);
+			}
+		}
+		// birds in the trees near the camera, by day
+		if (!spec.planted.empty()) {
+			unsigned k = 0;
+			for (double t = 0.4; t < T; t += 0.9, ++k) {
+				if (spec.hasSky) {
+					double el = 0.0, facing = 0.0;
+					dressing::sunAt(spec.sky, dressing::hourAt(spec.sky, t, spec.storyEnd), el, facing);
+					if (el < -4.0) continue;
+				}
+				const Vec3 eye = ears(t).eye;
+				const forest::Tree *best = nullptr;
+				double bestScore = 1e30;
+				for (const std::vector<forest::Tree> &trees : spec.planted)
+					for (const forest::Tree &tr : trees) {
+						const double d = std::hypot(tr.at.x - eye.x, tr.at.z - eye.z);
+						if (d > 80.0 || tr.species == "conifer" && audio::unit(k * 7u + 3u) < 0.3) continue;
+						const double score = d * (0.3 + audio::unit(static_cast<unsigned>(std::lround(tr.at.x * 13.0 + tr.at.z * 7.0)) + k));
+						if (score < bestScore) bestScore = score, best = &tr;
+					}
+				if (best) ss::place(m, ears, t + 0.5 * audio::unit(1101u + k), best->at + Vec3{0.0, 5.0 * best->scale, 0.0}, ss::birdPhrase(1201u + k), 0.12, 15.0);
+			}
+		}
 	}
 	// The thunder of its lightning, each strike heard as long after as sound takes to come from it to the camera at its time.
 	void thunder(audio::Mix &m) const {

@@ -1059,6 +1059,23 @@ are left on the surf zone and drift along the shore; spray blows off the breakin
 netted with moving caustics. It needs a `water sea` and a `terrain` (`coast` is made for it, but any land with a shore will do). The surf is part of the sea's mesh, so it
 is drawn by every renderer.
 
+**Nature heard from where it is.** (film_soundscape.h)
+
+A nature film's sounds are placed where they come from and heard from the camera as it moves - later the further off they are (sound goes 343 m a second: a crash
+across a bay comes after the wave is seen to break), quieter with distance (as 1/d beyond a few metres, a little more over kilometres of air), panned to the side they are
+on, with more of the reverb the further off. Nothing in the film file asks for it:
+
+- a waterfall roars from the pool at its foot;
+- a fire roars low and crackles; a wildfire roars over its land and crackles all across it; a lava flow hisses at its front and bubbles pop in it; a volcano rumbles;
+- the surf crashes where each wave breaks near the camera (each point of the shore when the swell reaches it there, louder in its sets), its wash fizzing after;
+- a herd's hooves strike at each footfall of its gait - the four-beat walk, the trot's pairs, the gallop's rolling thunder - deer lighter than horses, wolves' pads soft; a
+  wolf standing howls now and then; eagles cry from the sky;
+- birds sing from the trees near the camera, by day.
+
+A continuous sound is laid as overlapping grains a fraction of a second apart, each placed from where the camera is when it is heard; an event is placed once. They are
+mixed under the film's ambiences (which stay round the camera as before), its weather, footsteps, thunder, lines and music. `ray_tracer --film-sound <key> OUT.wav` writes
+a film's soundtrack alone, to listen to.
+
 **Storms: `storm`.** (film_file.h, film_dressing.h, film_particles.h)
 
 ```

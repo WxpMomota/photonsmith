@@ -243,6 +243,17 @@ inline void prepare(Flock &f, double seconds) {
 	if (f.kind == "starlings" || f.kind == "fish") detail::fly(f, std::min(seconds, std::max(0.0, f.t1)) + 1.0);
 }
 
+// Where eagle i of a flock is at t (pbrt's), circling its thermal: its way (`fwd`) and its circle's radius too.
+inline Vec3 eagleAt(const Flock &f, int i, double t, Vec3 *fwd = nullptr, double *radius = nullptr) {
+	const double speed = f.speed > 0.0 ? f.speed : detail::speedOf("eagles"), rel = t - f.t0;
+	const int s = f.seed * 37 + i;
+	const double r = f.radius * (0.55 + 0.6 * hash01(s, 1)), w = speed / r, a = 2.0 * kPi * hash01(s, 2) + w * rel;
+	const Vec3 c = f.at + Vec3{f.radius * 0.25 * (hash01(s, 3) - 0.5), 12.0 * hash01(s, 4) + 0.6 * rel, f.radius * 0.25 * (hash01(s, 5) - 0.5)};
+	if (fwd) *fwd = {-std::sin(a), 0.0, std::cos(a)};
+	if (radius) *radius = r;
+	return c + Vec3{r * std::cos(a), 1.5 * std::sin(0.3 * rel + i), r * std::sin(a)};
+}
+
 // A flock at t, as scene text: the poses of its kind (unless `objects` is false: another flock of the kind wrote them; a rigged kind's go through `poses`) and a placement
 // for each animal. "" outside its time.
 inline std::string flockText(const Flock &f, double t, const terrain::Field *ground, animals::Poses &poses, bool objects = true) {
@@ -285,9 +296,9 @@ inline std::string flockText(const Flock &f, double t, const terrain::Field *gro
 		const double speed = f.speed > 0.0 ? f.speed : detail::speedOf(f.kind);
 		for (int i = 0; i < f.count; ++i) {
 			const int s = f.seed * 37 + i;
-			const double r = f.radius * (0.55 + 0.6 * hash01(s, 1)), w = speed / r, a = 2.0 * kPi * hash01(s, 2) + w * rel;
-			const Vec3 c = f.at + Vec3{f.radius * 0.25 * (hash01(s, 3) - 0.5), 12.0 * hash01(s, 4) + 0.6 * rel, f.radius * 0.25 * (hash01(s, 5) - 0.5)};
-			const Vec3 p = c + Vec3{r * std::cos(a), 1.5 * std::sin(0.3 * rel + i), r * std::sin(a)}, fwd{-std::sin(a), 0.0, std::cos(a)};
+			double r = 0.0;
+			Vec3 fwd;
+			const Vec3 p = eagleAt(f, i, t, &fwd, &r);
 			const double bank = std::atan(speed * speed / (r * 9.81)) * 180.0 / kPi;
 			const double cycle = 9.0 + 6.0 * hash01(s, 6), when = std::fmod(t + cycle * hash01(s, 7), cycle);
 			const std::string pose = when < 2.0 ? poses.poseName("eagles", "flap", static_cast<int>(std::floor(t * 2.2 * animals::posesOf("flap"))), out)
@@ -331,39 +342,56 @@ inline Going goingAt(double rel, double pace, double cycle, double pause, double
 	return g;
 }
 
+// Where animal i of a herd is at t (pbrt's, on the ground), how it goes, and the way the herd is heading: what herdText draws and film_soundscape.h hears.
+struct Animal {
+	Vec3 at, dir;
+	Going going;
+	std::string clip;     // its gait's clip while it moves ("" when it has stopped)
+	double cycles = 0.0;  // how many cycles of that clip it has made (with its own offset): its footfalls
+};
+inline Animal animalAt(const Herd &h, const animals::Species &sp, int i, double t, const terrain::Field *ground) {
+	Animal a;
+	const Vec3 from{h.fx, 0, h.fz}, to{h.tx, 0, h.tz};
+	a.dir = normalize(to - from + Vec3{1e-9, 0, 0});
+	const Vec3 side{-a.dir.z, 0, a.dir.x};
+	const double total = length(to - from), size = sp.length / 0.95, pace = h.speed > 0.0 ? h.speed : sp.walkSpeed;
+	const int s = h.seed * 61 + i;
+	const double behind = size * (3.0 * std::sqrt(static_cast<double>(i)) + 2.0 * hash01(s, 1)), across = size * 4.0 * (hash01(s, 2) - 0.5) * std::sqrt(static_cast<double>(i + 1));
+	const double rel = std::max(0.0, t - h.t0);
+	const double cycle = 9.0 + 5.0 * hash01(s, 3), pause = (sp.grazes ? 2.5 : 1.2) + 2.0 * hash01(s, 4), offset = cycle * hash01(s, 5);
+	const double flee = h.flee >= 0.0 ? std::max(0.0, h.flee - h.t0) + 0.15 * std::sqrt(static_cast<double>(i)) + 0.3 * hash01(s, 9) : -1.0;   // (one after another)
+	a.going = goingAt(rel, pace, cycle, pause, offset, flee, sp.fleeSpeed * (0.92 + 0.16 * hash01(s, 10)));
+	if (flee < 0.0 && a.going.covered >= total) a.going.covered = total, a.going.paused = true, a.going.speed = 0.0;   // (there: it stops)
+	a.at = from + a.dir * a.going.covered - a.dir * behind + side * across;
+	a.at.y = ground ? ground->heightAt(a.at.x, a.at.z) : 0.0;
+	if (!a.going.paused) {
+		animals::gaitOf(sp, a.going.speed, a.going.covered, a.clip, a.cycles);
+		a.cycles += hash01(s, 6);
+	}
+	return a;
+}
+
 // A herd at t, as scene text: each animal walking from `from` towards `to` in a loose bunch, standing on the land, stopping now and then to graze (wolves: to look round),
 // fleeing at a gallop from `flee` on; its pose from its kind's clips (film_animals.h) through `poses`.
 inline std::string herdText(const Herd &h, double t, const terrain::Field *ground, animals::Poses &poses) {
 	const animals::Species *sp = animals::species(h.kind);
 	if (!sp) return std::string();
 	std::string out = "# a herd of " + h.kind + " (film_wildlife.h)\n";
-	const Vec3 from{h.fx, 0, h.fz}, to{h.tx, 0, h.tz};
-	const Vec3 dir = normalize(to - from + Vec3{1e-9, 0, 0}), side{-dir.z, 0, dir.x};
-	const double total = length(to - from), size = sp->length / 0.95, pace = h.speed > 0.0 ? h.speed : sp->walkSpeed;
 	for (int i = 0; i < h.count; ++i) {
 		const int s = h.seed * 61 + i;
-		const double behind = size * (3.0 * std::sqrt(static_cast<double>(i)) + 2.0 * hash01(s, 1)), across = size * 4.0 * (hash01(s, 2) - 0.5) * std::sqrt(static_cast<double>(i + 1));
-		const double rel = std::max(0.0, t - h.t0);
-		const double cycle = 9.0 + 5.0 * hash01(s, 3), pause = (sp->grazes ? 2.5 : 1.2) + 2.0 * hash01(s, 4), offset = cycle * hash01(s, 5);
-		const double flee = h.flee >= 0.0 ? std::max(0.0, h.flee - h.t0) + 0.15 * std::sqrt(static_cast<double>(i)) + 0.3 * hash01(s, 9) : -1.0;   // (one after another)
-		Going g = goingAt(rel, pace, cycle, pause, offset, flee, sp->fleeSpeed * (0.92 + 0.16 * hash01(s, 10)));
-		if (flee < 0.0 && g.covered >= total) g.covered = total, g.paused = true, g.speed = 0.0;   // (there: it stops)
-		Vec3 p = from + dir * g.covered - dir * behind + side * across;
+		const Animal a = animalAt(h, *sp, i, t, ground);
+		const Vec3 p = a.at, dir = a.dir;
 		const auto groundAt = [&](const Vec3 &q) { return ground ? ground->heightAt(q.x, q.z) : 0.0; };
-		p.y = groundAt(p);
 		const double pitch = std::atan2(groundAt(p + dir * (0.5 * sp->length)) - groundAt(p - dir * (0.5 * sp->length)), sp->length) * 180.0 / kPi;   // (to the slope)
 		std::string pose;
 		double turn = 6.0 * (hash01(s, 7) - 0.5);
-		if (g.paused) {
+		if (a.going.paused) {
 			const std::string clip = sp->grazes ? "graze" : "idle";
 			const double len = clip == "graze" ? 4.0 : 5.0;
 			pose = poses.poseName(h.kind, clip, static_cast<int>(std::floor((t / len + hash01(s, 11)) * animals::posesOf(clip))), out);
 			turn = 50.0 * (hash01(s, 7) - 0.5);
 		} else {
-			std::string clip;
-			double cycles = 0.0;
-			animals::gaitOf(*sp, g.speed, g.covered, clip, cycles);
-			pose = poses.poseName(h.kind, clip, static_cast<int>(std::floor((cycles + hash01(s, 6)) * animals::posesOf(clip))), out);
+			pose = poses.poseName(h.kind, a.clip, static_cast<int>(std::floor(a.cycles * animals::posesOf(a.clip))), out);
 		}
 		const Vec3 storyAt{-p.x, p.y, p.z}, storyFwd{-dir.x, 0.0, dir.z};
 		out += nature::placeObject(pose, mul(translate(storyAt), detail::facing(storyFwd, {0, 1, 0}), rotate({0, 1, 0}, turn), rotate({1, 0, 0}, -pitch), scale(0.9 + 0.2 * hash01(s, 8))));

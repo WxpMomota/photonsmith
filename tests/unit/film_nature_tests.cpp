@@ -1109,3 +1109,49 @@ TEST(FilmStorm, AStormDarkensTheSkyBlowsItsRainAndBringsLightning) {
 		EXPECT_NE(problem.find(says), std::string::npos) << text << " -> " << problem;
 	}
 }
+
+// Nature's sounds placed where they come from (film_soundscape.h): a sound to the camera's right is heard on the right, later and quieter the further off it is; a film's
+// waterfall is heard on the side it is on and a galloping herd is louder than a walking one.
+TEST(FilmSound, NaturesSoundsAreHeardFromWhereTheyAre) {
+	namespace ss = cartoon::soundscape;
+	namespace audio = cartoon::audio;
+	ss::Ears ears;
+	ears.at.push_back({{0.0, 0.0, 0.0}, {-1.0, 0.0, 0.0}});   // (pbrt's: the camera's right is -x)
+	const std::vector<float> noise = audio::noiseBurst(0.5, 0.01, 0.4, 500.0, 3000.0, 5);
+	const auto channels = [](const audio::Mix &m, double from, double to) {
+		const std::vector<std::int16_t> pcm = m.finish(0.0, 0.0);
+		double l = 0.0, r = 0.0;
+		for (std::size_t i = static_cast<std::size_t>(from * audio::kRate); i < static_cast<std::size_t>(to * audio::kRate) && 2 * i + 1 < pcm.size(); ++i)
+			l += double(pcm[2 * i]) * pcm[2 * i], r += double(pcm[2 * i + 1]) * pcm[2 * i + 1];
+		return std::make_pair(l, r);
+	};
+	audio::Mix right(3.0);
+	ss::place(right, ears, 0.2, {-30.0, 0.0, 0.0}, noise, 1.0, 5.0);
+	const auto [l, r] = channels(right, 0.0, 3.0);
+	EXPECT_GT(r, 3.0 * l) << "heard on the right";
+	const auto [l0, r0] = channels(right, 0.0, 0.2 + 30.0 / 343.0 - 0.01);
+	EXPECT_LT(l0 + r0, 1e-3 * (l + r)) << "nothing before the sound has come 30 m";
+	audio::Mix nearer(3.0), farther(3.0);
+	ss::place(nearer, ears, 0.2, {0.0, 0.0, -20.0}, noise, 1.0, 5.0);
+	ss::place(farther, ears, 0.2, {0.0, 0.0, -80.0}, noise, 1.0, 5.0);
+	const auto [nl, nr] = channels(nearer, 0.0, 3.0);
+	const auto [fl, fr] = channels(farther, 0.0, 3.0);
+	EXPECT_NEAR(nl, nr, 0.2 * nl) << "straight ahead: both sides";
+	EXPECT_GT(nl + nr, 4.0 * (fl + fr)) << "quieter further off";
+	// a waterfall on the camera's left; horses walking, then galloping past
+	ff::DataFilm film;
+	ASSERT_EQ(loadNature("sound", "scene s.pbrt\nlength 12\nwaterfall at 25 15 -5  width 8  drop 15  facing 270\nshot 0 A\n key 0 2 10  0 2 -10\n", film), "");
+	audio::Mix falls(12.0);
+	film.soundscape(falls);
+	const auto [wl, wr] = channels(falls, 1.0, 11.0);
+	EXPECT_GT(wl + wr, 0.0);
+	EXPECT_GT(wl, 2.0 * wr) << "the waterfall (pbrt's +x: the picture's left) on the left";
+	ff::DataFilm herd;
+	ASSERT_EQ(loadNature("sound_herd", "scene s.pbrt\nlength 14\nherd horses 6 from -30 0 to 0 0 flee 7\nshot 0 A\n key 0 2 15  0 1 0\n", herd), "");
+	audio::Mix hooves(14.0);
+	herd.soundscape(hooves);
+	const auto [a0, a1] = channels(hooves, 2.0, 6.0);
+	const auto [b0, b1] = channels(hooves, 9.0, 13.0);
+	EXPECT_GT(a0 + a1, 0.0) << "hoofbeats while they walk";
+	EXPECT_GT(b0 + b1, 2.0 * (a0 + a1)) << "a galloping herd thunders";
+}
