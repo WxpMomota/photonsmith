@@ -132,6 +132,7 @@ struct Discovered {
 void listGenerated(std::vector<Discovered> &out);   // appends one Discovered for each generated scene (its path is where its file will be)
 void materializeGenerated(const std::string &path);   // writes `path` when it is a generated scene's file that is missing or out of date; any other path is left alone
 const char *filmTable();   // the films compiled in here, one line each, for the GUI (which does not compile them: qt_gui/film_info.h reads the lines)
+const char *filmProblems();   // the film files that were left out and why ("file:line: what"), one line each: what the GUI shows of them
 // A moment of a film as a scene file: `cartoon:<key>@<seconds>` written to a file of its own (a film made from a file read again first when it was saved since), its path;
 // "" when it names no film. What Live Preview's film timeline draws.
 std::string filmMoment(const std::string &id);
@@ -504,6 +505,13 @@ inline int userSceneNumber(const std::string &folder, const std::string &fileNam
 	return maxN + 1;
 }
 
+// Whether the scene list leaves out the scenes the program writes itself (the cartoon stills). Set by a program that renders a scene file it was named and shows no list - a
+// frame of a cartoon video is one, a process each - which would otherwise read every film file (half a second and more) for stills it never shows.
+inline bool &skipGenerated() {
+	static bool skip = false;
+	return skip;
+}
+
 inline std::vector<Discovered> scanDefaultPaths() {
 	std::vector<Discovered> found;
 	for (const std::string &dir : defaultSearchPaths()) {
@@ -511,7 +519,7 @@ inline std::vector<Discovered> scanDefaultPaths() {
 		if (!found.empty()) break;
 	}
 	// Scenes the program writes itself (the stills of the cartoon films): described from a header alone here, written when first loaded.
-	listGenerated(found);
+	if (!skipGenerated()) listGenerated(found);
 	// Scenes saved in the per-user folder follow the scanned ones, numbered like any file the user named (so adding one never shifts a bundled scene's id).
 	if (const std::string userDir = userSceneDir(); !userDir.empty()) {
 		for (Discovered &d : scanDirectory(userDir)) {

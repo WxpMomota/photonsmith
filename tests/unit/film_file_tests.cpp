@@ -793,6 +793,32 @@ TEST(FilmTitles, ATitleCardCreditsAfterTheStoryAndATheme) {
 	EXPECT_TRUE(two.spec.credits);
 	EXPECT_EQ(one.titleCaptions()[0].lines[0].text, "Two Parts");
 	EXPECT_EQ(two.titleCaptions()[0].lines[0].text, "Two Parts");
+	// ... and the credits name the cast of every part, each once, in the order they come on
+	write(d / "cast.film", "name Cast\ncredits\nscene s.pbrt\npart One\nlength 4\ncharacter ann person\ncharacter bo person at 2 0 0\nshot 0 A\n key 0 1 5  0 1 0\n"
+						   "part Two\nlength 4\ncharacter bo person\ncharacter pip pip at 2 0 0\nshot 0 B\n key 0 1 5  0 1 0\n");
+	ff::DataFilm last;
+	ASSERT_EQ(last.load((d / "cast.film").string(), 1), "");
+	std::vector<std::string> named;
+	for (const cartoon::Caption &c : last.titleCaptions())
+		if (c.lines[0].text == "Cast")
+			for (std::size_t i = 1; i < c.lines.size(); ++i) named.push_back(c.lines[i].text);
+	EXPECT_EQ(named, (std::vector<std::string>{"Ann  -  a person", "Bo  -  a person", "Pip  -  a pip"}));
+}
+
+// `ease` is the film's motions wherever its line is - after the shots too - and a shot's camera has `ease camera`; a shot that is not of `key` lines has none.
+TEST(FilmFile, EaseIsTheFilmsWhereverItIsAndEaseCameraAShots) {
+	const std::string shots = "scene s.pbrt\nlength 10\nshot 0 A\n key 0 1 5  0 1 0\n key 4 1 5  0 1 0\n";
+	const ff::Parsed after = ff::parse(shots + "ease 0\n", "t.film");
+	ASSERT_TRUE(after.ok) << after.error;
+	EXPECT_FALSE(after.spec.ease) << "after a shot, still the film's";
+	EXPECT_TRUE(after.spec.shots[0].path.ease) << "and not the shot's camera";
+	const ff::Parsed camera = ff::parse(shots + "  ease camera 0\n", "t.film");
+	ASSERT_TRUE(camera.ok) << camera.error;
+	EXPECT_TRUE(camera.spec.ease);
+	EXPECT_FALSE(camera.spec.shots[0].path.ease);
+	EXPECT_NE(ff::parse("scene s.pbrt\nlength 10\nease camera 0\n", "t.film").error.find("belongs to a shot"), std::string::npos);
+	EXPECT_NE(ff::parse("scene s.pbrt\nlength 10\nease 0.5\n", "t.film").error.find("`ease 1` or `ease 0`"), std::string::npos);
+	EXPECT_NE(ff::parse("scene s.pbrt\nlength 10\ncharacter ann person\nshot 0 A\n orbit ann radius 3 degrees 120 height 1.6\n ease camera 0\n", "t.film").error.find("for a shot of `key` lines"), std::string::npos);
 }
 
 // Changes to a film file from the program (film_edit.h): a listed shot found as its file's line, its camera set to a view or given one more key, its start moved - the rest

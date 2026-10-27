@@ -38,6 +38,7 @@
 #include <QTimer>
 #include <QAbstractItemView>
 #include <QIcon>
+#include <QStyle>
 #include <QDesktopServices>
 #include <QUrl>
 #include <QSplitter>
@@ -228,6 +229,16 @@ void MainWindow::buildSceneGroup(QWidget *basicTab, QVBoxLayout *layout) {
 		// A bucket nothing is in is not offered: no film needs files from outside the program today, so that tab would only ever be empty.
 		m_sceneAvailabilityTabs->setTabVisible(scene_bucket::CartoonsExternal, cartoonFilesCount > 0);
 		m_sceneAvailabilityTabs->setTabVisible(scene_bucket::Cartoons, cartoonCount > 0);
+		// A film file with a mistake in it is left out of the films: the Cartoons tab says so with a warning sign and which files and why, and the log has a line for each.
+		if (const QStringList problems = SceneMetadataClient::filmProblems(); !problems.isEmpty()) {
+			m_sceneAvailabilityTabs->setTabVisible(scene_bucket::Cartoons, true);
+			m_sceneAvailabilityTabs->setTabIcon(cartoonTab, style()->standardIcon(QStyle::SP_MessageBoxWarning));
+			m_sceneAvailabilityTabs->setTabToolTip(cartoonTab, m_sceneAvailabilityTabs->tabToolTip(cartoonTab) + QStringLiteral("\n\n") +
+				tr("%n film file(s) could not be read and are left out:", "", problems.size()) + QStringLiteral("\n") + problems.join(QLatin1Char('\n')));
+			QTimer::singleShot(0, this, [this, problems] {
+				for (const QString &p : problems) onLogMessage(tr("Warning: a film file was left out - %1").arg(p));
+			});
+		}
 
 #ifndef QT_NO_DEBUG
 		// One-time drift guard against scene_technique_notes.h - see that

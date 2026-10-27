@@ -4,6 +4,10 @@
 // (`ray_tracer --film-feet <key>`, and the film doctor warns on it).
 
 #include <algorithm>
+#include <cstdlib>
+#include <regex>
+#include <set>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -128,6 +132,121 @@ inline std::vector<CutIssue> screenDirection(const Film &film) {
 				c.before = orderA;
 				c.after = orderB;
 				out.push_back(c);
+			}
+		}
+	}
+	return out;
+}
+
+// ---- the camera inside a medium's sphere ----
+// Smoke, flames, a volcano's plume and clouds are media filling a sphere round their box (`Material "interface"`, `MediumInterface "NAME" ""`), the outside being the air. A
+// camera inside such a sphere is not in that medium - its rays start in the air - so the smoke or the cloud is not seen while it is there, and pops in as it leaves. (Mist
+// and the sea round the camera are spheres of the camera's own medium, as they should be: not reported.) `ray_tracer --film-media <key>`; the film doctor warns on it.
+struct MediumSphere {
+	std::string name;
+	Vec3 centre;   // pbrt's
+	double radius = 0.0;
+};
+
+// The spheres of the media in a scene's text (pbrt's space): the top-level blocks that translate, are of the interface material, have a medium inside and nothing outside,
+// and are a sphere. A block that turns or scales is left out (where its sphere is is not read here).
+inline std::vector<MediumSphere> mediumSpheres(const std::string &scene) {
+	std::vector<MediumSphere> out;
+	std::istringstream in(scene);
+	int depth = 0;
+	MediumSphere s;
+	bool interface = false, sphere = false, plain = true;
+	std::string inside, outside;
+	const auto quoted = [](const std::string &line, std::size_t from, std::string &a, std::string &b) {
+		std::vector<std::string> q;
+		for (std::size_t i = line.find('"', from); i != std::string::npos && q.size() < 2;) {
+			const std::size_t j = line.find('"', i + 1);
+			if (j == std::string::npos) break;
+			q.push_back(line.substr(i + 1, j - i - 1));
+			i = line.find('"', j + 1);
+		}
+		a = q.size() > 0 ? q[0] : std::string();
+		b = q.size() > 1 ? q[1] : a;
+	};
+	for (std::string line; std::getline(in, line);) {
+		const std::size_t at = line.find_first_not_of(" \t");
+		if (at == std::string::npos) continue;
+		const std::string l = line.substr(at);
+		if (l.rfind("AttributeBegin", 0) == 0) {
+			if (++depth == 1) s = MediumSphere{}, interface = sphere = false, plain = true, inside.clear(), outside.clear();
+		} else if (l.rfind("AttributeEnd", 0) == 0) {
+			if (depth-- == 1 && interface && sphere && plain && !inside.empty() && outside.empty()) {
+				s.name = inside;
+				out.push_back(s);
+			}
+		} else if (depth == 1) {
+			if (l.rfind("Translate", 0) == 0) {
+				std::istringstream v(l.substr(9));
+				Vec3 d{};
+				if (v >> d.x >> d.y >> d.z) s.centre = s.centre + d;
+			} else if (l.rfind("Scale", 0) == 0 || l.rfind("Rotate", 0) == 0 || l.rfind("ConcatTransform", 0) == 0 || l.rfind("Transform", 0) == 0) {
+				plain = false;
+			} else if (l.rfind("Material", 0) == 0) {
+				interface = l.find("\"interface\"") != std::string::npos;
+			} else if (l.rfind("MediumInterface", 0) == 0) {
+				quoted(l, 15, inside, outside);
+			} else if (l.rfind("Shape", 0) == 0 && l.find("\"sphere\"") != std::string::npos) {
+				sphere = true;
+				const std::size_t r = l.find("\"float radius\"");
+				const std::size_t b = r == std::string::npos ? std::string::npos : l.find('[', r);
+				s.radius = 1.0;   // (pbrt's default)
+				if (b != std::string::npos) s.radius = std::atof(l.c_str() + b + 1);
+			}
+		}
+	}
+	return out;
+}
+
+struct InMedium {
+	int shot = 0;          // from 0
+	double at = 0.0;       // when (film time)
+	std::string name;      // the medium
+	double radius = 0.0;   // its sphere's
+	double inside = 0.0;   // how far inside it the camera is
+};
+
+// Each shot sampled `samples` times (its start, its end and evenly between): the first moment of each shot whose camera is inside the sphere of a medium that is not the
+// camera's own, one entry a medium and shot.
+inline std::vector<InMedium> cameraInMedia(const Film &film, int samples = 5, int *spheresSeen = nullptr) {   // (`spheresSeen`: the most in one frame)
+	std::vector<InMedium> out;
+	if (spheresSeen) *spheresSeen = 0;
+	if (!film.sceneAt) return out;
+	static const std::regex look(R"(LookAt\s+(\S+)\s+(\S+)\s+(\S+))");
+	const std::vector<double> starts = film.shotStarts ? film.shotStarts() : std::vector<double>{0.0};
+	for (std::size_t s = 0; s < starts.size(); ++s) {
+		const double end = s + 1 < starts.size() ? starts[s + 1] : film.duration;
+		std::set<std::string> said;
+		for (int k = 0; k < std::max(2, samples); ++k) {
+			const double t = std::min(starts[s] + (end - starts[s]) * k / (std::max(2, samples) - 1), end - 1e-3);
+			const std::string scene = film.sceneAt(t);
+			const std::size_t world = scene.find("WorldBegin");
+			const std::string header = scene.substr(0, world);
+			std::smatch m;
+			if (!std::regex_search(header, m, look)) continue;
+			const Vec3 eye{std::stod(m[1].str()), std::stod(m[2].str()), std::stod(m[3].str())};
+			// the camera's own medium: the outside of the last MediumInterface before the Camera line
+			std::string own, a, b;
+			const std::size_t camera = header.find("Camera");
+			for (std::size_t i = header.find("MediumInterface"); i != std::string::npos && i < camera; i = header.find("MediumInterface", i + 1)) {
+				const std::size_t q1 = header.find('"', i), q2 = q1 == std::string::npos ? q1 : header.find('"', q1 + 1);
+				const std::size_t q3 = q2 == std::string::npos ? q2 : header.find('"', q2 + 1), q4 = q3 == std::string::npos ? q3 : header.find('"', q3 + 1);
+				const std::size_t lineEnd = header.find('\n', i);
+				if (q2 == std::string::npos || q2 > lineEnd) continue;
+				a = header.substr(q1 + 1, q2 - q1 - 1);
+				b = q4 != std::string::npos && q4 < lineEnd ? header.substr(q3 + 1, q4 - q3 - 1) : a;
+				own = b;
+			}
+			const std::vector<MediumSphere> spheres = mediumSpheres(world == std::string::npos ? std::string() : scene.substr(world));
+			if (spheresSeen) *spheresSeen = std::max(*spheresSeen, static_cast<int>(spheres.size()));
+			for (const MediumSphere &sp : spheres) {
+				const double d = length(eye - sp.centre);
+				if (d >= sp.radius || sp.name == own || !said.insert(sp.name).second) continue;
+				out.push_back({static_cast<int>(s), t, sp.name, sp.radius, sp.radius - d});
 			}
 		}
 	}

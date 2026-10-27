@@ -71,6 +71,7 @@ extern char** environ;
 #include "src/shared/accelerator_override.h"
 #include "src/shared/exr_writer.h"
 #include "src/shared/output_crop.h"
+#include "src/shared/pbrt_discover.h"   // skipGenerated: a scene file named, no cartoon stills listed
 #include "src/shared/render_stats.h"
 #include "launcher/camera_path.h"
 #include "src/shared/camera_keyframes.h"
@@ -1206,6 +1207,22 @@ int main(int argc, char** argv) {
 					  << (s.shot < static_cast<int>(names.size()) ? names[static_cast<std::size_t>(s.shot)] : std::string()) << std::endl;
 		return EXIT_SUCCESS;
 	}
+	// `ray_tracer --film-media <key> [samples a shot]`: the moments the camera is inside the sphere of a medium not its own - smoke, a flame, a plume, a cloud, unseen from in
+	// there (film_checks.h) - one tab-separated line each: `inside  shot (1 = the first)  when  medium  radius  how far inside  name`; then `spheres  N`, the most in a frame.
+	if (argc >= 2 && std::string(argv[1]) == "--film-media") {
+		const cartoon::Film *film = argc >= 3 ? cartoon::find(argv[2]) : nullptr;
+		if (!film) {
+			std::cerr << "usage: " << argv[0] << " --film-media <film key> [samples a shot]" << std::endl;
+			return EXIT_FAILURE;
+		}
+		const std::vector<std::string> names = cartoon::shotNamesOf(*film);
+		int seen = 0;
+		for (const cartoon::film_checks::InMedium &m : cartoon::film_checks::cameraInMedia(*film, argc >= 4 ? std::max(2, std::atoi(argv[3])) : 5, &seen))
+			std::cout << "inside" << '\t' << m.shot + 1 << '\t' << m.at << '\t' << m.name << '\t' << m.radius << '\t' << m.inside << '\t'
+					  << (m.shot < static_cast<int>(names.size()) ? names[static_cast<std::size_t>(m.shot)] : std::string()) << std::endl;
+		std::cout << "spheres" << '\t' << seen << "\t(the most medium spheres in one frame checked)" << std::endl;
+		return EXIT_SUCCESS;
+	}
 	std::cout << "========================================" << std::endl;
 	std::cout << "RAY TRACER LAUNCHER (Unified GPU/CPU)" << std::endl;
 	std::cout << "========================================" << std::endl;
@@ -1311,6 +1328,7 @@ int main(int argc, char** argv) {
 			return EXIT_FAILURE;
 		}
 		char file_scene_id[32] = {};
+		pbrt_discover::skipGenerated() = true;   // (the scene list is not shown: the cartoon stills, every film file read, are not needed)
 		const int reg = cpu_register_scene_file(args.scene_file.c_str(), file_scene_id, static_cast<int>(sizeof file_scene_id));
 		if (reg != 0) {
 			std::cerr << "Cannot render " << args.scene_file << ": "

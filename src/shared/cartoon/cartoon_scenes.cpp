@@ -42,6 +42,8 @@ void listGenerated(std::vector<Discovered> &out) {
 
 void materializeGenerated(const std::string &path) {
 	const std::string dir = cacheDir();
+	std::error_code ec;   // (a file outside the stills' folder - which may not be made yet - is no still: the films, every film file read, are not asked)
+	if (std::filesystem::weakly_canonical(std::filesystem::path(path).parent_path(), ec) != std::filesystem::weakly_canonical(dir, ec)) return;
 	for (const cartoon::Film *filmPtr : cartoon::films()) {
 		const cartoon::Film &film = *filmPtr;
 		if (path != pathOf(dir, film)) continue;
@@ -54,6 +56,15 @@ void materializeGenerated(const std::string &path) {
 const char *filmTable() {
 	static const std::string table = cartoon::filmTable();
 	return table.c_str();
+}
+
+const char *filmProblems() {
+	static const std::string text = [] {
+		std::string out;
+		for (const std::string &p : cartoon::filmFileProblems()) out += p + "\n";
+		return out;
+	}();
+	return text.c_str();
 }
 
 std::string filmMoment(const std::string &id) {

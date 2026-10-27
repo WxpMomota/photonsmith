@@ -48,6 +48,8 @@ QString lastLoadError();
 // The cartoon films as the renderer's library knows them, one line each (cartoon::filmTable); empty when it says nothing. Read through film_info.h: this program does not
 // compile the films.
 QString filmTable();
+// The film files that were left out of the films and why ("file:line: what"), one each; empty when every one was read (or an older library cannot say).
+QStringList filmProblems();
 // Where a film's camera is at t and what it looks at (x y z, x y z: its LookAt); false when the library cannot say. For Live Preview's film timeline.
 bool filmCamera(const QString &key, double t, double out[6]);
 // Whether a film made from a file was saved since it was last read (the library reads it again): the film timeline draws the moment again.

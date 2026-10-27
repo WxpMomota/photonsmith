@@ -40,6 +40,7 @@ struct DllHandle {
 	CountFn refreshFn = nullptr;
 	StringByIdFn idForFileFn = nullptr;   // optional, like refreshFn
 	StringFn filmTableFn = nullptr;       // optional: the cartoon films (film_info.h)
+	StringFn filmProblemsFn = nullptr;    // optional: the film files left out and why
 	using FilmCameraFn = int (*)(const char *, double, double *);
 	using FilmChangedFn = int (*)(const char *);
 	FilmCameraFn filmCameraFn = nullptr;     // optional: a film's camera at a moment (the film timeline)
@@ -156,6 +157,7 @@ DllHandle& handle() {
 		}
 		// The cartoon films: this program does not compile them, the library says what they are (film_info.h). Optional: an older library has no films for the GUI.
 		h.filmTableFn = reinterpret_cast<StringFn>(cross_abi_library::lookupSymbol(h.module, "scene_metadata_film_table"));
+		h.filmProblemsFn = reinterpret_cast<StringFn>(cross_abi_library::lookupSymbol(h.module, "scene_metadata_film_problems"));
 		h.filmCameraFn = reinterpret_cast<DllHandle::FilmCameraFn>(cross_abi_library::lookupSymbol(h.module, "scene_metadata_film_camera"));
 		h.filmChangedFn = reinterpret_cast<DllHandle::FilmChangedFn>(cross_abi_library::lookupSymbol(h.module, "scene_metadata_film_changed"));
 		h.filmFileShotsFn = reinterpret_cast<StringByIdFn>(cross_abi_library::lookupSymbol(h.module, "scene_metadata_film_file_shots"));
@@ -178,6 +180,11 @@ QString lastLoadError() {
 QString filmTable() {
 	if (!ensureLoaded() || !handle().filmTableFn) return QString();
 	return QString::fromUtf8(handle().filmTableFn());
+}
+
+QStringList filmProblems() {
+	if (!ensureLoaded() || !handle().filmProblemsFn) return QStringList();
+	return QString::fromUtf8(handle().filmProblemsFn()).split(QLatin1Char('\n'), Qt::SkipEmptyParts);
 }
 
 bool filmCamera(const QString &key, double t, double out[6]) {

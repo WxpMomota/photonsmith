@@ -21,8 +21,40 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#if defined(_WIN32)
+// GetModuleFileNameW and GetModuleHandleExW exactly as windows.h declares them (STRICT: HMODULE is HINSTANCE__*), so that a file which includes both agrees; windows.h itself is
+// not included here, because this header reaches files that do not want its min/max/near/far macros.
+extern "C" __declspec(dllimport) unsigned long __stdcall GetModuleFileNameW(struct HINSTANCE__ *hModule, wchar_t *lpFilename, unsigned long nSize);
+extern "C" __declspec(dllimport) int __stdcall GetModuleHandleExW(unsigned long dwFlags, const wchar_t *lpModuleName, struct HINSTANCE__ **phModule);
+#else
+#include <dlfcn.h>   // dladdr
+#endif
 
 namespace pbrt_asset_check {
+
+// The file of the module this code is in: ray_tracer.exe, or the GUI's scene_metadata.dll or realtime_renderer.dll. Empty when it is not known.
+inline std::filesystem::path moduleFile() {
+	static const int anchor = 0;   // (an address inside the module)
+	static const std::filesystem::path file = [] {
+		std::filesystem::path out;
+#if defined(_WIN32)
+		// (4 is GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, 2 ..._UNCHANGED_REFCOUNT. Not _get_wpgmptr: it is only set in a program whose entry is wmain, and in any other one -
+		// every program here - it is a fatal invalid-parameter error.)
+		struct HINSTANCE__ *module = nullptr;
+		if (!GetModuleHandleExW(4u | 2u, reinterpret_cast<const wchar_t *>(&anchor), &module)) module = nullptr;
+		wchar_t buf[32768];
+		const unsigned long n = GetModuleFileNameW(module, buf, static_cast<unsigned long>(sizeof(buf) / sizeof(buf[0])));
+		if (n > 0 && n < sizeof(buf) / sizeof(buf[0])) out = std::wstring(buf, n);
+#else
+		Dl_info info{};
+		if (dladdr(&anchor, &info) && info.dli_fname) out = info.dli_fname;
+#endif
+		std::error_code ec;
+		if (!out.empty()) out = std::filesystem::absolute(out, ec);
+		return out;
+	}();
+	return file;
+}
 
 // Files fetched at run time (the GUI's "Download missing files") cannot always go next to the application - it may be on
 // a read-only disk image or in a protected folder - so they go to a per-user folder whose layout mirrors the application
@@ -53,12 +85,27 @@ inline std::string userSceneDir() {
 }
 
 // Where, in order, the scenes folder is looked for: RAY_TRACER_PBRT_DIR (a scene collection anywhere, without copying it into the install), then pbrt_scenes in the
-// working directory and up from it - the repository root during development, RayTracer_Package/ when the GUI starts the program there, a scratch folder below either.
-// The one list for scene discovery (pbrt_discover.h), film files (cartoons.h) and a film's pictures (film_cache.h), which each had their own copy.
+// working directory and up from it - the repository root during development, RayTracer_Package/ when the GUI starts the program there, a scratch folder below either -
+// and, when the working directory has none of those, beside the program and up from it (a program started from any other folder: its films and their pictures are still
+// found; not as well as the working directory's, whose film files would be the same films twice). The one list for scene discovery (pbrt_discover.h), film files
+// (cartoons.h) and a film's pictures (film_cache.h), which each had their own copy.
 inline std::vector<std::string> sceneSearchPaths() {
 	std::vector<std::string> dirs;
 	if (const std::string env = environmentValue("RAY_TRACER_PBRT_DIR"); !env.empty()) dirs.push_back(env);
-	for (const char *d : {"pbrt_scenes", "../pbrt_scenes", "../../pbrt_scenes", "../../../pbrt_scenes"}) dirs.emplace_back(d);
+	std::error_code ec;
+	bool working = false;
+	for (const char *d : {"pbrt_scenes", "../pbrt_scenes", "../../pbrt_scenes", "../../../pbrt_scenes"}) {
+		dirs.emplace_back(d);
+		working = working || std::filesystem::is_directory(d, ec);
+	}
+	if (!working)
+		if (const std::filesystem::path program = moduleFile(); !program.empty()) {
+			std::filesystem::path d = program.parent_path();
+			for (int up = 0; up < 4; ++up, d = d.parent_path()) {
+				dirs.push_back((d / "pbrt_scenes").string());
+				if (d == d.parent_path()) break;
+			}
+		}
 	return dirs;
 }
 

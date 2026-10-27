@@ -22,7 +22,7 @@
 //     fps      24                           # (default 24)
 //     still    6                            # the moment the scene list's picture shows (default: the middle)
 //     tags     emissive,dusk                # words from the scene list's vocabulary (cartoons.h); others are ignored
-//     ease     1                            # 1 (the default): motions start and stop gently; 0: they move at an even pace
+//     ease     1                            # 1 (the default): motions start and stop gently; 0: they move at an even pace (wherever the line is)
 //     shutter  0.5                          # motion blur: a moving block is blurred over this share of a frame (0.5, the default: a film camera's 180-degree shutter); 0: sharp
 //
 //     shot 0 The sails                      # a camera shot that begins at 0 seconds ... (a hard cut at the next shot's start)
@@ -30,7 +30,8 @@
 //       key  ...
 //     shot 6 Pull back
 //       key  ...
-//       dissolve 0.8                        # how this shot comes in: `dissolve`, `fade` (to black and up) or `wipe`, over so many seconds centred on its cut (default: a cut)
+//       ease camera 0                       # the camera goes through its keys at an even pace (default 1: it starts and stops gently)
+//       dissolve 0.8                       # how this shot comes in: `dissolve`, `fade` (to black and up) or `wipe`, over so many seconds centred on its cut (default: a cut)
 //     fadeout  1.5                          # the film ends with a fade to black over its last 1.5 s (a `fade` in its first shot fades it up from black)
 //
 //     turn  windmill about 0 3 0 axis 0 0 1   0 0   12 720   # rotate NAME: `about X Y Z` the point it turns about (default 0 0 0), `axis X Y Z` (default 0 1 0), then pairs: time degrees
@@ -213,7 +214,8 @@ namespace film_file {
 // Reads a film file's text. `where` names it in the messages. The scene is not read here (see load()), so the names it animates are not yet checked. The library files it
 // brings in (`set NAME`: library/NAME.set, film-file lines - a scene and what dresses it; `cast NAME`: library/NAME.cast, what a `character` line says of a character but
 // where it stands) are read here, as if their lines were the film file's at that place.
-inline Parsed parse(const std::string &text, const std::string &where) {
+// `castBefore`: a film in parts' last part is given the cast of the parts before it, for its credits.
+inline Parsed parse(const std::string &text, const std::string &where, const std::vector<Spec::CreditName> *castBefore = nullptr) {
 	using detail::number;
 	Parsed r;
 	Spec &s = r.spec;
@@ -234,8 +236,13 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 		return r;
 	};
 	std::string shotText;   // the key lines of the shot being read
+	std::string shotEase;   // its `ease camera` (as the camera path's `ease` line)
 	auto closeShot = [&]() -> std::string {
 		if (s.shots.empty()) return std::string();
+		const std::string ease = shotEase;
+		shotEase.clear();
+		if (!ease.empty() && (s.shots.back().move.kind != Shot::Move::None || !s.shots.back().fly.empty() || s.shots.back().following || s.shots.back().coverage))
+			return "the shot \"" + s.shots.back().name + "\" has `ease camera`, which is for a shot of `key` lines";
 		if (s.shots.back().move.kind != Shot::Move::None) {
 			if (!shotText.empty() || s.shots.back().following || s.shots.back().coverage) return "the shot \"" + s.shots.back().name + "\" has a move and `key`, `follow` or `auto` lines too";
 			return std::string();
@@ -257,7 +264,7 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			const std::size_t at = shotText.find("key ");
 			shotText += shotText.substr(at, shotText.find('\n', at) - at + 1);
 		}
-		const camera_keyframes::ParseResult p = camera_keyframes::parse(shotText);
+		const camera_keyframes::ParseResult p = camera_keyframes::parse(ease + shotText);
 		if (!p.ok) return p.error;
 		s.shots.back().path = p.path;
 		shotText.clear();
@@ -339,11 +346,14 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 			s.fps = static_cast<int>(v);
 		} else if (verb == "still") {
 			if (w.size() != 2 || !number(w[1], s.still) || s.still < 0) return fail("still is a time in seconds");
-		} else if (verb == "ease") {
+		} else if (verb == "ease") {   // the film's motions wherever the line is; `ease camera` a shot's camera path
 			double v = 1;
-			if (w.size() != 2 || !number(w[1], v)) return fail("ease is 1 or 0");
-			if (s.shots.empty()) s.ease = v != 0.0;
-			else shotText += line + "\n";   // inside a shot it is the camera path's own `ease`
+			const bool camera = w.size() == 3 && w[1] == "camera";
+			if (w.size() != (camera ? 3u : 2u) || !number(w.back(), v) || (v != 0.0 && v != 1.0))
+				return fail("`ease 1` or `ease 0` (the film's motions), or in a shot `ease camera 1` or `ease camera 0` (its camera)");
+			if (!camera) s.ease = v != 0.0;
+			else if (s.shots.empty()) return fail("`ease camera` belongs to a shot: start one with `shot 0 NAME` first");
+			else shotEase = "ease " + w.back() + "\n";
 		} else if (verb == "shutter") {
 			if (w.size() != 2 || !number(w[1], s.shutter) || s.shutter < 0.0 || s.shutter > 1.0) return fail("shutter is a share of a frame, from 0 (sharp) to 1");
 		} else if (verb == "shot") {
@@ -1795,14 +1805,18 @@ inline Parsed parse(const std::string &text, const std::string &where) {
 	for (skyfx::Aurora &a : s.auroras)
 		if (!a.facingSet && s.hasSky) a.facing = s.sky.south + 180.0;   // (the aurora is towards the pole: the film's own north)
 	s.storyEnd = s.length;
+	if (castBefore) s.creditCast = *castBefore;
+	for (const Character &c : s.characters) {   // (a character of an earlier part again: named once)
+		if (c.extra || std::any_of(s.creditCast.begin(), s.creditCast.end(), [&](const Spec::CreditName &k) { return k.name == c.name; })) continue;
+		const std::string voice = c.voice.empty() ? s.voices : c.voice;
+		s.creditCast.push_back({c.name, c.kind, !voice.empty() && voice != "babble"});
+	}
 	if (s.credits) {   // the credits: cards of three seconds after the story, over black (the film's name; the cast, five to a card; the film's own lines and how it was made)
 		if (s.shots.empty()) {
 			n = 0;
 			return fail("`credits` come after the film's shots: the film needs a `shot` line");
 		}
-		std::size_t cast = 0;
-		for (const Character &c : s.characters) cast += c.extra ? 0 : 1;
-		s.length += 3.0 * static_cast<double>(2 + (cast + 4) / 5);
+		s.length += 3.0 * static_cast<double>(2 + (s.creditCast.size() + 4) / 5);
 		Shot credits;
 		credits.start = s.storyEnd;
 		credits.name = "Credits";

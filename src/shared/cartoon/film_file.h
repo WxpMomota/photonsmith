@@ -228,7 +228,11 @@ class DataFilm {
 			if (partIndex >= static_cast<int>(parts.parts.size())) return filePath + ": it has no part " + std::to_string(partIndex + 1) + " (it has " + std::to_string(parts.parts.size()) + ")";
 			text = parts.parts[static_cast<std::size_t>(partIndex)].text;
 		}
-		Parsed p = parse(text, filePath);
+		std::vector<Spec::CreditName> castBefore;   // (the last part's credits name the whole film's cast)
+		if (partIndex > 0 && partIndex + 1 == static_cast<int>(parts.parts.size()))
+			for (int k = 0; k < partIndex; ++k)
+				if (const Parsed earlier = parse(parts.parts[static_cast<std::size_t>(k)].text, filePath, &castBefore); earlier.ok) castBefore = earlier.spec.creditCast;
+		Parsed p = parse(text, filePath, castBefore.empty() ? nullptr : &castBefore);
 		if (!p.ok) return p.error;
 		spec = p.spec;
 		if (partIndex >= 0) {
@@ -1480,13 +1484,11 @@ class DataFilm {
 		if (!episode.empty()) first.push_back({episode, 0.042});
 		card(t, t + 2.6, 0.45, first);
 		t += 3.0;
-		std::vector<const Character *> cast;
-		for (const Character &c : spec.characters)
-			if (!c.extra) cast.push_back(&c);
+		const std::vector<Spec::CreditName> &cast = spec.creditCast;
 		for (std::size_t k = 0; k < cast.size(); k += 5) {
 			std::vector<std::pair<std::string, double>> lines{{k == 0 ? "Cast" : "Cast (continued)", 0.05}};
 			for (std::size_t j = k; j < std::min(cast.size(), k + 5); ++j) {
-				std::string who = cast[j]->name, kind = cast[j]->kind;
+				std::string who = cast[j].name, kind = cast[j].kind;
 				if (!who.empty()) who[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(who[0])));
 				std::replace(kind.begin(), kind.end(), '-', ' ');
 				lines.push_back({who + "  -  a " + kind, 0.038});
@@ -1496,9 +1498,7 @@ class DataFilm {
 		}
 		std::vector<std::pair<std::string, double>> last;
 		for (const std::string &l : spec.creditLines) last.push_back({l, 0.04});
-		bool voiced = false;
-		for (const Character &c : spec.characters) voiced = voiced || !voiceAskedOf(c).empty();
-		if (voiced) last.push_back({"Voices by the computer's own text-to-speech", 0.034});
+		if (std::any_of(cast.begin(), cast.end(), [](const Spec::CreditName &c) { return c.voiced; })) last.push_back({"Voices by the computer's own text-to-speech", 0.034});
 		last.push_back({"Made with Photonsmith", 0.034});
 		card(t, std::min(spec.length - 0.1, t + 2.6), 0.45, last);
 		return out;

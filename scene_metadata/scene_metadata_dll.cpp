@@ -301,3 +301,12 @@ SCENE_METADATA_API const char* scene_metadata_film_table() {
 		return "";
 	}
 }
+
+// The film files that were left out of the films and why ("file:line: what"), one line each; "" when every one was read.
+SCENE_METADATA_API const char* scene_metadata_film_problems() {
+	try {
+		return pbrt_discover::filmProblems();
+	} catch (...) {
+		return "";
+	}
+}

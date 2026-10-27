@@ -2121,6 +2121,33 @@ TEST(FilmChecks, APlantedFootThatMovesIsFoundAndOneThatStaysIsNot) {
 	EXPECT_GT(found[1].worst, cartoon::film_checks::kSlideLimit);
 }
 
+// A camera inside a medium's sphere (smoke here) is reported, once a shot, with how far inside; the camera's own medium round it (mist) is not, nor a sphere it is outside of,
+// nor one that is scaled (where its sphere is is not read).
+TEST(FilmChecks, ACameraInsideSmokeIsFoundButNotInItsOwnMist) {
+	const auto scene = [](double t) {
+		char eye[120];
+		std::snprintf(eye, sizeof eye, "LookAt %.3f 1 0  0 1 -10  0 1 0\n", t < 2.0 ? 0.0 : 20.0);   // (the first shot in the smoke, the second clear of it)
+		return std::string("MediumInterface \"\" \"mist\"\n") + eye + "Camera \"perspective\"\nWorldBegin\n"
+			   "AttributeBegin\n  MediumInterface \"mist\" \"\"\n  Material \"interface\"\n  Translate 0 1 0\n  Shape \"sphere\" \"float radius\" [ 50 ]\nAttributeEnd\n"
+			   "AttributeBegin\n  Translate 1 0 0\n  Translate 0 1.5 0\n  Material \"interface\"\n  MediumInterface \"smoke\" \"\"\n  Shape \"sphere\" \"float radius\" [ 3 ]\nAttributeEnd\n"
+			   "AttributeBegin\n  Translate 0 1 0\n  Scale 2 2 2\n  Material \"interface\"\n  MediumInterface \"scaled\" \"\"\n  Shape \"sphere\" \"float radius\" [ 3 ]\nAttributeEnd\n"
+			   "AttributeBegin\n  Translate 0 1 -30\n  Material \"interface\"\n  MediumInterface \"far\" \"\"\n  Shape \"sphere\" \"float radius\" [ 3 ]\nAttributeEnd\n";
+	};
+	cartoon::Film film{"media-test", "Media test", "", 4.0, 24, scene, [&](double t) { return scene(t).substr(0, scene(t).find("WorldBegin")); },
+					   []() { return std::vector<double>{0.0, 2.0}; }, 0.0, {9996, "", "In|Out", 8, 0.0}};
+	const std::vector<cartoon::film_checks::MediumSphere> spheres = cartoon::film_checks::mediumSpheres(scene(0.0));
+	ASSERT_EQ(spheres.size(), 3u) << "the mist, the smoke and the far one (the scaled one left out)";
+	EXPECT_EQ(spheres[1].name, "smoke");
+	EXPECT_NEAR(spheres[1].centre.x, 1.0, 1e-9);
+	EXPECT_NEAR(spheres[1].centre.y, 1.5, 1e-9);
+	EXPECT_NEAR(spheres[1].radius, 3.0, 1e-9);
+	const std::vector<cartoon::film_checks::InMedium> found = cartoon::film_checks::cameraInMedia(film);
+	ASSERT_EQ(found.size(), 1u);
+	EXPECT_EQ(found[0].shot, 0);
+	EXPECT_EQ(found[0].name, "smoke");
+	EXPECT_NEAR(found[0].inside, 3.0 - std::hypot(1.0, 0.5), 1e-3);
+}
+
 // The Nomai explorer's walk: a foot on the ground goes back under the body at the body's own pace, so in every shot it walks in the planted feet stay put (the turning
 // floating steps, a body on a 6 m curve, the most: a little over a tenth of a metre a second). Its old swinging gait skated at 0.55 to 0.92 m/s.
 TEST(FilmChecks, TheNomaiExplorersPlantedFeetStayPut) {

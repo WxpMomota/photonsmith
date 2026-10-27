@@ -28,12 +28,7 @@
 #include <vector>
 #if defined(_WIN32)
 #include <process.h>   // _getpid
-// GetModuleFileNameW exactly as windows.h declares it (STRICT: HMODULE is HINSTANCE__*), so that a file which includes both agrees; windows.h itself is not included here,
-// because this header reaches files that do not want its min/max/near/far macros.
-extern "C" __declspec(dllimport) unsigned long __stdcall GetModuleFileNameW(struct HINSTANCE__ *hModule, wchar_t *lpFilename, unsigned long nSize);
-extern "C" __declspec(dllimport) int __stdcall GetModuleHandleExW(unsigned long dwFlags, const wchar_t *lpModuleName, struct HINSTANCE__ **phModule);
 #else
-#include <dlfcn.h>   // dladdr
 #include <unistd.h>
 #endif
 
@@ -52,21 +47,8 @@ inline std::mutex &lock() {
 // The program this code is in - the module holding it: ray_tracer.exe, or the GUI's scene_metadata.dll and realtime_renderer.dll (stamping the GUI's own exe, an updated DLL
 // reused the meshes the older one made) - its path, size and time, hashed (FNV-1a) to a short name. "" when the path is not known.
 inline std::string buildStamp() {
-	static const int anchor = 0;   // (an address inside the module)
 	static const std::string stamp = [] {
-		std::filesystem::path exe;
-#if defined(_WIN32)
-		// (GetModuleHandleExW and GetModuleFileNameW, declared above as windows.h declares them: 4 is ..._FROM_ADDRESS, 2 ..._UNCHANGED_REFCOUNT. Not _get_wpgmptr: it is
-		// only set in a program whose entry is wmain, and in any other one - every program here - it is a fatal invalid-parameter error.)
-		struct HINSTANCE__ *module = nullptr;
-		if (!GetModuleHandleExW(4u | 2u, reinterpret_cast<const wchar_t *>(&anchor), &module)) module = nullptr;
-		wchar_t buf[32768];
-		const unsigned long n = GetModuleFileNameW(module, buf, static_cast<unsigned long>(sizeof(buf) / sizeof(buf[0])));
-		if (n > 0 && n < sizeof(buf) / sizeof(buf[0])) exe = std::wstring(buf, n);
-#else
-		Dl_info info{};
-		if (dladdr(&anchor, &info) && info.dli_fname) exe = info.dli_fname;
-#endif
+		const std::filesystem::path exe = pbrt_asset_check::moduleFile();
 		std::error_code ec;
 		if (exe.empty() || !std::filesystem::exists(exe, ec)) return std::string();
 		const std::string id = exe.string() + "|" + std::to_string(static_cast<unsigned long long>(std::filesystem::file_size(exe, ec))) + "|" +

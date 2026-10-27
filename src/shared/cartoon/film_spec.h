@@ -407,6 +407,11 @@ struct Spec {
 	std::string episodeName;
 	bool credits = false;
 	std::vector<std::string> creditLines;
+	struct CreditName {
+		std::string name, kind;
+		bool voiced = false;        // its lines in a computer's voice
+	};
+	std::vector<CreditName> creditCast;   // the cast on the credits' cards, extras left out (a film in parts: every part's, in order)
 	double storyEnd = 0.0;          // where the story ends and the credits begin (the length without them)
 	std::string theme;              // "jingle" or a WAV of the library ("": none)
 	double themeGain = 0.8;

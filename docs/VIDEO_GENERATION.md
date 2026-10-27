@@ -387,6 +387,11 @@ file, between two marker lines that the next `--write` replaces; the frame's hea
 fewer than one sample), and a resume renders again only the frames whose share changed. `--shots` measures some shots only. On five shots of the Nomai film the giant
 in space and the canyon dropped to a quarter (no visible change, side by side) and the face close-up, the dark hall and the campfire kept all 32.
 
+**A camera inside smoke or a cloud.** Smoke, flames, a volcano's plume and clouds are media that fill a sphere round their box, the air outside. A camera inside such a
+sphere is not in the medium - its rays start in the air - so the smoke or the cloud is not seen from in there and pops in as the camera leaves. `ray_tracer --film-media <key>`
+samples each shot five times (no render) and lists the moments the camera is inside a medium that is not its own (mist round the camera and the sea are its own, and fine);
+the doctor warns on each.
+
 **Feet that slide, and flicker: the doctor watches the motion.** A film can report its characters' feet (its row's `feetAt(t)`: each foot's place and whether the walk means
 it to be on the ground; a film_kit shot sets `f.feet`, the Nomai explorer's are `explorerFeet(pose, frame)`). `src/shared/cartoon/film_checks.h` samples every shot at the
 film's frame rate and reports the fastest a planted foot moves (`ray_tracer --film-feet <key>`, no render); the doctor notes more than 0.10 m/s and warns above 0.25.
@@ -497,11 +502,12 @@ length   12                        # seconds (required)
 fps      24                        # default 24
 still    6                         # the moment the scene list's picture shows (default: the middle)
 tags     emissive,dusk             # words from the scene list's tags (others are ignored)
-ease     1                         # 1: motions start and stop gently (the default); 0: even pace
+ease     1                         # 1: motions start and stop gently (the default); 0: even pace (wherever the line is)
 
 shot 0 The windmill                # a camera shot from 0 s; the next shot is a hard cut
   key  0 3 14   0 2.5 0   38       # where the camera is, what it looks at, [fov [lensRadius focusDistance]], [hold S]
   key  -4 3.5 12  0 2.8 0  38      #   (the same `key` lines as a --camera-keyframes file: the camera goes through them)
+  ease camera 0                    #   (this shot's camera at an even pace; default 1, gently)
 shot 7 The lamp
   key  ...
 
