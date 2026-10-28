@@ -589,3 +589,32 @@ TEST(FilmUniverseRemnant, ASupernovaFlashesAndItsShellGrowsAPulsarSweepsAndAPlan
 
 	expectProblems({{"remnant a at 0 0 0", "how big it is"}, {"remnant a at 0 0 0 size 500 kind nova", "\"kind\""}, {"remnant a at 0 0 0 size 500 period 0", "\"period\""}});
 }
+
+// ---- 15. ships and stations -----------------------------------------------------------------------------------------------------------------------------------------------
+
+TEST(FilmUniverseShip, CraftFlyNoseFirstTheirEnginesGlowWhileTheyMoveAndWheelsSpin) {
+	cs::Ship sh;
+	sh.name = "ark", sh.at = {0.0, 0.0, -500.0}, sh.move = {0.0, 0.0, -40.0}, sh.size = 60.0;
+	// its nose (+x of its own frame) points the way it goes: -z, in story space too
+	const cartoon::Vec3 nose = cartoon::transformPoint(cs::shipPlacement(sh, 0.0), {0.5, 0.0, 0.0}), tail = cartoon::transformPoint(cs::shipPlacement(sh, 0.0), {-0.5, 0.0, 0.0});
+	EXPECT_LT(nose.z, tail.z) << "nose first";
+	EXPECT_NEAR(length(nose - tail), 60.0, 1e-6);
+	EXPECT_NEAR(cartoon::transformPoint(cs::shipPlacement(sh, 10.0), {0.0, 0.0, 0.0}).z, -900.0, 1e-6) << "40 m a second";
+	for (const std::string &kind : cs::shipKinds()) {
+		sh.kind = kind;
+		const std::string moving = cs::shipText(sh, 1.0);
+		EXPECT_NE(moving.find("# a " + kind), std::string::npos);
+		EXPECT_GE(count(moving, "AreaLightSource"), 2u) << kind << ": its running lights";
+	}
+	sh.kind = "shuttle";
+	cs::Ship still = sh;
+	still.move = {0.0, 0.0, 0.0};
+	EXPECT_GT(count(cs::shipText(sh, 0.5), "AreaLightSource"), count(cs::shipText(still, 0.5), "AreaLightSource")) << "its engines glow while it moves";
+	sh.kind = "wheel";
+	EXPECT_NE(cs::shipText(sh, 0.0), cs::shipText(sh, 2.0)) << "the wheel turns";
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("ship", "scene s.pbrt\nlength 4\nspace\nship ark at 0 0 -500 kind freighter size 80 move 0 0 -40 colour 0.8 0.3 0.2 engines on\nshot 0 A\n key 0 0 0  0 0 -100  50\n", film), "");
+	EXPECT_NE(film.sceneAt(1.0).find("# a freighter (film_cosmos.h): ark"), std::string::npos);
+	expectProblems({{"ship a at 0 0 0 kind tug", "\"kind\""}, {"ship a at 0 0 0 colour 2 0 0", "\"colour\""}, {"ship a at 0 0 0 engines maybe", "\"engines\""}, {"ship a at 0 0 0 size 0", "\"size\""}});
+}

@@ -1243,6 +1243,22 @@ spin axis, sweep round once every `period` seconds like a lighthouse's, in a sma
 nebula is an hourglass shell of teal gas rimmed with red round a tiny white-hot dwarf. Each glow is one grid in the film's cache (a supernova's is the same grid, placed
 bigger as it grows: it brightens as it spreads).
 
+**Ships and stations: `ship`.** (film_cosmos.h)
+
+```
+ship  ark     at 0 0 -500      kind shuttle    size 60   move 0 0 -40          # flies nose first along its `move`
+ship  wasp    at 40 10 -300    kind fighter    size 14   move 5 0 -90  seed 2
+ship  mule    at -300 -50 -900 kind freighter  size 300  move 0 0 -15  colour 0.7 0.5 0.3
+ship  haven   at 0 0 -4000     kind station    size 200  heading 30
+ship  spindle at 0 0 -8000     kind wheel      size 500  spin 1.5              # turns a minute
+```
+
+A craft `size` long (or across), where `at` says at nature's time 0 and moving `move` metres a second with its nose along its way (still: `heading` and `pitch`). A `shuttle`
+is a white body with delta wings and a tail fin; a `fighter` slim with four wings in an X and four engines; a `freighter` a long spine hung with coloured containers, a bridge
+at its bow and one great engine; a `station` modules round a hub with wings of solar panels on a truss, turning slowly; a `wheel` a ring on spokes, its windows lit, spinning
+`spin` turns a minute. `colour R G B` paints its hull. Its engines glow blue-white and flicker while it moves (`engines on|off` to choose), and it carries running lights - red
+to port, green to starboard, a white strobe (`lights off` to put them out).
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

@@ -40,6 +40,7 @@
 #include "film_space.h"
 #include "film_planets.h"
 #include "film_cosmos.h"
+#include "film_voyage.h"
 #include "film_flowers.h"
 #include "film_geology.h"
 #include "film_soundscape.h"
@@ -412,6 +413,7 @@ struct Spec {
 	std::vector<cosmos::Comet> comets;
 	std::vector<cosmos::Belt> belts;
 	std::vector<cosmos::Remnant> remnants;
+	std::vector<cosmos::Ship> ships;
 	std::vector<ground::Track> tracks;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
