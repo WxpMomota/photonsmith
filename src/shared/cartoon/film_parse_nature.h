@@ -566,7 +566,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 				else if (t[i] == "speed" && a > 0.0) f.speed = a;
 				else if (t[i] == "height") f.at.y = a;
 				else if (t[i] == "seed") f.seed = static_cast<int>(a);
-				else return fail("\"" + t[i] + "\": a flock takes at X Y Z, from X Y Z, to X Y Z, in X0 Z0 X1 Z1, radius, speed, height, during T0 T1 and seed");
+				else if (t[i] == "feathers" && (f.kind == "eagles" || f.kind == "geese") && a >= 0.0 && a <= 4.0) f.feathers = a;
+				else return fail("\"" + t[i] + "\": a flock takes at X Y Z, from X Y Z, to X Y Z, in X0 Z0 X1 Z1, radius, speed, height, during T0 T1 and seed (eagles and geese: feathers 0 to 4)");
 				i += 2;
 			} else {
 				return fail("\"" + t[i] + "\": a flock takes at X Y Z, from X Y Z, to X Y Z, in X0 Z0 X1 Z1, radius, speed, height, during T0 T1 and seed");
@@ -590,7 +591,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 			else if (t[i] == "start") h.t0 = a;
 			else if (t[i] == "flee" && a >= 0.0) h.flee = a;
 			else if (t[i] == "seed") h.seed = static_cast<int>(a);
-			else return fail("\"" + t[i] + "\": a herd takes speed, start, flee (when it bolts) and seed");
+			else if (t[i] == "fur" && a >= 0.0 && a <= 4.0) h.fur = a;
+			else return fail("\"" + t[i] + "\": a herd takes speed, start, flee (when it bolts), fur (0 to 4) and seed");
 		}
 		s.herds.push_back(h);
 	} else if (verb == "aurora" || verb == "lightning" || verb == "meteors" || verb == "rainbow") {

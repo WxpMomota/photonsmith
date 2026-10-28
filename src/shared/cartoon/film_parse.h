@@ -147,6 +147,7 @@
 //                                                               # tumbling down the slope; `avalanche from X Z [at T]`: a powder cloud racing down; `quake T0 T1`: shaking
 //     fire     at 0 0 -4  size 1.2                              # fire (film_fire.h): flames (glowing volumes, flickering, a light among them, sparks) with smoke above;
 //     lava     from 120 -300  width 6                           # lava creeping down the land from a vent; a volcano raised in the land (`volcano at X Z [height H]
+//     herd     deer 12 from 0 0 to 100 0  fur 1                # fur on a herd, `feathers A` on eagles and geese (film_fur.h): strands over the body
 //     wind     60 8                                            # the wind (film_wind.h): a bearing and m/s that the grass, trees, clouds, fog, rain, smoke and
 //                                                               # waves all take; `tornado from X Z to X Z [during T0 T1] [width W]`: a funnel crossing the land
 //     glacier  from 0 -400  toward 180  calve 20                # ice (film_ice.h): a glacier down the land, its front calving; `iceberg at X Z [size S]`,

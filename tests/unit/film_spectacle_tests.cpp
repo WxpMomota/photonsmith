@@ -519,3 +519,54 @@ TEST(FilmSpectacleWind, OneWindMovesEverythingAndATornadoCrossesTheLand) {
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }
+
+// ---- 7. fur and feathers ---------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace fur = cartoon::fur;
+
+// Fur is shared out over the skin by the rest pose's areas, so the same strands come back in every pose, lying back along the body; a herd with `fur` has it in its
+// poses (and not on its antlers or hooves), a flock of eagles with `feathers` its plumage.
+TEST(FilmSpectacleFur, StrandsKeepTheirPlacesLieBackAndCoatTheHerd) {
+	cartoon::Mesh skin;   // a square metre of flank, facing +x, the animal facing +z
+	for (int j = 0; j <= 10; ++j)
+		for (int i = 0; i <= 10; ++i) skin.verts.push_back({0.0, j / 10.0, i / 10.0}), skin.normals.push_back({1.0, 0.0, 0.0});
+	for (int j = 0; j < 10; ++j)
+		for (int i = 0; i < 10; ++i) {
+			const int k = j * 11 + i;
+			skin.tris.push_back({k, k + 1, k + 12});
+			skin.tris.push_back({k, k + 12, k + 11});
+		}
+	fur::Coat coat = fur::coatOf("deer");
+	const std::string a = fur::strandsText({skin}, {skin}, {{0.4, 0.3, 0.2}}, coat, 1.0);
+	cartoon::Mesh moved = skin;
+	for (cartoon::Vec3 &v : moved.verts) v.y += 5.0;
+	const std::string b = fur::strandsText({moved}, {skin}, {{0.4, 0.3, 0.2}}, coat, 1.0);
+	const std::size_t ia = a.find("\"integer indices\" ["), ib = b.find("\"integer indices\" [");
+	ASSERT_NE(ia, std::string::npos);
+	const std::size_t na = count(a.substr(ia, a.find(']', ia) - ia), " "), nb = count(b.substr(ib, b.find(']', ib) - ib), " ");
+	EXPECT_EQ(na, nb) << "the same strands in every pose";
+	EXPECT_NEAR(double(na) / 3.0 / 4.0, coat.strands, 0.05 * coat.strands) << "about the coat's number of strands on its whole skin (four triangles each)";
+	// the strands lie back and stand off the skin (+x) by less than their length
+	std::istringstream in(a.substr(a.find("\"point3 P\" [") + 12));
+	double x = 0.0, y = 0.0, z = 0.0, out = 0.0;
+	while (in >> x >> y >> z) out = std::max(out, -x);   // (written in pbrt's space: x mirrored)
+	EXPECT_LT(out, 1.2 * coat.length * 1.4);
+	EXPECT_EQ(fur::strandsText({skin}, {skin}, {{0.4, 0.3, 0.2}}, coat, 0.0), "");
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("fur", "scene s.pbrt\nlength 10\nterrain hills size 600 height 5 seed 2\nherd deer 3 from 0 0 to 30 0 fur 1\nherd wolves 2 from 0 5 to 30 5\n"
+							  "flock eagles 1 at 0 30 0 feathers 1\nshot 0 A\n key 0 2 -10  0 1 0  50\n",
+						film),
+			  "");
+	const std::string s = film.sceneAt(2.0);
+	EXPECT_NE(s.find("ObjectBegin \"anim_deer_walk_"), std::string::npos);
+	EXPECT_NE(s.find("_coat100\""), std::string::npos) << "the deer's poses with their coat";
+	EXPECT_EQ(s.find("ObjectBegin \"anim_wolves_walk_0_coat"), std::string::npos) << "no fur where none was asked for";
+	EXPECT_NE(s.find("ObjectBegin \"anim_eagles_"), std::string::npos);
+	EXPECT_GE(count(s, "# fur (film_fur.h)"), 2u) << "deer and eagle";
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"herd deer 3 from 0 0 to 1 1 fur 9", "fur (0 to 4)"},
+																						{"flock starlings 10 at 0 5 0 feathers 1", "feathers 0 to 4"}}) {
+		const std::string problem = problemOf(line);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}

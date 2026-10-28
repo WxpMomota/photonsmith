@@ -991,6 +991,20 @@ a rope `width` metres across at the ground (40), leaning and snaking more as it 
 flung out, or over water a ring of spray (a waterspout); heard as a roar. The funnel is one grid and the cloud at its foot another below it (they never overlap); keep a
 `clouds deck` base above its top.
 
+**Fur and feathers: `herd ... fur A`, `flock ... feathers A`.** (film_fur.h; nature round 9, 2026-10-27)
+
+```
+herd     wolves 6  from -40 0  to 200 -20  fur 1     # deer, horses, wolves: 0 to 4
+flock    eagles 2  at 0 40 0  radius 30  feathers 1   # eagles and geese: 0 to 4
+```
+
+A coat of strands over each posed animal: small tapered ribbons rooted on the skin, shared out by the rest pose's areas and placed by their numbers, so the same strand
+stays on the same spot from pose to pose and the coat does not crawl; each leaves the skin a little, lies back along the body and droops. A deer's coat is 3 cm strands
+(6000 at `fur 1`), a horse's short and sleek (1.8 cm, 9000), a wolf's long and shaggy (6 cm, 7000); a bird's plumage is broad, blunt, flat-lying feathers (3.5 cm, 4000).
+Only the coat, legs, plumage, head and tail grow it - not hooves, antlers, eyes or a beak. The strands are a little lighter than the skin under them, with a sheen. They
+are triangles, not pbrt curves: each pose is an object instance, and an instance holds only triangles and spheres. A pose with its coat is its own object
+(`anim_wolves_run_3_coat100`), so a herd still costs a few poses.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

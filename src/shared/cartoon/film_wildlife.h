@@ -49,6 +49,7 @@ struct Flock {
 	Vec3 at, from, to;
 	double radius = 30.0, speed = 0.0, t0 = 0.0, t1 = 1e30, x0 = 0.0, z0 = 0.0, x1 = 0.0, z1 = 0.0;
 	int seed = 1;
+	double feathers = 0.0;   // (eagles, geese: film_fur.h) how much plumage, 0 none
 	// (starlings, fish) the flight, worked out when the film is loaded: positions and velocities at each step (pbrt's)
 	std::vector<std::vector<Vec3>> pos, vel;
 	double dt = 1.0 / 24.0;
@@ -59,6 +60,7 @@ struct Herd {
 	int count = 10;
 	double fx = 0.0, fz = 0.0, tx = 0.0, tz = 0.0, speed = 0.0, t0 = 0.0, flee = -1.0;
 	int seed = 1;
+	double fur = 0.0;   // (film_fur.h) how much fur, 0 none
 };
 
 namespace detail {
@@ -290,7 +292,7 @@ inline std::string flockText(const Flock &f, double t, const terrain::Field *gro
 			const int rank = (i + 1) / 2, arm = i % 2 ? 1 : -1;
 			const Vec3 p = lead - dir * (2.2 * rank) + side * (1.8 * rank * arm) + Vec3{0, 0.4 * std::sin(t * 0.8 + i), 0};
 			const int pose = static_cast<int>(std::floor((t * 3.0 - 0.5 * rank) * animals::posesOf("flap")));
-			place(poses.poseName("geese", "flap", pose, out), p, dir, 0.0, 1.0);
+			place(poses.poseName("geese", "flap", pose, out, f.feathers), p, dir, 0.0, 1.0);
 		}
 	} else if (f.kind == "eagles") {   // each circling the thermal, rising; gliding, a few wingbeats now and then
 		const double speed = f.speed > 0.0 ? f.speed : detail::speedOf(f.kind);
@@ -301,8 +303,8 @@ inline std::string flockText(const Flock &f, double t, const terrain::Field *gro
 			const Vec3 p = eagleAt(f, i, t, &fwd, &r);
 			const double bank = std::atan(speed * speed / (r * 9.81)) * 180.0 / kPi;
 			const double cycle = 9.0 + 6.0 * hash01(s, 6), when = std::fmod(t + cycle * hash01(s, 7), cycle);
-			const std::string pose = when < 2.0 ? poses.poseName("eagles", "flap", static_cast<int>(std::floor(t * 2.2 * animals::posesOf("flap"))), out)
-												: poses.poseName("eagles", "glide", static_cast<int>(std::floor(t / 4.0 * animals::posesOf("glide"))), out);
+			const std::string pose = when < 2.0 ? poses.poseName("eagles", "flap", static_cast<int>(std::floor(t * 2.2 * animals::posesOf("flap"))), out, f.feathers)
+												: poses.poseName("eagles", "glide", static_cast<int>(std::floor(t / 4.0 * animals::posesOf("glide"))), out, f.feathers);
 			place(pose, p, fwd, bank, 1.0);
 		}
 	} else if (f.kind == "butterflies") {   // each wandering its patch, flitting up and down
@@ -404,9 +406,9 @@ inline std::string herdText(const Herd &h, double t, const terrain::Field *groun
 		if (a.going.paused) {
 			const std::string clip = sp->grazes ? "graze" : "idle";
 			const double len = clip == "graze" ? 4.0 : 5.0;
-			pose = poses.poseName(h.kind, clip, static_cast<int>(std::floor((t / len + hash01(s, 11)) * animals::posesOf(clip))), out);
+			pose = poses.poseName(h.kind, clip, static_cast<int>(std::floor((t / len + hash01(s, 11)) * animals::posesOf(clip))), out, h.fur);
 		} else {
-			pose = poses.poseName(h.kind, a.clip, static_cast<int>(std::floor(a.cycles * animals::posesOf(a.clip))), out);
+			pose = poses.poseName(h.kind, a.clip, static_cast<int>(std::floor(a.cycles * animals::posesOf(a.clip))), out, h.fur);
 		}
 		const Vec3 storyAt{-p.x, p.y, p.z}, storyFwd{-dir.x, 0.0, dir.z};
 		out += nature::placeObject(pose, mul(translate(storyAt), detail::facing(storyFwd, {0, 1, 0}), rotate({0, 1, 0}, turn), rotate({1, 0, 0}, -pitch), scale(0.9 + 0.2 * hash01(s, 8))));

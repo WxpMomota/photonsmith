@@ -22,6 +22,7 @@
 #include "../gltf_skin.h"
 #include "cartoon_lib.h"
 #include "film_cache.h"
+#include "film_fur.h"
 #include "nature_lib.h"
 
 namespace cartoon {
@@ -86,16 +87,8 @@ inline std::shared_ptr<const Model> modelOf(const std::string &kind, std::string
 // How many poses a clip is cut into, and over how long it runs (its loop).
 inline int posesOf(const std::string &clip) { return clip == "idle" ? 20 : clip == "glide" ? 8 : 16; }
 
-// The pbrt object of a kind in a clip's pose k (of posesOf), named `name`: its pieces with the file's colours.
-inline std::string poseObject(const Model &m, const std::string &name, const std::string &clip, int k) {
-	const gltf_skin::Rig &rig = m.rig;
-	gltf_skin::Pose pose = gltf_skin::restPose(rig);
-	const int c = m.clip(clip);
-	if (c >= 0) {
-		const double len = rig.clips[static_cast<std::size_t>(c)].length;
-		gltf_skin::apply(rig, rig.clips[static_cast<std::size_t>(c)], len * k / posesOf(clip), pose);
-	}
-	std::string body;
+// A posed rig's pieces as meshes (story space) and their colours.
+inline void piecesOf(const gltf_skin::Rig &rig, const gltf_skin::Pose &pose, std::vector<Mesh> &meshes, std::vector<gltf_import::Material> &materials) {
 	for (const gltf_skin::Posed &p : gltf_skin::posed(rig, pose)) {
 		Mesh mesh;
 		const std::size_t vn = p.positions.size() / 3;
@@ -105,10 +98,42 @@ inline std::string poseObject(const Model &m, const std::string &name, const std
 		}
 		for (std::size_t t = 0; t + 2 < p.indices.size(); t += 3)
 			mesh.tris.push_back({static_cast<int>(p.indices[t]), static_cast<int>(p.indices[t + 1]), static_cast<int>(p.indices[t + 2])});
-		const gltf_import::Material mat = p.material >= 0 && static_cast<std::size_t>(p.material) < rig.materials.size() ? rig.materials[static_cast<std::size_t>(p.material)]
-																														   : gltf_import::Material();
+		meshes.push_back(std::move(mesh));
+		materials.push_back(p.material >= 0 && static_cast<std::size_t>(p.material) < rig.materials.size() ? rig.materials[static_cast<std::size_t>(p.material)] : gltf_import::Material());
+	}
+}
+
+// The pbrt object of a kind in a clip's pose k (of posesOf), named `name`: its pieces with the file's colours, and (`coat` above 0: film_fur.h) its fur or feathers.
+inline std::string poseObject(const Model &m, const std::string &name, const std::string &clip, int k, const std::string &kind = std::string(), double coat = 0.0) {
+	const gltf_skin::Rig &rig = m.rig;
+	gltf_skin::Pose pose = gltf_skin::restPose(rig);
+	const int c = m.clip(clip);
+	if (c >= 0) {
+		const double len = rig.clips[static_cast<std::size_t>(c)].length;
+		gltf_skin::apply(rig, rig.clips[static_cast<std::size_t>(c)], len * k / posesOf(clip), pose);
+	}
+	std::vector<Mesh> meshes;
+	std::vector<gltf_import::Material> materials;
+	piecesOf(rig, pose, meshes, materials);
+	std::string body;
+	std::vector<Vec3> colours;
+	for (std::size_t i = 0; i < meshes.size(); ++i) {
+		const gltf_import::Material &mat = materials[i];
 		const Vec3 colour{mat.baseColor[0], mat.baseColor[1], mat.baseColor[2]};
-		body += attr(mat.roughness < 0.5 ? coated(colour, std::max(0.1, mat.roughness)) : diffuseMaterial(colour), emitMesh(mesh, identity()));
+		const bool furred = mat.name == "coat" || mat.name == "legs" || mat.name == "plumage" || mat.name == "head" || mat.name == "tail";   // (not on hooves, antlers, eyes, a beak)
+		colours.push_back(furred ? colour : Vec3{0.0, 0.0, 0.0});
+		body += attr(mat.roughness < 0.5 ? coated(colour, std::max(0.1, mat.roughness)) : diffuseMaterial(colour), emitMesh(meshes[i], identity()));
+	}
+	if (coat > 0.0) {   // its fur or feathers, rooted by the rest pose's areas so they keep to their places on the skin
+		std::vector<Mesh> rest, furred, keep;
+		std::vector<gltf_import::Material> restMaterials;
+		piecesOf(rig, gltf_skin::restPose(rig), rest, restMaterials);
+		std::vector<Vec3> keepColours;
+		for (std::size_t i = 0; i < meshes.size() && i < rest.size(); ++i) {
+			if (colours[i].x + colours[i].y + colours[i].z <= 0.0) continue;
+			furred.push_back(meshes[i]), keep.push_back(rest[i]), keepColours.push_back(colours[i]);
+		}
+		body += fur::strandsText(furred, keep, keepColours, fur::coatOf(kind), coat);
 	}
 	return nature::objectBegin(name) + body + nature::objectEnd();
 }
@@ -116,12 +141,12 @@ inline std::string poseObject(const Model &m, const std::string &name, const std
 // A frame's poses: each object written once, the first time a frame asks for it (`text` gets it), its name returned for the placements.
 struct Poses {
 	std::set<std::string> written;
-	std::string poseName(const std::string &kind, const std::string &clip, int k, std::string &text) {
+	std::string poseName(const std::string &kind, const std::string &clip, int k, std::string &text, double coat = 0.0) {
 		k = ((k % posesOf(clip)) + posesOf(clip)) % posesOf(clip);
-		const std::string name = "anim_" + kind + "_" + clip + "_" + std::to_string(k);
+		const std::string name = "anim_" + kind + "_" + clip + "_" + std::to_string(k) + (coat > 0.0 ? "_coat" + std::to_string(static_cast<int>(std::lround(coat * 100.0))) : std::string());
 		if (written.insert(name).second) {
 			const std::shared_ptr<const Model> m = modelOf(kind);
-			if (m) text += poseObject(*m, name, clip, k);
+			if (m) text += poseObject(*m, name, clip, k, kind, coat);
 		}
 		return name;
 	}
