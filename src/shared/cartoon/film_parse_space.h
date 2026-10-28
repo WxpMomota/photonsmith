@@ -17,7 +17,7 @@ inline bool isSpaceVerb(const std::string &verb) {
 inline std::string spaceSetLine(Spec &s, const std::vector<std::string> &t) {
 	using detail::number;
 	const auto fail = [](const std::string &what) { return what; };
-	const std::string usage = "`space [stars S] [milkyway M] [sun BEARING ELEVATION] [sunsize DEGREES] [sunlight S] [sun off] [flare F] [bloom B] [planetshine S] [seed N]`";
+	const std::string usage = "`space [stars S] [milkyway M] [sun BEARING ELEVATION] [sunsize DEGREES] [sunlight S] [sun off] [flare F] [bloom B] [planetshine S] [hum H] [seed N]`";
 	if (s.space.on) return fail("a film has one `space` line");
 	s.space.on = true;
 	for (std::size_t i = 1; i < t.size();) {
@@ -36,8 +36,9 @@ inline std::string spaceSetLine(Spec &s, const std::vector<std::string> &t) {
 			else if (t[i] == "flare" && a >= 0.0 && a <= 1.0) s.space.flare = a;
 			else if (t[i] == "bloom" && a >= 0.0 && a <= 1.0) s.space.bloom = a;
 			else if (t[i] == "planetshine" && a >= 0.0 && a <= 10.0) s.space.planetshine = a;
+			else if (t[i] == "hum" && a >= 0.0 && a <= 4.0) s.space.hum = a;
 			else if (t[i] == "seed") s.space.seed = static_cast<int>(a);
-			else return fail("\"" + t[i] + "\": " + usage + " (stars and milkyway 0 to 4, sunsize 0.05 to 20 degrees, sunlight up to 20, flare and bloom 0 to 1, planetshine 0 to 10)");
+			else return fail("\"" + t[i] + "\": " + usage + " (stars and milkyway 0 to 4, sunsize 0.05 to 20 degrees, sunlight up to 20, flare and bloom 0 to 1, planetshine 0 to 10, hum 0 to 4)");
 			i += 2;
 		} else {
 			return fail("\"" + t[i] + "\": " + usage);

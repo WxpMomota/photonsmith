@@ -5,7 +5,7 @@
 //   ship       a shuttle, a fighter, a freighter, a station or a wheel, flying nose first along its way, its engines glowing, its running lights blinking
 //   astronaut  someone floating in a spacesuit, tumbling slowly, tethered to a point or a ship, loose things drifting round them
 //   spacecam   a shot's camera on a journey: an orbit, a slingshot flyby, a powers-of-ten zoom, a jump to hyperspace
-//   (space)    light in space: planetshine, the lens's flare and glow
+//   (space)    light in space: planetshine, the lens's flare and glow; sound in space: the hum, engines, breathing, flares, blasts, the rush of hyperspace
 //
 // Coordinates are pbrt's, as a film file's; meshes are made in story space (x mirrored), as cartoon_lib.h's.
 
@@ -14,6 +14,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -21,6 +22,7 @@
 #include "cartoon_lib.h"
 #include "film_cosmos.h"
 #include "film_planets.h"
+#include "film_soundscape.h"
 
 namespace cartoon {
 namespace cosmos {
@@ -415,6 +417,107 @@ inline std::string withSpaceLook(std::string scene, double flare, double bloom) 
 	if (end == std::string::npos) end = scene.size();
 	if (end > look && scene[end - 1] == '\r') --end;
 	return scene.insert(end, words);
+}
+
+// ---- sound in space ----
+// No sound carries in space, so a film's is the cinema's: what is near is heard at once (not a sound's 343 m/s later), quieter further off and panned to its side, with
+// little reverb (there are no walls). Under it all, the hum of space - a low rumble and a slow deep tone (`space ... hum H`, 0 for silence).
+//
+//   ships        the rumble of their engines while they burn, from where they are: a craft passing swells, sweeps across and fades
+//   astronauts   breathing inside the helmet and a radio's blip now and then, when the camera is close to them
+//   stars        each flare's deep whoomp
+//   supernovae   the blast's boom and its long rumble
+//   black holes  a drone so low it is felt more than heard, near them
+//   hyperspace   a rising rush as the stars stretch, the boom of the flash, the rush falling away as they come back
+struct SpaceSounds {
+	double hum = 0.6;
+	std::vector<Ship> ships;
+	std::vector<Astronaut> astronauts;
+	std::vector<Star> stars;
+	std::vector<Remnant> remnants;
+	std::vector<BlackHole> blackHoles;
+	struct Jump {
+		double t0 = 0.0, t1 = 0.0;   // (film time: the shot's)
+	};
+	std::vector<Jump> jumps;
+	std::function<double(double)> natureAt;   // nature's time at a film time (what the bodies move by)
+};
+// A sound from pbrt's `p`, made at `t`, heard at once: `gain` within `within` metres, falling off as 1/d beyond, panned to its side.
+inline void heard(audio::Mix &m, const soundscape::Ears &ears, double t, Vec3 p, const std::vector<float> &sound, double gain, double within) {
+	const soundscape::Ears::At a = ears(t);
+	const Vec3 d = p - a.eye;
+	const double dist = length(d), g = gain * within / std::max(within, dist);
+	if (g < 2e-4 || sound.empty()) return;
+	const double pan = dist > 1e-6 ? 0.85 * std::clamp(dot(d * (1.0 / dist), a.right), -1.0, 1.0) : 0.0;
+	m.put(t, sound, g, pan, 0.08);
+}
+inline void spaceSound(audio::Mix &m, const soundscape::Ears &ears, const SpaceSounds &s) {
+	const double T = m.seconds();
+	const auto nature = [&s](double t) { return s.natureAt ? s.natureAt(t) : t; };
+	if (s.hum > 0.0) {   // the hum of space: a rumble in grains half a grain apart, and a deep tone swelling every eight seconds
+		const std::vector<std::vector<float>> rumble = soundscape::roar(22.0, 110.0, 2.0, 2101u);
+		int k = 0;
+		for (double t = 0.0; t < T; t += 1.0, ++k) m.put(t, rumble[static_cast<std::size_t>(k) % rumble.size()], 0.25 * s.hum, 0.0, 0.1);
+		const std::vector<float> tone = audio::pad(audio::hz(28.0), 9.0, 3.0, 3.0);
+		for (double t = 0.0; t < T; t += 8.0) m.put(t, tone, 0.05 * s.hum, std::sin(t) * 0.3, 0.2);
+	}
+	for (std::size_t i = 0; i < s.ships.size(); ++i) {   // engines
+		const Ship &sh = s.ships[i];
+		if (!(sh.engines == 1 || (sh.engines < 0 && length(sh.move) > 1e-9))) continue;
+		const std::vector<std::vector<float>> burn = soundscape::roar(30.0, 260.0, 0.6, 2201u + static_cast<unsigned>(i));
+		int k = 0;
+		for (double t = 0.0; t < T; t += 0.3, ++k) {
+			const Vec3 p = transformPoint(shipPlacement(sh, nature(t)), {0.0, 0.0, 0.0});
+			heard(m, ears, t, {-p.x, p.y, p.z}, burn[static_cast<std::size_t>(k) % burn.size()], 0.6, 2.0 * sh.size);
+		}
+	}
+	for (std::size_t i = 0; i < s.astronauts.size(); ++i) {   // breathing in the helmet, a radio's blip, near them
+		const Astronaut &a = s.astronauts[i];
+		const unsigned seed = 2301u + 17u * static_cast<unsigned>(i);
+		const auto close = [&](double t) { return length(astronautWaist(a, nature(t)) - ears(t).eye) < 4.0 * a.size; };
+		for (double t = 0.5 + 2.0 * audio::unit(seed); t < T; t += 3.6 + 0.6 * audio::unit(seed + static_cast<unsigned>(t * 10.0))) {
+			if (!close(t)) continue;
+			m.put(t, audio::noiseBurst(1.1, 0.5, 0.6, 500.0, 1600.0, seed + 1u), 0.10, 0.0, 0.05);         // (in)
+			m.put(t + 1.5, audio::noiseBurst(1.4, 0.1, 1.1, 350.0, 900.0, seed + 2u), 0.08, 0.0, 0.05);   // (out)
+		}
+		for (double t = 3.0 + 6.0 * audio::unit(seed + 3u); t < T; t += 9.0 + 6.0 * audio::unit(seed + static_cast<unsigned>(t))) {
+			if (!close(t)) continue;
+			m.put(t, audio::chirp(1250.0, 1300.0, 0.07, 0.0, 0.0), 0.04, 0.0, 0.0);
+			m.put(t + 0.12, audio::chirp(1650.0, 1700.0, 0.07, 0.0, 0.0), 0.04, 0.0, 0.0);
+		}
+	}
+	for (std::size_t i = 0; i < s.stars.size(); ++i)   // a flare's whoomp (nature's time: heard at the film time it comes to)
+		for (std::size_t k = 0; k < s.stars[i].flares.size(); ++k)
+			for (double t = 0.0; t < T; t += 1.0 / 24.0)
+				if (nature(t) >= s.stars[i].flares[k]) {
+					heard(m, ears, t, s.stars[i].at, audio::noiseBurst(3.0, 0.05, 1.8, 50.0, 900.0, 2401u + static_cast<unsigned>(i * 7 + k)), 0.6, 30.0 * s.stars[i].radius);
+					break;
+				}
+	for (std::size_t i = 0; i < s.remnants.size(); ++i) {   // a supernova's boom and long rumble
+		const Remnant &r = s.remnants[i];
+		if (r.kind != "supernova") continue;
+		for (double t = 0.0; t < T; t += 1.0 / 24.0)
+			if (nature(t) >= r.blast) {
+				heard(m, ears, t, r.at, audio::noiseBurst(7.0, 0.01, 3.5, 35.0, 500.0, 2501u + static_cast<unsigned>(i)), 1.0, 50.0 * r.size);
+				const std::vector<std::vector<float>> after = soundscape::roar(20.0, 160.0, 2.0, 2511u + static_cast<unsigned>(i));
+				for (int g = 0; g < 16 && t + 1.5 + g < T; ++g) heard(m, ears, t + 1.5 + g, r.at, after[static_cast<std::size_t>(g) % after.size()], 0.5 * std::exp(-g / 6.0), 50.0 * r.size);
+				break;
+			}
+	}
+	for (std::size_t i = 0; i < s.blackHoles.size(); ++i) {   // a black hole's drone
+		const std::vector<std::vector<float>> drone = soundscape::roar(16.0, 55.0, 2.0, 2601u + static_cast<unsigned>(i));
+		int k = 0;
+		for (double t = 0.0; t < T; t += 1.0, ++k) heard(m, ears, t, s.blackHoles[i].at, drone[static_cast<std::size_t>(k) % drone.size()], 0.9, 15.0 * s.blackHoles[i].radius);
+	}
+	for (std::size_t i = 0; i < s.jumps.size(); ++i) {   // hyperspace: the rush rising, the boom, the rush falling away
+		const SpaceSounds::Jump &j = s.jumps[i];
+		const double span = j.t1 - j.t0;
+		for (int g = 0; g < 14; ++g) {   // (as the hyperspace text's streaks: stretching from a fifth of the way to halfway, shrinking to three quarters)
+			const double u = 0.2 + 0.55 * g / 13.0, rise = u < 0.5 ? (u - 0.2) / 0.3 : 1.0 - (u - 0.5) / 0.25;
+			m.put(j.t0 + u * span, audio::noiseBurst(0.5 * span / 13.0 + 0.3, 0.1, 0.25, 200.0 + 4000.0 * rise, 300.0 + 5000.0 * rise, 2701u + static_cast<unsigned>(g)), 0.25 * std::max(0.0, rise), 0.0, 0.1);
+		}
+		m.put(j.t0 + 0.5 * span, audio::noiseBurst(3.0, 0.005, 1.5, 40.0, 1200.0, 2801u + static_cast<unsigned>(i)), 0.9, 0.0, 0.3);
+	}
 }
 
 }  // namespace cosmos

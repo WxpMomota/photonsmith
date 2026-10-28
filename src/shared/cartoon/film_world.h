@@ -433,7 +433,8 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 inline void DataFilm::soundscape(audio::Mix &m) const {
 	const bool eagles = std::any_of(spec.flocks.begin(), spec.flocks.end(), [](const wildlife::Flock &f) { return f.kind == "eagles"; });
 	if (spec.falls.empty() && spec.fires.empty() && spec.lavas.empty() && spec.volcanoes.empty() && spec.wildfires.empty() && !spec.swell.on && spec.herds.empty() && !eagles &&
-		spec.forests.empty() && spec.geysers.empty() && spec.rockfalls.empty() && spec.avalanches.empty() && spec.quakes.empty() && spec.whales.empty() && spec.pods.empty() && spec.glaciers.empty() && spec.tornadoes.empty())
+		spec.forests.empty() && spec.geysers.empty() && spec.rockfalls.empty() && spec.avalanches.empty() && spec.quakes.empty() && spec.whales.empty() && spec.pods.empty() && spec.glaciers.empty() && spec.tornadoes.empty() &&
+		!spec.space.on)
 		return;
 	namespace ss = soundscape;
 	const ss::Ears ears = ss::earsOf(m.seconds(), [this](double t, Vec3 &eye, Vec3 &target) {
@@ -444,6 +445,14 @@ inline void DataFilm::soundscape(audio::Mix &m) const {
 	const auto groundAt = [&](double x, double z) { return ground ? ground->heightAt(x, z) : 0.0; };
 	const double T = m.seconds();
 	const auto always = [](double) { return 1.0; };
+	if (spec.space.on) {   // sound in space (film_voyage.h)
+		cosmos::SpaceSounds s;
+		s.hum = spec.space.hum, s.ships = spec.ships, s.astronauts = spec.astronauts, s.stars = spec.stars, s.remnants = spec.remnants, s.blackHoles = spec.blackHoles;
+		s.natureAt = [this](double t) { return natureAt(t); };
+		for (std::size_t k = 0; k < spec.shots.size(); ++k)
+			if (spec.shots[k].spaceCam.kind == cosmos::SpaceCam::Hyperspace) s.jumps.push_back({spec.shots[k].start, k + 1 < spec.shots.size() ? spec.shots[k + 1].start : spec.length});
+		cosmos::spaceSound(m, ears, s);
+	}
 	for (std::size_t i = 0; i < spec.tornadoes.size(); ++i) {   // a tornado's roar, from its foot, as strong as it is
 		const wind::Tornado &k = spec.tornadoes[i];
 		ss::lay(m, ears, k.t0, std::min(T, k.t1), 0.5, [&k, &groundAt](double t) { const Vec3 f = wind::footAt(k, t); return Vec3{f.x, groundAt(f.x, f.z) + 20.0, f.z}; },

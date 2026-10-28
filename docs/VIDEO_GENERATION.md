@@ -1305,6 +1305,14 @@ scene: lens_look.h). `planetshine S` lights what is near a planet with the plane
 is turned to the camera and how big the planet looks - so the night side of a ship, a moon or an astronaut beside a bright planet is filled with its blue or ochre light rather
 than black (the path tracer finds that light too, but slowly and noisily; this is a fill on top of it).
 
+**Sound in space.** (film_voyage.h; `space ... hum H`)
+
+No sound carries in space, so a space film's sound is the cinema's: what is near is heard at once (not a sound's 343 m/s later), quieter further off and panned to its side,
+with little reverb. Under it all is the hum of space - a low rumble and a slow deep tone (`hum H`: 0.6, up to 4; `hum 0` for silence). Ships rumble while their engines burn,
+so a craft passing swells, sweeps across the picture and fades; near an astronaut the camera hears them breathe inside their helmet and their radio's blip; a star's flare
+lands with a deep whoomp and a supernova's blast with a boom and a long rumble; a black hole drones so low it is felt more than heard; a jump to hyperspace rises in a rush
+as the stars stretch, booms at the flash and falls away. All of it is the film's soundscape, under its music and dialogue like a nature film's sounds.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

@@ -715,3 +715,39 @@ TEST(FilmUniverseLight, TheSunFlaresTheLensAPlanetLightsItsNeighboursAndTheLookI
 	EXPECT_NE(s.find("# planetshine from home"), std::string::npos);
 	expectProblems({{"space flare 2", "flare and bloom 0 to 1"}, {"space planetshine -1", "planetshine 0 to 10"}});
 }
+
+// ---- 19. sound in space ---------------------------------------------------------------------------------------------------------------------------------------------------
+
+TEST(FilmUniverseSound, SpaceHumsEnginesRumbleAsTheyPassABlastBoomsAndSilenceIsAsked) {
+	const auto energy = [](const cartoon::audio::Mix &m, double from, double to, double *left = nullptr, double *right = nullptr) {
+		const std::vector<std::int16_t> pcm = m.finish(0.0, 0.0, 0.89, 0.0);   // (levels compared between mixes: none brought to a loudness)
+		double l = 0.0, r = 0.0;
+		for (std::size_t i = static_cast<std::size_t>(from * cartoon::audio::kRate); i < static_cast<std::size_t>(to * cartoon::audio::kRate) && 2 * i + 1 < pcm.size(); ++i)
+			l += double(pcm[2 * i]) * pcm[2 * i], r += double(pcm[2 * i + 1]) * pcm[2 * i + 1];
+		if (left) *left = l;
+		if (right) *right = r;
+		return l + r;
+	};
+	const auto mixOf = [](const std::string &key, const std::string &lines, double seconds) {
+		ff::DataFilm film;
+		EXPECT_EQ(loadFilm(key, "scene s.pbrt\nlength " + std::to_string(seconds) + "\n" + lines + "shot 0 A\n key 0 0 0  0 0 -100  50\n", film), "");
+		cartoon::audio::Mix m(seconds);
+		film.soundscape(m);
+		return m;
+	};
+	EXPECT_EQ(energy(mixOf("hush", "space hum 0\n", 6.0), 0.0, 6.0), 0.0) << "silence when asked";
+	const double hum = energy(mixOf("hum", "space\n", 6.0), 0.0, 6.0);
+	EXPECT_GT(hum, 0.0) << "the hum of space";
+	// a shuttle passing from left to right, 30 m in front: loudest as it passes, on the left first
+	double l0 = 0.0, r0 = 0.0, l1 = 0.0, r1 = 0.0;
+	const cartoon::audio::Mix pass = mixOf("pass", "space hum 0\nship ark at 300 0 -30 kind shuttle size 20 move -60 0 0\n", 10.0);
+	energy(pass, 0.0, 2.0, &l0, &r0);
+	energy(pass, 8.0, 10.0, &l1, &r1);
+	EXPECT_GT(energy(pass, 4.0, 6.0), 3.0 * energy(pass, 0.0, 2.0)) << "loudest as it passes";
+	EXPECT_GT(l0, 2.0 * r0) << "on the left first (pbrt's +x)";
+	EXPECT_GT(r1, 2.0 * l1) << "then on the right";
+	// a supernova blows up at 3 s: nothing before, a boom after
+	const cartoon::audio::Mix blast = mixOf("blast", "space hum 0\nremnant crab at 0 0 -40000 size 12000 blast 3\n", 8.0);
+	EXPECT_EQ(energy(blast, 0.0, 2.9), 0.0);
+	EXPECT_GT(energy(blast, 3.0, 6.0), 0.0) << "the boom";
+}

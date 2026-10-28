@@ -36,7 +36,7 @@ struct Space {
 	double stars = 1.0, milkyWay = 1.0, sunBearing = 60.0, sunElevation = 15.0, sunSize = 0.53, sunStrength = 1.0;
 	bool sun = true;
 	int seed = 1;
-	double flare = 0.0, bloom = 0.0, planetshine = 0.0;   // the light: the lens's flare and glow, the planets' light on what is near them (film_voyage.h)
+	double flare = 0.0, bloom = 0.0, planetshine = 0.0, hum = 0.6;   // the light: the lens's flare and glow, the planets' light on what is near them; the hum of space (film_voyage.h)
 };
 
 
