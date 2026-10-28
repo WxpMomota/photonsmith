@@ -419,11 +419,12 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		const std::vector<std::string> t = detail::tokens(line);
 		water::Fall fl;
 		if (t.size() < 5 || t[1] != "at" || !number(t[2], fl.lip.x) || !number(t[3], fl.lip.y) || !number(t[4], fl.lip.z))
-			return fail("`waterfall at X Y Z [width W] [drop H] [facing DEGREES] [frozen]`: the middle of its lip");
+			return fail("`waterfall at X Y Z [width W] [drop H] [facing DEGREES] [frozen] [rainbow]`: the middle of its lip");
 		for (std::size_t i = 5; i < t.size(); i += 2) {
 			double v = 0.0;
-			if (t[i] == "frozen") {   // (hung in ice: film_ice.h)
-				fl.frozen = true;
+			if (t[i] == "frozen" || t[i] == "rainbow") {   // (hung in ice: film_ice.h; a rainbow in its spray: film_caustics.h)
+				if (t[i] == "frozen") fl.frozen = true;
+				else fl.rainbow = 1.0;
 				--i;
 				continue;
 			}
@@ -431,7 +432,7 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 			if (t[i] == "width" && v > 0.0 && v <= 200.0) fl.width = v;
 			else if (t[i] == "drop" && v > 0.0 && v <= 1000.0) fl.drop = v;
 			else if (t[i] == "facing") fl.facing = v;
-			else return fail("\"" + t[i] + "\": a waterfall takes width (up to 200 m), drop (up to 1000 m), facing and frozen");
+			else return fail("\"" + t[i] + "\": a waterfall takes width (up to 200 m), drop (up to 1000 m), facing, frozen and rainbow");
 		}
 		s.falls.push_back(fl);
 	} else if (verb == "clouds") {
@@ -866,6 +867,10 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		return iceLine(s, verb, line);
 	} else if (verb == "wind" || verb == "tornado") {   // the wind (film_wind.h)
 		return windLine(s, verb, line);
+	} else if (verb == "caustics") {   // the net of light under water (film_caustics.h)
+		const std::vector<std::string> t = detail::tokens(line);
+		if (t.size() != 2 || (t[1] != "traced" && t[1] != "painted")) return fail("`caustics traced` (worked out from the rippling surface) or `caustics painted` (the default)");
+		s.tracedCaustics = t[1] == "traced";
 	} else if (verb == "optics") {   // the sky's optics (film_sky.h, film_dressing.h)
 		return opticsLine(s, line);
 	} else if (verb == "geyser" || verb == "rockfall" || verb == "avalanche") {   // the land in action (film_geology.h)

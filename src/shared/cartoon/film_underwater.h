@@ -24,6 +24,7 @@
 
 #include "cartoon_lib.h"
 #include "film_cache.h"
+#include "film_caustics.h"
 #include "film_sky.h"
 #include "nature_lib.h"
 
@@ -106,8 +107,9 @@ inline std::string causticPicture(const std::string &film, int k, int size) {
 inline int causticFrame(double t) { return static_cast<int>(std::floor(t / 0.1)) % 24; }
 
 // The caustics on the seabed round the camera's ground point (pbrt's x z), `groundAt` the seabed's height: a decal of sand coloured by the net of light, tiled every 4 m.
-inline std::string causticText(const std::string &film, double t, double cx, double cz, const std::function<double(double, double)> &groundAt) {
-	const std::string picture = causticPicture(film, causticFrame(t), 512);
+// `tracedDepth` (0 or more: `caustics traced`, film_caustics.h): the net traced from the surface for a bed that deep, instead of the painted one.
+inline std::string causticText(const std::string &film, double t, double cx, double cz, const std::function<double(double, double)> &groundAt, double tracedDepth = -1.0) {
+	const std::string picture = tracedDepth >= 0.0 ? caustics::picture(film, causticFrame(t), 512, tracedDepth) : causticPicture(film, causticFrame(t), 512);
 	Mesh m;
 	const int n = 64;
 	const double half = 40.0, x0 = std::floor((cx - half) / 4.0) * 4.0, z0 = std::floor((cz - half) / 4.0) * 4.0, step = 2.0 * half / n;
@@ -130,8 +132,8 @@ inline std::string causticText(const std::string &film, double t, double cx, dou
 		   emitMesh(m, identity()) + "AttributeEnd\n";
 }
 // The shafts of light: a projector above the camera (pbrt's eye) shining the net down through the water.
-inline std::string shaftsText(const std::string &film, double t, const Vec3 &eye, double surface) {
-	const std::string picture = causticPicture(film, causticFrame(t), 64);
+inline std::string shaftsText(const std::string &film, double t, const Vec3 &eye, double surface, double tracedDepth = -1.0) {
+	const std::string picture = tracedDepth >= 0.0 ? caustics::picture(film, causticFrame(t), 64, tracedDepth) : causticPicture(film, causticFrame(t), 64);
 	char buf[256];
 	std::snprintf(buf, sizeof buf, "AttributeBegin\n  Translate %.3f %.3f %.3f\n  Rotate 90 1 0 0\n", eye.x, surface + 2.0, eye.z);
 	return "# light shafts (film_underwater.h)\n" + std::string(buf) + "  LightSource \"projection\" \"float fov\" [ 70 ] \"string filename\" [ \"" + picture + "\" ] \"float scale\" [ 2.5 ]\nAttributeEnd\n";

@@ -1019,6 +1019,23 @@ from 1.2 degrees above the horizon where the sun went, from 2.5 degrees before s
 `greenflash` puts a green fleck where the sun's last sliver sets (or first rises) for the moment its centre is 0.05 to 0.35 degrees below the horizon, divided by the
 frame's exposure so it shows green; it sits 30 km out at the true horizon, so mountains hide it as they hide the sun - look over the sea or a plain.
 
+**Caustics traced from the surface, and a rainbow in a waterfall's spray: `caustics traced`, `waterfall ... rainbow`.** (film_caustics.h; nature round 9, 2026-10-27)
+
+```
+caustics   traced                                            # (or `painted`, the default)
+waterfall  at -28.5 25 33  drop 30  width 10  facing 139  rainbow
+```
+
+`caustics traced` works the net of light out from the water's surface instead of painting it: a tile of ripples 4 m across (two dozen waves 15 cm to 1.5 m long, each
+running at the speed deep water gives it, looped over 2.4 s), and through each of half a million points of it a ray of sunlight refracted into the water (Snell's law)
+and followed down to the bed - bright where the rays crowd, dim where they spread, the average the light a flat surface lets through. Worked out for beds 0.3, 0.6, 1.2,
+2.4, 4.8 and 9.6 m down (in between, blended), it sharpens to bright lines where the ripples focus (a metre or so) and coarsens and softens deeper, as a real net does.
+It is used wherever the films draw caustics: the seabed under water (for the depth under the camera), the light shafts, and the sand of the shallows (each point for its
+own depth). `rainbow` on a `waterfall` makes its spray (a sphere round its foot) glow in the bow's colours wherever the camera sees it 40.5 to 42.5 degrees from the point
+opposite the sun, red outside, violet inside: a faintly emitting volume that hardly absorbs, so it neither hides nor shadows what is behind it, densest in the middle of
+the spray. It shows only while the sun is up and behind the camera, and moves with the camera as a real one does: to see it, put the fall about 40 degrees to one side of
+the camera's shadow.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

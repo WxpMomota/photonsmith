@@ -12,6 +12,18 @@ inline std::string spectacleText(const Spec &spec, const std::string &header, do
 	const double light = 1.0 / std::max(1.0, exposure);   // (as bright on the screen however far the night camera has opened up)
 	water::Sea lit = spec.seas.empty() ? water::Sea() : spec.seas[0];
 	lit.glow = lit.glow * light;
+	if (spec.hasSky && std::any_of(spec.falls.begin(), spec.falls.end(), [](const water::Fall &f) { return f.rainbow > 0.0 && !f.frozen; })) {   // rainbows in the falls' spray
+		Vec3 eye, target;
+		double fov = 40.0, el = 0.0, facing = 0.0;
+		film_subjects::cameraOf(header, eye, target, fov);
+		dressing::sunAt(spec.sky, dressing::hourAt(spec.sky, t, spec.storyEnd), el, facing);
+		const double d2r = kPi / 180.0;
+		const Vec3 sun{std::cos(el * d2r) * std::sin(facing * d2r), std::sin(el * d2r), std::cos(el * d2r) * std::cos(facing * d2r)};
+		for (const water::Fall &f : spec.falls)
+			if (f.rainbow > 0.0 && !f.frozen)
+				out += caustics::mistbowText({-eye.x, eye.y, eye.z}, sun, 3.0 * smoothstep(0.0, 6.0, el) * (1.0 - 0.9 * spec.storm.levelAt(t)),
+											 water::fallFoot(f) + Vec3{0.0, 0.15 * f.drop, 0.0}, 0.3 * f.drop + 0.6 * f.width, f.rainbow);
+	}
 	if (!spec.tornadoes.empty()) {   // tornadoes (film_wind.h)
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
@@ -81,8 +93,9 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 						  floorY, floorY, floorY, floorY);
 			out += buf;
 		}
-		out += underwater::causticText(film, nt, -eye.x, eye.z, groundAt);
-		out += underwater::shaftsText(film, nt, Vec3{-eye.x, eye.y, eye.z}, spec.seas[0].level);
+		const double bedDepth = spec.tracedCaustics ? std::max(0.0, spec.seas[0].level - groundAt(-eye.x, eye.z)) : -1.0;   // (`caustics traced`: the net for the bed under the camera)
+		out += underwater::causticText(film, nt, -eye.x, eye.z, groundAt, bedDepth);
+		out += underwater::shaftsText(film, nt, Vec3{-eye.x, eye.y, eye.z}, spec.seas[0].level, bedDepth);
 		out += underwater::snowText(t, eye);
 		for (const underwater::Kelp &k : spec.kelps) out += underwater::kelpText(k, nt, groundAt);
 		for (const underwater::Coral &c : spec.corals) out += underwater::coralText(c, groundAt);
@@ -232,7 +245,7 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 			sea.glow = sea.glow * (1.0 / std::max(1.0, exposureAt(t)));   // (living light as bright on the screen however far the night camera has opened up)
 			out += water::seaText(sea, nt, eye, target, hfov, ground.get(), spec.swell.on ? &spec.swell : nullptr);
 		}
-		if (spec.swell.on && ground) out += surf::shallowsCausticText(spec.key.empty() ? std::string("film") : spec.key, nt, -eye.x, eye.z, *ground, spec.seas[0].level);
+		if (spec.swell.on && ground) out += surf::shallowsCausticText(spec.key.empty() ? std::string("film") : spec.key, nt, -eye.x, eye.z, *ground, spec.seas[0].level, spec.tracedCaustics);
 		for (const water::River &r : spec.rivers) out += water::riverText(r, nt, ground.get());
 		for (const water::Fall &f : spec.falls) out += f.frozen ? (ground ? std::string() : water::cliffText(f)) + ice::frozenFallText(f) : water::fallText(f, nt, ground.get());
 	}

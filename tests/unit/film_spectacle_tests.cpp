@@ -626,3 +626,57 @@ TEST(FilmSpectacleOptics, HaloSunDogsFogbowRaysAlpenglowAndTheGreenFlash) {
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }
+
+// ---- 9. caustics traced from the surface; a rainbow in the spray ---------------------------------------------------------------------------------------------------------
+
+namespace caus = cartoon::caustics;
+
+// The traced net keeps the light a flat surface lets through (on average), is sharpest round the depth where the ripples focus and moves from frame to frame; a film
+// with `caustics traced` uses it; a fall's spray shows a rainbow only where the bow's cone crosses it, with the sun up behind the camera.
+TEST(FilmSpectacleCaustics, TheTracedNetKeepsTheLightFocusesAndMovesAndTheSprayHoldsARainbow) {
+	const auto stats = [](const std::vector<float> &p, double &mean, double &spread) {
+		mean = 0.0, spread = 0.0;
+		for (float v : p) mean += v / p.size();
+		for (float v : p) spread += (v - mean) * (v - mean) / p.size();
+		spread = std::sqrt(spread);
+	};
+	double mean = 0.0, shallow = 0.0, focus = 0.0;
+	for (std::size_t d = 0; d < caus::kDepths.size(); ++d) {
+		double sd = 0.0;
+		stats(caus::pattern(3, static_cast<int>(d)), mean, sd);
+		EXPECT_NEAR(mean, 1.0, 0.03) << "the light a flat surface lets through, on average (depth " << caus::kDepths[d] << ")";
+		if (d == 0) shallow = sd;
+		focus = std::max(focus, sd);
+	}
+	EXPECT_GT(focus, 2.0 * shallow) << "sharper where the ripples focus than just under the surface";
+	EXPECT_DOUBLE_EQ(caus::at(0.3, 0.6, 3, 0.0), 1.0) << "no depth, no net";
+	const std::vector<float> &f0 = caus::pattern(0, 2), &f1 = caus::pattern(1, 2);
+	double moved = 0.0;
+	for (std::size_t i = 0; i < f0.size(); ++i) moved += std::abs(f0[i] - f1[i]) / f0.size();
+	EXPECT_GT(moved, 0.05) << "it moves";
+
+	ff::DataFilm traced, painted;
+	const std::string sea = "scene s.pbrt\nlength 4\nwater sea level 0 waves 0.5\nunderwater clarity 1.5 colour teal\n";
+	ASSERT_EQ(loadFilm("traced", sea + "caustics traced\nshot 0 A\n key 0 -10 6  0 -12 -20  60\n", traced), "");
+	ASSERT_EQ(loadFilm("painted", sea + "shot 0 A\n key 0 -10 6  0 -12 -20  60\n", painted), "");
+	EXPECT_NE(traced.sceneAt(1.0).find("caustic_traced_512"), std::string::npos);
+	EXPECT_EQ(painted.sceneAt(1.0).find("caustic_traced_"), std::string::npos) << "painted unless asked";
+
+	// the spray's rainbow: the sun up behind the camera, the spray 41.5 degrees off the point opposite it
+	const cartoon::Vec3 sun = cartoon::normalize(cartoon::Vec3{0.0, 0.4, 1.0}), eye{0.0, 2.0, 0.0};
+	const cartoon::Vec3 anti = sun * -1.0, side{1.0, 0.0, 0.0};
+	const double a = 41.5 * cartoon::kPi / 180.0;
+	const cartoon::Vec3 toward = cartoon::normalize(anti * std::cos(a) + side * std::sin(a));
+	const std::string bow = caus::mistbowText(eye, sun, 3.0, eye + toward * 40.0, 8.0, 1.0);
+	EXPECT_NE(bow.find("MakeNamedMedium \"mistbow\""), std::string::npos);
+	EXPECT_EQ(caus::mistbowText(eye, sun, 3.0, eye + anti * 40.0, 8.0, 1.0), "") << "spray round the point opposite the sun, inside the bow: no rainbow";
+	EXPECT_EQ(caus::mistbowText(eye, cartoon::Vec3{0.0, -0.2, 1.0}, 3.0, eye + toward * 40.0, 8.0, 1.0), "") << "the sun down";
+	ff::DataFilm fall;
+	ASSERT_EQ(loadFilm("fall", "scene s.pbrt\nlength 4\nwaterfall at 0 20 -30 drop 15 rainbow\nshot 0 A\n key 0 2 10  0 8 -30  60\n", fall), "");
+	ASSERT_EQ(fall.spec.falls.size(), 1u);
+	EXPECT_DOUBLE_EQ(fall.spec.falls[0].rainbow, 1.0);
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"caustics glowing", "`caustics traced`"}, {"caustics", "`caustics traced`"}}) {
+		const std::string problem = problemOf(line);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}

@@ -218,7 +218,7 @@ inline std::string sprayText(const std::vector<Vec3> &crests, const Vec3 &eye, d
 // The sand under the water round the camera's ground point (pbrt's x z), netted with the moving caustics (film_underwater.h): a decal 48 m across just above the bed,
 // wherever the water is more than a couple of centimetres deep, its picture baked for each frame of the caustics' loop - the bed's colour through the water (film_terrain.h's
 // seabed, as the terrain under it is painted) brightened and darkened by the net of light, which fades out with depth. "" when no water is near.
-inline std::string shallowsCausticText(const std::string &film, double t, double cx, double cz, const terrain::Field &ground, double level) {
+inline std::string shallowsCausticText(const std::string &film, double t, double cx, double cz, const terrain::Field &ground, double level, bool traced = false) {
 	const double size = 48.0, x0 = std::floor((cx - size / 2) / 16.0) * 16.0, z0 = std::floor((cz - size / 2) / 16.0) * 16.0;
 	const int n = 96;
 	Mesh m;
@@ -241,15 +241,17 @@ inline std::string shallowsCausticText(const std::string &film, double t, double
 	if (m.tris.empty()) return std::string();
 	const int k = underwater::causticFrame(t), W = 512;
 	char name[96];
-	std::snprintf(name, sizeof name, "shallows_%016llx_%d_%d_%02d", static_cast<unsigned long long>(std::hash<std::string>()(ground.spec.key() + std::to_string(level))),
-				  static_cast<int>(x0), static_cast<int>(z0), k);
+	std::snprintf(name, sizeof name, "shallows_%016llx_%d_%d_%02d%s", static_cast<unsigned long long>(std::hash<std::string>()(ground.spec.key() + std::to_string(level))),
+				  static_cast<int>(x0), static_cast<int>(z0), k, traced ? "_t" : "");
 	const std::string picture = film_sky::picture(film, name, W, W, [&](std::vector<float> &rgb) {
 		for (int j = 0; j < W; ++j) {
 			const double v = 1.0 - (j + 0.5) / W, pz = z0 + v * size;
 			for (int i = 0; i < W; ++i) {
 				const double u = (i + 0.5) / W, px = x0 + u * size, d = level - ground.heightAt(px, pz);
 				const double grain = nature::noise2(px / 2.0, pz / 2.0, ground.spec.seed + 61);   // (as the terrain's own sand: film_terrain.h colourAt)
-				const double net = underwater::causticAt(px / 2.5, pz / 2.5, k), fade = std::exp(-d / 2.0) * smoothstep(0.02, 0.25, d);
+				const double net = traced ? 0.3 + 0.3 * (caustics::at(px / caustics::kTile, pz / caustics::kTile, k, std::max(0.0, d)) - 1.0)   // (`caustics traced`)
+										  : underwater::causticAt(px / 2.5, pz / 2.5, k),
+							 fade = std::exp(-d / 2.0) * smoothstep(0.02, 0.25, d);
 				const Vec3 c = terrain::seabed(d, grain) * std::max(0.0, 1.0 + 1.6 * (net - 0.3) * fade);
 				const std::size_t q = (static_cast<std::size_t>(j) * W + i) * 3;
 				rgb[q] = static_cast<float>(c.x), rgb[q + 1] = static_cast<float>(c.y), rgb[q + 2] = static_cast<float>(c.z);

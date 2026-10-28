@@ -323,6 +323,7 @@ struct Spec {
 		double strength = 0.8, t0 = 0.0, t1 = 1e30;
 	};
 	std::vector<Rainbow> rainbows;
+	bool tracedCaustics = false;   // (`caustics traced`: film_caustics.h) the net of light under water traced from the surface
 	dressing::SkyOptics optics;   // (`optics`: halo, sun dogs, fogbow, crepuscular rays, alpenglow, the green flash)
 	// how fast nature runs (`timelapse`: the clouds, the water, the aurora, the wind in the trees), and the exposure (`exposure`: a factor, or `auto` - following the light)
 	double timelapse = 1.0, exposure = 1.0;
