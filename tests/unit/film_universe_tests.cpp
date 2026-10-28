@@ -388,3 +388,40 @@ TEST(FilmUniverseGalaxy, ArmsWindBulgeGlowsAndEllipticalsFade) {
 	expectProblems({{"galaxy a at 0 0 0", "how big it is"}, {"galaxy a at 0 0 0 size 10", "size 100 to 400000"}, {"galaxy a at 0 0 0 size 500 kind round", "\"kind\""},
 					{"galaxy a at 0 0 0 size 500 tilt 120", "\"tilt\""}});
 }
+
+TEST(FilmUniverseStar, ColourFollowsTemperatureSpotsAreDarkAndItGlows) {
+	cs::Star sun;
+	sun.name = "sol";
+	cs::Star red = sun, blue = sun;
+	red.kind = "red", blue.kind = "blue";
+	EXPECT_DOUBLE_EQ(sun.kelvin(), 5800.0);
+	cs::Star own = sun;
+	own.temperature = 7000.0;
+	EXPECT_DOUBLE_EQ(own.kelvin(), 7000.0) << "its own temperature wins";
+	const cartoon::Vec3 r = sp::blackbody(red.kelvin()), b = sp::blackbody(blue.kelvin());
+	EXPECT_GT(r.x, r.z) << "a red star is red";
+	EXPECT_GT(b.z, b.x) << "a blue star is blue";
+	// the surface: about 1 on average, its spots darker
+	double sum = 0.0, darkest = 1e9;
+	int n = 0;
+	for (int j = 1; j < 60; ++j)
+		for (int i = 0; i < 120; ++i) {
+			const double th = 3.14159265358979 * j / 60.0, ph = 2.0 * 3.14159265358979 * i / 120.0;
+			const double v = cs::starSurfaceAt(sun, {std::sin(th) * std::cos(ph), std::sin(th) * std::sin(ph), std::cos(th)});
+			sum += v, ++n, darkest = std::min(darkest, v);
+		}
+	EXPECT_NEAR(sum / n, 1.0, 0.25);
+	EXPECT_LT(darkest, 0.5) << "sunspots";
+	// the glow: light just above the surface, less further out, none inside or past its box
+	EXPECT_GT(cs::starGlowVoxel(sun, 1.1, 0.0, 0.0).le.x, 4.0 * cs::starGlowVoxel(sun, 2.0, 0.0, 0.0).le.x);
+	EXPECT_EQ(cs::starGlowVoxel(sun, 0.5, 0.0, 0.0).le.x, 0.0);
+	EXPECT_EQ(cs::starGlowVoxel(sun, 3.1, 0.0, 0.0).le.x, 0.0);
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("star", "scene s.pbrt\nlength 4\nspace sun off\nstar vega at 0 0 -30000 radius 5000 kind blue\nshot 0 A\n key 0 0 0  0 0 -100  50\n", film), "");
+	const std::string s = film.sceneAt(1.0);
+	EXPECT_NE(s.find("MediumInterface \"glow_vega\" \"\""), std::string::npos);
+	EXPECT_NE(s.find("\"string filename\" [ \""), std::string::npos) << "its surface picture";
+	expectProblems({{"star a at 0 0 0", "how big it is"}, {"star a at 0 0 0 radius 1", "radius 10 to 200000"}, {"star a at 0 0 0 radius 500 kind green", "\"kind\""},
+					{"star a at 0 0 0 radius 500 temperature 900", "\"temperature\""}});
+}

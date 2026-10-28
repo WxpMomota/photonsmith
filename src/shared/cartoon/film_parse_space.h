@@ -9,7 +9,7 @@ namespace film_file {
 
 // Whether `verb` is a space line's.
 inline bool isSpaceVerb(const std::string &verb) {
-	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy"};
+	static const std::vector<std::string> k = {"space", "planet", "moon", "nebula", "galaxy", "star"};
 	return std::find(k.begin(), k.end(), verb) != k.end();
 }
 
@@ -185,6 +185,24 @@ inline std::string galaxyLine(Spec &s, const std::vector<std::string> &t) {
 	return std::string();
 }
 
+// A `star` line (film_cosmos.h). "" or what is wrong with it.
+inline std::string starLine(Spec &s, const std::vector<std::string> &t) {
+	cosmos::Star st;
+	bool sized = false;
+	const std::string e = bodyLine(t, "`star NAME at X Y Z radius R [kind sun|red|orange|white|blue] [temperature K] [brightness B] [seed N]` (radius 10 to 200000 m, 1500 to 50000 K)",
+								   cosmos::starKinds(), st.name, st.kind, st.at, [&](const std::string &w, double a) {
+									   if (w == "radius" && a >= 10.0 && a <= 200000.0) return st.radius = a, sized = true;
+									   if (w == "temperature" && a >= 1500.0 && a <= 50000.0) return st.temperature = a, true;
+									   if (w == "brightness" && a > 0.0 && a <= 20.0) return st.brightness = a, true;
+									   if (w == "seed") return st.seed = static_cast<int>(a), true;
+									   return false;
+								   });
+	if (!e.empty()) return e;
+	if (!sized) return "`star NAME at X Y Z radius R ...`: how big it is";
+	s.stars.push_back(st);
+	return std::string();
+}
+
 // One space line: what it says goes into `s`. "" or what is wrong with it.
 inline std::string spaceLine(Spec &s, const std::string &verb, const std::string &line) {
 	const std::vector<std::string> t = detail::tokens(line);
@@ -193,6 +211,7 @@ inline std::string spaceLine(Spec &s, const std::string &verb, const std::string
 	if (verb == "moon") return moonLine(s, t);
 	if (verb == "nebula") return nebulaLine(s, t);
 	if (verb == "galaxy") return galaxyLine(s, t);
+	if (verb == "star") return starLine(s, t);
 	return "unknown space line \"" + verb + "\"";
 }
 

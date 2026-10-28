@@ -1169,6 +1169,19 @@ dust lanes on their inner edges; `barred` - the same, its arms starting from the
 in its middle, fading out. Untilted its disc faces a camera looking down -z; `tilt` tips it about x (90: edge on, its dust lane across it), `turn` turns it in its
 own plane. It is an "rgbgrid" medium in the box round its tipped disc (144 voxels along its longest side), written once into the film's cache.
 
+**Stars close up: `star`.** (film_cosmos.h)
+
+```
+star  sol    at 0 0 -30000       radius 5000  kind sun       # `brightness B` (1, up to 20), `seed N`
+star  ruby   at 100000 0 -30000  radius 8000  kind red
+star  rigel  at 200000 0 -30000  radius 4000  temperature 26000
+```
+
+A star seen close: a glowing ball in the colour of its temperature (red 3200 K, orange 4500, sun 5800, white 9500, blue 26000, or its own `temperature K`,
+1500 to 50000), its surface a picture painted once - granulation, two belts of sunspots (a dark umbra in a lighter penumbra) with bright faculae round them - turning
+slowly; round it a glow (a small emitting grid out to three radii, streaked a little) that falls off with height. It is a light: it lights planets near it. The `space`
+sun is a separate thing (the far sun in the sky); turn it off (`space sun off`) for a film round another star.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

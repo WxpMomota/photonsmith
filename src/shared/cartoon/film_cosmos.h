@@ -215,5 +215,86 @@ inline std::string galaxyText(const std::string &film, const Galaxy &g) {
 	return "# a galaxy (film_cosmos.h): " + g.name + "\n" + placedGrid(path, name, g.at - half * R, half * (2.0 * R));
 }
 
+// ---- stars ----
+// A star close up: its kind (or its own temperature), where, how big, how bright.
+struct Star {
+	std::string name, kind = "sun";
+	Vec3 at{0.0, 0.0, -30000.0};
+	double radius = 5000.0, temperature = 0.0, brightness = 1.0;
+	int seed = 1;
+	double kelvin() const {
+		if (temperature > 0.0) return temperature;
+		return kind == "red" ? 3200.0 : kind == "orange" ? 4500.0 : kind == "white" ? 9500.0 : kind == "blue" ? 26000.0 : 5800.0;
+	}
+};
+inline const std::vector<std::string> &starKinds() {
+	static const std::vector<std::string> k = {"sun", "red", "orange", "white", "blue"};
+	return k;
+}
+// A star's surface (relative brightness, about 1) at the unit direction o of its own frame: granulation (bright cells with darker lanes between), sunspots (a dark
+// umbra in a lighter penumbra) in two belts either side of its equator, bright faculae round them.
+inline double starSurfaceAt(const Star &s, Vec3 o) {
+	const int sd = s.seed * 151;
+	const double cells = clouds::detail::fbm3(o.x * 60.0, o.y * 60.0, o.z * 60.0, sd + 1);
+	double granulation = 0.82 + 0.3 * smoothstep(0.35, 0.65, cells);
+	double spot = 0.0;
+	for (int k = 0; k < 9; ++k) {
+		const double lat = (hash01(sd + k, 2) < 0.5 ? 1.0 : -1.0) * (8.0 + 22.0 * hash01(sd + k, 3)) * kPi / 180.0, lon = 2.0 * kPi * hash01(sd + k, 4);
+		const Vec3 c{std::cos(lat) * std::cos(lon), std::cos(lat) * std::sin(lon), std::sin(lat)};
+		const double r = (0.015 + 0.035 * hash01(sd + k, 5)) * (0.85 + 0.3 * clouds::detail::fbm3(o.x * 30.0, o.y * 30.0, o.z * 30.0, sd + k)),
+					 d = std::acos(std::clamp(dot(o, c), -1.0, 1.0)) / r;
+		spot = std::max(spot, d < 0.45 ? 0.85 : d < 1.0 ? 0.45 : 0.0);
+		granulation += 0.12 * std::exp(-std::pow((d - 1.6) / 0.6, 2.0));   // (faculae)
+	}
+	return granulation * (1.0 - spot);
+}
+// A star's surface picture (its brightness in its temperature's colour), painted once.
+inline std::string starPicture(const std::string &film, const Star &s) {
+	const int W = 1024, H = 512;
+	const Vec3 colour = space::blackbody(s.kelvin());
+	return film_sky::picture(film, "star_v1_" + std::to_string(s.seed) + "_" + std::to_string(static_cast<int>(s.kelvin())), W, H, [&](std::vector<float> &rgb) {
+		for (int j = 0; j < H; ++j)
+			for (int i = 0; i < W; ++i) {
+				const double theta = (j + 0.5) / H * kPi, phi = (i + 0.5) / W * 2.0 * kPi;
+				const double v = starSurfaceAt(s, {std::sin(theta) * std::cos(phi), std::sin(theta) * std::sin(phi), std::cos(theta)});
+				const std::size_t q = (static_cast<std::size_t>(j) * W + i) * 3;
+				rgb[q] = static_cast<float>(colour.x * v), rgb[q + 1] = static_cast<float>(colour.y * v), rgb[q + 2] = static_cast<float>(colour.z * v);
+			}
+	});
+}
+// The star's glow (a halo round it, as its corona and the camera's eye would show it): a small grid that gives out light falling off with height above its surface,
+// streaked a little.
+inline Voxel starGlowVoxel(const Star &s, double x, double y, double z) {
+	const double r = std::sqrt(x * x + y * y + z * z);   // (in star radii)
+	if (r < 0.98 || r > 3.0) return Voxel{};
+	const double a = std::atan2(y, x), streak = 0.7 + 0.6 * nature::fbm2(std::cos(a) * 3.0 + 1.0, std::sin(a) * 3.0 + z, s.seed + 9);
+	const double glow = std::pow(std::max(1.0, r), -4.0) * streak * (1.0 - smoothstep(2.4, 3.0, r));
+	Voxel v;
+	v.sa = Vec3{1.0, 1.0, 1.0} * (0.02 / s.radius);
+	v.le = space::blackbody(s.kelvin()) * glow;
+	return v;
+}
+// A star at nature's time `nt` as scene text: its glowing surface (turning slowly) and its glow.
+inline std::string starText(const std::string &film, const Star &s, double nt) {
+	char buf[400];
+	std::string out = "# a star (film_cosmos.h): " + s.name + "\nAttributeBegin\n";
+	std::snprintf(buf, sizeof buf, "  Translate %.4f %.4f %.4f\n  Rotate %.4f 0 1 0\n  Rotate -90 1 0 0\n", s.at.x, s.at.y, s.at.z, std::fmod(nt * 0.5, 360.0));
+	out += buf;
+	std::snprintf(buf, sizeof buf, "  AreaLightSource \"diffuse\" \"string filename\" [ \"%s\" ] \"float scale\" [ %.4f ]\n", starPicture(film, s).c_str(), 1.0 * s.brightness);   // (not so bright that its colour and its spots burn out to white)
+	out += buf;
+	std::snprintf(buf, sizeof buf, "  Material \"diffuse\" \"rgb reflectance\" [ 0 0 0 ]\n  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n", s.radius);
+	out += buf;
+	// its glow
+	const int N = 48;
+	char file[160];
+	std::snprintf(file, sizeof file, "starglow_v1_%s_%d_%.0f_%.4g.pbrt", s.name.c_str(), s.seed, s.kelvin(), s.brightness);
+	const std::string name = "glow_" + s.name;
+	const std::string path = rgbGridFile(film, file, name, N, N, N, 0.0, 0.06 * s.brightness, [&](int i, int j, int k) {
+		return starGlowVoxel(s, ((i + 0.5) / N * 2.0 - 1.0) * 3.0, ((j + 0.5) / N * 2.0 - 1.0) * 3.0, ((k + 0.5) / N * 2.0 - 1.0) * 3.0);
+	});
+	out += placedGrid(path, name, s.at - Vec3{3.0, 3.0, 3.0} * s.radius, Vec3{6.0, 6.0, 6.0} * s.radius);
+	return out;
+}
+
 }  // namespace cosmos
 }  // namespace cartoon
