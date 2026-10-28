@@ -326,6 +326,44 @@ inline std::string opticsLine(Spec &s, const std::string &line) {
 	return std::string();
 }
 
+// A `closeup` or `tracks` line (film_ground.h). "" or what is wrong with it.
+inline std::string groundLine(Spec &s, const std::string &verb, const std::string &line) {
+	using detail::number;
+	const auto fail = [](const std::string &what) { return what; };
+	const std::vector<std::string> t = detail::tokens(line);
+	double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
+	if (verb == "closeup") {
+		s.closeup.on = true;
+		for (std::size_t i = 1; i < t.size(); i += 2) {
+			if (i + 1 < t.size() && number(t[i + 1], a) && t[i] == "size" && a >= 2.0 && a <= 60.0) s.closeup.size = a;
+			else if (i + 1 < t.size() && number(t[i + 1], a) && t[i] == "cell" && a >= 0.01 && a <= 0.5) s.closeup.cell = a;
+			else return fail("\"" + t[i] + "\": `closeup [size S] [cell C]` (size 2 to 60 m, a point every C metres, 0.01 to 0.5)");
+		}
+		return std::string();
+	}
+	const std::string usage = "`tracks from X Z to X Z [during T0 T1] [kind boots|paws|hooves] [stride L] [seed N]`";
+	ground::Track k;
+	if (t.size() < 7 || t[1] != "from" || !number(t[2], a) || !number(t[3], b) || t[4] != "to" || !number(t[5], c) || !number(t[6], d)) return fail(usage);
+	k.x0 = a, k.z0 = b, k.x1 = c, k.z1 = d;
+	for (std::size_t i = 7; i < t.size();) {
+		if (t[i] == "during" && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && b > a) {
+			k.t0 = a, k.t1 = b;
+			i += 3;
+		} else if (t[i] == "kind" && i + 1 < t.size() && std::find(ground::trackKinds().begin(), ground::trackKinds().end(), t[i + 1]) != ground::trackKinds().end()) {
+			k.kind = t[i + 1];
+			i += 2;
+		} else if (i + 1 < t.size() && number(t[i + 1], a) && ((t[i] == "stride" && a >= 0.2 && a <= 3.0) || t[i] == "seed")) {
+			if (t[i] == "stride") k.stride = a;
+			else k.seed = static_cast<int>(a);
+			i += 2;
+		} else {
+			return fail("\"" + t[i] + "\": " + usage);
+		}
+	}
+	s.tracks.push_back(k);
+	return std::string();
+}
+
 // One line of a film file, if it is a nature line: what it says goes into `s`. `handled` is false when `verb` is not a nature word (the line is parse()'s); the
 // result is "" or what is wrong with the line (parse() adds the file and the line).
 inline std::string natureLine(Spec &s, const std::string &verb, const std::string &line, const std::string &rest, bool &handled) {
@@ -867,6 +905,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		return iceLine(s, verb, line);
 	} else if (verb == "wind" || verb == "tornado") {   // the wind (film_wind.h)
 		return windLine(s, verb, line);
+	} else if (verb == "closeup" || verb == "tracks") {   // the ground close up (film_ground.h)
+		return groundLine(s, verb, line);
 	} else if (verb == "caustics") {   // the net of light under water (film_caustics.h)
 		const std::vector<std::string> t = detail::tokens(line);
 		if (t.size() != 2 || (t[1] != "traced" && t[1] != "painted")) return fail("`caustics traced` (worked out from the rippling surface) or `caustics painted` (the default)");

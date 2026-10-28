@@ -148,6 +148,8 @@
 //     fire     at 0 0 -4  size 1.2                              # fire (film_fire.h): flames (glowing volumes, flickering, a light among them, sparks) with smoke above;
 //     lava     from 120 -300  width 6                           # lava creeping down the land from a vent; a volcano raised in the land (`volcano at X Z [height H]
 //     herd     deer 12 from 0 0 to 100 0  fur 1                # fur on a herd, `feathers A` on eagles and geese (film_fur.h): strands over the body
+//     closeup  size 16                                         # the ground close up (film_ground.h): ripples, drifts, pebbles, footprints, wet sand; `tracks from
+//                                                               # X Z to X Z [during T0 T1] [kind boots|paws|hooves]`: a trail of footprints made over its time
 //     caustics traced                                          # the net of light under water traced from the rippling surface (film_caustics.h);
 //                                                               # `waterfall ... rainbow`: a rainbow in its spray when the sun is behind the camera
 //     optics   halo 1  rays 0.6  alpenglow 1  greenflash          # the sky's optics (film_sky.h): a 22-degree halo and sun dogs, a fogbow (`fogbow S`),
@@ -992,7 +994,7 @@ inline Parsed parse(const std::string &text, const std::string &where, const std
 		} else if (verb == "part") {
 			return fail("a film in parts is read a part at a time (film_file::partsOf): this text is not one of its parts");
 		} else {
-			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, wind, tornado, optics, caustics, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
+			return fail("unknown word \"" + verb + "\" (film, name, part, about, scene, length, fps, still, tags, set, cast, ease, shutter, idle, shot, key, orbit, crane, push, track, handheld, focus, aperture, dissolve, fade, wipe, fadeout, follow, subject, auto, side, move, turn, grow, light, show, bounce, topple, character, crowd, walk, run, jump, sit, gesture, feel, say, look, touch, hold, hug, rigged, title, episode, credits, credit, theme, prop, pick, put, give, place, scatter, sky, ambience, mute, music, toon, voices, acting, lighting, terrain, water, river, waterfall, clouds, fogbank, forest, flock, herd, whale, dolphins, bioluminescence, fireflies, fungi, glacier, iceberg, seaice, wind, tornado, optics, caustics, closeup, tracks, aurora, lightning, meteors, rainbow, fly, timelapse, exposure, wet, snowcover, gusts, mist, fog, air, storm, surf, flowers, biome, slowmo, geyser, rockfall, avalanche, quake, underwater, kelp, coral, fire, lava, volcano, wildfire, weather, particles, burst)");
 		}
 	}
 	n = shotLine;
@@ -1181,6 +1183,10 @@ inline Parsed parse(const std::string &text, const std::string &where, const std
 		return fail(std::string(s.seaIce.on ? "sea ice" : "an iceberg") + " floats on the water: the film needs a `water` line");
 	}
 	applyWind(s);   // one wind over the set (film_wind.h)
+	if (s.closeup.on && !s.hasTerrain) {
+		n = 0;
+		return fail("`closeup` is the land close up: the film needs a `terrain` line");
+	}
 	if (s.bio.on) {   // (the sea's foam glows)
 		if (s.seas.empty()) {
 			n = 0;

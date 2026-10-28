@@ -1036,6 +1036,22 @@ opposite the sun, red outside, violet inside: a faintly emitting volume that har
 the spray. It shows only while the sun is up and behind the camera, and moves with the camera as a real one does: to see it, put the fall about 40 degrees to one side of
 the camera's shadow.
 
+**The ground close up: `closeup`, `tracks`.** (film_ground.h; nature round 9, 2026-10-27)
+
+```
+closeup  size 16                                                  # `cell C`: a point every C metres (0.05)
+tracks   from -3 0 to 30 -4  during 2 30  kind boots              # boots, paws or hooves; `stride L`, `seed N`
+```
+
+`closeup` lays a patch of fine ground over the land in front of the camera (`size` metres across, centred a third of its size ahead of the camera, snapped to a 1 m
+grid so it does not swim), a point every `cell` metres: wind ripples a hand apart in sand (dunes, a coast, a desert biome), soft drifts and wind-carved ridges in snow
+(when `snowcover` is over 0.3), grit and pebbles on bare earth; painted with the land's own colours, snow where it lies, darker and glossy when it is wet; its edge eases
+down into the land. On it, footprints: a `tracks` trail - one print every half stride, left and right in turn, made step by step from its first point to its second over
+its `during` - and the hoof and paw prints of every herd along the ways its animals have come over the last half minute; each a dent with a rim pushed up round it (boots
+with a heel and a tread, paws with a pad and four toes, cloven hooves), deep in sand, snow or mud and barely there on dry earth. On a coast the band from 0.3 m under to
+0.5 m above the sea's level is wet sand the wash has just left: its ripples washed smooth, dark, under a film of water as smooth as glass (`coateddiffuse` roughness 0),
+so the sky shows in it. It needs a `terrain`. The patch is some 100 000 points (at the defaults): keep it for shots near the ground.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

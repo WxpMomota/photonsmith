@@ -7,11 +7,49 @@ namespace film_file {
 
 // Round 9's spectacles in a frame at film time t (nature's `nt`): tornadoes (film_wind.h), ice (film_ice.h), living light (film_glow.h) and the sea's giants
 // (film_giants.h). `exposure`: the frame's (living light is divided by it); `natureAt`: nature's time at a film time.
-inline std::string spectacleText(const Spec &spec, const std::string &header, double t, double nt, double exposure, const std::function<double(double)> &natureAt) {
+inline std::string spectacleText(const Spec &spec, const std::string &header, double t, double nt, double exposure, const std::function<double(double)> &natureAt,
+							  const terrain::Weather &weather) {
 	std::string out;
 	const double light = 1.0 / std::max(1.0, exposure);   // (as bright on the screen however far the night camera has opened up)
 	water::Sea lit = spec.seas.empty() ? water::Sea() : spec.seas[0];
 	lit.glow = lit.glow * light;
+	if (spec.closeup.on && spec.hasTerrain) {   // the ground close up (film_ground.h): in front of the camera, with the footprints on it
+		Vec3 eye, target;
+		double fov = 40.0;
+		film_subjects::cameraOf(header, eye, target, fov);
+		const Vec3 e{-eye.x, eye.y, eye.z}, f = normalize(Vec3{-target.x + eye.x, 0.0, target.z - eye.z} + Vec3{1e-9, 0.0, 0.0});
+		const std::shared_ptr<const terrain::Field> land = terrain::fieldOf(spec.terrain);
+		const auto groundAt = [&](double x, double z) { return land->inside(x, z) ? land->heightAt(x, z) : spec.terrain.y; };
+		const std::string &tk = spec.terrain.kind;
+		const Vec3 mid = e + f * (0.35 * spec.closeup.size);   // (on a coast, sand on the beach only: within a few metres of the sea's level)
+		const bool beach = tk == "coast" && !spec.seas.empty() && groundAt(mid.x, mid.z) < spec.seas[0].level + 2.5;
+		const std::string kind = weather.snow > 0.3 ? "snow" : (tk == "dunes" || beach || spec.biome == "desert") ? "sand" : "earth";
+		const bool soft = kind != "earth" || weather.wet > 0.5;
+		std::vector<ground::Print> prints;
+		for (const ground::Track &k : spec.tracks)
+			for (ground::Print p : ground::trackPrints(k, t)) p.depth *= soft ? 1.0 : 0.15, prints.push_back(p);
+		for (const wildlife::Herd &h : spec.herds) {   // a herd's prints along the ways its animals have come over the last half minute
+			const animals::Species *sp = animals::species(h.kind);
+			if (!sp) continue;
+			for (int i = 0; i < h.count; ++i)
+				for (int k = 0; k < 90; ++k) {
+					const double tb = t - 0.35 * k;
+					if (tb < 0.0) break;
+					const wildlife::Animal a = wildlife::animalAt(h, *sp, i, natureAt(tb), land.get());
+					if (a.clip.empty() || std::hypot(a.at.x - e.x, a.at.z - e.z) > spec.closeup.size) continue;
+					const double side = k % 2 ? 1.0 : -1.0, off = 0.12 * sp->length / 0.95;
+					for (const double along : {0.35 * sp->length, -0.35 * sp->length}) {
+						ground::Print p;
+						p.x = a.at.x + a.dir.x * along - a.dir.z * side * off, p.z = a.at.z + a.dir.z * along + a.dir.x * side * off;
+						p.dx = a.dir.x, p.dz = a.dir.z, p.kind = h.kind == "wolves" ? "paws" : "hooves", p.depth = (soft ? 0.03 : 0.004) * (h.kind == "horses" ? 1.3 : 1.0);
+						prints.push_back(p);
+					}
+				}
+		}
+		const double shore = (!spec.seas.empty() && tk == "coast") ? spec.seas[0].level : -1e30;
+		out += ground::closeupText(spec.key.empty() ? std::string("film") : spec.key, spec.closeup, e.x + f.x * 0.35 * spec.closeup.size, e.z + f.z * 0.35 * spec.closeup.size, kind, prints, groundAt,
+								   [&](double x, double z) { return terrain::colourAt(*land, x, z); }, kind == "snow" ? weather.snow : 0.0, weather.wet, shore, spec.terrain.key(), spec.terrain.seed);
+	}
 	if (spec.hasSky && std::any_of(spec.falls.begin(), spec.falls.end(), [](const water::Fall &f) { return f.rainbow > 0.0 && !f.frozen; })) {   // rainbows in the falls' spray
 		Vec3 eye, target;
 		double fov = 40.0, el = 0.0, facing = 0.0;
@@ -249,7 +287,7 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 		for (const water::River &r : spec.rivers) out += water::riverText(r, nt, ground.get());
 		for (const water::Fall &f : spec.falls) out += f.frozen ? (ground ? std::string() : water::cliffText(f)) + ice::frozenFallText(f) : water::fallText(f, nt, ground.get());
 	}
-	out += spectacleText(spec, header, t, nt, exposureAt(t), [this](double ft) { return natureAt(ft); });
+	out += spectacleText(spec, header, t, nt, exposureAt(t), [this](double ft) { return natureAt(ft); }, weatherAt(t));
 	if (!spec.auroras.empty() || !spec.lightnings.empty() || !spec.meteors.empty()) {   // the sky's spectacles (film_skyfx.h)
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 		const Vec3 centre = ground ? Vec3{spec.terrain.x, spec.terrain.y, spec.terrain.z} : Vec3{0.0, 0.0, 0.0};

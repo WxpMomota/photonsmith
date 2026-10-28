@@ -680,3 +680,58 @@ TEST(FilmSpectacleCaustics, TheTracedNetKeepsTheLightFocusesAndMovesAndTheSprayH
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }
+
+// ---- 10. the ground close up ----------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace grd = cartoon::ground;
+
+// A trail is made step by step, left and right in turn; a print is a dent with a rim; the close-up patch carries the land's fine relief and the prints dented into it,
+// and on a shore the band the waves have left is wet and smooth as a mirror.
+TEST(FilmSpectacleGround, FootprintsAreMadeStepByStepAndDentTheCloseUpGroundAndWetSandMirrors) {
+	grd::Track k;
+	k.x0 = 0.0, k.z0 = 0.0, k.x1 = 10.0, k.z1 = 0.0, k.t0 = 2.0, k.t1 = 12.0, k.stride = 1.0;
+	EXPECT_TRUE(grd::trackPrints(k, 1.0).empty()) << "not yet";
+	const std::vector<grd::Print> half = grd::trackPrints(k, 7.0), all = grd::trackPrints(k, 12.0);
+	EXPECT_NEAR(double(half.size()), 0.5 * all.size(), 2.0);
+	ASSERT_GE(all.size(), 4u);
+	EXPECT_LT(all[0].z * all[1].z, 0.0) << "left and right in turn";
+	grd::Print boot;
+	EXPECT_GT(grd::printShape(boot, 0.05, 0.0), 0.9) << "deep in the middle of the sole";
+	EXPECT_NEAR(grd::printShape(boot, 0.3, 0.2), 0.0, 1e-9);
+	EXPECT_LT(grd::printShape(boot, 0.05, 0.058), 0.0) << "a rim pushed up round it";
+
+	double lo = 1e9, hi = -1e9;
+	for (double x = 0.0; x < 0.5; x += 0.005) lo = std::min(lo, grd::relief("sand", x, 0.0, 1)), hi = std::max(hi, grd::relief("sand", x, 0.0, 1));
+	EXPECT_GT(hi - lo, 0.004) << "ripples in the sand";
+	const auto flat = [](double, double) { return 0.0; };
+	const auto colour = [](double, double) { return cartoon::Vec3{0.4, 0.35, 0.3}; };
+	grd::Closeup c;
+	c.size = 4.0, c.cell = 0.04;
+	grd::Print deep;
+	deep.x = 2.0, deep.z = 2.0, deep.dx = 1.0, deep.dz = 0.0, deep.depth = 0.06;
+	const auto lowest = [](const std::string &s) {
+		std::istringstream in(s.substr(s.find("\"point3 P\" [") + 12));
+		double x = 0.0, y = 0.0, z = 0.0, m = 1e9;
+		while (in >> x >> y >> z) m = std::min(m, y);
+		return m;
+	};
+	const std::string plain = grd::closeupText("ground_test", c, 2.0, 2.0, "sand", {}, flat, colour, 0.0, 0.0, -1e30, "test", 1);
+	const std::string printed = grd::closeupText("ground_test", c, 2.0, 2.0, "sand", {deep}, flat, colour, 0.0, 0.0, -1e30, "test", 1);
+	EXPECT_LT(lowest(printed), lowest(plain) - 0.01) << "the print dents the ground";
+	EXPECT_EQ(plain.find("closeup_mirror"), std::string::npos);
+	const std::string shore = grd::closeupText("ground_test", c, 2.0, 2.0, "sand", {}, [](double x, double) { return 0.1 * x - 0.1; }, colour, 0.0, 0.0, 0.0, "test", 1);
+	EXPECT_NE(shore.find("closeup_mirror"), std::string::npos) << "wet sand just above the water";
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("closeup", "scene s.pbrt\nlength 10\nterrain dunes size 400 height 10 seed 2\ncloseup size 8\ntracks from -3 0 to 3 0 during 0 6 kind paws\n"
+								  "shot 0 A\n key 0 1.5 4  0 0 -2  50\n",
+						film),
+			  "");
+	EXPECT_NE(film.sceneAt(5.0).find("# the ground close up"), std::string::npos);
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"closeup", "needs a `terrain` line"},
+																						{"terrain hills\ncloseup size 500", "size 2 to 60"},
+																						{"tracks from 0 0 to 1 1 kind wheels", "\"kind\""}}) {
+		const std::string problem = problemOf(line);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}

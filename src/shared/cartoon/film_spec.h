@@ -36,6 +36,7 @@
 #include "film_glow.h"
 #include "film_ice.h"
 #include "film_wind.h"
+#include "film_ground.h"
 #include "film_flowers.h"
 #include "film_geology.h"
 #include "film_soundscape.h"
@@ -396,6 +397,9 @@ struct Spec {
 	// the wind (`wind`, `tornado`)
 	wind::Wind wind;
 	std::vector<wind::Tornado> tornadoes;
+	// the ground close up (`closeup`, `tracks`)
+	ground::Closeup closeup;
+	std::vector<ground::Track> tracks;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	bool muteBirds = false;   // (`mute birds`: no birdsong, no eagles' cries, no geese - whatever flies in the picture)
