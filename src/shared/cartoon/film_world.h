@@ -239,8 +239,26 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 		const std::size_t camera = out.find("Camera \"");
 		if (camera != std::string::npos) out = out.substr(0, camera) + nature::mistBeforeCamera(m) + out.substr(camera) + nature::mistBoundary(m);
 	}
-	if (spec.space.on) out += space::spaceText(spec.key.empty() ? std::string("film") : spec.key, spec.space);   // (the set in space: film_space.h)
-	for (const planets::Planet &p : spec.planets) out += planets::planetText(spec.key.empty() ? std::string("film") : spec.key, p, nt, space::sunDirection(spec.space));   // (film_planets.h)
+	if (spec.space.on) {   // (the set in space: film_space.h)
+		Vec3 eye, target;
+		double fov = 40.0;
+		film_subjects::cameraOf(header, eye, target, fov);
+		out += space::spaceText(spec.key.empty() ? std::string("film") : spec.key, spec.space, space::narrowOnTheSun(spec.space, eye, target, fov));
+	}
+	if (!spec.planets.empty()) {   // planets and their moons, each where it is now (film_planets.h); an eclipse when one covers the sun
+		const std::string film = spec.key.empty() ? std::string("film") : spec.key;
+		for (std::size_t i = 0; i < spec.planets.size(); ++i) {
+			planets::Planet p = spec.planets[i];
+			p.at = planets::centreAt(spec.planets, i, nt);
+			out += planets::planetText(film, p, nt, space::sunDirection(spec.space));
+		}
+		if (spec.space.on && spec.space.sun) {
+			Vec3 eye, target;
+			double fov = 40.0;
+			film_subjects::cameraOf(header, eye, target, fov);
+			out += planets::eclipseText(film, spec.planets, nt, {-eye.x, eye.y, eye.z}, space::sunDirection(spec.space), spec.space.sunSize);
+		}
+	}
 	if (spec.hasSky) {
 		double rainbow = 0.0;   // (eased in and out over two seconds)
 		for (const Spec::Rainbow &r : spec.rainbows) rainbow = std::max(rainbow, r.strength * smoothstep(r.t0, r.t0 + 2.0, t) * (1.0 - smoothstep(r.t1 - 2.0, r.t1, t)));

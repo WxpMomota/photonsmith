@@ -15,6 +15,10 @@
 //   rings      (`rings INNER OUTER [opacity S]`, in its radii) a system of rings in its equator's plane: some 160 ringlets of ice and dust, their widths
 //              (and so the gaps between them) set by how dense the rings are there - bright bands, dusty ones, a wide dark division and a narrow gap - so the stars
 //              and the planet show through where they are thin; lit by the sun, in the planet's shadow behind it, and their own shadow striped across it;
+//   moons      (`moon NAME KIND of PLANET radius R orbit D [period S] [phase DEGREES] [incline DEGREES]`) a body of its own (any kind, and its own air,
+//              rings...) going round another on a circle, so moons cast their shadows across their planets and pass into their planets' shadows;
+//   eclipses   when a body, seen from the camera, covers the sun: as the last of it goes, the diamond ring (a blaze at the limb where the sun still peeks out), and
+//              in totality the sun's corona - its pearly streamers round the black disc;
 //   surface    a picture painted once for the kind and its seed (the sphere's own pbrt coordinates: row 0 its north pole), on pbrt's sphere turned so its poles are
 //              up (tipped by `tilt`) and spinning once every `spin` seconds; an ocean world's seas glossy (a coated surface whose roughness is a second picture).
 //
@@ -46,6 +50,8 @@ struct Planet {
 	std::string airColour = "blue";   // blue (Rayleigh), orange (a haze), white (cloud), green
 	double cities = 0.0, aurora = 0.0;   // its night side's city lights and polar aurora (0 none)
 	double ringInner = 0.0, ringOuter = 0.0, ringOpacity = 1.0;   // its rings (in its radii; none when the outer is 0)
+	std::string around;   // (a moon) the body it goes round; its orbit's radius, its period (seconds of nature's time), where it starts on it, how its plane tips
+	double orbit = 0.0, period = 120.0, phase = 0.0, incline = 0.0;
 };
 inline const std::vector<std::string> &airColours() {
 	static const std::vector<std::string> k = {"blue", "orange", "white", "green"};
@@ -356,6 +362,91 @@ inline std::string ringsText(const Planet &p, double nt) {
 		out += buf;
 	}
 	return out + "AttributeEnd\n";
+}
+
+// ---- moons and eclipses ----
+// Where body i of `all` is at nature's time `nt`: its own place, or (a moon) on its orbit round the body it goes round, wherever that is.
+inline Vec3 centreAt(const std::vector<Planet> &all, std::size_t i, double nt, int depth = 0) {
+	const Planet &p = all[i];
+	if (p.around.empty() || depth > 8) return p.at;
+	for (std::size_t k = 0; k < all.size(); ++k)
+		if (all[k].name == p.around) {
+			const double a = (p.phase + 360.0 * nt / (p.period == 0.0 ? 1.0 : p.period)) * kPi / 180.0, inc = p.incline * kPi / 180.0;
+			return centreAt(all, k, nt, depth + 1) + Vec3{std::cos(a), std::sin(a) * std::sin(inc), std::sin(a) * std::cos(inc)} * p.orbit;
+		}
+	return p.at;
+}
+// How much of the sun (toward `sunDir`, `sunRadius` radians across from its middle) body (centre `c`, radius `r`) covers seen from `eye`: 0 .. 1 (the overlap of the
+// two discs), and (out) which way across the sky the body's middle lies from the sun's.
+inline double sunCovered(Vec3 eye, Vec3 c, double r, Vec3 sunDir, double sunRadius, Vec3 &away) {
+	const Vec3 v = c - eye;
+	const double dist = length(v);
+	if (dist <= r) return 0.0;
+	const Vec3 dir = v * (1.0 / dist);
+	const double rho = std::asin(std::min(1.0, r / dist)), theta = std::acos(std::clamp(dot(dir, sunDir), -1.0, 1.0)), s = sunRadius;
+	away = normalize(sunDir - dir + Vec3{1e-12, 0.0, 0.0});   // (across the sky, from the body's middle towards the sun's)
+	if (theta >= rho + s) return 0.0;
+	if (theta <= rho - s) return 1.0;
+	if (theta <= s - rho) return (rho * rho) / (s * s);   // (a small body inside the sun's disc: an annulus or a transit)
+	// the overlap of two circles (radii s and rho, centres theta apart), as a share of the sun's
+	const double d = theta, a1 = std::acos(std::clamp((d * d + s * s - rho * rho) / (2.0 * d * s), -1.0, 1.0)), a2 = std::acos(std::clamp((d * d + rho * rho - s * s) / (2.0 * d * rho), -1.0, 1.0));
+	const double area = s * s * a1 + rho * rho * a2 - 0.5 * std::sqrt(std::max(0.0, (-d + s + rho) * (d + s - rho) * (d - s + rho) * (d + s + rho)));
+	return std::clamp(area / (kPi * s * s), 0.0, 1.0);
+}
+// The corona's picture: pearly streamers round a dark middle (a square, the sun's disc a sixth of it across).
+inline std::string coronaPicture(const std::string &film) {
+	const int N = 1024;
+	return film_sky::picture(film, "corona_v2", N, N, [&](std::vector<float> &rgb) {
+		for (int j = 0; j < N; ++j)
+			for (int i = 0; i < N; ++i) {
+				const double x = (i + 0.5) / N * 2.0 - 1.0, y = (j + 0.5) / N * 2.0 - 1.0, r = std::hypot(x, y) * 6.0, a = std::atan2(y, x);   // (r in sun radii)
+				double v = 0.0;
+				if (r > 1.0) {
+					const double streamers = 0.4 + 0.6 * std::pow(nature::fbm2(std::cos(a) * 3.0 + 5.0, std::sin(a) * 3.0, 91), 2.0) * (1.0 + 0.8 * std::pow(std::abs(std::cos(a)), 3.0));
+					v = std::pow(r, -2.5) * streamers * (1.0 - smoothstep(4.5, 6.0, r)) * smoothstep(1.0, 1.06, r);
+				}
+				const std::size_t q = (static_cast<std::size_t>(j) * N + i) * 3;
+				rgb[q] = static_cast<float>(v * 0.95), rgb[q + 1] = static_cast<float>(v * 0.97), rgb[q + 2] = static_cast<float>(v * 1.05);
+			}
+	});
+}
+// An eclipse seen from `eye` at nature's time `nt`, as scene text: the corona (a glowing card facing the camera, far beyond the body that covers the sun) in totality,
+// and the diamond ring (a small blazing ball at the limb) as the last of the sun goes or the first returns. "" when nothing covers the sun.
+inline std::string eclipseText(const std::string &film, const std::vector<Planet> &all, double nt, Vec3 eye, Vec3 sunDir, double sunSizeDegrees) {
+	const double s = 0.5 * sunSizeDegrees * kPi / 180.0;
+	double covered = 0.0, nearest = 1e30;
+	Vec3 away{0.0, 1.0, 0.0};
+	for (std::size_t i = 0; i < all.size(); ++i) {
+		Vec3 a;
+		const Vec3 c = centreAt(all, i, nt);
+		const double f = sunCovered(eye, c, all[i].radius, sunDir, s, a);
+		if (f > covered) covered = f, away = a, nearest = length(c - eye);
+	}
+	if (covered < 0.97) return std::string();
+	std::string out;
+	const double D = std::min(4.0e5, 20.0 * nearest);   // (far beyond the body that covers the sun)
+	Vec3 e1 = normalize(cross(sunDir, Vec3{0.0, 1.0, 0.0}) + Vec3{1e-9, 0.0, 0.0});
+	const Vec3 e2 = cross(e1, sunDir), mid = eye + sunDir * D;
+	const double corona = smoothstep(0.985, 0.9995, covered), half = D * std::tan(6.0 * s);
+	if (corona > 0.0) {   // the corona: a card six sun-radii across each way, facing the camera
+		Mesh m;
+		for (const auto &[u, v] : {std::pair<double, double>{0, 0}, {1, 0}, {1, 1}, {0, 1}}) {
+			const Vec3 q = mid + e1 * ((2.0 * u - 1.0) * half) + e2 * ((2.0 * v - 1.0) * half);
+			m.verts.push_back({-q.x, q.y, q.z}), m.normals.push_back({sunDir.x, -sunDir.y, -sunDir.z}), m.uvs.push_back({u, v});
+		}
+		m.tris = {{0, 1, 2}, {0, 2, 3}};
+		char scale[48];
+		std::snprintf(scale, sizeof scale, "%.4f", 1.5 * corona);
+		out += "# the sun's corona (film_planets.h)\nAttributeBegin\n  AreaLightSource \"diffuse\" \"string filename\" [ \"" + coronaPicture(film) + "\" ] \"float scale\" [ " + scale +
+			   " ] \"bool twosided\" [ true ]\n  Material \"dielectric\" \"float eta\" [ 1 ]\n" + emitMesh(m, identity()) + "AttributeEnd\n";
+	}
+	const double ring = std::exp(-std::pow((covered - 0.996) / 0.003, 2.0));   // (the diamond ring: as the last sliver goes)
+	if (ring > 0.02) {
+		const Vec3 limb = normalize(sunDir * std::cos(0.97 * s) + normalize(away - sunDir * dot(away, sunDir) + Vec3{1e-9, 0, 0}) * std::sin(0.97 * s));
+		const Vec3 q = eye + limb * D;
+		out += "# the diamond ring (film_planets.h)\n" + emissiveSphere({-q.x, q.y, q.z}, D * std::tan(0.12 * s), Vec3{1.0, 0.98, 0.94} * (3000.0 * ring));
+	}
+	return out;
 }
 
 // A planet at nature's time `nt`, as scene text.

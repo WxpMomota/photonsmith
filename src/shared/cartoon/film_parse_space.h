@@ -9,7 +9,7 @@ namespace film_file {
 
 // Whether `verb` is a space line's.
 inline bool isSpaceVerb(const std::string &verb) {
-	static const std::vector<std::string> k = {"space", "planet"};
+	static const std::vector<std::string> k = {"space", "planet", "moon"};
 	return std::find(k.begin(), k.end(), verb) != k.end();
 }
 
@@ -87,11 +87,47 @@ inline std::string planetLine(Spec &s, const std::vector<std::string> &t) {
 	return std::string();
 }
 
+// A `moon` line: a body going round another (film_planets.h). "" or what is wrong with it.
+inline std::string moonLine(Spec &s, const std::vector<std::string> &t) {
+	using detail::number;
+	const auto fail = [](const std::string &what) { return what; };
+	const std::string usage = "`moon NAME KIND of BODY radius R orbit D [period SECONDS] [phase DEGREES] [incline DEGREES] [seed N]` (and a planet's options: air, rings ...)";
+	if (t.size() < 5 || t[3] != "of") return fail(usage);
+	if (std::none_of(s.planets.begin(), s.planets.end(), [&](const planets::Planet &q) { return q.name == t[4]; })) return fail("no planet or moon called " + t[4] + " (a moon's line comes after its planet's)");
+	double a = 0.0;
+	std::vector<std::string> rest = {"planet", t[1], t[2], "at", "0", "0", "0"};
+	planets::Planet m;
+	m.around = t[4];
+	bool orbits = false;
+	for (std::size_t i = 5; i < t.size(); ++i) {
+		if (i + 1 < t.size() && number(t[i + 1], a) && (t[i] == "orbit" || t[i] == "period" || t[i] == "phase" || t[i] == "incline")) {
+			if (t[i] == "orbit") {
+				if (a <= 0.0) return fail("a moon's orbit is a distance from its planet's middle, above 0");
+				m.orbit = a, orbits = true;
+			} else if (t[i] == "period") {
+				if (a == 0.0) return fail("a moon's period is not 0 (negative: it goes the other way)");
+				m.period = a;
+			} else if (t[i] == "phase") m.phase = a;
+			else m.incline = a;
+			++i;
+		} else {
+			rest.push_back(t[i]);
+		}
+	}
+	if (!orbits) return fail(usage + ": its orbit");
+	const std::string e = planetLine(s, rest);
+	if (!e.empty()) return e;
+	planets::Planet &p = s.planets.back();
+	p.around = m.around, p.orbit = m.orbit, p.period = m.period, p.phase = m.phase, p.incline = m.incline;
+	return std::string();
+}
+
 // One space line: what it says goes into `s`. "" or what is wrong with it.
 inline std::string spaceLine(Spec &s, const std::string &verb, const std::string &line) {
 	const std::vector<std::string> t = detail::tokens(line);
 	if (verb == "space") return spaceSetLine(s, t);
 	if (verb == "planet") return planetLine(s, t);
+	if (verb == "moon") return moonLine(s, t);
 	return "unknown space line \"" + verb + "\"";
 }
 

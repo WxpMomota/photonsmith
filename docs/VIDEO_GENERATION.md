@@ -1129,6 +1129,20 @@ wide as the rings are dense there - bands of their own, a wide dark division at 
 the planet show through where they are thin (more with a lower `opacity`). Lit by the sun: the planet's shadow falls across the rings behind it, and the rings' own
 striped shadow falls on the planet.
 
+**Moons and eclipses: `moon`.** (film_planets.h)
+
+```
+moon    luna  rocky  of home  radius 1500  orbit 9000  period 80  phase 60  incline 5     # and any planet option: air, rings ...
+```
+
+A body going round another (a planet or another moon, named on an earlier line) on a circle `orbit` metres from its middle, once every `period` seconds of nature's
+time (negative: the other way), starting `phase` degrees round, its orbit's plane tipped `incline` degrees; it is a planet of its own in every other way. Moons cast their
+shadows across their planets and pass into their planets' shadows (the sun does it). **Eclipses:** when a planet or moon, seen from the camera, covers the sun, the
+camera sees the sun's disc eaten away (the bodies hide it); from 97% covered, the diamond ring - a blaze at the limb where the last of the sun peeks out - and in
+totality the corona: pearly streamers round the black disc (an emitting card far beyond the body, its picture painted once). A body a little bigger in the sky than the
+sun gives a total eclipse; a smaller one, an annular one or a transit. For a narrow shot (12 degrees or less) with the sun in it, the sun is drawn as a glowing ball
+instead of the sky picture's disc, so it stays round however close the lens (the picture leaves it out then).
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

@@ -257,3 +257,53 @@ TEST(FilmUniverseRings, RingletsSpanTheRingsWithADivisionAndAGap) {
 	EXPECT_EQ(pl::ringsText(p, 0.0), "");
 	expectProblems({{"planet a gas at 0 0 0 radius 10 rings 3 2", "the outer beyond the inner"}, {"planet a gas at 0 0 0 radius 10 rings 0.5 2", "from 1 out to 10"}});
 }
+
+// ---- 6. moons and eclipses ------------------------------------------------------------------------------------------------------------------------------------------------
+
+// A moon goes round its planet at its orbit's distance, half its period apart on opposite sides; a body over the sun covers it all, beside it none, part way between;
+// in totality there is a corona, near the end the diamond ring; a narrow shot of the sun draws it as a ball.
+TEST(FilmUniverseMoons, MoonsGoRoundAndEclipsesShowTheCoronaAndTheDiamondRing) {
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("moons", "scene s.pbrt\nlength 4\nspace sun 180 0\nplanet home ocean at 1000 0 2000 radius 600\nmoon luna rocky of home radius 150 orbit 2000 period 80\n"
+								"shot 0 A\n key 0 0 0  0 0 -100  50\n",
+						film),
+			  "");
+	const std::vector<pl::Planet> &all = film.spec.planets;
+	ASSERT_EQ(all.size(), 2u);
+	EXPECT_EQ(all[1].around, "home");
+	const cartoon::Vec3 a = pl::centreAt(all, 1, 0.0), b = pl::centreAt(all, 1, 40.0);
+	EXPECT_NEAR(cartoon::length(a - all[0].at), 2000.0, 1e-6);
+	EXPECT_NEAR(cartoon::length(b - all[0].at), 2000.0, 1e-6);
+	EXPECT_NEAR(cartoon::length(a - b), 4000.0, 1e-3) << "opposite sides half a period apart";
+
+	const cartoon::Vec3 sun{0.0, 0.0, -1.0}, eye{0.0, 0.0, 0.0};
+	const double s = 0.5 * 0.53 * cartoon::kPi / 180.0;
+	cartoon::Vec3 away;
+	EXPECT_DOUBLE_EQ(pl::sunCovered(eye, {0.0, 0.0, -60000.0}, 300.0, sun, s, away), 1.0) << "right over it, a little bigger: total";
+	EXPECT_DOUBLE_EQ(pl::sunCovered(eye, {3000.0, 0.0, -60000.0}, 300.0, sun, s, away), 0.0) << "beside it";
+	const double part = pl::sunCovered(eye, {300.0, 0.0, -60000.0}, 300.0, sun, s, away);
+	EXPECT_GT(part, 0.2);
+	EXPECT_LT(part, 0.9);
+	std::vector<pl::Planet> eclipser(1);
+	eclipser[0].name = "dark", eclipser[0].radius = 300.0, eclipser[0].at = {0.0, 0.0, -60000.0};
+	EXPECT_NE(pl::eclipseText("eclipse_test", eclipser, 0.0, eye, sun, 0.53).find("# the sun's corona"), std::string::npos) << "in totality";
+	eclipser[0].at = {2000.0, 0.0, -60000.0};
+	EXPECT_EQ(pl::eclipseText("eclipse_test", eclipser, 0.0, eye, sun, 0.53), "");
+	// near the end: the diamond ring (search the offset that leaves 0.4% of the sun)
+	double x = 0.0;
+	for (double t = 0.0; t < 600.0; t += 0.25) {
+		eclipser[0].at = {t, 0.0, -60000.0};
+		if (pl::sunCovered(eye, eclipser[0].at, 300.0, sun, s, away) < 0.996) {
+			x = t;
+			break;
+		}
+	}
+	eclipser[0].at = {x, 0.0, -60000.0};
+	EXPECT_NE(pl::eclipseText("eclipse_test", eclipser, 0.0, eye, sun, 0.53).find("# the diamond ring"), std::string::npos);
+	cartoon::space::Space sp1;
+	sp1.sunBearing = 180.0, sp1.sunElevation = 0.0;
+	EXPECT_TRUE(cartoon::space::narrowOnTheSun(sp1, {0.0, 0.0, 0.0}, {0.0, 0.0, -100.0}, 6.0));
+	EXPECT_FALSE(cartoon::space::narrowOnTheSun(sp1, {0.0, 0.0, 0.0}, {0.0, 0.0, -100.0}, 40.0)) << "a wide shot keeps the sun in the sky's picture";
+	expectProblems({{"planet a rocky at 0 0 0 radius 10\nmoon b rocky of c radius 2 orbit 30", "no planet or moon called c"},
+					{"planet a rocky at 0 0 0 radius 10\nmoon b rocky of a radius 2", "its orbit"}});
+}
