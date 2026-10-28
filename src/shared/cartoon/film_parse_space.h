@@ -47,7 +47,7 @@ inline std::string spaceSetLine(Spec &s, const std::vector<std::string> &t) {
 inline std::string planetLine(Spec &s, const std::vector<std::string> &t) {
 	using detail::number;
 	const auto fail = [](const std::string &what) { return what; };
-	const std::string usage = "`planet NAME KIND at X Y Z radius R [tilt DEGREES] [spin SECONDS] [air S [colour blue|orange|white|green]] [seed N]` (rocky, desert, ice, ocean, gas or lava)";
+	const std::string usage = "`planet NAME KIND at X Y Z radius R [tilt DEGREES] [spin SECONDS] [air S [colour blue|orange|white|green]] [cities S] [aurora S] [seed N]` (rocky, desert, ice, ocean, gas or lava)";
 	if (t.size() < 3) return fail(usage);
 	planets::Planet p;
 	p.name = t[1], p.kind = t[2];
@@ -69,7 +69,9 @@ inline std::string planetLine(Spec &s, const std::vector<std::string> &t) {
 			else if (t[i] == "spin" && a != 0.0) p.spin = a;
 			else if (t[i] == "seed") p.seed = static_cast<int>(a);
 			else if (t[i] == "air" && a >= 0.0 && a <= 10.0) p.air = a;
-			else return fail("\"" + t[i] + "\": " + usage + " (radius 1 to 200000 m, air 0 to 10)");
+			else if (t[i] == "cities" && a >= 0.0 && a <= 10.0) p.cities = a;
+			else if (t[i] == "aurora" && a >= 0.0 && a <= 10.0) p.aurora = a;
+			else return fail("\"" + t[i] + "\": " + usage + " (radius 1 to 200000 m, air, cities and aurora 0 to 10)");
 			i += 2;
 		} else {
 			return fail("\"" + t[i] + "\": " + usage);

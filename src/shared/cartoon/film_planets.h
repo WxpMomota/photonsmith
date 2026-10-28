@@ -10,6 +10,8 @@
 //              sunlight - blue most, as air does (Rayleigh), or an orange haze, white cloud or green - so its rim glows against space, its day side is a little
 //              hazed, and along the line between day and night the light through the air comes red; one grid (film_clouds.h's kind, in the film's cache) in a
 //              sphere round the planet;
+//   night      (`cities S`) the lights of cities on its land - along coasts and rivers, in clusters joined by roads - glowing warm on its night side (and
+//              drowned by day); (`aurora S`) ovals of aurora round both poles, curtains of light hanging over its night side, green below, red above, drifting;
 //   surface    a picture painted once for the kind and its seed (the sphere's own pbrt coordinates: row 0 its north pole), on pbrt's sphere turned so its poles are
 //              up (tipped by `tilt`) and spinning once every `spin` seconds; an ocean world's seas glossy (a coated surface whose roughness is a second picture).
 //
@@ -19,12 +21,14 @@
 #include <cmath>
 #include <cstdio>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "cartoon_lib.h"
 #include "film_cache.h"
 #include "film_clouds.h"
 #include "film_sky.h"
+#include "film_skyfx.h"
 #include "film_space.h"
 
 namespace cartoon {
@@ -37,6 +41,7 @@ struct Planet {
 	int seed = 1;
 	double air = 0.0;                 // how thick its air is (0 none, 1 an Earth's)
 	std::string airColour = "blue";   // blue (Rayleigh), orange (a haze), white (cloud), green
+	double cities = 0.0, aurora = 0.0;   // its night side's city lights and polar aurora (0 none)
 };
 inline const std::vector<std::string> &airColours() {
 	static const std::vector<std::string> k = {"blue", "orange", "white", "green"};
@@ -133,6 +138,19 @@ inline Vec3 surfaceAt(const Planet &p, Vec3 o, double &sea, double &glow) {
 	return lerp(c, Vec3{0.92, 0.93, 0.95}, 0.9 * cloud);
 }
 
+// How bright the lights of cities are at o (0 .. 1): on land, not under ice, more along coasts, in clusters, the bigger cities joined by faint roads.
+inline double cityLightAt(const Planet &p, Vec3 o) {
+	double sea = 0.0, glow = 0.0;
+	const Vec3 c = surfaceAt(p, o, sea, glow);
+	if (sea > 0.0 || p.kind == "gas" || (c.x > 0.8 && c.z > 0.8)) return 0.0;   // (no cities at sea, on a gas giant, or under the ice caps and clouds' whites)
+	const int s = p.seed * 97;
+	const double land = detail::fbm(o, 2.2, s + 5) + 0.35 * (detail::fbm(o, 9.0, s + 6) - 0.5);
+	const double coast = 1.0 - smoothstep(0.53, 0.58, land);   // (just inland of the shore)
+	const double cluster = smoothstep(0.6, 0.75, detail::fbm(o, 25.0, s + 21)), speck = smoothstep(0.55, 0.9, detail::fbm(o, 140.0, s + 23));
+	const double road = (1.0 - smoothstep(0.0, 0.01, std::abs(detail::fbm(o, 8.0, s + 25) - 0.5))) * 0.25;
+	return std::min(1.0, (0.4 + 0.9 * coast) * (cluster * (0.5 + speck) + road * smoothstep(0.4, 0.6, detail::fbm(o, 12.0, s + 27))));
+}
+
 // A planet's pictures, painted once for its kind and seed: its colour (always), how glossy it is (an ocean world) and how it glows (lava). Their file paths.
 struct Pictures {
 	std::string colour, gloss, glow;
@@ -161,13 +179,14 @@ inline Pictures pictures(const std::string &film, const Planet &p) {
 					rgb[q] = rgb[q + 1] = rgb[q + 2] = r;
 				}
 		});
-	if (p.kind == "lava")
-		out.glow = film_sky::picture(film, base + "_glow", W, H, [&](std::vector<float> &rgb) {
+	if (p.kind == "lava" || p.cities > 0.0)
+		out.glow = film_sky::picture(film, base + (p.kind == "lava" ? "_glow" : "_cities"), W, H, [&](std::vector<float> &rgb) {
 			for (int j = 0; j < H; ++j)
 				for (int i = 0; i < W; ++i) {
 					double sea = 0.0, glow = 0.0;
-					surfaceAt(p, detail::dirOf(i, j, W, H), sea, glow);
-					const Vec3 c = Vec3{1.0, 0.35, 0.06} * glow;
+					const Vec3 o = detail::dirOf(i, j, W, H);
+					surfaceAt(p, o, sea, glow);
+					const Vec3 c = p.kind == "lava" ? Vec3{1.0, 0.35, 0.06} * glow : Vec3{1.0, 0.72, 0.38} * cityLightAt(p, o);
 					const std::size_t q = (static_cast<std::size_t>(j) * W + i) * 3;
 					rgb[q] = static_cast<float>(c.x), rgb[q + 1] = static_cast<float>(c.y), rgb[q + 2] = static_cast<float>(c.z);
 				}
@@ -255,14 +274,66 @@ inline std::string airText(const std::string &film, const Planet &p) {
 	return out + buf;
 }
 
+// ---- aurora seen from above ----
+// The world direction of a planet's north pole (its pole tipped by `tilt` about x, as placement() turns it).
+inline Vec3 poleOf(const Planet &p) {
+	const double a = p.tilt * kPi / 180.0;
+	return {0.0, std::cos(a), std::sin(a)};
+}
+// A planet's aurora at nature's time `nt` as scene text: an oval round each pole at about 67 degrees of latitude, wavering and drifting, a curtain of light standing from
+// 1% to 3.5% of the radius above the ground (skyfx's aurora picture: green below, red above) - drawn only over the night side (towards `sunDir` is day).
+inline std::string auroraText(const std::string &film, const Planet &p, double nt, Vec3 sunDir) {
+	if (p.aurora <= 0.0) return std::string();
+	const Vec3 pole = poleOf(p);
+	Vec3 e1 = normalize(cross(pole, Vec3{0.0, 0.0, 1.0}) + Vec3{1e-9, 0.0, 0.0});
+	const Vec3 e2 = cross(pole, e1);
+	std::string out;
+	for (int hemi = 0; hemi < 2; ++hemi) {
+		const Vec3 up = hemi == 0 ? pole : pole * -1.0;
+		Mesh m;
+		const int n = 240;
+		std::vector<int> keep(n + 1, 0);
+		for (int k = 0; k <= n; ++k) {
+			const double a = 2.0 * kPi * k / n;
+			const double lat = (67.0 + 3.0 * std::sin(3.0 * a + 0.2 * nt + hemi) + 2.0 * (nature::noise2(4.0 * std::cos(a) + hemi * 7.0, 4.0 * std::sin(a) + 0.05 * nt, p.seed + 61) - 0.5) * 3.0) * kPi / 180.0;
+			const Vec3 flat = e1 * std::cos(a) + e2 * std::sin(a), radial = normalize(up * std::sin(lat) + flat * std::cos(lat));
+			keep[static_cast<std::size_t>(k)] = dot(radial, sunDir) < -0.05;   // (the night side)
+			// four points round the oval: the curtain's foot and its top, and the edges of the glowing band it stands in (2.5 degrees either side, the picture's green
+			// fading towards them) - from above, a curtain is a line; the band is what the oval looks like from orbit
+			const double spread = 2.5 * kPi / 180.0;
+			const Vec3 inner = normalize(up * std::sin(lat - spread) + flat * std::cos(lat - spread)), outer = normalize(up * std::sin(lat + spread) + flat * std::cos(lat + spread));
+			for (const auto &[dir, h, v] : {std::tuple<Vec3, double, double>{radial, 0.01, 0.0}, {radial, 0.035, 1.0}, {inner, 0.01, 0.75}, {outer, 0.01, 0.75}}) {
+				const Vec3 q = p.at + dir * (p.radius * (1.0 + h));
+				m.verts.push_back({-q.x, q.y, q.z});   // (story space: emitMesh mirrors it back)
+				m.normals.push_back({-dir.x, dir.y, dir.z});
+				m.uvs.push_back({k / double(n), v});
+			}
+		}
+		for (int k = 0; k < n; ++k)
+			if (keep[static_cast<std::size_t>(k)] && keep[static_cast<std::size_t>(k) + 1]) {
+				const int v = 4 * k, w = v + 4;
+				for (const auto &[a, b] : {std::pair<int, int>{0, 1}, {2, 0}, {0, 3}}) {   // (the curtain, and the band's two halves)
+					m.tris.push_back({v + a, w + a, v + b});
+					m.tris.push_back({v + b, w + a, w + b});
+				}
+			}
+		if (m.tris.empty()) continue;
+		char scale[48];
+		std::snprintf(scale, sizeof scale, "%.4f", 0.6 * p.aurora);
+		out += "# aurora (film_planets.h)\nAttributeBegin\n  AreaLightSource \"diffuse\" \"string filename\" [ \"" + skyfx::auroraPicture(film, "green", hemi) + "\" ] \"float scale\" [ " + scale +
+			   " ] \"bool twosided\" [ true ]\n  Material \"dielectric\" \"float eta\" [ 1 ]\n" + emitMesh(m, identity()) + "AttributeEnd\n";
+	}
+	return out;
+}
+
 // A planet at nature's time `nt`, as scene text.
-inline std::string planetText(const std::string &film, const Planet &p, double nt) {
+inline std::string planetText(const std::string &film, const Planet &p, double nt, Vec3 sunDir = Vec3{0.0, 1.0, 0.0}) {
 	const Pictures pic = pictures(film, p);
 	std::string out = "# a planet (film_planets.h): " + p.name + "\nAttributeBegin\n" + placement(p, nt);
 	out += "  Texture \"" + p.name + "_colour\" \"spectrum\" \"imagemap\" \"string filename\" [ \"" + pic.colour + "\" ]\n";
 	if (!pic.glow.empty()) {
 		char scale[32];
-		std::snprintf(scale, sizeof scale, "%.4f", 1.5);
+		std::snprintf(scale, sizeof scale, "%.4f", p.kind == "lava" ? 1.5 : 0.25 * p.cities);
 		out += "  AreaLightSource \"diffuse\" \"string filename\" [ \"" + pic.glow + "\" ] \"float scale\" [ " + scale + " ]\n";
 	}
 	if (!pic.gloss.empty()) {
@@ -273,7 +344,7 @@ inline std::string planetText(const std::string &film, const Planet &p, double n
 	}
 	char buf[96];
 	std::snprintf(buf, sizeof buf, "  Shape \"sphere\" \"float radius\" [ %.4f ]\nAttributeEnd\n", p.radius);
-	return out + buf + airText(film, p);
+	return out + buf + airText(film, p) + auroraText(film, p, nt, sunDir);
 }
 
 }  // namespace planets

@@ -183,5 +183,50 @@ TEST(FilmUniverseAir, AirThinsWithHeightScattersBlueAndSurroundsThePlanet) {
 	const std::string s = film.sceneAt(1.0);
 	EXPECT_EQ(count(s, "# its air (film_planets.h)"), 1u) << "only the planet with air";
 	EXPECT_NE(s.find("MediumInterface \"air_home\" \"\""), std::string::npos);
-	expectProblems({{"planet a rocky at 0 0 0 radius 10 air 20", "air 0 to 10"}});
+	expectProblems({{"planet a rocky at 0 0 0 radius 10 air 20", "aurora 0 to 10"}});
+}
+
+// ---- 4. night sides ----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// Cities light the land and not the sea or a gas giant; the aurora's oval is drawn only over the night side, and none without `aurora`.
+TEST(FilmUniverseNight, CitiesLightTheLandAndAuroraHangsOverTheNightSide) {
+	pl::Planet p;
+	p.name = "home", p.kind = "ocean", p.cities = 1.0, p.aurora = 1.0, p.radius = 6000.0, p.at = {0.0, 0.0, -20000.0};
+	int lit = 0, litAtSea = 0;
+	for (int j = 0; j < 60; ++j)
+		for (int i = 0; i < 120; ++i) {
+			const cartoon::Vec3 o = pl::detail::dirOf(i, j, 120, 60);
+			double sea = 0.0, glow = 0.0;
+			pl::surfaceAt(p, o, sea, glow);
+			const double c = pl::cityLightAt(p, o);
+			lit += c > 0.1;
+			litAtSea += c > 0.1 && sea > 0.0;
+		}
+	EXPECT_GT(lit, 20) << "cities";
+	EXPECT_EQ(litAtSea, 0) << "none at sea";
+	pl::Planet gas = p;
+	gas.kind = "gas";
+	EXPECT_EQ(pl::cityLightAt(gas, cartoon::normalize(cartoon::Vec3{0.3, 0.2, 0.9})), 0.0);
+	const std::string night = pl::auroraText("aurora_test", p, 0.0, {1.0, 0.0, 0.0}), none = pl::auroraText("aurora_test", p, 0.0, {1.0, 0.0, 0.0});
+	EXPECT_EQ(count(night, "# aurora (film_planets.h)"), 2u) << "round both poles";
+	// every point of it on the night side (away from the sun at +x): pbrt x = -(story x) of the mesh points
+	std::vector<int> used;   // (the points its triangles use: the mesh keeps every point round the oval)
+	{
+		std::istringstream idx(night.substr(night.find("\"integer indices\" [") + 20));
+		int k = 0;
+		while (idx >> k) used.push_back(k);
+	}
+	std::vector<double> xs;
+	{
+		std::istringstream in(night.substr(night.find("\"point3 P\" [") + 12));
+		double x = 0.0, y = 0.0, z = 0.0;
+		while (in >> x >> y >> z) xs.push_back(x);
+	}
+	double sunward = -1e30;
+	for (int k : used) sunward = std::max(sunward, xs.at(static_cast<std::size_t>(k)));
+	EXPECT_LT(sunward, 0.3 * p.radius) << "drawn over the night side";
+	p.aurora = 0.0;
+	EXPECT_EQ(pl::auroraText("aurora_test", p, 0.0, {1.0, 0.0, 0.0}), "");
+	(void)none;
+	expectProblems({{"planet a ocean at 0 0 0 radius 10 cities 20", "cities and aurora 0 to 10"}});
 }

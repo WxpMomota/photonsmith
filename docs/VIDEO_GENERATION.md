@@ -1106,6 +1106,18 @@ so its rim glows against space, the day side is a little hazed, and along the li
 that a line of sight grazing the ground passes through about one and a half of its own lengths in blue. It is one grid (144 cubed) written once into the film's cache,
 in a sphere round the planet; the frame is then drawn by the wavefront renderer, which samples it along every ray.
 
+**Night sides: `planet ... cities S aurora S`.** (film_planets.h)
+
+```
+planet  home  ocean  at 0 0 -20000  radius 6000  tilt 30  air 1  cities 1  aurora 1     # each 0 to 10
+```
+
+`cities` lights the planet's land with the warm glow of cities - more just inland of the coasts, in clusters, the bigger ones joined by faint roads, none at sea, under
+the ice caps or on a gas giant - an emitting picture on the planet's own sphere, so it shows on the night side and is drowned by day. `aurora` hangs an oval round each
+pole at about 67 degrees of latitude, wavering and drifting with nature's time: a curtain of light from 1% to 3.5% of the radius above the ground (the films' aurora
+picture: green below, red above) standing in a glowing band 5 degrees wide, which is what the oval looks like from orbit. It is drawn over the night side only (an
+emitting ribbon, which casts a shadow like glass, would otherwise stripe the day side).
+
 **Forests: `forest`.** (film_forest.h)
 
 ```
