@@ -168,13 +168,26 @@ inline std::string DataFilm::worldAt(const std::string &header, double t) const 
 		film_subjects::cameraOf(header, eye, target, fov);
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 		const double aspect = 16.0 / 9.0, hfov = 2.0 * std::atan(std::tan(fov * kPi / 360.0) * aspect) * 180.0 / kPi;   // (a film's fov is its shorter side's)
-		for (const water::Sea &sea : spec.seas) out += water::seaText(sea, nt, eye, target, hfov, ground.get(), spec.swell.on ? &spec.swell : nullptr);
+		for (water::Sea sea : spec.seas) {
+			sea.glow = sea.glow * (1.0 / std::max(1.0, exposureAt(t)));   // (living light as bright on the screen however far the night camera has opened up)
+			out += water::seaText(sea, nt, eye, target, hfov, ground.get(), spec.swell.on ? &spec.swell : nullptr);
+		}
 		if (spec.swell.on && ground) out += surf::shallowsCausticText(spec.key.empty() ? std::string("film") : spec.key, nt, -eye.x, eye.z, *ground, spec.seas[0].level);
 		for (const water::River &r : spec.rivers) out += water::riverText(r, nt, ground.get());
 		for (const water::Fall &f : spec.falls) out += water::fallText(f, nt, ground.get());
 	}
-	if ((!spec.whales.empty() || !spec.pods.empty()) && !spec.seas.empty())   // the sea's giants (film_giants.h)
-		out += giants::giantsText(spec.whales, spec.pods, spec.seas[0], spec.hasUnderwater, t, nt, [this](double ft) { return natureAt(ft); });
+	if (!spec.fireflies.empty() || !spec.fungi.empty()) {   // living light (film_glow.h)
+		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
+		const auto groundAt = [&](double x, double z) { return ground && ground->inside(x, z) ? ground->heightAt(x, z) : (ground ? spec.terrain.y : 0.0); };
+		const double light = 1.0 / std::max(1.0, exposureAt(t));   // (as bright on the screen however far the night camera has opened up)
+		for (const glow::Fireflies &f : spec.fireflies) out += glow::firefliesText(f, nt, groundAt, light);
+		for (const glow::Fungi &f : spec.fungi) out += glow::fungiText(f, nt, groundAt, light);
+	}
+	if ((!spec.whales.empty() || !spec.pods.empty()) && !spec.seas.empty()) {   // the sea's giants (film_giants.h)
+		water::Sea sea = spec.seas[0];
+		sea.glow = sea.glow * (1.0 / std::max(1.0, exposureAt(t)));
+		out += giants::giantsText(spec.whales, spec.pods, sea, spec.hasUnderwater, t, nt, [this](double ft) { return natureAt(ft); });
+	}
 	if (!spec.auroras.empty() || !spec.lightnings.empty() || !spec.meteors.empty()) {   // the sky's spectacles (film_skyfx.h)
 		const std::shared_ptr<const terrain::Field> ground = spec.hasTerrain ? terrain::fieldOf(spec.terrain) : nullptr;
 		const Vec3 centre = ground ? Vec3{spec.terrain.x, spec.terrain.y, spec.terrain.z} : Vec3{0.0, 0.0, 0.0};

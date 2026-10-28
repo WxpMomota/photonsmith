@@ -36,6 +36,8 @@ struct Sea {
 	bool spectral = true;     // an ocean spectrum (film_ocean.h); `model gerstner`: the twenty summed waves of before
 	bool foam = true;
 	bool fromBelow = false;   // (film_underwater.h) seen from under it: a thin water surface, which lets the sun's light down
+	Vec3 glow{0.0, 0.0, 0.0};   // (film_glow.h `bioluminescence`) the light its foam gives out where the sea is stirred; none when zero
+	const Vec3 *glowing() const { return glow.x + glow.y + glow.z > 0.0 ? &glow : nullptr; }
 };
 // A river: its waypoints (pbrt's x z), its width and its speed (metres a second), its surface's height when there is no terrain under it. On a terrain a river may
 // instead start at one point and find its own way downhill (`from`), or run along a canyon's riverbed (`canyon`).
@@ -277,7 +279,7 @@ inline std::string seaText(const Sea &s, double t, const Vec3 &eyeStory, const V
 					if (a + b < k - 1) piece(a + 1, b, a + 1, b + 1, a, b + 1);
 				}
 		}
-		if (!foam.tris.empty()) text += attr(diffuseMaterial({0.82, 0.85, 0.87}), emitMesh(detail::agreeing(foam), identity()));
+		if (!foam.tris.empty()) text += attr(diffuseMaterial({0.82, 0.85, 0.87}), emitMesh(detail::agreeing(foam), identity()), s.glowing());
 	}
 	if (ground && s.foam && s.kind != "clear") text += shoreText(s, t, *ground);
 	if (grid) text += surf::sprayText(crests, eye, t, *swell);
@@ -326,7 +328,7 @@ inline std::string shoreText(const Sea &s, double t, const terrain::Field &groun
 		}
 		std::swap(row0, row1);
 	}
-	return m.tris.empty() ? std::string() : "# the foam along the shore (film_water.h)\n" + attr(diffuseMaterial({0.8, 0.82, 0.84}), emitMesh(detail::agreeing(m), identity()));
+	return m.tris.empty() ? std::string() : "# the foam along the shore (film_water.h)\n" + attr(diffuseMaterial({0.8, 0.82, 0.84}), emitMesh(detail::agreeing(m), identity()), s.glowing());
 }
 
 // ---- rivers ----

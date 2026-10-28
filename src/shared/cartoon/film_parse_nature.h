@@ -170,6 +170,60 @@ inline std::string giantLine(Spec &s, const std::string &verb, const std::string
 	return std::string();
 }
 
+// A `bioluminescence`, `fireflies` or `fungi` line (film_glow.h). "" or what is wrong with it.
+inline std::string glowLine(Spec &s, const std::string &verb, const std::string &line) {
+	using detail::number;
+	const auto fail = [](const std::string &what) { return what; };
+	const std::vector<std::string> t = detail::tokens(line);
+	const auto colourOk = [](const std::string &c) { return std::find(glow::glowColours().begin(), glow::glowColours().end(), c) != glow::glowColours().end(); };
+	double a = 0.0, b = 0.0, c = 0.0, d = 0.0;
+	if (verb == "bioluminescence") {
+		if (s.bio.on) return fail("a film has one `bioluminescence` line");
+		s.bio.on = true;
+		for (std::size_t i = 1; i < t.size(); i += 2) {
+			if (i + 1 < t.size() && t[i] == "strength" && number(t[i + 1], a) && a > 0.0 && a <= 20.0) s.bio.strength = a;
+			else if (i + 1 < t.size() && t[i] == "colour" && colourOk(t[i + 1])) s.bio.colour = t[i + 1];
+			else return fail("\"" + t[i] + "\": `bioluminescence [strength S] [colour blue|green|teal]` (strength above 0, up to 20)");
+		}
+		return std::string();
+	}
+	const bool flies = verb == "fireflies";
+	const std::string usage = flies ? "`fireflies COUNT in X0 Z0 X1 Z1 [height H] [during T0 T1] [together] [brightness B] [seed N]`"
+									: "`fungi COUNT in X0 Z0 X1 Z1 [colour green|blue|teal] [brightness B] [seed N]`";
+	if (t.size() < 7 || !number(t[1], a) || a < 1.0 || a > (flies ? 2000.0 : 500.0) || a != std::floor(a) || t[2] != "in" || !number(t[3], b) || !number(t[4], c) || !number(t[5], d)) {
+		return fail(usage + (flies ? ": 1 to 2000 fireflies" : ": 1 to 500 clusters"));
+	}
+	double e = 0.0;
+	if (!number(t[6], e)) return fail(usage);
+	glow::Fireflies f;
+	glow::Fungi g;
+	(flies ? f.count : g.count) = static_cast<int>(a);
+	(flies ? f.x0 : g.x0) = std::min(b, d), (flies ? f.x1 : g.x1) = std::max(b, d), (flies ? f.z0 : g.z0) = std::min(c, e), (flies ? f.z1 : g.z1) = std::max(c, e);
+	for (std::size_t i = 7; i < t.size();) {
+		if (flies && t[i] == "together") {
+			f.together = true;
+			++i;
+		} else if (flies && t[i] == "during" && i + 2 < t.size() && number(t[i + 1], a) && number(t[i + 2], b) && b > a) {
+			f.t0 = a, f.t1 = b;
+			i += 3;
+		} else if (!flies && t[i] == "colour" && i + 1 < t.size() && colourOk(t[i + 1])) {
+			g.colour = t[i + 1];
+			i += 2;
+		} else if (i + 1 < t.size() && number(t[i + 1], a)) {
+			if (t[i] == "brightness" && a > 0.0 && a <= 20.0) (flies ? f.brightness : g.brightness) = a;
+			else if (t[i] == "seed") (flies ? f.seed : g.seed) = static_cast<int>(a);
+			else if (flies && t[i] == "height" && a >= 0.3 && a <= 20.0) f.height = a;
+			else return fail("\"" + t[i] + "\": " + usage);
+			i += 2;
+		} else {
+			return fail("\"" + t[i] + "\": " + usage);
+		}
+	}
+	if (flies) s.fireflies.push_back(f);
+	else s.fungi.push_back(g);
+	return std::string();
+}
+
 // One line of a film file, if it is a nature line: what it says goes into `s`. `handled` is false when `verb` is not a nature word (the line is parse()'s); the
 // result is "" or what is wrong with the line (parse() adds the file and the line).
 inline std::string natureLine(Spec &s, const std::string &verb, const std::string &line, const std::string &rest, bool &handled) {
@@ -697,6 +751,8 @@ inline std::string natureLine(Spec &s, const std::string &verb, const std::strin
 		return fireLine(s, verb, line);
 	} else if (verb == "whale" || verb == "dolphins") {   // the sea's giants (film_giants.h)
 		return giantLine(s, verb, line);
+	} else if (verb == "bioluminescence" || verb == "fireflies" || verb == "fungi") {   // living light (film_glow.h)
+		return glowLine(s, verb, line);
 	} else if (verb == "geyser" || verb == "rockfall" || verb == "avalanche") {   // the land in action (film_geology.h)
 		const std::vector<std::string> t = detail::tokens(line);
 		const std::string where = verb == "geyser" ? "at" : "from";

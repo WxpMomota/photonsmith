@@ -327,3 +327,72 @@ TEST(FilmSpectacleSea, AWhaleRollsBlowsAndBreachesAndDolphinsPorpoise) {
 		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
 	}
 }
+
+// ---- 4. living light ------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace glow = cartoon::glow;
+
+// Fireflies flash briefly every few seconds, each in its own time - or, `together`, drifting into step until the swarm flashes as one; fungi glow in clusters; with
+// `bioluminescence` the sea's foam and the spray of a breach give out light.
+TEST(FilmSpectacleGlow, FirefliesFlashAndFallIntoStepFungiGlowAndTheStirredSeaShines) {
+	glow::Fireflies f;
+	f.count = 40;
+	int lit = 0, samples = 0;
+	for (int k = 0; k < f.count; ++k) {
+		int flashes = 0;
+		bool was = false;
+		for (double t = 0.0; t < 10.0; t += 0.02, ++samples) {
+			const bool on = glow::flash(f, k, t) > 0.2;
+			lit += on;
+			flashes += on && !was;
+			was = on;
+		}
+		EXPECT_GE(flashes, 2) << "firefly " << k << " flashes every few seconds";
+	}
+	EXPECT_LT(double(lit) / samples, 0.15) << "brief flashes";
+	const auto inStep = [&](const glow::Fireflies &s, double around) {   // (the share of the swarm lit when the most are)
+		double best = 0.0;
+		for (double t = around; t < around + 3.0; t += 0.02) {
+			int on = 0;
+			for (int k = 0; k < s.count; ++k) on += glow::flash(s, k, t) > 0.3;
+			best = std::max(best, double(on) / s.count);
+		}
+		return best;
+	};
+	glow::Fireflies sync = f;
+	sync.together = true;
+	EXPECT_LT(inStep(sync, 0.0), 0.5) << "each in its own time at first";
+	EXPECT_GT(inStep(sync, 40.0), 0.9) << "all as one after half a minute";
+	EXPECT_LT(inStep(f, 40.0), 0.5) << "without `together`, never in step";
+
+	ff::DataFilm film;
+	ASSERT_EQ(loadFilm("glow", "scene s.pbrt\nlength 30\nwater sea level 0 waves 1\nbioluminescence strength 2 colour teal\n"
+							   "fireflies 50 in -10 -10 10 10 height 3 together\nfungi 12 in -5 -5 5 5 colour green brightness 2\n"
+							   "whale at 0 -60 toward 90 breach 10\nshot 0 A\n key 0 3 30  0 1 -60  50\n",
+						film),
+			  "");
+	ASSERT_NE(film.spec.seas[0].glowing(), nullptr);
+	EXPECT_NEAR(film.spec.seas[0].glow.y, cartoon::glow::colourOf("teal").y * 1.2, 1e-9);
+	const std::string a = film.sceneAt(10.5);
+	const std::size_t spray = a.find("# spray (film_giants.h)");
+	ASSERT_NE(spray, std::string::npos);
+	EXPECT_LT(a.find("AreaLightSource", spray), a.find("Shape \"sphere\"", spray)) << "the spray glows";
+	const std::size_t flies = a.find("# fireflies"), fungi = a.find("# glowing fungi");
+	ASSERT_NE(flies, std::string::npos);
+	ASSERT_NE(fungi, std::string::npos);
+	ASSERT_LT(flies, fungi);
+	const std::size_t glowing = count(a.substr(flies, fungi - flies), "AreaLightSource");
+	EXPECT_GT(glowing, 0u);
+	EXPECT_LE(glowing, 50u) << "one light a firefly";
+	const std::size_t caps = count(a.substr(fungi), "\"rgb L\"");
+	EXPECT_GE(caps, 12u * 3u);
+	EXPECT_LE(caps, 12u * 11u);
+	for (const auto &[line, says] : std::vector<std::pair<std::string, std::string>>{{"bioluminescence", "needs a `water` line"},
+																						{"water sea level 0\nbioluminescence colour pink", "blue|green|teal"},
+																						{"fireflies 0 in 0 0 1 1", "1 to 2000 fireflies"},
+																						{"fireflies 10 in 0 0 1 1 height 50", "\"height\""},
+																						{"fungi 10 in 0 0 1 1 colour red", "\"colour\""}}) {
+		const std::string problem = problemOf(line);
+		EXPECT_NE(problem.find(says), std::string::npos) << line << " -> " << problem;
+	}
+}

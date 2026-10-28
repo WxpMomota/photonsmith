@@ -941,6 +941,22 @@ Dolphins (1 to 40, 2.6 m long, grey with pale bellies) porpoise along their head
 water, a second in the air), a splash where it leaves and where it goes back in. Heard: the whale's blows, the breach's wash and the boom of its crash, its song under water;
 the dolphins' splashes and their whistles. Both need a `water sea`. They move in nature's time, so `slowmo` slows a breach.
 
+**Living light on a night: `bioluminescence`, `fireflies`, `fungi`.** (film_glow.h; nature round 9, 2026-10-27)
+
+```
+bioluminescence  strength 1  colour blue                     # the stirred sea glows: blue, green or teal
+fireflies 300  in -40 25 20 70  height 3  together          # `during T0 T1`, `brightness B`, `seed N`
+fungi    40  in -25 35 5 60  colour green  brightness 2     # clusters of glowing mushrooms
+```
+
+`bioluminescence` makes the sea glow where it is stirred: the foam on folding crests, the wash along the shore, the white water of `surf`, and the spray and foam of whales
+and dolphins give out light (they become emitters, so they light what is round them). `fireflies COUNT in X0 Z0 X1 Z1` (up to 2000) wander slowly over the patch, up to
+`height` metres above the ground (2), each a tiny glowing sphere flashing yellow-green for a third of a second every 2 to 4 s, a faint glow between; with `together` their
+flashes drift into one shared beat (2.5 s) over the first half minute until the whole swarm flashes as one. `fungi COUNT in ...` (up to 500 clusters) puts 3 to 12 small
+mushrooms in each, pale stems and glowing round caps 2 to 6 cm across, breathing slowly brighter and dimmer. Every glow is divided by the frame's exposure (when it is
+above 1), so it looks as bright on the screen however far `exposure auto` opens the night camera up - `strength` and `brightness` are how it looks, not how much light it
+is. `bioluminescence` needs a `water` line.
+
 **Forests: `forest`.** (film_forest.h)
 
 ```

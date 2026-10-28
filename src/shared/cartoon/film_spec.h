@@ -33,6 +33,7 @@
 #include "film_clouds.h"
 #include "film_fire.h"
 #include "film_giants.h"
+#include "film_glow.h"
 #include "film_flowers.h"
 #include "film_geology.h"
 #include "film_soundscape.h"
@@ -379,6 +380,10 @@ struct Spec {
 	// the sea's giants (`whale`, `dolphins`)
 	std::vector<giants::Whale> whales;
 	std::vector<giants::Dolphins> pods;
+	// living light (`bioluminescence`, `fireflies`, `fungi`)
+	glow::Bioluminescence bio;
+	std::vector<glow::Fireflies> fireflies;
+	std::vector<glow::Fungi> fungi;
 	dressing::Sky sky;
 	std::vector<dressing::Ambience> ambience;
 	bool muteBirds = false;   // (`mute birds`: no birdsong, no eagles' cries, no geese - whatever flies in the picture)

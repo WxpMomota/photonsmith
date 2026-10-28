@@ -276,7 +276,7 @@ inline std::function<Frame(double)> dolphinFrames(const Dolphins &d, int i, doub
 // ---- spray, foam, bubbles ----
 // A burst of spray `age` seconds after it went up from `at`: `count` drops thrown up and out at about `speed`, `size` across (white: spray is white); a blow's (`blow`) go
 // up in a bushy column and hang, drifting.
-inline std::string sprayText(Vec3 at, double age, int count, double speed, double size, int seed, bool blow = false) {
+inline std::string sprayText(Vec3 at, double age, int count, double speed, double size, int seed, bool blow = false, const Vec3 *glow = nullptr) {
 	if (age < 0.0 || age > 6.0) return std::string();
 	std::string out;
 	char buf[160];
@@ -293,7 +293,9 @@ inline std::string sprayText(Vec3 at, double age, int count, double speed, doubl
 		std::snprintf(buf, sizeof buf, "  AttributeBegin\n    Translate %.3f %.3f %.3f\n    Shape \"sphere\" \"float radius\" [ %.4f ]\n  AttributeEnd\n", p.x, p.y, p.z, r);
 		out += buf;
 	}
-	return out.empty() ? out : "# spray (film_giants.h)\nAttributeBegin\n  Material \"diffuse\" \"rgb reflectance\" [ 0.82 0.85 0.87 ]\n" + out + "AttributeEnd\n";
+	if (out.empty()) return out;
+	const std::string light = glow ? "  AreaLightSource \"diffuse\" \"rgb L\" [ " + fmt3(*glow) + " ]\n" : std::string();
+	return "# spray (film_giants.h)\nAttributeBegin\n" + light + "  Material \"diffuse\" \"rgb reflectance\" [ 0.82 0.85 0.87 ]\n" + out + "AttributeEnd\n";
 }
 // A patch of foam `age` seconds after a crash at `at`, spreading to `radius` and breaking up over half a minute: flecks lying on the sea's surface.
 inline std::string foamText(const water::Sea &sea, Vec3 at, double age, double radius, double nt, int seed) {
@@ -311,7 +313,8 @@ inline std::string foamText(const water::Sea &sea, Vec3 at, double age, double r
 		const Vec3 e2 = cross(nn, e1), c = p + nn * 0.03;
 		mesh.quad(c - e1 * s - e2 * s, c + e1 * s - e2 * s, c + e1 * s + e2 * s, c - e1 * s + e2 * s);
 	}
-	return mesh.text("Material \"diffuse\" \"rgb reflectance\" [ 0.85 0.87 0.88 ]");
+	const std::string light = sea.glowing() ? "AreaLightSource \"diffuse\" \"rgb L\" [ " + fmt3(sea.glow) + " ]\n  " : std::string();
+	return mesh.text(light + "Material \"diffuse\" \"rgb reflectance\" [ 0.85 0.87 0.88 ]");
 }
 // Bubbles rising `age` seconds after something went into the sea at `at` (under water: `level` the surface): `count` of them, up to `size` across.
 inline std::string bubbleText(Vec3 at, double age, double level, int count, double depth, double size, int seed) {
@@ -363,8 +366,8 @@ inline std::string giantsText(const std::vector<Whale> &whales, const std::vecto
 		for (std::size_t k = 0; k < b.size(); ++k) {   // a breach: spray as it bursts out, a crash of spray as it lands, its foam, bubbles under water
 			const double crash = b[k] + breachCrash(w.length);
 			const Vec3 in = breachIn(w, b[k], ns, level);
-			out += sprayText(breachOut(w, b[k], ns, level), nt - b[k], 900, 8.0 * std::sqrt(sc), 0.06 * sc, seed + static_cast<int>(k));
-			out += sprayText(in, nt - crash, 2600, 13.0 * std::sqrt(sc), 0.07 * sc, seed + 50 + static_cast<int>(k));
+			out += sprayText(breachOut(w, b[k], ns, level), nt - b[k], 900, 8.0 * std::sqrt(sc), 0.06 * sc, seed + static_cast<int>(k), false, sea.glowing());
+			out += sprayText(in, nt - crash, 2600, 13.0 * std::sqrt(sc), 0.07 * sc, seed + 50 + static_cast<int>(k), false, sea.glowing());
 			out += foamText(sea, in, nt - crash, 0.9 * w.length, nt, seed + static_cast<int>(k));
 			if (underwater) out += bubbleText(in, nt - crash, level, 400, 0.4 * w.length, 0.12 * sc, seed + static_cast<int>(k));
 		}
@@ -384,7 +387,7 @@ inline std::string giantsText(const std::vector<Whale> &whales, const std::vecto
 				for (double x : *list) {
 					if (since - x > 1.6) continue;
 					const Vec3 at = dolphinFrames(d, i, x, level, kDolphinLength)(0.0).at;
-					out += sprayText({at.x, level, at.z}, since - x, 45, 3.5, 0.03, seed + static_cast<int>(x * 10.0));
+					out += sprayText({at.x, level, at.z}, since - x, 45, 3.5, 0.03, seed + static_cast<int>(x * 10.0), false, sea.glowing());
 					if (underwater && list == &ins) out += bubbleText({at.x, level, at.z}, since - x, level, 60, 1.2, 0.04, seed + static_cast<int>(x * 10.0));
 				}
 		}
